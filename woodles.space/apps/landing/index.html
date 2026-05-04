@@ -38,7 +38,123 @@
       overflow: hidden;
       position: relative;
     }
-    /* iridescent background blobs */
+
+    /* ── topbar ─────────────────────────────────────── */
+    .topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 10;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1.6rem;
+      background: rgba(250, 246, 240, 0.52);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      overflow: hidden;
+    }
+
+    /* iridescent shimmer layer */
+    .topbar::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        105deg,
+        rgba(201,191,238,0.28) 0%,
+        rgba(142,221,212,0.20) 22%,
+        rgba(250,246,240,0.05) 40%,
+        rgba(245,200,168,0.18) 60%,
+        rgba(219,184,232,0.24) 80%,
+        rgba(201,191,238,0.28) 100%
+      );
+      background-size: 260% 100%;
+      animation: bar-shimmer 11s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    /* gradient rule at the bottom edge */
+    .topbar::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        var(--lavender) 20%,
+        var(--aqua) 45%,
+        var(--peach) 65%,
+        var(--lilac) 80%,
+        transparent 100%
+      );
+      background-size: 220% 100%;
+      animation: bar-shimmer 11s ease-in-out infinite;
+      opacity: 0.55;
+    }
+
+    @keyframes bar-shimmer {
+      0%   { background-position: 0%   0; }
+      50%  { background-position: 100% 0; }
+      100% { background-position: 0%   0; }
+    }
+
+    .topbar-brand {
+      font-family: 'DM Mono', monospace;
+      font-weight: 300;
+      font-size: 0.68rem;
+      letter-spacing: 0.18em;
+      position: relative;
+      z-index: 1;
+      animation: brand-hue 16s ease-in-out infinite;
+    }
+
+    @keyframes brand-hue {
+      0%, 100% { color: var(--muted); }
+      30%       { color: var(--lapis); }
+      65%       { color: var(--plum); }
+    }
+
+    .topbar-clock {
+      font-family: 'DM Mono', monospace;
+      font-weight: 300;
+      font-size: 0.60rem;
+      letter-spacing: 0.10em;
+      display: flex;
+      align-items: center;
+      gap: 0.9rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .clock-date {
+      color: var(--muted);
+      opacity: 0.75;
+    }
+
+    .clock-sep {
+      color: var(--lavender);
+      opacity: 0.9;
+      font-size: 0.55rem;
+    }
+
+    .clock-time {
+      color: var(--text);
+      opacity: 0.85;
+    }
+
+    .clock-time.tick {
+      animation: tick-fade 0.45s ease;
+    }
+
+    @keyframes tick-fade {
+      0%   { opacity: 0.85; }
+      20%  { opacity: 0.30; }
+      100% { opacity: 0.85; }
+    }
+
+    /* ── background blobs ───────────────────────────── */
     .blob {
       position: fixed;
       border-radius: 50%;
@@ -56,6 +172,7 @@
       50%  { transform: translate(30px, -20px) scale(1.05); }
       100% { transform: translate(-20px, 30px) scale(0.97); }
     }
+
     /* grain overlay */
     body::before {
       content: '';
@@ -66,6 +183,7 @@
       pointer-events: none;
       z-index: 1;
     }
+
     main {
       position: relative;
       z-index: 2;
@@ -94,10 +212,7 @@
       opacity: 0;
       animation: rise 1.2s ease forwards 0.55s;
     }
-    .wordmark em {
-      font-style: italic;
-      color: var(--plum);
-    }
+    .wordmark em { font-style: italic; color: var(--plum); }
     .tld {
       font-family: 'DM Mono', monospace;
       font-weight: 300;
@@ -125,10 +240,7 @@
       opacity: 0;
       animation: rise 1.2s ease forwards 1.05s;
     }
-    .tagline em {
-      font-style: italic;
-      color: var(--plum);
-    }
+    .tagline em { font-style: italic; color: var(--plum); }
     .pills {
       display: flex;
       flex-wrap: wrap;
@@ -169,10 +281,21 @@
   </style>
 </head>
 <body>
+
+  <header class="topbar">
+    <span class="topbar-brand">.space</span>
+    <div class="topbar-clock">
+      <span class="clock-date" id="clock-date"></span>
+      <span class="clock-sep">·</span>
+      <span class="clock-time" id="clock-time"></span>
+    </div>
+  </header>
+
   <div class="blob blob-1"></div>
   <div class="blob blob-2"></div>
   <div class="blob blob-3"></div>
   <div class="blob blob-4"></div>
+
   <main>
     <p class="eyebrow">something is taking shape</p>
     <h1 class="wordmark"><em>woodles</em></h1>
@@ -188,5 +311,34 @@
     </div>
     <p class="footnote">returning shortly &nbsp;·&nbsp; z winters</p>
   </main>
+
+  <script>
+    const DAYS   = ['sun','mon','tue','wed','thu','fri','sat'];
+    const MONTHS = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+
+    const dateEl = document.getElementById('clock-date');
+    const timeEl = document.getElementById('clock-time');
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function tick() {
+      const now = new Date();
+      const d = DAYS[now.getDay()] + ' ' + pad(now.getDate()) + ' ' + MONTHS[now.getMonth()] + ' ' + now.getFullYear();
+      const t = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+
+      dateEl.textContent = d;
+
+      if (timeEl.textContent !== t) {
+        timeEl.classList.remove('tick');
+        void timeEl.offsetWidth;
+        timeEl.classList.add('tick');
+        timeEl.textContent = t;
+      }
+    }
+
+    tick();
+    setInterval(tick, 1000);
+  </script>
+
 </body>
 </html>
