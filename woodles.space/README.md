@@ -7,24 +7,42 @@ Personal monorepo. One repo, all the things.
 ```
 woodles.space/
 ├── apps/
-│   └── landing/        # woodles.space homepage (static HTML, no build step)
+│   ├── landing/        # woodles.space homepage (static HTML, no build step)
+│   ├── fonts/          # font viewer (static HTML, no build step)
+│   └── woodles/        # SvelteKit app
+├── packages/           # shared code (components, utils) — add when needed
+├── package.json        # workspace root
+├── pnpm-workspace.yaml
 └── README.md
+```
+
+## Package manager
+
+This repo uses [pnpm workspaces](https://pnpm.io/workspaces). Install everything from the `woodles.space/` root:
+
+```sh
+pnpm install
 ```
 
 ## Adding an app
 
-Each new project gets its own folder under `apps/`. Start simple — add a build tool only when you actually need one.
+Static apps (no build step) just drop a folder under `apps/`. For a new SvelteKit app:
 
+```sh
+cd woodles.space
+pnpm dlx sv create apps/<name>
+pnpm install
 ```
-apps/
-├── landing/            # live at woodles.space
-├── woodles/            # live at woodles.space/woodles or woodles.app
-└── echoes/             # etc.
+
+## Running an app locally
+
+```sh
+cd apps/<name>
+pnpm dev
 ```
 
 ## Deployment
 
-`apps/landing` is connected to Vercel. Root directory is set to `apps/landing`.
-Pushing to `main` triggers a production deploy automatically.
+Each app gets its own Vercel project. Set the root directory to `apps/<name>` and the framework to SvelteKit.
 
-Each app gets its own Vercel project when it's ready to ship.
+`apps/landing` deploys to `woodles.space`. Pushing to `main` triggers production automatically.
