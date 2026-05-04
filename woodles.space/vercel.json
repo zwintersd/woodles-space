@@ -1,8 +1,10 @@
 {
   "rewrites": [
-    { "source": "/fonts", "destination": "/apps/fonts/index.html" },
+    { "source": "/fonts",  "destination": "/apps/fonts/index.html" },
     { "source": "/fonts/(.*)", "destination": "/apps/fonts/$1" },
-    { "source": "/", "destination": "/apps/landing/index.html" }
+    { "source": "/write",  "destination": "/apps/write/index.html" },
+    { "source": "/letter", "destination": "/apps/letter/index.html" },
+    { "source": "/",       "destination": "/apps/landing/index.html" }
   ],
   "cleanUrls": true
 }
