@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>woodles.space</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --lavender: #c9bfee;
+      --aqua: #8eddd4;
+      --peach: #f5c8a8;
+      --lilac: #dbb8e8;
+      --cream: #faf6f0;
+      --dusk: #e8e0f5;
+      --lapis: #3a2d72;
+      --plum: #5c3464;
+      --text: #2e2040;
+      --muted: #7a6b90;
+    }
+    html, body {
+      height: 100%;
+      width: 100%;
+    }
+    body {
+      background: var(--cream);
+      color: var(--text);
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-weight: 300;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+    /* iridescent background blobs */
+    .blob {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.38;
+      animation: drift 18s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+    .blob-1 { width: 520px; height: 520px; background: var(--lavender); top: -120px; left: -100px; animation-delay: 0s; }
+    .blob-2 { width: 400px; height: 400px; background: var(--aqua); bottom: -80px; right: -60px; animation-delay: -6s; }
+    .blob-3 { width: 300px; height: 300px; background: var(--peach); top: 40%; left: 55%; animation-delay: -11s; }
+    .blob-4 { width: 260px; height: 260px; background: var(--lilac); bottom: 20%; left: 5%; animation-delay: -4s; }
+    @keyframes drift {
+      0%   { transform: translate(0, 0) scale(1); }
+      50%  { transform: translate(30px, -20px) scale(1.05); }
+      100% { transform: translate(-20px, 30px) scale(0.97); }
+    }
+    /* grain overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      opacity: 0.045;
+      pointer-events: none;
+      z-index: 1;
+    }
+    main {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      padding: 2rem;
+      max-width: 520px;
+    }
+    .eyebrow {
+      font-family: 'DM Mono', monospace;
+      font-weight: 300;
+      font-size: 0.7rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 2rem;
+      opacity: 0;
+      animation: rise 1.2s ease forwards 0.3s;
+    }
+    .wordmark {
+      font-size: clamp(3.2rem, 10vw, 5.5rem);
+      font-weight: 300;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      color: var(--lapis);
+      margin-bottom: 0.25rem;
+      opacity: 0;
+      animation: rise 1.2s ease forwards 0.55s;
+    }
+    .wordmark em {
+      font-style: italic;
+      color: var(--plum);
+    }
+    .tld {
+      font-family: 'DM Mono', monospace;
+      font-weight: 300;
+      font-size: clamp(0.75rem, 2.5vw, 1rem);
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      margin-bottom: 2.8rem;
+      opacity: 0;
+      animation: rise 1.2s ease forwards 0.7s;
+    }
+    .divider {
+      width: 40px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--lavender), var(--aqua), transparent);
+      margin: 0 auto 2.8rem;
+      opacity: 0;
+      animation: rise 1.2s ease forwards 0.9s;
+    }
+    .tagline {
+      font-size: clamp(1.05rem, 3vw, 1.35rem);
+      font-weight: 300;
+      line-height: 1.65;
+      color: var(--text);
+      margin-bottom: 3.2rem;
+      opacity: 0;
+      animation: rise 1.2s ease forwards 1.05s;
+    }
+    .tagline em {
+      font-style: italic;
+      color: var(--plum);
+    }
+    .pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 3.2rem;
+      opacity: 0;
+      animation: rise 1.2s ease forwards 1.25s;
+    }
+    .pill {
+      font-family: 'DM Mono', monospace;
+      font-weight: 300;
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 5px 14px;
+      border-radius: 100px;
+      border: 1px solid;
+    }
+    .pill-a { border-color: #c9bfee; color: var(--lapis); background: rgba(201,191,238,0.18); }
+    .pill-b { border-color: #8eddd4; color: #1a6b64; background: rgba(142,221,212,0.15); }
+    .pill-c { border-color: #dbb8e8; color: var(--plum); background: rgba(219,184,232,0.18); }
+    .pill-d { border-color: #f5c8a8; color: #8a4a1e; background: rgba(245,200,168,0.2); }
+    .pill-e { border-color: #c9bfee; color: var(--lapis); background: rgba(201,191,238,0.12); }
+    .footnote {
+      font-family: 'DM Mono', monospace;
+      font-weight: 300;
+      font-size: 0.62rem;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      opacity: 0;
+      animation: rise 1.2s ease forwards 1.5s;
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+  <div class="blob blob-4"></div>
+  <main>
+    <p class="eyebrow">something is taking shape</p>
+    <h1 class="wordmark"><em>woodles</em></h1>
+    <p class="tld">.space</p>
+    <div class="divider"></div>
+    <p class="tagline">a personal monorepo —<br /><em>knowledge, tools, and small living systems</em></p>
+    <div class="pills">
+      <span class="pill pill-a">woodles</span>
+      <span class="pill pill-b">echoes</span>
+      <span class="pill pill-c">article eater</span>
+      <span class="pill pill-d">observer os</span>
+      <span class="pill pill-e">more soon</span>
+    </div>
+    <p class="footnote">returning shortly &nbsp;·&nbsp; z winters</p>
+  </main>
+</body>
+</html>
