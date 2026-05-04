@@ -1,0 +1,22 @@
+/* woodles.space · shared font definitions · v2
+   import this file to access the full type system via CSS custom properties */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=DM+Mono:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;1,9..144,300;1,9..144,400&family=Lora:ital,wght@0,400;0,500;1,400;1,500&family=Plus+Jakarta+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600&family=IM+Fell+DW+Pica:ital@0;1&family=Datatype&family=Amarna&family=Coral+Pixels&family=Special+Gothic+Condensed+One&family=Kalnia+Glaze:wght@100;200;300;400;500;600;700&display=swap');
+
+:root {
+  /* — foundational — */
+  --font-display:   'Cormorant Garamond', Georgia, serif;
+  --font-optical:   'Fraunces', Georgia, serif;
+  --font-body:      'Lora', Georgia, serif;
+  --font-sans:      'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-geometric: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono:      'DM Mono', 'Courier New', monospace;
+
+  /* — expressive — */
+  --font-fell:      'IM Fell DW Pica', Georgia, serif;
+  --font-data:      'Datatype', monospace;
+  --font-ancient:   'Amarna', serif;
+  --font-pixel:     'Coral Pixels', monospace;
+  --font-gothic:    'Special Gothic Condensed One', sans-serif;
+  --font-glaze:     'Kalnia Glaze', serif;
+}
