@@ -1,0 +1,13 @@
+/* woodles.space · shared font definitions · v1
+   import this file to access the full type system via CSS custom properties */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=DM+Mono:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;1,9..144,300;1,9..144,400&family=Lora:ital,wght@0,400;0,500;1,400;1,500&family=Plus+Jakarta+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600&display=swap');
+
+:root {
+  --font-display:   'Cormorant Garamond', Georgia, serif;
+  --font-optical:   'Fraunces', Georgia, serif;
+  --font-body:      'Lora', Georgia, serif;
+  --font-sans:      'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-geometric: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono:      'DM Mono', 'Courier New', monospace;
+}
