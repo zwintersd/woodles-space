@@ -137,6 +137,77 @@
       color: var(--text);
       margin-top: 2.8rem;
     }
+
+    /* ── layers ── */
+    .layer { transition: opacity 0.4s ease; }
+    .layer[hidden] { display: none; }
+    .layer-eyebrow {
+      font-family: var(--letter-mono, var(--font-mono));
+      font-size: 0.55rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      opacity: 0.55;
+      margin-top: 3.4rem;
+      margin-bottom: 0.9rem;
+      padding-top: 1.4rem;
+      border-top: 1px solid var(--rule);
+    }
+    .layer-midground {
+      font-size: 0.97rem;
+      line-height: 1.78;
+      color: var(--muted);
+      max-width: 88%;
+      margin-left: 6%;
+    }
+    .layer-background {
+      font-size: 0.88rem;
+      line-height: 1.7;
+      color: var(--muted);
+      opacity: 0.78;
+      font-style: italic;
+      max-width: 78%;
+      margin-left: 12%;
+    }
+    .layer-midground :global(h1), .layer-midground h1,
+    .layer-midground :global(h2), .layer-midground h2,
+    .layer-background h1, .layer-background h2 {
+      font-size: 1.05rem;
+      font-style: italic;
+      color: var(--accent-deep);
+      margin: 1.2em 0 0.3em;
+    }
+
+    /* ── topbar layer toggles ── */
+    .layer-toggles {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      margin-left: 1.4rem;
+      position: relative;
+      z-index: 1;
+    }
+    .layer-tog {
+      font-family: var(--letter-mono, var(--font-mono));
+      font-size: 0.57rem;
+      letter-spacing: 0.14em;
+      text-transform: lowercase;
+      color: var(--muted);
+      background: none;
+      border: 1px solid transparent;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      opacity: 0.4;
+      transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
+    }
+    .layer-tog:hover { opacity: 0.85; color: var(--accent-strong); }
+    .layer-tog.on {
+      color: var(--accent-strong);
+      opacity: 1;
+      background: color-mix(in srgb, var(--accent) 22%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    }
     .letter-body h1 {
       font-family: var(--letter-display, var(--font-display));
       font-size: 2rem;
@@ -246,6 +317,7 @@
   <header class="topbar">
     <a href="/" class="topbar-brand">.space</a>
     <span class="topbar-label">echoes</span>
+    <div class="layer-toggles" id="layer-toggles" role="group" aria-label="layers"></div>
     <div class="topbar-clock">
       <span class="clock-date" id="clock-date"></span>
       <span class="clock-sep">·</span>
@@ -301,11 +373,88 @@
       return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
+    /* ── layer visibility ── */
+    const VIS_KEY = 'woodles_layer_visibility';
+    const LAYER_IDS = ['foreground', 'midground', 'background'];
+    const LAYER_LABELS = { foreground: 'fg', midground: 'mg', background: 'bg' };
+    const DEFAULT_VIS = { foreground: true, midground: false, background: false };
+
+    function loadVisibility() {
+      try {
+        const raw = localStorage.getItem(VIS_KEY);
+        if (!raw) return { ...DEFAULT_VIS };
+        const v = JSON.parse(raw);
+        return {
+          foreground: v.foreground !== false, // default on
+          midground: !!v.midground,
+          background: !!v.background
+        };
+      } catch (e) {
+        return { ...DEFAULT_VIS };
+      }
+    }
+    function saveVisibility(v) {
+      try { localStorage.setItem(VIS_KEY, JSON.stringify(v)); } catch (e) {}
+    }
+
+    function getLayers(letter) {
+      // Migration: synthesize layers from legacy `content` if missing.
+      const L = letter.layers || {};
+      return {
+        foreground: { html: (L.foreground && L.foreground.html) || letter.content || '' },
+        midground:  { html: (L.midground  && L.midground.html)  || '' },
+        background: { html: (L.background && L.background.html) || '' }
+      };
+    }
+
+    function isEmptyHtml(html) {
+      return String(html || '').replace(/<br\s*\/?>(\s*)/gi, '').replace(/<[^>]+>/g, '').trim().length === 0;
+    }
+
+    function renderLayers(letter, visibility) {
+      const layers = getLayers(letter);
+      let html = '';
+      LAYER_IDS.forEach((id) => {
+        const layerHtml = layers[id].html;
+        if (isEmptyHtml(layerHtml)) return;
+        const visible = !!visibility[id];
+        const eyebrow = id === 'foreground'
+          ? ''
+          : '<p class="layer-eyebrow">' + id + '</p>';
+        html +=
+          '<section class="layer letter-body layer-' + id + '"' + (visible ? '' : ' hidden') + ' data-layer="' + id + '">' +
+            eyebrow +
+            layerHtml +
+          '</section>';
+      });
+      return html;
+    }
+
+    function renderToggles(letter, visibility, onToggle) {
+      const layers = getLayers(letter);
+      const togglesEl = document.getElementById('layer-toggles');
+      togglesEl.innerHTML = '';
+      LAYER_IDS.forEach((id) => {
+        const empty = isEmptyHtml(layers[id].html);
+        const btn = document.createElement('button');
+        btn.className = 'layer-tog' + (visibility[id] ? ' on' : '');
+        btn.type = 'button';
+        btn.textContent = LAYER_LABELS[id];
+        btn.title = empty ? id + ' (empty)' : id;
+        btn.setAttribute('aria-pressed', visibility[id] ? 'true' : 'false');
+        if (empty) { btn.style.opacity = '0.2'; btn.style.cursor = 'default'; }
+        else btn.addEventListener('click', () => onToggle(id));
+        togglesEl.appendChild(btn);
+      });
+    }
+
     try {
       const raw = localStorage.getItem('woodles_published');
       if (!raw) throw new Error('empty');
       const letter = JSON.parse(raw);
       applyTokens(letter);
+
+      const visibility = loadVisibility();
 
       wrap.innerHTML =
         '<div class="letter-header">' +
@@ -313,11 +462,23 @@
           '<h1 class="letter-title">' + escapeHtml(letter.title) + '</h1>' +
           '<div class="letter-divider"></div>' +
         '</div>' +
-        '<div class="letter-body">' + letter.content + '</div>' +
+        '<div id="layer-stack">' + renderLayers(letter, visibility) + '</div>' +
         '<footer class="letter-footer">' +
           '<span class="letter-sig">woodles.space &nbsp;·&nbsp; echoes</span>' +
           '<a href="/write" class="edit-link">edit →</a>' +
         '</footer>';
+
+      function onToggle(id) {
+        visibility[id] = !visibility[id];
+        saveVisibility(visibility);
+        const section = wrap.querySelector('section[data-layer="' + id + '"]');
+        if (section) {
+          if (visibility[id]) section.removeAttribute('hidden');
+          else section.setAttribute('hidden', '');
+        }
+        renderToggles(letter, visibility, onToggle);
+      }
+      renderToggles(letter, visibility, onToggle);
 
     } catch(e) {
       applyTokens(null);

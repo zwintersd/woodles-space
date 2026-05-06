@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import Clock from '$lib/Clock.svelte';
 	import {
 		palettes,
@@ -13,21 +13,65 @@
 	const PUBLISHED_KEY = 'woodles_published';
 	const ISSUE_KEY = 'woodles_issue_count';
 
+	type LayerId = 'foreground' | 'midground' | 'background';
+	const LAYER_IDS: LayerId[] = ['foreground', 'midground', 'background'];
+	const LAYER_LABELS: Record<LayerId, string> = {
+		foreground: 'fg',
+		midground: 'mg',
+		background: 'bg'
+	};
+	const LAYER_PLACEHOLDERS: Record<LayerId, string> = {
+		foreground: 'Begin writing your letter…',
+		midground: 'thinking, working notes, what shaped this…',
+		background: 'the impulse. the thing only you know.'
+	};
+
 	let title = $state('');
 	let theme = $state('cream');
 	let motif = $state('blobs');
 	let font = $state('classic');
-	let bodyEl: HTMLDivElement | undefined = $state();
+
+	let fgEl: HTMLDivElement | undefined = $state();
+	let mgEl: HTMLDivElement | undefined = $state();
+	let bgEl: HTMLDivElement | undefined = $state();
 	let titleEl: HTMLInputElement | undefined = $state();
+
+	let activeLayer = $state<LayerId>('foreground');
 	let saveStatus = $state<'saved' | 'saving'>('saved');
 	let wordCount = $state(0);
 	let bold = $state(false);
 	let italic = $state(false);
 	let underline = $state(false);
 	let publishing = $state(false);
+	let fgIsEmpty = $state(true);
 
 	let saveTimer: ReturnType<typeof setTimeout> | undefined;
 	let hydrated = $state(false);
+
+	function elFor(layer: LayerId): HTMLDivElement | undefined {
+		return layer === 'foreground' ? fgEl : layer === 'midground' ? mgEl : bgEl;
+	}
+
+	function loadIntoLayers(d: {
+		title?: string;
+		theme?: string;
+		motif?: string;
+		font?: string;
+		layers?: Partial<Record<LayerId, { html?: string }>>;
+		content?: string;
+	}) {
+		title = d.title || '';
+		if (d.theme) theme = d.theme;
+		if (d.motif) motif = d.motif;
+		if (d.font) font = d.font;
+		const layers = d.layers ?? {};
+		const fgHtml = layers.foreground?.html ?? d.content ?? '';
+		const mgHtml = layers.midground?.html ?? '';
+		const bgHtml = layers.background?.html ?? '';
+		if (fgEl) fgEl.innerHTML = fgHtml;
+		if (mgEl) mgEl.innerHTML = mgHtml;
+		if (bgEl) bgEl.innerHTML = bgHtml;
+	}
 
 	onMount(() => {
 		// Templates take precedence over the saved draft so /write?template=
@@ -36,13 +80,15 @@
 		const tid = params.get('template');
 		if (tid) {
 			const t = findTemplate(tid);
-			if (t && bodyEl) {
-				title = t.sampleTitle;
-				theme = t.palette;
-				motif = t.motif;
-				font = t.font;
-				bodyEl.innerHTML = t.sampleContent;
-				updateWordCount();
+			if (t) {
+				loadIntoLayers({
+					title: t.sampleTitle,
+					theme: t.palette,
+					motif: t.motif,
+					font: t.font,
+					content: t.sampleContent
+				});
+				updateMeta();
 				history.replaceState(null, '', window.location.pathname);
 				hydrated = true;
 				scheduleSave();
@@ -52,18 +98,11 @@
 
 		try {
 			const raw = localStorage.getItem(DRAFT_KEY);
-			if (raw && bodyEl) {
-				const d = JSON.parse(raw);
-				title = d.title || '';
-				bodyEl.innerHTML = d.content || '';
-				if (d.theme) theme = d.theme;
-				if (d.motif) motif = d.motif;
-				if (d.font) font = d.font;
-				updateWordCount();
-			}
+			if (raw) loadIntoLayers(JSON.parse(raw));
 		} catch (e) {
 			// ignore corrupt draft
 		}
+		updateMeta();
 		hydrated = true;
 	});
 
@@ -82,10 +121,16 @@
 		document.body.style.setProperty('--editor-mono', f.mono);
 	});
 
-	function updateWordCount() {
-		const text = bodyEl?.innerText || '';
-		const n = text.trim().split(/\s+/).filter((w) => w.length).length;
-		wordCount = n;
+	function isEmptyHtml(html: string): boolean {
+		const stripped = html.replace(/<br\s*\/?>(\s*)/gi, '').replace(/<[^>]+>/g, '').trim();
+		return stripped.length === 0;
+	}
+
+	function updateMeta() {
+		const el = elFor(activeLayer);
+		const text = el?.innerText || '';
+		wordCount = text.trim().split(/\s+/).filter((w) => w.length).length;
+		fgIsEmpty = isEmptyHtml(fgEl?.innerHTML ?? '');
 	}
 
 	function scheduleSave() {
@@ -94,15 +139,22 @@
 		clearTimeout(saveTimer);
 		saveTimer = setTimeout(() => {
 			try {
+				const now = new Date().toISOString();
 				localStorage.setItem(
 					DRAFT_KEY,
 					JSON.stringify({
 						title,
-						content: bodyEl?.innerHTML ?? '',
 						theme,
 						motif,
 						font,
-						savedAt: new Date().toISOString()
+						layers: {
+							foreground: { html: fgEl?.innerHTML ?? '', updatedAt: now },
+							midground: { html: mgEl?.innerHTML ?? '', updatedAt: now },
+							background: { html: bgEl?.innerHTML ?? '', updatedAt: now }
+						},
+						// back-compat alias so older readers still load something
+						content: fgEl?.innerHTML ?? '',
+						savedAt: now
 					})
 				);
 			} catch (e) {
@@ -120,9 +172,20 @@
 		if (hydrated) scheduleSave();
 	});
 
+	async function setActiveLayer(next: LayerId) {
+		if (next === activeLayer) return;
+		activeLayer = next;
+		await tick();
+		const el = elFor(next);
+		el?.focus();
+		updateMeta();
+		if (next === 'foreground') updateToolbarState();
+	}
+
 	function exec(cmd: string, val: string | null = null) {
+		if (activeLayer !== 'foreground') return;
 		document.execCommand(cmd, false, val ?? undefined);
-		bodyEl?.focus();
+		fgEl?.focus();
 		updateToolbarState();
 	}
 
@@ -132,25 +195,55 @@
 	}
 
 	function updateToolbarState() {
+		if (activeLayer !== 'foreground') {
+			bold = italic = underline = false;
+			return;
+		}
 		bold = document.queryCommandState('bold');
 		italic = document.queryCommandState('italic');
 		underline = document.queryCommandState('underline');
+	}
+
+	// Anchor-stamping: walk block-level elements in foreground HTML at publish
+	// time and assign sequential data-anchor IDs so future margin notes have
+	// stable attachment points.
+	function stampAnchors(html: string): string {
+		if (typeof DOMParser === 'undefined') return html;
+		const doc = new DOMParser().parseFromString('<div id="__root">' + html + '</div>', 'text/html');
+		const root = doc.getElementById('__root');
+		if (!root) return html;
+		const blocks = root.querySelectorAll('h1,h2,h3,h4,h5,h6,p,blockquote,li,ul,ol,pre');
+		let i = 1;
+		blocks.forEach((b) => {
+			b.setAttribute('data-anchor', 'a-' + String(i++).padStart(3, '0'));
+		});
+		return root.innerHTML;
 	}
 
 	function publish() {
 		const issue = parseInt(localStorage.getItem(ISSUE_KEY) || '0') + 1;
 		localStorage.setItem(ISSUE_KEY, String(issue));
 		try {
+			const now = new Date().toISOString();
+			const fgHtml = stampAnchors(fgEl?.innerHTML ?? '');
+			const mgHtml = mgEl?.innerHTML ?? '';
+			const bgHtml = bgEl?.innerHTML ?? '';
 			localStorage.setItem(
 				PUBLISHED_KEY,
 				JSON.stringify({
 					title: title.trim() || 'untitled letter',
-					content: bodyEl?.innerHTML ?? '',
 					theme,
 					motif,
 					font,
 					issue,
-					publishedAt: new Date().toISOString()
+					publishedAt: now,
+					layers: {
+						foreground: { html: fgHtml, updatedAt: now },
+						midground: { html: mgHtml, updatedAt: now },
+						background: { html: bgHtml, updatedAt: now }
+					},
+					// back-compat alias for older viewer code paths
+					content: fgHtml
 				})
 			);
 		} catch (e) {
@@ -172,6 +265,18 @@
 <header class="topbar">
 	<a href="/" class="topbar-brand">.space</a>
 	<span class="topbar-label">echoes · write</span>
+	<div class="layer-switch" role="tablist" aria-label="layer">
+		{#each LAYER_IDS as id}
+			<button
+				class="layer-btn"
+				class:active={activeLayer === id}
+				role="tab"
+				aria-selected={activeLayer === id}
+				onclick={() => setActiveLayer(id)}
+				title={id}>{LAYER_LABELS[id]}</button
+			>
+		{/each}
+	</div>
 	<div class="topbar-clock"><Clock /></div>
 </header>
 
@@ -180,8 +285,8 @@
 	<p class="overlay-sub">woodles.space / echoes</p>
 </div>
 
-<div class="editor-wrap">
-	<p class="doc-eyebrow">echoes</p>
+<div class="editor-wrap" data-layer={activeLayer}>
+	<p class="doc-eyebrow">echoes · {activeLayer}</p>
 	<input
 		bind:this={titleEl}
 		bind:value={title}
@@ -193,117 +298,150 @@
 		autocomplete="off"
 	/>
 
-	<div class="toolbar">
-		<button
-			class="tool-btn"
-			class:active={bold}
-			onmousedown={(e) => {
-				e.preventDefault();
-				exec('bold');
-			}}
-			title="Bold"><b>B</b></button
-		>
-		<button
-			class="tool-btn"
-			class:active={italic}
-			onmousedown={(e) => {
-				e.preventDefault();
-				exec('italic');
-			}}
-			title="Italic"><em>I</em></button
-		>
-		<button
-			class="tool-btn"
-			class:active={underline}
-			onmousedown={(e) => {
-				e.preventDefault();
-				exec('underline');
-			}}
-			title="Underline"><u>U</u></button
-		>
-		<span class="tool-sep"></span>
-		<button
-			class="tool-btn"
-			onmousedown={(e) => {
-				e.preventDefault();
-				exec('formatBlock', 'h1');
-			}}
-			title="Heading 1">H1</button
-		>
-		<button
-			class="tool-btn"
-			onmousedown={(e) => {
-				e.preventDefault();
-				exec('formatBlock', 'h2');
-			}}
-			title="Heading 2">H2</button
-		>
-		<button
-			class="tool-btn"
-			onmousedown={(e) => {
-				e.preventDefault();
-				exec('formatBlock', 'p');
-			}}
-			title="Paragraph">¶</button
-		>
-		<span class="tool-sep"></span>
-		<button
-			class="tool-btn"
-			onmousedown={(e) => {
-				e.preventDefault();
-				exec('formatBlock', 'blockquote');
-			}}
-			title="Blockquote">❝</button
-		>
-		<span class="tool-sep"></span>
-		<button
-			class="tool-btn"
-			onmousedown={(e) => {
-				e.preventDefault();
-				exec('insertUnorderedList');
-			}}
-			title="Bullet list">· —</button
-		>
-		<button
-			class="tool-btn"
-			onmousedown={(e) => {
-				e.preventDefault();
-				exec('insertOrderedList');
-			}}
-			title="Numbered list">1.</button
-		>
-		<span class="tool-sep"></span>
-		<button
-			class="tool-btn"
-			onmousedown={(e) => {
-				e.preventDefault();
-				insertLink();
-			}}
-			title="Insert link">link</button
-		>
-		<span class="tool-sep"></span>
-		<button
-			class="tool-btn"
-			onmousedown={(e) => {
-				e.preventDefault();
-				exec('removeFormat');
-			}}
-			title="Clear formatting">×</button
-		>
-	</div>
+	{#if activeLayer === 'foreground'}
+		<div class="toolbar">
+			<button
+				class="tool-btn"
+				class:active={bold}
+				onmousedown={(e) => {
+					e.preventDefault();
+					exec('bold');
+				}}
+				title="Bold"><b>B</b></button
+			>
+			<button
+				class="tool-btn"
+				class:active={italic}
+				onmousedown={(e) => {
+					e.preventDefault();
+					exec('italic');
+				}}
+				title="Italic"><em>I</em></button
+			>
+			<button
+				class="tool-btn"
+				class:active={underline}
+				onmousedown={(e) => {
+					e.preventDefault();
+					exec('underline');
+				}}
+				title="Underline"><u>U</u></button
+			>
+			<span class="tool-sep"></span>
+			<button
+				class="tool-btn"
+				onmousedown={(e) => {
+					e.preventDefault();
+					exec('formatBlock', 'h1');
+				}}
+				title="Heading 1">H1</button
+			>
+			<button
+				class="tool-btn"
+				onmousedown={(e) => {
+					e.preventDefault();
+					exec('formatBlock', 'h2');
+				}}
+				title="Heading 2">H2</button
+			>
+			<button
+				class="tool-btn"
+				onmousedown={(e) => {
+					e.preventDefault();
+					exec('formatBlock', 'p');
+				}}
+				title="Paragraph">¶</button
+			>
+			<span class="tool-sep"></span>
+			<button
+				class="tool-btn"
+				onmousedown={(e) => {
+					e.preventDefault();
+					exec('formatBlock', 'blockquote');
+				}}
+				title="Blockquote">❝</button
+			>
+			<span class="tool-sep"></span>
+			<button
+				class="tool-btn"
+				onmousedown={(e) => {
+					e.preventDefault();
+					exec('insertUnorderedList');
+				}}
+				title="Bullet list">· —</button
+			>
+			<button
+				class="tool-btn"
+				onmousedown={(e) => {
+					e.preventDefault();
+					exec('insertOrderedList');
+				}}
+				title="Numbered list">1.</button
+			>
+			<span class="tool-sep"></span>
+			<button
+				class="tool-btn"
+				onmousedown={(e) => {
+					e.preventDefault();
+					insertLink();
+				}}
+				title="Insert link">link</button
+			>
+			<span class="tool-sep"></span>
+			<button
+				class="tool-btn"
+				onmousedown={(e) => {
+					e.preventDefault();
+					exec('removeFormat');
+				}}
+				title="Clear formatting">×</button
+			>
+		</div>
+	{/if}
 
 	<div
-		bind:this={bodyEl}
-		class="doc-body"
+		bind:this={fgEl}
+		class="doc-body layer-foreground"
+		class:hidden={activeLayer !== 'foreground'}
 		contenteditable="true"
 		spellcheck="true"
-		data-placeholder="Begin writing your letter…"
+		data-placeholder={LAYER_PLACEHOLDERS.foreground}
 		oninput={() => {
-			updateWordCount();
+			updateMeta();
 			scheduleSave();
 		}}
 		onkeyup={updateToolbarState}
 		onmouseup={updateToolbarState}
+		role="textbox"
+		tabindex="0"
+	></div>
+
+	<div
+		bind:this={mgEl}
+		class="doc-body layer-midground"
+		class:hidden={activeLayer !== 'midground'}
+		contenteditable="true"
+		spellcheck="true"
+		data-placeholder={LAYER_PLACEHOLDERS.midground}
+		oninput={() => {
+			updateMeta();
+			scheduleSave();
+		}}
+		role="textbox"
+		tabindex="0"
+	></div>
+
+	<div
+		bind:this={bgEl}
+		class="doc-body layer-background"
+		class:hidden={activeLayer !== 'background'}
+		contenteditable="true"
+		spellcheck="true"
+		data-placeholder={LAYER_PLACEHOLDERS.background}
+		oninput={() => {
+			updateMeta();
+			scheduleSave();
+		}}
 		role="textbox"
 		tabindex="0"
 	></div>
@@ -335,7 +473,16 @@
 			</select>
 		</label>
 	</div>
-	<button class="publish-btn" onclick={publish}>Publish →</button>
+	<div class="publish-cluster">
+		{#if activeLayer === 'foreground' && fgIsEmpty}
+			<span class="publish-warn">this letter will appear blank to others</span>
+		{/if}
+		{#if activeLayer === 'foreground'}
+			<button class="publish-btn" onclick={publish}>Publish →</button>
+		{:else}
+			<span class="publish-hint">switch to fg to publish</span>
+		{/if}
+	</div>
 </div>
 
 <style>
@@ -431,6 +578,42 @@
 		position: relative;
 		z-index: 1;
 	}
+	.layer-switch {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+		margin-left: 1.4rem;
+		position: relative;
+		z-index: 1;
+	}
+	.layer-btn {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.57rem;
+		letter-spacing: 0.14em;
+		text-transform: lowercase;
+		color: var(--muted);
+		background: none;
+		border: 1px solid transparent;
+		padding: 3px 8px;
+		border-radius: 4px;
+		cursor: pointer;
+		opacity: 0.5;
+		transition:
+			color 0.18s ease,
+			background 0.18s ease,
+			border-color 0.18s ease,
+			opacity 0.18s ease;
+	}
+	.layer-btn:hover {
+		opacity: 0.9;
+		color: var(--accent-strong);
+	}
+	.layer-btn.active {
+		color: var(--accent-strong);
+		opacity: 1;
+		background: color-mix(in srgb, var(--accent) 22%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+	}
 	.topbar-clock {
 		margin-left: auto;
 		font-family: var(--editor-mono, var(--font-mono));
@@ -449,6 +632,13 @@
 		max-width: 680px;
 		margin: 0 auto;
 		padding: 84px clamp(1.5rem, 5vw, 2.5rem) 96px;
+		transition: max-width 0.3s ease;
+	}
+	.editor-wrap[data-layer='midground'] {
+		max-width: 600px;
+	}
+	.editor-wrap[data-layer='background'] {
+		max-width: 540px;
 	}
 
 	.doc-eyebrow {
@@ -535,6 +725,9 @@
 		outline: none;
 		caret-color: var(--accent-deep);
 	}
+	.doc-body.hidden {
+		display: none;
+	}
 	.doc-body:empty::before {
 		content: attr(data-placeholder);
 		color: var(--muted);
@@ -592,6 +785,19 @@
 		font-weight: 600;
 	}
 	.doc-body :global(em) {
+		font-style: italic;
+	}
+
+	.layer-midground {
+		font-size: 0.98rem;
+		line-height: 1.78;
+		color: var(--muted);
+	}
+	.layer-background {
+		font-size: 0.9rem;
+		line-height: 1.7;
+		color: var(--muted);
+		opacity: 0.78;
 		font-style: italic;
 	}
 
@@ -676,6 +882,29 @@
 	.picker-select:focus {
 		outline: none;
 		border-color: var(--accent);
+	}
+
+	.publish-cluster {
+		display: flex;
+		align-items: center;
+		gap: 0.9rem;
+	}
+	.publish-warn {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.55rem;
+		letter-spacing: 0.12em;
+		text-transform: lowercase;
+		color: var(--muted);
+		opacity: 0.7;
+		font-style: italic;
+	}
+	.publish-hint {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.55rem;
+		letter-spacing: 0.12em;
+		text-transform: lowercase;
+		color: var(--muted);
+		opacity: 0.5;
 	}
 
 	.publish-btn {
