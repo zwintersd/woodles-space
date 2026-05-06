@@ -203,43 +203,9 @@
   <div class="page-wrap">
     <p class="page-eyebrow">color systems</p>
     <h1 class="page-title">palette</h1>
-    <p class="page-sub">three named themes · drop into <code>data-theme</code></p>
+    <p class="page-sub">named themes · drop into <code>data-theme</code></p>
 
-    <section class="theme-card" data-theme="cream">
-      <div class="theme-head">
-        <span class="theme-name">cream</span>
-        <span class="theme-desc">warm · daylight</span>
-      </div>
-      <div class="swatches" id="swatches-cream"></div>
-      <div class="preview-text">
-        <h3>a quiet morning, somewhere.</h3>
-        <p>this is what the body type looks like in <span class="accent">cream</span>. headings sit in lapis, body in deep plum on warm <span class="muted">paper-white</span>. accents come in waves: lavender, aqua, peach, lilac.</p>
-      </div>
-    </section>
-
-    <section class="theme-card" data-theme="dusk">
-      <div class="theme-head">
-        <span class="theme-name">dusk</span>
-        <span class="theme-desc">indigo · evening</span>
-      </div>
-      <div class="swatches" id="swatches-dusk"></div>
-      <div class="preview-text">
-        <h3>after the sun, before the stars.</h3>
-        <p>same vocabulary, lower light. accents <span class="accent">recede</span> into the dark; <span class="muted">muted text</span> is the rule, not the exception.</p>
-      </div>
-    </section>
-
-    <section class="theme-card" data-theme="paper">
-      <div class="theme-head">
-        <span class="theme-name">paper</span>
-        <span class="theme-desc">monochrome · ink</span>
-      </div>
-      <div class="swatches" id="swatches-paper"></div>
-      <div class="preview-text">
-        <h3>just words, on a page.</h3>
-        <p>no color. <span class="accent">ink on paper</span>. the <span class="muted">muted line</span> is a soft gray. for moments where the work should carry the room.</p>
-      </div>
-    </section>
+    <div id="palette-cards"></div>
 
     <p class="footnote">defined in <code>shared/palette.css</code> · listed in <code>shared/library.js</code></p>
   </div>
@@ -249,24 +215,51 @@
 
     const SWATCH_KEYS = ['bg','text','muted','lavender','aqua','peach','lilac','lapis','plum'];
 
+    // one preview blurb per theme — falls back to a generic line if missing
+    const PREVIEWS = {
+      cream:      { h: 'a quiet morning, somewhere.', p: 'headings sit in lapis, body in deep plum on warm <span class="muted">paper-white</span>. accents come in waves — <span class="accent">lavender, aqua, peach, lilac</span>.' },
+      dawn:       { h: 'first light through a window.', p: 'soft pinks and warm gold for <span class="accent">morning pages</span>, half-formed thoughts, the kind of letter you write before coffee.' },
+      dusk:       { h: 'after the sun, before the stars.', p: 'same vocabulary, lower light. accents <span class="accent">recede</span> into the dark; <span class="muted">muted text</span> is the rule, not the exception.' },
+      midnight:   { h: 'awake when nothing else is.', p: 'true dark with electric edges. for the <span class="accent">3 a.m. draft</span> you might delete by morning, or might not.' },
+      forest:     { h: 'a clearing, somewhere quiet.', p: 'moss and bark on parchment. for <span class="accent">nature notes</span>, slow observation, the long sentence about a single tree.' },
+      terracotta: { h: 'sun on warm stone.', p: 'clay and ochre, <span class="accent">mediterranean afternoon</span>. for travelogues, memoir, the postcard you wrote in your head and never sent.' },
+      inkwell:    { h: 'a navy card, gold at the edge.', p: 'the <span class="accent">formal letterhead</span>. dark blue paper, bone ink, gilt accents. when the occasion calls for it.' },
+      typewriter: { h: 'a draft, kept in a drawer.', p: 'sepia and aged ink. for the <span class="accent">manuscript feel</span> — every word looking older than it is, by ten minutes.' },
+      paper:      { h: 'just words, on a page.', p: 'no color. <span class="accent">ink on paper</span>. the <span class="muted">muted line</span> is a soft gray. for moments where the work should carry the room.' }
+    };
+
     function readVar(el, name) {
       return getComputedStyle(el).getPropertyValue('--' + name).trim();
     }
 
-    function renderSwatches(themeId) {
-      const card = document.querySelector('.theme-card[data-theme="' + themeId + '"]');
-      const wrap = document.getElementById('swatches-' + themeId);
-      if (!card || !wrap) return;
-      wrap.innerHTML = SWATCH_KEYS.map(k => {
+    const wrap = document.getElementById('palette-cards');
+    wrap.innerHTML = palettes.map(p =>
+      '<section class="theme-card" data-theme="' + p.id + '">' +
+        '<div class="theme-head">' +
+          '<span class="theme-name">' + p.name + '</span>' +
+          '<span class="theme-desc">' + p.desc + '</span>' +
+        '</div>' +
+        '<div class="swatches" id="swatches-' + p.id + '"></div>' +
+        '<div class="preview-text">' +
+          '<h3>' + (PREVIEWS[p.id]?.h || 'a sample of ' + p.name + '.') + '</h3>' +
+          '<p>' + (PREVIEWS[p.id]?.p || 'this is what the body type looks like in <span class="accent">' + p.name + '</span>.') + '</p>' +
+        '</div>' +
+      '</section>'
+    ).join('');
+
+    // populate swatches after the cards mount so getComputedStyle resolves the right theme
+    palettes.forEach(p => {
+      const card = document.querySelector('.theme-card[data-theme="' + p.id + '"]');
+      const target = document.getElementById('swatches-' + p.id);
+      if (!card || !target) return;
+      target.innerHTML = SWATCH_KEYS.map(k => {
         const hex = readVar(card, k);
         return '<div class="swatch" style="background:' + hex + '">' +
           '<span class="swatch-name">' + k + '</span>' +
           '<span class="swatch-hex">' + hex + '</span>' +
         '</div>';
       }).join('');
-    }
-
-    palettes.forEach(p => renderSwatches(p.id));
+    });
   </script>
 
 </body>
