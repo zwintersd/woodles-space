@@ -8,7 +8,13 @@
 
 export const palettes = [
 	{ id: 'cream', name: 'cream', desc: 'warm · daylight' },
+	{ id: 'dawn', name: 'dawn', desc: 'pink · early morning' },
 	{ id: 'dusk', name: 'dusk', desc: 'indigo · evening' },
+	{ id: 'midnight', name: 'midnight', desc: 'electric · late hours' },
+	{ id: 'forest', name: 'forest', desc: 'moss · grounded' },
+	{ id: 'terracotta', name: 'terracotta', desc: 'clay · sun-baked' },
+	{ id: 'inkwell', name: 'inkwell', desc: 'navy · letterhead' },
+	{ id: 'typewriter', name: 'typewriter', desc: 'sepia · drafts' },
 	{ id: 'paper', name: 'paper', desc: 'monochrome · ink' }
 ];
 
