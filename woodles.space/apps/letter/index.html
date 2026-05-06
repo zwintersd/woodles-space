@@ -376,6 +376,83 @@
     .pocket-card-readonly .pocket-body em { font-style: italic; }
     .pocket-card-readonly .pocket-body p { margin-bottom: 0.6em; }
     .pocket-card-readonly .pocket-body p:last-child { margin-bottom: 0; }
+
+    /* ── margin notes (right-margin annotations on fg passages) ── */
+    .letter-page {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 2.4rem;
+    }
+    .margin-column {
+      position: relative;
+      width: 280px;
+      flex-shrink: 0;
+      padding-top: 88px;
+      padding-bottom: 8rem;
+      min-height: 100vh;
+    }
+    .margin-column.hidden { visibility: hidden; }
+    .margin-group {
+      position: absolute;
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      transition: top 0.18s ease;
+    }
+    .margin-note-readonly {
+      position: relative;
+      padding: 0.7rem 0.9rem;
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      background: color-mix(in srgb, var(--surface) 50%, transparent);
+    }
+    .margin-anchor-ref {
+      font-family: var(--letter-mono, var(--font-mono));
+      font-size: 0.48rem;
+      letter-spacing: 0.16em;
+      text-transform: lowercase;
+      color: var(--muted);
+      opacity: 0.45;
+      display: block;
+      margin-bottom: 0.35rem;
+    }
+    .margin-note-readonly .margin-body {
+      font-family: var(--letter-body, var(--font-body));
+      font-size: 0.86rem;
+      line-height: 1.55;
+      color: var(--muted);
+      font-style: italic;
+    }
+    .margin-note-readonly .margin-body * { font-family: var(--letter-body, var(--font-body)); }
+    .margin-note-readonly .margin-body strong { font-weight: 600; font-style: italic; }
+    .margin-note-readonly .margin-body em { font-style: normal; }
+    .margin-note-readonly .margin-body p { margin-bottom: 0.4em; }
+    .margin-note-readonly .margin-body p:last-child { margin-bottom: 0; }
+
+    @media (max-width: 1100px) {
+      .letter-page {
+        flex-direction: column;
+        align-items: center;
+        gap: 0;
+      }
+      .margin-column {
+        width: 100%;
+        max-width: 640px;
+        min-height: 0;
+        padding-top: 0;
+        padding-bottom: 1rem;
+      }
+      .margin-column.hidden { display: none; visibility: visible; }
+      .margin-group {
+        position: static;
+        margin: 0 clamp(1.5rem, 5vw, 2.5rem) 0.6rem;
+      }
+    }
     .letter-body h1 {
       font-family: var(--letter-display, var(--font-display));
       font-size: 2rem;
@@ -493,7 +570,10 @@
     </div>
   </header>
 
-  <div class="letter-wrap" id="letter-wrap"></div>
+  <div class="letter-page">
+    <div class="letter-wrap" id="letter-wrap"></div>
+    <aside class="margin-column" id="margin-column" aria-label="margin notes"></aside>
+  </div>
 
   <script type="module">
     import { findFont, findPalette, findMotif } from '/shared/library.js';
@@ -652,6 +732,11 @@
       });
     }
 
+    function getMarginNotes(letter) {
+      const notes = letter && letter.annotations && letter.annotations.marginNotes;
+      if (!Array.isArray(notes)) return [];
+      return notes.map((n) => ({ ...n, html: sanitizeHtml(n.html || '') }));
+    }
     function getPocketNotes(letter) {
       const notes = letter && letter.annotations && letter.annotations.pocketNotes;
       if (!Array.isArray(notes)) return [];
@@ -700,6 +785,53 @@
       return html;
     }
 
+    function measureFgAnchors() {
+      const colEl = document.getElementById('margin-column');
+      const fgSection = document.querySelector('section[data-layer="foreground"]');
+      if (!colEl || !fgSection) return {};
+      const colTop = colEl.getBoundingClientRect().top;
+      const out = {};
+      fgSection.querySelectorAll('[data-anchor]').forEach((el) => {
+        const id = el.getAttribute('data-anchor');
+        if (!id) return;
+        const r = el.getBoundingClientRect();
+        out[id] = r.top - colTop;
+      });
+      return out;
+    }
+
+    function renderMarginNotes(letter, visibility, offsets) {
+      // Margin notes live at midground level and reference fg passages,
+      // so they only render when both fg and mg are visible.
+      if (!visibility.foreground || !visibility.midground) return '';
+      const notes = getMarginNotes(letter);
+      if (notes.length === 0) return '';
+      // Group by anchor; skip orphans (anchor not present in current fg).
+      const grouped = new Map();
+      notes.forEach((n) => {
+        if (!Object.prototype.hasOwnProperty.call(offsets, n.anchorId)) return;
+        const arr = grouped.get(n.anchorId) || [];
+        arr.push(n);
+        grouped.set(n.anchorId, arr);
+      });
+      const entries = [...grouped.entries()].sort((a, b) => offsets[a[0]] - offsets[b[0]]);
+      let html = '';
+      entries.forEach(([anchorId, group]) => {
+        const sorted = group.slice().sort((a, b) =>
+          String(a.createdAt || '').localeCompare(String(b.createdAt || ''))
+        );
+        html += '<div class="margin-group" style="top:' + (offsets[anchorId] || 0) + 'px">';
+        sorted.forEach((n) => {
+          html += '<article class="margin-note-readonly">';
+          html += '<span class="margin-anchor-ref" title="anchored to ' + anchorId + '">' + anchorId + '</span>';
+          html += '<div class="margin-body">' + (n.html || '') + '</div>';
+          html += '</article>';
+        });
+        html += '</div>';
+      });
+      return html;
+    }
+
     try {
       const raw = localStorage.getItem('woodles_published');
       if (!raw) throw new Error('empty');
@@ -738,6 +870,23 @@
         };
       }
 
+      function rerenderMargins() {
+        const colEl = document.getElementById('margin-column');
+        if (!colEl) return;
+        // Hide the entire column visually when fg or mg is off — pocket
+        // notes still belong on the page (they live at the bottom),
+        // but margin annotations need their fg passage AND the mg layer
+        // open.
+        const showCol = visibility.foreground && visibility.midground;
+        colEl.classList.toggle('hidden', !showCol);
+        if (!showCol) {
+          colEl.innerHTML = '';
+          return;
+        }
+        const offsets = measureFgAnchors();
+        colEl.innerHTML = renderMarginNotes(letter, visibility, offsets);
+      }
+
       function onToggleLayer(id) {
         visibility[id] = !visibility[id];
         saveVisibility(visibility);
@@ -748,11 +897,22 @@
         }
         renderToggles(letter, visibility, onToggleLayer);
         // Pocket notes inherit their layer's visibility, so re-render when
-        // mg or bg flips.
+        // mg or bg flips. Margin notes need both fg and mg visible.
         if (id === 'midground' || id === 'background') rerenderPockets();
+        // Defer to next frame so the DOM reflects the toggled section
+        // before we measure fg anchors.
+        requestAnimationFrame(rerenderMargins);
       }
       renderToggles(letter, visibility, onToggleLayer);
       bindPocketsOrderBtn();
+      // Initial margin render needs layout to settle so getBoundingClientRect
+      // returns real values.
+      requestAnimationFrame(rerenderMargins);
+      let resizeTimer;
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => requestAnimationFrame(rerenderMargins), 80);
+      });
 
     } catch(e) {
       applyTokens(null);
