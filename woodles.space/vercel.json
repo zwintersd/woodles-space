@@ -1,10 +1,12 @@
 {
-  "rewrites": [
-    { "source": "/fonts",  "destination": "/apps/fonts/index.html" },
-    { "source": "/fonts/(.*)", "destination": "/apps/fonts/$1" },
-    { "source": "/write",  "destination": "/apps/write/index.html" },
-    { "source": "/letter", "destination": "/apps/letter/index.html" },
-    { "source": "/",       "destination": "/apps/landing/index.html" }
-  ],
-  "cleanUrls": true
+  "buildCommand": "",
+  "outputDirectory": ".",
+  "routes": [
+    { "src": "^/fonts/?$",    "dest": "/apps/fonts/index.html" },
+    { "src": "^/fonts/(.+)$", "dest": "/apps/fonts/$1" },
+    { "src": "^/write/?$",    "dest": "/apps/write/index.html" },
+    { "src": "^/letter/?$",   "dest": "/apps/letter/index.html" },
+    { "src": "^/$",           "dest": "/apps/landing/index.html" },
+    { "src": "/(.*)",         "dest": "/$1" }
+  ]
 }
