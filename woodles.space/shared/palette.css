@@ -1,0 +1,81 @@
+/* woodles.space · shared palette · v1
+   set [data-theme="<id>"] on <html> or <body> to switch.
+   :root defaults to "cream". concrete color names (lavender, aqua, peach…)
+   are kept stable across themes so existing apps don't have to be rewritten —
+   each theme just remaps what those names point to. */
+
+:root,
+[data-theme='cream'] {
+	--bg: #faf6f0;
+	--text: #2e2040;
+	--muted: #7a6b90;
+
+	--lavender: #c9bfee;
+	--aqua: #8eddd4;
+	--peach: #f5c8a8;
+	--lilac: #dbb8e8;
+	--cream: #faf6f0;
+	--lapis: #3a2d72;
+	--plum: #5c3464;
+
+	--accent: var(--lavender);
+	--accent-soft: var(--aqua);
+	--accent-warm: var(--peach);
+	--accent-strong: var(--lapis);
+	--accent-deep: var(--plum);
+
+	--surface: rgba(250, 246, 240, 0.6);
+	--rule: rgba(201, 191, 238, 0.28);
+
+	color-scheme: light;
+}
+
+[data-theme='dusk'] {
+	--bg: #1f1a2e;
+	--text: #e8e0f0;
+	--muted: #9a8db0;
+
+	--lavender: #8b7fbe;
+	--aqua: #5fa89f;
+	--peach: #c8866a;
+	--lilac: #a07cb0;
+	--cream: #1f1a2e;
+	--lapis: #b3a8e8;
+	--plum: #d8b9e0;
+
+	--accent: var(--lavender);
+	--accent-soft: var(--aqua);
+	--accent-warm: var(--peach);
+	--accent-strong: var(--lapis);
+	--accent-deep: var(--plum);
+
+	--surface: rgba(31, 26, 46, 0.7);
+	--rule: rgba(139, 127, 190, 0.28);
+
+	color-scheme: dark;
+}
+
+[data-theme='paper'] {
+	--bg: #fafaf7;
+	--text: #1a1a1a;
+	--muted: #6a6a68;
+
+	--lavender: #6b6b6b;
+	--aqua: #555555;
+	--peach: #888888;
+	--lilac: #707070;
+	--cream: #fafaf7;
+	--lapis: #1a1a1a;
+	--plum: #333333;
+
+	--accent: var(--lapis);
+	--accent-soft: var(--muted);
+	--accent-warm: var(--peach);
+	--accent-strong: var(--lapis);
+	--accent-deep: var(--plum);
+
+	--surface: rgba(250, 250, 247, 0.8);
+	--rule: rgba(26, 26, 26, 0.12);
+
+	color-scheme: light;
+}

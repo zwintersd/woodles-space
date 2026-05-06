@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>motifs · woodles.space</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="/shared/fonts.css" />
+  <link rel="stylesheet" href="/shared/palette.css" />
+  <link rel="stylesheet" href="/shared/motifs.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-weight: 300;
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    .topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 30;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      padding: 0 1.6rem;
+      background: var(--surface);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+    }
+    .topbar-brand {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+      text-decoration: none;
+    }
+    .topbar-brand:hover { color: var(--accent-strong); }
+    .topbar-label {
+      font-family: var(--font-mono);
+      font-size: 0.57rem;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+      opacity: 0.55;
+      margin-left: 1.2rem;
+    }
+    .topbar-shimmer {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+    }
+
+    .page-wrap {
+      position: relative;
+      z-index: 2;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: calc(42px + 5rem) clamp(1.5rem, 5vw, 3rem) 6rem;
+    }
+
+    .page-eyebrow {
+      font-size: 0.62rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1.4rem;
+      animation: motif-rise 1s ease forwards;
+    }
+    .page-title {
+      font-family: var(--font-display);
+      font-size: clamp(2.6rem, 7vw, 4rem);
+      font-weight: 300;
+      font-style: italic;
+      color: var(--accent-strong);
+      line-height: 1.05;
+      margin-bottom: 0.4rem;
+      animation: motif-rise 1s ease forwards 0.1s;
+      opacity: 0;
+    }
+    .page-sub {
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin-bottom: 4rem;
+      animation: motif-rise 1s ease forwards 0.2s;
+      opacity: 0;
+    }
+
+    .motif-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.6rem;
+    }
+
+    .motif-tile {
+      position: relative;
+      aspect-ratio: 4 / 3;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid var(--rule);
+      background: var(--bg);
+      cursor: pointer;
+      animation: motif-rise 1s ease forwards 0.3s;
+      opacity: 0;
+    }
+    .motif-tile-canvas {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    /* re-scope motifs.css selectors so they apply inside the tile, not body */
+    .motif-tile-canvas .motif-grain { position: absolute; inset: 0; opacity: 0; transition: opacity 0.4s ease; pointer-events: none; }
+    .motif-tile-canvas .motif-blob  { position: absolute; border-radius: 50%; filter: blur(40px); pointer-events: none; opacity: 0; animation: motif-drift 22s ease-in-out infinite alternate; }
+    .motif-tile.preview-blobs   .motif-grain { opacity: 0.06; }
+    .motif-tile.preview-blobs   .motif-blob  { opacity: 0.55; }
+    .motif-tile.preview-blobs   .motif-blob-1 { width: 180px; height: 180px; background: var(--lavender); top: -40px; left: -30px; }
+    .motif-tile.preview-blobs   .motif-blob-2 { width: 140px; height: 140px; background: var(--aqua);     bottom: -30px; right: -20px; animation-delay: -6s; }
+    .motif-tile.preview-blobs   .motif-blob-3 { width: 100px; height: 100px; background: var(--peach);    top: 40%; left: 55%; animation-delay: -11s; }
+    .motif-tile.preview-blobs   .motif-blob-4 { width: 90px; height: 90px;  background: var(--lilac);     bottom: 20%; left: 5%; animation-delay: -4s; }
+
+    .motif-tile.preview-aurora  .motif-blob  { opacity: 0.7; filter: blur(60px); animation-duration: 30s; }
+    .motif-tile.preview-aurora  .motif-blob-1 { width: 260px; height: 260px; background: var(--lavender); top: -90px; left: -80px; }
+    .motif-tile.preview-aurora  .motif-blob-2 { width: 220px; height: 220px; background: var(--aqua);     bottom: -70px; right: -60px; animation-delay: -10s; }
+
+    .motif-tile.preview-mist    .motif-grain { opacity: 0.08; }
+    .motif-tile.preview-mist    .motif-blob  { opacity: 0.28; filter: blur(30px); }
+    .motif-tile.preview-mist    .motif-blob-1 { width: 80px; height: 80px; background: var(--lavender); top: 12%; left: 8%; }
+    .motif-tile.preview-mist    .motif-blob-2 { width: 70px; height: 70px; background: var(--aqua);     top: 60%; right: 12%; animation-delay: -7s; }
+    .motif-tile.preview-mist    .motif-blob-3 { width: 65px; height: 65px; background: var(--peach);    bottom: 18%; left: 38%; animation-delay: -13s; }
+    .motif-tile.preview-mist    .motif-blob-4 { width: 60px; height: 60px; background: var(--lilac);    top: 42%; left: 60%; animation-delay: -3s; }
+
+    .motif-tile.preview-paper   .motif-grain { opacity: 0.10; }
+    .motif-tile.preview-clean   .motif-grain { opacity: 0; }
+
+    .motif-tile-label {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      padding: 0.9rem 1.1rem;
+      background: linear-gradient(to top, var(--surface) 60%, transparent);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      z-index: 2;
+    }
+    .motif-tile-name {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-style: italic;
+      font-weight: 300;
+      color: var(--accent-strong);
+    }
+    .motif-tile-desc {
+      font-family: var(--font-mono);
+      font-size: 0.55rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      opacity: 0.7;
+    }
+
+    .footnote {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 4rem;
+      opacity: 0.55;
+    }
+  </style>
+</head>
+<body class="motif-mist">
+
+  <div class="motif-grain"></div>
+  <div class="motif-blob motif-blob-1"></div>
+  <div class="motif-blob motif-blob-2"></div>
+  <div class="motif-blob motif-blob-3"></div>
+  <div class="motif-blob motif-blob-4"></div>
+
+  <header class="topbar">
+    <a href="/" class="topbar-brand">.space</a>
+    <span class="topbar-label">motifs</span>
+    <div class="topbar-shimmer motif-shimmer-line"></div>
+  </header>
+
+  <div class="page-wrap">
+    <p class="page-eyebrow">ambient backdrops</p>
+    <h1 class="page-title">motifs</h1>
+    <p class="page-sub">five named backgrounds · pulled from <code>shared/motifs.css</code></p>
+
+    <div class="motif-grid" id="motif-grid"></div>
+
+    <p class="footnote">defined in <code>shared/motifs.css</code> · listed in <code>shared/library.js</code></p>
+  </div>
+
+  <script type="module">
+    import { motifs } from '/shared/library.js';
+
+    const grid = document.getElementById('motif-grid');
+    grid.innerHTML = motifs.map(m =>
+      '<div class="motif-tile preview-' + m.id + '">' +
+        '<div class="motif-tile-canvas">' +
+          '<div class="motif-grain"></div>' +
+          '<div class="motif-blob motif-blob-1"></div>' +
+          '<div class="motif-blob motif-blob-2"></div>' +
+          '<div class="motif-blob motif-blob-3"></div>' +
+          '<div class="motif-blob motif-blob-4"></div>' +
+        '</div>' +
+        '<div class="motif-tile-label">' +
+          '<span class="motif-tile-name">' + m.name + '</span>' +
+          '<span class="motif-tile-desc">' + m.desc + '</span>' +
+        '</div>' +
+      '</div>'
+    ).join('');
+  </script>
+
+</body>
+</html>
