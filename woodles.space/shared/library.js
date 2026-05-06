@@ -68,6 +68,30 @@ export const fontPairs = [
 		display: "var(--font-pixel)",
 		body: "var(--font-pixel)",
 		mono: "var(--font-data)"
+	},
+	{
+		id: 'ancient',
+		name: 'ancient',
+		desc: 'amarna · archival',
+		display: "var(--font-ancient)",
+		body: "var(--font-ancient)",
+		mono: "var(--font-mono)"
+	},
+	{
+		id: 'gothic',
+		name: 'gothic',
+		desc: 'special gothic · jakarta',
+		display: "var(--font-gothic)",
+		body: "var(--font-sans)",
+		mono: "var(--font-geometric)"
+	},
+	{
+		id: 'glaze',
+		name: 'glaze',
+		desc: 'kalnia glaze · lora',
+		display: "var(--font-glaze)",
+		body: "var(--font-body)",
+		mono: "var(--font-mono)"
 	}
 ];
 
