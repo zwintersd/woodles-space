@@ -15,27 +15,19 @@
       --peach: #f5c8a8;
       --lilac: #dbb8e8;
       --cream: #faf6f0;
-      --dusk: #e8e0f5;
       --lapis: #3a2d72;
       --plum: #5c3464;
       --text: #2e2040;
       --muted: #7a6b90;
     }
-    html, body {
-      height: 100%;
-      width: 100%;
-    }
+    html, body { width: 100%; }
     body {
       background: var(--cream);
       color: var(--text);
       font-family: 'Cormorant Garamond', Georgia, serif;
       font-weight: 300;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
       min-height: 100vh;
-      overflow: hidden;
+      overflow-x: hidden;
       position: relative;
     }
 
@@ -54,8 +46,6 @@
       -webkit-backdrop-filter: blur(22px);
       overflow: hidden;
     }
-
-    /* iridescent shimmer layer */
     .topbar::before {
       content: '';
       position: absolute;
@@ -73,8 +63,6 @@
       animation: bar-shimmer 11s ease-in-out infinite;
       pointer-events: none;
     }
-
-    /* gradient rule at the bottom edge */
     .topbar::after {
       content: '';
       position: absolute;
@@ -93,13 +81,11 @@
       animation: bar-shimmer 11s ease-in-out infinite;
       opacity: 0.55;
     }
-
     @keyframes bar-shimmer {
       0%   { background-position: 0%   0; }
       50%  { background-position: 100% 0; }
       100% { background-position: 0%   0; }
     }
-
     .topbar-brand {
       font-family: 'DM Mono', monospace;
       font-weight: 300;
@@ -107,15 +93,14 @@
       letter-spacing: 0.18em;
       position: relative;
       z-index: 1;
+      text-decoration: none;
       animation: brand-hue 16s ease-in-out infinite;
     }
-
     @keyframes brand-hue {
       0%, 100% { color: var(--muted); }
       30%       { color: var(--lapis); }
       65%       { color: var(--plum); }
     }
-
     .topbar-clock {
       font-family: 'DM Mono', monospace;
       font-weight: 300;
@@ -127,27 +112,10 @@
       position: relative;
       z-index: 1;
     }
-
-    .clock-date {
-      color: var(--muted);
-      opacity: 0.75;
-    }
-
-    .clock-sep {
-      color: var(--lavender);
-      opacity: 0.9;
-      font-size: 0.55rem;
-    }
-
-    .clock-time {
-      color: var(--text);
-      opacity: 0.85;
-    }
-
-    .clock-time.tick {
-      animation: tick-fade 0.45s ease;
-    }
-
+    .clock-date { color: var(--muted); opacity: 0.75; }
+    .clock-sep  { color: var(--lavender); opacity: 0.9; font-size: 0.55rem; }
+    .clock-time { color: var(--text); opacity: 0.85; }
+    .clock-time.tick { animation: tick-fade 0.45s ease; }
     @keyframes tick-fade {
       0%   { opacity: 0.85; }
       20%  { opacity: 0.30; }
@@ -164,9 +132,9 @@
       pointer-events: none;
     }
     .blob-1 { width: 520px; height: 520px; background: var(--lavender); top: -120px; left: -100px; animation-delay: 0s; }
-    .blob-2 { width: 400px; height: 400px; background: var(--aqua); bottom: -80px; right: -60px; animation-delay: -6s; }
-    .blob-3 { width: 300px; height: 300px; background: var(--peach); top: 40%; left: 55%; animation-delay: -11s; }
-    .blob-4 { width: 260px; height: 260px; background: var(--lilac); bottom: 20%; left: 5%; animation-delay: -4s; }
+    .blob-2 { width: 400px; height: 400px; background: var(--aqua);    bottom: -80px; right: -60px; animation-delay: -6s; }
+    .blob-3 { width: 300px; height: 300px; background: var(--peach);   top: 40%; left: 55%;        animation-delay: -11s; }
+    .blob-4 { width: 260px; height: 260px; background: var(--lilac);   bottom: 20%; left: 5%;      animation-delay: -4s; }
     @keyframes drift {
       0%   { transform: translate(0, 0) scale(1); }
       50%  { transform: translate(30px, -20px) scale(1.05); }
@@ -184,31 +152,38 @@
       z-index: 1;
     }
 
-    main {
+    /* ── page layout ────────────────────────────────── */
+    .page-wrap {
       position: relative;
       z-index: 2;
+      max-width: 560px;
+      margin: 0 auto;
+      padding: calc(42px + 5.5rem) 2rem 8rem;
+    }
+
+    /* ── hero ───────────────────────────────────────── */
+    .hero {
       text-align: center;
-      padding: 2rem;
-      max-width: 520px;
+      margin-bottom: 3.5rem;
     }
     .eyebrow {
       font-family: 'DM Mono', monospace;
       font-weight: 300;
-      font-size: 0.7rem;
+      font-size: 0.68rem;
       letter-spacing: 0.22em;
       text-transform: uppercase;
       color: var(--muted);
-      margin-bottom: 2rem;
+      margin-bottom: 1.8rem;
       opacity: 0;
       animation: rise 1.2s ease forwards 0.3s;
     }
     .wordmark {
-      font-size: clamp(3.2rem, 10vw, 5.5rem);
+      font-size: clamp(3.4rem, 11vw, 5.8rem);
       font-weight: 300;
       letter-spacing: -0.02em;
       line-height: 1;
       color: var(--lapis);
-      margin-bottom: 0.25rem;
+      margin-bottom: 0.3rem;
       opacity: 0;
       animation: rise 1.2s ease forwards 0.55s;
     }
@@ -216,64 +191,143 @@
     .tld {
       font-family: 'DM Mono', monospace;
       font-weight: 300;
-      font-size: clamp(0.75rem, 2.5vw, 1rem);
+      font-size: clamp(0.72rem, 2.4vw, 0.95rem);
       color: var(--muted);
-      letter-spacing: 0.06em;
-      margin-bottom: 2.8rem;
+      letter-spacing: 0.08em;
       opacity: 0;
       animation: rise 1.2s ease forwards 0.7s;
     }
+
+    /* ── divider ────────────────────────────────────── */
     .divider {
       width: 40px;
       height: 1px;
       background: linear-gradient(90deg, transparent, var(--lavender), var(--aqua), transparent);
-      margin: 0 auto 2.8rem;
+      margin: 0 auto 3.2rem;
       opacity: 0;
       animation: rise 1.2s ease forwards 0.9s;
     }
-    .tagline {
-      font-size: clamp(1.05rem, 3vw, 1.35rem);
+
+    /* ── project index ──────────────────────────────── */
+    .index-label {
+      font-family: 'DM Mono', monospace;
       font-weight: 300;
-      line-height: 1.65;
-      color: var(--text);
-      margin-bottom: 3.2rem;
+      font-size: 0.6rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1.2rem;
       opacity: 0;
       animation: rise 1.2s ease forwards 1.05s;
     }
-    .tagline em { font-style: italic; color: var(--plum); }
-    .pills {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      justify-content: center;
-      margin-bottom: 3.2rem;
+
+    .project-list {
+      list-style: none;
       opacity: 0;
-      animation: rise 1.2s ease forwards 1.25s;
+      animation: rise 1.2s ease forwards 1.2s;
     }
-    .pill {
+
+    .project-item {
+      border-top: 1px solid rgba(201,191,238,0.28);
+    }
+    .project-item:last-child {
+      border-bottom: 1px solid rgba(201,191,238,0.28);
+    }
+
+    .project-link {
+      display: flex;
+      align-items: baseline;
+      gap: 1.2rem;
+      padding: 1.4rem 0;
+      text-decoration: none;
+      color: inherit;
+      transition: background 0.2s ease;
+      position: relative;
+    }
+    .project-link::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(201,191,238,0.10), rgba(142,221,212,0.07));
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      border-radius: 2px;
+      pointer-events: none;
+    }
+    .project-link:hover::after { opacity: 1; }
+
+    .project-index {
       font-family: 'DM Mono', monospace;
       font-weight: 300;
-      font-size: 0.65rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      padding: 5px 14px;
-      border-radius: 100px;
-      border: 1px solid;
+      font-size: 0.56rem;
+      letter-spacing: 0.16em;
+      color: var(--lavender);
+      flex-shrink: 0;
+      padding-top: 0.15em;
     }
-    .pill-a { border-color: #c9bfee; color: var(--lapis); background: rgba(201,191,238,0.18); }
-    .pill-b { border-color: #8eddd4; color: #1a6b64; background: rgba(142,221,212,0.15); }
-    .pill-c { border-color: #dbb8e8; color: var(--plum); background: rgba(219,184,232,0.18); }
-    .pill-d { border-color: #f5c8a8; color: #8a4a1e; background: rgba(245,200,168,0.2); }
-    .pill-e { border-color: #c9bfee; color: var(--lapis); background: rgba(201,191,238,0.12); }
-    .footnote {
+
+    .project-body {
+      flex: 1;
+      min-width: 0;
+    }
+    .project-name {
+      display: block;
+      font-size: clamp(1.15rem, 3vw, 1.4rem);
+      font-weight: 300;
+      color: var(--lapis);
+      line-height: 1.2;
+      margin-bottom: 0.3rem;
+    }
+    .project-link:hover .project-name { color: var(--plum); }
+
+    .project-desc {
+      display: block;
+      font-family: 'DM Mono', monospace;
+      font-weight: 300;
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      opacity: 0.75;
+    }
+
+    .project-arrow {
       font-family: 'DM Mono', monospace;
       font-weight: 300;
       font-size: 0.62rem;
       letter-spacing: 0.1em;
       color: var(--muted);
-      opacity: 0;
-      animation: rise 1.2s ease forwards 1.5s;
+      opacity: 0.45;
+      flex-shrink: 0;
+      transition: opacity 0.2s ease, color 0.2s ease;
     }
+    .project-link:hover .project-arrow {
+      opacity: 1;
+      color: var(--lavender);
+    }
+
+    /* upcoming (non-link) item */
+    .project-upcoming {
+      display: flex;
+      align-items: baseline;
+      gap: 1.2rem;
+      padding: 1.4rem 0;
+    }
+    .project-upcoming .project-name { color: var(--muted); opacity: 0.5; }
+    .project-upcoming .project-desc { opacity: 0.45; }
+
+    /* ── footnote ───────────────────────────────────── */
+    .footnote {
+      font-family: 'DM Mono', monospace;
+      font-weight: 300;
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 3.5rem;
+      opacity: 0;
+      animation: rise 1.2s ease forwards 1.45s;
+    }
+
     @keyframes rise {
       from { opacity: 0; transform: translateY(14px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -296,38 +350,57 @@
   <div class="blob blob-3"></div>
   <div class="blob blob-4"></div>
 
-  <main>
-    <p class="eyebrow">something is taking shape</p>
-    <h1 class="wordmark"><em>woodles</em></h1>
-    <p class="tld">.space</p>
-    <div class="divider"></div>
-    <p class="tagline">a personal monorepo —<br /><em>knowledge, tools, and small living systems</em></p>
-    <div class="pills">
-      <span class="pill pill-a">woodles</span>
-      <span class="pill pill-b">echoes</span>
-      <span class="pill pill-c">article eater</span>
-      <span class="pill pill-d">observer os</span>
-      <span class="pill pill-e">more soon</span>
+  <div class="page-wrap">
+
+    <div class="hero">
+      <p class="eyebrow">personal monorepo · z winters</p>
+      <h1 class="wordmark"><em>woodles</em></h1>
+      <p class="tld">.space</p>
     </div>
-    <p class="footnote">returning shortly &nbsp;·&nbsp; z winters</p>
-  </main>
+
+    <div class="divider"></div>
+
+    <p class="index-label">what's here</p>
+
+    <ul class="project-list">
+
+      <li class="project-item">
+        <a class="project-link" href="/fonts">
+          <span class="project-index">01</span>
+          <div class="project-body">
+            <span class="project-name">font library</span>
+            <span class="project-desc">twelve typefaces · one shared stylesheet</span>
+          </div>
+          <span class="project-arrow">/fonts →</span>
+        </a>
+      </li>
+
+      <li class="project-item">
+        <div class="project-upcoming">
+          <span class="project-index">—</span>
+          <div class="project-body">
+            <span class="project-name">more arriving</span>
+            <span class="project-desc">knowledge, tools, and small living systems</span>
+          </div>
+        </div>
+      </li>
+
+    </ul>
+
+    <p class="footnote">woodles.space &nbsp;·&nbsp; open monorepo</p>
+
+  </div>
 
   <script>
     const DAYS   = ['sun','mon','tue','wed','thu','fri','sat'];
     const MONTHS = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
-
     const dateEl = document.getElementById('clock-date');
     const timeEl = document.getElementById('clock-time');
-
     function pad(n) { return String(n).padStart(2, '0'); }
-
     function tick() {
       const now = new Date();
-      const d = DAYS[now.getDay()] + ' ' + pad(now.getDate()) + ' ' + MONTHS[now.getMonth()] + ' ' + now.getFullYear();
+      dateEl.textContent = DAYS[now.getDay()] + ' ' + pad(now.getDate()) + ' ' + MONTHS[now.getMonth()] + ' ' + now.getFullYear();
       const t = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
-
-      dateEl.textContent = d;
-
       if (timeEl.textContent !== t) {
         timeEl.classList.remove('tick');
         void timeEl.offsetWidth;
@@ -335,7 +408,6 @@
         timeEl.textContent = t;
       }
     }
-
     tick();
     setInterval(tick, 1000);
   </script>
