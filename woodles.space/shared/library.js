@@ -20,9 +20,9 @@ export const palettes = [
 
 export const motifs = [
 	{ id: 'blobs', name: 'blobs', desc: 'drifting color · grain' },
-	{ id: 'aurora', name: 'aurora', desc: 'wide saturation' },
-	{ id: 'mist', name: 'mist', desc: 'scattered particles' },
-	{ id: 'paper', name: 'paper', desc: 'grain only' },
+	{ id: 'aurora', name: 'aurora', desc: 'sweeping ribbons · no grain' },
+	{ id: 'mist', name: 'mist', desc: 'breathing particles · grain' },
+	{ id: 'paper', name: 'paper', desc: 'grain · vignette' },
 	{ id: 'clean', name: 'clean', desc: 'nothing' }
 ];
 
@@ -68,6 +68,30 @@ export const fontPairs = [
 		display: "var(--font-pixel)",
 		body: "var(--font-pixel)",
 		mono: "var(--font-data)"
+	},
+	{
+		id: 'ancient',
+		name: 'ancient',
+		desc: 'amarna · archival',
+		display: "var(--font-ancient)",
+		body: "var(--font-ancient)",
+		mono: "var(--font-mono)"
+	},
+	{
+		id: 'gothic',
+		name: 'gothic',
+		desc: 'special gothic · jakarta',
+		display: "var(--font-gothic)",
+		body: "var(--font-sans)",
+		mono: "var(--font-geometric)"
+	},
+	{
+		id: 'glaze',
+		name: 'glaze',
+		desc: 'kalnia glaze · lora',
+		display: "var(--font-glaze)",
+		body: "var(--font-body)",
+		mono: "var(--font-mono)"
 	}
 ];
 
