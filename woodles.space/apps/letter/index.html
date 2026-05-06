@@ -208,6 +208,135 @@
       background: color-mix(in srgb, var(--accent) 22%, transparent);
       border-color: color-mix(in srgb, var(--accent) 40%, transparent);
     }
+
+    .topbar-divider {
+      display: inline-block;
+      width: 1px;
+      height: 14px;
+      background: var(--rule);
+      margin: 0 0.9rem;
+      opacity: 0.6;
+      position: relative;
+      z-index: 1;
+    }
+    .topbar-divider[hidden] { display: none; }
+    .pockets-tog {
+      font-family: var(--letter-mono, var(--font-mono));
+      font-size: 0.57rem;
+      letter-spacing: 0.14em;
+      text-transform: lowercase;
+      color: var(--muted);
+      background: none;
+      border: 1px solid transparent;
+      padding: 3px 9px;
+      border-radius: 4px;
+      cursor: pointer;
+      opacity: 0.5;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45em;
+      position: relative;
+      z-index: 1;
+      transition: color 0.22s ease, background 0.22s ease, border-color 0.22s ease, opacity 0.22s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .pockets-tog:hover { opacity: 0.9; color: var(--accent-strong); }
+    .pockets-tog.on {
+      color: var(--accent-strong);
+      opacity: 1;
+      background: color-mix(in srgb, var(--accent) 22%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+      transform: translateY(-1px);
+    }
+    .pockets-tog[hidden] { display: none; }
+    .pockets-tog-count {
+      font-size: 0.52rem;
+      letter-spacing: 0.08em;
+      padding: 1px 5px;
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--accent) 30%, transparent);
+      color: var(--accent-strong);
+      opacity: 0.85;
+    }
+
+    /* ── pockets (inside cover) ── */
+    .pockets-section {
+      margin-top: 3.6rem;
+      animation: pocket-rise 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .pockets-section[hidden] { display: none; }
+    @keyframes pocket-rise {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .pockets-divider {
+      height: 1px;
+      width: 100%;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        var(--rule) 18%,
+        color-mix(in srgb, var(--accent) 35%, transparent) 50%,
+        var(--rule) 82%,
+        transparent 100%
+      );
+      opacity: 0.7;
+      margin-bottom: 1.4rem;
+    }
+    .pockets-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 1.2rem;
+    }
+    .pockets-eyebrow {
+      font-family: var(--letter-mono, var(--font-mono));
+      font-size: 0.58rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--muted);
+      opacity: 0.55;
+    }
+    .pockets-order {
+      font-family: var(--letter-mono, var(--font-mono));
+      font-size: 0.55rem;
+      letter-spacing: 0.14em;
+      text-transform: lowercase;
+      color: var(--muted);
+      background: none;
+      border: 1px dashed transparent;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      opacity: 0.55;
+      transition: color 0.18s ease, border-color 0.18s ease, opacity 0.18s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .pockets-order:hover {
+      opacity: 0.95;
+      color: var(--accent-strong);
+      border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+      transform: translateY(-1px);
+    }
+    .pockets-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+    }
+    .pocket-card-readonly {
+      padding: 0.95rem 1.2rem;
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--surface) 55%, transparent);
+    }
+    .pocket-card-readonly .pocket-body {
+      font-family: var(--letter-body, var(--font-body));
+      font-size: 0.96rem;
+      line-height: 1.65;
+      color: var(--text);
+    }
+    .pocket-card-readonly .pocket-body strong { font-weight: 600; }
+    .pocket-card-readonly .pocket-body em { font-style: italic; }
+    .pocket-card-readonly .pocket-body p { margin-bottom: 0.6em; }
+    .pocket-card-readonly .pocket-body p:last-child { margin-bottom: 0; }
     .letter-body h1 {
       font-family: var(--letter-display, var(--font-display));
       font-size: 2rem;
@@ -318,6 +447,8 @@
     <a href="/" class="topbar-brand">.space</a>
     <span class="topbar-label">echoes</span>
     <div class="layer-toggles" id="layer-toggles" role="group" aria-label="layers"></div>
+    <span class="topbar-divider" id="topbar-divider" hidden aria-hidden="true"></span>
+    <button class="pockets-tog" id="pockets-tog" type="button" hidden></button>
     <div class="topbar-clock">
       <span class="clock-date" id="clock-date"></span>
       <span class="clock-sep">·</span>
@@ -373,11 +504,12 @@
       return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
-    /* ── layer visibility ── */
+    /* ── layer + pockets visibility ── */
     const VIS_KEY = 'woodles_layer_visibility';
+    const POCKETS_ORDER_KEY = 'woodles_pockets_order';
     const LAYER_IDS = ['foreground', 'midground', 'background'];
     const LAYER_LABELS = { foreground: 'fg', midground: 'mg', background: 'bg' };
-    const DEFAULT_VIS = { foreground: true, midground: false, background: false };
+    const DEFAULT_VIS = { foreground: true, midground: false, background: false, pockets: false };
 
     function loadVisibility() {
       try {
@@ -387,7 +519,8 @@
         return {
           foreground: v.foreground !== false, // default on
           midground: !!v.midground,
-          background: !!v.background
+          background: !!v.background,
+          pockets: !!v.pockets
         };
       } catch (e) {
         return { ...DEFAULT_VIS };
@@ -395,6 +528,16 @@
     }
     function saveVisibility(v) {
       try { localStorage.setItem(VIS_KEY, JSON.stringify(v)); } catch (e) {}
+    }
+
+    function loadPocketsOrder() {
+      try {
+        const o = localStorage.getItem(POCKETS_ORDER_KEY);
+        return (o === 'newest' || o === 'oldest') ? o : 'oldest';
+      } catch (e) { return 'oldest'; }
+    }
+    function savePocketsOrder(o) {
+      try { localStorage.setItem(POCKETS_ORDER_KEY, o); } catch (e) {}
     }
 
     function getLayers(letter) {
@@ -448,6 +591,59 @@
       });
     }
 
+    function getPocketNotes(letter) {
+      const notes = letter && letter.annotations && letter.annotations.pocketNotes;
+      return Array.isArray(notes) ? notes : [];
+    }
+    function sortPockets(notes, order) {
+      return [...notes].sort((a, b) =>
+        order === 'oldest'
+          ? String(a.createdAt || '').localeCompare(String(b.createdAt || ''))
+          : String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
+      );
+    }
+    function pocketsOrderLabel(order) {
+      return order === 'oldest' ? 'oldest first ↓' : 'newest first ↑';
+    }
+    function renderPockets(letter, visibility, order) {
+      const notes = getPocketNotes(letter);
+      if (notes.length === 0) return '';
+      const sorted = sortPockets(notes, order);
+      const visible = !!visibility.pockets;
+      let html = '<section class="pockets-section"' + (visible ? '' : ' hidden') + ' data-pockets>';
+      html += '<div class="pockets-divider" aria-hidden="true"></div>';
+      html += '<div class="pockets-header">';
+      html += '<span class="pockets-eyebrow">inside cover</span>';
+      html += '<button class="pockets-order" id="pockets-order-btn" type="button" title="flip ordering">' + pocketsOrderLabel(order) + '</button>';
+      html += '</div>';
+      html += '<div class="pockets-list">';
+      sorted.forEach((n) => {
+        html += '<article class="pocket-card-readonly">';
+        html += '<div class="pocket-body">' + (n.html || '') + '</div>';
+        html += '</article>';
+      });
+      html += '</div>';
+      html += '</section>';
+      return html;
+    }
+    function renderPocketsToggle(letter, visibility, onToggle) {
+      const notes = getPocketNotes(letter);
+      const tog = document.getElementById('pockets-tog');
+      const div = document.getElementById('topbar-divider');
+      if (notes.length === 0) {
+        tog.hidden = true;
+        div.hidden = true;
+        return;
+      }
+      tog.hidden = false;
+      div.hidden = false;
+      tog.className = 'pockets-tog' + (visibility.pockets ? ' on' : '');
+      tog.setAttribute('aria-pressed', visibility.pockets ? 'true' : 'false');
+      tog.title = 'pockets';
+      tog.innerHTML = 'pockets<span class="pockets-tog-count">' + notes.length + '</span>';
+      tog.onclick = onToggle;
+    }
+
     try {
       const raw = localStorage.getItem('woodles_published');
       if (!raw) throw new Error('empty');
@@ -455,6 +651,7 @@
       applyTokens(letter);
 
       const visibility = loadVisibility();
+      let pocketsOrder = loadPocketsOrder();
 
       wrap.innerHTML =
         '<div class="letter-header">' +
@@ -463,12 +660,26 @@
           '<div class="letter-divider"></div>' +
         '</div>' +
         '<div id="layer-stack">' + renderLayers(letter, visibility) + '</div>' +
+        '<div id="pockets-mount">' + renderPockets(letter, visibility, pocketsOrder) + '</div>' +
         '<footer class="letter-footer">' +
           '<span class="letter-sig">woodles.space &nbsp;·&nbsp; echoes</span>' +
           '<a href="/write" class="edit-link">edit →</a>' +
         '</footer>';
 
-      function onToggle(id) {
+      function bindPocketsOrderBtn() {
+        const btn = document.getElementById('pockets-order-btn');
+        if (!btn) return;
+        btn.onclick = () => {
+          pocketsOrder = pocketsOrder === 'oldest' ? 'newest' : 'oldest';
+          savePocketsOrder(pocketsOrder);
+          // re-render the pockets section in place; preserve visibility class
+          const mount = document.getElementById('pockets-mount');
+          mount.innerHTML = renderPockets(letter, visibility, pocketsOrder);
+          bindPocketsOrderBtn();
+        };
+      }
+
+      function onToggleLayer(id) {
         visibility[id] = !visibility[id];
         saveVisibility(visibility);
         const section = wrap.querySelector('section[data-layer="' + id + '"]');
@@ -476,9 +687,28 @@
           if (visibility[id]) section.removeAttribute('hidden');
           else section.setAttribute('hidden', '');
         }
-        renderToggles(letter, visibility, onToggle);
+        renderToggles(letter, visibility, onToggleLayer);
       }
-      renderToggles(letter, visibility, onToggle);
+      function onTogglePockets() {
+        visibility.pockets = !visibility.pockets;
+        saveVisibility(visibility);
+        const section = wrap.querySelector('section[data-pockets]');
+        if (section) {
+          if (visibility.pockets) {
+            section.removeAttribute('hidden');
+            // re-trigger the rise animation on each open
+            section.style.animation = 'none';
+            void section.offsetWidth;
+            section.style.animation = '';
+          } else {
+            section.setAttribute('hidden', '');
+          }
+        }
+        renderPocketsToggle(letter, visibility, onTogglePockets);
+      }
+      renderToggles(letter, visibility, onToggleLayer);
+      renderPocketsToggle(letter, visibility, onTogglePockets);
+      bindPocketsOrderBtn();
 
     } catch(e) {
       applyTokens(null);

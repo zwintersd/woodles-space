@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { fly, slide } from 'svelte/transition';
+	import { cubicOut } from 'svelte/easing';
 	import Clock from '$lib/Clock.svelte';
 	import {
 		palettes,
@@ -12,6 +14,7 @@
 	const DRAFT_KEY = 'woodles_write_draft';
 	const PUBLISHED_KEY = 'woodles_published';
 	const ISSUE_KEY = 'woodles_issue_count';
+	const POCKETS_ORDER_KEY = 'woodles_pockets_order';
 
 	type LayerId = 'foreground' | 'midground' | 'background';
 	const LAYER_IDS: LayerId[] = ['foreground', 'midground', 'background'];
@@ -25,6 +28,14 @@
 		midground: 'thinking, working notes, what shaped this…',
 		background: 'the impulse. the thing only you know.'
 	};
+
+	type PocketNote = {
+		id: string;
+		html: string;
+		createdAt: string;
+		updatedAt: string;
+	};
+	type PocketsOrder = 'oldest' | 'newest';
 
 	let title = $state('');
 	let theme = $state('cream');
@@ -45,8 +56,20 @@
 	let publishing = $state(false);
 	let fgIsEmpty = $state(true);
 
+	let pockets = $state<PocketNote[]>([]);
+	let pocketsOpen = $state(false);
+	let pocketsOrder = $state<PocketsOrder>('oldest');
+	let confirmingId = $state<string | null>(null);
+	let confirmTimer: ReturnType<typeof setTimeout> | undefined;
+
 	let saveTimer: ReturnType<typeof setTimeout> | undefined;
 	let hydrated = $state(false);
+
+	const sortedPockets = $derived(
+		pocketsOrder === 'oldest'
+			? [...pockets].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+			: [...pockets].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+	);
 
 	function elFor(layer: LayerId): HTMLDivElement | undefined {
 		return layer === 'foreground' ? fgEl : layer === 'midground' ? mgEl : bgEl;
@@ -59,6 +82,7 @@
 		font?: string;
 		layers?: Partial<Record<LayerId, { html?: string }>>;
 		content?: string;
+		annotations?: { pocketNotes?: PocketNote[] };
 	}) {
 		title = d.title || '';
 		if (d.theme) theme = d.theme;
@@ -71,9 +95,18 @@
 		if (fgEl) fgEl.innerHTML = fgHtml;
 		if (mgEl) mgEl.innerHTML = mgHtml;
 		if (bgEl) bgEl.innerHTML = bgHtml;
+		const notes = d.annotations?.pocketNotes;
+		pockets = Array.isArray(notes) ? notes : [];
 	}
 
 	onMount(() => {
+		try {
+			const order = localStorage.getItem(POCKETS_ORDER_KEY);
+			if (order === 'newest' || order === 'oldest') pocketsOrder = order;
+		} catch (e) {
+			// ignore
+		}
+
 		// Templates take precedence over the saved draft so /write?template=
 		// is always a fresh start.
 		const params = new URLSearchParams(window.location.search);
@@ -121,6 +154,15 @@
 		document.body.style.setProperty('--editor-mono', f.mono);
 	});
 
+	$effect(() => {
+		if (typeof localStorage === 'undefined') return;
+		try {
+			localStorage.setItem(POCKETS_ORDER_KEY, pocketsOrder);
+		} catch (e) {
+			// ignore
+		}
+	});
+
 	function isEmptyHtml(html: string): boolean {
 		const stripped = html.replace(/<br\s*\/?>(\s*)/gi, '').replace(/<[^>]+>/g, '').trim();
 		return stripped.length === 0;
@@ -152,6 +194,7 @@
 							midground: { html: mgEl?.innerHTML ?? '', updatedAt: now },
 							background: { html: bgEl?.innerHTML ?? '', updatedAt: now }
 						},
+						annotations: { pocketNotes: pockets },
 						// back-compat alias so older readers still load something
 						content: fgEl?.innerHTML ?? '',
 						savedAt: now
@@ -242,6 +285,7 @@
 						midground: { html: mgHtml, updatedAt: now },
 						background: { html: bgHtml, updatedAt: now }
 					},
+					annotations: { pocketNotes: pockets },
 					// back-compat alias for older viewer code paths
 					content: fgHtml
 				})
@@ -253,6 +297,60 @@
 		setTimeout(() => {
 			window.location.href = '/letter';
 		}, 1800);
+	}
+
+	// ── pocket notes ──
+	function newPocketId() {
+		return 'p-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+	}
+
+	async function addPocket() {
+		if (!pocketsOpen) pocketsOpen = true;
+		const now = new Date().toISOString();
+		const note: PocketNote = { id: newPocketId(), html: '', createdAt: now, updatedAt: now };
+		pockets = [...pockets, note];
+		scheduleSave();
+		await tick();
+		const el = document.querySelector<HTMLElement>('[data-pocket-body="' + note.id + '"]');
+		el?.focus();
+	}
+
+	function pocketBody(node: HTMLElement, html: string) {
+		node.innerHTML = html ?? '';
+		return {};
+	}
+
+	function onPocketInput(id: string, e: Event) {
+		const html = (e.currentTarget as HTMLElement).innerHTML;
+		const idx = pockets.findIndex((p) => p.id === id);
+		if (idx < 0) return;
+		const now = new Date().toISOString();
+		pockets[idx] = { ...pockets[idx], html, updatedAt: now };
+		scheduleSave();
+	}
+
+	function startConfirmDelete(id: string) {
+		confirmingId = id;
+		clearTimeout(confirmTimer);
+		confirmTimer = setTimeout(() => {
+			if (confirmingId === id) confirmingId = null;
+		}, 3000);
+	}
+
+	function cancelConfirmDelete() {
+		confirmingId = null;
+		clearTimeout(confirmTimer);
+	}
+
+	function confirmDelete(id: string) {
+		pockets = pockets.filter((p) => p.id !== id);
+		confirmingId = null;
+		clearTimeout(confirmTimer);
+		scheduleSave();
+	}
+
+	function flipPocketsOrder() {
+		pocketsOrder = pocketsOrder === 'oldest' ? 'newest' : 'oldest';
 	}
 </script>
 
@@ -277,6 +375,16 @@
 			>
 		{/each}
 	</div>
+	<span class="topbar-divider" aria-hidden="true"></span>
+	<button
+		class="pockets-toggle"
+		class:on={pocketsOpen}
+		onclick={() => (pocketsOpen = !pocketsOpen)}
+		aria-pressed={pocketsOpen}
+		title="pockets"
+	>
+		pockets{#if pockets.length > 0}<span class="pockets-count">{pockets.length}</span>{/if}
+	</button>
 	<div class="topbar-clock"><Clock /></div>
 </header>
 
@@ -445,6 +553,70 @@
 		role="textbox"
 		tabindex="0"
 	></div>
+
+	{#if pocketsOpen}
+		<section
+			class="pockets-panel"
+			aria-label="pockets"
+			transition:slide={{ duration: 320, easing: cubicOut }}
+		>
+			<div class="pockets-divider" aria-hidden="true"></div>
+			<div class="pockets-header">
+				<span class="pockets-eyebrow">inside cover</span>
+				<button
+					class="pockets-order"
+					onclick={flipPocketsOrder}
+					title="flip ordering"
+				>
+					{pocketsOrder === 'oldest' ? 'oldest first ↓' : 'newest first ↑'}
+				</button>
+			</div>
+			<div class="pockets-list">
+				{#each sortedPockets as note (note.id)}
+					<div
+						class="pocket-card"
+						in:fly={{ y: 8, duration: 240, easing: cubicOut }}
+						out:fly={{ y: -4, duration: 160, easing: cubicOut }}
+					>
+						<div
+							class="pocket-body"
+							contenteditable="true"
+							spellcheck="true"
+							use:pocketBody={note.html}
+							oninput={(e) => onPocketInput(note.id, e)}
+							data-pocket-body={note.id}
+							data-placeholder="…"
+							role="textbox"
+							tabindex="0"
+						></div>
+						<div class="pocket-controls">
+							{#if confirmingId === note.id}
+								<button
+									class="pocket-confirm"
+									onclick={() => confirmDelete(note.id)}
+									onblur={cancelConfirmDelete}
+								>remove?</button>
+							{:else}
+								<button
+									class="pocket-x"
+									onclick={() => startConfirmDelete(note.id)}
+									title="remove this pocket"
+									aria-label="remove pocket note"
+								>×</button>
+							{/if}
+						</div>
+					</div>
+				{/each}
+				{#if pockets.length === 0}
+					<p class="pockets-empty">a quiet place. tuck a thought in.</p>
+				{/if}
+			</div>
+			<button class="pocket-add" onclick={addPocket}>
+				<span class="pocket-add-plus">+</span>
+				<span class="pocket-add-label">pocket</span>
+			</button>
+		</section>
+	{/if}
 </div>
 
 <div class="bottom-bar">
@@ -613,6 +785,60 @@
 		opacity: 1;
 		background: color-mix(in srgb, var(--accent) 22%, transparent);
 		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+	}
+	.topbar-divider {
+		display: inline-block;
+		width: 1px;
+		height: 14px;
+		background: var(--rule);
+		margin: 0 0.9rem;
+		opacity: 0.6;
+		position: relative;
+		z-index: 1;
+	}
+	.pockets-toggle {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.57rem;
+		letter-spacing: 0.14em;
+		text-transform: lowercase;
+		color: var(--muted);
+		background: none;
+		border: 1px solid transparent;
+		padding: 3px 9px;
+		border-radius: 4px;
+		cursor: pointer;
+		opacity: 0.5;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45em;
+		position: relative;
+		z-index: 1;
+		transition:
+			color 0.22s ease,
+			background 0.22s ease,
+			border-color 0.22s ease,
+			opacity 0.22s ease,
+			transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+	}
+	.pockets-toggle:hover {
+		opacity: 0.9;
+		color: var(--accent-strong);
+	}
+	.pockets-toggle.on {
+		color: var(--accent-strong);
+		opacity: 1;
+		background: color-mix(in srgb, var(--accent) 22%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+		transform: translateY(-1px);
+	}
+	.pockets-count {
+		font-size: 0.52rem;
+		letter-spacing: 0.08em;
+		padding: 1px 5px;
+		border-radius: 8px;
+		background: color-mix(in srgb, var(--accent) 30%, transparent);
+		color: var(--accent-strong);
+		opacity: 0.85;
 	}
 	.topbar-clock {
 		margin-left: auto;
@@ -799,6 +1025,198 @@
 		color: var(--muted);
 		opacity: 0.78;
 		font-style: italic;
+	}
+
+	/* ── pockets panel (inside cover) ── */
+	.pockets-panel {
+		margin-top: 3.2rem;
+		padding-top: 0;
+	}
+	.pockets-divider {
+		height: 1px;
+		width: 100%;
+		background: linear-gradient(
+			90deg,
+			transparent 0%,
+			var(--rule) 18%,
+			color-mix(in srgb, var(--accent) 35%, transparent) 50%,
+			var(--rule) 82%,
+			transparent 100%
+		);
+		opacity: 0.7;
+		margin-bottom: 1.4rem;
+	}
+	.pockets-header {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		margin-bottom: 1.2rem;
+	}
+	.pockets-eyebrow {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.58rem;
+		letter-spacing: 0.22em;
+		text-transform: uppercase;
+		color: var(--muted);
+		opacity: 0.55;
+	}
+	.pockets-order {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.55rem;
+		letter-spacing: 0.14em;
+		text-transform: lowercase;
+		color: var(--muted);
+		background: none;
+		border: 1px dashed transparent;
+		padding: 3px 8px;
+		border-radius: 4px;
+		cursor: pointer;
+		opacity: 0.55;
+		transition:
+			color 0.18s ease,
+			border-color 0.18s ease,
+			opacity 0.18s ease,
+			transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+	}
+	.pockets-order:hover {
+		opacity: 0.95;
+		color: var(--accent-strong);
+		border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+		transform: translateY(-1px);
+	}
+	.pockets-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.9rem;
+	}
+	.pockets-empty {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.65rem;
+		letter-spacing: 0.08em;
+		color: var(--muted);
+		opacity: 0.4;
+		font-style: italic;
+		padding: 1.2rem 0.4rem;
+		text-align: center;
+	}
+	.pocket-card {
+		position: relative;
+		padding: 0.95rem 2.4rem 0.95rem 1.1rem;
+		border: 1px solid var(--rule);
+		border-radius: 8px;
+		background: color-mix(in srgb, var(--surface) 55%, transparent);
+		transition:
+			border-color 0.22s ease,
+			background 0.22s ease,
+			box-shadow 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+	}
+	.pocket-card:focus-within {
+		border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+		background: color-mix(in srgb, var(--surface) 80%, transparent);
+		box-shadow: 0 1px 0 color-mix(in srgb, var(--accent) 18%, transparent);
+	}
+	.pocket-body {
+		font-family: var(--editor-body, var(--font-body));
+		font-size: 0.96rem;
+		line-height: 1.65;
+		color: var(--text);
+		outline: none;
+		caret-color: var(--accent-deep);
+		min-height: 1.5em;
+	}
+	.pocket-body:empty::before {
+		content: attr(data-placeholder);
+		color: var(--muted);
+		opacity: 0.35;
+		pointer-events: none;
+		font-style: italic;
+	}
+	.pocket-body :global(strong) { font-weight: 600; }
+	.pocket-body :global(em) { font-style: italic; }
+	.pocket-controls {
+		position: absolute;
+		top: 0.4rem;
+		right: 0.5rem;
+	}
+	.pocket-x {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.85rem;
+		line-height: 1;
+		color: var(--muted);
+		background: none;
+		border: none;
+		padding: 4px 7px;
+		border-radius: 50%;
+		cursor: pointer;
+		opacity: 0.35;
+		transition:
+			color 0.18s ease,
+			background 0.18s ease,
+			opacity 0.18s ease,
+			transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+	}
+	.pocket-x:hover {
+		opacity: 0.95;
+		color: var(--accent-strong);
+		background: color-mix(in srgb, var(--accent) 18%, transparent);
+		transform: rotate(90deg);
+	}
+	.pocket-confirm {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.55rem;
+		letter-spacing: 0.12em;
+		text-transform: lowercase;
+		color: var(--accent-strong);
+		background: color-mix(in srgb, var(--accent) 25%, transparent);
+		border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+		padding: 3px 10px;
+		border-radius: 12px;
+		cursor: pointer;
+		font-style: italic;
+		transition:
+			background 0.2s ease,
+			border-color 0.2s ease,
+			transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+	}
+	.pocket-confirm:hover {
+		background: color-mix(in srgb, var(--accent) 40%, transparent);
+		border-color: var(--accent-strong);
+		transform: translateY(-1px);
+	}
+	.pocket-add {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.55em;
+		margin-top: 1.1rem;
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.6rem;
+		letter-spacing: 0.16em;
+		text-transform: lowercase;
+		color: var(--muted);
+		background: none;
+		border: 1px dashed var(--rule);
+		padding: 8px 16px;
+		border-radius: 100px;
+		cursor: pointer;
+		opacity: 0.7;
+		transition:
+			color 0.22s ease,
+			border-color 0.22s ease,
+			background 0.22s ease,
+			opacity 0.22s ease,
+			transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+	}
+	.pocket-add:hover {
+		color: var(--accent-strong);
+		border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+		background: color-mix(in srgb, var(--accent) 10%, transparent);
+		opacity: 1;
+		transform: translateY(-1px);
+	}
+	.pocket-add-plus {
+		font-size: 0.85rem;
+		line-height: 1;
+		font-weight: 400;
 	}
 
 	.bottom-bar {
