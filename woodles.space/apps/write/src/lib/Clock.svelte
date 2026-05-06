@@ -54,7 +54,7 @@
 		opacity: 0.7;
 	}
 	.clock-sep {
-		color: var(--lavender);
+		color: var(--accent);
 		opacity: 0.9;
 	}
 	.clock-time {

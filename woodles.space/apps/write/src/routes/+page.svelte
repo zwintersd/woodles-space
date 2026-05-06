@@ -1,12 +1,22 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import Clock from '$lib/Clock.svelte';
+	import {
+		palettes,
+		motifs as motifList,
+		fontPairs,
+		findTemplate,
+		findFont
+	} from '@shared/library.js';
 
 	const DRAFT_KEY = 'woodles_write_draft';
 	const PUBLISHED_KEY = 'woodles_published';
 	const ISSUE_KEY = 'woodles_issue_count';
 
 	let title = $state('');
+	let theme = $state('cream');
+	let motif = $state('blobs');
+	let font = $state('classic');
 	let bodyEl: HTMLDivElement | undefined = $state();
 	let titleEl: HTMLInputElement | undefined = $state();
 	let saveStatus = $state<'saved' | 'saving'>('saved');
@@ -17,19 +27,59 @@
 	let publishing = $state(false);
 
 	let saveTimer: ReturnType<typeof setTimeout> | undefined;
+	let hydrated = $state(false);
 
 	onMount(() => {
+		// Templates take precedence over the saved draft so /write?template=
+		// is always a fresh start.
+		const params = new URLSearchParams(window.location.search);
+		const tid = params.get('template');
+		if (tid) {
+			const t = findTemplate(tid);
+			if (t && bodyEl) {
+				title = t.sampleTitle;
+				theme = t.palette;
+				motif = t.motif;
+				font = t.font;
+				bodyEl.innerHTML = t.sampleContent;
+				updateWordCount();
+				history.replaceState(null, '', window.location.pathname);
+				hydrated = true;
+				scheduleSave();
+				return;
+			}
+		}
+
 		try {
 			const raw = localStorage.getItem(DRAFT_KEY);
 			if (raw && bodyEl) {
 				const d = JSON.parse(raw);
 				title = d.title || '';
 				bodyEl.innerHTML = d.content || '';
+				if (d.theme) theme = d.theme;
+				if (d.motif) motif = d.motif;
+				if (d.font) font = d.font;
 				updateWordCount();
 			}
 		} catch (e) {
 			// ignore corrupt draft
 		}
+		hydrated = true;
+	});
+
+	$effect(() => {
+		if (typeof document === 'undefined') return;
+		document.body.dataset.theme = theme;
+		Array.from(document.body.classList).forEach((c) => {
+			if (c.startsWith('motif-') && !c.startsWith('motif-blob') && c !== 'motif-grain') {
+				document.body.classList.remove(c);
+			}
+		});
+		document.body.classList.add('motif-' + motif);
+		const f = findFont(font);
+		document.body.style.setProperty('--editor-display', f.display);
+		document.body.style.setProperty('--editor-body', f.body);
+		document.body.style.setProperty('--editor-mono', f.mono);
 	});
 
 	function updateWordCount() {
@@ -39,6 +89,7 @@
 	}
 
 	function scheduleSave() {
+		if (!hydrated) return;
 		saveStatus = 'saving';
 		clearTimeout(saveTimer);
 		saveTimer = setTimeout(() => {
@@ -48,15 +99,26 @@
 					JSON.stringify({
 						title,
 						content: bodyEl?.innerHTML ?? '',
+						theme,
+						motif,
+						font,
 						savedAt: new Date().toISOString()
 					})
 				);
 			} catch (e) {
-				// quota or disabled — surface as still-saving and stop
+				// ignore quota / disabled storage
 			}
 			saveStatus = 'saved';
 		}, 700);
 	}
+
+	$effect(() => {
+		// re-save whenever the chosen tokens change (after hydration)
+		void theme;
+		void motif;
+		void font;
+		if (hydrated) scheduleSave();
+	});
 
 	function exec(cmd: string, val: string | null = null) {
 		document.execCommand(cmd, false, val ?? undefined);
@@ -84,6 +146,9 @@
 				JSON.stringify({
 					title: title.trim() || 'untitled letter',
 					content: bodyEl?.innerHTML ?? '',
+					theme,
+					motif,
+					font,
 					issue,
 					publishedAt: new Date().toISOString()
 				})
@@ -98,9 +163,11 @@
 	}
 </script>
 
-<div class="blob blob-1"></div>
-<div class="blob blob-2"></div>
-<div class="blob blob-3"></div>
+<div class="motif-grain"></div>
+<div class="motif-blob motif-blob-1"></div>
+<div class="motif-blob motif-blob-2"></div>
+<div class="motif-blob motif-blob-3"></div>
+<div class="motif-blob motif-blob-4"></div>
 
 <header class="topbar">
 	<a href="/" class="topbar-brand">.space</a>
@@ -248,6 +315,25 @@
 			{saveStatus === 'saving' ? 'saving…' : 'saved'}
 		</span>
 		<span class="word-count">{wordCount} word{wordCount !== 1 ? 's' : ''}</span>
+		<span class="picker-sep">·</span>
+		<label class="picker">
+			<span class="picker-label">palette</span>
+			<select bind:value={theme} class="picker-select">
+				{#each palettes as p}<option value={p.id}>{p.name}</option>{/each}
+			</select>
+		</label>
+		<label class="picker">
+			<span class="picker-label">motif</span>
+			<select bind:value={motif} class="picker-select">
+				{#each motifList as m}<option value={m.id}>{m.name}</option>{/each}
+			</select>
+		</label>
+		<label class="picker">
+			<span class="picker-label">font</span>
+			<select bind:value={font} class="picker-select">
+				{#each fontPairs as f}<option value={f.id}>{f.name}</option>{/each}
+			</select>
+		</label>
 	</div>
 	<button class="publish-btn" onclick={publish}>Publish →</button>
 </div>
@@ -260,80 +346,21 @@
 		margin: 0;
 		padding: 0;
 	}
-	:global(:root) {
-		--lavender: #c9bfee;
-		--aqua: #8eddd4;
-		--peach: #f5c8a8;
-		--lilac: #dbb8e8;
-		--cream: #faf6f0;
-		--lapis: #3a2d72;
-		--plum: #5c3464;
-		--text: #2e2040;
-		--muted: #7a6b90;
-	}
 	:global(html),
 	:global(body) {
 		height: 100%;
 	}
 	:global(body) {
-		background: var(--cream);
+		background: var(--bg);
 		color: var(--text);
-		font-family: var(--font-mono);
+		font-family: var(--editor-mono, var(--font-mono));
 		font-weight: 300;
 		min-height: 100vh;
 		overflow-x: hidden;
 		position: relative;
-	}
-	:global(body)::before {
-		content: '';
-		position: fixed;
-		inset: 0;
-		background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
-		opacity: 0.04;
-		pointer-events: none;
-		z-index: 1;
-	}
-
-	.blob {
-		position: fixed;
-		border-radius: 50%;
-		filter: blur(100px);
-		opacity: 0.14;
-		animation: drift 24s ease-in-out infinite alternate;
-		pointer-events: none;
-		z-index: 0;
-	}
-	.blob-1 {
-		width: 500px;
-		height: 500px;
-		background: var(--lavender);
-		top: -100px;
-		left: -120px;
-		animation-delay: 0s;
-	}
-	.blob-2 {
-		width: 360px;
-		height: 360px;
-		background: var(--aqua);
-		bottom: 8%;
-		right: -80px;
-		animation-delay: -9s;
-	}
-	.blob-3 {
-		width: 260px;
-		height: 260px;
-		background: var(--lilac);
-		top: 55%;
-		left: 68%;
-		animation-delay: -16s;
-	}
-	@keyframes drift {
-		0% {
-			transform: translate(0, 0) scale(1);
-		}
-		100% {
-			transform: translate(18px, -16px) scale(1.03);
-		}
+		transition:
+			background 0.3s ease,
+			color 0.3s ease;
 	}
 
 	.topbar {
@@ -346,25 +373,10 @@
 		display: flex;
 		align-items: center;
 		padding: 0 1.6rem;
-		background: rgba(250, 246, 240, 0.6);
+		background: var(--surface);
 		backdrop-filter: blur(22px);
 		-webkit-backdrop-filter: blur(22px);
 		overflow: hidden;
-	}
-	.topbar::before {
-		content: '';
-		position: absolute;
-		inset: 0;
-		background: linear-gradient(
-			105deg,
-			rgba(201, 191, 238, 0.22) 0%,
-			rgba(142, 221, 212, 0.14) 40%,
-			rgba(219, 184, 232, 0.18) 80%,
-			rgba(201, 191, 238, 0.22) 100%
-		);
-		background-size: 260% 100%;
-		animation: bar-shimmer 11s ease-in-out infinite;
-		pointer-events: none;
 	}
 	.topbar::after {
 		content: '';
@@ -398,28 +410,19 @@
 		}
 	}
 	.topbar-brand {
-		font-family: var(--font-mono);
+		font-family: var(--editor-mono, var(--font-mono));
 		font-size: 0.68rem;
 		letter-spacing: 0.18em;
 		text-decoration: none;
 		position: relative;
 		z-index: 1;
-		animation: brand-hue 16s ease-in-out infinite;
+		color: var(--muted);
 	}
-	@keyframes brand-hue {
-		0%,
-		100% {
-			color: var(--muted);
-		}
-		30% {
-			color: var(--lapis);
-		}
-		65% {
-			color: var(--plum);
-		}
+	.topbar-brand:hover {
+		color: var(--accent-strong);
 	}
 	.topbar-label {
-		font-family: var(--font-mono);
+		font-family: var(--editor-mono, var(--font-mono));
 		font-size: 0.57rem;
 		letter-spacing: 0.14em;
 		color: var(--muted);
@@ -430,7 +433,7 @@
 	}
 	.topbar-clock {
 		margin-left: auto;
-		font-family: var(--font-mono);
+		font-family: var(--editor-mono, var(--font-mono));
 		font-size: 0.6rem;
 		letter-spacing: 0.1em;
 		display: flex;
@@ -449,7 +452,7 @@
 	}
 
 	.doc-eyebrow {
-		font-family: var(--font-mono);
+		font-family: var(--editor-mono, var(--font-mono));
 		font-size: 0.58rem;
 		letter-spacing: 0.2em;
 		text-transform: uppercase;
@@ -459,18 +462,18 @@
 	}
 
 	.doc-title {
-		font-family: var(--font-display);
+		font-family: var(--editor-display, var(--font-display));
 		font-size: clamp(2rem, 6vw, 3.4rem);
 		font-weight: 300;
 		font-style: italic;
-		color: var(--lapis);
+		color: var(--accent-strong);
 		background: none;
 		border: none;
 		outline: none;
 		width: 100%;
 		padding: 0;
 		margin-bottom: 2.4rem;
-		caret-color: var(--plum);
+		caret-color: var(--accent-deep);
 		line-height: 1.1;
 	}
 	.doc-title::placeholder {
@@ -484,12 +487,12 @@
 		gap: 1px;
 		padding-bottom: 0.75rem;
 		margin-bottom: 1.6rem;
-		border-bottom: 1px solid rgba(201, 191, 238, 0.2);
+		border-bottom: 1px solid var(--rule);
 		flex-wrap: wrap;
 		row-gap: 4px;
 	}
 	.tool-btn {
-		font-family: var(--font-mono);
+		font-family: var(--editor-mono, var(--font-mono));
 		font-size: 0.6rem;
 		letter-spacing: 0.05em;
 		color: var(--muted);
@@ -506,31 +509,31 @@
 		user-select: none;
 	}
 	.tool-btn:hover {
-		background: rgba(201, 191, 238, 0.18);
-		color: var(--lapis);
-		border-color: rgba(201, 191, 238, 0.32);
+		background: color-mix(in srgb, var(--accent) 25%, transparent);
+		color: var(--accent-strong);
+		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 	}
 	.tool-btn.active {
-		background: rgba(201, 191, 238, 0.22);
-		color: var(--lapis);
-		border-color: rgba(201, 191, 238, 0.4);
+		background: color-mix(in srgb, var(--accent) 30%, transparent);
+		color: var(--accent-strong);
+		border-color: color-mix(in srgb, var(--accent) 50%, transparent);
 	}
 	.tool-sep {
 		width: 1px;
 		height: 13px;
-		background: rgba(201, 191, 238, 0.32);
+		background: var(--rule);
 		margin: 0 5px;
 		flex-shrink: 0;
 	}
 
 	.doc-body {
-		font-family: var(--font-body);
+		font-family: var(--editor-body, var(--font-body));
 		font-size: 1.05rem;
 		line-height: 1.9;
 		color: var(--text);
 		min-height: 52vh;
 		outline: none;
-		caret-color: var(--plum);
+		caret-color: var(--accent-deep);
 	}
 	.doc-body:empty::before {
 		content: attr(data-placeholder);
@@ -540,19 +543,19 @@
 		font-style: italic;
 	}
 	.doc-body :global(h1) {
-		font-family: var(--font-display);
+		font-family: var(--editor-display, var(--font-display));
 		font-size: 2rem;
 		font-weight: 300;
-		color: var(--lapis);
+		color: var(--accent-strong);
 		line-height: 1.15;
 		margin: 1.8em 0 0.4em;
 	}
 	.doc-body :global(h2) {
-		font-family: var(--font-display);
+		font-family: var(--editor-display, var(--font-display));
 		font-size: 1.35rem;
 		font-weight: 300;
 		font-style: italic;
-		color: var(--plum);
+		color: var(--accent-deep);
 		line-height: 1.2;
 		margin: 1.4em 0 0.35em;
 	}
@@ -563,7 +566,7 @@
 		margin-bottom: 0;
 	}
 	.doc-body :global(blockquote) {
-		border-left: 2px solid var(--lavender);
+		border-left: 2px solid var(--accent);
 		padding: 0.1em 0 0.1em 1.2em;
 		margin: 1.3em 0;
 		font-style: italic;
@@ -578,12 +581,12 @@
 		margin-bottom: 0.2em;
 	}
 	.doc-body :global(a) {
-		color: var(--lapis);
+		color: var(--accent-strong);
 		text-decoration: none;
-		border-bottom: 1px solid rgba(58, 45, 114, 0.22);
+		border-bottom: 1px solid color-mix(in srgb, var(--accent-strong) 22%, transparent);
 	}
 	.doc-body :global(a:hover) {
-		border-bottom-color: var(--lapis);
+		border-bottom-color: var(--accent-strong);
 	}
 	.doc-body :global(strong) {
 		font-weight: 600;
@@ -597,24 +600,27 @@
 		bottom: 0;
 		left: 0;
 		right: 0;
-		height: 46px;
+		min-height: 46px;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 0 1.8rem;
-		background: rgba(250, 246, 240, 0.88);
+		padding: 0.4rem 1.8rem;
+		background: var(--surface);
 		backdrop-filter: blur(18px);
 		-webkit-backdrop-filter: blur(18px);
-		border-top: 1px solid rgba(201, 191, 238, 0.16);
+		border-top: 1px solid var(--rule);
 		z-index: 20;
+		flex-wrap: wrap;
+		gap: 0.6rem;
 	}
 	.bottom-meta {
 		display: flex;
 		align-items: center;
-		gap: 1.6rem;
-		font-family: var(--font-mono);
+		gap: 1.2rem;
+		font-family: var(--editor-mono, var(--font-mono));
 		font-size: 0.57rem;
 		letter-spacing: 0.1em;
+		flex-wrap: wrap;
 	}
 	.save-status {
 		transition:
@@ -624,22 +630,62 @@
 		opacity: 0.5;
 	}
 	.save-status.saving {
-		color: var(--plum);
+		color: var(--accent-deep);
 		opacity: 0.9;
 	}
 	.word-count {
 		color: var(--muted);
 		opacity: 0.45;
 	}
+	.picker-sep {
+		color: var(--muted);
+		opacity: 0.3;
+	}
+	.picker {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.picker-label {
+		color: var(--muted);
+		opacity: 0.55;
+		text-transform: uppercase;
+	}
+	.picker-select {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.6rem;
+		letter-spacing: 0.06em;
+		color: var(--accent-strong);
+		background: transparent;
+		border: 1px solid var(--rule);
+		padding: 3px 18px 3px 8px;
+		border-radius: 4px;
+		cursor: pointer;
+		appearance: none;
+		-webkit-appearance: none;
+		background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+			linear-gradient(-45deg, transparent 50%, var(--muted) 50%);
+		background-position:
+			calc(100% - 9px) 50%,
+			calc(100% - 5px) 50%;
+		background-size:
+			4px 4px,
+			4px 4px;
+		background-repeat: no-repeat;
+	}
+	.picker-select:focus {
+		outline: none;
+		border-color: var(--accent);
+	}
 
 	.publish-btn {
-		font-family: var(--font-mono);
+		font-family: var(--editor-mono, var(--font-mono));
 		font-weight: 300;
 		font-size: 0.62rem;
 		letter-spacing: 0.16em;
 		text-transform: uppercase;
-		color: var(--cream);
-		background: var(--lapis);
+		color: var(--bg);
+		background: var(--accent-strong);
 		border: none;
 		padding: 8px 24px;
 		border-radius: 100px;
@@ -650,9 +696,8 @@
 			box-shadow 0.2s ease;
 	}
 	.publish-btn:hover {
-		background: var(--plum);
+		background: var(--accent-deep);
 		transform: translateY(-1px);
-		box-shadow: 0 4px 18px rgba(92, 52, 100, 0.22);
 	}
 	.publish-btn:active {
 		transform: translateY(0);
@@ -661,7 +706,7 @@
 	.overlay {
 		position: fixed;
 		inset: 0;
-		background: rgba(250, 246, 240, 0);
+		background: color-mix(in srgb, var(--bg) 0%, transparent);
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -671,15 +716,15 @@
 		transition: background 0.5s ease;
 	}
 	.overlay.active {
-		background: rgba(250, 246, 240, 0.94);
+		background: color-mix(in srgb, var(--bg) 94%, transparent);
 		pointer-events: all;
 	}
 	.overlay-word {
-		font-family: var(--font-display);
+		font-family: var(--editor-display, var(--font-display));
 		font-size: clamp(2.5rem, 7vw, 4.5rem);
 		font-weight: 300;
 		font-style: italic;
-		color: var(--lapis);
+		color: var(--accent-strong);
 		opacity: 0;
 		transform: translateY(12px);
 		transition:
@@ -691,7 +736,7 @@
 		transform: translateY(0);
 	}
 	.overlay-sub {
-		font-family: var(--font-mono);
+		font-family: var(--editor-mono, var(--font-mono));
 		font-size: 0.6rem;
 		letter-spacing: 0.16em;
 		text-transform: uppercase;

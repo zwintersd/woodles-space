@@ -15,6 +15,9 @@ const config = {
 			base: '/write',
 			relative: false
 		},
+		alias: {
+			'@shared': '../../shared'
+		},
 		prerender: {
 			handleHttpError: ({ path, message }) => {
 				// Cross-app links (anything outside /write) are served by sibling

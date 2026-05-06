@@ -7,56 +7,21 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="/shared/fonts.css" />
+  <link rel="stylesheet" href="/shared/palette.css" />
+  <link rel="stylesheet" href="/shared/motifs.css" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --lavender: #c9bfee;
-      --aqua: #8eddd4;
-      --peach: #f5c8a8;
-      --lilac: #dbb8e8;
-      --cream: #faf6f0;
-      --lapis: #3a2d72;
-      --plum: #5c3464;
-      --text: #2e2040;
-      --muted: #7a6b90;
-    }
 
     html, body { height: 100%; }
     body {
-      background: var(--cream);
+      background: var(--bg);
       color: var(--text);
-      font-family: var(--font-mono);
+      font-family: var(--letter-mono, var(--font-mono));
       font-weight: 300;
       min-height: 100vh;
       overflow-x: hidden;
       position: relative;
-    }
-
-    /* ── blobs ── */
-    .blob {
-      position: fixed;
-      border-radius: 50%;
-      filter: blur(100px);
-      opacity: 0.13;
-      animation: drift 26s ease-in-out infinite alternate;
-      pointer-events: none;
-      z-index: 0;
-    }
-    .blob-1 { width: 560px; height: 560px; background: var(--lavender); top: -140px; left: -100px; animation-delay: 0s; }
-    .blob-2 { width: 400px; height: 400px; background: var(--peach);   bottom: 0;   right: -60px;  animation-delay: -10s; }
-    .blob-3 { width: 240px; height: 240px; background: var(--aqua);    top: 40%;    left: 70%;     animation-delay: -18s; }
-    @keyframes drift {
-      0%   { transform: translate(0, 0) scale(1); }
-      100% { transform: translate(15px, -15px) scale(1.03); }
-    }
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
-      opacity: 0.04;
-      pointer-events: none;
-      z-index: 1;
+      transition: background 0.4s ease, color 0.4s ease;
     }
 
     /* ── topbar ── */
@@ -68,22 +33,10 @@
       display: flex;
       align-items: center;
       padding: 0 1.6rem;
-      background: rgba(250, 246, 240, 0.6);
+      background: var(--surface);
       backdrop-filter: blur(22px);
       -webkit-backdrop-filter: blur(22px);
       overflow: hidden;
-    }
-    .topbar::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(105deg,
-        rgba(201,191,238,0.22) 0%, rgba(142,221,212,0.14) 40%,
-        rgba(219,184,232,0.18) 80%, rgba(201,191,238,0.22) 100%
-      );
-      background-size: 260% 100%;
-      animation: bar-shimmer 11s ease-in-out infinite;
-      pointer-events: none;
     }
     .topbar::after {
       content: '';
@@ -96,26 +49,22 @@
       opacity: 0.5;
     }
     @keyframes bar-shimmer {
-      0%   { background-position: 0% 0; }
-      50%  { background-position: 100% 0; }
+      0% { background-position: 0% 0; }
+      50% { background-position: 100% 0; }
       100% { background-position: 0% 0; }
     }
     .topbar-brand {
-      font-family: var(--font-mono);
+      font-family: var(--letter-mono, var(--font-mono));
       font-size: 0.68rem;
       letter-spacing: 0.18em;
       text-decoration: none;
       position: relative;
       z-index: 1;
-      animation: brand-hue 16s ease-in-out infinite;
+      color: var(--muted);
     }
-    @keyframes brand-hue {
-      0%, 100% { color: var(--muted); }
-      30%       { color: var(--lapis); }
-      65%       { color: var(--plum); }
-    }
+    .topbar-brand:hover { color: var(--accent-strong); }
     .topbar-label {
-      font-family: var(--font-mono);
+      font-family: var(--letter-mono, var(--font-mono));
       font-size: 0.57rem;
       letter-spacing: 0.14em;
       color: var(--muted);
@@ -126,7 +75,7 @@
     }
     .topbar-clock {
       margin-left: auto;
-      font-family: var(--font-mono);
+      font-family: var(--letter-mono, var(--font-mono));
       font-size: 0.60rem;
       letter-spacing: 0.10em;
       display: flex;
@@ -136,7 +85,7 @@
       z-index: 1;
     }
     .clock-date { color: var(--muted); opacity: 0.7; }
-    .clock-sep  { color: var(--lavender); opacity: 0.9; }
+    .clock-sep  { color: var(--accent); opacity: 0.9; }
     .clock-time { color: var(--text); opacity: 0.8; }
     .clock-time.tick { animation: tick-fade 0.45s ease; }
     @keyframes tick-fade {
@@ -153,19 +102,12 @@
       margin: 0 auto;
       padding: 88px clamp(1.5rem, 5vw, 2.5rem) 8rem;
       opacity: 0;
-      animation: rise 1s ease forwards 0.1s;
-    }
-    @keyframes rise {
-      from { opacity: 0; transform: translateY(16px); }
-      to   { opacity: 1; transform: translateY(0); }
+      animation: motif-rise 1s ease forwards 0.1s;
     }
 
-    /* header */
-    .letter-header {
-      margin-bottom: 3rem;
-    }
+    .letter-header { margin-bottom: 3rem; }
     .letter-pub {
-      font-family: var(--font-mono);
+      font-family: var(--letter-mono, var(--font-mono));
       font-size: 0.58rem;
       letter-spacing: 0.18em;
       text-transform: uppercase;
@@ -174,11 +116,11 @@
       margin-bottom: 1.4rem;
     }
     .letter-title {
-      font-family: var(--font-display);
+      font-family: var(--letter-display, var(--font-display));
       font-size: clamp(2.4rem, 7vw, 4rem);
       font-weight: 300;
       font-style: italic;
-      color: var(--lapis);
+      color: var(--accent-strong);
       line-height: 1.08;
       margin-bottom: 1.8rem;
     }
@@ -188,35 +130,34 @@
       background: linear-gradient(90deg, transparent, var(--lavender), var(--aqua), transparent);
     }
 
-    /* body */
     .letter-body {
-      font-family: var(--font-body);
+      font-family: var(--letter-body, var(--font-body));
       font-size: 1.08rem;
       line-height: 1.92;
       color: var(--text);
       margin-top: 2.8rem;
     }
     .letter-body h1 {
-      font-family: var(--font-display);
+      font-family: var(--letter-display, var(--font-display));
       font-size: 2rem;
       font-weight: 300;
-      color: var(--lapis);
+      color: var(--accent-strong);
       line-height: 1.15;
       margin: 2em 0 0.5em;
     }
     .letter-body h2 {
-      font-family: var(--font-display);
+      font-family: var(--letter-display, var(--font-display));
       font-size: 1.35rem;
       font-weight: 300;
       font-style: italic;
-      color: var(--plum);
+      color: var(--accent-deep);
       line-height: 1.2;
       margin: 1.6em 0 0.4em;
     }
     .letter-body p { margin-bottom: 1.1em; }
     .letter-body p:last-child { margin-bottom: 0; }
     .letter-body blockquote {
-      border-left: 2px solid var(--lavender);
+      border-left: 2px solid var(--accent);
       padding: 0.1em 0 0.1em 1.3em;
       margin: 1.5em 0;
       font-style: italic;
@@ -224,16 +165,15 @@
     }
     .letter-body ul, .letter-body ol { padding-left: 1.5em; margin: 0.9em 0; }
     .letter-body li { margin-bottom: 0.25em; }
-    .letter-body a { color: var(--lapis); text-decoration: none; border-bottom: 1px solid rgba(58,45,114,0.2); }
-    .letter-body a:hover { border-bottom-color: var(--lapis); }
+    .letter-body a { color: var(--accent-strong); text-decoration: none; border-bottom: 1px solid var(--rule); }
+    .letter-body a:hover { border-bottom-color: var(--accent-strong); }
     .letter-body strong { font-weight: 600; }
     .letter-body em { font-style: italic; }
 
-    /* footer */
     .letter-footer {
       margin-top: 5rem;
       padding-top: 1.8rem;
-      border-top: 1px solid rgba(201,191,238,0.2);
+      border-top: 1px solid var(--rule);
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -241,7 +181,7 @@
       gap: 1rem;
     }
     .letter-sig {
-      font-family: var(--font-mono);
+      font-family: var(--letter-mono, var(--font-mono));
       font-size: 0.57rem;
       letter-spacing: 0.12em;
       text-transform: uppercase;
@@ -249,35 +189,31 @@
       opacity: 0.45;
     }
     .edit-link {
-      font-family: var(--font-mono);
+      font-family: var(--letter-mono, var(--font-mono));
       font-size: 0.57rem;
       letter-spacing: 0.12em;
       text-transform: uppercase;
       color: var(--muted);
       text-decoration: none;
-      border-bottom: 1px solid rgba(122,107,144,0.2);
+      border-bottom: 1px solid var(--rule);
       padding-bottom: 1px;
       transition: color 0.15s ease, border-color 0.15s ease;
       opacity: 0.5;
     }
-    .edit-link:hover { color: var(--lapis); border-color: var(--lavender); opacity: 1; }
+    .edit-link:hover { color: var(--accent-strong); border-color: var(--accent); opacity: 1; }
 
-    /* empty state */
-    .empty-state {
-      text-align: center;
-      padding-top: 6rem;
-    }
+    .empty-state { text-align: center; padding-top: 6rem; }
     .empty-title {
-      font-family: var(--font-display);
+      font-family: var(--letter-display, var(--font-display));
       font-size: clamp(1.8rem, 5vw, 2.8rem);
       font-weight: 300;
       font-style: italic;
-      color: var(--lapis);
+      color: var(--accent-strong);
       opacity: 0.4;
       margin-bottom: 1.2rem;
     }
     .empty-sub {
-      font-family: var(--font-mono);
+      font-family: var(--letter-mono, var(--font-mono));
       font-size: 0.60rem;
       letter-spacing: 0.14em;
       color: var(--muted);
@@ -285,25 +221,27 @@
       margin-bottom: 2rem;
     }
     .write-link {
-      font-family: var(--font-mono);
+      font-family: var(--letter-mono, var(--font-mono));
       font-size: 0.62rem;
       letter-spacing: 0.16em;
       text-transform: uppercase;
-      color: var(--cream);
-      background: var(--lapis);
+      color: var(--bg);
+      background: var(--accent-strong);
       text-decoration: none;
       padding: 8px 24px;
       border-radius: 100px;
       transition: background 0.2s ease;
     }
-    .write-link:hover { background: var(--plum); }
+    .write-link:hover { background: var(--accent-deep); }
   </style>
 </head>
 <body>
 
-  <div class="blob blob-1"></div>
-  <div class="blob blob-2"></div>
-  <div class="blob blob-3"></div>
+  <div class="motif-grain"></div>
+  <div class="motif-blob motif-blob-1"></div>
+  <div class="motif-blob motif-blob-2"></div>
+  <div class="motif-blob motif-blob-3"></div>
+  <div class="motif-blob motif-blob-4"></div>
 
   <header class="topbar">
     <a href="/" class="topbar-brand">.space</a>
@@ -317,7 +255,9 @@
 
   <div class="letter-wrap" id="letter-wrap"></div>
 
-  <script>
+  <script type="module">
+    import { findFont, findPalette, findMotif } from '/shared/library.js';
+
     /* ── clock ── */
     const DAYS   = ['sun','mon','tue','wed','thu','fri','sat'];
     const MONTHS = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
@@ -335,6 +275,18 @@
     }
     tick(); setInterval(tick, 1000);
 
+    /* ── apply theme/motif/font tokens to body ── */
+    function applyTokens(letter) {
+      const palette = findPalette(letter && letter.theme);
+      const motif = findMotif(letter && letter.motif);
+      const font = findFont(letter && letter.font);
+      document.body.dataset.theme = palette.id;
+      document.body.classList.add('motif-' + motif.id);
+      document.body.style.setProperty('--letter-display', font.display);
+      document.body.style.setProperty('--letter-body', font.body);
+      document.body.style.setProperty('--letter-mono', font.mono);
+    }
+
     /* ── render letter ── */
     const wrap = document.getElementById('letter-wrap');
 
@@ -342,15 +294,18 @@
       const d = new Date(iso);
       return DAYS[d.getDay()] + ' ' + pad(d.getDate()) + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
     }
-
     function formatIssue(n) {
       return '№ ' + String(n).padStart(3, '0');
+    }
+    function escapeHtml(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
     try {
       const raw = localStorage.getItem('woodles_published');
       if (!raw) throw new Error('empty');
       const letter = JSON.parse(raw);
+      applyTokens(letter);
 
       wrap.innerHTML =
         '<div class="letter-header">' +
@@ -365,16 +320,13 @@
         '</footer>';
 
     } catch(e) {
+      applyTokens(null);
       wrap.innerHTML =
         '<div class="empty-state">' +
           '<p class="empty-title">nothing here yet.</p>' +
           '<p class="empty-sub">write your first letter</p>' +
           '<a href="/write" class="write-link">write →</a>' +
         '</div>';
-    }
-
-    function escapeHtml(str) {
-      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
   </script>
 
