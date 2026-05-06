@@ -17,6 +17,7 @@
 	const POCKETS_ORDER_KEY = 'woodles_pockets_order';
 
 	type LayerId = 'foreground' | 'midground' | 'background';
+	type PocketLayer = 'midground' | 'background';
 	const LAYER_IDS: LayerId[] = ['foreground', 'midground', 'background'];
 	const LAYER_LABELS: Record<LayerId, string> = {
 		foreground: 'fg',
@@ -32,6 +33,7 @@
 	type PocketNote = {
 		id: string;
 		html: string;
+		layer: PocketLayer;
 		createdAt: string;
 		updatedAt: string;
 	};
@@ -71,8 +73,51 @@
 			: [...pockets].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 	);
 
+	const nextPocketLayer = $derived<PocketLayer>(
+		activeLayer === 'background' ? 'background' : 'midground'
+	);
+
 	function elFor(layer: LayerId): HTMLDivElement | undefined {
 		return layer === 'foreground' ? fgEl : layer === 'midground' ? mgEl : bgEl;
+	}
+
+	// Strip inline font/style attributes from HTML so the document's font
+	// system always wins. Preserves structural and semantic markup
+	// (headings, lists, links, bold/italic) but drops <font>/<span>
+	// wrappers and `style`/`color`/`face`/`size` attributes.
+	function sanitizeHtml(html: string): string {
+		if (typeof DOMParser === 'undefined' || !html) return html;
+		const doc = new DOMParser().parseFromString('<div id="__r">' + html + '</div>', 'text/html');
+		const root = doc.getElementById('__r');
+		if (!root) return html;
+		root.querySelectorAll('*').forEach((el) => {
+			el.removeAttribute('style');
+			el.removeAttribute('color');
+			el.removeAttribute('face');
+			el.removeAttribute('size');
+			el.removeAttribute('bgcolor');
+			if (el.tagName === 'FONT' || el.tagName === 'SPAN') {
+				const parent = el.parentNode;
+				if (!parent) return;
+				while (el.firstChild) parent.insertBefore(el.firstChild, el);
+				parent.removeChild(el);
+			}
+		});
+		return root.innerHTML;
+	}
+
+	function handlePaste(e: ClipboardEvent) {
+		const data = e.clipboardData;
+		if (!data) return;
+		const html = data.getData('text/html');
+		const text = data.getData('text/plain');
+		e.preventDefault();
+		if (html) {
+			const cleaned = sanitizeHtml(html);
+			document.execCommand('insertHTML', false, cleaned);
+		} else if (text) {
+			document.execCommand('insertText', false, text);
+		}
 	}
 
 	function loadIntoLayers(d: {
@@ -89,14 +134,20 @@
 		if (d.motif) motif = d.motif;
 		if (d.font) font = d.font;
 		const layers = d.layers ?? {};
-		const fgHtml = layers.foreground?.html ?? d.content ?? '';
-		const mgHtml = layers.midground?.html ?? '';
-		const bgHtml = layers.background?.html ?? '';
+		const fgHtml = sanitizeHtml(layers.foreground?.html ?? d.content ?? '');
+		const mgHtml = sanitizeHtml(layers.midground?.html ?? '');
+		const bgHtml = sanitizeHtml(layers.background?.html ?? '');
 		if (fgEl) fgEl.innerHTML = fgHtml;
 		if (mgEl) mgEl.innerHTML = mgHtml;
 		if (bgEl) bgEl.innerHTML = bgHtml;
 		const notes = d.annotations?.pocketNotes;
-		pockets = Array.isArray(notes) ? notes : [];
+		pockets = Array.isArray(notes)
+			? notes.map((n) => ({
+					...n,
+					layer: n.layer === 'background' ? 'background' : 'midground',
+					html: sanitizeHtml(n.html ?? '')
+				}))
+			: [];
 	}
 
 	onMount(() => {
@@ -195,7 +246,6 @@
 							background: { html: bgEl?.innerHTML ?? '', updatedAt: now }
 						},
 						annotations: { pocketNotes: pockets },
-						// back-compat alias so older readers still load something
 						content: fgEl?.innerHTML ?? '',
 						savedAt: now
 					})
@@ -208,7 +258,6 @@
 	}
 
 	$effect(() => {
-		// re-save whenever the chosen tokens change (after hydration)
 		void theme;
 		void motif;
 		void font;
@@ -247,9 +296,6 @@
 		underline = document.queryCommandState('underline');
 	}
 
-	// Anchor-stamping: walk block-level elements in foreground HTML at publish
-	// time and assign sequential data-anchor IDs so future margin notes have
-	// stable attachment points.
 	function stampAnchors(html: string): string {
 		if (typeof DOMParser === 'undefined') return html;
 		const doc = new DOMParser().parseFromString('<div id="__root">' + html + '</div>', 'text/html');
@@ -268,9 +314,10 @@
 		localStorage.setItem(ISSUE_KEY, String(issue));
 		try {
 			const now = new Date().toISOString();
-			const fgHtml = stampAnchors(fgEl?.innerHTML ?? '');
-			const mgHtml = mgEl?.innerHTML ?? '';
-			const bgHtml = bgEl?.innerHTML ?? '';
+			const fgHtml = stampAnchors(sanitizeHtml(fgEl?.innerHTML ?? ''));
+			const mgHtml = sanitizeHtml(mgEl?.innerHTML ?? '');
+			const bgHtml = sanitizeHtml(bgEl?.innerHTML ?? '');
+			const cleanedPockets = pockets.map((p) => ({ ...p, html: sanitizeHtml(p.html) }));
 			localStorage.setItem(
 				PUBLISHED_KEY,
 				JSON.stringify({
@@ -285,8 +332,7 @@
 						midground: { html: mgHtml, updatedAt: now },
 						background: { html: bgHtml, updatedAt: now }
 					},
-					annotations: { pocketNotes: pockets },
-					// back-compat alias for older viewer code paths
+					annotations: { pocketNotes: cleanedPockets },
 					content: fgHtml
 				})
 			);
@@ -307,7 +353,13 @@
 	async function addPocket() {
 		if (!pocketsOpen) pocketsOpen = true;
 		const now = new Date().toISOString();
-		const note: PocketNote = { id: newPocketId(), html: '', createdAt: now, updatedAt: now };
+		const note: PocketNote = {
+			id: newPocketId(),
+			html: '',
+			layer: nextPocketLayer,
+			createdAt: now,
+			updatedAt: now
+		};
 		pockets = [...pockets, note];
 		scheduleSave();
 		await tick();
@@ -351,6 +403,10 @@
 
 	function flipPocketsOrder() {
 		pocketsOrder = pocketsOrder === 'oldest' ? 'newest' : 'oldest';
+	}
+
+	function pocketLayerLabel(layer: PocketLayer) {
+		return layer === 'midground' ? 'mg' : 'bg';
 	}
 </script>
 
@@ -518,6 +574,7 @@
 			updateMeta();
 			scheduleSave();
 		}}
+		onpaste={handlePaste}
 		onkeyup={updateToolbarState}
 		onmouseup={updateToolbarState}
 		role="textbox"
@@ -535,6 +592,7 @@
 			updateMeta();
 			scheduleSave();
 		}}
+		onpaste={handlePaste}
 		role="textbox"
 		tabindex="0"
 	></div>
@@ -550,6 +608,7 @@
 			updateMeta();
 			scheduleSave();
 		}}
+		onpaste={handlePaste}
 		role="textbox"
 		tabindex="0"
 	></div>
@@ -574,16 +633,18 @@
 			<div class="pockets-list">
 				{#each sortedPockets as note (note.id)}
 					<div
-						class="pocket-card"
+						class="pocket-card pocket-card-{note.layer}"
 						in:fly={{ y: 8, duration: 240, easing: cubicOut }}
 						out:fly={{ y: -4, duration: 160, easing: cubicOut }}
 					>
+						<span class="pocket-layer-chip" title="{note.layer} pocket">{pocketLayerLabel(note.layer)}</span>
 						<div
 							class="pocket-body"
 							contenteditable="true"
 							spellcheck="true"
 							use:pocketBody={note.html}
 							oninput={(e) => onPocketInput(note.id, e)}
+							onpaste={handlePaste}
 							data-pocket-body={note.id}
 							data-placeholder="…"
 							role="textbox"
@@ -611,9 +672,9 @@
 					<p class="pockets-empty">a quiet place. tuck a thought in.</p>
 				{/if}
 			</div>
-			<button class="pocket-add" onclick={addPocket}>
+			<button class="pocket-add" onclick={addPocket} title="add a {nextPocketLayer} pocket">
 				<span class="pocket-add-plus">+</span>
-				<span class="pocket-add-label">pocket</span>
+				<span class="pocket-add-label">{nextPocketLayer} pocket</span>
 			</button>
 		</section>
 	{/if}
@@ -718,15 +779,9 @@
 		opacity: 0.5;
 	}
 	@keyframes bar-shimmer {
-		0% {
-			background-position: 0% 0;
-		}
-		50% {
-			background-position: 100% 0;
-		}
-		100% {
-			background-position: 0% 0;
-		}
+		0% { background-position: 0% 0; }
+		50% { background-position: 100% 0; }
+		100% { background-position: 0% 0; }
 	}
 	.topbar-brand {
 		font-family: var(--editor-mono, var(--font-mono));
@@ -737,9 +792,7 @@
 		z-index: 1;
 		color: var(--muted);
 	}
-	.topbar-brand:hover {
-		color: var(--accent-strong);
-	}
+	.topbar-brand:hover { color: var(--accent-strong); }
 	.topbar-label {
 		font-family: var(--editor-mono, var(--font-mono));
 		font-size: 0.57rem;
@@ -776,10 +829,7 @@
 			border-color 0.18s ease,
 			opacity 0.18s ease;
 	}
-	.layer-btn:hover {
-		opacity: 0.9;
-		color: var(--accent-strong);
-	}
+	.layer-btn:hover { opacity: 0.9; color: var(--accent-strong); }
 	.layer-btn.active {
 		color: var(--accent-strong);
 		opacity: 1;
@@ -820,10 +870,7 @@
 			opacity 0.22s ease,
 			transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
 	}
-	.pockets-toggle:hover {
-		opacity: 0.9;
-		color: var(--accent-strong);
-	}
+	.pockets-toggle:hover { opacity: 0.9; color: var(--accent-strong); }
 	.pockets-toggle.on {
 		color: var(--accent-strong);
 		opacity: 1;
@@ -860,12 +907,8 @@
 		padding: 84px clamp(1.5rem, 5vw, 2.5rem) 96px;
 		transition: max-width 0.3s ease;
 	}
-	.editor-wrap[data-layer='midground'] {
-		max-width: 600px;
-	}
-	.editor-wrap[data-layer='background'] {
-		max-width: 540px;
-	}
+	.editor-wrap[data-layer='midground'] { max-width: 600px; }
+	.editor-wrap[data-layer='background'] { max-width: 540px; }
 
 	.doc-eyebrow {
 		font-family: var(--editor-mono, var(--font-mono));
@@ -892,10 +935,7 @@
 		caret-color: var(--accent-deep);
 		line-height: 1.1;
 	}
-	.doc-title::placeholder {
-		color: var(--muted);
-		opacity: 0.28;
-	}
+	.doc-title::placeholder { color: var(--muted); opacity: 0.28; }
 
 	.toolbar {
 		display: flex;
@@ -942,8 +982,21 @@
 		flex-shrink: 0;
 	}
 
-	.doc-body {
+	/* Body fonts: high specificity to override any inline font-family from
+	 * pasted content. The cascade-controlled var() still wins as long as
+	 * pasted text doesn't bring its own inline style — which sanitizeHtml
+	 * strips on paste/load/publish. */
+	.doc-body,
+	.doc-body :global(*) {
 		font-family: var(--editor-body, var(--font-body));
+	}
+	.doc-body :global(h1),
+	.doc-body :global(h2),
+	.doc-body :global(h3) {
+		font-family: var(--editor-display, var(--font-display));
+	}
+
+	.doc-body {
 		font-size: 1.05rem;
 		line-height: 1.9;
 		color: var(--text);
@@ -951,9 +1004,7 @@
 		outline: none;
 		caret-color: var(--accent-deep);
 	}
-	.doc-body.hidden {
-		display: none;
-	}
+	.doc-body.hidden { display: none; }
 	.doc-body:empty::before {
 		content: attr(data-placeholder);
 		color: var(--muted);
@@ -962,7 +1013,6 @@
 		font-style: italic;
 	}
 	.doc-body :global(h1) {
-		font-family: var(--editor-display, var(--font-display));
 		font-size: 2rem;
 		font-weight: 300;
 		color: var(--accent-strong);
@@ -970,7 +1020,6 @@
 		margin: 1.8em 0 0.4em;
 	}
 	.doc-body :global(h2) {
-		font-family: var(--editor-display, var(--font-display));
 		font-size: 1.35rem;
 		font-weight: 300;
 		font-style: italic;
@@ -978,12 +1027,8 @@
 		line-height: 1.2;
 		margin: 1.4em 0 0.35em;
 	}
-	.doc-body :global(p) {
-		margin-bottom: 1em;
-	}
-	.doc-body :global(p:last-child) {
-		margin-bottom: 0;
-	}
+	.doc-body :global(p) { margin-bottom: 1em; }
+	.doc-body :global(p:last-child) { margin-bottom: 0; }
 	.doc-body :global(blockquote) {
 		border-left: 2px solid var(--accent);
 		padding: 0.1em 0 0.1em 1.2em;
@@ -992,27 +1037,16 @@
 		color: var(--muted);
 	}
 	.doc-body :global(ul),
-	.doc-body :global(ol) {
-		padding-left: 1.4em;
-		margin: 0.8em 0;
-	}
-	.doc-body :global(li) {
-		margin-bottom: 0.2em;
-	}
+	.doc-body :global(ol) { padding-left: 1.4em; margin: 0.8em 0; }
+	.doc-body :global(li) { margin-bottom: 0.2em; }
 	.doc-body :global(a) {
 		color: var(--accent-strong);
 		text-decoration: none;
 		border-bottom: 1px solid color-mix(in srgb, var(--accent-strong) 22%, transparent);
 	}
-	.doc-body :global(a:hover) {
-		border-bottom-color: var(--accent-strong);
-	}
-	.doc-body :global(strong) {
-		font-weight: 600;
-	}
-	.doc-body :global(em) {
-		font-style: italic;
-	}
+	.doc-body :global(a:hover) { border-bottom-color: var(--accent-strong); }
+	.doc-body :global(strong) { font-weight: 600; }
+	.doc-body :global(em) { font-style: italic; }
 
 	.layer-midground {
 		font-size: 0.98rem;
@@ -1115,6 +1149,30 @@
 		background: color-mix(in srgb, var(--surface) 80%, transparent);
 		box-shadow: 0 1px 0 color-mix(in srgb, var(--accent) 18%, transparent);
 	}
+	.pocket-card-background {
+		background: color-mix(in srgb, var(--surface) 35%, transparent);
+		border-style: dashed;
+		opacity: 0.92;
+	}
+	.pocket-layer-chip {
+		position: absolute;
+		top: 0.5rem;
+		left: 0.55rem;
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.5rem;
+		letter-spacing: 0.16em;
+		text-transform: lowercase;
+		color: var(--muted);
+		background: color-mix(in srgb, var(--surface) 90%, transparent);
+		padding: 1px 5px;
+		border-radius: 6px;
+		opacity: 0.6;
+		pointer-events: none;
+	}
+	.pocket-card-background .pocket-layer-chip {
+		color: var(--accent-deep);
+		opacity: 0.7;
+	}
 	.pocket-body {
 		font-family: var(--editor-body, var(--font-body));
 		font-size: 0.96rem;
@@ -1123,6 +1181,13 @@
 		outline: none;
 		caret-color: var(--accent-deep);
 		min-height: 1.5em;
+		margin-top: 0.6rem;
+	}
+	.pocket-body :global(*) { font-family: var(--editor-body, var(--font-body)); }
+	.pocket-card-background .pocket-body {
+		font-style: italic;
+		color: var(--muted);
+		font-size: 0.92rem;
 	}
 	.pocket-body:empty::before {
 		content: attr(data-placeholder);
@@ -1253,18 +1318,9 @@
 		color: var(--muted);
 		opacity: 0.5;
 	}
-	.save-status.saving {
-		color: var(--accent-deep);
-		opacity: 0.9;
-	}
-	.word-count {
-		color: var(--muted);
-		opacity: 0.45;
-	}
-	.picker-sep {
-		color: var(--muted);
-		opacity: 0.3;
-	}
+	.save-status.saving { color: var(--accent-deep); opacity: 0.9; }
+	.word-count { color: var(--muted); opacity: 0.45; }
+	.picker-sep { color: var(--muted); opacity: 0.3; }
 	.picker {
 		display: inline-flex;
 		align-items: center;
@@ -1292,15 +1348,10 @@
 		background-position:
 			calc(100% - 9px) 50%,
 			calc(100% - 5px) 50%;
-		background-size:
-			4px 4px,
-			4px 4px;
+		background-size: 4px 4px, 4px 4px;
 		background-repeat: no-repeat;
 	}
-	.picker-select:focus {
-		outline: none;
-		border-color: var(--accent);
-	}
+	.picker-select:focus { outline: none; border-color: var(--accent); }
 
 	.publish-cluster {
 		display: flex;
@@ -1346,9 +1397,7 @@
 		background: var(--accent-deep);
 		transform: translateY(-1px);
 	}
-	.publish-btn:active {
-		transform: translateY(0);
-	}
+	.publish-btn:active { transform: translateY(0); }
 
 	.overlay {
 		position: fixed;
@@ -1378,10 +1427,7 @@
 			opacity 0.55s ease 0.35s,
 			transform 0.55s ease 0.35s;
 	}
-	.overlay.active .overlay-word {
-		opacity: 1;
-		transform: translateY(0);
-	}
+	.overlay.active .overlay-word { opacity: 1; transform: translateY(0); }
 	.overlay-sub {
 		font-family: var(--editor-mono, var(--font-mono));
 		font-size: 0.6rem;
@@ -1392,7 +1438,5 @@
 		margin-top: 1rem;
 		transition: opacity 0.4s ease 0.65s;
 	}
-	.overlay.active .overlay-sub {
-		opacity: 0.5;
-	}
+	.overlay.active .overlay-sub { opacity: 0.5; }
 </style>

@@ -137,6 +137,13 @@
       color: var(--text);
       margin-top: 2.8rem;
     }
+    /* Force inheritance over any leftover inline font-family from
+     * pasted/imported content. The viewer also sanitizes HTML on render
+     * (sanitizeHtml below) — this rule is a defensive belt. */
+    .letter-body * { font-family: inherit; }
+    .letter-body h1, .letter-body h2, .letter-body h3 {
+      font-family: var(--letter-display, var(--font-display));
+    }
 
     /* ── layers ── */
     .layer { transition: opacity 0.4s ease; }
@@ -322,16 +329,48 @@
       gap: 0.9rem;
     }
     .pocket-card-readonly {
+      position: relative;
       padding: 0.95rem 1.2rem;
       border: 1px solid var(--rule);
       border-radius: 8px;
       background: color-mix(in srgb, var(--surface) 55%, transparent);
+    }
+    .pocket-card-readonly.is-background {
+      background: color-mix(in srgb, var(--surface) 35%, transparent);
+      border-style: dashed;
+      opacity: 0.92;
+    }
+    .pocket-layer-chip {
+      position: absolute;
+      top: 0.5rem;
+      left: 0.55rem;
+      font-family: var(--letter-mono, var(--font-mono));
+      font-size: 0.5rem;
+      letter-spacing: 0.16em;
+      text-transform: lowercase;
+      color: var(--muted);
+      background: color-mix(in srgb, var(--surface) 90%, transparent);
+      padding: 1px 5px;
+      border-radius: 6px;
+      opacity: 0.6;
+      pointer-events: none;
+    }
+    .pocket-card-readonly.is-background .pocket-layer-chip {
+      color: var(--accent-deep);
+      opacity: 0.7;
     }
     .pocket-card-readonly .pocket-body {
       font-family: var(--letter-body, var(--font-body));
       font-size: 0.96rem;
       line-height: 1.65;
       color: var(--text);
+      margin-top: 0.6rem;
+    }
+    .pocket-card-readonly .pocket-body * { font-family: var(--letter-body, var(--font-body)); }
+    .pocket-card-readonly.is-background .pocket-body {
+      font-style: italic;
+      color: var(--muted);
+      font-size: 0.92rem;
     }
     .pocket-card-readonly .pocket-body strong { font-weight: 600; }
     .pocket-card-readonly .pocket-body em { font-style: italic; }
@@ -447,8 +486,6 @@
     <a href="/" class="topbar-brand">.space</a>
     <span class="topbar-label">echoes</span>
     <div class="layer-toggles" id="layer-toggles" role="group" aria-label="layers"></div>
-    <span class="topbar-divider" id="topbar-divider" hidden aria-hidden="true"></span>
-    <button class="pockets-tog" id="pockets-tog" type="button" hidden></button>
     <div class="topbar-clock">
       <span class="clock-date" id="clock-date"></span>
       <span class="clock-sep">·</span>
@@ -504,12 +541,12 @@
       return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
-    /* ── layer + pockets visibility ── */
+    /* ── layer visibility ── */
     const VIS_KEY = 'woodles_layer_visibility';
     const POCKETS_ORDER_KEY = 'woodles_pockets_order';
     const LAYER_IDS = ['foreground', 'midground', 'background'];
     const LAYER_LABELS = { foreground: 'fg', midground: 'mg', background: 'bg' };
-    const DEFAULT_VIS = { foreground: true, midground: false, background: false, pockets: false };
+    const DEFAULT_VIS = { foreground: true, midground: false, background: false };
 
     function loadVisibility() {
       try {
@@ -519,8 +556,7 @@
         return {
           foreground: v.foreground !== false, // default on
           midground: !!v.midground,
-          background: !!v.background,
-          pockets: !!v.pockets
+          background: !!v.background
         };
       } catch (e) {
         return { ...DEFAULT_VIS };
@@ -540,13 +576,38 @@
       try { localStorage.setItem(POCKETS_ORDER_KEY, o); } catch (e) {}
     }
 
+    /* ── sanitize: strip inline font-family and other style carriers
+     * from rendered HTML so the document's font system always wins. */
+    function sanitizeHtml(html) {
+      if (typeof DOMParser === 'undefined' || !html) return html || '';
+      const doc = new DOMParser().parseFromString('<div id="__r">' + html + '</div>', 'text/html');
+      const root = doc.getElementById('__r');
+      if (!root) return html;
+      root.querySelectorAll('*').forEach((el) => {
+        el.removeAttribute('style');
+        el.removeAttribute('color');
+        el.removeAttribute('face');
+        el.removeAttribute('size');
+        el.removeAttribute('bgcolor');
+        if (el.tagName === 'FONT' || el.tagName === 'SPAN') {
+          const parent = el.parentNode;
+          if (!parent) return;
+          while (el.firstChild) parent.insertBefore(el.firstChild, el);
+          parent.removeChild(el);
+        }
+      });
+      return root.innerHTML;
+    }
+
     function getLayers(letter) {
       // Migration: synthesize layers from legacy `content` if missing.
+      // Sanitize on read so old letters with inline font styles render
+      // with the document's chosen font.
       const L = letter.layers || {};
       return {
-        foreground: { html: (L.foreground && L.foreground.html) || letter.content || '' },
-        midground:  { html: (L.midground  && L.midground.html)  || '' },
-        background: { html: (L.background && L.background.html) || '' }
+        foreground: { html: sanitizeHtml((L.foreground && L.foreground.html) || letter.content || '') },
+        midground:  { html: sanitizeHtml((L.midground  && L.midground.html)  || '') },
+        background: { html: sanitizeHtml((L.background && L.background.html) || '') }
       };
     }
 
@@ -593,7 +654,13 @@
 
     function getPocketNotes(letter) {
       const notes = letter && letter.annotations && letter.annotations.pocketNotes;
-      return Array.isArray(notes) ? notes : [];
+      if (!Array.isArray(notes)) return [];
+      // Normalize: ensure each note has a layer (default mg) and clean html.
+      return notes.map((n) => ({
+        ...n,
+        layer: n.layer === 'background' ? 'background' : 'midground',
+        html: sanitizeHtml(n.html || '')
+      }));
     }
     function sortPockets(notes, order) {
       return [...notes].sort((a, b) =>
@@ -605,12 +672,16 @@
     function pocketsOrderLabel(order) {
       return order === 'oldest' ? 'oldest first ↓' : 'newest first ↑';
     }
+    function pocketLayerShort(layer) {
+      return layer === 'background' ? 'bg' : 'mg';
+    }
     function renderPockets(letter, visibility, order) {
-      const notes = getPocketNotes(letter);
+      const allNotes = getPocketNotes(letter);
+      // Filter notes by their layer's visibility (per-note coupling).
+      const notes = allNotes.filter((n) => visibility[n.layer]);
       if (notes.length === 0) return '';
       const sorted = sortPockets(notes, order);
-      const visible = !!visibility.pockets;
-      let html = '<section class="pockets-section"' + (visible ? '' : ' hidden') + ' data-pockets>';
+      let html = '<section class="pockets-section" data-pockets>';
       html += '<div class="pockets-divider" aria-hidden="true"></div>';
       html += '<div class="pockets-header">';
       html += '<span class="pockets-eyebrow">inside cover</span>';
@@ -618,30 +689,15 @@
       html += '</div>';
       html += '<div class="pockets-list">';
       sorted.forEach((n) => {
-        html += '<article class="pocket-card-readonly">';
+        const cls = 'pocket-card-readonly is-' + n.layer;
+        html += '<article class="' + cls + '">';
+        html += '<span class="pocket-layer-chip" title="' + n.layer + ' pocket">' + pocketLayerShort(n.layer) + '</span>';
         html += '<div class="pocket-body">' + (n.html || '') + '</div>';
         html += '</article>';
       });
       html += '</div>';
       html += '</section>';
       return html;
-    }
-    function renderPocketsToggle(letter, visibility, onToggle) {
-      const notes = getPocketNotes(letter);
-      const tog = document.getElementById('pockets-tog');
-      const div = document.getElementById('topbar-divider');
-      if (notes.length === 0) {
-        tog.hidden = true;
-        div.hidden = true;
-        return;
-      }
-      tog.hidden = false;
-      div.hidden = false;
-      tog.className = 'pockets-tog' + (visibility.pockets ? ' on' : '');
-      tog.setAttribute('aria-pressed', visibility.pockets ? 'true' : 'false');
-      tog.title = 'pockets';
-      tog.innerHTML = 'pockets<span class="pockets-tog-count">' + notes.length + '</span>';
-      tog.onclick = onToggle;
     }
 
     try {
@@ -666,16 +722,19 @@
           '<a href="/write" class="edit-link">edit →</a>' +
         '</footer>';
 
+      function rerenderPockets() {
+        const mount = document.getElementById('pockets-mount');
+        if (!mount) return;
+        mount.innerHTML = renderPockets(letter, visibility, pocketsOrder);
+        bindPocketsOrderBtn();
+      }
       function bindPocketsOrderBtn() {
         const btn = document.getElementById('pockets-order-btn');
         if (!btn) return;
         btn.onclick = () => {
           pocketsOrder = pocketsOrder === 'oldest' ? 'newest' : 'oldest';
           savePocketsOrder(pocketsOrder);
-          // re-render the pockets section in place; preserve visibility class
-          const mount = document.getElementById('pockets-mount');
-          mount.innerHTML = renderPockets(letter, visibility, pocketsOrder);
-          bindPocketsOrderBtn();
+          rerenderPockets();
         };
       }
 
@@ -688,26 +747,11 @@
           else section.setAttribute('hidden', '');
         }
         renderToggles(letter, visibility, onToggleLayer);
-      }
-      function onTogglePockets() {
-        visibility.pockets = !visibility.pockets;
-        saveVisibility(visibility);
-        const section = wrap.querySelector('section[data-pockets]');
-        if (section) {
-          if (visibility.pockets) {
-            section.removeAttribute('hidden');
-            // re-trigger the rise animation on each open
-            section.style.animation = 'none';
-            void section.offsetWidth;
-            section.style.animation = '';
-          } else {
-            section.setAttribute('hidden', '');
-          }
-        }
-        renderPocketsToggle(letter, visibility, onTogglePockets);
+        // Pocket notes inherit their layer's visibility, so re-render when
+        // mg or bg flips.
+        if (id === 'midground' || id === 'background') rerenderPockets();
       }
       renderToggles(letter, visibility, onToggleLayer);
-      renderPocketsToggle(letter, visibility, onTogglePockets);
       bindPocketsOrderBtn();
 
     } catch(e) {
