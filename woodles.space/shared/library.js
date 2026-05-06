@@ -20,9 +20,9 @@ export const palettes = [
 
 export const motifs = [
 	{ id: 'blobs', name: 'blobs', desc: 'drifting color · grain' },
-	{ id: 'aurora', name: 'aurora', desc: 'wide saturation' },
-	{ id: 'mist', name: 'mist', desc: 'scattered particles' },
-	{ id: 'paper', name: 'paper', desc: 'grain only' },
+	{ id: 'aurora', name: 'aurora', desc: 'sweeping ribbons · no grain' },
+	{ id: 'mist', name: 'mist', desc: 'breathing particles · grain' },
+	{ id: 'paper', name: 'paper', desc: 'grain · vignette' },
 	{ id: 'clean', name: 'clean', desc: 'nothing' }
 ];
 
