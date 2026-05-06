@@ -1,16 +1,16 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "",
-  "installCommand": "",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --filter write build",
   "outputDirectory": ".",
   "trailingSlash": false,
   "rewrites": [
     { "source": "/",              "destination": "/apps/landing/index.html" },
     { "source": "/fonts",         "destination": "/apps/fonts/index.html" },
     { "source": "/fonts/:path*",  "destination": "/apps/fonts/:path*" },
-    { "source": "/write",         "destination": "/apps/write/index.html" },
-    { "source": "/write/:path*",  "destination": "/apps/write/:path*" },
+    { "source": "/write",         "destination": "/apps/write/dist/index.html" },
+    { "source": "/write/:path*",  "destination": "/apps/write/dist/:path*" },
     { "source": "/letter",        "destination": "/apps/letter/index.html" },
     { "source": "/letter/:path*", "destination": "/apps/letter/:path*" }
   ]
