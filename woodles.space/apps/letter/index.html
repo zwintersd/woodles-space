@@ -453,6 +453,205 @@
         margin: 0 clamp(1.5rem, 5vw, 2.5rem) 0.6rem;
       }
     }
+
+    /* ── binder ── */
+    .binder-tabs {
+      position: fixed;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 30;
+    }
+    .binder-tab {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      padding: 12px 6px;
+      font-family: var(--letter-mono, var(--font-mono));
+      font-size: 0.55rem;
+      letter-spacing: 0.18em;
+      text-transform: lowercase;
+      color: var(--muted);
+      background: var(--surface);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid var(--rule);
+      border-right: none;
+      border-radius: 6px 0 0 6px;
+      cursor: pointer;
+      opacity: 0.75;
+      transition: color 0.22s ease, background 0.22s ease, border-color 0.22s ease, opacity 0.22s ease, padding-right 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .binder-tab:hover { opacity: 1; color: var(--accent-strong); }
+    .binder-tab.active {
+      color: var(--accent-strong);
+      opacity: 1;
+      background: color-mix(in srgb, var(--accent) 22%, var(--surface) 78%);
+      border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+      padding-right: 10px;
+    }
+
+    .binder-panel {
+      position: fixed;
+      top: 42px;
+      bottom: 0;
+      right: 32px;
+      width: min(360px, calc(100vw - 64px));
+      background: var(--surface);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      border-left: 1px solid var(--rule);
+      z-index: 25;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(calc(100% + 32px));
+      transition: transform 0.34s cubic-bezier(0.34, 1.36, 0.64, 1), box-shadow 0.34s ease;
+      box-shadow: none;
+    }
+    .binder-panel.open {
+      transform: translateX(0);
+      box-shadow: -10px 0 36px color-mix(in srgb, var(--accent-deep) 16%, transparent);
+    }
+    .binder-header {
+      padding: 1.1rem 1.2rem 0.75rem;
+      border-bottom: 1px solid var(--rule);
+      display: flex; flex-direction: column; gap: 0.25rem;
+    }
+    .binder-header-eyebrow {
+      font-family: var(--letter-mono, var(--font-mono));
+      font-size: 0.5rem; letter-spacing: 0.22em;
+      text-transform: uppercase; color: var(--muted); opacity: 0.55;
+    }
+    .binder-header-title {
+      font-family: var(--letter-display, var(--font-display));
+      font-size: 1.25rem; font-weight: 300; font-style: italic;
+      color: var(--accent-strong);
+    }
+    .binder-controls {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 0.75rem; padding: 0.7rem 1.2rem 0.6rem;
+      border-bottom: 1px solid var(--rule);
+    }
+    .binder-filter { display: inline-flex; gap: 2px; }
+    .binder-filter-btn {
+      font-family: var(--letter-mono, var(--font-mono));
+      font-size: 0.52rem; letter-spacing: 0.14em;
+      text-transform: lowercase; color: var(--muted);
+      background: none; border: 1px solid transparent;
+      padding: 3px 8px; border-radius: 4px; cursor: pointer;
+      opacity: 0.55;
+      transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
+    }
+    .binder-filter-btn:hover { opacity: 0.95; color: var(--accent-strong); }
+    .binder-filter-btn.active {
+      color: var(--accent-strong); opacity: 1;
+      background: color-mix(in srgb, var(--accent) 22%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    }
+    .binder-sort {
+      font-family: var(--letter-mono, var(--font-mono));
+      font-size: 0.52rem; letter-spacing: 0.14em;
+      text-transform: lowercase; color: var(--muted);
+      background: none; border: 1px dashed transparent;
+      padding: 3px 8px; border-radius: 4px; cursor: pointer;
+      opacity: 0.6;
+      transition: color 0.18s ease, border-color 0.18s ease, opacity 0.18s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .binder-sort:hover {
+      opacity: 0.95; color: var(--accent-strong);
+      border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+      transform: translateY(-1px);
+    }
+    .binder-body {
+      flex: 1; overflow-y: auto;
+      padding: 0.7rem 1.2rem 1.4rem;
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .binder-empty {
+      font-family: var(--letter-mono, var(--font-mono));
+      font-size: 0.6rem; letter-spacing: 0.1em;
+      color: var(--muted); opacity: 0.4;
+      font-style: italic;
+      padding: 1rem 0.4rem; text-align: center;
+    }
+    .binder-row {
+      display: flex; flex-direction: column; gap: 0.35rem;
+      padding: 0.7rem 0.85rem;
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      background: color-mix(in srgb, var(--surface) 30%, transparent);
+      text-align: left; cursor: pointer;
+      width: 100%;
+      transition: border-color 0.2s ease, background 0.2s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+      font-family: var(--letter-mono, var(--font-mono));
+    }
+    .binder-row:hover {
+      border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+      background: color-mix(in srgb, var(--surface) 70%, transparent);
+      transform: translateY(-1px);
+    }
+    .binder-row.active {
+      border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+      background: color-mix(in srgb, var(--accent) 12%, var(--surface) 88%);
+    }
+    .binder-row-head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .binder-row-name {
+      font-family: var(--letter-mono, var(--font-mono));
+      font-size: 0.6rem; letter-spacing: 0.16em;
+      text-transform: lowercase; color: var(--accent-strong);
+    }
+    .binder-row-meta {
+      font-family: var(--letter-mono, var(--font-mono));
+      font-size: 0.5rem; letter-spacing: 0.1em;
+      color: var(--muted); opacity: 0.6;
+    }
+    .binder-row-preview {
+      font-family: var(--letter-body, var(--font-body));
+      font-size: 0.78rem; line-height: 1.45;
+      color: var(--muted); font-style: italic;
+    }
+    .binder-row-preview.dim { opacity: 0.4; }
+    .binder-row-passage {
+      font-family: var(--letter-body, var(--font-body));
+      font-size: 0.74rem; line-height: 1.4;
+      color: var(--text); opacity: 0.85;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .binder-chip {
+      font-family: var(--letter-mono, var(--font-mono));
+      font-size: 0.5rem; letter-spacing: 0.16em;
+      text-transform: lowercase; color: var(--muted);
+      background: color-mix(in srgb, var(--surface) 90%, transparent);
+      padding: 1px 5px; border-radius: 6px;
+      opacity: 0.7;
+    }
+    .binder-chip-anchor { color: var(--accent-deep); }
+    .binder-chip-on {
+      background: color-mix(in srgb, var(--accent) 30%, transparent);
+      color: var(--accent-strong);
+      opacity: 1;
+    }
+    .pocket-row-background { border-style: dashed; }
+    .pocket-row-background .binder-row-preview { opacity: 0.7; }
+
+    /* anchor flash */
+    .letter-body .anchor-flash {
+      background: color-mix(in srgb, var(--accent) 22%, transparent);
+      transition: background 1.2s ease;
+      border-radius: 3px;
+    }
+
+    @media (max-width: 700px) {
+      .binder-panel { right: 28px; width: calc(100vw - 56px); }
+    }
     .letter-body h1 {
       font-family: var(--letter-display, var(--font-display));
       font-size: 2rem;
@@ -574,6 +773,13 @@
     <div class="letter-wrap" id="letter-wrap"></div>
     <aside class="margin-column" id="margin-column" aria-label="margin notes"></aside>
   </div>
+
+  <div class="binder-tabs" role="tablist" aria-label="binder">
+    <button class="binder-tab" id="binder-tab-layers" role="tab" data-tab="layers" type="button">layers</button>
+    <button class="binder-tab" id="binder-tab-pockets" role="tab" data-tab="pockets" type="button">pockets</button>
+    <button class="binder-tab" id="binder-tab-notes" role="tab" data-tab="notes" type="button">notes</button>
+  </div>
+  <aside class="binder-panel" id="binder-panel" role="region" aria-hidden="true"></aside>
 
   <script type="module">
     import { findFont, findPalette, findMotif } from '/shared/library.js';
@@ -912,6 +1118,217 @@
       window.addEventListener('resize', () => {
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(() => requestAnimationFrame(rerenderMargins), 80);
+      });
+
+      // ── binder ──
+      let binderOpen = null;
+      let pocketsFilter = 'all';
+
+      function stripTags(html) {
+        return String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      }
+      function countWords(html) {
+        const t = stripTags(html);
+        return t ? t.split(/\s+/).filter((w) => w.length).length : 0;
+      }
+      function previewText(html, max) {
+        const m = max == null ? 90 : max;
+        const t = stripTags(html);
+        if (!t) return '';
+        if (t.length <= m) return t;
+        return t.slice(0, m).replace(/\s+\S*$/, '') + '…';
+      }
+
+      function renderBinderLayers() {
+        const layers = getLayers(letter);
+        let html = '<header class="binder-header"><span class="binder-header-eyebrow">binder</span><span class="binder-header-title">layers</span></header>';
+        html += '<div class="binder-body">';
+        ['foreground', 'midground', 'background'].forEach((id) => {
+          const lh = layers[id].html;
+          const empty = isEmptyHtml(lh);
+          const words = countWords(lh);
+          const prev = empty ? 'empty' : previewText(lh);
+          const visible = !!visibility[id];
+          html += '<button class="binder-row layer-row' + (visible ? ' active' : '') + '" data-layer-toggle="' + id + '"' + (empty ? ' disabled' : '') + '>';
+          html += '<span class="binder-row-head">';
+          html += '<span class="binder-row-name">' + id + '</span>';
+          html += '<span class="binder-chip' + (visible ? ' binder-chip-on' : '') + '">' + (visible ? 'on' : 'off') + '</span>';
+          html += '</span>';
+          html += '<span class="binder-row-meta">' + words + ' word' + (words === 1 ? '' : 's') + '</span>';
+          html += '<span class="binder-row-preview' + (empty ? ' dim' : '') + '">' + escapeHtml(prev) + '</span>';
+          html += '</button>';
+        });
+        html += '</div>';
+        return html;
+      }
+
+      function renderBinderPockets() {
+        const all = getPocketNotes(letter);
+        const filtered = pocketsFilter === 'all' ? all : all.filter((n) => n.layer === pocketsFilter);
+        const sorted = sortPockets(filtered, pocketsOrder);
+        let html = '<header class="binder-header"><span class="binder-header-eyebrow">binder</span><span class="binder-header-title">pockets · ' + all.length + '</span></header>';
+        html += '<div class="binder-controls">';
+        html += '<div class="binder-filter">';
+        ['all', 'midground', 'background'].forEach((f) => {
+          const lab = f === 'all' ? 'all' : (f === 'midground' ? 'mg' : 'bg');
+          html += '<button class="binder-filter-btn' + (pocketsFilter === f ? ' active' : '') + '" data-pf="' + f + '">' + lab + '</button>';
+        });
+        html += '</div>';
+        html += '<button class="binder-sort" id="binder-sort-pockets">' + (pocketsOrder === 'oldest' ? 'oldest ↓' : 'newest ↑') + '</button>';
+        html += '</div>';
+        html += '<div class="binder-body">';
+        if (sorted.length === 0) {
+          html += '<p class="binder-empty">nothing here.</p>';
+        } else {
+          sorted.forEach((n) => {
+            const lab = n.layer === 'midground' ? 'mg' : 'bg';
+            const empty = isEmptyHtml(n.html);
+            const prev = empty ? '(empty)' : previewText(n.html, 110);
+            html += '<button class="binder-row pocket-row pocket-row-' + n.layer + '" data-pocket-id="' + n.id + '" data-pocket-layer="' + n.layer + '">';
+            html += '<span class="binder-row-head"><span class="binder-chip">' + lab + '</span></span>';
+            html += '<span class="binder-row-preview' + (empty ? ' dim' : '') + '">' + escapeHtml(prev) + '</span>';
+            html += '</button>';
+          });
+        }
+        html += '</div>';
+        return html;
+      }
+
+      function renderBinderNotes() {
+        const notes = getMarginNotes(letter);
+        // Use FG section in DOM to look up passage text and skip orphans.
+        const fgSection = document.querySelector('section[data-layer="foreground"]');
+        const entries = [];
+        notes.forEach((n) => {
+          const block = fgSection ? fgSection.querySelector('[data-anchor="' + n.anchorId + '"]') : null;
+          if (!block) return;
+          entries.push({
+            id: n.id,
+            anchorId: n.anchorId,
+            preview: previewText(n.html, 70) || '(empty note)',
+            passage: previewText(block.textContent || '', 90)
+          });
+        });
+        entries.sort((a, b) => a.anchorId.localeCompare(b.anchorId));
+        let html = '<header class="binder-header"><span class="binder-header-eyebrow">binder</span><span class="binder-header-title">margin notes · ' + entries.length + '</span></header>';
+        html += '<div class="binder-body">';
+        if (entries.length === 0) {
+          html += '<p class="binder-empty">no margin notes here.</p>';
+        } else {
+          entries.forEach((e) => {
+            html += '<button class="binder-row margin-row" data-anchor-jump="' + e.anchorId + '">';
+            html += '<span class="binder-row-head"><span class="binder-chip binder-chip-anchor">' + e.anchorId + '</span></span>';
+            html += '<span class="binder-row-passage">' + escapeHtml(e.passage || '(passage missing)') + '</span>';
+            html += '<span class="binder-row-preview">' + escapeHtml(e.preview) + '</span>';
+            html += '</button>';
+          });
+        }
+        html += '</div>';
+        return html;
+      }
+
+      function rerenderBinder() {
+        const panel = document.getElementById('binder-panel');
+        if (!panel) return;
+        // Update tab active state
+        ['layers', 'pockets', 'notes'].forEach((t) => {
+          const btn = document.getElementById('binder-tab-' + t);
+          if (btn) {
+            btn.classList.toggle('active', binderOpen === t);
+            btn.setAttribute('aria-selected', binderOpen === t ? 'true' : 'false');
+          }
+        });
+        panel.classList.toggle('open', binderOpen !== null);
+        panel.setAttribute('aria-hidden', binderOpen === null ? 'true' : 'false');
+        if (binderOpen === 'layers') panel.innerHTML = renderBinderLayers();
+        else if (binderOpen === 'pockets') panel.innerHTML = renderBinderPockets();
+        else if (binderOpen === 'notes') panel.innerHTML = renderBinderNotes();
+        else panel.innerHTML = '';
+        bindBinderActions();
+      }
+
+      function bindBinderActions() {
+        // Layer toggles inside the binder mirror the topbar toggles.
+        document.querySelectorAll('[data-layer-toggle]').forEach((el) => {
+          el.addEventListener('click', () => {
+            const id = el.getAttribute('data-layer-toggle');
+            if (!id) return;
+            // Reuse existing toggle path so margin re-render fires correctly.
+            onToggleLayer(id);
+            rerenderBinder();
+          });
+        });
+        // Pocket filter chips.
+        document.querySelectorAll('[data-pf]').forEach((el) => {
+          el.addEventListener('click', () => {
+            pocketsFilter = el.getAttribute('data-pf') || 'all';
+            rerenderBinder();
+          });
+        });
+        // Sort flip from binder.
+        const sortBtn = document.getElementById('binder-sort-pockets');
+        if (sortBtn) {
+          sortBtn.addEventListener('click', () => {
+            pocketsOrder = pocketsOrder === 'oldest' ? 'newest' : 'oldest';
+            savePocketsOrder(pocketsOrder);
+            rerenderPockets();
+            rerenderBinder();
+          });
+        }
+        // Pocket click → ensure pocket's layer is on, scroll to inside cover.
+        document.querySelectorAll('[data-pocket-id]').forEach((el) => {
+          el.addEventListener('click', () => {
+            const layerNeeded = el.getAttribute('data-pocket-layer') || 'midground';
+            if (!visibility[layerNeeded]) {
+              onToggleLayer(layerNeeded);
+            }
+            requestAnimationFrame(() => {
+              const section = document.querySelector('section[data-pockets]');
+              if (section) {
+                section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            });
+          });
+        });
+        // Margin note click → ensure fg + mg on, scroll to anchor, flash.
+        document.querySelectorAll('[data-anchor-jump]').forEach((el) => {
+          el.addEventListener('click', () => {
+            const anchorId = el.getAttribute('data-anchor-jump');
+            if (!anchorId) return;
+            let toggled = false;
+            if (!visibility.foreground) { onToggleLayer('foreground'); toggled = true; }
+            if (!visibility.midground) { onToggleLayer('midground'); toggled = true; }
+            const doScroll = () => {
+              const block = document.querySelector('section[data-layer="foreground"] [data-anchor="' + anchorId + '"]');
+              if (!block) return;
+              block.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              block.classList.add('anchor-flash');
+              setTimeout(() => block.classList.remove('anchor-flash'), 1200);
+            };
+            if (toggled) {
+              // Wait for layer toggle re-render before measuring.
+              requestAnimationFrame(() => requestAnimationFrame(doScroll));
+            } else {
+              requestAnimationFrame(doScroll);
+            }
+          });
+        });
+      }
+
+      function toggleBinder(tab) {
+        binderOpen = binderOpen === tab ? null : tab;
+        rerenderBinder();
+      }
+
+      ['layers', 'pockets', 'notes'].forEach((t) => {
+        const btn = document.getElementById('binder-tab-' + t);
+        if (btn) btn.addEventListener('click', () => toggleBinder(t));
+      });
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && binderOpen) {
+          binderOpen = null;
+          rerenderBinder();
+        }
       });
 
     } catch(e) {
