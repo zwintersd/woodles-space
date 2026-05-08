@@ -11,8 +11,12 @@
 		findFont
 	} from '@shared/library.js';
 
-	const DRAFT_KEY = 'woodles_write_draft';
-	const PUBLISHED_KEY = 'woodles_published';
+	const LETTERS_KEY = 'woodles_letters';
+	const DRAFTS_KEY = 'woodles_drafts';
+	// Legacy keys — read on first migration, written-through on publish so
+	// older viewer code paths still see "the latest letter".
+	const LEGACY_DRAFT_KEY = 'woodles_write_draft';
+	const LEGACY_PUBLISHED_KEY = 'woodles_published';
 	const ISSUE_KEY = 'woodles_issue_count';
 	const POCKETS_ORDER_KEY = 'woodles_pockets_order';
 
@@ -84,6 +88,14 @@
 	type BinderTab = 'layers' | 'pockets' | 'notes';
 	let binderOpen = $state<BinderTab | null>(null);
 	let pocketsFilter = $state<'all' | PocketLayer>('all');
+
+	// Multi-doc reply context — set from ?reply=<id> URL param. When set,
+	// the draft autosaves under that source's draft slot, and on publish
+	// the new letter has replyTo set so it appears in the source's
+	// "Responses" section.
+	let replyTo = $state<string | null>(null);
+	let replyToTitle = $state<string | null>(null);
+	const draftKey = $derived<string>(replyTo ?? 'new');
 
 	let selectionRect = $state<{ top: number; left: number; width: number } | null>(null);
 	let selectionAnchorId = $state<string | null>(null);
@@ -201,6 +213,82 @@
 		return root.innerHTML;
 	}
 
+	// ── multi-doc storage ──
+	type StoredLetter = {
+		id: string;
+		title: string;
+		theme: string;
+		motif: string;
+		font: string;
+		issue: number;
+		publishedAt: string;
+		layers: Record<string, { html: string; updatedAt: string }>;
+		annotations: { pocketNotes: PocketNote[]; marginNotes: MarginNote[] };
+		content: string;
+		replyTo: string | null;
+	};
+
+	function newLetterId() {
+		return 'l-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+	}
+
+	function loadLettersList(): StoredLetter[] {
+		if (typeof localStorage === 'undefined') return [];
+		try {
+			const raw = localStorage.getItem(LETTERS_KEY);
+			if (raw) {
+				const parsed = JSON.parse(raw);
+				return Array.isArray(parsed) ? parsed : [];
+			}
+			// Migration from legacy single-letter slot.
+			const old = localStorage.getItem(LEGACY_PUBLISHED_KEY);
+			if (old) {
+				const lt = JSON.parse(old);
+				lt.id = lt.id || newLetterId();
+				lt.replyTo = lt.replyTo ?? null;
+				const list: StoredLetter[] = [lt];
+				localStorage.setItem(LETTERS_KEY, JSON.stringify(list));
+				return list;
+			}
+		} catch (e) {
+			// ignore corrupt list
+		}
+		return [];
+	}
+
+	function saveLettersList(list: StoredLetter[]) {
+		try { localStorage.setItem(LETTERS_KEY, JSON.stringify(list)); } catch (e) {}
+	}
+
+	function findLetter(list: StoredLetter[], id: string): StoredLetter | undefined {
+		return list.find((l) => l.id === id);
+	}
+
+	function loadDraftsMap(): Record<string, any> {
+		if (typeof localStorage === 'undefined') return {};
+		try {
+			const raw = localStorage.getItem(DRAFTS_KEY);
+			if (raw) {
+				const parsed = JSON.parse(raw);
+				return parsed && typeof parsed === 'object' ? parsed : {};
+			}
+			// Migration: legacy single-draft becomes the 'new' slot.
+			const old = localStorage.getItem(LEGACY_DRAFT_KEY);
+			if (old) {
+				const drafts = { new: JSON.parse(old) };
+				localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
+				return drafts;
+			}
+		} catch (e) {
+			// ignore
+		}
+		return {};
+	}
+
+	function saveDraftsMap(drafts: Record<string, any>) {
+		try { localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts)); } catch (e) {}
+	}
+
 	function loadIntoLayers(d: {
 		title?: string;
 		theme?: string;
@@ -249,6 +337,8 @@
 
 		const params = new URLSearchParams(window.location.search);
 		const tid = params.get('template');
+		const replyId = params.get('reply');
+
 		if (tid) {
 			const t = findTemplate(tid);
 			if (t) {
@@ -264,15 +354,29 @@
 				hydrated = true;
 				scheduleSave();
 				scheduleMeasure();
+				window.addEventListener('resize', onResize);
+				document.addEventListener('selectionchange', onSelectionChange);
 				return;
 			}
 		}
 
+		if (replyId) {
+			const letters = loadLettersList();
+			const source = findLetter(letters, replyId);
+			if (source) {
+				replyTo = replyId;
+				replyToTitle = source.title || 'untitled letter';
+			}
+			// If source missing, replyTo stays null; we fall back to the 'new' draft.
+		}
+
 		try {
-			const raw = localStorage.getItem(DRAFT_KEY);
-			if (raw) loadIntoLayers(JSON.parse(raw));
+			const drafts = loadDraftsMap();
+			const key = replyTo ?? 'new';
+			const draft = drafts[key];
+			if (draft) loadIntoLayers(draft);
 		} catch (e) {
-			// ignore corrupt draft
+			// ignore corrupt drafts
 		}
 		updateMeta();
 		hydrated = true;
@@ -338,23 +442,24 @@
 		saveTimer = setTimeout(() => {
 			try {
 				const now = new Date().toISOString();
-				localStorage.setItem(
-					DRAFT_KEY,
-					JSON.stringify({
-						title,
-						theme,
-						motif,
-						font,
-						layers: {
-							foreground: { html: fgEl?.innerHTML ?? '', updatedAt: now },
-							midground: { html: mgEl?.innerHTML ?? '', updatedAt: now },
-							background: { html: bgEl?.innerHTML ?? '', updatedAt: now }
-						},
-						annotations: { pocketNotes: pockets, marginNotes },
-						content: fgEl?.innerHTML ?? '',
-						savedAt: now
-					})
-				);
+				const key = replyTo ?? 'new';
+				const drafts = loadDraftsMap();
+				drafts[key] = {
+					title,
+					theme,
+					motif,
+					font,
+					layers: {
+						foreground: { html: fgEl?.innerHTML ?? '', updatedAt: now },
+						midground: { html: mgEl?.innerHTML ?? '', updatedAt: now },
+						background: { html: bgEl?.innerHTML ?? '', updatedAt: now }
+					},
+					annotations: { pocketNotes: pockets, marginNotes },
+					content: fgEl?.innerHTML ?? '',
+					replyTo,
+					savedAt: now
+				};
+				saveDraftsMap(drafts);
 			} catch (e) {
 				// ignore quota / disabled storage
 			}
@@ -428,6 +533,7 @@
 	function publish() {
 		const issue = parseInt(localStorage.getItem(ISSUE_KEY) || '0') + 1;
 		localStorage.setItem(ISSUE_KEY, String(issue));
+		let publishedId: string | null = null;
 		try {
 			const now = new Date().toISOString();
 			const fgHtml = stampAnchorsHtml(sanitizeHtml(fgEl?.innerHTML ?? ''));
@@ -435,30 +541,40 @@
 			const bgHtml = sanitizeHtml(bgEl?.innerHTML ?? '');
 			const cleanedPockets = pockets.map((p) => ({ ...p, html: sanitizeHtml(p.html) }));
 			const cleanedMargins = marginNotes.map((m) => ({ ...m, html: sanitizeHtml(m.html) }));
-			localStorage.setItem(
-				PUBLISHED_KEY,
-				JSON.stringify({
-					title: title.trim() || 'untitled letter',
-					theme,
-					motif,
-					font,
-					issue,
-					publishedAt: now,
-					layers: {
-						foreground: { html: fgHtml, updatedAt: now },
-						midground: { html: mgHtml, updatedAt: now },
-						background: { html: bgHtml, updatedAt: now }
-					},
-					annotations: { pocketNotes: cleanedPockets, marginNotes: cleanedMargins },
-					content: fgHtml
-				})
-			);
+			const newLetter: StoredLetter = {
+				id: newLetterId(),
+				title: title.trim() || 'untitled letter',
+				theme,
+				motif,
+				font,
+				issue,
+				publishedAt: now,
+				layers: {
+					foreground: { html: fgHtml, updatedAt: now },
+					midground: { html: mgHtml, updatedAt: now },
+					background: { html: bgHtml, updatedAt: now }
+				},
+				annotations: { pocketNotes: cleanedPockets, marginNotes: cleanedMargins },
+				content: fgHtml,
+				replyTo
+			};
+			publishedId = newLetter.id;
+			const list = loadLettersList();
+			list.push(newLetter);
+			saveLettersList(list);
+			// Legacy alias: keep woodles_published pointing at the latest letter
+			// so any older code paths still find something.
+			localStorage.setItem(LEGACY_PUBLISHED_KEY, JSON.stringify(newLetter));
+			// Clear the matching draft slot.
+			const drafts = loadDraftsMap();
+			delete drafts[replyTo ?? 'new'];
+			saveDraftsMap(drafts);
 		} catch (e) {
 			// ignore
 		}
 		publishing = true;
 		setTimeout(() => {
-			window.location.href = '/letter';
+			window.location.href = publishedId ? '/letter?id=' + publishedId : '/letter';
 		}, 1800);
 	}
 
@@ -781,6 +897,13 @@
 
 <div class="editor-page" data-layer={activeLayer} bind:this={editorPageEl}>
 	<div class="editor-wrap" data-layer={activeLayer}>
+		{#if replyTo && replyToTitle}
+			<a class="reply-breadcrumb" href="/letter?id={replyTo}" title="back to source letter">
+				<span class="reply-breadcrumb-eyebrow">in reply to</span>
+				<span class="reply-breadcrumb-title">{replyToTitle}</span>
+				<span class="reply-breadcrumb-arrow" aria-hidden="true">↗</span>
+			</a>
+		{/if}
 		<p class="doc-eyebrow">echoes · {activeLayer}</p>
 		<input
 			bind:this={titleEl}
@@ -1478,6 +1601,48 @@
 		color: var(--muted);
 		opacity: 0.45;
 		margin-bottom: 1rem;
+	}
+
+	.reply-breadcrumb {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 0.65rem;
+		margin-bottom: 1.1rem;
+		text-decoration: none;
+		padding: 6px 12px;
+		border-radius: 100px;
+		border: 1px solid var(--rule);
+		background: color-mix(in srgb, var(--surface) 40%, transparent);
+		transition: opacity 0.2s ease, border-color 0.2s ease, background 0.2s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+	}
+	.reply-breadcrumb:hover {
+		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+		background: color-mix(in srgb, var(--accent) 10%, transparent);
+		transform: translateY(-1px);
+	}
+	.reply-breadcrumb-eyebrow {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.5rem;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+		color: var(--muted);
+		opacity: 0.55;
+	}
+	.reply-breadcrumb-title {
+		font-family: var(--editor-display, var(--font-display));
+		font-style: italic;
+		color: var(--accent-strong);
+		font-size: 0.95rem;
+		max-width: 22em;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.reply-breadcrumb-arrow {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.7rem;
+		color: var(--accent-strong);
+		opacity: 0.7;
 	}
 
 	.doc-title {
