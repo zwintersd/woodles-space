@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy, tick } from 'svelte';
-	import { fly, slide } from 'svelte/transition';
+	import { fly, slide, fade } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
 	import Clock from '$lib/Clock.svelte';
 	import {
@@ -104,6 +104,17 @@
 	let measureTimer: ReturnType<typeof setTimeout> | undefined;
 	let hydrated = $state(false);
 
+	type DraftIndexItem = { id: string; title: string; updatedAt: string };
+	let draftsList = $state<DraftIndexItem[]>([]);
+	let currentDraftId = $state<string | null>(null);
+	let draftsOpen = $state(false);
+
+	const ACTIVE_DRAFT_ID_KEY = 'woodles_active_draft_id';
+	const DRAFTS_INDEX_KEY = 'woodles_drafts_index';
+	const DRAFT_PREFIX = 'woodles_draft_';
+
+	const sortedDrafts = $derived([...draftsList].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
+
 	const sortedPockets = $derived(
 		pocketsOrder === 'oldest'
 			? [...pockets].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
@@ -150,6 +161,7 @@
 			el.removeAttribute('face');
 			el.removeAttribute('size');
 			el.removeAttribute('bgcolor');
+			el.removeAttribute('data-anchor');
 			if (el.tagName === 'FONT' || el.tagName === 'SPAN') {
 				const parent = el.parentNode;
 				if (!parent) return;
@@ -181,13 +193,19 @@
 	function ensureAnchorsOn(blocks: NodeListOf<Element> | Element[]) {
 		const list = Array.from(blocks);
 		let max = 0;
+		const seen = new Set<string>();
 		for (const b of list) {
 			const id = b.getAttribute('data-anchor');
 			if (id) {
-				const m = /^a-(\d+)$/.exec(id);
-				if (m) {
-					const n = parseInt(m[1], 10);
-					if (!isNaN(n) && n > max) max = n;
+				if (seen.has(id)) {
+					b.removeAttribute('data-anchor');
+				} else {
+					seen.add(id);
+					const m = /^a-(\d+)$/.exec(id);
+					if (m) {
+						const n = parseInt(m[1], 10);
+						if (!isNaN(n) && n > max) max = n;
+					}
 				}
 			}
 		}
@@ -329,6 +347,10 @@
 
 	onMount(() => {
 		try {
+			document.execCommand('defaultParagraphSeparator', false, 'p');
+		} catch (e) {}
+
+		try {
 			const order = localStorage.getItem(POCKETS_ORDER_KEY);
 			if (order === 'newest' || order === 'oldest') pocketsOrder = order;
 		} catch (e) {
@@ -371,10 +393,33 @@
 		}
 
 		try {
-			const drafts = loadDraftsMap();
-			const key = replyTo ?? 'new';
-			const draft = drafts[key];
-			if (draft) loadIntoLayers(draft);
+			const indexRaw = localStorage.getItem(DRAFTS_INDEX_KEY);
+			if (indexRaw) draftsList = JSON.parse(indexRaw);
+		} catch(e) {}
+
+		let activeId = localStorage.getItem(ACTIVE_DRAFT_ID_KEY);
+		if (!activeId) {
+			const oldDraft = localStorage.getItem(DRAFT_KEY);
+			if (oldDraft) {
+				const id = 'd-' + Date.now().toString(36);
+				localStorage.setItem(DRAFT_PREFIX + id, oldDraft);
+				localStorage.removeItem(DRAFT_KEY);
+				activeId = id;
+				const parsed = JSON.parse(oldDraft);
+				draftsList = [{ id, title: parsed.title || 'untitled', updatedAt: parsed.savedAt || new Date().toISOString() }];
+				localStorage.setItem(DRAFTS_INDEX_KEY, JSON.stringify(draftsList));
+			} else {
+				activeId = 'd-' + Date.now().toString(36);
+				draftsList = [{ id: activeId, title: '', updatedAt: new Date().toISOString() }];
+				localStorage.setItem(DRAFTS_INDEX_KEY, JSON.stringify(draftsList));
+			}
+			localStorage.setItem(ACTIVE_DRAFT_ID_KEY, activeId);
+		}
+		currentDraftId = activeId;
+
+		try {
+			const raw = localStorage.getItem(DRAFT_PREFIX + currentDraftId);
+			if (raw) loadIntoLayers(JSON.parse(raw));
 		} catch (e) {
 			// ignore corrupt drafts
 		}
@@ -430,25 +475,21 @@
 
 	function updateMeta() {
 		const el = elFor(activeLayer);
-		const text = el?.innerText || '';
+		const text = el?.textContent || '';
 		wordCount = text.trim().split(/\s+/).filter((w) => w.length).length;
 		fgIsEmpty = isEmptyHtml(fgEl?.innerHTML ?? '');
 	}
 
 	function scheduleSave() {
 		if (!hydrated) return;
+		if (publishing) return;
 		saveStatus = 'saving';
 		clearTimeout(saveTimer);
 		saveTimer = setTimeout(() => {
 			try {
 				const now = new Date().toISOString();
-				const key = replyTo ?? 'new';
-				const drafts = loadDraftsMap();
-				drafts[key] = {
-					title,
-					theme,
-					motif,
-					font,
+				const draftData = {
+					title, theme, motif, font,
 					layers: {
 						foreground: { html: fgEl?.innerHTML ?? '', updatedAt: now },
 						midground: { html: mgEl?.innerHTML ?? '', updatedAt: now },
@@ -456,10 +497,19 @@
 					},
 					annotations: { pocketNotes: pockets, marginNotes },
 					content: fgEl?.innerHTML ?? '',
-					replyTo,
 					savedAt: now
 				};
-				saveDraftsMap(drafts);
+				if (currentDraftId) {
+					localStorage.setItem(DRAFT_PREFIX + currentDraftId, JSON.stringify(draftData));
+					
+					const idx = draftsList.findIndex(d => d.id === currentDraftId);
+					if (idx >= 0) {
+						draftsList[idx] = { ...draftsList[idx], title, updatedAt: now };
+					} else {
+						draftsList.push({ id: currentDraftId, title, updatedAt: now });
+					}
+					localStorage.setItem(DRAFTS_INDEX_KEY, JSON.stringify(draftsList));
+				}
 			} catch (e) {
 				// ignore quota / disabled storage
 			}
@@ -530,7 +580,85 @@
 		underline = document.queryCommandState('underline');
 	}
 
+	function loadDraft(id: string) {
+		if (id === currentDraftId) {
+			draftsOpen = false;
+			return;
+		}
+		clearTimeout(saveTimer);
+		try {
+			const now = new Date().toISOString();
+			const draftData = {
+				title, theme, motif, font,
+				layers: {
+					foreground: { html: fgEl?.innerHTML ?? '', updatedAt: now },
+					midground: { html: mgEl?.innerHTML ?? '', updatedAt: now },
+					background: { html: bgEl?.innerHTML ?? '', updatedAt: now }
+				},
+				annotations: { pocketNotes: pockets, marginNotes },
+				content: fgEl?.innerHTML ?? '',
+				savedAt: now
+			};
+			localStorage.setItem(DRAFT_PREFIX + currentDraftId!, JSON.stringify(draftData));
+		} catch(e) {}
+
+		currentDraftId = id;
+		localStorage.setItem(ACTIVE_DRAFT_ID_KEY, id);
+		
+		title = '';
+		pockets = [];
+		marginNotes = [];
+		if (fgEl) fgEl.innerHTML = '';
+		if (mgEl) mgEl.innerHTML = '';
+		if (bgEl) bgEl.innerHTML = '';
+
+		try {
+			const raw = localStorage.getItem(DRAFT_PREFIX + id);
+			if (raw) loadIntoLayers(JSON.parse(raw));
+		} catch (e) {}
+		
+		updateMeta();
+		scheduleMeasure(60);
+		draftsOpen = false;
+	}
+
+	function newDraft() {
+		const id = 'd-' + Date.now().toString(36);
+		const now = new Date().toISOString();
+		draftsList = [{ id, title: '', updatedAt: now }, ...draftsList];
+		localStorage.setItem(DRAFTS_INDEX_KEY, JSON.stringify(draftsList));
+		loadDraft(id);
+	}
+
+	function deleteDraft(id: string, e: Event) {
+		e.stopPropagation();
+		if (draftsList.length === 1 && id === currentDraftId) {
+			title = '';
+			if (fgEl) fgEl.innerHTML = '';
+			if (mgEl) mgEl.innerHTML = '';
+			if (bgEl) bgEl.innerHTML = '';
+			pockets = [];
+			marginNotes = [];
+			scheduleSave();
+			return;
+		}
+		
+		localStorage.removeItem(DRAFT_PREFIX + id);
+		draftsList = draftsList.filter(d => d.id !== id);
+		localStorage.setItem(DRAFTS_INDEX_KEY, JSON.stringify(draftsList));
+
+		if (id === currentDraftId) {
+			const next = [...draftsList].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+			if (next) {
+				loadDraft(next.id);
+				draftsOpen = true;
+			}
+		}
+	}
+
 	function publish() {
+		publishing = true;
+		clearTimeout(saveTimer);
 		const issue = parseInt(localStorage.getItem(ISSUE_KEY) || '0') + 1;
 		localStorage.setItem(ISSUE_KEY, String(issue));
 		let publishedId: string | null = null;
@@ -541,38 +669,33 @@
 			const bgHtml = sanitizeHtml(bgEl?.innerHTML ?? '');
 			const cleanedPockets = pockets.map((p) => ({ ...p, html: sanitizeHtml(p.html) }));
 			const cleanedMargins = marginNotes.map((m) => ({ ...m, html: sanitizeHtml(m.html) }));
-			const newLetter: StoredLetter = {
-				id: newLetterId(),
-				title: title.trim() || 'untitled letter',
-				theme,
-				motif,
-				font,
-				issue,
-				publishedAt: now,
-				layers: {
-					foreground: { html: fgHtml, updatedAt: now },
-					midground: { html: mgHtml, updatedAt: now },
-					background: { html: bgHtml, updatedAt: now }
-				},
-				annotations: { pocketNotes: cleanedPockets, marginNotes: cleanedMargins },
-				content: fgHtml,
-				replyTo
-			};
-			publishedId = newLetter.id;
-			const list = loadLettersList();
-			list.push(newLetter);
-			saveLettersList(list);
-			// Legacy alias: keep woodles_published pointing at the latest letter
-			// so any older code paths still find something.
-			localStorage.setItem(LEGACY_PUBLISHED_KEY, JSON.stringify(newLetter));
-			// Clear the matching draft slot.
-			const drafts = loadDraftsMap();
-			delete drafts[replyTo ?? 'new'];
-			saveDraftsMap(drafts);
+			localStorage.setItem(
+				PUBLISHED_KEY,
+				JSON.stringify({
+					title: title.trim() || 'untitled letter',
+					theme,
+					motif,
+					font,
+					issue,
+					publishedAt: now,
+					layers: {
+						foreground: { html: fgHtml, updatedAt: now },
+						midground: { html: mgHtml, updatedAt: now },
+						background: { html: bgHtml, updatedAt: now }
+					},
+					annotations: { pocketNotes: cleanedPockets, marginNotes: cleanedMargins },
+					content: fgHtml
+				})
+			);
+			if (currentDraftId) {
+				localStorage.removeItem(DRAFT_PREFIX + currentDraftId);
+				draftsList = draftsList.filter(d => d.id !== currentDraftId);
+				localStorage.setItem(DRAFTS_INDEX_KEY, JSON.stringify(draftsList));
+				localStorage.removeItem(ACTIVE_DRAFT_ID_KEY);
+			}
 		} catch (e) {
 			// ignore
 		}
-		publishing = true;
 		setTimeout(() => {
 			window.location.href = publishedId ? '/letter?id=' + publishedId : '/letter';
 		}, 1800);
@@ -690,7 +813,7 @@
 			return;
 		}
 		selectionAnchorId = (block as HTMLElement).getAttribute('data-anchor');
-		selectionRect = { top: r.top, left: r.left, width: r.width };
+		selectionRect = { top: r.top + window.scrollY, left: r.left + window.scrollX, width: r.width };
 	}
 
 	async function addMarginNote(anchorId: string) {
@@ -877,6 +1000,15 @@
 			>
 		{/each}
 	</div>
+	<button
+		class="drafts-toggle"
+		class:on={draftsOpen}
+		onclick={() => draftsOpen = !draftsOpen}
+		aria-pressed={draftsOpen}
+		title="drafts"
+	>
+		drafts
+	</button>
 	<span class="topbar-divider" aria-hidden="true"></span>
 	<button
 		class="pockets-toggle"
@@ -889,6 +1021,30 @@
 	</button>
 	<div class="topbar-clock"><Clock /></div>
 </header>
+
+{#if draftsOpen}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="drafts-overlay" transition:fade={{ duration: 240 }} onclick={() => draftsOpen = false}>
+		<div class="drafts-modal" onclick={(e) => e.stopPropagation()} transition:fly={{ y: 8, duration: 320, easing: cubicOut }}>
+			<div class="drafts-header">
+				<h2 class="drafts-title">your drafts</h2>
+				<button class="drafts-new-btn" onclick={newDraft}>+ new draft</button>
+			</div>
+			<div class="drafts-list">
+				{#each sortedDrafts as d (d.id)}
+					<div class="draft-item" class:active={d.id === currentDraftId}>
+						<button class="draft-item-btn" onclick={() => loadDraft(d.id)}>
+							<span class="draft-item-title">{d.title || 'untitled letter'}</span>
+							<span class="draft-item-date">{new Date(d.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+						</button>
+						<button class="draft-item-delete" onclick={(e) => deleteDraft(d.id, e)} title="discard draft">×</button>
+					</div>
+				{/each}
+			</div>
+		</div>
+	</div>
+{/if}
 
 <div class="overlay" class:active={publishing}>
 	<p class="overlay-word">published.</p>
@@ -1419,6 +1575,80 @@
 		z-index: 1;
 	}
 
+	.drafts-toggle {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.57rem; letter-spacing: 0.14em; text-transform: lowercase;
+		color: var(--muted); background: none; border: 1px solid transparent;
+		padding: 3px 9px; border-radius: 4px; cursor: pointer; opacity: 0.5;
+		display: inline-flex; align-items: center; gap: 0.45em;
+		position: relative; z-index: 1; margin-left: 1.4rem;
+		transition: color 0.22s ease, background 0.22s ease, border-color 0.22s ease, opacity 0.22s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+	}
+	.drafts-toggle:hover { opacity: 0.9; color: var(--accent-strong); }
+	.drafts-toggle.on {
+		color: var(--accent-strong); opacity: 1;
+		background: color-mix(in srgb, var(--accent) 22%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+		transform: translateY(-1px);
+	}
+	.drafts-overlay {
+		position: fixed; inset: 0;
+		background: color-mix(in srgb, var(--bg) 60%, transparent);
+		backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+		z-index: 100; display: flex; align-items: flex-start; justify-content: center;
+		padding-top: 12vh;
+	}
+	.drafts-modal {
+		background: var(--surface); border: 1px solid var(--rule); border-radius: 12px;
+		width: 100%; max-width: 420px;
+		box-shadow: 0 12px 40px color-mix(in srgb, var(--bg) 80%, transparent);
+		overflow: hidden; display: flex; flex-direction: column; max-height: 70vh;
+	}
+	.drafts-header {
+		display: flex; align-items: center; justify-content: space-between;
+		padding: 1.2rem 1.4rem; border-bottom: 1px dashed var(--rule);
+	}
+	.drafts-title {
+		font-family: var(--editor-mono, var(--font-mono)); font-size: 0.75rem;
+		letter-spacing: 0.15em; text-transform: lowercase; color: var(--accent-strong); font-weight: 400;
+	}
+	.drafts-new-btn {
+		font-family: var(--editor-mono, var(--font-mono)); font-size: 0.55rem;
+		letter-spacing: 0.12em; text-transform: lowercase; color: var(--bg);
+		background: var(--accent-strong); border: none; padding: 6px 12px; border-radius: 100px;
+		cursor: pointer; transition: background 0.18s ease, transform 0.18s ease;
+	}
+	.drafts-new-btn:hover { background: var(--accent-deep); transform: translateY(-1px); }
+	.drafts-list { padding: 0.8rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem; }
+	.draft-item {
+		display: flex; align-items: center; border-radius: 8px;
+		transition: background 0.18s ease; padding: 0.4rem;
+	}
+	.draft-item:hover { background: color-mix(in srgb, var(--surface) 50%, var(--rule)); }
+	.draft-item.active { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+	.draft-item-btn {
+		flex: 1; text-align: left; background: none; border: none; padding: 0.6rem;
+		cursor: pointer; display: flex; flex-direction: column; gap: 0.3rem; overflow: hidden;
+	}
+	.draft-item-title {
+		font-family: var(--editor-display, var(--font-display)); font-size: 1.1rem;
+		color: var(--accent-strong); font-style: italic; white-space: nowrap; overflow: hidden;
+		text-overflow: ellipsis; max-width: 100%;
+	}
+	.draft-item-date {
+		font-family: var(--editor-mono, var(--font-mono)); font-size: 0.5rem;
+		letter-spacing: 0.1em; color: var(--muted); opacity: 0.6;
+	}
+	.draft-item-delete {
+		background: none; border: none; font-size: 1rem; color: var(--muted); opacity: 0.3;
+		cursor: pointer; padding: 0.5rem; border-radius: 50%; width: 32px; height: 32px;
+		display: flex; align-items: center; justify-content: center; margin-left: 0.4rem;
+		transition: opacity 0.18s ease, color 0.18s ease, background 0.18s ease;
+	}
+	.draft-item-delete:hover {
+		opacity: 1; color: var(--accent-strong); background: color-mix(in srgb, var(--accent) 20%, transparent);
+	}
+
 	.editor-page {
 		position: relative;
 		z-index: 2;
@@ -1544,7 +1774,7 @@
 
 	/* selection popover */
 	.selection-popover {
-		position: fixed;
+		position: absolute;
 		z-index: 50;
 		transform: translateX(-50%);
 		animation: pop-rise 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
