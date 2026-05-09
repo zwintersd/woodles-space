@@ -241,6 +241,56 @@ class Game {
 		}
 	}
 
+	// ── reading pass ─────────────────────────────────────────────────────────
+
+	glossFromReadingPass(quality: 'luminous' | 'tight' | 'wide') {
+		const qualMult = quality === 'luminous' ? 25 : quality === 'tight' ? 5 : 1;
+
+		// ductus combo still applies (rapid successive hits build a rhythm)
+		const now = Date.now();
+		if (now - this.lastClickAt < 600) this.ductusCombo += 1;
+		else this.ductusCombo = 0;
+		this.lastClickAt = now;
+
+		let gain = this.clickPower * qualMult;
+
+		// collation: every 100th click
+		this.clicksThisHundred += 1;
+		if (this.hasUpgrade('collation') && this.clicksThisHundred >= 100) {
+			gain *= 10;
+			this.clicksThisHundred = 0;
+			this.pushFeed('milestone', 'a collation lands. the hundredth gloss carries the weight of ten.');
+		}
+
+		// close reading consumes a charge
+		if (Date.now() < this.closeReadingUntil && this.closeReadingClicksLeft > 0) {
+			this.closeReadingClicksLeft -= 1;
+			if (this.closeReadingClicksLeft <= 0) this.closeReadingUntil = 0;
+		}
+
+		this.glosses += gain;
+		this.totalGlossesEver += gain;
+		this.clicksEver += 1;
+		this.lastClickGain = gain;
+		this.clickPulse += 1;
+
+		if (Math.random() < 0.08) {
+			this.pushFeed('gloss', rand(glossLines));
+		}
+
+		// emendation still fires on reading pass hits
+		if (this.hasUpgrade('emendation') && Math.random() < 0.05) {
+			this.commentaries += 1;
+			this.pushFeed('milestone', 'an emendation coheres into a commentary.');
+		}
+
+		// luminous: 0.5% chance of a free commentary (the charged-token payoff)
+		if (quality === 'luminous' && Math.random() < 0.005) {
+			this.commentaries += 1;
+			this.pushFeed('milestone', 'a luminous gloss — a commentary coheres unbidden.');
+		}
+	}
+
 	canBuyGenerator(id: string): boolean {
 		const g = this.generatorById(id);
 		if (!g) return false;

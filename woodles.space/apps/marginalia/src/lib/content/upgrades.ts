@@ -10,6 +10,12 @@ export interface Upgrade {
 
 export const upgrades: Upgrade[] = [
 	{
+		id: 'reading_pass',
+		name: 'the reading pass',
+		description: 'words drift through a seam. click in time to annotate. tight timing gives 5×; luminous words give 25×.',
+		cost: { commentaries: 1 }
+	},
+	{
 		id: 'collation',
 		name: 'collation',
 		description: 'every 100th gloss is worth 10×.',

@@ -6,6 +6,7 @@
 	import Canonical from '$lib/components/Canonical.svelte';
 	import Feed from '$lib/components/Feed.svelte';
 	import ClickRegion from '$lib/components/ClickRegion.svelte';
+	import ReadingPass from '$lib/components/rhythm/ReadingPass.svelte';
 	import GeneratorList from '$lib/components/GeneratorList.svelte';
 	import UpgradeShelf from '$lib/components/UpgradeShelf.svelte';
 	import PracticeBar from '$lib/components/PracticeBar.svelte';
@@ -86,7 +87,11 @@
 	<Canonical />
 
 	<section class="reading">
-		<ClickRegion />
+		{#if game.hasUpgrade('reading_pass')}
+			<ReadingPass />
+		{:else}
+			<ClickRegion />
+		{/if}
 		<ResourceLine />
 		<Feed />
 	</section>
