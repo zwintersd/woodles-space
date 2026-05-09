@@ -291,6 +291,34 @@ class Game {
 		}
 	}
 
+	// ── the dispute ──────────────────────────────────────────────────────────
+
+	resourcesFromDispute(mode: 'agreement' | 'disagreement' | 'counterpoint') {
+		const now = Date.now();
+		if (now - this.lastClickAt < 600) this.ductusCombo += 1;
+		else this.ductusCombo = 0;
+		this.lastClickAt = now;
+		this.clickPulse += 1;
+
+		switch (mode) {
+			case 'agreement':
+				this.commentaries += 1;
+				if (Math.random() < 0.08)
+					this.pushFeed('milestone', 'you collate. the margins agree with themselves.');
+				break;
+			case 'disagreement':
+				this.apparatus += 0.1;
+				if (Math.random() < 0.1)
+					this.pushFeed('milestone', 'a refutation. apparatus accretes around the disputed passage.');
+				break;
+			case 'counterpoint':
+				this.recensions += 0.01;
+				if (Math.random() < 0.25)
+					this.pushFeed('milestone', 'counterpoint — your reading diverges into its own tradition.');
+				break;
+		}
+	}
+
 	canBuyGenerator(id: string): boolean {
 		const g = this.generatorById(id);
 		if (!g) return false;

@@ -62,5 +62,11 @@ export const upgrades: Upgrade[] = [
 		name: 'confluence',
 		description: 'commentaries are produced 50% faster.',
 		cost: { apparatus: 40 }
+	},
+	{
+		id: 'dispute',
+		name: 'the dispute',
+		description: 'two reading tracks. click in agreement, disagreement, or counterpoint with a previous reader\'s hand. produces commentaries, apparatus, and recensions.',
+		cost: { apparatus: 2 }
 	}
 ];
