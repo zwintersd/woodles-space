@@ -89,6 +89,10 @@ class Game {
 	ductusCombo = $state(0);
 	lastClickAt = $state(0);
 
+	// tactile pulse — increments on every click; components watch this
+	clickPulse = $state(0);
+	lastClickGain = $state(0);
+
 	// feed (newest first; we render in reverse)
 	feed = $state<FeedEntry[]>([]);
 	private nextFeedId = 1;
@@ -221,8 +225,14 @@ class Game {
 		this.glosses += gain;
 		this.totalGlossesEver += gain;
 		this.clicksEver += 1;
+		this.lastClickGain = gain;
+		this.clickPulse += 1;
 
-		this.pushFeed('gloss', rand(glossLines));
+		// only occasionally surface a written gloss in the feed —
+		// the mark itself is the per-click feedback.
+		if (Math.random() < 0.08) {
+			this.pushFeed('gloss', rand(glossLines));
+		}
 
 		// emendation: 5% chance to also produce a commentary
 		if (this.hasUpgrade('emendation') && Math.random() < 0.05) {

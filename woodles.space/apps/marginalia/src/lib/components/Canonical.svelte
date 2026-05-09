@@ -1,12 +1,24 @@
 <script lang="ts">
 	import { game } from '$lib/state/game.svelte';
 	const c = $derived(game.canonical);
+
+	let trembling = $state(false);
+	let timer: ReturnType<typeof setTimeout> | undefined;
+
+	$effect(() => {
+		// react to every click pulse
+		game.clickPulse;
+		trembling = true;
+		clearTimeout(timer);
+		timer = setTimeout(() => (trembling = false), 160);
+		return () => clearTimeout(timer);
+	});
 </script>
 
-<div class="canonical">
+<div class="canonical" class:trembling>
 	<div class="lines">
 		{#each c.lines as line, i (i)}
-			<p>{line}</p>
+			<p style="--s: {i % 2 === 0 ? 1 : -1}">{line}</p>
 		{/each}
 	</div>
 	<p class="attrib">— {c.attribution} ✦</p>
@@ -26,6 +38,7 @@
 		color: var(--cream);
 		margin: 0.15em 0;
 		letter-spacing: 0.005em;
+		transition: transform 80ms ease;
 	}
 	.attrib {
 		margin-top: 0.9rem;
@@ -34,5 +47,27 @@
 		letter-spacing: 0.18em;
 		text-transform: uppercase;
 		color: var(--periwinkle);
+	}
+	.canonical.trembling .lines p {
+		animation: tremor 160ms ease;
+	}
+	@keyframes tremor {
+		0% {
+			transform: translate(0, 0);
+		}
+		25% {
+			transform: translate(calc(var(--s, 1) * 0.6px), -0.4px);
+		}
+		60% {
+			transform: translate(calc(var(--s, 1) * -0.4px), 0.3px);
+		}
+		100% {
+			transform: translate(0, 0);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.canonical.trembling .lines p {
+			animation: none;
+		}
 	}
 </style>
