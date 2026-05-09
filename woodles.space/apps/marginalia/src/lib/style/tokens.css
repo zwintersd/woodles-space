@@ -1,0 +1,27 @@
+/* marginalia · twilight webcore tokens
+   scoped to the app via the layout wrapper class. */
+
+.marginalia-root {
+	--bg: #1a1a3e;
+	--panel: #2d2d5f;
+	--panel-accent: #3d2d4d;
+
+	--text: #f5f2e8;
+	--muted: #b9b4d8;
+	--periwinkle: #9a96c9;
+	--rule: rgba(154, 150, 201, 0.22);
+
+	--leafeon-pink: #f08fb8;
+	--cyan: #6ce5e8;
+	--print-pink: #b54a85;
+	--ink: #1a1a3e;
+	--cream: #f5f2e8;
+
+	--font-display: 'DM Serif Display', Georgia, serif;
+	--font-body: 'Lora', Georgia, serif;
+	--font-ui: 'DM Sans', system-ui, sans-serif;
+	--font-counter: 'VT323', 'DM Mono', monospace;
+	--font-hand: 'Caveat', cursive;
+
+	color-scheme: dark;
+}
