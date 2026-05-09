@@ -6,6 +6,8 @@
 		const u = upgrades.find((x) => x.id === id);
 		if (!u) return false;
 		if (game.upgrades[id]) return true;
+		// generator-gated upgrades only appear once the generator is owned
+		if (u.requiresGenerator && (game.generators[u.requiresGenerator] ?? 0) < 1) return false;
 		// reveal once they can afford within 50%
 		const c = u.cost;
 		if (c.commentaries && game.commentaries < c.commentaries * 0.5) return false;

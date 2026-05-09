@@ -7,6 +7,7 @@
 	import Feed from '$lib/components/Feed.svelte';
 	import ClickRegion from '$lib/components/ClickRegion.svelte';
 	import ReadingPass from '$lib/components/rhythm/ReadingPass.svelte';
+	import Dispute from '$lib/components/rhythm/Dispute.svelte';
 	import GeneratorList from '$lib/components/GeneratorList.svelte';
 	import UpgradeShelf from '$lib/components/UpgradeShelf.svelte';
 	import PracticeBar from '$lib/components/PracticeBar.svelte';
@@ -95,6 +96,12 @@
 		<ResourceLine />
 		<Feed />
 	</section>
+
+	{#if game.hasUpgrade('the_dispute')}
+		<section class="dispute-wrap">
+			<Dispute />
+		</section>
+	{/if}
 
 	<hr class="rule" />
 
@@ -216,6 +223,11 @@
 		max-width: 44rem;
 		margin: 0 auto;
 		padding: 0.8rem 0;
+	}
+	.dispute-wrap {
+		max-width: 44rem;
+		margin: 0 auto;
+		padding: 0 0 0.6rem;
 	}
 	.rule {
 		border: 0;

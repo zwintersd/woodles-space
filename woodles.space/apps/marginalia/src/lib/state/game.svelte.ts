@@ -291,6 +291,33 @@ class Game {
 		}
 	}
 
+	// ── the dispute ──────────────────────────────────────────────────────────
+
+	disputeHit(mode: 'agreement' | 'disagreement' | 'counterpoint') {
+		this.clickPulse += 1; // canonical text trembles
+
+		switch (mode) {
+			case 'agreement':
+				// Collating with a previous reader: commentary is the natural result.
+				this.commentaries += 0.5 * this.palimpsest;
+				if (Math.random() < 0.15)
+					this.pushFeed('milestone', 'agreement — you are collating with a previous reader.');
+				break;
+			case 'disagreement':
+				// Refuting: a footnote of contradiction becomes apparatus.
+				this.apparatus += 0.1 * this.palimpsest;
+				if (Math.random() < 0.15)
+					this.pushFeed('milestone', 'in dispute — a footnote forms in refutation.');
+				break;
+			case 'counterpoint':
+				// Diverging into something new: a recension.
+				this.recensions += 0.02 * this.palimpsest;
+				if (Math.random() < 0.15)
+					this.pushFeed('milestone', 'counterpoint — your reading has diverged into something new.');
+				break;
+		}
+	}
+
 	canBuyGenerator(id: string): boolean {
 		const g = this.generatorById(id);
 		if (!g) return false;
@@ -315,6 +342,7 @@ class Game {
 
 	canBuyUpgrade(u: Upgrade): boolean {
 		if (this.upgrades[u.id]) return false;
+		if (u.requiresGenerator && (this.generators[u.requiresGenerator] ?? 0) < 1) return false;
 		if (u.cost.commentaries && this.commentaries < u.cost.commentaries) return false;
 		if (u.cost.apparatus && this.apparatus < u.cost.apparatus) return false;
 		if (u.cost.recensions && this.recensions < u.cost.recensions) return false;

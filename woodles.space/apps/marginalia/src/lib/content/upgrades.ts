@@ -5,7 +5,8 @@ export interface Upgrade {
 	name: string;
 	description: string;
 	cost: { commentaries?: number; apparatus?: number; recensions?: number };
-	requires?: { glossators?: number };
+	// requiresGenerator: player must own ≥1 of this generator to unlock/purchase.
+	requiresGenerator?: string;
 }
 
 export const upgrades: Upgrade[] = [
@@ -62,5 +63,12 @@ export const upgrades: Upgrade[] = [
 		name: 'confluence',
 		description: 'commentaries are produced 50% faster.',
 		cost: { apparatus: 40 }
+	},
+	{
+		id: 'the_dispute',
+		name: 'the dispute',
+		description: 'a previous reader appears in the upper margin. their rhythm is yours to agree with, refute, or counter. agreement yields commentary; dispute yields apparatus; counterpoint yields recensions.',
+		cost: { commentaries: 20, apparatus: 1 },
+		requiresGenerator: 'unknown_hand'
 	}
 ];
