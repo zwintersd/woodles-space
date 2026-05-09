@@ -9,6 +9,7 @@
 
 	let date = $state('');
 	let time = $state('');
+	let dayOfYear = $state('');
 	let tickClass = $state('');
 	let interval: ReturnType<typeof setInterval> | undefined;
 
@@ -26,6 +27,9 @@
 			MONTHS[now.getMonth()] +
 			' ' +
 			now.getFullYear();
+		const start = new Date(now.getFullYear(), 0, 0);
+		const diff = now.getTime() - start.getTime();
+		dayOfYear = String(Math.floor(diff / 86_400_000));
 		const t = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
 		if (t !== time) {
 			tickClass = '';
@@ -47,6 +51,8 @@
 <span class="clock-date">{date}</span>
 <span class="clock-sep">·</span>
 <span class="clock-time {tickClass}">{time}</span>
+<span class="clock-sep">·</span>
+<span class="clock-day">day {dayOfYear}</span>
 
 <style>
 	.clock-date {
@@ -60,6 +66,10 @@
 	.clock-time {
 		color: var(--text);
 		opacity: 0.8;
+	}
+	.clock-day {
+		color: var(--muted);
+		opacity: 0.7;
 	}
 	.clock-time.tick {
 		animation: tick-fade 0.45s ease;
