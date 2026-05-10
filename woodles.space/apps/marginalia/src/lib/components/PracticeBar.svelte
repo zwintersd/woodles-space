@@ -17,12 +17,19 @@
 	const palinodeAvailable = $derived(
 		game.hasUpgrade('palinode') && !game.palinodeUsedThisRun
 	);
+
+	// recitation only appears once the upgrade is adopted; before that it
+	// would be a button to a feature the player cannot invoke yet.
+	function visible(id: string): boolean {
+		if (id === 'recitation') return game.hasUpgrade('recitation');
+		return true;
+	}
 </script>
 
 <section class="practices">
 	<h3>reading practices</h3>
 	<div class="row">
-		{#each practices as p (p.id)}
+		{#each practices.filter((x) => visible(x.id)) as p (p.id)}
 			{@const left = cooldownLeft(p.id)}
 			{@const ready = left === 0 && game.glosses >= p.cost}
 			<button

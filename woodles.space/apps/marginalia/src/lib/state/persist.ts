@@ -23,6 +23,10 @@ export interface SaveShape {
 	passagesRead?: string[];
 	// early-game scaffolding
 	whispersShown?: Record<string, boolean>;
+	// v2.5 — recitation
+	canonicalRemembered?: string[];
+	// v3.0 — update modal
+	lastSeenVersion?: string | null;
 }
 
 export function emptySave(): SaveShape {

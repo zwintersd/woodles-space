@@ -7,6 +7,7 @@ import { glosses as glossLines } from '../content/glosses';
 import { ambient as ambientLines } from '../content/ambient';
 import { canonicalFor, type Canonical } from '../content/canonical';
 import { citationFromPassage, type Passage } from '../content/passages';
+import { CURRENT_VERSION } from '../content/updates';
 import { emptySave, load, save, wipe, type SaveShape } from './persist';
 
 // ─── feed ─────────────────────────────────────────────────────────────────
@@ -92,6 +93,16 @@ export class Game {
 	contestedActive = $state(false);        // is the encounter currently open?
 	canonicalCitations = $state<string[]>([]); // strings: "line — source"
 	passagesRead = $state<string[]>([]);    // ids of passages already survived
+
+	// recitation (the séance) — transient flag while the overlay is open;
+	// remembered lines persist across prestige and surface in Canonical.
+	recitationActive = $state(false);
+	canonicalRemembered = $state<string[]>([]);
+
+	// update modal — persistent record of the most recent version notes
+	// the player has seen, plus a transient flag while the modal is open.
+	lastSeenVersion = $state<string | null>(null);
+	updateModalOpen = $state(false);
 
 	// ductus combo: each rapid click increases weight; decays after ~600ms idle
 	ductusCombo = $state(0);
@@ -412,6 +423,54 @@ export class Game {
 		}
 	}
 
+	// ── update modal ────────────────────────────────────────────────────────
+
+	openUpdateModal() {
+		this.updateModalOpen = true;
+	}
+
+	dismissUpdateModal() {
+		this.updateModalOpen = false;
+		this.lastSeenVersion = CURRENT_VERSION;
+		this.persist();
+	}
+
+	// ── the recitation (v2.5) ────────────────────────────────────────────────
+
+	beginRecitation() {
+		if (!this.hasUpgrade('recitation')) return;
+		if (this.recitationActive) return;
+		this.recitationActive = true;
+	}
+
+	completeRecitation(args: { hits: number; total: number; rememberedLine?: string }) {
+		this.recitationActive = false;
+		const ratio = args.total > 0 ? args.hits / args.total : 0;
+
+		if (ratio >= 0.8) {
+			// They are remembered.
+			this.apparatus += 5;
+			if (args.rememberedLine) {
+				this.canonicalRemembered.push(args.rememberedLine);
+			}
+			this.pushFeed(
+				'milestone',
+				`they are remembered — ${args.hits} of ${args.total} in time. apparatus +5, and a line returns to the canonical.`
+			);
+		} else if (ratio >= 0.5) {
+			this.apparatus += 2;
+			this.pushFeed(
+				'milestone',
+				`a partial recitation — ${args.hits} of ${args.total}. apparatus +2. some of the rhythm comes back.`
+			);
+		} else {
+			this.pushFeed(
+				'milestone',
+				`the margin forgets itself. only ${args.hits} of ${args.total} were in time. nothing returns.`
+			);
+		}
+	}
+
 	// ── the dispute ──────────────────────────────────────────────────────────
 
 	resourcesFromDispute(mode: 'agreement' | 'disagreement' | 'counterpoint') {
@@ -518,6 +577,13 @@ export class Game {
 				break;
 			case 'unname':
 				this.unnameLast();
+				break;
+			case 'recitation':
+				if (this.hasUpgrade('recitation')) {
+					this.beginRecitation();
+				} else {
+					this.pushFeed('system', 'a séance requires the recitation practice. it is not yet adopted.');
+				}
 				break;
 		}
 	}
@@ -648,8 +714,9 @@ export class Game {
 		this.missingLeafId = null;
 		this.contestedActive = false;
 		this.contestedReadyAt = 0;
-		// canonicalCitations and passagesRead persist across prestige —
-		// the reader carries their citations forward.
+		this.recitationActive = false;
+		// canonicalCitations, passagesRead, and canonicalRemembered persist
+		// across prestige — the reader carries them forward.
 		this.feed = [];
 		this.pushFeed(
 			'milestone',
@@ -681,6 +748,8 @@ export class Game {
 		this.contestedReadyAt = 0;
 		this.canonicalCitations = [];
 		this.passagesRead = [];
+		this.canonicalRemembered = [];
+		this.recitationActive = false;
 		this.whispersShown = {};
 		this.whispersLastFiredAt = {};
 		this.chargedClickReady = false;
@@ -710,6 +779,8 @@ export class Game {
 			canonicalCitations: [...this.canonicalCitations],
 			passagesRead: [...this.passagesRead],
 			whispersShown: { ...this.whispersShown },
+			canonicalRemembered: [...this.canonicalRemembered],
+			lastSeenVersion: this.lastSeenVersion,
 			startedAt: Date.now()
 		};
 	}
@@ -731,6 +802,8 @@ export class Game {
 		this.canonicalCitations = [...(s.canonicalCitations ?? [])];
 		this.passagesRead = [...(s.passagesRead ?? [])];
 		this.whispersShown = { ...(s.whispersShown ?? {}) };
+		this.canonicalRemembered = [...(s.canonicalRemembered ?? [])];
+		this.lastSeenVersion = s.lastSeenVersion ?? null;
 	}
 
 	hydrate() {
@@ -743,6 +816,11 @@ export class Game {
 				'system',
 				'an empty page. the canonical text is at the center; the margin is yours.'
 			);
+		}
+		// Auto-open the update modal whenever the player's save is older than
+		// the current version (or has no recorded version at all).
+		if (this.lastSeenVersion === null || this.lastSeenVersion < CURRENT_VERSION) {
+			this.updateModalOpen = true;
 		}
 	}
 

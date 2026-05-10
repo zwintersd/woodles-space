@@ -9,8 +9,10 @@
 	import ReadingPass from '$lib/components/rhythm/ReadingPass.svelte';
 	import Dispute from '$lib/components/rhythm/Dispute.svelte';
 	import ContestedPassage from '$lib/components/rhythm/ContestedPassage.svelte';
+	import Recitation from '$lib/components/rhythm/Recitation.svelte';
 	import Asides from '$lib/components/Asides.svelte';
 	import Whisper from '$lib/components/Whisper.svelte';
+	import UpdateModal from '$lib/components/UpdateModal.svelte';
 	import GeneratorList from '$lib/components/GeneratorList.svelte';
 	import UpgradeShelf from '$lib/components/UpgradeShelf.svelte';
 	import PracticeBar from '$lib/components/PracticeBar.svelte';
@@ -79,6 +81,15 @@
 
 {#if menuOpen}
 	<div class="menu">
+		<div class="menu-section">
+			<h4>about</h4>
+			<button
+				class="ghost"
+				onclick={() => {
+					game.openUpdateModal();
+					menuOpen = false;
+				}}>what's new</button>
+		</div>
 		<div class="menu-section">
 			<h4>save</h4>
 			<button class="ghost" onclick={doExport}>export current save</button>
@@ -182,6 +193,14 @@
 
 {#if game.contestedActive}
 	<ContestedPassage />
+{/if}
+
+{#if game.recitationActive}
+	<Recitation />
+{/if}
+
+{#if game.updateModalOpen}
+	<UpdateModal />
 {/if}
 
 <Whisper />

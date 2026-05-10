@@ -74,5 +74,11 @@ export const upgrades: Upgrade[] = [
 		name: 'the contested passage',
 		description: 'a boss-style encounter. a disputed passage descends; helpful glyphs must be caught and corrupting glyphs dodged. survive the reading intact and the passage joins your canonical citations.',
 		cost: { apparatus: 10 }
+	},
+	{
+		id: 'recitation',
+		name: 'the recitation',
+		description: 'unlocks a séance that summons the rhythm of your own past reading. recite it back in time and your past returns as bonus apparatus and a remembered line in the canonical opening.',
+		cost: { recensions: 1 }
 	}
 ];

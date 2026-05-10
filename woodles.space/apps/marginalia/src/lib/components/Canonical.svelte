@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { game } from '$lib/state/game.svelte';
 	const c = $derived(game.canonical);
+	const remembered = $derived(game.canonicalRemembered);
 
 	let trembling = $state(false);
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -16,6 +17,13 @@
 </script>
 
 <div class="canonical" class:trembling>
+	{#if remembered.length > 0}
+		<div class="remembered" aria-label="lines returned by recitation">
+			{#each remembered as line, i (i)}
+				<p>{line}</p>
+			{/each}
+		</div>
+	{/if}
 	<div class="lines">
 		{#each c.lines as line, i (i)}
 			<p style="--s: {i % 2 === 0 ? 1 : -1}">{line}</p>
@@ -47,6 +55,21 @@
 		letter-spacing: 0.18em;
 		text-transform: uppercase;
 		color: var(--periwinkle);
+	}
+	.remembered {
+		margin: 0 auto 1rem;
+		max-width: 32rem;
+		padding-bottom: 0.6rem;
+		border-bottom: 1px dashed var(--rule);
+	}
+	.remembered p {
+		font-family: var(--font-hand);
+		color: var(--print-pink);
+		font-size: clamp(0.95rem, 1.8vw, 1.1rem);
+		line-height: 1.5;
+		margin: 0.15em 0;
+		font-style: italic;
+		opacity: 0.85;
 	}
 	.canonical.trembling .lines p {
 		animation: tremor 160ms ease;
