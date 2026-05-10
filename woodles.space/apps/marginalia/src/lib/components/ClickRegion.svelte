@@ -16,6 +16,7 @@
 
 	const cp = $derived(game.clickPower);
 	const combo = $derived(game.ductusCombo);
+	const charged = $derived(game.chargedClickReady);
 
 	let buttonEl: HTMLButtonElement | undefined = $state();
 	let marks = $state<Mark[]>([]);
@@ -116,8 +117,9 @@
 		bind:this={buttonEl}
 		type="button"
 		{onclick}
-		aria-label="annotate"
+		aria-label={charged ? 'annotate (charged: 5×)' : 'annotate'}
 		class:stamping
+		class:charged
 		style="--combo: {Math.min(combo, 30)}"
 	>
 		<span class="bracket left">[</span>
@@ -143,7 +145,7 @@
 	</div>
 
 	<p class="meta">
-		each click writes <span class="num">{fmt(cp)}</span> gloss{cp === 1 ? '' : 'es'}{#if combo > 0 && game.hasUpgrade('ductus')}<span class="combo"> · ductus ×{combo}</span>{/if}.
+		each click writes <span class="num">{fmt(cp)}</span> gloss{cp === 1 ? '' : 'es'}{#if combo > 0 && game.hasUpgrade('ductus')}<span class="combo"> · ductus ×{combo}</span>{/if}{#if charged}<span class="charged-hint"> · charged ×5</span>{/if}.
 	</p>
 </div>
 
@@ -217,6 +219,25 @@
 	.combo {
 		color: var(--cyan);
 		font-family: var(--font-counter);
+	}
+	.charged-hint {
+		color: var(--leafeon-pink);
+		font-family: var(--font-counter);
+	}
+
+	/* ── charged state ───────────────────────────────────────────── */
+	button.charged .bracket {
+		color: var(--leafeon-pink);
+		animation: charged-tremor 700ms ease-in-out infinite;
+	}
+	button.charged .word {
+		color: var(--leafeon-pink);
+		text-shadow: 0 0 10px rgba(240, 143, 184, 0.45);
+	}
+	@keyframes charged-tremor {
+		0%, 100% { transform: translateX(0); }
+		25%      { transform: translateX(-1px); }
+		75%      { transform: translateX(1px); }
 	}
 
 	/* ── ink marks ───────────────────────────────────────────── */

@@ -55,7 +55,7 @@ export function fmt(n: number): string {
 
 // ─── state class ──────────────────────────────────────────────────────────
 
-class Game {
+export class Game {
 	// resources
 	glosses = $state(0);
 	commentaries = $state(0);
@@ -100,6 +100,17 @@ class Game {
 	// tactile pulse — increments on every click; components watch this
 	clickPulse = $state(0);
 	lastClickGain = $state(0);
+
+	// charged-click pacing: every Nth click is worth 5×, telegraphed by ClickRegion.
+	// Triggers on basic clicks only — the reading pass has its own multipliers.
+	chargedClickReady = $state(false);
+	clicksUntilCharged = $state(0);
+
+	// whisper instructor: which messages have been shown (persisted) and the
+	// timestamp of the last firing for repeatable whispers (in-memory only).
+	whispersShown = $state<Record<string, boolean>>({});
+	whispersLastFiredAt: Record<string, number> = {};
+	lastInteractionAt = $state(Date.now());
 
 	// feed (newest first; we render in reverse)
 	feed = $state<FeedEntry[]>([]);
@@ -209,12 +220,29 @@ class Game {
 
 	click() {
 		const now = Date.now();
+		this.lastInteractionAt = now;
 		// ductus combo accumulates if last click within 600ms
 		if (now - this.lastClickAt < 600) this.ductusCombo += 1;
 		else this.ductusCombo = 0;
 		this.lastClickAt = now;
 
 		let gain = this.clickPower;
+
+		// charged click consumed
+		const wasCharged = this.chargedClickReady;
+		if (wasCharged) {
+			gain *= 5;
+			this.chargedClickReady = false;
+		}
+		// reset the countdown to the next charged click — a small jitter so the
+		// tell never feels metronomic
+		if (!this.chargedClickReady) {
+			this.clicksUntilCharged -= 1;
+			if (this.clicksUntilCharged <= 0) {
+				this.chargedClickReady = true;
+				this.clicksUntilCharged = 12 + ((Math.random() * 9) | 0);
+			}
+		}
 
 		// collation: every 100th click is worth 10x
 		this.clicksThisHundred += 1;
@@ -236,6 +264,10 @@ class Game {
 		this.lastClickGain = gain;
 		this.clickPulse += 1;
 
+		if (wasCharged) {
+			this.pushFeed('milestone', 'a heavier mark — the click weighs five times as much.');
+		}
+
 		// only occasionally surface a written gloss in the feed —
 		// the mark itself is the per-click feedback.
 		if (Math.random() < 0.08) {
@@ -249,6 +281,34 @@ class Game {
 		}
 	}
 
+	// ── stray glosses (asides) ──────────────────────────────────────────────
+
+	gainStrayGloss(amount: number, source: string) {
+		this.lastInteractionAt = Date.now();
+		const gain = amount * this.palimpsest;
+		this.glosses += gain;
+		this.totalGlossesEver += gain;
+		this.lastClickGain = gain;
+		this.clickPulse += 1;
+		// modest, intentionally rare — the aside is its own small reward.
+		if (Math.random() < 0.25) {
+			this.pushFeed('gloss', `caught a stray phrase — ${source}`);
+		}
+	}
+
+	// ── whispers ────────────────────────────────────────────────────────────
+
+	markWhisperShown(id: string, repeat: boolean) {
+		this.whispersLastFiredAt[id] = Date.now();
+		if (!repeat) {
+			this.whispersShown[id] = true;
+		}
+	}
+
+	noteInteraction() {
+		this.lastInteractionAt = Date.now();
+	}
+
 	// ── reading pass ─────────────────────────────────────────────────────────
 
 	glossFromReadingPass(quality: 'luminous' | 'tight' | 'wide') {
@@ -256,6 +316,7 @@ class Game {
 
 		// ductus combo still applies (rapid successive hits build a rhythm)
 		const now = Date.now();
+		this.lastInteractionAt = now;
 		if (now - this.lastClickAt < 600) this.ductusCombo += 1;
 		else this.ductusCombo = 0;
 		this.lastClickAt = now;
@@ -355,6 +416,7 @@ class Game {
 
 	resourcesFromDispute(mode: 'agreement' | 'disagreement' | 'counterpoint') {
 		const now = Date.now();
+		this.lastInteractionAt = now;
 		if (now - this.lastClickAt < 600) this.ductusCombo += 1;
 		else this.ductusCombo = 0;
 		this.lastClickAt = now;
@@ -619,6 +681,10 @@ class Game {
 		this.contestedReadyAt = 0;
 		this.canonicalCitations = [];
 		this.passagesRead = [];
+		this.whispersShown = {};
+		this.whispersLastFiredAt = {};
+		this.chargedClickReady = false;
+		this.clicksUntilCharged = 0;
 		this.feed = [];
 		this.pushFeed('system', 'a wipe. the library returns to first hand.');
 	}
@@ -643,6 +709,7 @@ class Game {
 			contestedReadyAt: this.contestedReadyAt,
 			canonicalCitations: [...this.canonicalCitations],
 			passagesRead: [...this.passagesRead],
+			whispersShown: { ...this.whispersShown },
 			startedAt: Date.now()
 		};
 	}
@@ -663,6 +730,7 @@ class Game {
 		this.contestedReadyAt = s.contestedReadyAt ?? 0;
 		this.canonicalCitations = [...(s.canonicalCitations ?? [])];
 		this.passagesRead = [...(s.passagesRead ?? [])];
+		this.whispersShown = { ...(s.whispersShown ?? {}) };
 	}
 
 	hydrate() {
