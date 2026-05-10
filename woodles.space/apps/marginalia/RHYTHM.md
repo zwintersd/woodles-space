@@ -9,8 +9,8 @@ pitch.
 | Version | Mechanic              | Status      | Lives in                                   |
 |---------|-----------------------|-------------|--------------------------------------------|
 | v1.0    | The reading pass      | Shipped     | `lib/components/rhythm/ReadingPass.svelte` |
-| v1.5    | The dispute           | Shipped — polishing | `lib/components/rhythm/Dispute.svelte`     |
-| v2.0    | The contested passage | Not started | —                                          |
+| v1.5    | The dispute           | Shipped     | `lib/components/rhythm/Dispute.svelte`     |
+| v2.0    | The contested passage | Shipped     | `lib/components/rhythm/ContestedPassage.svelte` |
 | v2.5    | The recitation        | Recorder running, séance not built | `lib/rhythm/recorder.ts` |
 | v3.0    | More readers, sound   | Not started | —                                          |
 
@@ -85,21 +85,37 @@ v2.5, there is already a corpus of personal cadence to recite against.
 Distillation (clustering timestamps into rhythmic fragments) is not yet
 implemented.
 
-## v2.0 — the contested passage (not started)
+## v2.0 — the contested passage (shipped)
 
-Boss-style encounter. Dense passage in the centre, glyph rain falling toward
-it; the player moves a caret to catch helpful glyphs (`☞`, `¶`, `*`) and dodge
-corrupting ones (`†`, `‡`, `⸿`). Three corruptions ends the encounter; an
-intact read mints apparatus and adds the passage to that run's canonical
-citations. Cooldown ~5 minutes. Needs:
+Boss-style encounter. Unlocks via the `contested_passage` upgrade
+(10 apparatus). Five-minute cooldown between encounters; the cooldown is
+persisted in the save so it survives reloads.
 
-- A glyph-rain engine (probably extending the rAF loop pattern from
-  `Dispute.svelte`).
-- A small contested-passage corpus (church fathers, gnostic gospels, decree
-  drafts — generated, not curated).
-- Caret control (mouse + arrow keys).
-- Hookup to `game.canonical` so successful reads persist into the run's
-  canonical text.
+- 30-second timer. A passage of 5–6 lines sits in the centre.
+- Glyph rain spawns at random arena edges and drifts toward random points
+  inside the passage box.
+- The reading caret (a blinking `|`) tracks the pointer; arrow keys also work.
+  Collision radius is 22 px.
+- Helpful glyphs (☞ ¶ * ⁋ ✦) caught by the caret become marginal notes that
+  fade in at the edges of the passage box.
+- Corrupting glyphs († ‡ ⸿ ⁂) caught by the caret deface a random word —
+  they replace one non-whitespace character with a corruption block (█ ▒ ░ …).
+  Three corruptions ends the encounter as a collapse (no rewards).
+- Surviving the duration is a "passage holds" win: apparatus reward is
+  `5 + 0.5·caught − corrupted` (floor 1), and the first time a passage is read
+  intact it joins the player's `canonicalCitations`.
+- `Esc` abandons the encounter (counts as a collapse).
+
+`canonicalCitations` and `passagesRead` cross prestige (the reader carries
+their citations with them); they only clear on `hardReset()`. The current
+schema for them is permissive — older saves without these fields fall back to
+empty arrays in `fromSave()`.
+
+Files: `lib/content/passages.ts` (corpus), `lib/content/glyphs.ts` (glyphs +
+corruption chars), `lib/components/rhythm/ContestedPassage.svelte` (the
+overlay), `state/game.svelte.ts` (`canBeginContestedPassage`,
+`beginContestedPassage`, `completeContestedPassage`,
+`contestedCooldownLeftMs`).
 
 ## Files touched so far
 
@@ -108,22 +124,31 @@ lib/rhythm/
   timing.ts          # windows + classifyHit (v1.0)
   recorder.ts        # localStorage circular buffer (v1.0, feeds v2.5)
 lib/content/
-  corpus.ts          # passages + CHARGED_TOKENS for reading pass
-  readers.ts         # previous-reader personalities for dispute
+  corpus.ts          # passages + CHARGED_TOKENS for reading pass (v1.0)
+  readers.ts         # previous-reader personalities for dispute (v1.5)
+  passages.ts        # contested-passage corpus (v2.0)
+  glyphs.ts          # marginal glyphs + corruption chars (v2.0)
 lib/components/rhythm/
-  ReadingPass.svelte # v1.0
-  Dispute.svelte     # v1.5
+  ReadingPass.svelte      # v1.0
+  Dispute.svelte          # v1.5
+  ContestedPassage.svelte # v2.0
 state/
-  game.svelte.ts     # glossFromReadingPass, resourcesFromDispute
-content/upgrades.ts  # reading_pass, dispute upgrades
+  game.svelte.ts     # glossFromReadingPass, resourcesFromDispute,
+                     # beginContestedPassage / completeContestedPassage
+content/upgrades.ts  # reading_pass, dispute, contested_passage
 ```
 
-## Next after the v1.5 polish lands
+## Next after v2.0 lands
 
-1. Begin v2.0 — the contested passage. Most ambitious of the four because it's
-   a new interaction model (caret, not click), but it can reuse the rAF /
-   beat-tracking scaffolding the engine already has.
-2. Begin distilling the recorder buffer into rhythmic fragments so that v2.5
-   has something to recite when it ships.
-3. Eventually generalise the rhythm engine into a shared module (today the
-   logic is duplicated between `ReadingPass` and `Dispute`).
+1. Begin v2.5 — the recitation / séance. The recorder has been collecting
+   click timings since v1.0 shipped, so distillation
+   (clustering timestamps into rhythmic fragments) is the missing piece.
+   Then a séance component that replays a fragment as a beat pattern and
+   rewards in-time clicks with bonus apparatus and a "they are remembered"
+   line in the canonical opening of the next run.
+2. Eventually generalise the rhythm engine into a shared module — today the
+   rAF loop / spawn / collision pattern is duplicated across
+   `Dispute.svelte` and `ContestedPassage.svelte`. After v2.5 we'll have a
+   third caller and the right shape will be obvious.
+3. v3.0 — multiple previous readers (the methodist, the marginal heretic,
+   the unlearned hand), more contested passages, achievements, sound design.

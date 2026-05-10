@@ -6,6 +6,7 @@ import { practices, type Practice } from '../content/practices';
 import { glosses as glossLines } from '../content/glosses';
 import { ambient as ambientLines } from '../content/ambient';
 import { canonicalFor, type Canonical } from '../content/canonical';
+import { citationFromPassage, type Passage } from '../content/passages';
 import { emptySave, load, save, wipe, type SaveShape } from './persist';
 
 // ─── feed ─────────────────────────────────────────────────────────────────
@@ -84,6 +85,13 @@ class Game {
 	missingLeafId = $state<string | null>(null);
 	missingLeafUntil = $state(0);
 	missingLeafDoubleUntil = $state(0);
+
+	// contested passage: cooldown gate + a record of passages survived intact.
+	// Citations cross prestige (they belong to the reader, not the run).
+	contestedReadyAt = $state(0);          // ms timestamp; 0 = ready now
+	contestedActive = $state(false);        // is the encounter currently open?
+	canonicalCitations = $state<string[]>([]); // strings: "line — source"
+	passagesRead = $state<string[]>([]);    // ids of passages already survived
 
 	// ductus combo: each rapid click increases weight; decays after ~600ms idle
 	ductusCombo = $state(0);
@@ -288,6 +296,58 @@ class Game {
 		if (quality === 'luminous' && Math.random() < 0.005) {
 			this.commentaries += 1;
 			this.pushFeed('milestone', 'a luminous gloss — a commentary coheres unbidden.');
+		}
+	}
+
+	// ── the contested passage ────────────────────────────────────────────────
+
+	// Cooldown is 5 minutes between encounters; the first one is free at unlock.
+	private static CONTESTED_COOLDOWN_MS = 5 * 60 * 1000;
+
+	canBeginContestedPassage(): boolean {
+		if (!this.hasUpgrade('contested_passage')) return false;
+		if (this.contestedActive) return false;
+		return Date.now() >= this.contestedReadyAt;
+	}
+
+	contestedCooldownLeftMs(): number {
+		return Math.max(0, this.contestedReadyAt - Date.now());
+	}
+
+	beginContestedPassage() {
+		if (!this.canBeginContestedPassage()) return;
+		this.contestedActive = true;
+	}
+
+	completeContestedPassage(args: {
+		passage: Passage;
+		intact: boolean;
+		caught: number;
+		corrupted: number;
+	}) {
+		this.contestedActive = false;
+		this.contestedReadyAt = Date.now() + Game.CONTESTED_COOLDOWN_MS;
+
+		if (args.intact) {
+			// Apparatus reward scales with how cleanly the read went.
+			const apparatusGain = 5 + args.caught * 0.5 - args.corrupted * 1;
+			this.apparatus += Math.max(1, apparatusGain);
+
+			// First-time read of a passage: it joins the canonical citations.
+			if (!this.passagesRead.includes(args.passage.id)) {
+				this.passagesRead.push(args.passage.id);
+				this.canonicalCitations.push(citationFromPassage(args.passage));
+			}
+
+			this.pushFeed(
+				'milestone',
+				`the contested passage holds. apparatus +${Math.max(1, apparatusGain).toFixed(1)} — and the passage joins your citations.`
+			);
+		} else {
+			this.pushFeed(
+				'milestone',
+				'the passage collapses into nonsense. nothing is gained from a reading that was not finished.'
+			);
 		}
 	}
 
@@ -524,6 +584,10 @@ class Game {
 		this.palinodeUntil = 0;
 		this.seanceUntil = 0;
 		this.missingLeafId = null;
+		this.contestedActive = false;
+		this.contestedReadyAt = 0;
+		// canonicalCitations and passagesRead persist across prestige —
+		// the reader carries their citations forward.
 		this.feed = [];
 		this.pushFeed(
 			'milestone',
@@ -551,6 +615,10 @@ class Game {
 		this.palinodeUntil = 0;
 		this.seanceUntil = 0;
 		this.missingLeafId = null;
+		this.contestedActive = false;
+		this.contestedReadyAt = 0;
+		this.canonicalCitations = [];
+		this.passagesRead = [];
 		this.feed = [];
 		this.pushFeed('system', 'a wipe. the library returns to first hand.');
 	}
@@ -572,6 +640,9 @@ class Game {
 			upgrades: { ...this.upgrades },
 			practiceCooldowns: { ...this.practiceCooldowns },
 			palinodeUsedThisRun: this.palinodeUsedThisRun,
+			contestedReadyAt: this.contestedReadyAt,
+			canonicalCitations: [...this.canonicalCitations],
+			passagesRead: [...this.passagesRead],
 			startedAt: Date.now()
 		};
 	}
@@ -589,6 +660,9 @@ class Game {
 		this.upgrades = { ...s.upgrades };
 		this.practiceCooldowns = { ...s.practiceCooldowns };
 		this.palinodeUsedThisRun = s.palinodeUsedThisRun;
+		this.contestedReadyAt = s.contestedReadyAt ?? 0;
+		this.canonicalCitations = [...(s.canonicalCitations ?? [])];
+		this.passagesRead = [...(s.passagesRead ?? [])];
 	}
 
 	hydrate() {

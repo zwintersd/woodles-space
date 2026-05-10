@@ -68,5 +68,11 @@ export const upgrades: Upgrade[] = [
 		name: 'the dispute',
 		description: 'two reading tracks. click in agreement, disagreement, or counterpoint with a previous reader\'s hand. produces commentaries, apparatus, and recensions.',
 		cost: { apparatus: 2 }
+	},
+	{
+		id: 'contested_passage',
+		name: 'the contested passage',
+		description: 'a boss-style encounter. a disputed passage descends; helpful glyphs must be caught and corrupting glyphs dodged. survive the reading intact and the passage joins your canonical citations.',
+		cost: { apparatus: 10 }
 	}
 ];
