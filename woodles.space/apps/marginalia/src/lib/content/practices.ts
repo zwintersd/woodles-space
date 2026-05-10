@@ -33,5 +33,13 @@ export const practices: Practice[] = [
 		cooldown: 90,
 		duration: 0,
 		description: 'delete one entry from the feed; gain glosses equal to its cost.'
+	},
+	{
+		id: 'recitation',
+		name: 'recite the past',
+		cost: 200,
+		cooldown: 120,
+		duration: 0,
+		description: 'open a séance: a fragment of your own past reading rises. recite it in time. requires the recitation upgrade.'
 	}
 ];

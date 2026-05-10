@@ -9,6 +9,7 @@
 	import ReadingPass from '$lib/components/rhythm/ReadingPass.svelte';
 	import Dispute from '$lib/components/rhythm/Dispute.svelte';
 	import ContestedPassage from '$lib/components/rhythm/ContestedPassage.svelte';
+	import Recitation from '$lib/components/rhythm/Recitation.svelte';
 	import Asides from '$lib/components/Asides.svelte';
 	import Whisper from '$lib/components/Whisper.svelte';
 	import GeneratorList from '$lib/components/GeneratorList.svelte';
@@ -182,6 +183,10 @@
 
 {#if game.contestedActive}
 	<ContestedPassage />
+{/if}
+
+{#if game.recitationActive}
+	<Recitation />
 {/if}
 
 <Whisper />

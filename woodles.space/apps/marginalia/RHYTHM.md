@@ -11,7 +11,7 @@ pitch.
 | v1.0    | The reading pass      | Shipped     | `lib/components/rhythm/ReadingPass.svelte` |
 | v1.5    | The dispute           | Shipped     | `lib/components/rhythm/Dispute.svelte`     |
 | v2.0    | The contested passage | Shipped     | `lib/components/rhythm/ContestedPassage.svelte` |
-| v2.5    | The recitation        | Recorder running, séance not built | `lib/rhythm/recorder.ts` |
+| v2.5    | The recitation        | Shipped     | `lib/components/rhythm/Recitation.svelte` |
 | v3.0    | More readers, sound   | Not started | —                                          |
 
 ## v1.0 — the reading pass (shipped)
@@ -74,16 +74,44 @@ Issues identified that the polish commit addresses:
 6. Track labels (`their hand`, `your hand`) sit at a low z-index and beats
    can pass right over them.
 
-## v2.5 — the recitation (recorder running)
+## v2.5 — the recitation (shipped)
 
-The click recorder (`lib/rhythm/recorder.ts`) writes every reading-pass hit
-into a 500-entry circular buffer in `localStorage` under `marginalia.rhythm.v1`.
-Format: `{ t, q, w }` (timestamp, quality letter, word slice).
+The séance now exists. Unlocks via the `recitation` upgrade (1 recension) and
+runs through a new `recitation` practice (200 g, 120 s cooldown). Selecting
+the practice opens the Recitation overlay.
 
-This collects passively from v1.0 onward so that, when the séance is built in
-v2.5, there is already a corpus of personal cadence to recite against.
-Distillation (clustering timestamps into rhythmic fragments) is not yet
-implemented.
+- The recorder (`lib/rhythm/recorder.ts`) has been collecting reading-pass
+  click timings since v1.0. `distillFragments()` now walks the buffer and
+  produces contiguous beat patterns: a new fragment starts whenever the gap
+  between consecutive clicks exceeds `MAX_INTRA_FRAGMENT_GAP_MS` (1800 ms),
+  which also handles cross-session boundaries (since `performance.now()`
+  resets each load). Fragments must have ≥ 5 beats and are capped at 14.
+- `pickFragment()` selects one at random; the overlay replays it with the
+  *exact* original cadence — beats laid out at `peakTime = startTime + offset`.
+- Hit window is generous (±220 ms) — the past is forgiving.
+- Words appear as ghosts in the handwriting font, washed periwinkle, drifting
+  toward a print-pink seam. Hits brighten the ghost; misses cross it through.
+- Outcome:
+  - `hits / total ≥ 0.8` → "they are remembered" — apparatus +5 and a line
+    enters `canonicalRemembered`, surfaced in `Canonical.svelte` as a
+    handwritten preface above the canonical opening.
+  - `0.5 ≤ ratio < 0.8` → partial — apparatus +2, no canonical line.
+  - `ratio < 0.5` → "the margin forgets itself" — no reward.
+  - Esc breaks the séance (no reward).
+- Empty-card fallback when no fragment can be distilled yet (the player
+  hasn't logged enough rhythmic reading).
+- Remembered lines persist across prestige (the reader carries them forward);
+  cleared only on `hardReset()`.
+
+Files added/modified for v2.5:
+- `lib/components/rhythm/Recitation.svelte` (new)
+- `lib/rhythm/recorder.ts` (added `RecitationFragment`, `distillFragments`,
+  `pickFragment`, `hasFragments`)
+- `lib/components/Canonical.svelte` (renders `canonicalRemembered` preface)
+- `lib/components/PracticeBar.svelte` (filters out the recitation practice
+  until the upgrade is owned)
+- `state/game.svelte.ts` — `recitationActive`, `canonicalRemembered`,
+  `beginRecitation`, `completeRecitation`
 
 ## v2.0 — the contested passage (shipped)
 
@@ -122,7 +150,7 @@ overlay), `state/game.svelte.ts` (`canBeginContestedPassage`,
 ```
 lib/rhythm/
   timing.ts          # windows + classifyHit (v1.0)
-  recorder.ts        # localStorage circular buffer (v1.0, feeds v2.5)
+  recorder.ts        # circular buffer + fragment distillation (v1.0, v2.5)
 lib/content/
   corpus.ts          # passages + CHARGED_TOKENS for reading pass (v1.0)
   readers.ts         # previous-reader personalities for dispute (v1.5)
@@ -132,23 +160,22 @@ lib/components/rhythm/
   ReadingPass.svelte      # v1.0
   Dispute.svelte          # v1.5
   ContestedPassage.svelte # v2.0
+  Recitation.svelte       # v2.5
 state/
   game.svelte.ts     # glossFromReadingPass, resourcesFromDispute,
-                     # beginContestedPassage / completeContestedPassage
-content/upgrades.ts  # reading_pass, dispute, contested_passage
+                     # beginContestedPassage / completeContestedPassage,
+                     # beginRecitation / completeRecitation
+content/upgrades.ts  # reading_pass, dispute, contested_passage, recitation
+content/practices.ts # adds `recitation` (200 g, 120 s cooldown)
 ```
 
-## Next after v2.0 lands
+## Next
 
-1. Begin v2.5 — the recitation / séance. The recorder has been collecting
-   click timings since v1.0 shipped, so distillation
-   (clustering timestamps into rhythmic fragments) is the missing piece.
-   Then a séance component that replays a fragment as a beat pattern and
-   rewards in-time clicks with bonus apparatus and a "they are remembered"
-   line in the canonical opening of the next run.
-2. Eventually generalise the rhythm engine into a shared module — today the
-   rAF loop / spawn / collision pattern is duplicated across
-   `Dispute.svelte` and `ContestedPassage.svelte`. After v2.5 we'll have a
-   third caller and the right shape will be obvious.
-3. v3.0 — multiple previous readers (the methodist, the marginal heretic,
-   the unlearned hand), more contested passages, achievements, sound design.
+1. v3.0 — more reader personalities (the methodist, the marginal heretic, the
+   unlearned hand), more contested passages, sound design, achievements.
+2. Generalise the rhythm engine into a shared module. We now have four
+   callers (`ReadingPass`, `Dispute`, `ContestedPassage`, `Recitation`) all
+   running their own rAF loop / spawn / collision logic. The right shape is
+   probably visible now.
+3. Expand the recorder to also capture dispute-track clicks, so the recitation
+   can summon disputes in addition to readings.
