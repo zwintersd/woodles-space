@@ -9,6 +9,8 @@
 	import ReadingPass from '$lib/components/rhythm/ReadingPass.svelte';
 	import Dispute from '$lib/components/rhythm/Dispute.svelte';
 	import ContestedPassage from '$lib/components/rhythm/ContestedPassage.svelte';
+	import Asides from '$lib/components/Asides.svelte';
+	import Whisper from '$lib/components/Whisper.svelte';
 	import GeneratorList from '$lib/components/GeneratorList.svelte';
 	import UpgradeShelf from '$lib/components/UpgradeShelf.svelte';
 	import PracticeBar from '$lib/components/PracticeBar.svelte';
@@ -135,6 +137,9 @@
 				{/if}
 			</div>
 		{/if}
+		{#if game.clicksEver >= 8}
+			<Asides />
+		{/if}
 		<ResourceLine />
 		<Feed />
 	</section>
@@ -178,6 +183,8 @@
 {#if game.contestedActive}
 	<ContestedPassage />
 {/if}
+
+<Whisper />
 
 <style>
 	.topbar {

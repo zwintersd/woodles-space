@@ -21,6 +21,8 @@ export interface SaveShape {
 	contestedReadyAt?: number;
 	canonicalCitations?: string[];
 	passagesRead?: string[];
+	// early-game scaffolding
+	whispersShown?: Record<string, boolean>;
 }
 
 export function emptySave(): SaveShape {
