@@ -72,6 +72,33 @@ export const passages: Passage[] = [
 			'and the next reader read what was written, and corrected it,',
 			'and in this manner the book was composed, slowly, by many hands.'
 		]
+	},
+	{
+		id: 'epistle_concerning_doubt',
+		register: 'patristic',
+		source: 'epistle concerning doubt, fragment',
+		lines: [
+			'you write that you have begun to doubt the older readings.',
+			'this is correct. one should begin to doubt them.',
+			'but one should also doubt the doubt; it too is a reading.',
+			'the master, when pressed, refused to give us a method.',
+			'he said only: stay long enough at the passage to be changed by it.',
+			'i have stayed at this passage for forty years, and i am not yet finished.'
+		]
+	},
+	{
+		id: 'rescript_on_the_unwritten',
+		register: 'decretal',
+		source: 'rescript on the unwritten law, year unknown',
+		lines: [
+			'concerning that part of the law which was never set down,',
+			'the question has arisen whether it binds those who do not know it.',
+			'this office holds, with the third witness, that it does.',
+			'the unwritten law is not less because it was not written.',
+			'it is more, because no copyist has had occasion to err over it,',
+			'and no reader has had occasion to read it wrongly into the margin.',
+			'the unwritten law is the only law that remains intact.'
+		]
 	}
 ];
 

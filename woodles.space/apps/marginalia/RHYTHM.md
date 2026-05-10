@@ -12,7 +12,7 @@ pitch.
 | v1.5    | The dispute           | Shipped     | `lib/components/rhythm/Dispute.svelte`     |
 | v2.0    | The contested passage | Shipped     | `lib/components/rhythm/ContestedPassage.svelte` |
 | v2.5    | The recitation        | Shipped     | `lib/components/rhythm/Recitation.svelte` |
-| v3.0    | More readers, sound   | Not started | —                                          |
+| v3.0    | More readers + new passages | Shipped (no sound)  | `lib/content/readers.ts`, `lib/content/passages.ts` |
 
 ## v1.0 — the reading pass (shipped)
 
@@ -169,13 +169,63 @@ content/upgrades.ts  # reading_pass, dispute, contested_passage, recitation
 content/practices.ts # adds `recitation` (200 g, 120 s cooldown)
 ```
 
+## v3.0 — more hands in the margin (shipped)
+
+The dispute now has four selectable readers. Each carries a different rhythm:
+
+- **the hand of an unknown reader** (steady; ~1100 ms ± 70). The original
+  voice; assumes you have time.
+- **the methodist** (steady; ~950 ms ± 30). Iron regularity. Accents every
+  fifth beat are formal collations ("collated with the sisene codex").
+- **the marginal heretic** (burst; 5 close beats at ~280 ms then a 4–5 s
+  silence). Storms of disagreement, then long quiet. Every beat is fierce.
+- **the unlearned hand** (arrhythmic; uniform random 1400–3200 ms). Slow,
+  wrong-footed timing — but every seventh beat lands an accent of stunning
+  rightness ("and yet, it is true.").
+
+Implementation:
+- `lib/content/readers.ts` extended with a `ReaderPattern` discriminated
+  union (`steady | burst | arrhythmic`). `nextBeatTime(reader, lastPeak,
+  beatIndex)` switches on the kind. For burst patterns, beat 0 of each cycle
+  becomes the silence boundary (deterministic-modulo-jitter), so we don't
+  need any per-reader scratch state.
+- `Dispute.svelte` adds a pill row of selectable readers above the field;
+  switching readers clears the beat queue and rebuilds it under the new
+  cadence.
+
+Two new contested passages join the corpus:
+- `epistle_concerning_doubt` (patristic) — "stay long enough at the passage
+  to be changed by it."
+- `rescript_on_the_unwritten` (decretal) — "the unwritten law is the only
+  law that remains intact."
+
+Sound design and achievements remain out of scope (no audio assets; the
+existing palimpsest / citation / remembered-line counters already function
+as soft progress markers).
+
+## Update modal (shipped alongside v3.0)
+
+A "what's new" modal that surfaces version notes whenever the player's save
+records a `lastSeenVersion` older than `CURRENT_VERSION`.
+
+- Lives at `lib/components/UpdateModal.svelte`; content at
+  `lib/content/updates.ts`.
+- Auto-opens once on hydrate when versions don't match. Notes since the last
+  seen version get a "new" badge.
+- Re-openable from the menu under "about → what's new."
+- Dismiss writes `lastSeenVersion = CURRENT_VERSION` and persists.
+- Esc dismisses; backdrop click dismisses.
+
 ## Next
 
-1. v3.0 — more reader personalities (the methodist, the marginal heretic, the
-   unlearned hand), more contested passages, sound design, achievements.
-2. Generalise the rhythm engine into a shared module. We now have four
+1. Generalise the rhythm engine into a shared module. We now have four
    callers (`ReadingPass`, `Dispute`, `ContestedPassage`, `Recitation`) all
    running their own rAF loop / spawn / collision logic. The right shape is
    probably visible now.
-3. Expand the recorder to also capture dispute-track clicks, so the recitation
-   can summon disputes in addition to readings.
+2. Expand the recorder to also capture dispute-track clicks, so the
+   recitation can summon disputes in addition to readings — and so the
+   different reader rhythms shape the available recitations.
+3. Reader-specific dispute economy — e.g., the marginal heretic's burst
+   timing could yield disagreement-resource bonuses; the unlearned hand's
+   accents could pay extra recensions when caught. Right now all readers
+   share the same payout table.

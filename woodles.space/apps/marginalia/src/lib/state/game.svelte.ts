@@ -7,6 +7,7 @@ import { glosses as glossLines } from '../content/glosses';
 import { ambient as ambientLines } from '../content/ambient';
 import { canonicalFor, type Canonical } from '../content/canonical';
 import { citationFromPassage, type Passage } from '../content/passages';
+import { CURRENT_VERSION } from '../content/updates';
 import { emptySave, load, save, wipe, type SaveShape } from './persist';
 
 // ─── feed ─────────────────────────────────────────────────────────────────
@@ -97,6 +98,11 @@ export class Game {
 	// remembered lines persist across prestige and surface in Canonical.
 	recitationActive = $state(false);
 	canonicalRemembered = $state<string[]>([]);
+
+	// update modal — persistent record of the most recent version notes
+	// the player has seen, plus a transient flag while the modal is open.
+	lastSeenVersion = $state<string | null>(null);
+	updateModalOpen = $state(false);
 
 	// ductus combo: each rapid click increases weight; decays after ~600ms idle
 	ductusCombo = $state(0);
@@ -415,6 +421,18 @@ export class Game {
 				'the passage collapses into nonsense. nothing is gained from a reading that was not finished.'
 			);
 		}
+	}
+
+	// ── update modal ────────────────────────────────────────────────────────
+
+	openUpdateModal() {
+		this.updateModalOpen = true;
+	}
+
+	dismissUpdateModal() {
+		this.updateModalOpen = false;
+		this.lastSeenVersion = CURRENT_VERSION;
+		this.persist();
 	}
 
 	// ── the recitation (v2.5) ────────────────────────────────────────────────
@@ -762,6 +780,7 @@ export class Game {
 			passagesRead: [...this.passagesRead],
 			whispersShown: { ...this.whispersShown },
 			canonicalRemembered: [...this.canonicalRemembered],
+			lastSeenVersion: this.lastSeenVersion,
 			startedAt: Date.now()
 		};
 	}
@@ -784,6 +803,7 @@ export class Game {
 		this.passagesRead = [...(s.passagesRead ?? [])];
 		this.whispersShown = { ...(s.whispersShown ?? {}) };
 		this.canonicalRemembered = [...(s.canonicalRemembered ?? [])];
+		this.lastSeenVersion = s.lastSeenVersion ?? null;
 	}
 
 	hydrate() {
@@ -796,6 +816,11 @@ export class Game {
 				'system',
 				'an empty page. the canonical text is at the center; the margin is yours.'
 			);
+		}
+		// Auto-open the update modal whenever the player's save is older than
+		// the current version (or has no recorded version at all).
+		if (this.lastSeenVersion === null || this.lastSeenVersion < CURRENT_VERSION) {
+			this.updateModalOpen = true;
 		}
 	}
 

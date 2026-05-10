@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { game } from '$lib/state/game.svelte';
-	import { readers, nextBeatTime, phraseForBeat } from '$lib/content/readers';
+	import { readers, readerById, nextBeatTime, phraseForBeat, type Reader } from '$lib/content/readers';
 
 	// ── constants ─────────────────────────────────────────────────────────────
 
@@ -22,9 +22,19 @@
 	const DISAGREEMENT_PX = DISAGREEMENT_MS * SPEED_PX_MS;
 	const COUNTERPOINT_PX = COUNTERPOINT_MAX_MS * SPEED_PX_MS;
 
-	// ── reader ────────────────────────────────────────────────────────────────
+	// ── reader (selectable in v3.0) ─────────────────────────────────────────
 
-	const reader = readers[0]; // unknown hand
+	let readerId = $state('unknown_hand');
+	const reader: Reader = $derived(readerById(readerId));
+
+	function selectReader(id: string) {
+		if (id === readerId) return;
+		readerId = id;
+		// rebuild the beat sequence under the new hand
+		beats = [];
+		beatIndex = 0;
+		nextPeak = 0;
+	}
 
 	// ── state ─────────────────────────────────────────────────────────────────
 
@@ -101,8 +111,8 @@
 				phrase: phraseForBeat(reader, beatIndex),
 				isAccent: beatIndex % reader.accentEvery === 0,
 			});
+			nextPeak = nextBeatTime(reader, nextPeak, beatIndex);
 			beatIndex++;
-			nextPeak = nextBeatTime(reader, nextPeak);
 		}
 		// cull exited beats
 		beats = beats.filter((b) => now - b.peakTime < EXIT_THRESHOLD_MS);
@@ -209,7 +219,20 @@
 </script>
 
 <div class="dispute">
-	<p class="reader-id" aria-hidden="true">— {reader.name} —</p>
+	<div class="reader-row" role="radiogroup" aria-label="choose a previous reader">
+		{#each readers as r (r.id)}
+			<button
+				type="button"
+				class="reader-pill"
+				class:active={r.id === readerId}
+				role="radio"
+				aria-checked={r.id === readerId}
+				onclick={() => selectReader(r.id)}
+				title={r.tagline}
+			>{r.name}</button>
+		{/each}
+	</div>
+	<p class="reader-id" aria-hidden="true">{reader.tagline}</p>
 
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 	<div
@@ -325,13 +348,45 @@
 		text-align: center;
 	}
 
-	.reader-id {
+	.reader-row {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.35rem;
+		margin: 0 0 0.45rem;
+	}
+
+	.reader-pill {
 		font-family: var(--font-ui);
-		font-size: 0.74rem;
-		letter-spacing: 0.18em;
-		text-transform: uppercase;
+		font-size: 0.7rem;
+		letter-spacing: 0.12em;
+		text-transform: lowercase;
 		color: var(--muted);
-		margin: 0 0 0.6rem;
+		background: transparent;
+		border: 1px solid var(--rule);
+		border-radius: 999px;
+		padding: 0.18rem 0.6rem;
+		cursor: pointer;
+		transition: color 120ms ease, border-color 120ms ease;
+	}
+
+	.reader-pill:hover {
+		color: var(--cream);
+		border-color: var(--periwinkle);
+	}
+
+	.reader-pill.active {
+		color: var(--cream);
+		border-color: var(--periwinkle);
+		background: var(--panel);
+	}
+
+	.reader-id {
+		font-family: var(--font-body);
+		font-style: italic;
+		font-size: 0.82rem;
+		color: var(--muted);
+		margin: 0 0 0.7rem;
 	}
 
 	/* ── field ───────────────────────────────────────────────────────────── */
