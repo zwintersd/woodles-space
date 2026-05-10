@@ -17,6 +17,10 @@ export interface SaveShape {
 	practiceCooldowns: Record<string, number>; // ms timestamp when ready
 	palinodeUsedThisRun: boolean;
 	startedAt: number;
+	// v2.0 — contested passage
+	contestedReadyAt?: number;
+	canonicalCitations?: string[];
+	passagesRead?: string[];
 }
 
 export function emptySave(): SaveShape {

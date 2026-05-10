@@ -17,6 +17,11 @@
 	const DISAGREEMENT_MS = 380; // 110–380ms from peak → disagreement
 	const COUNTERPOINT_MAX_MS = 640; // 380–640ms from peak → counterpoint (≈ half-beat)
 
+	// Window widths in pixels (each side of the seam) — for visualising the zones.
+	const AGREEMENT_PX = AGREEMENT_MS * SPEED_PX_MS;
+	const DISAGREEMENT_PX = DISAGREEMENT_MS * SPEED_PX_MS;
+	const COUNTERPOINT_PX = COUNTERPOINT_MAX_MS * SPEED_PX_MS;
+
 	// ── reader ────────────────────────────────────────────────────────────────
 
 	const reader = readers[0]; // unknown hand
@@ -31,6 +36,26 @@
 	}
 
 	type DisputeMode = 'agreement' | 'disagreement' | 'counterpoint';
+
+	// Per-mode resource gain (must mirror game.resourcesFromDispute).
+	const MODE_GAIN: Record<DisputeMode, number> = {
+		agreement: 1,
+		disagreement: 0.1,
+		counterpoint: 0.01,
+	};
+
+	const MODE_RESOURCE_NAME: Record<DisputeMode, string> = {
+		agreement: 'commentary',
+		disagreement: 'apparatus',
+		counterpoint: 'recension',
+	};
+
+	function fmtGain(mode: DisputeMode): string {
+		const g = MODE_GAIN[mode];
+		const num = g >= 1 ? g.toFixed(0) : g.toFixed(2);
+		const name = MODE_RESOURCE_NAME[mode];
+		return `+ ${num} ${name}`;
+	}
 
 	let fieldEl: HTMLDivElement | undefined = $state();
 	let fieldWidth = $state(700);
@@ -48,6 +73,13 @@
 	// player click flash — position offset from seam (0 = on beat, ±px)
 	let clickFlash = $state(0); // opacity
 	let clickOffset = $state(0); // px from seam at moment of click
+
+	// miss flash — distinct from hit flash, faintly muted
+	let missFlash = $state(0);
+	let missOffset = $state(0);
+
+	// running tallies per mode this session, shown subtly
+	let hits = $state({ agreement: 0, disagreement: 0, counterpoint: 0 });
 
 	const seamX = $derived(fieldWidth / 2);
 
@@ -81,8 +113,9 @@
 	function tick(ts: number) {
 		now = ts;
 		ensureBeats();
-		// decay click flash
+		// decay flashes
 		if (clickFlash > 0) clickFlash = Math.max(0, clickFlash - 0.035);
+		if (missFlash > 0) missFlash = Math.max(0, missFlash - 0.05);
 		rafId = requestAnimationFrame(tick);
 	}
 
@@ -102,22 +135,29 @@
 
 	function handleHit() {
 		const clickTime = performance.now();
-		const mode = classify(clickTime);
-		if (!mode) return;
 
-		// find nearest beat to compute px offset for the click flash
+		// find nearest beat (used for both hit and miss feedback)
 		let nearestBeat: Beat | null = null;
 		let nearestDist = Infinity;
 		for (const b of beats) {
 			const d = Math.abs(b.peakTime - clickTime);
 			if (d < nearestDist) { nearestDist = d; nearestBeat = b; }
 		}
-		// offset in px: how far the nearest beat was from the seam at click time
-		clickOffset = nearestBeat ? (nearestBeat.peakTime - clickTime) * SPEED_PX_MS : 0;
+		const offsetPx = nearestBeat ? (nearestBeat.peakTime - clickTime) * SPEED_PX_MS : 0;
 
+		const mode = classify(clickTime);
+		if (!mode) {
+			// miss — register feedback so the click is felt, but no resource
+			missOffset = offsetPx;
+			missFlash = 1;
+			return;
+		}
+
+		clickOffset = offsetPx;
 		lastMode = mode;
 		lastHitAt = clickTime;
 		clickFlash = 1;
+		hits[mode] += 1;
 
 		game.resourcesFromDispute(mode);
 	}
@@ -145,12 +185,6 @@
 		agreement: 'agreement',
 		disagreement: 'disagreement',
 		counterpoint: 'counterpoint',
-	};
-
-	const MODE_RESOURCE: Record<DisputeMode, string> = {
-		agreement: '+ commentary',
-		disagreement: '+ apparatus',
-		counterpoint: '+ recension',
 	};
 
 	// ── lifecycle ─────────────────────────────────────────────────────────────
@@ -187,6 +221,22 @@
 		onpointerdown={onPointerDown}
 		onkeydown={onKeyDown}
 	>
+		<!-- timing-window zones around the seam, on the upper track -->
+		<div class="zones" aria-hidden="true">
+			<div
+				class="zone zone-counter"
+				style="left: calc(50% - {COUNTERPOINT_PX}px); width: {COUNTERPOINT_PX * 2}px"
+			></div>
+			<div
+				class="zone zone-disagree"
+				style="left: calc(50% - {DISAGREEMENT_PX}px); width: {DISAGREEMENT_PX * 2}px"
+			></div>
+			<div
+				class="zone zone-agree"
+				style="left: calc(50% - {AGREEMENT_PX}px); width: {AGREEMENT_PX * 2}px"
+			></div>
+		</div>
+
 		<!-- vertical seam, spans both tracks -->
 		<div class="seam" aria-hidden="true"></div>
 
@@ -220,6 +270,14 @@
 				>|</span>
 			{/if}
 
+			<!-- miss flash: faintly muted, no resource -->
+			{#if missFlash > 0.01}
+				<span
+					class="click-mark click-mark-miss"
+					style="left: {seamX + missOffset}px; opacity: {(missFlash * 0.6).toFixed(3)}"
+				>|</span>
+			{/if}
+
 			<!-- mode + resource label, fades after hit -->
 			{#if labelOpacity > 0.01 && lastMode}
 				<span
@@ -228,19 +286,34 @@
 					aria-live="polite"
 				>
 					<span class="mode-word">{MODE_LABEL[lastMode]}</span>
-					<span class="resource-word">{MODE_RESOURCE[lastMode]}</span>
+					<span class="resource-word">{fmtGain(lastMode)}</span>
 				</span>
 			{/if}
 		</div>
 	</div>
 
 	<p class="meta">
-		<span class="hint-agree">agree</span>
-		·
-		<span class="hint-disagree">disagree</span>
-		·
-		<span class="hint-counter">counterpoint</span>
-		<span class="meta-sep"> — </span>collate, refute, or diverge from the previous reader's hand
+		<span class="hint-agree">on-beat → agreement</span>
+		<span class="meta-sep"> · </span>
+		<span class="hint-disagree">off-beat → disagreement</span>
+		<span class="meta-sep"> · </span>
+		<span class="hint-counter">half-beat → counterpoint</span>
+	</p>
+
+	<p class="tallies" aria-live="off">
+		<span class="tally-agree" title="commentaries from agreement">
+			<span class="tally-dot tally-dot-agree"></span>{hits.agreement}
+		</span>
+		<span class="tally-sep">·</span>
+		<span class="tally-disagree" title="apparatus from disagreement">
+			<span class="tally-dot tally-dot-disagree"></span>{hits.disagreement}
+		</span>
+		<span class="tally-sep">·</span>
+		<span class="tally-counter" title="recensions from counterpoint">
+			<span class="tally-dot tally-dot-counter"></span>{hits.counterpoint}
+		</span>
+		<span class="tally-sep">·</span>
+		<span class="tally-hint">space / click</span>
 	</p>
 </div>
 
@@ -287,7 +360,46 @@
 		background: var(--periwinkle);
 		opacity: 0.35;
 		pointer-events: none;
-		z-index: 2;
+		z-index: 3;
+	}
+
+	/* ── timing-window zones (upper track only) ───────────────────────── */
+
+	.zones {
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: 0;
+		height: 3.4rem; /* matches .track height */
+		pointer-events: none;
+		z-index: 0;
+	}
+
+	.zone {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		opacity: 0.12;
+	}
+
+	.zone-counter {
+		background: linear-gradient(
+			to right,
+			transparent,
+			var(--periwinkle) 20%,
+			var(--periwinkle) 80%,
+			transparent
+		);
+	}
+
+	.zone-disagree {
+		background: var(--leafeon-pink);
+		opacity: 0.10;
+	}
+
+	.zone-agree {
+		background: var(--cyan);
+		opacity: 0.18;
 	}
 
 	/* ── tracks ──────────────────────────────────────────────────────────── */
@@ -311,7 +423,14 @@
 		pointer-events: none;
 		user-select: none;
 		white-space: nowrap;
-		z-index: 1;
+		z-index: 4;
+		background: linear-gradient(
+			to right,
+			var(--bg) 0%,
+			var(--bg) 80%,
+			transparent
+		);
+		padding-right: 0.6rem;
 	}
 
 	.track-divider {
@@ -364,6 +483,11 @@
 
 	.click-mark-counterpoint {
 		color: var(--periwinkle);
+	}
+
+	.click-mark-miss {
+		color: var(--rule);
+		font-size: 1.3rem;
 	}
 
 	/* ── hit label (lower track, centred) ────────────────────────────────── */
@@ -432,6 +556,44 @@
 	}
 
 	.meta-sep {
+		color: var(--rule);
+	}
+
+	/* ── tallies ──────────────────────────────────────────────────────────── */
+
+	.tallies {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		gap: 0.55rem;
+		font-family: var(--font-counter);
+		font-size: 0.82rem;
+		color: var(--muted);
+		margin: 0.45rem 0 0;
+	}
+
+	.tally-dot {
+		display: inline-block;
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		margin-right: 0.3rem;
+		vertical-align: middle;
+	}
+
+	.tally-dot-agree { background: var(--cyan); }
+	.tally-dot-disagree { background: var(--leafeon-pink); }
+	.tally-dot-counter { background: var(--periwinkle); }
+
+	.tally-sep {
+		color: var(--rule);
+	}
+
+	.tally-hint {
+		font-family: var(--font-ui);
+		font-size: 0.68rem;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
 		color: var(--rule);
 	}
 

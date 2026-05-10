@@ -8,6 +8,7 @@
 	import ClickRegion from '$lib/components/ClickRegion.svelte';
 	import ReadingPass from '$lib/components/rhythm/ReadingPass.svelte';
 	import Dispute from '$lib/components/rhythm/Dispute.svelte';
+	import ContestedPassage from '$lib/components/rhythm/ContestedPassage.svelte';
 	import GeneratorList from '$lib/components/GeneratorList.svelte';
 	import UpgradeShelf from '$lib/components/UpgradeShelf.svelte';
 	import PracticeBar from '$lib/components/PracticeBar.svelte';
@@ -22,6 +23,17 @@
 
 	const canPrestige = $derived(game.canPrestige());
 	const pending = $derived(game.pendingPalimpsest);
+
+	// 250ms ticker so the contested-passage cooldown UI updates live.
+	let cooldownTick = $state(Date.now());
+	$effect(() => {
+		const id = setInterval(() => (cooldownTick = Date.now()), 250);
+		return () => clearInterval(id);
+	});
+	const contestedCooldownLeft = $derived.by(() => {
+		void cooldownTick;
+		return game.contestedCooldownLeftMs();
+	});
 
 	function doExport() {
 		exportBlob = exportSave(game.toSave());
@@ -96,6 +108,33 @@
 		{#if game.hasUpgrade('dispute')}
 			<Dispute />
 		{/if}
+		{#if game.hasUpgrade('contested_passage')}
+			<div class="contested-trigger">
+				<button
+					class="contested-button"
+					type="button"
+					disabled={!game.canBeginContestedPassage()}
+					onclick={() => game.beginContestedPassage()}
+				>
+					— begin a contested passage —
+				</button>
+				{#if contestedCooldownLeft > 0}
+					<span class="contested-meta">
+						next reading available in
+						<span class="num">{Math.ceil(contestedCooldownLeft / 1000)}s</span>
+					</span>
+				{:else}
+					<span class="contested-meta muted">
+						a passage is ready. catch the helpful glyphs and dodge the censor's pen.
+					</span>
+				{/if}
+				{#if game.canonicalCitations.length > 0}
+					<span class="contested-meta tiny">
+						citations gathered: <span class="num">{game.canonicalCitations.length}</span>
+					</span>
+				{/if}
+			</div>
+		{/if}
 		<ResourceLine />
 		<Feed />
 	</section>
@@ -135,6 +174,10 @@
 		</p>
 	</footer>
 </main>
+
+{#if game.contestedActive}
+	<ContestedPassage />
+{/if}
 
 <style>
 	.topbar {
@@ -296,6 +339,50 @@
 	}
 	footer a {
 		color: var(--periwinkle);
+	}
+
+	/* ── contested-passage trigger ───────────────────────────────────────── */
+	.contested-trigger {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.3rem;
+		margin: 0.6rem 0 0.4rem;
+	}
+	.contested-button {
+		font-family: var(--font-display);
+		font-size: 1rem;
+		color: var(--cream);
+		background: var(--panel-accent);
+		border: 1px solid var(--rule);
+		border-radius: 3px;
+		padding: 0.35rem 0.7rem;
+	}
+	.contested-button:hover:not(:disabled) {
+		border-color: var(--leafeon-pink);
+		color: var(--leafeon-pink);
+	}
+	.contested-button:disabled {
+		color: var(--muted);
+		cursor: not-allowed;
+	}
+	.contested-meta {
+		font-family: var(--font-ui);
+		font-size: 0.78rem;
+		color: var(--muted);
+	}
+	.contested-meta.muted {
+		font-style: italic;
+	}
+	.contested-meta.tiny {
+		font-size: 0.7rem;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--rule);
+	}
+	.contested-meta .num {
+		font-family: var(--font-counter);
+		color: var(--cyan);
 	}
 
 	@media print {
