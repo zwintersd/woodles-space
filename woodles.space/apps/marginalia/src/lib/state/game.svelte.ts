@@ -99,6 +99,15 @@ export class Game {
 	recitationActive = $state(false);
 	canonicalRemembered = $state<string[]>([]);
 
+	// reading for the stars — mouse-presence reading timer.
+	// 20 min of presence = 1 point; 5 points = 1 completed star.
+	// Phase 1 tracks only; no economy hookup yet. Persists across prestige.
+	readingMsTowardNextPoint = $state(0);
+	readingStarPoints = $state(0); // 0..POINTS_PER_STAR-1 (the active star's fill)
+	readingCompletedStars = $state(0);
+	readingCumulativeMs = $state(0);
+	readingCumulativeWords = $state(0);
+
 	// update modal — persistent record of the most recent version notes
 	// the player has seen, plus a transient flag while the modal is open.
 	lastSeenVersion = $state<string | null>(null);
@@ -421,6 +430,39 @@ export class Game {
 				'the passage collapses into nonsense. nothing is gained from a reading that was not finished.'
 			);
 		}
+	}
+
+	// ── reading for the stars ───────────────────────────────────────────────
+
+	static readonly READING_POINT_MS = 20 * 60 * 1000; // 20 minutes per point
+	static readonly READING_POINTS_PER_STAR = 5;
+
+	// Credit elapsed mouse-presence reading time. May roll into points and stars.
+	// dtMs may be any positive number — we handle multi-point overflow.
+	creditReadingMs(dtMs: number) {
+		if (dtMs <= 0) return;
+		this.lastInteractionAt = Date.now();
+		this.readingCumulativeMs += dtMs;
+		this.readingMsTowardNextPoint += dtMs;
+		while (this.readingMsTowardNextPoint >= Game.READING_POINT_MS) {
+			this.readingMsTowardNextPoint -= Game.READING_POINT_MS;
+			this.readingStarPoints += 1;
+			if (this.readingStarPoints >= Game.READING_POINTS_PER_STAR) {
+				this.readingStarPoints = 0;
+				this.readingCompletedStars += 1;
+				this.pushFeed(
+					'milestone',
+					`a star fills in — ${this.readingCompletedStars} now hang in the margin. brianna reads alongside you.`
+				);
+			}
+		}
+	}
+
+	// Set the in-session word count for the current paste. Cumulative count is
+	// only added once per paste, by the room component (it tracks deltas).
+	addReadingWords(words: number) {
+		if (words <= 0) return;
+		this.readingCumulativeWords += words;
 	}
 
 	// ── update modal ────────────────────────────────────────────────────────
@@ -754,6 +796,11 @@ export class Game {
 		this.whispersLastFiredAt = {};
 		this.chargedClickReady = false;
 		this.clicksUntilCharged = 0;
+		this.readingMsTowardNextPoint = 0;
+		this.readingStarPoints = 0;
+		this.readingCompletedStars = 0;
+		this.readingCumulativeMs = 0;
+		this.readingCumulativeWords = 0;
 		this.feed = [];
 		this.pushFeed('system', 'a wipe. the library returns to first hand.');
 	}
@@ -781,6 +828,11 @@ export class Game {
 			whispersShown: { ...this.whispersShown },
 			canonicalRemembered: [...this.canonicalRemembered],
 			lastSeenVersion: this.lastSeenVersion,
+			readingMsTowardNextPoint: this.readingMsTowardNextPoint,
+			readingStarPoints: this.readingStarPoints,
+			readingCompletedStars: this.readingCompletedStars,
+			readingCumulativeMs: this.readingCumulativeMs,
+			readingCumulativeWords: this.readingCumulativeWords,
 			startedAt: Date.now()
 		};
 	}
@@ -804,6 +856,11 @@ export class Game {
 		this.whispersShown = { ...(s.whispersShown ?? {}) };
 		this.canonicalRemembered = [...(s.canonicalRemembered ?? [])];
 		this.lastSeenVersion = s.lastSeenVersion ?? null;
+		this.readingMsTowardNextPoint = s.readingMsTowardNextPoint ?? 0;
+		this.readingStarPoints = s.readingStarPoints ?? 0;
+		this.readingCompletedStars = s.readingCompletedStars ?? 0;
+		this.readingCumulativeMs = s.readingCumulativeMs ?? 0;
+		this.readingCumulativeWords = s.readingCumulativeWords ?? 0;
 	}
 
 	hydrate() {

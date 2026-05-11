@@ -10,6 +10,7 @@
 	import Dispute from '$lib/components/rhythm/Dispute.svelte';
 	import ContestedPassage from '$lib/components/rhythm/ContestedPassage.svelte';
 	import Recitation from '$lib/components/rhythm/Recitation.svelte';
+	import ReadingRoom from '$lib/components/reading/ReadingRoom.svelte';
 	import Asides from '$lib/components/Asides.svelte';
 	import Whisper from '$lib/components/Whisper.svelte';
 	import UpdateModal from '$lib/components/UpdateModal.svelte';
@@ -154,6 +155,10 @@
 		<ResourceLine />
 		<Feed />
 	</section>
+
+	{#if game.hasUpgrade('reading_for_stars')}
+		<ReadingRoom />
+	{/if}
 
 	<hr class="rule" />
 
