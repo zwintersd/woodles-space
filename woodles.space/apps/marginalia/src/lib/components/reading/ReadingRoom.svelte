@@ -1,21 +1,47 @@
 <script lang="ts">
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, tick } from 'svelte';
 	import { game } from '$lib/state/game.svelte';
 	import { createReadingTimer } from '$lib/reading/timer';
+	import {
+		splitParagraphs,
+		newNoteId,
+		type Paragraph,
+		type MarginNote
+	} from '$lib/reading/text';
 	import Star from './Star.svelte';
 	import StarShelf from './StarShelf.svelte';
+	import Passage from './Passage.svelte';
+	import MarginNotes from './MarginNotes.svelte';
 
 	const POINT_MS = 20 * 60 * 1000;
 	const PASTE_CAP = 500_000;
 	const WPM = 230;
 	const PERSIST_INTERVAL_MS = 3_000;
-	const PASTE_KEY = 'marginalia.reading.paste.v1';
-	const PDF_CAP_BYTES = 32 * 1024 * 1024; // 32 MB; refuse beyond this
+	const DOC_KEY = 'marginalia.reading.doc.v2';
+	const LEGACY_PASTE_KEY = 'marginalia.reading.paste.v1';
+	const PDF_CAP_BYTES = 32 * 1024 * 1024;
+
+	interface ReadingDoc {
+		text: string;
+		paragraphs: Paragraph[];
+		notes: MarginNote[];
+	}
 
 	let paneEl: HTMLElement | undefined = $state();
+	let passageEl: HTMLElement | undefined = $state();
+	let marginColumnEl: HTMLElement | undefined = $state();
 	let pasteText = $state('');
 	let mode = $state<'paste' | 'read'>('paste');
 	let truncated = $state(false);
+
+	// Current reading document.
+	let paragraphs = $state<Paragraph[]>([]);
+	let notes = $state<MarginNote[]>([]);
+	let anchorOffsets = $state<Record<string, number>>({});
+
+	// Selection state for the popover.
+	let selectionRect = $state<{ top: number; left: number; width: number } | null>(null);
+	let selectionAnchorId = $state<string | null>(null);
 
 	// PDF ingestion
 	let pdfLoading = $state(false);
@@ -25,9 +51,8 @@
 
 	// Live counters
 	let sessionMs = $state(0);
-	let nowTick = $state(0); // bumped each frame so derived re-evaluates
+	let nowTick = $state(0);
 
-	// Word count of the current paste, computed once on commit.
 	let committedWordCount = $state(0);
 
 	const timer = createReadingTimer({
@@ -71,7 +96,46 @@
 		return r === 0 ? `${h} hr` : `${h} hr ${r} min`;
 	}
 
-	function commitText() {
+	function persistDoc() {
+		try {
+			const doc: ReadingDoc = { text: pasteText, paragraphs, notes };
+			sessionStorage.setItem(DOC_KEY, JSON.stringify(doc));
+		} catch {
+			// ignore quota
+		}
+	}
+
+	function loadDoc(): boolean {
+		try {
+			const raw = sessionStorage.getItem(DOC_KEY);
+			if (raw) {
+				const parsed = JSON.parse(raw) as ReadingDoc;
+				if (parsed?.text && Array.isArray(parsed.paragraphs)) {
+					pasteText = parsed.text;
+					paragraphs = parsed.paragraphs;
+					notes = Array.isArray(parsed.notes) ? parsed.notes : [];
+					committedWordCount = countWords(parsed.text);
+					return true;
+				}
+			}
+			// Legacy v1 — a raw string. Migrate by splitting paragraphs, no notes.
+			const legacy = sessionStorage.getItem(LEGACY_PASTE_KEY);
+			if (legacy) {
+				pasteText = legacy;
+				paragraphs = splitParagraphs(legacy);
+				notes = [];
+				committedWordCount = countWords(legacy);
+				sessionStorage.removeItem(LEGACY_PASTE_KEY);
+				persistDoc();
+				return true;
+			}
+		} catch {
+			// ignore
+		}
+		return false;
+	}
+
+	async function commitText() {
 		let t = pasteText;
 		truncated = false;
 		if (t.length > PASTE_CAP) {
@@ -82,23 +146,28 @@
 		const words = countWords(t);
 		committedWordCount = words;
 		game.addReadingWords(words);
+		paragraphs = splitParagraphs(t);
+		notes = [];
 		mode = 'read';
-		try {
-			sessionStorage.setItem(PASTE_KEY, t);
-		} catch {
-			// ignore quota
-		}
+		persistDoc();
+		await tick();
+		measureAnchors();
 	}
 
 	function newText() {
 		mode = 'paste';
 		pasteText = '';
+		paragraphs = [];
+		notes = [];
+		anchorOffsets = {};
 		committedWordCount = 0;
 		truncated = false;
 		pdfError = null;
 		pdfProgress = null;
+		selectionRect = null;
+		selectionAnchorId = null;
 		try {
-			sessionStorage.removeItem(PASTE_KEY);
+			sessionStorage.removeItem(DOC_KEY);
 		} catch {
 			// ignore
 		}
@@ -149,48 +218,158 @@
 
 	function onUnload() {
 		game.persist();
+		persistDoc();
+	}
+
+	// ── annotation flow ─────────────────────────────────────────────────────
+
+	function measureAnchors() {
+		if (!passageEl) return;
+		const top = passageEl.getBoundingClientRect().top;
+		const next: Record<string, number> = {};
+		passageEl.querySelectorAll('[data-anchor]').forEach((el) => {
+			const id = el.getAttribute('data-anchor');
+			if (!id) return;
+			next[id] = (el as HTMLElement).getBoundingClientRect().top - top;
+		});
+		anchorOffsets = next;
+	}
+
+	function onSelectionChange() {
+		if (typeof window === 'undefined') return;
+		if (mode !== 'read' || !passageEl) {
+			selectionRect = null;
+			selectionAnchorId = null;
+			return;
+		}
+		const sel = window.getSelection();
+		if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+			selectionRect = null;
+			selectionAnchorId = null;
+			return;
+		}
+		const range = sel.getRangeAt(0);
+		const container =
+			range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+				? range.commonAncestorContainer.parentElement
+				: (range.commonAncestorContainer as Element);
+		if (!container || !passageEl.contains(container)) {
+			selectionRect = null;
+			selectionAnchorId = null;
+			return;
+		}
+		let block: Element | null = container;
+		while (block && block !== passageEl) {
+			if (block instanceof HTMLElement && block.hasAttribute('data-anchor')) break;
+			block = block.parentElement;
+		}
+		if (!block || block === passageEl) {
+			selectionRect = null;
+			selectionAnchorId = null;
+			return;
+		}
+		const r = range.getBoundingClientRect();
+		if (r.width === 0 && r.height === 0) {
+			selectionRect = null;
+			selectionAnchorId = null;
+			return;
+		}
+		selectionAnchorId = (block as HTMLElement).getAttribute('data-anchor');
+		selectionRect = { top: r.top, left: r.left, width: r.width };
+	}
+
+	async function addNoteFor(anchorId: string) {
+		const now = new Date().toISOString();
+		const note: MarginNote = {
+			id: newNoteId(),
+			anchorId,
+			html: '',
+			createdAt: now,
+			updatedAt: now
+		};
+		notes = [...notes, note];
+		selectionRect = null;
+		selectionAnchorId = null;
+		// Drop the active text selection so the popover doesn't reappear.
+		window.getSelection()?.removeAllRanges();
+		persistDoc();
+		await tick();
+		measureAnchors();
+		const el = document.querySelector<HTMLElement>(`[data-margin-id="${note.id}"]`);
+		el?.focus();
+	}
+
+	function onNoteChange(id: string, html: string) {
+		const next = notes.map((n) =>
+			n.id === id ? { ...n, html, updatedAt: new Date().toISOString() } : n
+		);
+		notes = next;
+		persistDoc();
+	}
+
+	function onNoteDelete(id: string) {
+		notes = notes.filter((n) => n.id !== id);
+		persistDoc();
+	}
+
+	// Click on the popover button: prevent the mousedown from clearing the
+	// selection before we have a chance to read it.
+	function onPopoverMouseDown(e: MouseEvent) {
+		e.preventDefault();
+		if (selectionAnchorId) addNoteFor(selectionAnchorId);
 	}
 
 	onMount(() => {
-		try {
-			const saved = sessionStorage.getItem(PASTE_KEY);
-			if (saved) {
-				pasteText = saved;
-				committedWordCount = countWords(saved);
-				mode = 'read';
-			}
-		} catch {
-			// ignore
-		}
+		const hadDoc = loadDoc();
+		if (hadDoc) mode = 'read';
 		timer.start();
-		const id = setInterval(() => game.persist(), PERSIST_INTERVAL_MS);
+		const id = setInterval(() => {
+			game.persist();
+			persistDoc();
+		}, PERSIST_INTERVAL_MS);
 		window.addEventListener('beforeunload', onUnload);
-		// If the page was deep-linked with #reading-room, scroll the pane into
-		// view once we've actually mounted (the section may have rendered after
-		// the browser's initial anchor jump).
-		if (typeof window !== 'undefined' && window.location.hash === '#reading-room' && paneEl) {
+		document.addEventListener('selectionchange', onSelectionChange);
+		window.addEventListener('resize', measureAnchors);
+		window.addEventListener('scroll', measureAnchors, { passive: true });
+
+		if (
+			typeof window !== 'undefined' &&
+			window.location.hash === '#reading-room' &&
+			paneEl
+		) {
 			paneEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 		}
+
+		// After we've mounted with a restored doc, measure once we have the DOM.
+		tick().then(measureAnchors);
+
 		return () => {
 			clearInterval(id);
 			window.removeEventListener('beforeunload', onUnload);
+			document.removeEventListener('selectionchange', onSelectionChange);
+			window.removeEventListener('resize', measureAnchors);
+			window.removeEventListener('scroll', measureAnchors);
 		};
 	});
 
 	onDestroy(() => {
 		timer.stop();
 		game.persist();
+		persistDoc();
 	});
 
 	const accruing = $derived.by(() => {
 		void nowTick;
 		return timer.isAccruing();
 	});
+
+	const hasNotes = $derived(notes.length > 0);
 </script>
 
 <section
 	id="reading-room"
 	class="reading-room"
+	class:wide={mode === 'read'}
 	bind:this={paneEl}
 	onpointerenter={onEnter}
 	onpointerleave={onLeave}
@@ -201,7 +380,7 @@
 		<p class="sub">a quiet room. read at your own pace — the timer follows your cursor.</p>
 	</header>
 
-	<div class="board">
+	<div class="board" class:read={mode === 'read'}>
 		<div class="active-star">
 			<Star points={game.readingStarPoints} progress={progress} active size={120} />
 			<p class="points">
@@ -217,6 +396,12 @@
 					<span class="paused">— paused</span>
 				{/if}
 			</p>
+			{#if mode === 'read' && hasNotes}
+				<p class="notes-count">
+					<span class="num">{notes.length}</span>
+					note{notes.length === 1 ? '' : 's'} in the margin
+				</p>
+			{/if}
 		</div>
 
 		<div class="reader">
@@ -277,7 +462,18 @@
 				{#if truncated}
 					<p class="notice">— text was longer than 500k characters; the rest was set aside.</p>
 				{/if}
-				<article class="passage">{pasteText}</article>
+				<div class="passage-and-margin">
+					<Passage {paragraphs} bind:rootEl={passageEl} />
+					<div class="margin-wrap">
+						<MarginNotes
+							{notes}
+							{anchorOffsets}
+							onChange={onNoteChange}
+							onDelete={onNoteDelete}
+							bind:columnEl={marginColumnEl}
+						/>
+					</div>
+				</div>
 			{/if}
 		</div>
 	</div>
@@ -288,6 +484,18 @@
 	</footer>
 </section>
 
+{#if selectionRect && selectionAnchorId && mode === 'read'}
+	<div
+		class="selection-popover"
+		style:top="{selectionRect.top - 38}px"
+		style:left="{selectionRect.left + selectionRect.width / 2}px"
+	>
+		<button class="popover-btn" onmousedown={onPopoverMouseDown} title="add margin note">
+			+ note in the margin
+		</button>
+	</div>
+{/if}
+
 <style>
 	.reading-room {
 		max-width: 44rem;
@@ -296,6 +504,10 @@
 		border: 1px solid var(--rule);
 		border-radius: 4px;
 		background: var(--panel);
+		transition: max-width 240ms ease;
+	}
+	.reading-room.wide {
+		max-width: 60rem;
 	}
 	.head {
 		text-align: center;
@@ -331,6 +543,12 @@
 		flex-direction: column;
 		align-items: center;
 		gap: 0.4rem;
+	}
+	.notes-count {
+		font-family: var(--font-ui);
+		font-size: 0.74rem;
+		color: var(--muted);
+		margin: 0;
 	}
 	.points {
 		font-family: var(--font-ui);
@@ -470,15 +688,29 @@
 		color: var(--print-pink);
 		margin: 0 0 0.5rem;
 	}
-	.passage {
-		font-family: var(--font-body);
-		font-size: 1.02rem;
-		line-height: 1.7;
-		color: var(--text);
-		white-space: pre-wrap;
-		max-height: 26rem;
-		overflow-y: auto;
-		padding: 0.4rem 0.6rem 0.4rem 0;
+	.passage-and-margin {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 16rem;
+		gap: 1.2rem;
+		align-items: start;
+		padding: 0.4rem 0;
+	}
+	.margin-wrap {
+		position: relative;
+		border-left: 1px dashed var(--rule);
+		padding-left: 0.6rem;
+		min-height: 6rem;
+	}
+	@media (max-width: 760px) {
+		.passage-and-margin {
+			grid-template-columns: 1fr;
+		}
+		.margin-wrap {
+			border-left: none;
+			border-top: 1px dashed var(--rule);
+			padding-left: 0;
+			padding-top: 0.6rem;
+		}
 	}
 	.shelf-wrap {
 		margin-top: 1.1rem;
@@ -493,5 +725,29 @@
 		text-transform: uppercase;
 		color: var(--periwinkle);
 		margin: 0 0 0.5rem;
+	}
+
+	/* ── selection popover ─────────────────────────────────────── */
+	.selection-popover {
+		position: fixed;
+		transform: translateX(-50%);
+		z-index: 50;
+		pointer-events: auto;
+	}
+	.popover-btn {
+		font-family: var(--font-ui);
+		font-size: 0.74rem;
+		letter-spacing: 0.12em;
+		color: var(--cream);
+		background: var(--panel-accent);
+		border: 1px solid var(--periwinkle);
+		border-radius: 3px;
+		padding: 0.3rem 0.6rem;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+		white-space: nowrap;
+	}
+	.popover-btn:hover {
+		border-color: var(--leafeon-pink);
+		color: var(--leafeon-pink);
 	}
 </style>
