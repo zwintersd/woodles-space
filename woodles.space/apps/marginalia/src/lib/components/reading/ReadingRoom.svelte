@@ -165,6 +165,12 @@
 		timer.start();
 		const id = setInterval(() => game.persist(), PERSIST_INTERVAL_MS);
 		window.addEventListener('beforeunload', onUnload);
+		// If the page was deep-linked with #reading-room, scroll the pane into
+		// view once we've actually mounted (the section may have rendered after
+		// the browser's initial anchor jump).
+		if (typeof window !== 'undefined' && window.location.hash === '#reading-room' && paneEl) {
+			paneEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		}
 		return () => {
 			clearInterval(id);
 			window.removeEventListener('beforeunload', onUnload);
@@ -183,6 +189,7 @@
 </script>
 
 <section
+	id="reading-room"
 	class="reading-room"
 	bind:this={paneEl}
 	onpointerenter={onEnter}
