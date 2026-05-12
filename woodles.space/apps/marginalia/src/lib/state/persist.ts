@@ -27,6 +27,12 @@ export interface SaveShape {
 	canonicalRemembered?: string[];
 	// v3.0 — update modal
 	lastSeenVersion?: string | null;
+	// reading for the stars — phase 1 (track only, no economy hookup)
+	readingMsTowardNextPoint?: number;
+	readingStarPoints?: number;
+	readingCompletedStars?: number;
+	readingCumulativeMs?: number;
+	readingCumulativeWords?: number;
 }
 
 export function emptySave(): SaveShape {
