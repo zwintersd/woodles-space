@@ -80,11 +80,5 @@ export const upgrades: Upgrade[] = [
 		name: 'the recitation',
 		description: 'unlocks a séance that summons the rhythm of your own past reading. recite it back in time and your past returns as bonus apparatus and a remembered line in the canonical opening.',
 		cost: { recensions: 1 }
-	},
-	{
-		id: 'reading_for_stars',
-		name: 'reading for the stars',
-		description: 'a quiet reading room. paste a text and read at your own pace — the timer follows your cursor. twenty minutes of attention earns a point on a star; five points complete it. brianna reads alongside you.',
-		cost: { commentaries: 3 }
 	}
 ];

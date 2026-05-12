@@ -156,9 +156,7 @@
 		<Feed />
 	</section>
 
-	{#if game.hasUpgrade('reading_for_stars')}
-		<ReadingRoom />
-	{/if}
+	<ReadingRoom />
 
 	<hr class="rule" />
 
