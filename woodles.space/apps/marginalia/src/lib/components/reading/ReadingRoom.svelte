@@ -3,8 +3,11 @@
 	import { game } from '$lib/state/game.svelte';
 	import { createReadingTimer } from '$lib/reading/timer';
 	import {
-		splitParagraphs,
+		paragraphsFromText,
+		paragraphsFromDom,
+		stampLiveAnchors,
 		newNoteId,
+		countWordsInText,
 		type Paragraph,
 		type MarginNote
 	} from '$lib/reading/text';
@@ -12,13 +15,15 @@
 	import StarShelf from './StarShelf.svelte';
 	import Passage from './Passage.svelte';
 	import MarginNotes from './MarginNotes.svelte';
+	import EditorToolbar from './EditorToolbar.svelte';
 
 	const POINT_MS = 20 * 60 * 1000;
 	const PASTE_CAP = 500_000;
 	const WPM = 230;
 	const PERSIST_INTERVAL_MS = 3_000;
-	const DOC_KEY = 'marginalia.reading.doc.v2';
-	const LEGACY_PASTE_KEY = 'marginalia.reading.paste.v1';
+	const DOC_KEY = 'marginalia.reading.doc.v3';
+	const LEGACY_DOC_V2_KEY = 'marginalia.reading.doc.v2';
+	const LEGACY_PASTE_V1_KEY = 'marginalia.reading.paste.v1';
 	const PDF_CAP_BYTES = 32 * 1024 * 1024;
 
 	interface ReadingDoc {
@@ -34,12 +39,13 @@
 	let mode = $state<'paste' | 'read'>('paste');
 	let truncated = $state(false);
 
-	// Current reading document.
+	// Reading document — paragraphs and notes.
 	let paragraphs = $state<Paragraph[]>([]);
 	let notes = $state<MarginNote[]>([]);
 	let anchorOffsets = $state<Record<string, number>>({});
+	let docKey = $state(0); // bumped to force-remount Passage on a new doc
 
-	// Selection state for the popover.
+	// Selection state for the bubble popover.
 	let selectionRect = $state<{ top: number; left: number; width: number } | null>(null);
 	let selectionAnchorId = $state<string | null>(null);
 
@@ -53,7 +59,7 @@
 	let sessionMs = $state(0);
 	let nowTick = $state(0);
 
-	let committedWordCount = $state(0);
+	let liveWordCount = $state(0);
 
 	const timer = createReadingTimer({
 		onAccrueMs: (dt) => {
@@ -68,13 +74,7 @@
 		return game.readingMsTowardNextPoint / POINT_MS;
 	});
 
-	const estimatedReadingMin = $derived(committedWordCount > 0 ? committedWordCount / WPM : 0);
-
-	function countWords(s: string): number {
-		const trimmed = s.trim();
-		if (!trimmed) return 0;
-		return trimmed.split(/\s+/).length;
-	}
+	const estimatedReadingMin = $derived(liveWordCount > 0 ? liveWordCount / WPM : 0);
 
 	function formatHms(ms: number): string {
 		const s = Math.floor(ms / 1000);
@@ -114,18 +114,42 @@
 					pasteText = parsed.text;
 					paragraphs = parsed.paragraphs;
 					notes = Array.isArray(parsed.notes) ? parsed.notes : [];
-					committedWordCount = countWords(parsed.text);
+					liveWordCount = countWordsInText(parsed.text);
 					return true;
 				}
 			}
-			// Legacy v1 — a raw string. Migrate by splitting paragraphs, no notes.
-			const legacy = sessionStorage.getItem(LEGACY_PASTE_KEY);
-			if (legacy) {
-				pasteText = legacy;
-				paragraphs = splitParagraphs(legacy);
+			// v2 → v3: paragraphs were `{id, content}` (plain text). Convert.
+			const v2 = sessionStorage.getItem(LEGACY_DOC_V2_KEY);
+			if (v2) {
+				const parsed = JSON.parse(v2) as {
+					text: string;
+					paragraphs?: { id: string; content?: string; html?: string }[];
+					notes?: MarginNote[];
+				};
+				if (parsed?.text) {
+					pasteText = parsed.text;
+					paragraphs = parsed.paragraphs
+						? parsed.paragraphs.map((p) =>
+								p.html
+									? { id: p.id, html: p.html }
+									: { id: p.id, html: paraHtmlFromContent(p.content ?? '') }
+						  )
+						: paragraphsFromText(parsed.text);
+					notes = Array.isArray(parsed.notes) ? parsed.notes : [];
+					liveWordCount = countWordsInText(parsed.text);
+					sessionStorage.removeItem(LEGACY_DOC_V2_KEY);
+					persistDoc();
+					return true;
+				}
+			}
+			// v1 → v3: raw string.
+			const v1 = sessionStorage.getItem(LEGACY_PASTE_V1_KEY);
+			if (v1) {
+				pasteText = v1;
+				paragraphs = paragraphsFromText(v1);
 				notes = [];
-				committedWordCount = countWords(legacy);
-				sessionStorage.removeItem(LEGACY_PASTE_KEY);
+				liveWordCount = countWordsInText(v1);
+				sessionStorage.removeItem(LEGACY_PASTE_V1_KEY);
 				persistDoc();
 				return true;
 			}
@@ -133,6 +157,14 @@
 			// ignore
 		}
 		return false;
+	}
+
+	function paraHtmlFromContent(content: string): string {
+		const escaped = content
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;');
+		return `<p data-anchor="placeholder">${escaped.replace(/\n/g, '<br>')}</p>`;
 	}
 
 	async function commitText() {
@@ -143,12 +175,12 @@
 			truncated = true;
 			pasteText = t;
 		}
-		const words = countWords(t);
-		committedWordCount = words;
-		game.addReadingWords(words);
-		paragraphs = splitParagraphs(t);
+		paragraphs = paragraphsFromText(t);
 		notes = [];
+		liveWordCount = countWordsInText(t);
+		game.addReadingWords(liveWordCount);
 		mode = 'read';
+		docKey++;
 		persistDoc();
 		await tick();
 		measureAnchors();
@@ -160,12 +192,13 @@
 		paragraphs = [];
 		notes = [];
 		anchorOffsets = {};
-		committedWordCount = 0;
+		liveWordCount = 0;
 		truncated = false;
 		pdfError = null;
 		pdfProgress = null;
 		selectionRect = null;
 		selectionAnchorId = null;
+		docKey++;
 		try {
 			sessionStorage.removeItem(DOC_KEY);
 		} catch {
@@ -219,6 +252,107 @@
 	function onUnload() {
 		game.persist();
 		persistDoc();
+	}
+
+	// ── editor commands ─────────────────────────────────────────────────────
+
+	function focusPassage() {
+		if (passageEl && document.activeElement !== passageEl) {
+			passageEl.focus();
+		}
+	}
+
+	function runCommand(cmd: string, value?: string) {
+		focusPassage();
+		try {
+			document.execCommand(cmd, false, value);
+		} catch {
+			// some browsers throw on legacy execCommand; ignore
+		}
+		// Recount + re-measure after any block change.
+		afterEdit();
+	}
+
+	function applyInlineFormat(cmd: string) {
+		runCommand(cmd);
+	}
+
+	function applyHighlight() {
+		// Wrap the current selection in <mark>. Done manually so we don't rely
+		// on hiliteColor (which would emit a style attribute that our sanitizer
+		// strips, dropping the highlight on next save).
+		focusPassage();
+		const sel = window.getSelection();
+		if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+		const range = sel.getRangeAt(0);
+		if (!passageEl || !passageEl.contains(range.commonAncestorContainer)) return;
+
+		// If the selection is entirely inside an existing <mark>, unwrap it.
+		const ancestor =
+			range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+				? range.commonAncestorContainer.parentElement
+				: (range.commonAncestorContainer as Element);
+		const existingMark = ancestor?.closest('mark');
+		if (existingMark && passageEl.contains(existingMark)) {
+			const parent = existingMark.parentNode;
+			if (parent) {
+				while (existingMark.firstChild) parent.insertBefore(existingMark.firstChild, existingMark);
+				parent.removeChild(existingMark);
+			}
+		} else {
+			const mark = document.createElement('mark');
+			try {
+				mark.appendChild(range.extractContents());
+				range.insertNode(mark);
+				sel.removeAllRanges();
+				const r = document.createRange();
+				r.selectNodeContents(mark);
+				sel.addRange(r);
+			} catch {
+				// selection spans non-contiguous nodes — bail
+			}
+		}
+		afterEdit();
+	}
+
+	function applyLink() {
+		focusPassage();
+		const sel = window.getSelection();
+		if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+		const url = window.prompt('link url:');
+		if (!url) return;
+		if (!/^(https?:|mailto:|#)/i.test(url.trim())) return;
+		document.execCommand('createLink', false, url.trim());
+		afterEdit();
+	}
+
+	function afterEdit() {
+		// Passage emits onChange on input, but execCommand-driven edits don't
+		// always trigger input events in older engines. Force a re-read.
+		if (!passageEl) return;
+		stampLiveAnchors(passageEl);
+		paragraphs = paragraphsFromDom(passageEl);
+		updateWordCount();
+		persistDoc();
+		measureAnchors();
+	}
+
+	function updateWordCount() {
+		if (!passageEl) return;
+		liveWordCount = countWordsInText(passageEl.innerText ?? '');
+	}
+
+	// ── passage change wiring ───────────────────────────────────────────────
+
+	function onPassageChange(next: Paragraph[]) {
+		paragraphs = next;
+		updateWordCount();
+		persistDoc();
+	}
+
+	function onPassageAnchorsChanged() {
+		// Schedule a measure pass after the DOM settles.
+		queueMicrotask(measureAnchors);
 	}
 
 	// ── annotation flow ─────────────────────────────────────────────────────
@@ -290,7 +424,6 @@
 		notes = [...notes, note];
 		selectionRect = null;
 		selectionAnchorId = null;
-		// Drop the active text selection so the popover doesn't reappear.
 		window.getSelection()?.removeAllRanges();
 		persistDoc();
 		await tick();
@@ -300,10 +433,9 @@
 	}
 
 	function onNoteChange(id: string, html: string) {
-		const next = notes.map((n) =>
+		notes = notes.map((n) =>
 			n.id === id ? { ...n, html, updatedAt: new Date().toISOString() } : n
 		);
-		notes = next;
 		persistDoc();
 	}
 
@@ -312,11 +444,27 @@
 		persistDoc();
 	}
 
-	// Click on the popover button: prevent the mousedown from clearing the
-	// selection before we have a chance to read it.
-	function onPopoverMouseDown(e: MouseEvent) {
+	// Bubble popover button: prevent the mousedown from clearing selection.
+	function onAddNote(e: MouseEvent) {
 		e.preventDefault();
 		if (selectionAnchorId) addNoteFor(selectionAnchorId);
+	}
+
+	function bubbleCmd(cmd: string) {
+		return (e: MouseEvent) => {
+			e.preventDefault();
+			applyInlineFormat(cmd);
+		};
+	}
+
+	function onBubbleHighlight(e: MouseEvent) {
+		e.preventDefault();
+		applyHighlight();
+	}
+
+	function onBubbleLink(e: MouseEvent) {
+		e.preventDefault();
+		applyLink();
 	}
 
 	onMount(() => {
@@ -340,8 +488,10 @@
 			paneEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 		}
 
-		// After we've mounted with a restored doc, measure once we have the DOM.
-		tick().then(measureAnchors);
+		tick().then(() => {
+			measureAnchors();
+			updateWordCount();
+		});
 
 		return () => {
 			clearInterval(id);
@@ -377,7 +527,7 @@
 >
 	<header class="head">
 		<h3 id="reading-room-title">reading for the stars</h3>
-		<p class="sub">a quiet room. read at your own pace — the timer follows your cursor.</p>
+		<p class="sub">a quiet room. read at your own pace — the timer follows your cursor. write back into the text or out into the margin.</p>
 	</header>
 
 	<div class="board" class:read={mode === 'read'}>
@@ -407,7 +557,7 @@
 		<div class="reader">
 			{#if mode === 'paste'}
 				<label class="paste-label">
-					<span>paste a text, or open a pdf. word count and reading time will appear once you begin.</span>
+					<span>paste a text, or open a pdf. once you begin you can keep editing — the room is a working desk, not a glass case.</span>
 					<textarea
 						bind:value={pasteText}
 						placeholder="paste here — anything you want to read."
@@ -455,15 +605,23 @@
 				</div>
 			{:else}
 				<div class="text-meta">
-					<span><span class="num">{committedWordCount.toLocaleString()}</span> words</span>
+					<span><span class="num">{liveWordCount.toLocaleString()}</span> words</span>
 					<span>· about <span class="num">{formatMin(estimatedReadingMin)}</span></span>
 					<button class="ghost" type="button" onclick={newText}>new text</button>
 				</div>
 				{#if truncated}
 					<p class="notice">— text was longer than 500k characters; the rest was set aside.</p>
 				{/if}
+				<EditorToolbar onCommand={runCommand} />
 				<div class="passage-and-margin">
-					<Passage {paragraphs} bind:rootEl={passageEl} />
+					{#key docKey}
+						<Passage
+							{paragraphs}
+							onChange={onPassageChange}
+							onAnchorsChanged={onPassageAnchorsChanged}
+							bind:rootEl={passageEl}
+						/>
+					{/key}
 					<div class="margin-wrap">
 						<MarginNotes
 							{notes}
@@ -487,12 +645,19 @@
 {#if selectionRect && selectionAnchorId && mode === 'read'}
 	<div
 		class="selection-popover"
-		style:top="{selectionRect.top - 38}px"
+		style:top="{selectionRect.top - 42}px"
 		style:left="{selectionRect.left + selectionRect.width / 2}px"
 	>
-		<button class="popover-btn" onmousedown={onPopoverMouseDown} title="add margin note">
-			+ note in the margin
-		</button>
+		<div class="bubble">
+			<button class="bub-btn bold" onmousedown={bubbleCmd('bold')} title="bold (⌘b)">B</button>
+			<button class="bub-btn italic" onmousedown={bubbleCmd('italic')} title="italic (⌘i)">I</button>
+			<button class="bub-btn under" onmousedown={bubbleCmd('underline')} title="underline (⌘u)">U</button>
+			<button class="bub-btn strike" onmousedown={bubbleCmd('strikethrough')} title="strikethrough">S</button>
+			<button class="bub-btn" onmousedown={onBubbleHighlight} title="highlight (toggle)">●</button>
+			<button class="bub-btn" onmousedown={onBubbleLink} title="link">↗</button>
+			<span class="bub-sep" aria-hidden="true"></span>
+			<button class="bub-btn note" onmousedown={onAddNote} title="add margin note">+ note</button>
+		</div>
 	</div>
 {/if}
 
@@ -507,7 +672,7 @@
 		transition: max-width 240ms ease;
 	}
 	.reading-room.wide {
-		max-width: 60rem;
+		max-width: 64rem;
 	}
 	.head {
 		text-align: center;
@@ -727,27 +892,62 @@
 		margin: 0 0 0.5rem;
 	}
 
-	/* ── selection popover ─────────────────────────────────────── */
+	/* ── selection bubble ─────────────────────────────────────── */
 	.selection-popover {
 		position: fixed;
 		transform: translateX(-50%);
 		z-index: 50;
 		pointer-events: auto;
 	}
-	.popover-btn {
-		font-family: var(--font-ui);
-		font-size: 0.74rem;
-		letter-spacing: 0.12em;
-		color: var(--cream);
+	.bubble {
+		display: flex;
+		align-items: center;
+		gap: 0.15rem;
+		padding: 0.25rem 0.4rem;
 		background: var(--panel-accent);
 		border: 1px solid var(--periwinkle);
 		border-radius: 3px;
-		padding: 0.3rem 0.6rem;
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-		white-space: nowrap;
 	}
-	.popover-btn:hover {
-		border-color: var(--leafeon-pink);
+	.bub-btn {
+		font-family: var(--font-counter);
+		font-size: 0.86rem;
+		color: var(--periwinkle);
+		min-width: 1.5rem;
+		padding: 0.15rem 0.35rem;
+		border-radius: 2px;
+		line-height: 1;
+	}
+	.bub-btn:hover {
 		color: var(--leafeon-pink);
+		background: rgba(154, 150, 201, 0.12);
+	}
+	.bub-btn.bold {
+		font-weight: 700;
+	}
+	.bub-btn.italic {
+		font-style: italic;
+	}
+	.bub-btn.under {
+		text-decoration: underline;
+	}
+	.bub-btn.strike {
+		text-decoration: line-through;
+	}
+	.bub-btn.note {
+		font-family: var(--font-ui);
+		font-size: 0.74rem;
+		letter-spacing: 0.1em;
+		color: var(--cream);
+		padding: 0.18rem 0.5rem;
+	}
+	.bub-btn.note:hover {
+		color: var(--leafeon-pink);
+	}
+	.bub-sep {
+		width: 1px;
+		height: 1rem;
+		background: var(--rule);
+		margin: 0 0.2rem;
 	}
 </style>
