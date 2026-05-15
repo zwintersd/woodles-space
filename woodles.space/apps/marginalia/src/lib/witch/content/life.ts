@@ -22,6 +22,13 @@ export interface Life {
 	domain: LifeDomain;
 	// every required condition must be written for this to emerge
 	requires: string[];
+	// idle tuning ──────────────────────────────────────────────────────────
+	// insightWeight: how much Insight this life yields once witnessed. The
+	//   per-second yield scales with how deeply it has been observed.
+	// studyEase: how quickly attention deepens here. >1 is quick to know,
+	//   <1 is slow but usually richer — the core min/max tension.
+	insightWeight: number;
+	studyEase: number;
 	// the four observation stages — the description fills in as she watches
 	notice: string; // greyed-out, before she has looked
 	observe: string; // first sustained look
@@ -38,6 +45,8 @@ export const world1Life: Life[] = [
 		category: 'aquatic',
 		domain: 'geology',
 		requires: ['holding'],
+		insightWeight: 0.5,
+		studyEase: 1.4,
 		notice: 'something white gathering at the tide line.',
 		observe: 'crystals. they grow where the water is allowed to leave but the salt is not.',
 		study: 'they keep the shape of the last wave. the sea writes itself down here.',
@@ -50,6 +59,8 @@ export const world1Life: Life[] = [
 		category: 'aquatic',
 		domain: 'plant',
 		requires: ['flow', 'reaching'],
+		insightWeight: 1.2,
+		studyEase: 1.0,
 		notice: 'something green in the shallows.',
 		observe: 'it pulses, faintly, with the light. the first thing here that eats the sun.',
 		study: 'it spreads toward nutrients and dies when the water warms. it keeps the light cycle better than a clock.',
@@ -62,6 +73,8 @@ export const world1Life: Life[] = [
 		category: 'aquatic',
 		domain: 'ecosystem',
 		requires: ['flow', 'holding'],
+		insightWeight: 1.7,
+		studyEase: 0.7,
 		notice: 'small held waters along the rock.',
 		observe: 'each pool is its own argument. cut off twice a day, and richer for it.',
 		study: 'the crowded ones diverge fastest. scarcity, doing its patient work.',
@@ -74,6 +87,8 @@ export const world1Life: Life[] = [
 		category: 'aquatic',
 		domain: 'animal',
 		requires: ['boundary', 'flow'],
+		insightWeight: 1.4,
+		studyEase: 0.9,
 		notice: 'a drifting translucence in the deeper water.',
 		observe: 'a boundary that moves itself. it has no plan, only a pulse.',
 		study: 'it follows warmth and flinches from shadow. the first life here that decides anything.',
@@ -88,6 +103,8 @@ export const world1Life: Life[] = [
 		category: 'terrestrial',
 		domain: 'plant',
 		requires: ['reaching', 'holding'],
+		insightWeight: 0.7,
+		studyEase: 1.3,
 		notice: 'a grey-gold crust on the bare rock.',
 		observe: 'two lives agreeing to be one. it asks the stone for almost nothing.',
 		study: 'it advances a hair each year and unmakes the rock as it goes. the first soil is its leavings.',
@@ -100,6 +117,8 @@ export const world1Life: Life[] = [
 		category: 'terrestrial',
 		domain: 'plant',
 		requires: ['reaching', 'returning'],
+		insightWeight: 0.9,
+		studyEase: 1.1,
 		notice: 'a low green softening the hollows.',
 		observe: 'it has no roots. it drinks the whole sky at once and holds the rain in place.',
 		study: 'where it spreads, the ground stops leaving. it keeps the water for everything that comes after.',
@@ -112,6 +131,8 @@ export const world1Life: Life[] = [
 		category: 'terrestrial',
 		domain: 'ecosystem',
 		requires: ['returning', 'holding'],
+		insightWeight: 1.9,
+		studyEase: 0.6,
 		notice: 'pale threads under the moss, where she had not thought to look.',
 		observe: 'it is the part of returning that no one sees. it eats what has ended.',
 		study: 'every separate plant is, underground, not separate at all. it carries word between them.',
@@ -124,6 +145,8 @@ export const world1Life: Life[] = [
 		category: 'terrestrial',
 		domain: 'geology',
 		requires: ['falling', 'flow'],
+		insightWeight: 0.6,
+		studyEase: 1.3,
 		notice: 'a dark seam in the rock that stays wet.',
 		observe: 'water arriving from inside the land, having fallen somewhere else first.',
 		study: 'it is the same rain, kept and slowly given back. the land breathes out where it is lowest.',
@@ -138,6 +161,8 @@ export const world1Life: Life[] = [
 		category: 'atmospheric',
 		domain: 'weather',
 		requires: ['flow', 'falling'],
+		insightWeight: 1.0,
+		studyEase: 1.0,
 		notice: 'the sky is no longer empty.',
 		observe: 'water, gone up, gathered, made visible. the cycle showing its work.',
 		study: 'they thicken over the warm sea and break against the cold land. weather is just water with somewhere to be.',
@@ -150,6 +175,8 @@ export const world1Life: Life[] = [
 		category: 'atmospheric',
 		domain: 'weather',
 		requires: ['flow', 'falling', 'returning'],
+		insightWeight: 1.5,
+		studyEase: 0.8,
 		notice: 'the clouds are letting go of something.',
 		observe: 'freshwater, carried inland and set down where nothing could reach before.',
 		study: 'it decides where the land turns green. everything terrestrial waits on its schedule.',
@@ -162,6 +189,8 @@ export const world1Life: Life[] = [
 		category: 'atmospheric',
 		domain: 'weather',
 		requires: ['flow', 'boundary'],
+		insightWeight: 0.8,
+		studyEase: 1.2,
 		notice: 'the shoreline blurs in the early light.',
 		observe: 'a soft, low water that never quite becomes rain.',
 		study: 'it makes a narrow band of damp the moss and lichen never have to leave. a microhabitat, hand-width thin.',
