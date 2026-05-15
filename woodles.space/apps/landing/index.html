@@ -1,482 +1,1006 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="cream">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>woodles.space</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/shared/palette.css" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --lavender: #c9bfee;
-      --aqua: #8eddd4;
-      --peach: #f5c8a8;
-      --lilac: #dbb8e8;
-      --cream: #faf6f0;
-      --lapis: #3a2d72;
-      --plum: #5c3464;
-      --text: #2e2040;
-      --muted: #7a6b90;
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
     }
-    html, body { width: 100%; }
     body {
-      background: var(--cream);
+      background: var(--bg);
       color: var(--text);
       font-family: 'Cormorant Garamond', Georgia, serif;
       font-weight: 300;
-      min-height: 100vh;
-      overflow-x: hidden;
-      position: relative;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
 
-    /* ── topbar ─────────────────────────────────────── */
-    .topbar {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      z-index: 10;
-      height: 42px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 1.6rem;
-      background: rgba(250, 246, 240, 0.52);
-      backdrop-filter: blur(22px);
-      -webkit-backdrop-filter: blur(22px);
+    /* ─────────────────────────── wallpaper ─────────────────────────── */
+    .wallpaper {
+      position: fixed; inset: 0; z-index: 0;
+      background: var(--bg);
       overflow: hidden;
+      transition: background 0.9s ease;
     }
-    .topbar::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(
-        105deg,
-        rgba(201,191,238,0.28) 0%,
-        rgba(142,221,212,0.20) 22%,
-        rgba(250,246,240,0.05) 40%,
-        rgba(245,200,168,0.18) 60%,
-        rgba(219,184,232,0.24) 80%,
-        rgba(201,191,238,0.28) 100%
-      );
-      background-size: 260% 100%;
-      animation: bar-shimmer 11s ease-in-out infinite;
-      pointer-events: none;
-    }
-    .topbar::after {
-      content: '';
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 1px;
-      background: linear-gradient(
-        90deg,
-        transparent 0%,
-        var(--lavender) 20%,
-        var(--aqua) 45%,
-        var(--peach) 65%,
-        var(--lilac) 80%,
-        transparent 100%
-      );
-      background-size: 220% 100%;
-      animation: bar-shimmer 11s ease-in-out infinite;
+    .wash {
+      position: absolute; inset: -20%;
+      background:
+        radial-gradient(38% 42% at 18% 22%, var(--lavender) 0%, transparent 70%),
+        radial-gradient(34% 38% at 82% 30%, var(--aqua)     0%, transparent 70%),
+        radial-gradient(40% 44% at 70% 82%, var(--peach)    0%, transparent 72%),
+        radial-gradient(32% 36% at 24% 80%, var(--lilac)    0%, transparent 70%),
+        radial-gradient(46% 50% at 50% 50%, var(--plum)     0%, transparent 80%);
       opacity: 0.55;
+      filter: blur(40px);
+      animation: wash-drift 34s ease-in-out infinite alternate;
     }
-    @keyframes bar-shimmer {
-      0%   { background-position: 0%   0; }
-      50%  { background-position: 100% 0; }
-      100% { background-position: 0%   0; }
+    @keyframes wash-drift {
+      0%   { transform: translate(0,0) scale(1)    rotate(0deg); }
+      50%  { transform: translate(2%,-3%) scale(1.06) rotate(3deg); }
+      100% { transform: translate(-3%,2%) scale(1.03) rotate(-3deg); }
     }
-    .topbar-brand {
-      font-family: 'DM Mono', monospace;
-      font-weight: 300;
-      font-size: 0.68rem;
-      letter-spacing: 0.18em;
-      position: relative;
-      z-index: 1;
-      text-decoration: none;
-      animation: brand-hue 16s ease-in-out infinite;
-    }
-    @keyframes brand-hue {
-      0%, 100% { color: var(--muted); }
-      30%       { color: var(--lapis); }
-      65%       { color: var(--plum); }
-    }
-    .topbar-clock {
-      font-family: 'DM Mono', monospace;
-      font-weight: 300;
-      font-size: 0.60rem;
-      letter-spacing: 0.10em;
-      display: flex;
-      align-items: center;
-      gap: 0.9rem;
-      position: relative;
-      z-index: 1;
-    }
-    .clock-date { color: var(--muted); opacity: 0.75; }
-    .clock-sep  { color: var(--lavender); opacity: 0.9; font-size: 0.55rem; }
-    .clock-time { color: var(--text); opacity: 0.85; }
-    .clock-time.tick { animation: tick-fade 0.45s ease; }
-    @keyframes tick-fade {
-      0%   { opacity: 0.85; }
-      20%  { opacity: 0.30; }
-      100% { opacity: 0.85; }
-    }
-
-    /* ── background blobs ───────────────────────────── */
-    .blob {
-      position: fixed;
-      border-radius: 50%;
-      filter: blur(80px);
-      opacity: 0.38;
-      animation: drift 18s ease-in-out infinite alternate;
-      pointer-events: none;
-    }
-    .blob-1 { width: 520px; height: 520px; background: var(--lavender); top: -120px; left: -100px; animation-delay: 0s; }
-    .blob-2 { width: 400px; height: 400px; background: var(--aqua);    bottom: -80px; right: -60px; animation-delay: -6s; }
-    .blob-3 { width: 300px; height: 300px; background: var(--peach);   top: 40%; left: 55%;        animation-delay: -11s; }
-    .blob-4 { width: 260px; height: 260px; background: var(--lilac);   bottom: 20%; left: 5%;      animation-delay: -4s; }
-    @keyframes drift {
-      0%   { transform: translate(0, 0) scale(1); }
-      50%  { transform: translate(30px, -20px) scale(1.05); }
-      100% { transform: translate(-20px, 30px) scale(0.97); }
-    }
-
-    /* grain overlay */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
+    .grain {
+      position: fixed; inset: 0; z-index: 1; pointer-events: none;
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
-      opacity: 0.045;
-      pointer-events: none;
-      z-index: 1;
+      opacity: 0.04;
+    }
+    /* drifting sparkles */
+    .sparkle {
+      position: fixed; z-index: 1; pointer-events: none;
+      font-size: 0.9rem; color: var(--accent-strong);
+      opacity: 0;
+      animation: twinkle 7s ease-in-out infinite;
+    }
+    @keyframes twinkle {
+      0%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); }
+      45%, 55% { opacity: 0.7; transform: scale(1) rotate(40deg); }
     }
 
-    /* ── page layout ────────────────────────────────── */
-    .page-wrap {
+    /* ─────────────────────────── desktop ───────────────────────────── */
+    .desktop {
+      position: fixed; inset: 0; z-index: 2;
+      padding: 1.4rem 1.4rem calc(64px + 1.4rem);
+    }
+
+    /* desktop icons — top-left, column flow like Win11 */
+    .icons {
+      display: flex;
+      flex-direction: column;
+      flex-wrap: wrap;
+      align-content: flex-start;
+      gap: 0.2rem;
+      height: 100%;
+    }
+    .icon {
+      width: 92px;
+      padding: 0.55rem 0.3rem 0.45rem;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0.4rem;
+      border-radius: 12px;
+      cursor: pointer;
+      text-decoration: none;
+      border: 1px solid transparent;
+      transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+      opacity: 0;
+      animation: icon-in 0.6s ease forwards;
+    }
+    @keyframes icon-in {
+      from { opacity: 0; transform: translateY(10px) scale(0.96); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .icon:hover {
+      background: color-mix(in srgb, var(--surface) 70%, transparent);
+      border-color: var(--rule);
+    }
+    .icon:active { transform: scale(0.95); }
+    .tile {
+      width: 50px; height: 50px;
+      border-radius: 14px;
+      display: grid; place-items: center;
+      font-size: 1.5rem;
+      color: #fff;
+      background: linear-gradient(140deg, var(--g1), var(--g2));
+      box-shadow:
+        0 6px 16px -6px color-mix(in srgb, var(--g1) 80%, transparent),
+        inset 0 1px 0 rgba(255,255,255,0.45);
       position: relative;
-      z-index: 2;
-      max-width: 560px;
-      margin: 0 auto;
-      padding: calc(42px + 5.5rem) 2rem 8rem;
     }
-
-    /* ── hero ───────────────────────────────────────── */
-    .hero {
-      text-align: center;
-      margin-bottom: 3.5rem;
+    .tile::after {
+      content: '';
+      position: absolute; inset: 0;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.25);
     }
-    .eyebrow {
+    .icon-label {
       font-family: 'DM Mono', monospace;
       font-weight: 300;
-      font-size: 0.68rem;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 1.8rem;
-      opacity: 0;
-      animation: rise 1.2s ease forwards 0.3s;
+      font-size: 0.6rem;
+      letter-spacing: 0.04em;
+      text-align: center;
+      color: var(--text);
+      line-height: 1.3;
+      text-shadow: 0 1px 3px var(--bg);
     }
-    .wordmark {
-      font-size: clamp(3.4rem, 11vw, 5.8rem);
+
+    /* greeting widget — top-right */
+    .widget {
+      position: fixed;
+      top: 1.4rem; right: 1.4rem; z-index: 3;
+      width: 250px;
+      padding: 1.3rem 1.4rem;
+      border-radius: 18px;
+      background: color-mix(in srgb, var(--surface) 78%, transparent);
+      backdrop-filter: blur(28px) saturate(1.4);
+      -webkit-backdrop-filter: blur(28px) saturate(1.4);
+      border: 1px solid var(--rule);
+      box-shadow: 0 18px 40px -22px var(--accent-deep);
+      opacity: 0;
+      animation: icon-in 0.8s ease forwards 0.5s;
+    }
+    .widget-greet {
+      font-size: 1.65rem;
+      font-weight: 400;
+      color: var(--accent-strong);
+      line-height: 1.1;
+      margin-bottom: 0.15rem;
+    }
+    .widget-greet em { font-style: italic; color: var(--accent-deep); }
+    .widget-clock {
+      font-family: 'DM Mono', monospace;
+      font-size: 2.4rem;
       font-weight: 300;
+      color: var(--text);
       letter-spacing: -0.02em;
       line-height: 1;
-      color: var(--lapis);
-      margin-bottom: 0.3rem;
-      opacity: 0;
-      animation: rise 1.2s ease forwards 0.55s;
+      margin: 0.5rem 0 0.1rem;
     }
-    .wordmark em { font-style: italic; color: var(--plum); }
-    .tld {
+    .widget-date {
       font-family: 'DM Mono', monospace;
-      font-weight: 300;
-      font-size: clamp(0.72rem, 2.4vw, 0.95rem);
-      color: var(--muted);
-      letter-spacing: 0.08em;
-      opacity: 0;
-      animation: rise 1.2s ease forwards 0.7s;
-    }
-
-    /* ── divider ────────────────────────────────────── */
-    .divider {
-      width: 40px;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--lavender), var(--aqua), transparent);
-      margin: 0 auto 3.2rem;
-      opacity: 0;
-      animation: rise 1.2s ease forwards 0.9s;
-    }
-
-    /* ── project index ──────────────────────────────── */
-    .index-label {
-      font-family: 'DM Mono', monospace;
-      font-weight: 300;
-      font-size: 0.6rem;
-      letter-spacing: 0.22em;
+      font-size: 0.62rem;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
       color: var(--muted);
-      margin-bottom: 1.2rem;
+    }
+    .widget-note {
+      margin-top: 0.9rem;
+      padding-top: 0.8rem;
+      border-top: 1px solid var(--rule);
+      font-size: 0.98rem;
+      font-style: italic;
+      color: var(--accent-deep);
+    }
+
+    /* ─────────────────────────── taskbar ───────────────────────────── */
+    .taskbar {
+      position: fixed;
+      bottom: 8px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      height: 52px;
+      display: flex; align-items: center;
+      gap: 0.25rem;
+      padding: 0 0.55rem;
+      border-radius: 16px;
+      background: color-mix(in srgb, var(--surface) 82%, transparent);
+      backdrop-filter: blur(30px) saturate(1.5);
+      -webkit-backdrop-filter: blur(30px) saturate(1.5);
+      border: 1px solid var(--rule);
+      box-shadow: 0 16px 42px -16px var(--accent-deep);
       opacity: 0;
-      animation: rise 1.2s ease forwards 1.05s;
+      animation: bar-in 0.7s cubic-bezier(.2,.9,.3,1) forwards 0.3s;
+      max-width: calc(100vw - 16px);
     }
-
-    .project-list {
-      list-style: none;
-      opacity: 0;
-      animation: rise 1.2s ease forwards 1.2s;
+    @keyframes bar-in {
+      from { opacity: 0; transform: translate(-50%, 24px); }
+      to   { opacity: 1; transform: translate(-50%, 0); }
     }
-
-    .project-item {
-      border-top: 1px solid rgba(201,191,238,0.28);
-    }
-    .project-item:last-child {
-      border-bottom: 1px solid rgba(201,191,238,0.28);
-    }
-
-    .project-link {
-      display: flex;
-      align-items: baseline;
-      gap: 1.2rem;
-      padding: 1.4rem 0;
-      text-decoration: none;
-      color: inherit;
-      transition: background 0.2s ease;
+    .tb-btn {
+      width: 40px; height: 40px;
+      border: none; background: transparent;
+      border-radius: 10px;
+      display: grid; place-items: center;
+      cursor: pointer;
       position: relative;
+      transition: background 0.16s ease, transform 0.12s ease;
+      font-family: inherit;
     }
-    .project-link::after {
+    .tb-btn:hover { background: color-mix(in srgb, var(--accent) 26%, transparent); }
+    .tb-btn:active { transform: scale(0.9); }
+    .tb-btn .tile { width: 30px; height: 30px; border-radius: 9px; font-size: 0.95rem; }
+    .tb-btn .tile::after { border-radius: 9px; }
+    /* running indicator */
+    .tb-app::before {
       content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(90deg, rgba(201,191,238,0.10), rgba(142,221,212,0.07));
-      opacity: 0;
-      transition: opacity 0.25s ease;
-      border-radius: 2px;
-      pointer-events: none;
+      position: absolute; bottom: 3px; left: 50%;
+      transform: translateX(-50%);
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--accent-strong);
+      opacity: 0; transition: opacity 0.18s ease, width 0.18s ease;
     }
-    .project-link:hover::after { opacity: 1; }
+    .tb-app:hover::before { opacity: 0.85; width: 14px; border-radius: 3px; }
 
-    .project-index {
+    .start-btn .start-orb {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      background:
+        conic-gradient(from 210deg,
+          var(--lavender), var(--aqua), var(--peach), var(--lilac), var(--lavender));
+      box-shadow: inset 0 0 0 3px var(--bg), 0 2px 8px -2px var(--accent-deep);
+      transition: transform 0.4s cubic-bezier(.2,.9,.3,1);
+    }
+    .start-btn:hover .start-orb { transform: rotate(140deg) scale(1.06); }
+    body.start-open .start-btn .start-orb { transform: rotate(180deg) scale(1.08); }
+
+    .tb-sep {
+      width: 1px; height: 24px;
+      background: var(--rule);
+      margin: 0 0.25rem;
+    }
+
+    /* system tray */
+    .tray {
+      display: flex; align-items: center;
+      gap: 0.55rem;
+      padding: 0 0.7rem 0 0.55rem;
+      height: 40px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.16s ease;
+    }
+    .tray:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+    .tray-glyphs {
+      display: flex; gap: 0.35rem;
+      font-size: 0.8rem; color: var(--accent-strong);
+    }
+    .tray-clock {
       font-family: 'DM Mono', monospace;
-      font-weight: 300;
-      font-size: 0.56rem;
-      letter-spacing: 0.16em;
-      color: var(--lavender);
-      flex-shrink: 0;
-      padding-top: 0.15em;
-    }
-
-    .project-body {
-      flex: 1;
-      min-width: 0;
-    }
-    .project-name {
-      display: block;
-      font-size: clamp(1.15rem, 3vw, 1.4rem);
-      font-weight: 300;
-      color: var(--lapis);
-      line-height: 1.2;
-      margin-bottom: 0.3rem;
-    }
-    .project-link:hover .project-name { color: var(--plum); }
-
-    .project-desc {
-      display: block;
-      font-family: 'DM Mono', monospace;
-      font-weight: 300;
-      font-size: 0.6rem;
-      letter-spacing: 0.1em;
-      color: var(--muted);
-      opacity: 0.75;
-    }
-
-    .project-arrow {
-      font-family: 'DM Mono', monospace;
-      font-weight: 300;
       font-size: 0.62rem;
-      letter-spacing: 0.1em;
-      color: var(--muted);
-      opacity: 0.45;
-      flex-shrink: 0;
-      transition: opacity 0.2s ease, color 0.2s ease;
+      line-height: 1.35;
+      color: var(--text);
+      text-align: right;
+      letter-spacing: 0.03em;
     }
-    .project-link:hover .project-arrow {
-      opacity: 1;
-      color: var(--lavender);
-    }
+    .tray-clock .td { color: var(--muted); font-size: 0.56rem; }
 
-    /* upcoming (non-link) item */
-    .project-upcoming {
-      display: flex;
-      align-items: baseline;
-      gap: 1.2rem;
+    /* ─────────────────────────── start menu ────────────────────────── */
+    .start {
+      position: fixed;
+      bottom: 70px; left: 50%;
+      z-index: 19;
+      width: min(540px, calc(100vw - 24px));
+      padding: 1.5rem 1.5rem 1.1rem;
+      border-radius: 20px;
+      background: color-mix(in srgb, var(--surface) 90%, var(--bg));
+      backdrop-filter: blur(36px) saturate(1.5);
+      -webkit-backdrop-filter: blur(36px) saturate(1.5);
+      border: 1px solid var(--rule);
+      box-shadow: 0 30px 70px -24px var(--accent-deep);
+      transform: translate(-50%, 16px) scale(0.97);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.26s cubic-bezier(.2,.9,.3,1), opacity 0.2s ease;
+    }
+    body.start-open .start {
+      transform: translate(-50%, 0) scale(1);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .start-search {
+      width: 100%;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 300;
+      padding: 0.7rem 1rem;
+      border-radius: 11px;
+      border: 1px solid var(--rule);
+      background: color-mix(in srgb, var(--bg) 70%, transparent);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+    .start-search::placeholder { color: var(--muted); }
+    .start-search:focus {
+      border-color: var(--accent-strong);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+    }
+    .start-section {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.56rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 1.3rem 0 0.7rem;
+    }
+    .start-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.3rem;
+    }
+    .start-app {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0.45rem;
+      padding: 0.8rem 0.3rem;
+      border-radius: 12px;
+      text-decoration: none;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background 0.16s ease, border-color 0.16s ease, transform 0.12s ease;
+    }
+    .start-app:hover {
+      background: color-mix(in srgb, var(--accent) 20%, transparent);
+      border-color: var(--rule);
+    }
+    .start-app:active { transform: scale(0.95); }
+    .start-app .tile { width: 44px; height: 44px; font-size: 1.3rem; }
+    .start-app-name {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.56rem;
+      letter-spacing: 0.03em;
+      color: var(--text);
+      text-align: center;
+      line-height: 1.3;
+    }
+    .start-empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      font-style: italic;
+      color: var(--muted);
       padding: 1.4rem 0;
     }
-    .project-upcoming .project-name { color: var(--muted); opacity: 0.5; }
-    .project-upcoming .project-desc { opacity: 0.45; }
-
-    /* ── footnote ───────────────────────────────────── */
-    .footnote {
+    /* recommended row */
+    .recommended { display: flex; flex-direction: column; gap: 0.15rem; }
+    .rec-item {
+      display: flex; align-items: center; gap: 0.85rem;
+      padding: 0.6rem 0.7rem;
+      border-radius: 11px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.16s ease;
+    }
+    .rec-item:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+    .rec-item .tile { width: 34px; height: 34px; font-size: 1rem; border-radius: 10px; }
+    .rec-item .tile::after { border-radius: 10px; }
+    .rec-text { display: flex; flex-direction: column; }
+    .rec-name { font-size: 1.05rem; color: var(--accent-strong); line-height: 1.2; }
+    .rec-desc {
       font-family: 'DM Mono', monospace;
-      font-weight: 300;
-      font-size: 0.6rem;
-      letter-spacing: 0.12em;
+      font-size: 0.54rem; letter-spacing: 0.06em;
       color: var(--muted);
-      text-align: center;
-      margin-top: 3.5rem;
-      opacity: 0;
-      animation: rise 1.2s ease forwards 1.45s;
+    }
+    .start-foot {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 1.2rem;
+      padding-top: 0.9rem;
+      border-top: 1px solid var(--rule);
+    }
+    .start-user { display: flex; align-items: center; gap: 0.6rem; }
+    .user-pic {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: conic-gradient(from 90deg, var(--lilac), var(--peach), var(--aqua), var(--lilac));
+      display: grid; place-items: center;
+      font-size: 0.8rem; color: #fff;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.5);
+    }
+    .user-name {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.66rem; letter-spacing: 0.06em;
+      color: var(--text);
+    }
+    .start-power {
+      width: 32px; height: 32px;
+      border: none; background: transparent;
+      border-radius: 9px; cursor: pointer;
+      font-size: 0.85rem; color: var(--accent-strong);
+      transition: background 0.16s ease;
+    }
+    .start-power:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+
+    /* ─────────────────────────── context menu ──────────────────────── */
+    .ctx {
+      position: fixed; z-index: 30;
+      min-width: 196px;
+      padding: 0.4rem;
+      border-radius: 13px;
+      background: color-mix(in srgb, var(--surface) 92%, var(--bg));
+      backdrop-filter: blur(30px) saturate(1.5);
+      -webkit-backdrop-filter: blur(30px) saturate(1.5);
+      border: 1px solid var(--rule);
+      box-shadow: 0 22px 50px -18px var(--accent-deep);
+      opacity: 0; transform: scale(0.95);
+      pointer-events: none;
+      transition: opacity 0.13s ease, transform 0.13s ease;
+      transform-origin: top left;
+    }
+    .ctx.open { opacity: 1; transform: scale(1); pointer-events: auto; }
+    .ctx-item {
+      display: flex; align-items: center; gap: 0.7rem;
+      width: 100%;
+      padding: 0.55rem 0.7rem;
+      border: none; background: transparent;
+      border-radius: 9px;
+      cursor: pointer;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.66rem;
+      font-weight: 300;
+      letter-spacing: 0.04em;
+      color: var(--text);
+      text-align: left;
+      transition: background 0.14s ease;
+    }
+    .ctx-item:hover { background: color-mix(in srgb, var(--accent) 24%, transparent); }
+    .ctx-glyph { font-size: 0.8rem; width: 1.1rem; text-align: center; color: var(--accent-strong); }
+    .ctx-sep { height: 1px; background: var(--rule); margin: 0.3rem 0.4rem; }
+
+    /* ─────────────────────────── about window ──────────────────────── */
+    .scrim {
+      position: fixed; inset: 0; z-index: 39;
+      background: color-mix(in srgb, var(--accent-deep) 26%, transparent);
+      backdrop-filter: blur(2px);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    body.about-open .scrim { opacity: 1; pointer-events: auto; }
+    .window {
+      position: fixed; z-index: 40;
+      top: 50%; left: 50%;
+      width: min(420px, calc(100vw - 32px));
+      transform: translate(-50%, -50%) scale(0.94);
+      border-radius: 16px;
+      background: color-mix(in srgb, var(--surface) 95%, var(--bg));
+      backdrop-filter: blur(30px);
+      -webkit-backdrop-filter: blur(30px);
+      border: 1px solid var(--rule);
+      box-shadow: 0 36px 80px -26px var(--accent-deep);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.22s ease, transform 0.22s cubic-bezier(.2,.9,.3,1);
+      overflow: hidden;
+    }
+    body.about-open .window {
+      opacity: 1; pointer-events: auto;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    .titlebar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.5rem 0.55rem 0.5rem 0.95rem;
+      border-bottom: 1px solid var(--rule);
+      cursor: grab;
+    }
+    .titlebar:active { cursor: grabbing; }
+    .title {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem; letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .win-close {
+      width: 28px; height: 28px;
+      border: none; background: transparent;
+      border-radius: 8px; cursor: pointer;
+      font-size: 0.9rem; color: var(--text);
+      transition: background 0.14s ease, color 0.14s ease;
+    }
+    .win-close:hover { background: #e8859a; color: #fff; }
+    .win-body { padding: 1.6rem 1.5rem 1.7rem; }
+    .win-body h2 {
+      font-size: 2.2rem; font-weight: 400;
+      color: var(--accent-strong);
+      line-height: 1; margin-bottom: 0.1rem;
+    }
+    .win-body h2 em { font-style: italic; color: var(--accent-deep); }
+    .win-tld {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.62rem; letter-spacing: 0.1em;
+      color: var(--muted); margin-bottom: 1rem;
+    }
+    .win-body p {
+      font-size: 1.05rem; line-height: 1.55;
+      color: var(--text); margin-bottom: 0.7rem;
+    }
+    .win-meta {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.58rem; letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-top: 1.1rem; padding-top: 0.9rem;
+      border-top: 1px solid var(--rule);
     }
 
-    @keyframes rise {
-      from { opacity: 0; transform: translateY(14px); }
-      to   { opacity: 1; transform: translateY(0); }
+    /* tray flyout */
+    .flyout {
+      position: fixed;
+      bottom: 70px; right: 8px;
+      z-index: 19;
+      width: 240px;
+      padding: 1.3rem 1.4rem;
+      border-radius: 18px;
+      background: color-mix(in srgb, var(--surface) 90%, var(--bg));
+      backdrop-filter: blur(34px) saturate(1.5);
+      -webkit-backdrop-filter: blur(34px) saturate(1.5);
+      border: 1px solid var(--rule);
+      box-shadow: 0 28px 60px -22px var(--accent-deep);
+      transform: translateY(16px) scale(0.97);
+      opacity: 0; pointer-events: none;
+      transition: transform 0.24s cubic-bezier(.2,.9,.3,1), opacity 0.2s ease;
+    }
+    body.flyout-open .flyout {
+      transform: translateY(0) scale(1);
+      opacity: 1; pointer-events: auto;
+    }
+    .fly-day {
+      font-size: 1.5rem; color: var(--accent-strong);
+      line-height: 1.1;
+    }
+    .fly-big {
+      font-family: 'DM Mono', monospace;
+      font-size: 3.4rem; font-weight: 300;
+      color: var(--text); line-height: 1;
+      margin: 0.2rem 0;
+    }
+    .fly-month {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--muted);
+    }
+    .fly-note {
+      margin-top: 1rem; padding-top: 0.85rem;
+      border-top: 1px solid var(--rule);
+      font-style: italic; font-size: 1rem;
+      color: var(--accent-deep);
+    }
+    .fly-themes {
+      display: flex; gap: 0.4rem; margin-top: 0.9rem;
+    }
+    .swatch {
+      width: 26px; height: 26px;
+      border-radius: 8px; cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.14s ease, border-color 0.14s ease;
+    }
+    .swatch:hover { transform: scale(1.14); }
+    .swatch.on { border-color: var(--accent-strong); }
+
+    /* ─────────────────────────── open transition ───────────────────── */
+    .launch {
+      position: fixed; inset: 0; z-index: 60;
+      display: grid; place-items: center;
+      background: color-mix(in srgb, var(--bg) 70%, transparent);
+      backdrop-filter: blur(8px);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+    .launch.go { opacity: 1; pointer-events: auto; }
+    .launch-card {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 1rem;
+      transform: scale(0.7);
+      transition: transform 0.35s cubic-bezier(.2,.9,.3,1);
+    }
+    .launch.go .launch-card { transform: scale(1); }
+    .launch-card .tile {
+      width: 76px; height: 76px; font-size: 2.3rem; border-radius: 20px;
+      animation: launch-pulse 1.1s ease-in-out infinite;
+    }
+    @keyframes launch-pulse {
+      0%, 100% { transform: scale(1); }
+      50%      { transform: scale(1.07); }
+    }
+    .launch-name {
+      font-size: 1.5rem; color: var(--accent-strong);
+      font-style: italic;
+    }
+    .launch-dots {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem; letter-spacing: 0.3em;
+      color: var(--muted);
+    }
+
+    /* ─────────────────────────── responsive ────────────────────────── */
+    @media (max-width: 720px) {
+      .widget { display: none; }
+      .tb-btn { width: 36px; height: 36px; }
+      .start-grid { grid-template-columns: repeat(3, 1fr); }
+      .tray-glyphs { display: none; }
+    }
+    @media (max-width: 480px) {
+      .icons { gap: 0; }
+      .icon { width: 80px; }
+      .tb-btn { width: 32px; height: 32px; }
+      .tb-btn .tile { width: 24px; height: 24px; font-size: 0.8rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
     }
   </style>
 </head>
 <body>
 
-  <header class="topbar">
-    <span class="topbar-brand">.space</span>
-    <div class="topbar-clock">
-      <span class="clock-date" id="clock-date"></span>
-      <span class="clock-sep">·</span>
-      <span class="clock-time" id="clock-time"></span>
+  <div class="wallpaper"><div class="wash"></div></div>
+  <div class="grain"></div>
+
+  <!-- desktop -->
+  <main class="desktop">
+    <div class="icons" id="icons"></div>
+  </main>
+
+  <!-- greeting widget -->
+  <aside class="widget" id="widget">
+    <p class="widget-greet" id="greet">hello</p>
+    <p class="widget-clock" id="w-clock">--:--</p>
+    <p class="widget-date" id="w-date"></p>
+    <p class="widget-note" id="w-note"></p>
+  </aside>
+
+  <!-- start menu -->
+  <section class="start" id="start" role="dialog" aria-label="Start">
+    <input class="start-search" id="search" type="text" placeholder="search woodles.space…" autocomplete="off" />
+    <p class="start-section">pinned</p>
+    <div class="start-grid" id="start-grid"></div>
+    <p class="start-section" id="rec-label">recommended</p>
+    <div class="recommended" id="recommended"></div>
+    <div class="start-foot">
+      <div class="start-user">
+        <div class="user-pic">z</div>
+        <span class="user-name">z winters</span>
+      </div>
+      <button class="start-power" id="about-btn" title="about">&#9432;</button>
     </div>
-  </header>
+  </section>
 
-  <div class="blob blob-1"></div>
-  <div class="blob blob-2"></div>
-  <div class="blob blob-3"></div>
-  <div class="blob blob-4"></div>
+  <!-- tray flyout -->
+  <section class="flyout" id="flyout">
+    <p class="fly-day" id="fly-day">day</p>
+    <p class="fly-big" id="fly-big">00</p>
+    <p class="fly-month" id="fly-month">month</p>
+    <p class="fly-note">a good day to make something &#10084;</p>
+    <div class="fly-themes" id="themes"></div>
+  </section>
 
-  <div class="page-wrap">
-
-    <div class="hero">
-      <p class="eyebrow">personal monorepo · z winters</p>
-      <h1 class="wordmark"><em>woodles</em></h1>
-      <p class="tld">.space</p>
+  <!-- taskbar -->
+  <nav class="taskbar" id="taskbar">
+    <button class="tb-btn start-btn" id="start-btn" title="start" aria-label="Start">
+      <span class="start-orb"></span>
+    </button>
+    <span class="tb-sep"></span>
+    <div id="tb-apps" style="display:flex;gap:0.25rem"></div>
+    <span class="tb-sep"></span>
+    <div class="tray" id="tray">
+      <div class="tray-glyphs">
+        <span title="connected">&#9685;</span>
+        <span title="sound">&#9834;</span>
+        <span title="loved">&#10084;</span>
+      </div>
+      <div class="tray-clock">
+        <div id="t-time">--:--</div>
+        <div class="td" id="t-date"></div>
+      </div>
     </div>
+  </nav>
 
-    <div class="divider"></div>
+  <!-- context menu -->
+  <div class="ctx" id="ctx">
+    <button class="ctx-item" data-act="start"><span class="ctx-glyph">&#9678;</span> open start</button>
+    <button class="ctx-item" data-act="wallpaper"><span class="ctx-glyph">&#10052;</span> next wallpaper</button>
+    <button class="ctx-item" data-act="tidy"><span class="ctx-glyph">&#10070;</span> tidy desktop</button>
+    <div class="ctx-sep"></div>
+    <button class="ctx-item" data-act="refresh"><span class="ctx-glyph">&#8635;</span> refresh</button>
+    <button class="ctx-item" data-act="about"><span class="ctx-glyph">&#9432;</span> about woodles</button>
+  </div>
 
-    <p class="index-label">what's here</p>
+  <!-- about window -->
+  <div class="scrim" id="scrim"></div>
+  <div class="window" id="window" role="dialog" aria-label="About">
+    <div class="titlebar" id="titlebar">
+      <span class="title">about &mdash; woodles.space</span>
+      <button class="win-close" id="win-close" aria-label="Close">&#10005;</button>
+    </div>
+    <div class="win-body">
+      <h2><em>woodles</em></h2>
+      <p class="win-tld">.space &mdash; a personal monorepo</p>
+      <p>a little desktop of soft, made things &mdash; typefaces and letters,
+         palettes and quiet timers. one repo, all the things, kept close.</p>
+      <p>open it like a drawer. everything inside was made by hand.</p>
+      <p class="win-meta" id="win-meta">z winters &middot; open monorepo</p>
+    </div>
+  </div>
 
-    <ul class="project-list">
-
-      <li class="project-item">
-        <a class="project-link" href="/fonts">
-          <span class="project-index">01</span>
-          <div class="project-body">
-            <span class="project-name">font library</span>
-            <span class="project-desc">twelve typefaces · one shared stylesheet</span>
-          </div>
-          <span class="project-arrow">/fonts →</span>
-        </a>
-      </li>
-
-      <li class="project-item">
-        <a class="project-link" href="/write">
-          <span class="project-index">02</span>
-          <div class="project-body">
-            <span class="project-name">write</span>
-            <span class="project-desc">compose · save · send a letter</span>
-          </div>
-          <span class="project-arrow">/write →</span>
-        </a>
-      </li>
-
-      <li class="project-item">
-        <a class="project-link" href="/letter">
-          <span class="project-index">03</span>
-          <div class="project-body">
-            <span class="project-name">echoes</span>
-            <span class="project-desc">letters left here · words that stayed</span>
-          </div>
-          <span class="project-arrow">/letter →</span>
-        </a>
-      </li>
-
-      <li class="project-item">
-        <a class="project-link" href="/palette">
-          <span class="project-index">04</span>
-          <div class="project-body">
-            <span class="project-name">palette</span>
-            <span class="project-desc">three named themes · color systems</span>
-          </div>
-          <span class="project-arrow">/palette →</span>
-        </a>
-      </li>
-
-      <li class="project-item">
-        <a class="project-link" href="/motifs">
-          <span class="project-index">05</span>
-          <div class="project-body">
-            <span class="project-name">motifs</span>
-            <span class="project-desc">ambient backdrops · drift &amp; grain</span>
-          </div>
-          <span class="project-arrow">/motifs →</span>
-        </a>
-      </li>
-
-      <li class="project-item">
-        <a class="project-link" href="/scaffold">
-          <span class="project-index">06</span>
-          <div class="project-body">
-            <span class="project-name">scaffold</span>
-            <span class="project-desc">templates · starting points for /write</span>
-          </div>
-          <span class="project-arrow">/scaffold →</span>
-        </a>
-      </li>
-
-      <li class="project-item">
-        <a class="project-link" href="/marginalia">
-          <span class="project-index">07</span>
-          <div class="project-body">
-            <span class="project-name">marginalia</span>
-            <span class="project-desc">a text-based incremental · reading something into existence</span>
-          </div>
-          <span class="project-arrow">/marginalia →</span>
-        </a>
-      </li>
-
-      <li class="project-item">
-        <a class="project-link" href="/marginalia#reading-room">
-          <span class="project-index">08</span>
-          <div class="project-body">
-            <span class="project-name">reading room</span>
-            <span class="project-desc">a quiet timer · read for the stars · within marginalia</span>
-          </div>
-          <span class="project-arrow">/marginalia →</span>
-        </a>
-      </li>
-
-    </ul>
-
-    <p class="footnote">woodles.space &nbsp;·&nbsp; open monorepo</p>
-
+  <!-- launch overlay -->
+  <div class="launch" id="launch">
+    <div class="launch-card">
+      <div class="tile" id="launch-tile">&#9788;</div>
+      <p class="launch-name" id="launch-name">opening…</p>
+      <p class="launch-dots">&middot; &middot; &middot;</p>
+    </div>
   </div>
 
   <script>
-    const DAYS   = ['sun','mon','tue','wed','thu','fri','sat'];
+    /* ── app catalogue ─────────────────────────────────────────────── */
+    const apps = [
+      { id:'fonts',   name:'Font Library', href:'/fonts',                  glyph:'Aa', desc:'twelve typefaces, one sheet',     g1:'var(--lavender)', g2:'var(--lilac)' },
+      { id:'write',   name:'Write',        href:'/write',                  glyph:'✎', desc:'compose, save, send a letter', g1:'var(--aqua)',     g2:'var(--lavender)' },
+      { id:'echoes',  name:'Echoes',       href:'/letter',                 glyph:'❝', desc:'letters left here, words that stayed', g1:'var(--peach)', g2:'var(--lilac)' },
+      { id:'palette', name:'Palette',      href:'/palette',                glyph:'◐', desc:'named themes & color systems',  g1:'var(--lilac)',    g2:'var(--aqua)' },
+      { id:'motifs',  name:'Motifs',       href:'/motifs',                 glyph:'❀', desc:'ambient backdrops, drift & grain', g1:'var(--aqua)',  g2:'var(--peach)' },
+      { id:'scaffold',name:'Scaffold',     href:'/scaffold',               glyph:'❏', desc:'templates for /write',          g1:'var(--lavender)', g2:'var(--peach)' },
+      { id:'marg',    name:'Marginalia',   href:'/marginalia',             glyph:'❦', desc:'a text-based incremental',      g1:'var(--plum)',     g2:'var(--lavender)' },
+      { id:'reading', name:'Reading Room', href:'/marginalia#reading-room',glyph:'☾', desc:'a quiet timer, read for stars', g1:'var(--peach)',    g2:'var(--aqua)' },
+    ];
+
+    const tileHTML = a =>
+      '<span class="tile" style="--g1:'+a.g1+';--g2:'+a.g2+'">'+a.glyph+'</span>';
+
+    /* ── desktop icons ─────────────────────────────────────────────── */
+    const iconsEl = document.getElementById('icons');
+    apps.forEach((a, i) => {
+      const el = document.createElement('a');
+      el.className = 'icon';
+      el.href = a.href;
+      el.style.animationDelay = (0.15 + i * 0.06) + 's';
+      el.innerHTML = tileHTML(a) +
+        '<span class="icon-label">' + a.name + '</span>';
+      el.addEventListener('click', e => { e.preventDefault(); launch(a); });
+      iconsEl.appendChild(el);
+    });
+
+    /* ── taskbar pinned apps ───────────────────────────────────────── */
+    const tbApps = document.getElementById('tb-apps');
+    apps.forEach(a => {
+      const b = document.createElement('button');
+      b.className = 'tb-btn tb-app';
+      b.title = a.name;
+      b.innerHTML = tileHTML(a);
+      b.addEventListener('click', () => launch(a));
+      tbApps.appendChild(b);
+    });
+
+    /* ── start menu grid ───────────────────────────────────────────── */
+    const grid = document.getElementById('start-grid');
+    function renderGrid(filter) {
+      grid.innerHTML = '';
+      const list = apps.filter(a =>
+        !filter || (a.name + ' ' + a.desc).toLowerCase().includes(filter));
+      if (!list.length) {
+        grid.innerHTML = '<p class="start-empty">nothing here by that name &mdash; yet</p>';
+        return;
+      }
+      list.forEach(a => {
+        const el = document.createElement('a');
+        el.className = 'start-app';
+        el.href = a.href;
+        el.innerHTML = tileHTML(a) + '<span class="start-app-name">' + a.name + '</span>';
+        el.addEventListener('click', e => { e.preventDefault(); launch(a); });
+        grid.appendChild(el);
+      });
+    }
+    renderGrid('');
+
+    /* recommended — a curated trio */
+    const rec = document.getElementById('recommended');
+    ['write','marg','palette'].forEach(id => {
+      const a = apps.find(x => x.id === id);
+      const el = document.createElement('a');
+      el.className = 'rec-item';
+      el.href = a.href;
+      el.innerHTML = tileHTML(a) +
+        '<span class="rec-text"><span class="rec-name">' + a.name +
+        '</span><span class="rec-desc">' + a.desc + '</span></span>';
+      el.addEventListener('click', e => { e.preventDefault(); launch(a); });
+      rec.appendChild(el);
+    });
+
+    /* ── clock + greeting ──────────────────────────────────────────── */
+    const DAYS   = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
     const MONTHS = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
-    const dateEl = document.getElementById('clock-date');
-    const timeEl = document.getElementById('clock-time');
-    function pad(n) { return String(n).padStart(2, '0'); }
+    const pad = n => String(n).padStart(2, '0');
+    const NOTES = [
+      'a good day to make something ♡',
+      'soft hours. small joys.',
+      'leave a little light on ✩',
+      'everything here was made by hand.',
+      'be gentle with the drafts.',
+    ];
+    function greeting(h) {
+      if (h < 5)  return 'still up,';
+      if (h < 12) return 'good morning,';
+      if (h < 17) return 'good afternoon,';
+      if (h < 22) return 'good evening,';
+      return 'goodnight,';
+    }
     function tick() {
       const now = new Date();
-      dateEl.textContent = DAYS[now.getDay()] + ' ' + pad(now.getDate()) + ' ' + MONTHS[now.getMonth()] + ' ' + now.getFullYear();
-      const t = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
-      if (timeEl.textContent !== t) {
-        timeEl.classList.remove('tick');
-        void timeEl.offsetWidth;
-        timeEl.classList.add('tick');
-        timeEl.textContent = t;
-      }
+      const time = pad(now.getHours()) + ':' + pad(now.getMinutes());
+      const dShort = pad(now.getDate()) + ' ' + MONTHS[now.getMonth()] + ' ' + now.getFullYear();
+      document.getElementById('w-clock').textContent = time;
+      document.getElementById('w-date').textContent = DAYS[now.getDay()] + ' · ' + dShort;
+      document.getElementById('t-time').textContent = time;
+      document.getElementById('t-date').textContent = dShort;
+      document.getElementById('greet').innerHTML = greeting(now.getHours()) + ' <em>z</em>';
+      document.getElementById('fly-day').textContent = DAYS[now.getDay()];
+      document.getElementById('fly-big').textContent = pad(now.getDate());
+      document.getElementById('fly-month').textContent =
+        MONTHS[now.getMonth()] + ' ' + now.getFullYear();
     }
     tick();
-    setInterval(tick, 1000);
+    setInterval(tick, 1000 * 20);
+    document.getElementById('w-note').textContent =
+      NOTES[new Date().getDate() % NOTES.length];
+    document.getElementById('win-meta').textContent =
+      'z winters · open monorepo · ' + new Date().getFullYear();
+
+    /* ── start menu toggle ─────────────────────────────────────────── */
+    const body = document.body;
+    const search = document.getElementById('search');
+    function setStart(open) {
+      body.classList.toggle('start-open', open);
+      if (open) { closeAll('start'); setTimeout(() => search.focus(), 120); }
+      else { search.value = ''; renderGrid(''); }
+    }
+    document.getElementById('start-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      setStart(!body.classList.contains('start-open'));
+    });
+    search.addEventListener('input', () => renderGrid(search.value.trim().toLowerCase()));
+    document.getElementById('start').addEventListener('click', e => e.stopPropagation());
+
+    /* ── tray flyout ───────────────────────────────────────────────── */
+    document.getElementById('tray').addEventListener('click', e => {
+      e.stopPropagation();
+      const open = !body.classList.contains('flyout-open');
+      if (open) closeAll('flyout');
+      body.classList.toggle('flyout-open', open);
+    });
+    document.getElementById('flyout').addEventListener('click', e => e.stopPropagation());
+
+    /* ── theme / wallpaper ─────────────────────────────────────────── */
+    const THEMES = ['cream','dawn','dusk','terracotta','midnight','forest'];
+    let themeIdx = 0;
+    const stored = localStorage.getItem('woodles-theme');
+    if (stored && THEMES.includes(stored)) themeIdx = THEMES.indexOf(stored);
+    function applyTheme() {
+      const t = THEMES[themeIdx];
+      document.documentElement.setAttribute('data-theme', t);
+      localStorage.setItem('woodles-theme', t);
+      document.querySelectorAll('.swatch').forEach((s, i) =>
+        s.classList.toggle('on', i === themeIdx));
+    }
+    function nextTheme() { themeIdx = (themeIdx + 1) % THEMES.length; applyTheme(); }
+    /* theme swatches in flyout */
+    const themesEl = document.getElementById('themes');
+    THEMES.forEach((t, i) => {
+      const s = document.createElement('div');
+      s.className = 'swatch';
+      s.title = t;
+      s.setAttribute('data-theme', t);
+      s.style.background =
+        'conic-gradient(from 120deg, var(--lavender), var(--aqua), var(--peach), var(--lilac))';
+      s.addEventListener('click', e => {
+        e.stopPropagation(); themeIdx = i; applyTheme();
+      });
+      themesEl.appendChild(s);
+    });
+    applyTheme();
+
+    /* ── context menu ──────────────────────────────────────────────── */
+    const ctx = document.getElementById('ctx');
+    document.addEventListener('contextmenu', e => {
+      if (e.target.closest('.window, .start, .taskbar, .flyout')) return;
+      e.preventDefault();
+      closeAll('ctx');
+      const w = 200, h = 240;
+      ctx.style.left = Math.min(e.clientX, innerWidth - w) + 'px';
+      ctx.style.top  = Math.min(e.clientY, innerHeight - h) + 'px';
+      ctx.classList.add('open');
+    });
+    ctx.addEventListener('click', e => {
+      const item = e.target.closest('.ctx-item');
+      if (!item) return;
+      const act = item.dataset.act;
+      ctx.classList.remove('open');
+      if (act === 'start')     setStart(true);
+      if (act === 'wallpaper') nextTheme();
+      if (act === 'refresh')   location.reload();
+      if (act === 'about')     openAbout();
+      if (act === 'tidy') {
+        iconsEl.querySelectorAll('.icon').forEach((el, i) => {
+          el.style.animation = 'none'; void el.offsetWidth;
+          el.style.animationDelay = (i * 0.05) + 's';
+          el.style.animation = 'icon-in 0.5s ease forwards';
+        });
+      }
+    });
+
+    /* ── about window + drag ───────────────────────────────────────── */
+    const win = document.getElementById('window');
+    function openAbout() { closeAll('about'); body.classList.add('about-open'); }
+    function closeAbout() {
+      body.classList.remove('about-open');
+      win.style.top = '50%'; win.style.left = '50%';
+    }
+    document.getElementById('about-btn').addEventListener('click', e => {
+      e.stopPropagation(); openAbout();
+    });
+    document.getElementById('win-close').addEventListener('click', closeAbout);
+    document.getElementById('scrim').addEventListener('click', closeAbout);
+
+    /* drag the about window by its titlebar */
+    (function () {
+      const bar = document.getElementById('titlebar');
+      let dragging = false, sx, sy, ox, oy;
+      bar.addEventListener('pointerdown', e => {
+        if (e.target.closest('.win-close')) return;
+        dragging = true;
+        const r = win.getBoundingClientRect();
+        win.style.transform = 'none';
+        win.style.top = r.top + 'px';
+        win.style.left = r.left + 'px';
+        sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top;
+        bar.setPointerCapture(e.pointerId);
+      });
+      bar.addEventListener('pointermove', e => {
+        if (!dragging) return;
+        win.style.left = (ox + e.clientX - sx) + 'px';
+        win.style.top  = (oy + e.clientY - sy) + 'px';
+      });
+      bar.addEventListener('pointerup', () => { dragging = false; });
+    })();
+
+    /* ── launch transition ─────────────────────────────────────────── */
+    const launchEl = document.getElementById('launch');
+    let launching = false;
+    function launch(a) {
+      if (launching) return;
+      launching = true;
+      closeAll();
+      const tile = document.getElementById('launch-tile');
+      tile.textContent = a.glyph;
+      tile.style.setProperty('--g1', a.g1);
+      tile.style.setProperty('--g2', a.g2);
+      document.getElementById('launch-name').textContent = 'opening ' + a.name.toLowerCase() + '…';
+      launchEl.classList.add('go');
+      setTimeout(() => { window.location.href = a.href; }, 620);
+    }
+
+    /* ── global close handling ─────────────────────────────────────── */
+    function closeAll(except) {
+      if (except !== 'start')  body.classList.remove('start-open');
+      if (except !== 'flyout') body.classList.remove('flyout-open');
+      if (except !== 'about')  body.classList.remove('about-open');
+      if (except !== 'ctx')    ctx.classList.remove('open');
+    }
+    document.addEventListener('click', () => {
+      body.classList.remove('start-open', 'flyout-open');
+      ctx.classList.remove('open');
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        body.classList.remove('start-open', 'flyout-open', 'about-open');
+        ctx.classList.remove('open');
+      }
+      if (e.key === '/' && !body.classList.contains('start-open')
+          && document.activeElement.tagName !== 'INPUT') {
+        e.preventDefault(); setStart(true);
+      }
+    });
+
+    /* ── sparkles ──────────────────────────────────────────────────── */
+    const SPARKS = 7;
+    for (let i = 0; i < SPARKS; i++) {
+      const s = document.createElement('span');
+      s.className = 'sparkle';
+      s.textContent = '✧';
+      s.style.left = (8 + Math.random() * 84) + 'vw';
+      s.style.top  = (8 + Math.random() * 78) + 'vh';
+      s.style.animationDelay = (Math.random() * 7) + 's';
+      s.style.fontSize = (0.6 + Math.random() * 0.9) + 'rem';
+      document.body.appendChild(s);
+    }
   </script>
 
 </body>
