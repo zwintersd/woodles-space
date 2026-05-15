@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { book } from '$lib/witch/book.svelte';
+	import { book, fmt } from '$lib/witch/book.svelte';
+	import { startTick, stopTick } from '$lib/witch/tick';
 	import { titleById } from '$lib/witch/content/titles';
 	import { exportSave, importSave } from '$lib/witch/persist';
 	import TheWeb from '$lib/witch/TheWeb.svelte';
 	import TheWorld from '$lib/witch/TheWorld.svelte';
+	import Ledger from '$lib/witch/Ledger.svelte';
 	import ReadingRoom from '$lib/components/reading/ReadingRoom.svelte';
 
 	let menuOpen = $state(false);
@@ -12,15 +14,14 @@
 	let exportBlob = $state('');
 	let readingOpen = $state(false);
 
-	let saveTimer = 0;
 	onMount(() => {
 		book.hydrate();
 		if (window.location.hash === '#reading-room') readingOpen = true;
-		saveTimer = window.setInterval(() => book.persist(), 5_000);
+		startTick();
 		window.addEventListener('beforeunload', persist);
 	});
 	onDestroy(() => {
-		if (saveTimer) clearInterval(saveTimer);
+		stopTick();
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('beforeunload', persist);
 			book.persist();
@@ -29,6 +30,17 @@
 	function persist() {
 		book.persist();
 	}
+
+	function awayLabel(seconds: number): string {
+		const m = Math.round(seconds / 60);
+		if (m < 1) return 'a moment';
+		if (m < 60) return `${m} minute${m === 1 ? '' : 's'}`;
+		const h = Math.floor(m / 60);
+		const r = m % 60;
+		return r === 0 ? `${h} hour${h === 1 ? '' : 's'}` : `${h}h ${r}m`;
+	}
+
+	const offline = $derived(book.offlineReport);
 
 	const currentTitle = $derived(titleById(book.title));
 	const journal = $derived(book.pendingJournal);
@@ -113,6 +125,18 @@
 				</div>
 				<button class="ghost" onclick={() => book.closeBook()}>close the book</button>
 			</div>
+
+			{#if offline}
+				<aside class="offline">
+					<p>
+						she watched the world for <strong>{awayLabel(offline.seconds)}</strong> while you were
+						away. it gathered <span class="num">{fmt(offline.insight)}</span> insight{#if offline.advanced > 0}, and crossed <span class="num">{offline.advanced}</span> observation{offline.advanced === 1 ? '' : 's'}{/if}.
+					</p>
+					<button class="ghost tiny" onclick={() => book.dismissOfflineReport()}>thank you</button>
+				</aside>
+			{/if}
+
+			<Ledger />
 
 			<nav class="tabs">
 				<button class:active={book.mode === 'web'} onclick={() => (book.mode = 'web')}>
@@ -382,6 +406,32 @@
 	}
 	.mode-panel {
 		min-height: 12rem;
+	}
+	.offline {
+		border: 1px solid var(--cyan);
+		border-radius: 4px;
+		background: var(--panel-accent);
+		padding: 0.6rem 0.8rem;
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.8rem;
+		flex-wrap: wrap;
+	}
+	.offline p {
+		font-family: var(--font-body);
+		font-size: 0.86rem;
+		color: var(--text);
+		margin: 0;
+	}
+	.offline strong {
+		color: var(--cyan);
+		font-weight: 500;
+	}
+	.num {
+		font-family: var(--font-counter);
+		color: var(--leafeon-pink);
+		font-size: 1.1em;
 	}
 
 	.rule {

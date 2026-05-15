@@ -1,5 +1,7 @@
 // localStorage save/load for The Witch's Book.
 
+import { ATTENTION_START } from './tuning';
+
 const KEY = 'witch.book.save.v1';
 const LEGACY_MARGINALIA_KEY = 'marginalia.save.v1';
 
@@ -9,6 +11,9 @@ export interface BookSave {
 	knowing: number;
 	insight: number;
 	favor: number;
+	attentionCapacity: number;
+	attending: string[];
+	study: Record<string, number>;
 	writtenConditions: string[];
 	observation: Record<string, number>;
 	journalShown: string[];
@@ -20,7 +25,8 @@ export interface BookSave {
 	readingCompletedStars: number;
 	readingCumulativeMs: number;
 	readingCumulativeWords: number;
-	startedAt: number;
+	// wall-clock of the last save — drives offline progress
+	lastSeen: number;
 }
 
 export function emptySave(): BookSave {
@@ -30,6 +36,9 @@ export function emptySave(): BookSave {
 		knowing: 0,
 		insight: 0,
 		favor: 60,
+		attentionCapacity: ATTENTION_START,
+		attending: [],
+		study: {},
 		writtenConditions: [],
 		observation: {},
 		journalShown: [],
@@ -40,7 +49,7 @@ export function emptySave(): BookSave {
 		readingCompletedStars: 0,
 		readingCumulativeMs: 0,
 		readingCumulativeWords: 0,
-		startedAt: Date.now()
+		lastSeen: Date.now()
 	};
 }
 
@@ -69,7 +78,6 @@ export function load(): BookSave | null {
 	try {
 		const raw = localStorage.getItem(KEY);
 		if (!raw) {
-			// first run on the new design — fold in any old reading progress
 			const legacy = inheritReadingFromLegacy(emptySave());
 			return legacy.readingCompletedStars > 0 || legacy.readingMsTowardNextPoint > 0
 				? legacy

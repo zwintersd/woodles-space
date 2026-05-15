@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { book, stageLabel, STAGE_KNOWN } from './book.svelte';
-	import { domainVerb, type LifeCategory } from './content/life';
+	import { book, fmt, stageLabel, STAGE_KNOWN } from './book.svelte';
+	import { STAGE_INSIGHT_MULT, DISTILL_INSIGHT_COST, DISTILL_ESSENCE_GAIN } from './tuning';
+	import { domainVerb, type Life, type LifeCategory } from './content/life';
 
 	const categories: { id: LifeCategory; label: string }[] = [
 		{ id: 'aquatic', label: 'in the water' },
@@ -8,26 +9,55 @@
 		{ id: 'atmospheric', label: 'in the sky' }
 	];
 
-	const metric = (n: number) => Math.min(100, Math.round(n));
+	const nextStageName = (stage: number) => stageLabel[Math.min(stage + 1, STAGE_KNOWN)];
+
+	// effective insight/sec this life is currently contributing
+	function yields(l: Life): number {
+		return l.insightWeight * (STAGE_INSIGHT_MULT[book.stageOf(l.id)] ?? 0) * book.favorMult;
+	}
+
+	// a plain-language read on a life's idle character, for min/maxing
+	function character(l: Life): string {
+		const rich = l.insightWeight >= 1.3 ? 'rich' : l.insightWeight <= 0.8 ? 'thin' : 'steady';
+		const pace = l.studyEase >= 1.2 ? 'quick to know' : l.studyEase <= 0.8 ? 'slow to know' : 'even pace';
+		return `${rich} · ${pace}`;
+	}
 </script>
 
 <div class="world">
 	<header class="mode-head">
 		<h2>the world</h2>
 		<p class="mode-sub">
-			she wrote one condition. the world answered with forty things. she cannot
-			help a thing until she has truly seen it.
+			she wrote one condition. the world answered with dozens of things. it goes
+			on living whether or not she is looking — but it shows her more when she does.
 		</p>
 	</header>
 
-	<div class="ledger">
-		<span>insight <span class="num">{book.insight}</span></span>
-		<span>favor <span class="num">{metric(book.favor)}</span></span>
-		<span class="metrics">
-			nutrients {metric(book.nutrients)} · oxygen {metric(book.oxygen)} · stability
-			{metric(book.stability)} · complexity {book.complexity}
-		</span>
-	</div>
+	<section class="attention-panel">
+		<div class="ap-line">
+			<span class="ap-label">her attention</span>
+			<span class="ap-meta">
+				watching <span class="num">{book.attentionUsed}</span> of
+				<span class="num">{book.attentionCapacity}</span>
+			</span>
+		</div>
+		<div class="ap-actions">
+			{#if book.attentionUpgradeCost !== null}
+				<button
+					class="ap-btn"
+					disabled={book.insight < book.attentionUpgradeCost}
+					onclick={() => book.expandAttention()}
+				>
+					widen her attention — {fmt(book.attentionUpgradeCost)} insight
+				</button>
+			{:else}
+				<span class="ap-note">her attention is as wide as it goes, in this world.</span>
+			{/if}
+			<button class="ap-btn" disabled={!book.canDistill()} onclick={() => book.distillEssence()}>
+				distill {DISTILL_INSIGHT_COST} insight → {DISTILL_ESSENCE_GAIN} essence
+			</button>
+		</div>
+	</section>
 
 	{#if book.life.length === 0}
 		<p class="empty">
@@ -44,24 +74,64 @@
 						{#each here as l (l.id)}
 							{@const stage = book.stageOf(l.id)}
 							{@const known = stage >= STAGE_KNOWN}
-							<article class="card" class:unlooked={stage === 0}>
+							{@const attending = book.isAttending(l.id)}
+							<article class="card" class:unlooked={stage === 0} class:attending class:known>
 								<div class="card-head">
-									<h4>{l.name}</h4>
-									<span class="sci">{l.scientificName}</span>
+									<div class="naming">
+										<h4>{l.name}</h4>
+										<span class="sci">{l.scientificName}</span>
+									</div>
+									<span class="character">{character(l)}</span>
 								</div>
+
 								<p class="stage-text">{book.stageTextFor(l)}</p>
-								<div class="card-foot">
+
+								<div class="yield-line">
 									<span class="stage-badge">{stageLabel[stage]}</span>
-									{#if book.canObserve(l.id)}
-										<button class="observe" onclick={() => book.observe(l.id)}>
-											{stage === 0 ? 'observe' : 'keep watching'}
-										</button>
+									{#if yields(l) > 0}
+										<span class="yield">yielding {fmt(yields(l))} insight/s</span>
 									{:else}
-										<span class="intervene" title="interventions arrive in a later pass">
-											she could {domainVerb[l.domain]} it now — soon
-										</span>
+										<span class="yield muted">not yet yielding</span>
 									{/if}
 								</div>
+
+								{#if !known}
+									<div class="progress" aria-hidden="true">
+										<div class="bar" style:width="{book.stageProgress(l.id) * 100}%"></div>
+									</div>
+									<p class="toward">
+										{#if attending}
+											deepening toward <em>{nextStageName(stage)}</em> —
+											{Math.floor(book.stageProgress(l.id) * 100)}%
+										{:else}
+											idle. attend to it and it will deepen toward
+											<em>{nextStageName(stage)}</em>.
+										{/if}
+									</p>
+									<div class="card-actions">
+										{#if attending}
+											<button class="look" onclick={() => book.lookCloser(l.id)}>
+												look closer
+											</button>
+											<button class="release" onclick={() => book.unattend(l.id)}>
+												release
+											</button>
+										{:else}
+											<button
+												class="attend"
+												disabled={!book.canAttend(l.id)}
+												onclick={() => book.attend(l.id)}
+											>
+												{book.attentionFree > 0 ? 'attend' : 'no attention free'}
+											</button>
+										{/if}
+									</div>
+								{:else}
+									<p class="intervene">
+										she knows it now — enough to {domainVerb[l.domain]} it kindly.
+										<span class="soon">(intervention arrives in a later pass.)</span>
+									</p>
+								{/if}
 							</article>
 						{/each}
 					</div>
@@ -89,27 +159,66 @@
 		font-style: italic;
 		color: var(--muted);
 		margin: 0;
-		max-width: 34rem;
-	}
-	.ledger {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.4rem 1.1rem;
-		font-family: var(--font-ui);
-		font-size: 0.82rem;
-		color: var(--text);
-		border-top: 1px solid var(--rule);
-		border-bottom: 1px solid var(--rule);
-		padding: 0.5rem 0;
-	}
-	.metrics {
-		color: var(--muted);
+		max-width: 36rem;
 	}
 	.num {
 		font-family: var(--font-counter);
 		color: var(--leafeon-pink);
-		font-size: 1.15em;
+		font-size: 1.1em;
 	}
+
+	/* ── attention panel ─────────────────────────────────────────────────── */
+	.attention-panel {
+		border: 1px solid var(--rule);
+		border-radius: 4px;
+		background: var(--panel-accent);
+		padding: 0.6rem 0.8rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+	.ap-line {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.8rem;
+	}
+	.ap-label {
+		font-family: var(--font-ui);
+		font-size: 0.7rem;
+		letter-spacing: 0.2em;
+		text-transform: uppercase;
+		color: var(--periwinkle);
+	}
+	.ap-meta {
+		font-family: var(--font-ui);
+		font-size: 0.82rem;
+		color: var(--muted);
+	}
+	.ap-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+	.ap-btn {
+		font-family: var(--font-ui);
+		font-size: 0.74rem;
+		color: var(--cream);
+		border: 1px solid var(--rule);
+		border-radius: 3px;
+		padding: 0.35rem 0.6rem;
+	}
+	.ap-btn:hover:not(:disabled) {
+		border-color: var(--cyan);
+		color: var(--cyan);
+	}
+	.ap-note {
+		font-family: var(--font-body);
+		font-style: italic;
+		font-size: 0.78rem;
+		color: var(--muted);
+	}
+
 	.empty {
 		font-family: var(--font-body);
 		font-style: italic;
@@ -127,7 +236,7 @@
 	}
 	.cards {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+		grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
 		gap: 0.7rem;
 	}
 	.card {
@@ -137,12 +246,25 @@
 		padding: 0.7rem 0.8rem;
 		display: flex;
 		flex-direction: column;
-		gap: 0.45rem;
+		gap: 0.4rem;
 	}
 	.card.unlooked {
-		opacity: 0.6;
+		opacity: 0.72;
+	}
+	.card.attending {
+		border-color: var(--cyan);
+	}
+	.card.known {
+		background: var(--panel-accent);
+		border-color: rgba(240, 143, 184, 0.4);
 	}
 	.card-head {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
+	.naming {
 		display: flex;
 		flex-direction: column;
 		gap: 0.05rem;
@@ -160,45 +282,97 @@
 		font-size: 0.74rem;
 		color: var(--periwinkle);
 	}
+	.character {
+		font-family: var(--font-ui);
+		font-size: 0.62rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--muted);
+		text-align: right;
+		white-space: nowrap;
+	}
 	.stage-text {
 		font-family: var(--font-body);
-		font-size: 0.86rem;
+		font-size: 0.85rem;
 		color: var(--muted);
 		margin: 0;
 		flex: 1;
 	}
-	.card-foot {
+	.yield-line {
 		display: flex;
-		align-items: center;
+		align-items: baseline;
 		justify-content: space-between;
 		gap: 0.5rem;
 	}
 	.stage-badge {
 		font-family: var(--font-ui);
-		font-size: 0.66rem;
+		font-size: 0.64rem;
 		letter-spacing: 0.16em;
 		text-transform: uppercase;
 		color: var(--periwinkle);
 	}
-	.observe {
+	.yield {
+		font-family: var(--font-counter);
+		font-size: 0.82rem;
+		color: var(--cyan);
+	}
+	.yield.muted {
+		color: var(--muted);
+	}
+	.progress {
+		height: 5px;
+		background: var(--bg);
+		border-radius: 3px;
+		overflow: hidden;
+	}
+	.bar {
+		height: 100%;
+		background: linear-gradient(90deg, var(--periwinkle), var(--cyan));
+		transition: width 180ms linear;
+	}
+	.toward {
+		font-family: var(--font-ui);
+		font-size: 0.74rem;
+		color: var(--muted);
+		margin: 0;
+	}
+	.toward em {
+		color: var(--cyan);
+		font-style: normal;
+	}
+	.card-actions {
+		display: flex;
+		gap: 0.4rem;
+	}
+	.attend,
+	.look,
+	.release {
 		font-family: var(--font-ui);
 		font-size: 0.72rem;
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
-		color: var(--cream);
 		border: 1px solid var(--rule);
 		border-radius: 3px;
-		padding: 0.3rem 0.5rem;
+		padding: 0.3rem 0.55rem;
+		color: var(--cream);
 	}
-	.observe:hover {
+	.attend:hover:not(:disabled),
+	.look:hover {
 		border-color: var(--cyan);
 		color: var(--cyan);
 	}
+	.release:hover {
+		border-color: var(--print-pink);
+		color: var(--print-pink);
+	}
 	.intervene {
-		font-family: var(--font-ui);
+		font-family: var(--font-body);
 		font-style: italic;
-		font-size: 0.72rem;
+		font-size: 0.8rem;
 		color: var(--leafeon-pink);
-		text-align: right;
+		margin: 0;
+	}
+	.soon {
+		color: var(--muted);
 	}
 </style>
