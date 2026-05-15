@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onDestroy, onMount, tick } from 'svelte';
-	import { game } from '$lib/state/game.svelte';
+	import { book } from '$lib/witch/book.svelte';
 	import { createReadingTimer } from '$lib/reading/timer';
 	import {
 		paragraphsFromText,
@@ -63,7 +63,7 @@
 
 	const timer = createReadingTimer({
 		onAccrueMs: (dt) => {
-			game.creditReadingMs(dt);
+			book.creditReadingMs(dt);
 			sessionMs += dt;
 			nowTick++;
 		}
@@ -71,7 +71,7 @@
 
 	const progress = $derived.by(() => {
 		void nowTick;
-		return game.readingMsTowardNextPoint / POINT_MS;
+		return book.readingMsTowardNextPoint / POINT_MS;
 	});
 
 	const estimatedReadingMin = $derived(liveWordCount > 0 ? liveWordCount / WPM : 0);
@@ -178,7 +178,7 @@
 		paragraphs = paragraphsFromText(t);
 		notes = [];
 		liveWordCount = countWordsInText(t);
-		game.addReadingWords(liveWordCount);
+		book.addReadingWords(liveWordCount);
 		mode = 'read';
 		docKey++;
 		persistDoc();
@@ -250,7 +250,7 @@
 	}
 
 	function onUnload() {
-		game.persist();
+		book.persist();
 		persistDoc();
 	}
 
@@ -472,7 +472,7 @@
 		if (hadDoc) mode = 'read';
 		timer.start();
 		const id = setInterval(() => {
-			game.persist();
+			book.persist();
 			persistDoc();
 		}, PERSIST_INTERVAL_MS);
 		window.addEventListener('beforeunload', onUnload);
@@ -504,7 +504,7 @@
 
 	onDestroy(() => {
 		timer.stop();
-		game.persist();
+		book.persist();
 		persistDoc();
 	});
 
@@ -532,11 +532,11 @@
 
 	<div class="board" class:read={mode === 'read'}>
 		<div class="active-star">
-			<Star points={game.readingStarPoints} progress={progress} active size={120} />
+			<Star points={book.readingStarPoints} progress={progress} active size={120} />
 			<p class="points">
-				<span class="num">{game.readingStarPoints}</span> / 5 points
-				{#if game.readingCompletedStars > 0}
-					· <span class="num">{game.readingCompletedStars}</span>
+				<span class="num">{book.readingStarPoints}</span> / 5 points
+				{#if book.readingCompletedStars > 0}
+					· <span class="num">{book.readingCompletedStars}</span>
 					completed
 				{/if}
 			</p>
@@ -638,7 +638,7 @@
 
 	<footer class="shelf-wrap">
 		<h4>the shelf</h4>
-		<StarShelf count={game.readingCompletedStars} />
+		<StarShelf count={book.readingCompletedStars} />
 	</footer>
 </section>
 
