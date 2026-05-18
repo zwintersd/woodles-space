@@ -15,6 +15,8 @@
     { "source": "/motifs/:path*",   "destination": "/apps/motifs/:path*" },
     { "source": "/scaffold",        "destination": "/apps/scaffold/index.html" },
     { "source": "/scaffold/:path*", "destination": "/apps/scaffold/:path*" },
+    { "source": "/digits",          "destination": "/apps/digits/index.html" },
+    { "source": "/digits/:path*",   "destination": "/apps/digits/:path*" },
     { "source": "/write",           "destination": "/apps/write/dist/index.html" },
     { "source": "/write/:path*",    "destination": "/apps/write/dist/:path*" },
     { "source": "/letter",          "destination": "/apps/letter/index.html" },

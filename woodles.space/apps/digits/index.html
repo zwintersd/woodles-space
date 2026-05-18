@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="cream">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>digits · woodles.space</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="/shared/fonts.css" />
+  <link rel="stylesheet" href="/shared/palette.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-weight: 300;
+      min-height: 100vh;
+      padding: 3.5rem clamp(1rem, 4vw, 3rem) 5rem;
+    }
+
+    .wrap { max-width: 880px; margin: 0 auto; }
+
+    .eyebrow {
+      font-size: 0.62rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2.4rem, 6vw, 3.4rem);
+      font-weight: 300;
+      font-style: italic;
+      color: var(--accent-strong);
+      line-height: 1.05;
+    }
+    .lede {
+      font-size: 0.74rem;
+      line-height: 1.7;
+      color: var(--muted);
+      margin: 0.6rem 0 2.6rem;
+      max-width: 46ch;
+    }
+
+    h2 {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-weight: 300;
+      font-size: 1.5rem;
+      color: var(--accent-deep);
+      margin-bottom: 1rem;
+    }
+    section { margin-bottom: 3.4rem; }
+
+    /* lined-notebook sheet */
+    .sheet {
+      position: relative;
+      border-radius: 10px;
+      border: 1px solid var(--rule);
+      background-color: #fffdf8;
+      background-image:
+        linear-gradient(to right, rgba(214, 122, 122, 0.32) 0 1.5px, transparent 1.5px),
+        repeating-linear-gradient(
+          to bottom,
+          transparent 0 35px,
+          rgba(120, 150, 200, 0.28) 35px 36px
+        );
+      background-position: 46px 0, 0 0;
+      box-shadow: 0 14px 34px -20px rgba(46, 32, 64, 0.4);
+      overflow: hidden;
+    }
+    .sheet svg { display: block; width: 100%; height: auto; }
+
+    .sheet-digit { padding: 1.4rem 1.4rem 1.4rem 64px; }
+    .sheet-problem { padding: 2.2rem 2.2rem 2.2rem 70px; }
+
+    /* faint handwriting guide rules drawn inside the digit SVG */
+    .guide { stroke: rgba(120, 150, 200, 0.55); stroke-width: 0.8; }
+    .guide-dash { stroke-dasharray: 3 4; }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 1.1rem;
+    }
+    .digit-pad { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+    button {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      font-weight: 400;
+      color: var(--accent-strong);
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: 7px;
+      padding: 0.45rem 0.7rem;
+      min-width: 2.3rem;
+      cursor: pointer;
+      transition: border-color 0.18s ease, transform 0.1s ease, background 0.18s ease;
+    }
+    button:hover:not(:disabled) { border-color: var(--accent); }
+    button:active:not(:disabled) { transform: translateY(1px); }
+    button:disabled { opacity: 0.4; cursor: default; }
+    button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+    label.field {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    input[type="range"] { width: 110px; accent-color: var(--accent); }
+    label.toggle { text-transform: none; letter-spacing: 0.04em; font-size: 0.68rem; }
+
+    .footnote {
+      font-size: 0.62rem;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      opacity: 0.7;
+      line-height: 1.8;
+      margin-top: 3rem;
+    }
+    code {
+      font-size: 0.92em;
+      background: var(--surface);
+      padding: 0.05em 0.35em;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <p class="eyebrow">math practice · proof of concept</p>
+    <h1>digits</h1>
+    <p class="lede">
+      Numbers drawn in real time — each digit revealed stroke by stroke, in the
+      order you'd teach a child to write it. SVG paths, animated dash offsets,
+      no dependencies.
+    </p>
+
+    <section>
+      <h2>one digit at a time</h2>
+      <div class="sheet sheet-digit">
+        <svg id="digit-svg" viewBox="0 0 100 140" aria-label="animated digit">
+          <g class="guides">
+            <line class="guide" x1="0" y1="27"  x2="100" y2="27" />
+            <line class="guide guide-dash" x1="0" y1="71" x2="100" y2="71" />
+            <line class="guide" x1="0" y1="116" x2="100" y2="116" />
+          </g>
+        </svg>
+      </div>
+      <div class="controls">
+        <div class="digit-pad" id="digit-pad"></div>
+        <button id="digit-replay">replay</button>
+      </div>
+      <div class="controls">
+        <label class="field">
+          stroke speed
+          <input type="range" id="speed" min="180" max="1100" value="480" step="20" />
+        </label>
+        <label class="field">
+          pause
+          <input type="range" id="gap" min="0" max="500" value="150" step="20" />
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <h2>a full problem</h2>
+      <div class="sheet sheet-problem">
+        <svg id="problem-svg" viewBox="0 0 300 380" aria-label="animated addition problem"></svg>
+      </div>
+      <div class="controls">
+        <button id="problem-new" class="primary">new problem</button>
+        <button id="problem-replay">replay</button>
+        <label class="field toggle">
+          <input type="checkbox" id="reveal" />
+          write the answer too
+        </label>
+      </div>
+    </section>
+
+    <p class="footnote">
+      reusable bits live in <code>pen.js</code> —
+      <code>writeDigit()</code>, <code>writeStrokes()</code>, <code>writeProblem()</code>.
+      framework-agnostic; this page is just a vanilla harness.
+    </p>
+  </div>
+
+  <script type="module">
+    import { writeDigit, writeProblem, wait } from './pen.js';
+
+    /* remove everything pen.js drew, keeping any static .guides group */
+    const clearMarks = (svg) => {
+      [...svg.children].forEach((child) => {
+        if (!child.classList.contains('guides')) child.remove();
+      });
+    };
+
+    let busy = false;
+    const lockEls = document.querySelectorAll('button, input');
+    const setBusy = (state) => {
+      busy = state;
+      lockEls.forEach((el) => { el.disabled = state; });
+    };
+
+    /* ---- single digit ---- */
+    const digitSvg = document.getElementById('digit-svg');
+    const speed = document.getElementById('speed');
+    const gap = document.getElementById('gap');
+    let currentDigit = 3;
+
+    async function showDigit(d) {
+      if (busy) return;
+      currentDigit = d;
+      setBusy(true);
+      clearMarks(digitSvg);
+      await writeDigit(digitSvg, d, {
+        strokeDuration: Number(speed.value),
+        strokeGap: Number(gap.value),
+      });
+      setBusy(false);
+    }
+
+    const pad = document.getElementById('digit-pad');
+    for (let d = 0; d <= 9; d++) {
+      const btn = document.createElement('button');
+      btn.textContent = d;
+      btn.addEventListener('click', () => showDigit(d));
+      pad.appendChild(btn);
+    }
+    document.getElementById('digit-replay')
+      .addEventListener('click', () => showDigit(currentDigit));
+
+    /* ---- full problem ---- */
+    const problemSvg = document.getElementById('problem-svg');
+    const reveal = document.getElementById('reveal');
+    let a = 27, b = 48;
+
+    async function runProblem() {
+      if (busy) return;
+      setBusy(true);
+      clearMarks(problemSvg);
+      await writeProblem(problemSvg, a, b, {
+        strokeDuration: Math.max(220, Number(speed.value) * 0.85),
+        revealAnswer: reveal.checked,
+      });
+      setBusy(false);
+    }
+
+    const twoDigit = () => Math.floor(10 + Math.random() * 89);
+    document.getElementById('problem-new').addEventListener('click', () => {
+      a = twoDigit();
+      b = twoDigit();
+      runProblem();
+    });
+    document.getElementById('problem-replay').addEventListener('click', runProblem);
+
+    /* first run */
+    (async () => {
+      await showDigit(currentDigit);
+      await wait(400);
+      await runProblem();
+    })();
+  </script>
+</body>
+</html>
