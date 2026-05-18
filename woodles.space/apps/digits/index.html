@@ -72,10 +72,14 @@
       box-shadow: 0 14px 34px -20px rgba(46, 32, 64, 0.4);
       overflow: hidden;
     }
-    .sheet svg { display: block; width: 100%; height: auto; }
+    /* SVGs are sized by height so the viewBox aspect ratio decides the width —
+       sizing by width would scale a 100x140 viewBox to a ~1500px-tall canvas. */
+    .sheet svg { display: block; height: auto; max-width: 100%; margin: 0 auto; }
+    .sheet-digit svg { width: auto; height: clamp(220px, 42vw, 320px); }
+    .sheet-problem svg { width: auto; height: clamp(240px, 50vw, 360px); }
 
-    .sheet-digit { padding: 1.4rem 1.4rem 1.4rem 64px; }
-    .sheet-problem { padding: 2.2rem 2.2rem 2.2rem 70px; }
+    .sheet-digit { padding: 1.6rem; }
+    .sheet-problem { padding: 2rem; }
 
     /* faint handwriting guide rules drawn inside the digit SVG */
     .guide { stroke: rgba(120, 150, 200, 0.55); stroke-width: 0.8; }
@@ -134,6 +138,19 @@
       padding: 0.05em 0.35em;
       border-radius: 4px;
     }
+
+    #err {
+      display: none;
+      margin-bottom: 2rem;
+      padding: 0.8rem 1rem;
+      border: 1px solid #d77a7a;
+      border-radius: 8px;
+      background: rgba(215, 122, 122, 0.12);
+      color: #a23b3b;
+      font-size: 0.68rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
   </style>
 </head>
 <body>
@@ -145,6 +162,8 @@
       order you'd teach a child to write it. SVG paths, animated dash offsets,
       no dependencies.
     </p>
+
+    <div id="err"></div>
 
     <section>
       <h2>one digit at a time</h2>
@@ -195,6 +214,26 @@
     </p>
   </div>
 
+  <script>
+    /* surface any failure (module load, runtime) instead of a blank canvas */
+    function showError(msg) {
+      const box = document.getElementById('err');
+      if (!box) return;
+      box.style.display = 'block';
+      box.textContent = msg;
+    }
+    window.addEventListener('error', (e) => {
+      if (e.target && e.target.tagName === 'SCRIPT') {
+        showError('Could not load ' + (e.target.src || 'a script') +
+          ' — check the file is served and has a JavaScript MIME type.');
+      } else {
+        showError('Script error: ' + (e.message || e.error));
+      }
+    }, true);
+    window.addEventListener('unhandledrejection', (e) => {
+      showError('Error: ' + ((e.reason && e.reason.message) || e.reason));
+    });
+  </script>
   <script type="module">
     import { writeDigit, writeProblem, wait } from './pen.js';
 
