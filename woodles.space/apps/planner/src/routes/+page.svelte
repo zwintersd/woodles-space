@@ -3,6 +3,8 @@
 	import NowNext from '$lib/components/NowNext.svelte';
 	import TodayBoard from '$lib/components/TodayBoard.svelte';
 	import WeekView from '$lib/components/WeekView.svelte';
+	import MonthView from '$lib/components/MonthView.svelte';
+	import YearScroll from '$lib/components/YearScroll.svelte';
 	import Binder from '$lib/components/Binder.svelte';
 	import Dock from '$lib/components/Dock.svelte';
 
@@ -47,9 +49,9 @@
 		{:else if store.currentView === 'week'}
 			<WeekView />
 		{:else if store.currentView === 'month'}
-			<WeekView stub="month" />
+			<MonthView />
 		{:else if store.currentView === 'year'}
-			<WeekView stub="year" />
+			<YearScroll />
 		{/if}
 	</main>
 
