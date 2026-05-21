@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { store } from '$lib/store.svelte';
 	import { dayOfWeekLabel, shortDateLabel, dateKey } from '$lib/utils';
+	import YearScroll from './YearScroll.svelte';
 
 	type BinderTabId = 'domains' | 'waiting' | 'upcoming' | 'year-scroll' | 'holidays';
 
@@ -122,12 +123,8 @@
 		</div>
 
 	{:else if store.binderTab === 'year-scroll'}
-		<header class="binder-header">
-			<span class="binder-eyebrow">binder</span>
-			<span class="binder-title">year scroll</span>
-		</header>
-		<div class="binder-body">
-			<p class="binder-empty">year view — coming soon.</p>
+		<div class="binder-year-scroll">
+			<YearScroll compact />
 		</div>
 
 	{:else if store.binderTab === 'holidays'}
@@ -360,5 +357,11 @@
 
 	.upcoming-task::before {
 		content: '· ';
+	}
+
+	.binder-year-scroll {
+		flex: 1;
+		overflow-y: auto;
+		padding: 0 0.75rem;
 	}
 </style>
