@@ -1,0 +1,361 @@
+<script lang="ts">
+	import { store } from '$lib/store.svelte';
+	import { getCurrentBlock, minutesRemaining } from '$lib/templates';
+	import { minutesToDisplay, dayOfWeekLabel, shortDateLabel, nowMinutes, dateKey, timeToMinutes } from '$lib/utils';
+	import TaskItem from './TaskItem.svelte';
+
+	let dayType = $derived(store.getDayType(store.now));
+	let blocks = $derived(store.getBlocksForDate(store.now));
+	let currentBlock = $derived(getCurrentBlock(dayType, store.now));
+	let unscheduled = $derived(store.getUnscheduledTasks());
+	let todayKey = $derived(dateKey(store.now));
+
+	let addingTo = $state<string | null>(null);
+	let newTitle = $state('');
+	let addInputEl: HTMLInputElement | undefined = $state();
+
+	function startAdd(blockId: string) {
+		addingTo = blockId;
+		newTitle = '';
+		setTimeout(() => addInputEl?.focus(), 20);
+	}
+
+	function cancelAdd() {
+		addingTo = null;
+		newTitle = '';
+	}
+
+	function submitAdd(e: Event) {
+		e.preventDefault();
+		const title = newTitle.trim();
+		if (!title || !addingTo) return;
+		store.addTask({ title, targetBlockId: addingTo });
+		newTitle = '';
+		addingTo = null;
+	}
+
+	function handleAddKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') cancelAdd();
+	}
+
+	function isPast(blockId: string): boolean {
+		const block = blocks.find((b) => b.id === blockId);
+		if (!block) return false;
+		return timeToMinutes(block.endTime) <= nowMinutes(store.now);
+	}
+
+	const dayTypeLabel = $derived(dayType === 'weekday-work' ? 'work day' : 'day off');
+</script>
+
+<div class="today-board">
+	<header class="tb-header">
+		<a href="/" class="tb-home" title="back to woodles.space">·space</a>
+		<div class="tb-header-center">
+			<span class="tb-heading">TODAY</span>
+			<span class="tb-date">{dayOfWeekLabel(store.now)}, {shortDateLabel(store.now)}</span>
+		</div>
+		<button class="tb-daytype" onclick={() => store.toggleDayType(store.now)} title="toggle day type">
+			{dayTypeLabel}
+		</button>
+	</header>
+
+	<div class="tb-timeline">
+		{#each blocks as block (block.id)}
+			{@const blockTasks = store.getTasksForBlock(block.id, todayKey)}
+			{@const past = isPast(block.id)}
+			{@const current = currentBlock?.id === block.id}
+
+			<div class="tb-block" class:past class:current>
+				<div class="tb-time-col">
+					<span class="tb-time">{block.startTime}</span>
+					{#if current}
+						<div class="tb-current-dot" aria-label="current block"></div>
+					{/if}
+				</div>
+
+				<div class="tb-block-content">
+					<div class="tb-block-header">
+						<span class="tb-block-name">{block.title}</span>
+						{#if current}
+							<span class="tb-block-remaining">
+								{minutesToDisplay(minutesRemaining(block, store.now))}
+							</span>
+						{/if}
+					</div>
+
+					{#if blockTasks.length > 0}
+						<div class="tb-tasks" role="list">
+							{#each blockTasks as task (task.id)}
+								<TaskItem {task} compact />
+							{/each}
+						</div>
+					{/if}
+
+					{#if !past || current}
+						{#if addingTo === block.id}
+							<form class="tb-add-form" onsubmit={submitAdd}>
+								<input
+									bind:this={addInputEl}
+									bind:value={newTitle}
+									class="tb-add-input"
+									placeholder="task title…"
+									autocomplete="off"
+									spellcheck="false"
+									onkeydown={handleAddKeydown}
+									onblur={cancelAdd}
+								/>
+							</form>
+						{:else}
+							<button
+								class="tb-add-btn"
+								onclick={() => startAdd(block.id)}
+								title="add task to {block.title}"
+							>
+								+ task
+							</button>
+						{/if}
+					{/if}
+				</div>
+			</div>
+		{/each}
+	</div>
+
+	{#if unscheduled.length > 0}
+		<div class="tb-unscheduled">
+			<div class="tb-time-col">
+				<span class="tb-tray-label">tray</span>
+			</div>
+			<div class="tb-block-content">
+				<div class="tb-tasks" role="list">
+					{#each unscheduled as task (task.id)}
+						<TaskItem {task} compact />
+					{/each}
+				</div>
+			</div>
+		</div>
+	{/if}
+</div>
+
+<style>
+	.today-board {
+		max-width: 660px;
+		margin: 0 auto;
+		padding: 0 clamp(1.25rem, 5vw, 2.5rem) var(--pl-space-xl);
+	}
+
+	.tb-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 1.1rem 0 1.5rem;
+		gap: 1rem;
+	}
+
+	.tb-home {
+		font-family: var(--pl-font-mono);
+		font-size: 0.65rem;
+		letter-spacing: 0.16em;
+		color: var(--p-muted);
+		text-decoration: none;
+		opacity: 0.6;
+		transition: opacity var(--pl-transition-fast);
+	}
+
+	.tb-home:hover {
+		opacity: 1;
+	}
+
+	.tb-header-center {
+		display: flex;
+		align-items: baseline;
+		gap: 0.75rem;
+	}
+
+	.tb-heading {
+		font-family: var(--pl-font-mono);
+		font-size: 0.58rem;
+		letter-spacing: 0.26em;
+		text-transform: uppercase;
+		color: var(--p-accent);
+		opacity: 0.8;
+	}
+
+	.tb-date {
+		font-family: var(--pl-font-mono);
+		font-size: 0.7rem;
+		letter-spacing: 0.08em;
+		color: var(--p-muted);
+	}
+
+	.tb-daytype {
+		font-family: var(--pl-font-mono);
+		font-size: 0.6rem;
+		letter-spacing: 0.13em;
+		text-transform: lowercase;
+		color: var(--p-muted);
+		border: 1px solid var(--p-border);
+		padding: 4px 10px;
+		border-radius: var(--pl-radius-pill);
+		opacity: 0.7;
+		transition: opacity var(--pl-transition-fast), border-color var(--pl-transition-fast), color var(--pl-transition-fast);
+	}
+
+	.tb-daytype:hover {
+		opacity: 1;
+		border-color: var(--p-accent);
+		color: var(--p-accent);
+	}
+
+	.tb-timeline {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.tb-block {
+		display: flex;
+		gap: 1.25rem;
+		padding: 0.75rem 0;
+		border-top: 1px solid var(--p-border);
+		transition: opacity var(--pl-transition-fast);
+	}
+
+	.tb-block.past {
+		opacity: 0.45;
+	}
+
+	.tb-block.current {
+		opacity: 1;
+	}
+
+	.tb-time-col {
+		flex-shrink: 0;
+		width: 3.5rem;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.35rem;
+		padding-top: 0.2rem;
+	}
+
+	.tb-time {
+		font-family: var(--pl-font-mono);
+		font-size: 0.68rem;
+		letter-spacing: 0.06em;
+		color: var(--p-muted);
+	}
+
+	.tb-block.current .tb-time {
+		color: var(--p-accent);
+	}
+
+	.tb-current-dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--p-accent);
+		animation: dot-pulse 2s ease-in-out infinite;
+	}
+
+	@keyframes dot-pulse {
+		0%, 100% { opacity: 1; }
+		50% { opacity: 0.4; }
+	}
+
+	.tb-block-content {
+		flex: 1;
+		min-width: 0;
+		padding-bottom: 0.25rem;
+	}
+
+	.tb-block-header {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.75rem;
+		margin-bottom: 0.35rem;
+	}
+
+	.tb-block-name {
+		font-family: var(--pl-font-display);
+		font-size: 1.3rem;
+		font-weight: 400;
+		color: var(--p-text);
+		letter-spacing: -0.01em;
+		line-height: 1.2;
+	}
+
+	.tb-block.past .tb-block-name {
+		color: var(--p-muted);
+	}
+
+	.tb-block-remaining {
+		font-family: var(--pl-font-mono);
+		font-size: 0.65rem;
+		letter-spacing: 0.08em;
+		color: var(--p-accent);
+		flex-shrink: 0;
+	}
+
+	.tb-tasks {
+		display: flex;
+		flex-direction: column;
+		margin-bottom: 0.25rem;
+	}
+
+	.tb-add-btn {
+		font-family: var(--pl-font-mono);
+		font-size: 0.65rem;
+		letter-spacing: 0.1em;
+		color: var(--p-muted);
+		opacity: 0;
+		padding: 2px 0;
+		transition: opacity var(--pl-transition-fast), color var(--pl-transition-fast);
+	}
+
+	.tb-block:hover .tb-add-btn,
+	.tb-block.current .tb-add-btn {
+		opacity: 0.5;
+	}
+
+	.tb-block:hover .tb-add-btn:hover {
+		opacity: 1;
+		color: var(--p-accent);
+	}
+
+	.tb-add-form {
+		margin-top: 0.25rem;
+	}
+
+	.tb-add-input {
+		width: 100%;
+		font-family: var(--pl-font-mono);
+		font-size: 0.78rem;
+		color: var(--p-text);
+		padding: 0.2rem 0;
+		border-bottom: 1px solid var(--p-accent);
+		background: transparent;
+		transition: border-color var(--pl-transition-fast);
+	}
+
+	.tb-add-input::placeholder {
+		color: var(--p-muted);
+		opacity: 0.5;
+	}
+
+	.tb-unscheduled {
+		display: flex;
+		gap: 1.25rem;
+		padding: 1rem 0 0.5rem;
+		border-top: 1px dashed var(--p-border);
+		margin-top: 0.25rem;
+	}
+
+	.tb-tray-label {
+		font-family: var(--pl-font-mono);
+		font-size: 0.58rem;
+		letter-spacing: 0.2em;
+		text-transform: uppercase;
+		color: var(--p-muted);
+		opacity: 0.5;
+	}
+</style>
