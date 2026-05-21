@@ -1,0 +1,54 @@
+/* carillon · planner design tokens
+   scoped to .planner-root — never bleeds into the rest of woodles.space
+   --p-* properties are updated via JS (dayCycle.ts) on every clock tick.
+   Fallback values match the late-afternoon canonical anchor. */
+
+.planner-root {
+	/* ── day-cycle palette (overridden by JS) ─────────────────────── */
+	--p-bg:          #f0e6c0;
+	--p-surface:     #faf3d8;
+	--p-text:        #28200f;
+	--p-muted:       #766850;
+	--p-accent:      #c48c08;
+	--p-accent-soft: rgba(196,140,8,0.17);
+	--p-border:      rgba(40,32,15,0.13);
+	--p-highlight:   #9e7050;
+
+	/* ── typography (inherits from shared/fonts.css) ──────────────── */
+	--pl-font-display: var(--font-display, 'Cormorant Garamond', Georgia, serif);
+	--pl-font-body:    var(--font-body, 'Lora', Georgia, serif);
+	--pl-font-mono:    var(--font-mono, 'DM Mono', 'Courier New', monospace);
+
+	/* ── spacing scale ────────────────────────────────────────────── */
+	--pl-space-xs:  0.25rem;
+	--pl-space-sm:  0.5rem;
+	--pl-space-md:  1rem;
+	--pl-space-lg:  1.75rem;
+	--pl-space-xl:  2.5rem;
+	--pl-space-2xl: 4rem;
+
+	/* ── block-title sizes ────────────────────────────────────────── */
+	--pl-title-now:  clamp(2.4rem, 6vw, 3.75rem);
+	--pl-title-next: clamp(1.5rem, 3.5vw, 2.1rem);
+
+	/* ── radius ───────────────────────────────────────────────────── */
+	--pl-radius-sm:  6px;
+	--pl-radius-md:  12px;
+	--pl-radius-lg:  20px;
+	--pl-radius-pill: 100px;
+
+	/* ── z-index layers ───────────────────────────────────────────── */
+	--pl-z-dock:   10;
+	--pl-z-binder: 20;
+	--pl-z-modal:  30;
+
+	/* ── transitions ──────────────────────────────────────────────── */
+	--pl-transition-palette: background 0.6s ease, color 0.6s ease, border-color 0.6s ease;
+	--pl-transition-fast:    0.18s ease;
+	--pl-transition-medium:  0.28s ease;
+	--pl-transition-spring:  0.36s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+	/* ── shadows ──────────────────────────────────────────────────── */
+	--pl-shadow-card:  0 2px 16px var(--p-accent-soft);
+	--pl-shadow-hover: 0 4px 24px var(--p-accent-soft);
+}

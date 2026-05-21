@@ -1,0 +1,77 @@
+<script lang="ts">
+	import '$lib/style/tokens.css';
+	import { store } from '$lib/store.svelte';
+	import { getPaletteForTime, getNamedPalette } from '$lib/dayCycle';
+	import type { PaletteModeName } from '$lib/dayCycle';
+
+	let { children } = $props();
+	let root: HTMLElement | undefined = $state();
+
+	$effect(() => {
+		if (!root) return;
+		const palette = store.settings.fixedPaletteMode
+			? getNamedPalette(store.settings.fixedPaletteMode as PaletteModeName)
+			: getPaletteForTime(store.now);
+		for (const [k, v] of Object.entries(palette)) {
+			root.style.setProperty(k, v);
+		}
+	});
+</script>
+
+<div class="planner-root" bind:this={root}>
+	{@render children()}
+</div>
+
+<style>
+	:global(*),
+	:global(*::before),
+	:global(*::after) {
+		box-sizing: border-box;
+		margin: 0;
+		padding: 0;
+	}
+
+	:global(html),
+	:global(body) {
+		height: 100%;
+	}
+
+	:global(body) {
+		background: var(--p-bg, #f0e6c0);
+		overflow-x: hidden;
+	}
+
+	:global(button) {
+		font: inherit;
+		color: inherit;
+		background: none;
+		border: none;
+		cursor: pointer;
+		padding: 0;
+	}
+
+	:global(button:disabled) {
+		cursor: not-allowed;
+		opacity: 0.4;
+	}
+
+	:global(input) {
+		font: inherit;
+		color: inherit;
+		background: none;
+		border: none;
+		outline: none;
+	}
+
+	.planner-root {
+		min-height: 100vh;
+		background: var(--p-bg);
+		color: var(--p-text);
+		font-family: var(--pl-font-mono);
+		font-weight: 400;
+		font-size: 15px;
+		line-height: 1.55;
+		transition: var(--pl-transition-palette);
+		position: relative;
+	}
+</style>
