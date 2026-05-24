@@ -93,6 +93,8 @@
 								{@const off = isDayOff(day)}
 								{@const count = taskCount(day)}
 
+								<!-- svelte-ignore a11y_click_events_have_key_events -->
+								<!-- svelte-ignore a11y_no_static_element_interactions -->
 								<div
 									class="ys-day"
 									class:today
@@ -100,6 +102,7 @@
 									class:day-off={off}
 									class:has-tasks={count > 0}
 									title={count > 0 ? `${day.getDate()} · ${count} task${count !== 1 ? 's' : ''}` : undefined}
+									onclick={() => store.openDayPanel(dateKey(day))}
 								>
 									{day.getDate()}
 									{#if count > 0}
@@ -265,7 +268,11 @@
 		color: var(--p-text);
 		line-height: 1.4;
 		transition: background var(--pl-transition-fast);
-		cursor: default;
+		cursor: pointer;
+	}
+
+	.ys-day:hover:not(.today) {
+		background: var(--p-accent-soft);
 	}
 
 	.ys-day.today {

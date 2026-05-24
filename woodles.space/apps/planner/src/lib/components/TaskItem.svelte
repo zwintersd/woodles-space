@@ -48,7 +48,9 @@
 		{/if}
 	</button>
 
-	<span class="task-title">{task.title}</span>
+	<button class="task-title-btn" onclick={() => store.openTaskEdit(task.id)}>
+		{task.title}
+	</button>
 
 	{#if domain && !compact}
 		<span class="task-domain" style:color={domain.color} title={domain.name}>{domain.icon}</span>
@@ -76,7 +78,7 @@
 		opacity: 0.45;
 	}
 
-	.task-item.done .task-title {
+	.task-item.done .task-title-btn {
 		text-decoration: line-through;
 	}
 
@@ -114,7 +116,7 @@
 		line-height: 1;
 	}
 
-	.task-title {
+	.task-title-btn {
 		flex: 1;
 		font-family: var(--pl-font-mono);
 		font-size: 0.82rem;
@@ -123,6 +125,12 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		text-align: left;
+		transition: color var(--pl-transition-fast);
+	}
+
+	.task-title-btn:hover {
+		color: var(--p-accent);
 	}
 
 	.task-domain {

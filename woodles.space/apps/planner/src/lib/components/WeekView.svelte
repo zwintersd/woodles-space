@@ -107,7 +107,12 @@
 					<!-- Column header -->
 					<div class="wv-col-header">
 						<span class="wv-dow">{DOW_LABELS[i]}</span>
-						<span class="wv-date-num" class:today-num={today}>{day.getDate()}</span>
+						<button
+							class="wv-date-num"
+							class:today-num={today}
+							onclick={() => store.openDayPanel(dateKey(day))}
+							title="view {day.toDateString()}"
+						>{day.getDate()}</button>
 						{#if dayType === 'day-off'}
 							<span class="wv-off-badge">off</span>
 						{/if}
@@ -321,6 +326,14 @@
 		color: var(--p-text);
 		letter-spacing: 0;
 		line-height: 1;
+		border-radius: var(--pl-radius-sm);
+		padding: 1px 4px;
+		transition: background var(--pl-transition-fast), color var(--pl-transition-fast);
+	}
+
+	.wv-date-num:hover:not(.today-num) {
+		background: var(--p-accent-soft);
+		color: var(--p-accent);
 	}
 
 	.wv-date-num.today-num {
