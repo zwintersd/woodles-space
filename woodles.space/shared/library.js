@@ -186,15 +186,19 @@ export const templates = [
 ];
 
 // helpers consumers use to default safely when a token is unknown.
+/** @param {string} id */
 export function findPalette(id) {
 	return palettes.find((p) => p.id === id) || palettes[0];
 }
+/** @param {string} id */
 export function findMotif(id) {
 	return motifs.find((m) => m.id === id) || motifs[0];
 }
+/** @param {string} id */
 export function findFont(id) {
 	return fontPairs.find((f) => f.id === id) || fontPairs[0];
 }
+/** @param {string} id */
 export function findTemplate(id) {
 	return templates.find((t) => t.id === id) || null;
 }

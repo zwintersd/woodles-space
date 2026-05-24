@@ -12,9 +12,9 @@
 	} from '@shared/library.js';
 
 	const LETTERS_KEY = 'woodles_letters';
-	const DRAFTS_KEY = 'woodles_drafts';
-	// Legacy keys — read on first migration, written-through on publish so
-	// older viewer code paths still see "the latest letter".
+	// Legacy keys — read for one-time migration of pre-indexed-drafts state,
+	// and written-through on publish so older viewer code paths still see
+	// "the latest letter".
 	const LEGACY_DRAFT_KEY = 'woodles_write_draft';
 	const LEGACY_PUBLISHED_KEY = 'woodles_published';
 	const ISSUE_KEY = 'woodles_issue_count';
@@ -282,31 +282,6 @@
 		return list.find((l) => l.id === id);
 	}
 
-	function loadDraftsMap(): Record<string, any> {
-		if (typeof localStorage === 'undefined') return {};
-		try {
-			const raw = localStorage.getItem(DRAFTS_KEY);
-			if (raw) {
-				const parsed = JSON.parse(raw);
-				return parsed && typeof parsed === 'object' ? parsed : {};
-			}
-			// Migration: legacy single-draft becomes the 'new' slot.
-			const old = localStorage.getItem(LEGACY_DRAFT_KEY);
-			if (old) {
-				const drafts = { new: JSON.parse(old) };
-				localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
-				return drafts;
-			}
-		} catch (e) {
-			// ignore
-		}
-		return {};
-	}
-
-	function saveDraftsMap(drafts: Record<string, any>) {
-		try { localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts)); } catch (e) {}
-	}
-
 	function loadIntoLayers(d: {
 		title?: string;
 		theme?: string;
@@ -399,11 +374,11 @@
 
 		let activeId = localStorage.getItem(ACTIVE_DRAFT_ID_KEY);
 		if (!activeId) {
-			const oldDraft = localStorage.getItem(DRAFT_KEY);
+			const oldDraft = localStorage.getItem(LEGACY_DRAFT_KEY);
 			if (oldDraft) {
 				const id = 'd-' + Date.now().toString(36);
 				localStorage.setItem(DRAFT_PREFIX + id, oldDraft);
-				localStorage.removeItem(DRAFT_KEY);
+				localStorage.removeItem(LEGACY_DRAFT_KEY);
 				activeId = id;
 				const parsed = JSON.parse(oldDraft);
 				draftsList = [{ id, title: parsed.title || 'untitled', updatedAt: parsed.savedAt || new Date().toISOString() }];
@@ -670,7 +645,7 @@
 			const cleanedPockets = pockets.map((p) => ({ ...p, html: sanitizeHtml(p.html) }));
 			const cleanedMargins = marginNotes.map((m) => ({ ...m, html: sanitizeHtml(m.html) }));
 			localStorage.setItem(
-				PUBLISHED_KEY,
+				LEGACY_PUBLISHED_KEY,
 				JSON.stringify({
 					title: title.trim() || 'untitled letter',
 					theme,
@@ -2451,6 +2426,7 @@
 		opacity: 0.85;
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
+		line-clamp: 2;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
 	}
