@@ -226,8 +226,15 @@
 			pasteText = result.text;
 			pdfProgress = { page: result.pageCount, totalPages: result.pageCount };
 		} catch (err) {
-			console.error(err);
-			pdfError = 'could not read that pdf. it may be scanned, encrypted, or malformed.';
+			console.error('[marginalia] pdf extraction failed', err);
+			const msg = err instanceof Error ? err.message.toLowerCase() : '';
+			if (msg.includes('password') || msg.includes('encrypted')) {
+				pdfError = 'this pdf is password-protected. try an unlocked copy.';
+			} else if (msg.includes('invalid') || msg.includes('corrupt')) {
+				pdfError = 'this pdf appears to be malformed.';
+			} else {
+				pdfError = 'could not read that pdf. it may be scanned, encrypted, or malformed.';
+			}
 			pdfProgress = null;
 		} finally {
 			pdfLoading = false;

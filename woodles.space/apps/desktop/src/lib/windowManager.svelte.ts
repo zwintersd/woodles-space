@@ -1,4 +1,4 @@
-type WindowState = {
+export type WindowState = {
     id: string
     x: number
     y: number
