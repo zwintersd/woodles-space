@@ -59,6 +59,8 @@ class PlannerStore {
 	currentView = $state<View>('now-next');
 	binderTab = $state<BinderTab>(null);
 	now = $state<Date>(new Date());
+	editingTaskId = $state<string | null>(null);
+	activeDayKey = $state<string | null>(null);
 
 	// ── derived helpers ─────────────────────────────────────────────
 
@@ -145,6 +147,31 @@ class PlannerStore {
 
 	closeBinder(): void {
 		this.binderTab = null;
+	}
+
+	updateTask(id: string, changes: Partial<Omit<Task, 'id' | 'createdAt'>>): void {
+		this.tasks = this.tasks.map((t) => (t.id === id ? { ...t, ...changes } : t));
+		save('planner.tasks.v1', this.tasks);
+	}
+
+	openTaskEdit(id: string): void {
+		this.editingTaskId = id;
+	}
+
+	closeTaskEdit(): void {
+		this.editingTaskId = null;
+	}
+
+	openDayPanel(dateStr: string): void {
+		this.activeDayKey = dateStr;
+	}
+
+	closeDayPanel(): void {
+		this.activeDayKey = null;
+	}
+
+	getTasksForDay(dateStr: string): Task[] {
+		return this.tasks.filter((t) => t.status !== 'dropped' && t.targetDate === dateStr);
 	}
 
 	// ── clock + bell ────────────────────────────────────────────────

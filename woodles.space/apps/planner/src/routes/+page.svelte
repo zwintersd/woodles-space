@@ -5,6 +5,8 @@
 	import WeekView from '$lib/components/WeekView.svelte';
 	import MonthView from '$lib/components/MonthView.svelte';
 	import YearScroll from '$lib/components/YearScroll.svelte';
+	import TaskEditDrawer from '$lib/components/TaskEditDrawer.svelte';
+	import DayPanel from '$lib/components/DayPanel.svelte';
 	import Binder from '$lib/components/Binder.svelte';
 	import Dock from '$lib/components/Dock.svelte';
 
@@ -55,6 +57,8 @@
 		{/if}
 	</main>
 
+	<DayPanel />
+	<TaskEditDrawer />
 	<Binder />
 	<Dock />
 </div>

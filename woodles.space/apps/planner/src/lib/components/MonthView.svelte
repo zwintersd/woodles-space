@@ -71,11 +71,14 @@
 					{@const tasks = dayTasks(day)}
 					{@const count = taskCount(day)}
 
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div
 						class="mv-cell"
 						class:today
 						class:past
 						class:day-off={off}
+						onclick={() => store.openDayPanel(dateKey(day))}
 					>
 						<div class="mv-cell-head">
 							<span class="mv-cell-num">{day.getDate()}</span>
@@ -200,7 +203,7 @@
 		min-height: 80px;
 		padding: 6px 8px;
 		transition: background var(--pl-transition-fast);
-		cursor: default;
+		cursor: pointer;
 	}
 
 	.mv-cell:hover {
