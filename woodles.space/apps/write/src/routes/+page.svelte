@@ -6,6 +6,7 @@
 	import BottomBar from '$lib/BottomBar.svelte';
 	import EditorToolbar from '$lib/EditorToolbar.svelte';
 	import DraftsModal from '$lib/DraftsModal.svelte';
+	import PublishOverlay from '$lib/PublishOverlay.svelte';
 	import {
 		ANCHOR_BLOCK_SELECTOR,
 		sanitizeHtml,
@@ -16,12 +17,14 @@
 		countWords,
 		previewText
 	} from '$lib/htmlTools';
+	import { POCKETS_ORDER_KEY } from '$lib/storage';
 	import {
-		LETTERS_KEY,
-		ISSUE_KEY,
-		POCKETS_ORDER_KEY,
-		LEGACY_PUBLISHED_KEY
-	} from '$lib/storage';
+		findLetter,
+		incrementIssue,
+		loadLettersList,
+		writePublishedLegacy,
+		type StoredLetter
+	} from '$lib/letters';
 	import {
 		bootstrap as bootstrapDrafts,
 		createDraftId,
@@ -167,56 +170,6 @@
 	}
 
 	// ── multi-doc storage ──
-	type StoredLetter = {
-		id: string;
-		title: string;
-		theme: string;
-		motif: string;
-		font: string;
-		issue: number;
-		publishedAt: string;
-		layers: Record<string, { html: string; updatedAt: string }>;
-		annotations: { pocketNotes: PocketNote[]; marginNotes: MarginNote[] };
-		content: string;
-		replyTo: string | null;
-	};
-
-	function newLetterId() {
-		return 'l-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
-	}
-
-	function loadLettersList(): StoredLetter[] {
-		if (typeof localStorage === 'undefined') return [];
-		try {
-			const raw = localStorage.getItem(LETTERS_KEY);
-			if (raw) {
-				const parsed = JSON.parse(raw);
-				return Array.isArray(parsed) ? parsed : [];
-			}
-			// Migration from legacy single-letter slot.
-			const old = localStorage.getItem(LEGACY_PUBLISHED_KEY);
-			if (old) {
-				const lt = JSON.parse(old);
-				lt.id = lt.id || newLetterId();
-				lt.replyTo = lt.replyTo ?? null;
-				const list: StoredLetter[] = [lt];
-				localStorage.setItem(LETTERS_KEY, JSON.stringify(list));
-				return list;
-			}
-		} catch (e) {
-			// ignore corrupt list
-		}
-		return [];
-	}
-
-	function saveLettersList(list: StoredLetter[]) {
-		try { localStorage.setItem(LETTERS_KEY, JSON.stringify(list)); } catch (e) {}
-	}
-
-	function findLetter(list: StoredLetter[], id: string): StoredLetter | undefined {
-		return list.find((l) => l.id === id);
-	}
-
 	function loadIntoLayers(d: {
 		title?: string;
 		theme?: string;
@@ -536,9 +489,7 @@
 	function publish() {
 		publishing = true;
 		clearTimeout(saveTimer);
-		const issue = parseInt(localStorage.getItem(ISSUE_KEY) || '0') + 1;
-		localStorage.setItem(ISSUE_KEY, String(issue));
-		let publishedId: string | null = null;
+		const issue = incrementIssue();
 		try {
 			const now = new Date().toISOString();
 			const fgHtml = stampAnchorsHtml(sanitizeHtml(fgEl?.innerHTML ?? ''));
@@ -546,24 +497,21 @@
 			const bgHtml = sanitizeHtml(bgEl?.innerHTML ?? '');
 			const cleanedPockets = pockets.map((p) => ({ ...p, html: sanitizeHtml(p.html) }));
 			const cleanedMargins = marginNotes.map((m) => ({ ...m, html: sanitizeHtml(m.html) }));
-			localStorage.setItem(
-				LEGACY_PUBLISHED_KEY,
-				JSON.stringify({
-					title: title.trim() || 'untitled letter',
-					theme,
-					motif,
-					font,
-					issue,
-					publishedAt: now,
-					layers: {
-						foreground: { html: fgHtml, updatedAt: now },
-						midground: { html: mgHtml, updatedAt: now },
-						background: { html: bgHtml, updatedAt: now }
-					},
-					annotations: { pocketNotes: cleanedPockets, marginNotes: cleanedMargins },
-					content: fgHtml
-				})
-			);
+			writePublishedLegacy({
+				title: title.trim() || 'untitled letter',
+				theme,
+				motif,
+				font,
+				issue,
+				publishedAt: now,
+				layers: {
+					foreground: { html: fgHtml, updatedAt: now },
+					midground: { html: mgHtml, updatedAt: now },
+					background: { html: bgHtml, updatedAt: now }
+				},
+				annotations: { pocketNotes: cleanedPockets, marginNotes: cleanedMargins },
+				content: fgHtml
+			});
 			if (currentDraftId) {
 				removeDraftBody(currentDraftId);
 				draftsList = draftsList.filter((d) => d.id !== currentDraftId);
@@ -574,7 +522,7 @@
 			// ignore
 		}
 		setTimeout(() => {
-			window.location.href = publishedId ? '/letter?id=' + publishedId : '/letter';
+			window.location.href = '/letter';
 		}, 1800);
 	}
 
@@ -865,10 +813,7 @@
 	onDelete={deleteDraft}
 />
 
-<div class="overlay" class:active={publishing}>
-	<p class="overlay-word">published.</p>
-	<p class="overlay-sub">woodles.space / echoes</p>
-</div>
+<PublishOverlay active={publishing} />
 
 <div class="editor-page" data-layer={activeLayer} bind:this={editorPageEl}>
 	<div class="editor-wrap" data-layer={activeLayer}>
@@ -1651,36 +1596,6 @@
 		transform: translateY(-1px);
 	}
 	.pocket-add-plus { font-size: 0.85rem; line-height: 1; font-weight: 400; }
-
-	.overlay {
-		position: fixed; inset: 0;
-		background: color-mix(in srgb, var(--bg) 0%, transparent);
-		display: flex; flex-direction: column;
-		align-items: center; justify-content: center;
-		z-index: 100; pointer-events: none;
-		transition: background 0.5s ease;
-	}
-	.overlay.active {
-		background: color-mix(in srgb, var(--bg) 94%, transparent);
-		pointer-events: all;
-	}
-	.overlay-word {
-		font-family: var(--editor-display, var(--font-display));
-		font-size: clamp(2.5rem, 7vw, 4.5rem);
-		font-weight: 300; font-style: italic;
-		color: var(--accent-strong);
-		opacity: 0; transform: translateY(12px);
-		transition: opacity 0.55s ease 0.35s, transform 0.55s ease 0.35s;
-	}
-	.overlay.active .overlay-word { opacity: 1; transform: translateY(0); }
-	.overlay-sub {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.6rem; letter-spacing: 0.16em;
-		text-transform: uppercase; color: var(--muted);
-		opacity: 0; margin-top: 1rem;
-		transition: opacity 0.4s ease 0.65s;
-	}
-	.overlay.active .overlay-sub { opacity: 0.5; }
 
 	/* ── binder ── */
 	.binder-tabs {
