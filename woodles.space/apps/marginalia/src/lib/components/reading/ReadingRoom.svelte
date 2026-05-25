@@ -11,6 +11,8 @@
 		type Paragraph,
 		type MarginNote
 	} from '$lib/reading/text';
+	import { loadDoc, persistDoc as persistDocToStorage, wipeDoc } from '$lib/reading/doc';
+	import { formatHms, formatMin } from '$lib/reading/format';
 	import Star from './Star.svelte';
 	import StarShelf from './StarShelf.svelte';
 	import Passage from './Passage.svelte';
@@ -21,16 +23,7 @@
 	const PASTE_CAP = 500_000;
 	const WPM = 230;
 	const PERSIST_INTERVAL_MS = 3_000;
-	const DOC_KEY = 'marginalia.reading.doc.v3';
-	const LEGACY_DOC_V2_KEY = 'marginalia.reading.doc.v2';
-	const LEGACY_PASTE_V1_KEY = 'marginalia.reading.paste.v1';
 	const PDF_CAP_BYTES = 32 * 1024 * 1024;
-
-	interface ReadingDoc {
-		text: string;
-		paragraphs: Paragraph[];
-		notes: MarginNote[];
-	}
 
 	let paneEl: HTMLElement | undefined = $state();
 	let passageEl: HTMLElement | undefined = $state();
@@ -76,95 +69,18 @@
 
 	const estimatedReadingMin = $derived(liveWordCount > 0 ? liveWordCount / WPM : 0);
 
-	function formatHms(ms: number): string {
-		const s = Math.floor(ms / 1000);
-		const h = Math.floor(s / 3600);
-		const m = Math.floor((s % 3600) / 60);
-		const sec = s % 60;
-		const mm = String(m).padStart(2, '0');
-		const ss = String(sec).padStart(2, '0');
-		if (h > 0) return `${h}:${mm}:${ss}`;
-		return `${mm}:${ss}`;
-	}
-
-	function formatMin(min: number): string {
-		if (min < 1) return '< 1 min';
-		const m = Math.round(min);
-		if (m < 60) return `${m} min`;
-		const h = Math.floor(m / 60);
-		const r = m % 60;
-		return r === 0 ? `${h} hr` : `${h} hr ${r} min`;
-	}
-
 	function persistDoc() {
-		try {
-			const doc: ReadingDoc = { text: pasteText, paragraphs, notes };
-			sessionStorage.setItem(DOC_KEY, JSON.stringify(doc));
-		} catch {
-			// ignore quota
-		}
+		persistDocToStorage({ text: pasteText, paragraphs, notes });
 	}
 
-	function loadDoc(): boolean {
-		try {
-			const raw = sessionStorage.getItem(DOC_KEY);
-			if (raw) {
-				const parsed = JSON.parse(raw) as ReadingDoc;
-				if (parsed?.text && Array.isArray(parsed.paragraphs)) {
-					pasteText = parsed.text;
-					paragraphs = parsed.paragraphs;
-					notes = Array.isArray(parsed.notes) ? parsed.notes : [];
-					liveWordCount = countWordsInText(parsed.text);
-					return true;
-				}
-			}
-			// v2 → v3: paragraphs were `{id, content}` (plain text). Convert.
-			const v2 = sessionStorage.getItem(LEGACY_DOC_V2_KEY);
-			if (v2) {
-				const parsed = JSON.parse(v2) as {
-					text: string;
-					paragraphs?: { id: string; content?: string; html?: string }[];
-					notes?: MarginNote[];
-				};
-				if (parsed?.text) {
-					pasteText = parsed.text;
-					paragraphs = parsed.paragraphs
-						? parsed.paragraphs.map((p) =>
-								p.html
-									? { id: p.id, html: p.html }
-									: { id: p.id, html: paraHtmlFromContent(p.content ?? '') }
-						  )
-						: paragraphsFromText(parsed.text);
-					notes = Array.isArray(parsed.notes) ? parsed.notes : [];
-					liveWordCount = countWordsInText(parsed.text);
-					sessionStorage.removeItem(LEGACY_DOC_V2_KEY);
-					persistDoc();
-					return true;
-				}
-			}
-			// v1 → v3: raw string.
-			const v1 = sessionStorage.getItem(LEGACY_PASTE_V1_KEY);
-			if (v1) {
-				pasteText = v1;
-				paragraphs = paragraphsFromText(v1);
-				notes = [];
-				liveWordCount = countWordsInText(v1);
-				sessionStorage.removeItem(LEGACY_PASTE_V1_KEY);
-				persistDoc();
-				return true;
-			}
-		} catch {
-			// ignore
-		}
-		return false;
-	}
-
-	function paraHtmlFromContent(content: string): string {
-		const escaped = content
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;');
-		return `<p data-anchor="placeholder">${escaped.replace(/\n/g, '<br>')}</p>`;
+	function hydrateFromStorage(): boolean {
+		const doc = loadDoc();
+		if (!doc) return false;
+		pasteText = doc.text;
+		paragraphs = doc.paragraphs;
+		notes = doc.notes;
+		liveWordCount = doc.wordCount;
+		return true;
 	}
 
 	async function commitText() {
@@ -199,11 +115,7 @@
 		selectionRect = null;
 		selectionAnchorId = null;
 		docKey++;
-		try {
-			sessionStorage.removeItem(DOC_KEY);
-		} catch {
-			// ignore
-		}
+		wipeDoc();
 	}
 
 	async function handlePdfFile(file: File) {
@@ -475,7 +387,7 @@
 	}
 
 	onMount(() => {
-		const hadDoc = loadDoc();
+		const hadDoc = hydrateFromStorage();
 		if (hadDoc) mode = 'read';
 		timer.start();
 		const id = setInterval(() => {
