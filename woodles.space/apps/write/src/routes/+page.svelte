@@ -5,6 +5,7 @@
 	import Topbar from '$lib/Topbar.svelte';
 	import BottomBar from '$lib/BottomBar.svelte';
 	import EditorToolbar from '$lib/EditorToolbar.svelte';
+	import DraftsModal from '$lib/DraftsModal.svelte';
 	import {
 		ANCHOR_BLOCK_SELECTOR,
 		sanitizeHtml,
@@ -19,12 +20,23 @@
 		LETTERS_KEY,
 		ISSUE_KEY,
 		POCKETS_ORDER_KEY,
-		ACTIVE_DRAFT_ID_KEY,
-		DRAFTS_INDEX_KEY,
-		DRAFT_PREFIX,
-		LEGACY_DRAFT_KEY,
 		LEGACY_PUBLISHED_KEY
 	} from '$lib/storage';
+	import {
+		bootstrap as bootstrapDrafts,
+		createDraftId,
+		listDrafts,
+		loadDraft as loadDraftBody,
+		saveDraft,
+		removeDraftBody,
+		setActiveDraftId,
+		clearActiveDraftId,
+		upsertIndex,
+		writeIndex,
+		type DraftIndexItem,
+		type DraftBody
+	} from '$lib/drafts';
+	import type { LayerId, PocketLayer, PocketNote, MarginNote } from '$lib/types';
 	import {
 		palettes,
 		motifs as motifList,
@@ -33,8 +45,6 @@
 		findFont
 	} from '@shared/library.js';
 
-	type LayerId = 'foreground' | 'midground' | 'background';
-	type PocketLayer = 'midground' | 'background';
 	const LAYER_IDS: LayerId[] = ['foreground', 'midground', 'background'];
 	const LAYER_LABELS: Record<LayerId, string> = {
 		foreground: 'fg',
@@ -46,21 +56,7 @@
 		midground: 'thinking, working notes, what shaped this…',
 		background: 'the impulse. the thing only you know.'
 	};
-	type PocketNote = {
-		id: string;
-		html: string;
-		layer: PocketLayer;
-		createdAt: string;
-		updatedAt: string;
-	};
 	type PocketsOrder = 'oldest' | 'newest';
-	type MarginNote = {
-		id: string;
-		anchorId: string;
-		html: string;
-		createdAt: string;
-		updatedAt: string;
-	};
 
 	let title = $state('');
 	let theme = $state('cream');
@@ -115,12 +111,9 @@
 	let measureTimer: ReturnType<typeof setTimeout> | undefined;
 	let hydrated = $state(false);
 
-	type DraftIndexItem = { id: string; title: string; updatedAt: string };
 	let draftsList = $state<DraftIndexItem[]>([]);
 	let currentDraftId = $state<string | null>(null);
 	let draftsOpen = $state(false);
-
-	const sortedDrafts = $derived([...draftsList].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
 
 	const sortedPockets = $derived(
 		pocketsOrder === 'oldest'
@@ -309,36 +302,16 @@
 			// If source missing, replyTo stays null; we fall back to the 'new' draft.
 		}
 
-		try {
-			const indexRaw = localStorage.getItem(DRAFTS_INDEX_KEY);
-			if (indexRaw) draftsList = JSON.parse(indexRaw);
-		} catch(e) {}
+		const boot = bootstrapDrafts();
+		draftsList = boot.drafts;
+		currentDraftId = boot.activeId;
 
-		let activeId = localStorage.getItem(ACTIVE_DRAFT_ID_KEY);
-		if (!activeId) {
-			const oldDraft = localStorage.getItem(LEGACY_DRAFT_KEY);
-			if (oldDraft) {
-				const id = 'd-' + Date.now().toString(36);
-				localStorage.setItem(DRAFT_PREFIX + id, oldDraft);
-				localStorage.removeItem(LEGACY_DRAFT_KEY);
-				activeId = id;
-				const parsed = JSON.parse(oldDraft);
-				draftsList = [{ id, title: parsed.title || 'untitled', updatedAt: parsed.savedAt || new Date().toISOString() }];
-				localStorage.setItem(DRAFTS_INDEX_KEY, JSON.stringify(draftsList));
-			} else {
-				activeId = 'd-' + Date.now().toString(36);
-				draftsList = [{ id: activeId, title: '', updatedAt: new Date().toISOString() }];
-				localStorage.setItem(DRAFTS_INDEX_KEY, JSON.stringify(draftsList));
+		if (boot.body) {
+			try {
+				loadIntoLayers(boot.body);
+			} catch (e) {
+				// ignore corrupt drafts
 			}
-			localStorage.setItem(ACTIVE_DRAFT_ID_KEY, activeId);
-		}
-		currentDraftId = activeId;
-
-		try {
-			const raw = localStorage.getItem(DRAFT_PREFIX + currentDraftId);
-			if (raw) loadIntoLayers(JSON.parse(raw));
-		} catch (e) {
-			// ignore corrupt drafts
 		}
 		updateMeta();
 		hydrated = true;
@@ -412,15 +385,9 @@
 					savedAt: now
 				};
 				if (currentDraftId) {
-					localStorage.setItem(DRAFT_PREFIX + currentDraftId, JSON.stringify(draftData));
-					
-					const idx = draftsList.findIndex(d => d.id === currentDraftId);
-					if (idx >= 0) {
-						draftsList[idx] = { ...draftsList[idx], title, updatedAt: now };
-					} else {
-						draftsList.push({ id: currentDraftId, title, updatedAt: now });
-					}
-					localStorage.setItem(DRAFTS_INDEX_KEY, JSON.stringify(draftsList));
+					saveDraft(currentDraftId, draftData);
+					draftsList = upsertIndex(draftsList, currentDraftId, title, now);
+					writeIndex(draftsList);
 				}
 			} catch (e) {
 				// ignore quota / disabled storage
@@ -498,9 +465,9 @@
 			return;
 		}
 		clearTimeout(saveTimer);
-		try {
+		if (currentDraftId) {
 			const now = new Date().toISOString();
-			const draftData = {
+			const draftData: DraftBody = {
 				title, theme, motif, font,
 				layers: {
 					foreground: { html: fgEl?.innerHTML ?? '', updatedAt: now },
@@ -511,12 +478,12 @@
 				content: fgEl?.innerHTML ?? '',
 				savedAt: now
 			};
-			localStorage.setItem(DRAFT_PREFIX + currentDraftId!, JSON.stringify(draftData));
-		} catch(e) {}
+			saveDraft(currentDraftId, draftData);
+		}
 
 		currentDraftId = id;
-		localStorage.setItem(ACTIVE_DRAFT_ID_KEY, id);
-		
+		setActiveDraftId(id);
+
 		title = '';
 		pockets = [];
 		marginNotes = [];
@@ -524,21 +491,19 @@
 		if (mgEl) mgEl.innerHTML = '';
 		if (bgEl) bgEl.innerHTML = '';
 
-		try {
-			const raw = localStorage.getItem(DRAFT_PREFIX + id);
-			if (raw) loadIntoLayers(JSON.parse(raw));
-		} catch (e) {}
-		
+		const body = loadDraftBody(id);
+		if (body) loadIntoLayers(body);
+
 		updateMeta();
 		scheduleMeasure(60);
 		draftsOpen = false;
 	}
 
 	function newDraft() {
-		const id = 'd-' + Date.now().toString(36);
+		const id = createDraftId();
 		const now = new Date().toISOString();
 		draftsList = [{ id, title: '', updatedAt: now }, ...draftsList];
-		localStorage.setItem(DRAFTS_INDEX_KEY, JSON.stringify(draftsList));
+		writeIndex(draftsList);
 		loadDraft(id);
 	}
 
@@ -554,10 +519,10 @@
 			scheduleSave();
 			return;
 		}
-		
-		localStorage.removeItem(DRAFT_PREFIX + id);
-		draftsList = draftsList.filter(d => d.id !== id);
-		localStorage.setItem(DRAFTS_INDEX_KEY, JSON.stringify(draftsList));
+
+		removeDraftBody(id);
+		draftsList = draftsList.filter((d) => d.id !== id);
+		writeIndex(draftsList);
 
 		if (id === currentDraftId) {
 			const next = [...draftsList].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
@@ -600,10 +565,10 @@
 				})
 			);
 			if (currentDraftId) {
-				localStorage.removeItem(DRAFT_PREFIX + currentDraftId);
-				draftsList = draftsList.filter(d => d.id !== currentDraftId);
-				localStorage.setItem(DRAFTS_INDEX_KEY, JSON.stringify(draftsList));
-				localStorage.removeItem(ACTIVE_DRAFT_ID_KEY);
+				removeDraftBody(currentDraftId);
+				draftsList = draftsList.filter((d) => d.id !== currentDraftId);
+				writeIndex(draftsList);
+				clearActiveDraftId();
 			}
 		} catch (e) {
 			// ignore
@@ -891,29 +856,14 @@
 	onLayerChange={setActiveLayer}
 />
 
-{#if draftsOpen}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="drafts-overlay" transition:fade={{ duration: 240 }} onclick={() => draftsOpen = false}>
-		<div class="drafts-modal" onclick={(e) => e.stopPropagation()} transition:fly={{ y: 8, duration: 320, easing: cubicOut }}>
-			<div class="drafts-header">
-				<h2 class="drafts-title">your drafts</h2>
-				<button class="drafts-new-btn" onclick={newDraft}>+ new draft</button>
-			</div>
-			<div class="drafts-list">
-				{#each sortedDrafts as d (d.id)}
-					<div class="draft-item" class:active={d.id === currentDraftId}>
-						<button class="draft-item-btn" onclick={() => loadDraft(d.id)}>
-							<span class="draft-item-title">{d.title || 'untitled letter'}</span>
-							<span class="draft-item-date">{new Date(d.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
-						</button>
-						<button class="draft-item-delete" onclick={(e) => deleteDraft(d.id, e)} title="discard draft">×</button>
-					</div>
-				{/each}
-			</div>
-		</div>
-	</div>
-{/if}
+<DraftsModal
+	bind:open={draftsOpen}
+	drafts={draftsList}
+	{currentDraftId}
+	onSelect={loadDraft}
+	onCreate={newDraft}
+	onDelete={deleteDraft}
+/>
 
 <div class="overlay" class:active={publishing}>
 	<p class="overlay-word">published.</p>
@@ -1255,64 +1205,6 @@
 		overflow-x: hidden;
 		position: relative;
 		transition: background 0.3s ease, color 0.3s ease;
-	}
-
-	.drafts-overlay {
-		position: fixed; inset: 0;
-		background: color-mix(in srgb, var(--bg) 60%, transparent);
-		backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-		z-index: 100; display: flex; align-items: flex-start; justify-content: center;
-		padding-top: 12vh;
-	}
-	.drafts-modal {
-		background: var(--surface); border: 1px solid var(--rule); border-radius: 12px;
-		width: 100%; max-width: 420px;
-		box-shadow: 0 12px 40px color-mix(in srgb, var(--bg) 80%, transparent);
-		overflow: hidden; display: flex; flex-direction: column; max-height: 70vh;
-	}
-	.drafts-header {
-		display: flex; align-items: center; justify-content: space-between;
-		padding: 1.2rem 1.4rem; border-bottom: 1px dashed var(--rule);
-	}
-	.drafts-title {
-		font-family: var(--editor-mono, var(--font-mono)); font-size: 0.75rem;
-		letter-spacing: 0.15em; text-transform: lowercase; color: var(--accent-strong); font-weight: 400;
-	}
-	.drafts-new-btn {
-		font-family: var(--editor-mono, var(--font-mono)); font-size: 0.55rem;
-		letter-spacing: 0.12em; text-transform: lowercase; color: var(--bg);
-		background: var(--accent-strong); border: none; padding: 6px 12px; border-radius: 100px;
-		cursor: pointer; transition: background 0.18s ease, transform 0.18s ease;
-	}
-	.drafts-new-btn:hover { background: var(--accent-deep); transform: translateY(-1px); }
-	.drafts-list { padding: 0.8rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem; }
-	.draft-item {
-		display: flex; align-items: center; border-radius: 8px;
-		transition: background 0.18s ease; padding: 0.4rem;
-	}
-	.draft-item:hover { background: color-mix(in srgb, var(--surface) 50%, var(--rule)); }
-	.draft-item.active { background: color-mix(in srgb, var(--accent) 15%, transparent); }
-	.draft-item-btn {
-		flex: 1; text-align: left; background: none; border: none; padding: 0.6rem;
-		cursor: pointer; display: flex; flex-direction: column; gap: 0.3rem; overflow: hidden;
-	}
-	.draft-item-title {
-		font-family: var(--editor-display, var(--font-display)); font-size: 1.1rem;
-		color: var(--accent-strong); font-style: italic; white-space: nowrap; overflow: hidden;
-		text-overflow: ellipsis; max-width: 100%;
-	}
-	.draft-item-date {
-		font-family: var(--editor-mono, var(--font-mono)); font-size: 0.5rem;
-		letter-spacing: 0.1em; color: var(--muted); opacity: 0.6;
-	}
-	.draft-item-delete {
-		background: none; border: none; font-size: 1rem; color: var(--muted); opacity: 0.3;
-		cursor: pointer; padding: 0.5rem; border-radius: 50%; width: 32px; height: 32px;
-		display: flex; align-items: center; justify-content: center; margin-left: 0.4rem;
-		transition: opacity 0.18s ease, color 0.18s ease, background 0.18s ease;
-	}
-	.draft-item-delete:hover {
-		opacity: 1; color: var(--accent-strong); background: color-mix(in srgb, var(--accent) 20%, transparent);
 	}
 
 	.editor-page {
