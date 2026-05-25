@@ -11,26 +11,19 @@
 		type Paragraph,
 		type MarginNote
 	} from '$lib/reading/text';
+	import { loadDoc, persistDoc as persistDocToStorage, wipeDoc } from '$lib/reading/doc';
+	import { formatHms, formatMin } from '$lib/reading/format';
 	import Star from './Star.svelte';
 	import StarShelf from './StarShelf.svelte';
 	import Passage from './Passage.svelte';
 	import MarginNotes from './MarginNotes.svelte';
 	import EditorToolbar from './EditorToolbar.svelte';
+	import PdfIntake from './PdfIntake.svelte';
+	import SelectionBubble, { type BubbleAction } from './SelectionBubble.svelte';
 
 	const POINT_MS = 20 * 60 * 1000;
-	const PASTE_CAP = 500_000;
 	const WPM = 230;
 	const PERSIST_INTERVAL_MS = 3_000;
-	const DOC_KEY = 'marginalia.reading.doc.v3';
-	const LEGACY_DOC_V2_KEY = 'marginalia.reading.doc.v2';
-	const LEGACY_PASTE_V1_KEY = 'marginalia.reading.paste.v1';
-	const PDF_CAP_BYTES = 32 * 1024 * 1024;
-
-	interface ReadingDoc {
-		text: string;
-		paragraphs: Paragraph[];
-		notes: MarginNote[];
-	}
 
 	let paneEl: HTMLElement | undefined = $state();
 	let passageEl: HTMLElement | undefined = $state();
@@ -48,12 +41,6 @@
 	// Selection state for the bubble popover.
 	let selectionRect = $state<{ top: number; left: number; width: number } | null>(null);
 	let selectionAnchorId = $state<string | null>(null);
-
-	// PDF ingestion
-	let pdfLoading = $state(false);
-	let pdfProgress = $state<{ page: number; totalPages: number } | null>(null);
-	let pdfError = $state<string | null>(null);
-	let fileInputEl: HTMLInputElement | undefined = $state();
 
 	// Live counters
 	let sessionMs = $state(0);
@@ -76,108 +63,26 @@
 
 	const estimatedReadingMin = $derived(liveWordCount > 0 ? liveWordCount / WPM : 0);
 
-	function formatHms(ms: number): string {
-		const s = Math.floor(ms / 1000);
-		const h = Math.floor(s / 3600);
-		const m = Math.floor((s % 3600) / 60);
-		const sec = s % 60;
-		const mm = String(m).padStart(2, '0');
-		const ss = String(sec).padStart(2, '0');
-		if (h > 0) return `${h}:${mm}:${ss}`;
-		return `${mm}:${ss}`;
-	}
-
-	function formatMin(min: number): string {
-		if (min < 1) return '< 1 min';
-		const m = Math.round(min);
-		if (m < 60) return `${m} min`;
-		const h = Math.floor(m / 60);
-		const r = m % 60;
-		return r === 0 ? `${h} hr` : `${h} hr ${r} min`;
-	}
-
 	function persistDoc() {
-		try {
-			const doc: ReadingDoc = { text: pasteText, paragraphs, notes };
-			sessionStorage.setItem(DOC_KEY, JSON.stringify(doc));
-		} catch {
-			// ignore quota
-		}
+		persistDocToStorage({ text: pasteText, paragraphs, notes });
 	}
 
-	function loadDoc(): boolean {
-		try {
-			const raw = sessionStorage.getItem(DOC_KEY);
-			if (raw) {
-				const parsed = JSON.parse(raw) as ReadingDoc;
-				if (parsed?.text && Array.isArray(parsed.paragraphs)) {
-					pasteText = parsed.text;
-					paragraphs = parsed.paragraphs;
-					notes = Array.isArray(parsed.notes) ? parsed.notes : [];
-					liveWordCount = countWordsInText(parsed.text);
-					return true;
-				}
-			}
-			// v2 → v3: paragraphs were `{id, content}` (plain text). Convert.
-			const v2 = sessionStorage.getItem(LEGACY_DOC_V2_KEY);
-			if (v2) {
-				const parsed = JSON.parse(v2) as {
-					text: string;
-					paragraphs?: { id: string; content?: string; html?: string }[];
-					notes?: MarginNote[];
-				};
-				if (parsed?.text) {
-					pasteText = parsed.text;
-					paragraphs = parsed.paragraphs
-						? parsed.paragraphs.map((p) =>
-								p.html
-									? { id: p.id, html: p.html }
-									: { id: p.id, html: paraHtmlFromContent(p.content ?? '') }
-						  )
-						: paragraphsFromText(parsed.text);
-					notes = Array.isArray(parsed.notes) ? parsed.notes : [];
-					liveWordCount = countWordsInText(parsed.text);
-					sessionStorage.removeItem(LEGACY_DOC_V2_KEY);
-					persistDoc();
-					return true;
-				}
-			}
-			// v1 → v3: raw string.
-			const v1 = sessionStorage.getItem(LEGACY_PASTE_V1_KEY);
-			if (v1) {
-				pasteText = v1;
-				paragraphs = paragraphsFromText(v1);
-				notes = [];
-				liveWordCount = countWordsInText(v1);
-				sessionStorage.removeItem(LEGACY_PASTE_V1_KEY);
-				persistDoc();
-				return true;
-			}
-		} catch {
-			// ignore
-		}
-		return false;
+	function hydrateFromStorage(): boolean {
+		const doc = loadDoc();
+		if (!doc) return false;
+		pasteText = doc.text;
+		paragraphs = doc.paragraphs;
+		notes = doc.notes;
+		liveWordCount = doc.wordCount;
+		return true;
 	}
 
-	function paraHtmlFromContent(content: string): string {
-		const escaped = content
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;');
-		return `<p data-anchor="placeholder">${escaped.replace(/\n/g, '<br>')}</p>`;
-	}
-
-	async function commitText() {
-		let t = pasteText;
-		truncated = false;
-		if (t.length > PASTE_CAP) {
-			t = t.slice(0, PASTE_CAP);
-			truncated = true;
-			pasteText = t;
-		}
-		paragraphs = paragraphsFromText(t);
+	async function onPdfCommit(text: string, wasTruncated: boolean) {
+		truncated = wasTruncated;
+		pasteText = text;
+		paragraphs = paragraphsFromText(text);
 		notes = [];
-		liveWordCount = countWordsInText(t);
+		liveWordCount = countWordsInText(text);
 		book.addReadingWords(liveWordCount);
 		mode = 'read';
 		docKey++;
@@ -194,58 +99,10 @@
 		anchorOffsets = {};
 		liveWordCount = 0;
 		truncated = false;
-		pdfError = null;
-		pdfProgress = null;
 		selectionRect = null;
 		selectionAnchorId = null;
 		docKey++;
-		try {
-			sessionStorage.removeItem(DOC_KEY);
-		} catch {
-			// ignore
-		}
-	}
-
-	async function handlePdfFile(file: File) {
-		pdfError = null;
-		if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-			pdfError = 'that does not look like a pdf.';
-			return;
-		}
-		if (file.size > PDF_CAP_BYTES) {
-			pdfError = `the pdf is larger than ${Math.round(PDF_CAP_BYTES / 1024 / 1024)} mb. try a smaller file.`;
-			return;
-		}
-		pdfLoading = true;
-		pdfProgress = { page: 0, totalPages: 0 };
-		try {
-			const { extractPdfText } = await import('$lib/reading/pdf');
-			const result = await extractPdfText(file, (p) => {
-				pdfProgress = p;
-			});
-			pasteText = result.text;
-			pdfProgress = { page: result.pageCount, totalPages: result.pageCount };
-		} catch (err) {
-			console.error('[marginalia] pdf extraction failed', err);
-			const msg = err instanceof Error ? err.message.toLowerCase() : '';
-			if (msg.includes('password') || msg.includes('encrypted')) {
-				pdfError = 'this pdf is password-protected. try an unlocked copy.';
-			} else if (msg.includes('invalid') || msg.includes('corrupt')) {
-				pdfError = 'this pdf appears to be malformed.';
-			} else {
-				pdfError = 'could not read that pdf. it may be scanned, encrypted, or malformed.';
-			}
-			pdfProgress = null;
-		} finally {
-			pdfLoading = false;
-			if (fileInputEl) fileInputEl.value = '';
-		}
-	}
-
-	function onPdfPick(e: Event) {
-		const input = e.currentTarget as HTMLInputElement;
-		const file = input.files?.[0];
-		if (file) handlePdfFile(file);
+		wipeDoc();
 	}
 
 	function onEnter() {
@@ -451,31 +308,30 @@
 		persistDoc();
 	}
 
-	// Bubble popover button: prevent the mousedown from clearing selection.
-	function onAddNote(e: MouseEvent) {
-		e.preventDefault();
-		if (selectionAnchorId) addNoteFor(selectionAnchorId);
-	}
-
-	function bubbleCmd(cmd: string) {
-		return (e: MouseEvent) => {
-			e.preventDefault();
-			applyInlineFormat(cmd);
-		};
-	}
-
-	function onBubbleHighlight(e: MouseEvent) {
-		e.preventDefault();
-		applyHighlight();
-	}
-
-	function onBubbleLink(e: MouseEvent) {
-		e.preventDefault();
-		applyLink();
+	// SelectionBubble.preventDefault() has already fired before this is called,
+	// so the selection survives the dispatch.
+	function onBubbleAction(action: BubbleAction) {
+		switch (action) {
+			case 'bold':
+			case 'italic':
+			case 'underline':
+			case 'strikethrough':
+				applyInlineFormat(action);
+				return;
+			case 'highlight':
+				applyHighlight();
+				return;
+			case 'link':
+				applyLink();
+				return;
+			case 'note':
+				if (selectionAnchorId) addNoteFor(selectionAnchorId);
+				return;
+		}
 	}
 
 	onMount(() => {
-		const hadDoc = loadDoc();
+		const hadDoc = hydrateFromStorage();
 		if (hadDoc) mode = 'read';
 		timer.start();
 		const id = setInterval(() => {
@@ -563,53 +419,7 @@
 
 		<div class="reader">
 			{#if mode === 'paste'}
-				<label class="paste-label">
-					<span>paste a text, or open a pdf. once you begin you can keep editing — the room is a working desk, not a glass case.</span>
-					<textarea
-						bind:value={pasteText}
-						placeholder="paste here — anything you want to read."
-						rows="10"
-						disabled={pdfLoading}
-					></textarea>
-				</label>
-				<div class="pdf-row">
-					<input
-						bind:this={fileInputEl}
-						type="file"
-						accept="application/pdf,.pdf"
-						id="reading-room-pdf"
-						onchange={onPdfPick}
-						disabled={pdfLoading}
-					/>
-					<label for="reading-room-pdf" class="pdf-button" class:loading={pdfLoading}>
-						{pdfLoading ? '— extracting —' : '— open a pdf —'}
-					</label>
-					{#if pdfLoading && pdfProgress && pdfProgress.totalPages > 0}
-						<span class="pdf-status">
-							page <span class="num">{pdfProgress.page}</span> / {pdfProgress.totalPages}
-						</span>
-					{:else if pdfLoading}
-						<span class="pdf-status">opening…</span>
-					{:else if pdfProgress && !pdfError}
-						<span class="pdf-status">
-							<span class="num">{pdfProgress.totalPages}</span>
-							pages extracted — edit if you'd like, then begin.
-						</span>
-					{/if}
-				</div>
-				{#if pdfError}
-					<p class="notice">— {pdfError}</p>
-				{/if}
-				<div class="paste-actions">
-					<button
-						class="commit"
-						type="button"
-						disabled={!pasteText.trim() || pdfLoading}
-						onclick={commitText}
-					>
-						— begin reading —
-					</button>
-				</div>
+				<PdfIntake bind:pasteText onCommit={onPdfCommit} />
 			{:else}
 				<div class="text-meta">
 					<span><span class="num">{liveWordCount.toLocaleString()}</span> words</span>
@@ -649,24 +459,10 @@
 	</footer>
 </section>
 
-{#if selectionRect && selectionAnchorId && mode === 'read'}
-	<div
-		class="selection-popover"
-		style:top="{selectionRect.top - 42}px"
-		style:left="{selectionRect.left + selectionRect.width / 2}px"
-	>
-		<div class="bubble">
-			<button class="bub-btn bold" onmousedown={bubbleCmd('bold')} title="bold (⌘b)">B</button>
-			<button class="bub-btn italic" onmousedown={bubbleCmd('italic')} title="italic (⌘i)">I</button>
-			<button class="bub-btn under" onmousedown={bubbleCmd('underline')} title="underline (⌘u)">U</button>
-			<button class="bub-btn strike" onmousedown={bubbleCmd('strikethrough')} title="strikethrough">S</button>
-			<button class="bub-btn" onmousedown={onBubbleHighlight} title="highlight (toggle)">●</button>
-			<button class="bub-btn" onmousedown={onBubbleLink} title="link">↗</button>
-			<span class="bub-sep" aria-hidden="true"></span>
-			<button class="bub-btn note" onmousedown={onAddNote} title="add margin note">+ note</button>
-		</div>
-	</div>
-{/if}
+<SelectionBubble
+	rect={selectionRect && selectionAnchorId && mode === 'read' ? selectionRect : null}
+	onAction={onBubbleAction}
+/>
 
 <style>
 	.reading-room {
@@ -754,85 +550,6 @@
 	.reader {
 		min-width: 0;
 	}
-	.paste-label {
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-	}
-	.paste-label span {
-		font-family: var(--font-ui);
-		font-size: 0.82rem;
-		color: var(--muted);
-	}
-	textarea {
-		width: 100%;
-		background: var(--panel-accent);
-		color: var(--text);
-		border: 1px solid var(--rule);
-		border-radius: 3px;
-		font-family: var(--font-body);
-		font-size: 1rem;
-		padding: 0.6rem;
-		resize: vertical;
-		line-height: 1.6;
-	}
-	.pdf-row {
-		display: flex;
-		align-items: center;
-		gap: 0.6rem;
-		margin-top: 0.5rem;
-		flex-wrap: wrap;
-	}
-	.pdf-row input[type='file'] {
-		position: absolute;
-		opacity: 0;
-		width: 0;
-		height: 0;
-		pointer-events: none;
-	}
-	.pdf-button {
-		display: inline-block;
-		font-family: var(--font-display);
-		font-size: 0.92rem;
-		color: var(--cream);
-		background: var(--panel-accent);
-		border: 1px solid var(--rule);
-		border-radius: 3px;
-		padding: 0.3rem 0.7rem;
-		cursor: pointer;
-	}
-	.pdf-button:hover {
-		border-color: var(--leafeon-pink);
-		color: var(--leafeon-pink);
-	}
-	.pdf-button.loading {
-		color: var(--cyan);
-		border-color: var(--cyan);
-		cursor: progress;
-	}
-	.pdf-status {
-		font-family: var(--font-ui);
-		font-size: 0.78rem;
-		color: var(--muted);
-	}
-	.paste-actions {
-		display: flex;
-		justify-content: flex-end;
-		margin-top: 0.6rem;
-	}
-	.commit {
-		font-family: var(--font-display);
-		font-size: 1rem;
-		color: var(--cream);
-		background: var(--panel-accent);
-		border: 1px solid var(--rule);
-		border-radius: 3px;
-		padding: 0.4rem 0.8rem;
-	}
-	.commit:hover:not(:disabled) {
-		border-color: var(--leafeon-pink);
-		color: var(--leafeon-pink);
-	}
 	.text-meta {
 		display: flex;
 		align-items: baseline;
@@ -899,62 +616,4 @@
 		margin: 0 0 0.5rem;
 	}
 
-	/* ── selection bubble ─────────────────────────────────────── */
-	.selection-popover {
-		position: fixed;
-		transform: translateX(-50%);
-		z-index: 50;
-		pointer-events: auto;
-	}
-	.bubble {
-		display: flex;
-		align-items: center;
-		gap: 0.15rem;
-		padding: 0.25rem 0.4rem;
-		background: var(--panel-accent);
-		border: 1px solid var(--periwinkle);
-		border-radius: 3px;
-		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-	}
-	.bub-btn {
-		font-family: var(--font-counter);
-		font-size: 0.86rem;
-		color: var(--periwinkle);
-		min-width: 1.5rem;
-		padding: 0.15rem 0.35rem;
-		border-radius: 2px;
-		line-height: 1;
-	}
-	.bub-btn:hover {
-		color: var(--leafeon-pink);
-		background: rgba(154, 150, 201, 0.12);
-	}
-	.bub-btn.bold {
-		font-weight: 700;
-	}
-	.bub-btn.italic {
-		font-style: italic;
-	}
-	.bub-btn.under {
-		text-decoration: underline;
-	}
-	.bub-btn.strike {
-		text-decoration: line-through;
-	}
-	.bub-btn.note {
-		font-family: var(--font-ui);
-		font-size: 0.74rem;
-		letter-spacing: 0.1em;
-		color: var(--cream);
-		padding: 0.18rem 0.5rem;
-	}
-	.bub-btn.note:hover {
-		color: var(--leafeon-pink);
-	}
-	.bub-sep {
-		width: 1px;
-		height: 1rem;
-		background: var(--rule);
-		margin: 0 0.2rem;
-	}
 </style>

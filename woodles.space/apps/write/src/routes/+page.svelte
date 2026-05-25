@@ -2,7 +2,44 @@
 	import { onMount, onDestroy, tick } from 'svelte';
 	import { fly, slide, fade } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
-	import Clock from '$lib/Clock.svelte';
+	import Topbar from '$lib/Topbar.svelte';
+	import BottomBar from '$lib/BottomBar.svelte';
+	import EditorToolbar from '$lib/EditorToolbar.svelte';
+	import DraftsModal from '$lib/DraftsModal.svelte';
+	import PublishOverlay from '$lib/PublishOverlay.svelte';
+	import {
+		ANCHOR_BLOCK_SELECTOR,
+		sanitizeHtml,
+		ensureAnchorsOn,
+		stampAnchorsHtml,
+		isEmptyHtml,
+		stripTags,
+		countWords,
+		previewText
+	} from '$lib/htmlTools';
+	import { POCKETS_ORDER_KEY } from '$lib/storage';
+	import {
+		findLetter,
+		incrementIssue,
+		loadLettersList,
+		writePublishedLegacy,
+		type StoredLetter
+	} from '$lib/letters';
+	import {
+		bootstrap as bootstrapDrafts,
+		createDraftId,
+		listDrafts,
+		loadDraft as loadDraftBody,
+		saveDraft,
+		removeDraftBody,
+		setActiveDraftId,
+		clearActiveDraftId,
+		upsertIndex,
+		writeIndex,
+		type DraftIndexItem,
+		type DraftBody
+	} from '$lib/drafts';
+	import type { LayerId, PocketLayer, PocketNote, MarginNote } from '$lib/types';
 	import {
 		palettes,
 		motifs as motifList,
@@ -11,17 +48,6 @@
 		findFont
 	} from '@shared/library.js';
 
-	const LETTERS_KEY = 'woodles_letters';
-	// Legacy keys — read for one-time migration of pre-indexed-drafts state,
-	// and written-through on publish so older viewer code paths still see
-	// "the latest letter".
-	const LEGACY_DRAFT_KEY = 'woodles_write_draft';
-	const LEGACY_PUBLISHED_KEY = 'woodles_published';
-	const ISSUE_KEY = 'woodles_issue_count';
-	const POCKETS_ORDER_KEY = 'woodles_pockets_order';
-
-	type LayerId = 'foreground' | 'midground' | 'background';
-	type PocketLayer = 'midground' | 'background';
 	const LAYER_IDS: LayerId[] = ['foreground', 'midground', 'background'];
 	const LAYER_LABELS: Record<LayerId, string> = {
 		foreground: 'fg',
@@ -33,23 +59,7 @@
 		midground: 'thinking, working notes, what shaped this…',
 		background: 'the impulse. the thing only you know.'
 	};
-	const ANCHOR_BLOCK_SELECTOR = 'h1,h2,h3,h4,h5,h6,p,blockquote,li,ul,ol,pre';
-
-	type PocketNote = {
-		id: string;
-		html: string;
-		layer: PocketLayer;
-		createdAt: string;
-		updatedAt: string;
-	};
 	type PocketsOrder = 'oldest' | 'newest';
-	type MarginNote = {
-		id: string;
-		anchorId: string;
-		html: string;
-		createdAt: string;
-		updatedAt: string;
-	};
 
 	let title = $state('');
 	let theme = $state('cream');
@@ -104,16 +114,9 @@
 	let measureTimer: ReturnType<typeof setTimeout> | undefined;
 	let hydrated = $state(false);
 
-	type DraftIndexItem = { id: string; title: string; updatedAt: string };
 	let draftsList = $state<DraftIndexItem[]>([]);
 	let currentDraftId = $state<string | null>(null);
 	let draftsOpen = $state(false);
-
-	const ACTIVE_DRAFT_ID_KEY = 'woodles_active_draft_id';
-	const DRAFTS_INDEX_KEY = 'woodles_drafts_index';
-	const DRAFT_PREFIX = 'woodles_draft_';
-
-	const sortedDrafts = $derived([...draftsList].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
 
 	const sortedPockets = $derived(
 		pocketsOrder === 'oldest'
@@ -147,31 +150,6 @@
 		return layer === 'foreground' ? fgEl : layer === 'midground' ? mgEl : bgEl;
 	}
 
-	// Strip inline font/style attributes from HTML so the document's font
-	// system always wins. Preserves structural and semantic markup
-	// (headings, lists, links, bold/italic) and data-* attributes (anchors).
-	function sanitizeHtml(html: string): string {
-		if (typeof DOMParser === 'undefined' || !html) return html;
-		const doc = new DOMParser().parseFromString('<div id="__r">' + html + '</div>', 'text/html');
-		const root = doc.getElementById('__r');
-		if (!root) return html;
-		root.querySelectorAll('*').forEach((el) => {
-			el.removeAttribute('style');
-			el.removeAttribute('color');
-			el.removeAttribute('face');
-			el.removeAttribute('size');
-			el.removeAttribute('bgcolor');
-			el.removeAttribute('data-anchor');
-			if (el.tagName === 'FONT' || el.tagName === 'SPAN') {
-				const parent = el.parentNode;
-				if (!parent) return;
-				while (el.firstChild) parent.insertBefore(el.firstChild, el);
-				parent.removeChild(el);
-			}
-		});
-		return root.innerHTML;
-	}
-
 	function handlePaste(e: ClipboardEvent) {
 		const data = e.clipboardData;
 		if (!data) return;
@@ -186,102 +164,12 @@
 		}
 	}
 
-	// Anchor stamping: assign stable data-anchor IDs to every block-level
-	// element. Existing IDs are preserved; new blocks get max+1. Idempotent
-	// and additive, so margin notes survive editing as long as their
-	// anchor block isn't deleted.
-	function ensureAnchorsOn(blocks: NodeListOf<Element> | Element[]) {
-		const list = Array.from(blocks);
-		let max = 0;
-		const seen = new Set<string>();
-		for (const b of list) {
-			const id = b.getAttribute('data-anchor');
-			if (id) {
-				if (seen.has(id)) {
-					b.removeAttribute('data-anchor');
-				} else {
-					seen.add(id);
-					const m = /^a-(\d+)$/.exec(id);
-					if (m) {
-						const n = parseInt(m[1], 10);
-						if (!isNaN(n) && n > max) max = n;
-					}
-				}
-			}
-		}
-		let next = max + 1;
-		for (const b of list) {
-			if (!b.getAttribute('data-anchor')) {
-				b.setAttribute('data-anchor', 'a-' + String(next++).padStart(3, '0'));
-			}
-		}
-	}
-
 	function stampLiveAnchors() {
 		if (!fgEl) return;
 		ensureAnchorsOn(fgEl.querySelectorAll(ANCHOR_BLOCK_SELECTOR));
 	}
 
-	function stampAnchorsHtml(html: string): string {
-		if (typeof DOMParser === 'undefined') return html;
-		const doc = new DOMParser().parseFromString('<div id="__r">' + html + '</div>', 'text/html');
-		const root = doc.getElementById('__r');
-		if (!root) return html;
-		ensureAnchorsOn(root.querySelectorAll(ANCHOR_BLOCK_SELECTOR));
-		return root.innerHTML;
-	}
-
 	// ── multi-doc storage ──
-	type StoredLetter = {
-		id: string;
-		title: string;
-		theme: string;
-		motif: string;
-		font: string;
-		issue: number;
-		publishedAt: string;
-		layers: Record<string, { html: string; updatedAt: string }>;
-		annotations: { pocketNotes: PocketNote[]; marginNotes: MarginNote[] };
-		content: string;
-		replyTo: string | null;
-	};
-
-	function newLetterId() {
-		return 'l-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
-	}
-
-	function loadLettersList(): StoredLetter[] {
-		if (typeof localStorage === 'undefined') return [];
-		try {
-			const raw = localStorage.getItem(LETTERS_KEY);
-			if (raw) {
-				const parsed = JSON.parse(raw);
-				return Array.isArray(parsed) ? parsed : [];
-			}
-			// Migration from legacy single-letter slot.
-			const old = localStorage.getItem(LEGACY_PUBLISHED_KEY);
-			if (old) {
-				const lt = JSON.parse(old);
-				lt.id = lt.id || newLetterId();
-				lt.replyTo = lt.replyTo ?? null;
-				const list: StoredLetter[] = [lt];
-				localStorage.setItem(LETTERS_KEY, JSON.stringify(list));
-				return list;
-			}
-		} catch (e) {
-			// ignore corrupt list
-		}
-		return [];
-	}
-
-	function saveLettersList(list: StoredLetter[]) {
-		try { localStorage.setItem(LETTERS_KEY, JSON.stringify(list)); } catch (e) {}
-	}
-
-	function findLetter(list: StoredLetter[], id: string): StoredLetter | undefined {
-		return list.find((l) => l.id === id);
-	}
-
 	function loadIntoLayers(d: {
 		title?: string;
 		theme?: string;
@@ -367,36 +255,16 @@
 			// If source missing, replyTo stays null; we fall back to the 'new' draft.
 		}
 
-		try {
-			const indexRaw = localStorage.getItem(DRAFTS_INDEX_KEY);
-			if (indexRaw) draftsList = JSON.parse(indexRaw);
-		} catch(e) {}
+		const boot = bootstrapDrafts();
+		draftsList = boot.drafts;
+		currentDraftId = boot.activeId;
 
-		let activeId = localStorage.getItem(ACTIVE_DRAFT_ID_KEY);
-		if (!activeId) {
-			const oldDraft = localStorage.getItem(LEGACY_DRAFT_KEY);
-			if (oldDraft) {
-				const id = 'd-' + Date.now().toString(36);
-				localStorage.setItem(DRAFT_PREFIX + id, oldDraft);
-				localStorage.removeItem(LEGACY_DRAFT_KEY);
-				activeId = id;
-				const parsed = JSON.parse(oldDraft);
-				draftsList = [{ id, title: parsed.title || 'untitled', updatedAt: parsed.savedAt || new Date().toISOString() }];
-				localStorage.setItem(DRAFTS_INDEX_KEY, JSON.stringify(draftsList));
-			} else {
-				activeId = 'd-' + Date.now().toString(36);
-				draftsList = [{ id: activeId, title: '', updatedAt: new Date().toISOString() }];
-				localStorage.setItem(DRAFTS_INDEX_KEY, JSON.stringify(draftsList));
+		if (boot.body) {
+			try {
+				loadIntoLayers(boot.body);
+			} catch (e) {
+				// ignore corrupt drafts
 			}
-			localStorage.setItem(ACTIVE_DRAFT_ID_KEY, activeId);
-		}
-		currentDraftId = activeId;
-
-		try {
-			const raw = localStorage.getItem(DRAFT_PREFIX + currentDraftId);
-			if (raw) loadIntoLayers(JSON.parse(raw));
-		} catch (e) {
-			// ignore corrupt drafts
 		}
 		updateMeta();
 		hydrated = true;
@@ -443,11 +311,6 @@
 		}
 	});
 
-	function isEmptyHtml(html: string): boolean {
-		const stripped = html.replace(/<br\s*\/?>(\s*)/gi, '').replace(/<[^>]+>/g, '').trim();
-		return stripped.length === 0;
-	}
-
 	function updateMeta() {
 		const el = elFor(activeLayer);
 		const text = el?.textContent || '';
@@ -475,15 +338,9 @@
 					savedAt: now
 				};
 				if (currentDraftId) {
-					localStorage.setItem(DRAFT_PREFIX + currentDraftId, JSON.stringify(draftData));
-					
-					const idx = draftsList.findIndex(d => d.id === currentDraftId);
-					if (idx >= 0) {
-						draftsList[idx] = { ...draftsList[idx], title, updatedAt: now };
-					} else {
-						draftsList.push({ id: currentDraftId, title, updatedAt: now });
-					}
-					localStorage.setItem(DRAFTS_INDEX_KEY, JSON.stringify(draftsList));
+					saveDraft(currentDraftId, draftData);
+					draftsList = upsertIndex(draftsList, currentDraftId, title, now);
+					writeIndex(draftsList);
 				}
 			} catch (e) {
 				// ignore quota / disabled storage
@@ -561,9 +418,9 @@
 			return;
 		}
 		clearTimeout(saveTimer);
-		try {
+		if (currentDraftId) {
 			const now = new Date().toISOString();
-			const draftData = {
+			const draftData: DraftBody = {
 				title, theme, motif, font,
 				layers: {
 					foreground: { html: fgEl?.innerHTML ?? '', updatedAt: now },
@@ -574,12 +431,12 @@
 				content: fgEl?.innerHTML ?? '',
 				savedAt: now
 			};
-			localStorage.setItem(DRAFT_PREFIX + currentDraftId!, JSON.stringify(draftData));
-		} catch(e) {}
+			saveDraft(currentDraftId, draftData);
+		}
 
 		currentDraftId = id;
-		localStorage.setItem(ACTIVE_DRAFT_ID_KEY, id);
-		
+		setActiveDraftId(id);
+
 		title = '';
 		pockets = [];
 		marginNotes = [];
@@ -587,21 +444,19 @@
 		if (mgEl) mgEl.innerHTML = '';
 		if (bgEl) bgEl.innerHTML = '';
 
-		try {
-			const raw = localStorage.getItem(DRAFT_PREFIX + id);
-			if (raw) loadIntoLayers(JSON.parse(raw));
-		} catch (e) {}
-		
+		const body = loadDraftBody(id);
+		if (body) loadIntoLayers(body);
+
 		updateMeta();
 		scheduleMeasure(60);
 		draftsOpen = false;
 	}
 
 	function newDraft() {
-		const id = 'd-' + Date.now().toString(36);
+		const id = createDraftId();
 		const now = new Date().toISOString();
 		draftsList = [{ id, title: '', updatedAt: now }, ...draftsList];
-		localStorage.setItem(DRAFTS_INDEX_KEY, JSON.stringify(draftsList));
+		writeIndex(draftsList);
 		loadDraft(id);
 	}
 
@@ -617,10 +472,10 @@
 			scheduleSave();
 			return;
 		}
-		
-		localStorage.removeItem(DRAFT_PREFIX + id);
-		draftsList = draftsList.filter(d => d.id !== id);
-		localStorage.setItem(DRAFTS_INDEX_KEY, JSON.stringify(draftsList));
+
+		removeDraftBody(id);
+		draftsList = draftsList.filter((d) => d.id !== id);
+		writeIndex(draftsList);
 
 		if (id === currentDraftId) {
 			const next = [...draftsList].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
@@ -634,9 +489,7 @@
 	function publish() {
 		publishing = true;
 		clearTimeout(saveTimer);
-		const issue = parseInt(localStorage.getItem(ISSUE_KEY) || '0') + 1;
-		localStorage.setItem(ISSUE_KEY, String(issue));
-		let publishedId: string | null = null;
+		const issue = incrementIssue();
 		try {
 			const now = new Date().toISOString();
 			const fgHtml = stampAnchorsHtml(sanitizeHtml(fgEl?.innerHTML ?? ''));
@@ -644,35 +497,32 @@
 			const bgHtml = sanitizeHtml(bgEl?.innerHTML ?? '');
 			const cleanedPockets = pockets.map((p) => ({ ...p, html: sanitizeHtml(p.html) }));
 			const cleanedMargins = marginNotes.map((m) => ({ ...m, html: sanitizeHtml(m.html) }));
-			localStorage.setItem(
-				LEGACY_PUBLISHED_KEY,
-				JSON.stringify({
-					title: title.trim() || 'untitled letter',
-					theme,
-					motif,
-					font,
-					issue,
-					publishedAt: now,
-					layers: {
-						foreground: { html: fgHtml, updatedAt: now },
-						midground: { html: mgHtml, updatedAt: now },
-						background: { html: bgHtml, updatedAt: now }
-					},
-					annotations: { pocketNotes: cleanedPockets, marginNotes: cleanedMargins },
-					content: fgHtml
-				})
-			);
+			writePublishedLegacy({
+				title: title.trim() || 'untitled letter',
+				theme,
+				motif,
+				font,
+				issue,
+				publishedAt: now,
+				layers: {
+					foreground: { html: fgHtml, updatedAt: now },
+					midground: { html: mgHtml, updatedAt: now },
+					background: { html: bgHtml, updatedAt: now }
+				},
+				annotations: { pocketNotes: cleanedPockets, marginNotes: cleanedMargins },
+				content: fgHtml
+			});
 			if (currentDraftId) {
-				localStorage.removeItem(DRAFT_PREFIX + currentDraftId);
-				draftsList = draftsList.filter(d => d.id !== currentDraftId);
-				localStorage.setItem(DRAFTS_INDEX_KEY, JSON.stringify(draftsList));
-				localStorage.removeItem(ACTIVE_DRAFT_ID_KEY);
+				removeDraftBody(currentDraftId);
+				draftsList = draftsList.filter((d) => d.id !== currentDraftId);
+				writeIndex(draftsList);
+				clearActiveDraftId();
 			}
 		} catch (e) {
 			// ignore
 		}
 		setTimeout(() => {
-			window.location.href = publishedId ? '/letter?id=' + publishedId : '/letter';
+			window.location.href = '/letter';
 		}, 1800);
 	}
 
@@ -844,22 +694,6 @@
 	}
 
 	// ── binder ──
-	function stripTags(html: string): string {
-		return String(html ?? '')
-			.replace(/<[^>]+>/g, ' ')
-			.replace(/\s+/g, ' ')
-			.trim();
-	}
-	function countWords(html: string): number {
-		const t = stripTags(html);
-		return t ? t.split(/\s+/).filter((w) => w.length > 0).length : 0;
-	}
-	function previewText(html: string, max = 90): string {
-		const t = stripTags(html);
-		if (!t) return '';
-		if (t.length <= max) return t;
-		return t.slice(0, max).replace(/\s+\S*$/, '') + '…';
-	}
 
 	type LayerStat = { id: LayerId; words: number; preview: string; isEmpty: boolean };
 	const layerStats = $derived.by<LayerStat[]>(() => {
@@ -960,71 +794,26 @@
 <div class="motif-blob motif-blob-3"></div>
 <div class="motif-blob motif-blob-4"></div>
 
-<header class="topbar">
-	<a href="/" class="topbar-brand">.space</a>
-	<span class="topbar-label">echoes · write</span>
-	<div class="layer-switch" role="tablist" aria-label="layer">
-		{#each LAYER_IDS as id}
-			<button
-				class="layer-btn"
-				class:active={activeLayer === id}
-				role="tab"
-				aria-selected={activeLayer === id}
-				onclick={() => setActiveLayer(id)}
-				title={id}>{LAYER_LABELS[id]}</button
-			>
-		{/each}
-	</div>
-	<button
-		class="drafts-toggle"
-		class:on={draftsOpen}
-		onclick={() => draftsOpen = !draftsOpen}
-		aria-pressed={draftsOpen}
-		title="drafts"
-	>
-		drafts
-	</button>
-	<span class="topbar-divider" aria-hidden="true"></span>
-	<button
-		class="pockets-toggle"
-		class:on={pocketsOpen}
-		onclick={() => (pocketsOpen = !pocketsOpen)}
-		aria-pressed={pocketsOpen}
-		title="pockets"
-	>
-		pockets{#if pockets.length > 0}<span class="pockets-count">{pockets.length}</span>{/if}
-	</button>
-	<div class="topbar-clock"><Clock /></div>
-</header>
+<Topbar
+	{activeLayer}
+	layerIds={LAYER_IDS}
+	layerLabels={LAYER_LABELS}
+	bind:draftsOpen
+	bind:pocketsOpen
+	pocketsCount={pockets.length}
+	onLayerChange={setActiveLayer}
+/>
 
-{#if draftsOpen}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="drafts-overlay" transition:fade={{ duration: 240 }} onclick={() => draftsOpen = false}>
-		<div class="drafts-modal" onclick={(e) => e.stopPropagation()} transition:fly={{ y: 8, duration: 320, easing: cubicOut }}>
-			<div class="drafts-header">
-				<h2 class="drafts-title">your drafts</h2>
-				<button class="drafts-new-btn" onclick={newDraft}>+ new draft</button>
-			</div>
-			<div class="drafts-list">
-				{#each sortedDrafts as d (d.id)}
-					<div class="draft-item" class:active={d.id === currentDraftId}>
-						<button class="draft-item-btn" onclick={() => loadDraft(d.id)}>
-							<span class="draft-item-title">{d.title || 'untitled letter'}</span>
-							<span class="draft-item-date">{new Date(d.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
-						</button>
-						<button class="draft-item-delete" onclick={(e) => deleteDraft(d.id, e)} title="discard draft">×</button>
-					</div>
-				{/each}
-			</div>
-		</div>
-	</div>
-{/if}
+<DraftsModal
+	bind:open={draftsOpen}
+	drafts={draftsList}
+	{currentDraftId}
+	onSelect={loadDraft}
+	onCreate={newDraft}
+	onDelete={deleteDraft}
+/>
 
-<div class="overlay" class:active={publishing}>
-	<p class="overlay-word">published.</p>
-	<p class="overlay-sub">woodles.space / echoes</p>
-</div>
+<PublishOverlay active={publishing} />
 
 <div class="editor-page" data-layer={activeLayer} bind:this={editorPageEl}>
 	<div class="editor-wrap" data-layer={activeLayer}>
@@ -1048,35 +837,7 @@
 		/>
 
 		{#if activeLayer === 'foreground'}
-			<div class="toolbar">
-				<button class="tool-btn" class:active={bold}
-					onmousedown={(e) => { e.preventDefault(); exec('bold'); }} title="Bold"><b>B</b></button>
-				<button class="tool-btn" class:active={italic}
-					onmousedown={(e) => { e.preventDefault(); exec('italic'); }} title="Italic"><em>I</em></button>
-				<button class="tool-btn" class:active={underline}
-					onmousedown={(e) => { e.preventDefault(); exec('underline'); }} title="Underline"><u>U</u></button>
-				<span class="tool-sep"></span>
-				<button class="tool-btn"
-					onmousedown={(e) => { e.preventDefault(); exec('formatBlock', 'h1'); }} title="Heading 1">H1</button>
-				<button class="tool-btn"
-					onmousedown={(e) => { e.preventDefault(); exec('formatBlock', 'h2'); }} title="Heading 2">H2</button>
-				<button class="tool-btn"
-					onmousedown={(e) => { e.preventDefault(); exec('formatBlock', 'p'); }} title="Paragraph">¶</button>
-				<span class="tool-sep"></span>
-				<button class="tool-btn"
-					onmousedown={(e) => { e.preventDefault(); exec('formatBlock', 'blockquote'); }} title="Blockquote">❝</button>
-				<span class="tool-sep"></span>
-				<button class="tool-btn"
-					onmousedown={(e) => { e.preventDefault(); exec('insertUnorderedList'); }} title="Bullet list">· —</button>
-				<button class="tool-btn"
-					onmousedown={(e) => { e.preventDefault(); exec('insertOrderedList'); }} title="Numbered list">1.</button>
-				<span class="tool-sep"></span>
-				<button class="tool-btn"
-					onmousedown={(e) => { e.preventDefault(); insertLink(); }} title="Insert link">link</button>
-				<span class="tool-sep"></span>
-				<button class="tool-btn"
-					onmousedown={(e) => { e.preventDefault(); exec('removeFormat'); }} title="Clear formatting">×</button>
-			</div>
+			<EditorToolbar {bold} {italic} {underline} onCommand={exec} onInsertLink={insertLink} />
 		{/if}
 
 		<div
@@ -1357,43 +1118,19 @@
 	{/if}
 </aside>
 
-<div class="bottom-bar">
-	<div class="bottom-meta">
-		<span class="save-status" class:saving={saveStatus === 'saving'}>
-			{saveStatus === 'saving' ? 'saving…' : 'saved'}
-		</span>
-		<span class="word-count">{wordCount} word{wordCount !== 1 ? 's' : ''}</span>
-		<span class="picker-sep">·</span>
-		<label class="picker">
-			<span class="picker-label">palette</span>
-			<select bind:value={theme} class="picker-select">
-				{#each palettes as p}<option value={p.id}>{p.name}</option>{/each}
-			</select>
-		</label>
-		<label class="picker">
-			<span class="picker-label">motif</span>
-			<select bind:value={motif} class="picker-select">
-				{#each motifList as m}<option value={m.id}>{m.name}</option>{/each}
-			</select>
-		</label>
-		<label class="picker">
-			<span class="picker-label">font</span>
-			<select bind:value={font} class="picker-select">
-				{#each fontPairs as f}<option value={f.id}>{f.name}</option>{/each}
-			</select>
-		</label>
-	</div>
-	<div class="publish-cluster">
-		{#if activeLayer === 'foreground' && fgIsEmpty}
-			<span class="publish-warn">this letter will appear blank to others</span>
-		{/if}
-		{#if activeLayer === 'foreground'}
-			<button class="publish-btn" onclick={publish}>Publish →</button>
-		{:else}
-			<span class="publish-hint">switch to fg to publish</span>
-		{/if}
-	</div>
-</div>
+<BottomBar
+	{saveStatus}
+	{wordCount}
+	bind:theme
+	bind:motif
+	bind:font
+	{palettes}
+	motifs={motifList}
+	fonts={fontPairs}
+	{activeLayer}
+	{fgIsEmpty}
+	onPublish={publish}
+/>
 
 <style>
 	:global(*),
@@ -1413,215 +1150,6 @@
 		overflow-x: hidden;
 		position: relative;
 		transition: background 0.3s ease, color 0.3s ease;
-	}
-
-	.topbar {
-		position: fixed;
-		top: 0; left: 0; right: 0;
-		z-index: 20;
-		height: 42px;
-		display: flex;
-		align-items: center;
-		padding: 0 1.6rem;
-		background: var(--surface);
-		backdrop-filter: blur(22px);
-		-webkit-backdrop-filter: blur(22px);
-		overflow: hidden;
-	}
-	.topbar::after {
-		content: '';
-		position: absolute;
-		bottom: 0; left: 0; right: 0;
-		height: 1px;
-		background: linear-gradient(90deg, transparent 0%, var(--lavender) 20%, var(--aqua) 45%, var(--peach) 65%, var(--lilac) 80%, transparent 100%);
-		background-size: 220% 100%;
-		animation: bar-shimmer 11s ease-in-out infinite;
-		opacity: 0.5;
-	}
-	@keyframes bar-shimmer {
-		0% { background-position: 0% 0; }
-		50% { background-position: 100% 0; }
-		100% { background-position: 0% 0; }
-	}
-	.topbar-brand {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.68rem;
-		letter-spacing: 0.18em;
-		text-decoration: none;
-		position: relative;
-		z-index: 1;
-		color: var(--muted);
-	}
-	.topbar-brand:hover { color: var(--accent-strong); }
-	.topbar-label {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.57rem;
-		letter-spacing: 0.14em;
-		color: var(--muted);
-		opacity: 0.45;
-		margin-left: 1.2rem;
-		position: relative;
-		z-index: 1;
-	}
-	.layer-switch {
-		display: flex;
-		align-items: center;
-		gap: 2px;
-		margin-left: 1.4rem;
-		position: relative;
-		z-index: 1;
-	}
-	.layer-btn {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.57rem;
-		letter-spacing: 0.14em;
-		text-transform: lowercase;
-		color: var(--muted);
-		background: none;
-		border: 1px solid transparent;
-		padding: 3px 8px;
-		border-radius: 4px;
-		cursor: pointer;
-		opacity: 0.5;
-		transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
-	}
-	.layer-btn:hover { opacity: 0.9; color: var(--accent-strong); }
-	.layer-btn.active {
-		color: var(--accent-strong);
-		opacity: 1;
-		background: color-mix(in srgb, var(--accent) 22%, transparent);
-		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-	}
-	.topbar-divider {
-		display: inline-block;
-		width: 1px;
-		height: 14px;
-		background: var(--rule);
-		margin: 0 0.9rem;
-		opacity: 0.6;
-		position: relative;
-		z-index: 1;
-	}
-	.pockets-toggle {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.57rem;
-		letter-spacing: 0.14em;
-		text-transform: lowercase;
-		color: var(--muted);
-		background: none;
-		border: 1px solid transparent;
-		padding: 3px 9px;
-		border-radius: 4px;
-		cursor: pointer;
-		opacity: 0.5;
-		display: inline-flex;
-		align-items: center;
-		gap: 0.45em;
-		position: relative;
-		z-index: 1;
-		transition: color 0.22s ease, background 0.22s ease, border-color 0.22s ease, opacity 0.22s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
-	}
-	.pockets-toggle:hover { opacity: 0.9; color: var(--accent-strong); }
-	.pockets-toggle.on {
-		color: var(--accent-strong);
-		opacity: 1;
-		background: color-mix(in srgb, var(--accent) 22%, transparent);
-		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-		transform: translateY(-1px);
-	}
-	.pockets-count {
-		font-size: 0.52rem;
-		letter-spacing: 0.08em;
-		padding: 1px 5px;
-		border-radius: 8px;
-		background: color-mix(in srgb, var(--accent) 30%, transparent);
-		color: var(--accent-strong);
-		opacity: 0.85;
-	}
-	.topbar-clock {
-		margin-left: auto;
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.6rem;
-		letter-spacing: 0.1em;
-		display: flex;
-		align-items: center;
-		gap: 0.9rem;
-		position: relative;
-		z-index: 1;
-	}
-
-	.drafts-toggle {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.57rem; letter-spacing: 0.14em; text-transform: lowercase;
-		color: var(--muted); background: none; border: 1px solid transparent;
-		padding: 3px 9px; border-radius: 4px; cursor: pointer; opacity: 0.5;
-		display: inline-flex; align-items: center; gap: 0.45em;
-		position: relative; z-index: 1; margin-left: 1.4rem;
-		transition: color 0.22s ease, background 0.22s ease, border-color 0.22s ease, opacity 0.22s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
-	}
-	.drafts-toggle:hover { opacity: 0.9; color: var(--accent-strong); }
-	.drafts-toggle.on {
-		color: var(--accent-strong); opacity: 1;
-		background: color-mix(in srgb, var(--accent) 22%, transparent);
-		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-		transform: translateY(-1px);
-	}
-	.drafts-overlay {
-		position: fixed; inset: 0;
-		background: color-mix(in srgb, var(--bg) 60%, transparent);
-		backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-		z-index: 100; display: flex; align-items: flex-start; justify-content: center;
-		padding-top: 12vh;
-	}
-	.drafts-modal {
-		background: var(--surface); border: 1px solid var(--rule); border-radius: 12px;
-		width: 100%; max-width: 420px;
-		box-shadow: 0 12px 40px color-mix(in srgb, var(--bg) 80%, transparent);
-		overflow: hidden; display: flex; flex-direction: column; max-height: 70vh;
-	}
-	.drafts-header {
-		display: flex; align-items: center; justify-content: space-between;
-		padding: 1.2rem 1.4rem; border-bottom: 1px dashed var(--rule);
-	}
-	.drafts-title {
-		font-family: var(--editor-mono, var(--font-mono)); font-size: 0.75rem;
-		letter-spacing: 0.15em; text-transform: lowercase; color: var(--accent-strong); font-weight: 400;
-	}
-	.drafts-new-btn {
-		font-family: var(--editor-mono, var(--font-mono)); font-size: 0.55rem;
-		letter-spacing: 0.12em; text-transform: lowercase; color: var(--bg);
-		background: var(--accent-strong); border: none; padding: 6px 12px; border-radius: 100px;
-		cursor: pointer; transition: background 0.18s ease, transform 0.18s ease;
-	}
-	.drafts-new-btn:hover { background: var(--accent-deep); transform: translateY(-1px); }
-	.drafts-list { padding: 0.8rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem; }
-	.draft-item {
-		display: flex; align-items: center; border-radius: 8px;
-		transition: background 0.18s ease; padding: 0.4rem;
-	}
-	.draft-item:hover { background: color-mix(in srgb, var(--surface) 50%, var(--rule)); }
-	.draft-item.active { background: color-mix(in srgb, var(--accent) 15%, transparent); }
-	.draft-item-btn {
-		flex: 1; text-align: left; background: none; border: none; padding: 0.6rem;
-		cursor: pointer; display: flex; flex-direction: column; gap: 0.3rem; overflow: hidden;
-	}
-	.draft-item-title {
-		font-family: var(--editor-display, var(--font-display)); font-size: 1.1rem;
-		color: var(--accent-strong); font-style: italic; white-space: nowrap; overflow: hidden;
-		text-overflow: ellipsis; max-width: 100%;
-	}
-	.draft-item-date {
-		font-family: var(--editor-mono, var(--font-mono)); font-size: 0.5rem;
-		letter-spacing: 0.1em; color: var(--muted); opacity: 0.6;
-	}
-	.draft-item-delete {
-		background: none; border: none; font-size: 1rem; color: var(--muted); opacity: 0.3;
-		cursor: pointer; padding: 0.5rem; border-radius: 50%; width: 32px; height: 32px;
-		display: flex; align-items: center; justify-content: center; margin-left: 0.4rem;
-		transition: opacity 0.18s ease, color 0.18s ease, background 0.18s ease;
-	}
-	.draft-item-delete:hover {
-		opacity: 1; color: var(--accent-strong); background: color-mix(in srgb, var(--accent) 20%, transparent);
 	}
 
 	.editor-page {
@@ -1867,48 +1395,6 @@
 	}
 	.doc-title::placeholder { color: var(--muted); opacity: 0.28; }
 
-	.toolbar {
-		display: flex;
-		align-items: center;
-		gap: 1px;
-		padding-bottom: 0.75rem;
-		margin-bottom: 1.6rem;
-		border-bottom: 1px solid var(--rule);
-		flex-wrap: wrap;
-		row-gap: 4px;
-	}
-	.tool-btn {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.6rem;
-		letter-spacing: 0.05em;
-		color: var(--muted);
-		background: none;
-		border: 1px solid transparent;
-		padding: 4px 9px;
-		border-radius: 5px;
-		cursor: pointer;
-		transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
-		line-height: 1.2;
-		user-select: none;
-	}
-	.tool-btn:hover {
-		background: color-mix(in srgb, var(--accent) 25%, transparent);
-		color: var(--accent-strong);
-		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-	}
-	.tool-btn.active {
-		background: color-mix(in srgb, var(--accent) 30%, transparent);
-		color: var(--accent-strong);
-		border-color: color-mix(in srgb, var(--accent) 50%, transparent);
-	}
-	.tool-sep {
-		width: 1px;
-		height: 13px;
-		background: var(--rule);
-		margin: 0 5px;
-		flex-shrink: 0;
-	}
-
 	.doc-body, .doc-body :global(*) {
 		font-family: var(--editor-body, var(--font-body));
 	}
@@ -2110,104 +1596,6 @@
 		transform: translateY(-1px);
 	}
 	.pocket-add-plus { font-size: 0.85rem; line-height: 1; font-weight: 400; }
-
-	.bottom-bar {
-		position: fixed;
-		bottom: 0; left: 0; right: 0;
-		min-height: 46px;
-		display: flex; align-items: center; justify-content: space-between;
-		padding: 0.4rem 1.8rem;
-		background: var(--surface);
-		backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
-		border-top: 1px solid var(--rule);
-		z-index: 20;
-		flex-wrap: wrap; gap: 0.6rem;
-	}
-	.bottom-meta {
-		display: flex; align-items: center; gap: 1.2rem;
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.57rem; letter-spacing: 0.1em;
-		flex-wrap: wrap;
-	}
-	.save-status {
-		transition: color 0.3s ease, opacity 0.3s ease;
-		color: var(--muted); opacity: 0.5;
-	}
-	.save-status.saving { color: var(--accent-deep); opacity: 0.9; }
-	.word-count { color: var(--muted); opacity: 0.45; }
-	.picker-sep { color: var(--muted); opacity: 0.3; }
-	.picker { display: inline-flex; align-items: center; gap: 0.4rem; }
-	.picker-label { color: var(--muted); opacity: 0.55; text-transform: uppercase; }
-	.picker-select {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.6rem; letter-spacing: 0.06em;
-		color: var(--accent-strong);
-		background: transparent;
-		border: 1px solid var(--rule);
-		padding: 3px 18px 3px 8px; border-radius: 4px;
-		cursor: pointer;
-		appearance: none; -webkit-appearance: none;
-		background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
-			linear-gradient(-45deg, transparent 50%, var(--muted) 50%);
-		background-position: calc(100% - 9px) 50%, calc(100% - 5px) 50%;
-		background-size: 4px 4px, 4px 4px;
-		background-repeat: no-repeat;
-	}
-	.picker-select:focus { outline: none; border-color: var(--accent); }
-
-	.publish-cluster { display: flex; align-items: center; gap: 0.9rem; }
-	.publish-warn {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.55rem; letter-spacing: 0.12em;
-		text-transform: lowercase; color: var(--muted);
-		opacity: 0.7; font-style: italic;
-	}
-	.publish-hint {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.55rem; letter-spacing: 0.12em;
-		text-transform: lowercase; color: var(--muted); opacity: 0.5;
-	}
-	.publish-btn {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-weight: 300; font-size: 0.62rem;
-		letter-spacing: 0.16em; text-transform: uppercase;
-		color: var(--bg); background: var(--accent-strong);
-		border: none; padding: 8px 24px; border-radius: 100px;
-		cursor: pointer;
-		transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
-	}
-	.publish-btn:hover { background: var(--accent-deep); transform: translateY(-1px); }
-	.publish-btn:active { transform: translateY(0); }
-
-	.overlay {
-		position: fixed; inset: 0;
-		background: color-mix(in srgb, var(--bg) 0%, transparent);
-		display: flex; flex-direction: column;
-		align-items: center; justify-content: center;
-		z-index: 100; pointer-events: none;
-		transition: background 0.5s ease;
-	}
-	.overlay.active {
-		background: color-mix(in srgb, var(--bg) 94%, transparent);
-		pointer-events: all;
-	}
-	.overlay-word {
-		font-family: var(--editor-display, var(--font-display));
-		font-size: clamp(2.5rem, 7vw, 4.5rem);
-		font-weight: 300; font-style: italic;
-		color: var(--accent-strong);
-		opacity: 0; transform: translateY(12px);
-		transition: opacity 0.55s ease 0.35s, transform 0.55s ease 0.35s;
-	}
-	.overlay.active .overlay-word { opacity: 1; transform: translateY(0); }
-	.overlay-sub {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.6rem; letter-spacing: 0.16em;
-		text-transform: uppercase; color: var(--muted);
-		opacity: 0; margin-top: 1rem;
-		transition: opacity 0.4s ease 0.65s;
-	}
-	.overlay.active .overlay-sub { opacity: 0.5; }
 
 	/* ── binder ── */
 	.binder-tabs {
