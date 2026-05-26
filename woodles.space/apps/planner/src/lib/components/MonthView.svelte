@@ -34,7 +34,7 @@
 	}
 
 	function isDayOff(date: Date): boolean {
-		return store.getDayType(date) === 'day-off';
+		return store.isRestful(date);
 	}
 </script>
 

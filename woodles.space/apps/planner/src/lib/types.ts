@@ -1,13 +1,24 @@
-export type DayType = 'weekday-work' | 'day-off';
-
-export type BlockTemplate = {
+export type Block = {
 	id: string;
 	startTime: string; // "HH:MM" 24h
 	endTime: string;
 	title: string;
-	bellId: string;
-	voicePrompt: string;
+	bellId?: string;
+	voicePrompt?: string;
 	flourishEligible?: boolean;
+	domainId?: string;
+};
+
+export type DayShape = {
+	id: string;
+	name: string;
+	blocks: Block[];
+	restful?: boolean; // hints to UI that this is "off-like" (styling, badges)
+};
+
+// Indexed by Date.getDay() — 0=Sun .. 6=Sat. Each slot is a DayShape id.
+export type WeekPattern = {
+	days: [string, string, string, string, string, string, string];
 };
 
 export type Task = {
@@ -39,7 +50,7 @@ export type Domain = {
 
 export type DayInstance = {
 	date: string; // YYYY-MM-DD
-	dayType: DayType;
+	dayShapeId: string;
 };
 
 export type PlannerSettings = {
@@ -50,6 +61,7 @@ export type PlannerSettings = {
 	bellsEnabled: boolean;
 	dayCycleEnabled: boolean;
 	fixedPaletteMode: string | null; // null = shift with time
+	onboardingComplete: boolean;
 };
 
 export type Bell = {

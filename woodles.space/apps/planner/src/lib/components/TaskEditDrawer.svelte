@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { store } from '$lib/store.svelte';
-	import { getTemplate } from '$lib/templates';
 
 	let localTitle = $state('');
 	let localDomainId = $state('');
@@ -33,12 +32,7 @@
 		}
 	});
 
-	const allBlocks = $derived.by(() => {
-		const weekday = getTemplate('weekday-work');
-		const dayoff = getTemplate('day-off');
-		const seen = new Set(weekday.map((b) => b.id));
-		return [...weekday, ...dayoff.filter((b) => !seen.has(b.id))];
-	});
+	const allBlocks = $derived(store.getAllBlocks());
 
 	function commitAndClose() {
 		const id = store.editingTaskId;
