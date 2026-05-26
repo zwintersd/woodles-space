@@ -7,6 +7,9 @@
 	import EditorToolbar from '$lib/EditorToolbar.svelte';
 	import DraftsModal from '$lib/DraftsModal.svelte';
 	import PocketsPanel from '$lib/PocketsPanel.svelte';
+	import MarginNotesColumn from '$lib/MarginNotes.svelte';
+	import SelectionPopover from '$lib/SelectionPopover.svelte';
+	import Binder from '$lib/Binder.svelte';
 	import PublishOverlay from '$lib/PublishOverlay.svelte';
 	import {
 		ANCHOR_BLOCK_SELECTOR,
@@ -42,12 +45,15 @@
 	} from '$lib/drafts';
 	import {
 		newId,
-		pocketLayerLabel,
 		type LayerId,
 		type PocketLayer,
 		type PocketNote,
 		type PocketsOrder,
-		type MarginNote
+		type MarginNote,
+		type BinderTab,
+		type LayerStat,
+		type MarginEntry,
+		type MarginGroup
 	} from '$lib/types';
 	import {
 		palettes,
@@ -103,7 +109,6 @@
 	// FG version counter — bumped on FG input so binder previews recompute.
 	let fgVersion = $state(0);
 
-	type BinderTab = 'layers' | 'pockets' | 'notes';
 	let binderOpen = $state<BinderTab | null>(null);
 	let pocketsFilter = $state<'all' | PocketLayer>('all');
 
@@ -130,7 +135,6 @@
 		activeLayer === 'background' ? 'background' : 'midground'
 	);
 
-	type MarginGroup = { anchorId: string; offsetTop: number; notes: MarginNote[] };
 	const visibleMarginGroups = $derived.by<MarginGroup[]>(() => {
 		const groups = new Map<string, MarginNote[]>();
 		for (const note of marginNotes) {
@@ -649,11 +653,6 @@
 		el?.focus();
 	}
 
-	function marginBody(node: HTMLElement, html: string) {
-		node.innerHTML = html ?? '';
-		return {};
-	}
-
 	function onMarginInput(id: string, e: Event) {
 		const html = (e.currentTarget as HTMLElement).innerHTML;
 		const idx = marginNotes.findIndex((m) => m.id === id);
@@ -684,7 +683,6 @@
 
 	// ── binder ──
 
-	type LayerStat = { id: LayerId; words: number; preview: string; isEmpty: boolean };
 	const layerStats = $derived.by<LayerStat[]>(() => {
 		void fgVersion;
 		const items: LayerStat[] = [];
@@ -705,14 +703,6 @@
 		return items;
 	});
 
-	const filteredPockets = $derived.by(() => {
-		const arr = pocketsFilter === 'all' ? pockets : pockets.filter((p) => p.layer === pocketsFilter);
-		return pocketsOrder === 'oldest'
-			? [...arr].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-			: [...arr].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-	});
-
-	type MarginEntry = { id: string; anchorId: string; preview: string; passage: string };
 	const marginEntries = $derived.by<MarginEntry[]>(() => {
 		void fgVersion;
 		const out: MarginEntry[] = [];
@@ -728,18 +718,6 @@
 		}
 		return out.sort((a, b) => a.anchorId.localeCompare(b.anchorId));
 	});
-
-	function toggleBinder(tab: BinderTab) {
-		binderOpen = binderOpen === tab ? null : tab;
-	}
-	function closeBinder() {
-		binderOpen = null;
-	}
-	function onBinderKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape' && binderOpen) {
-			binderOpen = null;
-		}
-	}
 
 	async function gotoLayer(layer: LayerId) {
 		await setActiveLayer(layer);
@@ -770,11 +748,6 @@
 		noteEl?.focus();
 	}
 
-	$effect(() => {
-		if (typeof window === 'undefined') return;
-		window.addEventListener('keydown', onBinderKeydown);
-		return () => window.removeEventListener('keydown', onBinderKeydown);
-	});
 </script>
 
 <div class="motif-grain"></div>
@@ -886,183 +859,36 @@
 		{/if}
 	</div>
 
-	<aside
-		class="margin-column"
-		class:hidden={activeLayer !== 'foreground'}
-		bind:this={marginColumnEl}
-		aria-label="margin notes"
-	>
-		{#each visibleMarginGroups as group (group.anchorId)}
-			<div class="margin-group" style:top="{group.offsetTop}px">
-				{#each group.notes as note (note.id)}
-					<div
-						class="margin-note"
-						in:fly={{ y: 6, duration: 220, easing: cubicOut }}
-						out:fly={{ y: -3, duration: 140, easing: cubicOut }}
-					>
-						<span class="margin-anchor-ref" title="anchored to {group.anchorId}">{group.anchorId}</span>
-						<div
-							class="margin-body"
-							contenteditable="true"
-							spellcheck="true"
-							use:marginBody={note.html}
-							oninput={(e) => onMarginInput(note.id, e)}
-							onpaste={handlePaste}
-							data-margin-id={note.id}
-							data-placeholder="margin note…"
-							role="textbox"
-							tabindex="0"
-						></div>
-						<div class="margin-controls">
-							{#if confirmingMarginId === note.id}
-								<button class="margin-confirm"
-									onclick={() => confirmDeleteMargin(note.id)}
-									onblur={cancelConfirmDeleteMargin}>remove?</button>
-							{:else}
-								<button class="margin-x"
-									onclick={() => startConfirmDeleteMargin(note.id)}
-									title="remove margin note"
-									aria-label="remove margin note">×</button>
-							{/if}
-						</div>
-					</div>
-				{/each}
-			</div>
-		{/each}
-	</aside>
+	<MarginNotesColumn
+		bind:columnEl={marginColumnEl}
+		groups={visibleMarginGroups}
+		confirmingId={confirmingMarginId}
+		hidden={activeLayer !== 'foreground'}
+		onInput={onMarginInput}
+		onPaste={handlePaste}
+		onStartConfirmDelete={startConfirmDeleteMargin}
+		onCancelConfirmDelete={cancelConfirmDeleteMargin}
+		onConfirmDelete={confirmDeleteMargin}
+	/>
 </div>
 
-{#if selectionRect && selectionAnchorId && activeLayer === 'foreground'}
-	<div
-		class="selection-popover"
-		style:top="{selectionRect.top - 38}px"
-		style:left="{selectionRect.left + selectionRect.width / 2}px"
-	>
-		<button
-			class="selection-popover-btn"
-			onmousedown={(e) => {
-				e.preventDefault();
-				if (selectionAnchorId) addMarginNote(selectionAnchorId);
-			}}
-			title="add margin note"
-		>+ note</button>
-	</div>
-{/if}
+<SelectionPopover
+	rect={selectionRect && selectionAnchorId && activeLayer === 'foreground' ? selectionRect : null}
+	onAdd={() => { if (selectionAnchorId) addMarginNote(selectionAnchorId); }}
+/>
 
-<!-- ── binder: right-edge tabs + slide-in panel ── -->
-<div class="binder-tabs" role="tablist" aria-label="binder">
-	{#each ['layers', 'pockets', 'notes'] as tab (tab)}
-		<button
-			class="binder-tab"
-			class:active={binderOpen === tab}
-			role="tab"
-			aria-selected={binderOpen === tab}
-			onclick={() => toggleBinder(tab as BinderTab)}
-			title={tab}
-		>
-			<span class="binder-tab-label">{tab}</span>
-		</button>
-	{/each}
-</div>
-
-<aside
-	class="binder-panel"
-	class:open={binderOpen !== null}
-	aria-hidden={binderOpen === null}
-	role="region"
->
-	{#if binderOpen === 'layers'}
-		<header class="binder-header">
-			<span class="binder-header-eyebrow">binder</span>
-			<span class="binder-header-title">layers</span>
-		</header>
-		<div class="binder-body">
-			{#each layerStats as stat (stat.id)}
-				<button
-					class="binder-row layer-row"
-					class:active={activeLayer === stat.id}
-					onclick={() => gotoLayer(stat.id)}
-					title="edit {stat.id}"
-				>
-					<span class="binder-row-head">
-						<span class="binder-row-name">{stat.id}</span>
-						<span class="binder-row-meta">{stat.words} word{stat.words === 1 ? '' : 's'}</span>
-					</span>
-					<span class="binder-row-preview" class:dim={stat.isEmpty}>
-						{stat.isEmpty ? 'empty' : stat.preview}
-					</span>
-				</button>
-			{/each}
-		</div>
-	{/if}
-
-	{#if binderOpen === 'pockets'}
-		<header class="binder-header">
-			<span class="binder-header-eyebrow">binder</span>
-			<span class="binder-header-title">pockets · {pockets.length}</span>
-		</header>
-		<div class="binder-controls">
-			<div class="binder-filter">
-				{#each ['all', 'midground', 'background'] as f (f)}
-					<button
-						class="binder-filter-btn"
-						class:active={pocketsFilter === f}
-						onclick={() => (pocketsFilter = f as 'all' | PocketLayer)}
-					>{f === 'all' ? 'all' : f === 'midground' ? 'mg' : 'bg'}</button>
-				{/each}
-			</div>
-			<button class="binder-sort" onclick={flipPocketsOrder} title="flip ordering">
-				{pocketsOrder === 'oldest' ? 'oldest ↓' : 'newest ↑'}
-			</button>
-		</div>
-		<div class="binder-body">
-			{#if filteredPockets.length === 0}
-				<p class="binder-empty">nothing here.</p>
-			{:else}
-				{#each filteredPockets as note (note.id)}
-					<button
-						class="binder-row pocket-row pocket-row-{note.layer}"
-						onclick={() => gotoPocket(note.id, note.layer)}
-						title="open in inside cover"
-					>
-						<span class="binder-row-head">
-							<span class="binder-chip">{pocketLayerLabel(note.layer)}</span>
-						</span>
-						<span class="binder-row-preview" class:dim={isEmptyHtml(note.html)}>
-							{isEmptyHtml(note.html) ? '(empty)' : previewText(note.html, 110)}
-						</span>
-					</button>
-				{/each}
-			{/if}
-		</div>
-	{/if}
-
-	{#if binderOpen === 'notes'}
-		<header class="binder-header">
-			<span class="binder-header-eyebrow">binder</span>
-			<span class="binder-header-title">margin notes · {marginEntries.length}</span>
-		</header>
-		<div class="binder-body">
-			{#if marginEntries.length === 0}
-				<p class="binder-empty">no margin notes yet.</p>
-			{:else}
-				{#each marginEntries as entry (entry.id)}
-					<button
-						class="binder-row margin-row"
-						onclick={() => gotoMarginNote(entry.id, entry.anchorId)}
-						title="scroll to {entry.anchorId}"
-					>
-						<span class="binder-row-head">
-							<span class="binder-chip binder-chip-anchor">{entry.anchorId}</span>
-						</span>
-						<span class="binder-row-passage">{entry.passage || '(passage missing)'}</span>
-						<span class="binder-row-preview">{entry.preview}</span>
-					</button>
-				{/each}
-			{/if}
-		</div>
-	{/if}
-</aside>
+<Binder
+	bind:open={binderOpen}
+	{activeLayer}
+	{layerStats}
+	{pockets}
+	bind:filter={pocketsFilter}
+	bind:order={pocketsOrder}
+	{marginEntries}
+	onLayerGoto={gotoLayer}
+	onPocketGoto={gotoPocket}
+	onMarginGoto={gotoMarginNote}
+/>
 
 <BottomBar
 	{saveStatus}
@@ -1117,158 +943,12 @@
 	.editor-wrap[data-layer='midground'] { max-width: 600px; }
 	.editor-wrap[data-layer='background'] { max-width: 540px; }
 
-	.margin-column {
-		position: relative;
-		width: 280px;
-		flex-shrink: 0;
-		padding-top: 84px;
-		padding-bottom: 96px;
-		min-height: 100vh;
-	}
-	.margin-column.hidden { visibility: hidden; }
-
-	.margin-group {
-		position: absolute;
-		left: 0;
-		right: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 0.45rem;
-		transition: top 0.18s ease;
-	}
-	.margin-note {
-		position: relative;
-		padding: 0.7rem 2rem 0.7rem 0.9rem;
-		border: 1px solid var(--rule);
-		border-radius: 6px;
-		background: color-mix(in srgb, var(--surface) 50%, transparent);
-		transition: border-color 0.22s ease, background 0.22s ease, box-shadow 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
-	}
-	.margin-note:focus-within {
-		border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-		background: color-mix(in srgb, var(--surface) 80%, transparent);
-		box-shadow: 0 1px 0 color-mix(in srgb, var(--accent) 18%, transparent);
-	}
-	.margin-anchor-ref {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.48rem;
-		letter-spacing: 0.16em;
-		text-transform: lowercase;
-		color: var(--muted);
-		opacity: 0.45;
-		display: block;
-		margin-bottom: 0.35rem;
-	}
-	.margin-body {
-		font-family: var(--editor-body, var(--font-body));
-		font-size: 0.86rem;
-		line-height: 1.55;
-		color: var(--muted);
-		font-style: italic;
-		outline: none;
-		caret-color: var(--accent-deep);
-		min-height: 1.2em;
-	}
-	.margin-body :global(*) { font-family: var(--editor-body, var(--font-body)); }
-	.margin-body :global(strong) { font-weight: 600; font-style: italic; }
-	.margin-body :global(em) { font-style: normal; }
-	.margin-body:empty::before {
-		content: attr(data-placeholder);
-		color: var(--muted);
-		opacity: 0.3;
-		pointer-events: none;
-	}
-	.margin-controls {
-		position: absolute;
-		top: 0.25rem;
-		right: 0.35rem;
-	}
-	.margin-x {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.78rem;
-		line-height: 1;
-		color: var(--muted);
-		background: none;
-		border: none;
-		padding: 3px 6px;
-		border-radius: 50%;
-		cursor: pointer;
-		opacity: 0.3;
-		transition: color 0.18s ease, background 0.18s ease, opacity 0.18s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
-	}
-	.margin-x:hover {
-		opacity: 0.95;
-		color: var(--accent-strong);
-		background: color-mix(in srgb, var(--accent) 18%, transparent);
-		transform: rotate(90deg);
-	}
-	.margin-confirm {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.5rem;
-		letter-spacing: 0.12em;
-		text-transform: lowercase;
-		color: var(--accent-strong);
-		background: color-mix(in srgb, var(--accent) 25%, transparent);
-		border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-		padding: 2px 8px;
-		border-radius: 12px;
-		cursor: pointer;
-		font-style: italic;
-		transition: background 0.2s ease, border-color 0.2s ease;
-	}
-	.margin-confirm:hover {
-		background: color-mix(in srgb, var(--accent) 40%, transparent);
-		border-color: var(--accent-strong);
-	}
-
-	/* selection popover */
-	.selection-popover {
-		position: absolute;
-		z-index: 50;
-		transform: translateX(-50%);
-		animation: pop-rise 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-	}
-	@keyframes pop-rise {
-		from { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.96); }
-		to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
-	}
-	.selection-popover-btn {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.58rem;
-		letter-spacing: 0.14em;
-		text-transform: lowercase;
-		color: var(--bg);
-		background: var(--accent-strong);
-		border: none;
-		padding: 6px 14px;
-		border-radius: 100px;
-		cursor: pointer;
-		box-shadow: 0 4px 14px color-mix(in srgb, var(--accent-deep) 35%, transparent);
-		transition: background 0.18s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
-	}
-	.selection-popover-btn:hover {
-		background: var(--accent-deep);
-		transform: translateY(-1px);
-	}
-
-	/* ── narrow screen fallback for margin column ── */
+	/* ── narrow screen fallback for editor-page ── */
 	@media (max-width: 1100px) {
 		.editor-page {
 			flex-direction: column;
 			align-items: center;
 			gap: 0;
-		}
-		.margin-column {
-			width: 100%;
-			max-width: 680px;
-			min-height: 0;
-			padding-top: 0;
-			padding-bottom: 1rem;
-		}
-		.margin-column.hidden { display: none; visibility: visible; }
-		.margin-group {
-			position: static;
-			margin: 0 clamp(1.5rem, 5vw, 2.5rem) 0.6rem;
 		}
 	}
 
@@ -1398,254 +1078,12 @@
 	}
 
 
-	/* ── binder ── */
-	.binder-tabs {
-		position: fixed;
-		right: 0;
-		top: 50%;
-		transform: translateY(-50%);
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		z-index: 30;
-	}
-	.binder-tab {
-		writing-mode: vertical-rl;
-		transform: rotate(180deg);
-		padding: 12px 6px;
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.55rem;
-		letter-spacing: 0.18em;
-		text-transform: lowercase;
-		color: var(--muted);
-		background: var(--surface);
-		backdrop-filter: blur(18px);
-		-webkit-backdrop-filter: blur(18px);
-		border: 1px solid var(--rule);
-		border-right: none;
-		border-radius: 6px 0 0 6px;
-		cursor: pointer;
-		opacity: 0.75;
-		transition: color 0.22s ease, background 0.22s ease, border-color 0.22s ease, opacity 0.22s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1), padding-right 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
-	}
-	.binder-tab:hover {
-		opacity: 1;
-		color: var(--accent-strong);
-	}
-	.binder-tab.active {
-		color: var(--accent-strong);
-		opacity: 1;
-		background: color-mix(in srgb, var(--accent) 22%, var(--surface) 78%);
-		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-		padding-right: 10px;
-	}
-	.binder-tab-label { display: inline-block; }
-
-	.binder-panel {
-		position: fixed;
-		top: 42px;
-		bottom: 46px;
-		right: 32px;
-		width: min(360px, calc(100vw - 64px));
-		background: var(--surface);
-		backdrop-filter: blur(22px);
-		-webkit-backdrop-filter: blur(22px);
-		border-left: 1px solid var(--rule);
-		z-index: 25;
-		display: flex;
-		flex-direction: column;
-		transform: translateX(calc(100% + 32px));
-		transition: transform 0.34s cubic-bezier(0.34, 1.36, 0.64, 1), box-shadow 0.34s ease;
-		box-shadow: none;
-	}
-	.binder-panel.open {
-		transform: translateX(0);
-		box-shadow: -10px 0 36px color-mix(in srgb, var(--accent-deep) 16%, transparent);
-	}
-
-	.binder-header {
-		padding: 1.1rem 1.2rem 0.75rem;
-		border-bottom: 1px solid var(--rule);
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-	}
-	.binder-header-eyebrow {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.5rem;
-		letter-spacing: 0.22em;
-		text-transform: uppercase;
-		color: var(--muted);
-		opacity: 0.55;
-	}
-	.binder-header-title {
-		font-family: var(--editor-display, var(--font-display));
-		font-size: 1.25rem;
-		font-weight: 300;
-		font-style: italic;
-		color: var(--accent-strong);
-	}
-
-	.binder-controls {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.75rem;
-		padding: 0.7rem 1.2rem 0.6rem;
-		border-bottom: 1px solid var(--rule);
-	}
-	.binder-filter { display: inline-flex; gap: 2px; }
-	.binder-filter-btn {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.52rem;
-		letter-spacing: 0.14em;
-		text-transform: lowercase;
-		color: var(--muted);
-		background: none;
-		border: 1px solid transparent;
-		padding: 3px 8px;
-		border-radius: 4px;
-		cursor: pointer;
-		opacity: 0.55;
-		transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
-	}
-	.binder-filter-btn:hover { opacity: 0.95; color: var(--accent-strong); }
-	.binder-filter-btn.active {
-		color: var(--accent-strong);
-		opacity: 1;
-		background: color-mix(in srgb, var(--accent) 22%, transparent);
-		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-	}
-	.binder-sort {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.52rem;
-		letter-spacing: 0.14em;
-		text-transform: lowercase;
-		color: var(--muted);
-		background: none;
-		border: 1px dashed transparent;
-		padding: 3px 8px;
-		border-radius: 4px;
-		cursor: pointer;
-		opacity: 0.6;
-		transition: color 0.18s ease, border-color 0.18s ease, opacity 0.18s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
-	}
-	.binder-sort:hover {
-		opacity: 0.95;
-		color: var(--accent-strong);
-		border-color: color-mix(in srgb, var(--accent) 35%, transparent);
-		transform: translateY(-1px);
-	}
-
-	.binder-body {
-		flex: 1;
-		overflow-y: auto;
-		padding: 0.7rem 1.2rem 1.4rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-	.binder-empty {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.6rem;
-		letter-spacing: 0.1em;
-		color: var(--muted);
-		opacity: 0.4;
-		font-style: italic;
-		padding: 1rem 0.4rem;
-		text-align: center;
-	}
-
-	.binder-row {
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-		padding: 0.7rem 0.85rem;
-		border: 1px solid var(--rule);
-		border-radius: 6px;
-		background: color-mix(in srgb, var(--surface) 30%, transparent);
-		text-align: left;
-		cursor: pointer;
-		transition: border-color 0.2s ease, background 0.2s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
-		font-family: var(--editor-mono, var(--font-mono));
-	}
-	.binder-row:hover {
-		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-		background: color-mix(in srgb, var(--surface) 70%, transparent);
-		transform: translateY(-1px);
-	}
-	.binder-row.active {
-		border-color: color-mix(in srgb, var(--accent) 60%, transparent);
-		background: color-mix(in srgb, var(--accent) 12%, var(--surface) 88%);
-	}
-	.binder-row-head {
-		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: 0.5rem;
-	}
-	.binder-row-name {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.6rem;
-		letter-spacing: 0.16em;
-		text-transform: lowercase;
-		color: var(--accent-strong);
-	}
-	.binder-row.active .binder-row-name { color: var(--accent-deep); }
-	.binder-row-meta {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.5rem;
-		letter-spacing: 0.1em;
-		color: var(--muted);
-		opacity: 0.6;
-	}
-	.binder-row-preview {
-		font-family: var(--editor-body, var(--font-body));
-		font-size: 0.78rem;
-		line-height: 1.45;
-		color: var(--muted);
-		font-style: italic;
-	}
-	.binder-row-preview.dim { opacity: 0.4; }
-	.binder-row-passage {
-		font-family: var(--editor-body, var(--font-body));
-		font-size: 0.74rem;
-		line-height: 1.4;
-		color: var(--text);
-		opacity: 0.85;
-		display: -webkit-box;
-		-webkit-line-clamp: 2;
-		line-clamp: 2;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
-	}
-	.binder-chip {
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.5rem;
-		letter-spacing: 0.16em;
-		text-transform: lowercase;
-		color: var(--muted);
-		background: color-mix(in srgb, var(--surface) 90%, transparent);
-		padding: 1px 5px;
-		border-radius: 6px;
-		opacity: 0.7;
-	}
-	.binder-chip-anchor { color: var(--accent-deep); }
-
-	.pocket-row-background { border-style: dashed; }
-	.pocket-row-background .binder-row-preview { opacity: 0.7; }
-
-	/* anchor flash for "scroll to" feedback */
+	/* anchor flash for "scroll to" feedback (the anchor lives in .doc-body
+	   in the parent; the binder's gotoMarginNote adds the class there). */
 	.doc-body :global(.anchor-flash) {
 		background: color-mix(in srgb, var(--accent) 22%, transparent);
 		transition: background 1.2s ease;
 		border-radius: 3px;
 	}
 
-	@media (max-width: 700px) {
-		.binder-panel {
-			right: 28px;
-			width: calc(100vw - 56px);
-		}
-	}
 </style>

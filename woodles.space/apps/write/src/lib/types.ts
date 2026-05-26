@@ -25,3 +25,25 @@ export function pocketLayerLabel(layer: PocketLayer): string {
 export function newId(prefix: string): string {
 	return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
 }
+
+export type BinderTab = 'layers' | 'pockets' | 'notes';
+
+export type LayerStat = {
+	id: LayerId;
+	words: number;
+	preview: string;
+	isEmpty: boolean;
+};
+
+export type MarginEntry = {
+	id: string;
+	anchorId: string;
+	preview: string;
+	passage: string;
+};
+
+export type MarginGroup = {
+	anchorId: string;
+	offsetTop: number;
+	notes: MarginNote[];
+};
