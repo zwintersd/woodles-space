@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { store } from '$lib/store.svelte';
 	import { getWeekDays, DOW_LABELS, MONTH_NAMES_SHORT, weekRangeLabel, isSameDay, isBeforeDay } from '$lib/calendar';
-	import { getTemplate } from '$lib/templates';
 	import { dateKey, timeToMinutes, nowMinutes } from '$lib/utils';
 
 	let { stub = '' }: { stub?: string } = $props();
@@ -100,8 +99,8 @@
 		<div class="wv-columns">
 			{#each days as day, i}
 				{@const today = isSameDay(day, store.now)}
-				{@const dayType = store.getDayType(day)}
-				{@const blocks = getTemplate(dayType)}
+				{@const shape = store.getDayShape(day)}
+				{@const blocks = shape?.blocks ?? []}
 
 				<div class="wv-col" class:today>
 					<!-- Column header -->
@@ -113,7 +112,7 @@
 							onclick={() => store.openDayPanel(dateKey(day))}
 							title="view {day.toDateString()}"
 						>{day.getDate()}</button>
-						{#if dayType === 'day-off'}
+						{#if shape?.restful}
 							<span class="wv-off-badge">off</span>
 						{/if}
 					</div>

@@ -10,9 +10,10 @@
 	import { getDailyFlourish, shouldShowFlourish } from '$lib/voice';
 	import TaskItem from './TaskItem.svelte';
 
-	let dayType = $derived(store.getDayType(store.now));
-	let currentBlock = $derived(getCurrentBlock(dayType, store.now));
-	let nextBlock = $derived(getNextBlock(dayType, store.now));
+	let dayShape = $derived(store.getDayShape(store.now));
+	let blocks = $derived(store.getBlocksForDate(store.now));
+	let currentBlock = $derived(getCurrentBlock(blocks, store.now));
+	let nextBlock = $derived(getNextBlock(blocks, store.now));
 	let remaining = $derived(currentBlock ? minutesRemaining(currentBlock, store.now) : null);
 	let untilNext = $derived(nextBlock ? minutesUntilBlock(nextBlock, store.now) : null);
 	let currentTasks = $derived(
@@ -42,7 +43,7 @@
 		return Math.min(100, Math.max(0, ((total - remaining) / total) * 100));
 	});
 
-	const dayTypeLabel = $derived(dayType === 'weekday-work' ? 'work day' : 'day off');
+	const dayShapeLabel = $derived(dayShape?.name ?? 'no shape');
 
 	let newTaskTitle = $state('');
 	let inputEl: HTMLInputElement | undefined = $state();
@@ -76,10 +77,10 @@
 
 		<button
 			class="nn-daytype"
-			onclick={() => store.toggleDayType(store.now)}
-			title="toggle day type"
+			onclick={() => store.cycleDayShape(store.now)}
+			title="cycle day shape"
 		>
-			{dayTypeLabel}
+			{dayShapeLabel}
 		</button>
 	</header>
 

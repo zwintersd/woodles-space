@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { store } from '$lib/store.svelte';
-	import { getTemplate } from '$lib/templates';
 	import { dayOfWeekLabel, shortDateLabel } from '$lib/utils';
 	import TaskItem from './TaskItem.svelte';
 
@@ -12,10 +11,10 @@
 		return new Date(y, m - 1, d);
 	});
 
-	const dayType = $derived(date ? store.getDayType(date) : 'weekday-work');
-	const blocks = $derived(getTemplate(dayType));
+	const dayShape = $derived(date ? store.getDayShape(date) : null);
+	const blocks = $derived(date ? store.getBlocksForDate(date) : []);
 	const tasks = $derived(dateStr ? store.getTasksForDay(dateStr) : []);
-	const dayTypeLabel = $derived(dayType === 'weekday-work' ? 'work day' : 'day off');
+	const dayShapeLabel = $derived(dayShape?.name ?? 'no shape');
 
 	const blocksWithTasks = $derived(
 		blocks
@@ -43,9 +42,9 @@
 		addTitle = '';
 	}
 
-	function toggleDayType() {
+	function cycleShape() {
 		if (!date) return;
-		store.toggleDayType(date);
+		store.cycleDayShape(date);
 	}
 </script>
 
@@ -71,7 +70,7 @@
 				<span class="dp-date">{shortDateLabel(date)}</span>
 			</div>
 			<div class="dp-header-right">
-				<button class="dp-daytype" onclick={toggleDayType}>{dayTypeLabel}</button>
+				<button class="dp-daytype" onclick={cycleShape}>{dayShapeLabel}</button>
 				<button class="dp-close" onclick={close} aria-label="close">×</button>
 			</div>
 		</header>

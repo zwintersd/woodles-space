@@ -4,9 +4,9 @@
 	import { minutesToDisplay, dayOfWeekLabel, shortDateLabel, nowMinutes, dateKey, timeToMinutes } from '$lib/utils';
 	import TaskItem from './TaskItem.svelte';
 
-	let dayType = $derived(store.getDayType(store.now));
+	let dayShape = $derived(store.getDayShape(store.now));
 	let blocks = $derived(store.getBlocksForDate(store.now));
-	let currentBlock = $derived(getCurrentBlock(dayType, store.now));
+	let currentBlock = $derived(getCurrentBlock(blocks, store.now));
 	let unscheduled = $derived(store.getUnscheduledTasks());
 	let todayKey = $derived(dateKey(store.now));
 
@@ -44,7 +44,7 @@
 		return timeToMinutes(block.endTime) <= nowMinutes(store.now);
 	}
 
-	const dayTypeLabel = $derived(dayType === 'weekday-work' ? 'work day' : 'day off');
+	const dayShapeLabel = $derived(dayShape?.name ?? 'no shape');
 </script>
 
 <div class="today-board">
@@ -54,8 +54,8 @@
 			<span class="tb-heading">TODAY</span>
 			<span class="tb-date">{dayOfWeekLabel(store.now)}, {shortDateLabel(store.now)}</span>
 		</div>
-		<button class="tb-daytype" onclick={() => store.toggleDayType(store.now)} title="toggle day type">
-			{dayTypeLabel}
+		<button class="tb-daytype" onclick={() => store.cycleDayShape(store.now)} title="cycle day shape">
+			{dayShapeLabel}
 		</button>
 	</header>
 

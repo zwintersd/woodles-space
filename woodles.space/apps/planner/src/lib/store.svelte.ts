@@ -1,5 +1,20 @@
-import type { Task, DayInstance, DayType, PlannerSettings, View, BinderTab, Domain } from './types';
-import { getTemplate, defaultDayType, getCurrentBlock, getNextBlock } from './templates';
+import type {
+	Task,
+	DayInstance,
+	DayShape,
+	WeekPattern,
+	PlannerSettings,
+	View,
+	BinderTab,
+	Domain,
+	Block
+} from './types';
+import {
+	STARTER_SHAPES,
+	STARTER_WEEK_PATTERN,
+	getCurrentBlock,
+	getNextBlock
+} from './templates';
 import { dateKey, nowMinutes, uid, timeToMinutes } from './utils';
 import { playBell } from './bells';
 
@@ -31,29 +46,25 @@ const DEFAULT_SETTINGS: PlannerSettings = {
 	leadTimeMinutes: 5,
 	bellsEnabled: true,
 	dayCycleEnabled: true,
-	fixedPaletteMode: null
+	fixedPaletteMode: null,
+	onboardingComplete: true // layer 2 will flip default to false
 };
-
-const DEFAULT_DOMAINS: Domain[] = [
-	{ id: 'appointments', name: 'appointments', color: '#7c9e7a', icon: '⊕' },
-	{ id: 'car',          name: 'car',          color: '#c8900a', icon: '◎' },
-	{ id: 'household',    name: 'household',    color: '#b07858', icon: '⌂' },
-	{ id: 'financial',    name: 'financial',    color: '#5e8b8c', icon: '◈' },
-	{ id: 'health',       name: 'health',       color: '#9b8ea0', icon: '✦' },
-	{ id: 'kp-career',    name: 'kp/career',    color: '#c4a882', icon: '❏' },
-	{ id: 'creative',     name: 'creative',     color: '#b5a47a', icon: '✎' },
-	{ id: 'social',       name: 'social',       color: '#8878a8', icon: '◦' },
-	{ id: 'pets',         name: 'pets',         color: '#a0785a', icon: '❦' }
-];
 
 // ── store class (Svelte 5 runes, class pattern) ───────────────────
 
 class PlannerStore {
-	// Persisted
+	// Persisted — schedule data (new in layer 1)
+	dayShapes = $state<DayShape[]>(load('planner.shapes.v1', STARTER_SHAPES));
+	weekPattern = $state<WeekPattern>(load('planner.weekPattern.v1', STARTER_WEEK_PATTERN));
+	dayOverrides = $state<Record<string, DayInstance>>(load('planner.days.v2', {}));
+
+	// Persisted — user data
 	tasks = $state<Task[]>(load('planner.tasks.v1', []));
-	dayOverrides = $state<Record<string, DayInstance>>(load('planner.days.v1', {}));
-	settings = $state<PlannerSettings>(load('planner.settings.v1', DEFAULT_SETTINGS));
-	domains = $state<Domain[]>(load('planner.domains.v1', DEFAULT_DOMAINS));
+	settings = $state<PlannerSettings>({
+		...DEFAULT_SETTINGS,
+		...load('planner.settings.v1', {} as Partial<PlannerSettings>)
+	});
+	domains = $state<Domain[]>(load('planner.domains.v1', []));
 
 	// Transient
 	currentView = $state<View>('now-next');
@@ -62,15 +73,36 @@ class PlannerStore {
 	editingTaskId = $state<string | null>(null);
 	activeDayKey = $state<string | null>(null);
 
-	// ── derived helpers ─────────────────────────────────────────────
+	// ── shape resolution ────────────────────────────────────────────
 
-	getDayType(date: Date = this.now): DayType {
+	getDayShape(date: Date = this.now): DayShape | null {
 		const key = dateKey(date);
-		return this.dayOverrides[key]?.dayType ?? defaultDayType(date);
+		const overrideId = this.dayOverrides[key]?.dayShapeId;
+		const patternId = this.weekPattern.days[date.getDay()];
+		const id = overrideId ?? patternId;
+		return this.dayShapes.find((s) => s.id === id) ?? this.dayShapes[0] ?? null;
 	}
 
-	getBlocksForDate(date: Date = this.now) {
-		return getTemplate(this.getDayType(date));
+	getBlocksForDate(date: Date = this.now): Block[] {
+		return this.getDayShape(date)?.blocks ?? [];
+	}
+
+	isRestful(date: Date = this.now): boolean {
+		return this.getDayShape(date)?.restful === true;
+	}
+
+	getAllBlocks(): Block[] {
+		const seen = new Set<string>();
+		const out: Block[] = [];
+		for (const shape of this.dayShapes) {
+			for (const b of shape.blocks) {
+				if (!seen.has(b.id)) {
+					seen.add(b.id);
+					out.push(b);
+				}
+			}
+		}
+		return out.sort((a, b) => a.startTime.localeCompare(b.startTime));
 	}
 
 	getTasksForBlock(blockId: string, dateStr?: string): Task[] {
@@ -91,7 +123,7 @@ class PlannerStore {
 		return this.domains.find((d) => d.id === id);
 	}
 
-	// ── actions ────────────────────────────────────────────────────
+	// ── task actions ────────────────────────────────────────────────
 
 	addTask(partial: Partial<Task> & { title: string }): Task {
 		const t: Task = {
@@ -126,29 +158,6 @@ class PlannerStore {
 		save('planner.tasks.v1', this.tasks);
 	}
 
-	setDayType(date: Date, dayType: DayType): void {
-		const key = dateKey(date);
-		this.dayOverrides = { ...this.dayOverrides, [key]: { date: key, dayType } };
-		save('planner.days.v1', this.dayOverrides);
-	}
-
-	toggleDayType(date: Date): void {
-		const current = this.getDayType(date);
-		this.setDayType(date, current === 'weekday-work' ? 'day-off' : 'weekday-work');
-	}
-
-	setView(v: View): void {
-		this.currentView = v;
-	}
-
-	toggleBinder(tab: BinderTab): void {
-		this.binderTab = this.binderTab === tab ? null : tab;
-	}
-
-	closeBinder(): void {
-		this.binderTab = null;
-	}
-
 	updateTask(id: string, changes: Partial<Omit<Task, 'id' | 'createdAt'>>): void {
 		this.tasks = this.tasks.map((t) => (t.id === id ? { ...t, ...changes } : t));
 		save('planner.tasks.v1', this.tasks);
@@ -160,6 +169,59 @@ class PlannerStore {
 
 	closeTaskEdit(): void {
 		this.editingTaskId = null;
+	}
+
+	// ── day-shape actions ───────────────────────────────────────────
+
+	setDayShape(date: Date, dayShapeId: string): void {
+		const key = dateKey(date);
+		this.dayOverrides = { ...this.dayOverrides, [key]: { date: key, dayShapeId } };
+		save('planner.days.v2', this.dayOverrides);
+	}
+
+	clearDayOverride(date: Date): void {
+		const key = dateKey(date);
+		const { [key]: _, ...rest } = this.dayOverrides;
+		this.dayOverrides = rest;
+		save('planner.days.v2', this.dayOverrides);
+	}
+
+	cycleDayShape(date: Date): void {
+		if (this.dayShapes.length === 0) return;
+		const current = this.getDayShape(date);
+		const idx = current ? this.dayShapes.findIndex((s) => s.id === current.id) : -1;
+		const next = this.dayShapes[(idx + 1) % this.dayShapes.length];
+		this.setDayShape(date, next.id);
+	}
+
+	saveDayShapes(): void {
+		save('planner.shapes.v1', this.dayShapes);
+	}
+
+	saveWeekPattern(): void {
+		save('planner.weekPattern.v1', this.weekPattern);
+	}
+
+	saveSettings(): void {
+		save('planner.settings.v1', this.settings);
+	}
+
+	saveDomains(): void {
+		save('planner.domains.v1', this.domains);
+	}
+
+	// ── view + binder ───────────────────────────────────────────────
+
+	setView(v: View): void {
+		this.currentView = v;
+	}
+
+	toggleBinder(tab: BinderTab): void {
+		this.binderTab = this.binderTab === tab ? null : tab;
+	}
+
+	closeBinder(): void {
+		this.binderTab = null;
 	}
 
 	openDayPanel(dateStr: string): void {
@@ -187,7 +249,7 @@ class PlannerStore {
 		const minuteKey = `${dateKey(this.now)}-${mins}`;
 		if (minuteKey === this.#lastBellMinuteKey) return;
 
-		const blocks = getTemplate(this.getDayType(this.now));
+		const blocks = this.getBlocksForDate(this.now);
 		for (const block of blocks) {
 			const startMins = timeToMinutes(block.startTime);
 			const diff = startMins - mins;
@@ -197,11 +259,21 @@ class PlannerStore {
 				break;
 			}
 			if (diff === 0) {
-				playBell(block.bellId);
+				playBell(block.bellId ?? 'block-start');
 				this.#lastBellMinuteKey = minuteKey;
 				break;
 			}
 		}
+	}
+
+	// ── shape-relative wrappers (convenience for views) ─────────────
+
+	getCurrentBlockForDate(date: Date = this.now): Block | null {
+		return getCurrentBlock(this.getBlocksForDate(date), date);
+	}
+
+	getNextBlockForDate(date: Date = this.now): Block | null {
+		return getNextBlock(this.getBlocksForDate(date), date);
 	}
 
 	constructor() {

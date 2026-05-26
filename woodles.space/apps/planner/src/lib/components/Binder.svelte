@@ -26,7 +26,7 @@
 			const dayTasks = store.tasks.filter(
 				(t) => t.status !== 'dropped' && t.targetDate === key
 			);
-			days.push({ date: d, key, dayType: store.getDayType(d), tasks: dayTasks });
+			days.push({ date: d, key, restful: store.isRestful(d), tasks: dayTasks });
 		}
 		return days;
 	});
@@ -107,7 +107,7 @@
 					<div class="upcoming-day-header">
 						<span class="upcoming-day-name">{dayOfWeekLabel(day.date)}</span>
 						<span class="upcoming-day-date">{shortDateLabel(day.date)}</span>
-						{#if day.dayType === 'day-off'}
+						{#if day.restful}
 							<span class="upcoming-day-type">off</span>
 						{/if}
 					</div>
