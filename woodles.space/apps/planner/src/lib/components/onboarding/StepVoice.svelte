@@ -52,7 +52,11 @@
 					<span class="tone-name">{tone.name}</span>
 					<span class="tone-desc">{tone.description}</span>
 				</div>
-				<p class="tone-sample">“{tonePreview(tone.id)}”</p>
+				<p class="tone-sample">
+					<span class="tone-quote" aria-hidden="true">“</span>
+					<span class="tone-sample-text">{tonePreview(tone.id)}</span>
+					<span class="tone-quote tone-quote-close" aria-hidden="true">”</span>
+				</p>
 			</button>
 		{/each}
 	</div>
@@ -112,17 +116,37 @@
 	}
 
 	.tone-sample {
+		position: relative;
 		font-family: var(--pl-font-body);
-		font-size: 0.92rem;
+		font-size: 0.95rem;
 		font-style: italic;
 		line-height: 1.55;
 		color: var(--p-text);
-		opacity: 0.85;
-		padding-left: 0.75rem;
-		border-left: 2px solid var(--p-accent-soft);
+		opacity: 0.88;
+		padding-left: 1.4rem;
+		padding-right: 0.4rem;
 	}
 
-	.tone-card.active .tone-sample {
-		border-left-color: var(--p-accent);
+	.tone-quote {
+		font-family: var(--pl-font-fell);
+		font-style: italic;
+		font-size: 1.85rem;
+		line-height: 0.5;
+		color: var(--p-accent);
+		opacity: 0.55;
+		vertical-align: -0.3em;
+		margin-right: 0.05em;
 	}
+
+	.tone-quote-close {
+		margin-left: 0.1em;
+		margin-right: 0;
+		vertical-align: -0.6em;
+	}
+
+	.tone-card.active .tone-quote {
+		opacity: 0.9;
+	}
+
+	.tone-sample-text { display: inline; }
 </style>

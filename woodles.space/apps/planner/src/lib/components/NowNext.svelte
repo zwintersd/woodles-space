@@ -80,9 +80,11 @@
 		<a href="/" class="nn-home" title="back to woodles.space">·space</a>
 
 		<div class="nn-header-center">
+			<span class="nn-header-mark" aria-hidden="true">❦</span>
 			<span class="nn-clock">{formatTime(store.now)}</span>
 			<span class="nn-sep">·</span>
 			<span class="nn-date">{dayOfWeekLabel(store.now)} {shortDateLabel(store.now)}</span>
+			<span class="nn-header-mark" aria-hidden="true">❦</span>
 		</div>
 
 		<button
@@ -160,7 +162,18 @@
 	{/if}
 
 	{#if flourishText}
-		<p class="nn-flourish">{flourishText}</p>
+		<figure class="nn-flourish-wrap">
+			<span class="nn-flourish-rule" aria-hidden="true">
+				<span class="flourish-line"></span>
+				<span class="flourish-mark">⁂</span>
+				<span class="flourish-line"></span>
+			</span>
+			<blockquote class="nn-flourish">
+				<span class="nn-flourish-quote" aria-hidden="true">“</span>
+				<span class="nn-flourish-text">{flourishText}</span>
+				<span class="nn-flourish-quote nn-flourish-quote-close" aria-hidden="true">”</span>
+			</blockquote>
+		</figure>
 	{/if}
 </div>
 
@@ -196,7 +209,15 @@
 	.nn-header-center {
 		display: flex;
 		align-items: baseline;
-		gap: 0.5rem;
+		gap: 0.55rem;
+	}
+
+	.nn-header-mark {
+		font-family: var(--pl-font-fell);
+		color: var(--p-accent);
+		opacity: 0.45;
+		font-size: 0.72rem;
+		line-height: 1;
 	}
 
 	.nn-clock {
@@ -406,14 +427,65 @@
 		opacity: 1;
 	}
 
+	.nn-flourish-wrap {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.85rem;
+		margin: 0;
+		padding: var(--pl-space-lg) clamp(0.75rem, 4vw, 2rem);
+	}
+
+	.nn-flourish-rule {
+		display: flex;
+		align-items: center;
+		gap: 0.7rem;
+		width: 100%;
+		max-width: 18rem;
+	}
+
+	.flourish-line {
+		flex: 1;
+		height: 1px;
+		background: var(--p-border);
+	}
+
+	.flourish-mark {
+		font-family: var(--pl-font-fell);
+		color: var(--p-accent);
+		opacity: 0.55;
+		font-size: 0.9rem;
+		line-height: 1;
+	}
+
 	.nn-flourish {
 		font-family: var(--pl-font-body);
 		font-style: italic;
-		font-size: 0.9rem;
-		line-height: 1.6;
-		color: var(--p-muted);
+		font-size: 0.95rem;
+		line-height: 1.65;
+		color: var(--p-text);
 		text-align: center;
-		padding: var(--pl-space-lg) var(--pl-space-xl);
-		opacity: 0.75;
+		opacity: 0.82;
+		max-width: 32rem;
+		margin: 0;
+		position: relative;
 	}
+
+	.nn-flourish-quote {
+		font-family: var(--pl-font-fell);
+		color: var(--p-accent);
+		opacity: 0.55;
+		font-size: 1.6rem;
+		line-height: 0.5;
+		vertical-align: -0.25em;
+		margin-right: 0.1em;
+	}
+
+	.nn-flourish-quote-close {
+		margin-left: 0.1em;
+		margin-right: 0;
+		vertical-align: -0.5em;
+	}
+
+	.nn-flourish-text { font-style: italic; }
 </style>
