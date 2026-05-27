@@ -30,7 +30,17 @@
 		if (!store.settings.flourishEnabled) return null;
 		if (!currentBlock?.flourishEligible) return null;
 		if (!shouldShowFlourish(store.now, currentBlock.id)) return null;
-		return getDailyFlourish(store.now, currentBlock.id);
+		return getDailyFlourish(
+			{
+				date: store.now,
+				block: currentBlock,
+				dayShape,
+				domains: store.domains,
+				blockCount: blocks.length
+			},
+			store.settings.tone,
+			currentBlock.id
+		);
 	});
 
 	// Progress through current block
@@ -120,6 +130,9 @@
 					onkeydown={handleInputKeydown}
 				/>
 			</form>
+		{:else if blocks.length === 0}
+			<h1 class="nn-block-title nn-free">The day has not yet decided what it is.</h1>
+			<p class="nn-block-time">neither have you. this seems fine.</p>
 		{:else}
 			<h1 class="nn-block-title nn-free">—</h1>
 			<p class="nn-block-time">between schedule</p>

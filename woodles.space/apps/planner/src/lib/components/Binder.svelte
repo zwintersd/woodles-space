@@ -1,17 +1,30 @@
 <script lang="ts">
 	import { store } from '$lib/store.svelte';
 	import { dayOfWeekLabel, shortDateLabel, dateKey } from '$lib/utils';
+	import { EMPTY_STATES, BINDER_LABELS } from '$lib/onboarding.copy';
 	import YearScroll from './YearScroll.svelte';
 
-	type BinderTabId = 'domains' | 'waiting' | 'upcoming' | 'year-scroll' | 'holidays';
+	type BinderTabId =
+		| 'domains'
+		| 'waiting'
+		| 'upcoming'
+		| 'year-scroll'
+		| 'holidays'
+		| 'shapes'
+		| 'week-pattern';
 
 	const TABS: { id: BinderTabId; icon: string; label: string }[] = [
-		{ id: 'domains',     icon: '◈', label: 'domains' },
-		{ id: 'waiting',     icon: '⏳', label: 'waiting' },
-		{ id: 'upcoming',    icon: '⇒', label: 'upcoming' },
-		{ id: 'year-scroll', icon: '∞', label: 'year' },
-		{ id: 'holidays',    icon: '✦', label: 'holidays' }
+		{ id: 'shapes',       icon: '◐', label: BINDER_LABELS.shapes },
+		{ id: 'week-pattern', icon: '◇', label: BINDER_LABELS.weekPattern },
+		{ id: 'domains',      icon: '◈', label: 'domains' },
+		{ id: 'waiting',      icon: '⏳', label: 'waiting' },
+		{ id: 'upcoming',     icon: '⇒', label: 'upcoming' },
+		{ id: 'year-scroll',  icon: '∞', label: 'year' },
+		{ id: 'holidays',     icon: '✦', label: 'holidays' }
 	];
+
+	const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+	const WEEKDAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
 	let waitingTasks = $derived(
 		store.tasks.filter((t) => t.status === 'open' && t.notes?.startsWith('waiting:'))
@@ -134,6 +147,54 @@
 		</header>
 		<div class="binder-body">
 			<p class="binder-empty">holiday layer — coming soon.</p>
+		</div>
+
+	{:else if store.binderTab === 'shapes'}
+		<header class="binder-header">
+			<span class="binder-eyebrow">binder</span>
+			<span class="binder-title">{BINDER_LABELS.shapes}</span>
+		</header>
+		<div class="binder-body">
+			{#if store.dayShapes.length === 0}
+				<div class="binder-empty-block">
+					<p class="binder-empty-heading">{EMPTY_STATES.shapes.heading}</p>
+					<p class="binder-empty-body">{EMPTY_STATES.shapes.body}</p>
+				</div>
+			{:else}
+				{#each store.dayShapes as shape (shape.id)}
+					<div class="shape-row">
+						<span class="shape-row-name">{shape.name}</span>
+						<span class="shape-row-meta">
+							{shape.blocks.length} block{shape.blocks.length === 1 ? '' : 's'}
+							{#if shape.restful}<span class="shape-restful">· restful</span>{/if}
+						</span>
+					</div>
+				{/each}
+			{/if}
+		</div>
+
+	{:else if store.binderTab === 'week-pattern'}
+		<header class="binder-header">
+			<span class="binder-eyebrow">binder</span>
+			<span class="binder-title">{BINDER_LABELS.weekPattern}</span>
+		</header>
+		<div class="binder-body">
+			{#if store.dayShapes.length === 0}
+				<div class="binder-empty-block">
+					<p class="binder-empty-heading">{EMPTY_STATES.weekPattern.heading}</p>
+					<p class="binder-empty-body">{EMPTY_STATES.weekPattern.body}</p>
+				</div>
+			{:else}
+				{#each WEEKDAY_ORDER as dow, i}
+					{@const shapeId = store.weekPattern.days[dow]}
+					{@const shape = store.dayShapes.find((s) => s.id === shapeId)}
+					<div class="pattern-row">
+						<span class="pattern-dow">{WEEKDAY_LABELS[i]}</span>
+						<span class="pattern-shape">{shape?.name ?? '—'}</span>
+						{#if shape?.restful}<span class="pattern-restful">restful</span>{/if}
+					</div>
+				{/each}
+			{/if}
 		</div>
 	{/if}
 </aside>
@@ -363,5 +424,95 @@
 		flex: 1;
 		overflow-y: auto;
 		padding: 0 0.75rem;
+	}
+
+	/* ── empty states ─────────────────────────────────────────────── */
+	.binder-empty-block {
+		padding: 1.2rem 0.25rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+
+	.binder-empty-heading {
+		font-family: var(--pl-font-optical);
+		font-style: italic;
+		font-weight: 400;
+		font-size: 1rem;
+		color: var(--p-text);
+		font-variation-settings: 'opsz' 36;
+	}
+
+	.binder-empty-body {
+		font-family: var(--pl-font-body);
+		font-size: 0.85rem;
+		line-height: 1.5;
+		color: var(--p-muted);
+		font-style: italic;
+		opacity: 0.85;
+	}
+
+	/* ── shape rows ───────────────────────────────────────────────── */
+	.shape-row {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.5rem;
+		padding: 0.55rem 0;
+		border-bottom: 1px solid var(--p-border);
+	}
+
+	.shape-row-name {
+		font-family: var(--pl-font-optical);
+		font-style: italic;
+		font-size: 0.95rem;
+		color: var(--p-text);
+		font-variation-settings: 'opsz' 36;
+	}
+
+	.shape-row-meta {
+		font-family: var(--pl-font-mono);
+		font-size: 0.6rem;
+		letter-spacing: 0.08em;
+		color: var(--p-muted);
+		opacity: 0.7;
+	}
+
+	.shape-restful {
+		opacity: 0.6;
+	}
+
+	/* ── week-pattern rows ────────────────────────────────────────── */
+	.pattern-row {
+		display: grid;
+		grid-template-columns: auto 1fr auto;
+		gap: 0.7rem;
+		align-items: baseline;
+		padding: 0.5rem 0;
+		border-bottom: 1px solid var(--p-border);
+	}
+
+	.pattern-dow {
+		font-family: var(--pl-font-mono);
+		font-size: 0.66rem;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--p-muted);
+	}
+
+	.pattern-shape {
+		font-family: var(--pl-font-body);
+		font-size: 0.88rem;
+		font-style: italic;
+		color: var(--p-text);
+	}
+
+	.pattern-restful {
+		font-family: var(--pl-font-mono);
+		font-size: 0.55rem;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--p-muted);
+		opacity: 0.55;
 	}
 </style>

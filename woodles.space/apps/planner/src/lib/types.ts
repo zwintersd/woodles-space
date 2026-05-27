@@ -7,6 +7,8 @@ export type Block = {
 	voicePrompt?: string;
 	flourishEligible?: boolean;
 	domainId?: string;
+	// Overlay metadata — set only on blocks synthesized from obligations/rituals.
+	overlay?: 'obligation' | 'ritual';
 };
 
 export type DayShape = {
@@ -19,6 +21,26 @@ export type DayShape = {
 // Indexed by Date.getDay() — 0=Sun .. 6=Sat. Each slot is a DayShape id.
 export type WeekPattern = {
 	days: [string, string, string, string, string, string, string];
+};
+
+// A recurring weekday-bound commitment ("past you made an agreement").
+// Resolved into Blocks per-day by store.getBlocksForDate().
+export type Obligation = {
+	id: string;
+	name: string;
+	weekdays: number[]; // 0=Sun..6=Sat (Date.getDay() index)
+	startTime: string; // "HH:MM"
+	endTime: string;
+	domainId?: string;
+};
+
+// A small repeated thing that's yours — applies to every day.
+export type Ritual = {
+	id: string;
+	name: string;
+	startTime: string;
+	endTime: string;
+	domainId?: string;
 };
 
 export type Task = {
@@ -53,6 +75,8 @@ export type DayInstance = {
 	dayShapeId: string;
 };
 
+export type ToneName = 'wry' | 'gentle' | 'minimal' | 'earnest';
+
 export type PlannerSettings = {
 	flourishEnabled: boolean;
 	quietHoursStart: string; // "HH:MM"
@@ -60,8 +84,11 @@ export type PlannerSettings = {
 	leadTimeMinutes: number;
 	bellsEnabled: boolean;
 	dayCycleEnabled: boolean;
-	fixedPaletteMode: string | null; // null = shift with time
+	fixedPaletteMode: string | null;
 	onboardingComplete: boolean;
+	wakeAnchor: string; // "HH:MM" — when the day actually starts
+	sleepAnchor: string;
+	tone: ToneName;
 };
 
 export type Bell = {
@@ -72,4 +99,12 @@ export type Bell = {
 };
 
 export type View = 'now-next' | 'today' | 'week' | 'month' | 'year';
-export type BinderTab = 'domains' | 'waiting' | 'upcoming' | 'year-scroll' | 'holidays' | null;
+export type BinderTab =
+	| 'domains'
+	| 'waiting'
+	| 'upcoming'
+	| 'year-scroll'
+	| 'holidays'
+	| 'shapes'
+	| 'week-pattern'
+	| null;

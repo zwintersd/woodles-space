@@ -18,6 +18,10 @@
 	--pl-font-display: var(--font-display, 'Cormorant Garamond', Georgia, serif);
 	--pl-font-body:    var(--font-body, 'Lora', Georgia, serif);
 	--pl-font-mono:    var(--font-mono, 'DM Mono', 'Courier New', monospace);
+	/* Onboarding: Fraunces' optical sizing gives the larger questions more presence
+	   than Cormorant; IM Fell adds a slightly hand-set quality to the welcome rule. */
+	--pl-font-optical: var(--font-optical, 'Fraunces', Georgia, serif);
+	--pl-font-fell:    var(--font-fell, 'IM Fell DW Pica', Georgia, serif);
 
 	/* ── spacing scale ────────────────────────────────────────────── */
 	--pl-space-xs:  0.25rem;
