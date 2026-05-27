@@ -7,13 +7,17 @@ import type {
 	View,
 	BinderTab,
 	Domain,
-	Block
+	Block,
+	Obligation,
+	Ritual,
+	ToneName
 } from './types';
 import {
 	STARTER_SHAPES,
 	STARTER_WEEK_PATTERN,
 	getCurrentBlock,
-	getNextBlock
+	getNextBlock,
+	mergeBlocks
 } from './templates';
 import { dateKey, nowMinutes, uid, timeToMinutes } from './utils';
 import { playBell } from './bells';
@@ -47,16 +51,21 @@ const DEFAULT_SETTINGS: PlannerSettings = {
 	bellsEnabled: true,
 	dayCycleEnabled: true,
 	fixedPaletteMode: null,
-	onboardingComplete: true // layer 2 will flip default to false
+	onboardingComplete: false,
+	wakeAnchor: '07:00',
+	sleepAnchor: '22:30',
+	tone: 'gentle'
 };
 
 // ── store class (Svelte 5 runes, class pattern) ───────────────────
 
 class PlannerStore {
-	// Persisted — schedule data (new in layer 1)
+	// Persisted — schedule data
 	dayShapes = $state<DayShape[]>(load('planner.shapes.v1', STARTER_SHAPES));
 	weekPattern = $state<WeekPattern>(load('planner.weekPattern.v1', STARTER_WEEK_PATTERN));
 	dayOverrides = $state<Record<string, DayInstance>>(load('planner.days.v2', {}));
+	obligations = $state<Obligation[]>(load('planner.obligations.v1', []));
+	rituals = $state<Ritual[]>(load('planner.rituals.v1', []));
 
 	// Persisted — user data
 	tasks = $state<Task[]>(load('planner.tasks.v1', []));
@@ -84,7 +93,31 @@ class PlannerStore {
 	}
 
 	getBlocksForDate(date: Date = this.now): Block[] {
-		return this.getDayShape(date)?.blocks ?? [];
+		const shape = this.getDayShape(date);
+		const base = shape?.blocks ?? [];
+		const weekday = date.getDay();
+
+		const obligationBlocks: Block[] = this.obligations
+			.filter((o) => o.weekdays.includes(weekday))
+			.map((o) => ({
+				id: `obl-${o.id}`,
+				startTime: o.startTime,
+				endTime: o.endTime,
+				title: o.name,
+				domainId: o.domainId,
+				overlay: 'obligation' as const
+			}));
+
+		const ritualBlocks: Block[] = this.rituals.map((r) => ({
+			id: `rit-${r.id}`,
+			startTime: r.startTime,
+			endTime: r.endTime,
+			title: r.name,
+			domainId: r.domainId,
+			overlay: 'ritual' as const
+		}));
+
+		return mergeBlocks(base, [...obligationBlocks, ...ritualBlocks]);
 	}
 
 	isRestful(date: Date = this.now): boolean {
@@ -100,6 +133,21 @@ class PlannerStore {
 					seen.add(b.id);
 					out.push(b);
 				}
+			}
+		}
+		// also include obligation/ritual overlay blocks as targetable
+		for (const o of this.obligations) {
+			const id = `obl-${o.id}`;
+			if (!seen.has(id)) {
+				seen.add(id);
+				out.push({ id, startTime: o.startTime, endTime: o.endTime, title: o.name, overlay: 'obligation' });
+			}
+		}
+		for (const r of this.rituals) {
+			const id = `rit-${r.id}`;
+			if (!seen.has(id)) {
+				seen.add(id);
+				out.push({ id, startTime: r.startTime, endTime: r.endTime, title: r.name, overlay: 'ritual' });
 			}
 		}
 		return out.sort((a, b) => a.startTime.localeCompare(b.startTime));
@@ -194,20 +242,57 @@ class PlannerStore {
 		this.setDayShape(date, next.id);
 	}
 
-	saveDayShapes(): void {
-		save('planner.shapes.v1', this.dayShapes);
+	// ── obligation / ritual actions ────────────────────────────────
+
+	addObligation(o: Omit<Obligation, 'id'>): Obligation {
+		const created: Obligation = { ...o, id: uid() };
+		this.obligations = [...this.obligations, created];
+		save('planner.obligations.v1', this.obligations);
+		return created;
 	}
 
-	saveWeekPattern(): void {
-		save('planner.weekPattern.v1', this.weekPattern);
+	removeObligation(id: string): void {
+		this.obligations = this.obligations.filter((o) => o.id !== id);
+		save('planner.obligations.v1', this.obligations);
 	}
 
-	saveSettings(): void {
+	addRitual(r: Omit<Ritual, 'id'>): Ritual {
+		const created: Ritual = { ...r, id: uid() };
+		this.rituals = [...this.rituals, created];
+		save('planner.rituals.v1', this.rituals);
+		return created;
+	}
+
+	removeRitual(id: string): void {
+		this.rituals = this.rituals.filter((r) => r.id !== id);
+		save('planner.rituals.v1', this.rituals);
+	}
+
+	// ── settings + persistence ─────────────────────────────────────
+
+	updateSettings(patch: Partial<PlannerSettings>): void {
+		this.settings = { ...this.settings, ...patch };
 		save('planner.settings.v1', this.settings);
 	}
 
-	saveDomains(): void {
+	setDomains(domains: Domain[]): void {
+		this.domains = domains;
 		save('planner.domains.v1', this.domains);
+	}
+
+	setDayShapes(shapes: DayShape[]): void {
+		this.dayShapes = shapes;
+		save('planner.shapes.v1', this.dayShapes);
+	}
+
+	setWeekPattern(pattern: WeekPattern): void {
+		this.weekPattern = pattern;
+		save('planner.weekPattern.v1', this.weekPattern);
+	}
+
+	// Wipe everything user-introductory — used by "redo onboarding" affordance.
+	resetOnboarding(): void {
+		this.updateSettings({ onboardingComplete: false });
 	}
 
 	// ── view + binder ───────────────────────────────────────────────
