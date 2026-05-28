@@ -12,10 +12,20 @@
 //
 // DATABASE_URL is injected automatically by the Neon Vercel integration.
 
-import { neon } from '@neondatabase/serverless';
+import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 import { createHash, timingSafeEqual } from 'node:crypto';
 
-const sql = neon(process.env.DATABASE_URL!);
+// Lazy: defer the DATABASE_URL check + neon() call until the first request, so
+// a missing env var surfaces as a useful 500 body rather than a module-load
+// crash that produces an opaque 500.
+let _sql: NeonQueryFunction<false, false> | null = null;
+function db(): NeonQueryFunction<false, false> {
+  if (_sql) return _sql;
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error('DATABASE_URL is not set');
+  _sql = neon(url);
+  return _sql;
+}
 
 const APP_PATTERN = /^[a-z0-9-]{1,40}$/;
 
@@ -42,7 +52,20 @@ function json(body: unknown, status = 200): Response {
 export const config = { runtime: 'nodejs' };
 
 export default async function handler(req: Request): Promise<Response> {
+  try {
+    return await route(req);
+  } catch (err) {
+    // Surface the actual error message back to the client so 500s are
+    // diagnosable without round-tripping through Vercel's log viewer.
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.error('sync handler error:', err);
+    return json({ ok: false, error: 'server', message }, 500);
+  }
+}
+
+async function route(req: Request): Promise<Response> {
   if (!authed(req)) return json({ ok: false, error: 'unauthorized' }, 401);
+  const sql = db();
 
   // ── pull ──────────────────────────────────────────────────────────────
   if (req.method === 'GET') {
