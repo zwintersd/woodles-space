@@ -62,6 +62,44 @@ function lerpColor(a: string, b: string, t: number): string {
 	return `rgb(${r},${g},${bl})`;
 }
 
+// ── Contrast helpers ──────────────────────────────────────────────
+// Used to solve the light↔dark mode-flip transitions: when one stop
+// expects dark text and the next expects light text, linear interp
+// of text color crosses through mid-gray exactly when the bg crosses
+// through mid-tone — guaranteed unreadable. We instead snap text to
+// whichever endpoint reads better against the live bg.
+
+function relativeLuminance(r: number, g: number, b: number): number {
+	const lin = (c: number) => {
+		const s = c / 255;
+		return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+	};
+	return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+function contrastRatio(l1: number, l2: number): number {
+	const [hi, lo] = l1 > l2 ? [l1, l2] : [l2, l1];
+	return (hi + 0.05) / (lo + 0.05);
+}
+
+function lumOfHex(hex: string): number {
+	const rgb = parseHexToRgb(hex);
+	if (!rgb) return 0.5;
+	return relativeLuminance(rgb[0], rgb[1], rgb[2]);
+}
+
+function isDarkStop(s: PaletteStop): boolean {
+	return lumOfHex(s.bg) < 0.3;
+}
+
+// Quintic ease — used on the bg curve during mode-flip transitions
+// so the bg lingers in "still light" longer, rushes through the
+// unreadable mid-tone in a few minutes, then settles into "fully
+// dark". Matches how blue hour actually feels — sudden.
+function easeInOutQuintic(t: number): number {
+	return t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2;
+}
+
 export function getPaletteForTime(date: Date): Record<string, string> {
 	const hour = date.getHours() + date.getMinutes() / 60;
 
@@ -78,15 +116,62 @@ export function getPaletteForTime(date: Date): Record<string, string> {
 	const range = b.hour - a.hour;
 	const t = range === 0 ? 0 : (hour - a.hour) / range;
 
+	const aDark = isDarkStop(a);
+	const bDark = isDarkStop(b);
+	const modeFlip = aDark !== bDark;
+	// Ease bg interpolation through the dead-zone on mode flips
+	const eased = modeFlip ? easeInOutQuintic(t) : t;
+
+	// Compute interpolated bg as an RGB tuple so we can measure its
+	// luminance for the contrast-aware text pick below.
+	const aBg = parseHexToRgb(a.bg);
+	const bBg = parseHexToRgb(b.bg);
+	let bgStr: string;
+	let bgLum: number;
+	if (aBg && bBg) {
+		const bgR = Math.round(aBg[0] + (bBg[0] - aBg[0]) * eased);
+		const bgG = Math.round(aBg[1] + (bBg[1] - aBg[1]) * eased);
+		const bgB = Math.round(aBg[2] + (bBg[2] - aBg[2]) * eased);
+		bgStr = `rgb(${bgR},${bgG},${bgB})`;
+		bgLum = relativeLuminance(bgR, bgG, bgB);
+	} else {
+		bgStr = a.bg;
+		bgLum = lumOfHex(a.bg);
+	}
+
+	let textColor: string;
+	let mutedColor: string;
+	let accentSoftColor: string;
+	let borderColor: string;
+
+	if (modeFlip) {
+		// Pick whichever stop's text family gives higher contrast
+		// against the live bg. The picker flips at the exact moment
+		// the "wrong" text starts losing readability, so we never
+		// drift through unreadable mid-gray.
+		const aContrast = contrastRatio(lumOfHex(a.text), bgLum);
+		const bContrast = contrastRatio(lumOfHex(b.text), bgLum);
+		const winner = aContrast >= bContrast ? a : b;
+		textColor = winner.text;
+		mutedColor = winner.muted;
+		accentSoftColor = winner.accentSoft;
+		borderColor = winner.border;
+	} else {
+		textColor = lerpColor(a.text, b.text, t);
+		mutedColor = lerpColor(a.muted, b.muted, t);
+		accentSoftColor = t < 0.5 ? a.accentSoft : b.accentSoft;
+		borderColor = t < 0.5 ? a.border : b.border;
+	}
+
 	return {
-		'--p-bg': lerpColor(a.bg, b.bg, t),
-		'--p-surface': lerpColor(a.surface, b.surface, t),
-		'--p-text': lerpColor(a.text, b.text, t),
-		'--p-muted': lerpColor(a.muted, b.muted, t),
-		'--p-accent': lerpColor(a.accent, b.accent, t),
-		'--p-accent-soft': t < 0.5 ? a.accentSoft : b.accentSoft,
-		'--p-border': t < 0.5 ? a.border : b.border,
-		'--p-highlight': lerpColor(a.highlight, b.highlight, t)
+		'--p-bg': bgStr,
+		'--p-surface': lerpColor(a.surface, b.surface, eased),
+		'--p-text': textColor,
+		'--p-muted': mutedColor,
+		'--p-accent': lerpColor(a.accent, b.accent, eased),
+		'--p-accent-soft': accentSoftColor,
+		'--p-border': borderColor,
+		'--p-highlight': lerpColor(a.highlight, b.highlight, eased)
 	};
 }
 
