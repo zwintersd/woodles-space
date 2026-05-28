@@ -39,7 +39,7 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-export const config = { runtime: 'edge' };
+export const config = { runtime: 'nodejs' };
 
 export default async function handler(req: Request): Promise<Response> {
   if (!authed(req)) return json({ ok: false, error: 'unauthorized' }, 401);
