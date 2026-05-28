@@ -57,7 +57,7 @@ export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'POST') {
     let body: { app?: string; blob?: unknown; baseVersion?: number };
     try {
-      body = await req.json();
+      body = await req.json() as typeof body;
     } catch {
       return json({ ok: false, error: 'bad json' }, 400);
     }
