@@ -11,6 +11,13 @@ importers:
       '@neondatabase/serverless':
         specifier: ^0.10.4
         version: 0.10.4
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.17
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   apps/desktop:
     devDependencies:
@@ -77,6 +84,10 @@ importers:
         version: 3.2.4(@types/node@22.19.17)(happy-dom@15.11.7)
 
   apps/planner:
+    dependencies:
+      '@woodles/sync':
+        specifier: workspace:*
+        version: link:../../packages/sync
     devDependencies:
       '@sveltejs/adapter-static':
         specifier: ^3.0.0

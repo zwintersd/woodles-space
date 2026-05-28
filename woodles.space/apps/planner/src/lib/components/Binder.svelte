@@ -3,6 +3,7 @@
 	import { dayOfWeekLabel, shortDateLabel, dateKey } from '$lib/utils';
 	import { EMPTY_STATES, BINDER_LABELS } from '$lib/onboarding.copy';
 	import YearScroll from './YearScroll.svelte';
+	import { syncState, connectAndHydrate, flushSync, disconnect } from '$lib/sync.svelte';
 
 	type BinderTabId =
 		| 'domains'
@@ -11,7 +12,8 @@
 		| 'year-scroll'
 		| 'holidays'
 		| 'shapes'
-		| 'week-pattern';
+		| 'week-pattern'
+		| 'sync';
 
 	const TABS: { id: BinderTabId; icon: string; label: string }[] = [
 		{ id: 'shapes',       icon: '◐', label: BINDER_LABELS.shapes },
@@ -20,8 +22,18 @@
 		{ id: 'waiting',      icon: '⏳', label: 'waiting' },
 		{ id: 'upcoming',     icon: '⇒', label: 'upcoming' },
 		{ id: 'year-scroll',  icon: '∞', label: 'year' },
-		{ id: 'holidays',     icon: '✦', label: 'holidays' }
+		{ id: 'holidays',     icon: '✦', label: 'holidays' },
+		{ id: 'sync',         icon: '◎', label: 'sync' }
 	];
+
+	let passphraseInput = $state('');
+
+	async function handleConnect() {
+		const pass = passphraseInput.trim();
+		if (!pass) return;
+		passphraseInput = '';
+		await connectAndHydrate(pass);
+	}
 
 	const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 	const WEEKDAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
@@ -194,6 +206,58 @@
 						{#if shape?.restful}<span class="pattern-restful">restful</span>{/if}
 					</div>
 				{/each}
+			{/if}
+		</div>
+
+	{:else if store.binderTab === 'sync'}
+		<header class="binder-header">
+			<span class="binder-eyebrow">binder</span>
+			<span class="binder-title">sync</span>
+		</header>
+		<div class="binder-body">
+			{#if !syncState.connected}
+				<div class="sync-section">
+					<label class="sync-label" for="sync-pass">passphrase</label>
+					<div class="sync-row">
+						<input
+							id="sync-pass"
+							type="password"
+							class="sync-input"
+							bind:value={passphraseInput}
+							placeholder="·····"
+							onkeydown={(e) => { if (e.key === 'Enter') handleConnect(); }}
+						/>
+						<button class="sync-btn-primary" onclick={handleConnect}>connect</button>
+					</div>
+					{#if syncState.errorMessage}
+						<p class="sync-error">{syncState.errorMessage}</p>
+					{/if}
+				</div>
+			{:else}
+				<div class="sync-status-row">
+					{#if syncState.syncing}
+						<span class="sync-dot syncing">○</span>
+						<span class="sync-status-text">syncing…</span>
+					{:else if syncState.status === 'ok'}
+						<span class="sync-dot ok">✓</span>
+						<span class="sync-status-text">synced</span>
+					{:else if syncState.status === 'error'}
+						<span class="sync-dot error">✗</span>
+						<span class="sync-status-text sync-status-error">{syncState.errorMessage}</span>
+					{:else}
+						<span class="sync-dot">○</span>
+						<span class="sync-status-text">ready</span>
+					{/if}
+				</div>
+				{#if syncState.lastSyncedAt}
+					<p class="sync-last">last synced {syncState.lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+				{/if}
+				<div class="sync-actions">
+					<button class="sync-btn-primary" onclick={() => flushSync()} disabled={syncState.syncing}>
+						sync now
+					</button>
+					<button class="sync-btn-ghost" onclick={() => disconnect()}>disconnect</button>
+				</div>
 			{/if}
 		</div>
 	{/if}
@@ -514,5 +578,131 @@
 		text-transform: uppercase;
 		color: var(--p-muted);
 		opacity: 0.55;
+	}
+
+	/* ── sync tab ─────────────────────────────────────────────────── */
+	.sync-section {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		padding: 0.5rem 0;
+	}
+
+	.sync-label {
+		font-family: var(--pl-font-mono);
+		font-size: 0.48rem;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+		color: var(--p-muted);
+		opacity: 0.55;
+	}
+
+	.sync-row {
+		display: flex;
+		gap: 0.5rem;
+		align-items: center;
+	}
+
+	.sync-input {
+		flex: 1;
+		font-family: var(--pl-font-mono);
+		font-size: 0.7rem;
+		color: var(--p-text);
+		background: var(--p-bg);
+		border: 1px solid var(--p-border);
+		border-radius: var(--pl-radius-sm);
+		padding: 5px 8px;
+		transition: border-color var(--pl-transition-fast);
+	}
+
+	.sync-input:focus {
+		border-color: var(--p-accent);
+		outline: none;
+	}
+
+	.sync-btn-primary {
+		font-family: var(--pl-font-mono);
+		font-size: 0.6rem;
+		letter-spacing: 0.1em;
+		color: var(--p-muted);
+		border: 1px solid var(--p-border);
+		padding: 5px 12px;
+		border-radius: var(--pl-radius-pill);
+		white-space: nowrap;
+		transition: opacity var(--pl-transition-fast), color var(--pl-transition-fast), border-color var(--pl-transition-fast);
+	}
+
+	.sync-btn-primary:hover:not(:disabled) {
+		color: var(--p-accent);
+		border-color: var(--p-accent);
+	}
+
+	.sync-btn-primary:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	.sync-error {
+		font-family: var(--pl-font-mono);
+		font-size: 0.65rem;
+		color: var(--p-accent);
+		opacity: 0.85;
+	}
+
+	.sync-status-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 0 0.25rem;
+	}
+
+	.sync-dot {
+		font-size: 0.75rem;
+		color: var(--p-muted);
+		opacity: 0.6;
+	}
+
+	.sync-dot.ok { color: var(--p-accent); opacity: 1; }
+	.sync-dot.error { color: var(--p-accent); opacity: 0.85; }
+	.sync-dot.syncing { opacity: 0.5; }
+
+	.sync-status-text {
+		font-family: var(--pl-font-mono);
+		font-size: 0.68rem;
+		letter-spacing: 0.06em;
+		color: var(--p-text);
+	}
+
+	.sync-status-error {
+		color: var(--p-accent);
+		opacity: 0.85;
+	}
+
+	.sync-last {
+		font-family: var(--pl-font-mono);
+		font-size: 0.58rem;
+		color: var(--p-muted);
+		opacity: 0.55;
+		padding-bottom: 0.75rem;
+	}
+
+	.sync-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding-top: 0.25rem;
+	}
+
+	.sync-btn-ghost {
+		font-family: var(--pl-font-mono);
+		font-size: 0.58rem;
+		letter-spacing: 0.1em;
+		color: var(--p-muted);
+		opacity: 0.45;
+		transition: opacity var(--pl-transition-fast);
+	}
+
+	.sync-btn-ghost:hover {
+		opacity: 0.9;
 	}
 </style>

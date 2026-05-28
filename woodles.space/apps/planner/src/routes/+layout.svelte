@@ -3,9 +3,13 @@
 	import { store } from '$lib/store.svelte';
 	import { getPaletteForTime, getNamedPalette } from '$lib/dayCycle';
 	import type { PaletteModeName } from '$lib/dayCycle';
+	import { initSync } from '$lib/sync.svelte';
+	import { onMount } from 'svelte';
 
 	let { children } = $props();
 	let root: HTMLElement | undefined = $state();
+
+	onMount(() => { initSync(); });
 
 	$effect(() => {
 		if (!root) return;
