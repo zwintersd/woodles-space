@@ -77,6 +77,10 @@ importers:
         version: 3.2.4(@types/node@22.19.17)(happy-dom@15.11.7)
 
   apps/planner:
+    dependencies:
+      '@woodles/sync':
+        specifier: workspace:*
+        version: link:../../packages/sync
     devDependencies:
       '@sveltejs/adapter-static':
         specifier: ^3.0.0

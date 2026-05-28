@@ -107,4 +107,16 @@ export type BinderTab =
 	| 'holidays'
 	| 'shapes'
 	| 'week-pattern'
+	| 'sync'
 	| null;
+
+export type PlannerBlob = {
+	shapes: DayShape[];
+	weekPattern: WeekPattern;
+	days: Record<string, DayInstance>;
+	obligations: Obligation[];
+	rituals: Ritual[];
+	tasks: Task[];
+	settings: PlannerSettings;
+	domains: Domain[];
+};

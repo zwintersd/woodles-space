@@ -10,7 +10,8 @@ import type {
 	Block,
 	Obligation,
 	Ritual,
-	ToneName
+	ToneName,
+	PlannerBlob
 } from './types';
 import {
 	STARTER_SHAPES,
@@ -293,6 +294,26 @@ class PlannerStore {
 	// Wipe everything user-introductory — used by "redo onboarding" affordance.
 	resetOnboarding(): void {
 		this.updateSettings({ onboardingComplete: false });
+	}
+
+	// Apply a blob from the sync server to all persisted state fields.
+	rehydrate(blob: PlannerBlob): void {
+		this.dayShapes = blob.shapes;
+		this.weekPattern = blob.weekPattern;
+		this.dayOverrides = blob.days;
+		this.obligations = blob.obligations;
+		this.rituals = blob.rituals;
+		this.tasks = blob.tasks;
+		this.settings = { ...DEFAULT_SETTINGS, ...blob.settings };
+		this.domains = blob.domains;
+		save('planner.shapes.v1', this.dayShapes);
+		save('planner.weekPattern.v1', this.weekPattern);
+		save('planner.days.v2', this.dayOverrides);
+		save('planner.obligations.v1', this.obligations);
+		save('planner.rituals.v1', this.rituals);
+		save('planner.tasks.v1', this.tasks);
+		save('planner.settings.v1', this.settings);
+		save('planner.domains.v1', this.domains);
 	}
 
 	// ── view + binder ───────────────────────────────────────────────
