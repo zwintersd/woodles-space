@@ -25,8 +25,8 @@ describe('getPaletteForTime', () => {
 
 	it('produces midnight values at hour 0', () => {
 		const p = getPaletteForTime(new Date(2024, 5, 12, 0, 0));
-		// Hour 0 sits on the first stop (#1c1926 → rgb form via lerp).
-		expect(p['--p-bg']).toBe('rgb(28,25,38)');
+		// Hour 0 sits on the first stop (#1a1638 → rgb form via lerp).
+		expect(p['--p-bg']).toBe('rgb(26,22,56)');
 	});
 });
 

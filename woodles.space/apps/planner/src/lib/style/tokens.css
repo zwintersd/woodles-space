@@ -5,14 +5,14 @@
 
 .planner-root {
 	/* ── day-cycle palette (overridden by JS) ─────────────────────── */
-	--p-bg:          #f0e6c0;
-	--p-surface:     #faf3d8;
-	--p-text:        #28200f;
-	--p-muted:       #766850;
-	--p-accent:      #c48c08;
-	--p-accent-soft: rgba(196,140,8,0.17);
-	--p-border:      rgba(40,32,15,0.13);
-	--p-highlight:   #9e7050;
+	--p-bg:          #f6efd2;
+	--p-surface:     #fdf7dc;
+	--p-text:        #2a2515;
+	--p-muted:       #6a5e3a;
+	--p-accent:      #d4b820;
+	--p-accent-soft: rgba(212,184,32,0.20);
+	--p-border:      rgba(42,37,21,0.12);
+	--p-highlight:   #c870a0;
 
 	/* ── typography (inherits from shared/fonts.css) ──────────────── */
 	--pl-font-display: var(--font-display, 'Cormorant Garamond', Georgia, serif);
