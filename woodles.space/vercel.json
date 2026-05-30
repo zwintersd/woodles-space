@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm --filter write build && pnpm --filter marginalia build && pnpm --filter planner build",
+  "buildCommand": "pnpm --filter write build && pnpm --filter marginalia build && pnpm --filter planner build && pnpm --filter desktop build",
   "outputDirectory": ".",
   "trailingSlash": false,
   "rewrites": [
@@ -24,6 +24,10 @@
     { "source": "/marginalia",         "destination": "/apps/marginalia/dist/index.html" },
     { "source": "/marginalia/:path*",  "destination": "/apps/marginalia/dist/:path*" },
     { "source": "/planner",            "destination": "/apps/planner/dist/index.html" },
-    { "source": "/planner/:path*",     "destination": "/apps/planner/dist/:path*" }
+    { "source": "/planner/:path*",     "destination": "/apps/planner/dist/:path*" },
+    { "source": "/animations",         "destination": "/apps/animations/index.html" },
+    { "source": "/animations/:path*",  "destination": "/apps/animations/:path*" },
+    { "source": "/desktop",            "destination": "/apps/desktop/dist/index.html" },
+    { "source": "/desktop/:path*",     "destination": "/apps/desktop/dist/:path*" }
   ]
 }
