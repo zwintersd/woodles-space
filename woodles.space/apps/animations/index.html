@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="cream">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>animations · woodles.space</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/shared/palette.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-weight: 300;
+    }
+
+    /* ── layout ── */
+    .shell {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      grid-template-rows: auto 1fr;
+      min-height: 100vh;
+    }
+
+    /* ── header ── */
+    header {
+      grid-column: 1 / -1;
+      padding: 1.4rem 2rem 1.1rem;
+      border-bottom: 1px solid var(--rule);
+      display: flex;
+      align-items: baseline;
+      gap: 1.4rem;
+    }
+    header h1 {
+      font-size: 1.35rem;
+      font-weight: 400;
+      letter-spacing: 0.01em;
+    }
+    header span {
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-weight: 300;
+    }
+    header a {
+      margin-left: auto;
+      font-size: 0.8rem;
+      font-family: 'DM Mono', monospace;
+      color: var(--muted);
+      text-decoration: none;
+      opacity: 0.7;
+      transition: opacity 0.2s;
+    }
+    header a:hover { opacity: 1; }
+
+    /* ── sidebar ── */
+    aside {
+      border-right: 1px solid var(--rule);
+      padding: 1.4rem 0;
+      overflow-y: auto;
+    }
+    .sidebar-label {
+      padding: 0 1.4rem 0.7rem;
+      font-size: 0.72rem;
+      font-family: 'DM Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+    .scene-list {
+      list-style: none;
+    }
+    .scene-item {
+      padding: 0.7rem 1.4rem;
+      cursor: pointer;
+      border-left: 3px solid transparent;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .scene-item:hover {
+      background: color-mix(in srgb, var(--lavender) 12%, transparent);
+    }
+    .scene-item.active {
+      border-left-color: var(--accent-strong);
+      background: color-mix(in srgb, var(--lavender) 18%, transparent);
+    }
+    .scene-item .scene-title {
+      font-size: 1rem;
+      font-weight: 400;
+      display: block;
+    }
+    .scene-item .scene-tag {
+      font-size: 0.72rem;
+      font-family: 'DM Mono', monospace;
+      color: var(--muted);
+      margin-top: 0.15rem;
+      display: block;
+    }
+
+    /* ── main content ── */
+    main {
+      padding: 2rem 2.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      overflow-y: auto;
+    }
+
+    .scene-header {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+    .scene-header h2 {
+      font-size: 1.6rem;
+      font-weight: 400;
+      letter-spacing: 0.01em;
+    }
+    .scene-header .scene-desc {
+      font-size: 0.98rem;
+      color: var(--muted);
+      font-style: italic;
+      max-width: 60ch;
+      line-height: 1.5;
+    }
+
+    /* ── player ── */
+    .player {
+      background: color-mix(in srgb, var(--lavender) 8%, var(--bg));
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 360px;
+      position: relative;
+    }
+    .player video,
+    .player img {
+      max-width: 100%;
+      max-height: 520px;
+      display: block;
+      border-radius: 4px;
+    }
+    .player-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      padding: 3rem;
+      color: var(--muted);
+      text-align: center;
+    }
+    .player-empty .icon {
+      font-size: 2.8rem;
+      opacity: 0.35;
+    }
+    .player-empty p {
+      font-size: 0.9rem;
+      font-family: 'DM Mono', monospace;
+      line-height: 1.6;
+    }
+    .player-empty code {
+      display: block;
+      margin-top: 0.5rem;
+      padding: 0.6rem 1rem;
+      background: color-mix(in srgb, var(--accent-strong) 6%, var(--bg));
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      font-size: 0.82rem;
+      text-align: left;
+      white-space: pre;
+      color: var(--accent-strong);
+    }
+
+    /* ── meta strip ── */
+    .meta-strip {
+      display: flex;
+      gap: 1.4rem;
+      flex-wrap: wrap;
+    }
+    .meta-chip {
+      font-size: 0.75rem;
+      font-family: 'DM Mono', monospace;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .meta-chip .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--lavender);
+      flex-shrink: 0;
+    }
+
+    /* ── source toggle ── */
+    details {
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    details summary {
+      padding: 0.7rem 1.1rem;
+      font-size: 0.78rem;
+      font-family: 'DM Mono', monospace;
+      cursor: pointer;
+      color: var(--muted);
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: background 0.15s;
+    }
+    details summary::-webkit-details-marker { display: none; }
+    details summary::before {
+      content: '▶';
+      font-size: 0.6rem;
+      transition: transform 0.2s;
+    }
+    details[open] summary::before { transform: rotate(90deg); }
+    details summary:hover {
+      background: color-mix(in srgb, var(--lavender) 10%, transparent);
+    }
+    details pre {
+      padding: 1.1rem 1.4rem;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.78rem;
+      line-height: 1.7;
+      overflow-x: auto;
+      background: color-mix(in srgb, var(--accent-strong) 4%, var(--bg));
+      border-top: 1px solid var(--rule);
+      color: var(--text);
+      white-space: pre;
+    }
+
+    /* ── theme picker ── */
+    .theme-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      padding: 0 1.4rem 1rem;
+      flex-wrap: wrap;
+    }
+    .theme-swatch {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: border-color 0.15s, transform 0.15s;
+    }
+    .theme-swatch:hover { transform: scale(1.2); }
+    .theme-swatch.active { border-color: var(--accent-strong); }
+  </style>
+</head>
+<body>
+<div class="shell">
+
+  <header>
+    <h1>animations</h1>
+    <span>manim playspace</span>
+    <a href="/">← woodles.space</a>
+  </header>
+
+  <aside>
+    <div class="sidebar-label">scenes</div>
+    <ul class="scene-list" id="sceneList"></ul>
+
+    <div class="sidebar-label" style="margin-top:1.4rem">theme</div>
+    <div class="theme-row" id="themeRow"></div>
+  </aside>
+
+  <main>
+    <div class="scene-header">
+      <h2 id="sceneTitle">—</h2>
+      <p class="scene-desc" id="sceneDesc"></p>
+    </div>
+
+    <div class="player" id="player">
+      <div class="player-empty">
+        <div class="icon">◎</div>
+        <p>select a scene to view the rendered animation<br>or render one first:</p>
+        <code>./render scenes/positionality.py PositionalityScene -qm
+./render scenes/positionality.py PositionalityScene --gif</code>
+      </div>
+    </div>
+
+    <div class="meta-strip" id="metaStrip" style="display:none">
+      <div class="meta-chip"><span class="dot"></span><span id="metaFile"></span></div>
+      <div class="meta-chip"><span class="dot" style="background:var(--peach)"></span><span id="metaClass"></span></div>
+      <div class="meta-chip"><span class="dot" style="background:var(--aqua)"></span><span id="metaFormat"></span></div>
+    </div>
+
+    <details id="sourceDetails" style="display:none">
+      <summary>view source</summary>
+      <pre id="sourceCode"></pre>
+    </details>
+  </main>
+
+</div>
+
+<script>
+// ── scene manifest ─────────────────────────────────────────────────────────
+// Add entries here as you render new animations.
+// `src` points to the rendered file relative to this page.
+// `srcFallback` is shown if the file isn't rendered yet.
+const SCENES = [
+  {
+    id: "positionality",
+    title: "positionality",
+    desc: "where you stand shapes what you see — a person at the center of a world-view circle, with a wedge tracing their vantage point as it sweeps through the full arc of perspective.",
+    file: "scenes/positionality.py",
+    sceneClass: "PositionalityScene",
+    // update this path after rendering:
+    src: "media/videos/positionality/720p30/PositionalityScene.mp4",
+    srcGif: "media/videos/positionality/480p15/PositionalityScene.gif",
+    format: "mp4",
+    tags: ["concepts", "whiteboard"],
+  },
+];
+
+// ── themes ─────────────────────────────────────────────────────────────────
+const THEMES = [
+  { id: "cream",      bg: "#faf6f0" },
+  { id: "dusk",       bg: "#1f1a2e" },
+  { id: "paper",      bg: "#fafaf7" },
+  { id: "dawn",       bg: "#fff6ee" },
+  { id: "forest",     bg: "#f4f1e8" },
+  { id: "inkwell",    bg: "#0e1a3a" },
+  { id: "midnight",   bg: "#0a0a14" },
+  { id: "typewriter", bg: "#f0e6d2" },
+];
+
+// ── state ──────────────────────────────────────────────────────────────────
+let active = null;
+
+function selectScene(scene) {
+  active = scene;
+
+  // sidebar
+  document.querySelectorAll('.scene-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.id === scene.id);
+  });
+
+  // header
+  document.getElementById('sceneTitle').textContent = scene.title;
+  document.getElementById('sceneDesc').textContent = scene.desc;
+
+  // player
+  const player = document.getElementById('player');
+  const hasMp4 = scene.src && scene.format === 'mp4';
+  const hasGif = scene.srcGif;
+
+  if (hasMp4) {
+    player.innerHTML = `<video controls autoplay loop muted playsinline src="${scene.src}"></video>`;
+  } else if (hasGif) {
+    player.innerHTML = `<img src="${scene.srcGif}" alt="${scene.title}" />`;
+  } else {
+    const file = scene.file.split('/').pop().replace('.py', '');
+    player.innerHTML = `<div class="player-empty">
+      <div class="icon">◎</div>
+      <p>not yet rendered — run:</p>
+      <code>./render ${scene.file} ${scene.sceneClass} -qm
+./render ${scene.file} ${scene.sceneClass} --gif</code>
+    </div>`;
+  }
+
+  // meta strip
+  document.getElementById('metaStrip').style.display = 'flex';
+  document.getElementById('metaFile').textContent = scene.file;
+  document.getElementById('metaClass').textContent = scene.sceneClass;
+  document.getElementById('metaFormat').textContent = scene.format || 'mp4';
+
+  // source panel — fetch lazily
+  const srcDetails = document.getElementById('sourceDetails');
+  srcDetails.style.display = 'block';
+  srcDetails.open = false;
+  srcDetails.querySelector('summary').textContent = `view source  ·  ${scene.file}`;
+
+  const pre = document.getElementById('sourceCode');
+  pre.textContent = 'loading…';
+  fetch(scene.file)
+    .then(r => r.text())
+    .then(txt => { pre.textContent = txt; })
+    .catch(() => { pre.textContent = `# open ${scene.file} in your editor`; });
+}
+
+// ── build sidebar ──────────────────────────────────────────────────────────
+const list = document.getElementById('sceneList');
+SCENES.forEach(scene => {
+  const li = document.createElement('li');
+  li.className = 'scene-item';
+  li.dataset.id = scene.id;
+  li.innerHTML = `<span class="scene-title">${scene.title}</span>
+    <span class="scene-tag">${scene.tags.join(' · ')}</span>`;
+  li.addEventListener('click', () => selectScene(scene));
+  list.appendChild(li);
+});
+
+// auto-select first
+if (SCENES.length) selectScene(SCENES[0]);
+
+// ── build theme swatches ───────────────────────────────────────────────────
+const themeRow = document.getElementById('themeRow');
+const html = document.documentElement;
+const savedTheme = localStorage.getItem('woodles-theme') || 'cream';
+html.dataset.theme = savedTheme;
+
+THEMES.forEach(t => {
+  const sw = document.createElement('button');
+  sw.className = 'theme-swatch' + (t.id === savedTheme ? ' active' : '');
+  sw.title = t.id;
+  sw.style.background = t.bg;
+  sw.style.border = '2px solid transparent';
+  sw.addEventListener('click', () => {
+    html.dataset.theme = t.id;
+    localStorage.setItem('woodles-theme', t.id);
+    document.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
+    sw.classList.add('active');
+  });
+  themeRow.appendChild(sw);
+});
+</script>
+</body>
+</html>
