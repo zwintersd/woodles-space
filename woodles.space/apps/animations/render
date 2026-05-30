@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# render — Manim render helper for woodles animations
+#
+# Usage:
+#   ./render scenes/positionality.py PositionalityScene        # MP4, medium quality
+#   ./render scenes/positionality.py PositionalityScene --gif  # GIF output
+#   ./render scenes/positionality.py PositionalityScene -ql    # low quality (fast preview)
+#   ./render scenes/positionality.py PositionalityScene -qh    # high quality
+#   ./render --list                                             # list all scenes
+#   ./render --preview scenes/positionality.py PositionalityScene  # open after render
+#
+# Rendered files land in media/videos/<scene_file>/<quality>/
+# GIFs land in media/videos/<scene_file>/<quality>/
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# ── ensure Python env is available ────────────────────────────────────────────
+if ! command -v manim &>/dev/null; then
+  if [ -f ".venv/bin/manim" ]; then
+    export PATH="$SCRIPT_DIR/.venv/bin:$PATH"
+  else
+    echo "manim not found. Set up with:"
+    echo "  uv venv && uv pip install manim"
+    echo "  # or: pip install manim"
+    exit 1
+  fi
+fi
+
+# ── flag handling ──────────────────────────────────────────────────────────────
+if [[ "${1:-}" == "--list" ]]; then
+  echo "Available scene files:"
+  find scenes -name "*.py" | sort | while read -r f; do
+    echo "  $f"
+    grep -E "^class .+Scene" "$f" | sed 's/class /    → /; s/(.*$//'
+  done
+  exit 0
+fi
+
+PREVIEW=false
+if [[ "${1:-}" == "--preview" ]]; then
+  PREVIEW=true
+  shift
+fi
+
+SCENE_FILE="${1:?Usage: ./render scenes/<file>.py <SceneName> [manim flags]}"
+SCENE_NAME="${2:?Provide a scene class name}"
+shift 2
+
+# Default to medium quality MP4; pass remaining args through to manim
+QUALITY_FLAG="${1:--qm}"
+shift || true
+
+OUTPUT_ARGS=("$QUALITY_FLAG")
+
+# If caller passes --gif, switch to gif output
+GIF=false
+for arg in "$@"; do
+  if [[ "$arg" == "--gif" ]]; then
+    GIF=true
+  fi
+done
+
+if $GIF; then
+  manim "$SCENE_FILE" "$SCENE_NAME" --format gif "${OUTPUT_ARGS[@]}" "$@"
+else
+  manim "$SCENE_FILE" "$SCENE_NAME" "${OUTPUT_ARGS[@]}" "$@"
+fi
+
+# ── open preview if requested ──────────────────────────────────────────────────
+if $PREVIEW; then
+  LATEST=$(find media -name "*.mp4" -o -name "*.gif" 2>/dev/null | sort -t/ -k4 | tail -1)
+  if [[ -n "$LATEST" ]]; then
+    echo "Opening: $LATEST"
+    open "$LATEST" 2>/dev/null || xdg-open "$LATEST" 2>/dev/null || echo "File at: $LATEST"
+  fi
+fi
