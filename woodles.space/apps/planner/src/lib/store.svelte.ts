@@ -60,7 +60,7 @@ const DEFAULT_SETTINGS: PlannerSettings = {
 
 // ── store class (Svelte 5 runes, class pattern) ───────────────────
 
-class PlannerStore {
+export class PlannerStore {
 	// Persisted — schedule data
 	dayShapes = $state<DayShape[]>(load('planner.shapes.v1', STARTER_SHAPES));
 	weekPattern = $state<WeekPattern>(load('planner.weekPattern.v1', STARTER_WEEK_PATTERN));
