@@ -8,11 +8,13 @@
 	import TheWorld from '$lib/witch/TheWorld.svelte';
 	import Ledger from '$lib/witch/Ledger.svelte';
 	import ReadingRoom from '$lib/components/reading/ReadingRoom.svelte';
+	import Arcade from '$lib/arcade/Arcade.svelte';
 
 	let menuOpen = $state(false);
 	let importBox = $state('');
 	let exportBlob = $state('');
 	let readingOpen = $state(false);
+	let arcadeOpen = $state(false);
 
 	onMount(() => {
 		book.hydrate();
@@ -179,6 +181,23 @@
 		</p>
 		{#if readingOpen}
 			<ReadingRoom />
+		{/if}
+	</section>
+
+	<hr class="rule" />
+
+	<section class="side">
+		<button class="side-toggle" onclick={() => (arcadeOpen = !arcadeOpen)}>
+			the arcade {arcadeOpen ? '−' : '+'}
+		</button>
+		<p class="side-note">
+			Small games tucked into a corner of the study. Some reward patience,
+			others speed. Prizes drift back into the Book.
+		</p>
+		{#if arcadeOpen}
+			<div class="arcade-wrap">
+				<Arcade />
+			</div>
 		{/if}
 	</section>
 
@@ -458,6 +477,9 @@
 		color: var(--muted);
 		max-width: 34rem;
 		margin: 0.3rem 0 0;
+	}
+	.arcade-wrap {
+		margin-top: 1rem;
 	}
 	footer {
 		margin-top: 3rem;
