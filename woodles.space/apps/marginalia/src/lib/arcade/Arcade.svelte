@@ -1,4 +1,6 @@
 <script lang="ts">
+	import TwoZeroFourEight from './TwoZeroFourEight.svelte';
+
 	type GameStatus = 'play' | 'soon' | 'locked';
 
 	interface MiniGame {
@@ -11,7 +13,17 @@
 		lockedHint?: string;
 	}
 
+	let activeGame = $state<string | null>(null);
+
 	const games: MiniGame[] = [
+		{
+			id: 'stack-2048',
+			icon: '▦',
+			title: '2048',
+			tagline: 'Slide the tiles. Merge the numbers. Reach 2048 before the board fills.',
+			tags: ['puzzle', 'numbers'],
+			status: 'play'
+		},
 		{
 			id: 'type-witch',
 			icon: '⌨',
@@ -101,7 +113,7 @@
 						{/each}
 					</div>
 					{#if game.status === 'play'}
-						<button class="play-btn">play →</button>
+						<button class="play-btn" onclick={() => (activeGame = game.id)}>play →</button>
 					{:else if game.status === 'soon'}
 						<span class="play-placeholder">soon</span>
 					{:else}
@@ -111,6 +123,10 @@
 			</article>
 		{/each}
 	</div>
+
+	{#if activeGame === 'stack-2048'}
+		<TwoZeroFourEight onclose={() => (activeGame = null)} />
+	{/if}
 
 	<p class="arcade-note">
 		More games are written as the study grows. Play unlocks small rewards that drift
