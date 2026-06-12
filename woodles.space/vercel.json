@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm --filter write build && pnpm --filter marginalia build && pnpm --filter planner build && pnpm --filter desktop build",
+  "buildCommand": "pnpm --filter write build && pnpm --filter marginalia build && pnpm --filter planner build && pnpm --filter desktop build && pnpm --filter spores build",
   "outputDirectory": ".",
   "trailingSlash": false,
   "rewrites": [
@@ -28,6 +28,8 @@
     { "source": "/animations",         "destination": "/apps/animations/index.html" },
     { "source": "/animations/:path*",  "destination": "/apps/animations/:path*" },
     { "source": "/desktop",            "destination": "/apps/desktop/dist/index.html" },
-    { "source": "/desktop/:path*",     "destination": "/apps/desktop/dist/:path*" }
+    { "source": "/desktop/:path*",     "destination": "/apps/desktop/dist/:path*" },
+    { "source": "/spores",             "destination": "/apps/spores/dist/index.html" },
+    { "source": "/spores/:path*",      "destination": "/apps/spores/dist/:path*" }
   ]
 }

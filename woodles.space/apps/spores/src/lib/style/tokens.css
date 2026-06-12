@@ -1,0 +1,56 @@
+/* spores · twilight webcore design tokens
+   scoped to .spores-root — never bleeds into the rest of woodles.space */
+
+.spores-root {
+	/* ── palette ───────────────────────────────────────────────────── */
+	--g-bg:            #0d0d1a;
+	--g-surface:       #13132a;
+	--g-surface-2:     #1a1a35;
+	--g-text:          #e2daf0;
+	--g-text-dim:      #a09ab8;
+	--g-muted:         #6a6480;
+	--g-border:        rgba(240, 143, 184, 0.12);
+	--g-border-strong: rgba(240, 143, 184, 0.25);
+	--g-rule:          rgba(162, 150, 200, 0.15);
+
+	/* ── lines of flight ───────────────────────────────────────────── */
+	--g-flight:        #f08fb8;   /* leafeon pink */
+	--g-flight-soft:   rgba(240, 143, 184, 0.18);
+	--g-flight-active: #6ce5e8;   /* cyan — hovered / active connections */
+	--g-flight-active-soft: rgba(108, 229, 232, 0.18);
+
+	/* ── typography ────────────────────────────────────────────────── */
+	--g-font-display: var(--font-display, 'Cormorant Garamond', Georgia, serif);
+	--g-font-body:    var(--font-body, 'Lora', Georgia, serif);
+	--g-font-mono:    var(--font-mono, 'DM Mono', 'Courier New', monospace);
+
+	/* ── spacing ───────────────────────────────────────────────────── */
+	--g-space-xs:  0.25rem;
+	--g-space-sm:  0.5rem;
+	--g-space-md:  1rem;
+	--g-space-lg:  1.75rem;
+	--g-space-xl:  2.5rem;
+	--g-space-2xl: 4rem;
+
+	/* ── radius ────────────────────────────────────────────────────── */
+	--g-radius-sm:   6px;
+	--g-radius-md:   12px;
+	--g-radius-lg:   20px;
+	--g-radius-pill: 100px;
+
+	/* ── z-index layers ────────────────────────────────────────────── */
+	--g-z-sidebar:  10;
+	--g-z-panel:    20;
+	--g-z-modal:    30;
+	--g-z-overlay:  40;
+
+	/* ── transitions ───────────────────────────────────────────────── */
+	--g-transition-fast:   0.15s ease;
+	--g-transition-medium: 0.25s ease;
+	--g-transition-spring: 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+	/* ── shadows ───────────────────────────────────────────────────── */
+	--g-shadow-card:  0 2px 20px rgba(13, 13, 26, 0.6);
+	--g-shadow-hover: 0 4px 28px rgba(240, 143, 184, 0.12);
+	--g-shadow-flight: 0 0 12px rgba(240, 143, 184, 0.25);
+}
