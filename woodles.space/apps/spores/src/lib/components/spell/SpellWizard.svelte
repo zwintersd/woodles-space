@@ -1,11 +1,33 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { garden } from '$lib/garden.svelte';
 	import { CURATED_CATEGORIES, getCategory } from '$lib/spells/registry';
 	import { buildSpell } from '$lib/spells/assembler';
 	import { parseImport } from '$lib/spells/parser';
 	import type { Category, SpellDraft, ChildLevel } from '$lib/spells/types';
 	import type { ImportResult } from '$lib/spells/types';
+	import type { Spore, OnboardingStep } from '$lib/types';
+	import { ONBOARDING_EXAMPLE } from '$lib/onboarding/example';
 	import CustomCategoryEditor from './CustomCategoryEditor.svelte';
+
+	// ── onboarding mode (first-run guided cast) ─────────────────────
+	// All props default off, so the normal wizard behaviour is unchanged.
+	// In onboarding mode the wizard is pre-seeded to TV Series, the category
+	// and modifier steps are skipped, the field step is narrowed to a single
+	// choice, and a successful grow hands the new Spore back via `ongrown`.
+	let {
+		onboarding = false,
+		presetSubject = '',
+		startStep = 0,
+		onstep = undefined,
+		ongrown = undefined
+	}: {
+		onboarding?: boolean;
+		presetSubject?: string;
+		startStep?: number;
+		onstep?: (step: OnboardingStep) => void;
+		ongrown?: (spore: Spore) => void;
+	} = $props();
 
 	// ── wizard state ───────────────────────────────────────────────
 
@@ -26,7 +48,7 @@
 	let showCustomEditor = $state(false);
 
 	// Post-import state
-	let pendingSpore = $state<import('$lib/types').Spore | null>(null);
+	let pendingSpore = $state<Spore | null>(null);
 	let pendingSpellbookIds = $state<string[]>([]);
 
 	// ── category resolution ────────────────────────────────────────
@@ -39,6 +61,41 @@
 	let selectedCategory = $derived(
 		draft.categoryId ? getCategory(draft.categoryId, garden.settings.customCategories ?? []) : null
 	);
+
+	// ── onboarding: pre-seed TV Series, narrow the field step ──────
+
+	// The one exposed child level in onboarding (season → episode).
+	let episodeLevel = $derived<ChildLevel | undefined>(selectedCategory?.children?.children);
+	let episodeOn = $derived(draft.includedLevels.includes('episode'));
+
+	function setEpisodes(on: boolean) {
+		if (!episodeLevel) return;
+		if (on !== episodeOn) toggleLevel(episodeLevel.kind, episodeLevel);
+	}
+
+	onMount(() => {
+		if (!onboarding) return;
+		const cat = getCategory('tv-series');
+		if (cat) {
+			draft.categoryId = cat.id;
+			initFieldsForCategory(cat);
+			// First-run default: seasons only — a smaller, faster, more reliable
+			// first cast. The user can opt into episode detail in the field step.
+			draft.includedLevels = draft.includedLevels.filter((k) => k !== 'episode');
+			draft.selectedFields = draft.selectedFields.filter((f) => !f.startsWith('episode.'));
+			draft.subject = presetSubject;
+		}
+		goStep(startStep && startStep > 0 ? startStep : 2);
+	});
+
+	// Report wizard step changes to the onboarding orchestrator so it can
+	// keep its own OnboardingStep in sync (and the dev backdoor can inspect).
+	$effect(() => {
+		if (!onboarding || !onstep) return;
+		const mapped: Record<number, OnboardingStep> = { 2: 'subject', 3: 'wizard', 5: 'cast' };
+		const s = mapped[step];
+		if (s) onstep(s);
+	});
 
 	// ── field initialization when category changes ─────────────────
 
@@ -123,12 +180,18 @@
 	}
 
 	function next() {
-		if (step === 3 && !hasModifiers()) goStep(5);
+		// Onboarding skips the modifier step entirely (3 → 5).
+		if (step === 3 && (onboarding || !hasModifiers())) goStep(5);
 		else goStep(step + 1);
 	}
 
 	function back() {
-		if (step === 5 && !hasModifiers()) goStep(3);
+		// In onboarding there is no category step — back from subject returns to welcome.
+		if (onboarding && step === 2) {
+			garden.setOnboardingStep('welcome');
+			return;
+		}
+		if (step === 5 && (onboarding || !hasModifiers())) goStep(3);
 		else goStep(step - 1);
 	}
 
@@ -148,6 +211,13 @@
 	function runParser() {
 		if (!pasteText.trim()) return;
 		const result = parseImport(pasteText);
+		if (onboarding && result.ok) {
+			// First-run: a successful parse is the first real, kept write.
+			// Hand the new Spore to the orchestrator for the "grown" beat.
+			const created = garden.importStructuredSpore(result.spore);
+			ongrown?.(created);
+			return;
+		}
 		importResult = result;
 		if (result.ok) pendingSpore = result.spore;
 	}
@@ -161,15 +231,17 @@
 </script>
 
 <div class="wizard">
-	<header class="wizard-header">
-		<button class="close-btn" onclick={() => garden.closeSpellWizard()}>× close</button>
-		<div class="step-track">
-			{#each [1, 2, 3, hasModifiers() ? 4 : 0, 5].filter((n) => n > 0) as n}
-				<span class="step-dot" class:active={step === n} class:done={step > n}></span>
-			{/each}
-		</div>
-		<h2 class="wizard-title">✦ cast a spell</h2>
-	</header>
+	{#if !onboarding}
+		<header class="wizard-header">
+			<button class="close-btn" onclick={() => garden.closeSpellWizard()}>× close</button>
+			<div class="step-track">
+				{#each [1, 2, 3, hasModifiers() ? 4 : 0, 5].filter((n) => n > 0) as n}
+					<span class="step-dot" class:active={step === n} class:done={step > n}></span>
+				{/each}
+			</div>
+			<h2 class="wizard-title">✦ cast a spell</h2>
+		</header>
+	{/if}
 
 	<div class="wizard-body">
 		<!-- Step 1: Category -->
@@ -220,11 +292,16 @@
 		<!-- Step 2: Subject -->
 		{:else if step === 2 && selectedCategory}
 			<div class="step">
-				<h3 class="step-heading">Who or what is this about?</h3>
+				{#if onboarding}
+					<p class="onb-caption">Pick something you love. The spell works best when you know it well.</p>
+				{/if}
+				<h3 class="step-heading">
+					{onboarding ? "What's a show you could talk about for an hour?" : 'Who or what is this about?'}
+				</h3>
 				<input
 					class="subject-input"
 					type="text"
-					placeholder={selectedCategory.label + ' name…'}
+					placeholder={onboarding ? 'e.g. Twin Peaks' : selectedCategory.label + ' name…'}
 					bind:value={draft.subject}
 					onkeydown={(e) => e.key === 'Enter' && draft.subject.trim() && next()}
 				/>
@@ -233,12 +310,18 @@
 					<input
 						class="disambig-input"
 						type="text"
-						placeholder="e.g. the Canadian musician, not the band…"
+						placeholder={onboarding ? 'e.g. the 1990 series, not the 2017 revival…' : 'e.g. the Canadian musician, not the band…'}
 						bind:value={draft.disambiguation}
 					/>
 				</label>
+				{#if onboarding}
+					<p class="onb-note">
+						We've picked <strong>TV Series</strong> for now — you'll find authors, albums,
+						films and more after this.
+					</p>
+				{/if}
 				<div class="step-nav">
-					<button class="btn-ghost" onclick={() => goStep(1)}>← back</button>
+					<button class="btn-ghost" onclick={back}>← back</button>
 					<button class="btn-primary" onclick={next} disabled={!draft.subject.trim()}>
 						next →
 					</button>
@@ -248,6 +331,64 @@
 		<!-- Step 3: Fields & levels -->
 		{:else if step === 3 && selectedCategory}
 			<div class="step">
+				{#if onboarding}
+					<p class="onb-caption">This is what the LLM will go find for you.</p>
+					<h3 class="step-heading">How much detail?</h3>
+					{#if episodeLevel}
+						<div class="onb-choice">
+							<button
+								type="button"
+								class="onb-option"
+								class:active={!episodeOn}
+								onclick={() => setEpisodes(false)}
+							>
+								<span class="onb-option-title">Just seasons</span>
+								<span class="onb-option-sub">Faster, fewer surprises — promote a season later.</span>
+							</button>
+							<button
+								type="button"
+								class="onb-option"
+								class:active={episodeOn}
+								onclick={() => setEpisodes(true)}
+							>
+								<span class="onb-option-title">Episode-level detail</span>
+								<span class="onb-option-sub">Every episode, per season — a bigger ask of the LLM.</span>
+							</button>
+						</div>
+					{/if}
+					<details class="onb-collapsed">
+						<summary>What we'll gather about {draft.subject || 'the show'}</summary>
+						<div class="field-group root-fields">
+							<p class="field-group-label">about {draft.subject || selectedCategory.label}</p>
+							{#each selectedCategory.rootFields as f}
+								<label class="field-check">
+									<input
+										type="checkbox"
+										checked={draft.selectedFields.includes(`root.${f.key}`)}
+										onchange={() => toggleField(`root.${f.key}`)}
+									/>
+									{f.label}
+								</label>
+							{/each}
+						</div>
+						{#if selectedCategory.children}
+							{@const seasonLevel = selectedCategory.children}
+							<div class="field-group">
+								<p class="field-group-label">per {seasonLevel.label.toLowerCase()}</p>
+								{#each seasonLevel.fields.filter((f) => f.key !== 'title') as f}
+									<label class="field-check">
+										<input
+											type="checkbox"
+											checked={draft.selectedFields.includes(`${seasonLevel.kind}.${f.key}`)}
+											onchange={() => toggleField(`${seasonLevel.kind}.${f.key}`)}
+										/>
+										{f.label}
+									</label>
+								{/each}
+							</div>
+						{/if}
+					</details>
+				{:else}
 				<h3 class="step-heading">What should the spell gather?</h3>
 
 				<!-- Root fields -->
@@ -326,10 +467,11 @@
 						{/if}
 					</div>
 				{/if}
+				{/if}
 
 				<div class="step-nav">
 					<button class="btn-ghost" onclick={back}>← back</button>
-					<button class="btn-primary" onclick={next}>next →</button>
+					<button class="btn-primary" onclick={next}>{onboarding ? 'cast spell →' : 'next →'}</button>
 				</div>
 			</div>
 
@@ -361,18 +503,38 @@
 		<!-- Step 5: Review & cast -->
 		{:else if step === 5}
 			<div class="step step-review">
+				{#if onboarding}
+					<p class="onb-caption">
+						This is the hop out and back. Copy your spell, paste it into an LLM, then
+						bring the answer home.
+					</p>
+				{/if}
 				<div class="spell-block">
 					<div class="spell-toolbar">
 						<span class="spell-label">your spell</span>
 						<button class="btn-copy" onclick={copySpell}>
-							{copied ? '✓ copied' : 'copy'}
+							{copied
+								? onboarding
+									? '✓ copied — now paste it into your LLM'
+									: '✓ copied'
+								: 'copy'}
 						</button>
 					</div>
 					<pre class="spell-text">{spellText}</pre>
 				</div>
 
+				{#if onboarding}
+					<div class="onb-launch">
+						<span class="onb-launch-label">open an LLM</span>
+						<a class="onb-launch-link" href="https://claude.ai/new" target="_blank" rel="noopener noreferrer">Claude ↗</a>
+						<a class="onb-launch-link" href="https://gemini.google.com/app" target="_blank" rel="noopener noreferrer">Gemini ↗</a>
+					</div>
+				{/if}
+
 				<p class="paste-instruction">
-					Paste this into any LLM. When it responds, paste the JSON below.
+					{onboarding
+						? 'Paste the LLM’s full response below — then grow your first Spore.'
+						: 'Paste this into any LLM. When it responds, paste the JSON below.'}
 				</p>
 
 				<div class="paste-block">
@@ -390,6 +552,14 @@
 						grow spore →
 					</button>
 				</div>
+
+				{#if onboarding}
+					<details class="onb-example">
+						<summary>what you'll get back looks like this</summary>
+						<p class="onb-example-note">Illustrative example — not your data.</p>
+						<pre class="onb-example-text">{ONBOARDING_EXAMPLE}</pre>
+					</details>
+				{/if}
 
 				{#if importResult}
 					{#if !importResult.ok}
@@ -998,4 +1168,145 @@
 	}
 
 	.btn-ghost:hover { border-color: var(--g-flight); }
+
+	/* ── onboarding (first-run) extras ── */
+	.onb-caption {
+		font-family: var(--g-font-mono);
+		font-size: 0.78rem;
+		line-height: 1.5;
+		color: var(--g-flight);
+		border-left: 2px solid var(--g-flight-soft);
+		padding-left: var(--g-space-md);
+	}
+
+	.onb-note {
+		font-size: 0.82rem;
+		color: var(--g-muted);
+		line-height: 1.6;
+	}
+
+	.onb-note strong {
+		color: var(--g-text-dim);
+		font-weight: 600;
+	}
+
+	.onb-choice {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: var(--g-space-sm);
+	}
+
+	.onb-option {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		text-align: left;
+		padding: var(--g-space-md);
+		background: var(--g-surface);
+		border: 1px solid var(--g-border);
+		border-radius: var(--g-radius-md);
+		cursor: pointer;
+		transition: border-color var(--g-transition-fast), box-shadow var(--g-transition-fast);
+	}
+
+	.onb-option:hover { border-color: var(--g-flight-active); }
+
+	.onb-option.active {
+		border-color: var(--g-flight);
+		box-shadow: var(--g-shadow-hover);
+	}
+
+	.onb-option-title {
+		font-family: var(--g-font-display);
+		font-size: 1.05rem;
+		color: var(--g-text);
+	}
+
+	.onb-option-sub {
+		font-size: 0.78rem;
+		color: var(--g-muted);
+		line-height: 1.4;
+	}
+
+	.onb-collapsed,
+	.onb-example {
+		border: 1px solid var(--g-border);
+		border-radius: var(--g-radius-md);
+		background: var(--g-surface);
+		padding: var(--g-space-sm) var(--g-space-md);
+	}
+
+	.onb-collapsed summary,
+	.onb-example summary {
+		font-family: var(--g-font-mono);
+		font-size: 0.75rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--g-muted);
+		cursor: pointer;
+		list-style: none;
+	}
+
+	.onb-collapsed summary::-webkit-details-marker,
+	.onb-example summary::-webkit-details-marker { display: none; }
+
+	.onb-collapsed summary::before,
+	.onb-example summary::before { content: '▸ '; }
+
+	.onb-collapsed[open] summary::before,
+	.onb-example[open] summary::before { content: '▾ '; }
+
+	.onb-collapsed[open] { padding-bottom: var(--g-space-md); }
+
+	.onb-collapsed[open] summary { margin-bottom: var(--g-space-md); }
+
+	.onb-collapsed .field-group + .field-group { margin-top: var(--g-space-md); }
+
+	.onb-launch {
+		display: flex;
+		align-items: center;
+		gap: var(--g-space-sm);
+		flex-wrap: wrap;
+	}
+
+	.onb-launch-label {
+		font-family: var(--g-font-mono);
+		font-size: 0.7rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--g-muted);
+	}
+
+	.onb-launch-link {
+		font-family: var(--g-font-mono);
+		font-size: 0.8rem;
+		color: var(--g-flight);
+		border: 1px solid var(--g-flight-soft);
+		border-radius: var(--g-radius-pill);
+		padding: 0.25rem 0.8rem;
+		text-decoration: none;
+		transition: background var(--g-transition-fast), color var(--g-transition-fast);
+	}
+
+	.onb-launch-link:hover { background: var(--g-flight); color: #0d0d1a; }
+
+	.onb-example[open] { padding-bottom: var(--g-space-md); }
+
+	.onb-example-note {
+		font-size: 0.75rem;
+		color: var(--g-flight-active);
+		font-style: italic;
+		margin: var(--g-space-sm) 0;
+	}
+
+	.onb-example-text {
+		font-family: var(--g-font-mono);
+		font-size: 0.72rem;
+		color: var(--g-text-dim);
+		white-space: pre-wrap;
+		word-break: break-word;
+		max-height: 220px;
+		overflow-y: auto;
+		line-height: 1.5;
+	}
 </style>

@@ -1,4 +1,12 @@
-import type { Spore, Spellbook, Flight, GardenBlob, GardenSettings, GardenView } from './types';
+import type {
+	Spore,
+	Spellbook,
+	Flight,
+	GardenBlob,
+	GardenSettings,
+	GardenView,
+	OnboardingStep
+} from './types';
 import type { Category } from './spells/types';
 import { uid, now } from './utils';
 
@@ -51,6 +59,14 @@ export class GardenStore {
 
 	// Spell wizard
 	spellPrevView = $state<Exclude<GardenView, 'spell'>>('garden');
+
+	// First-run onboarding (transient — the flag itself lives in settings.onboarded)
+	showOnboarding = $state(false);
+	onboardingStep = $state<OnboardingStep>('welcome');
+	onboardingGrownSporeId = $state<string | null>(null);
+	// Bumped to force the embedded wizard to remount at a chosen step (dev jumps).
+	onboardingMountToken = $state(0);
+	devMode = $state(false);
 
 	// ── derived views ──────────────────────────────────────────────
 
@@ -119,6 +135,59 @@ export class GardenStore {
 
 	closeSpellWizard(): void {
 		this.currentView = this.spellPrevView;
+	}
+
+	// ── first-run onboarding ────────────────────────────────────────
+	// Trigger the guided first cast when the Garden is empty and the
+	// user has never been onboarded. Never auto-fires once the flag is set.
+
+	maybeStartOnboarding(): void {
+		if (this.spores.length === 0 && this.settings.onboarded !== true) {
+			this.onboardingStep = 'welcome';
+			this.onboardingGrownSporeId = null;
+			this.showOnboarding = true;
+		}
+	}
+
+	setOnboardingStep(step: OnboardingStep): void {
+		this.onboardingStep = step;
+	}
+
+	markOnboarded(): void {
+		this.settings = { ...this.settings, onboarded: true };
+		save('spores.settings.v1', this.settings);
+	}
+
+	completeOnboarding(): void {
+		this.markOnboarded();
+		this.showOnboarding = false;
+		const grownId = this.onboardingGrownSporeId;
+		if (grownId && this.spores.some((s) => s.id === grownId)) this.openSpore(grownId);
+		else this.openGarden();
+	}
+
+	// Dev backdoor (see §7) — re-arm first-run and/or jump to any step.
+	// Gated by garden.devMode, which is off unless explicitly enabled.
+
+	resetOnboarding(clearSpores = false): void {
+		this.settings = { ...this.settings, onboarded: false };
+		save('spores.settings.v1', this.settings);
+		if (clearSpores) {
+			this.spores = [];
+			save('spores.spores.v1', this.spores);
+			this.flights = [];
+			save('spores.flights.v1', this.flights);
+		}
+		this.onboardingGrownSporeId = null;
+		this.onboardingStep = 'welcome';
+		this.showOnboarding = true;
+	}
+
+	jumpToOnboardingStep(step: OnboardingStep): void {
+		this.showOnboarding = true;
+		this.onboardingStep = step;
+		// Force the embedded wizard to remount so it lands on the matching step.
+		this.onboardingMountToken++;
 	}
 
 	// ── spellbook CRUD ──────────────────────────────────────────────
