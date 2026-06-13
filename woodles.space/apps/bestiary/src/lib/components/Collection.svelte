@@ -150,7 +150,7 @@
 		align-items: center;
 		gap: 0.4rem;
 		background: var(--b-gold);
-		color: var(--b-bg-2);
+		color: var(--b-on-accent);
 		font-family: var(--b-font-mono);
 		font-size: 0.82rem;
 		font-weight: 600;

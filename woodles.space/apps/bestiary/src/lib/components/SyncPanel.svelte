@@ -102,7 +102,7 @@
 	.sync-actions { display: flex; gap: var(--b-space-sm); flex-wrap: wrap; }
 	.btn-primary {
 		background: var(--b-gold);
-		color: var(--b-bg-2);
+		color: var(--b-on-accent);
 		border-radius: var(--b-radius-sm);
 		padding: var(--b-space-sm) var(--b-space-md);
 		font-size: 0.85rem;

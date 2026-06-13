@@ -25,7 +25,7 @@
 	:global(body) { height: 100%; }
 
 	:global(body) {
-		background: var(--b-bg, #0c0e1a);
+		background: var(--b-bg, #fdeef7);
 		overflow-x: hidden;
 	}
 
@@ -52,7 +52,8 @@
 	.bestiary-root {
 		min-height: 100vh;
 		background:
-			radial-gradient(120% 80% at 50% -10%, rgba(216, 178, 90, 0.06), transparent 60%),
+			radial-gradient(75% 55% at 0% 0%, rgba(244, 154, 196, 0.35), transparent 60%),
+			radial-gradient(75% 55% at 100% 0%, rgba(160, 206, 239, 0.32), transparent 60%),
 			var(--b-bg);
 		color: var(--b-text);
 		font-family: var(--b-font-body);

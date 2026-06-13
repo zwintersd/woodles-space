@@ -92,7 +92,7 @@
 		padding: 0.35rem 0.7rem;
 		transition: background var(--b-transition-fast), color var(--b-transition-fast);
 	}
-	.new:hover { background: var(--b-gold); color: var(--b-bg-2); }
+	.new:hover { background: var(--b-gold); color: var(--b-on-accent); }
 
 	.tally {
 		padding: 0 var(--b-space-lg);
@@ -141,7 +141,8 @@
 	.sync-overlay {
 		position: fixed;
 		inset: 0;
-		background: rgba(10, 11, 21, 0.6);
+		background: rgba(90, 54, 80, 0.30);
+		backdrop-filter: blur(2px);
 		z-index: var(--b-z-overlay);
 		display: flex;
 		align-items: flex-end;

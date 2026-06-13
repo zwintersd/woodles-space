@@ -275,7 +275,7 @@
 
 	.primary {
 		background: var(--b-gold);
-		color: var(--b-bg-2);
+		color: var(--b-on-accent);
 		border-radius: var(--b-radius-sm);
 		padding: 0.35rem 0.9rem;
 		font-size: 0.82rem;
@@ -417,10 +417,10 @@
 	.seg:hover { border-color: var(--seg); color: var(--b-text); }
 	.seg.active {
 		border-color: var(--seg);
-		color: var(--b-bg-2);
+		color: var(--b-on-accent);
 		background: var(--seg);
 	}
-	.seg.active .seg-sym { color: var(--b-bg-2); }
+	.seg.active .seg-sym { color: var(--b-on-accent); }
 
 	/* steppers */
 	.stats-row { display: flex; gap: var(--b-space-md); flex-wrap: wrap; }

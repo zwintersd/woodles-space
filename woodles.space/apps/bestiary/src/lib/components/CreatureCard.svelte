@@ -101,9 +101,9 @@
 		inset: 0;
 		pointer-events: none;
 		background: linear-gradient(125deg, transparent 38%,
-			color-mix(in srgb, var(--rarity) 26%, transparent) 50%, transparent 62%);
-		mix-blend-mode: screen;
-		opacity: 0.6;
+			color-mix(in srgb, var(--rarity) 32%, transparent) 50%, transparent 62%);
+		mix-blend-mode: multiply;
+		opacity: 0.55;
 	}
 
 	.card.interactive {
@@ -159,9 +159,10 @@
 		border-radius: 50%;
 		font-family: var(--b-font-pixel);
 		font-size: 1em;
-		color: var(--b-bg-2);
+		color: var(--b-on-accent);
 		background: radial-gradient(circle at 35% 30%, var(--b-gold-bright), var(--domain));
-		box-shadow: inset 0 0 0 0.12em rgba(0, 0, 0, 0.25), 0 0.1em 0.3em rgba(0, 0, 0, 0.4);
+		box-shadow: inset 0 0.08em 0.16em rgba(255, 255, 255, 0.6),
+			inset 0 0 0 0.1em rgba(120, 60, 100, 0.18), 0 0.12em 0.3em rgba(206, 130, 175, 0.4);
 	}
 
 	/* ── art window ── */
@@ -312,7 +313,7 @@
 		border: 1px solid var(--b-border-strong);
 		border-radius: 0.4em;
 		padding: 0.18em 0.5em;
-		box-shadow: 0 0.1em 0.3em rgba(0, 0, 0, 0.4);
+		box-shadow: 0 0.1em 0.28em rgba(206, 130, 175, 0.3);
 	}
 	.slash {
 		color: var(--b-muted);

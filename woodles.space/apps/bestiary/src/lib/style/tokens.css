@@ -1,45 +1,47 @@
-/* bestiary · twilight-codex design tokens
+/* bestiary · cotton-candy design tokens
    scoped to .bestiary-root — never bleeds into the rest of woodles.space.
 
    The bestiary is the witch's field guide: the creatures that emerged from
    the conditions she wrote in Marginalia, pinned to vellum as playing cards.
-   So the palette is ink-and-gilt — a dark codex lit by a single candle. */
+   Here the palette is spun sugar — pale pink and sky, lit like a fair at
+   midday. Sweet, soft, and light. */
 
 .bestiary-root {
-	/* ── surfaces ──────────────────────────────────────────────────── */
-	--b-bg:            #0c0e1a;
-	--b-bg-2:          #0a0b15;
-	--b-surface:       #14162a;
-	--b-surface-2:     #1c1e36;
-	--b-vellum:        #161527;   /* the card field, behind the art */
+	/* ── surfaces: spun sugar ──────────────────────────────────────── */
+	--b-bg:            #fdeef7;   /* cotton-candy pink mist */
+	--b-bg-2:          #eceefb;   /* sky-lavender mist — the other candy */
+	--b-surface:       #ffffff;   /* sugar white */
+	--b-surface-2:     #fbf1f8;   /* faint pink, for inputs */
+	--b-vellum:        #fff8fc;   /* the card field, behind the art */
 
-	/* ── ink ───────────────────────────────────────────────────────── */
-	--b-text:          #ece6da;   /* warm parchment-white */
-	--b-text-dim:      #b0a890;
-	--b-muted:         #6f6a82;
-	--b-border:        rgba(216, 178, 90, 0.14);
-	--b-border-strong: rgba(216, 178, 90, 0.32);
-	--b-rule:          rgba(176, 168, 144, 0.16);
+	/* ── ink: soft blackberry ──────────────────────────────────────── */
+	--b-text:          #6a4763;
+	--b-text-dim:      #9a7d96;
+	--b-muted:         #c0aec8;
+	--b-border:        rgba(239, 122, 174, 0.22);
+	--b-border-strong: rgba(239, 122, 174, 0.45);
+	--b-rule:          rgba(150, 130, 185, 0.18);
 
-	/* ── gilt: the codex accent ────────────────────────────────────── */
-	--b-gold:          #d8b25a;
-	--b-gold-soft:     rgba(216, 178, 90, 0.18);
-	--b-gold-bright:   #f0cf7e;
+	/* ── the sweet accent: bubblegum ───────────────────────────────── */
+	--b-gold:          #ef7aae;
+	--b-gold-soft:     rgba(239, 122, 174, 0.16);
+	--b-gold-bright:   #ffd8ea;
+	--b-on-accent:     #5a2a48;   /* deep berry — text that sits on the accent */
 
 	/* ── color identity: a creature's domain (mirrors Marginalia) ──── */
 	/* temporal · on time   · spatial · on space
 	   biochemical · on substance   · relational · on meaning */
-	--b-temporal:      #e8c15a;   /* amber — the hour-gold */
-	--b-spatial:       #6aa6e8;   /* blue — distance and depth */
-	--b-biochemical:   #7fd08a;   /* green — water, carbon, growth */
-	--b-relational:    #c98be0;   /* violet — cause, meaning, bond */
-	--b-unspecified:   #9aa0b5;   /* slate — the wandering, unwritten */
+	--b-temporal:      #f2b75e;   /* honey — the hour-gold */
+	--b-spatial:       #7fb8ec;   /* candy blue — distance and depth */
+	--b-biochemical:   #86d6a0;   /* mint — water, carbon, growth */
+	--b-relational:    #cf9be8;   /* lilac — cause, meaning, bond */
+	--b-unspecified:   #b7aecb;   /* soft grey-lavender — the unwritten */
 
 	/* ── rarity ────────────────────────────────────────────────────── */
-	--b-common:        #b8bcc8;
-	--b-uncommon:      #7fb8c8;
-	--b-rare:          #e8c15a;
-	--b-mythic:        #ef9a55;
+	--b-common:        #a9a1b8;
+	--b-uncommon:      #5cb8c4;
+	--b-rare:          #dca63c;
+	--b-mythic:        #fb8a5b;   /* tangerine sherbet */
 
 	/* ── typography ────────────────────────────────────────────────── */
 	--b-font-codex:   var(--font-fell, 'IM Fell DW Pica', Georgia, serif);
@@ -74,8 +76,8 @@
 	--b-transition-medium: 0.25s ease;
 	--b-transition-spring: 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
 
-	/* ── shadows ───────────────────────────────────────────────────── */
-	--b-shadow-card:  0 8px 30px rgba(6, 7, 14, 0.7);
-	--b-shadow-hover: 0 14px 44px rgba(6, 7, 14, 0.8);
-	--b-shadow-gilt:  0 0 0 1px var(--b-border-strong), 0 10px 34px rgba(6, 7, 14, 0.75);
+	/* ── shadows: pink-tinted, soft ────────────────────────────────── */
+	--b-shadow-card:  0 6px 22px rgba(206, 130, 175, 0.20);
+	--b-shadow-hover: 0 12px 34px rgba(206, 130, 175, 0.32);
+	--b-shadow-gilt:  0 0 0 1px var(--b-border-strong), 0 8px 26px rgba(206, 130, 175, 0.22);
 }

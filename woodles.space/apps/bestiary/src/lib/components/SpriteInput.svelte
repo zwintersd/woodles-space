@@ -135,7 +135,8 @@
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
 		color: var(--b-text);
-		background: rgba(10, 11, 21, 0.55);
+		background: rgba(255, 248, 252, 0.66);
+		backdrop-filter: blur(1px);
 		opacity: 0;
 		transition: opacity var(--b-transition-fast);
 	}
