@@ -3,6 +3,8 @@
 	import { syncState } from '$lib/sync.svelte';
 	import SyncPanel from './SyncPanel.svelte';
 
+	let isSpell = $derived(garden.currentView === 'spell');
+
 	let showSync = $derived(garden.showSyncPanel);
 
 	const ARCHETYPE_GLYPHS: Record<string, string> = {
@@ -43,6 +45,14 @@
 	</div>
 
 	<div class="sidebar-bottom">
+		<button
+			class="spell-btn"
+			class:active={isSpell}
+			onclick={() => isSpell ? garden.closeSpellWizard() : garden.openSpellWizard()}
+			title="Cast a spell"
+		>
+			✦ spell
+		</button>
 		<button
 			class="sync-btn"
 			class:connected={syncState.connected}
@@ -150,6 +160,26 @@
 
 	.sidebar-bottom {
 		padding: 0 var(--g-space-lg);
+		display: flex;
+		flex-direction: column;
+		gap: var(--g-space-sm);
+	}
+
+	.spell-btn {
+		font-family: var(--g-font-mono);
+		font-size: 0.78rem;
+		color: var(--g-flight);
+		border: 1px solid var(--g-flight-soft);
+		border-radius: var(--g-radius-pill);
+		padding: 0.3rem 0.7rem;
+		transition: background var(--g-transition-fast), color var(--g-transition-fast);
+		align-self: flex-start;
+	}
+
+	.spell-btn:hover,
+	.spell-btn.active {
+		background: var(--g-flight);
+		color: #0d0d1a;
 	}
 
 	.sync-btn {
