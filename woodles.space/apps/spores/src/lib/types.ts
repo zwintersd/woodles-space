@@ -26,6 +26,7 @@ export type Flight = {
 
 export type GardenSettings = {
 	passphrase?: string;
+	customCategories?: import('./spells/types').Category[];
 };
 
 export type GardenBlob = {
@@ -35,4 +36,4 @@ export type GardenBlob = {
 	settings: GardenSettings;
 };
 
-export type GardenView = 'garden' | 'spellbook' | 'spore';
+export type GardenView = 'garden' | 'spellbook' | 'spore' | 'spell';
