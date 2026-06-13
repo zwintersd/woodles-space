@@ -1,0 +1,83 @@
+/* bestiary · cotton-candy design tokens
+   scoped to .bestiary-root — never bleeds into the rest of woodles.space.
+
+   The bestiary is the witch's field guide: the creatures that emerged from
+   the conditions she wrote in Marginalia, pinned to vellum as playing cards.
+   Here the palette is spun sugar — pale pink and sky, lit like a fair at
+   midday. Sweet, soft, and light. */
+
+.bestiary-root {
+	/* ── surfaces: spun sugar ──────────────────────────────────────── */
+	--b-bg:            #fdeef7;   /* cotton-candy pink mist */
+	--b-bg-2:          #eceefb;   /* sky-lavender mist — the other candy */
+	--b-surface:       #ffffff;   /* sugar white */
+	--b-surface-2:     #fbf1f8;   /* faint pink, for inputs */
+	--b-vellum:        #fff8fc;   /* the card field, behind the art */
+
+	/* ── ink: soft blackberry ──────────────────────────────────────── */
+	--b-text:          #6a4763;
+	--b-text-dim:      #9a7d96;
+	--b-muted:         #c0aec8;
+	--b-border:        rgba(239, 122, 174, 0.22);
+	--b-border-strong: rgba(239, 122, 174, 0.45);
+	--b-rule:          rgba(150, 130, 185, 0.18);
+
+	/* ── the sweet accent: bubblegum ───────────────────────────────── */
+	--b-gold:          #ef7aae;
+	--b-gold-soft:     rgba(239, 122, 174, 0.16);
+	--b-gold-bright:   #ffd8ea;
+	--b-on-accent:     #5a2a48;   /* deep berry — text that sits on the accent */
+
+	/* ── color identity: a creature's domain (mirrors Marginalia) ──── */
+	/* temporal · on time   · spatial · on space
+	   biochemical · on substance   · relational · on meaning */
+	--b-temporal:      #f2b75e;   /* honey — the hour-gold */
+	--b-spatial:       #7fb8ec;   /* candy blue — distance and depth */
+	--b-biochemical:   #86d6a0;   /* mint — water, carbon, growth */
+	--b-relational:    #cf9be8;   /* lilac — cause, meaning, bond */
+	--b-unspecified:   #b7aecb;   /* soft grey-lavender — the unwritten */
+
+	/* ── rarity ────────────────────────────────────────────────────── */
+	--b-common:        #a9a1b8;
+	--b-uncommon:      #5cb8c4;
+	--b-rare:          #dca63c;
+	--b-mythic:        #fb8a5b;   /* tangerine sherbet */
+
+	/* ── typography ────────────────────────────────────────────────── */
+	--b-font-codex:   var(--font-fell, 'IM Fell DW Pica', Georgia, serif);
+	--b-font-display: var(--font-display, 'Cormorant Garamond', Georgia, serif);
+	--b-font-body:    var(--font-body, 'Lora', Georgia, serif);
+	--b-font-mono:    var(--font-mono, 'DM Mono', 'Courier New', monospace);
+	--b-font-pixel:   var(--font-pixel, 'Coral Pixels', 'DM Mono', monospace);
+
+	/* ── spacing ───────────────────────────────────────────────────── */
+	--b-space-xs:  0.25rem;
+	--b-space-sm:  0.5rem;
+	--b-space-md:  1rem;
+	--b-space-lg:  1.75rem;
+	--b-space-xl:  2.5rem;
+	--b-space-2xl: 4rem;
+
+	/* ── radius ────────────────────────────────────────────────────── */
+	--b-radius-sm:   6px;
+	--b-radius-md:   12px;
+	--b-radius-lg:   20px;
+	--b-radius-card: 18px;   /* the rounded corner of a trading card */
+	--b-radius-pill: 100px;
+
+	/* ── z-index layers ────────────────────────────────────────────── */
+	--b-z-sidebar:  10;
+	--b-z-panel:    20;
+	--b-z-modal:    30;
+	--b-z-overlay:  40;
+
+	/* ── transitions ───────────────────────────────────────────────── */
+	--b-transition-fast:   0.15s ease;
+	--b-transition-medium: 0.25s ease;
+	--b-transition-spring: 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+	/* ── shadows: pink-tinted, soft ────────────────────────────────── */
+	--b-shadow-card:  0 6px 22px rgba(206, 130, 175, 0.20);
+	--b-shadow-hover: 0 12px 34px rgba(206, 130, 175, 0.32);
+	--b-shadow-gilt:  0 0 0 1px var(--b-border-strong), 0 8px 26px rgba(206, 130, 175, 0.22);
+}
