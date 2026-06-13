@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { garden, SAMPLE_STRUCTURED_SPORE } from '$lib/garden.svelte';
+	import { garden } from '$lib/garden.svelte';
 	import type { Spore } from '$lib/types';
 	import { formatDate } from '$lib/utils';
+	import PromotePanel from './spell/PromotePanel.svelte';
 
 	let spore = $derived(garden.activeSpore);
 	let editing = $derived(garden.editingSporeId === garden.activeSporeId);
@@ -65,18 +66,6 @@
 		garden.deleteFlight(flightId);
 	}
 
-	// ── structured data / branches ─────────────────────────────────
-
-	let branches = $derived(
-		spore?.data?.branches as Array<Record<string, unknown>> | undefined
-	);
-
-	function handlePromote(branchKey: string) {
-		if (!spore) return;
-		const promoted = garden.promoteBranch(spore.id, branchKey);
-		if (promoted) garden.openSpore(promoted.id);
-	}
-
 	// ── spellbook membership ────────────────────────────────────────
 
 	function toggleMembership(spellbookId: string) {
@@ -88,16 +77,7 @@
 		}
 	}
 
-	// ── sample structured spore ─────────────────────────────────────
 
-	function loadSampleStructured() {
-		// Import seam stub: seeds the sample structured spore for demo
-		const exists = garden.spores.find((s) => s.id === SAMPLE_STRUCTURED_SPORE.id);
-		if (!exists) {
-			garden.spores = [...garden.spores, SAMPLE_STRUCTURED_SPORE];
-		}
-		garden.openSpore(SAMPLE_STRUCTURED_SPORE.id);
-	}
 </script>
 
 {#if spore}
@@ -143,34 +123,8 @@
 			{/if}
 		</div>
 
-		<!-- structured data / branches (import seam) -->
-		{#if branches && branches.length > 0}
-			<section class="branches-section">
-				<h3 class="section-label">branches</h3>
-				<p class="branches-hint">Promote a branch to its own Spore when you have something to say.</p>
-				<ul class="branches-list">
-					{#each branches as branch}
-						<li class="branch-item">
-							<div class="branch-info">
-								<span class="branch-label">{branch.label ?? branch.key}</span>
-								{#if branch.year}
-									<span class="branch-meta">{branch.year}</span>
-								{/if}
-								{#if branch.notes}
-									<p class="branch-notes">{branch.notes}</p>
-								{/if}
-							</div>
-							<button
-								class="btn-promote"
-								onclick={() => handlePromote(String(branch.key))}
-							>
-								promote →
-							</button>
-						</li>
-					{/each}
-				</ul>
-			</section>
-		{/if}
+		<!-- promote to spore (import data) -->
+		<PromotePanel {spore} />
 
 		<!-- lines of flight -->
 		<section class="flights-section">
@@ -403,13 +357,6 @@
 
 	.body-placeholder:hover { color: var(--g-flight); }
 
-	/* ── branches ── */
-	.branches-section {
-		margin-bottom: var(--g-space-2xl);
-		padding-bottom: var(--g-space-xl);
-		border-bottom: 1px solid var(--g-rule);
-	}
-
 	.section-label {
 		font-family: var(--g-font-mono);
 		font-size: 0.7rem;
@@ -418,70 +365,6 @@
 		color: var(--g-muted);
 		font-weight: 400;
 		margin-bottom: var(--g-space-sm);
-	}
-
-	.branches-hint {
-		font-size: 0.82rem;
-		color: var(--g-muted);
-		margin-bottom: var(--g-space-md);
-		font-style: italic;
-	}
-
-	.branches-list {
-		list-style: none;
-		display: flex;
-		flex-direction: column;
-		gap: var(--g-space-sm);
-	}
-
-	.branch-item {
-		display: flex;
-		align-items: flex-start;
-		gap: var(--g-space-md);
-		padding: var(--g-space-md);
-		background: var(--g-surface);
-		border: 1px solid var(--g-border);
-		border-radius: var(--g-radius-md);
-	}
-
-	.branch-info {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		gap: 0.2rem;
-	}
-
-	.branch-label {
-		font-family: var(--g-font-display);
-		font-size: 1rem;
-		color: var(--g-text);
-	}
-
-	.branch-meta {
-		font-family: var(--g-font-mono);
-		font-size: 0.72rem;
-		color: var(--g-muted);
-	}
-
-	.branch-notes {
-		font-size: 0.85rem;
-		color: var(--g-text-dim);
-	}
-
-	.btn-promote {
-		font-family: var(--g-font-mono);
-		font-size: 0.75rem;
-		color: var(--g-flight);
-		border: 1px solid var(--g-flight-soft);
-		border-radius: var(--g-radius-pill);
-		padding: 0.25rem 0.6rem;
-		flex-shrink: 0;
-		transition: background var(--g-transition-fast), color var(--g-transition-fast);
-	}
-
-	.btn-promote:hover {
-		background: var(--g-flight);
-		color: #0d0d1a;
 	}
 
 	/* ── flights ── */

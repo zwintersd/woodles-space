@@ -1,4 +1,5 @@
 import type { Spore, Spellbook, Flight, GardenBlob, GardenSettings, GardenView } from './types';
+import type { Category } from './spells/types';
 import { uid, now } from './utils';
 
 // ── persistence helpers ───────────────────────────────────────────
@@ -21,43 +22,6 @@ function save<T>(key: string, value: T): void {
 		// ignore quota / disabled storage
 	}
 }
-
-// ── sample structured spore (import seam demo) ────────────────────
-// This is the stub for the garden-import-v1 parser handoff.
-// The parser will hand off a GardenBlob-compatible structured Spore
-// where the imported hierarchy lives in `data`. See §7 of the build doc.
-
-export const SAMPLE_STRUCTURED_SPORE: Spore = {
-	id: 'sample-structured',
-	title: 'Discography: Grouper',
-	body: 'A structured import — promote branches to Spores where you have something to say.',
-	data: {
-		_importSource: 'garden-import-v1-stub',
-		branches: [
-			{
-				key: 'dragging-a-dead-deer',
-				label: 'Dragging a Dead Deer Up a Hill',
-				year: 2008,
-				notes: 'The fog record. Reverb as shelter.'
-			},
-			{
-				key: 'a-i-a',
-				label: 'A I A',
-				year: 2011,
-				notes: 'Two discs: Alien Observer and Dream Loss.'
-			},
-			{
-				key: 'ruins',
-				label: 'Ruins',
-				year: 2014,
-				notes: 'Piano and voice, stripped to bone.'
-			}
-		]
-	},
-	spellbookIds: [],
-	created: '2024-01-01T00:00:00.000Z',
-	updated: '2024-01-01T00:00:00.000Z'
-};
 
 const DEFAULT_SETTINGS: GardenSettings = {};
 
@@ -84,6 +48,9 @@ export class GardenStore {
 	newSpellbookArchetype = $state<'plain' | 'diary' | 'media'>('plain');
 	showAddFlight = $state(false);
 	flightSearchQuery = $state('');
+
+	// Spell wizard
+	spellPrevView = $state<Exclude<GardenView, 'spell'>>('garden');
 
 	// ── derived views ──────────────────────────────────────────────
 
@@ -143,6 +110,15 @@ export class GardenStore {
 		this.editingSporeId = null;
 		this.showAddFlight = false;
 		this.flightSearchQuery = '';
+	}
+
+	openSpellWizard(): void {
+		this.spellPrevView = this.currentView as Exclude<GardenView, 'spell'>;
+		this.currentView = 'spell';
+	}
+
+	closeSpellWizard(): void {
+		this.currentView = this.spellPrevView;
 	}
 
 	// ── spellbook CRUD ──────────────────────────────────────────────
@@ -258,43 +234,83 @@ export class GardenStore {
 		save('spores.flights.v1', this.flights);
 	}
 
-	// ── promote branch to Spore (import seam) ───────────────────────
-	// Promotes a branch from a structured Spore's data.branches array
-	// into its own Spore, linked back via a Line of Flight.
-	// The parser (garden-import-v1) will hand off structured Spores in this shape.
+	// ── import a parsed structured Spore ────────────────────────────
 
-	promoteBranch(
+	importStructuredSpore(spore: Spore, spellbookIds: string[] = []): Spore {
+		return this.addSpore({
+			title: spore.title,
+			body: spore.body,
+			data: spore.data,
+			spellbookIds
+		});
+	}
+
+	// ── promote a child from import data to its own Spore ────────────
+	// childArrayKey: the key in parent.data holding the child array (e.g. 'albums')
+	// childIndex:    index within that array
+	// prune:         if true, removes the child from the parent's array (default: additive)
+
+	promoteChild(
 		parentSporeId: string,
-		branchKey: string
+		childArrayKey: string,
+		childIndex: number,
+		opts?: { prune?: boolean }
 	): Spore | null {
 		const parent = this.spores.find((s) => s.id === parentSporeId);
 		if (!parent) return null;
 
-		const branches = parent.data.branches as Array<Record<string, unknown>> | undefined;
-		if (!branches) return null;
-		const branch = branches.find((b) => b.key === branchKey);
-		if (!branch) return null;
+		const arr = parent.data[childArrayKey];
+		if (!Array.isArray(arr) || childIndex >= arr.length) return null;
 
-		const label = typeof branch.label === 'string' ? branch.label : String(branchKey);
-		const notes = typeof branch.notes === 'string' ? branch.notes : '';
-		const { key: _key, label: _label, notes: _notes, ...rest } = branch;
+		const child = arr[childIndex] as Record<string, unknown>;
+		const title =
+			typeof child.title === 'string' && child.title.trim()
+				? child.title.trim()
+				: `${childArrayKey} ${childIndex + 1}`;
+
+		const body =
+			typeof child.bio === 'string' && child.bio !== 'unknown'
+				? child.bio
+				: typeof child.description === 'string' && child.description !== 'unknown'
+					? child.description
+					: '';
 
 		const promoted = this.addSpore({
-			title: label,
-			body: notes,
-			data: rest,
+			title,
+			body,
+			data: child,
 			spellbookIds: [...parent.spellbookIds]
 		});
 
-		this.addFlight(parentSporeId, promoted.id, `branch: ${label}`);
+		this.addFlight(parentSporeId, promoted.id, `${childArrayKey}: ${title}`);
 
-		// Remove promoted branch from parent's data
-		const remaining = branches.filter((b) => b.key !== branchKey);
-		this.updateSpore(parentSporeId, {
-			data: { ...parent.data, branches: remaining }
-		});
+		if (opts?.prune) {
+			const newArr = (arr as unknown[]).filter((_, i) => i !== childIndex);
+			this.updateSpore(parentSporeId, {
+				data: { ...parent.data, [childArrayKey]: newArr }
+			});
+		}
 
 		return promoted;
+	}
+
+	// ── custom category persistence ──────────────────────────────────
+
+	addCustomCategory(cat: Category): void {
+		const existing = this.settings.customCategories ?? [];
+		this.settings = {
+			...this.settings,
+			customCategories: [...existing.filter((c) => c.id !== cat.id), cat]
+		};
+		save('spores.settings.v1', this.settings);
+	}
+
+	deleteCustomCategory(id: string): void {
+		this.settings = {
+			...this.settings,
+			customCategories: (this.settings.customCategories ?? []).filter((c) => c.id !== id)
+		};
+		save('spores.settings.v1', this.settings);
 	}
 
 	// ── rehydrate from sync ─────────────────────────────────────────
