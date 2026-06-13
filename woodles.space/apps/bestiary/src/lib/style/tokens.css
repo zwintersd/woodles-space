@@ -1,0 +1,81 @@
+/* bestiary · twilight-codex design tokens
+   scoped to .bestiary-root — never bleeds into the rest of woodles.space.
+
+   The bestiary is the witch's field guide: the creatures that emerged from
+   the conditions she wrote in Marginalia, pinned to vellum as playing cards.
+   So the palette is ink-and-gilt — a dark codex lit by a single candle. */
+
+.bestiary-root {
+	/* ── surfaces ──────────────────────────────────────────────────── */
+	--b-bg:            #0c0e1a;
+	--b-bg-2:          #0a0b15;
+	--b-surface:       #14162a;
+	--b-surface-2:     #1c1e36;
+	--b-vellum:        #161527;   /* the card field, behind the art */
+
+	/* ── ink ───────────────────────────────────────────────────────── */
+	--b-text:          #ece6da;   /* warm parchment-white */
+	--b-text-dim:      #b0a890;
+	--b-muted:         #6f6a82;
+	--b-border:        rgba(216, 178, 90, 0.14);
+	--b-border-strong: rgba(216, 178, 90, 0.32);
+	--b-rule:          rgba(176, 168, 144, 0.16);
+
+	/* ── gilt: the codex accent ────────────────────────────────────── */
+	--b-gold:          #d8b25a;
+	--b-gold-soft:     rgba(216, 178, 90, 0.18);
+	--b-gold-bright:   #f0cf7e;
+
+	/* ── color identity: a creature's domain (mirrors Marginalia) ──── */
+	/* temporal · on time   · spatial · on space
+	   biochemical · on substance   · relational · on meaning */
+	--b-temporal:      #e8c15a;   /* amber — the hour-gold */
+	--b-spatial:       #6aa6e8;   /* blue — distance and depth */
+	--b-biochemical:   #7fd08a;   /* green — water, carbon, growth */
+	--b-relational:    #c98be0;   /* violet — cause, meaning, bond */
+	--b-unspecified:   #9aa0b5;   /* slate — the wandering, unwritten */
+
+	/* ── rarity ────────────────────────────────────────────────────── */
+	--b-common:        #b8bcc8;
+	--b-uncommon:      #7fb8c8;
+	--b-rare:          #e8c15a;
+	--b-mythic:        #ef9a55;
+
+	/* ── typography ────────────────────────────────────────────────── */
+	--b-font-codex:   var(--font-fell, 'IM Fell DW Pica', Georgia, serif);
+	--b-font-display: var(--font-display, 'Cormorant Garamond', Georgia, serif);
+	--b-font-body:    var(--font-body, 'Lora', Georgia, serif);
+	--b-font-mono:    var(--font-mono, 'DM Mono', 'Courier New', monospace);
+	--b-font-pixel:   var(--font-pixel, 'Coral Pixels', 'DM Mono', monospace);
+
+	/* ── spacing ───────────────────────────────────────────────────── */
+	--b-space-xs:  0.25rem;
+	--b-space-sm:  0.5rem;
+	--b-space-md:  1rem;
+	--b-space-lg:  1.75rem;
+	--b-space-xl:  2.5rem;
+	--b-space-2xl: 4rem;
+
+	/* ── radius ────────────────────────────────────────────────────── */
+	--b-radius-sm:   6px;
+	--b-radius-md:   12px;
+	--b-radius-lg:   20px;
+	--b-radius-card: 18px;   /* the rounded corner of a trading card */
+	--b-radius-pill: 100px;
+
+	/* ── z-index layers ────────────────────────────────────────────── */
+	--b-z-sidebar:  10;
+	--b-z-panel:    20;
+	--b-z-modal:    30;
+	--b-z-overlay:  40;
+
+	/* ── transitions ───────────────────────────────────────────────── */
+	--b-transition-fast:   0.15s ease;
+	--b-transition-medium: 0.25s ease;
+	--b-transition-spring: 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+	/* ── shadows ───────────────────────────────────────────────────── */
+	--b-shadow-card:  0 8px 30px rgba(6, 7, 14, 0.7);
+	--b-shadow-hover: 0 14px 44px rgba(6, 7, 14, 0.8);
+	--b-shadow-gilt:  0 0 0 1px var(--b-border-strong), 0 10px 34px rgba(6, 7, 14, 0.75);
+}
