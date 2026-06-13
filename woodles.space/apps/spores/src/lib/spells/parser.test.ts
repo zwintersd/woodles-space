@@ -161,3 +161,45 @@ describe('parseImport — error surfaces', () => {
 		expect(r.errors.length).toBeGreaterThan(0);
 	});
 });
+
+describe('parseImport — forgiving repair: stringified containers', () => {
+	it('unwraps an array emitted as a quoted string, with a warning', () => {
+		// The exact drift a real paste hit: genres wrapped in quotes.
+		const raw = `{
+  "woodles": "garden-import-v1",
+  "kind": "tv-series",
+  "title": "Dickinson",
+  "genres": "["comedy", "drama", "biographical"]",
+  "status": "ended"
+}`;
+		const r = expectOk(parseImport(raw));
+		expect(r.spore.data.genres).toEqual(['comedy', 'drama', 'biographical']);
+		expect(r.warnings.some((w) => /quotes|unwrapp/i.test(w))).toBe(true);
+	});
+
+	it('unwraps a stringified object value', () => {
+		const raw = `{"woodles":"garden-import-v1","kind":"work","title":"X","meta":"{"a":1}"}`;
+		const r = expectOk(parseImport(raw));
+		expect(r.spore.data.meta).toEqual({ a: 1 });
+	});
+
+	it('leaves valid arrays untouched and raises no spurious warning', () => {
+		const raw = `{"woodles":"garden-import-v1","kind":"tv-series","title":"Y","genres":["a","b"]}`;
+		const r = expectOk(parseImport(raw));
+		expect(r.spore.data.genres).toEqual(['a', 'b']);
+		expect(r.warnings).toHaveLength(0);
+	});
+});
+
+describe('parseImport — error coaching', () => {
+	it('surfaces the parser reason (with position) on malformed JSON', () => {
+		// missing comma between two properties — not truncated, not unwrappable
+		const raw = `{"woodles":"garden-import-v1","kind":"tv-series","title":"X" "network":"Y"}`;
+		const r = expectFail(parseImport(raw));
+		expect(
+			r.errors.some((e) => /position|line|column|where it broke/i.test(e))
+		).toBe(true);
+		expect(r.recoverableText).toBe(raw);
+	});
+});
+

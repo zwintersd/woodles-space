@@ -93,48 +93,94 @@ function extractBody(data: Record<string, unknown>): string {
 	return '';
 }
 
+// ── value-position repairs ─────────────────────────────────────────
+
+// A common LLM drift: emitting a list or object as a quoted string —
+//   "genres": "["a","b"]"   instead of   "genres": ["a","b"]
+// Unwrap those at value positions. Best-effort, and only used as a
+// fallback after a normal parse fails, so it can't alter valid JSON.
+function unwrapStringifiedContainers(s: string): string {
+	return s
+		.replace(/(:\s*)"(\[[\s\S]*?\])"(\s*[,}\]])/g, '$1$2$3')
+		.replace(/(:\s*)"(\{[\s\S]*?\})"(\s*[,}\]])/g, '$1$2$3');
+}
+
+// ── parse helper ───────────────────────────────────────────────────
+
+type ParseAttempt = { ok: true; value: unknown } | { ok: false; error: string };
+
+function tryParse(s: string): ParseAttempt {
+	try {
+		return { ok: true, value: JSON.parse(s) };
+	} catch (e) {
+		return { ok: false, error: e instanceof Error ? e.message : 'Invalid JSON' };
+	}
+}
+
 // ── main parse ─────────────────────────────────────────────────────
 
 export function parseImport(raw: string): ImportResult {
 	const warnings: string[] = [];
 	const stripped = stripFences(raw);
 
-	// First parse attempt
+	// Be forgiving on intake, strict on shape.
 	let parsed: unknown;
-	try {
-		parsed = JSON.parse(stripped);
-	} catch {
-		// Attempt truncation repair
-		const repaired = repairTruncated(stripped);
-		if (!repaired) {
-			return {
-				ok: false,
-				errors: [
-					'Could not parse JSON. The response may be mismatched or corrupted.',
-					'Check that you copied the full response — if it was cut off, re-run the spell or paste the rest and try again.'
-				],
-				recoverableText: raw
-			};
+	const first = tryParse(stripped);
+
+	if (first.ok) {
+		parsed = first.value;
+	} else {
+		let recoveredValue: unknown = undefined;
+		let recovered = false;
+		let parseError = first.error;
+		let working = stripped;
+		let lookedTruncated = false;
+
+		// Repair 1 — unwrap stringified arrays/objects ("[...]" → [...]).
+		const unwrapped = unwrapStringifiedContainers(working);
+		if (unwrapped !== working) {
+			const r = tryParse(unwrapped);
+			if (r.ok) {
+				recoveredValue = r.value;
+				recovered = true;
+				warnings.push(
+					'Some list fields arrived wrapped in quotes — Spores unwrapped them. Check the data before planting.'
+				);
+			} else {
+				working = unwrapped; // carry the improvement into the next repair
+				parseError = r.error;
+			}
 		}
-		if (repaired === stripped) {
-			return {
-				ok: false,
-				errors: ['Invalid JSON — check the pasted text for extra characters or missing brackets.'],
-				recoverableText: raw
-			};
+
+		// Repair 2 — bounded truncation repair (close open strings/containers).
+		if (!recovered) {
+			const repaired = repairTruncated(working);
+			if (repaired && repaired !== working) {
+				lookedTruncated = true;
+				const r = tryParse(repaired);
+				if (r.ok) {
+					recoveredValue = r.value;
+					recovered = true;
+					warnings.push(
+						'The response appeared truncated — Spores repaired it. Check the data before planting.'
+					);
+				} else {
+					parseError = r.error;
+				}
+			}
 		}
-		try {
-			parsed = JSON.parse(repaired);
-			warnings.push('The response appeared truncated — Spores repaired it. Check the data before planting.');
-		} catch {
-			return {
-				ok: false,
-				errors: [
-					'The response looks cut off. Re-run the spell or paste the rest and try again.',
-					'If this keeps happening, try asking the LLM to be more concise or reduce the scope.'
-				],
-				recoverableText: raw
-			};
+
+		if (recovered) {
+			parsed = recoveredValue;
+		} else {
+			const errors = lookedTruncated
+				? [
+						'The response looks cut off — re-run the spell or paste the rest and try again.',
+						'If this keeps happening, ask the LLM to be more concise or narrow the scope.'
+					]
+				: ['This isn’t valid JSON yet — fix the spot flagged below, then try again.'];
+			if (parseError) errors.push(`Where it broke: ${parseError}`);
+			return { ok: false, errors, recoverableText: raw };
 		}
 	}
 
@@ -164,7 +210,6 @@ export function parseImport(raw: string): ImportResult {
 		}
 	}
 
-	const kind = typeof obj.kind === 'string' ? obj.kind : 'work';
 	const title = typeof obj.title === 'string' && obj.title.trim() ? obj.title.trim() : null;
 
 	if (!title) {
