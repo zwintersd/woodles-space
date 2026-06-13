@@ -3,9 +3,19 @@
 	import type { Spore } from '$lib/types';
 	import { formatDate } from '$lib/utils';
 	import PromotePanel from './spell/PromotePanel.svelte';
+	import TagInput from './TagInput.svelte';
 
 	let spore = $derived(garden.activeSpore);
 	let editing = $derived(garden.editingSporeId === garden.activeSporeId);
+
+	// Label for the back button reflects where the spore was opened from.
+	let backLabel = $derived(
+		garden.sporeReturnView === 'spellbook' && garden.activeSpellbook
+			? garden.activeSpellbook.title
+			: garden.sporeReturnView === 'tag' && garden.activeTag
+				? `#${garden.activeTag}`
+				: 'garden'
+	);
 
 	let draftTitle = $state('');
 	let draftBody = $state('');
@@ -42,8 +52,7 @@
 	}
 
 	function handleBack() {
-		if (garden.activeSpellbookId) garden.currentView = 'spellbook';
-		else garden.openGarden();
+		garden.closeSpore();
 	}
 
 	// ── flights ────────────────────────────────────────────────────
@@ -84,7 +93,7 @@
 	<article class="spore-view">
 		<header class="spore-header">
 			<button class="back-btn" onclick={handleBack}>
-				← {garden.activeSpellbook ? garden.activeSpellbook.title : 'garden'}
+				← {backLabel}
 			</button>
 
 			{#if editing}
@@ -122,6 +131,18 @@
 				<button class="body-placeholder" onclick={startEdit}>add a body…</button>
 			{/if}
 		</div>
+
+		<!-- tags -->
+		<section class="tags-section">
+			<h3 class="section-label">tags</h3>
+			<TagInput
+				tags={spore.tags}
+				suggestions={garden.allTags.map((t) => t.tag)}
+				onadd={(t) => garden.addSporeTag(spore.id, t)}
+				onremove={(t) => garden.removeSporeTag(spore.id, t)}
+				onnavigate={(t) => garden.openTag(t)}
+			/>
+		</section>
 
 		<!-- promote to spore (import data) -->
 		<PromotePanel {spore} />
@@ -368,6 +389,12 @@
 	}
 
 	/* ── flights ── */
+	.tags-section {
+		margin-bottom: var(--g-space-2xl);
+		padding-bottom: var(--g-space-xl);
+		border-bottom: 1px solid var(--g-rule);
+	}
+
 	.flights-section {
 		margin-bottom: var(--g-space-2xl);
 		padding-bottom: var(--g-space-xl);

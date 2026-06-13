@@ -230,6 +230,7 @@ export function parseImport(raw: string): ImportResult {
 		body,
 		data: normalized,
 		spellbookIds: [],
+		tags: [],
 		created: now(),
 		updated: now()
 	};
