@@ -27,6 +27,7 @@ export type Flight = {
 export type GardenSettings = {
 	passphrase?: string;
 	customCategories?: import('./spells/types').Category[];
+	onboarded?: boolean;
 };
 
 export type GardenBlob = {
@@ -37,3 +38,6 @@ export type GardenBlob = {
 };
 
 export type GardenView = 'garden' | 'spellbook' | 'spore' | 'spell';
+
+// First-run onboarding — the guided first cast. See onboarding/Onboarding.svelte.
+export type OnboardingStep = 'welcome' | 'subject' | 'wizard' | 'cast' | 'grown' | 'done';
