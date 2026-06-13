@@ -9,6 +9,16 @@ import type {
 } from './types';
 import type { Category } from './spells/types';
 import { uid, now } from './utils';
+import {
+	tagCounts,
+	addTag,
+	removeTag,
+	hasTag,
+	normalizeTag,
+	sameTag,
+	cleanTags,
+	type TagCount
+} from './tags';
 
 // ── persistence helpers ───────────────────────────────────────────
 
@@ -20,6 +30,11 @@ function load<T>(key: string, fallback: T): T {
 	} catch {
 		return fallback;
 	}
+}
+
+// Ensure every spore has a `tags` array (back-fill for data saved before tags).
+function migrateSpores(spores: Spore[]): Spore[] {
+	return spores.map((s) => (Array.isArray(s.tags) ? s : { ...s, tags: [] }));
 }
 
 function save<T>(key: string, value: T): void {
@@ -35,7 +50,7 @@ const DEFAULT_SETTINGS: GardenSettings = {};
 
 export class GardenStore {
 	// Persisted
-	spores = $state<Spore[]>(load('spores.spores.v1', []));
+	spores = $state<Spore[]>(migrateSpores(load('spores.spores.v1', [])));
 	spellbooks = $state<Spellbook[]>(load('spores.spellbooks.v1', []));
 	flights = $state<Flight[]>(load('spores.flights.v1', []));
 	settings = $state<GardenSettings>({
@@ -47,6 +62,9 @@ export class GardenStore {
 	currentView = $state<GardenView>('garden');
 	activeSpellbookId = $state<string | null>(null);
 	activeSporeId = $state<string | null>(null);
+	activeTag = $state<string | null>(null);
+	// Where the spore view returns to (set when entering it from a list view).
+	sporeReturnView = $state<Exclude<GardenView, 'spore'>>('garden');
 
 	// Transient UI
 	editingSporeId = $state<string | null>(null);
@@ -110,22 +128,49 @@ export class GardenStore {
 		this.currentView = 'garden';
 		this.activeSpellbookId = null;
 		this.activeSporeId = null;
+		this.activeTag = null;
 		this.editingSporeId = null;
 	}
 
 	openSpellbook(id: string): void {
 		this.activeSpellbookId = id;
 		this.activeSporeId = null;
+		this.activeTag = null;
 		this.currentView = 'spellbook';
 		this.editingSporeId = null;
 	}
 
+	openTag(tag: string): void {
+		this.activeTag = tag;
+		this.activeSpellbookId = null;
+		this.activeSporeId = null;
+		this.currentView = 'tag';
+		this.editingSporeId = null;
+	}
+
 	openSpore(id: string): void {
+		// Remember the list view to return to (but not when jumping spore→spore).
+		if (this.currentView !== 'spore') {
+			this.sporeReturnView = this.currentView as Exclude<GardenView, 'spore'>;
+		}
 		this.activeSporeId = id;
 		this.currentView = 'spore';
 		this.editingSporeId = null;
 		this.showAddFlight = false;
 		this.flightSearchQuery = '';
+	}
+
+	// Return from the spore view to wherever it was opened from.
+	closeSpore(): void {
+		this.activeSporeId = null;
+		this.editingSporeId = null;
+		if (this.sporeReturnView === 'spellbook' && this.activeSpellbookId) {
+			this.currentView = 'spellbook';
+		} else if (this.sporeReturnView === 'tag' && this.activeTag) {
+			this.currentView = 'tag';
+		} else {
+			this.openGarden();
+		}
 	}
 
 	openSpellWizard(): void {
@@ -236,6 +281,7 @@ export class GardenStore {
 			body: partial.body ?? '',
 			data: partial.data ?? {},
 			spellbookIds: partial.spellbookIds ?? [],
+			tags: cleanTags(partial.tags ?? []),
 			created: now(),
 			updated: now()
 		};
@@ -256,10 +302,7 @@ export class GardenStore {
 		save('spores.spores.v1', this.spores);
 		this.flights = this.flights.filter((f) => f.from !== id && f.to !== id);
 		save('spores.flights.v1', this.flights);
-		if (this.activeSporeId === id) {
-			if (this.activeSpellbookId) this.currentView = 'spellbook';
-			else this.openGarden();
-		}
+		if (this.activeSporeId === id) this.closeSpore();
 	}
 
 	// ── membership ──────────────────────────────────────────────────
@@ -280,6 +323,57 @@ export class GardenStore {
 				: s
 		);
 		save('spores.spores.v1', this.spores);
+	}
+
+	// ── tags ────────────────────────────────────────────────────────
+
+	// All tags across the Garden, with counts (case-insensitive grouping).
+	get allTags(): TagCount[] {
+		return tagCounts(this.spores);
+	}
+
+	get activeTagSpores(): Spore[] {
+		return this.activeTag ? this.sporesWithTag(this.activeTag) : [];
+	}
+
+	sporesWithTag(tag: string): Spore[] {
+		return this.spores.filter((s) => hasTag(s.tags, tag));
+	}
+
+	addSporeTag(sporeId: string, raw: string): void {
+		this.spores = this.spores.map((s) =>
+			s.id === sporeId ? { ...s, tags: addTag(s.tags, raw), updated: now() } : s
+		);
+		save('spores.spores.v1', this.spores);
+	}
+
+	removeSporeTag(sporeId: string, tag: string): void {
+		this.spores = this.spores.map((s) =>
+			s.id === sporeId ? { ...s, tags: removeTag(s.tags, tag), updated: now() } : s
+		);
+		save('spores.spores.v1', this.spores);
+	}
+
+	// Rename a tag across every spore that carries it.
+	renameTag(from: string, to: string): void {
+		const next = normalizeTag(to);
+		if (!next || sameTag(from, next)) return;
+		this.spores = this.spores.map((s) =>
+			hasTag(s.tags, from)
+				? { ...s, tags: addTag(removeTag(s.tags, from), next), updated: now() }
+				: s
+		);
+		save('spores.spores.v1', this.spores);
+		if (this.activeTag && sameTag(this.activeTag, from)) this.activeTag = next;
+	}
+
+	// Remove a tag from every spore that carries it.
+	deleteTag(tag: string): void {
+		this.spores = this.spores.map((s) =>
+			hasTag(s.tags, tag) ? { ...s, tags: removeTag(s.tags, tag), updated: now() } : s
+		);
+		save('spores.spores.v1', this.spores);
+		if (this.activeTag && sameTag(this.activeTag, tag)) this.openGarden();
 	}
 
 	// ── flights ─────────────────────────────────────────────────────
@@ -348,7 +442,8 @@ export class GardenStore {
 			title,
 			body,
 			data: child,
-			spellbookIds: [...parent.spellbookIds]
+			spellbookIds: [...parent.spellbookIds],
+			tags: [...parent.tags] // a promoted branch inherits the parent's tags
 		});
 
 		this.addFlight(parentSporeId, promoted.id, `${childArrayKey}: ${title}`);
@@ -385,7 +480,7 @@ export class GardenStore {
 	// ── rehydrate from sync ─────────────────────────────────────────
 
 	rehydrate(blob: GardenBlob): void {
-		this.spores = blob.spores;
+		this.spores = migrateSpores(blob.spores);
 		this.spellbooks = blob.spellbooks;
 		this.flights = blob.flights;
 		this.settings = { ...DEFAULT_SETTINGS, ...blob.settings };

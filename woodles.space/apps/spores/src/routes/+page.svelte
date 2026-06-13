@@ -5,6 +5,7 @@
 	import SpellbookList from '$lib/components/SpellbookList.svelte';
 	import SpellbookView from '$lib/components/SpellbookView.svelte';
 	import SporeView from '$lib/components/SporeView.svelte';
+	import TagView from '$lib/components/TagView.svelte';
 	import SpellWizard from '$lib/components/spell/SpellWizard.svelte';
 	import Onboarding from '$lib/components/onboarding/Onboarding.svelte';
 	import OnboardingDevPanel from '$lib/components/onboarding/OnboardingDevPanel.svelte';
@@ -33,12 +34,9 @@
 			if (garden.currentView === 'spell') { garden.closeSpellWizard(); return; }
 			if (garden.showAddFlight) { garden.showAddFlight = false; garden.flightSearchQuery = ''; return; }
 			if (garden.editingSporeId) { garden.editingSporeId = null; return; }
-			if (garden.currentView === 'spore') {
-				if (garden.activeSpellbookId) garden.currentView = 'spellbook';
-				else garden.openGarden();
-				return;
-			}
+			if (garden.currentView === 'spore') { garden.closeSpore(); return; }
 			if (garden.currentView === 'spellbook') { garden.openGarden(); return; }
+			if (garden.currentView === 'tag') { garden.openGarden(); return; }
 		}
 	}
 </script>
@@ -57,6 +55,8 @@
 			<SpellbookView />
 		{:else if garden.currentView === 'spore'}
 			<SporeView />
+		{:else if garden.currentView === 'tag'}
+			<TagView />
 		{/if}
 	</main>
 </div>

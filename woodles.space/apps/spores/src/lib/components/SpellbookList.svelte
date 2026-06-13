@@ -100,6 +100,19 @@
 			{/each}
 		</ul>
 	{/if}
+
+	{#if garden.allTags.length > 0}
+		<section class="tags-cloud">
+			<h3 class="cloud-label">tags</h3>
+			<div class="cloud">
+				{#each garden.allTags as { tag, count } (tag)}
+					<button class="cloud-tag" onclick={() => garden.openTag(tag)}>
+						{tag}<span class="cloud-count">{count}</span>
+					</button>
+				{/each}
+			</div>
+		</section>
+	{/if}
 </section>
 
 <style>
@@ -295,5 +308,52 @@
 		font-size: 0.78rem;
 		color: var(--g-muted);
 		margin-left: auto;
+	}
+
+	/* ── tag cloud ── */
+	.tags-cloud {
+		margin-top: var(--g-space-2xl);
+		padding-top: var(--g-space-lg);
+		border-top: 1px solid var(--g-rule);
+	}
+
+	.cloud-label {
+		font-family: var(--g-font-mono);
+		font-size: 0.7rem;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--g-muted);
+		font-weight: 400;
+		margin-bottom: var(--g-space-md);
+	}
+
+	.cloud {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--g-space-sm);
+	}
+
+	.cloud-tag {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-family: var(--g-font-mono);
+		font-size: 0.82rem;
+		color: var(--g-flight);
+		background: var(--g-flight-soft);
+		border: 1px solid transparent;
+		border-radius: var(--g-radius-pill);
+		padding: 0.25rem 0.75rem;
+		transition: border-color var(--g-transition-fast), color var(--g-transition-fast);
+	}
+
+	.cloud-tag:hover {
+		border-color: var(--g-flight);
+		color: var(--g-flight-active);
+	}
+
+	.cloud-count {
+		font-size: 0.72rem;
+		color: var(--g-muted);
 	}
 </style>

@@ -4,6 +4,7 @@ export type Spore = {
 	body: string;
 	data: Record<string, unknown>;
 	spellbookIds: string[];
+	tags: string[];
 	created: string;
 	updated: string;
 };
@@ -37,7 +38,7 @@ export type GardenBlob = {
 	settings: GardenSettings;
 };
 
-export type GardenView = 'garden' | 'spellbook' | 'spore' | 'spell';
+export type GardenView = 'garden' | 'spellbook' | 'spore' | 'spell' | 'tag';
 
 // First-run onboarding — the guided first cast. See onboarding/Onboarding.svelte.
 export type OnboardingStep = 'welcome' | 'subject' | 'wizard' | 'cast' | 'grown' | 'done';
