@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { garden } from '$lib/garden.svelte';
-	import { CURATED_CATEGORIES, getCategory, inferArchetype } from '$lib/spells/registry';
+	import { CURATED_CATEGORIES, getCategory } from '$lib/spells/registry';
 	import { buildSpell } from '$lib/spells/assembler';
 	import { parseImport } from '$lib/spells/parser';
-	import type { Category, SpellDraft, FieldDef, ChildLevel } from '$lib/spells/types';
+	import type { Category, SpellDraft, ChildLevel } from '$lib/spells/types';
 	import type { ImportResult } from '$lib/spells/types';
 	import CustomCategoryEditor from './CustomCategoryEditor.svelte';
 
@@ -157,19 +157,6 @@
 		const created = garden.importStructuredSpore(pendingSpore, pendingSpellbookIds);
 		garden.closeSpellWizard();
 		garden.openSpore(created.id);
-	}
-
-	// ── field tree rendering ────────────────────────────────────────
-
-	function renderFieldGroup(
-		kind: string,
-		label: string,
-		fields: FieldDef[],
-		level: ChildLevel | undefined = undefined,
-		depth = 0
-	) {
-		// handled inline in template
-		return { kind, label, fields, level, depth };
 	}
 </script>
 

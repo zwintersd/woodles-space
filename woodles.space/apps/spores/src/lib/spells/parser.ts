@@ -1,6 +1,5 @@
 import type { ImportResult } from './types';
 import type { Spore } from '../types';
-import { inferArchetype } from './registry';
 import { uid, now } from '../utils';
 
 // ── fence-stripping ────────────────────────────────────────────────
