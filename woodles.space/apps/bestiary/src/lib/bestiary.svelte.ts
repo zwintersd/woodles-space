@@ -9,6 +9,7 @@ import type {
 } from './types';
 import { rarities, type Rarity } from './content/domains';
 import type { CoreStat, Substat } from './content/stats';
+import { migrateComposition, type Composition } from './composer';
 import { uid, now, clampInt } from './utils';
 import {
 	blankCreature,
@@ -19,12 +20,15 @@ import {
 	defaultStats
 } from './collection';
 
-// Older creatures in storage predate the stat block. Fill any missing
-// structure with defaults so a pre-stats record loads cleanly.
+// Older creatures in storage predate the stat block (and, later, the studio
+// composition). Fill any missing structure so an old record loads cleanly, and
+// coerce a stored composition through its migration so a malformed blob can't
+// crash the editor.
 function normalizeCreature(raw: Creature): Creature {
 	return {
 		...raw,
-		stats: raw.stats ?? defaultStats()
+		stats: raw.stats ?? defaultStats(),
+		composition: raw.composition ? migrateComposition(raw.composition) : null
 	};
 }
 
@@ -151,11 +155,19 @@ export class Bestiary {
 	}
 
 	setSprite(id: string, sprite: string, pixelated: boolean): void {
-		this.updateCreature(id, { sprite, pixelated });
+		// A plain upload replaces any studio composition — the two are one slot.
+		this.updateCreature(id, { sprite, pixelated, composition: null });
+	}
+
+	// Commit studio art: the flattened composite becomes the sprite, the layer
+	// stack rides along so the studio can reopen exactly where it left off.
+	// Composited art is smooth, so the pixelated card flag is cleared.
+	setComposition(id: string, composition: Composition, flattened: string): void {
+		this.updateCreature(id, { sprite: flattened, composition, pixelated: false });
 	}
 
 	clearSprite(id: string): void {
-		this.updateCreature(id, { sprite: null });
+		this.updateCreature(id, { sprite: null, composition: null });
 	}
 
 	// ── stat mutations ─────────────────────────────────────────────
