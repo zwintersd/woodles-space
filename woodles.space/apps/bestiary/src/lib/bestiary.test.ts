@@ -6,7 +6,10 @@ import {
 	isUntouched,
 	filterCreatures,
 	sortCreatures,
-	rarityCounts
+	rarityCounts,
+	defaultStats,
+	effectiveSubstat,
+	isSubstatOverridden
 } from './collection';
 import type { Creature } from './types';
 
@@ -77,6 +80,38 @@ describe('isUntouched', () => {
 	});
 	it('ignores stat changes alone — stats are not authored content', () => {
 		expect(isUntouched(make({ power: 7, toughness: 7, cost: 9 }))).toBe(true);
+	});
+	it('ignores stat-block changes alone — same logic as cost/power/toughness', () => {
+		expect(isUntouched(make({ stats: { ...defaultStats(), body: 8, grace: 9 } }))).toBe(true);
+	});
+});
+
+describe('defaultStats', () => {
+	it('starts all six cores at 1 with no substat overrides', () => {
+		const s = defaultStats();
+		expect(s.body).toBe(1);
+		expect(s.spark).toBe(1);
+		expect(s.substats).toEqual({});
+	});
+});
+
+describe('effectiveSubstat', () => {
+	it('falls back to parent core when no override', () => {
+		const s = { ...defaultStats(), body: 7 };
+		expect(effectiveSubstat(s, 'stamina')).toBe(7);
+	});
+	it('uses the override when one is set', () => {
+		const s = { ...defaultStats(), body: 7, substats: { stamina: 2 } };
+		expect(effectiveSubstat(s, 'stamina')).toBe(2);
+	});
+});
+
+describe('isSubstatOverridden', () => {
+	it('is false by default and true after authoring', () => {
+		const s = defaultStats();
+		expect(isSubstatOverridden(s, 'empathy')).toBe(false);
+		s.substats.empathy = 5;
+		expect(isSubstatOverridden(s, 'empathy')).toBe(true);
 	});
 });
 

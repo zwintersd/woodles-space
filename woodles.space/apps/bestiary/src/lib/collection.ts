@@ -2,8 +2,10 @@
 // shelf does over a list of creatures. Kept out of the $state store so it can be
 // unit-tested directly (Svelte 5 runes can't be instantiated in a plain test).
 
-import type { Creature, SortKey, RarityFilter, DomainFilter } from './types';
+import type { Creature, Stats, SortKey, RarityFilter, DomainFilter } from './types';
 import type { Rarity } from './content/domains';
+import type { Substat } from './content/stats';
+import { substatDef } from './content/stats';
 import { uid, now } from './utils';
 
 export const RARITY_ORDER: Record<Rarity, number> = {
@@ -12,6 +14,27 @@ export const RARITY_ORDER: Record<Rarity, number> = {
 	rare: 2,
 	mythic: 3
 };
+
+// All cores start at 1, matching the blank's power/toughness baseline.
+export function defaultStats(): Stats {
+	return {
+		body: 1, mind: 1, grace: 1, heart: 1, will: 1, spark: 1,
+		substats: {}
+	};
+}
+
+// Read the effective value of a substat — its override if set, else its
+// parent core. Used by editor and card-display alike.
+export function effectiveSubstat(stats: Stats, sub: Substat): number {
+	const override = stats.substats[sub];
+	if (override !== undefined) return override;
+	return stats[substatDef(sub).parent];
+}
+
+// True if this substat has been authored away from its parent's value.
+export function isSubstatOverridden(stats: Stats, sub: Substat): boolean {
+	return stats.substats[sub] !== undefined;
+}
 
 // A fresh, unwritten card. New creatures start here; the editor binds straight
 // to the stored record and saves as you type.
@@ -31,6 +54,7 @@ export function blankCreature(): Creature {
 		abilities: '',
 		flavor: '',
 		foundIn: '',
+		stats: defaultStats(),
 		created: ts,
 		updated: ts
 	};

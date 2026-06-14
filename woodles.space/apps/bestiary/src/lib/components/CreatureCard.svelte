@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Creature } from '$lib/types';
 	import { domainDef, rarityDef } from '$lib/content/domains';
+	import { capacities, arc } from '$lib/content/stats';
 
 	let { creature, interactive = false }: { creature: Creature; interactive?: boolean } = $props();
 
@@ -61,6 +62,27 @@
 			{#if !creature.abilities.trim() && !creature.flavor.trim()}
 				<p class="empty-text">no abilities written</p>
 			{/if}
+		</div>
+
+		<!-- stat strip: the creature's interior, beneath the battle math -->
+		<div class="stat-strip">
+			<div class="stat-group capacities">
+				{#each capacities as s (s.id)}
+					<span class="stat" style="--c: var({s.colorVar})">
+						<span class="glyph">{s.glyph}</span>
+						<span class="val">{creature.stats[s.id]}</span>
+					</span>
+				{/each}
+			</div>
+			<div class="divider" aria-hidden="true"></div>
+			<div class="stat-group arc">
+				{#each arc as s (s.id)}
+					<span class="stat" style="--c: var({s.colorVar})">
+						<span class="glyph">{s.glyph}</span>
+						<span class="val">{creature.stats[s.id]}</span>
+					</span>
+				{/each}
+			</div>
 		</div>
 
 		<!-- footer: found-in + power/toughness -->
@@ -280,6 +302,52 @@
 		font-size: 0.58em;
 		color: var(--b-muted);
 		font-style: italic;
+	}
+
+	/* ── stat strip ── */
+	.stat-strip {
+		display: flex;
+		align-items: center;
+		gap: 0.5em;
+		padding: 0.25em 0.35em;
+		background: color-mix(in srgb, var(--domain) 8%, var(--b-bg-2));
+		border: 1px solid var(--b-border);
+		border-radius: 0.4em;
+	}
+	.stat-group {
+		display: flex;
+		align-items: center;
+		gap: 0.5em;
+		flex: 1;
+	}
+	.stat-group.arc {
+		flex: 0 0 auto;
+		gap: 0.6em;
+		padding-left: 0.2em;
+	}
+	.stat {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 0.18em;
+	}
+	.stat .glyph {
+		color: var(--c);
+		font-size: 0.72em;
+		line-height: 1;
+	}
+	.stat .val {
+		font-family: var(--b-font-pixel);
+		font-size: 0.74em;
+		line-height: 1;
+		color: var(--b-text);
+	}
+	/* the arc sits visually removed — a touch quieter, telegraphing "other panel" */
+	.stat-group.arc .glyph { opacity: 0.78; }
+	.divider {
+		flex-shrink: 0;
+		width: 1px;
+		align-self: stretch;
+		background: var(--b-border);
 	}
 
 	/* ── footer ── */

@@ -43,6 +43,14 @@
 	--b-rare:          #dca63c;
 	--b-mythic:        #fb8a5b;   /* tangerine sherbet */
 
+	/* ── stats: six soft accents ──────────────────────────────── */
+	--b-stat-body:   #f29b8b;   /* coral — flesh-warmth */
+	--b-stat-mind:   #9bc3e8;   /* clear sky — clarity */
+	--b-stat-grace:  #d4a5d8;   /* iris — between-people */
+	--b-stat-heart:  #e87a98;   /* rose — sustained warmth */
+	--b-stat-will:   #f5d76e;   /* sun — forward motion */
+	--b-stat-spark:  #9ed4c8;   /* seafoam — the unexpected */
+
 	/* ── typography ────────────────────────────────────────────────── */
 	--b-font-codex:   var(--font-fell, 'IM Fell DW Pica', Georgia, serif);
 	--b-font-display: var(--font-display, 'Cormorant Garamond', Georgia, serif);
