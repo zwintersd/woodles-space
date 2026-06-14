@@ -1,4 +1,18 @@
 import type { Domain, Rarity } from './content/domains';
+import type { Substat } from './content/stats';
+
+// Six axes describing the creature beneath its P/T. Cores are 0–10 integers,
+// authored directly. Substats default to their parent core; only authored
+// overrides land in the substats record. Empty record = no overrides.
+export type Stats = {
+	body: number;
+	mind: number;
+	grace: number;
+	heart: number;
+	will: number;
+	spark: number;
+	substats: Partial<Record<Substat, number>>;
+};
 
 // A Creature is one card in the bestiary — a sprite the witch's world grew,
 // pinned to vellum with its stats, cost, and rarity, as if it were yours to play.
@@ -25,6 +39,8 @@ export type Creature = {
 	flavor: string;
 	// where in the margins it was first seen (flavour, optional)
 	foundIn: string;
+	// the six-axis interior — who this creature is beneath the battle math
+	stats: Stats;
 	created: string;
 	updated: string;
 };

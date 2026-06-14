@@ -2,8 +2,10 @@
 // shelf does over a list of creatures. Kept out of the $state store so it can be
 // unit-tested directly (Svelte 5 runes can't be instantiated in a plain test).
 
-import type { Creature, SortKey, RarityFilter, DomainFilter } from './types';
+import type { Creature, Stats, SortKey, RarityFilter, DomainFilter } from './types';
 import type { Rarity } from './content/domains';
+import type { Substat } from './content/stats';
+import { substatDef } from './content/stats';
 import { uid, now } from './utils';
 
 export const RARITY_ORDER: Record<Rarity, number> = {
@@ -12,6 +14,60 @@ export const RARITY_ORDER: Record<Rarity, number> = {
 	rare: 2,
 	mythic: 3
 };
+
+// All cores start at 1, matching the blank's power/toughness baseline.
+export function defaultStats(): Stats {
+	return {
+		body: 1, mind: 1, grace: 1, heart: 1, will: 1, spark: 1,
+		substats: {}
+	};
+}
+
+// Read the effective value of a substat — its override if set, else its
+// parent core. Used by editor and card-display alike.
+export function effectiveSubstat(stats: Stats, sub: Substat): number {
+	const override = stats.substats[sub];
+	if (override !== undefined) return override;
+	return stats[substatDef(sub).parent];
+}
+
+// True if this substat has been authored away from its parent's value.
+export function isSubstatOverridden(stats: Stats, sub: Substat): boolean {
+	return stats.substats[sub] !== undefined;
+}
+
+// An evocative one-line reading of the creature's shape — the numbers reflected
+// back as character. This is the inverse of a preset: it never invents values,
+// it only glosses what was authored, and it shifts live as the cores change.
+export function statProfile(stats: Stats): string {
+	const caps = [stats.body, stats.mind, stats.grace, stats.heart];
+	const top = Math.max(...caps);
+	const { will, spark } = stats;
+
+	// Barely there yet — Will decides whether it's a seed or just a faint outline.
+	if (top <= 2) {
+		return will >= 6
+			? 'a seed — little yet, but a long way up'
+			: 'barely sketched — still mostly potential';
+	}
+
+	// A clear leader among the four capacities, ahead of the rest by a margin.
+	const reads = [
+		'a creature of the body — it meets the world by doing',
+		'a creature of the mind — it meets the world by knowing',
+		'a creature of grace — it meets the world through others',
+		'a creature of the heart — it stays, and keeps caring'
+	];
+	let lead = 0;
+	for (let i = 1; i < caps.length; i++) if (caps[i] > caps[lead]) lead = i;
+	const rest = caps.filter((_, i) => i !== lead);
+	if (caps[lead] >= 5 && caps[lead] - Math.max(...rest) >= 2) return reads[lead];
+
+	// No single way it meets the world — let the arc colour the reading.
+	if (spark >= 8) return 'the world keeps finding it — coincidence runs high';
+	if (will >= 7) return 'still climbing — already much, and becoming more';
+	return 'evenly made — no single way it meets the world';
+}
 
 // A fresh, unwritten card. New creatures start here; the editor binds straight
 // to the stored record and saves as you type.
@@ -31,6 +87,7 @@ export function blankCreature(): Creature {
 		abilities: '',
 		flavor: '',
 		foundIn: '',
+		stats: defaultStats(),
 		created: ts,
 		updated: ts
 	};

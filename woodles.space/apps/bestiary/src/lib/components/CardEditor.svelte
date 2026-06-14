@@ -5,6 +5,7 @@
 	import { clampInt } from '$lib/utils';
 	import CreatureCard from './CreatureCard.svelte';
 	import SpriteInput from './SpriteInput.svelte';
+	import StatBlock from './StatBlock.svelte';
 
 	let creature = $derived(bestiary.activeCreature);
 
@@ -185,6 +186,9 @@
 						</div>
 					</div>
 				</fieldset>
+
+				<!-- stats -->
+				<StatBlock {creature} />
 
 				<!-- sprite -->
 				<fieldset class="group">

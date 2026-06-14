@@ -8,14 +8,25 @@ import type {
 	DomainFilter
 } from './types';
 import { rarities, type Rarity } from './content/domains';
-import { uid, now } from './utils';
+import type { CoreStat, Substat } from './content/stats';
+import { uid, now, clampInt } from './utils';
 import {
 	blankCreature,
 	isUntouched,
 	filterCreatures,
 	sortCreatures,
-	rarityCounts
+	rarityCounts,
+	defaultStats
 } from './collection';
+
+// Older creatures in storage predate the stat block. Fill any missing
+// structure with defaults so a pre-stats record loads cleanly.
+function normalizeCreature(raw: Creature): Creature {
+	return {
+		...raw,
+		stats: raw.stats ?? defaultStats()
+	};
+}
 
 // ── persistence helpers ───────────────────────────────────────────
 
@@ -45,7 +56,7 @@ const DEFAULT_SETTINGS: BestiarySettings = { sort: 'recent' };
 
 export class Bestiary {
 	// Persisted
-	creatures = $state<Creature[]>(load(CREATURES_KEY, []));
+	creatures = $state<Creature[]>(load<Creature[]>(CREATURES_KEY, []).map(normalizeCreature));
 	settings = $state<BestiarySettings>({
 		...DEFAULT_SETTINGS,
 		...load(SETTINGS_KEY, {} as Partial<BestiarySettings>)
@@ -147,6 +158,27 @@ export class Bestiary {
 		this.updateCreature(id, { sprite: null });
 	}
 
+	// ── stat mutations ─────────────────────────────────────────────
+	// Setting a core changes the default its substats fall back to; it never
+	// rewrites existing overrides. Substats are cleared explicitly by passing
+	// null — the "reset to core" signal.
+
+	setCoreStat(id: string, stat: CoreStat, value: number): void {
+		const c = this.creatures.find((x) => x.id === id);
+		if (!c) return;
+		const v = clampInt(value, 0, 10);
+		this.updateCreature(id, { stats: { ...c.stats, [stat]: v } });
+	}
+
+	setSubstat(id: string, sub: Substat, value: number | null): void {
+		const c = this.creatures.find((x) => x.id === id);
+		if (!c) return;
+		const next = { ...c.stats.substats };
+		if (value === null) delete next[sub];
+		else next[sub] = clampInt(value, 0, 10);
+		this.updateCreature(id, { stats: { ...c.stats, substats: next } });
+	}
+
 	// Copy a card as a new draft — handy for variants of one creature.
 	duplicateCreature(id: string): Creature | null {
 		const src = this.creatures.find((c) => c.id === id);
@@ -181,7 +213,7 @@ export class Bestiary {
 	// ── rehydrate from sync ─────────────────────────────────────────
 
 	rehydrate(blob: BestiaryBlob): void {
-		this.creatures = blob.creatures;
+		this.creatures = blob.creatures.map(normalizeCreature);
 		this.settings = { ...DEFAULT_SETTINGS, ...blob.settings };
 		save(CREATURES_KEY, this.creatures);
 		save(SETTINGS_KEY, this.settings);
