@@ -9,8 +9,10 @@ import {
 	rarityCounts,
 	defaultStats,
 	effectiveSubstat,
-	isSubstatOverridden
+	isSubstatOverridden,
+	statProfile
 } from './collection';
+import { spokeAngle, radarPoint, coreValues, radarPolygon } from './chart';
 import type { Creature } from './types';
 
 // Note: the $state store (bestiary.svelte.ts) can't be instantiated in a plain
@@ -112,6 +114,45 @@ describe('isSubstatOverridden', () => {
 		expect(isSubstatOverridden(s, 'empathy')).toBe(false);
 		s.substats.empathy = 5;
 		expect(isSubstatOverridden(s, 'empathy')).toBe(true);
+	});
+});
+
+describe('statProfile', () => {
+	it('reads low-everything-high-Will as a seed', () => {
+		expect(statProfile({ ...defaultStats(), will: 8 })).toContain('seed');
+	});
+	it('reads a blank creature as barely sketched', () => {
+		expect(statProfile(defaultStats())).toContain('barely sketched');
+	});
+	it('names a clear capacity leader', () => {
+		const s = { ...defaultStats(), body: 2, mind: 8, grace: 3, heart: 2 };
+		expect(statProfile(s)).toContain('mind');
+	});
+	it('reads a creature with no clear lead as evenly made', () => {
+		const s = { ...defaultStats(), body: 6, mind: 6, grace: 6, heart: 6 };
+		expect(statProfile(s)).toContain('evenly made');
+	});
+});
+
+describe('radar geometry', () => {
+	it('puts spoke 0 at the top (−90°)', () => {
+		expect(spokeAngle(0, 6)).toBeCloseTo(-Math.PI / 2);
+	});
+	it('reads the six cores in canonical order', () => {
+		const s = { ...defaultStats(), body: 3, spark: 9 };
+		expect(coreValues(s)).toEqual([3, 1, 1, 1, 1, 9]);
+	});
+	it('places a maxed top spoke at the rim, a zero spoke at the centre', () => {
+		const top = radarPoint(10, 0, 6, 50, 100, 100);
+		expect(top.x).toBeCloseTo(100);
+		expect(top.y).toBeCloseTo(50);
+		const zero = radarPoint(0, 2, 6, 50, 100, 100);
+		expect(zero.x).toBeCloseTo(100);
+		expect(zero.y).toBeCloseTo(100);
+	});
+	it('emits one "x,y" pair per value for the polygon', () => {
+		const poly = radarPolygon([10, 10, 10, 10, 10, 10], 50, 100, 100);
+		expect(poly.split(' ')).toHaveLength(6);
 	});
 });
 

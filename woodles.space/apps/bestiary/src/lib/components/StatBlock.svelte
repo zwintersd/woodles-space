@@ -1,13 +1,22 @@
 <script lang="ts">
 	import type { Creature } from '$lib/types';
 	import { capacities, arc } from '$lib/content/stats';
+	import { statProfile } from '$lib/collection';
 	import StatRow from './StatRow.svelte';
+	import StatChart from './StatChart.svelte';
 
 	let { creature }: { creature: Creature } = $props();
+
+	let profile = $derived(statProfile(creature.stats));
 </script>
 
 <fieldset class="group stats">
 	<legend>stats</legend>
+
+	<div class="portrait">
+		<StatChart stats={creature.stats} />
+		<p class="profile">{profile}</p>
+	</div>
 
 	<div class="subgroup">
 		<h4 class="sub-head">capacities</h4>
@@ -31,6 +40,25 @@
 </fieldset>
 
 <style>
+	/* the portrait: hexagon + its one-line reading, centred above the controls */
+	.portrait {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: var(--b-space-xs);
+		padding-bottom: var(--b-space-sm);
+	}
+	.profile {
+		margin: 0;
+		max-width: 26rem;
+		font-family: var(--b-font-body);
+		font-style: italic;
+		font-size: 0.82rem;
+		line-height: 1.35;
+		color: var(--b-text-dim);
+		text-align: center;
+	}
+
 	.subgroup {
 		display: flex;
 		flex-direction: column;
