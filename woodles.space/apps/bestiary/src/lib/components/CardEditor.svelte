@@ -3,11 +3,61 @@
 	import { domains, rarities } from '$lib/content/domains';
 	import type { Domain, Rarity } from '$lib/content/domains';
 	import { clampInt } from '$lib/utils';
+	import {
+		emptyComposition,
+		cloneComposition,
+		createImageLayer,
+		coverScale,
+		type Composition
+	} from '$lib/composer';
+	import { measureImage } from '$lib/render';
 	import CreatureCard from './CreatureCard.svelte';
 	import SpriteInput from './SpriteInput.svelte';
+	import SpriteStudio from './SpriteStudio.svelte';
 	import StatBlock from './StatBlock.svelte';
 
 	let creature = $derived(bestiary.activeCreature);
+
+	// ── sprite studio ──────────────────────────────────────────────────
+	let studioOpen = $state(false);
+	let studioInitial = $state<Composition | null>(null);
+	let preparing = $state(false);
+
+	// Seed the studio: a saved composition reopens as-is; a plain sprite comes
+	// in as a single full-bleed layer; an artless card starts empty.
+	async function openStudio() {
+		if (!creature || preparing) return;
+		if (creature.composition) {
+			studioInitial = cloneComposition(creature.composition);
+		} else if (creature.sprite) {
+			preparing = true;
+			try {
+				const { naturalW, naturalH } = await measureImage(creature.sprite);
+				const comp = emptyComposition();
+				comp.layers = [
+					createImageLayer({
+						src: creature.sprite,
+						naturalW,
+						naturalH,
+						name: creature.name.trim() || 'sprite',
+						scale: coverScale(naturalW, naturalH),
+						smooth: !creature.pixelated
+					})
+				];
+				studioInitial = comp;
+			} finally {
+				preparing = false;
+			}
+		} else {
+			studioInitial = emptyComposition();
+		}
+		studioOpen = true;
+	}
+
+	function handleStudioSave(comp: Composition, dataUrl: string) {
+		if (creature) bestiary.setComposition(creature.id, comp, dataUrl);
+		studioOpen = false;
+	}
 
 	function set(changes: Parameters<typeof bestiary.updateCreature>[1]) {
 		if (creature) bestiary.updateCreature(creature.id, changes);
@@ -199,7 +249,31 @@
 						onpick={handleSprite}
 						onclear={handleClearSprite}
 					/>
-					{#if creature.sprite}
+
+					<button type="button" class="studio-open" onclick={openStudio} disabled={preparing}>
+						<span class="so-glyph">✦</span>
+						<span class="so-text">
+							<span class="so-title">
+								{preparing
+									? 'opening the studio…'
+									: creature.composition
+										? 'edit in the sprite studio'
+										: 'open the sprite studio'}
+							</span>
+							<span class="so-sub">layer a backdrop, trees, the creature & light</span>
+						</span>
+					</button>
+
+					{#if creature.composition}
+						<p class="studio-note">
+							built from {creature.composition.layers.length} layer{creature.composition.layers
+								.length === 1
+								? ''
+								: 's'} — reopen the studio to rearrange
+						</p>
+					{/if}
+
+					{#if creature.sprite && !creature.composition}
 						<label class="check">
 							<input
 								type="checkbox"
@@ -251,6 +325,15 @@
 			</form>
 		</div>
 	</div>
+
+	{#if studioOpen && studioInitial}
+		<SpriteStudio
+			initial={studioInitial}
+			{creature}
+			onsave={handleStudioSave}
+			onclose={() => (studioOpen = false)}
+		/>
+	{/if}
 {/if}
 
 <style>
@@ -474,4 +557,34 @@
 		cursor: pointer;
 	}
 	.check input { accent-color: var(--b-gold); width: 14px; height: 14px; }
+
+	/* studio entry */
+	.studio-open {
+		display: flex;
+		align-items: center;
+		gap: var(--b-space-sm);
+		width: 100%;
+		padding: 0.6rem 0.7rem;
+		border: 1px solid var(--b-border-strong);
+		border-radius: var(--b-radius-md);
+		background: linear-gradient(120deg, var(--b-gold-soft), transparent);
+		text-align: left;
+		transition: border-color var(--b-transition-fast), transform var(--b-transition-fast);
+	}
+	.studio-open:hover:not(:disabled) { border-color: var(--b-gold); transform: translateY(-1px); }
+	.studio-open:disabled { opacity: 0.6; }
+	.so-glyph { font-size: 1.2rem; color: var(--b-gold); }
+	.so-text { display: flex; flex-direction: column; gap: 0.1rem; }
+	.so-title {
+		font-family: var(--b-font-mono);
+		font-size: 0.8rem;
+		color: var(--b-text);
+		letter-spacing: 0.02em;
+	}
+	.so-sub { font-family: var(--b-font-body); font-style: italic; font-size: 0.74rem; color: var(--b-muted); }
+	.studio-note {
+		font-family: var(--b-font-mono);
+		font-size: 0.68rem;
+		color: var(--b-muted);
+	}
 </style>
