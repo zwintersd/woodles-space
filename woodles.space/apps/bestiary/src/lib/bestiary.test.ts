@@ -12,7 +12,14 @@ import {
 	isSubstatOverridden,
 	statProfile
 } from './collection';
-import { spokeAngle, radarPoint, coreValues, radarPolygon } from './chart';
+import {
+	spokeAngle,
+	radarPoint,
+	coreValues,
+	radarPolygon,
+	coreDetailValues,
+	hasDepth
+} from './chart';
 import type { Creature } from './types';
 
 // Note: the $state store (bestiary.svelte.ts) can't be instantiated in a plain
@@ -153,6 +160,26 @@ describe('radar geometry', () => {
 	it('emits one "x,y" pair per value for the polygon', () => {
 		const poly = radarPolygon([10, 10, 10, 10, 10, 10], 50, 100, 100);
 		expect(poly.split(' ')).toHaveLength(6);
+	});
+});
+
+describe('substat-depth ghost', () => {
+	it('matches the core shape and shows no depth when nothing is overridden', () => {
+		const s = { ...defaultStats(), body: 8, mind: 4 };
+		expect(coreDetailValues(s)).toEqual(coreValues(s));
+		expect(hasDepth(s)).toBe(false);
+	});
+	it('pulls a capacity toward its substat mean once one is overridden', () => {
+		// Body 8 with Stamina dragged to 2: five subs at 8, one at 2 → mean 7.
+		const s = { ...defaultStats(), body: 8, substats: { stamina: 2 } };
+		expect(coreDetailValues(s)[0]).toBe(7);
+		expect(hasDepth(s)).toBe(true);
+	});
+	it('leaves Will and Spark at their core value — they have no substats', () => {
+		const s = { ...defaultStats(), will: 6, spark: 9, substats: { stamina: 2 } };
+		const detail = coreDetailValues(s);
+		expect(detail[4]).toBe(6); // will
+		expect(detail[5]).toBe(9); // spark
 	});
 });
 

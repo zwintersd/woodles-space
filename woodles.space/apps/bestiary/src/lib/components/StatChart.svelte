@@ -4,7 +4,14 @@
 	// shape morphs live as the editor's steppers change — a face, not a tally.
 	import type { Stats } from '$lib/types';
 	import { coreStats } from '$lib/content/stats';
-	import { coreValues, radarPoint, radarPolygon, spokeAngle } from '$lib/chart';
+	import {
+		coreValues,
+		coreDetailValues,
+		hasDepth,
+		radarPoint,
+		radarPolygon,
+		spokeAngle
+	} from '$lib/chart';
 
 	let { stats }: { stats: Stats } = $props();
 
@@ -16,6 +23,12 @@
 
 	let values = $derived(coreValues(stats));
 	let dataPoly = $derived(radarPolygon(values, R, C, C));
+
+	// The ghost: where the substat detail actually reaches. Only drawn when it
+	// pulls away from the headline shape, so a creature with no overrides shows
+	// a single clean hexagon.
+	let depth = $derived(hasDepth(stats));
+	let detailPoly = $derived(radarPolygon(coreDetailValues(stats), R, C, C));
 
 	let spokes = $derived(
 		coreStats.map((core, i) => {
@@ -57,6 +70,13 @@
 		<line class="spoke" x1={C} y1={C} x2={s.rim.x} y2={s.rim.y} />
 	{/each}
 
+	<!-- the ghost: the reach of its substat detail, when it diverges -->
+	{#if depth}
+		<polygon class="detail" points={detailPoly}>
+			<title>the reach of its substats</title>
+		</polygon>
+	{/if}
+
 	<!-- the creature's shape -->
 	<polygon class="data" points={dataPoly} />
 
@@ -96,6 +116,14 @@
 		stroke-width: 1.5;
 		stroke-linejoin: round;
 		transition: fill var(--b-transition-fast);
+	}
+	.detail {
+		fill: none;
+		stroke: var(--b-muted);
+		stroke-width: 1;
+		stroke-dasharray: 3 2.5;
+		stroke-linejoin: round;
+		opacity: 0.8;
 	}
 	.vtx {
 		fill: var(--c);

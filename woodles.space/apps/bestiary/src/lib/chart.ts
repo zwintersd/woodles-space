@@ -5,6 +5,7 @@
 
 import type { Stats } from './types';
 import { coreStats } from './content/stats';
+import { effectiveSubstat } from './collection';
 
 export type ChartPoint = { x: number; y: number };
 
@@ -32,6 +33,26 @@ export function radarPoint(
 // The six core values in canonical order: body, mind, grace, heart, will, spark.
 export function coreValues(stats: Stats): number[] {
 	return coreStats.map((c) => stats[c.id]);
+}
+
+// For each core, the mean of its effective substats — or the core's own value
+// when it has none (Will, Spark). Equal to coreValues() until a substat is
+// overridden, at which point it diverges: the lived detail under the headline.
+export function coreDetailValues(stats: Stats): number[] {
+	return coreStats.map((c) => {
+		if (c.substats.length === 0) return stats[c.id];
+		const sum = c.substats.reduce((acc, s) => acc + effectiveSubstat(stats, s.id), 0);
+		return sum / c.substats.length;
+	});
+}
+
+// Whether the substat detail pulls any capacity away from its core — i.e.
+// whether there's a second shape worth drawing. False for a creature whose
+// substats all rest at their defaults.
+export function hasDepth(stats: Stats): boolean {
+	const core = coreValues(stats);
+	const detail = coreDetailValues(stats);
+	return core.some((v, i) => Math.abs(v - detail[i]) > 1e-9);
 }
 
 // A closed polygon string for an SVG <polygon points="…">, one vertex per value.
