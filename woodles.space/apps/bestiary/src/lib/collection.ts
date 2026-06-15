@@ -93,16 +93,40 @@ export function blankCreature(): Creature {
 	};
 }
 
-// A card the user never wrote anything into — no name, no art, no text. We sweep
-// these when the editor closes so an abandoned "new" doesn't litter the shelf.
+// A pristine stat block — all six cores at their summon baseline of 1, with no
+// substat overrides. Used to tell an untouched card from a shaped one.
+export function statsAreDefault(stats: Stats): boolean {
+	return (
+		stats.body === 1 &&
+		stats.mind === 1 &&
+		stats.grace === 1 &&
+		stats.heart === 1 &&
+		stats.will === 1 &&
+		stats.spark === 1 &&
+		Object.keys(stats.substats).length === 0
+	);
+}
+
+// A card the user never shaped — exactly as it was summoned: no identity, no
+// art, no text, and every number still at its blank default. We sweep these
+// when the editor closes so an abandoned "new" doesn't litter the shelf. The
+// moment anything is changed — a stat, the cost, the rarity, the domain, the
+// P/T — the card counts as authored and is kept, even before it has a name.
 export function isUntouched(c: Creature): boolean {
 	return (
 		c.name.trim() === '' &&
 		c.sprite === null &&
+		!c.composition &&
 		c.kind.trim() === '' &&
 		c.abilities.trim() === '' &&
 		c.flavor.trim() === '' &&
-		c.foundIn.trim() === ''
+		c.foundIn.trim() === '' &&
+		c.domain === 'unspecified' &&
+		c.rarity === 'common' &&
+		c.cost === 1 &&
+		c.power === 1 &&
+		c.toughness === 1 &&
+		statsAreDefault(c.stats ?? defaultStats())
 	);
 }
 

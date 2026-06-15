@@ -87,11 +87,22 @@ describe('isUntouched', () => {
 	it('is false once a sprite is attached', () => {
 		expect(isUntouched(make({ sprite: 'data:image/png;base64,xxx' }))).toBe(false);
 	});
-	it('ignores stat changes alone — stats are not authored content', () => {
-		expect(isUntouched(make({ power: 7, toughness: 7, cost: 9 }))).toBe(true);
+	it('is false once the card numbers are shaped — a custom P/T or cost is kept', () => {
+		expect(isUntouched(make({ power: 7 }))).toBe(false);
+		expect(isUntouched(make({ toughness: 7 }))).toBe(false);
+		expect(isUntouched(make({ cost: 9 }))).toBe(false);
 	});
-	it('ignores stat-block changes alone — same logic as cost/power/toughness', () => {
-		expect(isUntouched(make({ stats: { ...defaultStats(), body: 8, grace: 9 } }))).toBe(true);
+	it('is false once a core stat is authored', () => {
+		expect(isUntouched(make({ stats: { ...defaultStats(), body: 8, grace: 9 } }))).toBe(false);
+	});
+	it('is false once a substat is overridden', () => {
+		expect(isUntouched(make({ stats: { ...defaultStats(), substats: { stamina: 2 } } }))).toBe(
+			false
+		);
+	});
+	it('is false once the domain or rarity is chosen', () => {
+		expect(isUntouched(make({ domain: 'temporal' }))).toBe(false);
+		expect(isUntouched(make({ rarity: 'mythic' }))).toBe(false);
 	});
 });
 
