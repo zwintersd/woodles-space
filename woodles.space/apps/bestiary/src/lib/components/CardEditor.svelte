@@ -15,8 +15,12 @@
 	import SpriteInput from './SpriteInput.svelte';
 	import SpriteStudio from './SpriteStudio.svelte';
 	import StatBlock from './StatBlock.svelte';
+	import AppearancePanel from './AppearancePanel.svelte';
 
 	let creature = $derived(bestiary.activeCreature);
+
+	// the form switches between the creature's content and its look
+	let editorTab = $state<'content' | 'look'>('content');
 
 	// ── sprite studio ──────────────────────────────────────────────────
 	let studioOpen = $state(false);
@@ -106,18 +110,44 @@
 			</div>
 		</header>
 
+		<div class="editor-tabs" role="tablist">
+			<button
+				type="button"
+				role="tab"
+				class="etab"
+				class:active={editorTab === 'content'}
+				aria-selected={editorTab === 'content'}
+				onclick={() => (editorTab = 'content')}>content</button
+			>
+			<button
+				type="button"
+				role="tab"
+				class="etab"
+				class:active={editorTab === 'look'}
+				aria-selected={editorTab === 'look'}
+				onclick={() => (editorTab = 'look')}>look</button
+			>
+		</div>
+
 		<div class="editor-grid">
 			<!-- live preview -->
 			<aside class="preview">
 				<div class="preview-card">
 					<CreatureCard {creature} />
 				</div>
-				<p class="preview-note">a living likeness — it changes as you write</p>
+				<p class="preview-note">
+					{editorTab === 'look'
+						? 'dress the card — every change shows here'
+						: 'a living likeness — it changes as you write'}
+				</p>
 			</aside>
 
-			<!-- the form -->
-			<form class="form" onsubmit={(e) => e.preventDefault()}>
-				<!-- identity -->
+			{#if editorTab === 'look'}
+				<div class="form"><AppearancePanel {creature} /></div>
+			{:else}
+				<!-- the form -->
+				<form class="form" onsubmit={(e) => e.preventDefault()}>
+					<!-- identity -->
 				<fieldset class="group">
 					<legend>identity</legend>
 
@@ -322,7 +352,8 @@
 						/>
 					</label>
 				</fieldset>
-			</form>
+				</form>
+			{/if}
 		</div>
 	</div>
 
@@ -359,6 +390,24 @@
 	}
 	.back:hover { color: var(--b-gold); }
 	.head-actions { display: flex; gap: var(--b-space-sm); }
+
+	.editor-tabs {
+		display: flex;
+		gap: var(--b-space-xs);
+		margin-bottom: var(--b-space-lg);
+		border-bottom: 1px solid var(--b-rule);
+	}
+	.etab {
+		padding: 0.4rem 0.9rem;
+		font-family: var(--b-font-mono);
+		font-size: 0.78rem;
+		color: var(--b-text-dim);
+		border-bottom: 2px solid transparent;
+		margin-bottom: -1px;
+		transition: color var(--b-transition-fast), border-color var(--b-transition-fast);
+	}
+	.etab:hover { color: var(--b-gold); }
+	.etab.active { color: var(--b-gold); border-bottom-color: var(--b-gold); }
 
 	.primary {
 		background: var(--b-gold);
