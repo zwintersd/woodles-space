@@ -20,8 +20,22 @@
 
 	let creature = $derived(bestiary.activeCreature);
 
-	// the form switches between the creature's content and its look
-	let editorTab = $state<'content' | 'look'>('content');
+	// The workshop is organised as a set of benches; the tool rail picks which
+	// one the right-hand panel is showing. "look" sits apart from the content
+	// benches — it dresses the card rather than defining the creature.
+	type Section = 'identity' | 'summoning' | 'stats' | 'sprite' | 'lore' | 'look';
+	const contentBenches: { id: Section; glyph: string; label: string; note: string }[] = [
+		{ id: 'identity', glyph: '❦', label: 'identity', note: 'name, kind & domain' },
+		{ id: 'summoning', glyph: '✦', label: 'summoning', note: 'cost, rarity & numbers' },
+		{ id: 'stats', glyph: '⬡', label: 'stats', note: 'the six capacities' },
+		{ id: 'sprite', glyph: '✶', label: 'sprite', note: 'art & the studio' },
+		{ id: 'lore', glyph: '✑', label: 'lore', note: 'abilities & flavor' }
+	];
+	const lookBench = { id: 'look' as Section, glyph: '✿', label: 'look & feel', note: 'frame, finish & colour' };
+	const allBenches = [...contentBenches, lookBench];
+
+	let section = $state<Section>('identity');
+	let bench = $derived(allBenches.find((b) => b.id === section) ?? contentBenches[0]);
 
 	// ── sprite studio ──────────────────────────────────────────────────
 	let studioOpen = $state(false);
@@ -135,45 +149,65 @@
 
 
 {#if creature}
-	<div class="editor">
-		<header class="editor-head">
+	<div class="workshop">
+		<!-- ── the tool rail: pick a bench ─────────────────────────────── -->
+		<nav class="rail">
 			<button class="back" onclick={() => bestiary.openCollection()}>← the shelf</button>
-			<div class="head-actions">
+			<p class="rail-title"><span class="rail-mark">✦</span> the workshop</p>
+
+			<div class="rail-benches" role="tablist" aria-label="workbench">
+				{#each contentBenches as b (b.id)}
+					<button
+						type="button"
+						role="tab"
+						class="bench"
+						class:active={section === b.id}
+						aria-selected={section === b.id}
+						onclick={() => (section = b.id)}
+					>
+						<span class="bench-glyph">{b.glyph}</span>
+						<span class="bench-text">
+							<span class="bench-label">{b.label}</span>
+							<span class="bench-note">{b.note}</span>
+						</span>
+					</button>
+				{/each}
+
+				<div class="rail-divider"><span>finish</span></div>
+
+				<button
+					type="button"
+					role="tab"
+					class="bench"
+					class:active={section === lookBench.id}
+					aria-selected={section === lookBench.id}
+					onclick={() => (section = lookBench.id)}
+				>
+					<span class="bench-glyph">{lookBench.glyph}</span>
+					<span class="bench-text">
+						<span class="bench-label">{lookBench.label}</span>
+						<span class="bench-note">{lookBench.note}</span>
+					</span>
+				</button>
+			</div>
+
+			<div class="rail-actions">
 				<button class="ghost" onclick={handleDuplicate}>duplicate</button>
 				<button class="danger" onclick={handleDelete}>release</button>
 				<button class="primary" onclick={() => bestiary.openCollection()}>done</button>
 			</div>
-		</header>
+		</nav>
 
-		<div class="editor-tabs" role="tablist">
-			<button
-				type="button"
-				role="tab"
-				class="etab"
-				class:active={editorTab === 'content'}
-				aria-selected={editorTab === 'content'}
-				onclick={() => (editorTab = 'content')}>content</button
-			>
-			<button
-				type="button"
-				role="tab"
-				class="etab"
-				class:active={editorTab === 'look'}
-				aria-selected={editorTab === 'look'}
-				onclick={() => (editorTab = 'look')}>look</button
-			>
-		</div>
-
-		<div class="editor-grid">
-			<!-- live preview -->
-			<aside class="preview">
-				<div class="preview-card">
+		<!-- ── the stage: the specimen under the lamp ──────────────────── -->
+		<section class="stage">
+			<div class="stage-inner">
+				<div class="specimen">
 					<CreatureCard {creature} />
 				</div>
 				<p class="preview-note">
-					{editorTab === 'look'
+					{section === 'look'
 						? 'dress the card — every change shows here'
-						: 'a living likeness — it changes as you write'}
+						: 'a living likeness — it changes as you work'}
 				</p>
 				<div class="export-row">
 					<button class="exp" onclick={saveCard} disabled={!!exporting}>
@@ -186,221 +220,226 @@
 					{/if}
 				</div>
 				{#if exportError}<p class="export-err">{exportError}</p>{/if}
-			</aside>
+			</div>
+		</section>
 
-			{#if editorTab === 'look'}
-				<div class="form"><AppearancePanel {creature} /></div>
-			{:else}
-				<!-- the form -->
-				<form class="form" onsubmit={(e) => e.preventDefault()}>
-					<!-- identity -->
-				<fieldset class="group">
-					<legend>identity</legend>
+		<!-- ── the bench: the controls for the chosen tool ─────────────── -->
+		<aside class="bench-panel">
+			<header class="bench-head">
+				<span class="bench-head-glyph">{bench.glyph}</span>
+				<span class="bench-head-text">
+					<h2 class="bench-head-title">{bench.label}</h2>
+					<p class="bench-head-note">{bench.note}</p>
+				</span>
+			</header>
 
-					<label class="field">
-						<span class="label">name</span>
-						<input
-							class="text"
-							type="text"
-							placeholder="name this creature"
-							value={creature.name}
-							oninput={(e) => set({ name: e.currentTarget.value })}
-						/>
-					</label>
+			<form class="bench-body" onsubmit={(e) => e.preventDefault()}>
+				{#if section === 'identity'}
+					<fieldset class="group">
+						<legend>identity</legend>
 
-					<label class="field">
-						<span class="label">kind <em>· the type line subtype</em></span>
-						<input
-							class="text"
-							type="text"
-							placeholder="Beast · Spirit Wisp · Construct…"
-							value={creature.kind}
-							oninput={(e) => set({ kind: e.currentTarget.value })}
-						/>
-					</label>
-
-					<div class="field">
-						<span class="label">domain <em>· its color identity</em></span>
-						<div class="swatches">
-							{#each domains as d (d.id)}
-								<button
-									type="button"
-									class="swatch"
-									class:active={creature.domain === d.id}
-									style="--sw: var({d.colorVar})"
-									title={d.note}
-									onclick={() => set({ domain: d.id as Domain })}
-								>
-									<span class="sw-glyph">{d.glyph}</span>
-									<span class="sw-name">{d.name}</span>
-								</button>
-							{/each}
-						</div>
-						<p class="hint-note">{domains.find((d) => d.id === creature?.domain)?.note}</p>
-					</div>
-				</fieldset>
-
-				<!-- summoning -->
-				<fieldset class="group">
-					<legend>summoning</legend>
-
-					<div class="field">
-						<span class="label">essence cost</span>
-						<div class="stepper">
-							<button type="button" onclick={() => step('cost', -1)} aria-label="less essence">−</button>
+						<label class="field">
+							<span class="label">name</span>
 							<input
-								class="num"
-								type="number"
-								min="0"
-								max="99"
-								value={creature.cost}
-								oninput={(e) => setNumber('cost', e.currentTarget.valueAsNumber)}
+								class="text"
+								type="text"
+								placeholder="name this creature"
+								value={creature.name}
+								oninput={(e) => set({ name: e.currentTarget.value })}
 							/>
-							<button type="button" onclick={() => step('cost', 1)} aria-label="more essence">+</button>
-						</div>
-					</div>
-
-					<div class="field">
-						<span class="label">rarity</span>
-						<div class="segmented">
-							{#each rarities as r (r.id)}
-								<button
-									type="button"
-									class="seg"
-									class:active={creature.rarity === r.id}
-									style="--seg: var({r.colorVar})"
-									title={r.note}
-									onclick={() => set({ rarity: r.id as Rarity })}
-								>
-									<span class="seg-sym">{r.symbol}</span>
-									{r.name}
-								</button>
-							{/each}
-						</div>
-					</div>
-
-					<div class="stats-row">
-						<div class="field">
-							<span class="label">power</span>
-							<div class="stepper">
-								<button type="button" onclick={() => step('power', -1)} aria-label="less power">−</button>
-								<input
-									class="num"
-									type="number"
-									min="0"
-									max="99"
-									value={creature.power}
-									oninput={(e) => setNumber('power', e.currentTarget.valueAsNumber)}
-								/>
-								<button type="button" onclick={() => step('power', 1)} aria-label="more power">+</button>
-							</div>
-						</div>
-						<div class="field">
-							<span class="label">toughness</span>
-							<div class="stepper">
-								<button type="button" onclick={() => step('toughness', -1)} aria-label="less toughness">−</button>
-								<input
-									class="num"
-									type="number"
-									min="0"
-									max="99"
-									value={creature.toughness}
-									oninput={(e) => setNumber('toughness', e.currentTarget.valueAsNumber)}
-								/>
-								<button type="button" onclick={() => step('toughness', 1)} aria-label="more toughness">+</button>
-							</div>
-						</div>
-					</div>
-				</fieldset>
-
-				<!-- stats -->
-				<StatBlock {creature} />
-
-				<!-- sprite -->
-				<fieldset class="group">
-					<legend>sprite</legend>
-					<SpriteInput
-						sprite={creature.sprite}
-						pixelated={creature.pixelated}
-						onpick={handleSprite}
-						onclear={handleClearSprite}
-					/>
-
-					<button type="button" class="studio-open" onclick={openStudio} disabled={preparing}>
-						<span class="so-glyph">✦</span>
-						<span class="so-text">
-							<span class="so-title">
-								{preparing
-									? 'opening the studio…'
-									: creature.composition
-										? 'edit in the sprite studio'
-										: 'open the sprite studio'}
-							</span>
-							<span class="so-sub">layer a backdrop, trees, the creature & light</span>
-						</span>
-					</button>
-
-					{#if creature.composition}
-						<p class="studio-note">
-							built from {creature.composition.layers.length} layer{creature.composition.layers
-								.length === 1
-								? ''
-								: 's'} — reopen the studio to rearrange
-						</p>
-					{/if}
-
-					{#if creature.sprite && !creature.composition}
-						<label class="check">
-							<input
-								type="checkbox"
-								checked={creature.pixelated}
-								onchange={(e) => set({ pixelated: e.currentTarget.checked })}
-							/>
-							pixel art — keep edges crisp
 						</label>
-					{/if}
-				</fieldset>
 
-				<!-- text -->
-				<fieldset class="group">
-					<legend>the card text</legend>
+						<label class="field">
+							<span class="label">kind <em>· the type line subtype</em></span>
+							<input
+								class="text"
+								type="text"
+								placeholder="Beast · Spirit Wisp · Construct…"
+								value={creature.kind}
+								oninput={(e) => set({ kind: e.currentTarget.value })}
+							/>
+						</label>
 
-					<label class="field">
-						<span class="label">abilities <em>· rules text</em></span>
-						<textarea
-							class="area"
-							rows="3"
-							placeholder="what it does — e.g. “When this enters, draw the margin.”"
-							value={creature.abilities}
-							oninput={(e) => set({ abilities: e.currentTarget.value })}
-						></textarea>
-					</label>
+						<div class="field">
+							<span class="label">domain <em>· its color identity</em></span>
+							<div class="swatches">
+								{#each domains as d (d.id)}
+									<button
+										type="button"
+										class="swatch"
+										class:active={creature.domain === d.id}
+										style="--sw: var({d.colorVar})"
+										title={d.note}
+										onclick={() => set({ domain: d.id as Domain })}
+									>
+										<span class="sw-glyph">{d.glyph}</span>
+										<span class="sw-name">{d.name}</span>
+									</button>
+								{/each}
+							</div>
+							<p class="hint-note">{domains.find((d) => d.id === creature?.domain)?.note}</p>
+						</div>
+					</fieldset>
+				{:else if section === 'summoning'}
+					<fieldset class="group">
+						<legend>summoning</legend>
 
-					<label class="field">
-						<span class="label">flavor <em>· italic, at the foot of the box</em></span>
-						<textarea
-							class="area"
-							rows="2"
-							placeholder="a line overheard about it"
-							value={creature.flavor}
-							oninput={(e) => set({ flavor: e.currentTarget.value })}
-						></textarea>
-					</label>
+						<div class="field">
+							<span class="label">essence cost</span>
+							<div class="stepper">
+								<button type="button" onclick={() => step('cost', -1)} aria-label="less essence">−</button>
+								<input
+									class="num"
+									type="number"
+									min="0"
+									max="99"
+									value={creature.cost}
+									oninput={(e) => setNumber('cost', e.currentTarget.valueAsNumber)}
+								/>
+								<button type="button" onclick={() => step('cost', 1)} aria-label="more essence">+</button>
+							</div>
+						</div>
 
-					<label class="field">
-						<span class="label">found in <em>· where it was discovered</em></span>
-						<input
-							class="text"
-							type="text"
-							placeholder="a passage, a page, a margin…"
-							value={creature.foundIn}
-							oninput={(e) => set({ foundIn: e.currentTarget.value })}
+						<div class="field">
+							<span class="label">rarity</span>
+							<div class="segmented">
+								{#each rarities as r (r.id)}
+									<button
+										type="button"
+										class="seg"
+										class:active={creature.rarity === r.id}
+										style="--seg: var({r.colorVar})"
+										title={r.note}
+										onclick={() => set({ rarity: r.id as Rarity })}
+									>
+										<span class="seg-sym">{r.symbol}</span>
+										{r.name}
+									</button>
+								{/each}
+							</div>
+						</div>
+
+						<div class="stats-row">
+							<div class="field">
+								<span class="label">power</span>
+								<div class="stepper">
+									<button type="button" onclick={() => step('power', -1)} aria-label="less power">−</button>
+									<input
+										class="num"
+										type="number"
+										min="0"
+										max="99"
+										value={creature.power}
+										oninput={(e) => setNumber('power', e.currentTarget.valueAsNumber)}
+									/>
+									<button type="button" onclick={() => step('power', 1)} aria-label="more power">+</button>
+								</div>
+							</div>
+							<div class="field">
+								<span class="label">toughness</span>
+								<div class="stepper">
+									<button type="button" onclick={() => step('toughness', -1)} aria-label="less toughness">−</button>
+									<input
+										class="num"
+										type="number"
+										min="0"
+										max="99"
+										value={creature.toughness}
+										oninput={(e) => setNumber('toughness', e.currentTarget.valueAsNumber)}
+									/>
+									<button type="button" onclick={() => step('toughness', 1)} aria-label="more toughness">+</button>
+								</div>
+							</div>
+						</div>
+					</fieldset>
+				{:else if section === 'stats'}
+					<StatBlock {creature} />
+				{:else if section === 'sprite'}
+					<fieldset class="group">
+						<legend>sprite</legend>
+						<SpriteInput
+							sprite={creature.sprite}
+							pixelated={creature.pixelated}
+							onpick={handleSprite}
+							onclear={handleClearSprite}
 						/>
-					</label>
-				</fieldset>
-				</form>
-			{/if}
-		</div>
+
+						<button type="button" class="studio-open" onclick={openStudio} disabled={preparing}>
+							<span class="so-glyph">✦</span>
+							<span class="so-text">
+								<span class="so-title">
+									{preparing
+										? 'opening the studio…'
+										: creature.composition
+											? 'edit in the sprite studio'
+											: 'open the sprite studio'}
+								</span>
+								<span class="so-sub">layer a backdrop, trees, the creature & light</span>
+							</span>
+						</button>
+
+						{#if creature.composition}
+							<p class="studio-note">
+								built from {creature.composition.layers.length} layer{creature.composition.layers
+									.length === 1
+									? ''
+									: 's'} — reopen the studio to rearrange
+							</p>
+						{/if}
+
+						{#if creature.sprite && !creature.composition}
+							<label class="check">
+								<input
+									type="checkbox"
+									checked={creature.pixelated}
+									onchange={(e) => set({ pixelated: e.currentTarget.checked })}
+								/>
+								pixel art — keep edges crisp
+							</label>
+						{/if}
+					</fieldset>
+				{:else if section === 'lore'}
+					<fieldset class="group">
+						<legend>the card text</legend>
+
+						<label class="field">
+							<span class="label">abilities <em>· rules text</em></span>
+							<textarea
+								class="area"
+								rows="4"
+								placeholder="what it does — e.g. “When this enters, draw the margin.”"
+								value={creature.abilities}
+								oninput={(e) => set({ abilities: e.currentTarget.value })}
+							></textarea>
+						</label>
+
+						<label class="field">
+							<span class="label">flavor <em>· italic, at the foot of the box</em></span>
+							<textarea
+								class="area"
+								rows="3"
+								placeholder="a line overheard about it"
+								value={creature.flavor}
+								oninput={(e) => set({ flavor: e.currentTarget.value })}
+							></textarea>
+						</label>
+
+						<label class="field">
+							<span class="label">found in <em>· where it was discovered</em></span>
+							<input
+								class="text"
+								type="text"
+								placeholder="a passage, a page, a margin…"
+								value={creature.foundIn}
+								oninput={(e) => set({ foundIn: e.currentTarget.value })}
+							/>
+						</label>
+					</fieldset>
+				{:else if section === 'look'}
+					<AppearancePanel {creature} />
+				{/if}
+			</form>
+		</aside>
 	</div>
 
 	<!-- hidden, fixed-width card used only for crisp PNG export -->
@@ -419,61 +458,128 @@
 {/if}
 
 <style>
-	.editor {
-		padding: var(--b-space-lg) var(--b-space-lg) var(--b-space-2xl);
-		max-width: 1080px;
-		margin: 0 auto;
+	/* ════════════════════════════════════════════════════════════════
+	   THE WORKSHOP — a full-bleed three-zone bench:
+	   rail (pick a tool) · stage (the specimen) · panel (its controls).
+	   Each zone scrolls on its own so the card never leaves the lamp. */
+	.workshop {
+		height: 100%;
+		display: grid;
+		grid-template-columns: 234px minmax(0, 1fr) 420px;
+		background:
+			radial-gradient(120% 80% at 50% -10%, rgba(255, 216, 234, 0.5), transparent 60%),
+			var(--b-bg-2);
 	}
 
-	.editor-head {
+	/* ── the tool rail ──────────────────────────────────────────────── */
+	.rail {
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
+		flex-direction: column;
 		gap: var(--b-space-md);
-		margin-bottom: var(--b-space-lg);
-		flex-wrap: wrap;
+		padding: var(--b-space-lg) var(--b-space-md);
+		background: var(--b-surface);
+		border-right: 1px solid var(--b-border);
+		overflow-y: auto;
 	}
 	.back {
+		align-self: flex-start;
 		font-family: var(--b-font-mono);
-		font-size: 0.8rem;
+		font-size: 0.78rem;
 		color: var(--b-text-dim);
 		transition: color var(--b-transition-fast);
 	}
 	.back:hover { color: var(--b-gold); }
-	.head-actions { display: flex; gap: var(--b-space-sm); }
-
-	.editor-tabs {
+	.rail-title {
+		font-family: var(--b-font-codex);
+		font-size: 1.15rem;
+		color: var(--b-text);
+		letter-spacing: 0.02em;
 		display: flex;
-		gap: var(--b-space-xs);
-		margin-bottom: var(--b-space-lg);
-		border-bottom: 1px solid var(--b-rule);
+		align-items: center;
+		gap: 0.4rem;
 	}
-	.etab {
-		padding: 0.4rem 0.9rem;
-		font-family: var(--b-font-mono);
-		font-size: 0.78rem;
-		color: var(--b-text-dim);
-		border-bottom: 2px solid transparent;
-		margin-bottom: -1px;
-		transition: color var(--b-transition-fast), border-color var(--b-transition-fast);
-	}
-	.etab:hover { color: var(--b-gold); }
-	.etab.active { color: var(--b-gold); border-bottom-color: var(--b-gold); }
+	.rail-mark { color: var(--b-gold); font-size: 0.9rem; }
 
+	.rail-benches { display: flex; flex-direction: column; gap: 2px; }
+	.bench {
+		display: flex;
+		align-items: center;
+		gap: var(--b-space-sm);
+		width: 100%;
+		text-align: left;
+		padding: 0.5rem 0.6rem;
+		border-radius: var(--b-radius-md);
+		border: 1px solid transparent;
+		color: var(--b-text-dim);
+		transition: background var(--b-transition-fast), color var(--b-transition-fast),
+			border-color var(--b-transition-fast);
+	}
+	.bench-glyph {
+		font-size: 1rem;
+		width: 1.4rem;
+		text-align: center;
+		color: var(--b-muted);
+		flex-shrink: 0;
+		transition: color var(--b-transition-fast);
+	}
+	.bench-text { display: flex; flex-direction: column; gap: 0.05rem; min-width: 0; }
+	.bench-label { font-family: var(--b-font-mono); font-size: 0.82rem; }
+	.bench-note {
+		font-family: var(--b-font-body);
+		font-style: italic;
+		font-size: 0.72rem;
+		color: var(--b-muted);
+	}
+	.bench:hover { background: var(--b-gold-soft); color: var(--b-text); }
+	.bench:hover .bench-glyph { color: var(--b-gold); }
+	.bench.active {
+		background: var(--b-gold-soft);
+		border-color: var(--b-border-strong);
+		color: var(--b-text);
+	}
+	.bench.active .bench-glyph { color: var(--b-gold); }
+
+	.rail-divider {
+		display: flex;
+		align-items: center;
+		gap: var(--b-space-sm);
+		margin: var(--b-space-sm) 0.3rem;
+		font-family: var(--b-font-mono);
+		font-size: 0.6rem;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+		color: var(--b-muted);
+	}
+	.rail-divider::after {
+		content: '';
+		flex: 1;
+		height: 1px;
+		background: var(--b-rule);
+	}
+
+	.rail-actions {
+		margin-top: auto;
+		padding-top: var(--b-space-md);
+		display: flex;
+		flex-direction: column;
+		gap: var(--b-space-sm);
+	}
 	.primary {
 		background: var(--b-gold);
 		color: var(--b-on-accent);
 		border-radius: var(--b-radius-sm);
-		padding: 0.35rem 0.9rem;
+		padding: 0.5rem 0.9rem;
 		font-size: 0.82rem;
 		font-weight: 600;
 		font-family: var(--b-font-mono);
+		transition: transform var(--b-transition-fast), box-shadow var(--b-transition-fast);
 	}
+	.primary:hover { transform: translateY(-1px); box-shadow: 0 0.4rem 1rem var(--b-gold-soft); }
 	.ghost, .danger {
 		border: 1px solid var(--b-border);
 		border-radius: var(--b-radius-sm);
-		padding: 0.35rem 0.8rem;
-		font-size: 0.82rem;
+		padding: 0.4rem 0.8rem;
+		font-size: 0.8rem;
 		font-family: var(--b-font-mono);
 		color: var(--b-text-dim);
 		transition: border-color var(--b-transition-fast), color var(--b-transition-fast);
@@ -482,33 +588,32 @@
 	.danger { color: var(--b-muted); }
 	.danger:hover { border-color: var(--b-mythic); color: var(--b-mythic); }
 
-	/* ── layout ── */
-	.editor-grid {
-		display: grid;
-		grid-template-columns: 1fr;
-		gap: var(--b-space-xl);
+	/* ── the stage ──────────────────────────────────────────────────── */
+	.stage {
+		overflow-y: auto;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: var(--b-space-xl);
 	}
-	@media (min-width: 880px) {
-		.editor-grid {
-			grid-template-columns: minmax(0, 1fr) 300px;
-			align-items: start;
-		}
-		.form { grid-column: 1; grid-row: 1; }
-		.preview { grid-column: 2; grid-row: 1; position: sticky; top: var(--b-space-lg); }
-	}
-
-	.preview {
+	.stage-inner {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: var(--b-space-sm);
+		gap: var(--b-space-md);
+		width: 100%;
 	}
-	.preview-card { width: 100%; max-width: 290px; }
+	.specimen {
+		width: clamp(280px, 30vw, 460px);
+		filter: drop-shadow(0 18px 40px rgba(206, 130, 175, 0.32));
+		transition: transform var(--b-transition-spring);
+	}
+	.specimen:hover { transform: translateY(-4px) rotate(-0.4deg); }
 	.preview-note {
 		font-family: var(--b-font-body);
 		font-style: italic;
-		font-size: 0.78rem;
-		color: var(--b-muted);
+		font-size: 0.82rem;
+		color: var(--b-text-dim);
 		text-align: center;
 	}
 
@@ -516,7 +621,7 @@
 	.exp {
 		border: 1px solid var(--b-border-strong);
 		border-radius: var(--b-radius-sm);
-		padding: 0.4rem 0.8rem;
+		padding: 0.45rem 0.9rem;
 		font-family: var(--b-font-mono);
 		font-size: 0.78rem;
 		color: var(--b-on-accent);
@@ -539,6 +644,90 @@
 		text-align: center;
 	}
 
+	/* ── the bench panel ────────────────────────────────────────────── */
+	.bench-panel {
+		display: flex;
+		flex-direction: column;
+		background: var(--b-surface);
+		border-left: 1px solid var(--b-border);
+		overflow: hidden;
+	}
+	.bench-head {
+		display: flex;
+		align-items: center;
+		gap: var(--b-space-sm);
+		padding: var(--b-space-lg) var(--b-space-lg) var(--b-space-md);
+		border-bottom: 1px solid var(--b-rule);
+		flex-shrink: 0;
+	}
+	.bench-head-glyph { font-size: 1.3rem; color: var(--b-gold); }
+	.bench-head-text { display: flex; flex-direction: column; gap: 0.1rem; }
+	.bench-head-title {
+		font-family: var(--b-font-codex);
+		font-size: 1.25rem;
+		font-weight: 600;
+		color: var(--b-text);
+		line-height: 1.1;
+	}
+	.bench-head-note {
+		font-family: var(--b-font-body);
+		font-style: italic;
+		font-size: 0.76rem;
+		color: var(--b-muted);
+	}
+	.bench-body {
+		flex: 1;
+		overflow-y: auto;
+		padding: var(--b-space-lg);
+		display: flex;
+		flex-direction: column;
+		gap: var(--b-space-lg);
+		min-width: 0;
+	}
+
+	/* ── narrow: fold the three zones into a single scrolling column ── */
+	@media (max-width: 1024px) {
+		.workshop {
+			height: auto;
+			min-height: 100%;
+			display: flex;
+			flex-direction: column;
+		}
+		.rail {
+			flex-direction: row;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: var(--b-space-sm);
+			border-right: none;
+			border-bottom: 1px solid var(--b-border);
+			overflow-x: auto;
+			position: sticky;
+			top: 0;
+			z-index: var(--b-z-panel);
+		}
+		.rail-title { display: none; }
+		.rail-benches {
+			flex-direction: row;
+			flex-wrap: nowrap;
+			flex: 1;
+			min-width: 0;
+			overflow-x: auto;
+		}
+		.bench { width: auto; flex-shrink: 0; }
+		.bench-note { display: none; }
+		.rail-divider { display: none; }
+		.rail-actions {
+			margin-top: 0;
+			padding-top: 0;
+			flex-direction: row;
+			margin-left: auto;
+		}
+		.stage { padding: var(--b-space-lg); }
+		.specimen { width: clamp(240px, 70vw, 340px); }
+		.bench-panel { border-left: none; border-top: 1px solid var(--b-border); overflow: visible; }
+		.bench-body { overflow-y: visible; }
+	}
+
 	/* the off-screen card the exporter rasterises — laid out, never shown */
 	.export-stage {
 		position: fixed;
@@ -549,9 +738,7 @@
 		opacity: 1;
 	}
 
-	/* ── form ── */
-	.form { display: flex; flex-direction: column; gap: var(--b-space-lg); min-width: 0; }
-
+	/* ── form internals (shared by every bench) ── */
 	.group {
 		border: 1px solid var(--b-border);
 		border-radius: var(--b-radius-md);
