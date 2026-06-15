@@ -8,21 +8,24 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"test": "vitest run"
+		"test": "vitest run",
+		"screenshot": "node scripts/screenshot.mjs"
 	},
 	"dependencies": {
-		"@woodles/sync": "workspace:*"
+		"@woodles/sync": "workspace:*",
+		"modern-screenshot": "^4.7.0"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-static": "^3.0.0",
 		"@sveltejs/kit": "^2.50.2",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
 		"@types/node": "^22.0.0",
+		"happy-dom": "^15.0.0",
+		"playwright-core": "^1.61.0",
 		"svelte": "^5.51.0",
 		"svelte-check": "^4.4.2",
 		"typescript": "^5.9.3",
 		"vite": "^7.3.1",
-		"vitest": "^3.0.0",
-		"happy-dom": "^15.0.0"
+		"vitest": "^3.0.0"
 	}
 }

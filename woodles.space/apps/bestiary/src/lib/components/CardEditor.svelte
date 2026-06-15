@@ -11,6 +11,7 @@
 		type Composition
 	} from '$lib/composer';
 	import { measureImage } from '$lib/render';
+	import { exportCardPng, exportArtPng } from '$lib/cardImage';
 	import CreatureCard from './CreatureCard.svelte';
 	import SpriteInput from './SpriteInput.svelte';
 	import SpriteStudio from './SpriteStudio.svelte';
@@ -97,7 +98,41 @@
 			bestiary.deleteCreature(creature.id);
 		}
 	}
+
+	// ── export ─────────────────────────────────────────────────────────
+	// A hidden, fixed-width copy of the card is rasterised so the PNG is crisp
+	// regardless of the on-screen preview size.
+	let exportNode = $state<HTMLDivElement>();
+	let exporting = $state<null | 'card' | 'art'>(null);
+	let exportError = $state<string | null>(null);
+
+	async function saveCard() {
+		if (!creature || !exportNode || exporting) return;
+		exporting = 'card';
+		exportError = null;
+		try {
+			await exportCardPng(exportNode, creature.name.trim() || 'creature', 2);
+		} catch {
+			exportError = 'could not render the card image';
+		} finally {
+			exporting = null;
+		}
+	}
+
+	async function saveArt() {
+		if (!creature?.sprite || exporting) return;
+		exporting = 'art';
+		exportError = null;
+		try {
+			await exportArtPng(creature.sprite, creature.name.trim() || 'creature');
+		} catch {
+			exportError = 'could not export the art';
+		} finally {
+			exporting = null;
+		}
+	}
 </script>
+
 
 {#if creature}
 	<div class="editor">
@@ -140,6 +175,17 @@
 						? 'dress the card — every change shows here'
 						: 'a living likeness — it changes as you write'}
 				</p>
+				<div class="export-row">
+					<button class="exp" onclick={saveCard} disabled={!!exporting}>
+						{exporting === 'card' ? 'saving…' : '↓ save card'}
+					</button>
+					{#if creature.sprite}
+						<button class="exp ghost" onclick={saveArt} disabled={!!exporting}>
+							{exporting === 'art' ? 'saving…' : 'art only'}
+						</button>
+					{/if}
+				</div>
+				{#if exportError}<p class="export-err">{exportError}</p>{/if}
 			</aside>
 
 			{#if editorTab === 'look'}
@@ -357,6 +403,11 @@
 		</div>
 	</div>
 
+	<!-- hidden, fixed-width card used only for crisp PNG export -->
+	<div class="export-stage" bind:this={exportNode} aria-hidden="true">
+		<CreatureCard {creature} />
+	</div>
+
 	{#if studioOpen && studioInitial}
 		<SpriteStudio
 			initial={studioInitial}
@@ -459,6 +510,43 @@
 		font-size: 0.78rem;
 		color: var(--b-muted);
 		text-align: center;
+	}
+
+	.export-row { display: flex; gap: var(--b-space-sm); justify-content: center; flex-wrap: wrap; }
+	.exp {
+		border: 1px solid var(--b-border-strong);
+		border-radius: var(--b-radius-sm);
+		padding: 0.4rem 0.8rem;
+		font-family: var(--b-font-mono);
+		font-size: 0.78rem;
+		color: var(--b-on-accent);
+		background: var(--b-gold);
+		transition: opacity var(--b-transition-fast), border-color var(--b-transition-fast),
+			color var(--b-transition-fast);
+	}
+	.exp:hover:not(:disabled) { opacity: 0.88; }
+	.exp:disabled { opacity: 0.5; }
+	.exp.ghost {
+		background: transparent;
+		color: var(--b-text-dim);
+		border-color: var(--b-border);
+	}
+	.exp.ghost:hover:not(:disabled) { border-color: var(--b-gold); color: var(--b-gold); opacity: 1; }
+	.export-err {
+		font-family: var(--b-font-mono);
+		font-size: 0.72rem;
+		color: var(--b-mythic);
+		text-align: center;
+	}
+
+	/* the off-screen card the exporter rasterises — laid out, never shown */
+	.export-stage {
+		position: fixed;
+		left: -10000px;
+		top: 0;
+		width: 640px;
+		pointer-events: none;
+		opacity: 1;
 	}
 
 	/* ── form ── */
