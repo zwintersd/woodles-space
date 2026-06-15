@@ -19,6 +19,7 @@ import {
 	rarityCounts,
 	defaultStats
 } from './collection';
+import { idbAvailable, idbGet, idbSet } from './idb';
 
 // Older creatures in storage predate the stat block (and, later, the studio
 // composition). Fill any missing structure so an old record loads cleanly, and
@@ -33,6 +34,9 @@ function normalizeCreature(raw: Creature): Creature {
 }
 
 // ── persistence helpers ───────────────────────────────────────────
+// Settings are tiny and never overflow, so they stay in localStorage (and stay
+// synchronous, so the sort is right on first paint). Creatures carry the heavy
+// art and live in IndexedDB — see idb.ts and the store's hydrate/persist below.
 
 function load<T>(key: string, fallback: T): T {
 	if (typeof localStorage === 'undefined') return fallback;
@@ -59,12 +63,98 @@ const SETTINGS_KEY = 'bestiary.settings.v1';
 const DEFAULT_SETTINGS: BestiarySettings = { sort: 'recent' };
 
 export class Bestiary {
-	// Persisted
-	creatures = $state<Creature[]>(load<Creature[]>(CREATURES_KEY, []).map(normalizeCreature));
+	// Persisted. Creatures load asynchronously from IndexedDB (see hydrate());
+	// `ready` flips true once that first read lands, so the UI can hold the
+	// empty-state until we actually know the shelf is empty.
+	creatures = $state<Creature[]>([]);
+	ready = $state(false);
 	settings = $state<BestiarySettings>({
 		...DEFAULT_SETTINGS,
 		...load(SETTINGS_KEY, {} as Partial<BestiarySettings>)
 	});
+
+	// Persistence bookkeeping. Until the initial load lands we don't write, so a
+	// stray early mutation can't clobber stored cards. Writes coalesce: a rapid
+	// burst of edits keeps only the latest snapshot, and the drain loop always
+	// persists the most recent one (last write wins).
+	#hydrated = false;
+	#pendingWrite: Creature[] | null = null;
+	#writing = false;
+
+	constructor() {
+		void this.#hydrate();
+	}
+
+	// Load creatures from IndexedDB, migrating any cards that fit in the old
+	// localStorage slot on first run. Anything created before this resolves
+	// (a brief race) is merged in rather than dropped.
+	async #hydrate(): Promise<void> {
+		let loaded: Creature[] = [];
+		if (idbAvailable()) {
+			try {
+				let stored = await idbGet<Creature[]>(CREATURES_KEY);
+				if (stored === undefined) {
+					// One-time migration of whatever survived in localStorage.
+					const legacy = load<Creature[]>(CREATURES_KEY, []);
+					if (legacy.length) {
+						await idbSet(CREATURES_KEY, legacy);
+						try {
+							localStorage.removeItem(CREATURES_KEY);
+						} catch {
+							// ignore — freeing the old slot is a nicety, not required
+						}
+						stored = legacy;
+					}
+				}
+				loaded = stored ?? [];
+			} catch (err) {
+				console.error('[bestiary] could not read creatures from IndexedDB', err);
+				// Best effort: fall back to anything still in localStorage.
+				loaded = load<Creature[]>(CREATURES_KEY, []);
+			}
+		} else {
+			loaded = load<Creature[]>(CREATURES_KEY, []);
+		}
+
+		// A sync rehydrate may have set authoritative state while we were reading;
+		// if so, don't clobber it or merge stale local cards back in.
+		if (this.#hydrated) return;
+
+		const normalized = loaded.map(normalizeCreature);
+		const seen = new Set(this.creatures.map((c) => c.id));
+		this.creatures = [...this.creatures, ...normalized.filter((c) => !seen.has(c.id))];
+		this.#hydrated = true;
+		this.ready = true;
+		// Seed IDB with the merged result (and persist any pre-hydrate edits).
+		this.#persistCreatures();
+	}
+
+	// Schedule a write of the current creatures to IndexedDB. Coalesces bursts
+	// and serializes writes so the latest snapshot always wins.
+	#persistCreatures(): void {
+		if (!this.#hydrated) return;
+		// $state proxies aren't structured-cloneable; snapshot to a plain copy.
+		this.#pendingWrite = $state.snapshot(this.creatures) as Creature[];
+		void this.#drainWrites();
+	}
+
+	async #drainWrites(): Promise<void> {
+		if (this.#writing || !idbAvailable()) return;
+		this.#writing = true;
+		try {
+			while (this.#pendingWrite) {
+				const next = this.#pendingWrite;
+				this.#pendingWrite = null;
+				try {
+					await idbSet(CREATURES_KEY, next);
+				} catch (err) {
+					console.error('[bestiary] could not persist creatures to IndexedDB', err);
+				}
+			}
+		} finally {
+			this.#writing = false;
+		}
+	}
 
 	// Transient navigation
 	currentView = $state<BestiaryView>('collection');
@@ -142,7 +232,7 @@ export class Bestiary {
 	newCreature(): Creature {
 		const c = blankCreature();
 		this.creatures = [c, ...this.creatures];
-		save(CREATURES_KEY, this.creatures);
+		this.#persistCreatures();
 		this.openEditor(c.id);
 		return c;
 	}
@@ -151,7 +241,7 @@ export class Bestiary {
 		this.creatures = this.creatures.map((c) =>
 			c.id === id ? { ...c, ...changes, updated: now() } : c
 		);
-		save(CREATURES_KEY, this.creatures);
+		this.#persistCreatures();
 	}
 
 	setSprite(id: string, sprite: string, pixelated: boolean): void {
@@ -203,13 +293,13 @@ export class Bestiary {
 			updated: now()
 		};
 		this.creatures = [copy, ...this.creatures];
-		save(CREATURES_KEY, this.creatures);
+		this.#persistCreatures();
 		return copy;
 	}
 
 	deleteCreature(id: string): void {
 		this.creatures = this.creatures.filter((c) => c.id !== id);
-		save(CREATURES_KEY, this.creatures);
+		this.#persistCreatures();
 		if (this.activeCreatureId === id) this.openCollection();
 	}
 
@@ -218,7 +308,7 @@ export class Bestiary {
 		const c = this.creatures.find((x) => x.id === id);
 		if (c && isUntouched(c)) {
 			this.creatures = this.creatures.filter((x) => x.id !== id);
-			save(CREATURES_KEY, this.creatures);
+			this.#persistCreatures();
 		}
 	}
 
@@ -227,7 +317,11 @@ export class Bestiary {
 	rehydrate(blob: BestiaryBlob): void {
 		this.creatures = blob.creatures.map(normalizeCreature);
 		this.settings = { ...DEFAULT_SETTINGS, ...blob.settings };
-		save(CREATURES_KEY, this.creatures);
+		// Synced data is authoritative — mark hydration done so the write lands
+		// and the in-flight local load (if any) steps aside.
+		this.#hydrated = true;
+		this.ready = true;
+		this.#persistCreatures();
 		save(SETTINGS_KEY, this.settings);
 	}
 

@@ -24,7 +24,9 @@
 			</button>
 		</div>
 		<p class="census">
-			{#if bestiary.total === 0}
+			{#if !bestiary.ready}
+				&nbsp;
+			{:else if bestiary.total === 0}
 				no creatures yet — the margins are quiet
 			{:else}
 				{bestiary.total} discovered
@@ -93,7 +95,10 @@
 		</div>
 	{/if}
 
-	{#if bestiary.total === 0}
+	{#if !bestiary.ready}
+		<!-- Creatures load asynchronously from IndexedDB; hold the empty-state
+		     until that first read lands so the shelf doesn't flash "bare". -->
+	{:else if bestiary.total === 0}
 		<div class="empty">
 			<span class="empty-glyph">✶</span>
 			<p class="empty-lead">The shelf is bare.</p>
