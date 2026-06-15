@@ -22,8 +22,10 @@ import {
 	clampOffset,
 	type Composition,
 	type Layer,
+	type ImageLayer,
 	type Fill
 } from './composer';
+import { bakeOutline } from './outline';
 import { scenePresets, type ScenePreset } from './props';
 
 const HISTORY_CAP = 50;
@@ -35,11 +37,17 @@ export class StudioState {
 	undoDepth = $state(0);
 	redoDepth = $state(0);
 
+	// transient outline-bake cache for the live preview (never persisted) —
+	// keyed by layer id, holding the bake's input key + resulting data URL
+	baked = $state<Record<string, { key: string; src: string }>>({});
+
 	private undoStack: Composition[] = [];
 	private redoStack: Composition[] = [];
 	private snapshot: Composition | null = null;
 	private interacting = false;
 	private idleTimer: ReturnType<typeof setTimeout> | null = null;
+	private bakeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+	private bakeWant = new Map<string, string>();
 
 	// ── derived ───────────────────────────────────────────────────────
 
@@ -69,6 +77,10 @@ export class StudioState {
 		this.redoStack = [];
 		this.snapshot = null;
 		this.interacting = false;
+		this.baked = {};
+		this.bakeTimers.forEach((t) => clearTimeout(t));
+		this.bakeTimers.clear();
+		this.bakeWant.clear();
 		this.syncCounts();
 		const top = this.comp.layers[this.comp.layers.length - 1];
 		this.selectedId = top?.id ?? null;
@@ -243,6 +255,65 @@ export class StudioState {
 			this.setLayers([]);
 			this.selectedId = null;
 		});
+	}
+
+	// ── outline preview cache ──────────────────────────────────────────
+	// Outlines are baked to a bitmap (see outline.ts); too costly to redo on
+	// every frame, so the live preview reads a cached bake and the stage shows
+	// the plain art until a fresh one lands.
+
+	private outlineKey(layer: ImageLayer): string {
+		return `${layer.src.length}:${layer.src.slice(0, 48)}:${JSON.stringify(layer.outline)}`;
+	}
+
+	// The source the stage should display for an image layer — its baked outline
+	// when one is current, otherwise the untouched art.
+	renderSrc(layer: ImageLayer): string {
+		if (!layer.outline) return layer.src;
+		const got = this.baked[layer.id];
+		return got && got.key === this.outlineKey(layer) ? got.src : layer.src;
+	}
+
+	// Drive the cache from a component $effect: (re)bake changed outlines and
+	// drop caches for layers that lost theirs or were removed.
+	syncBakes(): void {
+		const live = new Set<string>();
+		for (const layer of this.comp.layers) {
+			if (layer.kind !== 'image' || !layer.outline) continue;
+			live.add(layer.id);
+			const key = this.outlineKey(layer);
+			if (this.baked[layer.id]?.key === key) continue;
+			if (this.bakeWant.get(layer.id) === key) continue;
+			this.scheduleBake(layer, key);
+		}
+		for (const id of Object.keys(this.baked)) {
+			if (!live.has(id)) {
+				const next = { ...this.baked };
+				delete next[id];
+				this.baked = next;
+			}
+		}
+	}
+
+	private scheduleBake(layer: ImageLayer, key: string): void {
+		this.bakeWant.set(layer.id, key);
+		const prev = this.bakeTimers.get(layer.id);
+		if (prev) clearTimeout(prev);
+		const id = layer.id;
+		const src = layer.src;
+		const nw = layer.naturalW;
+		const nh = layer.naturalH;
+		const outline = JSON.parse(JSON.stringify(layer.outline));
+		const timer = setTimeout(async () => {
+			this.bakeTimers.delete(id);
+			try {
+				const out = await bakeOutline(src, nw, nh, outline);
+				if (this.bakeWant.get(id) === key) this.baked = { ...this.baked, [id]: { key, src: out } };
+			} catch {
+				// leave the preview on the plain art
+			}
+		}, 70);
+		this.bakeTimers.set(id, timer);
 	}
 }
 

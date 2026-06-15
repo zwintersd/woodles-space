@@ -25,7 +25,7 @@
 		{ id: 'backdrop', label: 'backdrops' },
 		{ id: 'nature', label: 'nature' },
 		{ id: 'sky', label: 'sky' },
-		{ id: 'overlay', label: 'light' },
+		{ id: 'overlay', label: 'fx' },
 		{ id: 'upload', label: 'upload' }
 	];
 

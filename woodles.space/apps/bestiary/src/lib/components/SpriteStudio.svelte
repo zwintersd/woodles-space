@@ -33,6 +33,13 @@
 		root?.focus();
 	});
 
+	// Keep the live outline bakes in step with the layers as their outlines
+	// change; reading studio.layers here is what re-runs the effect.
+	$effect(() => {
+		void studio.layers;
+		studio.syncBakes();
+	});
+
 	async function place() {
 		saving = true;
 		saveError = null;

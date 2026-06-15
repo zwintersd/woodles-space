@@ -2,6 +2,7 @@
 	import {
 		imageLayerBox,
 		fillToCss,
+		cssFilter,
 		normalizeRotation,
 		clampOffset,
 		clampScale,
@@ -139,7 +140,7 @@
 			`width:${width}%`,
 			`opacity:${layer.opacity}`,
 			`transform:translate(-50%,-50%) rotate(${layer.rotation}deg) scale(${fx},${fy})`,
-			`filter:${layer.blur > 0 ? `blur(${blurPx(layer.blur)}px)` : 'none'}`,
+			`filter:${cssFilter(layer.filters, blurPx(layer.blur))}`,
 			`mix-blend-mode:${layer.blend}`,
 			`image-rendering:${layer.smooth ? 'auto' : 'pixelated'}`
 		].join(';');
@@ -206,7 +207,7 @@
 			{:else}
 				<img
 					class="layer img"
-					src={layer.src}
+					src={studio.renderSrc(layer)}
 					alt={layer.name}
 					draggable="false"
 					style={imageStyle(layer)}

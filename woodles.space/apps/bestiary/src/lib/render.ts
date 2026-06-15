@@ -8,10 +8,12 @@
 import {
 	blendToComposite,
 	imageLayerBox,
+	cssFilter,
 	type Composition,
 	type Fill,
 	type ImageLayer
 } from './composer';
+import { bakeOutline } from './outline';
 
 export class RenderError extends Error {
 	constructor(message: string) {
@@ -81,12 +83,17 @@ export async function renderComposition(comp: Composition): Promise<string> {
 	const ctx = canvas.getContext('2d');
 	if (!ctx) throw new RenderError('canvas is unavailable');
 
-	const srcs = new Map<string, HTMLImageElement>();
+	// Each image layer is baked (outline applied) and loaded ahead of the draw
+	// pass, keyed by layer id, so blend order stays exact and deterministic.
+	const bitmaps = new Map<string, HTMLImageElement>();
 	await Promise.all(
 		comp.layers
 			.filter((l): l is ImageLayer => l.kind === 'image' && !l.hidden)
 			.map(async (l) => {
-				if (!srcs.has(l.src)) srcs.set(l.src, await loadImage(l.src));
+				const src = l.outline
+					? await bakeOutline(l.src, l.naturalW, l.naturalH, l.outline)
+					: l.src;
+				bitmaps.set(l.id, await loadImage(src));
 			})
 	);
 
@@ -96,12 +103,13 @@ export async function renderComposition(comp: Composition): Promise<string> {
 		ctx.globalAlpha = layer.opacity;
 		ctx.globalCompositeOperation = blendToComposite(layer.blend);
 		const blurPx = layer.blur * comp.width;
-		ctx.filter = blurPx > 0 ? `blur(${blurPx}px)` : 'none';
 		if (layer.kind === 'fill') {
+			ctx.filter = blurPx > 0 ? `blur(${blurPx}px)` : 'none';
 			// Overscan blurred fills so the soft edge doesn't reveal the canvas.
 			paintFill(ctx, layer.fill, comp.width, comp.height, blurPx * 3);
 		} else {
-			const img = srcs.get(layer.src);
+			ctx.filter = cssFilter(layer.filters, blurPx);
+			const img = bitmaps.get(layer.id);
 			if (img) drawImageLayer(ctx, layer, img, comp.width, comp.height);
 		}
 		ctx.restore();

@@ -194,6 +194,41 @@ const sparkles = `<svg xmlns="http://www.w3.org/2000/svg" width="${CANVAS_W}" he
 <g fill="#ffffff"><path d="M280 150 l4 12 12 4 -12 4 -4 12 -4 -12 -12 -4 12 -4 z"/><path d="M520 300 l3 9 9 3 -9 3 -3 9 -3 -9 -9 -3 9 -3 z"/><path d="M90 340 l3 9 9 3 -9 3 -3 9 -3 -9 -9 -3 9 -3 z"/></g>
 </svg>`;
 
+// ── grain, texture & light (feTurbulence + patterns) ──────────────────
+// These rasterise when the SVG is drawn, so the same noise bakes into the
+// flatten. Paired with a low opacity and a soft blend they read as film grain,
+// paper, scanlines, or a light leak.
+
+const grain = `<svg xmlns="http://www.w3.org/2000/svg" width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}">
+<filter id="g"><feTurbulence type="fractalNoise" baseFrequency="0.82" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope="0" intercept="1"/></feComponentTransfer></filter>
+<rect width="${CANVAS_W}" height="${CANVAS_H}" filter="url(#g)"/>
+</svg>`;
+
+const paper = `<svg xmlns="http://www.w3.org/2000/svg" width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}">
+<filter id="p"><feTurbulence type="fractalNoise" baseFrequency="0.013 0.017" numOctaves="3" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope="0" intercept="1"/></feComponentTransfer></filter>
+<rect width="${CANVAS_W}" height="${CANVAS_H}" filter="url(#p)"/>
+</svg>`;
+
+const scanlines = `<svg xmlns="http://www.w3.org/2000/svg" width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}">
+<defs><pattern id="s" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="4" height="2" fill="#000"/></pattern></defs>
+<rect width="${CANVAS_W}" height="${CANVAS_H}" fill="url(#s)"/>
+</svg>`;
+
+const halftone = `<svg xmlns="http://www.w3.org/2000/svg" width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}">
+<defs><pattern id="h" width="11" height="11" patternUnits="userSpaceOnUse"><circle cx="5.5" cy="5.5" r="2.4" fill="#000"/></pattern></defs>
+<rect width="${CANVAS_W}" height="${CANVAS_H}" fill="url(#h)"/>
+</svg>`;
+
+const leakWarm = `<svg xmlns="http://www.w3.org/2000/svg" width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}">
+<defs><radialGradient id="lw" cx="82%" cy="14%" r="78%"><stop offset="0%" stop-color="#ffe1ad" stop-opacity="0.95"/><stop offset="42%" stop-color="#ff8f6b" stop-opacity="0.4"/><stop offset="100%" stop-color="#ff7a8f" stop-opacity="0"/></radialGradient></defs>
+<rect width="${CANVAS_W}" height="${CANVAS_H}" fill="url(#lw)"/>
+</svg>`;
+
+const leakCool = `<svg xmlns="http://www.w3.org/2000/svg" width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}">
+<defs><radialGradient id="lc" cx="16%" cy="88%" r="80%"><stop offset="0%" stop-color="#bdeaff" stop-opacity="0.9"/><stop offset="44%" stop-color="#7aa6ff" stop-opacity="0.34"/><stop offset="100%" stop-color="#9b7aff" stop-opacity="0"/></radialGradient></defs>
+<rect width="${CANVAS_W}" height="${CANVAS_H}" fill="url(#lc)"/>
+</svg>`;
+
 // ── registries ──────────────────────────────────────────────────────
 
 function img(
@@ -234,6 +269,36 @@ export const imageAssets: ImageAsset[] = [
 	img('sparkles', 'sparkles', 'overlay', sparkles, CANVAS_W, CANVAS_H, {
 		fit: 'cover',
 		defaultBlend: 'screen'
+	}),
+	img('grain', 'grain', 'overlay', grain, CANVAS_W, CANVAS_H, {
+		fit: 'cover',
+		defaultBlend: 'soft-light',
+		defaultOpacity: 0.55
+	}),
+	img('paper', 'paper', 'overlay', paper, CANVAS_W, CANVAS_H, {
+		fit: 'cover',
+		defaultBlend: 'multiply',
+		defaultOpacity: 0.4
+	}),
+	img('scanlines', 'scanlines', 'overlay', scanlines, CANVAS_W, CANVAS_H, {
+		fit: 'cover',
+		defaultBlend: 'soft-light',
+		defaultOpacity: 0.35
+	}),
+	img('halftone', 'halftone', 'overlay', halftone, CANVAS_W, CANVAS_H, {
+		fit: 'cover',
+		defaultBlend: 'soft-light',
+		defaultOpacity: 0.3
+	}),
+	img('leak-warm', 'warm leak', 'overlay', leakWarm, CANVAS_W, CANVAS_H, {
+		fit: 'cover',
+		defaultBlend: 'screen',
+		defaultOpacity: 0.8
+	}),
+	img('leak-cool', 'cool leak', 'overlay', leakCool, CANVAS_W, CANVAS_H, {
+		fit: 'cover',
+		defaultBlend: 'screen',
+		defaultOpacity: 0.8
 	})
 ];
 
