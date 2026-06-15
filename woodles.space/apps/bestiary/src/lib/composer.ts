@@ -79,6 +79,90 @@ export function fillToCss(fill: Fill): string {
 	}
 }
 
+// ── filters ───────────────────────────────────────────────────────────
+// Per-image colour grading. Every value maps straight onto a CSS filter
+// function — the same string drives the live preview and the canvas flatten,
+// so what you see is what gets baked.
+
+export type Filters = {
+	brightness: number; // 1 = untouched
+	contrast: number; // 1
+	saturate: number; // 1
+	hue: number; // degrees, 0
+	sepia: number; // 0..1
+	grayscale: number; // 0..1
+	invert: number; // 0..1
+};
+
+export const DEFAULT_FILTERS: Filters = {
+	brightness: 1,
+	contrast: 1,
+	saturate: 1,
+	hue: 0,
+	sepia: 0,
+	grayscale: 0,
+	invert: 0
+};
+
+export function defaultFilters(): Filters {
+	return { ...DEFAULT_FILTERS };
+}
+
+export function filtersAreDefault(f: Filters): boolean {
+	return (
+		f.brightness === 1 &&
+		f.contrast === 1 &&
+		f.saturate === 1 &&
+		f.hue === 0 &&
+		f.sepia === 0 &&
+		f.grayscale === 0 &&
+		f.invert === 0
+	);
+}
+
+function round2(n: number): number {
+	return Math.round(n * 100) / 100;
+}
+
+// Build the combined CSS/canvas filter string. blurPx is resolved per context
+// (preview measures the stage; flatten uses the canvas width) and prepended.
+export function cssFilter(filters: Filters | undefined, blurPx = 0): string {
+	const f = filters ?? DEFAULT_FILTERS;
+	const parts: string[] = [];
+	if (blurPx > 0) parts.push(`blur(${round2(blurPx)}px)`);
+	if (f.brightness !== 1) parts.push(`brightness(${round2(f.brightness)})`);
+	if (f.contrast !== 1) parts.push(`contrast(${round2(f.contrast)})`);
+	if (f.saturate !== 1) parts.push(`saturate(${round2(f.saturate)})`);
+	if (f.hue !== 0) parts.push(`hue-rotate(${Math.round(f.hue)}deg)`);
+	if (f.sepia > 0) parts.push(`sepia(${round2(f.sepia)})`);
+	if (f.grayscale > 0) parts.push(`grayscale(${round2(f.grayscale)})`);
+	if (f.invert > 0) parts.push(`invert(${round2(f.invert)})`);
+	return parts.length ? parts.join(' ') : 'none';
+}
+
+// ── outline ───────────────────────────────────────────────────────────
+// A silhouette stroke traced from a PNG's alpha — the sticker edge. width is a
+// fraction of the image's longest side (so it scales with the art, not the
+// upload's resolution); the fill reuses the backdrop Fill type, so an outline
+// can be a flat colour or a gradient. See outline.ts for the bake.
+
+export const MAX_OUTLINE = 0.08;
+
+export type Outline = {
+	width: number; // 0..MAX_OUTLINE, fraction of longest side
+	softness: number; // 0 = crisp edge, 1 = a soft halo
+	fill: Fill;
+};
+
+export function defaultOutline(): Outline {
+	return { width: 0.025, softness: 0.12, fill: { type: 'solid', color: '#fff8fc' } };
+}
+
+export function clampOutlineWidth(n: number): number {
+	if (Number.isNaN(n)) return 0;
+	return Math.max(0, Math.min(MAX_OUTLINE, n));
+}
+
 // ── layers ────────────────────────────────────────────────────────────
 
 type LayerCommon = {
@@ -104,6 +188,8 @@ export type ImageLayer = LayerCommon & {
 	flipX: boolean;
 	flipY: boolean;
 	smooth: boolean; // false renders nearest-neighbour, for pixel art
+	filters: Filters;
+	outline: Outline | null;
 };
 
 // Fills are full-bleed backdrops — no transform, just paint, blur, blend.
@@ -142,6 +228,8 @@ type ImageLayerInit = {
 	flipX?: boolean;
 	flipY?: boolean;
 	smooth?: boolean;
+	filters?: Filters;
+	outline?: Outline | null;
 };
 
 export function createImageLayer(init: ImageLayerInit): ImageLayer {
@@ -162,7 +250,9 @@ export function createImageLayer(init: ImageLayerInit): ImageLayer {
 		blend: init.blend ?? 'normal',
 		flipX: init.flipX ?? false,
 		flipY: init.flipY ?? false,
-		smooth: init.smooth ?? true
+		smooth: init.smooth ?? true,
+		filters: init.filters ?? defaultFilters(),
+		outline: init.outline ?? null
 	};
 }
 
@@ -358,8 +448,40 @@ function normalizeLayer(raw: unknown): Layer | null {
 			rotation: normalizeRotation(typeof l.rotation === 'number' ? l.rotation : 0),
 			flipX: l.flipX === true,
 			flipY: l.flipY === true,
-			smooth: l.smooth !== false
+			smooth: l.smooth !== false,
+			filters: normalizeFilters(l.filters),
+			outline: normalizeOutline(l.outline)
 		};
 	}
 	return null;
+}
+
+function num(v: unknown, fallback: number): number {
+	return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+}
+
+function normalizeFilters(raw: unknown): Filters {
+	if (!raw || typeof raw !== 'object') return defaultFilters();
+	const f = raw as Record<string, unknown>;
+	return {
+		brightness: Math.max(0, Math.min(2, num(f.brightness, 1))),
+		contrast: Math.max(0, Math.min(2, num(f.contrast, 1))),
+		saturate: Math.max(0, Math.min(3, num(f.saturate, 1))),
+		hue: normalizeRotation(num(f.hue, 0)),
+		sepia: clamp01(num(f.sepia, 0)),
+		grayscale: clamp01(num(f.grayscale, 0)),
+		invert: clamp01(num(f.invert, 0))
+	};
+}
+
+function normalizeOutline(raw: unknown): Outline | null {
+	if (!raw || typeof raw !== 'object') return null;
+	const o = raw as Record<string, unknown>;
+	const fill = o.fill as Fill | undefined;
+	if (!fill || typeof fill !== 'object') return null;
+	return {
+		width: clampOutlineWidth(num(o.width, 0.025)),
+		softness: clamp01(num(o.softness, 0.12)),
+		fill
+	};
 }

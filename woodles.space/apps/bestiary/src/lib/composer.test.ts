@@ -21,9 +21,15 @@ import {
 	blendToComposite,
 	fillToCss,
 	emptyComposition,
+	cssFilter,
+	defaultFilters,
+	filtersAreDefault,
+	defaultOutline,
+	clampOutlineWidth,
 	FIT_SCALE,
 	MAX_SCALE,
 	MAX_BLUR,
+	MAX_OUTLINE,
 	CANVAS_W,
 	CANVAS_H,
 	type Layer
@@ -197,6 +203,66 @@ describe('blend & fill helpers', () => {
 			'linear-gradient(90deg'
 		);
 		expect(fillToCss({ type: 'radial', from: '#000', to: '#fff' })).toContain('radial-gradient');
+	});
+});
+
+describe('filters', () => {
+	it('a fresh image layer is unfiltered with no outline', () => {
+		const l = img();
+		expect(filtersAreDefault(l.filters)).toBe(true);
+		expect(l.outline).toBeNull();
+	});
+	it('cssFilter is "none" at defaults', () => {
+		expect(cssFilter(defaultFilters())).toBe('none');
+		expect(cssFilter(undefined)).toBe('none');
+	});
+	it('prepends blur, then only the non-default functions', () => {
+		const f = { ...defaultFilters(), brightness: 1.2, hue: 45, grayscale: 0.5 };
+		const s = cssFilter(f, 8);
+		expect(s.startsWith('blur(8px)')).toBe(true);
+		expect(s).toContain('brightness(1.2)');
+		expect(s).toContain('hue-rotate(45deg)');
+		expect(s).toContain('grayscale(0.5)');
+		expect(s).not.toContain('contrast');
+		expect(s).not.toContain('sepia');
+	});
+});
+
+describe('outline', () => {
+	it('defaults to a soft, thin, solid stroke', () => {
+		const o = defaultOutline();
+		expect(o.fill.type).toBe('solid');
+		expect(o.width).toBeGreaterThan(0);
+		expect(o.width).toBeLessThanOrEqual(MAX_OUTLINE);
+	});
+	it('clamps thickness to the allowed band', () => {
+		expect(clampOutlineWidth(99)).toBe(MAX_OUTLINE);
+		expect(clampOutlineWidth(-1)).toBe(0);
+		expect(clampOutlineWidth(NaN)).toBe(0);
+	});
+	it('round-trips through migration, dropping a fill-less outline', () => {
+		const ok = migrateComposition({
+			layers: [
+				{
+					kind: 'image',
+					id: 'a',
+					src: 'x',
+					naturalW: 10,
+					naturalH: 10,
+					outline: { width: 0.04, softness: 0.5, fill: { type: 'solid', color: '#000' } },
+					filters: { brightness: 9 }
+				},
+				{ kind: 'image', id: 'b', src: 'y', naturalW: 10, naturalH: 10, outline: { width: 0.04 } }
+			]
+		});
+		const a = ok!.layers[0];
+		const b = ok!.layers[1];
+		expect(a.kind).toBe('image');
+		if (a.kind === 'image') {
+			expect(a.outline?.width).toBe(0.04);
+			expect(a.filters.brightness).toBe(2); // clamped from 9
+		}
+		if (b.kind === 'image') expect(b.outline).toBeNull(); // no fill → dropped
 	});
 });
 
