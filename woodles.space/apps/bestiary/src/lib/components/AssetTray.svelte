@@ -1,10 +1,13 @@
 <script lang="ts">
 	import {
 		imageAssetsByTray,
+		overlayAssets,
+		overlayGroups,
 		fillAssets,
 		layerFromAsset,
 		scenePresets,
-		type AssetTray
+		type AssetTray,
+		type ImageAsset
 	} from '$lib/props';
 	import { fillToCss, createImageLayer, coverScale } from '$lib/composer';
 	import { layerSourceFromFile, RenderError } from '$lib/render';
@@ -93,6 +96,13 @@
 	}
 </script>
 
+{#snippet stamp(a: ImageAsset)}
+	<button type="button" class="stamp" title={a.name} onclick={() => studio.addLayer(layerFromAsset(a))}>
+		<img src={a.src} alt={a.name} draggable="false" />
+		<span class="stamp-name">{a.name}</span>
+	</button>
+{/snippet}
+
 <div class="tray">
 	<div class="tabs" role="tablist">
 		{#each tabs as t (t.id)}
@@ -160,19 +170,24 @@
 			{/if}
 			{#if error}<p class="err">{error}</p>{/if}
 			<input bind:this={fileInput} type="file" accept="image/*" onchange={onInputChange} hidden />
+		{:else if tab === 'overlay'}
+			<p class="tray-hint">light, weather, grain — stacked over the whole scene.</p>
+			{#each overlayGroups as g (g.id)}
+				{@const items = overlayAssets(g.id)}
+				{#if items.length}
+					<h4 class="grp">{g.label}</h4>
+					<div class="grid">
+						{#each items as a (a.id)}
+							{@render stamp(a)}
+						{/each}
+					</div>
+				{/if}
+			{/each}
 		{:else}
 			<p class="tray-hint">tap to stamp it on; drag to place, the corner to size.</p>
 			<div class="grid">
 				{#each imageAssetsByTray(tab) as a (a.id)}
-					<button
-						type="button"
-						class="stamp"
-						title={a.name}
-						onclick={() => studio.addLayer(layerFromAsset(a))}
-					>
-						<img src={a.src} alt={a.name} draggable="false" />
-						<span class="stamp-name">{a.name}</span>
-					</button>
+					{@render stamp(a)}
 				{/each}
 			</div>
 		{/if}
@@ -203,6 +218,16 @@
 		margin-bottom: var(--b-space-sm);
 		line-height: 1.4;
 	}
+
+	.grp {
+		font-family: var(--b-font-mono);
+		font-size: 0.62rem;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--b-text-dim);
+		margin: var(--b-space-sm) 0 var(--b-space-xs);
+	}
+	.grp:first-child { margin-top: 0; }
 
 	.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--b-space-xs); }
 	.swatches { grid-template-columns: repeat(4, 1fr); }
