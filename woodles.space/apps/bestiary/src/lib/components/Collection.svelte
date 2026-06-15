@@ -129,8 +129,8 @@
 
 <style>
 	.collection {
-		padding: var(--b-space-xl) var(--b-space-lg) var(--b-space-2xl);
-		max-width: 1200px;
+		padding: var(--b-space-xl) clamp(var(--b-space-lg), 4vw, var(--b-space-2xl)) var(--b-space-2xl);
+		max-width: 1600px;
 		margin: 0 auto;
 	}
 
@@ -237,8 +237,8 @@
 	/* ── grid ── */
 	.grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-		gap: var(--b-space-lg);
+		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+		gap: clamp(var(--b-space-md), 2vw, var(--b-space-xl));
 	}
 	.card-cell { display: block; width: 100%; background: none; text-align: left; }
 

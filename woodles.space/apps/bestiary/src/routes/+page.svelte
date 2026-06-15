@@ -28,13 +28,20 @@
 </div>
 
 <style>
+	/* Fixed-height shell so the editor can run its own internal scroll
+	   regions (the immersive workshop fills the viewport); the gallery still
+	   scrolls naturally inside .main-content. */
 	.page-layout {
 		display: flex;
-		min-height: 100vh;
+		height: 100vh;
 	}
 	.main-content { flex: 1; min-width: 0; overflow-y: auto; }
 
+	/* The workshop manages its own scrolling — let it own the full height. */
+	.main-content:has(:global(.workshop)) { overflow-y: hidden; }
+
 	@media (max-width: 680px) {
-		.page-layout { flex-direction: column; }
+		.page-layout { flex-direction: column; height: auto; min-height: 100vh; }
+		.main-content:has(:global(.workshop)) { overflow-y: auto; }
 	}
 </style>
