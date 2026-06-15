@@ -1,6 +1,7 @@
 import type { Domain, Rarity } from './content/domains';
 import type { Substat } from './content/stats';
 import type { Composition } from './composer';
+import type { CardStyle } from './cardstyle';
 
 // Six axes describing the creature beneath its P/T. Cores are 0–10 integers,
 // authored directly. Substats default to their parent core; only authored
@@ -28,6 +29,8 @@ export type Creature = {
 	// the editable layer stack behind the sprite, when it was built in the studio.
 	// absent for plain uploads and pre-studio cards — sprite is then the whole art.
 	composition?: Composition | null;
+	// the card's chosen look. absent/null = the house default frame.
+	cardStyle?: CardStyle | null;
 	// color identity — which kind of condition it emerged from
 	domain: Domain;
 	// the type line subtype, e.g. "Beast", "Spirit Wisp", "Construct"

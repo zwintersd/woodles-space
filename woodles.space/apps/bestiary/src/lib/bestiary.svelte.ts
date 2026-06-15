@@ -10,6 +10,7 @@ import type {
 import { rarities, type Rarity } from './content/domains';
 import type { CoreStat, Substat } from './content/stats';
 import { migrateComposition, type Composition } from './composer';
+import { normalizeCardStyle, defaultCardStyle, type CardStyle } from './cardstyle';
 import { uid, now, clampInt } from './utils';
 import {
 	blankCreature,
@@ -29,7 +30,8 @@ function normalizeCreature(raw: Creature): Creature {
 	return {
 		...raw,
 		stats: raw.stats ?? defaultStats(),
-		composition: raw.composition ? migrateComposition(raw.composition) : null
+		composition: raw.composition ? migrateComposition(raw.composition) : null,
+		cardStyle: raw.cardStyle ? normalizeCardStyle(raw.cardStyle) : null
 	};
 }
 
@@ -258,6 +260,24 @@ export class Bestiary {
 
 	clearSprite(id: string): void {
 		this.updateCreature(id, { sprite: null, composition: null });
+	}
+
+	// ── card look ──────────────────────────────────────────────────
+	// cardStyle is null until the card is dressed; mutations seed it from the
+	// default so the first edit starts from the house frame.
+
+	setCardStyle(id: string, style: CardStyle): void {
+		this.updateCreature(id, { cardStyle: style });
+	}
+
+	updateCardStyle(id: string, changes: Partial<CardStyle>): void {
+		const c = this.creatures.find((x) => x.id === id);
+		if (!c) return;
+		this.updateCreature(id, { cardStyle: { ...(c.cardStyle ?? defaultCardStyle()), ...changes } });
+	}
+
+	resetCardStyle(id: string): void {
+		this.updateCreature(id, { cardStyle: null });
 	}
 
 	// ── stat mutations ─────────────────────────────────────────────
