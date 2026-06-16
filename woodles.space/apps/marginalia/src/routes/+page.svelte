@@ -16,16 +16,23 @@
 	let readingOpen = $state(false);
 	let arcadeOpen = $state(false);
 
+	function onFocus() {
+		void book.refreshBestiaryCreatures();
+	}
+
 	onMount(() => {
 		book.hydrate();
+		void book.refreshBestiaryCreatures();
 		if (window.location.hash === '#reading-room') readingOpen = true;
 		startTick();
 		window.addEventListener('beforeunload', persist);
+		window.addEventListener('focus', onFocus);
 	});
 	onDestroy(() => {
 		stopTick();
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('beforeunload', persist);
+			window.removeEventListener('focus', onFocus);
 			book.persist();
 		}
 	});

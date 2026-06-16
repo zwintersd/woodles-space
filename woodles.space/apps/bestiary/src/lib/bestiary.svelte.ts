@@ -33,7 +33,8 @@ function normalizeCreature(raw: Creature): Creature {
 		stats: raw.stats ?? defaultStats(),
 		status: raw.status ?? {},
 		composition: raw.composition ? migrateComposition(raw.composition) : null,
-		cardStyle: raw.cardStyle ? normalizeCardStyle(raw.cardStyle) : null
+		cardStyle: raw.cardStyle ? normalizeCardStyle(raw.cardStyle) : null,
+		isolatedSprite: raw.isolatedSprite ?? null
 	};
 }
 
@@ -280,8 +281,15 @@ export class Bestiary {
 	// Commit studio art: the flattened composite becomes the sprite, the layer
 	// stack rides along so the studio can reopen exactly where it left off.
 	// Composited art is smooth, so the pixelated card flag is cleared.
-	setComposition(id: string, composition: Composition, flattened: string): void {
-		this.updateCreature(id, { sprite: flattened, composition, pixelated: false });
+	// isolatedSprite is the creature-only crop for Marginalia; null if no
+	// creature layers were present in the composition.
+	setComposition(
+		id: string,
+		composition: Composition,
+		flattened: string,
+		isolatedSprite: string | null
+	): void {
+		this.updateCreature(id, { sprite: flattened, composition, pixelated: false, isolatedSprite });
 	}
 
 	clearSprite(id: string): void {
