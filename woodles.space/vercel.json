@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm --filter write build && pnpm --filter marginalia build && pnpm --filter planner build && pnpm --filter desktop build && pnpm --filter spores build && pnpm --filter bestiary build",
+  "buildCommand": "pnpm --filter write build && pnpm --filter marginalia build && pnpm --filter planner build && pnpm --filter spores build && pnpm --filter bestiary build",
   "outputDirectory": ".",
   "trailingSlash": false,
   "rewrites": [
@@ -27,9 +27,7 @@
     { "source": "/planner/:path*",     "destination": "/apps/planner/dist/:path*" },
     { "source": "/animations",         "destination": "/apps/animations/index.html" },
     { "source": "/animations/:path*",  "destination": "/apps/animations/:path*" },
-    { "source": "/desktop",            "destination": "/apps/desktop/dist/index.html" },
-    { "source": "/desktop/:path*",     "destination": "/apps/desktop/dist/:path*" },
-    { "source": "/spores",             "destination": "/apps/spores/dist/index.html" },
+{ "source": "/spores",             "destination": "/apps/spores/dist/index.html" },
     { "source": "/spores/:path*",      "destination": "/apps/spores/dist/:path*" },
     { "source": "/bestiary",           "destination": "/apps/bestiary/dist/index.html" },
     { "source": "/bestiary/:path*",    "destination": "/apps/bestiary/dist/:path*" }

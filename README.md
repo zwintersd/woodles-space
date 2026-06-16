@@ -39,8 +39,7 @@ shape.
         ├── letter/            ← static · published letter viewer (Echoes)
         ├── write/             ← SvelteKit · the letter editor
         ├── marginalia/        ← SvelteKit · a witch writes worlds (+ reading room)
-        ├── planner/           ← SvelteKit · Carillon, the day held quietly
-        └── desktop/           ← SvelteKit · in-progress window-manager surface
+        └── planner/           ← SvelteKit · Carillon, the day held quietly
 ```
 
 The wrapper repo holds only this README and a `.gitignore`; everything
@@ -69,7 +68,6 @@ and font system.
 | `/marginalia`    | Marginalia   | a witch writes worlds into being (idle world-game)  |
 | `/marginalia#…`  | Reading Room | a quiet timer, read for stars (lives inside it)     |
 | `/planner`       | Carillon     | the day, held quietly                               |
-| `(local)`        | Desktop      | window-manager scaffold, not yet deployed           |
 
 **Two app shapes** coexist in the same workspace:
 
@@ -80,7 +78,7 @@ and font system.
   `<link href="/shared/palette.css">` and `import from
   "/shared/library.js"`.
 
-- **SvelteKit apps** (`write`, `marginalia`, `planner`, `desktop`) use
+- **SvelteKit apps** (`write`, `marginalia`, `planner`) use
   Svelte 5 runes + Vite 7 + `@sveltejs/adapter-static`. Their build
   output lands in `apps/<name>/dist/`; `vercel.json`'s build command
   is just `pnpm --filter <name> build` for each. They consume
@@ -184,7 +182,7 @@ From `woodles.space/`:
 pnpm install            # one install for the whole workspace
 pnpm test               # vitest in every SvelteKit app (128 tests)
 pnpm check              # svelte-check in every app
-pnpm build              # build write / marginalia / planner / desktop
+pnpm build              # build write / marginalia / planner
 ```
 
 To work on one app:
