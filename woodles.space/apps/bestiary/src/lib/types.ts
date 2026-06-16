@@ -53,9 +53,32 @@ export type Creature = {
 	updated: string;
 };
 
+// How large the specimen sits on the workshop stage.
+export type CardSize = 'snug' | 'roomy' | 'grand';
+
+// How the workshop is arranged, and how loud it feels. Kept across sessions so
+// the bench is always how you left it — predictability is a feature, not a
+// nicety, for the senses these knobs are here to serve.
+export type WorkshopPrefs = {
+	// the tool rail folded down to its glyphs
+	railCollapsed: boolean;
+	// the controls panel tucked away — the specimen gets the room
+	panelCollapsed: boolean;
+	// how large the card sits on the stage
+	cardSize: CardSize;
+	// the little whispered notes & inline descriptions (off = less to read)
+	showHints: boolean;
+	// still backgrounds, softer glow — fewer things competing for attention
+	calm: boolean;
+	// hold all drifting, hovering, springing motion
+	reduceMotion: boolean;
+};
+
 export type BestiarySettings = {
 	// the collection's preferred sort, kept across sessions and devices
 	sort?: SortKey;
+	// how the workshop is laid out & how quiet it feels
+	workshop?: Partial<WorkshopPrefs>;
 };
 
 export type BestiaryBlob = {
