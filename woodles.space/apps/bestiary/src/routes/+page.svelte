@@ -8,6 +8,7 @@
 		const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
 		if (tag === 'input' || tag === 'textarea') return;
 		if (e.key === 'Escape') {
+			if (bestiary.showComfort) { bestiary.showComfort = false; return; }
 			if (bestiary.showSyncPanel) { bestiary.showSyncPanel = false; return; }
 			if (bestiary.currentView === 'editor') { bestiary.openCollection(); return; }
 		}

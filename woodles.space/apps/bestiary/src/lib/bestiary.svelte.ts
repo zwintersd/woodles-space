@@ -5,7 +5,8 @@ import type {
 	BestiaryView,
 	SortKey,
 	RarityFilter,
-	DomainFilter
+	DomainFilter,
+	WorkshopPrefs
 } from './types';
 import { rarities, type Rarity } from './content/domains';
 import type { CoreStat, Substat } from './content/stats';
@@ -63,6 +64,17 @@ const CREATURES_KEY = 'bestiary.creatures.v1';
 const SETTINGS_KEY = 'bestiary.settings.v1';
 
 const DEFAULT_SETTINGS: BestiarySettings = { sort: 'recent' };
+
+// The workshop opens roomy, hint-lit, and gently alive — but every one of these
+// is a knob the player can turn, and the choice is remembered.
+const DEFAULT_WORKSHOP: WorkshopPrefs = {
+	railCollapsed: false,
+	panelCollapsed: false,
+	cardSize: 'roomy',
+	showHints: true,
+	calm: false,
+	reduceMotion: false
+};
 
 export class Bestiary {
 	// Persisted. Creatures load asynchronously from IndexedDB (see hydrate());
@@ -169,11 +181,18 @@ export class Bestiary {
 
 	// Transient UI
 	showSyncPanel = $state(false);
+	showComfort = $state(false);
 
 	// ── derived views ──────────────────────────────────────────────
 
 	get sort(): SortKey {
 		return this.settings.sort ?? 'recent';
+	}
+
+	// Workshop layout & comfort, merged over the defaults so a partial (or older)
+	// stored blob still reads as a complete set of preferences.
+	get workshop(): WorkshopPrefs {
+		return { ...DEFAULT_WORKSHOP, ...this.settings.workshop };
 	}
 
 	get activeCreature(): Creature | null {
@@ -219,6 +238,12 @@ export class Bestiary {
 
 	setSort(sort: SortKey): void {
 		this.settings = { ...this.settings, sort };
+		save(SETTINGS_KEY, this.settings);
+	}
+
+	// Patch one or more workshop preferences and remember the choice.
+	setWorkshop(patch: Partial<WorkshopPrefs>): void {
+		this.settings = { ...this.settings, workshop: { ...this.workshop, ...patch } };
 		save(SETTINGS_KEY, this.settings);
 	}
 

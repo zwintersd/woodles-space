@@ -2,6 +2,7 @@
 	import { bestiary } from '$lib/bestiary.svelte';
 	import { syncState } from '$lib/sync.svelte';
 	import SyncPanel from './SyncPanel.svelte';
+	import ComfortMenu from './ComfortMenu.svelte';
 </script>
 
 <nav class="sidebar">
@@ -24,6 +25,14 @@
 			↩ marginalia
 		</a>
 		<button
+			class="comfort-btn"
+			onclick={() => (bestiary.showComfort = !bestiary.showComfort)}
+			title="comfort & quiet — calm, motion & hints"
+		>
+			<span class="comfort-glyph">☾</span>
+			comfort
+		</button>
+		<button
 			class="sync-btn"
 			class:connected={syncState.connected}
 			onclick={() => (bestiary.showSyncPanel = !bestiary.showSyncPanel)}
@@ -35,15 +44,30 @@
 	</div>
 </nav>
 
+{#if bestiary.showComfort}
+	<div
+		class="drawer-overlay comfort-anchor"
+		role="button"
+		tabindex="-1"
+		onclick={(e) => { if (e.target === e.currentTarget) bestiary.showComfort = false; }}
+		onkeydown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); bestiary.showComfort = false; } }}
+	>
+		<div class="drawer">
+			<button class="close-btn" onclick={() => (bestiary.showComfort = false)} aria-label="close">×</button>
+			<ComfortMenu />
+		</div>
+	</div>
+{/if}
+
 {#if bestiary.showSyncPanel}
 	<div
-		class="sync-overlay"
+		class="drawer-overlay sync-anchor"
 		role="button"
 		tabindex="-1"
 		onclick={(e) => { if (e.target === e.currentTarget) bestiary.showSyncPanel = false; }}
-		onkeydown={(e) => { if (e.key === 'Escape') bestiary.showSyncPanel = false; }}
+		onkeydown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); bestiary.showSyncPanel = false; } }}
 	>
-		<div class="sync-drawer">
+		<div class="drawer">
 			<button class="close-btn" onclick={() => (bestiary.showSyncPanel = false)} aria-label="close">×</button>
 			<SyncPanel />
 		</div>
@@ -118,6 +142,7 @@
 	}
 	.margin-link:hover { color: var(--b-relational); }
 
+	.comfort-btn,
 	.sync-btn {
 		display: flex;
 		align-items: center;
@@ -127,7 +152,10 @@
 		color: var(--b-muted);
 		transition: color var(--b-transition-fast);
 	}
+	.comfort-btn:hover,
 	.sync-btn:hover { color: var(--b-text-dim); }
+	.comfort-btn:hover { color: var(--b-relational); }
+	.comfort-glyph { font-size: 0.85rem; color: var(--b-gold); }
 	.sync-btn.connected { color: var(--b-biochemical); }
 	.sync-dot {
 		width: 6px;
@@ -138,7 +166,8 @@
 	}
 	.sync-dot.on { background: var(--b-biochemical); }
 
-	.sync-overlay {
+	/* a drawer that rises from the lower-left, shared by sync & comfort */
+	.drawer-overlay {
 		position: fixed;
 		inset: 0;
 		background: rgba(90, 54, 80, 0.30);
@@ -148,13 +177,16 @@
 		align-items: flex-end;
 		justify-content: flex-start;
 	}
-	.sync-drawer {
+	.drawer {
 		background: var(--b-surface);
 		border: 1px solid var(--b-border);
 		border-radius: var(--b-radius-lg) var(--b-radius-lg) 0 0;
 		width: 400px;
 		max-width: 100vw;
+		max-height: 90vh;
+		overflow-y: auto;
 		position: relative;
+		box-shadow: var(--b-shadow-hover);
 	}
 	.close-btn {
 		position: absolute;

@@ -1,14 +1,16 @@
 <script lang="ts">
 	import '$lib/style/tokens.css';
 	import { initSync } from '$lib/sync.svelte';
+	import { bestiary } from '$lib/bestiary.svelte';
 	import { onMount } from 'svelte';
 
 	let { children } = $props();
+	let w = $derived(bestiary.workshop);
 
 	onMount(() => { initSync(); });
 </script>
 
-<div class="bestiary-root">
+<div class="bestiary-root" class:calm={w.calm} class:reduce-motion={w.reduceMotion}>
 	{@render children()}
 </div>
 
@@ -59,5 +61,31 @@
 		font-family: var(--b-font-body);
 		font-size: 15px;
 		line-height: 1.6;
+	}
+
+	/* ── calm the lights: flatten the lit-fair backdrop to a single quiet wash,
+	   so fewer things compete for the eye ───────────────────────────────── */
+	.bestiary-root.calm { background: var(--b-bg); }
+
+	/* ── still the air: hold motion when the player asks for it, and always
+	   honour the operating system's own reduced-motion preference ────────── */
+	.bestiary-root.reduce-motion :global(*),
+	.bestiary-root.reduce-motion :global(*::before),
+	.bestiary-root.reduce-motion :global(*::after) {
+		animation-duration: 0.001ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.001ms !important;
+		scroll-behavior: auto !important;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		:global(.bestiary-root *),
+		:global(.bestiary-root *::before),
+		:global(.bestiary-root *::after) {
+			animation-duration: 0.001ms !important;
+			animation-iteration-count: 1 !important;
+			transition-duration: 0.001ms !important;
+			scroll-behavior: auto !important;
+		}
 	}
 </style>

@@ -2,6 +2,7 @@
 	import { bestiary } from '$lib/bestiary.svelte';
 	import { domains, rarities } from '$lib/content/domains';
 	import type { Domain, Rarity } from '$lib/content/domains';
+	import type { CardSize } from '$lib/types';
 	import { clampInt } from '$lib/utils';
 	import {
 		emptyComposition,
@@ -36,6 +37,32 @@
 
 	let section = $state<Section>('identity');
 	let bench = $derived(allBenches.find((b) => b.id === section) ?? contentBenches[0]);
+
+	// ── workshop layout & comfort (persisted; see bestiary.setWorkshop) ──
+	let w = $derived(bestiary.workshop);
+	// "focus" is simply both wings folded at once — no separate state to drift.
+	let focusActive = $derived(w.railCollapsed && w.panelCollapsed);
+
+	const SIZE_W: Record<CardSize, string> = {
+		snug: 'clamp(230px, 22vw, 340px)',
+		roomy: 'clamp(280px, 30vw, 460px)',
+		grand: 'clamp(320px, 42vw, 640px)'
+	};
+	const sizes: { id: CardSize; label: string }[] = [
+		{ id: 'snug', label: 'snug' },
+		{ id: 'roomy', label: 'roomy' },
+		{ id: 'grand', label: 'grand' }
+	];
+	let specimenW = $derived(SIZE_W[w.cardSize] ?? SIZE_W.roomy);
+	let railW = $derived(w.railCollapsed ? '66px' : '236px');
+	let gridCols = $derived(
+		`${railW} minmax(0, 1fr)${w.panelCollapsed ? '' : ' clamp(330px, 26vw, 460px)'}`
+	);
+
+	function toggleFocus() {
+		const next = !focusActive;
+		bestiary.setWorkshop({ railCollapsed: next, panelCollapsed: next });
+	}
 
 	// ── sprite studio ──────────────────────────────────────────────────
 	let studioOpen = $state(false);
@@ -149,11 +176,18 @@
 
 
 {#if creature}
-	<div class="workshop">
+	<div
+		class="workshop"
+		class:calm={w.calm}
+		class:hide-hints={!w.showHints}
+		style={`grid-template-columns: ${gridCols};`}
+	>
 		<!-- ── the tool rail: pick a bench ─────────────────────────────── -->
-		<nav class="rail">
-			<button class="back" onclick={() => bestiary.openCollection()}>← the shelf</button>
-			<p class="rail-title"><span class="rail-mark">✦</span> the workshop</p>
+		<nav class="rail" class:collapsed={w.railCollapsed}>
+			<button class="back" onclick={() => bestiary.openCollection()} title="the shelf">
+				<span class="back-glyph">←</span><span class="back-text">the shelf</span>
+			</button>
+			<p class="rail-title"><span class="rail-mark">✦</span> <span class="back-text">the workshop</span></p>
 
 			<div class="rail-benches" role="tablist" aria-label="workbench">
 				{#each contentBenches as b (b.id)}
@@ -163,6 +197,7 @@
 						class="bench"
 						class:active={section === b.id}
 						aria-selected={section === b.id}
+						title={b.label}
 						onclick={() => (section = b.id)}
 					>
 						<span class="bench-glyph">{b.glyph}</span>
@@ -181,6 +216,7 @@
 					class="bench"
 					class:active={section === lookBench.id}
 					aria-selected={section === lookBench.id}
+					title={lookBench.label}
 					onclick={() => (section = lookBench.id)}
 				>
 					<span class="bench-glyph">{lookBench.glyph}</span>
@@ -192,38 +228,101 @@
 			</div>
 
 			<div class="rail-actions">
-				<button class="ghost" onclick={handleDuplicate}>duplicate</button>
-				<button class="danger" onclick={handleDelete}>release</button>
-				<button class="primary" onclick={() => bestiary.openCollection()}>done</button>
+				<button class="ghost" onclick={handleDuplicate} title="duplicate">
+					<span class="act-glyph">⎘</span><span class="act-label">duplicate</span>
+				</button>
+				<button class="danger" onclick={handleDelete} title="release">
+					<span class="act-glyph">✕</span><span class="act-label">release</span>
+				</button>
+				<button class="primary" onclick={() => bestiary.openCollection()} title="done">
+					<span class="act-glyph">✓</span><span class="act-label">done</span>
+				</button>
 			</div>
 		</nav>
 
 		<!-- ── the stage: the specimen under the lamp ──────────────────── -->
-		<section class="stage">
-			<div class="stage-inner">
-				<div class="specimen">
-					<CreatureCard {creature} />
-				</div>
-				<p class="preview-note">
-					{section === 'look'
-						? 'dress the card — every change shows here'
-						: 'a living likeness — it changes as you work'}
-				</p>
-				<div class="export-row">
-					<button class="exp" onclick={saveCard} disabled={!!exporting}>
-						{exporting === 'card' ? 'saving…' : '↓ save card'}
+		<section class="stage" class:focus-on={focusActive && !w.calm}>
+			<!-- the lamp bar: the workshop's one, unmoving set of view controls -->
+			<div class="stage-bar">
+				<button
+					type="button"
+					class="bar-btn fold-rail"
+					class:on={!w.railCollapsed}
+					title={w.railCollapsed ? 'open the tools' : 'fold the tools away'}
+					aria-pressed={!w.railCollapsed}
+					onclick={() => bestiary.setWorkshop({ railCollapsed: !w.railCollapsed })}
+				>
+					<span class="bar-chev">{w.railCollapsed ? '»' : '«'}</span>
+					<span class="bar-text">tools</span>
+				</button>
+
+				<div class="bar-center">
+					<div class="size-seg" role="group" aria-label="specimen size">
+						{#each sizes as s (s.id)}
+							<button
+								type="button"
+								class="size-btn"
+								class:on={w.cardSize === s.id}
+								onclick={() => bestiary.setWorkshop({ cardSize: s.id })}
+							>{s.label}</button>
+						{/each}
+					</div>
+					<button
+						type="button"
+						class="bar-btn focus"
+						class:on={focusActive}
+						title="just you and the specimen"
+						aria-pressed={focusActive}
+						onclick={toggleFocus}
+					>
+						<span class="bar-chev">◎</span>
+						<span class="bar-text">{focusActive ? 'unfocus' : 'focus'}</span>
 					</button>
-					{#if creature.sprite}
-						<button class="exp ghost" onclick={saveArt} disabled={!!exporting}>
-							{exporting === 'art' ? 'saving…' : 'art only'}
-						</button>
-					{/if}
 				</div>
-				{#if exportError}<p class="export-err">{exportError}</p>{/if}
+
+				<button
+					type="button"
+					class="bar-btn fold-panel"
+					class:on={!w.panelCollapsed}
+					title={w.panelCollapsed ? 'open the controls' : 'fold the controls away'}
+					aria-pressed={!w.panelCollapsed}
+					onclick={() => bestiary.setWorkshop({ panelCollapsed: !w.panelCollapsed })}
+				>
+					<span class="bar-text">controls</span>
+					<span class="bar-chev">{w.panelCollapsed ? '«' : '»'}</span>
+				</button>
+			</div>
+
+			<div class="stage-scroll">
+				<div class="stage-inner">
+					{#if !w.calm && !w.reduceMotion}
+						<span class="spark" aria-hidden="true">✦</span>
+					{/if}
+					<div class="specimen" style={`width: ${specimenW};`}>
+						<CreatureCard {creature} />
+					</div>
+					<p class="preview-note">
+						{section === 'look'
+							? 'dress the card — every change shows here'
+							: 'a living likeness — it changes as you work'}
+					</p>
+					<div class="export-row">
+						<button class="exp" onclick={saveCard} disabled={!!exporting}>
+							{exporting === 'card' ? 'saving…' : '↓ save card'}
+						</button>
+						{#if creature.sprite}
+							<button class="exp ghost" onclick={saveArt} disabled={!!exporting}>
+								{exporting === 'art' ? 'saving…' : 'art only'}
+							</button>
+						{/if}
+					</div>
+					{#if exportError}<p class="export-err">{exportError}</p>{/if}
+				</div>
 			</div>
 		</section>
 
 		<!-- ── the bench: the controls for the chosen tool ─────────────── -->
+		{#if !w.panelCollapsed}
 		<aside class="bench-panel">
 			<header class="bench-head">
 				<span class="bench-head-glyph">{bench.glyph}</span>
@@ -440,6 +539,7 @@
 				{/if}
 			</form>
 		</aside>
+		{/if}
 	</div>
 
 	<!-- hidden, fixed-width card used only for crisp PNG export -->
@@ -465,10 +565,26 @@
 	.workshop {
 		height: 100%;
 		display: grid;
-		grid-template-columns: 234px minmax(0, 1fr) 420px;
+		/* grid-template-columns is set inline so the rail & panel can fold */
+		grid-template-columns: 236px minmax(0, 1fr) clamp(330px, 26vw, 460px);
 		background:
 			radial-gradient(120% 80% at 50% -10%, rgba(255, 216, 234, 0.5), transparent 60%),
 			var(--b-bg-2);
+		transition: grid-template-columns var(--b-transition-medium);
+	}
+	/* calm the lights: drop the lit wash for one quiet surface */
+	.workshop.calm {
+		background: var(--b-bg);
+	}
+
+	/* whispered notes, hushed: cut the inline descriptions to lighten the read */
+	.hide-hints .bench-note,
+	.hide-hints .bench-head-note,
+	.hide-hints .preview-note,
+	.hide-hints .hint-note,
+	.hide-hints .studio-note,
+	.hide-hints .label em {
+		display: none;
 	}
 
 	/* ── the tool rail ──────────────────────────────────────────────── */
@@ -483,12 +599,16 @@
 	}
 	.back {
 		align-self: flex-start;
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
 		font-family: var(--b-font-mono);
 		font-size: 0.78rem;
 		color: var(--b-text-dim);
 		transition: color var(--b-transition-fast);
 	}
 	.back:hover { color: var(--b-gold); }
+	.back-glyph { font-size: 0.95rem; }
 	.rail-title {
 		font-family: var(--b-font-codex);
 		font-size: 1.15rem;
@@ -499,6 +619,8 @@
 		gap: 0.4rem;
 	}
 	.rail-mark { color: var(--b-gold); font-size: 0.9rem; }
+
+	.act-glyph { display: none; }
 
 	.rail-benches { display: flex; flex-direction: column; gap: 2px; }
 	.bench {
@@ -588,27 +710,127 @@
 	.danger { color: var(--b-muted); }
 	.danger:hover { border-color: var(--b-mythic); color: var(--b-mythic); }
 
+	/* ── rail folded to glyphs: the workshop, made small ───────────────── */
+	.rail.collapsed { padding: var(--b-space-lg) 0.4rem; align-items: center; }
+	.rail.collapsed .back-text,
+	.rail.collapsed .rail-title,
+	.rail.collapsed .bench-text,
+	.rail.collapsed .act-label,
+	.rail.collapsed .rail-divider { display: none; }
+	.rail.collapsed .back { align-self: center; }
+	.rail.collapsed .rail-benches { align-items: center; gap: var(--b-space-xs); }
+	.rail.collapsed .bench { width: auto; justify-content: center; padding: 0.5rem; }
+	.rail.collapsed .bench-glyph { width: auto; font-size: 1.15rem; }
+	.rail.collapsed .rail-actions { align-items: center; gap: var(--b-space-xs); }
+	.rail.collapsed .ghost,
+	.rail.collapsed .danger,
+	.rail.collapsed .primary { padding: 0.5rem; }
+	.rail.collapsed .act-glyph { display: inline; font-size: 0.95rem; }
+
 	/* ── the stage ──────────────────────────────────────────────────── */
 	.stage {
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		position: relative;
+	}
+
+	/* the lamp bar — the workshop's single, never-moving set of view controls */
+	.stage-bar {
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--b-space-sm);
+		padding: var(--b-space-sm) var(--b-space-md);
+		border-bottom: 1px solid var(--b-rule);
+		background: color-mix(in srgb, var(--b-surface) 55%, transparent);
+		backdrop-filter: blur(6px);
+	}
+	.workshop.calm .stage-bar { background: var(--b-surface); backdrop-filter: none; }
+	.bar-center { display: flex; align-items: center; gap: var(--b-space-sm); }
+	.bar-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		font-family: var(--b-font-mono);
+		font-size: 0.74rem;
+		color: var(--b-text-dim);
+		border: 1px solid var(--b-border);
+		border-radius: var(--b-radius-pill);
+		padding: 0.32rem 0.75rem;
+		transition: border-color var(--b-transition-fast), color var(--b-transition-fast),
+			background var(--b-transition-fast);
+	}
+	.bar-btn:hover { border-color: var(--b-gold); color: var(--b-gold); }
+	.bar-btn.on { color: var(--b-text); border-color: var(--b-border-strong); }
+	.bar-btn.focus.on {
+		background: var(--b-gold);
+		color: var(--b-on-accent);
+		border-color: var(--b-gold);
+	}
+	.bar-chev { font-size: 0.85rem; line-height: 1; }
+
+	.size-seg {
+		display: inline-flex;
+		border: 1px solid var(--b-border);
+		border-radius: var(--b-radius-pill);
+		overflow: hidden;
+	}
+	.size-btn {
+		font-family: var(--b-font-mono);
+		font-size: 0.72rem;
+		color: var(--b-text-dim);
+		padding: 0.32rem 0.7rem;
+		transition: background var(--b-transition-fast), color var(--b-transition-fast);
+	}
+	.size-btn:hover { color: var(--b-gold); }
+	.size-btn.on { background: var(--b-gold-soft); color: var(--b-text); }
+
+	.stage-scroll {
+		flex: 1;
 		overflow-y: auto;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		padding: var(--b-space-xl);
+		transition: background var(--b-transition-medium);
+	}
+	/* under the lamp: a soft spotlight when nothing else is in the room */
+	.stage.focus-on .stage-scroll {
+		background: radial-gradient(58% 52% at 50% 46%, transparent 38%, rgba(120, 90, 120, 0.12) 100%);
 	}
 	.stage-inner {
+		position: relative;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		gap: var(--b-space-md);
 		width: 100%;
 	}
+	/* a drifting spark, the workshop breathing — hushed by calm & still air */
+	.spark {
+		position: absolute;
+		top: -0.4rem;
+		left: 50%;
+		font-size: 1.1rem;
+		color: var(--b-gold);
+		opacity: 0.5;
+		pointer-events: none;
+		animation: spark-drift 7s ease-in-out infinite;
+	}
+	@keyframes spark-drift {
+		0%, 100% { transform: translate(-50%, 0) rotate(0deg); opacity: 0.35; }
+		50% { transform: translate(-50%, -12px) rotate(8deg); opacity: 0.75; }
+	}
 	.specimen {
-		width: clamp(280px, 30vw, 460px);
+		max-width: 100%;
 		filter: drop-shadow(0 18px 40px rgba(206, 130, 175, 0.32));
-		transition: transform var(--b-transition-spring);
+		transition: transform var(--b-transition-spring), width var(--b-transition-medium);
 	}
 	.specimen:hover { transform: translateY(-4px) rotate(-0.4deg); }
+	.workshop.calm .specimen { filter: drop-shadow(0 4px 12px rgba(150, 110, 140, 0.14)); }
+	.workshop.calm .specimen:hover { transform: none; }
 	.preview-note {
 		font-family: var(--b-font-body);
 		font-style: italic;
@@ -693,11 +915,14 @@
 			display: flex;
 			flex-direction: column;
 		}
-		.rail {
+		/* the rail reads as a row of tabs again, regardless of the folded flag */
+		.rail,
+		.rail.collapsed {
 			flex-direction: row;
 			flex-wrap: wrap;
 			align-items: center;
 			gap: var(--b-space-sm);
+			padding: var(--b-space-sm) var(--b-space-md);
 			border-right: none;
 			border-bottom: 1px solid var(--b-border);
 			overflow-x: auto;
@@ -705,25 +930,47 @@
 			top: 0;
 			z-index: var(--b-z-panel);
 		}
-		.rail-title { display: none; }
-		.rail-benches {
+		.rail-title,
+		.rail.collapsed .rail-title { display: none; }
+		.rail.collapsed .back-text { display: inline; }
+		/* every bench stays in view — wrapped chips, never a hidden scroll */
+		.rail-benches,
+		.rail.collapsed .rail-benches {
 			flex-direction: row;
-			flex-wrap: nowrap;
-			flex: 1;
+			flex-wrap: wrap;
+			flex: 1 1 100%;
 			min-width: 0;
-			overflow-x: auto;
+			overflow: visible;
+			align-items: center;
+			gap: var(--b-space-xs);
 		}
-		.bench { width: auto; flex-shrink: 0; }
+		.bench,
+		.rail.collapsed .bench {
+			width: auto;
+			flex-shrink: 0;
+			justify-content: flex-start;
+			border-color: var(--b-border);
+		}
+		.rail.collapsed .bench-text { display: flex; }
 		.bench-note { display: none; }
-		.rail-divider { display: none; }
-		.rail-actions {
+		.rail-divider,
+		.rail.collapsed .rail-divider { display: none; }
+		.rail-actions,
+		.rail.collapsed .rail-actions {
 			margin-top: 0;
 			padding-top: 0;
 			flex-direction: row;
 			margin-left: auto;
 		}
-		.stage { padding: var(--b-space-lg); }
-		.specimen { width: clamp(240px, 70vw, 340px); }
+		.rail.collapsed .act-label { display: inline; }
+
+		/* the lamp bar's fold toggles are spatial — meaningless once stacked */
+		.fold-rail, .fold-panel { display: none; }
+		.stage-bar { flex-wrap: wrap; justify-content: center; }
+
+		.stage { overflow: visible; }
+		.stage-scroll { overflow: visible; padding: var(--b-space-lg); }
+		.stage.focus-on .stage-scroll { background: none; }
 		.bench-panel { border-left: none; border-top: 1px solid var(--b-border); overflow: visible; }
 		.bench-body { overflow-y: visible; }
 	}
