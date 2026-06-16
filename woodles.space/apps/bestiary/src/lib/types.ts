@@ -49,6 +49,11 @@ export type Creature = {
 	foundIn: string;
 	// the six-axis interior — who this creature is beneath the battle math
 	stats: Stats;
+	// keyed status intensities, 0–10 — conditions the creature is under. Only
+	// `cold` is wired up for now (it drives the procedural snow/frost/ice on the
+	// card); the map shape is here so `burning`, `cursed`, … can land later with
+	// no migration. An empty map (or absent) means the creature is unafflicted.
+	status?: Record<string, number>;
 	created: string;
 	updated: string;
 };

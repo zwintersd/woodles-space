@@ -88,6 +88,7 @@ export function blankCreature(): Creature {
 		flavor: '',
 		foundIn: '',
 		stats: defaultStats(),
+		status: {},
 		created: ts,
 		updated: ts
 	};

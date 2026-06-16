@@ -23,3 +23,11 @@ export function clampInt(value: number, min: number, max: number): number {
 	if (Number.isNaN(value)) return min;
 	return Math.max(min, Math.min(max, Math.round(value)));
 }
+
+// Clamp a status intensity into [0, 10], kept to one decimal so a slider can
+// glide (cold 6.4) without spraying float dust into storage. NaN → 0, i.e. off.
+export function clampStatus(value: number): number {
+	if (Number.isNaN(value)) return 0;
+	const clamped = Math.max(0, Math.min(10, value));
+	return Math.round(clamped * 10) / 10;
+}
