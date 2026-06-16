@@ -59,6 +59,7 @@
 		palettes,
 		motifs as motifList,
 		fontPairs,
+		templates,
 		findTemplate,
 		findFont
 	} from '@shared/library.js';
@@ -748,6 +749,72 @@
 		noteEl?.focus();
 	}
 
+	async function onSelectTemplate(templateId: string) {
+		const t = findTemplate(templateId);
+		if (!t) return;
+
+		// Check if current draft is empty
+		const fgIsCurrentlyEmpty = isEmptyHtml(fgEl?.innerHTML ?? '');
+
+		if (fgIsCurrentlyEmpty) {
+			// Load directly into current draft
+			loadIntoLayers({
+				title: t.sampleTitle,
+				theme: t.palette,
+				motif: t.motif,
+				font: t.font,
+				content: t.sampleContent
+			});
+			updateMeta();
+			scheduleSave();
+		} else {
+			// Save current draft and create new one for template
+			clearTimeout(saveTimer);
+			const now = new Date().toISOString();
+			const draftData: DraftBody = {
+				title, theme, motif, font,
+				layers: {
+					foreground: { html: fgEl?.innerHTML ?? '', updatedAt: now },
+					midground: { html: mgEl?.innerHTML ?? '', updatedAt: now },
+					background: { html: bgEl?.innerHTML ?? '', updatedAt: now }
+				},
+				annotations: { pocketNotes: pockets, marginNotes },
+				content: fgEl?.innerHTML ?? '',
+				savedAt: now
+			};
+			if (currentDraftId) {
+				saveDraft(currentDraftId, draftData);
+			}
+
+			// Create new draft for template
+			const newId = createDraftId();
+			const newTime = new Date().toISOString();
+			draftsList = [{ id: newId, title: t.sampleTitle, updatedAt: newTime }, ...draftsList];
+			writeIndex(draftsList);
+			currentDraftId = newId;
+			setActiveDraftId(newId);
+
+			// Load template into new draft
+			title = t.sampleTitle;
+			theme = t.palette;
+			motif = t.motif;
+			font = t.font;
+			pockets = [];
+			marginNotes = [];
+			if (fgEl) fgEl.innerHTML = sanitizeHtml(t.sampleContent);
+			if (mgEl) mgEl.innerHTML = '';
+			if (bgEl) bgEl.innerHTML = '';
+			stampLiveAnchors();
+
+			updateMeta();
+			scheduleSave();
+		}
+
+		binderOpen = null;
+		await tick();
+		scheduleMeasure(60);
+	}
+
 </script>
 
 <div class="motif-grain"></div>
@@ -885,9 +952,11 @@
 	bind:filter={pocketsFilter}
 	bind:order={pocketsOrder}
 	{marginEntries}
+	{templates}
 	onLayerGoto={gotoLayer}
 	onPocketGoto={gotoPocket}
 	onMarginGoto={gotoMarginNote}
+	onSelectTemplate={onSelectTemplate}
 />
 
 <BottomBar

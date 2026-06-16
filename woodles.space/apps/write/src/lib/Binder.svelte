@@ -10,6 +10,8 @@
 		type PocketNote,
 		type PocketsOrder
 	} from './types';
+	import { findFont } from '@shared/library.js';
+	import type { templates as TemplatesType } from '@shared/library.js';
 
 	let {
 		open = $bindable(),
@@ -19,9 +21,11 @@
 		filter = $bindable(),
 		order = $bindable(),
 		marginEntries,
+		templates = [],
 		onLayerGoto,
 		onPocketGoto,
-		onMarginGoto
+		onMarginGoto,
+		onSelectTemplate
 	}: {
 		open: BinderTab | null;
 		activeLayer: LayerId;
@@ -30,12 +34,14 @@
 		filter: 'all' | PocketLayer;
 		order: PocketsOrder;
 		marginEntries: MarginEntry[];
+		templates?: typeof TemplatesType;
 		onLayerGoto: (layer: LayerId) => void;
 		onPocketGoto: (id: string, layer: PocketLayer) => void;
 		onMarginGoto: (id: string, anchorId: string) => void;
+		onSelectTemplate?: (id: string) => void;
 	} = $props();
 
-	const TABS: BinderTab[] = ['layers', 'pockets', 'notes'];
+	const TABS: BinderTab[] = ['layers', 'pockets', 'notes', 'templates'];
 
 	const filteredPockets = $derived.by(() => {
 		const arr = filter === 'all' ? pockets : pockets.filter((p) => p.layer === filter);
@@ -166,6 +172,39 @@
 							{entry.passage || '(passage missing)'}
 						</span>
 						<span class="binder-row-preview">{entry.preview}</span>
+					</button>
+				{/each}
+			{/if}
+		</div>
+	{/if}
+
+	{#if open === 'templates'}
+		<header class="binder-header">
+			<span class="binder-header-eyebrow">binder</span>
+			<span class="binder-header-title">templates · {templates.length}</span>
+		</header>
+		<div class="binder-body">
+			{#if templates.length === 0}
+				<p class="binder-empty">no templates available.</p>
+			{:else}
+				{#each templates as t (t.id)}
+					<button
+						class="binder-row template-row"
+						onclick={() => {
+							onSelectTemplate?.(t.id);
+							open = null;
+						}}
+						title="load {t.name} template"
+					>
+						<span class="binder-row-head">
+							<span class="binder-row-name">{t.name}</span>
+							<span class="binder-row-meta">{t.desc}</span>
+						</span>
+						<span class="binder-row-tokens">
+							<span class="binder-token" title="palette: {t.palette}">{t.palette}</span>
+							<span class="binder-token" title="motif: {t.motif}">{t.motif}</span>
+							<span class="binder-token" title="font: {t.font}">{t.font}</span>
+						</span>
 					</button>
 				{/each}
 			{/if}
@@ -409,6 +448,25 @@
 
 	.pocket-row-background { border-style: dashed; }
 	.pocket-row-background .binder-row-preview { opacity: 0.7; }
+
+	.binder-row-tokens {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.3rem;
+		margin-top: 0.35rem;
+	}
+	.binder-token {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.5rem;
+		letter-spacing: 0.14em;
+		text-transform: lowercase;
+		color: var(--muted);
+		background: color-mix(in srgb, var(--surface) 90%, transparent);
+		padding: 2px 6px;
+		border-radius: 4px;
+		opacity: 0.65;
+		display: inline-block;
+	}
 
 	@media (max-width: 700px) {
 		.binder-panel {
