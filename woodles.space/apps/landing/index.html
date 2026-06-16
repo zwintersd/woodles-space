@@ -723,11 +723,9 @@
   <script>
     /* ── app catalogue ─────────────────────────────────────────────── */
     const apps = [
-      { id:'fonts',   name:'Font Library', href:'/fonts',                  glyph:'Aa', desc:'twelve typefaces, one sheet',     g1:'var(--lavender)', g2:'var(--lilac)' },
+      { id:'hygge',   name:'Hygge',        href:'/hygge',                  glyph:'☕', desc:'design playground: fonts, motifs & palette', g1:'var(--lavender)', g2:'var(--peach)' },
       { id:'write',   name:'Write',        href:'/write',                  glyph:'✎', desc:'compose, save, send a letter', g1:'var(--aqua)',     g2:'var(--lavender)' },
       { id:'echoes',  name:'Echoes',       href:'/letter',                 glyph:'❝', desc:'letters left here, words that stayed', g1:'var(--peach)', g2:'var(--lilac)' },
-      { id:'palette', name:'Palette',      href:'/palette',                glyph:'◐', desc:'named themes & color systems',  g1:'var(--lilac)',    g2:'var(--aqua)' },
-      { id:'motifs',  name:'Motifs',       href:'/motifs',                 glyph:'❀', desc:'ambient backdrops, drift & grain', g1:'var(--aqua)',  g2:'var(--peach)' },
       { id:'scaffold',name:'Scaffold',     href:'/scaffold',               glyph:'❏', desc:'templates for /write',          g1:'var(--lavender)', g2:'var(--peach)' },
       { id:'marg',    name:'Marginalia',   href:'/marginalia',             glyph:'❦', desc:'a witch writes worlds into being',      g1:'var(--plum)',     g2:'var(--lavender)' },
       { id:'reading', name:'Reading Room', href:'/marginalia#reading-room',glyph:'☾', desc:'a quiet timer, read for stars', g1:'var(--peach)',    g2:'var(--aqua)' },
@@ -789,7 +787,7 @@
 
     /* recommended — a curated trio */
     const rec = document.getElementById('recommended');
-    ['write','marg','palette'].forEach(id => {
+    ['write','marg','hygge'].forEach(id => {
       const a = apps.find(x => x.id === id);
       const el = document.createElement('a');
       el.className = 'rec-item';

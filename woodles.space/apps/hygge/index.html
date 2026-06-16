@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="cream">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>hygge · design playground · woodles.space</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="/shared/fonts.css" />
+  <link rel="stylesheet" href="/shared/palette.css" />
+  <link rel="stylesheet" href="/shared/motifs.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-weight: 300;
+      overflow: hidden;
+      transition: background 0.5s ease, color 0.5s ease;
+    }
+
+    /* ── topbar ─────────────────────────────────────────── */
+    .topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 20;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      padding: 0 1.4rem;
+      background: color-mix(in srgb, var(--surface) 85%, transparent);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+    }
+    .topbar-brand {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    .topbar-brand:hover { color: var(--accent-strong); }
+    .topbar-sep { color: var(--muted); opacity: 0.4; margin: 0 0.7rem; font-size: 0.6rem; }
+    .topbar-label {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.14em;
+      color: var(--accent-strong);
+    }
+    .topbar-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .topbar-clock {
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      display: flex;
+      gap: 0.5rem;
+    }
+    .clock-sep { opacity: 0.4; }
+    .topbar-shimmer {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+    }
+
+    /* ── layout ─────────────────────────────────────────── */
+    .hygge-layout {
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      height: calc(100vh - 42px);
+      margin-top: 42px;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* ── canvas (left) ──────────────────────────────────── */
+    .canvas-wrap {
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4rem clamp(2rem, 7vw, 6rem);
+      scrollbar-width: thin;
+      scrollbar-color: var(--rule) transparent;
+    }
+    .canvas {
+      max-width: 580px;
+      width: 100%;
+      animation: cv-rise 0.7s ease forwards;
+    }
+    @keyframes cv-rise {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .canvas-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.54rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--muted);
+      opacity: 0.5;
+      margin-bottom: 2.2rem;
+      transition: color 0.4s ease;
+    }
+    .canvas-h1 {
+      font-family: var(--cv-display, var(--font-display));
+      font-size: clamp(2rem, 5vw, 3.4rem);
+      font-weight: 300;
+      font-style: italic;
+      color: var(--accent-strong);
+      line-height: 1.1;
+      margin-bottom: 0.4rem;
+      transition: font-family 0.3s ease, color 0.5s ease;
+    }
+    .canvas-h2 {
+      font-family: var(--cv-display, var(--font-display));
+      font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+      font-weight: 300;
+      color: var(--accent-deep);
+      line-height: 1.2;
+      margin-bottom: 1.8rem;
+      transition: font-family 0.3s ease, color 0.5s ease;
+    }
+    .canvas-p {
+      font-family: var(--cv-body, var(--font-body));
+      font-size: 1.02rem;
+      line-height: 1.85;
+      color: var(--text);
+      margin-bottom: 1.2rem;
+      transition: font-family 0.3s ease, color 0.5s ease;
+    }
+    .canvas-ul {
+      font-family: var(--cv-body, var(--font-body));
+      font-size: 0.97rem;
+      line-height: 1.8;
+      color: var(--text);
+      padding-left: 1.2rem;
+      margin-bottom: 1.4rem;
+      transition: font-family 0.3s ease, color 0.5s ease;
+    }
+    .canvas-ul li { margin-bottom: 0.2rem; }
+    .canvas-bq {
+      font-family: var(--cv-body, var(--font-body));
+      font-size: 1rem;
+      font-style: italic;
+      color: var(--muted);
+      border-left: 2px solid var(--accent);
+      padding: 0.1em 0 0.1em 1.2em;
+      margin-top: 0.4rem;
+      transition: font-family 0.3s ease, color 0.5s ease, border-color 0.5s ease;
+    }
+
+    /* ── panel (right) ──────────────────────────────────── */
+    .panel {
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--rule);
+      background: color-mix(in srgb, var(--surface) 82%, transparent);
+      backdrop-filter: blur(28px) saturate(1.4);
+      -webkit-backdrop-filter: blur(28px) saturate(1.4);
+      overflow: hidden;
+      transition: background 0.5s ease, border-color 0.5s ease;
+    }
+
+    /* tabs */
+    .panel-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--rule);
+      flex-shrink: 0;
+      transition: border-color 0.5s ease;
+    }
+    .ptab {
+      flex: 1;
+      padding: 0.85rem 0.3rem;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      font-family: var(--font-mono);
+      font-size: 0.52rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      cursor: pointer;
+      transition: color 0.15s ease, border-color 0.15s ease;
+    }
+    .ptab:hover { color: var(--text); }
+    .ptab.active {
+      color: var(--accent-strong);
+      border-bottom-color: var(--accent-strong);
+    }
+
+    /* panel body */
+    .panel-body {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--rule) transparent;
+    }
+
+    .pane {
+      padding: 1.4rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.4rem;
+    }
+    .pane.hidden { display: none; }
+
+    /* ── playground controls ─────────────────────────────── */
+    .ctrl-section { display: flex; flex-direction: column; }
+    .ctrl-label {
+      font-family: var(--font-mono);
+      font-size: 0.52rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.7rem;
+    }
+
+    /* palette swatches */
+    .palette-swatches {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+    .theme-swatch {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.65rem;
+      border-radius: 100px;
+      border: 1px solid var(--rule);
+      background: color-mix(in srgb, var(--surface) 60%, transparent);
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 0.54rem;
+      letter-spacing: 0.04em;
+      color: var(--text);
+      transition: border-color 0.15s ease, transform 0.1s ease;
+    }
+    .theme-swatch:hover { border-color: var(--accent); transform: scale(1.04); }
+    .theme-swatch.active { border-color: var(--accent-strong); }
+    .swatch-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--accent-strong);
+      border: 2px solid var(--bg);
+      box-shadow: 0 0 0 1px var(--accent);
+      flex-shrink: 0;
+    }
+
+    /* motif picks */
+    .motif-picks {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+    .motif-pick {
+      display: flex;
+      flex-direction: column;
+      padding: 0.5rem 0.8rem;
+      border-radius: 10px;
+      border: 1px solid var(--rule);
+      background: color-mix(in srgb, var(--surface) 60%, transparent);
+      cursor: pointer;
+      min-width: 70px;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .motif-pick:hover { border-color: var(--accent); }
+    .motif-pick.active {
+      border-color: var(--accent-strong);
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+    }
+    .motif-pick-name {
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.06em;
+      color: var(--accent-strong);
+    }
+    .motif-pick-desc {
+      font-family: var(--font-mono);
+      font-size: 0.48rem;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin-top: 0.2rem;
+    }
+
+    /* font picks */
+    .font-picks {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.4rem;
+    }
+    .font-pick {
+      display: flex;
+      flex-direction: column;
+      padding: 0.5rem 0.7rem;
+      border-radius: 10px;
+      border: 1px solid var(--rule);
+      background: color-mix(in srgb, var(--surface) 60%, transparent);
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease;
+      text-align: left;
+    }
+    .font-pick:hover { border-color: var(--accent); }
+    .font-pick.active {
+      border-color: var(--accent-strong);
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+    }
+    .font-pick-name {
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.06em;
+      color: var(--accent-strong);
+    }
+    .font-pick-desc {
+      font-family: var(--font-mono);
+      font-size: 0.46rem;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin-top: 0.2rem;
+    }
+
+    /* write CTA */
+    .ctrl-cta { padding-top: 0.4rem; }
+    .write-btn {
+      display: block;
+      text-align: center;
+      padding: 0.85rem 1.5rem;
+      border-radius: 100px;
+      background: var(--accent-strong);
+      color: var(--bg);
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      text-decoration: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .write-btn:hover { opacity: 0.82; transform: translateY(-1px); }
+    .write-btn:active { transform: scale(0.98); }
+
+    /* ── font specimens tab ──────────────────────────────── */
+    .font-spec {
+      padding: 0.9rem 0;
+      border-bottom: 1px solid var(--rule);
+    }
+    .font-spec:last-child { border-bottom: none; }
+    .font-spec-meta {
+      display: flex;
+      align-items: baseline;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.55rem;
+    }
+    .font-spec-n {
+      font-family: var(--font-mono);
+      font-size: 0.5rem;
+      letter-spacing: 0.14em;
+      color: var(--lavender);
+      flex-shrink: 0;
+    }
+    .font-spec-name {
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.08em;
+      color: var(--text);
+    }
+    .font-spec-role {
+      font-family: var(--font-mono);
+      font-size: 0.5rem;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .font-spec-cssvar {
+      font-family: var(--font-mono);
+      font-size: 0.5rem;
+      letter-spacing: 0.06em;
+      color: var(--lavender);
+      margin-left: auto;
+    }
+    .font-spec-sample {
+      font-size: 1.2rem;
+      line-height: 1.2;
+      color: var(--accent-strong);
+      margin-bottom: 0.6rem;
+    }
+    .font-spec-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+    .font-spec-code {
+      font-family: var(--font-mono);
+      font-size: 0.5rem;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      background: color-mix(in srgb, var(--rule) 40%, transparent);
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+    .copy-btn {
+      font-family: var(--font-mono);
+      font-size: 0.5rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: none;
+      border: 1px solid var(--rule);
+      padding: 4px 10px;
+      border-radius: 100px;
+      cursor: pointer;
+      transition: color 0.15s ease, border-color 0.15s ease;
+    }
+    .copy-btn:hover { color: var(--accent-strong); border-color: var(--accent); }
+    .copy-btn.copied { color: var(--accent-deep); border-color: var(--accent-deep); }
+
+    /* ── palettes tab ────────────────────────────────────── */
+    .pal-card {
+      padding: 1rem;
+      border-radius: 12px;
+      border: 1px solid var(--rule);
+      background: color-mix(in srgb, var(--surface) 40%, transparent);
+      margin-bottom: 0.7rem;
+    }
+    .pal-card:last-child { margin-bottom: 0; }
+    .pal-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.8rem;
+      flex-wrap: wrap;
+    }
+    .pal-name {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 1.2rem;
+      font-weight: 300;
+      color: var(--accent-strong);
+    }
+    .pal-desc {
+      font-family: var(--font-mono);
+      font-size: 0.5rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      opacity: 0.7;
+    }
+    .pal-swatches {
+      display: flex;
+      gap: 0.3rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.7rem;
+    }
+    .pal-swatch {
+      width: 24px; height: 24px;
+      border-radius: 5px;
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+    .pal-preview {
+      font-family: var(--font-body);
+      font-size: 0.78rem;
+      line-height: 1.6;
+      color: var(--text);
+      border-top: 1px solid var(--rule);
+      padding-top: 0.65rem;
+    }
+
+    /* ── motifs tab ──────────────────────────────────────── */
+    .motif-card {
+      display: flex;
+      gap: 0.85rem;
+      align-items: center;
+      padding: 0.75rem;
+      border-radius: 12px;
+      border: 1px solid var(--rule);
+      background: color-mix(in srgb, var(--surface) 40%, transparent);
+      margin-bottom: 0.6rem;
+    }
+    .motif-card:last-child { margin-bottom: 0; }
+    .motif-card-canvas {
+      position: relative;
+      width: 100px;
+      height: 72px;
+      border-radius: 8px;
+      overflow: hidden;
+      flex-shrink: 0;
+      background: var(--bg);
+    }
+    .motif-card-canvas .motif-grain {
+      position: absolute; inset: 0;
+      opacity: 0; pointer-events: none;
+    }
+    .motif-card-canvas .motif-blob {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 0;
+      animation: motif-drift 22s ease-in-out infinite alternate;
+    }
+    /* blobs preview */
+    .motif-card-canvas.preview-blobs .motif-grain { opacity: 0.06; }
+    .motif-card-canvas.preview-blobs .motif-blob { opacity: 0.55; filter: blur(18px); }
+    .motif-card-canvas.preview-blobs .motif-blob-1 { width: 65px; height: 65px; background: var(--lavender); top: -20px; left: -15px; }
+    .motif-card-canvas.preview-blobs .motif-blob-2 { width: 48px; height: 48px; background: var(--aqua); bottom: -12px; right: -10px; animation-delay: -6s; }
+    .motif-card-canvas.preview-blobs .motif-blob-3 { width: 36px; height: 36px; background: var(--peach); top: 45%; left: 52%; animation-delay: -11s; }
+    .motif-card-canvas.preview-blobs .motif-blob-4 { width: 32px; height: 32px; background: var(--lilac); bottom: 22%; left: 6%; animation-delay: -4s; }
+    /* aurora preview */
+    .motif-card-canvas.preview-aurora .motif-blob { opacity: 0.65; filter: blur(24px); border-radius: 40%; animation-name: motif-aurora-sweep; animation-duration: 38s; animation-timing-function: linear; }
+    .motif-card-canvas.preview-aurora .motif-blob-1 { width: 140%; height: 65px; background: var(--lavender); top: -18px; left: -20%; }
+    .motif-card-canvas.preview-aurora .motif-blob-2 { width: 110%; height: 50px; background: var(--aqua); bottom: 4%; right: -10%; animation-delay: -16s; }
+    .motif-card-canvas.preview-aurora .motif-blob-3 { width: 95%; height: 42px; background: var(--lilac); top: 38%; left: 5%; animation-delay: -8s; }
+    .motif-card-canvas.preview-aurora .motif-blob-4 { width: 0; height: 0; }
+    /* mist preview */
+    .motif-card-canvas.preview-mist .motif-grain { opacity: 0.08; }
+    .motif-card-canvas.preview-mist .motif-blob { filter: blur(10px); }
+    .motif-card-canvas.preview-mist .motif-blob-1 { width: 28px; height: 28px; background: var(--lavender); top: 14%; left: 8%; animation: motif-mist-1 18s ease-in-out infinite; }
+    .motif-card-canvas.preview-mist .motif-blob-2 { width: 24px; height: 24px; background: var(--aqua); top: 60%; right: 12%; animation: motif-mist-2 24s ease-in-out infinite; }
+    .motif-card-canvas.preview-mist .motif-blob-3 { width: 20px; height: 20px; background: var(--peach); bottom: 18%; left: 42%; animation: motif-mist-3 20s ease-in-out infinite; }
+    .motif-card-canvas.preview-mist .motif-blob-4 { width: 18px; height: 18px; background: var(--lilac); top: 38%; left: 56%; animation: motif-mist-4 15s ease-in-out infinite; }
+    /* paper preview */
+    .motif-card-canvas.preview-paper .motif-grain { opacity: 0.10; }
+    /* clean preview — nothing */
+
+    .motif-card-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      flex: 1;
+      min-width: 0;
+    }
+    .motif-card-name {
+      font-family: var(--font-display);
+      font-size: 1.05rem;
+      font-style: italic;
+      font-weight: 300;
+      color: var(--accent-strong);
+    }
+    .motif-card-desc {
+      font-family: var(--font-mono);
+      font-size: 0.5rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      opacity: 0.75;
+    }
+    .motif-use-btn {
+      margin-top: 0.5rem;
+      align-self: flex-start;
+      font-family: var(--font-mono);
+      font-size: 0.5rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: none;
+      border: 1px solid var(--rule);
+      padding: 4px 10px;
+      border-radius: 100px;
+      cursor: pointer;
+      transition: color 0.15s ease, border-color 0.15s ease;
+    }
+    .motif-use-btn:hover { color: var(--accent-strong); border-color: var(--accent); }
+
+    /* ── responsive ──────────────────────────────────────── */
+    @media (max-width: 860px) {
+      body { overflow: auto; }
+      .hygge-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto;
+        height: auto;
+      }
+      .canvas-wrap {
+        min-height: 55vh;
+        overflow: visible;
+      }
+      .panel {
+        height: 65vh;
+        border-left: none;
+        border-top: 1px solid var(--rule);
+      }
+    }
+    @media (max-width: 480px) {
+      .font-picks { grid-template-columns: 1fr; }
+      .panel { height: 70vh; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body class="motif-blobs">
+
+  <!-- motif scaffold -->
+  <div class="motif-grain"></div>
+  <div class="motif-blob motif-blob-1"></div>
+  <div class="motif-blob motif-blob-2"></div>
+  <div class="motif-blob motif-blob-3"></div>
+  <div class="motif-blob motif-blob-4"></div>
+
+  <!-- topbar -->
+  <header class="topbar">
+    <a href="/" class="topbar-brand">.space</a>
+    <span class="topbar-sep">·</span>
+    <span class="topbar-label">hygge</span>
+    <div class="topbar-right">
+      <div class="topbar-clock">
+        <span id="clock-date"></span>
+        <span class="clock-sep">·</span>
+        <span id="clock-time"></span>
+      </div>
+    </div>
+    <div class="topbar-shimmer motif-shimmer-line"></div>
+  </header>
+
+  <!-- main layout -->
+  <div class="hygge-layout">
+
+    <!-- live canvas -->
+    <main class="canvas-wrap">
+      <div class="canvas" id="canvas">
+        <p class="canvas-eyebrow" id="canvas-label">cream · blobs · classic</p>
+        <h1 class="canvas-h1">a quiet morning, somewhere.</h1>
+        <h2 class="canvas-h2">notes from the margin</h2>
+        <p class="canvas-p">here is the thing about light: it arrives without announcing itself. you notice it only after, the way you notice a song was playing only once it stops.</p>
+        <ul class="canvas-ul">
+          <li>the first draft is always wrong</li>
+          <li>the second draft is where you find what you meant</li>
+          <li>the third is the one you send</li>
+        </ul>
+        <blockquote class="canvas-bq">so much depends, still, on what you noticed first.</blockquote>
+      </div>
+    </main>
+
+    <!-- control panel -->
+    <aside class="panel">
+      <nav class="panel-tabs">
+        <button class="ptab active" data-tab="playground">playground</button>
+        <button class="ptab" data-tab="fonts">fonts</button>
+        <button class="ptab" data-tab="palettes">palettes</button>
+        <button class="ptab" data-tab="motifs">motifs</button>
+      </nav>
+
+      <div class="panel-body">
+
+        <!-- Tab: Playground -->
+        <div class="pane" id="pane-playground">
+          <div class="ctrl-section">
+            <p class="ctrl-label">palette</p>
+            <div class="palette-swatches" id="palette-swatches"></div>
+          </div>
+          <div class="ctrl-section">
+            <p class="ctrl-label">motif</p>
+            <div class="motif-picks" id="motif-picks"></div>
+          </div>
+          <div class="ctrl-section">
+            <p class="ctrl-label">font pairing</p>
+            <div class="font-picks" id="font-picks"></div>
+          </div>
+          <div class="ctrl-cta">
+            <a class="write-btn" id="write-btn" href="/write">write with this theme &rarr;</a>
+          </div>
+        </div>
+
+        <!-- Tab: Fonts -->
+        <div class="pane hidden" id="pane-fonts">
+          <div id="font-specimens"></div>
+        </div>
+
+        <!-- Tab: Palettes -->
+        <div class="pane hidden" id="pane-palettes">
+          <div id="palette-list"></div>
+        </div>
+
+        <!-- Tab: Motifs -->
+        <div class="pane hidden" id="pane-motifs">
+          <div id="motif-list"></div>
+        </div>
+
+      </div>
+    </aside>
+  </div>
+
+  <script type="module">
+    import { palettes, motifs, fontPairs } from '/shared/library.js';
+
+    /* ── font full list (not in library.js) ── */
+    const FONTS_FULL = [
+      { n: 1,  name: 'Cormorant Garamond', role: 'display serif',      cssVar: '--font-display',   italic: true,  specimen: 'The woodles space — ideas in motion.',     google: 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&display=swap' },
+      { n: 2,  name: 'Fraunces',           role: 'optical serif',      cssVar: '--font-optical',   italic: false, specimen: 'A question worth keeping.',                 google: 'https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;1,9..144,400&display=swap' },
+      { n: 3,  name: 'Lora',               role: 'body serif',         cssVar: '--font-body',      italic: false, specimen: 'Knowledge, tools, and small living systems.',google: 'https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400;1,500&display=swap' },
+      { n: 4,  name: 'Plus Jakarta Sans',  role: 'humanist sans',      cssVar: '--font-sans',      italic: false, specimen: 'woodles · personal monorepo',               google: 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap' },
+      { n: 5,  name: 'Space Grotesk',      role: 'geometric sans',     cssVar: '--font-geometric', italic: false, specimen: 'something is taking shape',                 google: 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&display=swap' },
+      { n: 6,  name: 'DM Mono',            role: 'monospace',          cssVar: '--font-mono',      italic: false, specimen: 'returning shortly · z winters',             google: 'https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap' },
+      { n: 7,  name: 'IM Fell DW Pica',   role: 'historic italic',    cssVar: '--font-fell',      italic: true,  specimen: 'the echoes of a question kept.',            google: 'https://fonts.googleapis.com/css2?family=IM+Fell+DW+Pica:ital@0;1&display=swap' },
+      { n: 8,  name: 'Datatype',           role: 'data display',       cssVar: '--font-data',      italic: false, specimen: 'input / output · observer_os',              google: 'https://fonts.googleapis.com/css2?family=Datatype&display=swap' },
+      { n: 9,  name: 'Amarna',             role: 'archival display',   cssVar: '--font-ancient',   italic: false, specimen: 'woodles archive',                           google: 'https://fonts.googleapis.com/css2?family=Amarna&display=swap' },
+      { n: 10, name: 'Coral Pixels',       role: 'pixel display',      cssVar: '--font-pixel',     italic: false, specimen: 'pixel · space · 8bit woodles',              google: 'https://fonts.googleapis.com/css2?family=Coral+Pixels&display=swap' },
+      { n: 11, name: 'Special Gothic',     role: 'condensed gothic',   cssVar: '--font-gothic',    italic: false, specimen: 'WOODLES · OBSERVER OS',                    google: 'https://fonts.googleapis.com/css2?family=Special+Gothic+Condensed+One&display=swap' },
+      { n: 12, name: 'Kalnia Glaze',       role: 'decorative display', cssVar: '--font-glaze',     italic: false, specimen: 'article eater · glaze',                    google: 'https://fonts.googleapis.com/css2?family=Kalnia+Glaze:wght@100;200;300;400;500;600;700&display=swap' },
+    ];
+
+    /* ── palette preview blurbs ── */
+    const PALETTE_PREVIEWS = {
+      cream:      'headings in lapis, body in deep plum on warm paper-white. accents come in waves — lavender, aqua, peach, lilac.',
+      dawn:       'soft pinks and warm gold for morning pages, half-formed thoughts, the kind of letter you write before coffee.',
+      dusk:       'same vocabulary, lower light. accents recede into the dark; muted text is the rule, not the exception.',
+      midnight:   'true dark with electric edges. for the 3 a.m. draft you might delete by morning, or might not.',
+      forest:     'moss and bark on parchment. for nature notes, slow observation, the long sentence about a single tree.',
+      terracotta: 'clay and ochre, mediterranean afternoon. for travelogues, memoir, the postcard you never sent.',
+      inkwell:    'the formal letterhead. dark blue paper, bone ink, gilt accents. when the occasion calls for it.',
+      typewriter: 'sepia and aged ink. for the manuscript feel — every word looking older than it is, by ten minutes.',
+      paper:      'no color. ink on paper. the muted line is a soft gray. for when the work should carry the room.',
+    };
+
+    const SWATCH_KEYS = ['bg', 'text', 'muted', 'lavender', 'aqua', 'peach', 'lilac', 'lapis', 'plum'];
+
+    /* ── state ── */
+    let activePalette = 'cream';
+    let activeMotif   = 'blobs';
+    let activeFont    = 'classic';
+
+    const html   = document.documentElement;
+    const body   = document.body;
+    const canvas = document.getElementById('canvas');
+
+    /* ── apply current state to page ── */
+    function applyState() {
+      html.dataset.theme = activePalette;
+
+      const cls = [...body.classList].filter(c => !c.startsWith('motif-'));
+      body.className = cls.join(' ') + ' motif-' + activeMotif;
+
+      const pair = fontPairs.find(f => f.id === activeFont) || fontPairs[0];
+      canvas.style.setProperty('--cv-display', pair.display);
+      canvas.style.setProperty('--cv-body', pair.body);
+
+      document.getElementById('canvas-label').textContent =
+        activePalette + ' · ' + activeMotif + ' · ' + activeFont;
+
+      document.getElementById('write-btn').href =
+        '/write?palette=' + activePalette + '&motif=' + activeMotif + '&font=' + activeFont;
+
+      updatePickerActive();
+    }
+
+    function updatePickerActive() {
+      document.querySelectorAll('.theme-swatch').forEach(el =>
+        el.classList.toggle('active', el.dataset.palette === activePalette));
+      document.querySelectorAll('.motif-pick').forEach(el =>
+        el.classList.toggle('active', el.dataset.motif === activeMotif));
+      document.querySelectorAll('.font-pick').forEach(el =>
+        el.classList.toggle('active', el.dataset.font === activeFont));
+    }
+
+    /* ── render playground controls ── */
+    function renderPlayground() {
+      const palEl = document.getElementById('palette-swatches');
+      palEl.innerHTML = palettes.map(p =>
+        '<button class="theme-swatch" data-palette="' + p.id + '" data-theme="' + p.id + '" title="' + p.desc + '">' +
+          '<div class="swatch-dot"></div>' +
+          '<span>' + p.name + '</span>' +
+        '</button>'
+      ).join('');
+      palEl.querySelectorAll('.theme-swatch').forEach(btn =>
+        btn.addEventListener('click', () => { activePalette = btn.dataset.palette; applyState(); }));
+
+      const motEl = document.getElementById('motif-picks');
+      motEl.innerHTML = motifs.map(m =>
+        '<button class="motif-pick" data-motif="' + m.id + '">' +
+          '<span class="motif-pick-name">' + m.name + '</span>' +
+          '<span class="motif-pick-desc">' + m.desc + '</span>' +
+        '</button>'
+      ).join('');
+      motEl.querySelectorAll('.motif-pick').forEach(btn =>
+        btn.addEventListener('click', () => { activeMotif = btn.dataset.motif; applyState(); }));
+
+      const fntEl = document.getElementById('font-picks');
+      fntEl.innerHTML = fontPairs.map(f =>
+        '<button class="font-pick" data-font="' + f.id + '">' +
+          '<span class="font-pick-name">' + f.name + '</span>' +
+          '<span class="font-pick-desc">' + f.desc + '</span>' +
+        '</button>'
+      ).join('');
+      fntEl.querySelectorAll('.font-pick').forEach(btn =>
+        btn.addEventListener('click', () => { activeFont = btn.dataset.font; applyState(); }));
+    }
+
+    /* ── render fonts tab ── */
+    function renderFonts() {
+      const container = document.getElementById('font-specimens');
+      container.innerHTML = FONTS_FULL.map(f => {
+        const n = String(f.n).padStart(2, '0');
+        const style = 'font-family: var(' + f.cssVar + ');' + (f.italic ? ' font-style: italic;' : '');
+        return '<div class="font-spec">' +
+          '<div class="font-spec-meta">' +
+            '<span class="font-spec-n">' + n + '</span>' +
+            '<span class="font-spec-name">' + f.name + '</span>' +
+            '<span class="font-spec-role">' + f.role + '</span>' +
+            '<span class="font-spec-cssvar">' + f.cssVar + '</span>' +
+          '</div>' +
+          '<div class="font-spec-sample" style="' + style + '">' + f.specimen + '</div>' +
+          '<div class="font-spec-actions">' +
+            '<code class="font-spec-code">font-family: var(' + f.cssVar + ');</code>' +
+            '<button class="copy-btn" data-url="' + f.google + '">copy import</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      container.querySelectorAll('.copy-btn').forEach(btn =>
+        btn.addEventListener('click', () => {
+          const snippet = '<link rel="stylesheet" href="' + btn.dataset.url + '">';
+          navigator.clipboard.writeText(snippet).then(() => {
+            btn.textContent = 'copied';
+            btn.classList.add('copied');
+            setTimeout(() => { btn.textContent = 'copy import'; btn.classList.remove('copied'); }, 2000);
+          });
+        }));
+    }
+
+    /* ── render palettes tab ── */
+    function renderPalettes() {
+      const container = document.getElementById('palette-list');
+      container.innerHTML = palettes.map(p =>
+        '<div class="pal-card" data-theme="' + p.id + '">' +
+          '<div class="pal-head">' +
+            '<span class="pal-name">' + p.name + '</span>' +
+            '<span class="pal-desc">' + p.desc + '</span>' +
+          '</div>' +
+          '<div class="pal-swatches" id="hpswatches-' + p.id + '"></div>' +
+          '<p class="pal-preview">' + (PALETTE_PREVIEWS[p.id] || '') + '</p>' +
+        '</div>'
+      ).join('');
+
+      palettes.forEach(p => {
+        const card = container.querySelector('[data-theme="' + p.id + '"]');
+        const target = document.getElementById('hpswatches-' + p.id);
+        if (!card || !target) return;
+        target.innerHTML = SWATCH_KEYS.map(k => {
+          const hex = getComputedStyle(card).getPropertyValue('--' + k).trim();
+          return '<div class="pal-swatch" title="' + k + ': ' + hex + '" style="background:' + hex + '"></div>';
+        }).join('');
+      });
+    }
+
+    /* ── render motifs tab ── */
+    function renderMotifs() {
+      const container = document.getElementById('motif-list');
+      container.innerHTML = motifs.map(m =>
+        '<div class="motif-card">' +
+          '<div class="motif-card-canvas preview-' + m.id + '">' +
+            '<div class="motif-grain"></div>' +
+            '<div class="motif-blob motif-blob-1"></div>' +
+            '<div class="motif-blob motif-blob-2"></div>' +
+            '<div class="motif-blob motif-blob-3"></div>' +
+            '<div class="motif-blob motif-blob-4"></div>' +
+          '</div>' +
+          '<div class="motif-card-info">' +
+            '<span class="motif-card-name">' + m.name + '</span>' +
+            '<span class="motif-card-desc">' + m.desc + '</span>' +
+            '<button class="motif-use-btn" data-motif="' + m.id + '">use this</button>' +
+          '</div>' +
+        '</div>'
+      ).join('');
+
+      container.querySelectorAll('.motif-use-btn').forEach(btn =>
+        btn.addEventListener('click', () => {
+          activeMotif = btn.dataset.motif;
+          applyState();
+          activateTab('playground');
+        }));
+    }
+
+    /* ── tab switching ── */
+    function activateTab(tabId) {
+      document.querySelectorAll('.ptab').forEach(t =>
+        t.classList.toggle('active', t.dataset.tab === tabId));
+      document.querySelectorAll('.pane').forEach(p =>
+        p.classList.toggle('hidden', p.id !== 'pane-' + tabId));
+    }
+    document.querySelectorAll('.ptab').forEach(tab =>
+      tab.addEventListener('click', () => activateTab(tab.dataset.tab)));
+
+    /* ── clock ── */
+    const DAYS   = ['sun','mon','tue','wed','thu','fri','sat'];
+    const MONTHS = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+    const pad = n => String(n).padStart(2, '0');
+    function tick() {
+      const now = new Date();
+      document.getElementById('clock-date').textContent =
+        DAYS[now.getDay()] + ' ' + pad(now.getDate()) + ' ' + MONTHS[now.getMonth()];
+      document.getElementById('clock-time').textContent =
+        pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+    }
+    tick();
+    setInterval(tick, 1000);
+
+    /* ── init ── */
+    renderPlayground();
+    renderFonts();
+    renderPalettes();
+    renderMotifs();
+    applyState();
+  </script>
+
+</body>
+</html>
