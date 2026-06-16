@@ -3,6 +3,7 @@
 	import { domainDef, rarityDef } from '$lib/content/domains';
 	import { capacities, arc } from '$lib/content/stats';
 	import { defaultCardStyle, cardStyleAttr } from '$lib/cardstyle';
+	import StatusOverlay from './StatusOverlay.svelte';
 
 	let { creature, interactive = false }: { creature: Creature; interactive?: boolean } = $props();
 
@@ -13,7 +14,18 @@
 	let displayName = $derived(creature.name.trim() || 'Unnamed Creature');
 	let typeLine = $derived(creature.kind.trim() ? `Creature — ${creature.kind.trim()}` : 'Creature');
 	let foil = $derived(creature.rarity === 'rare' || creature.rarity === 'mythic');
-	let styleAttr = $derived(cardStyleAttr(style, domain.colorVar, rarity.colorVar));
+
+	// the cold condition (0–10) drives the snow/frost/ice overlay; past 6 it also
+	// blends the plate toward ice via --cold-shift (0 at cold 6 → 1 at cold 10).
+	let cold = $derived(creature.status?.cold ?? 0);
+	let coldShift = $derived(cold <= 6 ? 0 : Math.min(1, (cold - 6) / 4));
+
+	// the art window, handed to the overlay so it can size & place the ice layers
+	let artEl = $state<HTMLElement | null>(null);
+
+	let styleAttr = $derived(
+		`${cardStyleAttr(style, domain.colorVar, rarity.colorVar)}; --cold-shift: ${coldShift}`
+	);
 </script>
 
 <article
@@ -30,7 +42,7 @@
 		</header>
 
 		<!-- art window -->
-		<div class="art" class:empty={!creature.sprite}>
+		<div class="art" class:empty={!creature.sprite} bind:this={artEl}>
 			{#if creature.sprite}
 				<img
 					src={creature.sprite}
@@ -109,6 +121,10 @@
 				{creature.power}<span class="slash">/</span>{creature.toughness}
 			</span>
 		</footer>
+
+		<!-- status conditions: the cold overlay (snow / frost / ice), measured
+		     against the art window. Hidden entirely when the creature is unafflicted. -->
+		<StatusOverlay {cold} seed={creature.id} {artEl} />
 	</div>
 
 	<!-- decorative overlays: texture, then finish, above content, never interactive -->
@@ -123,7 +139,17 @@
 		width: 100%;
 		aspect-ratio: 63 / 88;
 		border-radius: var(--card-radius);
-		/* the frame: a domain-tinted plate under a gilt edge */
+		/* the frame: a domain-tinted plate under a gilt edge. cardstyle hands us
+		   --plate-base; here we wash it toward ice as the creature freezes, the
+		   oklch mix keeping every domain colour believable (capped near 40% so
+		   even a fully-frozen card still reads as itself). --cold-shift is 0 for
+		   any creature below cold 6, where this leaves --plate-base untouched. */
+		--plate: linear-gradient(
+				160deg,
+				color-mix(in oklch, #cdeefb calc(var(--cold-shift, 0) * 40%), transparent) 0%,
+				color-mix(in oklch, #bfe6f5 calc(var(--cold-shift, 0) * 40%), transparent) 100%
+			),
+			var(--plate-base);
 		background: var(--plate);
 		box-shadow: var(--b-shadow-card);
 		border: var(--card-border-w) solid var(--card-border-color);

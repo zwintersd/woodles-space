@@ -33,8 +33,8 @@ describe('cardCssVars', () => {
 		expect(v['--card-radius']).toBe('18px');
 		expect(v['--title-font']).toBe('var(--b-font-codex)');
 		expect(v['--title-color']).toBe('var(--b-text)');
-		expect(v['--plate']).toContain('color-mix');
-		expect(v['--plate']).toContain('22%');
+		expect(v['--plate-base']).toContain('color-mix');
+		expect(v['--plate-base']).toContain('22%');
 	});
 	it('uses a custom accent, plate, border and title colour', () => {
 		const v = cardCssVars(
@@ -52,7 +52,7 @@ describe('cardCssVars', () => {
 			'--b-temporal'
 		);
 		expect(v['--domain']).toBe('#abcdef');
-		expect(v['--plate']).toBe('linear-gradient(160deg, #111111, #222222)');
+		expect(v['--plate-base']).toBe('linear-gradient(160deg, #111111, #222222)');
 		expect(v['--card-border-color']).toBe('#333333');
 		expect(v['--title-color']).toBe('#eeeeee');
 	});
@@ -62,7 +62,7 @@ describe('cardCssVars', () => {
 	});
 	it('rounds the tint into a percentage', () => {
 		const v = cardCssVars(base({ tint: 0.5 }), '--b-temporal');
-		expect(v['--plate']).toContain('50%');
+		expect(v['--plate-base']).toContain('50%');
 	});
 });
 

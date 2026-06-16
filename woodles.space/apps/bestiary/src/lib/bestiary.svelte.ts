@@ -12,7 +12,7 @@ import { rarities, type Rarity } from './content/domains';
 import type { CoreStat, Substat } from './content/stats';
 import { migrateComposition, type Composition } from './composer';
 import { normalizeCardStyle, defaultCardStyle, type CardStyle } from './cardstyle';
-import { uid, now, clampInt } from './utils';
+import { uid, now, clampInt, clampStatus } from './utils';
 import {
 	blankCreature,
 	isUntouched,
@@ -31,6 +31,7 @@ function normalizeCreature(raw: Creature): Creature {
 	return {
 		...raw,
 		stats: raw.stats ?? defaultStats(),
+		status: raw.status ?? {},
 		composition: raw.composition ? migrateComposition(raw.composition) : null,
 		cardStyle: raw.cardStyle ? normalizeCardStyle(raw.cardStyle) : null
 	};
@@ -324,6 +325,22 @@ export class Bestiary {
 		if (value === null) delete next[sub];
 		else next[sub] = clampInt(value, 0, 10);
 		this.updateCreature(id, { stats: { ...c.stats, substats: next } });
+	}
+
+	// ── status conditions ──────────────────────────────────────────
+	// Set one keyed status intensity (e.g. cold) on a creature, clamped to
+	// 0–10. Zero is "no longer afflicted", so the key is dropped to keep the map
+	// clean. No UI wires here yet — the card overlay reads `status.cold`, and
+	// this is the tidy door future benches (burning, cursed…) will call.
+
+	setStatus(id: string, key: string, value: number): void {
+		const c = this.creatures.find((x) => x.id === id);
+		if (!c) return;
+		const v = clampStatus(value);
+		const status = { ...(c.status ?? {}) };
+		if (v === 0) delete status[key];
+		else status[key] = v;
+		this.updateCreature(id, { status });
 	}
 
 	// Copy a card as a new draft — handy for variants of one creature.

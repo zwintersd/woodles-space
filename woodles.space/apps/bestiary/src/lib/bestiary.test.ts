@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampInt } from './utils';
+import { clampInt, clampStatus } from './utils';
 import { domainDef, rarityDef, domains, rarities } from './content/domains';
 import {
 	blankCreature,
@@ -42,6 +42,21 @@ describe('clampInt', () => {
 	});
 });
 
+describe('clampStatus', () => {
+	it('clamps into 0–10', () => {
+		expect(clampStatus(5)).toBe(5);
+		expect(clampStatus(-2)).toBe(0);
+		expect(clampStatus(99)).toBe(10);
+	});
+	it('keeps one decimal of precision', () => {
+		expect(clampStatus(6.44)).toBe(6.4);
+		expect(clampStatus(7.06)).toBe(7.1);
+	});
+	it('treats NaN as off', () => {
+		expect(clampStatus(NaN)).toBe(0);
+	});
+});
+
 describe('domain & rarity lookups', () => {
 	it('has five domains and four rarities', () => {
 		expect(domains).toHaveLength(5);
@@ -74,6 +89,9 @@ describe('blankCreature', () => {
 	});
 	it('mints a unique id each time', () => {
 		expect(blankCreature().id).not.toBe(blankCreature().id);
+	});
+	it('starts unafflicted — an empty status map', () => {
+		expect(blankCreature().status).toEqual({});
 	});
 });
 

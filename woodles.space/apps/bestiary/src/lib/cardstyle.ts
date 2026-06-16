@@ -252,7 +252,9 @@ export function cardCssVars(style: CardStyle, domainVar: string): Record<string,
 				: 'var(--b-text)';
 	return {
 		'--domain': accent,
-		'--plate': plate,
+		// the *uncold* plate. CreatureCard derives the live `--plate` from this,
+		// blending it toward ice as `--cold-shift` rises (see its card styles).
+		'--plate-base': plate,
 		'--card-border-color': border,
 		'--card-border-w': `${clampRange(style.borderWidth, 0, BORDER_MAX, 1)}px`,
 		'--card-radius': `${clampRange(style.radius, 0, RADIUS_MAX, 18)}px`,
