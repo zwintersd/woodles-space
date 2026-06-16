@@ -25,6 +25,7 @@ import {
 	OFFLINE_CAP_SECONDS
 } from './tuning';
 import { load, save, wipe, type BookSave } from './persist';
+import { getBestiaryCreatures, type BestiaryCreature } from './bestiaryDb';
 
 // observation stages
 export const STAGE_NOTICED = 0; // it has emerged; she has not looked yet
@@ -78,6 +79,49 @@ export class Book {
 
 	// transient — surfaced once after a return, then dismissed
 	offlineReport = $state<OfflineReport | null>(null);
+
+	// ── bestiary integration ─────────────────────────────────────────────────
+	// Cached snapshot of creatures from the Bestiary app (same-origin IndexedDB).
+	// Refreshed on page focus so edits in Bestiary are reflected promptly.
+	bestiaryCreatures = $state<BestiaryCreature[]>([]);
+	// Maps Marginalia life ID → Bestiary creature ID. Persisted in the book save.
+	spriteBindings = $state<Record<string, string>>({});
+
+	async refreshBestiaryCreatures(): Promise<void> {
+		this.bestiaryCreatures = await getBestiaryCreatures();
+		// drop any bindings whose target creature has since been deleted
+		const ids = new Set(this.bestiaryCreatures.map((c) => c.id));
+		const cleaned: Record<string, string> = {};
+		let changed = false;
+		for (const [lifeId, creatureId] of Object.entries(this.spriteBindings)) {
+			if (ids.has(creatureId)) {
+				cleaned[lifeId] = creatureId;
+			} else {
+				changed = true;
+			}
+		}
+		if (changed) {
+			this.spriteBindings = cleaned;
+			this.persist();
+		}
+	}
+
+	setSpriteBinding(lifeId: string, creatureId: string | null): void {
+		const next = { ...this.spriteBindings };
+		if (creatureId === null) {
+			delete next[lifeId];
+		} else {
+			next[lifeId] = creatureId;
+		}
+		this.spriteBindings = next;
+		this.persist();
+	}
+
+	boundCreatureFor(lifeId: string): BestiaryCreature | null {
+		const creatureId = this.spriteBindings[lifeId];
+		if (!creatureId) return null;
+		return this.bestiaryCreatures.find((c) => c.id === creatureId) ?? null;
+	}
 
 	// ── reading room — "reading alongside Brianna" (a side feature) ──────────
 	readingMsTowardNextPoint = $state(0);
@@ -398,6 +442,7 @@ export class Book {
 			readingCompletedStars: this.readingCompletedStars,
 			readingCumulativeMs: this.readingCumulativeMs,
 			readingCumulativeWords: this.readingCumulativeWords,
+			spriteBindings: { ...this.spriteBindings },
 			lastSeen: Date.now()
 		};
 	}
@@ -420,6 +465,7 @@ export class Book {
 		this.readingCompletedStars = s.readingCompletedStars;
 		this.readingCumulativeMs = s.readingCumulativeMs;
 		this.readingCumulativeWords = s.readingCumulativeWords;
+		this.spriteBindings = { ...(s.spriteBindings ?? {}) };
 	}
 
 	hydrate() {
@@ -455,6 +501,8 @@ export class Book {
 		this.readingCompletedStars = 0;
 		this.readingCumulativeMs = 0;
 		this.readingCumulativeWords = 0;
+		this.spriteBindings = {};
+		this.bestiaryCreatures = [];
 	}
 }
 

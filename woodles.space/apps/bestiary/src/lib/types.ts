@@ -29,6 +29,10 @@ export type Creature = {
 	// the editable layer stack behind the sprite, when it was built in the studio.
 	// absent for plain uploads and pre-studio cards — sprite is then the whole art.
 	composition?: Composition | null;
+	// isolated creature sprite: the creature layer(s) only, cropped and on a
+	// transparent background. set by the studio on save. absent/null means the
+	// composition has no creature layers, or the card predates this field.
+	isolatedSprite?: string | null;
 	// the card's chosen look. absent/null = the house default frame.
 	cardStyle?: CardStyle | null;
 	// color identity — which kind of condition it emerged from

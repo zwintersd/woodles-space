@@ -21,6 +21,7 @@ import {
 	rarityCounts,
 	defaultStats
 } from './collection';
+import { seedCreatures } from './seed';
 import { idbAvailable, idbGet, idbSet } from './idb';
 
 // Older creatures in storage predate the stat block (and, later, the studio
@@ -33,7 +34,8 @@ function normalizeCreature(raw: Creature): Creature {
 		stats: raw.stats ?? defaultStats(),
 		status: raw.status ?? {},
 		composition: raw.composition ? migrateComposition(raw.composition) : null,
-		cardStyle: raw.cardStyle ? normalizeCardStyle(raw.cardStyle) : null
+		cardStyle: raw.cardStyle ? normalizeCardStyle(raw.cardStyle) : null,
+		isolatedSprite: raw.isolatedSprite ?? null
 	};
 }
 
@@ -134,6 +136,11 @@ export class Bestiary {
 		// A sync rehydrate may have set authoritative state while we were reading;
 		// if so, don't clobber it or merge stale local cards back in.
 		if (this.#hydrated) return;
+
+		// Seed with initial creatures if the bestiary is empty
+		if (loaded.length === 0) {
+			loaded = seedCreatures();
+		}
 
 		const normalized = loaded.map(normalizeCreature);
 		const seen = new Set(this.creatures.map((c) => c.id));
@@ -280,8 +287,15 @@ export class Bestiary {
 	// Commit studio art: the flattened composite becomes the sprite, the layer
 	// stack rides along so the studio can reopen exactly where it left off.
 	// Composited art is smooth, so the pixelated card flag is cleared.
-	setComposition(id: string, composition: Composition, flattened: string): void {
-		this.updateCreature(id, { sprite: flattened, composition, pixelated: false });
+	// isolatedSprite is the creature-only crop for Marginalia; null if no
+	// creature layers were present in the composition.
+	setComposition(
+		id: string,
+		composition: Composition,
+		flattened: string,
+		isolatedSprite: string | null
+	): void {
+		this.updateCreature(id, { sprite: flattened, composition, pixelated: false, isolatedSprite });
 	}
 
 	clearSprite(id: string): void {

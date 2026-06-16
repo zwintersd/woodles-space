@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { StudioState } from '$lib/studio.svelte';
-	import { renderComposition } from '$lib/render';
+	import { renderComposition, renderIsolatedCreature } from '$lib/render';
 	import type { Composition } from '$lib/composer';
 	import type { Creature } from '$lib/types';
 	import StudioStage from './StudioStage.svelte';
@@ -16,7 +16,7 @@
 	}: {
 		initial: Composition;
 		creature: Creature;
-		onsave: (comp: Composition, dataUrl: string) => void;
+		onsave: (comp: Composition, dataUrl: string, isolatedDataUrl: string | null) => void;
 		onclose: () => void;
 	} = $props();
 
@@ -45,8 +45,11 @@
 		saveError = null;
 		try {
 			const comp = $state.snapshot(studio.comp) as Composition;
-			const dataUrl = await renderComposition(comp);
-			onsave(comp, dataUrl);
+			const [dataUrl, isolatedDataUrl] = await Promise.all([
+				renderComposition(comp),
+				renderIsolatedCreature(comp)
+			]);
+			onsave(comp, dataUrl, isolatedDataUrl);
 		} catch {
 			saveError = 'could not render the art — try removing a layer';
 			saving = false;
