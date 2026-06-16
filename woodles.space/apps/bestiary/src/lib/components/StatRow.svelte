@@ -15,13 +15,24 @@
 	let hasSubstats = $derived(core.substats.length > 0);
 
 	let open = $state(false);
+	let rowEl = $state<HTMLElement | null>(null);
 
 	function step(delta: number) {
 		bestiary.setCoreStat(creatureId, core.id, value + delta);
 	}
+
+	$effect(() => {
+		if (!rowEl) return;
+		function onwheel(e: WheelEvent) {
+			e.preventDefault();
+			step(e.deltaY < 0 ? 1 : -1);
+		}
+		rowEl.addEventListener('wheel', onwheel, { passive: false });
+		return () => rowEl!.removeEventListener('wheel', onwheel);
+	});
 </script>
 
-<div class="row" style="--c: var({core.colorVar})">
+<div class="row" bind:this={rowEl} style="--c: var({core.colorVar})">
 	<div class="lead">
 		<span class="glyph" aria-hidden="true">{core.glyph}</span>
 		<span class="name">{core.name}</span>
@@ -40,7 +51,11 @@
 		<button type="button" onclick={() => step(1)} aria-label="more {core.name}">+</button>
 	</div>
 
-	<StatBar {value} colorVar={core.colorVar} />
+	<StatBar
+		{value}
+		colorVar={core.colorVar}
+		onpick={(n) => bestiary.setCoreStat(creatureId, core.id, n)}
+	/>
 
 	{#if hasSubstats}
 		<button

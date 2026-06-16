@@ -14,6 +14,7 @@
 
 	let value = $derived(effectiveSubstat(stats, sub.id));
 	let overridden = $derived(isSubstatOverridden(stats, sub.id));
+	let rowEl = $state<HTMLElement | null>(null);
 
 	function step(delta: number) {
 		bestiary.setSubstat(creatureId, sub.id, value + delta);
@@ -21,9 +22,19 @@
 	function reset() {
 		bestiary.setSubstat(creatureId, sub.id, null);
 	}
+
+	$effect(() => {
+		if (!rowEl) return;
+		function onwheel(e: WheelEvent) {
+			e.preventDefault();
+			step(e.deltaY < 0 ? 1 : -1);
+		}
+		rowEl.addEventListener('wheel', onwheel, { passive: false });
+		return () => rowEl!.removeEventListener('wheel', onwheel);
+	});
 </script>
 
-<div class="sub" class:overridden style="--c: var({colorVar})">
+<div class="sub" class:overridden bind:this={rowEl} style="--c: var({colorVar})">
 	<span class="dot" aria-hidden="true"></span>
 	<span class="name" title={sub.note}>{sub.name}</span>
 	<div class="stepper" class:authored={overridden}>
@@ -38,7 +49,11 @@
 		/>
 		<button type="button" onclick={() => step(1)} aria-label="more {sub.name}">+</button>
 	</div>
-	<StatBar {value} {colorVar} />
+	<StatBar
+		{value}
+		{colorVar}
+		onpick={(n) => bestiary.setSubstat(creatureId, sub.id, n)}
+	/>
 	{#if overridden}
 		<button type="button" class="reset" onclick={reset} title="reset to its core value">↺ reset</button>
 	{/if}
