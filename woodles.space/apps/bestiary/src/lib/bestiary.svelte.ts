@@ -21,6 +21,7 @@ import {
 	rarityCounts,
 	defaultStats
 } from './collection';
+import { seedCreatures } from './seed';
 import { idbAvailable, idbGet, idbSet } from './idb';
 
 // Older creatures in storage predate the stat block (and, later, the studio
@@ -135,6 +136,11 @@ export class Bestiary {
 		// A sync rehydrate may have set authoritative state while we were reading;
 		// if so, don't clobber it or merge stale local cards back in.
 		if (this.#hydrated) return;
+
+		// Seed with initial creatures if the bestiary is empty
+		if (loaded.length === 0) {
+			loaded = seedCreatures();
+		}
 
 		const normalized = loaded.map(normalizeCreature);
 		const seen = new Set(this.creatures.map((c) => c.id));
