@@ -61,7 +61,9 @@
 		fontPairs,
 		templates,
 		findTemplate,
-		findFont
+		findFont,
+		findPalette,
+		findMotif
 	} from '@shared/library.js';
 
 	const LAYER_IDS: LayerId[] = ['foreground', 'midground', 'background'];
@@ -231,6 +233,17 @@
 		const tid = params.get('template');
 		const replyId = params.get('reply');
 
+		// Hygge design playground passes ?palette=&motif=&font= to pre-style the editor.
+		const hyggeParams = {
+			palette: params.get('palette'),
+			motif:   params.get('motif'),
+			font:    params.get('font'),
+		};
+		const hasHyggeStyle = hyggeParams.palette || hyggeParams.motif || hyggeParams.font;
+		if (hasHyggeStyle) {
+			history.replaceState(null, '', window.location.pathname);
+		}
+
 		if (tid) {
 			const t = findTemplate(tid);
 			if (t) {
@@ -242,7 +255,6 @@
 					content: t.sampleContent
 				});
 				updateMeta();
-				history.replaceState(null, '', window.location.pathname);
 				hydrated = true;
 				scheduleSave();
 				scheduleMeasure();
@@ -273,6 +285,14 @@
 				// ignore corrupt drafts
 			}
 		}
+
+		// Apply hygge-sourced style overrides after any draft is loaded.
+		if (hasHyggeStyle) {
+			if (hyggeParams.palette && findPalette(hyggeParams.palette).id === hyggeParams.palette) theme = hyggeParams.palette;
+			if (hyggeParams.motif   && findMotif(hyggeParams.motif).id   === hyggeParams.motif)   motif = hyggeParams.motif;
+			if (hyggeParams.font    && findFont(hyggeParams.font).id      === hyggeParams.font)    font  = hyggeParams.font;
+		}
+
 		updateMeta();
 		hydrated = true;
 		scheduleMeasure();
