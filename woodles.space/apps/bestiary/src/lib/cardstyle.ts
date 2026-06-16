@@ -8,7 +8,7 @@
 // plain string/value functions, unit-tested without a DOM.
 
 export type FrameStyle = 'classic' | 'fullart' | 'borderless' | 'minimal' | 'cinema';
-export type Finish = 'matte' | 'gloss' | 'foil' | 'rainbow' | 'glow';
+export type Finish = 'matte' | 'gloss' | 'foil' | 'rainbow' | 'glow' | 'sparkle' | 'holo';
 export type TextBox = 'parchment' | 'ghost' | 'ink' | 'none';
 export type CardFont = 'codex' | 'display' | 'body' | 'mono' | 'pixel';
 export type Texture = 'none' | 'paper' | 'linen' | 'grain' | 'noise';
@@ -66,7 +66,9 @@ export const FINISHES: { id: Finish; name: string }[] = [
 	{ id: 'gloss', name: 'gloss' },
 	{ id: 'foil', name: 'foil' },
 	{ id: 'rainbow', name: 'rainbow' },
-	{ id: 'glow', name: 'glow' }
+	{ id: 'glow', name: 'glow' },
+	{ id: 'sparkle', name: 'sparkle' },
+	{ id: 'holo', name: 'holo' }
 ];
 
 export const TEXT_BOXES: { id: TextBox; name: string }[] = [

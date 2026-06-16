@@ -4,6 +4,7 @@
 	import { capacities, arc } from '$lib/content/stats';
 	import { defaultCardStyle, cardStyleAttr } from '$lib/cardstyle';
 	import StatusOverlay from './StatusOverlay.svelte';
+	import FinishOverlay from './FinishOverlay.svelte';
 
 	let { creature, interactive = false }: { creature: Creature; interactive?: boolean } = $props();
 
@@ -130,6 +131,13 @@
 	<!-- decorative overlays: texture, then finish, above content, never interactive -->
 	<div class="texture" aria-hidden="true"></div>
 	<div class="finish-layer" aria-hidden="true"></div>
+	{#if style.finish === 'sparkle' || style.finish === 'holo'}
+		<FinishOverlay
+			finish={style.finish as 'sparkle' | 'holo'}
+			intensity={style.finishIntensity}
+			creatureId={creature.id}
+		/>
+	{/if}
 </article>
 
 <style>
@@ -154,6 +162,7 @@
 		box-shadow: var(--b-shadow-card);
 		border: var(--card-border-w) solid var(--card-border-color);
 		overflow: hidden;
+		isolation: isolate;
 		user-select: none;
 	}
 
