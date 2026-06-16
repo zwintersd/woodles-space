@@ -21,6 +21,7 @@
 	</div>
 
 	<div class="bottom">
+		<a class="margin-link" href="/" title="back to woodles.space">← woodles.space</a>
 		<a class="margin-link" href="/marginalia" title="where creatures are discovered">
 			↩ marginalia
 		</a>

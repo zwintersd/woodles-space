@@ -45,6 +45,7 @@
 	</div>
 
 	<div class="sidebar-bottom">
+		<a class="home-link" href="/" title="back to woodles.space">← woodles.space</a>
 		<button
 			class="spell-btn"
 			class:active={isSpell}
@@ -164,6 +165,15 @@
 		flex-direction: column;
 		gap: var(--g-space-sm);
 	}
+
+	.home-link {
+		font-family: var(--g-font-mono);
+		font-size: 0.74rem;
+		color: var(--g-text-dim);
+		text-decoration: none;
+		transition: color var(--g-transition-fast);
+	}
+	.home-link:hover { color: var(--g-flight); }
 
 	.spell-btn {
 		font-family: var(--g-font-mono);

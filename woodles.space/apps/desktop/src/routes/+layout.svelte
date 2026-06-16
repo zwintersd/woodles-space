@@ -6,7 +6,9 @@
 	<div class="desktop">
 		{@render children()}
 	</div>
-	<div class="taskbar"></div>
+	<div class="taskbar">
+		<a href="/" class="taskbar-home">← woodles.space</a>
+	</div>
 </div>
 
 <style>
@@ -28,5 +30,18 @@
 		height: 48px;
 		width: 100%;
 		background: rgba(201, 191, 238, 0.4);
+		display: flex;
+		align-items: center;
+		padding: 0 1rem;
 	}
+
+	.taskbar-home {
+		font-family: 'DM Mono', monospace;
+		font-size: 0.72rem;
+		letter-spacing: 0.1em;
+		color: rgba(90, 74, 122, 0.7);
+		text-decoration: none;
+		transition: color 0.2s;
+	}
+	.taskbar-home:hover { color: rgba(90, 74, 122, 1); }
 </style>
