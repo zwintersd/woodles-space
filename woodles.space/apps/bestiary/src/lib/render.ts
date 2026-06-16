@@ -120,6 +120,93 @@ export async function renderComposition(comp: Composition): Promise<string> {
 	return out;
 }
 
+// ── isolated creature render ──────────────────────────────────────────
+// Draws only layers flagged isCreature === true onto a fresh transparent canvas,
+// forces blend mode to source-over (non-normal blends break on transparency),
+// then crops and scales the result down to ISOLATED_MAX_PX on its longest side.
+// Returns a data URL, or null if the composition has no creature layers.
+
+const ISOLATED_MAX_PX = 256;
+
+export async function renderIsolatedCreature(comp: Composition): Promise<string | null> {
+	const creatureLayers = comp.layers.filter(
+		(l): l is ImageLayer => l.kind === 'image' && !l.hidden && l.isCreature === true
+	);
+	if (creatureLayers.length === 0) return null;
+
+	const canvas = document.createElement('canvas');
+	canvas.width = comp.width;
+	canvas.height = comp.height;
+	const ctx = canvas.getContext('2d');
+	if (!ctx) return null;
+
+	const bitmaps = new Map<string, HTMLImageElement>();
+	await Promise.all(
+		creatureLayers.map(async (l) => {
+			const src = l.outline
+				? await bakeOutline(l.src, l.naturalW, l.naturalH, l.outline)
+				: l.src;
+			bitmaps.set(l.id, await loadImage(src));
+		})
+	);
+
+	for (const layer of creatureLayers) {
+		if (layer.opacity <= 0) continue;
+		const img = bitmaps.get(layer.id);
+		if (!img) continue;
+		ctx.save();
+		ctx.globalAlpha = layer.opacity;
+		ctx.globalCompositeOperation = 'source-over'; // non-normal breaks on transparency
+		const blurPx = layer.blur * comp.width;
+		ctx.filter = cssFilter(layer.filters, blurPx);
+		drawImageLayer(ctx, layer, img, comp.width, comp.height);
+		ctx.restore();
+	}
+
+	return cropAndScaleCanvas(canvas);
+}
+
+// Crop to the bounding box of non-transparent pixels and scale down so the
+// longest side is at most ISOLATED_MAX_PX. Returns null if fully transparent.
+function cropAndScaleCanvas(canvas: HTMLCanvasElement): string | null {
+	const ctx = canvas.getContext('2d');
+	if (!ctx) return null;
+	const { width, height } = canvas;
+	const data = ctx.getImageData(0, 0, width, height).data;
+
+	let minX = width, minY = height, maxX = -1, maxY = -1;
+	for (let y = 0; y < height; y++) {
+		for (let x = 0; x < width; x++) {
+			if (data[(y * width + x) * 4 + 3] > 0) {
+				if (x < minX) minX = x;
+				if (x > maxX) maxX = x;
+				if (y < minY) minY = y;
+				if (y > maxY) maxY = y;
+			}
+		}
+	}
+	if (maxX < 0) return null;
+
+	const cropW = maxX - minX + 1;
+	const cropH = maxY - minY + 1;
+	const longest = Math.max(cropW, cropH);
+	const scale = longest > ISOLATED_MAX_PX ? ISOLATED_MAX_PX / longest : 1;
+	const outW = Math.max(1, Math.round(cropW * scale));
+	const outH = Math.max(1, Math.round(cropH * scale));
+
+	const out = document.createElement('canvas');
+	out.width = outW;
+	out.height = outH;
+	const outCtx = out.getContext('2d');
+	if (!outCtx) return null;
+	outCtx.imageSmoothingEnabled = true;
+	outCtx.drawImage(canvas, minX, minY, cropW, cropH, 0, 0, outW, outH);
+
+	let result = out.toDataURL('image/webp', 0.9);
+	if (!result.startsWith('data:image/webp')) result = out.toDataURL('image/png');
+	return result;
+}
+
 // ── upload → layer source ─────────────────────────────────────────────
 // A dropped/chosen image becomes a layer source: downscaled so the stored
 // composition stays light, with its (downscaled) natural size and a pixel-art
