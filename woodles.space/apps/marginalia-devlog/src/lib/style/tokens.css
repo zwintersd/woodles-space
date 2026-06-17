@@ -1,0 +1,83 @@
+/* marginalia devlog · twilight webcore design tokens
+   Pixel Reliquary × Decoden Nocturne
+   Scoped to .devlog-root */
+
+.devlog-root {
+	/* ── surfaces: deep night ──────────────────────────────────────── */
+	--d-bg:        #0b0919;   /* void behind the stars */
+	--d-surface:   #130e24;   /* the reliquary shelf */
+	--d-surface-2: #1b1535;   /* raised panel */
+	--d-surface-3: #231d42;   /* card face */
+	--d-surface-4: #2c2552;   /* hovered card */
+
+	/* ── ink: pale lavender ────────────────────────────────────────── */
+	--d-text:      #e2d8f5;
+	--d-text-dim:  #8e80b8;
+	--d-text-faint:#5c5180;
+	--d-placeholder: #4a4168;
+
+	/* ── borders ───────────────────────────────────────────────────── */
+	--d-border:       rgba(180, 140, 255, 0.14);
+	--d-border-mid:   rgba(180, 140, 255, 0.28);
+	--d-border-glow:  rgba(180, 140, 255, 0.50);
+
+	/* ── accent: primary interactive ──────────────────────────────── */
+	--d-accent:       #b899f5;   /* lavender-violet */
+	--d-accent-soft:  rgba(184, 153, 245, 0.18);
+	--d-accent-glow:  rgba(184, 153, 245, 0.35);
+	--d-on-accent:    #0b0919;
+
+	/* ── block type colors ─────────────────────────────────────────── */
+	--d-creature:   #c07ef5;   /* violet — the written beast */
+	--d-biome:      #7ae8d8;   /* aqua — the world-terrain */
+	--d-ability:    #f07aae;   /* rose — the power exercised */
+	--d-stat:       #f5c76e;   /* amber — the measured quality */
+	--d-minigame:   #7ab8f5;   /* sky — the played loop */
+	--d-lore:       #c5a87a;   /* parchment — the recorded past */
+	--d-prose:      #8e80b8;   /* muted lavender — the freeform voice */
+
+	/* softened variants for backgrounds */
+	--d-creature-soft:  rgba(192, 126, 245, 0.12);
+	--d-biome-soft:     rgba(122, 232, 216, 0.10);
+	--d-ability-soft:   rgba(240, 122, 174, 0.10);
+	--d-stat-soft:      rgba(245, 199, 110, 0.10);
+	--d-minigame-soft:  rgba(122, 184, 245, 0.10);
+	--d-lore-soft:      rgba(197, 168, 122, 0.10);
+
+	/* ── typography ────────────────────────────────────────────────── */
+	--d-font-display: var(--font-display, 'Cormorant Garamond', Georgia, serif);
+	--d-font-body:    var(--font-body, 'Lora', Georgia, serif);
+	--d-font-mono:    var(--font-mono, 'DM Mono', 'Courier New', monospace);
+	--d-font-pixel:   var(--font-pixel, 'Coral Pixels', 'DM Mono', monospace);
+
+	/* ── spacing ───────────────────────────────────────────────────── */
+	--d-space-xs:  0.25rem;
+	--d-space-sm:  0.5rem;
+	--d-space-md:  1rem;
+	--d-space-lg:  1.75rem;
+	--d-space-xl:  2.5rem;
+	--d-space-2xl: 4rem;
+
+	/* ── radius ────────────────────────────────────────────────────── */
+	--d-radius-sm:  4px;
+	--d-radius-md:  8px;
+	--d-radius-lg:  14px;
+	--d-radius-pill: 100px;
+
+	/* ── z-index ───────────────────────────────────────────────────── */
+	--d-z-overlay: 50;
+	--d-z-picker:  40;
+	--d-z-panel:   30;
+
+	/* ── transitions ───────────────────────────────────────────────── */
+	--d-transition-fast:   0.12s ease;
+	--d-transition-medium: 0.22s ease;
+
+	/* ── shadows ───────────────────────────────────────────────────── */
+	--d-shadow-card:  0 4px 18px rgba(0, 0, 0, 0.45);
+	--d-shadow-glow:  0 0 0 1px var(--d-border-mid), 0 4px 18px rgba(0, 0, 0, 0.45);
+	--d-shadow-focus: 0 0 0 2px var(--d-accent-glow);
+
+	/* ── max content width ─────────────────────────────────────────── */
+	--d-max-width: 760px;
+}
