@@ -14,10 +14,12 @@
 
 		<button class="new" onclick={() => bestiary.newCreature()}>＋ new creature</button>
 
-		<p class="tally">
-			<span class="tally-num">{bestiary.total}</span>
-			<span class="tally-word">{bestiary.total === 1 ? 'creature' : 'creatures'}</span>
-		</p>
+		{#if bestiary.ready}
+			<p class="tally">
+				<span class="tally-num">{bestiary.total}</span>
+				<span class="tally-word">{bestiary.total === 1 ? 'creature' : 'creatures'}</span>
+			</p>
+		{/if}
 	</div>
 
 	<div class="bottom">

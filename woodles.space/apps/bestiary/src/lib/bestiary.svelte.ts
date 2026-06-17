@@ -90,6 +90,11 @@ export class Bestiary {
 		...load(SETTINGS_KEY, {} as Partial<BestiarySettings>)
 	});
 
+	// Resolves when the initial IDB load (or seed) is complete. External
+	// callers that must not race with hydration (e.g. sync) should await this.
+	readonly readyPromise: Promise<void>;
+	#resolveReady: () => void = () => {};
+
 	// Persistence bookkeeping. Until the initial load lands we don't write, so a
 	// stray early mutation can't clobber stored cards. Writes coalesce: a rapid
 	// burst of edits keeps only the latest snapshot, and the drain loop always
@@ -99,6 +104,9 @@ export class Bestiary {
 	#writing = false;
 
 	constructor() {
+		this.readyPromise = new Promise<void>((resolve) => {
+			this.#resolveReady = resolve;
+		});
 		void this.#hydrate();
 	}
 
@@ -147,6 +155,7 @@ export class Bestiary {
 		this.creatures = [...this.creatures, ...normalized.filter((c) => !seen.has(c.id))];
 		this.#hydrated = true;
 		this.ready = true;
+		this.#resolveReady();
 		// Seed IDB with the merged result (and persist any pre-hydrate edits).
 		this.#persistCreatures();
 	}
@@ -397,6 +406,7 @@ export class Bestiary {
 		// and the in-flight local load (if any) steps aside.
 		this.#hydrated = true;
 		this.ready = true;
+		this.#resolveReady();
 		this.#persistCreatures();
 		save(SETTINGS_KEY, this.settings);
 	}
