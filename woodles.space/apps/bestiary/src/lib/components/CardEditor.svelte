@@ -87,7 +87,8 @@
 						naturalH,
 						name: creature.name.trim() || 'sprite',
 						scale: coverScale(naturalW, naturalH),
-						smooth: !creature.pixelated
+						smooth: !creature.pixelated,
+						isCreature: true
 					})
 				];
 				studioInitial = comp;
@@ -100,8 +101,8 @@
 		studioOpen = true;
 	}
 
-	function handleStudioSave(comp: Composition, dataUrl: string) {
-		if (creature) bestiary.setComposition(creature.id, comp, dataUrl);
+	function handleStudioSave(comp: Composition, dataUrl: string, isolatedDataUrl: string | null) {
+		if (creature) bestiary.setComposition(creature.id, comp, dataUrl, isolatedDataUrl);
 		studioOpen = false;
 	}
 

@@ -59,8 +59,11 @@
 		palettes,
 		motifs as motifList,
 		fontPairs,
+		templates,
 		findTemplate,
-		findFont
+		findFont,
+		findPalette,
+		findMotif
 	} from '@shared/library.js';
 
 	const LAYER_IDS: LayerId[] = ['foreground', 'midground', 'background'];
@@ -230,6 +233,17 @@
 		const tid = params.get('template');
 		const replyId = params.get('reply');
 
+		// Hygge design playground passes ?palette=&motif=&font= to pre-style the editor.
+		const hyggeParams = {
+			palette: params.get('palette'),
+			motif:   params.get('motif'),
+			font:    params.get('font'),
+		};
+		const hasHyggeStyle = hyggeParams.palette || hyggeParams.motif || hyggeParams.font;
+		if (hasHyggeStyle) {
+			history.replaceState(null, '', window.location.pathname);
+		}
+
 		if (tid) {
 			const t = findTemplate(tid);
 			if (t) {
@@ -241,7 +255,6 @@
 					content: t.sampleContent
 				});
 				updateMeta();
-				history.replaceState(null, '', window.location.pathname);
 				hydrated = true;
 				scheduleSave();
 				scheduleMeasure();
@@ -272,6 +285,14 @@
 				// ignore corrupt drafts
 			}
 		}
+
+		// Apply hygge-sourced style overrides after any draft is loaded.
+		if (hasHyggeStyle) {
+			if (hyggeParams.palette && findPalette(hyggeParams.palette).id === hyggeParams.palette) theme = hyggeParams.palette;
+			if (hyggeParams.motif   && findMotif(hyggeParams.motif).id   === hyggeParams.motif)   motif = hyggeParams.motif;
+			if (hyggeParams.font    && findFont(hyggeParams.font).id      === hyggeParams.font)    font  = hyggeParams.font;
+		}
+
 		updateMeta();
 		hydrated = true;
 		scheduleMeasure();
@@ -794,6 +815,72 @@
 		noteEl?.focus();
 	}
 
+	async function onSelectTemplate(templateId: string) {
+		const t = findTemplate(templateId);
+		if (!t) return;
+
+		// Check if current draft is empty
+		const fgIsCurrentlyEmpty = isEmptyHtml(fgEl?.innerHTML ?? '');
+
+		if (fgIsCurrentlyEmpty) {
+			// Load directly into current draft
+			loadIntoLayers({
+				title: t.sampleTitle,
+				theme: t.palette,
+				motif: t.motif,
+				font: t.font,
+				content: t.sampleContent
+			});
+			updateMeta();
+			scheduleSave();
+		} else {
+			// Save current draft and create new one for template
+			clearTimeout(saveTimer);
+			const now = new Date().toISOString();
+			const draftData: DraftBody = {
+				title, theme, motif, font,
+				layers: {
+					foreground: { html: fgEl?.innerHTML ?? '', updatedAt: now },
+					midground: { html: mgEl?.innerHTML ?? '', updatedAt: now },
+					background: { html: bgEl?.innerHTML ?? '', updatedAt: now }
+				},
+				annotations: { pocketNotes: pockets, marginNotes },
+				content: fgEl?.innerHTML ?? '',
+				savedAt: now
+			};
+			if (currentDraftId) {
+				saveDraft(currentDraftId, draftData);
+			}
+
+			// Create new draft for template
+			const newId = createDraftId();
+			const newTime = new Date().toISOString();
+			draftsList = [{ id: newId, title: t.sampleTitle, updatedAt: newTime }, ...draftsList];
+			writeIndex(draftsList);
+			currentDraftId = newId;
+			setActiveDraftId(newId);
+
+			// Load template into new draft
+			title = t.sampleTitle;
+			theme = t.palette;
+			motif = t.motif;
+			font = t.font;
+			pockets = [];
+			marginNotes = [];
+			if (fgEl) fgEl.innerHTML = sanitizeHtml(t.sampleContent);
+			if (mgEl) mgEl.innerHTML = '';
+			if (bgEl) bgEl.innerHTML = '';
+			stampLiveAnchors();
+
+			updateMeta();
+			scheduleSave();
+		}
+
+		binderOpen = null;
+		await tick();
+		scheduleMeasure(60);
+	}
+
 </script>
 
 <div class="motif-grain"></div>
@@ -931,10 +1018,12 @@
 	bind:filter={pocketsFilter}
 	bind:order={pocketsOrder}
 	{marginEntries}
+	{templates}
 	onLayerGoto={gotoLayer}
 	onPocketGoto={gotoPocket}
 	onMarginGoto={gotoMarginNote}
 	onSelectTemplate={selectTemplate}
+	onSelectTemplate={onSelectTemplate}
 />
 
 <BottomBar

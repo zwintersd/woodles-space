@@ -22,6 +22,36 @@
 		const pace = l.studyEase >= 1.2 ? 'quick to know' : l.studyEase <= 0.8 ? 'slow to know' : 'even pace';
 		return `${rich} · ${pace}`;
 	}
+
+	// ── bestiary sprite binding ───────────────────────────────────────────────
+
+	let bindingPickerLife = $state<string | null>(null);
+
+	function openBindingPicker(lifeId: string) {
+		bindingPickerLife = bindingPickerLife === lifeId ? null : lifeId;
+	}
+
+	function bindCreature(lifeId: string, creatureId: string) {
+		book.setSpriteBinding(lifeId, creatureId);
+		bindingPickerLife = null;
+	}
+
+	function unbindCreature(lifeId: string) {
+		book.setSpriteBinding(lifeId, null);
+		bindingPickerLife = null;
+	}
+
+	// The sprite to show for a life: isolatedSprite first, fall back to sprite.
+	function creatureImageSrc(lifeId: string): string | null {
+		const c = book.boundCreatureFor(lifeId);
+		if (!c) return null;
+		return c.isolatedSprite ?? c.sprite ?? null;
+	}
+
+	function creatureIsPixelated(lifeId: string): boolean {
+		const c = book.boundCreatureFor(lifeId);
+		return c?.pixelated ?? false;
+	}
 </script>
 
 <div class="world">
@@ -75,7 +105,20 @@
 							{@const stage = book.stageOf(l.id)}
 							{@const known = stage >= STAGE_KNOWN}
 							{@const attending = book.isAttending(l.id)}
+							{@const boundSprite = creatureImageSrc(l.id)}
+							{@const boundPixelated = creatureIsPixelated(l.id)}
 							<article class="card" class:unlooked={stage === 0} class:attending class:known>
+								{#if boundSprite}
+									<div class="sprite-preview">
+										<img
+											src={boundSprite}
+											alt={book.boundCreatureFor(l.id)?.name ?? ''}
+											class="sprite-img"
+											class:pixelated={boundPixelated}
+										/>
+									</div>
+								{/if}
+
 								<div class="card-head">
 									<div class="naming">
 										<h4>{l.name}</h4>
@@ -131,6 +174,53 @@
 										she knows it now — enough to {domainVerb[l.domain]} it kindly.
 										<span class="soon">(intervention arrives in a later pass.)</span>
 									</p>
+								{/if}
+
+								{#if book.bestiaryCreatures.length > 0}
+									<div class="bind-row">
+										{#if book.spriteBindings[l.id]}
+											<span class="bind-name">
+												{book.boundCreatureFor(l.id)?.name ?? '—'}
+											</span>
+											<button class="bind-btn" onclick={() => openBindingPicker(l.id)}>
+												change
+											</button>
+											<button class="bind-btn danger" onclick={() => unbindCreature(l.id)}>
+												remove
+											</button>
+										{:else}
+											<button class="bind-btn" onclick={() => openBindingPicker(l.id)}>
+												bind creature sprite
+											</button>
+										{/if}
+									</div>
+
+									{#if bindingPickerLife === l.id}
+										<ul class="bind-picker">
+											{#each book.bestiaryCreatures as c (c.id)}
+												<li>
+													<button
+														class="pick-entry"
+														class:active={book.spriteBindings[l.id] === c.id}
+														onclick={() => bindCreature(l.id, c.id)}
+													>
+														{#if c.isolatedSprite ?? c.sprite}
+															<img
+																src={c.isolatedSprite ?? c.sprite ?? ''}
+																alt=""
+																class="pick-thumb"
+																class:pixelated={c.pixelated}
+															/>
+														{:else}
+															<span class="pick-thumb pick-thumb-empty">?</span>
+														{/if}
+														<span class="pick-name">{c.name || '(unnamed)'}</span>
+														<span class="pick-domain">{c.domain}</span>
+													</button>
+												</li>
+											{/each}
+										</ul>
+									{/if}
 								{/if}
 							</article>
 						{/each}
@@ -374,5 +464,126 @@
 	}
 	.soon {
 		color: var(--muted);
+	}
+
+	/* ── bestiary creature sprite ────────────────────────────────────────── */
+	.sprite-preview {
+		display: flex;
+		justify-content: center;
+		padding: 0.3rem 0;
+	}
+	.sprite-img {
+		max-width: 80px;
+		max-height: 80px;
+		object-fit: contain;
+		border-radius: 3px;
+	}
+	.sprite-img.pixelated {
+		image-rendering: pixelated;
+	}
+
+	/* ── binding controls ────────────────────────────────────────────────── */
+	.bind-row {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		flex-wrap: wrap;
+		padding-top: 0.2rem;
+		border-top: 1px solid var(--rule);
+		margin-top: 0.2rem;
+	}
+	.bind-name {
+		font-family: var(--font-ui);
+		font-size: 0.7rem;
+		color: var(--leafeon-pink);
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.bind-btn {
+		font-family: var(--font-ui);
+		font-size: 0.66rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		border: 1px solid var(--rule);
+		border-radius: 3px;
+		padding: 0.22rem 0.45rem;
+		color: var(--muted);
+		white-space: nowrap;
+	}
+	.bind-btn:hover {
+		border-color: var(--periwinkle);
+		color: var(--periwinkle);
+	}
+	.bind-btn.danger:hover {
+		border-color: var(--print-pink);
+		color: var(--print-pink);
+	}
+	.bind-picker {
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+		max-height: 180px;
+		overflow-y: auto;
+		border: 1px solid var(--rule);
+		border-radius: 3px;
+		background: var(--bg);
+		padding: 0.25rem;
+	}
+	.pick-entry {
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		width: 100%;
+		padding: 0.3rem 0.4rem;
+		border-radius: 3px;
+		text-align: left;
+		transition: background 80ms;
+	}
+	.pick-entry:hover {
+		background: var(--panel-accent);
+	}
+	.pick-entry.active {
+		background: var(--panel-accent);
+		outline: 1px solid var(--periwinkle);
+	}
+	.pick-thumb {
+		width: 32px;
+		height: 32px;
+		object-fit: contain;
+		border-radius: 2px;
+		flex-shrink: 0;
+	}
+	.pick-thumb.pixelated {
+		image-rendering: pixelated;
+	}
+	.pick-thumb-empty {
+		display: grid;
+		place-items: center;
+		background: var(--panel);
+		color: var(--muted);
+		font-family: var(--font-ui);
+		font-size: 0.9rem;
+	}
+	.pick-name {
+		font-family: var(--font-ui);
+		font-size: 0.76rem;
+		color: var(--cream);
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.pick-domain {
+		font-family: var(--font-ui);
+		font-size: 0.62rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--muted);
+		white-space: nowrap;
 	}
 </style>

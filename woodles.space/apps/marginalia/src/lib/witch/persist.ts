@@ -25,6 +25,10 @@ export interface BookSave {
 	readingCompletedStars: number;
 	readingCumulativeMs: number;
 	readingCumulativeWords: number;
+	// bestiary bindings: maps Marginalia life ID → Bestiary creature ID.
+	// when a bound creature is deleted from the Bestiary, the binding is
+	// dropped on next load so dead entries don't accumulate.
+	spriteBindings: Record<string, string>;
 	// wall-clock of the last save — drives offline progress
 	lastSeen: number;
 }
@@ -49,6 +53,7 @@ export function emptySave(): BookSave {
 		readingCompletedStars: 0,
 		readingCumulativeMs: 0,
 		readingCumulativeWords: 0,
+		spriteBindings: {},
 		lastSeen: Date.now()
 	};
 }

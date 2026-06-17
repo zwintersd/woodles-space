@@ -190,6 +190,10 @@ export type ImageLayer = LayerCommon & {
 	smooth: boolean; // false renders nearest-neighbour, for pixel art
 	filters: Filters;
 	outline: Outline | null;
+	// marks this layer as the creature itself (not backdrop or scenery).
+	// the isolated render pass draws only these layers onto a transparent
+	// canvas so Marginalia can show the creature without its scene.
+	isCreature?: boolean;
 };
 
 // Fills are full-bleed backdrops — no transform, just paint, blur, blend.
@@ -230,6 +234,7 @@ type ImageLayerInit = {
 	smooth?: boolean;
 	filters?: Filters;
 	outline?: Outline | null;
+	isCreature?: boolean;
 };
 
 export function createImageLayer(init: ImageLayerInit): ImageLayer {
@@ -252,7 +257,8 @@ export function createImageLayer(init: ImageLayerInit): ImageLayer {
 		flipY: init.flipY ?? false,
 		smooth: init.smooth ?? true,
 		filters: init.filters ?? defaultFilters(),
-		outline: init.outline ?? null
+		outline: init.outline ?? null,
+		isCreature: init.isCreature ?? false
 	};
 }
 
@@ -436,6 +442,14 @@ function normalizeLayer(raw: unknown): Layer | null {
 	}
 	if (l.kind === 'image') {
 		if (typeof l.src !== 'string') return null;
+		// Explicit boolean is respected. Otherwise fall back to the name:
+		// 'Sprite' / 'S' are the current convention; 'creature' is the legacy name.
+		const isCreature =
+			typeof l.isCreature === 'boolean'
+				? l.isCreature
+				: common.name.toLowerCase() === 'sprite' ||
+				  common.name.toLowerCase() === 's' ||
+				  common.name === 'creature';
 		return {
 			...common,
 			kind: 'image',
@@ -450,7 +464,8 @@ function normalizeLayer(raw: unknown): Layer | null {
 			flipY: l.flipY === true,
 			smooth: l.smooth !== false,
 			filters: normalizeFilters(l.filters),
-			outline: normalizeOutline(l.outline)
+			outline: normalizeOutline(l.outline),
+			isCreature
 		};
 	}
 	return null;

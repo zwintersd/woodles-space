@@ -21,6 +21,7 @@ import {
 	rarityCounts,
 	defaultStats
 } from './collection';
+import { seedCreatures } from './seed';
 import { idbAvailable, idbGet, idbSet } from './idb';
 
 // Older creatures in storage predate the stat block (and, later, the studio
@@ -33,7 +34,8 @@ function normalizeCreature(raw: Creature): Creature {
 		stats: raw.stats ?? defaultStats(),
 		status: raw.status ?? {},
 		composition: raw.composition ? migrateComposition(raw.composition) : null,
-		cardStyle: raw.cardStyle ? normalizeCardStyle(raw.cardStyle) : null
+		cardStyle: raw.cardStyle ? normalizeCardStyle(raw.cardStyle) : null,
+		isolatedSprite: raw.isolatedSprite ?? null
 	};
 }
 
@@ -88,6 +90,11 @@ export class Bestiary {
 		...load(SETTINGS_KEY, {} as Partial<BestiarySettings>)
 	});
 
+	// Resolves when the initial IDB load (or seed) is complete. External
+	// callers that must not race with hydration (e.g. sync) should await this.
+	readonly readyPromise: Promise<void>;
+	#resolveReady: () => void = () => {};
+
 	// Persistence bookkeeping. Until the initial load lands we don't write, so a
 	// stray early mutation can't clobber stored cards. Writes coalesce: a rapid
 	// burst of edits keeps only the latest snapshot, and the drain loop always
@@ -97,6 +104,9 @@ export class Bestiary {
 	#writing = false;
 
 	constructor() {
+		this.readyPromise = new Promise<void>((resolve) => {
+			this.#resolveReady = resolve;
+		});
 		void this.#hydrate();
 	}
 
@@ -135,11 +145,17 @@ export class Bestiary {
 		// if so, don't clobber it or merge stale local cards back in.
 		if (this.#hydrated) return;
 
+		// Seed with initial creatures if the bestiary is empty
+		if (loaded.length === 0) {
+			loaded = seedCreatures();
+		}
+
 		const normalized = loaded.map(normalizeCreature);
 		const seen = new Set(this.creatures.map((c) => c.id));
 		this.creatures = [...this.creatures, ...normalized.filter((c) => !seen.has(c.id))];
 		this.#hydrated = true;
 		this.ready = true;
+		this.#resolveReady();
 		// Seed IDB with the merged result (and persist any pre-hydrate edits).
 		this.#persistCreatures();
 	}
@@ -280,8 +296,15 @@ export class Bestiary {
 	// Commit studio art: the flattened composite becomes the sprite, the layer
 	// stack rides along so the studio can reopen exactly where it left off.
 	// Composited art is smooth, so the pixelated card flag is cleared.
-	setComposition(id: string, composition: Composition, flattened: string): void {
-		this.updateCreature(id, { sprite: flattened, composition, pixelated: false });
+	// isolatedSprite is the creature-only crop for Marginalia; null if no
+	// creature layers were present in the composition.
+	setComposition(
+		id: string,
+		composition: Composition,
+		flattened: string,
+		isolatedSprite: string | null
+	): void {
+		this.updateCreature(id, { sprite: flattened, composition, pixelated: false, isolatedSprite });
 	}
 
 	clearSprite(id: string): void {
@@ -383,6 +406,7 @@ export class Bestiary {
 		// and the in-flight local load (if any) steps aside.
 		this.#hydrated = true;
 		this.ready = true;
+		this.#resolveReady();
 		this.#persistCreatures();
 		save(SETTINGS_KEY, this.settings);
 	}

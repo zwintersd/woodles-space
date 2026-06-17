@@ -7,7 +7,7 @@
 	let { children } = $props();
 	let w = $derived(bestiary.workshop);
 
-	onMount(() => { initSync(); });
+	onMount(async () => { await bestiary.readyPromise; initSync(); });
 </script>
 
 <div class="bestiary-root" class:calm={w.calm} class:reduce-motion={w.reduceMotion}>
