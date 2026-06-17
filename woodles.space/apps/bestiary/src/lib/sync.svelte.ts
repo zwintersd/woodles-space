@@ -34,6 +34,11 @@ const synced = createSyncedStore<BestiaryBlob>({
 	},
 	write(blob: BestiaryBlob): void {
 		bestiary.rehydrate(blob);
+	},
+	isNewer(local: BestiaryBlob, remote: BestiaryBlob): boolean {
+		// If local has more creatures than the server, push up rather than clobber.
+		// Recovers from a server accidentally seeded with empty state.
+		return (local.creatures?.length ?? 0) > (remote.creatures?.length ?? 0);
 	}
 });
 
