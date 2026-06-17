@@ -10,6 +10,7 @@
 		type PocketNote,
 		type PocketsOrder
 	} from './types';
+	import { templates, findFont } from '@shared/library.js';
 
 	let {
 		open = $bindable(),
@@ -21,7 +22,8 @@
 		marginEntries,
 		onLayerGoto,
 		onPocketGoto,
-		onMarginGoto
+		onMarginGoto,
+		onSelectTemplate
 	}: {
 		open: BinderTab | null;
 		activeLayer: LayerId;
@@ -33,9 +35,10 @@
 		onLayerGoto: (layer: LayerId) => void;
 		onPocketGoto: (id: string, layer: PocketLayer) => void;
 		onMarginGoto: (id: string, anchorId: string) => void;
+		onSelectTemplate: (id: string) => void;
 	} = $props();
 
-	const TABS: BinderTab[] = ['layers', 'pockets', 'notes'];
+	const TABS: BinderTab[] = ['layers', 'pockets', 'notes', 'templates'];
 
 	const filteredPockets = $derived.by(() => {
 		const arr = filter === 'all' ? pockets : pockets.filter((p) => p.layer === filter);
@@ -169,6 +172,30 @@
 					</button>
 				{/each}
 			{/if}
+		</div>
+	{/if}
+
+	{#if open === 'templates'}
+		<header class="binder-header">
+			<span class="binder-header-eyebrow">binder</span>
+			<span class="binder-header-title">scaffolds · {templates.length}</span>
+		</header>
+		<div class="binder-body">
+			{#each templates as t (t.id)}
+				<button
+					class="binder-row template-row"
+					onclick={() => onSelectTemplate(t.id)}
+					title="use template '{t.name}'"
+				>
+					<span class="binder-row-head">
+						<span class="binder-row-name" style="font-family: {findFont(t.font).display}; font-style: italic;">{t.name}</span>
+						<span class="binder-row-meta">{t.font} · {t.palette}</span>
+					</span>
+					<span class="binder-row-preview">
+						{t.desc}
+					</span>
+				</button>
+			{/each}
 		</div>
 	{/if}
 </aside>

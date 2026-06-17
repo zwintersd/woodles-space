@@ -26,7 +26,7 @@ export function newId(prefix: string): string {
 	return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
 }
 
-export type BinderTab = 'layers' | 'pockets' | 'notes';
+export type BinderTab = 'layers' | 'pockets' | 'notes' | 'templates';
 
 export type LayerStat = {
 	id: LayerId;

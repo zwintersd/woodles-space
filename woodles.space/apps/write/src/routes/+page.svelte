@@ -466,6 +466,52 @@
 		loadDraft(id);
 	}
 
+	function selectTemplate(templateId: string) {
+		const t = findTemplate(templateId);
+		if (!t) return;
+
+		const mgEmpty = isEmptyHtml(mgEl?.innerHTML ?? '');
+		const bgEmpty = isEmptyHtml(bgEl?.innerHTML ?? '');
+		const currentDraftIsEmpty = fgIsEmpty && !title && mgEmpty && bgEmpty && pockets.length === 0 && marginNotes.length === 0;
+
+		if (!currentDraftIsEmpty) {
+			// Auto save current draft first
+			if (currentDraftId) {
+				const now = new Date().toISOString();
+				saveDraft(currentDraftId, {
+					title, theme, motif, font,
+					layers: {
+						foreground: { html: fgEl?.innerHTML ?? '', updatedAt: now },
+						midground: { html: mgEl?.innerHTML ?? '', updatedAt: now },
+						background: { html: bgEl?.innerHTML ?? '', updatedAt: now }
+					},
+					annotations: { pocketNotes: pockets, marginNotes },
+					content: fgEl?.innerHTML ?? '',
+					savedAt: now
+				});
+			}
+			const id = createDraftId();
+			const now = new Date().toISOString();
+			draftsList = [{ id, title: t.sampleTitle, updatedAt: now }, ...draftsList];
+			writeIndex(draftsList);
+			currentDraftId = id;
+			setActiveDraftId(id);
+		}
+
+		loadIntoLayers({
+			title: t.sampleTitle,
+			theme: t.palette,
+			motif: t.motif,
+			font: t.font,
+			content: t.sampleContent
+		});
+		updateMeta();
+		scheduleMeasure(60);
+		scheduleSave();
+
+		binderOpen = null;
+	}
+
 	function deleteDraft(id: string, e: Event) {
 		e.stopPropagation();
 		if (draftsList.length === 1 && id === currentDraftId) {
@@ -888,6 +934,7 @@
 	onLayerGoto={gotoLayer}
 	onPocketGoto={gotoPocket}
 	onMarginGoto={gotoMarginNote}
+	onSelectTemplate={selectTemplate}
 />
 
 <BottomBar
