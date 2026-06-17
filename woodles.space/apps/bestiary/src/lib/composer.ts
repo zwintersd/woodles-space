@@ -442,12 +442,14 @@ function normalizeLayer(raw: unknown): Layer | null {
 	}
 	if (l.kind === 'image') {
 		if (typeof l.src !== 'string') return null;
-		// migration: layers named 'creature' that predate the isCreature field
-		// are assumed to be the creature layer. explicit boolean is respected.
+		// Explicit boolean is respected. Otherwise fall back to the name:
+		// 'Sprite' / 'S' are the current convention; 'creature' is the legacy name.
 		const isCreature =
 			typeof l.isCreature === 'boolean'
 				? l.isCreature
-				: common.name === 'creature';
+				: common.name.toLowerCase() === 'sprite' ||
+				  common.name.toLowerCase() === 's' ||
+				  common.name === 'creature';
 		return {
 			...common,
 			kind: 'image',

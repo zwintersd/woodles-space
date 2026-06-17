@@ -37,27 +37,53 @@
 	let error = $state<string | null>(null);
 	let fileInput = $state<HTMLInputElement>();
 
+	type PendingUpload = { src: string; naturalW: number; naturalH: number; pixelated: boolean };
+	let pendingUpload = $state<PendingUpload | null>(null);
+	let pendingName = $state('Sprite');
+	let nameInput = $state<HTMLInputElement>();
+
 	async function addFile(file: File | undefined | null) {
 		if (!file) return;
 		busy = true;
 		error = null;
 		try {
 			const s = await layerSourceFromFile(file);
-			studio.addLayer(
-				createImageLayer({
-					src: s.src,
-					naturalW: s.naturalW,
-					naturalH: s.naturalH,
-					name: 'upload',
-					smooth: !s.pixelated
-				})
-			);
+			pendingUpload = { src: s.src, naturalW: s.naturalW, naturalH: s.naturalH, pixelated: s.pixelated };
+			pendingName = 'Sprite';
 		} catch (err) {
 			error = err instanceof RenderError ? err.message : 'could not add that image';
 		} finally {
 			busy = false;
 		}
 	}
+
+	function confirmAdd() {
+		if (!pendingUpload) return;
+		const name = pendingName.trim() || 'layer';
+		const isCreature = name.toLowerCase() === 's' || name.toLowerCase() === 'sprite';
+		studio.addLayer(
+			createImageLayer({
+				src: pendingUpload.src,
+				naturalW: pendingUpload.naturalW,
+				naturalH: pendingUpload.naturalH,
+				name,
+				smooth: !pendingUpload.pixelated,
+				isCreature
+			})
+		);
+		pendingUpload = null;
+		pendingName = 'Sprite';
+	}
+
+	function cancelAdd() {
+		pendingUpload = null;
+		pendingName = 'Sprite';
+		error = null;
+	}
+
+	$effect(() => {
+		if (pendingUpload) nameInput?.focus();
+	});
 
 	function onInputChange(e: Event) {
 		const input = e.currentTarget as HTMLInputElement;
@@ -143,33 +169,55 @@
 				{/each}
 			</div>
 		{:else if tab === 'upload'}
-			<button
-				type="button"
-				class="drop"
-				class:dragging
-				onclick={() => fileInput?.click()}
-				ondragover={(e) => {
-					e.preventDefault();
-					dragging = true;
-				}}
-				ondragleave={() => (dragging = false)}
-				ondrop={onDrop}
-			>
-				{#if busy}
-					<span class="drop-hint">reading…</span>
-				{:else}
-					<span class="drop-glyph">⬓</span>
-					<span class="drop-hint">drop an image, or click</span>
-					<span class="drop-sub">it lands as a new layer</span>
-				{/if}
-			</button>
-			{#if creatureSprite}
-				<button type="button" class="add-current" onclick={addCreatureSprite}>
-					+ add the card's current sprite
+			{#if pendingUpload}
+				<div class="name-step">
+					<p class="name-label">name this layer</p>
+					<input
+						bind:this={nameInput}
+						bind:value={pendingName}
+						class="name-input"
+						type="text"
+						placeholder="Sprite"
+						onkeydown={(e) => {
+							if (e.key === 'Enter') { e.preventDefault(); confirmAdd(); }
+							if (e.key === 'Escape') cancelAdd();
+						}}
+					/>
+					<p class="sprite-rule">must have a layer named <strong>Sprite</strong> or <strong>S</strong> for the isolated creature render</p>
+					<div class="name-actions">
+						<button type="button" class="name-cancel" onclick={cancelAdd}>cancel</button>
+						<button type="button" class="name-add" onclick={confirmAdd}>add layer</button>
+					</div>
+				</div>
+			{:else}
+				<button
+					type="button"
+					class="drop"
+					class:dragging
+					onclick={() => fileInput?.click()}
+					ondragover={(e) => {
+						e.preventDefault();
+						dragging = true;
+					}}
+					ondragleave={() => (dragging = false)}
+					ondrop={onDrop}
+				>
+					{#if busy}
+						<span class="drop-hint">reading…</span>
+					{:else}
+						<span class="drop-glyph">⬓</span>
+						<span class="drop-hint">drop an image, or click</span>
+						<span class="drop-sub">it lands as a new layer</span>
+					{/if}
 				</button>
+				{#if creatureSprite}
+					<button type="button" class="add-current" onclick={addCreatureSprite}>
+						+ add the card's current sprite
+					</button>
+				{/if}
+				{#if error}<p class="err">{error}</p>{/if}
+				<input bind:this={fileInput} type="file" accept="image/*" onchange={onInputChange} hidden />
 			{/if}
-			{#if error}<p class="err">{error}</p>{/if}
-			<input bind:this={fileInput} type="file" accept="image/*" onchange={onInputChange} hidden />
 		{:else if tab === 'overlay'}
 			<p class="tray-hint">light, weather, grain — stacked over the whole scene.</p>
 			{#each overlayGroups as g (g.id)}
@@ -317,4 +365,61 @@
 	}
 	.add-current:hover { border-color: var(--b-gold); color: var(--b-gold); }
 	.err { font-family: var(--b-font-mono); font-size: 0.72rem; color: var(--b-mythic); margin-top: var(--b-space-xs); }
+
+	.name-step {
+		display: flex;
+		flex-direction: column;
+		gap: var(--b-space-sm);
+	}
+	.name-label {
+		font-family: var(--b-font-mono);
+		font-size: 0.68rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--b-gold);
+	}
+	.name-input {
+		background: var(--b-surface-2);
+		border: 1px solid var(--b-border-strong);
+		border-radius: var(--b-radius-sm);
+		padding: 0.45rem 0.6rem;
+		color: var(--b-text);
+		font-family: var(--b-font-mono);
+		font-size: 0.86rem;
+		width: 100%;
+	}
+	.name-input:focus { border-color: var(--b-gold); outline: none; }
+	.sprite-rule {
+		font-family: var(--b-font-body);
+		font-size: 0.72rem;
+		color: var(--b-muted);
+		line-height: 1.4;
+	}
+	.sprite-rule strong { color: var(--b-text-dim); font-weight: 600; }
+	.name-actions {
+		display: flex;
+		gap: var(--b-space-xs);
+		justify-content: flex-end;
+	}
+	.name-cancel {
+		border: 1px solid var(--b-border);
+		border-radius: var(--b-radius-sm);
+		padding: 0.32rem 0.6rem;
+		font-family: var(--b-font-mono);
+		font-size: 0.72rem;
+		color: var(--b-muted);
+		transition: all var(--b-transition-fast);
+	}
+	.name-cancel:hover { color: var(--b-text-dim); border-color: var(--b-border-strong); }
+	.name-add {
+		background: var(--b-gold);
+		color: var(--b-on-accent);
+		border-radius: var(--b-radius-sm);
+		padding: 0.32rem 0.7rem;
+		font-family: var(--b-font-mono);
+		font-size: 0.72rem;
+		font-weight: 600;
+		transition: opacity var(--b-transition-fast);
+	}
+	.name-add:hover { opacity: 0.85; }
 </style>
