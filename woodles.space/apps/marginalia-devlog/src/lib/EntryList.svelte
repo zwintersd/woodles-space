@@ -63,7 +63,7 @@
 	<!-- header -->
 	<header class="list-header">
 		<div class="list-title">
-			<h1><span class="wordmark">marginalia devlog</span> <span class="wordmark-star">✦</span></h1>
+			<h1><span class="wordmark" data-text="marginalia devlog">marginalia devlog</span> <span class="wordmark-star">✦</span></h1>
 			<span class="list-subtitle">⋆ making the witch's world ⋆</span>
 		</div>
 
@@ -218,19 +218,44 @@
 		gap: 0.4rem;
 	}
 
-	/* holographic glaze on the wordmark */
+	/* holographic foil wordmark — a *static* deepened rainbow keeps every
+	   letter legible against the pale wash, while a gloss band sweeps across
+	   on top for the living, light-catching shimmer. */
 	.wordmark {
-		background: var(--d-holo);
-		background-size: 220% auto;
+		position: relative;
+		display: inline-block;
+		/* deepened, saturated stops — readable at every point, no shift */
+		background: linear-gradient(100deg, #c4459a, #7b4fe0, #3a72cf, #18998c, #b9842a, #c4459a);
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
 		color: transparent;
-		animation: holo-shift 9s ease-in-out infinite alternate;
+		/* gentle separation from the busy backdrop */
+		filter: drop-shadow(0 1px 1px rgba(91, 74, 120, 0.22));
 	}
-	@keyframes holo-shift {
-		0%   { background-position: 0% 50%; }
-		100% { background-position: 100% 50%; }
+	/* the gloss: bright pastel holo, masked to a narrow diagonal band that
+	   travels across the wordmark like foil catching the light */
+	.wordmark::after {
+		content: attr(data-text);
+		position: absolute;
+		inset: 0;
+		background: linear-gradient(100deg, #ffd9ec, #e7d2ff, #d2ecff, #d2fff0, #fff6d2, #ffd9ec);
+		-webkit-background-clip: text;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+		color: transparent;
+		-webkit-mask-image: linear-gradient(72deg, transparent 38%, #000 50%, transparent 62%);
+		mask-image: linear-gradient(72deg, transparent 38%, #000 50%, transparent 62%);
+		-webkit-mask-size: 280% 100%;
+		mask-size: 280% 100%;
+		-webkit-mask-repeat: no-repeat;
+		mask-repeat: no-repeat;
+		animation: foil-sweep 6.5s ease-in-out infinite;
+		pointer-events: none;
+	}
+	@keyframes foil-sweep {
+		0%        { -webkit-mask-position: 135% 0; mask-position: 135% 0; }
+		60%, 100% { -webkit-mask-position: -35% 0; mask-position: -35% 0; }
 	}
 
 	.wordmark-star {
@@ -245,7 +270,7 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.wordmark { animation: none; }
+		.wordmark::after { animation: none; opacity: 0; }
 		.wordmark-star { animation: none; opacity: 0.9; }
 	}
 
