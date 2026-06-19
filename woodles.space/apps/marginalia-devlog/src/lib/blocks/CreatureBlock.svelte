@@ -142,7 +142,7 @@
 	.field-textarea:focus {
 		outline: none;
 		border-color: var(--d-creature);
-		box-shadow: 0 0 0 2px rgba(192, 126, 245, 0.15);
+		box-shadow: 0 0 0 3px var(--d-creature-glow);
 	}
 	.field-input::placeholder,
 	.field-textarea::placeholder { color: var(--d-placeholder); }

@@ -63,8 +63,8 @@
 	<!-- header -->
 	<header class="list-header">
 		<div class="list-title">
-			<h1>marginalia devlog</h1>
-			<span class="list-subtitle">making the witch's world</span>
+			<h1><span class="wordmark">marginalia devlog</span> <span class="wordmark-star">✦</span></h1>
+			<span class="list-subtitle">⋆ making the witch's world ⋆</span>
 		</div>
 
 		<div class="header-actions">
@@ -209,11 +209,44 @@
 
 	.list-title h1 {
 		font-family: var(--d-font-display);
-		font-size: clamp(1.6rem, 4vw, 2.2rem);
+		font-size: clamp(1.7rem, 4vw, 2.4rem);
 		font-weight: 600;
-		color: var(--d-text);
 		line-height: 1.1;
 		letter-spacing: -0.01em;
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+
+	/* holographic glaze on the wordmark */
+	.wordmark {
+		background: var(--d-holo);
+		background-size: 220% auto;
+		-webkit-background-clip: text;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+		color: transparent;
+		animation: holo-shift 9s ease-in-out infinite alternate;
+	}
+	@keyframes holo-shift {
+		0%   { background-position: 0% 50%; }
+		100% { background-position: 100% 50%; }
+	}
+
+	.wordmark-star {
+		color: var(--d-accent);
+		font-size: 0.7em;
+		text-shadow: 0 0 10px var(--d-accent-glow);
+		animation: twinkle-star 4s ease-in-out infinite;
+	}
+	@keyframes twinkle-star {
+		0%, 100% { opacity: 0.5; transform: scale(0.9) rotate(0deg); }
+		50%      { opacity: 1; transform: scale(1.1) rotate(20deg); }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.wordmark { animation: none; }
+		.wordmark-star { animation: none; opacity: 0.9; }
 	}
 
 	.list-subtitle {
@@ -279,11 +312,14 @@
 
 	/* ── sync panel ─────────────────────────────────────────────────── */
 	.sync-panel {
-		background: var(--d-surface-2);
+		background: rgba(255, 255, 255, 0.7);
+		backdrop-filter: blur(10px) saturate(1.3);
+		-webkit-backdrop-filter: blur(10px) saturate(1.3);
 		border: 1px solid var(--d-border-mid);
-		border-radius: var(--d-radius-md);
+		border-radius: var(--d-radius-lg);
 		padding: var(--d-space-md);
 		margin-bottom: var(--d-space-lg);
+		box-shadow: var(--d-shadow-card);
 	}
 
 	.sync-status-row,
@@ -386,19 +422,22 @@
 		display: flex;
 		align-items: flex-start;
 		gap: var(--d-space-md);
-		background: var(--d-surface);
+		background: rgba(255, 255, 255, 0.66);
+		backdrop-filter: blur(8px) saturate(1.3);
+		-webkit-backdrop-filter: blur(8px) saturate(1.3);
 		border: 1px solid var(--d-border);
-		border-radius: var(--d-radius-md);
+		border-radius: var(--d-radius-lg);
 		padding: var(--d-space-md);
 		cursor: pointer;
 		transition: all var(--d-transition-fast);
 		text-align: left;
+		box-shadow: var(--d-shadow-card);
 	}
 	.entry-card:hover {
-		background: var(--d-surface-2);
+		background: rgba(255, 255, 255, 0.86);
 		border-color: var(--d-border-mid);
-		transform: translateY(-1px);
-		box-shadow: var(--d-shadow-card);
+		transform: translateY(-2px);
+		box-shadow: var(--d-shadow-hover);
 	}
 
 	.entry-card-main { flex: 1; min-width: 0; }
@@ -483,7 +522,9 @@
 		position: fixed;
 		inset: 0;
 		z-index: var(--d-z-overlay);
-		background: rgba(0, 0, 0, 0.5);
+		background: var(--d-scrim);
+		backdrop-filter: blur(3px);
+		-webkit-backdrop-filter: blur(3px);
 	}
 
 	.confirm-dialog {
@@ -492,13 +533,15 @@
 		left: 50%;
 		transform: translate(-50%, -50%);
 		z-index: calc(var(--d-z-overlay) + 1);
-		background: var(--d-surface-2);
+		background: rgba(255, 255, 255, 0.86);
+		backdrop-filter: blur(16px) saturate(1.4);
+		-webkit-backdrop-filter: blur(16px) saturate(1.4);
 		border: 1px solid var(--d-border-mid);
 		border-radius: var(--d-radius-lg);
 		padding: var(--d-space-lg);
 		min-width: 260px;
 		text-align: center;
-		box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+		box-shadow: var(--d-shadow-pop);
 	}
 
 	.confirm-text {
@@ -532,6 +575,6 @@
 		color: var(--d-ability);
 	}
 	.confirm-btn.danger:hover {
-		background: rgba(240, 122, 174, 0.15);
+		background: rgba(242, 132, 176, 0.16);
 	}
 </style>

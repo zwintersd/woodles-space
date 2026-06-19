@@ -136,7 +136,7 @@
 	.field-textarea:focus {
 		outline: none;
 		border-color: var(--d-lore);
-		box-shadow: 0 0 0 2px rgba(197, 168, 122, 0.15);
+		box-shadow: 0 0 0 3px var(--d-lore-glow);
 	}
 	.field-input::placeholder,
 	.field-textarea::placeholder { color: var(--d-placeholder); }
@@ -156,7 +156,7 @@
 		font-size: 11px;
 		color: var(--d-lore);
 		background: var(--d-lore-soft);
-		border: 1px solid rgba(197, 168, 122, 0.3);
+		border: 1px solid rgba(217, 154, 114, 0.32);
 	}
 	.tag-remove {
 		opacity: 0.6;

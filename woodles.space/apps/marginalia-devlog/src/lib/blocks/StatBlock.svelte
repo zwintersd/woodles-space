@@ -114,7 +114,7 @@
 	.field-textarea:focus {
 		outline: none;
 		border-color: var(--d-stat);
-		box-shadow: 0 0 0 2px rgba(245, 199, 110, 0.15);
+		box-shadow: 0 0 0 3px var(--d-stat-glow);
 	}
 	.field-input::placeholder,
 	.field-textarea::placeholder { color: var(--d-placeholder); }
