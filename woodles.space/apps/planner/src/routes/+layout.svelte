@@ -40,6 +40,12 @@
 		height: 100%;
 	}
 
+	/* base type scale — % keeps it relative to the reader's browser font size,
+	   so every rem in the app scales from here (and large-text prefs are honored) */
+	:global(html) {
+		font-size: 112.5%;
+	}
+
 	:global(body) {
 		background: var(--p-bg, #f6efd2);
 		overflow-x: hidden;
@@ -73,7 +79,7 @@
 		color: var(--p-text);
 		font-family: var(--pl-font-mono);
 		font-weight: 400;
-		font-size: 15px;
+		font-size: 1rem;
 		line-height: 1.55;
 		transition: var(--pl-transition-palette);
 		position: relative;

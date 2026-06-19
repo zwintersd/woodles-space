@@ -12,6 +12,11 @@
 		margin: 0;
 		background: #1a1a3e;
 	}
+	/* base type scale — % keeps it relative to the reader's browser font size,
+	   so every rem in the app scales from here (and large-text prefs are honored) */
+	:global(html) {
+		font-size: 112.5%;
+	}
 	:global(*),
 	:global(*::before),
 	:global(*::after) {
@@ -35,7 +40,7 @@
 		color: var(--text);
 		font-family: var(--font-body);
 		font-weight: 400;
-		font-size: 16px;
+		font-size: 1rem;
 		line-height: 1.55;
 	}
 </style>
