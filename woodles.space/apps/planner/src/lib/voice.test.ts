@@ -17,8 +17,8 @@ describe('voice — flourish generation', () => {
 			dayShape: { id: 'focused', name: 'Focused Day', blocks: [], restful: false },
 			blockCount: 3,
 			domains: [
-				{ id: 'work', name: 'Work', color: '#000' },
-				{ id: 'life', name: 'Life', color: '#fff' }
+				{ id: 'work', name: 'Work', color: '#000', icon: '●' },
+				{ id: 'life', name: 'Life', color: '#fff', icon: '◆' }
 			]
 		};
 
@@ -82,14 +82,14 @@ describe('voice — flourish generation', () => {
 		});
 
 		it('is deterministic for the same date and context', () => {
-			const ctx = { ...basicCtx, domains: [{ id: 'd1', name: 'Domain 1', color: '#000' }] };
+			const ctx = { ...basicCtx, domains: [{ id: 'd1', name: 'Domain 1', color: '#000', icon: '●' }] };
 			const result1 = fillSlots('{domain_name}', ctx);
 			const result2 = fillSlots('{domain_name}', ctx);
 			expect(result1).toBe(result2);
 		});
 
 		it('changes domain for different dates', () => {
-			const ctx = { ...basicCtx, domains: [{ id: 'd1', name: 'A', color: '#000' }, { id: 'd2', name: 'B', color: '#fff' }] };
+			const ctx = { ...basicCtx, domains: [{ id: 'd1', name: 'A', color: '#000', icon: '●' }, { id: 'd2', name: 'B', color: '#fff', icon: '◆' }] };
 			const date1 = new Date(2024, 5, 15);
 			const date2 = new Date(2024, 5, 16);
 			const result1 = fillSlots('{domain_name}', { ...ctx, date: date1 });
@@ -163,7 +163,7 @@ describe('voice — flourish generation', () => {
 			block: { id: 'morning', startTime: '08:00', endTime: '12:00', title: 'Morning' },
 			dayShape: { id: 'test', name: 'Test', blocks: [], restful: false },
 			blockCount: 1,
-			domains: [{ id: 'work', name: 'Work', color: '#000' }]
+			domains: [{ id: 'work', name: 'Work', color: '#000', icon: '●' }]
 		};
 
 		it('returns a string flourish', () => {
@@ -338,7 +338,7 @@ describe('voice — flourish generation', () => {
 			const date = new Date(2024, 5, 15);
 			// Test a larger set of possible block IDs
 			const blockIds = Array.from({ length: 50 }, (_, i) => `block-${i}`);
-			const showCounts = blockIds.map((id) => (shouldShowFlourish(date, id) ? 1 : 0));
+			const showCounts = blockIds.map((id): number => (shouldShowFlourish(date, id) ? 1 : 0));
 			const total = showCounts.reduce((a, b) => a + b, 0);
 			// On average, ~20% (1/5 slots) should show flourish with large sample
 			expect(total).toBeGreaterThan(0);
@@ -371,7 +371,7 @@ describe('voice — flourish generation', () => {
 						block: { id: 'morning', startTime: '08:00', endTime: '12:00', title: 'Morning' },
 						dayShape: { id: 'test', name: 'Test', blocks: [], restful: false },
 						blockCount: 1,
-						domains: [{ id: 'work', name: 'Work', color: '#000' }]
+						domains: [{ id: 'work', name: 'Work', color: '#000', icon: '●' }]
 					},
 					'gentle',
 					'morning'
