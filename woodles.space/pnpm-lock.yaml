@@ -148,6 +148,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.17
+      happy-dom:
+        specifier: ^15.0.0
+        version: 15.11.7
       svelte:
         specifier: ^5.51.0
         version: 5.55.5

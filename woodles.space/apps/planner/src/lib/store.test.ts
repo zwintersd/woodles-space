@@ -1,8 +1,9 @@
+// @vitest-environment happy-dom
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { PlannerStore } from './store.svelte';
 import { STARTER_SHAPES, STARTER_WEEK_PATTERN } from './templates';
 import { dateKey } from './utils';
-import type { Task, DayShape, Obligation, Ritual, Domain } from './types';
+import type { Task, DayShape, Obligation, Ritual, Domain, WeekPattern } from './types';
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -188,11 +189,13 @@ describe('PlannerStore', () => {
 			const task = store.addTask({ title: 'Task' });
 			const originalId = task.id;
 			const originalCreated = task.createdAt;
+			// id and createdAt are not part of the updatable type; pass them
+			// anyway (via a cast) to prove updateTask ignores them.
 			store.updateTask(task.id, {
-				id: 'fake-id' as any,
-				createdAt: 'fake-date' as any,
+				id: 'fake-id',
+				createdAt: 'fake-date',
 				title: 'New'
-			});
+			} as Partial<Omit<Task, 'id' | 'createdAt'>>);
 			const updated = store.tasks.find((t) => t.id === originalId);
 			expect(updated?.id).toBe(originalId);
 			expect(updated?.createdAt).toBe(originalCreated);
@@ -226,9 +229,13 @@ describe('PlannerStore', () => {
 			expect(tasks[0].title).toBe('Scheduled');
 		});
 
-		it('getTasksForBlock excludes done and dropped tasks', () => {
+		it('getTasksForBlock keeps done tasks but excludes dropped', () => {
+			// Done tasks stay visible (TaskItem renders them struck-through); only
+			// dropped tasks are hidden — consistent with getTasksForDay /
+			// getUnscheduledTasks.
 			const tasks = store.getTasksForBlock('block-2');
-			expect(tasks).toHaveLength(0); // The completed one is filtered
+			expect(tasks).toHaveLength(1);
+			expect(tasks[0].status).toBe('done');
 		});
 	});
 
@@ -342,7 +349,7 @@ describe('PlannerStore', () => {
 			});
 			expect(obl.id).toBeTruthy();
 			expect(obl.name).toBe('Meeting');
-			expect(store.obligations).toContain(obl);
+			expect(store.obligations).toContainEqual(obl);
 		});
 
 		it('persists obligations', () => {
@@ -369,7 +376,7 @@ describe('PlannerStore', () => {
 				domainId: 'domain-1'
 			});
 			store.removeObligation(obl.id);
-			expect(store.obligations).not.toContain(obl);
+			expect(store.obligations).not.toContainEqual(obl);
 		});
 	});
 
@@ -383,7 +390,7 @@ describe('PlannerStore', () => {
 			});
 			expect(ritual.id).toBeTruthy();
 			expect(ritual.name).toBe('Morning');
-			expect(store.rituals).toContain(ritual);
+			expect(store.rituals).toContainEqual(ritual);
 		});
 	});
 
@@ -396,7 +403,7 @@ describe('PlannerStore', () => {
 				domainId: 'domain-1'
 			});
 			store.removeRitual(ritual.id);
-			expect(store.rituals).not.toContain(ritual);
+			expect(store.rituals).not.toContainEqual(ritual);
 		});
 	});
 
@@ -419,7 +426,7 @@ describe('PlannerStore', () => {
 
 	describe('domains', () => {
 		it('getDomainById returns matching domain', () => {
-			const domain = { id: 'domain-1', name: 'Work', color: '#000' };
+			const domain = { id: 'domain-1', name: 'Work', color: '#000', icon: '●' };
 			store.setDomains([domain]);
 			expect(store.getDomainById('domain-1')).toEqual(domain);
 		});
@@ -430,8 +437,8 @@ describe('PlannerStore', () => {
 
 		it('setDomains persists domains', () => {
 			const domains = [
-				{ id: 'domain-1', name: 'Work', color: '#000' },
-				{ id: 'domain-2', name: 'Life', color: '#fff' }
+				{ id: 'domain-1', name: 'Work', color: '#000', icon: '●' },
+				{ id: 'domain-2', name: 'Life', color: '#fff', icon: '◆' }
 			];
 			store.setDomains(domains);
 			const newStore = new PlannerStore();
@@ -456,7 +463,7 @@ describe('PlannerStore', () => {
 
 	describe('setWeekPattern', () => {
 		it('sets week pattern and persists', () => {
-			const pattern = { days: ['id1', 'id2', 'id3', 'id4', 'id5', 'id6', 'id7'] };
+			const pattern: WeekPattern = { days: ['id1', 'id2', 'id3', 'id4', 'id5', 'id6', 'id7'] };
 			store.setWeekPattern(pattern);
 			expect(store.weekPattern).toEqual(pattern);
 
@@ -479,8 +486,8 @@ describe('PlannerStore', () => {
 
 	describe('view management', () => {
 		it('setView updates currentView', () => {
-			store.setView('calendar');
-			expect(store.currentView).toBe('calendar');
+			store.setView('month');
+			expect(store.currentView).toBe('month');
 		});
 
 		it('toggleBinder opens tab if closed', () => {
@@ -496,8 +503,8 @@ describe('PlannerStore', () => {
 
 		it('toggleBinder switches between tabs', () => {
 			store.toggleBinder('shapes');
-			store.toggleBinder('tasks');
-			expect(store.binderTab).toBe('tasks');
+			store.toggleBinder('waiting');
+			expect(store.binderTab).toBe('waiting');
 		});
 
 		it('closeBinder clears binderTab', () => {
@@ -523,7 +530,7 @@ describe('PlannerStore', () => {
 			const dateStr = '2024-06-15';
 			const task = store.addTask({ title: 'Task', targetDate: dateStr });
 			const tasks = store.getTasksForDay(dateStr);
-			expect(tasks).toContain(task);
+			expect(tasks).toContainEqual(task);
 		});
 
 		it('getTasksForDay excludes dropped tasks', () => {
@@ -531,7 +538,7 @@ describe('PlannerStore', () => {
 			const task = store.addTask({ title: 'Task', targetDate: dateStr });
 			store.dropTask(task.id);
 			const tasks = store.getTasksForDay(dateStr);
-			expect(tasks).not.toContain(task);
+			expect(tasks).not.toContainEqual(task);
 		});
 	});
 
@@ -622,7 +629,7 @@ describe('PlannerStore', () => {
 		it('restores all persisted state fields', () => {
 			const blob = {
 				shapes: [{ id: 'custom', name: 'Custom', blocks: [], restful: false }],
-				weekPattern: { days: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] },
+				weekPattern: { days: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] as WeekPattern['days'] },
 				days: { '2024-06-15': { date: '2024-06-15', dayShapeId: 'custom' } },
 				obligations: [
 					{
@@ -639,7 +646,7 @@ describe('PlannerStore', () => {
 				],
 				tasks: [{ id: 'task-1', title: 'Task', status: 'open' } as any],
 				settings: { flourishEnabled: false, tone: 'wry' } as any,
-				domains: [{ id: 'domain-1', name: 'Work', color: '#000' }]
+				domains: [{ id: 'domain-1', name: 'Work', color: '#000', icon: '●' }]
 			};
 			store.rehydrate(blob);
 
@@ -655,7 +662,7 @@ describe('PlannerStore', () => {
 		it('persists rehydrated state', () => {
 			const blob = {
 				shapes: [{ id: 'custom', name: 'Custom', blocks: [], restful: false }],
-				weekPattern: { days: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] },
+				weekPattern: { days: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] as WeekPattern['days'] },
 				days: {},
 				obligations: [],
 				rituals: [],

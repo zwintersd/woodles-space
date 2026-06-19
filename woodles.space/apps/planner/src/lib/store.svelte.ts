@@ -208,7 +208,11 @@ export class PlannerStore {
 	}
 
 	updateTask(id: string, changes: Partial<Omit<Task, 'id' | 'createdAt'>>): void {
-		this.tasks = this.tasks.map((t) => (t.id === id ? { ...t, ...changes } : t));
+		// id and createdAt are immutable once a task exists — guard them even if a
+		// caller forces them through (the type already forbids it).
+		this.tasks = this.tasks.map((t) =>
+			t.id === id ? { ...t, ...changes, id: t.id, createdAt: t.createdAt } : t
+		);
 		save('planner.tasks.v1', this.tasks);
 	}
 
