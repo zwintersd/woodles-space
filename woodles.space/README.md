@@ -1,94 +1,57 @@
 # woodles.space
 
-Personal monorepo. One repo, all the things.
+a pnpm workspace, deployed as one Vercel project. for how the code fits
+together, read [ARCHITECTURE.md](./ARCHITECTURE.md). this file is the
+deployment reference.
 
-## Structure
+## how it ships
+
+the static apps go up as-is — one HTML file each, no build step. the six
+SvelteKit apps (`write`, `marginalia`, `planner`, `bestiary`, `spores`,
+`marginalia-devlog`) build to `apps/<name>/dist/`. `vercel.json` rewrites each
+friendly path to the right file: `/write` → `/apps/write/dist/index.html`,
+`/digits` → `/apps/digits/index.html`, and so on.
+
+the build command is one filter per SvelteKit app, chained:
 
 ```
-woodles.space/
-├── apps/
-│   ├── landing/        # woodles.space homepage (static HTML, no build step)
-│   ├── fonts/          # font viewer (static HTML, no build step)
-│   └── woodles/        # SvelteKit app
-├── packages/           # shared code (components, utils) — add when needed
-├── package.json        # workspace root
-├── pnpm-workspace.yaml
-└── README.md
+pnpm --filter write build && pnpm --filter marginalia build && …
 ```
 
-## Package manager
+the static apps aren't in it. they have nothing to build, so Vercel just
+serves them from the directory.
 
-This repo uses [pnpm workspaces](https://pnpm.io/workspaces). Install everything from the `woodles.space/` root:
+## the settings that matter
 
-```sh
-pnpm install
-```
+three of these are non-obvious, and getting them wrong is the usual cause of a
+deploy that 404s everything.
 
-## Adding an app
+| setting          | value           | why                                                                       |
+| ---------------- | --------------- | ------------------------------------------------------------------------- |
+| Root Directory   | `woodles.space` | the repo nests one level deep; without this, Vercel never reads `vercel.json`. |
+| Framework Preset | Other / None    | auto-detect sees SvelteKit and drops the static apps.                     |
+| Output Directory | `.`             | `vercel.json` ships everything from the root; nothing to build up top.    |
 
-Static apps (no build step) just drop a folder under `apps/`. For a new SvelteKit app:
+`vercel.json` also declares `framework: null` and empty build/install overrides,
+but those only take hold once Vercel finds the file — which needs the Root
+Directory above.
 
-```sh
-cd woodles.space
-pnpm dlx sv create apps/<name>
-pnpm install
-```
+## when a path 404s
 
-## Running an app locally
+work it in this order:
 
-```sh
-cd apps/<name>
-pnpm dev
-```
+1. **the rewrite.** is the path in `vercel.json`? `/fonts`, `/palette`, and
+   `/motifs` all rewrite to `hygge`; `/scaffold` rewrites to `/write`.
+2. **`paths.base`.** in the app's `svelte.config.js`, does it match the sub-path
+   the rewrite serves? a mismatch builds clean and breaks every asset link in
+   production.
+3. **the output dir.** does the app write to `dist/`? the rewrite points at
+   `/apps/<name>/dist/`; the adapter has to agree.
 
-## Deployment
+## a note on the recursive scripts
 
-`woodles.space` is served by a single Vercel project that ships every static
-app from this directory. `apps/landing` is the homepage; `apps/fonts`,
-`apps/write`, and `apps/letter` mount at `/fonts`, `/write`, `/letter` via the
-rewrites in `vercel.json`. Pushing to `main` triggers production automatically.
-
-The SvelteKit app under `apps/woodles/` is **not** part of this deployment yet
-— it has its own build step and is intended for a separate Vercel project (or
-a follow-up unification once it has real routes).
-
-### Required Vercel project settings
-
-Misconfiguring these is the most common cause of `/fonts`, `/write`, and
-`/letter` returning 404. The repo nests the project one level deep
-(`woodles-space/woodles.space/`), so the dashboard defaults are wrong.
-
-| Setting             | Value                | Why                                                                      |
-| ------------------- | -------------------- | ------------------------------------------------------------------------ |
-| Root Directory      | `woodles.space`      | Without this, Vercel never reads `vercel.json` and serves the repo root. |
-| Framework Preset    | Other / None         | Auto-detects SvelteKit from `apps/woodles/` and drops the static apps.   |
-| Build Command       | (empty / overridden) | `vercel.json` sets `buildCommand: ""` — leave the dashboard override off.|
-| Install Command     | (empty / overridden) | `vercel.json` sets `installCommand: ""` — skip workspace install.        |
-| Output Directory    | `.`                  | Set in `vercel.json`; nothing to build.                                  |
-| Node.js Version     | any LTS              | No build runs, so the version doesn't matter.                            |
-
-`vercel.json` declares `framework: null`, empty build/install commands, and
-explicit rewrites for each app — these defend against the dashboard
-auto-detecting SvelteKit, but they only take effect once Vercel actually
-*finds* `vercel.json`, which requires the Root Directory above.
-
-### When `/fonts` 404s — checklist
-
-1. **Open the latest deployment in Vercel.** Look at "Source" → confirm
-   `vercel.json` is listed at the project root. If it isn't, the Root
-   Directory setting is wrong.
-2. **Check the build logs.** If they mention `vite build`, `@sveltejs/kit`,
-   or "Detected framework: SvelteKit", the framework preset is overriding
-   `vercel.json`. Force it to "Other".
-3. **Confirm `apps/fonts/index.html` is in the deployed output.** Visit
-   `https://woodles.space/apps/fonts/index.html` directly — if that 404s,
-   the file isn't being shipped (build step swallowed it). If it loads,
-   the rewrite is the problem.
-4. **Verify `/shared/fonts.css` loads** (`curl -I`). If it 404s, the deploy
-   is rooted at the wrong directory.
-5. **Force a clean redeploy** after changing settings — Vercel caches
-   previous output and won't pick up new rewrites until a new commit lands
-   or you redeploy manually with "Use existing Build Cache" off.
-6. **Subdomains vs paths.** `woodles.space/fonts` is a path (handled here).
-   `fonts.woodles.space` would be a subdomain, which would need its own
-   Vercel project + DNS record and is **not** what this repo configures.
+`pnpm -r check` and `pnpm -r test` stop at the first app that fails, so a break
+early in the run hides the apps after it. when something fails, run the one app
+directly — `pnpm --filter <name> check` — to see the rest. planner's test and
+check setup has a few sharp edges worth knowing before you touch it; they're in
+[apps/planner/KNOWN_ISSUES.md](./apps/planner/KNOWN_ISSUES.md).
