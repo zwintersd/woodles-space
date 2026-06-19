@@ -1002,6 +1002,9 @@
 		padding: 0;
 	}
 	:global(html), :global(body) { height: 100%; }
+	/* base type scale — % keeps it relative to the reader's browser font size,
+	   so every rem in the app scales from here (and large-text prefs are honored) */
+	:global(html) { font-size: 112.5%; }
 	:global(body) {
 		background: var(--bg);
 		color: var(--text);

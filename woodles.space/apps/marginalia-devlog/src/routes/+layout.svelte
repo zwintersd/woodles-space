@@ -104,6 +104,10 @@
 	:global(html),
 	:global(body) { height: 100%; }
 
+	/* base type scale — % keeps it relative to the reader's browser font size,
+	   so every rem in the app scales from here (and large-text prefs are honored) */
+	:global(html) { font-size: 112.5%; }
+
 	:global(body) {
 		background: var(--d-bg, #f3ecfb);
 		overflow-x: hidden;
@@ -148,7 +152,7 @@
 		background: var(--d-bg);
 		color: var(--d-text);
 		font-family: var(--d-font-body);
-		font-size: 15px;
+		font-size: 1rem;
 		line-height: 1.6;
 		overflow: hidden;
 	}
