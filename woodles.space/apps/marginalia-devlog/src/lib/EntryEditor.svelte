@@ -331,7 +331,9 @@
 		position: fixed;
 		inset: 0;
 		z-index: var(--d-z-picker);
-		background: rgba(0, 0, 0, 0.4);
+		background: var(--d-scrim);
+		backdrop-filter: blur(3px);
+		-webkit-backdrop-filter: blur(3px);
 	}
 
 	.picker {
@@ -340,11 +342,13 @@
 		left: 50%;
 		transform: translate(-50%, -50%);
 		z-index: calc(var(--d-z-picker) + 1);
-		background: var(--d-surface-2);
+		background: rgba(255, 255, 255, 0.82);
+		backdrop-filter: blur(16px) saturate(1.4);
+		-webkit-backdrop-filter: blur(16px) saturate(1.4);
 		border: 1px solid var(--d-border-mid);
 		border-radius: var(--d-radius-lg);
 		padding: var(--d-space-md);
-		box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+		box-shadow: var(--d-shadow-pop);
 		min-width: 320px;
 		max-width: 420px;
 	}

@@ -1,54 +1,73 @@
-/* marginalia devlog · twilight webcore design tokens
-   Pixel Reliquary × Decoden Nocturne
-   Scoped to .devlog-root */
+/* marginalia devlog · pastel dreamcore design tokens
+   Soft Fairycore × Holographic Webcore
+   Scoped to .devlog-root
+
+   The midnight reliquary opened its shutters and let the morning in.
+   Where the old skin was a void scattered with cold stars, this one is a
+   dream at dawn — cotton-candy cloud, lavender haze, the holographic glaze
+   of a sticker sheet. Cards float like polaroids on a pinboard; sparkles
+   drift; everything is soft, lit, and kind to the eye. */
 
 .devlog-root {
-	/* ── surfaces: deep night ──────────────────────────────────────── */
-	--d-bg:        #0b0919;   /* void behind the stars */
-	--d-surface:   #130e24;   /* the reliquary shelf */
-	--d-surface-2: #1b1535;   /* raised panel */
-	--d-surface-3: #231d42;   /* card face */
-	--d-surface-4: #2c2552;   /* hovered card */
+	/* ── surfaces: morning haze ────────────────────────────────────── */
+	--d-bg:        #f3ecfb;   /* pale lavender mist (layout paints the wash) */
+	--d-surface:   #ffffff;   /* polaroid white */
+	--d-surface-2: #f8f1fd;   /* faint lavender — input fields */
+	--d-surface-3: #ffffff;   /* card face, crisp on the wash */
+	--d-surface-4: #fdf6ff;   /* hovered card */
 
-	/* ── ink: pale lavender ────────────────────────────────────────── */
-	--d-text:      #e2d8f5;
-	--d-text-dim:  #8e80b8;
-	--d-text-faint:#5c5180;
-	--d-placeholder: #4a4168;
+	/* ── ink: soft blackberry ──────────────────────────────────────── */
+	--d-text:      #5b4a78;
+	--d-text-dim:  #8a78aa;
+	--d-text-faint:#b3a4cf;
+	--d-placeholder: #cabce0;
 
 	/* ── borders ───────────────────────────────────────────────────── */
-	--d-border:       rgba(180, 140, 255, 0.14);
-	--d-border-mid:   rgba(180, 140, 255, 0.28);
-	--d-border-glow:  rgba(180, 140, 255, 0.50);
+	--d-border:      rgba(180, 150, 235, 0.20);
+	--d-border-mid:  rgba(180, 150, 235, 0.38);
+	--d-border-glow: rgba(180, 150, 235, 0.60);
 
-	/* ── accent: primary interactive ──────────────────────────────── */
-	--d-accent:       #b899f5;   /* lavender-violet */
-	--d-accent-soft:  rgba(184, 153, 245, 0.18);
-	--d-accent-glow:  rgba(184, 153, 245, 0.35);
-	--d-on-accent:    #0b0919;
+	/* ── accent: primary interactive (orchid) ─────────────────────── */
+	--d-accent:      #b78cf0;
+	--d-accent-soft: rgba(183, 140, 240, 0.16);
+	--d-accent-glow: rgba(183, 140, 240, 0.40);
+	--d-on-accent:   #ffffff;
 
-	/* ── block type colors ─────────────────────────────────────────── */
-	--d-creature:   #c07ef5;   /* violet — the written beast */
-	--d-biome:      #7ae8d8;   /* aqua — the world-terrain */
-	--d-ability:    #f07aae;   /* rose — the power exercised */
-	--d-stat:       #f5c76e;   /* amber — the measured quality */
-	--d-minigame:   #7ab8f5;   /* sky — the played loop */
-	--d-lore:       #c5a87a;   /* parchment — the recorded past */
-	--d-prose:      #8e80b8;   /* muted lavender — the freeform voice */
+	/* ── block type colors — pastel but legible on white ──────────── */
+	--d-creature:   #c084e8;   /* orchid — the written beast */
+	--d-biome:      #5ec9c0;   /* mint-teal — the world-terrain */
+	--d-ability:    #f284b0;   /* rose — the power exercised */
+	--d-stat:       #f0b75e;   /* honey — the measured quality */
+	--d-minigame:   #7aa8f0;   /* cornflower — the played loop */
+	--d-lore:       #d99a72;   /* peach-clay — the recorded past */
+	--d-prose:      #a394c4;   /* muted lavender — the freeform voice */
 
-	/* softened variants for backgrounds */
-	--d-creature-soft:  rgba(192, 126, 245, 0.12);
-	--d-biome-soft:     rgba(122, 232, 216, 0.10);
-	--d-ability-soft:   rgba(240, 122, 174, 0.10);
-	--d-stat-soft:      rgba(245, 199, 110, 0.10);
-	--d-minigame-soft:  rgba(122, 184, 245, 0.10);
-	--d-lore-soft:      rgba(197, 168, 122, 0.10);
+	/* softened fills for card headers */
+	--d-creature-soft:  rgba(192, 132, 232, 0.12);
+	--d-biome-soft:     rgba(94, 201, 192, 0.13);
+	--d-ability-soft:   rgba(242, 132, 176, 0.12);
+	--d-stat-soft:      rgba(240, 183, 94, 0.14);
+	--d-minigame-soft:  rgba(122, 168, 240, 0.12);
+	--d-lore-soft:      rgba(217, 154, 114, 0.12);
+	--d-prose-soft:     rgba(163, 148, 196, 0.10);
+
+	/* focus glows */
+	--d-creature-glow:  rgba(192, 132, 232, 0.24);
+	--d-biome-glow:     rgba(94, 201, 192, 0.24);
+	--d-ability-glow:   rgba(242, 132, 176, 0.24);
+	--d-stat-glow:      rgba(240, 183, 94, 0.26);
+	--d-minigame-glow:  rgba(122, 168, 240, 0.24);
+	--d-lore-glow:      rgba(217, 154, 114, 0.24);
+
+	/* ── holographic glaze — pastel rainbow for special touches ────── */
+	--d-holo: linear-gradient(100deg, #f5b8d8, #d2b8f5, #b8d8f5, #b8f5e3, #f5edb8, #f5b8d8);
 
 	/* ── typography ────────────────────────────────────────────────── */
 	--d-font-display: var(--font-display, 'Cormorant Garamond', Georgia, serif);
 	--d-font-body:    var(--font-body, 'Lora', Georgia, serif);
 	--d-font-mono:    var(--font-mono, 'DM Mono', 'Courier New', monospace);
 	--d-font-pixel:   var(--font-pixel, 'Coral Pixels', 'DM Mono', monospace);
+	--d-font-glaze:   var(--font-glaze, 'Kalnia Glaze', 'Cormorant Garamond', serif);
 
 	/* ── spacing ───────────────────────────────────────────────────── */
 	--d-space-xs:  0.25rem;
@@ -58,10 +77,10 @@
 	--d-space-xl:  2.5rem;
 	--d-space-2xl: 4rem;
 
-	/* ── radius ────────────────────────────────────────────────────── */
-	--d-radius-sm:  4px;
-	--d-radius-md:  8px;
-	--d-radius-lg:  14px;
+	/* ── radius — softer, rounder, sweeter ─────────────────────────── */
+	--d-radius-sm:  8px;
+	--d-radius-md:  14px;
+	--d-radius-lg:  22px;
 	--d-radius-pill: 100px;
 
 	/* ── z-index ───────────────────────────────────────────────────── */
@@ -70,13 +89,19 @@
 	--d-z-panel:   30;
 
 	/* ── transitions ───────────────────────────────────────────────── */
-	--d-transition-fast:   0.12s ease;
-	--d-transition-medium: 0.22s ease;
+	--d-transition-fast:   0.14s ease;
+	--d-transition-medium: 0.24s ease;
+	--d-transition-spring: 0.34s cubic-bezier(0.34, 1.56, 0.64, 1);
 
-	/* ── shadows ───────────────────────────────────────────────────── */
-	--d-shadow-card:  0 4px 18px rgba(0, 0, 0, 0.45);
-	--d-shadow-glow:  0 0 0 1px var(--d-border-mid), 0 4px 18px rgba(0, 0, 0, 0.45);
-	--d-shadow-focus: 0 0 0 2px var(--d-accent-glow);
+	/* ── shadows: soft, lavender-tinted, never black ───────────────── */
+	--d-shadow-card:  0 6px 20px rgba(180, 140, 220, 0.16);
+	--d-shadow-hover: 0 12px 30px rgba(180, 140, 220, 0.24);
+	--d-shadow-glow:  0 0 0 1px var(--d-border-mid), 0 8px 24px rgba(180, 140, 220, 0.20);
+	--d-shadow-focus: 0 0 0 3px var(--d-accent-glow);
+	--d-shadow-pop:   0 24px 60px rgba(150, 110, 200, 0.30);
+
+	/* ── modal scrim ───────────────────────────────────────────────── */
+	--d-scrim: rgba(120, 90, 170, 0.25);
 
 	/* ── max content width ─────────────────────────────────────────── */
 	--d-max-width: 760px;

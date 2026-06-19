@@ -155,7 +155,7 @@
 	.field-textarea:focus {
 		outline: none;
 		border-color: var(--d-minigame);
-		box-shadow: 0 0 0 2px rgba(122, 184, 245, 0.15);
+		box-shadow: 0 0 0 3px var(--d-minigame-glow);
 	}
 	.field-input::placeholder,
 	.field-textarea::placeholder { color: var(--d-placeholder); }
