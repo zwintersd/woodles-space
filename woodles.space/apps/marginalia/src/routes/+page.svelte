@@ -9,12 +9,14 @@
 	import Ledger from '$lib/witch/Ledger.svelte';
 	import ReadingRoom from '$lib/components/reading/ReadingRoom.svelte';
 	import Arcade from '$lib/arcade/Arcade.svelte';
+	import HexStage from '$lib/witch/HexStage.svelte';
 
 	let menuOpen = $state(false);
 	let importBox = $state('');
 	let exportBlob = $state('');
 	let readingOpen = $state(false);
 	let arcadeOpen = $state(false);
+	let hexStageOpen = $state(false);
 
 	function onFocus() {
 		void book.refreshBestiaryCreatures();
@@ -205,6 +207,21 @@
 			<div class="arcade-wrap">
 				<Arcade />
 			</div>
+		{/if}
+	</section>
+
+	<hr class="rule" />
+
+	<section class="side">
+		<button class="side-toggle" onclick={() => (hexStageOpen = !hexStageOpen)}>
+			hex stage · dev {hexStageOpen ? '−' : '+'}
+		</button>
+		<p class="side-note">
+			A mockup stage for previewing Bestiary creature sprites inside Marginalia.
+			Reads your local Bestiary — open both apps on the same device.
+		</p>
+		{#if hexStageOpen}
+			<HexStage />
 		{/if}
 	</section>
 
