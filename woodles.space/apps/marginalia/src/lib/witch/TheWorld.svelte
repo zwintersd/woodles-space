@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { book, fmt, stageLabel, STAGE_KNOWN } from './book.svelte';
-	import { STAGE_INSIGHT_MULT, DISTILL_INSIGHT_COST, DISTILL_ESSENCE_GAIN } from './tuning';
+	import { STAGE_INSIGHT_MULT, DISTILL_INSIGHT_COST, DISTILL_ESSENCE_GAIN, LOOK_CLOSER_SECONDS } from './tuning';
 	import { domainVerb, type Life, type LifeCategory } from './content/life';
+	import MiniHex from './MiniHex.svelte';
 
 	const categories: { id: LifeCategory; label: string }[] = [
 		{ id: 'aquatic', label: 'in the water' },
@@ -21,6 +22,29 @@
 		const rich = l.insightWeight >= 1.3 ? 'rich' : l.insightWeight <= 0.8 ? 'thin' : 'steady';
 		const pace = l.studyEase >= 1.2 ? 'quick to know' : l.studyEase <= 0.8 ? 'slow to know' : 'even pace';
 		return `${rich} · ${pace}`;
+	}
+
+	// ── look-closer click feedback ────────────────────────────────────────────
+
+	interface FloatLabel {
+		lifeId: string;
+		key: number;
+		value: string;
+		zone: 'strip' | 'card';
+	}
+
+	let floats = $state<FloatLabel[]>([]);
+	let floatSeq = 0;
+
+	function handleLookCloser(l: Life, zone: 'strip' | 'card') {
+		book.lookCloser(l.id);
+		const secs = LOOK_CLOSER_SECONDS * l.studyEase;
+		const value = `+${Number.isInteger(secs) ? secs.toFixed(0) : secs.toFixed(1)}s`;
+		const key = ++floatSeq;
+		floats = [...floats, { lifeId: l.id, key, value, zone }];
+		setTimeout(() => {
+			floats = floats.filter((f) => f.key !== key);
+		}, 900);
 	}
 
 	// ── bestiary sprite binding ───────────────────────────────────────────────
@@ -52,6 +76,9 @@
 		const c = book.boundCreatureFor(lifeId);
 		return c?.pixelated ?? false;
 	}
+
+	// attended life in emergence order (stable ordering)
+	const attendedLife = $derived(book.life.filter((l) => book.isAttending(l.id)));
 </script>
 
 <div class="world">
@@ -88,6 +115,44 @@
 			</button>
 		</div>
 	</section>
+
+	{#if attendedLife.length > 0}
+		<section class="attended-strip">
+			<h3 class="strip-head">
+				<span>attending</span>
+				<span class="strip-count">{book.attentionUsed}/{book.attentionCapacity}</span>
+			</h3>
+			<ul class="strip-rows">
+				{#each attendedLife as l (l.id)}
+					{@const stage = book.stageOf(l.id)}
+					{@const progress = book.stageProgress(l.id)}
+					{@const creature = book.boundCreatureFor(l.id)}
+					<li class="strip-row">
+						<MiniHex {creature} />
+						<div class="strip-content">
+							<div class="strip-namerow">
+								<span class="strip-name">{l.name}</span>
+								<span class="strip-stage">
+									{stageLabel[stage]} → {nextStageName(stage)}
+								</span>
+							</div>
+							<div class="strip-progress" aria-hidden="true">
+								<div class="strip-bar" style:width="{progress * 100}%"></div>
+							</div>
+							<div class="strip-action">
+								{#each floats.filter((f) => f.lifeId === l.id && f.zone === 'strip') as f (f.key)}
+									<span class="float-label" aria-live="polite">{f.value}</span>
+								{/each}
+								<button class="look-btn" onclick={() => handleLookCloser(l, 'strip')}>
+									look closer
+								</button>
+							</div>
+						</div>
+					</li>
+				{/each}
+			</ul>
+		</section>
+	{/if}
 
 	{#if book.life.length === 0}
 		<p class="empty">
@@ -152,8 +217,11 @@
 										{/if}
 									</p>
 									<div class="card-actions">
+										{#each floats.filter((f) => f.lifeId === l.id && f.zone === 'card') as f (f.key)}
+											<span class="float-label" aria-live="polite">{f.value}</span>
+										{/each}
 										{#if attending}
-											<button class="look" onclick={() => book.lookCloser(l.id)}>
+											<button class="look" onclick={() => handleLookCloser(l, 'card')}>
 												look closer
 											</button>
 											<button class="release" onclick={() => book.unattend(l.id)}>
@@ -307,6 +375,137 @@
 		font-style: italic;
 		font-size: 0.78rem;
 		color: var(--muted);
+	}
+
+	/* ── attended strip ─────────────────────────────────────────────────────── */
+	.attended-strip {
+		border: 1px solid rgba(108, 229, 232, 0.22);
+		border-radius: 4px;
+		background: var(--panel);
+		padding: 0.7rem 0.8rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.55rem;
+	}
+	.strip-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		font-family: var(--font-ui);
+		font-size: 0.66rem;
+		letter-spacing: 0.22em;
+		text-transform: uppercase;
+		color: var(--cyan);
+		margin: 0;
+	}
+	.strip-count {
+		font-family: var(--font-counter);
+		font-size: 0.78rem;
+		color: var(--muted);
+		letter-spacing: 0;
+		text-transform: none;
+	}
+	.strip-rows {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+	.strip-row {
+		display: flex;
+		align-items: center;
+		gap: 0.8rem;
+	}
+	.strip-content {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+	}
+	.strip-namerow {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.5rem;
+		min-width: 0;
+	}
+	.strip-name {
+		font-family: var(--font-display);
+		font-size: 0.95rem;
+		color: var(--cream);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.strip-stage {
+		font-family: var(--font-ui);
+		font-size: 0.62rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--muted);
+		white-space: nowrap;
+		flex-shrink: 0;
+	}
+	.strip-progress {
+		height: 4px;
+		background: var(--bg);
+		border-radius: 2px;
+		overflow: hidden;
+	}
+	.strip-bar {
+		height: 100%;
+		background: linear-gradient(90deg, var(--periwinkle), var(--cyan));
+		transition: width 180ms linear;
+	}
+	.strip-action {
+		position: relative;
+	}
+	.look-btn {
+		width: 100%;
+		font-family: var(--font-ui);
+		font-size: 0.76rem;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--cyan);
+		border: 1px solid rgba(108, 229, 232, 0.38);
+		border-radius: 3px;
+		padding: 0.32rem 0.6rem;
+		text-align: center;
+		transition: border-color 120ms, color 120ms, background 120ms;
+	}
+	.look-btn:hover {
+		border-color: var(--cyan);
+		background: rgba(108, 229, 232, 0.07);
+	}
+	.look-btn:active {
+		background: rgba(108, 229, 232, 0.14);
+	}
+
+	/* ── float label (shared between strip and card zones) ───────────────────── */
+	.float-label {
+		position: absolute;
+		bottom: calc(100% + 2px);
+		left: 50%;
+		transform: translateX(-50%);
+		font-family: var(--font-counter);
+		font-size: 0.92rem;
+		color: var(--cyan);
+		pointer-events: none;
+		white-space: nowrap;
+		animation: float-up 0.9s ease-out forwards;
+	}
+	@keyframes float-up {
+		0%   { opacity: 1; transform: translateX(-50%) translateY(0); }
+		60%  { opacity: 1; transform: translateX(-50%) translateY(-14px); }
+		100% { opacity: 0; transform: translateX(-50%) translateY(-22px); }
+	}
+
+	/* card-actions needs position:relative for the card float anchor */
+	.card-actions {
+		position: relative;
 	}
 
 	.empty {
