@@ -131,6 +131,99 @@ function writeVersion(app: string, v: number): void {
   }
 }
 
+// ── createAppSync ────────────────────────────────────────────────────────────
+// Generic wiring shared by every app that syncs a single blob. Owns the
+// passphrase lifecycle, connect/disconnect, status tracking, and the
+// hydrate/flush cycle. The caller provides a mutable `state` object so the
+// app can back it with Svelte $state class fields without this file needing
+// to be a .svelte.ts module.
+
+export interface AppSyncState {
+  connected: boolean;
+  syncing: boolean;
+  status: 'idle' | 'ok' | 'error';
+  lastSyncedAt: Date | null;
+  errorMessage: string | null;
+}
+
+export function createAppSync<T>({
+  adapter,
+  state,
+  passKey = 'woodles_sync_passphrase',
+}: {
+  adapter: StoreAdapter<T>;
+  state: AppSyncState;
+  passKey?: string;
+}) {
+  function loadStoredPassphrase(): string | null {
+    try { return localStorage.getItem(passKey); } catch { return null; }
+  }
+  function persistPassphrase(pass: string | null): void {
+    try {
+      if (pass) localStorage.setItem(passKey, pass);
+      else localStorage.removeItem(passKey);
+    } catch { /* ignore quota */ }
+  }
+
+  const synced = createSyncedStore<T>(adapter);
+
+  function connect(pass: string): void {
+    setPassphrase(pass);
+    persistPassphrase(pass);
+    state.connected = true;
+    state.errorMessage = null;
+  }
+
+  function disconnect(): void {
+    setPassphrase('');
+    persistPassphrase(null);
+    state.connected = false;
+    state.status = 'idle';
+    state.lastSyncedAt = null;
+    state.errorMessage = null;
+  }
+
+  async function runWithStatus(fn: () => Promise<void>): Promise<void> {
+    state.syncing = true;
+    state.errorMessage = null;
+    try {
+      await fn();
+      state.status = 'ok';
+      state.lastSyncedAt = new Date();
+    } catch (err) {
+      state.status = 'error';
+      state.errorMessage = err instanceof SyncError ? err.message : 'sync failed';
+      if (err instanceof SyncError && err.kind === 'unauthorized') disconnect();
+    } finally {
+      state.syncing = false;
+    }
+  }
+
+  async function connectAndHydrate(pass: string): Promise<void> {
+    connect(pass);
+    await runWithStatus(() => synced.hydrate(async (): Promise<ConflictChoice> => 'theirs'));
+  }
+
+  async function initSync(): Promise<void> {
+    const stored = loadStoredPassphrase();
+    if (!stored) return;
+    connect(stored);
+    await runWithStatus(() => synced.hydrate(async (): Promise<ConflictChoice> => 'theirs'));
+  }
+
+  async function flushSync(): Promise<void> {
+    if (!hasPassphrase()) return;
+    await runWithStatus(async () => {
+      const result = await synced.flush();
+      if ('conflict' in result && result.server.blob) {
+        adapter.write(result.server.blob as T);
+      }
+    });
+  }
+
+  return { connectAndHydrate, initSync, flushSync, disconnect };
+}
+
 export function createSyncedStore<T>(adapter: StoreAdapter<T>) {
   const { app } = adapter;
 
