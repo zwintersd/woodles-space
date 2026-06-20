@@ -473,6 +473,8 @@ export class Book {
 		if (s) {
 			this.fromSave(s);
 			if (s.lastSeen) this.creditOffline((Date.now() - s.lastSeen) / 1000);
+			// Return to the world, not the web, when life already exists.
+			if (this.life.length > 0) this.mode = 'world';
 		}
 	}
 

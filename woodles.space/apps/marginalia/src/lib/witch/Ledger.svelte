@@ -4,6 +4,12 @@
 	const favorWord = $derived(
 		book.favorBand === 'high' ? 'at ease' : book.favorBand === 'low' ? 'wary' : 'even'
 	);
+
+	// Show one decimal for small insight so it visibly ticks every rAF frame.
+	function fmtLive(n: number): string {
+		if (n < 1000) return n.toFixed(1);
+		return fmt(n);
+	}
 </script>
 
 <div class="ledger">
@@ -15,7 +21,7 @@
 				title="the world yields Insight every second it is witnessed. spend it on attention, or distill it into Essence."
 			>
 				<span class="label">insight</span>
-				<span class="value">{fmt(book.insight)}</span>
+				<span class="value">{fmtLive(book.insight)}</span>
 				<span class="rate">+{fmt(book.insightPerSec)}/s</span>
 			</div>
 			<div
