@@ -82,14 +82,13 @@ owns the version bookkeeping and the "ask before clobber" decision — its
 `onConflict` returns `mine`, `theirs`, or `cancel`. the passphrase lives in
 memory for the session; the last-seen version is cached in localStorage.
 
-**`apps/*/src/lib/sync.svelte.ts`** — the per-app glue. it reads the app's store
-into a blob and writes a blob back, then hands that adapter to
-`createSyncedStore`. this file is a four-way near-duplicate across `bestiary`,
-`spores`, `planner`, and `marginalia-devlog`. the only real difference is the
-store and blob type it wires up (`PlannerBlob`, `BestiaryBlob`, `GardenBlob`,
-`DevlogBlob`); `bestiary` adds an `isNewer` heuristic and `marginalia-devlog`
-uses a different localStorage key. `write` and `marginalia` don't sync at all.
-the four copies are a known consolidation target — see [REFACTORING.md](./REFACTORING.md).
+**`apps/*/src/lib/sync.svelte.ts`** — the per-app glue. each file is ~30 lines:
+a `SyncState` class with `$state` fields, its instantiation, and a call to
+`createAppSync` (from `@woodles/sync`) that wires up the app-specific adapter.
+the adapter's `read()` maps the store into the blob type (`PlannerBlob`,
+`BestiaryBlob`, `GardenBlob`, `DevlogBlob`); `write()` calls the store's
+`rehydrate()`; `isNewer` is optionally provided (`bestiary`, `marginalia-devlog`
+use it). `write` and `marginalia` don't sync at all.
 
 ## shared design tokens
 
@@ -134,9 +133,9 @@ its shape, then extract the shared version. premature sharing freezes an API
 before the copies have stopped moving. some of these have settled; some are still
 in motion. the full log is in [REFACTORING.md](./REFACTORING.md); the shape of it:
 
-- **`sync.svelte.ts`** — `bestiary`, `spores`, `planner`, `marginalia-devlog`.
-  ~90–100 lines each, identical but for the store/blob type. converged;
-  consolidation is straightforward.
+- **`sync.svelte.ts`** — consolidated. `createAppSync` in `@woodles/sync` now
+  owns the passphrase lifecycle, connect/disconnect, and status tracking. each
+  app's file is ~30 lines of adapter wiring. see [REFACTORING.md](./REFACTORING.md).
 - **text / HTML utilities** — `sanitize`, `isEmptyHtml`, `stripTags`,
   `countWords`, `previewText`, and anchor stamping. they live in
   `write/src/lib/htmlTools.ts`, are mirrored in `marginalia/src/lib/reading/text.ts`,

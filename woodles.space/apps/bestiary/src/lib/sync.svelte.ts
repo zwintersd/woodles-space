@@ -1,18 +1,6 @@
-import { setPassphrase, hasPassphrase, createSyncedStore, SyncError } from '@woodles/sync';
+import { createAppSync } from '@woodles/sync';
 import { bestiary } from './bestiary.svelte';
 import type { BestiaryBlob } from './types';
-
-const PASS_KEY = 'woodles_sync_passphrase';
-
-function loadStoredPassphrase(): string | null {
-	try { return localStorage.getItem(PASS_KEY); } catch { return null; }
-}
-function persistPassphrase(pass: string | null): void {
-	try {
-		if (pass) localStorage.setItem(PASS_KEY, pass);
-		else localStorage.removeItem(PASS_KEY);
-	} catch { /* ignore quota */ }
-}
 
 class SyncState {
 	connected = $state(false);
@@ -24,74 +12,22 @@ class SyncState {
 
 export const syncState = new SyncState();
 
-const synced = createSyncedStore<BestiaryBlob>({
-	app: 'bestiary',
-	read(): BestiaryBlob {
-		return {
-			creatures: bestiary.creatures,
-			settings: bestiary.settings
-		};
-	},
-	write(blob: BestiaryBlob): void {
-		bestiary.rehydrate(blob);
-	},
-	isNewer(local: BestiaryBlob, remote: BestiaryBlob): boolean {
-		// If local has more creatures than the server, push up rather than clobber.
-		// Recovers from a server accidentally seeded with empty state.
-		return (local.creatures?.length ?? 0) > (remote.creatures?.length ?? 0);
-	}
-});
-
-function connect(pass: string): void {
-	setPassphrase(pass);
-	persistPassphrase(pass);
-	syncState.connected = true;
-	syncState.errorMessage = null;
-}
-
-export function disconnect(): void {
-	setPassphrase('');
-	persistPassphrase(null);
-	syncState.connected = false;
-	syncState.status = 'idle';
-	syncState.lastSyncedAt = null;
-	syncState.errorMessage = null;
-}
-
-async function runWithStatus(fn: () => Promise<void>): Promise<void> {
-	syncState.syncing = true;
-	syncState.errorMessage = null;
-	try {
-		await fn();
-		syncState.status = 'ok';
-		syncState.lastSyncedAt = new Date();
-	} catch (err) {
-		syncState.status = 'error';
-		syncState.errorMessage = err instanceof SyncError ? err.message : 'sync failed';
-		if (err instanceof SyncError && err.kind === 'unauthorized') disconnect();
-	} finally {
-		syncState.syncing = false;
-	}
-}
-
-export async function connectAndHydrate(pass: string): Promise<void> {
-	connect(pass);
-	await runWithStatus(() => synced.hydrate(async (): Promise<import('@woodles/sync').ConflictChoice> => 'theirs'));
-}
-
-export async function initSync(): Promise<void> {
-	const stored = loadStoredPassphrase();
-	if (!stored) return;
-	connect(stored);
-	await runWithStatus(() => synced.hydrate(async (): Promise<import('@woodles/sync').ConflictChoice> => 'theirs'));
-}
-
-export async function flushSync(): Promise<void> {
-	if (!hasPassphrase()) return;
-	await runWithStatus(async () => {
-		const result = await synced.flush();
-		if ('conflict' in result && result.server.blob) {
-			bestiary.rehydrate(result.server.blob as BestiaryBlob);
-		}
+export const { connectAndHydrate, initSync, flushSync, disconnect } =
+	createAppSync<BestiaryBlob>({
+		adapter: {
+			app: 'bestiary',
+			read(): BestiaryBlob {
+				return {
+					creatures: bestiary.creatures,
+					settings: bestiary.settings,
+				};
+			},
+			write(blob: BestiaryBlob): void {
+				bestiary.rehydrate(blob);
+			},
+			isNewer(local: BestiaryBlob, remote: BestiaryBlob): boolean {
+				return (local.creatures?.length ?? 0) > (remote.creatures?.length ?? 0);
+			},
+		},
+		state: syncState,
 	});
-}

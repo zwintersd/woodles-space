@@ -19,15 +19,18 @@ Notes:   what consolidation needs, or what's holding it
 ---
 
 ## sync.svelte.ts
-**Status:** candidate · strong
+**Status:** done
 **Copies:** `apps/{planner,bestiary,spores,marginalia-devlog}/src/lib/sync.svelte.ts`
-**State:** minor variation
-**Notes:** four near-identical wrappers around `@woodles/sync`'s
-`createSyncedStore`. only the store and blob type differ (`PlannerBlob` /
-`BestiaryBlob` / `GardenBlob` / `DevlogBlob`); `bestiary` adds an `isNewer`
-heuristic and `marginalia-devlog` uses a different localStorage key. a generic
-helper in `@woodles/sync` that takes the store adapter would collapse all four.
-nothing blocks it — the shape has settled.
+**State:** consolidated
+**Notes:** extracted into `createAppSync` in `packages/sync/src/index.ts`. each
+app's file is now ~30 lines: a `SyncState` class with `$state` fields, its
+instantiation, and a `createAppSync` call that wires up the app-specific adapter
+(blob type, read/write/isNewer). the factory owns passphrase persistence,
+connect/disconnect, status tracking, and the hydrate/flush cycle. `passKey`
+defaults to `'woodles_sync_passphrase'`; `marginalia-devlog` passes
+`'woodles_sync_passphrase_devlog'`. the `SyncState` class itself stays in each
+app's `.svelte.ts` so `$state` compiles under the app's Svelte plugin rather than
+in the package.
 
 ## text / HTML utilities
 **Status:** candidate · strong
