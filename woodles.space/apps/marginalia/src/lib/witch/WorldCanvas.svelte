@@ -6,6 +6,7 @@
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
 	import { book } from './book.svelte';
+	import type { LifeCategory } from './content/life';
 
 	// reference frame is 960×340 (see ASSETS.md); the canvas keeps that aspect.
 	const ASPECT = 960 / 340;
@@ -56,6 +57,15 @@
 	const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 	const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 	const rgb = (r: number, g: number, b: number) => `rgb(${r | 0}, ${g | 0}, ${b | 0})`;
+	// a stable 0..1 from a life id, for un-gridded placement and phase offsets
+	const hash01 = (s: string) => {
+		let h = 2166136261;
+		for (let i = 0; i < s.length; i++) {
+			h ^= s.charCodeAt(i);
+			h = Math.imul(h, 16777619);
+		}
+		return (h >>> 0) % 1000 / 1000;
+	};
 
 	onMount(() => {
 		// bound by the time onMount runs; assert so the closures below keep the type
@@ -124,6 +134,83 @@
 				}
 			}
 		}, 5000);
+
+		// ── creatures: bound Bestiary sprites standing in their zone ────────────
+		// loaded lazily by sprite src and cached; rebinds just add a new entry.
+		const spriteCache = new Map<string, { img: HTMLImageElement; ok: boolean }>();
+		function getSprite(src: string) {
+			let e = spriteCache.get(src);
+			if (!e) {
+				const entry = { img: new Image(), ok: false };
+				entry.img.onload = () => {
+					entry.ok = true;
+					anyReady = true;
+				};
+				entry.img.src = src;
+				spriteCache.set(src, entry);
+				e = entry;
+			}
+			return e;
+		}
+		function spriteFor(lifeId: string): { src: string; pixelated: boolean } | null {
+			const c = book.boundCreatureFor(lifeId);
+			const src = c ? (c.isolatedSprite ?? c.sprite ?? null) : null;
+			return src ? { src, pixelated: c!.pixelated } : null;
+		}
+
+		// where each category stands, and how it moves
+		const ZONE: Record<
+			LifeCategory,
+			{ y: number; amp: number; speed: number; ground?: boolean }
+		> = {
+			atmospheric: { y: 0.24, amp: 0.03, speed: 0.5 },
+			terrestrial: { y: LAND_Y, amp: 0.012, speed: 0.7, ground: true },
+			aquatic: { y: 0.8, amp: 0.025, speed: 0.6 }
+		};
+		const CREATURE_BOX = 0.2; // max sprite box, as a fraction of height
+
+		function drawZone(cat: LifeCategory, T: number) {
+			const zone = ZONE[cat];
+			const group = book.life.filter((l) => l.category === cat && spriteFor(l.id));
+			for (let j = 0; j < group.length; j++) {
+				const l = group[j];
+				const info = spriteFor(l.id)!;
+				const e = getSprite(info.src);
+				if (!e.ok || !e.img.naturalWidth) continue;
+
+				const stage = book.stageOf(l.id);
+				const box = H * CREATURE_BOX * (0.6 + 0.4 * (stage / 3));
+				const scale = box / Math.max(e.img.naturalWidth, e.img.naturalHeight);
+				const dw = e.img.naturalWidth * scale;
+				const dh = e.img.naturalHeight * scale;
+
+				const frac = (j + 0.5) / group.length;
+				const jitter = (hash01(l.id) - 0.5) * (W / group.length) * 0.4;
+				const cx = W * (0.08 + 0.84 * frac) + jitter;
+				const zoneY = H * zone.y;
+				const bob = reduce ? 0 : Math.sin(T * zone.speed + hash01(l.id) * 6.283) * H * zone.amp;
+				const cy = (zone.ground ? zoneY - dh / 2 : zoneY) + bob;
+
+				// unwitnessed life is faint; witnessed life dims as it suffers
+				const alpha = clamp01(stage === 0 ? 0.3 : 0.55 + 0.45 * book.vitalityOf(l.id));
+
+				if (zone.ground) {
+					ctx!.save();
+					ctx!.globalAlpha = alpha * 0.25;
+					ctx!.fillStyle = 'rgb(14, 14, 40)';
+					ctx!.beginPath();
+					ctx!.ellipse(cx, zoneY, dw * 0.32, dh * 0.06, 0, 0, Math.PI * 2);
+					ctx!.fill();
+					ctx!.restore();
+				}
+
+				ctx!.save();
+				ctx!.globalAlpha = alpha;
+				ctx!.imageSmoothingEnabled = !info.pixelated;
+				ctx!.drawImage(e.img, cx - dw / 2, cy - dh / 2, dw, dh);
+				ctx!.restore();
+			}
+		}
 
 		function draw(tMs: number) {
 			if (!ctx) return;
@@ -203,7 +290,8 @@
 				tinted(soil.img, 0, landY, W, H * SOIL_H, richness);
 			}
 
-			// ── water: translucent, a gentle bob ────────────────────────────────
+			// ── aquatic life, then water washes over it ─────────────────────────
+			drawZone('aquatic', T);
 			if (water.ok) {
 				const bob = reduce ? 0 : Math.sin(T * 0.9) * (H * 0.004);
 				ctx.save();
@@ -211,6 +299,10 @@
 				ctx.drawImage(water.img, 0, H * WATER_TOP + bob, W, H * (1 - WATER_TOP) + 2);
 				ctx.restore();
 			}
+
+			// ── land & sky life, standing in front of the water ─────────────────
+			drawZone('terrestrial', T);
+			drawZone('atmospheric', T);
 
 			// ── rain: only when quite wet; tiled and scrolling ──────────────────
 			if (rain.ok) {
