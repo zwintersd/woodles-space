@@ -3,6 +3,7 @@
 	import { STAGE_INSIGHT_MULT, DISTILL_INSIGHT_COST, DISTILL_ESSENCE_GAIN, LOOK_CLOSER_SECONDS } from './tuning';
 	import { domainVerb, type Life, type LifeCategory } from './content/life';
 	import MiniHex from './MiniHex.svelte';
+	import WorldCanvas from './WorldCanvas.svelte';
 
 	const categories: { id: LifeCategory; label: string }[] = [
 		{ id: 'aquatic', label: 'in the water' },
@@ -89,6 +90,8 @@
 			on living whether or not she is looking — but it shows her more when she does.
 		</p>
 	</header>
+
+	<WorldCanvas />
 
 	<section class="attention-panel">
 		<div class="ap-line">
