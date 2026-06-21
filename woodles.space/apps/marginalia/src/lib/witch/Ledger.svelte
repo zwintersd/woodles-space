@@ -86,7 +86,12 @@
 
 	{#if book.life.length > 0}
 		<section class="group body">
-			<h3>the world's body {#if book.quiet}<span class="quiet">— going quiet</span>{/if}</h3>
+			<h3>
+				the world's body
+				{#if book.quiet}<span class="quiet">— going quiet</span>{:else if book.selfBalancing}<span
+						class="balancing">— holding itself</span
+					>{/if}
+			</h3>
 			<div class="cells">
 				{#each stockRows as row (row.id)}
 					<div class="cell stock" title={row.hint}>
@@ -187,6 +192,12 @@
 		font-size: 0.6rem;
 		letter-spacing: 0.12em;
 		color: var(--print-pink);
+	}
+	.balancing {
+		font-family: var(--font-ui);
+		font-size: 0.6rem;
+		letter-spacing: 0.12em;
+		color: var(--cyan);
 	}
 	.value.sm {
 		font-size: 1.1rem;

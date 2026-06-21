@@ -25,18 +25,32 @@ import {
 	OFFLINE_CAP_SECONDS,
 	STAGE_ACTIVITY,
 	FAVOR_STRESS_PENALTY,
-	WORLD_QUIET_STABILITY
+	WORLD_QUIET_STABILITY,
+	TEND_BUMP,
+	INVOKE_BUMP,
+	SHAPE_BASELINE_RAISE,
+	SHAPE_BASELINE_MAX,
+	ENCOURAGE_STABILITY,
+	ENCOURAGE_STABILITY_MAX,
+	GUIDE_METABOLISM_SCALE,
+	INTERVENTION_LOAD_WEIGHT,
+	INTERVENTION_LOAD_DECAY,
+	FAVOR_EQUILIBRIUM_BONUS,
+	EQUILIBRIUM_MIN_FACTOR
 } from './tuning';
 import {
 	type Stocks,
 	STOCK_IDS,
+	STOCK_BANDS,
 	neutralStocks,
 	severityFor,
 	nextVitality,
 	lifeStockRate,
 	driftRate,
+	focusStock,
 	stabilityOf
 } from './vitals';
+import { interventionForDomain } from './content/interventions';
 import { load, save, wipe, type BookSave } from './persist';
 import { getBestiaryCreatures, type BestiaryCreature } from './bestiaryDb';
 
@@ -85,6 +99,17 @@ export class Book {
 	vitalityOf(lifeId: string): number {
 		return this.vitality[lifeId] ?? 1;
 	}
+
+	// ── interventions: the Known endgame ──────────────────────────────────────
+	// lasting modifiers an intervention can set on the world…
+	stockBaseline = $state<Stocks>(neutralStocks()); // shape raises a drift target
+	stabilityBonus = $state(0); // encourage raises resilience
+	metabolismScale = $state<Record<string, number>>({}); // guide eases an animal's draw
+	// …and the bookkeeping: which life she has acted on (→ the line she spoke),
+	// how heavy her hand has been lately, and how long the world has held itself.
+	interventionsDone = $state<Record<string, number>>({}); // lifeId -> chosen line index
+	interventionLoad = $state(0);
+	equilibriumSeconds = $state(0);
 
 	// ── attention: the capacity that drives the idle tick ────────────────────
 	attentionCapacity = $state(ATTENTION_START);
@@ -214,8 +239,10 @@ export class Book {
 	);
 
 	// 0..100 resilience — how close the three stocks sit to a balanced world,
-	// lifted by the ecosystems she has come to Know.
-	stability = $derived(stabilityOf(this.stocks, this.knownEcosystems));
+	// lifted by the ecosystems she has come to Know and any encouragement.
+	stability = $derived(
+		Math.min(100, stabilityOf(this.stocks, this.knownEcosystems) + this.stabilityBonus)
+	);
 
 	// how stressed a life is right now: 0 (content) .. 1 (dire)
 	severityOf(life: Life): number {
@@ -225,6 +252,23 @@ export class Book {
 	// placeholder soft-fail signal — the world is "going quiet". The collapse
 	// pass will give this consequences and a voice; for now it only surfaces.
 	quiet = $derived(this.life.length > 0 && this.stability < WORLD_QUIET_STABILITY);
+
+	// ── derived: the equilibrium dividend ─────────────────────────────────────
+	// the world is balanced when every stock sits inside its healthy band.
+	private allStocksInBand = $derived(
+		STOCK_IDS.every((id) => {
+			const [lo, hi] = STOCK_BANDS[id];
+			return this.stocks[id] >= lo && this.stocks[id] <= hi;
+		})
+	);
+
+	// a balanced world she is *not* propping up rewards her — the lighter her
+	// recent hand (load), the larger the dividend. 0..1.
+	equilibriumFactor = $derived(
+		this.allStocksInBand ? Math.max(0, 1 - Math.min(1, this.interventionLoad)) : 0
+	);
+
+	selfBalancing = $derived(this.life.length > 0 && this.equilibriumFactor > EQUILIBRIUM_MIN_FACTOR);
 
 	favorBand: FavorBand = $derived(
 		this.favor >= 70 ? 'high' : this.favor <= 35 ? 'low' : 'even'
@@ -365,6 +409,85 @@ export class Book {
 		}
 	}
 
+	// ── interventions: act on a Known life, once, gently ──────────────────────
+
+	hasIntervened(lifeId: string): boolean {
+		return lifeId in this.interventionsDone;
+	}
+
+	interventionCostFor(lifeId: string): { insight: number; essence: number } {
+		const life = lifeById(lifeId);
+		return life ? interventionForDomain(life.domain).cost : { insight: 0, essence: 0 };
+	}
+
+	canIntervene(lifeId: string): boolean {
+		if (this.stageOf(lifeId) < STAGE_KNOWN || this.hasIntervened(lifeId)) return false;
+		const c = this.interventionCostFor(lifeId);
+		return this.insight >= c.insight && this.essence >= c.essence;
+	}
+
+	// the line she spoke when she acted on this life (persisted), or null
+	interventionLineFor(lifeId: string): string | null {
+		const idx = this.interventionsDone[lifeId];
+		const life = lifeById(lifeId);
+		if (idx === undefined || !life) return null;
+		return interventionForDomain(life.domain).lines[idx] ?? null;
+	}
+
+	intervene(lifeId: string) {
+		if (!this.canIntervene(lifeId)) return;
+		const life = lifeById(lifeId)!;
+		const spec = interventionForDomain(life.domain);
+		this.insight -= spec.cost.insight;
+		this.essence -= spec.cost.essence;
+		this.applyInterventionEffect(life);
+		const idx = Math.floor(Math.random() * spec.lines.length);
+		this.interventionsDone = { ...this.interventionsDone, [lifeId]: idx };
+		this.interventionLoad += INTERVENTION_LOAD_WEIGHT[spec.permanence];
+		this.persist();
+	}
+
+	// each verb does its own thing — see DESIGN.md §2.2.
+	private applyInterventionEffect(life: Life) {
+		const focus = focusStock(life.metabolism, life.needs);
+		switch (life.domain) {
+			case 'plant': {
+				// tend: a small, temporary bump to the stock it lives by; drift fades it
+				const s = { ...this.stocks };
+				s[focus] = Math.min(100, s[focus] + TEND_BUMP);
+				this.stocks = s;
+				break;
+			}
+			case 'weather': {
+				// invoke: a broad, uncertain moisture push — asked, never commanded
+				const s = { ...this.stocks };
+				s.moisture = Math.min(100, s.moisture + INVOKE_BUMP * (0.6 + Math.random() * 0.8));
+				this.stocks = s;
+				break;
+			}
+			case 'geology': {
+				// shape: move a stock's baseline for good — monumental, slow
+				const b = { ...this.stockBaseline };
+				b[focus] = Math.min(SHAPE_BASELINE_MAX, b[focus] + SHAPE_BASELINE_RAISE);
+				this.stockBaseline = b;
+				break;
+			}
+			case 'ecosystem': {
+				// encourage: raise the floor under everything
+				this.stabilityBonus = Math.min(
+					ENCOURAGE_STABILITY_MAX,
+					this.stabilityBonus + ENCOURAGE_STABILITY
+				);
+				break;
+			}
+			case 'animal': {
+				// guide: ease what it draws from the world
+				this.metabolismScale = { ...this.metabolismScale, [life.id]: GUIDE_METABOLISM_SCALE };
+				break;
+			}
+		}
+	}
+
 	// ── insight sinks ────────────────────────────────────────────────────────
 
 	expandAttention() {
@@ -402,7 +525,8 @@ export class Book {
 			const v = nextVitality(this.vitalityOf(l.id), this.severityOf(l), dt);
 			nextVit[l.id] = v;
 			stress += 1 - v;
-			const r = lifeStockRate(l.metabolism, STAGE_ACTIVITY[this.stageOf(l.id)] ?? 0, v);
+			const scale = this.metabolismScale[l.id] ?? 1;
+			const r = lifeStockRate(l.metabolism, (STAGE_ACTIVITY[this.stageOf(l.id)] ?? 0) * scale, v);
 			for (const id of STOCK_IDS) rate[id] += r[id] ?? 0;
 		}
 		this.vitality = nextVit;
@@ -417,19 +541,33 @@ export class Book {
 		// 3) stocks move by metabolism, then drift back toward neutral.
 		const s = { ...this.stocks };
 		for (const id of STOCK_IDS) {
-			s[id] = Math.max(0, Math.min(100, s[id] + (rate[id] + driftRate(s[id])) * dt));
+			s[id] = Math.max(
+				0,
+				Math.min(100, s[id] + (rate[id] + driftRate(s[id], this.stockBaseline[id])) * dt)
+			);
 		}
 		this.stocks = s;
 
 		// 4) the world yields Insight every second it is witnessed.
 		this.insight += this.insightPerSec * dt;
 
-		// 5) Favor eases toward a target set by how much she has Known, pulled down
-		//    by the world's accumulated stress. Exponential approach stays stable
-		//    for any dt (incl. offline jumps).
+		// 5) her hand grows light again, and a balanced world she isn't propping up
+		//    banks the equilibrium dividend.
+		if (this.interventionLoad > 0) {
+			this.interventionLoad = Math.max(0, this.interventionLoad - INTERVENTION_LOAD_DECAY * dt);
+		}
+		const eq = this.equilibriumFactor;
+		if (eq > EQUILIBRIUM_MIN_FACTOR) this.equilibriumSeconds += dt;
+
+		// 6) Favor eases toward a target set by how much she has Known, pulled down
+		//    by the world's stress and lifted when it holds itself. Exponential
+		//    approach stays stable for any dt (incl. offline jumps).
 		const target = Math.max(
 			0,
-			FAVOR_BASE_TARGET + FAVOR_PER_KNOWN * this.knownCount - FAVOR_STRESS_PENALTY * stress
+			FAVOR_BASE_TARGET +
+				FAVOR_PER_KNOWN * this.knownCount -
+				FAVOR_STRESS_PENALTY * stress +
+				FAVOR_EQUILIBRIUM_BONUS * eq
 		);
 		const k = 1 - Math.exp(-FAVOR_DRIFT_PER_SEC * dt);
 		this.favor = Math.max(0, Math.min(100, this.favor + (target - this.favor) * k));
@@ -499,6 +637,12 @@ export class Book {
 			favor: this.favor,
 			stocks: { ...this.stocks },
 			vitality: { ...this.vitality },
+			stockBaseline: { ...this.stockBaseline },
+			stabilityBonus: this.stabilityBonus,
+			metabolismScale: { ...this.metabolismScale },
+			interventionsDone: { ...this.interventionsDone },
+			interventionLoad: this.interventionLoad,
+			equilibriumSeconds: this.equilibriumSeconds,
 			attentionCapacity: this.attentionCapacity,
 			attending: [...this.attending],
 			study: { ...this.study },
@@ -524,6 +668,12 @@ export class Book {
 		this.favor = s.favor;
 		this.stocks = { ...(s.stocks ?? neutralStocks()) };
 		this.vitality = { ...(s.vitality ?? {}) };
+		this.stockBaseline = { ...(s.stockBaseline ?? neutralStocks()) };
+		this.stabilityBonus = s.stabilityBonus ?? 0;
+		this.metabolismScale = { ...(s.metabolismScale ?? {}) };
+		this.interventionsDone = { ...(s.interventionsDone ?? {}) };
+		this.interventionLoad = s.interventionLoad ?? 0;
+		this.equilibriumSeconds = s.equilibriumSeconds ?? 0;
 		this.attentionCapacity = s.attentionCapacity;
 		this.attending = [...s.attending];
 		this.study = { ...s.study };
@@ -562,6 +712,12 @@ export class Book {
 		this.favor = 60;
 		this.stocks = neutralStocks();
 		this.vitality = {};
+		this.stockBaseline = neutralStocks();
+		this.stabilityBonus = 0;
+		this.metabolismScale = {};
+		this.interventionsDone = {};
+		this.interventionLoad = 0;
+		this.equilibriumSeconds = 0;
 		this.attentionCapacity = ATTENTION_START;
 		this.attending = [];
 		this.study = {};

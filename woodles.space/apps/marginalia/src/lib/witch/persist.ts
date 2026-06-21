@@ -15,6 +15,13 @@ export interface BookSave {
 	// vital signs — the world's metabolism
 	stocks: Stocks;
 	vitality: Record<string, number>; // lifeId -> 0..1 health
+	// interventions — the Known endgame
+	stockBaseline: Stocks;
+	stabilityBonus: number;
+	metabolismScale: Record<string, number>;
+	interventionsDone: Record<string, number>; // lifeId -> spoken line index
+	interventionLoad: number;
+	equilibriumSeconds: number;
 	attentionCapacity: number;
 	attending: string[];
 	study: Record<string, number>;
@@ -46,6 +53,12 @@ export function emptySave(): BookSave {
 		favor: 60,
 		stocks: neutralStocks(),
 		vitality: {},
+		stockBaseline: neutralStocks(),
+		stabilityBonus: 0,
+		metabolismScale: {},
+		interventionsDone: {},
+		interventionLoad: 0,
+		equilibriumSeconds: 0,
 		attentionCapacity: ATTENTION_START,
 		attending: [],
 		study: {},
