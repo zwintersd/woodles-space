@@ -83,9 +83,13 @@ export type WorkshopPrefs = {
 	reduceMotion: boolean;
 };
 
+export type CollectionLayout = 'grid' | 'list';
+
 export type BestiarySettings = {
 	// the collection's preferred sort, kept across sessions and devices
 	sort?: SortKey;
+	// grid of cards or compact text list
+	collectionLayout?: CollectionLayout;
 	// how the workshop is laid out & how quiet it feels
 	workshop?: Partial<WorkshopPrefs>;
 };
@@ -95,7 +99,7 @@ export type BestiaryBlob = {
 	settings: BestiarySettings;
 };
 
-export type BestiaryView = 'collection' | 'editor';
+export type BestiaryView = 'collection' | 'editor' | 'codex';
 
 // What the collection is sorted/filtered by.
 export type SortKey = 'recent' | 'name' | 'cost' | 'rarity';
