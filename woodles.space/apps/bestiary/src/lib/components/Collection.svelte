@@ -5,6 +5,7 @@
 	import CreatureCard from './CreatureCard.svelte';
 	import ListView from './ListView.svelte';
 	import BinderPrint from './BinderPrint.svelte';
+	import StatSheetPrint from './StatSheetPrint.svelte';
 	import { formatAllPlainText, formatAllMarkdown, downloadText } from '$lib/textformat';
 
 	const sorts: { id: SortKey; label: string }[] = [
@@ -18,8 +19,9 @@
 	let counts = $derived(bestiary.rarityCounts);
 	let layout = $derived(bestiary.collectionLayout);
 
-	// Binder + export UI
+	// Print modals + export UI
 	let showBinder = $state(false);
+	let showStatSheet = $state(false);
 	let exportOpen = $state(false);
 	let exportCopiedText = $state(false);
 	let exportCopiedMd = $state(false);
@@ -148,12 +150,17 @@
 					>☰ list</button>
 				</div>
 
-				<!-- binder -->
+				<!-- print views -->
 				<button
 					class="chip binder-btn"
 					onclick={() => (showBinder = true)}
-					title="print card binder"
+					title="print card binder — 3×3 per page"
 				>⊟ binder</button>
+				<button
+					class="chip sheet-btn"
+					onclick={() => (showStatSheet = true)}
+					title="print stat sheets — 3 per page with stat detail and card back"
+				>⊠ stat sheet</button>
 
 				<!-- export menu -->
 				<div class="export-wrap">
@@ -217,6 +224,10 @@
 
 {#if showBinder}
 	<BinderPrint onclose={() => (showBinder = false)} />
+{/if}
+
+{#if showStatSheet}
+	<StatSheetPrint onclose={() => (showStatSheet = false)} />
 {/if}
 
 <style>
@@ -337,6 +348,7 @@
 	.layout-chip { gap: 0.25rem; }
 
 	.binder-btn:hover { color: var(--b-relational); border-color: color-mix(in srgb, var(--b-relational) 40%, transparent); }
+	.sheet-btn:hover  { color: var(--b-biochemical); border-color: color-mix(in srgb, var(--b-biochemical) 40%, transparent); }
 
 	.export-wrap { position: relative; }
 
