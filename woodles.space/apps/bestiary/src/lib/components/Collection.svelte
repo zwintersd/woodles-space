@@ -3,6 +3,8 @@
 	import { domains, rarities } from '$lib/content/domains';
 	import type { SortKey } from '$lib/types';
 	import CreatureCard from './CreatureCard.svelte';
+	import ListView from './ListView.svelte';
+	import { formatAllPlainText, formatAllMarkdown, downloadText } from '$lib/textformat';
 
 	const sorts: { id: SortKey; label: string }[] = [
 		{ id: 'recent', label: 'newest' },
@@ -13,6 +15,40 @@
 
 	let visible = $derived(bestiary.visibleCreatures);
 	let counts = $derived(bestiary.rarityCounts);
+	let layout = $derived(bestiary.collectionLayout);
+
+	// Export menu
+	let exportOpen = $state(false);
+	let exportCopiedText = $state(false);
+	let exportCopiedMd = $state(false);
+
+	function copyAllText() {
+		navigator.clipboard.writeText(formatAllPlainText(visible)).then(() => {
+			exportCopiedText = true;
+			setTimeout(() => { exportCopiedText = false; }, 1400);
+		});
+		exportOpen = false;
+	}
+
+	function copyAllMarkdown() {
+		navigator.clipboard.writeText(formatAllMarkdown(visible)).then(() => {
+			exportCopiedMd = true;
+			setTimeout(() => { exportCopiedMd = false; }, 1400);
+		});
+		exportOpen = false;
+	}
+
+	function downloadAllText() {
+		const date = new Date().toISOString().slice(0, 10);
+		downloadText(formatAllPlainText(visible), `bestiary-${date}.txt`);
+		exportOpen = false;
+	}
+
+	function downloadAllMarkdown() {
+		const date = new Date().toISOString().slice(0, 10);
+		downloadText(formatAllMarkdown(visible), `bestiary-${date}.md`);
+		exportOpen = false;
+	}
 </script>
 
 <div class="collection">
@@ -92,6 +128,47 @@
 					><span class="sym">{d.glyph}</span>{d.name}</button>
 				{/each}
 			</div>
+
+			<div class="control-end">
+				<!-- layout toggle -->
+				<div class="control-group layout-toggle" role="group" aria-label="view layout">
+					<button
+						class="chip layout-chip"
+						class:active={layout === 'grid'}
+						onclick={() => bestiary.setCollectionLayout('grid')}
+						title="card grid"
+					>⊞ grid</button>
+					<button
+						class="chip layout-chip"
+						class:active={layout === 'list'}
+						onclick={() => bestiary.setCollectionLayout('list')}
+						title="text list"
+					>☰ list</button>
+				</div>
+
+				<!-- export menu -->
+				<div class="export-wrap">
+					<button
+						class="chip export-trigger"
+						class:active={exportOpen}
+						onclick={() => (exportOpen = !exportOpen)}
+						title="export visible creatures"
+					>
+						{#if exportCopiedText || exportCopiedMd}✓ copied{:else}↓ export{/if}
+					</button>
+					{#if exportOpen}
+						<div
+							class="export-menu"
+							role="menu"
+						>
+							<button class="export-item" role="menuitem" onclick={copyAllText}>⎘ copy as text</button>
+							<button class="export-item" role="menuitem" onclick={copyAllMarkdown}>⎘ copy as markdown</button>
+							<button class="export-item" role="menuitem" onclick={downloadAllText}>↓ download .txt</button>
+							<button class="export-item" role="menuitem" onclick={downloadAllMarkdown}>↓ download .md</button>
+						</div>
+					{/if}
+				</div>
+			</div>
 		</div>
 	{/if}
 
@@ -116,6 +193,8 @@
 			<p class="empty-lead">Nothing on the shelf matches.</p>
 			<button class="ghost" onclick={() => bestiary.clearFilters()}>clear filters</button>
 		</div>
+	{:else if layout === 'list'}
+		<ListView />
 	{:else}
 		<div class="grid">
 			{#each visible as creature (creature.id)}
@@ -233,6 +312,43 @@
 		border-color: var(--c);
 		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 40%, transparent);
 	}
+
+	/* ── layout + export controls ── */
+	.control-end {
+		display: flex;
+		align-items: center;
+		gap: var(--b-space-sm);
+		margin-left: auto;
+	}
+
+	.layout-chip { gap: 0.25rem; }
+
+	.export-wrap { position: relative; }
+
+	.export-menu {
+		position: absolute;
+		right: 0;
+		top: calc(100% + 4px);
+		background: var(--b-surface);
+		border: 1px solid var(--b-border);
+		border-radius: var(--b-radius-sm);
+		box-shadow: var(--b-shadow-card);
+		z-index: var(--b-z-panel);
+		min-width: 160px;
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.export-item {
+		font-family: var(--b-font-mono);
+		font-size: 0.74rem;
+		color: var(--b-text-dim);
+		padding: 0.5rem 0.85rem;
+		text-align: left;
+		transition: background var(--b-transition-fast), color var(--b-transition-fast);
+	}
+	.export-item:hover { background: var(--b-surface-2, var(--b-bg)); color: var(--b-gold); }
 
 	/* ── grid ── */
 	.grid {

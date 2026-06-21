@@ -3,6 +3,7 @@ import type {
 	BestiaryBlob,
 	BestiarySettings,
 	BestiaryView,
+	CollectionLayout,
 	SortKey,
 	RarityFilter,
 	DomainFilter,
@@ -206,6 +207,15 @@ export class Bestiary {
 		return this.settings.sort ?? 'recent';
 	}
 
+	get collectionLayout(): CollectionLayout {
+		return this.settings.collectionLayout ?? 'grid';
+	}
+
+	setCollectionLayout(layout: CollectionLayout): void {
+		this.settings = { ...this.settings, collectionLayout: layout };
+		save(SETTINGS_KEY, this.settings);
+	}
+
 	// Workshop layout & comfort, merged over the defaults so a partial (or older)
 	// stored blob still reads as a complete set of preferences.
 	get workshop(): WorkshopPrefs {
@@ -251,6 +261,11 @@ export class Bestiary {
 	openEditor(id: string): void {
 		this.activeCreatureId = id;
 		this.currentView = 'editor';
+	}
+
+	openCodex(id: string): void {
+		this.activeCreatureId = id;
+		this.currentView = 'codex';
 	}
 
 	setSort(sort: SortKey): void {
@@ -425,6 +440,18 @@ export class Bestiary {
 		a.download = `bestiary-export-${new Date().toISOString().slice(0, 10)}.json`;
 		a.click();
 		URL.revokeObjectURL(a.href);
+	}
+
+	// Return the codex neighbour IDs for prev/next navigation within the
+	// currently visible (filtered + sorted) list.
+	codexNeighbours(id: string): { prev: string | null; next: string | null } {
+		const list = this.visibleCreatures;
+		const idx = list.findIndex(c => c.id === id);
+		if (idx === -1) return { prev: null, next: null };
+		return {
+			prev: idx > 0 ? list[idx - 1].id : null,
+			next: idx < list.length - 1 ? list[idx + 1].id : null
+		};
 	}
 }
 

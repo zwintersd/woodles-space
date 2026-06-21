@@ -3,6 +3,7 @@
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import Collection from '$lib/components/Collection.svelte';
 	import CardEditor from '$lib/components/CardEditor.svelte';
+	import CreatureCodex from '$lib/components/CreatureCodex.svelte';
 
 	function handleKeydown(e: KeyboardEvent) {
 		const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
@@ -11,6 +12,15 @@
 			if (bestiary.showComfort) { bestiary.showComfort = false; return; }
 			if (bestiary.showSyncPanel) { bestiary.showSyncPanel = false; return; }
 			if (bestiary.currentView === 'editor') { bestiary.openCollection(); return; }
+			if (bestiary.currentView === 'codex') { bestiary.openCollection(); return; }
+		}
+		if (e.key === 'ArrowLeft' && bestiary.currentView === 'codex' && bestiary.activeCreatureId) {
+			const { prev } = bestiary.codexNeighbours(bestiary.activeCreatureId);
+			if (prev) bestiary.openCodex(prev);
+		}
+		if (e.key === 'ArrowRight' && bestiary.currentView === 'codex' && bestiary.activeCreatureId) {
+			const { next } = bestiary.codexNeighbours(bestiary.activeCreatureId);
+			if (next) bestiary.openCodex(next);
 		}
 	}
 </script>
@@ -22,6 +32,8 @@
 	<main class="main-content">
 		{#if bestiary.currentView === 'editor'}
 			<CardEditor />
+		{:else if bestiary.currentView === 'codex'}
+			<CreatureCodex />
 		{:else}
 			<Collection />
 		{/if}
