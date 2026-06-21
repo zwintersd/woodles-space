@@ -22,8 +22,21 @@ import {
 	FAVOR_PER_KNOWN,
 	FAVOR_DRIFT_PER_SEC,
 	favorMultiplier,
-	OFFLINE_CAP_SECONDS
+	OFFLINE_CAP_SECONDS,
+	STAGE_ACTIVITY,
+	FAVOR_STRESS_PENALTY,
+	WORLD_QUIET_STABILITY
 } from './tuning';
+import {
+	type Stocks,
+	STOCK_IDS,
+	neutralStocks,
+	severityFor,
+	nextVitality,
+	lifeStockRate,
+	driftRate,
+	stabilityOf
+} from './vitals';
 import { load, save, wipe, type BookSave } from './persist';
 import { getBestiaryCreatures, type BestiaryCreature } from './bestiaryDb';
 
@@ -62,6 +75,16 @@ export class Book {
 	// ── this-world resources ─────────────────────────────────────────────────
 	insight = $state(0); // the world's idle currency
 	favor = $state(60); // the world's relationship with her, 0..100
+
+	// ── vital signs: the world's metabolism ──────────────────────────────────
+	// three stocks life produces and consumes; out-of-band stocks stress the
+	// life that needs them. vitality is each life's health, 0..1.
+	stocks = $state<Stocks>(neutralStocks());
+	vitality = $state<Record<string, number>>({}); // lifeId -> 0..1 (default 1)
+
+	vitalityOf(lifeId: string): number {
+		return this.vitality[lifeId] ?? 1;
+	}
 
 	// ── attention: the capacity that drives the idle tick ────────────────────
 	attentionCapacity = $state(ATTENTION_START);
@@ -150,11 +173,12 @@ export class Book {
 
 	// ── derived: the idle engine ─────────────────────────────────────────────
 
-	// raw Insight/sec from witnessed life, before the Favor multiplier
+	// raw Insight/sec from witnessed life, before the Favor multiplier. A
+	// stressed life (low vitality) shows her less.
 	private baseInsightRate = $derived.by(() => {
 		let r = 0;
 		for (const l of this.life) {
-			r += l.insightWeight * (STAGE_INSIGHT_MULT[this.stageOf(l.id)] ?? 0);
+			r += l.insightWeight * (STAGE_INSIGHT_MULT[this.stageOf(l.id)] ?? 0) * this.vitalityOf(l.id);
 		}
 		return r;
 	});
@@ -177,16 +201,30 @@ export class Book {
 
 	// ── derived: world metrics & framing ─────────────────────────────────────
 
-	complexity = $derived(this.life.length + this.emergences.length);
-	nutrients = $derived(
-		(this.hasWritten('returning') ? 40 : 0) + (this.hasWritten('flow') ? 20 : 0)
-	);
-	oxygen = $derived(this.life.filter((l) => l.domain === 'plant').length * 12);
+	// richness of the world — weighted by how deeply each life is witnessed,
+	// plus what has emerged and what she has fully Known.
+	complexity = $derived.by(() => {
+		let c = 0;
+		for (const l of this.life) c += 1 + this.stageOf(l.id);
+		return c + 1.5 * this.emergences.length + 2 * this.knownCount;
+	});
 
-	private studiedCount = $derived(
-		Object.values(this.observation).filter((s) => s >= STAGE_STUDIED).length
+	private knownEcosystems = $derived(
+		this.life.filter((l) => l.domain === 'ecosystem' && this.stageOf(l.id) >= STAGE_KNOWN).length
 	);
-	stability = $derived(Math.min(100, 30 + this.studiedCount * 10));
+
+	// 0..100 resilience — how close the three stocks sit to a balanced world,
+	// lifted by the ecosystems she has come to Know.
+	stability = $derived(stabilityOf(this.stocks, this.knownEcosystems));
+
+	// how stressed a life is right now: 0 (content) .. 1 (dire)
+	severityOf(life: Life): number {
+		return severityFor(life.needs, this.stocks);
+	}
+
+	// placeholder soft-fail signal — the world is "going quiet". The collapse
+	// pass will give this consequences and a voice; for now it only surfaces.
+	quiet = $derived(this.life.length > 0 && this.stability < WORLD_QUIET_STABILITY);
 
 	favorBand: FavorBand = $derived(
 		this.favor >= 70 ? 'high' : this.favor <= 35 ? 'low' : 'even'
@@ -352,17 +390,47 @@ export class Book {
 
 	tick(dt: number) {
 		if (dt <= 0) return;
-		// study accrual for everything she is attending to
+		const present = this.life;
+
+		// 1) vitality eases with each life's stress, and a wilting life metabolises
+		//    less — so a stressed world eases its own pressure. gather stock rates
+		//    and the world's total stress in the same pass.
+		const nextVit: Record<string, number> = { ...this.vitality };
+		const rate: Stocks = { nutrients: 0, oxygen: 0, moisture: 0 };
+		let stress = 0;
+		for (const l of present) {
+			const v = nextVitality(this.vitalityOf(l.id), this.severityOf(l), dt);
+			nextVit[l.id] = v;
+			stress += 1 - v;
+			const r = lifeStockRate(l.metabolism, STAGE_ACTIVITY[this.stageOf(l.id)] ?? 0, v);
+			for (const id of STOCK_IDS) rate[id] += r[id] ?? 0;
+		}
+		this.vitality = nextVit;
+
+		// 2) study accrual for attended life, slowed when it is suffering.
 		for (const id of [...this.attending]) {
 			const life = lifeById(id);
 			if (!life) continue;
-			this.addStudy(id, dt * life.studyEase);
+			this.addStudy(id, dt * life.studyEase * this.vitalityOf(id));
 		}
-		// the world yields Insight every second it is witnessed
+
+		// 3) stocks move by metabolism, then drift back toward neutral.
+		const s = { ...this.stocks };
+		for (const id of STOCK_IDS) {
+			s[id] = Math.max(0, Math.min(100, s[id] + (rate[id] + driftRate(s[id])) * dt));
+		}
+		this.stocks = s;
+
+		// 4) the world yields Insight every second it is witnessed.
 		this.insight += this.insightPerSec * dt;
-		// Favor eases toward the target set by how much she has Known.
-		// Exponential approach stays stable for any dt (incl. offline jumps).
-		const target = FAVOR_BASE_TARGET + FAVOR_PER_KNOWN * this.knownCount;
+
+		// 5) Favor eases toward a target set by how much she has Known, pulled down
+		//    by the world's accumulated stress. Exponential approach stays stable
+		//    for any dt (incl. offline jumps).
+		const target = Math.max(
+			0,
+			FAVOR_BASE_TARGET + FAVOR_PER_KNOWN * this.knownCount - FAVOR_STRESS_PENALTY * stress
+		);
 		const k = 1 - Math.exp(-FAVOR_DRIFT_PER_SEC * dt);
 		this.favor = Math.max(0, Math.min(100, this.favor + (target - this.favor) * k));
 	}
@@ -429,6 +497,8 @@ export class Book {
 			knowing: this.knowing,
 			insight: this.insight,
 			favor: this.favor,
+			stocks: { ...this.stocks },
+			vitality: { ...this.vitality },
 			attentionCapacity: this.attentionCapacity,
 			attending: [...this.attending],
 			study: { ...this.study },
@@ -452,6 +522,8 @@ export class Book {
 		this.knowing = s.knowing;
 		this.insight = s.insight;
 		this.favor = s.favor;
+		this.stocks = { ...(s.stocks ?? neutralStocks()) };
+		this.vitality = { ...(s.vitality ?? {}) };
 		this.attentionCapacity = s.attentionCapacity;
 		this.attending = [...s.attending];
 		this.study = { ...s.study };
@@ -488,6 +560,8 @@ export class Book {
 		this.knowing = 0;
 		this.insight = 0;
 		this.favor = 60;
+		this.stocks = neutralStocks();
+		this.vitality = {};
 		this.attentionCapacity = ATTENTION_START;
 		this.attending = [];
 		this.study = {};

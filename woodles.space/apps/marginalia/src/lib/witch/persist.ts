@@ -1,6 +1,7 @@
 // localStorage save/load for The Witch's Book.
 
 import { ATTENTION_START } from './tuning';
+import { neutralStocks, type Stocks } from './vitals';
 
 const KEY = 'witch.book.save.v1';
 const LEGACY_MARGINALIA_KEY = 'marginalia.save.v1';
@@ -11,6 +12,9 @@ export interface BookSave {
 	knowing: number;
 	insight: number;
 	favor: number;
+	// vital signs — the world's metabolism
+	stocks: Stocks;
+	vitality: Record<string, number>; // lifeId -> 0..1 health
 	attentionCapacity: number;
 	attending: string[];
 	study: Record<string, number>;
@@ -40,6 +44,8 @@ export function emptySave(): BookSave {
 		knowing: 0,
 		insight: 0,
 		favor: 60,
+		stocks: neutralStocks(),
+		vitality: {},
 		attentionCapacity: ATTENTION_START,
 		attending: [],
 		study: {},
