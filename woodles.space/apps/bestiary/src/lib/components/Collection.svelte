@@ -4,6 +4,7 @@
 	import type { SortKey } from '$lib/types';
 	import CreatureCard from './CreatureCard.svelte';
 	import ListView from './ListView.svelte';
+	import BinderPrint from './BinderPrint.svelte';
 	import { formatAllPlainText, formatAllMarkdown, downloadText } from '$lib/textformat';
 
 	const sorts: { id: SortKey; label: string }[] = [
@@ -17,7 +18,8 @@
 	let counts = $derived(bestiary.rarityCounts);
 	let layout = $derived(bestiary.collectionLayout);
 
-	// Export menu
+	// Binder + export UI
+	let showBinder = $state(false);
 	let exportOpen = $state(false);
 	let exportCopiedText = $state(false);
 	let exportCopiedMd = $state(false);
@@ -146,6 +148,13 @@
 					>☰ list</button>
 				</div>
 
+				<!-- binder -->
+				<button
+					class="chip binder-btn"
+					onclick={() => (showBinder = true)}
+					title="print card binder"
+				>⊟ binder</button>
+
 				<!-- export menu -->
 				<div class="export-wrap">
 					<button
@@ -205,6 +214,10 @@
 		</div>
 	{/if}
 </div>
+
+{#if showBinder}
+	<BinderPrint onclose={() => (showBinder = false)} />
+{/if}
 
 <style>
 	.collection {
@@ -322,6 +335,8 @@
 	}
 
 	.layout-chip { gap: 0.25rem; }
+
+	.binder-btn:hover { color: var(--b-relational); border-color: color-mix(in srgb, var(--b-relational) 40%, transparent); }
 
 	.export-wrap { position: relative; }
 
