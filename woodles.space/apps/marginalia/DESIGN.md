@@ -193,9 +193,7 @@ the favor it can reach — a propped world depends, it doesn't trust. a world sh
 prestige. the golden path is the light touch. ✍️ you: the line for the moment a world
 first self-balances (the rewarded beat), and the line for *choosing not to* intervene.
 
-⚖️ **fork — intervention currency.** I have it on **Insight** (+ Essence for geology).
-alternative: a dedicated "care" resource. *recommend Insight* — it gives the idle
-currency a real sink and avoids a fourth counter. ok?
+✅ **resolved — intervention currency: Insight (+ Essence for the geology verb).**
 
 ---
 
@@ -216,43 +214,41 @@ further. `worldIndex` (`book.svelte.ts:75`, currently inert) becomes the run cou
                                     ▼
         complexity climbs ──► prestige unlocks ──► "close the Book"
                                     ▼
-        mint GLEANINGS  ∝  f(complexity, known, equilibrium)
+        mint CONCEPTS  ∝  f(complexity, known, equilibrium)
                                     ▼
-        spend GLEANINGS on the meta-tree ──► open the next Book ──┐
+        spend CONCEPTS on the meta-tree ──► open the next Book ──┐
             ▲                                                     │
             └─────────────────────────────────────────────────────┘
 ```
 
-### 3.2 what carries, what resets  ⚖️ fork
+### 3.2 what carries, what resets
 
 leaning typical-incremental:
 
 | carries across worlds | resets each world |
 | --- | --- |
 | **Knowing** (lifetime stat) | Insight, Favor, vital signs |
-| **Gleanings** + everything bought | written conditions, observation, attending, study |
+| **Concepts** + everything bought | written conditions, observation, attending, study |
 | unlocked **assumptions** | the (procedural) life set, intervention load |
 | unlocked **condition tiers / domains** | **Essence** → back to meta-upgradable base |
 | **creature-cap** level | **attention capacity** → back to meta-upgradable base |
 | reading-room stars, titles | |
 
-⚖️ **fork — Essence & attention.** the old code comments call Essence/Knowing
-"carried." for a clean prestige curve I'd **reset Essence and attention to
-meta-upgradable baselines** (Knowing stays the carried lifetime stat). this contradicts
-an old comment, but you said don't worry about save-compat. *recommend reset.* keep
-either carried instead?
+✅ **resolved — Essence and attention reset to meta-upgradable baselines** each world;
+Knowing stays the carried lifetime stat. (the old "carried" comments will be updated
+when prestige lands.)
 
-### 3.3 minting gleanings
+### 3.3 minting concepts
 
 ```
-gleanings = floor( 0.5·√complexityPeak  +  0.3·knownCount  +  0.2·√equilibriumSeconds )
+concepts = floor( 0.5·√complexityPeak  +  0.3·knownCount  +  0.2·√equilibriumSeconds )
 ```
 
 √-scaling = diminishing returns, the genre standard: longer/richer runs pay more, but
 sublinearly, so there's always a reason to reset. the `equilibriumSeconds` term is the
 restraint dividend from §2.3 — **the gentlest worlds are worth the most.**
 
-### 3.4 the meta-tree (gleanings sinks)
+### 3.4 the meta-tree (concepts sinks)
 
 permanent, between-worlds upgrades — bought in **the Study** (the book-closed screen,
 which currently does nothing but greet you):
@@ -294,35 +290,40 @@ world 1 stays authored. from world 2, generate a world from the assumption loado
 - author the four stage-texts from **templates per domain** (✍️ you: the template
   phrasings; procedural prose should still sound like her)
 
-### 3.7 the soft fail  ⚖️ fork
+### 3.7 the soft fail
 
-idle games rarely hard-fail. I'd make **collapse a state, not a game-over**: if stability
-sits at 0 too long, the world "goes quiet" — yields floor, life thins, and the only move
-is to close the Book, which still pays a **guaranteed gleanings floor** plus a unique
+idle games rarely hard-fail. **collapse is a state, not a game-over**: if stability
+sits very low too long, the world "goes quiet" — yields floor, life thins, and the only
+move is to close the Book, which still pays a **guaranteed concepts floor** plus a unique
 bittersweet journal beat and title. honors "loss is relational" without punishing.
-*recommend include, but as a later pass.* ⚖️ build it now or defer?
+
+✅ **resolved — placeholder now, full pass later.** phase A ships a `book.quiet` signal
+(stability below `WORLD_QUIET_STABILITY`, surfaced as a quiet line in the Ledger) so the
+state exists and is visible; its consequences and voice land with the collapse pass (F).
 
 ---
 
 ## 4. the voice lines I need (✍️ you)
 
-collected so you can write them in one sitting. all optional-to-draft — say the word and
-I'll rough them in Brianna's register for you to redline.
+collected so you can write them in one sitting. ✅ = already provided; the rest are
+still open. all optional-to-draft — say the word and I'll rough any in Brianna's
+register for you to redline.
 
-1. **prestige currency** — its name (placeholder **"gleanings"**) + one line of meaning.
+1. ✅ **prestige currency — Concepts.** (still nice to have: one line of what they *are*
+   to her.)
 2. **closing the Book** — what she says/does when she lets a finished world go (the
    prestige action; distinct from the plain "close the book" toggle that exists now).
-3. **the five interventions** — 1–2 lines each for *tend / guide / encourage / shape /
-   invoke*: what it feels like to do it.
+3. ✅ **the five interventions** — your lines are captured in
+   `content/interventions.ts` (four each for tend / guide / encourage / shape / invoke).
 4. **restraint beats** — a line for *choosing not to intervene*, and a line for the
    moment a world **first self-balances** (the rewarded equilibrium).
 5. **loss** — reusable micro-copy for a life **declining** and for one **dying-as-meal**
    (per-domain if you're inspired; one each is enough to start).
-6. **the vital signs, in her words** — does she call them nutrients/oxygen/moisture, or
-   something like *the soil's memory / the breath / the damp*? labels + tooltips.
+6. ✅ **the vital signs — nutrients / oxygen / moisture** (plain names chosen). the
+   Ledger tooltips are functional placeholders; reword them in her voice anytime.
 7. **assumptions becoming choices** — the framing when prestige unlocks changing one.
 8. **collapse** — the journal beat + title for a world that goes quiet (cf. the golden
-   "The Witness").
+   "The Witness"). the `book.quiet` placeholder is live and waiting for this.
 9. **new journal seeds** — for: first intervention, first death, first equilibrium, first
    close-the-Book, first changed assumption. (extends `content/journal.ts`.)
 10. **meta-tree copy** — §3.4 upgrade names/descriptions (or I draft).
@@ -331,29 +332,9 @@ I'll rough them in Brianna's register for you to redline.
 
 ## 5. asset list (for you)
 
-for the §1.6 canvas. an afternoon's worth; **P1 is the minimum** for a living diorama,
-P2/P3 are richness. format: **PNG-24 + alpha, @2x**, soft-edged to match the existing
-glow aesthetic (palette in `lib/style/tokens.css` — periwinkle, cyan, leafeon-pink; dark
-stage `#1a1a3e`). pixel-art is fine where noted — there's already an `image-rendering:
-pixelated` path. life creatures come from **Bestiary bindings**, so you don't draw those
-here.
-
-**P1 — the diorama (≈8 pieces)**
-- **sky** — 1 sun/star sprite (~128²); optional moon.
-- **clouds** — 3 soft cloud variants (~256×128); opacity will be driven by moisture.
-- **rain overlay** — 1 vertically-tileable strip (~256²).
-- **mist overlay** — 1 soft wide haze (~512×256).
-- **terrain cross-section** — 1 rock-strata silhouette (~1024×256) + 1 soil-band overlay
-  to tint by nutrients.
-- **sea/waterline** — 1 semi-transparent water layer (~1024×256); surface animates in code.
-
-**P2 — flora & particles (only the canonical plants without Bestiary art)**
-- algae (~64²), lichen crust (~96²), moss patch (~96²), fungal threads (~128²).
-- particle motes: oxygen bubble (~16²), nutrient mote (~16²), salt crystal (~24²).
-
-**P3 — the gauge cluster (hex aesthetic, matches `HexStage`)**
-- 1 reusable hex/ring **gauge frame** (~96²), tinted per sign.
-- 5 line **icons** (~48²): nutrients, oxygen, moisture, stability, complexity.
+moved to a dedicated brief with composition, exact sizes, palette hexes, and delivery
+conventions: **[ASSETS.md](./ASSETS.md)**. (P1 is the minimum for a living diorama;
+P2/P3 are richness. creatures come from Bestiary bindings, so you don't draw those.)
 
 ---
 
@@ -361,16 +342,18 @@ here.
 
 each phase is shippable on its own and unblocks the next.
 
-| phase | what | depends on |
-| --- | --- | --- |
-| **A** | vital-signs math — stocks, bands, stress, decline, gating; surfaced as numbers in the Ledger | — |
-| **B** | the canvas diorama | A · P1 assets |
-| **C** | interventions — the five verbs, intervention load, equilibrium dividend | A |
-| **D** | prestige — close the Book, gleanings, the Study meta-tree, Essence/attention reset | A, C |
-| **E** | procedural worlds — generator, name-gen, creature-cap scaling, worlds 2+ | D |
-| **F** | collapse/soft-fail + favor weather events | A, D |
+| phase | what | depends on | status |
+| --- | --- | --- | --- |
+| **A** | vital-signs math — stocks, bands, stress, vitality, gating; the `quiet` placeholder; surfaced as numbers in the Ledger | — | ✅ shipped |
+| **B** | the canvas diorama, **+ visible decline/death** (loss made legible alongside the art) | A · P1 assets | — |
+| **C** | interventions — the five verbs, intervention load, equilibrium dividend | A | — |
+| **D** | prestige — close the Book, Concepts, the Study meta-tree, Essence/attention reset | A, C | — |
+| **E** | procedural worlds — generator, name-gen, creature-cap scaling, worlds 2+ | D | — |
+| **F** | collapse/soft-fail + favor weather events | A, D | — |
 
-**recommended first build: phase A.** it's invisible-ish but it's the spine everything
-else hangs on, it finally uses four dead derived values, and it makes the existing world
-*behave*. I can start there the moment you've ruled on the three forks (§2.3, §3.2, §3.7).
-```
+**phase A is in.** the three stocks live and cycle, life metabolises and is stressed by
+what it lacks, vitality mediates yield/study/favor, stability and complexity are real,
+and the Ledger shows it all. **decline and death moved to phase B**: a creature wilting
+or dying shouldn't happen before the canvas can show *why* — so in A, vitality floors
+(dormant, recoverable) rather than removing life. next natural step is **B** (needs the
+[ASSETS.md](./ASSETS.md) art) or **C** (interventions, no art required).

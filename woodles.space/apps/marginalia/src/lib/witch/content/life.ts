@@ -2,6 +2,8 @@
 // Each entry emerges once its required conditions are written. Brianna cannot
 // touch a thing until she has witnessed it: notice, observe, study, know.
 
+import type { StockVector, Needs } from '../vitals';
+
 export type LifeCategory = 'aquatic' | 'terrestrial' | 'atmospheric';
 export type LifeDomain = 'plant' | 'animal' | 'ecosystem' | 'geology' | 'weather';
 
@@ -29,6 +31,14 @@ export interface Life {
 	//   <1 is slow but usually richer — the core min/max tension.
 	insightWeight: number;
 	studyEase: number;
+	// vital signs ────────────────────────────────────────────────────────────
+	// metabolism: per-second effect on each stock at full activity (Known and
+	//   healthy), positive produces / negative consumes. Scaled by stage and
+	//   vitality at runtime. Omitted = metabolically inert.
+	// needs: healthy bands on the stocks this life depends on. Out of band, the
+	//   life is stressed: it yields less, deepens slower, and its vitality drains.
+	metabolism?: StockVector;
+	needs?: Needs;
 	// the four observation stages — the description fills in as she watches
 	notice: string; // greyed-out, before she has looked
 	observe: string; // first sustained look
@@ -47,6 +57,7 @@ export const world1Life: Life[] = [
 		requires: ['holding'],
 		insightWeight: 0.5,
 		studyEase: 1.4,
+		metabolism: { nutrients: 0.03 },
 		notice: 'something white gathering at the tide line.',
 		observe: 'crystals. they grow where the water is allowed to leave but the salt is not.',
 		study: 'they keep the shape of the last wave. the sea writes itself down here.',
@@ -61,6 +72,8 @@ export const world1Life: Life[] = [
 		requires: ['flow', 'reaching'],
 		insightWeight: 1.2,
 		studyEase: 1.0,
+		metabolism: { oxygen: 0.2, nutrients: -0.06 },
+		needs: { nutrients: [30, 100] },
 		notice: 'something green in the shallows.',
 		observe: 'it pulses, faintly, with the light. the first thing here that eats the sun.',
 		study: 'it spreads toward nutrients and dies when the water warms. it keeps the light cycle better than a clock.',
@@ -75,6 +88,7 @@ export const world1Life: Life[] = [
 		requires: ['flow', 'holding'],
 		insightWeight: 1.7,
 		studyEase: 0.7,
+		metabolism: { oxygen: 0.02, nutrients: 0.02 },
 		notice: 'small held waters along the rock.',
 		observe: 'each pool is its own argument. cut off twice a day, and richer for it.',
 		study: 'the crowded ones diverge fastest. scarcity, doing its patient work.',
@@ -89,6 +103,8 @@ export const world1Life: Life[] = [
 		requires: ['boundary', 'flow'],
 		insightWeight: 1.4,
 		studyEase: 0.9,
+		metabolism: { oxygen: -0.1 },
+		needs: { oxygen: [45, 100] },
 		notice: 'a drifting translucence in the deeper water.',
 		observe: 'a boundary that moves itself. it has no plan, only a pulse.',
 		study: 'it follows warmth and flinches from shadow. the first life here that decides anything.',
@@ -105,6 +121,8 @@ export const world1Life: Life[] = [
 		requires: ['reaching', 'holding'],
 		insightWeight: 0.7,
 		studyEase: 1.3,
+		metabolism: { oxygen: 0.05, nutrients: 0.02, moisture: -0.02 },
+		needs: { moisture: [15, 100] },
 		notice: 'a grey-gold crust on the bare rock.',
 		observe: 'two lives agreeing to be one. it asks the stone for almost nothing.',
 		study: 'it advances a hair each year and unmakes the rock as it goes. the first soil is its leavings.',
@@ -119,6 +137,8 @@ export const world1Life: Life[] = [
 		requires: ['reaching', 'returning'],
 		insightWeight: 0.9,
 		studyEase: 1.1,
+		metabolism: { oxygen: 0.1, nutrients: -0.04, moisture: -0.05 },
+		needs: { moisture: [40, 100], nutrients: [25, 100] },
 		notice: 'a low green softening the hollows.',
 		observe: 'it has no roots. it drinks the whole sky at once and holds the rain in place.',
 		study: 'where it spreads, the ground stops leaving. it keeps the water for everything that comes after.',
@@ -133,6 +153,7 @@ export const world1Life: Life[] = [
 		requires: ['returning', 'holding'],
 		insightWeight: 1.9,
 		studyEase: 0.6,
+		metabolism: { nutrients: 0.15, oxygen: -0.03 },
 		notice: 'pale threads under the moss, where she had not thought to look.',
 		observe: 'it is the part of returning that no one sees. it eats what has ended.',
 		study: 'every separate plant is, underground, not separate at all. it carries word between them.',
@@ -147,6 +168,7 @@ export const world1Life: Life[] = [
 		requires: ['falling', 'flow'],
 		insightWeight: 0.6,
 		studyEase: 1.3,
+		metabolism: { moisture: 0.06 },
 		notice: 'a dark seam in the rock that stays wet.',
 		observe: 'water arriving from inside the land, having fallen somewhere else first.',
 		study: 'it is the same rain, kept and slowly given back. the land breathes out where it is lowest.',
@@ -163,6 +185,7 @@ export const world1Life: Life[] = [
 		requires: ['flow', 'falling'],
 		insightWeight: 1.0,
 		studyEase: 1.0,
+		metabolism: { moisture: 0.05 },
 		notice: 'the sky is no longer empty.',
 		observe: 'water, gone up, gathered, made visible. the cycle showing its work.',
 		study: 'they thicken over the warm sea and break against the cold land. weather is just water with somewhere to be.',
@@ -177,6 +200,7 @@ export const world1Life: Life[] = [
 		requires: ['flow', 'falling', 'returning'],
 		insightWeight: 1.5,
 		studyEase: 0.8,
+		metabolism: { moisture: 0.18 },
 		notice: 'the clouds are letting go of something.',
 		observe: 'freshwater, carried inland and set down where nothing could reach before.',
 		study: 'it decides where the land turns green. everything terrestrial waits on its schedule.',
@@ -191,6 +215,7 @@ export const world1Life: Life[] = [
 		requires: ['flow', 'boundary'],
 		insightWeight: 0.8,
 		studyEase: 1.2,
+		metabolism: { moisture: 0.07 },
 		notice: 'the shoreline blurs in the early light.',
 		observe: 'a soft, low water that never quite becomes rain.',
 		study: 'it makes a narrow band of damp the moss and lichen never have to leave. a microhabitat, hand-width thin.',
