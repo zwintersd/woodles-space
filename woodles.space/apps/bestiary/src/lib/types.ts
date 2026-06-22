@@ -85,6 +85,10 @@ export type WorkshopPrefs = {
 
 export type CollectionLayout = 'grid' | 'list';
 
+// Animated border / overlay effect shown on a card back.
+// 'none' = clean; each other value applies a CSS animation layer.
+export type BackBorderStyle = 'none' | 'pulse' | 'shimmer' | 'halo' | 'drift';
+
 export type BestiarySettings = {
 	// the collection's preferred sort, kept across sessions and devices
 	sort?: SortKey;

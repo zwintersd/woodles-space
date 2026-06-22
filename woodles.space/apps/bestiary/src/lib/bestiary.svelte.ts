@@ -4,6 +4,7 @@ import type {
 	BestiarySettings,
 	BestiaryView,
 	CollectionLayout,
+	BackBorderStyle,
 	SortKey,
 	RarityFilter,
 	DomainFilter,
@@ -68,7 +69,12 @@ const CREATURES_KEY = 'bestiary.creatures.v1';
 const SETTINGS_KEY = 'bestiary.settings.v1';
 const CARD_BACKS_KEY = 'bestiary.cardbacks.v1';
 
-type CardBackMap = Partial<Record<Domain, { composition: Composition; dataUrl: string }>>;
+type CardBackData = {
+	composition?: Composition;
+	dataUrl?: string;
+	border?: BackBorderStyle;
+};
+type CardBackMap = Partial<Record<Domain, CardBackData>>;
 
 const DEFAULT_SETTINGS: BestiarySettings = { sort: 'recent' };
 
@@ -364,20 +370,37 @@ export class Bestiary {
 	// One custom back per domain, stored in IDB. Falls back to the CSS
 	// placeholder in CardBack.svelte when no custom art is set.
 
-	getCardBack(domain: Domain): { composition: Composition; dataUrl: string } | null {
+	getCardBack(domain: Domain): CardBackData | null {
 		return this.cardBacks[domain] ?? null;
 	}
 
 	setCardBack(domain: Domain, composition: Composition, dataUrl: string): void {
-		this.cardBacks = { ...this.cardBacks, [domain]: { composition, dataUrl } };
+		const existing = this.cardBacks[domain];
+		this.cardBacks = { ...this.cardBacks, [domain]: { ...existing, composition, dataUrl } };
+		if (idbAvailable()) {
+			void idbSet(CARD_BACKS_KEY, $state.snapshot(this.cardBacks));
+		}
+	}
+
+	setCardBackBorder(domain: Domain, border: BackBorderStyle): void {
+		const existing = this.cardBacks[domain];
+		this.cardBacks = { ...this.cardBacks, [domain]: { ...existing, border } };
 		if (idbAvailable()) {
 			void idbSet(CARD_BACKS_KEY, $state.snapshot(this.cardBacks));
 		}
 	}
 
 	clearCardBack(domain: Domain): void {
+		// Clear art but keep border style
+		const existing = this.cardBacks[domain];
+		if (!existing) return;
+		const { border } = existing;
 		const next = { ...this.cardBacks };
-		delete next[domain];
+		if (border && border !== 'none') {
+			next[domain] = { border };
+		} else {
+			delete next[domain];
+		}
 		this.cardBacks = next;
 		if (idbAvailable()) {
 			void idbSet(CARD_BACKS_KEY, $state.snapshot(this.cardBacks));
