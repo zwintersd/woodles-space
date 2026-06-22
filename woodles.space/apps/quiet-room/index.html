@@ -361,9 +361,9 @@
     heart.position.copy(lookTarget);
     scene.add(heart);
 
-    /* inner glow — bright enough that bloom blooms it */
+    /* inner glow — small and soft, a held ember rather than a hotspot */
     const coreMat = new THREE.MeshBasicMaterial({ color: cur.core.clone() });
-    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.52, 2), coreMat);
+    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.34, 2), coreMat);
     heart.add(core);
 
     /* faceted shell catching the inner light */
@@ -377,19 +377,19 @@
       opacity: 0.78,
       flatShading: true,
     });
-    const shell = new THREE.Mesh(new THREE.IcosahedronGeometry(0.92, 1), shellMat);
+    const shell = new THREE.Mesh(new THREE.IcosahedronGeometry(0.6, 1), shellMat);
     heart.add(shell);
 
     /* a hairline wireframe over the shell for structure */
     const wire = new THREE.LineSegments(
-      new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(0.94, 1)),
+      new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(0.62, 1)),
       new THREE.LineBasicMaterial({ color: cur.core.clone(), transparent: true, opacity: 0.22 }),
     );
     heart.add(wire);
 
     /* a halo disc behind the heart, additive, for a soft aura */
     const halo = new THREE.Mesh(
-      new THREE.CircleGeometry(2.0, 64),
+      new THREE.CircleGeometry(1.4, 64),
       new THREE.MeshBasicMaterial({
         color: cur.core.clone(), transparent: true, opacity: 0.14,
         blending: THREE.AdditiveBlending, depthWrite: false,
@@ -398,12 +398,12 @@
     halo.position.copy(lookTarget);
     scene.add(halo);
 
-    /* the light that lives inside the heart */
-    const coreLight = new THREE.PointLight(cur.light.clone(), 16, 26, 1.6);
+    /* the light that lives inside the heart — gentle, so the aurora can lead */
+    const coreLight = new THREE.PointLight(cur.light.clone(), 9, 24, 1.7);
     coreLight.position.copy(lookTarget);
     scene.add(coreLight);
-    scene.add(new THREE.AmbientLight(0x20203a, 0.5));
-    const fill = new THREE.DirectionalLight(0x6a5a9a, 0.35);
+    scene.add(new THREE.AmbientLight(0x262642, 0.6));
+    const fill = new THREE.DirectionalLight(0x6a5a9a, 0.32);
     fill.position.set(3, 6, 4);
     scene.add(fill);
 
@@ -413,7 +413,7 @@
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
-      uniforms: { uColor: { value: cur.beam.clone() }, uOpacity: { value: 0.10 } },
+      uniforms: { uColor: { value: cur.beam.clone() }, uOpacity: { value: 0.065 } },
       vertexShader: `
         varying float vY;
         void main() {
@@ -432,6 +432,70 @@
     const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 2.4, 9, 40, 1, true), beamMat);
     beam.position.set(0, 5.4, 0);
     scene.add(beam);
+
+    /* ── the aurora: the room's true light ───────────────────────────────────
+       an enveloping curtain of pastel-rainbow light in the far sky, woven from
+       value-noise. it breathes and slides, hues drift round the wheel, and the
+       active mood tints the whole sheet. fog is off so it reads as distant sky;
+       the pillars stand as silhouettes against it. */
+    const auroraMat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      fog: false,
+      uniforms: {
+        uTime: { value: 0 },
+        uMood: { value: cur.light.clone() },
+        uMoodMix: { value: 0.32 },
+        uIntensity: { value: 1.0 },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `
+        precision highp float;
+        varying vec2 vUv;
+        uniform float uTime, uMoodMix, uIntensity;
+        uniform vec3 uMood;
+        vec3 hsl2rgb(vec3 c) {
+          vec3 r = clamp(abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+          return c.z + c.y * (r - 0.5) * (1.0 - abs(2.0 * c.z - 1.0));
+        }
+        float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+        float noise(vec2 p) {
+          vec2 i = floor(p), f = fract(p);
+          vec2 u = f * f * (3.0 - 2.0 * f);
+          return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+                     mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+        }
+        float fbm(vec2 p) {
+          float v = 0.0, a = 0.5;
+          for (int i = 0; i < 4; i++) { v += a * noise(p); p = p * 2.0 + 11.3; a *= 0.5; }
+          return v;
+        }
+        void main() {
+          float x = vUv.x, y = vUv.y;
+          float t = uTime * 0.04;
+          float warp = fbm(vec2(x * 3.0 + t, y * 1.5 - t * 0.3));           /* slow drift */
+          float rays = fbm(vec2(x * 16.0 - t * 1.2, y * 1.2 + warp * 1.4)); /* vertical streaks */
+          rays = pow(clamp(rays, 0.0, 1.0), 1.8);
+          float wash = fbm(vec2(x * 2.0 + t * 0.5, y + warp));              /* broad soft sheet */
+          float washEnv = smoothstep(0.22, 0.5, y) * (1.0 - smoothstep(0.72, 1.05, y));
+          float curtEnv = smoothstep(0.34, 0.58, y) * (1.0 - smoothstep(0.82, 1.02, y));
+          float a = (wash * 0.22 * washEnv + rays * 0.55 * curtEnv) * uIntensity;
+          float hue = fract(x * 0.7 + warp * 0.28 + uTime * 0.015);
+          vec3 col = hsl2rgb(vec3(hue, 0.45, 0.72));
+          col = mix(col, uMood, uMoodMix);
+          gl_FragColor = vec4(col, clamp(a, 0.0, 1.0) * 0.85);
+        }`,
+    });
+    const aurora = new THREE.Mesh(new THREE.CylinderGeometry(22, 22, 40, 96, 1, true), auroraMat);
+    aurora.position.y = 8;
+    scene.add(aurora);
 
     /* ── dust motes adrift in the light ─────────────────────────────────────
        round, soft, pastel-rainbow points. drawn in a shader so the glow is a
@@ -793,6 +857,8 @@
       halo.material.color.copy(cur.core).lerp(iris, 0.5);    // shimmering aura
       coreLight.color.copy(cur.light);
       beamMat.uniforms.uColor.value.copy(cur.beam);
+      auroraMat.uniforms.uTime.value = t;
+      auroraMat.uniforms.uMood.value.copy(cur.light);
 
       // the heart breathes
       const breath = 0.5 + 0.5 * Math.sin(t * 0.55);
@@ -801,10 +867,11 @@
       const scl = 1 + breath * 0.05 + boost * 0.14;
       core.scale.setScalar(scl);
       shell.scale.setScalar(1 + breath * 0.03);
-      coreLight.intensity = 13 + breath * 5 + boost * 22;
-      shellMat.emissiveIntensity = 0.3 + breath * 0.25 + boost * 0.7;
-      halo.material.opacity = 0.12 + breath * 0.06 + boost * 0.2;
-      bloom.strength = 0.82 + breath * 0.14 + boost * 0.5;
+      coreLight.intensity = 7 + breath * 3 + boost * 15;
+      shellMat.emissiveIntensity = 0.26 + breath * 0.2 + boost * 0.6;
+      halo.material.opacity = 0.1 + breath * 0.05 + boost * 0.2;
+      bloom.strength = 0.7 + breath * 0.12 + boost * 0.45;
+      auroraMat.uniforms.uIntensity.value = 0.9 + breath * 0.22;
 
       if (!still && !reduced) {
         heart.rotation.y += dt * 0.12;
