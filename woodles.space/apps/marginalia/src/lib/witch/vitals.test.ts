@@ -5,6 +5,7 @@ import {
 	nextVitality,
 	lifeStockRate,
 	driftRate,
+	focusStock,
 	stabilityOf,
 	neutralStocks,
 	STOCK_IDS,
@@ -95,6 +96,20 @@ describe('driftRate', () => {
 	});
 	it('is zero at neutral', () => {
 		expect(driftRate(50)).toBe(0);
+	});
+	it('pulls toward a raised baseline when one is given', () => {
+		expect(driftRate(50, 65)).toBeGreaterThan(0); // below the new baseline
+		expect(driftRate(65, 65)).toBe(0);
+	});
+});
+
+describe('focusStock', () => {
+	it('is the needed stock when a life has needs', () => {
+		expect(focusStock({ oxygen: 0.2, nutrients: -0.06 }, { nutrients: [30, 100] })).toBe('nutrients');
+	});
+	it('falls back to the most-affected stock when there are no needs', () => {
+		expect(focusStock({ moisture: 0.06 })).toBe('moisture');
+		expect(focusStock({ nutrients: 0.03 })).toBe('nutrients');
 	});
 });
 

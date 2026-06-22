@@ -85,10 +85,31 @@ export function lifeStockRate(
 	return out;
 }
 
-// The pull that returns an untouched stock toward neutral, so an empty or
-// unwatched world sits still rather than drifting.
-export function driftRate(value: number): number {
-	return STOCK_DRIFT_PER_SEC * (STOCK_NEUTRAL - value);
+// The pull that returns an untouched stock toward its baseline, so an empty or
+// unwatched world sits still rather than drifting. The baseline is normally
+// neutral, but shaping geology (an intervention) can raise it.
+export function driftRate(value: number, baseline: number = STOCK_NEUTRAL): number {
+	return STOCK_DRIFT_PER_SEC * (baseline - value);
+}
+
+// The stock an intervention should act on for a given life: the stock it most
+// depends on, or — for things with no needs — the stock it most affects.
+export function focusStock(metabolism?: StockVector, needs?: Needs): StockId {
+	if (needs) {
+		for (const id of STOCK_IDS) if (needs[id]) return id;
+	}
+	let best: StockId = 'nutrients';
+	let mag = -1;
+	if (metabolism) {
+		for (const id of STOCK_IDS) {
+			const m = Math.abs(metabolism[id] ?? 0);
+			if (m > mag) {
+				mag = m;
+				best = id;
+			}
+		}
+	}
+	return best;
 }
 
 // 0..100. Mean band-health of the three stocks, lifted a little for each

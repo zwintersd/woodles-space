@@ -345,8 +345,8 @@ each phase is shippable on its own and unblocks the next.
 | phase | what | depends on | status |
 | --- | --- | --- | --- |
 | **A** | vital-signs math — stocks, bands, stress, vitality, gating; the `quiet` placeholder; surfaced as numbers in the Ledger | — | ✅ shipped |
-| **B** | the canvas diorama, **+ visible decline/death** (loss made legible alongside the art) | A · P1 assets | — |
-| **C** | interventions — the five verbs, intervention load, equilibrium dividend | A | — |
+| **B** | the canvas diorama (environment + creatures), **+ visible decline/death** (loss made legible alongside the art) | A · P1 assets | ✅ scaffold shipped (decline/death still pending) |
+| **C** | interventions — the five verbs, intervention load, equilibrium dividend | A | ✅ shipped |
 | **D** | prestige — close the Book, Concepts, the Study meta-tree, Essence/attention reset | A, C | — |
 | **E** | procedural worlds — generator, name-gen, creature-cap scaling, worlds 2+ | D | — |
 | **F** | collapse/soft-fail + favor weather events | A, D | — |

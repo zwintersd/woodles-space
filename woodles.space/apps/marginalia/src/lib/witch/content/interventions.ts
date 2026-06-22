@@ -15,6 +15,8 @@ export interface Intervention {
 	reach: 'broad' | 'targeted' | 'narrow';
 	permanence: 'temporary' | 'lasting' | 'permanent';
 	uncertain?: boolean; // invoke: asked, not commanded — the outcome varies
+	// what it costs her to act — Insight always, Essence only for the dear ones
+	cost: { insight: number; essence: number };
 	lines: string[];
 }
 
@@ -24,6 +26,7 @@ export const interventions: Record<LifeDomain, Intervention> = {
 		verb: 'tend',
 		reach: 'broad',
 		permanence: 'temporary',
+		cost: { insight: 25, essence: 0 },
 		lines: [
 			"I don't know if it needs me. I come anyway.",
 			'Patience is the only tool that works here.',
@@ -36,6 +39,7 @@ export const interventions: Record<LifeDomain, Intervention> = {
 		verb: 'guide',
 		reach: 'targeted',
 		permanence: 'lasting',
+		cost: { insight: 60, essence: 0 },
 		lines: [
 			"I don't tell it where to go. I just make going somewhere feel safer.",
 			"It doesn't know I'm here. That's probably how it should be.",
@@ -48,6 +52,7 @@ export const interventions: Record<LifeDomain, Intervention> = {
 		verb: 'encourage',
 		reach: 'broad',
 		permanence: 'lasting',
+		cost: { insight: 80, essence: 0 },
 		lines: [
 			"I can't see it working. I have to trust that it is.",
 			"This one doesn't need direction. It needs permission.",
@@ -60,6 +65,7 @@ export const interventions: Record<LifeDomain, Intervention> = {
 		verb: 'shape',
 		reach: 'narrow',
 		permanence: 'permanent',
+		cost: { insight: 150, essence: 2 },
 		lines: [
 			"This is slow work. Centuries-slow, if I'm honest with myself.",
 			"I'm not making something. I'm making conditions for something.",
@@ -73,6 +79,7 @@ export const interventions: Record<LifeDomain, Intervention> = {
 		reach: 'broad',
 		permanence: 'temporary',
 		uncertain: true,
+		cost: { insight: 30, essence: 0 },
 		lines: [
 			"I ask. That's all I can do. I try to ask well.",
 			"There's no guarantee. That's what makes it an invocation and not a command.",
@@ -81,3 +88,7 @@ export const interventions: Record<LifeDomain, Intervention> = {
 		]
 	}
 };
+
+export function interventionForDomain(domain: LifeDomain): Intervention {
+	return interventions[domain];
+}

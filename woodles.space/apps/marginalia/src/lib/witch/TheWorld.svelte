@@ -13,6 +13,9 @@
 
 	const nextStageName = (stage: number) => stageLabel[Math.min(stage + 1, STAGE_KNOWN)];
 
+	// tend → tended, guide → guided, shape → shaped, invoke → invoked …
+	const pastVerb = (v: string) => (v.endsWith('e') ? `${v}d` : `${v}ed`);
+
 	// effective insight/sec this life is currently contributing
 	function yields(l: Life): number {
 		return l.insightWeight * (STAGE_INSIGHT_MULT[book.stageOf(l.id)] ?? 0) * book.favorMult;
@@ -240,11 +243,27 @@
 											</button>
 										{/if}
 									</div>
-								{:else}
-									<p class="intervene">
-										she knows it now — enough to {domainVerb[l.domain]} it kindly.
-										<span class="soon">(intervention arrives in a later pass.)</span>
+								{:else if book.hasIntervened(l.id)}
+									<p class="intervened">
+										<span class="verb-done">{pastVerb(domainVerb[l.domain])}.</span>
+										<span class="intervened-line">“{book.interventionLineFor(l.id)}”</span>
 									</p>
+								{:else}
+									{@const cost = book.interventionCostFor(l.id)}
+									<div class="intervene">
+										<p class="intervene-lead">
+											she knows it now — enough to {domainVerb[l.domain]} it kindly.
+										</p>
+										<button
+											class="act"
+											disabled={!book.canIntervene(l.id)}
+											onclick={() => book.intervene(l.id)}
+										>
+											{domainVerb[l.domain]} · {cost.insight} insight{#if cost.essence}
+												+ {cost.essence} essence{/if}
+										</button>
+										<p class="intervene-or">or witness it, and leave it be.</p>
+									</div>
 								{/if}
 
 								{#if book.bestiaryCreatures.length > 0}
@@ -658,14 +677,65 @@
 		color: var(--print-pink);
 	}
 	.intervene {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.intervene-lead {
 		font-family: var(--font-body);
 		font-style: italic;
 		font-size: 0.8rem;
 		color: var(--leafeon-pink);
 		margin: 0;
 	}
-	.soon {
+	.act {
+		align-self: flex-start;
+		font-family: var(--font-ui);
+		font-size: 0.74rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--cream);
+		border: 1px solid var(--leafeon-pink);
+		border-radius: 3px;
+		padding: 0.35rem 0.6rem;
+		background: var(--panel-accent);
+	}
+	.act:hover:not(:disabled) {
+		color: var(--leafeon-pink);
+		box-shadow: 0 0 8px rgba(240, 143, 184, 0.25);
+	}
+	.act:disabled {
+		opacity: 0.45;
+		border-color: var(--rule);
+	}
+	.intervene-or {
+		font-family: var(--font-ui);
+		font-size: 0.7rem;
+		font-style: italic;
 		color: var(--muted);
+		margin: 0;
+	}
+	.intervened {
+		font-family: var(--font-body);
+		font-size: 0.82rem;
+		color: var(--muted);
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+	.verb-done {
+		font-family: var(--font-ui);
+		font-size: 0.66rem;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--leafeon-pink);
+	}
+	.intervened-line {
+		font-family: var(--font-hand);
+		font-size: 1.05rem;
+		line-height: 1.4;
+		color: var(--cream);
 	}
 
 	/* ── bestiary creature sprite ────────────────────────────────────────── */

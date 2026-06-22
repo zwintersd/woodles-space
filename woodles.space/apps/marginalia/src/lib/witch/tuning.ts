@@ -79,3 +79,26 @@ export const STABILITY_ECOSYSTEM_BONUS = 0.04;
 // Below this stability, with life present, the world is "going quiet" — a
 // placeholder state ahead of the full collapse/soft-fail pass.
 export const WORLD_QUIET_STABILITY = 18;
+
+// ── interventions: the Known endgame (phase C) ──────────────────────────────
+// Effect magnitudes. tend/invoke bump a stock level — drift then fades them, so
+// they read as temporary; shape/encourage/guide set a lasting modifier.
+export const TEND_BUMP = 8; // + to a plant's focus stock
+export const INVOKE_BUMP = 22; // + to moisture, ×0.6..1.4 (invoked, never commanded)
+export const SHAPE_BASELINE_RAISE = 15; // permanent raise to a stock's drift target
+export const SHAPE_BASELINE_MAX = 85;
+export const ENCOURAGE_STABILITY = 8; // permanent stability add
+export const ENCOURAGE_STABILITY_MAX = 40;
+export const GUIDE_METABOLISM_SCALE = 0.5; // a guided animal eases what it draws
+
+// Restraint, rewarded. Each act adds load by its permanence; load decays, and
+// while it is low and the stocks sit in band the world banks an equilibrium
+// dividend — so the lightest touch is worth the most.
+export const INTERVENTION_LOAD_WEIGHT = {
+	temporary: 0.1,
+	lasting: 0.3,
+	permanent: 0.5
+} as const;
+export const INTERVENTION_LOAD_DECAY = 0.01; // per second, the hand grows light again
+export const FAVOR_EQUILIBRIUM_BONUS = 8;
+export const EQUILIBRIUM_MIN_FACTOR = 0.5; // above this, equilibrium seconds bank
