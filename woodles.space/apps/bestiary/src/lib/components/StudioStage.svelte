@@ -6,13 +6,16 @@
 		normalizeRotation,
 		clampOffset,
 		clampScale,
-		CANVAS_W,
-		CANVAS_H,
 		type ImageLayer
 	} from '$lib/composer';
 	import type { StudioState } from '$lib/studio.svelte';
 
 	let { studio }: { studio: StudioState } = $props();
+
+	// Derive canvas dimensions from the live composition so the stage works for
+	// any aspect ratio — the landscape sprite canvas and the portrait card back.
+	let cw = $derived(studio.comp.width);
+	let ch = $derived(studio.comp.height);
 
 	// measured stage width in px → lets blur (an absolute length) track the
 	// canvas's blur-as-fraction-of-width, so preview and flatten agree.
@@ -26,12 +29,12 @@
 
 	let gesture: Gesture | null = null;
 
-	// pointer position in canvas (640×480) space
+	// pointer position in canvas space
 	function toCanvas(e: PointerEvent): { x: number; y: number } {
 		const rect = stageEl.getBoundingClientRect();
 		return {
-			x: ((e.clientX - rect.left) / rect.width) * CANVAS_W,
-			y: ((e.clientY - rect.top) / rect.height) * CANVAS_H
+			x: ((e.clientX - rect.left) / rect.width) * cw,
+			y: ((e.clientY - rect.top) / rect.height) * ch
 		};
 	}
 
@@ -46,7 +49,7 @@
 	function startScale(e: PointerEvent, layer: ImageLayer) {
 		studio.select(layer.id);
 		studio.begin();
-		const box = imageLayerBox(layer, CANVAS_W, CANVAS_H);
+		const box = imageLayerBox(layer, cw, ch);
 		const p = toCanvas(e);
 		gesture = {
 			mode: 'scale',
@@ -61,7 +64,7 @@
 	function startRotate(e: PointerEvent, layer: ImageLayer) {
 		studio.select(layer.id);
 		studio.begin();
-		const box = imageLayerBox(layer, CANVAS_W, CANVAS_H);
+		const box = imageLayerBox(layer, cw, ch);
 		const p = toCanvas(e);
 		gesture = {
 			mode: 'rotate',
@@ -85,8 +88,8 @@
 		const p = toCanvas(e);
 		if (gesture.mode === 'move') {
 			studio.updateSelected({
-				x: clampOffset(gesture.ox + (p.x - gesture.startX) / CANVAS_W),
-				y: clampOffset(gesture.oy + (p.y - gesture.startY) / CANVAS_H)
+				x: clampOffset(gesture.ox + (p.x - gesture.startX) / cw),
+				y: clampOffset(gesture.oy + (p.y - gesture.startY) / ch)
 			} as Partial<ImageLayer>);
 		} else if (gesture.mode === 'scale') {
 			const dist = Math.hypot(p.x - gesture.cx, p.y - gesture.cy);
@@ -128,10 +131,10 @@
 	}
 
 	function imageStyle(layer: ImageLayer): string {
-		const box = imageLayerBox(layer, CANVAS_W, CANVAS_H);
-		const left = (box.cx / CANVAS_W) * 100;
-		const top = (box.cy / CANVAS_H) * 100;
-		const width = (box.w / CANVAS_W) * 100;
+		const box = imageLayerBox(layer, cw, ch);
+		const left = (box.cx / cw) * 100;
+		const top = (box.cy / ch) * 100;
+		const width = (box.w / cw) * 100;
 		const fx = layer.flipX ? -1 : 1;
 		const fy = layer.flipY ? -1 : 1;
 		return [
@@ -159,13 +162,13 @@
 	let selBox = $derived.by(() => {
 		const sel = studio.selected;
 		if (!sel || sel.kind !== 'image') return null;
-		const box = imageLayerBox(sel, CANVAS_W, CANVAS_H);
+		const box = imageLayerBox(sel, cw, ch);
 		return {
 			layer: sel,
-			left: (box.cx / CANVAS_W) * 100,
-			top: (box.cy / CANVAS_H) * 100,
-			width: (box.w / CANVAS_W) * 100,
-			height: (box.h / CANVAS_H) * 100,
+			left: (box.cx / cw) * 100,
+			top: (box.cy / ch) * 100,
+			width: (box.w / cw) * 100,
+			height: (box.h / ch) * 100,
 			rotation: sel.rotation,
 			fx: sel.flipX ? -1 : 1,
 			fy: sel.flipY ? -1 : 1
@@ -177,7 +180,7 @@
 	class="stage"
 	bind:this={stageEl}
 	bind:clientWidth={stageW}
-	style="aspect-ratio:{CANVAS_W}/{CANVAS_H}"
+	style="aspect-ratio:{cw}/{ch}"
 	onpointerdown={onStagePointerdown}
 	onwheel={onWheel}
 	role="application"
