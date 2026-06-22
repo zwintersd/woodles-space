@@ -321,7 +321,7 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.06;
+    renderer.toneMappingExposure = 0.96;
 
     const scene = new THREE.Scene();
     scene.background = cur.fog.clone();
@@ -389,7 +389,7 @@
 
     /* a halo disc behind the heart, additive, for a soft aura */
     const halo = new THREE.Mesh(
-      new THREE.CircleGeometry(1.4, 64),
+      new THREE.CircleGeometry(1.05, 64),
       new THREE.MeshBasicMaterial({
         color: cur.core.clone(), transparent: true, opacity: 0.14,
         blending: THREE.AdditiveBlending, depthWrite: false,
@@ -413,7 +413,7 @@
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
-      uniforms: { uColor: { value: cur.beam.clone() }, uOpacity: { value: 0.065 } },
+      uniforms: { uColor: { value: cur.beam.clone() }, uOpacity: { value: 0.038 } },
       vertexShader: `
         varying float vY;
         void main() {
@@ -486,11 +486,11 @@
           float wash = fbm(vec2(x * 2.0 + t * 0.5, y + warp));              /* broad soft sheet */
           float washEnv = smoothstep(0.22, 0.5, y) * (1.0 - smoothstep(0.72, 1.05, y));
           float curtEnv = smoothstep(0.34, 0.58, y) * (1.0 - smoothstep(0.82, 1.02, y));
-          float a = (wash * 0.22 * washEnv + rays * 0.55 * curtEnv) * uIntensity;
+          float a = (wash * 0.14 * washEnv + rays * 0.4 * curtEnv) * uIntensity;
           float hue = fract(x * 0.7 + warp * 0.28 + uTime * 0.015);
           vec3 col = hsl2rgb(vec3(hue, 0.45, 0.72));
           col = mix(col, uMood, uMoodMix);
-          gl_FragColor = vec4(col, clamp(a, 0.0, 1.0) * 0.85);
+          gl_FragColor = vec4(col, clamp(a, 0.0, 1.0) * 0.6);
         }`,
     });
     const aurora = new THREE.Mesh(new THREE.CylinderGeometry(22, 22, 40, 96, 1, true), auroraMat);
@@ -622,9 +622,9 @@
     composer.addPass(new RenderPass(scene, camera));
     const bloom = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.9,   // strength
-      0.7,   // radius
-      0.16,  // threshold
+      0.42,  // strength (driven per-frame below)
+      0.6,   // radius
+      0.6,   // threshold — only the brightest cores bloom, so soft light stays crisp
     );
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
@@ -646,6 +646,8 @@
     let playTarget = 0;     // 1 while held, 0 when released
     let held = false;       // is the pointer currently pressed
     let lastTrail = 0;      // throttle for the ripple trail while dragging
+    let playNx = 0.5;       // 0..1 across the screen — the note's place, low → high
+    const nxOf = (cx) => Math.max(0, Math.min(1, cx / window.innerWidth));
 
     function groundXZ(cx, cy) {
       ndc.x = (cx / window.innerWidth) * 2 - 1;
@@ -673,11 +675,13 @@
       pulseBoost = 1;
       held = true;
       playTarget = 1;
+      playNx = nxOf(e.clientX);
       try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
       startVoice(e.clientX, e.clientY);
     });
     canvas.addEventListener('pointermove', (e) => {
       if (!held) return;
+      playNx = nxOf(e.clientX);
       bendVoice(e.clientX, e.clientY);          // dragging bends the pitch
       const now = performance.now();
       if (now - lastTrail > 110) {              // a sparse trail of ripples
@@ -899,6 +903,7 @@
 
     const tmpColor = new THREE.Color();
     const iris = new THREE.Color();   // a slow pastel-rainbow tint, shared by halo + motes
+    const playColor = new THREE.Color();   // the note's colour: low → red, high → blue
     function render() {
       requestAnimationFrame(render);
       if (!visible) return;
@@ -918,15 +923,18 @@
       // a pastel rainbow that eases slowly round the wheel
       const hueShift = (t * 0.018) % 1;
       iris.setHSL((t * 0.03) % 1, 0.5, 0.78);
+      // the played note's colour — low notes red, gliding up to blue
+      playColor.setHSL(playNx * 0.66, 0.7, 0.58);
+      const tint = playGlow * 0.85;   // only while a voice is singing
 
       scene.background.copy(cur.fog);
       scene.fog.color.copy(cur.fog);
       floorMat.color.copy(cur.ground);
-      coreMat.color.copy(cur.core);
-      shellMat.emissive.copy(cur.core);
-      wire.material.color.copy(cur.core).lerp(iris, 0.32);   // iridescent edge
-      halo.material.color.copy(cur.core).lerp(iris, 0.5);    // shimmering aura
-      coreLight.color.copy(cur.light);
+      coreMat.color.copy(cur.core).lerp(playColor, tint);
+      shellMat.emissive.copy(cur.core).lerp(playColor, tint * 0.6);
+      wire.material.color.copy(cur.core).lerp(iris, 0.32);              // iridescent edge
+      halo.material.color.copy(cur.core).lerp(iris, 0.5).lerp(playColor, tint * 0.7);
+      coreLight.color.copy(cur.light).lerp(playColor, tint * 0.6);
       beamMat.uniforms.uColor.value.copy(cur.beam);
       auroraMat.uniforms.uTime.value = t;
       auroraMat.uniforms.uMood.value.copy(cur.light);
@@ -936,14 +944,14 @@
       const boost = pulseBoost;
       pulseBoost = Math.max(0, pulseBoost - dt * 1.6);
       playGlow += (playTarget - playGlow) * Math.min(1, dt * 3.5);   // the room sings while held
-      const scl = 1 + breath * 0.05 + boost * 0.14 + playGlow * 0.06;
+      const scl = 1 + breath * 0.05 + boost * 0.12 + playGlow * 0.05;
       core.scale.setScalar(scl);
-      shell.scale.setScalar(1 + breath * 0.03 + playGlow * 0.04);
-      coreLight.intensity = 7 + breath * 3 + boost * 15 + playGlow * 7;
-      shellMat.emissiveIntensity = 0.26 + breath * 0.2 + boost * 0.6 + playGlow * 0.4;
-      halo.material.opacity = 0.1 + breath * 0.05 + boost * 0.2 + playGlow * 0.12;
-      bloom.strength = 0.7 + breath * 0.12 + boost * 0.45 + playGlow * 0.18;
-      auroraMat.uniforms.uIntensity.value = 0.9 + breath * 0.22 + playGlow * 0.3;
+      shell.scale.setScalar(1 + breath * 0.03 + playGlow * 0.03);
+      coreLight.intensity = 5.5 + breath * 2 + boost * 9 + playGlow * 4;
+      shellMat.emissiveIntensity = 0.2 + breath * 0.14 + boost * 0.35 + playGlow * 0.22;
+      halo.material.opacity = 0.055 + breath * 0.03 + boost * 0.13 + playGlow * 0.07;
+      bloom.strength = 0.36 + breath * 0.07 + boost * 0.26 + playGlow * 0.1;
+      auroraMat.uniforms.uIntensity.value = 0.7 + breath * 0.16 + playGlow * 0.12;
 
       if (!still && !reduced) {
         heart.rotation.y += dt * 0.12;
