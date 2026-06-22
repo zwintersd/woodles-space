@@ -17,50 +17,52 @@
 </script>
 
 <div class="stat-detail">
-	<!-- ── identity ── -->
-	<header class="sd-head">
-		<h3 class="sd-name">{creature.name || '(unnamed)'}</h3>
-		<div class="sd-identity">
-			<span class="sd-domain-glyph" style="color: var({domain.colorVar})">{domain.glyph}</span>
-			<span class="sd-kind">{creature.kind || 'Creature'}</span>
-			<span class="sd-dot">·</span>
-			<span class="sd-rarity" style="color: var({rarity.colorVar})" title={rarity.name}>{rarity.symbol}</span>
-			<span class="sd-cost">cost {creature.cost}</span>
-			<span class="sd-dot">·</span>
-			<span class="sd-pt">{creature.power}/{creature.toughness}</span>
-		</div>
-	</header>
-
-	<div class="sd-rule"></div>
-
-	<!-- ── stat bars ── -->
-	<div class="sd-stats" role="list" aria-label="stats">
-		{#each coreStats as stat (stat.id)}
-			{@const v = val(stat.id)}
-			<div class="sd-stat" role="listitem" style="--c: var({stat.colorVar}); --v: {v}">
-				<span class="sd-glyph" aria-hidden="true">{stat.glyph}</span>
-				<span class="sd-sname">{stat.name}</span>
-				<div class="sd-bar-track" aria-hidden="true">
-					<div class="sd-bar-fill"></div>
-				</div>
-				<span class="sd-val" aria-label="{stat.name} {v}">{v}</span>
+	<div class="sd-inner">
+		<!-- ── identity ── -->
+		<header class="sd-head">
+			<h3 class="sd-name">{creature.name || '(unnamed)'}</h3>
+			<div class="sd-identity">
+				<span class="sd-domain-glyph" style="color: var({domain.colorVar})">{domain.glyph}</span>
+				<span class="sd-kind">{creature.kind || 'Creature'}</span>
+				<span class="sd-dot">·</span>
+				<span class="sd-rarity" style="color: var({rarity.colorVar})" title={rarity.name}>{rarity.symbol}</span>
+				<span class="sd-cost">cost {creature.cost}</span>
+				<span class="sd-dot">·</span>
+				<span class="sd-pt">{creature.power}/{creature.toughness}</span>
 			</div>
-		{/each}
+		</header>
+
+		<div class="sd-rule"></div>
+
+		<!-- ── stat bars ── -->
+		<div class="sd-stats" role="list" aria-label="stats">
+			{#each coreStats as stat (stat.id)}
+				{@const v = val(stat.id)}
+				<div class="sd-stat" role="listitem" style="--c: var({stat.colorVar}); --v: {v}">
+					<span class="sd-glyph" aria-hidden="true">{stat.glyph}</span>
+					<span class="sd-sname">{stat.name}</span>
+					<div class="sd-bar-track" aria-hidden="true">
+						<div class="sd-bar-fill"></div>
+					</div>
+					<span class="sd-val" aria-label="{stat.name} {v}">{v}</span>
+				</div>
+			{/each}
+		</div>
+
+		<div class="sd-rule"></div>
+
+		<!-- ── profile line ── -->
+		<p class="sd-profile">{profile}</p>
+
+		<!-- ── text ── -->
+		{#if creature.abilities.trim()}
+			<p class="sd-abilities">{creature.abilities}</p>
+		{/if}
+
+		{#if creature.flavor.trim()}
+			<p class="sd-flavor">"{creature.flavor}"</p>
+		{/if}
 	</div>
-
-	<div class="sd-rule"></div>
-
-	<!-- ── profile line ── -->
-	<p class="sd-profile">{profile}</p>
-
-	<!-- ── text ── -->
-	{#if creature.abilities.trim()}
-		<p class="sd-abilities">{creature.abilities}</p>
-	{/if}
-
-	{#if creature.flavor.trim()}
-		<p class="sd-flavor">"{creature.flavor}"</p>
-	{/if}
 </div>
 
 <style>
@@ -68,12 +70,17 @@
 		width: 100%;
 		height: 100%;
 		container-type: inline-size;
+	}
+
+	.sd-inner {
 		font-size: 5cqw;
 		display: flex;
 		flex-direction: column;
 		gap: 0.5em;
 		overflow: hidden;
 		padding: 0.4em 0.5em;
+		width: 100%;
+		height: 100%;
 	}
 
 	/* ── header ── */
