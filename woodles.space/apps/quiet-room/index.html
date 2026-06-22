@@ -202,7 +202,7 @@
 
   <div class="stage">
     <h1 class="title">quiet room</h1>
-    <p class="hint">move to look &middot; touch for a chime</p>
+    <p class="hint">move to look &middot; hold &amp; drag to play</p>
   </div>
 
   <a class="home" href="/" title="back to woodles" aria-label="back to woodles.space">&#8617;</a>
@@ -637,37 +637,66 @@
     }
     window.addEventListener('pointermove', (e) => onMove(e.clientX, e.clientY), { passive: true });
 
-    /* ── interaction: a touch sends a chime, a ripple, a pulse ──────────── */
+    /* ── interaction: hold to sing, drag to bend the pitch ───────────────── */
     const raycaster = new THREE.Raycaster();
     const ndc = new THREE.Vector2();
-    let pulseBoost = 0;          // brief brightening of the heart
-    function touchRoom(cx, cy) {
-      body.classList.add('touched');
-      if (!hintGone) hideHint();
+    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    let pulseBoost = 0;     // a brief swell of the heart on each touch
+    let playGlow = 0;       // eased glow while a voice sings
+    let playTarget = 0;     // 1 while held, 0 when released
+    let held = false;       // is the pointer currently pressed
+    let lastTrail = 0;      // throttle for the ripple trail while dragging
+
+    function groundXZ(cx, cy) {
       ndc.x = (cx / window.innerWidth) * 2 - 1;
       ndc.y = -(cy / window.innerHeight) * 2 + 1;
       raycaster.setFromCamera(ndc, camera);
       const hit = new THREE.Vector3();
-      const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
       let x = 0, z = 0;
       if (raycaster.ray.intersectPlane(groundPlane, hit)) { x = hit.x; z = hit.z; }
-      // keep ripples within the room
-      const d = Math.hypot(x, z);
+      const d = Math.hypot(x, z);              // keep ripples within the room
       if (d > 12) { x *= 12 / d; z *= 12 / d; }
-      spawnRipple(x, z);
+      return { x, z };
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      if (held) return;          // one voice at a time — ignore extra fingers
+      ensureAudio();
+      // the first touch is a real user gesture — let the room find its voice,
+      // unless the visitor has already chosen quiet for themselves.
+      if (!userSetSound && !soundOn) setSound(true);
+      body.classList.add('touched');
+      if (!hintGone) hideHint();
+      const g = groundXZ(e.clientX, e.clientY);
+      spawnRipple(g.x, g.z);
       spawnPulse();
       pulseBoost = 1;
-      chime(x);
-    }
-    canvas.addEventListener('pointerdown', (e) => {
-      ensureAudio();
-      // the very first touch is a real user gesture — let the room find its
-      // voice, unless the visitor has already chosen quiet for themselves.
-      if (!userSetSound && !soundOn) setSound(true);
-      touchRoom(e.clientX, e.clientY);
+      held = true;
+      playTarget = 1;
+      try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+      startVoice(e.clientX, e.clientY);
     });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!held) return;
+      bendVoice(e.clientX, e.clientY);          // dragging bends the pitch
+      const now = performance.now();
+      if (now - lastTrail > 110) {              // a sparse trail of ripples
+        lastTrail = now;
+        const g = groundXZ(e.clientX, e.clientY);
+        spawnRipple(g.x, g.z);
+      }
+    });
+    function release() {
+      if (!held) return;
+      held = false;
+      playTarget = 0;
+      endVoice();
+    }
+    canvas.addEventListener('pointerup', release);
+    canvas.addEventListener('pointercancel', release);
+    window.addEventListener('blur', release);
 
-    /* ── sound: a generated ambient pad + soft bells ────────────────────── */
+    /* ── sound: a generated ambient pad + a playable stylophone voice ───── */
     let audio = null, soundOn = false, userSetSound = false;
     function ensureAudio() {
       if (audio) { if (audio.ctx.state === 'suspended') audio.ctx.resume(); return; }
@@ -710,31 +739,72 @@
 
       audio = { ctx, master, verb };
     }
-    // A minor pentatonic, spread across a few octaves — every chime is gentle.
-    const SCALE = [220.0, 261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25];
-    function chime(x) {
+    /* a glide-able ladder — A-minor pentatonic across two octaves, in tune with
+       the drone. position maps continuously onto it; the voice slides between
+       rungs as you drag, so a held drag reads as a smooth pitch bend. */
+    const LADDER = [220.0, 261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25, 783.99, 880.0];
+    function freqFromX(cx) {
+      const nx = Math.max(0, Math.min(1, cx / window.innerWidth));
+      const fi = nx * (LADDER.length - 1);
+      const i = Math.floor(fi), f = fi - i;
+      const a = LADDER[i], b = LADDER[Math.min(LADDER.length - 1, i + 1)];
+      return a * Math.pow(b / a, f);            // log-interpolate → a smooth bend
+    }
+    function cutoffFromY(cy) {
+      const ny = Math.max(0, Math.min(1, cy / window.innerHeight));
+      return 680 * Math.pow(4.2, 1 - ny);       // drag up → brighter, reedier
+    }
+
+    let voice = null;     // the single held stylophone voice
+    function startVoice(cx, cy) {
       if (!audio || !soundOn) return;
       const { ctx, master, verb } = audio;
-      const t = ctx.currentTime;
-      // pan/pick a note from where the room was touched
-      const norm = Math.max(0, Math.min(1, (x + 12) / 24));
-      const note = SCALE[Math.floor(norm * (SCALE.length - 1) + Math.random() * 0.6)];
-      const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-      if (pan) pan.pan.value = (norm - 0.5) * 1.2;
-      const out = pan || ctx.createGain();
-      out.connect(master); out.connect(verb);
-      // bell partials with quick attack, long exponential decay
-      [[1, 0.5, 2.6], [2.01, 0.28, 1.9], [2.99, 0.16, 1.4], [4.21, 0.09, 1.0]].forEach(([mul, amp, dec]) => {
-        const o = ctx.createOscillator();
-        o.type = 'sine';
-        o.frequency.value = note * mul;
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(0.0001, t);
-        g.gain.exponentialRampToValueAtTime(amp * 0.5, t + 0.012);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + dec);
-        o.connect(g); g.connect(out);
-        o.start(t); o.stop(t + dec + 0.1);
-      });
+      const now = ctx.currentTime;
+      const freq = freqFromX(cx);
+      const saw = ctx.createOscillator(); saw.type = 'sawtooth';
+      const sqr = ctx.createOscillator(); sqr.type = 'square'; sqr.detune.value = -3;
+      const sub = ctx.createOscillator(); sub.type = 'sine';
+      saw.frequency.value = freq; sqr.frequency.value = freq; sub.frequency.value = freq / 2;
+      // a gentle vibrato — the stylophone's wavering reed
+      const vib = ctx.createOscillator(); vib.type = 'sine'; vib.frequency.value = 5.6;
+      const vibG = ctx.createGain(); vibG.gain.value = 4.5;   // ± cents
+      vib.connect(vibG); vibG.connect(saw.detune); vibG.connect(sqr.detune);
+      // a lowpass keeps the reed warm rather than harsh
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 4;
+      lp.frequency.value = cutoffFromY(cy);
+      const sawG = ctx.createGain(); sawG.gain.value = 0.5;
+      const sqrG = ctx.createGain(); sqrG.gain.value = 0.16;
+      const subG = ctx.createGain(); subG.gain.value = 0.4;
+      saw.connect(sawG); sawG.connect(lp);
+      sqr.connect(sqrG); sqrG.connect(lp);
+      const env = ctx.createGain(); env.gain.value = 0.0001;
+      lp.connect(env);
+      sub.connect(subG); subG.connect(env);     // sub bypasses the filter, for body
+      env.connect(master); env.connect(verb);
+      env.gain.setValueAtTime(0.0001, now);
+      env.gain.exponentialRampToValueAtTime(0.16, now + 0.04);   // soft attack
+      saw.start(now); sqr.start(now); sub.start(now); vib.start(now);
+      voice = { saw, sqr, sub, vib, lp, env };
+    }
+    function bendVoice(cx, cy) {
+      if (!voice || !audio) return;
+      const now = audio.ctx.currentTime;
+      const freq = freqFromX(cx);
+      const glide = 0.07;                         // portamento → the bend itself
+      voice.saw.frequency.setTargetAtTime(freq, now, glide);
+      voice.sqr.frequency.setTargetAtTime(freq, now, glide);
+      voice.sub.frequency.setTargetAtTime(freq / 2, now, glide);
+      voice.lp.frequency.setTargetAtTime(cutoffFromY(cy), now, 0.05);
+    }
+    function endVoice() {
+      if (!voice || !audio) return;
+      const now = audio.ctx.currentTime;
+      const v = voice; voice = null;
+      v.env.gain.cancelScheduledValues(now);
+      v.env.gain.setValueAtTime(Math.max(0.0001, v.env.gain.value), now);
+      v.env.gain.setTargetAtTime(0.0001, now, 0.12);   // gentle release
+      const stop = now + 0.9;
+      [v.saw, v.sqr, v.sub, v.vib].forEach((o) => o.stop(stop));
     }
 
     /* ── controls ───────────────────────────────────────────────────────── */
@@ -823,7 +893,8 @@
     let visible = true;
     document.addEventListener('visibilitychange', () => {
       visible = !document.hidden;
-      if (visible) clock.getDelta();          // swallow the gap so nothing jumps
+      if (document.hidden) release();          // never leave a voice ringing
+      if (visible) clock.getDelta();           // swallow the gap so nothing jumps
     });
 
     const tmpColor = new THREE.Color();
@@ -864,14 +935,15 @@
       const breath = 0.5 + 0.5 * Math.sin(t * 0.55);
       const boost = pulseBoost;
       pulseBoost = Math.max(0, pulseBoost - dt * 1.6);
-      const scl = 1 + breath * 0.05 + boost * 0.14;
+      playGlow += (playTarget - playGlow) * Math.min(1, dt * 3.5);   // the room sings while held
+      const scl = 1 + breath * 0.05 + boost * 0.14 + playGlow * 0.06;
       core.scale.setScalar(scl);
-      shell.scale.setScalar(1 + breath * 0.03);
-      coreLight.intensity = 7 + breath * 3 + boost * 15;
-      shellMat.emissiveIntensity = 0.26 + breath * 0.2 + boost * 0.6;
-      halo.material.opacity = 0.1 + breath * 0.05 + boost * 0.2;
-      bloom.strength = 0.7 + breath * 0.12 + boost * 0.45;
-      auroraMat.uniforms.uIntensity.value = 0.9 + breath * 0.22;
+      shell.scale.setScalar(1 + breath * 0.03 + playGlow * 0.04);
+      coreLight.intensity = 7 + breath * 3 + boost * 15 + playGlow * 7;
+      shellMat.emissiveIntensity = 0.26 + breath * 0.2 + boost * 0.6 + playGlow * 0.4;
+      halo.material.opacity = 0.1 + breath * 0.05 + boost * 0.2 + playGlow * 0.12;
+      bloom.strength = 0.7 + breath * 0.12 + boost * 0.45 + playGlow * 0.18;
+      auroraMat.uniforms.uIntensity.value = 0.9 + breath * 0.22 + playGlow * 0.3;
 
       if (!still && !reduced) {
         heart.rotation.y += dt * 0.12;
