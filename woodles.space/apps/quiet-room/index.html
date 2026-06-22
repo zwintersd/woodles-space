@@ -433,25 +433,55 @@
     beam.position.set(0, 5.4, 0);
     scene.add(beam);
 
-    /* ── dust motes adrift in the light ─────────────────────────────────── */
-    function softSprite() {
-      const s = 64, c = document.createElement('canvas');
-      c.width = c.height = s;
-      const g = c.getContext('2d');
-      const grd = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-      grd.addColorStop(0, 'rgba(255,255,255,1)');
-      grd.addColorStop(0.25, 'rgba(255,255,255,0.85)');
-      grd.addColorStop(1, 'rgba(255,255,255,0)');
-      g.fillStyle = grd;
-      g.fillRect(0, 0, s, s);
-      const tex = new THREE.CanvasTexture(c);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      return tex;
-    }
-    const spriteTex = softSprite();
+    /* ── dust motes adrift in the light ─────────────────────────────────────
+       round, soft, pastel-rainbow points. drawn in a shader so the glow is a
+       true circle — no boxy sprite edge — and every mote owns its own hue and
+       a slow twinkle. the whole field eases its hues round the wheel over time. */
+    const MOTE_VERT = `
+      attribute float aHue;
+      attribute float aPhase;
+      attribute float aScale;
+      uniform float uTime;
+      uniform float uSize;
+      uniform float uScale;        /* 0.5 * drawing-buffer height */
+      varying float vHue;
+      varying float vTw;
+      void main() {
+        vHue = aHue;
+        float tw = 0.55 + 0.45 * sin(uTime * 1.3 + aPhase * 6.2831853);
+        vTw = tw;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_Position = projectionMatrix * mv;
+        float sz = uSize * aScale * (0.75 + 0.4 * tw);
+        gl_PointSize = clamp(sz * uScale / -mv.z, 0.0, 180.0);
+      }`;
+    const MOTE_FRAG = `
+      precision mediump float;
+      uniform float uHueShift;
+      uniform float uOpacity;
+      uniform float uMoodMix;
+      uniform vec3 uMood;
+      varying float vHue;
+      varying float vTw;
+      vec3 hsl2rgb(vec3 c) {
+        vec3 r = clamp(abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+        return c.z + c.y * (r - 0.5) * (1.0 - abs(2.0 * c.z - 1.0));
+      }
+      void main() {
+        vec2 uv = gl_PointCoord - 0.5;
+        float a = smoothstep(0.5, 0.0, length(uv));   /* soft round disc */
+        a *= a;                                        /* bright core, gentle halo */
+        vec3 col = hsl2rgb(vec3(fract(vHue + uHueShift), 0.5, 0.78));
+        col = mix(col, uMood, uMoodMix);               /* a touch of the mood, for cohesion */
+        gl_FragColor = vec4(col, a * uOpacity * vTw);
+      }`;
+    const moteScale = () => renderer.domElement.height * 0.5;
 
-    function makeMotes(count, spread, height, size, opacity) {
+    function makeMotes(count, spread, height, size, opacity, moodMix) {
       const pos = new Float32Array(count * 3);
+      const hue = new Float32Array(count);
+      const phase = new Float32Array(count);
+      const scl = new Float32Array(count);
       const seed = new Float32Array(count);
       for (let i = 0; i < count; i++) {
         const r = Math.pow(Math.random(), 0.7) * spread;
@@ -459,22 +489,32 @@
         pos[i * 3]     = Math.cos(a) * r;
         pos[i * 3 + 1] = Math.random() * height;
         pos[i * 3 + 2] = Math.sin(a) * r;
-        seed[i] = Math.random() * 1000;
+        hue[i]   = Math.random();
+        phase[i] = Math.random();
+        scl[i]   = 0.6 + Math.random() * 0.85;
+        seed[i]  = Math.random() * 1000;
       }
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      const mat = new THREE.PointsMaterial({
-        size, map: spriteTex, color: cur.mote.clone(),
-        transparent: true, opacity, depthWrite: false,
-        blending: THREE.AdditiveBlending, sizeAttenuation: true,
+      geo.setAttribute('aHue', new THREE.BufferAttribute(hue, 1));
+      geo.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
+      geo.setAttribute('aScale', new THREE.BufferAttribute(scl, 1));
+      const mat = new THREE.ShaderMaterial({
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+        vertexShader: MOTE_VERT, fragmentShader: MOTE_FRAG,
+        uniforms: {
+          uTime: { value: 0 }, uSize: { value: size }, uScale: { value: moteScale() },
+          uHueShift: { value: 0 }, uOpacity: { value: opacity },
+          uMood: { value: cur.mote.clone() }, uMoodMix: { value: moodMix },
+        },
       });
       const pts = new THREE.Points(geo, mat);
-      pts.userData = { seed, height, base: pos.slice() };
+      pts.userData = { seed, height };
       scene.add(pts);
       return pts;
     }
-    const motes = makeMotes(reduced ? 260 : 520, 9, 8.5, 0.085, 0.9);
-    const bokeh = makeMotes(reduced ? 40 : 90, 7, 6.5, 0.36, 0.22); // big, faint, near
+    const motes = makeMotes(reduced ? 280 : 560, 9, 8.5, 0.13, 0.95, 0.18);
+    const bokeh = makeMotes(reduced ? 44 : 96, 7, 6.5, 0.58, 0.30, 0.10); // big, faint, near
 
     /* ── ripples + pulses, pooled ───────────────────────────────────────── */
     const ripples = [];
@@ -504,7 +544,7 @@
     }
     function spawnRipple(x, z) {
       const r = ripples.find((r) => r.t >= 1) || ripples[0];
-      r.t = 0; r.x = x; r.z = z;
+      r.t = 0; r.x = x; r.z = z; r.hue = Math.random();   // each ring its own pastel
       r.mesh.position.set(x, 0.015, z);
       r.mesh.visible = true;
     }
@@ -708,6 +748,9 @@
       renderer.setSize(w, h);
       composer.setSize(w, h);
       bloom.setSize(w, h);
+      const sc = moteScale();
+      motes.material.uniforms.uScale.value = sc;
+      bokeh.material.uniforms.uScale.value = sc;
     }
     window.addEventListener('resize', resize);
 
@@ -720,6 +763,7 @@
     });
 
     const tmpColor = new THREE.Color();
+    const iris = new THREE.Color();   // a slow pastel-rainbow tint, shared by halo + motes
     function render() {
       requestAnimationFrame(render);
       if (!visible) return;
@@ -736,17 +780,19 @@
       cur.beam.lerp(tmpColor.set(m.beam), k);
       cur.ground.lerp(tmpColor.set(m.ground), k);
 
+      // a pastel rainbow that eases slowly round the wheel
+      const hueShift = (t * 0.018) % 1;
+      iris.setHSL((t * 0.03) % 1, 0.5, 0.78);
+
       scene.background.copy(cur.fog);
       scene.fog.color.copy(cur.fog);
       floorMat.color.copy(cur.ground);
       coreMat.color.copy(cur.core);
       shellMat.emissive.copy(cur.core);
-      wire.material.color.copy(cur.core);
-      halo.material.color.copy(cur.core);
+      wire.material.color.copy(cur.core).lerp(iris, 0.32);   // iridescent edge
+      halo.material.color.copy(cur.core).lerp(iris, 0.5);    // shimmering aura
       coreLight.color.copy(cur.light);
       beamMat.uniforms.uColor.value.copy(cur.beam);
-      motes.material.color.copy(cur.mote);
-      bokeh.material.color.copy(cur.mote);
 
       // the heart breathes
       const breath = 0.5 + 0.5 * Math.sin(t * 0.55);
@@ -768,6 +814,10 @@
 
       // motes drift upward and wander, wrapping back to the floor
       [motes, bokeh].forEach((sys, idx) => {
+        const u = sys.material.uniforms;
+        u.uTime.value = t;
+        u.uHueShift.value = hueShift;
+        u.uMood.value.copy(cur.mote);
         const p = sys.geometry.attributes.position;
         const a = p.array, seed = sys.userData.seed, H = sys.userData.height;
         const rise = (idx === 0 ? 0.22 : 0.09) * (still ? 0.3 : 1);
@@ -789,7 +839,9 @@
         const e = r.t;
         const s = 0.4 + e * 6.5;
         r.mesh.scale.setScalar(s);
-        r.mesh.material.color.copy(cur.beam);
+        // a soft pastel ring, drifting hue, leaning toward the mood's beam
+        tmpColor.setHSL(((r.hue || 0) + t * 0.04) % 1, 0.5, 0.72);
+        r.mesh.material.color.copy(cur.beam).lerp(tmpColor, 0.6);
         r.mesh.material.opacity = (1 - e) * 0.5 * (1 - e * 0.3);
       });
       // pulses bloom outward from the heart
