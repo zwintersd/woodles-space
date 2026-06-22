@@ -25,6 +25,14 @@
     /* the canvas fills everything; three.js draws into it */
     #room { position: fixed; inset: 0; z-index: 0; display: block; }
 
+    /* a soft cinematic vignette to frame the light and draw the eye in */
+    .vignette {
+      position: fixed; inset: 0; z-index: 2;
+      pointer-events: none;
+      background: radial-gradient(125% 105% at 50% 44%,
+        transparent 36%, rgba(6, 5, 12, 0.42) 78%, rgba(4, 3, 9, 0.72) 100%);
+    }
+
     /* a held breath of darkness, lifted once the first frame is ready */
     #veil {
       position: fixed; inset: 0; z-index: 5;
@@ -198,6 +206,7 @@
 </head>
 <body>
   <canvas id="room"></canvas>
+  <div class="vignette"></div>
   <div id="veil"></div>
 
   <div class="stage">
@@ -284,6 +293,7 @@
     import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
     import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
     import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+    import { Reflector } from 'three/addons/objects/Reflector.js';
 
     const body = document.body;
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -340,8 +350,58 @@
     });
     const floor = new THREE.Mesh(new THREE.CircleGeometry(34, 96), floorMat);
     floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -0.02;
+    floor.position.y = -0.04;
     scene.add(floor);
+
+    /* ── a reflecting pool: the heart, beam and motes mirrored in the stone,
+       faded out toward the rim so there's no hard horizon. additive and dim,
+       a wet sheen rather than a mirror. kept linear — the composer tone-maps. */
+    const REFL_R = 34;
+    const reflShader = {
+      uniforms: {
+        color: { value: null },
+        tDiffuse: { value: null },
+        textureMatrix: { value: null },
+        uStrength: { value: 0.9 },
+      },
+      vertexShader: `
+        uniform mat4 textureMatrix;
+        varying vec4 vUv;
+        varying float vR;
+        void main() {
+          vUv = textureMatrix * vec4(position, 1.0);
+          vR = length(position.xy) / ${REFL_R.toFixed(1)};
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `
+        uniform vec3 color;
+        uniform sampler2D tDiffuse;
+        uniform float uStrength;
+        varying vec4 vUv;
+        varying float vR;
+        void main() {
+          vec4 base = texture2DProj(tDiffuse, vUv);
+          float fade = smoothstep(1.0, 0.25, vR);     /* bright centre, gone by the rim */
+          gl_FragColor = vec4(base.rgb * color * uStrength, fade);
+        }`,
+    };
+    let reflector = null;
+    try {
+      const rdpr = renderer.getPixelRatio();
+      reflector = new Reflector(new THREE.CircleGeometry(REFL_R, 96), {
+        clipBias: 0.003,
+        textureWidth: Math.max(256, Math.floor(window.innerWidth * rdpr * 0.5)),
+        textureHeight: Math.max(256, Math.floor(window.innerHeight * rdpr * 0.5)),
+        color: 0x6a6d82,
+        shader: reflShader,
+      });
+      reflector.rotation.x = -Math.PI / 2;
+      reflector.position.y = -0.018;
+      reflector.material.transparent = true;
+      reflector.material.depthWrite = false;
+      reflector.material.blending = THREE.AdditiveBlending;
+      scene.add(reflector);
+    } catch (_) { reflector = null; }
 
     /* a faint ring of standing stones — just suggestions of walls */
     const pillarGroup = new THREE.Group();
@@ -579,6 +639,59 @@
     }
     const motes = makeMotes(reduced ? 280 : 560, 9, 8.5, 0.13, 0.95, 0.18);
     const bokeh = makeMotes(reduced ? 44 : 96, 7, 6.5, 0.58, 0.30, 0.10); // big, faint, near
+
+    /* ── shooting stars: rare, gentle streaks across the far sky ─────────── */
+    function streakTexture() {
+      const w = 32, h = 160, c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const g = c.getContext('2d');
+      g.filter = 'blur(2px)';
+      const lg = g.createLinearGradient(0, 0, 0, h);     // bright head → fading tail
+      lg.addColorStop(0.0, 'rgba(255,255,255,0.95)');
+      lg.addColorStop(0.12, 'rgba(255,255,255,0.6)');
+      lg.addColorStop(1.0, 'rgba(255,255,255,0)');
+      g.fillStyle = lg;
+      g.fillRect(w / 2 - 3, 0, 6, h);
+      g.filter = 'none';
+      const head = g.createRadialGradient(w / 2, 9, 0, w / 2, 9, 9);
+      head.addColorStop(0, 'rgba(255,255,255,1)');
+      head.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = head;
+      g.beginPath(); g.arc(w / 2, 9, 9, 0, Math.PI * 2); g.fill();
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+    const stars = [];
+    if (!reduced) {
+      const streakTex = streakTexture();
+      for (let i = 0; i < 4; i++) {
+        const mat = new THREE.SpriteMaterial({
+          map: streakTex, transparent: true, opacity: 0, depthWrite: false,
+          blending: THREE.AdditiveBlending, color: 0xeae6ff,
+        });
+        const sp = new THREE.Sprite(mat);
+        sp.scale.set(0.34, 2.4, 1);
+        sp.visible = false;
+        scene.add(sp);
+        stars.push({ sp, life: 1, dur: 1, vx: 0, vy: 0 });   // start spent (available)
+      }
+    }
+    let nextStar = 4 + Math.random() * 6;
+    function launchStar() {
+      const s = stars.find((s) => s.life >= s.dur);
+      if (!s) return;
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      const y = 7 + Math.random() * 7;
+      const z = -6 - Math.random() * 9;
+      s.sp.position.set(-16 * dir, y, z);
+      s.vx = dir * (10 + Math.random() * 6);
+      s.vy = -(1 + Math.random() * 2.2);
+      s.sp.material.rotation = Math.atan2(s.vy, s.vx) - Math.PI / 2;  // head leads the travel
+      s.dur = 1.3 + Math.random() * 0.9;
+      s.life = 0;
+      s.sp.visible = true;
+    }
 
     /* ── ripples + pulses, pooled ───────────────────────────────────────── */
     const ripples = [];
@@ -889,6 +1002,13 @@
       const sc = moteScale();
       motes.material.uniforms.uScale.value = sc;
       bokeh.material.uniforms.uScale.value = sc;
+      if (reflector) {
+        const r = renderer.getPixelRatio();
+        reflector.getRenderTarget().setSize(
+          Math.max(256, Math.floor(w * r * 0.5)),
+          Math.max(256, Math.floor(h * r * 0.5)),
+        );
+      }
     }
     window.addEventListener('resize', resize);
 
@@ -937,7 +1057,7 @@
       coreLight.color.copy(cur.light).lerp(playColor, tint * 0.6);
       beamMat.uniforms.uColor.value.copy(cur.beam);
       auroraMat.uniforms.uTime.value = t;
-      auroraMat.uniforms.uMood.value.copy(cur.light);
+      auroraMat.uniforms.uMood.value.copy(cur.light).lerp(playColor, tint * 0.35);  // sky answers the note
 
       // the heart breathes
       const breath = 0.5 + 0.5 * Math.sin(t * 0.55);
@@ -1000,6 +1120,22 @@
         p.mesh.material.color.copy(cur.core);
         p.mesh.material.opacity = (1 - e) * 0.35;
       });
+
+      // shooting stars cross the far sky now and then
+      if (stars.length) {
+        nextStar -= dt;
+        if (nextStar <= 0) { launchStar(); nextStar = 5 + Math.random() * 9; }
+        stars.forEach((s) => {
+          if (s.life >= s.dur) return;
+          s.life += dt;
+          const e = s.life / s.dur;
+          s.sp.position.x += s.vx * dt;
+          s.sp.position.y += s.vy * dt;
+          // fade in over the first sixth, out over the rest
+          s.sp.material.opacity = Math.min(1, e / 0.16) * (1 - e) * 0.9;
+          if (e >= 1) s.sp.visible = false;
+        });
+      }
 
       // camera: gentle auto-drift + pointer parallax, eased
       pointer.x += (pointer.tx - pointer.x) * Math.min(1, dt * 2.4);
