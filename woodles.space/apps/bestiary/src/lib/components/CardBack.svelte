@@ -1,14 +1,19 @@
 <script lang="ts">
 	import type { Domain } from '$lib/content/domains';
 	import { domainDef } from '$lib/content/domains';
+	import { bestiary } from '$lib/bestiary.svelte';
 
 	let { domain }: { domain: Domain } = $props();
 	let def = $derived(domainDef(domain));
+	let customArt = $derived(bestiary.getCardBack(domain));
 </script>
 
 <div class="card-back" style="--dc: var({def.colorVar})">
-	<!-- inner decorative border -->
-	<div class="back-frame">
+	{#if customArt}
+		<img class="back-art" src={customArt.dataUrl} alt="" aria-hidden="true" />
+	{/if}
+	<!-- inner decorative border (shown as fallback or overlay when no custom art) -->
+	<div class="back-frame" class:hidden={!!customArt}>
 		<!-- corner ornaments -->
 		<span class="corner tl" aria-hidden="true"></span>
 		<span class="corner tr" aria-hidden="true"></span>
@@ -52,6 +57,17 @@
 				#0e080e 100%
 			);
 	}
+
+	.back-art {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		border-radius: inherit;
+	}
+
+	.back-frame.hidden { display: none; }
 
 	/* ── inner frame ── */
 	.back-frame {

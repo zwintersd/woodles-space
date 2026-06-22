@@ -10,12 +10,12 @@
 
 	let {
 		initial,
-		creature,
+		creature = null,
 		onsave,
 		onclose
 	}: {
 		initial: Composition;
-		creature: Creature;
+		creature?: Creature | null;
 		onsave: (comp: Composition, dataUrl: string, isolatedDataUrl: string | null) => void;
 		onclose: () => void;
 	} = $props();
@@ -109,7 +109,7 @@
 			<button class="x" title="close studio" aria-label="close studio" onclick={close}>←</button>
 			<div class="titles">
 				<h2 class="title">sprite studio</h2>
-				<p class="sub">layer a world — backdrop, trees, the creature, light</p>
+				<p class="sub">{creature ? 'layer a world — backdrop, trees, the creature, light' : 'design the card back — backdrops, patterns, overlays'}</p>
 			</div>
 		</div>
 		<div class="bar-right">
@@ -119,7 +119,7 @@
 			</div>
 			<button class="ghost danger" disabled={studio.isEmpty} onclick={() => studio.clearAll()}>clear</button>
 			<button class="primary" disabled={saving} onclick={place}>
-				{saving ? 'placing…' : 'place into card'}
+				{saving ? 'saving…' : creature ? 'place into card' : 'save card back'}
 			</button>
 		</div>
 	</header>
@@ -129,7 +129,7 @@
 	<div class="work">
 		<!-- left: the art kit -->
 		<aside class="rail left">
-			<AssetTray {studio} creatureSprite={creature.sprite} creaturePixelated={creature.pixelated} />
+			<AssetTray {studio} creatureSprite={creature?.sprite ?? null} creaturePixelated={creature?.pixelated ?? false} />
 		</aside>
 
 		<!-- center: the stage -->

@@ -9,7 +9,7 @@ import type {
 	DomainFilter,
 	WorkshopPrefs
 } from './types';
-import { rarities, type Rarity } from './content/domains';
+import { rarities, type Rarity, type Domain } from './content/domains';
 import type { CoreStat, Substat } from './content/stats';
 import { migrateComposition, type Composition } from './composer';
 import { normalizeCardStyle, defaultCardStyle, type CardStyle } from './cardstyle';
@@ -66,6 +66,9 @@ function save<T>(key: string, value: T): void {
 
 const CREATURES_KEY = 'bestiary.creatures.v1';
 const SETTINGS_KEY = 'bestiary.settings.v1';
+const CARD_BACKS_KEY = 'bestiary.cardbacks.v1';
+
+type CardBackMap = Partial<Record<Domain, { composition: Composition; dataUrl: string }>>;
 
 const DEFAULT_SETTINGS: BestiarySettings = { sort: 'recent' };
 
@@ -104,11 +107,24 @@ export class Bestiary {
 	#pendingWrite: Creature[] | null = null;
 	#writing = false;
 
+	cardBacks = $state<CardBackMap>({});
+
 	constructor() {
 		this.readyPromise = new Promise<void>((resolve) => {
 			this.#resolveReady = resolve;
 		});
 		void this.#hydrate();
+		void this.#hydrateCardBacks();
+	}
+
+	async #hydrateCardBacks(): Promise<void> {
+		if (!idbAvailable()) return;
+		try {
+			const stored = await idbGet<CardBackMap>(CARD_BACKS_KEY);
+			if (stored) this.cardBacks = stored;
+		} catch {
+			// ignore — card backs are cosmetic, a failed load just shows defaults
+		}
 	}
 
 	// Load creatures from IndexedDB, migrating any cards that fit in the old
@@ -342,6 +358,30 @@ export class Bestiary {
 
 	resetCardStyle(id: string): void {
 		this.updateCreature(id, { cardStyle: null });
+	}
+
+	// ── card backs ─────────────────────────────────────────────────
+	// One custom back per domain, stored in IDB. Falls back to the CSS
+	// placeholder in CardBack.svelte when no custom art is set.
+
+	getCardBack(domain: Domain): { composition: Composition; dataUrl: string } | null {
+		return this.cardBacks[domain] ?? null;
+	}
+
+	setCardBack(domain: Domain, composition: Composition, dataUrl: string): void {
+		this.cardBacks = { ...this.cardBacks, [domain]: { composition, dataUrl } };
+		if (idbAvailable()) {
+			void idbSet(CARD_BACKS_KEY, $state.snapshot(this.cardBacks));
+		}
+	}
+
+	clearCardBack(domain: Domain): void {
+		const next = { ...this.cardBacks };
+		delete next[domain];
+		this.cardBacks = next;
+		if (idbAvailable()) {
+			void idbSet(CARD_BACKS_KEY, $state.snapshot(this.cardBacks));
+		}
 	}
 
 	// ── stat mutations ─────────────────────────────────────────────

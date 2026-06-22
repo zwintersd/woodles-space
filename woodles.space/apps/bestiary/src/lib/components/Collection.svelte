@@ -6,6 +6,7 @@
 	import ListView from './ListView.svelte';
 	import BinderPrint from './BinderPrint.svelte';
 	import StatSheetPrint from './StatSheetPrint.svelte';
+	import CardBackEditor from './CardBackEditor.svelte';
 	import { formatAllPlainText, formatAllMarkdown, downloadText } from '$lib/textformat';
 
 	const sorts: { id: SortKey; label: string }[] = [
@@ -22,6 +23,7 @@
 	// Print modals + export UI
 	let showBinder = $state(false);
 	let showStatSheet = $state(false);
+	let showCardBacks = $state(false);
 	let exportOpen = $state(false);
 	let exportCopiedText = $state(false);
 	let exportCopiedMd = $state(false);
@@ -161,6 +163,11 @@
 					onclick={() => (showStatSheet = true)}
 					title="print stat sheets — 3 per page with stat detail and card back"
 				>⊠ stat sheet</button>
+				<button
+					class="chip backs-btn"
+					onclick={() => (showCardBacks = true)}
+					title="design per-domain card backs in the sprite studio"
+				>⊡ backs</button>
 
 				<!-- export menu -->
 				<div class="export-wrap">
@@ -228,6 +235,10 @@
 
 {#if showStatSheet}
 	<StatSheetPrint onclose={() => (showStatSheet = false)} />
+{/if}
+
+{#if showCardBacks}
+	<CardBackEditor onclose={() => (showCardBacks = false)} />
 {/if}
 
 <style>
@@ -349,6 +360,7 @@
 
 	.binder-btn:hover { color: var(--b-relational); border-color: color-mix(in srgb, var(--b-relational) 40%, transparent); }
 	.sheet-btn:hover  { color: var(--b-biochemical); border-color: color-mix(in srgb, var(--b-biochemical) 40%, transparent); }
+	.backs-btn:hover  { color: var(--b-temporal); border-color: color-mix(in srgb, var(--b-temporal) 40%, transparent); }
 
 	.export-wrap { position: relative; }
 
