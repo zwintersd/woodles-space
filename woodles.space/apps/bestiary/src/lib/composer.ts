@@ -217,6 +217,14 @@ export function emptyComposition(): Composition {
 	return { v: 1, width: CANVAS_W, height: CANVAS_H, layers: [] };
 }
 
+// Portrait canvas sized to the exact 63:88 card ratio (8× scale).
+export const CARD_BACK_W = 504;
+export const CARD_BACK_H = 704;
+
+export function cardBackComposition(): Composition {
+	return { v: 1, width: CARD_BACK_W, height: CARD_BACK_H, layers: [] };
+}
+
 type ImageLayerInit = {
 	src: string;
 	naturalW: number;

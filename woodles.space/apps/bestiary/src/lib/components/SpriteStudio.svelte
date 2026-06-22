@@ -25,6 +25,8 @@
 	const studio = new StudioState();
 	untrack(() => studio.load(initial));
 
+	let isPortrait = $derived(studio.comp.height > studio.comp.width);
+
 	let saving = $state(false);
 	let saveError = $state<string | null>(null);
 	let root: HTMLDivElement;
@@ -134,7 +136,7 @@
 
 		<!-- center: the stage -->
 		<section class="center">
-			<div class="stage-wrap">
+			<div class="stage-wrap" class:portrait={isPortrait}>
 				<StudioStage {studio} />
 			</div>
 			<p class="stage-tip">
@@ -286,6 +288,10 @@
 		max-width: min(100%, 64vh);
 		max-height: 100%;
 	}
+	/* portrait canvas (card backs): height drives sizing, not width */
+	.stage-wrap.portrait {
+		max-width: min(100%, 46vh);
+	}
 	.stage-tip {
 		font-family: var(--b-font-mono);
 		font-size: 0.66rem;
@@ -376,6 +382,7 @@
 		}
 		.rail { overflow: visible; }
 		.stage-wrap { max-width: min(100%, 52vh); }
+		.stage-wrap.portrait { max-width: min(100%, 38vh); }
 		.layer-list { max-height: none; }
 	}
 </style>

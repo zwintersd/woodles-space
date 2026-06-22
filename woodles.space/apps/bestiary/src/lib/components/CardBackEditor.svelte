@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { domains, type Domain } from '$lib/content/domains';
 	import { bestiary } from '$lib/bestiary.svelte';
-	import { emptyComposition, type Composition } from '$lib/composer';
+	import { cardBackComposition, type Composition } from '$lib/composer';
 	import CardBack from './CardBack.svelte';
 	import SpriteStudio from './SpriteStudio.svelte';
 
@@ -14,7 +14,7 @@
 	function openStudio(domain: Domain) {
 		selectedDomain = domain;
 		const existing = bestiary.getCardBack(domain);
-		studioInitial = existing?.composition ?? emptyComposition();
+		studioInitial = existing?.composition ?? cardBackComposition();
 		studioOpen = true;
 	}
 
