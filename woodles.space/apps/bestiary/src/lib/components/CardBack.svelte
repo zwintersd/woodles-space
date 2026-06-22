@@ -5,22 +5,29 @@
 
 	let { domain }: { domain: Domain } = $props();
 	let def = $derived(domainDef(domain));
-	let customArt = $derived(bestiary.getCardBack(domain));
+	let back = $derived(bestiary.getCardBack(domain));
+	let customArt = $derived(back?.dataUrl ?? null);
+	let border = $derived(back?.border ?? 'none');
 </script>
 
-<div class="card-back" style="--dc: var({def.colorVar})">
+<div
+	class="card-back"
+	class:fx-pulse={border === 'pulse'}
+	class:fx-shimmer={border === 'shimmer'}
+	class:fx-halo={border === 'halo'}
+	class:fx-drift={border === 'drift'}
+	style="--dc: var({def.colorVar})"
+>
 	{#if customArt}
-		<img class="back-art" src={customArt.dataUrl} alt="" aria-hidden="true" />
+		<img class="back-art" src={customArt} alt="" aria-hidden="true" />
 	{/if}
-	<!-- inner decorative border (shown as fallback or overlay when no custom art) -->
+
+	<!-- decorative default design, hidden when custom art is present -->
 	<div class="back-frame" class:hidden={!!customArt}>
-		<!-- corner ornaments -->
 		<span class="corner tl" aria-hidden="true"></span>
 		<span class="corner tr" aria-hidden="true"></span>
 		<span class="corner bl" aria-hidden="true"></span>
 		<span class="corner br" aria-hidden="true"></span>
-
-		<!-- central medallion -->
 		<div class="medallion">
 			<div class="medallion-ring">
 				<span class="back-glyph">{def.glyph}</span>
@@ -29,6 +36,8 @@
 			<span class="back-label">bestiary</span>
 		</div>
 	</div>
+
+	<!-- fx overlay: always on top, handled by ::after on .card-back -->
 </div>
 
 <style>
@@ -41,7 +50,6 @@
 		container-type: inline-size;
 		font-size: 4.4cqw;
 
-		/* layered background: subtle cross-hatch grain over a domain radial glow */
 		background:
 			repeating-linear-gradient(
 				-45deg,
@@ -58,6 +66,7 @@
 			);
 	}
 
+	/* ── custom art ── */
 	.back-art {
 		position: absolute;
 		inset: 0;
@@ -67,9 +76,9 @@
 		border-radius: inherit;
 	}
 
+	/* ── default CSS design ── */
 	.back-frame.hidden { display: none; }
 
-	/* ── inner frame ── */
 	.back-frame {
 		position: absolute;
 		inset: 5%;
@@ -80,7 +89,6 @@
 		justify-content: center;
 	}
 
-	/* corner ornaments — four tiny squares at the inner frame corners */
 	.corner {
 		position: absolute;
 		width: 0.5em;
@@ -94,14 +102,12 @@
 	.corner.bl { bottom: -1px; left: -1px; border-bottom-width: 1.5px; border-left-width: 1.5px; }
 	.corner.br { bottom: -1px; right: -1px; border-bottom-width: 1.5px; border-right-width: 1.5px; }
 
-	/* ── central design ── */
 	.medallion {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		gap: 0.55em;
 	}
-
 	.medallion-ring {
 		width: 3.8em;
 		height: 3.8em;
@@ -115,14 +121,12 @@
 		align-items: center;
 		justify-content: center;
 	}
-
 	.back-glyph {
 		font-size: 1.65em;
 		color: color-mix(in srgb, var(--dc) 90%, #fff);
 		text-shadow: 0 0 0.6em color-mix(in srgb, var(--dc) 60%, transparent);
 		line-height: 1;
 	}
-
 	.back-domain {
 		font-family: var(--b-font-mono);
 		font-size: 0.52em;
@@ -131,7 +135,6 @@
 		color: color-mix(in srgb, var(--dc) 65%, #fff);
 		opacity: 0.75;
 	}
-
 	.back-label {
 		font-family: var(--b-font-codex);
 		font-size: 0.46em;
@@ -139,5 +142,105 @@
 		color: #fff;
 		opacity: 0.18;
 		margin-top: -0.2em;
+	}
+
+	/* ═══════════════════════════════════════════
+	   ANIMATED FX — all via ::after on .card-back
+	   The card has overflow:hidden so anything
+	   that overflows is cleanly clipped.
+	   ═══════════════════════════════════════════ */
+
+	.card-back.fx-pulse::after,
+	.card-back.fx-shimmer::after,
+	.card-back.fx-halo::after,
+	.card-back.fx-drift::after {
+		content: '';
+		position: absolute;
+		pointer-events: none;
+		z-index: 30;
+	}
+
+	/* ── pulse: breathing inner-edge glow ── */
+	@keyframes cb-pulse {
+		0%, 100% { opacity: 0.3; }
+		50%       { opacity: 1; }
+	}
+	.card-back.fx-pulse::after {
+		inset: 0;
+		border-radius: inherit;
+		box-shadow:
+			inset 0 0 1.8em 0.5em color-mix(in srgb, var(--dc) 60%, transparent),
+			inset 0 0 0.6em 0.1em color-mix(in srgb, var(--dc) 45%, transparent),
+			inset 0 0 0.25em 0      color-mix(in srgb, var(--dc) 80%, white);
+		animation: cb-pulse 3.2s ease-in-out infinite;
+	}
+
+	/* ── shimmer: slow diagonal silver light sweep ── */
+	@keyframes cb-shimmer {
+		0%        { transform: translateX(-160%) skewX(-18deg); opacity: 0; }
+		8%        { opacity: 1; }
+		55%       { opacity: 0.9; }
+		60%, 100% { transform: translateX(210%) skewX(-18deg); opacity: 0; }
+	}
+	.card-back.fx-shimmer::after {
+		top: -10%;
+		left: 0;
+		width: 55%;
+		height: 120%;
+		background: linear-gradient(
+			105deg,
+			transparent 10%,
+			rgba(255, 255, 255, 0.04) 30%,
+			rgba(255, 255, 255, 0.13) 50%,
+			rgba(255, 255, 255, 0.04) 70%,
+			transparent 90%
+		);
+		animation: cb-shimmer 7s ease-in-out infinite;
+		transform: translateX(-160%) skewX(-18deg);
+	}
+
+	/* ── halo: slow rotating conic sweep (holographic) ── */
+	@keyframes cb-halo {
+		to { transform: rotate(360deg); }
+	}
+	.card-back.fx-halo::after {
+		/* oversized so the rotating gradient fills the card from every angle */
+		top: -50%;
+		left: -50%;
+		width: 200%;
+		height: 200%;
+		background: conic-gradient(
+			from 0deg at 50% 50%,
+			transparent                                        0deg,
+			color-mix(in srgb, var(--dc) 22%, transparent)   30deg,
+			transparent                                       70deg,
+			transparent                                      180deg,
+			color-mix(in srgb, var(--dc) 14%, transparent)  220deg,
+			transparent                                      260deg
+		);
+		mix-blend-mode: screen;
+		animation: cb-halo 14s linear infinite;
+	}
+
+	/* ── drift: a slow-floating domain-tinted veil ── */
+	@keyframes cb-drift {
+		0%   { transform: translate(  0%,   0%) scale(1.00); opacity: 0.45; }
+		25%  { transform: translate( -7%,   5%) scale(1.08); opacity: 0.65; }
+		50%  { transform: translate(  5%,  -6%) scale(0.96); opacity: 0.5;  }
+		75%  { transform: translate( -4%,  -3%) scale(1.05); opacity: 0.7;  }
+		100% { transform: translate(  0%,   0%) scale(1.00); opacity: 0.45; }
+	}
+	.card-back.fx-drift::after {
+		top: -20%;
+		left: -20%;
+		width: 140%;
+		height: 140%;
+		background: radial-gradient(
+			ellipse 75% 60% at 40% 45%,
+			color-mix(in srgb, var(--dc) 32%, transparent),
+			transparent 68%
+		);
+		mix-blend-mode: screen;
+		animation: cb-drift 11s ease-in-out infinite;
 	}
 </style>

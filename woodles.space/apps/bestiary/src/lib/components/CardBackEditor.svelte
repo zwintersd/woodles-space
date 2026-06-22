@@ -2,6 +2,7 @@
 	import { domains, type Domain } from '$lib/content/domains';
 	import { bestiary } from '$lib/bestiary.svelte';
 	import { cardBackComposition, type Composition } from '$lib/composer';
+	import type { BackBorderStyle } from '$lib/types';
 	import CardBack from './CardBack.svelte';
 	import SpriteStudio from './SpriteStudio.svelte';
 
@@ -10,6 +11,14 @@
 	let selectedDomain = $state<Domain>('temporal');
 	let studioOpen = $state(false);
 	let studioInitial = $state<Composition | null>(null);
+
+	const borders: { id: BackBorderStyle; label: string; symbol: string }[] = [
+		{ id: 'none',    label: 'none',    symbol: '○' },
+		{ id: 'pulse',   label: 'pulse',   symbol: '◉' },
+		{ id: 'shimmer', label: 'shimmer', symbol: '◈' },
+		{ id: 'halo',    label: 'halo',    symbol: '⊙' },
+		{ id: 'drift',   label: 'drift',   symbol: '≋' }
+	];
 
 	function openStudio(domain: Domain) {
 		selectedDomain = domain;
@@ -23,10 +32,18 @@
 		studioOpen = false;
 	}
 
-	function handleClear(domain: Domain) {
-		if (confirm(`Clear the custom back for ${domain}? It will revert to the default design.`)) {
+	function handleClearArt(domain: Domain) {
+		if (confirm(`Clear the custom art for ${domain}? The border effect will remain.`)) {
 			bestiary.clearCardBack(domain);
 		}
+	}
+
+	function setBorder(domain: Domain, border: BackBorderStyle) {
+		bestiary.setCardBackBorder(domain, border);
+	}
+
+	function currentBorder(domain: Domain): BackBorderStyle {
+		return bestiary.getCardBack(domain)?.border ?? 'none';
 	}
 </script>
 
@@ -41,7 +58,7 @@
 		<div class="cbe-nav">
 			<div class="cbe-info">
 				<span class="cbe-title">card backs</span>
-				<span class="cbe-meta">one design per domain · click a card to edit</span>
+				<span class="cbe-meta">one design per domain · art + animated border effects</span>
 			</div>
 			<button class="close-btn" onclick={onclose} aria-label="close card back editor">×</button>
 		</div>
@@ -49,28 +66,48 @@
 		<div class="cbe-scroll">
 			<div class="cbe-grid">
 				{#each domains as d (d.id)}
-					{@const hasCustom = !!bestiary.getCardBack(d.id)}
+					{@const hasArt = !!bestiary.getCardBack(d.id)?.dataUrl}
+					{@const activeBorder = currentBorder(d.id)}
 					<div class="cbe-item">
 						<button
 							class="cbe-card-btn"
 							onclick={() => openStudio(d.id)}
-							title="edit {d.name} card back"
+							title="edit {d.name} card back art"
 						>
 							<CardBack domain={d.id} />
 						</button>
-						<div class="cbe-card-meta">
+
+						<div class="cbe-meta">
 							<span class="cbe-domain-name" style="color: var({d.colorVar})">
 								{d.glyph} {d.name}
 							</span>
-							<div class="cbe-card-actions">
+
+							<!-- art controls -->
+							<div class="cbe-art-row">
 								<button class="cbe-edit-btn" onclick={() => openStudio(d.id)}>
-									{hasCustom ? '✎ edit' : '✦ design'}
+									{hasArt ? '✎ edit art' : '✦ design art'}
 								</button>
-								{#if hasCustom}
-									<button class="cbe-clear-btn" onclick={() => handleClear(d.id)} title="clear custom art">
+								{#if hasArt}
+									<button class="cbe-clear-btn" onclick={() => handleClearArt(d.id)} title="clear custom art">
 										✕
 									</button>
 								{/if}
+							</div>
+
+							<!-- border effect picker -->
+							<div class="cbe-border-row" role="group" aria-label="{d.name} border effect">
+								{#each borders as b (b.id)}
+									<button
+										class="cbe-border-chip"
+										class:active={activeBorder === b.id}
+										onclick={() => setBorder(d.id, b.id)}
+										title="{b.label} border"
+										style="--dc: var({d.colorVar})"
+									>
+										<span class="chip-sym">{b.symbol}</span>
+										{b.label}
+									</button>
+								{/each}
 							</div>
 						</div>
 					</div>
@@ -109,7 +146,8 @@
 		font-weight: 600;
 		color: var(--b-text);
 	}
-	.cbe-meta {
+	/* nav subtitle */
+	.cbe-info > span:last-child {
 		font-family: var(--b-font-mono);
 		font-size: 0.76rem;
 		color: var(--b-muted);
@@ -141,17 +179,17 @@
 
 	.cbe-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(160px, 200px));
-		gap: 32px;
+		grid-template-columns: repeat(auto-fill, minmax(180px, 220px));
+		gap: 36px;
 		justify-content: center;
 		width: 100%;
-		max-width: 900px;
+		max-width: 1100px;
 	}
 
 	.cbe-item {
 		display: flex;
 		flex-direction: column;
-		gap: 10px;
+		gap: 12px;
 	}
 
 	.cbe-card-btn {
@@ -160,28 +198,28 @@
 		background: none;
 		border-radius: var(--b-radius-card, 10px);
 		transition: transform var(--b-transition-fast), box-shadow var(--b-transition-fast);
-		box-shadow: 0 2px 16px rgba(0, 0, 0, 0.25);
+		box-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
 	}
 	.cbe-card-btn:hover {
 		transform: translateY(-3px);
-		box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+		box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
 	}
 
-	.cbe-card-meta {
+	/* ── per-card metadata + controls ── */
+	.cbe-meta {
 		display: flex;
 		flex-direction: column;
-		gap: 6px;
-		align-items: flex-start;
+		gap: 8px;
 	}
 
 	.cbe-domain-name {
 		font-family: var(--b-font-mono);
-		font-size: 0.76rem;
+		font-size: 0.8rem;
 		font-weight: 600;
 		letter-spacing: 0.04em;
 	}
 
-	.cbe-card-actions {
+	.cbe-art-row {
 		display: flex;
 		gap: 6px;
 		align-items: center;
@@ -208,4 +246,36 @@
 		transition: border-color var(--b-transition-fast), color var(--b-transition-fast);
 	}
 	.cbe-clear-btn:hover { border-color: var(--b-mythic); color: var(--b-mythic); }
+
+	/* ── border effect picker ── */
+	.cbe-border-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+	}
+
+	.cbe-border-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		font-family: var(--b-font-mono);
+		font-size: 0.66rem;
+		color: var(--b-muted);
+		border: 1px solid transparent;
+		border-radius: var(--b-radius-sm);
+		padding: 0.22rem 0.45rem;
+		transition: color var(--b-transition-fast), border-color var(--b-transition-fast), background var(--b-transition-fast);
+	}
+	.cbe-border-chip:hover { color: var(--b-text-dim); border-color: var(--b-border); }
+	.cbe-border-chip.active {
+		color: var(--b-text);
+		border-color: var(--dc);
+		background: color-mix(in srgb, var(--dc) 12%, transparent);
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dc) 30%, transparent);
+	}
+	.chip-sym {
+		color: var(--dc);
+		font-size: 0.78rem;
+		line-height: 1;
+	}
 </style>
