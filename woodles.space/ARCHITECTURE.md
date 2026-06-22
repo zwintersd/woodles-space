@@ -32,6 +32,7 @@ woodles.space/
     ├── landing/             static · the homepage
     ├── hygge/               static · design playground (fonts, palette, motifs)
     ├── digits/              static · an SVG pen that writes the time
+    ├── quiet-room/          static · an immersive three.js room of light
     ├── letter/              static · echoes — the published-letter reader
     ├── animations/          Python · Manim playspace, outside the workspace
     ├── write/               SvelteKit · the letter editor
@@ -51,7 +52,9 @@ member of the pnpm workspace; `vercel.json` serves its `index.html` directly.
 build step. `vercel.json` serves them as-is and rewrites the friendly path
 (`/digits`) to the file (`/apps/digits/index.html`). they consume `shared/` at
 runtime — `<link href="/shared/palette.css">` and `import … from
-"/shared/library.js"`.
+"/shared/library.js"`. `quiet-room` goes one step further: it pulls `three`
+and its bloom post-processing addons from a CDN through a `<script
+type="importmap">`, still with no build step.
 
 **SvelteKit apps** — `write`, `marginalia`, `planner`, `bestiary`, `spores`,
 `marginalia-devlog` — use Svelte 5 runes, Vite 7, and `@sveltejs/adapter-static`.
