@@ -5,7 +5,8 @@ import {
 	overlayGroups,
 	overlayAssets,
 	layerFromAsset,
-	imageAssetById
+	imageAssetById,
+	recolorFxSrc
 } from './props';
 import { coverScale, CANVAS_W, CANVAS_H } from './composer';
 
@@ -62,5 +63,36 @@ describe('layerFromAsset', () => {
 		const glow = imageAssetById('glow')!;
 		const layer = layerFromAsset(glow);
 		if (layer.kind === 'image') expect(layer.blend).toBe('screen');
+	});
+	it('attaches a recipe to a colour-bearing fx and none to a colourless one', () => {
+		const wash = layerFromAsset(imageAssetById('golden')!);
+		if (wash.kind === 'image') {
+			expect(wash.recipe?.id).toBe('golden');
+			expect(wash.recipe?.colors).toEqual(['#ffe0a0', '#ff9e6b']);
+		}
+		const grain = layerFromAsset(imageAssetById('grain')!);
+		if (grain.kind === 'image') expect(grain.recipe).toBeNull();
+	});
+});
+
+describe('fx recipes', () => {
+	it('a colour-bearing fx is rebuildable, a colourless one is not', () => {
+		const wash = imageAssetById('golden')!;
+		expect(wash.colors.length).toBe(2);
+		expect(wash.colorLabels?.length).toBe(2);
+		const grain = imageAssetById('grain')!;
+		expect(grain.colors.length).toBe(0);
+	});
+	it('recolorFxSrc changes the src and is stable for the same colours', () => {
+		const original = imageAssetById('golden')!.src;
+		const recolored = recolorFxSrc('golden', ['#000000', '#ffffff']);
+		expect(recolored).not.toBeNull();
+		expect(recolored).not.toBe(original);
+		expect(recolorFxSrc('golden', ['#000000', '#ffffff'])).toBe(recolored);
+		// the default colours reproduce the asset's own src exactly
+		expect(recolorFxSrc('golden', imageAssetById('golden')!.colors)).toBe(original);
+	});
+	it('returns null for an unknown fx id', () => {
+		expect(recolorFxSrc('nope', ['#fff'])).toBeNull();
 	});
 });

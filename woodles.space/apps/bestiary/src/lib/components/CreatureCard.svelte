@@ -3,10 +3,20 @@
 	import { domainDef, rarityDef } from '$lib/content/domains';
 	import { capacities, arc } from '$lib/content/stats';
 	import { defaultCardStyle, cardStyleAttr } from '$lib/cardstyle';
+	import { holo } from '$lib/holo';
 	import StatusOverlay from './StatusOverlay.svelte';
 	import FinishOverlay from './FinishOverlay.svelte';
 
-	let { creature, interactive = false }: { creature: Creature; interactive?: boolean } = $props();
+	let {
+		creature,
+		interactive = false,
+		preview = false
+	}: { creature: Creature; interactive?: boolean; preview?: boolean } = $props();
+
+	// "shine" = a live, on-screen card that should catch the pointer (the shelf,
+	// or the editor preview). Prints and the PNG export stage are neither, so they
+	// stay perfectly flat. Only `interactive` cards are also click targets.
+	let shine = $derived(interactive || preview);
 
 	let domain = $derived(domainDef(creature.domain));
 	let rarity = $derived(rarityDef(creature.rarity));
@@ -15,6 +25,18 @@
 	let displayName = $derived(creature.name.trim() || 'Unnamed Creature');
 	let typeLine = $derived(creature.kind.trim() ? `Creature — ${creature.kind.trim()}` : 'Creature');
 	let foil = $derived(creature.rarity === 'rare' || creature.rarity === 'mythic');
+
+	// how strongly the pointer-driven holo reads on this card — louder on a holo
+	// finish, present on foils, a quiet glaze on everything else.
+	let holoAmt = $derived(
+		style.finish === 'holo'
+			? 0.55 + style.finishIntensity * 0.45
+			: style.finish === 'rainbow' || style.finish === 'foil'
+				? 0.5
+				: foil
+					? 0.4
+					: 0.24
+	);
 
 	// the cold condition (0–10) drives the snow/frost/ice overlay; past 6 it also
 	// blends the plate toward ice via --cold-shift (0 at cold 6 → 1 at cold 10).
@@ -25,15 +47,17 @@
 	let artEl = $state<HTMLElement | null>(null);
 
 	let styleAttr = $derived(
-		`${cardStyleAttr(style, domain.colorVar, rarity.colorVar)}; --cold-shift: ${coldShift}`
+		`${cardStyleAttr(style, domain.colorVar, rarity.colorVar)}; --cold-shift: ${coldShift}; --holo: ${holoAmt}`
 	);
 </script>
 
 <article
 	class="card frame-{style.frame} finish-{style.finish} tb-{style.textBox} tex-{style.texture} title-{style.titleAlign}"
 	class:interactive
+	class:shine
 	class:foil
 	style={styleAttr}
+	use:holo={shine}
 >
 	<div class="card-inner">
 		<!-- title bar -->
@@ -138,6 +162,17 @@
 			creatureId={creature.id}
 		/>
 	{/if}
+
+	<!-- pointer-driven holo: a glare that rides the cursor on every live card
+	     (shelf + editor preview), plus a faint spectral sheen — except on a holo
+	     finish, which gets its own richer (also pointer-driven) sheen from
+	     FinishOverlay. Prints/exports are not live, so they stay flat. -->
+	{#if shine}
+		<div class="holo-glare" aria-hidden="true"></div>
+		{#if style.finish !== 'holo'}
+			<div class="holo-sheen" aria-hidden="true"></div>
+		{/if}
+	{/if}
 </article>
 
 <style>
@@ -166,7 +201,7 @@
 		user-select: none;
 	}
 
-	/* a faint sheen for rare and mythic cards */
+	/* a faint sheen for rare and mythic cards — the band slides with the pointer */
 	.card.foil::after {
 		content: '';
 		position: absolute;
@@ -174,18 +209,28 @@
 		pointer-events: none;
 		background: linear-gradient(125deg, transparent 38%,
 			color-mix(in srgb, var(--rarity) 32%, transparent) 50%, transparent 62%);
+		background-size: 220% 100%;
+		background-position: calc(var(--holo-px, 0.5) * 100%) 0;
 		mix-blend-mode: multiply;
-		opacity: 0.55;
+		opacity: calc(0.5 + var(--holo-active, 0) * 0.28);
 		z-index: 3;
 	}
 
+	/* a live card (shelf or editor preview) tilts + lifts toward the pointer; the
+	   easing lives in JS (rAF), so transform isn't transitioned here */
+	.card.shine {
+		transform:
+			perspective(900px)
+			rotateX(var(--holo-rx, 0deg))
+			rotateY(var(--holo-ry, 0deg))
+			translateY(calc(var(--holo-active, 0) * -5px));
+	}
+	/* only a shelf card is a click target — cursor + hover affordance */
 	.card.interactive {
 		cursor: pointer;
-		transition: transform var(--b-transition-spring), box-shadow var(--b-transition-medium),
-			border-color var(--b-transition-fast);
+		transition: box-shadow var(--b-transition-medium), border-color var(--b-transition-fast);
 	}
 	.card.interactive:hover {
-		transform: translateY(-4px);
 		box-shadow: var(--b-shadow-hover);
 		border-color: var(--domain);
 	}
@@ -529,6 +574,46 @@
 	.finish-glow .finish-layer {
 		box-shadow: inset 0 0 calc(10px * var(--finish-amt))
 			color-mix(in srgb, var(--domain) 55%, transparent);
+	}
+
+	/* ── pointer-driven holo ── */
+	/* a soft glare that rides the cursor — present on every live card */
+	.holo-glare {
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		pointer-events: none;
+		z-index: 5;
+		background: radial-gradient(
+			58% 46% at calc(var(--holo-px, 0.5) * 100%) calc(var(--holo-py, 0.5) * 100%),
+			rgba(255, 255, 255, 0.6),
+			rgba(255, 255, 255, 0) 60%
+		);
+		mix-blend-mode: screen;
+		opacity: calc(var(--holo-active, 0) * 0.35);
+	}
+	/* spectral banding that slides with the pointer — scaled by the card's --holo
+	   (loud on a holo finish, a whisper on a matte common) */
+	.holo-sheen {
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		pointer-events: none;
+		z-index: 5;
+		background-image: repeating-linear-gradient(
+			110deg,
+			hsl(0 90% 72%) 0%,
+			hsl(50 90% 72%) 7%,
+			hsl(140 85% 70%) 14%,
+			hsl(200 90% 72%) 21%,
+			hsl(280 85% 74%) 28%,
+			hsl(330 90% 74%) 35%,
+			hsl(0 90% 72%) 42%
+		);
+		background-size: 230% 230%;
+		background-position: calc(var(--holo-px, 0.5) * 120%) calc(var(--holo-py, 0.5) * 120%);
+		mix-blend-mode: color-dodge;
+		opacity: calc(var(--holo, 0.24) * var(--holo-active, 0) * 0.45);
 	}
 
 	/* ── frames ── */

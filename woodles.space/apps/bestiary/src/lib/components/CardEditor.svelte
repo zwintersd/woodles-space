@@ -300,7 +300,7 @@
 						<span class="spark" aria-hidden="true">✦</span>
 					{/if}
 					<div class="specimen" style={`width: ${specimenW};`}>
-						<CreatureCard {creature} />
+						<CreatureCard {creature} preview />
 					</div>
 					<p class="preview-note">
 						{section === 'look'

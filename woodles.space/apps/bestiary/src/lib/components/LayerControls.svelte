@@ -17,11 +17,21 @@
 		type FillLayer,
 		type BlendMode
 	} from '$lib/composer';
+	import { recolorFxSrc, imageAssetById } from '$lib/props';
 	import type { StudioState } from '$lib/studio.svelte';
 
 	let { studio }: { studio: StudioState } = $props();
 
 	let layer = $derived(studio.selected);
+
+	// The fx this layer was stamped from, when it carries an editable recipe —
+	// gates the per-stop "colours" editor (vs the generic tint for everything else).
+	let recipeAsset = $derived(
+		layer?.kind === 'image' && layer.recipe ? imageAssetById(layer.recipe.id) : undefined
+	);
+	let hasColours = $derived(
+		!!(layer?.kind === 'image' && layer.recipe && layer.recipe.colors.length && recipeAsset)
+	);
 
 	function up(changes: Partial<ImageLayer> | Partial<FillLayer>) {
 		studio.updateSelected(changes as never);
@@ -99,6 +109,38 @@
 		const l = layer;
 		if (l?.kind === 'image' && l.tint) up({ tint: { ...l.tint, strength } as Tint });
 	}
+
+	// ── fx colours (edit the effect's own stops) ──────────────────────
+	// Each pick regenerates the layer's src from the recipe — synchronous svg, so
+	// the stage updates instantly. One undo step per pick (the native picker fires
+	// after pointerup, so commit() brackets it rather than the gesture wrapper).
+	function setRecipeColor(i: number, color: string) {
+		const l = layer;
+		if (l?.kind !== 'image' || !l.recipe) return;
+		const colors = l.recipe.colors.slice();
+		colors[i] = color;
+		const src = recolorFxSrc(l.recipe.id, colors);
+		if (!src) return;
+		studio.commit(() => up({ recipe: { ...l.recipe!, colors }, src }));
+	}
+	function resetRecipe() {
+		const l = layer;
+		if (l?.kind !== 'image' || !l.recipe) return;
+		const asset = imageAssetById(l.recipe.id);
+		if (!asset) return;
+		const colors = asset.colors.slice();
+		const src = recolorFxSrc(l.recipe.id, colors);
+		if (!src) return;
+		studio.commit(() => up({ recipe: { ...l.recipe!, colors }, src }));
+	}
+	function recipeIsDefault(): boolean {
+		const l = layer;
+		if (l?.kind !== 'image' || !l.recipe) return true;
+		const asset = imageAssetById(l.recipe.id);
+		if (!asset) return true;
+		return l.recipe.colors.every((c, i) => c.toLowerCase() === (asset.colors[i] ?? '').toLowerCase());
+	}
+	const colourLabel = (i: number) => recipeAsset?.colorLabels?.[i] ?? `stop ${i + 1}`;
 
 	// ── filters ──────────────────────────────────────────────────────
 	function setFilter(p: Partial<Filters>) {
@@ -207,6 +249,33 @@
 				<button type="button" class="tog" class:on={!layer.smooth} title="render without smoothing — for pixel art" onclick={() => up({ smooth: !layer.smooth })}>pixel</button>
 			</div>
 
+			{#if hasColours && layer.recipe}
+				<!-- colours: edit the effect's own stops -->
+				<section class="sub">
+					<div class="sub-head">
+						<span class="sub-title">colours</span>
+						{#if !recipeIsDefault()}
+							<button type="button" class="toggle" onclick={resetRecipe}>reset</button>
+						{/if}
+					</div>
+					<p class="sub-note">recolour the effect itself — every stop is yours</p>
+					<div class="ramp" style="background:linear-gradient(90deg,{layer.recipe.colors.join(',')})"></div>
+					<div class="wells">
+						{#each layer.recipe.colors as c, i (i)}
+							<label class="well" title={colourLabel(i)}>
+								<span class="well-chip" style="background:{c}"></span>
+								<span class="well-label">{colourLabel(i)}</span>
+								<input
+									type="color"
+									value={c}
+									aria-label="{colourLabel(i)} colour"
+									oninput={(e) => setRecipeColor(i, e.currentTarget.value)}
+								/>
+							</label>
+						{/each}
+					</div>
+				</section>
+			{:else}
 			<!-- tint -->
 			<section class="sub">
 				<div class="sub-head">
@@ -243,6 +312,7 @@
 					)}
 				{/if}
 			</section>
+			{/if}
 
 			<!-- outline -->
 			<section class="sub">
@@ -444,6 +514,55 @@
 		color: #fff;
 		mix-blend-mode: difference;
 		pointer-events: none;
+	}
+
+	/* fx colours — a live gradient ramp over a row of editable stop wells */
+	.ramp {
+		height: 0.85rem;
+		border-radius: var(--b-radius-pill);
+		border: 1px solid var(--b-border-strong);
+		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+	}
+	.wells {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.45rem;
+	}
+	.well {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.18rem;
+		cursor: pointer;
+	}
+	.well-chip {
+		width: 1.7rem;
+		height: 1.7rem;
+		border-radius: var(--b-radius-sm);
+		border: 1.5px solid var(--b-border-strong);
+		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+		transition: transform var(--b-transition-fast);
+	}
+	.well:hover .well-chip { transform: translateY(-1px) scale(1.05); }
+	.well-label {
+		font-family: var(--b-font-mono);
+		font-size: 0.56rem;
+		color: var(--b-muted);
+		max-width: 4rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.well input[type='color'] {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		opacity: 0;
+		cursor: pointer;
+		border: none;
+		padding: 0;
 	}
 
 	.fill-editor { display: flex; flex-direction: column; gap: var(--b-space-sm); }
