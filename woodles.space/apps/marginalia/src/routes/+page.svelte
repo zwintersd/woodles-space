@@ -10,7 +10,6 @@
 	import { LOOK_CLOSER_SECONDS } from '$lib/witch/tuning';
 	import type { Life } from '$lib/witch/content/life';
 	import ReadingRoom from '$lib/components/reading/ReadingRoom.svelte';
-	import Arcade from '$lib/arcade/Arcade.svelte';
 	import HexStage from '$lib/witch/HexStage.svelte';
 	import TutorialOverlay from '$lib/witch/TutorialOverlay.svelte';
 
@@ -20,7 +19,6 @@
 	let importBox = $state('');
 	let exportBlob = $state('');
 	let readingOpen = $state(false);
-	let arcadeOpen = $state(false);
 	let hexStageOpen = $state(false);
 	let tutorialOpen = $state(false);
 	let portalPulse = $state(false);
@@ -182,9 +180,8 @@
 			setPortalHint(`attending: ${target.name}`);
 		}
 	}
-	function openRoom(id: 'reading-room' | 'arcade-room' | 'hex-room') {
+	function openRoom(id: 'reading-room' | 'hex-room') {
 		if (id === 'reading-room') readingOpen = true;
-		if (id === 'arcade-room') arcadeOpen = true;
 		if (id === 'hex-room') hexStageOpen = true;
 		setTimeout(() => document.getElementById(id)?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
 	}
@@ -265,10 +262,10 @@
 			<span class="spine-mark">R</span>
 			<span>reading</span>
 		</button>
-		<button class:active={arcadeOpen} onclick={() => openRoom('arcade-room')}>
+		<a href="/marginalia/arcade">
 			<span class="spine-mark">A</span>
 			<span>arcade</span>
-		</button>
+		</a>
 		<a href="/bestiary">
 			<span class="spine-mark">B</span>
 			<span>bestiary</span>
@@ -370,18 +367,11 @@
 			<hr class="rule" />
 
 			<section class="side" id="arcade-room">
-				<button class="side-toggle" onclick={() => (arcadeOpen = !arcadeOpen)}>
-					the arcade {arcadeOpen ? '−' : '+'}
-				</button>
+				<a class="side-toggle side-link" href="/marginalia/arcade">the arcade ↗</a>
 				<p class="side-note">
-					Small games tucked into a corner of the study. Some reward patience,
-					others speed. Prizes drift back into the Book.
+					Small games tucked into a corner of the study, now with an active
+					Bestiary companion sitting beside the cabinet.
 				</p>
-				{#if arcadeOpen}
-					<div class="arcade-wrap">
-						<Arcade />
-					</div>
-				{/if}
 			</section>
 
 			<hr class="rule" />
@@ -987,6 +977,10 @@
 		text-transform: uppercase;
 		color: var(--periwinkle);
 	}
+	.side-link {
+		display: inline-block;
+		text-decoration: none;
+	}
 	.side-toggle:hover {
 		color: var(--cyan);
 	}
@@ -997,9 +991,6 @@
 		color: var(--muted);
 		max-width: 34rem;
 		margin: 0.3rem 0 0;
-	}
-	.arcade-wrap {
-		margin-top: 1rem;
 	}
 	footer {
 		margin-top: 3rem;

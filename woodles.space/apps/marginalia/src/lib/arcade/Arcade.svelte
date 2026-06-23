@@ -1,4 +1,5 @@
 <script lang="ts">
+	import InsightRush from './InsightRush.svelte';
 	import TwoZeroFourEight from './TwoZeroFourEight.svelte';
 
 	type GameStatus = 'play' | 'soon' | 'locked';
@@ -46,7 +47,7 @@
 			title: 'Insight Rush',
 			tagline: 'Tap fast, tap true. Harvest a burst of insight before the moment closes.',
 			tags: ['clicker', 'speed'],
-			status: 'soon'
+			status: 'play'
 		},
 		{
 			id: 'word-weave',
@@ -126,6 +127,8 @@
 
 	{#if activeGame === 'stack-2048'}
 		<TwoZeroFourEight onclose={() => (activeGame = null)} />
+	{:else if activeGame === 'insight-rush'}
+		<InsightRush onclose={() => (activeGame = null)} />
 	{/if}
 
 	<p class="arcade-note">
