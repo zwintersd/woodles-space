@@ -18,7 +18,7 @@
 	{:else if finish === 'holo'}
 		<div
 			class="holo"
-			style="--holo-opacity: {0.3 + intensity * 0.45}; --holo-speed: {8 - intensity * 4}s"
+			style="--holo-opacity: {0.1 + intensity * 0.12}; --holo-speed: {16 - intensity * 7}s"
 		>
 			<div class="holo-gradient"></div>
 			<div class="holo-noise"></div>
@@ -44,33 +44,42 @@
 		pointer-events: none;
 	}
 
+	/* fine spectral banding (a diffraction sheen, not a colour wash) that slides
+	   with the pointer — vars are set by the card's holo action, centred by
+	   default — and brightens as the pointer comes live. A slow hue drift keeps
+	   it alive at rest without a sweep that would fight the pointer. */
 	.holo-gradient {
 		position: absolute;
-		inset: -50%;
-		background: linear-gradient(
-			105deg,
-			hsl(0, 90%, 70%),
-			hsl(60, 90%, 70%),
-			hsl(120, 90%, 70%),
-			hsl(180, 90%, 70%),
-			hsl(240, 90%, 70%),
-			hsl(300, 90%, 70%),
-			hsl(360, 90%, 70%)
+		inset: 0;
+		border-radius: inherit;
+		background-image: repeating-linear-gradient(
+			110deg,
+			hsl(0 90% 72%) 0%,
+			hsl(50 90% 72%) 6%,
+			hsl(140 85% 70%) 12%,
+			hsl(200 90% 72%) 18%,
+			hsl(280 85% 74%) 24%,
+			hsl(330 90% 74%) 30%,
+			hsl(0 90% 72%) 36%
 		);
-		mix-blend-mode: color-dodge;
-		opacity: var(--holo-opacity);
-		animation: holo-sweep var(--holo-speed) linear infinite;
+		background-size: 220% 220%;
+		background-position: calc(var(--holo-px, 0.5) * 120%) calc(var(--holo-py, 0.5) * 120%);
+		mix-blend-mode: soft-light;
+		opacity: calc(var(--holo-opacity) * (0.5 + var(--holo-active, 0) * 0.5));
 	}
 
-	@keyframes holo-sweep {
-		0% {
-			transform: translateX(-30%) rotate(0deg);
+	@media (prefers-reduced-motion: no-preference) {
+		.holo-gradient {
+			animation: holo-drift var(--holo-speed) linear infinite;
 		}
-		50% {
-			transform: translateX(30%) rotate(8deg);
+	}
+
+	@keyframes holo-drift {
+		from {
+			filter: hue-rotate(0deg);
 		}
-		100% {
-			transform: translateX(-30%) rotate(0deg);
+		to {
+			filter: hue-rotate(360deg);
 		}
 	}
 
