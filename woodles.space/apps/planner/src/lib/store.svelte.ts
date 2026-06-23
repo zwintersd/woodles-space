@@ -82,6 +82,9 @@ export class PlannerStore {
 	now = $state<Date>(new Date());
 	editingTaskId = $state<string | null>(null);
 	activeDayKey = $state<string | null>(null);
+	// Compose flow — a brand-new task being filled in (guided "when/where" sheet).
+	composing = $state<boolean>(false);
+	composeDefaults = $state<Partial<Task>>({});
 
 	// ── shape resolution ────────────────────────────────────────────
 
@@ -154,6 +157,15 @@ export class PlannerStore {
 		return out.sort((a, b) => a.startTime.localeCompare(b.startTime));
 	}
 
+	// Blocks for a "YYYY-MM-DD" key — the shape that day actually resolves to,
+	// including obligation/ritual overlays. Used by the composer so picking a
+	// future date surfaces that day's real blocks rather than today's.
+	getBlocksForDateKey(dateStr: string): Block[] {
+		const [y, m, d] = dateStr.split('-').map(Number);
+		if (!y || !m || !d) return [];
+		return this.getBlocksForDate(new Date(y, m - 1, d));
+	}
+
 	getTasksForBlock(blockId: string, dateStr?: string): Task[] {
 		const dk = dateStr ?? dateKey(this.now);
 		return this.tasks.filter(
@@ -217,11 +229,26 @@ export class PlannerStore {
 	}
 
 	openTaskEdit(id: string): void {
+		this.composing = false;
 		this.editingTaskId = id;
 	}
 
 	closeTaskEdit(): void {
 		this.editingTaskId = null;
+	}
+
+	// Open the guided composer for a brand-new task. Defaults pre-fill the
+	// "when" (date), "where" (block), and domain so any view can hand off a
+	// sensible starting point — e.g. NowNext seeds today + the current block.
+	startCompose(defaults: Partial<Task> = {}): void {
+		this.editingTaskId = null;
+		this.composeDefaults = defaults;
+		this.composing = true;
+	}
+
+	cancelCompose(): void {
+		this.composing = false;
+		this.composeDefaults = {};
 	}
 
 	// ── day-shape actions ───────────────────────────────────────────

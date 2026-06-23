@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { store } from '$lib/store.svelte';
+	import { dateKey } from '$lib/utils';
 
 	let localTitle = $state('');
 	let localDomainId = $state('');
@@ -11,10 +12,17 @@
 	let localStatus = $state<'open' | 'done' | 'dropped'>('open');
 	let titleInput: HTMLInputElement | undefined = $state();
 
-	// Sync local fields only when the editing ID changes — not on every task mutation.
-	// untrack() prevents store.tasks access from becoming a reactive dependency here.
+	// The sheet serves two modes from one form: editing an existing task, or
+	// composing a brand-new one. `open` is true for either.
+	const composing = $derived(store.composing && store.editingTaskId == null);
+	const open = $derived(store.editingTaskId != null || composing);
+
+	// Sync local fields when a session opens — keyed on the editing ID (edit) or
+	// the composing flag (create). untrack() keeps store.tasks/composeDefaults
+	// reads from becoming reactive dependencies of this effect.
 	$effect(() => {
 		const id = store.editingTaskId;
+		const isComposing = store.composing;
 		if (id != null) {
 			untrack(() => {
 				const t = store.tasks.find((t) => t.id === id);
@@ -29,12 +37,48 @@
 				}
 			});
 			setTimeout(() => titleInput?.focus(), 30);
+		} else if (isComposing) {
+			untrack(() => {
+				const d = store.composeDefaults;
+				localTitle = '';
+				localDomainId = d.domainId ?? '';
+				localTargetDate = d.targetDate ?? dateKey(store.now);
+				localTargetBlockId = d.targetBlockId ?? '';
+				localDuration = d.estimatedDuration != null ? String(d.estimatedDuration) : '';
+				localNotes = d.notes ?? '';
+				localStatus = 'open';
+			});
+			setTimeout(() => titleInput?.focus(), 30);
 		}
 	});
 
-	const allBlocks = $derived(store.getAllBlocks());
+	// Block options follow the chosen day, so scheduling for a future date shows
+	// that day's real blocks. With no date set, fall back to every known block.
+	const blockOptions = $derived(
+		localTargetDate ? store.getBlocksForDateKey(localTargetDate) : store.getAllBlocks()
+	);
+
+	// Changing the day invalidates a block picked for the old day.
+	function handleDateChange() {
+		localTargetBlockId = '';
+	}
 
 	function commitAndClose() {
+		if (composing) {
+			if (localTitle.trim()) {
+				store.addTask({
+					title: localTitle.trim(),
+					domainId: localDomainId || undefined,
+					targetDate: localTargetDate || undefined,
+					targetBlockId: localTargetBlockId || undefined,
+					estimatedDuration: localDuration ? parseInt(localDuration, 10) : undefined,
+					notes: localNotes.trim() || undefined
+				});
+			}
+			store.cancelCompose();
+			return;
+		}
+
 		const id = store.editingTaskId;
 		if (!id) return;
 		if (localTitle.trim()) {
@@ -72,23 +116,25 @@
 
 <svelte:window
 	onkeydown={(e) => {
-		if (e.key === 'Escape' && store.editingTaskId != null) commitAndClose();
+		if (e.key === 'Escape' && open) commitAndClose();
 	}}
 />
 
-{#if store.editingTaskId != null}
+{#if open}
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="ted-backdrop" onclick={commitAndClose}></div>
 {/if}
 
-<div class="ted-sheet" class:open={store.editingTaskId != null}>
-	{#if store.editingTaskId != null}
+<div class="ted-sheet" class:open>
+	{#if open}
 		<div class="ted-handle"></div>
 
 		<div class="ted-header">
-			<span class="ted-eyebrow">task</span>
-			<button class="ted-close" onclick={commitAndClose}>save</button>
+			<span class="ted-eyebrow">{composing ? 'new task' : 'task'}</span>
+			<button class="ted-close" onclick={commitAndClose}>
+				{composing ? 'add' : 'save'}
+			</button>
 		</div>
 
 		<div class="ted-body">
@@ -113,15 +159,21 @@
 				</div>
 
 				<div class="ted-field">
-					<label class="ted-label" for="ted-date">date</label>
-					<input id="ted-date" type="date" class="ted-input" bind:value={localTargetDate} />
+					<label class="ted-label" for="ted-date">{composing ? 'when' : 'date'}</label>
+					<input
+						id="ted-date"
+						type="date"
+						class="ted-input"
+						bind:value={localTargetDate}
+						onchange={handleDateChange}
+					/>
 				</div>
 
 				<div class="ted-field">
 					<label class="ted-label" for="ted-block">block</label>
 					<select id="ted-block" class="ted-select" bind:value={localTargetBlockId}>
-						<option value="">— none —</option>
-						{#each allBlocks as b (b.id)}
+						<option value="">{localTargetDate ? '— unscheduled —' : '— none —'}</option>
+						{#each blockOptions as b (b.id)}
 							<option value={b.id}>{b.startTime} · {b.title}</option>
 						{/each}
 					</select>
@@ -157,16 +209,22 @@
 			</div>
 		</div>
 
-		<div class="ted-actions">
-			<button class="ted-drop-btn" onclick={handleDrop}>drop</button>
-			<button
-				class="ted-status-btn"
-				class:done={localStatus === 'done'}
-				onclick={handleStatusToggle}
-			>
-				{localStatus === 'done' ? '✓ done' : '○ open'}
-			</button>
-		</div>
+		{#if composing}
+			<div class="ted-actions ted-actions-compose">
+				<span class="ted-hint">pick a day and a block, or leave it for the tray.</span>
+			</div>
+		{:else}
+			<div class="ted-actions">
+				<button class="ted-drop-btn" onclick={handleDrop}>drop</button>
+				<button
+					class="ted-status-btn"
+					class:done={localStatus === 'done'}
+					onclick={handleStatusToggle}
+				>
+					{localStatus === 'done' ? '✓ done' : '○ open'}
+				</button>
+			</div>
+		{/if}
 	{/if}
 </div>
 
@@ -366,6 +424,19 @@
 		padding: 0.6rem 1.25rem 1.25rem;
 		border-top: 1px solid var(--p-border);
 		flex-shrink: 0;
+	}
+
+	.ted-actions-compose {
+		justify-content: flex-start;
+	}
+
+	.ted-hint {
+		font-family: var(--pl-font-mono);
+		font-size: 0.58rem;
+		letter-spacing: 0.04em;
+		color: var(--p-muted);
+		opacity: 0.55;
+		font-style: italic;
 	}
 
 	.ted-drop-btn {
