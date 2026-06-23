@@ -294,6 +294,28 @@ describe('tint', () => {
 	});
 });
 
+describe('fx recipe', () => {
+	it('a fresh image layer has no recipe', () => {
+		expect(img().recipe).toBeNull();
+	});
+	it('round-trips through migration, dropping recipes without colours', () => {
+		const comp = migrateComposition({
+			layers: [
+				{ kind: 'image', id: 'a', src: 'x', naturalW: 10, naturalH: 10, recipe: { id: 'golden', colors: ['#fff', '#000'] } },
+				{ kind: 'image', id: 'b', src: 'y', naturalW: 10, naturalH: 10, recipe: { id: 'glow', colors: [] } },
+				{ kind: 'image', id: 'c', src: 'z', naturalW: 10, naturalH: 10, recipe: { colors: ['#fff'] } }
+			]
+		});
+		const [a, b, c] = comp!.layers;
+		if (a.kind === 'image') {
+			expect(a.recipe?.id).toBe('golden');
+			expect(a.recipe?.colors).toEqual(['#fff', '#000']);
+		}
+		if (b.kind === 'image') expect(b.recipe).toBeNull(); // empty colours → dropped
+		if (c.kind === 'image') expect(c.recipe).toBeNull(); // missing id → dropped
+	});
+});
+
 describe('composition (de)serialization', () => {
 	it('clones without sharing layer references', () => {
 		const comp = emptyComposition();

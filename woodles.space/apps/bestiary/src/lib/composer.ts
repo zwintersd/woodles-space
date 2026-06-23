@@ -181,6 +181,20 @@ export function defaultTint(): Tint {
 	return { color: '#ef7aae', strength: 0.7 };
 }
 
+// ── fx recipe ───────────────────────────────────────────────────────────
+// A recolourable effect: the id of the fx it was stamped from, plus the current
+// colour stops. Unlike a tint (which multiplies one colour over the finished
+// art), a recipe regenerates the effect's own gradient from these colours — so
+// every stop of a wash, leak, glow or vignette is yours. The studio rebuilds
+// the layer's src from props.ts whenever a stop changes; the data lives here so
+// it round-trips through save/sync as plain JSON. Layers without a recipe (an
+// upload, or a colourless grain) fall back to the tint for colour control.
+
+export type LayerRecipe = {
+	id: string; // the fx asset this was stamped from
+	colors: string[]; // the editable stops, in the asset's slot order
+};
+
 // ── layers ────────────────────────────────────────────────────────────
 
 type LayerCommon = {
@@ -208,6 +222,7 @@ export type ImageLayer = LayerCommon & {
 	smooth: boolean; // false renders nearest-neighbour, for pixel art
 	filters: Filters;
 	tint: Tint | null;
+	recipe: LayerRecipe | null;
 	outline: Outline | null;
 	// marks this layer as the creature itself (not backdrop or scenery).
 	// the isolated render pass draws only these layers onto a transparent
@@ -261,6 +276,7 @@ type ImageLayerInit = {
 	smooth?: boolean;
 	filters?: Filters;
 	tint?: Tint | null;
+	recipe?: LayerRecipe | null;
 	outline?: Outline | null;
 	isCreature?: boolean;
 };
@@ -286,6 +302,7 @@ export function createImageLayer(init: ImageLayerInit): ImageLayer {
 		smooth: init.smooth ?? true,
 		filters: init.filters ?? defaultFilters(),
 		tint: init.tint ?? null,
+		recipe: init.recipe ?? null,
 		outline: init.outline ?? null,
 		isCreature: init.isCreature ?? false
 	};
@@ -494,6 +511,7 @@ function normalizeLayer(raw: unknown): Layer | null {
 			smooth: l.smooth !== false,
 			filters: normalizeFilters(l.filters),
 			tint: normalizeTint(l.tint),
+			recipe: normalizeRecipe(l.recipe),
 			outline: normalizeOutline(l.outline),
 			isCreature
 		};
@@ -524,6 +542,15 @@ function normalizeTint(raw: unknown): Tint | null {
 	const t = raw as Record<string, unknown>;
 	if (typeof t.color !== 'string') return null;
 	return { color: t.color, strength: clamp01(num(t.strength, 0.7)) };
+}
+
+function normalizeRecipe(raw: unknown): LayerRecipe | null {
+	if (!raw || typeof raw !== 'object') return null;
+	const r = raw as Record<string, unknown>;
+	if (typeof r.id !== 'string' || !Array.isArray(r.colors)) return null;
+	const colors = r.colors.filter((c): c is string => typeof c === 'string');
+	if (!colors.length) return null;
+	return { id: r.id, colors };
 }
 
 function normalizeOutline(raw: unknown): Outline | null {
