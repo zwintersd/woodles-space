@@ -110,6 +110,60 @@
     .dock.dim { opacity: 0.16; }
     .dock.dim:hover, .dock.dim:focus-within { opacity: 1; }
 
+    /* ── hideable tone panel ──────────────────────────────────────────── */
+    .tones {
+      position: fixed; z-index: 9;
+      left: 50%;
+      bottom: calc(max(1.3rem, env(safe-area-inset-bottom)) + 64px);
+      transform: translateX(-50%) translateY(10px);
+      width: 232px;
+      padding: 1rem 1.1rem 1.1rem;
+      border-radius: 16px;
+      background: rgba(18, 16, 30, 0.5);
+      border: 1px solid rgba(180, 168, 232, 0.2);
+      backdrop-filter: blur(22px) saturate(1.3);
+      -webkit-backdrop-filter: blur(22px) saturate(1.3);
+      box-shadow: 0 24px 56px -28px rgba(0, 0, 0, 0.92);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.32s ease, transform 0.32s cubic-bezier(.2,.9,.3,1);
+      touch-action: auto;
+    }
+    body.tones-open .tones { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+    .tones-title {
+      font-size: 0.54rem; letter-spacing: 0.26em; text-transform: uppercase;
+      color: rgba(226, 220, 246, 0.55);
+      margin-bottom: 0.85rem;
+    }
+    .tone-row {
+      display: grid; grid-template-columns: 3.6rem 1fr; align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.55rem;
+    }
+    .tone-row:last-child { margin-bottom: 0; }
+    .tone-row span {
+      font-size: 0.6rem; letter-spacing: 0.08em;
+      color: rgba(226, 220, 246, 0.78);
+    }
+    .tone-row input[type="range"] {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 3px; border-radius: 3px;
+      background: rgba(180, 168, 232, 0.26);
+      outline: none; cursor: pointer; touch-action: auto;
+    }
+    .tone-row input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #cdc4f5;
+      box-shadow: 0 0 10px -1px rgba(180, 160, 250, 0.9);
+      cursor: pointer; border: none;
+    }
+    .tone-row input[type="range"]::-moz-range-thumb {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #cdc4f5; border: none;
+      box-shadow: 0 0 10px -1px rgba(180, 160, 250, 0.9);
+      cursor: pointer;
+    }
+
     .ctl {
       width: 42px; height: 42px;
       border: 1px solid transparent;
@@ -218,6 +272,27 @@
 
   <p class="mood-name" id="mood-name"></p>
 
+  <!-- hideable tone panel -->
+  <div class="tones" id="tones" role="group" aria-label="tone controls" aria-hidden="true">
+    <p class="tones-title">the voice</p>
+    <label class="tone-row">
+      <span>linger</span>
+      <input type="range" id="t-linger" min="0" max="1" step="0.01" value="0.25" aria-label="how long each note rings out" />
+    </label>
+    <label class="tone-row">
+      <span>reverb</span>
+      <input type="range" id="t-reverb" min="0" max="1" step="0.01" value="0.5" aria-label="reverberant space" />
+    </label>
+    <label class="tone-row">
+      <span>glide</span>
+      <input type="range" id="t-glide" min="0" max="1" step="0.01" value="0.25" aria-label="how slowly the pitch bends" />
+    </label>
+    <label class="tone-row">
+      <span>tone</span>
+      <input type="range" id="t-tone" min="0" max="1" step="0.01" value="0.4" aria-label="brightness of the reed" />
+    </label>
+  </div>
+
   <nav class="dock" id="dock" aria-label="quiet room controls">
     <button class="ctl" id="sound" aria-pressed="false" title="sound on / off" aria-label="toggle sound">
       <svg id="sound-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -225,6 +300,15 @@
         <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" fill="currentColor" stroke="none"/>
         <path class="wave" d="M15.5 9.2a4 4 0 0 1 0 5.6"/>
         <path class="wave" d="M18 6.8a7.4 7.4 0 0 1 0 10.4"/>
+      </svg>
+    </button>
+    <button class="ctl" id="tune" aria-pressed="false" title="tone" aria-label="tone controls">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+           stroke-linecap="round" aria-hidden="true">
+        <path d="M6 4v6M6 14v6M12 4v3M12 11v9M18 4v9M18 17v3"/>
+        <circle cx="6" cy="12" r="1.7" fill="currentColor" stroke="none"/>
+        <circle cx="12" cy="9" r="1.7" fill="currentColor" stroke="none"/>
+        <circle cx="18" cy="15" r="1.7" fill="currentColor" stroke="none"/>
       </svg>
     </button>
     <span class="dock-sep"></span>
@@ -833,7 +917,7 @@
         for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2);
       }
       verb.buffer = ir;
-      const wet = ctx.createGain(); wet.gain.value = 0.5;
+      const wet = ctx.createGain(); wet.gain.value = settings.reverb;
       verb.connect(wet); wet.connect(master);
 
       // the ambient drone: a few detuned voices under a slow filter
@@ -854,8 +938,22 @@
       const lfoG = ctx.createGain(); lfoG.gain.value = 180;
       lfo.connect(lfoG); lfoG.connect(lp.frequency); lfo.start();
 
-      audio = { ctx, master, verb };
+      audio = { ctx, master, verb, wet };
     }
+    /* ── tone settings, driven by the hideable panel (defaults match the
+       slider values in the markup) ──────────────────────────────────────── */
+    const mapRelease    = (s) => 0.09 * Math.pow(24, s);   // linger: 0.09s … ~2.2s
+    const mapGlide      = (s) => 0.01 + s * 0.24;          // portamento time
+    const mapBrightness = (s) => 0.5 + s * 1.3;            // lowpass multiplier
+    const mapReverb     = (s) => s * 0.92;                 // reverb wet level
+    const settings = {
+      release:    mapRelease(0.25),
+      glide:      mapGlide(0.25),
+      brightness: mapBrightness(0.4),
+      reverb:     mapReverb(0.5),
+    };
+    let lastCy = window.innerHeight * 0.5;   // remembered so tone tweaks apply live
+
     /* a glide-able ladder — A-minor pentatonic across two octaves, in tune with
        the drone. position maps continuously onto it; the voice slides between
        rungs as you drag, so a held drag reads as a smooth pitch bend. */
@@ -869,12 +967,13 @@
     }
     function cutoffFromY(cy) {
       const ny = Math.max(0, Math.min(1, cy / window.innerHeight));
-      return 680 * Math.pow(4.2, 1 - ny);       // drag up → brighter, reedier
+      return 680 * Math.pow(4.2, 1 - ny) * settings.brightness;  // drag up → brighter
     }
 
     let voice = null;     // the single held stylophone voice
     function startVoice(cx, cy) {
       if (!audio || !soundOn) return;
+      lastCy = cy;
       const { ctx, master, verb } = audio;
       const now = ctx.currentTime;
       const freq = freqFromX(cx);
@@ -905,9 +1004,10 @@
     }
     function bendVoice(cx, cy) {
       if (!voice || !audio) return;
+      lastCy = cy;
       const now = audio.ctx.currentTime;
       const freq = freqFromX(cx);
-      const glide = 0.07;                         // portamento → the bend itself
+      const glide = settings.glide;               // portamento → the bend itself
       voice.saw.frequency.setTargetAtTime(freq, now, glide);
       voice.sqr.frequency.setTargetAtTime(freq, now, glide);
       voice.sub.frequency.setTargetAtTime(freq / 2, now, glide);
@@ -919,8 +1019,8 @@
       const v = voice; voice = null;
       v.env.gain.cancelScheduledValues(now);
       v.env.gain.setValueAtTime(Math.max(0.0001, v.env.gain.value), now);
-      v.env.gain.setTargetAtTime(0.0001, now, 0.12);   // gentle release
-      const stop = now + 0.9;
+      v.env.gain.setTargetAtTime(0.0001, now, settings.release);   // the linger
+      const stop = now + settings.release * 6 + 0.25;
       [v.saw, v.sqr, v.sub, v.vib].forEach((o) => o.stop(stop));
     }
 
@@ -973,6 +1073,26 @@
       else document.exitFullscreen?.();
     });
 
+    /* ── the tone panel ──────────────────────────────────────────────────── */
+    const tuneBtn = document.getElementById('tune');
+    tuneBtn.addEventListener('click', () => {
+      const open = !body.classList.contains('tones-open');
+      body.classList.toggle('tones-open', open);
+      tuneBtn.setAttribute('aria-pressed', String(open));
+    });
+    const bindTone = (id, apply) =>
+      document.getElementById(id).addEventListener('input', (e) => apply(parseFloat(e.target.value)));
+    bindTone('t-linger', (s) => { settings.release = mapRelease(s); });
+    bindTone('t-glide',  (s) => { settings.glide = mapGlide(s); });
+    bindTone('t-tone',   (s) => {
+      settings.brightness = mapBrightness(s);
+      if (voice && audio) voice.lp.frequency.setTargetAtTime(cutoffFromY(lastCy), audio.ctx.currentTime, 0.05);
+    });
+    bindTone('t-reverb', (s) => {
+      settings.reverb = mapReverb(s);
+      if (audio) audio.wet.gain.setTargetAtTime(settings.reverb, audio.ctx.currentTime, 0.1);
+    });
+
     /* the hint fades on its own after a while if untouched */
     let hintGone = false;
     function hideHint() { hintGone = true; body.classList.add('touched'); }
@@ -985,7 +1105,10 @@
     function wake() {
       dock.classList.remove('dim'); homeBtn.classList.remove('dim');
       clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => { dock.classList.add('dim'); homeBtn.classList.add('dim'); }, 4500);
+      idleTimer = setTimeout(() => {
+        if (body.classList.contains('tones-open')) return;   // stay lit while tuning
+        dock.classList.add('dim'); homeBtn.classList.add('dim');
+      }, 4500);
     }
     ['pointermove', 'pointerdown', 'keydown'].forEach((ev) =>
       window.addEventListener(ev, wake, { passive: true }));
