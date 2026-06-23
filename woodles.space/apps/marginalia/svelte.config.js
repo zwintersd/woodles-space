@@ -16,7 +16,8 @@ const config = {
 			relative: false
 		},
 		alias: {
-			'@shared': '../../shared'
+			'@shared': '../../shared',
+			'@bestiary': '../bestiary/src/lib'
 		},
 		prerender: {
 			handleHttpError: ({ path, message }) => {

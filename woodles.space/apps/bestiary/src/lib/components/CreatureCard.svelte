@@ -1,9 +1,9 @@
 <script lang="ts">
-	import type { Creature } from '$lib/types';
-	import { domainDef, rarityDef } from '$lib/content/domains';
-	import { capacities, arc } from '$lib/content/stats';
-	import { defaultCardStyle, cardStyleAttr } from '$lib/cardstyle';
-	import { holo } from '$lib/holo';
+	import type { Creature } from '../types';
+	import { domainDef, rarityDef } from '../content/domains';
+	import { capacities, arc } from '../content/stats';
+	import { defaultCardStyle, cardStyleAttr } from '../cardstyle';
+	import { holo } from '../holo';
 	import StatusOverlay from './StatusOverlay.svelte';
 	import FinishOverlay from './FinishOverlay.svelte';
 

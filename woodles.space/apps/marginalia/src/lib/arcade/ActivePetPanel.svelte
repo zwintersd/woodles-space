@@ -1,5 +1,7 @@
 <script lang="ts">
+	import '@bestiary/style/tokens.css';
 	import { onMount } from 'svelte';
+	import CreatureCard from '@bestiary/components/CreatureCard.svelte';
 	import { book } from '$lib/witch/book.svelte';
 	import MiniHex from '$lib/witch/MiniHex.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
@@ -16,19 +18,6 @@
 	const selected = $derived<BestiaryCreature | null>(
 		creatures.find((c) => c.id === selectedId) ?? creatures[0] ?? null
 	);
-	const artSrc = $derived(selected?.sprite ?? selected?.isolatedSprite ?? null);
-	const kind = $derived(field(selected, 'kind') || 'Companion');
-	const cost = $derived(field(selected, 'cost'));
-	const power = $derived(field(selected, 'power'));
-	const toughness = $derived(field(selected, 'toughness'));
-	const abilities = $derived(field(selected, 'abilities'));
-	const flavor = $derived(field(selected, 'flavor'));
-	const foundIn = $derived(field(selected, 'foundIn'));
-
-	function field(creature: BestiaryCreature | null, key: string): string {
-		const value = (creature as Record<string, unknown> | null)?.[key];
-		return value === null || value === undefined ? '' : String(value);
-	}
 
 	function persistSelection(id: string) {
 		selectedId = id;
@@ -76,45 +65,10 @@
 				<div class="hex-stand">
 					<MiniHex creature={selected} />
 				</div>
-			{:else}
-				<article class="pet-card">
-					<header class="card-title">
-						<h3>{selected?.name || 'Unnamed Creature'}</h3>
-						{#if cost}<span>{cost}</span>{/if}
-					</header>
-					<div class="card-art" class:empty={!artSrc}>
-						{#if artSrc}
-							<img
-								src={artSrc}
-								alt={selected?.name ?? ''}
-								class:pixelated={selected?.pixelated}
-								draggable="false"
-							/>
-						{:else}
-							<span>awaiting art</span>
-						{/if}
-					</div>
-					<div class="type-line">
-						<span>{selected?.domain}</span>
-						<span>{kind}</span>
-					</div>
-					<div class="rules-box">
-						{#if abilities}
-							<p>{abilities}</p>
-						{:else}
-							<p class="muted">quiet for now</p>
-						{/if}
-						{#if flavor}
-							<em>{flavor}</em>
-						{/if}
-					</div>
-					<footer class="card-foot">
-						<span>{foundIn || 'the margins'}</span>
-						{#if power || toughness}
-							<strong>{power || 0}/{toughness || 0}</strong>
-						{/if}
-					</footer>
-				</article>
+			{:else if selected}
+				<div class="bestiary-root pet-card-host">
+					<CreatureCard creature={selected} preview />
+				</div>
 			{/if}
 		</div>
 
@@ -214,128 +168,20 @@
 	.pet-stage.mode-hex {
 		min-height: 14rem;
 	}
+	.pet-stage.mode-card {
+		align-items: start;
+		min-height: 26rem;
+	}
 	.hex-stand {
 		transform: scale(1.72);
 		transform-origin: center;
 	}
-	.pet-card {
-		width: min(100%, 17.5rem);
-		aspect-ratio: 63 / 88;
-		display: flex;
-		flex-direction: column;
-		gap: 0.42rem;
-		padding: 0.7rem;
-		border: 2px solid rgba(245, 242, 232, 0.28);
-		border-radius: 8px;
-		background:
-			linear-gradient(160deg, rgba(240, 143, 184, 0.18), rgba(108, 229, 232, 0.12)),
-			#f5f2e8;
-		color: var(--ink);
-		box-shadow: 0 12px 26px rgba(10, 10, 28, 0.32);
-	}
-	.card-title,
-	.type-line,
-	.card-foot {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.45rem;
-		border: 1px solid rgba(26, 26, 62, 0.18);
-		border-radius: 5px;
-		background: rgba(255, 255, 255, 0.42);
-		padding: 0.28rem 0.45rem;
-	}
-	.card-title h3 {
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		font-family: var(--font-display);
-		font-size: 1rem;
-		line-height: 1.05;
-		font-weight: 400;
-		margin: 0;
-	}
-	.card-title span,
-	.card-foot strong {
-		display: grid;
-		place-items: center;
-		min-width: 1.55rem;
-		height: 1.55rem;
-		border-radius: 999px;
-		font-family: var(--font-counter);
-		background: var(--leafeon-pink);
-		color: var(--cream);
-	}
-	.card-art {
-		flex: 1;
-		min-height: 0;
-		display: grid;
-		place-items: center;
-		overflow: hidden;
-		border: 1px solid rgba(26, 26, 62, 0.18);
-		border-radius: 5px;
-		background:
-			radial-gradient(circle at 50% 25%, rgba(108, 229, 232, 0.22), transparent 58%),
-			rgba(26, 26, 62, 0.08);
-	}
-	.card-art img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		display: block;
-	}
-	.card-art img.pixelated {
-		image-rendering: pixelated;
-		object-fit: contain;
-	}
-	.card-art.empty span {
-		font-family: var(--font-ui);
-		font-size: 0.7rem;
-		letter-spacing: 0.12em;
-		text-transform: uppercase;
-		color: rgba(26, 26, 62, 0.48);
-	}
-	.type-line {
-		font-family: var(--font-ui);
-		font-size: 0.66rem;
-		letter-spacing: 0.1em;
-		text-transform: uppercase;
-		color: rgba(26, 26, 62, 0.7);
-	}
-	.rules-box {
-		min-height: 4.6rem;
-		border: 1px solid rgba(26, 26, 62, 0.16);
-		border-radius: 5px;
-		background: rgba(255, 255, 255, 0.46);
-		padding: 0.45rem 0.55rem;
-		overflow: hidden;
-	}
-	.rules-box p,
-	.rules-box em {
-		display: block;
-		margin: 0;
-		font-size: 0.76rem;
-		line-height: 1.32;
-	}
-	.rules-box em {
-		margin-top: 0.35rem;
-		color: rgba(26, 26, 62, 0.64);
-	}
-	.rules-box .muted {
-		color: rgba(26, 26, 62, 0.48);
-		font-style: italic;
-	}
-	.card-foot {
-		font-family: var(--font-ui);
-		font-size: 0.62rem;
-		color: rgba(26, 26, 62, 0.62);
-	}
-	.card-foot span {
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+	.pet-card-host {
+		width: min(100%, 18rem);
+		background: transparent;
+		color: var(--b-text);
+		font-family: var(--b-font-body);
+		line-height: 1.6;
 	}
 	.pet-note,
 	.empty-pet p {

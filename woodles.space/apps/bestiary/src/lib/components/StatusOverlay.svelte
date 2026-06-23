@@ -18,9 +18,9 @@
 	// `artEl` is CreatureCard's `.art` div. We measure it against our own box to
 	// place art-bound layers over the frame and give spreading effects an origin.
 
-	import { seededRng } from '$lib/prng';
-	import { generateFrostPaths } from '$lib/frostgen';
-	import { generateFirePaths } from '$lib/firegen';
+	import { seededRng } from '../prng';
+	import { generateFrostPaths } from '../frostgen';
+	import { generateFirePaths } from '../firegen';
 	import SnowCanvas from './SnowCanvas.svelte';
 	import FrostBorder from './FrostBorder.svelte';
 	import CrackOverlay from './CrackOverlay.svelte';

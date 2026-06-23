@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { seededRng } from '$lib/prng';
+	import { seededRng } from '../prng';
 
 	let { intensity = 0.5, creatureId }: { intensity: number; creatureId: string } = $props();
 

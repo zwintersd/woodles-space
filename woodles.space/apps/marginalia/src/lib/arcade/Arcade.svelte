@@ -15,6 +15,7 @@
 	}
 
 	let activeGame = $state<string | null>(null);
+	let rootEl: HTMLDivElement;
 
 	const games: MiniGame[] = [
 		{
@@ -78,6 +79,22 @@
 		}
 	];
 
+	const activeGameData = $derived(games.find((game) => game.id === activeGame) ?? null);
+
+	function showCabinetTop() {
+		requestAnimationFrame(() => rootEl?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+	}
+
+	function openGame(gameId: string) {
+		activeGame = gameId;
+		showCabinetTop();
+	}
+
+	function closeGame() {
+		activeGame = null;
+		showCabinetTop();
+	}
+
 	const statusLabel: Record<GameStatus, string> = {
 		play: 'play',
 		soon: 'coming soon',
@@ -85,7 +102,7 @@
 	};
 </script>
 
-<div class="arcade-root">
+<div class="arcade-root" bind:this={rootEl}>
 	<header class="arcade-header">
 		<div class="marquee-rail" aria-hidden="true">
 			<span class="marquee-inner">
@@ -98,37 +115,49 @@
 		</div>
 	</header>
 
-	<div class="game-grid">
-		{#each games as game (game.id)}
-			<article class="game-card status-{game.status}">
-				<div class="card-top">
-					<span class="game-icon" aria-hidden="true">{game.icon}</span>
-					<span class="status-badge">{statusLabel[game.status]}</span>
+	{#if activeGameData}
+		<section class="active-game" aria-label="{activeGameData.title} game">
+			<header class="active-head">
+				<button class="back-to-games" onclick={closeGame}>← games</button>
+				<div>
+					<p class="active-kicker">now playing</p>
+					<h3>{activeGameData.title}</h3>
 				</div>
-				<h3 class="game-title">{game.title}</h3>
-				<p class="game-tagline">{game.tagline}</p>
-				<footer class="card-footer">
-					<div class="tag-row">
-						{#each game.tags as tag}
-							<span class="tag">{tag}</span>
-						{/each}
-					</div>
-					{#if game.status === 'play'}
-						<button class="play-btn" onclick={() => (activeGame = game.id)}>play →</button>
-					{:else if game.status === 'soon'}
-						<span class="play-placeholder">soon</span>
-					{:else}
-						<span class="play-placeholder locked-hint">{game.lockedHint}</span>
-					{/if}
-				</footer>
-			</article>
-		{/each}
-	</div>
+			</header>
 
-	{#if activeGame === 'stack-2048'}
-		<TwoZeroFourEight onclose={() => (activeGame = null)} />
-	{:else if activeGame === 'insight-rush'}
-		<InsightRush onclose={() => (activeGame = null)} />
+			{#if activeGame === 'stack-2048'}
+				<TwoZeroFourEight onclose={closeGame} />
+			{:else if activeGame === 'insight-rush'}
+				<InsightRush onclose={closeGame} />
+			{/if}
+		</section>
+	{:else}
+		<div class="game-grid">
+			{#each games as game (game.id)}
+				<article class="game-card status-{game.status}">
+					<div class="card-top">
+						<span class="game-icon" aria-hidden="true">{game.icon}</span>
+						<span class="status-badge">{statusLabel[game.status]}</span>
+					</div>
+					<h3 class="game-title">{game.title}</h3>
+					<p class="game-tagline">{game.tagline}</p>
+					<footer class="card-footer">
+						<div class="tag-row">
+							{#each game.tags as tag}
+								<span class="tag">{tag}</span>
+							{/each}
+						</div>
+						{#if game.status === 'play'}
+							<button class="play-btn" onclick={() => openGame(game.id)}>play →</button>
+						{:else if game.status === 'soon'}
+							<span class="play-placeholder">soon</span>
+						{:else}
+							<span class="play-placeholder locked-hint">{game.lockedHint}</span>
+						{/if}
+					</footer>
+				</article>
+			{/each}
+		</div>
 	{/if}
 
 	<p class="arcade-note">
@@ -278,6 +307,54 @@
 		flex: 1;
 	}
 
+	/* ── active game screen ───────────────────────────────────────────────── */
+	.active-game {
+		background:
+			linear-gradient(180deg, rgba(238, 232, 213, 0.62), transparent 8rem),
+			var(--sol-base3);
+		border-top: 1px solid var(--sol-base2);
+		min-height: 36rem;
+	}
+	.active-head {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		align-items: center;
+		gap: 0.85rem;
+		padding: 0.85rem 1.4rem;
+		background: var(--sol-base2);
+		border-bottom: 2px solid var(--sol-blue);
+	}
+	.back-to-games {
+		font-family: var(--font-ui);
+		font-size: 0.72rem;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--sol-base3);
+		background: var(--sol-base0);
+		border-radius: 3px;
+		padding: 0.34rem 0.7rem;
+		white-space: nowrap;
+	}
+	.back-to-games:hover {
+		background: var(--sol-base00);
+	}
+	.active-kicker {
+		font-family: var(--font-ui);
+		font-size: 0.58rem;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+		color: var(--sol-base1);
+		margin: 0 0 0.08rem;
+	}
+	.active-head h3 {
+		font-family: var(--font-counter);
+		font-weight: 400;
+		font-size: 1.65rem;
+		line-height: 1;
+		color: var(--sol-base01);
+		margin: 0;
+	}
+
 	/* ── card footer ────────────────────────────────────────────────────── */
 	.card-footer {
 		display: flex;
@@ -342,5 +419,13 @@
 		padding: 0.9rem 1.4rem;
 		margin: 0;
 		border-top: 1px solid var(--sol-base2);
+	}
+	@media (max-width: 560px) {
+		.active-head {
+			grid-template-columns: 1fr;
+		}
+		.back-to-games {
+			justify-self: start;
+		}
 	}
 </style>

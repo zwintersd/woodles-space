@@ -4,20 +4,13 @@
 // 'bestiary' database directly and read the creature list. This file only ever
 // reads — it never writes to Bestiary's store.
 
+import type { Creature } from '@bestiary/types';
+
 const DB_NAME = 'bestiary';
 const STORE = 'kv';
 const CREATURES_KEY = 'bestiary.creatures.v1';
 
-// Minimal shape of a Bestiary creature — only the fields Marginalia needs.
-export interface BestiaryCreature {
-	id: string;
-	name: string;
-	domain: string;
-	sprite: string | null;
-	// set by the studio when saving; null means no creature layer was present.
-	isolatedSprite?: string | null;
-	pixelated: boolean;
-}
+export type BestiaryCreature = Creature;
 
 function openBestiaryDb(): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
