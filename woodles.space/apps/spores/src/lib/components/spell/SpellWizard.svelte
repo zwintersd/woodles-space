@@ -255,32 +255,35 @@
 					/>
 				{:else}
 					<div class="category-groups">
-						{#each ['person', 'media'] as grp}
-							<div class="cat-group">
-								<p class="cat-group-label">{grp}</p>
-								<div class="cat-grid">
-									{#each allCategories.filter((c) => c.group === grp) as cat}
-										<button class="cat-card" onclick={() => selectCategory(cat)}>
-											<span class="cat-glyph">{cat.glyph ?? '◦'}</span>
-											<span class="cat-label">{cat.label}</span>
-										</button>
-									{/each}
-									{#if grp === 'media'}
-										{#each (garden.settings.customCategories ?? []) as cat}
-											<div class="cat-card custom">
-												<button class="cat-card-inner" onclick={() => selectCategory(cat)}>
-													<span class="cat-glyph">{cat.glyph ?? '◦'}</span>
-													<span class="cat-label">{cat.label}</span>
-												</button>
-												<button
-													class="cat-delete"
-													onclick={() => garden.deleteCustomCategory(cat.id)}
-												>×</button>
-											</div>
+						{#each ['person', 'media', 'anime'] as grp}
+							{@const grpCats = allCategories.filter((c) => c.group === grp)}
+							{#if grpCats.length > 0 || grp === 'media'}
+								<div class="cat-group">
+									<p class="cat-group-label">{grp}</p>
+									<div class="cat-grid">
+										{#each grpCats as cat}
+											<button class="cat-card" onclick={() => selectCategory(cat)}>
+												<span class="cat-glyph">{cat.glyph ?? '◦'}</span>
+												<span class="cat-label">{cat.label}</span>
+											</button>
 										{/each}
-									{/if}
+										{#if grp === 'media'}
+											{#each (garden.settings.customCategories ?? []) as cat}
+												<div class="cat-card custom">
+													<button class="cat-card-inner" onclick={() => selectCategory(cat)}>
+														<span class="cat-glyph">{cat.glyph ?? '◦'}</span>
+														<span class="cat-label">{cat.label}</span>
+													</button>
+													<button
+														class="cat-delete"
+														onclick={() => garden.deleteCustomCategory(cat.id)}
+													>×</button>
+												</div>
+											{/each}
+										{/if}
+									</div>
 								</div>
-							</div>
+							{/if}
 						{/each}
 					</div>
 					<button class="btn-custom" onclick={() => (showCustomEditor = true)}>
@@ -389,7 +392,16 @@
 						{/if}
 					</details>
 				{:else}
-				<h3 class="step-heading">What should the spell gather?</h3>
+				{#if selectedCategory.rootKind === 'anime-relationship-graph'}
+					<h3 class="step-heading">Relationship graph options</h3>
+					<p class="graph-note">
+						This spell returns a <strong>character relationship graph</strong> — a fixed JSON
+						structure with nodes (characters) and edges (relationships). Choose which optional
+						metadata to include in the series record below, then proceed.
+					</p>
+				{:else}
+					<h3 class="step-heading">What should the spell gather?</h3>
+				{/if}
 
 				<!-- Root fields -->
 				<div class="field-group root-fields">
@@ -644,6 +656,18 @@
 	}
 
 	.close-btn:hover { color: var(--g-flight); }
+
+	.graph-note {
+		font-size: 0.88rem;
+		line-height: 1.6;
+		color: var(--g-text-dim);
+		background: var(--g-flight-soft);
+		border: 1px solid var(--g-border-strong);
+		border-radius: var(--g-radius-md);
+		padding: var(--g-space-md);
+		margin-bottom: var(--g-space-sm);
+	}
+	.graph-note strong { color: var(--g-flight); font-weight: 600; }
 
 	.step-track {
 		display: flex;

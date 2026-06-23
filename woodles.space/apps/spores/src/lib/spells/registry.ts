@@ -303,6 +303,32 @@ const CAT_GAME: Category = {
 	modifiers: [MOD_CITATIONS]
 };
 
+// ── anime category ────────────────────────────────────────────────
+
+const MOD_VOICE_ACTORS: Modifier = {
+	id: 'voice-actors',
+	label: 'Voice actor info (Japanese & English)',
+	hint: 'Requests voiceActor on each character node.',
+	injectRules: [
+		'Include a "voiceActor" field on every character node in the format "Japanese VA (JA) / English VA (EN)".',
+		'Use "unknown" for either language when uncertain rather than omitting.'
+	]
+};
+
+const CAT_ANIME_GRAPH: Category = {
+	id: 'anime-graph',
+	label: 'Anime — Relationship Graph',
+	group: 'anime' as 'media',
+	glyph: '◉',
+	rootKind: 'anime-relationship-graph',
+	rootFields: [
+		{ key: 'description', label: 'Series description', example: 'One-paragraph series premise', default: true },
+		{ key: 'studio', label: 'Animation studio', example: 'Studio Name', default: true },
+		{ key: 'year', label: 'Premiere year', example: 'YYYY', default: true }
+	],
+	modifiers: [MOD_VOICE_ACTORS, MOD_CITATIONS]
+};
+
 const CAT_WORK: Category = {
 	id: 'work',
 	label: 'Generic Work',
@@ -332,8 +358,11 @@ export const CURATED_CATEGORIES: Category[] = [
 	CAT_BOOK,
 	CAT_ALBUM,
 	CAT_GAME,
-	CAT_WORK
+	CAT_WORK,
+	CAT_ANIME_GRAPH
 ];
+
+export const ANIME_GROUPS = new Set(['anime']);
 
 export function getCategory(id: string, custom: Category[] = []): Category | undefined {
 	return [...CURATED_CATEGORIES, ...custom].find((c) => c.id === id);
@@ -356,6 +385,6 @@ export function getChildLevel(
 
 // Infer a Spellbook archetype from a root kind
 export function inferArchetype(kind: string): string {
-	const media = ['album', 'film', 'tv-series', 'game', 'book', 'work'];
+	const media = ['album', 'film', 'tv-series', 'game', 'book', 'work', 'anime-relationship-graph'];
 	return media.includes(kind) ? 'media' : 'plain';
 }

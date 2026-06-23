@@ -4,6 +4,7 @@
 	import { formatDate } from '$lib/utils';
 	import PromotePanel from './spell/PromotePanel.svelte';
 	import TagInput from './TagInput.svelte';
+	import GraphRenderer from './GraphRenderer.svelte';
 
 	let spore = $derived(garden.activeSpore);
 	let editing = $derived(garden.editingSporeId === garden.activeSporeId);
@@ -75,6 +76,25 @@
 		garden.deleteFlight(flightId);
 	}
 
+	// ── graph detection ─────────────────────────────────────────────
+
+	let showGraph = $state(false);
+
+	interface GraphScriptData {
+		title: string;
+		description?: string;
+		nodes: { id: string; name: string; type?: string; role?: string; faction?: string; description?: string; voiceActor?: string }[];
+		edges: { from: string; to: string; type?: string; label?: string }[];
+	}
+
+	let graphScript = $derived((): GraphScriptData | null => {
+		const d = spore?.data;
+		if (d?.kind === 'anime-relationship-graph' && Array.isArray(d.nodes)) {
+			return d as unknown as GraphScriptData;
+		}
+		return null;
+	});
+
 	// ── spellbook membership ────────────────────────────────────────
 
 	function toggleMembership(spellbookId: string) {
@@ -88,6 +108,13 @@
 
 
 </script>
+
+{#if showGraph && graphScript()}
+	<GraphRenderer
+		graphScript={graphScript()}
+		onclose={() => (showGraph = false)}
+	/>
+{/if}
 
 {#if spore}
 	<article class="spore-view">
@@ -105,6 +132,11 @@
 			<div class="header-meta">
 				<span class="spore-date">{formatDate(spore.updated)}</span>
 				<div class="header-actions">
+					{#if graphScript()}
+						<button class="btn-graph" onclick={() => (showGraph = true)}>
+							◉ view graph
+						</button>
+					{/if}
 					{#if editing}
 						<button class="btn-primary" onclick={saveEdit}>save</button>
 						<button class="btn-ghost" onclick={cancelEdit}>cancel</button>
@@ -299,6 +331,22 @@
 	.header-actions {
 		display: flex;
 		gap: var(--g-space-sm);
+	}
+
+	.btn-graph {
+		background: var(--g-flight-soft);
+		border: 1px solid var(--g-border-strong);
+		border-radius: var(--g-radius-sm);
+		padding: 0.3rem 0.8rem;
+		font-size: 0.82rem;
+		color: var(--g-flight);
+		font-family: var(--g-font-mono);
+		transition: background var(--g-transition-fast), border-color var(--g-transition-fast);
+	}
+	.btn-graph:hover {
+		background: var(--g-flight);
+		color: #0d0d1a;
+		border-color: var(--g-flight);
 	}
 
 	.btn-primary {
