@@ -73,7 +73,7 @@
 		</div>
 
 		<p class="pet-note">
-			This one sits beside the arcade while you take little focus sets.
+			This creature is currently supporting your efforts.
 		</p>
 	{:else}
 		<div class="empty-pet">
