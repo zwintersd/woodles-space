@@ -7,6 +7,8 @@
 	import TheWeb from '$lib/witch/TheWeb.svelte';
 	import TheWorld from '$lib/witch/TheWorld.svelte';
 	import Ledger from '$lib/witch/Ledger.svelte';
+	import { LOOK_CLOSER_SECONDS } from '$lib/witch/tuning';
+	import type { Life } from '$lib/witch/content/life';
 	import ReadingRoom from '$lib/components/reading/ReadingRoom.svelte';
 	import Arcade from '$lib/arcade/Arcade.svelte';
 	import HexStage from '$lib/witch/HexStage.svelte';
@@ -21,6 +23,11 @@
 	let arcadeOpen = $state(false);
 	let hexStageOpen = $state(false);
 	let tutorialOpen = $state(false);
+	let portalPulse = $state(false);
+	let portalHint = $state<string | null>(null);
+	let portalFloats = $state<{ key: number; text: string; tone: 'look' | 'attend' | 'guide' }[]>([]);
+	let portalSeq = 0;
+	let portalTimers: ReturnType<typeof setTimeout>[] = [];
 
 	function onFocus() {
 		void book.refreshBestiaryCreatures();
@@ -37,6 +44,7 @@
 	});
 	onDestroy(() => {
 		stopTick();
+		for (const timer of portalTimers) clearTimeout(timer);
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('beforeunload', persist);
 			window.removeEventListener('focus', onFocus);
@@ -78,6 +86,13 @@
 			`--portal-oxygen:${Math.max(0, Math.min(1, book.stocks.oxygen / 100)).toFixed(3)}`
 		].join(';')
 	);
+	const portalActionLabel = $derived.by(() => {
+		const target = portalTargetLife();
+		if (book.life.length === 0) return 'open the world';
+		if (!target) return 'rest in what is known';
+		if (book.isAttending(target.id)) return `look closer at ${target.name}`;
+		return `attend to ${target.name}`;
+	});
 
 	function doExport() {
 		exportBlob = exportSave(book.toSave());
@@ -112,6 +127,60 @@
 	function goWorld() {
 		book.openBook();
 		book.mode = 'world';
+	}
+	function portalTargetLife(): Life | null {
+		return (
+			book.life.find((life) => book.isAttending(life.id)) ??
+			book.life.find((life) => book.canAttend(life.id)) ??
+			null
+		);
+	}
+	function pushPortalFloat(text: string, tone: 'look' | 'attend' | 'guide') {
+		const key = ++portalSeq;
+		portalFloats = [...portalFloats, { key, text, tone }];
+		const removeTimer = setTimeout(() => {
+			portalFloats = portalFloats.filter((item) => item.key !== key);
+		}, 900);
+		portalTimers.push(removeTimer);
+	}
+	function setPortalHint(text: string) {
+		portalHint = text;
+		const hintTimer = setTimeout(() => {
+			if (portalHint === text) portalHint = null;
+		}, 1500);
+		portalTimers.push(hintTimer);
+	}
+	function pulsePortal() {
+		portalPulse = false;
+		requestAnimationFrame(() => {
+			portalPulse = true;
+			const pulseTimer = setTimeout(() => (portalPulse = false), 260);
+			portalTimers.push(pulseTimer);
+		});
+	}
+	function clickPortal() {
+		goWorld();
+		pulsePortal();
+		const target = portalTargetLife();
+		if (!target) {
+			const text = book.life.length === 0 ? 'write a condition first' : 'all known';
+			pushPortalFloat(text, 'guide');
+			setPortalHint(text);
+			return;
+		}
+		if (book.isAttending(target.id)) {
+			book.lookCloser(target.id);
+			const secs = LOOK_CLOSER_SECONDS * target.studyEase;
+			const label = `+${Number.isInteger(secs) ? secs.toFixed(0) : secs.toFixed(1)}s`;
+			pushPortalFloat(label, 'look');
+			setPortalHint(`looking closer: ${target.name}`);
+			return;
+		}
+		if (book.canAttend(target.id)) {
+			book.attend(target.id);
+			pushPortalFloat('attending', 'attend');
+			setPortalHint(`attending: ${target.name}`);
+		}
 	}
 	function openRoom(id: 'reading-room' | 'arcade-room' | 'hex-room') {
 		if (id === 'reading-room') readingOpen = true;
@@ -340,18 +409,29 @@
 	</div>
 
 	<aside class="world-portal-panel" aria-label="world portal">
-		<button class="portal" style={portalStyle} onclick={goWorld} aria-label="open the world">
+		<button
+			class="portal"
+			class:popping={portalPulse}
+			style={portalStyle}
+			onclick={clickPortal}
+			aria-label={portalActionLabel}
+		>
 			<span class="portal-sky"></span>
 			<span class="portal-water"></span>
 			<span class="portal-land"></span>
 			<span class="portal-life one"></span>
 			<span class="portal-life two"></span>
 			<span class="portal-life three"></span>
+			{#each portalFloats as item (item.key)}
+				<span class="portal-float" class:attend={item.tone === 'attend'} class:guide={item.tone === 'guide'}>
+					{item.text}
+				</span>
+			{/each}
 		</button>
 		<div class="portal-copy">
-			<span class="portal-kicker">world portal</span>
+			<span class="portal-kicker">world clicker</span>
 			<strong>{portalLabel}</strong>
-			<span>{book.life.length > 0 ? `${Math.round(book.stability)} stability` : 'write a condition'}</span>
+			<span>{portalHint ?? portalActionLabel}</span>
 		</div>
 	</aside>
 </div>
@@ -577,9 +657,22 @@
 		box-shadow:
 			0 0 calc(10px + var(--portal-favor) * 22px) rgba(108, 229, 232, 0.22),
 			inset 0 0 26px rgba(26, 26, 62, calc(0.25 + (1 - var(--portal-stability)) * 0.45));
+		transition:
+			border-color 120ms,
+			box-shadow 140ms,
+			transform 140ms;
 	}
 	.portal:hover {
 		border-color: var(--cyan);
+		transform: translateY(-1px);
+		box-shadow:
+			0 0 calc(14px + var(--portal-favor) * 26px) rgba(108, 229, 232, 0.28),
+			inset 0 0 26px rgba(26, 26, 62, calc(0.25 + (1 - var(--portal-stability)) * 0.45));
+	}
+	.portal:active,
+	.portal.popping {
+		transform: scale(0.975);
+		border-color: var(--leafeon-pink);
 	}
 	.portal::before {
 		content: '';
@@ -645,6 +738,51 @@
 	.portal-life.three {
 		left: 63%;
 		transform: rotate(12deg) scale(calc(0.4 + var(--portal-life) * 0.28));
+	}
+	.portal-float {
+		position: absolute;
+		left: 50%;
+		top: 47%;
+		z-index: 6;
+		transform: translate(-50%, -50%);
+		font-family: var(--font-counter);
+		font-size: 1.05rem;
+		line-height: 1;
+		color: var(--cyan);
+		text-shadow: 0 0 8px rgba(108, 229, 232, 0.75);
+		white-space: nowrap;
+		pointer-events: none;
+		animation: portal-pop 0.9s ease-out forwards;
+	}
+	.portal-float.attend {
+		color: var(--leafeon-pink);
+		text-shadow: 0 0 8px rgba(240, 143, 184, 0.72);
+	}
+	.portal-float.guide {
+		font-family: var(--font-ui);
+		font-size: 0.58rem;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--cream);
+		text-shadow: 0 0 8px rgba(245, 242, 232, 0.5);
+	}
+	@keyframes portal-pop {
+		0% {
+			opacity: 0;
+			transform: translate(-50%, -34%) scale(0.86);
+		}
+		18% {
+			opacity: 1;
+			transform: translate(-50%, -50%) scale(1);
+		}
+		70% {
+			opacity: 1;
+			transform: translate(-50%, -74%) scale(1);
+		}
+		100% {
+			opacity: 0;
+			transform: translate(-50%, -96%) scale(0.96);
+		}
 	}
 	.portal-copy {
 		display: flex;
