@@ -3,20 +3,21 @@
 
 	interface Props {
 		creature: BestiaryCreature | null;
+		unclipped?: boolean;
 	}
 
-	let { creature }: Props = $props();
+	let { creature, unclipped = false }: Props = $props();
 
 	const src = $derived(creature ? (creature.isolatedSprite ?? creature.sprite) : null);
 	const isIsolated = $derived(!!creature?.isolatedSprite);
 </script>
 
-<div class="mini-glow">
+<div class="mini-glow" class:unclipped>
 	<div class="mini-outer">
 		<div class="mini-bg"></div>
 		<div class="mini-viewport" class:scene={!isIsolated && !!src}>
 
-			{#if src && isIsolated}
+			{#if src && isIsolated && !unclipped}
 				<div class="sprite-float">
 					<img
 						{src}
@@ -40,6 +41,17 @@
 			{/if}
 
 		</div>
+
+		{#if src && isIsolated && unclipped}
+			<div class="sprite-float sprite-over">
+				<img
+					{src}
+					alt={creature?.name ?? ''}
+					class="sprite"
+					class:pixelated={creature?.pixelated}
+				/>
+			</div>
+		{/if}
 	</div>
 </div>
 
@@ -51,10 +63,15 @@
 			drop-shadow(0 0 3px rgba(240, 143, 184, 0.14));
 	}
 
+	.mini-glow.unclipped {
+		overflow: visible;
+	}
+
 	.mini-outer {
 		position: relative;
 		width: 90px;
 		height: 90px;
+		overflow: visible;
 	}
 
 	.mini-bg {
@@ -97,6 +114,19 @@
 		max-width: 100%;
 		max-height: 100%;
 		object-fit: contain;
+	}
+
+	.sprite-over {
+		position: absolute;
+		left: 50%;
+		top: 50%;
+		z-index: 3;
+		width: 76px;
+		height: 76px;
+		max-width: none;
+		max-height: none;
+		translate: -50% -50%;
+		pointer-events: none;
 	}
 
 	.sprite.pixelated {

@@ -63,7 +63,7 @@
 		<div class="pet-stage mode-{view}">
 			{#if view === 'hex'}
 				<div class="hex-stand">
-					<MiniHex creature={selected} />
+					<MiniHex creature={selected} unclipped />
 				</div>
 			{:else if selected}
 				<div class="bestiary-root pet-card-host">
