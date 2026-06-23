@@ -25,8 +25,7 @@ import {
 	type ImageLayer,
 	type Fill
 } from './composer';
-import { bakeOutline } from './outline';
-import { scenePresets, type ScenePreset } from './props';
+import { bakeLayer } from './outline';
 
 const HISTORY_CAP = 50;
 
@@ -241,14 +240,6 @@ export class StudioState {
 		this.commit(() => this.updateLayerById(id, { hidden: !layer.hidden }));
 	}
 
-	loadScene(preset: ScenePreset): void {
-		this.commit(() => {
-			const layers = preset.build();
-			this.setLayers(layers);
-			this.selectedId = layers[layers.length - 1]?.id ?? null;
-		});
-	}
-
 	clearAll(): void {
 		if (this.isEmpty) return;
 		this.commit(() => {
@@ -257,31 +248,35 @@ export class StudioState {
 		});
 	}
 
-	// ── outline preview cache ──────────────────────────────────────────
-	// Outlines are baked to a bitmap (see outline.ts); too costly to redo on
-	// every frame, so the live preview reads a cached bake and the stage shows
-	// the plain art until a fresh one lands.
+	// ── bake preview cache ─────────────────────────────────────────────
+	// Tint and outline are baked to a bitmap (see outline.ts); too costly to
+	// redo on every frame, so the live preview reads a cached bake and the stage
+	// shows the plain art until a fresh one lands.
 
-	private outlineKey(layer: ImageLayer): string {
-		return `${layer.src.length}:${layer.src.slice(0, 48)}:${JSON.stringify(layer.outline)}`;
+	private bakeKey(layer: ImageLayer): string {
+		return `${layer.src.length}:${layer.src.slice(0, 48)}:${JSON.stringify(layer.tint)}:${JSON.stringify(layer.outline)}`;
 	}
 
-	// The source the stage should display for an image layer — its baked outline
-	// when one is current, otherwise the untouched art.
+	private layerNeedsBake(layer: ImageLayer): boolean {
+		return !!layer.outline || (!!layer.tint && layer.tint.strength > 0);
+	}
+
+	// The source the stage should display for an image layer — its baked tint /
+	// outline when one is current, otherwise the untouched art.
 	renderSrc(layer: ImageLayer): string {
-		if (!layer.outline) return layer.src;
+		if (!this.layerNeedsBake(layer)) return layer.src;
 		const got = this.baked[layer.id];
-		return got && got.key === this.outlineKey(layer) ? got.src : layer.src;
+		return got && got.key === this.bakeKey(layer) ? got.src : layer.src;
 	}
 
-	// Drive the cache from a component $effect: (re)bake changed outlines and
-	// drop caches for layers that lost theirs or were removed.
+	// Drive the cache from a component $effect: (re)bake changed layers and drop
+	// caches for layers that lost their tint/outline or were removed.
 	syncBakes(): void {
 		const live = new Set<string>();
 		for (const layer of this.comp.layers) {
-			if (layer.kind !== 'image' || !layer.outline) continue;
+			if (layer.kind !== 'image' || !this.layerNeedsBake(layer)) continue;
 			live.add(layer.id);
-			const key = this.outlineKey(layer);
+			const key = this.bakeKey(layer);
 			if (this.baked[layer.id]?.key === key) continue;
 			if (this.bakeWant.get(layer.id) === key) continue;
 			this.scheduleBake(layer, key);
@@ -303,11 +298,12 @@ export class StudioState {
 		const src = layer.src;
 		const nw = layer.naturalW;
 		const nh = layer.naturalH;
-		const outline = JSON.parse(JSON.stringify(layer.outline));
+		const outline = layer.outline ? JSON.parse(JSON.stringify(layer.outline)) : null;
+		const tint = layer.tint ? JSON.parse(JSON.stringify(layer.tint)) : null;
 		const timer = setTimeout(async () => {
 			this.bakeTimers.delete(id);
 			try {
-				const out = await bakeOutline(src, nw, nh, outline);
+				const out = await bakeLayer(src, nw, nh, { outline, tint });
 				if (this.bakeWant.get(id) === key) this.baked = { ...this.baked, [id]: { key, src: out } };
 			} catch {
 				// leave the preview on the plain art
@@ -316,5 +312,3 @@ export class StudioState {
 		this.bakeTimers.set(id, timer);
 	}
 }
-
-export { scenePresets };

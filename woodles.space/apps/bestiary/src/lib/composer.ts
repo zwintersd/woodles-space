@@ -163,6 +163,24 @@ export function clampOutlineWidth(n: number): number {
 	return Math.max(0, Math.min(MAX_OUTLINE, n));
 }
 
+// ── tint ──────────────────────────────────────────────────────────────
+// Full colour control over any image layer — the heart of the fx kit. The
+// chosen colour is multiplied into the art (lerped by strength), so a white
+// glow becomes that colour, a grain keeps its texture but takes the hue, and
+// a dark vignette becomes a tinted shadow. Alpha is untouched, so the fx keeps
+// its shape. The recolour is baked in render/preview (see outline.ts) so the
+// same pixels show on the stage and in the flatten.
+
+export type Tint = {
+	color: string; // any css hex; the colour multiplied into the art
+	strength: number; // 0 = untouched, 1 = full colour
+};
+
+// A fresh tint leans on the house bubblegum so toggling it on reads instantly.
+export function defaultTint(): Tint {
+	return { color: '#ef7aae', strength: 0.7 };
+}
+
 // ── layers ────────────────────────────────────────────────────────────
 
 type LayerCommon = {
@@ -189,6 +207,7 @@ export type ImageLayer = LayerCommon & {
 	flipY: boolean;
 	smooth: boolean; // false renders nearest-neighbour, for pixel art
 	filters: Filters;
+	tint: Tint | null;
 	outline: Outline | null;
 	// marks this layer as the creature itself (not backdrop or scenery).
 	// the isolated render pass draws only these layers onto a transparent
@@ -241,6 +260,7 @@ type ImageLayerInit = {
 	flipY?: boolean;
 	smooth?: boolean;
 	filters?: Filters;
+	tint?: Tint | null;
 	outline?: Outline | null;
 	isCreature?: boolean;
 };
@@ -265,6 +285,7 @@ export function createImageLayer(init: ImageLayerInit): ImageLayer {
 		flipY: init.flipY ?? false,
 		smooth: init.smooth ?? true,
 		filters: init.filters ?? defaultFilters(),
+		tint: init.tint ?? null,
 		outline: init.outline ?? null,
 		isCreature: init.isCreature ?? false
 	};
@@ -472,6 +493,7 @@ function normalizeLayer(raw: unknown): Layer | null {
 			flipY: l.flipY === true,
 			smooth: l.smooth !== false,
 			filters: normalizeFilters(l.filters),
+			tint: normalizeTint(l.tint),
 			outline: normalizeOutline(l.outline),
 			isCreature
 		};
@@ -495,6 +517,13 @@ function normalizeFilters(raw: unknown): Filters {
 		grayscale: clamp01(num(f.grayscale, 0)),
 		invert: clamp01(num(f.invert, 0))
 	};
+}
+
+function normalizeTint(raw: unknown): Tint | null {
+	if (!raw || typeof raw !== 'object') return null;
+	const t = raw as Record<string, unknown>;
+	if (typeof t.color !== 'string') return null;
+	return { color: t.color, strength: clamp01(num(t.strength, 0.7)) };
 }
 
 function normalizeOutline(raw: unknown): Outline | null {

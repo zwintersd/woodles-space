@@ -26,6 +26,7 @@ import {
 	filtersAreDefault,
 	defaultOutline,
 	clampOutlineWidth,
+	defaultTint,
 	FIT_SCALE,
 	MAX_SCALE,
 	MAX_BLUR,
@@ -263,6 +264,33 @@ describe('outline', () => {
 			expect(a.filters.brightness).toBe(2); // clamped from 9
 		}
 		if (b.kind === 'image') expect(b.outline).toBeNull(); // no fill → dropped
+	});
+});
+
+describe('tint', () => {
+	it('a fresh image layer has no tint', () => {
+		expect(img().tint).toBeNull();
+	});
+	it('defaults to a strong house-pink recolour', () => {
+		const t = defaultTint();
+		expect(t.color).toMatch(/^#/);
+		expect(t.strength).toBeGreaterThan(0);
+		expect(t.strength).toBeLessThanOrEqual(1);
+	});
+	it('round-trips through migration, clamping strength and dropping colourless tints', () => {
+		const comp = migrateComposition({
+			layers: [
+				{ kind: 'image', id: 'a', src: 'x', naturalW: 10, naturalH: 10, tint: { color: '#7fb8ec', strength: 9 } },
+				{ kind: 'image', id: 'b', src: 'y', naturalW: 10, naturalH: 10, tint: { strength: 0.5 } }
+			]
+		});
+		const a = comp!.layers[0];
+		const b = comp!.layers[1];
+		if (a.kind === 'image') {
+			expect(a.tint?.color).toBe('#7fb8ec');
+			expect(a.tint?.strength).toBe(1); // clamped from 9
+		}
+		if (b.kind === 'image') expect(b.tint).toBeNull(); // no colour → dropped
 	});
 });
 

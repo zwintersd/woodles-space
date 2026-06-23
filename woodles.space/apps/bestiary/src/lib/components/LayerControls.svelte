@@ -7,10 +7,12 @@
 		MAX_OUTLINE,
 		defaultFilters,
 		defaultOutline,
+		defaultTint,
 		filtersAreDefault,
 		type Fill,
 		type Filters,
 		type Outline,
+		type Tint,
 		type ImageLayer,
 		type FillLayer,
 		type BlendMode
@@ -76,6 +78,26 @@
 		const l = layer;
 		if (l?.kind === 'image' && l.outline)
 			up({ outline: { ...l.outline, fill: { ...l.outline.fill, ...p } as Fill } });
+	}
+
+	// ── tint (full colour control over the layer) ─────────────────────
+	// A whimsy-forward spread drawn from the house palette, plus a custom
+	// picker — the quickest way to recolour an fx to fit a card.
+	const TINT_SWATCHES = ['#fff2cc', '#f2b75e', '#fb8a5b', '#ef7aae', '#cf9be8', '#7fb8ec', '#86d6a0', '#5a2a48'];
+
+	function toggleTint() {
+		const l = layer;
+		if (l?.kind === 'image') studio.commit(() => up({ tint: l.tint ? null : defaultTint() }));
+	}
+	function setTintColor(color: string) {
+		const l = layer;
+		// each pick is its own undo step; the native picker fires after pointerup,
+		// so commit() brackets it rather than relying on the gesture wrapper
+		if (l?.kind === 'image' && l.tint) studio.commit(() => up({ tint: { ...l.tint!, color } }));
+	}
+	function setTintStrength(strength: number) {
+		const l = layer;
+		if (l?.kind === 'image' && l.tint) up({ tint: { ...l.tint, strength } as Tint });
 	}
 
 	// ── filters ──────────────────────────────────────────────────────
@@ -184,6 +206,43 @@
 				<button type="button" class="tog" class:on={layer.flipY} onclick={() => up({ flipY: !layer.flipY })}>flip ⇅</button>
 				<button type="button" class="tog" class:on={!layer.smooth} title="render without smoothing — for pixel art" onclick={() => up({ smooth: !layer.smooth })}>pixel</button>
 			</div>
+
+			<!-- tint -->
+			<section class="sub">
+				<div class="sub-head">
+					<span class="sub-title">tint</span>
+					<button type="button" class="toggle" class:on={!!layer.tint} onclick={toggleTint}>
+						{layer.tint ? 'on' : 'off'}
+					</button>
+				</div>
+				{#if layer.tint}
+					<p class="sub-note">recolour the whole layer — give the fx any colour you like</p>
+					<div class="tint-swatches">
+						{#each TINT_SWATCHES as c (c)}
+							<button
+								type="button"
+								class="tint-dot"
+								class:on={layer.tint.color.toLowerCase() === c}
+								style="background:{c}"
+								title={c}
+								aria-label="tint {c}"
+								onclick={() => setTintColor(c)}
+							></button>
+						{/each}
+						<label class="tint-dot custom" style="background:{layer.tint.color}" title="custom colour">
+							<input
+								type="color"
+								value={layer.tint.color}
+								oninput={(e) => setTintColor(e.currentTarget.value)}
+							/>
+							<span class="custom-glyph">+</span>
+						</label>
+					</div>
+					{@render range('strength', layer.tint.strength, 0, 1, 0.01, pct(layer.tint.strength), (n) =>
+						setTintStrength(n)
+					)}
+				{/if}
+			</section>
 
 			<!-- outline -->
 			<section class="sub">
@@ -341,6 +400,51 @@
 	}
 	.toggle:hover { border-color: var(--b-gold); color: var(--b-gold); }
 	.toggle.on { background: var(--b-gold); color: var(--b-on-accent); border-color: var(--b-gold); }
+
+	/* tint swatches — quick recolour picks + a custom well */
+	.tint-swatches {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.3rem;
+		align-items: center;
+	}
+	.tint-dot {
+		width: 1.5rem;
+		height: 1.5rem;
+		border-radius: 50%;
+		border: 1.5px solid var(--b-border-strong);
+		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+		transition: transform var(--b-transition-fast), box-shadow var(--b-transition-fast);
+		cursor: pointer;
+		position: relative;
+	}
+	.tint-dot:hover { transform: scale(1.12); }
+	.tint-dot.on {
+		box-shadow: 0 0 0 2px var(--b-surface), 0 0 0 3.5px var(--b-gold);
+	}
+	.tint-dot.custom {
+		display: grid;
+		place-items: center;
+		overflow: hidden;
+	}
+	.tint-dot.custom input[type='color'] {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		opacity: 0;
+		cursor: pointer;
+		border: none;
+		padding: 0;
+	}
+	.custom-glyph {
+		font-family: var(--b-font-mono);
+		font-size: 0.9rem;
+		line-height: 1;
+		color: #fff;
+		mix-blend-mode: difference;
+		pointer-events: none;
+	}
 
 	.fill-editor { display: flex; flex-direction: column; gap: var(--b-space-sm); }
 	.seg { display: flex; gap: 0; border: 1px solid var(--b-border); border-radius: var(--b-radius-sm); overflow: hidden; }
