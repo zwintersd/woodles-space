@@ -13,7 +13,7 @@ import {
 	type Fill,
 	type ImageLayer
 } from './composer';
-import { bakeOutline } from './outline';
+import { bakeLayer } from './outline';
 
 export class RenderError extends Error {
 	constructor(message: string) {
@@ -90,9 +90,10 @@ export async function renderComposition(comp: Composition): Promise<string> {
 		comp.layers
 			.filter((l): l is ImageLayer => l.kind === 'image' && !l.hidden)
 			.map(async (l) => {
-				const src = l.outline
-					? await bakeOutline(l.src, l.naturalW, l.naturalH, l.outline)
-					: l.src;
+				const src = await bakeLayer(l.src, l.naturalW, l.naturalH, {
+					outline: l.outline,
+					tint: l.tint
+				});
 				bitmaps.set(l.id, await loadImage(src));
 			})
 	);
@@ -143,9 +144,10 @@ export async function renderIsolatedCreature(comp: Composition): Promise<string 
 	const bitmaps = new Map<string, HTMLImageElement>();
 	await Promise.all(
 		creatureLayers.map(async (l) => {
-			const src = l.outline
-				? await bakeOutline(l.src, l.naturalW, l.naturalH, l.outline)
-				: l.src;
+			const src = await bakeLayer(l.src, l.naturalW, l.naturalH, {
+				outline: l.outline,
+				tint: l.tint
+			});
 			bitmaps.set(l.id, await loadImage(src));
 		})
 	);

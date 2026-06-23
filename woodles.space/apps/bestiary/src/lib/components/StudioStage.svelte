@@ -257,6 +257,9 @@
 			repeating-conic-gradient(rgba(154, 125, 150, 0.12) 0% 25%, transparent 0% 50%) 50% / 22px 22px,
 			var(--b-vellum);
 		border: 1px solid var(--b-border-strong);
+		box-shadow:
+			0 0 0 1px rgba(255, 255, 255, 0.6),
+			var(--b-shadow-hover);
 		touch-action: none;
 		user-select: none;
 		cursor: default;

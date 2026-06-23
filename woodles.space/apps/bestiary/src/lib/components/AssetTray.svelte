@@ -1,12 +1,9 @@
 <script lang="ts">
 	import {
-		imageAssetsByTray,
 		overlayAssets,
 		overlayGroups,
 		fillAssets,
 		layerFromAsset,
-		scenePresets,
-		type AssetTray,
 		type ImageAsset
 	} from '$lib/props';
 	import { fillToCss, createImageLayer, coverScale } from '$lib/composer';
@@ -20,14 +17,11 @@
 	}: { studio: StudioState; creatureSprite?: string | null; creaturePixelated?: boolean } =
 		$props();
 
-	type Tab = 'scene' | 'backdrop' | AssetTray | 'upload';
-	let tab = $state<Tab>('scene');
+	type Tab = 'backdrop' | 'overlay' | 'upload';
+	let tab = $state<Tab>('backdrop');
 
 	const tabs: { id: Tab; label: string }[] = [
-		{ id: 'scene', label: 'scenes' },
 		{ id: 'backdrop', label: 'backdrops' },
-		{ id: 'nature', label: 'nature' },
-		{ id: 'sky', label: 'sky' },
 		{ id: 'overlay', label: 'fx' },
 		{ id: 'upload', label: 'upload' }
 	];
@@ -144,17 +138,7 @@
 	</div>
 
 	<div class="tray-body">
-		{#if tab === 'scene'}
-			<p class="tray-hint">a whole little world in one tap — then take it apart.</p>
-			<div class="scene-list">
-				{#each scenePresets as s (s.id)}
-					<button type="button" class="scene" onclick={() => studio.loadScene(s)}>
-						<span class="scene-name">{s.name}</span>
-						<span class="scene-note">{s.note}</span>
-					</button>
-				{/each}
-			</div>
-		{:else if tab === 'backdrop'}
+		{#if tab === 'backdrop'}
 			<p class="tray-hint">a full-bleed colour or sky, dropped behind everything.</p>
 			<div class="grid swatches">
 				{#each fillAssets as f (f.id)}
@@ -218,8 +202,8 @@
 				{#if error}<p class="err">{error}</p>{/if}
 				<input bind:this={fileInput} type="file" accept="image/*" onchange={onInputChange} hidden />
 			{/if}
-		{:else if tab === 'overlay'}
-			<p class="tray-hint">light, weather, grain — stacked over the whole scene.</p>
+		{:else}
+			<p class="tray-hint">light, weather, colour & grain — stacked over the whole scene, and recolourable once placed.</p>
 			{#each overlayGroups as g (g.id)}
 				{@const items = overlayAssets(g.id)}
 				{#if items.length}
@@ -231,13 +215,6 @@
 					</div>
 				{/if}
 			{/each}
-		{:else}
-			<p class="tray-hint">tap to stamp it on; drag to place, the corner to size.</p>
-			<div class="grid">
-				{#each imageAssetsByTray(tab) as a (a.id)}
-					{@render stamp(a)}
-				{/each}
-			</div>
 		{/if}
 	</div>
 </div>
@@ -291,11 +268,17 @@
 		background: var(--b-surface-2);
 		transition: all var(--b-transition-fast);
 	}
-	.stamp:hover { border-color: var(--b-gold); transform: translateY(-1px); }
+	.stamp:hover { border-color: var(--b-gold); transform: translateY(-1px); box-shadow: var(--b-shadow-card); }
+	/* a light→dark tile behind each fx so white glows and dark vignettes
+	   both have something to read against */
 	.stamp img {
 		width: 100%;
-		height: 44px;
-		object-fit: contain;
+		height: 46px;
+		object-fit: cover;
+		border-radius: 5px;
+		background:
+			linear-gradient(135deg, #f3ecf6 0%, #c7b8d8 48%, #5d5168 100%);
+		box-shadow: inset 0 0 0 1px rgba(90, 42, 72, 0.12);
 	}
 	.stamp-name {
 		font-family: var(--b-font-mono);
@@ -313,24 +296,7 @@
 		border: 1px solid var(--b-border-strong);
 		transition: transform var(--b-transition-fast);
 	}
-	.swatch:hover { transform: scale(1.06); }
-
-	.scene-list { display: flex; flex-direction: column; gap: var(--b-space-xs); }
-	.scene {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 0.1rem;
-		padding: 0.5rem 0.6rem;
-		border: 1px solid var(--b-border);
-		border-radius: var(--b-radius-sm);
-		background: var(--b-surface-2);
-		text-align: left;
-		transition: all var(--b-transition-fast);
-	}
-	.scene:hover { border-color: var(--b-gold); transform: translateY(-1px); }
-	.scene-name { font-family: var(--b-font-codex); font-size: 0.92rem; color: var(--b-text); }
-	.scene-note { font-family: var(--b-font-body); font-style: italic; font-size: 0.72rem; color: var(--b-muted); }
+	.swatch:hover { transform: scale(1.06); box-shadow: var(--b-shadow-card); }
 
 	.drop {
 		display: flex;

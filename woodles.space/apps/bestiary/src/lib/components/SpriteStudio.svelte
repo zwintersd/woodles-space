@@ -111,7 +111,7 @@
 			<button class="x" title="close studio" aria-label="close studio" onclick={close}>←</button>
 			<div class="titles">
 				<h2 class="title">sprite studio</h2>
-				<p class="sub">{creature ? 'layer a world — backdrop, trees, the creature, light' : 'design the card back — backdrops, patterns, overlays'}</p>
+				<p class="sub">{creature ? 'layer a world — a backdrop, the creature, light & colour' : 'design the card back — backdrops, washes, overlays'}</p>
 			</div>
 		</div>
 		<div class="bar-right">
@@ -190,7 +190,10 @@
 		position: fixed;
 		inset: 0;
 		z-index: var(--b-z-overlay);
-		background: var(--b-bg);
+		/* spun-sugar wash — pink mist easing into sky-lavender */
+		background:
+			radial-gradient(120% 90% at 18% 0%, rgba(255, 255, 255, 0.55), transparent 60%),
+			linear-gradient(150deg, var(--b-bg) 0%, var(--b-bg-2) 100%);
 		display: flex;
 		flex-direction: column;
 		outline: none;
@@ -203,7 +206,9 @@
 		gap: var(--b-space-md);
 		padding: var(--b-space-sm) var(--b-space-md);
 		border-bottom: 1px solid var(--b-border);
-		background: var(--b-surface);
+		background: color-mix(in srgb, var(--b-surface) 78%, transparent);
+		backdrop-filter: blur(10px);
+		box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, var(--b-shadow-card);
 		flex-wrap: wrap;
 	}
 	.bar-left { display: flex; align-items: center; gap: var(--b-space-sm); }
@@ -242,15 +247,17 @@
 	.ghost:disabled { opacity: 0.35; }
 	.ghost.danger:hover:not(:disabled) { border-color: var(--b-mythic); color: var(--b-mythic); }
 	.primary {
-		background: var(--b-gold);
+		background: linear-gradient(180deg, color-mix(in srgb, var(--b-gold) 84%, white), var(--b-gold));
 		color: var(--b-on-accent);
 		border-radius: var(--b-radius-sm);
-		padding: 0.4rem 0.9rem;
+		padding: 0.44rem 1rem;
 		font-family: var(--b-font-mono);
 		font-size: 0.82rem;
 		font-weight: 600;
-		transition: opacity var(--b-transition-fast);
+		box-shadow: var(--b-shadow-card);
+		transition: transform var(--b-transition-fast), box-shadow var(--b-transition-fast), opacity var(--b-transition-fast);
 	}
+	.primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--b-shadow-hover); }
 	.primary:disabled { opacity: 0.5; }
 	.save-error {
 		font-family: var(--b-font-mono);
@@ -263,9 +270,13 @@
 		flex: 1;
 		min-height: 0;
 		display: grid;
-		grid-template-columns: 230px minmax(0, 1fr) 270px;
+		grid-template-columns: 248px minmax(0, 1fr) 300px;
 		gap: var(--b-space-md);
 		padding: var(--b-space-md);
+	}
+	/* on wide screens let the rails breathe and the stage grow */
+	@media (min-width: 1500px) {
+		.work { grid-template-columns: 280px minmax(0, 1fr) 332px; gap: var(--b-space-lg); padding: var(--b-space-lg); }
 	}
 	.rail {
 		min-height: 0;
@@ -285,12 +296,12 @@
 	}
 	.stage-wrap {
 		width: 100%;
-		max-width: min(100%, 64vh);
+		max-width: min(100%, 76vh);
 		max-height: 100%;
 	}
 	/* portrait canvas (card backs): height drives sizing, not width */
 	.stage-wrap.portrait {
-		max-width: min(100%, 46vh);
+		max-width: min(100%, 58vh);
 	}
 	.stage-tip {
 		font-family: var(--b-font-mono);
@@ -300,7 +311,7 @@
 	}
 
 	.panel {
-		background: var(--b-surface);
+		background: color-mix(in srgb, var(--b-surface) 90%, transparent);
 		border: 1px solid var(--b-border);
 		border-radius: var(--b-radius-md);
 		padding: var(--b-space-sm) var(--b-space-md) var(--b-space-md);
@@ -308,6 +319,7 @@
 		flex-direction: column;
 		gap: var(--b-space-sm);
 		min-height: 0;
+		box-shadow: var(--b-shadow-card);
 	}
 	.panel.grow { flex: 1; overflow-y: auto; }
 	.panel-h {
