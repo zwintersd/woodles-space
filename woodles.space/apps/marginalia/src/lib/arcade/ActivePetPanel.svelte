@@ -8,6 +8,13 @@
 
 	type PetView = 'card' | 'hex';
 
+	interface Props {
+		locked?: boolean;
+		onpetchange?: (creature: BestiaryCreature | null) => void;
+	}
+
+	let { locked = false, onpetchange }: Props = $props();
+
 	const PET_KEY = 'marginalia.arcade.activePet.v1';
 	const VIEW_KEY = 'marginalia.arcade.petView.v1';
 
@@ -19,7 +26,11 @@
 		creatures.find((c) => c.id === selectedId) ?? creatures[0] ?? null
 	);
 
-	function persistSelection(id: string) {
+	function persistSelection(id: string, select: HTMLSelectElement) {
+		if (locked) {
+			select.value = selected?.id ?? '';
+			return;
+		}
 		selectedId = id;
 		localStorage.setItem(PET_KEY, id);
 	}
@@ -34,9 +45,13 @@
 		const storedView = localStorage.getItem(VIEW_KEY);
 		if (storedView === 'card' || storedView === 'hex') view = storedView;
 	});
+
+	$effect(() => {
+		onpetchange?.(selected);
+	});
 </script>
 
-<aside class="pet-panel" aria-label="active pet">
+<aside class="pet-panel" class:locked aria-label="active pet">
 	<header class="pet-head">
 		<p>active pet</p>
 		<h2>{selected?.name || 'no pet yet'}</h2>
@@ -47,13 +62,20 @@
 			<span>choose companion</span>
 			<select
 				value={selected?.id ?? ''}
-				onchange={(event) => persistSelection((event.target as HTMLSelectElement).value)}
+				disabled={locked}
+				aria-describedby={locked ? 'pet-lock-note' : undefined}
+				onchange={(event) =>
+					persistSelection((event.currentTarget as HTMLSelectElement).value, event.currentTarget)}
 			>
 				{#each creatures as creature (creature.id)}
 					<option value={creature.id}>{creature.name || '(unnamed)'}</option>
 				{/each}
 			</select>
 		</label>
+
+		{#if locked}
+			<p class="pet-lock" id="pet-lock-note">companion locked until you leave the game</p>
+		{/if}
 
 		<div class="view-toggle" aria-label="pet display mode">
 			<button class:active={view === 'hex'} onclick={() => setView('hex')}>hex</button>
@@ -101,6 +123,9 @@
 		box-shadow: 0 18px 40px rgba(11, 11, 32, 0.28);
 		min-width: 0;
 	}
+	.pet-panel.locked {
+		border-color: rgba(108, 229, 232, 0.32);
+	}
 	.pet-head {
 		display: flex;
 		flex-direction: column;
@@ -137,6 +162,20 @@
 		border: 1px solid var(--rule);
 		border-radius: 4px;
 		padding: 0.45rem 0.55rem;
+	}
+	.pet-select select:disabled {
+		cursor: not-allowed;
+		opacity: 0.72;
+		border-color: rgba(108, 229, 232, 0.34);
+	}
+	.pet-lock {
+		font-family: var(--font-ui);
+		font-size: 0.58rem;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--cyan);
+		text-align: center;
+		margin: -0.25rem 0 0;
 	}
 	.view-toggle {
 		display: grid;

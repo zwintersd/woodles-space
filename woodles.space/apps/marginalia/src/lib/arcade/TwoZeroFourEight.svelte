@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
 
 	interface Props {
 		onclose: () => void;
+		creature?: BestiaryCreature | null;
 	}
-	let { onclose }: Props = $props();
+	let { onclose, creature = null }: Props = $props();
 
 	type Board = number[][];
 	type Dir = 'left' | 'right' | 'up' | 'down';
@@ -14,18 +16,19 @@
 		return Array.from({ length: 4 }, () => [0, 0, 0, 0]);
 	}
 
-	function addTile(b: Board): void {
+	function addTile(b: Board, value?: number): void {
 		const empties: [number, number][] = [];
 		for (let r = 0; r < 4; r++)
 			for (let c = 0; c < 4; c++)
 				if (b[r][c] === 0) empties.push([r, c]);
 		if (!empties.length) return;
 		const [r, c] = empties[Math.floor(Math.random() * empties.length)];
-		b[r][c] = Math.random() < 0.9 ? 2 : 4;
+		b[r][c] = value ?? (Math.random() < 0.9 ? 2 : 4);
 	}
 
 	function freshBoard(): Board {
 		const b = emptyBoard();
+		if ((creature?.stats?.body ?? 0) >= 5) addTile(b, 16);
 		addTile(b);
 		addTile(b);
 		return b;

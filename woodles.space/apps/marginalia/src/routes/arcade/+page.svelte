@@ -4,6 +4,10 @@
 	import { startTick, stopTick } from '$lib/witch/tick';
 	import Arcade from '$lib/arcade/Arcade.svelte';
 	import ActivePetPanel from '$lib/arcade/ActivePetPanel.svelte';
+	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
+
+	let activeGame = $state<string | null>(null);
+	let activePet = $state<BestiaryCreature | null>(null);
 
 	function onFocus() {
 		void book.refreshBestiaryCreatures();
@@ -51,9 +55,9 @@
 
 	<main class="arcade-layout">
 		<section class="game-column" aria-label="arcade games">
-			<Arcade />
+			<Arcade {activePet} onactivechange={(gameId) => (activeGame = gameId)} />
 		</section>
-		<ActivePetPanel />
+		<ActivePetPanel locked={activeGame !== null} onpetchange={(pet) => (activePet = pet)} />
 	</main>
 </div>
 

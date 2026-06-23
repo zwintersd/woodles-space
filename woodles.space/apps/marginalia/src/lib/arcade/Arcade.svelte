@@ -1,6 +1,7 @@
 <script lang="ts">
 	import InsightRush from './InsightRush.svelte';
 	import TwoZeroFourEight from './TwoZeroFourEight.svelte';
+	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
 
 	type GameStatus = 'play' | 'soon' | 'locked';
 
@@ -13,6 +14,13 @@
 		status: GameStatus;
 		lockedHint?: string;
 	}
+
+	interface Props {
+		activePet?: BestiaryCreature | null;
+		onactivechange?: (gameId: string | null) => void;
+	}
+
+	let { activePet = null, onactivechange }: Props = $props();
 
 	let activeGame = $state<string | null>(null);
 	let rootEl: HTMLDivElement;
@@ -87,11 +95,13 @@
 
 	function openGame(gameId: string) {
 		activeGame = gameId;
+		onactivechange?.(activeGame);
 		showCabinetTop();
 	}
 
 	function closeGame() {
 		activeGame = null;
+		onactivechange?.(activeGame);
 		showCabinetTop();
 	}
 
@@ -126,7 +136,7 @@
 			</header>
 
 			{#if activeGame === 'stack-2048'}
-				<TwoZeroFourEight onclose={closeGame} />
+				<TwoZeroFourEight onclose={closeGame} creature={activePet} />
 			{:else if activeGame === 'insight-rush'}
 				<InsightRush onclose={closeGame} />
 			{/if}
