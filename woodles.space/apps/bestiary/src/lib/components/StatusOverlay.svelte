@@ -1,44 +1,50 @@
 <script lang="ts">
-	// The single door CreatureCard opens onto the cold system. It owns the three
-	// procedural tiers — drifting snow, creeping frost, fractured ice — and decides
-	// which are present from one number: `cold` (0–10).
+	// The single door CreatureCard opens onto all status conditions. It owns the
+	// procedural tiers for cold and burning, and decides which are present from
+	// two numbers: `cold` and `burning` (each 0–10).
 	//
-	//   cold > 0  snow in the art window
-	//   cold > 3  frost crystals on the art frame
-	//   cold > 6  ice cracks across the whole card
+	//   cold > 0      snow in the art window
+	//   cold > 3      frost crystals on the art frame
+	//   cold > 6      ice cracks across the whole card
 	//
-	// The frost/crack path data is generated *once* from the creature's seed (so a
-	// creature's ice is its own stable fingerprint, not reshuffled on every edit)
-	// and held in plain state — never a $derived, which would regenerate it.
+	//   burning > 0   embers rising in the art window
+	//   burning > 3   flame tongues on the art frame
+	//   burning > 6   scorch marks across the whole card
 	//
-	// `artEl` is CreatureCard's `.art` div. We measure it against our own box (we
-	// fill `.card-inner`) to place the art-bound layers over the frame and to give
-	// the cracks an origin to radiate from. That geometry is recomputed on resize
-	// so the responsive card never drifts out of register.
+	// Path data is generated *once* from the creature's seed (its ice and fire are
+	// stable fingerprints, never reshuffled on edit). Frost uses the raw seed;
+	// fire uses seed + ':fire' so the two fingerprints are independent.
+	//
+	// `artEl` is CreatureCard's `.art` div. We measure it against our own box to
+	// place art-bound layers over the frame and give spreading effects an origin.
 
 	import { seededRng } from '$lib/prng';
 	import { generateFrostPaths } from '$lib/frostgen';
+	import { generateFirePaths } from '$lib/firegen';
 	import SnowCanvas from './SnowCanvas.svelte';
 	import FrostBorder from './FrostBorder.svelte';
 	import CrackOverlay from './CrackOverlay.svelte';
+	import EmberCanvas from './EmberCanvas.svelte';
+	import FlameBorder from './FlameBorder.svelte';
+	import CharOverlay from './CharOverlay.svelte';
 
 	let {
 		cold = 0,
+		burning = 0,
 		seed = '',
 		artEl
-	}: { cold: number; seed?: string; artEl: HTMLElement | null } = $props();
+	}: { cold: number; burning: number; seed?: string; artEl: HTMLElement | null } = $props();
 
 	let rootEl: HTMLDivElement;
 
-	// generated-once path data + the art's pixel box (the SVG viewBox)
 	let borderPaths = $state<string[]>([]);
 	let crackPaths = $state<string[]>([]);
+	let flamePaths = $state<string[]>([]);
+	let scorchPaths = $state<string[]>([]);
 	let artW = $state(0);
 	let artH = $state(0);
 	let generated = false;
 
-	// the art frame's place within our box, as percentages, so the overlay layers
-	// stay pinned to the art as the card scales
 	let frame = $state({ left: '0%', top: '0%', width: '100%', height: '100%' });
 
 	function measure() {
@@ -54,19 +60,24 @@
 			height: `${(a.height / r.height) * 100}%`
 		};
 
-		// generate the ice fingerprint the first time the art has a real size
 		if (!generated) {
+			// frost: raw seed preserves existing creature fingerprints
 			const { borderPaths: bp, crackPaths: cp } = generateFrostPaths(seededRng(seed), a);
+			// fire: ':fire' suffix keeps it independent of the frost fingerprint
+			const { flamePaths: fp, scorchPaths: sp } = generateFirePaths(
+				seededRng(seed + ':fire'),
+				a
+			);
 			borderPaths = bp;
 			crackPaths = cp;
+			flamePaths = fp;
+			scorchPaths = sp;
 			artW = a.width;
 			artH = a.height;
 			generated = true;
 		}
 	}
 
-	// Re-run when the art ref arrives; keep measuring across resizes. The observer
-	// also fires once on observe(), which covers the first real layout.
 	$effect(() => {
 		if (!artEl || !rootEl) return;
 		measure();
@@ -94,8 +105,25 @@
 
 		<!-- card-bound tier: radiates out of the art box, across the whole card -->
 		{#if cold > 6 && ready}
-			<div class="crack-frame" style={frameStyle}>
+			<div class="spread-frame" style={frameStyle}>
 				<CrackOverlay {cold} paths={crackPaths} width={artW} height={artH} />
+			</div>
+		{/if}
+	{/if}
+
+	{#if burning > 0}
+		<!-- art-bound tiers: clipped so embers & flames end at the art edge -->
+		<div class="art-frame" style={frameStyle}>
+			<EmberCanvas {burning} />
+			{#if burning > 3 && ready}
+				<FlameBorder {burning} paths={flamePaths} width={artW} height={artH} />
+			{/if}
+		</div>
+
+		<!-- card-bound tier: char spreads out of the art box, across the whole card -->
+		{#if burning > 6 && ready}
+			<div class="spread-frame" style={frameStyle}>
+				<CharOverlay {burning} paths={scorchPaths} width={artW} height={artH} />
 			</div>
 		{/if}
 	{/if}
@@ -112,10 +140,10 @@
 	.art-frame {
 		position: absolute;
 		overflow: hidden;
-		/* match the art window's rounded corner so flakes clip cleanly */
+		/* match the art window's rounded corner so effects clip cleanly */
 		border-radius: 0.45em;
 	}
-	.crack-frame {
+	.spread-frame {
 		position: absolute;
 		overflow: visible;
 	}

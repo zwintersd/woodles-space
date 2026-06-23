@@ -38,16 +38,21 @@
 					: 0.24
 	);
 
-	// the cold condition (0–10) drives the snow/frost/ice overlay; past 6 it also
-	// blends the plate toward ice via --cold-shift (0 at cold 6 → 1 at cold 10).
+	// cold (0–10) drives snow/frost/ice; past 6 it also blends the plate toward
+	// ice via --cold-shift (0 at cold 6 → 1 at cold 10).
 	let cold = $derived(creature.status?.cold ?? 0);
 	let coldShift = $derived(cold <= 6 ? 0 : Math.min(1, (cold - 6) / 4));
 
-	// the art window, handed to the overlay so it can size & place the ice layers
+	// burning (0–10) drives embers/flames/char; past 6 it blends the plate toward
+	// dark ember/ash via --burn-shift (0 at burning 6 → 1 at burning 10).
+	let burning = $derived(creature.status?.burning ?? 0);
+	let burnShift = $derived(burning <= 6 ? 0 : Math.min(1, (burning - 6) / 4));
+
+	// the art window, handed to the overlay so it can size & place the effect layers
 	let artEl = $state<HTMLElement | null>(null);
 
 	let styleAttr = $derived(
-		`${cardStyleAttr(style, domain.colorVar, rarity.colorVar)}; --cold-shift: ${coldShift}; --holo: ${holoAmt}`
+		`${cardStyleAttr(style, domain.colorVar, rarity.colorVar)}; --cold-shift: ${coldShift}; --burn-shift: ${burnShift}; --holo: ${holoAmt}`
 	);
 </script>
 
@@ -147,9 +152,9 @@
 			</span>
 		</footer>
 
-		<!-- status conditions: the cold overlay (snow / frost / ice), measured
-		     against the art window. Hidden entirely when the creature is unafflicted. -->
-		<StatusOverlay {cold} seed={creature.id} {artEl} />
+		<!-- status conditions: cold (snow/frost/ice) and burning (embers/flames/char),
+		     measured against the art window. -->
+		<StatusOverlay {cold} {burning} seed={creature.id} {artEl} />
 	</div>
 
 	<!-- decorative overlays: texture, then finish, above content, never interactive -->
@@ -191,6 +196,11 @@
 				160deg,
 				color-mix(in oklch, #cdeefb calc(var(--cold-shift, 0) * 40%), transparent) 0%,
 				color-mix(in oklch, #bfe6f5 calc(var(--cold-shift, 0) * 40%), transparent) 100%
+			),
+			linear-gradient(
+				160deg,
+				color-mix(in oklch, #3d0f00 calc(var(--burn-shift, 0) * 45%), transparent) 0%,
+				color-mix(in oklch, #1a0500 calc(var(--burn-shift, 0) * 45%), transparent) 100%
 			),
 			var(--plate-base);
 		background: var(--plate);
