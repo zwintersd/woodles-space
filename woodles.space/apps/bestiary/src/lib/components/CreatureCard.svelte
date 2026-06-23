@@ -7,7 +7,16 @@
 	import StatusOverlay from './StatusOverlay.svelte';
 	import FinishOverlay from './FinishOverlay.svelte';
 
-	let { creature, interactive = false }: { creature: Creature; interactive?: boolean } = $props();
+	let {
+		creature,
+		interactive = false,
+		preview = false
+	}: { creature: Creature; interactive?: boolean; preview?: boolean } = $props();
+
+	// "shine" = a live, on-screen card that should catch the pointer (the shelf,
+	// or the editor preview). Prints and the PNG export stage are neither, so they
+	// stay perfectly flat. Only `interactive` cards are also click targets.
+	let shine = $derived(interactive || preview);
 
 	let domain = $derived(domainDef(creature.domain));
 	let rarity = $derived(rarityDef(creature.rarity));
@@ -45,9 +54,10 @@
 <article
 	class="card frame-{style.frame} finish-{style.finish} tb-{style.textBox} tex-{style.texture} title-{style.titleAlign}"
 	class:interactive
+	class:shine
 	class:foil
 	style={styleAttr}
-	use:holo={interactive}
+	use:holo={shine}
 >
 	<div class="card-inner">
 		<!-- title bar -->
@@ -153,11 +163,11 @@
 		/>
 	{/if}
 
-	<!-- pointer-driven holo: a glare that rides the cursor on every live card,
-	     plus a faint spectral sheen — except on a holo finish, which gets its own
-	     richer (also pointer-driven) sheen from FinishOverlay. Prints/exports are
-	     not interactive, so they stay flat. -->
-	{#if interactive}
+	<!-- pointer-driven holo: a glare that rides the cursor on every live card
+	     (shelf + editor preview), plus a faint spectral sheen — except on a holo
+	     finish, which gets its own richer (also pointer-driven) sheen from
+	     FinishOverlay. Prints/exports are not live, so they stay flat. -->
+	{#if shine}
 		<div class="holo-glare" aria-hidden="true"></div>
 		{#if style.finish !== 'holo'}
 			<div class="holo-sheen" aria-hidden="true"></div>
@@ -206,15 +216,18 @@
 		z-index: 3;
 	}
 
-	.card.interactive {
-		cursor: pointer;
-		/* the pointer drives the tilt + lift through the holo action's vars; the
-		   easing lives in JS (rAF), so transform isn't transitioned here */
+	/* a live card (shelf or editor preview) tilts + lifts toward the pointer; the
+	   easing lives in JS (rAF), so transform isn't transitioned here */
+	.card.shine {
 		transform:
 			perspective(900px)
 			rotateX(var(--holo-rx, 0deg))
 			rotateY(var(--holo-ry, 0deg))
 			translateY(calc(var(--holo-active, 0) * -5px));
+	}
+	/* only a shelf card is a click target — cursor + hover affordance */
+	.card.interactive {
+		cursor: pointer;
 		transition: box-shadow var(--b-transition-medium), border-color var(--b-transition-fast);
 	}
 	.card.interactive:hover {
