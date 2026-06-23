@@ -254,6 +254,44 @@ describe('PlannerStore', () => {
 		});
 	});
 
+	describe('compose mode', () => {
+		it('startCompose opens with the given defaults', () => {
+			store.startCompose({ targetDate: '2026-06-23', targetBlockId: 'b1' });
+			expect(store.composing).toBe(true);
+			expect(store.composeDefaults.targetDate).toBe('2026-06-23');
+			expect(store.composeDefaults.targetBlockId).toBe('b1');
+		});
+
+		it('startCompose defaults to an empty object when omitted', () => {
+			store.startCompose();
+			expect(store.composing).toBe(true);
+			expect(store.composeDefaults).toEqual({});
+		});
+
+		it('startCompose clears any active edit', () => {
+			const task = store.addTask({ title: 'Task' });
+			store.openTaskEdit(task.id);
+			store.startCompose();
+			expect(store.editingTaskId).toBeNull();
+			expect(store.composing).toBe(true);
+		});
+
+		it('openTaskEdit cancels an in-progress compose', () => {
+			const task = store.addTask({ title: 'Task' });
+			store.startCompose();
+			store.openTaskEdit(task.id);
+			expect(store.composing).toBe(false);
+			expect(store.editingTaskId).toBe(task.id);
+		});
+
+		it('cancelCompose closes and clears defaults', () => {
+			store.startCompose({ targetDate: '2026-06-23' });
+			store.cancelCompose();
+			expect(store.composing).toBe(false);
+			expect(store.composeDefaults).toEqual({});
+		});
+	});
+
 	// ── day shape resolution ────────────────────────────────────────
 
 	describe('getDayShape', () => {
@@ -620,6 +658,18 @@ describe('PlannerStore', () => {
 			const ritualBlock = blocks.find((b) => b.overlay === 'ritual');
 			expect(ritualBlock).toBeTruthy();
 			expect(ritualBlock?.title).toBe('Morning Meditation');
+		});
+
+		it('getBlocksForDateKey resolves blocks from a YYYY-MM-DD key', () => {
+			const testDate = new Date(2024, 5, 15);
+			store.setDayShape(testDate, 'test-shape');
+			const blocks = store.getBlocksForDateKey('2024-06-15');
+			expect(blocks.length).toBeGreaterThanOrEqual(2);
+		});
+
+		it('getBlocksForDateKey returns [] for a malformed key', () => {
+			expect(store.getBlocksForDateKey('')).toEqual([]);
+			expect(store.getBlocksForDateKey('not-a-date')).toEqual([]);
 		});
 	});
 

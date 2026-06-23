@@ -61,9 +61,22 @@
 	function submitTask(e: Event) {
 		e.preventDefault();
 		const title = newTaskTitle.trim();
-		if (!title || !currentBlock) return;
-		store.addTask({ title, targetBlockId: currentBlock.id });
+		if (!title) return;
+		// With a block in progress, capture straight into it; otherwise the task
+		// lands on today's tray (unscheduled) rather than going nowhere.
+		if (currentBlock) {
+			store.addTask({ title, targetBlockId: currentBlock.id });
+		} else {
+			store.addTask({ title, targetDate: dateKey(store.now) });
+		}
 		newTaskTitle = '';
+	}
+
+	function scheduleForLater() {
+		store.startCompose({
+			targetDate: dateKey(store.now),
+			targetBlockId: currentBlock?.id
+		});
 	}
 
 	function handleInputKeydown(e: KeyboardEvent) {
@@ -120,18 +133,6 @@
 					{/each}
 				</div>
 			{/if}
-
-			<form class="nn-add-task" onsubmit={submitTask}>
-				<input
-					bind:this={inputEl}
-					bind:value={newTaskTitle}
-					class="nn-add-input"
-					placeholder="+ add task"
-					autocomplete="off"
-					spellcheck="false"
-					onkeydown={handleInputKeydown}
-				/>
-			</form>
 		{:else if blocks.length === 0}
 			<h1 class="nn-block-title nn-free">The day has not yet decided what it is.</h1>
 			<p class="nn-block-time">neither have you. this seems fine.</p>
@@ -139,6 +140,24 @@
 			<h1 class="nn-block-title nn-free">—</h1>
 			<p class="nn-block-time">between schedule</p>
 		{/if}
+
+		<!-- Capture bar — always present, even when no block is in progress -->
+		<div class="nn-capture">
+			<form class="nn-add-task" onsubmit={submitTask}>
+				<input
+					bind:this={inputEl}
+					bind:value={newTaskTitle}
+					class="nn-add-input"
+					placeholder={currentBlock ? '+ add task' : '+ capture a task'}
+					autocomplete="off"
+					spellcheck="false"
+					onkeydown={handleInputKeydown}
+				/>
+			</form>
+			<button type="button" class="nn-schedule-btn" onclick={scheduleForLater}>
+				schedule for later…
+			</button>
+		</div>
 	</section>
 
 	<!-- Next block card -->
@@ -343,10 +362,18 @@
 		flex-direction: column;
 	}
 
-	.nn-add-task {
+	.nn-capture {
 		border-top: 1px solid var(--p-border);
 		padding-top: 0.75rem;
-		margin-top: 0.25rem;
+		margin-top: 1.25rem;
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.nn-add-task {
+		flex: 1;
+		min-width: 0;
 	}
 
 	.nn-add-input {
@@ -357,6 +384,25 @@
 		letter-spacing: 0.03em;
 		padding: 0.3rem 0;
 		transition: color var(--pl-transition-fast);
+	}
+
+	.nn-schedule-btn {
+		flex-shrink: 0;
+		font-family: var(--pl-font-mono);
+		font-size: 0.62rem;
+		letter-spacing: 0.08em;
+		color: var(--p-muted);
+		border: 1px solid var(--p-border);
+		padding: 4px 11px;
+		border-radius: var(--pl-radius-pill);
+		opacity: 0.7;
+		transition: opacity var(--pl-transition-fast), color var(--pl-transition-fast), border-color var(--pl-transition-fast);
+	}
+
+	.nn-schedule-btn:hover {
+		opacity: 1;
+		color: var(--p-accent);
+		border-color: var(--p-accent);
 	}
 
 	.nn-add-input::placeholder {
