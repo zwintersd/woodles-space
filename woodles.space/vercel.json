@@ -17,6 +17,8 @@
     { "source": "/motifs/:path*",   "destination": "/apps/hygge/index.html" },
     { "source": "/scaffold",        "destination": "/write" },
     { "source": "/scaffold/:path*", "destination": "/write" },
+    { "source": "/lab",             "destination": "/apps/lab/index.html" },
+    { "source": "/lab/:path*",      "destination": "/apps/lab/:path*" },
     { "source": "/digits",          "destination": "/apps/digits/index.html" },
     { "source": "/digits/:path*",   "destination": "/apps/digits/:path*" },
     { "source": "/quiet-room",        "destination": "/apps/quiet-room/index.html" },

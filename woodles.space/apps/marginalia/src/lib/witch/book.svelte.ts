@@ -51,7 +51,7 @@ import {
 	stabilityOf
 } from './vitals';
 import { interventionForDomain } from './content/interventions';
-import { load, save, wipe, type BookSave } from './persist';
+import { emptySave, load, save, wipe, type BookSave } from './persist';
 import { getBestiaryCreatures, type BestiaryCreature } from './bestiaryDb';
 
 // observation stages
@@ -704,37 +704,19 @@ export class Book {
 		save(this.toSave());
 	}
 
-	hardReset() {
-		wipe();
-		this.essence = 6;
-		this.knowing = 0;
-		this.insight = 0;
-		this.favor = 60;
-		this.stocks = neutralStocks();
-		this.vitality = {};
-		this.stockBaseline = neutralStocks();
-		this.stabilityBonus = 0;
-		this.metabolismScale = {};
-		this.interventionsDone = {};
-		this.interventionLoad = 0;
-		this.equilibriumSeconds = 0;
-		this.attentionCapacity = ATTENTION_START;
-		this.attending = [];
-		this.study = {};
-		this.writtenConditions = [];
-		this.observation = {};
-		this.journalShown = [];
-		this.worldIndex = 0;
-		this.bookOpen = false;
+	resetIdleProgress() {
+		const preservedBindings = { ...this.spriteBindings };
+		const preservedBestiaryCreatures = this.bestiaryCreatures;
+		this.fromSave({ ...emptySave(), spriteBindings: preservedBindings });
 		this.mode = 'web';
 		this.offlineReport = null;
-		this.readingMsTowardNextPoint = 0;
-		this.readingStarPoints = 0;
-		this.readingCompletedStars = 0;
-		this.readingCumulativeMs = 0;
-		this.readingCumulativeWords = 0;
-		this.spriteBindings = {};
-		this.bestiaryCreatures = [];
+		this.bestiaryCreatures = preservedBestiaryCreatures;
+		this.persist();
+	}
+
+	hardReset() {
+		wipe();
+		this.resetIdleProgress();
 	}
 }
 

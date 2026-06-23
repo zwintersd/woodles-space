@@ -4,13 +4,30 @@ a pnpm workspace, deployed as one Vercel project. for how the code fits
 together, read [ARCHITECTURE.md](./ARCHITECTURE.md). this file is the
 deployment reference.
 
+## docs map
+
+the docs have one owner each:
+
+| doc | owns |
+| --- | --- |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | current repo layout, app inventory, shared systems, tests, checks, local workflow |
+| this README | deployment and Vercel routing notes |
+| [REFACTORING.md](./REFACTORING.md) | living list of duplicated code and consolidation candidates |
+| `apps/*/*.md` | app-specific design briefs, proposals, assets, and known issues |
+| [`../AUDIT.md`](../AUDIT.md) | dated audit snapshot only; not the current source of truth |
+
+when docs disagree, treat `ARCHITECTURE.md` and the code as current. update this
+README only for deployment details.
+
 ## how it ships
 
 the static apps go up as-is — one HTML file each, no build step. the six
 SvelteKit apps (`write`, `marginalia`, `planner`, `bestiary`, `spores`,
 `marginalia-devlog`) build to `apps/<name>/dist/`. `vercel.json` rewrites each
 friendly path to the right file: `/write` → `/apps/write/dist/index.html`,
-`/digits` → `/apps/digits/index.html`, and so on.
+`/lab` → `/apps/lab/index.html`, `/digits` → `/apps/digits/index.html`, and so
+on. `lab` is the homepage-facing shelf for stub experiments; the direct
+experiment paths still exist for links and bookmarks.
 
 the build command is one filter per SvelteKit app, chained:
 
@@ -52,6 +69,7 @@ work it in this order:
 
 `pnpm -r check` and `pnpm -r test` stop at the first app that fails, so a break
 early in the run hides the apps after it. when something fails, run the one app
-directly — `pnpm --filter <name> check` — to see the rest. planner's test and
-check setup has a few sharp edges worth knowing before you touch it; they're in
+directly — `pnpm --filter <name> check` or `pnpm --filter <name> test` — to see
+the rest. planner's test and check setup has a few sharp edges worth knowing
+before you touch it; they're in
 [apps/planner/KNOWN_ISSUES.md](./apps/planner/KNOWN_ISSUES.md).

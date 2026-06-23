@@ -2,6 +2,12 @@
 
 *Read-only audit. No source files were modified. Date: 2026-06-19. Branch: `claude/festive-curie-7w5a9o`.*
 
+> **Status:** historical snapshot. this audit captured the repo on June 19, 2026
+> and is useful context, but it is not the current source of truth. start with
+> [`woodles.space/ARCHITECTURE.md`](./woodles.space/ARCHITECTURE.md) for the
+> current app inventory, test counts, shared systems, and workflow. several
+> findings below have already been fixed or superseded.
+
 > **Top-line context the brief didn't anticipate.** The audit prompt (and the
 > repo's own docs) describe **three** SvelteKit apps (`write`, `marginalia`,
 > `planner`) and **128 tests**. The repository on disk actually contains **six**

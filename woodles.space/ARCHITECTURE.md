@@ -6,6 +6,20 @@ one repo, all the things, kept close. apps reach across `apps/` for each
 other's code when they need to, and the shared design system sits at the same
 depth so nothing is "above" anything else.
 
+## source of truth
+
+this file is the current source of truth for the workspace. keep it in sync when
+the app inventory, shared systems, deployment shape, test/check/build behavior,
+or local workflow changes.
+
+other docs have narrower jobs:
+
+- [README.md](./README.md) is the deployment reference.
+- [REFACTORING.md](./REFACTORING.md) is the living consolidation log.
+- `apps/*/*.md` files own app-specific design briefs, proposals, assets, and
+  known issues.
+- [`../AUDIT.md`](../AUDIT.md) is a dated audit snapshot, not live truth.
+
 ## repo layout
 
 ```
@@ -30,6 +44,7 @@ woodles.space/
 │   └── sync/                @woodles/sync — the sync client
 └── apps/
     ├── landing/             static · the homepage
+    ├── lab/                 static · future shelf for stub experiments
     ├── hygge/               static · design playground (fonts, palette, motifs)
     ├── digits/              static · an SVG pen that writes the time
     ├── quiet-room/          static · an immersive three.js room of light
@@ -63,7 +78,10 @@ Vite alias (`../../shared`). there is no SSR; every app ships as a static bundle
 
 `hygge` is the design playground — it holds the fonts, palette, and motifs
 showcases that used to be separate pages. `/fonts`, `/palette`, and `/motifs` all
-rewrite to it; `/scaffold` rewrites to `/write`.
+rewrite to it; `/scaffold` rewrites to `/write`. `lab` is the home for stub
+experiments that should stay reachable without appearing as separate homepage
+apps; it links out to `/digits` and `/animations`, whose direct routes still
+work for old bookmarks.
 
 ## the sync layer
 
@@ -157,14 +175,19 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-574 tests across five apps — `write` 52, `marginalia` 89, `planner` 276,
-`spores` 46, `bestiary` 111. `marginalia-devlog` has no test script.
+620 tests across five apps — `write` 52, `marginalia` 114, `planner` 283,
+`spores` 46, `bestiary` 125. `marginalia-devlog` has no test script.
 
 each app's `test` runs `svelte-kit sync && vitest run`. the `sync` matters: a
 SvelteKit app's `tsconfig.json` extends `./.svelte-kit/tsconfig.json`, which
 `svelte-kit sync` generates — run `vitest` without it on a fresh clone and it
 can't resolve the tsconfig. because the scripts sync first, `pnpm test` works
 straight from a clean checkout.
+
+`write` and `marginalia` load the workspace-level `vitest.setup.ts` to install a
+browser-like in-memory `localStorage` under Node. planner keeps its own
+localStorage mock in `store.test.ts`; under the current Node runtime that suite
+passes but may still print a `--localstorage-file` warning.
 
 `planner`'s `vitest.config.ts` loads the SvelteKit plugin, and it has to:
 `planner`'s store is a `.svelte.ts` module that uses `$state`, instantiated at
@@ -194,7 +217,7 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               vitest in every SvelteKit app (574 tests)
+pnpm test               vitest in every SvelteKit app with a test script (620 tests)
 pnpm check              svelte-check in every app
 pnpm build              build the six SvelteKit apps
 ```

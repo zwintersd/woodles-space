@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="cream">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>lab · woodles.space</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="/shared/fonts.css" />
+  <link rel="stylesheet" href="/shared/palette.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --lab-ink: #33263e;
+      --lab-panel: rgba(255, 253, 248, 0.82);
+      --lab-line: rgba(83, 62, 112, 0.16);
+      --lab-shadow: 0 22px 60px -40px rgba(44, 31, 58, 0.66);
+      --lab-aqua: #6edfd7;
+      --lab-rose: #ec94b7;
+      --lab-violet: #9f83e6;
+      --lab-gold: #e3b657;
+    }
+
+    html, body { min-height: 100%; }
+
+    body {
+      min-height: 100vh;
+      background:
+        linear-gradient(120deg, rgba(110, 223, 215, 0.16), transparent 32%),
+        linear-gradient(215deg, rgba(236, 148, 183, 0.18), transparent 36%),
+        var(--bg);
+      color: var(--lab-ink);
+      font-family: var(--font-body);
+      font-weight: 300;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(var(--lab-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--lab-line) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent 72%);
+    }
+
+    a { color: inherit; }
+
+    .shell {
+      width: min(1120px, calc(100% - 2rem));
+      margin: 0 auto;
+      padding: clamp(1rem, 3vw, 2.4rem) 0 4rem;
+    }
+
+    .topbar {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .home {
+      text-decoration: none;
+      opacity: 0.76;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .home:hover {
+      opacity: 1;
+      transform: translateX(-2px);
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-align: right;
+    }
+
+    .status::before {
+      content: "";
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 999px;
+      background: var(--lab-aqua);
+      box-shadow: 0 0 0 5px rgba(110, 223, 215, 0.16);
+    }
+
+    header {
+      min-height: clamp(280px, 46vh, 430px);
+      display: grid;
+      align-content: center;
+      gap: 1rem;
+      padding: 1.2rem 0 2.2rem;
+    }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      max-width: 780px;
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 7.2rem;
+      font-weight: 300;
+      line-height: 0.88;
+      color: var(--accent-deep);
+    }
+
+    .lede {
+      max-width: 58ch;
+      font-size: 1.16rem;
+      line-height: 1.6;
+      color: color-mix(in srgb, var(--text) 72%, var(--muted));
+    }
+
+    .bench {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: clamp(1rem, 2.4vw, 1.6rem);
+      align-items: stretch;
+    }
+
+    .experiment {
+      position: relative;
+      display: grid;
+      grid-template-rows: minmax(180px, 0.9fr) auto;
+      min-height: 420px;
+      overflow: hidden;
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      background: var(--lab-panel);
+      text-decoration: none;
+      box-shadow: var(--lab-shadow);
+      isolation: isolate;
+      transition:
+        transform 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+    }
+
+    .experiment:hover {
+      transform: translateY(-4px);
+      border-color: color-mix(in srgb, var(--accent-strong) 44%, var(--rule));
+      box-shadow: 0 26px 70px -38px rgba(44, 31, 58, 0.76);
+    }
+
+    .preview {
+      position: relative;
+      min-height: 210px;
+      overflow: hidden;
+      border-bottom: 1px solid var(--rule);
+      background:
+        radial-gradient(circle at 24% 22%, rgba(110, 223, 215, 0.34), transparent 28%),
+        radial-gradient(circle at 80% 34%, rgba(236, 148, 183, 0.32), transparent 30%),
+        #fffdf8;
+    }
+
+    .digits-preview {
+      display: grid;
+      place-items: center;
+      font-family: var(--font-mono);
+      font-size: 6.4rem;
+      letter-spacing: 0;
+      color: transparent;
+      -webkit-text-stroke: 1.5px var(--accent-deep);
+    }
+
+    .digits-preview::before {
+      content: "01";
+      position: absolute;
+      color: var(--accent-deep);
+      clip-path: inset(0 100% 0 0);
+      animation: write 3.6s ease-in-out infinite;
+    }
+
+    .digits-preview::after {
+      content: "";
+      position: absolute;
+      width: min(44%, 160px);
+      height: 2px;
+      left: 30%;
+      bottom: 28%;
+      background: var(--lab-gold);
+      transform-origin: left center;
+      animation: underline 3.6s ease-in-out infinite;
+    }
+
+    .animation-preview {
+      display: grid;
+      place-items: center;
+    }
+
+    .stage {
+      position: relative;
+      width: min(64%, 260px);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      border: 1px solid rgba(83, 62, 112, 0.18);
+      background:
+        conic-gradient(from 20deg, var(--lab-violet), var(--lab-aqua), var(--lab-rose), var(--lab-violet));
+      animation: spin 10s linear infinite;
+    }
+
+    .stage::before,
+    .stage::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      background: #fffdf8;
+    }
+
+    .stage::before {
+      inset: 16%;
+      border: 1px solid rgba(83, 62, 112, 0.12);
+    }
+
+    .stage::after {
+      width: 17%;
+      aspect-ratio: 1;
+      top: 10%;
+      left: 50%;
+      transform: translateX(-50%);
+      box-shadow: 0 0 22px rgba(255, 253, 248, 0.92);
+    }
+
+    .copy {
+      display: grid;
+      gap: 0.8rem;
+      padding: clamp(1rem, 3vw, 1.45rem);
+    }
+
+    .label {
+      width: fit-content;
+      border: 1px solid var(--rule);
+      border-radius: 999px;
+      padding: 0.3rem 0.58rem;
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      color: var(--muted);
+      background: rgba(255, 253, 248, 0.74);
+    }
+
+    h2 {
+      font-family: var(--font-display);
+      font-size: 2.3rem;
+      font-style: italic;
+      font-weight: 300;
+      line-height: 1;
+      color: var(--accent-deep);
+    }
+
+    .copy p {
+      max-width: 42ch;
+      font-size: 0.96rem;
+      line-height: 1.62;
+      color: color-mix(in srgb, var(--text) 70%, var(--muted));
+    }
+
+    .launch {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.46rem;
+      width: fit-content;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--accent-strong);
+    }
+
+    .launch::after {
+      content: "->";
+      transition: transform 0.18s ease;
+    }
+
+    .experiment:hover .launch::after { transform: translateX(4px); }
+
+    @keyframes write {
+      0%, 14% { clip-path: inset(0 100% 0 0); }
+      44%, 72% { clip-path: inset(0 0 0 0); }
+      100% { clip-path: inset(0 100% 0 0); }
+    }
+
+    @keyframes underline {
+      0%, 18% { transform: scaleX(0); opacity: 0.2; }
+      46%, 76% { transform: scaleX(1); opacity: 1; }
+      100% { transform: scaleX(0); opacity: 0.2; }
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .shell { width: min(100% - 1rem, 1120px); padding-bottom: 2rem; }
+      .topbar { font-size: 0.68rem; }
+      h1 { font-size: 4rem; }
+      .lede { font-size: 1rem; }
+      .bench { grid-template-columns: 1fr; }
+      .experiment { min-height: 360px; }
+      .preview { min-height: 180px; }
+      .digits-preview { font-size: 4.6rem; }
+      h2 { font-size: 1.9rem; }
+    }
+
+    @media (max-width: 420px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.55rem;
+      }
+      .status { text-align: left; }
+      h1 { font-size: 3.2rem; }
+      .digits-preview { font-size: 3.8rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <nav class="topbar" aria-label="Lab navigation">
+      <a class="home" href="/">back to woodles.space</a>
+      <span class="status">future shelf</span>
+    </nav>
+
+    <header>
+      <p class="eyebrow">woodles lab</p>
+      <h1>small experiments, held for later.</h1>
+      <p class="lede">unfinished little machines live here while they wait for a bigger reason to exist.</p>
+    </header>
+
+    <section class="bench" aria-label="Lab experiments">
+      <a class="experiment" href="/digits">
+        <div class="preview digits-preview" aria-hidden="true">01</div>
+        <div class="copy">
+          <span class="label">static sketch</span>
+          <h2>Digits</h2>
+          <p>Numbers rendered stroke by stroke, like a pen practicing time on lined paper.</p>
+          <span class="launch">open digits</span>
+        </div>
+      </a>
+
+      <a class="experiment" href="/animations">
+        <div class="preview animation-preview" aria-hidden="true">
+          <div class="stage"></div>
+        </div>
+        <div class="copy">
+          <span class="label">manim playspace</span>
+          <h2>Animations</h2>
+          <p>Rendered scenes and mathematical motion studies, gathered before they become a full app.</p>
+          <span class="launch">open animations</span>
+        </div>
+      </a>
+    </section>
+  </main>
+</body>
+</html>
