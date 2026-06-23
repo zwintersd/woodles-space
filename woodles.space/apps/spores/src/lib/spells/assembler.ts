@@ -91,7 +91,80 @@ function collectModifierInjections(
 	return { fields, rules };
 }
 
+// ── graph spell (anime relationship graph) ─────────────────────────
+
+function buildGraphSpell(draft: SpellDraft, category: Category): string {
+	const { rules: modifierRules } = collectModifierInjections(draft, category);
+	const includeVoiceActor = draft.modifiers.includes('voice-actors');
+
+	const subjectLine = draft.disambiguation
+		? `Subject: ${draft.subject} (${draft.disambiguation})`
+		: `Subject: ${draft.subject}`;
+
+	const nodeSkeleton: Record<string, unknown> = {
+		id: 'snake_case_character_id',
+		name: 'Character Full Name',
+		type: 'character',
+		role: 'protagonist | antagonist | deuteragonist | supporting | minor',
+		faction: 'Primary group or affiliation',
+		description: '1–2 sentence character summary'
+	};
+	if (includeVoiceActor) {
+		nodeSkeleton.voiceActor = 'Japanese VA (JA) / English VA (EN)';
+	}
+
+	const skeleton: Record<string, unknown> = {
+		woodles: 'garden-import-v1',
+		kind: 'anime-relationship-graph',
+		title: draft.subject
+	};
+	if (selectedAt(draft, 'root', 'description')) skeleton.description = '(series premise and genre)';
+	if (selectedAt(draft, 'root', 'studio')) skeleton.studio = '(animation studio)';
+	if (selectedAt(draft, 'root', 'year')) skeleton.year = 'YYYY';
+
+	skeleton.nodes = [nodeSkeleton];
+	skeleton.edges = [
+		{
+			from: 'id_of_source_character',
+			to: 'id_of_target_character',
+			type: 'bond | friendship | rivalry | romance | family | ally | enemy | mentor',
+			label: 'brief relationship description'
+		}
+	];
+
+	const skeletonJson = JSON.stringify(skeleton, null, 2);
+
+	const baseRules = [
+		'Return ONLY the JSON object above. No preamble, no markdown fences, no commentary.',
+		'Include all major characters — aim for 10–20 nodes covering the main and supporting cast.',
+		'Node "id" must be unique snake_case strings (e.g., "eren_yeager"). Never reuse an id.',
+		'"type" must be exactly "character" for all nodes.',
+		'Include all meaningful relationships — aim for 15–30 edges between major characters.',
+		'Every "from" and "to" value must exactly match an existing node id.',
+		'Use "unknown" for any uncertain fields rather than fabricating.',
+		'"faction" should reflect the character\'s primary group, organisation, or allegiance.'
+	];
+
+	const allRules = [...baseRules, ...modifierRules];
+	const rulesText = allRules.map((r, i) => `${i + 1}. ${r}`).join('\n');
+
+	return [
+		`You are a careful research assistant. ${subjectLine}.`,
+		'',
+		'Return ONLY valid JSON in this exact shape — expand nodes[] and edges[] to include the full cast and their relationships:',
+		'',
+		skeletonJson,
+		'',
+		'RULES:',
+		rulesText
+	].join('\n');
+}
+
 export function buildSpell(draft: SpellDraft, category: Category): string {
+	if (category.rootKind === 'anime-relationship-graph') {
+		return buildGraphSpell(draft, category);
+	}
+
 	const { fields: injectedFields, rules: modifierRules } = collectModifierInjections(
 		draft,
 		category
