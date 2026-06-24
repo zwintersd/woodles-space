@@ -10,6 +10,25 @@
 
 	type Board = number[][];
 	type Dir = 'left' | 'right' | 'up' | 'down';
+	type Mode = 'endless' | 'turn-100';
+	type CoreStat = 'body' | 'mind' | 'grace' | 'heart' | 'will' | 'spark';
+	type PowerUpId = 'delete' | 'double' | 'undo';
+	type TargetPowerUpId = Exclude<PowerUpId, 'undo'>;
+	type PowerUps = Record<PowerUpId, number>;
+
+	interface TurnSnapshot {
+		board: Board;
+		score: number;
+		won: boolean;
+		over: boolean;
+		keepPlaying: boolean;
+		turns: number;
+		overReason: OverReason;
+	}
+
+	type OverReason = 'moves' | 'turns' | null;
+
+	const BASE_TURN_LIMIT = 100;
 
 	// ── board helpers ────────────────────────────────────────────────────
 	function emptyBoard(): Board {
@@ -26,9 +45,34 @@
 		b[r][c] = value ?? (Math.random() < 0.9 ? 2 : 4);
 	}
 
+	function statValue(stat: CoreStat): number {
+		return creature?.stats?.[stat] ?? 0;
+	}
+
+	function statTier(value: number): number {
+		if (value >= 9) return 3;
+		if (value >= 7) return 2;
+		if (value >= 5) return 1;
+		return 0;
+	}
+
+	function openingTileValue(): number | undefined {
+		const tier = statTier(statValue('body'));
+		return tier > 0 ? 2 ** (3 + tier) : undefined;
+	}
+
+	function freshPowerUps(): PowerUps {
+		return {
+			delete: statTier(statValue('grace')),
+			double: statTier(statValue('heart')),
+			undo: statTier(statValue('mind'))
+		};
+	}
+
 	function freshBoard(): Board {
 		const b = emptyBoard();
-		if ((creature?.stats?.body ?? 0) >= 5) addTile(b, 16);
+		const openingTile = openingTileValue();
+		if (openingTile) addTile(b, openingTile);
 		addTile(b);
 		addTile(b);
 		return b;
@@ -99,6 +143,10 @@
 		return false;
 	}
 
+	function cloneBoard(b: Board): Board {
+		return b.map((row) => [...row]);
+	}
+
 	// ── state ─────────────────────────────────────────────────────────────
 	let board = $state<Board>(freshBoard());
 	let score = $state(0);
@@ -106,17 +154,83 @@
 	let won = $state(false);
 	let over = $state(false);
 	let keepPlaying = $state(false);
+	let overReason = $state<OverReason>(null);
+	let mode = $state<Mode>('endless');
+	let turns = $state(0);
+	let powerUps = $state<PowerUps>(freshPowerUps());
+	let sparkReserve = $state(statTier(statValue('spark')));
+	let activePower = $state<TargetPowerUpId | null>(null);
+	let undoStack = $state<TurnSnapshot[]>([]);
+
+	const turnLimit = $derived(
+		mode === 'turn-100' ? BASE_TURN_LIMIT + statTier(statValue('will')) * 10 : null
+	);
+	const turnDisplay = $derived(turnLimit === null ? `${turns}` : `${turns}/${turnLimit}`);
+	const turnsLeft = $derived(turnLimit === null ? null : Math.max(turnLimit - turns, 0));
+	const canPlay = $derived(!over && !(won && !keepPlaying));
+	const statPerks = $derived([
+		{
+			stat: 'body',
+			value: statValue('body'),
+			effect: openingTileValue() ? `opens with ${openingTileValue()}` : 'no opening tile'
+		},
+		{
+			stat: 'mind',
+			value: statValue('mind'),
+			effect: `${statTier(statValue('mind'))} undo`
+		},
+		{
+			stat: 'grace',
+			value: statValue('grace'),
+			effect: `${statTier(statValue('grace'))} delete`
+		},
+		{
+			stat: 'heart',
+			value: statValue('heart'),
+			effect: `${statTier(statValue('heart'))} double`
+		},
+		{
+			stat: 'will',
+			value: statValue('will'),
+			effect: `+${statTier(statValue('will')) * 10} turns`
+		},
+		{
+			stat: 'spark',
+			value: statValue('spark'),
+			effect: `${statTier(statValue('spark'))} wild`
+		}
+	]);
+
+	function snapshotTurn(): TurnSnapshot {
+		return {
+			board: cloneBoard(board),
+			score,
+			won,
+			over,
+			keepPlaying,
+			turns,
+			overReason
+		};
+	}
 
 	function move(dir: Dir) {
-		if (over || (won && !keepPlaying)) return;
+		if (!canPlay) return;
 		const { board: nb, score: gained, moved } = applyMove(board, dir);
 		if (!moved) return;
+		undoStack = [...undoStack, snapshotTurn()].slice(-20);
 		score += gained;
 		if (score > best) best = score;
 		addTile(nb);
 		board = nb;
+		turns += 1;
 		if (!won && nb.some((row) => row.includes(2048))) won = true;
-		if (!hasMovesLeft(nb)) over = true;
+		if (turnLimit !== null && turns >= turnLimit) {
+			over = true;
+			overReason = 'turns';
+		} else if (!hasMovesLeft(nb)) {
+			over = true;
+			overReason = 'moves';
+		}
 	}
 
 	function reset() {
@@ -125,6 +239,78 @@
 		won = false;
 		over = false;
 		keepPlaying = false;
+		overReason = null;
+		turns = 0;
+		powerUps = freshPowerUps();
+		sparkReserve = statTier(statValue('spark'));
+		activePower = null;
+		undoStack = [];
+	}
+
+	function setMode(next: Mode) {
+		if (mode === next) return;
+		mode = next;
+		reset();
+	}
+
+	function powerCount(id: PowerUpId): number {
+		return powerUps[id] + sparkReserve;
+	}
+
+	function consumePowerUp(id: PowerUpId): boolean {
+		if (powerUps[id] > 0) {
+			powerUps = { ...powerUps, [id]: powerUps[id] - 1 };
+			return true;
+		}
+		if (sparkReserve > 0) {
+			sparkReserve -= 1;
+			return true;
+		}
+		return false;
+	}
+
+	function chooseTargetPower(id: TargetPowerUpId) {
+		if (!canPlay || powerCount(id) <= 0) return;
+		activePower = activePower === id ? null : id;
+	}
+
+	function useTargetPower(r: number, c: number) {
+		if (!activePower || !canPlay || board[r][c] === 0 || !consumePowerUp(activePower)) return;
+
+		const nb = cloneBoard(board);
+		if (activePower === 'delete') {
+			nb[r][c] = 0;
+		} else {
+			nb[r][c] *= 2;
+			if (!won && nb[r][c] >= 2048) won = true;
+		}
+		board = nb;
+		activePower = null;
+		if (!hasMovesLeft(nb)) {
+			over = true;
+			overReason = 'moves';
+		}
+	}
+
+	function undoTurn() {
+		if (undoStack.length === 0 || !consumePowerUp('undo')) return;
+		const last = undoStack[undoStack.length - 1];
+		undoStack = undoStack.slice(0, -1);
+		board = cloneBoard(last.board);
+		score = last.score;
+		won = last.won;
+		over = last.over;
+		keepPlaying = last.keepPlaying;
+		turns = last.turns;
+		overReason = last.overReason;
+		activePower = null;
+	}
+
+	function onCellKey(e: KeyboardEvent, r: number, c: number) {
+		if ((e.key === 'Enter' || e.key === ' ') && activePower) {
+			e.preventDefault();
+			useTargetPower(r, c);
+		}
 	}
 
 	// ── keyboard ──────────────────────────────────────────────────────────
@@ -204,12 +390,68 @@
 				<span class="score-label">best</span>
 				<span class="score-val">{best}</span>
 			</div>
+			<div class="score-box">
+				<span class="score-label">turns</span>
+				<span class="score-val">{turnDisplay}</span>
+			</div>
 		</div>
 		<div class="btn-group">
 			<button class="ctrl-btn" onclick={reset}>new game</button>
 			<button class="ctrl-btn back" onclick={onclose}>← arcade</button>
 		</div>
 	</div>
+
+	<div class="mode-row" aria-label="2048 mode">
+		<button class:active={mode === 'endless'} onclick={() => setMode('endless')}>endless</button>
+		<button class:active={mode === 'turn-100'} onclick={() => setMode('turn-100')}>100 turn</button>
+	</div>
+
+	<section class="power-panel" aria-label="pet power-ups">
+		<div class="power-head">
+			<span>pet powers</span>
+			<span>spark wild: {sparkReserve}</span>
+		</div>
+		<div class="power-grid">
+			<button
+				class:armed={activePower === 'delete'}
+				disabled={!canPlay || powerCount('delete') <= 0}
+				onclick={() => chooseTargetPower('delete')}
+			>
+				<span>delete tile</span>
+				<strong>{powerUps.delete}</strong>
+			</button>
+			<button
+				class:armed={activePower === 'double'}
+				disabled={!canPlay || powerCount('double') <= 0}
+				onclick={() => chooseTargetPower('double')}
+			>
+				<span>double tile</span>
+				<strong>{powerUps.double}</strong>
+			</button>
+			<button
+				disabled={undoStack.length === 0 || powerCount('undo') <= 0}
+				onclick={undoTurn}
+			>
+				<span>undo turn</span>
+				<strong>{powerUps.undo}</strong>
+			</button>
+		</div>
+		{#if activePower}
+			<p class="target-note">choose a numbered tile to {activePower}</p>
+		{:else if mode === 'turn-100' && turnsLeft !== null}
+			<p class="target-note">{turnsLeft} turns remaining</p>
+		{:else}
+			<p class="target-note">pet stats shape the opening, powers, and turn budget</p>
+		{/if}
+		<div class="perk-grid" aria-label="active pet stat bonuses">
+			{#each statPerks as perk (perk.stat)}
+				<span class:lit={perk.value >= 5}>
+					<b>{perk.stat}</b>
+					{perk.value}: {perk.effect}
+				</span>
+			{/each}
+		</div>
+	</section>
 
 	<!-- board -->
 	<div
@@ -222,7 +464,17 @@
 		<div class="board">
 			{#each board as row, r (r)}
 				{#each row as val, c (c)}
-					<div class="cell" class:empty={val === 0} style={tileStyle(val)}>
+					<div
+						class="cell"
+						class:empty={val === 0}
+						class:targetable={activePower !== null && val !== 0}
+						style={tileStyle(val)}
+						role="button"
+						aria-disabled={activePower === null || val === 0}
+						tabindex={activePower && val !== 0 ? 0 : undefined}
+						onclick={() => useTargetPower(r, c)}
+						onkeydown={(event) => onCellKey(event, r, c)}
+					>
 						{#if val !== 0}{val}{/if}
 					</div>
 				{/each}
@@ -242,8 +494,12 @@
 		{/if}
 		{#if over}
 			<div class="overlay lose">
-				<p class="overlay-title">game over</p>
-				<p class="overlay-sub">no moves left. final score: {score}</p>
+				<p class="overlay-title">{overReason === 'turns' ? 'turns spent' : 'game over'}</p>
+				<p class="overlay-sub">
+					{overReason === 'turns'
+						? `turn limit reached. final score: ${score}`
+						: `no moves left. final score: ${score}`}
+				</p>
 				<button onclick={reset}>try again</button>
 			</div>
 		{/if}
@@ -294,6 +550,8 @@
 	.score-group {
 		display: flex;
 		gap: 0.4rem;
+		flex-wrap: wrap;
+		justify-content: flex-end;
 	}
 	.score-box {
 		background: var(--sol-base2);
@@ -347,6 +605,135 @@
 		color: var(--sol-base3);
 	}
 
+	.mode-row {
+		width: min(360px, calc(100vw - 3rem));
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 1px;
+		overflow: hidden;
+		border: 1px solid var(--sol-base2);
+		border-radius: 4px;
+		background: var(--sol-base2);
+	}
+	.mode-row button {
+		font-family: var(--font-ui);
+		font-size: 0.66rem;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--sol-base0);
+		background: var(--sol-base3);
+		padding: 0.45rem 0.5rem;
+		transition:
+			background 0.1s,
+			color 0.1s;
+	}
+	.mode-row button.active {
+		color: var(--sol-base3);
+		background: var(--sol-blue);
+	}
+
+	/* ── powers ─────────────────────────────────────────────────────────── */
+	.power-panel {
+		width: min(360px, calc(100vw - 3rem));
+		border: 1px solid var(--sol-base2);
+		border-radius: 5px;
+		background: rgba(238, 232, 213, 0.46);
+		padding: 0.65rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.55rem;
+	}
+	.power-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.6rem;
+		font-family: var(--font-ui);
+		font-size: 0.58rem;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+		color: var(--sol-base1);
+	}
+	.power-grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0.35rem;
+	}
+	.power-grid button {
+		min-height: 3.3rem;
+		border: 1px solid var(--sol-base2);
+		border-radius: 4px;
+		background: var(--sol-base3);
+		color: var(--sol-base0);
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.16rem;
+		padding: 0.35rem 0.3rem;
+		transition:
+			background 0.1s,
+			border-color 0.1s,
+			color 0.1s;
+	}
+	.power-grid button:not(:disabled):hover,
+	.power-grid button.armed {
+		color: var(--sol-base3);
+		background: var(--sol-cyan);
+		border-color: var(--sol-cyan);
+	}
+	.power-grid button:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+	.power-grid span {
+		font-family: var(--font-ui);
+		font-size: 0.58rem;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		text-align: center;
+		line-height: 1.2;
+	}
+	.power-grid strong {
+		font-family: var(--font-counter);
+		font-size: 1.1rem;
+		line-height: 1;
+	}
+	.target-note {
+		font-family: var(--font-body);
+		font-style: italic;
+		font-size: 0.74rem;
+		text-align: center;
+		color: var(--sol-base0);
+		margin: -0.05rem 0 0;
+	}
+	.perk-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.3rem;
+	}
+	.perk-grid span {
+		border: 1px solid var(--sol-base2);
+		border-radius: 3px;
+		background: rgba(253, 246, 227, 0.7);
+		color: var(--sol-base1);
+		font-family: var(--font-ui);
+		font-size: 0.58rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		line-height: 1.25;
+		padding: 0.28rem 0.35rem;
+	}
+	.perk-grid span.lit {
+		color: var(--sol-base00);
+		border-color: rgba(42, 161, 152, 0.5);
+		background: rgba(42, 161, 152, 0.1);
+	}
+	.perk-grid b {
+		color: var(--sol-base01);
+		font-weight: 700;
+	}
+
 	/* ── board ──────────────────────────────────────────────────────────── */
 	.board-wrap {
 		position: relative;
@@ -368,17 +755,30 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		border: 0;
 		font-family: var(--font-counter);
 		font-weight: 700;
 		line-height: 1;
 		letter-spacing: 0.02em;
 		transition:
 			background 0.08s,
-			color 0.08s;
+			color 0.08s,
+			outline-color 0.08s,
+			transform 0.08s;
 	}
 	.cell.empty {
 		background: rgba(255, 255, 255, 0.06);
 		box-shadow: none;
+	}
+	.cell.targetable {
+		cursor: crosshair;
+		outline: 2px solid rgba(253, 246, 227, 0.68);
+		outline-offset: -5px;
+	}
+	.cell.targetable:hover,
+	.cell.targetable:focus-visible {
+		transform: scale(0.96);
+		outline-color: var(--sol-cyan);
 	}
 
 	/* ── overlays ───────────────────────────────────────────────────────── */
@@ -434,5 +834,22 @@
 	}
 	.overlay button:hover {
 		background: rgba(253, 246, 227, 0.38);
+	}
+
+	@media (max-width: 420px) {
+		.game-bar {
+			justify-content: center;
+		}
+		.game-id,
+		.btn-group {
+			align-items: center;
+		}
+		.score-group {
+			justify-content: center;
+		}
+		.power-grid span,
+		.perk-grid span {
+			font-size: 0.52rem;
+		}
 	}
 </style>
