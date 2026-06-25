@@ -1,6 +1,7 @@
 <script lang="ts">
 	import InsightRush from './InsightRush.svelte';
 	import TwoZeroFourEight from './TwoZeroFourEight.svelte';
+	import TypeWitch from './TypeWitch.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
 
 	type GameStatus = 'play' | 'soon' | 'locked';
@@ -40,7 +41,7 @@
 			title: 'Type Witch',
 			tagline: 'Race against the clock to transcribe Brianna\'s conditions before they dissolve.',
 			tags: ['typing', 'timed'],
-			status: 'soon'
+			status: 'play'
 		},
 		{
 			id: 'condition-match',
@@ -139,6 +140,8 @@
 				<TwoZeroFourEight onclose={closeGame} creature={activePet} />
 			{:else if activeGame === 'insight-rush'}
 				<InsightRush onclose={closeGame} />
+			{:else if activeGame === 'type-witch'}
+				<TypeWitch onclose={closeGame} />
 			{/if}
 		</section>
 	{:else}
