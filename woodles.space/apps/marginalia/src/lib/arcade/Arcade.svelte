@@ -1,5 +1,6 @@
 <script lang="ts">
 	import InsightRush from './InsightRush.svelte';
+	import Inkblot from './Inkblot.svelte';
 	import TwoZeroFourEight from './TwoZeroFourEight.svelte';
 	import TypeWitch from './TypeWitch.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
@@ -18,15 +19,24 @@
 
 	interface Props {
 		activePet?: BestiaryCreature | null;
+		bestiaryCreatures?: BestiaryCreature[];
 		onactivechange?: (gameId: string | null) => void;
 	}
 
-	let { activePet = null, onactivechange }: Props = $props();
+	let { activePet = null, bestiaryCreatures = [], onactivechange }: Props = $props();
 
 	let activeGame = $state<string | null>(null);
 	let rootEl: HTMLDivElement;
 
 	const games: MiniGame[] = [
+		{
+			id: 'inkblot',
+			icon: '⬤',
+			title: 'Inkblot',
+			tagline: 'An image blooms slowly from ink. Press space to pause and name the creature before it fully resolves.',
+			tags: ['recognition', 'observation'],
+			status: 'play'
+		},
 		{
 			id: 'stack-2048',
 			icon: '▦',
@@ -136,7 +146,9 @@
 				</div>
 			</header>
 
-			{#if activeGame === 'stack-2048'}
+			{#if activeGame === 'inkblot'}
+				<Inkblot onclose={closeGame} creatures={bestiaryCreatures} />
+			{:else if activeGame === 'stack-2048'}
 				<TwoZeroFourEight onclose={closeGame} creature={activePet} />
 			{:else if activeGame === 'insight-rush'}
 				<InsightRush onclose={closeGame} />
