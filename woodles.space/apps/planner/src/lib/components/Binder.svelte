@@ -705,4 +705,31 @@
 	.sync-btn-ghost:hover {
 		opacity: 0.9;
 	}
+
+	@media (max-width: 620px) {
+		.binder-tabs {
+			top: auto;
+			right: 0.75rem;
+			bottom: 4.15rem;
+			transform: none;
+			flex-direction: row;
+			max-width: calc(100vw - 5.4rem);
+			overflow-x: auto;
+			border: 1px solid var(--p-border);
+			border-radius: var(--pl-radius-md);
+			padding: 4px;
+		}
+
+		.binder-tab {
+			width: 32px;
+			height: 32px;
+			margin: 0;
+			flex: 0 0 auto;
+		}
+
+		.binder-panel {
+			right: 0;
+			width: min(320px, calc(100vw - 1rem));
+		}
+	}
 </style>

@@ -101,7 +101,7 @@
 									class:past
 									class:day-off={off}
 									class:has-tasks={count > 0}
-									title={count > 0 ? `${day.getDate()} · ${count} task${count !== 1 ? 's' : ''}` : undefined}
+									title={count > 0 ? `${day.getDate()} · ${count} item${count !== 1 ? 's' : ''}` : undefined}
 									onclick={() => store.openDayPanel(dateKey(day))}
 								>
 									{day.getDate()}

@@ -131,7 +131,7 @@
 		<div class="ted-handle"></div>
 
 		<div class="ted-header">
-			<span class="ted-eyebrow">{composing ? 'new task' : 'task'}</span>
+			<span class="ted-eyebrow">{composing ? 'new thing' : 'thing'}</span>
 			<button class="ted-close" onclick={commitAndClose}>
 				{composing ? 'add' : 'save'}
 			</button>
@@ -142,7 +142,7 @@
 				bind:this={titleInput}
 				bind:value={localTitle}
 				class="ted-title-input"
-				placeholder="task title"
+				placeholder="what is it?"
 				autocomplete="off"
 				spellcheck="false"
 			/>
@@ -211,7 +211,7 @@
 
 		{#if composing}
 			<div class="ted-actions ted-actions-compose">
-				<span class="ted-hint">pick a day and a block, or leave it for the tray.</span>
+				<span class="ted-hint">pick a day and a block, or leave it in the tray.</span>
 			</div>
 		{:else}
 			<div class="ted-actions">

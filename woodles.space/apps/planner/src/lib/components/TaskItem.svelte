@@ -39,7 +39,7 @@
 	<button
 		class="task-check"
 		onclick={toggleComplete}
-		aria-label={task.status === 'done' ? 'reopen task' : 'complete task'}
+		aria-label={task.status === 'done' ? 'reopen item' : 'complete item'}
 	>
 		{#if task.status === 'done'}
 			<span class="check-mark">✓</span>
@@ -60,7 +60,7 @@
 		{#if confirmDrop}
 			<button class="task-drop-confirm" onclick={confirmDropTask} onblur={cancelDrop}>drop?</button>
 		{:else}
-			<button class="task-drop" onclick={startDrop} title="drop task" aria-label="drop task">×</button>
+			<button class="task-drop" onclick={startDrop} title="drop item" aria-label="drop item">×</button>
 		{/if}
 	{/if}
 </div>
