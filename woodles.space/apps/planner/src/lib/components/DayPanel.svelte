@@ -107,7 +107,7 @@
 				bind:this={addInput}
 				bind:value={addTitle}
 				class="dp-add-input"
-				placeholder="add a task…"
+				placeholder="add something…"
 				autocomplete="off"
 				spellcheck="false"
 			/>

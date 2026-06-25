@@ -32,10 +32,21 @@ class OnboardingStore {
 		this.stage = 'welcome';
 	}
 
+	quickStart(): void {
+		this.ensureStarterWeek();
+		store.updateSettings({ onboardingComplete: true });
+		this.stage = 'welcome';
+	}
+
 	// Called by the welcome screen — installs the four starter shapes
 	// (if the user has none yet) so by the time step 5 lands there are
 	// cards to assign.
 	beginFlow(): void {
+		this.ensureStarterWeek();
+		this.stage = 1;
+	}
+
+	private ensureStarterWeek(): void {
 		if (store.dayShapes.length === 0) {
 			store.setDayShapes(STARTER_SHAPES_V2);
 		} else {
@@ -60,7 +71,6 @@ class OnboardingStore {
 		};
 		// Always overwrite during onboarding — the user's about to set this in step 5.
 		store.setWeekPattern(defaultPattern);
-		this.stage = 1;
 	}
 
 	private nextOf(s: WizardStage): WizardStage {

@@ -41,7 +41,7 @@
 		border: 1px solid var(--p-border);
 		border-bottom: none;
 		border-radius: var(--pl-radius-md) var(--pl-radius-md) 0 0;
-		padding: 6px 10px 8px;
+		padding: 7px 11px 9px;
 		box-shadow: 0 -2px 16px var(--p-accent-soft);
 		transition: var(--pl-transition-palette);
 	}
@@ -57,7 +57,7 @@
 		letter-spacing: 0.1em;
 		text-transform: lowercase;
 		color: var(--p-muted);
-		opacity: 0.55;
+		opacity: 0.72;
 		transition: opacity var(--pl-transition-fast), background var(--pl-transition-fast), color var(--pl-transition-fast);
 	}
 
@@ -68,7 +68,7 @@
 
 	.dock-btn.active {
 		opacity: 1;
-		color: var(--p-accent);
+		color: var(--p-text);
 		background: var(--p-accent-soft);
 	}
 

@@ -98,7 +98,7 @@
 									bind:this={addInputEl}
 									bind:value={newTitle}
 									class="tb-add-input"
-									placeholder="task title…"
+									placeholder="what goes here?"
 									autocomplete="off"
 									spellcheck="false"
 									onkeydown={handleAddKeydown}
@@ -109,9 +109,9 @@
 							<button
 								class="tb-add-btn"
 								onclick={() => startAdd(block.id)}
-								title="add task to {block.title}"
+								title="add something to {block.title}"
 							>
-								+ task
+								+ add
 							</button>
 						{/if}
 					{/if}
@@ -307,19 +307,21 @@
 		font-size: 0.65rem;
 		letter-spacing: 0.1em;
 		color: var(--p-muted);
-		opacity: 0;
-		padding: 2px 0;
-		transition: opacity var(--pl-transition-fast), color var(--pl-transition-fast);
+		opacity: 0.62;
+		padding: 3px 0;
+		transition: opacity var(--pl-transition-fast), color var(--pl-transition-fast), transform var(--pl-transition-fast);
 	}
 
 	.tb-block:hover .tb-add-btn,
 	.tb-block.current .tb-add-btn {
-		opacity: 0.5;
+		opacity: 0.86;
 	}
 
-	.tb-block:hover .tb-add-btn:hover {
+	.tb-block:hover .tb-add-btn:hover,
+	.tb-add-btn:focus-visible {
 		opacity: 1;
 		color: var(--p-accent);
+		transform: translateX(2px);
 	}
 
 	.tb-add-form {

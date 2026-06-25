@@ -19,6 +19,11 @@
 	let currentTasks = $derived(
 		currentBlock ? store.getTasksForBlock(currentBlock.id, dateKey(store.now)) : []
 	);
+	let todayKey = $derived(dateKey(store.now));
+	let todayTasks = $derived(store.getTasksForDay(todayKey));
+	let openTodayCount = $derived(todayTasks.filter((task) => task.status === 'open').length);
+	let doneTodayCount = $derived(todayTasks.filter((task) => task.status === 'done').length);
+	let trayCount = $derived(store.getUnscheduledTasks().filter((task) => task.status === 'open').length);
 
 	let leadTime = $derived(
 		untilNext !== null &&
@@ -148,7 +153,7 @@
 					bind:this={inputEl}
 					bind:value={newTaskTitle}
 					class="nn-add-input"
-					placeholder={currentBlock ? '+ add task' : '+ capture a task'}
+					placeholder={currentBlock ? '+ add something' : '+ capture something'}
 					autocomplete="off"
 					spellcheck="false"
 					onkeydown={handleInputKeydown}
@@ -158,6 +163,24 @@
 				schedule for later…
 			</button>
 		</div>
+	</section>
+
+	<section class="nn-day-strip" aria-label="today summary">
+		<div class="nn-strip-item">
+			<span class="nn-strip-value">{openTodayCount}</span>
+			<span class="nn-strip-label">open today</span>
+		</div>
+		<div class="nn-strip-item">
+			<span class="nn-strip-value">{doneTodayCount}</span>
+			<span class="nn-strip-label">done</span>
+		</div>
+		<button class="nn-strip-item nn-strip-button" onclick={() => store.setView('today')}>
+			<span class="nn-strip-value">{trayCount}</span>
+			<span class="nn-strip-label">tray</span>
+		</button>
+		<button class="nn-strip-action" onclick={() => store.setView('today')}>
+			open today
+		</button>
 	</section>
 
 	<!-- Next block card -->
@@ -431,6 +454,67 @@
 		opacity: 1;
 	}
 
+	.nn-day-strip {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+		align-items: stretch;
+		gap: 0.5rem;
+		margin: -0.15rem 0 1rem;
+	}
+
+	.nn-strip-item,
+	.nn-strip-action {
+		border: 1px solid var(--p-border);
+		border-radius: var(--pl-radius-md);
+		background: color-mix(in srgb, var(--p-surface) 72%, transparent);
+	}
+
+	.nn-strip-item {
+		min-height: 3.1rem;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		gap: 0.1rem;
+		padding: 0.45rem 0.7rem;
+		text-align: left;
+	}
+
+	.nn-strip-button,
+	.nn-strip-action {
+		transition: border-color var(--pl-transition-fast), color var(--pl-transition-fast), background var(--pl-transition-fast);
+	}
+
+	.nn-strip-button:hover,
+	.nn-strip-action:hover {
+		border-color: var(--p-accent);
+		background: var(--p-accent-soft);
+	}
+
+	.nn-strip-value {
+		font-family: var(--pl-font-display);
+		font-size: 1.25rem;
+		line-height: 1;
+		color: var(--p-text);
+	}
+
+	.nn-strip-label {
+		font-family: var(--pl-font-mono);
+		font-size: 0.56rem;
+		letter-spacing: 0.1em;
+		text-transform: lowercase;
+		color: var(--p-muted);
+		white-space: nowrap;
+	}
+
+	.nn-strip-action {
+		font-family: var(--pl-font-mono);
+		font-size: 0.62rem;
+		letter-spacing: 0.12em;
+		color: var(--p-muted);
+		padding: 0 1rem;
+		white-space: nowrap;
+	}
+
 	.nn-next-body {
 		display: flex;
 		align-items: baseline;
@@ -534,4 +618,31 @@
 	}
 
 	.nn-flourish-text { font-style: italic; }
+
+	@media (max-width: 620px) {
+		.nn-header {
+			align-items: flex-start;
+			gap: 0.65rem;
+		}
+
+		.nn-header-center {
+			flex-wrap: wrap;
+			justify-content: center;
+			row-gap: 0.25rem;
+		}
+
+		.nn-date {
+			width: 100%;
+			text-align: center;
+		}
+
+		.nn-day-strip {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+
+		.nn-strip-action {
+			grid-column: 1 / -1;
+			min-height: 2.4rem;
+		}
+	}
 </style>

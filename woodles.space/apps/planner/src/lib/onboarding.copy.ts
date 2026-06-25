@@ -254,7 +254,7 @@ const RECOVERY_DAY_BLOCKS: Block[] = [
 	{ id: 'rec-slow',        startTime: '09:00', endTime: '10:30', title: 'Slow morning', flourishEligible: true },
 	{ id: 'rec-open-1',      startTime: '10:30', endTime: '12:30', title: 'Open',         flourishEligible: true },
 	{ id: 'rec-midday',      startTime: '12:30', endTime: '13:30', title: 'Midday',       bellId: 'meal' },
-	{ id: 'rec-open-2',      startTime: '13:30', endTime: '17:00', title: 'Open / light tasks', flourishEligible: true },
+	{ id: 'rec-open-2',      startTime: '13:30', endTime: '17:00', title: 'Open / light things', flourishEligible: true },
 	{ id: 'rec-quiet',       startTime: '17:00', endTime: '20:00', title: 'Quiet evening', flourishEligible: true, bellId: 'wind-down' }
 ];
 

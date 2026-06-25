@@ -1,18 +1,18 @@
 /* carillon · planner design tokens
    scoped to .planner-root — never bleeds into the rest of woodles.space
    --p-* properties are updated via JS (dayCycle.ts) on every clock tick.
-   Fallback values match the late-afternoon canonical anchor. */
+   Fallback values match the prismatic afternoon anchor. */
 
 .planner-root {
 	/* ── day-cycle palette (overridden by JS) ─────────────────────── */
-	--p-bg:          #f6efd2;
-	--p-surface:     #fdf7dc;
-	--p-text:        #2a2515;
-	--p-muted:       #6a5e3a;
-	--p-accent:      #d4b820;
-	--p-accent-soft: rgba(212,184,32,0.20);
-	--p-border:      rgba(42,37,21,0.12);
-	--p-highlight:   #c870a0;
+	--p-bg:          #e8fbff;
+	--p-surface:     #fbffff;
+	--p-text:        #25354a;
+	--p-muted:       #5f7387;
+	--p-accent:      #31c7e8;
+	--p-accent-soft: rgba(49,199,232,0.20);
+	--p-border:      rgba(37,53,74,0.12);
+	--p-highlight:   #ffd84f;
 
 	/* ── typography (inherits from shared/fonts.css) ──────────────── */
 	--pl-font-display: var(--font-display, 'Cormorant Garamond', Georgia, serif);

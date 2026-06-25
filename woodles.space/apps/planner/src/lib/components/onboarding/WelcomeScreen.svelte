@@ -34,15 +34,20 @@
 			<span class="rule-line"></span>
 		</div>
 
-		<button class="welcome-cta" onclick={() => onboarding.beginFlow()}>
-			<span class="cta-pre">❧</span>
-			<span>{WELCOME.cta}</span>
-		</button>
+		<div class="welcome-actions">
+			<button class="welcome-cta" onclick={() => onboarding.beginFlow()}>
+				<span class="cta-pre">❧</span>
+				<span>{WELCOME.cta}</span>
+			</button>
+			<button class="welcome-skip" onclick={() => onboarding.quickStart()}>
+				open planner now
+			</button>
+		</div>
 
 		<p class="welcome-foot">
-			six small questions
+			quick-start available
 			<span class="foot-sep">·</span>
-			about three minutes
+			six small questions
 			<span class="foot-sep">·</span>
 			revisable any time
 		</p>
@@ -199,6 +204,15 @@
 	}
 
 	/* ── CTA ──────────────────────────────────────────────────────── */
+	.welcome-actions {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+		margin-top: 0.5rem;
+	}
+
 	.welcome-cta {
 		display: inline-flex;
 		align-items: center;
@@ -211,7 +225,6 @@
 		background: var(--p-accent-soft);
 		padding: 12px 26px;
 		border-radius: var(--pl-radius-pill);
-		margin-top: 0.5rem;
 		transition: background var(--pl-transition-fast), color var(--pl-transition-fast);
 	}
 
@@ -228,6 +241,24 @@
 		line-height: 1;
 		opacity: 0.85;
 		transition: transform var(--pl-transition-fast);
+	}
+
+	.welcome-skip {
+		font-family: var(--pl-font-mono);
+		font-size: 0.7rem;
+		letter-spacing: 0.12em;
+		color: var(--p-muted);
+		border: 1px solid var(--p-border);
+		background: color-mix(in srgb, var(--p-surface) 65%, transparent);
+		padding: 10px 18px;
+		border-radius: var(--pl-radius-pill);
+		transition: border-color var(--pl-transition-fast), color var(--pl-transition-fast), background var(--pl-transition-fast);
+	}
+
+	.welcome-skip:hover {
+		color: var(--p-text);
+		border-color: var(--p-accent);
+		background: var(--p-surface);
 	}
 
 	.welcome-foot {

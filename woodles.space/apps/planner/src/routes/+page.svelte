@@ -72,11 +72,11 @@
 		<button
 			class="compose-fab"
 			onclick={() => store.startCompose({ targetDate: dateKey(store.now) })}
-			title="new task [n]"
-			aria-label="new task"
+			title="add something [n]"
+			aria-label="add something"
 		>
 			<span class="compose-fab-plus" aria-hidden="true">+</span>
-			<span class="compose-fab-label">task</span>
+			<span class="compose-fab-label">add</span>
 		</button>
 
 		<DayPanel />
@@ -99,7 +99,7 @@
 		padding-bottom: 3.5rem;
 	}
 
-	/* Always-on "new task" affordance — reaches the guided composer from any view. */
+	/* Always-on capture affordance — reaches the guided composer from any view. */
 	.compose-fab {
 		position: fixed;
 		left: 1rem;
@@ -108,12 +108,12 @@
 		display: flex;
 		align-items: center;
 		gap: 0.4rem;
-		padding: 8px 14px 8px 12px;
+		padding: 10px 16px 10px 13px;
 		background: var(--p-surface);
 		border: 1px solid var(--p-border);
 		border-radius: var(--pl-radius-pill);
 		box-shadow: 0 2px 14px var(--p-accent-soft);
-		opacity: 0.85;
+		opacity: 0.96;
 		transition: opacity var(--pl-transition-fast), color var(--pl-transition-fast),
 			border-color var(--pl-transition-fast), transform var(--pl-transition-spring);
 	}
@@ -133,10 +133,10 @@
 
 	.compose-fab-label {
 		font-family: var(--pl-font-mono);
-		font-size: 0.62rem;
-		letter-spacing: 0.12em;
+		font-size: 0.66rem;
+		letter-spacing: 0.1em;
 		text-transform: lowercase;
-		color: var(--p-muted);
+		color: var(--p-text);
 	}
 
 	.compose-fab:hover .compose-fab-label {
@@ -150,6 +150,7 @@
 		}
 
 		.compose-fab {
+			bottom: 4.2rem;
 			padding: 10px 12px;
 		}
 	}

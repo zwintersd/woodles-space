@@ -13,32 +13,31 @@ type PaletteStop = {
 // Named anchor modes and their approximate hour
 export type PaletteModeName = 'early-light' | 'full-day' | 'late-afternoon' | 'evening' | 'dusk' | 'night';
 
-// ── Enchanted hours palette ───────────────────────────────────────
-// Each stop is a small story painted with two or three pastel hues plus
-// one bright accent. Text + muted tokens are always tuned for ≥4.5:1
-// contrast against the bg so the planner stays readable at every hour.
-// No orange — substitutes use clear yellow, rose-pink, sky-blue,
-// silver-lilac, and pearl in place of the previous warm-gold family.
+// ── Daydream hours palette ────────────────────────────────────────
+// Bright pastel anchors inspired by soft rainbow skies: cotton-candy
+// dawn, mint-blue morning, pearl-sky noon, prismatic afternoon, and
+// lavender evening. Night does not go dark; it quiets into a neutral
+// moonlit pearl so the planner feels calmer rather than heavier.
 
 const STOPS: PaletteStop[] = [
-	// 00:00 — same as night (deep midnight + glow lilac, silver-lilac highlight)
-	{ hour: 0,    bg: '#1a1638', surface: '#241f4a', text: '#ece5ff', muted: '#a896d8', accent: '#a78dff', accentSoft: 'rgba(167,141,255,0.25)', border: 'rgba(236,229,255,0.13)', highlight: '#e0d0ff' },
-	// 06:30 — first light: pale rose-cream + ivory + sky-blue accent
-	{ hour: 6.5,  bg: '#fbeef0', surface: '#fff7f8', text: '#2b1f30', muted: '#7c5e7c', accent: '#5fa3d4', accentSoft: 'rgba(95,163,212,0.18)',  border: 'rgba(43,31,48,0.12)',     highlight: '#c98ac8' },
-	// 09:00 — bright morning: butter + fresh mint + lilac
-	{ hour: 9,    bg: '#fdf6dc', surface: '#fffceb', text: '#1f2a1d', muted: '#5e6a52', accent: '#5cb966', accentSoft: 'rgba(92,185,102,0.18)',  border: 'rgba(31,42,29,0.12)',     highlight: '#9b8be0' },
-	// 12:00 — noon garden: pearl-sky + sky-blue accent + rose highlight
-	{ hour: 12,   bg: '#eaf2f5', surface: '#f5fafd', text: '#1f2a32', muted: '#506574', accent: '#4f9bd0', accentSoft: 'rgba(79,155,208,0.18)',  border: 'rgba(31,42,50,0.12)',     highlight: '#e08aa8' },
-	// 15:00 — late afternoon ("gold afternoon"): cream + sage + clear sun-yellow + dusty rose
-	{ hour: 15,   bg: '#f6efd2', surface: '#fdf7dc', text: '#2a2515', muted: '#6a5e3a', accent: '#d4b820', accentSoft: 'rgba(212,184,32,0.20)',  border: 'rgba(42,37,21,0.12)',     highlight: '#c870a0' },
-	// 18:00 — rosy evening: cool pink + rose-pink + soft violet (no apricot/peach)
-	{ hour: 18,   bg: '#f5d8e0', surface: '#fae3e8', text: '#2a1828', muted: '#6b4f63', accent: '#c66a98', accentSoft: 'rgba(198,106,152,0.20)', border: 'rgba(42,24,40,0.13)',     highlight: '#9070d4' },
-	// 20:30 — twilight magic: deep periwinkle + luminous lilac + starlight silver-lilac
-	{ hour: 20.5, bg: '#3e3568', surface: '#4a4080', text: '#f0e8ff', muted: '#b8aadc', accent: '#c5a0ff', accentSoft: 'rgba(197,160,255,0.25)', border: 'rgba(240,232,255,0.15)', highlight: '#d8c0f0' },
-	// 22:00 — deep magic: midnight blue + glow lilac + silver-lilac
-	{ hour: 22,   bg: '#1a1638', surface: '#241f4a', text: '#ece5ff', muted: '#a896d8', accent: '#a78dff', accentSoft: 'rgba(167,141,255,0.25)', border: 'rgba(236,229,255,0.13)', highlight: '#e0d0ff' },
+	// 00:00 — neutral night: moonlit pearl + quiet blue-grey + soft lavender
+	{ hour: 0,    bg: '#eef0f5', surface: '#f8f8fb', text: '#2d2d42', muted: '#676b7c', accent: '#8f9ab4', accentSoft: 'rgba(143,154,180,0.18)', border: 'rgba(45,45,66,0.11)', highlight: '#b8a8d8' },
+	// 06:30 — cotton-candy dawn: pink cloud + sky-blue accent
+	{ hour: 6.5,  bg: '#ffeaf4', surface: '#fff6fb', text: '#30243e', muted: '#725c82', accent: '#56bfe4', accentSoft: 'rgba(86,191,228,0.20)',  border: 'rgba(48,36,62,0.12)', highlight: '#ff8fc7' },
+	// 09:00 — bright morning: mint milk + bluebell + bubblegum highlight
+	{ hour: 9,    bg: '#e9fbe9', surface: '#f6fff7', text: '#20343a', muted: '#536f73', accent: '#5bbfe8', accentSoft: 'rgba(91,191,232,0.20)',  border: 'rgba(32,52,58,0.12)', highlight: '#f29bd2' },
+	// 12:00 — rainbow noon: pearl sky + saturated cornflower
+	{ hour: 12,   bg: '#e9f6ff', surface: '#f7fcff', text: '#223047', muted: '#557086', accent: '#6b8cff', accentSoft: 'rgba(107,140,255,0.20)', border: 'rgba(34,48,71,0.12)', highlight: '#ff9fc9' },
+	// 15:00 — prismatic afternoon: aqua sky + cloud-white + sunny yellow
+	{ hour: 15,   bg: '#e8fbff', surface: '#fbffff', text: '#25354a', muted: '#5f7387', accent: '#31c7e8', accentSoft: 'rgba(49,199,232,0.20)',  border: 'rgba(37,53,74,0.12)', highlight: '#ffd84f' },
+	// 18:00 — pastel evening: blue-lavender, not mauve
+	{ hour: 18,   bg: '#f0eaff', surface: '#fbf8ff', text: '#332946', muted: '#6a6380', accent: '#bd8cff', accentSoft: 'rgba(189,140,255,0.20)', border: 'rgba(51,41,70,0.12)', highlight: '#7edfff' },
+	// 20:30 — quiet twilight: cooler lilac, still light
+	{ hour: 20.5, bg: '#edf0ff', surface: '#f7f8ff', text: '#2d3149', muted: '#666d86', accent: '#9b8df2', accentSoft: 'rgba(155,141,242,0.18)', border: 'rgba(45,49,73,0.11)', highlight: '#90cce8' },
+	// 22:00 — neutral night returns: less engaging, not darker
+	{ hour: 22,   bg: '#eef0f5', surface: '#f8f8fb', text: '#2d2d42', muted: '#676b7c', accent: '#8f9ab4', accentSoft: 'rgba(143,154,180,0.18)', border: 'rgba(45,45,66,0.11)', highlight: '#b8a8d8' },
 	// 24:00 — same as night
-	{ hour: 24,   bg: '#1a1638', surface: '#241f4a', text: '#ece5ff', muted: '#a896d8', accent: '#a78dff', accentSoft: 'rgba(167,141,255,0.25)', border: 'rgba(236,229,255,0.13)', highlight: '#e0d0ff' }
+	{ hour: 24,   bg: '#eef0f5', surface: '#f8f8fb', text: '#2d2d42', muted: '#676b7c', accent: '#8f9ab4', accentSoft: 'rgba(143,154,180,0.18)', border: 'rgba(45,45,66,0.11)', highlight: '#b8a8d8' }
 ];
 
 function parseHexToRgb(hex: string): [number, number, number] | null {
