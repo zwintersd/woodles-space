@@ -55,7 +55,7 @@
 
 	<main class="arcade-layout">
 		<section class="game-column" aria-label="arcade games">
-			<Arcade {activePet} onactivechange={(gameId) => (activeGame = gameId)} />
+			<Arcade {activePet} bestiaryCreatures={book.bestiaryCreatures} onactivechange={(gameId) => (activeGame = gameId)} />
 		</section>
 		<ActivePetPanel locked={activeGame !== null} onpetchange={(pet) => (activePet = pet)} />
 	</main>
