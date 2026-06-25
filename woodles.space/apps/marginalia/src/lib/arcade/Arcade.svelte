@@ -1,5 +1,8 @@
 <script lang="ts">
+	import BulletHeaven from './BulletHeaven.svelte';
 	import InsightRush from './InsightRush.svelte';
+	import Snake from './Snake.svelte';
+	import TowerDefense from './TowerDefense.svelte';
 	import TwoZeroFourEight from './TwoZeroFourEight.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
 
@@ -56,6 +59,30 @@
 			title: 'Insight Rush',
 			tagline: 'Tap fast, tap true. Harvest a burst of insight before the moment closes.',
 			tags: ['clicker', 'speed'],
+			status: 'play'
+		},
+		{
+			id: 'bullet-dot',
+			icon: '•',
+			title: 'Bullet Dot',
+			tagline: 'The simplest bullet heaven possible: one dot, one swarm, automatic shots.',
+			tags: ['action', 'survival'],
+			status: 'play'
+		},
+		{
+			id: 'margin-defense',
+			icon: '⌂',
+			title: 'Margin Defense',
+			tagline: 'Place tiny towers along one route. Hold five waves before the margin breaks.',
+			tags: ['tower', 'strategy'],
+			status: 'play'
+		},
+		{
+			id: 'margin-snake',
+			icon: '∿',
+			title: 'Margin Snake',
+			tagline: 'Classic snake in a notebook grid. Eat marks, grow longer, avoid yourself.',
+			tags: ['arcade', 'grid'],
 			status: 'play'
 		},
 		{
@@ -139,6 +166,12 @@
 				<TwoZeroFourEight onclose={closeGame} creature={activePet} />
 			{:else if activeGame === 'insight-rush'}
 				<InsightRush onclose={closeGame} />
+			{:else if activeGame === 'bullet-dot'}
+				<BulletHeaven onclose={closeGame} />
+			{:else if activeGame === 'margin-defense'}
+				<TowerDefense onclose={closeGame} />
+			{:else if activeGame === 'margin-snake'}
+				<Snake onclose={closeGame} />
 			{/if}
 		</section>
 	{:else}
