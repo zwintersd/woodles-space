@@ -83,12 +83,12 @@
 		return open[Math.floor(Math.random() * open.length)] ?? { x: 0, y: 0 };
 	}
 
-	function reset() {
+	function reset(initialDir: Cell = { x: 1, y: 0 }) {
 		const body = freshSnake();
 		snake = body;
 		food = randomFood(body);
-		dir = { x: 1, y: 0 };
-		nextDir = { x: 1, y: 0 };
+		dir = initialDir;
+		nextDir = initialDir;
 		score = 0;
 		awarded = 0;
 		wraps = 0;
@@ -97,8 +97,12 @@
 	}
 
 	function start() {
+		startRun();
+	}
+
+	function startRun(initialDir: Cell = { x: 1, y: 0 }) {
 		stop();
-		reset();
+		reset(initialDir);
 		phase = 'running';
 		lastTime = performance.now();
 		raf = requestAnimationFrame(loop);
@@ -123,7 +127,7 @@
 	}
 
 	function loop(now: number) {
-		const dt = Math.min(0.05, Math.max(0, now - lastTime));
+		const dt = Math.min(50, Math.max(0, now - lastTime));
 		lastTime = now;
 		stepClock += dt;
 		pulse = Math.max(0, pulse - dt / 220);
@@ -178,7 +182,10 @@
 	}
 
 	function setDirection(next: Cell) {
-		if (phase !== 'running') return;
+		if (phase !== 'running') {
+			startRun(next);
+			return;
+		}
 		if (dir.x + next.x === 0 && dir.y + next.y === 0) return;
 		nextDir = next;
 	}

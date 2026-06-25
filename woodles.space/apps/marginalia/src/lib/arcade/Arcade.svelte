@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import BulletHeaven from './BulletHeaven.svelte';
 	import InsightRush from './InsightRush.svelte';
 	import Snake from './Snake.svelte';
@@ -116,20 +117,27 @@
 
 	const activeGameData = $derived(games.find((game) => game.id === activeGame) ?? null);
 
-	function showCabinetTop() {
-		requestAnimationFrame(() => rootEl?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+	async function showCabinetTop() {
+		await tick();
+		requestAnimationFrame(() => {
+			requestAnimationFrame(() => {
+				if (!rootEl) return;
+				const top = rootEl.getBoundingClientRect().top + window.scrollY - 12;
+				window.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
+			});
+		});
 	}
 
 	function openGame(gameId: string) {
 		activeGame = gameId;
 		onactivechange?.(activeGame);
-		showCabinetTop();
+		void showCabinetTop();
 	}
 
 	function closeGame() {
 		activeGame = null;
 		onactivechange?.(activeGame);
-		showCabinetTop();
+		void showCabinetTop();
 	}
 
 	const statusLabel: Record<GameStatus, string> = {
