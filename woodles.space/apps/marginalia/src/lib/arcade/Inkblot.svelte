@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy, onMount, tick as nextTick } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { book, fmt } from '$lib/witch/book.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
 	import { dailyLimit } from './dailyLimit';
@@ -78,51 +78,23 @@
 		const W = canvasEl.width;
 		const H = canvasEl.height;
 
-		// pixelation: start at 6px blocks, fully resolved at end
-		const minBlocks = 6;
-		const maxBlocks = Math.min(W, H);
-		const blockSize = Math.max(1, Math.round(minBlocks + (maxBlocks - minBlocks) * progress));
-
-		// draw at reduced resolution
+		// pixelation: 64px blocks at start → 1px (sharp) at end
+		const blockSize = Math.max(1, Math.round(64 * (1 - progress) + 1));
 		const sw = Math.max(1, Math.round(W / blockSize));
 		const sh = Math.max(1, Math.round(H / blockSize));
 
 		ctx.clearRect(0, 0, W, H);
 		ctx.imageSmoothingEnabled = false;
 
-		// draw tiny then scale up for pixelation
 		const offscreen = new OffscreenCanvas(sw, sh);
 		const offCtx = offscreen.getContext('2d')!;
 		offCtx.imageSmoothingEnabled = false;
 		offCtx.drawImage(spriteImg, 0, 0, sw, sh);
 		ctx.drawImage(offscreen, 0, 0, W, H);
 
-		// ink overlay: dark wash that lifts as progress increases
-		const inkAlpha = Math.max(0, 0.82 - progress * 0.85);
-		if (inkAlpha > 0) {
-			ctx.globalCompositeOperation = 'multiply';
-			// ink blot: radial dark patches
-			const numPatches = 5;
-			for (let i = 0; i < numPatches; i++) {
-				// deterministic positions seeded by creature id
-				const seed = (creature?.id.charCodeAt(i % (creature?.id.length ?? 1)) ?? i) + i * 137;
-				const px = ((seed * 97) % 80 + 10) / 100;
-				const py = ((seed * 53) % 70 + 15) / 100;
-				const radius = W * (0.18 + (i * 0.07) % 0.22);
-				const grad = ctx.createRadialGradient(px * W, py * H, 0, px * W, py * H, radius);
-				grad.addColorStop(0, `rgba(7, 36, 46, ${inkAlpha})`);
-				grad.addColorStop(0.6, `rgba(7, 36, 46, ${inkAlpha * 0.7})`);
-				grad.addColorStop(1, 'rgba(7, 36, 46, 0)');
-				ctx.fillStyle = grad;
-				ctx.fillRect(0, 0, W, H);
-			}
-			ctx.globalCompositeOperation = 'source-over';
-		}
-
-		// sepia/blur overlay via CSS filter is on the canvas element directly
-		// blur: starts heavy, clears
-		const blurPx = Math.max(0, (1 - progress) * 12);
-		canvasEl.style.filter = blurPx > 0.3 ? `blur(${blurPx.toFixed(1)}px) sepia(0.5)` : 'sepia(0.2)';
+		// blur fades out as reveal progresses
+		const blurPx = Math.max(0, (1 - progress) * 6);
+		canvasEl.style.filter = blurPx > 0.2 ? `blur(${blurPx.toFixed(1)}px) sepia(0.4)` : 'sepia(0.15)';
 	}
 
 	function loadSprite(c: BestiaryCreature): Promise<HTMLImageElement> {
@@ -170,7 +142,6 @@
 		phase = 'revealing';
 
 		spriteImg = await loadSprite(creature);
-		await nextTick();
 		drawFrame(0);
 		startedAt = Date.now();
 		rafId = requestAnimationFrame(loop);
@@ -263,6 +234,12 @@
 	const multiplierLabel = $derived(
 		guessCount === 0 ? '100%' : guessCount === 1 ? '66%' : '33%'
 	);
+	// ink veil opacity: full dark at start, lifts as image resolves
+	const inkVeil = $derived(
+		phase === 'revealing' || phase === 'paused'
+			? Math.max(0, (1 - revealProgress) * 0.92).toFixed(3)
+			: '0'
+	);
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -301,6 +278,19 @@
 
 	<!-- main field -->
 	<div class="inkblot-field">
+		<!-- single persistent canvas — always bound, never recreated -->
+		<canvas
+			bind:this={canvasEl}
+			class="creature-canvas"
+			class:hidden={phase === 'intro'}
+			width="400"
+			height="400"
+		></canvas>
+
+		<!-- ink veil: CSS overlay that lifts as reveal progresses -->
+		<div class="ink-veil" style="--ink:{inkVeil}" aria-hidden="true"></div>
+
+		<!-- phase overlays -->
 		{#if phase === 'intro'}
 			{#if !canPlay}
 				{#if creatures.length === 0}
@@ -322,75 +312,46 @@
 					<span class="plays-note">{remainingPlays} of {DAILY_LIMIT} plays remaining today</span>
 				</div>
 			{/if}
-
-		{:else if phase === 'revealing' || phase === 'paused'}
-			<canvas
-				bind:this={canvasEl}
-				class="creature-canvas"
-				class:paused={phase === 'paused'}
-				width="400"
-				height="400"
-			></canvas>
-
-			{#if phase === 'paused'}
-				<div class="guess-overlay">
-					<form class="guess-form" onsubmit={(e) => { e.preventDefault(); submitGuess(); }}>
-						<label class="guess-label-text" for="guess-input">{guessLabel} · {multiplierLabel} multiplier</label>
-						<div class="guess-row">
-							<input
-								id="guess-input"
-								bind:this={inputEl}
-								bind:value={guessInput}
-								class="guess-input"
-								type="text"
-								placeholder="name the creature…"
-								autocomplete="off"
-								spellcheck="false"
-							/>
-							<button class="guess-btn" type="submit">guess</button>
-						</div>
-						{#if guessError}
-							<span class="guess-error">{guessError}</span>
-						{/if}
-						<button class="resume-link" type="button" onclick={resume}>keep watching ↩</button>
-					</form>
-				</div>
-			{:else}
-				<div class="space-hint">
-					<kbd>space</kbd> to pause & guess
-				</div>
-			{/if}
-
-		{:else if phase === 'correct'}
-			<div class="result-wrap">
-				<canvas
-					bind:this={canvasEl}
-					class="creature-canvas revealed"
-					width="400"
-					height="400"
-				></canvas>
-				<div class="result-overlay correct">
-					<strong class="result-verdict">recognized</strong>
-					<span class="result-name">{creature?.name}</span>
-					<span class="result-detail">
-						guess {guessCount + 1} · {multiplierLabel} · +{fmt(awarded)} insight
-					</span>
-				</div>
+		{:else if phase === 'revealing'}
+			<div class="space-hint">
+				<kbd>space</kbd> to pause & guess
 			</div>
-
+		{:else if phase === 'paused'}
+			<div class="guess-overlay">
+				<form class="guess-form" onsubmit={(e) => { e.preventDefault(); submitGuess(); }}>
+					<label class="guess-label-text" for="guess-input">{guessLabel} · {multiplierLabel} multiplier</label>
+					<div class="guess-row">
+						<input
+							id="guess-input"
+							bind:this={inputEl}
+							bind:value={guessInput}
+							class="guess-input"
+							type="text"
+							placeholder="name the creature…"
+							autocomplete="off"
+							spellcheck="false"
+						/>
+						<button class="guess-btn" type="submit">guess</button>
+					</div>
+					{#if guessError}
+						<span class="guess-error">{guessError}</span>
+					{/if}
+					<button class="resume-link" type="button" onclick={resume}>keep watching ↩</button>
+				</form>
+			</div>
+		{:else if phase === 'correct'}
+			<div class="result-overlay correct">
+				<strong class="result-verdict">recognized</strong>
+				<span class="result-name">{creature?.name}</span>
+				<span class="result-detail">
+					guess {guessCount + 1} · {multiplierLabel} · +{fmt(awarded)} insight
+				</span>
+			</div>
 		{:else if phase === 'failed'}
-			<div class="result-wrap">
-				<canvas
-					bind:this={canvasEl}
-					class="creature-canvas revealed"
-					width="400"
-					height="400"
-				></canvas>
-				<div class="result-overlay failed">
-					<strong class="result-verdict">unrecognized</strong>
-					<span class="result-name">{creature?.name}</span>
-					<span class="result-detail">it fully resolved — no insight earned</span>
-				</div>
+			<div class="result-overlay failed">
+				<strong class="result-verdict">unrecognized</strong>
+				<span class="result-name">{creature?.name}</span>
+				<span class="result-detail">it fully resolved — no insight earned</span>
 			</div>
 		{/if}
 	</div>
@@ -525,9 +486,6 @@
 		position: relative;
 		width: min(420px, calc(100vw - 3rem));
 		aspect-ratio: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
 		border-radius: 6px;
 		border: 1px solid var(--sol-base2);
 		overflow: hidden;
@@ -535,13 +493,26 @@
 	}
 
 	.creature-canvas {
+		position: absolute;
+		inset: 0;
 		width: 100%;
 		height: 100%;
 		display: block;
 		transition: filter 0.12s ease;
 	}
-	.creature-canvas.revealed {
-		filter: sepia(0.15) !important;
+	.creature-canvas.hidden {
+		visibility: hidden;
+	}
+
+	.ink-veil {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		opacity: var(--ink, 0);
+		background:
+			radial-gradient(ellipse 80% 70% at 38% 44%, rgba(4, 20, 28, 0.98) 0%, rgba(7, 36, 46, 0.8) 45%, rgba(7, 54, 66, 0.3) 80%, transparent 100%),
+			radial-gradient(ellipse 60% 80% at 68% 62%, rgba(4, 20, 28, 0.85) 0%, rgba(7, 36, 46, 0.5) 50%, transparent 100%);
+		transition: opacity 0.15s ease;
 	}
 
 	.space-hint {
@@ -647,12 +618,17 @@
 
 	/* field message (intro/locked states) */
 	.field-message {
+		position: absolute;
+		inset: 0;
+		z-index: 2;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
+		justify-content: center;
 		gap: 0.6rem;
 		text-align: center;
 		padding: 1.5rem;
+		background: #f5eed8;
 	}
 	.field-message strong {
 		font-family: var(--font-counter);
@@ -689,14 +665,10 @@
 	}
 
 	/* result states */
-	.result-wrap {
-		position: relative;
-		width: 100%;
-		height: 100%;
-	}
 	.result-overlay {
 		position: absolute;
 		inset: 0;
+		z-index: 2;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
