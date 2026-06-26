@@ -234,12 +234,6 @@
 	const multiplierLabel = $derived(
 		guessCount === 0 ? '100%' : guessCount === 1 ? '66%' : '33%'
 	);
-	// ink veil opacity: full dark at start, lifts as image resolves
-	const inkVeil = $derived(
-		phase === 'revealing' || phase === 'paused'
-			? Math.max(0, (1 - revealProgress) * 0.92).toFixed(3)
-			: '0'
-	);
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -286,9 +280,6 @@
 			width="400"
 			height="400"
 		></canvas>
-
-		<!-- ink veil: CSS overlay that lifts as reveal progresses -->
-		<div class="ink-veil" style="--ink:{inkVeil}" aria-hidden="true"></div>
 
 		<!-- phase overlays -->
 		{#if phase === 'intro'}
@@ -502,17 +493,6 @@
 	}
 	.creature-canvas.hidden {
 		visibility: hidden;
-	}
-
-	.ink-veil {
-		position: absolute;
-		inset: 0;
-		pointer-events: none;
-		opacity: var(--ink, 0);
-		background:
-			radial-gradient(ellipse 80% 70% at 38% 44%, rgba(4, 20, 28, 0.98) 0%, rgba(7, 36, 46, 0.8) 45%, rgba(7, 54, 66, 0.3) 80%, transparent 100%),
-			radial-gradient(ellipse 60% 80% at 68% 62%, rgba(4, 20, 28, 0.85) 0%, rgba(7, 36, 46, 0.5) 50%, transparent 100%);
-		transition: opacity 0.15s ease;
 	}
 
 	.space-hint {
