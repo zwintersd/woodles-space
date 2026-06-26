@@ -259,6 +259,14 @@ export function cardBackComposition(): Composition {
 	return { v: 1, width: CARD_BACK_W, height: CARD_BACK_H, layers: [] };
 }
 
+// Square canvas for launcher app icons (512×512 — scales cleanly to any display size).
+export const APP_ICON_W = 512;
+export const APP_ICON_H = 512;
+
+export function appIconComposition(): Composition {
+	return { v: 1, width: APP_ICON_W, height: APP_ICON_H, layers: [] };
+}
+
 type ImageLayerInit = {
 	src: string;
 	naturalW: number;
