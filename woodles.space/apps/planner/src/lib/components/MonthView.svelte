@@ -16,19 +16,6 @@
 	let calendar = $derived(getMonthCalendar(year, month));
 
 	// ── helpers ──────────────────────────────────────────────────────
-	function taskCount(date: Date): number {
-		const key = dateKey(date);
-		return store.tasks.filter((t) => t.status !== 'dropped' && t.targetDate === key).length;
-	}
-
-	function dayTasks(date: Date): string[] {
-		const key = dateKey(date);
-		return store.tasks
-			.filter((t) => t.status !== 'dropped' && t.targetDate === key)
-			.slice(0, 3)
-			.map((t) => t.title);
-	}
-
 	function isPast(date: Date): boolean {
 		return isBeforeDay(date, store.now);
 	}
@@ -68,8 +55,7 @@
 					{@const today = isSameDay(day, store.now)}
 					{@const past = isPast(day)}
 					{@const off = isDayOff(day)}
-					{@const tasks = dayTasks(day)}
-					{@const count = taskCount(day)}
+					{@const shape = store.getDayShape(day)}
 
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -82,15 +68,13 @@
 					>
 						<div class="mv-cell-head">
 							<span class="mv-cell-num">{day.getDate()}</span>
-							{#if count > 0}
-								<span class="mv-task-badge">{count}</span>
+							{#if off}
+								<span class="mv-day-badge">off</span>
 							{/if}
 						</div>
-						{#if tasks.length > 0}
-							<div class="mv-cell-tasks">
-								{#each tasks as t}
-									<span class="mv-cell-task">{t}</span>
-								{/each}
+						{#if shape}
+							<div class="mv-cell-blocks">
+								<span class="mv-cell-block">{shape.name}</span>
 							</div>
 						{/if}
 					</div>
@@ -254,7 +238,7 @@
 		color: var(--p-muted);
 	}
 
-	.mv-task-badge {
+	.mv-day-badge {
 		font-family: var(--pl-font-mono);
 		font-size: 0.5rem;
 		color: var(--p-accent);
@@ -264,13 +248,13 @@
 		line-height: 1.4;
 	}
 
-	.mv-cell-tasks {
+	.mv-cell-blocks {
 		display: flex;
 		flex-direction: column;
 		gap: 1px;
 	}
 
-	.mv-cell-task {
+	.mv-cell-block {
 		font-family: var(--pl-font-mono);
 		font-size: 0.52rem;
 		color: var(--p-muted);
@@ -280,9 +264,9 @@
 		line-height: 1.4;
 	}
 
-	/* Collapse task list on narrow cells */
+	/* Collapse block text on narrow cells */
 	@media (max-width: 500px) {
-		.mv-cell-task { display: none; }
+		.mv-cell-block { display: none; }
 		.mv-cell { min-height: 48px; }
 	}
 </style>

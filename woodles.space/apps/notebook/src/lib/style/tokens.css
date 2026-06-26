@@ -1,0 +1,22 @@
+:root {
+	--nb-bg: #ffe7fb;
+	--nb-paper: #fff9ff;
+	--nb-paper-alt: #ffe0f4;
+	--nb-ink: #4d2464;
+	--nb-muted: #8f5e9e;
+	--nb-line: #ff9ede;
+	--nb-line-strong: #ff61c7;
+	--nb-blue: #2f87ff;
+	--nb-green: #43c98c;
+	--nb-red: #ff4f9a;
+	--nb-yellow: #ffd84d;
+	--nb-violet: #9a61ff;
+	--nb-cyan: #62e8ff;
+	--nb-cream: #fff8b8;
+	--nb-shadow: 0 20px 0 #ffb6ea, 0 28px 44px rgba(113, 46, 145, 0.24);
+	--nb-radius-sm: 14px;
+	--nb-radius-md: 24px;
+	--nb-font-display: "Cormorant Garamond", Georgia, serif;
+	--nb-font-body: "Cormorant Garamond", Georgia, serif;
+	--nb-font-mono: "DM Mono", "SFMono-Regular", Consolas, monospace;
+}

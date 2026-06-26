@@ -14,16 +14,6 @@
 	let months = $derived(getYearCalendar(year));
 
 	// ── helpers ──────────────────────────────────────────────────────
-	function hasTask(date: Date): boolean {
-		const key = dateKey(date);
-		return store.tasks.some((t) => t.status !== 'dropped' && t.targetDate === key);
-	}
-
-	function taskCount(date: Date): number {
-		const key = dateKey(date);
-		return store.tasks.filter((t) => t.status !== 'dropped' && t.targetDate === key).length;
-	}
-
 	function isPast(date: Date): boolean {
 		return isBeforeDay(date, store.now);
 	}
@@ -91,7 +81,7 @@
 								{@const today = isSameDay(day, store.now)}
 								{@const past = isPast(day)}
 								{@const off = isDayOff(day)}
-								{@const count = taskCount(day)}
+								{@const shape = store.getDayShape(day)}
 
 								<!-- svelte-ignore a11y_click_events_have_key_events -->
 								<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -100,12 +90,11 @@
 									class:today
 									class:past
 									class:day-off={off}
-									class:has-tasks={count > 0}
-									title={count > 0 ? `${day.getDate()} · ${count} item${count !== 1 ? 's' : ''}` : undefined}
+									title={shape?.name}
 									onclick={() => store.openDayPanel(dateKey(day))}
 								>
 									{day.getDate()}
-									{#if count > 0}
+									{#if off}
 										<span class="ys-day-dot"></span>
 									{/if}
 								</div>
@@ -288,10 +277,6 @@
 
 	.ys-day.day-off {
 		color: var(--p-muted);
-	}
-
-	.ys-day.has-tasks:not(.today) {
-		color: var(--p-accent);
 	}
 
 	.ys-day-empty {
