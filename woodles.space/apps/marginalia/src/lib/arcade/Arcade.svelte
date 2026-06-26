@@ -2,6 +2,7 @@
 	import { tick } from 'svelte';
 	import BulletHeaven from './BulletHeaven.svelte';
 	import InsightRush from './InsightRush.svelte';
+	import PaddleBreak from './PaddleBreak.svelte';
 	import Snake from './Snake.svelte';
 	import TowerDefense from './TowerDefense.svelte';
 	import TwoZeroFourEight from './TwoZeroFourEight.svelte';
@@ -84,6 +85,14 @@
 			title: 'Margin Snake',
 			tagline: 'Classic snake in a notebook grid. Eat marks, grow longer, avoid yourself.',
 			tags: ['arcade', 'grid'],
+			status: 'play'
+		},
+		{
+			id: 'paddle-break',
+			icon: '▭',
+			title: 'Paddle Break',
+			tagline: 'Pong hands, Breakout wall: keep the ball alive while the bricks come loose.',
+			tags: ['arcade', 'reflex'],
 			status: 'play'
 		},
 		{
@@ -180,6 +189,8 @@
 				<TowerDefense onclose={closeGame} />
 			{:else if activeGame === 'margin-snake'}
 				<Snake onclose={closeGame} />
+			{:else if activeGame === 'paddle-break'}
+				<PaddleBreak onclose={closeGame} />
 			{/if}
 		</section>
 	{:else}
