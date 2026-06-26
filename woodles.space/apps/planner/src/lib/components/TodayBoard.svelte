@@ -1,42 +1,11 @@
 <script lang="ts">
 	import { store } from '$lib/store.svelte';
 	import { getCurrentBlock, minutesRemaining } from '$lib/templates';
-	import { minutesToDisplay, dayOfWeekLabel, shortDateLabel, nowMinutes, dateKey, timeToMinutes } from '$lib/utils';
-	import TaskItem from './TaskItem.svelte';
+	import { minutesToDisplay, dayOfWeekLabel, shortDateLabel, nowMinutes, timeToMinutes } from '$lib/utils';
 
 	let dayShape = $derived(store.getDayShape(store.now));
 	let blocks = $derived(store.getBlocksForDate(store.now));
 	let currentBlock = $derived(getCurrentBlock(blocks, store.now));
-	let unscheduled = $derived(store.getUnscheduledTasks());
-	let todayKey = $derived(dateKey(store.now));
-
-	let addingTo = $state<string | null>(null);
-	let newTitle = $state('');
-	let addInputEl: HTMLInputElement | undefined = $state();
-
-	function startAdd(blockId: string) {
-		addingTo = blockId;
-		newTitle = '';
-		setTimeout(() => addInputEl?.focus(), 20);
-	}
-
-	function cancelAdd() {
-		addingTo = null;
-		newTitle = '';
-	}
-
-	function submitAdd(e: Event) {
-		e.preventDefault();
-		const title = newTitle.trim();
-		if (!title || !addingTo) return;
-		store.addTask({ title, targetBlockId: addingTo });
-		newTitle = '';
-		addingTo = null;
-	}
-
-	function handleAddKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') cancelAdd();
-	}
 
 	function isPast(blockId: string): boolean {
 		const block = blocks.find((b) => b.id === blockId);
@@ -61,7 +30,6 @@
 
 	<div class="tb-timeline">
 		{#each blocks as block (block.id)}
-			{@const blockTasks = store.getTasksForBlock(block.id, todayKey)}
 			{@const past = isPast(block.id)}
 			{@const current = currentBlock?.id === block.id}
 
@@ -83,57 +51,15 @@
 						{/if}
 					</div>
 
-					{#if blockTasks.length > 0}
-						<div class="tb-tasks" role="list">
-							{#each blockTasks as task (task.id)}
-								<TaskItem {task} compact />
-							{/each}
-						</div>
-					{/if}
-
-					{#if !past || current}
-						{#if addingTo === block.id}
-							<form class="tb-add-form" onsubmit={submitAdd}>
-								<input
-									bind:this={addInputEl}
-									bind:value={newTitle}
-									class="tb-add-input"
-									placeholder="what goes here?"
-									autocomplete="off"
-									spellcheck="false"
-									onkeydown={handleAddKeydown}
-									onblur={cancelAdd}
-								/>
-							</form>
-						{:else}
-							<button
-								class="tb-add-btn"
-								onclick={() => startAdd(block.id)}
-								title="add something to {block.title}"
-							>
-								+ add
-							</button>
-						{/if}
+					{#if current}
+						<p class="tb-block-note">current</p>
+					{:else if past}
+						<p class="tb-block-note">passed</p>
 					{/if}
 				</div>
 			</div>
 		{/each}
 	</div>
-
-	{#if unscheduled.length > 0}
-		<div class="tb-unscheduled">
-			<div class="tb-time-col">
-				<span class="tb-tray-label">tray</span>
-			</div>
-			<div class="tb-block-content">
-				<div class="tb-tasks" role="list">
-					{#each unscheduled as task (task.id)}
-						<TaskItem {task} compact />
-					{/each}
-				</div>
-			</div>
-		</div>
-	{/if}
 </div>
 
 <style>
@@ -296,66 +222,10 @@
 		flex-shrink: 0;
 	}
 
-	.tb-tasks {
-		display: flex;
-		flex-direction: column;
-		margin-bottom: 0.25rem;
-	}
-
-	.tb-add-btn {
-		font-family: var(--pl-font-mono);
-		font-size: 0.65rem;
-		letter-spacing: 0.1em;
-		color: var(--p-muted);
-		opacity: 0.62;
-		padding: 3px 0;
-		transition: opacity var(--pl-transition-fast), color var(--pl-transition-fast), transform var(--pl-transition-fast);
-	}
-
-	.tb-block:hover .tb-add-btn,
-	.tb-block.current .tb-add-btn {
-		opacity: 0.86;
-	}
-
-	.tb-block:hover .tb-add-btn:hover,
-	.tb-add-btn:focus-visible {
-		opacity: 1;
-		color: var(--p-accent);
-		transform: translateX(2px);
-	}
-
-	.tb-add-form {
-		margin-top: 0.25rem;
-	}
-
-	.tb-add-input {
-		width: 100%;
-		font-family: var(--pl-font-mono);
-		font-size: 0.78rem;
-		color: var(--p-text);
-		padding: 0.2rem 0;
-		border-bottom: 1px solid var(--p-accent);
-		background: transparent;
-		transition: border-color var(--pl-transition-fast);
-	}
-
-	.tb-add-input::placeholder {
-		color: var(--p-muted);
-		opacity: 0.5;
-	}
-
-	.tb-unscheduled {
-		display: flex;
-		gap: 1.25rem;
-		padding: 1rem 0 0.5rem;
-		border-top: 1px dashed var(--p-border);
-		margin-top: 0.25rem;
-	}
-
-	.tb-tray-label {
+	.tb-block-note {
 		font-family: var(--pl-font-mono);
 		font-size: 0.58rem;
-		letter-spacing: 0.2em;
+		letter-spacing: 0.12em;
 		text-transform: uppercase;
 		color: var(--p-muted);
 		opacity: 0.5;

@@ -40,13 +40,6 @@
 	);
 
 	// ── helpers ─────────────────────────────────────────────────────
-	function blockTaskCount(day: Date, blockId: string): number {
-		const key = dateKey(day);
-		return store.tasks.filter(
-			(t) => t.status !== 'dropped' && t.targetDate === key && t.targetBlockId === blockId
-		).length;
-	}
-
 	function isPastBlock(day: Date, endStr: string): boolean {
 		if (!isSameDay(day, store.now)) return isBeforeDay(day, store.now);
 		return timeToMinutes(endStr) <= nowMinutes(store.now);
@@ -131,7 +124,6 @@
 						{#each blocks as block}
 							{@const top = topPx(block.startTime)}
 							{@const h = heightPx(block.startTime, block.endTime)}
-							{@const count = blockTaskCount(day, block.id)}
 							{@const past = isPastBlock(day, block.endTime)}
 							{@const current = isCurrentBlock(day, block.startTime, block.endTime)}
 
@@ -145,9 +137,6 @@
 									title="{block.title} · {block.startTime}"
 								>
 									<span class="wv-block-name">{block.title}</span>
-									{#if count > 0}
-										<span class="wv-block-count">{count}</span>
-									{/if}
 								</div>
 							{/if}
 						{/each}
@@ -408,17 +397,6 @@
 	}
 
 	.wv-block.past .wv-block-name { color: var(--p-muted); }
-
-	.wv-block-count {
-		font-family: var(--pl-font-mono);
-		font-size: 0.48rem;
-		color: var(--p-accent);
-		background: color-mix(in srgb, var(--p-accent) 15%, transparent);
-		border-radius: 3px;
-		padding: 0 3px;
-		flex-shrink: 0;
-		line-height: 1.5;
-	}
 
 	/* ── current time rule ───────────────────────────────────────────── */
 	.wv-now-rule {
