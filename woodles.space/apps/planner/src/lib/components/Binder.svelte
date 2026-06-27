@@ -20,6 +20,14 @@
 	];
 
 	let passphraseInput = $state('');
+	let confirmReset = $state(false);
+
+	function handleResetSetup() {
+		if (!confirmReset) { confirmReset = true; return; }
+		confirmReset = false;
+		store.resetOnboarding();
+		store.closeBinder();
+	}
 
 	async function handleConnect() {
 		const pass = passphraseInput.trim();
@@ -171,6 +179,17 @@
 					<button class="sync-btn-ghost" onclick={() => disconnect()}>disconnect</button>
 				</div>
 			{/if}
+		<div class="reset-section">
+				{#if confirmReset}
+					<p class="reset-confirm-text">restart the setup wizard?</p>
+					<div class="reset-confirm-actions">
+						<button class="sync-btn-primary" onclick={handleResetSetup}>confirm</button>
+						<button class="sync-btn-ghost" onclick={() => confirmReset = false}>cancel</button>
+					</div>
+				{:else}
+					<button class="sync-btn-ghost reset-btn" onclick={handleResetSetup}>redo setup</button>
+				{/if}
+			</div>
 		</div>
 	{/if}
 </aside>
@@ -511,6 +530,35 @@
 
 	.sync-btn-ghost:hover {
 		opacity: 0.9;
+	}
+
+	.reset-section {
+		margin-top: auto;
+		padding-top: 1.5rem;
+		border-top: 1px solid var(--p-border);
+	}
+
+	.reset-btn {
+		font-size: 0.55rem;
+		opacity: 0.3;
+	}
+
+	.reset-btn:hover {
+		opacity: 0.7;
+	}
+
+	.reset-confirm-text {
+		font-family: var(--pl-font-mono);
+		font-size: 0.65rem;
+		color: var(--p-muted);
+		opacity: 0.75;
+		margin-bottom: 0.5rem;
+	}
+
+	.reset-confirm-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
 	}
 
 	@media (max-width: 620px) {

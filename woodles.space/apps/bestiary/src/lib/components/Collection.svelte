@@ -7,6 +7,7 @@
 	import BinderPrint from './BinderPrint.svelte';
 	import StatSheetPrint from './StatSheetPrint.svelte';
 	import CardBackEditor from './CardBackEditor.svelte';
+	import AppIconEditor from './AppIconEditor.svelte';
 	import { formatAllPlainText, formatAllMarkdown, downloadText } from '$lib/textformat';
 
 	const sorts: { id: SortKey; label: string }[] = [
@@ -24,6 +25,7 @@
 	let showBinder = $state(false);
 	let showStatSheet = $state(false);
 	let showCardBacks = $state(false);
+	let showAppIcons = $state(false);
 	let exportOpen = $state(false);
 	let exportCopiedText = $state(false);
 	let exportCopiedMd = $state(false);
@@ -168,6 +170,11 @@
 					onclick={() => (showCardBacks = true)}
 					title="design per-domain card backs in the sprite studio"
 				>⊡ backs</button>
+				<button
+					class="chip icons-btn"
+					onclick={() => (showAppIcons = true)}
+					title="design a custom launcher icon in the sprite studio"
+				>✦ icon</button>
 
 				<!-- export menu -->
 				<div class="export-wrap">
@@ -239,6 +246,10 @@
 
 {#if showCardBacks}
 	<CardBackEditor onclose={() => (showCardBacks = false)} />
+{/if}
+
+{#if showAppIcons}
+	<AppIconEditor onclose={() => (showAppIcons = false)} />
 {/if}
 
 <style>
@@ -361,6 +372,7 @@
 	.binder-btn:hover { color: var(--b-relational); border-color: color-mix(in srgb, var(--b-relational) 40%, transparent); }
 	.sheet-btn:hover  { color: var(--b-biochemical); border-color: color-mix(in srgb, var(--b-biochemical) 40%, transparent); }
 	.backs-btn:hover  { color: var(--b-temporal); border-color: color-mix(in srgb, var(--b-temporal) 40%, transparent); }
+	.icons-btn:hover  { color: var(--b-gold);     border-color: color-mix(in srgb, var(--b-gold) 40%, transparent); }
 
 	.export-wrap { position: relative; }
 
