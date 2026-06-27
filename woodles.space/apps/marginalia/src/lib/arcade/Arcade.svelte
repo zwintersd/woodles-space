@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
+	import BubbleShooter from './BubbleShooter.svelte';
 	import BulletHeaven from './BulletHeaven.svelte';
 	import InsightRush from './InsightRush.svelte';
 	import PaddleBreak from './PaddleBreak.svelte';
@@ -93,6 +94,14 @@
 			title: 'Paddle Break',
 			tagline: 'Pong hands, Breakout wall: keep the ball alive while the bricks come loose.',
 			tags: ['arcade', 'reflex'],
+			status: 'play'
+		},
+		{
+			id: 'margin-bubbles',
+			icon: '◌',
+			title: 'Margin Bubbles',
+			tagline: 'Bank shots into the canopy, match colors in threes, and keep the ceiling from pressing down.',
+			tags: ['shooter', 'aim'],
 			status: 'play'
 		},
 		{
@@ -191,6 +200,8 @@
 				<Snake onclose={closeGame} />
 			{:else if activeGame === 'paddle-break'}
 				<PaddleBreak onclose={closeGame} />
+			{:else if activeGame === 'margin-bubbles'}
+				<BubbleShooter onclose={closeGame} />
 			{/if}
 		</section>
 	{:else}
