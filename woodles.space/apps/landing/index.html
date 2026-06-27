@@ -71,21 +71,25 @@
       padding: 1.4rem 1.4rem calc(64px + 1.4rem);
     }
 
-    /* desktop icons — top-left, column flow like Win11 */
+    /* desktop icons — top-left, single scrollable column */
     .icons {
       display: flex;
       flex-direction: column;
-      flex-wrap: wrap;
-      align-content: flex-start;
-      gap: 0.6rem;
-      height: 100%;
-    }
-    .icon {
-      width: 96px;
-      padding: 0.7rem 0.4rem 0.6rem;
-      display: flex; flex-direction: column; align-items: center;
+      align-items: flex-start;
       gap: 0.4rem;
-      border-radius: 12px;
+      height: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .icons::-webkit-scrollbar { display: none; }
+    .icon {
+      width: 108px;
+      padding: 0.75rem 0.5rem 0.65rem;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0.5rem;
+      border-radius: 14px;
       cursor: pointer;
       text-decoration: none;
       border: 1px solid transparent;
@@ -103,10 +107,10 @@
     }
     .icon:active { transform: scale(0.95); }
     .tile {
-      width: 50px; height: 50px;
-      border-radius: 14px;
+      width: 64px; height: 64px;
+      border-radius: 16px;
       display: grid; place-items: center;
-      font-size: 1.5rem;
+      font-size: 1.9rem;
       color: #fff;
       background: linear-gradient(140deg, var(--g1), var(--g2));
       box-shadow:
@@ -117,13 +121,13 @@
     .tile::after {
       content: '';
       position: absolute; inset: 0;
-      border-radius: 14px;
+      border-radius: 16px;
       border: 1px solid rgba(255,255,255,0.25);
     }
     .icon-label {
       font-family: 'DM Mono', monospace;
       font-weight: 300;
-      font-size: 0.6rem;
+      font-size: 0.65rem;
       letter-spacing: 0.04em;
       text-align: center;
       color: var(--text);
@@ -610,8 +614,9 @@
       .tray-glyphs { display: none; }
     }
     @media (max-width: 480px) {
-      .icons { gap: 0.3rem; }
-      .icon { width: 84px; }
+      .icons { gap: 0.25rem; }
+      .icon { width: 88px; }
+      .tile { width: 52px; height: 52px; font-size: 1.55rem; }
       .tb-btn { width: 32px; height: 32px; }
       .tb-btn .tile { width: 24px; height: 24px; font-size: 0.8rem; }
     }
