@@ -4,6 +4,7 @@
 	import BulletHeaven from './BulletHeaven.svelte';
 	import GetBig from './GetBig.svelte';
 	import InsightRush from './InsightRush.svelte';
+	import MarginHollow from './MarginHollow.svelte';
 	import PaddleBreak from './PaddleBreak.svelte';
 	import Snake from './Snake.svelte';
 	import TowerDefense from './TowerDefense.svelte';
@@ -66,6 +67,14 @@
 			title: 'Get Big!',
 			tagline: 'Eat smaller jelly, dodge bigger jelly, and grow until yellow finally fits.',
 			tags: ['arcade', 'growth'],
+			status: 'play'
+		},
+		{
+			id: 'margin-hollow',
+			icon: '▣',
+			title: 'Margin Hollow',
+			tagline: 'A tiny metroidvania-like: jump, collect a wing, open gates, and reach the vault.',
+			tags: ['platform', 'gates'],
 			status: 'play'
 		},
 		{
@@ -214,6 +223,8 @@
 				<TwoZeroFourEight onclose={closeGame} creature={activePet} />
 			{:else if activeGame === 'get-big'}
 				<GetBig onclose={closeGame} />
+			{:else if activeGame === 'margin-hollow'}
+				<MarginHollow onclose={closeGame} />
 			{:else if activeGame === 'insight-rush'}
 				<InsightRush onclose={closeGame} />
 			{:else if activeGame === 'bullet-dot'}
