@@ -31,6 +31,18 @@ Keep game-specific rules inside the game component until at least two games need
 
 These are safe to share because they are pure, tiny, and domain-neutral. They do not know about any particular game.
 
+`arcadeRewards.ts` is the second shared layer — the single point where a game's
+reward touches the Book economy:
+
+- `creditInsight(amount)` — the one place `book.insight += …; book.persist()`
+  happens. Every paying game routes through it, so a future arcade-wide economy
+  policy (e.g. a per-day insight cap) has exactly one home.
+- `payReward(raw, max)` — clamp a raw, score-derived reward to `[0, max]` and
+  credit it; the common case for games whose reward floors at zero.
+
+Reward *formulas* stay local (each game scores differently); only the clamp
+(`cappedReward`) and the payout are shared.
+
 ## What To Reuse By Copying For Now
 
 Some patterns are intentionally repeated in `BulletHeaven.svelte`, `TowerDefense.svelte`, and `Snake.svelte`:
@@ -58,8 +70,9 @@ Extract in this order if the arcade keeps growing:
 3. `SvgArena.svelte`
    Responsive SVG wrapper, background rect, grid pattern slot, and overlay slot.
 
-4. `arcadeRewards.ts`
-   Shared payout helpers if reward formulas start to align. Keep formulas local while games still score differently.
+4. ~~`arcadeRewards.ts`~~ — **done.** Extracted as the shared payout
+   chokepoint (`creditInsight` / `payReward`), not as shared formulas. Reward
+   formulas remain local while games still score differently.
 
 5. `useArcadeLoop.ts`
    Only if at least two games need the exact same `requestAnimationFrame` lifecycle. Bullet Dot and Tower Defense are frame-based; Snake is step-based, so do not force this too early.

@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { book, fmt } from '$lib/witch/book.svelte';
+	import { fmt } from '$lib/witch/book.svelte';
 	import { conditions } from '$lib/witch/content/conditions';
+	import { cappedReward } from './arcadeMath';
+	import { payReward } from './arcadeRewards';
 
 	interface Props {
 		onclose: () => void;
@@ -70,7 +72,7 @@
 
 	function rewardFor(done: number, pts: number, errs: number): number {
 		const raw = done * 3 + Math.floor(pts / 4) - Math.floor(errs / 8);
-		return Math.max(0, Math.min(MAX_REWARD, raw));
+		return cappedReward(raw, MAX_REWARD);
 	}
 
 	function start() {
@@ -113,11 +115,7 @@
 		remaining = 0;
 		phase = 'complete';
 		rounds += 1;
-		awarded = rewardFor(completed, score, errors);
-		if (awarded > 0) {
-			book.insight += awarded;
-			book.persist();
-		}
+		awarded = payReward(rewardFor(completed, score, errors), MAX_REWARD);
 	}
 
 	function advancePhrase(succeeded: boolean) {
