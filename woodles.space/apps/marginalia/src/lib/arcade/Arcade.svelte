@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
+	import BubbleShooter from './BubbleShooter.svelte';
 	import BulletHeaven from './BulletHeaven.svelte';
 	import InsightRush from './InsightRush.svelte';
 	import PaddleBreak from './PaddleBreak.svelte';
@@ -107,6 +108,14 @@
 			status: 'play'
 		},
 		{
+			id: 'margin-bubbles',
+			icon: '◌',
+			title: 'Margin Bubbles',
+			tagline: 'Bank shots into the canopy, match colors in threes, and keep the ceiling from pressing down.',
+			tags: ['shooter', 'aim'],
+			status: 'play'
+		},
+		{
 			id: 'word-weave',
 			icon: '🝩',
 			title: 'Word Weave',
@@ -204,6 +213,8 @@
 				<Snake onclose={closeGame} />
 			{:else if activeGame === 'paddle-break'}
 				<PaddleBreak onclose={closeGame} />
+			{:else if activeGame === 'margin-bubbles'}
+				<BubbleShooter onclose={closeGame} />
 			{:else if activeGame === 'type-witch'}
 				<TypeWitch onclose={closeGame} />
 			{/if}
