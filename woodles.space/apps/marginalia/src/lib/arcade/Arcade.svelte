@@ -2,6 +2,7 @@
 	import { tick } from 'svelte';
 	import BubbleShooter from './BubbleShooter.svelte';
 	import BulletHeaven from './BulletHeaven.svelte';
+	import GetBig from './GetBig.svelte';
 	import InsightRush from './InsightRush.svelte';
 	import PaddleBreak from './PaddleBreak.svelte';
 	import Snake from './Snake.svelte';
@@ -47,6 +48,14 @@
 			tagline: 'Race against the clock to transcribe Brianna\'s conditions before they dissolve.',
 			tags: ['typing', 'timed'],
 			status: 'soon'
+		},
+		{
+			id: 'get-big',
+			icon: '●',
+			title: 'Get Big!',
+			tagline: 'Eat smaller jelly, dodge bigger jelly, and grow until yellow finally fits.',
+			tags: ['arcade', 'growth'],
+			status: 'play'
 		},
 		{
 			id: 'condition-match',
@@ -190,6 +199,8 @@
 
 			{#if activeGame === 'stack-2048'}
 				<TwoZeroFourEight onclose={closeGame} creature={activePet} />
+			{:else if activeGame === 'get-big'}
+				<GetBig onclose={closeGame} />
 			{:else if activeGame === 'insight-rush'}
 				<InsightRush onclose={closeGame} />
 			{:else if activeGame === 'bullet-dot'}
@@ -207,7 +218,7 @@
 	{:else}
 		<div class="game-grid">
 			{#each games as game (game.id)}
-				<article class="game-card status-{game.status}">
+				<article class="game-card status-{game.status}" data-game-id={game.id}>
 					<div class="card-top">
 						<span class="game-icon" aria-hidden="true">{game.icon}</span>
 						<span class="status-badge">{statusLabel[game.status]}</span>
