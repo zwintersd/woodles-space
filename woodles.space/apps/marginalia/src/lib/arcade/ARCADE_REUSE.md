@@ -28,6 +28,9 @@ Keep game-specific rules inside the game component until at least two games need
 - `distance`
 - `normalize`
 - `cappedReward`
+- cube hex helpers: `CubeHex`, `HEX_DIRECTIONS`, `hexKey`, `addHex`, `hexNeighbors`,
+  `hexDistance`, `axialToPoint`, `pointToHex`, `hexesWithinRadius`
+- `rotate`
 
 These are safe to share because they are pure, tiny, and domain-neutral. They do not know about any particular game.
 

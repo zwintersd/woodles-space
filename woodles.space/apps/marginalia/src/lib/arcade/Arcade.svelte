@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import BubbleShooter from './BubbleShooter.svelte';
+	import BubbleSpinner from './BubbleSpinner.svelte';
 	import BulletHeaven from './BulletHeaven.svelte';
 	import GetBig from './GetBig.svelte';
 	import InsightRush from './InsightRush.svelte';
@@ -126,6 +127,14 @@
 			status: 'play'
 		},
 		{
+			id: 'bubble-spinner',
+			icon: 'o',
+			title: 'Bubble Spinner',
+			tagline: 'Shoot into a hex cluster, kick it into spin, match colors, and drop orphaned rings.',
+			tags: ['shooter', 'physics'],
+			status: 'play'
+		},
+		{
 			id: 'margin-bubbles',
 			icon: '◌',
 			title: 'Margin Bubbles',
@@ -235,6 +244,8 @@
 				<Snake onclose={closeGame} />
 			{:else if activeGame === 'paddle-break'}
 				<PaddleBreak onclose={closeGame} />
+			{:else if activeGame === 'bubble-spinner'}
+				<BubbleSpinner onclose={closeGame} />
 			{:else if activeGame === 'margin-bubbles'}
 				<BubbleShooter onclose={closeGame} />
 			{:else if activeGame === 'type-witch'}
