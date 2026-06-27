@@ -2,7 +2,7 @@
 <html lang="en" data-theme="cream">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>woodles.space</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -606,19 +606,160 @@
       color: var(--muted);
     }
 
+    /* ─────────────────────────── phone home ────────────────────────── */
+    /* a touch-first home screen — greeting, app grid, dock.
+       hidden by default; the responsive query below swaps it in for
+       desktop on small screens. */
+    .phone {
+      display: none;
+      position: fixed; inset: 0; z-index: 2;
+      flex-direction: column;
+      padding:
+        calc(env(safe-area-inset-top, 0px) + 1.5rem)
+        calc(env(safe-area-inset-right, 0px) + 1.2rem)
+        calc(env(safe-area-inset-bottom, 0px) + 0.7rem)
+        calc(env(safe-area-inset-left, 0px) + 1.2rem);
+    }
+    .phone-top {
+      flex: none;
+      padding: 0.2rem 0.3rem 0.9rem;
+      opacity: 0;
+      animation: icon-in 0.7s ease forwards 0.1s;
+    }
+    .phone-greet {
+      font-size: 1.55rem; font-weight: 400;
+      color: var(--accent-strong);
+      line-height: 1.1;
+    }
+    .phone-greet em { font-style: italic; color: var(--accent-deep); }
+    .phone-clock {
+      font-family: 'DM Mono', monospace;
+      font-size: 3.2rem; font-weight: 300;
+      color: var(--text);
+      letter-spacing: -0.02em; line-height: 1;
+      margin: 0.35rem 0 0.2rem;
+    }
+    .phone-date {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--muted);
+    }
+    .phone-search {
+      flex: none;
+      width: 100%;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem; font-weight: 300;
+      padding: 0.7rem 1rem;
+      margin-bottom: 0.5rem;
+      border-radius: 13px;
+      border: 1px solid var(--rule);
+      background: color-mix(in srgb, var(--surface) 70%, transparent);
+      backdrop-filter: blur(20px) saturate(1.3);
+      -webkit-backdrop-filter: blur(20px) saturate(1.3);
+      color: var(--text);
+      outline: none;
+      opacity: 0;
+      animation: icon-in 0.7s ease forwards 0.18s;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+    .phone-search::placeholder { color: var(--muted); }
+    .phone-search:focus {
+      border-color: var(--accent-strong);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+    }
+    .app-grid {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto; overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none; -ms-overflow-style: none;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      align-content: start;
+      gap: 0.7rem 0.3rem;
+      padding: 0.5rem 0.1rem 1rem;
+    }
+    .app-grid::-webkit-scrollbar { display: none; }
+    .app-cell {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0.5rem;
+      padding: 0.25rem 0.15rem;
+      border-radius: 16px;
+      text-decoration: none; cursor: pointer;
+      opacity: 0;
+      animation: icon-in 0.5s ease forwards;
+      transition: transform 0.14s ease;
+    }
+    .app-cell:active { transform: scale(0.9); }
+    .app-cell .tile {
+      width: 60px; height: 60px;
+      font-size: 1.75rem; border-radius: 18px;
+    }
+    .app-cell .tile::after { border-radius: 18px; }
+    .app-label {
+      font-family: 'DM Mono', monospace;
+      font-weight: 300;
+      font-size: 0.58rem; letter-spacing: 0.02em;
+      text-align: center; line-height: 1.25;
+      color: var(--text);
+      text-shadow: 0 1px 3px var(--bg);
+    }
+    .app-empty {
+      grid-column: 1 / -1;
+      text-align: center; font-style: italic;
+      color: var(--muted); padding: 2rem 0;
+    }
+    .phone-dock {
+      flex: none;
+      display: flex; align-items: center; justify-content: center;
+      gap: 0.4rem;
+      margin: 0.3rem auto 0;
+      padding: 0.5rem 0.6rem;
+      border-radius: 22px;
+      background: color-mix(in srgb, var(--surface) 84%, transparent);
+      backdrop-filter: blur(30px) saturate(1.5);
+      -webkit-backdrop-filter: blur(30px) saturate(1.5);
+      border: 1px solid var(--rule);
+      box-shadow: 0 16px 42px -16px var(--accent-deep);
+      opacity: 0;
+      animation: dock-in 0.7s cubic-bezier(.2,.9,.3,1) forwards 0.35s;
+      max-width: 100%;
+    }
+    @keyframes dock-in {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .dock-btn {
+      width: 48px; height: 48px;
+      border: none; background: transparent;
+      border-radius: 14px;
+      display: grid; place-items: center;
+      cursor: pointer; position: relative;
+      font-family: inherit;
+      font-size: 1.15rem; color: var(--accent-strong);
+      transition: background 0.16s ease, transform 0.12s ease;
+    }
+    .dock-btn:active { transform: scale(0.88); }
+    .dock-btn .tile {
+      width: 42px; height: 42px;
+      font-size: 1.25rem; border-radius: 13px;
+    }
+    .dock-btn .tile::after { border-radius: 13px; }
+    .dock-sep {
+      width: 1px; height: 28px;
+      background: var(--rule);
+      margin: 0 0.15rem;
+    }
+
     /* ─────────────────────────── responsive ────────────────────────── */
     @media (max-width: 720px) {
-      .widget { display: none; }
-      .tb-btn { width: 36px; height: 36px; }
+      .desktop, .widget, .taskbar { display: none !important; }
+      .phone { display: flex; }
       .start-grid { grid-template-columns: repeat(3, 1fr); }
-      .tray-glyphs { display: none; }
     }
-    @media (max-width: 480px) {
-      .icons { gap: 0.25rem; }
-      .icon { width: 88px; }
-      .tile { width: 52px; height: 52px; font-size: 1.55rem; }
-      .tb-btn { width: 32px; height: 32px; }
-      .tb-btn .tile { width: 24px; height: 24px; font-size: 0.8rem; }
+    @media (max-width: 360px) {
+      .app-cell .tile { width: 54px; height: 54px; font-size: 1.55rem; }
+      .phone-clock { font-size: 2.8rem; }
     }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
@@ -633,6 +774,18 @@
   <!-- desktop -->
   <main class="desktop">
     <div class="icons" id="icons"></div>
+  </main>
+
+  <!-- phone home screen -->
+  <main class="phone" id="phone">
+    <header class="phone-top">
+      <p class="phone-greet" id="m-greet">hello</p>
+      <p class="phone-clock" id="m-clock">--:--</p>
+      <p class="phone-date" id="m-date"></p>
+    </header>
+    <input class="phone-search" id="m-search" type="text" placeholder="search woodles.space…" autocomplete="off" />
+    <div class="app-grid" id="app-grid"></div>
+    <nav class="phone-dock" id="phone-dock"></nav>
   </main>
 
   <!-- greeting widget -->
@@ -805,6 +958,59 @@
       rec.appendChild(el);
     });
 
+    /* ── phone home: app grid ──────────────────────────────────────── */
+    const appGrid = document.getElementById('app-grid');
+    function renderAppGrid(filter) {
+      appGrid.innerHTML = '';
+      const list = apps.filter(a =>
+        !filter || (a.name + ' ' + a.desc).toLowerCase().includes(filter));
+      if (!list.length) {
+        appGrid.innerHTML = '<p class="app-empty">nothing here by that name &mdash; yet</p>';
+        return;
+      }
+      list.forEach((a, i) => {
+        const el = document.createElement('a');
+        el.className = 'app-cell';
+        el.href = a.href;
+        el.style.animationDelay = (i * 0.035) + 's';
+        el.innerHTML = tileHTML(a) + '<span class="app-label">' + a.name + '</span>';
+        el.addEventListener('click', e => { e.preventDefault(); launch(a); });
+        appGrid.appendChild(el);
+      });
+    }
+    renderAppGrid('');
+    const mSearch = document.getElementById('m-search');
+    mSearch.addEventListener('input', () =>
+      renderAppGrid(mSearch.value.trim().toLowerCase()));
+
+    /* ── phone home: dock ──────────────────────────────────────────── */
+    const dock = document.getElementById('phone-dock');
+    ['write','hygge','marg'].forEach(id => {
+      const a = apps.find(x => x.id === id);
+      const b = document.createElement('button');
+      b.className = 'dock-btn';
+      b.title = a.name;
+      b.setAttribute('aria-label', a.name);
+      b.innerHTML = tileHTML(a);
+      b.addEventListener('click', () => launch(a));
+      dock.appendChild(b);
+    });
+    dock.insertAdjacentHTML('beforeend', '<span class="dock-sep"></span>');
+    const themeBtn = document.createElement('button');
+    themeBtn.className = 'dock-btn';
+    themeBtn.title = 'next theme';
+    themeBtn.setAttribute('aria-label', 'Next theme');
+    themeBtn.innerHTML = '&#10052;';
+    themeBtn.addEventListener('click', () => nextTheme());
+    dock.appendChild(themeBtn);
+    const aboutDockBtn = document.createElement('button');
+    aboutDockBtn.className = 'dock-btn';
+    aboutDockBtn.title = 'about';
+    aboutDockBtn.setAttribute('aria-label', 'About woodles');
+    aboutDockBtn.innerHTML = '&#9432;';
+    aboutDockBtn.addEventListener('click', e => { e.stopPropagation(); openAbout(); });
+    dock.appendChild(aboutDockBtn);
+
     /* ── clock + greeting ──────────────────────────────────────────── */
     const DAYS   = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
     const MONTHS = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
@@ -832,6 +1038,9 @@
       document.getElementById('t-time').textContent = time;
       document.getElementById('t-date').textContent = dShort;
       document.getElementById('greet').innerHTML = greeting(now.getHours()) + ' <em>z</em>';
+      document.getElementById('m-greet').innerHTML = greeting(now.getHours()) + ' <em>z</em>';
+      document.getElementById('m-clock').textContent = time;
+      document.getElementById('m-date').textContent = DAYS[now.getDay()] + ' · ' + dShort;
       document.getElementById('fly-day').textContent = DAYS[now.getDay()];
       document.getElementById('fly-big').textContent = pad(now.getDate());
       document.getElementById('fly-month').textContent =
@@ -900,6 +1109,7 @@
     /* ── context menu ──────────────────────────────────────────────── */
     const ctx = document.getElementById('ctx');
     document.addEventListener('contextmenu', e => {
+      if (innerWidth <= 720) return;  /* phone home has its own dock, no desktop menu */
       if (e.target.closest('.window, .start, .taskbar, .flyout')) return;
       e.preventDefault();
       closeAll('ctx');
