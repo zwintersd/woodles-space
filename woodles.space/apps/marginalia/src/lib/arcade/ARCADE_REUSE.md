@@ -43,6 +43,8 @@ Some patterns are intentionally repeated in `BulletHeaven.svelte`, `TowerDefense
 
 This repetition is useful evidence. It lets the shape settle before we commit to a shared component API.
 
+`MarginHollow.svelte` adds a first platform/metroidvania-like shape. Keep its room data, axis-aligned collision, door/gate requirements, pickup handling, hazards, and jump physics local until at least one more game wants the same shape. If that repetition appears, the likely first extraction is a tiny room/rect vocabulary, not a full platformer engine.
+
 ## Next Extraction Candidates
 
 Extract in this order if the arcade keeps growing:
