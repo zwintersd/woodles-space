@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ColorPop from './ColorPop.svelte';
 	import InsightRush from './InsightRush.svelte';
 	import TwoZeroFourEight from './TwoZeroFourEight.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
@@ -32,6 +33,14 @@
 			title: '2048',
 			tagline: 'Slide the tiles. Merge the numbers. Reach 2048 before the board fills.',
 			tags: ['puzzle', 'numbers'],
+			status: 'play'
+		},
+		{
+			id: 'color-pop',
+			icon: '●',
+			title: 'Color POP!',
+			tagline: 'Drop bright circles, merge matching tiers, and keep the pile below the line.',
+			tags: ['physics', 'merge'],
 			status: 'play'
 		},
 		{
@@ -137,6 +146,8 @@
 
 			{#if activeGame === 'stack-2048'}
 				<TwoZeroFourEight onclose={closeGame} creature={activePet} />
+			{:else if activeGame === 'color-pop'}
+				<ColorPop onclose={closeGame} />
 			{:else if activeGame === 'insight-rush'}
 				<InsightRush onclose={closeGame} />
 			{/if}
@@ -144,7 +155,7 @@
 	{:else}
 		<div class="game-grid">
 			{#each games as game (game.id)}
-				<article class="game-card status-{game.status}">
+				<article class="game-card status-{game.status}" data-game-id={game.id}>
 					<div class="card-top">
 						<span class="game-icon" aria-hidden="true">{game.icon}</span>
 						<span class="status-badge">{statusLabel[game.status]}</span>
