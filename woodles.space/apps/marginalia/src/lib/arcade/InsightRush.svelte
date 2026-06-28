@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { fmt } from '$lib/witch/book.svelte';
-	import type { ArcadeActivePet } from './arcadeStats';  
-	import { cappedReward } from './arcadeMath';
-	import { payReward } from './arcadeRewards';
+	import { payReward, previewReward as previewArcadeReward } from './arcadeRewards';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
+	import type { ArcadeActivePet } from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
@@ -38,6 +38,7 @@
 	let score = $state(0);
 	let streak = $state(0);
 	let bestStreak = $state(0);
+	let bestRecordedStreak = $state(loadArcadeRecord('insight-rush').bestScore);
 	let hits = $state(0);
 	let misses = $state(0);
 	let awarded = $state(0);
@@ -102,7 +103,7 @@
 			Math.floor(chain / 5) +
 			Math.floor(chain / 12) -
 			Math.floor(errors / 5);
-		return cappedReward(raw, MAX_REWARD);
+		return previewArcadeReward(raw, MAX_REWARD);
 	}
 
 	function start() {
@@ -140,6 +141,17 @@
 		phase = 'complete';
 		rounds += 1;
 		awarded = payReward(rewardFor(score, bestStreak, misses), MAX_REWARD);
+		const record = recordArcadeRun('insight-rush', {
+			score: bestStreak,
+			summary: {
+				points: score,
+				hits,
+				misses,
+				accuracy: Math.round(accuracy * 100),
+				awarded
+			}
+		});
+		bestRecordedStreak = record.bestScore;
 	}
 
 	function addPop(x: number, y: number, text: string, tone: Pop['tone']) {
@@ -179,6 +191,10 @@
 		placeSparks();
 	}
 
+	onMount(() => {
+		bestRecordedStreak = loadArcadeRecord('insight-rush').bestScore;
+	});
+
 	onDestroy(() => {
 		stopTimer();
 		for (const popTimer of popTimers) clearTimeout(popTimer);
@@ -202,7 +218,7 @@
 			</div>
 			<div class="score-box">
 				<span class="score-label">best</span>
-				<span class="score-val">{bestStreak}</span>
+				<span class="score-val">{Math.max(bestStreak, bestRecordedStreak)}</span>
 			</div>
 			<div class="score-box">
 				<span class="score-label">prize</span>

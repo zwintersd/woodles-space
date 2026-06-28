@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import { cappedReward, clamp, distance, normalize, type Dot } from './arcadeMath';
+	import { clamp, distance, normalize, type Dot } from './arcadeMath';
 	import { fmt } from '$lib/witch/book.svelte';
-	import { payReward } from './arcadeRewards';
+	import { payReward, previewReward } from './arcadeRewards';
 	import type { ArcadeActivePet } from './arcadeStats';
 
 	interface Props {
@@ -75,7 +75,7 @@
 
 	function rewardFor(defeated: number, seconds: number, cleared: boolean): number {
 		const raw = Math.floor(defeated / 8) + Math.floor(seconds / 14) + (cleared ? 5 : 0);
-		return cappedReward(raw, MAX_REWARD);
+		return previewReward(raw, MAX_REWARD);
 	}
 
 	function edgeSpawn(): Enemy {

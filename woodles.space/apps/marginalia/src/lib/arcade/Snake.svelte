@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import { cappedReward, type Dot } from './arcadeMath';
-	import type { ArcadeActivePet } from './arcadeStats';
+	import type { Dot } from './arcadeMath';
 	import { fmt } from '$lib/witch/book.svelte';
-	import { payReward } from './arcadeRewards';
+	import { payReward, previewReward } from './arcadeRewards';
+	import type { ArcadeActivePet } from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
@@ -63,7 +63,7 @@
 	}
 
 	function rewardFor(points: number, cleared: boolean): number {
-		return cappedReward(Math.floor(points / 3) + (cleared ? 6 : 0), MAX_REWARD);
+		return previewReward(Math.floor(points / 3) + (cleared ? 6 : 0), MAX_REWARD);
 	}
 
 	function sameCell(a: Cell, b: Cell): boolean {

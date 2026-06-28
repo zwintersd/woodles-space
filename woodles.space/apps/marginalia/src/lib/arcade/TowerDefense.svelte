@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { cappedReward, clamp, distance, normalize, type Dot } from './arcadeMath';
-	import type { ArcadeActivePet } from './arcadeStats';
+	import { clamp, distance, normalize, type Dot } from './arcadeMath';
 	import { fmt } from '$lib/witch/book.svelte';
-	import { payReward } from './arcadeRewards';
+	import { payReward, previewReward } from './arcadeRewards';
+	import type { ArcadeActivePet } from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
@@ -123,7 +123,7 @@
 
 	function rewardFor(defeated: number, reachedWave: number, cleared: boolean): number {
 		const raw = Math.floor(defeated / 5) + reachedWave + (cleared ? 6 : 0);
-		return cappedReward(raw, MAX_REWARD);
+		return previewReward(raw, MAX_REWARD);
 	}
 
 	function resetMap() {

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import type { ArcadeActivePet } from './arcadeStats';
+	import { scoreOnlyReason } from './arcadeRewards';
 
 	interface Props {
 		onclose: () => void;
@@ -53,6 +54,8 @@
 	const BASE_RETRACT_SPEED = 430;
 	const WEIGHT_MULTIPLIER = 52;
 	const MIN_RETRACT_SPEED = 42;
+	const GAME_ID = 'margin-miner';
+	const scoreOnlyLabel = scoreOnlyReason(GAME_ID) ? 'score only' : '-';
 
 	const weights = {
 		veryLight: 0.25,
@@ -711,6 +714,10 @@
 				<span class="score-val">{timerText}</span>
 			</div>
 			<div class="score-box">
+				<span class="score-label">prize</span>
+				<span class="score-val policy">{scoreOnlyLabel}</span>
+			</div>
+			<div class="score-box">
 				<span class="score-label">state</span>
 				<span class="score-val state">{stateLabel}</span>
 			</div>
@@ -836,6 +843,14 @@
 		font-size: 1.2rem;
 		color: var(--sol-base01);
 		line-height: 1.1;
+	}
+
+	.score-val.policy {
+		font-family: var(--font-ui);
+		font-size: 0.68rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		white-space: nowrap;
 	}
 
 	.score-val.state {
