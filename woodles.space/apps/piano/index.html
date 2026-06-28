@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="cream">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>piano · woodles.space</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="/shared/fonts.css" />
+  <link rel="stylesheet" href="/shared/palette.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --piano-bg: #1f1433;
+      --piano-ink: #fff9ff;
+      --piano-muted: #c7b8dd;
+      --piano-line: rgba(236, 221, 255, 0.18);
+      --piano-panel: rgba(43, 28, 70, 0.76);
+      --piano-panel-strong: rgba(58, 37, 90, 0.92);
+      --piano-violet: #9d7cf4;
+      --piano-lilac: #d6b1ff;
+      --piano-plum: #4f2a6f;
+      --piano-mint: #87e4d4;
+      --piano-gold: #f0c66d;
+      --piano-rose: #ef91c7;
+      --white-key: #fbf7ff;
+      --white-key-edge: #d7c8e9;
+      --black-key: #2b173f;
+    }
+
+    html, body { min-height: 100%; }
+
+    body {
+      min-height: 100vh;
+      background:
+        linear-gradient(135deg, rgba(135, 228, 212, 0.14), transparent 32%),
+        linear-gradient(235deg, rgba(239, 145, 199, 0.18), transparent 36%),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 78px),
+        var(--piano-bg);
+      color: var(--piano-ink);
+      font-family: var(--font-sans);
+      font-weight: 300;
+      overflow-x: hidden;
+    }
+
+    button, input, select { font: inherit; }
+    button { color: inherit; }
+    a { color: inherit; }
+
+    .shell {
+      width: min(1180px, calc(100% - 2rem));
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: clamp(1rem, 3vw, 2.3rem) 0 2.4rem;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: clamp(1.2rem, 3vw, 2.2rem);
+    }
+
+    .topbar {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--piano-muted);
+    }
+
+    .home {
+      text-decoration: none;
+      opacity: 0.78;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .home:hover {
+      opacity: 1;
+      transform: translateX(-2px);
+    }
+
+    .meter {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .meter::before {
+      content: "";
+      width: 0.48rem;
+      height: 0.48rem;
+      border-radius: 999px;
+      background: var(--piano-mint);
+      box-shadow: 0 0 0 5px rgba(135, 228, 212, 0.16);
+    }
+
+    .instrument {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+      gap: clamp(1rem, 2.4vw, 1.6rem);
+      align-items: stretch;
+    }
+
+    .main {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto minmax(260px, 1fr) auto;
+      gap: 1rem;
+    }
+
+    header {
+      display: grid;
+      gap: 0.7rem;
+      max-width: 760px;
+    }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--piano-muted);
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: 6.9rem;
+      font-style: italic;
+      font-weight: 300;
+      line-height: 0.9;
+      color: var(--piano-lilac);
+      text-shadow: 0 16px 42px rgba(15, 7, 28, 0.42);
+    }
+
+    .lede {
+      max-width: 54ch;
+      font-size: 1rem;
+      line-height: 1.7;
+      color: var(--piano-muted);
+    }
+
+    .stage {
+      min-height: 360px;
+      border: 1px solid var(--piano-line);
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 36%),
+        linear-gradient(90deg, rgba(157, 124, 244, 0.18), rgba(135, 228, 212, 0.08), rgba(240, 198, 109, 0.1)),
+        var(--piano-panel);
+      box-shadow: 0 28px 80px -46px rgba(7, 4, 15, 0.96);
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: minmax(130px, 1fr) auto;
+    }
+
+    .stage.secret-playing {
+      border-color: rgba(240, 198, 109, 0.58);
+      box-shadow:
+        0 32px 90px -44px rgba(7, 4, 15, 0.96),
+        0 0 42px -24px rgba(240, 198, 109, 0.86);
+    }
+
+    .soundboard {
+      position: relative;
+      min-height: 130px;
+      overflow: hidden;
+      border-bottom: 1px solid var(--piano-line);
+      background:
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 58px),
+        linear-gradient(180deg, rgba(31, 20, 51, 0.22), rgba(31, 20, 51, 0.72));
+    }
+
+    .stage.secret-playing .soundboard {
+      background:
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 58px),
+        linear-gradient(90deg, rgba(240, 198, 109, 0.16), rgba(214, 177, 255, 0.18), rgba(135, 228, 212, 0.12)),
+        linear-gradient(180deg, rgba(31, 20, 51, 0.2), rgba(31, 20, 51, 0.72));
+    }
+
+    .strings {
+      position: absolute;
+      inset: 18% 3% 18% 3%;
+      display: grid;
+      grid-template-columns: repeat(18, minmax(0, 1fr));
+      align-items: stretch;
+      gap: min(1.2vw, 0.7rem);
+      opacity: 0.66;
+    }
+
+    .string {
+      position: relative;
+      min-width: 2px;
+      border-radius: 999px;
+      background: linear-gradient(to bottom, transparent, rgba(240, 198, 109, 0.82), transparent);
+      transform-origin: center;
+      transition: transform 0.16s ease, opacity 0.16s ease, background 0.16s ease;
+    }
+
+    .string.on {
+      opacity: 1;
+      transform: scaleY(1.12);
+      background: linear-gradient(to bottom, transparent, var(--piano-mint), var(--piano-lilac), transparent);
+    }
+
+    .now-playing {
+      position: absolute;
+      left: clamp(1rem, 3vw, 2rem);
+      bottom: clamp(0.9rem, 2vw, 1.4rem);
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+      color: var(--piano-ink);
+    }
+
+    .note-name {
+      min-width: 4.8ch;
+      font-family: var(--font-display);
+      font-size: 3.2rem;
+      font-style: italic;
+      line-height: 0.9;
+      color: var(--piano-lilac);
+    }
+
+    .note-detail {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      color: var(--piano-muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .keyboard-wrap {
+      padding: clamp(0.75rem, 2vw, 1rem);
+      overflow-x: auto;
+      scrollbar-color: var(--piano-violet) transparent;
+    }
+
+    .keyboard {
+      position: relative;
+      min-width: 812px;
+      height: clamp(220px, 32vh, 310px);
+      display: grid;
+      grid-template-columns: repeat(14, minmax(52px, 1fr));
+      gap: 3px;
+      padding: 0.2rem;
+      border-radius: 8px;
+      background: rgba(14, 8, 24, 0.7);
+      touch-action: none;
+    }
+
+    .key {
+      border: 0;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: transform 0.08s ease, filter 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    .key:focus-visible {
+      outline: 3px solid var(--piano-mint);
+      outline-offset: -5px;
+    }
+
+    .white {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.38rem;
+      padding: 0 0.25rem 1rem;
+      border-radius: 0 0 7px 7px;
+      background:
+        linear-gradient(180deg, #fff, var(--white-key) 52%, #e8dcf5);
+      color: #332243;
+      box-shadow:
+        inset 0 -8px 0 rgba(79, 42, 111, 0.08),
+        inset -1px 0 0 var(--white-key-edge);
+    }
+
+    .white.active {
+      transform: translateY(5px);
+      filter: saturate(1.2);
+      box-shadow:
+        inset 0 -2px 0 rgba(79, 42, 111, 0.16),
+        inset 0 0 0 999px rgba(214, 177, 255, 0.26);
+    }
+
+    .black {
+      position: absolute;
+      z-index: 3;
+      top: 0.2rem;
+      width: clamp(34px, 4.8vw, 48px);
+      height: 62%;
+      border-radius: 0 0 6px 6px;
+      background:
+        linear-gradient(180deg, #4a2a6f, var(--black-key) 76%, #160d22);
+      color: #f7edff;
+      box-shadow:
+        0 12px 22px -14px rgba(0, 0, 0, 0.9),
+        inset 0 1px 0 rgba(255, 255, 255, 0.18);
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.28rem;
+      padding: 0 0.15rem 0.72rem;
+    }
+
+    .black.active {
+      transform: translateX(-50%) translateY(4px);
+      background:
+        linear-gradient(180deg, var(--piano-violet), #3a2056 76%, #160d22);
+    }
+
+    .key-note {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0;
+      pointer-events: none;
+    }
+
+    .key-map {
+      min-width: 1.6rem;
+      border: 1px solid currentColor;
+      border-radius: 5px;
+      padding: 0.12rem 0.22rem;
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      line-height: 1.2;
+      opacity: 0.62;
+      pointer-events: none;
+    }
+
+    .black .key-map { opacity: 0.72; }
+
+    .phrase {
+      min-height: 76px;
+      display: grid;
+      align-content: center;
+      gap: 0.45rem;
+      padding: 1rem 0.2rem;
+      font-family: var(--font-mono);
+      color: var(--piano-muted);
+    }
+
+    .phrase-label {
+      font-size: 0.62rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .phrase-notes {
+      min-height: 1.6rem;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.36rem;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 1.6rem;
+      border: 1px solid rgba(214, 177, 255, 0.34);
+      border-radius: 999px;
+      padding: 0.22rem 0.48rem;
+      color: var(--piano-ink);
+      background: rgba(214, 177, 255, 0.12);
+      font-size: 0.66rem;
+    }
+
+    .controls {
+      border: 1px solid var(--piano-line);
+      border-radius: 8px;
+      background: var(--piano-panel-strong);
+      box-shadow: 0 28px 80px -46px rgba(7, 4, 15, 0.96);
+      padding: 1rem;
+      display: grid;
+      align-content: start;
+      gap: 1rem;
+    }
+
+    .control-group {
+      display: grid;
+      gap: 0.65rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--piano-line);
+    }
+
+    .control-group:last-child {
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
+
+    .group-title {
+      font-family: var(--font-mono);
+      font-size: 0.64rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--piano-muted);
+    }
+
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.46rem;
+    }
+
+    .icon-button,
+    .text-button {
+      min-height: 2.45rem;
+      border: 1px solid rgba(214, 177, 255, 0.28);
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--piano-ink);
+      cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.16s ease, background 0.16s ease;
+    }
+
+    .icon-button {
+      width: 2.45rem;
+      display: grid;
+      place-items: center;
+      font-family: var(--font-mono);
+      font-size: 1rem;
+    }
+
+    .text-button {
+      padding: 0 0.72rem;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.04em;
+    }
+
+    .icon-button:hover,
+    .text-button:hover {
+      border-color: var(--piano-mint);
+      background: rgba(135, 228, 212, 0.12);
+    }
+
+    .icon-button:active,
+    .text-button:active {
+      transform: translateY(1px);
+    }
+
+    .text-button.on {
+      border-color: var(--piano-gold);
+      background: rgba(240, 198, 109, 0.15);
+    }
+
+    .readout {
+      min-height: 2.45rem;
+      display: inline-grid;
+      place-items: center;
+      border: 1px solid rgba(214, 177, 255, 0.22);
+      border-radius: 7px;
+      padding: 0 0.78rem;
+      background: rgba(12, 7, 21, 0.28);
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--piano-lilac);
+    }
+
+    .field {
+      display: grid;
+      gap: 0.35rem;
+      font-family: var(--font-mono);
+      font-size: 0.64rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--piano-muted);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--piano-violet);
+    }
+
+    select {
+      min-height: 2.35rem;
+      border: 1px solid rgba(214, 177, 255, 0.28);
+      border-radius: 7px;
+      padding: 0 0.65rem;
+      background: rgba(12, 7, 21, 0.36);
+      color: var(--piano-ink);
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      min-height: 2.4rem;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--piano-muted);
+    }
+
+    .toggle input {
+      width: 2.6rem;
+      height: 1.35rem;
+      accent-color: var(--piano-violet);
+    }
+
+    .hint {
+      font-size: 0.76rem;
+      line-height: 1.6;
+      color: var(--piano-muted);
+    }
+
+    .spark {
+      position: fixed;
+      z-index: 5;
+      width: 0.42rem;
+      height: 0.42rem;
+      border-radius: 999px;
+      pointer-events: none;
+      background: var(--piano-mint);
+      box-shadow: 0 0 18px rgba(135, 228, 212, 0.8);
+      animation: spark 520ms ease-out forwards;
+    }
+
+    @keyframes spark {
+      from { opacity: 0.95; transform: translate(-50%, -50%) scale(0.8); }
+      to { opacity: 0; transform: translate(-50%, -180%) scale(2.7); }
+    }
+
+    @media (max-width: 920px) {
+      .shell { width: min(100% - 1rem, 1180px); }
+      .instrument { grid-template-columns: 1fr; }
+      .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .control-group { border-bottom: 0; padding-bottom: 0; }
+      .keyboard { min-width: 760px; height: 250px; }
+    }
+
+    @media (max-width: 620px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      h1 { font-size: 3.7rem; }
+      .stage { min-height: 330px; }
+      .controls { grid-template-columns: 1fr; }
+      .keyboard { min-width: 700px; height: 230px; }
+      .note-name { font-size: 2.4rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <nav class="topbar" aria-label="Piano navigation">
+      <a class="home" href="/">back to woodles.space</a>
+      <span class="meter" id="audio-state">tap a key to wake the strings</span>
+    </nav>
+
+    <section class="instrument" aria-label="Purple piano">
+      <div class="main">
+        <header>
+          <p class="eyebrow">woodles instrument</p>
+          <h1>purple piano</h1>
+          <p class="lede">A little playable keyboard with soft synth strings, computer-key mappings, octave drift, sustain, echo, and a pocket-sized phrase recorder.</p>
+        </header>
+
+        <section class="stage" aria-label="Playable piano keyboard">
+          <div class="soundboard" aria-hidden="true">
+            <div class="strings" id="strings"></div>
+            <div class="now-playing">
+              <span class="note-name" id="note-name">rest</span>
+              <span class="note-detail" id="note-detail">press, tap, or click</span>
+            </div>
+          </div>
+          <div class="keyboard-wrap">
+            <div class="keyboard" id="keyboard" aria-label="Two octave piano keyboard"></div>
+          </div>
+        </section>
+
+        <section class="phrase" aria-label="Recorded phrase">
+          <p class="phrase-label">phrase</p>
+          <div class="phrase-notes" id="phrase-notes">
+            <span class="chip">nothing caught yet</span>
+          </div>
+        </section>
+      </div>
+
+      <aside class="controls" aria-label="Piano controls">
+        <section class="control-group" aria-label="Octave controls">
+          <p class="group-title">range</p>
+          <div class="buttons">
+            <button class="icon-button" id="octave-down" type="button" aria-label="Octave down" title="Octave down">-</button>
+            <span class="readout" id="octave-readout">C3-B4</span>
+            <button class="icon-button" id="octave-up" type="button" aria-label="Octave up" title="Octave up">+</button>
+          </div>
+        </section>
+
+        <section class="control-group" aria-label="Tone controls">
+          <p class="group-title">tone</p>
+          <label class="field">
+            voice
+            <select id="waveform">
+              <option value="triangle">velvet triangle</option>
+              <option value="sine">clear sine</option>
+              <option value="sawtooth">bright saw</option>
+              <option value="square">glass square</option>
+            </select>
+          </label>
+          <label class="field">
+            volume
+            <input id="volume" type="range" min="0" max="0.8" step="0.01" value="0.42" />
+          </label>
+          <label class="field">
+            echo
+            <input id="echo" type="range" min="0" max="0.55" step="0.01" value="0.16" />
+          </label>
+        </section>
+
+        <section class="control-group" aria-label="Performance controls">
+          <p class="group-title">hands</p>
+          <label class="toggle">
+            sustain
+            <input id="sustain" type="checkbox" />
+          </label>
+          <div class="buttons">
+            <button class="text-button" id="record" type="button">record</button>
+            <button class="text-button" id="play" type="button">play</button>
+            <button class="text-button" id="clear" type="button">clear</button>
+          </div>
+        </section>
+
+        <section class="control-group" aria-label="Keyboard help">
+          <p class="group-title">typing keys</p>
+          <p class="hint">Use A through semicolon for white keys. The row above them plays sharps. Shift the octave when the room wants a lower hum or a brighter ceiling.</p>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const NOTE_STEPS = {
+      'C': 0,
+      'C#': 1,
+      'D': 2,
+      'D#': 3,
+      'E': 4,
+      'F': 5,
+      'F#': 6,
+      'G': 7,
+      'G#': 8,
+      'A': 9,
+      'A#': 10,
+      'B': 11,
+    };
+    const SECRET_SEQUENCE = [
+      'D', 'D', 'D+', 'A', 'G#', 'G', 'F', 'D', 'F', 'G',
+      'C', 'C', 'D+', 'A', 'G#', 'G', 'F', 'D', 'F', 'G',
+      'B', 'B', 'D+', 'A', 'G#', 'G', 'F', 'D', 'F', 'G',
+      'A#', 'A#', 'D+', 'A', 'G#', 'G', 'F', 'D', 'F', 'G',
+      'F', 'F', 'F', 'F', 'D', 'D', 'D', 'F', 'F', 'F', 'G', 'G#', 'G', 'F', 'D', 'F', 'G',
+      'F', 'F', 'F', 'G', 'G#', 'A', 'C', 'A',
+      'D', 'D', 'D', 'A', 'D', 'C', 'A',
+      'A', 'A', 'A', 'A', 'G', 'G', 'G', 'A', 'A', 'A', 'A', 'G', 'A', 'C', 'A', 'G',
+      'D', 'A', 'G', 'F', 'C', 'G', 'F', 'E',
+      'D', 'D', 'D', 'D', 'F', 'C', 'F', 'D', 'F', 'G', 'G#', 'G', 'F',
+    ];
+    const SECRET_GROUP_ENDS = new Set([9, 19, 29, 39, 56, 64, 71, 87, 95]);
+    const SECRET_INTERVAL_MS = 142;
+    const SECRET_HOLD_MS = 108;
+    const WHITE_NOTES = [
+      { step: 0, label: 'C', key: 'a' },
+      { step: 2, label: 'D', key: 's' },
+      { step: 4, label: 'E', key: 'd' },
+      { step: 5, label: 'F', key: 'f' },
+      { step: 7, label: 'G', key: 'g' },
+      { step: 9, label: 'A', key: 'h' },
+      { step: 11, label: 'B', key: 'j' },
+      { step: 12, label: 'C', key: 'k' },
+      { step: 14, label: 'D', key: 'l' },
+      { step: 16, label: 'E', key: ';' },
+      { step: 17, label: 'F', key: "'" },
+      { step: 19, label: 'G', key: 'z' },
+      { step: 21, label: 'A', key: 'x' },
+      { step: 23, label: 'B', key: 'c' },
+    ];
+    const BLACK_NOTES = [
+      { step: 1, label: 'C#', key: 'w', afterWhite: 0 },
+      { step: 3, label: 'D#', key: 'e', afterWhite: 1 },
+      { step: 6, label: 'F#', key: 't', afterWhite: 3 },
+      { step: 8, label: 'G#', key: 'y', afterWhite: 4 },
+      { step: 10, label: 'A#', key: 'u', afterWhite: 5 },
+      { step: 13, label: 'C#', key: 'o', afterWhite: 7 },
+      { step: 15, label: 'D#', key: 'p', afterWhite: 8 },
+      { step: 18, label: 'F#', key: ']', afterWhite: 10 },
+      { step: 20, label: 'G#', key: 'v', afterWhite: 11 },
+      { step: 22, label: 'A#', key: 'b', afterWhite: 12 },
+    ];
+    const KEY_ALIASES = new Map([[' ', 'sustain']]);
+    const keyboard = document.getElementById('keyboard');
+    const stage = document.querySelector('.stage');
+    const noteName = document.getElementById('note-name');
+    const noteDetail = document.getElementById('note-detail');
+    const audioState = document.getElementById('audio-state');
+    const strings = document.getElementById('strings');
+    const phraseNotes = document.getElementById('phrase-notes');
+    const octaveReadout = document.getElementById('octave-readout');
+    const waveform = document.getElementById('waveform');
+    const volume = document.getElementById('volume');
+    const echo = document.getElementById('echo');
+    const sustain = document.getElementById('sustain');
+    const recordButton = document.getElementById('record');
+    const playButton = document.getElementById('play');
+    const clearButton = document.getElementById('clear');
+    let audioContext = null;
+    let masterGain = null;
+    let delayNode = null;
+    let delayGain = null;
+    let active = new Map();
+    let pressed = new Map();
+    let baseOctave = 3;
+    let recording = false;
+    let recordStart = 0;
+    let phrase = [];
+    let secretTimers = [];
+    let secretActive = new Map();
+    let secretPlaying = false;
+    let secretClicks = 0;
+    let secretClickTimer = null;
+    let secretKeys = '';
+
+    for (let i = 0; i < 18; i++) {
+      const string = document.createElement('span');
+      string.className = 'string';
+      strings.appendChild(string);
+    }
+
+    function midiToName(midi) {
+      const name = NOTE_NAMES[midi % 12];
+      const octave = Math.floor(midi / 12) - 1;
+      return name + octave;
+    }
+
+    function midiToFrequency(midi) {
+      return 440 * Math.pow(2, (midi - 69) / 12);
+    }
+
+    function stepToMidi(step) {
+      return (baseOctave + 1) * 12 + step;
+    }
+
+    function ensureAudio() {
+      if (!audioContext) {
+        const AudioCtor = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AudioCtor();
+        masterGain = audioContext.createGain();
+        delayNode = audioContext.createDelay(0.9);
+        delayGain = audioContext.createGain();
+        delayNode.delayTime.value = 0.23;
+        delayGain.gain.value = Number(echo.value);
+        masterGain.gain.value = Number(volume.value);
+        masterGain.connect(audioContext.destination);
+        masterGain.connect(delayNode);
+        delayNode.connect(delayGain);
+        delayGain.connect(audioContext.destination);
+      }
+      if (audioContext.state === 'suspended') audioContext.resume();
+      audioState.textContent = 'audio awake';
+    }
+
+    function makeVoice(midi) {
+      ensureAudio();
+      const now = audioContext.currentTime;
+      const output = audioContext.createGain();
+      const osc = audioContext.createOscillator();
+      const sub = audioContext.createOscillator();
+      const subGain = audioContext.createGain();
+      const filter = audioContext.createBiquadFilter();
+      osc.type = waveform.value;
+      sub.type = 'sine';
+      osc.frequency.value = midiToFrequency(midi);
+      sub.frequency.value = midiToFrequency(midi) / 2;
+      filter.type = 'lowpass';
+      filter.frequency.value = 2400;
+      filter.Q.value = 0.8;
+      output.gain.setValueAtTime(0.0001, now);
+      output.gain.exponentialRampToValueAtTime(0.9, now + 0.018);
+      output.gain.exponentialRampToValueAtTime(0.56, now + 0.2);
+      subGain.gain.value = 0.16;
+      osc.connect(filter);
+      sub.connect(subGain);
+      subGain.connect(filter);
+      filter.connect(output);
+      output.connect(masterGain);
+      osc.start(now);
+      sub.start(now);
+      return { osc, sub, output };
+    }
+
+    function releaseVoice(id, quick = false) {
+      const voice = active.get(id);
+      if (!voice) return;
+      const now = audioContext.currentTime;
+      const tail = quick ? 0.08 : (sustain.checked ? 1.2 : 0.32);
+      voice.output.gain.cancelScheduledValues(now);
+      voice.output.gain.setTargetAtTime(0.0001, now, tail / 4);
+      voice.osc.stop(now + tail);
+      voice.sub.stop(now + tail);
+      active.delete(id);
+    }
+
+    function animateString(step) {
+      const all = [...strings.children];
+      const index = step % all.length;
+      all[index].classList.add('on');
+      window.setTimeout(() => all[index].classList.remove('on'), 240);
+    }
+
+    function sparkFromKey(keyEl) {
+      const box = keyEl.getBoundingClientRect();
+      const spark = document.createElement('span');
+      spark.className = 'spark';
+      spark.style.left = (box.left + box.width / 2) + 'px';
+      spark.style.top = (box.top + box.height * 0.24) + 'px';
+      document.body.appendChild(spark);
+      window.setTimeout(() => spark.remove(), 540);
+    }
+
+    function playNote(step, source = 'pointer', options = {}) {
+      const midi = stepToMidi(step);
+      const id = source + '-' + step + '-' + performance.now();
+      const keyEl = keyboard.querySelector('[data-step="' + step + '"]');
+      if (keyEl) {
+        keyEl.classList.add('active');
+        sparkFromKey(keyEl);
+      }
+      active.set(id, makeVoice(midi));
+      animateString(step);
+      const name = midiToName(midi);
+      noteName.textContent = name;
+      noteDetail.textContent = Math.round(midiToFrequency(midi)) + ' hz';
+      if (recording && !options.skipRecord) {
+        phrase.push({ step, at: performance.now() - recordStart, duration: 360 });
+        renderPhrase();
+      }
+      return id;
+    }
+
+    function stopNote(id, step) {
+      releaseVoice(id);
+      const keyEl = keyboard.querySelector('[data-step="' + step + '"]');
+      if (keyEl) keyEl.classList.remove('active');
+    }
+
+    function secretStepFrom(token) {
+      const high = token.endsWith('+');
+      const note = high ? token.slice(0, -1) : token;
+      return NOTE_STEPS[note] + (high ? 12 : 0);
+    }
+
+    function clearSecretPerformance() {
+      secretTimers.forEach((timer) => window.clearTimeout(timer));
+      secretTimers = [];
+      for (const [id, step] of secretActive) stopNote(id, step);
+      secretActive.clear();
+      secretPlaying = false;
+      stage.classList.remove('secret-playing');
+    }
+
+    function playSecretSong() {
+      clearSecretPerformance();
+      ensureAudio();
+      secretPlaying = true;
+      stage.classList.add('secret-playing');
+      audioState.textContent = 'a hidden melody found';
+      noteDetail.textContent = 'let it play';
+      let elapsed = 0;
+      SECRET_SEQUENCE.forEach((token, index) => {
+        const step = secretStepFrom(token);
+        const startTimer = window.setTimeout(() => {
+          const id = playNote(step, 'secret', { skipRecord: true });
+          secretActive.set(id, step);
+          const stopTimer = window.setTimeout(() => {
+            stopNote(id, step);
+            secretActive.delete(id);
+          }, SECRET_HOLD_MS);
+          secretTimers.push(stopTimer);
+        }, elapsed);
+        secretTimers.push(startTimer);
+        elapsed += SECRET_INTERVAL_MS + (SECRET_GROUP_ENDS.has(index) ? 180 : 0);
+      });
+      const doneTimer = window.setTimeout(() => {
+        secretPlaying = false;
+        secretTimers = [];
+        secretActive.clear();
+        stage.classList.remove('secret-playing');
+        audioState.textContent = 'audio awake';
+        noteDetail.textContent = 'secret song complete';
+      }, elapsed + 360);
+      secretTimers.push(doneTimer);
+    }
+
+    function trackSecretKeys(key) {
+      if (key.length !== 1) return;
+      secretKeys = (secretKeys + key.toLowerCase()).slice(-11);
+      if (secretKeys === 'megalovania') {
+        secretKeys = '';
+        playSecretSong();
+      }
+    }
+
+    function renderKeyboard() {
+      keyboard.innerHTML = '';
+      const keyToStep = new Map();
+      WHITE_NOTES.forEach((note, index) => {
+        const button = document.createElement('button');
+        button.className = 'key white';
+        button.type = 'button';
+        button.dataset.step = note.step;
+        button.style.gridColumn = String(index + 1);
+        button.innerHTML = '<span class="key-note">' + note.label + '</span><span class="key-map">' + note.key.toUpperCase() + '</span>';
+        button.setAttribute('aria-label', midiToName(stepToMidi(note.step)));
+        keyboard.appendChild(button);
+        keyToStep.set(note.key, note.step);
+      });
+      BLACK_NOTES.forEach((note) => {
+        const button = document.createElement('button');
+        button.className = 'key black';
+        button.type = 'button';
+        button.dataset.step = note.step;
+        button.style.left = 'calc((100% - 0.4rem) / 14 * ' + (note.afterWhite + 1) + ' + 0.2rem)';
+        button.innerHTML = '<span class="key-note">' + note.label + '</span><span class="key-map">' + note.key.toUpperCase() + '</span>';
+        button.setAttribute('aria-label', midiToName(stepToMidi(note.step)));
+        keyboard.appendChild(button);
+        keyToStep.set(note.key, note.step);
+      });
+      window.keyToStep = keyToStep;
+    }
+
+    function updateOctave() {
+      octaveReadout.textContent = 'C' + baseOctave + '-B' + (baseOctave + 1);
+      [...keyboard.querySelectorAll('.key')].forEach((key) => {
+        key.setAttribute('aria-label', midiToName(stepToMidi(Number(key.dataset.step))));
+      });
+    }
+
+    function renderPhrase() {
+      phraseNotes.innerHTML = '';
+      if (!phrase.length) {
+        phraseNotes.innerHTML = '<span class="chip">nothing caught yet</span>';
+        return;
+      }
+      phrase.slice(-24).forEach((item) => {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.textContent = midiToName(stepToMidi(item.step));
+        phraseNotes.appendChild(chip);
+      });
+    }
+
+    function pointerStart(event) {
+      const key = event.target.closest('.key');
+      if (!key) return;
+      event.preventDefault();
+      const step = Number(key.dataset.step);
+      const id = playNote(step, 'pointer');
+      key.setPointerCapture(event.pointerId);
+      pressed.set('pointer-' + event.pointerId, { id, step });
+    }
+
+    function pointerEnd(event) {
+      const held = pressed.get('pointer-' + event.pointerId);
+      if (!held) return;
+      stopNote(held.id, held.step);
+      pressed.delete('pointer-' + event.pointerId);
+    }
+
+    keyboard.addEventListener('pointerdown', pointerStart);
+    keyboard.addEventListener('pointerup', pointerEnd);
+    keyboard.addEventListener('pointercancel', pointerEnd);
+    keyboard.addEventListener('pointerleave', pointerEnd);
+
+    document.querySelector('h1').addEventListener('click', () => {
+      secretClicks += 1;
+      window.clearTimeout(secretClickTimer);
+      secretClickTimer = window.setTimeout(() => { secretClicks = 0; }, 1200);
+      if (secretClicks >= 5) {
+        secretClicks = 0;
+        playSecretSong();
+      }
+    });
+
+    window.addEventListener('keydown', (event) => {
+      if (
+        event.repeat ||
+        (event.target instanceof Element && event.target.matches('input, select, textarea'))
+      ) return;
+      const key = event.key.toLowerCase();
+      trackSecretKeys(key);
+      if (KEY_ALIASES.get(event.key) === 'sustain') {
+        event.preventDefault();
+        sustain.checked = !sustain.checked;
+        return;
+      }
+      const step = window.keyToStep.get(key);
+      if (step === undefined) return;
+      event.preventDefault();
+      const id = playNote(step, 'keyboard');
+      pressed.set('keyboard-' + key, { id, step });
+    });
+
+    window.addEventListener('keyup', (event) => {
+      const key = event.key.toLowerCase();
+      const held = pressed.get('keyboard-' + key);
+      if (!held) return;
+      event.preventDefault();
+      stopNote(held.id, held.step);
+      pressed.delete('keyboard-' + key);
+    });
+
+    document.getElementById('octave-down').addEventListener('click', () => {
+      baseOctave = Math.max(1, baseOctave - 1);
+      updateOctave();
+    });
+
+    document.getElementById('octave-up').addEventListener('click', () => {
+      baseOctave = Math.min(5, baseOctave + 1);
+      updateOctave();
+    });
+
+    volume.addEventListener('input', () => {
+      if (masterGain) masterGain.gain.value = Number(volume.value);
+    });
+
+    echo.addEventListener('input', () => {
+      if (delayGain) delayGain.gain.value = Number(echo.value);
+    });
+
+    sustain.addEventListener('change', () => {
+      if (!sustain.checked) {
+        for (const [id] of active) releaseVoice(id, true);
+      }
+    });
+
+    recordButton.addEventListener('click', () => {
+      recording = !recording;
+      recordButton.classList.toggle('on', recording);
+      recordButton.textContent = recording ? 'recording' : 'record';
+      if (recording) {
+        phrase = [];
+        recordStart = performance.now();
+        renderPhrase();
+      }
+    });
+
+    playButton.addEventListener('click', () => {
+      if (!phrase.length) return;
+      ensureAudio();
+      phrase.forEach((item) => {
+        window.setTimeout(() => {
+          const id = playNote(item.step, 'phrase');
+          window.setTimeout(() => stopNote(id, item.step), item.duration);
+        }, item.at);
+      });
+    });
+
+    clearButton.addEventListener('click', () => {
+      phrase = [];
+      recording = false;
+      recordButton.classList.remove('on');
+      recordButton.textContent = 'record';
+      renderPhrase();
+    });
+
+    renderKeyboard();
+    updateOctave();
+    renderPhrase();
+  </script>
+</body>
+</html>

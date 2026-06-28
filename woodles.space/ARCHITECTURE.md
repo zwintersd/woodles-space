@@ -52,7 +52,8 @@ woodles.space/
     ├── animations/          Python · Manim playspace, outside the workspace
     ├── write/               SvelteKit · the letter editor
     ├── marginalia/          SvelteKit · a witch writes worlds + a reading room
-    ├── planner/             SvelteKit · carillon — the day, held quietly
+    ├── planner/             SvelteKit · carillon — calendar, schedule, and time
+    ├── notebook/            SvelteKit · notes, tasks, and ideas kept close
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
     ├── spores/              SvelteKit · a garden of spores, gathered into spellbooks
     └── marginalia-devlog/   SvelteKit · a devlog built from typed blocks
@@ -71,8 +72,8 @@ runtime — `<link href="/shared/palette.css">` and `import … from
 and its bloom post-processing addons from a CDN through a `<script
 type="importmap">`, still with no build step.
 
-**SvelteKit apps** — `write`, `marginalia`, `planner`, `bestiary`, `spores`,
-`marginalia-devlog` — use Svelte 5 runes, Vite 7, and `@sveltejs/adapter-static`.
+**SvelteKit apps** — `write`, `marginalia`, `planner`, `notebook`, `bestiary`,
+`spores`, `marginalia-devlog` — use Svelte 5 runes, Vite 7, and `@sveltejs/adapter-static`.
 each builds to `apps/<name>/dist/` and consumes `shared/` through the `@shared`
 Vite alias (`../../shared`). there is no SSR; every app ships as a static bundle.
 
@@ -207,7 +208,7 @@ are written up in [apps/planner/KNOWN_ISSUES.md](./apps/planner/KNOWN_ISSUES.md)
 | `spores`            | 4 warnings — `autofocus` a11y           |
 | `marginalia-devlog` | 1 warning — `line-clamp` in `EntryList` |
 
-`pnpm -r check` runs all six in turn and reaches every one. it stops at the
+`pnpm -r check` runs all seven in turn and reaches every one. it stops at the
 first app that fails, though, so if you break an early one, run the app you care
 about directly to see past it.
 
@@ -219,7 +220,7 @@ from `woodles.space/`:
 pnpm install            one install for the whole workspace
 pnpm test               vitest in every SvelteKit app with a test script (620 tests)
 pnpm check              svelte-check in every app
-pnpm build              build the six SvelteKit apps
+pnpm build              build the seven SvelteKit apps
 ```
 
 both `test` and `check` generate `.svelte-kit/` themselves on a fresh clone, so

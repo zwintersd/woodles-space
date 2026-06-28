@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { store } from '$lib/store.svelte';
 	import { dayOfWeekLabel, shortDateLabel } from '$lib/utils';
-	import TaskItem from './TaskItem.svelte';
 
 	const dateStr = $derived(store.activeDayKey);
 
@@ -13,33 +12,10 @@
 
 	const dayShape = $derived(date ? store.getDayShape(date) : null);
 	const blocks = $derived(date ? store.getBlocksForDate(date) : []);
-	const tasks = $derived(dateStr ? store.getTasksForDay(dateStr) : []);
 	const dayShapeLabel = $derived(dayShape?.name ?? 'no shape');
-
-	const blocksWithTasks = $derived(
-		blocks
-			.map((b) => ({ block: b, tasks: tasks.filter((t) => t.targetBlockId === b.id) }))
-			.filter((bt) => bt.tasks.length > 0)
-	);
-
-	const unscheduled = $derived(tasks.filter((t) => !t.targetBlockId));
-
-	let addTitle = $state('');
-	let addBlockId = $state('');
-	let addInput: HTMLInputElement | undefined = $state();
-
-	function submitAdd(e: Event) {
-		e.preventDefault();
-		const title = addTitle.trim();
-		if (!title || !dateStr) return;
-		store.addTask({ title, targetDate: dateStr, targetBlockId: addBlockId || undefined });
-		addTitle = '';
-		addInput?.focus();
-	}
 
 	function close() {
 		store.closeDayPanel();
-		addTitle = '';
 	}
 
 	function cycleShape() {
@@ -50,11 +26,11 @@
 
 <svelte:window
 	onkeydown={(e) => {
-		if (e.key === 'Escape' && store.activeDayKey != null && store.editingTaskId == null && !store.composing) close();
+		if (e.key === 'Escape' && store.activeDayKey != null) close();
 	}}
 />
 
-{#if store.activeDayKey != null && store.editingTaskId == null && !store.composing}
+{#if store.activeDayKey != null}
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="dp-backdrop" onclick={close}></div>
@@ -76,49 +52,20 @@
 		</header>
 
 		<div class="dp-body">
-			{#if tasks.length === 0}
-				<p class="dp-empty">nothing scheduled.</p>
+			{#if blocks.length === 0}
+				<p class="dp-empty">no blocks.</p>
 			{:else}
-				{#each blocksWithTasks as bt (bt.block.id)}
-					<div class="dp-group">
-						<span class="dp-group-label">{bt.block.startTime} · {bt.block.title}</span>
-						<div role="list">
-							{#each bt.tasks as task (task.id)}
-								<TaskItem {task} />
-							{/each}
-						</div>
+				{#each blocks as block (block.id)}
+					<div class="dp-block" class:overlay={block.overlay != null}>
+						<span class="dp-block-time">{block.startTime} — {block.endTime}</span>
+						<span class="dp-block-title">{block.title}</span>
+						{#if block.overlay}
+							<span class="dp-block-kind">{block.overlay}</span>
+						{/if}
 					</div>
 				{/each}
-				{#if unscheduled.length > 0}
-					<div class="dp-group">
-						<span class="dp-group-label">unscheduled</span>
-						<div role="list">
-							{#each unscheduled as task (task.id)}
-								<TaskItem {task} />
-							{/each}
-						</div>
-					</div>
-				{/if}
 			{/if}
 		</div>
-
-		<form class="dp-add" onsubmit={submitAdd}>
-			<input
-				bind:this={addInput}
-				bind:value={addTitle}
-				class="dp-add-input"
-				placeholder="add something…"
-				autocomplete="off"
-				spellcheck="false"
-			/>
-			<select class="dp-add-block" bind:value={addBlockId}>
-				<option value="">no block</option>
-				{#each blocks as b (b.id)}
-					<option value={b.id}>{b.startTime} {b.title}</option>
-				{/each}
-			</select>
-			<button type="submit" class="dp-add-submit" disabled={!addTitle.trim()}>→</button>
-		</form>
 	{/if}
 </div>
 
@@ -245,81 +192,33 @@
 		letter-spacing: 0.04em;
 	}
 
-	.dp-group {
-		margin-bottom: 0.65rem;
+	.dp-block {
+		display: grid;
+		grid-template-columns: 6.8rem 1fr auto;
+		align-items: baseline;
+		gap: 0.7rem;
+		padding: 0.6rem 0;
+		border-bottom: 1px solid var(--p-border);
 	}
 
-	.dp-group-label {
-		display: block;
+	.dp-block-time,
+	.dp-block-kind {
 		font-family: var(--pl-font-mono);
-		font-size: 0.5rem;
-		letter-spacing: 0.14em;
+		font-size: 0.55rem;
+		letter-spacing: 0.1em;
 		text-transform: uppercase;
 		color: var(--p-muted);
-		opacity: 0.5;
-		margin-bottom: 0.1rem;
+		opacity: 0.62;
 	}
 
-	.dp-add {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.55rem 1.25rem 1rem;
-		border-top: 1px solid var(--p-border);
-		flex-shrink: 0;
-	}
-
-	.dp-add-input {
-		flex: 1;
-		font-family: var(--pl-font-mono);
-		font-size: 0.76rem;
+	.dp-block-title {
+		font-family: var(--pl-font-display);
+		font-size: 1.08rem;
+		line-height: 1.25;
 		color: var(--p-text);
-		padding: 4px 0;
-		border-bottom: 1px solid var(--p-border);
-		background: transparent;
-		transition: border-color var(--pl-transition-fast);
-		min-width: 0;
 	}
 
-	.dp-add-input:focus {
-		border-color: var(--p-accent);
-		outline: none;
-	}
-
-	.dp-add-input::placeholder {
-		color: var(--p-muted);
-		opacity: 0.4;
-	}
-
-	.dp-add-block {
-		font-family: var(--pl-font-mono);
-		font-size: 0.58rem;
-		color: var(--p-muted);
-		background: transparent;
-		border: 1px solid var(--p-border);
-		border-radius: var(--pl-radius-sm);
-		padding: 3px 5px;
-		max-width: 110px;
-		flex-shrink: 0;
-	}
-
-	.dp-add-submit {
-		font-family: var(--pl-font-mono);
-		font-size: 0.85rem;
-		color: var(--p-muted);
-		opacity: 0.45;
-		padding: 2px 4px;
-		flex-shrink: 0;
-		transition: opacity var(--pl-transition-fast), color var(--pl-transition-fast);
-	}
-
-	.dp-add-submit:not(:disabled):hover {
-		opacity: 1;
-		color: var(--p-accent);
-	}
-
-	.dp-add-submit:disabled {
-		opacity: 0.2;
-		cursor: default;
+	.dp-block.overlay .dp-block-title {
+		font-style: italic;
 	}
 </style>

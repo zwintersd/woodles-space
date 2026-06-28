@@ -6,9 +6,8 @@
 		minutesRemaining,
 		minutesUntilBlock
 	} from '$lib/templates';
-	import { minutesToDisplay, dayOfWeekLabel, shortDateLabel, dateKey, formatTime, timeToMinutes } from '$lib/utils';
+	import { minutesToDisplay, dayOfWeekLabel, shortDateLabel, formatTime, timeToMinutes } from '$lib/utils';
 	import { getDailyFlourish, shouldShowFlourish } from '$lib/voice';
-	import TaskItem from './TaskItem.svelte';
 
 	let dayShape = $derived(store.getDayShape(store.now));
 	let blocks = $derived(store.getBlocksForDate(store.now));
@@ -16,14 +15,6 @@
 	let nextBlock = $derived(getNextBlock(blocks, store.now));
 	let remaining = $derived(currentBlock ? minutesRemaining(currentBlock, store.now) : null);
 	let untilNext = $derived(nextBlock ? minutesUntilBlock(nextBlock, store.now) : null);
-	let currentTasks = $derived(
-		currentBlock ? store.getTasksForBlock(currentBlock.id, dateKey(store.now)) : []
-	);
-	let todayKey = $derived(dateKey(store.now));
-	let todayTasks = $derived(store.getTasksForDay(todayKey));
-	let openTodayCount = $derived(todayTasks.filter((task) => task.status === 'open').length);
-	let doneTodayCount = $derived(todayTasks.filter((task) => task.status === 'done').length);
-	let trayCount = $derived(store.getUnscheduledTasks().filter((task) => task.status === 'open').length);
 
 	let leadTime = $derived(
 		untilNext !== null &&
@@ -60,36 +51,7 @@
 
 	const dayShapeLabel = $derived(dayShape?.name ?? 'no shape');
 
-	let newTaskTitle = $state('');
-	let inputEl: HTMLInputElement | undefined = $state();
-
-	function submitTask(e: Event) {
-		e.preventDefault();
-		const title = newTaskTitle.trim();
-		if (!title) return;
-		// With a block in progress, capture straight into it; otherwise the task
-		// lands on today's tray (unscheduled) rather than going nowhere.
-		if (currentBlock) {
-			store.addTask({ title, targetBlockId: currentBlock.id });
-		} else {
-			store.addTask({ title, targetDate: dateKey(store.now) });
-		}
-		newTaskTitle = '';
-	}
-
-	function scheduleForLater() {
-		store.startCompose({
-			targetDate: dateKey(store.now),
-			targetBlockId: currentBlock?.id
-		});
-	}
-
-	function handleInputKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') {
-			newTaskTitle = '';
-			inputEl?.blur();
-		}
-	}
+	let elapsedLabel = $derived(currentBlock ? `${Math.round(progressPct)}% elapsed` : null);
 </script>
 
 <div class="now-next">
@@ -131,12 +93,8 @@
 			<h1 class="nn-block-title">{currentBlock.title}</h1>
 			<p class="nn-block-time">{currentBlock.startTime} — {currentBlock.endTime}</p>
 
-			{#if currentTasks.length > 0}
-				<div class="nn-tasks" role="list">
-					{#each currentTasks as task (task.id)}
-						<TaskItem {task} />
-					{/each}
-				</div>
+			{#if elapsedLabel}
+				<p class="nn-block-note">{elapsedLabel}</p>
 			{/if}
 		{:else if blocks.length === 0}
 			<h1 class="nn-block-title nn-free">The day has not yet decided what it is.</h1>
@@ -146,41 +104,6 @@
 			<p class="nn-block-time">between schedule</p>
 		{/if}
 
-		<!-- Capture bar — always present, even when no block is in progress -->
-		<div class="nn-capture">
-			<form class="nn-add-task" onsubmit={submitTask}>
-				<input
-					bind:this={inputEl}
-					bind:value={newTaskTitle}
-					class="nn-add-input"
-					placeholder={currentBlock ? '+ add something' : '+ capture something'}
-					autocomplete="off"
-					spellcheck="false"
-					onkeydown={handleInputKeydown}
-				/>
-			</form>
-			<button type="button" class="nn-schedule-btn" onclick={scheduleForLater}>
-				schedule for later…
-			</button>
-		</div>
-	</section>
-
-	<section class="nn-day-strip" aria-label="today summary">
-		<div class="nn-strip-item">
-			<span class="nn-strip-value">{openTodayCount}</span>
-			<span class="nn-strip-label">open today</span>
-		</div>
-		<div class="nn-strip-item">
-			<span class="nn-strip-value">{doneTodayCount}</span>
-			<span class="nn-strip-label">done</span>
-		</div>
-		<button class="nn-strip-item nn-strip-button" onclick={() => store.setView('today')}>
-			<span class="nn-strip-value">{trayCount}</span>
-			<span class="nn-strip-label">tray</span>
-		</button>
-		<button class="nn-strip-action" onclick={() => store.setView('today')}>
-			open today
-		</button>
 	</section>
 
 	<!-- Next block card -->
@@ -377,64 +300,12 @@
 		margin-bottom: 1.5rem;
 	}
 
-	.nn-tasks {
-		border-top: 1px solid var(--p-border);
-		padding-top: 0.85rem;
-		margin-bottom: 0.5rem;
-		display: flex;
-		flex-direction: column;
-	}
-
-	.nn-capture {
-		border-top: 1px solid var(--p-border);
-		padding-top: 0.75rem;
-		margin-top: 1.25rem;
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-	}
-
-	.nn-add-task {
-		flex: 1;
-		min-width: 0;
-	}
-
-	.nn-add-input {
-		width: 100%;
+	.nn-block-note {
 		font-family: var(--pl-font-mono);
-		font-size: 0.8rem;
-		color: var(--p-muted);
-		letter-spacing: 0.03em;
-		padding: 0.3rem 0;
-		transition: color var(--pl-transition-fast);
-	}
-
-	.nn-schedule-btn {
-		flex-shrink: 0;
-		font-family: var(--pl-font-mono);
-		font-size: 0.62rem;
+		font-size: 0.66rem;
 		letter-spacing: 0.08em;
 		color: var(--p-muted);
-		border: 1px solid var(--p-border);
-		padding: 4px 11px;
-		border-radius: var(--pl-radius-pill);
-		opacity: 0.7;
-		transition: opacity var(--pl-transition-fast), color var(--pl-transition-fast), border-color var(--pl-transition-fast);
-	}
-
-	.nn-schedule-btn:hover {
-		opacity: 1;
-		color: var(--p-accent);
-		border-color: var(--p-accent);
-	}
-
-	.nn-add-input::placeholder {
-		color: var(--p-muted);
-		opacity: 0.45;
-	}
-
-	.nn-add-input:focus {
-		color: var(--p-text);
+		margin-top: 1.2rem;
 	}
 
 	.nn-next-card {
@@ -454,66 +325,6 @@
 		opacity: 1;
 	}
 
-	.nn-day-strip {
-		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
-		align-items: stretch;
-		gap: 0.5rem;
-		margin: -0.15rem 0 1rem;
-	}
-
-	.nn-strip-item,
-	.nn-strip-action {
-		border: 1px solid var(--p-border);
-		border-radius: var(--pl-radius-md);
-		background: color-mix(in srgb, var(--p-surface) 72%, transparent);
-	}
-
-	.nn-strip-item {
-		min-height: 3.1rem;
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		gap: 0.1rem;
-		padding: 0.45rem 0.7rem;
-		text-align: left;
-	}
-
-	.nn-strip-button,
-	.nn-strip-action {
-		transition: border-color var(--pl-transition-fast), color var(--pl-transition-fast), background var(--pl-transition-fast);
-	}
-
-	.nn-strip-button:hover,
-	.nn-strip-action:hover {
-		border-color: var(--p-accent);
-		background: var(--p-accent-soft);
-	}
-
-	.nn-strip-value {
-		font-family: var(--pl-font-display);
-		font-size: 1.25rem;
-		line-height: 1;
-		color: var(--p-text);
-	}
-
-	.nn-strip-label {
-		font-family: var(--pl-font-mono);
-		font-size: 0.56rem;
-		letter-spacing: 0.1em;
-		text-transform: lowercase;
-		color: var(--p-muted);
-		white-space: nowrap;
-	}
-
-	.nn-strip-action {
-		font-family: var(--pl-font-mono);
-		font-size: 0.62rem;
-		letter-spacing: 0.12em;
-		color: var(--p-muted);
-		padding: 0 1rem;
-		white-space: nowrap;
-	}
 
 	.nn-next-body {
 		display: flex;
@@ -636,13 +447,5 @@
 			text-align: center;
 		}
 
-		.nn-day-strip {
-			grid-template-columns: repeat(3, minmax(0, 1fr));
-		}
-
-		.nn-strip-action {
-			grid-column: 1 / -1;
-			min-height: 2.4rem;
-		}
 	}
 </style>

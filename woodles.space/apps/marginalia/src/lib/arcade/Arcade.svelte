@@ -2,7 +2,19 @@
 	import ColorPop from './ColorPop.svelte';
 	import InsightRush from './InsightRush.svelte';
 	import MarginMiner from './MarginMiner.svelte';
+	import { tick } from 'svelte';
+	import BubbleShooter from './BubbleShooter.svelte';
+	import BubbleSpinner from './BubbleSpinner.svelte';
+	import BulletHeaven from './BulletHeaven.svelte';
+	import GetBig from './GetBig.svelte';
+	import InsightRush from './InsightRush.svelte';
+	import MarginHollow from './MarginHollow.svelte';
+	import PaddleBreak from './PaddleBreak.svelte';
+	import Snake from './Snake.svelte';
+	import TowerDefense from './TowerDefense.svelte';
+	import Inkblot from './Inkblot.svelte';
 	import TwoZeroFourEight from './TwoZeroFourEight.svelte';
+	import TypeWitch from './TypeWitch.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
 
 	type GameStatus = 'play' | 'soon' | 'locked';
@@ -19,15 +31,24 @@
 
 	interface Props {
 		activePet?: BestiaryCreature | null;
+		bestiaryCreatures?: BestiaryCreature[];
 		onactivechange?: (gameId: string | null) => void;
 	}
 
-	let { activePet = null, onactivechange }: Props = $props();
+	let { activePet = null, bestiaryCreatures = [], onactivechange }: Props = $props();
 
 	let activeGame = $state<string | null>(null);
 	let rootEl: HTMLDivElement;
 
 	const games: MiniGame[] = [
+		{
+			id: 'inkblot',
+			icon: '⬤',
+			title: 'Inkblot',
+			tagline: 'An image blooms slowly from ink. Press space to pause and name the creature before it fully resolves.',
+			tags: ['recognition', 'observation'],
+			status: 'play'
+		},
 		{
 			id: 'stack-2048',
 			icon: '▦',
@@ -58,7 +79,23 @@
 			title: 'Type Witch',
 			tagline: 'Race against the clock to transcribe Brianna\'s conditions before they dissolve.',
 			tags: ['typing', 'timed'],
-			status: 'soon'
+			status: 'play'
+		},
+		{
+			id: 'get-big',
+			icon: '●',
+			title: 'Get Big!',
+			tagline: 'Eat smaller jelly, dodge bigger jelly, and grow until yellow finally fits.',
+			tags: ['arcade', 'growth'],
+			status: 'play'
+		},
+		{
+			id: 'margin-hollow',
+			icon: '▣',
+			title: 'Margin Hollow',
+			tagline: 'A tiny metroidvania-like: jump, collect a wing, open gates, and reach the vault.',
+			tags: ['platform', 'gates'],
+			status: 'play'
 		},
 		{
 			id: 'condition-match',
@@ -74,6 +111,54 @@
 			title: 'Insight Rush',
 			tagline: 'Tap fast, tap true. Harvest a burst of insight before the moment closes.',
 			tags: ['clicker', 'speed'],
+			status: 'play'
+		},
+		{
+			id: 'bullet-dot',
+			icon: '•',
+			title: 'Bullet Dot',
+			tagline: 'The simplest bullet heaven possible: one dot, one swarm, automatic shots.',
+			tags: ['action', 'survival'],
+			status: 'play'
+		},
+		{
+			id: 'margin-defense',
+			icon: '⌂',
+			title: 'Margin Defense',
+			tagline: 'Place tiny towers along one route. Hold five waves before the margin breaks.',
+			tags: ['tower', 'strategy'],
+			status: 'play'
+		},
+		{
+			id: 'margin-snake',
+			icon: '∿',
+			title: 'Margin Snake',
+			tagline: 'Classic snake in a notebook grid. Eat marks, grow longer, avoid yourself.',
+			tags: ['arcade', 'grid'],
+			status: 'play'
+		},
+		{
+			id: 'paddle-break',
+			icon: '▭',
+			title: 'Paddle Break',
+			tagline: 'Pong hands, Breakout wall: keep the ball alive while the bricks come loose.',
+			tags: ['arcade', 'reflex'],
+			status: 'play'
+		},
+		{
+			id: 'bubble-spinner',
+			icon: 'o',
+			title: 'Bubble Spinner',
+			tagline: 'Shoot into a hex cluster, kick it into spin, match colors, and drop orphaned rings.',
+			tags: ['shooter', 'physics'],
+			status: 'play'
+		},
+		{
+			id: 'margin-bubbles',
+			icon: '◌',
+			title: 'Margin Bubbles',
+			tagline: 'Bank shots into the canopy, match colors in threes, and keep the ceiling from pressing down.',
+			tags: ['shooter', 'aim'],
 			status: 'play'
 		},
 		{
@@ -107,20 +192,27 @@
 
 	const activeGameData = $derived(games.find((game) => game.id === activeGame) ?? null);
 
-	function showCabinetTop() {
-		requestAnimationFrame(() => rootEl?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+	async function showCabinetTop() {
+		await tick();
+		requestAnimationFrame(() => {
+			requestAnimationFrame(() => {
+				if (!rootEl) return;
+				const top = rootEl.getBoundingClientRect().top + window.scrollY - 12;
+				window.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
+			});
+		});
 	}
 
 	function openGame(gameId: string) {
 		activeGame = gameId;
 		onactivechange?.(activeGame);
-		showCabinetTop();
+		void showCabinetTop();
 	}
 
 	function closeGame() {
 		activeGame = null;
 		onactivechange?.(activeGame);
-		showCabinetTop();
+		void showCabinetTop();
 	}
 
 	const statusLabel: Record<GameStatus, string> = {
@@ -153,14 +245,34 @@
 				</div>
 			</header>
 
-			{#if activeGame === 'stack-2048'}
+			{#if activeGame === 'inkblot'}
+				<Inkblot onclose={closeGame} creatures={bestiaryCreatures} />
+			{:else if activeGame === 'stack-2048'}
 				<TwoZeroFourEight onclose={closeGame} creature={activePet} />
 			{:else if activeGame === 'color-pop'}
 				<ColorPop onclose={closeGame} />
 			{:else if activeGame === 'margin-miner'}
 				<MarginMiner onclose={closeGame} />
+			{:else if activeGame === 'get-big'}
+				<GetBig onclose={closeGame} />
+			{:else if activeGame === 'margin-hollow'}
+				<MarginHollow onclose={closeGame} />
 			{:else if activeGame === 'insight-rush'}
 				<InsightRush onclose={closeGame} />
+			{:else if activeGame === 'bullet-dot'}
+				<BulletHeaven onclose={closeGame} />
+			{:else if activeGame === 'margin-defense'}
+				<TowerDefense onclose={closeGame} />
+			{:else if activeGame === 'margin-snake'}
+				<Snake onclose={closeGame} />
+			{:else if activeGame === 'paddle-break'}
+				<PaddleBreak onclose={closeGame} />
+			{:else if activeGame === 'bubble-spinner'}
+				<BubbleSpinner onclose={closeGame} />
+			{:else if activeGame === 'margin-bubbles'}
+				<BubbleShooter onclose={closeGame} />
+			{:else if activeGame === 'type-witch'}
+				<TypeWitch onclose={closeGame} />
 			{/if}
 		</section>
 	{:else}

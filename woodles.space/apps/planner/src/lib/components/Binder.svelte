@@ -1,14 +1,10 @@
 <script lang="ts">
 	import { store } from '$lib/store.svelte';
-	import { dayOfWeekLabel, shortDateLabel, dateKey } from '$lib/utils';
 	import { EMPTY_STATES, BINDER_LABELS } from '$lib/onboarding.copy';
 	import YearScroll from './YearScroll.svelte';
 	import { syncState, connectAndHydrate, flushSync, disconnect } from '$lib/sync.svelte';
 
 	type BinderTabId =
-		| 'domains'
-		| 'waiting'
-		| 'upcoming'
 		| 'year-scroll'
 		| 'holidays'
 		| 'shapes'
@@ -18,15 +14,20 @@
 	const TABS: { id: BinderTabId; icon: string; label: string }[] = [
 		{ id: 'shapes',       icon: '◐', label: BINDER_LABELS.shapes },
 		{ id: 'week-pattern', icon: '◇', label: BINDER_LABELS.weekPattern },
-		{ id: 'domains',      icon: '◈', label: 'domains' },
-		{ id: 'waiting',      icon: '⏳', label: 'waiting' },
-		{ id: 'upcoming',     icon: '⇒', label: 'upcoming' },
 		{ id: 'year-scroll',  icon: '∞', label: 'year' },
 		{ id: 'holidays',     icon: '✦', label: 'holidays' },
 		{ id: 'sync',         icon: '◎', label: 'sync' }
 	];
 
 	let passphraseInput = $state('');
+	let confirmReset = $state(false);
+
+	function handleResetSetup() {
+		if (!confirmReset) { confirmReset = true; return; }
+		confirmReset = false;
+		store.resetOnboarding();
+		store.closeBinder();
+	}
 
 	async function handleConnect() {
 		const pass = passphraseInput.trim();
@@ -37,24 +38,6 @@
 
 	const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 	const WEEKDAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
-
-	let waitingTasks = $derived(
-		store.tasks.filter((t) => t.status === 'open' && t.notes?.startsWith('waiting:'))
-	);
-
-	let upcomingDays = $derived.by(() => {
-		const days = [];
-		for (let i = 0; i < 7; i++) {
-			const d = new Date(store.now);
-			d.setDate(d.getDate() + i);
-			const key = dateKey(d);
-			const dayTasks = store.tasks.filter(
-				(t) => t.status !== 'dropped' && t.targetDate === key
-			);
-			days.push({ date: d, key, restful: store.isRestful(d), tasks: dayTasks });
-		}
-		return days;
-	});
 </script>
 
 {#if store.binderTab !== null}
@@ -84,70 +67,7 @@
 	class:open={store.binderTab !== null}
 	aria-hidden={store.binderTab === null}
 >
-	{#if store.binderTab === 'domains'}
-		<header class="binder-header">
-			<span class="binder-eyebrow">binder</span>
-			<span class="binder-title">domains</span>
-		</header>
-		<div class="binder-body">
-			{#each store.domains as domain (domain.id)}
-				<div class="domain-row">
-					<span class="domain-icon" style:color={domain.color}>{domain.icon}</span>
-					<span class="domain-name">{domain.name}</span>
-					<span class="domain-count">
-						{store.tasks.filter((t) => t.status !== 'dropped' && t.domainId === domain.id).length}
-					</span>
-				</div>
-			{/each}
-		</div>
-
-	{:else if store.binderTab === 'waiting'}
-		<header class="binder-header">
-			<span class="binder-eyebrow">binder</span>
-			<span class="binder-title">waiting tray</span>
-		</header>
-		<div class="binder-body">
-			{#if waitingTasks.length === 0}
-				<p class="binder-empty">nothing waiting.</p>
-			{:else}
-				{#each waitingTasks as task (task.id)}
-					<div class="binder-task-row">
-						<span class="binder-task-title">{task.title}</span>
-						{#if task.notes}
-							<span class="binder-task-note">{task.notes.replace('waiting:', '').trim()}</span>
-						{/if}
-					</div>
-				{/each}
-			{/if}
-		</div>
-
-	{:else if store.binderTab === 'upcoming'}
-		<header class="binder-header">
-			<span class="binder-eyebrow">binder</span>
-			<span class="binder-title">next 7 days</span>
-		</header>
-		<div class="binder-body">
-			{#each upcomingDays as day, i (day.key)}
-				<div class="upcoming-day" class:today={i === 0}>
-					<div class="upcoming-day-header">
-						<span class="upcoming-day-name">{dayOfWeekLabel(day.date)}</span>
-						<span class="upcoming-day-date">{shortDateLabel(day.date)}</span>
-						{#if day.restful}
-							<span class="upcoming-day-type">off</span>
-						{/if}
-					</div>
-					{#if day.tasks.length > 0}
-						<div class="upcoming-tasks">
-							{#each day.tasks as task (task.id)}
-								<span class="upcoming-task">{task.title}</span>
-							{/each}
-						</div>
-					{/if}
-				</div>
-			{/each}
-		</div>
-
-	{:else if store.binderTab === 'year-scroll'}
+	{#if store.binderTab === 'year-scroll'}
 		<div class="binder-year-scroll">
 			<YearScroll compact />
 		</div>
@@ -259,6 +179,17 @@
 					<button class="sync-btn-ghost" onclick={() => disconnect()}>disconnect</button>
 				</div>
 			{/if}
+		<div class="reset-section">
+				{#if confirmReset}
+					<p class="reset-confirm-text">restart the setup wizard?</p>
+					<div class="reset-confirm-actions">
+						<button class="sync-btn-primary" onclick={handleResetSetup}>confirm</button>
+						<button class="sync-btn-ghost" onclick={() => confirmReset = false}>cancel</button>
+					</div>
+				{:else}
+					<button class="sync-btn-ghost reset-btn" onclick={handleResetSetup}>redo setup</button>
+				{/if}
+			</div>
 		</div>
 	{/if}
 </aside>
@@ -377,111 +308,6 @@
 		color: var(--p-muted);
 		opacity: 0.5;
 		padding: 1rem 0;
-	}
-
-	.domain-row {
-		display: flex;
-		align-items: center;
-		gap: 0.6rem;
-		padding: 0.5rem 0;
-		border-bottom: 1px solid var(--p-border);
-	}
-
-	.domain-icon {
-		font-size: 0.9rem;
-		flex-shrink: 0;
-	}
-
-	.domain-name {
-		font-family: var(--pl-font-mono);
-		font-size: 0.75rem;
-		letter-spacing: 0.04em;
-		color: var(--p-text);
-		flex: 1;
-	}
-
-	.domain-count {
-		font-family: var(--pl-font-mono);
-		font-size: 0.65rem;
-		color: var(--p-muted);
-		opacity: 0.6;
-	}
-
-	.binder-task-row {
-		padding: 0.5rem 0;
-		border-bottom: 1px solid var(--p-border);
-	}
-
-	.binder-task-title {
-		display: block;
-		font-family: var(--pl-font-mono);
-		font-size: 0.75rem;
-		color: var(--p-text);
-		margin-bottom: 0.2rem;
-	}
-
-	.binder-task-note {
-		font-family: var(--pl-font-mono);
-		font-size: 0.65rem;
-		color: var(--p-muted);
-		opacity: 0.6;
-		font-style: italic;
-	}
-
-	.upcoming-day {
-		padding: 0.6rem 0;
-		border-bottom: 1px solid var(--p-border);
-	}
-
-	.upcoming-day.today .upcoming-day-name {
-		color: var(--p-accent);
-	}
-
-	.upcoming-day-header {
-		display: flex;
-		align-items: baseline;
-		gap: 0.5rem;
-		margin-bottom: 0.2rem;
-	}
-
-	.upcoming-day-name {
-		font-family: var(--pl-font-mono);
-		font-size: 0.65rem;
-		letter-spacing: 0.1em;
-		color: var(--p-text);
-	}
-
-	.upcoming-day-date {
-		font-family: var(--pl-font-mono);
-		font-size: 0.6rem;
-		color: var(--p-muted);
-		opacity: 0.7;
-	}
-
-	.upcoming-day-type {
-		font-family: var(--pl-font-mono);
-		font-size: 0.55rem;
-		color: var(--p-muted);
-		opacity: 0.5;
-		margin-left: auto;
-		font-style: italic;
-	}
-
-	.upcoming-tasks {
-		display: flex;
-		flex-direction: column;
-		gap: 0.15rem;
-	}
-
-	.upcoming-task {
-		font-family: var(--pl-font-mono);
-		font-size: 0.68rem;
-		color: var(--p-muted);
-		padding-left: 0.6rem;
-	}
-
-	.upcoming-task::before {
-		content: '· ';
 	}
 
 	.binder-year-scroll {
@@ -704,6 +530,35 @@
 
 	.sync-btn-ghost:hover {
 		opacity: 0.9;
+	}
+
+	.reset-section {
+		margin-top: auto;
+		padding-top: 1.5rem;
+		border-top: 1px solid var(--p-border);
+	}
+
+	.reset-btn {
+		font-size: 0.55rem;
+		opacity: 0.3;
+	}
+
+	.reset-btn:hover {
+		opacity: 0.7;
+	}
+
+	.reset-confirm-text {
+		font-family: var(--pl-font-mono);
+		font-size: 0.65rem;
+		color: var(--p-muted);
+		opacity: 0.75;
+		margin-bottom: 0.5rem;
+	}
+
+	.reset-confirm-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
 	}
 
 	@media (max-width: 620px) {
