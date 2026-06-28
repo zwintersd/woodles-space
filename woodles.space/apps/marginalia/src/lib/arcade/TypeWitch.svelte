@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { conditions } from '$lib/witch/content/conditions';
+	import { payReward, previewReward as previewArcadeReward } from './arcadeRewards';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
 	import type { ArcadeActivePet } from './arcadeStats';
-	import { cappedReward } from './arcadeMath';
-	import { payReward } from './arcadeRewards';
 
 	interface Props {
 		onclose: () => void;
@@ -28,6 +28,7 @@
 	let currentIndex = $state(0);
 	let currentPhraseIdx = $state(0);
 	let completed = $state(0);
+	let bestCompleted = $state(loadArcadeRecord('type-witch').bestScore);
 	let score = $state(0);
 	let errors = $state(0);
 	let awarded = $state(0);
@@ -74,7 +75,7 @@
 
 	function rewardFor(done: number, pts: number, errs: number): number {
 		const raw = done * 3 + Math.floor(pts / 4) - Math.floor(errs / 8);
-		return cappedReward(raw, MAX_REWARD);
+		return previewArcadeReward(raw, MAX_REWARD);
 	}
 
 	function start() {
@@ -118,6 +119,16 @@
 		phase = 'complete';
 		rounds += 1;
 		awarded = payReward(rewardFor(completed, score, errors), MAX_REWARD);
+		const record = recordArcadeRun('type-witch', {
+			score: completed,
+			summary: {
+				chars: score,
+				errors,
+				accuracy: Math.round(accuracy * 100),
+				awarded
+			}
+		});
+		bestCompleted = record.bestScore;
 	}
 
 	function advancePhrase(succeeded: boolean) {
@@ -157,6 +168,10 @@
 		}
 	}
 
+	onMount(() => {
+		bestCompleted = loadArcadeRecord('type-witch').bestScore;
+	});
+
 	onDestroy(() => {
 		stopTimer();
 	});
@@ -172,6 +187,10 @@
 			<div class="score-box">
 				<span class="score-label">done</span>
 				<span class="score-val">{completed}</span>
+			</div>
+			<div class="score-box">
+				<span class="score-label">best</span>
+				<span class="score-val">{bestCompleted}</span>
 			</div>
 			<div class="score-box live">
 				<span class="score-label">chars</span>

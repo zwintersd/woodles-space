@@ -8,6 +8,8 @@
 		type ArcadeCoreStat,
 		type ArcadeStatEffects
 	} from './arcadeStats';
+	import { scoreOnlyReason } from './arcadeRewards';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
 
 	interface Props {
 		onclose: () => void;
@@ -35,7 +37,9 @@
 
 	type OverReason = 'moves' | 'turns' | null;
 
+	const GAME_ID = 'stack-2048';
 	const BASE_TURN_LIMIT = 100;
+	const scoreOnlyLabel = scoreOnlyReason(GAME_ID) ? 'score only' : '—';
 
 	// ── board helpers ────────────────────────────────────────────────────
 	function emptyBoard(): Board {
@@ -154,7 +158,7 @@
 	// ── state ─────────────────────────────────────────────────────────────
 	let board = $state<Board>(freshBoard());
 	let score = $state(0);
-	let best = $state(0);
+	let best = $state(loadArcadeRecord(recordId('endless')).bestScore);
 	let won = $state(false);
 	let over = $state(false);
 	let keepPlaying = $state(false);
@@ -165,6 +169,7 @@
 	let sparkReserve = $state(statTier(supportStatValue('spark')));
 	let activePower = $state<TargetPowerUpId | null>(null);
 	let undoStack = $state<TurnSnapshot[]>([]);
+	let recordedRun = $state(false);
 
 	const turnLimit = $derived(
 		mode === 'turn-100' ? BASE_TURN_LIMIT + statTier(supportStatValue('will')) * 10 : null
@@ -178,6 +183,30 @@
 		grace: (_value, tier) => `${tier} delete`,
 		heart: (_value, tier) => `${tier} double`
 	});
+
+	function recordId(nextMode: Mode = mode): string {
+		return `${GAME_ID}:${nextMode}`;
+	}
+
+	function loadBestForMode(nextMode: Mode = mode) {
+		best = loadArcadeRecord(recordId(nextMode)).bestScore;
+	}
+
+	function recordRun(reason: string) {
+		if (recordedRun || (turns === 0 && score === 0)) return;
+		const record = recordArcadeRun(recordId(), {
+			score,
+			summary: {
+				mode,
+				turns,
+				reason,
+				won,
+				over
+			}
+		});
+		best = record.bestScore;
+		recordedRun = true;
+	}
 
 	function snapshotTurn(): TurnSnapshot {
 		return {
@@ -209,9 +238,10 @@
 			over = true;
 			overReason = 'moves';
 		}
+		if (over) recordRun(overReason ?? 'over');
 	}
 
-	function reset() {
+	function freshRun() {
 		board = freshBoard();
 		score = 0;
 		won = false;
@@ -223,12 +253,20 @@
 		sparkReserve = statTier(supportStatValue('spark'));
 		activePower = null;
 		undoStack = [];
+		recordedRun = false;
+	}
+
+	function reset() {
+		recordRun('reset');
+		freshRun();
 	}
 
 	function setMode(next: Mode) {
 		if (mode === next) return;
+		recordRun('mode');
 		mode = next;
-		reset();
+		loadBestForMode(next);
+		freshRun();
 	}
 
 	function powerCount(id: PowerUpId): number {
@@ -267,6 +305,7 @@
 		if (!hasMovesLeft(nb)) {
 			over = true;
 			overReason = 'moves';
+			recordRun('moves');
 		}
 	}
 
@@ -325,8 +364,14 @@
 		move(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up');
 	}
 
-	onMount(() => window.addEventListener('keydown', onKey));
-	onDestroy(() => window.removeEventListener('keydown', onKey));
+	onMount(() => {
+		loadBestForMode();
+		window.addEventListener('keydown', onKey);
+	});
+	onDestroy(() => {
+		recordRun('close');
+		window.removeEventListener('keydown', onKey);
+	});
 
 	// ── tile appearance ───────────────────────────────────────────────────
 	const TILE_COLORS: Record<number, [string, string]> = {
@@ -371,6 +416,10 @@
 			<div class="score-box">
 				<span class="score-label">turns</span>
 				<span class="score-val">{turnDisplay}</span>
+			</div>
+			<div class="score-box">
+				<span class="score-label">prize</span>
+				<span class="score-val policy">{scoreOnlyLabel}</span>
 			</div>
 		</div>
 		<div class="btn-group">
@@ -545,6 +594,15 @@
 		font-size: 1.3rem;
 		color: var(--sol-base01);
 		line-height: 1.1;
+	}
+	.score-val.policy {
+		font-family: var(--font-ui);
+		font-size: 0.64rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		line-height: 1.25;
+		max-width: 4.2rem;
+		text-align: center;
 	}
 	.btn-group {
 		display: flex;

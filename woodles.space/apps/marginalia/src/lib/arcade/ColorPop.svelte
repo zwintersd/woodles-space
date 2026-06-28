@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import type { ArcadeActivePet } from './arcadeStats';
+	import { scoreOnlyReason } from './arcadeRewards';
 
 	interface Props {
 		onclose: () => void;
@@ -45,6 +46,8 @@
 	const BODY_DENSITY = 0.00235;
 	const SETTLE_AGE_MS = 1700;
 	const SETTLE_SPEED = 0.16;
+	const GAME_ID = 'color-pop';
+	const scoreOnlyLabel = scoreOnlyReason(GAME_ID) ? 'score only' : '-';
 
 	const tiers: Tier[] = [
 		{ radius: 15, color: '#2aa198', density: BODY_DENSITY, points: 20 },
@@ -481,6 +484,10 @@
 				<span class="score-label">drop</span>
 				<span class="score-val">{readyLabel}</span>
 			</div>
+			<div class="score-box">
+				<span class="score-label">prize</span>
+				<span class="score-val policy">{scoreOnlyLabel}</span>
+			</div>
 			<div class="score-box swatch-box">
 				<span class="score-label">next</span>
 				<span class="swatch" style={nextTierStyle} aria-label="next tier color"></span>
@@ -599,6 +606,14 @@
 		font-size: 1.25rem;
 		color: var(--sol-base01);
 		line-height: 1.1;
+	}
+
+	.score-val.policy {
+		font-family: var(--font-ui);
+		font-size: 0.68rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		white-space: nowrap;
 	}
 
 	.swatch-box {

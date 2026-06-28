@@ -2,7 +2,6 @@
 	import { onDestroy, onMount } from 'svelte';
 	import {
 		axialToPoint,
-		cappedReward,
 		clamp,
 		distance,
 		hexDistance,
@@ -15,7 +14,8 @@
 		type CubeHex,
 		type Dot
 	} from './arcadeMath';
-	import { book, fmt } from '$lib/witch/book.svelte';
+	import { fmt } from '$lib/witch/book.svelte';
+	import { payReward, previewReward } from './arcadeRewards';
 	import type { ArcadeActivePet } from './arcadeStats';
 
 	interface Props {
@@ -159,7 +159,7 @@
 	}
 
 	function rewardFor(score: number, cleared: boolean): number {
-		return cappedReward(Math.floor(score / 85) + (cleared ? 12 : 0), MAX_REWARD);
+		return previewReward(Math.floor(score / 85) + (cleared ? 12 : 0), MAX_REWARD);
 	}
 
 	function safeAimAngle(): number {
@@ -188,11 +188,7 @@
 		stop();
 		rounds += 1;
 		best = Math.max(best, game.score);
-		awarded = rewardFor(game.score, nextPhase === 'complete');
-		if (awarded > 0) {
-			book.insight += awarded;
-			book.persist();
-		}
+		awarded = payReward(rewardFor(game.score, nextPhase === 'complete'), MAX_REWARD);
 		draw();
 	}
 
