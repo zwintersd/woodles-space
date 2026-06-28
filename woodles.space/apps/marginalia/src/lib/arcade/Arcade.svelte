@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ColorPop from './ColorPop.svelte';
 	import InsightRush from './InsightRush.svelte';
+	import MarginMiner from './MarginMiner.svelte';
 	import TwoZeroFourEight from './TwoZeroFourEight.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
 
@@ -41,6 +42,14 @@
 			title: 'Color POP!',
 			tagline: 'Drop bright circles, merge matching tiers, and keep the pile below the line.',
 			tags: ['physics', 'merge'],
+			status: 'play'
+		},
+		{
+			id: 'margin-miner',
+			icon: '$',
+			title: 'Margin Miner',
+			tagline: 'Swing the claw, snag treasure, and beat the target before the minute runs out.',
+			tags: ['claw', 'timed'],
 			status: 'play'
 		},
 		{
@@ -148,6 +157,8 @@
 				<TwoZeroFourEight onclose={closeGame} creature={activePet} />
 			{:else if activeGame === 'color-pop'}
 				<ColorPop onclose={closeGame} />
+			{:else if activeGame === 'margin-miner'}
+				<MarginMiner onclose={closeGame} />
 			{:else if activeGame === 'insight-rush'}
 				<InsightRush onclose={closeGame} />
 			{/if}
