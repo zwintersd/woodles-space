@@ -4,10 +4,12 @@
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import type { Dot } from './arcadeMath';
 	import { fmt } from '$lib/witch/book.svelte';
-	import { awardArcadeReward, previewArcadeReward } from './arcadeRewards';
+	import { payReward, previewReward } from './arcadeRewards';
+	import type { ArcadeActivePet } from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
+		activePet?: ArcadeActivePet;
 	}
 	let { onclose }: Props = $props();
 
@@ -63,7 +65,7 @@
 	}
 
 	function rewardFor(points: number, cleared: boolean): number {
-		return previewArcadeReward(Math.floor(points / 3) + (cleared ? 6 : 0), MAX_REWARD);
+		return previewReward(Math.floor(points / 3) + (cleared ? 6 : 0), MAX_REWARD);
 	}
 
 	function sameCell(a: Cell, b: Cell): boolean {
@@ -122,7 +124,7 @@
 		stop();
 		rounds += 1;
 		best = Math.max(best, score);
-		awarded = awardArcadeReward('margin-snake', rewardFor(score, nextPhase === 'complete'), MAX_REWARD);
+		awarded = payReward(rewardFor(score, nextPhase === 'complete'), MAX_REWARD);
 	}
 
 	function loop(now: number) {

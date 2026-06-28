@@ -4,10 +4,12 @@
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { clamp, distance, normalize, type Dot } from './arcadeMath';
 	import { fmt } from '$lib/witch/book.svelte';
-	import { awardArcadeReward, previewArcadeReward } from './arcadeRewards';
+	import { payReward, previewReward } from './arcadeRewards';
+	import type { ArcadeActivePet } from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
+		activePet?: ArcadeActivePet;
 	}
 	let { onclose }: Props = $props();
 
@@ -75,7 +77,7 @@
 
 	function rewardFor(defeated: number, seconds: number, cleared: boolean): number {
 		const raw = Math.floor(defeated / 8) + Math.floor(seconds / 14) + (cleared ? 5 : 0);
-		return previewArcadeReward(raw, MAX_REWARD);
+		return previewReward(raw, MAX_REWARD);
 	}
 
 	function edgeSpawn(): Enemy {
@@ -134,7 +136,7 @@
 		stop();
 		rounds += 1;
 		best = Math.max(best, kills);
-		awarded = awardArcadeReward('bullet-dot', rewardFor(kills, elapsed, nextPhase === 'complete'), MAX_REWARD);
+		awarded = payReward(rewardFor(kills, elapsed, nextPhase === 'complete'), MAX_REWARD);
 	}
 
 	function loop(now: number) {

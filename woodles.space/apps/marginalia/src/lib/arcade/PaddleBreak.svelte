@@ -4,10 +4,12 @@
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { clamp, type Dot } from './arcadeMath';
 	import { fmt } from '$lib/witch/book.svelte';
-	import { awardArcadeReward, previewArcadeReward } from './arcadeRewards';
+	import { payReward, previewReward } from './arcadeRewards';
+	import type { ArcadeActivePet } from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
+		activePet?: ArcadeActivePet;
 	}
 	let { onclose }: Props = $props();
 
@@ -110,7 +112,7 @@
 
 	function rewardFor(points: number, rescued: number, cleared: boolean): number {
 		const raw = Math.floor(points / 7) + Math.floor(rescued / 3) + (cleared ? 7 : 0);
-		return previewArcadeReward(raw, MAX_REWARD);
+		return previewReward(raw, MAX_REWARD);
 	}
 
 	function reset() {
@@ -144,7 +146,7 @@
 		stop();
 		rounds += 1;
 		best = Math.max(best, score);
-		awarded = awardArcadeReward('paddle-break', rewardFor(score, saves, nextPhase === 'complete'), MAX_REWARD);
+		awarded = payReward(rewardFor(score, saves, nextPhase === 'complete'), MAX_REWARD);
 	}
 
 	function loop(now: number) {

@@ -35,17 +35,19 @@ Keep game-specific rules inside the game component until at least two games need
 
 These are safe to share because they are pure, tiny, and domain-neutral. They do not know about any particular game.
 
-`arcadeRewards.ts` is the shared economy touch-point:
+`arcadeRewards.ts` is the second shared layer - the single point where a game's
+reward touches the Book economy:
 
-- `previewArcadeReward(raw, max)` clamps score-derived previews through
+- `creditInsight(amount)` - the one place `book.insight += ...; book.persist()`
+  happens. Every paying game routes through it, so a future arcade-wide economy
+  policy (e.g. a per-day insight cap) has exactly one home.
+- `previewReward(raw, max)` - clamp score-derived previews through
   `cappedReward`.
-- `awardArcadeReward(gameId, raw, max)` records the game id, credits positive
-  insight, and persists the Book in one place.
-- `creditInsight(gameId, amount)` exists for special cases such as Inkblot's
-  floor-at-one reward.
+- `payReward(raw, max)` - clamp a raw, score-derived reward to `[0, max]` and
+  credit it; the common case for games whose reward floors at zero.
 
-Reward formulas stay local. The helper owns the coin slot, not the rules that
-earn the coin.
+Reward *formulas* stay local (each game scores differently); only the clamp
+(`cappedReward`) and the payout are shared.
 
 `ArcadeHud.svelte` and `ArcadeProgress.svelte` are the first shared shell
 components. They are now used by the core paying/action games:
@@ -140,7 +142,7 @@ When adding a new game:
 
 1. Start with one component in `src/lib/arcade`.
 2. Define the smallest possible complete loop.
-3. Reuse `Dot`, `clamp`, `distance`, `normalize`, and `previewArcadeReward`
+3. Reuse `Dot`, `clamp`, `distance`, `normalize`, and `previewReward`
    when they fit naturally.
 4. Use `ArcadeHud` and `ArcadeProgress` when the game's shell matches the
    existing arcade shape.

@@ -4,10 +4,12 @@
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { clamp, distance, type Dot } from './arcadeMath';
 	import { fmt } from '$lib/witch/book.svelte';
-	import { awardArcadeReward, previewArcadeReward } from './arcadeRewards';
+	import { payReward, previewReward } from './arcadeRewards';
+	import type { ArcadeActivePet } from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
+		activePet?: ArcadeActivePet;
 	}
 	let { onclose }: Props = $props();
 
@@ -134,7 +136,7 @@
 
 	function rewardFor(popCount: number, dropCount: number, cleared: boolean): number {
 		const raw = Math.floor(popCount / 5) + Math.floor(dropCount / 3) + (cleared ? 9 : 0);
-		return previewArcadeReward(raw, MAX_REWARD);
+		return previewReward(raw, MAX_REWARD);
 	}
 
 	function cellKey(row: number, col: number): string {
@@ -206,7 +208,7 @@
 		stop();
 		rounds += 1;
 		best = Math.max(best, popped + dropped);
-		awarded = awardArcadeReward('margin-bubbles', rewardFor(popped, dropped, nextPhase === 'complete'), MAX_REWARD);
+		awarded = payReward(rewardFor(popped, dropped, nextPhase === 'complete'), MAX_REWARD);
 	}
 
 	function loop(now: number) {

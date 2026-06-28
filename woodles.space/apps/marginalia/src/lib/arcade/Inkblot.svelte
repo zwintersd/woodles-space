@@ -3,11 +3,13 @@
 	import { fmt } from '$lib/witch/book.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
 	import { dailyLimit } from './dailyLimit';
-	import { awardArcadeReward } from './arcadeRewards';
+	import { payReward } from './arcadeRewards';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
 
 	interface Props {
 		onclose: () => void;
 		creatures: BestiaryCreature[];
+		activePet?: BestiaryCreature | null;
 	}
 	let { onclose, creatures }: Props = $props();
 
@@ -33,6 +35,7 @@
 	let elapsedMs = $state(0);
 	let awarded = $state(0);
 	let roundsPlayed = $state(0);
+	let bestReward = $state(loadArcadeRecord('inkblot').bestScore);
 	let inputEl = $state<HTMLInputElement | null>(null);
 
 	let startedAt = 0;
@@ -193,12 +196,24 @@
 		if (correct) {
 			const mult = GUESS_MULT[guessCount] ?? GUESS_MULT[GUESS_MULT.length - 1];
 			const raw = Math.round(timeScore * mult * MAX_REWARD / 1000);
-			awarded = awardArcadeReward('inkblot', Math.max(1, raw), MAX_REWARD);
+			awarded = payReward(Math.max(1, raw), MAX_REWARD);
 			phase = 'correct';
 		} else {
 			awarded = 0;
 			phase = 'failed';
 		}
+
+		const record = recordArcadeRun('inkblot', {
+			score: awarded,
+			summary: {
+				correct,
+				guesses: correct ? guessCount + 1 : guessCount,
+				revealMs: Math.round(elapsedMs),
+				creature: creature?.name ?? null,
+				awarded
+			}
+		});
+		bestReward = record.bestScore;
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -211,6 +226,7 @@
 	}
 
 	onMount(() => {
+		bestReward = loadArcadeRecord('inkblot').bestScore;
 		window.addEventListener('keydown', handleKeydown);
 	});
 
@@ -246,6 +262,10 @@
 			<div class="score-box">
 				<span class="score-label">plays</span>
 				<span class="score-val">{remainingPlays}/{DAILY_LIMIT}</span>
+			</div>
+			<div class="score-box">
+				<span class="score-label">best</span>
+				<span class="score-val">{bestReward}</span>
 			</div>
 			{#if phase === 'correct' || phase === 'failed'}
 			<div class="score-box" class:earned={awarded > 0}>

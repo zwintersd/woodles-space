@@ -1,12 +1,15 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import ArcadeHud from './ArcadeHud.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { fmt } from '$lib/witch/book.svelte';
-	import { awardArcadeReward, previewArcadeReward } from './arcadeRewards';
+	import { payReward, previewReward as previewArcadeReward } from './arcadeRewards';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
+	import type { ArcadeActivePet } from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
+		activePet?: ArcadeActivePet;
 	}
 	let { onclose }: Props = $props();
 
@@ -37,6 +40,7 @@
 	let score = $state(0);
 	let streak = $state(0);
 	let bestStreak = $state(0);
+	let bestRecordedStreak = $state(loadArcadeRecord('insight-rush').bestScore);
 	let hits = $state(0);
 	let misses = $state(0);
 	let awarded = $state(0);
@@ -138,7 +142,18 @@
 		remaining = 0;
 		phase = 'complete';
 		rounds += 1;
-		awarded = awardArcadeReward('insight-rush', rewardFor(score, bestStreak, misses), MAX_REWARD);
+		awarded = payReward(rewardFor(score, bestStreak, misses), MAX_REWARD);
+		const record = recordArcadeRun('insight-rush', {
+			score: bestStreak,
+			summary: {
+				points: score,
+				hits,
+				misses,
+				accuracy: Math.round(accuracy * 100),
+				awarded
+			}
+		});
+		bestRecordedStreak = record.bestScore;
 	}
 
 	function addPop(x: number, y: number, text: string, tone: Pop['tone']) {
@@ -178,6 +193,10 @@
 		placeSparks();
 	}
 
+	onMount(() => {
+		bestRecordedStreak = loadArcadeRecord('insight-rush').bestScore;
+	});
+
 	onDestroy(() => {
 		stopTimer();
 		for (const popTimer of popTimers) clearTimeout(popTimer);
@@ -192,7 +211,7 @@
 		scores={[
 			{ label: 'score', value: score },
 			{ label: 'now', value: streak, live: true, tone: 'yellow' },
-			{ label: 'best', value: bestStreak },
+			{ label: 'best', value: Math.max(bestStreak, bestRecordedStreak) },
 			{ label: 'prize', value: fmt(phase === 'complete' ? awarded : previewReward) }
 		]}
 		{startLabel}

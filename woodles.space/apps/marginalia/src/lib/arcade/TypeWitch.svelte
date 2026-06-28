@@ -1,13 +1,16 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import ArcadeHud from './ArcadeHud.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { conditions } from '$lib/witch/content/conditions';
-	import { awardArcadeReward, previewArcadeReward } from './arcadeRewards';
+	import { payReward, previewReward as previewArcadeReward } from './arcadeRewards';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
+	import type { ArcadeActivePet } from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
+		activePet?: ArcadeActivePet;
 	}
 	let { onclose }: Props = $props();
 
@@ -27,6 +30,7 @@
 	let currentIndex = $state(0);
 	let currentPhraseIdx = $state(0);
 	let completed = $state(0);
+	let bestCompleted = $state(loadArcadeRecord('type-witch').bestScore);
 	let score = $state(0);
 	let errors = $state(0);
 	let awarded = $state(0);
@@ -117,7 +121,17 @@
 		remaining = 0;
 		phase = 'complete';
 		rounds += 1;
-		awarded = awardArcadeReward('type-witch', rewardFor(completed, score, errors), MAX_REWARD);
+		awarded = payReward(rewardFor(completed, score, errors), MAX_REWARD);
+		const record = recordArcadeRun('type-witch', {
+			score: completed,
+			summary: {
+				chars: score,
+				errors,
+				accuracy: Math.round(accuracy * 100),
+				awarded
+			}
+		});
+		bestCompleted = record.bestScore;
 	}
 
 	function advancePhrase(succeeded: boolean) {
@@ -157,6 +171,10 @@
 		}
 	}
 
+	onMount(() => {
+		bestCompleted = loadArcadeRecord('type-witch').bestScore;
+	});
+
 	onDestroy(() => {
 		stopTimer();
 	});
@@ -169,6 +187,7 @@
 		maxWidth="580px"
 		scores={[
 			{ label: 'done', value: completed },
+			{ label: 'best', value: Math.max(completed, bestCompleted) },
 			{ label: 'chars', value: score, live: true, tone: 'cyan' },
 			{ label: 'errors', value: errors },
 			{ label: 'prize', value: fmt(phase === 'complete' ? awarded : previewReward) }

@@ -4,10 +4,12 @@
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { clamp, type Dot } from './arcadeMath';
 	import { fmt } from '$lib/witch/book.svelte';
-	import { awardArcadeReward, previewArcadeReward } from './arcadeRewards';
+	import { payReward, previewReward } from './arcadeRewards';
+	import type { ArcadeActivePet } from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
+		activePet?: ArcadeActivePet;
 	}
 	let { onclose }: Props = $props();
 
@@ -244,7 +246,7 @@
 
 	function rewardFor(foundGlyphs: number, wing: boolean, key: boolean, complete: boolean): number {
 		const raw = foundGlyphs * 2 + (wing ? 3 : 0) + (key ? 4 : 0) + (complete ? 7 : 0);
-		return previewArcadeReward(raw, MAX_REWARD);
+		return previewReward(raw, MAX_REWARD);
 	}
 
 	function playerRect(next: Player = player): Rect {
@@ -317,7 +319,7 @@
 		stop();
 		rounds += 1;
 		best = Math.max(best, glyphs);
-		awarded = awardArcadeReward('margin-hollow', rewardFor(glyphs, hasWing, hasKey, nextPhase === 'complete'), MAX_REWARD);
+		awarded = payReward(rewardFor(glyphs, hasWing, hasKey, nextPhase === 'complete'), MAX_REWARD);
 	}
 
 	function loop(now: number) {

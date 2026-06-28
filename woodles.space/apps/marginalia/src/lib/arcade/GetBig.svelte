@@ -4,10 +4,12 @@
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { clamp, distance, type Dot } from './arcadeMath';
 	import { fmt } from '$lib/witch/book.svelte';
-	import { awardArcadeReward, previewArcadeReward } from './arcadeRewards';
+	import { payReward, previewReward } from './arcadeRewards';
+	import type { ArcadeActivePet } from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
+		activePet?: ArcadeActivePet;
 	}
 	let { onclose }: Props = $props();
 
@@ -129,7 +131,7 @@
 
 	function rewardFor(points: number, radius: number, won: boolean): number {
 		const raw = Math.floor(points / 8) + Math.floor(Math.max(0, radius - START_RADIUS) / 4) + (won ? 12 : 0);
-		return previewArcadeReward(raw, MAX_REWARD);
+		return previewReward(raw, MAX_REWARD);
 	}
 
 	function canEatYellow(): boolean {
@@ -222,7 +224,7 @@
 		stop();
 		rounds += 1;
 		best = Math.max(best, score);
-		awarded = awardArcadeReward('get-big', rewardFor(score, playerRadius, nextPhase === 'complete'), MAX_REWARD);
+		awarded = payReward(rewardFor(score, playerRadius, nextPhase === 'complete'), MAX_REWARD);
 	}
 
 	function loop(now: number) {

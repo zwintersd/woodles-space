@@ -6,6 +6,25 @@ and economy touch-points; keep each cabinet's core rules local until repetition
 is real.*
 
 ## Current Status
+## Updates Since Review
+
+Recommendation #1 landed in [`arcadeRewards.ts`](./arcadeRewards.ts):
+
+- `creditInsight(amount)` is now the single place the Book economy is mutated;
+  all paying games route their payout through it. **Finding #3** (the
+  payout block copy-pasted in nine games) is resolved.
+- The clamp is unified on `cappedReward`; Insight Rush, Type Witch, and Inkblot
+  no longer re-implement it inline. **Finding #2** is resolved.
+- `creditInsight` is also the single attach point for a future per-day insight
+  cap, giving **finding #1** a home. The cap itself is *not* yet applied — that
+  is the deliberate economy decision in recommendation #2, still open.
+- `ArcadeHud.svelte` and `ArcadeProgress.svelte` now carry the repeated shell
+  for ten playable games, advancing **finding #4** without extracting game
+  rules.
+
+The remaining findings (#5 tokens/vocabulary, #6-#9) are unchanged.
+
+## Scope & method
 
 `Arcade.svelte` now registers **18 cards**:
 
@@ -72,10 +91,9 @@ round of growth makes the copy-paste expensive.
 
 **Week 2 status: done.**
 
-`arcadeRewards.ts` is now the shared reward chokepoint. All 11 insight-paying
-games route final payouts through `awardArcadeReward` or `creditInsight`; the
-helper clamps with `cappedReward`, records the game id, mutates `book.insight`,
-and persists the Book.
+`arcadeRewards.ts` is now the shared reward chokepoint. All insight-paying
+games route final payouts through `payReward` or `creditInsight`; the helper
+clamps with `cappedReward`, mutates `book.insight`, and persists the Book.
 
 Each game's scoring formula stays local. The shared layer owns the coin slot,
 not the rules that earn the coin.

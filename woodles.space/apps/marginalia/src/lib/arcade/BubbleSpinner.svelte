@@ -16,10 +16,12 @@
 		type Dot
 	} from './arcadeMath';
 	import { fmt } from '$lib/witch/book.svelte';
-	import { awardArcadeReward, previewArcadeReward } from './arcadeRewards';
+	import { payReward, previewReward } from './arcadeRewards';
+	import type { ArcadeActivePet } from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
+		activePet?: ArcadeActivePet;
 	}
 	let { onclose }: Props = $props();
 
@@ -158,7 +160,7 @@
 	}
 
 	function rewardFor(score: number, cleared: boolean): number {
-		return previewArcadeReward(Math.floor(score / 85) + (cleared ? 12 : 0), MAX_REWARD);
+		return previewReward(Math.floor(score / 85) + (cleared ? 12 : 0), MAX_REWARD);
 	}
 
 	function safeAimAngle(): number {
@@ -187,7 +189,7 @@
 		stop();
 		rounds += 1;
 		best = Math.max(best, game.score);
-		awarded = awardArcadeReward('bubble-spinner', rewardFor(game.score, nextPhase === 'complete'), MAX_REWARD);
+		awarded = payReward(rewardFor(game.score, nextPhase === 'complete'), MAX_REWARD);
 		draw();
 	}
 

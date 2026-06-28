@@ -1,17 +1,26 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
+	import ArcadePetPerks from './ArcadePetPerks.svelte';
+	import {
+		coreStatValue,
+		statTier,
+		type ArcadeActivePet,
+		type ArcadeCoreStat,
+		type ArcadeStatEffects
+	} from './arcadeStats';
+	import { scoreOnlyReason } from './arcadeRewards';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
 
 	interface Props {
 		onclose: () => void;
-		creature?: BestiaryCreature | null;
+		activePet?: ArcadeActivePet;
 	}
-	let { onclose, creature = null }: Props = $props();
+	let { onclose, activePet = null }: Props = $props();
 
 	type Board = number[][];
 	type Dir = 'left' | 'right' | 'up' | 'down';
 	type Mode = 'endless' | 'turn-100';
-	type CoreStat = 'body' | 'mind' | 'grace' | 'heart' | 'will' | 'spark';
+	type SupportStat = 'will' | 'spark';
 	type PowerUpId = 'delete' | 'double' | 'undo';
 	type TargetPowerUpId = Exclude<PowerUpId, 'undo'>;
 	type PowerUps = Record<PowerUpId, number>;
@@ -28,7 +37,9 @@
 
 	type OverReason = 'moves' | 'turns' | null;
 
+	const GAME_ID = 'stack-2048';
 	const BASE_TURN_LIMIT = 100;
+	const scoreOnlyLabel = scoreOnlyReason(GAME_ID) ? 'score only' : '—';
 
 	// ── board helpers ────────────────────────────────────────────────────
 	function emptyBoard(): Board {
@@ -45,15 +56,12 @@
 		b[r][c] = value ?? (Math.random() < 0.9 ? 2 : 4);
 	}
 
-	function statValue(stat: CoreStat): number {
-		return creature?.stats?.[stat] ?? 0;
+	function statValue(stat: ArcadeCoreStat): number {
+		return coreStatValue(activePet, stat);
 	}
 
-	function statTier(value: number): number {
-		if (value >= 9) return 3;
-		if (value >= 7) return 2;
-		if (value >= 5) return 1;
-		return 0;
+	function supportStatValue(stat: SupportStat): number {
+		return activePet?.stats?.[stat] ?? 0;
 	}
 
 	function openingTileValue(): number | undefined {
@@ -150,7 +158,7 @@
 	// ── state ─────────────────────────────────────────────────────────────
 	let board = $state<Board>(freshBoard());
 	let score = $state(0);
-	let best = $state(0);
+	let best = $state(loadArcadeRecord(recordId('endless')).bestScore);
 	let won = $state(false);
 	let over = $state(false);
 	let keepPlaying = $state(false);
@@ -158,48 +166,47 @@
 	let mode = $state<Mode>('endless');
 	let turns = $state(0);
 	let powerUps = $state<PowerUps>(freshPowerUps());
-	let sparkReserve = $state(statTier(statValue('spark')));
+	let sparkReserve = $state(statTier(supportStatValue('spark')));
 	let activePower = $state<TargetPowerUpId | null>(null);
 	let undoStack = $state<TurnSnapshot[]>([]);
+	let recordedRun = $state(false);
 
 	const turnLimit = $derived(
-		mode === 'turn-100' ? BASE_TURN_LIMIT + statTier(statValue('will')) * 10 : null
+		mode === 'turn-100' ? BASE_TURN_LIMIT + statTier(supportStatValue('will')) * 10 : null
 	);
 	const turnDisplay = $derived(turnLimit === null ? `${turns}` : `${turns}/${turnLimit}`);
 	const turnsLeft = $derived(turnLimit === null ? null : Math.max(turnLimit - turns, 0));
 	const canPlay = $derived(!over && !(won && !keepPlaying));
-	const statPerks = $derived([
-		{
-			stat: 'body',
-			value: statValue('body'),
-			effect: openingTileValue() ? `opens with ${openingTileValue()}` : 'no opening tile'
-		},
-		{
-			stat: 'mind',
-			value: statValue('mind'),
-			effect: `${statTier(statValue('mind'))} undo`
-		},
-		{
-			stat: 'grace',
-			value: statValue('grace'),
-			effect: `${statTier(statValue('grace'))} delete`
-		},
-		{
-			stat: 'heart',
-			value: statValue('heart'),
-			effect: `${statTier(statValue('heart'))} double`
-		},
-		{
-			stat: 'will',
-			value: statValue('will'),
-			effect: `+${statTier(statValue('will')) * 10} turns`
-		},
-		{
-			stat: 'spark',
-			value: statValue('spark'),
-			effect: `${statTier(statValue('spark'))} wild`
-		}
-	]);
+	const statEffects = $derived<ArcadeStatEffects>({
+		body: () => (openingTileValue() ? `opens with ${openingTileValue()}` : 'no opening tile'),
+		mind: (_value, tier) => `${tier} undo`,
+		grace: (_value, tier) => `${tier} delete`,
+		heart: (_value, tier) => `${tier} double`
+	});
+
+	function recordId(nextMode: Mode = mode): string {
+		return `${GAME_ID}:${nextMode}`;
+	}
+
+	function loadBestForMode(nextMode: Mode = mode) {
+		best = loadArcadeRecord(recordId(nextMode)).bestScore;
+	}
+
+	function recordRun(reason: string) {
+		if (recordedRun || (turns === 0 && score === 0)) return;
+		const record = recordArcadeRun(recordId(), {
+			score,
+			summary: {
+				mode,
+				turns,
+				reason,
+				won,
+				over
+			}
+		});
+		best = record.bestScore;
+		recordedRun = true;
+	}
 
 	function snapshotTurn(): TurnSnapshot {
 		return {
@@ -231,9 +238,10 @@
 			over = true;
 			overReason = 'moves';
 		}
+		if (over) recordRun(overReason ?? 'over');
 	}
 
-	function reset() {
+	function freshRun() {
 		board = freshBoard();
 		score = 0;
 		won = false;
@@ -242,15 +250,23 @@
 		overReason = null;
 		turns = 0;
 		powerUps = freshPowerUps();
-		sparkReserve = statTier(statValue('spark'));
+		sparkReserve = statTier(supportStatValue('spark'));
 		activePower = null;
 		undoStack = [];
+		recordedRun = false;
+	}
+
+	function reset() {
+		recordRun('reset');
+		freshRun();
 	}
 
 	function setMode(next: Mode) {
 		if (mode === next) return;
+		recordRun('mode');
 		mode = next;
-		reset();
+		loadBestForMode(next);
+		freshRun();
 	}
 
 	function powerCount(id: PowerUpId): number {
@@ -289,6 +305,7 @@
 		if (!hasMovesLeft(nb)) {
 			over = true;
 			overReason = 'moves';
+			recordRun('moves');
 		}
 	}
 
@@ -347,8 +364,14 @@
 		move(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up');
 	}
 
-	onMount(() => window.addEventListener('keydown', onKey));
-	onDestroy(() => window.removeEventListener('keydown', onKey));
+	onMount(() => {
+		loadBestForMode();
+		window.addEventListener('keydown', onKey);
+	});
+	onDestroy(() => {
+		recordRun('close');
+		window.removeEventListener('keydown', onKey);
+	});
 
 	// ── tile appearance ───────────────────────────────────────────────────
 	const TILE_COLORS: Record<number, [string, string]> = {
@@ -393,6 +416,10 @@
 			<div class="score-box">
 				<span class="score-label">turns</span>
 				<span class="score-val">{turnDisplay}</span>
+			</div>
+			<div class="score-box">
+				<span class="score-label">prize</span>
+				<span class="score-val policy">{scoreOnlyLabel}</span>
 			</div>
 		</div>
 		<div class="btn-group">
@@ -443,14 +470,7 @@
 		{:else}
 			<p class="target-note">pet stats shape the opening, powers, and turn budget</p>
 		{/if}
-		<div class="perk-grid" aria-label="active pet stat bonuses">
-			{#each statPerks as perk (perk.stat)}
-				<span class:lit={perk.value >= 5}>
-					<b>{perk.stat}</b>
-					{perk.value}: {perk.effect}
-				</span>
-			{/each}
-		</div>
+		<ArcadePetPerks creature={activePet} effects={statEffects} />
 	</section>
 
 	<!-- board -->
@@ -574,6 +594,15 @@
 		font-size: 1.3rem;
 		color: var(--sol-base01);
 		line-height: 1.1;
+	}
+	.score-val.policy {
+		font-family: var(--font-ui);
+		font-size: 0.64rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		line-height: 1.25;
+		max-width: 4.2rem;
+		text-align: center;
 	}
 	.btn-group {
 		display: flex;
@@ -707,33 +736,6 @@
 		color: var(--sol-base0);
 		margin: -0.05rem 0 0;
 	}
-	.perk-grid {
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 0.3rem;
-	}
-	.perk-grid span {
-		border: 1px solid var(--sol-base2);
-		border-radius: 3px;
-		background: rgba(253, 246, 227, 0.7);
-		color: var(--sol-base1);
-		font-family: var(--font-ui);
-		font-size: 0.58rem;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		line-height: 1.25;
-		padding: 0.28rem 0.35rem;
-	}
-	.perk-grid span.lit {
-		color: var(--sol-base00);
-		border-color: rgba(42, 161, 152, 0.5);
-		background: rgba(42, 161, 152, 0.1);
-	}
-	.perk-grid b {
-		color: var(--sol-base01);
-		font-weight: 700;
-	}
-
 	/* ── board ──────────────────────────────────────────────────────────── */
 	.board-wrap {
 		position: relative;
@@ -847,8 +849,7 @@
 		.score-group {
 			justify-content: center;
 		}
-		.power-grid span,
-		.perk-grid span {
+		.power-grid span {
 			font-size: 0.52rem;
 		}
 	}
