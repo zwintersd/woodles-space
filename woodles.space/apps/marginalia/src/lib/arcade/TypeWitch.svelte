@@ -2,11 +2,13 @@
 	import { onDestroy } from 'svelte';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { conditions } from '$lib/witch/content/conditions';
+	import type { ArcadeActivePet } from './arcadeStats';
 	import { cappedReward } from './arcadeMath';
 	import { payReward } from './arcadeRewards';
 
 	interface Props {
 		onclose: () => void;
+		activePet?: ArcadeActivePet;
 	}
 	let { onclose }: Props = $props();
 

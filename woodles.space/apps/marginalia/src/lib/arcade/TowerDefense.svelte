@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { cappedReward, clamp, distance, normalize, type Dot } from './arcadeMath';
+	import type { ArcadeActivePet } from './arcadeStats';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { payReward } from './arcadeRewards';
 
 	interface Props {
 		onclose: () => void;
+		activePet?: ArcadeActivePet;
 	}
 	let { onclose }: Props = $props();
 

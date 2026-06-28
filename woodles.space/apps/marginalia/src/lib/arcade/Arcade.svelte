@@ -245,33 +245,33 @@
 			</header>
 
 			{#if activeGame === 'inkblot'}
-				<Inkblot onclose={closeGame} creatures={bestiaryCreatures} />
+				<Inkblot onclose={closeGame} creatures={bestiaryCreatures} {activePet} />
 			{:else if activeGame === 'stack-2048'}
-				<TwoZeroFourEight onclose={closeGame} creature={activePet} />
+				<TwoZeroFourEight onclose={closeGame} {activePet} />
 			{:else if activeGame === 'color-pop'}
-				<ColorPop onclose={closeGame} />
+				<ColorPop onclose={closeGame} {activePet} />
 			{:else if activeGame === 'margin-miner'}
-				<MarginMiner onclose={closeGame} />
+				<MarginMiner onclose={closeGame} {activePet} />
 			{:else if activeGame === 'get-big'}
-				<GetBig onclose={closeGame} />
+				<GetBig onclose={closeGame} {activePet} />
 			{:else if activeGame === 'margin-hollow'}
-				<MarginHollow onclose={closeGame} />
+				<MarginHollow onclose={closeGame} {activePet} />
 			{:else if activeGame === 'insight-rush'}
-				<InsightRush onclose={closeGame} />
+				<InsightRush onclose={closeGame} {activePet} />
 			{:else if activeGame === 'bullet-dot'}
-				<BulletHeaven onclose={closeGame} />
+				<BulletHeaven onclose={closeGame} {activePet} />
 			{:else if activeGame === 'margin-defense'}
-				<TowerDefense onclose={closeGame} />
+				<TowerDefense onclose={closeGame} {activePet} />
 			{:else if activeGame === 'margin-snake'}
-				<Snake onclose={closeGame} />
+				<Snake onclose={closeGame} {activePet} />
 			{:else if activeGame === 'paddle-break'}
-				<PaddleBreak onclose={closeGame} />
+				<PaddleBreak onclose={closeGame} {activePet} />
 			{:else if activeGame === 'bubble-spinner'}
-				<BubbleSpinner onclose={closeGame} />
+				<BubbleSpinner onclose={closeGame} {activePet} />
 			{:else if activeGame === 'margin-bubbles'}
-				<BubbleShooter onclose={closeGame} />
+				<BubbleShooter onclose={closeGame} {activePet} />
 			{:else if activeGame === 'type-witch'}
-				<TypeWitch onclose={closeGame} />
+				<TypeWitch onclose={closeGame} {activePet} />
 			{/if}
 		</section>
 	{:else}
