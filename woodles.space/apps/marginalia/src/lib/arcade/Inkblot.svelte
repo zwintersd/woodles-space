@@ -7,6 +7,7 @@
 	interface Props {
 		onclose: () => void;
 		creatures: BestiaryCreature[];
+		activePet?: BestiaryCreature | null;
 	}
 	let { onclose, creatures }: Props = $props();
 

@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { book, fmt } from '$lib/witch/book.svelte';
+	import type { ArcadeActivePet } from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
+		activePet?: ArcadeActivePet;
 	}
 	let { onclose }: Props = $props();
 
