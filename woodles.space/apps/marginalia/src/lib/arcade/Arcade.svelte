@@ -7,7 +7,6 @@
 	import BubbleSpinner from './BubbleSpinner.svelte';
 	import BulletHeaven from './BulletHeaven.svelte';
 	import GetBig from './GetBig.svelte';
-	import InsightRush from './InsightRush.svelte';
 	import MarginHollow from './MarginHollow.svelte';
 	import PaddleBreak from './PaddleBreak.svelte';
 	import Snake from './Snake.svelte';
