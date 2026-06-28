@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { book, fmt } from '$lib/witch/book.svelte';
+	import ArcadeHud from './ArcadeHud.svelte';
+	import ArcadeProgress from './ArcadeProgress.svelte';
+	import { fmt } from '$lib/witch/book.svelte';
+	import { awardArcadeReward, previewArcadeReward } from './arcadeRewards';
 
 	interface Props {
 		onclose: () => void;
@@ -49,7 +52,7 @@
 	let endsAt = 0;
 	let lastHitAt = 0;
 
-	const timeStyle = $derived(`--time:${Math.max(0, remaining / ROUND_SECONDS).toFixed(4)}`);
+	const timeProgress = $derived(Math.max(0, remaining / ROUND_SECONDS));
 	const accuracy = $derived(hits + misses === 0 ? 1 : hits / (hits + misses));
 	const focusLevel = $derived(Math.min(5, Math.floor(streak / 4)));
 	const flow = $derived(Math.min(1, (focusLevel / 5) * 0.62 + accuracy * 0.38));
@@ -98,7 +101,7 @@
 			Math.floor(chain / 5) +
 			Math.floor(chain / 12) -
 			Math.floor(errors / 5);
-		return Math.max(0, Math.min(MAX_REWARD, raw));
+		return previewArcadeReward(raw, MAX_REWARD);
 	}
 
 	function start() {
@@ -135,11 +138,7 @@
 		remaining = 0;
 		phase = 'complete';
 		rounds += 1;
-		awarded = rewardFor(score, bestStreak, misses);
-		if (awarded > 0) {
-			book.insight += awarded;
-			book.persist();
-		}
+		awarded = awardArcadeReward('insight-rush', rewardFor(score, bestStreak, misses), MAX_REWARD);
 	}
 
 	function addPop(x: number, y: number, text: string, tone: Pop['tone']) {
@@ -186,34 +185,20 @@
 </script>
 
 <div class="rush-shell">
-	<div class="rush-bar">
-		<div class="game-id">
-			<span class="game-name">Insight Rush</span>
-			<span class="game-hint">tap the bright mark before the moment closes</span>
-		</div>
-		<div class="score-group">
-			<div class="score-box">
-				<span class="score-label">score</span>
-				<span class="score-val">{score}</span>
-			</div>
-			<div class="score-box live">
-				<span class="score-label">now</span>
-				<span class="score-val">{streak}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">best</span>
-				<span class="score-val">{bestStreak}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">prize</span>
-				<span class="score-val">{fmt(phase === 'complete' ? awarded : previewReward)}</span>
-			</div>
-		</div>
-		<div class="btn-group">
-			<button class="ctrl-btn" onclick={start}>{startLabel}</button>
-			<button class="ctrl-btn back" onclick={onclose}>arcade</button>
-		</div>
-	</div>
+	<ArcadeHud
+		title="Insight Rush"
+		hint="tap the bright mark before the moment closes"
+		maxWidth="520px"
+		scores={[
+			{ label: 'score', value: score },
+			{ label: 'now', value: streak, live: true, tone: 'yellow' },
+			{ label: 'best', value: bestStreak },
+			{ label: 'prize', value: fmt(phase === 'complete' ? awarded : previewReward) }
+		]}
+		{startLabel}
+		onstart={start}
+		onclose={onclose}
+	/>
 
 	<div class="focus-row" aria-label="focus">
 		<span class="rhythm">{rhythmLabel}</span>
@@ -225,9 +210,7 @@
 		<span>{Math.round(accuracy * 100)}%</span>
 	</div>
 
-	<div class="time-track" style={timeStyle} aria-label="time remaining">
-		<span></span>
-	</div>
+	<ArcadeProgress value={timeProgress} label="time remaining" tone="yellow" maxWidth="520px" />
 
 	<div
 		class="rush-field"
@@ -292,95 +275,6 @@
 		border-top: 2px solid var(--sol-base2);
 	}
 
-	.rush-bar {
-		width: 100%;
-		max-width: 520px;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.8rem;
-		flex-wrap: wrap;
-	}
-
-	.game-id {
-		display: flex;
-		flex-direction: column;
-		gap: 0.1rem;
-	}
-	.game-name {
-		font-family: var(--font-counter);
-		font-size: 2rem;
-		line-height: 1;
-		color: var(--sol-base01);
-		letter-spacing: 0.04em;
-	}
-	.game-hint {
-		font-family: var(--font-ui);
-		font-size: 0.62rem;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-	.score-group {
-		display: flex;
-		gap: 0.4rem;
-		flex-wrap: wrap;
-	}
-	.score-box {
-		background: var(--sol-base2);
-		border-radius: 3px;
-		padding: 0.3rem 0.6rem;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		min-width: 3.2rem;
-	}
-	.score-box.live {
-		background: color-mix(in srgb, var(--sol-base2) 68%, var(--sol-yellow));
-	}
-	.score-label {
-		font-family: var(--font-ui);
-		font-size: 0.56rem;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-	.score-val {
-		font-family: var(--font-counter);
-		font-size: 1.3rem;
-		color: var(--sol-base01);
-		line-height: 1.1;
-	}
-	.btn-group {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-		align-items: flex-end;
-	}
-	.ctrl-btn {
-		font-family: var(--font-ui);
-		font-size: 0.66rem;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: var(--sol-base3);
-		background: var(--sol-base0);
-		border-radius: 3px;
-		padding: 0.24rem 0.6rem;
-		white-space: nowrap;
-		transition: background 0.1s;
-	}
-	.ctrl-btn:hover {
-		background: var(--sol-base00);
-	}
-	.ctrl-btn.back {
-		background: var(--sol-base2);
-		color: var(--sol-base0);
-	}
-	.ctrl-btn.back:hover {
-		background: var(--sol-base1);
-		color: var(--sol-base3);
-	}
-
 	.focus-row {
 		width: min(520px, 100%);
 		display: grid;
@@ -410,21 +304,6 @@
 	.focus-pips span.lit {
 		background: var(--sol-yellow);
 		box-shadow: 0 0 10px rgba(181, 137, 0, 0.28);
-	}
-
-	.time-track {
-		width: min(520px, 100%);
-		height: 0.45rem;
-		border-radius: 999px;
-		background: var(--sol-base2);
-		overflow: hidden;
-	}
-	.time-track span {
-		display: block;
-		width: calc(var(--time) * 100%);
-		height: 100%;
-		background: linear-gradient(90deg, var(--sol-green), var(--sol-yellow), var(--sol-orange));
-		transition: width 80ms linear;
 	}
 
 	.rush-field {
@@ -618,16 +497,6 @@
 	}
 
 	@media (max-width: 520px) {
-		.rush-bar {
-			align-items: flex-start;
-		}
-		.game-name {
-			font-size: 1.7rem;
-		}
-		.btn-group {
-			flex-direction: row;
-			align-items: center;
-		}
 		.focus-row {
 			grid-template-columns: 4.8rem minmax(5rem, 1fr) 2.8rem;
 			gap: 0.45rem;

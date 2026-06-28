@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import { book, fmt } from '$lib/witch/book.svelte';
+	import { fmt } from '$lib/witch/book.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
 	import { dailyLimit } from './dailyLimit';
+	import { awardArcadeReward } from './arcadeRewards';
 
 	interface Props {
 		onclose: () => void;
@@ -192,9 +193,7 @@
 		if (correct) {
 			const mult = GUESS_MULT[guessCount] ?? GUESS_MULT[GUESS_MULT.length - 1];
 			const raw = Math.round(timeScore * mult * MAX_REWARD / 1000);
-			awarded = Math.max(1, Math.min(MAX_REWARD, raw));
-			book.insight += awarded;
-			book.persist();
+			awarded = awardArcadeReward('inkblot', Math.max(1, raw), MAX_REWARD);
 			phase = 'correct';
 		} else {
 			awarded = 0;

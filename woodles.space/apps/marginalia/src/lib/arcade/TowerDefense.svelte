@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { cappedReward, clamp, distance, normalize, type Dot } from './arcadeMath';
-	import { book, fmt } from '$lib/witch/book.svelte';
+	import ArcadeHud from './ArcadeHud.svelte';
+	import ArcadeProgress from './ArcadeProgress.svelte';
+	import { clamp, distance, normalize, type Dot } from './arcadeMath';
+	import { fmt } from '$lib/witch/book.svelte';
+	import { awardArcadeReward, previewArcadeReward } from './arcadeRewards';
 
 	interface Props {
 		onclose: () => void;
@@ -102,7 +105,6 @@
 			? 1
 			: Math.min(1, (wave - 1 + waveDone / Math.max(1, waveSize)) / WAVE_COUNT)
 	);
-	const progressStyle = $derived(`--left:${waveProgress.toFixed(4)}`);
 	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
 	const rewardPreview = $derived(rewardFor(kills, wave, phase === 'complete'));
 	const outcomeLabel = $derived.by(() => {
@@ -120,7 +122,7 @@
 
 	function rewardFor(defeated: number, reachedWave: number, cleared: boolean): number {
 		const raw = Math.floor(defeated / 5) + reachedWave + (cleared ? 6 : 0);
-		return cappedReward(raw, MAX_REWARD);
+		return previewArcadeReward(raw, MAX_REWARD);
 	}
 
 	function resetMap() {
@@ -166,11 +168,7 @@
 		stop();
 		rounds += 1;
 		best = Math.max(best, kills);
-		awarded = rewardFor(kills, wave, nextPhase === 'complete');
-		if (awarded > 0) {
-			book.insight += awarded;
-			book.persist();
-		}
+		awarded = awardArcadeReward('margin-defense', rewardFor(kills, wave, nextPhase === 'complete'), MAX_REWARD);
 	}
 
 	function loop(now: number) {
@@ -401,38 +399,21 @@
 </script>
 
 <div class="defense-shell">
-	<div class="defense-bar">
-		<div class="game-id">
-			<span class="game-name">Margin Defense</span>
-			<span class="game-hint">click sigils, hold the path</span>
-		</div>
-		<div class="score-group">
-			<div class="score-box">
-				<span class="score-label">wave</span>
-				<span class="score-val">{wave}/{WAVE_COUNT}</span>
-			</div>
-			<div class="score-box live">
-				<span class="score-label">lives</span>
-				<span class="score-val">{lives}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">coins</span>
-				<span class="score-val">{coins}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">prize</span>
-				<span class="score-val">{fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview)}</span>
-			</div>
-		</div>
-		<div class="btn-group">
-			<button class="ctrl-btn" onclick={start}>{startLabel}</button>
-			<button class="ctrl-btn back" onclick={onclose}>arcade</button>
-		</div>
-	</div>
+	<ArcadeHud
+		title="Margin Defense"
+		hint="click sigils, hold the path"
+		scores={[
+			{ label: 'wave', value: `${wave}/${WAVE_COUNT}` },
+			{ label: 'lives', value: lives, live: true, tone: 'green' },
+			{ label: 'coins', value: coins },
+			{ label: 'prize', value: fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview) }
+		]}
+		{startLabel}
+		onstart={start}
+		onclose={onclose}
+	/>
 
-	<div class="wave-track" style={progressStyle} aria-label="wave progress">
-		<span></span>
-	</div>
+	<ArcadeProgress value={waveProgress} label="wave progress" tone="green" />
 
 	<svg
 		class="field"
@@ -530,103 +511,6 @@
 		gap: 0.9rem;
 		background: var(--sol-base3);
 		border-top: 2px solid var(--sol-base2);
-	}
-	.defense-bar {
-		width: 100%;
-		max-width: 540px;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.8rem;
-		flex-wrap: wrap;
-	}
-	.game-id {
-		display: flex;
-		flex-direction: column;
-		gap: 0.1rem;
-	}
-	.game-name {
-		font-family: var(--font-counter);
-		font-size: 2rem;
-		line-height: 1;
-		color: var(--sol-base01);
-	}
-	.game-hint {
-		font-family: var(--font-ui);
-		font-size: 0.62rem;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-	.score-group {
-		display: flex;
-		gap: 0.4rem;
-		flex-wrap: wrap;
-	}
-	.score-box {
-		background: var(--sol-base2);
-		border-radius: 3px;
-		padding: 0.3rem 0.6rem;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		min-width: 3.2rem;
-	}
-	.score-box.live {
-		background: color-mix(in srgb, var(--sol-base2) 70%, var(--sol-green));
-	}
-	.score-label {
-		font-family: var(--font-ui);
-		font-size: 0.56rem;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-	.score-val {
-		font-family: var(--font-counter);
-		font-size: 1.3rem;
-		color: var(--sol-base01);
-		line-height: 1.1;
-	}
-	.btn-group {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-		align-items: flex-end;
-	}
-	.ctrl-btn {
-		font-family: var(--font-ui);
-		font-size: 0.66rem;
-		text-transform: uppercase;
-		color: var(--sol-base3);
-		background: var(--sol-base0);
-		border-radius: 3px;
-		padding: 0.24rem 0.6rem;
-		white-space: nowrap;
-		transition: background 0.1s;
-	}
-	.ctrl-btn:hover {
-		background: var(--sol-base00);
-	}
-	.ctrl-btn.back {
-		background: var(--sol-base2);
-		color: var(--sol-base0);
-	}
-	.ctrl-btn.back:hover {
-		background: var(--sol-base1);
-		color: var(--sol-base3);
-	}
-	.wave-track {
-		width: min(540px, 100%);
-		height: 0.45rem;
-		border-radius: 999px;
-		background: var(--sol-base2);
-		overflow: hidden;
-	}
-	.wave-track span {
-		display: block;
-		width: calc(var(--left) * 100%);
-		height: 100%;
-		background: linear-gradient(90deg, var(--sol-yellow), var(--sol-green), var(--sol-cyan));
-		transition: width 160ms linear;
 	}
 	.field {
 		width: min(540px, calc(100vw - 3rem));
@@ -753,20 +637,6 @@
 		color: var(--sol-base0);
 	}
 	@media (max-width: 560px) {
-		.defense-bar {
-			align-items: flex-start;
-		}
-		.btn-group {
-			flex-direction: row;
-			align-items: center;
-		}
-		.game-name {
-			font-size: 1.7rem;
-		}
-		.score-box {
-			min-width: 2.85rem;
-			padding-inline: 0.48rem;
-		}
 		.center-title {
 			font-size: 34px;
 		}

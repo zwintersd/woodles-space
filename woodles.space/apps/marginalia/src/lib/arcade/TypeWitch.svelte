@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { book, fmt } from '$lib/witch/book.svelte';
+	import ArcadeHud from './ArcadeHud.svelte';
+	import ArcadeProgress from './ArcadeProgress.svelte';
+	import { fmt } from '$lib/witch/book.svelte';
 	import { conditions } from '$lib/witch/content/conditions';
+	import { awardArcadeReward, previewArcadeReward } from './arcadeRewards';
 
 	interface Props {
 		onclose: () => void;
@@ -58,7 +61,7 @@
 		});
 	});
 
-	const timeStyle = $derived(`--time:${Math.max(0, remaining / ROUND_SECONDS).toFixed(4)}`);
+	const timeProgress = $derived(Math.max(0, remaining / ROUND_SECONDS));
 	const phraseTimeStyle = $derived(`--ptime:${Math.max(0, phraseRemaining / PHRASE_SECONDS).toFixed(4)}`);
 
 	const accuracy = $derived.by(() => {
@@ -67,10 +70,11 @@
 	});
 
 	const previewReward = $derived(rewardFor(completed, score, errors));
+	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
 
 	function rewardFor(done: number, pts: number, errs: number): number {
 		const raw = done * 3 + Math.floor(pts / 4) - Math.floor(errs / 8);
-		return Math.max(0, Math.min(MAX_REWARD, raw));
+		return previewArcadeReward(raw, MAX_REWARD);
 	}
 
 	function start() {
@@ -113,11 +117,7 @@
 		remaining = 0;
 		phase = 'complete';
 		rounds += 1;
-		awarded = rewardFor(completed, score, errors);
-		if (awarded > 0) {
-			book.insight += awarded;
-			book.persist();
-		}
+		awarded = awardArcadeReward('type-witch', rewardFor(completed, score, errors), MAX_REWARD);
 	}
 
 	function advancePhrase(succeeded: boolean) {
@@ -163,40 +163,22 @@
 </script>
 
 <div class="witch-shell">
-	<div class="witch-bar">
-		<div class="game-id">
-			<span class="game-name">Type Witch</span>
-			<span class="game-hint">transcribe Brianna's conditions before they dissolve</span>
-		</div>
-		<div class="score-group">
-			<div class="score-box">
-				<span class="score-label">done</span>
-				<span class="score-val">{completed}</span>
-			</div>
-			<div class="score-box live">
-				<span class="score-label">chars</span>
-				<span class="score-val">{score}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">errors</span>
-				<span class="score-val">{errors}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">prize</span>
-				<span class="score-val">{fmt(phase === 'complete' ? awarded : previewReward)}</span>
-			</div>
-		</div>
-		<div class="btn-group">
-			<button class="ctrl-btn" onclick={start}>
-				{phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start'}
-			</button>
-			<button class="ctrl-btn back" onclick={onclose}>arcade</button>
-		</div>
-	</div>
+	<ArcadeHud
+		title="Type Witch"
+		hint="transcribe Brianna's conditions before they dissolve"
+		maxWidth="580px"
+		scores={[
+			{ label: 'done', value: completed },
+			{ label: 'chars', value: score, live: true, tone: 'cyan' },
+			{ label: 'errors', value: errors },
+			{ label: 'prize', value: fmt(phase === 'complete' ? awarded : previewReward) }
+		]}
+		{startLabel}
+		onstart={start}
+		onclose={onclose}
+	/>
 
-	<div class="time-track" style={timeStyle} aria-label="round time remaining">
-		<span></span>
-	</div>
+	<ArcadeProgress value={timeProgress} label="round time remaining" tone="yellow" maxWidth="580px" />
 
 	<div class="witch-field" class:idle={phase !== 'running'}>
 		{#if phase === 'ready'}
@@ -268,111 +250,6 @@
 		gap: 0.9rem;
 		background: var(--sol-base3);
 		border-top: 2px solid var(--sol-base2);
-	}
-
-	/* ── top bar ───────────────────────────────────────────────────────────── */
-	.witch-bar {
-		width: 100%;
-		max-width: 580px;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.8rem;
-		flex-wrap: wrap;
-	}
-	.game-id {
-		display: flex;
-		flex-direction: column;
-		gap: 0.1rem;
-	}
-	.game-name {
-		font-family: var(--font-counter);
-		font-size: 2rem;
-		line-height: 1;
-		color: var(--sol-base01);
-		letter-spacing: 0.04em;
-	}
-	.game-hint {
-		font-family: var(--font-ui);
-		font-size: 0.62rem;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-	.score-group {
-		display: flex;
-		gap: 0.4rem;
-		flex-wrap: wrap;
-	}
-	.score-box {
-		background: var(--sol-base2);
-		border-radius: 3px;
-		padding: 0.3rem 0.6rem;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		min-width: 3.2rem;
-	}
-	.score-box.live {
-		background: color-mix(in srgb, var(--sol-base2) 68%, var(--sol-cyan));
-	}
-	.score-label {
-		font-family: var(--font-ui);
-		font-size: 0.56rem;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-	.score-val {
-		font-family: var(--font-counter);
-		font-size: 1.3rem;
-		color: var(--sol-base01);
-		line-height: 1.1;
-	}
-	.btn-group {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-		align-items: flex-end;
-	}
-	.ctrl-btn {
-		font-family: var(--font-ui);
-		font-size: 0.66rem;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: var(--sol-base3);
-		background: var(--sol-base0);
-		border-radius: 3px;
-		padding: 0.24rem 0.6rem;
-		white-space: nowrap;
-		transition: background 0.1s;
-	}
-	.ctrl-btn:hover {
-		background: var(--sol-base00);
-	}
-	.ctrl-btn.back {
-		background: var(--sol-base2);
-		color: var(--sol-base0);
-	}
-	.ctrl-btn.back:hover {
-		background: var(--sol-base1);
-		color: var(--sol-base3);
-	}
-
-	/* ── round timer bar ───────────────────────────────────────────────────── */
-	.time-track {
-		width: min(580px, 100%);
-		height: 0.45rem;
-		border-radius: 999px;
-		background: var(--sol-base2);
-		overflow: hidden;
-	}
-	.time-track span {
-		display: block;
-		width: calc(var(--time) * 100%);
-		height: 100%;
-		background: linear-gradient(90deg, var(--sol-green), var(--sol-yellow), var(--sol-orange));
-		transition: width 80ms linear;
 	}
 
 	/* ── main field ────────────────────────────────────────────────────────── */
@@ -523,16 +400,6 @@
 	}
 
 	@media (max-width: 520px) {
-		.witch-bar {
-			align-items: flex-start;
-		}
-		.game-name {
-			font-size: 1.7rem;
-		}
-		.btn-group {
-			flex-direction: row;
-			align-items: center;
-		}
 		.phrase-display {
 			font-size: 1.3rem;
 		}

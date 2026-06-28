@@ -34,16 +34,24 @@ export function dailyLimit(gameId: string, limit: number): DailyLimit {
 		localStorage.setItem(storageKey, JSON.stringify(record));
 	}
 
-	const record = load();
+	let record = load();
+
+	function currentRecord(): DailyRecord {
+		if (record.date !== todayKey()) {
+			record = { date: todayKey(), count: 0 };
+		}
+		return record;
+	}
 
 	return {
-		get remaining() { return Math.max(0, limit - load().count); },
-		get used() { return load().count; },
+		get remaining() { return Math.max(0, limit - currentRecord().count); },
+		get used() { return currentRecord().count; },
 		get total() { return limit; },
-		get canPlay() { return load().count < limit; },
+		get canPlay() { return currentRecord().count < limit; },
 		increment() {
-			const current = load();
-			save({ date: current.date, count: current.count + 1 });
+			const current = currentRecord();
+			record = { date: current.date, count: current.count + 1 };
+			save(record);
 		}
 	};
 }

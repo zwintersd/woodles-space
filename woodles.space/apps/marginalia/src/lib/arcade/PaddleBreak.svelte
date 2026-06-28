@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import { cappedReward, clamp, type Dot } from './arcadeMath';
-	import { book, fmt } from '$lib/witch/book.svelte';
+	import ArcadeHud from './ArcadeHud.svelte';
+	import ArcadeProgress from './ArcadeProgress.svelte';
+	import { clamp, type Dot } from './arcadeMath';
+	import { fmt } from '$lib/witch/book.svelte';
+	import { awardArcadeReward, previewArcadeReward } from './arcadeRewards';
 
 	interface Props {
 		onclose: () => void;
@@ -63,7 +66,7 @@
 	let fieldEl: SVGSVGElement;
 	let pointerDown = false;
 
-	const progressStyle = $derived(`--left:${((BRICK_COLS * BRICK_ROWS - bricks.length) / (BRICK_COLS * BRICK_ROWS)).toFixed(4)}`);
+	const wallProgress = $derived((BRICK_COLS * BRICK_ROWS - bricks.length) / (BRICK_COLS * BRICK_ROWS));
 	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
 	const rewardPreview = $derived(rewardFor(score, saves, phase === 'complete'));
 	const outcomeLabel = $derived.by(() => {
@@ -107,7 +110,7 @@
 
 	function rewardFor(points: number, rescued: number, cleared: boolean): number {
 		const raw = Math.floor(points / 7) + Math.floor(rescued / 3) + (cleared ? 7 : 0);
-		return cappedReward(raw, MAX_REWARD);
+		return previewArcadeReward(raw, MAX_REWARD);
 	}
 
 	function reset() {
@@ -141,11 +144,7 @@
 		stop();
 		rounds += 1;
 		best = Math.max(best, score);
-		awarded = rewardFor(score, saves, nextPhase === 'complete');
-		if (awarded > 0) {
-			book.insight += awarded;
-			book.persist();
-		}
+		awarded = awardArcadeReward('paddle-break', rewardFor(score, saves, nextPhase === 'complete'), MAX_REWARD);
 	}
 
 	function loop(now: number) {
@@ -306,38 +305,21 @@
 </script>
 
 <div class="paddle-shell">
-	<div class="paddle-bar">
-		<div class="game-id">
-			<span class="game-name">Paddle Break</span>
-			<span class="game-hint">{hintLabel}</span>
-		</div>
-		<div class="score-group">
-			<div class="score-box">
-				<span class="score-label">score</span>
-				<span class="score-val">{score}</span>
-			</div>
-			<div class="score-box live">
-				<span class="score-label">combo</span>
-				<span class="score-val">{combo}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">wall</span>
-				<span class="score-val">{BRICK_COLS * BRICK_ROWS - bricks.length}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">prize</span>
-				<span class="score-val">{fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview)}</span>
-			</div>
-		</div>
-		<div class="btn-group">
-			<button class="ctrl-btn" onclick={start}>{startLabel}</button>
-			<button class="ctrl-btn back" onclick={onclose}>arcade</button>
-		</div>
-	</div>
+	<ArcadeHud
+		title="Paddle Break"
+		hint={hintLabel}
+		scores={[
+			{ label: 'score', value: score },
+			{ label: 'combo', value: combo, live: true, tone: 'yellow' },
+			{ label: 'wall', value: BRICK_COLS * BRICK_ROWS - bricks.length },
+			{ label: 'prize', value: fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview) }
+		]}
+		{startLabel}
+		onstart={start}
+		onclose={onclose}
+	/>
 
-	<div class="break-track" style={progressStyle} aria-label="wall cleared">
-		<span></span>
-	</div>
+	<ArcadeProgress value={wallProgress} label="wall cleared" tone="violet" />
 
 	<svg
 		bind:this={fieldEl}
@@ -410,68 +392,6 @@
 		background: var(--sol-base3);
 		border-top: 2px solid var(--sol-base2);
 	}
-	.paddle-bar {
-		width: 100%;
-		max-width: 540px;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.8rem;
-		flex-wrap: wrap;
-	}
-	.game-id {
-		display: flex;
-		flex-direction: column;
-		gap: 0.1rem;
-	}
-	.game-name {
-		font-family: var(--font-counter);
-		font-size: 2rem;
-		line-height: 1;
-		color: var(--sol-base01);
-	}
-	.game-hint {
-		font-family: var(--font-ui);
-		font-size: 0.62rem;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-	.score-group {
-		display: flex;
-		gap: 0.4rem;
-		flex-wrap: wrap;
-	}
-	.score-box {
-		background: var(--sol-base2);
-		border-radius: 3px;
-		padding: 0.3rem 0.6rem;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		min-width: 3.2rem;
-	}
-	.score-box.live {
-		background: color-mix(in srgb, var(--sol-base2) 68%, var(--sol-yellow));
-	}
-	.score-label {
-		font-family: var(--font-ui);
-		font-size: 0.56rem;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-	.score-val {
-		font-family: var(--font-counter);
-		font-size: 1.3rem;
-		color: var(--sol-base01);
-		line-height: 1.1;
-	}
-	.btn-group {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-		align-items: flex-end;
-	}
-	.ctrl-btn,
 	.pad-row button {
 		font-family: var(--font-ui);
 		font-size: 0.66rem;
@@ -483,31 +403,8 @@
 		white-space: nowrap;
 		transition: background 0.1s;
 	}
-	.ctrl-btn:hover,
 	.pad-row button:hover {
 		background: var(--sol-base00);
-	}
-	.ctrl-btn.back {
-		background: var(--sol-base2);
-		color: var(--sol-base0);
-	}
-	.ctrl-btn.back:hover {
-		background: var(--sol-base1);
-		color: var(--sol-base3);
-	}
-	.break-track {
-		width: min(540px, 100%);
-		height: 0.45rem;
-		border-radius: 999px;
-		background: var(--sol-base2);
-		overflow: hidden;
-	}
-	.break-track span {
-		display: block;
-		width: calc(var(--left) * 100%);
-		height: 100%;
-		background: linear-gradient(90deg, var(--sol-cyan), var(--sol-blue), var(--sol-violet));
-		transition: width 120ms linear;
 	}
 	.field {
 		width: min(540px, calc(100vw - 3rem));
@@ -611,20 +508,6 @@
 		color: var(--sol-base3);
 	}
 	@media (max-width: 560px) {
-		.paddle-bar {
-			align-items: flex-start;
-		}
-		.btn-group {
-			flex-direction: row;
-			align-items: center;
-		}
-		.game-name {
-			font-size: 1.7rem;
-		}
-		.score-box {
-			min-width: 2.85rem;
-			padding-inline: 0.48rem;
-		}
 		.center-title {
 			font-size: 34px;
 		}

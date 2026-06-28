@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import { cappedReward, clamp, distance, type Dot } from './arcadeMath';
-	import { book, fmt } from '$lib/witch/book.svelte';
+	import ArcadeHud from './ArcadeHud.svelte';
+	import ArcadeProgress from './ArcadeProgress.svelte';
+	import { clamp, distance, type Dot } from './arcadeMath';
+	import { fmt } from '$lib/witch/book.svelte';
+	import { awardArcadeReward, previewArcadeReward } from './arcadeRewards';
 
 	interface Props {
 		onclose: () => void;
@@ -95,7 +98,6 @@
 		const deepest = bubbles.reduce((max, bubble) => Math.max(max, bubble.row), -1);
 		return clamp((deepest + rack / SHOTS_PER_DROP) / (ROWS - 1), 0, 1);
 	});
-	const progressStyle = $derived(`--left:${pressure.toFixed(4)}`);
 	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
 	const rewardPreview = $derived(rewardFor(popped, dropped, phase === 'complete'));
 	const outcomeLabel = $derived.by(() => {
@@ -132,7 +134,7 @@
 
 	function rewardFor(popCount: number, dropCount: number, cleared: boolean): number {
 		const raw = Math.floor(popCount / 5) + Math.floor(dropCount / 3) + (cleared ? 9 : 0);
-		return cappedReward(raw, MAX_REWARD);
+		return previewArcadeReward(raw, MAX_REWARD);
 	}
 
 	function cellKey(row: number, col: number): string {
@@ -204,11 +206,7 @@
 		stop();
 		rounds += 1;
 		best = Math.max(best, popped + dropped);
-		awarded = rewardFor(popped, dropped, nextPhase === 'complete');
-		if (awarded > 0) {
-			book.insight += awarded;
-			book.persist();
-		}
+		awarded = awardArcadeReward('margin-bubbles', rewardFor(popped, dropped, nextPhase === 'complete'), MAX_REWARD);
 	}
 
 	function loop(now: number) {
@@ -545,38 +543,21 @@
 </script>
 
 <div class="bubble-shell">
-	<div class="bubble-bar">
-		<div class="game-id">
-			<span class="game-name">Margin Bubbles</span>
-			<span class="game-hint">{hintLabel}</span>
-		</div>
-		<div class="score-group">
-			<div class="score-box">
-				<span class="score-label">popped</span>
-				<span class="score-val">{popped}</span>
-			</div>
-			<div class="score-box live">
-				<span class="score-label">dropped</span>
-				<span class="score-val">{dropped}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">ceiling</span>
-				<span class="score-val">{nextDrop}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">prize</span>
-				<span class="score-val">{fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview)}</span>
-			</div>
-		</div>
-		<div class="btn-group">
-			<button class="ctrl-btn" onclick={start}>{startLabel}</button>
-			<button class="ctrl-btn back" onclick={onclose}>arcade</button>
-		</div>
-	</div>
+	<ArcadeHud
+		title="Margin Bubbles"
+		hint={hintLabel}
+		scores={[
+			{ label: 'popped', value: popped },
+			{ label: 'dropped', value: dropped, live: true, tone: 'violet' },
+			{ label: 'ceiling', value: nextDrop },
+			{ label: 'prize', value: fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview) }
+		]}
+		{startLabel}
+		onstart={start}
+		onclose={onclose}
+	/>
 
-	<div class="pressure-track" style={progressStyle} aria-label="ceiling pressure">
-		<span></span>
-	</div>
+	<ArcadeProgress value={pressure} label="ceiling pressure" tone="danger" />
 
 	<svg
 		bind:this={fieldEl}
@@ -682,68 +663,6 @@
 		background: var(--sol-base3);
 		border-top: 2px solid var(--sol-base2);
 	}
-	.bubble-bar {
-		width: 100%;
-		max-width: 540px;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.8rem;
-		flex-wrap: wrap;
-	}
-	.game-id {
-		display: flex;
-		flex-direction: column;
-		gap: 0.1rem;
-	}
-	.game-name {
-		font-family: var(--font-counter);
-		font-size: 2rem;
-		line-height: 1;
-		color: var(--sol-base01);
-	}
-	.game-hint {
-		font-family: var(--font-ui);
-		font-size: 0.62rem;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-	.score-group {
-		display: flex;
-		gap: 0.4rem;
-		flex-wrap: wrap;
-	}
-	.score-box {
-		background: var(--sol-base2);
-		border-radius: 3px;
-		padding: 0.3rem 0.6rem;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		min-width: 3.2rem;
-	}
-	.score-box.live {
-		background: color-mix(in srgb, var(--sol-base2) 68%, var(--sol-violet));
-	}
-	.score-label {
-		font-family: var(--font-ui);
-		font-size: 0.56rem;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-	.score-val {
-		font-family: var(--font-counter);
-		font-size: 1.3rem;
-		color: var(--sol-base01);
-		line-height: 1.1;
-	}
-	.btn-group {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-		align-items: flex-end;
-	}
-	.ctrl-btn,
 	.control-row button {
 		font-family: var(--font-ui);
 		font-size: 0.66rem;
@@ -755,31 +674,8 @@
 		white-space: nowrap;
 		transition: background 0.1s;
 	}
-	.ctrl-btn:hover,
 	.control-row button:hover {
 		background: var(--sol-base00);
-	}
-	.ctrl-btn.back {
-		background: var(--sol-base2);
-		color: var(--sol-base0);
-	}
-	.ctrl-btn.back:hover {
-		background: var(--sol-base1);
-		color: var(--sol-base3);
-	}
-	.pressure-track {
-		width: min(540px, 100%);
-		height: 0.45rem;
-		border-radius: 999px;
-		background: var(--sol-base2);
-		overflow: hidden;
-	}
-	.pressure-track span {
-		display: block;
-		width: calc(var(--left) * 100%);
-		height: 100%;
-		background: linear-gradient(90deg, var(--sol-cyan), var(--sol-yellow), var(--sol-orange), var(--sol-red));
-		transition: width 120ms linear;
 	}
 	.field {
 		width: min(540px, calc(100vw - 3rem));
@@ -947,20 +843,6 @@
 		color: var(--sol-base1);
 	}
 	@media (max-width: 560px) {
-		.bubble-bar {
-			align-items: flex-start;
-		}
-		.btn-group {
-			flex-direction: row;
-			align-items: center;
-		}
-		.game-name {
-			font-size: 1.7rem;
-		}
-		.score-box {
-			min-width: 2.85rem;
-			padding-inline: 0.48rem;
-		}
 		.center-title {
 			font-size: 34px;
 		}

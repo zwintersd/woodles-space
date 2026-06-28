@@ -1,192 +1,202 @@
-# Marginalia Arcade — Resource-Sharing Review
+# Marginalia Arcade - Progress Roadmap
 
-*Read-only review of the arcade as it stands today: the games in it, and how
-effectively and efficiently they share code, state, and runtime resources.
-Companion to [`ARCADE_REUSE.md`](./ARCADE_REUSE.md), which sets the
-extraction philosophy this review measures against.*
+*Last updated: 2026-06-28. Companion to [`ARCADE_REUSE.md`](./ARCADE_REUSE.md),
+which still defines the extraction philosophy: share the room, palette, shell,
+and economy touch-points; keep each cabinet's core rules local until repetition
+is real.*
 
-## Scope & method
+## Current Status
 
-Reviewed every file under `src/lib/arcade/`, the arcade route
-(`src/routes/arcade/+page.svelte`), the shared idle engine
-(`src/lib/witch/book.svelte.ts`, `tick.ts`), and the bestiary integration.
-"Resources" is read in three senses: **shared code** (utilities, components,
-CSS), **shared state** (the Book's `insight` economy, localStorage), and
-**shared runtime** (animation loops, timers, listeners).
+`Arcade.svelte` now registers **18 cards**:
+
+- **14 playable** games with mounted Svelte components.
+- **1 coming soon** card: Condition Match.
+- **3 locked roadmap** cards: Word Weave, Star Catcher, The Long Game.
+
+The arcade has moved from a small experiment into a real cabinet. The immediate
+roadmap is no longer "make more games at any cost." It is now: keep the new
+games handmade, but consolidate the shared shell and economy before the next
+round of growth makes the copy-paste expensive.
 
 ## Inventory
 
-`Arcade.svelte` registers **15 cards**: 11 playable, 1 `soon`
-(Condition Match), 3 `locked` (Word Weave, Star Catcher, The Long Game). Eleven
-game components back the playable cards.
+| Game | Component | Status | Loop / Runtime | `MAX_REWARD` | Pays `insight`? | Notes |
+|---|---|---|---|---:|:---:|---|
+| Inkblot | `Inkblot.svelte` | play | rAF | 20 | yes | Special daily cap; pays through `arcadeRewards`. |
+| 2048 | `TwoZeroFourEight.svelte` | play | step / keyboard | - | no | Only active-pet-stat-driven game. |
+| Color POP! | `ColorPop.svelte` | play | Matter.js runner + UI interval | - | no | Score-only physics merge game. |
+| Margin Miner | `MarginMiner.svelte` | play | rAF canvas | - | no | Score-only claw game with levels. |
+| Type Witch | `TypeWitch.svelte` | play | interval | 32 | yes | Shared reward helper and HUD/progress shell. |
+| Get Big! | `GetBig.svelte` | play | rAF | 28 | yes | Shared reward helper and HUD/progress shell. |
+| Margin Hollow | `MarginHollow.svelte` | play | rAF | 24 | yes | First platform / gate / pickup shape; shared HUD/progress shell. |
+| Condition Match | - | soon | - | - | no | Placeholder only. |
+| Insight Rush | `InsightRush.svelte` | play | interval + timeouts | 24 | yes | Shared reward helper and HUD/progress shell; explicitly repeatable. |
+| Bullet Dot | `BulletHeaven.svelte` | play | rAF | 18 | yes | Shared reward helper and HUD/progress shell. |
+| Margin Defense | `TowerDefense.svelte` | play | rAF | 20 | yes | Shared reward helper and HUD/progress shell. |
+| Margin Snake | `Snake.svelte` | play | step on rAF | 18 | yes | Shared reward helper and HUD/progress shell. |
+| Paddle Break | `PaddleBreak.svelte` | play | rAF | 22 | yes | Shared reward helper and HUD/progress shell. |
+| Bubble Spinner | `BubbleSpinner.svelte` | play | rAF canvas | 30 | yes | Uses new hex helpers, `rotate`, and shared HUD shell. |
+| Margin Bubbles | `BubbleShooter.svelte` | play | rAF | 24 | yes | Shared reward helper and HUD/progress shell. |
+| Word Weave | - | locked | - | - | no | Hardcoded roadmap lock. |
+| Star Catcher | - | locked | - | - | no | Hardcoded roadmap lock. |
+| The Long Game | - | locked | - | - | no | Hardcoded roadmap lock. |
 
-| Game | Component | Loop | `MAX_REWARD` | `cappedReward`? | Daily cap? | Pays `insight`? |
-|---|---|---|---:|:---:|:---:|:---:|
-| Inkblot | `Inkblot.svelte` | rAF | 20 | inline | **yes (5/day)** | yes |
-| 2048 | `TwoZeroFourEight.svelte` | step | — | — | — | **no** |
-| Type Witch | `TypeWitch.svelte` | interval | 32 | inline | no | yes |
-| Get Big! | `GetBig.svelte` | rAF | 28 | shared | no | yes |
-| Margin Hollow | `MarginHollow.svelte` | rAF | 24 | shared | no | yes |
-| Insight Rush | `InsightRush.svelte` | interval | 24 | inline | no | yes |
-| Bullet Dot | `BulletHeaven.svelte` | rAF | 18 | shared | no | yes |
-| Margin Defense | `TowerDefense.svelte` | rAF | 20 | shared | no | yes |
-| Margin Snake | `Snake.svelte` | step/rAF | 18 | shared | no | yes |
-| Paddle Break | `PaddleBreak.svelte` | rAF | 22 | shared | no | yes |
-| Margin Bubbles | `BubbleShooter.svelte` | rAF | 24 | shared | no | yes |
+## Progress Since The Last Review
 
-## What is shared well
+- The cabinet grew from 15 cards / 11 playable games to 18 cards / 14 playable
+  games.
+- Newer playable games now include **Color POP!**, **Margin Miner**, and
+  **Bubble Spinner**.
+- `Arcade.svelte` owns cabinet registration and active-game routing, while the
+  route owns shared `activeGame` / `activePet` state for the game panel and pet
+  panel.
+- `ActivePetPanel.svelte` persists the selected companion and locks companion
+  switching while a game is open.
+- `arcadeMath.ts` has grown beyond point math into the first safe primitive
+  layer: `Dot`, `clamp`, `distance`, `normalize`, `cappedReward`, `rotate`, and
+  cube-hex helpers.
+- Cabinet cards expose `data-game-id`, which gives smoke tests and future
+  tooling a durable hook.
+- Every paying game now pays through `arcadeRewards.ts`; that helper is the
+  only arcade file that mutates `book.insight` and calls `book.persist()` for
+  game rewards.
+- `dailyLimit.ts` now keeps a cached daily record and invalidates it when the
+  date rolls over, instead of reparsing localStorage on every getter.
+- `ArcadeHud.svelte` and `ArcadeProgress.svelte` now carry the repeated shell
+  for 10 playable games. 2048, Color POP!, Margin Miner, and Inkblot keep
+  custom local HUDs because their flows are still meaningfully different.
 
-- **`arcadeMath.ts`** (`Dot`, `clamp`, `distance`, `normalize`,
-  `cappedReward`) is pure, tiny, and domain-neutral, and the frame-based games
-  use it as intended. This is the right kind of shared layer.
-- **One economy sink.** Every paying game routes its payout through the single
-  global `book` (`book.insight += awarded; book.persist()`), so rewards land in
-  one place and survive via the same persistence path. The Book itself is a
-  clean single source of truth.
-- **Design tokens are defined once.** `Arcade.svelte` declares the Solarized
-  `--sol-*` palette on `.arcade-root` (`Arcade.svelte:281`), and game shells
-  mounted beneath it inherit those variables through the cascade rather than
-  re-declaring them.
-- **Clean teardown.** Every game cancels its `requestAnimationFrame`/timers and
-  removes its window listeners in `onDestroy`. No loops or listeners leak when a
-  cabinet closes — verified across all 11 components.
+## Roadmap
 
-## Findings — shared code (reuse gaps)
+### 1. Centralize arcade rewards
 
-These are the places where a shared resource *exists* but isn't used, or where
-duplication has clearly passed the "factor after the third repetition" line that
-`ARCADE_REUSE.md` itself sets.
+**Week 2 status: done.**
 
-### 1. `dailyLimit.ts` is used by 1 of 11 games — the biggest gap
+`arcadeRewards.ts` is now the shared reward chokepoint. All 11 insight-paying
+games route final payouts through `awardArcadeReward` or `creditInsight`; the
+helper clamps with `cappedReward`, records the game id, mutates `book.insight`,
+and persists the Book.
 
-`dailyLimit` is a shared, well-built rate-limiter, but only **Inkblot**
-consumes it (`Inkblot.svelte:22`). The other nine paying games have no per-day
-cap. The effect is both a reuse gap and an **economy-balance gap**: Inkblot's
-careful 5-plays-per-day ceiling is meaningless next to uncapped games that pay
-more per attempt. Insight Rush is the sharpest example — it pays up to 24
-insight per 20-second round and its own note literally invites repetition
-("the drill will let you keep taking sets", `InsightRush.svelte:279`). The
-arcade's insight faucet is effectively unbounded today, which devalues the idle
-loop the rewards are meant to feed back into.
+Each game's scoring formula stays local. The shared layer owns the coin slot,
+not the rules that earn the coin.
 
-### 2. `cappedReward` is bypassed in three games
+### 2. Decide the arcade economy policy
 
-`InsightRush.svelte:101`, `TypeWitch.svelte:73`, and `Inkblot.svelte:195` each
-re-implement `Math.max(0, Math.min(MAX_REWARD, raw))` inline instead of calling
-the shared helper that exists for exactly this. Harmless individually, but it
-means the one clamp the arcade standardized on isn't actually standard.
+**Week 2 status: done, with a conservative no-balance-change policy.**
 
-### 3. The payout block is copy-pasted in nine games
+The policy for now is:
 
-```
-rounds += 1;
-awarded = rewardFor(...);
-if (awarded > 0) { book.insight += awarded; book.persist(); }
-```
+- Existing insight-paying games stay uncapped except for their own local round
+  caps.
+- Inkblot intentionally keeps its special daily recognition cap.
+- 2048, Color POP!, and Margin Miner intentionally remain score-only toys until
+  a later balance pass decides how score-only games should join the economy.
+- No 2048 best-score persistence was added in this pass, because that would
+  change the score-only policy surface.
 
-This exact shape appears verbatim in all nine paying games
-(`BulletHeaven.svelte:132`, `Snake.svelte:120`, `InsightRush.svelte:137`,
-`TypeWitch.svelte:115`, `GetBig.svelte` ~225, `TowerDefense.svelte` ~169,
-`PaddleBreak.svelte` ~144, `BubbleShooter.svelte` ~207, `MarginHollow.svelte`
-~318). It is the single piece of logic that touches the shared economy, and it
-is the most duplicated. A one-line helper —
-`payArcadeReward(gameId, raw, max)` — is the natural single chokepoint to (a)
-apply the clamp from finding #2, and (b) enforce a shared daily cap from finding
-#1. Centralizing the payout fixes three findings at once.
+`dailyLimit.ts` was still cleaned up now, so it is ready if the shared reward
+helper later grows a daily or session cap.
 
-### 4. HUD / shell CSS is duplicated ~150–200 lines per game
+### 3. Extract the shared cabinet shell
 
-`ARCADE_REUSE.md` deferred extracting `ArcadeHud`, `ArcadeProgress`, and
-`SvgArena` until the shape settled — a reasonable call at three games. At
-**eleven**, `.score-box`, `.score-group`, `.btn-group`, `.ctrl-btn`,
-`.game-id`, the `--left`/`--time` progress track, `.center-title`/`.center-sub`,
-and the 560px media query are near-identical copies in every shell. A token or
-spacing change now means editing nine-plus files. The extraction candidates the
-reuse doc already named have not moved despite the game count tripling; the
-threshold the doc set has been crossed.
+**Week 3 status: underway.**
 
-### 5. `startLabel` and tokens-as-hex — small shared vocabulary that drifted
+`ARCADE_REUSE.md` waited until repetition was real before extracting
+`ArcadeHud`, `ArcadeProgress`, and arena wrappers. That threshold has been
+crossed.
 
-- The derived `phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start'`
-  is repeated in eight games, and `TypeWitch.svelte:191` inlines the same
-  expression in markup instead of a derived. This "start / again / restart"
-  vocabulary is arcade-wide and belongs in one place.
-- Despite the shared `--sol-*` tokens, raw Solarized hex literals
-  (`#fdf6e3`, `#eee8d5`, `#e7dfc7`) appear **28 times across 11 files** — e.g.
-  `.field-bg { fill: #fdf6e3 }` in Bullet Dot and Snake, gradient stops in
-  Insight Rush, and a large local re-statement in 2048 (13 occurrences). These
-  bypass the tokens they could reference, so a palette change won't propagate.
+Done in this pass:
 
-## Findings — shared state & runtime
+- `ArcadeHud.svelte` for title, hint, score boxes, prize labels, and controls.
+- `ArcadeProgress.svelte` for narrow time / progress tracks.
+- Migrated 10 games onto the shared shell: Type Witch, Get Big!, Margin Hollow,
+  Insight Rush, Bullet Dot, Margin Defense, Margin Snake, Paddle Break, Bubble
+  Spinner, and Margin Bubbles.
 
-### 6. The idle economy and the game economy both run during play
+Still open:
 
-The arcade page starts the world clock on mount and only stops it on unmount
-(`+page.svelte:23,29`), so `tick.ts`'s rAF keeps calling `book.tick(dt)` —
-accruing idle insight and persisting every 5s — the entire time a game is open.
-Meanwhile each frame-based game runs its own rAF. So during play there are two
-independent animation loops, and the same `insight` resource is being filled
-from two faucets at once (idle accrual + game payout). It's not a leak and the
-per-frame cost is small, but it's worth a deliberate decision: should the world
-keep paying out while you're in a cabinet?
+- `SvgArena.svelte` for SVG games that share a background, grid, and overlay.
+- A small `CanvasArcadeFrame.svelte` only if Color POP!, Margin Miner, and
+  Bubble Spinner converge on the same canvas shell.
+- A tiny shared `start / again / restart` label helper, now that `ArcadeHud`
+  exists.
 
-### 7. `dailyLimit` re-reads localStorage on every getter
+Keep 2048, Color POP!, Margin Miner, and Inkblot local until their control
+surfaces settle.
 
-Each of `remaining`, `used`, and `canPlay` calls `load()` →
-`localStorage.getItem` + `JSON.parse` on every access
-(`dailyLimit.ts:40–43`), and they're read inside reactive `$derived`/template
-contexts. The `const record = load()` at `dailyLimit.ts:37` is then never used
-(dead read). A single cached read with explicit invalidation on `increment()`
-would be both cheaper and clearer. Low impact today (one consumer), but it
-becomes real the moment finding #1 is addressed and every game calls it.
+### 4. Make roadmap locks honest or real
 
-### 8. 2048 sits entirely outside the shared economy
+Condition Match, Word Weave, Star Catcher, and The Long Game are still hardcoded
+cards. Their hints talk like gates, but no Book or reading state flips them.
 
-`TwoZeroFourEight.svelte` is the only game that turns the **active pet** into a
-mechanical advantage — it reads `creature.stats` to seed power-ups
-(`:64–70`) — yet it pays **no** insight and persists no state. That asymmetry
-(consumes the shared pet resource, returns nothing to the shared economy, keeps
-no best score) may be intentional, but it currently reads as an accident of
-omission rather than a choice.
+Choose one path:
 
-### 9. `locked` / `soon` statuses are inert
+- keep them as visible roadmap cards and phrase the hints as future plans; or
+- wire unlock predicates to real Book / reading / lifecycle state.
 
-The three locked cards carry evocative gates ("unlocks after writing 8
-conditions", `Arcade.svelte:143`), but nothing reads Book progress to flip them
-— `status` is a hardcoded literal. They are permanent placeholders today. Fine
-as a roadmap, but the gating "resource" (book state) is not wired, so the hints
-promise a mechanism that doesn't exist.
+Until that decision is made, avoid adding more locked cards with specific
+unlock promises.
 
-## Recommendations, in priority order
+### 5. Clean up tokens and shared labels
 
-1. **Add a shared payout helper and route every game through it.** One function
-   that clamps (absorbing finding #2) and is the single place a daily cap can
-   live (finding #1). This is the highest-leverage change: it touches the one
-   resource all games share and collapses nine copies into one.
-2. **Decide the economy policy deliberately.** Either extend `dailyLimit` to the
-   uncapped paying games, or soften Inkblot's cap — but make the faucet
-   consistent. Re-tune Insight Rush's "keep taking sets" framing to match
-   whatever you choose.
-3. **Extract `ArcadeHud` + `ArcadeProgress` (and likely `SvgArena`).** The reuse
-   doc already specifies these and the repetition has crossed its own threshold.
-   Start with the HUD bar + score boxes + control buttons, since that markup and
-   CSS is the most identical across all eleven.
-4. **Fix `dailyLimit`'s per-access reads** (cache + invalidate; drop the dead
-   `record`). Cheap, and a prerequisite for #1/#2 scaling to every game.
-5. **Replace raw hex with `--sol-*` tokens** and share the `startLabel`
-   vocabulary. Small, mechanical, and restores the token system the arcade
-   already pays for.
-6. **Make `locked`/`soon` either real or honest** — wire them to Book state, or
-   label them as roadmap so the hints don't over-promise. Decide whether 2048
-   should join the reward economy.
+The Solarized palette is centralized in `Arcade.svelte`, but many components
+still carry raw Solarized hex literals. Current arcade files contain more than a
+hundred such occurrences, especially in canvas-heavy games.
 
-## What still should *not* be extracted
+Do not blindly replace every literal. Use this distinction:
 
-The reuse doc's restraint holds where it matters. Keep local: enemy movement
-(chase vs. path-follow vs. discrete), projectile ownership, Margin Hollow's
-platform physics/room data, and the per-game reward *formulas* — these are the
-rules that make each cabinet feel hand-made, and a generic engine would make
-them harder to tune. The extractions above are all presentation shells and the
-single shared economy touch-point, not game rules. The arcade should stay a
-cabinet of tiny handmade machines that happen to share a frame, a palette, and
-one coin slot.
+- UI shell colors should use `--sol-*` tokens.
+- Canvas/SVG scene art may keep local constants, but those constants should be
+  named when the same color means the same thing across a game.
+
+Also move the common `start / again / restart` label to a tiny shared helper
+once `ArcadeHud` exists.
+
+### 6. Decide whether the world clock runs during play
+
+The arcade route starts the idle world clock on mount and stops it only when the
+route unmounts. That means the Book continues accruing idle resources while a
+cabinet game is open, while the game itself may also run rAF, timers, or a
+Matter.js runner.
+
+This is not automatically wrong. It just needs to be a deliberate rule:
+
+- keep idle accrual running if games are meant to layer on top of the world; or
+- pause idle accrual while `activeGame !== null` if arcade play should replace
+  idle progress for that moment.
+
+### 7. Leave game rules local
+
+Even with 14 playable games, the core game rules should remain local unless a
+second game needs the exact same shape.
+
+Still local:
+
+- Get Big!'s growth / speed tradeoff;
+- Margin Hollow's room data, collision, gates, pickups, hazards, and jump
+  physics;
+- Bubble Spinner's spinning hex cluster rules;
+- Bubble Shooter's canopy and bank-shot rules;
+- Color POP!'s Matter.js body setup and merge physics;
+- Margin Miner's claw, loot, levels, and canvas drawing;
+- each game's reward formula.
+
+Future extraction candidates are small primitives, not a generic engine:
+
+- a room / rect vocabulary if another platform game appears;
+- shared canvas sizing only if the canvas games converge;
+- `useArcadeLoop.ts` only if at least two games need the same rAF lifecycle;
+- reward plumbing, because `insight` is the one resource all paying games share.
+
+## Verification Path
+
+For arcade roadmap work, use lightweight checks unless code changes accompany
+the doc update:
+
+- `pnpm --filter marginalia check`
+- `pnpm --filter marginalia build`
+- smoke the cabinet at `http://127.0.0.1:5173/marginalia/arcade` when gameplay
+  changes, falling back to port 5174 if 5173 is occupied.
+
+The arcade should stay a cabinet of tiny handmade machines: same room, same
+materials, different little mechanisms, one increasingly coherent coin slot.

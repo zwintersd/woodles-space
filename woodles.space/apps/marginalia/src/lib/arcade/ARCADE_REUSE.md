@@ -14,8 +14,9 @@ A good arcade game component usually contains:
 - A `start`, `reset`, `stop`, `finish` lifecycle.
 - One update loop, either frame-based or step-based.
 - A compact SVG or grid arena.
-- A HUD row with score, run state, reward preview, and arcade/back controls.
-- Reward payout through `book.insight` only in `finish`.
+- A HUD row with score, run state, reward preview, and arcade/back controls,
+  usually through `ArcadeHud.svelte`.
+- Reward payout through `arcadeRewards.ts` only in `finish`.
 
 Keep game-specific rules inside the game component until at least two games need the same rule in nearly the same form.
 
@@ -34,17 +35,46 @@ Keep game-specific rules inside the game component until at least two games need
 
 These are safe to share because they are pure, tiny, and domain-neutral. They do not know about any particular game.
 
+`arcadeRewards.ts` is the shared economy touch-point:
+
+- `previewArcadeReward(raw, max)` clamps score-derived previews through
+  `cappedReward`.
+- `awardArcadeReward(gameId, raw, max)` records the game id, credits positive
+  insight, and persists the Book in one place.
+- `creditInsight(gameId, amount)` exists for special cases such as Inkblot's
+  floor-at-one reward.
+
+Reward formulas stay local. The helper owns the coin slot, not the rules that
+earn the coin.
+
+`ArcadeHud.svelte` and `ArcadeProgress.svelte` are the first shared shell
+components. They are now used by the core paying/action games:
+
+- `TypeWitch.svelte`
+- `GetBig.svelte`
+- `MarginHollow.svelte`
+- `InsightRush.svelte`
+- `BulletHeaven.svelte`
+- `TowerDefense.svelte`
+- `Snake.svelte`
+- `PaddleBreak.svelte`
+- `BubbleSpinner.svelte`
+- `BubbleShooter.svelte`
+
 ## What To Reuse By Copying For Now
 
-Some patterns are intentionally repeated in `BulletHeaven.svelte`, `TowerDefense.svelte`, and `Snake.svelte`:
+Some patterns are still intentionally local while their shape remains more
+specialized:
 
-- Shell layout: `*-shell`, `*-bar`, `score-group`, `score-box`, `btn-group`.
-- SVG arena treatment: responsive width, fixed `viewBox`, Solarized arcade tokens, grid background.
-- Center overlay text for ready/complete/over.
-- Progress track below the HUD.
-- Start/back button placement.
+- Inkblot's daily cap, reveal track, canvas, and "next" round flow.
+- 2048's active-pet stat panel and power-up controls.
+- Color POP!'s Matter.js canvas, swatch preview, and score-only economy.
+- Margin Miner's claw level controls and score-only economy.
+- SVG arena treatment: responsive width, fixed `viewBox`, Solarized arcade
+  tokens, grid background, and center overlays.
 
-This repetition is useful evidence. It lets the shape settle before we commit to a shared component API.
+The first shell repetition has already been extracted. The remaining repetition
+is evidence for `SvgArena.svelte`, not a reason to introduce a generic engine.
 
 `MarginHollow.svelte` adds a first platform/metroidvania-like shape. Keep its room data, axis-aligned collision, door/gate requirements, pickup handling, hazards, and jump physics local until at least one more game wants the same shape. If that repetition appears, the likely first extraction is a tiny room/rect vocabulary, not a full platformer engine.
 
@@ -52,17 +82,17 @@ This repetition is useful evidence. It lets the shape settle before we commit to
 
 Extract in this order if the arcade keeps growing:
 
-1. `ArcadeHud.svelte`
+1. ~~`arcadeRewards.ts`~~ - done.
+   Shared payout chokepoint with game ids and no shared reward formulas.
+
+2. ~~`ArcadeHud.svelte`~~ - done for the core paying/action games.
    Shared title, hint, score boxes, start button, and arcade/back button.
 
-2. `ArcadeProgress.svelte`
-   A narrow progress track with `--left` styling and a configurable gradient class.
+3. ~~`ArcadeProgress.svelte`~~ - done for narrow time / progress tracks.
+   Supports the current blue, green, yellow, violet, magic, and danger tracks.
 
-3. `SvgArena.svelte`
+4. `SvgArena.svelte`
    Responsive SVG wrapper, background rect, grid pattern slot, and overlay slot.
-
-4. `arcadeRewards.ts`
-   Shared payout helpers if reward formulas start to align. Keep formulas local while games still score differently.
 
 5. `useArcadeLoop.ts`
    Only if at least two games need the exact same `requestAnimationFrame` lifecycle. Bullet Dot and Tower Defense are frame-based; Snake is step-based, so do not force this too early.
@@ -74,7 +104,7 @@ Do not extract these just because they look similar:
 - Enemy movement, because Bullet Dot chases and Tower Defense follows a path.
 - Projectile targeting, because player auto-fire and tower auto-fire have different ownership.
 - Snake movement, because it is discrete and grid-step based.
-- CSS wholesale, until `ArcadeHud` and `SvgArena` exist.
+- CSS wholesale, until `SvgArena` exists and the arena shape has settled.
 - Reward formulas, while each game expresses success differently.
 
 Small games become harder to tune when their core rules are hidden in a generic engine.
@@ -110,8 +140,10 @@ When adding a new game:
 
 1. Start with one component in `src/lib/arcade`.
 2. Define the smallest possible complete loop.
-3. Reuse `Dot`, `clamp`, `distance`, `normalize`, and `cappedReward` when they fit naturally.
-4. Copy the existing HUD/SVG shape if no shared component exists yet.
+3. Reuse `Dot`, `clamp`, `distance`, `normalize`, and `previewArcadeReward`
+   when they fit naturally.
+4. Use `ArcadeHud` and `ArcadeProgress` when the game's shell matches the
+   existing arcade shape.
 5. Register the card and active component in `Arcade.svelte`.
 6. Smoke test the game from the cabinet, not only from the active screen.
 7. Factor only after the third clear repetition.

@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import { cappedReward, type Dot } from './arcadeMath';
-	import { book, fmt } from '$lib/witch/book.svelte';
+	import ArcadeHud from './ArcadeHud.svelte';
+	import ArcadeProgress from './ArcadeProgress.svelte';
+	import type { Dot } from './arcadeMath';
+	import { fmt } from '$lib/witch/book.svelte';
+	import { awardArcadeReward, previewArcadeReward } from './arcadeRewards';
 
 	interface Props {
 		onclose: () => void;
@@ -37,7 +40,7 @@
 	let pulse = $state(0);
 
 	const speedMs = $derived(Math.max(86, 170 - score * 4));
-	const progressStyle = $derived(`--left:${Math.min(1, score / WIN_SCORE).toFixed(4)}`);
+	const growthProgress = $derived(Math.min(1, score / WIN_SCORE));
 	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
 	const rewardPreview = $derived(rewardFor(score, phase === 'complete'));
 	const outcomeLabel = $derived.by(() => {
@@ -60,7 +63,7 @@
 	}
 
 	function rewardFor(points: number, cleared: boolean): number {
-		return cappedReward(Math.floor(points / 3) + (cleared ? 6 : 0), MAX_REWARD);
+		return previewArcadeReward(Math.floor(points / 3) + (cleared ? 6 : 0), MAX_REWARD);
 	}
 
 	function sameCell(a: Cell, b: Cell): boolean {
@@ -119,11 +122,7 @@
 		stop();
 		rounds += 1;
 		best = Math.max(best, score);
-		awarded = rewardFor(score, nextPhase === 'complete');
-		if (awarded > 0) {
-			book.insight += awarded;
-			book.persist();
-		}
+		awarded = awardArcadeReward('margin-snake', rewardFor(score, nextPhase === 'complete'), MAX_REWARD);
 	}
 
 	function loop(now: number) {
@@ -243,38 +242,21 @@
 </script>
 
 <div class="snake-shell">
-	<div class="snake-bar">
-		<div class="game-id">
-			<span class="game-name">Margin Snake</span>
-			<span class="game-hint">{hintLabel}</span>
-		</div>
-		<div class="score-group">
-			<div class="score-box">
-				<span class="score-label">score</span>
-				<span class="score-val">{score}</span>
-			</div>
-			<div class="score-box live">
-				<span class="score-label">length</span>
-				<span class="score-val">{snake.length}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">best</span>
-				<span class="score-val">{best}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">prize</span>
-				<span class="score-val">{fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview)}</span>
-			</div>
-		</div>
-		<div class="btn-group">
-			<button class="ctrl-btn" onclick={start}>{startLabel}</button>
-			<button class="ctrl-btn back" onclick={onclose}>arcade</button>
-		</div>
-	</div>
+	<ArcadeHud
+		title="Margin Snake"
+		hint={hintLabel}
+		scores={[
+			{ label: 'score', value: score },
+			{ label: 'length', value: snake.length, live: true, tone: 'cyan' },
+			{ label: 'best', value: best },
+			{ label: 'prize', value: fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview) }
+		]}
+		{startLabel}
+		onstart={start}
+		onclose={onclose}
+	/>
 
-	<div class="grow-track" style={progressStyle} aria-label="growth progress">
-		<span></span>
-	</div>
+	<ArcadeProgress value={growthProgress} label="growth progress" />
 
 	<svg
 		class="field"
@@ -339,68 +321,6 @@
 		background: var(--sol-base3);
 		border-top: 2px solid var(--sol-base2);
 	}
-	.snake-bar {
-		width: 100%;
-		max-width: 540px;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.8rem;
-		flex-wrap: wrap;
-	}
-	.game-id {
-		display: flex;
-		flex-direction: column;
-		gap: 0.1rem;
-	}
-	.game-name {
-		font-family: var(--font-counter);
-		font-size: 2rem;
-		line-height: 1;
-		color: var(--sol-base01);
-	}
-	.game-hint {
-		font-family: var(--font-ui);
-		font-size: 0.62rem;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-	.score-group {
-		display: flex;
-		gap: 0.4rem;
-		flex-wrap: wrap;
-	}
-	.score-box {
-		background: var(--sol-base2);
-		border-radius: 3px;
-		padding: 0.3rem 0.6rem;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		min-width: 3.2rem;
-	}
-	.score-box.live {
-		background: color-mix(in srgb, var(--sol-base2) 68%, var(--sol-cyan));
-	}
-	.score-label {
-		font-family: var(--font-ui);
-		font-size: 0.56rem;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-	.score-val {
-		font-family: var(--font-counter);
-		font-size: 1.3rem;
-		color: var(--sol-base01);
-		line-height: 1.1;
-	}
-	.btn-group {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-		align-items: flex-end;
-	}
-	.ctrl-btn,
 	.pad-row button {
 		font-family: var(--font-ui);
 		font-size: 0.66rem;
@@ -412,31 +332,8 @@
 		white-space: nowrap;
 		transition: background 0.1s;
 	}
-	.ctrl-btn:hover,
 	.pad-row button:hover {
 		background: var(--sol-base00);
-	}
-	.ctrl-btn.back {
-		background: var(--sol-base2);
-		color: var(--sol-base0);
-	}
-	.ctrl-btn.back:hover {
-		background: var(--sol-base1);
-		color: var(--sol-base3);
-	}
-	.grow-track {
-		width: min(540px, 100%);
-		height: 0.45rem;
-		border-radius: 999px;
-		background: var(--sol-base2);
-		overflow: hidden;
-	}
-	.grow-track span {
-		display: block;
-		width: calc(var(--left) * 100%);
-		height: 100%;
-		background: linear-gradient(90deg, var(--sol-green), var(--sol-cyan), var(--sol-blue));
-		transition: width 120ms linear;
 	}
 	.field {
 		width: min(540px, calc(100vw - 3rem));
@@ -504,20 +401,6 @@
 		color: var(--sol-base3);
 	}
 	@media (max-width: 560px) {
-		.snake-bar {
-			align-items: flex-start;
-		}
-		.btn-group {
-			flex-direction: row;
-			align-items: center;
-		}
-		.game-name {
-			font-size: 1.7rem;
-		}
-		.score-box {
-			min-width: 2.85rem;
-			padding-inline: 0.48rem;
-		}
 		.center-title {
 			font-size: 34px;
 		}

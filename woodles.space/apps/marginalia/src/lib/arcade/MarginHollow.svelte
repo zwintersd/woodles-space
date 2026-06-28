@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import { cappedReward, clamp, type Dot } from './arcadeMath';
-	import { book, fmt } from '$lib/witch/book.svelte';
+	import ArcadeHud from './ArcadeHud.svelte';
+	import ArcadeProgress from './ArcadeProgress.svelte';
+	import { clamp, type Dot } from './arcadeMath';
+	import { fmt } from '$lib/witch/book.svelte';
+	import { awardArcadeReward, previewArcadeReward } from './arcadeRewards';
 
 	interface Props {
 		onclose: () => void;
@@ -228,7 +231,6 @@
 	const progress = $derived(
 		clamp((roomIndex + glyphs / Math.max(1, TOTAL_GLYPHS) + (hasWing ? 0.45 : 0) + (hasKey ? 0.55 : 0)) / 5, 0, 1)
 	);
-	const progressStyle = $derived(`--left:${progress.toFixed(4)}`);
 	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
 	const rewardPreview = $derived(rewardFor(glyphs, hasWing, hasKey, phase === 'complete'));
 	const hintLabel = $derived(messageClock > 0 ? message : currentRoom.hint);
@@ -242,7 +244,7 @@
 
 	function rewardFor(foundGlyphs: number, wing: boolean, key: boolean, complete: boolean): number {
 		const raw = foundGlyphs * 2 + (wing ? 3 : 0) + (key ? 4 : 0) + (complete ? 7 : 0);
-		return cappedReward(raw, MAX_REWARD);
+		return previewArcadeReward(raw, MAX_REWARD);
 	}
 
 	function playerRect(next: Player = player): Rect {
@@ -315,11 +317,7 @@
 		stop();
 		rounds += 1;
 		best = Math.max(best, glyphs);
-		awarded = rewardFor(glyphs, hasWing, hasKey, nextPhase === 'complete');
-		if (awarded > 0) {
-			book.insight += awarded;
-			book.persist();
-		}
+		awarded = awardArcadeReward('margin-hollow', rewardFor(glyphs, hasWing, hasKey, nextPhase === 'complete'), MAX_REWARD);
 	}
 
 	function loop(now: number) {
@@ -577,42 +575,23 @@
 </script>
 
 <div class="hollow-shell">
-	<div class="hollow-bar">
-		<div class="game-id">
-			<span class="game-name">Margin Hollow</span>
-			<span class="game-hint">{hintLabel}</span>
-		</div>
-		<div class="score-group">
-			<div class="score-box">
-				<span class="score-label">room</span>
-				<span class="score-val">{roomLabel}</span>
-			</div>
-			<div class="score-box live">
-				<span class="score-label">lives</span>
-				<span class="score-val">{lives}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">glyphs</span>
-				<span class="score-val">{glyphs}/{TOTAL_GLYPHS}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">wing</span>
-				<span class="score-val">{hasWing ? 'yes' : 'no'}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">prize</span>
-				<span class="score-val">{fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview)}</span>
-			</div>
-		</div>
-		<div class="btn-group">
-			<button class="ctrl-btn" onclick={start}>{startLabel}</button>
-			<button class="ctrl-btn back" onclick={onclose}>arcade</button>
-		</div>
-	</div>
+	<ArcadeHud
+		title="Margin Hollow"
+		hint={hintLabel}
+		maxWidth="560px"
+		scores={[
+			{ label: 'room', value: roomLabel },
+			{ label: 'lives', value: lives, live: true, tone: 'green' },
+			{ label: 'glyphs', value: `${glyphs}/${TOTAL_GLYPHS}` },
+			{ label: 'wing', value: hasWing ? 'yes' : 'no' },
+			{ label: 'prize', value: fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview) }
+		]}
+		{startLabel}
+		onstart={start}
+		onclose={onclose}
+	/>
 
-	<div class="hollow-track" style={progressStyle} aria-label="map progress">
-		<span></span>
-	</div>
+	<ArcadeProgress value={progress} label="map progress" tone="magic" maxWidth="560px" />
 
 	<svg
 		class="field"
@@ -731,68 +710,6 @@
 		background: var(--sol-base3);
 		border-top: 2px solid var(--sol-base2);
 	}
-	.hollow-bar {
-		width: 100%;
-		max-width: 560px;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.8rem;
-		flex-wrap: wrap;
-	}
-	.game-id {
-		display: flex;
-		flex-direction: column;
-		gap: 0.1rem;
-	}
-	.game-name {
-		font-family: var(--font-counter);
-		font-size: 2rem;
-		line-height: 1;
-		color: var(--sol-base01);
-	}
-	.game-hint {
-		font-family: var(--font-ui);
-		font-size: 0.62rem;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-	.score-group {
-		display: flex;
-		gap: 0.4rem;
-		flex-wrap: wrap;
-	}
-	.score-box {
-		background: var(--sol-base2);
-		border-radius: 3px;
-		padding: 0.3rem 0.55rem;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		min-width: 3.2rem;
-	}
-	.score-box.live {
-		background: color-mix(in srgb, var(--sol-base2) 66%, var(--sol-green));
-	}
-	.score-label {
-		font-family: var(--font-ui);
-		font-size: 0.56rem;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-	.score-val {
-		font-family: var(--font-counter);
-		font-size: 1.22rem;
-		color: var(--sol-base01);
-		line-height: 1.1;
-	}
-	.btn-group {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-		align-items: flex-end;
-	}
-	.ctrl-btn,
 	.pad-row button {
 		font-family: var(--font-ui);
 		font-size: 0.66rem;
@@ -805,31 +722,8 @@
 		transition: background 0.1s;
 		touch-action: none;
 	}
-	.ctrl-btn:hover,
 	.pad-row button:hover {
 		background: var(--sol-base00);
-	}
-	.ctrl-btn.back {
-		background: var(--sol-base2);
-		color: var(--sol-base0);
-	}
-	.ctrl-btn.back:hover {
-		background: var(--sol-base1);
-		color: var(--sol-base3);
-	}
-	.hollow-track {
-		width: min(560px, 100%);
-		height: 0.45rem;
-		border-radius: 999px;
-		background: var(--sol-base2);
-		overflow: hidden;
-	}
-	.hollow-track span {
-		display: block;
-		width: calc(var(--left) * 100%);
-		height: 100%;
-		background: linear-gradient(90deg, var(--sol-cyan), var(--sol-violet), var(--sol-yellow));
-		transition: width 140ms linear;
 	}
 	.field {
 		width: min(560px, calc(100vw - 3rem));
@@ -961,20 +855,6 @@
 		color: var(--sol-base3);
 	}
 	@media (max-width: 560px) {
-		.hollow-bar {
-			align-items: flex-start;
-		}
-		.btn-group {
-			flex-direction: row;
-			align-items: center;
-		}
-		.game-name {
-			font-size: 1.7rem;
-		}
-		.score-box {
-			min-width: 2.85rem;
-			padding-inline: 0.48rem;
-		}
 		.center-title {
 			font-size: 34px;
 		}
