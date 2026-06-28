@@ -1,4 +1,7 @@
 <script lang="ts">
+	import ColorPop from './ColorPop.svelte';
+	import InsightRush from './InsightRush.svelte';
+	import MarginMiner from './MarginMiner.svelte';
 	import { tick } from 'svelte';
 	import BubbleShooter from './BubbleShooter.svelte';
 	import BubbleSpinner from './BubbleSpinner.svelte';
@@ -52,6 +55,22 @@
 			title: '2048',
 			tagline: 'Slide the tiles. Merge the numbers. Reach 2048 before the board fills.',
 			tags: ['puzzle', 'numbers'],
+			status: 'play'
+		},
+		{
+			id: 'color-pop',
+			icon: '●',
+			title: 'Color POP!',
+			tagline: 'Drop bright circles, merge matching tiers, and keep the pile below the line.',
+			tags: ['physics', 'merge'],
+			status: 'play'
+		},
+		{
+			id: 'margin-miner',
+			icon: '$',
+			title: 'Margin Miner',
+			tagline: 'Swing the claw, snag treasure, and beat the target before the minute runs out.',
+			tags: ['claw', 'timed'],
 			status: 'play'
 		},
 		{
@@ -230,6 +249,10 @@
 				<Inkblot onclose={closeGame} creatures={bestiaryCreatures} />
 			{:else if activeGame === 'stack-2048'}
 				<TwoZeroFourEight onclose={closeGame} creature={activePet} />
+			{:else if activeGame === 'color-pop'}
+				<ColorPop onclose={closeGame} />
+			{:else if activeGame === 'margin-miner'}
+				<MarginMiner onclose={closeGame} />
 			{:else if activeGame === 'get-big'}
 				<GetBig onclose={closeGame} />
 			{:else if activeGame === 'margin-hollow'}
