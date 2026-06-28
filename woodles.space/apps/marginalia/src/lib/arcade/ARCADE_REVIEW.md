@@ -5,6 +5,23 @@ effectively and efficiently they share code, state, and runtime resources.
 Companion to [`ARCADE_REUSE.md`](./ARCADE_REUSE.md), which sets the
 extraction philosophy this review measures against.*
 
+## Update — recommendation #1 implemented
+
+Since this review was written, the **shared payout helper** (recommendation #1)
+landed in [`arcadeRewards.ts`](./arcadeRewards.ts):
+
+- `creditInsight(amount)` is now the single place the Book economy is mutated;
+  all ten paying games route their payout through it. **Finding #3** (the
+  payout block copy-pasted in nine games) is resolved.
+- The clamp is unified on `cappedReward` — Insight Rush, Type Witch, and Inkblot
+  no longer re-implement it inline. **Finding #2** is resolved.
+- `creditInsight` is also the single attach point for a future per-day insight
+  cap, giving **finding #1** a home. The cap itself is *not* yet applied — that
+  is the deliberate economy decision in recommendation #2, still open.
+
+The remaining findings (#4 HUD/CSS extraction, #5 tokens/vocabulary, #6–#9) are
+unchanged. `check` and `build` pass.
+
 ## Scope & method
 
 Reviewed every file under `src/lib/arcade/`, the arcade route

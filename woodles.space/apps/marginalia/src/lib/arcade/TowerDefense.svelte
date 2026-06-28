@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { cappedReward, clamp, distance, normalize, type Dot } from './arcadeMath';
-	import { book, fmt } from '$lib/witch/book.svelte';
 	import type { ArcadeActivePet } from './arcadeStats';
+	import { fmt } from '$lib/witch/book.svelte';
+	import { payReward } from './arcadeRewards';
 
 	interface Props {
 		onclose: () => void;
@@ -168,11 +169,7 @@
 		stop();
 		rounds += 1;
 		best = Math.max(best, kills);
-		awarded = rewardFor(kills, wave, nextPhase === 'complete');
-		if (awarded > 0) {
-			book.insight += awarded;
-			book.persist();
-		}
+		awarded = payReward(rewardFor(kills, wave, nextPhase === 'complete'), MAX_REWARD);
 	}
 
 	function loop(now: number) {
