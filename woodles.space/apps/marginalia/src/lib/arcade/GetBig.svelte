@@ -4,6 +4,7 @@
 	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { clamp, distance, type Dot } from './arcadeMath';
+	import { arcadeStartLabel } from './arcadeLabels';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { payReward, previewReward } from './arcadeRewards';
 	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
@@ -127,7 +128,7 @@
 	const heartTier = $derived(statTier(coreStatValue(activePet, 'heart')));
 	const startRadius = $derived(START_RADIUS + bodyTier * 1.4);
 	const growthProgress = $derived(clamp((playerRadius - START_RADIUS) / (MASSIVE_RADIUS - START_RADIUS), 0, 1));
-	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
+	const startLabel = $derived(arcadeStartLabel(phase, rounds));
 	const speedLabel = $derived(Math.round(playerSpeed()));
 	const sizeLabel = $derived(playerRadius.toFixed(1));
 	const rewardPreview = $derived(rewardFor(score, playerRadius, phase === 'complete'));

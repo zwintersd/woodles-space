@@ -3,6 +3,7 @@
 	import ArcadeHud from './ArcadeHud.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { clamp, type Dot } from './arcadeMath';
+	import { arcadeStartLabel } from './arcadeLabels';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { payReward, previewReward } from './arcadeRewards';
 	import type { ArcadeActivePet } from './arcadeStats';
@@ -233,7 +234,7 @@
 	const progress = $derived(
 		clamp((roomIndex + glyphs / Math.max(1, TOTAL_GLYPHS) + (hasWing ? 0.45 : 0) + (hasKey ? 0.55 : 0)) / 5, 0, 1)
 	);
-	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
+	const startLabel = $derived(arcadeStartLabel(phase, rounds));
 	const rewardPreview = $derived(rewardFor(glyphs, hasWing, hasKey, phase === 'complete'));
 	const hintLabel = $derived(messageClock > 0 ? message : currentRoom.hint);
 	const roomLabel = $derived(`${roomIndex + 1}/${ROOMS.length}`);

@@ -383,8 +383,9 @@ Stat pitch:
 ### Bubble Spinner
 
 Current progress: A rotating hex-bubble shooter. It uses shared hex helpers,
-impact torque, fouls, penalty layers, matches, orphan drops, canvas drawing, and
-insight payout. This is a strong geometry and aiming game.
+impact torque, fouls, penalty layers, matches, orphan drops, canvas drawing,
+active-pet stat effects, local records, color-safe swatches, and insight
+payout. This is a strong geometry and aiming game.
 
 Next expansions:
 - Add level seeds with known clearable clusters.
@@ -393,7 +394,6 @@ Next expansions:
 - Add better mobile aim/fire separation.
 
 Rough edges:
-- No active-pet stats yet.
 - Canvas text currently uses CSS-variable font strings that may not resolve as
   intended in all browsers.
 - Foul penalty layers are interesting but could surprise players.
@@ -409,8 +409,9 @@ Stat pitch:
 ### Margin Bubbles
 
 Current progress: A fixed-canopy bubble shooter with bank shots, match-three
-clusters, orphan drops, every-fifth-shot ceiling pressure, and insight payout.
-It is the clearest aim/angle/reaction game in the cabinet.
+clusters, orphan drops, stat-tuned ceiling pressure, `SvgArena`, local records,
+color-safe swatches, and insight payout. It is the clearest aim/angle/reaction
+game in the cabinet.
 
 Next expansions:
 - Add level seeds and board patterns.
@@ -419,10 +420,10 @@ Next expansions:
 - Add a clearer lost-run breakdown: popped, dropped, ceiling advances.
 
 Rough edges:
-- No active-pet stats yet.
-- Pointer-drag-to-fire is nice, but accidental fire needs testing on mobile.
+- Pointer/touch aim now separates from firing on mobile, but it still needs
+  real-device feel testing.
 - The queue only shows loaded and next; deeper preview should be stat-gated if
-  added.
+  added. Mind now reveals the third bubble at tier 2+.
 - No daily pacing.
 
 Stat pitch:

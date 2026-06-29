@@ -1,20 +1,32 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import ArcadeHud from './ArcadeHud.svelte';
+	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
+	import SvgArena from './SvgArena.svelte';
 	import { clamp, distance, type Dot } from './arcadeMath';
+	import {
+		MARGIN_BUBBLE_COLORS,
+		type MarginBubbleColor as BubbleColor
+	} from './arcadeBubblePalette';
+	import { arcadeStartLabel } from './arcadeLabels';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { payReward, previewReward } from './arcadeRewards';
-	import type { ArcadeActivePet } from './arcadeStats';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
+	import {
+		coreStatValue,
+		statTier,
+		type ArcadeActivePet,
+		type ArcadeStatEffects
+	} from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
 		activePet?: ArcadeActivePet;
 	}
-	let { onclose }: Props = $props();
+	let { onclose, activePet = null }: Props = $props();
 
 	type Phase = 'ready' | 'running' | 'complete' | 'over';
-	type BubbleColor = 'sun' | 'sea' | 'leaf' | 'violet';
 
 	interface Bubble {
 		row: number;
@@ -35,9 +47,10 @@
 		tone: BubbleColor | 'ink';
 	}
 
-	const COLORS: BubbleColor[] = ['sun', 'sea', 'leaf', 'violet'];
+	const COLORS: BubbleColor[] = [...MARGIN_BUBBLE_COLORS];
 	const WORLD_W = 520;
 	const WORLD_H = 360;
+	const GAME_ID = 'margin-bubbles';
 	const COLS = 11;
 	const ROWS = 11;
 	const BUBBLE_R = 17;
@@ -47,7 +60,7 @@
 	const GRID_TOP = 26;
 	const SHOOTER: Dot = { x: WORLD_W / 2, y: WORLD_H - 22 };
 	const SHOT_SPEED = 340;
-	const SHOTS_PER_DROP = 5;
+	const BASE_SHOTS_PER_DROP = 5;
 	const MAX_REWARD = 24;
 	const MIN_ANGLE = -2.72;
 	const MAX_ANGLE = -0.42;
@@ -80,6 +93,7 @@
 	let bursts = $state<Burst[]>([]);
 	let loadedColor = $state<BubbleColor>('sun');
 	let nextColor = $state<BubbleColor>('sea');
+	let thirdColor = $state<BubbleColor>('leaf');
 	let aimAngle = $state(-Math.PI / 2);
 	let popped = $state(0);
 	let dropped = $state(0);
@@ -88,19 +102,31 @@
 	let advances = $state(0);
 	let awarded = $state(0);
 	let rounds = $state(0);
-	let best = $state(0);
+	let best = $state(loadArcadeRecord(GAME_ID).bestScore);
+	let ceilingHolds = $state(0);
+	let ceilingHoldsUsed = $state(0);
+	let colorSafe = $state(false);
 	let raf = 0;
 	let lastTime = 0;
 	let burstSeq = 0;
 	let pointerDown = false;
-	let fieldEl: SVGSVGElement;
+	let pointerStart: Dot | null = null;
+	let pointerMoved = false;
+	let fieldEl = $state<SVGSVGElement>();
 
-	const nextDrop = $derived(SHOTS_PER_DROP - rack);
+	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
+	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
+	const graceTier = $derived(statTier(coreStatValue(activePet, 'grace')));
+	const heartTier = $derived(statTier(coreStatValue(activePet, 'heart')));
+	const shotSpeed = $derived(SHOT_SPEED + bodyTier * 28);
+	const shotsPerDrop = $derived(BASE_SHOTS_PER_DROP + graceTier);
+	const guideSteps = $derived(30 + mindTier * 10);
+	const nextDrop = $derived(shotsPerDrop - rack);
 	const pressure = $derived.by(() => {
 		const deepest = bubbles.reduce((max, bubble) => Math.max(max, bubble.row), -1);
-		return clamp((deepest + rack / SHOTS_PER_DROP) / (ROWS - 1), 0, 1);
+		return clamp((deepest + rack / shotsPerDrop) / (ROWS - 1), 0, 1);
 	});
-	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
+	const startLabel = $derived(arcadeStartLabel(phase, rounds));
 	const rewardPreview = $derived(rewardFor(popped, dropped, phase === 'complete'));
 	const outcomeLabel = $derived.by(() => {
 		if (phase === 'complete') return awarded > 0 ? `+${fmt(awarded)} insight` : 'clear';
@@ -118,6 +144,21 @@
 		if (shot) return '';
 		const points = aimGuide();
 		return points.map((point) => `${point.x},${point.y}`).join(' ');
+	});
+	const guideTarget = $derived.by(() => {
+		if (shot || mindTier === 0) return null;
+		const points = aimGuide();
+		const final = points.at(-1);
+		if (!final) return null;
+		const cell = findNearestOpenCell(final.x, final.y, bubbles);
+		return cell ? bubbleCenter(cell.row, cell.col) : null;
+	});
+	const statEffects = $derived<ArcadeStatEffects>({
+		body: (_value, tier) => (tier > 0 ? `shot speed +${tier}` : 'standard shot'),
+		mind: (_value, tier) =>
+			tier > 1 ? 'long guide + next-next' : tier > 0 ? 'long guide + landing mark' : 'short guide',
+		grace: (_value, tier) => (tier > 0 ? `${BASE_SHOTS_PER_DROP + tier} shots/drop` : '5 shots/drop'),
+		heart: (_value, tier) => (tier > 0 ? `${tier} ceiling hold${tier === 1 ? '' : 's'}` : 'no hold')
 	});
 
 	function seedBoard(): Bubble[] {
@@ -180,6 +221,7 @@
 		bursts = [];
 		loadedColor = randomPaletteColor(seeded);
 		nextColor = randomPaletteColor(seeded);
+		thirdColor = randomPaletteColor(seeded);
 		aimAngle = -Math.PI / 2;
 		popped = 0;
 		dropped = 0;
@@ -187,6 +229,8 @@
 		rack = 0;
 		advances = 0;
 		awarded = 0;
+		ceilingHolds = heartTier;
+		ceilingHoldsUsed = 0;
 	}
 
 	function start() {
@@ -207,7 +251,19 @@
 		phase = nextPhase;
 		stop();
 		rounds += 1;
-		best = Math.max(best, popped + dropped);
+		const score = popped + dropped;
+		const record = recordArcadeRun(GAME_ID, {
+			score,
+			summary: {
+				popped,
+				dropped,
+				advances,
+				ceilingHolds: ceilingHoldsUsed,
+				cleared: nextPhase === 'complete',
+				awarded: rewardFor(popped, dropped, nextPhase === 'complete')
+			}
+		});
+		best = record.bestScore;
 		awarded = payReward(rewardFor(popped, dropped, nextPhase === 'complete'), MAX_REWARD);
 	}
 
@@ -278,12 +334,13 @@
 		shot = {
 			x: SHOOTER.x,
 			y: SHOOTER.y - 24,
-			vx: Math.cos(aimAngle) * SHOT_SPEED,
-			vy: Math.sin(aimAngle) * SHOT_SPEED,
+			vx: Math.cos(aimAngle) * shotSpeed,
+			vy: Math.sin(aimAngle) * shotSpeed,
 			color
 		};
 		loadedColor = nextColor;
-		nextColor = randomPaletteColor(bubbles);
+		nextColor = thirdColor;
+		thirdColor = randomPaletteColor(bubbles);
 	}
 
 	function placeShot(activeShot: Shot, anchoredToTop: boolean) {
@@ -408,6 +465,7 @@
 		const palette = paletteFor(source);
 		if (!palette.includes(loadedColor)) loadedColor = palette[0] ?? COLORS[0];
 		if (!palette.includes(nextColor)) nextColor = randomPaletteColor(source);
+		if (!palette.includes(thirdColor)) thirdColor = randomPaletteColor(source);
 	}
 
 	function resolvePlacement(source: Bubble[], placed: Bubble) {
@@ -440,11 +498,17 @@
 			return;
 		}
 
-		if (rack >= SHOTS_PER_DROP) {
-			nextBubbles = advanceCeiling(nextBubbles);
+		if (rack >= shotsPerDrop) {
 			rack = 0;
-			advances += 1;
-			addBurst(SHOOTER.x, GRID_TOP + 10, 'ceiling', 'ink');
+			if (ceilingHolds > 0 && deepestRow(nextBubbles) >= ROWS - 2) {
+				ceilingHolds -= 1;
+				ceilingHoldsUsed += 1;
+				addBurst(SHOOTER.x, DANGER_Y - 18, 'hold', 'ink');
+			} else {
+				nextBubbles = advanceCeiling(nextBubbles);
+				advances += 1;
+				addBurst(SHOOTER.x, GRID_TOP + 10, 'ceiling', 'ink');
+			}
 		}
 
 		bubbles = nextBubbles;
@@ -454,6 +518,10 @@
 		}
 	}
 
+	function deepestRow(source: Bubble[]): number {
+		return source.reduce((deepest, bubble) => Math.max(deepest, bubble.row), -1);
+	}
+
 	function aimGuide(): Dot[] {
 		const points: Dot[] = [{ x: SHOOTER.x, y: SHOOTER.y - 10 }];
 		let x = SHOOTER.x;
@@ -461,7 +529,7 @@
 		let vx = Math.cos(aimAngle) * 18;
 		let vy = Math.sin(aimAngle) * 18;
 
-		for (let step = 0; step < 36; step += 1) {
+		for (let step = 0; step < guideSteps; step += 1) {
 			x += vx;
 			y += vy;
 			if (x <= WALL_LEFT) {
@@ -479,7 +547,8 @@
 	}
 
 	function pointerToLocal(event: PointerEvent): Dot {
-		const rect = fieldEl.getBoundingClientRect();
+		const rect = fieldEl?.getBoundingClientRect();
+		if (!rect) return SHOOTER;
 		return {
 			x: ((event.clientX - rect.left) / rect.width) * WORLD_W,
 			y: ((event.clientY - rect.top) / rect.height) * WORLD_H
@@ -497,20 +566,26 @@
 
 	function onPointerDown(event: PointerEvent) {
 		pointerDown = true;
-		fieldEl.setPointerCapture(event.pointerId);
-		setAim(pointerToLocal(event));
+		pointerStart = pointerToLocal(event);
+		pointerMoved = false;
+		fieldEl?.setPointerCapture(event.pointerId);
+		setAim(pointerStart);
 	}
 
 	function onPointerMove(event: PointerEvent) {
 		if (!pointerDown) return;
-		setAim(pointerToLocal(event));
+		const point = pointerToLocal(event);
+		if (pointerStart && distance(point, pointerStart) > 8) pointerMoved = true;
+		setAim(point);
 	}
 
 	function onPointerUp(event: PointerEvent) {
 		pointerDown = false;
-		fieldEl.releasePointerCapture(event.pointerId);
+		if (fieldEl?.hasPointerCapture(event.pointerId)) fieldEl.releasePointerCapture(event.pointerId);
 		setAim(pointerToLocal(event));
-		fire();
+		if (event.pointerType !== 'touch' && !pointerMoved) fire();
+		pointerStart = null;
+		pointerMoved = false;
 	}
 
 	function onKeyDown(event: KeyboardEvent) {
@@ -544,7 +619,7 @@
 	});
 </script>
 
-<div class="bubble-shell">
+<div class="bubble-shell" class:color-safe={colorSafe}>
 	<ArcadeHud
 		title="Margin Bubbles"
 		hint={hintLabel}
@@ -552,6 +627,7 @@
 			{ label: 'popped', value: popped },
 			{ label: 'dropped', value: dropped, live: true, tone: 'violet' },
 			{ label: 'ceiling', value: nextDrop },
+			{ label: 'hold', value: ceilingHolds, live: ceilingHolds > 0, tone: 'green' },
 			{ label: 'prize', value: fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview) }
 		]}
 		{startLabel}
@@ -559,27 +635,21 @@
 		onclose={onclose}
 	/>
 
+	<ArcadePetPerks creature={activePet} effects={statEffects} />
 	<ArcadeProgress value={pressure} label="ceiling pressure" tone="danger" />
 
-	<svg
-		bind:this={fieldEl}
-		class="field"
-		class:active={phase === 'running'}
-		viewBox={`0 0 ${WORLD_W} ${WORLD_H}`}
-		role="img"
-		aria-label="Margin Bubbles arena"
+	<SvgArena
+		bind:element={fieldEl}
+		width={WORLD_W}
+		height={WORLD_H}
+		ariaLabel="Margin Bubbles arena"
+		active={phase === 'running'}
+		gridId="margin-bubbles-grid"
 		onpointerdown={onPointerDown}
 		onpointermove={onPointerMove}
 		onpointerup={onPointerUp}
 		onpointercancel={onPointerUp}
 	>
-		<defs>
-			<pattern id="bubble-grid" width="34" height="34" patternUnits="userSpaceOnUse">
-				<path d="M 34 0 L 0 0 0 34" fill="none" stroke="rgba(88, 110, 117, 0.12)" stroke-width="1" />
-			</pattern>
-		</defs>
-		<rect class="field-bg" width={WORLD_W} height={WORLD_H} rx="6" />
-		<rect width={WORLD_W} height={WORLD_H} fill="url(#bubble-grid)" opacity="0.56" />
 		<line class="danger-line" x1="0" y1={DANGER_Y} x2={WORLD_W} y2={DANGER_Y} />
 
 		{#each bubbles as bubble (bubbleKey(bubble))}
@@ -591,6 +661,9 @@
 
 		{#if guidePath}
 			<polyline class="aim-guide" points={guidePath} />
+		{/if}
+		{#if guideTarget}
+			<circle class="landing-preview" cx={guideTarget.x} cy={guideTarget.y} r={BUBBLE_R + 4} />
 		{/if}
 
 		<line
@@ -631,12 +704,13 @@
 					: `pop ${popped} · drop ${dropped} · best ${best} · ${rounds} run${rounds === 1 ? '' : 's'}`}
 			</text>
 		{/if}
-	</svg>
+	</SvgArena>
 
 	<div class="control-row" aria-label="bubble controls">
 		<button onclick={() => nudgeAim(-1)}>aim left</button>
 		<button class="fire-btn" onclick={fire}>fire</button>
 		<button onclick={() => nudgeAim(1)}>aim right</button>
+		<button class:pressed={colorSafe} onclick={() => (colorSafe = !colorSafe)}>palette</button>
 	</div>
 
 	<div class="queue-row" aria-label="loaded and next bubbles">
@@ -648,9 +722,15 @@
 			<span>next</span>
 			<i class={`queue-bubble bubble-${nextColor}`}></i>
 		</div>
+		{#if mindTier > 1}
+			<div class="queue-card">
+				<span>after</span>
+				<i class={`queue-bubble bubble-${thirdColor}`}></i>
+			</div>
+		{/if}
 		<p>
-			Pointer, arrows, or `A` / `D` to aim. Space, Enter, click, or tap to fire.
-			Every fifth shot lowers the ceiling.
+			Pointer, arrows, or `A` / `D` to aim. Space, Enter, click, or fire button to shoot.
+			The ceiling counter shows the next drop.
 		</p>
 	</div>
 </div>
@@ -664,6 +744,9 @@
 		gap: 0.9rem;
 		background: var(--sol-base3);
 		border-top: 2px solid var(--sol-base2);
+	}
+	.bubble-shell :global(.pet-perks) {
+		width: min(540px, 100%);
 	}
 	.control-row button {
 		font-family: var(--font-ui);
@@ -679,24 +762,6 @@
 	.control-row button:hover {
 		background: var(--sol-base00);
 	}
-	.field {
-		width: min(540px, calc(100vw - 3rem));
-		aspect-ratio: 26 / 18;
-		border: 1px solid var(--sol-base2);
-		border-radius: 6px;
-		background: var(--sol-base2);
-		box-shadow:
-			inset 0 0 0 6px rgba(7, 54, 66, 0.05),
-			0 8px 24px rgba(7, 54, 66, 0.08);
-		touch-action: none;
-		user-select: none;
-	}
-	.field.active {
-		cursor: crosshair;
-	}
-	.field-bg {
-		fill: #fdf6e3;
-	}
 	.danger-line {
 		stroke: rgba(220, 50, 47, 0.34);
 		stroke-width: 2;
@@ -708,6 +773,12 @@
 		stroke-width: 2.4;
 		stroke-dasharray: 6 7;
 		stroke-linecap: round;
+	}
+	.landing-preview {
+		fill: rgba(253, 246, 227, 0.18);
+		stroke: rgba(38, 139, 210, 0.5);
+		stroke-width: 2;
+		stroke-dasharray: 4 5;
 	}
 	.aim-barrel {
 		stroke: var(--sol-base00);
@@ -741,6 +812,26 @@
 	.loaded-violet,
 	.bubble-violet {
 		fill: var(--sol-violet);
+	}
+	.color-safe .bubble-shadow-sun,
+	.color-safe .loaded-sun,
+	.color-safe .bubble-sun {
+		fill: #e69f00;
+	}
+	.color-safe .bubble-shadow-sea,
+	.color-safe .loaded-sea,
+	.color-safe .bubble-sea {
+		fill: #0072b2;
+	}
+	.color-safe .bubble-shadow-leaf,
+	.color-safe .loaded-leaf,
+	.color-safe .bubble-leaf {
+		fill: #009e73;
+	}
+	.color-safe .bubble-shadow-violet,
+	.color-safe .loaded-violet,
+	.color-safe .bubble-violet {
+		fill: #cc79a7;
 	}
 	.bubble,
 	.loaded {
@@ -810,10 +901,14 @@
 	.control-row .fire-btn:hover {
 		background: var(--sol-orange);
 	}
+	.control-row button.pressed {
+		background: var(--sol-cyan);
+		color: var(--sol-base3);
+	}
 	.queue-row {
 		width: min(540px, 100%);
 		display: grid;
-		grid-template-columns: auto auto minmax(0, 1fr);
+		grid-template-columns: repeat(3, auto) minmax(0, 1fr);
 		gap: 0.65rem;
 		align-items: center;
 	}

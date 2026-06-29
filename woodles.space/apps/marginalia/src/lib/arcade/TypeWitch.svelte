@@ -5,6 +5,7 @@
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { conditions } from '$lib/witch/content/conditions';
+	import { arcadeStartLabel } from './arcadeLabels';
 	import { payReward, previewReward as previewArcadeReward } from './arcadeRewards';
 	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
 	import {
@@ -105,7 +106,7 @@
 	});
 
 	const previewReward = $derived(rewardFor(completed, score, errors));
-	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
+	const startLabel = $derived(arcadeStartLabel(phase, rounds));
 
 	function rewardFor(done: number, pts: number, errs: number): number {
 		const raw = done * 3 + Math.floor(pts / 4) - Math.floor(errs / 8);

@@ -237,6 +237,8 @@ Milestone:
 
 Theme: movement/action stat pass.
 
+Status: complete in code as of June 29, 2026.
+
 Games:
 
 - Get Big!
@@ -267,6 +269,10 @@ Milestone:
 
 Theme: geometry and shooter stat pass, part 1.
 
+Status: complete in code as of June 29, 2026, with one deliberate scope note:
+`SvgArena.svelte` was applied to Margin Bubbles, while Bubble Spinner stayed on
+its canvas frame because the SVG wrapper is not a clean fit for that game.
+
 Games:
 
 - Margin Bubbles
@@ -274,12 +280,13 @@ Games:
 
 Tasks:
 
-- Create `SvgArena.svelte`.
-- Apply `SvgArena` to both bubble games if the fit is clean.
-- Add Margin Bubbles shot/aim/ceiling-hold stat effects.
-- Add Bubble Spinner torque/guide/foul/pivot-save stat effects.
-- Improve mobile aim/fire separation.
-- Add color-safe palette option or at least central color mapping hooks.
+- Create `SvgArena.svelte`. Done.
+- Apply `SvgArena` to both bubble games if the fit is clean. Done for Margin
+  Bubbles; intentionally skipped for Bubble Spinner's canvas surface.
+- Add Margin Bubbles shot/aim/ceiling-hold stat effects. Done.
+- Add Bubble Spinner torque/guide/foul/pivot-save stat effects. Done.
+- Improve mobile aim/fire separation. Done.
+- Add color-safe palette option or at least central color mapping hooks. Done.
 
 Validation:
 

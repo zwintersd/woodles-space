@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import ArcadeHud from './ArcadeHud.svelte';
+	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import {
 		axialToPoint,
 		clamp,
@@ -15,18 +16,29 @@
 		type CubeHex,
 		type Dot
 	} from './arcadeMath';
+	import {
+		SPINNER_BUBBLE_COLORS,
+		spinnerBubbleSwatch,
+		type SpinnerBubbleColor as BubbleColor
+	} from './arcadeBubblePalette';
+	import { arcadeStartLabel } from './arcadeLabels';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { payReward, previewReward } from './arcadeRewards';
-	import type { ArcadeActivePet } from './arcadeStats';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
+	import {
+		coreStatValue,
+		statTier,
+		type ArcadeActivePet,
+		type ArcadeStatEffects
+	} from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
 		activePet?: ArcadeActivePet;
 	}
-	let { onclose }: Props = $props();
+	let { onclose, activePet = null }: Props = $props();
 
-	const COLORS = ['red', 'blue', 'green', 'yellow', 'purple'] as const;
-	type BubbleColor = (typeof COLORS)[number];
+	const COLORS: BubbleColor[] = [...SPINNER_BUBBLE_COLORS];
 	type Phase = 'ready' | 'running' | 'complete' | 'over';
 	type FlashTone = BubbleColor | 'ink';
 
@@ -67,6 +79,9 @@
 		nextColor: BubbleColor;
 		falling: FallingBubble[];
 		flash: Flash | null;
+		foulLimit: number;
+		pivotSaves: number;
+		pivotSavesUsed: number;
 		score: number;
 		matches: number;
 		orphans: number;
@@ -74,6 +89,7 @@
 	}
 
 	const CANVAS_SIZE = 600;
+	const GAME_ID = 'bubble-spinner';
 	const CENTER: Dot = { x: CANVAS_SIZE / 2, y: CANVAS_SIZE / 2 };
 	const ORIGIN: CubeHex = { q: 0, r: 0, s: 0 };
 	const SHOOTER: Dot = { x: CANVAS_SIZE / 2, y: 42 };
@@ -88,27 +104,29 @@
 	const DAMPING_PER_FRAME = 0.98;
 	const MIN_AIM = 0.22;
 	const MAX_AIM = Math.PI - 0.22;
-	const COLOR_SWATCHES: Record<BubbleColor, { name: string; fill: string; light: string; dark: string }> = {
-		red: { name: 'red', fill: '#dc322f', light: '#ff8a76', dark: '#8f1d22' },
-		blue: { name: 'blue', fill: '#268bd2', light: '#91d5ff', dark: '#12507f' },
-		green: { name: 'green', fill: '#2aa198', light: '#7ee6d8', dark: '#17645f' },
-		yellow: { name: 'yellow', fill: '#b58900', light: '#ffe08a', dark: '#735600' },
-		purple: { name: 'purple', fill: '#6c71c4', light: '#b8baf2', dark: '#3e438d' }
-	};
-
 	let game = $state<GameState>(createState('ready'));
 	let aimAngle = $state(Math.PI / 2);
 	let rounds = $state(0);
-	let best = $state(0);
+	let best = $state(loadArcadeRecord(GAME_ID).bestScore);
 	let awarded = $state(0);
+	let colorSafe = $state(false);
 	let canvasEl: HTMLCanvasElement;
 	let context: CanvasRenderingContext2D | null = null;
 	let raf = 0;
 	let lastTime = 0;
 	let pixelRatio = 1;
 	let fallingSeq = 0;
+	let pointerStart: Dot | null = null;
+	let pointerMoved = false;
 
-	const startLabel = $derived(game.phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
+	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
+	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
+	const graceTier = $derived(statTier(coreStatValue(activePet, 'grace')));
+	const heartTier = $derived(statTier(coreStatValue(activePet, 'heart')));
+	const impactTorque = $derived(IMPACT_TORQUE * (1 + bodyTier * 0.16));
+	const maxSpin = $derived(MAX_SPIN + bodyTier * 0.12);
+	const guideSteps = $derived(23 + mindTier * 8);
+	const startLabel = $derived(arcadeStartLabel(game.phase, rounds));
 	const rewardPreview = $derived(rewardFor(game.score, game.bubbles.size === 0));
 	const prizeLabel = $derived(fmt(game.phase === 'running' ? rewardPreview : awarded));
 	const bubbleCount = $derived(game.bubbles.size);
@@ -119,19 +137,32 @@
 		if (game.phase === 'running') return game.projectile ? 'shot in flight' : 'cluster spinning';
 		return 'pivot ready';
 	});
+	const statEffects = $derived<ArcadeStatEffects>({
+		body: (_value, tier) => (tier > 0 ? `torque control +${tier}` : 'standard impact'),
+		mind: (_value, tier) => (tier > 0 ? 'longer aim guide' : 'short aim guide'),
+		grace: (_value, tier) => (tier > 0 ? `${FOUL_LIMIT + tier} fouls` : '5 fouls'),
+		heart: (_value, tier) => (tier > 0 ? `${tier} pivot save${tier === 1 ? '' : 's'}` : 'no pivot save')
+	});
 
-	function createState(phase: Phase): GameState {
+	function createState(
+		phase: Phase,
+		perks: { graceTier?: number; heartTier?: number } = {}
+	): GameState {
+		const foulLimit = FOUL_LIMIT + (perks.graceTier ?? 0);
 		return {
 			bubbles: seedBubbles(),
 			angle: 0,
 			angularVelocity: 0,
-			foulCount: FOUL_LIMIT,
+			foulCount: foulLimit,
 			phase,
 			projectile: null,
 			loadedColor: randomColor(),
 			nextColor: randomColor(),
 			falling: [],
 			flash: null,
+			foulLimit,
+			pivotSaves: perks.heartTier ?? 0,
+			pivotSavesUsed: 0,
 			score: 0,
 			matches: 0,
 			orphans: 0,
@@ -169,7 +200,7 @@
 
 	function start() {
 		stop();
-		game = createState('running');
+		game = createState('running', { graceTier, heartTier });
 		aimAngle = Math.PI / 2;
 		awarded = 0;
 		lastTime = performance.now();
@@ -188,7 +219,18 @@
 		game.projectile = null;
 		stop();
 		rounds += 1;
-		best = Math.max(best, game.score);
+		const record = recordArcadeRun(GAME_ID, {
+			score: game.score,
+			summary: {
+				matches: game.matches,
+				orphans: game.orphans,
+				shots: game.shots,
+				pivotSaves: game.pivotSavesUsed,
+				cleared: nextPhase === 'complete',
+				awarded: rewardFor(game.score, nextPhase === 'complete')
+			}
+		});
+		best = record.bestScore;
 		awarded = payReward(rewardFor(game.score, nextPhase === 'complete'), MAX_REWARD);
 		draw();
 	}
@@ -250,7 +292,7 @@
 		for (const bubble of game.bubbles.values()) {
 			const center = worldPointForHex(bubble);
 			const gap = distance(projectile, center);
-			if (gap <= BUBBLE_R * 2 - 1 && gap < hitDistance) {
+			if (gap <= BUBBLE_R * 2 - 1 + graceTier * 1.35 && gap < hitDistance) {
 				hit = bubble;
 				hitDistance = gap;
 			}
@@ -277,7 +319,7 @@
 	function applyImpactTorque(projectile: Projectile) {
 		const arm = { x: projectile.x - CENTER.x, y: projectile.y - CENTER.y };
 		const cross = arm.x * projectile.vy - arm.y * projectile.vx;
-		game.angularVelocity = clamp(game.angularVelocity + cross * IMPACT_TORQUE, -MAX_SPIN, MAX_SPIN);
+		game.angularVelocity = clamp(game.angularVelocity + cross * impactTorque, -maxSpin, maxSpin);
 	}
 
 	function snapTargetFor(projectile: Projectile, collided: Bubble): CubeHex | null {
@@ -404,10 +446,19 @@
 			return;
 		}
 
-		game.foulCount = FOUL_LIMIT;
+		game.foulCount = game.foulLimit;
+		if (game.pivotSaves > 0) {
+			game.pivotSaves -= 1;
+			game.pivotSavesUsed += 1;
+			game.angularVelocity *= 0.34;
+			setFlash('pivot save', 'ink');
+			checkGameOver();
+			return;
+		}
+
 		const added = spawnPenaltyLayer();
 		const direction = Math.random() < 0.5 ? -1 : 1;
-		game.angularVelocity = clamp(game.angularVelocity + direction * (0.34 + added * 0.018), -MAX_SPIN, MAX_SPIN);
+		game.angularVelocity = clamp(game.angularVelocity + direction * (0.34 + added * 0.018), -maxSpin, maxSpin);
 		setFlash(`layer ${added}`, 'ink');
 		checkGameOver();
 	}
@@ -517,6 +568,11 @@
 		draw();
 	}
 
+	function togglePalette() {
+		colorSafe = !colorSafe;
+		draw();
+	}
+
 	function pointerToCanvas(event: PointerEvent): Dot {
 		const rect = canvasEl.getBoundingClientRect();
 		return {
@@ -535,21 +591,28 @@
 	}
 
 	function onPointerMove(event: PointerEvent) {
-		setAim(pointerToCanvas(event));
+		const point = pointerToCanvas(event);
+		if (pointerStart && distance(point, pointerStart) > 10) pointerMoved = true;
+		setAim(point);
 	}
 
 	function onPointerDown(event: PointerEvent) {
 		canvasEl.setPointerCapture(event.pointerId);
-		setAim(pointerToCanvas(event));
+		pointerStart = pointerToCanvas(event);
+		pointerMoved = false;
+		setAim(pointerStart);
 		if (game.phase !== 'running') {
 			start();
 			return;
 		}
-		fire();
 	}
 
 	function onPointerUp(event: PointerEvent) {
 		if (canvasEl.hasPointerCapture(event.pointerId)) canvasEl.releasePointerCapture(event.pointerId);
+		setAim(pointerToCanvas(event));
+		if (event.pointerType !== 'touch' && !pointerMoved) fire();
+		pointerStart = null;
+		pointerMoved = false;
 	}
 
 	function onKeyDown(event: KeyboardEvent) {
@@ -667,7 +730,7 @@
 		const angle = safeAimAngle();
 		let vx = Math.cos(angle) * 22;
 		const vy = Math.sin(angle) * 22;
-		for (let step = 0; step < 23; step += 1) {
+		for (let step = 0; step < guideSteps; step += 1) {
 			x += vx;
 			y += vy;
 			if (x <= BUBBLE_R + SAFE_PADDING) {
@@ -777,17 +840,17 @@
 		drawHudBox(ctx, CANVAS_SIZE - 190, 18, 172, 72);
 		drawHudText(ctx, 'next', CANVAS_SIZE - 174, 43, 11);
 		drawBubble(ctx, CANVAS_SIZE - 126, 60, game.nextColor, 11, 1);
-		drawHudText(ctx, COLOR_SWATCHES[game.nextColor].name, CANVAS_SIZE - 106, 65, 17, '#073642', 'counter');
+		drawHudText(ctx, spinnerBubbleSwatch(game.nextColor, colorSafe).name, CANVAS_SIZE - 106, 65, 17, '#073642', 'counter');
 
 		drawHudBox(ctx, 18, CANVAS_SIZE - 78, 158, 58);
 		drawHudText(ctx, 'fouls', 34, CANVAS_SIZE - 53, 11);
-		drawHudText(ctx, `${game.foulCount}/${FOUL_LIMIT}`, 92, CANVAS_SIZE - 43, 24, '#073642', 'counter');
+		drawHudText(ctx, `${game.foulCount}/${game.foulLimit}`, 92, CANVAS_SIZE - 43, 24, '#073642', 'counter');
 
 		if (game.flash) {
 			const alpha = clamp(game.flash.life, 0, 1);
 			ctx.save();
 			ctx.globalAlpha = alpha;
-			ctx.fillStyle = game.flash.tone === 'ink' ? '#073642' : COLOR_SWATCHES[game.flash.tone].dark;
+			ctx.fillStyle = game.flash.tone === 'ink' ? '#073642' : spinnerBubbleSwatch(game.flash.tone, colorSafe).dark;
 			ctx.font = '26px var(--font-counter)';
 			ctx.textAlign = 'center';
 			ctx.textBaseline = 'middle';
@@ -860,7 +923,7 @@
 		radius: number,
 		alpha: number
 	) {
-		const swatch = COLOR_SWATCHES[color];
+		const swatch = spinnerBubbleSwatch(color, colorSafe);
 		ctx.save();
 		ctx.globalAlpha = alpha;
 		ctx.fillStyle = 'rgba(7, 54, 66, 0.14)';
@@ -932,6 +995,7 @@
 		scores={[
 			{ label: 'score', value: game.score },
 			{ label: 'fouls', value: game.foulCount, live: true, tone: 'yellow' },
+			{ label: 'pivot', value: game.pivotSaves, live: game.pivotSaves > 0, tone: 'green' },
 			{ label: 'spin', value: spinLabel },
 			{ label: 'prize', value: prizeLabel }
 		]}
@@ -939,6 +1003,8 @@
 		onstart={start}
 		onclose={onclose}
 	/>
+
+	<ArcadePetPerks creature={activePet} effects={statEffects} />
 
 	<canvas
 		bind:this={canvasEl}
@@ -955,6 +1021,7 @@
 		<button onclick={() => nudgeAim(-1)}>left</button>
 		<button class="fire-btn" onclick={fire}>fire</button>
 		<button onclick={() => nudgeAim(1)}>right</button>
+		<button class:pressed={colorSafe} onclick={togglePalette}>palette</button>
 	</div>
 </div>
 
@@ -967,6 +1034,9 @@
 		gap: 0.9rem;
 		background: var(--sol-base3);
 		border-top: 2px solid var(--sol-base2);
+	}
+	.spinner-shell :global(.pet-perks) {
+		width: min(600px, 100%);
 	}
 	.control-row button {
 		font-family: var(--font-ui);
@@ -1019,6 +1089,10 @@
 	}
 	.control-row .fire-btn:hover {
 		background: var(--sol-orange);
+	}
+	.control-row button.pressed {
+		background: var(--sol-cyan);
+		color: var(--sol-base3);
 	}
 </style>
 

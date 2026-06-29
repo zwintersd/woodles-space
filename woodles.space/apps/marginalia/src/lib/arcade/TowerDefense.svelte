@@ -3,6 +3,7 @@
 	import ArcadeHud from './ArcadeHud.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { clamp, distance, normalize, type Dot } from './arcadeMath';
+	import { arcadeStartLabel } from './arcadeLabels';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { payReward, previewReward } from './arcadeRewards';
 	import type { ArcadeActivePet } from './arcadeStats';
@@ -107,7 +108,7 @@
 			? 1
 			: Math.min(1, (wave - 1 + waveDone / Math.max(1, waveSize)) / WAVE_COUNT)
 	);
-	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
+	const startLabel = $derived(arcadeStartLabel(phase, rounds));
 	const rewardPreview = $derived(rewardFor(kills, wave, phase === 'complete'));
 	const outcomeLabel = $derived.by(() => {
 		if (phase === 'complete') return awarded > 0 ? `+${fmt(awarded)} insight` : 'held';
