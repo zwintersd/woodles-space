@@ -21,8 +21,22 @@ Recommendation #1 landed in [`arcadeRewards.ts`](./arcadeRewards.ts):
 - `ArcadeHud.svelte` and `ArcadeProgress.svelte` now carry the repeated shell
   for ten playable games, advancing **finding #4** without extracting game
   rules.
+- `arcadeLabels.ts` now owns the shared `start / again / restart` control copy,
+  closing the small label helper called out in recommendation #5.
+- Week 5's movement/action stat pass is complete for Get Big!, Bullet Dot,
+  Paddle Break, and Margin Snake: each now has visible Body/Mind/Grace/Heart
+  effects, active-pet perk rows, local records, and the planned kinder fail
+  mechanics.
+- Week 6's bubble pass is complete: Margin Bubbles has `SvgArena`, both bubble
+  games have active-pet stat effects, local records, mobile aim/fire separation,
+  and color-safe palette controls.
+- The arcade route now pauses the idle world clock while `activeGame !== null`
+  and resumes it when the cabinet returns, resolving recommendation #6 with a
+  deliberate "arcade replaces idle accrual while playing" rule.
 
-The remaining findings (#5 tokens/vocabulary, #6-#9) are unchanged.
+The remaining broad findings are token vocabulary cleanup where raw scene colors
+are still intentional/local, lock honesty, and future extraction candidates that
+need more repetition before they should move.
 
 ## Scope & method
 
@@ -54,8 +68,8 @@ round of growth makes the copy-paste expensive.
 | Margin Defense | `TowerDefense.svelte` | play | rAF | 20 | yes | Shared reward helper and HUD/progress shell. |
 | Margin Snake | `Snake.svelte` | play | step on rAF | 18 | yes | Shared reward helper and HUD/progress shell. |
 | Paddle Break | `PaddleBreak.svelte` | play | rAF | 22 | yes | Shared reward helper and HUD/progress shell. |
-| Bubble Spinner | `BubbleSpinner.svelte` | play | rAF canvas | 30 | yes | Uses new hex helpers, `rotate`, and shared HUD shell. |
-| Margin Bubbles | `BubbleShooter.svelte` | play | rAF | 24 | yes | Shared reward helper and HUD/progress shell. |
+| Bubble Spinner | `BubbleSpinner.svelte` | play | rAF canvas | 30 | yes | Shared HUD shell, active-pet stats, local records, color-safe canvas swatches. |
+| Margin Bubbles | `BubbleShooter.svelte` | play | rAF | 24 | yes | Shared reward helper, HUD/progress shell, `SvgArena`, active-pet stats, local records. |
 | Word Weave | - | locked | - | - | no | Hardcoded roadmap lock. |
 | Star Catcher | - | locked | - | - | no | Hardcoded roadmap lock. |
 | The Long Game | - | locked | - | - | no | Hardcoded roadmap lock. |
@@ -130,14 +144,15 @@ Done in this pass:
 - Migrated 10 games onto the shared shell: Type Witch, Get Big!, Margin Hollow,
   Insight Rush, Bullet Dot, Margin Defense, Margin Snake, Paddle Break, Bubble
   Spinner, and Margin Bubbles.
+- `arcadeLabels.ts` for the shared `start / again / restart` label helper.
+- `SvgArena.svelte` pilot adoption in Margin Bubbles.
 
 Still open:
 
-- `SvgArena.svelte` for SVG games that share a background, grid, and overlay.
+- Broader `SvgArena.svelte` adoption. The component exists and Margin Bubbles
+  uses it; other SVG games should move only when each fit is clean.
 - A small `CanvasArcadeFrame.svelte` only if Color POP!, Margin Miner, and
   Bubble Spinner converge on the same canvas shell.
-- A tiny shared `start / again / restart` label helper, now that `ArcadeHud`
-  exists.
 
 Keep 2048, Color POP!, Margin Miner, and Inkblot local until their control
 surfaces settle.
@@ -157,6 +172,8 @@ unlock promises.
 
 ### 5. Clean up tokens and shared labels
 
+**Status: shared labels done; token cleanup remains selective.**
+
 The Solarized palette is centralized in `Arcade.svelte`, but many components
 still carry raw Solarized hex literals. Current arcade files contain more than a
 hundred such occurrences, especially in canvas-heavy games.
@@ -167,21 +184,16 @@ Do not blindly replace every literal. Use this distinction:
 - Canvas/SVG scene art may keep local constants, but those constants should be
   named when the same color means the same thing across a game.
 
-Also move the common `start / again / restart` label to a tiny shared helper
-once `ArcadeHud` exists.
+The common `start / again / restart` label now lives in `arcadeLabels.ts`.
 
 ### 6. Decide whether the world clock runs during play
 
-The arcade route starts the idle world clock on mount and stops it only when the
-route unmounts. That means the Book continues accruing idle resources while a
-cabinet game is open, while the game itself may also run rAF, timers, or a
-Matter.js runner.
+**Status: done.**
 
-This is not automatically wrong. It just needs to be a deliberate rule:
-
-- keep idle accrual running if games are meant to layer on top of the world; or
-- pause idle accrual while `activeGame !== null` if arcade play should replace
-  idle progress for that moment.
+The deliberate rule is: arcade play replaces idle world progress while a game is
+open. The route pauses the idle tick when `activeGame !== null`, persists once
+on pause, and restarts the tick when the cabinet returns. `startTick()` is now
+idempotent so repeated resumes do not stack multiple loops.
 
 ### 7. Leave game rules local
 

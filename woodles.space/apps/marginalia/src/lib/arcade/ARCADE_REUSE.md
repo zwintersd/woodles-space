@@ -63,6 +63,15 @@ components. They are now used by the core paying/action games:
 - `BubbleSpinner.svelte`
 - `BubbleShooter.svelte`
 
+`arcadeLabels.ts` owns the shared `start / again / restart` control vocabulary
+used by the shared HUD games.
+
+`SvgArena.svelte` is the first SVG-frame extraction. It owns the responsive SVG
+box, Solarized paper background, grid pattern, and pointer/touch surface for
+good-fit SVG games. `BubbleShooter.svelte` is the pilot user; canvas games such
+as `BubbleSpinner.svelte` should stay canvas-native unless their frame actually
+converges.
+
 ## What To Reuse By Copying For Now
 
 Some patterns are still intentionally local while their shape remains more
@@ -75,8 +84,9 @@ specialized:
 - SVG arena treatment: responsive width, fixed `viewBox`, Solarized arcade
   tokens, grid background, and center overlays.
 
-The first shell repetition has already been extracted. The remaining repetition
-is evidence for `SvgArena.svelte`, not a reason to introduce a generic engine.
+The first shell repetition has already been extracted. The remaining SVG
+repetition produced `SvgArena.svelte`; future extractions should stay this small
+and should not become a generic engine.
 
 `MarginHollow.svelte` adds a first platform/metroidvania-like shape. Keep its room data, axis-aligned collision, door/gate requirements, pickup handling, hazards, and jump physics local until at least one more game wants the same shape. If that repetition appears, the likely first extraction is a tiny room/rect vocabulary, not a full platformer engine.
 
@@ -93,8 +103,9 @@ Extract in this order if the arcade keeps growing:
 3. ~~`ArcadeProgress.svelte`~~ - done for narrow time / progress tracks.
    Supports the current blue, green, yellow, violet, magic, and danger tracks.
 
-4. `SvgArena.svelte`
-   Responsive SVG wrapper, background rect, grid pattern slot, and overlay slot.
+4. `SvgArena.svelte` - pilot done.
+   Responsive SVG wrapper, background rect, grid pattern, and pointer surface.
+   Expand only to SVG games where the fit is clean.
 
 5. `useArcadeLoop.ts`
    Only if at least two games need the exact same `requestAnimationFrame` lifecycle. Bullet Dot and Tower Defense are frame-based; Snake is step-based, so do not force this too early.

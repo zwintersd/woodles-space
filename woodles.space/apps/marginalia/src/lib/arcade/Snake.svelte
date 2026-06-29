@@ -4,6 +4,7 @@
 	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import type { Dot } from './arcadeMath';
+	import { arcadeStartLabel } from './arcadeLabels';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { payReward, previewReward } from './arcadeRewards';
 	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
@@ -61,7 +62,7 @@
 		Math.max(94 + bodyTier * 8, 170 + bodyTier * 10 - score * Math.max(2.2, 4 - bodyTier * 0.45))
 	);
 	const growthProgress = $derived(Math.min(1, score / WIN_SCORE));
-	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
+	const startLabel = $derived(arcadeStartLabel(phase, rounds));
 	const rewardPreview = $derived(rewardFor(score, phase === 'complete'));
 	const outcomeLabel = $derived.by(() => {
 		if (phase === 'complete') return awarded > 0 ? `+${fmt(awarded)} insight` : 'full';

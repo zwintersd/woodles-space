@@ -4,6 +4,7 @@
 	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { clamp, distance, normalize, type Dot } from './arcadeMath';
+	import { arcadeStartLabel } from './arcadeLabels';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { payReward, previewReward } from './arcadeRewards';
 	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
@@ -82,7 +83,7 @@
 	const heartTier = $derived(statTier(coreStatValue(activePet, 'heart')));
 	const playerHitRadius = $derived(Math.max(6, PLAYER_R - graceTier));
 	const moveSpeed = $derived(128 + bodyTier * 12);
-	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
+	const startLabel = $derived(arcadeStartLabel(phase, rounds));
 	const outcomeLabel = $derived.by(() => {
 		if (phase === 'complete') return awarded > 0 ? `+${fmt(awarded)} insight` : 'clear';
 		if (phase === 'over') return 'overrun';

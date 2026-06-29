@@ -8,6 +8,7 @@ let saveAt = 0;
 
 export function startTick() {
 	if (typeof window === 'undefined') return;
+	if (raf) return;
 	lastT = performance.now();
 	saveAt = Date.now() + 5_000;
 	const loop = (t: number) => {

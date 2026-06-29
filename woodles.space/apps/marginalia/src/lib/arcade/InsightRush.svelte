@@ -6,6 +6,7 @@
 	import { fmt } from '$lib/witch/book.svelte';
 	import { payReward, previewReward as previewArcadeReward } from './arcadeRewards';
 	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
+	import { arcadeStartLabel } from './arcadeLabels';
 	import {
 		clamp,
 		distance,
@@ -94,7 +95,7 @@
 		if (misses > hits && hits > 0) return 'resetting';
 		return 'searching';
 	});
-	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
+	const startLabel = $derived(arcadeStartLabel(phase, rounds));
 	const shieldLabel = $derived(heartShield > 0 ? 'ready' : heartTier > 0 ? `${shieldCharge}/${Math.max(3, 6 - heartTier)}` : 'none');
 	const statEffects = $derived<ArcadeStatEffects>({
 		body: (_value, tier) => (tier > 0 ? `larger target +${tier}` : 'normal target'),

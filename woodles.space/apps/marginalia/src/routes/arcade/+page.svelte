@@ -17,6 +17,16 @@
 		book.persist();
 	}
 
+	function setActiveGame(gameId: string | null) {
+		activeGame = gameId;
+		if (gameId) {
+			stopTick();
+			book.persist();
+		} else {
+			startTick();
+		}
+	}
+
 	onMount(() => {
 		book.hydrate();
 		void book.refreshBestiaryCreatures();
@@ -55,7 +65,7 @@
 
 	<main class="arcade-layout">
 		<section class="game-column" aria-label="arcade games">
-			<Arcade {activePet} bestiaryCreatures={book.bestiaryCreatures} onactivechange={(gameId) => (activeGame = gameId)} />
+			<Arcade {activePet} bestiaryCreatures={book.bestiaryCreatures} onactivechange={setActiveGame} />
 		</section>
 		<ActivePetPanel locked={activeGame !== null} onpetchange={(pet) => (activePet = pet)} />
 	</main>
