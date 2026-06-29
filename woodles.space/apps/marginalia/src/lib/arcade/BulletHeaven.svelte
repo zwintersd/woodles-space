@@ -1,17 +1,24 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import ArcadeHud from './ArcadeHud.svelte';
+	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { clamp, distance, normalize, type Dot } from './arcadeMath';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { payReward, previewReward } from './arcadeRewards';
-	import type { ArcadeActivePet } from './arcadeStats';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
+	import {
+		coreStatValue,
+		statTier,
+		type ArcadeActivePet,
+		type ArcadeStatEffects
+	} from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
 		activePet?: ArcadeActivePet;
 	}
-	let { onclose }: Props = $props();
+	let { onclose, activePet = null }: Props = $props();
 
 	type Phase = 'ready' | 'running' | 'complete' | 'over';
 
@@ -35,6 +42,7 @@
 
 	const WORLD_W = 520;
 	const WORLD_H = 340;
+	const GAME_ID = 'bullet-dot';
 	const PLAYER_R = 9;
 	const ROUND_SECONDS = 45;
 	const MAX_REWARD = 18;
@@ -49,7 +57,9 @@
 	let elapsed = $state(0);
 	let awarded = $state(0);
 	let rounds = $state(0);
-	let best = $state(0);
+	let best = $state(loadArcadeRecord(GAME_ID).bestScore);
+	let shields = $state(0);
+	let shieldsUsed = $state(0);
 	let fieldEl: SVGSVGElement;
 	let raf = 0;
 	let lastTime = 0;
@@ -60,12 +70,18 @@
 	let shotSeq = 0;
 	let burstSeq = 0;
 	let pointerDown = false;
-	let pointerGoal: Dot | null = null;
+	let pointerGoal = $state<Dot | null>(null);
 
 	const keys = new Set<string>();
 
 	const remaining = $derived(Math.max(0, ROUND_SECONDS - elapsed));
 	const timeProgress = $derived(Math.max(0, remaining / ROUND_SECONDS));
+	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
+	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
+	const graceTier = $derived(statTier(coreStatValue(activePet, 'grace')));
+	const heartTier = $derived(statTier(coreStatValue(activePet, 'heart')));
+	const playerHitRadius = $derived(Math.max(6, PLAYER_R - graceTier));
+	const moveSpeed = $derived(128 + bodyTier * 12);
 	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
 	const outcomeLabel = $derived.by(() => {
 		if (phase === 'complete') return awarded > 0 ? `+${fmt(awarded)} insight` : 'clear';
@@ -74,6 +90,13 @@
 		return 'ready?';
 	});
 	const prizePreview = $derived(rewardFor(kills, elapsed, phase === 'complete'));
+	const currentTarget = $derived.by(() => pickTarget());
+	const statEffects = $derived<ArcadeStatEffects>({
+		body: (_value, tier) => (tier > 0 ? `speed +${tier}` : 'standard speed'),
+		mind: (_value, tier) => (tier > 0 ? 'lead targeting line' : 'nearest target'),
+		grace: (_value, tier) => (tier > 0 ? `hitbox -${tier}` : 'normal hitbox'),
+		heart: (_value, tier) => (tier > 0 ? `${tier} shield${tier === 1 ? '' : 's'}` : 'health only')
+	});
 
 	function rewardFor(defeated: number, seconds: number, cleared: boolean): number {
 		const raw = Math.floor(defeated / 8) + Math.floor(seconds / 14) + (cleared ? 5 : 0);
@@ -108,6 +131,9 @@
 		shots = [];
 		bursts = [];
 		health = 3;
+		health += bodyTier;
+		shields = heartTier;
+		shieldsUsed = 0;
 		kills = 0;
 		elapsed = 0;
 		awarded = 0;
@@ -135,7 +161,17 @@
 		phase = nextPhase;
 		stop();
 		rounds += 1;
-		best = Math.max(best, kills);
+		const record = recordArcadeRun(GAME_ID, {
+			score: kills,
+			summary: {
+				seconds: Math.round(elapsed),
+				health,
+				cleared: nextPhase === 'complete',
+				shields: shieldsUsed,
+				awarded: rewardFor(kills, elapsed, nextPhase === 'complete')
+			}
+		});
+		best = record.bestScore;
 		awarded = payReward(rewardFor(kills, elapsed, nextPhase === 'complete'), MAX_REWARD);
 	}
 
@@ -189,25 +225,17 @@
 
 		if (dx === 0 && dy === 0) return;
 		const dir = normalize(dx, dy);
-		const speed = 128;
 		player = {
-			x: clamp(player.x + dir.x * speed * dt, PLAYER_R, WORLD_W - PLAYER_R),
-			y: clamp(player.y + dir.y * speed * dt, PLAYER_R, WORLD_H - PLAYER_R)
+			x: clamp(player.x + dir.x * moveSpeed * dt, PLAYER_R, WORLD_W - PLAYER_R),
+			y: clamp(player.y + dir.y * moveSpeed * dt, PLAYER_R, WORLD_H - PLAYER_R)
 		};
 	}
 
 	function fireAtNearest() {
-		if (enemies.length === 0) return;
-		let target = enemies[0];
-		let bestDistance = distance(player, target);
-		for (const enemy of enemies) {
-			const nextDistance = distance(player, enemy);
-			if (nextDistance < bestDistance) {
-				target = enemy;
-				bestDistance = nextDistance;
-			}
-		}
-		const dir = normalize(target.x - player.x, target.y - player.y);
+		const target = pickTarget();
+		if (!target) return;
+		const targetPoint = predictedTarget(target);
+		const dir = normalize(targetPoint.x - player.x, targetPoint.y - player.y);
 		const speed = 235;
 		shots = [
 			...shots,
@@ -221,6 +249,35 @@
 		];
 	}
 
+	function pickTarget(): Enemy | null {
+		if (enemies.length === 0) return null;
+		let target = enemies[0];
+		let bestScore = targetScore(target);
+		for (const enemy of enemies) {
+			const nextScore = targetScore(enemy);
+			if (nextScore < bestScore) {
+				target = enemy;
+				bestScore = nextScore;
+			}
+		}
+		return target;
+	}
+
+	function targetScore(enemy: Enemy): number {
+		const closeness = distance(player, enemy);
+		return closeness - mindTier * enemy.speed * 0.25;
+	}
+
+	function predictedTarget(enemy: Enemy): Dot {
+		if (mindTier === 0) return enemy;
+		const leadSeconds = 0.08 + mindTier * 0.05;
+		const chase = normalize(player.x - enemy.x, player.y - enemy.y);
+		return {
+			x: enemy.x + chase.x * enemy.speed * leadSeconds,
+			y: enemy.y + chase.y * enemy.speed * leadSeconds
+		};
+	}
+
 	function updateShots(dt: number) {
 		shots = shots
 			.map((shot) => ({ ...shot, x: shot.x + shot.vx * dt, y: shot.y + shot.vy * dt }))
@@ -232,6 +289,7 @@
 		const liveShots = [...shots];
 		let defeated = 0;
 		let tookHit = false;
+		let blockedHit = false;
 
 		for (const enemy of enemies) {
 			const dir = normalize(player.x - enemy.x, player.y - enemy.y);
@@ -247,10 +305,17 @@
 				addBurst(next.x, next.y, '+1');
 				continue;
 			}
-			if (distance(next, player) < next.size + PLAYER_R && hurtClock <= 0) {
+			if (distance(next, player) < next.size + playerHitRadius && hurtClock <= 0) {
 				tookHit = true;
-				hurtClock = 1;
-				addBurst(player.x, player.y, '-heart');
+				hurtClock = 1 + heartTier * 0.22;
+				if (shields > 0) {
+					shields -= 1;
+					shieldsUsed += 1;
+					blockedHit = true;
+					addBurst(player.x, player.y, 'shield');
+				} else {
+					addBurst(player.x, player.y, '-heart');
+				}
 				continue;
 			}
 			liveEnemies.push(next);
@@ -258,7 +323,7 @@
 
 		if (defeated > 0) kills += defeated;
 		if (tookHit) {
-			health -= 1;
+			if (!blockedHit) health -= 1;
 			if (health <= 0) finish('over');
 		}
 		enemies = liveEnemies;
@@ -332,7 +397,9 @@
 		scores={[
 			{ label: 'time', value: Math.ceil(remaining) },
 			{ label: 'hearts', value: health, live: true, tone: 'red' },
+			{ label: 'shield', value: shields, live: shields > 0, tone: 'green' },
 			{ label: 'score', value: kills },
+			{ label: 'best', value: Math.max(kills, best) },
 			{ label: 'prize', value: fmt(phase === 'complete' || phase === 'over' ? awarded : prizePreview) }
 		]}
 		{startLabel}
@@ -341,6 +408,10 @@
 	/>
 
 	<ArcadeProgress value={timeProgress} label="time remaining" />
+
+	<div class="perks-wrap">
+		<ArcadePetPerks creature={activePet} effects={statEffects} />
+	</div>
 
 	<svg
 		bind:this={fieldEl}
@@ -362,6 +433,14 @@
 		</defs>
 		<rect class="field-bg" width={WORLD_W} height={WORLD_H} rx="6" />
 		<rect width={WORLD_W} height={WORLD_H} fill="url(#heaven-grid)" opacity="0.62" />
+		{#if phase === 'running' && pointerGoal}
+			<circle class="pointer-goal" cx={pointerGoal.x} cy={pointerGoal.y} r="11" />
+		{/if}
+		{#if phase === 'running' && currentTarget && mindTier > 0}
+			{@const targetPoint = predictedTarget(currentTarget)}
+			<line class="target-line" x1={player.x} y1={player.y} x2={targetPoint.x} y2={targetPoint.y} />
+			<circle class="target-mark" cx={targetPoint.x} cy={targetPoint.y} r="7" />
+		{/if}
 
 		{#if phase === 'ready' || phase === 'complete' || phase === 'over'}
 			<text class="center-title" x={WORLD_W / 2} y={WORLD_H / 2 - 10} text-anchor="middle">
@@ -385,7 +464,7 @@
 		{/each}
 		{#if phase === 'running'}
 			<circle class="player-aura" cx={player.x} cy={player.y} r={hurtClock > 0 ? 23 : 18} />
-			<circle class="player" cx={player.x} cy={player.y} r={PLAYER_R} />
+			<circle class="player" cx={player.x} cy={player.y} r={playerHitRadius} />
 		{/if}
 	</svg>
 
@@ -424,6 +503,27 @@
 	}
 	.field.hit .field-bg {
 		fill: color-mix(in srgb, #fdf6e3 80%, var(--sol-red));
+	}
+	.perks-wrap {
+		width: min(540px, 100%);
+	}
+	.pointer-goal {
+		fill: none;
+		stroke: rgba(38, 139, 210, 0.5);
+		stroke-width: 1.5;
+		stroke-dasharray: 3 3;
+	}
+	.target-line {
+		stroke: rgba(108, 113, 196, 0.52);
+		stroke-width: 1.6;
+		stroke-dasharray: 5 5;
+		pointer-events: none;
+	}
+	.target-mark {
+		fill: none;
+		stroke: rgba(108, 113, 196, 0.72);
+		stroke-width: 2;
+		pointer-events: none;
 	}
 	.enemy {
 		fill: var(--sol-orange);

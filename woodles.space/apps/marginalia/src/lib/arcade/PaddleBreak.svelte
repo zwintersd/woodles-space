@@ -1,17 +1,24 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import ArcadeHud from './ArcadeHud.svelte';
+	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
-	import { clamp, type Dot } from './arcadeMath';
+	import { clamp, normalize, type Dot } from './arcadeMath';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { payReward, previewReward } from './arcadeRewards';
-	import type { ArcadeActivePet } from './arcadeStats';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
+	import {
+		coreStatValue,
+		statTier,
+		type ArcadeActivePet,
+		type ArcadeStatEffects
+	} from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
 		activePet?: ArcadeActivePet;
 	}
-	let { onclose }: Props = $props();
+	let { onclose, activePet = null }: Props = $props();
 
 	type Phase = 'ready' | 'running' | 'complete' | 'over';
 
@@ -37,6 +44,7 @@
 
 	const WORLD_W = 520;
 	const WORLD_H = 340;
+	const GAME_ID = 'paddle-break';
 	const PADDLE_W = 78;
 	const PADDLE_H = 12;
 	const PADDLE_Y = WORLD_H - 32;
@@ -57,11 +65,14 @@
 	let bursts = $state<Burst[]>([]);
 	let score = $state(0);
 	let combo = $state(0);
-	let best = $state(0);
+	let best = $state(loadArcadeRecord(GAME_ID).bestScore);
+	let maxCombo = $state(0);
 	let awarded = $state(0);
 	let rounds = $state(0);
 	let saves = $state(0);
 	let misses = $state(0);
+	let ballReserves = $state(0);
+	let reservesUsed = $state(0);
 	let raf = 0;
 	let lastTime = 0;
 	let burstSeq = 0;
@@ -69,6 +80,13 @@
 	let pointerDown = false;
 
 	const wallProgress = $derived((BRICK_COLS * BRICK_ROWS - bricks.length) / (BRICK_COLS * BRICK_ROWS));
+	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
+	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
+	const graceTier = $derived(statTier(coreStatValue(activePet, 'grace')));
+	const heartTier = $derived(statTier(coreStatValue(activePet, 'heart')));
+	const paddleWidth = $derived(PADDLE_W + bodyTier * 12);
+	const saveZone = $derived(BALL_R + graceTier * 5);
+	const english = $derived(170 + graceTier * 16);
 	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
 	const rewardPreview = $derived(rewardFor(score, saves, phase === 'complete'));
 	const outcomeLabel = $derived.by(() => {
@@ -82,6 +100,12 @@
 		if (phase === 'complete') return 'the wall came loose';
 		if (phase === 'over') return 'the ball slipped through the margin';
 		return 'keep the ball in play, break the wall';
+	});
+	const statEffects = $derived<ArcadeStatEffects>({
+		body: (_value, tier) => (tier > 0 ? `paddle +${tier * 12}px` : 'standard paddle'),
+		mind: (_value, tier) => (tier > 0 ? 'ball path preview' : 'no path preview'),
+		grace: (_value, tier) => (tier > 0 ? `save zone +${tier}` : 'strict edge'),
+		heart: (_value, tier) => (tier > 0 ? `${tier} reserve bounce${tier === 1 ? '' : 's'}` : 'one drop ends')
 	});
 
 	function freshBall(): Ball {
@@ -116,15 +140,18 @@
 	}
 
 	function reset() {
-		paddleX = WORLD_W / 2 - PADDLE_W / 2;
+		paddleX = WORLD_W / 2 - paddleWidth / 2;
 		ball = freshBall();
 		bricks = freshBricks();
 		bursts = [];
 		score = 0;
 		combo = 0;
+		maxCombo = 0;
 		awarded = 0;
 		saves = 0;
 		misses = 0;
+		ballReserves = heartTier;
+		reservesUsed = 0;
 	}
 
 	function start() {
@@ -145,7 +172,19 @@
 		phase = nextPhase;
 		stop();
 		rounds += 1;
-		best = Math.max(best, score);
+		const record = recordArcadeRun(GAME_ID, {
+			score,
+			summary: {
+				bricks: BRICK_COLS * BRICK_ROWS - bricks.length,
+				saves,
+				drops: misses,
+				combo: maxCombo,
+				cleared: nextPhase === 'complete',
+				reserves: reservesUsed,
+				awarded: rewardFor(score, saves, nextPhase === 'complete')
+			}
+		});
+		best = record.bestScore;
 		awarded = payReward(rewardFor(score, saves, nextPhase === 'complete'), MAX_REWARD);
 	}
 
@@ -167,7 +206,7 @@
 		if (keys.has('arrowleft') || keys.has('a')) dx -= 1;
 		if (keys.has('arrowright') || keys.has('d')) dx += 1;
 		if (dx === 0) return;
-		paddleX = clamp(paddleX + dx * 245 * dt, 0, WORLD_W - PADDLE_W);
+		paddleX = clamp(paddleX + dx * 245 * dt, 0, WORLD_W - paddleWidth);
 	}
 
 	function updateBall(dt: number) {
@@ -186,17 +225,17 @@
 			next.vy > 0 &&
 			next.y + BALL_R >= PADDLE_Y &&
 			next.y - BALL_R <= PADDLE_Y + PADDLE_H &&
-			next.x >= paddleX - BALL_R &&
-			next.x <= paddleX + PADDLE_W + BALL_R
+			next.x >= paddleX - saveZone &&
+			next.x <= paddleX + paddleWidth + saveZone
 		) {
-			const paddleCenter = paddleX + PADDLE_W / 2;
-			const hit = clamp((next.x - paddleCenter) / (PADDLE_W / 2), -1, 1);
+			const paddleCenter = paddleX + paddleWidth / 2;
+			const hit = clamp((next.x - paddleCenter) / (paddleWidth / 2 + graceTier * 4), -1, 1);
 			const speed = Math.min(310, Math.hypot(next.vx, next.vy) + 6);
 			next = {
 				...next,
 				y: PADDLE_Y - BALL_R - 0.5,
-				vx: hit * 170,
-				vy: -Math.sqrt(Math.max(90 * 90, speed * speed - (hit * 170) ** 2))
+				vx: hit * english,
+				vy: -Math.sqrt(Math.max(90 * 90, speed * speed - (hit * english) ** 2))
 			};
 			saves += 1;
 			combo = 0;
@@ -211,6 +250,7 @@
 			bricks = nextBricks;
 			score += gained;
 			combo += 1;
+			maxCombo = Math.max(maxCombo, combo);
 			addBurst(brick.x + brick.w / 2, brick.y + brick.h / 2, `+${gained}`);
 
 			const previousX = ball.x;
@@ -226,6 +266,21 @@
 
 		if (next.y > WORLD_H + BALL_R) {
 			misses += 1;
+			if (ballReserves > 0) {
+				ballReserves -= 1;
+				reservesUsed += 1;
+				next = {
+					...next,
+					y: WORLD_H - BALL_R - 1,
+					vx: clamp(next.vx, -220, 220),
+					vy: -Math.abs(next.vy) * 0.92
+				};
+				combo = 0;
+				saves += 1;
+				addBurst(next.x, WORLD_H - 18, 'reserve');
+				ball = next;
+				return;
+			}
 			finish('over');
 			return;
 		}
@@ -253,7 +308,7 @@
 		if (phase !== 'running') return;
 		const rect = fieldEl.getBoundingClientRect();
 		const x = ((event.clientX - rect.left) / rect.width) * WORLD_W;
-		paddleX = clamp(x - PADDLE_W / 2, 0, WORLD_W - PADDLE_W);
+		paddleX = clamp(x - paddleWidth / 2, 0, WORLD_W - paddleWidth);
 	}
 
 	function onPointerDown(event: PointerEvent) {
@@ -273,7 +328,16 @@
 
 	function press(direction: -1 | 1) {
 		if (phase !== 'running') start();
-		paddleX = clamp(paddleX + direction * 28, 0, WORLD_W - PADDLE_W);
+		paddleX = clamp(paddleX + direction * 28, 0, WORLD_W - paddleWidth);
+	}
+
+	function pathEnd(): Dot {
+		const dir = normalize(ball.vx, ball.vy);
+		const length = 70 + mindTier * 36;
+		return {
+			x: clamp(ball.x + dir.x * length, BALL_R, WORLD_W - BALL_R),
+			y: clamp(ball.y + dir.y * length, BALL_R, WORLD_H - BALL_R)
+		};
 	}
 
 	function onKeyDown(event: KeyboardEvent) {
@@ -313,7 +377,9 @@
 		scores={[
 			{ label: 'score', value: score },
 			{ label: 'combo', value: combo, live: true, tone: 'yellow' },
+			{ label: 'reserve', value: ballReserves, live: ballReserves > 0, tone: 'green' },
 			{ label: 'wall', value: BRICK_COLS * BRICK_ROWS - bricks.length },
+			{ label: 'best', value: Math.max(score, best) },
 			{ label: 'prize', value: fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview) }
 		]}
 		{startLabel}
@@ -322,6 +388,10 @@
 	/>
 
 	<ArcadeProgress value={wallProgress} label="wall cleared" tone="violet" />
+
+	<div class="perks-wrap">
+		<ArcadePetPerks creature={activePet} effects={statEffects} />
+	</div>
 
 	<svg
 		bind:this={fieldEl}
@@ -343,6 +413,10 @@
 		<rect class="field-bg" width={WORLD_W} height={WORLD_H} rx="6" />
 		<rect width={WORLD_W} height={WORLD_H} fill="url(#paddle-grid)" opacity="0.62" />
 		<line class="danger-line" x1="0" y1={WORLD_H - 10} x2={WORLD_W} y2={WORLD_H - 10} />
+		{#if phase === 'running' && mindTier > 0}
+			{@const end = pathEnd()}
+			<line class="path-preview" x1={ball.x} y1={ball.y} x2={end.x} y2={end.y} />
+		{/if}
 
 		{#each bricks as brick (brick.id)}
 			<rect
@@ -355,8 +429,9 @@
 			/>
 		{/each}
 
-		<rect class="paddle-shadow" x={paddleX - 6} y={PADDLE_Y + 8} width={PADDLE_W + 12} height="7" rx="3.5" />
-		<rect class="paddle" x={paddleX} y={PADDLE_Y} width={PADDLE_W} height={PADDLE_H} rx="6" />
+		<rect class="paddle-shadow" x={paddleX - 6} y={PADDLE_Y + 8} width={paddleWidth + 12} height="7" rx="3.5" />
+		<rect class="save-zone" x={paddleX - saveZone} y={PADDLE_Y - 3} width={paddleWidth + saveZone * 2} height={PADDLE_H + 6} rx="9" />
+		<rect class="paddle" x={paddleX} y={PADDLE_Y} width={paddleWidth} height={PADDLE_H} rx="6" />
 		<circle class="ball-aura" cx={ball.x} cy={ball.y} r="15" />
 		<circle class="ball" cx={ball.x} cy={ball.y} r={BALL_R} />
 
@@ -426,10 +501,19 @@
 	.field-bg {
 		fill: #fdf6e3;
 	}
+	.perks-wrap {
+		width: min(540px, 100%);
+	}
 	.danger-line {
 		stroke: rgba(220, 50, 47, 0.32);
 		stroke-width: 2;
 		stroke-dasharray: 7 6;
+	}
+	.path-preview {
+		stroke: rgba(108, 113, 196, 0.55);
+		stroke-width: 2;
+		stroke-dasharray: 5 5;
+		pointer-events: none;
 	}
 	.brick {
 		stroke: rgba(253, 246, 227, 0.86);
@@ -452,6 +536,12 @@
 	}
 	.paddle-shadow {
 		fill: rgba(7, 54, 66, 0.12);
+	}
+	.save-zone {
+		fill: rgba(42, 161, 152, 0.1);
+		stroke: rgba(42, 161, 152, 0.2);
+		stroke-width: 1;
+		pointer-events: none;
 	}
 	.paddle {
 		fill: var(--sol-base00);

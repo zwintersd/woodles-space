@@ -1,18 +1,24 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import ArcadeHud from './ArcadeHud.svelte';
+	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { conditions } from '$lib/witch/content/conditions';
 	import { payReward, previewReward as previewArcadeReward } from './arcadeRewards';
 	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
-	import type { ArcadeActivePet } from './arcadeStats';
+	import {
+		coreStatValue,
+		statTier,
+		type ArcadeActivePet,
+		type ArcadeStatEffects
+	} from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
 		activePet?: ArcadeActivePet;
 	}
-	let { onclose }: Props = $props();
+	let { onclose, activePet = null }: Props = $props();
 
 	type Phase = 'ready' | 'running' | 'complete';
 
@@ -35,6 +41,12 @@
 	let errors = $state(0);
 	let awarded = $state(0);
 	let rounds = $state(0);
+	let combo = $state(0);
+	let bestCombo = $state(0);
+	let phraseForgivenessLeft = $state(0);
+	let comboShields = $state(0);
+	let preservedCombos = $state(0);
+	let forgivenTypos = $state(0);
 
 	let timer: ReturnType<typeof setInterval> | null = null;
 	let inputEl = $state<HTMLInputElement | null>(null);
@@ -55,6 +67,23 @@
 	let pool = phrases.slice();
 
 	const currentPhrase = $derived(pool[currentPhraseIdx % pool.length]);
+	const nextPhrase = $derived(pool[(currentPhraseIdx + 1) % pool.length]);
+	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
+	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
+	const graceTier = $derived(statTier(coreStatValue(activePet, 'grace')));
+	const heartTier = $derived(statTier(coreStatValue(activePet, 'heart')));
+	const effectivePhraseSeconds = $derived(PHRASE_SECONDS + bodyTier);
+	const nextPhrasePreview = $derived.by(() => {
+		if (mindTier === 0 || phase !== 'running') return '';
+		const limit = mindTier === 1 ? 16 : mindTier === 2 ? 28 : nextPhrase.length;
+		return nextPhrase.length > limit ? `${nextPhrase.slice(0, limit)}...` : nextPhrase;
+	});
+	const statEffects = $derived<ArcadeStatEffects>({
+		body: (_value, tier) => (tier > 0 ? `+${tier}s phrase time` : 'normal phrase time'),
+		mind: (_value, tier) => (tier > 0 ? 'next phrase preview' : 'no preview'),
+		grace: (_value, tier) => (tier > 0 ? `${tier} typo grace` : 'strict typos'),
+		heart: (_value, tier) => (tier > 0 ? `${tier} combo shield` : 'combo drops')
+	});
 
 	// per-character match state
 	const charStates = $derived.by((): Array<'pending' | 'correct' | 'error'> => {
@@ -66,7 +95,9 @@
 	});
 
 	const timeProgress = $derived(Math.max(0, remaining / ROUND_SECONDS));
-	const phraseTimeStyle = $derived(`--ptime:${Math.max(0, phraseRemaining / PHRASE_SECONDS).toFixed(4)}`);
+	const phraseTimeStyle = $derived(
+		`--ptime:${Math.max(0, phraseRemaining / effectivePhraseSeconds).toFixed(4)}`
+	);
 
 	const accuracy = $derived.by(() => {
 		const total = score + errors;
@@ -93,8 +124,14 @@
 		score = 0;
 		errors = 0;
 		awarded = 0;
+		combo = 0;
+		bestCombo = 0;
+		phraseForgivenessLeft = graceTier;
+		comboShields = heartTier;
+		preservedCombos = 0;
+		forgivenTypos = 0;
 		endsAt = Date.now() + ROUND_SECONDS * 1000;
-		phraseEndsAt = Date.now() + PHRASE_SECONDS * 1000;
+		phraseEndsAt = Date.now() + effectivePhraseSeconds * 1000;
 		timer = setInterval(tick, 80);
 		requestAnimationFrame(() => inputEl?.focus());
 	}
@@ -128,6 +165,9 @@
 				chars: score,
 				errors,
 				accuracy: Math.round(accuracy * 100),
+				combo: bestCombo,
+				forgivenTypos,
+				preservedCombos,
 				awarded
 			}
 		});
@@ -137,11 +177,19 @@
 	function advancePhrase(succeeded: boolean) {
 		if (succeeded) {
 			completed += 1;
+			combo += 1;
+			bestCombo = Math.max(bestCombo, combo);
+		} else if (combo > 0 && comboShields > 0) {
+			comboShields -= 1;
+			preservedCombos += 1;
+		} else {
+			combo = 0;
 		}
 		typed = '';
 		currentPhraseIdx += 1;
-		phraseEndsAt = Date.now() + PHRASE_SECONDS * 1000;
-		phraseRemaining = PHRASE_SECONDS;
+		phraseForgivenessLeft = graceTier;
+		phraseEndsAt = Date.now() + effectivePhraseSeconds * 1000;
+		phraseRemaining = effectivePhraseSeconds;
 		requestAnimationFrame(() => inputEl?.focus());
 	}
 
@@ -153,8 +201,14 @@
 
 		// count new errors on each keystroke
 		for (let i = typed.length; i < val.length; i++) {
-			if (val[i] !== phrase[i]) errors += 1;
-			else score += 1;
+			if (val[i] !== phrase[i]) {
+				if (phraseForgivenessLeft > 0) {
+					phraseForgivenessLeft -= 1;
+					forgivenTypos += 1;
+				} else {
+					errors += 1;
+				}
+			} else score += 1;
 		}
 
 		typed = val;
@@ -188,6 +242,7 @@
 		scores={[
 			{ label: 'done', value: completed },
 			{ label: 'best', value: Math.max(completed, bestCompleted) },
+			{ label: 'combo', value: combo, live: combo > 0, tone: 'yellow' },
 			{ label: 'chars', value: score, live: true, tone: 'cyan' },
 			{ label: 'errors', value: errors },
 			{ label: 'prize', value: fmt(phase === 'complete' ? awarded : previewReward) }
@@ -198,6 +253,10 @@
 	/>
 
 	<ArcadeProgress value={timeProgress} label="round time remaining" tone="yellow" maxWidth="580px" />
+
+	<div class="perks-wrap">
+		<ArcadePetPerks creature={activePet} effects={statEffects} />
+	</div>
 
 	<div class="witch-field" class:idle={phase !== 'running'}>
 		{#if phase === 'ready'}
@@ -222,6 +281,9 @@
 					<span></span>
 				</div>
 				<p class="prompt-label">transcribe:</p>
+				{#if nextPhrasePreview}
+					<p class="next-preview">next: {nextPhrasePreview}</p>
+				{/if}
 				<p class="phrase-display" aria-live="polite">
 					{#each (currentPhrase ?? '').split('') as ch, i (i)}
 						<span
@@ -249,6 +311,8 @@
 				<div class="stats-row">
 					<span class="stat">{Math.ceil(remaining)}s left</span>
 					<span class="stat accent">{completed} done</span>
+					<span class="stat">{phraseForgivenessLeft} grace</span>
+					<span class="stat">{comboShields} shield</span>
 					<span class="stat">{Math.round(accuracy * 100)}% true</span>
 				</div>
 			</div>
@@ -256,7 +320,7 @@
 	</div>
 
 	<p class="witch-note">
-		{PHRASE_SECONDS}s per phrase. Complete as many as you can in {ROUND_SECONDS}s. Rewards cap at {MAX_REWARD} insight.
+		Each phrase dissolves on its own timer. Complete as many as you can in {ROUND_SECONDS}s. Rewards cap at {MAX_REWARD} insight.
 	</p>
 </div>
 
@@ -283,6 +347,9 @@
 		display: grid;
 		place-items: center;
 		min-height: 14rem;
+	}
+	.perks-wrap {
+		width: min(580px, 100%);
 	}
 	.field-message {
 		display: grid;
@@ -334,6 +401,18 @@
 		text-transform: uppercase;
 		color: var(--sol-base1);
 		margin: 0;
+	}
+	.next-preview {
+		font-family: var(--font-ui);
+		font-size: 0.62rem;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--sol-violet);
+		background: rgba(108, 113, 196, 0.1);
+		border: 1px solid rgba(108, 113, 196, 0.2);
+		border-radius: 3px;
+		padding: 0.3rem 0.5rem;
+		margin: -0.1rem 0 0;
 	}
 
 	.phrase-display {

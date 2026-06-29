@@ -1,17 +1,24 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import ArcadeHud from './ArcadeHud.svelte';
+	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { clamp, distance, type Dot } from './arcadeMath';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { payReward, previewReward } from './arcadeRewards';
-	import type { ArcadeActivePet } from './arcadeStats';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
+	import {
+		coreStatValue,
+		statTier,
+		type ArcadeActivePet,
+		type ArcadeStatEffects
+	} from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
 		activePet?: ArcadeActivePet;
 	}
-	let { onclose }: Props = $props();
+	let { onclose, activePet = null }: Props = $props();
 
 	type Phase = 'ready' | 'running' | 'complete' | 'over';
 	type Direction = 'left' | 'right' | 'up' | 'down';
@@ -52,6 +59,7 @@
 
 	const WORLD_W = 540;
 	const WORLD_H = 340;
+	const GAME_ID = 'get-big';
 	const START_RADIUS = 12;
 	const MASSIVE_RADIUS = 34;
 	const MAX_PLAYER_RADIUS = 40;
@@ -100,17 +108,24 @@
 	let bursts = $state<Burst[]>([]);
 	let score = $state(0);
 	let eaten = $state(0);
-	let best = $state(0);
+	let best = $state(loadArcadeRecord(GAME_ID).bestScore);
 	let awarded = $state(0);
 	let rounds = $state(0);
 	let elapsed = $state(0);
 	let lastSnack = $state<BlobTone | null>(null);
+	let bumpSaves = $state(0);
+	let bumpSavesUsed = $state(0);
 	let raf = 0;
 	let lastTime = 0;
 	let spawnClock = 0;
 	let enemySeq = 0;
 	let burstSeq = 0;
 
+	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
+	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
+	const graceTier = $derived(statTier(coreStatValue(activePet, 'grace')));
+	const heartTier = $derived(statTier(coreStatValue(activePet, 'heart')));
+	const startRadius = $derived(START_RADIUS + bodyTier * 1.4);
 	const growthProgress = $derived(clamp((playerRadius - START_RADIUS) / (MASSIVE_RADIUS - START_RADIUS), 0, 1));
 	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
 	const speedLabel = $derived(Math.round(playerSpeed()));
@@ -127,6 +142,12 @@
 		if (phase === 'over') return 'strictly bigger means strictly bigger';
 		if (phase === 'running') return canEatYellow() ? 'yellow is food now' : 'eat smaller, avoid bigger';
 		return 'ice feet, wrap walls, strict appetite';
+	});
+	const statEffects = $derived<ArcadeStatEffects>({
+		body: (_value, tier) => (tier > 0 ? `start size +${(tier * 1.4).toFixed(1)}` : 'standard start'),
+		mind: (_value, tier) => (tier > 0 ? 'edge warnings + outlines' : 'normal outlines'),
+		grace: (_value, tier) => (tier > 0 ? `brake/turn +${tier}` : 'ice feet'),
+		heart: (_value, tier) => (tier > 0 ? `${tier} bump save${tier === 1 ? '' : 's'}` : 'strict bump')
 	});
 
 	function rewardFor(points: number, radius: number, won: boolean): number {
@@ -192,7 +213,7 @@
 	function reset() {
 		player = { x: WORLD_W / 2, y: WORLD_H / 2 };
 		velocity = { x: 0, y: 0 };
-		playerRadius = START_RADIUS;
+		playerRadius = startRadius;
 		facing = 'right';
 		padDirection = null;
 		enemies = [];
@@ -202,6 +223,8 @@
 		awarded = 0;
 		elapsed = 0;
 		lastSnack = null;
+		bumpSaves = heartTier;
+		bumpSavesUsed = 0;
 		spawnClock = 0.18;
 	}
 
@@ -223,7 +246,18 @@
 		phase = nextPhase;
 		stop();
 		rounds += 1;
-		best = Math.max(best, score);
+		const record = recordArcadeRun(GAME_ID, {
+			score,
+			summary: {
+				eaten,
+				size: Number(playerRadius.toFixed(1)),
+				seconds: Math.round(elapsed),
+				won: nextPhase === 'complete',
+				bumpSaves: bumpSavesUsed,
+				awarded: rewardFor(score, playerRadius, nextPhase === 'complete')
+			}
+		});
+		best = record.bestScore;
 		awarded = payReward(rewardFor(score, playerRadius, nextPhase === 'complete'), MAX_REWARD);
 	}
 
@@ -251,15 +285,15 @@
 		if (direction) {
 			const intent = DIRECTIONS[direction];
 			facing = direction;
-			const acceleration = speed * 5.4;
+			const acceleration = speed * (5.4 + graceTier * 0.55);
 			vx += intent.x * acceleration * dt;
 			vy += intent.y * acceleration * dt;
-			const driftBrake = Math.pow(0.2, dt);
+			const driftBrake = Math.pow(0.2 - graceTier * 0.035, dt);
 			if (intent.x !== 0) vy *= driftBrake;
 			if (intent.y !== 0) vx *= driftBrake;
 		}
 
-		const friction = Math.pow(direction ? 0.5 : 0.07, dt);
+		const friction = Math.pow(direction ? 0.5 - graceTier * 0.035 : 0.07 - graceTier * 0.01, dt);
 		vx *= friction;
 		vy *= friction;
 
@@ -384,6 +418,14 @@
 		}
 
 		if (doomed) {
+			if (lethal && bumpSaves > 0) {
+				bumpSaves -= 1;
+				bumpSavesUsed += 1;
+				playerRadius = Math.max(START_RADIUS, playerRadius - Math.max(2, lethal.radius * 0.16));
+				enemies = moved.filter((enemy) => enemy.id !== lethal?.id);
+				addBurst(player.x, player.y, 'heart save', 'ink');
+				return;
+			}
 			if (lethal) addBurst(player.x, player.y, `${lethal.radius.toFixed(0)} > ${radiusAtImpact.toFixed(0)}`, 'ink');
 			enemies = moved;
 			finish('over');
@@ -445,7 +487,19 @@
 
 	function enemyClass(enemy: Enemy): string {
 		const danger = playerRadius > enemy.radius ? ' edible' : ' danger';
-		return `enemy enemy-${enemy.tone}${danger}`;
+		const readable = mindTier > 0 ? ' stat-read' : '';
+		return `enemy enemy-${enemy.tone}${danger}${readable}`;
+	}
+
+	function incomingPreview(enemy: Enemy): Dot | null {
+		if (mindTier === 0) return null;
+		const offX = enemy.x < 0 || enemy.x > WORLD_W;
+		const offY = enemy.y < 0 || enemy.y > WORLD_H;
+		if (!offX && !offY) return null;
+		return {
+			x: clamp(enemy.x, 12, WORLD_W - 12),
+			y: clamp(enemy.y, 12, WORLD_H - 12)
+		};
 	}
 
 	function setPadDirection(direction: Direction | null) {
@@ -494,6 +548,8 @@
 			{ label: 'score', value: score },
 			{ label: 'size', value: sizeLabel, live: true, tone: 'green' },
 			{ label: 'speed', value: speedLabel },
+			{ label: 'save', value: bumpSaves, live: bumpSaves > 0, tone: 'violet' },
+			{ label: 'best', value: Math.max(score, best) },
 			{ label: 'prize', value: fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview) }
 		]}
 		{startLabel}
@@ -502,6 +558,10 @@
 	/>
 
 	<ArcadeProgress value={growthProgress} label="jelly appetite" tone="green" maxWidth="560px" />
+
+	<div class="perks-wrap">
+		<ArcadePetPerks creature={activePet} effects={statEffects} />
+	</div>
 
 	<svg
 		class="field"
@@ -527,6 +587,10 @@
 		<rect width={WORLD_W} height={WORLD_H} fill="url(#big-grid)" opacity="0.58" />
 
 		{#each enemies as enemy (enemy.id)}
+			{@const preview = incomingPreview(enemy)}
+			{#if preview}
+				<circle class="incoming-ring" cx={preview.x} cy={preview.y} r={Math.max(7, enemy.radius * 0.5)} />
+			{/if}
 			<circle class="enemy-shadow" cx={enemy.x} cy={enemy.y + enemy.radius * 0.34} r={enemy.radius * 0.92} />
 			<circle class={enemyClass(enemy)} cx={enemy.x} cy={enemy.y} r={enemy.radius} />
 			<circle class="enemy-shine" cx={enemy.x - enemy.radius * 0.32} cy={enemy.y - enemy.radius * 0.38} r={enemy.radius * 0.24} />
@@ -589,6 +653,7 @@
 	<div class="pad-row" aria-label="direction controls">
 		<button
 			aria-label="move up"
+			class:pressed={padDirection === 'up'}
 			onpointerdown={() => setPadDirection('up')}
 			onpointerup={() => setPadDirection(null)}
 			onpointercancel={() => setPadDirection(null)}
@@ -598,6 +663,7 @@
 		</button>
 		<button
 			aria-label="move left"
+			class:pressed={padDirection === 'left'}
 			onpointerdown={() => setPadDirection('left')}
 			onpointerup={() => setPadDirection(null)}
 			onpointercancel={() => setPadDirection(null)}
@@ -607,6 +673,7 @@
 		</button>
 		<button
 			aria-label="move right"
+			class:pressed={padDirection === 'right'}
 			onpointerdown={() => setPadDirection('right')}
 			onpointerup={() => setPadDirection(null)}
 			onpointercancel={() => setPadDirection(null)}
@@ -616,6 +683,7 @@
 		</button>
 		<button
 			aria-label="move down"
+			class:pressed={padDirection === 'down'}
 			onpointerdown={() => setPadDirection('down')}
 			onpointerup={() => setPadDirection(null)}
 			onpointercancel={() => setPadDirection(null)}
@@ -679,6 +747,21 @@
 	}
 	.enemy.danger {
 		stroke: rgba(7, 54, 66, 0.5);
+	}
+	.enemy.stat-read.edible {
+		stroke: rgba(42, 161, 152, 0.92);
+		stroke-dasharray: 4 3;
+	}
+	.enemy.stat-read.danger {
+		stroke: rgba(220, 50, 47, 0.72);
+		stroke-dasharray: 2 4;
+	}
+	.incoming-ring {
+		fill: none;
+		stroke: rgba(108, 113, 196, 0.6);
+		stroke-width: 2;
+		stroke-dasharray: 3 4;
+		pointer-events: none;
 	}
 	.enemy-cyan {
 		fill: var(--sol-cyan);
@@ -817,6 +900,15 @@
 	.pad-row button:hover {
 		background: var(--sol-cyan);
 		color: var(--sol-base3);
+	}
+	.pad-row button:active,
+	.pad-row button.pressed {
+		background: var(--sol-violet);
+		color: var(--sol-base3);
+		transform: translateY(1px);
+	}
+	.perks-wrap {
+		width: min(560px, 100%);
 	}
 	@media (max-width: 560px) {
 		.center-title {

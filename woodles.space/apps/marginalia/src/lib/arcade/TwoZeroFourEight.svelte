@@ -177,6 +177,19 @@
 	const turnDisplay = $derived(turnLimit === null ? `${turns}` : `${turns}/${turnLimit}`);
 	const turnsLeft = $derived(turnLimit === null ? null : Math.max(turnLimit - turns, 0));
 	const canPlay = $derived(!over && !(won && !keepPlaying));
+	const supportBonusLabel = $derived.by(() => {
+		const parts: string[] = [];
+		const willTier = statTier(supportStatValue('will'));
+		const sparkTier = statTier(supportStatValue('spark'));
+		if (mode === 'turn-100' && willTier > 0) {
+			const extraTurns = willTier * 10;
+			parts.push(`will quietly adds ${extraTurns} turn${extraTurns === 1 ? '' : 's'}`);
+		}
+		if (sparkTier > 0) {
+			parts.push(`spark adds ${sparkTier} wild charge${sparkTier === 1 ? '' : 's'}`);
+		}
+		return parts.join(' · ');
+	});
 	const statEffects = $derived<ArcadeStatEffects>({
 		body: () => (openingTileValue() ? `opens with ${openingTileValue()}` : 'no opening tile'),
 		mind: (_value, tier) => `${tier} undo`,
@@ -435,8 +448,8 @@
 
 	<section class="power-panel" aria-label="pet power-ups">
 		<div class="power-head">
-			<span>pet powers</span>
-			<span>spark wild: {sparkReserve}</span>
+			<span>core pet powers</span>
+			<span>wild charges: {sparkReserve}</span>
 		</div>
 		<div class="power-grid">
 			<button
@@ -468,7 +481,10 @@
 		{:else if mode === 'turn-100' && turnsLeft !== null}
 			<p class="target-note">{turnsLeft} turns remaining</p>
 		{:else}
-			<p class="target-note">pet stats shape the opening, powers, and turn budget</p>
+			<p class="target-note">Body, Mind, Grace, and Heart shape this board</p>
+		{/if}
+		{#if supportBonusLabel}
+			<p class="support-note">{supportBonusLabel}</p>
 		{/if}
 		<ArcadePetPerks creature={activePet} effects={statEffects} />
 	</section>
@@ -735,6 +751,15 @@
 		text-align: center;
 		color: var(--sol-base0);
 		margin: -0.05rem 0 0;
+	}
+	.support-note {
+		font-family: var(--font-ui);
+		font-size: 0.56rem;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		text-align: center;
+		color: var(--sol-base1);
+		margin: -0.2rem 0 0;
 	}
 	/* ── board ──────────────────────────────────────────────────────────── */
 	.board-wrap {

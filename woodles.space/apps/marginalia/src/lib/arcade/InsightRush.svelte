@@ -1,17 +1,28 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import ArcadeHud from './ArcadeHud.svelte';
+	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { payReward, previewReward as previewArcadeReward } from './arcadeRewards';
 	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
-	import type { ArcadeActivePet } from './arcadeStats';
+	import {
+		clamp,
+		distance,
+		type Dot
+	} from './arcadeMath';
+	import {
+		coreStatValue,
+		statTier,
+		type ArcadeActivePet,
+		type ArcadeStatEffects
+	} from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
 		activePet?: ArcadeActivePet;
 	}
-	let { onclose }: Props = $props();
+	let { onclose, activePet = null }: Props = $props();
 
 	type Phase = 'ready' | 'running' | 'complete';
 
@@ -46,6 +57,12 @@
 	let awarded = $state(0);
 	let rounds = $state(0);
 	let lastPaceMs = $state(0);
+	let graceSaves = $state(0);
+	let heartShield = $state(0);
+	let shieldCharge = $state(0);
+	let savesUsed = $state(0);
+	let keyboardX = $state(50);
+	let keyboardY = $state(50);
 	let sparkSeq = 0;
 	let popSeq = 0;
 	let target = $state<Spark>(newSpark());
@@ -58,9 +75,16 @@
 
 	const timeProgress = $derived(Math.max(0, remaining / ROUND_SECONDS));
 	const accuracy = $derived(hits + misses === 0 ? 1 : hits / (hits + misses));
+	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
+	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
+	const graceTier = $derived(statTier(coreStatValue(activePet, 'grace')));
+	const heartTier = $derived(statTier(coreStatValue(activePet, 'heart')));
 	const focusLevel = $derived(Math.min(5, Math.floor(streak / 4)));
 	const flow = $derived(Math.min(1, (focusLevel / 5) * 0.62 + accuracy * 0.38));
-	const fieldStyle = $derived(`--flow:${flow.toFixed(3)};--focus:${focusLevel}`);
+	const keyboardCatchRadius = $derived(7 + bodyTier * 1.5 + graceTier);
+	const fieldStyle = $derived(
+		`--flow:${flow.toFixed(3)};--focus:${focusLevel};--kx:${keyboardX.toFixed(2)}%;--ky:${keyboardY.toFixed(2)}%;--kr:${keyboardCatchRadius.toFixed(2)}%`
+	);
 	const previewReward = $derived(rewardFor(score, bestStreak, misses));
 	const rhythmLabel = $derived.by(() => {
 		if (phase === 'ready') return rounds > 0 ? 'again' : 'ready';
@@ -71,6 +95,13 @@
 		return 'searching';
 	});
 	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
+	const shieldLabel = $derived(heartShield > 0 ? 'ready' : heartTier > 0 ? `${shieldCharge}/${Math.max(3, 6 - heartTier)}` : 'none');
+	const statEffects = $derived<ArcadeStatEffects>({
+		body: (_value, tier) => (tier > 0 ? `larger target +${tier}` : 'normal target'),
+		mind: (_value, tier) => (tier > 0 ? 'fewer early echoes' : 'full echoes'),
+		grace: (_value, tier) => (tier > 0 ? `${tier} stumble save` : 'hard miss reset'),
+		heart: (_value, tier) => (tier > 0 ? 'recharging shield' : 'no shield')
+	});
 
 	function newSpark(): Spark {
 		return {
@@ -83,11 +114,12 @@
 		};
 	}
 
-	function sparkStyle(spark: Spark): string {
+	function sparkStyle(spark: Spark, isTarget = false): string {
+		const size = isTarget ? spark.size + bodyTier * 0.3 : spark.size;
 		return [
 			`--x:${spark.x.toFixed(2)}%`,
 			`--y:${spark.y.toFixed(2)}%`,
-			`--spark-size:${spark.size.toFixed(2)}rem`,
+			`--spark-size:${size.toFixed(2)}rem`,
 			`--spin:${spark.spin.toFixed(2)}deg`,
 			`--tilt:${spark.tilt.toFixed(3)}`
 		].join(';');
@@ -95,7 +127,9 @@
 
 	function placeSparks() {
 		target = newSpark();
-		const echoCount = streak >= 14 ? 4 : streak >= 7 ? 3 : 2;
+		const baseEchoCount = streak >= 14 ? 4 : streak >= 7 ? 3 : 2;
+		const mindReduction = mindTier > 0 && streak < 14 ? 1 : 0;
+		const echoCount = Math.max(1, baseEchoCount - mindReduction);
 		echoes = Array.from({ length: echoCount }, () => newSpark());
 	}
 
@@ -119,6 +153,12 @@
 		misses = 0;
 		awarded = 0;
 		lastPaceMs = 0;
+		graceSaves = graceTier;
+		heartShield = heartTier > 0 ? 1 : 0;
+		shieldCharge = 0;
+		savesUsed = 0;
+		keyboardX = 50;
+		keyboardY = 50;
 		pops = [];
 		endsAt = Date.now() + ROUND_SECONDS * 1000;
 		lastHitAt = 0;
@@ -150,6 +190,7 @@
 				hits,
 				misses,
 				accuracy: Math.round(accuracy * 100),
+				saves: savesUsed,
 				awarded
 			}
 		});
@@ -165,8 +206,8 @@
 		popTimers.push(popTimer);
 	}
 
-	function hit(event: MouseEvent) {
-		event.stopPropagation();
+	function hit(event?: MouseEvent) {
+		event?.stopPropagation();
 		if (phase !== 'running') return;
 		const now = Date.now();
 		if (lastHitAt > 0) lastPaceMs = now - lastHitAt;
@@ -176,7 +217,43 @@
 		bestStreak = Math.max(bestStreak, streak);
 		const gained = 1 + Math.min(5, Math.floor(streak / 4));
 		score += gained;
+		if (heartTier > 0 && heartShield === 0) {
+			const chargeGoal = Math.max(3, 6 - heartTier);
+			shieldCharge += 1;
+			if (shieldCharge >= chargeGoal) {
+				heartShield = 1;
+				shieldCharge = 0;
+			}
+		}
 		addPop(target.x, target.y, `+${gained}`, 'hit');
+		placeSparks();
+	}
+
+	function missAt(x: number, y: number) {
+		if (heartShield > 0) {
+			heartShield = 0;
+			shieldCharge = 0;
+			savesUsed += 1;
+			misses += 1;
+			streak = Math.max(0, streak - 1);
+			addPop(x, y, 'shield', 'miss');
+			placeSparks();
+			return;
+		}
+		if (graceSaves > 0 && streak >= 4) {
+			graceSaves -= 1;
+			savesUsed += 1;
+			misses += 1;
+			streak = Math.max(0, streak - 2);
+			score = Math.max(0, score - 1);
+			addPop(x, y, 'stumble', 'miss');
+			placeSparks();
+			return;
+		}
+		misses += 1;
+		streak = 0;
+		score = Math.max(0, score - 1);
+		addPop(x, y, 'false', 'miss');
 		placeSparks();
 	}
 
@@ -186,19 +263,51 @@
 		const spark = event?.currentTarget as HTMLElement | null;
 		const x = Number(spark?.style.getPropertyValue('--x').replace('%', '')) || target.x;
 		const y = Number(spark?.style.getPropertyValue('--y').replace('%', '')) || target.y;
-		misses += 1;
-		streak = 0;
-		score = Math.max(0, score - 1);
-		addPop(x, y, 'false', 'miss');
-		placeSparks();
+		missAt(x, y);
+	}
+
+	function keyboardPoint(): Dot {
+		return { x: keyboardX, y: keyboardY };
+	}
+
+	function targetPoint(): Dot {
+		return { x: target.x, y: target.y };
+	}
+
+	function handleKeydown(event: KeyboardEvent) {
+		if (phase !== 'running') return;
+		const key = event.key.toLowerCase();
+		const step = 4 + graceTier;
+		if (key === 'arrowleft' || key === 'a') {
+			event.preventDefault();
+			keyboardX = clamp(keyboardX - step, 4, 96);
+		} else if (key === 'arrowright' || key === 'd') {
+			event.preventDefault();
+			keyboardX = clamp(keyboardX + step, 4, 96);
+		} else if (key === 'arrowup' || key === 'w') {
+			event.preventDefault();
+			keyboardY = clamp(keyboardY - step, 4, 96);
+		} else if (key === 'arrowdown' || key === 's') {
+			event.preventDefault();
+			keyboardY = clamp(keyboardY + step, 4, 96);
+		} else if (key === ' ' || key === 'enter') {
+			event.preventDefault();
+			if (distance(keyboardPoint(), targetPoint()) <= keyboardCatchRadius) {
+				hit();
+			} else {
+				missAt(keyboardX, keyboardY);
+			}
+		}
 	}
 
 	onMount(() => {
 		bestRecordedStreak = loadArcadeRecord('insight-rush').bestScore;
+		window.addEventListener('keydown', handleKeydown);
 	});
 
 	onDestroy(() => {
 		stopTimer();
+		window.removeEventListener('keydown', handleKeydown);
 		for (const popTimer of popTimers) clearTimeout(popTimer);
 	});
 </script>
@@ -212,6 +321,7 @@
 			{ label: 'score', value: score },
 			{ label: 'now', value: streak, live: true, tone: 'yellow' },
 			{ label: 'best', value: Math.max(bestStreak, bestRecordedStreak) },
+			{ label: 'saves', value: graceSaves + heartShield, live: graceSaves + heartShield > 0, tone: 'green' },
 			{ label: 'prize', value: fmt(phase === 'complete' ? awarded : previewReward) }
 		]}
 		{startLabel}
@@ -227,9 +337,14 @@
 			{/each}
 		</div>
 		<span>{Math.round(accuracy * 100)}%</span>
+		<span>shield {shieldLabel}</span>
 	</div>
 
 	<ArcadeProgress value={timeProgress} label="time remaining" tone="yellow" maxWidth="520px" />
+
+	<div class="perks-wrap">
+		<ArcadePetPerks creature={activePet} effects={statEffects} />
+	</div>
 
 	<div
 		class="rush-field"
@@ -250,6 +365,7 @@
 			</span>
 		{:else}
 			<span class="breath-ring" aria-hidden="true"></span>
+			<span class="keyboard-reticle" aria-hidden="true"></span>
 			{#each echoes as echo (echo.id)}
 				<button
 					class="spark echo"
@@ -261,7 +377,8 @@
 			{/each}
 			<button
 				class="spark target"
-				style={sparkStyle(target)}
+				class:mind-lit={mindTier > 0}
+				style={sparkStyle(target, true)}
 				onclick={hit}
 				type="button"
 				aria-label="Catch the insight"
@@ -278,8 +395,7 @@
 	</div>
 
 	<p class="rush-note">
-		A quick burst only. Rewards are capped at {MAX_REWARD} insight, but the drill will let
-		you keep taking sets.
+		A quick burst only. Tap the mark, or move the reticle with arrows and press space. Rewards cap at {MAX_REWARD} insight.
 	</p>
 </div>
 
@@ -297,7 +413,7 @@
 	.focus-row {
 		width: min(520px, 100%);
 		display: grid;
-		grid-template-columns: 5.2rem minmax(6rem, 1fr) 3rem;
+		grid-template-columns: 5.2rem minmax(6rem, 1fr) 3rem 5.2rem;
 		align-items: center;
 		gap: 0.7rem;
 		font-family: var(--font-ui);
@@ -323,6 +439,9 @@
 	.focus-pips span.lit {
 		background: var(--sol-yellow);
 		box-shadow: 0 0 10px rgba(181, 137, 0, 0.28);
+	}
+	.perks-wrap {
+		width: min(520px, 100%);
 	}
 
 	.rush-field {
@@ -395,6 +514,37 @@
 		pointer-events: none;
 		animation: breathe 1.9s ease-in-out infinite;
 	}
+	.keyboard-reticle {
+		position: absolute;
+		left: var(--kx);
+		top: var(--ky);
+		width: var(--kr);
+		aspect-ratio: 1;
+		border: 1px solid rgba(38, 139, 210, 0.56);
+		border-radius: 50%;
+		transform: translate(-50%, -50%);
+		box-shadow: 0 0 0 4px rgba(38, 139, 210, 0.08);
+		z-index: 3;
+		pointer-events: none;
+	}
+	.keyboard-reticle::before,
+	.keyboard-reticle::after {
+		content: '';
+		position: absolute;
+		background: rgba(38, 139, 210, 0.5);
+	}
+	.keyboard-reticle::before {
+		left: 50%;
+		top: -0.35rem;
+		bottom: -0.35rem;
+		width: 1px;
+	}
+	.keyboard-reticle::after {
+		top: 50%;
+		left: -0.35rem;
+		right: -0.35rem;
+		height: 1px;
+	}
 	.spark {
 		position: absolute;
 		left: var(--x);
@@ -425,6 +575,10 @@
 			0 0 calc(20px + var(--flow) * 22px) rgba(181, 137, 0, calc(0.46 + var(--flow) * 0.18));
 		cursor: pointer;
 		animation: pulse calc(620ms - var(--flow) * 180ms) ease-in-out infinite alternate;
+	}
+	.spark.target.mind-lit {
+		outline: 2px solid rgba(108, 113, 196, 0.42);
+		outline-offset: 4px;
 	}
 	.spark-core {
 		width: 34%;
@@ -520,6 +674,9 @@
 			grid-template-columns: 4.8rem minmax(5rem, 1fr) 2.8rem;
 			gap: 0.45rem;
 			font-size: 0.58rem;
+		}
+		.focus-row span:last-child {
+			grid-column: 1 / -1;
 		}
 		.field-message strong {
 			font-size: 2rem;

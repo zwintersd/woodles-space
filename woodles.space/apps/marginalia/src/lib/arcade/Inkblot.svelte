@@ -2,6 +2,12 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { fmt } from '$lib/witch/book.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
+	import ArcadePetPerks from './ArcadePetPerks.svelte';
+	import {
+		coreStatValue,
+		statTier,
+		type ArcadeStatEffects
+	} from './arcadeStats';
 	import { dailyLimit } from './dailyLimit';
 	import { payReward } from './arcadeRewards';
 	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
@@ -11,7 +17,7 @@
 		creatures: BestiaryCreature[];
 		activePet?: BestiaryCreature | null;
 	}
-	let { onclose, creatures }: Props = $props();
+	let { onclose, creatures, activePet = null }: Props = $props();
 
 	// ── constants ──────────────────────────────────────────────────────────────
 	const DAILY_LIMIT = 5;
@@ -20,6 +26,7 @@
 	const MAX_REWARD = 20;
 	const GUESS_MULT = [1.0, 0.66, 0.33];
 	const MATCH_THRESHOLD = 0.8;
+	const BASE_CLOSE_GUESS_THRESHOLD = 0.68;
 
 	// ── daily limit ────────────────────────────────────────────────────────────
 	const limit = dailyLimit('inkblot', DAILY_LIMIT);
@@ -37,6 +44,8 @@
 	let roundsPlayed = $state(0);
 	let bestReward = $state(loadArcadeRecord('inkblot').bestScore);
 	let inputEl = $state<HTMLInputElement | null>(null);
+	let practiceRound = $state(false);
+	let graceSaveUsed = $state(false);
 
 	let startedAt = 0;
 	let rafId = 0;
@@ -47,10 +56,28 @@
 	let spriteImg: HTMLImageElement | null = null;
 
 	// ── derived ────────────────────────────────────────────────────────────────
+	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
+	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
+	const graceTier = $derived(statTier(coreStatValue(activePet, 'grace')));
 	const revealProgress = $derived(Math.min(1, elapsedMs / (REVEAL_SECONDS * 1000)));
 	const timeScore = $derived(Math.round(1000 * (1 - revealProgress)));
-	const canPlay = $derived(limit.canPlay && creatures.length > 0);
+	const hasCreaturePool = $derived(creatures.length > 0);
+	const canPlayPaid = $derived(limit.canPlay && hasCreaturePool);
+	const canPractice = $derived(hasCreaturePool && !limit.canPlay);
+	const canStartRound = $derived(canPlayPaid || canPractice);
 	const remainingPlays = $derived(limit.remaining);
+	const mindGlint = $derived.by(() => {
+		if (!creature || mindTier === 0) return '';
+		const name = creature.name.trim();
+		const visible = name.slice(0, Math.min(mindTier, name.length));
+		return `${visible}${name.length > visible.length ? '...' : ''}`;
+	});
+	const statEffects = $derived<ArcadeStatEffects>({
+		body: (_value, tier) => (tier > 0 ? `clearer reveal +${tier}` : 'normal reveal'),
+		mind: (_value, tier) => (tier > 0 ? `${tier} letter glint` : 'no glint'),
+		grace: (_value, tier) => (tier > 0 ? 'close guess softened' : 'strict guesses'),
+		heart: (_value, tier) => (tier > 0 ? 'practice after cap' : 'daily cap only')
+	});
 
 	// ── fuzzy match ────────────────────────────────────────────────────────────
 	function similarity(a: string, b: string): number {
@@ -81,23 +108,28 @@
 		if (!ctx) return;
 		const W = canvasEl.width;
 		const H = canvasEl.height;
+		const visualProgress = Math.min(1, progress + bodyTier * 0.08);
 
 		// pixelation: 64px blocks at start → 1px (sharp) at end
-		const blockSize = Math.max(1, Math.round(64 * (1 - progress) + 1));
+		const blockSize = Math.max(1, Math.round(64 * (1 - visualProgress) + 1));
 		const sw = Math.max(1, Math.round(W / blockSize));
 		const sh = Math.max(1, Math.round(H / blockSize));
 
 		ctx.clearRect(0, 0, W, H);
 		ctx.imageSmoothingEnabled = false;
 
-		const offscreen = new OffscreenCanvas(sw, sh);
-		const offCtx = offscreen.getContext('2d')!;
+		const offscreen =
+			typeof OffscreenCanvas === 'undefined'
+				? Object.assign(document.createElement('canvas'), { width: sw, height: sh })
+				: new OffscreenCanvas(sw, sh);
+		const offCtx = offscreen.getContext('2d');
+		if (!offCtx) return;
 		offCtx.imageSmoothingEnabled = false;
 		offCtx.drawImage(spriteImg, 0, 0, sw, sh);
 		ctx.drawImage(offscreen, 0, 0, W, H);
 
 		// blur fades out as reveal progresses
-		const blurPx = Math.max(0, (1 - progress) * 6);
+		const blurPx = Math.max(0, (1 - visualProgress) * 6);
 		canvasEl.style.filter = blurPx > 0.2 ? `blur(${blurPx.toFixed(1)}px) sepia(0.4)` : 'sepia(0.15)';
 	}
 
@@ -130,12 +162,13 @@
 	}
 
 	// ── game flow ──────────────────────────────────────────────────────────────
-	async function startRound() {
-		if (!canPlay) return;
+	async function startRound(practice = false) {
+		if (!hasCreaturePool) return;
+		if (!practice && !canPlayPaid) return;
 		const pool = creatures.filter((c) => c.isolatedSprite ?? c.sprite);
 		if (!pool.length) return;
 
-		limit.increment();
+		if (!practice) limit.increment();
 		creature = pool[Math.floor(Math.random() * pool.length)];
 		guessCount = 0;
 		guessInput = '';
@@ -143,12 +176,18 @@
 		elapsedMs = 0;
 		pausedElapsed = 0;
 		awarded = 0;
+		practiceRound = practice;
+		graceSaveUsed = false;
 		phase = 'revealing';
 
 		spriteImg = await loadSprite(creature);
 		drawFrame(0);
 		startedAt = Date.now();
 		rafId = requestAnimationFrame(loop);
+	}
+
+	function beginNextRound() {
+		void startRound(!canPlayPaid && canPractice);
 	}
 
 	function pause() {
@@ -177,6 +216,15 @@
 		const score = similarity(guess, creature.name);
 		if (score >= MATCH_THRESHOLD) {
 			endRound(true);
+		} else if (
+			graceTier > 0 &&
+			!graceSaveUsed &&
+			score >= Math.max(0.5, BASE_CLOSE_GUESS_THRESHOLD - (graceTier - 1) * 0.06)
+		) {
+			graceSaveUsed = true;
+			guessError = 'grace softened that close guess';
+			guessInput = '';
+			resume();
 		} else {
 			guessCount += 1;
 			if (guessCount >= MAX_GUESSES) {
@@ -194,9 +242,13 @@
 		roundsPlayed += 1;
 
 		if (correct) {
-			const mult = GUESS_MULT[guessCount] ?? GUESS_MULT[GUESS_MULT.length - 1];
-			const raw = Math.round(timeScore * mult * MAX_REWARD / 1000);
-			awarded = payReward(Math.max(1, raw), MAX_REWARD);
+			if (practiceRound) {
+				awarded = 0;
+			} else {
+				const mult = GUESS_MULT[guessCount] ?? GUESS_MULT[GUESS_MULT.length - 1];
+				const raw = Math.round((timeScore * mult * MAX_REWARD) / 1000);
+				awarded = payReward(Math.max(1, raw), MAX_REWARD);
+			}
 			phase = 'correct';
 		} else {
 			awarded = 0;
@@ -210,7 +262,9 @@
 				guesses: correct ? guessCount + 1 : guessCount,
 				revealMs: Math.round(elapsedMs),
 				creature: creature?.name ?? null,
-				awarded
+				awarded,
+				practice: practiceRound,
+				graceSave: graceSaveUsed
 			}
 		});
 		bestReward = record.bestScore;
@@ -275,8 +329,8 @@
 			{/if}
 		</div>
 		<div class="btn-group">
-			{#if (phase === 'correct' || phase === 'failed') && remainingPlays > 0}
-				<button class="ctrl-btn" onclick={startRound}>next</button>
+			{#if (phase === 'correct' || phase === 'failed') && canStartRound}
+				<button class="ctrl-btn" onclick={beginNextRound}>{canPlayPaid ? 'next' : 'practice'}</button>
 			{/if}
 			<button class="ctrl-btn back" onclick={onclose}>arcade</button>
 		</div>
@@ -302,24 +356,24 @@
 
 		<!-- phase overlays -->
 		{#if phase === 'intro'}
-			{#if !canPlay}
-				{#if creatures.length === 0}
-					<div class="field-message">
-						<strong>no creatures yet</strong>
-						<em>head to the bestiary and discover some creatures — then come back to test your eye.</em>
-					</div>
-				{:else}
-					<div class="field-message">
-						<strong>all {DAILY_LIMIT} plays used</strong>
-						<em>the ink dries overnight. come back tomorrow for more.</em>
-					</div>
-				{/if}
-			{:else}
+			{#if creatures.length === 0}
+				<div class="field-message">
+					<strong>no creatures yet</strong>
+					<em>head to the bestiary and discover some creatures, then come back to test your eye.</em>
+				</div>
+			{:else if canPlayPaid}
 				<div class="field-message">
 					<strong>ready to look?</strong>
 					<em>an image will slowly bloom. press <kbd>space</kbd> at any time to pause and guess. earlier is worth more.</em>
-					<button class="start-btn" onclick={startRound}>begin</button>
+					<button class="start-btn" onclick={() => startRound(false)}>begin</button>
 					<span class="plays-note">{remainingPlays} of {DAILY_LIMIT} plays remaining today</span>
+				</div>
+			{:else}
+				<div class="field-message">
+					<strong>practice?</strong>
+					<em>today's paid ink is dry, but you can keep looking without earning insight.</em>
+					<button class="start-btn" onclick={() => startRound(true)}>practice</button>
+					<span class="plays-note">practice reveal, no payout</span>
 				</div>
 			{/if}
 		{:else if phase === 'revealing'}
@@ -346,6 +400,9 @@
 					{#if guessError}
 						<span class="guess-error">{guessError}</span>
 					{/if}
+					{#if mindGlint}
+						<span class="mind-glint">structure glint: {mindGlint}</span>
+					{/if}
 					<button class="resume-link" type="button" onclick={resume}>keep watching ↩</button>
 				</form>
 			</div>
@@ -354,7 +411,7 @@
 				<strong class="result-verdict">recognized</strong>
 				<span class="result-name">{creature?.name}</span>
 				<span class="result-detail">
-					guess {guessCount + 1} · {multiplierLabel} · +{fmt(awarded)} insight
+					guess {guessCount + 1} · {multiplierLabel} · {practiceRound ? 'practice' : `+${fmt(awarded)} insight`}
 				</span>
 			</div>
 		{:else if phase === 'failed'}
@@ -366,11 +423,17 @@
 		{/if}
 	</div>
 
+	<div class="perks-wrap">
+		<ArcadePetPerks creature={activePet} effects={statEffects} />
+	</div>
+
 	<p class="inkblot-note">
-		{#if phase === 'intro' && canPlay}
+		{#if phase === 'intro' && canPlayPaid}
 			Five chances per day. Guess on the first try for full marks.
+		{:else if phase === 'intro' && canPractice}
+			Practice rounds keep the eye warm but do not pay insight.
 		{:else if phase === 'correct' || phase === 'failed'}
-			{remainingPlays > 0 ? `${remainingPlays} play${remainingPlays === 1 ? '' : 's'} left today.` : 'No plays remaining — the ink rests until tomorrow.'}
+			{remainingPlays > 0 ? `${remainingPlays} play${remainingPlays === 1 ? '' : 's'} left today.` : 'Paid plays are spent; practice stays open.'}
 		{:else}
 			The image resolves over {REVEAL_SECONDS} seconds. Wrong guesses return you to the reveal.
 		{/if}
@@ -604,6 +667,17 @@
 		text-transform: uppercase;
 		color: var(--sol-orange);
 	}
+	.mind-glint {
+		font-family: var(--font-ui);
+		font-size: 0.62rem;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--sol-violet);
+		background: rgba(108, 113, 196, 0.1);
+		border: 1px solid rgba(108, 113, 196, 0.22);
+		border-radius: 3px;
+		padding: 0.22rem 0.5rem;
+	}
 	.resume-link {
 		font-family: var(--font-body);
 		font-style: italic;
@@ -705,6 +779,9 @@
 		font-size: 0.8rem;
 		color: var(--sol-base1);
 		text-align: center;
+	}
+	.perks-wrap {
+		width: min(520px, 100%);
 	}
 
 	@media (max-width: 520px) {
