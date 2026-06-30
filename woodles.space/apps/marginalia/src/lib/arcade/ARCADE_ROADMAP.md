@@ -35,7 +35,8 @@ the cabinet.
    - Route paying games through it.
    - Decide whether every paying game gets a daily cap, or whether caps only
      apply to games with high insight-per-minute output.
-   - 2048, Color POP!, and Margin Miner currently do not pay insight.
+   - 2048 is now the only game that does not pay insight; it is a deliberate
+     pet-training toy. Color POP! and Margin Miner joined the economy in Week 7.
    - Inkblot is the only daily-limited game.
 
 3. Extract settled presentation parts.
@@ -143,14 +144,21 @@ Next expansions:
 - Add a daily or session mode if payouts arrive.
 - Add small merge effects that make cause and effect easier to read.
 
-Rough edges:
-- No Book payout yet.
-- Matter.js is loaded from a CDN script in `app.html`, while the package does
-  not own the dependency.
-- It uses a local clamp helper rather than shared `arcadeMath`.
-- Game over can feel abrupt when a settled circle crosses the line.
+Resolved in Week 7:
+- It now pays insight through `arcadeRewards` (capped at 22) and keeps local
+  records and a run summary.
+- All four core stats have visible effects (see stat pitch below), shown in a
+  pet-perk row.
+- Keyboard play landed: arrows / `A` / `D` to aim, Space / Down / Enter to drop.
+- Matter.js is now a bundled `matter-js` package dependency, lazy-imported and
+  code-split so it loads from our own origin; the CDN `<script>` is gone, and a
+  retryable error overlay remains as a defensive guard.
+- Heart's settle-save softens the previously abrupt game-over.
 
-Stat pitch:
+Rough edges:
+- It uses a local clamp helper rather than shared `arcadeMath`.
+
+Stat pitch (now implemented):
 - Body: heavier drops or stronger pop impulse, making merges physically punchier.
 - Mind: show the next two drops, or a faint landing column after the pointer
   steadies.
@@ -171,13 +179,19 @@ Next expansions:
 - Add object variety that changes timing, not only value.
 - Add a visible "best level" and "best haul."
 
-Rough edges:
-- No Book payout yet.
-- The canvas is beautiful but not very accessible beyond click/tap/Down.
-- Level difficulty may need tuning once payouts exist.
-- It does not yet use active-pet stats.
+Resolved in Week 7:
+- It now pays insight on level clear and game over through `arcadeRewards`
+  (capped at 20) and keeps local bests and run summaries.
+- All four core stats have visible effects (see stat pitch below), shown in a
+  pet-perk row.
+- Space / Enter now fire alongside the existing Down key.
 
-Stat pitch:
+Rough edges:
+- The canvas still has no pointer-free aiming; firing is keyboard-accessible but
+  timing still relies on watching the swing.
+- Level difficulty may need tuning now that payouts exist.
+
+Stat pitch (now implemented):
 - Body: faster reeling for heavy objects and slightly stronger claw grip.
 - Mind: brief weight/value scan when the claw passes over an object.
 - Grace: slower swing near center or a slightly wider grab radius.

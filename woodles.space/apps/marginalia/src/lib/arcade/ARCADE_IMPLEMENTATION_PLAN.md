@@ -302,6 +302,8 @@ Milestone:
 
 Theme: physics and timing stat pass, part 2.
 
+Status: complete in code as of June 30, 2026.
+
 Games:
 
 - Color POP!
@@ -309,18 +311,34 @@ Games:
 
 Tasks:
 
-- Decide and implement payout/score-only status for both games.
+- Decide and implement payout/score-only status for both games. Done: both now
+  pay insight through `arcadeRewards`. Color POP! caps at 22, Margin Miner at 20.
+  2048 stays the only deliberate score-only game (a pet-training toy).
 - Move Color POP! to a local Matter dependency or add a stronger CDN fallback.
-- Add Color POP! drop/preview/cooldown/settle-save stat effects.
-- Add Margin Miner reel/scan/swing/extension stat effects.
-- Add run summaries and bests.
-- Improve keyboard/control accessibility where feasible.
+  Done via the local-dependency path: `matter-js` is now a bundled package
+  dependency, lazy-imported (code-split) on the client so it is served from our
+  own origin instead of a CDN. The CDN `<script>` was removed from `app.html`. A
+  retryable error overlay remains as a defensive guard.
+- Add Color POP! drop/preview/cooldown/settle-save stat effects. Done: Body
+  punches merges harder, Mind reveals upcoming drops, Grace shortens the drop
+  cooldown and softens the settle threshold, Heart banks settle-saves.
+- Add Margin Miner reel/scan/swing/extension stat effects. Done: Body reels
+  faster against weight, Mind scans nearby loot value/weight, Grace widens the
+  grab and calms the swing, Heart grants near-miss time extensions.
+- Add run summaries and bests. Done: both use `arcadeRecords` for local bests
+  and recent-run summaries, surfaced in the HUD and end overlays.
+- Improve keyboard/control accessibility where feasible. Done: Color POP! gained
+  arrow/`A`/`D` aim and Space/Down/Enter drop; Margin Miner accepts Space/Enter
+  in addition to Down.
 
 Validation:
 
 - `pnpm --filter marginalia check`
 - Browser smoke: Matter loads, drops merge, game over works, claw fires and
-  reels, stat effects are visible.
+  reels, stat effects are visible. Smoked at `/marginalia/arcade`; both games
+  mount with pet-perk rows, insight prizes, progress bars, and keyboard control.
+  Color POP! loads its bundled physics engine and drops/merges circles with no
+  CDN dependency.
 
 Milestone:
 

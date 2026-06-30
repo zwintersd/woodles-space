@@ -30,6 +30,12 @@ Recommendation #1 landed in [`arcadeRewards.ts`](./arcadeRewards.ts):
 - Week 6's bubble pass is complete: Margin Bubbles has `SvgArena`, both bubble
   games have active-pet stat effects, local records, mobile aim/fire separation,
   and color-safe palette controls.
+- Week 7's physics/timing pass is complete: Color POP! and Margin Miner now pay
+  insight through `arcadeRewards`, carry Body/Mind/Grace/Heart effects with
+  visible perk rows, keep local records and run summaries, and gained keyboard
+  controls. Color POP!'s Matter.js dependency is now a bundled package
+  (`matter-js`), lazy-imported and code-split so it loads from our own origin
+  instead of a CDN. 2048 stays the one deliberate score-only game.
 - The arcade route now pauses the idle world clock while `activeGame !== null`
   and resumes it when the cabinet returns, resolving recommendation #6 with a
   deliberate "arcade replaces idle accrual while playing" rule.
@@ -56,9 +62,9 @@ round of growth makes the copy-paste expensive.
 | Game | Component | Status | Loop / Runtime | `MAX_REWARD` | Pays `insight`? | Notes |
 |---|---|---|---|---:|:---:|---|
 | Inkblot | `Inkblot.svelte` | play | rAF | 20 | yes | Special daily cap; pays through `arcadeRewards`. |
-| 2048 | `TwoZeroFourEight.svelte` | play | step / keyboard | - | no | Only active-pet-stat-driven game. |
-| Color POP! | `ColorPop.svelte` | play | Matter.js runner + UI interval | - | no | Score-only physics merge game. |
-| Margin Miner | `MarginMiner.svelte` | play | rAF canvas | - | no | Score-only claw game with levels. |
+| 2048 | `TwoZeroFourEight.svelte` | play | step / keyboard | - | no | Deliberate score-only pet-training toy. |
+| Color POP! | `ColorPop.svelte` | play | Matter.js runner + UI interval | 22 | yes | Active-pet stats, local records, bundled `matter-js`. |
+| Margin Miner | `MarginMiner.svelte` | play | rAF canvas | 20 | yes | Active-pet stats, local records, level payouts. |
 | Type Witch | `TypeWitch.svelte` | play | interval | 32 | yes | Shared reward helper and HUD/progress shell. |
 | Get Big! | `GetBig.svelte` | play | rAF | 28 | yes | Shared reward helper and HUD/progress shell. |
 | Margin Hollow | `MarginHollow.svelte` | play | rAF | 24 | yes | First platform / gate / pickup shape; shared HUD/progress shell. |
@@ -115,8 +121,9 @@ not the rules that earn the coin.
 ### 2. Decide the arcade economy policy
 
 **Week 2 status: done, with a conservative no-balance-change policy.**
+**Week 7 update: Color POP! and Margin Miner now pay; 2048 stays score-only.**
 
-The policy for now is:
+The Week 2 policy was:
 
 - Existing insight-paying games stay uncapped except for their own local round
   caps.
@@ -125,6 +132,14 @@ The policy for now is:
   a later balance pass decides how score-only games should join the economy.
 - No 2048 best-score persistence was added in this pass, because that would
   change the score-only policy surface.
+
+The Week 7 physics/timing pass was that balance pass for the two physics games:
+
+- Color POP! pays through `arcadeRewards` (capped at 22); Margin Miner pays per
+  level clear and on game over (capped at 20). Both keep local records.
+- 2048 stays deliberately score-only: it spends active-pet stats instead of
+  earning the shared insight resource, so it is the single entry left in
+  `SCORE_ONLY_ARCADE_GAMES`.
 
 `dailyLimit.ts` was still cleaned up now, so it is ready if the shared reward
 helper later grows a daily or session cap.

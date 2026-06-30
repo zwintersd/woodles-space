@@ -1,13 +1,22 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import type { ArcadeActivePet } from './arcadeStats';
-	import { scoreOnlyReason } from './arcadeRewards';
+	import ArcadePetPerks from './ArcadePetPerks.svelte';
+	import ArcadeProgress from './ArcadeProgress.svelte';
+	import {
+		coreStatValue,
+		statTier,
+		type ArcadeActivePet,
+		type ArcadeStatEffects
+	} from './arcadeStats';
+	import { payReward, previewReward } from './arcadeRewards';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
+	import { fmt } from '$lib/witch/book.svelte';
 
 	interface Props {
 		onclose: () => void;
 		activePet?: ArcadeActivePet;
 	}
-	let { onclose }: Props = $props();
+	let { onclose, activePet = null }: Props = $props();
 
 	type ClawMode = 'swinging' | 'firing' | 'reeling';
 	type RoundPhase = 'playing' | 'level-clear' | 'game-over';
@@ -55,7 +64,9 @@
 	const WEIGHT_MULTIPLIER = 52;
 	const MIN_RETRACT_SPEED = 42;
 	const GAME_ID = 'margin-miner';
-	const scoreOnlyLabel = scoreOnlyReason(GAME_ID) ? 'score only' : '-';
+	const MAX_REWARD = 20;
+	const EXTENSION_SECONDS = 12;
+	const EXTENSION_THRESHOLD = 0.6;
 
 	const weights = {
 		veryLight: 0.25,
@@ -140,10 +151,29 @@
 	let remaining = $state(LEVEL_SECONDS);
 	let objectCount = $state(0);
 	let lastHaul = $state('Click, tap, or press Down to fire.');
+	let awarded = $state(0);
+	let best = $state(loadArcadeRecord(GAME_ID).bestScore);
+	let extensions = $state(0);
+	let extensionsUsed = $state(0);
+
+	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
+	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
+	const graceTier = $derived(statTier(coreStatValue(activePet, 'grace')));
+	const heartTier = $derived(statTier(coreStatValue(activePet, 'heart')));
+
+	// Body reels faster and shrugs off weight; Grace widens the grab and calms the
+	// swing; Mind scans nearby loot; Heart banks near-miss time extensions.
+	const reelBonus = $derived(bodyTier * 36);
+	const weightPenalty = $derived(Math.max(18, WEIGHT_MULTIPLIER - bodyTier * 8));
+	const grabRadius = $derived(CLAW_RADIUS + graceTier * 3);
+	const swingSpeed = $derived(Math.max(1, SWING_SPEED - graceTier * 0.12));
+	const scanRadius = $derived(mindTier > 0 ? 64 + mindTier * 34 : 0);
 
 	const scoreText = $derived(formatMoney(score));
 	const targetText = $derived(formatMoney(targetScore));
 	const timerText = $derived(Math.ceil(remaining).toString().padStart(2, '0'));
+	const targetProgress = $derived(targetScore > 0 ? Math.min(1, score / targetScore) : 0);
+	const rewardPreview = $derived(rewardForLevel(level, true));
 	const stateLabel = $derived.by(() => {
 		if (phase === 'level-clear') return 'CLEAR';
 		if (phase === 'game-over') return 'GAME OVER';
@@ -152,6 +182,18 @@
 	const modeClass = $derived(`mode-${phase === 'playing' ? clawMode : phase}`);
 	const nextTargetText = $derived(formatMoney(targetForLevel(level + 1)));
 	const shortfallText = $derived(formatMoney(Math.max(0, targetScore - score)));
+	const statEffects = $derived<ArcadeStatEffects>({
+		body: (_value, tier) => (tier > 0 ? `reel +${tier}` : 'standard reel'),
+		mind: (_value, tier) => (tier > 1 ? 'scan value+weight' : tier > 0 ? 'scan value' : 'no scan'),
+		grace: (_value, tier) => (tier > 0 ? `grab +${tier}` : 'standard grab'),
+		heart: (_value, tier) =>
+			tier > 0 ? `${tier} extension${tier === 1 ? '' : 's'}` : 'no extension'
+	});
+
+	function rewardForLevel(forLevel: number, cleared: boolean): number {
+		const raw = cleared ? forLevel * 4 + 4 : forLevel * 2;
+		return previewReward(raw, MAX_REWARD);
+	}
 
 	function targetForLevel(value: number): number {
 		return Math.round(650 + (value - 1) * 850 + Math.pow(value - 1, 2) * 180);
@@ -170,7 +212,7 @@
 	}
 
 	function currentFireAngle(): number {
-		return Math.PI / 2 + Math.sin(swingTime * SWING_SPEED) * MAX_SWING;
+		return Math.PI / 2 + Math.sin(swingTime * swingSpeed) * MAX_SWING;
 	}
 
 	function clawAngle(): number {
@@ -186,8 +228,8 @@
 	}
 
 	function reelSpeed(object: MineObject | null): number {
-		if (!object) return EMPTY_RETRACT_SPEED;
-		return Math.max(MIN_RETRACT_SPEED, BASE_RETRACT_SPEED - object.weight * WEIGHT_MULTIPLIER);
+		if (!object) return EMPTY_RETRACT_SPEED + reelBonus;
+		return Math.max(MIN_RETRACT_SPEED, BASE_RETRACT_SPEED + reelBonus - object.weight * weightPenalty);
 	}
 
 	function createMineObject(kind: MineKind): MineObject {
@@ -277,6 +319,7 @@
 		objectCount = objects.length;
 		floaters = [];
 		levelEndsAt = performance.now() + LEVEL_SECONDS * 1000;
+		extensions = heartTier;
 		lastHaul = 'Click, tap, or press Down to fire.';
 	}
 
@@ -286,7 +329,23 @@
 		lockedAngle = Math.PI / 2;
 		objectSeq = 0;
 		floaterSeq = 0;
+		awarded = 0;
+		extensionsUsed = 0;
 		startLevel(1);
+	}
+
+	function recordRun(cleared: boolean) {
+		const record = recordArcadeRun(GAME_ID, {
+			score,
+			summary: {
+				level,
+				cleared,
+				haul: score,
+				extensions: extensionsUsed,
+				awarded
+			}
+		});
+		best = record.bestScore;
 	}
 
 	function fireClaw() {
@@ -304,21 +363,41 @@
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
-		if (event.key !== 'ArrowDown') return;
+		if (event.key !== 'ArrowDown' && event.key !== ' ' && event.key !== 'Enter') return;
 		event.preventDefault();
 		fireClaw();
 	}
 
 	function finishLevel() {
 		if (phase !== 'playing') return;
-		remaining = 0;
+
 		if (score >= targetScore) {
+			remaining = 0;
 			phase = 'level-clear';
-			lastHaul = `Level ${level} cleared. Next target ${formatMoney(targetForLevel(level + 1))}.`;
-		} else {
-			phase = 'game-over';
-			lastHaul = `Short by ${formatMoney(targetScore - score)}.`;
+			awarded = rewardForLevel(level, true);
+			payReward(awarded, MAX_REWARD);
+			recordRun(true);
+			lastHaul = `Level ${level} cleared. +${fmt(awarded)} insight. Next target ${formatMoney(targetForLevel(level + 1))}.`;
+			return;
 		}
+
+		// Heart: a near-miss grants one extra stretch of time before the run ends.
+		if (extensions > 0 && score >= targetScore * EXTENSION_THRESHOLD) {
+			extensions -= 1;
+			extensionsUsed += 1;
+			levelEndsAt = performance.now() + EXTENSION_SECONDS * 1000;
+			remaining = EXTENSION_SECONDS;
+			addFloater(ORIGIN_X, ORIGIN_Y + 44, `+${EXTENSION_SECONDS}s`, 'good');
+			lastHaul = `Heart held the line: ${EXTENSION_SECONDS} more seconds.`;
+			return;
+		}
+
+		remaining = 0;
+		phase = 'game-over';
+		awarded = rewardForLevel(level, false);
+		payReward(awarded, MAX_REWARD);
+		recordRun(false);
+		lastHaul = `Short by ${formatMoney(targetScore - score)}.`;
 	}
 
 	function beginReel(object: MineObject | null) {
@@ -380,7 +459,7 @@
 			const nextClaw = clawPosition();
 			const hit = objects.find((object) => {
 				if (object.captured) return false;
-				return Math.hypot(nextClaw.x - object.x, nextClaw.y - object.y) <= CLAW_RADIUS + object.collisionRadius;
+				return Math.hypot(nextClaw.x - object.x, nextClaw.y - object.y) <= grabRadius + object.collisionRadius;
 			});
 
 			if (hit) {
@@ -420,9 +499,45 @@
 		drawObjects(ctx);
 		drawWinch(ctx);
 		drawLineAndClaw(ctx);
+		drawScan(ctx);
 		drawFloaters(ctx);
 		drawCanvasHud(ctx);
 		if (phase !== 'playing') drawCanvasEndState(ctx);
+	}
+
+	function drawScan(ctx: CanvasRenderingContext2D) {
+		if (scanRadius <= 0 || phase !== 'playing') return;
+		const tip = clawPosition();
+
+		ctx.save();
+		ctx.strokeStyle = 'rgba(38, 139, 210, 0.4)';
+		ctx.lineWidth = 1.5;
+		ctx.setLineDash([5, 6]);
+		ctx.beginPath();
+		ctx.arc(tip.x, tip.y, scanRadius, 0, Math.PI * 2);
+		ctx.stroke();
+		ctx.setLineDash([]);
+
+		ctx.font = '700 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		for (const object of objects) {
+			if (object.captured) continue;
+			if (Math.hypot(tip.x - object.x, tip.y - object.y) > scanRadius + object.radius) continue;
+
+			const label =
+				mindTier > 1
+					? `${formatMoney(object.value)} · ${object.weightClass}`
+					: formatMoney(object.value);
+			const width = ctx.measureText(label).width + 12;
+			const tagY = object.y - object.radius - 13;
+
+			ctx.fillStyle = 'rgba(7, 54, 66, 0.86)';
+			ctx.fillRect(object.x - width / 2, tagY - 9, width, 18);
+			ctx.fillStyle = '#fdf6e3';
+			ctx.fillText(label, object.x, tagY);
+		}
+		ctx.restore();
 	}
 
 	function drawWorld(ctx: CanvasRenderingContext2D) {
@@ -713,9 +828,9 @@
 				<span class="score-label">time</span>
 				<span class="score-val">{timerText}</span>
 			</div>
-			<div class="score-box">
+			<div class="score-box" class:earned={phase !== 'playing' && awarded > 0}>
 				<span class="score-label">prize</span>
-				<span class="score-val policy">{scoreOnlyLabel}</span>
+				<span class="score-val">{fmt(phase === 'playing' ? rewardPreview : awarded)}</span>
 			</div>
 			<div class="score-box">
 				<span class="score-label">state</span>
@@ -732,11 +847,16 @@
 		</div>
 	</div>
 
+	<ArcadePetPerks creature={activePet} effects={statEffects} />
+
 	<div class="status-row" aria-label="Margin Miner status">
 		<span>level <b>{level}</b></span>
-		<span>objects <b>{objectCount}</b></span>
+		<span>best <b>{fmt(best)}</b></span>
+		<span class:lit={extensions > 0}>stretch <b>{extensions}</b></span>
 		<span class={modeClass}>{lastHaul}</span>
 	</div>
+
+	<ArcadeProgress value={targetProgress} label="haul toward target" tone="yellow" maxWidth="800px" />
 
 	<div
 		class="canvas-frame"
@@ -751,8 +871,11 @@
 				<p class="overlay-title">{phase === 'level-clear' ? 'level clear' : 'game over'}</p>
 				<p class="overlay-sub">
 					{phase === 'level-clear'
-						? `Score ${scoreText}. Next target ${nextTargetText}.`
-						: `Score ${scoreText}. Short by ${shortfallText}.`}
+						? `Score ${scoreText}. +${fmt(awarded)} insight. Next target ${nextTargetText}.`
+						: `Score ${scoreText}. Short by ${shortfallText}. +${fmt(awarded)} insight.`}
+				</p>
+				<p class="overlay-meta">
+					best haul {formatMoney(best)}{#if extensionsUsed > 0} · {extensionsUsed} stretch used{/if}
 				</p>
 				{#if phase === 'level-clear'}
 					<button onclick={() => startLevel(level + 1)}>next level</button>
@@ -762,6 +885,11 @@
 			</div>
 		{/if}
 	</div>
+
+	<p class="control-hint">
+		Click, tap, Down, Space, or Enter drops the claw. The claw swings on its own —
+		time the release.
+	</p>
 </div>
 
 <style>
@@ -773,6 +901,29 @@
 		gap: 0.85rem;
 		background: var(--sol-base3);
 		border-top: 2px solid var(--sol-base2);
+	}
+
+	.miner-shell :global(.pet-perks) {
+		width: min(800px, calc(100vw - 3rem));
+	}
+
+	.control-hint {
+		width: min(800px, calc(100vw - 3rem));
+		margin: 0;
+		text-align: center;
+		font-family: var(--font-body);
+		font-style: italic;
+		font-size: 0.8rem;
+		color: var(--sol-base1);
+	}
+
+	.overlay-meta {
+		font-family: var(--font-ui);
+		font-size: 0.66rem;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: rgba(253, 246, 227, 0.72);
+		margin: 0;
 	}
 
 	.miner-bar {
@@ -845,12 +996,8 @@
 		line-height: 1.1;
 	}
 
-	.score-val.policy {
-		font-family: var(--font-ui);
-		font-size: 0.68rem;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		white-space: nowrap;
+	.score-box.earned {
+		background: color-mix(in srgb, var(--sol-base2) 65%, var(--sol-yellow));
 	}
 
 	.score-val.state {
@@ -895,8 +1042,14 @@
 	.status-row {
 		width: min(800px, calc(100vw - 3rem));
 		display: grid;
-		grid-template-columns: 5.2rem 6.2rem minmax(0, 1fr);
+		grid-template-columns: 5rem 6.4rem 6rem minmax(0, 1fr);
 		gap: 0.4rem;
+	}
+
+	.status-row span.lit {
+		border-color: rgba(42, 161, 152, 0.5);
+		background: rgba(42, 161, 152, 0.12);
+		color: var(--sol-base00);
 	}
 
 	.status-row span {

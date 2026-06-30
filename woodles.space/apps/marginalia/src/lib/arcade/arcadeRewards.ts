@@ -11,12 +11,14 @@
 import { book } from '$lib/witch/book.svelte';
 import { cappedReward } from './arcadeMath';
 
-export type ScoreOnlyArcadeGameId = 'stack-2048' | 'color-pop' | 'margin-miner';
+// 2048 stays a deliberate pet-training toy: its powers spend active-pet stats
+// rather than earn the shared insight resource. Color POP! and Margin Miner
+// joined the insight economy in the Week 7 physics/timing pass, so they are no
+// longer score-only.
+export type ScoreOnlyArcadeGameId = 'stack-2048';
 
 export const SCORE_ONLY_ARCADE_GAMES: Record<ScoreOnlyArcadeGameId, string> = {
-	'stack-2048': 'score-only training toy during the economy pass',
-	'color-pop': 'score-only until the physics payout policy lands',
-	'margin-miner': 'score-only until the timed-claw payout policy lands'
+	'stack-2048': 'pet-training toy: spends active-pet stats instead of paying insight'
 };
 
 // Credit a positive insight reward to the Book and persist. Non-positive

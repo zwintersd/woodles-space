@@ -1,13 +1,22 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import type { ArcadeActivePet } from './arcadeStats';
-	import { scoreOnlyReason } from './arcadeRewards';
+	import ArcadePetPerks from './ArcadePetPerks.svelte';
+	import ArcadeProgress from './ArcadeProgress.svelte';
+	import {
+		coreStatValue,
+		statTier,
+		type ArcadeActivePet,
+		type ArcadeStatEffects
+	} from './arcadeStats';
+	import { payReward, previewReward } from './arcadeRewards';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
+	import { fmt } from '$lib/witch/book.svelte';
 
 	interface Props {
 		onclose: () => void;
 		activePet?: ArcadeActivePet;
 	}
-	let { onclose }: Props = $props();
+	let { onclose, activePet = null }: Props = $props();
 
 	type MatterApi = {
 		Bodies: Record<string, (...args: any[]) => any>;
@@ -47,7 +56,7 @@
 	const SETTLE_AGE_MS = 1700;
 	const SETTLE_SPEED = 0.16;
 	const GAME_ID = 'color-pop';
-	const scoreOnlyLabel = scoreOnlyReason(GAME_ID) ? 'score only' : '-';
+	const MAX_REWARD = 22;
 
 	const tiers: Tier[] = [
 		{ radius: 15, color: '#2aa198', density: BODY_DENSITY, points: 20 },
@@ -82,13 +91,36 @@
 	let highTier = $state(0);
 	let bodyCount = $state(0);
 	let cursorX = $state(WIDTH / 2);
-	let nextTier = $state(randomDropTier());
+	let upcoming = $state<number[]>(makeUpcoming());
 	let readyAt = $state(0);
 	let now = $state(Date.now());
 	let gameOver = $state(false);
 	let lastPopTier = $state<number | null>(null);
+	let awarded = $state(0);
+	let rounds = $state(0);
+	let best = $state(loadArcadeRecord(GAME_ID).bestScore);
+	let settleSaves = $state(0);
+	let settleSavesUsed = $state(0);
+	let saveFlashUntil = $state(0);
+	let threat = $state(0);
 
+	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
+	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
+	const graceTier = $derived(statTier(coreStatValue(activePet, 'grace')));
+	const heartTier = $derived(statTier(coreStatValue(activePet, 'heart')));
+
+	// Grace shortens the drop cooldown; Body makes merges shove harder; Mind
+	// reveals more of the upcoming queue; Heart banks settle-saves at reset.
+	const dropCooldownMs = $derived(Math.max(440, DROP_COOLDOWN_MS - graceTier * 180));
+	const popStrength = $derived(1 + bodyTier * 0.4);
+	const previewCount = $derived(mindTier);
+	const settleSpeed = $derived(SETTLE_SPEED - graceTier * 0.018);
+
+	const nextTier = $derived(upcoming[0] ?? 0);
+	const previewTiers = $derived(upcoming.slice(1, 1 + previewCount));
 	const cooldownSeconds = $derived(Math.max(0, (readyAt - now) / 1000));
+	const saveActive = $derived(now < saveFlashUntil);
+	const rewardPreview = $derived(rewardFor(merges, highTier));
 	const readyLabel = $derived.by(() => {
 		if (loadError) return 'offline';
 		if (!matterReady) return 'loading';
@@ -98,26 +130,27 @@
 	});
 	const nextTierStyle = $derived(`background:${tiers[nextTier].color}`);
 	const highTierStyle = $derived(`background:${tiers[Math.max(0, highTier)].color}`);
+	const statEffects = $derived<ArcadeStatEffects>({
+		body: (_value, tier) => (tier > 0 ? `pop punch +${tier}` : 'standard pop'),
+		mind: (_value, tier) => (tier > 0 ? `see ${tier} ahead` : 'next only'),
+		grace: (_value, tier) => (tier > 0 ? 'faster drops' : 'standard cooldown'),
+		heart: (_value, tier) => (tier > 0 ? `${tier} settle save${tier === 1 ? '' : 's'}` : 'no save')
+	});
 
 	function randomDropTier(): number {
 		return Math.floor(Math.random() * 5);
 	}
 
+	function makeUpcoming(): number[] {
+		return Array.from({ length: 4 }, () => randomDropTier());
+	}
+
+	function rewardFor(mergeCount: number, topTier: number): number {
+		return previewReward(Math.floor(mergeCount / 3) + topTier * 2, MAX_REWARD);
+	}
+
 	function clamp(value: number, min: number, max: number): number {
 		return Math.max(min, Math.min(max, value));
-	}
-
-	function matterGlobal(): MatterApi | undefined {
-		return (window as Window & { Matter?: MatterApi }).Matter;
-	}
-
-	async function waitForMatter(): Promise<MatterApi | null> {
-		for (let attempt = 0; attempt < 80; attempt++) {
-			const api = matterGlobal();
-			if (api) return api;
-			await new Promise((resolve) => setTimeout(resolve, 50));
-		}
-		return null;
 	}
 
 	function circleData(body: MatterBody): PopData | null {
@@ -256,7 +289,12 @@
 		lastPopTier = null;
 		gameOver = false;
 		readyAt = 0;
-		nextTier = randomDropTier();
+		awarded = 0;
+		threat = 0;
+		settleSaves = heartTier;
+		settleSavesUsed = 0;
+		saveFlashUntil = 0;
+		upcoming = makeUpcoming();
 		pendingMerges = [];
 
 		if (!M || !engine || !runner) return;
@@ -278,6 +316,10 @@
 	function drop(event: PointerEvent) {
 		event.preventDefault();
 		trackPointer(event);
+		performDrop();
+	}
+
+	function performDrop() {
 		if (!M || !engine || !matterReady || gameOver || Date.now() < readyAt) return;
 
 		const tier = nextTier;
@@ -288,9 +330,28 @@
 
 		M.World.add(engine.world, body);
 		M.Body.setVelocity(body, { x: (Math.random() - 0.5) * 0.4, y: 0.35 });
-		readyAt = Date.now() + DROP_COOLDOWN_MS;
-		nextTier = randomDropTier();
+		readyAt = Date.now() + dropCooldownMs;
+		upcoming = [...upcoming.slice(1), randomDropTier()];
 		refreshBodyCount();
+	}
+
+	function moveCursor(direction: -1 | 1) {
+		const radius = tiers[nextTier].radius;
+		cursorX = clamp(cursorX + direction * 26, radius + 6, WIDTH - radius - 6);
+	}
+
+	function handleKeydown(event: KeyboardEvent) {
+		const key = event.key.toLowerCase();
+		if (key === 'arrowleft' || key === 'a') {
+			event.preventDefault();
+			moveCursor(-1);
+		} else if (key === 'arrowright' || key === 'd') {
+			event.preventDefault();
+			moveCursor(1);
+		} else if (key === ' ' || key === 'arrowdown' || key === 'enter') {
+			event.preventDefault();
+			performDrop();
+		}
 	}
 
 	function handleCollisionStart(event: { pairs: MatterPair[] }) {
@@ -357,10 +418,10 @@
 
 		// A new larger body already separates overlaps naturally. The extra impulse
 		// below gives nearby circles a visible Color POP jostle without turning the
-		// pile into chaos.
+		// pile into chaos. Body scales the punch through `popStrength`.
 		M.Body.setVelocity(merged, {
-			x: (Math.random() - 0.5) * 1.4,
-			y: -1.1 - Math.random() * 0.55
+			x: (Math.random() - 0.5) * 1.4 * popStrength,
+			y: (-1.1 - Math.random() * 0.55) * popStrength
 		});
 
 		for (const body of allCircles()) {
@@ -375,29 +436,77 @@
 			if (dist > range) continue;
 
 			const strength = 1 - dist / range;
-			const force = 0.00085 * body.mass * strength;
+			const force = 0.00085 * body.mass * strength * popStrength;
 			M.Body.applyForce(body, body.position, {
 				x: (dx / dist) * force,
-				y: (dy / dist) * force - 0.00018 * body.mass * strength
+				y: (dy / dist) * force - 0.00018 * body.mass * strength * popStrength
 			});
 		}
 	}
 
-	function checkGameOver() {
-		if (!M || !runner || gameOver) return;
-		const current = Date.now();
-		const settledTooHigh = allCircles().some((body) => {
+	function offendingBodies(current: number): MatterBody[] {
+		// Grace lowers the settle-speed bar so a wobbling-but-not-quite-still stack
+		// is judged more leniently before it counts against the danger line.
+		return allCircles().filter((body) => {
 			const data = circleData(body);
 			if (!data || data.merging || current - data.bornAt < SETTLE_AGE_MS) return false;
 			const speed = Math.hypot(body.velocity.x, body.velocity.y);
-			return body.position.y < GAME_OVER_Y && speed < SETTLE_SPEED;
+			return body.position.y < GAME_OVER_Y && speed < settleSpeed;
 		});
+	}
 
-		if (settledTooHigh) {
-			gameOver = true;
-			M.Runner.stop(runner);
-			refreshBodyCount();
+	function applySettleSave(bodies: MatterBody[]) {
+		if (!M) return;
+		settleSaves -= 1;
+		settleSavesUsed += 1;
+		saveFlashUntil = Date.now() + 1100;
+		for (const body of bodies) {
+			const data = circleData(body);
+			if (data) data.bornAt = Date.now();
+			// Shove the offending stack back down so the run keeps going.
+			M.Body.setVelocity(body, { x: (Math.random() - 0.5) * 1.2, y: 3.4 });
 		}
+	}
+
+	function computeThreat(): number {
+		const circles = allCircles();
+		if (circles.length === 0) return 0;
+		const topY = Math.min(...circles.map((body) => body.position.y));
+		const span = HEIGHT * 0.6 - GAME_OVER_Y;
+		return clamp((HEIGHT * 0.6 - topY) / span, 0, 1);
+	}
+
+	function checkGameOver() {
+		if (!M || !runner || gameOver) return;
+		const offenders = offendingBodies(Date.now());
+		if (offenders.length === 0) return;
+
+		// Heart banks one settle-save per tier: nudge the pile down instead of ending.
+		if (settleSaves > 0) {
+			applySettleSave(offenders);
+			return;
+		}
+
+		endRun();
+	}
+
+	function endRun() {
+		if (!M || !runner || gameOver) return;
+		gameOver = true;
+		M.Runner.stop(runner);
+		refreshBodyCount();
+		rounds += 1;
+		awarded = payReward(rewardFor(merges, highTier), MAX_REWARD);
+		const record = recordArcadeRun(GAME_ID, {
+			score,
+			summary: {
+				merges,
+				highTier,
+				saves: settleSavesUsed,
+				awarded
+			}
+		});
+		best = record.bestScore;
 	}
 
 	function drawCanvasOverlay() {
@@ -436,7 +545,39 @@
 			context.stroke();
 		}
 
+		if (Date.now() < saveFlashUntil) {
+			context.globalAlpha = 0.92;
+			context.fillStyle = '#2aa198';
+			context.font = '700 22px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+			context.textAlign = 'center';
+			context.fillText('settle save', WIDTH / 2, GAME_OVER_Y - 16);
+		}
+
 		context.restore();
+	}
+
+	async function bootMatter() {
+		try {
+			// Lazy import so the physics engine is code-split into its own chunk and
+			// only fetched (from our own origin) when the cabinet is opened, keeping
+			// it out of the prerendered server bundle.
+			const mod = (await import('matter-js')) as unknown as { default?: MatterApi } & MatterApi;
+			if (!mounted) return;
+			M = mod.default ?? mod;
+			setupMatter();
+		} catch {
+			if (!mounted) return;
+			loadError = 'Color POP! could not start its physics engine. Retry to try again.';
+		}
+	}
+
+	function retryMatter() {
+		if (matterReady) {
+			resetGame();
+			return;
+		}
+		loadError = '';
+		void bootMatter();
 	}
 
 	onMount(() => {
@@ -444,23 +585,17 @@
 		uiTimer = setInterval(() => {
 			now = Date.now();
 			refreshBodyCount();
+			if (matterReady && !gameOver) threat = computeThreat();
 		}, 120);
 
-		void (async () => {
-			const api = await waitForMatter();
-			if (!mounted) return;
-			if (!api) {
-				loadError = 'Matter.js did not load.';
-				return;
-			}
-			M = api;
-			setupMatter();
-		})();
+		window.addEventListener('keydown', handleKeydown);
+		void bootMatter();
 	});
 
 	onDestroy(() => {
 		mounted = false;
 		if (uiTimer) clearInterval(uiTimer);
+		window.removeEventListener('keydown', handleKeydown);
 		cleanupMatter();
 	});
 </script>
@@ -484,13 +619,22 @@
 				<span class="score-label">drop</span>
 				<span class="score-val">{readyLabel}</span>
 			</div>
-			<div class="score-box">
+			<div class="score-box" class:earned={gameOver && awarded > 0}>
 				<span class="score-label">prize</span>
-				<span class="score-val policy">{scoreOnlyLabel}</span>
+				<span class="score-val">{fmt(gameOver ? awarded : rewardPreview)}</span>
 			</div>
 			<div class="score-box swatch-box">
 				<span class="score-label">next</span>
-				<span class="swatch" style={nextTierStyle} aria-label="next tier color"></span>
+				<span class="swatch-queue">
+					<span class="swatch" style={nextTierStyle} aria-label="next tier color"></span>
+					{#each previewTiers as tier, index (index)}
+						<i
+							class="swatch preview"
+							style={`background:${tiers[tier].color}`}
+							aria-label="upcoming tier color"
+						></i>
+					{/each}
+				</span>
 			</div>
 		</div>
 		<div class="btn-group">
@@ -499,16 +643,22 @@
 		</div>
 	</div>
 
+	<ArcadePetPerks creature={activePet} effects={statEffects} />
+
 	<div class="stat-row" aria-label="Color POP status">
 		<span>tier <b>{highTier}</b><i style={highTierStyle}></i></span>
 		<span>circles <b>{bodyCount}</b></span>
 		<span>last <b>{lastPopTier === null ? '-' : lastPopTier}</b></span>
+		<span class:lit={settleSaves > 0}>saves <b>{settleSaves}</b></span>
 	</div>
+
+	<ArcadeProgress value={threat} label="stack pressure" tone="danger" maxWidth="400px" />
 
 	<div
 		class="canvas-frame"
 		class:cooling={cooldownSeconds > 0}
 		class:stopped={gameOver || Boolean(loadError)}
+		class:saved={saveActive}
 		onpointermove={trackPointer}
 		onpointerdown={drop}
 		role="application"
@@ -519,16 +669,23 @@
 			<div class="game-overlay">
 				<p class="overlay-title">not loaded</p>
 				<p class="overlay-sub">{loadError}</p>
-				<button onclick={resetGame}>retry</button>
+				<button onclick={retryMatter}>retry</button>
 			</div>
 		{:else if gameOver}
 			<div class="game-overlay">
 				<p class="overlay-title">game over</p>
-				<p class="overlay-sub">score {score} · {merges} merges · tier {highTier}</p>
+				<p class="overlay-sub">
+						score {fmt(score)} · {merges} merges · tier {highTier} · best {fmt(best)}{#if settleSavesUsed > 0}
+							· {settleSavesUsed} saved{/if}
+					</p>
 				<button onclick={resetGame}>play again</button>
 			</div>
 		{/if}
 	</div>
+
+	<p class="control-hint">
+		Pointer to aim, click or tap to drop. Arrows or `A` / `D` move, Space or Down drops.
+	</p>
 </div>
 
 <style>
@@ -540,6 +697,20 @@
 		gap: 0.85rem;
 		background: var(--sol-base3);
 		border-top: 2px solid var(--sol-base2);
+	}
+
+	.pop-shell :global(.pet-perks) {
+		width: min(400px, calc(100vw - 3rem));
+	}
+
+	.control-hint {
+		width: min(400px, calc(100vw - 3rem));
+		margin: 0;
+		text-align: center;
+		font-family: var(--font-body);
+		font-style: italic;
+		font-size: 0.78rem;
+		color: var(--sol-base1);
 	}
 
 	.pop-bar {
@@ -608,16 +779,18 @@
 		line-height: 1.1;
 	}
 
-	.score-val.policy {
-		font-family: var(--font-ui);
-		font-size: 0.68rem;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		white-space: nowrap;
+	.score-box.earned {
+		background: color-mix(in srgb, var(--sol-base2) 65%, var(--sol-yellow));
 	}
 
 	.swatch-box {
 		min-width: 3rem;
+	}
+
+	.swatch-queue {
+		display: flex;
+		align-items: center;
+		gap: 0.28rem;
 	}
 
 	.swatch {
@@ -626,6 +799,13 @@
 		border-radius: 50%;
 		border: 2px solid rgba(7, 54, 66, 0.28);
 		box-shadow: inset 0 -3px 0 rgba(7, 54, 66, 0.16);
+	}
+
+	.swatch.preview {
+		width: 0.8rem;
+		height: 0.8rem;
+		opacity: 0.7;
+		box-shadow: none;
 	}
 
 	.btn-group {
@@ -665,7 +845,7 @@
 	.stat-row {
 		width: min(400px, calc(100vw - 3rem));
 		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
+		grid-template-columns: repeat(4, minmax(0, 1fr));
 		gap: 0.4rem;
 	}
 
@@ -683,6 +863,12 @@
 		letter-spacing: 0.14em;
 		text-transform: uppercase;
 		color: var(--sol-base1);
+	}
+
+	.stat-row span.lit {
+		border-color: rgba(42, 161, 152, 0.5);
+		background: rgba(42, 161, 152, 0.12);
+		color: var(--sol-base00);
 	}
 
 	.stat-row b {
@@ -731,6 +917,12 @@
 
 	.canvas-frame.cooling {
 		cursor: wait;
+	}
+
+	.canvas-frame.saved {
+		box-shadow:
+			inset 0 0 0 4px rgba(42, 161, 152, 0.7),
+			0 18px 48px rgba(7, 54, 66, 0.1);
 	}
 
 	.canvas-frame.stopped {
