@@ -1,9 +1,11 @@
 # Marginalia Arcade Polish Roadmap
 
-Status snapshot: June 28, 2026.
+Status snapshot: June 30, 2026.
 
 This roadmap reviews the current Arcade cabinet as it exists in
-`Arcade.svelte`: 14 playable games, 1 coming-soon card, and 3 locked cards.
+`Arcade.svelte`: 14 playable games, 1 coming-soon card, and 3 roadmap cards
+(Word Weave, Star Catcher, The Long Game — see "Coming-Soon And Roadmap
+Cards" for the Week 9 status-honesty pass).
 It is broader than `ARCADE_REVIEW.md`, which is a resource-sharing review and
 is now stale on the game inventory.
 
@@ -61,6 +63,13 @@ the cabinet.
    - Condition Match is marked `soon`.
    - Word Weave, Star Catcher, and The Long Game are hardcoded `locked`.
    - Either wire these statuses to Book state or label them as roadmap promises.
+   - Done in Week 9: Condition Match stays `soon` (it really is next up after
+     the polish cycle). Word Weave and Star Catcher moved to a `roadmap`
+     status with live progress read from `book.writtenConditions` and
+     `book.readingCompletedStars` — wired to real state, but framed as an
+     idea rather than a promise of an unlock with no game behind it yet. The
+     Long Game also moved to `roadmap`, with copy admitting no lifecycle
+     marker is tracked.
 
 ## Core Stat Pattern
 
@@ -88,6 +97,10 @@ Next expansions:
 - Let the active pet participate, not only the creature list.
 - Consider creature pools: recent creatures, favorites, or unknown-only.
 
+Resolved in Week 9:
+- The reveal-progress bar now uses the shared `ArcadeProgress` component
+  instead of a bespoke `.time-track` element with the same gradient.
+
 Rough edges:
 - Only this game uses `dailyLimit`.
 - Daily reset uses `toISOString()`, which is UTC rather than the player's local
@@ -95,6 +108,10 @@ Rough edges:
 - OffscreenCanvas may need a graceful fallback for older browser contexts.
 - The result phase could make the exact learned recognition cue more visible
   without becoming instructional.
+- Its top bar stays bespoke rather than `ArcadeHud`: the "begin"/"practice"
+  start action lives in the field overlay (gated by daily limit and creature
+  pool state), not a fixed HUD button, so it does not share `ArcadeHud`'s
+  always-on start control without changing that flow.
 
 Stat pitch:
 - Body: steadier reveal. Higher Body reduces visual wobble/blur at the very
@@ -118,6 +135,12 @@ Next expansions:
 - Add tile movement/merge animation so the board feels less static.
 - Add a small "pet rules this run" summary on game over.
 - Consider a variant board, such as 5x5, only after the core board is polished.
+
+Resolved in Week 9:
+- It now uses `ArcadeHud` for its title/score/start row instead of a bespoke
+  bar, and the moves-exhausted end state reads "boxed in" instead of a flat
+  "game over" to match the rest of the cabinet's tone (the turn-limit end
+  state already read "turns spent").
 
 Rough edges:
 - It is the only live stat-heavy game, so the stat experience feels isolated.
@@ -155,6 +178,11 @@ Resolved in Week 7:
   retryable error overlay remains as a defensive guard.
 - Heart's settle-save softens the previously abrupt game-over.
 
+Resolved in Week 9:
+- It now uses `ArcadeHud` for its title/score/start row instead of a bespoke
+  bar, and its end-state copy reads "overflowed" instead of a flat "game
+  over" to match the rest of the cabinet's tone.
+
 Rough edges:
 - It uses a local clamp helper rather than shared `arcadeMath`.
 
@@ -186,6 +214,11 @@ Resolved in Week 7:
   pet-perk row.
 - Space / Enter now fire alongside the existing Down key.
 
+Resolved in Week 9:
+- It now uses `ArcadeHud` for its title/score/start row instead of a bespoke
+  bar, and its end-state copy reads "came up short" instead of a flat "game
+  over" to match the rest of the cabinet's tone.
+
 Rough edges:
 - The canvas still has no pointer-free aiming; firing is keyboard-accessible but
   timing still relies on watching the swing.
@@ -211,9 +244,12 @@ Next expansions:
 
 Rough edges:
 - No daily pacing despite a high maximum reward.
-- `cappedReward` is not used.
-- There is an unused derived shuffle value; the pool itself handles shuffling.
+- There is an unused derived shuffle value (`phraseOrder`); the pool itself
+  handles shuffling.
 - Backspacing and partial correction could feel clearer.
+- Week 9 note: this game already routes through the shared `payReward`/
+  `previewReward` helpers; an earlier "`cappedReward` is not used" note here
+  had gone stale and is removed.
 
 Stat pitch:
 - Body: steadier hands. Slightly slower phrase dissolve or larger active input
@@ -234,6 +270,10 @@ Next expansions:
 - Add a post-run breakdown of edible contacts, danger dodges, and time.
 - Add subtle spawn warning at screen edges.
 - Add pet-stat tuning without weakening the "strictly bigger" rule.
+
+Resolved in Week 9:
+- Its hand-rolled `<svg class="field">` wrapper now uses the shared
+  `SvgArena` component for the grid background and frame.
 
 Rough edges:
 - No active-pet stats yet.
@@ -260,8 +300,12 @@ Next expansions:
 - Add one optional challenge route for a higher reward.
 - Add more readable coyote time and jump buffering.
 
+Resolved in Week 9:
+- Its hand-rolled `<svg class="field">` wrapper now uses the shared
+  `SvgArena` component; the hurt-flash tint moved from a background-fill
+  swap to a translucent overlay rect so it survives the shared frame.
+
 Rough edges:
-- No active-pet stats yet.
 - Three lives can feel punishing without checkpoints.
 - Controls need very careful mobile tuning.
 - Current room data is local and should stay local until another platformer
@@ -281,17 +325,26 @@ echoes, builds streaks, sees focus pips, and gets a capped insight payout after
 20 seconds.
 
 Next expansions:
-- Add a daily/session cap or lower faucet pressure.
-- Add keyboard support for accessibility.
+- Add a session cap, separate from the Week 9 per-round cap cut, if repeated
+  back-to-back rounds still feel too generous.
 - Add patterns of decoy behavior, not just more echoes.
 - Add a calm mode that emphasizes accuracy over speed.
 
+Resolved in Week 9:
+- Its cap dropped from 24 to 12. A 20-second round paying out 24 was close to
+  3x the per-minute rate of the next-fastest games (Bullet Dot, Snake); the
+  cabinet's only deliberately grace/heart-protected miss combined with the
+  shortest round in the cabinet made it the easiest reward to farm.
+
 Rough edges:
-- `cappedReward` is not used.
-- The game explicitly allows repeated sets despite a high per-minute payout.
-- It is pointer-first.
+- The game still allows repeated sets back-to-back with no daily or session
+  pacing, only the Week 9 per-round cap cut.
 - A miss fully resets the streak, which may be harsher than the rest of the
   arcade's tone.
+- Note: this game already has keyboard support (arrows/WASD move a reticle,
+  space/enter hits) and already routes through the shared `payReward`/
+  `previewReward` helpers — two earlier "next expansion"/"rough edge" notes
+  here had gone stale and are removed.
 
 Stat pitch:
 - Body: larger target hitbox or slightly longer target pulse.
@@ -310,11 +363,13 @@ Next expansions:
 - Add a "manual aim" or "priority target" option only if it stays simple.
 - Add best survival and best kill count.
 
+Resolved in Week 9:
+- Its hand-rolled `<svg class="field">` wrapper now uses the shared
+  `SvgArena` component; the hit-flash tint moved to a translucent overlay
+  rect so it survives the shared frame.
+
 Rough edges:
-- No active-pet stats yet.
 - Autofire makes the player's agency almost entirely movement-based.
-- Pointer movement and keyboard movement coexist, but the field could show the
-  pointer goal.
 - There is no daily pacing.
 
 Stat pitch:
@@ -331,13 +386,13 @@ upgrades, coins, five waves, enemies with HP, leaks, and insight payout.
 
 Next expansions:
 - Add tower types: slow, splash, long-range.
-- Add a between-wave pause with clearer build affordances.
 - Add sell/refund or repositioning if the first placement feels bad.
-- Add wave preview.
+
+Resolved in Week 9:
+- Its hand-rolled `<svg class="field">` wrapper now uses the shared
+  `SvgArena` component for the grid background and frame.
 
 Rough edges:
-- No active-pet stats yet.
-- Build-before-start works mechanically, but the UI could make that clearer.
 - Only one tower type limits long-term planning.
 - No daily pacing.
 
@@ -355,12 +410,14 @@ planning, patience, and self-collision practice.
 
 Next expansions:
 - Add modes: classic walls, wrap, or obstacle grid.
-- Add a ghost of the next head cell for younger players.
 - Add persistent best score by mode.
 - Add optional slow mode.
 
+Resolved in Week 9:
+- Its hand-rolled `<svg class="field">` wrapper now uses the shared
+  `SvgArena` component for the grid background and frame.
+
 Rough edges:
-- No active-pet stats yet.
 - One mistake ends the run.
 - Direction buttons are useful but could be more spatially arranged on mobile.
 - No daily pacing.
@@ -380,10 +437,12 @@ Next expansions:
 - Add levels with brick layouts.
 - Add powerups: widen paddle, slow ball, pierce one brick.
 - Add serve control before the first launch.
-- Add best clear and best combo memory.
+
+Resolved in Week 9:
+- Its hand-rolled `<svg class="field">` wrapper now uses the shared
+  `SvgArena` component for the grid background and frame.
 
 Rough edges:
-- No active-pet stats yet.
 - One miss ends the run.
 - Paddle hit angles are good but could be more legible.
 - No daily pacing.
@@ -406,6 +465,10 @@ Next expansions:
 - Add a color-safe palette option.
 - Add a visible anchor/orphan preview for Mind-like play.
 - Add better mobile aim/fire separation.
+
+Resolved in Week 9:
+- Its end-state copy reads "jammed" instead of a flat "game over" to match
+  the rest of the cabinet's tone.
 
 Rough edges:
 - Canvas text currently uses CSS-variable font strings that may not resolve as
@@ -446,7 +509,14 @@ Stat pitch:
 - Grace: one extra shot before ceiling drop, or easier snap placement.
 - Heart: one ceiling hold when the canopy reaches danger.
 
-## Coming-Soon And Locked Cards
+## Coming-Soon And Roadmap Cards
+
+Week 9 update: Word Weave, Star Catcher, and The Long Game moved from a
+hardcoded `locked` status with a fixed unlock hint to a `roadmap` status.
+Word Weave and Star Catcher now show live progress read from
+`book.writtenConditions` and `book.readingCompletedStars`; the copy is framed
+as a roadmap idea, not a promise that the card will flip to `play` once the
+number is reached, because no playable component exists behind either yet.
 
 ### Condition Match
 
@@ -470,16 +540,17 @@ Stat pitch:
 
 ### Word Weave
 
-Current progress: Registered as locked with the hint "unlocks after writing 8
-conditions." No unlock wiring or playable component exists.
+Current progress: Registered as `roadmap` with live progress ("roadmap idea
+· N/8 conditions written so far") sourced from `book.writtenConditions`. No
+playable component exists yet.
 
 Next expansions:
-- Wire the unlock to Book condition count or relabel as roadmap.
 - Build a small phrase-arrangement game using condition vocabulary.
 - Start with sentence reconstruction before free-form validation.
+- Decide the real unlock condition once the game exists; today's count is
+  flavor, not a gate.
 
 Rough edges:
-- The locked hint currently promises a mechanism that does not exist.
 - Validation could become brittle if it tries to parse too much too soon.
 
 Stat pitch:
@@ -490,16 +561,17 @@ Stat pitch:
 
 ### Star Catcher
 
-Current progress: Registered as locked with the hint "unlocks after earning 3
-reading stars." No unlock wiring or playable component exists.
+Current progress: Registered as `roadmap` with live progress ("roadmap idea
+· N/3 reading stars earned so far") sourced from `book.readingCompletedStars`.
+No playable component exists yet.
 
 Next expansions:
-- Wire the unlock to reading-star state or relabel as roadmap.
 - Build a falling-object catch game with missed-star pressure.
 - Make the loop about reading falling trajectories, not just reaction speed.
+- Decide the real unlock condition once the game exists; today's count is
+  flavor, not a gate.
 
 Rough edges:
-- Locked state is hardcoded.
 - It overlaps with Bullet Dot and Paddle Break unless the catch mechanic has its
   own feel.
 
@@ -511,12 +583,16 @@ Stat pitch:
 
 ### The Long Game
 
-Current progress: Registered as locked with the hint "unlocks after witnessing a
-full lifecycle." No unlock wiring or playable component exists.
+Current progress: Registered as `roadmap`. Unlike Word Weave and Star
+Catcher, there is no Book field tracking a lifecycle event yet (the closest
+proxy, `knownCount`, only counts creatures reaching full understanding, not a
+birth/death/renewal cycle), so its copy says plainly that no lifecycle marker
+is tracked rather than showing a fabricated progress number.
 
 Next expansions:
 - Decide whether this should be a game, a prestige screen, or an idle ritual.
-- Wire the unlock to lifecycle evidence.
+- Give "a full lifecycle" a real source of truth in the Book before wiring
+  any progress display.
 - Keep it rare and quiet, not another high-frequency reward faucet.
 
 Rough edges:

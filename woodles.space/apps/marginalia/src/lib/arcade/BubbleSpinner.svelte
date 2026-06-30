@@ -906,7 +906,7 @@
 
 	function centerTitle(): string {
 		if (game.phase === 'complete') return awarded > 0 ? `+${fmt(awarded)} insight` : 'clear';
-		if (game.phase === 'over') return 'game over';
+		if (game.phase === 'over') return 'jammed';
 		return 'Bubble Spinner';
 	}
 

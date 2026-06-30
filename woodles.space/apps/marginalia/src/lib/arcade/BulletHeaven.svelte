@@ -3,6 +3,7 @@
 	import ArcadeHud from './ArcadeHud.svelte';
 	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
+	import SvgArena from './SvgArena.svelte';
 	import { clamp, distance, normalize, type Dot } from './arcadeMath';
 	import { arcadeStartLabel } from './arcadeLabels';
 	import { fmt } from '$lib/witch/book.svelte';
@@ -61,7 +62,7 @@
 	let best = $state(loadArcadeRecord(GAME_ID).bestScore);
 	let shields = $state(0);
 	let shieldsUsed = $state(0);
-	let fieldEl: SVGSVGElement;
+	let fieldEl = $state<SVGSVGElement>();
 	let raf = 0;
 	let lastTime = 0;
 	let shotClock = 0;
@@ -95,7 +96,7 @@
 	const statEffects = $derived<ArcadeStatEffects>({
 		body: (_value, tier) => (tier > 0 ? `speed +${tier}` : 'standard speed'),
 		mind: (_value, tier) => (tier > 0 ? 'lead targeting line' : 'nearest target'),
-		grace: (_value, tier) => (tier > 0 ? `hitbox -${tier}` : 'normal hitbox'),
+		grace: (_value, tier) => (tier > 0 ? `hitbox -${tier}` : 'standard hitbox'),
 		heart: (_value, tier) => (tier > 0 ? `${tier} shield${tier === 1 ? '' : 's'}` : 'health only')
 	});
 
@@ -338,7 +339,8 @@
 	}
 
 	function pointerToWorld(event: PointerEvent): Dot {
-		const rect = fieldEl.getBoundingClientRect();
+		const rect = fieldEl?.getBoundingClientRect();
+		if (!rect) return { x: player.x, y: player.y };
 		return {
 			x: clamp(((event.clientX - rect.left) / rect.width) * WORLD_W, 0, WORLD_W),
 			y: clamp(((event.clientY - rect.top) / rect.height) * WORLD_H, 0, WORLD_H)
@@ -352,7 +354,7 @@
 
 	function onPointerDown(event: PointerEvent) {
 		pointerDown = true;
-		fieldEl.setPointerCapture(event.pointerId);
+		fieldEl?.setPointerCapture(event.pointerId);
 		setPointerGoal(event);
 	}
 
@@ -362,7 +364,7 @@
 
 	function onPointerUp(event: PointerEvent) {
 		pointerDown = false;
-		fieldEl.releasePointerCapture(event.pointerId);
+		if (fieldEl?.hasPointerCapture(event.pointerId)) fieldEl.releasePointerCapture(event.pointerId);
 	}
 
 	function onKeyDown(event: KeyboardEvent) {
@@ -414,26 +416,20 @@
 		<ArcadePetPerks creature={activePet} effects={statEffects} />
 	</div>
 
-	<svg
-		bind:this={fieldEl}
-		class="field"
-		class:active={phase === 'running'}
-		class:hit={hurtClock > 0}
-		viewBox={`0 0 ${WORLD_W} ${WORLD_H}`}
-		role="img"
-		aria-label="Bullet Dot arena"
+	<SvgArena
+		bind:element={fieldEl}
+		width={WORLD_W}
+		height={WORLD_H}
+		ariaLabel="Bullet Dot arena"
+		active={phase === 'running'}
+		gridId="heaven-grid"
+		gridOpacity={0.62}
 		onpointerdown={onPointerDown}
 		onpointermove={onPointerMove}
 		onpointerup={onPointerUp}
 		onpointercancel={onPointerUp}
 	>
-		<defs>
-			<pattern id="heaven-grid" width="32" height="32" patternUnits="userSpaceOnUse">
-				<path d="M 32 0 L 0 0 0 32" fill="none" stroke="rgba(88, 110, 117, 0.12)" stroke-width="1" />
-			</pattern>
-		</defs>
-		<rect class="field-bg" width={WORLD_W} height={WORLD_H} rx="6" />
-		<rect width={WORLD_W} height={WORLD_H} fill="url(#heaven-grid)" opacity="0.62" />
+		<rect class="hit-flash" class:active={hurtClock > 0} width={WORLD_W} height={WORLD_H} rx="6" />
 		{#if phase === 'running' && pointerGoal}
 			<circle class="pointer-goal" cx={pointerGoal.x} cy={pointerGoal.y} r="11" />
 		{/if}
@@ -467,7 +463,7 @@
 			<circle class="player-aura" cx={player.x} cy={player.y} r={hurtClock > 0 ? 23 : 18} />
 			<circle class="player" cx={player.x} cy={player.y} r={playerHitRadius} />
 		{/if}
-	</svg>
+	</SvgArena>
 
 	<p class="heaven-note">
 		Survive {ROUND_SECONDS} seconds. The dot fires on its own, because sometimes mercy is automation.
@@ -484,26 +480,13 @@
 		background: var(--sol-base3);
 		border-top: 2px solid var(--sol-base2);
 	}
-	.field {
-		width: min(540px, calc(100vw - 3rem));
-		aspect-ratio: 26 / 17;
-		border: 1px solid var(--sol-base2);
-		border-radius: 6px;
-		background: var(--sol-base2);
-		box-shadow:
-			inset 0 0 0 6px rgba(7, 54, 66, 0.05),
-			0 8px 24px rgba(7, 54, 66, 0.08);
-		touch-action: none;
-		user-select: none;
+	.hit-flash {
+		fill: var(--sol-red);
+		opacity: 0;
+		pointer-events: none;
 	}
-	.field.active {
-		cursor: crosshair;
-	}
-	.field-bg {
-		fill: #fdf6e3;
-	}
-	.field.hit .field-bg {
-		fill: color-mix(in srgb, #fdf6e3 80%, var(--sol-red));
+	.hit-flash.active {
+		opacity: 0.2;
 	}
 	.perks-wrap {
 		width: min(540px, 100%);
