@@ -644,3 +644,68 @@ Stat pitch:
 - Keyboard and pointer/touch paths both work, or the exception is deliberate.
 - Finish/fail states show what happened and invite another try without scolding.
 - The implementation still keeps game rules local unless repetition is proven.
+
+## Week 10 — Release Hardening
+
+Theme: verify the nine-week polish cycle instead of adding new behavior.
+`ARCADE_IMPLEMENTATION_PLAN.md`'s Week 10 task list is the source of this pass.
+
+Findings:
+
+- Reward once-only behavior: audited every `payReward` call site across all 14
+  paying games. Each `finish`/`endRound`/`finishLevel` function transitions its
+  phase state to a terminal value (e.g. `phase = nextPhase`) before crediting
+  insight, and every entry point re-checks that phase first
+  (`if (phase !== 'running') return;` or equivalent). No double-credit path
+  found; no fix needed.
+- Local-best persistence: code-reviewed `arcadeRecords.ts` plus every game's
+  `loadArcadeRecord`/`recordArcadeRun` call sites for `gameId` consistency,
+  then confirmed live in a browser by seeding `localStorage` and reloading
+  `/marginalia/arcade` for Margin Snake, Type Witch, and 2048 (mode-keyed via
+  `stack-2048:endless`). Best scores survive reload in all three. No fix
+  needed.
+- Active-pet graceless degradation: every playable game already renders a
+  baseline "standard X" / "no Y" pet-perk row with `activePet = null`, with no
+  console errors. Confirmed via screenshots at desktop and mobile widths.
+- Desktop and mobile visual + console-error sweep: scripted a headless-browser
+  pass that opened all 14 playable cards at 1280x900 and 390x844, screenshotted
+  each, and watched for console/page errors. Zero errors at either width;
+  zero clipped or broken layouts found.
+- Targeted test gaps: `arcadeRewards.ts` (the shared payout/credit helper) had
+  no test file at all, and `cappedReward`/`clamp` in `arcadeMath.ts` were
+  untested. Testing `arcadeRewards.ts` directly requires touching the real
+  `book` singleton, which uses Svelte 5 rune state (`$state`) — `vitest.config.ts`
+  had no Svelte plugin, so `.svelte.ts` modules failed to compile under Vitest
+  (`$state is not defined`) and `$lib` wasn't aliased. Fixed by adding
+  `@sveltejs/vite-plugin-svelte`'s `svelte()` plugin and a `$lib` resolve alias
+  to `vitest.config.ts`; this unblocks rune-aware testing for any future shared
+  helper, not just this one. Added `arcadeRewards.test.ts` (7 tests covering
+  `previewReward`, `creditInsight`, `payReward`, and `scoreOnlyReason`) and
+  filled the `clamp`/`cappedReward` gap in `arcadeMath.test.ts` (5 new tests).
+  134 passing tests grew to 146.
+
+Validation:
+
+- `pnpm --filter marginalia check`: 0 errors, 0 warnings.
+- `pnpm --filter marginalia test`: 146 passing (was 134; +12 new tests).
+- `pnpm --filter marginalia build`: succeeds.
+- Full cabinet smoke: all 14 playable cards open with no console errors at
+  desktop and mobile widths; reload-persistence and no-pet baselines spot
+  checked live in a browser.
+
+Rough edges noticed but out of scope for this hardening pass (left for the
+post-cycle backlog, since Week 10's job was verification, not new behavior):
+
+- Inkblot's Heart pitch ("one extra practice reveal after daily plays are
+  spent") is described as a Heart-tier perk in `statEffects`, but
+  `canPractice` is unconditional once the daily cap is spent — practice
+  unlocks for every player, not only those with Heart tier. The perk-row copy
+  should either gate practice on Heart tier or stop attributing it to Heart.
+- Insight Rush and Type Witch still have no daily/session pacing despite
+  highest-in-cabinet payout caps, a rough edge already flagged in earlier
+  weeks and still open.
+
+Milestone: full 10-week polish cycle complete. The cabinet has a shared stat
+vocabulary, one payout path, extracted presentation shells, local run memory
+on every playable game, and a verified-clean baseline to build the post-cycle
+backlog (Condition Match first) on top of.

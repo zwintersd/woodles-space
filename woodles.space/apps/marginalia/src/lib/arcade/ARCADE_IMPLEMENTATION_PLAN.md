@@ -1,6 +1,6 @@
 # Marginalia Arcade Implementation Plan
 
-Status snapshot: June 28, 2026.
+Status snapshot: June 30, 2026.
 
 This plan turns `ARCADE_ROADMAP.md` into a staged build sequence. It assumes one
 primary developer working in focused passes, with browser smoke tests after each
@@ -457,22 +457,45 @@ Milestone:
 
 Theme: release hardening.
 
+Status: complete in code as of June 30, 2026.
+
 Tasks:
 
-- Desktop and mobile visual pass for every game.
-- Console-error sweep.
-- Verify reward once-only behavior.
-- Verify local bests persist after reload.
-- Verify active-pet effects degrade gracefully with no pet.
-- Update `ARCADE_ROADMAP.md` with completed/in-progress notes.
-- Add or refresh targeted tests for shared helpers.
+- Desktop and mobile visual pass for every game. Done: scripted a headless
+  pass over all 14 playable cards at 1280x900 and 390x844, screenshotting
+  each. No clipped or broken layouts found.
+- Console-error sweep. Done: zero console/page errors across all 14 games at
+  both widths.
+- Verify reward once-only behavior. Done: every paying game's
+  `finish`/`endRound`/`finishLevel` guards re-entrancy by transitioning phase
+  state to a terminal value before calling `payReward`. No double-credit path
+  found.
+- Verify local bests persist after reload. Done: code-reviewed `gameId`
+  consistency between `loadArcadeRecord`/`recordArcadeRun` call sites across
+  every game, then confirmed live by seeding `localStorage` and reloading for
+  Margin Snake, Type Witch, and 2048 (mode-keyed).
+- Verify active-pet effects degrade gracefully with no pet. Done: every game
+  renders a baseline "standard X"/"no Y" pet-perk row with no active pet and
+  no console errors.
+- Update `ARCADE_ROADMAP.md` with completed/in-progress notes. Done: added a
+  "Week 10 — Release Hardening" section with findings and two rough edges
+  deferred to the post-cycle backlog.
+- Add or refresh targeted tests for shared helpers. Done: `arcadeRewards.ts`
+  had no test file; testing it requires the real `book` singleton, which uses
+  Svelte 5 runes that Vitest couldn't compile (`vitest.config.ts` had no
+  Svelte plugin and no `$lib` alias). Added the `svelte()` plugin and a `$lib`
+  alias to `vitest.config.ts`, then added `arcadeRewards.test.ts` (7 tests)
+  and filled the untested `clamp`/`cappedReward` gap in `arcadeMath.test.ts`
+  (5 tests). 134 passing tests grew to 146.
 
 Validation:
 
-- `pnpm --filter marginalia check`
-- `pnpm --filter marginalia test`
-- `pnpm --filter marginalia build`
-- Browser smoke at `/marginalia/arcade`.
+- `pnpm --filter marginalia check`: 0 errors, 0 warnings.
+- `pnpm --filter marginalia test`: 146 passing.
+- `pnpm --filter marginalia build`: succeeds.
+- Browser smoke at `/marginalia/arcade`: all 14 playable cards open cleanly at
+  desktop and mobile widths; reload-persistence and no-pet baselines spot
+  checked live.
 
 Milestone:
 
