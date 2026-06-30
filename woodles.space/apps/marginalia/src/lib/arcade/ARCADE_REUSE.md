@@ -79,8 +79,9 @@ specialized:
 
 - Inkblot's daily cap, reveal track, canvas, and "next" round flow.
 - 2048's active-pet stat panel and power-up controls.
-- Color POP!'s Matter.js canvas, swatch preview, and resilient CDN loader (it
-  now pays insight through the shared `arcadeRewards` helper).
+- Color POP!'s Matter.js canvas and swatch preview (it bundles `matter-js` as a
+  lazy-imported package and pays insight through the shared `arcadeRewards`
+  helper).
 - Margin Miner's claw level controls (it now pays insight per level through the
   shared `arcadeRewards` helper).
 - SVG arena treatment: responsive width, fixed `viewBox`, Solarized arcade

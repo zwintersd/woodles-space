@@ -150,13 +150,12 @@ Resolved in Week 7:
 - All four core stats have visible effects (see stat pitch below), shown in a
   pet-perk row.
 - Keyboard play landed: arrows / `A` / `D` to aim, Space / Down / Enter to drop.
-- The Matter.js loader now self-injects, falls back to a second CDN host, and
-  degrades to a retryable offline overlay instead of a dead canvas.
+- Matter.js is now a bundled `matter-js` package dependency, lazy-imported and
+  code-split so it loads from our own origin; the CDN `<script>` is gone, and a
+  retryable error overlay remains as a defensive guard.
 - Heart's settle-save softens the previously abrupt game-over.
 
 Rough edges:
-- Matter.js is still a CDN dependency rather than a bundled package; the loader
-  is resilient, but the package still does not own the dependency.
 - It uses a local clamp helper rather than shared `arcadeMath`.
 
 Stat pitch (now implemented):

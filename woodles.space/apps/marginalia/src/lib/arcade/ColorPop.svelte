@@ -57,14 +57,6 @@
 	const SETTLE_SPEED = 0.16;
 	const GAME_ID = 'color-pop';
 	const MAX_REWARD = 22;
-	// Color POP! is rendered by the CDN-loaded Matter.js global. We keep the
-	// dependency external (no bundler import), but the loader below self-injects
-	// the script and falls back to a second CDN host so a blocked or slow primary
-	// CDN degrades to a retryable "offline" state instead of a dead canvas.
-	const MATTER_SRCS = [
-		'https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js',
-		'https://unpkg.com/matter-js@0.20.0/build/matter.min.js'
-	];
 
 	const tiers: Tier[] = [
 		{ radius: 15, color: '#2aa198', density: BODY_DENSITY, points: 20 },
@@ -159,72 +151,6 @@
 
 	function clamp(value: number, min: number, max: number): number {
 		return Math.max(min, Math.min(max, value));
-	}
-
-	function matterGlobal(): MatterApi | undefined {
-		return (window as Window & { Matter?: MatterApi }).Matter;
-	}
-
-	async function pollForMatter(steps: number): Promise<MatterApi | null> {
-		for (let attempt = 0; attempt < steps; attempt++) {
-			const api = matterGlobal();
-			if (api) return api;
-			await new Promise((resolve) => setTimeout(resolve, 50));
-		}
-		return matterGlobal() ?? null;
-	}
-
-	function injectMatter(src: string): Promise<void> {
-		return new Promise((resolve, reject) => {
-			const existing = document.querySelector<HTMLScriptElement>(`script[data-matter='${src}']`);
-			if (existing) {
-				if (existing.dataset.loaded === 'true') return resolve();
-				existing.addEventListener('load', () => resolve(), { once: true });
-				existing.addEventListener('error', () => reject(new Error('matter load failed')), {
-					once: true
-				});
-				return;
-			}
-			const script = document.createElement('script');
-			script.src = src;
-			script.async = true;
-			script.dataset.matter = src;
-			script.addEventListener(
-				'load',
-				() => {
-					script.dataset.loaded = 'true';
-					resolve();
-				},
-				{ once: true }
-			);
-			script.addEventListener(
-				'error',
-				() => {
-					script.remove();
-					reject(new Error('matter load failed'));
-				},
-				{ once: true }
-			);
-			document.head.appendChild(script);
-		});
-	}
-
-	async function loadMatter(): Promise<MatterApi | null> {
-		// The app shell already injects the primary CDN with `defer`; give it a
-		// short head start before we race our own injections.
-		const early = await pollForMatter(24);
-		if (early) return early;
-
-		for (const src of MATTER_SRCS) {
-			try {
-				await injectMatter(src);
-			} catch {
-				continue;
-			}
-			const api = await pollForMatter(20);
-			if (api) return api;
-		}
-		return matterGlobal() ?? null;
 	}
 
 	function circleData(body: MatterBody): PopData | null {
@@ -631,14 +557,18 @@
 	}
 
 	async function bootMatter() {
-		const api = await loadMatter();
-		if (!mounted) return;
-		if (!api) {
-			loadError = 'Matter.js could not load. Check the connection and retry.';
-			return;
+		try {
+			// Lazy import so the physics engine is code-split into its own chunk and
+			// only fetched (from our own origin) when the cabinet is opened, keeping
+			// it out of the prerendered server bundle.
+			const mod = (await import('matter-js')) as unknown as { default?: MatterApi } & MatterApi;
+			if (!mounted) return;
+			M = mod.default ?? mod;
+			setupMatter();
+		} catch {
+			if (!mounted) return;
+			loadError = 'Color POP! could not start its physics engine. Retry to try again.';
 		}
-		M = api;
-		setupMatter();
 	}
 
 	function retryMatter() {

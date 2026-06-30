@@ -315,9 +315,10 @@ Tasks:
   pay insight through `arcadeRewards`. Color POP! caps at 22, Margin Miner at 20.
   2048 stays the only deliberate score-only game (a pet-training toy).
 - Move Color POP! to a local Matter dependency or add a stronger CDN fallback.
-  Done via the fallback path: a self-injecting loader races the app-shell CDN,
-  falls back to a second CDN host, and degrades to a retryable "offline" overlay
-  instead of a dead canvas.
+  Done via the local-dependency path: `matter-js` is now a bundled package
+  dependency, lazy-imported (code-split) on the client so it is served from our
+  own origin instead of a CDN. The CDN `<script>` was removed from `app.html`. A
+  retryable error overlay remains as a defensive guard.
 - Add Color POP! drop/preview/cooldown/settle-save stat effects. Done: Body
   punches merges harder, Mind reveals upcoming drops, Grace shortens the drop
   cooldown and softens the settle threshold, Heart banks settle-saves.
@@ -336,8 +337,8 @@ Validation:
 - Browser smoke: Matter loads, drops merge, game over works, claw fires and
   reels, stat effects are visible. Smoked at `/marginalia/arcade`; both games
   mount with pet-perk rows, insight prizes, progress bars, and keyboard control.
-  Color POP!'s Matter fallback was exercised: with the CDN blocked it showed the
-  retryable offline overlay rather than failing.
+  Color POP! loads its bundled physics engine and drops/merges circles with no
+  CDN dependency.
 
 Milestone:
 

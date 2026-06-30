@@ -33,9 +33,9 @@ Recommendation #1 landed in [`arcadeRewards.ts`](./arcadeRewards.ts):
 - Week 7's physics/timing pass is complete: Color POP! and Margin Miner now pay
   insight through `arcadeRewards`, carry Body/Mind/Grace/Heart effects with
   visible perk rows, keep local records and run summaries, and gained keyboard
-  controls. Color POP!'s Matter.js dependency now loads through a self-injecting
-  loader with a second-CDN fallback and a retryable offline state. 2048 stays the
-  one deliberate score-only game.
+  controls. Color POP!'s Matter.js dependency is now a bundled package
+  (`matter-js`), lazy-imported and code-split so it loads from our own origin
+  instead of a CDN. 2048 stays the one deliberate score-only game.
 - The arcade route now pauses the idle world clock while `activeGame !== null`
   and resumes it when the cabinet returns, resolving recommendation #6 with a
   deliberate "arcade replaces idle accrual while playing" rule.
@@ -63,7 +63,7 @@ round of growth makes the copy-paste expensive.
 |---|---|---|---|---:|:---:|---|
 | Inkblot | `Inkblot.svelte` | play | rAF | 20 | yes | Special daily cap; pays through `arcadeRewards`. |
 | 2048 | `TwoZeroFourEight.svelte` | play | step / keyboard | - | no | Deliberate score-only pet-training toy. |
-| Color POP! | `ColorPop.svelte` | play | Matter.js runner + UI interval | 22 | yes | Active-pet stats, local records, resilient CDN loader. |
+| Color POP! | `ColorPop.svelte` | play | Matter.js runner + UI interval | 22 | yes | Active-pet stats, local records, bundled `matter-js`. |
 | Margin Miner | `MarginMiner.svelte` | play | rAF canvas | 20 | yes | Active-pet stats, local records, level payouts. |
 | Type Witch | `TypeWitch.svelte` | play | interval | 32 | yes | Shared reward helper and HUD/progress shell. |
 | Get Big! | `GetBig.svelte` | play | rAF | 28 | yes | Shared reward helper and HUD/progress shell. |
