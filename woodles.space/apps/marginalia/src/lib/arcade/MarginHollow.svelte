@@ -1,18 +1,25 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import ArcadeHud from './ArcadeHud.svelte';
+	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { clamp, type Dot } from './arcadeMath';
 	import { arcadeStartLabel } from './arcadeLabels';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { payReward, previewReward } from './arcadeRewards';
-	import type { ArcadeActivePet } from './arcadeStats';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
+	import {
+		coreStatValue,
+		statTier,
+		type ArcadeActivePet,
+		type ArcadeStatEffects
+	} from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
 		activePet?: ArcadeActivePet;
 	}
-	let { onclose }: Props = $props();
+	let { onclose, activePet = null }: Props = $props();
 
 	type Phase = 'ready' | 'running' | 'complete' | 'over';
 	type Facing = 'left' | 'right';
@@ -82,6 +89,8 @@
 	const PICKUP_SIZE = 16;
 	const START_LIVES = 3;
 	const MAX_REWARD = 24;
+	const GAME_ID = 'margin-hollow';
+	const COYOTE_STEP = 0.07;
 
 	const ROOMS: Room[] = [
 		{
@@ -212,15 +221,19 @@
 	let player = $state<Player>({ x: ROOMS[0].spawn.x, y: ROOMS[0].spawn.y, vx: 0, vy: 0 });
 	let facing = $state<Facing>('right');
 	let onGround = $state(false);
+	let groundedClock = $state(0);
+	let lastGroundSpot = $state<Dot>({ x: ROOMS[0].spawn.x, y: ROOMS[0].spawn.y });
 	let jumpsUsed = $state(0);
 	let hasWing = $state(false);
 	let hasKey = $state(false);
 	let lives = $state(START_LIVES);
 	let glyphs = $state(0);
 	let deaths = $state(0);
+	let checkpointSaves = $state(0);
+	let checkpointSavesUsed = $state(0);
 	let awarded = $state(0);
 	let rounds = $state(0);
-	let best = $state(0);
+	let best = $state(loadArcadeRecord(GAME_ID).bestScore);
 	let collected = $state<string[]>([]);
 	let message = $state('find the wing');
 	let messageClock = $state(0);
@@ -234,9 +247,49 @@
 	const progress = $derived(
 		clamp((roomIndex + glyphs / Math.max(1, TOTAL_GLYPHS) + (hasWing ? 0.45 : 0) + (hasKey ? 0.55 : 0)) / 5, 0, 1)
 	);
+	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
+	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
+	const graceTier = $derived(statTier(coreStatValue(activePet, 'grace')));
+	const heartTier = $derived(statTier(coreStatValue(activePet, 'heart')));
+	// Body raises the jump, grace grants a coyote window after leaving a ledge,
+	// and heart banks checkpoint saves that cancel a hazard hit outright.
+	const jumpSpeed = $derived(JUMP_SPEED - bodyTier * 16);
+	const coyoteTime = $derived(graceTier * COYOTE_STEP);
+	const statEffects = $derived<ArcadeStatEffects>({
+		body: (_value, tier) => (tier > 0 ? `jump +${tier * 16}` : 'standard jump'),
+		mind: (_value, tier) => (tier > 1 ? 'compass + distance' : tier > 0 ? 'compass arrow' : 'no compass'),
+		grace: (_value, tier) => (tier > 0 ? `coyote +${(tier * COYOTE_STEP).toFixed(2)}s` : 'no coyote window'),
+		heart: (_value, tier) => (tier > 0 ? `${tier} checkpoint save${tier === 1 ? '' : 's'}` : 'no checkpoint save')
+	});
 	const startLabel = $derived(arcadeStartLabel(phase, rounds));
 	const rewardPreview = $derived(rewardFor(glyphs, hasWing, hasKey, phase === 'complete'));
-	const hintLabel = $derived(messageClock > 0 ? message : currentRoom.hint);
+	const mapTarget = $derived.by(() => {
+		if (mindTier <= 0 || phase !== 'running') return null;
+		const open = currentRoom.pickups.filter((pickup) => !collected.includes(pickup.id));
+		if (open.length > 0) {
+			return open.reduce((nearest, pickup) =>
+				Math.hypot(pickup.x - player.x, pickup.y - player.y) <
+				Math.hypot(nearest.x - player.x, nearest.y - player.y)
+					? pickup
+					: nearest
+			);
+		}
+		return (
+			currentRoom.doors.find((candidate) => candidate.to !== undefined && candidate.to > roomIndex) ??
+			currentRoom.doors.find((candidate) => candidate.exit) ??
+			null
+		);
+	});
+	const mapHint = $derived.by(() => {
+		const target = mapTarget;
+		if (!target) return null;
+		const dx = target.x - player.x;
+		const dir = Math.abs(dx) < 6 ? 'here' : dx < 0 ? 'west' : 'east';
+		if (mindTier < 2) return `${target.label} ${dir}`;
+		const dist = Math.round(Math.hypot(target.x - player.x, target.y - player.y));
+		return `${target.label} ${dir} · ${dist}px`;
+	});
+	const hintLabel = $derived(messageClock > 0 ? message : mapHint ?? currentRoom.hint);
 	const roomLabel = $derived(`${roomIndex + 1}/${ROOMS.length}`);
 	const outcomeLabel = $derived.by(() => {
 		if (phase === 'complete') return awarded > 0 ? `+${fmt(awarded)} insight` : 'opened';
@@ -285,12 +338,16 @@
 		player = { x: ROOMS[0].spawn.x, y: ROOMS[0].spawn.y, vx: 0, vy: 0 };
 		facing = 'right';
 		onGround = false;
+		groundedClock = 0;
+		lastGroundSpot = { x: ROOMS[0].spawn.x, y: ROOMS[0].spawn.y };
 		jumpsUsed = 0;
 		hasWing = false;
 		hasKey = false;
 		lives = START_LIVES;
 		glyphs = 0;
 		deaths = 0;
+		checkpointSaves = heartTier;
+		checkpointSavesUsed = 0;
 		awarded = 0;
 		collected = [];
 		hurtClock = 0;
@@ -319,8 +376,19 @@
 		phase = nextPhase;
 		stop();
 		rounds += 1;
-		best = Math.max(best, glyphs);
 		awarded = payReward(rewardFor(glyphs, hasWing, hasKey, nextPhase === 'complete'), MAX_REWARD);
+		const record = recordArcadeRun(GAME_ID, {
+			score: glyphs,
+			summary: {
+				opened: nextPhase === 'complete',
+				hasWing,
+				hasKey,
+				deaths,
+				checkpointSavesUsed,
+				awarded
+			}
+		});
+		best = record.bestScore;
 	}
 
 	function loop(now: number) {
@@ -348,6 +416,8 @@
 	}
 
 	function movePlayer(dt: number) {
+		groundedClock = onGround ? 0 : groundedClock + dt;
+
 		const intent = horizontalIntent();
 		const speed = onGround ? MOVE_SPEED : AIR_SPEED;
 		const targetVx = intent * speed;
@@ -355,7 +425,7 @@
 		let next = {
 			...player,
 			vx: player.vx + (targetVx - player.vx) * blend,
-			vy: clamp(player.vy + GRAVITY * dt, JUMP_SPEED, MAX_FALL)
+			vy: clamp(player.vy + GRAVITY * dt, jumpSpeed, MAX_FALL)
 		};
 
 		if (intent < 0) facing = 'left';
@@ -363,12 +433,14 @@
 
 		if (jumpQueued) {
 			jumpQueued = false;
-			if (onGround) {
-				next.vy = JUMP_SPEED;
+			const coyoteReady = !onGround && jumpsUsed === 0 && groundedClock <= coyoteTime;
+			if (onGround || coyoteReady) {
+				next.vy = jumpSpeed;
 				onGround = false;
 				jumpsUsed = 1;
+				if (coyoteReady) showMessage('coyote step', 0.6);
 			} else if (hasWing && jumpsUsed < 2) {
-				next.vy = JUMP_SPEED * 0.92;
+				next.vy = jumpSpeed * 0.92;
 				jumpsUsed += 1;
 				showMessage('wing step', 0.7);
 			}
@@ -433,7 +505,11 @@
 		}
 
 		onGround = landed;
-		if (landed) jumpsUsed = 0;
+		if (landed) {
+			jumpsUsed = 0;
+			groundedClock = 0;
+			lastGroundSpot = { x: player.x, y: nextY };
+		}
 		player = { ...player, y: nextY, vy: nextVy };
 	}
 
@@ -461,16 +537,23 @@
 		if (!currentRoom.hazards.some((hazard) => overlaps(rect, hazard))) return;
 		hurtClock = 1.1;
 		deaths += 1;
-		lives -= 1;
-		if (lives <= 0) {
-			finish('over');
-			return;
+		if (checkpointSaves > 0) {
+			checkpointSaves -= 1;
+			checkpointSavesUsed += 1;
+			showMessage('checkpoint save');
+		} else {
+			lives -= 1;
+			showMessage('thorns bite');
+			if (lives <= 0) {
+				finish('over');
+				return;
+			}
 		}
-		const spawn = currentRoom.spawn;
-		player = { x: spawn.x, y: spawn.y, vx: 0, vy: 0 };
+		const spot = lastGroundSpot;
+		player = { x: spot.x, y: spot.y, vx: 0, vy: 0 };
 		onGround = false;
 		jumpsUsed = 0;
-		showMessage('thorns bite');
+		groundedClock = 0;
 	}
 
 	function checkDoors() {
@@ -490,6 +573,8 @@
 		player = { x: door.spawn.x, y: door.spawn.y, vx: 0, vy: 0 };
 		onGround = false;
 		jumpsUsed = 0;
+		groundedClock = 0;
+		lastGroundSpot = { x: door.spawn.x, y: door.spawn.y };
 		showMessage(ROOMS[door.to].title.toLowerCase(), 1.1);
 	}
 
@@ -587,6 +672,7 @@
 			{ label: 'lives', value: lives, live: true, tone: 'green' },
 			{ label: 'glyphs', value: `${glyphs}/${TOTAL_GLYPHS}` },
 			{ label: 'wing', value: hasWing ? 'yes' : 'no' },
+			{ label: 'save', value: checkpointSaves, live: checkpointSaves > 0, tone: 'violet' },
 			{ label: 'prize', value: fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview) }
 		]}
 		{startLabel}
@@ -595,6 +681,10 @@
 	/>
 
 	<ArcadeProgress value={progress} label="map progress" tone="magic" maxWidth="560px" />
+
+	<div class="perks-wrap">
+		<ArcadePetPerks creature={activePet} effects={statEffects} />
+	</div>
 
 	<svg
 		class="field"
@@ -677,7 +767,7 @@
 			<text class="center-sub" x={WORLD_W / 2} y={WORLD_H / 2 + 20} text-anchor="middle">
 				{phase === 'ready'
 					? 'run, jump, pick up, open the margin'
-					: `glyphs ${glyphs}/${TOTAL_GLYPHS} - falls ${deaths} - best ${best}`}
+					: `glyphs ${glyphs}/${TOTAL_GLYPHS} - falls ${deaths} - best ${best}${checkpointSavesUsed > 0 ? ` - ${checkpointSavesUsed} saved` : ''}`}
 			</text>
 		{/if}
 	</svg>
@@ -712,6 +802,9 @@
 		gap: 0.9rem;
 		background: var(--sol-base3);
 		border-top: 2px solid var(--sol-base2);
+	}
+	.perks-wrap {
+		width: min(560px, 100%);
 	}
 	.pad-row button {
 		font-family: var(--font-ui);

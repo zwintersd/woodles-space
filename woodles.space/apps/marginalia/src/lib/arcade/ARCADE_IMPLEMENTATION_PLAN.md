@@ -348,6 +348,8 @@ Milestone:
 
 Theme: strategy and platform stat pass.
 
+Status: complete in code as of June 30, 2026.
+
 Games:
 
 - Margin Defense
@@ -355,18 +357,37 @@ Games:
 
 Tasks:
 
-- Add Margin Defense lives/preview/range/refund stat effects.
-- Add clearer between-wave build state.
-- Add Margin Hollow jump/map/coyote/checkpoint stat effects.
-- Add checkpoints or gentler fall recovery.
-- Add local records.
-- Keep room data and platform physics local.
+- Add Margin Defense lives/preview/range/refund stat effects. Done: Body banks
+  extra starting lives, Mind reveals the next wave's size and HP during the
+  build gap, Grace widens tower range, Heart refunds coins when an enemy leaks.
+- Add clearer between-wave build state. Done: a dedicated `building` phase
+  pauses between waves with a countdown, a wave preview banner, and a "send
+  wave now" skip control, while towers can still be built or upgraded.
+- Add Margin Hollow jump/map/coyote/checkpoint stat effects. Done: Body raises
+  jump height, Mind reveals a compass toward the nearest pickup or door (plus
+  distance at tier 2), Grace grants a coyote-time jump window after leaving a
+  ledge, Heart banks checkpoint saves that cancel a hazard hit outright.
+- Add checkpoints or gentler fall recovery. Done: hazard hits now respawn the
+  player at their last grounded spot in the room instead of the room's start,
+  for every player regardless of pet.
+- Add local records. Done: both games use `arcadeRecords` for local bests and
+  recent-run summaries, surfaced in the end-state overlays.
+- Keep room data and platform physics local. Done: `MarginHollow`'s room
+  layout and platform physics, and `TowerDefense`'s path/pad data, stayed local
+  to each game.
 
 Validation:
 
 - `pnpm --filter marginalia check`
+- `pnpm --filter marginalia test`
+- `pnpm --filter marginalia build`
 - Browser smoke: tower build/upgrade, wave clear/fail, platform room transition,
-  pickup, hazard, and door/gate behavior.
+  pickup, hazard, and door/gate behavior. Smoked at `/marginalia/arcade`: Margin
+  Defense builds/upgrades towers, clears into a build-phase countdown with a
+  working skip button, and shows the leak-refund burst on a wave loss. Margin
+  Hollow opens, walks/jumps between rooms, and respawns at the last grounded
+  spot after a hazard hit. Both show pet-perk rows with baseline ("standard
+  lives", "no compass", etc.) labels when no pet is active.
 
 Milestone:
 
