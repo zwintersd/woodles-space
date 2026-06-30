@@ -1,12 +1,39 @@
 import { describe, expect, it } from 'vitest';
 import {
 	axialToPoint,
+	cappedReward,
+	clamp,
 	hexDistance,
 	hexNeighbors,
 	hexesWithinRadius,
 	pointToHex,
 	rotate
 } from './arcadeMath';
+
+describe('clamp', () => {
+	it('keeps in-range values unchanged', () => {
+		expect(clamp(5, 0, 10)).toBe(5);
+	});
+
+	it('clamps below the minimum and above the maximum', () => {
+		expect(clamp(-5, 0, 10)).toBe(0);
+		expect(clamp(15, 0, 10)).toBe(10);
+	});
+});
+
+describe('cappedReward', () => {
+	it('floors negative raw rewards at zero', () => {
+		expect(cappedReward(-10, 20)).toBe(0);
+	});
+
+	it('caps raw rewards at the max', () => {
+		expect(cappedReward(99, 20)).toBe(20);
+	});
+
+	it('passes through in-range raw rewards', () => {
+		expect(cappedReward(12, 20)).toBe(12);
+	});
+});
 
 describe('arcade hex helpers', () => {
 	it('round-trips pointy axial positions through screen space', () => {
