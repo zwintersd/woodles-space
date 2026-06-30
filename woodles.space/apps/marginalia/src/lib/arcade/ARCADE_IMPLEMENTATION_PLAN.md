@@ -397,23 +397,57 @@ Milestone:
 
 Theme: cabinet-level polish and lock honesty.
 
+Status: complete in code as of June 30, 2026.
+
 Tasks:
 
 - Apply `ArcadeHud`, `ArcadeProgress`, and `SvgArena` to remaining good-fit
-  games.
-- Normalize stat-perk display copy across all games.
-- Wire or relabel Condition Match, Word Weave, Star Catcher, and The Long Game.
-- Tune reward caps after all games use the same payout helper.
-- Review all finish/fail copy for tone.
-- Add a small cabinet-level note explaining that the active pet is locked while
-  a game is open, if needed.
+  games. Done: `SvgArena` now wraps Get Big!, Margin Hollow, Paddle Break,
+  Margin Snake, Margin Defense, and Bullet Dot (every SVG-canvas game except
+  Bubble Spinner's deliberately-skipped canvas surface). `ArcadeHud` now also
+  wraps Color POP!, Margin Miner, and 2048; Inkblot's bespoke `.time-track`
+  bar was swapped for `ArcadeProgress`. Inkblot's top bar stays bespoke
+  because its "begin"/"practice" start action lives in the field overlay, not
+  a fixed HUD button, so it does not share `ArcadeHud`'s always-on start
+  control without changing the daily-limit flow.
+- Normalize stat-perk display copy across all games. Done: every game already
+  shared one `aria-label` and perk-row shape; the real drift was the
+  no-bonus baseline word ("normal X" vs "standard X") in six games' stat
+  effects. All six now read "standard X" to match the majority pattern.
+- Wire or relabel Condition Match, Word Weave, Star Catcher, and The Long
+  Game. Done: Condition Match stays `soon` (it is honestly next in the
+  post-cycle backlog). Word Weave and Star Catcher moved to a new `roadmap`
+  status that shows live progress pulled from `book.writtenConditions` and
+  `book.readingCompletedStars`, framed as a roadmap idea rather than a
+  promise of an unlock that has no game behind it yet. The Long Game also
+  moved to `roadmap`, with copy that says plainly there is no lifecycle
+  marker tracked yet instead of implying one exists.
+- Tune reward caps after all games use the same payout helper. Done: Insight
+  Rush's cap dropped from 24 to 12. Its 20-second round was paying out at
+  roughly 3x the per-minute rate of the next-fastest games (Bullet Dot,
+  Snake), a rough edge the roadmap had already flagged twice without fixing.
+- Review all finish/fail copy for tone. Done: four games (Color POP!, Margin
+  Miner, 2048, Bubble Spinner) used a flat "game over" while the rest of the
+  cabinet uses an in-world word + flavor line. They now read "overflowed",
+  "came up short", "boxed in", and "jammed" respectively, matching the
+  established register.
+- Add a small cabinet-level note explaining that the active pet is locked
+  while a game is open, if needed. Done: the lock note already existed in
+  `ActivePetPanel.svelte`, but it is not always in view (narrow widths stack
+  it below the fold). `Arcade.svelte`'s "now playing" header now also shows
+  "{pet} is locked in for this game" whenever a pet is active, regardless of
+  panel position.
 
 Validation:
 
-- `pnpm --filter marginalia check`
-- `pnpm --filter marginalia test`
-- `pnpm --filter marginalia build`
-- Full cabinet smoke: open every playable card once.
+- `pnpm --filter marginalia check`: 0 errors, 0 warnings.
+- `pnpm --filter marginalia test`: 134 passing.
+- `pnpm --filter marginalia build`: succeeds.
+- Full cabinet smoke: scripted a headless-browser pass over all 14 playable
+  cards (open, see the HUD render, return to the grid) plus the 4
+  soon/roadmap cards, and a deeper pass that started six of the
+  newly-migrated `SvgArena` games and confirmed the arena renders with no
+  console errors. No regressions found.
 
 Milestone:
 

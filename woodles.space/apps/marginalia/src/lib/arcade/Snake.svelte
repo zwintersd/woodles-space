@@ -3,6 +3,7 @@
 	import ArcadeHud from './ArcadeHud.svelte';
 	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
+	import SvgArena from './SvgArena.svelte';
 	import type { Dot } from './arcadeMath';
 	import { arcadeStartLabel } from './arcadeLabels';
 	import { fmt } from '$lib/witch/book.svelte';
@@ -80,7 +81,7 @@
 		queuedDir ? `queued ${directionName(queuedDir)}` : nextDir ? `next ${directionName(nextDir)}` : 'steady'
 	);
 	const statEffects = $derived<ArcadeStatEffects>({
-		body: (_value, tier) => (tier > 0 ? 'slower speed ramp' : 'normal speed ramp'),
+		body: (_value, tier) => (tier > 0 ? 'slower speed ramp' : 'standard speed ramp'),
 		mind: (_value, tier) => (tier > 1 ? 'head + food preview' : tier > 0 ? 'head preview' : 'no preview'),
 		grace: (_value, tier) => (tier > 0 ? 'queued turns visible' : 'single turn buffer'),
 		heart: (_value, tier) => (tier > 0 ? `${tier} tail shed${tier === 1 ? '' : 's'}` : 'self-bite ends')
@@ -358,23 +359,16 @@
 		<ArcadePetPerks creature={activePet} effects={statEffects} />
 	</div>
 
-	<svg
-		class="field"
-		class:active={phase === 'running'}
-		style={`--pulse:${pulse.toFixed(3)}`}
-		viewBox={`0 0 ${WORLD_W} ${WORLD_H}`}
-		role="img"
-		aria-label="Margin Snake board"
+	<SvgArena
+		width={WORLD_W}
+		height={WORLD_H}
+		ariaLabel="Margin Snake board"
+		gridId="snake-grid"
+		gridSize={CELL}
+		gridOpacity={0.72}
 		onpointerdown={onPointerDown}
 		onpointerup={onPointerUp}
 	>
-		<defs>
-			<pattern id="snake-grid" width={CELL} height={CELL} patternUnits="userSpaceOnUse">
-				<path d={`M ${CELL} 0 L 0 0 0 ${CELL}`} fill="none" stroke="rgba(88, 110, 117, 0.12)" stroke-width="1" />
-			</pattern>
-		</defs>
-		<rect class="field-bg" width={WORLD_W} height={WORLD_H} rx="6" />
-		<rect width={WORLD_W} height={WORLD_H} fill="url(#snake-grid)" opacity="0.72" />
 		{#if phase === 'running' && mindTier > 0}
 			{@const preview = nextHeadPreview()}
 			<rect class="head-preview" x={cellX(preview) + 3} y={cellY(preview) + 3} width={CELL - 6} height={CELL - 6} rx="5" />
@@ -382,7 +376,15 @@
 		{#if phase === 'running' && mindTier > 1}
 			<rect class="next-food-preview" x={cellX(nextFood) + 5} y={cellY(nextFood) + 5} width={CELL - 10} height={CELL - 10} rx="4" />
 		{/if}
-		<rect class="food-aura" x={cellX(food) + 2} y={cellY(food) + 2} width={CELL - 4} height={CELL - 4} rx="5" />
+		<rect
+			class="food-aura"
+			style={`--pulse:${pulse.toFixed(3)}`}
+			x={cellX(food) + 2}
+			y={cellY(food) + 2}
+			width={CELL - 4}
+			height={CELL - 4}
+			rx="5"
+		/>
 		<rect class="food" x={cellX(food) + 6} y={cellY(food) + 6} width={CELL - 12} height={CELL - 12} rx="3" />
 
 		{#each snake as part, index (`${part.x}:${part.y}:${index}`)}
@@ -408,7 +410,7 @@
 					: `score ${score} · wraps ${wraps} · ${rounds} coil${rounds === 1 ? '' : 's'}`}
 			</text>
 		{/if}
-	</svg>
+	</SvgArena>
 
 	<div class="pad-row" aria-label="direction controls">
 		<button class:pressed={directionName(nextDir) === 'up' || directionName(queuedDir ?? nextDir) === 'up'} onclick={() => setDirection({ x: 0, y: -1 })}>up</button>
@@ -442,24 +444,6 @@
 	}
 	.pad-row button:hover {
 		background: var(--sol-base00);
-	}
-	.field {
-		width: min(540px, calc(100vw - 3rem));
-		aspect-ratio: 11 / 8;
-		border: 1px solid var(--sol-base2);
-		border-radius: 6px;
-		background: var(--sol-base2);
-		box-shadow:
-			inset 0 0 0 6px rgba(7, 54, 66, 0.05),
-			0 8px 24px rgba(7, 54, 66, 0.08);
-		touch-action: none;
-		user-select: none;
-	}
-	.field.active {
-		cursor: grab;
-	}
-	.field-bg {
-		fill: #fdf6e3;
 	}
 	.perks-wrap {
 		width: min(540px, 100%);

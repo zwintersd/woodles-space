@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
+	import ArcadeHud from './ArcadeHud.svelte';
 	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import {
@@ -601,46 +602,31 @@
 </script>
 
 <div class="pop-shell">
-	<div class="pop-bar">
-		<div class="game-id">
-			<span class="game-name">Color POP!</span>
-			<span class="game-hint">match colors into heavier circles</span>
-		</div>
-		<div class="score-group">
-			<div class="score-box">
-				<span class="score-label">score</span>
-				<span class="score-val">{score}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">merges</span>
-				<span class="score-val">{merges}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">drop</span>
-				<span class="score-val">{readyLabel}</span>
-			</div>
-			<div class="score-box" class:earned={gameOver && awarded > 0}>
-				<span class="score-label">prize</span>
-				<span class="score-val">{fmt(gameOver ? awarded : rewardPreview)}</span>
-			</div>
-			<div class="score-box swatch-box">
-				<span class="score-label">next</span>
-				<span class="swatch-queue">
-					<span class="swatch" style={nextTierStyle} aria-label="next tier color"></span>
-					{#each previewTiers as tier, index (index)}
-						<i
-							class="swatch preview"
-							style={`background:${tiers[tier].color}`}
-							aria-label="upcoming tier color"
-						></i>
-					{/each}
-				</span>
-			</div>
-		</div>
-		<div class="btn-group">
-			<button class="ctrl-btn" onclick={resetGame}>new game</button>
-			<button class="ctrl-btn back" onclick={onclose}>arcade</button>
-		</div>
+	<ArcadeHud
+		title="Color POP!"
+		hint="match colors into heavier circles"
+		maxWidth="400px"
+		scores={[
+			{ label: 'score', value: score },
+			{ label: 'merges', value: merges },
+			{ label: 'drop', value: readyLabel, live: cooldownSeconds > 0 },
+			{ label: 'prize', value: fmt(gameOver ? awarded : rewardPreview), earned: gameOver && awarded > 0 }
+		]}
+		startLabel="new game"
+		onstart={resetGame}
+		{onclose}
+	/>
+
+	<div class="swatch-row" aria-label="upcoming tier colors">
+		<span class="swatch-row-label">next</span>
+		<span class="swatch" style={nextTierStyle} aria-label="next tier color"></span>
+		{#each previewTiers as tier, index (index)}
+			<i
+				class="swatch preview"
+				style={`background:${tiers[tier].color}`}
+				aria-label="upcoming tier color"
+			></i>
+		{/each}
 	</div>
 
 	<ArcadePetPerks creature={activePet} effects={statEffects} />
@@ -673,7 +659,7 @@
 			</div>
 		{:else if gameOver}
 			<div class="game-overlay">
-				<p class="overlay-title">game over</p>
+				<p class="overlay-title">overflowed</p>
 				<p class="overlay-sub">
 						score {fmt(score)} · {merges} merges · tier {highTier} · best {fmt(best)}{#if settleSavesUsed > 0}
 							· {settleSavesUsed} saved{/if}
@@ -713,84 +699,20 @@
 		color: var(--sol-base1);
 	}
 
-	.pop-bar {
-		width: 100%;
-		max-width: 660px;
+	.swatch-row {
+		width: min(400px, calc(100vw - 3rem));
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		gap: 0.8rem;
-		flex-wrap: wrap;
+		gap: 0.32rem;
 	}
 
-	.game-id {
-		display: flex;
-		flex-direction: column;
-		gap: 0.1rem;
-	}
-
-	.game-name {
-		font-family: var(--font-counter);
-		font-size: 2rem;
-		line-height: 1;
-		color: var(--sol-base01);
-		letter-spacing: 0.04em;
-	}
-
-	.game-hint {
-		font-family: var(--font-ui);
-		font-size: 0.62rem;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-
-	.score-group {
-		display: flex;
-		gap: 0.4rem;
-		flex-wrap: wrap;
-		justify-content: center;
-	}
-
-	.score-box {
-		background: var(--sol-base2);
-		border-radius: 3px;
-		padding: 0.3rem 0.58rem;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		min-width: 3.1rem;
-		min-height: 2.75rem;
-	}
-
-	.score-label {
+	.swatch-row-label {
 		font-family: var(--font-ui);
 		font-size: 0.56rem;
 		letter-spacing: 0.16em;
 		text-transform: uppercase;
 		color: var(--sol-base1);
-	}
-
-	.score-val {
-		font-family: var(--font-counter);
-		font-size: 1.25rem;
-		color: var(--sol-base01);
-		line-height: 1.1;
-	}
-
-	.score-box.earned {
-		background: color-mix(in srgb, var(--sol-base2) 65%, var(--sol-yellow));
-	}
-
-	.swatch-box {
-		min-width: 3rem;
-	}
-
-	.swatch-queue {
-		display: flex;
-		align-items: center;
-		gap: 0.28rem;
+		margin-right: 0.1rem;
 	}
 
 	.swatch {
@@ -806,40 +728,6 @@
 		height: 0.8rem;
 		opacity: 0.7;
 		box-shadow: none;
-	}
-
-	.btn-group {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-		align-items: flex-end;
-	}
-
-	.ctrl-btn {
-		font-family: var(--font-ui);
-		font-size: 0.66rem;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: var(--sol-base3);
-		background: var(--sol-base0);
-		border-radius: 3px;
-		padding: 0.24rem 0.6rem;
-		white-space: nowrap;
-		transition: background 0.1s;
-	}
-
-	.ctrl-btn:hover {
-		background: var(--sol-base00);
-	}
-
-	.ctrl-btn.back {
-		background: var(--sol-base2);
-		color: var(--sol-base0);
-	}
-
-	.ctrl-btn.back:hover {
-		background: var(--sol-base1);
-		color: var(--sol-base3);
 	}
 
 	.stat-row {
@@ -979,31 +867,5 @@
 
 	.game-overlay button:hover {
 		background: rgba(253, 246, 227, 0.32);
-	}
-
-	@media (max-width: 520px) {
-		.pop-bar,
-		.btn-group,
-		.game-id {
-			align-items: center;
-		}
-
-		.pop-bar {
-			justify-content: center;
-			text-align: center;
-		}
-
-		.btn-group {
-			flex-direction: row;
-		}
-
-		.game-name {
-			font-size: 1.7rem;
-		}
-
-		.score-box {
-			min-width: 2.8rem;
-			padding-inline: 0.48rem;
-		}
 	}
 </style>

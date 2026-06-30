@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
+	import ArcadeHud from './ArcadeHud.svelte';
 	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import {
@@ -775,7 +776,7 @@
 		ctx.textBaseline = 'middle';
 		ctx.fillStyle = '#fdf6e3';
 		ctx.font = '700 52px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-		ctx.fillText(phase === 'level-clear' ? 'LEVEL CLEAR' : 'GAME OVER', WIDTH / 2, 276);
+		ctx.fillText(phase === 'level-clear' ? 'LEVEL CLEAR' : 'CAME UP SHORT', WIDTH / 2, 276);
 		ctx.font = '22px ui-serif, Georgia, serif';
 		ctx.fillText(
 			phase === 'level-clear'
@@ -810,42 +811,25 @@
 </script>
 
 <div class="miner-shell">
-	<div class="miner-bar">
-		<div class="game-id">
-			<span class="game-name">Margin Miner</span>
-			<span class="game-hint">pendulum claw, hard weights, sixty seconds</span>
-		</div>
-		<div class="score-group">
-			<div class="score-box">
-				<span class="score-label">score</span>
-				<span class="score-val">{scoreText}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">target</span>
-				<span class="score-val">{targetText}</span>
-			</div>
-			<div class="score-box live">
-				<span class="score-label">time</span>
-				<span class="score-val">{timerText}</span>
-			</div>
-			<div class="score-box" class:earned={phase !== 'playing' && awarded > 0}>
-				<span class="score-label">prize</span>
-				<span class="score-val">{fmt(phase === 'playing' ? rewardPreview : awarded)}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">state</span>
-				<span class="score-val state">{stateLabel}</span>
-			</div>
-		</div>
-		<div class="btn-group">
-			{#if phase === 'level-clear'}
-				<button class="ctrl-btn" onclick={() => startLevel(level + 1)}>next level</button>
-			{:else}
-				<button class="ctrl-btn" onclick={resetRun}>new game</button>
-			{/if}
-			<button class="ctrl-btn back" onclick={onclose}>arcade</button>
-		</div>
-	</div>
+	<ArcadeHud
+		title="Margin Miner"
+		hint="pendulum claw, hard weights, sixty seconds"
+		maxWidth="800px"
+		scores={[
+			{ label: 'score', value: scoreText },
+			{ label: 'target', value: targetText },
+			{ label: 'time', value: timerText, live: true, tone: 'yellow' },
+			{
+				label: 'prize',
+				value: fmt(phase === 'playing' ? rewardPreview : awarded),
+				earned: phase !== 'playing' && awarded > 0
+			},
+			{ label: 'state', value: stateLabel }
+		]}
+		startLabel={phase === 'level-clear' ? 'next level' : 'new game'}
+		onstart={() => (phase === 'level-clear' ? startLevel(level + 1) : resetRun())}
+		{onclose}
+	/>
 
 	<ArcadePetPerks creature={activePet} effects={statEffects} />
 
@@ -868,7 +852,7 @@
 		<canvas bind:this={canvasEl} width={WIDTH} height={HEIGHT}></canvas>
 		{#if phase !== 'playing'}
 			<div class="game-overlay">
-				<p class="overlay-title">{phase === 'level-clear' ? 'level clear' : 'game over'}</p>
+				<p class="overlay-title">{phase === 'level-clear' ? 'level clear' : 'came up short'}</p>
 				<p class="overlay-sub">
 					{phase === 'level-clear'
 						? `Score ${scoreText}. +${fmt(awarded)} insight. Next target ${nextTargetText}.`
@@ -924,119 +908,6 @@
 		text-transform: uppercase;
 		color: rgba(253, 246, 227, 0.72);
 		margin: 0;
-	}
-
-	.miner-bar {
-		width: 100%;
-		max-width: 800px;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.8rem;
-		flex-wrap: wrap;
-	}
-
-	.game-id {
-		display: flex;
-		flex-direction: column;
-		gap: 0.1rem;
-	}
-
-	.game-name {
-		font-family: var(--font-counter);
-		font-size: 2rem;
-		line-height: 1;
-		color: var(--sol-base01);
-		letter-spacing: 0.04em;
-	}
-
-	.game-hint {
-		font-family: var(--font-ui);
-		font-size: 0.62rem;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-
-	.score-group {
-		display: flex;
-		gap: 0.4rem;
-		flex-wrap: wrap;
-		justify-content: center;
-	}
-
-	.score-box {
-		background: var(--sol-base2);
-		border-radius: 3px;
-		padding: 0.3rem 0.58rem;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		min-width: 3.6rem;
-		min-height: 2.75rem;
-	}
-
-	.score-box.live {
-		background: color-mix(in srgb, var(--sol-base2) 70%, var(--sol-yellow));
-	}
-
-	.score-label {
-		font-family: var(--font-ui);
-		font-size: 0.56rem;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-
-	.score-val {
-		font-family: var(--font-counter);
-		font-size: 1.2rem;
-		color: var(--sol-base01);
-		line-height: 1.1;
-	}
-
-	.score-box.earned {
-		background: color-mix(in srgb, var(--sol-base2) 65%, var(--sol-yellow));
-	}
-
-	.score-val.state {
-		font-size: 0.92rem;
-		letter-spacing: 0.04em;
-	}
-
-	.btn-group {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-		align-items: flex-end;
-	}
-
-	.ctrl-btn {
-		font-family: var(--font-ui);
-		font-size: 0.66rem;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: var(--sol-base3);
-		background: var(--sol-base0);
-		border-radius: 3px;
-		padding: 0.24rem 0.6rem;
-		white-space: nowrap;
-		transition: background 0.1s;
-	}
-
-	.ctrl-btn:hover {
-		background: var(--sol-base00);
-	}
-
-	.ctrl-btn.back {
-		background: var(--sol-base2);
-		color: var(--sol-base0);
-	}
-
-	.ctrl-btn.back:hover {
-		background: var(--sol-base1);
-		color: var(--sol-base3);
 	}
 
 	.status-row {
@@ -1172,21 +1043,6 @@
 	}
 
 	@media (max-width: 740px) {
-		.miner-bar,
-		.btn-group,
-		.game-id {
-			align-items: center;
-		}
-
-		.miner-bar {
-			justify-content: center;
-			text-align: center;
-		}
-
-		.btn-group {
-			flex-direction: row;
-		}
-
 		.status-row {
 			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
@@ -1194,15 +1050,6 @@
 		.status-row span:last-child {
 			grid-column: 1 / -1;
 			justify-content: center;
-		}
-
-		.game-name {
-			font-size: 1.7rem;
-		}
-
-		.score-box {
-			min-width: 3.2rem;
-			padding-inline: 0.48rem;
 		}
 	}
 </style>

@@ -3,6 +3,7 @@
 	import ArcadeHud from './ArcadeHud.svelte';
 	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
+	import SvgArena from './SvgArena.svelte';
 	import { clamp, type Dot } from './arcadeMath';
 	import { arcadeStartLabel } from './arcadeLabels';
 	import { fmt } from '$lib/witch/book.svelte';
@@ -686,21 +687,16 @@
 		<ArcadePetPerks creature={activePet} effects={statEffects} />
 	</div>
 
-	<svg
-		class="field"
-		class:active={phase === 'running'}
-		class:hit={hurtClock > 0}
-		viewBox={`0 0 ${WORLD_W} ${WORLD_H}`}
-		role="img"
-		aria-label="Margin Hollow map"
+	<SvgArena
+		width={WORLD_W}
+		height={WORLD_H}
+		ariaLabel="Margin Hollow map"
+		maxWidth="560px"
+		gridId="hollow-grid"
+		gridSize={30}
+		gridOpacity={0.66}
 	>
-		<defs>
-			<pattern id="hollow-grid" width="30" height="30" patternUnits="userSpaceOnUse">
-				<path d="M 30 0 L 0 0 0 30" fill="none" stroke="rgba(88, 110, 117, 0.12)" stroke-width="1" />
-			</pattern>
-		</defs>
-		<rect class="field-bg" width={WORLD_W} height={WORLD_H} rx="6" />
-		<rect width={WORLD_W} height={WORLD_H} fill="url(#hollow-grid)" opacity="0.66" />
+		<rect class="hit-flash" class:active={hurtClock > 0} width={WORLD_W} height={WORLD_H} rx="6" />
 		<text class="room-title" x="18" y="28">{currentRoom.title}</text>
 
 		{#each currentRoom.doors as door (door.id)}
@@ -770,7 +766,7 @@
 					: `glyphs ${glyphs}/${TOTAL_GLYPHS} - falls ${deaths} - best ${best}${checkpointSavesUsed > 0 ? ` - ${checkpointSavesUsed} saved` : ''}`}
 			</text>
 		{/if}
-	</svg>
+	</SvgArena>
 
 	<div class="pad-row" aria-label="platform controls">
 		<button
@@ -821,25 +817,13 @@
 	.pad-row button:hover {
 		background: var(--sol-base00);
 	}
-	.field {
-		width: min(560px, calc(100vw - 3rem));
-		aspect-ratio: 27 / 16;
-		border: 1px solid var(--sol-base2);
-		border-radius: 6px;
-		background: var(--sol-base2);
-		box-shadow:
-			inset 0 0 0 6px rgba(7, 54, 66, 0.05),
-			0 8px 24px rgba(7, 54, 66, 0.08);
-		user-select: none;
+	.hit-flash {
+		fill: var(--sol-red);
+		opacity: 0;
+		pointer-events: none;
 	}
-	.field.active {
-		cursor: crosshair;
-	}
-	.field-bg {
-		fill: #fdf6e3;
-	}
-	.field.hit .field-bg {
-		fill: color-mix(in srgb, #fdf6e3 82%, var(--sol-red));
+	.hit-flash.active {
+		opacity: 0.18;
 	}
 	.room-title,
 	.door-label,

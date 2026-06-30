@@ -80,7 +80,7 @@
 		return nextPhrase.length > limit ? `${nextPhrase.slice(0, limit)}...` : nextPhrase;
 	});
 	const statEffects = $derived<ArcadeStatEffects>({
-		body: (_value, tier) => (tier > 0 ? `+${tier}s phrase time` : 'normal phrase time'),
+		body: (_value, tier) => (tier > 0 ? `+${tier}s phrase time` : 'standard phrase time'),
 		mind: (_value, tier) => (tier > 0 ? 'next phrase preview' : 'no preview'),
 		grace: (_value, tier) => (tier > 0 ? `${tier} typo grace` : 'strict typos'),
 		heart: (_value, tier) => (tier > 0 ? `${tier} combo shield` : 'combo drops')

@@ -45,7 +45,11 @@
 	}
 
 	const ROUND_SECONDS = 20;
-	const MAX_REWARD = 24;
+	// A 20-second round is the shortest in the cabinet, so its cap stays well
+	// below the per-minute pace of the other quick games (Bullet Dot, Snake)
+	// instead of matching their full-size cap — see ARCADE_ROADMAP.md's
+	// Insight Rush rough edges.
+	const MAX_REWARD = 12;
 
 	let phase = $state<Phase>('ready');
 	let remaining = $state(ROUND_SECONDS);
@@ -98,7 +102,7 @@
 	const startLabel = $derived(arcadeStartLabel(phase, rounds));
 	const shieldLabel = $derived(heartShield > 0 ? 'ready' : heartTier > 0 ? `${shieldCharge}/${Math.max(3, 6 - heartTier)}` : 'none');
 	const statEffects = $derived<ArcadeStatEffects>({
-		body: (_value, tier) => (tier > 0 ? `larger target +${tier}` : 'normal target'),
+		body: (_value, tier) => (tier > 0 ? `larger target +${tier}` : 'standard target'),
 		mind: (_value, tier) => (tier > 0 ? 'fewer early echoes' : 'full echoes'),
 		grace: (_value, tier) => (tier > 0 ? `${tier} stumble save` : 'hard miss reset'),
 		heart: (_value, tier) => (tier > 0 ? 'recharging shield' : 'no shield')

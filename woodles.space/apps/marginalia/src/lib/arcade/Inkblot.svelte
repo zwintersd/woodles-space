@@ -3,6 +3,7 @@
 	import { fmt } from '$lib/witch/book.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
 	import ArcadePetPerks from './ArcadePetPerks.svelte';
+	import ArcadeProgress from './ArcadeProgress.svelte';
 	import {
 		coreStatValue,
 		statTier,
@@ -73,7 +74,7 @@
 		return `${visible}${name.length > visible.length ? '...' : ''}`;
 	});
 	const statEffects = $derived<ArcadeStatEffects>({
-		body: (_value, tier) => (tier > 0 ? `clearer reveal +${tier}` : 'normal reveal'),
+		body: (_value, tier) => (tier > 0 ? `clearer reveal +${tier}` : 'standard reveal'),
 		mind: (_value, tier) => (tier > 0 ? `${tier} letter glint` : 'no glint'),
 		grace: (_value, tier) => (tier > 0 ? 'close guess softened' : 'strict guesses'),
 		heart: (_value, tier) => (tier > 0 ? 'practice after cap' : 'daily cap only')
@@ -344,9 +345,7 @@
 
 	<!-- reveal progress bar -->
 	{#if phase === 'revealing' || phase === 'paused'}
-	<div class="time-track" style="--prog:{revealProgress.toFixed(4)}">
-		<span></span>
-	</div>
+		<ArcadeProgress value={revealProgress} label="reveal progress" tone="violet" maxWidth="520px" />
 	{/if}
 
 	<!-- main field -->
@@ -544,21 +543,6 @@
 	.ctrl-btn.back:hover {
 		background: var(--sol-base1);
 		color: var(--sol-base3);
-	}
-
-	.time-track {
-		width: min(520px, 100%);
-		height: 0.45rem;
-		border-radius: 999px;
-		background: var(--sol-base2);
-		overflow: hidden;
-	}
-	.time-track span {
-		display: block;
-		width: calc(var(--prog) * 100%);
-		height: 100%;
-		background: linear-gradient(90deg, var(--sol-cyan), var(--sol-blue), var(--sol-violet));
-		transition: width 80ms linear;
 	}
 
 	.inkblot-field {

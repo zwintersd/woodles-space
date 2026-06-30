@@ -15,8 +15,9 @@
 	import TwoZeroFourEight from './TwoZeroFourEight.svelte';
 	import TypeWitch from './TypeWitch.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
+	import { book } from '$lib/witch/book.svelte';
 
-	type GameStatus = 'play' | 'soon' | 'locked';
+	type GameStatus = 'play' | 'soon' | 'roadmap';
 
 	interface MiniGame {
 		id: string;
@@ -25,7 +26,7 @@
 		tagline: string;
 		tags: string[];
 		status: GameStatus;
-		lockedHint?: string;
+		roadmapNote?: string;
 	}
 
 	interface Props {
@@ -39,7 +40,10 @@
 	let activeGame = $state<string | null>(null);
 	let rootEl: HTMLDivElement;
 
-	const games: MiniGame[] = [
+	const WORD_WEAVE_TARGET = 8;
+	const STAR_CATCHER_TARGET = 3;
+
+	const games = $derived<MiniGame[]>([
 		{
 			id: 'inkblot',
 			icon: '⬤',
@@ -166,8 +170,8 @@
 			title: 'Word Weave',
 			tagline: 'Arrange scattered words into valid conditions. The Book will know if you\'re wrong.',
 			tags: ['word', 'puzzle'],
-			status: 'locked',
-			lockedHint: 'unlocks after writing 8 conditions'
+			status: 'roadmap',
+			roadmapNote: `roadmap idea · ${Math.min(book.writtenConditions.length, WORD_WEAVE_TARGET)}/${WORD_WEAVE_TARGET} conditions written so far`
 		},
 		{
 			id: 'star-catcher',
@@ -175,8 +179,8 @@
 			title: 'Star Catcher',
 			tagline: 'Guide falling stars into the margin before they blink out. Don\'t miss.',
 			tags: ['action', 'reflex'],
-			status: 'locked',
-			lockedHint: 'unlocks after earning 3 reading stars'
+			status: 'roadmap',
+			roadmapNote: `roadmap idea · ${Math.min(book.readingCompletedStars, STAR_CATCHER_TARGET)}/${STAR_CATCHER_TARGET} reading stars earned so far`
 		},
 		{
 			id: 'the-long-game',
@@ -184,10 +188,10 @@
 			title: 'The Long Game',
 			tagline: 'A prestige loop within the loop. It watches you back.',
 			tags: ['idle', 'meta'],
-			status: 'locked',
-			lockedHint: 'unlocks after witnessing a full lifecycle'
+			status: 'roadmap',
+			roadmapNote: 'roadmap idea · waiting on a real lifecycle marker, not yet tracked'
 		}
-	];
+	]);
 
 	const activeGameData = $derived(games.find((game) => game.id === activeGame) ?? null);
 
@@ -217,7 +221,7 @@
 	const statusLabel: Record<GameStatus, string> = {
 		play: 'play',
 		soon: 'coming soon',
-		locked: 'locked'
+		roadmap: 'roadmap'
 	};
 </script>
 
@@ -241,6 +245,9 @@
 				<div>
 					<p class="active-kicker">now playing</p>
 					<h3>{activeGameData.title}</h3>
+					{#if activePet}
+						<p class="pet-lock-note">{activePet.name} is locked in for this game</p>
+					{/if}
 				</div>
 			</header>
 
@@ -295,7 +302,7 @@
 						{:else if game.status === 'soon'}
 							<span class="play-placeholder">soon</span>
 						{:else}
-							<span class="play-placeholder locked-hint">{game.lockedHint}</span>
+							<span class="play-placeholder roadmap-note">{game.roadmapNote}</span>
 						{/if}
 					</footer>
 				</article>
@@ -397,7 +404,7 @@
 	.game-card.status-play:hover {
 		background: #f7f0d8;
 	}
-	.game-card.status-locked {
+	.game-card.status-roadmap {
 		opacity: 0.72;
 	}
 
@@ -429,7 +436,7 @@
 		color: var(--sol-base0);
 		border: 1px solid var(--sol-base1);
 	}
-	.status-locked .status-badge {
+	.status-roadmap .status-badge {
 		background: var(--sol-base2);
 		color: var(--sol-base1);
 	}
@@ -497,6 +504,13 @@
 		color: var(--sol-base01);
 		margin: 0;
 	}
+	.pet-lock-note {
+		font-family: var(--font-body);
+		font-style: italic;
+		font-size: 0.7rem;
+		color: var(--sol-base1);
+		margin: 0.2rem 0 0;
+	}
 
 	/* ── card footer ────────────────────────────────────────────────────── */
 	.card-footer {
@@ -546,7 +560,7 @@
 		font-style: italic;
 		text-align: right;
 	}
-	.locked-hint {
+	.roadmap-note {
 		color: var(--sol-orange);
 		font-style: normal;
 		font-size: 0.64rem;

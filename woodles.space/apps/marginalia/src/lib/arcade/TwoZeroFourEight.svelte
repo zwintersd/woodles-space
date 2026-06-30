@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import ArcadeHud from './ArcadeHud.svelte';
 	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import {
 		coreStatValue,
@@ -411,35 +412,20 @@
 </script>
 
 <div class="game-shell">
-	<!-- header row -->
-	<div class="game-bar">
-		<div class="game-id">
-			<span class="game-name">2048</span>
-			<span class="game-hint">arrow keys or swipe</span>
-		</div>
-		<div class="score-group">
-			<div class="score-box">
-				<span class="score-label">score</span>
-				<span class="score-val">{score}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">best</span>
-				<span class="score-val">{best}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">turns</span>
-				<span class="score-val">{turnDisplay}</span>
-			</div>
-			<div class="score-box">
-				<span class="score-label">prize</span>
-				<span class="score-val policy">{scoreOnlyLabel}</span>
-			</div>
-		</div>
-		<div class="btn-group">
-			<button class="ctrl-btn" onclick={reset}>new game</button>
-			<button class="ctrl-btn back" onclick={onclose}>← arcade</button>
-		</div>
-	</div>
+	<ArcadeHud
+		title="2048"
+		hint="arrow keys or swipe"
+		maxWidth="360px"
+		scores={[
+			{ label: 'score', value: score },
+			{ label: 'best', value: best },
+			{ label: 'turns', value: turnDisplay },
+			{ label: 'prize', value: scoreOnlyLabel }
+		]}
+		startLabel="new game"
+		onstart={reset}
+		{onclose}
+	/>
 
 	<div class="mode-row" aria-label="2048 mode">
 		<button class:active={mode === 'endless'} onclick={() => setMode('endless')}>endless</button>
@@ -530,7 +516,7 @@
 		{/if}
 		{#if over}
 			<div class="overlay lose">
-				<p class="overlay-title">{overReason === 'turns' ? 'turns spent' : 'game over'}</p>
+				<p class="overlay-title">{overReason === 'turns' ? 'turns spent' : 'boxed in'}</p>
 				<p class="overlay-sub">
 					{overReason === 'turns'
 						? `turn limit reached. final score: ${score}`
@@ -552,102 +538,6 @@
 		gap: 1.1rem;
 		background: var(--sol-base3);
 		border-top: 2px solid var(--sol-base2);
-	}
-
-	/* ── header ─────────────────────────────────────────────────────────── */
-	.game-bar {
-		width: 100%;
-		max-width: 360px;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.8rem;
-		flex-wrap: wrap;
-	}
-	.game-id {
-		display: flex;
-		flex-direction: column;
-		gap: 0.1rem;
-	}
-	.game-name {
-		font-family: var(--font-counter);
-		font-size: 2rem;
-		line-height: 1;
-		color: var(--sol-base01);
-		letter-spacing: 0.04em;
-	}
-	.game-hint {
-		font-family: var(--font-ui);
-		font-size: 0.62rem;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-	.score-group {
-		display: flex;
-		gap: 0.4rem;
-		flex-wrap: wrap;
-		justify-content: flex-end;
-	}
-	.score-box {
-		background: var(--sol-base2);
-		border-radius: 3px;
-		padding: 0.3rem 0.6rem;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		min-width: 3.2rem;
-	}
-	.score-label {
-		font-family: var(--font-ui);
-		font-size: 0.56rem;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-		color: var(--sol-base1);
-	}
-	.score-val {
-		font-family: var(--font-counter);
-		font-size: 1.3rem;
-		color: var(--sol-base01);
-		line-height: 1.1;
-	}
-	.score-val.policy {
-		font-family: var(--font-ui);
-		font-size: 0.64rem;
-		letter-spacing: 0.1em;
-		text-transform: uppercase;
-		line-height: 1.25;
-		max-width: 4.2rem;
-		text-align: center;
-	}
-	.btn-group {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-		align-items: flex-end;
-	}
-	.ctrl-btn {
-		font-family: var(--font-ui);
-		font-size: 0.66rem;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: var(--sol-base3);
-		background: var(--sol-base0);
-		border-radius: 3px;
-		padding: 0.24rem 0.6rem;
-		white-space: nowrap;
-		transition: background 0.1s;
-	}
-	.ctrl-btn:hover {
-		background: var(--sol-base00);
-	}
-	.ctrl-btn.back {
-		background: var(--sol-base2);
-		color: var(--sol-base0);
-	}
-	.ctrl-btn.back:hover {
-		background: var(--sol-base1);
-		color: var(--sol-base3);
 	}
 
 	.mode-row {
@@ -864,16 +754,6 @@
 	}
 
 	@media (max-width: 420px) {
-		.game-bar {
-			justify-content: center;
-		}
-		.game-id,
-		.btn-group {
-			align-items: center;
-		}
-		.score-group {
-			justify-content: center;
-		}
 		.power-grid span {
 			font-size: 0.52rem;
 		}

@@ -3,6 +3,7 @@
 	import ArcadeHud from './ArcadeHud.svelte';
 	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
+	import SvgArena from './SvgArena.svelte';
 	import { clamp, distance, type Dot } from './arcadeMath';
 	import { arcadeStartLabel } from './arcadeLabels';
 	import { fmt } from '$lib/witch/book.svelte';
@@ -146,7 +147,7 @@
 	});
 	const statEffects = $derived<ArcadeStatEffects>({
 		body: (_value, tier) => (tier > 0 ? `start size +${(tier * 1.4).toFixed(1)}` : 'standard start'),
-		mind: (_value, tier) => (tier > 0 ? 'edge warnings + outlines' : 'normal outlines'),
+		mind: (_value, tier) => (tier > 0 ? 'edge warnings + outlines' : 'standard outlines'),
 		grace: (_value, tier) => (tier > 0 ? `brake/turn +${tier}` : 'ice feet'),
 		heart: (_value, tier) => (tier > 0 ? `${tier} bump save${tier === 1 ? '' : 's'}` : 'strict bump')
 	});
@@ -564,17 +565,14 @@
 		<ArcadePetPerks creature={activePet} effects={statEffects} />
 	</div>
 
-	<svg
-		class="field"
-		class:active={phase === 'running'}
-		viewBox={`0 0 ${WORLD_W} ${WORLD_H}`}
-		role="img"
-		aria-label="Get Big arena"
+	<SvgArena
+		width={WORLD_W}
+		height={WORLD_H}
+		ariaLabel="Get Big arena"
+		maxWidth="560px"
+		gridId="big-grid"
 	>
 		<defs>
-			<pattern id="big-grid" width="34" height="34" patternUnits="userSpaceOnUse">
-				<path d="M 34 0 L 0 0 0 34" fill="none" stroke="rgba(88, 110, 117, 0.12)" stroke-width="1" />
-			</pattern>
 			<filter id="jelly-wobble" x="-20%" y="-20%" width="140%" height="140%">
 				<feGaussianBlur in="SourceAlpha" stdDeviation="0.65" result="blur" />
 				<feOffset in="blur" dx="0" dy="1" result="shadow" />
@@ -584,8 +582,6 @@
 				</feMerge>
 			</filter>
 		</defs>
-		<rect class="field-bg" width={WORLD_W} height={WORLD_H} rx="6" />
-		<rect width={WORLD_W} height={WORLD_H} fill="url(#big-grid)" opacity="0.58" />
 
 		{#each enemies as enemy (enemy.id)}
 			{@const preview = incomingPreview(enemy)}
@@ -649,7 +645,7 @@
 						: `score ${score} · eaten ${eaten} · best ${best} · ${rounds} run${rounds === 1 ? '' : 's'}`}
 			</text>
 		{/if}
-	</svg>
+	</SvgArena>
 
 	<div class="pad-row" aria-label="direction controls">
 		<button
@@ -718,23 +714,6 @@
 	}
 	.pad-row button:hover {
 		background: var(--sol-base00);
-	}
-	.field {
-		width: min(560px, calc(100vw - 3rem));
-		aspect-ratio: 27 / 17;
-		border: 1px solid var(--sol-base2);
-		border-radius: 6px;
-		background: var(--sol-base2);
-		box-shadow:
-			inset 0 0 0 6px rgba(7, 54, 66, 0.05),
-			0 8px 24px rgba(7, 54, 66, 0.08);
-		user-select: none;
-	}
-	.field.active {
-		cursor: none;
-	}
-	.field-bg {
-		fill: #fdf6e3;
 	}
 	.enemy-shadow {
 		fill: rgba(7, 54, 66, 0.12);

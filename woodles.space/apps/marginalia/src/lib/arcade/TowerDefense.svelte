@@ -3,6 +3,7 @@
 	import ArcadeHud from './ArcadeHud.svelte';
 	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
+	import SvgArena from './SvgArena.svelte';
 	import { clamp, distance, normalize, type Dot } from './arcadeMath';
 	import { arcadeStartLabel } from './arcadeLabels';
 	import { fmt } from '$lib/witch/book.svelte';
@@ -500,20 +501,14 @@
 		<ArcadePetPerks creature={activePet} effects={statEffects} />
 	</div>
 
-	<svg
-		class="field"
-		class:active={phase === 'running'}
-		viewBox={`0 0 ${WORLD_W} ${WORLD_H}`}
-		role="img"
-		aria-label="Margin Defense map"
+	<SvgArena
+		width={WORLD_W}
+		height={WORLD_H}
+		ariaLabel="Margin Defense map"
+		active={phase === 'running'}
+		gridId="defense-grid"
+		gridOpacity={0.58}
 	>
-		<defs>
-			<pattern id="defense-grid" width="32" height="32" patternUnits="userSpaceOnUse">
-				<path d="M 32 0 L 0 0 0 32" fill="none" stroke="rgba(88, 110, 117, 0.12)" stroke-width="1" />
-			</pattern>
-		</defs>
-		<rect class="field-bg" width={WORLD_W} height={WORLD_H} rx="6" />
-		<rect width={WORLD_W} height={WORLD_H} fill="url(#defense-grid)" opacity="0.58" />
 		<polyline class="route-shadow" points={pathPoints} />
 		<polyline class="route" points={pathPoints} />
 		<circle class="gate start" cx={PATH[0].x} cy={PATH[0].y} r="12" />
@@ -583,7 +578,7 @@
 					: `score ${kills} · best ${best} · ${rounds} map${rounds === 1 ? '' : 's'}${leakRefund > 0 ? ` · ${leakRefund} refunded` : ''}`}
 			</text>
 		{/if}
-	</svg>
+	</SvgArena>
 
 	<div class="build-row" aria-label="build status">
 		<span>{buildHint}</span>
@@ -603,20 +598,6 @@
 		gap: 0.9rem;
 		background: var(--sol-base3);
 		border-top: 2px solid var(--sol-base2);
-	}
-	.field {
-		width: min(540px, calc(100vw - 3rem));
-		aspect-ratio: 26 / 17;
-		border: 1px solid var(--sol-base2);
-		border-radius: 6px;
-		background: var(--sol-base2);
-		box-shadow:
-			inset 0 0 0 6px rgba(7, 54, 66, 0.05),
-			0 8px 24px rgba(7, 54, 66, 0.08);
-		user-select: none;
-	}
-	.field-bg {
-		fill: #fdf6e3;
 	}
 	.route-shadow,
 	.route {
