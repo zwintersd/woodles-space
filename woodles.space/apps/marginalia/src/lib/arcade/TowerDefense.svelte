@@ -1,19 +1,26 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import ArcadeHud from './ArcadeHud.svelte';
+	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { clamp, distance, normalize, type Dot } from './arcadeMath';
 	import { fmt } from '$lib/witch/book.svelte';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
 	import { payReward, previewReward } from './arcadeRewards';
-	import type { ArcadeActivePet } from './arcadeStats';
+	import {
+		coreStatValue,
+		statTier,
+		type ArcadeActivePet,
+		type ArcadeStatEffects
+	} from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
 		activePet?: ArcadeActivePet;
 	}
-	let { onclose }: Props = $props();
+	let { onclose, activePet = null }: Props = $props();
 
-	type Phase = 'ready' | 'running' | 'complete' | 'over';
+	type Phase = 'ready' | 'running' | 'between' | 'complete' | 'over';
 
 	interface Pad extends Dot {
 		id: string;
@@ -55,6 +62,7 @@
 	const STARTING_LIVES = 8;
 	const TOWER_COST = 4;
 	const UPGRADE_COST = 5;
+	const GAME_ID = 'margin-defense';
 	const MAX_REWARD = 20;
 
 	const PATH: Dot[] = [
@@ -90,7 +98,9 @@
 	let kills = $state(0);
 	let awarded = $state(0);
 	let rounds = $state(0);
-	let best = $state(0);
+	let best = $state(loadArcadeRecord(GAME_ID).bestScore);
+	let refunds = $state(0);
+	let refundsUsed = $state(0);
 	let raf = 0;
 	let lastTime = 0;
 	let spawnClock = 0;
@@ -99,27 +109,48 @@
 	let shotSeq = 0;
 	let burstSeq = 0;
 
+	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
+	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
+	const graceTier = $derived(statTier(coreStatValue(activePet, 'grace')));
+	const heartTier = $derived(statTier(coreStatValue(activePet, 'heart')));
+	const startingLives = $derived(STARTING_LIVES + bodyTier);
 	const pathPoints = PATH.map((point) => `${point.x},${point.y}`).join(' ');
 	const waveSize = $derived(4 + wave * 3);
 	const waveDone = $derived(Math.max(0, waveSize - spawnRemaining));
 	const waveProgress = $derived(
 		phase === 'complete'
 			? 1
-			: Math.min(1, (wave - 1 + waveDone / Math.max(1, waveSize)) / WAVE_COUNT)
+			: phase === 'between'
+				? Math.min(1, wave / WAVE_COUNT)
+				: Math.min(1, (wave - 1 + waveDone / Math.max(1, waveSize)) / WAVE_COUNT)
 	);
-	const startLabel = $derived(phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start');
+	const startLabel = $derived(
+		phase === 'between' ? 'next wave' : phase === 'running' ? 'restart' : rounds > 0 ? 'again' : 'start'
+	);
 	const rewardPreview = $derived(rewardFor(kills, wave, phase === 'complete'));
 	const outcomeLabel = $derived.by(() => {
 		if (phase === 'complete') return awarded > 0 ? `+${fmt(awarded)} insight` : 'held';
 		if (phase === 'over') return 'breached';
+		if (phase === 'between') return 'build';
 		if (rounds > 0) return 'again?';
 		return 'ready?';
 	});
 	const buildHint = $derived.by(() => {
 		if (phase === 'complete') return 'the route is held';
 		if (phase === 'over') return 'the route broke';
+		if (phase === 'between') return `wave ${wave} held. build, upgrade, then launch wave ${wave + 1}`;
 		if (coins < TOWER_COST) return 'earn coins from defeated marks';
 		return `place ${TOWER_COST} coin towers on open sigils`;
+	});
+	const previewWave = $derived(Math.min(WAVE_COUNT, wave + (phase === 'between' ? 1 : 0)));
+	const wavePreview = $derived(
+		mindTier > 0 ? `next ${4 + previewWave * 3} marks / hp ${1 + Math.floor(previewWave / 2)}` : 'preview hidden'
+	);
+	const statEffects = $derived<ArcadeStatEffects>({
+		body: (_value, tier) => (tier > 0 ? `lives +${tier}` : 'standard margin'),
+		mind: (_value, tier) => (tier > 0 ? 'wave preview' : 'no preview'),
+		grace: (_value, tier) => (tier > 0 ? `range +${tier * 8}` : 'standard range'),
+		heart: (_value, tier) => (tier > 0 ? `${tier} refund${tier === 1 ? '' : 's'}` : 'no refunds')
 	});
 
 	function rewardFor(defeated: number, reachedWave: number, cleared: boolean): number {
@@ -135,16 +166,25 @@
 		shots = [];
 		bursts = [];
 		coins = STARTING_COINS;
-		lives = STARTING_LIVES;
+		lives = startingLives;
 		wave = 1;
 		spawnRemaining = 0;
 		spawnedThisWave = 0;
 		kills = 0;
 		awarded = 0;
+		refunds = heartTier;
+		refundsUsed = 0;
 		spawnClock = 0;
 	}
 
 	function start() {
+		if (phase === 'between') {
+			phase = 'running';
+			startWave(wave + 1);
+			lastTime = performance.now();
+			raf = requestAnimationFrame(loop);
+			return;
+		}
 		if (phase !== 'ready') resetMap();
 		phase = 'running';
 		startWave(1);
@@ -169,8 +209,19 @@
 		phase = nextPhase;
 		stop();
 		rounds += 1;
-		best = Math.max(best, kills);
-		awarded = payReward(rewardFor(kills, wave, nextPhase === 'complete'), MAX_REWARD);
+		const reward = rewardFor(kills, wave, nextPhase === 'complete');
+		const record = recordArcadeRun(GAME_ID, {
+			score: kills,
+			summary: {
+				wave,
+				lives,
+				cleared: nextPhase === 'complete',
+				refunds: refundsUsed,
+				awarded: reward
+			}
+		});
+		best = record.bestScore;
+		awarded = payReward(reward, MAX_REWARD);
 	}
 
 	function loop(now: number) {
@@ -201,7 +252,8 @@
 			} else {
 				coins += 3;
 				addBurst(WORLD_W / 2, 38, '+wave');
-				startWave(wave + 1);
+				phase = 'between';
+				stop();
 			}
 		}
 	}
@@ -229,7 +281,7 @@
 	}
 
 	function towerRange(tower: Tower): number {
-		return 86 + tower.level * 12;
+		return 86 + tower.level * 12 + graceTier * 8;
 	}
 
 	function towerDamage(tower: Tower): number {
@@ -249,6 +301,22 @@
 		if (!tower) return coins >= TOWER_COST ? `Build tower on pad ${pad.id}` : `Pad ${pad.id}, need coins`;
 		if (tower.level >= 3) return `Tower ${pad.id} is fully inked`;
 		return coins >= UPGRADE_COST ? `Upgrade tower ${pad.id}` : `Tower ${pad.id}, need coins`;
+	}
+
+	function towerInvestment(tower: Tower): number {
+		return TOWER_COST + (tower.level - 1) * UPGRADE_COST;
+	}
+
+	function refundLastTower() {
+		if (refunds <= 0 || towers.length === 0 || phase === 'complete' || phase === 'over') return;
+		const tower = towers[towers.length - 1];
+		const rate = 0.35 + heartTier * 0.1;
+		const returned = Math.max(1, Math.floor(towerInvestment(tower) * rate));
+		towers = towers.filter((item) => item.id !== tower.id);
+		coins += returned;
+		refunds -= 1;
+		refundsUsed += 1;
+		addBurst(tower.x, tower.y - 18, `+${returned}`);
 	}
 
 	function usePad(pad: Pad) {
@@ -381,7 +449,7 @@
 		}
 
 		if (leaked > 0) {
-			lives = clamp(lives - leaked, 0, STARTING_LIVES);
+			lives = clamp(lives - leaked, 0, startingLives);
 			if (lives <= 0) {
 				enemies = liveEnemies;
 				finish('over');
@@ -408,6 +476,8 @@
 			{ label: 'wave', value: `${wave}/${WAVE_COUNT}` },
 			{ label: 'lives', value: lives, live: true, tone: 'green' },
 			{ label: 'coins', value: coins },
+			{ label: 'refund', value: refunds, live: refunds > 0, tone: 'violet' },
+			{ label: 'best', value: Math.max(kills, best) },
 			{ label: 'prize', value: fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview) }
 		]}
 		{startLabel}
@@ -416,6 +486,10 @@
 	/>
 
 	<ArcadeProgress value={waveProgress} label="wave progress" tone="green" />
+
+	<div class="perks-wrap">
+		<ArcadePetPerks creature={activePet} effects={statEffects} />
+	</div>
 
 	<svg
 		class="field"
@@ -486,21 +560,26 @@
 			<text class="burst" x={burst.x} y={burst.y} text-anchor="middle">{burst.text}</text>
 		{/each}
 
-		{#if phase === 'ready' || phase === 'complete' || phase === 'over'}
+		{#if phase === 'ready' || phase === 'between' || phase === 'complete' || phase === 'over'}
 			<text class="center-title" x={WORLD_W / 2} y={WORLD_H / 2 - 10} text-anchor="middle">
 				{outcomeLabel}
 			</text>
 			<text class="center-sub" x={WORLD_W / 2} y={WORLD_H / 2 + 22} text-anchor="middle">
 				{phase === 'ready'
 					? 'build before or during the run'
-					: `score ${kills} · best ${best} · ${rounds} map${rounds === 1 ? '' : 's'}`}
+					: phase === 'between'
+						? `coins ${coins} · ${wavePreview}`
+						: `score ${kills} · best ${best} · ${rounds} map${rounds === 1 ? '' : 's'}`}
 			</text>
 		{/if}
 	</svg>
 
 	<div class="build-row" aria-label="build status">
 		<span>{buildHint}</span>
-		<span>tower {TOWER_COST} / upgrade {UPGRADE_COST}</span>
+		<span>{mindTier > 0 ? wavePreview : `tower ${TOWER_COST} / upgrade ${UPGRADE_COST}`}</span>
+		{#if heartTier > 0 && refunds > 0 && towers.length > 0 && phase !== 'complete' && phase !== 'over'}
+			<button type="button" onclick={refundLastTower}>refund last</button>
+		{/if}
 	</div>
 </div>
 
@@ -524,6 +603,9 @@
 			inset 0 0 0 6px rgba(7, 54, 66, 0.05),
 			0 8px 24px rgba(7, 54, 66, 0.08);
 		user-select: none;
+	}
+	.perks-wrap {
+		width: min(540px, 100%);
 	}
 	.field-bg {
 		fill: #fdf6e3;
@@ -637,6 +719,19 @@
 	}
 	.build-row span:first-child {
 		color: var(--sol-base0);
+	}
+	.build-row button {
+		font-family: var(--font-ui);
+		font-size: 0.62rem;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--sol-base3);
+		background: var(--sol-base0);
+		border-radius: 3px;
+		padding: 0.24rem 0.62rem;
+	}
+	.build-row button:hover {
+		background: var(--sol-base00);
 	}
 	@media (max-width: 560px) {
 		.center-title {

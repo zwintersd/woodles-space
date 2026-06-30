@@ -24,6 +24,20 @@ Recommendation #1 landed in [`arcadeRewards.ts`](./arcadeRewards.ts):
 
 The remaining findings (#5 tokens/vocabulary, #6-#9) are unchanged.
 
+Week 7 and Week 8 cluster work has now landed:
+
+- Color POP! now uses a local `matter-js` dependency instead of the CDN script,
+  keeps its score-only policy explicit, records local best/run summaries, and
+  exposes Body/Mind/Grace/Heart effects for pop impulse, next-drop preview,
+  cooldown, and settle saves.
+- Margin Miner remains score-only, but now records best/run summaries and uses
+  active-pet stats for heavy reeling, value/weight scan, catch radius, and a
+  close-target extension.
+- Margin Defense now has active-pet lives, wave preview, tower-range, and
+  refund effects, plus a clearer between-wave build state and local records.
+- Margin Hollow now has active-pet jump/run, map-memory, coyote/buffer, and
+  checkpoint-save effects, plus local records.
+
 ## Scope & method
 
 `Arcade.svelte` now registers **18 cards**:
@@ -43,15 +57,15 @@ round of growth makes the copy-paste expensive.
 |---|---|---|---|---:|:---:|---|
 | Inkblot | `Inkblot.svelte` | play | rAF | 20 | yes | Special daily cap; pays through `arcadeRewards`. |
 | 2048 | `TwoZeroFourEight.svelte` | play | step / keyboard | - | no | Only active-pet-stat-driven game. |
-| Color POP! | `ColorPop.svelte` | play | Matter.js runner + UI interval | - | no | Score-only physics merge game. |
-| Margin Miner | `MarginMiner.svelte` | play | rAF canvas | - | no | Score-only claw game with levels. |
+| Color POP! | `ColorPop.svelte` | play | Matter.js runner + UI interval | - | no | Score-only physics merge game with local Matter dependency, pet stats, and records. |
+| Margin Miner | `MarginMiner.svelte` | play | rAF canvas | - | no | Score-only claw game with levels, pet stats, and records. |
 | Type Witch | `TypeWitch.svelte` | play | interval | 32 | yes | Shared reward helper and HUD/progress shell. |
 | Get Big! | `GetBig.svelte` | play | rAF | 28 | yes | Shared reward helper and HUD/progress shell. |
-| Margin Hollow | `MarginHollow.svelte` | play | rAF | 24 | yes | First platform / gate / pickup shape; shared HUD/progress shell. |
+| Margin Hollow | `MarginHollow.svelte` | play | rAF | 24 | yes | First platform / gate / pickup shape; shared HUD/progress shell, pet stats, checkpoints, and records. |
 | Condition Match | - | soon | - | - | no | Placeholder only. |
 | Insight Rush | `InsightRush.svelte` | play | interval + timeouts | 24 | yes | Shared reward helper and HUD/progress shell; explicitly repeatable. |
 | Bullet Dot | `BulletHeaven.svelte` | play | rAF | 18 | yes | Shared reward helper and HUD/progress shell. |
-| Margin Defense | `TowerDefense.svelte` | play | rAF | 20 | yes | Shared reward helper and HUD/progress shell. |
+| Margin Defense | `TowerDefense.svelte` | play | rAF | 20 | yes | Shared reward helper and HUD/progress shell, pet stats, between-wave build state, and records. |
 | Margin Snake | `Snake.svelte` | play | step on rAF | 18 | yes | Shared reward helper and HUD/progress shell. |
 | Paddle Break | `PaddleBreak.svelte` | play | rAF | 22 | yes | Shared reward helper and HUD/progress shell. |
 | Bubble Spinner | `BubbleSpinner.svelte` | play | rAF canvas | 30 | yes | Uses new hex helpers, `rotate`, and shared HUD shell. |

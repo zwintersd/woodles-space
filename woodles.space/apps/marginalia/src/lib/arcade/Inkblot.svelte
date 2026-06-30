@@ -122,7 +122,10 @@
 			typeof OffscreenCanvas === 'undefined'
 				? Object.assign(document.createElement('canvas'), { width: sw, height: sh })
 				: new OffscreenCanvas(sw, sh);
-		const offCtx = offscreen.getContext('2d');
+		const offCtx = offscreen.getContext('2d') as
+			| CanvasRenderingContext2D
+			| OffscreenCanvasRenderingContext2D
+			| null;
 		if (!offCtx) return;
 		offCtx.imageSmoothingEnabled = false;
 		offCtx.drawImage(spriteImg, 0, 0, sw, sh);

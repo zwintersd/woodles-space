@@ -1,13 +1,20 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import type { ArcadeActivePet } from './arcadeStats';
+	import ArcadePetPerks from './ArcadePetPerks.svelte';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
 	import { scoreOnlyReason } from './arcadeRewards';
+	import {
+		coreStatValue,
+		statTier,
+		type ArcadeActivePet,
+		type ArcadeStatEffects
+	} from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
 		activePet?: ArcadeActivePet;
 	}
-	let { onclose }: Props = $props();
+	let { onclose, activePet = null }: Props = $props();
 
 	type ClawMode = 'swinging' | 'firing' | 'reeling';
 	type RoundPhase = 'playing' | 'level-clear' | 'game-over';
@@ -137,12 +144,24 @@
 	let level = $state(1);
 	let score = $state(0);
 	let targetScore = $state(targetForLevel(1));
+	let best = $state(loadArcadeRecord(GAME_ID).bestScore);
 	let remaining = $state(LEVEL_SECONDS);
 	let objectCount = $state(0);
 	let lastHaul = $state('Click, tap, or press Down to fire.');
+	let extensions = $state(0);
+	let extensionsUsed = $state(0);
 
+	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
+	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
+	const graceTier = $derived(statTier(coreStatValue(activePet, 'grace')));
+	const heartTier = $derived(statTier(coreStatValue(activePet, 'heart')));
+	const swingSpeed = $derived(SWING_SPEED * (1 - graceTier * 0.07));
+	const clawCatchRadius = $derived(CLAW_RADIUS + graceTier * 3);
+	const extensionSeconds = $derived(5 + heartTier * 2);
+	const extensionMargin = $derived(180 + heartTier * 140);
 	const scoreText = $derived(formatMoney(score));
 	const targetText = $derived(formatMoney(targetScore));
+	const bestText = $derived(formatMoney(Math.max(score, best)));
 	const timerText = $derived(Math.ceil(remaining).toString().padStart(2, '0'));
 	const stateLabel = $derived.by(() => {
 		if (phase === 'level-clear') return 'CLEAR';
@@ -152,6 +171,17 @@
 	const modeClass = $derived(`mode-${phase === 'playing' ? clawMode : phase}`);
 	const nextTargetText = $derived(formatMoney(targetForLevel(level + 1)));
 	const shortfallText = $derived(formatMoney(Math.max(0, targetScore - score)));
+	const scanLabel = $derived.by(() => {
+		const scan = scannedObject();
+		if (!scan) return mindTier > 0 ? 'scan waiting' : 'scan hidden';
+		return `${scan.name}: ${formatMoney(scan.value)} / ${scan.weightClass}`;
+	});
+	const statEffects = $derived<ArcadeStatEffects>({
+		body: (_value, tier) => (tier > 0 ? `heavy reel +${tier}` : 'standard reel'),
+		mind: (_value, tier) => (tier > 0 ? 'value/weight scan' : 'no scan'),
+		grace: (_value, tier) => (tier > 0 ? `catch radius +${tier * 3}` : 'sharp claw'),
+		heart: (_value, tier) => (tier > 0 ? 'close-target extension' : 'strict timer')
+	});
 
 	function targetForLevel(value: number): number {
 		return Math.round(650 + (value - 1) * 850 + Math.pow(value - 1, 2) * 180);
@@ -170,7 +200,7 @@
 	}
 
 	function currentFireAngle(): number {
-		return Math.PI / 2 + Math.sin(swingTime * SWING_SPEED) * MAX_SWING;
+		return Math.PI / 2 + Math.sin(swingTime * swingSpeed) * MAX_SWING;
 	}
 
 	function clawAngle(): number {
@@ -187,7 +217,35 @@
 
 	function reelSpeed(object: MineObject | null): number {
 		if (!object) return EMPTY_RETRACT_SPEED;
-		return Math.max(MIN_RETRACT_SPEED, BASE_RETRACT_SPEED - object.weight * WEIGHT_MULTIPLIER);
+		return Math.max(
+			MIN_RETRACT_SPEED,
+			BASE_RETRACT_SPEED + bodyTier * 38 - object.weight * WEIGHT_MULTIPLIER
+		);
+	}
+
+	function scannedObject(): MineObject | null {
+		if (mindTier === 0 || phase !== 'playing' || clawMode !== 'swinging') return null;
+		const angle = currentFireAngle();
+		const ux = Math.cos(angle);
+		const uy = Math.sin(angle);
+		let bestObject: MineObject | null = null;
+		let bestProjection = Number.POSITIVE_INFINITY;
+
+		for (const object of objects) {
+			if (object.captured) continue;
+			const dx = object.x - ORIGIN_X;
+			const dy = object.y - ORIGIN_Y;
+			const projection = dx * ux + dy * uy;
+			if (projection < IDLE_LENGTH || projection > HEIGHT - ORIGIN_Y) continue;
+			const perpendicular = Math.abs(dx * -uy + dy * ux);
+			if (perpendicular > object.collisionRadius + 18 + mindTier * 8) continue;
+			if (projection < bestProjection) {
+				bestProjection = projection;
+				bestObject = object;
+			}
+		}
+
+		return bestObject;
 	}
 
 	function createMineObject(kind: MineKind): MineObject {
@@ -278,6 +336,8 @@
 		floaters = [];
 		levelEndsAt = performance.now() + LEVEL_SECONDS * 1000;
 		lastHaul = 'Click, tap, or press Down to fire.';
+		extensions = heartTier > 0 ? 1 : 0;
+		extensionsUsed = 0;
 	}
 
 	function resetRun() {
@@ -315,10 +375,37 @@
 		if (score >= targetScore) {
 			phase = 'level-clear';
 			lastHaul = `Level ${level} cleared. Next target ${formatMoney(targetForLevel(level + 1))}.`;
+			recordRun('level-clear');
 		} else {
+			const shortfall = targetScore - score;
+			if (extensions > 0 && shortfall <= extensionMargin) {
+				extensions -= 1;
+				extensionsUsed += 1;
+				remaining = extensionSeconds;
+				levelEndsAt = performance.now() + extensionSeconds * 1000;
+				lastHaul = `Heart extension: ${extensionSeconds}s to find ${formatMoney(shortfall)}.`;
+				addFloater(ORIGIN_X, ORIGIN_Y + 34, `+${extensionSeconds}s`, 'plain');
+				return;
+			}
 			phase = 'game-over';
 			lastHaul = `Short by ${formatMoney(targetScore - score)}.`;
+			recordRun('game-over');
 		}
+	}
+
+	function recordRun(outcome: Exclude<RoundPhase, 'playing'>) {
+		const record = recordArcadeRun(GAME_ID, {
+			score,
+			summary: {
+				level,
+				target: targetScore,
+				outcome,
+				objects: objectCount,
+				extensions: extensionsUsed,
+				scoreOnly: true
+			}
+		});
+		best = record.bestScore;
 	}
 
 	function beginReel(object: MineObject | null) {
@@ -380,7 +467,7 @@
 			const nextClaw = clawPosition();
 			const hit = objects.find((object) => {
 				if (object.captured) return false;
-				return Math.hypot(nextClaw.x - object.x, nextClaw.y - object.y) <= CLAW_RADIUS + object.collisionRadius;
+				return Math.hypot(nextClaw.x - object.x, nextClaw.y - object.y) <= clawCatchRadius + object.collisionRadius;
 			});
 
 			if (hit) {
@@ -419,6 +506,7 @@
 		drawWorld(ctx);
 		drawObjects(ctx);
 		drawWinch(ctx);
+		drawScan(ctx);
 		drawLineAndClaw(ctx);
 		drawFloaters(ctx);
 		drawCanvasHud(ctx);
@@ -510,6 +598,26 @@
 			ctx.stroke();
 		}
 
+		ctx.restore();
+	}
+
+	function drawScan(ctx: CanvasRenderingContext2D) {
+		const scan = scannedObject();
+		if (!scan) return;
+		ctx.save();
+		ctx.strokeStyle = 'rgba(42, 161, 152, 0.58)';
+		ctx.fillStyle = 'rgba(42, 161, 152, 0.16)';
+		ctx.lineWidth = 2;
+		ctx.setLineDash([7, 6]);
+		ctx.beginPath();
+		ctx.moveTo(ORIGIN_X, ORIGIN_Y);
+		ctx.lineTo(scan.x, scan.y);
+		ctx.stroke();
+		ctx.setLineDash([]);
+		ctx.beginPath();
+		ctx.arc(scan.x, scan.y, scan.collisionRadius + 8, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.stroke();
 		ctx.restore();
 	}
 
@@ -709,6 +817,10 @@
 				<span class="score-label">target</span>
 				<span class="score-val">{targetText}</span>
 			</div>
+			<div class="score-box">
+				<span class="score-label">best</span>
+				<span class="score-val">{bestText}</span>
+			</div>
 			<div class="score-box live">
 				<span class="score-label">time</span>
 				<span class="score-val">{timerText}</span>
@@ -721,6 +833,10 @@
 				<span class="score-label">state</span>
 				<span class="score-val state">{stateLabel}</span>
 			</div>
+			<div class="score-box">
+				<span class="score-label">extend</span>
+				<span class="score-val">{extensions}</span>
+			</div>
 		</div>
 		<div class="btn-group">
 			{#if phase === 'level-clear'}
@@ -732,10 +848,14 @@
 		</div>
 	</div>
 
+	<div class="perks-wrap">
+		<ArcadePetPerks creature={activePet} effects={statEffects} />
+	</div>
+
 	<div class="status-row" aria-label="Margin Miner status">
 		<span>level <b>{level}</b></span>
 		<span>objects <b>{objectCount}</b></span>
-		<span class={modeClass}>{lastHaul}</span>
+		<span class={modeClass}>{mindTier > 0 && clawMode === 'swinging' ? scanLabel : lastHaul}</span>
 	</div>
 
 	<div
@@ -897,6 +1017,10 @@
 		display: grid;
 		grid-template-columns: 5.2rem 6.2rem minmax(0, 1fr);
 		gap: 0.4rem;
+	}
+
+	.perks-wrap {
+		width: min(800px, calc(100vw - 3rem));
 	}
 
 	.status-row span {

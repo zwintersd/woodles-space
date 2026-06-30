@@ -11,6 +11,15 @@ Main rule for this cycle: do not add new games. The goal is to make the current
 cabinet stronger. Condition Match, Word Weave, Star Catcher, and The Long Game
 should only receive status/gating work unless the polish cycle is complete.
 
+Current implementation note:
+
+- Week 7 status: complete. Color POP! and Margin Miner now have intentional
+  score-only records, active-pet stat effects, and the Color POP! Matter.js
+  dependency is local.
+- Week 8 status: complete. Margin Defense and Margin Hollow now have visible
+  active-pet stat effects, local records, and the requested strategy/platform
+  kindness passes.
+
 ## Target Outcome
 
 By September 6, 2026, the Arcade should have:

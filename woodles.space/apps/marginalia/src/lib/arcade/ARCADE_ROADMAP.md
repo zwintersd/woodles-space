@@ -134,19 +134,20 @@ Stat pitch:
 
 Current progress: A Matter.js physics merge game. Dropped circles collide,
 matching tiers merge into larger circles, and a ceiling danger line ends the run.
-It has strong physics, geometry, estimation, and patience value.
+It has strong physics, geometry, estimation, and patience value. It now uses a
+local Matter dependency, remains explicitly score-only, records local runs, and
+shows pet-stat effects for drop impulse, next-drop preview, cooldown, and settle
+saves.
 
 Next expansions:
-- Add insight payout or clearly mark it as score-only.
+- Add insight payout only if the balance pass brings score-only games into the
+  economy.
 - Add a visible goal ladder: next named tier, highest tier reached, clear target.
-- Add a local Matter dependency or a stronger CDN fallback state.
 - Add a daily or session mode if payouts arrive.
 - Add small merge effects that make cause and effect easier to read.
 
 Rough edges:
-- No Book payout yet.
-- Matter.js is loaded from a CDN script in `app.html`, while the package does
-  not own the dependency.
+- No Book payout yet; score-only is deliberate during this balance pass.
 - It uses a local clamp helper rather than shared `arcadeMath`.
 - Game over can feel abrupt when a settled circle crosses the line.
 
@@ -163,19 +164,21 @@ Stat pitch:
 
 Current progress: A claw-machine game with a pendulum, object value, object
 weight, reeling speed, level targets, and timed rounds. It is one of the best
-pure timing/estimation loops in the cabinet.
+pure timing/estimation loops in the cabinet. It now remains explicitly
+score-only while recording best/run summaries and showing pet-stat effects for
+heavy reeling, scan, catch radius, and close-target extension.
 
 Next expansions:
-- Add insight payout on level clear or game over.
+- Add insight payout on level clear or game over only if the balance pass brings
+  score-only games into the economy.
 - Add a small shop between levels: stronger reel, wider claw, one scan pulse.
 - Add object variety that changes timing, not only value.
 - Add a visible "best level" and "best haul."
 
 Rough edges:
-- No Book payout yet.
+- No Book payout yet; score-only is deliberate during this balance pass.
 - The canvas is beautiful but not very accessible beyond click/tap/Down.
-- Level difficulty may need tuning once payouts exist.
-- It does not yet use active-pet stats.
+- Level difficulty may need tuning now that pet effects and records exist.
 
 Stat pitch:
 - Body: faster reeling for heavy objects and slightly stronger claw grip.
@@ -238,7 +241,9 @@ Stat pitch:
 
 Current progress: A compact platform/metroidvania-like game with rooms,
 platforms, gates, pickups, hazards, lives, double jump, key, and exit. It is
-already the arcade's richest spatial-navigation loop.
+already the arcade's richest spatial-navigation loop. It now has visible pet
+effects for jump/run, map memory, coyote/buffer timing, and checkpoint saves,
+with local run records.
 
 Next expansions:
 - Add a map strip showing room connections and collected pickups.
@@ -247,8 +252,7 @@ Next expansions:
 - Add more readable coyote time and jump buffering.
 
 Rough edges:
-- No active-pet stats yet.
-- Three lives can feel punishing without checkpoints.
+- Three lives can still feel punishing if checkpoint saves are not available.
 - Controls need very careful mobile tuning.
 - Current room data is local and should stay local until another platformer
   proves the same vocabulary is needed.
@@ -313,17 +317,17 @@ Stat pitch:
 ### Margin Defense
 
 Current progress: A tower-defense loop with a fixed path, build pads, tower
-upgrades, coins, five waves, enemies with HP, leaks, and insight payout.
+upgrades, coins, five waves, enemies with HP, leaks, and insight payout. It now
+has a between-wave build pause, local records, and visible pet effects for
+lives, wave preview, tower range, and refunds.
 
 Next expansions:
 - Add tower types: slow, splash, long-range.
-- Add a between-wave pause with clearer build affordances.
-- Add sell/refund or repositioning if the first placement feels bad.
-- Add wave preview.
+- Consider deeper sell/repositioning after the first refund pass settles.
 
 Rough edges:
-- No active-pet stats yet.
-- Build-before-start works mechanically, but the UI could make that clearer.
+- Build-before-start and between-wave building work mechanically; future polish
+  can make tower planning richer.
 - Only one tower type limits long-term planning.
 - No daily pacing.
 

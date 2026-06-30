@@ -1,13 +1,20 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import type { ArcadeActivePet } from './arcadeStats';
+	import ArcadePetPerks from './ArcadePetPerks.svelte';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
 	import { scoreOnlyReason } from './arcadeRewards';
+	import {
+		coreStatValue,
+		statTier,
+		type ArcadeActivePet,
+		type ArcadeStatEffects
+	} from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
 		activePet?: ArcadeActivePet;
 	}
-	let { onclose }: Props = $props();
+	let { onclose, activePet = null }: Props = $props();
 
 	type MatterApi = {
 		Bodies: Record<string, (...args: any[]) => any>;
@@ -42,11 +49,11 @@
 	const WALL = 42;
 	const FLOOR = 44;
 	const GAME_OVER_Y = 110;
+	const GAME_ID = 'color-pop';
 	const DROP_COOLDOWN_MS = 1000;
 	const BODY_DENSITY = 0.00235;
 	const SETTLE_AGE_MS = 1700;
 	const SETTLE_SPEED = 0.16;
-	const GAME_ID = 'color-pop';
 	const scoreOnlyLabel = scoreOnlyReason(GAME_ID) ? 'score only' : '-';
 
 	const tiers: Tier[] = [
@@ -83,11 +90,21 @@
 	let bodyCount = $state(0);
 	let cursorX = $state(WIDTH / 2);
 	let nextTier = $state(randomDropTier());
+	let nextPreviewTier = $state(randomDropTier());
 	let readyAt = $state(0);
 	let now = $state(Date.now());
 	let gameOver = $state(false);
 	let lastPopTier = $state<number | null>(null);
+	let best = $state(loadArcadeRecord(GAME_ID).bestScore);
+	let settleSaves = $state(0);
+	let settleSavesUsed = $state(0);
+	let recordedRun = false;
 
+	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
+	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
+	const graceTier = $derived(statTier(coreStatValue(activePet, 'grace')));
+	const heartTier = $derived(statTier(coreStatValue(activePet, 'heart')));
+	const dropCooldownMs = $derived(Math.max(620, DROP_COOLDOWN_MS - graceTier * 110));
 	const cooldownSeconds = $derived(Math.max(0, (readyAt - now) / 1000));
 	const readyLabel = $derived.by(() => {
 		if (loadError) return 'offline';
@@ -97,7 +114,14 @@
 		return 'ready';
 	});
 	const nextTierStyle = $derived(`background:${tiers[nextTier].color}`);
+	const nextPreviewTierStyle = $derived(`background:${tiers[nextPreviewTier].color}`);
 	const highTierStyle = $derived(`background:${tiers[Math.max(0, highTier)].color}`);
+	const statEffects = $derived<ArcadeStatEffects>({
+		body: (_value, tier) => (tier > 0 ? `pop impulse +${tier}` : 'normal pop'),
+		mind: (_value, tier) => (tier > 0 ? 'next drop preview' : 'single drop'),
+		grace: (_value, tier) => (tier > 0 ? `cooldown -${tier * 110}ms` : 'standard cooldown'),
+		heart: (_value, tier) => (tier > 0 ? `${tier} settle save${tier === 1 ? '' : 's'}` : 'hard ceiling')
+	});
 
 	function randomDropTier(): number {
 		return Math.floor(Math.random() * 5);
@@ -108,10 +132,23 @@
 	}
 
 	function matterGlobal(): MatterApi | undefined {
-		return (window as Window & { Matter?: MatterApi }).Matter;
+		return (window as unknown as { Matter?: MatterApi }).Matter;
+	}
+
+	async function localMatter(): Promise<MatterApi | null> {
+		try {
+			const matterModule = await import('matter-js');
+			const moduleWithDefault = matterModule as unknown as { default?: MatterApi };
+			return moduleWithDefault.default ?? (matterModule as unknown as MatterApi);
+		} catch {
+			return null;
+		}
 	}
 
 	async function waitForMatter(): Promise<MatterApi | null> {
+		const localApi = await localMatter();
+		if (localApi) return localApi;
+
 		for (let attempt = 0; attempt < 80; attempt++) {
 			const api = matterGlobal();
 			if (api) return api;
@@ -257,6 +294,10 @@
 		gameOver = false;
 		readyAt = 0;
 		nextTier = randomDropTier();
+		nextPreviewTier = randomDropTier();
+		settleSaves = heartTier;
+		settleSavesUsed = 0;
+		recordedRun = false;
 		pendingMerges = [];
 
 		if (!M || !engine || !runner) return;
@@ -287,9 +328,13 @@
 		const body = makeCircle(tier, x, y);
 
 		M.World.add(engine.world, body);
-		M.Body.setVelocity(body, { x: (Math.random() - 0.5) * 0.4, y: 0.35 });
-		readyAt = Date.now() + DROP_COOLDOWN_MS;
-		nextTier = randomDropTier();
+		M.Body.setVelocity(body, {
+			x: (Math.random() - 0.5) * (0.4 + bodyTier * 0.05),
+			y: 0.35 + bodyTier * 0.08
+		});
+		readyAt = Date.now() + dropCooldownMs;
+		nextTier = nextPreviewTier;
+		nextPreviewTier = randomDropTier();
 		refreshBodyCount();
 	}
 
@@ -375,7 +420,7 @@
 			if (dist > range) continue;
 
 			const strength = 1 - dist / range;
-			const force = 0.00085 * body.mass * strength;
+			const force = 0.00085 * (1 + bodyTier * 0.18) * body.mass * strength;
 			M.Body.applyForce(body, body.position, {
 				x: (dx / dist) * force,
 				y: (dy / dist) * force - 0.00018 * body.mass * strength
@@ -386,7 +431,7 @@
 	function checkGameOver() {
 		if (!M || !runner || gameOver) return;
 		const current = Date.now();
-		const settledTooHigh = allCircles().some((body) => {
+		const settledTooHigh = allCircles().find((body) => {
 			const data = circleData(body);
 			if (!data || data.merging || current - data.bornAt < SETTLE_AGE_MS) return false;
 			const speed = Math.hypot(body.velocity.x, body.velocity.y);
@@ -394,10 +439,46 @@
 		});
 
 		if (settledTooHigh) {
+			if (settleSaves > 0) {
+				const tier = circleTier(settledTooHigh) ?? 0;
+				const radius = settledTooHigh.circleRadius ?? tiers[tier].radius;
+				const data = circleData(settledTooHigh);
+				if (data) data.bornAt = current;
+				settleSaves -= 1;
+				settleSavesUsed += 1;
+				lastPopTier = tier;
+				M.Body.setPosition(settledTooHigh, {
+					x: settledTooHigh.position.x,
+					y: GAME_OVER_Y + radius + 12
+				});
+				M.Body.setVelocity(settledTooHigh, {
+					x: settledTooHigh.velocity.x * 0.25,
+					y: 2.2
+				});
+				refreshBodyCount();
+				return;
+			}
 			gameOver = true;
 			M.Runner.stop(runner);
 			refreshBodyCount();
+			recordRun();
 		}
+	}
+
+	function recordRun() {
+		if (recordedRun) return;
+		recordedRun = true;
+		const record = recordArcadeRun(GAME_ID, {
+			score,
+			summary: {
+				merges,
+				highTier,
+				circles: bodyCount,
+				settleSaves: settleSavesUsed,
+				scoreOnly: true
+			}
+		});
+		best = record.bestScore;
 	}
 
 	function drawCanvasOverlay() {
@@ -481,8 +562,16 @@
 				<span class="score-val">{merges}</span>
 			</div>
 			<div class="score-box">
+				<span class="score-label">best</span>
+				<span class="score-val">{Math.max(score, best)}</span>
+			</div>
+			<div class="score-box">
 				<span class="score-label">drop</span>
 				<span class="score-val">{readyLabel}</span>
+			</div>
+			<div class="score-box">
+				<span class="score-label">save</span>
+				<span class="score-val">{settleSaves}</span>
 			</div>
 			<div class="score-box">
 				<span class="score-label">prize</span>
@@ -492,6 +581,12 @@
 				<span class="score-label">next</span>
 				<span class="swatch" style={nextTierStyle} aria-label="next tier color"></span>
 			</div>
+			{#if mindTier > 0}
+				<div class="score-box swatch-box">
+					<span class="score-label">after</span>
+					<span class="swatch ghost" style={nextPreviewTierStyle} aria-label="following tier color"></span>
+				</div>
+			{/if}
 		</div>
 		<div class="btn-group">
 			<button class="ctrl-btn" onclick={resetGame}>new game</button>
@@ -499,10 +594,14 @@
 		</div>
 	</div>
 
+	<div class="perks-wrap">
+		<ArcadePetPerks creature={activePet} effects={statEffects} />
+	</div>
+
 	<div class="stat-row" aria-label="Color POP status">
 		<span>tier <b>{highTier}</b><i style={highTierStyle}></i></span>
 		<span>circles <b>{bodyCount}</b></span>
-		<span>last <b>{lastPopTier === null ? '-' : lastPopTier}</b></span>
+		<span>{settleSavesUsed > 0 ? 'saved' : 'last'} <b>{settleSavesUsed > 0 ? settleSavesUsed : (lastPopTier ?? '-')}</b></span>
 	</div>
 
 	<div
@@ -626,6 +725,14 @@
 		border-radius: 50%;
 		border: 2px solid rgba(7, 54, 66, 0.28);
 		box-shadow: inset 0 -3px 0 rgba(7, 54, 66, 0.16);
+	}
+
+	.swatch.ghost {
+		opacity: 0.58;
+	}
+
+	.perks-wrap {
+		width: min(400px, calc(100vw - 3rem));
 	}
 
 	.btn-group {

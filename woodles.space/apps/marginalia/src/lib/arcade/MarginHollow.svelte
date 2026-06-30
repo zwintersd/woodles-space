@@ -1,17 +1,24 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import ArcadeHud from './ArcadeHud.svelte';
+	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import { clamp, type Dot } from './arcadeMath';
 	import { fmt } from '$lib/witch/book.svelte';
+	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
 	import { payReward, previewReward } from './arcadeRewards';
-	import type { ArcadeActivePet } from './arcadeStats';
+	import {
+		coreStatValue,
+		statTier,
+		type ArcadeActivePet,
+		type ArcadeStatEffects
+	} from './arcadeStats';
 
 	interface Props {
 		onclose: () => void;
 		activePet?: ArcadeActivePet;
 	}
-	let { onclose }: Props = $props();
+	let { onclose, activePet = null }: Props = $props();
 
 	type Phase = 'ready' | 'running' | 'complete' | 'over';
 	type Facing = 'left' | 'right';
@@ -80,6 +87,7 @@
 	const MAX_FALL = 520;
 	const PICKUP_SIZE = 16;
 	const START_LIVES = 3;
+	const GAME_ID = 'margin-hollow';
 	const MAX_REWARD = 24;
 
 	const ROOMS: Room[] = [
@@ -219,16 +227,32 @@
 	let deaths = $state(0);
 	let awarded = $state(0);
 	let rounds = $state(0);
-	let best = $state(0);
+	let best = $state(loadArcadeRecord(GAME_ID).bestScore);
 	let collected = $state<string[]>([]);
+	let visitedRooms = $state<number[]>([0]);
 	let message = $state('find the wing');
 	let messageClock = $state(0);
 	let hurtClock = $state(0);
+	let coyoteClock = $state(0);
+	let jumpBufferClock = $state(0);
+	let checkpointRoom = $state(0);
+	let checkpointSpawn = $state<Dot>({ ...ROOMS[0].spawn });
+	let checkpointSaves = $state(0);
+	let checkpointSavesUsed = $state(0);
 	let padX = $state(0);
 	let jumpQueued = false;
 	let raf = 0;
 	let lastTime = 0;
 
+	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
+	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
+	const graceTier = $derived(statTier(coreStatValue(activePet, 'grace')));
+	const heartTier = $derived(statTier(coreStatValue(activePet, 'heart')));
+	const moveSpeed = $derived(MOVE_SPEED + bodyTier * 10);
+	const airSpeed = $derived(AIR_SPEED + bodyTier * 7);
+	const jumpSpeed = $derived(JUMP_SPEED - bodyTier * 14);
+	const coyoteWindow = $derived(graceTier > 0 ? 0.05 + graceTier * 0.035 : 0);
+	const jumpBufferWindow = $derived(graceTier > 0 ? 0.07 + graceTier * 0.04 : 0);
 	const currentRoom = $derived(ROOMS[roomIndex]);
 	const progress = $derived(
 		clamp((roomIndex + glyphs / Math.max(1, TOTAL_GLYPHS) + (hasWing ? 0.45 : 0) + (hasKey ? 0.55 : 0)) / 5, 0, 1)
@@ -242,6 +266,12 @@
 		if (phase === 'over') return 'sent back';
 		if (rounds > 0) return 'again?';
 		return 'ready?';
+	});
+	const statEffects = $derived<ArcadeStatEffects>({
+		body: (_value, tier) => (tier > 0 ? `jump/run +${tier}` : 'standard jump'),
+		mind: (_value, tier) => (tier > 0 ? 'room map memory' : 'room by room'),
+		grace: (_value, tier) => (tier > 0 ? 'coyote + jump buffer' : 'strict ledges'),
+		heart: (_value, tier) => (tier > 0 ? `${tier} checkpoint save${tier === 1 ? '' : 's'}` : 'life loss')
 	});
 
 	function rewardFor(foundGlyphs: number, wing: boolean, key: boolean, complete: boolean): number {
@@ -292,7 +322,14 @@
 		deaths = 0;
 		awarded = 0;
 		collected = [];
+		visitedRooms = [0];
+		checkpointRoom = 0;
+		checkpointSpawn = { ...ROOMS[0].spawn };
+		checkpointSaves = heartTier;
+		checkpointSavesUsed = 0;
 		hurtClock = 0;
+		coyoteClock = 0;
+		jumpBufferClock = 0;
 		message = 'find the wing';
 		messageClock = 0;
 		keys.clear();
@@ -318,8 +355,21 @@
 		phase = nextPhase;
 		stop();
 		rounds += 1;
-		best = Math.max(best, glyphs);
-		awarded = payReward(rewardFor(glyphs, hasWing, hasKey, nextPhase === 'complete'), MAX_REWARD);
+		const reward = rewardFor(glyphs, hasWing, hasKey, nextPhase === 'complete');
+		const record = recordArcadeRun(GAME_ID, {
+			score: glyphs,
+			summary: {
+				room: roomIndex + 1,
+				falls: deaths,
+				wing: hasWing,
+				key: hasKey,
+				cleared: nextPhase === 'complete',
+				checkpointSaves: checkpointSavesUsed,
+				awarded: reward
+			}
+		});
+		best = record.bestScore;
+		awarded = payReward(reward, MAX_REWARD);
 	}
 
 	function loop(now: number) {
@@ -332,6 +382,8 @@
 	function step(dt: number) {
 		messageClock = Math.max(0, messageClock - dt);
 		hurtClock = Math.max(0, hurtClock - dt);
+		coyoteClock = Math.max(0, coyoteClock - dt);
+		jumpBufferClock = Math.max(0, jumpBufferClock - dt);
 		movePlayer(dt);
 		collectPickups();
 		checkHazards();
@@ -348,28 +400,34 @@
 
 	function movePlayer(dt: number) {
 		const intent = horizontalIntent();
-		const speed = onGround ? MOVE_SPEED : AIR_SPEED;
+		const speed = onGround ? moveSpeed : airSpeed;
 		const targetVx = intent * speed;
-		const blend = onGround ? 0.42 : 0.22;
+		const blend = onGround ? 0.42 + graceTier * 0.02 : 0.22 + graceTier * 0.035;
 		let next = {
 			...player,
 			vx: player.vx + (targetVx - player.vx) * blend,
-			vy: clamp(player.vy + GRAVITY * dt, JUMP_SPEED, MAX_FALL)
+			vy: clamp(player.vy + GRAVITY * dt, jumpSpeed, MAX_FALL)
 		};
 
 		if (intent < 0) facing = 'left';
 		if (intent > 0) facing = 'right';
 
 		if (jumpQueued) {
-			jumpQueued = false;
-			if (onGround) {
-				next.vy = JUMP_SPEED;
+			if (onGround || coyoteClock > 0) {
+				jumpQueued = false;
+				jumpBufferClock = 0;
+				coyoteClock = 0;
+				next.vy = jumpSpeed;
 				onGround = false;
 				jumpsUsed = 1;
 			} else if (hasWing && jumpsUsed < 2) {
-				next.vy = JUMP_SPEED * 0.92;
+				jumpQueued = false;
+				jumpBufferClock = 0;
+				next.vy = jumpSpeed * 0.92;
 				jumpsUsed += 1;
 				showMessage('wing step', 0.7);
+			} else if (jumpBufferClock <= 0) {
+				jumpQueued = false;
 			}
 		}
 
@@ -405,6 +463,7 @@
 	}
 
 	function moveY(amount: number) {
+		const wasOnGround = onGround;
 		let nextY = player.y + amount;
 		let nextVy = player.vy;
 		let landed = false;
@@ -432,7 +491,12 @@
 		}
 
 		onGround = landed;
-		if (landed) jumpsUsed = 0;
+		if (landed) {
+			jumpsUsed = 0;
+			coyoteClock = 0;
+		} else if (wasOnGround && amount >= 0 && coyoteWindow > 0) {
+			coyoteClock = coyoteWindow;
+		}
 		player = { ...player, y: nextY, vy: nextVy };
 	}
 
@@ -460,16 +524,29 @@
 		if (!currentRoom.hazards.some((hazard) => overlaps(rect, hazard))) return;
 		hurtClock = 1.1;
 		deaths += 1;
+		if (checkpointSaves > 0) {
+			checkpointSaves -= 1;
+			checkpointSavesUsed += 1;
+			respawnAt(checkpointRoom, checkpointSpawn, 'checkpoint held');
+			return;
+		}
 		lives -= 1;
 		if (lives <= 0) {
 			finish('over');
 			return;
 		}
-		const spawn = currentRoom.spawn;
+		respawnAt(roomIndex, currentRoom.spawn, 'thorns bite');
+	}
+
+	function respawnAt(nextRoom: number, spawn: Dot, note: string) {
+		roomIndex = nextRoom;
 		player = { x: spawn.x, y: spawn.y, vx: 0, vy: 0 };
 		onGround = false;
 		jumpsUsed = 0;
-		showMessage('thorns bite');
+		coyoteClock = 0;
+		jumpBufferClock = 0;
+		jumpQueued = false;
+		showMessage(note);
 	}
 
 	function checkDoors() {
@@ -489,12 +566,16 @@
 		player = { x: door.spawn.x, y: door.spawn.y, vx: 0, vy: 0 };
 		onGround = false;
 		jumpsUsed = 0;
+		visitedRooms = Array.from(new Set([...visitedRooms, door.to]));
+		checkpointRoom = door.to;
+		checkpointSpawn = { ...door.spawn };
 		showMessage(ROOMS[door.to].title.toLowerCase(), 1.1);
 	}
 
 	function queueJump() {
 		if (phase !== 'running') start();
 		jumpQueued = true;
+		jumpBufferClock = jumpBufferWindow;
 	}
 
 	function setPad(next: number) {
@@ -586,6 +667,8 @@
 			{ label: 'lives', value: lives, live: true, tone: 'green' },
 			{ label: 'glyphs', value: `${glyphs}/${TOTAL_GLYPHS}` },
 			{ label: 'wing', value: hasWing ? 'yes' : 'no' },
+			{ label: 'save', value: checkpointSaves, live: checkpointSaves > 0, tone: 'violet' },
+			{ label: 'best', value: Math.max(glyphs, best) },
 			{ label: 'prize', value: fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview) }
 		]}
 		{startLabel}
@@ -594,6 +677,21 @@
 	/>
 
 	<ArcadeProgress value={progress} label="map progress" tone="magic" maxWidth="560px" />
+
+	<div class="perks-wrap">
+		<ArcadePetPerks creature={activePet} effects={statEffects} />
+	</div>
+
+	{#if mindTier > 0}
+		<div class="map-strip" aria-label="Margin Hollow map memory">
+			{#each ROOMS as room, index (room.id)}
+				<span class:visited={visitedRooms.includes(index)} class:current={roomIndex === index}>
+					<b>{index + 1}</b>
+					{room.title}
+				</span>
+			{/each}
+		</div>
+	{/if}
 
 	<svg
 		class="field"
@@ -738,6 +836,45 @@
 			0 8px 24px rgba(7, 54, 66, 0.08);
 		user-select: none;
 	}
+	.perks-wrap,
+	.map-strip {
+		width: min(560px, 100%);
+	}
+	.map-strip {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 0.3rem;
+	}
+	.map-strip span {
+		min-height: 2rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.25rem;
+		border: 1px solid var(--sol-base2);
+		border-radius: 3px;
+		background: rgba(238, 232, 213, 0.38);
+		color: var(--sol-base1);
+		font-family: var(--font-ui);
+		font-size: 0.56rem;
+		text-transform: uppercase;
+		text-align: center;
+	}
+	.map-strip span.visited {
+		color: var(--sol-base0);
+		background: rgba(42, 161, 152, 0.09);
+		border-color: rgba(42, 161, 152, 0.36);
+	}
+	.map-strip span.current {
+		color: var(--sol-base01);
+		background: rgba(108, 113, 196, 0.14);
+		border-color: rgba(108, 113, 196, 0.5);
+	}
+	.map-strip b {
+		font-family: var(--font-counter);
+		font-size: 0.92rem;
+		font-weight: 400;
+	}
 	.field.active {
 		cursor: crosshair;
 	}
@@ -859,6 +996,9 @@
 	@media (max-width: 560px) {
 		.center-title {
 			font-size: 34px;
+		}
+		.map-strip {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
 	}
 </style>
