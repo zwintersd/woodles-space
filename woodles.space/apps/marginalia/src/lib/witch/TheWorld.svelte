@@ -1,9 +1,16 @@
 <script lang="ts">
-	import { book, fmt, stageLabel, STAGE_KNOWN } from './book.svelte';
-	import { STAGE_INSIGHT_MULT, DISTILL_INSIGHT_COST, DISTILL_ESSENCE_GAIN, LOOK_CLOSER_SECONDS } from './tuning';
+	import { book, fmt, stageLabel, STAGE_KNOWN, humanizeSeconds } from './book.svelte';
+	import {
+		STAGE_INSIGHT_MULT,
+		DISTILL_INSIGHT_COST,
+		DISTILL_ESSENCE_GAIN,
+		LOOK_CLOSER_SECONDS,
+		CATEGORY_MASTERY_BONUS
+	} from './tuning';
 	import { domainVerb, type Life, type LifeCategory } from './content/life';
 	import MiniHex from './MiniHex.svelte';
 	import WorldCanvas from './WorldCanvas.svelte';
+	import FieldNotes from './FieldNotes.svelte';
 
 	const categories: { id: LifeCategory; label: string }[] = [
 		{ id: 'aquatic', label: 'in the water' },
@@ -18,7 +25,8 @@
 
 	// effective insight/sec this life is currently contributing
 	function yields(l: Life): number {
-		return l.insightWeight * (STAGE_INSIGHT_MULT[book.stageOf(l.id)] ?? 0) * book.favorMult;
+		const mastery = book.categoryMastered[l.category] ? 1 + CATEGORY_MASTERY_BONUS : 1;
+		return l.insightWeight * (STAGE_INSIGHT_MULT[book.stageOf(l.id)] ?? 0) * book.favorMult * mastery;
 	}
 
 	// a plain-language read on a life's idle character, for min/maxing
@@ -29,12 +37,15 @@
 	}
 
 	// ── look-closer click feedback ────────────────────────────────────────────
+	// consecutive clicks build a focus streak (book.focusStreak) that boosts
+	// the study-seconds granted — the label intensifies to show it.
 
 	interface FloatLabel {
 		lifeId: string;
 		key: number;
 		value: string;
 		zone: 'strip' | 'card';
+		streak: number;
 	}
 
 	let floats = $state<FloatLabel[]>([]);
@@ -42,14 +53,53 @@
 
 	function handleLookCloser(l: Life, zone: 'strip' | 'card') {
 		book.lookCloser(l.id);
-		const secs = LOOK_CLOSER_SECONDS * l.studyEase;
-		const value = `+${Number.isInteger(secs) ? secs.toFixed(0) : secs.toFixed(1)}s`;
+		const mult = book.focusMult;
+		const streak = book.focusStreak;
+		const secs = LOOK_CLOSER_SECONDS * l.studyEase * mult;
+		const value = `+${Number.isInteger(secs) ? secs.toFixed(0) : secs.toFixed(1)}s${
+			streak > 1 ? ` ×${mult.toFixed(2)}` : ''
+		}`;
+		// replace, don't stack — a fast streak clicks well inside the fade
+		// window, and piled-up afterimages read as broken rather than lively.
 		const key = ++floatSeq;
-		floats = [...floats, { lifeId: l.id, key, value, zone }];
+		floats = [...floats.filter((f) => !(f.lifeId === l.id && f.zone === zone)), { lifeId: l.id, key, value, zone, streak }];
 		setTimeout(() => {
 			floats = floats.filter((f) => f.key !== key);
 		}, 900);
 	}
+
+	// ── stage-cross juice: a one-shot flash + toast when a card deepens ───────
+
+	let prevStages: Record<string, number> = {};
+	let flashingCards = $state<Record<string, boolean>>({});
+	interface StageToast {
+		lifeId: string;
+		key: number;
+		text: string;
+	}
+	let stageToasts = $state<StageToast[]>([]);
+	let toastSeq = 0;
+
+	function triggerStageCross(lifeId: string, newStage: number) {
+		flashingCards = { ...flashingCards, [lifeId]: true };
+		setTimeout(() => {
+			flashingCards = { ...flashingCards, [lifeId]: false };
+		}, 900);
+		const key = ++toastSeq;
+		stageToasts = [...stageToasts.filter((t) => t.lifeId !== lifeId), { lifeId, key, text: `→ ${stageLabel[newStage]}` }];
+		setTimeout(() => {
+			stageToasts = stageToasts.filter((t) => t.key !== key);
+		}, 1400);
+	}
+
+	$effect(() => {
+		for (const l of book.life) {
+			const stage = book.stageOf(l.id);
+			const prev = prevStages[l.id];
+			if (prev !== undefined && stage > prev) triggerStageCross(l.id, stage);
+			prevStages[l.id] = stage;
+		}
+	});
 
 	// ── bestiary sprite binding ───────────────────────────────────────────────
 
@@ -106,21 +156,33 @@
 		</div>
 		<div class="ap-actions">
 			{#if book.attentionUpgradeCost !== null}
-				<button
-					class="ap-btn"
-					disabled={book.insight < book.attentionUpgradeCost}
-					onclick={() => book.expandAttention()}
-				>
-					widen her attention — {fmt(book.attentionUpgradeCost)} insight
-				</button>
+				<div class="ap-action">
+					<button
+						class="ap-btn"
+						disabled={book.insight < book.attentionUpgradeCost}
+						onclick={() => book.expandAttention()}
+					>
+						widen her attention — {fmt(book.attentionUpgradeCost)} insight
+					</button>
+					{#if book.insight < book.attentionUpgradeCost}
+						<span class="ap-eta">{humanizeSeconds(book.attentionUpgradeEtaSeconds)} at this rate</span>
+					{/if}
+				</div>
 			{:else}
 				<span class="ap-note">her attention is as wide as it goes, in this world.</span>
 			{/if}
-			<button class="ap-btn" disabled={!book.canDistill()} onclick={() => book.distillEssence()}>
-				distill {DISTILL_INSIGHT_COST} insight → {DISTILL_ESSENCE_GAIN} essence
-			</button>
+			<div class="ap-action">
+				<button class="ap-btn" disabled={!book.canDistill()} onclick={() => book.distillEssence()}>
+					distill {DISTILL_INSIGHT_COST} insight → {DISTILL_ESSENCE_GAIN} essence
+				</button>
+				{#if !book.canDistill()}
+					<span class="ap-eta">{humanizeSeconds(book.distillEtaSeconds)} at this rate</span>
+				{/if}
+			</div>
 		</div>
 	</section>
+
+	<FieldNotes />
 
 	{#if attendedLife.length > 0}
 		<section class="attended-strip">
@@ -147,7 +209,9 @@
 							</div>
 							<div class="strip-action">
 								{#each floats.filter((f) => f.lifeId === l.id && f.zone === 'strip') as f (f.key)}
-									<span class="float-label" aria-live="polite">{f.value}</span>
+									<span class="float-label" class:boosted={f.streak > 1} aria-live="polite"
+										>{f.value}</span
+									>
 								{/each}
 								<button class="look-btn" onclick={() => handleLookCloser(l, 'strip')}>
 									look closer
@@ -170,7 +234,14 @@
 			{@const here = book.life.filter((l) => l.category === cat.id)}
 			{#if here.length > 0}
 				<section class="cat">
-					<h3 class="cat-label">{cat.label}</h3>
+					<h3 class="cat-label">
+						{cat.label}
+						{#if book.categoryMastered[cat.id]}
+							<span class="mastery-badge"
+								>— fully known · +{Math.round(CATEGORY_MASTERY_BONUS * 100)}% insight</span
+							>
+						{/if}
+					</h3>
 					<div class="cards">
 						{#each here as l (l.id)}
 							{@const stage = book.stageOf(l.id)}
@@ -178,7 +249,13 @@
 							{@const attending = book.isAttending(l.id)}
 							{@const boundSprite = creatureImageSrc(l.id)}
 							{@const boundPixelated = creatureIsPixelated(l.id)}
-							<article class="card" class:unlooked={stage === 0} class:attending class:known>
+							<article
+								class="card"
+								class:unlooked={stage === 0}
+								class:attending
+								class:known
+								class:just-crossed={flashingCards[l.id]}
+							>
 								{#if boundSprite}
 									<div class="sprite-preview">
 										<img
@@ -196,6 +273,9 @@
 										<span class="sci">{l.scientificName}</span>
 									</div>
 									<span class="character">{character(l)}</span>
+									{#each stageToasts.filter((t) => t.lifeId === l.id) as t (t.key)}
+										<span class="stage-toast" aria-live="polite">{t.text}</span>
+									{/each}
 								</div>
 
 								<p class="stage-text">{book.stageTextFor(l)}</p>
@@ -224,7 +304,9 @@
 									</p>
 									<div class="card-actions">
 										{#each floats.filter((f) => f.lifeId === l.id && f.zone === 'card') as f (f.key)}
-											<span class="float-label" aria-live="polite">{f.value}</span>
+											<span class="float-label" class:boosted={f.streak > 1} aria-live="polite"
+												>{f.value}</span
+											>
 										{/each}
 										{#if attending}
 											<button class="look" onclick={() => handleLookCloser(l, 'card')}>
@@ -392,11 +474,26 @@
 		border-color: var(--cyan);
 		color: var(--cyan);
 	}
+	.ap-btn:active:not(:disabled) {
+		transform: scale(0.96);
+	}
 	.ap-note {
 		font-family: var(--font-body);
 		font-style: italic;
 		font-size: 0.78rem;
 		color: var(--muted);
+	}
+	.ap-action {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.2rem;
+	}
+	.ap-eta {
+		font-family: var(--font-ui);
+		font-size: 0.66rem;
+		color: var(--muted);
+		padding-left: 0.1rem;
 	}
 
 	/* ── attended strip ─────────────────────────────────────────────────────── */
@@ -496,7 +593,7 @@
 		border-radius: 3px;
 		padding: 0.32rem 0.6rem;
 		text-align: center;
-		transition: border-color 120ms, color 120ms, background 120ms;
+		transition: border-color 120ms, color 120ms, background 120ms, transform 80ms;
 	}
 	.look-btn:hover {
 		border-color: var(--cyan);
@@ -504,6 +601,7 @@
 	}
 	.look-btn:active {
 		background: rgba(108, 229, 232, 0.14);
+		transform: scale(0.94);
 	}
 
 	/* ── float label (shared between strip and card zones) ───────────────────── */
@@ -523,6 +621,11 @@
 		0%   { opacity: 1; transform: translateX(-50%) translateY(0); }
 		60%  { opacity: 1; transform: translateX(-50%) translateY(-14px); }
 		100% { opacity: 0; transform: translateX(-50%) translateY(-22px); }
+	}
+	.float-label.boosted {
+		color: var(--leafeon-pink);
+		font-size: 1.02rem;
+		text-shadow: 0 0 6px rgba(240, 143, 184, 0.4);
 	}
 
 	/* card-actions needs position:relative for the card float anchor */
@@ -544,6 +647,14 @@
 		text-transform: uppercase;
 		color: var(--periwinkle);
 		margin: 0 0 0.6rem;
+	}
+	.mastery-badge {
+		font-family: var(--font-body);
+		font-style: italic;
+		font-size: 0.68rem;
+		letter-spacing: 0;
+		text-transform: none;
+		color: var(--leafeon-pink);
 	}
 	.cards {
 		display: grid;
@@ -569,11 +680,36 @@
 		background: var(--panel-accent);
 		border-color: rgba(240, 143, 184, 0.4);
 	}
+	.card.just-crossed {
+		animation: stage-flash 900ms ease-out;
+	}
+	@keyframes stage-flash {
+		0% {
+			border-color: var(--cyan);
+			box-shadow: 0 0 12px rgba(108, 229, 232, 0.5);
+		}
+		100% {
+			box-shadow: none;
+		}
+	}
 	.card-head {
+		position: relative;
 		display: flex;
 		align-items: flex-start;
 		justify-content: space-between;
 		gap: 0.5rem;
+	}
+	.stage-toast {
+		position: absolute;
+		top: -0.3rem;
+		right: 0;
+		font-family: var(--font-ui);
+		font-size: 0.66rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--cyan);
+		pointer-events: none;
+		animation: float-up 1.4s ease-out forwards;
 	}
 	.naming {
 		display: flex;
@@ -666,11 +802,16 @@
 		border-radius: 3px;
 		padding: 0.3rem 0.55rem;
 		color: var(--cream);
+		transition: border-color 120ms, color 120ms, transform 80ms;
 	}
 	.attend:hover:not(:disabled),
 	.look:hover {
 		border-color: var(--cyan);
 		color: var(--cyan);
+	}
+	.attend:active:not(:disabled),
+	.look:active {
+		transform: scale(0.94);
 	}
 	.release:hover {
 		border-color: var(--print-pink);
@@ -699,10 +840,14 @@
 		border-radius: 3px;
 		padding: 0.35rem 0.6rem;
 		background: var(--panel-accent);
+		transition: color 120ms, box-shadow 120ms, transform 80ms;
 	}
 	.act:hover:not(:disabled) {
 		color: var(--leafeon-pink);
 		box-shadow: 0 0 8px rgba(240, 143, 184, 0.25);
+	}
+	.act:active:not(:disabled) {
+		transform: scale(0.96);
 	}
 	.act:disabled {
 		opacity: 0.45;

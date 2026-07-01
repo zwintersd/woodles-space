@@ -102,3 +102,23 @@ export const INTERVENTION_LOAD_WEIGHT = {
 export const INTERVENTION_LOAD_DECAY = 0.01; // per second, the hand grows light again
 export const FAVOR_EQUILIBRIUM_BONUS = 8;
 export const EQUILIBRIUM_MIN_FACTOR = 0.5; // above this, equilibrium seconds bank
+
+// ── focus: consecutive "look closer" clicks build a bounded streak ─────────
+// A click within this many seconds of the last one continues the streak;
+// a longer gap resets it to one. Each step beyond the first adds a little
+// more study-time to the click — reads as skill, not randomness.
+export const FOCUS_STREAK_WINDOW_SEC = 2.2;
+export const FOCUS_STREAK_STEP = 0.09; // + per streak level beyond the first
+export const FOCUS_STREAK_MAX = 6; // caps the bonus at +(MAX-1)*STEP
+
+// ── vital-sign instrumentation: rolling sample history for the sparklines ──
+export const STOCK_HISTORY_SAMPLE_SEC = 3; // sim-seconds between samples
+export const STOCK_HISTORY_LENGTH = 40; // samples kept per stock
+
+// ── field notes: the live observation log ──────────────────────────────────
+export const FIELD_NOTES_MAX = 24;
+
+// ── category mastery: a completion bonus, once earned, never revoked ───────
+// every currently-emerged life in a category (aquatic/terrestrial/
+// atmospheric) reaching Known permanently lifts that category's yield.
+export const CATEGORY_MASTERY_BONUS = 0.12;

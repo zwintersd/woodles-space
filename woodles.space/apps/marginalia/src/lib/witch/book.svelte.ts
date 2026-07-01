@@ -6,8 +6,16 @@
 
 import { conditions, conditionById } from './content/conditions';
 import { revealedEmergences } from './content/emergences';
-import { revealedLife, lifeById, world1Life, type Life } from './content/life';
+import { revealedLife, lifeById, world1Life, type Life, type LifeCategory } from './content/life';
 import { journalSeeds, type FavorBand } from './content/journal';
+import {
+	stageFieldNoteOptions,
+	fillTemplate,
+	pickLine,
+	equilibriumFieldNotes,
+	quietFieldNotes,
+	categoryMasteryFieldNotes
+} from './content/fieldNoteTemplates';
 import {
 	STAGE_SECONDS,
 	LOOK_CLOSER_SECONDS,
@@ -36,10 +44,14 @@ import {
 	INTERVENTION_LOAD_WEIGHT,
 	INTERVENTION_LOAD_DECAY,
 	FAVOR_EQUILIBRIUM_BONUS,
-	EQUILIBRIUM_MIN_FACTOR
+	EQUILIBRIUM_MIN_FACTOR,
+	STOCK_HISTORY_SAMPLE_SEC,
+	FIELD_NOTES_MAX,
+	CATEGORY_MASTERY_BONUS
 } from './tuning';
 import {
 	type Stocks,
+	type StockId,
 	STOCK_IDS,
 	STOCK_BANDS,
 	neutralStocks,
@@ -50,8 +62,10 @@ import {
 	focusStock,
 	stabilityOf
 } from './vitals';
+import { nextFocusStreak, focusMultiplier } from './focus';
+import { pushSample } from './history';
 import { interventionForDomain } from './content/interventions';
-import { emptySave, load, save, wipe, type BookSave } from './persist';
+import { emptySave, load, save, wipe, type BookSave, type FieldNote } from './persist';
 import { getBestiaryCreatures, type BestiaryCreature } from './bestiaryDb';
 
 // observation stages
@@ -79,6 +93,16 @@ export function fmt(n: number): string {
 		i++;
 	}
 	return (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : v.toFixed(0)) + units[i];
+}
+
+// a rough ETA readout — "how long at this rate", the classic idle-game hook.
+// null/negative/non-finite reads as "—": nothing to project from a 0 rate.
+export function humanizeSeconds(s: number | null): string {
+	if (s === null || !isFinite(s) || s < 0) return '—';
+	if (s < 1) return 'any moment';
+	if (s < 60) return `~${Math.ceil(s)}s`;
+	if (s < 3600) return `~${Math.ceil(s / 60)}m`;
+	return `~${Math.ceil(s / 3600)}h`;
 }
 
 export class Book {
@@ -115,6 +139,26 @@ export class Book {
 	attentionCapacity = $state(ATTENTION_START);
 	attending = $state<string[]>([]); // life ids currently being watched
 	study = $state<Record<string, number>>({}); // lifeId -> study-seconds banked
+
+	// ── focus: consecutive "look closer" clicks build a bounded streak ───────
+	// transient — not persisted; a fresh session starts cold, which is fine,
+	// the streak lives on the timescale of one sitting of clicking.
+	focusStreak = $state(0);
+	private lastLookCloserAt = 0; // ms epoch, plain field: internal bookkeeping only
+
+	// ── vital-sign instrumentation: rolling history for the Ledger sparklines ─
+	// transient — not persisted; rebuilds live through the session (and
+	// backfills a little during the offline-credit replay).
+	stockHistory = $state<Record<StockId, number[]>>({ nutrients: [], oxygen: [], moisture: [] });
+	private historySampleAccum = 0;
+
+	// ── field notes: the live observation log ─────────────────────────────────
+	fieldNotes = $state<FieldNote[]>([]);
+	private wasSelfBalancing = false;
+	private wasQuiet = false;
+
+	// ── category mastery: a completion bonus, sticky once earned ─────────────
+	categoryMastered = $state<Record<string, boolean>>({});
 
 	// ── progress ─────────────────────────────────────────────────────────────
 	writtenConditions = $state<string[]>([]);
@@ -199,17 +243,40 @@ export class Book {
 	// ── derived: the idle engine ─────────────────────────────────────────────
 
 	// raw Insight/sec from witnessed life, before the Favor multiplier. A
-	// stressed life (low vitality) shows her less.
+	// stressed life (low vitality) shows her less; a category she has come
+	// to fully Know pays a permanent bonus (see categoryMastered).
 	private baseInsightRate = $derived.by(() => {
 		let r = 0;
 		for (const l of this.life) {
-			r += l.insightWeight * (STAGE_INSIGHT_MULT[this.stageOf(l.id)] ?? 0) * this.vitalityOf(l.id);
+			const mastery = this.categoryMastered[l.category] ? 1 + CATEGORY_MASTERY_BONUS : 1;
+			r +=
+				l.insightWeight * (STAGE_INSIGHT_MULT[this.stageOf(l.id)] ?? 0) * this.vitalityOf(l.id) * mastery;
 		}
 		return r;
 	});
 
 	favorMult = $derived(favorMultiplier(this.favor));
 	insightPerSec = $derived(this.baseInsightRate * this.favorMult);
+
+	// the multiplier the next "look closer" click will land at, given her
+	// current streak — read by the UI to show the bonus before it's spent.
+	focusMult = $derived(focusMultiplier(this.focusStreak));
+
+	// seconds until Insight covers a cost at the current rate, or null when
+	// the rate can't get there (0/sec) — the UI reads this as "—".
+	private etaSeconds(cost: number): number | null {
+		const remaining = cost - this.insight;
+		if (remaining <= 0) return 0;
+		if (this.insightPerSec <= 0) return null;
+		return remaining / this.insightPerSec;
+	}
+
+	attentionUpgradeEtaSeconds = $derived.by(() => {
+		const cost = this.attentionUpgradeCost;
+		return cost === null ? null : this.etaSeconds(cost);
+	});
+
+	distillEtaSeconds = $derived(this.etaSeconds(DISTILL_INSIGHT_COST));
 
 	attentionUsed = $derived(this.attending.length);
 	attentionFree = $derived(this.attentionCapacity - this.attending.length);
@@ -359,10 +426,15 @@ export class Book {
 		return Math.min(1, (this.study[lifeId] ?? 0) / t);
 	}
 
-	// the clicker hook: nudge an attended life along by hand
+	// the clicker hook: nudge an attended life along by hand. Consecutive
+	// clicks build a bounded focus streak that boosts the seconds granted.
 	lookCloser(lifeId: string) {
 		if (!this.isAttending(lifeId)) return;
-		this.addStudy(lifeId, LOOK_CLOSER_SECONDS * (lifeById(lifeId)?.studyEase ?? 1));
+		const now = Date.now();
+		this.focusStreak = nextFocusStreak(this.focusStreak, this.lastLookCloserAt, now);
+		this.lastLookCloserAt = now;
+		const seconds = LOOK_CLOSER_SECONDS * (lifeById(lifeId)?.studyEase ?? 1) * this.focusMult;
+		this.addStudy(lifeId, seconds);
 	}
 
 	private addStudy(lifeId: string, seconds: number) {
@@ -376,6 +448,7 @@ export class Book {
 		let crossed = 0;
 		let stage = this.stageOf(lifeId);
 		let banked = this.study[lifeId] ?? 0;
+		const life = lifeById(lifeId);
 		while (stage < STAGE_KNOWN) {
 			const threshold = STAGE_SECONDS[stage + 1];
 			if (banked < threshold) break;
@@ -386,6 +459,11 @@ export class Book {
 			this.knowing += 1;
 			if (stage === STAGE_STUDIED) this.essence += ESSENCE_ON_STUDIED;
 			if (stage === STAGE_KNOWN) this.essence += ESSENCE_ON_KNOWN;
+			if (life) {
+				const line = pickLine(stageFieldNoteOptions(life.domain, stage), Math.random());
+				if (line) this.pushFieldNote(fillTemplate(line, life.name));
+				if (stage === STAGE_KNOWN) this.checkCategoryMastery(life.category);
+			}
 		}
 		if (stage >= STAGE_KNOWN) {
 			// fully known — it no longer needs watching; free the slot
@@ -394,6 +472,30 @@ export class Book {
 		}
 		this.study = { ...this.study, [lifeId]: banked };
 		return crossed;
+	}
+
+	// append to the observation log, newest first, capped.
+	private pushFieldNote(text: string) {
+		const note: FieldNote = {
+			id: `fn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+			t: Date.now(),
+			text
+		};
+		this.fieldNotes = [note, ...this.fieldNotes].slice(0, FIELD_NOTES_MAX);
+	}
+
+	// a category is mastered the moment its last un-Known life reaches Known —
+	// so this only ever needs checking right after a Known crossing. sticky:
+	// once true, later-emerging life in the category can't revoke it.
+	private checkCategoryMastery(category: LifeCategory) {
+		if (this.categoryMastered[category]) return;
+		const inCategory = this.life.filter((l) => l.category === category);
+		if (inCategory.length === 0 || !inCategory.every((l) => this.stageOf(l.id) >= STAGE_KNOWN)) {
+			return;
+		}
+		this.categoryMastered = { ...this.categoryMastered, [category]: true };
+		const line = pickLine(categoryMasteryFieldNotes[category], Math.random());
+		if (line) this.pushFieldNote(line);
 	}
 
 	stageTextFor(life: Life): string {
@@ -444,6 +546,7 @@ export class Book {
 		const idx = Math.floor(Math.random() * spec.lines.length);
 		this.interventionsDone = { ...this.interventionsDone, [lifeId]: idx };
 		this.interventionLoad += INTERVENTION_LOAD_WEIGHT[spec.permanence];
+		this.pushFieldNote(`${life.name}: "${spec.lines[idx]}"`);
 		this.persist();
 	}
 
@@ -548,6 +651,16 @@ export class Book {
 		}
 		this.stocks = s;
 
+		// 3b) sample the stocks every few sim-seconds for the Ledger sparklines —
+		//     an instrument reading, not every-frame noise.
+		this.historySampleAccum += dt;
+		if (this.historySampleAccum >= STOCK_HISTORY_SAMPLE_SEC) {
+			this.historySampleAccum -= STOCK_HISTORY_SAMPLE_SEC;
+			const h = { ...this.stockHistory };
+			for (const id of STOCK_IDS) h[id] = pushSample(h[id], this.stocks[id]);
+			this.stockHistory = h;
+		}
+
 		// 4) the world yields Insight every second it is witnessed.
 		this.insight += this.insightPerSec * dt;
 
@@ -558,6 +671,22 @@ export class Book {
 		}
 		const eq = this.equilibriumFactor;
 		if (eq > EQUILIBRIUM_MIN_FACTOR) this.equilibriumSeconds += dt;
+
+		// 5b) a field note the first time this world settles into balance, or
+		//     the first time it goes quiet — a beat, not a repeating alarm.
+		const balancingNow = this.selfBalancing;
+		if (balancingNow && !this.wasSelfBalancing) {
+			const line = pickLine(equilibriumFieldNotes, Math.random());
+			if (line) this.pushFieldNote(line);
+		}
+		this.wasSelfBalancing = balancingNow;
+
+		const quietNow = this.quiet;
+		if (quietNow && !this.wasQuiet) {
+			const line = pickLine(quietFieldNotes, Math.random());
+			if (line) this.pushFieldNote(line);
+		}
+		this.wasQuiet = quietNow;
 
 		// 6) Favor eases toward a target set by how much she has Known, pulled down
 		//    by the world's stress and lifted when it holds itself. Exponential
@@ -657,6 +786,8 @@ export class Book {
 			readingCumulativeMs: this.readingCumulativeMs,
 			readingCumulativeWords: this.readingCumulativeWords,
 			spriteBindings: { ...this.spriteBindings },
+			fieldNotes: this.fieldNotes.map((n) => ({ ...n })),
+			categoryMastered: { ...this.categoryMastered },
 			lastSeen: Date.now()
 		};
 	}
@@ -688,6 +819,16 @@ export class Book {
 		this.readingCumulativeMs = s.readingCumulativeMs;
 		this.readingCumulativeWords = s.readingCumulativeWords;
 		this.spriteBindings = { ...(s.spriteBindings ?? {}) };
+		this.fieldNotes = [...(s.fieldNotes ?? [])];
+		this.categoryMastered = { ...(s.categoryMastered ?? {}) };
+		// transient state (focus streak, stock history) is session-only —
+		// a fresh load starts cold rather than trying to replay it.
+		this.focusStreak = 0;
+		this.lastLookCloserAt = 0;
+		this.stockHistory = { nutrients: [], oxygen: [], moisture: [] };
+		this.historySampleAccum = 0;
+		this.wasSelfBalancing = false;
+		this.wasQuiet = false;
 	}
 
 	hydrate() {

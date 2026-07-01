@@ -1,16 +1,22 @@
 <script lang="ts">
 	import { book, fmt } from './book.svelte';
+	import { trend } from './history';
+	import Sparkline from './Sparkline.svelte';
 
 	const favorWord = $derived(
 		book.favorBand === 'high' ? 'at ease' : book.favorBand === 'low' ? 'wary' : 'even'
 	);
 
-	// the three stocks, for the world's-body readout
+	const trendGlyph = { [-1]: '▾', [0]: '▪', [1]: '▴' } as const;
+
+	// the three stocks, for the world's-body readout — a reading and a trace,
+	// the way an instrument panel gives you both.
 	const stockRows = $derived([
 		{
 			id: 'nutrients',
 			label: 'nutrients',
 			value: book.stocks.nutrients,
+			history: book.stockHistory.nutrients,
 			tint: 'var(--leafeon-pink)',
 			hint: 'fertility of soil and water — plants draw it down; decay and decomposers return it.'
 		},
@@ -18,6 +24,7 @@
 			id: 'oxygen',
 			label: 'oxygen',
 			value: book.stocks.oxygen,
+			history: book.stockHistory.oxygen,
 			tint: 'var(--cyan)',
 			hint: 'breathable air — plants make it; animals burn it.'
 		},
@@ -25,6 +32,7 @@
 			id: 'moisture',
 			label: 'moisture',
 			value: book.stocks.moisture,
+			history: book.stockHistory.moisture,
 			tint: 'var(--periwinkle)',
 			hint: 'water on the land — weather brings it; land plants drink it.'
 		}
@@ -94,12 +102,19 @@
 			</h3>
 			<div class="cells">
 				{#each stockRows as row (row.id)}
+					{@const dir = trend(row.history)}
 					<div class="cell stock" title={row.hint}>
 						<span class="label">{row.label}</span>
-						<span class="value sm">{Math.round(row.value)}</span>
+						<span class="value-row">
+							<span class="value sm">{Math.round(row.value)}</span>
+							<span class="trend" class:rising={dir === 1} class:falling={dir === -1}
+								>{trendGlyph[dir]}</span
+							>
+						</span>
 						<span class="bar" aria-hidden="true">
 							<span class="fill" style:width="{row.value}%" style:background={row.tint}></span>
 						</span>
+						<Sparkline samples={row.history} color={row.tint} />
 					</div>
 				{/each}
 				<div class="cell" title="resilience — how close the three stocks sit to a balanced world, steadied by the ecosystems she has come to Know.">
@@ -204,7 +219,22 @@
 		color: var(--cream);
 	}
 	.cell.stock {
-		min-width: 5rem;
+		min-width: 6.5rem;
+	}
+	.value-row {
+		display: flex;
+		align-items: baseline;
+		gap: 0.3rem;
+	}
+	.trend {
+		font-size: 0.7rem;
+		color: var(--muted);
+	}
+	.trend.rising {
+		color: var(--cyan);
+	}
+	.trend.falling {
+		color: var(--print-pink);
 	}
 	.bar {
 		display: block;

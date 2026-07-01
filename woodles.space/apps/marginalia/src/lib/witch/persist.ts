@@ -40,8 +40,20 @@ export interface BookSave {
 	// when a bound creature is deleted from the Bestiary, the binding is
 	// dropped on next load so dead entries don't accumulate.
 	spriteBindings: Record<string, string>;
+	// the live observation log — short, timestamped, auto-generated entries
+	// distinct from the scripted journalSeeds milestones.
+	fieldNotes: FieldNote[];
+	// categories (aquatic/terrestrial/atmospheric) whose every emerged life
+	// has reached Known at least once — sticky, never revoked.
+	categoryMastered: Record<string, boolean>;
 	// wall-clock of the last save — drives offline progress
 	lastSeen: number;
+}
+
+export interface FieldNote {
+	id: string;
+	t: number; // ms epoch, when it was written
+	text: string;
 }
 
 export function emptySave(): BookSave {
@@ -73,6 +85,8 @@ export function emptySave(): BookSave {
 		readingCumulativeMs: 0,
 		readingCumulativeWords: 0,
 		spriteBindings: {},
+		fieldNotes: [],
+		categoryMastered: {},
 		lastSeen: Date.now()
 	};
 }
