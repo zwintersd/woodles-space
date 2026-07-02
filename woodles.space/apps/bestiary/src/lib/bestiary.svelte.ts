@@ -472,6 +472,9 @@ export class Bestiary {
 			...src,
 			id: uid(),
 			name: src.name ? `${src.name} (variant)` : '',
+			// a fresh id has never appeared in any published snapshot, however the
+			// source it's copied from was marked
+			published: false,
 			created: now(),
 			updated: now()
 		};

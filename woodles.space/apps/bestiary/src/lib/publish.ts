@@ -18,6 +18,14 @@ export { BESTIARY_PUBLIC_SLUG };
 // renderIsolatedCreature layer predicate (kind === 'image', !hidden,
 // isCreature === true) so a hidden creature layer — excluded from the
 // isolated-sprite render — isn't surfaced here either.
+//
+// Deliberately simpler than renderIsolatedCreature for a multi-layer
+// creature: that composites every isCreature layer onto one canvas, but this
+// just returns the first one's raw src, unstacked and un-composited. "show
+// the source" is a hand-picked opt-in (ROADMAP.md: "needs Z to pick/make the
+// example pairs"), so a creature stamped from several separate layers is
+// something Z would notice and simply leave off, rather than something this
+// needs to render correctly for every shape.
 export function rawSourceFor(creature: Creature): string | null {
 	const creatureLayer = creature.composition?.layers.find(
 		(l): l is ImageLayer => l.kind === 'image' && !l.hidden && l.isCreature === true
@@ -45,6 +53,9 @@ export function isCardOnly(creature: Creature): boolean {
 // Assemble one creature's published snapshot entry. `cardImage` is the
 // rasterised compact card (produced by the caller via cardImage.ts's
 // renderCardDataUrl — this module stays DOM-free so it's plain-testable).
+// Free-text fields are trimmed, matching what CreatureCard and the publish
+// preview itself already display — otherwise a name like "Dragon " (with a
+// trailing space Z never sees) could publish differently than reviewed.
 export function buildPublicCreature(
 	creature: Creature,
 	cardImage: string,
@@ -53,16 +64,16 @@ export function buildPublicCreature(
 	const source = creature.publishSource ? rawSourceFor(creature) : null;
 	return {
 		id: creature.id,
-		name: creature.name,
+		name: creature.name.trim(),
 		domain: creature.domain,
-		kind: creature.kind,
+		kind: creature.kind.trim(),
 		cost: creature.cost,
 		rarity: creature.rarity,
 		power: creature.power,
 		toughness: creature.toughness,
-		abilities: creature.abilities,
-		flavor: creature.flavor,
-		foundIn: creature.foundIn,
+		abilities: creature.abilities.trim(),
+		flavor: creature.flavor.trim(),
+		foundIn: creature.foundIn.trim(),
 		cardImage,
 		isolatedSprite: resolvedSpriteFor(creature),
 		...(source ? { sourceImage: source } : {}),

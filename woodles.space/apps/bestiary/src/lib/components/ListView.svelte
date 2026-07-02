@@ -43,7 +43,7 @@
 				onclick={() => bestiary.openCodex(c.id)}
 				title="read entry"
 			>
-				{#if c.published}<span class="pub-dot" title="published to the public gallery"></span>{/if}
+				{#if c.published}<span class="pub-dot" aria-hidden="true" title="published to the public gallery"></span><span class="sr-only">published · </span>{/if}
 				{#if c.name}{c.name}{:else}<span class="unnamed">(unnamed)</span>{/if}
 			</button>
 

@@ -132,6 +132,22 @@ describe('buildPublicCreature', () => {
 		const out = buildPublicCreature(c, 'data:card-image', '2026-07-02T00:00:00.000Z');
 		expect(out).not.toHaveProperty('sourceImage');
 	});
+
+	it('trims free-text fields, matching what the publish preview itself displays', () => {
+		const c = make({
+			name: '  Dragon ',
+			kind: ' Beast ',
+			abilities: ' breathes fire ',
+			flavor: ' ancient ',
+			foundIn: ' a cave '
+		});
+		const out = buildPublicCreature(c, 'data:card-image', '2026-07-02T00:00:00.000Z');
+		expect(out.name).toBe('Dragon');
+		expect(out.kind).toBe('Beast');
+		expect(out.abilities).toBe('breathes fire');
+		expect(out.flavor).toBe('ancient');
+		expect(out.foundIn).toBe('a cave');
+	});
 });
 
 describe('applyPublishedFlags', () => {
