@@ -43,6 +43,15 @@ with no password. almost everything below builds on that.
 - **publishing is explicit and curated.** nothing becomes public by
   default. Z picks what to publish, per creature / per letter / per pack.
   the sync password keeps guarding every write.
+- **the bestiary's promise: anything you drop can belong.** the card
+  editor is built so anyone — an over-earnest 7th grader with scribbled
+  anthro characters, someone turning their favorite anime characters into
+  playing creatures — can drop a transparent png of *anything* and the
+  studio's affordances (the alpha-traced sticker outline above all, plus
+  tints, finishes, borders, the whole FX drawer) pull it into a consistent
+  style: a personal library where things feel like they belong. going
+  public means this promise has to be *legible on first open*, not
+  discovered by accident. the bar for entry is a png, not talent.
 - **the thesis is protected.** marginalia's rule — *reward attention and
   restraint; never optimize them away* — applies to the public framing too.
   no leaderboards-first energy, no engagement mechanics. the public feeling
@@ -108,26 +117,60 @@ Z-facing: choosing what the world sees.
 - the publish preview surfaces a creature that has a card but **no
   isolated sprite** (pre-studio uploads), so it's obvious which published
   creatures can appear in marginalia's diorama and which are card-only.
+- one deliberate exception to "only two assets": a per-creature **"show
+  the source" opt-in** that additionally publishes the raw dropped png,
+  feeding week 3's before/after gallery spots. off by default, chosen
+  card by card.
 - a per-creature "published" marker in the collection view, so the
   curated set is visible at a glance while editing.
 - republish is a whole-snapshot upsert (no per-card CAS) — simple,
   idempotent, matches the "curated exhibit" mental model.
 
-### week 3 — the bestiary gallery (the visitor's front door)
+### week 3 — the gallery, and the first open
 
-visitor-facing: the bestiary opens as an exhibit, not an empty workshop.
+visitor-facing: the bestiary opens as an exhibit — and the exhibit's job
+is to teach, in under a minute, what the app is asking of you: *bring a
+png of anything; the studio will make it belong.*
 
-- a **gallery view** that loads the published snapshot and shows Z's
-  curated cards — the codex/binder presentation the app already knows how
-  to do (`CreatureCodex`, `Collection`), read-only, no password anywhere.
-- first-run routing: no local collection → land in the gallery with a
-  clear, quiet door to "start your own bestiary" (which begins the
-  existing seed-deck editor flow, unchanged). returning designers land
-  where they left off.
+the first-open arc, in order of what a stranger sees:
+
+1. **the gallery as proof.** a gallery view loads the published snapshot
+   and shows Z's curated cards — the codex/binder presentation the app
+   already knows how to do (`CreatureCodex`, `Collection`), read-only, no
+   password anywhere. a shelf of finished cards in one coherent style is
+   the promise shown, not told.
+2. **the before/after.** one or two gallery spots show a card's *raw
+   source png next to its finished card* — deliberately including a
+   rough one. this is the single clearest way to say "your art is
+   enough"; nothing communicates the studio's power like a scribble that
+   now looks like it was always meant to be there. (needs Z to pick/make
+   the example pairs — they're published assets like any other.)
+3. **the invitation.** the door out of the gallery is not a "start your
+   own bestiary" button — it's the drop zone itself, the `SpriteInput`
+   "drop a sprite, or click to choose" affordance, promoted to the
+   gallery's threshold. the ask *is* the interface: drop a png.
+4. **the first card, guided.** dropping something walks the visitor
+   through the shortest path to belonging: sprite lands → the sticker
+   outline traces it → pick a finish (matte → holo) → the card sits in
+   their (new, local) collection next to the seed deck. three beats, each
+   one an existing studio affordance surfaced at the right moment — no
+   new mechanics, just sequencing and copy.
+
+and the plumbing underneath:
+
+- first-run routing: no local collection → the gallery arc above.
+  returning designers land where they left off, exactly as today.
 - empty/failed fetch degrades to today's behavior exactly (seed deck,
   editor) — the gallery is additive, never a gate.
-- copy pass: the gallery frames whose bestiary this is and invites the
-  visitor to make their own. voice: ✍️ Z.
+- the seed deck's framing shifts for visitors: from "your starting cards"
+  to worked examples sitting alongside their first card.
+- copy pass: whose bestiary this is, the invitation, the guided beats.
+  this is the heaviest ✍️ Z week in the plan — the words *are* the
+  onboarding.
+
+*if the week overflows:* the guided first-card beats (4) can slide into
+week 4, which is card-focused anyway; the gallery + drop-zone threshold
+(1–3) are the core and ship first.
 
 ### week 4 — cards that travel
 
@@ -222,7 +265,8 @@ the site-level pass that makes the public apps feel like one place.
 
 - **landing page reframing**: marginalia and the bestiary presented as
   things to *visit* — a sentence each about what a stranger will find,
-  not just app names. voice: ✍️ Z.
+  not just app names. the bestiary's sentence carries the promise: bring
+  a png of anything, leave with a card that belongs. voice: ✍️ Z.
 - **cross-links as architecture**: bestiary gallery ↔ witch game bindings
   ↔ reading room ↔ echoes each acknowledge the others, so a visitor who
   arrives anywhere can find everywhere.
