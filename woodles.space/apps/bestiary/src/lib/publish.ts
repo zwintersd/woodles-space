@@ -3,21 +3,24 @@
 // can be unit-tested directly (see bestiary.svelte.ts for why). ROADMAP.md
 // week 2: the bestiary publish flow.
 
-import type { PublicCreature } from '@woodles/sync';
+import { BESTIARY_PUBLIC_SLUG, type PublicCreature } from '@woodles/sync';
 import type { Creature } from './types';
 import type { ImageLayer } from './composer';
 
-// The slug bestiary publishes its curated gallery snapshot under.
-export const BESTIARY_PUBLIC_SLUG = 'gallery';
+// re-exported so callers only need to import from one place
+export { BESTIARY_PUBLIC_SLUG };
 
 // The raw art before any studio polish: the pre-studio upload itself, or —
 // for a studio-built card — the first creature-flagged layer's source,
 // before outline/tint/finish were baked on. Feeds the before/after gallery
 // spots (ROADMAP.md week 3, the "show the source" opt-in). null when the
-// creature has no art to show at all.
+// creature has no art to show at all. Mirrors render.ts's
+// renderIsolatedCreature layer predicate (kind === 'image', !hidden,
+// isCreature === true) so a hidden creature layer — excluded from the
+// isolated-sprite render — isn't surfaced here either.
 export function rawSourceFor(creature: Creature): string | null {
 	const creatureLayer = creature.composition?.layers.find(
-		(l): l is ImageLayer => l.kind === 'image' && l.isCreature === true
+		(l): l is ImageLayer => l.kind === 'image' && !l.hidden && l.isCreature === true
 	);
 	return creatureLayer?.src ?? creature.sprite ?? null;
 }

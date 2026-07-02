@@ -122,6 +122,10 @@ describe('isUntouched', () => {
 		expect(isUntouched(make({ domain: 'temporal' }))).toBe(false);
 		expect(isUntouched(make({ rarity: 'mythic' }))).toBe(false);
 	});
+	it('is false for a published card even if it otherwise still reads as blank', () => {
+		// guards against discardIfUntouched orphaning a live public snapshot
+		expect(isUntouched(make({ published: true }))).toBe(false);
+	});
 });
 
 describe('defaultStats', () => {

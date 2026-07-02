@@ -31,7 +31,7 @@
 		selectedIds[id] = !selectedIds[id];
 	}
 	function selectAll(): void {
-		for (const c of sorted) selectedIds[c.id] = true;
+		selectedIds = Object.fromEntries(sorted.map((c) => [c.id, true]));
 	}
 	function selectNone(): void {
 		selectedIds = {};
@@ -48,20 +48,31 @@
 		publishing = true;
 		publishError = null;
 		justPublished = null;
+		// Snapshot the selection once — `selectedCreatures` is derived from
+		// `selectedIds`, which stays live and editable while these awaits run.
+		// Reading it again later (instead of `toPublish`) would let a mid-publish
+		// checkbox change desync the local `published` flags from what was
+		// actually rasterised and sent to the server.
+		const toPublish = selectedCreatures;
 		try {
 			// let the export-stage settle onto the current selection before reading its nodes
 			await tick();
 			const publishedAt = now();
 			const creatures: PublicCreature[] = [];
-			for (const c of selectedCreatures) {
+			// Track only the ids that actually made it into the blob — if a node
+			// is missing (never mounted) it's silently skipped above, and it must
+			// not be marked published locally when it wasn't published at all.
+			const publishedIds = new Set<string>();
+			for (const c of toPublish) {
 				const node = exportNodes[c.id];
 				if (!node) continue;
 				const cardImage = await renderCardDataUrl(node, 2);
 				creatures.push(buildPublicCreature(c, cardImage, publishedAt));
+				publishedIds.add(c.id);
 			}
 			const blob: BestiaryPublicBlob = { creatures };
 			await publish('bestiary', BESTIARY_PUBLIC_SLUG, blob);
-			bestiary.applyPublishResult(new Set(selectedCreatures.map((c) => c.id)));
+			bestiary.applyPublishResult(publishedIds);
 			justPublished = { count: creatures.length };
 		} catch (err) {
 			publishError = err instanceof SyncError ? err.message : 'could not publish — try again';
@@ -82,8 +93,8 @@
 
 	<div class="pub-toolbar">
 		<div class="pub-toolbar-left">
-			<button class="pub-chip" onclick={selectAll}>select all</button>
-			<button class="pub-chip" onclick={selectNone}>select none</button>
+			<button class="pub-chip" onclick={selectAll} disabled={publishing}>select all</button>
+			<button class="pub-chip" onclick={selectNone} disabled={publishing}>select none</button>
 			<span class="pub-count">{selectedCreatures.length} selected</span>
 		</div>
 		<button class="pub-publish-btn" onclick={doPublish} disabled={publishing}>
@@ -114,6 +125,7 @@
 							class="pub-select"
 							checked={!!selectedIds[c.id]}
 							onchange={() => toggle(c.id)}
+							disabled={publishing}
 							aria-label="include {c.name.trim() || 'this creature'} in the public gallery"
 						/>
 						<div class="pub-card-wrap">
@@ -134,6 +146,7 @@
 								<input
 									type="checkbox"
 									checked={!!c.publishSource}
+									disabled={publishing}
 									onchange={(e) => bestiary.setPublishSource(c.id, e.currentTarget.checked)}
 								/>
 								show the source

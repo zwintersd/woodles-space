@@ -12,6 +12,12 @@
 // `Domain` / `Rarity` unions (apps/bestiary/src/lib/content/domains.ts) as
 // plain strings, so this package doesn't import app-local types.
 
+// The slug bestiary publishes its curated gallery snapshot under — shared so
+// any consumer (bestiary's own publish flow, marginalia's diorama in week 5)
+// pulls the same `pullPublic('bestiary', BESTIARY_PUBLIC_SLUG)` rather than
+// each hardcoding the string separately.
+export const BESTIARY_PUBLIC_SLUG = 'gallery';
+
 export type PublicCreature = {
 	id: string;
 	name: string;

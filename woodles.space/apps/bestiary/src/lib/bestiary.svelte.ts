@@ -368,12 +368,14 @@ export class Bestiary {
 	}
 
 	// ── publish (ROADMAP.md week 2) ──────────────────────────────────
-	// publishSource is a per-creature authored choice, same shape as cardStyle.
-	// published is set only by applyPublishResult, after a snapshot actually
-	// lands on the server — never optimistically.
+	// published and publishSource are publish-flow bookkeeping, not authored
+	// card content — unlike cardStyle, neither goes through updateCreature, so
+	// toggling "show the source" (or a republish) can't bump `updated` and
+	// silently reorder the shelf's default "newest" sort.
 
 	setPublishSource(id: string, on: boolean): void {
-		this.updateCreature(id, { publishSource: on });
+		this.creatures = this.creatures.map((c) => (c.id === id ? { ...c, publishSource: on } : c));
+		this.#persistCreatures();
 	}
 
 	// Call after a successful publish push with the ids that made it into the

@@ -42,6 +42,18 @@ describe('rawSourceFor', () => {
 		});
 		expect(rawSourceFor(c)).toBe('data:flattened');
 	});
+
+	it('skips a hidden creature layer, matching renderIsolatedCreature\'s own layer predicate', () => {
+		const hiddenCreatureLayer = {
+			...createImageLayer({ src: 'data:raw', naturalW: 10, naturalH: 10, isCreature: true }),
+			hidden: true
+		};
+		const c = make({
+			sprite: 'data:flattened',
+			composition: { ...emptyComposition(), layers: [hiddenCreatureLayer] }
+		});
+		expect(rawSourceFor(c)).toBe('data:flattened');
+	});
 });
 
 describe('resolvedSpriteFor', () => {
