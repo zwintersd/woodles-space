@@ -12,7 +12,10 @@
 // bearer credential: anyone with the device can read it. Don't keep anything
 // in here you'd be harmed to leak.
 
+export * from './publicBlobs';
+
 const ENDPOINT = '/api/sync';
+const PUBLIC_ENDPOINT = '/api/public';
 
 let passphrase: string | null = null;
 
@@ -95,6 +98,55 @@ export async function push<T = unknown>(
   if (!res.ok) throw new SyncError('server', `push failed (${res.status})`);
   const data = (await res.json()) as { ok: true; version: number };
   return data;
+}
+
+// ── the public read path ──────────────────────────────────────────────────
+//
+// A curated, unauthenticated counterpart to pull/push, over /api/public.
+// pullPublic never sends the passphrase — that's the point, a visitor's
+// browser calls it with none. publish stays passphrase-gated, same as push,
+// but there's no compare-and-swap: republishing is a whole-snapshot upsert.
+
+export interface PublicSnapshot<T = unknown> {
+  blob: T | null;
+  version: number;
+  publishedAt: string | null;
+}
+
+export async function publish<T = unknown>(
+  app: string,
+  slug: string,
+  blob: T
+): Promise<{ ok: true; version: number; publishedAt: string }> {
+  const auth = authHeader(); // throws 'no-passphrase' outside the try, so a missing
+  // passphrase isn't miscategorized as a network error.
+  let res: Response;
+  try {
+    res = await fetch(PUBLIC_ENDPOINT, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...auth },
+      body: JSON.stringify({ app, slug, blob })
+    });
+  } catch {
+    throw new SyncError('network', 'could not reach the sync server');
+  }
+  if (res.status === 401) throw new SyncError('unauthorized', 'wrong passphrase');
+  if (!res.ok) throw new SyncError('server', `publish failed (${res.status})`);
+  return (await res.json()) as { ok: true; version: number; publishedAt: string };
+}
+
+export async function pullPublic<T = unknown>(app: string, slug: string): Promise<PublicSnapshot<T>> {
+  let res: Response;
+  try {
+    res = await fetch(
+      `${PUBLIC_ENDPOINT}?app=${encodeURIComponent(app)}&slug=${encodeURIComponent(slug)}`
+    );
+  } catch {
+    throw new SyncError('network', 'could not reach the sync server');
+  }
+  if (!res.ok) throw new SyncError('server', `pullPublic failed (${res.status})`);
+  const data = (await res.json()) as PublicSnapshot<T>;
+  return { blob: data.blob, version: data.version, publishedAt: data.publishedAt };
 }
 
 // ── syncedStore: the per-app orchestration each app reuses ───────────────
