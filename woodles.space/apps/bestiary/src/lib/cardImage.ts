@@ -44,10 +44,8 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 	});
 }
 
-// Rasterise a card node to a PNG and download it. `scale` multiplies the node's
-// CSS pixels — 2 over a 640px-wide stage gives a crisp ~1280px card.
-export async function exportCardPng(node: HTMLElement, name: string, scale = 2): Promise<void> {
-	// let any web fonts settle so the title renders in its real face
+// let any web fonts settle so a title renders in its real face before rasterising
+async function waitForFonts(): Promise<void> {
 	if (typeof document !== 'undefined' && document.fonts?.ready) {
 		try {
 			await document.fonts.ready;
@@ -55,9 +53,23 @@ export async function exportCardPng(node: HTMLElement, name: string, scale = 2):
 			// non-fatal — fall back to whatever's loaded
 		}
 	}
+}
+
+// Rasterise a card node to a PNG and download it. `scale` multiplies the node's
+// CSS pixels — 2 over a 640px-wide stage gives a crisp ~1280px card.
+export async function exportCardPng(node: HTMLElement, name: string, scale = 2): Promise<void> {
+	await waitForFonts();
 	const { domToBlob } = await import('modern-screenshot');
 	const blob = await domToBlob(node, { scale, type: 'image/png' });
 	if (blob) downloadBlob(blob, slugFilename(name, '', 'png'));
+}
+
+// Rasterise a card node to a PNG data URL — for embedding directly (the
+// bestiary publish flow's card image) rather than triggering a download.
+export async function renderCardDataUrl(node: HTMLElement, scale = 2): Promise<string> {
+	await waitForFonts();
+	const { domToPng } = await import('modern-screenshot');
+	return domToPng(node, { scale });
 }
 
 // Download just the creature's art (the flattened sprite) as a PNG. Same-origin

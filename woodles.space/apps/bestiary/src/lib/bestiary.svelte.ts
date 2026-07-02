@@ -25,6 +25,7 @@ import {
 } from './collection';
 import { seedCreatures } from './seed';
 import { idbAvailable, idbGet, idbSet } from './idb';
+import { applyPublishedFlags } from './publish';
 
 // Older creatures in storage predate the stat block (and, later, the studio
 // composition). Fill any missing structure so an old record loads cleanly, and
@@ -364,6 +365,23 @@ export class Bestiary {
 
 	resetCardStyle(id: string): void {
 		this.updateCreature(id, { cardStyle: null });
+	}
+
+	// ── publish (ROADMAP.md week 2) ──────────────────────────────────
+	// publishSource is a per-creature authored choice, same shape as cardStyle.
+	// published is set only by applyPublishResult, after a snapshot actually
+	// lands on the server — never optimistically.
+
+	setPublishSource(id: string, on: boolean): void {
+		this.updateCreature(id, { publishSource: on });
+	}
+
+	// Call after a successful publish push with the ids that made it into the
+	// snapshot. Republishing is a whole-snapshot upsert, so anything not in
+	// the set is no longer public even if it was before.
+	applyPublishResult(publishedIds: ReadonlySet<string>): void {
+		this.creatures = applyPublishedFlags(this.creatures, publishedIds);
+		this.#persistCreatures();
 	}
 
 	// ── card backs ─────────────────────────────────────────────────
