@@ -73,15 +73,25 @@ the primitive everything else needs.
 - a small `publish(app, slug, blob)` / `pullPublic(app, slug)` pair in
   `@woodles/sync`, alongside the existing private `pull`/`push`.
 - define the first snapshot shapes as types: `BestiaryPublicBlob`
-  (curated creature list), `SpritePackBlob` (creature art for marginalia's
-  diorama), `EchoesPublicBlob` (published letters).
+  (curated creature list) and `EchoesPublicBlob` (published letters).
 - tests for the endpoint (auth on write, no auth on read, CAS-free upsert)
   and the client pair.
 
-*decision to make up front:* published bestiary blobs should carry
-**rendered card images or isolated sprites, not full compositions** —
-compositions are heavy and editor-shaped; the public shape is the finished
-card. keeps blobs small and the editor internals private.
+*decided up front:* each published creature carries **exactly two
+assets** —
+
+1. the **rendered card image** (the finished compact card, via the
+   existing `cardImage.ts` / `render.ts` pipeline), and
+2. the **isolated sprite** — the studio's "S" layer (`isolatedSprite`:
+   the creature alone, cropped, on transparency), falling back to the
+   plain `sprite` upload when a card was never built in the studio.
+
+nothing else from the editor is published: no compositions, no layer
+stacks, no card styles, no workshop prefs. the card image is what the
+gallery and share links show; the sprite is what lets the creature *live*
+in marginalia's diorama (week 5) — the diorama already resolves art as
+`isolatedSprite ?? sprite`, so the published shape feeds it directly. one
+snapshot serves both apps; no separate sprite-pack blob needed.
 
 ### week 2 — the bestiary publish flow
 
@@ -90,9 +100,14 @@ Z-facing: choosing what the world sees.
 - a "publish" section in the existing `SyncPanel` (it already owns the
   passphrase session): select creatures → preview the public set → push a
   `BestiaryPublicBlob` snapshot.
-- publishing renders each card to a compact image (via the existing
-  `cardImage.ts` / `render.ts` pipeline) and strips private fields —
-  no compositions, no workshop prefs, no timestamps beyond `published`.
+- publishing snapshots the two assets per creature (week 1's decision):
+  the rendered compact card image and the isolated "S" sprite
+  (`isolatedSprite ?? sprite`). everything else — compositions, layer
+  stacks, card styles, workshop prefs, timestamps beyond `published` —
+  stays private.
+- the publish preview surfaces a creature that has a card but **no
+  isolated sprite** (pre-studio uploads), so it's obvious which published
+  creatures can appear in marginalia's diorama and which are card-only.
 - a per-creature "published" marker in the collection view, so the
   curated set is visible at a glance while editing.
 - republish is a whole-snapshot upsert (no per-card CAS) — simple,
@@ -138,12 +153,15 @@ sharing is the public feeling, distilled to one card.
 the witch's diorama should never be empty just because the visitor
 hasn't drawn anything yet.
 
-- publish a **sprite pack** from the bestiary (week 1's `SpritePackBlob`):
-  Z's isolated sprites keyed to the diorama's binding slots.
+- no new publish surface needed: the published `BestiaryPublicBlob`
+  already carries each creature's isolated "S" sprite (week 1's
+  two-asset decision), which is exactly what the diorama renders
+  (`isolatedSprite ?? sprite`, in `TheWorld`, `WorldCanvas`, `MiniHex`,
+  `HexStage`).
 - `witch/bestiaryDb.ts` grows a fallback chain: local bestiary IndexedDB
   first (Z and any visitor who's made creatures), then the published
-  sprite pack, then the current unbound placeholders. cached in IDB so the
-  diorama works offline after first load.
+  snapshot's sprites, then the current unbound placeholders. cached in
+  IDB so the diorama works offline after first load.
 - the binding UI in the witch game distinguishes "yours" from "from the
   bestiary at woodles.space" so a visitor understands the connection —
   and follows it: this is the natural cross-link from marginalia *into*
@@ -218,7 +236,7 @@ the site-level pass that makes the public apps feel like one place.
 ### week 10 — hardening, docs, and the quiet launch
 
 - cross-browser and mobile QA of every public flow (gallery, share links,
-  adopt, sprite-pack fallback, echoes, first-hour witch game) — including
+  adopt, published-sprite fallback, echoes, first-hour witch game) — including
   the degraded paths (public API down, empty snapshots).
 - perf sanity: published blob sizes, image weights, cache headers,
   bundle-size check on marginalia (the biggest app).
