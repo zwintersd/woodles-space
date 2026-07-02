@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.1",
   "scripts": {
-    "test": "pnpm -r --if-present test",
+    "test": "vitest run && pnpm -r --if-present test",
     "check": "pnpm -r --if-present check",
     "build": "pnpm -r --if-present build"
   },
@@ -12,6 +12,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.6"
   }
 }
