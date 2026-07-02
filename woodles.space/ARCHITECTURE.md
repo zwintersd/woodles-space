@@ -16,6 +16,8 @@ other docs have narrower jobs:
 
 - [README.md](./README.md) is the deployment reference.
 - [REFACTORING.md](./REFACTORING.md) is the living consolidation log.
+- [ROADMAP.md](./ROADMAP.md) is the 10-week plan for making marginalia and
+  the bestiary public-facing.
 - `apps/*/*.md` files own app-specific design briefs, proposals, assets, and
   known issues.
 - [`../AUDIT.md`](../AUDIT.md) is a dated audit snapshot, not live truth.
