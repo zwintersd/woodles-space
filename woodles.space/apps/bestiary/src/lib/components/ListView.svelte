@@ -43,6 +43,7 @@
 				onclick={() => bestiary.openCodex(c.id)}
 				title="read entry"
 			>
+				{#if c.published}<span class="pub-dot" aria-hidden="true" title="published to the public gallery"></span><span class="sr-only">published · </span>{/if}
 				{#if c.name}{c.name}{:else}<span class="unnamed">(unnamed)</span>{/if}
 			</button>
 
@@ -221,6 +222,15 @@
 
 	.none { color: var(--b-muted); }
 	.unnamed { color: var(--b-muted); font-style: italic; }
+	.pub-dot {
+		display: inline-block;
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--b-biochemical);
+		margin-right: 0.4rem;
+		vertical-align: middle;
+	}
 
 	.col-actions {
 		display: flex;

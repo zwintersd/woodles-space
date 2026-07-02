@@ -113,8 +113,12 @@ export function statsAreDefault(stats: Stats): boolean {
 // when the editor closes so an abandoned "new" doesn't litter the shelf. The
 // moment anything is changed — a stat, the cost, the rarity, the domain, the
 // P/T — the card counts as authored and is kept, even before it has a name.
+// A published card is never swept, even if it happens to still read as
+// blank — it's live in the public gallery, and discarding it locally would
+// orphan that snapshot until the next whole-collection republish.
 export function isUntouched(c: Creature): boolean {
 	return (
+		!c.published &&
 		c.name.trim() === '' &&
 		c.sprite === null &&
 		!c.composition &&

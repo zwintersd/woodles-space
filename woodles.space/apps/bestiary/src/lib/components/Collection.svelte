@@ -229,6 +229,9 @@
 		<div class="grid">
 			{#each visible as creature (creature.id)}
 				<button class="card-cell" onclick={() => bestiary.openEditor(creature.id)}>
+					{#if creature.published}
+						<span class="published-badge" title="published to the public gallery">◉ public</span>
+					{/if}
 					<CreatureCard {creature} interactive />
 				</button>
 			{/each}
@@ -407,7 +410,22 @@
 		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 		gap: clamp(var(--b-space-md), 2vw, var(--b-space-xl));
 	}
-	.card-cell { display: block; width: 100%; background: none; text-align: left; }
+	.card-cell { position: relative; display: block; width: 100%; background: none; text-align: left; }
+	.published-badge {
+		position: absolute;
+		top: 0.4rem;
+		right: 0.4rem;
+		z-index: 2;
+		font-family: var(--b-font-mono);
+		font-size: 0.62rem;
+		letter-spacing: 0.02em;
+		color: var(--b-biochemical);
+		background: color-mix(in srgb, var(--b-biochemical) 14%, var(--b-surface));
+		border: 1px solid color-mix(in srgb, var(--b-biochemical) 40%, transparent);
+		border-radius: var(--b-radius-pill);
+		padding: 0.15rem 0.5rem;
+		pointer-events: none;
+	}
 
 	/* ── empty states ── */
 	.empty {

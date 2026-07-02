@@ -58,6 +58,14 @@ export type Creature = {
 	// card); the map shape is here so `burning`, `cursed`, … can land later with
 	// no migration. An empty map (or absent) means the creature is unafflicted.
 	status?: Record<string, number>;
+	// true while this creature is part of the current public gallery snapshot
+	// (ROADMAP.md week 2). Set by the publish flow, never by hand — a local
+	// marker so the collection view can show at a glance what's curated in.
+	published?: boolean;
+	// "show the source" opt-in, chosen card by card: additionally publishes the
+	// raw dropped art alongside the finished card, for the before/after gallery
+	// spots (ROADMAP.md week 3). off by default.
+	publishSource?: boolean;
 	created: string;
 	updated: string;
 };

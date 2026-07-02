@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { syncState, connectAndHydrate, disconnect, flushSync } from '$lib/sync.svelte';
 	import { bestiary } from '$lib/bestiary.svelte';
+	import PublishPanel from './PublishPanel.svelte';
 
 	let pass = $state('');
 	let connecting = $state(false);
+	let showPublish = $state(false);
 
 	async function handleConnect() {
 		if (!pass.trim()) return;
@@ -34,6 +36,10 @@
 		{#if syncState.errorMessage}
 			<p class="error-msg">{syncState.errorMessage}</p>
 		{/if}
+
+		<div class="publish-row">
+			<button class="btn-ghost" onclick={() => (showPublish = true)}>publish to the gallery…</button>
+		</div>
 	{:else}
 		<p class="sync-hint">Enter your passphrase to sync the bestiary across devices.</p>
 		<div class="pass-row">
@@ -57,6 +63,10 @@
 		<button class="btn-ghost" onclick={() => bestiary.downloadExport()}>export all as JSON</button>
 	</div>
 </div>
+
+{#if showPublish}
+	<PublishPanel onclose={() => (showPublish = false)} />
+{/if}
 
 <style>
 	.sync-panel {
@@ -124,5 +134,6 @@
 	.btn-ghost.muted { color: var(--b-muted); }
 	.btn-ghost.muted:hover { color: var(--b-text-dim); border-color: var(--b-border-strong); }
 	.error-msg { font-size: 0.82rem; color: var(--b-mythic); font-family: var(--b-font-mono); }
+	.publish-row { padding-top: var(--b-space-sm); }
 	.export-row { padding-top: var(--b-space-md); border-top: 1px solid var(--b-rule); }
 </style>

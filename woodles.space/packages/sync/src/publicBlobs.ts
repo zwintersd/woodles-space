@@ -12,6 +12,12 @@
 // `Domain` / `Rarity` unions (apps/bestiary/src/lib/content/domains.ts) as
 // plain strings, so this package doesn't import app-local types.
 
+// The slug bestiary publishes its curated gallery snapshot under — shared so
+// any consumer (bestiary's own publish flow, marginalia's diorama in week 5)
+// pulls the same `pullPublic('bestiary', BESTIARY_PUBLIC_SLUG)` rather than
+// each hardcoding the string separately.
+export const BESTIARY_PUBLIC_SLUG = 'gallery';
+
 export type PublicCreature = {
 	id: string;
 	name: string;
@@ -26,9 +32,11 @@ export type PublicCreature = {
 	foundIn: string;
 	// the finished compact card (cardImage.ts / render.ts output)
 	cardImage: string;
-	// the studio's "S" layer, cropped on transparency. null when a published
-	// card has no isolated sprite (a pre-studio upload) — card-only in the
-	// gallery, skipped by marginalia's diorama fallback chain.
+	// the studio's "S" layer when there is one, else the plain flat sprite —
+	// resolved once at publish time (bestiary's `isolatedSprite ?? sprite`, the
+	// same fallback marginalia's diorama already applies locally), so this
+	// field needs no further fallback downstream. null only when the creature
+	// has no art at all.
 	isolatedSprite: string | null;
 	// "show the source" opt-in (week 2): the raw dropped png, for the
 	// before/after gallery spots. off by default — absent unless chosen.

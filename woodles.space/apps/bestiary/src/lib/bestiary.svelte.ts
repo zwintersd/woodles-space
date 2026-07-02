@@ -25,6 +25,7 @@ import {
 } from './collection';
 import { seedCreatures } from './seed';
 import { idbAvailable, idbGet, idbSet } from './idb';
+import { applyPublishedFlags } from './publish';
 
 // Older creatures in storage predate the stat block (and, later, the studio
 // composition). Fill any missing structure so an old record loads cleanly, and
@@ -366,6 +367,25 @@ export class Bestiary {
 		this.updateCreature(id, { cardStyle: null });
 	}
 
+	// ── publish (ROADMAP.md week 2) ──────────────────────────────────
+	// published and publishSource are publish-flow bookkeeping, not authored
+	// card content — unlike cardStyle, neither goes through updateCreature, so
+	// toggling "show the source" (or a republish) can't bump `updated` and
+	// silently reorder the shelf's default "newest" sort.
+
+	setPublishSource(id: string, on: boolean): void {
+		this.creatures = this.creatures.map((c) => (c.id === id ? { ...c, publishSource: on } : c));
+		this.#persistCreatures();
+	}
+
+	// Call after a successful publish push with the ids that made it into the
+	// snapshot. Republishing is a whole-snapshot upsert, so anything not in
+	// the set is no longer public even if it was before.
+	applyPublishResult(publishedIds: ReadonlySet<string>): void {
+		this.creatures = applyPublishedFlags(this.creatures, publishedIds);
+		this.#persistCreatures();
+	}
+
 	// ── card backs ─────────────────────────────────────────────────
 	// One custom back per domain, stored in IDB. Falls back to the CSS
 	// placeholder in CardBack.svelte when no custom art is set.
@@ -452,6 +472,9 @@ export class Bestiary {
 			...src,
 			id: uid(),
 			name: src.name ? `${src.name} (variant)` : '',
+			// a fresh id has never appeared in any published snapshot, however the
+			// source it's copied from was marked
+			published: false,
 			created: now(),
 			updated: now()
 		};
