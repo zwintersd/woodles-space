@@ -96,6 +96,13 @@ export class Bestiary {
 	// empty-state until we actually know the shelf is empty.
 	creatures = $state<Creature[]>([]);
 	ready = $state(false);
+
+	// True for the remainder of this session when IndexedDB held nothing at
+	// all before the seed deck was planted — a browser that has never opened
+	// the bestiary before. Drives first-run routing to the public gallery
+	// (ROADMAP.md week 3); set once in #hydrate(), never persisted, so a
+	// reload always re-derives it from what's actually in storage.
+	isFirstRun = $state(false);
 	settings = $state<BestiarySettings>({
 		...DEFAULT_SETTINGS,
 		...load(SETTINGS_KEY, {} as Partial<BestiarySettings>)
@@ -171,6 +178,7 @@ export class Bestiary {
 
 		// Seed with initial creatures if the bestiary is empty
 		if (loaded.length === 0) {
+			this.isFirstRun = true;
 			loaded = seedCreatures();
 		}
 
@@ -223,6 +231,12 @@ export class Bestiary {
 	// Transient UI
 	showSyncPanel = $state(false);
 	showComfort = $state(false);
+
+	// Set alongside a creature id when the gallery's drop-zone (ROADMAP.md
+	// week 3) creates it, so the editor knows to walk straight into the
+	// sprite studio instead of landing on a bare bench. Consumed once by
+	// CardEditor and cleared — never persisted, it only bridges one navigation.
+	autoStudioId = $state<string | null>(null);
 
 	// ── derived views ──────────────────────────────────────────────
 
@@ -291,6 +305,15 @@ export class Bestiary {
 		this.currentView = 'codex';
 	}
 
+	// The public gallery (ROADMAP.md week 3) — a visitor's landing view, and
+	// reachable any time via the sidebar. Mirrors openCollection's sweep of an
+	// abandoned blank card left behind in the editor.
+	openGallery(): void {
+		if (this.activeCreatureId) this.discardIfUntouched(this.activeCreatureId);
+		this.currentView = 'gallery';
+		this.activeCreatureId = null;
+	}
+
 	setSort(sort: SortKey): void {
 		this.settings = { ...this.settings, sort };
 		save(SETTINGS_KEY, this.settings);
@@ -316,6 +339,18 @@ export class Bestiary {
 		this.creatures = [c, ...this.creatures];
 		this.#persistCreatures();
 		this.openEditor(c.id);
+		return c;
+	}
+
+	// The gallery's drop-zone invitation (ROADMAP.md week 3): a sprite dropped
+	// before any creature exists yet, so the card is created and given its art
+	// in one step rather than the usual blank-then-set-sprite two-step. Doesn't
+	// navigate — callers pair this with openEditor (and, for the guided first
+	// card, autoStudioId).
+	newCreatureFromSprite(sprite: string, pixelated: boolean): Creature {
+		const c: Creature = { ...blankCreature(), sprite, pixelated };
+		this.creatures = [c, ...this.creatures];
+		this.#persistCreatures();
 		return c;
 	}
 

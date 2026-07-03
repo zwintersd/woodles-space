@@ -81,6 +81,12 @@
 				<span class="cc" style="--c: var(--b-mythic)">{counts.mythic} mythic</span>
 			{/if}
 		</p>
+		{#if bestiary.isFirstRun}
+			<p class="starter-note">
+				this shelf opens with worked examples to learn the shapes from — yours starts
+				with the next card you drop.
+			</p>
+		{/if}
 	</header>
 
 	{#if bestiary.total > 0}
@@ -306,6 +312,14 @@
 		align-items: center;
 	}
 	.census .dot { color: var(--b-muted); }
+	.starter-note {
+		margin-top: var(--b-space-xs);
+		font-family: var(--b-font-body);
+		font-style: italic;
+		font-size: 0.82rem;
+		color: var(--b-muted);
+		max-width: 40rem;
+	}
 	.cc::before {
 		content: '';
 		display: inline-block;

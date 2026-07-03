@@ -111,7 +111,7 @@ export type BestiaryBlob = {
 	settings: BestiarySettings;
 };
 
-export type BestiaryView = 'collection' | 'editor' | 'codex';
+export type BestiaryView = 'collection' | 'editor' | 'codex' | 'gallery';
 
 // What the collection is sorted/filtered by.
 export type SortKey = 'recent' | 'name' | 'cost' | 'rarity';
