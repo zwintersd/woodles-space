@@ -38,6 +38,15 @@ export type PublicCreature = {
 	// field needs no further fallback downstream. null only when the creature
 	// has no art at all.
 	isolatedSprite: string | null;
+	// true when isolatedSprite above is a genuine studio cutout (creature
+	// alone, on transparency) rather than the card-only flat sprite falling
+	// back into this same field. Consumers that render an isolated crop
+	// differently from a full flat scene (marginalia's MiniHex float-vs-portal
+	// modes) need this to pick the right one — the single resolved field alone
+	// can't tell them apart. optional: blobs published before this field
+	// existed read as isolated (the common case; card-only publishes are
+	// flagged to Z in the publish preview and comparatively rare).
+	hasIsolatedSprite?: boolean;
 	// pixel-art sprites read best un-smoothed (mirrors Creature.pixelated) —
 	// carried along so a visitor's world renders published sprites the same
 	// way Z's own device does. optional: blobs published before this field

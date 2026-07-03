@@ -185,11 +185,21 @@ export class Book {
 	// Maps Marginalia life ID → Bestiary creature ID (local or published).
 	// Persisted in the book save.
 	spriteBindings = $state<Record<string, string>>({});
+	// Guards refreshBestiaryCreatures against overlapping calls (mount + focus
+	// can both fire in quick succession) — internal bookkeeping only, not
+	// persisted or reactive.
+	private refreshSeq = 0;
 
 	async refreshBestiaryCreatures(): Promise<void> {
+		const seq = ++this.refreshSeq;
 		const local = await getBestiaryCreatures();
+		const world = await getWorldCreatures(local);
+		// a newer call started (and will finish its own commit + cleanup) —
+		// applying this one's now-stale result could wipe a binding the newer
+		// call's fresher local read would have kept
+		if (seq !== this.refreshSeq) return;
 		this.bestiaryCreatures = local;
-		this.worldCreatures = await getWorldCreatures(local);
+		this.worldCreatures = world;
 		// drop any bindings whose target creature no longer resolves — deleted
 		// locally, or dropped from a re-published snapshot
 		const ids = new Set(this.worldCreatures.map((c) => c.id));

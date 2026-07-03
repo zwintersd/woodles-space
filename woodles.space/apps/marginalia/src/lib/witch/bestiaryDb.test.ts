@@ -95,6 +95,25 @@ describe('mergeWorldCreatures', () => {
 		expect(out[0].name).toBe('Local copy');
 	});
 
+	it('routes a card-only published creature\'s flat sprite into sprite, not isolatedSprite', () => {
+		const p = published({ id: 'p1', hasIsolatedSprite: false });
+		const [out] = mergeWorldCreatures([], [p]);
+		// MiniHex picks its render mode off isolatedSprite alone — a card-only
+		// creature (possibly with a background) must land in the "portal" mode
+		// a local card-only Creature already gets, not the "float" mode a true
+		// studio cutout gets.
+		expect(out.isolatedSprite).toBeNull();
+		expect(out.sprite).toBe('data:isolated');
+	});
+
+	it('defaults a published creature with no hasIsolatedSprite flag to isolated (pre-existing snapshots)', () => {
+		const p = published({ id: 'p1' });
+		delete (p as Partial<PublicCreature>).hasIsolatedSprite;
+		const [out] = mergeWorldCreatures([], [p]);
+		expect(out.isolatedSprite).toBe('data:isolated');
+		expect(out.sprite).toBeNull();
+	});
+
 	it('defaults a published creature with no pixelated flag to smooth (pre-existing snapshots)', () => {
 		const p = published({ id: 'p1' });
 		delete (p as Partial<PublicCreature>).pixelated;

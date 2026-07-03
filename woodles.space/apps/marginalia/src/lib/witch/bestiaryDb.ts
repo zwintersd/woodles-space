@@ -161,13 +161,19 @@ function toLocalWorldCreature(c: BestiaryCreature): WorldCreature {
 }
 
 function toPublishedWorldCreature(c: PublicCreature): WorldCreature {
+	// the public blob resolves isolatedSprite ?? sprite into one field at
+	// publish time (ROADMAP.md week 1) — but MiniHex still needs to tell a
+	// true studio cutout (float mode) from a card-only flat sprite (portal
+	// mode) apart, exactly as it already does for a local Creature. Route the
+	// one resolved image back into whichever field matches its real nature —
+	// missing hasIsolatedSprite (pre-field blobs) reads as isolated, the
+	// common case.
+	const isolated = c.hasIsolatedSprite ?? true;
 	return {
 		id: c.id,
 		name: c.name,
-		// the public blob already resolved isolatedSprite ?? sprite once, at
-		// publish time (ROADMAP.md week 1) — there's no separate raw sprite.
-		sprite: null,
-		isolatedSprite: c.isolatedSprite,
+		sprite: isolated ? null : c.isolatedSprite,
+		isolatedSprite: isolated ? c.isolatedSprite : null,
 		pixelated: c.pixelated ?? false,
 		source: 'published'
 	};
