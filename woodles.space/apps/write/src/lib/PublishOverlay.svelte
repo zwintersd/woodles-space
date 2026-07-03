@@ -1,10 +1,26 @@
 <script lang="ts">
-	let { active }: { active: boolean } = $props();
+	// 'local' (saved to this device only) is a distinct, honest state from
+	// 'public' (the world can now read it) — ROADMAP.md week 7. Before this,
+	// the overlay always claimed "woodles.space / echoes" regardless of
+	// whether anyone but Z could actually see it.
+	export type PublishStatus = 'idle' | 'local' | 'public' | 'error';
+
+	let { status, errorMessage = null }: { status: PublishStatus; errorMessage?: string | null } =
+		$props();
+	const activeState = $derived(status !== 'idle');
 </script>
 
-<div class="overlay" class:active>
-	<p class="overlay-word">published.</p>
-	<p class="overlay-sub">woodles.space / echoes</p>
+<div class="overlay" class:active={activeState}>
+	{#if status === 'public'}
+		<p class="overlay-word">published.</p>
+		<p class="overlay-sub">woodles.space / echoes</p>
+	{:else if status === 'error'}
+		<p class="overlay-word">saved.</p>
+		<p class="overlay-sub">{errorMessage ?? "couldn't reach the world — try again from echoes"}</p>
+	{:else}
+		<p class="overlay-word">saved.</p>
+		<p class="overlay-sub">just here, for now</p>
+	{/if}
 </div>
 
 <style>

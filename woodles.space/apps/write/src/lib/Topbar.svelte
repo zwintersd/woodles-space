@@ -10,6 +10,8 @@
 		draftsOpen = $bindable(),
 		pocketsOpen = $bindable(),
 		pocketsCount,
+		syncOpen = $bindable(),
+		syncConnected,
 		onLayerChange
 	}: {
 		activeLayer: LayerId;
@@ -18,6 +20,8 @@
 		draftsOpen: boolean;
 		pocketsOpen: boolean;
 		pocketsCount: number;
+		syncOpen: boolean;
+		syncConnected: boolean;
 		onLayerChange: (id: LayerId) => void;
 	} = $props();
 </script>
@@ -55,6 +59,17 @@
 		title="pockets"
 	>
 		pockets{#if pocketsCount > 0}<span class="pockets-count">{pocketsCount}</span>{/if}
+	</button>
+	<span class="topbar-divider" aria-hidden="true"></span>
+	<button
+		class="sync-toggle"
+		class:on={syncOpen}
+		class:connected={syncConnected}
+		onclick={() => (syncOpen = !syncOpen)}
+		aria-pressed={syncOpen}
+		title="publish to echoes"
+	>
+		echoes{#if syncConnected}<span class="sync-dot" aria-hidden="true"></span>{/if}
 	</button>
 	<div class="topbar-clock"><Clock /></div>
 </header>
@@ -182,6 +197,39 @@
 		background: color-mix(in srgb, var(--accent) 30%, transparent);
 		color: var(--accent-strong);
 		opacity: 0.85;
+	}
+	.sync-toggle {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.57rem;
+		letter-spacing: 0.14em;
+		text-transform: lowercase;
+		color: var(--muted);
+		background: none;
+		border: 1px solid transparent;
+		padding: 3px 9px;
+		border-radius: 4px;
+		cursor: pointer;
+		opacity: 0.5;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4em;
+		position: relative;
+		z-index: 1;
+		transition: color 0.22s ease, background 0.22s ease, border-color 0.22s ease, opacity 0.22s ease;
+	}
+	.sync-toggle:hover { opacity: 0.9; color: var(--accent-strong); }
+	.sync-toggle.on {
+		color: var(--accent-strong);
+		opacity: 1;
+		background: color-mix(in srgb, var(--accent) 22%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+	}
+	.sync-toggle.connected { opacity: 0.75; }
+	.sync-dot {
+		width: 5px;
+		height: 5px;
+		border-radius: 50%;
+		background: var(--accent-strong);
 	}
 	.topbar-clock {
 		margin-left: auto;

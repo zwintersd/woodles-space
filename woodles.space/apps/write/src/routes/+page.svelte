@@ -10,7 +10,8 @@
 	import MarginNotesColumn from '$lib/MarginNotes.svelte';
 	import SelectionPopover from '$lib/SelectionPopover.svelte';
 	import Binder from '$lib/Binder.svelte';
-	import PublishOverlay from '$lib/PublishOverlay.svelte';
+	import PublishOverlay, { type PublishStatus } from '$lib/PublishOverlay.svelte';
+	import EchoesSyncPanel from '$lib/EchoesSyncPanel.svelte';
 	import {
 		ANCHOR_BLOCK_SELECTOR,
 		sanitizeHtml,
@@ -26,9 +27,14 @@
 		findLetter,
 		incrementIssue,
 		loadLettersList,
+		saveLettersList,
+		newLetterId,
 		writePublishedLegacy,
 		type StoredLetter
 	} from '$lib/letters';
+	import { buildEchoesPublicBlob, ECHOES_PUBLIC_SLUG } from '$lib/publish';
+	import { syncState, initSync } from '$lib/sync.svelte';
+	import { publish as publishPublicBlob, hasPassphrase, SyncError } from '@woodles/sync';
 	import {
 		bootstrap as bootstrapDrafts,
 		createDraftId,
@@ -97,7 +103,11 @@
 	let italic = $state(false);
 	let underline = $state(false);
 	let publishing = $state(false);
+	let publishStatus = $state<PublishStatus>('idle');
+	let publishErrorMessage = $state<string | null>(null);
 	let fgIsEmpty = $state(true);
+	let isPublic = $state(false);
+	let syncOpen = $state(false);
 
 	let pockets = $state<PocketNote[]>([]);
 	let pocketsOpen = $state(false);
@@ -218,6 +228,8 @@
 	}
 
 	onMount(() => {
+		void initSync();
+
 		try {
 			document.execCommand('defaultParagraphSeparator', false, 'p');
 		} catch (e) {}
@@ -513,8 +525,10 @@
 		}
 	}
 
-	function publish() {
+	async function publish() {
 		publishing = true;
+		publishStatus = 'local';
+		publishErrorMessage = null;
 		clearTimeout(saveTimer);
 		const issue = incrementIssue();
 		try {
@@ -524,7 +538,8 @@
 			const bgHtml = sanitizeHtml(bgEl?.innerHTML ?? '');
 			const cleanedPockets = pockets.map((p) => ({ ...p, html: sanitizeHtml(p.html) }));
 			const cleanedMargins = marginNotes.map((m) => ({ ...m, html: sanitizeHtml(m.html) }));
-			writePublishedLegacy({
+			const letter: StoredLetter = {
+				id: newLetterId(),
 				title: title.trim() || 'untitled letter',
 				theme,
 				motif,
@@ -537,13 +552,43 @@
 					background: { html: bgHtml, updatedAt: now }
 				},
 				annotations: { pocketNotes: cleanedPockets, marginNotes: cleanedMargins },
-				content: fgHtml
-			});
+				content: fgHtml,
+				replyTo: replyTo ?? null,
+				public: isPublic
+			};
+			// loadLettersList() must run before writePublishedLegacy() below:
+			// on a browser with no LETTERS_KEY yet, it migrates whatever is
+			// currently in the legacy slot into the list (see letters.ts). If
+			// the legacy slot already held *this* letter, that migration would
+			// re-discover it and the spread below would duplicate it. Reading
+			// old state first, then writing, keeps the two straight.
+			const allLetters = [...loadLettersList(), letter];
+			saveLettersList(allLetters);
+			// legacy single-slot write-through so older viewer code paths still
+			// see "the latest letter".
+			writePublishedLegacy(letter);
+
 			if (currentDraftId) {
 				removeDraftBody(currentDraftId);
 				draftsList = draftsList.filter((d) => d.id !== currentDraftId);
 				writeIndex(draftsList);
 				clearActiveDraftId();
+			}
+
+			// Publishing locally (above) always succeeds — the world-facing push
+			// is a second, optional step that needs both the per-letter opt-in
+			// and a connected passphrase. Neither being true isn't an error:
+			// the letter is exactly as public as Z asked it to be.
+			if (isPublic && hasPassphrase()) {
+				try {
+					const blob = buildEchoesPublicBlob(allLetters);
+					await publishPublicBlob('echoes', ECHOES_PUBLIC_SLUG, blob);
+					publishStatus = 'public';
+				} catch (err) {
+					publishStatus = 'error';
+					publishErrorMessage =
+						err instanceof SyncError ? err.message : "couldn't reach the world — try again from echoes";
+				}
 			}
 		} catch (e) {
 			// ignore
@@ -850,6 +895,8 @@
 	bind:draftsOpen
 	bind:pocketsOpen
 	pocketsCount={pockets.length}
+	bind:syncOpen
+	syncConnected={syncState.connected}
 	onLayerChange={setActiveLayer}
 />
 
@@ -862,7 +909,11 @@
 	onDelete={deleteDraft}
 />
 
-<PublishOverlay active={publishing} />
+{#if syncOpen}
+	<EchoesSyncPanel onclose={() => (syncOpen = false)} />
+{/if}
+
+<PublishOverlay status={publishStatus} errorMessage={publishErrorMessage} />
 
 <div class="editor-page" data-layer={activeLayer} bind:this={editorPageEl}>
 	<div class="editor-wrap" data-layer={activeLayer}>
@@ -990,6 +1041,7 @@
 	fonts={fontPairs}
 	{activeLayer}
 	{fgIsEmpty}
+	bind:isPublic
 	onPublish={publish}
 />
 

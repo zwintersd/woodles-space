@@ -5,6 +5,7 @@
 	import {
 		paragraphsFromText,
 		paragraphsFromDom,
+		paragraphsFromLetterHtml,
 		stampLiveAnchors,
 		newNoteId,
 		countWordsInText,
@@ -13,6 +14,8 @@
 	} from '$lib/reading/text';
 	import { loadDoc, persistDoc as persistDocToStorage, wipeDoc } from '$lib/reading/doc';
 	import { formatHms, formatMin } from '$lib/reading/format';
+	import { echoesLibrary } from '$lib/reading/echoesLibrary.svelte';
+	import type { PublicLetter } from '@woodles/sync';
 	import Star from './Star.svelte';
 	import StarShelf from './StarShelf.svelte';
 	import Passage from './Passage.svelte';
@@ -89,6 +92,28 @@
 		persistDoc();
 		await tick();
 		measureAnchors();
+	}
+
+	// Reads one of Z's published letters instead of pasted-in text
+	// (ROADMAP.md week 7) — same downstream pipeline (paragraphs, anchors,
+	// annotation, persistence) as paste/PDF intake; only the source differs.
+	async function readLetter(letter: PublicLetter) {
+		truncated = false;
+		pasteText = '';
+		const html = letter.layers?.foreground?.html || letter.content || '';
+		paragraphs = paragraphsFromLetterHtml(html);
+		notes = [];
+		liveWordCount = countWordsInText(passageTextOf(paragraphs));
+		book.addReadingWords(liveWordCount);
+		mode = 'read';
+		docKey++;
+		persistDoc();
+		await tick();
+		measureAnchors();
+	}
+
+	function passageTextOf(paras: Paragraph[]): string {
+		return paras.map((p) => p.html.replace(/<[^>]+>/g, ' ')).join(' ');
 	}
 
 	function newText() {
@@ -333,6 +358,7 @@
 	onMount(() => {
 		const hadDoc = hydrateFromStorage();
 		if (hadDoc) mode = 'read';
+		void echoesLibrary.load();
 		timer.start();
 		const id = setInterval(() => {
 			book.persist();
@@ -420,6 +446,26 @@
 		<div class="reader">
 			{#if mode === 'paste'}
 				<PdfIntake bind:pasteText onCommit={onPdfCommit} />
+
+				{#if echoesLibrary.status === 'ready'}
+					<div class="echoes-picker">
+						<p class="echoes-picker-label">or read one of Z's letters</p>
+						<ul class="echoes-picker-list">
+							{#each echoesLibrary.letters as letter (letter.id)}
+								<li>
+									<button class="echoes-picker-item" onclick={() => readLetter(letter)}>
+										<span class="echoes-picker-title">{letter.title || 'untitled letter'}</span>
+										<span class="echoes-picker-issue">№ {String(letter.issue).padStart(3, '0')}</span>
+									</button>
+								</li>
+							{/each}
+						</ul>
+					</div>
+				{:else if echoesLibrary.status === 'error'}
+					<p class="echoes-picker-note">
+						couldn't reach Z's letters right now — paste your own text instead.
+					</p>
+				{/if}
 			{:else}
 				<div class="text-meta">
 					<span><span class="num">{liveWordCount.toLocaleString()}</span> words</span>
@@ -576,6 +622,63 @@
 		font-size: 0.78rem;
 		color: var(--print-pink);
 		margin: 0 0 0.5rem;
+	}
+	.echoes-picker {
+		margin-top: 1rem;
+		padding-top: 0.8rem;
+		border-top: 1px dashed var(--rule);
+	}
+	.echoes-picker-label {
+		font-family: var(--font-ui);
+		font-size: 0.7rem;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--periwinkle);
+		margin: 0 0 0.5rem;
+	}
+	.echoes-picker-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+	}
+	.echoes-picker-item {
+		width: 100%;
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.6rem;
+		border: 1px solid var(--rule);
+		border-radius: 4px;
+		padding: 0.45rem 0.65rem;
+		text-align: left;
+		transition: border-color 120ms, background 120ms;
+	}
+	.echoes-picker-item:hover {
+		border-color: var(--cyan);
+		background: var(--panel-accent);
+	}
+	.echoes-picker-title {
+		font-family: var(--font-hand);
+		font-size: 1rem;
+		color: var(--cream);
+	}
+	.echoes-picker-issue {
+		font-family: var(--font-ui);
+		font-size: 0.62rem;
+		letter-spacing: 0.08em;
+		color: var(--muted);
+		white-space: nowrap;
+		flex-shrink: 0;
+	}
+	.echoes-picker-note {
+		margin-top: 0.8rem;
+		font-family: var(--font-body);
+		font-style: italic;
+		font-size: 0.78rem;
+		color: var(--muted);
 	}
 	.passage-and-margin {
 		display: grid;

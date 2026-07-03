@@ -13,6 +13,11 @@ export interface StoredLetter {
 	annotations: { pocketNotes: PocketNote[]; marginNotes: MarginNote[] };
 	content: string;
 	replyTo: string | null;
+	// ROADMAP.md week 7: explicit, per-letter opt-in to the public echoes
+	// snapshot. Off by default — publishing locally (this list) and
+	// publishing to the world are separate acts; only letters with this set
+	// are ever included when building the public blob.
+	public?: boolean;
 }
 
 export function newLetterId(): string {
