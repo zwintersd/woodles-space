@@ -56,6 +56,23 @@ export function paragraphsFromText(text: string): Paragraph[] {
 	return out;
 }
 
+// Turn a published echoes letter's foreground HTML into reading-room
+// paragraphs (ROADMAP.md week 7) — the same shape paste/PDF intake produces,
+// so the rest of the room (annotation, anchors, persistence) doesn't need to
+// know where the text came from. Sanitizes first regardless of what write's
+// own pipeline already did — a defensive second pass, same reasoning as
+// echoes' own reader re-sanitizing on render. Anchors are stamped
+// defensively too: today's letters already carry data-anchor from write's
+// publish-time stamping, but nothing here should break on one that doesn't.
+export function paragraphsFromLetterHtml(html: string): Paragraph[] {
+	if (typeof document === 'undefined') return [];
+	const clean = sanitizePassageHtml(html);
+	const container = document.createElement('div');
+	container.innerHTML = clean;
+	ensureAnchorsOn(Array.from(container.querySelectorAll(ANCHOR_BLOCK_SELECTOR)));
+	return paragraphsFromDom(container);
+}
+
 function escapeHtml(s: string): string {
 	return s
 		.replace(/&/g, '&amp;')
@@ -158,7 +175,13 @@ export function sanitizePassageHtml(html: string): string {
 		}
 	}
 
-	clean(root);
+	// clean() itself decides whether a node gets removed or unwrapped — never
+	// call it on `root`: root is the synthetic #__r wrapper, not real content,
+	// and DIV is one of the UNWRAP_TAGS, so clean(root) unwraps root right out
+	// from under itself (moves every child up to root's own parent, then
+	// removes root), leaving root permanently empty. Only its children are
+	// real content to walk.
+	for (const child of Array.from(root.children)) clean(child);
 	return root.innerHTML;
 }
 

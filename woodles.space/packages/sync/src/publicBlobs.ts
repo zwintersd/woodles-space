@@ -68,6 +68,11 @@ export type BestiaryPublicBlob = {
 // anything editor-only. only letters Z marks public ever land in this blob;
 // drafts and private letters stay in the (password-gated) sync table.
 
+// The slug write publishes the echoes snapshot under — shared so write's
+// publish flow, echoes' own reader, and marginalia's reading room (week 7)
+// all pull the same `pullPublic('echoes', ECHOES_PUBLIC_SLUG)`.
+export const ECHOES_PUBLIC_SLUG = 'letters';
+
 export type PublicPocketNote = {
 	id: string;
 	html: string;

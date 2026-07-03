@@ -1240,8 +1240,55 @@
       return html;
     }
 
+    // ── the public snapshot (ROADMAP.md week 7) ──────────────────────────
+    // A stranger has no localStorage here — loadLettersList() above returns
+    // [] for them. This is the fallback: the same unauthenticated read path
+    // marginalia's diorama already uses, hand-rolled (not imported from
+    // @woodles/sync) because this is a plain, no-build static page — matches
+    // this file's existing pattern of duplicating write's helpers inline
+    // (see ARCHITECTURE.md's cross-app-duplication section). Slug must match
+    // ECHOES_PUBLIC_SLUG in packages/sync/src/publicBlobs.ts.
+    //
+    // Cached under its own key, never LETTERS_KEY — that key means "my own
+    // letters, written by write" (Z's device), and must stay that way so it
+    // keeps winning as her always-fresh, no-network fast path. A visitor's
+    // cache lives separately so a later visit still tries the network first
+    // (picking up a fresh publish) and only falls back to what was cached
+    // the last time the fetch actually succeeded.
+    const ECHOES_PUBLIC_SLUG = 'letters';
+    const ECHOES_PUBLIC_CACHE_KEY = 'woodles_echoes_public_cache';
+
+    function readCachedPublicLetters() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(ECHOES_PUBLIC_CACHE_KEY) || 'null');
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        return [];
+      }
+    }
+    function writeCachedPublicLetters(letters) {
+      try { localStorage.setItem(ECHOES_PUBLIC_CACHE_KEY, JSON.stringify(letters)); } catch (e) {}
+    }
+    async function fetchPublicEchoes() {
+      try {
+        const res = await fetch('/api/public?app=echoes&slug=' + encodeURIComponent(ECHOES_PUBLIC_SLUG));
+        if (!res.ok) throw new Error('bad status ' + res.status);
+        const data = await res.json();
+        const letters = (data && data.blob && Array.isArray(data.blob.letters)) ? data.blob.letters : [];
+        if (letters.length > 0) writeCachedPublicLetters(letters);
+        return letters;
+      } catch (e) {
+        return readCachedPublicLetters();
+      }
+    }
+
+    (async () => {
     try {
-      const lettersList = loadLettersList();
+      const localLettersList = loadLettersList();
+      // Z's own device always has this populated (via write) and always
+      // wins — her fast path, no network involved. Only a visitor with
+      // nothing local falls through to the public fetch.
+      const lettersList = localLettersList.length > 0 ? localLettersList : await fetchPublicEchoes();
       const params = new URLSearchParams(window.location.search);
       const requestedId = params.get('id');
       const letter = pickLetter(lettersList, requestedId);
@@ -1676,6 +1723,7 @@
           '<a href="/write" class="write-link">write →</a>' +
         '</div>';
     }
+    })();
   </script>
 
 </body>
