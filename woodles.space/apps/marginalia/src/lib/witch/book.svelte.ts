@@ -53,6 +53,21 @@ import {
 import { interventionForDomain } from './content/interventions';
 import { emptySave, load, save, wipe, type BookSave } from './persist';
 import { getBestiaryCreatures, type BestiaryCreature } from './bestiaryDb';
+import {
+	SEDIMENT_UNLOCK_COST,
+	SEDIMENT_POUR_RATE,
+	applySedimentPour,
+	emptyWorldShape,
+	featurePlacementStatus,
+	normalizeWorldShape,
+	placeFeatureOnBestSediment,
+	sedimentCoverage as sedimentCoverageOf,
+	unlockWorldspacesForCoverage,
+	visibleLifeForWorldspace,
+	type WorldFeatureId,
+	type WorldShape,
+	type Worldspace
+} from './worldShape';
 
 // observation stages
 export const STAGE_NOTICED = 0; // it has emerged; she has not looked yet
@@ -122,6 +137,7 @@ export class Book {
 	journalShown = $state<string[]>([]);
 	worldIndex = $state(0);
 	bookOpen = $state(false);
+	worldShape = $state<WorldShape>(emptyWorldShape());
 
 	mode = $state<'web' | 'world'>('web');
 
@@ -190,7 +206,8 @@ export class Book {
 	}
 
 	emergences = $derived(revealedEmergences(this.writtenSet));
-	life = $derived(revealedLife(this.writtenSet));
+	allRevealedLife = $derived(revealedLife(this.writtenSet));
+	life = $derived(visibleLifeForWorldspace(this.allRevealedLife, this.worldShape.activeWorldspace));
 
 	stageOf(lifeId: string): number {
 		return this.observation[lifeId] ?? STAGE_NOTICED;
@@ -213,6 +230,26 @@ export class Book {
 
 	attentionUsed = $derived(this.attending.length);
 	attentionFree = $derived(this.attentionCapacity - this.attending.length);
+
+	sedimentCoverage = $derived(sedimentCoverageOf(this.worldShape.sedimentGrid));
+	sedimentUnlockCost = SEDIMENT_UNLOCK_COST;
+	sedimentPourRate = SEDIMENT_POUR_RATE;
+	hasObservedAquaticLife = $derived(
+		this.allRevealedLife.some(
+			(l) => l.category === 'aquatic' && this.stageOf(l.id) >= STAGE_OBSERVED
+		)
+	);
+	canBuySediment = $derived(
+		!this.worldShape.sedimentUnlocked &&
+			this.hasObservedAquaticLife &&
+			this.insight >= SEDIMENT_UNLOCK_COST
+	);
+	pendingWorldspaceUnlock = $derived.by(() => {
+		const unlocked = this.worldShape.unlockedWorldspaces.find(
+			(space) => space !== 'water' && !this.worldShape.seenUnlocks.includes(space)
+		);
+		return unlocked ?? null;
+	});
 
 	// cost to raise attention capacity by one, or null at the maximum
 	attentionUpgradeCost = $derived.by(() => {
@@ -330,6 +367,7 @@ export class Book {
 
 	canAttend(lifeId: string): boolean {
 		if (this.isAttending(lifeId)) return false;
+		if (!this.life.some((l) => l.id === lifeId)) return false;
 		if (this.stageOf(lifeId) >= STAGE_KNOWN) return false;
 		return this.attentionFree > 0;
 	}
@@ -509,11 +547,81 @@ export class Book {
 		this.persist();
 	}
 
+	// ── world shaping: sediment, worldspaces, and feature cards ───────────────
+
+	buySediment() {
+		if (!this.canBuySediment) return;
+		this.insight -= SEDIMENT_UNLOCK_COST;
+		this.worldShape = { ...this.worldShape, sedimentUnlocked: true };
+		this.persist();
+	}
+
+	canPourSediment(): boolean {
+		return this.worldShape.sedimentUnlocked && this.insight > 0;
+	}
+
+	pourSedimentAt(x: number, y: number, dt: number): number {
+		if (!this.canPourSediment() || dt <= 0) return 0;
+		const spend = Math.min(this.insight, SEDIMENT_POUR_RATE * dt);
+		const effectiveDt = spend / SEDIMENT_POUR_RATE;
+		const nextGrid = applySedimentPour(this.worldShape.sedimentGrid, x, y, effectiveDt);
+		this.insight -= spend;
+		this.worldShape = unlockWorldspacesForCoverage({
+			...this.worldShape,
+			sedimentGrid: nextGrid
+		});
+		return spend;
+	}
+
+	finishPourSediment() {
+		this.persist();
+	}
+
+	enterWorldspace(worldspace: Worldspace) {
+		if (!this.worldShape.unlockedWorldspaces.includes(worldspace)) return;
+		this.worldShape = {
+			...this.worldShape,
+			activeWorldspace: worldspace,
+			seenUnlocks: Array.from(new Set([...this.worldShape.seenUnlocks, worldspace])).filter(
+				(space) => space !== 'water'
+			)
+		};
+		this.persist();
+	}
+
+	markWorldspaceSeen(worldspace: Worldspace) {
+		if (worldspace === 'water') return;
+		this.worldShape = {
+			...this.worldShape,
+			seenUnlocks: Array.from(new Set([...this.worldShape.seenUnlocks, worldspace]))
+		};
+		this.persist();
+	}
+
+	canPlaceFeature(featureId: WorldFeatureId): boolean {
+		return featurePlacementStatus(this.worldShape, featureId).ok;
+	}
+
+	featurePlacementReason(featureId: WorldFeatureId): string {
+		return featurePlacementStatus(this.worldShape, featureId).reason;
+	}
+
+	placeFeature(featureId: WorldFeatureId) {
+		const next = placeFeatureOnBestSediment(this.worldShape, featureId);
+		if (next === this.worldShape) return;
+		this.worldShape = next;
+		this.persist();
+	}
+
 	// ── the idle tick ────────────────────────────────────────────────────────
 
 	tick(dt: number) {
 		if (dt <= 0) return;
 		const present = this.life;
+		const presentIds = new Set(present.map((life) => life.id));
+		if (this.attending.some((id) => !presentIds.has(id))) {
+			this.attending = this.attending.filter((id) => presentIds.has(id));
+		}
 
 		// 1) vitality eases with each life's stress, and a wilting life metabolises
 		//    less — so a stressed world eases its own pressure. gather stock rates
@@ -533,6 +641,7 @@ export class Book {
 
 		// 2) study accrual for attended life, slowed when it is suffering.
 		for (const id of [...this.attending]) {
+			if (!presentIds.has(id)) continue;
 			const life = lifeById(id);
 			if (!life) continue;
 			this.addStudy(id, dt * life.studyEase * this.vitalityOf(id));
@@ -651,6 +760,7 @@ export class Book {
 			journalShown: [...this.journalShown],
 			worldIndex: this.worldIndex,
 			bookOpen: this.bookOpen,
+			worldShape: normalizeWorldShape(this.worldShape),
 			readingMsTowardNextPoint: this.readingMsTowardNextPoint,
 			readingStarPoints: this.readingStarPoints,
 			readingCompletedStars: this.readingCompletedStars,
@@ -682,6 +792,7 @@ export class Book {
 		this.journalShown = [...s.journalShown];
 		this.worldIndex = s.worldIndex;
 		this.bookOpen = s.bookOpen;
+		this.worldShape = normalizeWorldShape(s.worldShape);
 		this.readingMsTowardNextPoint = s.readingMsTowardNextPoint;
 		this.readingStarPoints = s.readingStarPoints;
 		this.readingCompletedStars = s.readingCompletedStars;

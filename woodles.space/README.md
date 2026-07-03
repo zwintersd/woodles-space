@@ -23,20 +23,22 @@ README only for deployment details.
 
 the static apps go up as-is — one HTML file each, no build step. the seven
 SvelteKit apps (`write`, `marginalia`, `planner`, `bestiary`, `spores`,
-`marginalia-devlog`, `notebook`) build to `apps/<name>/dist/`. `vercel.json` rewrites each
-friendly path to the right file: `/write` → `/apps/write/dist/index.html`,
-`/lab` → `/apps/lab/index.html`, `/digits` → `/apps/digits/index.html`, and so
-on. `lab` is the homepage-facing shelf for stub experiments; the direct
-experiment paths still exist for links and bookmarks.
+`marginalia-devlog`, `notebook`) and the React/Vite `quiet-room` app build to
+`apps/<name>/dist/`. `vercel.json` rewrites each friendly path to the right
+file: `/write` → `/apps/write/dist/index.html`, `/quiet-room` →
+`/apps/quiet-room/dist/index.html`, `/lab` → `/apps/lab/index.html`, `/digits`
+→ `/apps/digits/index.html`, and so on. `lab` is the homepage-facing shelf for
+stub experiments; the direct experiment paths still exist for links and
+bookmarks.
 
-the build command is one filter per SvelteKit app, chained:
+the build command is one filter per built app, chained:
 
 ```
 pnpm --filter write build && pnpm --filter marginalia build && …
 ```
 
-the static apps aren't in it. they have nothing to build, so Vercel just
-serves them from the directory.
+the remaining static apps aren't in it. they have nothing to build, so Vercel
+just serves them from the directory.
 
 ## the settings that matter
 

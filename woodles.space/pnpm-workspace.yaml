@@ -3,3 +3,6 @@ packages:
   - 'packages/*'
 allowBuilds:
   esbuild: true
+minimumReleaseAgeExclude:
+  - '@paper-design/shaders-react@0.0.77'
+  - '@paper-design/shaders@0.0.77'

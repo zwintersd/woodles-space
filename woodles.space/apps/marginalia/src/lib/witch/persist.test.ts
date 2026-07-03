@@ -15,6 +15,9 @@ describe('emptySave', () => {
 		expect(s.writtenConditions).toEqual([]);
 		expect(s.observation).toEqual({});
 		expect(s.journalShown).toEqual([]);
+		expect(s.worldShape.activeWorldspace).toBe('water');
+		expect(s.worldShape.unlockedWorldspaces).toEqual(['water']);
+		expect(s.worldShape.sedimentGrid.cells.length).toBeGreaterThan(0);
 	});
 	it('uses ATTENTION_START for capacity', () => {
 		expect(emptySave().attentionCapacity).toBeGreaterThan(0);
@@ -45,6 +48,20 @@ describe('export/import roundtrip', () => {
 		const back = importSave(partial);
 		expect(back?.essence).toBe(7);
 		expect(back?.attending).toEqual([]);
+		expect(back?.worldShape.activeWorldspace).toBe('water');
+	});
+	it('preserves worldShape through export/import', () => {
+		const s = emptySave();
+		s.worldShape.sedimentUnlocked = true;
+		s.worldShape.sedimentGrid.cells[0] = 0.7;
+		s.worldShape.placedFeatures = [
+			{ id: 'shell_bed-1', featureId: 'shell_bed', x: 0.4, y: 0.8, rotation: 0, scale: 1 }
+		];
+		const blob = exportSave(s);
+		const back = importSave(blob);
+		expect(back?.worldShape.sedimentUnlocked).toBe(true);
+		expect(back?.worldShape.sedimentGrid.cells[0]).toBe(0.7);
+		expect(back?.worldShape.placedFeatures).toHaveLength(1);
 	});
 });
 
@@ -52,9 +69,11 @@ describe('load/save/wipe', () => {
 	it('round-trips via localStorage', () => {
 		const s = emptySave();
 		s.essence = 42;
+		s.worldShape.sedimentUnlocked = true;
 		save(s);
 		const back = load();
 		expect(back?.essence).toBe(42);
+		expect(back?.worldShape.sedimentUnlocked).toBe(true);
 	});
 	it('returns null when no save exists and no legacy data', () => {
 		expect(load()).toBeNull();

@@ -47,7 +47,7 @@ woodles.space/
     ├── lab/                 static · future shelf for stub experiments
     ├── hygge/               static · design playground (fonts, palette, motifs)
     ├── digits/              static · an SVG pen that writes the time
-    ├── quiet-room/          static · an immersive three.js room of light
+    ├── quiet-room/          React/Vite · an immersive three.js room of light
     ├── letter/              static · echoes — the published-letter reader
     ├── animations/          Python · Manim playspace, outside the workspace
     ├── write/               SvelteKit · the letter editor
@@ -62,15 +62,20 @@ woodles.space/
 `animations/` is a Python/Manim playspace. it has no `package.json` and isn't a
 member of the pnpm workspace; `vercel.json` serves its `index.html` directly.
 
-## the two app shapes
+## the app shapes
 
 **static apps** are one HTML file plus inline CSS and a little module JS. no
 build step. `vercel.json` serves them as-is and rewrites the friendly path
 (`/digits`) to the file (`/apps/digits/index.html`). they consume `shared/` at
 runtime — `<link href="/shared/palette.css">` and `import … from
-"/shared/library.js"`. `quiet-room` goes one step further: it pulls `three`
-and its bloom post-processing addons from a CDN through a `<script
-type="importmap">`, still with no build step.
+"/shared/library.js"`.
+
+**Quiet Room** (`quiet-room`) is React 19 on Vite 7. it keeps the immersive
+three.js engine local to the app, uses `@paper-design/shaders-react` for the
+Paper Shaders wash, and builds to `apps/quiet-room/dist/` with
+`base: "/quiet-room/"`. it still consumes `/shared/fonts.css` and
+`/shared/palette.css`; its Vite config serves those shared root assets during
+local dev and preview.
 
 **SvelteKit apps** — `write`, `marginalia`, `planner`, `notebook`, `bestiary`,
 `spores`, `marginalia-devlog` — use Svelte 5 runes, Vite 7, and `@sveltejs/adapter-static`.
@@ -220,7 +225,7 @@ from `woodles.space/`:
 pnpm install            one install for the whole workspace
 pnpm test               vitest in every SvelteKit app with a test script (620 tests)
 pnpm check              svelte-check in every app
-pnpm build              build the seven SvelteKit apps
+pnpm build              build the seven SvelteKit apps plus Quiet Room
 ```
 
 both `test` and `check` generate `.svelte-kit/` themselves on a fresh clone, so
@@ -238,4 +243,10 @@ resolve:
 
 ```
 python3 -m http.server 8000     then visit /apps/<name>/index.html
+```
+
+Quiet Room has its own Vite dev server:
+
+```
+pnpm --filter quiet-room dev
 ```

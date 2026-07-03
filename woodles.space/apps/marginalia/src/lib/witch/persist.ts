@@ -2,6 +2,7 @@
 
 import { ATTENTION_START } from './tuning';
 import { neutralStocks, type Stocks } from './vitals';
+import { emptyWorldShape, normalizeWorldShape, type WorldShape } from './worldShape';
 
 const KEY = 'witch.book.save.v1';
 const LEGACY_MARGINALIA_KEY = 'marginalia.save.v1';
@@ -30,6 +31,8 @@ export interface BookSave {
 	journalShown: string[];
 	worldIndex: number;
 	bookOpen: boolean;
+	// world-shaping — sediment, worldspaces, and feature-card placements
+	worldShape: WorldShape;
 	// reading room — "reading alongside Brianna"
 	readingMsTowardNextPoint: number;
 	readingStarPoints: number;
@@ -67,6 +70,7 @@ export function emptySave(): BookSave {
 		journalShown: [],
 		worldIndex: 0,
 		bookOpen: false,
+		worldShape: emptyWorldShape(),
 		readingMsTowardNextPoint: 0,
 		readingStarPoints: 0,
 		readingCompletedStars: 0,
@@ -109,10 +113,18 @@ export function load(): BookSave | null {
 		}
 		const parsed = JSON.parse(raw);
 		if (parsed?.v !== 1) return null;
-		return { ...emptySave(), ...parsed };
+		return withDefaults(parsed);
 	} catch {
 		return null;
 	}
+}
+
+function withDefaults(parsed: Partial<BookSave>): BookSave {
+	const base = { ...emptySave(), ...parsed };
+	return {
+		...base,
+		worldShape: normalizeWorldShape(parsed.worldShape)
+	};
 }
 
 export function save(state: BookSave): void {
@@ -138,7 +150,7 @@ export function importSave(blob: string): BookSave | null {
 		const json = decodeURIComponent(escape(atob(blob.trim())));
 		const parsed = JSON.parse(json);
 		if (parsed?.v !== 1) return null;
-		return { ...emptySave(), ...parsed };
+		return withDefaults(parsed);
 	} catch {
 		return null;
 	}
