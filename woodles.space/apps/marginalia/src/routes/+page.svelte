@@ -1065,7 +1065,9 @@
 			top: 5.6rem;
 			z-index: 20;
 			flex-direction: row;
-			overflow-x: auto;
+			flex-wrap: wrap;
+			overflow-x: visible;
+			gap: 0.25rem;
 			padding: 0.45rem 0;
 			margin: 0 -1rem 0.6rem;
 			background: color-mix(in srgb, var(--bg) 92%, transparent);
@@ -1074,7 +1076,7 @@
 		}
 		.book-spine button,
 		.book-spine a {
-			flex: 0 0 auto;
+			flex: 1 1 4.4rem;
 			grid-template-columns: 1.3rem auto;
 			border-left: 0;
 			border-bottom: 2px solid transparent;

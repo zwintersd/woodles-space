@@ -9,8 +9,11 @@
 	} from './tuning';
 	import { domainVerb, type Life, type LifeCategory } from './content/life';
 	import MiniHex from './MiniHex.svelte';
+	import NewWorldspaceUnlock from './NewWorldspaceUnlock.svelte';
 	import WorldCanvas from './WorldCanvas.svelte';
 	import FieldNotes from './FieldNotes.svelte';
+	import WorldShapingDetails from './WorldShapingDetails.svelte';
+	import { FEATURE_SPECS, SEDIMENT_UNLOCK_COVERAGE, type WorldFeatureId } from './worldShape';
 
 	const categories: { id: LifeCategory; label: string }[] = [
 		{ id: 'aquatic', label: 'in the water' },
@@ -138,6 +141,37 @@
 	// (ROADMAP.md week 5) — the picker surfaces the cross-link to /bestiary
 	// only when there's actually something published to point at.
 	const hasPublishedInPool = $derived(book.worldCreatures.some((c) => c.source === 'published'));
+
+	// ── world shaping affordance ──────────────────────────────────────────────
+
+	let shapingDetailsOpen = $state(false);
+
+	const showWorldShaping = $derived(
+		book.hasObservedAquaticLife ||
+			book.worldShape.sedimentUnlocked ||
+			book.worldShape.unlockedWorldspaces.includes('shallows')
+	);
+	const sedimentUnlockPct = Math.floor(SEDIMENT_UNLOCK_COVERAGE * 100);
+	const sedimentPct = $derived(Math.floor(book.sedimentCoverage * 100));
+	const sedimentPhrase = $derived.by(() => {
+		if (book.sedimentCoverage >= SEDIMENT_UNLOCK_COVERAGE) return 'the floor has learned shallows.';
+		if (book.sedimentCoverage >= 0.4) return 'the floor is gathering into shelves.';
+		if (book.sedimentCoverage >= 0.18) return 'the water is keeping a little ground.';
+		if (book.worldShape.sedimentUnlocked) return 'sand is beginning to remember where it fell.';
+		return 'the water is not ready to hold ground yet.';
+	});
+
+	function featurePlaced(featureId: WorldFeatureId): boolean {
+		return book.worldShape.placedFeatures.some((feature) => feature.featureId === featureId);
+	}
+
+	function featureActionLabel(featureId: WorldFeatureId): string {
+		if (featurePlaced(featureId)) return 'settled';
+		const reason = book.featurePlacementReason(featureId);
+		if (reason === 'needs-sediment') return 'needs dense sediment';
+		if (reason === 'locked') return 'locked';
+		return 'settle feature';
+	}
 </script>
 
 <div class="world">
@@ -150,6 +184,100 @@
 	</header>
 
 	<WorldCanvas />
+
+	{#if book.pendingWorldspaceUnlock}
+		<NewWorldspaceUnlock worldspace={book.pendingWorldspaceUnlock} />
+	{/if}
+
+	{#if showWorldShaping}
+		<section class="shape-panel">
+			<div class="shape-head">
+				<div>
+					<span class="shape-kicker">world shaping</span>
+					<h3>{book.worldShape.activeWorldspace === 'shallows' ? 'the shallows' : 'water world'}</h3>
+				</div>
+				<button
+					class="aperture"
+					class:open={shapingDetailsOpen}
+					aria-label={shapingDetailsOpen ? 'hide world details' : 'show world details'}
+					aria-pressed={shapingDetailsOpen}
+					onclick={() => (shapingDetailsOpen = !shapingDetailsOpen)}
+				>
+					<span></span>
+				</button>
+			</div>
+
+			{#if !book.worldShape.sedimentUnlocked}
+				<div class="shape-buy-row">
+					<p>
+						the first water has no floor yet. once she understands one aquatic life,
+						she can spend the world's surplus on sediment.
+					</p>
+					<button class="shape-buy" disabled={!book.canBuySediment} onclick={() => book.buySediment()}>
+						sift sediment · {fmt(book.sedimentUnlockCost)} insight
+					</button>
+				</div>
+			{:else}
+				<div class="sediment-readout">
+					<div class="sediment-line">
+						<span>{sedimentPhrase}</span>
+						<strong>{sedimentPct}/{sedimentUnlockPct}%</strong>
+					</div>
+					<div class="sediment-meter" aria-hidden="true">
+						<div style:width="{Math.min(100, (book.sedimentCoverage / SEDIMENT_UNLOCK_COVERAGE) * 100)}%"></div>
+					</div>
+					<p class="shape-note">
+						sift sediment where her hand rests · {fmt(book.sedimentPourRate)} insight/s
+					</p>
+				</div>
+			{/if}
+
+			{#if book.worldShape.unlockedWorldspaces.includes('shallows')}
+				<div class="worldspace-switch" aria-label="worldspace">
+					<button
+						class:active={book.worldShape.activeWorldspace === 'water'}
+						onclick={() => book.enterWorldspace('water')}
+					>
+						water
+					</button>
+					<button
+						class:active={book.worldShape.activeWorldspace === 'shallows'}
+						onclick={() => book.enterWorldspace('shallows')}
+					>
+						shallows
+					</button>
+				</div>
+
+				<section class="feature-panel">
+					<div class="feature-head">
+						<span>archaeological features</span>
+						<small>{book.worldShape.placedFeatures.length}/{FEATURE_SPECS.length} settled</small>
+					</div>
+					<div class="feature-list">
+						{#each FEATURE_SPECS as feature (feature.id)}
+							<article class="feature-row" class:placed={featurePlaced(feature.id)}>
+								<div>
+									<h4>{feature.name}</h4>
+									<p>{feature.short}</p>
+									<span>{feature.effect}</span>
+								</div>
+								<button
+									disabled={!book.canPlaceFeature(feature.id)}
+									onclick={() => book.placeFeature(feature.id)}
+								>
+									{featureActionLabel(feature.id)}
+								</button>
+							</article>
+						{/each}
+					</div>
+				</section>
+			{/if}
+
+			{#if shapingDetailsOpen}
+				<WorldShapingDetails />
+			{/if}
+		</section>
+	{/if}
 
 	<section class="attention-panel">
 		<div class="ap-line">
@@ -444,6 +572,204 @@
 		font-family: var(--font-counter);
 		color: var(--leafeon-pink);
 		font-size: 1.1em;
+	}
+
+	/* ── world shaping ───────────────────────────────────────────────────── */
+	.shape-panel {
+		border: 1px solid rgba(108, 229, 232, 0.24);
+		border-radius: 4px;
+		background:
+			linear-gradient(180deg, rgba(108, 229, 232, 0.05), rgba(45, 45, 95, 0.24)),
+			var(--panel);
+		padding: 0.75rem 0.85rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.7rem;
+	}
+	.shape-head,
+	.sediment-line,
+	.feature-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+	}
+	.shape-kicker,
+	.feature-head span {
+		display: block;
+		font-family: var(--font-ui);
+		font-size: 0.64rem;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+		color: var(--cyan);
+	}
+	.shape-head h3 {
+		font-family: var(--font-display);
+		font-weight: 400;
+		font-size: 1.2rem;
+		color: var(--cream);
+		margin: 0.05rem 0 0;
+	}
+	.aperture {
+		position: relative;
+		width: 2.2rem;
+		height: 2.2rem;
+		flex: 0 0 auto;
+		border: 1px solid var(--rule);
+		border-radius: 50%;
+		display: grid;
+		place-items: center;
+		background: rgba(26, 26, 62, 0.55);
+	}
+	.aperture span,
+	.aperture::before,
+	.aperture::after {
+		content: '';
+		display: block;
+		border-radius: 50%;
+	}
+	.aperture span {
+		width: 0.58rem;
+		height: 0.58rem;
+		background: var(--periwinkle);
+		box-shadow: 0 0 8px rgba(154, 150, 201, 0.35);
+	}
+	.aperture::before {
+		position: absolute;
+		width: 1.35rem;
+		height: 1.35rem;
+		border: 1px solid rgba(154, 150, 201, 0.42);
+	}
+	.aperture::after {
+		position: absolute;
+		width: 1.82rem;
+		height: 1.82rem;
+		border: 1px solid rgba(108, 229, 232, 0.2);
+	}
+	.aperture:hover,
+	.aperture.open {
+		border-color: var(--cyan);
+	}
+	.aperture.open span {
+		background: var(--cyan);
+	}
+	.shape-buy-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.8rem;
+	}
+	.shape-buy-row p,
+	.shape-note {
+		font-family: var(--font-body);
+		font-size: 0.84rem;
+		color: var(--muted);
+		margin: 0;
+	}
+	.shape-buy,
+	.worldspace-switch button,
+	.feature-row button {
+		font-family: var(--font-ui);
+		font-size: 0.72rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--cream);
+		border: 1px solid var(--rule);
+		border-radius: 3px;
+		padding: 0.35rem 0.58rem;
+		white-space: nowrap;
+	}
+	.shape-buy:hover:not(:disabled),
+	.feature-row button:hover:not(:disabled) {
+		border-color: var(--cyan);
+		color: var(--cyan);
+	}
+	.sediment-readout {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.sediment-line span {
+		font-family: var(--font-body);
+		font-style: italic;
+		color: var(--muted);
+	}
+	.sediment-line strong {
+		font-family: var(--font-counter);
+		font-weight: 400;
+		font-size: 1.1rem;
+		color: var(--cyan);
+		white-space: nowrap;
+	}
+	.sediment-meter {
+		height: 6px;
+		background: var(--bg);
+		border-radius: 999px;
+		overflow: hidden;
+	}
+	.sediment-meter div {
+		height: 100%;
+		background: linear-gradient(90deg, #ab8974, #d8be8e, var(--cyan));
+		transition: width 160ms linear;
+	}
+	.worldspace-switch {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+	}
+	.worldspace-switch button.active {
+		border-color: var(--cyan);
+		color: var(--cyan);
+		background: rgba(108, 229, 232, 0.07);
+	}
+	.feature-panel {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+	}
+	.feature-head small {
+		font-family: var(--font-counter);
+		font-size: 0.9rem;
+		color: var(--muted);
+	}
+	.feature-list {
+		display: flex;
+		flex-direction: column;
+		border-top: 1px solid var(--rule);
+	}
+	.feature-row {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		gap: 0.75rem;
+		align-items: center;
+		padding: 0.55rem 0;
+		border-bottom: 1px solid var(--rule);
+	}
+	.feature-row h4 {
+		font-family: var(--font-display);
+		font-weight: 400;
+		font-size: 1rem;
+		color: var(--cream);
+		margin: 0;
+	}
+	.feature-row p {
+		font-family: var(--font-body);
+		font-size: 0.82rem;
+		color: var(--muted);
+		margin: 0.08rem 0;
+	}
+	.feature-row span {
+		font-family: var(--font-ui);
+		font-size: 0.62rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--periwinkle);
+	}
+	.feature-row.placed {
+		opacity: 0.75;
+	}
+	.feature-row.placed button {
+		color: var(--periwinkle);
 	}
 
 	/* ── attention panel ─────────────────────────────────────────────────── */
@@ -1042,5 +1368,18 @@
 	}
 	.bind-cross-link a {
 		color: var(--cyan);
+	}
+	@media (max-width: 680px) {
+		.shape-buy-row,
+		.sediment-line,
+		.feature-row {
+			align-items: stretch;
+			grid-template-columns: 1fr;
+			flex-direction: column;
+		}
+		.feature-row button,
+		.shape-buy {
+			width: 100%;
+		}
 	}
 </style>
