@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { Life } from './content/life';
 import { STAGE_SECONDS, ATTENTION_START, ATTENTION_COSTS } from './tuning';
+import { visibleLifeForWorldspace } from './worldShape';
 
 // Constants from book.svelte (duplicated here to avoid importing the Book class
 // which uses Svelte 5 $state runes that can't be instantiated in test context)
@@ -150,6 +152,26 @@ describe('Book — utilities and constants', () => {
 		it('labels match expected values', () => {
 			const labels = Array.from(stageLabel);
 			expect(labels).toEqual(['noticed', 'observed', 'studied', 'known']);
+		});
+	});
+
+	describe('worldspace life gating', () => {
+		const aquatic = { id: 'a', category: 'aquatic' } as Life;
+		const terrestrial = { id: 't', category: 'terrestrial' } as Life;
+		const atmospheric = { id: 's', category: 'atmospheric' } as Life;
+
+		it('keeps the opening water world aquatic-only', () => {
+			expect(visibleLifeForWorldspace([aquatic, terrestrial, atmospheric], 'water')).toEqual([
+				aquatic
+			]);
+		});
+
+		it('allows all current world-one categories in the shallows', () => {
+			expect(visibleLifeForWorldspace([aquatic, terrestrial, atmospheric], 'shallows')).toEqual([
+				aquatic,
+				terrestrial,
+				atmospheric
+			]);
 		});
 	});
 });
