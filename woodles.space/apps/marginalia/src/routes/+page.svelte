@@ -292,6 +292,11 @@
 						— the Web, where she writes conditions, and the World, where she
 						watches what they become.
 					</p>
+					<p class="save-note">
+						This is a game about witnessing, not winning — it saves in your browser as
+						you go. No account needed; export a save from the menu any time to keep
+						it, or carry it to another device.
+					</p>
 					<div class="title-plate">
 						<span class="title-name">{currentTitle.name}</span>
 						<span class="title-note">{currentTitle.earnedNote}</span>
@@ -835,6 +840,18 @@
 		color: var(--muted);
 		font-style: italic;
 		font-size: 0.9rem;
+	}
+	.save-note {
+		font-family: var(--font-ui);
+		font-size: 0.72rem;
+		letter-spacing: 0.01em;
+		line-height: 1.5;
+		color: var(--periwinkle);
+		border: 1px solid var(--rule);
+		border-radius: 4px;
+		background: var(--panel);
+		padding: 0.55rem 0.75rem;
+		margin: 0.3rem 0 0;
 	}
 	.title-plate {
 		display: flex;

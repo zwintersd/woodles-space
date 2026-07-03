@@ -357,3 +357,25 @@ and the Ledger shows it all. **decline and death moved to phase B**: a creature 
 or dying shouldn't happen before the canvas can show *why* — so in A, vitality floors
 (dormant, recoverable) rather than removing life. next natural step is **B** (needs the
 [ASSETS.md](./ASSETS.md) art) or **C** (interventions, no art required).
+
+---
+
+## 7. save discipline (ROADMAP.md week 6)
+
+`../ROADMAP.md`'s public-facing arc means a stranger, not just Z, can start a
+save today — there's no account and no server copy, so a save that fails to
+load is gone. From week 6 on this is a hard rule, not a nice-to-have:
+
+- **every `BookSave` shape change ships with a migration in `persist.ts` and
+  a `persist.test.ts` case.** the common case — a new field — is already
+  free: `load()`/`importSave()` both merge onto `emptySave()`
+  (`{ ...emptySave(), ...parsed }`), so an older save missing the field just
+  gets its default. a renamed field, a changed type, or a default that
+  depends on other saved values needs an explicit step (see
+  `inheritReadingFromLegacy` for the shape of one) — write the test against
+  an old-shaped blob, not just the new one.
+- **`v` stays `1`** for any change the merge-onto-`emptySave()` pattern
+  covers. only bump it for a break too large to migrate, and decide
+  deliberately what happens to existing `v: 1` saves when you do.
+- see `persist.ts`'s own header comment for the same rule, kept next to the
+  code it governs.
