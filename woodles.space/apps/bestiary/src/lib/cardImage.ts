@@ -35,6 +35,15 @@ function downloadBlob(blob: Blob, filename: string): void {
 	setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// Download an already-rendered card image directly — a published
+// PublicCreature's cardImage is a data URL produced once at publish time
+// (ROADMAP.md week 2), so the gallery and share-link views (which only ever
+// have that flattened image, never a live CreatureCard DOM node to
+// rasterise) can hand it straight to the browser with no re-render.
+export function downloadCardDataUrl(dataUrl: string, name: string): void {
+	triggerDownload(dataUrl, slugFilename(name, '', 'png'));
+}
+
 function loadImage(src: string): Promise<HTMLImageElement> {
 	return new Promise((resolve, reject) => {
 		const img = new Image();

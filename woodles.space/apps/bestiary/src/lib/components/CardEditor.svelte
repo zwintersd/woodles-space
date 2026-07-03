@@ -352,6 +352,10 @@
 					<fieldset class="group">
 						<legend>identity</legend>
 
+						{#if creature.lineage}
+							<p class="lineage-note">✦ {creature.lineage}</p>
+						{/if}
+
 						<label class="field">
 							<span class="label">name</span>
 							<input
@@ -1046,6 +1050,15 @@
 		font-style: italic;
 		font-size: 0.78rem;
 		color: var(--b-muted);
+	}
+
+	.lineage-note {
+		font-family: var(--b-font-mono);
+		font-size: 0.74rem;
+		color: var(--b-gold);
+		background: var(--b-gold-soft);
+		border-radius: var(--b-radius-sm);
+		padding: 0.4rem 0.6rem;
 	}
 
 	/* domain swatches */

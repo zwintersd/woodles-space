@@ -4,7 +4,26 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>bestiary · woodles.space</title>
-		<meta name="description" content="a field guide of creatures, drawn as cards" />
+		<meta name="description" content="a field guide of creatures, drawn as cards. bring a picture of anything — the studio will make it belong." />
+
+		<!-- OG/Twitter meta (ROADMAP.md week 4): one static, bestiary-wide
+		     unfurl image. per-card unfurl images are a stretch goal — this app
+		     ships with no SSR (adapter-static, ssr=false), so a share link's
+		     <svelte:head> tags never reach an unfurl bot; only what's hardcoded
+		     here, in the prerendered shell, does. -->
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="woodles.space" />
+		<meta property="og:title" content="the bestiary · woodles.space" />
+		<meta property="og:description" content="a field guide of creatures, drawn as cards. bring a picture of anything — the studio will make it belong." />
+		<meta property="og:url" content="https://woodles.space/bestiary" />
+		<meta property="og:image" content="https://woodles.space/bestiary/og-image.png" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="the bestiary · woodles.space" />
+		<meta name="twitter:description" content="a field guide of creatures, drawn as cards. bring a picture of anything — the studio will make it belong." />
+		<meta name="twitter:image" content="https://woodles.space/bestiary/og-image.png" />
+
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link rel="stylesheet" href="/shared/fonts.css" />
