@@ -1,4 +1,18 @@
 // localStorage save/load for The Witch's Book.
+//
+// ── save discipline (ROADMAP.md week 6) ─────────────────────────────────────
+// Any visitor who starts playing during the public-facing arc is a save we
+// must not break — there's no account and no server copy, so a broken load
+// is unrecoverable for them. The rule: BookSave.v never changes on its own;
+// a shape change is additive (a new optional-in-practice field with a
+// sensible default) and lands through `{ ...emptySave(), ...parsed }` below
+// (load() and importSave() both use it), which already fills in anything an
+// older save is missing. That covers a genuinely new field for free. It does
+// NOT cover a renamed field, a changed type, or a default that depends on
+// other saved values — those need an explicit migration step here (see
+// inheritReadingFromLegacy for the shape of one) plus a persist.test.ts case
+// loading an old-shaped blob to prove the migration runs. Only bump `v` (and
+// decide what happens to existing v:1 saves) for a break too large to migrate.
 
 import { ATTENTION_START } from './tuning';
 import { neutralStocks, type Stocks } from './vitals';

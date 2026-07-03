@@ -63,6 +63,20 @@ describe('load/save/wipe', () => {
 		localStorage.setItem('witch.book.save.v1', JSON.stringify({ v: 2, essence: 5 }));
 		expect(load()).toBeNull();
 	});
+	it('fills in fields an older v1 save predates, from localStorage', () => {
+		// simulates a save written before a field existed — the save-discipline
+		// rule (see this file's header) says an additive shape change must not
+		// break a save like this one, missing spriteBindings/fieldNotes entirely.
+		localStorage.setItem(
+			'witch.book.save.v1',
+			JSON.stringify({ v: 1, essence: 9, writtenConditions: ['holding'] })
+		);
+		const back = load();
+		expect(back?.essence).toBe(9);
+		expect(back?.writtenConditions).toEqual(['holding']);
+		expect(back?.spriteBindings).toEqual({});
+		expect(back?.fieldNotes).toEqual([]);
+	});
 	it('wipe removes the save', () => {
 		save(emptySave());
 		wipe();

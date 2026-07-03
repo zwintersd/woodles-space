@@ -43,6 +43,37 @@
 		if (n < 1000) return n.toFixed(1);
 		return fmt(n);
 	}
+
+	// One copy of each explanation, read by both the (mouse-only) title
+	// tooltip and the tap-to-reveal hint below, so they can't drift apart.
+	const hints = $derived({
+		insight:
+			'the world yields Insight every second it is witnessed. spend it on attention, or distill it into Essence.',
+		favor: `the world's relationship with her. it eases upward as she comes to Know its life — and it multiplies all Insight, ×${book.favorMult.toFixed(2)} right now.`,
+		attention:
+			'how many lives she can deepen at once. attended life advances through the observation stages over time.',
+		essence: 'raw creative power. spent writing conditions into the Web.',
+		knowing: 'lifetime understanding — every observation stage she has ever crossed.',
+		stability:
+			'resilience — how close the three stocks sit to a balanced world, steadied by the ecosystems she has come to Know.',
+		complexity:
+			'the richness of the world — its life, how deeply it is witnessed, what has emerged, and what she has fully Known.'
+	});
+
+	// Every cell's explanation lives in its title tooltip — useless on a touch
+	// screen, which has no hover. Tapping toggles the same text open inline
+	// instead, so "how the vital signs read to someone with no context"
+	// (ROADMAP.md week 6) doesn't depend on a mouse. One open at a time.
+	let expandedId = $state<string | null>(null);
+	function toggleHint(id: string) {
+		expandedId = expandedId === id ? null : id;
+	}
+	function hintKeydown(event: KeyboardEvent, id: string) {
+		if (event.key === 'Enter' || event.key === ' ') {
+			event.preventDefault();
+			toggleHint(id);
+		}
+	}
 </script>
 
 <div class="ledger">
@@ -51,29 +82,45 @@
 		<div class="cells">
 			<div
 				class="cell wide"
-				title="the world yields Insight every second it is witnessed. spend it on attention, or distill it into Essence."
+				title={hints.insight}
+				role="button"
+				tabindex="0"
+				aria-expanded={expandedId === 'insight'}
+				onclick={() => toggleHint('insight')}
+				onkeydown={(e) => hintKeydown(e, 'insight')}
 			>
 				<span class="label">insight</span>
 				<span class="value">{fmtLive(book.insight)}</span>
 				<span class="rate">+{fmt(book.insightPerSec)}/s</span>
+				{#if expandedId === 'insight'}<p class="hint">{hints.insight}</p>{/if}
 			</div>
 			<div
 				class="cell"
-				title="the world's relationship with her. it eases upward as she comes to Know its life — and it multiplies all Insight, ×{book.favorMult.toFixed(
-					2
-				)} right now."
+				title={hints.favor}
+				role="button"
+				tabindex="0"
+				aria-expanded={expandedId === 'favor'}
+				onclick={() => toggleHint('favor')}
+				onkeydown={(e) => hintKeydown(e, 'favor')}
 			>
 				<span class="label">favor</span>
 				<span class="value">{Math.round(book.favor)}</span>
 				<span class="rate">{favorWord} · ×{book.favorMult.toFixed(2)}</span>
+				{#if expandedId === 'favor'}<p class="hint">{hints.favor}</p>{/if}
 			</div>
 			<div
 				class="cell"
-				title="how many lives she can deepen at once. attended life advances through the observation stages over time."
+				title={hints.attention}
+				role="button"
+				tabindex="0"
+				aria-expanded={expandedId === 'attention'}
+				onclick={() => toggleHint('attention')}
+				onkeydown={(e) => hintKeydown(e, 'attention')}
 			>
 				<span class="label">attention</span>
 				<span class="value">{book.attentionUsed}<span class="of">/{book.attentionCapacity}</span></span>
 				<span class="rate">{book.attentionFree} free</span>
+				{#if expandedId === 'attention'}<p class="hint">{hints.attention}</p>{/if}
 			</div>
 		</div>
 	</section>
@@ -81,13 +128,31 @@
 	<section class="group book">
 		<h3>carried in the book</h3>
 		<div class="cells">
-			<div class="cell" title="raw creative power. spent writing conditions into the Web.">
+			<div
+				class="cell"
+				title={hints.essence}
+				role="button"
+				tabindex="0"
+				aria-expanded={expandedId === 'essence'}
+				onclick={() => toggleHint('essence')}
+				onkeydown={(e) => hintKeydown(e, 'essence')}
+			>
 				<span class="label">essence</span>
 				<span class="value">{book.essence}</span>
+				{#if expandedId === 'essence'}<p class="hint">{hints.essence}</p>{/if}
 			</div>
-			<div class="cell" title="lifetime understanding — every observation stage she has ever crossed.">
+			<div
+				class="cell"
+				title={hints.knowing}
+				role="button"
+				tabindex="0"
+				aria-expanded={expandedId === 'knowing'}
+				onclick={() => toggleHint('knowing')}
+				onkeydown={(e) => hintKeydown(e, 'knowing')}
+			>
 				<span class="label">knowing</span>
 				<span class="value">{fmt(book.knowing)}</span>
+				{#if expandedId === 'knowing'}<p class="hint">{hints.knowing}</p>{/if}
 			</div>
 		</div>
 	</section>
@@ -103,7 +168,15 @@
 			<div class="cells">
 				{#each stockRows as row (row.id)}
 					{@const dir = trend(row.history)}
-					<div class="cell stock" title={row.hint}>
+					<div
+						class="cell stock"
+						title={row.hint}
+						role="button"
+						tabindex="0"
+						aria-expanded={expandedId === row.id}
+						onclick={() => toggleHint(row.id)}
+						onkeydown={(e) => hintKeydown(e, row.id)}
+					>
 						<span class="label">{row.label}</span>
 						<span class="value-row">
 							<span class="value sm">{Math.round(row.value)}</span>
@@ -115,15 +188,34 @@
 							<span class="fill" style:width="{row.value}%" style:background={row.tint}></span>
 						</span>
 						<Sparkline samples={row.history} color={row.tint} />
+						{#if expandedId === row.id}<p class="hint">{row.hint}</p>{/if}
 					</div>
 				{/each}
-				<div class="cell" title="resilience — how close the three stocks sit to a balanced world, steadied by the ecosystems she has come to Know.">
+				<div
+					class="cell"
+					title={hints.stability}
+					role="button"
+					tabindex="0"
+					aria-expanded={expandedId === 'stability'}
+					onclick={() => toggleHint('stability')}
+					onkeydown={(e) => hintKeydown(e, 'stability')}
+				>
 					<span class="label">stability</span>
 					<span class="value sm">{Math.round(book.stability)}</span>
+					{#if expandedId === 'stability'}<p class="hint">{hints.stability}</p>{/if}
 				</div>
-				<div class="cell" title="the richness of the world — its life, how deeply it is witnessed, what has emerged, and what she has fully Known.">
+				<div
+					class="cell"
+					title={hints.complexity}
+					role="button"
+					tabindex="0"
+					aria-expanded={expandedId === 'complexity'}
+					onclick={() => toggleHint('complexity')}
+					onkeydown={(e) => hintKeydown(e, 'complexity')}
+				>
 					<span class="label">complexity</span>
 					<span class="value sm">{fmt(book.complexity)}</span>
+					{#if expandedId === 'complexity'}<p class="hint">{hints.complexity}</p>{/if}
 				</div>
 			</div>
 		</section>
@@ -167,9 +259,27 @@
 		flex-direction: column;
 		gap: 0.05rem;
 		cursor: help;
+		max-width: 14rem;
+		border-radius: 3px;
+	}
+	.cell:focus-visible {
+		outline: 1px solid var(--cyan);
+		outline-offset: 2px;
 	}
 	.cell.wide {
 		min-width: 6rem;
+	}
+	/* the tap-revealed twin of the title tooltip above — same words, reachable
+	   without a mouse (ROADMAP.md week 6: the ledger read with no context). */
+	.hint {
+		margin: 0.2rem 0 0;
+		font-family: var(--font-body);
+		font-style: italic;
+		font-size: 0.72rem;
+		line-height: 1.35;
+		color: var(--text);
+		white-space: normal;
+		cursor: auto;
 	}
 	.label {
 		font-family: var(--font-ui);
