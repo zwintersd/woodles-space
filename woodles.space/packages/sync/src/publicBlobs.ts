@@ -38,6 +38,11 @@ export type PublicCreature = {
 	// field needs no further fallback downstream. null only when the creature
 	// has no art at all.
 	isolatedSprite: string | null;
+	// pixel-art sprites read best un-smoothed (mirrors Creature.pixelated) —
+	// carried along so a visitor's world renders published sprites the same
+	// way Z's own device does. optional: blobs published before this field
+	// existed simply read as smoothed.
+	pixelated?: boolean;
 	// "show the source" opt-in (week 2): the raw dropped png, for the
 	// before/after gallery spots. off by default — absent unless chosen.
 	sourceImage?: string | null;

@@ -66,7 +66,7 @@ import { nextFocusStreak, focusMultiplier } from './focus';
 import { pushSample } from './history';
 import { interventionForDomain } from './content/interventions';
 import { emptySave, load, save, wipe, type BookSave, type FieldNote } from './persist';
-import { getBestiaryCreatures, type BestiaryCreature } from './bestiaryDb';
+import { getBestiaryCreatures, getWorldCreatures, type BestiaryCreature, type WorldCreature } from './bestiaryDb';
 
 // observation stages
 export const STAGE_NOTICED = 0; // it has emerged; she has not looked yet
@@ -174,15 +174,25 @@ export class Book {
 
 	// ── bestiary integration ─────────────────────────────────────────────────
 	// Cached snapshot of creatures from the Bestiary app (same-origin IndexedDB).
-	// Refreshed on page focus so edits in Bestiary are reflected promptly.
+	// Refreshed on page focus so edits in Bestiary are reflected promptly. Local
+	// only — the arcade's companion picker and the hex-stage dev preview stay
+	// deliberately scoped to what's actually on this device.
 	bestiaryCreatures = $state<BestiaryCreature[]>([]);
-	// Maps Marginalia life ID → Bestiary creature ID. Persisted in the book save.
+	// The world's binding pool (ROADMAP.md week 5): local creatures first, the
+	// published bestiary gallery filling in the rest, so the world isn't empty
+	// just because a visitor hasn't drawn anything of their own yet.
+	worldCreatures = $state<WorldCreature[]>([]);
+	// Maps Marginalia life ID → Bestiary creature ID (local or published).
+	// Persisted in the book save.
 	spriteBindings = $state<Record<string, string>>({});
 
 	async refreshBestiaryCreatures(): Promise<void> {
-		this.bestiaryCreatures = await getBestiaryCreatures();
-		// drop any bindings whose target creature has since been deleted
-		const ids = new Set(this.bestiaryCreatures.map((c) => c.id));
+		const local = await getBestiaryCreatures();
+		this.bestiaryCreatures = local;
+		this.worldCreatures = await getWorldCreatures(local);
+		// drop any bindings whose target creature no longer resolves — deleted
+		// locally, or dropped from a re-published snapshot
+		const ids = new Set(this.worldCreatures.map((c) => c.id));
 		const cleaned: Record<string, string> = {};
 		let changed = false;
 		for (const [lifeId, creatureId] of Object.entries(this.spriteBindings)) {
@@ -209,10 +219,10 @@ export class Book {
 		this.persist();
 	}
 
-	boundCreatureFor(lifeId: string): BestiaryCreature | null {
+	boundCreatureFor(lifeId: string): WorldCreature | null {
 		const creatureId = this.spriteBindings[lifeId];
 		if (!creatureId) return null;
-		return this.bestiaryCreatures.find((c) => c.id === creatureId) ?? null;
+		return this.worldCreatures.find((c) => c.id === creatureId) ?? null;
 	}
 
 	// ── reading room — "reading alongside Brianna" (a side feature) ──────────
@@ -848,10 +858,12 @@ export class Book {
 	resetIdleProgress() {
 		const preservedBindings = { ...this.spriteBindings };
 		const preservedBestiaryCreatures = this.bestiaryCreatures;
+		const preservedWorldCreatures = this.worldCreatures;
 		this.fromSave({ ...emptySave(), spriteBindings: preservedBindings });
 		this.mode = 'web';
 		this.offlineReport = null;
 		this.bestiaryCreatures = preservedBestiaryCreatures;
+		this.worldCreatures = preservedWorldCreatures;
 		this.persist();
 	}
 

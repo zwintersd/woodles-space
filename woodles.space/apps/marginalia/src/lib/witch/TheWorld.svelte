@@ -133,6 +133,11 @@
 
 	// attended life in emergence order (stable ordering)
 	const attendedLife = $derived(book.life.filter((l) => book.isAttending(l.id)));
+
+	// true once the published bestiary gallery has filled in the binding pool
+	// (ROADMAP.md week 5) — the picker surfaces the cross-link to /bestiary
+	// only when there's actually something published to point at.
+	const hasPublishedInPool = $derived(book.worldCreatures.some((c) => c.source === 'published'));
 </script>
 
 <div class="world">
@@ -348,11 +353,15 @@
 									</div>
 								{/if}
 
-								{#if book.bestiaryCreatures.length > 0}
+								{#if book.worldCreatures.length > 0}
+									{@const bound = book.boundCreatureFor(l.id)}
 									<div class="bind-row">
-										{#if book.spriteBindings[l.id]}
+										{#if bound}
 											<span class="bind-name">
-												{book.boundCreatureFor(l.id)?.name ?? '—'}
+												{bound.name || '—'}
+												{#if bound.source === 'published'}
+													<span class="bind-source">from the bestiary at woodles.space</span>
+												{/if}
 											</span>
 											<button class="bind-btn" onclick={() => openBindingPicker(l.id)}>
 												change
@@ -369,7 +378,7 @@
 
 									{#if bindingPickerLife === l.id}
 										<ul class="bind-picker">
-											{#each book.bestiaryCreatures as c (c.id)}
+											{#each book.worldCreatures as c (c.id)}
 												<li>
 													<button
 														class="pick-entry"
@@ -387,11 +396,19 @@
 															<span class="pick-thumb pick-thumb-empty">?</span>
 														{/if}
 														<span class="pick-name">{c.name || '(unnamed)'}</span>
-														<span class="pick-domain">{c.domain}</span>
+														<span class="pick-tag" class:published={c.source === 'published'}>
+															{c.source === 'published' ? 'the bestiary' : 'yours'}
+														</span>
 													</button>
 												</li>
 											{/each}
 										</ul>
+										{#if hasPublishedInPool}
+											<p class="bind-cross-link">
+												"the bestiary" creatures are Z's published collection —
+												<a href="/bestiary">see them all at woodles.space</a>
+											</p>
+										{/if}
 									{/if}
 								{/if}
 							</article>
@@ -919,6 +936,14 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
+	.bind-source {
+		display: block;
+		white-space: normal;
+		font-family: var(--font-ui);
+		font-size: 0.62rem;
+		font-style: italic;
+		color: var(--periwinkle);
+	}
 	.bind-btn {
 		font-family: var(--font-ui);
 		font-size: 0.66rem;
@@ -995,12 +1020,27 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.pick-domain {
+	.pick-tag {
+		flex-shrink: 0;
 		font-family: var(--font-ui);
-		font-size: 0.62rem;
-		letter-spacing: 0.08em;
+		font-size: 0.6rem;
+		letter-spacing: 0.06em;
 		text-transform: uppercase;
 		color: var(--muted);
 		white-space: nowrap;
+	}
+	.pick-tag.published {
+		color: var(--leafeon-pink);
+	}
+	.bind-cross-link {
+		font-family: var(--font-ui);
+		font-size: 0.68rem;
+		font-style: italic;
+		color: var(--muted);
+		margin: 0.3rem 0 0;
+		padding: 0 0.1rem;
+	}
+	.bind-cross-link a {
+		color: var(--cyan);
 	}
 </style>

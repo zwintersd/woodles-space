@@ -67,6 +67,9 @@ importers:
 
   apps/marginalia:
     dependencies:
+      '@woodles/sync':
+        specifier: workspace:*
+        version: link:../../packages/sync
       matter-js:
         specifier: ^0.20.0
         version: 0.20.0
