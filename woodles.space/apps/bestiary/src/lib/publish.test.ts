@@ -116,9 +116,29 @@ describe('buildPublicCreature', () => {
 			foundIn: 'the margin',
 			cardImage: 'data:card-image',
 			isolatedSprite: 'data:plain',
+			hasIsolatedSprite: false,
+			pixelated: false,
 			publishedAt: '2026-07-02T00:00:00.000Z'
 		});
 		expect(out).not.toHaveProperty('sourceImage');
+	});
+
+	it('carries pixelated through so a visitor sees pixel art unsmoothed', () => {
+		const c = make({ sprite: 'data:plain', pixelated: true });
+		const out = buildPublicCreature(c, 'data:card-image', '2026-07-02T00:00:00.000Z');
+		expect(out.pixelated).toBe(true);
+	});
+
+	it('flags hasIsolatedSprite true for a real studio cutout', () => {
+		const c = make({ sprite: 'data:plain', isolatedSprite: 'data:isolated' });
+		const out = buildPublicCreature(c, 'data:card-image', '2026-07-02T00:00:00.000Z');
+		expect(out.hasIsolatedSprite).toBe(true);
+	});
+
+	it('flags hasIsolatedSprite false for a card-only creature, matching isCardOnly', () => {
+		const c = make({ sprite: 'data:plain', isolatedSprite: null });
+		const out = buildPublicCreature(c, 'data:card-image', '2026-07-02T00:00:00.000Z');
+		expect(out.hasIsolatedSprite).toBe(false);
 	});
 
 	it('includes sourceImage only when publishSource is opted in', () => {

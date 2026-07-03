@@ -76,6 +76,8 @@ export function buildPublicCreature(
 		foundIn: creature.foundIn.trim(),
 		cardImage,
 		isolatedSprite: resolvedSpriteFor(creature),
+		hasIsolatedSprite: !isCardOnly(creature),
+		pixelated: creature.pixelated,
 		...(source ? { sourceImage: source } : {}),
 		publishedAt
 	};

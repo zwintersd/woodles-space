@@ -1,8 +1,11 @@
 <script lang="ts">
-	import type { BestiaryCreature } from './bestiaryDb';
+	import type { SpriteCreature } from './bestiaryDb';
 
 	interface Props {
-		creature: BestiaryCreature | null;
+		// the minimal shape, not the full local BestiaryCreature — this also
+		// renders a bound creature from the published bestiary fallback
+		// (ROADMAP.md week 5), which doesn't carry every local-only field.
+		creature: SpriteCreature | null;
 		unclipped?: boolean;
 	}
 
