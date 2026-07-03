@@ -12,6 +12,15 @@
 			<span class="home-label">bestiary</span>
 		</button>
 
+		<button
+			class="gallery-link"
+			class:active={bestiary.currentView === 'gallery'}
+			onclick={() => bestiary.openGallery()}
+			title="the public gallery"
+		>
+			<span class="gallery-glyph">◈</span> gallery
+		</button>
+
 		<button class="new" onclick={() => bestiary.newCreature()}>＋ new creature</button>
 
 		{#if bestiary.ready}
@@ -107,6 +116,20 @@
 		font-size: 1.15rem;
 		letter-spacing: 0.03em;
 	}
+
+	.gallery-link {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		margin: 0 var(--b-space-lg);
+		font-family: var(--b-font-mono);
+		font-size: 0.78rem;
+		color: var(--b-text-dim);
+		transition: color var(--b-transition-fast);
+	}
+	.gallery-link:hover { color: var(--b-gold); }
+	.gallery-link.active { color: var(--b-gold); }
+	.gallery-glyph { font-size: 0.85rem; color: var(--b-gold); }
 
 	.new {
 		margin: 0 var(--b-space-lg);
@@ -214,6 +237,8 @@
 		}
 		.top { flex-direction: row; align-items: center; gap: var(--b-space-sm); }
 		.new { margin: 0; }
+		.gallery-link { margin: 0; }
+		.gallery-link .gallery-glyph { font-size: 0.95rem; }
 		.tally { display: none; }
 		.bottom { flex-direction: row; align-items: center; padding: 0; }
 	}

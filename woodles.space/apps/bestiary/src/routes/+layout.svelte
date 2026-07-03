@@ -1,13 +1,27 @@
 <script lang="ts">
 	import '$lib/style/tokens.css';
 	import { initSync } from '$lib/sync.svelte';
+	import { hasPassphrase } from '@woodles/sync';
 	import { bestiary } from '$lib/bestiary.svelte';
+	import { gallery } from '$lib/gallery.svelte';
 	import { onMount } from 'svelte';
 
 	let { children } = $props();
 	let w = $derived(bestiary.workshop);
 
-	onMount(async () => { await bestiary.readyPromise; initSync(); });
+	onMount(async () => {
+		await bestiary.readyPromise;
+		await initSync();
+		// First-run routing (ROADMAP.md week 3): a browser that has never
+		// opened the bestiary before lands in the public gallery instead of
+		// the seed deck, if Z has published one. hasPassphrase is only true
+		// once initSync has connected a stored passphrase — that's Z's own
+		// device, which should always land on her real collection instead.
+		if (bestiary.isFirstRun && !hasPassphrase()) {
+			await gallery.load();
+			if (gallery.status === 'ready') bestiary.openGallery();
+		}
+	});
 </script>
 
 <div class="bestiary-root" class:calm={w.calm} class:reduce-motion={w.reduceMotion}>

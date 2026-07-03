@@ -69,6 +69,20 @@
 	let studioInitial = $state<Composition | null>(null);
 	let preparing = $state(false);
 
+	// The gallery's drop-zone invitation (ROADMAP.md week 3: the guided first
+	// card) hands off a freshly-sprited creature and asks the editor to walk
+	// straight into the studio, continuing the sprite-lands → outline-traces →
+	// pick-a-finish sequence instead of stopping at a bare bench. Fires once —
+	// autoStudioId is cleared immediately so navigating back to this same
+	// creature later opens the plain editor.
+	$effect(() => {
+		if (creature && bestiary.autoStudioId === creature.id) {
+			bestiary.autoStudioId = null;
+			section = 'sprite';
+			void openStudio();
+		}
+	});
+
 	// Seed the studio: a saved composition reopens as-is; a plain sprite comes
 	// in as a single full-bleed layer; an artless card starts empty.
 	async function openStudio() {
