@@ -26,6 +26,8 @@ import {
 import { seedCreatures } from './seed';
 import { idbAvailable, idbGet, idbSet } from './idb';
 import { applyPublishedFlags } from './publish';
+import { buildAdoptedCreature } from './gallery';
+import type { PublicCreature } from '@woodles/sync';
 
 // Older creatures in storage predate the stat block (and, later, the studio
 // composition). Fill any missing structure so an old record loads cleanly, and
@@ -314,6 +316,17 @@ export class Bestiary {
 		this.activeCreatureId = null;
 	}
 
+	// A share-link destination (ROADMAP.md week 4): `id` is a *published*
+	// creature's id, not necessarily one in this.creatures — CardView resolves
+	// it against the gallery store itself. Reuses activeCreatureId rather than
+	// a parallel field; discardIfUntouched no-ops harmlessly if it doesn't
+	// match a local creature, which a published id generally won't.
+	openCard(id: string): void {
+		if (this.activeCreatureId) this.discardIfUntouched(this.activeCreatureId);
+		this.currentView = 'card';
+		this.activeCreatureId = id;
+	}
+
 	setSort(sort: SortKey): void {
 		this.settings = { ...this.settings, sort };
 		save(SETTINGS_KEY, this.settings);
@@ -349,6 +362,17 @@ export class Bestiary {
 	// card, autoStudioId).
 	newCreatureFromSprite(sprite: string, pixelated: boolean): Creature {
 		const c: Creature = { ...blankCreature(), sprite, pixelated };
+		this.creatures = [c, ...this.creatures];
+		this.#persistCreatures();
+		return c;
+	}
+
+	// "Adopt a card" (ROADMAP.md week 4): copy a published creature into the
+	// local bestiary as a starting point to remix. See gallery.ts's
+	// buildAdoptedCreature for exactly what carries over — doesn't navigate;
+	// callers pair this with openEditor.
+	adoptCreature(pub: PublicCreature): Creature {
+		const c = buildAdoptedCreature(pub);
 		this.creatures = [c, ...this.creatures];
 		this.#persistCreatures();
 		return c;
