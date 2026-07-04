@@ -849,7 +849,9 @@
 		role="application"
 		aria-label="Margin Miner canvas game"
 	>
-		<canvas bind:this={canvasEl} width={WIDTH} height={HEIGHT}></canvas>
+		<canvas bind:this={canvasEl} width={WIDTH} height={HEIGHT} aria-label="the claw machine: a pendulum swinging over objects of varying value and weight"
+			>a claw machine: a pendulum swinging over objects of varying value and weight</canvas
+		>
 		{#if phase !== 'playing'}
 			<div class="game-overlay">
 				<p class="overlay-title">{phase === 'level-clear' ? 'level clear' : 'came up short'}</p>
@@ -981,7 +983,7 @@
 			inset 0 0 0 7px rgba(7, 54, 66, 0.06),
 			0 18px 48px rgba(7, 54, 66, 0.1);
 		cursor: crosshair;
-		touch-action: manipulation;
+		touch-action: none;
 		user-select: none;
 	}
 

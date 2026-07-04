@@ -626,6 +626,7 @@
 		scores={[
 			{ label: 'popped', value: popped },
 			{ label: 'dropped', value: dropped, live: true, tone: 'violet' },
+			{ label: 'best', value: Math.max(popped + dropped, best) },
 			{ label: 'ceiling', value: nextDrop },
 			{ label: 'hold', value: ceilingHolds, live: ceilingHolds > 0, tone: 'green' },
 			{ label: 'prize', value: fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview) }

@@ -994,6 +994,7 @@
 		maxWidth="620px"
 		scores={[
 			{ label: 'score', value: game.score },
+			{ label: 'best', value: Math.max(game.score, best) },
 			{ label: 'fouls', value: game.foulCount, live: true, tone: 'yellow' },
 			{ label: 'pivot', value: game.pivotSaves, live: game.pivotSaves > 0, tone: 'green' },
 			{ label: 'spin', value: spinLabel },
@@ -1010,12 +1011,13 @@
 		bind:this={canvasEl}
 		class="spinner-canvas"
 		class:active={game.phase === 'running'}
-		aria-label="Bubble Spinner arena"
+		aria-label="Bubble Spinner arena: a rotating hex cluster of bubbles at the center"
 		onpointermove={onPointerMove}
 		onpointerdown={onPointerDown}
 		onpointerup={onPointerUp}
 		onpointercancel={onPointerUp}
-	></canvas>
+		>a rotating hex cluster of bubbles at the center</canvas
+	>
 
 	<div class="control-row" aria-label="spinner controls">
 		<button onclick={() => nudgeAim(-1)}>left</button>

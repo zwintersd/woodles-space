@@ -464,7 +464,7 @@
 			inset 0 0 0 6px rgba(7, 54, 66, 0.05),
 			inset 0 0 calc(12px + var(--flow) * 30px) rgba(181, 137, 0, calc(var(--flow) * 0.12));
 		cursor: default;
-		touch-action: manipulation;
+		touch-action: none;
 	}
 	.rush-field::before {
 		content: '';

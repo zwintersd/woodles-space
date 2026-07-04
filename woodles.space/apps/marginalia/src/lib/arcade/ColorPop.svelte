@@ -608,6 +608,7 @@
 		maxWidth="400px"
 		scores={[
 			{ label: 'score', value: score },
+			{ label: 'best', value: Math.max(score, best) },
 			{ label: 'merges', value: merges },
 			{ label: 'drop', value: readyLabel, live: cooldownSeconds > 0 },
 			{ label: 'prize', value: fmt(gameOver ? awarded : rewardPreview), earned: gameOver && awarded > 0 }
@@ -650,7 +651,9 @@
 		role="application"
 		aria-label="Color POP physics board"
 	>
-		<canvas bind:this={canvasEl} width={WIDTH} height={HEIGHT}></canvas>
+		<canvas bind:this={canvasEl} width={WIDTH} height={HEIGHT} aria-label="the physics board: circles dropping and merging toward the ceiling line"
+			>circles dropping and merging toward the ceiling line</canvas
+		>
 		{#if loadError}
 			<div class="game-overlay">
 				<p class="overlay-title">not loaded</p>

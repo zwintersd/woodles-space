@@ -672,6 +672,7 @@
 			{ label: 'room', value: roomLabel },
 			{ label: 'lives', value: lives, live: true, tone: 'green' },
 			{ label: 'glyphs', value: `${glyphs}/${TOTAL_GLYPHS}` },
+			{ label: 'best', value: Math.max(glyphs, best) },
 			{ label: 'wing', value: hasWing ? 'yes' : 'no' },
 			{ label: 'save', value: checkpointSaves, live: checkpointSaves > 0, tone: 'violet' },
 			{ label: 'prize', value: fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview) }
