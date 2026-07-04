@@ -6,6 +6,7 @@
 		WORLD_WATER_TOP,
 		featureById,
 		resolveSpawnPointForLife,
+		stable01,
 		waterGridYToWorld,
 		worldYToWaterGrid,
 		type SpawnLayer
@@ -14,6 +15,10 @@
 	const ASPECT = 960 / 480;
 	const WATER_TOP = WORLD_WATER_TOP;
 	const CREATURE_BOX = 0.2;
+	const PEARL_BIT_SPRITES = [0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 14, 15, 48, 49, 50, 55, 57, 60, 61, 62, 63];
+	const PASTEL_BIT_SPRITES = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 52, 53, 56, 59];
+	const GLINT_SPRITES = [32, 33, 34, 35, 36, 37, 38, 39];
+	const PUFF_SPRITES = [40, 41, 42, 43, 44, 45, 46, 47];
 
 	let wrapEl: HTMLDivElement | undefined = $state();
 	let canvasEl: HTMLCanvasElement | undefined = $state();
@@ -95,6 +100,54 @@
 		resize();
 		const ro = new ResizeObserver(resize);
 		ro.observe(wrap);
+
+		interface SpriteSheet {
+			img: HTMLImageElement;
+			ok: boolean;
+			cols: number;
+			rows: number;
+		}
+
+		function loadSheet(name: string, cols: number, rows: number): SpriteSheet {
+			const sheet = { img: new Image(), ok: false, cols, rows };
+			sheet.img.onload = () => {
+				sheet.ok = true;
+			};
+			sheet.img.src = assetUrl(name);
+			return sheet;
+		}
+
+		const sedimentBits = loadSheet('pearl_sediment_bits.png', 8, 8);
+		const sedimentClusters = loadSheet('pearl_sediment_clusters.png', 4, 4);
+
+		function pickSprite(options: number[], seed: string): number {
+			return options[Math.floor(stable01(seed) * options.length) % options.length];
+		}
+
+		function drawSheetSprite(
+			sheet: SpriteSheet,
+			index: number,
+			x: number,
+			y: number,
+			size: number,
+			rotation: number,
+			alpha: number,
+			yScale = 1
+		): boolean {
+			if (!sheet.ok || !sheet.img.naturalWidth || !sheet.img.naturalHeight) return false;
+			const cellW = sheet.img.naturalWidth / sheet.cols;
+			const cellH = sheet.img.naturalHeight / sheet.rows;
+			const sx = (index % sheet.cols) * cellW;
+			const sy = Math.floor(index / sheet.cols) * cellH;
+			ctx!.save();
+			ctx!.translate(x, y);
+			ctx!.rotate(rotation);
+			ctx!.globalAlpha = alpha;
+			ctx!.imageSmoothingEnabled = true;
+			ctx!.drawImage(sheet.img, sx, sy, cellW, cellH, -size / 2, -(size * yScale) / 2, size, size * yScale);
+			ctx!.restore();
+			return true;
+		}
 
 		const spriteCache = new Map<string, { img: HTMLImageElement; ok: boolean }>();
 		function getSprite(src: string) {
@@ -246,8 +299,11 @@
 					if (value <= 0.01) continue;
 					const cx = (x + 0.5) * cellW;
 					const cy = waterY + (y + 0.5) * cellH;
+					const seed = `${x}:${y}:${book.worldShape.spawnRevision}`;
+					const depth = y / Math.max(1, grid.h - 1);
+
 					ctx!.save();
-					ctx!.globalAlpha = 0.12 + value * 0.58;
+					ctx!.globalAlpha = (0.06 + value * 0.22) * (1 - depth * 0.18);
 					const pearl = ctx!.createRadialGradient(cx - cellW * 0.22, cy - cellH * 0.22, 0, cx, cy, cellW * (1.2 + value));
 					pearl.addColorStop(0, 'rgba(255, 255, 255, 0.98)');
 					pearl.addColorStop(0.46, value > 0.62 ? 'rgba(249, 242, 255, 0.9)' : 'rgba(248, 248, 242, 0.78)');
@@ -256,13 +312,69 @@
 					ctx!.beginPath();
 					ctx!.ellipse(cx, cy, cellW * (0.75 + value), cellH * (0.5 + value * 0.3), 0, 0, Math.PI * 2);
 					ctx!.fill();
-					if (value > 0.5) {
-						ctx!.globalAlpha = value * 0.22;
-						ctx!.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-						ctx!.lineWidth = 0.8;
-						ctx!.stroke();
-					}
 					ctx!.restore();
+
+					if (value > 0.42 && stable01(`${seed}:puff`) < value * 0.28) {
+						const sprite = pickSprite(PUFF_SPRITES, `${seed}:puff-sprite`);
+						const size = cellW * (2.1 + stable01(`${seed}:puff-size`) * 1.3);
+						drawSheetSprite(
+							sedimentBits,
+							sprite,
+							cx + (stable01(`${seed}:puff-x`) - 0.5) * cellW * 0.8,
+							cy + (stable01(`${seed}:puff-y`) - 0.5) * cellH * 0.5,
+							size,
+							(stable01(`${seed}:puff-r`) - 0.5) * 0.7,
+							0.16 + value * 0.22,
+							0.72
+						);
+					}
+
+					if (value > 0.24 && stable01(`${seed}:cluster`) < value * 0.44) {
+						const sprite = Math.floor(stable01(`${seed}:cluster-sprite`) * 16);
+						const size = cellW * (1.8 + value * 2.4 + stable01(`${seed}:cluster-size`) * 0.8);
+						if (!drawSheetSprite(
+							sedimentClusters,
+							sprite,
+							cx + (stable01(`${seed}:cluster-x`) - 0.5) * cellW * 0.85,
+							cy + cellH * (0.1 + stable01(`${seed}:cluster-y`) * 0.28),
+							size,
+							(stable01(`${seed}:cluster-r`) - 0.5) * 0.42,
+							0.32 + value * 0.56,
+							0.72 + stable01(`${seed}:cluster-scale-y`) * 0.22
+						)) {
+							ctx!.save();
+							ctx!.globalAlpha = 0.12 + value * 0.36;
+							ctx!.fillStyle = 'rgba(255, 255, 255, 0.82)';
+							ctx!.beginPath();
+							ctx!.ellipse(cx, cy, cellW * (0.75 + value), cellH * (0.5 + value * 0.3), 0, 0, Math.PI * 2);
+							ctx!.fill();
+							ctx!.restore();
+						}
+					}
+
+					const bitCount = value > 0.62 ? 3 : value > 0.28 ? 2 : 1;
+					for (let i = 0; i < bitCount; i++) {
+						const bitSeed = `${seed}:bit:${i}`;
+						if (stable01(`${bitSeed}:skip`) > 0.35 + value * 0.56) continue;
+						const roll = stable01(`${bitSeed}:kind`);
+						const sprite =
+							roll > 0.88 && value > 0.4
+								? pickSprite(GLINT_SPRITES, `${bitSeed}:glint`)
+								: roll > 0.62
+									? pickSprite(PASTEL_BIT_SPRITES, `${bitSeed}:pastel`)
+									: pickSprite(PEARL_BIT_SPRITES, `${bitSeed}:pearl`);
+						const size = cellW * (0.72 + stable01(`${bitSeed}:size`) * 1.1) * (0.84 + value * 0.5);
+						drawSheetSprite(
+							sedimentBits,
+							sprite,
+							cx + (stable01(`${bitSeed}:x`) - 0.5) * cellW * 1.5,
+							cy + (stable01(`${bitSeed}:y`) - 0.5) * cellH * 1.1,
+							size,
+							(stable01(`${bitSeed}:r`) - 0.5) * Math.PI,
+							0.42 + value * 0.44,
+							0.72 + stable01(`${bitSeed}:ys`) * 0.46
+						);
+					}
 				}
 			}
 		}
@@ -476,6 +588,27 @@
 					ctx!.fill();
 				}
 				ctx!.restore();
+
+				for (let i = 0; i < 14; i++) {
+					const fall = (i / 14 + drift * 0.58) % 1;
+					const seed = `pour:${i}`;
+					const px = x + Math.sin(i * 2.3 + drift * 3.4) * H * 0.018;
+					const py = top + (bottom - top) * fall;
+					const sprite =
+						stable01(`${seed}:kind`) > 0.72
+							? pickSprite(PASTEL_BIT_SPRITES, `${seed}:pastel`)
+							: pickSprite(PEARL_BIT_SPRITES, `${seed}:pearl`);
+					drawSheetSprite(
+						sedimentBits,
+						sprite,
+						px,
+						py,
+						H * (0.012 + stable01(`${seed}:size`) * 0.014),
+						drift * (0.9 + stable01(`${seed}:spin`) * 1.2) + i,
+						0.28 + fall * 0.45,
+						0.78 + stable01(`${seed}:ys`) * 0.32
+					);
+				}
 
 				ctx!.save();
 				ctx!.globalAlpha = 0.78;
