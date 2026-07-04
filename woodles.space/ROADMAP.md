@@ -172,17 +172,18 @@ and the plumbing underneath:
 week 4, which is card-focused anyway; the gallery + drop-zone threshold
 (1–3) are the core and ship first.
 
-### week 4 — cards that travel ⏸ deferred, not built
+### week 4 — cards that travel ✅ shipped
 
 sharing is the public feeling, distilled to one card.
 
-*week 10 note: this week was never picked up — the roadmap jumped from
-week 3 straight to week 5, and no share route, export button, adopt
-flow, or per-card OG exists in the app today. week 10's hardening pass
-deliberately left it that way rather than building it under a "hardening,
-not features" week; it's a real, scoped gap for a future session, not an
-oversight to paper over. everything below is still the plan for when
-that happens.*
+*week 10 note: this shipped via a separate effort that was in flight while
+weeks 5–10 happened in this branch, and only merged in partway through
+week 10's own hardening pass (after this file had already, briefly,
+marked it `⏸ deferred, not built` — accurate at the time that was
+written, wrong by the time this branch caught up). share links, save-as-
+image, and adopt-a-card all exist and work; per-card OG unfurl images
+stayed a stretch goal, exactly as planned below (one bestiary-wide unfurl
+image shipped instead).*
 
 - **share links**: `/bestiary?card=<slug>` resolves against the published
   snapshot and opens a single-card view — the card, large, with its
@@ -299,18 +300,29 @@ the site-level pass that makes the public apps feel like one place.
   begin the per-card OG unfurl stretch goal, or start the DESIGN.md
   phase-D (prestige) conversation for the now-public witch game.
 
-*week 10 note: "share links" and "adopt" were dropped from the QA list —
-week 4 (their home) was never built (see its header above), so there was
-nothing there to test. everything else on this list was: gallery,
-published-sprite fallback, echoes (write's publish, letter's reading,
-marginalia's reading room), and first-hour onboarding, each across desktop
-and mobile viewports, each including its degraded path. the mobile pass
-also caught and fixed a real, pre-existing (not week-9's) bestiary sidebar
-overflow at phone widths. perf sanity found one real gap — the published-
-blob size budget was design-only, never enforced — and fixed it; bundle
-size turned out fine on inspection (marginalia's biggest chunk is properly
-lazy-loaded, not part of first paint). buffer went to those fixes, not the
-stretch goals.*
+*week 10 note: this pass was planned and largely written against a
+snapshot of the branch where week 4 hadn't merged in yet — a parallel
+effort had already built it, but that merge only reached this branch
+partway through this week's own work, after "share links" and "adopt"
+had already been dropped from the QA list on the (accurate, at the time)
+belief that week 4 didn't exist. once the merge landed, week 4's header
+above was corrected from `⏸ deferred` to `✅ shipped` and this note
+rewritten, rather than leaving a stale claim in a docs pass whose whole
+job was accuracy. the QA/perf work that didn't depend on that timing
+stands as planned: gallery, published-sprite fallback, echoes (write's
+publish, letter's reading, marginalia's reading room), and first-hour
+onboarding, each across desktop and mobile viewports, each including its
+degraded path. the mobile pass also caught and fixed a real, pre-existing
+bestiary sidebar overflow at phone widths — unrelated to week 9 or the
+week-4 merge, just never caught before. perf sanity found one real gap —
+the published-blob size budget was design-only, never enforced — and
+fixed it; bundle size turned out fine on inspection (marginalia's biggest
+chunks are properly lazy-loaded, not part of first paint). the same merge
+also surfaced a real, independent bug: bestiary's `app.html` had picked up
+two full, duplicate sets of OG/Twitter meta tags — one from this branch's
+own week 9, one from week 4's separate work, neither aware of the other —
+fixed by keeping one clean set and deleting the orphaned second image.
+buffer went to those fixes, not the stretch goals.*
 
 ---
 

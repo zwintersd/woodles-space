@@ -17,10 +17,10 @@ other docs have narrower jobs:
 - [README.md](./README.md) is the deployment reference.
 - [REFACTORING.md](./REFACTORING.md) is the living consolidation log.
 - [ROADMAP.md](./ROADMAP.md) is the 10-week plan for making marginalia and
-  the bestiary public-facing — shipped weeks are marked `✅` in its own
-  headers; week 4 (share links, export-as-image, adopt-a-card, per-card
-  OG) was never picked up, marked `⏸ deferred` there rather than silently
-  skipped.
+  the bestiary public-facing — all ten weeks are marked `✅ shipped` in its
+  own headers, week 4 (share links, save-as-image, adopt-a-card) having
+  arrived via a separate effort that merged into this branch mid-week-10;
+  per-card OG unfurl images stayed the one documented stretch goal.
 - [`../AUDIT.md`](../AUDIT.md) is a dated audit snapshot, not live truth.
 - `apps/*/*.md` files own app-specific design briefs, proposals, assets, and
   known issues — not every app has one. doc inventory, as of week 10:
@@ -105,14 +105,15 @@ experiments that should stay reachable without appearing as separate homepage
 apps; it links out to `/digits` and `/animations`, whose direct routes still
 work for old bookmarks.
 
-`marginalia` is the biggest app by built size (`dist/` ~2.8 MB, week 10
+`marginalia` is the biggest app by built size (`dist/` ~3.1 MB, week 10
 perf-sanity check) — but the number that actually matters, first-load
-transfer, is a much healthier ~250 KB. the difference is `pdfjs-dist`
-(reading room's PDF intake) and its 1.2 MB worker file: both are
-Vite-code-split behind a dynamic import and a `?url` reference, so neither
-loads until a visitor actually opens that one feature. confirmed by
-measuring real network transfer against a `vite preview` build, not just
-`dist/`'s total size.
+transfer, is a much healthier ~290 KB. the difference is the reading
+room's two document-import paths — `pdf.ts` (and its 1.2 MB `pdfjs-dist`
+worker) and `epub.ts` — both reached only via a dynamic `await import(...)`
+from `Intake.svelte`'s own file-select handlers, so neither loads until a
+visitor actually opens that one feature. confirmed by measuring real
+network transfer against a `vite preview` build, not just `dist/`'s total
+size.
 
 ## the sync layer
 
@@ -271,16 +272,18 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-764 tests total, as of week 10: 16 in `api/` (its own root-level
+805 tests total, as of week 10: 16 in `api/` (its own root-level
 `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one part of
 the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 748 across six pnpm
-packages — `write` 65, `marginalia` 196, `planner` 283, `spores` 46,
-`bestiary` 153, `packages/sync` 5. `marginalia-devlog` has no test script.
-weeks 1–9 added eight of these test files outright (`api/public.test.ts`,
-`api/sync.test.ts`, `packages/sync/src/index.test.ts`, and one new file
-in each of `write`, `marginalia` ×2, `bestiary` ×2) — this table used to
-undercount them; keep it updated when that happens again.
+instead of the recursive `pnpm -r test`), plus 789 across six pnpm
+packages — `write` 65, `marginalia` 230, `planner` 283, `spores` 46,
+`bestiary` 160, `packages/sync` 5. `marginalia-devlog` has no test script.
+this table has already gone stale once this week alone — it read 620
+before weeks 1–9's own new test files, then 764 right after this file's
+own week-10 pass, then 805 once a same-week, separately-developed effort
+(week 4's cards-that-travel, plus an unrelated epub reader) merged into
+this branch and brought its own new tests along. keep it updated when
+that happens again — it will.
 
 each app's `test` runs `svelte-kit sync && vitest run`. the `sync` matters: a
 SvelteKit app's `tsconfig.json` extends `./.svelte-kit/tsconfig.json`, which
@@ -308,12 +311,17 @@ are written up in [apps/planner/KNOWN_ISSUES.md](./apps/planner/KNOWN_ISSUES.md)
 | `marginalia`        | clean                                   |
 | `planner`           | clean                                   |
 | `bestiary`          | clean                                   |
-| `spores`            | 4 warnings — `autofocus` a11y           |
+| `spores`            | **2 errors**, 6 warnings — `GraphRenderer.svelte`/`SporeView.svelte` type errors, plus `autofocus` a11y warnings |
 | `marginalia-devlog` | 1 warning — `line-clamp` in `EntryList` |
 
 `pnpm -r check` runs all seven in turn and reaches every one. it stops at the
 first app that fails, though, so if you break an early one, run the app you care
-about directly to see past it.
+about directly to see past it. `spores`'s 2 errors are exactly that case today
+— pre-existing (last touched by an unrelated commit, well before this
+roadmap's work started, confirmed via `git log`/`git diff` against every
+commit in weeks 1–10), not introduced by anything in the public-facing
+roadmap. left unfixed here: out of scope for a hardening pass whose job was
+this roadmap's own work, not an unrelated app's stale type errors.
 
 ## running things locally
 
@@ -321,7 +329,7 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (764 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (805 tests)
 pnpm check              svelte-check in every app
 pnpm build              build the seven SvelteKit apps
 ```
