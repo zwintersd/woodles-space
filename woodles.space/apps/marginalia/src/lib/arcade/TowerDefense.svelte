@@ -488,6 +488,8 @@
 			{ label: 'wave', value: phase === 'building' ? `${pendingWave}/${WAVE_COUNT}` : `${wave}/${WAVE_COUNT}` },
 			{ label: 'lives', value: lives, live: true, tone: 'green' },
 			{ label: 'coins', value: coins },
+			{ label: 'kills', value: kills, live: true },
+			{ label: 'best', value: Math.max(kills, best) },
 			{ label: 'prize', value: fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview) }
 		]}
 		{startLabel}

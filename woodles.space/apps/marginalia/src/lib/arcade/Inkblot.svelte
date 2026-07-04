@@ -357,7 +357,9 @@
 			class:hidden={phase === 'intro'}
 			width="400"
 			height="400"
-		></canvas>
+			aria-label="a creature's portrait, gradually revealing as you wait or guess"
+			>a creature's portrait, gradually revealing as you wait or guess</canvas
+		>
 
 		<!-- phase overlays -->
 		{#if phase === 'intro'}

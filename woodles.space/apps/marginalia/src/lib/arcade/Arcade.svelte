@@ -311,8 +311,10 @@
 	{/if}
 
 	<p class="arcade-note">
-		More games are written as the study grows. Play unlocks small rewards that drift
-		back into the main book.
+		More games are written as the study grows. Play unlocks small rewards — insight —
+		that drift back into the main book. When a pet from the bestiary is looking on, its
+		stats can quietly change how a game plays; the small perk row under the score
+		explains what's active.
 	</p>
 </div>
 
