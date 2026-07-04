@@ -157,7 +157,7 @@
 		if (book.sedimentCoverage >= SEDIMENT_UNLOCK_COVERAGE) return 'the floor has learned shallows.';
 		if (book.sedimentCoverage >= 0.4) return 'the floor is gathering into shelves.';
 		if (book.sedimentCoverage >= 0.18) return 'the water is keeping a little ground.';
-		if (book.worldShape.sedimentUnlocked) return 'sand is beginning to remember where it fell.';
+		if (book.worldShape.sedimentUnlocked) return 'sediment is beginning to remember where it fell.';
 		return 'the water is not ready to hold ground yet.';
 	});
 
@@ -709,7 +709,7 @@
 	}
 	.sediment-meter div {
 		height: 100%;
-		background: linear-gradient(90deg, #ab8974, #d8be8e, var(--cyan));
+		background: linear-gradient(90deg, rgba(255, 255, 255, 0.92), #f8e7f4, #cddff8);
 		transition: width 160ms linear;
 	}
 	.worldspace-switch {
