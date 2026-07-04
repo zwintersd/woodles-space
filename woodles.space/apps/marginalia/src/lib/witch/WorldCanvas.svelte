@@ -27,6 +27,7 @@
 	const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 	const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 	const rgb = (r: number, g: number, b: number) => `rgb(${r | 0}, ${g | 0}, ${b | 0})`;
+	const TAU = Math.PI * 2;
 	const assetUrl = (name: string, bust = 0) =>
 		`${base}/diorama/${name}${bust ? `?r=${bust}` : ''}`;
 
@@ -119,6 +120,10 @@
 
 		const sedimentBits = loadSheet('pearl_sediment_bits.png', 8, 8);
 		const sedimentClusters = loadSheet('pearl_sediment_clusters.png', 4, 4);
+		const witchMotes = loadSheet('witch_influence_motes.png', 8, 8);
+		const waterRipples = loadSheet('witch_water_ripples.png', 8, 2);
+		const sedimentCast = loadSheet('sift_sediment_cast.png', 8, 4);
+		const featureAwakenings = loadSheet('feature_awakenings.png', 4, 4);
 
 		function pickSprite(options: number[], seed: string): number {
 			return options[Math.floor(stable01(seed) * options.length) % options.length];
@@ -132,7 +137,8 @@
 			size: number,
 			rotation: number,
 			alpha: number,
-			yScale = 1
+			yScale = 1,
+			blend: GlobalCompositeOperation = 'source-over'
 		): boolean {
 			if (!sheet.ok || !sheet.img.naturalWidth || !sheet.img.naturalHeight) return false;
 			const cellW = sheet.img.naturalWidth / sheet.cols;
@@ -142,11 +148,37 @@
 			ctx!.save();
 			ctx!.translate(x, y);
 			ctx!.rotate(rotation);
-			ctx!.globalAlpha = alpha;
+			ctx!.globalAlpha = clamp01(alpha);
+			ctx!.globalCompositeOperation = blend;
 			ctx!.imageSmoothingEnabled = true;
 			ctx!.drawImage(sheet.img, sx, sy, cellW, cellH, -size / 2, -(size * yScale) / 2, size, size * yScale);
 			ctx!.restore();
 			return true;
+		}
+
+		function drawSheetRegion(
+			sheet: SpriteSheet,
+			sx: number,
+			sy: number,
+			sw: number,
+			sh: number,
+			cx: number,
+			cy: number,
+			dw: number,
+			dh: number,
+			alpha: number,
+			rotation = 0,
+			blend: GlobalCompositeOperation = 'source-over'
+		) {
+			if (!sheet.ok || !sheet.img.naturalWidth || alpha <= 0 || dw <= 0 || dh <= 0) return;
+			ctx!.save();
+			ctx!.globalAlpha = clamp01(alpha);
+			ctx!.globalCompositeOperation = blend;
+			ctx!.translate(cx, cy);
+			if (rotation) ctx!.rotate(rotation);
+			ctx!.imageSmoothingEnabled = true;
+			ctx!.drawImage(sheet.img, sx, sy, sw, sh, -dw / 2, -dh / 2, dw, dh);
+			ctx!.restore();
 		}
 
 		const spriteCache = new Map<string, { img: HTMLImageElement; ok: boolean }>();
@@ -626,21 +658,173 @@
 			}
 		}
 
+		function drawWitchMotes(T: number, intensity: number) {
+			if (!witchMotes.ok || intensity <= 0.02) return;
+			const rows = [0, 1, 2, 4, 5, 6, 7];
+			const count = Math.round(6 + intensity * 16 + book.attentionUsed * 1.5);
+			for (let i = 0; i < count; i++) {
+				const seed = `witch-mote-${book.worldIndex}-${i}`;
+				const drift = (T * (0.018 + stable01(`${seed}-speed`) * 0.025) + stable01(`${seed}-phase`)) % 1;
+				const sway = Math.sin(T * (0.5 + stable01(`${seed}-sway`) * 0.8) + stable01(seed) * TAU);
+				const x = W * (0.06 + stable01(`${seed}-x`) * 0.88) + sway * W * 0.012;
+				const y = H * (0.32 + stable01(`${seed}-y`) * 0.58) - drift * H * 0.16;
+				const row = rows[i % rows.length];
+				const col = Math.floor(stable01(`${seed}-col`) * 8);
+				const size = H * (0.018 + stable01(`${seed}-size`) * 0.026);
+				const twinkle = 0.65 + 0.35 * Math.sin(T * (1.2 + stable01(`${seed}-blink`)) + i);
+				drawSheetSprite(
+					witchMotes,
+					row * 8 + col,
+					x,
+					y,
+					size,
+					0,
+					(0.1 + 0.42 * intensity) * twinkle,
+					1,
+					'screen'
+				);
+			}
+		}
+
+		function drawWaterRipples(T: number, moisture: number, intensity: number) {
+			if (!waterRipples.ok || intensity <= 0.01) return;
+			const count = 2 + Math.round(moisture * 3);
+			for (let i = 0; i < count; i++) {
+				const seed = `ripple-${book.worldIndex}-${i}`;
+				const frame = Math.floor(T * (5.5 + i * 0.4) + stable01(`${seed}-phase`) * 8) % 8;
+				const row = i % 2;
+				const x = W * (0.12 + stable01(`${seed}-x`) * 0.76);
+				const y = H * (WATER_TOP + 0.06 + stable01(`${seed}-y`) * 0.2);
+				const size = H * (0.12 + stable01(`${seed}-size`) * 0.15);
+				const alpha = (0.1 + 0.22 * intensity) * (0.75 + 0.25 * Math.sin(T + i));
+				drawSheetSprite(
+					waterRipples,
+					row * 8 + frame,
+					x,
+					y,
+					row === 0 ? size : size * 1.45,
+					0,
+					alpha,
+					row === 0 ? 1 : 0.42,
+					'screen'
+				);
+			}
+		}
+
+		function drawSedimentCast(T: number, intensity: number) {
+			if (!sedimentCast.ok || !sedimentCast.img.naturalWidth || intensity <= 0.03) return;
+			const sw = sedimentCast.img.naturalWidth / 8;
+			const streamH = sedimentCast.img.naturalHeight / 2;
+			const puffY = sedimentCast.img.naturalHeight - sw;
+			const casts = intensity > 0.55 ? 2 : 1;
+			for (let i = 0; i < casts; i++) {
+				const seed = `sediment-cast-${book.worldIndex}-${i}`;
+				const frame = Math.floor(T * 6 + stable01(`${seed}-phase`) * 8) % 8;
+				const x = W * (0.28 + stable01(`${seed}-x`) * 0.44);
+				const lean = (stable01(`${seed}-lean`) - 0.5) * 0.18;
+				const streamW = H * (0.12 + stable01(`${seed}-w`) * 0.05);
+				const streamAlpha = 0.11 + intensity * 0.2;
+				drawSheetRegion(
+					sedimentCast,
+					frame * sw,
+					0,
+					sw,
+					streamH,
+					x,
+					H * (WATER_TOP - 0.025),
+					streamW,
+					H * 0.42,
+					streamAlpha,
+					lean,
+					'screen'
+				);
+				drawSheetRegion(
+					sedimentCast,
+					frame * sw,
+					puffY,
+					sw,
+					sw,
+					x + lean * H * 0.16,
+					H * (WATER_TOP + 0.205),
+					streamW * 1.3,
+					H * 0.09,
+					streamAlpha * 1.25,
+					0,
+					'screen'
+				);
+			}
+		}
+
+		function drawFeatureAuras(T: number, intensity: number) {
+			if (!featureAwakenings.ok || intensity <= 0.02) return;
+			const interventions = Object.keys(book.interventionsDone).length;
+			const count = Math.min(
+				4,
+				Math.max(
+					book.worldShape.placedFeatures.length,
+					book.selfBalancing ? 2 : 0,
+					Math.ceil(interventions / 2),
+					Math.floor(book.knownCount / 4)
+				)
+			);
+			if (count <= 0) return;
+			for (let i = 0; i < count; i++) {
+				const seed = `feature-aura-${book.worldIndex}-${i}`;
+				const rowBase = Math.min(3, Math.floor(intensity * 3 + interventions / 5));
+				const row = Math.min(3, rowBase + (Math.sin(T * 0.7 + i) > 0.7 ? 1 : 0));
+				const placed = book.worldShape.placedFeatures[i % Math.max(1, book.worldShape.placedFeatures.length)];
+				const x = placed ? placed.x * W : W * (0.17 + i * 0.22 + (stable01(`${seed}-x`) - 0.5) * 0.05);
+				const y = placed
+					? H * waterGridYToWorld(placed.y)
+					: H * (WATER_TOP + 0.12 + stable01(`${seed}-y`) * 0.28);
+				const size = H * (0.15 + stable01(`${seed}-size`) * 0.05);
+				const pulse = 0.78 + 0.22 * Math.sin(T * (0.8 + stable01(`${seed}-pulse`)) + i);
+				drawSheetSprite(
+					featureAwakenings,
+					row * 4 + (i % 4),
+					x,
+					y,
+					size,
+					0,
+					(0.08 + intensity * 0.16) * pulse,
+					1,
+					'screen'
+				);
+			}
+		}
+
 		function draw(tMs: number) {
 			const T = tMs / 1000;
 			ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
 			ctx!.clearRect(0, 0, W, H);
 
+			const m = clamp01(book.stocks.moisture / 100);
+			const fav = clamp01(book.favor / 100);
+			const attention = clamp01(book.attentionUsed / Math.max(1, book.attentionCapacity));
+			const witchInfluence = clamp01(
+				book.life.length * 0.03 +
+					book.knownCount * 0.035 +
+					book.worldShape.placedFeatures.length * 0.08 +
+					attention * 0.24 +
+					Math.min(book.insightPerSec / 4, 0.25) +
+					fav * 0.14 +
+					(isPouring ? 0.28 : 0)
+			);
+
 			drawSky(T);
 			drawWeather(T);
 			drawWaterBase(T);
 			drawSedimentGrid();
+			drawSedimentCast(T, isPouring ? 1 : witchInfluence * 0.35);
 			drawShallowsShelf();
 			drawFeatures();
+			drawFeatureAuras(T, witchInfluence);
 			drawCreatureLayers(['water', 'floor'], T);
 			drawWaterGlaze(T);
+			drawWaterRipples(T, m, witchInfluence);
 			drawCreatureLayers(['shore', 'air'], T);
 			drawRain(T);
+			drawWitchMotes(T, witchInfluence);
 			drawOverlays(T);
 		}
 
