@@ -11,47 +11,19 @@
 		type SpawnLayer
 	} from './worldShape';
 
-	const ASPECT = 960 / 340;
+	const ASPECT = 960 / 480;
 	const WATER_TOP = WORLD_WATER_TOP;
 	const CREATURE_BOX = 0.2;
 
 	let wrapEl: HTMLDivElement | undefined = $state();
 	let canvasEl: HTMLCanvasElement | undefined = $state();
-	let anyReady = $state(false);
 	let isPouring = $state(false);
-
-	interface Slot {
-		img: HTMLImageElement;
-		ok: boolean;
-		cands: string[];
-		i: number;
-	}
 
 	const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 	const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 	const rgb = (r: number, g: number, b: number) => `rgb(${r | 0}, ${g | 0}, ${b | 0})`;
 	const assetUrl = (name: string, bust = 0) =>
 		`${base}/diorama/${name}${bust ? `?r=${bust}` : ''}`;
-
-	function makeSlot(cands: string[]): Slot {
-		const slot: Slot = { img: new Image(), ok: false, cands, i: 0 };
-		slot.img.onload = () => {
-			slot.ok = true;
-			anyReady = true;
-		};
-		slot.img.onerror = () => {
-			slot.i++;
-			if (slot.i < slot.cands.length) slot.img.src = assetUrl(slot.cands[slot.i]);
-		};
-		slot.img.src = assetUrl(cands[0]);
-		return slot;
-	}
-
-	let sun: Slot;
-	let mist: Slot;
-	let rain: Slot;
-	let water: Slot;
-	let clouds: Slot[] = [];
 
 	let activePointerId: number | null = null;
 	let pourPoint: { x: number; y: number } | null = null;
@@ -102,13 +74,6 @@
 		const wrap = wrapEl!;
 		const ctx = canvas.getContext('2d');
 		if (!ctx) return;
-		anyReady = true;
-
-		sun = makeSlot(['sky-sun.png']);
-		mist = makeSlot(['mist.png']);
-		rain = makeSlot(['rain.png']);
-		water = makeSlot(['water.png']);
-		clouds = [makeSlot(['cloud-a.png']), makeSlot(['cloud-b.png']), makeSlot(['cloud-c.png'])];
 
 		const reduce =
 			typeof matchMedia !== 'undefined' &&
@@ -131,22 +96,6 @@
 		const ro = new ResizeObserver(resize);
 		ro.observe(wrap);
 
-		let attempt = 0;
-		const retry = setInterval(() => {
-			attempt++;
-			const slots = [sun, mist, rain, water, ...clouds];
-			if (slots.every((s) => s.ok) || attempt > 12) {
-				clearInterval(retry);
-				return;
-			}
-			for (const s of slots) {
-				if (!s.ok) {
-					s.i = 0;
-					s.img.src = assetUrl(s.cands[0], attempt);
-				}
-			}
-		}, 5000);
-
 		const spriteCache = new Map<string, { img: HTMLImageElement; ok: boolean }>();
 		function getSprite(src: string) {
 			let entry = spriteCache.get(src);
@@ -154,7 +103,6 @@
 				entry = { img: new Image(), ok: false };
 				entry.img.onload = () => {
 					entry!.ok = true;
-					anyReady = true;
 				};
 				entry.img.src = src;
 				spriteCache.set(src, entry);
@@ -190,56 +138,63 @@
 			const fav = clamp01(book.favor / 100);
 			const horizon = H * WATER_TOP;
 			const sky = ctx!.createLinearGradient(0, 0, 0, horizon);
-			sky.addColorStop(0, rgb(lerp(22, 35, o), lerp(26, 54, o), lerp(70, 104, o)));
-			sky.addColorStop(1, rgb(lerp(48, 84, o), lerp(70, 130, o), lerp(118, 168, o)));
+			sky.addColorStop(0, rgb(lerp(236, 255, fav), lerp(178, 214, o), lerp(198, 226, o)));
+			sky.addColorStop(0.58, rgb(lerp(242, 255, fav), lerp(193, 221, o), lerp(211, 235, o)));
+			sky.addColorStop(1, rgb(lerp(210, 232, o), lerp(166, 194, fav), lerp(207, 228, fav)));
 			ctx!.fillStyle = sky;
 			ctx!.fillRect(0, 0, W, horizon + 1);
 
-			if (sun.ok) {
-				const ss = H * 0.5;
-				const sx = W * 0.78 - ss / 2;
-				const sy = H * 0.19 - ss / 2;
-				const pulse = reduce ? 1 : 0.86 + 0.14 * Math.sin(T * 0.8);
-				ctx!.save();
-				ctx!.globalAlpha = (0.22 + 0.48 * fav) * pulse;
-				ctx!.drawImage(sun.img, sx, sy, ss, ss);
-				ctx!.restore();
+			const drift = reduce ? 0 : T;
+			ctx!.save();
+			ctx!.globalAlpha = 0.18 + fav * 0.16;
+			ctx!.strokeStyle = 'rgba(255, 252, 252, 0.72)';
+			ctx!.lineWidth = 1;
+			for (let i = 0; i < 5; i++) {
+				const y = horizon * (0.18 + i * 0.13) + Math.sin(drift * 0.25 + i) * H * 0.006;
+				ctx!.beginPath();
+				ctx!.moveTo(-W * 0.08, y);
+				ctx!.bezierCurveTo(W * 0.22, y - H * 0.025, W * 0.48, y + H * 0.018, W * 1.08, y - H * 0.006);
+				ctx!.stroke();
 			}
+			ctx!.restore();
+
+			const horizonGlow = ctx!.createLinearGradient(0, horizon - H * 0.09, 0, horizon + H * 0.04);
+			horizonGlow.addColorStop(0, 'rgba(255, 255, 255, 0)');
+			horizonGlow.addColorStop(0.7, 'rgba(255, 245, 250, 0.28)');
+			horizonGlow.addColorStop(1, 'rgba(210, 164, 198, 0)');
+			ctx!.fillStyle = horizonGlow;
+			ctx!.fillRect(0, horizon - H * 0.09, W, H * 0.13);
 		}
 
 		function drawWeather(T: number) {
 			const m = clamp01(book.stocks.moisture / 100);
 			const drift = reduce ? 0 : T;
-			const cloudOpacity = clamp01((m - 0.25) / 0.5);
-			const cloudCount = m < 0.35 ? 1 : m < 0.65 ? 2 : 3;
-			if (cloudOpacity > 0.01) {
-				const cw = W * 0.3;
-				const ch = cw * 0.5;
+			const veilOpacity = clamp01((m - 0.25) / 0.5);
+			if (veilOpacity > 0.01) {
 				ctx!.save();
-				ctx!.globalAlpha = cloudOpacity;
-				for (let i = 0; i < cloudCount; i++) {
-					const c = clouds[i];
-					if (!c?.ok) continue;
-					const span = W + cw;
-					const speed = (0.012 + i * 0.004) * W;
-					const x = (((drift * speed + i * W * 0.37) % span) + span) % span - cw;
-					const y = H * (0.06 + i * 0.08);
-					ctx!.drawImage(c.img, x, y, cw, ch);
+				ctx!.globalAlpha = veilOpacity * 0.34;
+				ctx!.strokeStyle = 'rgba(255, 255, 255, 0.68)';
+				ctx!.lineWidth = H * 0.018;
+				ctx!.lineCap = 'round';
+				for (let i = 0; i < 3; i++) {
+					const y = H * (0.09 + i * 0.085);
+					const offset = ((drift * W * (0.01 + i * 0.003) + i * W * 0.31) % (W * 1.2)) - W * 0.1;
+					ctx!.beginPath();
+					ctx!.moveTo(offset - W * 0.28, y);
+					ctx!.bezierCurveTo(offset, y - H * 0.035, offset + W * 0.28, y + H * 0.025, offset + W * 0.62, y);
+					ctx!.stroke();
 				}
 				ctx!.restore();
 			}
 
-			if (mist.ok) {
-				const mo = clamp01((m - 0.4) / 0.4) * 0.55;
-				if (mo > 0.01) {
-					const mw = W * 1.1;
-					const mh = H * 0.3;
-					const x = -(((drift * W * 0.006) % (mw - W)) + 0);
-					ctx!.save();
-					ctx!.globalAlpha = mo;
-					ctx!.drawImage(mist.img, x, H * WATER_TOP - mh * 0.5, mw, mh);
-					ctx!.restore();
-				}
+			const mo = clamp01((m - 0.4) / 0.4) * 0.42;
+			if (mo > 0.01) {
+				const mist = ctx!.createLinearGradient(0, H * WATER_TOP - H * 0.1, 0, H * WATER_TOP + H * 0.08);
+				mist.addColorStop(0, 'rgba(255, 255, 255, 0)');
+				mist.addColorStop(0.45, `rgba(255, 246, 251, ${mo})`);
+				mist.addColorStop(1, 'rgba(255, 255, 255, 0)');
+				ctx!.fillStyle = mist;
+				ctx!.fillRect(0, H * WATER_TOP - H * 0.1, W, H * 0.18);
 			}
 		}
 
@@ -248,21 +203,29 @@
 			const waterH = H - waterY;
 			const m = clamp01(book.stocks.moisture / 100);
 			const waterGrad = ctx!.createLinearGradient(0, waterY, 0, H);
-			waterGrad.addColorStop(0, `rgba(108, 229, 232, ${0.24 + m * 0.12})`);
-			waterGrad.addColorStop(0.38, 'rgba(97, 146, 197, 0.62)');
-			waterGrad.addColorStop(1, 'rgba(95, 93, 165, 0.82)');
+			waterGrad.addColorStop(0, `rgba(255, 229, 239, ${0.28 + m * 0.1})`);
+			waterGrad.addColorStop(0.32, 'rgba(204, 193, 229, 0.58)');
+			waterGrad.addColorStop(1, 'rgba(132, 146, 205, 0.78)');
 			ctx!.fillStyle = waterGrad;
 			ctx!.fillRect(0, waterY, W, waterH);
 
 			const wave = reduce ? 0 : Math.sin(T * 0.9) * H * 0.004;
 			ctx!.save();
-			ctx!.globalAlpha = 0.6;
-			if (water.ok) ctx!.drawImage(water.img, 0, waterY + wave, W, waterH + 2);
+			ctx!.globalAlpha = 0.18;
+			ctx!.strokeStyle = 'rgba(255, 255, 255, 0.74)';
+			ctx!.lineWidth = 1;
+			for (let i = 0; i < 7; i++) {
+				const y = waterY + ((i + 1) / 8) * waterH + wave * (i + 1);
+				ctx!.beginPath();
+				ctx!.moveTo(-W * 0.05, y);
+				ctx!.bezierCurveTo(W * 0.22, y + H * 0.012, W * 0.48, y - H * 0.01, W * 1.05, y + H * 0.006);
+				ctx!.stroke();
+			}
 			ctx!.restore();
 
 			ctx!.save();
-			ctx!.globalAlpha = 0.24;
-			ctx!.strokeStyle = 'rgba(245, 242, 232, 0.7)';
+			ctx!.globalAlpha = 0.36;
+			ctx!.strokeStyle = 'rgba(255, 250, 252, 0.82)';
 			ctx!.lineWidth = 1;
 			ctx!.beginPath();
 			ctx!.moveTo(0, waterY + 0.5);
@@ -284,11 +247,21 @@
 					const cx = (x + 0.5) * cellW;
 					const cy = waterY + (y + 0.5) * cellH;
 					ctx!.save();
-					ctx!.globalAlpha = 0.08 + value * 0.58;
-					ctx!.fillStyle = value > 0.62 ? 'rgb(216, 190, 142)' : 'rgb(171, 137, 116)';
+					ctx!.globalAlpha = 0.12 + value * 0.58;
+					const pearl = ctx!.createRadialGradient(cx - cellW * 0.22, cy - cellH * 0.22, 0, cx, cy, cellW * (1.2 + value));
+					pearl.addColorStop(0, 'rgba(255, 255, 255, 0.98)');
+					pearl.addColorStop(0.46, value > 0.62 ? 'rgba(249, 242, 255, 0.9)' : 'rgba(248, 248, 242, 0.78)');
+					pearl.addColorStop(1, 'rgba(205, 218, 244, 0.18)');
+					ctx!.fillStyle = pearl;
 					ctx!.beginPath();
 					ctx!.ellipse(cx, cy, cellW * (0.75 + value), cellH * (0.5 + value * 0.3), 0, 0, Math.PI * 2);
 					ctx!.fill();
+					if (value > 0.5) {
+						ctx!.globalAlpha = value * 0.22;
+						ctx!.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+						ctx!.lineWidth = 0.8;
+						ctx!.stroke();
+					}
 					ctx!.restore();
 				}
 			}
@@ -298,9 +271,9 @@
 			if (book.worldShape.activeWorldspace !== 'shallows') return;
 			const y = H * 0.57;
 			const shelf = ctx!.createLinearGradient(0, y - 16, 0, y + 52);
-			shelf.addColorStop(0, 'rgba(216, 190, 142, 0)');
-			shelf.addColorStop(0.4, 'rgba(216, 190, 142, 0.32)');
-			shelf.addColorStop(1, 'rgba(71, 47, 61, 0.24)');
+			shelf.addColorStop(0, 'rgba(255, 255, 255, 0)');
+			shelf.addColorStop(0.4, 'rgba(248, 241, 255, 0.32)');
+			shelf.addColorStop(1, 'rgba(196, 174, 223, 0.24)');
 			ctx!.fillStyle = shelf;
 			ctx!.beginPath();
 			ctx!.moveTo(0, y + 16);
@@ -421,14 +394,19 @@
 		function drawRain(T: number) {
 			const m = clamp01(book.stocks.moisture / 100);
 			const ro2 = clamp01((m - 0.7) / 0.3) * 0.7;
-			if (!rain.ok || ro2 <= 0.01) return;
-			const rw = W * 0.13;
-			const rh = rw * 2;
-			const scroll = reduce ? 0 : (T * H * 0.5) % rh;
+			if (ro2 <= 0.01) return;
+			const drift = reduce ? 0 : T;
 			ctx!.save();
-			ctx!.globalAlpha = ro2;
-			for (let y = -rh + scroll; y < H; y += rh) {
-				for (let x = 0; x < W; x += rw) ctx!.drawImage(rain.img, x, y, rw, rh);
+			ctx!.globalAlpha = ro2 * 0.44;
+			ctx!.strokeStyle = 'rgba(255, 248, 252, 0.72)';
+			ctx!.lineWidth = 1;
+			for (let i = 0; i < 80; i++) {
+				const x = (i * 73 + drift * W * 0.12) % (W + 60) - 30;
+				const y = (i * 31 + drift * H * 0.9) % (H + 80) - 80;
+				ctx!.beginPath();
+				ctx!.moveTo(x, y);
+				ctx!.lineTo(x - H * 0.025, y + H * 0.12);
+				ctx!.stroke();
 			}
 			ctx!.restore();
 		}
@@ -437,8 +415,8 @@
 			const drift = reduce ? 0 : T;
 			const waterY = H * WATER_TOP;
 			ctx!.save();
-			ctx!.globalAlpha = 0.22;
-			ctx!.fillStyle = 'rgba(108, 229, 232, 0.4)';
+			ctx!.globalAlpha = 0.18;
+			ctx!.fillStyle = 'rgba(255, 255, 255, 0.54)';
 			for (let i = 0; i < 8; i++) {
 				const y = waterY + ((i + 1) / 9) * (H - waterY);
 				ctx!.fillRect(((drift * 8 + i * 37) % 80) - 80, y, W + 120, 1);
@@ -446,32 +424,71 @@
 			ctx!.restore();
 		}
 
-		function drawOverlays() {
+		function drawOverlays(T: number) {
 			const stab = clamp01(book.stability / 100);
 			if (stab < 0.999) {
 				ctx!.save();
 				ctx!.globalAlpha = (1 - stab) * 0.3;
-				ctx!.fillStyle = 'rgb(40, 40, 70)';
+				ctx!.fillStyle = 'rgb(86, 60, 96)';
 				ctx!.fillRect(0, 0, W, H);
 				ctx!.restore();
 			}
 			if (book.quiet) {
 				const vg = ctx!.createRadialGradient(W / 2, H / 2, H * 0.2, W / 2, H / 2, H * 0.8);
-				vg.addColorStop(0, 'rgba(14,14,40,0)');
-				vg.addColorStop(1, 'rgba(14,14,40,0.55)');
+				vg.addColorStop(0, 'rgba(70,38,75,0)');
+				vg.addColorStop(1, 'rgba(70,38,75,0.42)');
 				ctx!.fillStyle = vg;
 				ctx!.fillRect(0, 0, W, H);
 			}
 			if (isPouring && pourPoint) {
 				const x = pourPoint.x * W;
 				const y = H * waterGridYToWorld(pourPoint.y);
+				const top = H * WATER_TOP + H * 0.012;
+				const bottom = Math.max(top + H * 0.035, y);
+				const drift = reduce ? 0 : T;
+
 				ctx!.save();
-				ctx!.globalAlpha = 0.7;
-				ctx!.strokeStyle = 'rgba(245, 242, 232, 0.7)';
+				ctx!.globalAlpha = 0.34;
+				ctx!.strokeStyle = 'rgba(255, 255, 255, 0.78)';
+				ctx!.lineWidth = H * 0.01;
+				ctx!.lineCap = 'round';
+				ctx!.beginPath();
+				ctx!.moveTo(x, top);
+				ctx!.bezierCurveTo(x - H * 0.02, top + (bottom - top) * 0.24, x + H * 0.018, bottom * 0.74 + top * 0.26, x, bottom);
+				ctx!.stroke();
+				ctx!.restore();
+
+				ctx!.save();
+				for (let i = 0; i < 24; i++) {
+					const fall = (i / 24 + drift * 0.46) % 1;
+					const wobble = Math.sin(i * 1.91 + drift * 2.4) * H * 0.012;
+					const px = x + wobble + Math.cos(i * 0.7) * H * 0.005;
+					const py = top + (bottom - top) * fall;
+					const r = H * (0.0038 + (i % 4) * 0.0012) * (0.7 + fall * 0.45);
+					const pearl = ctx!.createRadialGradient(px - r * 0.35, py - r * 0.35, 0, px, py, r * 2.2);
+					pearl.addColorStop(0, 'rgba(255, 255, 255, 0.98)');
+					pearl.addColorStop(0.48, 'rgba(250, 244, 255, 0.78)');
+					pearl.addColorStop(1, 'rgba(206, 223, 248, 0)');
+					ctx!.globalAlpha = 0.38 + fall * 0.36;
+					ctx!.fillStyle = pearl;
+					ctx!.beginPath();
+					ctx!.arc(px, py, r * 2.2, 0, Math.PI * 2);
+					ctx!.fill();
+				}
+				ctx!.restore();
+
+				ctx!.save();
+				ctx!.globalAlpha = 0.78;
+				ctx!.strokeStyle = 'rgba(255, 255, 255, 0.86)';
 				ctx!.lineWidth = 1;
 				ctx!.beginPath();
 				ctx!.arc(x, y, H * 0.045, 0, Math.PI * 2);
 				ctx!.stroke();
+				ctx!.globalAlpha = 0.2;
+				ctx!.fillStyle = 'rgba(255, 255, 255, 0.72)';
+				ctx!.beginPath();
+				ctx!.arc(x, y, H * 0.03, 0, Math.PI * 2);
+				ctx!.fill();
 				ctx!.restore();
 			}
 		}
@@ -491,7 +508,7 @@
 			drawWaterGlaze(T);
 			drawCreatureLayers(['shore', 'air'], T);
 			drawRain(T);
-			drawOverlays();
+			drawOverlays(T);
 		}
 
 		let raf = 0;
@@ -529,7 +546,6 @@
 			stopPour();
 			running = false;
 			if (raf) cancelAnimationFrame(raf);
-			clearInterval(retry);
 			ro.disconnect();
 			document.removeEventListener('visibilitychange', onVisibility);
 		};
@@ -546,9 +562,6 @@
 		onpointercancel={stopPour}
 		onlostpointercapture={stopPour}
 	></canvas>
-	{#if !anyReady}
-		<p class="hint">the world's image is still arriving; the signs are live below.</p>
-	{/if}
 </div>
 
 <style>
@@ -558,31 +571,19 @@
 		border: 1px solid var(--rule);
 		border-radius: 4px;
 		overflow: hidden;
-		background: radial-gradient(ellipse at 50% 30%, #26265a 0%, var(--bg) 90%);
-		aspect-ratio: 960 / 340;
+		background: linear-gradient(180deg, #f8cdd9 0%, #e7b6ce 38%, #b8b2db 100%);
+		aspect-ratio: 960 / 480;
 	}
 	.diorama.pourable canvas {
 		cursor: crosshair;
 		touch-action: none;
 	}
 	.diorama.pouring {
-		border-color: rgba(108, 229, 232, 0.58);
-		box-shadow: 0 0 18px rgba(108, 229, 232, 0.12);
+		border-color: rgba(255, 255, 255, 0.74);
+		box-shadow: 0 0 18px rgba(255, 236, 248, 0.2);
 	}
 	canvas {
 		display: block;
 		width: 100%;
-	}
-	.hint {
-		position: absolute;
-		inset: auto 0 0 0;
-		margin: 0;
-		padding: 0.5rem 0.7rem;
-		font-family: var(--font-body);
-		font-style: italic;
-		font-size: 0.78rem;
-		color: var(--muted);
-		text-align: center;
-		background: linear-gradient(transparent, rgba(14, 14, 40, 0.7));
 	}
 </style>
