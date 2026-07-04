@@ -379,3 +379,26 @@ load is gone. From week 6 on this is a hard rule, not a nice-to-have:
   deliberately what happens to existing `v: 1` saves when you do.
 - see `persist.ts`'s own header comment for the same rule, kept next to the
   code it governs.
+
+## 8. what this app publishes, and what it only reads (ROADMAP.md week 10)
+
+marginalia publishes nothing of its own to `/api/public` — no passphrase
+gate lives in this app, and nothing here has ever needed one. its part in
+the public read path (see `../ARCHITECTURE.md`'s "the public read path")
+is entirely on the reading side:
+
+- **the bestiary's creatures**, read in `witch/bestiaryDb.ts` and bound
+  into the diorama (`isolatedSprite ?? sprite`) — a fallback chain, never
+  a hard dependency: local IndexedDB first, the published snapshot next,
+  the unbound placeholders last. losing the network never empties the
+  world.
+- **echoes' published letters**, read in `reading/echoesLibrary.svelte.ts`
+  and offered in the reading room alongside pasting your own text — never
+  in place of it. the same `idle → loading → ready/empty → error` shape as
+  the bestiary gallery's own store, on purpose.
+
+both reads are unauthenticated `pullPublic()` calls — the same fetch any
+stranger's browser could make. if a "publish from marginalia" feature is
+ever added (there's no such plan today), it needs the same explicit,
+per-item opt-in write/bestiary already enforce — nothing here should ever
+become public by drifting into a snapshot unasked.

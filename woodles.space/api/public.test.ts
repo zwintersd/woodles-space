@@ -124,6 +124,35 @@ describe('POST /api/public — auth required', () => {
     expect(res.status).toBe(400);
     expect(sqlMock).not.toHaveBeenCalled();
   });
+
+  it('rejects a blob over the 4 MB budget before touching the database', async () => {
+    const res = await handler(
+      req({
+        method: 'POST',
+        url: 'https://x/api/public',
+        auth: PASSPHRASE,
+        body: { app: 'bestiary', slug: 'gallery', blob: { big: 'x'.repeat(5 * 1024 * 1024) } }
+      })
+    );
+
+    expect(res.status).toBe(413);
+    expect(sqlMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts a blob comfortably under the budget', async () => {
+    sqlMock.mockResolvedValueOnce([{ version: 1, published_at: '2026-07-02T00:00:00Z' }]);
+
+    const res = await handler(
+      req({
+        method: 'POST',
+        url: 'https://x/api/public',
+        auth: PASSPHRASE,
+        body: { app: 'bestiary', slug: 'gallery', blob: { creatures: [{ name: 'x'.repeat(1000) }] } }
+      })
+    );
+
+    expect(res.status).toBe(200);
+  });
 });
 
 describe('DELETE /api/public — auth required', () => {

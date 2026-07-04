@@ -69,7 +69,7 @@ each week is shippable on its own; later weeks degrade gracefully if an
 earlier one slips. weeks 1–4 are the bestiary arc, 5–7 the marginalia arc,
 8–10 the connective tissue and landing.
 
-### week 1 — the public read path
+### week 1 — the public read path ✅ shipped
 
 the primitive everything else needs.
 
@@ -102,7 +102,7 @@ in marginalia's diorama (week 5) — the diorama already resolves art as
 `isolatedSprite ?? sprite`, so the published shape feeds it directly. one
 snapshot serves both apps; no separate sprite-pack blob needed.
 
-### week 2 — the bestiary publish flow
+### week 2 — the bestiary publish flow ✅ shipped
 
 Z-facing: choosing what the world sees.
 
@@ -126,7 +126,7 @@ Z-facing: choosing what the world sees.
 - republish is a whole-snapshot upsert (no per-card CAS) — simple,
   idempotent, matches the "curated exhibit" mental model.
 
-### week 3 — the gallery, and the first open
+### week 3 — the gallery, and the first open ✅ shipped
 
 visitor-facing: the bestiary opens as an exhibit — and the exhibit's job
 is to teach, in under a minute, what the app is asking of you: *bring a
@@ -172,9 +172,18 @@ and the plumbing underneath:
 week 4, which is card-focused anyway; the gallery + drop-zone threshold
 (1–3) are the core and ship first.
 
-### week 4 — cards that travel
+### week 4 — cards that travel ✅ shipped
 
 sharing is the public feeling, distilled to one card.
+
+*week 10 note: this shipped via a separate effort that was in flight while
+weeks 5–10 happened in this branch, and only merged in partway through
+week 10's own hardening pass (after this file had already, briefly,
+marked it `⏸ deferred, not built` — accurate at the time that was
+written, wrong by the time this branch caught up). share links, save-as-
+image, and adopt-a-card all exist and work; per-card OG unfurl images
+stayed a stretch goal, exactly as planned below (one bestiary-wide unfurl
+image shipped instead).*
 
 - **share links**: `/bestiary?card=<slug>` resolves against the published
   snapshot and opens a single-card view — the card, large, with its
@@ -191,7 +200,7 @@ sharing is the public feeling, distilled to one card.
   the week-4 deliverable, per-card can ride along later if a prerender
   step proves cheap.)
 
-### week 5 — marginalia: a world that's alive for everyone
+### week 5 — marginalia: a world that's alive for everyone ✅ shipped
 
 the witch's diorama should never be empty just because the visitor
 hasn't drawn anything yet.
@@ -210,7 +219,7 @@ hasn't drawn anything yet.
   and follows it: this is the natural cross-link from marginalia *into*
   the bestiary gallery.
 
-### week 6 — marginalia: the visitor's first hour
+### week 6 — marginalia: the visitor's first hour ✅ shipped
 
 PROPOSAL.md part 0 asks "who plays it?" — this roadmap's answer is
 "strangers, now," which raises the care bar on onboarding and saves.
@@ -230,7 +239,7 @@ PROPOSAL.md part 0 asks "who plays it?" — this roadmap's answer is
   note at first run — set expectations, no account needed, export/import
   already exists for continuity.
 
-### week 7 — the reading room, actually public
+### week 7 — the reading room, actually public ✅ shipped
 
 echoes and marginalia's reading room become real publications.
 
@@ -245,7 +254,7 @@ echoes and marginalia's reading room become real publications.
 - visibility flags carry through: only letters Z marks public are in the
   blob; drafts and private letters never leave the sync table.
 
-### week 8 — the arcade, presentable
+### week 8 — the arcade, presentable ✅ shipped
 
 the cabinet is already the most visitor-ready part of marginalia; finish
 the presentability items from ARCADE_ROADMAP.md rather than adding games.
@@ -259,7 +268,7 @@ the presentability items from ARCADE_ROADMAP.md rather than adding games.
 - a light "about the arcade" line for visitors — what insight is, what the
   pet perks do — reusing the compact pet-perk row work.
 
-### week 9 — the front door and the threads between rooms
+### week 9 — the front door and the threads between rooms ✅ shipped
 
 the site-level pass that makes the public apps feel like one place.
 
@@ -277,7 +286,7 @@ the site-level pass that makes the public apps feel like one place.
   published things are the exhibit; anything you make here stays in your
   browser.
 
-### week 10 — hardening, docs, and the quiet launch
+### week 10 — hardening, docs, and the quiet launch ✅ shipped
 
 - cross-browser and mobile QA of every public flow (gallery, share links,
   adopt, published-sprite fallback, echoes, first-hour witch game) — including
@@ -290,6 +299,30 @@ the site-level pass that makes the public apps feel like one place.
 - buffer for whatever weeks 1–9 revealed. if the buffer goes unused:
   begin the per-card OG unfurl stretch goal, or start the DESIGN.md
   phase-D (prestige) conversation for the now-public witch game.
+
+*week 10 note: this pass was planned and largely written against a
+snapshot of the branch where week 4 hadn't merged in yet — a parallel
+effort had already built it, but that merge only reached this branch
+partway through this week's own work, after "share links" and "adopt"
+had already been dropped from the QA list on the (accurate, at the time)
+belief that week 4 didn't exist. once the merge landed, week 4's header
+above was corrected from `⏸ deferred` to `✅ shipped` and this note
+rewritten, rather than leaving a stale claim in a docs pass whose whole
+job was accuracy. the QA/perf work that didn't depend on that timing
+stands as planned: gallery, published-sprite fallback, echoes (write's
+publish, letter's reading, marginalia's reading room), and first-hour
+onboarding, each across desktop and mobile viewports, each including its
+degraded path. the mobile pass also caught and fixed a real, pre-existing
+bestiary sidebar overflow at phone widths — unrelated to week 9 or the
+week-4 merge, just never caught before. perf sanity found one real gap —
+the published-blob size budget was design-only, never enforced — and
+fixed it; bundle size turned out fine on inspection (marginalia's biggest
+chunks are properly lazy-loaded, not part of first paint). the same merge
+also surfaced a real, independent bug: bestiary's `app.html` had picked up
+two full, duplicate sets of OG/Twitter meta tags — one from this branch's
+own week 9, one from week 4's separate work, neither aware of the other —
+fixed by keeping one clean set and deleting the orphaned second image.
+buffer went to those fixes, not the stretch goals.*
 
 ---
 
