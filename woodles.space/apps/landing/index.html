@@ -4,6 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>woodles.space</title>
+  <meta name="description" content="a little desktop of soft, made things — typefaces and letters, a witch's world, a field guide of creatures. kept close, opened a little." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://woodles.space/" />
+  <meta property="og:title" content="woodles.space" />
+  <meta property="og:description" content="a little desktop of soft, made things — typefaces and letters, a witch's world, a field guide of creatures. kept close, opened a little." />
+  <meta property="og:image" content="https://woodles.space/apps/landing/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="woodles.space" />
+  <meta name="twitter:description" content="a little desktop of soft, made things — typefaces and letters, a witch's world, a field guide of creatures. kept close, opened a little." />
+  <meta name="twitter:image" content="https://woodles.space/apps/landing/og.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet" />
@@ -865,6 +877,10 @@
       <p>a little desktop of soft, made things &mdash; typefaces and letters,
          palettes and quiet timers. one repo, all the things, kept close.</p>
       <p>open it like a drawer. everything inside was made by hand.</p>
+      <p>a few rooms are properly public now: the bestiary's gallery, the witch's
+         shared world, letters marked to be read. that's the exhibit &mdash; what
+         i've chosen to put on show. everything you make here is yours alone,
+         saved in your own browser, unless you publish it the same way.</p>
       <p class="win-meta" id="win-meta">z winters &middot; open monorepo</p>
     </div>
   </div>
@@ -884,7 +900,7 @@
       { id:'hygge',   name:'Hygge',        href:'/hygge',                  glyph:'◪', desc:'design playground: fonts, motifs & palette', g1:'var(--lavender)', g2:'var(--peach)' },
       { id:'write',   name:'Write',        href:'/write',                  glyph:'✎', desc:'compose, save, send a letter', g1:'var(--aqua)',     g2:'var(--lavender)' },
       { id:'echoes',  name:'Echoes',       href:'/letter',                 glyph:'❝', desc:'letters left here, words that stayed', g1:'var(--peach)', g2:'var(--lilac)' },
-      { id:'marg',    name:'Marginalia',   href:'/marginalia',             glyph:'❦', desc:'a witch writes worlds into being',      g1:'var(--plum)',     g2:'var(--lavender)' },
+      { id:'marg',    name:'Marginalia',   href:'/marginalia',             glyph:'❦', desc:'tend a small witch, grow her world, and meet the creatures Z\'s already brought into it', g1:'var(--plum)', g2:'var(--lavender)' },
       { id:'devlog',  name:'Dev Log',      href:'/marginalia-devlog',      glyph:'✦', desc:'notes from making the witch\'s world',  g1:'#b58fe8',        g2:'#f29ac4' },
       { id:'reading', name:'Reading Room', href:'/marginalia#reading-room',glyph:'☾', desc:'a quiet timer, read for stars', g1:'var(--peach)',    g2:'var(--aqua)' },
       { id:'planner',    name:'Carillon',    href:'/planner',    glyph:'☉',  desc:'calendar, schedule, and time',       g1:'var(--peach)',    g2:'var(--lavender)' },
@@ -892,7 +908,7 @@
       { id:'piano',      name:'Piano',       href:'/piano',      glyph:'♫', desc:'a purple keyboard with soft synth strings', g1:'#9d7cf4', g2:'#87e4d4' },
       { id:'lab',        name:'Lab',         href:'/lab',        glyph:'L', desc:'experiments, sketches, and stub apps', g1:'var(--aqua)',     g2:'var(--plum)' },
 { id:'spores',     name:'Spores',      href:'/spores',     glyph:'❀', desc:'a personal wikipedia, tended by hand', g1:'#f08fb8',         g2:'#6ce5e8' },
-      { id:'bestiary',   name:'Bestiary',    href:'/bestiary',   glyph:'❖', desc:'a field guide of creatures, drawn as cards', g1:'#d8b25a',  g2:'#c98be0' },
+      { id:'bestiary',   name:'Bestiary',    href:'/bestiary',   glyph:'❖', desc:'bring a png of anything, leave with a card that belongs', g1:'#d8b25a', g2:'#c98be0' },
       { id:'quiet',      name:'Quiet Room',  href:'/quiet-room', glyph:'◉', desc:'an immersive room of light, drawn in three.js', g1:'var(--lavender)', g2:'var(--plum)' },
     ];
 
@@ -944,9 +960,9 @@
     }
     renderGrid('');
 
-    /* recommended — a curated trio */
+    /* recommended — worth a visit */
     const rec = document.getElementById('recommended');
-    ['write','marg','hygge'].forEach(id => {
+    ['marg','bestiary','write'].forEach(id => {
       const a = apps.find(x => x.id === id);
       const el = document.createElement('a');
       el.className = 'rec-item';

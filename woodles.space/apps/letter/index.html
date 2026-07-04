@@ -4,6 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>echoes · woodles.space</title>
+  <meta name="description" content="letters left here, words that stayed — read the ones marked to be shared" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://woodles.space/letter" />
+  <meta property="og:title" content="echoes · woodles.space" />
+  <meta property="og:description" content="letters left here, words that stayed — read the ones marked to be shared" />
+  <meta property="og:image" content="https://woodles.space/letter/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="echoes · woodles.space" />
+  <meta name="twitter:description" content="letters left here, words that stayed — read the ones marked to be shared" />
+  <meta name="twitter:image" content="https://woodles.space/letter/og.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="/shared/fonts.css" />
@@ -73,6 +85,33 @@
       position: relative;
       z-index: 1;
     }
+    .topbar-elsewhere-group {
+      display: flex;
+      align-items: center;
+    }
+    .topbar-elsewhere {
+      display: flex;
+      align-items: center;
+      gap: 0.9rem;
+      position: relative;
+      z-index: 1;
+    }
+    .topbar-elsewhere a {
+      font-family: var(--letter-mono, var(--font-mono));
+      font-size: 0.57rem;
+      letter-spacing: 0.14em;
+      text-decoration: none;
+      color: var(--muted);
+      opacity: 0.55;
+      transition: color 0.18s ease, opacity 0.18s ease;
+    }
+    /* the topbar has no other responsive handling and is a fixed 42px strip
+       with overflow:hidden — below ~480px the clock has no room left once
+       these links are in the flow, so they step aside rather than clip it. */
+    @media (max-width: 480px) {
+      .topbar-elsewhere-group { display: none; }
+    }
+    .topbar-elsewhere a:hover { color: var(--accent-strong); opacity: 1; }
     .topbar-clock {
       margin-left: auto;
       font-family: var(--letter-mono, var(--font-mono));
@@ -921,6 +960,13 @@
     <a href="/" class="topbar-brand">.space</a>
     <span class="topbar-label">echoes</span>
     <div class="layer-toggles" id="layer-toggles" role="group" aria-label="layers"></div>
+    <div class="topbar-elsewhere-group">
+      <span class="topbar-divider" aria-hidden="true"></span>
+      <nav class="topbar-elsewhere" aria-label="elsewhere at woodles.space">
+        <a href="/marginalia">marginalia</a>
+        <a href="/bestiary">bestiary</a>
+      </nav>
+    </div>
     <div class="topbar-clock">
       <span class="clock-date" id="clock-date"></span>
       <span class="clock-sep">·</span>
