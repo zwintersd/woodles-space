@@ -10,6 +10,7 @@
 	import { LOOK_CLOSER_SECONDS } from '$lib/witch/tuning';
 	import type { Life } from '$lib/witch/content/life';
 	import ReadingRoom from '$lib/components/reading/ReadingRoom.svelte';
+	import CheatConsole from '$lib/witch/CheatConsole.svelte';
 	import HexStage from '$lib/witch/HexStage.svelte';
 	import TutorialOverlay from '$lib/witch/TutorialOverlay.svelte';
 
@@ -194,6 +195,8 @@
 		}
 	}
 </script>
+
+<CheatConsole />
 
 <header class="topbar">
 	<div class="brand-group">
