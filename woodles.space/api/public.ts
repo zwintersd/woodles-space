@@ -23,6 +23,13 @@ const SLUG_PATTERN = /^[a-z0-9-]{1,80}$/;
 
 const PUBLIC_CACHE = 'public, max-age=300, stale-while-revalidate=86400';
 
+// ROADMAP.md's own design budget ("sequencing notes and risks": "~2-4 MB
+// keeps the public GET fast") was never enforced anywhere in code — week 10
+// hardening closes that gap. 4 MB (the generous end of that range) rejects a
+// runaway/corrupted publish before it ever reaches the DB, rather than
+// discovering the cost on every visitor's subsequent unauthenticated GET.
+const MAX_BLOB_BYTES = 4 * 1024 * 1024;
+
 export const config = { runtime: 'edge' };
 
 export default async function handler(req: Request): Promise<Response> {
@@ -74,6 +81,14 @@ async function route(req: Request): Promise<Response> {
     if (blob === undefined) return json({ ok: false, error: 'missing blob' }, 400);
 
     const payload = JSON.stringify(blob);
+    const byteLength = new TextEncoder().encode(payload).length;
+    if (byteLength > MAX_BLOB_BYTES) {
+      return json(
+        { ok: false, error: 'blob too large', maxBytes: MAX_BLOB_BYTES, actualBytes: byteLength },
+        413
+      );
+    }
+
     const rows = await sql`
       INSERT INTO published (app, slug, blob, version, published_at)
       VALUES (${app}, ${slug}, ${payload}::jsonb, 1, now())

@@ -17,10 +17,29 @@ other docs have narrower jobs:
 - [README.md](./README.md) is the deployment reference.
 - [REFACTORING.md](./REFACTORING.md) is the living consolidation log.
 - [ROADMAP.md](./ROADMAP.md) is the 10-week plan for making marginalia and
-  the bestiary public-facing.
-- `apps/*/*.md` files own app-specific design briefs, proposals, assets, and
-  known issues.
+  the bestiary public-facing — shipped weeks are marked `✅` in its own
+  headers; week 4 (share links, export-as-image, adopt-a-card, per-card
+  OG) was never picked up, marked `⏸ deferred` there rather than silently
+  skipped.
 - [`../AUDIT.md`](../AUDIT.md) is a dated audit snapshot, not live truth.
+- `apps/*/*.md` files own app-specific design briefs, proposals, assets, and
+  known issues — not every app has one. doc inventory, as of week 10:
+  - `apps/marginalia/`: `DESIGN.md` (mechanics, the week-6 save-discipline
+    policy, and a week-10 note on what it publishes vs. only reads),
+    `PROPOSAL.md`, `ASSETS.md`, `static/diorama/README.md` (the world-canvas
+    art's filenames and its graceful-degradation contract), and four docs
+    under `src/lib/arcade/` — `ARCADE_ROADMAP.md` (the cabinet's own polish
+    log, a separate week-numbering from this file's ROADMAP.md, don't
+    conflate the two), `ARCADE_IMPLEMENTATION_PLAN.md` (the roadmap staged
+    into a build sequence), `ARCADE_REUSE.md` (what's shared across games
+    vs. kept deliberately local), and `ARCADE_REVIEW.md` (an older
+    resource-sharing review, now stale on the game inventory per
+    `ARCADE_ROADMAP.md`'s own note about it).
+  - `apps/planner/`: `KNOWN_ISSUES.md` (the vitest/rune-store sharp edges
+    under "the test suite" below).
+  - `apps/write`, `apps/letter`, `apps/bestiary`: no doc file of their own
+    — their publish/passphrase behavior is documented once, centrally, in
+    "the public read path" below, rather than duplicated three times.
 
 ## repo layout
 
@@ -86,6 +105,15 @@ experiments that should stay reachable without appearing as separate homepage
 apps; it links out to `/digits` and `/animations`, whose direct routes still
 work for old bookmarks.
 
+`marginalia` is the biggest app by built size (`dist/` ~2.8 MB, week 10
+perf-sanity check) — but the number that actually matters, first-load
+transfer, is a much healthier ~250 KB. the difference is `pdfjs-dist`
+(reading room's PDF intake) and its 1.2 MB worker file: both are
+Vite-code-split behind a dynamic import and a `?url` reference, so neither
+loads until a visitor actually opens that one feature. confirmed by
+measuring real network transfer against a `vite preview` build, not just
+`dist/`'s total size.
+
 ## the sync layer
 
 a single-user sync spine that a few apps opt into. localStorage stays the source
@@ -112,7 +140,72 @@ a `SyncState` class with `$state` fields, its instantiation, and a call to
 the adapter's `read()` maps the store into the blob type (`PlannerBlob`,
 `BestiaryBlob`, `GardenBlob`, `DevlogBlob`); `write()` calls the store's
 `rehydrate()`; `isNewer` is optionally provided (`bestiary`, `marginalia-devlog`
-use it). `write` and `marginalia` don't sync at all.
+use it). `marginalia` still has none of this — it never syncs privately.
+`write` gained a file in week 7, but it has no private blob to sync at all;
+its adapter's `read`/`write` are no-ops, kept only to reuse `createAppSync`'s
+passphrase connect/disconnect/persistence for gating the public echoes
+publish below — connecting the passphrase once, in any app, connects it
+everywhere, same origin, same localStorage key.
+
+### the public read path
+
+a second, unrelated spine, added across ROADMAP.md's weeks 1–9: publishing a
+curated snapshot for anyone to read, no passphrase required. `sync` above is
+what keeps Z's own data following her between devices; this is what lets a
+stranger's browser see any of it at all.
+
+**`api/public.ts`** — a second Neon-backed edge function, over its own
+`published` table (`api/schema.sql`), keyed `(app, slug)`, entirely separate
+from `sync`'s table.
+
+- `GET /api/public?app=<name>&slug=<slug>` — **no auth**, and the only
+  cacheable response anywhere in `api/`: `cache-control: public,
+  max-age=300, stale-while-revalidate=86400`. an unpublished slug returns
+  `{ blob: null, version: 0, publishedAt: null }` with the same header — a
+  200, not a 404, so a visitor's browser can always cache the answer
+  either way.
+- `POST` (upsert) and `DELETE` stay behind the same passphrase check as
+  `sync` (`authed()`, shared from `_lib.ts`). every other response —
+  `POST`/`DELETE` here, and all of `sync.ts` — stays `no-store`, the shared
+  `json()` helper's default.
+- republish is a whole-snapshot upsert, not a compare-and-swap: there's no
+  concurrent editor racing a publish action the way `sync` has to guard
+  against, so its "ask before clobber" dance doesn't apply here.
+- a 4 MB cap on the POST body (week 10 hardening). the "~2-4 MB keeps the
+  public GET fast" budget was a design decision from week 1's own planning
+  notes, but nothing enforced it in code until now — a runaway or corrupted
+  publish is rejected with `413` before it ever reaches the database,
+  rather than becoming every subsequent visitor's slow unauthenticated GET.
+
+**`packages/sync`** grows a second, parallel pair: `publish(app, slug,
+blob)` and `pullPublic(app, slug)`. `pullPublic` never sends the
+passphrase — its whole job is to be exactly what an unauthenticated
+visitor's own fetch can see.
+
+**the published shapes** (`packages/sync/src/publicBlobs.ts`):
+`BestiaryPublicBlob` (`PublicCreature[]`) and `EchoesPublicBlob`
+(`PublicLetter[]`). each publish is a curated, explicit subset of what's
+stored privately — never a mirror of it. a creature publishes exactly two
+assets (the rendered card image, and the isolated sprite, or the plain
+upload as a fallback); a letter publishes only when its author marked it
+`public: true` — filtered with `=== true`, never a truthy check, so
+nothing ever leaks by accident.
+
+**who publishes what, and who only ever reads:**
+
+| app | publishes | reads (unauthenticated) |
+| --- | --- | --- |
+| `bestiary` | curated creatures, via `SyncPanel`'s publish section | its own gallery (`gallery.svelte.ts`) |
+| `write` | letters explicitly marked `public: true` (`publish.ts`) | nothing — it's the private editor |
+| `letter` | nothing (static, no editor) | the published echoes letters, for a visitor with no local copy of their own |
+| `marginalia` | nothing | both: the bestiary's creatures (diorama binding, `bestiaryDb.ts`) and echoes' letters (reading room, `echoesLibrary.svelte.ts`) |
+
+every reader degrades the same way — `idle → loading → ready/empty →
+error`, never a blank crash on a slow network or a down API. `bestiary`'s
+`gallery.svelte.ts` and marginalia's `echoesLibrary.svelte.ts` share that
+shape on purpose; `letter/index.html`'s hand-rolled fetch (a static page,
+no `@woodles/sync` import possible in the browser) and `bestiaryDb.ts`'s
+IndexedDB-backed fallback chain land in the same place by different means.
 
 ## shared design tokens
 
@@ -178,8 +271,16 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-620 tests across five apps — `write` 52, `marginalia` 114, `planner` 283,
-`spores` 46, `bestiary` 125. `marginalia-devlog` has no test script.
+764 tests total, as of week 10: 16 in `api/` (its own root-level
+`vitest.config.ts`, covering `public.ts` and `sync.ts` — the one part of
+the workspace that isn't a pnpm package, so it needs its own runner
+instead of the recursive `pnpm -r test`), plus 748 across six pnpm
+packages — `write` 65, `marginalia` 196, `planner` 283, `spores` 46,
+`bestiary` 153, `packages/sync` 5. `marginalia-devlog` has no test script.
+weeks 1–9 added eight of these test files outright (`api/public.test.ts`,
+`api/sync.test.ts`, `packages/sync/src/index.test.ts`, and one new file
+in each of `write`, `marginalia` ×2, `bestiary` ×2) — this table used to
+undercount them; keep it updated when that happens again.
 
 each app's `test` runs `svelte-kit sync && vitest run`. the `sync` matters: a
 SvelteKit app's `tsconfig.json` extends `./.svelte-kit/tsconfig.json`, which
@@ -220,7 +321,7 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               vitest in every SvelteKit app with a test script (620 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (764 tests)
 pnpm check              svelte-check in every app
 pnpm build              build the seven SvelteKit apps
 ```
