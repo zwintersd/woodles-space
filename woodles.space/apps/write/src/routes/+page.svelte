@@ -479,6 +479,9 @@
 		title = '';
 		pockets = [];
 		marginNotes = [];
+		// "public" is an explicit, per-letter act — it must never carry over
+		// to a different letter just because the checkbox was left checked.
+		isPublic = false;
 		if (fgEl) fgEl.innerHTML = '';
 		if (mgEl) mgEl.innerHTML = '';
 		if (bgEl) bgEl.innerHTML = '';
@@ -508,6 +511,7 @@
 			if (bgEl) bgEl.innerHTML = '';
 			pockets = [];
 			marginNotes = [];
+			isPublic = false;
 			scheduleSave();
 			return;
 		}
