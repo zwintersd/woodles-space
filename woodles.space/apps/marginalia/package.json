@@ -25,6 +25,7 @@
 	},
 	"dependencies": {
 		"@woodles/sync": "workspace:*",
+		"fflate": "^0.8.2",
 		"matter-js": "^0.20.0",
 		"pdfjs-dist": "~5.7.284"
 	}
