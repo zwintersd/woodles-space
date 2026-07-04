@@ -66,6 +66,11 @@ export type Creature = {
 	// raw dropped art alongside the finished card, for the before/after gallery
 	// spots (ROADMAP.md week 3). off by default.
 	publishSource?: boolean;
+	// set once, at creation, when this card was "adopted" from the public
+	// gallery (ROADMAP.md week 4) — a short note ("after a card by Z") shown
+	// in the editor. absent for every card summoned the ordinary way. never
+	// authored or cleared by hand.
+	lineage?: string | null;
 	created: string;
 	updated: string;
 };
@@ -111,7 +116,7 @@ export type BestiaryBlob = {
 	settings: BestiarySettings;
 };
 
-export type BestiaryView = 'collection' | 'editor' | 'codex' | 'gallery';
+export type BestiaryView = 'collection' | 'editor' | 'codex' | 'gallery' | 'card';
 
 // What the collection is sorted/filtered by.
 export type SortKey = 'recent' | 'name' | 'cost' | 'rarity';

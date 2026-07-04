@@ -21,7 +21,7 @@
 	import Passage from './Passage.svelte';
 	import MarginNotes from './MarginNotes.svelte';
 	import EditorToolbar from './EditorToolbar.svelte';
-	import PdfIntake from './PdfIntake.svelte';
+	import Intake from './Intake.svelte';
 	import SelectionBubble, { type BubbleAction } from './SelectionBubble.svelte';
 
 	const POINT_MS = 20 * 60 * 1000;
@@ -86,6 +86,31 @@
 		paragraphs = paragraphsFromText(text);
 		notes = [];
 		liveWordCount = countWordsInText(text);
+		book.addReadingWords(liveWordCount);
+		mode = 'read';
+		docKey++;
+		persistDoc();
+		await tick();
+		measureAnchors();
+	}
+
+	// Epub chapters arrive as already-structured HTML (headings, emphasis,
+	// lists), so this skips the plain-text pasteText step entirely and reuses
+	// the same sanitize-to-paragraphs pipeline as `readLetter` below rather
+	// than flattening a book down to paragraphsFromText's blank-line guessing.
+	async function onEpubCommit(
+		html: string,
+		meta: { title?: string; author?: string; truncated: boolean }
+	) {
+		truncated = meta.truncated;
+		paragraphs = paragraphsFromLetterHtml(html);
+		notes = [];
+		// Persisted as `text` too (not '') so a refreshed tab still finds a
+		// truthy `doc.text` and recomputes the right word count on reload —
+		// see loadDoc()'s `parsed?.text` check in doc.ts.
+		const plain = passageTextOf(paragraphs);
+		pasteText = plain;
+		liveWordCount = countWordsInText(plain);
 		book.addReadingWords(liveWordCount);
 		mode = 'read';
 		docKey++;
@@ -445,7 +470,7 @@
 
 		<div class="reader">
 			{#if mode === 'paste'}
-				<PdfIntake bind:pasteText onCommit={onPdfCommit} />
+				<Intake bind:pasteText onCommit={onPdfCommit} {onEpubCommit} />
 
 				{#if echoesLibrary.status === 'ready'}
 					<div class="echoes-picker">

@@ -5,6 +5,7 @@
 	import CardEditor from '$lib/components/CardEditor.svelte';
 	import CreatureCodex from '$lib/components/CreatureCodex.svelte';
 	import Gallery from '$lib/components/Gallery.svelte';
+	import CardView from '$lib/components/CardView.svelte';
 
 	function handleKeydown(e: KeyboardEvent) {
 		const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
@@ -37,6 +38,8 @@
 			<CreatureCodex />
 		{:else if bestiary.currentView === 'gallery'}
 			<Gallery />
+		{:else if bestiary.currentView === 'card'}
+			<CardView />
 		{:else}
 			<Collection />
 		{/if}

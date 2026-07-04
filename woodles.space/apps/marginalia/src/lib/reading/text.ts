@@ -6,6 +6,11 @@
 // sanitizer (it allows headings, lists, blockquote, basic emphasis, links,
 // <mark> highlights). Anything else is stripped.
 
+// Shared ceiling for how much text the room will hold before setting the
+// rest aside — applied to pasted text and to anything extracted from a file
+// (PDF, epub), regardless of source.
+export const READING_TEXT_CAP = 500_000;
+
 const ANCHOR_BLOCK_SELECTOR = 'p,h1,h2,h3,h4,h5,h6,blockquote,ul,ol,li,pre';
 
 const PASSAGE_ALLOWED_TAGS = new Set([

@@ -12,6 +12,19 @@
 	onMount(async () => {
 		await bestiary.readyPromise;
 		await initSync();
+
+		// Share links (ROADMAP.md week 4): /bestiary?card=<id> always wins,
+		// for anyone — first-run visitor, returning designer, or Z herself —
+		// since it's an explicit destination, not an ambient heuristic. The
+		// id is resolved against the published snapshot; CardView shows its
+		// own not-found state if the fetch fails or nothing matches.
+		const cardId = new URLSearchParams(location.search).get('card');
+		if (cardId) {
+			await gallery.load();
+			bestiary.openCard(cardId);
+			return;
+		}
+
 		// First-run routing (ROADMAP.md week 3): a browser that has never
 		// opened the bestiary before lands in the public gallery instead of
 		// the seed deck, if Z has published one. hasPassphrase is only true
