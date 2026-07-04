@@ -1064,20 +1064,42 @@
       try { localStorage.setItem(POCKETS_ORDER_KEY, o); } catch (e) {}
     }
 
-    /* ── sanitize: strip inline font-family and other style carriers
-     * from rendered HTML so the document's font system always wins. */
+    /* ── sanitize: this page renders letters fetched from an unauthenticated
+     * public endpoint (ROADMAP.md week 7), not just Z's own localStorage, so
+     * this is a real security boundary, not just a font-style normalizer.
+     * Tags outside the allow/unwrap sets below are removed outright — that's
+     * what stops a <script>/<img onerror>/<svg onload> payload — and every
+     * remaining element has all attributes stripped except a protocol-checked
+     * href on <a> and data-anchor (this reader, unlike write's editor, never
+     * re-stamps anchors — it only ever displays what it's given, so the
+     * anchor a margin note points at has to survive). */
+    var SANITIZE_ALLOWED_TAGS = new Set([
+      'P','H1','H2','H3','H4','H5','H6','BLOCKQUOTE','UL','OL','LI',
+      'B','STRONG','I','EM','U','S','STRIKE','MARK','A','BR','PRE','CODE'
+    ]);
+    var SANITIZE_UNWRAP_TAGS = new Set(['SPAN', 'FONT', 'DIV', 'SECTION', 'ARTICLE']);
+    var SAFE_HREF_PROTOCOL = /^(https?:|mailto:|#)/i;
     function sanitizeHtml(html) {
       if (typeof DOMParser === 'undefined' || !html) return html || '';
       const doc = new DOMParser().parseFromString('<div id="__r">' + html + '</div>', 'text/html');
       const root = doc.getElementById('__r');
       if (!root) return html;
       root.querySelectorAll('*').forEach((el) => {
-        el.removeAttribute('style');
-        el.removeAttribute('color');
-        el.removeAttribute('face');
-        el.removeAttribute('size');
-        el.removeAttribute('bgcolor');
-        if (el.tagName === 'FONT' || el.tagName === 'SPAN') {
+        const tag = el.tagName;
+        if (!SANITIZE_ALLOWED_TAGS.has(tag) && !SANITIZE_UNWRAP_TAGS.has(tag)) {
+          el.remove();
+          return;
+        }
+        Array.from(el.attributes).forEach((attr) => {
+          const name = attr.name.toLowerCase();
+          if (name === 'data-anchor') return;
+          if (name === 'href' && tag === 'A') {
+            if (!SAFE_HREF_PROTOCOL.test(attr.value.trim())) el.removeAttribute('href');
+            return;
+          }
+          el.removeAttribute(attr.name);
+        });
+        if (SANITIZE_UNWRAP_TAGS.has(tag)) {
           const parent = el.parentNode;
           if (!parent) return;
           while (el.firstChild) parent.insertBefore(el.firstChild, el);

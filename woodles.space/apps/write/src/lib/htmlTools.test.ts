@@ -29,6 +29,35 @@ describe('sanitizeHtml', () => {
 	it('passes through empty input', () => {
 		expect(sanitizeHtml('')).toBe('');
 	});
+
+	// A published letter's HTML can end up rendered in a stranger's browser
+	// (ROADMAP.md week 7) — these guard the actual security boundary, not
+	// just font/style normalization.
+	it('removes a script tag entirely, including its text content', () => {
+		const out = sanitizeHtml('<p>safe</p><script>alert(1)</script>');
+		expect(out).not.toContain('script');
+		expect(out).not.toContain('alert');
+		expect(out).toBe('<p>safe</p>');
+	});
+	it('removes an img tag outright, taking an onerror payload with it', () => {
+		const out = sanitizeHtml('<p>before</p><img src="x" onerror="alert(1)">after');
+		expect(out).not.toContain('onerror');
+		expect(out).not.toContain('img');
+	});
+	it('strips an inline event-handler attribute from an otherwise-allowed tag', () => {
+		const out = sanitizeHtml('<p onclick="alert(1)">x</p>');
+		expect(out).toBe('<p>x</p>');
+	});
+	it('strips a javascript: href but keeps the link text', () => {
+		const out = sanitizeHtml('<a href="javascript:alert(1)">click</a>');
+		expect(out).not.toContain('javascript:');
+		expect(out).toContain('click');
+	});
+	it('keeps a safe https:// href', () => {
+		expect(sanitizeHtml('<a href="https://example.com">x</a>')).toBe(
+			'<a href="https://example.com">x</a>'
+		);
+	});
 });
 
 describe('ensureAnchorsOn', () => {
