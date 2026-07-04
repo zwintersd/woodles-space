@@ -35,6 +35,9 @@
 		<a class="margin-link" href="/marginalia" title="where creatures are discovered">
 			↩ marginalia
 		</a>
+		<a class="echoes-link" href="/letter" title="letters, published the same way">
+			↩ echoes
+		</a>
 		<button
 			class="comfort-btn"
 			onclick={() => (bestiary.showComfort = !bestiary.showComfort)}
@@ -158,14 +161,16 @@
 		flex-direction: column;
 		gap: var(--b-space-md);
 	}
-	.margin-link {
+	.margin-link,
+	.echoes-link {
 		font-family: var(--b-font-mono);
 		font-size: 0.74rem;
 		color: var(--b-text-dim);
 		text-decoration: none;
 		transition: color var(--b-transition-fast);
 	}
-	.margin-link:hover { color: var(--b-relational); }
+	.margin-link:hover,
+	.echoes-link:hover { color: var(--b-relational); }
 
 	.comfort-btn,
 	.sync-btn {

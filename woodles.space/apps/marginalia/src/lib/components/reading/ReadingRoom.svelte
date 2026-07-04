@@ -485,6 +485,7 @@
 								</li>
 							{/each}
 						</ul>
+						<a class="echoes-picker-link" href="/letter">read these (and more) at echoes →</a>
 					</div>
 				{:else if echoesLibrary.status === 'error'}
 					<p class="echoes-picker-note">
@@ -704,6 +705,18 @@
 		font-style: italic;
 		font-size: 0.78rem;
 		color: var(--muted);
+	}
+	.echoes-picker-link {
+		display: inline-block;
+		margin-top: 0.55rem;
+		font-family: var(--font-ui);
+		font-size: 0.66rem;
+		letter-spacing: 0.06em;
+		color: var(--periwinkle);
+		text-decoration: none;
+	}
+	.echoes-picker-link:hover {
+		color: var(--cyan);
 	}
 	.passage-and-margin {
 		display: grid;
