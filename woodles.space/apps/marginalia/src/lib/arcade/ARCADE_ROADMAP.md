@@ -1,6 +1,6 @@
 # Marginalia Arcade Polish Roadmap
 
-Status snapshot: June 30, 2026.
+Status snapshot: July 5, 2026.
 
 This roadmap reviews the current Arcade cabinet as it exists in
 `Arcade.svelte`: 14 playable games, 1 coming-soon card, and 3 roadmap cards
@@ -219,10 +219,35 @@ Resolved in Week 9:
   bar, and its end-state copy reads "came up short" instead of a flat "game
   over" to match the rest of the cabinet's tone.
 
+Resolved in Week 11:
+- Introduced per-pet mastery (`arcadeMastery.ts`): the active pet banks flat
+  XP for every finished round (level clear or game over) on this one game,
+  scoped to that pet's id, and enough plays roll it into a mastery level (a
+  triangular XP ramp — level 1 after 3 plays, each further level taking
+  longer). Each level adds +10% to a new `previewMasteredReward` helper in
+  `arcadeRewards.ts`, which scales both a reward *and its cap* by the
+  multiplier before clamping — mastery raises the ceiling itself instead of
+  just filling faster up to the existing fixed one, so a well-practiced pet's
+  insight keeps scaling on this machine specifically.
+- The pet's mastery level, insight multiplier, and progress toward the next
+  level are shown directly under the pet-perk row (hidden entirely with no
+  active pet), and a level-up folds into the existing end-of-round message
+  rather than adding a new toast.
+- Local and per-device, like `arcadeRecords.ts` — keyed by `(gameId,
+  creatureId)`, so the same pet's mastery is specific to this one cabinet
+  machine and doesn't leak into any other game.
+- Only wired into Margin Miner so far; the module has no Margin-Miner-specific
+  logic, so another game can adopt it the same way `arcadeStats.ts` rolled out
+  game by game.
+
 Rough edges:
 - The canvas still has no pointer-free aiming; firing is keyboard-accessible but
   timing still relies on watching the swing.
 - Level difficulty may need tuning now that payouts exist.
+- Mastery level is currently uncapped (like `essence`/`knowing` elsewhere in
+  the Book) rather than tiered like the four core stats; the XP ramp keeps
+  high levels rare in practice, but there's no hard ceiling on the multiplier
+  itself yet.
 
 Stat pitch (now implemented):
 - Body: faster reeling for heavy objects and slightly stronger claw grip.
@@ -709,3 +734,41 @@ Milestone: full 10-week polish cycle complete. The cabinet has a shared stat
 vocabulary, one payout path, extracted presentation shells, local run memory
 on every playable game, and a verified-clean baseline to build the post-cycle
 backlog (Condition Match first) on top of.
+
+## Week 11 — Per-Pet Mastery
+
+Theme: the first post-cycle backlog item that isn't Condition Match — letting
+the arcade's rewards actually scale, instead of every paying game sitting under
+a fixed per-round `MAX_REWARD` forever.
+
+Landed:
+
+- `arcadeMastery.ts`: a new shared, localStorage-backed module tracking XP,
+  level, and insight multiplier per `(gameId, creatureId)` pair — the same
+  "local, per-device, versioned record" shape as `arcadeRecords.ts`, just
+  keyed by a pet as well as a game. A pet banks flat XP for every finished
+  round; the XP curve is a triangular ramp (level 1 after 3 plays, each
+  further level taking longer), and each level is worth +10% insight.
+- `arcadeRewards.ts` gained `previewMasteredReward(raw, max, multiplier)`,
+  which scales both a reward and its cap before clamping. This is the actual
+  reward-scaling mechanism: mastery raises the ceiling itself rather than
+  just reaching the same fixed one faster.
+- Margin Miner is the first (and so far only) game wired up: it credits one
+  play's mastery XP on every level-clear or game-over, feeds the pet's
+  current multiplier into its reward formula, and shows the pet's mastery
+  level, multiplier, and progress bar right under the pet-perk row — visible
+  the same way the four core stats are, not hidden math. A level-up folds
+  into the existing end-of-round line instead of adding a new toast.
+- Verified live in a browser at desktop (1280x900) and mobile (390x844): no
+  console errors, no horizontal overflow, and a seeded mastery record renders
+  the right level/multiplier and visibly raises the HUD's prize preview
+  (confirmed 8 -> 9.6 insight at a seeded level 2 / 1.2x). Also played three
+  real rounds end-to-end to confirm XP banks and persists through actual
+  gameplay, not only through directly-seeded storage.
+
+Deliberately left alone:
+
+- No other game reads `arcadeMastery.ts` yet. The module has no Margin-Miner
+  rules baked into it (it only knows `gameId`/`creatureId` strings), so the
+  next adopter can wire it in the same call-shape without changes here.
+- No hard cap on mastery level or multiplier — see the rough edge above.

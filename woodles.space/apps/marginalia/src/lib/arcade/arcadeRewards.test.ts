@@ -4,6 +4,7 @@ import {
 	SCORE_ONLY_ARCADE_GAMES,
 	creditInsight,
 	payReward,
+	previewMasteredReward,
 	previewReward,
 	scoreOnlyReason
 } from './arcadeRewards';
@@ -46,6 +47,26 @@ describe('arcadeRewards', () => {
 			const awarded = payReward(-4, 20);
 			expect(awarded).toBe(0);
 			expect(book.insight).toBe(0);
+		});
+	});
+
+	describe('previewMasteredReward', () => {
+		it('scales both the raw reward and its cap by the multiplier', () => {
+			expect(previewMasteredReward(10, 20, 1.1)).toBeCloseTo(11);
+			expect(previewMasteredReward(19, 20, 1.5)).toBe(28.5);
+		});
+
+		it('raises the ceiling itself rather than just filling faster', () => {
+			// unmastered, this would clamp at 20; at 1.5x mastery the same raw
+			// score-derived value clears the old ceiling instead of stalling on it.
+			expect(previewMasteredReward(15, 20, 1.5)).toBeCloseTo(22.5);
+			expect(previewMasteredReward(30, 20, 1.5)).toBe(30);
+		});
+
+		it('treats a non-finite or non-positive multiplier as 1x', () => {
+			expect(previewMasteredReward(10, 20, 0)).toBe(10);
+			expect(previewMasteredReward(10, 20, -2)).toBe(10);
+			expect(previewMasteredReward(10, 20, Number.NaN)).toBe(10);
 		});
 	});
 

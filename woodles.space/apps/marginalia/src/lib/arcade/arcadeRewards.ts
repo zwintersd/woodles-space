@@ -44,6 +44,15 @@ export function payReward(raw: number, max: number): number {
 	return awarded;
 }
 
+// Scales a raw reward and its cap by a per-pet mastery multiplier (see
+// arcadeMastery.ts) before clamping, so mastery raises the ceiling itself
+// rather than just filling faster up to a fixed one — this is the mechanism
+// that lets the arcade's rewards keep scaling as a pet masters one game.
+export function previewMasteredReward(raw: number, max: number, multiplier: number): number {
+	const safeMultiplier = Number.isFinite(multiplier) && multiplier > 0 ? multiplier : 1;
+	return previewReward(raw * safeMultiplier, max * safeMultiplier);
+}
+
 export function scoreOnlyReason(gameId: string): string | null {
 	return gameId in SCORE_ONLY_ARCADE_GAMES
 		? SCORE_ONLY_ARCADE_GAMES[gameId as ScoreOnlyArcadeGameId]

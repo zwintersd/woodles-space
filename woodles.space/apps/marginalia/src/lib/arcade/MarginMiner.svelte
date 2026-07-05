@@ -9,8 +9,9 @@
 		type ArcadeActivePet,
 		type ArcadeStatEffects
 	} from './arcadeStats';
-	import { payReward, previewReward } from './arcadeRewards';
+	import { creditInsight, previewMasteredReward } from './arcadeRewards';
 	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
+	import { petMasteryProgress, recordMasteryPlay, type PetMasteryProgress } from './arcadeMastery';
 	import { fmt } from '$lib/witch/book.svelte';
 
 	interface Props {
@@ -156,6 +157,7 @@
 	let best = $state(loadArcadeRecord(GAME_ID).bestScore);
 	let extensions = $state(0);
 	let extensionsUsed = $state(0);
+	let mastery = $state<PetMasteryProgress>(petMasteryProgress(GAME_ID, null));
 
 	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
 	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
@@ -193,7 +195,7 @@
 
 	function rewardForLevel(forLevel: number, cleared: boolean): number {
 		const raw = cleared ? forLevel * 4 + 4 : forLevel * 2;
-		return previewReward(raw, MAX_REWARD);
+		return previewMasteredReward(raw, MAX_REWARD, mastery.multiplier);
 	}
 
 	function targetForLevel(value: number): number {
@@ -376,9 +378,12 @@
 			remaining = 0;
 			phase = 'level-clear';
 			awarded = rewardForLevel(level, true);
-			payReward(awarded, MAX_REWARD);
+			creditInsight(awarded);
 			recordRun(true);
-			lastHaul = `Level ${level} cleared. +${fmt(awarded)} insight. Next target ${formatMoney(targetForLevel(level + 1))}.`;
+			mastery = recordMasteryPlay(GAME_ID, activePet?.id);
+			lastHaul = mastery.leveledUp
+				? `Level ${level} cleared. +${fmt(awarded)} insight. ${activePet?.name ?? 'Your pet'} reached mastery level ${mastery.level}!`
+				: `Level ${level} cleared. +${fmt(awarded)} insight. Next target ${formatMoney(targetForLevel(level + 1))}.`;
 			return;
 		}
 
@@ -396,9 +401,12 @@
 		remaining = 0;
 		phase = 'game-over';
 		awarded = rewardForLevel(level, false);
-		payReward(awarded, MAX_REWARD);
+		creditInsight(awarded);
 		recordRun(false);
-		lastHaul = `Short by ${formatMoney(targetScore - score)}.`;
+		mastery = recordMasteryPlay(GAME_ID, activePet?.id);
+		lastHaul = mastery.leveledUp
+			? `Short by ${formatMoney(targetScore - score)}. ${activePet?.name ?? 'Your pet'} reached mastery level ${mastery.level}!`
+			: `Short by ${formatMoney(targetScore - score)}.`;
 	}
 
 	function beginReel(object: MineObject | null) {
@@ -799,6 +807,7 @@
 
 	onMount(() => {
 		context = canvasEl.getContext('2d');
+		mastery = petMasteryProgress(GAME_ID, activePet?.id);
 		resetRun();
 		window.addEventListener('keydown', handleKeydown);
 		rafId = requestAnimationFrame(loop);
@@ -832,6 +841,19 @@
 	/>
 
 	<ArcadePetPerks creature={activePet} effects={statEffects} />
+
+	{#if activePet}
+		<div class="mastery-row" aria-label="{activePet.name} mastery in Margin Miner">
+			<span class="mastery-label"><b>{activePet.name}</b> mastery <b>Lv.{mastery.level}</b></span>
+			<span class="mastery-mult">&times;{mastery.multiplier.toFixed(1)} insight</span>
+		</div>
+		<ArcadeProgress
+			value={mastery.progress}
+			label="progress toward mastery level {mastery.level + 1}"
+			tone="violet"
+			maxWidth="800px"
+		/>
+	{/if}
 
 	<div class="status-row" aria-label="Margin Miner status">
 		<span>level <b>{level}</b></span>
@@ -910,6 +932,31 @@
 		text-transform: uppercase;
 		color: rgba(253, 246, 227, 0.72);
 		margin: 0;
+	}
+
+	.mastery-row {
+		width: min(800px, calc(100vw - 3rem));
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.5rem;
+		font-family: var(--font-ui);
+		font-size: 0.64rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--sol-base1);
+	}
+
+	.mastery-row b {
+		font-family: var(--font-counter);
+		font-weight: 400;
+		letter-spacing: 0;
+		color: var(--sol-base01);
+	}
+
+	.mastery-mult {
+		color: var(--sol-violet);
+		font-weight: 600;
 	}
 
 	.status-row {
