@@ -77,7 +77,8 @@ woodles.space/
     ├── notebook/            SvelteKit · notes, tasks, and ideas kept close
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
     ├── spores/              SvelteKit · a garden of spores, gathered into spellbooks
-    └── marginalia-devlog/   SvelteKit · a devlog built from typed blocks
+    ├── marginalia-devlog/   SvelteKit · a devlog built from typed blocks
+    └── thinking-about/      SvelteKit · a board for what's being read, played, and watched
 ```
 
 `animations/` is a Python/Manim playspace. it has no `package.json` and isn't a
@@ -94,7 +95,7 @@ and its bloom post-processing addons from a CDN through a `<script
 type="importmap">`, still with no build step.
 
 **SvelteKit apps** — `write`, `marginalia`, `planner`, `notebook`, `bestiary`,
-`spores`, `marginalia-devlog` — use Svelte 5 runes, Vite 7, and `@sveltejs/adapter-static`.
+`spores`, `marginalia-devlog`, `thinking-about` — use Svelte 5 runes, Vite 7, and `@sveltejs/adapter-static`.
 each builds to `apps/<name>/dist/` and consumes `shared/` through the `@shared`
 Vite alias (`../../shared`). there is no SSR; every app ships as a static bundle.
 
@@ -139,9 +140,10 @@ memory for the session; the last-seen version is cached in localStorage.
 a `SyncState` class with `$state` fields, its instantiation, and a call to
 `createAppSync` (from `@woodles/sync`) that wires up the app-specific adapter.
 the adapter's `read()` maps the store into the blob type (`PlannerBlob`,
-`BestiaryBlob`, `GardenBlob`, `DevlogBlob`); `write()` calls the store's
-`rehydrate()`; `isNewer` is optionally provided (`bestiary`, `marginalia-devlog`
-use it). `marginalia` still has none of this — it never syncs privately.
+`BestiaryBlob`, `GardenBlob`, `DevlogBlob`, `ThinkingAboutBlob`); `write()` calls
+the store's `rehydrate()`; `isNewer` is optionally provided (`bestiary`,
+`marginalia-devlog`, `thinking-about` use it). `marginalia` still has none of
+this — it never syncs privately.
 `write` gained a file in week 7, but it has no private blob to sync at all;
 its adapter's `read`/`write` are no-ops, kept only to reuse `createAppSync`'s
 passphrase connect/disconnect/persistence for gating the public echoes
@@ -220,12 +222,24 @@ theme, and concrete color names (`--lavender`, `--aqua`, `--peach`, `--lilac`,
 `--plum`, `--lapis`, `--cream`) stay stable across them. `write` and the static
 apps consume this.
 
-the other five SvelteKit apps don't. each ships its own root-scoped token file
-under `src/lib/style/tokens.css`, namespaced so it never leaks: `marginalia`
+the other seven SvelteKit apps don't. each ships its own token file under
+`src/lib/style/tokens.css`, namespaced so it never leaks: `marginalia`
 redefines the bare names under `.marginalia-root`, `planner` uses `--p-*`,
 `spores` uses `--g-*`, `bestiary` uses `--b-*`, `marginalia-devlog` has its own
-under `.devlog-root`. `data-theme` and the nine shared themes don't reach them;
-they own their own look.
+under `.devlog-root`, `notebook` defines `--nb-*` straight on `:root` (no
+scoping class — each app is its own page, so there's nothing else in the DOM
+for it to leak onto), and `thinking-about` uses `--ta-*` under
+`.thinking-about-root`. `data-theme` and the nine shared themes don't reach
+any of them; they own their own look.
+
+`thinking-about`'s look is a deliberate departure even from its SvelteKit
+siblings' own house style: the rest lean into a dark, serif-display,
+jewel-toned "Twilight Webcore" (marginalia and spores' own tokens.css files
+name it outright); `thinking-about` goes the other way on purpose — white/
+near-white chrome, thin gray rules, a plain sans (`--font-sans`, already in
+`shared/fonts.css`), and color living only in the entries themselves as
+calendar-event-style chips. Google Calendar light-mode logic, not another
+Twilight Webcore variant.
 
 **`shared/fonts.css`** is the `--font-*` variable layer — `--font-display`,
 `--font-body`, `--font-mono`, and named alternates. the `@font-face` sources are
@@ -267,23 +281,24 @@ in motion. the full log is in [REFACTORING.md](./REFACTORING.md); the shape of i
 - **`SelectionPopover.svelte` (write, 58 lines) / `SelectionBubble.svelte`
   (marginalia, 105)** — same idea, renamed, diverged.
 
-the five per-app `tokens.css` files play the same role but are deliberately
+the seven per-app `tokens.css` files play the same role but are deliberately
 different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-805 tests total, as of week 10: 16 in `api/` (its own root-level
-`vitest.config.ts`, covering `public.ts` and `sync.ts` — the one part of
-the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 789 across six pnpm
+840 tests total, as of `thinking-about`'s addition: 16 in `api/` (its own
+root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
+part of the workspace that isn't a pnpm package, so it needs its own runner
+instead of the recursive `pnpm -r test`), plus 824 across seven pnpm
 packages — `write` 65, `marginalia` 230, `planner` 283, `spores` 46,
-`bestiary` 160, `packages/sync` 5. `marginalia-devlog` has no test script.
-this table has already gone stale once this week alone — it read 620
-before weeks 1–9's own new test files, then 764 right after this file's
-own week-10 pass, then 805 once a same-week, separately-developed effort
+`bestiary` 160, `packages/sync` 5, `thinking-about` 35. `marginalia-devlog`
+has no test script. this table has already gone stale more than once — it
+read 620 before weeks 1–9's own new test files, then 764 right after
+week-10's own pass, then 805 once a same-week, separately-developed effort
 (week 4's cards-that-travel, plus an unrelated epub reader) merged into
-this branch and brought its own new tests along. keep it updated when
-that happens again — it will.
+this branch and brought its own new tests along, then 840 once
+`thinking-about` shipped. keep it updated when that happens again — it
+will.
 
 each app's `test` runs `svelte-kit sync && vitest run`. the `sync` matters: a
 SvelteKit app's `tsconfig.json` extends `./.svelte-kit/tsconfig.json`, which
@@ -310,11 +325,13 @@ are written up in [apps/planner/KNOWN_ISSUES.md](./apps/planner/KNOWN_ISSUES.md)
 | `write`             | clean                                   |
 | `marginalia`        | clean                                   |
 | `planner`           | clean                                   |
+| `notebook`          | clean                                   |
 | `bestiary`          | clean                                   |
 | `spores`            | **2 errors**, 6 warnings — `GraphRenderer.svelte`/`SporeView.svelte` type errors, plus `autofocus` a11y warnings |
 | `marginalia-devlog` | 1 warning — `line-clamp` in `EntryList` |
+| `thinking-about`    | clean                                   |
 
-`pnpm -r check` runs all seven in turn and reaches every one. it stops at the
+`pnpm -r check` runs all eight in turn and reaches every one. it stops at the
 first app that fails, though, so if you break an early one, run the app you care
 about directly to see past it. `spores`'s 2 errors are exactly that case today
 — pre-existing (last touched by an unrelated commit, well before this
@@ -329,9 +346,9 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (805 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (840 tests)
 pnpm check              svelte-check in every app
-pnpm build              build the seven SvelteKit apps
+pnpm build              build the eight SvelteKit apps
 ```
 
 both `test` and `check` generate `.svelte-kit/` themselves on a fresh clone, so
