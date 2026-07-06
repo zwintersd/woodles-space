@@ -29,14 +29,14 @@ friendly path to the right file: `/write` → `/apps/write/dist/index.html`,
 on. `lab` is the homepage-facing shelf for stub experiments; the direct
 experiment paths still exist for links and bookmarks.
 
-the build command is one filter per SvelteKit app, chained:
-
-```
-pnpm --filter write build && pnpm --filter marginalia build && …
-```
-
-the static apps aren't in it. they have nothing to build, so Vercel just
-serves them from the directory.
+`vercel.json`'s `buildCommand` is just `pnpm build`, the root `package.json`
+script (`pnpm -r --if-present build`) — it used to be one `--filter <app>
+build` per SvelteKit app, chained with `&&`, but that string hit Vercel's
+256-character cap on `buildCommand` the moment an eighth app joined the
+chain. `--if-present` is what makes the recursive form safe: the static
+apps and `packages/sync` have no `build` script, so pnpm skips them rather
+than failing, and Vercel just serves the static apps straight from their
+directory.
 
 ## the settings that matter
 

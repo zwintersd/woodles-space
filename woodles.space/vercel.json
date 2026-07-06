@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm --filter write build && pnpm --filter bestiary build && pnpm --filter marginalia build && pnpm --filter planner build && pnpm --filter notebook build && pnpm --filter spores build && pnpm --filter marginalia-devlog build && pnpm --filter thinking-about build",
+  "buildCommand": "pnpm build",
   "outputDirectory": ".",
   "trailingSlash": false,
   "rewrites": [
