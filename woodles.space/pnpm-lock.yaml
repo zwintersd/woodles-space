@@ -246,6 +246,43 @@ importers:
         specifier: ^3.2.6
         version: 3.2.6(@types/node@22.19.17)(happy-dom@20.10.6)
 
+  apps/thinking-about:
+    dependencies:
+      '@woodles/sync':
+        specifier: workspace:*
+        version: link:../../packages/sync
+    devDependencies:
+      '@sveltejs/adapter-static':
+        specifier: ^3.0.0
+        version: 3.0.10(@sveltejs/kit@2.66.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@7.3.5(@types/node@22.19.17)))(svelte@5.56.3)(typescript@5.9.3)(vite@7.3.5(@types/node@22.19.17)))
+      '@sveltejs/kit':
+        specifier: ^2.66.0
+        version: 2.66.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@7.3.5(@types/node@22.19.17)))(svelte@5.56.3)(typescript@5.9.3)(vite@7.3.5(@types/node@22.19.17))
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^6.2.4
+        version: 6.2.4(svelte@5.56.3)(vite@7.3.5(@types/node@22.19.17))
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.17
+      happy-dom:
+        specifier: ^20.0.0
+        version: 20.10.6
+      svelte:
+        specifier: ^5.56.3
+        version: 5.56.3
+      svelte-check:
+        specifier: ^4.4.2
+        version: 4.4.7(picomatch@4.0.4)(svelte@5.56.3)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^7.3.5
+        version: 7.3.5(@types/node@22.19.17)
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@22.19.17)(happy-dom@20.10.6)
+
   apps/write:
     dependencies:
       '@woodles/sync':

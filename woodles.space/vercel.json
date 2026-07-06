@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm --filter write build && pnpm --filter bestiary build && pnpm --filter marginalia build && pnpm --filter planner build && pnpm --filter notebook build && pnpm --filter spores build && pnpm --filter marginalia-devlog build",
+  "buildCommand": "pnpm --filter write build && pnpm --filter bestiary build && pnpm --filter marginalia build && pnpm --filter planner build && pnpm --filter notebook build && pnpm --filter spores build && pnpm --filter marginalia-devlog build && pnpm --filter thinking-about build",
   "outputDirectory": ".",
   "trailingSlash": false,
   "rewrites": [
@@ -45,6 +45,8 @@
     { "source": "/bestiary",                  "destination": "/apps/bestiary/dist/index.html" },
     { "source": "/bestiary/:path*",           "destination": "/apps/bestiary/dist/:path*" },
     { "source": "/marginalia-devlog",         "destination": "/apps/marginalia-devlog/dist/index.html" },
-    { "source": "/marginalia-devlog/:path*",  "destination": "/apps/marginalia-devlog/dist/:path*" }
+    { "source": "/marginalia-devlog/:path*",  "destination": "/apps/marginalia-devlog/dist/:path*" },
+    { "source": "/thinking-about",            "destination": "/apps/thinking-about/dist/index.html" },
+    { "source": "/thinking-about/:path*",     "destination": "/apps/thinking-about/dist/:path*" }
   ]
 }

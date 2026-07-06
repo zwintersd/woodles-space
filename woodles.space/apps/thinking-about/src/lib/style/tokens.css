@@ -1,0 +1,50 @@
+/* thinking-about · design tokens
+   scoped to .thinking-about-root — never bleeds into the rest of woodles.space
+
+   A deliberate departure from Twilight Webcore (the dark, serif-display,
+   jewel-toned look most SvelteKit apps here share): Google Calendar
+   light-mode logic instead. Chrome stays white/near-white with thin gray
+   rules; color lives only in the entries themselves, as pills/chips against
+   the white ground — the same visual logic as a calendar event block. */
+
+.thinking-about-root {
+	--ta-bg:          #ffffff;
+	--ta-bg-subtle:   #f8f9fa;
+	--ta-surface:     #ffffff;
+	--ta-text:        #202124;
+	--ta-text-dim:    #3c4043;
+	--ta-muted:       #5f6368;
+	--ta-border:      #e3e5e8;
+	--ta-border-soft: #eceff1;
+	--ta-accent:      #1a73e8;
+	--ta-accent-soft: rgba(26, 115, 232, 0.08);
+	--ta-danger:      #d93025;
+	--ta-danger-soft: rgba(217, 48, 37, 0.08);
+
+	/* typography — plain/functional, not the Twilight Webcore display stack.
+	   Plus Jakarta Sans is already the shared "clean sans" (shared/fonts.css);
+	   system-ui/sans-serif cover the case fonts.css hasn't loaded yet. */
+	--ta-font-sans: var(--font-sans, 'Plus Jakarta Sans', system-ui, sans-serif);
+	--ta-font-mono: var(--font-mono, 'DM Mono', 'Courier New', monospace);
+
+	--ta-space-xs: 0.25rem;
+	--ta-space-sm: 0.5rem;
+	--ta-space-md: 1rem;
+	--ta-space-lg: 1.5rem;
+	--ta-space-xl: 2.5rem;
+
+	--ta-radius-sm:   6px;
+	--ta-radius-md:   10px;
+	--ta-radius-pill: 100px;
+
+	--ta-z-detail: 30;
+
+	--ta-transition-fast:   0.14s ease;
+	--ta-transition-medium: 0.22s ease;
+
+	/* minimal shadows — just enough to lift a popover off the page */
+	--ta-shadow-sm: 0 1px 2px rgba(60, 64, 67, 0.15);
+	--ta-shadow-md: 0 4px 18px rgba(60, 64, 67, 0.18);
+
+	color-scheme: light;
+}
