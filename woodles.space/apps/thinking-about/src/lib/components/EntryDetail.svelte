@@ -1,6 +1,9 @@
 <script lang="ts">
+	import { fade, fly } from 'svelte/transition';
+	import { quintOut } from 'svelte/easing';
 	import { thinkingAbout } from '$lib/thinkingAbout.svelte';
 	import { columnLabel, sectionLabel, showsSchedule, showsSharedWith } from '$lib/constants';
+	import { motionDuration } from '$lib/motion';
 	import ColorPicker from './ColorPicker.svelte';
 
 	let entry = $derived(thinkingAbout.activeEntry);
@@ -29,8 +32,15 @@
 	{@const id = entry.id}
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="scrim" onclick={close}></div>
-	<div class="detail" style:--chip-color={entry.color} role="dialog" aria-modal="true" aria-label="entry detail">
+	<div class="scrim" onclick={close} transition:fade={{ duration: motionDuration(160) }}></div>
+	<div
+		class="detail"
+		style:--chip-color={entry.color}
+		role="dialog"
+		aria-modal="true"
+		aria-label="entry detail"
+		transition:fly={{ x: 48, duration: motionDuration(260), easing: quintOut }}
+	>
 		<header class="detail-header">
 			<span class="detail-breadcrumb">{columnLabel(entry.columnKey)} · {sectionLabel(entry.sectionKey)}</span>
 			<button class="detail-close" onclick={close} aria-label="close">×</button>
@@ -48,12 +58,24 @@
 
 		<div class="detail-field">
 			<label for="ta-date-started">started</label>
-			<input
-				id="ta-date-started"
-				type="date"
-				value={entry.dateStarted}
-				onchange={(e) => thinkingAbout.updateEntry(id, { dateStarted: e.currentTarget.value })}
-			/>
+			<div class="field-with-clear">
+				<input
+					id="ta-date-started"
+					type="date"
+					value={entry.dateStarted ?? ''}
+					onchange={(e) => thinkingAbout.updateEntry(id, { dateStarted: e.currentTarget.value || null })}
+				/>
+				{#if entry.dateStarted}
+					<button
+						class="field-clear"
+						onclick={() => thinkingAbout.updateEntry(id, { dateStarted: null })}
+						title="clear started date"
+						aria-label="clear started date"
+					>
+						×
+					</button>
+				{/if}
+			</div>
 		</div>
 
 		{#if showsSharedWith(entry.sectionKey)}
@@ -120,7 +142,9 @@
 	.scrim {
 		position: fixed;
 		inset: 0;
-		background: rgba(32, 33, 36, 0.32);
+		background: rgba(32, 33, 36, 0.28);
+		backdrop-filter: blur(2px);
+		-webkit-backdrop-filter: blur(2px);
 		z-index: var(--ta-z-detail);
 	}
 
@@ -131,7 +155,9 @@
 		bottom: 0;
 		z-index: calc(var(--ta-z-detail) + 1);
 		width: min(420px, 100vw);
-		background: var(--ta-surface);
+		background:
+			linear-gradient(180deg, color-mix(in srgb, var(--chip-color) 12%, transparent) 0%, transparent 160px),
+			var(--ta-surface);
 		box-shadow: var(--ta-shadow-md);
 		padding: 1.1rem 1.3rem 1.4rem;
 		display: flex;
@@ -150,7 +176,7 @@
 	.detail-breadcrumb {
 		font-family: var(--ta-font-sans);
 		font-size: 0.7rem;
-		letter-spacing: 0.04em;
+		letter-spacing: 0.06em;
 		text-transform: uppercase;
 		color: var(--ta-muted);
 	}
@@ -162,12 +188,17 @@
 		font-size: 1.1rem;
 		line-height: 1;
 		color: var(--ta-muted);
-		transition: background var(--ta-transition-fast), color var(--ta-transition-fast);
+		transition: background var(--ta-transition-fast), color var(--ta-transition-fast), transform var(--ta-transition-spring);
 	}
 
 	.detail-close:hover {
 		background: var(--ta-bg-subtle);
 		color: var(--ta-text);
+		transform: var(--ta-lift-hover) scale(1.06);
+	}
+
+	.detail-close:active {
+		transform: var(--ta-lift-press);
 	}
 
 	.detail-title {
@@ -194,7 +225,7 @@
 	.detail-field label {
 		font-family: var(--ta-font-sans);
 		font-size: 0.68rem;
-		letter-spacing: 0.04em;
+		letter-spacing: 0.06em;
 		text-transform: uppercase;
 		color: var(--ta-muted);
 	}
@@ -207,13 +238,49 @@
 		padding: 0.4rem 0.55rem;
 		border: 1px solid var(--ta-border);
 		border-radius: var(--ta-radius-sm);
-		transition: border-color var(--ta-transition-fast);
+		transition: border-color var(--ta-transition-fast), box-shadow var(--ta-transition-fast);
 	}
 
 	.detail-field input[type='text']:focus-visible,
 	.detail-field input[type='date']:focus-visible {
 		border-color: var(--ta-accent);
+		box-shadow: 0 0 0 3px var(--ta-accent-soft);
 		outline: none;
+	}
+
+	.field-with-clear {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+
+	.field-with-clear input {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.field-clear {
+		flex-shrink: 0;
+		width: 1.5rem;
+		height: 1.5rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 50%;
+		color: var(--ta-muted);
+		font-size: 1rem;
+		line-height: 1;
+		transition: background var(--ta-transition-fast), color var(--ta-transition-fast), transform var(--ta-transition-spring);
+	}
+
+	.field-clear:hover {
+		background: var(--ta-danger-soft);
+		color: var(--ta-danger);
+		transform: scale(1.12);
+	}
+
+	.field-clear:active {
+		transform: var(--ta-lift-press);
 	}
 
 	.detail-notes {
@@ -226,10 +293,12 @@
 		padding: 0.5rem 0.6rem;
 		border: 1px solid var(--ta-border);
 		border-radius: var(--ta-radius-sm);
+		transition: border-color var(--ta-transition-fast), box-shadow var(--ta-transition-fast);
 	}
 
 	.detail-notes:focus-visible {
 		border-color: var(--ta-accent);
+		box-shadow: 0 0 0 3px var(--ta-accent-soft);
 		outline: none;
 	}
 
@@ -275,7 +344,19 @@
 		padding: 0.35rem 0.7rem;
 		border-radius: var(--ta-radius-sm);
 		border: 1px solid var(--ta-border);
-		transition: border-color var(--ta-transition-fast), color var(--ta-transition-fast), background var(--ta-transition-fast);
+		transition: border-color var(--ta-transition-fast), color var(--ta-transition-fast), background var(--ta-transition-fast), transform var(--ta-transition-spring);
+	}
+
+	.btn-ghost:hover,
+	.btn-danger:hover,
+	.btn-danger-ghost:hover {
+		transform: var(--ta-lift-hover);
+	}
+
+	.btn-ghost:active,
+	.btn-danger:active,
+	.btn-danger-ghost:active {
+		transform: var(--ta-lift-press);
 	}
 
 	.btn-ghost {

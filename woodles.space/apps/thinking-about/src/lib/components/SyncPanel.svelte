@@ -104,6 +104,13 @@
 		border-radius: var(--ta-radius-sm);
 		padding: 0.4rem 0.6rem;
 		font-size: 0.85rem;
+		transition: border-color var(--ta-transition-fast), box-shadow var(--ta-transition-fast);
+	}
+
+	.pass-input:focus-visible {
+		border-color: var(--ta-accent);
+		box-shadow: 0 0 0 3px var(--ta-accent-soft);
+		outline: none;
 	}
 
 	.sync-actions {
@@ -119,11 +126,19 @@
 		padding: 0.4rem 0.7rem;
 		font-size: 0.8rem;
 		font-weight: 600;
-		transition: opacity var(--ta-transition-fast);
+		transition: opacity var(--ta-transition-fast), transform var(--ta-transition-spring);
 	}
 
 	.btn-primary:disabled {
 		opacity: 0.5;
+	}
+
+	.btn-primary:not(:disabled):hover {
+		transform: var(--ta-lift-hover);
+	}
+
+	.btn-primary:not(:disabled):active {
+		transform: var(--ta-lift-press);
 	}
 
 	.btn-ghost {
@@ -132,12 +147,18 @@
 		padding: 0.35rem 0.65rem;
 		font-size: 0.78rem;
 		color: var(--ta-text-dim);
-		transition: border-color var(--ta-transition-fast), color var(--ta-transition-fast);
+		transition: border-color var(--ta-transition-fast), color var(--ta-transition-fast),
+			transform var(--ta-transition-spring);
 	}
 
 	.btn-ghost:hover {
 		border-color: var(--ta-accent);
 		color: var(--ta-accent);
+		transform: var(--ta-lift-hover);
+	}
+
+	.btn-ghost:active {
+		transform: var(--ta-lift-press);
 	}
 
 	.btn-ghost.muted {

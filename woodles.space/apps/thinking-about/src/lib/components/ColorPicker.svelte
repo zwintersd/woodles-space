@@ -57,7 +57,7 @@
 		border-radius: 50%;
 		border: none;
 		box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
-		transition: transform var(--ta-transition-fast), box-shadow var(--ta-transition-fast);
+		transition: transform var(--ta-transition-spring), box-shadow var(--ta-transition-fast);
 		cursor: pointer;
 		display: flex;
 		align-items: center;
@@ -71,7 +71,12 @@
 
 	.swatch:hover,
 	.custom-swatch:hover {
-		transform: scale(1.12);
+		transform: scale(1.18);
+	}
+
+	.swatch:active,
+	.custom-swatch:active {
+		transform: scale(0.95);
 	}
 
 	/* a white-then-dark double ring reads on every swatch color, light or
