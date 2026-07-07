@@ -96,7 +96,8 @@
 		font-size: 0.85rem;
 		line-height: 1;
 		opacity: 0.4;
-		transition: opacity var(--ta-transition-fast), background var(--ta-transition-fast), color var(--ta-transition-fast);
+		transition: opacity var(--ta-transition-fast), background var(--ta-transition-fast),
+			color var(--ta-transition-fast), transform var(--ta-transition-spring);
 	}
 
 	/* dim by default rather than fully hidden — hover-to-reveal has no
@@ -109,6 +110,11 @@
 	.section-add:hover {
 		background: var(--ta-accent-soft);
 		color: var(--ta-accent);
+		transform: scale(1.15);
+	}
+
+	.section-add:active {
+		transform: scale(0.9);
 	}
 
 	.section-chips {

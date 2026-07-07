@@ -1,11 +1,17 @@
 <script lang="ts">
+	import { fly } from 'svelte/transition';
+	import { motionDuration } from '$lib/motion';
 	import { thinkingAbout } from '$lib/thinkingAbout.svelte';
 	import type { ThinkingAboutEntry } from '$lib/types';
 
 	let { entry }: { entry: ThinkingAboutEntry } = $props();
 </script>
 
-<div class="chip" style:--chip-color={entry.color}>
+<div
+	class="chip"
+	style:--chip-color={entry.color}
+	transition:fly={{ y: -6, duration: motionDuration(200) }}
+>
 	<button class="chip-open" onclick={() => thinkingAbout.openEntry(entry.id)}>
 		<span class="chip-dot" aria-hidden="true"></span>
 		<span class="chip-title">{entry.title || 'untitled'}</span>
@@ -28,13 +34,15 @@
 		border-radius: var(--ta-radius-sm);
 		background: color-mix(in srgb, var(--chip-color) 13%, white);
 		border: 1px solid color-mix(in srgb, var(--chip-color) 32%, white);
-		transition: background var(--ta-transition-fast), box-shadow var(--ta-transition-fast);
+		transition: background var(--ta-transition-fast), box-shadow var(--ta-transition-fast),
+			transform var(--ta-transition-spring);
 	}
 
 	.chip:hover,
 	.chip:focus-within {
 		background: color-mix(in srgb, var(--chip-color) 22%, white);
 		box-shadow: var(--ta-shadow-sm);
+		transform: var(--ta-lift-hover);
 	}
 
 	.chip-open {
@@ -47,12 +55,21 @@
 		text-align: left;
 	}
 
+	.chip-open:active {
+		transform: scale(0.985);
+	}
+
 	.chip-dot {
 		width: 8px;
 		height: 8px;
 		border-radius: 50%;
 		background: var(--chip-color);
 		flex-shrink: 0;
+		transition: transform var(--ta-transition-spring);
+	}
+
+	.chip:hover .chip-dot {
+		transform: scale(1.2);
 	}
 
 	.chip-title {
@@ -75,7 +92,8 @@
 		font-size: 0.7rem;
 		color: color-mix(in srgb, var(--chip-color) 65%, black 25%);
 		opacity: 0.45;
-		transition: opacity var(--ta-transition-fast), background var(--ta-transition-fast);
+		transition: opacity var(--ta-transition-fast), background var(--ta-transition-fast),
+			transform var(--ta-transition-spring);
 		border-radius: var(--ta-radius-sm);
 	}
 
@@ -89,5 +107,10 @@
 	.chip-archive:focus-visible {
 		opacity: 1;
 		background: rgba(255, 255, 255, 0.55);
+		transform: scale(1.15);
+	}
+
+	.chip-archive:active {
+		transform: scale(0.92);
 	}
 </style>

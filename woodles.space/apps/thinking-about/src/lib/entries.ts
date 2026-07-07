@@ -105,6 +105,7 @@ export function normalizeEntry(raw: ThinkingAboutEntry): ThinkingAboutEntry {
 		color: raw.color || DEFAULT_COLOR,
 		status: raw.status ?? 'active',
 		notes: raw.notes ?? '',
+		dateStarted: raw.dateStarted ?? null,
 		dateClosed: raw.dateClosed ?? null,
 		sharedWith: raw.sharedWith ?? null,
 		schedule: raw.schedule ?? null

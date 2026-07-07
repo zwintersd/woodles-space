@@ -27,7 +27,7 @@ export type ThinkingAboutEntry = {
 	sectionKey: SectionKey;
 	title: string;
 	color: string;
-	dateStarted: string; // YYYY-MM-DD — defaults to date added, overridable
+	dateStarted: string | null; // YYYY-MM-DD — defaults to date added, overridable, clearable
 	status: EntryStatus;
 	dateClosed: string | null; // YYYY-MM-DD — set when archived
 	notes: string;

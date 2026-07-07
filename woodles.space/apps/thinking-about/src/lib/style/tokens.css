@@ -41,10 +41,22 @@
 
 	--ta-transition-fast:   0.14s ease;
 	--ta-transition-medium: 0.22s ease;
+	/* a small, tasteful bounce for hover/press feedback — same shape as the
+	   "spring" easing planner and spores already use for their own tactile
+	   moments (task-check ticks, swatch hovers), so a click here feels like
+	   it belongs to the same family of apps even with a very different look. */
+	--ta-transition-spring: 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
 
-	/* minimal shadows — just enough to lift a popover off the page */
+	/* a gentle lift on hover — cards/buttons rise a hair off the page rather
+	   than just recoloring, borrowed from hygge's own hover language. */
+	--ta-lift-hover: translateY(-1px);
+	--ta-lift-press: scale(0.97);
+
+	/* shadows — sm lifts a chip on hover, md is the detail/popover elevation,
+	   lg is the board's own resting elevation off the page background. */
 	--ta-shadow-sm: 0 1px 2px rgba(60, 64, 67, 0.15);
 	--ta-shadow-md: 0 4px 18px rgba(60, 64, 67, 0.18);
+	--ta-shadow-lg: 0 1px 2px rgba(60, 64, 67, 0.08), 0 8px 28px rgba(60, 64, 67, 0.12);
 
 	color-scheme: light;
 }

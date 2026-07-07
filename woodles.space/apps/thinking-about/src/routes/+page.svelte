@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { fly } from 'svelte/transition';
 	import { thinkingAbout } from '$lib/thinkingAbout.svelte';
 	import { syncState } from '$lib/sync.svelte';
+	import { motionDuration } from '$lib/motion';
 	import Board from '$lib/components/Board.svelte';
 	import ArchiveView from '$lib/components/ArchiveView.svelte';
 	import EntryDetail from '$lib/components/EntryDetail.svelte';
@@ -16,6 +18,12 @@
 <div class="page">
 	<header class="page-header">
 		<a class="home-link" href="/" title="back to woodles.space">·space</a>
+		<div class="brand-mark" aria-hidden="true">
+			<span class="mark-dot" style:background="#d50000"></span>
+			<span class="mark-dot" style:background="#f6bf26"></span>
+			<span class="mark-dot" style:background="#33b679"></span>
+			<span class="mark-dot" style:background="#039be5"></span>
+		</div>
 		<h1 class="page-title">Thinking About</h1>
 
 		<div class="view-tabs" role="tablist" aria-label="board view">
@@ -54,7 +62,7 @@
 	</header>
 
 	{#if showSync}
-		<div class="sync-popover">
+		<div class="sync-popover" transition:fly={{ y: -8, duration: motionDuration(180) }}>
 			<SyncPanel />
 		</div>
 	{/if}
@@ -99,6 +107,26 @@
 		opacity: 1;
 	}
 
+	/* a small Calendar-icon-style mark — the only spot of color in the
+	   chrome, reusing the same swatch family the entries themselves are
+	   colored from, everything else stays neutral. */
+	.brand-mark {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 3px;
+		width: 20px;
+		height: 20px;
+		padding: 3px;
+		border-radius: 7px;
+		background: var(--ta-bg-subtle);
+		border: 1px solid var(--ta-border);
+		flex-shrink: 0;
+	}
+
+	.mark-dot {
+		border-radius: 2px;
+	}
+
 	.page-title {
 		font-family: var(--ta-font-sans);
 		font-size: 1.3rem;
@@ -125,7 +153,16 @@
 		color: var(--ta-muted);
 		padding: 0.35rem 0.85rem;
 		border-radius: var(--ta-radius-pill);
-		transition: background var(--ta-transition-fast), color var(--ta-transition-fast);
+		transition: background var(--ta-transition-fast), color var(--ta-transition-fast),
+			transform var(--ta-transition-spring);
+	}
+
+	.view-tab:hover {
+		color: var(--ta-text-dim);
+	}
+
+	.view-tab:active {
+		transform: var(--ta-lift-press);
 	}
 
 	.view-tab.active {
@@ -153,12 +190,19 @@
 		border: 1px solid var(--ta-border);
 		border-radius: var(--ta-radius-pill);
 		padding: 0.35rem 0.8rem;
-		transition: border-color var(--ta-transition-fast), color var(--ta-transition-fast);
+		transition: border-color var(--ta-transition-fast), color var(--ta-transition-fast),
+			transform var(--ta-transition-spring), box-shadow var(--ta-transition-fast);
 	}
 
 	.sync-toggle:hover {
 		border-color: var(--ta-accent);
 		color: var(--ta-accent);
+		box-shadow: var(--ta-shadow-sm);
+		transform: var(--ta-lift-hover);
+	}
+
+	.sync-toggle:active {
+		transform: var(--ta-lift-press);
 	}
 
 	.sync-dot {

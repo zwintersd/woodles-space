@@ -16,6 +16,7 @@
 		background: var(--ta-surface);
 		border: 1px solid var(--ta-border);
 		border-radius: var(--ta-radius-md);
+		box-shadow: var(--ta-shadow-lg);
 		overflow: hidden;
 	}
 
