@@ -30,8 +30,11 @@
 
 <style>
 	.archive-view {
-		background: var(--ta-surface);
-		border: 1px solid var(--ta-border);
+		background:
+			linear-gradient(135deg, rgba(63, 81, 181, 0.07), transparent 35%),
+			linear-gradient(315deg, rgba(51, 182, 121, 0.08), transparent 40%),
+			var(--ta-surface);
+		border: 1px solid rgba(255, 255, 255, 0.9);
 		border-radius: var(--ta-radius-md);
 		box-shadow: var(--ta-shadow-lg);
 		padding: 1rem 1.2rem 1.4rem;
@@ -95,7 +98,7 @@
 	}
 
 	.archive-row:hover {
-		background: var(--ta-bg-subtle);
+		background: color-mix(in srgb, var(--chip-color, var(--ta-accent)) 9%, white);
 	}
 
 	.archive-dot {
@@ -103,6 +106,7 @@
 		height: 9px;
 		border-radius: 50%;
 		background: var(--chip-color);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--chip-color) 16%, transparent);
 		flex-shrink: 0;
 		transition: transform var(--ta-transition-spring);
 	}

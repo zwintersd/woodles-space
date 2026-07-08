@@ -2,8 +2,8 @@
 // testable without instantiating the rune store (see thinkingAbout.svelte.ts,
 // which is a thin wrapper delegating to these functions).
 
-import { DEFAULT_COLOR } from './constants';
-import type { ColumnKey, SectionKey, ThinkingAboutEntry } from './types';
+import { DEFAULT_COLOR, normalizeColumnSection } from './constants';
+import type { ColumnKey, EntryStatus, SectionKey, ThinkingAboutEntry } from './types';
 
 export function uid(): string {
 	return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -15,6 +15,18 @@ export function nowIso(): string {
 
 export function today(): string {
 	return new Date().toISOString().slice(0, 10);
+}
+
+function stringOr(value: unknown, fallback = ''): string {
+	return typeof value === 'string' ? value : fallback;
+}
+
+function nullableString(value: unknown): string | null {
+	return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function normalizedStatus(value: unknown): EntryStatus {
+	return value === 'archived' ? 'archived' : 'active';
 }
 
 export function blankEntry(
@@ -96,18 +108,37 @@ export function archivedEntries(entries: ThinkingAboutEntry[]): ThinkingAboutEnt
 		.sort((a, b) => (b.dateClosed ?? '').localeCompare(a.dateClosed ?? ''));
 }
 
+export function latestEntryTimestamp(entries: ThinkingAboutEntry[] | undefined): string | null {
+	let latest: string | null = null;
+	for (const entry of entries ?? []) {
+		const stamp = entry.updatedAt || entry.createdAt;
+		if (stamp && (!latest || stamp > latest)) latest = stamp;
+	}
+	return latest;
+}
+
 // Defensive fill for a stored/synced entry missing fields a newer build
 // added — keeps an older or hand-edited blob from crashing conditional
-// rendering that expects these to at least be null rather than undefined.
-export function normalizeEntry(raw: ThinkingAboutEntry): ThinkingAboutEntry {
+// rendering, and keeps malformed bucket keys visible somewhere real.
+export function normalizeEntry(raw: Partial<ThinkingAboutEntry>): ThinkingAboutEntry {
+	const { columnKey, sectionKey } = normalizeColumnSection(raw.columnKey, raw.sectionKey);
+	const createdAt = stringOr(raw.createdAt, stringOr(raw.updatedAt, nowIso()));
+	const updatedAt = stringOr(raw.updatedAt, createdAt);
+
 	return {
 		...raw,
+		id: stringOr(raw.id, uid()),
+		columnKey,
+		sectionKey,
+		title: stringOr(raw.title),
 		color: raw.color || DEFAULT_COLOR,
-		status: raw.status ?? 'active',
-		notes: raw.notes ?? '',
-		dateStarted: raw.dateStarted ?? null,
-		dateClosed: raw.dateClosed ?? null,
-		sharedWith: raw.sharedWith ?? null,
-		schedule: raw.schedule ?? null
+		status: normalizedStatus(raw.status),
+		notes: stringOr(raw.notes),
+		dateStarted: nullableString(raw.dateStarted),
+		dateClosed: nullableString(raw.dateClosed),
+		sharedWith: nullableString(raw.sharedWith),
+		schedule: nullableString(raw.schedule),
+		createdAt,
+		updatedAt
 	};
 }

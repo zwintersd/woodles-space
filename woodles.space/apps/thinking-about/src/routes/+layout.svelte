@@ -53,7 +53,7 @@
 
 	.thinking-about-root {
 		min-height: 100vh;
-		background: var(--ta-bg-subtle);
+		background: var(--ta-page-wash);
 		color: var(--ta-text);
 		font-family: var(--ta-font-sans);
 		line-height: 1.5;
