@@ -3,7 +3,7 @@
 // which is a thin wrapper delegating to these functions).
 
 import { DEFAULT_COLOR, normalizeColumnSection } from './constants';
-import type { ColumnKey, EntryStatus, SectionKey, ThinkingAboutEntry } from './types';
+import type { ColumnKey, EntryStatus, SectionKey, ThinkingAboutEntry, WatchSession } from './types';
 
 export function uid(): string {
 	return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -29,6 +29,18 @@ function normalizedStatus(value: unknown): EntryStatus {
 	return value === 'archived' ? 'archived' : 'active';
 }
 
+function normalizeSession(raw: Partial<WatchSession>): WatchSession {
+	return {
+		id: stringOr(raw.id, uid()),
+		date: stringOr(raw.date, today()),
+		note: stringOr(raw.note)
+	};
+}
+
+function normalizeSessions(raw: unknown): WatchSession[] {
+	return Array.isArray(raw) ? raw.map(normalizeSession) : [];
+}
+
 export function blankEntry(
 	columnKey: ColumnKey,
 	sectionKey: SectionKey,
@@ -47,6 +59,7 @@ export function blankEntry(
 		notes: '',
 		sharedWith: null,
 		schedule: null,
+		sessions: [],
 		createdAt: stamp,
 		updatedAt: stamp
 	};
@@ -86,6 +99,49 @@ export function reopenEntry(entries: ThinkingAboutEntry[], id: string): Thinking
 
 export function deleteEntry(entries: ThinkingAboutEntry[], id: string): ThinkingAboutEntry[] {
 	return entries.filter((e) => e.id !== id);
+}
+
+// One tap logs "watched today" — no dialog, nothing required. Newest first,
+// so the freshest sitting reads at the top of the log.
+export function logSession(
+	entries: ThinkingAboutEntry[],
+	id: string,
+	note = ''
+): ThinkingAboutEntry[] {
+	return entries.map((e) =>
+		e.id === id
+			? { ...e, sessions: [{ id: uid(), date: today(), note }, ...e.sessions], updatedAt: nowIso() }
+			: e
+	);
+}
+
+export function updateSession(
+	entries: ThinkingAboutEntry[],
+	entryId: string,
+	sessionId: string,
+	patch: Partial<Omit<WatchSession, 'id'>>
+): ThinkingAboutEntry[] {
+	return entries.map((e) =>
+		e.id === entryId
+			? {
+					...e,
+					sessions: e.sessions.map((s) => (s.id === sessionId ? { ...s, ...patch } : s)),
+					updatedAt: nowIso()
+				}
+			: e
+	);
+}
+
+export function removeSession(
+	entries: ThinkingAboutEntry[],
+	entryId: string,
+	sessionId: string
+): ThinkingAboutEntry[] {
+	return entries.map((e) =>
+		e.id === entryId
+			? { ...e, sessions: e.sessions.filter((s) => s.id !== sessionId), updatedAt: nowIso() }
+			: e
+	);
 }
 
 // The active board only ever shows what's still open — closing a loop
@@ -138,6 +194,7 @@ export function normalizeEntry(raw: Partial<ThinkingAboutEntry>): ThinkingAboutE
 		dateClosed: nullableString(raw.dateClosed),
 		sharedWith: nullableString(raw.sharedWith),
 		schedule: nullableString(raw.schedule),
+		sessions: normalizeSessions(raw.sessions),
 		createdAt,
 		updatedAt
 	};

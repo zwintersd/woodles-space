@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { fly } from 'svelte/transition';
 	import { motionDuration } from '$lib/motion';
+	import { showsSessions } from '$lib/constants';
 	import { thinkingAbout } from '$lib/thinkingAbout.svelte';
 	import type { ThinkingAboutEntry } from '$lib/types';
 
@@ -16,6 +17,19 @@
 		<span class="chip-dot" aria-hidden="true"></span>
 		<span class="chip-title">{entry.title || 'untitled'}</span>
 	</button>
+	{#if showsSessions(entry.columnKey)}
+		<button
+			class="chip-log"
+			onclick={() => thinkingAbout.logSession(entry.id)}
+			title="log a watch session"
+			aria-label="log a watch session for {entry.title || 'untitled'}"
+		>
+			<span aria-hidden="true">▸</span>
+			{#if entry.sessions.length > 0}
+				<span class="chip-log-count">{entry.sessions.length}</span>
+			{/if}
+		</button>
+	{/if}
 	<button
 		class="chip-archive"
 		onclick={() => thinkingAbout.archiveEntry(entry.id)}
@@ -88,6 +102,7 @@
 		white-space: nowrap;
 	}
 
+	.chip-log,
 	.chip-archive {
 		flex-shrink: 0;
 		width: 1.6rem;
@@ -102,12 +117,28 @@
 		border-radius: var(--ta-radius-sm);
 	}
 
+	.chip-log {
+		width: auto;
+		min-width: 1.6rem;
+		padding: 0 0.3rem;
+		gap: 0.12rem;
+	}
+
+	.chip-log-count {
+		font-family: var(--ta-font-mono);
+		font-size: 0.6rem;
+	}
+
 	/* dim by default rather than fully hidden — touch has no hover to reveal it */
+	.chip:hover .chip-log,
+	.chip:focus-within .chip-log,
 	.chip:hover .chip-archive,
 	.chip:focus-within .chip-archive {
 		opacity: 0.8;
 	}
 
+	.chip-log:hover,
+	.chip-log:focus-visible,
 	.chip-archive:hover,
 	.chip-archive:focus-visible {
 		opacity: 1;
@@ -115,6 +146,7 @@
 		transform: scale(1.15);
 	}
 
+	.chip-log:active,
 	.chip-archive:active {
 		transform: scale(0.92);
 	}

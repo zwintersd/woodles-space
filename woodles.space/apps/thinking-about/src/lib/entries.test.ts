@@ -9,12 +9,15 @@ import {
 	entriesForSection,
 	isUntouched,
 	latestEntryTimestamp,
+	logSession,
 	normalizeEntry,
+	removeSession,
 	reopenEntry,
 	today,
-	updateEntry
+	updateEntry,
+	updateSession
 } from './entries';
-import type { ThinkingAboutEntry } from './types';
+import type { ThinkingAboutEntry, WatchSession } from './types';
 
 function make(over: Partial<ThinkingAboutEntry>): ThinkingAboutEntry {
 	return { ...blankEntry('reading', 'book'), ...over };
@@ -31,6 +34,7 @@ describe('blankEntry', () => {
 		expect(e.sectionKey).toBe('film');
 		expect(e.title).toBe('');
 		expect(e.createdAt).toBe(e.updatedAt);
+		expect(e.sessions).toEqual([]);
 	});
 
 	it('mints a unique id each time', () => {
@@ -123,6 +127,75 @@ describe('deleteEntry', () => {
 	});
 });
 
+describe('logSession', () => {
+	it('prepends a session dated today with an empty note by default', () => {
+		const a = make({ id: 'a' });
+		const [result] = logSession([a], 'a');
+		expect(result.sessions).toHaveLength(1);
+		expect(result.sessions[0]).toMatchObject({ date: today(), note: '' });
+	});
+
+	it('accepts a note and keeps prior sessions, newest first', () => {
+		const a = make({ id: 'a', sessions: [{ id: 'old', date: '2026-01-01', note: 'ep 1' }] });
+		const [result] = logSession([a], 'a', 'ep 2');
+		expect(result.sessions.map((s) => s.note)).toEqual(['ep 2', 'ep 1']);
+	});
+
+	it('is a no-op for an unknown id', () => {
+		const a = make({ id: 'a' });
+		expect(logSession([a], 'nope')).toEqual([a]);
+	});
+
+	it('does not mutate the input entry', () => {
+		const a = make({ id: 'a' });
+		logSession([a], 'a');
+		expect(a.sessions).toEqual([]);
+	});
+});
+
+describe('updateSession', () => {
+	it('patches only the matching session on the matching entry', () => {
+		const a = make({
+			id: 'a',
+			sessions: [
+				{ id: 's1', date: '2026-01-01', note: 'one' },
+				{ id: 's2', date: '2026-01-02', note: 'two' }
+			]
+		});
+		const [result] = updateSession([a], 'a', 's1', { note: 'edited' });
+		expect(result.sessions).toEqual([
+			{ id: 's1', date: '2026-01-01', note: 'edited' },
+			{ id: 's2', date: '2026-01-02', note: 'two' }
+		]);
+	});
+
+	it('is a no-op for an unknown entry or session id', () => {
+		const a = make({ id: 'a', sessions: [{ id: 's1', date: '2026-01-01', note: 'one' }] });
+		expect(updateSession([a], 'nope', 's1', { note: 'x' })[0].sessions).toEqual(a.sessions);
+		expect(updateSession([a], 'a', 'nope', { note: 'x' })[0].sessions).toEqual(a.sessions);
+	});
+});
+
+describe('removeSession', () => {
+	it('removes only the matching session', () => {
+		const a = make({
+			id: 'a',
+			sessions: [
+				{ id: 's1', date: '2026-01-01', note: 'one' },
+				{ id: 's2', date: '2026-01-02', note: 'two' }
+			]
+		});
+		const [result] = removeSession([a], 'a', 's1');
+		expect(result.sessions).toEqual([{ id: 's2', date: '2026-01-02', note: 'two' }]);
+	});
+
+	it('is a no-op for an unknown entry or session id', () => {
+		const a = make({ id: 'a', sessions: [{ id: 's1', date: '2026-01-01', note: 'one' }] });
+		expect(removeSession([a], 'nope', 's1')[0].sessions).toEqual(a.sessions);
+		expect(removeSession([a], 'a', 'nope')[0].sessions).toEqual(a.sessions);
+	});
+});
+
 describe('entriesForSection', () => {
 	it('filters by column, section, and active status', () => {
 		const list = [
@@ -170,10 +243,33 @@ describe('normalizeEntry', () => {
 		delete raw.status;
 		// @ts-expect-error — simulating an older/partial stored record
 		delete raw.color;
+		// @ts-expect-error — simulating a pre-sessions stored record
+		delete raw.sessions;
 		const normalized = normalizeEntry(raw);
 		expect(normalized.notes).toBe('');
 		expect(normalized.status).toBe('active');
 		expect(normalized.color).toBe(DEFAULT_COLOR);
+		expect(normalized.sessions).toEqual([]);
+	});
+
+	it('fills missing id/date on a hand-edited session', () => {
+		const raw = { ...blankEntry('watching', 'film') } as ThinkingAboutEntry;
+		const partialSession = { note: 'ep 3' } as Partial<WatchSession>;
+		// @ts-expect-error — simulating a hand-edited/corrupt session record
+		raw.sessions = [partialSession];
+		const normalized = normalizeEntry(raw);
+		expect(normalized.sessions).toHaveLength(1);
+		expect(normalized.sessions[0]).toMatchObject({ note: 'ep 3', date: today() });
+		expect(typeof normalized.sessions[0].id).toBe('string');
+		expect(normalized.sessions[0].id.length).toBeGreaterThan(0);
+	});
+
+	it('treats a non-array sessions value as empty', () => {
+		const normalized = normalizeEntry({
+			...blankEntry('watching', 'film'),
+			sessions: 'nope' as never
+		});
+		expect(normalized.sessions).toEqual([]);
 	});
 
 	it('repairs invalid or mismatched buckets', () => {

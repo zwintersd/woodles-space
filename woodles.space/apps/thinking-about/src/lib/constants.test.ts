@@ -10,6 +10,7 @@ import {
 	sectionLabel,
 	sectionSize,
 	showsSchedule,
+	showsSessions,
 	showsSharedWith
 } from './constants';
 import type { SectionKey } from './types';
@@ -157,5 +158,15 @@ describe('showsSchedule', () => {
 	it('is true for playing and watching', () => {
 		expect(showsSchedule('playing')).toBe(true);
 		expect(showsSchedule('watching')).toBe(true);
+	});
+});
+
+describe('showsSessions', () => {
+	it('is true only for watching', () => {
+		expect(showsSessions('watching')).toBe(true);
+	});
+	it('is false for reading and playing', () => {
+		expect(showsSessions('reading')).toBe(false);
+		expect(showsSessions('playing')).toBe(false);
 	});
 });
