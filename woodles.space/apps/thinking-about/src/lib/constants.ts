@@ -113,6 +113,12 @@ export function showsSchedule(columnKey: ColumnKey): boolean {
 	return columnKey !== 'reading';
 }
 
+// session logging is a watching-only concept — a running log of sittings
+// with a show/film, the way a book or a game doesn't get logged per-episode.
+export function showsSessions(columnKey: ColumnKey): boolean {
+	return columnKey === 'watching';
+}
+
 // Calendar-event-style named swatches — the same visual logic as picking a
 // color for a calendar event. Freeform hex entry (ColorPicker's native
 // <input type="color">) always stays available alongside these.

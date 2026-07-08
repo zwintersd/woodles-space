@@ -8,6 +8,7 @@
 		columnLabel,
 		sectionLabel,
 		showsSchedule,
+		showsSessions,
 		showsSharedWith
 	} from '$lib/constants';
 	import { motionDuration } from '$lib/motion';
@@ -88,6 +89,9 @@
 
 {#if entry}
 	{@const id = entry.id}
+	{@const sessions = [...entry.sessions].sort(
+		(a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id)
+	)}
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="scrim" onclick={close} transition:fade={{ duration: motionDuration(160) }}></div>
@@ -180,6 +184,52 @@
 					placeholder="e.g. Tuesdays after work"
 					oninput={(e) => thinkingAbout.updateEntry(id, { schedule: e.currentTarget.value })}
 				/>
+			</div>
+		{/if}
+
+		{#if showsSessions(entry.columnKey)}
+			<div class="detail-field">
+				<div class="sessions-heading">
+					<span class="detail-field-label">sessions</span>
+					<button class="btn-log-session" onclick={() => thinkingAbout.logSession(id)}>
+						+ log session
+					</button>
+				</div>
+				{#if sessions.length === 0}
+					<p class="sessions-empty">no sessions logged yet</p>
+				{:else}
+					<ul class="sessions-list">
+						{#each sessions as session (session.id)}
+							<li class="session-row">
+								<input
+									type="date"
+									class="session-date"
+									value={session.date}
+									aria-label="date watched"
+									onchange={(e) =>
+										thinkingAbout.updateSession(id, session.id, { date: e.currentTarget.value })}
+								/>
+								<input
+									type="text"
+									class="session-note"
+									placeholder="note (optional)"
+									value={session.note}
+									aria-label="session note"
+									oninput={(e) =>
+										thinkingAbout.updateSession(id, session.id, { note: e.currentTarget.value })}
+								/>
+								<button
+									class="field-clear"
+									onclick={() => thinkingAbout.removeSession(id, session.id)}
+									title="remove session"
+									aria-label="remove session logged {session.date}"
+								>
+									×
+								</button>
+							</li>
+						{/each}
+					</ul>
+				{/if}
 			</div>
 		{/if}
 
@@ -313,7 +363,8 @@
 		gap: 0.3rem;
 	}
 
-	.detail-field label {
+	.detail-field label,
+	.detail-field-label {
 		font-family: var(--ta-font-sans);
 		font-size: 0.68rem;
 		letter-spacing: 0.06em;
@@ -374,6 +425,63 @@
 
 	.field-clear:active {
 		transform: var(--ta-lift-press);
+	}
+
+	.sessions-heading {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
+
+	.btn-log-session {
+		flex-shrink: 0;
+		font-family: var(--ta-font-sans);
+		font-size: 0.74rem;
+		color: var(--ta-accent);
+		background: var(--ta-accent-soft);
+		border-radius: var(--ta-radius-pill);
+		padding: 0.25rem 0.6rem;
+		transition: background var(--ta-transition-fast), transform var(--ta-transition-spring);
+	}
+
+	.btn-log-session:hover {
+		background: color-mix(in srgb, var(--ta-accent-soft) 70%, var(--ta-accent) 30%);
+	}
+
+	.btn-log-session:active {
+		transform: var(--ta-lift-press);
+	}
+
+	.sessions-empty {
+		font-family: var(--ta-font-sans);
+		font-size: 0.78rem;
+		color: var(--ta-muted);
+		padding: 0.3rem 0;
+	}
+
+	.sessions-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		max-height: 11rem;
+		overflow-y: auto;
+	}
+
+	.session-row {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+	}
+
+	.session-date {
+		flex-shrink: 0;
+		width: 8.7rem;
+	}
+
+	.session-note {
+		flex: 1;
+		min-width: 0;
 	}
 
 	.detail-notes {

@@ -6,17 +6,21 @@ import {
 	entriesForSection as entriesForSectionOf,
 	isUntouched,
 	latestEntryTimestamp,
+	logSession,
 	normalizeEntry,
 	nowIso,
+	removeSession,
 	reopenEntry,
-	updateEntry
+	updateEntry,
+	updateSession
 } from './entries';
 import type {
 	BoardView,
 	ColumnKey,
 	SectionKey,
 	ThinkingAboutBlob,
-	ThinkingAboutEntry
+	ThinkingAboutEntry,
+	WatchSession
 } from './types';
 
 function load<T>(key: string, fallback: T): T {
@@ -114,6 +118,26 @@ export class ThinkingAbout {
 	reopenEntry(id: string): void {
 		if (!this.entries.some((e) => e.id === id)) return;
 		this.entries = reopenEntry(this.entries, id);
+		this.#touch();
+	}
+
+	// One tap, no dialog — logging a sitting should be as frictionless as
+	// marking an entry done.
+	logSession(id: string, note = ''): void {
+		if (!this.entries.some((e) => e.id === id)) return;
+		this.entries = logSession(this.entries, id, note);
+		this.#touch();
+	}
+
+	updateSession(entryId: string, sessionId: string, patch: Partial<Omit<WatchSession, 'id'>>): void {
+		if (!this.entries.some((e) => e.id === entryId)) return;
+		this.entries = updateSession(this.entries, entryId, sessionId, patch);
+		this.#touch();
+	}
+
+	removeSession(entryId: string, sessionId: string): void {
+		if (!this.entries.some((e) => e.id === entryId)) return;
+		this.entries = removeSession(this.entries, entryId, sessionId);
 		this.#touch();
 	}
 
