@@ -2,13 +2,28 @@
 	import { fade, fly } from 'svelte/transition';
 	import { quintOut } from 'svelte/easing';
 	import { thinkingAbout } from '$lib/thinkingAbout.svelte';
-	import { columnLabel, sectionLabel, showsSchedule, showsSharedWith } from '$lib/constants';
+	import {
+		COLUMNS,
+		columnForSection,
+		columnLabel,
+		sectionLabel,
+		showsSchedule,
+		showsSharedWith
+	} from '$lib/constants';
 	import { motionDuration } from '$lib/motion';
+	import type { SectionKey } from '$lib/types';
 	import ColorPicker from './ColorPicker.svelte';
 
 	let entry = $derived(thinkingAbout.activeEntry);
 
 	let confirmDelete = $state(false);
+	let detailPanel = $state<HTMLDivElement | undefined>();
+	let titleInput = $state<HTMLInputElement | undefined>();
+	let previousFocus: HTMLElement | null = null;
+	let focusedEntryId: string | null = null;
+
+	const FOCUSABLE_SELECTOR =
+		'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 	// Reset the delete confirmation whenever which entry is open changes,
 	// so it never carries over from a previous visit to this panel.
@@ -17,12 +32,55 @@
 		confirmDelete = false;
 	});
 
+	$effect(() => {
+		const entryId = entry?.id ?? null;
+		if (entryId && entryId !== focusedEntryId) {
+			previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+			focusedEntryId = entryId;
+			queueMicrotask(() => titleInput?.focus());
+		}
+		if (!entryId) focusedEntryId = null;
+	});
+
 	function close(): void {
+		const restoreTo = previousFocus;
 		thinkingAbout.closeEntry();
+		queueMicrotask(() => restoreTo?.focus());
+	}
+
+	function moveToSection(sectionKey: SectionKey): void {
+		if (!entry) return;
+		const columnKey = columnForSection(sectionKey);
+		thinkingAbout.updateEntry(entry.id, {
+			columnKey,
+			sectionKey,
+			sharedWith: showsSharedWith(sectionKey) ? entry.sharedWith : null,
+			schedule: showsSchedule(columnKey) ? entry.schedule : null
+		});
+	}
+
+	function trapTab(e: KeyboardEvent): void {
+		if (!detailPanel || e.key !== 'Tab') return;
+		const focusables = Array.from(
+			detailPanel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+		).filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null);
+		if (focusables.length === 0) return;
+
+		const first = focusables[0];
+		const last = focusables[focusables.length - 1];
+		if (e.shiftKey && document.activeElement === first) {
+			e.preventDefault();
+			last.focus();
+		} else if (!e.shiftKey && document.activeElement === last) {
+			e.preventDefault();
+			first.focus();
+		}
 	}
 
 	function handleKeydown(e: KeyboardEvent): void {
+		if (!entry) return;
 		if (e.key === 'Escape') close();
+		else trapTab(e);
 	}
 </script>
 
@@ -34,19 +92,23 @@
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="scrim" onclick={close} transition:fade={{ duration: motionDuration(160) }}></div>
 	<div
+		bind:this={detailPanel}
 		class="detail"
 		style:--chip-color={entry.color}
 		role="dialog"
 		aria-modal="true"
-		aria-label="entry detail"
+		aria-labelledby="ta-detail-heading"
 		transition:fly={{ x: 48, duration: motionDuration(260), easing: quintOut }}
 	>
+		<span id="ta-detail-heading" class="sr-only">entry detail</span>
 		<header class="detail-header">
 			<span class="detail-breadcrumb">{columnLabel(entry.columnKey)} · {sectionLabel(entry.sectionKey)}</span>
 			<button class="detail-close" onclick={close} aria-label="close">×</button>
 		</header>
 
 		<input
+			id="ta-title"
+			bind:this={titleInput}
 			class="detail-title"
 			value={entry.title}
 			placeholder="untitled"
@@ -55,6 +117,23 @@
 		/>
 
 		<ColorPicker value={entry.color} onChange={(hex) => thinkingAbout.updateEntry(id, { color: hex })} />
+
+		<div class="detail-field">
+			<label for="ta-section">section</label>
+			<select
+				id="ta-section"
+				value={entry.sectionKey}
+				onchange={(e) => moveToSection(e.currentTarget.value as SectionKey)}
+			>
+				{#each COLUMNS as column (column.key)}
+					<optgroup label={column.label}>
+						{#each column.sections as sectionKey (sectionKey)}
+							<option value={sectionKey}>{sectionLabel(sectionKey)}</option>
+						{/each}
+					</optgroup>
+				{/each}
+			</select>
+		</div>
 
 		<div class="detail-field">
 			<label for="ta-date-started">started</label>
@@ -173,6 +252,18 @@
 		justify-content: space-between;
 	}
 
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
+	}
+
 	.detail-breadcrumb {
 		font-family: var(--ta-font-sans);
 		font-size: 0.7rem;
@@ -231,7 +322,8 @@
 	}
 
 	.detail-field input[type='text'],
-	.detail-field input[type='date'] {
+	.detail-field input[type='date'],
+	.detail-field select {
 		font-family: var(--ta-font-sans);
 		font-size: 0.88rem;
 		color: var(--ta-text);
@@ -242,7 +334,8 @@
 	}
 
 	.detail-field input[type='text']:focus-visible,
-	.detail-field input[type='date']:focus-visible {
+	.detail-field input[type='date']:focus-visible,
+	.detail-field select:focus-visible {
 		border-color: var(--ta-accent);
 		box-shadow: 0 0 0 3px var(--ta-accent-soft);
 		outline: none;

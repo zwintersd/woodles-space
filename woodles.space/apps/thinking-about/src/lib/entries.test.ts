@@ -8,6 +8,7 @@ import {
 	deleteEntry,
 	entriesForSection,
 	isUntouched,
+	latestEntryTimestamp,
 	normalizeEntry,
 	reopenEntry,
 	today,
@@ -145,6 +146,21 @@ describe('archivedEntries', () => {
 	});
 });
 
+describe('latestEntryTimestamp', () => {
+	it('returns the newest updatedAt from entries', () => {
+		expect(
+			latestEntryTimestamp([
+				make({ id: 'a', updatedAt: '2026-01-01T00:00:00.000Z' }),
+				make({ id: 'b', updatedAt: '2026-02-01T00:00:00.000Z' })
+			])
+		).toBe('2026-02-01T00:00:00.000Z');
+	});
+
+	it('falls back to null for an empty list', () => {
+		expect(latestEntryTimestamp([])).toBeNull();
+	});
+});
+
 describe('normalizeEntry', () => {
 	it('fills missing optional fields with safe defaults', () => {
 		const raw = { ...blankEntry('reading', 'book') } as ThinkingAboutEntry;
@@ -158,6 +174,32 @@ describe('normalizeEntry', () => {
 		expect(normalized.notes).toBe('');
 		expect(normalized.status).toBe('active');
 		expect(normalized.color).toBe(DEFAULT_COLOR);
+	});
+
+	it('repairs invalid or mismatched buckets', () => {
+		const normalized = normalizeEntry({
+			...blankEntry('reading', 'book'),
+			columnKey: 'reading',
+			sectionKey: 'film'
+		});
+		expect(normalized.columnKey).toBe('watching');
+		expect(normalized.sectionKey).toBe('film');
+
+		const fallback = normalizeEntry({
+			...blankEntry('reading', 'book'),
+			columnKey: 'playing',
+			sectionKey: 'podcast' as never
+		});
+		expect(fallback.columnKey).toBe('playing');
+		expect(fallback.sectionKey).toBe('pc_social');
+	});
+
+	it('falls back from an invalid status to active', () => {
+		const normalized = normalizeEntry({
+			...blankEntry('reading', 'book'),
+			status: 'paused' as never
+		});
+		expect(normalized.status).toBe('active');
 	});
 
 	it('leaves a well-formed entry unchanged', () => {

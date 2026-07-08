@@ -32,15 +32,19 @@
 		align-items: stretch;
 		gap: 0.3rem;
 		border-radius: var(--ta-radius-sm);
-		background: color-mix(in srgb, var(--chip-color) 13%, white);
-		border: 1px solid color-mix(in srgb, var(--chip-color) 32%, white);
+		background:
+			linear-gradient(90deg, color-mix(in srgb, var(--chip-color) 26%, white), white 150%),
+			color-mix(in srgb, var(--chip-color) 18%, white);
+		border: 1px solid color-mix(in srgb, var(--chip-color) 42%, white);
 		transition: background var(--ta-transition-fast), box-shadow var(--ta-transition-fast),
 			transform var(--ta-transition-spring);
 	}
 
 	.chip:hover,
 	.chip:focus-within {
-		background: color-mix(in srgb, var(--chip-color) 22%, white);
+		background:
+			linear-gradient(90deg, color-mix(in srgb, var(--chip-color) 34%, white), white 145%),
+			color-mix(in srgb, var(--chip-color) 24%, white);
 		box-shadow: var(--ta-shadow-sm);
 		transform: var(--ta-lift-hover);
 	}
@@ -60,10 +64,11 @@
 	}
 
 	.chip-dot {
-		width: 8px;
-		height: 8px;
+		width: 9px;
+		height: 9px;
 		border-radius: 50%;
 		background: var(--chip-color);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--chip-color) 18%, transparent);
 		flex-shrink: 0;
 		transition: transform var(--ta-transition-spring);
 	}

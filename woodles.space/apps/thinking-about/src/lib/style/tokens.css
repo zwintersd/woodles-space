@@ -4,22 +4,27 @@
    A deliberate departure from Twilight Webcore (the dark, serif-display,
    jewel-toned look most SvelteKit apps here share): Google Calendar
    light-mode logic instead. Chrome stays white/near-white with thin gray
-   rules; color lives only in the entries themselves, as pills/chips against
-   the white ground — the same visual logic as a calendar event block. */
+   rules; color lives in entries and restrained column accents — the same
+   visual logic as a calendar event block, just a little more dressed up. */
 
 .thinking-about-root {
 	--ta-bg:          #ffffff;
-	--ta-bg-subtle:   #f8f9fa;
+	--ta-bg-subtle:   #f6f8ff;
 	--ta-surface:     #ffffff;
 	--ta-text:        #202124;
 	--ta-text-dim:    #3c4043;
 	--ta-muted:       #5f6368;
-	--ta-border:      #e3e5e8;
-	--ta-border-soft: #eceff1;
+	--ta-border:      #dde4ee;
+	--ta-border-soft: #e7edf5;
 	--ta-accent:      #1a73e8;
 	--ta-accent-soft: rgba(26, 115, 232, 0.08);
 	--ta-danger:      #d93025;
 	--ta-danger-soft: rgba(217, 48, 37, 0.08);
+	--ta-page-wash:
+		linear-gradient(135deg, rgba(63, 81, 181, 0.08), transparent 32%),
+		linear-gradient(225deg, rgba(51, 182, 121, 0.08), transparent 34%),
+		linear-gradient(315deg, rgba(244, 81, 30, 0.07), transparent 38%),
+		var(--ta-bg-subtle);
 
 	/* typography — plain/functional, not the Twilight Webcore display stack.
 	   Plus Jakarta Sans is already the shared "clean sans" (shared/fonts.css);

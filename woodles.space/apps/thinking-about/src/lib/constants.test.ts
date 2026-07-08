@@ -3,6 +3,10 @@ import {
 	COLUMNS,
 	columnForSection,
 	columnLabel,
+	defaultSectionForColumn,
+	isColumnKey,
+	isSectionKey,
+	normalizeColumnSection,
 	sectionLabel,
 	sectionSize,
 	showsSchedule,
@@ -72,6 +76,46 @@ describe('columnForSection', () => {
 		expect(columnForSection('manga')).toBe('reading');
 		expect(columnForSection('switch')).toBe('playing');
 		expect(columnForSection('cartoon')).toBe('watching');
+	});
+});
+
+describe('defaultSectionForColumn', () => {
+	it('returns the first section for a column', () => {
+		expect(defaultSectionForColumn('reading')).toBe('book');
+		expect(defaultSectionForColumn('playing')).toBe('pc_social');
+		expect(defaultSectionForColumn('watching')).toBe('anime_social');
+	});
+});
+
+describe('isColumnKey / isSectionKey', () => {
+	it('recognizes known keys only', () => {
+		expect(isColumnKey('reading')).toBe(true);
+		expect(isColumnKey('listening')).toBe(false);
+		expect(isSectionKey('film')).toBe(true);
+		expect(isSectionKey('podcast')).toBe(false);
+	});
+});
+
+describe('normalizeColumnSection', () => {
+	it('uses a valid section as the source of truth', () => {
+		expect(normalizeColumnSection('reading', 'film')).toEqual({
+			columnKey: 'watching',
+			sectionKey: 'film'
+		});
+	});
+
+	it('falls back to the first section of a valid column', () => {
+		expect(normalizeColumnSection('playing', 'podcast')).toEqual({
+			columnKey: 'playing',
+			sectionKey: 'pc_social'
+		});
+	});
+
+	it('falls all the way back to reading books', () => {
+		expect(normalizeColumnSection('listening', 'podcast')).toEqual({
+			columnKey: 'reading',
+			sectionKey: 'book'
+		});
 	});
 });
 

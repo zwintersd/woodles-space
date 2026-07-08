@@ -39,7 +39,16 @@
 	.section {
 		padding: 0.65rem 0.85rem;
 		border-bottom: 1px solid var(--ta-border-soft);
-		transition: padding var(--ta-transition-medium);
+		transition: background var(--ta-transition-fast), padding var(--ta-transition-medium);
+	}
+
+	.section:hover,
+	.section:focus-within {
+		background: linear-gradient(
+			90deg,
+			color-mix(in srgb, var(--column-color, var(--ta-accent)) 7%, transparent),
+			transparent 72%
+		);
 	}
 
 	.section:last-child {
@@ -72,14 +81,14 @@
 	}
 
 	.section.full .section-label {
-		color: var(--ta-text-dim);
+		color: color-mix(in srgb, var(--column-color, var(--ta-accent)) 70%, var(--ta-text-dim));
 	}
 
 	.section-count {
 		font-family: var(--ta-font-mono);
 		font-size: 0.66rem;
-		color: var(--ta-muted);
-		background: var(--ta-bg-subtle);
+		color: color-mix(in srgb, var(--column-color, var(--ta-accent)) 70%, var(--ta-text-dim));
+		background: color-mix(in srgb, var(--column-color, var(--ta-accent)) 13%, white);
 		border-radius: var(--ta-radius-pill);
 		padding: 0.05rem 0.4rem;
 	}
@@ -108,8 +117,8 @@
 	}
 
 	.section-add:hover {
-		background: var(--ta-accent-soft);
-		color: var(--ta-accent);
+		background: color-mix(in srgb, var(--column-color, var(--ta-accent)) 14%, white);
+		color: color-mix(in srgb, var(--column-color, var(--ta-accent)) 78%, black);
 		transform: scale(1.15);
 	}
 

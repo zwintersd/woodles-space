@@ -1,5 +1,6 @@
 import { createAppSync } from '@woodles/sync';
 import { thinkingAbout } from './thinkingAbout.svelte';
+import { isThinkingAboutBlobNewer } from './syncLogic';
 import type { ThinkingAboutBlob } from './types';
 
 class SyncState {
@@ -17,13 +18,13 @@ export const { connectAndHydrate, initSync, flushSync, disconnect } =
 		adapter: {
 			app: 'thinking-about',
 			read(): ThinkingAboutBlob {
-				return { entries: thinkingAbout.entries };
+				return { entries: thinkingAbout.entries, updatedAt: thinkingAbout.updatedAt };
 			},
 			write(blob: ThinkingAboutBlob): void {
 				thinkingAbout.rehydrate(blob);
 			},
 			isNewer(local: ThinkingAboutBlob, remote: ThinkingAboutBlob): boolean {
-				return (local.entries?.length ?? 0) > (remote.entries?.length ?? 0);
+				return isThinkingAboutBlobNewer(local, remote);
 			}
 		},
 		state: syncState

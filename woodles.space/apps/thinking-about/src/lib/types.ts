@@ -39,6 +39,7 @@ export type ThinkingAboutEntry = {
 
 export type ThinkingAboutBlob = {
 	entries: ThinkingAboutEntry[];
+	updatedAt?: string;
 };
 
 export type SectionSize = 'minimized' | 'compact' | 'full';
