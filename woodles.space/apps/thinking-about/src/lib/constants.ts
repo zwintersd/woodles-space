@@ -113,10 +113,27 @@ export function showsSchedule(columnKey: ColumnKey): boolean {
 	return columnKey !== 'reading';
 }
 
-// session logging is a watching-only concept — a running log of sittings
-// with a show/film, the way a book or a game doesn't get logged per-episode.
-export function showsSessions(columnKey: ColumnKey): boolean {
-	return columnKey === 'watching';
+// Session logging works the same in every column — reading, playing, and
+// watching all get a running log of sittings — but the copy should still
+// speak the column's own language instead of a one-size-fits-all "session."
+const SESSION_VERB: Record<ColumnKey, string> = {
+	reading: 'reading',
+	playing: 'play',
+	watching: 'watch'
+};
+
+export function sessionVerb(columnKey: ColumnKey): string {
+	return SESSION_VERB[columnKey];
+}
+
+const SESSION_NOTE_PLACEHOLDER: Record<ColumnKey, string> = {
+	reading: 'e.g. ch. 12, pages 40–65',
+	playing: 'e.g. reached the third boss',
+	watching: 'e.g. ep 4–6'
+};
+
+export function sessionNotePlaceholder(columnKey: ColumnKey): string {
+	return SESSION_NOTE_PLACEHOLDER[columnKey];
 }
 
 // Calendar-event-style named swatches — the same visual logic as picking a

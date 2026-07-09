@@ -18,12 +18,12 @@ export type SectionKey =
 
 export type EntryStatus = 'active' | 'archived';
 
-// One sitting down with a thing that's being watched — a single tap logs
-// "today, no note"; the date and note stay editable after the fact.
-export type WatchSession = {
+// One sitting down with a thing being read, played, or watched — a single
+// tap logs "today, no note"; the date and note stay editable after the fact.
+export type Session = {
 	id: string;
 	date: string; // YYYY-MM-DD — defaults to today, editable
-	note: string; // e.g. an episode range — freeform, optional
+	note: string; // e.g. a chapter, a boss, an episode range — freeform, optional
 };
 
 // One thing being read / played / watched. Mirrors the thinking_about_entries
@@ -41,7 +41,7 @@ export type ThinkingAboutEntry = {
 	notes: string;
 	sharedWith: string | null; // only meaningful on *_social sections
 	schedule: string | null; // only meaningful on playing/watching columns
-	sessions: WatchSession[]; // logged sittings — only meaningful on the watching column
+	sessions: Session[]; // logged sittings with the thing, newest first by date
 	createdAt: string; // ISO timestamp
 	updatedAt: string; // ISO timestamp
 };

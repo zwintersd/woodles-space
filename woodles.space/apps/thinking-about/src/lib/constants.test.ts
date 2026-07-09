@@ -9,11 +9,12 @@ import {
 	normalizeColumnSection,
 	sectionLabel,
 	sectionSize,
+	sessionNotePlaceholder,
+	sessionVerb,
 	showsSchedule,
-	showsSessions,
 	showsSharedWith
 } from './constants';
-import type { SectionKey } from './types';
+import type { ColumnKey, SectionKey } from './types';
 
 describe('COLUMNS', () => {
 	it('has exactly reading, playing, watching, in that order', () => {
@@ -161,12 +162,24 @@ describe('showsSchedule', () => {
 	});
 });
 
-describe('showsSessions', () => {
-	it('is true only for watching', () => {
-		expect(showsSessions('watching')).toBe(true);
+describe('sessionVerb', () => {
+	it('gives every column a distinct, non-empty verb', () => {
+		const verbs = COLUMNS.map((c) => sessionVerb(c.key));
+		expect(verbs).toEqual(['reading', 'play', 'watch']);
+		expect(new Set(verbs).size).toBe(verbs.length);
 	});
-	it('is false for reading and playing', () => {
-		expect(showsSessions('reading')).toBe(false);
-		expect(showsSessions('playing')).toBe(false);
+});
+
+describe('sessionNotePlaceholder', () => {
+	it('gives every column a non-empty, distinct placeholder', () => {
+		const placeholders: Record<ColumnKey, string> = {
+			reading: sessionNotePlaceholder('reading'),
+			playing: sessionNotePlaceholder('playing'),
+			watching: sessionNotePlaceholder('watching')
+		};
+		for (const key of COLUMNS.map((c) => c.key)) {
+			expect(placeholders[key].length).toBeGreaterThan(0);
+		}
+		expect(new Set(Object.values(placeholders)).size).toBe(3);
 	});
 });

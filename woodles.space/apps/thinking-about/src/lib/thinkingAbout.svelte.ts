@@ -18,9 +18,9 @@ import type {
 	BoardView,
 	ColumnKey,
 	SectionKey,
+	Session,
 	ThinkingAboutBlob,
-	ThinkingAboutEntry,
-	WatchSession
+	ThinkingAboutEntry
 } from './types';
 
 function load<T>(key: string, fallback: T): T {
@@ -122,14 +122,17 @@ export class ThinkingAbout {
 	}
 
 	// One tap, no dialog — logging a sitting should be as frictionless as
-	// marking an entry done.
-	logSession(id: string, note = ''): void {
-		if (!this.entries.some((e) => e.id === id)) return;
-		this.entries = logSession(this.entries, id, note);
+	// marking an entry done. Returns the new session's id so a caller (the
+	// detail panel's own log button) can focus straight into its note field.
+	logSession(id: string, note = ''): string | null {
+		if (!this.entries.some((e) => e.id === id)) return null;
+		const { entries, created } = logSession(this.entries, id, note);
+		this.entries = entries;
 		this.#touch();
+		return created?.id ?? null;
 	}
 
-	updateSession(entryId: string, sessionId: string, patch: Partial<Omit<WatchSession, 'id'>>): void {
+	updateSession(entryId: string, sessionId: string, patch: Partial<Omit<Session, 'id'>>): void {
 		if (!this.entries.some((e) => e.id === entryId)) return;
 		this.entries = updateSession(this.entries, entryId, sessionId, patch);
 		this.#touch();

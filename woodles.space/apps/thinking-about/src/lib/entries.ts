@@ -3,7 +3,7 @@
 // which is a thin wrapper delegating to these functions).
 
 import { DEFAULT_COLOR, normalizeColumnSection } from './constants';
-import type { ColumnKey, EntryStatus, SectionKey, ThinkingAboutEntry, WatchSession } from './types';
+import type { ColumnKey, EntryStatus, SectionKey, Session, ThinkingAboutEntry } from './types';
 
 export function uid(): string {
 	return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -29,7 +29,7 @@ function normalizedStatus(value: unknown): EntryStatus {
 	return value === 'archived' ? 'archived' : 'active';
 }
 
-function normalizeSession(raw: Partial<WatchSession>): WatchSession {
+function normalizeSession(raw: Partial<Session>): Session {
 	return {
 		id: stringOr(raw.id, uid()),
 		date: stringOr(raw.date, today()),
@@ -37,7 +37,7 @@ function normalizeSession(raw: Partial<WatchSession>): WatchSession {
 	};
 }
 
-function normalizeSessions(raw: unknown): WatchSession[] {
+function normalizeSessions(raw: unknown): Session[] {
 	return Array.isArray(raw) ? raw.map(normalizeSession) : [];
 }
 
@@ -101,25 +101,30 @@ export function deleteEntry(entries: ThinkingAboutEntry[], id: string): Thinking
 	return entries.filter((e) => e.id !== id);
 }
 
-// One tap logs "watched today" — no dialog, nothing required. Newest first,
-// so the freshest sitting reads at the top of the log.
+// One tap logs a sitting for today — no dialog, nothing required, the same
+// gesture whether the thing is a book, a game, or a show. Newest first, so
+// the freshest sitting reads at the top of the log. Returns the created
+// session alongside the updated entries so a caller can, say, focus its
+// note field — mirrors addEntry's { entries, created } shape.
 export function logSession(
 	entries: ThinkingAboutEntry[],
 	id: string,
 	note = ''
-): ThinkingAboutEntry[] {
-	return entries.map((e) =>
-		e.id === id
-			? { ...e, sessions: [{ id: uid(), date: today(), note }, ...e.sessions], updatedAt: nowIso() }
-			: e
-	);
+): { entries: ThinkingAboutEntry[]; created: Session | null } {
+	let created: Session | null = null;
+	const next = entries.map((e) => {
+		if (e.id !== id) return e;
+		created = { id: uid(), date: today(), note };
+		return { ...e, sessions: [created, ...e.sessions], updatedAt: nowIso() };
+	});
+	return { entries: next, created };
 }
 
 export function updateSession(
 	entries: ThinkingAboutEntry[],
 	entryId: string,
 	sessionId: string,
-	patch: Partial<Omit<WatchSession, 'id'>>
+	patch: Partial<Omit<Session, 'id'>>
 ): ThinkingAboutEntry[] {
 	return entries.map((e) =>
 		e.id === entryId
@@ -169,6 +174,17 @@ export function latestEntryTimestamp(entries: ThinkingAboutEntry[] | undefined):
 	for (const entry of entries ?? []) {
 		const stamp = entry.updatedAt || entry.createdAt;
 		if (stamp && (!latest || stamp > latest)) latest = stamp;
+	}
+	return latest;
+}
+
+// The most recent sitting's date — sessions aren't stored in date order (a
+// backdated edit can leave the array unsorted), so this scans rather than
+// trusting sessions[0]. Powers the "last logged" hint on the board chip.
+export function latestSessionDate(sessions: Session[]): string | null {
+	let latest: string | null = null;
+	for (const session of sessions) {
+		if (!latest || session.date > latest) latest = session.date;
 	}
 	return latest;
 }
