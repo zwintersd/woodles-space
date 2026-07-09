@@ -1,11 +1,19 @@
 <script lang="ts">
-	import { fly } from 'svelte/transition';
+	import { fly, scale } from 'svelte/transition';
 	import { motionDuration } from '$lib/motion';
-	import { showsSessions } from '$lib/constants';
+	import { sessionVerb } from '$lib/constants';
+	import { latestSessionDate } from '$lib/entries';
 	import { thinkingAbout } from '$lib/thinkingAbout.svelte';
 	import type { ThinkingAboutEntry } from '$lib/types';
 
 	let { entry }: { entry: ThinkingAboutEntry } = $props();
+
+	let lastLogged = $derived(latestSessionDate(entry.sessions));
+	let logTitle = $derived(
+		lastLogged
+			? `log a ${sessionVerb(entry.columnKey)} session — last logged ${lastLogged}`
+			: `log a ${sessionVerb(entry.columnKey)} session`
+	);
 </script>
 
 <div
@@ -17,19 +25,21 @@
 		<span class="chip-dot" aria-hidden="true"></span>
 		<span class="chip-title">{entry.title || 'untitled'}</span>
 	</button>
-	{#if showsSessions(entry.columnKey)}
-		<button
-			class="chip-log"
-			onclick={() => thinkingAbout.logSession(entry.id)}
-			title="log a watch session"
-			aria-label="log a watch session for {entry.title || 'untitled'}"
-		>
-			<span aria-hidden="true">▸</span>
-			{#if entry.sessions.length > 0}
-				<span class="chip-log-count">{entry.sessions.length}</span>
-			{/if}
-		</button>
-	{/if}
+	<button
+		class="chip-log"
+		onclick={() => thinkingAbout.logSession(entry.id)}
+		title={logTitle}
+		aria-label="log a {sessionVerb(entry.columnKey)} session for {entry.title || 'untitled'}"
+	>
+		<span aria-hidden="true">▸</span>
+		{#if entry.sessions.length > 0}
+			{#key entry.sessions.length}
+				<span class="chip-log-count" in:scale={{ duration: motionDuration(220), start: 0.4 }}>
+					{entry.sessions.length}
+				</span>
+			{/key}
+		{/if}
+	</button>
 	<button
 		class="chip-archive"
 		onclick={() => thinkingAbout.archiveEntry(entry.id)}

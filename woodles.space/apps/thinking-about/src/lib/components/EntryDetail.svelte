@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { fade, fly } from 'svelte/transition';
 	import { quintOut } from 'svelte/easing';
 	import { thinkingAbout } from '$lib/thinkingAbout.svelte';
@@ -7,8 +8,9 @@
 		columnForSection,
 		columnLabel,
 		sectionLabel,
+		sessionNotePlaceholder,
+		sessionVerb,
 		showsSchedule,
-		showsSessions,
 		showsSharedWith
 	} from '$lib/constants';
 	import { motionDuration } from '$lib/motion';
@@ -47,6 +49,15 @@
 		const restoreTo = previousFocus;
 		thinkingAbout.closeEntry();
 		queueMicrotask(() => restoreTo?.focus());
+	}
+
+	// Log, then jump the cursor straight into the new row's note field — tick()
+	// waits for the row to actually exist in the DOM before it goes looking.
+	async function handleLogSession(entryId: string): Promise<void> {
+		const sessionId = thinkingAbout.logSession(entryId);
+		if (!sessionId) return;
+		await tick();
+		detailPanel?.querySelector<HTMLInputElement>(`[data-session-id="${sessionId}"]`)?.focus();
 	}
 
 	function moveToSection(sectionKey: SectionKey): void {
@@ -187,51 +198,50 @@
 			</div>
 		{/if}
 
-		{#if showsSessions(entry.columnKey)}
-			<div class="detail-field">
-				<div class="sessions-heading">
-					<span class="detail-field-label">sessions</span>
-					<button class="btn-log-session" onclick={() => thinkingAbout.logSession(id)}>
-						+ log session
-					</button>
-				</div>
-				{#if sessions.length === 0}
-					<p class="sessions-empty">no sessions logged yet</p>
-				{:else}
-					<ul class="sessions-list">
-						{#each sessions as session (session.id)}
-							<li class="session-row">
-								<input
-									type="date"
-									class="session-date"
-									value={session.date}
-									aria-label="date watched"
-									onchange={(e) =>
-										thinkingAbout.updateSession(id, session.id, { date: e.currentTarget.value })}
-								/>
-								<input
-									type="text"
-									class="session-note"
-									placeholder="note (optional)"
-									value={session.note}
-									aria-label="session note"
-									oninput={(e) =>
-										thinkingAbout.updateSession(id, session.id, { note: e.currentTarget.value })}
-								/>
-								<button
-									class="field-clear"
-									onclick={() => thinkingAbout.removeSession(id, session.id)}
-									title="remove session"
-									aria-label="remove session logged {session.date}"
-								>
-									×
-								</button>
-							</li>
-						{/each}
-					</ul>
-				{/if}
+		<div class="detail-field">
+			<div class="sessions-heading">
+				<span class="detail-field-label">{sessionVerb(entry.columnKey)} sessions</span>
+				<button class="btn-log-session" onclick={() => handleLogSession(id)}>
+					+ log session
+				</button>
 			</div>
-		{/if}
+			{#if sessions.length === 0}
+				<p class="sessions-empty">no sessions logged yet</p>
+			{:else}
+				<ul class="sessions-list">
+					{#each sessions as session (session.id)}
+						<li class="session-row" transition:fly={{ y: -6, duration: motionDuration(160) }}>
+							<input
+								type="date"
+								class="session-date"
+								value={session.date}
+								aria-label="session date"
+								onchange={(e) =>
+									thinkingAbout.updateSession(id, session.id, { date: e.currentTarget.value })}
+							/>
+							<input
+								type="text"
+								class="session-note"
+								data-session-id={session.id}
+								placeholder={sessionNotePlaceholder(entry.columnKey)}
+								value={session.note}
+								aria-label="session note"
+								oninput={(e) =>
+									thinkingAbout.updateSession(id, session.id, { note: e.currentTarget.value })}
+							/>
+							<button
+								class="field-clear"
+								onclick={() => thinkingAbout.removeSession(id, session.id)}
+								title="remove session"
+								aria-label="remove session logged {session.date}"
+							>
+								×
+							</button>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</div>
 
 		<div class="detail-field">
 			<label for="ta-notes">notes</label>

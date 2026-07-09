@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_COLOR } from './constants';
+import { DEFAULT_COLOR, defaultSectionForColumn } from './constants';
 import {
 	addEntry,
 	archiveEntry,
@@ -9,6 +9,7 @@ import {
 	entriesForSection,
 	isUntouched,
 	latestEntryTimestamp,
+	latestSessionDate,
 	logSession,
 	normalizeEntry,
 	removeSession,
@@ -17,7 +18,7 @@ import {
 	updateEntry,
 	updateSession
 } from './entries';
-import type { ThinkingAboutEntry, WatchSession } from './types';
+import type { Session, ThinkingAboutEntry } from './types';
 
 function make(over: Partial<ThinkingAboutEntry>): ThinkingAboutEntry {
 	return { ...blankEntry('reading', 'book'), ...over };
@@ -128,28 +129,55 @@ describe('deleteEntry', () => {
 });
 
 describe('logSession', () => {
-	it('prepends a session dated today with an empty note by default', () => {
+	it('prepends a session dated today with an empty note by default, and returns it as created', () => {
 		const a = make({ id: 'a' });
-		const [result] = logSession([a], 'a');
-		expect(result.sessions).toHaveLength(1);
-		expect(result.sessions[0]).toMatchObject({ date: today(), note: '' });
+		const { entries, created } = logSession([a], 'a');
+		expect(entries[0].sessions).toHaveLength(1);
+		expect(entries[0].sessions[0]).toMatchObject({ date: today(), note: '' });
+		expect(created).toMatchObject({ date: today(), note: '' });
+		expect(entries[0].sessions[0]).toEqual(created);
 	});
 
 	it('accepts a note and keeps prior sessions, newest first', () => {
 		const a = make({ id: 'a', sessions: [{ id: 'old', date: '2026-01-01', note: 'ep 1' }] });
-		const [result] = logSession([a], 'a', 'ep 2');
-		expect(result.sessions.map((s) => s.note)).toEqual(['ep 2', 'ep 1']);
+		const { entries } = logSession([a], 'a', 'ep 2');
+		expect(entries[0].sessions.map((s) => s.note)).toEqual(['ep 2', 'ep 1']);
+	});
+
+	it('works the same regardless of the entry column — reading, playing, or watching', () => {
+		for (const columnKey of ['reading', 'playing', 'watching'] as const) {
+			const a = blankEntry(columnKey, defaultSectionForColumn(columnKey));
+			const { created } = logSession([a], a.id, 'a note');
+			expect(created).toMatchObject({ date: today(), note: 'a note' });
+		}
 	});
 
 	it('is a no-op for an unknown id', () => {
 		const a = make({ id: 'a' });
-		expect(logSession([a], 'nope')).toEqual([a]);
+		const { entries, created } = logSession([a], 'nope');
+		expect(entries).toEqual([a]);
+		expect(created).toBeNull();
 	});
 
 	it('does not mutate the input entry', () => {
 		const a = make({ id: 'a' });
 		logSession([a], 'a');
 		expect(a.sessions).toEqual([]);
+	});
+});
+
+describe('latestSessionDate', () => {
+	it('returns the latest date across sessions regardless of array order', () => {
+		const sessions: Session[] = [
+			{ id: 's1', date: '2026-01-05', note: '' },
+			{ id: 's2', date: '2026-02-01', note: '' },
+			{ id: 's3', date: '2026-01-20', note: '' }
+		];
+		expect(latestSessionDate(sessions)).toBe('2026-02-01');
+	});
+
+	it('falls back to null for no sessions', () => {
+		expect(latestSessionDate([])).toBeNull();
 	});
 });
 
@@ -254,7 +282,7 @@ describe('normalizeEntry', () => {
 
 	it('fills missing id/date on a hand-edited session', () => {
 		const raw = { ...blankEntry('watching', 'film') } as ThinkingAboutEntry;
-		const partialSession = { note: 'ep 3' } as Partial<WatchSession>;
+		const partialSession = { note: 'ep 3' } as Partial<Session>;
 		// @ts-expect-error — simulating a hand-edited/corrupt session record
 		raw.sessions = [partialSession];
 		const normalized = normalizeEntry(raw);
