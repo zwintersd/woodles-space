@@ -180,6 +180,25 @@
   .ex-failure .failure-why p{font-size:12.8px; line-height:1.5; color:var(--ink); margin:0;}
   @media (max-width:480px){ .ex-failure .failure-tracks{grid-template-columns:1fr;} }
 
+  /* ============================================================
+     .artifact-meta — NOT an .ex- pattern on purpose: a two-line
+     typographic convention (metadata strip + prose), not a block
+     family. Used by artifact close-reading.
+     ============================================================ */
+  .artifact-meta{display:flex; flex-wrap:wrap; margin:0 0 14px; border:1px solid var(--rose-dust); border-radius:8px; overflow:hidden;}
+  .artifact-meta > div{flex:1 1 130px; padding:8px 12px; border-right:1px dotted var(--rose-dust); background:var(--paper);}
+  .artifact-meta > div:last-child{border-right:none;}
+  .artifact-meta dt{font-family:var(--font-display); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--rose-deep); margin:0 0 2px;}
+  .artifact-meta dd{font-size:12.5px; color:var(--ink); margin:0;}
+
+  /* ============================================================
+     composed-demo — a stack of existing blocks with no wrapper of
+     its own, used by the experiment-walkthrough demonstration
+     ============================================================ */
+  .composed-demo > *{margin-bottom:16px;}
+  .composed-demo > *:last-child{margin-bottom:0;}
+  .composed-label{font-family:var(--font-display); font-weight:600; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--rose-dust); text-align:center; margin-bottom:8px;}
+
   footer.tagline{text-align:center; font-family:var(--font-display); font-style:italic; font-size:15px; color:var(--rose-dust); margin-top:10px;}
 </style>
 </head>
@@ -191,7 +210,7 @@
   <div class="intro-note">
     <h1>Example Block Library</h1>
     <p>The topic-dependent half of the system. Where the <a href="/ologypedia/textbook-chrome-blocks.html" style="color:var(--rose-deep);">chrome blocks</a> barely vary page to page, these four vary with what the worked example actually is — a causal chain wants nodes and arrows, a chronology wants a spine, a chart wants an axis. Each still renders inside the chrome's <code>.figure-box</code>, which already handles the border, background, and caption; these components only fill the content area.</p>
-    <p>Class-naming convention: <code>.ex-&lt;pattern&gt;</code>. Ten are built here, covering thirteen of the menu's sixteen formats — <code>.ex-mechanism</code>, <code>.ex-compare</code>, <code>.ex-timeline</code>, <code>.ex-datadive</code>, <code>.ex-case</code>, <code>.ex-document</code>, <code>.ex-exchange</code>, <code>.ex-spectrum</code>, <code>.ex-envelope</code>, <code>.ex-failure</code>. One pattern can honestly cover more than one menu item when the shapes converge — <code>.ex-case</code> is a single "specific real instance, and what it settled" card reused across legal case, single documented case, policy/institutional episode, and biographical vignette, distinguished only by its eyebrow label. The remaining three menu items — artifact close-reading, geographic case, experiment walkthrough — are documented at the bottom of this file as deliberately <em>not</em> new components: they compose the existing blocks, or they're just well-set prose. Don't force a diagram where the prose already carries it.</p>
+    <p>Class-naming convention: <code>.ex-&lt;pattern&gt;</code>. Ten are built here, covering all sixteen of the menu's formats — <code>.ex-mechanism</code>, <code>.ex-compare</code>, <code>.ex-timeline</code>, <code>.ex-datadive</code>, <code>.ex-case</code>, <code>.ex-document</code>, <code>.ex-exchange</code>, <code>.ex-spectrum</code>, <code>.ex-envelope</code>, <code>.ex-failure</code>. One pattern can honestly cover more than one menu item when the shapes converge — <code>.ex-case</code> is a single "specific real instance, and what it settled" card reused across legal case, single documented case, policy/institutional episode, and biographical vignette, distinguished only by its eyebrow label. The last three menu items — artifact close-reading, geographic case, experiment walkthrough — are demonstrated at the bottom of this file too, but deliberately <em>without</em> a new component: one reaches for <code>.ex-case</code> again, one composes three existing blocks with no wrapper of its own, and one is a two-line typographic convention that isn't part of the <code>.ex-</code> family at all. Don't build a pattern where reuse already carries it.</p>
     <p>Every color below is one of the seven tokens already defined in <code>textbook-chrome-blocks.html</code> — no second palette, no new hex values. <code>.ex-datadive</code>'s bars and <code>.ex-spectrum</code>'s track use <code>color-mix()</code> / a two-token gradient rather than any new hue; <code>.ex-envelope</code> borrows <code>var(--font-mono)</code> from <code>shared/fonts.css</code> (already loaded) for tabular digit alignment — still no font stack of its own.</p>
   </div>
 
@@ -501,16 +520,126 @@
     <p class="note">Sage marks the path nobody got to see (the intention); rose marks what was actually documented happening. Keeping both visible at once, rather than narrating the failure in isolation, is what makes the gap legible as a gap.</p>
   </section>
 
+  <!-- ============================================================
+       11. artifact close-reading — a convention, not a pattern
+       ============================================================ -->
   <section>
-    <span class="label">the other three — deliberately not new components</span>
-    <div class="intro-note" style="margin-bottom:0;">
-      <p><b>Artifact close-reading</b> — one real object and what it reveals. Usually just a short metadata line (object, date, material, current location) in front of ordinary prose; if the object needs a labeled diagram, that's <code>.ex-mechanism</code> with the "steps" reframed as "features," not a new pattern.</p>
-      <p><b>Geographic case</b> — a real place where the concept plays out visibly. Without real map data this is prose plus a short place line (name, coordinates, region); reach for <code>.ex-case</code> when the place has a clear "what happened here, and why it matters" shape.</p>
-      <p><b>Experiment walkthrough</b> — one real study's design and result. Compose it: <code>.ex-mechanism</code> for the procedure's steps, <code>.ex-compare</code> for control vs. treatment, and <code>.ex-datadive</code> for the result — three existing blocks, no fourth one needed.</p>
+    <span class="label"><code>.artifact-meta</code> — artifact close-reading: one real object and what it reveals (not an <code>.ex-</code> pattern on purpose)</span>
+    <div class="block-demo">
+      <figure class="figure-box">
+        <figcaption>Figure &middot; A Metadata Strip, Then Ordinary Prose</figcaption>
+        <dl class="artifact-meta">
+          <div><dt>Object</dt><dd>What it plainly is</dd></div>
+          <div><dt>Date</dt><dd>When it was made</dd></div>
+          <div><dt>Material</dt><dd>What it's made of</dd></div>
+          <div><dt>Now at</dt><dd>Current location</dd></div>
+        </dl>
+        <p style="font-size:13px; line-height:1.6; color:var(--ink); margin:0;">The close-reading itself runs here as ordinary, unstyled prose — the same weight as any other paragraph on the page. That's the point: an artifact's interest is almost always in what it means, which is an argument, not a diagram.</p>
+      </figure>
     </div>
+    <p class="note">Two lines of markup, not a component — a <code>&lt;dl&gt;</code> and a paragraph. If a specific physical feature of the object is doing real argumentative work ("note the wear pattern here, and here"), that's <code>.ex-mechanism</code> borrowed wholesale, with its step numbers read as callouts to features instead of stages in a process — still not a fifth thing to maintain.</p>
   </section>
 
-  <footer class="tagline">Ten patterns down, three left — and those three don't need a new one. ✦</footer>
+  <!-- ============================================================
+       12. geographic case — reuses .ex-case directly
+       ============================================================ -->
+  <section>
+    <span class="label"><code>.ex-case</code> again — geographic case: a real place where the concept plays out visibly</span>
+    <div class="block-demo">
+      <figure class="figure-box">
+        <figcaption>Figure &middot; A Place, Read the Same Way as a Ruling or a Life</figcaption>
+        <div class="ex-case">
+          <div class="case-head">
+            <span class="case-kind">Geographic Case</span>
+            <h5 class="case-title">Place Name</h5>
+            <span class="case-meta">Coordinates &middot; Region</span>
+          </div>
+          <p class="case-body">What happens here, specifically — not a place in general, but this one, and why the concept is legible here in a way a description couldn't manage on its own.</p>
+          <div class="case-outcome">
+            <span class="outcome-label">Why Here</span>
+            <p>What this location makes visible that a generic example wouldn't.</p>
+          </div>
+        </div>
+      </figure>
+    </div>
+    <p class="note">Zero new CSS on this one — it's literally <code>.ex-case</code> a fifth time, with <code>.case-kind</code> reading "Geographic Case" instead of "Legal Case." A place that did something specific and checkable is structurally identical to a ruling that did: header, facts, outcome.</p>
+  </section>
+
+  <!-- ============================================================
+       13. experiment walkthrough — composed from three blocks
+       ============================================================ -->
+  <section>
+    <span class="label">composed from three <code>.ex-</code> blocks — experiment walkthrough: one real study's design and result</span>
+    <div class="block-demo">
+      <figure class="figure-box">
+        <figcaption>Figure &middot; One Study, Three Existing Blocks, No Fourth One</figcaption>
+        <div class="composed-demo">
+          <div>
+            <span class="composed-label">1 &middot; Procedure, via <code>.ex-mechanism</code></span>
+            <div class="ex-mechanism">
+              <div class="node">
+                <span class="node-tag">Step 1</span>
+                <h5 class="node-title">Hypothesis</h5>
+                <p class="node-detail">What the study predicts, stated so it could fail.</p>
+              </div>
+              <div class="arrow">→</div>
+              <div class="node">
+                <span class="node-tag">Step 2</span>
+                <h5 class="node-title">Procedure</h5>
+                <p class="node-detail">What was actually done to test it.</p>
+              </div>
+              <div class="arrow">→</div>
+              <div class="node node-accent">
+                <span class="node-tag">Step 3</span>
+                <h5 class="node-title">Observation</h5>
+                <p class="node-detail">What was measured, and how.</p>
+              </div>
+            </div>
+          </div>
+          <div>
+            <span class="composed-label">2 &middot; Design, via <code>.ex-compare</code></span>
+            <div class="ex-compare">
+              <div class="pair-item">
+                <h5 class="pair-name">Control Group</h5>
+                <ul class="pair-facts">
+                  <li><b>Gets:</b> everything except the manipulated variable</li>
+                  <li><b>Purpose:</b> the baseline the treatment group is read against</li>
+                </ul>
+              </div>
+              <div class="pair-variable"><span>isolating<br><b>the manipulated variable</b></span></div>
+              <div class="pair-item">
+                <h5 class="pair-name">Treatment Group</h5>
+                <ul class="pair-facts">
+                  <li><b>Gets:</b> everything the control gets, plus the one variable</li>
+                  <li><b>Purpose:</b> where the predicted effect should show up</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div>
+            <span class="composed-label">3 &middot; Result, via <code>.ex-datadive</code></span>
+            <div class="ex-datadive">
+              <svg viewBox="0 0 320 150" role="img" aria-label="Bar chart comparing control and treatment group results: control at 12 units, treatment at 47 units.">
+                <line class="grid-line" x1="30" y1="95" x2="290" y2="95"></line>
+                <line class="grid-line" x1="30" y1="65" x2="290" y2="65"></line>
+                <line class="axis-line" x1="30" y1="120" x2="290" y2="120"></line>
+                <rect x="70" y="110" width="50" height="10" rx="4" style="fill:color-mix(in srgb, var(--rose-deep) 25%, var(--rose-dust));"><title>Control — 12 units</title></rect>
+                <text class="bar-value" x="95" y="104" text-anchor="middle">12</text>
+                <text class="bar-label" x="95" y="136" text-anchor="middle">Control</text>
+                <rect x="180" y="42" width="50" height="78" rx="4" style="fill:color-mix(in srgb, var(--rose-deep) 100%, var(--rose-dust));"><title>Treatment — 47 units</title></rect>
+                <text class="bar-value" x="205" y="36" text-anchor="middle">47</text>
+                <text class="bar-label" x="205" y="136" text-anchor="middle">Treatment</text>
+              </svg>
+              <p class="datadive-note"><b>So what:</b> the gap between the two bars is the entire result — everything above is what makes that gap interpretable instead of just a fact.</p>
+            </div>
+          </div>
+        </div>
+      </figure>
+    </div>
+    <p class="note">No wrapper class holds these three together — <code>.composed-demo</code> above is nothing but a margin reset between three ordinary block instances, stacked in the order a reader needs them: what was predicted, how it was set up, what happened. A fourth "experiment" pattern would just be these three blocks pre-glued, which is exactly the kind of premature component this library is trying to avoid.</p>
+  </section>
+
+  <footer class="tagline">Sixteen menu items, ten shapes — the rest just borrow. ✦</footer>
 
 </div>
 </body>
