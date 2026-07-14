@@ -83,20 +83,15 @@
       padding: 1.4rem 1.4rem calc(64px + 1.4rem);
     }
 
-    /* desktop icons — top-left, single scrollable column */
+    /* desktop icons — freely placeable, like a real desktop.
+       positions are computed in JS (column-major default) and any icon can
+       be dragged anywhere; custom spots persist in localStorage. */
     .icons {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0.4rem;
-      height: 100%;
-      overflow-y: auto;
-      overflow-x: hidden;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
+      position: absolute;
+      inset: 1.4rem 1.4rem calc(64px + 1.4rem);
     }
-    .icons::-webkit-scrollbar { display: none; }
     .icon {
+      position: absolute;
       width: 108px;
       padding: 0.75rem 0.5rem 0.65rem;
       display: flex; flex-direction: column; align-items: center;
@@ -105,9 +100,19 @@
       cursor: pointer;
       text-decoration: none;
       border: 1px solid transparent;
+      touch-action: none;
       transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
       opacity: 0;
       animation: icon-in 0.6s ease forwards;
+    }
+    .icon.dragging {
+      z-index: 15;
+      transform: scale(1.06) rotate(-1.5deg);
+      background: color-mix(in srgb, var(--surface) 82%, transparent);
+      border-color: var(--rule);
+      box-shadow: 0 18px 36px -14px var(--accent-deep);
+      transition: none;
+      cursor: grabbing;
     }
     @keyframes icon-in {
       from { opacity: 0; transform: translateY(10px) scale(0.96); }
@@ -464,7 +469,7 @@
       opacity: 0; pointer-events: none;
       transition: opacity 0.2s ease;
     }
-    body.about-open .scrim { opacity: 1; pointer-events: auto; }
+    body.win-open .scrim { opacity: 1; pointer-events: auto; }
     .window {
       position: fixed; z-index: 40;
       top: 50%; left: 50%;
@@ -480,7 +485,7 @@
       transition: opacity 0.22s ease, transform 0.22s cubic-bezier(.2,.9,.3,1);
       overflow: hidden;
     }
-    body.about-open .window {
+    .window.open {
       opacity: 1; pointer-events: auto;
       transform: translate(-50%, -50%) scale(1);
     }
@@ -572,16 +577,138 @@
       color: var(--accent-deep);
     }
     .fly-themes {
-      display: flex; gap: 0.4rem; margin-top: 0.9rem;
+      display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.9rem;
     }
+    /* each swatch carries its own data-theme, so the palette vars inside it
+       resolve to that theme — a live preview for free */
     .swatch {
       width: 26px; height: 26px;
       border-radius: 8px; cursor: pointer;
       border: 2px solid transparent;
+      background: linear-gradient(135deg,
+        var(--bg) 0% 48%, var(--lavender) 48% 76%, var(--peach) 76% 100%);
+      box-shadow: inset 0 0 0 1px var(--rule);
       transition: transform 0.14s ease, border-color 0.14s ease;
     }
     .swatch:hover { transform: scale(1.14); }
     .swatch.on { border-color: var(--accent-strong); }
+    .fly-pers {
+      display: block; width: 100%;
+      margin-top: 0.9rem;
+      padding: 0.5rem 0;
+      border: 1px dashed var(--rule);
+      border-radius: 9px;
+      background: transparent;
+      cursor: pointer;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.58rem; letter-spacing: 0.1em;
+      color: var(--muted);
+      transition: background 0.16s ease, color 0.16s ease;
+    }
+    .fly-pers:hover {
+      background: color-mix(in srgb, var(--accent) 20%, transparent);
+      color: var(--accent-strong);
+    }
+
+    /* ─────────────────────── editable name ─────────────────────────── */
+    .greet-name {
+      cursor: pointer;
+      border-bottom: 1px dashed transparent;
+      transition: border-color 0.16s ease;
+    }
+    .greet-name:hover { border-bottom-color: var(--accent-deep); }
+    .greet-input {
+      font: inherit;
+      font-style: italic;
+      color: var(--accent-deep);
+      background: transparent;
+      border: none;
+      border-bottom: 1px dashed var(--accent-deep);
+      outline: none;
+      width: 8ch;
+      padding: 0;
+    }
+    .start-user { cursor: pointer; border-radius: 10px; padding: 0.25rem 0.45rem; margin: -0.25rem -0.45rem; transition: background 0.16s ease; }
+    .start-user:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+
+    /* ───────────────────── personalize window ──────────────────────── */
+    .pers-body { padding: 1.2rem 1.4rem 1.4rem; display: flex; flex-direction: column; gap: 1.05rem; }
+    .pers-row { display: flex; flex-direction: column; gap: 0.45rem; }
+    .pers-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.56rem; letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .pers-input {
+      width: 100%;
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 1.1rem;
+      padding: 0.5rem 0.85rem;
+      border-radius: 10px;
+      border: 1px solid var(--rule);
+      background: color-mix(in srgb, var(--bg) 70%, transparent);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+    .pers-input:focus {
+      border-color: var(--accent-strong);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+    }
+    .pers-hint {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.54rem; letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .theme-grid { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+    .theme-grid .swatch { width: 34px; height: 34px; border-radius: 10px; }
+    .seg {
+      display: inline-flex; gap: 0.2rem;
+      padding: 0.2rem;
+      border: 1px solid var(--rule);
+      border-radius: 10px;
+      align-self: flex-start;
+    }
+    .seg button {
+      border: none; background: transparent;
+      padding: 0.35rem 0.85rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem; letter-spacing: 0.08em;
+      color: var(--muted);
+      transition: background 0.14s ease, color 0.14s ease;
+    }
+    .seg button:hover { color: var(--text); }
+    .seg button.on {
+      background: color-mix(in srgb, var(--accent) 40%, transparent);
+      color: var(--accent-strong);
+    }
+    .pers-foot {
+      display: flex; gap: 0.5rem;
+      padding-top: 0.9rem;
+      border-top: 1px solid var(--rule);
+    }
+    .pers-foot button {
+      flex: 1;
+      border: 1px solid var(--rule);
+      background: transparent;
+      border-radius: 10px;
+      padding: 0.5rem 0;
+      cursor: pointer;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem; letter-spacing: 0.1em;
+      color: var(--muted);
+      transition: background 0.16s ease, color 0.16s ease;
+    }
+    .pers-foot button:hover {
+      background: color-mix(in srgb, var(--accent) 22%, transparent);
+      color: var(--accent-strong);
+    }
+
+    body.no-sparkles .sparkle { display: none; }
+    .ampm { font-size: 0.45em; letter-spacing: 0.1em; color: var(--muted); margin-left: 0.15em; }
 
     /* ─────────────────────────── open transition ───────────────────── */
     .launch {
@@ -791,7 +918,7 @@
   <!-- phone home screen -->
   <main class="phone" id="phone">
     <header class="phone-top">
-      <p class="phone-greet" id="m-greet">hello</p>
+      <p class="phone-greet"><span id="m-greet-word">hello,</span> <em class="greet-name" id="m-greet-name" title="tap to change your name">user</em></p>
       <p class="phone-clock" id="m-clock">--:--</p>
       <p class="phone-date" id="m-date"></p>
     </header>
@@ -802,7 +929,7 @@
 
   <!-- greeting widget -->
   <aside class="widget" id="widget">
-    <p class="widget-greet" id="greet">hello</p>
+    <p class="widget-greet"><span id="greet-word">hello,</span> <em class="greet-name" id="greet-name" title="click to change your name">user</em></p>
     <p class="widget-clock" id="w-clock">--:--</p>
     <p class="widget-date" id="w-date"></p>
     <p class="widget-note" id="w-note"></p>
@@ -816,9 +943,9 @@
     <p class="start-section" id="rec-label">recommended</p>
     <div class="recommended" id="recommended"></div>
     <div class="start-foot">
-      <div class="start-user">
-        <div class="user-pic">z</div>
-        <span class="user-name">z winters</span>
+      <div class="start-user" id="start-user" title="personalize" role="button" tabindex="0">
+        <div class="user-pic" id="user-pic">u</div>
+        <span class="user-name" id="user-name">user</span>
       </div>
       <button class="start-power" id="about-btn" title="about">&#9432;</button>
     </div>
@@ -829,8 +956,9 @@
     <p class="fly-day" id="fly-day">day</p>
     <p class="fly-big" id="fly-big">00</p>
     <p class="fly-month" id="fly-month">month</p>
-    <p class="fly-note">a good day to make something &#10084;</p>
+    <p class="fly-note" id="fly-note">a good day to make something &#10084;</p>
     <div class="fly-themes" id="themes"></div>
+    <button class="fly-pers" id="fly-pers">personalize this desktop &#10024;</button>
   </section>
 
   <!-- taskbar -->
@@ -858,6 +986,7 @@
   <div class="ctx" id="ctx">
     <button class="ctx-item" data-act="start"><span class="ctx-glyph">&#9678;</span> open start</button>
     <button class="ctx-item" data-act="wallpaper"><span class="ctx-glyph">&#10052;</span> next wallpaper</button>
+    <button class="ctx-item" data-act="personalize"><span class="ctx-glyph">&#10024;</span> personalize</button>
     <button class="ctx-item" data-act="tidy"><span class="ctx-glyph">&#10070;</span> tidy desktop</button>
     <div class="ctx-sep"></div>
     <button class="ctx-item" data-act="refresh"><span class="ctx-glyph">&#8635;</span> refresh</button>
@@ -882,6 +1011,47 @@
          i've chosen to put on show. everything you make here is yours alone,
          saved in your own browser, unless you publish it the same way.</p>
       <p class="win-meta" id="win-meta">z winters &middot; open monorepo</p>
+    </div>
+  </div>
+
+  <!-- personalize window -->
+  <div class="window" id="pwin" role="dialog" aria-label="Personalize">
+    <div class="titlebar" id="p-titlebar">
+      <span class="title">personalize &mdash; woodles.space</span>
+      <button class="win-close" id="p-close" aria-label="Close">&#10005;</button>
+    </div>
+    <div class="win-body pers-body">
+      <div class="pers-row">
+        <label class="pers-label" for="p-name">your name</label>
+        <input class="pers-input" id="p-name" type="text" maxlength="24" placeholder="user" autocomplete="off" />
+        <p class="pers-hint">how the desktop greets you. you can also click the name itself.</p>
+      </div>
+      <div class="pers-row">
+        <span class="pers-label">theme</span>
+        <div class="theme-grid" id="p-themes"></div>
+      </div>
+      <div class="pers-row">
+        <span class="pers-label">clock</span>
+        <div class="seg" id="p-clock">
+          <button type="button" data-v="24">24h</button>
+          <button type="button" data-v="12">12h</button>
+        </div>
+      </div>
+      <div class="pers-row">
+        <span class="pers-label">sparkles</span>
+        <div class="seg" id="p-sparkles">
+          <button type="button" data-v="1">on</button>
+          <button type="button" data-v="0">off</button>
+        </div>
+      </div>
+      <div class="pers-row">
+        <label class="pers-label" for="p-note">widget note</label>
+        <input class="pers-input" id="p-note" type="text" maxlength="64" placeholder="leave blank for the daily note" autocomplete="off" />
+      </div>
+      <div class="pers-foot">
+        <button type="button" id="p-tidy">tidy icons</button>
+        <button type="button" id="p-reset">reset desktop</button>
+      </div>
     </div>
   </div>
 
@@ -917,18 +1087,103 @@
     const tileHTML = a =>
       '<span class="tile" style="--g1:'+a.g1+';--g2:'+a.g2+'">'+a.glyph+'</span>';
 
-    /* ── desktop icons ─────────────────────────────────────────────── */
+    /* ── desktop preferences ───────────────────────────────────────── */
+    /* everything personal lives in the browser, like the rest of the site */
+    const PREFS_KEY = 'woodles-desk';
+    const prefs = { name: 'user', clock: '24', sparkles: true, note: '' };
+    try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS_KEY)) || {}); } catch {}
+    function savePrefs() { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }
+
+    /* ── desktop icons — free placement + drag ─────────────────────── */
+    const LAYOUT_KEY = 'woodles-icon-layout';
+    let layout = {};
+    try { layout = JSON.parse(localStorage.getItem(LAYOUT_KEY)) || {}; } catch {}
+    function saveLayout() { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); }
+
     const iconsEl = document.getElementById('icons');
+    const CELL_W = 118, CELL_H = 134, ICON_W = 108, ICON_H = 118;
+
+    function placeIcons() {
+      const cw = Math.max(iconsEl.clientWidth,  ICON_W);
+      const ch = Math.max(iconsEl.clientHeight, ICON_H);
+      const perCol = Math.max(1, Math.floor(ch / CELL_H));
+      iconsEl.querySelectorAll('.icon').forEach((el, i) => {
+        const saved = layout[el.dataset.id];
+        const x = saved ? Math.min(Math.max(saved.x, 0), cw - ICON_W)
+                        : Math.floor(i / perCol) * CELL_W;
+        const y = saved ? Math.min(Math.max(saved.y, 0), ch - ICON_H)
+                        : (i % perCol) * CELL_H;
+        el.style.left = x + 'px';
+        el.style.top  = y + 'px';
+      });
+    }
+
+    function makeIconDraggable(el) {
+      let sx, sy, ox, oy, moved = false, active = false;
+      /* anchors are natively draggable — that would steal the pointer */
+      el.addEventListener('dragstart', e => e.preventDefault());
+      el.addEventListener('pointercancel', () => {
+        active = false;
+        el.classList.remove('dragging');
+      });
+      el.addEventListener('pointerdown', e => {
+        if (e.button !== 0) return;
+        active = true; moved = false;
+        sx = e.clientX; sy = e.clientY;
+        ox = el.offsetLeft; oy = el.offsetTop;
+        el.setPointerCapture(e.pointerId);
+      });
+      el.addEventListener('pointermove', e => {
+        if (!active) return;
+        const dx = e.clientX - sx, dy = e.clientY - sy;
+        if (!moved && Math.hypot(dx, dy) < 6) return;
+        if (!moved) {
+          moved = true;
+          /* the entry animation's forwards-fill would pin transform/opacity */
+          el.style.animation = 'none';
+          el.style.opacity = '1';
+          el.classList.add('dragging');
+        }
+        el.style.left = Math.min(Math.max(ox + dx, 0), iconsEl.clientWidth  - ICON_W) + 'px';
+        el.style.top  = Math.min(Math.max(oy + dy, 0), iconsEl.clientHeight - ICON_H) + 'px';
+      });
+      el.addEventListener('pointerup', () => {
+        active = false;
+        if (!moved) return;
+        el.classList.remove('dragging');
+        layout[el.dataset.id] = { x: el.offsetLeft, y: el.offsetTop };
+        saveLayout();
+      });
+      el.addEventListener('click', e => {
+        if (moved) { e.preventDefault(); e.stopImmediatePropagation(); moved = false; }
+      });
+    }
+
     apps.forEach((a, i) => {
       const el = document.createElement('a');
       el.className = 'icon';
       el.href = a.href;
+      el.dataset.id = a.id;
       el.style.animationDelay = (0.15 + i * 0.06) + 's';
       el.innerHTML = tileHTML(a) +
         '<span class="icon-label">' + a.name + '</span>';
+      makeIconDraggable(el);
       el.addEventListener('click', e => { e.preventDefault(); launch(a); });
       iconsEl.appendChild(el);
     });
+    placeIcons();
+    addEventListener('resize', placeIcons);
+
+    function tidyIcons() {
+      layout = {};
+      saveLayout();
+      placeIcons();
+      iconsEl.querySelectorAll('.icon').forEach((el, i) => {
+        el.style.animation = 'none'; void el.offsetWidth;
+        el.style.animationDelay = (i * 0.05) + 's';
+        el.style.animation = 'icon-in 0.5s ease forwards';
+      });
+    }
 
     /* ── taskbar pinned apps ───────────────────────────────────────── */
     const tbApps = document.getElementById('tb-apps');
@@ -1021,6 +1276,13 @@
     themeBtn.innerHTML = '&#10052;';
     themeBtn.addEventListener('click', () => nextTheme());
     dock.appendChild(themeBtn);
+    const persDockBtn = document.createElement('button');
+    persDockBtn.className = 'dock-btn';
+    persDockBtn.title = 'personalize';
+    persDockBtn.setAttribute('aria-label', 'Personalize');
+    persDockBtn.innerHTML = '&#10024;';
+    persDockBtn.addEventListener('click', e => { e.stopPropagation(); openPers(); });
+    dock.appendChild(persDockBtn);
     const aboutDockBtn = document.createElement('button');
     aboutDockBtn.className = 'dock-btn';
     aboutDockBtn.title = 'about';
@@ -1047,17 +1309,25 @@
       if (h < 22) return 'good evening,';
       return 'goodnight,';
     }
+    function clockHTML(now) {
+      if (prefs.clock === '12') {
+        const h = now.getHours() % 12 || 12;
+        const ap = now.getHours() < 12 ? 'am' : 'pm';
+        return h + ':' + pad(now.getMinutes()) + '<span class="ampm">' + ap + '</span>';
+      }
+      return pad(now.getHours()) + ':' + pad(now.getMinutes());
+    }
     function tick() {
       const now = new Date();
-      const time = pad(now.getHours()) + ':' + pad(now.getMinutes());
+      const time = clockHTML(now);
       const dShort = pad(now.getDate()) + ' ' + MONTHS[now.getMonth()] + ' ' + now.getFullYear();
-      document.getElementById('w-clock').textContent = time;
+      document.getElementById('w-clock').innerHTML = time;
       document.getElementById('w-date').textContent = DAYS[now.getDay()] + ' · ' + dShort;
-      document.getElementById('t-time').textContent = time;
+      document.getElementById('t-time').innerHTML = time;
       document.getElementById('t-date').textContent = dShort;
-      document.getElementById('greet').innerHTML = greeting(now.getHours()) + ' <em>z</em>';
-      document.getElementById('m-greet').innerHTML = greeting(now.getHours()) + ' <em>z</em>';
-      document.getElementById('m-clock').textContent = time;
+      document.getElementById('greet-word').textContent = greeting(now.getHours());
+      document.getElementById('m-greet-word').textContent = greeting(now.getHours());
+      document.getElementById('m-clock').innerHTML = time;
       document.getElementById('m-date').textContent = DAYS[now.getDay()] + ' · ' + dShort;
       document.getElementById('fly-day').textContent = DAYS[now.getDay()];
       document.getElementById('fly-big').textContent = pad(now.getDate());
@@ -1066,10 +1336,62 @@
     }
     tick();
     setInterval(tick, 1000 * 20);
-    document.getElementById('w-note').textContent =
-      NOTES[new Date().getDate() % NOTES.length];
     document.getElementById('win-meta').textContent =
       'z winters · open monorepo · ' + new Date().getFullYear();
+
+    /* ── name, note, sparkles — reflect prefs everywhere ───────────── */
+    function renderPrefs() {
+      const name = (prefs.name || 'user').trim() || 'user';
+      document.getElementById('greet-name').textContent = name;
+      document.getElementById('m-greet-name').textContent = name;
+      document.getElementById('user-name').textContent = name;
+      document.getElementById('user-pic').textContent = name[0].toLowerCase();
+      const note = (prefs.note || '').trim() ||
+        NOTES[new Date().getDate() % NOTES.length];
+      document.getElementById('w-note').textContent = note;
+      document.getElementById('fly-note').textContent = note;
+      document.body.classList.toggle('no-sparkles', !prefs.sparkles);
+      const pName = document.getElementById('p-name');
+      if (document.activeElement !== pName)
+        pName.value = prefs.name === 'user' ? '' : prefs.name;
+      const pNote = document.getElementById('p-note');
+      if (document.activeElement !== pNote)
+        pNote.value = prefs.note || '';
+      document.querySelectorAll('#p-clock button').forEach(b =>
+        b.classList.toggle('on', b.dataset.v === prefs.clock));
+      document.querySelectorAll('#p-sparkles button').forEach(b =>
+        b.classList.toggle('on', b.dataset.v === (prefs.sparkles ? '1' : '0')));
+      tick();
+    }
+
+    /* click the name itself to rename — the smallest possible settings ui */
+    function editNameInline(span) {
+      if (span.querySelector('input')) return;
+      const input = document.createElement('input');
+      input.className = 'greet-input';
+      input.maxLength = 24;
+      input.value = (prefs.name || '').trim() === 'user' ? '' : prefs.name;
+      input.placeholder = 'user';
+      span.textContent = '';
+      span.appendChild(input);
+      input.focus();
+      const done = () => {
+        prefs.name = input.value.trim() || 'user';
+        savePrefs();
+        renderPrefs();
+      };
+      input.addEventListener('blur', done);
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') input.blur();
+        if (e.key === 'Escape') { input.value = prefs.name; input.blur(); }
+        e.stopPropagation();
+      });
+      input.addEventListener('click', e => e.stopPropagation());
+    }
+    ['greet-name', 'm-greet-name'].forEach(id => {
+      const span = document.getElementById(id);
+      span.addEventListener('click', e => { e.stopPropagation(); editNameInline(span); });
+    });
 
     /* ── start menu toggle ─────────────────────────────────────────── */
     const body = document.body;
@@ -1096,7 +1418,8 @@
     document.getElementById('flyout').addEventListener('click', e => e.stopPropagation());
 
     /* ── theme / wallpaper ─────────────────────────────────────────── */
-    const THEMES = ['cream','dawn','dusk','terracotta','midnight','forest'];
+    /* every theme the shared palette knows about */
+    const THEMES = ['cream','dawn','dusk','terracotta','midnight','forest','paper','inkwell','typewriter'];
     let themeIdx = 0;
     const stored = localStorage.getItem('woodles-theme');
     if (stored && THEMES.includes(stored)) themeIdx = THEMES.indexOf(stored);
@@ -1104,24 +1427,26 @@
       const t = THEMES[themeIdx];
       document.documentElement.setAttribute('data-theme', t);
       localStorage.setItem('woodles-theme', t);
-      document.querySelectorAll('.swatch').forEach((s, i) =>
-        s.classList.toggle('on', i === themeIdx));
+      document.querySelectorAll('.swatch').forEach(s =>
+        s.classList.toggle('on', s.dataset.theme === t));
     }
     function nextTheme() { themeIdx = (themeIdx + 1) % THEMES.length; applyTheme(); }
-    /* theme swatches in flyout */
-    const themesEl = document.getElementById('themes');
-    THEMES.forEach((t, i) => {
-      const s = document.createElement('div');
-      s.className = 'swatch';
-      s.title = t;
-      s.setAttribute('data-theme', t);
-      s.style.background =
-        'conic-gradient(from 120deg, var(--lavender), var(--aqua), var(--peach), var(--lilac))';
-      s.addEventListener('click', e => {
-        e.stopPropagation(); themeIdx = i; applyTheme();
+    /* theme swatches — flyout + personalize window share the same builder;
+       each swatch carries data-theme so the css previews the real palette */
+    function buildSwatches(container) {
+      THEMES.forEach((t, i) => {
+        const s = document.createElement('div');
+        s.className = 'swatch';
+        s.title = t;
+        s.setAttribute('data-theme', t);
+        s.addEventListener('click', e => {
+          e.stopPropagation(); themeIdx = i; applyTheme();
+        });
+        container.appendChild(s);
       });
-      themesEl.appendChild(s);
-    });
+    }
+    buildSwatches(document.getElementById('themes'));
+    buildSwatches(document.getElementById('p-themes'));
     applyTheme();
 
     /* ── context menu ──────────────────────────────────────────────── */
@@ -1131,7 +1456,7 @@
       if (e.target.closest('.window, .start, .taskbar, .flyout')) return;
       e.preventDefault();
       closeAll('ctx');
-      const w = 200, h = 240;
+      const w = 200, h = 280;
       ctx.style.left = Math.min(e.clientX, innerWidth - w) + 'px';
       ctx.style.top  = Math.min(e.clientY, innerHeight - h) + 'px';
       ctx.classList.add('open');
@@ -1141,35 +1466,52 @@
       if (!item) return;
       const act = item.dataset.act;
       ctx.classList.remove('open');
-      if (act === 'start')     setStart(true);
-      if (act === 'wallpaper') nextTheme();
-      if (act === 'refresh')   location.reload();
-      if (act === 'about')     openAbout();
-      if (act === 'tidy') {
-        iconsEl.querySelectorAll('.icon').forEach((el, i) => {
-          el.style.animation = 'none'; void el.offsetWidth;
-          el.style.animationDelay = (i * 0.05) + 's';
-          el.style.animation = 'icon-in 0.5s ease forwards';
-        });
-      }
+      if (act === 'start')       setStart(true);
+      if (act === 'wallpaper')   nextTheme();
+      if (act === 'personalize') openPers();
+      if (act === 'refresh')     location.reload();
+      if (act === 'about')       openAbout();
+      if (act === 'tidy')        tidyIcons();
     });
 
-    /* ── about window + drag ───────────────────────────────────────── */
-    const win = document.getElementById('window');
-    function openAbout() { closeAll('about'); body.classList.add('about-open'); }
-    function closeAbout() {
-      body.classList.remove('about-open');
-      win.style.top = '50%'; win.style.left = '50%';
+    /* ── windows (about, personalize) + drag ───────────────────────── */
+    const WINDOWS = {
+      about: document.getElementById('window'),
+      pers:  document.getElementById('pwin'),
+    };
+    function openWin(key) {
+      closeAll('win');
+      closeWins();
+      WINDOWS[key].classList.add('open');
+      body.classList.add('win-open');
     }
+    function closeWins() {
+      Object.values(WINDOWS).forEach(w => {
+        w.classList.remove('open');
+        w.style.top = '50%'; w.style.left = '50%'; w.style.transform = '';
+      });
+      body.classList.remove('win-open');
+    }
+    const openAbout = () => openWin('about');
+    const openPers  = () => openWin('pers');
     document.getElementById('about-btn').addEventListener('click', e => {
       e.stopPropagation(); openAbout();
     });
-    document.getElementById('win-close').addEventListener('click', closeAbout);
-    document.getElementById('scrim').addEventListener('click', closeAbout);
+    document.getElementById('win-close').addEventListener('click', closeWins);
+    document.getElementById('p-close').addEventListener('click', closeWins);
+    document.getElementById('scrim').addEventListener('click', closeWins);
+    document.getElementById('start-user').addEventListener('click', e => {
+      e.stopPropagation(); openPers();
+    });
+    document.getElementById('start-user').addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPers(); }
+    });
+    document.getElementById('fly-pers').addEventListener('click', e => {
+      e.stopPropagation(); openPers();
+    });
 
-    /* drag the about window by its titlebar */
-    (function () {
-      const bar = document.getElementById('titlebar');
+    /* drag a window by its titlebar */
+    function makeWindowDraggable(win, bar) {
       let dragging = false, sx, sy, ox, oy;
       bar.addEventListener('pointerdown', e => {
         if (e.target.closest('.win-close')) return;
@@ -1187,7 +1529,38 @@
         win.style.top  = (oy + e.clientY - sy) + 'px';
       });
       bar.addEventListener('pointerup', () => { dragging = false; });
-    })();
+    }
+    makeWindowDraggable(WINDOWS.about, document.getElementById('titlebar'));
+    makeWindowDraggable(WINDOWS.pers,  document.getElementById('p-titlebar'));
+    WINDOWS.pers.addEventListener('click', e => e.stopPropagation());
+
+    /* ── personalize controls ──────────────────────────────────────── */
+    document.getElementById('p-name').addEventListener('input', e => {
+      prefs.name = e.target.value.trim() || 'user';
+      savePrefs(); renderPrefs();
+    });
+    document.getElementById('p-note').addEventListener('input', e => {
+      prefs.note = e.target.value;
+      savePrefs(); renderPrefs();
+    });
+    document.getElementById('p-clock').addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      prefs.clock = b.dataset.v;
+      savePrefs(); renderPrefs();
+    });
+    document.getElementById('p-sparkles').addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      prefs.sparkles = b.dataset.v === '1';
+      savePrefs(); renderPrefs();
+    });
+    document.getElementById('p-tidy').addEventListener('click', tidyIcons);
+    document.getElementById('p-reset').addEventListener('click', () => {
+      localStorage.removeItem(PREFS_KEY);
+      localStorage.removeItem(LAYOUT_KEY);
+      localStorage.removeItem('woodles-theme');
+      location.reload();
+    });
+    renderPrefs();
 
     /* ── launch transition ─────────────────────────────────────────── */
     const launchEl = document.getElementById('launch');
@@ -1209,7 +1582,7 @@
     function closeAll(except) {
       if (except !== 'start')  body.classList.remove('start-open');
       if (except !== 'flyout') body.classList.remove('flyout-open');
-      if (except !== 'about')  body.classList.remove('about-open');
+      if (except !== 'win')    closeWins();
       if (except !== 'ctx')    ctx.classList.remove('open');
     }
     document.addEventListener('click', () => {
@@ -1218,7 +1591,8 @@
     });
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
-        body.classList.remove('start-open', 'flyout-open', 'about-open');
+        body.classList.remove('start-open', 'flyout-open');
+        closeWins();
         ctx.classList.remove('open');
       }
       if (e.key === '/' && !body.classList.contains('start-open')
