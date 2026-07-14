@@ -101,6 +101,85 @@
   .ex-datadive .datadive-note{margin:12px 2px 0; font-size:12.5px; line-height:1.5; color:var(--ink-soft); border-top:1px dotted var(--rose-dust); padding-top:9px;}
   .ex-datadive .datadive-note b{color:var(--rose-deep);}
 
+  /* ============================================================
+     .ex-case — case file: one shape, four menu items (legal case,
+     single documented case, policy/institutional episode,
+     biographical vignette)
+     ============================================================ */
+  .ex-case{background:var(--paper); border:1px solid var(--rose-dust); border-radius:8px; overflow:hidden;}
+  .ex-case .case-head{padding:14px 18px 12px; border-bottom:1px dotted var(--rose-dust);}
+  .ex-case .case-kind{display:inline-block; font-family:var(--font-display); font-weight:600; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--rose-deep); border:1px solid var(--rose-dust); border-radius:999px; padding:2px 10px; background:var(--blush); margin-bottom:8px;}
+  .ex-case .case-title{font-family:var(--font-display); font-weight:600; font-size:17px; color:var(--rose-deep); margin:0 0 3px;}
+  .ex-case .case-meta{font-size:12px; color:var(--ink-soft); letter-spacing:.02em;}
+  .ex-case .case-body{padding:14px 18px; font-size:13px; line-height:1.6; color:var(--ink); margin:0;}
+  .ex-case .case-outcome{background:var(--blush); padding:12px 18px; border-top:1px solid var(--rose-dust);}
+  .ex-case .outcome-label{display:block; font-family:var(--font-display); font-weight:600; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--rose-deep); margin-bottom:4px;}
+  .ex-case .case-outcome p{font-size:13px; line-height:1.55; color:var(--ink); margin:0;}
+
+  /* ============================================================
+     .ex-document — primary document excerpt
+     ============================================================ */
+  .ex-document .doc-source{display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:10px; flex-wrap:wrap;}
+  .ex-document .doc-kind{font-family:var(--font-display); font-weight:600; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--rose-deep);}
+  .ex-document .doc-cite{font-size:12px; color:var(--ink-soft); font-style:italic;}
+  .ex-document .doc-excerpt{margin:0 0 10px; padding:6px 20px; border-left:3px solid var(--gold); background:var(--paper); font-family:var(--font-display); font-size:15.5px; font-style:italic; line-height:1.6; color:var(--ink);}
+  .ex-document .doc-context{font-size:12.5px; line-height:1.5; color:var(--ink-soft); margin:0;}
+
+  /* ============================================================
+     .ex-exchange — documented exchange between two people
+     ============================================================ */
+  .ex-exchange{display:flex; flex-direction:column; gap:10px;}
+  .ex-exchange .turn{max-width:82%; padding:10px 14px; border-radius:10px; border:1px solid var(--rose-dust);}
+  .ex-exchange .turn-a{align-self:flex-start; background:var(--paper); border-bottom-left-radius:2px;}
+  .ex-exchange .turn-b{align-self:flex-end; background:var(--lavender); border-bottom-right-radius:2px; text-align:right;}
+  .ex-exchange .turn-name{display:block; font-family:var(--font-display); font-weight:600; font-size:11.5px; letter-spacing:.05em; color:var(--rose-deep); margin-bottom:4px;}
+  .ex-exchange .turn p{margin:0; font-size:13px; line-height:1.5; color:var(--ink);}
+  @media (max-width:480px){ .ex-exchange .turn{max-width:94%;} }
+
+  /* ============================================================
+     .ex-spectrum — edge case / boundary stress-test
+     ============================================================ */
+  .ex-spectrum{padding:26px 10px 6px;}
+  .ex-spectrum .spectrum-track{position:relative; height:8px; border-radius:999px; background:linear-gradient(to right, var(--lavender), var(--rose-dust));}
+  .ex-spectrum .spectrum-marker{position:absolute; top:-6px; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center;}
+  .ex-spectrum .marker-pin{width:20px; height:20px; border-radius:50% 50% 50% 0; background:var(--rose-deep); border:2px solid var(--paper); transform:rotate(-45deg); box-shadow:0 0 0 1px var(--rose-dust); display:block;}
+  .ex-spectrum .marker-typical .marker-pin{background:var(--gold);}
+  .ex-spectrum .marker-label{margin-top:8px; font-size:11px; text-align:center; color:var(--ink-soft); white-space:nowrap; font-family:var(--font-display);}
+  .ex-spectrum .marker-edge .marker-label{color:var(--rose-deep); font-weight:600;}
+  .ex-spectrum .spectrum-poles{display:flex; justify-content:space-between; margin-top:10px; font-family:var(--font-display); font-size:11.5px; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-soft);}
+
+  /* ============================================================
+     .ex-envelope — back-of-envelope math
+     ============================================================ */
+  .ex-envelope{max-width:360px; margin:0 auto; font-family:var(--font-mono, monospace);}
+  .ex-envelope .envelope-row{display:flex; justify-content:space-between; gap:12px; padding:8px 2px; border-bottom:1px dotted var(--rose-dust); align-items:baseline;}
+  .ex-envelope .envelope-row:first-child{border-top:1px dotted var(--rose-dust);}
+  .ex-envelope .envelope-label{font-family:var(--font-body); font-size:12.5px; color:var(--ink-soft);}
+  .ex-envelope .envelope-value{font-size:13.5px; color:var(--ink); font-variant-numeric:tabular-nums;}
+  .ex-envelope .envelope-result{background:var(--blush); border-radius:6px; margin-top:2px; padding:9px 10px; border-bottom:none;}
+  .ex-envelope .envelope-result .envelope-label, .ex-envelope .envelope-result .envelope-value{color:var(--rose-deep); font-weight:600;}
+
+  /* ============================================================
+     .ex-failure — failure case: expected vs. actual, diverging
+     from a shared starting point
+     ============================================================ */
+  .ex-failure .failure-start{text-align:center; background:var(--paper); border:1px solid var(--rose-dust); border-radius:8px; padding:10px 16px; margin:0 auto; max-width:320px;}
+  .ex-failure .failure-start h5{font-family:var(--font-display); font-weight:600; font-size:13.5px; color:var(--rose-deep); margin:0 0 3px;}
+  .ex-failure .failure-start p{font-size:12px; color:var(--ink-soft); margin:0;}
+  .ex-failure .failure-fork{display:flex; justify-content:space-around; padding:0 20px; color:var(--gold); font-size:20px; margin:2px 0;}
+  .ex-failure .failure-tracks{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .ex-failure .track{border-radius:8px; padding:12px 14px; border:1px solid;}
+  .ex-failure .track-expected{background:#f2f6ef; border-color:var(--sage);}
+  .ex-failure .track-actual{background:var(--blush); border-color:var(--rose-deep);}
+  .ex-failure .track-label{display:block; font-family:var(--font-display); font-weight:600; font-size:11px; letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px;}
+  .ex-failure .track-expected .track-label{color:#4c6b40;}
+  .ex-failure .track-actual .track-label{color:var(--rose-deep);}
+  .ex-failure .track p{font-size:12.5px; line-height:1.5; color:var(--ink); margin:0;}
+  .ex-failure .failure-why{margin-top:12px; padding:12px 14px; background:#fffdfa; border:1px solid var(--gold); border-radius:8px;}
+  .ex-failure .why-label{display:block; font-family:var(--font-display); font-weight:600; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--rose-deep); margin-bottom:4px;}
+  .ex-failure .failure-why p{font-size:12.8px; line-height:1.5; color:var(--ink); margin:0;}
+  @media (max-width:480px){ .ex-failure .failure-tracks{grid-template-columns:1fr;} }
+
   footer.tagline{text-align:center; font-family:var(--font-display); font-style:italic; font-size:15px; color:var(--rose-dust); margin-top:10px;}
 </style>
 </head>
@@ -112,8 +191,8 @@
   <div class="intro-note">
     <h1>Example Block Library</h1>
     <p>The topic-dependent half of the system. Where the <a href="/ologypedia/textbook-chrome-blocks.html" style="color:var(--rose-deep);">chrome blocks</a> barely vary page to page, these four vary with what the worked example actually is — a causal chain wants nodes and arrows, a chronology wants a spine, a chart wants an axis. Each still renders inside the chrome's <code>.figure-box</code>, which already handles the border, background, and caption; these components only fill the content area.</p>
-    <p>Class-naming convention: <code>.ex-&lt;pattern&gt;</code>. Four are built here — <code>.ex-mechanism</code>, <code>.ex-compare</code>, <code>.ex-timeline</code>, <code>.ex-datadive</code> — covering mechanism walkthrough, comparative pair, timeline of one event, and data deep-dive. The menu's other twelve formats can follow the same convention when they need one (<code>.ex-artifact</code>, <code>.ex-caselaw</code>, …) — but not all of them will. A documented exchange or an artifact close-reading is often just well-set prose; don't force a diagram where the prose already carries it.</p>
-    <p>Every color below is one of the seven tokens already defined in <code>textbook-chrome-blocks.html</code> — no second palette, no new hex values. <code>.ex-datadive</code>'s bars use <code>color-mix()</code> to step between <code>--rose-dust</code> and <code>--rose-deep</code>, so magnitude reads as depth of the same hue rather than a rainbow of unrelated colors.</p>
+    <p>Class-naming convention: <code>.ex-&lt;pattern&gt;</code>. Ten are built here, covering thirteen of the menu's sixteen formats — <code>.ex-mechanism</code>, <code>.ex-compare</code>, <code>.ex-timeline</code>, <code>.ex-datadive</code>, <code>.ex-case</code>, <code>.ex-document</code>, <code>.ex-exchange</code>, <code>.ex-spectrum</code>, <code>.ex-envelope</code>, <code>.ex-failure</code>. One pattern can honestly cover more than one menu item when the shapes converge — <code>.ex-case</code> is a single "specific real instance, and what it settled" card reused across legal case, single documented case, policy/institutional episode, and biographical vignette, distinguished only by its eyebrow label. The remaining three menu items — artifact close-reading, geographic case, experiment walkthrough — are documented at the bottom of this file as deliberately <em>not</em> new components: they compose the existing blocks, or they're just well-set prose. Don't force a diagram where the prose already carries it.</p>
+    <p>Every color below is one of the seven tokens already defined in <code>textbook-chrome-blocks.html</code> — no second palette, no new hex values. <code>.ex-datadive</code>'s bars and <code>.ex-spectrum</code>'s track use <code>color-mix()</code> / a two-token gradient rather than any new hue; <code>.ex-envelope</code> borrows <code>var(--font-mono)</code> from <code>shared/fonts.css</code> (already loaded) for tabular digit alignment — still no font stack of its own.</p>
   </div>
 
   <section>
@@ -270,7 +349,168 @@
     <p class="note">One axis, one series, one hue — bars step from <code>--rose-dust</code> to <code>--rose-deep</code> in proportion to their share of the series max, so color and height encode the same thing instead of fighting. Values are labeled directly on every bar rather than left to a legend, which only works because there are few enough categories to read at a glance; a denser dataset should thin the labels before it thins the bars. Each <code>&lt;rect&gt;</code> carries a native SVG <code>&lt;title&gt;</code> for a free hover tooltip, and the <code>&lt;svg&gt;</code> itself carries a full-sentence <code>aria-label</code> so the trend survives without sight or a mouse. Swap the four bars and the viewBox width for a line-chart <code>&lt;polyline&gt;</code> when the data is closer to continuous (a time series) than categorical — same tokens, same axis rules.</p>
   </section>
 
-  <footer class="tagline">Four patterns down, a dozen to go — most of them prose. ✦</footer>
+  <!-- ============================================================
+       5. case file
+       ============================================================ -->
+  <section>
+    <span class="label"><code>.ex-case</code> — case file: one shape, four menu items (legal case &middot; single documented case &middot; policy/institutional episode &middot; biographical vignette)</span>
+    <div class="block-demo">
+      <figure class="figure-box">
+        <figcaption>Figure &middot; A Specific, Real, Well-Recorded Instance</figcaption>
+        <div class="ex-case">
+          <div class="case-head">
+            <span class="case-kind">Legal Case</span>
+            <h5 class="case-title">Party A v. Party B</h5>
+            <span class="case-meta">Court &middot; Year &middot; Citation</span>
+          </div>
+          <p class="case-body">The facts: what happened, to whom, and what question it forced a ruling on.</p>
+          <div class="case-outcome">
+            <span class="outcome-label">Holding</span>
+            <p>What the ruling established, and why it's still cited.</p>
+          </div>
+        </div>
+      </figure>
+    </div>
+    <p class="note">Retarget the same three-part shape — header, facts, outcome — by swapping <code>.case-kind</code>'s text and the outcome label: <code>Documented Case</code> / "What Happened," <code>Policy Episode</code> / "Downstream Effect," <code>Biographical Vignette</code> / "Why It Matters." All four menu items are "a specific real instance, and what it settled" — they don't need four components, just four labels on one.</p>
+  </section>
+
+  <!-- ============================================================
+       6. primary document excerpt
+       ============================================================ -->
+  <section>
+    <span class="label"><code>.ex-document</code> — primary document excerpt: a real letter, memo, ruling, or transcript</span>
+    <div class="block-demo">
+      <figure class="figure-box">
+        <figcaption>Figure &middot; Excerpted, Not Paraphrased</figcaption>
+        <div class="ex-document">
+          <div class="doc-source">
+            <span class="doc-kind">Memo</span>
+            <span class="doc-cite">Author, Institution — Date</span>
+          </div>
+          <blockquote class="doc-excerpt">&ldquo;&hellip;the excerpted language itself, quoted directly and trimmed with an ellipsis rather than smoothed over&hellip;&rdquo;</blockquote>
+          <p class="doc-context">One line of framing: why this exact wording matters more than a summary of it would.</p>
+        </div>
+      </figure>
+    </div>
+    <p class="note">The gold left-rule and italic display font mark this as quoted material, distinct from the narrator's own voice everywhere else on the page — the one place a textbook page should deliberately sound like someone other than the narrator.</p>
+  </section>
+
+  <!-- ============================================================
+       7. documented exchange
+       ============================================================ -->
+  <section>
+    <span class="label"><code>.ex-exchange</code> — documented exchange: a real back-and-forth between two people, paraphrased</span>
+    <div class="block-demo">
+      <figure class="figure-box">
+        <figcaption>Figure &middot; Two Sides of a Real Conversation</figcaption>
+        <div class="ex-exchange">
+          <div class="turn turn-a">
+            <span class="turn-name">Speaker A</span>
+            <p>Opens the exchange — a position, a question, a request.</p>
+          </div>
+          <div class="turn turn-b">
+            <span class="turn-name">Speaker B</span>
+            <p>The reply — agreement, pushback, or a reframing.</p>
+          </div>
+          <div class="turn turn-a">
+            <span class="turn-name">Speaker A</span>
+            <p>Where it lands, or doesn't.</p>
+          </div>
+        </div>
+      </figure>
+    </div>
+    <p class="note">Left/right alignment does the work a "he said, she said" tag would otherwise carry in prose. Keep turns short and paraphrased — this is a shape for the back-and-forth of an exchange, not a transcript dump.</p>
+  </section>
+
+  <!-- ============================================================
+       8. edge case / boundary stress-test
+       ============================================================ -->
+  <section>
+    <span class="label"><code>.ex-spectrum</code> — edge case / boundary stress-test: a real instance that almost doesn't fit</span>
+    <div class="block-demo">
+      <figure class="figure-box">
+        <figcaption>Figure &middot; Where the Edge Case Sits on the Spectrum</figcaption>
+        <div class="ex-spectrum">
+          <div class="spectrum-track">
+            <div class="spectrum-marker marker-typical" style="left:22%">
+              <span class="marker-pin"></span>
+              <span class="marker-label">Typical case</span>
+            </div>
+            <div class="spectrum-marker marker-edge" style="left:86%">
+              <span class="marker-pin"></span>
+              <span class="marker-label">The edge case</span>
+            </div>
+          </div>
+          <div class="spectrum-poles"><span>Pole A</span><span>Pole B</span></div>
+        </div>
+      </figure>
+    </div>
+    <p class="note">The gradient track is itself the argument: the concept isn't binary, and the edge case's whole interest is in how close it sits to the far pole without quite crossing it. Gold marks a prototypical case for reference; rose-deep marks the edge case under discussion.</p>
+  </section>
+
+  <!-- ============================================================
+       9. back-of-envelope math
+       ============================================================ -->
+  <section>
+    <span class="label"><code>.ex-envelope</code> — back-of-envelope math: real numbers, worked live</span>
+    <div class="block-demo">
+      <figure class="figure-box">
+        <figcaption>Figure &middot; The Arithmetic, Shown, Not Hidden</figcaption>
+        <div class="ex-envelope">
+          <div class="envelope-row"><span class="envelope-label">Starting figure</span><span class="envelope-value">1,234</span></div>
+          <div class="envelope-row"><span class="envelope-label">&times; conversion factor</span><span class="envelope-value">&times; 2.2</span></div>
+          <div class="envelope-row"><span class="envelope-label">&divide; share of total</span><span class="envelope-value">&divide; 0.6</span></div>
+          <div class="envelope-row envelope-result"><span class="envelope-label">Result</span><span class="envelope-value">&approx; 4,525</span></div>
+        </div>
+      </figure>
+    </div>
+    <p class="note">Every row is one operation and its running value — a reader should be able to redo the math themselves from what's on screen, which is the entire point of a back-of-envelope worked example. Numbers set in <code>var(--font-mono)</code> for tabular alignment; everything else on the page stays in Lora.</p>
+  </section>
+
+  <!-- ============================================================
+       10. failure case
+       ============================================================ -->
+  <section>
+    <span class="label"><code>.ex-failure</code> — failure case: something real that didn't work, and a documented account of why</span>
+    <div class="block-demo">
+      <figure class="figure-box">
+        <figcaption>Figure &middot; Where the Plan and Reality Split</figcaption>
+        <div class="ex-failure">
+          <div class="failure-start">
+            <h5>Shared starting point</h5>
+            <p>What was true going in, before the two paths diverge.</p>
+          </div>
+          <div class="failure-fork"><span>&#8601;</span><span>&#8600;</span></div>
+          <div class="failure-tracks">
+            <div class="track track-expected">
+              <span class="track-label">Expected</span>
+              <p>What the design or plan called for.</p>
+            </div>
+            <div class="track track-actual">
+              <span class="track-label">What Actually Happened</span>
+              <p>Where it broke, specifically.</p>
+            </div>
+          </div>
+          <div class="failure-why">
+            <span class="why-label">Root Cause</span>
+            <p>Why the divergence happened — the documented account, not a guess.</p>
+          </div>
+        </div>
+      </figure>
+    </div>
+    <p class="note">Sage marks the path nobody got to see (the intention); rose marks what was actually documented happening. Keeping both visible at once, rather than narrating the failure in isolation, is what makes the gap legible as a gap.</p>
+  </section>
+
+  <section>
+    <span class="label">the other three — deliberately not new components</span>
+    <div class="intro-note" style="margin-bottom:0;">
+      <p><b>Artifact close-reading</b> — one real object and what it reveals. Usually just a short metadata line (object, date, material, current location) in front of ordinary prose; if the object needs a labeled diagram, that's <code>.ex-mechanism</code> with the "steps" reframed as "features," not a new pattern.</p>
+      <p><b>Geographic case</b> — a real place where the concept plays out visibly. Without real map data this is prose plus a short place line (name, coordinates, region); reach for <code>.ex-case</code> when the place has a clear "what happened here, and why it matters" shape.</p>
+      <p><b>Experiment walkthrough</b> — one real study's design and result. Compose it: <code>.ex-mechanism</code> for the procedure's steps, <code>.ex-compare</code> for control vs. treatment, and <code>.ex-datadive</code> for the result — three existing blocks, no fourth one needed.</p>
+    </div>
+  </section>
+
+  <footer class="tagline">Ten patterns down, three left — and those three don't need a new one. ✦</footer>
 
 </div>
 </body>
