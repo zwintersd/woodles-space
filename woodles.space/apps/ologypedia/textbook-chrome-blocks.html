@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chrome Blocks · Ologypedia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="/shared/fonts.css">
+<style>
+  :root{
+    --paper:#FBF3EC; --paper-edge:#F3E6D9; --ink:#3D2B2B; --ink-soft:#6B5656;
+    --rose-deep:#8C3B4A; --rose-dust:#C77C8E; --blush:#F7DFE3; --lavender:#EAE0F2;
+    --gold:#C9A66B; --sage:#8FA37E;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:#E9DCCB; padding:32px 16px; font-family:var(--font-body); color:var(--ink);}
+  .wrap{max-width:820px; margin:0 auto;}
+  .tb-back{margin-bottom:18px;}
+  .tb-back a{font-family:var(--font-body); font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); text-decoration:none; border-bottom:1px dotted var(--rose-dust); padding-bottom:1px;}
+  .tb-back a:hover{color:var(--rose-deep);}
+  .intro-note{background:#fff; border:1px solid var(--gold); border-radius:8px; padding:18px 22px; margin-bottom:34px; font-size:14.5px; line-height:1.6;}
+  .intro-note h1{font-family:var(--font-display); font-size:26px; color:var(--rose-deep); margin:0 0 8px;}
+  .block-demo{background:var(--paper); border:1px solid var(--gold); border-radius:8px; padding:26px 28px; margin-bottom:14px;}
+  .label{font-family:var(--font-body); font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:#9c8f8f; margin:0 0 40px 0; display:block;}
+  .label code{background:var(--paper-edge); padding:2px 7px; border-radius:4px; font-family:monospace; color:var(--rose-deep);}
+  section{margin-bottom:38px;}
+
+  /* ===== token swatches ===== */
+  .swatches{display:flex; flex-wrap:wrap; gap:10px;}
+  .swatch{width:110px; font-size:11px; text-align:center;}
+  .swatch .chip{height:44px; border-radius:6px; border:1px solid rgba(0,0,0,.08); margin-bottom:4px;}
+
+  /* ===== masthead ===== */
+  .kicker-tag{display:inline-block; font-family:var(--font-display); font-weight:600; letter-spacing:.16em; font-size:12.5px; color:var(--rose-deep); border:1px solid var(--rose-dust); border-radius:999px; padding:4px 16px; background:var(--blush);}
+  h1.title{font-family:var(--font-display); font-weight:600; font-size:44px; color:var(--rose-deep); margin:14px 0 6px; line-height:1.05;}
+  .subtitle-row{display:flex; align-items:center; gap:14px; margin-bottom:14px;}
+  .subtitle-row .orn{color:var(--gold); font-size:14px;}
+  h2.subtitle{font-family:var(--font-display); font-weight:500; letter-spacing:.12em; font-size:15px; color:var(--rose-dust); text-transform:uppercase; margin:0;}
+  p.intro{font-size:16px; line-height:1.7; color:var(--ink-soft); margin:0;}
+
+  /* ===== numbered section ===== */
+  .sec-head{display:flex; align-items:center; gap:12px; margin-bottom:10px;}
+  .num{flex:none; width:30px; height:30px; border-radius:50%; background:var(--rose-deep); color:var(--paper); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:600; font-size:15px;}
+  .sec-head h3{font-family:var(--font-display); font-weight:600; font-size:20px; letter-spacing:.04em; color:var(--rose-deep); margin:0; text-transform:uppercase; flex:1; border-bottom:1px solid var(--rose-dust); padding-bottom:8px;}
+
+  /* ===== chain ===== */
+  .chain{display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-family:var(--font-display);}
+  .chain .chip{background:var(--lavender); border:1px solid var(--rose-dust); border-radius:6px; padding:6px 12px; font-size:14.5px; color:var(--ink);}
+  .chain .chip b{color:var(--rose-deep);}
+  .chain .arrow{color:var(--gold); font-size:16px;}
+
+  /* ===== pullquote ===== */
+  blockquote.pullquote{margin:0; padding:18px 26px; text-align:center; background:var(--blush); border:1px solid var(--rose-dust); border-radius:8px; font-family:var(--font-display); font-style:italic; font-size:19px; color:var(--rose-deep);}
+  blockquote.pullquote::before{content:"✦"; display:block; color:var(--gold); margin-bottom:6px; font-style:normal;}
+
+  /* ===== figure box (frame only — contents are "example blocks", not chrome) ===== */
+  figure.figure-box{margin:0; padding:18px 20px 14px; border:1px solid var(--gold); border-radius:8px; background:#fffdfa;}
+  figure.figure-box figcaption{font-family:var(--font-display); font-weight:600; letter-spacing:.06em; color:var(--rose-deep); font-size:14px; text-transform:uppercase; margin-bottom:8px; text-align:center;}
+  figure.figure-box .placeholder{border:1px dashed var(--rose-dust); border-radius:6px; padding:30px; text-align:center; color:var(--ink-soft); font-size:13.5px;}
+
+  /* ===== table ===== */
+  table.compare{width:100%; border-collapse:collapse; font-size:14px;}
+  table.compare th, table.compare td{border:1px solid var(--gold); padding:9px 12px; text-align:left;}
+  table.compare thead th:nth-child(2){background:var(--blush); color:var(--rose-deep);}
+  table.compare thead th:nth-child(3){background:var(--lavender); color:var(--rose-deep);}
+  table.compare thead th:first-child{background:var(--paper-edge);}
+  table.compare th{font-family:var(--font-display); font-weight:600;}
+
+  /* ===== sidebar boxes ===== */
+  .box{border:1px solid var(--rose-dust); border-radius:8px; padding:16px 18px; background:var(--paper);}
+  .box.reading{background:var(--blush);}
+  .box.notes{background:#fffdfa;}
+  .box h4{font-family:var(--font-display); font-weight:600; letter-spacing:.06em; font-size:14.5px; text-transform:uppercase; color:var(--rose-deep); margin:0 0 10px;}
+  .box ul{margin:0; padding-left:18px; font-size:13.8px; line-height:1.55;}
+  .box li{margin-bottom:10px;}
+  .box .why{display:block; color:var(--ink-soft); font-size:12.6px; margin-top:2px;}
+  .rule-lines div{border-bottom:1px dotted var(--rose-dust); height:24px;}
+
+  footer.tagline{text-align:center; font-family:var(--font-display); font-style:italic; font-size:15px; color:var(--rose-dust);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="tb-back"><a href="/ologypedia">&larr; Ologypedia</a></nav>
+
+  <div class="intro-note">
+    <h1>Chrome Block Library</h1>
+    <p>The near-universal wrapper pieces of a textbook page — the parts that barely vary by topic. Design tokens and every block are plain CSS classes; any model that can read this file's source can replicate them exactly. Example-block patterns (worked-example diagrams, charts, timelines) are a separate, topic-dependent library — see <code>textbook-example-blocks.html</code>.</p>
+  </div>
+
+  <section>
+    <span class="label">tokens — the palette</span>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#FBF3EC"></div>paper #FBF3EC</div>
+      <div class="swatch"><div class="chip" style="background:#8C3B4A"></div>rose-deep #8C3B4A</div>
+      <div class="swatch"><div class="chip" style="background:#C77C8E"></div>rose-dust #C77C8E</div>
+      <div class="swatch"><div class="chip" style="background:#F7DFE3"></div>blush #F7DFE3</div>
+      <div class="swatch"><div class="chip" style="background:#EAE0F2"></div>lavender #EAE0F2</div>
+      <div class="swatch"><div class="chip" style="background:#C9A66B"></div>gold #C9A66B</div>
+      <div class="swatch"><div class="chip" style="background:#8FA37E"></div>sage #8FA37E</div>
+    </div>
+    <p class="label" style="margin-top:10px;">fonts: display/headers → Cormorant Garamond · body → Lora (loaded via <code>/shared/fonts.css</code>, <code>var(--font-display)</code> / <code>var(--font-body)</code>)</p>
+  </section>
+
+  <section>
+    <span class="label"><code>.masthead</code> — page header</span>
+    <div class="block-demo">
+      <span class="kicker-tag">DOMAIN &amp; SUBDOMAIN</span>
+      <h1 class="title">Topic Title</h1>
+      <div class="subtitle-row"><span class="orn">✦</span><h2 class="subtitle">Descriptive Subtitle</h2><span class="orn">✦</span></div>
+      <p class="intro">Hook and roadmap sentence goes here, in the narrator's voice, addressing the reader directly.</p>
+    </div>
+  </section>
+
+  <section>
+    <span class="label"><code>.sec-head</code> — numbered section header</span>
+    <div class="block-demo">
+      <div class="sec-head"><span class="num">1</span><h3>Section Title</h3></div>
+      <p style="font-size:14.5px; color:var(--ink-soft);">Body prose follows directly below, unstyled.</p>
+    </div>
+  </section>
+
+  <section>
+    <span class="label"><code>.chain</code> — etymology/sequence chips</span>
+    <div class="block-demo">
+      <div class="chain">
+        <span class="chip"><b>Language</b> word — gloss</span><span class="arrow">→</span>
+        <span class="chip"><b>Language</b> word — gloss</span><span class="arrow">→</span>
+        <span class="chip"><b>English</b> modern form</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="label"><code>.pullquote</code> — common-confusion / callout</span>
+    <div class="block-demo">
+      <blockquote class="pullquote">The single most load-bearing sentence in the section goes here.</blockquote>
+    </div>
+  </section>
+
+  <section>
+    <span class="label"><code>.figure-box</code> — frame for an example block (contents vary — see example-block library)</span>
+    <div class="block-demo">
+      <figure class="figure-box">
+        <figcaption>Figure 1 · Title</figcaption>
+        <div class="placeholder">[ example-block content — mechanism / chart / timeline / etc. ]</div>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <span class="label"><code>.compare</code> — comparison table</span>
+    <div class="block-demo">
+      <table class="compare">
+        <thead><tr><th>Attribute</th><th>Option A</th><th>Option B</th></tr></thead>
+        <tbody><tr><td>Row label</td><td>Value</td><td>Value</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <span class="label"><code>.box.reading</code> / <code>.box.notes</code> — sidebar boxes</span>
+    <div class="block-demo" style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+      <div class="box reading">
+        <h4>Further Reading</h4>
+        <ul><li>Source citation<span class="why">Why it matters.</span></li></ul>
+      </div>
+      <div class="box notes">
+        <h4>Notes</h4>
+        <div class="rule-lines"><div></div><div></div><div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="label"><code>.tagline</code> — footer</span>
+    <div class="block-demo">
+      <footer class="tagline">A one-line closing note in the narrator's voice. ✦</footer>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

@@ -25,6 +25,8 @@
     { "source": "/digits/:path*",   "destination": "/apps/digits/:path*" },
     { "source": "/quiet-room",        "destination": "/apps/quiet-room/index.html" },
     { "source": "/quiet-room/:path*", "destination": "/apps/quiet-room/:path*" },
+    { "source": "/ologypedia",        "destination": "/apps/ologypedia/index.html" },
+    { "source": "/ologypedia/:path*", "destination": "/apps/ologypedia/:path*" },
     { "source": "/write",           "destination": "/apps/write/dist/index.html" },
     { "source": "/write/:path*",    "destination": "/apps/write/dist/:path*" },
     { "source": "/letter",          "destination": "/apps/letter/index.html" },
