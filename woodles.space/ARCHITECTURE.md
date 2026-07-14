@@ -69,6 +69,7 @@ woodles.space/
     ├── hygge/               static · design playground (fonts, palette, motifs)
     ├── digits/              static · an SVG pen that writes the time
     ├── quiet-room/          static · an immersive three.js room of light
+    ├── ologypedia/          static · a block system for textbook-style pages, and the pages it renders
     ├── letter/              static · echoes — the published-letter reader
     ├── animations/          Python · Manim playspace, outside the workspace
     ├── write/               SvelteKit · the letter editor
@@ -105,6 +106,20 @@ rewrite to it; `/scaffold` rewrites to `/write`. `lab` is the home for stub
 experiments that should stay reachable without appearing as separate homepage
 apps; it links out to `/digits` and `/animations`, whose direct routes still
 work for old bookmarks.
+
+`ologypedia` is a block system for textbook-style pages, not a single page —
+four static HTML files (`index.html`, `textbook-chrome-blocks.html`,
+`textbook-example-blocks.html`, one worked page per topic, starting with
+`textbook-photosynthesis.html`) that each carry their own copy of the same
+CSS tokens (`--paper`, `--ink`, `--rose-deep`, …) and block classes
+(`.masthead`, `.figure-box`, `.ex-mechanism`, …) inline, by design — the whole
+point is that the source of any one file is a complete, copy-paste-able spec
+another model can read and replicate exactly, so nothing here is factored out
+to a shared stylesheet the way `shared/fonts.css` is. It does pull
+`shared/fonts.css` for the Cormorant Garamond / Lora pairing, but skips
+`shared/palette.css` entirely — its cream/rose/gold palette is its own, same
+pattern as the SvelteKit apps that own their own look, just on a static app
+instead.
 
 `marginalia` is the biggest app by built size (`dist/` ~3.1 MB, week 10
 perf-sanity check) — but the number that actually matters, first-load

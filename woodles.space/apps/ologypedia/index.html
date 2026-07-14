@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ologypedia · woodles.space</title>
+<meta name="description" content="a block system for textbook-style pages on anything — a content spec, a chrome library, and a growing set of worked-example blocks.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="/shared/fonts.css">
+<style>
+  :root{
+    --paper:#FBF3EC; --paper-edge:#F3E6D9; --ink:#3D2B2B; --ink-soft:#6B5656;
+    --rose-deep:#8C3B4A; --rose-dust:#C77C8E; --blush:#F7DFE3; --lavender:#EAE0F2;
+    --gold:#C9A66B; --sage:#8FA37E;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:#E9DCCB; padding:32px 16px 64px; font-family:var(--font-body); color:var(--ink); line-height:1.65;}
+  .wrap{max-width:820px; margin:0 auto;}
+  .page{background:var(--paper); border:1px solid var(--gold); border-radius:10px; padding:34px 40px 30px;}
+  @media (max-width:600px){ .page{padding:24px 20px 22px;} }
+  p{margin:0 0 16px; font-size:15.5px;}
+  a{color:var(--rose-deep);}
+
+  /* ===== masthead ===== */
+  .kicker-tag{display:inline-block; font-family:var(--font-display); font-weight:600; letter-spacing:.16em; font-size:12.5px; color:var(--rose-deep); border:1px solid var(--rose-dust); border-radius:999px; padding:4px 16px; background:var(--blush);}
+  h1.title{font-family:var(--font-display); font-weight:600; font-size:44px; color:var(--rose-deep); margin:14px 0 6px; line-height:1.05;}
+  .subtitle-row{display:flex; align-items:center; gap:14px; margin-bottom:16px;}
+  .subtitle-row .orn{color:var(--gold); font-size:14px;}
+  h2.subtitle{font-family:var(--font-display); font-weight:500; letter-spacing:.12em; font-size:15px; color:var(--rose-dust); text-transform:uppercase; margin:0;}
+  p.intro{font-size:16.5px; line-height:1.7; color:var(--ink-soft); margin:0 0 28px;}
+
+  /* ===== numbered section ===== */
+  .sec-head{display:flex; align-items:center; gap:12px; margin:34px 0 14px;}
+  .num{flex:none; width:30px; height:30px; border-radius:50%; background:var(--rose-deep); color:var(--paper); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:600; font-size:15px;}
+  .sec-head h3{font-family:var(--font-display); font-weight:600; font-size:20px; letter-spacing:.04em; color:var(--rose-deep); margin:0; text-transform:uppercase; flex:1; border-bottom:1px solid var(--rose-dust); padding-bottom:8px;}
+
+  /* ===== figure box ===== */
+  figure.figure-box{margin:22px 0 24px; padding:18px 20px 14px; border:1px solid var(--gold); border-radius:8px; background:#fffdfa;}
+  figure.figure-box figcaption{font-family:var(--font-display); font-weight:600; letter-spacing:.06em; color:var(--rose-deep); font-size:14px; text-transform:uppercase; margin-bottom:14px; text-align:center;}
+
+  /* ===== mechanism (reused to document the system's own architecture) ===== */
+  .ex-mechanism{display:flex; flex-wrap:wrap; align-items:stretch; gap:10px; justify-content:center;}
+  .ex-mechanism .node{flex:1 1 150px; max-width:200px; background:var(--paper); border:1px solid var(--rose-dust); border-radius:8px; padding:12px 14px;}
+  .ex-mechanism .node-accent{background:var(--blush); border-color:var(--rose-deep);}
+  .ex-mechanism .node-tag{display:inline-block; font-family:var(--font-display); font-weight:600; font-size:11px; letter-spacing:.08em; color:var(--paper); background:var(--rose-deep); border-radius:999px; padding:1px 9px; margin-bottom:7px;}
+  .ex-mechanism .node-title{font-family:var(--font-display); font-weight:600; font-size:14.5px; color:var(--rose-deep); margin:0 0 4px;}
+  .ex-mechanism .node-detail{font-size:12.5px; line-height:1.45; color:var(--ink-soft); margin:0;}
+  .ex-mechanism .arrow{flex:0 0 auto; align-self:center; color:var(--gold); font-size:20px; line-height:1;}
+  @media (max-width:520px){ .ex-mechanism .arrow{transform:rotate(90deg);} }
+
+  /* ===== library cards ===== */
+  .lib-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:6px;}
+  @media (max-width:600px){ .lib-grid{grid-template-columns:1fr;} }
+  .lib-grid.full{grid-template-columns:1fr;}
+  .card{display:block; text-decoration:none; background:#fffdfa; border:1px solid var(--gold); border-radius:8px; padding:16px 18px; transition:border-color .15s ease, background .15s ease;}
+  .card:hover{border-color:var(--rose-deep); background:var(--blush);}
+  .card .card-eyebrow{display:block; font-family:var(--font-display); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--rose-dust); margin-bottom:5px;}
+  .card h4{font-family:var(--font-display); font-weight:600; font-size:17px; color:var(--rose-deep); margin:0 0 5px;}
+  .card p{font-size:13.2px; color:var(--ink-soft); margin:0;}
+
+  /* ===== sidebar box ===== */
+  .box{border:1px solid var(--rose-dust); border-radius:8px; padding:16px 18px; background:var(--blush); margin-top:8px;}
+  .box h4{font-family:var(--font-display); font-weight:600; letter-spacing:.06em; font-size:14.5px; text-transform:uppercase; color:var(--rose-deep); margin:0 0 10px;}
+  .box ul{margin:0; padding-left:18px; font-size:13.5px; line-height:1.6; columns:2; column-gap:24px;}
+  @media (max-width:600px){ .box ul{columns:1;} }
+  .box li{margin-bottom:6px; break-inside:avoid;}
+  .box li.done{color:var(--ink-soft);}
+  .box li.done::marker{color:var(--sage);}
+
+  footer.tagline{text-align:center; font-family:var(--font-display); font-style:italic; font-size:15px; color:var(--rose-dust); margin-top:30px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <article class="page">
+
+    <span class="kicker-tag">A Woodle</span>
+    <h1 class="title">Ologypedia</h1>
+    <div class="subtitle-row"><span class="orn">✦</span><h2 class="subtitle">A Block System for Textbook-Style Pages</h2><span class="orn">✦</span></div>
+    <p class="intro">Not an app you click around in — a system you write with. Give any capable model the voice spec below and it writes in a consistent register; give it the chrome and it drops that writing into a page that looks like every other page here; give it the example blocks and its worked examples get a real diagram instead of a wall of description. Three layers, one look, no proprietary tooling required — it's all plain HTML, CSS, and SVG, readable straight from the source of any page in this library.</p>
+
+    <div class="sec-head"><span class="num">1</span><h3>How the Three Layers Fit</h3></div>
+    <p>The content spec shapes the writing. The chrome wraps it in the same masthead, headers, and callouts every time. The example blocks give topic-specific worked examples — a mechanism, a comparison, a timeline, a chart — an actual visual shape instead of another paragraph.</p>
+    <figure class="figure-box">
+      <figcaption>Figure · The Pipeline, in One Glance</figcaption>
+      <div class="ex-mechanism">
+        <div class="node">
+          <span class="node-tag">Spec</span>
+          <h5 class="node-title">Content spec</h5>
+          <p class="node-detail">Voice, structure, worked-example rules — gets any model writing in the same register.</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="node">
+          <span class="node-tag">Chrome</span>
+          <h5 class="node-title">Chrome blocks</h5>
+          <p class="node-detail">Masthead, section headers, callouts, tables, sidebar boxes — the near-universal wrapper.</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="node">
+          <span class="node-tag">Example</span>
+          <h5 class="node-title">Example blocks</h5>
+          <p class="node-detail">Mechanism, comparative pair, timeline, data deep-dive — the topic-dependent worked-example patterns.</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="node node-accent">
+          <span class="node-tag">Out</span>
+          <h5 class="node-title">A rendered page</h5>
+          <p class="node-detail">Same palette, same structure, same rigor, on whatever topic you hand it.</p>
+        </div>
+      </div>
+    </figure>
+
+    <div class="sec-head"><span class="num">2</span><h3>The Library</h3></div>
+    <p>Two reference files, documented and live-rendered so a fresh model session can read the source and replicate the classes exactly — plus one worked page proving the whole pipeline end to end.</p>
+    <div class="lib-grid">
+      <a class="card" href="/ologypedia/textbook-chrome-blocks.html">
+        <span class="card-eyebrow">Reference</span>
+        <h4>Chrome Blocks</h4>
+        <p>Tokens, masthead, section headers, pullquote, figure frame, comparison table, sidebar boxes, footer.</p>
+      </a>
+      <a class="card" href="/ologypedia/textbook-example-blocks.html">
+        <span class="card-eyebrow">Reference</span>
+        <h4>Example Blocks</h4>
+        <p>The topic-dependent family: mechanism, comparative pair, timeline, data deep-dive.</p>
+      </a>
+    </div>
+    <div class="lib-grid full">
+      <a class="card" href="/ologypedia/textbook-photosynthesis.html">
+        <span class="card-eyebrow">Worked Page &middot; No. 1</span>
+        <h4>Photosynthesis — How Light Becomes Sugar</h4>
+        <p>The integration test: chrome plus all four example blocks, on one real, checkable topic — the mechanism, the two centuries it took to work out, C3 vs. C4, and two billion years of atmospheric oxygen.</p>
+      </a>
+    </div>
+
+    <div class="box">
+      <h4>What's Built, What's Next</h4>
+      <ul>
+        <li class="done">Mechanism walkthrough</li>
+        <li class="done">Comparative pair</li>
+        <li class="done">Timeline of one event</li>
+        <li class="done">Data deep-dive</li>
+        <li>Artifact close-reading</li>
+        <li>Single documented case</li>
+        <li>Failure case</li>
+        <li>Primary document excerpt</li>
+        <li>Back-of-envelope math</li>
+        <li>Biographical vignette</li>
+        <li>Policy/institutional episode</li>
+        <li>Legal case</li>
+        <li>Geographic case</li>
+        <li>Edge case / boundary stress-test</li>
+        <li>Experiment walkthrough</li>
+        <li>Documented exchange</li>
+      </ul>
+    </div>
+
+    <footer class="tagline">Formalized once, so nobody has to re-derive the palette from a paragraph again. ✦</footer>
+
+  </article>
+</div>
+</body>
+</html>
