@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Add a Page · Ologypedia</title>
+<meta name="description" content="Turn the content spec and the block library into one copy-pasteable prompt for any capable model — the parked add-page expansion mechanism, built.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="/shared/fonts.css">
+<style>
+  :root{
+    --paper:#FBF3EC; --paper-edge:#F3E6D9; --ink:#3D2B2B; --ink-soft:#6B5656;
+    --rose-deep:#8C3B4A; --rose-dust:#C77C8E; --blush:#F7DFE3; --lavender:#EAE0F2;
+    --gold:#C9A66B; --sage:#8FA37E;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:#E9DCCB; padding:32px 16px 64px; font-family:var(--font-body); color:var(--ink); line-height:1.65;}
+  .wrap{max-width:820px; margin:0 auto;}
+  .tb-back{margin-bottom:18px;}
+  .tb-back a{font-family:var(--font-body); font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); text-decoration:none; border-bottom:1px dotted var(--rose-dust); padding-bottom:1px;}
+  .tb-back a:hover{color:var(--rose-deep);}
+  .page{background:var(--paper); border:1px solid var(--gold); border-radius:10px; padding:34px 40px 30px;}
+  @media (max-width:600px){ .page{padding:24px 20px 22px;} }
+  p{margin:0 0 16px; font-size:15.5px;}
+  p:last-child{margin-bottom:0;}
+  code{background:var(--paper-edge); padding:1px 6px; border-radius:4px; font-family:monospace; color:var(--rose-deep); font-size:13px;}
+
+  /* ===== masthead ===== */
+  .kicker-tag{display:inline-block; font-family:var(--font-display); font-weight:600; letter-spacing:.16em; font-size:12.5px; color:var(--rose-deep); border:1px solid var(--rose-dust); border-radius:999px; padding:4px 16px; background:var(--blush);}
+  h1.title{font-family:var(--font-display); font-weight:600; font-size:44px; color:var(--rose-deep); margin:14px 0 6px; line-height:1.05;}
+  .subtitle-row{display:flex; align-items:center; gap:14px; margin-bottom:16px;}
+  .subtitle-row .orn{color:var(--gold); font-size:14px;}
+  h2.subtitle{font-family:var(--font-display); font-weight:500; letter-spacing:.12em; font-size:15px; color:var(--rose-dust); text-transform:uppercase; margin:0;}
+  p.intro{font-size:16.5px; line-height:1.7; color:var(--ink-soft); margin:0 0 28px;}
+
+  /* ===== numbered section ===== */
+  .sec-head{display:flex; align-items:center; gap:12px; margin:34px 0 14px;}
+  .num{flex:none; width:30px; height:30px; border-radius:50%; background:var(--rose-deep); color:var(--paper); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:600; font-size:15px;}
+  .sec-head h3{font-family:var(--font-display); font-weight:600; font-size:20px; letter-spacing:.04em; color:var(--rose-deep); margin:0; text-transform:uppercase; flex:1; border-bottom:1px solid var(--rose-dust); padding-bottom:8px;}
+
+  /* ===== figure box ===== */
+  figure.figure-box{margin:0 0 24px; padding:18px 20px 14px; border:1px solid var(--gold); border-radius:8px; background:#fffdfa;}
+  figure.figure-box figcaption{font-family:var(--font-display); font-weight:600; letter-spacing:.06em; color:var(--rose-deep); font-size:14px; text-transform:uppercase; margin-bottom:14px; text-align:center;}
+
+  /* ===== .ex-mechanism (reused for the how-it-works figure) ===== */
+  .ex-mechanism{display:flex; flex-wrap:wrap; align-items:stretch; gap:10px; justify-content:center;}
+  .ex-mechanism .node{flex:1 1 150px; max-width:190px; background:var(--paper); border:1px solid var(--rose-dust); border-radius:8px; padding:12px 14px;}
+  .ex-mechanism .node-accent{background:var(--blush); border-color:var(--rose-deep);}
+  .ex-mechanism .node-tag{display:inline-block; font-family:var(--font-display); font-weight:600; font-size:11px; letter-spacing:.08em; color:var(--paper); background:var(--rose-deep); border-radius:999px; padding:1px 9px; margin-bottom:7px;}
+  .ex-mechanism .node-title{font-family:var(--font-display); font-weight:600; font-size:14.5px; color:var(--rose-deep); margin:0 0 4px;}
+  .ex-mechanism .node-detail{font-size:12.5px; line-height:1.45; color:var(--ink-soft); margin:0;}
+  .ex-mechanism .arrow{flex:0 0 auto; align-self:center; color:var(--gold); font-size:20px; line-height:1;}
+  @media (max-width:520px){ .ex-mechanism .arrow{transform:rotate(90deg);} }
+
+  /* ===== form ===== */
+  .field{margin-bottom:16px;}
+  .field label{display:block; font-family:var(--font-display); font-weight:600; font-size:12.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--rose-deep); margin-bottom:6px;}
+  .field .hint{font-size:12px; color:var(--ink-soft); margin-top:4px;}
+  .field input[type="text"], .field textarea{
+    width:100%; font-family:var(--font-body); font-size:14.5px; color:var(--ink);
+    background:#fffdfa; border:1px solid var(--rose-dust); border-radius:8px;
+    padding:9px 12px; resize:vertical;
+  }
+  .field input[type="text"]:focus, .field textarea:focus{outline:2px solid var(--gold); outline-offset:1px;}
+  .checkbox-field{display:flex; align-items:flex-start; gap:8px; font-size:13.5px; color:var(--ink); margin-bottom:16px;}
+  .checkbox-field input{margin-top:3px;}
+
+  /* ===== output boxes ===== */
+  .output-wrap{margin-bottom:8px; border:1px solid var(--gold); border-radius:8px; overflow:hidden; background:#fffdfa;}
+  .output-head{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; border-bottom:1px solid var(--paper-edge); background:var(--paper);}
+  .output-head span{font-family:var(--font-display); font-weight:600; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--rose-dust);}
+  .output-wrap textarea{
+    display:block; width:100%; font-family:'DM Mono', monospace; font-size:12px; line-height:1.55;
+    color:var(--ink); background:#fffdfa; border:none; border-radius:0;
+    padding:16px 18px; white-space:pre-wrap;
+  }
+  .output-wrap textarea:focus{outline:none;}
+  .copy-btn{
+    flex:none;
+    font-family:var(--font-display); font-weight:600; font-size:11.5px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--rose-deep); background:var(--blush); border:1px solid var(--rose-dust); border-radius:999px;
+    padding:5px 14px; cursor:pointer; transition:background .15s ease, color .15s ease;
+  }
+  .copy-btn:hover{background:var(--rose-deep); color:var(--paper);}
+  .copy-btn.copied{background:var(--sage); border-color:var(--sage); color:#fff;}
+
+  /* ===== checklist ===== */
+  .box.notes{border:1px solid var(--rose-dust); border-radius:8px; padding:16px 18px; background:#fffdfa;}
+  .box.notes h4{font-family:var(--font-display); font-weight:600; letter-spacing:.06em; font-size:14.5px; text-transform:uppercase; color:var(--rose-deep); margin:0 0 10px;}
+  .box.notes ol{margin:0; padding-left:20px; font-size:13.8px; line-height:1.7;}
+  .box.notes li{margin-bottom:6px;}
+
+  footer.tagline{text-align:center; font-family:var(--font-display); font-style:italic; font-size:15px; color:var(--rose-dust); margin-top:26px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="tb-back"><a href="/ologypedia">&larr; Ologypedia</a></nav>
+
+  <article class="page">
+
+    <span class="kicker-tag">A Woodle &middot; Expansion Mechanism</span>
+    <h1 class="title">Add a Page</h1>
+    <div class="subtitle-row"><span class="orn">✦</span><h2 class="subtitle">Turn the Spec Into a Prompt, Turn the Prompt Into a Page</h2><span class="orn">✦</span></div>
+    <p class="intro">There's no database behind this site, no "save" button that writes to a server — Ologypedia is a static block library, on purpose. So "adding a page" here doesn't mean filling out a form and watching a new row appear. It means assembling one complete, copy-pasteable prompt — content spec plus visual system, topic dropped in — handing it to whatever capable model you're already talking to, and dropping what comes back into this folder. This page just does the assembling.</p>
+
+    <div class="sec-head"><span class="num">1</span><h3>How This Works</h3></div>
+    <figure class="figure-box">
+      <figcaption>Figure &middot; Four Steps, No Backend</figcaption>
+      <div class="ex-mechanism">
+        <div class="node">
+          <span class="node-tag">1</span>
+          <h5 class="node-title">Type a Topic</h5>
+          <p class="node-detail">Below — plus optional context, and a toggle if it's a diagnosis or health condition.</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="node">
+          <span class="node-tag">2</span>
+          <h5 class="node-title">Copy the Prompt</h5>
+          <p class="node-detail">It assembles live as you type: the full content spec, plus the token and class legend below.</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="node">
+          <span class="node-tag">3</span>
+          <h5 class="node-title">Hand It to a Model</h5>
+          <p class="node-detail">Any capable one. Point it at the two reference files if it can read files directly.</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="node node-accent">
+          <span class="node-tag">4</span>
+          <h5 class="node-title">Save &amp; Register</h5>
+          <p class="node-detail">Drop the file in this folder, paste one card into <code>index.html</code> — done.</p>
+        </div>
+      </div>
+    </figure>
+
+    <div class="sec-head"><span class="num">2</span><h3>Build Your Prompt</h3></div>
+    <div class="field">
+      <label for="topic">Topic</label>
+      <input type="text" id="topic" placeholder="e.g., Bioluminescence, The Domestication of the Cat, Mirror Neurons&hellip;" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="context">Your Own Relationship to the Topic <span style="text-transform:none; font-weight:400; color:var(--ink-soft);">(optional)</span></label>
+      <textarea id="context" rows="2" placeholder="Brief background on your own knowledge of or relation to the topic, if relevant. Leave blank to skip."></textarea>
+      <p class="hint">Per the spec: personal context is too idiosyncratic to generalize, so it belongs in the request, not the reusable template.</p>
+    </div>
+    <div class="checkbox-field">
+      <input type="checkbox" id="diagnosis">
+      <label for="diagnosis" style="text-transform:none; font-family:var(--font-body); font-weight:400; font-size:13.5px; color:var(--ink);">This topic is a diagnosis or health condition — add the four extra sections (supporting a loved one, personal risk-assessment, professional/clinical application, prerequisite-study map).</label>
+    </div>
+
+    <div class="output-wrap">
+      <div class="output-head">
+        <span>Assembled Prompt</span>
+        <button class="copy-btn" id="copy-prompt" type="button">Copy Prompt</button>
+      </div>
+      <textarea id="prompt-output" rows="20" readonly></textarea>
+    </div>
+    <p class="note" style="font-size:12.5px; color:var(--ink-soft);">Best results: run this inside a session that already has <code>textbook-chrome-blocks.html</code> and <code>textbook-example-blocks.html</code> open or readable, and tell the model to reuse those files' exact CSS rather than re-deriving them from the legend below. The legend is there so the prompt still mostly works even without file access.</p>
+
+    <div class="sec-head"><span class="num">3</span><h3>After You've Got the Page</h3></div>
+    <div class="box notes">
+      <h4>Registering a New Page</h4>
+      <ol>
+        <li>Save the model's output as <code id="filename-preview">textbook-&lt;topic&gt;.html</code> inside <code>apps/ologypedia/</code>.</li>
+        <li>Open it straight from the filesystem (or serve the workspace locally) and check it renders — masthead, figures, footer, all present.</li>
+        <li>Paste this card into <code>index.html</code>'s library grid, in the <code>.lib-grid.full</code> block with the other worked pages:</li>
+      </ol>
+    </div>
+    <div class="output-wrap" style="margin-top:12px;">
+      <div class="output-head">
+        <span>Index Card Snippet</span>
+        <button class="copy-btn" id="copy-card" type="button">Copy Card</button>
+      </div>
+      <textarea id="card-output" rows="6" readonly></textarea>
+    </div>
+    <p class="note" style="font-size:12.5px; color:var(--ink-soft); margin-top:8px;">No rebuild, no deploy step beyond the usual one — <code>apps/ologypedia/</code> is a static app, so a new file and one pasted link card is the entire "publish."</p>
+
+    <footer class="tagline">The library grows exactly one honest prompt at a time. ✦</footer>
+
+  </article>
+</div>
+
+<script>
+(function(){
+  var topicEl = document.getElementById('topic');
+  var contextEl = document.getElementById('context');
+  var diagnosisEl = document.getElementById('diagnosis');
+  var promptOut = document.getElementById('prompt-output');
+  var cardOut = document.getElementById('card-output');
+  var filenamePreview = document.getElementById('filename-preview');
+
+  function slugify(str){
+    return str.toLowerCase().trim()
+      .replace(/['’]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-+|-+$)/g, '') || 'topic';
+  }
+
+  var VISUAL_SYSTEM =
+"VISUAL SYSTEM — Ologypedia block library. Reuse the tokens and classes\n" +
+"below exactly; do not invent a second palette or new class names.\n\n" +
+"Tokens: --paper #FBF3EC · --paper-edge #F3E6D9 · --ink #3D2B2B ·\n" +
+"--ink-soft #6B5656 · --rose-deep #8C3B4A · --rose-dust #C77C8E ·\n" +
+"--blush #F7DFE3 · --lavender #EAE0F2 · --gold #C9A66B · --sage #8FA37E.\n" +
+"Fonts: var(--font-display) (Cormorant Garamond) for headers, var(--font-body)\n" +
+"(Lora) for body — both loaded via /shared/fonts.css.\n\n" +
+"Chrome (near-universal, from textbook-chrome-blocks.html): .masthead,\n" +
+".sec-head, .chain, .pullquote, .figure-box, .compare, .box.reading /\n" +
+".box.notes, .tagline.\n\n" +
+"Example blocks (topic-dependent, from textbook-example-blocks.html):\n" +
+".ex-mechanism (flow/process diagram), .ex-compare (comparative pair,\n" +
+"one isolated variable), .ex-timeline (chronology of one event),\n" +
+".ex-datadive (SVG bar chart, single hue via color-mix()), .ex-case\n" +
+"(case file — retarget .case-kind for legal case / single documented\n" +
+"case / policy episode / biographical vignette / geographic case),\n" +
+".ex-document (primary source excerpt), .ex-exchange (documented\n" +
+"exchange, alternating turns), .ex-spectrum (edge case on a gradient\n" +
+"track), .ex-envelope (back-of-envelope math), .ex-failure (failure\n" +
+"case, expected vs. actual), .artifact-meta (a 2-line metadata\n" +
+"convention for artifact close-reading — not part of the .ex- family).\n" +
+"Compose .ex-mechanism + .ex-compare + .ex-datadive for an experiment\n" +
+"walkthrough — no new component needed.\n\n" +
+"Output: one complete, self-contained HTML file named\n" +
+"textbook-{SLUG}.html. Inline all CSS, copying the exact rules for any\n" +
+"class you use from textbook-chrome-blocks.html and\n" +
+"textbook-example-blocks.html rather than reinventing them. Plain\n" +
+"HTML/CSS/SVG only — no JS frameworks, no build step. Don't force an\n" +
+"example block where prose already carries the point.";
+
+  function buildPrompt(){
+    var topic = topicEl.value.trim() || '[TOPIC]';
+    var context = contextEl.value.trim();
+    var slug = slugify(topicEl.value.trim());
+
+    var lines = [];
+    lines.push('Write this as a personal-textbook-style page or chapter on: ' + topic);
+    lines.push('');
+    if (context){
+      lines.push('Optional context: ' + context);
+      lines.push('');
+    }
+    lines.push('Voice: conversational but rigorous, standard intro-course background assumed.');
+    lines.push('Slightly more playful than neutral — except where the topic is genuinely');
+    lines.push('heavy, where the register shifts to hope/awe/significance rather than');
+    lines.push('forced levity or flat solemnity. The narrator is an implied presence —');
+    lines.push('never says "I" — but has clear judgment and speaks directly to "you,"');
+    lines.push('steering attention rather than narrating past it. External, curious,');
+    lines.push('helpful, a little magical — not an oracle, not a casual friend.');
+    lines.push('');
+    lines.push('Structure: headers, generously used. No length ceiling. No closing');
+    lines.push('synthesis/wrap-up paragraph — end on the last substantive section. Include');
+    lines.push('a figure or diagram whenever a mechanism, process, or structure would');
+    lines.push('genuinely be clearer shown than described.');
+    lines.push('');
+    lines.push('Etymology: track key terms as semantic drift — how the meaning moved and');
+    lines.push('why — at first use, not just the root. Foreign/loan terms get a quick');
+    lines.push('pronunciation gloss on first appearance.');
+    lines.push('');
+    lines.push('Bridges: metaphors only from educational psychology, game/systems design,');
+    lines.push('sociology & media studies, or neuroscience/cognitive science. Never sports.');
+    lines.push('');
+    lines.push('Worked example(s): grounded in real, checkable material only — a');
+    lines.push('mechanism, a real historical artifact/event, real data. Never an');
+    lines.push('interpretive reading of the topic\'s own fictional content.');
+    lines.push('');
+    lines.push('Standing lenses — check for a genuine connection to: (1) autism/');
+    lines.push('neurodivergence, including special-interest culture, not just clinical');
+    lines.push('application; (2) ABA & behavior-analytic clinical practice; (3)');
+    lines.push('anti-essentialism, queerness, or systems-thinking approaches. Skip');
+    lines.push('silently if there\'s no real connection — no mention of absence. When');
+    lines.push('there is one, weave it into the prose without ever naming the lens.');
+    lines.push('Length scales to how much it adds.');
+    lines.push('');
+    lines.push('Conversions, every time relevant: distance in mi + km, temperature in');
+    lines.push('°F + °C, weight in lb + kg, volume in gal/cups + L/mL, historical dollar');
+    lines.push('figures with a current-year inflation-adjusted equivalent, historical');
+    lines.push('dates with "X years ago," chemical formula alongside common name where');
+    lines.push('relevant, population/count figures alongside their share of the relevant');
+    lines.push('total. Do not anchor big numbers to a forced concrete-object comparison.');
+    lines.push('');
+    lines.push('Reading list: primary/seminal sources preferred; one accessible on-ramp');
+    lines.push('only if the primary source is a genuinely rough entry point.');
+
+    if (diagnosisEl.checked){
+      lines.push('');
+      lines.push('This topic is a diagnosis or health condition — also add: supporting a');
+      lines.push('loved one who has it, personal risk-assessment (what to know if');
+      lines.push('diagnosed, or whether to get assessed), professional/clinical');
+      lines.push('application (relevant to ABA/behavior-analytic work), and a');
+      lines.push('prerequisite-study map (what to learn first for real depth).');
+    }
+
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+    lines.push(VISUAL_SYSTEM.replace('{SLUG}', slug));
+
+    promptOut.value = lines.join('\n');
+    filenamePreview.textContent = 'textbook-' + slug + '.html';
+
+    var title = topicEl.value.trim() || 'Page Title';
+    cardOut.value =
+'<a class="card" href="/ologypedia/textbook-' + slug + '.html">\n' +
+'  <span class="card-eyebrow">Worked Page &middot; No. N</span>\n' +
+'  <h4>' + title + '</h4>\n' +
+'  <p>One line on what it covers and which example blocks it uses.</p>\n' +
+'</a>';
+  }
+
+  [topicEl, contextEl, diagnosisEl].forEach(function(el){
+    el.addEventListener('input', buildPrompt);
+    el.addEventListener('change', buildPrompt);
+  });
+  buildPrompt();
+
+  function wireCopy(btnId, sourceEl){
+    var btn = document.getElementById(btnId);
+    btn.addEventListener('click', function(){
+      sourceEl.select();
+      navigator.clipboard.writeText(sourceEl.value).then(function(){
+        var original = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(function(){
+          btn.textContent = original;
+          btn.classList.remove('copied');
+        }, 1400);
+      });
+    });
+  }
+  wireCopy('copy-prompt', promptOut);
+  wireCopy('copy-card', cardOut);
+})();
+</script>
+</body>
+</html>

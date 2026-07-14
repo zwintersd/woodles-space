@@ -58,6 +58,10 @@
   .card .card-eyebrow{display:block; font-family:var(--font-display); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--rose-dust); margin-bottom:5px;}
   .card h4{font-family:var(--font-display); font-weight:600; font-size:17px; color:var(--rose-deep); margin:0 0 5px;}
   .card p{font-size:13.2px; color:var(--ink-soft); margin:0;}
+  .card.card-add{background:transparent; border-style:dashed; border-color:var(--rose-dust); text-align:center; padding:20px 18px;}
+  .card.card-add:hover{border-style:dashed; border-color:var(--rose-deep);}
+  .card.card-add .card-eyebrow{color:var(--rose-dust);}
+  .card.card-add h4::before{content:"+ "; color:var(--gold);}
 
   /* ===== sidebar box ===== */
   .box{border:1px solid var(--rose-dust); border-radius:8px; padding:16px 18px; background:var(--blush); margin-top:8px;}
@@ -138,6 +142,11 @@
         <span class="card-eyebrow">Worked Page &middot; No. 2</span>
         <h4>The Challenger Disaster</h4>
         <p>The second integration test, on a genuinely heavy topic: chrome plus six more example blocks — the failure mechanism, the teleconference, the institutional aftermath, and the number Feynman couldn't let go of.</p>
+      </a>
+      <a class="card card-add" href="/ologypedia/add-page.html">
+        <span class="card-eyebrow">Expansion Mechanism</span>
+        <h4>Add a Page</h4>
+        <p>The parked "add page" mechanism, built: a form that assembles the content spec and this library's tokens and classes into one copy-pasteable prompt for any capable model.</p>
       </a>
     </div>
 
