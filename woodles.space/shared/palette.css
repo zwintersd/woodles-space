@@ -229,3 +229,57 @@
 
 	color-scheme: light;
 }
+
+/* blossom — aura gradients and petal pinks: honeydew, dust grey,
+   soft blossom, petal pink, bright lavender */
+[data-theme='blossom'] {
+	--bg: #f3eaf8;
+	--text: #46285f;
+	--muted: #9a7fae;
+
+	--lavender: #a775c9;
+	--aqua: #c2ead0;
+	--peach: #deafc2;
+	--lilac: #d480bb;
+	--cream: #eaf7ec;
+	--lapis: #7c3fae;
+	--plum: #a04b92;
+
+	--accent: var(--lavender);
+	--accent-soft: var(--aqua);
+	--accent-warm: var(--peach);
+	--accent-strong: var(--lapis);
+	--accent-deep: var(--plum);
+
+	--surface: rgba(246, 238, 250, 0.72);
+	--rule: rgba(167, 117, 201, 0.3);
+
+	color-scheme: light;
+}
+
+/* sugar — candy-shop brights: bubblegum pink, butter yellow,
+   sweet mint, and periwinkle on a cool aqua ground */
+[data-theme='sugar'] {
+	--bg: #a9f0e9;
+	--text: #33307a;
+	--muted: #5f6cae;
+
+	--lavender: #bdc0f7;
+	--aqua: #72f0ec;
+	--peach: #ffeea8;
+	--lilac: #fec3df;
+	--cream: #fff6fb;
+	--lapis: #e8468f;
+	--plum: #6f74c9;
+
+	--accent: var(--lilac);
+	--accent-soft: var(--aqua);
+	--accent-warm: var(--peach);
+	--accent-strong: var(--lapis);
+	--accent-deep: var(--plum);
+
+	--surface: rgba(255, 248, 252, 0.74);
+	--rule: rgba(232, 70, 143, 0.26);
+
+	color-scheme: light;
+}
