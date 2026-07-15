@@ -54,7 +54,7 @@ woodles.space/
 ├── README.md                deployment reference
 ├── REFACTORING.md           consolidation log
 ├── shared/                  cross-app design system + data registry
-│   ├── palette.css          9 named themes, switched via [data-theme]
+│   ├── palette.css          11 named themes, switched via [data-theme]
 │   ├── fonts.css            --font-* custom properties
 │   ├── motifs.css           ambient backdrops (class="motif-<id>")
 │   └── library.js           palettes / motifs / fontPairs / templates — untyped
@@ -229,8 +229,9 @@ IndexedDB-backed fallback chain land in the same place by different means.
 
 the design system is shared at the lowest level only, and not by every app.
 
-**`shared/palette.css`** defines nine themes — `cream`, `dawn`, `dusk`,
-`midnight`, `forest`, `terracotta`, `inkwell`, `typewriter`, `paper` — as CSS
+**`shared/palette.css`** defines eleven themes — `cream`, `dawn`, `dusk`,
+`midnight`, `forest`, `terracotta`, `inkwell`, `typewriter`, `paper`,
+`blossom`, `sugar` — as CSS
 custom properties, switched by setting `data-theme="<id>"`. role tokens
 (`--bg`, `--text`, `--accent`, `--rule`, …) carry the same meaning through every
 theme, and concrete color names (`--lavender`, `--aqua`, `--peach`, `--lilac`,
@@ -244,7 +245,7 @@ redefines the bare names under `.marginalia-root`, `planner` uses `--p-*`,
 under `.devlog-root`, `notebook` defines `--nb-*` straight on `:root` (no
 scoping class — each app is its own page, so there's nothing else in the DOM
 for it to leak onto), and `thinking-about` uses `--ta-*` under
-`.thinking-about-root`. `data-theme` and the nine shared themes don't reach
+`.thinking-about-root`. `data-theme` and the eleven shared themes don't reach
 any of them; they own their own look.
 
 `thinking-about`'s look is a deliberate departure even from its SvelteKit
