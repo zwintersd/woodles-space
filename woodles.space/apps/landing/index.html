@@ -269,7 +269,13 @@
     .tb-btn:active { transform: scale(0.9); }
     .tb-btn .tile { width: 30px; height: 30px; border-radius: 9px; font-size: 0.95rem; }
     .tb-btn .tile::after { border-radius: 9px; }
-    /* running indicator */
+    /* dock magnification — tiles swell toward the cursor */
+    .tb-app .tile {
+      transform-origin: 50% 92%;
+      transition: transform 0.18s cubic-bezier(.2,.9,.3,1);
+      will-change: transform;
+    }
+    /* recently-opened indicator */
     .tb-app::before {
       content: '';
       position: absolute; bottom: 3px; left: 50%;
@@ -278,7 +284,33 @@
       background: var(--accent-strong);
       opacity: 0; transition: opacity 0.18s ease, width 0.18s ease;
     }
-    .tb-app:hover::before { opacity: 0.85; width: 14px; border-radius: 3px; }
+    .tb-app.recent::before { opacity: 0.9; }
+    .tb-app:hover::before { width: 14px; border-radius: 3px; }
+    /* label bubbles above the bar */
+    .taskbar [data-label]::after {
+      content: attr(data-label);
+      position: absolute;
+      bottom: calc(100% + 13px);
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      padding: 0.32rem 0.6rem;
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--surface) 94%, var(--bg));
+      border: 1px solid var(--rule);
+      box-shadow: 0 10px 24px -12px var(--accent-deep);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.08em;
+      color: var(--text);
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    .taskbar [data-label]:hover::after {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
 
     .start-btn .start-orb {
       width: 30px; height: 30px;
@@ -309,10 +341,21 @@
       transition: background 0.16s ease;
     }
     .tray:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
-    .tray-glyphs {
-      display: flex; gap: 0.35rem;
+    /* tray buttons — small, functional */
+    .tray-btn {
+      width: 26px; height: 26px;
+      border: none; background: transparent;
+      border-radius: 8px;
+      display: grid; place-items: center;
+      cursor: pointer;
+      position: relative;
+      font-family: inherit;
       font-size: 0.8rem; color: var(--accent-strong);
+      transition: background 0.14s ease, opacity 0.14s ease, transform 0.12s ease;
     }
+    .tray-btn:hover { background: color-mix(in srgb, var(--accent) 32%, transparent); }
+    .tray-btn:active { transform: scale(0.86); }
+    .tray-btn.off { opacity: 0.35; }
     .tray-clock {
       font-family: 'DM Mono', monospace;
       font-size: 0.62rem;
@@ -328,7 +371,10 @@
       position: fixed;
       bottom: 70px; left: 50%;
       z-index: 19;
-      width: min(540px, calc(100vw - 24px));
+      width: min(580px, calc(100vw - 24px));
+      max-height: calc(100vh - 96px);
+      overflow-y: auto;
+      scrollbar-width: thin;
       padding: 1.5rem 1.5rem 1.1rem;
       border-radius: 20px;
       background: color-mix(in srgb, var(--surface) 90%, var(--bg));
@@ -408,6 +454,11 @@
       color: var(--muted);
       padding: 1.4rem 0;
     }
+    /* the all-apps shelf — denser than pinned */
+    .start-grid-all { grid-template-columns: repeat(5, 1fr); }
+    .start-grid-all .start-app { padding: 0.6rem 0.2rem; gap: 0.4rem; }
+    .start-grid-all .tile { width: 38px; height: 38px; }
+    .start-actions { display: flex; gap: 0.15rem; }
     /* recommended row */
     .recommended { display: flex; flex-direction: column; gap: 0.15rem; }
     .rec-item {
@@ -968,17 +1019,22 @@
 
   <!-- start menu -->
   <section class="start" id="start" role="dialog" aria-label="Start">
-    <input class="start-search" id="search" type="text" placeholder="search woodles.space…" autocomplete="off" />
-    <p class="start-section">pinned</p>
+    <input class="start-search" id="search" type="text" placeholder="search woodles.space… (enter opens the first hit)" autocomplete="off" />
+    <p class="start-section" id="pinned-label">pinned</p>
     <div class="start-grid" id="start-grid"></div>
-    <p class="start-section" id="rec-label">recommended</p>
+    <p class="start-section" id="all-label">all apps</p>
+    <div class="start-grid start-grid-all" id="all-grid"></div>
+    <p class="start-section" id="rec-label">recently opened</p>
     <div class="recommended" id="recommended"></div>
     <div class="start-foot">
       <div class="start-user" id="start-user" title="personalize" role="button" tabindex="0">
         <div class="user-pic" id="user-pic">u</div>
         <span class="user-name" id="user-name">user</span>
       </div>
-      <button class="start-power" id="about-btn" title="about">&#9432;</button>
+      <div class="start-actions">
+        <button class="start-power" id="pers-btn" title="personalize">&#10024;</button>
+        <button class="start-power" id="about-btn" title="about">&#9432;</button>
+      </div>
     </div>
   </section>
 
@@ -994,18 +1050,15 @@
 
   <!-- taskbar -->
   <nav class="taskbar" id="taskbar">
-    <button class="tb-btn start-btn" id="start-btn" title="start" aria-label="Start">
+    <button class="tb-btn start-btn" id="start-btn" data-label="start" aria-label="Start">
       <span class="start-orb"></span>
     </button>
     <span class="tb-sep"></span>
     <div id="tb-apps" style="display:flex;gap:0.25rem"></div>
     <span class="tb-sep"></span>
     <div class="tray" id="tray">
-      <div class="tray-glyphs">
-        <span title="connected">&#9685;</span>
-        <span title="sound">&#9834;</span>
-        <span title="loved">&#10084;</span>
-      </div>
+      <button class="tray-btn" id="tray-sparkle" data-label="sparkles" aria-label="Toggle sparkles">&#10022;</button>
+      <button class="tray-btn" id="tray-theme" data-label="next wallpaper" aria-label="Next wallpaper">&#10052;</button>
       <div class="tray-clock">
         <div id="t-time">--:--</div>
         <div class="td" id="t-date"></div>
@@ -1013,16 +1066,8 @@
     </div>
   </nav>
 
-  <!-- context menu -->
-  <div class="ctx" id="ctx">
-    <button class="ctx-item" data-act="start"><span class="ctx-glyph">&#9678;</span> open start</button>
-    <button class="ctx-item" data-act="wallpaper"><span class="ctx-glyph">&#10052;</span> next wallpaper</button>
-    <button class="ctx-item" data-act="personalize"><span class="ctx-glyph">&#10024;</span> personalize</button>
-    <button class="ctx-item" data-act="tidy"><span class="ctx-glyph">&#10070;</span> tidy desktop</button>
-    <div class="ctx-sep"></div>
-    <button class="ctx-item" data-act="refresh"><span class="ctx-glyph">&#8635;</span> refresh</button>
-    <button class="ctx-item" data-act="about"><span class="ctx-glyph">&#9432;</span> about woodles</button>
-  </div>
+  <!-- context menu (contents are built per-target in js) -->
+  <div class="ctx" id="ctx"></div>
 
   <!-- about window -->
   <div class="scrim" id="scrim"></div>
@@ -1153,6 +1198,23 @@
     try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS_KEY)) || {}); } catch {}
     function savePrefs() { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }
 
+    /* pinned apps live in prefs; recents are tracked on every launch */
+    const DEFAULT_PINS = ['hygge', 'write', 'marg', 'planner', 'notebook', 'quiet'];
+    if (!Array.isArray(prefs.pins)) prefs.pins = DEFAULT_PINS.slice();
+    const RECENTS_KEY = 'woodles-recents';
+    let recents = [];
+    try { recents = JSON.parse(localStorage.getItem(RECENTS_KEY)) || []; } catch {}
+    const byId = id => apps.find(a => a.id === id);
+    const isPinned = id => prefs.pins.includes(id);
+    function togglePin(id) {
+      prefs.pins = isPinned(id)
+        ? prefs.pins.filter(p => p !== id)
+        : prefs.pins.concat(id);
+      savePrefs();
+      renderTaskbar();
+      renderStart(search.value);
+    }
+
     /* ── desktop icons — free placement + drag ─────────────────────── */
     const LAYOUT_KEY = 'woodles-icon-layout';
     let layout = {};
@@ -1244,51 +1306,109 @@
       });
     }
 
-    /* ── taskbar pinned apps ───────────────────────────────────────── */
+    /* ── taskbar: pinned apps only, dock-style ─────────────────────── */
     const tbApps = document.getElementById('tb-apps');
-    apps.forEach(a => {
-      const b = document.createElement('button');
-      b.className = 'tb-btn tb-app';
-      b.title = a.name;
-      b.innerHTML = tileHTML(a);
-      b.addEventListener('click', () => launch(a));
-      tbApps.appendChild(b);
-    });
-
-    /* ── start menu grid ───────────────────────────────────────────── */
-    const grid = document.getElementById('start-grid');
-    function renderGrid(filter) {
-      grid.innerHTML = '';
-      const list = apps.filter(a =>
-        !filter || (a.name + ' ' + a.desc).toLowerCase().includes(filter));
-      if (!list.length) {
-        grid.innerHTML = '<p class="start-empty">nothing here by that name &mdash; yet</p>';
-        return;
-      }
-      list.forEach(a => {
-        const el = document.createElement('a');
-        el.className = 'start-app';
-        el.href = a.href;
-        el.innerHTML = tileHTML(a) + '<span class="start-app-name">' + a.name + '</span>';
-        el.addEventListener('click', e => { e.preventDefault(); launch(a); });
-        grid.appendChild(el);
+    function renderTaskbar() {
+      tbApps.innerHTML = '';
+      prefs.pins.map(byId).filter(Boolean).forEach(a => {
+        const b = document.createElement('button');
+        b.className = 'tb-btn tb-app';
+        b.dataset.id = a.id;
+        b.dataset.label = a.name.toLowerCase();
+        if (recents.includes(a.id)) b.classList.add('recent');
+        b.innerHTML = tileHTML(a);
+        b.addEventListener('click', () => launch(a));
+        tbApps.appendChild(b);
       });
     }
-    renderGrid('');
+    renderTaskbar();
 
-    /* recommended — worth a visit */
-    const rec = document.getElementById('recommended');
-    ['marg','bestiary','write'].forEach(id => {
-      const a = apps.find(x => x.id === id);
-      const el = document.createElement('a');
-      el.className = 'rec-item';
-      el.href = a.href;
-      el.innerHTML = tileHTML(a) +
-        '<span class="rec-text"><span class="rec-name">' + a.name +
-        '</span><span class="rec-desc">' + a.desc + '</span></span>';
-      el.addEventListener('click', e => { e.preventDefault(); launch(a); });
-      rec.appendChild(el);
+    /* dock magnification — tiles swell toward the cursor */
+    const MAG_RANGE = 110, MAG_MAX = 0.45;
+    const noMotion = matchMedia('(prefers-reduced-motion: reduce)');
+    tbApps.addEventListener('pointermove', e => {
+      if (noMotion.matches || e.pointerType !== 'mouse') return;
+      tbApps.querySelectorAll('.tb-app').forEach(b => {
+        const r = b.getBoundingClientRect();
+        const d = Math.abs(e.clientX - (r.left + r.width / 2));
+        const s = 1 + MAG_MAX * Math.max(0, 1 - d / MAG_RANGE);
+        b.querySelector('.tile').style.transform =
+          s > 1.01 ? 'scale(' + s.toFixed(3) + ')' : '';
+      });
     });
+    tbApps.addEventListener('pointerleave', () => {
+      tbApps.querySelectorAll('.tile').forEach(t => { t.style.transform = ''; });
+    });
+
+    /* ── start menu: pinned, all apps, recently opened ─────────────── */
+    const grid = document.getElementById('start-grid');
+    const allGrid = document.getElementById('all-grid');
+    const rec = document.getElementById('recommended');
+    const pinnedLabel = document.getElementById('pinned-label');
+    const allLabel = document.getElementById('all-label');
+    const recLabel = document.getElementById('rec-label');
+
+    function startAppEl(a) {
+      const el = document.createElement('a');
+      el.className = 'start-app';
+      el.href = a.href;
+      el.dataset.id = a.id;
+      el.innerHTML = tileHTML(a) + '<span class="start-app-name">' + a.name + '</span>';
+      el.addEventListener('click', e => { e.preventDefault(); launch(a); });
+      return el;
+    }
+    function fillGrid(target, list) {
+      target.innerHTML = '';
+      list.forEach(a => target.appendChild(startAppEl(a)));
+    }
+    function renderRecents() {
+      rec.innerHTML = '';
+      const opened = recents.map(byId).filter(Boolean).slice(0, 3);
+      const list = opened.length
+        ? opened
+        : ['marg', 'bestiary', 'write'].map(byId);
+      recLabel.textContent = opened.length ? 'recently opened' : 'worth a visit';
+      list.forEach(a => {
+        const el = document.createElement('a');
+        el.className = 'rec-item';
+        el.href = a.href;
+        el.dataset.id = a.id;
+        el.innerHTML = tileHTML(a) +
+          '<span class="rec-text"><span class="rec-name">' + a.name +
+          '</span><span class="rec-desc">' + a.desc + '</span></span>';
+        el.addEventListener('click', e => { e.preventDefault(); launch(a); });
+        rec.appendChild(el);
+      });
+    }
+    function renderStart(filter) {
+      const f = (filter || '').trim().toLowerCase();
+      const match = a => !f || (a.name + ' ' + a.desc).toLowerCase().includes(f);
+      if (f) {
+        /* searching: one flat results section */
+        const results = apps.filter(match);
+        pinnedLabel.textContent = 'results';
+        fillGrid(grid, results);
+        if (!results.length)
+          grid.innerHTML = '<p class="start-empty">nothing here by that name &mdash; yet</p>';
+        allLabel.style.display = 'none';
+        allGrid.style.display = 'none';
+        recLabel.style.display = 'none';
+        rec.style.display = 'none';
+        return;
+      }
+      pinnedLabel.textContent = 'pinned';
+      const pinned = prefs.pins.map(byId).filter(Boolean);
+      fillGrid(grid, pinned);
+      if (!pinned.length)
+        grid.innerHTML = '<p class="start-empty">nothing pinned &mdash; right-click any app</p>';
+      allLabel.style.display = '';
+      allGrid.style.display = '';
+      recLabel.style.display = '';
+      rec.style.display = '';
+      fillGrid(allGrid, apps.filter(a => !isPinned(a.id)));
+      renderRecents();
+    }
+    renderStart('');
 
     /* ── phone home: app grid ──────────────────────────────────────── */
     const appGrid = document.getElementById('app-grid');
@@ -1420,6 +1540,7 @@
         b.classList.toggle('on', b.dataset.v === prefs.clock));
       document.querySelectorAll('#p-sparkles button').forEach(b =>
         b.classList.toggle('on', b.dataset.v === (prefs.sparkles ? '1' : '0')));
+      document.getElementById('tray-sparkle').classList.toggle('off', !prefs.sparkles);
       tick();
     }
 
@@ -1458,16 +1579,21 @@
     function setStart(open) {
       body.classList.toggle('start-open', open);
       if (open) { closeAll('start'); setTimeout(() => search.focus(), 120); }
-      else { search.value = ''; renderGrid(''); }
+      else { search.value = ''; renderStart(''); }
     }
     document.getElementById('start-btn').addEventListener('click', e => {
       e.stopPropagation();
       setStart(!body.classList.contains('start-open'));
     });
-    search.addEventListener('input', () => renderGrid(search.value.trim().toLowerCase()));
+    search.addEventListener('input', () => renderStart(search.value));
+    search.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      const first = document.querySelector('#start-grid .start-app');
+      if (first) launch(byId(first.dataset.id));
+    });
     document.getElementById('start').addEventListener('click', e => e.stopPropagation());
 
-    /* ── tray flyout ───────────────────────────────────────────────── */
+    /* ── tray flyout + tray buttons ────────────────────────────────── */
     document.getElementById('tray').addEventListener('click', e => {
       e.stopPropagation();
       const open = !body.classList.contains('flyout-open');
@@ -1475,6 +1601,15 @@
       body.classList.toggle('flyout-open', open);
     });
     document.getElementById('flyout').addEventListener('click', e => e.stopPropagation());
+    document.getElementById('tray-sparkle').addEventListener('click', e => {
+      e.stopPropagation();
+      prefs.sparkles = !prefs.sparkles;
+      savePrefs(); renderPrefs();
+    });
+    document.getElementById('tray-theme').addEventListener('click', e => {
+      e.stopPropagation();
+      nextTheme();
+    });
 
     /* ── theme / wallpaper ─────────────────────────────────────────── */
     /* every theme the shared palette knows about */
@@ -1508,17 +1643,45 @@
     buildSwatches(document.getElementById('p-themes'));
     applyTheme();
 
-    /* ── context menu ──────────────────────────────────────────────── */
+    /* ── context menu — built per-target ───────────────────────────── */
     const ctx = document.getElementById('ctx');
+    const DESKTOP_CTX = [
+      { act: 'start',       glyph: '&#9678;',  label: 'open start' },
+      { act: 'wallpaper',   glyph: '&#10052;', label: 'next wallpaper' },
+      { act: 'personalize', glyph: '&#10024;', label: 'personalize' },
+      { act: 'tidy',        glyph: '&#10070;', label: 'tidy desktop' },
+      '-',
+      { act: 'refresh',     glyph: '&#8635;',  label: 'refresh' },
+      { act: 'about',       glyph: '&#9432;',  label: 'about woodles' },
+    ];
+    function appCtx(a) {
+      return [
+        { act: 'open', id: a.id, glyph: '&#10148;', label: 'open ' + a.name.toLowerCase() },
+        isPinned(a.id)
+          ? { act: 'togglepin', id: a.id, glyph: '&#8722;', label: 'unpin from taskbar' }
+          : { act: 'togglepin', id: a.id, glyph: '&#10010;', label: 'pin to taskbar' },
+      ];
+    }
+    function showCtx(x, y, items) {
+      ctx.innerHTML = items.map(it => it === '-'
+        ? '<div class="ctx-sep"></div>'
+        : '<button class="ctx-item" data-act="' + it.act + '"' +
+          (it.id ? ' data-id="' + it.id + '"' : '') +
+          '><span class="ctx-glyph">' + it.glyph + '</span> ' + it.label + '</button>'
+      ).join('');
+      ctx.style.left = Math.min(x, innerWidth - ctx.offsetWidth - 8) + 'px';
+      ctx.style.top  = Math.min(y, innerHeight - ctx.offsetHeight - 8) + 'px';
+      ctx.classList.add('open');
+    }
     document.addEventListener('contextmenu', e => {
       if (innerWidth <= 720) return;  /* phone home has its own dock, no desktop menu */
-      if (e.target.closest('.window, .start, .taskbar, .flyout')) return;
+      if (e.target.closest('.window, .flyout, input')) return;
+      const appEl = e.target.closest('.icon[data-id], .start-app[data-id], .tb-app[data-id], .rec-item[data-id]');
+      if (!appEl && e.target.closest('.start, .taskbar')) return;
       e.preventDefault();
       closeAll('ctx');
-      const w = 200, h = 280;
-      ctx.style.left = Math.min(e.clientX, innerWidth - w) + 'px';
-      ctx.style.top  = Math.min(e.clientY, innerHeight - h) + 'px';
-      ctx.classList.add('open');
+      const a = appEl && byId(appEl.dataset.id);
+      showCtx(e.clientX, e.clientY, a ? appCtx(a) : DESKTOP_CTX);
     });
     ctx.addEventListener('click', e => {
       const item = e.target.closest('.ctx-item');
@@ -1531,6 +1694,8 @@
       if (act === 'refresh')     location.reload();
       if (act === 'about')       openAbout();
       if (act === 'tidy')        tidyIcons();
+      if (act === 'open')        launch(byId(item.dataset.id));
+      if (act === 'togglepin')   togglePin(item.dataset.id);
     });
 
     /* ── windows (about, personalize) + drag ───────────────────────── */
@@ -1566,6 +1731,9 @@
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPers(); }
     });
     document.getElementById('fly-pers').addEventListener('click', e => {
+      e.stopPropagation(); openPers();
+    });
+    document.getElementById('pers-btn').addEventListener('click', e => {
       e.stopPropagation(); openPers();
     });
 
@@ -1616,6 +1784,7 @@
     document.getElementById('p-reset').addEventListener('click', () => {
       localStorage.removeItem(PREFS_KEY);
       localStorage.removeItem(LAYOUT_KEY);
+      localStorage.removeItem(RECENTS_KEY);
       localStorage.removeItem('woodles-theme');
       location.reload();
     });
@@ -1628,6 +1797,8 @@
       if (launching) return;
       launching = true;
       closeAll();
+      recents = [a.id].concat(recents.filter(id => id !== a.id)).slice(0, 6);
+      localStorage.setItem(RECENTS_KEY, JSON.stringify(recents));
       const tile = document.getElementById('launch-tile');
       tile.innerHTML = iconSVG(a);
       tile.style.setProperty('--g1', a.g1);
