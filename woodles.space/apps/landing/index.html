@@ -60,6 +60,25 @@
       50%  { transform: translate(2%,-3%) scale(1.06) rotate(3deg); }
       100% { transform: translate(-3%,2%) scale(1.03) rotate(-3deg); }
     }
+    /* wallpaper styles — chosen in personalize, independent of theme */
+    .pattern { position: absolute; inset: 0; pointer-events: none; }
+    [data-wallpaper='still'] .wash {
+      opacity: 0.28;
+      animation-play-state: paused;
+    }
+    [data-wallpaper='confetti'] .pattern {
+      background-image: radial-gradient(
+        color-mix(in srgb, var(--accent-strong) 55%, transparent) 1.4px, transparent 2px);
+      background-size: 34px 34px;
+      opacity: 0.25;
+    }
+    [data-wallpaper='ruled'] .pattern {
+      background-image: repeating-linear-gradient(to bottom,
+        transparent 0 27px,
+        color-mix(in srgb, var(--accent-strong) 40%, transparent) 27px 28px);
+      opacity: 0.22;
+    }
+
     /* theme flourishes — some themes bring their own weather */
     [data-theme='blossom'] .wash { opacity: 0.8; filter: blur(55px); }
     [data-theme='sugar'] .wash { opacity: 0.7; }
@@ -197,7 +216,10 @@
       box-shadow: 0 18px 40px -22px var(--accent-deep);
       opacity: 0;
       animation: icon-in 0.8s ease forwards 0.5s;
+      cursor: grab;
+      touch-action: none;
     }
+    .widget:active { cursor: grabbing; }
     .widget-greet {
       font-size: 1.65rem;
       font-weight: 400;
@@ -989,7 +1011,7 @@
 </head>
 <body>
 
-  <div class="wallpaper"><div class="wash"></div></div>
+  <div class="wallpaper"><div class="wash"></div><div class="pattern"></div></div>
   <div class="grain"></div>
 
   <!-- desktop -->
@@ -1107,6 +1129,15 @@
         <div class="theme-grid" id="p-themes"></div>
       </div>
       <div class="pers-row">
+        <span class="pers-label">wallpaper</span>
+        <div class="seg" id="p-wallpaper">
+          <button type="button" data-v="aura">aura</button>
+          <button type="button" data-v="still">still</button>
+          <button type="button" data-v="confetti">confetti</button>
+          <button type="button" data-v="ruled">ruled</button>
+        </div>
+      </div>
+      <div class="pers-row">
         <span class="pers-label">clock</span>
         <div class="seg" id="p-clock">
           <button type="button" data-v="24">24h</button>
@@ -1194,7 +1225,7 @@
     /* ── desktop preferences ───────────────────────────────────────── */
     /* everything personal lives in the browser, like the rest of the site */
     const PREFS_KEY = 'woodles-desk';
-    const prefs = { name: 'user', clock: '24', sparkles: true, note: '' };
+    const prefs = { name: 'user', clock: '24', sparkles: true, note: '', wallpaper: 'aura' };
     try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS_KEY)) || {}); } catch {}
     function savePrefs() { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }
 
@@ -1435,10 +1466,11 @@
     mSearch.addEventListener('input', () =>
       renderAppGrid(mSearch.value.trim().toLowerCase()));
 
-    /* ── phone home: dock ──────────────────────────────────────────── */
+    /* ── phone home: dock mirrors the first pinned apps ────────────── */
     const dock = document.getElementById('phone-dock');
-    ['write','hygge','marg'].forEach(id => {
-      const a = apps.find(x => x.id === id);
+    (prefs.pins.length ? prefs.pins : DEFAULT_PINS).slice(0, 4).forEach(id => {
+      const a = byId(id);
+      if (!a) return;
       const b = document.createElement('button');
       b.className = 'dock-btn';
       b.title = a.name;
@@ -1541,6 +1573,10 @@
       document.querySelectorAll('#p-sparkles button').forEach(b =>
         b.classList.toggle('on', b.dataset.v === (prefs.sparkles ? '1' : '0')));
       document.getElementById('tray-sparkle').classList.toggle('off', !prefs.sparkles);
+      const wp = prefs.wallpaper || 'aura';
+      document.documentElement.setAttribute('data-wallpaper', wp);
+      document.querySelectorAll('#p-wallpaper button').forEach(b =>
+        b.classList.toggle('on', b.dataset.v === wp));
       tick();
     }
 
@@ -1572,6 +1608,49 @@
       const span = document.getElementById(id);
       span.addEventListener('click', e => { e.stopPropagation(); editNameInline(span); });
     });
+
+    /* ── the clock widget is draggable too ─────────────────────────── */
+    (function () {
+      const widget = document.getElementById('widget');
+      function applyWidgetPos() {
+        const p = prefs.widgetPos;
+        if (!p) return;
+        widget.style.right = 'auto';
+        widget.style.left =
+          Math.min(Math.max(p.x, 8), innerWidth - widget.offsetWidth - 8) + 'px';
+        widget.style.top =
+          Math.min(Math.max(p.y, 8), innerHeight - widget.offsetHeight - 8) + 'px';
+      }
+      applyWidgetPos();
+      addEventListener('resize', applyWidgetPos);
+      let sx, sy, ox, oy, active = false, moved = false;
+      widget.addEventListener('pointerdown', e => {
+        if (e.button !== 0) return;
+        if (e.target.closest('.greet-name, input')) return;
+        active = true; moved = false;
+        const r = widget.getBoundingClientRect();
+        sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top;
+        widget.setPointerCapture(e.pointerId);
+      });
+      widget.addEventListener('pointermove', e => {
+        if (!active) return;
+        const dx = e.clientX - sx, dy = e.clientY - sy;
+        if (!moved && Math.hypot(dx, dy) < 6) return;
+        moved = true;
+        widget.style.right = 'auto';
+        widget.style.left =
+          Math.min(Math.max(ox + dx, 8), innerWidth - widget.offsetWidth - 8) + 'px';
+        widget.style.top =
+          Math.min(Math.max(oy + dy, 8), innerHeight - widget.offsetHeight - 8) + 'px';
+      });
+      widget.addEventListener('pointerup', () => {
+        if (active && moved) {
+          prefs.widgetPos = { x: widget.offsetLeft, y: widget.offsetTop };
+          savePrefs();
+        }
+        active = false;
+      });
+    })();
 
     /* ── start menu toggle ─────────────────────────────────────────── */
     const body = document.body;
@@ -1768,6 +1847,11 @@
     });
     document.getElementById('p-note').addEventListener('input', e => {
       prefs.note = e.target.value;
+      savePrefs(); renderPrefs();
+    });
+    document.getElementById('p-wallpaper').addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      prefs.wallpaper = b.dataset.v;
       savePrefs(); renderPrefs();
     });
     document.getElementById('p-clock').addEventListener('click', e => {
