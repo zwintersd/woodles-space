@@ -58,6 +58,10 @@
   .card .card-eyebrow{display:block; font-family:var(--font-display); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--rose-dust); margin-bottom:5px;}
   .card h4{font-family:var(--font-display); font-weight:600; font-size:17px; color:var(--rose-deep); margin:0 0 5px;}
   .card p{font-size:13.2px; color:var(--ink-soft); margin:0;}
+  .card.card-add{background:transparent; border-style:dashed; border-color:var(--rose-dust); text-align:center; padding:20px 18px;}
+  .card.card-add:hover{border-style:dashed; border-color:var(--rose-deep);}
+  .card.card-add .card-eyebrow{color:var(--rose-dust);}
+  .card.card-add h4::before{content:"+ "; color:var(--gold);}
 
   /* ===== sidebar box ===== */
   .box{border:1px solid var(--rose-dust); border-radius:8px; padding:16px 18px; background:var(--blush); margin-top:8px;}
@@ -67,6 +71,9 @@
   .box li{margin-bottom:6px; break-inside:avoid;}
   .box li.done{color:var(--ink-soft);}
   .box li.done::marker{color:var(--sage);}
+  .box li.composed{color:var(--ink-soft);}
+  .box li.composed::marker{color:var(--gold);}
+  .box li .why{display:block; color:var(--ink-soft); font-size:11.5px; font-style:italic; margin-top:1px;}
 
   footer.tagline{text-align:center; font-family:var(--font-display); font-style:italic; font-size:15px; color:var(--rose-dust); margin-top:30px;}
 </style>
@@ -112,7 +119,7 @@
     </figure>
 
     <div class="sec-head"><span class="num">2</span><h3>The Library</h3></div>
-    <p>Two reference files, documented and live-rendered so a fresh model session can read the source and replicate the classes exactly — plus one worked page proving the whole pipeline end to end.</p>
+    <p>Two reference files, documented and live-rendered so a fresh model session can read the source and replicate the classes exactly — plus worked pages proving the pipeline end to end on real material, one light topic and one heavy one.</p>
     <div class="lib-grid">
       <a class="card" href="/ologypedia/textbook-chrome-blocks.html">
         <span class="card-eyebrow">Reference</span>
@@ -129,29 +136,39 @@
       <a class="card" href="/ologypedia/textbook-photosynthesis.html">
         <span class="card-eyebrow">Worked Page &middot; No. 1</span>
         <h4>Photosynthesis — How Light Becomes Sugar</h4>
-        <p>The integration test: chrome plus all four example blocks, on one real, checkable topic — the mechanism, the two centuries it took to work out, C3 vs. C4, and two billion years of atmospheric oxygen.</p>
+        <p>The first integration test: chrome plus the first four example blocks, on one real, checkable topic — the mechanism, the two centuries it took to work out, C3 vs. C4, two billion years of atmospheric oxygen, and Hill's 1937 experiment composed live from three of those blocks.</p>
+      </a>
+      <a class="card" href="/ologypedia/textbook-challenger.html">
+        <span class="card-eyebrow">Worked Page &middot; No. 2</span>
+        <h4>The Challenger Disaster</h4>
+        <p>The second integration test, on a genuinely heavy topic: chrome plus six more example blocks — the failure mechanism, the teleconference, the institutional aftermath, and the number Feynman couldn't let go of.</p>
+      </a>
+      <a class="card card-add" href="/ologypedia/add-page.html">
+        <span class="card-eyebrow">Expansion Mechanism</span>
+        <h4>Add a Page</h4>
+        <p>The parked "add page" mechanism, built: a form that assembles the content spec and this library's tokens and classes into one copy-pasteable prompt for any capable model.</p>
       </a>
     </div>
 
     <div class="box">
-      <h4>What's Built, What's Next</h4>
+      <h4>The Full Menu — Sixteen for Sixteen</h4>
       <ul>
         <li class="done">Mechanism walkthrough</li>
         <li class="done">Comparative pair</li>
         <li class="done">Timeline of one event</li>
         <li class="done">Data deep-dive</li>
-        <li>Artifact close-reading</li>
-        <li>Single documented case</li>
-        <li>Failure case</li>
-        <li>Primary document excerpt</li>
-        <li>Back-of-envelope math</li>
-        <li>Biographical vignette</li>
-        <li>Policy/institutional episode</li>
-        <li>Legal case</li>
-        <li>Geographic case</li>
-        <li>Edge case / boundary stress-test</li>
-        <li>Experiment walkthrough</li>
-        <li>Documented exchange</li>
+        <li class="done">Legal case</li>
+        <li class="done">Single documented case</li>
+        <li class="done">Policy/institutional episode</li>
+        <li class="done">Biographical vignette</li>
+        <li class="done">Primary document excerpt</li>
+        <li class="done">Documented exchange</li>
+        <li class="done">Edge case / boundary stress-test</li>
+        <li class="done">Back-of-envelope math</li>
+        <li class="done">Failure case</li>
+        <li class="composed">Artifact close-reading <span class="why">a 2-line convention, not a pattern — live-demoed in the reference</span></li>
+        <li class="composed">Geographic case <span class="why">reuses .ex-case again — live-demoed in the reference</span></li>
+        <li class="composed">Experiment walkthrough <span class="why">3 existing blocks stacked — live-demoed in the reference</span></li>
       </ul>
     </div>
 

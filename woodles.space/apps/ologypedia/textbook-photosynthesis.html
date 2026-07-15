@@ -134,6 +134,11 @@
   .ex-datadive .grid-line{stroke:var(--paper-edge); stroke-width:1;}
   .ex-datadive .datadive-note{margin:14px 2px 0; font-size:13px; line-height:1.55; color:var(--ink-soft); border-top:1px dotted var(--rose-dust); padding-top:10px;}
   .ex-datadive .datadive-note b{color:var(--rose-deep);}
+
+  /* ===== composed-demo (experiment walkthrough = 3 existing blocks, no wrapper of its own) ===== */
+  .composed-demo > *{margin-bottom:16px;}
+  .composed-demo > *:last-child{margin-bottom:0;}
+  .composed-label{font-family:var(--font-display); font-weight:600; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--rose-dust); text-align:center; margin-bottom:8px;}
 </style>
 </head>
 <body>
@@ -258,6 +263,75 @@
             <div class="beat-body">
               <h5>Calvin, Benson, and Bassham trace the carbon</h5>
               <p>Using radioactive carbon-14 and paper chromatography, the trio maps the exact path a carbon atom takes from CO₂ to sugar. Calvin receives the 1961 Nobel Prize in Chemistry for what's still called the Calvin cycle.</p>
+            </div>
+          </div>
+        </div>
+      </figure>
+    </div>
+    <p>Hill's 1937 result is worth pulling out of the timeline and looking at directly — it's the moment the light reactions and the Calvin cycle first came apart as two separable stages, rather than one continuous step.</p>
+    <div class="fig-wrap">
+      <figure class="figure-box">
+        <figcaption>Figure 2b · Hill's 1937 Experiment, Up Close</figcaption>
+        <div class="composed-demo">
+          <div>
+            <span class="composed-label">Design</span>
+            <div class="ex-mechanism">
+              <div class="node">
+                <span class="node-tag">1</span>
+                <h5 class="node-title">Hypothesis</h5>
+                <p class="node-detail">If O₂ release doesn't require carbon fixation, isolated chloroplasts should evolve O₂ under light even with no CO₂ available.</p>
+              </div>
+              <div class="arrow">→</div>
+              <div class="node">
+                <span class="node-tag">2</span>
+                <h5 class="node-title">Procedure</h5>
+                <p class="node-detail">Chloroplasts isolated from leaf cells, suspended with an artificial electron acceptor standing in for NADP⁺, CO₂ excluded, then illuminated.</p>
+              </div>
+              <div class="arrow">→</div>
+              <div class="node node-accent">
+                <span class="node-tag">3</span>
+                <h5 class="node-title">Observation</h5>
+                <p class="node-detail">O₂ evolution measured directly, compared against the standard, CO₂-present condition.</p>
+              </div>
+            </div>
+          </div>
+          <div>
+            <span class="composed-label">The One Variable Being Isolated</span>
+            <div class="ex-compare">
+              <div class="pair-item">
+                <h5 class="pair-name">With CO₂</h5>
+                <span class="pair-sub">the standard assumption</span>
+                <ul class="pair-facts">
+                  <li><b>Setup:</b> intact chloroplasts, light, CO₂ supplied</li>
+                  <li><b>Expected:</b> O₂ released as part of full sugar-building</li>
+                </ul>
+              </div>
+              <div class="pair-variable"><span>isolating<br><b>whether CO₂ is required for O₂ release</b></span></div>
+              <div class="pair-item">
+                <h5 class="pair-name">Without CO₂</h5>
+                <span class="pair-sub">Hill's test condition</span>
+                <ul class="pair-facts">
+                  <li><b>Setup:</b> isolated chloroplasts, light, no CO₂, artificial acceptor instead</li>
+                  <li><b>Expected (if the two stages are linked):</b> no O₂</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div>
+            <span class="composed-label">Result</span>
+            <div class="ex-datadive">
+              <svg viewBox="0 0 320 150" role="img" aria-label="Bar chart: O2 evolution rate relative to the illuminated, CO2-present baseline of 100. With CO2, 100. Without CO2 plus artificial acceptor, 94 — nearly identical.">
+                <line class="grid-line" x1="30" y1="95" x2="290" y2="95"></line>
+                <line class="grid-line" x1="30" y1="65" x2="290" y2="65"></line>
+                <line class="axis-line" x1="30" y1="120" x2="290" y2="120"></line>
+                <rect x="70" y="45" width="50" height="75" rx="4" style="fill:color-mix(in srgb, var(--rose-deep) 100%, var(--rose-dust));"><title>With CO₂ — 100 (baseline)</title></rect>
+                <text class="bar-value" x="95" y="39" text-anchor="middle">100</text>
+                <text class="bar-label" x="95" y="136" text-anchor="middle">With CO₂</text>
+                <rect x="180" y="50" width="50" height="70" rx="4" style="fill:color-mix(in srgb, var(--rose-deep) 92%, var(--rose-dust));"><title>Without CO₂, plus artificial acceptor — 94</title></rect>
+                <text class="bar-value" x="205" y="44" text-anchor="middle">94</text>
+                <text class="bar-label" x="205" y="136" text-anchor="middle">Without CO₂</text>
+              </svg>
+              <p class="datadive-note"><b>So what:</b> nearly identical O₂ output whether or not CO₂ was even in the flask. The gas plants breathe out doesn't wait on the sugar plants build — which is exactly the crack Calvin's team spent the next twenty years widening into a full, separate cycle.</p>
             </div>
           </div>
         </div>
