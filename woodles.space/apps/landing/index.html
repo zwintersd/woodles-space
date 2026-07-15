@@ -129,18 +129,35 @@
       display: grid; place-items: center;
       font-size: 1.9rem;
       color: #fff;
-      background: linear-gradient(140deg, var(--g1), var(--g2));
+      text-shadow: 0 1px 3px color-mix(in srgb, var(--accent-deep) 45%, transparent);
+      background:
+        radial-gradient(130% 95% at 22% 12%, rgba(255,255,255,0.38), transparent 58%),
+        linear-gradient(var(--ga, 140deg),
+          var(--g1),
+          color-mix(in srgb, var(--g1) 45%, var(--g2)) 55%,
+          var(--g2));
       box-shadow:
-        0 6px 16px -6px color-mix(in srgb, var(--g1) 80%, transparent),
-        inset 0 1px 0 rgba(255,255,255,0.45);
+        0 10px 22px -9px color-mix(in srgb, var(--g2) 60%, var(--accent-deep)),
+        inset 0 1px 0 rgba(255,255,255,0.5),
+        inset 0 -10px 16px -12px color-mix(in srgb, var(--accent-deep) 45%, transparent);
       position: relative;
+      transition: transform 0.25s cubic-bezier(.2,.9,.3,1), box-shadow 0.25s ease;
     }
     .tile::after {
       content: '';
       position: absolute; inset: 0;
       border-radius: 16px;
-      border: 1px solid rgba(255,255,255,0.25);
+      border: 1px solid rgba(255,255,255,0.28);
     }
+    .icon:hover .tile,
+    .start-app:hover .tile {
+      transform: translateY(-3px) rotate(-2deg);
+      box-shadow:
+        0 16px 28px -10px color-mix(in srgb, var(--g2) 70%, var(--accent-deep)),
+        inset 0 1px 0 rgba(255,255,255,0.55),
+        inset 0 -10px 16px -12px color-mix(in srgb, var(--accent-deep) 45%, transparent);
+    }
+    .icon.dragging .tile { transform: none; }
     .icon-label {
       font-family: 'DM Mono', monospace;
       font-weight: 300;
@@ -1066,26 +1083,29 @@
 
   <script>
     /* ── app catalogue ─────────────────────────────────────────────── */
+    /* every tile draws from the shared palette vars (never raw hex),
+       so the whole set re-colors when the theme changes. `ga` varies the
+       gradient angle so neighbours don't read as copies of each other. */
     const apps = [
-      { id:'hygge',   name:'Hygge',        href:'/hygge',                  glyph:'◪', desc:'design playground: fonts, motifs & palette', g1:'var(--lavender)', g2:'var(--peach)' },
-      { id:'write',   name:'Write',        href:'/write',                  glyph:'✎', desc:'compose, save, send a letter', g1:'var(--aqua)',     g2:'var(--lavender)' },
-      { id:'echoes',  name:'Echoes',       href:'/letter',                 glyph:'❝', desc:'letters left here, words that stayed', g1:'var(--peach)', g2:'var(--lilac)' },
-      { id:'marg',    name:'Marginalia',   href:'/marginalia',             glyph:'❦', desc:'tend a small witch, grow her world, and meet the creatures Z\'s already brought into it', g1:'var(--plum)', g2:'var(--lavender)' },
-      { id:'devlog',  name:'Dev Log',      href:'/marginalia-devlog',      glyph:'✦', desc:'notes from making the witch\'s world',  g1:'#b58fe8',        g2:'#f29ac4' },
-      { id:'reading', name:'Reading Room', href:'/marginalia#reading-room',glyph:'☾', desc:'a quiet timer, read for stars', g1:'var(--peach)',    g2:'var(--aqua)' },
-      { id:'planner',    name:'Carillon',    href:'/planner',    glyph:'☉',  desc:'calendar, schedule, and time',       g1:'var(--peach)',    g2:'var(--lavender)' },
-      { id:'notebook',   name:'Notebook',    href:'/notebook',   glyph:'▤',  desc:'notes, tasks, and ideas kept close', g1:'#276875',        g2:'#d8aa3d' },
-      { id:'thinking',   name:'Thinking About', href:'/thinking-about', glyph:'❧', desc:'a landing spot for what you are reading, playing, and watching', g1:'#1a73e8', g2:'#34a853' },
-      { id:'piano',      name:'Piano',       href:'/piano',      glyph:'♫', desc:'a purple keyboard with soft synth strings', g1:'#9d7cf4', g2:'#87e4d4' },
-      { id:'lab',        name:'Lab',         href:'/lab',        glyph:'L', desc:'experiments, sketches, and stub apps', g1:'var(--aqua)',     g2:'var(--plum)' },
-{ id:'spores',     name:'Spores',      href:'/spores',     glyph:'❀', desc:'a personal wikipedia, tended by hand', g1:'#f08fb8',         g2:'#6ce5e8' },
-      { id:'ologypedia', name:'Ologypedia',  href:'/ologypedia', glyph:'Ω', desc:'a block system for textbook-style pages, and the pages it renders', g1:'#8C3B4A', g2:'#C9A66B' },
-      { id:'bestiary',   name:'Bestiary',    href:'/bestiary',   glyph:'❖', desc:'bring a png of anything, leave with a card that belongs', g1:'#d8b25a', g2:'#c98be0' },
-      { id:'quiet',      name:'Quiet Room',  href:'/quiet-room', glyph:'◉', desc:'an immersive room of light, drawn in three.js', g1:'var(--lavender)', g2:'var(--plum)' },
+      { id:'hygge',   name:'Hygge',        href:'/hygge',                  glyph:'◪', desc:'design playground: fonts, motifs & palette', g1:'var(--lavender)', g2:'var(--peach)', ga:'135deg' },
+      { id:'write',   name:'Write',        href:'/write',                  glyph:'✎', desc:'compose, save, send a letter', g1:'var(--aqua)',     g2:'var(--lavender)', ga:'160deg' },
+      { id:'echoes',  name:'Echoes',       href:'/letter',                 glyph:'❝', desc:'letters left here, words that stayed', g1:'var(--peach)', g2:'var(--lilac)', ga:'120deg' },
+      { id:'marg',    name:'Marginalia',   href:'/marginalia',             glyph:'❦', desc:'tend a small witch, grow her world, and meet the creatures Z\'s already brought into it', g1:'var(--plum)', g2:'var(--lavender)', ga:'150deg' },
+      { id:'devlog',  name:'Dev Log',      href:'/marginalia-devlog',      glyph:'✦', desc:'notes from making the witch\'s world',  g1:'var(--lilac)',   g2:'var(--plum)', ga:'200deg' },
+      { id:'reading', name:'Reading Room', href:'/marginalia#reading-room',glyph:'☾', desc:'a quiet timer, read for stars', g1:'var(--peach)',    g2:'var(--aqua)', ga:'115deg' },
+      { id:'planner',    name:'Carillon',    href:'/planner',    glyph:'☉',  desc:'calendar, schedule, and time',       g1:'var(--peach)',    g2:'var(--lavender)', ga:'170deg' },
+      { id:'notebook',   name:'Notebook',    href:'/notebook',   glyph:'▤',  desc:'notes, tasks, and ideas kept close', g1:'var(--aqua)',    g2:'var(--peach)', ga:'205deg' },
+      { id:'thinking',   name:'Thinking About', href:'/thinking-about', glyph:'❧', desc:'a landing spot for what you are reading, playing, and watching', g1:'var(--lapis)', g2:'var(--aqua)', ga:'140deg' },
+      { id:'piano',      name:'Piano',       href:'/piano',      glyph:'♫', desc:'a purple keyboard with soft synth strings', g1:'var(--lavender)', g2:'var(--aqua)', ga:'125deg' },
+      { id:'lab',        name:'Lab',         href:'/lab',        glyph:'L', desc:'experiments, sketches, and stub apps', g1:'var(--aqua)',     g2:'var(--plum)', ga:'185deg' },
+      { id:'spores',     name:'Spores',      href:'/spores',     glyph:'❀', desc:'a personal wikipedia, tended by hand', g1:'var(--lilac)',    g2:'var(--aqua)', ga:'145deg' },
+      { id:'ologypedia', name:'Ologypedia',  href:'/ologypedia', glyph:'Ω', desc:'a block system for textbook-style pages, and the pages it renders', g1:'var(--plum)', g2:'var(--peach)', ga:'160deg' },
+      { id:'bestiary',   name:'Bestiary',    href:'/bestiary',   glyph:'❖', desc:'bring a png of anything, leave with a card that belongs', g1:'var(--peach)', g2:'var(--plum)', ga:'110deg' },
+      { id:'quiet',      name:'Quiet Room',  href:'/quiet-room', glyph:'◉', desc:'an immersive room of light, drawn in three.js', g1:'var(--lapis)', g2:'var(--lilac)', ga:'195deg' },
     ];
 
     const tileHTML = a =>
-      '<span class="tile" style="--g1:'+a.g1+';--g2:'+a.g2+'">'+a.glyph+'</span>';
+      '<span class="tile" style="--g1:'+a.g1+';--g2:'+a.g2+';--ga:'+(a.ga||'140deg')+'">'+a.glyph+'</span>';
 
     /* ── desktop preferences ───────────────────────────────────────── */
     /* everything personal lives in the browser, like the rest of the site */
