@@ -253,6 +253,138 @@
       color: var(--accent-deep);
     }
 
+    /* ─────────────────────────── widgets ───────────────────────────── */
+    /* small things that live on the desktop: sticky notes, the moon,
+       a mini month, a countdown. draggable, removable, persisted. */
+    .dwidget {
+      position: fixed; z-index: 3;
+      padding: 1rem 1.1rem;
+      border-radius: 16px;
+      background: color-mix(in srgb, var(--surface) 80%, transparent);
+      backdrop-filter: blur(26px) saturate(1.4);
+      -webkit-backdrop-filter: blur(26px) saturate(1.4);
+      border: 1px solid var(--rule);
+      box-shadow: 0 16px 36px -20px var(--accent-deep);
+      cursor: grab;
+      touch-action: none;
+      opacity: 0;
+      animation: icon-in 0.5s ease forwards;
+    }
+    .dwidget:active { cursor: grabbing; }
+    .dw-x {
+      position: absolute; top: 5px; right: 5px;
+      width: 22px; height: 22px;
+      border: none; border-radius: 7px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.7rem;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+    }
+    .dwidget:hover .dw-x { opacity: 1; }
+    .dw-x:hover { background: #e8859a; color: #fff; }
+    .dw-title {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.54rem; letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+    /* sticky note */
+    .dw-sticky {
+      width: 190px;
+      transform: rotate(-1.3deg);
+      background: color-mix(in srgb, var(--peach) 42%, var(--surface));
+      animation: none; opacity: 1;
+    }
+    .dw-sticky textarea {
+      width: 100%;
+      min-height: 96px;
+      border: none; background: transparent; outline: none;
+      resize: none;
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-style: italic;
+      font-size: 1.05rem; line-height: 1.45;
+      color: var(--text);
+      cursor: text;
+    }
+    .dw-sticky textarea::placeholder { color: color-mix(in srgb, var(--text) 45%, transparent); }
+    /* moon */
+    .dw-moon { width: 168px; text-align: center; }
+    .moon-svg { width: 74px; height: 74px; margin: 0.2rem auto 0.4rem; display: block; }
+    .moon-dark { fill: color-mix(in srgb, var(--text) 16%, transparent); }
+    .moon-lit  { fill: color-mix(in srgb, var(--peach) 55%, #fff); }
+    .moon-ring { fill: none; stroke: color-mix(in srgb, var(--accent-strong) 35%, transparent); stroke-width: 1; }
+    .moon-name { font-size: 1.15rem; color: var(--accent-strong); line-height: 1.2; }
+    .moon-illum {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.56rem; letter-spacing: 0.12em;
+      color: var(--muted); margin-top: 0.2rem;
+    }
+    /* mini month */
+    .dw-month { width: 196px; }
+    .mo-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 2px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.56rem;
+      text-align: center;
+    }
+    .mo-h { color: var(--muted); padding: 2px 0; }
+    .mo-d { color: var(--text); padding: 3px 0; border-radius: 6px; }
+    .mo-today {
+      background: var(--accent-strong);
+      color: var(--bg);
+    }
+    /* countdown */
+    .dw-count { width: 176px; text-align: center; }
+    .cd-num {
+      font-family: 'DM Mono', monospace;
+      font-size: 2.6rem; font-weight: 300;
+      color: var(--text); line-height: 1;
+    }
+    .cd-until {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.54rem; letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted); margin: 0.25rem 0 0.2rem;
+    }
+    .cd-label {
+      width: 100%;
+      border: none; background: transparent; outline: none;
+      text-align: center;
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-style: italic;
+      font-size: 1.1rem;
+      color: var(--accent-deep);
+      cursor: text;
+    }
+    .cd-date {
+      width: 100%;
+      border: none; background: transparent; outline: none;
+      border-top: 1px solid var(--rule);
+      margin-top: 0.5rem; padding-top: 0.45rem;
+      text-align: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem; letter-spacing: 0.08em;
+      color: var(--muted);
+      color-scheme: inherit;
+      cursor: text;
+    }
+    /* widget picker rows */
+    .wt-glyph {
+      width: 34px; height: 34px;
+      border-radius: 10px;
+      display: grid; place-items: center;
+      font-size: 1rem;
+      color: var(--accent-strong);
+      background: color-mix(in srgb, var(--accent) 30%, transparent);
+      border: 1px solid var(--rule);
+      flex: none;
+    }
+
     /* ─────────────────────────── taskbar ───────────────────────────── */
     .taskbar {
       position: fixed;
@@ -996,7 +1128,7 @@
 
     /* ─────────────────────────── responsive ────────────────────────── */
     @media (max-width: 720px) {
-      .desktop, .widget, .taskbar { display: none !important; }
+      .desktop, .widget, .taskbar, .dwidget { display: none !important; }
       .phone { display: flex; }
       .start-grid { grid-template-columns: repeat(3, 1fr); }
     }
@@ -1157,8 +1289,22 @@
       </div>
       <div class="pers-foot">
         <button type="button" id="p-tidy">tidy icons</button>
+        <button type="button" id="p-widgets">add widgets</button>
         <button type="button" id="p-reset">reset desktop</button>
       </div>
+    </div>
+  </div>
+
+  <!-- widget picker window -->
+  <div class="window" id="wwin" role="dialog" aria-label="Widgets">
+    <div class="titlebar" id="w-titlebar">
+      <span class="title">widgets &mdash; woodles.space</span>
+      <button class="win-close" id="w-close" aria-label="Close">&#10005;</button>
+    </div>
+    <div class="win-body pers-body">
+      <p class="pers-hint">little things that live on the desktop.
+        drag them anywhere; hover one for its &#10005;.</p>
+      <div class="recommended" id="wtype-list"></div>
     </div>
   </div>
 
@@ -1652,6 +1798,218 @@
       });
     })();
 
+    /* ── desktop widgets ───────────────────────────────────────────── */
+    const WIDGETS_KEY = 'woodles-widgets';
+    let widgets = [];
+    try { widgets = JSON.parse(localStorage.getItem(WIDGETS_KEY)) || []; } catch {}
+    function saveWidgets() { localStorage.setItem(WIDGETS_KEY, JSON.stringify(widgets)); }
+    const widgetEls = {};
+
+    /* moon phase, computed locally from a known new moon */
+    const SYNODIC = 29.530588853;
+    const MOON_NAMES = ['new moon','waxing crescent','first quarter','waxing gibbous',
+                        'full moon','waning gibbous','last quarter','waning crescent'];
+    /* lit-area paths for the eight phase buckets, on a 40×40 grid */
+    const MOON_LIT = {
+      0: '',
+      1: 'M20 3 A17 17 0 0 1 20 37 A10 17 0 0 0 20 3',
+      2: 'M20 3 A17 17 0 0 1 20 37 Z',
+      3: 'M20 3 A17 17 0 0 1 20 37 A10 17 0 0 1 20 3',
+      4: 'M20 3 A17 17 0 0 1 20 37 A17 17 0 0 1 20 3',
+      5: 'M20 3 A17 17 0 0 0 20 37 A10 17 0 0 0 20 3',
+      6: 'M20 3 A17 17 0 0 0 20 37 Z',
+      7: 'M20 3 A17 17 0 0 0 20 37 A10 17 0 0 1 20 3',
+    };
+    function moonInfo(d) {
+      const days = (d - Date.UTC(2000, 0, 6, 18, 14)) / 86400000;
+      const phase = (((days % SYNODIC) + SYNODIC) % SYNODIC) / SYNODIC;
+      const illum = (1 - Math.cos(phase * 2 * Math.PI)) / 2;
+      const idx = Math.round(phase * 8) % 8;
+      return { illum, idx, name: MOON_NAMES[idx] };
+    }
+
+    const WTYPES = {
+      sticky: {
+        title: 'sticky note', glyph: '&#10002;', desc: 'a little note to self',
+        data: () => ({ text: '' }),
+        build(el, w) {
+          el.innerHTML = '<textarea placeholder="jot something&hellip;" maxlength="400"></textarea>';
+          const ta = el.querySelector('textarea');
+          ta.value = w.data.text || '';
+          ta.addEventListener('input', () => { w.data.text = ta.value; saveWidgets(); });
+        },
+      },
+      moon: {
+        title: 'the moon', glyph: '&#9789;', desc: 'tonight, computed right here',
+        data: () => ({}),
+        build(el) {
+          const m = moonInfo(Date.now());
+          el.innerHTML =
+            '<svg class="moon-svg" viewBox="0 0 40 40" aria-hidden="true">' +
+            '<circle class="moon-dark" cx="20" cy="20" r="17"/>' +
+            (MOON_LIT[m.idx] ? '<path class="moon-lit" d="' + MOON_LIT[m.idx] + '"/>' : '') +
+            '<circle class="moon-ring" cx="20" cy="20" r="17"/></svg>' +
+            '<p class="moon-name">' + m.name + '</p>' +
+            '<p class="moon-illum">' + Math.round(m.illum * 100) + '% lit</p>';
+        },
+      },
+      month: {
+        title: 'this month', glyph: '&#9638;', desc: 'the month at a glance',
+        data: () => ({}),
+        build(el) {
+          const now = new Date();
+          const y = now.getFullYear(), mo = now.getMonth();
+          const first = new Date(y, mo, 1).getDay();
+          const len = new Date(y, mo + 1, 0).getDate();
+          let cells = 'smtwtfs'.split('').map(h => '<span class="mo-h">' + h + '</span>').join('');
+          for (let i = 0; i < first; i++) cells += '<span></span>';
+          for (let d = 1; d <= len; d++)
+            cells += '<span class="mo-d' + (d === now.getDate() ? ' mo-today' : '') + '">' + d + '</span>';
+          el.innerHTML =
+            '<p class="dw-title">' + MONTHS[mo] + ' ' + y + '</p>' +
+            '<div class="mo-grid">' + cells + '</div>';
+        },
+      },
+      count: {
+        title: 'counting down', glyph: '&#8987;', desc: 'days until something lovely',
+        data: () => {
+          const d = new Date(Date.now() + 30 * 86400000);
+          return { label: 'something lovely',
+                   date: d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) };
+        },
+        build(el, w) {
+          el.innerHTML =
+            '<p class="cd-num">--</p>' +
+            '<p class="cd-until">days until</p>' +
+            '<input class="cd-label" maxlength="40" />' +
+            '<input class="cd-date" type="date" />';
+          const label = el.querySelector('.cd-label');
+          const date = el.querySelector('.cd-date');
+          label.value = w.data.label || '';
+          date.value = w.data.date || '';
+          label.addEventListener('input', () => { w.data.label = label.value; saveWidgets(); });
+          date.addEventListener('change', () => {
+            w.data.date = date.value; saveWidgets(); this.refresh(el, w);
+          });
+          this.refresh(el, w);
+        },
+        refresh(el, w) {
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          const target = new Date((w.data.date || '') + 'T00:00:00');
+          const diff = isNaN(target) ? null : Math.round((target - today) / 86400000);
+          el.querySelector('.cd-num').textContent = diff === null ? '--' : Math.abs(diff);
+          el.querySelector('.cd-until').textContent =
+            diff !== null && diff < 0 ? 'days since' : 'days until';
+        },
+      },
+    };
+
+    function makeWidgetElDraggable(el, w) {
+      let sx, sy, ox, oy, active = false, moved = false;
+      el.addEventListener('pointerdown', e => {
+        if (e.button !== 0) return;
+        if (e.target.closest('textarea, input, .dw-x')) return;
+        active = true; moved = false;
+        const r = el.getBoundingClientRect();
+        sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top;
+        el.setPointerCapture(e.pointerId);
+      });
+      el.addEventListener('pointermove', e => {
+        if (!active) return;
+        const dx = e.clientX - sx, dy = e.clientY - sy;
+        if (!moved && Math.hypot(dx, dy) < 6) return;
+        moved = true;
+        el.style.left = Math.min(Math.max(ox + dx, 8), innerWidth - el.offsetWidth - 8) + 'px';
+        el.style.top  = Math.min(Math.max(oy + dy, 8), innerHeight - el.offsetHeight - 8) + 'px';
+      });
+      el.addEventListener('pointerup', () => {
+        if (active && moved) {
+          w.x = el.offsetLeft; w.y = el.offsetTop;
+          saveWidgets();
+        }
+        active = false;
+      });
+    }
+
+    function removeWidget(id) {
+      widgets = widgets.filter(w => w.id !== id);
+      saveWidgets();
+      if (widgetEls[id]) { widgetEls[id].remove(); delete widgetEls[id]; }
+    }
+
+    function renderWidget(w) {
+      const t = WTYPES[w.type];
+      if (!t) return;
+      const el = document.createElement('div');
+      el.className = 'dwidget dw-' + w.type;
+      el.dataset.wid = w.id;
+      el.style.left = Math.min(Math.max(w.x, 8), Math.max(innerWidth - 200, 8)) + 'px';
+      el.style.top  = Math.min(Math.max(w.y, 8), Math.max(innerHeight - 160, 8)) + 'px';
+      t.build(el, w);
+      const x = document.createElement('button');
+      x.className = 'dw-x';
+      x.title = 'remove';
+      x.setAttribute('aria-label', 'Remove widget');
+      x.innerHTML = '&#10005;';
+      x.addEventListener('click', () => removeWidget(w.id));
+      el.appendChild(x);
+      makeWidgetElDraggable(el, w);
+      document.body.appendChild(el);
+      widgetEls[w.id] = el;
+    }
+    widgets.forEach(renderWidget);
+
+    function refreshWidgets() {
+      widgets.forEach(w => {
+        const el = widgetEls[w.id], t = WTYPES[w.type];
+        if (!el || !t) return;
+        if (w.type === 'moon' || w.type === 'month') {
+          const x = el.querySelector('.dw-x');
+          t.build(el, w);
+          el.appendChild(x);
+        } else if (t.refresh) t.refresh(el, w);
+      });
+    }
+
+    function addWidget(type) {
+      /* place new widgets in a loose grid so they don't stack */
+      const n = widgets.length;
+      const w = {
+        id: 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+        type,
+        x: Math.round(innerWidth * 0.3) + (n % 3) * 220,
+        y: Math.round(innerHeight * 0.12) + (Math.floor(n / 3) % 3) * 200,
+        data: WTYPES[type].data(),
+      };
+      widgets.push(w);
+      saveWidgets();
+      renderWidget(w);
+      closeWins();
+    }
+
+    /* keep date-driven widgets honest across midnight */
+    let wDay = new Date().getDate();
+    setInterval(() => {
+      const d = new Date().getDate();
+      if (d !== wDay) { wDay = d; refreshWidgets(); }
+    }, 60000);
+
+    /* widget picker rows */
+    const wtypeList = document.getElementById('wtype-list');
+    Object.keys(WTYPES).forEach(type => {
+      const t = WTYPES[type];
+      const el = document.createElement('button');
+      el.className = 'rec-item';
+      el.style.border = 'none';
+      el.style.background = 'transparent';
+      el.style.width = '100%';
+      el.innerHTML = '<span class="wt-glyph">' + t.glyph + '</span>' +
+        '<span class="rec-text"><span class="rec-name">' + t.title +
+        '</span><span class="rec-desc">' + t.desc + '</span></span>';
+      el.addEventListener('click', () => addWidget(type));
+      wtypeList.appendChild(el);
+    });
+
     /* ── start menu toggle ─────────────────────────────────────────── */
     const body = document.body;
     const search = document.getElementById('search');
@@ -1728,6 +2086,7 @@
       { act: 'start',       glyph: '&#9678;',  label: 'open start' },
       { act: 'wallpaper',   glyph: '&#10052;', label: 'next wallpaper' },
       { act: 'personalize', glyph: '&#10024;', label: 'personalize' },
+      { act: 'addwidget',   glyph: '&#10063;', label: 'add a widget' },
       { act: 'tidy',        glyph: '&#10070;', label: 'tidy desktop' },
       '-',
       { act: 'refresh',     glyph: '&#8635;',  label: 'refresh' },
@@ -1754,11 +2113,19 @@
     }
     document.addEventListener('contextmenu', e => {
       if (innerWidth <= 720) return;  /* phone home has its own dock, no desktop menu */
-      if (e.target.closest('.window, .flyout, input')) return;
+      if (e.target.closest('.window, .flyout, input, textarea')) return;
+      const wEl = e.target.closest('.dwidget');
       const appEl = e.target.closest('.icon[data-id], .start-app[data-id], .tb-app[data-id], .rec-item[data-id]');
-      if (!appEl && e.target.closest('.start, .taskbar')) return;
+      if (!appEl && !wEl && e.target.closest('.start, .taskbar')) return;
       e.preventDefault();
       closeAll('ctx');
+      if (wEl) {
+        showCtx(e.clientX, e.clientY, [
+          { act: 'removewidget', id: wEl.dataset.wid, glyph: '&#10005;', label: 'remove widget' },
+          { act: 'addwidget', glyph: '&#10063;', label: 'add another widget' },
+        ]);
+        return;
+      }
       const a = appEl && byId(appEl.dataset.id);
       showCtx(e.clientX, e.clientY, a ? appCtx(a) : DESKTOP_CTX);
     });
@@ -1773,14 +2140,17 @@
       if (act === 'refresh')     location.reload();
       if (act === 'about')       openAbout();
       if (act === 'tidy')        tidyIcons();
-      if (act === 'open')        launch(byId(item.dataset.id));
-      if (act === 'togglepin')   togglePin(item.dataset.id);
+      if (act === 'open')         launch(byId(item.dataset.id));
+      if (act === 'togglepin')    togglePin(item.dataset.id);
+      if (act === 'addwidget')    openWin('widgets');
+      if (act === 'removewidget') removeWidget(item.dataset.id);
     });
 
     /* ── windows (about, personalize) + drag ───────────────────────── */
     const WINDOWS = {
-      about: document.getElementById('window'),
-      pers:  document.getElementById('pwin'),
+      about:   document.getElementById('window'),
+      pers:    document.getElementById('pwin'),
+      widgets: document.getElementById('wwin'),
     };
     function openWin(key) {
       closeAll('win');
@@ -1802,6 +2172,7 @@
     });
     document.getElementById('win-close').addEventListener('click', closeWins);
     document.getElementById('p-close').addEventListener('click', closeWins);
+    document.getElementById('w-close').addEventListener('click', closeWins);
     document.getElementById('scrim').addEventListener('click', closeWins);
     document.getElementById('start-user').addEventListener('click', e => {
       e.stopPropagation(); openPers();
@@ -1836,9 +2207,11 @@
       });
       bar.addEventListener('pointerup', () => { dragging = false; });
     }
-    makeWindowDraggable(WINDOWS.about, document.getElementById('titlebar'));
-    makeWindowDraggable(WINDOWS.pers,  document.getElementById('p-titlebar'));
+    makeWindowDraggable(WINDOWS.about,   document.getElementById('titlebar'));
+    makeWindowDraggable(WINDOWS.pers,    document.getElementById('p-titlebar'));
+    makeWindowDraggable(WINDOWS.widgets, document.getElementById('w-titlebar'));
     WINDOWS.pers.addEventListener('click', e => e.stopPropagation());
+    WINDOWS.widgets.addEventListener('click', e => e.stopPropagation());
 
     /* ── personalize controls ──────────────────────────────────────── */
     document.getElementById('p-name').addEventListener('input', e => {
@@ -1865,10 +2238,12 @@
       savePrefs(); renderPrefs();
     });
     document.getElementById('p-tidy').addEventListener('click', tidyIcons);
+    document.getElementById('p-widgets').addEventListener('click', () => openWin('widgets'));
     document.getElementById('p-reset').addEventListener('click', () => {
       localStorage.removeItem(PREFS_KEY);
       localStorage.removeItem(LAYOUT_KEY);
       localStorage.removeItem(RECENTS_KEY);
+      localStorage.removeItem(WIDGETS_KEY);
       localStorage.removeItem('woodles-theme');
       location.reload();
     });
@@ -1910,7 +2285,7 @@
         ctx.classList.remove('open');
       }
       if (e.key === '/' && !body.classList.contains('start-open')
-          && document.activeElement.tagName !== 'INPUT') {
+          && !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) {
         e.preventDefault(); setStart(true);
       }
     });
