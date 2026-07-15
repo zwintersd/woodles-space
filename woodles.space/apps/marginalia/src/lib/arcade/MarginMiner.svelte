@@ -11,6 +11,15 @@
 	} from './arcadeStats';
 	import { payReward, previewReward } from './arcadeRewards';
 	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
+	import {
+		MARGIN_MINER_CLOCK_UPGRADE_SECONDS,
+		MARGIN_MINER_RIG_UPGRADES,
+		marginMinerLootPlan,
+		marginMinerSeconds,
+		marginMinerTarget,
+		type MarginMinerLootKind,
+		type MarginMinerRigUpgrade
+	} from './marginMinerTuning';
 	import { fmt } from '$lib/witch/book.svelte';
 
 	interface Props {
@@ -20,9 +29,10 @@
 	let { onclose, activePet = null }: Props = $props();
 
 	type ClawMode = 'swinging' | 'firing' | 'reeling';
-	type RoundPhase = 'playing' | 'level-clear' | 'game-over';
-	type MineKind = 'small-gold' | 'large-gold' | 'small-rock' | 'large-rock' | 'diamond' | 'mystery-bag';
+	type RoundPhase = 'ready' | 'playing' | 'paused' | 'level-clear' | 'game-over';
+	type MineKind = MarginMinerLootKind;
 	type WeightClass = 'Very Light' | 'Light' | 'Medium' | 'Heavy' | 'Very Heavy' | 'Unknown';
+	type RigUpgrade = MarginMinerRigUpgrade;
 
 	interface MineObject {
 		id: number;
@@ -50,7 +60,6 @@
 
 	const WIDTH = 800;
 	const HEIGHT = 600;
-	const LEVEL_SECONDS = 60;
 	const UI_HEIGHT = 58;
 	const SURFACE_Y = 128;
 	const ORIGIN_X = WIDTH / 2;
@@ -140,22 +149,21 @@
 	let caughtObject: MineObject | null = null;
 	let objects: MineObject[] = [];
 	let floaters: FloatingText[] = [];
-	let levelEndsAt = 0;
 	let objectSeq = 0;
 	let floaterSeq = 0;
 
-	let phase = $state<RoundPhase>('playing');
+	let phase = $state<RoundPhase>('ready');
 	let clawMode = $state<ClawMode>('swinging');
 	let level = $state(1);
 	let score = $state(0);
-	let targetScore = $state(targetForLevel(1));
-	let remaining = $state(LEVEL_SECONDS);
-	let objectCount = $state(0);
+	let targetScore = $state(marginMinerTarget(1));
+	let remaining = $state(marginMinerSeconds(0));
 	let lastHaul = $state('Click, tap, or press Down to fire.');
 	let awarded = $state(0);
 	let best = $state(loadArcadeRecord(GAME_ID).bestScore);
 	let extensions = $state(0);
 	let extensionsUsed = $state(0);
+	let rigUpgrades = $state<Record<RigUpgrade, number>>({ motor: 0, grip: 0, clock: 0 });
 
 	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
 	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
@@ -164,11 +172,12 @@
 
 	// Body reels faster and shrugs off weight; Grace widens the grab and calms the
 	// swing; Mind scans nearby loot; Heart banks near-miss time extensions.
-	const reelBonus = $derived(bodyTier * 36);
+	const reelBonus = $derived(bodyTier * 36 + rigUpgrades.motor * 24);
 	const weightPenalty = $derived(Math.max(18, WEIGHT_MULTIPLIER - bodyTier * 8));
-	const grabRadius = $derived(CLAW_RADIUS + graceTier * 3);
+	const grabRadius = $derived(CLAW_RADIUS + graceTier * 3 + rigUpgrades.grip * 2);
 	const swingSpeed = $derived(Math.max(1, SWING_SPEED - graceTier * 0.12));
 	const scanRadius = $derived(mindTier > 0 ? 64 + mindTier * 34 : 0);
+	const levelSeconds = $derived(marginMinerSeconds(rigUpgrades.clock));
 
 	const scoreText = $derived(formatMoney(score));
 	const targetText = $derived(formatMoney(targetScore));
@@ -176,13 +185,41 @@
 	const targetProgress = $derived(targetScore > 0 ? Math.min(1, score / targetScore) : 0);
 	const rewardPreview = $derived(rewardForLevel(level, true));
 	const stateLabel = $derived.by(() => {
+		if (phase === 'ready') return 'READY';
+		if (phase === 'paused') return 'PAUSED';
 		if (phase === 'level-clear') return 'CLEAR';
 		if (phase === 'game-over') return 'GAME OVER';
 		return clawMode.toUpperCase();
 	});
 	const modeClass = $derived(`mode-${phase === 'playing' ? clawMode : phase}`);
-	const nextTargetText = $derived(formatMoney(targetForLevel(level + 1)));
 	const shortfallText = $derived(formatMoney(Math.max(0, targetScore - score)));
+	const primaryLabel = $derived.by(() => {
+		if (phase === 'ready') return 'start dig';
+		if (phase === 'playing') return 'pause';
+		if (phase === 'paused') return 'resume';
+		return 'new run';
+	});
+	const rigSummary = $derived(
+		`motor ${rigUpgrades.motor} · grip ${rigUpgrades.grip} · clock +${rigUpgrades.clock * MARGIN_MINER_CLOCK_UPGRADE_SECONDS}s`
+	);
+	const targetHint = $derived.by(() => {
+		if (phase === 'ready') return `You have ${levelSeconds}s. A large gold nugget meets this first target.`;
+		if (phase === 'paused') return `${formatMoney(Math.max(0, targetScore - score))} left when you resume.`;
+		if (score >= targetScore) return 'Target met — finish the reel, then choose a rig upgrade.';
+		return `${formatMoney(Math.max(0, targetScore - score))} still needed.`;
+	});
+	const scanReadout = $derived.by(() => {
+		if (mindTier <= 0 || phase !== 'playing') return 'Mind scan: no nearby readout.';
+		const tip = clawPosition();
+		const nearby = objects
+			.filter(
+				(object) =>
+					!object.captured && Math.hypot(tip.x - object.x, tip.y - object.y) <= scanRadius + object.radius
+			)
+			.slice(0, 3)
+			.map((object) => `${object.name} ${formatMoney(object.value)}${mindTier > 1 ? `, ${object.weightClass}` : ''}`);
+		return nearby.length > 0 ? `Mind scan: ${nearby.join(' · ')}` : 'Mind scan: no loot in range.';
+	});
 	const statEffects = $derived<ArcadeStatEffects>({
 		body: (_value, tier) => (tier > 0 ? `reel +${tier}` : 'standard reel'),
 		mind: (_value, tier) => (tier > 1 ? 'scan value+weight' : tier > 0 ? 'scan value' : 'no scan'),
@@ -194,10 +231,6 @@
 	function rewardForLevel(forLevel: number, cleared: boolean): number {
 		const raw = cleared ? forLevel * 4 + 4 : forLevel * 2;
 		return previewReward(raw, MAX_REWARD);
-	}
-
-	function targetForLevel(value: number): number {
-		return Math.round(650 + (value - 1) * 850 + Math.pow(value - 1, 2) * 180);
 	}
 
 	function formatMoney(value: number): string {
@@ -292,14 +325,7 @@
 
 	function spawnObjects(forLevel: number): MineObject[] {
 		const result: MineObject[] = [];
-		const plan: Array<[MineKind, number]> = [
-			['small-gold', 6 + forLevel],
-			['large-gold', 2 + Math.ceil(forLevel / 2)],
-			['small-rock', 4 + forLevel],
-			['large-rock', 2 + Math.floor(forLevel / 2)],
-			['diamond', 1 + Math.floor(forLevel / 3)],
-			['mystery-bag', 1 + Math.floor(forLevel / 2)]
-		];
+		const plan = marginMinerLootPlan(forLevel);
 
 		for (const [kind, count] of plan) {
 			for (let i = 0; i < count; i += 1) addPlacedObject(result, kind);
@@ -308,20 +334,22 @@
 		return result.sort((a, b) => a.y - b.y);
 	}
 
-	function startLevel(nextLevel: number) {
+	function stageLevel(nextLevel: number) {
 		level = nextLevel;
-		targetScore = targetForLevel(nextLevel);
-		remaining = LEVEL_SECONDS;
-		phase = 'playing';
+		targetScore = marginMinerTarget(nextLevel);
+		remaining = levelSeconds;
 		clawMode = 'swinging';
 		currentLength = IDLE_LENGTH;
 		caughtObject = null;
 		objects = spawnObjects(nextLevel);
-		objectCount = objects.length;
 		floaters = [];
-		levelEndsAt = performance.now() + LEVEL_SECONDS * 1000;
 		extensions = heartTier;
-		lastHaul = 'Click, tap, or press Down to fire.';
+	}
+
+	function startLevel() {
+		phase = 'playing';
+		lastFrameAt = performance.now();
+		lastHaul = `Level ${level}: ${levelSeconds}s on the clock. Time the release.`;
 	}
 
 	function resetRun() {
@@ -332,7 +360,33 @@
 		floaterSeq = 0;
 		awarded = 0;
 		extensionsUsed = 0;
-		startLevel(1);
+		rigUpgrades = { motor: 0, grip: 0, clock: 0 };
+		stageLevel(1);
+		phase = 'ready';
+		lastHaul = 'Study the loot, then start the dig.';
+	}
+
+	function chooseUpgrade(upgrade: RigUpgrade) {
+		rigUpgrades = { ...rigUpgrades, [upgrade]: rigUpgrades[upgrade] + 1 };
+		stageLevel(level + 1);
+		startLevel();
+	}
+
+	function handlePrimaryAction() {
+		if (phase === 'ready') {
+			startLevel();
+			return;
+		}
+		if (phase === 'playing') {
+			phase = 'paused';
+			lastHaul = 'Clock paused. Resume when you are ready.';
+			return;
+		}
+		if (phase === 'paused') {
+			startLevel();
+			return;
+		}
+		resetRun();
 	}
 
 	function recordRun(cleared: boolean) {
@@ -378,7 +432,7 @@
 			awarded = rewardForLevel(level, true);
 			payReward(awarded, MAX_REWARD);
 			recordRun(true);
-			lastHaul = `Level ${level} cleared. +${fmt(awarded)} insight. Next target ${formatMoney(targetForLevel(level + 1))}.`;
+			lastHaul = `Level ${level} cleared. Choose one rig upgrade for the next dig.`;
 			return;
 		}
 
@@ -386,7 +440,6 @@
 		if (extensions > 0 && score >= targetScore * EXTENSION_THRESHOLD) {
 			extensions -= 1;
 			extensionsUsed += 1;
-			levelEndsAt = performance.now() + EXTENSION_SECONDS * 1000;
 			remaining = EXTENSION_SECONDS;
 			addFloater(ORIGIN_X, ORIGIN_Y + 44, `+${EXTENSION_SECONDS}s`, 'good');
 			lastHaul = `Heart held the line: ${EXTENSION_SECONDS} more seconds.`;
@@ -419,7 +472,6 @@
 			score += caughtObject.value;
 			addFloater(ORIGIN_X, ORIGIN_Y + 16, `+${formatMoney(caughtObject.value)}`, caughtObject.value <= 20 ? 'bad' : 'good');
 			objects = objects.filter((object) => object.id !== caughtObject?.id);
-			objectCount = objects.length;
 			lastHaul = `${caughtObject.name} banked for ${formatMoney(caughtObject.value)}.`;
 			caughtObject = null;
 		}
@@ -437,11 +489,11 @@
 			.filter((floater) => floater.age < 1.1);
 	}
 
-	function updateGame(dt: number, timestamp: number) {
+	function updateGame(dt: number) {
 		updateFloaters(dt);
 		if (phase !== 'playing') return;
 
-		remaining = Math.max(0, (levelEndsAt - timestamp) / 1000);
+		remaining = Math.max(0, remaining - dt);
 		if (remaining <= 0) {
 			finishLevel();
 			return;
@@ -769,6 +821,22 @@
 	}
 
 	function drawCanvasEndState(ctx: CanvasRenderingContext2D) {
+		const title =
+			phase === 'ready'
+				? 'READY TO DIG'
+				: phase === 'paused'
+					? 'CLOCK PAUSED'
+					: phase === 'level-clear'
+						? 'LEVEL CLEAR'
+						: 'CAME UP SHORT';
+		const subtitle =
+			phase === 'ready'
+				? `${levelSeconds} seconds. Reach ${targetText}.`
+				: phase === 'paused'
+					? `${timerText} seconds remain.`
+					: phase === 'level-clear'
+						? `Score ${scoreText}. Choose a rig upgrade for level ${level + 1}.`
+						: `Score ${scoreText}. Short by ${shortfallText}.`;
 		ctx.save();
 		ctx.fillStyle = 'rgba(7, 54, 66, 0.76)';
 		ctx.fillRect(0, UI_HEIGHT, WIDTH, HEIGHT - UI_HEIGHT);
@@ -776,15 +844,9 @@
 		ctx.textBaseline = 'middle';
 		ctx.fillStyle = '#fdf6e3';
 		ctx.font = '700 52px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-		ctx.fillText(phase === 'level-clear' ? 'LEVEL CLEAR' : 'CAME UP SHORT', WIDTH / 2, 276);
+		ctx.fillText(title, WIDTH / 2, 276);
 		ctx.font = '22px ui-serif, Georgia, serif';
-		ctx.fillText(
-			phase === 'level-clear'
-				? `Score ${scoreText}. Next target ${nextTargetText}.`
-				: `Score ${scoreText}. Short by ${shortfallText}.`,
-			WIDTH / 2,
-			324
-		);
+		ctx.fillText(subtitle, WIDTH / 2, 324);
 		ctx.restore();
 	}
 
@@ -792,7 +854,7 @@
 		if (!lastFrameAt) lastFrameAt = timestamp;
 		const dt = Math.min(0.05, (timestamp - lastFrameAt) / 1000);
 		lastFrameAt = timestamp;
-		updateGame(dt, timestamp);
+		updateGame(dt);
 		draw();
 		rafId = requestAnimationFrame(loop);
 	}
@@ -813,7 +875,7 @@
 <div class="miner-shell">
 	<ArcadeHud
 		title="Margin Miner"
-		hint="pendulum claw, hard weights, sixty seconds"
+		hint="pendulum claw, hard weights, fifteen seconds"
 		maxWidth="800px"
 		scores={[
 			{ label: 'score', value: scoreText },
@@ -826,8 +888,8 @@
 			},
 			{ label: 'state', value: stateLabel }
 		]}
-		startLabel={phase === 'level-clear' ? 'next level' : 'new game'}
-		onstart={() => (phase === 'level-clear' ? startLevel(level + 1) : resetRun())}
+		startLabel={primaryLabel}
+		onstart={handlePrimaryAction}
 		{onclose}
 	/>
 
@@ -837,10 +899,23 @@
 		<span>level <b>{level}</b></span>
 		<span>best <b>{fmt(best)}</b></span>
 		<span class:lit={extensions > 0}>stretch <b>{extensions}</b></span>
-		<span class={modeClass}>{lastHaul}</span>
+		<span class={modeClass} aria-live="polite">{lastHaul}</span>
 	</div>
 
 	<ArcadeProgress value={targetProgress} label="haul toward target" tone="yellow" maxWidth="800px" />
+	<p class="target-hint">{targetHint}</p>
+	<p class="rig-summary" aria-label="run-scoped rig upgrades">{rigSummary}</p>
+
+	<div class="loot-guide" aria-label="loot value and weight guide">
+		<span><b>diamond</b> $600 · very light</span>
+		<span><b>large gold</b> $500 · medium</span>
+		<span><b>small gold</b> $50 · light</span>
+		<span><b>rocks</b> $11–20 · heavy</span>
+		<span><b>mystery</b> unknown</span>
+	</div>
+	{#if mindTier > 0}
+		<p class="scan-readout">{scanReadout}</p>
+	{/if}
 
 	<div
 		class="canvas-frame"
@@ -854,19 +929,40 @@
 		>
 		{#if phase !== 'playing'}
 			<div class="game-overlay">
-				<p class="overlay-title">{phase === 'level-clear' ? 'level clear' : 'came up short'}</p>
-				<p class="overlay-sub">
-					{phase === 'level-clear'
-						? `Score ${scoreText}. +${fmt(awarded)} insight. Next target ${nextTargetText}.`
-						: `Score ${scoreText}. Short by ${shortfallText}. +${fmt(awarded)} insight.`}
+				<p class="overlay-title">
+					{phase === 'ready'
+						? 'ready to dig'
+						: phase === 'paused'
+							? 'clock paused'
+							: phase === 'level-clear'
+								? 'level clear'
+								: 'came up short'}
 				</p>
-				<p class="overlay-meta">
-					best haul {formatMoney(best)}{#if extensionsUsed > 0} · {extensionsUsed} stretch used{/if}
+				<p class="overlay-sub">
+					{phase === 'ready'
+						? `You have ${levelSeconds} seconds to reach ${targetText}. Large gold or a diamond starts you strong.`
+						: phase === 'paused'
+							? `${timerText} seconds remain. The claw and clock will wait.`
+							: phase === 'level-clear'
+								? `Score ${scoreText}. +${fmt(awarded)} insight. Choose one rig upgrade for level ${level + 1}.`
+								: `Score ${scoreText}. Short by ${shortfallText}. +${fmt(awarded)} insight.`}
 				</p>
 				{#if phase === 'level-clear'}
-					<button onclick={() => startLevel(level + 1)}>next level</button>
+					<div class="upgrade-grid" aria-label="choose one rig upgrade">
+						{#each MARGIN_MINER_RIG_UPGRADES as upgrade (upgrade.id)}
+							<button class="upgrade-choice" onclick={() => chooseUpgrade(upgrade.id)}>
+								<b>{upgrade.title}</b>
+								<span>{upgrade.description}</span>
+							</button>
+						{/each}
+					</div>
 				{:else}
-					<button onclick={resetRun}>try again</button>
+					<p class="overlay-meta">
+						best haul {formatMoney(best)}{#if extensionsUsed > 0} · {extensionsUsed} stretch used{/if}
+					</p>
+					<button onclick={phase === 'ready' || phase === 'paused' ? startLevel : resetRun}>
+						{phase === 'ready' ? 'start dig' : phase === 'paused' ? 'resume' : 'try again'}
+					</button>
 				{/if}
 			</div>
 		{/if}
@@ -901,6 +997,53 @@
 		font-style: italic;
 		font-size: 0.8rem;
 		color: var(--sol-base1);
+	}
+
+	.target-hint,
+	.rig-summary,
+	.scan-readout {
+		width: min(800px, calc(100vw - 3rem));
+		margin: -0.35rem 0 0;
+		text-align: center;
+		font-family: var(--font-body);
+		font-size: 0.78rem;
+		color: var(--sol-base1);
+	}
+
+	.rig-summary {
+		font-family: var(--font-ui);
+		font-size: 0.58rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--sol-base0);
+	}
+
+	.scan-readout {
+		color: var(--sol-blue);
+	}
+
+	.loot-guide {
+		width: min(800px, calc(100vw - 3rem));
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.25rem 0.5rem;
+		font-family: var(--font-ui);
+		font-size: 0.56rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--sol-base1);
+	}
+
+	.loot-guide span {
+		padding: 0.2rem 0.35rem;
+		border: 1px solid var(--sol-base2);
+		border-radius: 3px;
+		background: rgba(238, 232, 213, 0.32);
+	}
+
+	.loot-guide b {
+		color: var(--sol-base01);
 	}
 
 	.overlay-meta {
@@ -1040,6 +1183,36 @@
 		padding: 0.34rem 0.72rem;
 	}
 
+	.upgrade-grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0.5rem;
+		width: min(620px, 100%);
+	}
+
+	.game-overlay .upgrade-choice {
+		display: flex;
+		flex-direction: column;
+		gap: 0.24rem;
+		align-items: flex-start;
+		text-align: left;
+		padding: 0.6rem;
+	}
+
+	.upgrade-choice b {
+		font-family: var(--font-ui);
+		font-size: 0.64rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+	}
+
+	.upgrade-choice span {
+		font-family: var(--font-body);
+		font-size: 0.74rem;
+		font-style: italic;
+		color: rgba(253, 246, 227, 0.8);
+	}
+
 	.game-overlay button:hover {
 		background: rgba(253, 246, 227, 0.32);
 	}
@@ -1052,6 +1225,11 @@
 		.status-row span:last-child {
 			grid-column: 1 / -1;
 			justify-content: center;
+		}
+
+		.upgrade-grid {
+			grid-template-columns: 1fr;
+			max-width: 290px;
 		}
 	}
 </style>
