@@ -101,7 +101,7 @@
 		}
 	> = {
 		'small-gold': {
-			name: 'Small Gold',
+			name: 'Sun Drop',
 			value: 50,
 			weight: weights.light,
 			weightClass: 'Light',
@@ -109,7 +109,7 @@
 			collisionRadius: 19
 		},
 		'large-gold': {
-			name: 'Large Gold',
+			name: 'Sun Pearl',
 			value: 500,
 			weight: weights.medium,
 			weightClass: 'Medium',
@@ -117,7 +117,7 @@
 			collisionRadius: 36
 		},
 		'small-rock': {
-			name: 'Small Rock',
+			name: 'Cloud Pebble',
 			value: 11,
 			weight: weights.heavy,
 			weightClass: 'Heavy',
@@ -125,7 +125,7 @@
 			collisionRadius: 22
 		},
 		'large-rock': {
-			name: 'Large Rock',
+			name: 'Cloud Boulder',
 			value: 20,
 			weight: weights.veryHeavy,
 			weightClass: 'Very Heavy',
@@ -133,7 +133,7 @@
 			collisionRadius: 38
 		},
 		diamond: {
-			name: 'Diamond',
+			name: 'Star Crystal',
 			value: 600,
 			weight: weights.veryLight,
 			weightClass: 'Very Light',
@@ -141,7 +141,7 @@
 			collisionRadius: 16
 		},
 		'unstable-cache': {
-			name: 'Unstable Cache',
+			name: 'Fading Parcel',
 			value: 800,
 			weight: weights.medium,
 			weightClass: 'Medium',
@@ -149,7 +149,7 @@
 			collisionRadius: 25
 		},
 		'anchored-ore': {
-			name: 'Anchored Ore',
+			name: 'Moonstone',
 			value: 900,
 			weight: 11.5,
 			weightClass: 'Very Heavy',
@@ -228,7 +228,7 @@
 		fastestClearSeconds === null ? '—' : `${fastestClearSeconds.toFixed(1)}s`
 	);
 	const targetHint = $derived.by(() => {
-		if (phase === 'ready') return `You have ${levelSeconds}s. A large gold nugget meets this first target.`;
+		if (phase === 'ready') return `You have ${levelSeconds}s. A sun pearl meets this first target.`;
 		if (phase === 'paused') return `${formatMoney(Math.max(0, targetScore - score))} left when you resume.`;
 		if (score >= targetScore) return 'Target met — finish the reel, then choose a rig upgrade.';
 		return `${formatMoney(Math.max(0, targetScore - score))} still needed.`;
@@ -304,7 +304,7 @@
 		const spec =
 			kind === 'mystery-bag'
 				? {
-						name: 'Mystery Bag',
+						name: 'Wish Pouch',
 						value: randomInt(2, 800),
 						weight: randomBetween(0.4, 7.4),
 						weightClass: 'Unknown' as WeightClass,
@@ -654,7 +654,7 @@
 			const width = ctx.measureText(label).width + 12;
 			const tagY = object.y - object.radius - 13;
 
-			ctx.fillStyle = 'rgba(7, 54, 66, 0.86)';
+			ctx.fillStyle = 'rgba(95, 72, 129, 0.86)';
 			ctx.fillRect(object.x - width / 2, tagY - 9, width, 18);
 			ctx.fillStyle = '#fdf6e3';
 			ctx.fillText(label, object.x, tagY);
@@ -662,47 +662,59 @@
 		ctx.restore();
 	}
 
+	function drawCloud(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, color: string) {
+		ctx.save();
+		ctx.translate(x, y);
+		ctx.scale(scale, scale);
+		ctx.fillStyle = color;
+		ctx.beginPath();
+		ctx.ellipse(-30, 8, 38, 22, 0, 0, Math.PI * 2);
+		ctx.ellipse(3, -3, 32, 30, 0, 0, Math.PI * 2);
+		ctx.ellipse(36, 10, 31, 20, 0, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.restore();
+	}
+
 	function drawWorld(ctx: CanvasRenderingContext2D) {
-		const sky = ctx.createLinearGradient(0, UI_HEIGHT, 0, SURFACE_Y);
-		sky.addColorStop(0, '#fdf6e3');
-		sky.addColorStop(1, '#eee8d5');
+		const sky = ctx.createLinearGradient(0, UI_HEIGHT, 0, HEIGHT);
+		sky.addColorStop(0, '#c9e8ff');
+		sky.addColorStop(0.44, '#e8dcff');
+		sky.addColorStop(1, '#ffdce8');
 		ctx.fillStyle = sky;
-		ctx.fillRect(0, UI_HEIGHT, WIDTH, SURFACE_Y - UI_HEIGHT);
+		ctx.fillRect(0, UI_HEIGHT, WIDTH, HEIGHT - UI_HEIGHT);
 
-		ctx.fillStyle = '#073642';
-		ctx.fillRect(0, SURFACE_Y - 8, WIDTH, 12);
+		const glow = ctx.createRadialGradient(WIDTH * 0.78, 136, 12, WIDTH * 0.78, 136, 150);
+		glow.addColorStop(0, 'rgba(255, 248, 211, 0.92)');
+		glow.addColorStop(1, 'rgba(255, 248, 211, 0)');
+		ctx.fillStyle = glow;
+		ctx.fillRect(0, UI_HEIGHT, WIDTH, HEIGHT - UI_HEIGHT);
 
-		const soil = ctx.createLinearGradient(0, SURFACE_Y, 0, HEIGHT);
-		soil.addColorStop(0, '#b58900');
-		soil.addColorStop(0.4, '#8d6a19');
-		soil.addColorStop(1, '#473516');
-		ctx.fillStyle = soil;
-		ctx.fillRect(0, SURFACE_Y, WIDTH, HEIGHT - SURFACE_Y);
-
-		ctx.globalAlpha = 0.18;
-		ctx.strokeStyle = '#fdf6e3';
-		ctx.lineWidth = 1;
-		for (let y = SURFACE_Y + 42; y < HEIGHT; y += 54) {
+		ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+		for (let i = 0; i < 22; i += 1) {
+			const x = (i * 149 + 47) % WIDTH;
+			const y = UI_HEIGHT + 32 + ((i * 71) % 290);
+			const radius = i % 4 === 0 ? 3 : 1.5;
 			ctx.beginPath();
-			for (let x = 0; x <= WIDTH; x += 48) {
-				const wave = Math.sin(x * 0.025 + y * 0.03) * 5;
-				if (x === 0) ctx.moveTo(x, y + wave);
-				else ctx.lineTo(x, y + wave);
-			}
-			ctx.stroke();
+			ctx.arc(x, y, radius, 0, Math.PI * 2);
+			ctx.fill();
 		}
-		ctx.globalAlpha = 1;
 
-		ctx.fillStyle = '#2aa198';
-		ctx.fillRect(0, SURFACE_Y - 3, WIDTH, 6);
+		for (let i = 0; i < 7; i += 1) {
+			const x = ((i * 167 + 58) % 920) - 55;
+			const y = 172 + ((i * 83) % 238);
+			drawCloud(ctx, x, y, 0.45 + (i % 3) * 0.15, 'rgba(255, 255, 255, 0.28)');
+		}
+		drawCloud(ctx, 105, 533, 1.6, 'rgba(255, 255, 255, 0.76)');
+		drawCloud(ctx, 356, 571, 1.8, 'rgba(255, 255, 255, 0.72)');
+		drawCloud(ctx, 648, 528, 1.55, 'rgba(255, 255, 255, 0.78)');
 	}
 
 	function drawCanvasHud(ctx: CanvasRenderingContext2D) {
-		ctx.fillStyle = '#073642';
+		ctx.fillStyle = '#64527b';
 		ctx.fillRect(0, 0, WIDTH, UI_HEIGHT);
-		ctx.fillStyle = '#0f4653';
+		ctx.fillStyle = '#f5b4cf';
 		ctx.fillRect(0, UI_HEIGHT - 5, WIDTH, 5);
-		ctx.fillStyle = '#fdf6e3';
+		ctx.fillStyle = '#fffafd';
 		ctx.font = '700 18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 		ctx.textBaseline = 'middle';
 		ctx.fillText(`SCORE ${scoreText}`, 24, 29);
@@ -715,35 +727,52 @@
 		ctx.save();
 		ctx.translate(ORIGIN_X, ORIGIN_Y);
 
-		ctx.fillStyle = '#eee8d5';
-		ctx.strokeStyle = '#073642';
+		const balloon = ctx.createLinearGradient(0, -82, 0, -12);
+		balloon.addColorStop(0, '#ffe6f0');
+		balloon.addColorStop(0.48, '#e7c9ff');
+		balloon.addColorStop(1, '#a9d8f7');
+		ctx.fillStyle = balloon;
+		ctx.strokeStyle = '#725a88';
 		ctx.lineWidth = 3;
 		ctx.beginPath();
-		ctx.moveTo(-54, 24);
-		ctx.lineTo(54, 24);
-		ctx.lineTo(42, -22);
-		ctx.lineTo(-42, -22);
-		ctx.closePath();
+		ctx.ellipse(0, -48, 43, 38, 0, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.stroke();
+		ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+		ctx.lineWidth = 4;
+		ctx.beginPath();
+		ctx.moveTo(-19, -78);
+		ctx.quadraticCurveTo(-29, -48, -17, -18);
+		ctx.moveTo(19, -78);
+		ctx.quadraticCurveTo(29, -48, 17, -18);
+		ctx.stroke();
+
+		ctx.fillStyle = '#f9d5a7';
+		ctx.strokeStyle = '#725a88';
+		ctx.lineWidth = 2;
+		ctx.fillRect(-22, -2, 44, 20);
+		ctx.strokeRect(-22, -2, 44, 20);
+		ctx.strokeStyle = '#725a88';
+		ctx.beginPath();
+		ctx.moveTo(-26, -14);
+		ctx.lineTo(-17, -2);
+		ctx.moveTo(26, -14);
+		ctx.lineTo(17, -2);
+		ctx.stroke();
+
+		ctx.fillStyle = '#b997d8';
+		ctx.beginPath();
+		ctx.arc(0, 27, 17, 0, Math.PI * 2);
 		ctx.fill();
 		ctx.stroke();
 
-		ctx.fillStyle = '#cb4b16';
-		ctx.fillRect(-66, 24, 132, 12);
-		ctx.strokeRect(-66, 24, 132, 12);
-
-		ctx.fillStyle = '#586e75';
-		ctx.beginPath();
-		ctx.arc(0, 0, 25, 0, Math.PI * 2);
-		ctx.fill();
-		ctx.stroke();
-
-		ctx.strokeStyle = '#fdf6e3';
-		ctx.lineWidth = 3;
-		for (let spoke = 0; spoke < 6; spoke += 1) {
+		ctx.strokeStyle = '#fffafd';
+		ctx.lineWidth = 2;
+		for (let spoke = 0; spoke < 5; spoke += 1) {
 			const angle = spoke * (Math.PI / 3) + swingTime * 0.4;
 			ctx.beginPath();
-			ctx.moveTo(0, 0);
-			ctx.lineTo(Math.cos(angle) * 21, Math.sin(angle) * 21);
+			ctx.moveTo(0, 27);
+			ctx.lineTo(Math.cos(angle) * 13, 27 + Math.sin(angle) * 13);
 			ctx.stroke();
 		}
 
@@ -754,7 +783,7 @@
 		const claw = clawPosition();
 		const angle = clawAngle();
 
-		ctx.strokeStyle = '#1e1b13';
+		ctx.strokeStyle = '#9f82b5';
 		ctx.lineWidth = 3;
 		ctx.beginPath();
 		ctx.moveTo(ORIGIN_X, ORIGIN_Y);
@@ -765,7 +794,7 @@
 		ctx.translate(claw.x, claw.y);
 		ctx.rotate(angle - Math.PI / 2);
 
-		ctx.strokeStyle = '#073642';
+		ctx.strokeStyle = '#725a88';
 		ctx.lineWidth = 5;
 		ctx.lineCap = 'round';
 		ctx.beginPath();
@@ -781,8 +810,8 @@
 		ctx.quadraticCurveTo(19, 12, 18, 28);
 		ctx.stroke();
 
-		ctx.fillStyle = '#eee8d5';
-		ctx.strokeStyle = '#073642';
+		ctx.fillStyle = '#fff4fa';
+		ctx.strokeStyle = '#725a88';
 		ctx.lineWidth = 2;
 		ctx.beginPath();
 		ctx.arc(0, 2, 9, 0, Math.PI * 2);
@@ -803,23 +832,23 @@
 
 		if (object.kind === 'small-gold' || object.kind === 'large-gold') {
 			const gradient = ctx.createRadialGradient(-object.radius * 0.35, -object.radius * 0.35, 3, 0, 0, object.radius);
-			gradient.addColorStop(0, '#fff4a7');
-			gradient.addColorStop(0.38, '#ffd447');
-			gradient.addColorStop(1, '#b58900');
+			gradient.addColorStop(0, '#fffdf1');
+			gradient.addColorStop(0.38, '#ffe89a');
+			gradient.addColorStop(1, '#f2a9c5');
 			ctx.fillStyle = gradient;
-			ctx.strokeStyle = '#6f5300';
+			ctx.strokeStyle = '#bd799d';
 			ctx.lineWidth = 2;
 			ctx.beginPath();
 			ctx.arc(0, 0, object.radius, 0, Math.PI * 2);
 			ctx.fill();
 			ctx.stroke();
-			ctx.fillStyle = 'rgba(253, 246, 227, 0.58)';
+			ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
 			ctx.beginPath();
 			ctx.arc(-object.radius * 0.35, -object.radius * 0.38, object.radius * 0.24, 0, Math.PI * 2);
 			ctx.fill();
 		} else if (object.kind === 'small-rock' || object.kind === 'large-rock') {
-			ctx.fillStyle = object.kind === 'large-rock' ? '#657b83' : '#93a1a1';
-			ctx.strokeStyle = '#073642';
+			ctx.fillStyle = object.kind === 'large-rock' ? '#b9d9ec' : '#e5f3ff';
+			ctx.strokeStyle = '#8eb6d3';
 			ctx.lineWidth = 2;
 			ctx.beginPath();
 			const sides = object.kind === 'large-rock' ? 8 : 7;
@@ -835,8 +864,8 @@
 			ctx.fill();
 			ctx.stroke();
 		} else if (object.kind === 'diamond') {
-			ctx.fillStyle = '#8ee9ff';
-			ctx.strokeStyle = '#268bd2';
+			ctx.fillStyle = '#f7ecff';
+			ctx.strokeStyle = '#b48bd6';
 			ctx.lineWidth = 2;
 			ctx.beginPath();
 			ctx.moveTo(0, -object.radius);
@@ -846,27 +875,27 @@
 			ctx.closePath();
 			ctx.fill();
 			ctx.stroke();
-			ctx.strokeStyle = 'rgba(253, 246, 227, 0.85)';
+			ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
 			ctx.beginPath();
 			ctx.moveTo(0, -object.radius + 3);
 			ctx.lineTo(0, object.radius - 4);
 			ctx.stroke();
 		} else if (object.kind === 'unstable-cache') {
 			const pulse = 0.56 + Math.sin(object.age * 7) * 0.22;
-			ctx.fillStyle = `rgba(211, 54, 130, ${pulse})`;
-			ctx.strokeStyle = '#6c1f4a';
+			ctx.fillStyle = `rgba(238, 153, 194, ${pulse})`;
+			ctx.strokeStyle = '#a46391';
 			ctx.lineWidth = 2;
 			ctx.fillRect(-object.radius * 0.76, -object.radius * 0.62, object.radius * 1.52, object.radius * 1.24);
 			ctx.strokeRect(-object.radius * 0.76, -object.radius * 0.62, object.radius * 1.52, object.radius * 1.24);
-			ctx.fillStyle = '#fdf6e3';
+			ctx.fillStyle = '#fffafd';
 			ctx.fillRect(-object.radius * 0.44, -object.radius * 0.28, object.radius * 0.88, object.radius * 0.12);
 			ctx.font = '700 17px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 			ctx.textAlign = 'center';
 			ctx.textBaseline = 'middle';
 			ctx.fillText('!', 0, object.radius * 0.24);
 		} else if (object.kind === 'anchored-ore') {
-			ctx.fillStyle = '#586e75';
-			ctx.strokeStyle = '#073642';
+			ctx.fillStyle = '#c4b4db';
+			ctx.strokeStyle = '#78678f';
 			ctx.lineWidth = 3;
 			ctx.beginPath();
 			for (let i = 0; i < 7; i += 1) {
@@ -878,7 +907,7 @@
 			ctx.closePath();
 			ctx.fill();
 			ctx.stroke();
-			ctx.strokeStyle = '#fdf6e3';
+			ctx.strokeStyle = '#fffafd';
 			ctx.lineWidth = 2;
 			ctx.beginPath();
 			ctx.moveTo(0, -object.radius * 0.58);
@@ -888,17 +917,17 @@
 			ctx.lineTo(object.radius * 0.48, object.radius * 0.08);
 			ctx.stroke();
 		} else {
-			ctx.fillStyle = '#d33682';
-			ctx.strokeStyle = '#073642';
+			ctx.fillStyle = '#f7a9c8';
+			ctx.strokeStyle = '#a7678b';
 			ctx.lineWidth = 2;
 			ctx.beginPath();
 			ctx.ellipse(0, 4, object.radius * 0.78, object.radius * 0.95, 0, 0, Math.PI * 2);
 			ctx.fill();
 			ctx.stroke();
-			ctx.fillStyle = '#eee8d5';
+			ctx.fillStyle = '#fff4fa';
 			ctx.fillRect(-object.radius * 0.5, -object.radius * 0.62, object.radius, object.radius * 0.3);
 			ctx.strokeRect(-object.radius * 0.5, -object.radius * 0.62, object.radius, object.radius * 0.3);
-			ctx.fillStyle = '#073642';
+			ctx.fillStyle = '#755978';
 			ctx.font = '700 18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 			ctx.textAlign = 'center';
 			ctx.textBaseline = 'middle';
@@ -916,8 +945,8 @@
 		for (const floater of floaters) {
 			const alpha = Math.max(0, 1 - floater.age / 1.1);
 			ctx.globalAlpha = alpha;
-			ctx.fillStyle = floater.tone === 'good' ? '#fdf6e3' : floater.tone === 'bad' ? '#dc322f' : '#93a1a1';
-			ctx.strokeStyle = 'rgba(7, 54, 66, 0.72)';
+			ctx.fillStyle = floater.tone === 'good' ? '#fffafd' : floater.tone === 'bad' ? '#d46f98' : '#9d8bb2';
+			ctx.strokeStyle = 'rgba(102, 78, 130, 0.62)';
 			ctx.lineWidth = 4;
 			ctx.strokeText(floater.text, floater.x, floater.y);
 			ctx.fillText(floater.text, floater.x, floater.y);
@@ -943,11 +972,11 @@
 						? `Score ${scoreText}. Choose a rig upgrade for level ${level + 1}.`
 						: `Score ${scoreText}. Short by ${shortfallText}.`;
 		ctx.save();
-		ctx.fillStyle = 'rgba(7, 54, 66, 0.76)';
+		ctx.fillStyle = 'rgba(104, 79, 134, 0.72)';
 		ctx.fillRect(0, UI_HEIGHT, WIDTH, HEIGHT - UI_HEIGHT);
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
-		ctx.fillStyle = '#fdf6e3';
+		ctx.fillStyle = '#fffafd';
 		ctx.font = '700 52px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 		ctx.fillText(title, WIDTH / 2, 276);
 		ctx.font = '22px ui-serif, Georgia, serif';
@@ -984,7 +1013,7 @@
 <div class="miner-shell">
 	<ArcadeHud
 		title="Margin Miner"
-		hint="pendulum claw, hard weights, fifteen seconds"
+		hint="skyhook, cloud cargo, fifteen seconds"
 		maxWidth="800px"
 		scores={[
 			{ label: 'score', value: scoreText },
@@ -1020,13 +1049,13 @@
 	<p class="rig-summary" aria-label="run-scoped rig upgrades">{rigSummary}</p>
 
 	<div class="loot-guide" aria-label="loot value and weight guide">
-		<span><b>diamond</b> $600 · very light</span>
-		<span><b>large gold</b> $500 · medium</span>
-		<span><b>small gold</b> $50 · light</span>
-		<span><b>rocks</b> $11–20 · heavy</span>
-		<span><b>unstable cache</b> $800 → $200 · decays</span>
-		<span><b>anchored ore</b> $900 · very heavy</span>
-		<span><b>mystery</b> unknown</span>
+		<span><b>star crystal</b> $600 · very light</span>
+		<span><b>sun pearl</b> $500 · medium</span>
+		<span><b>sun drop</b> $50 · light</span>
+		<span><b>cloud stones</b> $11–20 · heavy</span>
+		<span><b>fading parcel</b> $800 → $200 · fades</span>
+		<span><b>moonstone</b> $900 · very heavy</span>
+		<span><b>wish pouch</b> unknown</span>
 	</div>
 	{#if mindTier > 0}
 		<p class="scan-readout">{scanReadout}</p>
@@ -1055,7 +1084,7 @@
 				</p>
 				<p class="overlay-sub">
 					{phase === 'ready'
-						? `You have ${levelSeconds} seconds to reach ${targetText}. Large gold or a diamond starts you strong.`
+						? `You have ${levelSeconds} seconds to reach ${targetText}. A sun pearl or star crystal starts you strong.`
 						: phase === 'paused'
 							? `${timerText} seconds remain. The claw and clock will wait.`
 							: phase === 'level-clear'
@@ -1392,6 +1421,99 @@
 	.drop-control:disabled {
 		cursor: not-allowed;
 		opacity: 0.45;
+	}
+
+	/* Cloudcatcher skin: keep the cabinet shell, soften only this game's palette. */
+	.miner-shell {
+		background: linear-gradient(180deg, #fff8fc 0%, #f4f6ff 46%, #fff2f8 100%);
+		border-top-color: #e8d7ee;
+	}
+
+	.control-hint,
+	.target-hint,
+	.loot-guide,
+	.status-row span,
+	.mastery-row span {
+		color: #806986;
+	}
+
+	.rig-summary,
+	.status-row span:last-child {
+		color: #725f80;
+	}
+
+	.scan-readout {
+		color: #8a72b4;
+	}
+
+	.loot-guide span,
+	.status-row span,
+	.mastery-row span {
+		border-color: #e4d4ea;
+		background: rgba(255, 255, 255, 0.76);
+	}
+
+	.loot-guide b,
+	.status-row b,
+	.mastery-row b {
+		color: #735f81;
+	}
+
+	.status-row span.lit {
+		border-color: rgba(169, 125, 197, 0.48);
+		background: rgba(224, 198, 243, 0.32);
+		color: #765f88;
+	}
+
+	.status-row span.mode-reeling {
+		color: #bd78a1;
+	}
+
+	.status-row span.mode-level-clear {
+		color: #6f9d93;
+	}
+
+	.status-row span.mode-game-over {
+		color: #c67599;
+	}
+
+	.canvas-frame {
+		border-color: #dfd1e9;
+		background: #d8e9ff;
+		box-shadow:
+			inset 0 0 0 7px rgba(255, 255, 255, 0.36),
+			0 18px 48px rgba(151, 112, 171, 0.18);
+	}
+
+	.drop-control:focus-visible {
+		outline-color: #e6a9cb;
+	}
+
+	.game-overlay {
+		background: rgba(116, 88, 146, 0.66);
+		color: #fffafd;
+	}
+
+	.overlay-sub,
+	.upgrade-choice span {
+		color: rgba(255, 250, 253, 0.9);
+	}
+
+	.game-overlay button {
+		background: rgba(255, 250, 253, 0.2);
+		color: #fffafd;
+		border-color: rgba(255, 250, 253, 0.56);
+	}
+
+	.game-overlay button:hover {
+		background: rgba(255, 250, 253, 0.34);
+	}
+
+	.drop-control {
+		border-color: #c99fbe;
+		background: linear-gradient(135deg, #f8bdd5, #d5c0f1);
+		color: #5d496b;
+		box-shadow: 0 7px 15px rgba(183, 127, 161, 0.16);
 	}
 
 	@media (max-width: 740px) {
