@@ -1,11 +1,13 @@
 # Marginalia Arcade Polish Roadmap
 
-Status snapshot: June 30, 2026.
+Status snapshot: July 16, 2026.
 
 This roadmap reviews the current Arcade cabinet as it exists in
-`Arcade.svelte`: 14 playable games, 1 coming-soon card, and 3 roadmap cards
-(Word Weave, Star Catcher, The Long Game — see "Coming-Soon And Roadmap
-Cards" for the Week 9 status-honesty pass).
+`Arcade.svelte`: 15 playable games and 3 roadmap cards (Word Weave, Star
+Catcher, The Long Game — see "Coming-Soon And Roadmap Cards" for the Week 9
+status-honesty pass). Condition Match shipped its first playable loop on July
+16 and moved from `soon` to `play`; see "Week 11 — Condition Match Ships"
+below and its "Playable Games" entry for what actually landed.
 It is broader than `ARCADE_REVIEW.md`, which is a resource-sharing review and
 is now stale on the game inventory.
 
@@ -533,19 +535,47 @@ number is reached, because no playable component exists behind either yet.
 
 ### Condition Match
 
-Current progress: Registered as `soon`; no playable component yet. The card
-promises a memory game pairing conditions with emergences.
+Moved from `soon` to `play` on July 16, 2026 (Week 11) — see "Week 11 —
+Condition Match Ships" below. It now belongs with the Playable Games above;
+kept here so this section's history stays intact.
+
+Current progress: A concentration/memory game built on the real
+condition → emergence graph in `content/conditions.ts` and
+`content/emergences.ts`. Flip two tiles; if their conditions are the two that
+give rise to a real emergence, they lock in and the emergence's name and note
+appear as a brief flourish. A wrong pair flips back after a linger window. A
+round ends when every pair is found. Three difficulty picks (3/4/6 pairs) are
+chosen before starting. Logic lives in `conditionMatchPairs.ts`
+(`selectRoundEmergences`, `buildTilePool`, `emergenceForPair`), unit-tested
+separately from the component.
 
 Next expansions:
-- Build the first playable loop: reveal, hide, match, score, finish.
-- Pull pairs from existing condition/emergence content.
-- Add a simple difficulty ladder by pair count.
+- Persist a "fastest clear" or "fewest moves" highlight per difficulty
+  instead of one undifferentiated best score across all three pair counts.
+- Consider level seeds that guarantee a specific mix of "easy" (conditions
+  that appear only once on the board) and "trap" (a condition repeated
+  across two chosen emergences) tiles, rather than pure random selection.
+- A small end-of-round list of which emergences were found, not just the
+  count.
+
+Resolved at ship (Week 11):
+- First playable loop: reveal, hide, match, score, finish.
+- Pairs are pulled from the real `emergences.ts` content, not placeholder
+  data — matching two conditions reveals the actual in-world emergence.
+- Content selection rule for replay variety: each round samples `pairCount`
+  emergences at random via `selectRoundEmergences`; because a condition can
+  belong to more than one chosen emergence, the same condition name can
+  appear on the board more than once with a different correct partner each
+  time, so no two rounds play out identically and a repeated label is never
+  itself a valid match.
 
 Rough edges:
-- The promise exists in the cabinet but there is no game surface.
-- It will need content selection rules so repeated plays are not identical.
+- No daily pacing, matching most of the cabinet's non-Inkblot games.
+- The "best" record is a single cross-difficulty score; a 6-pair clear will
+  usually out-score a 3-pair clear, which is intentional (harder rounds pay
+  more) but not yet explained in the HUD.
 
-Stat pitch:
+Stat pitch (now implemented):
 - Body: faster card flip animation and shorter lockout after a match.
 - Mind: one or more peek charges.
 - Grace: mismatched cards linger slightly longer before hiding.
@@ -722,3 +752,58 @@ Milestone: full 10-week polish cycle complete. The cabinet has a shared stat
 vocabulary, one payout path, extracted presentation shells, local run memory
 on every playable game, and a verified-clean baseline to build the post-cycle
 backlog (Condition Match first) on top of.
+
+## Week 11 — Condition Match Ships
+
+Theme: build the first item in the post-cycle backlog, per
+`ARCADE_IMPLEMENTATION_PLAN.md`'s recommended order ("1. Condition Match as
+the first new game after the pause").
+
+What shipped:
+
+- `conditionMatchPairs.ts`: pure, unit-tested round logic separate from the
+  component — `selectRoundEmergences` (random sample of N emergences from
+  the real `content/emergences.ts` list), `buildTilePool` (two tiles per
+  emergence, shuffled into board order), and `emergenceForPair` (order
+  -independent lookup of whether two condition ids form a known emergence).
+- `ConditionMatch.svelte`: the concentration/memory game itself. Ready
+  phase lets the player pick a round size (3/4/6 pairs); running phase is a
+  tile grid where flipping two tiles either locks in a match (with the
+  discovered emergence's name and note shown as a brief flourish) or flips
+  back after a linger window; complete phase reports pairs found, moves,
+  time, and best streak. Follows the shared shell pattern: `ArcadeHud` for
+  title/score/start, `ArcadeProgress` for pairs-found progress, and
+  `ArcadePetPerks` for the stat row.
+- All four core stats wired per the existing stat pitch: Body shortens the
+  match lockout and speeds the flip transition, Mind grants peek charges
+  that briefly reveal the whole board, Grace lengthens the mismatch linger
+  window, and Heart grants streak shields that protect a run's match streak
+  through one miss.
+- Local best score and run summary via the shared `arcadeRecords` helpers
+  (`gameId: 'condition-match'`); insight payout via the shared
+  `arcadeRewards` helpers, capped at 30.
+- `Arcade.svelte`: import wired, status flipped from `soon` to `play`, and
+  the active-game switch renders the new component. No other game's status
+  or wiring changed.
+
+Validation:
+
+- `pnpm --filter marginalia test`: 249 passing (was 237; +12 new tests in
+  `conditionMatchPairs.test.ts`).
+- `pnpm --filter marginalia check`: 0 errors, 0 warnings.
+- `pnpm --filter marginalia build`: succeeds.
+- Browser smoke at `/marginalia/arcade`: opened the card (status badge now
+  reads "play"), exercised all three difficulty picks, flipped tiles and
+  confirmed a real condition label is revealed, confirmed both a match
+  (tile gains a lasting "matched" state) and a mismatch (tile reverts to
+  face-down after the linger window) resolve correctly, confirmed the HUD
+  move counter updates live, confirmed the peek button renders correctly
+  disabled with no active pet (Mind tier 0), and confirmed the "back to
+  arcade" control returns to the grid cleanly mid-round. No new console or
+  page errors introduced (the only console output during the smoke pass was
+  the sandboxed dev environment's pre-existing blocked Google Fonts request
+  and a missing local `/api` route, neither related to this game).
+
+Next up per the backlog order in `ARCADE_IMPLEMENTATION_PLAN.md`: Word
+Weave, but only once condition-writing unlock state is real; see that
+file's "Backlog Order After The Polish Cycle" section for the full order.
