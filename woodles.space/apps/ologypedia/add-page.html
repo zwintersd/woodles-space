@@ -131,6 +131,26 @@
   .box.notes ol{margin:0; padding-left:20px; font-size:13.8px; line-height:1.7;}
   .box.notes li{margin-bottom:6px;}
 
+  /* ===== the shelf (session-persisted textbook) ===== */
+  .shelf-empty{border:1px dashed var(--rose-dust); border-radius:8px; padding:22px; text-align:center; color:var(--ink-soft); font-size:13.5px; font-style:italic; background:repeating-linear-gradient(135deg,#fffdfa,#fffdfa 12px,var(--paper) 12px,var(--paper) 24px);}
+  .shelf.has-entries .shelf-empty{display:none;}
+  .shelf-list{list-style:none; margin:0; padding:0;}
+  .shelf-list li{display:flex; align-items:center; gap:12px; padding:11px 14px; border:1px solid var(--rose-dust); border-radius:8px; background:#fffdfa; margin-bottom:8px;}
+  .shelf-num{flex:none; width:26px; height:26px; border-radius:50%; background:var(--blush); color:var(--rose-deep); border:1px solid var(--rose-dust); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:600; font-size:13px;}
+  .shelf-meta{flex:1 1 auto; min-width:0;}
+  .shelf-title{font-family:var(--font-display); font-weight:600; font-size:15px; color:var(--rose-deep); margin:0; line-height:1.25; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .shelf-file{font-family:'DM Mono',monospace; font-size:11px; color:var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .shelf-row-actions{flex:none; display:flex; gap:4px;}
+  .iconbtn{border:1px solid var(--rose-dust); background:var(--paper); color:var(--rose-deep); border-radius:7px; width:30px; height:30px; cursor:pointer; font-size:13px; line-height:1; display:flex; align-items:center; justify-content:center; transition:background .15s ease,color .15s ease,border-color .15s ease;}
+  .iconbtn:hover{background:var(--rose-deep); color:var(--paper); border-color:var(--rose-deep);}
+  .iconbtn.danger:hover{background:#a8434f; border-color:#a8434f;}
+  .startat{display:flex; align-items:center; gap:8px; font-size:12.5px; letter-spacing:.03em; text-transform:uppercase; color:var(--ink-soft); font-family:var(--font-display); font-weight:600;}
+  .startat input{width:66px; font-family:'DM Mono',monospace; font-size:13px; padding:6px 8px; border:1px solid var(--rose-dust); border-radius:7px; background:#fffdfa; color:var(--ink);}
+  .shelf-tools{display:flex; flex-wrap:wrap; gap:18px; margin-top:14px;}
+  .linkbtn{background:none; border:none; padding:0 0 1px; cursor:pointer; font-family:var(--font-body); font-size:12.5px; color:var(--rose-deep); border-bottom:1px dotted var(--rose-dust);}
+  .linkbtn:hover{color:var(--rose-dust);}
+  .linkbtn.danger{color:#a8434f; border-bottom-color:#a8434f;}
+
   footer.tagline{text-align:center; font-family:var(--font-display); font-style:italic; font-size:15px; color:var(--rose-dust); margin-top:30px;}
 </style>
 </head>
@@ -144,7 +164,7 @@
     <span class="kicker-tag">A Woodle &middot; The Studio</span>
     <h1 class="title">Add a Page</h1>
     <div class="subtitle-row"><span class="orn">✦</span><h2 class="subtitle">One Entry at a Time, Start to Finished File</h2><span class="orn">✦</span></div>
-    <p class="intro">There's no database behind this site, no "save" button writing to a server — Ologypedia is a static block library, on purpose. So a whole textbook gets built the honest way: one entry at a time. Name a topic and this studio hands you the exact prompt to grow it. Paste back what the model writes, and it renders live right here — then downloads as a finished file, named and ready to drop in. Four steps, no backend, and you never leave this page until the entry is done.</p>
+    <p class="intro">There's no database behind this site, no "save" button writing to a server — Ologypedia is a static block library, on purpose. So a whole textbook gets built the honest way: one entry at a time. Name a topic and this studio hands you the exact prompt to grow it. Paste back what the model writes, it renders live right here, then downloads as a finished file — and joins a shelf that remembers your whole textbook as it grows, so you never lose your place between sessions and can register every entry in a single pass at the end.</p>
 
     <figure class="figure-box">
       <figcaption>Figure &middot; The Loop, Once Through</figcaption>
@@ -169,8 +189,8 @@
         <div class="arrow">→</div>
         <div class="node node-accent">
           <span class="node-tag">4</span>
-          <h5 class="node-title">Download &amp; register</h5>
-          <p class="node-detail">Save the finished file, paste one card into the index.</p>
+          <h5 class="node-title">Save &amp; shelve</h5>
+          <p class="node-detail">Download the file, add it to your shelf, and emit the whole index at once.</p>
         </div>
       </div>
     </figure>
@@ -185,6 +205,11 @@
       <label for="context">Your Own Relationship to the Topic <span style="text-transform:none; font-weight:400; color:var(--ink-soft);">(optional)</span></label>
       <textarea id="context" rows="2" placeholder="Brief background on your own knowledge of or relation to the topic, if relevant. Leave blank to skip."></textarea>
       <p class="hint">Per the spec: personal context is too idiosyncratic to generalize, so it belongs in the request, not the reusable template.</p>
+    </div>
+    <div class="field">
+      <label for="desc">One-Line Description <span style="text-transform:none; font-weight:400; color:var(--ink-soft);">(optional)</span></label>
+      <input type="text" id="desc" placeholder="e.g., How a firefly makes cold light — the luciferin reaction, and the cost of a glow." autocomplete="off">
+      <p class="hint">Becomes the entry's card text on the front door. Leave it blank now and the card gets a placeholder you can fill in later.</p>
     </div>
     <div class="checkbox-field">
       <input type="checkbox" id="diagnosis">
@@ -223,25 +248,45 @@
       </div>
     </div>
 
-    <div class="sec-head"><span class="num">4</span><h3>Download &amp; Register</h3></div>
-    <p class="step-lede">Download saves it under the right filename, ready to drop straight into <code>apps/ologypedia/</code>. Then paste the card below into <code>index.html</code>'s library grid so the entry is reachable from the front door. No build, no deploy beyond the usual one — a new file and one pasted card is the whole publish.</p>
+    <div class="sec-head"><span class="num">4</span><h3>Save &amp; Download</h3></div>
+    <p class="step-lede">Two moves here. <b>Download</b> saves the finished file under the right name, ready to drop into <code>apps/ologypedia/</code>. <b>Add to my textbook</b> tucks the entry onto the shelf below — so it's remembered across the whole build, re-openable and re-downloadable, and folded into the one-shot index grid in Step&nbsp;5.</p>
     <div class="btn-row">
       <a class="btn is-disabled" id="download" download="textbook-topic.html"><span class="glyph">&#8595;</span> Download <span id="dl-name" style="opacity:.8; font-weight:400;">textbook-topic.html</span></a>
+      <button class="btn btn-ghost is-disabled" id="add-shelf" type="button"><span class="glyph">✦</span> Add to my textbook</button>
     </div>
-    <div class="box notes">
-      <h4>Registering the New Entry</h4>
+    <p class="note" id="save-msg" role="status" aria-live="polite" style="font-size:12.5px; color:var(--ink-soft); margin-top:10px; min-height:1.1em;"></p>
+
+    <div class="sec-head"><span class="num">5</span><h3>Your Textbook</h3></div>
+    <p class="step-lede">Every entry you save lands here and stays — kept in this browser, so a whole textbook can grow across many sessions without losing your place. Re-open one to edit and re-download it; when you're ready, copy the entire index grid in a single pass instead of pasting cards one at a time.</p>
+    <div class="shelf" id="shelf">
+      <div class="shelf-empty" id="shelf-empty">Nothing saved yet. Build an entry above, then <b>Add to my textbook</b> — it'll appear here, and outlast this session.</div>
+      <ol class="shelf-list" id="shelf-list"></ol>
+    </div>
+    <div class="btn-row" id="shelf-actions" style="display:none; align-items:center;">
+      <label class="startat">First card's number
+        <input type="number" id="start-at" min="1" value="1" inputmode="numeric">
+      </label>
+    </div>
+    <div class="output-wrap" id="grid-wrap" style="display:none; margin-top:12px;">
+      <div class="output-head">
+        <span>Full Library Grid &middot; <span id="grid-count">0</span> entr<span id="grid-plural">ies</span></span>
+        <button class="copy-btn" id="copy-grid" type="button">Copy Grid</button>
+      </div>
+      <textarea id="grid-output" rows="8" readonly></textarea>
+    </div>
+    <div class="box notes" id="register-note" style="display:none;">
+      <h4>Registering the Whole Set</h4>
       <ol>
-        <li>Move the downloaded <code id="filename-preview">textbook-topic.html</code> into <code>apps/ologypedia/</code>.</li>
-        <li>Paste the card below into <code>index.html</code>'s library grid — the <code>.lib-grid.full</code> block with the other worked pages — and set its number and one-line description.</li>
-        <li>That's it. Reload the front door; the new entry is there.</li>
+        <li>Make sure each downloaded <code>textbook-*.html</code> is sitting in <code>apps/ologypedia/</code>.</li>
+        <li>Open <code>index.html</code>, find the <code>.lib-grid.full</code> block, and paste the grid above in — after the existing worked-page cards.</li>
+        <li>Set <b>First card's number</b> so the numbering continues from whatever's already there, then reload the front door.</li>
       </ol>
     </div>
-    <div class="output-wrap" style="margin-top:12px;">
-      <div class="output-head">
-        <span>Index Card Snippet</span>
-        <button class="copy-btn" id="copy-card" type="button">Copy Card</button>
-      </div>
-      <textarea id="card-output" rows="6" readonly></textarea>
+    <div class="shelf-tools" id="shelf-tools" style="display:none;">
+      <button class="linkbtn" id="export-shelf" type="button">Export shelf as JSON</button>
+      <button class="linkbtn" id="import-shelf" type="button">Import a shelf&hellip;</button>
+      <button class="linkbtn danger" id="clear-shelf" type="button">Clear all</button>
+      <input type="file" id="import-file" accept="application/json,.json" style="display:none;">
     </div>
 
     <footer class="tagline">The library grows exactly one honest entry at a time. ✦</footer>
@@ -253,17 +298,32 @@
 (function(){
   var topicEl = document.getElementById('topic');
   var contextEl = document.getElementById('context');
+  var descEl = document.getElementById('desc');
   var diagnosisEl = document.getElementById('diagnosis');
   var promptOut = document.getElementById('prompt-output');
-  var cardOut = document.getElementById('card-output');
-  var filenamePreview = document.getElementById('filename-preview');
   var pasteEl = document.getElementById('paste-in');
   var previewFrame = document.getElementById('preview-frame');
   var previewIframe = document.getElementById('preview');
   var downloadEl = document.getElementById('download');
   var dlName = document.getElementById('dl-name');
   var openTabEl = document.getElementById('open-tab');
+  var addShelfEl = document.getElementById('add-shelf');
+  var saveMsgEl = document.getElementById('save-msg');
+  var shelfEl = document.getElementById('shelf');
+  var shelfListEl = document.getElementById('shelf-list');
+  var shelfActionsEl = document.getElementById('shelf-actions');
+  var gridWrapEl = document.getElementById('grid-wrap');
+  var gridOutputEl = document.getElementById('grid-output');
+  var gridCountEl = document.getElementById('grid-count');
+  var gridPluralEl = document.getElementById('grid-plural');
+  var registerNoteEl = document.getElementById('register-note');
+  var shelfToolsEl = document.getElementById('shelf-tools');
+  var startAtEl = document.getElementById('start-at');
+  var importFileEl = document.getElementById('import-file');
   var lastBlobUrl = null;
+
+  var SHELF_KEY = 'ologypedia-studio-v1';
+  var shelf = loadShelf();
 
   function slugify(str){
     return str.toLowerCase().trim()
@@ -272,6 +332,16 @@
       .replace(/(^-+|-+$)/g, '') || 'topic';
   }
   function currentSlug(){ return slugify(topicEl.value.trim()); }
+  function escapeHtml(s){
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function cardFor(slug, title, desc, number){
+    return '<a class="card" href="/ologypedia/textbook-' + slug + '.html">\n' +
+      '  <span class="card-eyebrow">Worked Page &middot; No. ' + number + '</span>\n' +
+      '  <h4>' + escapeHtml(title) + '</h4>\n' +
+      '  <p>' + escapeHtml(desc || 'One line on what it covers and which example blocks it uses.') + '</p>\n' +
+      '</a>';
+  }
 
   var VISUAL_SYSTEM =
 "VISUAL SYSTEM — Ologypedia block library. Reuse the tokens and classes\n" +
@@ -377,17 +447,8 @@
     promptOut.value = lines.join('\n');
 
     var filename = 'textbook-' + slug + '.html';
-    filenamePreview.textContent = filename;
     dlName.textContent = filename;
     if (!downloadEl.classList.contains('is-disabled')) downloadEl.download = filename;
-
-    var title = topicEl.value.trim() || 'Page Title';
-    cardOut.value =
-'<a class="card" href="/ologypedia/' + filename + '">\n' +
-'  <span class="card-eyebrow">Worked Page &middot; No. N</span>\n' +
-'  <h4>' + title + '</h4>\n' +
-'  <p>One line on what it covers and which example blocks it uses.</p>\n' +
-'</a>';
   }
 
   // strip a leading ```html / ``` fence and a trailing ``` if the model added them
@@ -416,6 +477,7 @@
       downloadEl.classList.add('is-disabled');
       downloadEl.removeAttribute('href');
       openTabEl.classList.add('is-disabled');
+      addShelfEl.classList.add('is-disabled');
       if (lastBlobUrl){ URL.revokeObjectURL(lastBlobUrl); lastBlobUrl = null; }
       setChk('chk-doc', false); setChk('chk-fonts', false); setChk('chk-blocks', false);
       return;
@@ -434,9 +496,163 @@
     downloadEl.download = 'textbook-' + currentSlug() + '.html';
     downloadEl.classList.remove('is-disabled');
     openTabEl.classList.remove('is-disabled');
+    addShelfEl.classList.remove('is-disabled');
   }
 
-  [topicEl, contextEl, diagnosisEl].forEach(function(el){
+  /* ===== the shelf: a session-persisted textbook ===== */
+  function loadShelf(){
+    try { var raw = localStorage.getItem(SHELF_KEY); var arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) ? arr : []; }
+    catch (e) { return []; }
+  }
+  function persistShelf(){
+    try { localStorage.setItem(SHELF_KEY, JSON.stringify(shelf)); return true; }
+    catch (e) { return false; }
+  }
+  function findEntry(slug){
+    for (var i = 0; i < shelf.length; i++){ if (shelf[i].slug === slug) return shelf[i]; }
+    return null;
+  }
+  function showSave(msg, warn){
+    saveMsgEl.textContent = msg;
+    saveMsgEl.style.color = warn ? '#a8434f' : 'var(--sage)';
+  }
+  function blobFor(html){ return URL.createObjectURL(new Blob([html], { type: 'text/html' })); }
+
+  function addCurrentToShelf(){
+    var html = cleanedHTML();
+    if (!html) return;
+    var slug = currentSlug();
+    var title = topicEl.value.trim() || 'Untitled entry';
+    var desc = descEl.value.trim();
+    var entry = { slug: slug, title: title, desc: desc, html: html, savedAt: Date.now() };
+    var backup = shelf.slice();
+    var existing = findEntry(slug);
+    if (existing){ shelf[shelf.indexOf(existing)] = entry; }
+    else { shelf.push(entry); }
+    if (!persistShelf()){
+      shelf = backup;
+      showSave('Browser storage is full — download and remove an older entry, then try again.', true);
+      return;
+    }
+    renderShelf();
+    var n = shelf.length;
+    showSave((existing ? 'Updated' : 'Saved') + ' “' + title + '” — ' + n + ' entr' + (n === 1 ? 'y' : 'ies') + ' in your textbook now.', false);
+  }
+
+  function openEntry(slug){
+    var e = findEntry(slug); if (!e) return;
+    topicEl.value = e.title === 'Untitled entry' ? '' : e.title;
+    descEl.value = e.desc || '';
+    pasteEl.value = e.html;
+    buildPrompt();
+    refreshPreview();
+    showSave('Opened “' + e.title + '” — edit above, then Add to my textbook to save your changes.', false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  function previewEntry(slug){
+    var e = findEntry(slug); if (!e) return;
+    var url = blobFor(e.html);
+    window.open(url, '_blank', 'noopener');
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 30000);
+  }
+  function downloadEntry(slug){
+    var e = findEntry(slug); if (!e) return;
+    var url = blobFor(e.html);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'textbook-' + e.slug + '.html';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+  }
+  function removeEntry(slug){
+    var e = findEntry(slug); if (!e) return;
+    shelf.splice(shelf.indexOf(e), 1);
+    persistShelf();
+    renderShelf();
+    showSave('Removed “' + e.title + '” from your textbook.', false);
+  }
+
+  function iconBtn(glyph, label, fn, danger){
+    var b = document.createElement('button');
+    b.className = 'iconbtn' + (danger ? ' danger' : '');
+    b.type = 'button';
+    b.textContent = glyph;
+    b.title = label;
+    b.setAttribute('aria-label', label);
+    b.addEventListener('click', fn);
+    return b;
+  }
+  function renderShelf(){
+    shelfListEl.innerHTML = '';
+    shelf.forEach(function(e, i){
+      var li = document.createElement('li');
+      var num = document.createElement('span'); num.className = 'shelf-num'; num.textContent = (i + 1);
+      var meta = document.createElement('div'); meta.className = 'shelf-meta';
+      var t = document.createElement('p'); t.className = 'shelf-title'; t.textContent = e.title;
+      var f = document.createElement('div'); f.className = 'shelf-file'; f.textContent = 'textbook-' + e.slug + '.html';
+      meta.appendChild(t); meta.appendChild(f);
+      var acts = document.createElement('div'); acts.className = 'shelf-row-actions';
+      acts.appendChild(iconBtn('↺', 'Open in the studio', function(){ openEntry(e.slug); }));
+      acts.appendChild(iconBtn('↗', 'Preview in a new tab', function(){ previewEntry(e.slug); }));
+      acts.appendChild(iconBtn('↓', 'Download this file', function(){ downloadEntry(e.slug); }));
+      acts.appendChild(iconBtn('✕', 'Remove from textbook', function(){ removeEntry(e.slug); }, true));
+      li.appendChild(num); li.appendChild(meta); li.appendChild(acts);
+      shelfListEl.appendChild(li);
+    });
+    var has = shelf.length > 0;
+    shelfEl.classList.toggle('has-entries', has);
+    shelfActionsEl.style.display = has ? 'flex' : 'none';
+    gridWrapEl.style.display = has ? '' : 'none';
+    registerNoteEl.style.display = has ? '' : 'none';
+    shelfToolsEl.style.display = has ? 'flex' : 'none';
+    updateGrid();
+  }
+  function updateGrid(){
+    var start = parseInt(startAtEl.value, 10);
+    if (isNaN(start) || start < 1) start = 1;
+    gridOutputEl.value = shelf.map(function(e, i){
+      return cardFor(e.slug, e.title, e.desc, start + i);
+    }).join('\n');
+    gridCountEl.textContent = shelf.length;
+    gridPluralEl.textContent = shelf.length === 1 ? 'y' : 'ies';
+  }
+
+  function exportShelf(){
+    var url = URL.createObjectURL(new Blob([JSON.stringify(shelf, null, 2)], { type: 'application/json' }));
+    var a = document.createElement('a');
+    a.href = url; a.download = 'ologypedia-textbook.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+  }
+  function importShelf(file){
+    var reader = new FileReader();
+    reader.onload = function(){
+      var incoming;
+      try { incoming = JSON.parse(reader.result); } catch (e) { showSave('That file is not valid JSON.', true); return; }
+      if (!Array.isArray(incoming)){ showSave('That file is not a shelf export.', true); return; }
+      var added = 0;
+      incoming.forEach(function(e){
+        if (!e || !e.slug || !e.html) return;
+        var clean = { slug: e.slug, title: e.title || 'Untitled entry', desc: e.desc || '', html: e.html, savedAt: e.savedAt || Date.now() };
+        var existing = findEntry(clean.slug);
+        if (existing){ shelf[shelf.indexOf(existing)] = clean; } else { shelf.push(clean); }
+        added++;
+      });
+      if (!persistShelf()){ showSave('Import too large for browser storage.', true); return; }
+      renderShelf();
+      showSave('Imported ' + added + ' entr' + (added === 1 ? 'y' : 'ies') + '.', false);
+    };
+    reader.readAsText(file);
+  }
+  function clearShelf(){
+    if (!shelf.length) return;
+    if (!window.confirm('Remove all ' + shelf.length + ' entries from this browser? Downloaded files are not affected.')) return;
+    shelf = [];
+    persistShelf();
+    renderShelf();
+    showSave('Textbook cleared.', false);
+  }
+
+  [topicEl, contextEl, descEl, diagnosisEl].forEach(function(el){
     el.addEventListener('input', buildPrompt);
     el.addEventListener('change', buildPrompt);
   });
@@ -444,9 +660,16 @@
   openTabEl.addEventListener('click', function(){
     if (lastBlobUrl) window.open(lastBlobUrl, '_blank', 'noopener');
   });
+  addShelfEl.addEventListener('click', addCurrentToShelf);
+  startAtEl.addEventListener('input', updateGrid);
+  document.getElementById('export-shelf').addEventListener('click', exportShelf);
+  document.getElementById('import-shelf').addEventListener('click', function(){ importFileEl.click(); });
+  importFileEl.addEventListener('change', function(){ if (importFileEl.files[0]) importShelf(importFileEl.files[0]); importFileEl.value = ''; });
+  document.getElementById('clear-shelf').addEventListener('click', clearShelf);
 
   buildPrompt();
   refreshPreview();
+  renderShelf();
 
   function wireCopy(btnId, sourceEl){
     var btn = document.getElementById(btnId);
@@ -464,7 +687,7 @@
     });
   }
   wireCopy('copy-prompt', promptOut);
-  wireCopy('copy-card', cardOut);
+  wireCopy('copy-grid', gridOutputEl);
 })();
 </script>
 </body>
