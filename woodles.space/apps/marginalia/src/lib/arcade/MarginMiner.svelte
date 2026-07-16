@@ -11,6 +11,18 @@
 	} from './arcadeStats';
 	import { payReward, previewReward } from './arcadeRewards';
 	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
+	import {
+		MARGIN_MINER_CLOCK_UPGRADE_SECONDS,
+		MARGIN_MINER_MAX_REWARD,
+		MARGIN_MINER_RIG_UPGRADES,
+		marginMinerLootPlan,
+		marginMinerRawReward,
+		marginMinerSeconds,
+		marginMinerTarget,
+		marginMinerUnstableCacheValue,
+		type MarginMinerLootKind,
+		type MarginMinerRigUpgrade
+	} from './marginMinerTuning';
 	import { fmt } from '$lib/witch/book.svelte';
 
 	interface Props {
@@ -20,9 +32,10 @@
 	let { onclose, activePet = null }: Props = $props();
 
 	type ClawMode = 'swinging' | 'firing' | 'reeling';
-	type RoundPhase = 'playing' | 'level-clear' | 'game-over';
-	type MineKind = 'small-gold' | 'large-gold' | 'small-rock' | 'large-rock' | 'diamond' | 'mystery-bag';
+	type RoundPhase = 'ready' | 'playing' | 'paused' | 'level-clear' | 'game-over';
+	type MineKind = MarginMinerLootKind;
 	type WeightClass = 'Very Light' | 'Light' | 'Medium' | 'Heavy' | 'Very Heavy' | 'Unknown';
+	type RigUpgrade = MarginMinerRigUpgrade;
 
 	interface MineObject {
 		id: number;
@@ -36,6 +49,7 @@
 		radius: number;
 		collisionRadius: number;
 		spin: number;
+		age: number;
 		captured: boolean;
 	}
 
@@ -50,7 +64,6 @@
 
 	const WIDTH = 800;
 	const HEIGHT = 600;
-	const LEVEL_SECONDS = 60;
 	const UI_HEIGHT = 58;
 	const SURFACE_Y = 128;
 	const ORIGIN_X = WIDTH / 2;
@@ -65,7 +78,6 @@
 	const WEIGHT_MULTIPLIER = 52;
 	const MIN_RETRACT_SPEED = 42;
 	const GAME_ID = 'margin-miner';
-	const MAX_REWARD = 20;
 	const EXTENSION_SECONDS = 12;
 	const EXTENSION_THRESHOLD = 0.6;
 
@@ -127,6 +139,22 @@
 			weightClass: 'Very Light',
 			radius: 14,
 			collisionRadius: 16
+		},
+		'unstable-cache': {
+			name: 'Unstable Cache',
+			value: 800,
+			weight: weights.medium,
+			weightClass: 'Medium',
+			radius: 24,
+			collisionRadius: 25
+		},
+		'anchored-ore': {
+			name: 'Anchored Ore',
+			value: 900,
+			weight: 11.5,
+			weightClass: 'Very Heavy',
+			radius: 31,
+			collisionRadius: 32
 		}
 	};
 
@@ -140,22 +168,24 @@
 	let caughtObject: MineObject | null = null;
 	let objects: MineObject[] = [];
 	let floaters: FloatingText[] = [];
-	let levelEndsAt = 0;
 	let objectSeq = 0;
 	let floaterSeq = 0;
 
-	let phase = $state<RoundPhase>('playing');
+	let phase = $state<RoundPhase>('ready');
 	let clawMode = $state<ClawMode>('swinging');
 	let level = $state(1);
 	let score = $state(0);
-	let targetScore = $state(targetForLevel(1));
-	let remaining = $state(LEVEL_SECONDS);
-	let objectCount = $state(0);
+	let targetScore = $state(marginMinerTarget(1));
+	let remaining = $state(marginMinerSeconds(0));
 	let lastHaul = $state('Click, tap, or press Down to fire.');
 	let awarded = $state(0);
-	let best = $state(loadArcadeRecord(GAME_ID).bestScore);
+	const initialRecord = loadArcadeRecord(GAME_ID);
+	let best = $state(initialRecord.bestScore);
+	let bestLevel = $state(recordNumber(initialRecord.highlights.bestLevel) ?? 0);
+	let fastestClearSeconds = $state(recordNumber(initialRecord.highlights.fastestClearSeconds));
 	let extensions = $state(0);
 	let extensionsUsed = $state(0);
+	let rigUpgrades = $state<Record<RigUpgrade, number>>({ motor: 0, grip: 0, clock: 0 });
 
 	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
 	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
@@ -164,11 +194,12 @@
 
 	// Body reels faster and shrugs off weight; Grace widens the grab and calms the
 	// swing; Mind scans nearby loot; Heart banks near-miss time extensions.
-	const reelBonus = $derived(bodyTier * 36);
+	const reelBonus = $derived(bodyTier * 36 + rigUpgrades.motor * 24);
 	const weightPenalty = $derived(Math.max(18, WEIGHT_MULTIPLIER - bodyTier * 8));
-	const grabRadius = $derived(CLAW_RADIUS + graceTier * 3);
+	const grabRadius = $derived(CLAW_RADIUS + graceTier * 3 + rigUpgrades.grip * 2);
 	const swingSpeed = $derived(Math.max(1, SWING_SPEED - graceTier * 0.12));
 	const scanRadius = $derived(mindTier > 0 ? 64 + mindTier * 34 : 0);
+	const levelSeconds = $derived(marginMinerSeconds(rigUpgrades.clock));
 
 	const scoreText = $derived(formatMoney(score));
 	const targetText = $derived(formatMoney(targetScore));
@@ -176,13 +207,44 @@
 	const targetProgress = $derived(targetScore > 0 ? Math.min(1, score / targetScore) : 0);
 	const rewardPreview = $derived(rewardForLevel(level, true));
 	const stateLabel = $derived.by(() => {
+		if (phase === 'ready') return 'READY';
+		if (phase === 'paused') return 'PAUSED';
 		if (phase === 'level-clear') return 'CLEAR';
 		if (phase === 'game-over') return 'GAME OVER';
 		return clawMode.toUpperCase();
 	});
 	const modeClass = $derived(`mode-${phase === 'playing' ? clawMode : phase}`);
-	const nextTargetText = $derived(formatMoney(targetForLevel(level + 1)));
 	const shortfallText = $derived(formatMoney(Math.max(0, targetScore - score)));
+	const primaryLabel = $derived.by(() => {
+		if (phase === 'ready') return 'start dig';
+		if (phase === 'playing') return 'pause';
+		if (phase === 'paused') return 'resume';
+		return 'new run';
+	});
+	const rigSummary = $derived(
+		`motor ${rigUpgrades.motor} · grip ${rigUpgrades.grip} · clock +${rigUpgrades.clock * MARGIN_MINER_CLOCK_UPGRADE_SECONDS}s`
+	);
+	const fastestClearText = $derived(
+		fastestClearSeconds === null ? '—' : `${fastestClearSeconds.toFixed(1)}s`
+	);
+	const targetHint = $derived.by(() => {
+		if (phase === 'ready') return `You have ${levelSeconds}s. A large gold nugget meets this first target.`;
+		if (phase === 'paused') return `${formatMoney(Math.max(0, targetScore - score))} left when you resume.`;
+		if (score >= targetScore) return 'Target met — finish the reel, then choose a rig upgrade.';
+		return `${formatMoney(Math.max(0, targetScore - score))} still needed.`;
+	});
+	const scanReadout = $derived.by(() => {
+		if (mindTier <= 0 || phase !== 'playing') return 'Mind scan: no nearby readout.';
+		const tip = clawPosition();
+		const nearby = objects
+			.filter(
+				(object) =>
+					!object.captured && Math.hypot(tip.x - object.x, tip.y - object.y) <= scanRadius + object.radius
+			)
+			.slice(0, 3)
+			.map((object) => `${object.name} ${formatMoney(object.value)}${mindTier > 1 ? `, ${object.weightClass}` : ''}`);
+		return nearby.length > 0 ? `Mind scan: ${nearby.join(' · ')}` : 'Mind scan: no loot in range.';
+	});
 	const statEffects = $derived<ArcadeStatEffects>({
 		body: (_value, tier) => (tier > 0 ? `reel +${tier}` : 'standard reel'),
 		mind: (_value, tier) => (tier > 1 ? 'scan value+weight' : tier > 0 ? 'scan value' : 'no scan'),
@@ -192,12 +254,7 @@
 	});
 
 	function rewardForLevel(forLevel: number, cleared: boolean): number {
-		const raw = cleared ? forLevel * 4 + 4 : forLevel * 2;
-		return previewReward(raw, MAX_REWARD);
-	}
-
-	function targetForLevel(value: number): number {
-		return Math.round(650 + (value - 1) * 850 + Math.pow(value - 1, 2) * 180);
+		return previewReward(marginMinerRawReward(forLevel, cleared), MARGIN_MINER_MAX_REWARD);
 	}
 
 	function formatMoney(value: number): string {
@@ -233,6 +290,16 @@
 		return Math.max(MIN_RETRACT_SPEED, BASE_RETRACT_SPEED + reelBonus - object.weight * weightPenalty);
 	}
 
+	function recordNumber(value: unknown): number | null {
+		return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+	}
+
+	function objectValue(object: MineObject): number {
+		return object.kind === 'unstable-cache'
+			? marginMinerUnstableCacheValue(object.age)
+			: object.value;
+	}
+
 	function createMineObject(kind: MineKind): MineObject {
 		const spec =
 			kind === 'mystery-bag'
@@ -258,6 +325,7 @@
 			radius: spec.radius,
 			collisionRadius: spec.collisionRadius,
 			spin: randomBetween(-0.7, 0.7),
+			age: 0,
 			captured: false
 		};
 	}
@@ -273,7 +341,13 @@
 			const x = randomBetween(minX, maxX);
 			const y = randomBetween(minY, maxY);
 			const separated = result.every((other) => {
-				const padding = object.kind === 'large-rock' || other.kind === 'large-rock' ? 15 : 10;
+				const padding =
+					object.kind === 'large-rock' ||
+					object.kind === 'anchored-ore' ||
+					other.kind === 'large-rock' ||
+					other.kind === 'anchored-ore'
+						? 15
+						: 10;
 				return Math.hypot(x - other.x, y - other.y) > object.radius + other.radius + padding;
 			});
 
@@ -292,14 +366,7 @@
 
 	function spawnObjects(forLevel: number): MineObject[] {
 		const result: MineObject[] = [];
-		const plan: Array<[MineKind, number]> = [
-			['small-gold', 6 + forLevel],
-			['large-gold', 2 + Math.ceil(forLevel / 2)],
-			['small-rock', 4 + forLevel],
-			['large-rock', 2 + Math.floor(forLevel / 2)],
-			['diamond', 1 + Math.floor(forLevel / 3)],
-			['mystery-bag', 1 + Math.floor(forLevel / 2)]
-		];
+		const plan = marginMinerLootPlan(forLevel);
 
 		for (const [kind, count] of plan) {
 			for (let i = 0; i < count; i += 1) addPlacedObject(result, kind);
@@ -308,20 +375,22 @@
 		return result.sort((a, b) => a.y - b.y);
 	}
 
-	function startLevel(nextLevel: number) {
+	function stageLevel(nextLevel: number) {
 		level = nextLevel;
-		targetScore = targetForLevel(nextLevel);
-		remaining = LEVEL_SECONDS;
-		phase = 'playing';
+		targetScore = marginMinerTarget(nextLevel);
+		remaining = levelSeconds;
 		clawMode = 'swinging';
 		currentLength = IDLE_LENGTH;
 		caughtObject = null;
 		objects = spawnObjects(nextLevel);
-		objectCount = objects.length;
 		floaters = [];
-		levelEndsAt = performance.now() + LEVEL_SECONDS * 1000;
 		extensions = heartTier;
-		lastHaul = 'Click, tap, or press Down to fire.';
+	}
+
+	function startLevel() {
+		phase = 'playing';
+		lastFrameAt = performance.now();
+		lastHaul = `Level ${level}: ${levelSeconds}s on the clock. Time the release.`;
 	}
 
 	function resetRun() {
@@ -332,21 +401,62 @@
 		floaterSeq = 0;
 		awarded = 0;
 		extensionsUsed = 0;
-		startLevel(1);
+		rigUpgrades = { motor: 0, grip: 0, clock: 0 };
+		stageLevel(1);
+		phase = 'ready';
+		lastHaul = 'Study the loot, then start the dig.';
 	}
 
-	function recordRun(cleared: boolean) {
+	function chooseUpgrade(upgrade: RigUpgrade) {
+		rigUpgrades = { ...rigUpgrades, [upgrade]: rigUpgrades[upgrade] + 1 };
+		stageLevel(level + 1);
+		startLevel();
+	}
+
+	function handlePrimaryAction() {
+		if (phase === 'ready') {
+			startLevel();
+			return;
+		}
+		if (phase === 'playing') {
+			phase = 'paused';
+			lastHaul = 'Clock paused. Resume when you are ready.';
+			return;
+		}
+		if (phase === 'paused') {
+			startLevel();
+			return;
+		}
+		resetRun();
+	}
+
+	function recordRun(cleared: boolean, clearSeconds: number | null = null) {
+		const current = loadArcadeRecord(GAME_ID);
+		const priorBestLevel = recordNumber(current.highlights.bestLevel) ?? 0;
+		const priorFastest = recordNumber(current.highlights.fastestClearSeconds);
+		const nextFastest =
+			cleared && clearSeconds !== null
+				? priorFastest === null
+					? clearSeconds
+					: Math.min(priorFastest, clearSeconds)
+				: priorFastest;
 		const record = recordArcadeRun(GAME_ID, {
 			score,
 			summary: {
 				level,
 				cleared,
 				haul: score,
+				clearSeconds,
 				extensions: extensionsUsed,
 				awarded
-			}
+			},
+			highlights: cleared
+				? { bestLevel: Math.max(priorBestLevel, level), fastestClearSeconds: nextFastest }
+				: undefined
 		});
 		best = record.bestScore;
+		bestLevel = recordNumber(record.highlights.bestLevel) ?? 0;
+		fastestClearSeconds = recordNumber(record.highlights.fastestClearSeconds);
 	}
 
 	function fireClaw() {
@@ -373,12 +483,13 @@
 		if (phase !== 'playing') return;
 
 		if (score >= targetScore) {
+			const clearSeconds = Math.max(0, levelSeconds - remaining);
 			remaining = 0;
 			phase = 'level-clear';
 			awarded = rewardForLevel(level, true);
-			payReward(awarded, MAX_REWARD);
-			recordRun(true);
-			lastHaul = `Level ${level} cleared. +${fmt(awarded)} insight. Next target ${formatMoney(targetForLevel(level + 1))}.`;
+			payReward(awarded, MARGIN_MINER_MAX_REWARD);
+			recordRun(true, clearSeconds);
+			lastHaul = `Level ${level} cleared. Choose one rig upgrade for the next dig.`;
 			return;
 		}
 
@@ -386,7 +497,6 @@
 		if (extensions > 0 && score >= targetScore * EXTENSION_THRESHOLD) {
 			extensions -= 1;
 			extensionsUsed += 1;
-			levelEndsAt = performance.now() + EXTENSION_SECONDS * 1000;
 			remaining = EXTENSION_SECONDS;
 			addFloater(ORIGIN_X, ORIGIN_Y + 44, `+${EXTENSION_SECONDS}s`, 'good');
 			lastHaul = `Heart held the line: ${EXTENSION_SECONDS} more seconds.`;
@@ -396,7 +506,7 @@
 		remaining = 0;
 		phase = 'game-over';
 		awarded = rewardForLevel(level, false);
-		payReward(awarded, MAX_REWARD);
+		payReward(awarded, MARGIN_MINER_MAX_REWARD);
 		recordRun(false);
 		lastHaul = `Short by ${formatMoney(targetScore - score)}.`;
 	}
@@ -405,7 +515,7 @@
 		caughtObject = object;
 		if (caughtObject) {
 			caughtObject.captured = true;
-			lastHaul = `${caughtObject.name}: ${formatMoney(caughtObject.value)} / ${caughtObject.weightClass}.`;
+			lastHaul = `${caughtObject.name}: ${formatMoney(objectValue(caughtObject))} / ${caughtObject.weightClass}.`;
 		} else {
 			lastHaul = 'Nothing but air.';
 		}
@@ -416,15 +526,16 @@
 		currentLength = IDLE_LENGTH;
 
 		if (caughtObject) {
-			score += caughtObject.value;
-			addFloater(ORIGIN_X, ORIGIN_Y + 16, `+${formatMoney(caughtObject.value)}`, caughtObject.value <= 20 ? 'bad' : 'good');
+			const haulValue = objectValue(caughtObject);
+			score += haulValue;
+			addFloater(ORIGIN_X, ORIGIN_Y + 16, `+${formatMoney(haulValue)}`, haulValue <= 20 ? 'bad' : 'good');
 			objects = objects.filter((object) => object.id !== caughtObject?.id);
-			objectCount = objects.length;
-			lastHaul = `${caughtObject.name} banked for ${formatMoney(caughtObject.value)}.`;
+			lastHaul = `${caughtObject.name} banked for ${formatMoney(haulValue)}.`;
 			caughtObject = null;
 		}
 
 		clawMode = 'swinging';
+		if (score >= targetScore) finishLevel();
 	}
 
 	function addFloater(x: number, y: number, text: string, tone: FloatingText['tone']) {
@@ -437,15 +548,25 @@
 			.filter((floater) => floater.age < 1.1);
 	}
 
-	function updateGame(dt: number, timestamp: number) {
+	function updateObjects(dt: number) {
+		// A cache stops decaying once the claw has it, so its displayed value is the haul value.
+		objects = objects.map((object) =>
+			object.kind === 'unstable-cache' && !object.captured
+				? { ...object, age: object.age + dt }
+				: object
+		);
+	}
+
+	function updateGame(dt: number) {
 		updateFloaters(dt);
 		if (phase !== 'playing') return;
 
-		remaining = Math.max(0, (levelEndsAt - timestamp) / 1000);
+		remaining = Math.max(0, remaining - dt);
 		if (remaining <= 0) {
 			finishLevel();
 			return;
 		}
+		updateObjects(dt);
 
 		if (clawMode === 'swinging') {
 			swingTime += dt;
@@ -528,8 +649,8 @@
 
 			const label =
 				mindTier > 1
-					? `${formatMoney(object.value)} · ${object.weightClass}`
-					: formatMoney(object.value);
+					? `${formatMoney(objectValue(object))} · ${object.weightClass}`
+					: formatMoney(objectValue(object));
 			const width = ctx.measureText(label).width + 12;
 			const tagY = object.y - object.radius - 13;
 
@@ -730,6 +851,42 @@
 			ctx.moveTo(0, -object.radius + 3);
 			ctx.lineTo(0, object.radius - 4);
 			ctx.stroke();
+		} else if (object.kind === 'unstable-cache') {
+			const pulse = 0.56 + Math.sin(object.age * 7) * 0.22;
+			ctx.fillStyle = `rgba(211, 54, 130, ${pulse})`;
+			ctx.strokeStyle = '#6c1f4a';
+			ctx.lineWidth = 2;
+			ctx.fillRect(-object.radius * 0.76, -object.radius * 0.62, object.radius * 1.52, object.radius * 1.24);
+			ctx.strokeRect(-object.radius * 0.76, -object.radius * 0.62, object.radius * 1.52, object.radius * 1.24);
+			ctx.fillStyle = '#fdf6e3';
+			ctx.fillRect(-object.radius * 0.44, -object.radius * 0.28, object.radius * 0.88, object.radius * 0.12);
+			ctx.font = '700 17px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			ctx.fillText('!', 0, object.radius * 0.24);
+		} else if (object.kind === 'anchored-ore') {
+			ctx.fillStyle = '#586e75';
+			ctx.strokeStyle = '#073642';
+			ctx.lineWidth = 3;
+			ctx.beginPath();
+			for (let i = 0; i < 7; i += 1) {
+				const angle = (i / 7) * Math.PI * 2;
+				const radius = object.radius * (0.78 + (i % 2) * 0.14);
+				if (i === 0) ctx.moveTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+				else ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+			}
+			ctx.closePath();
+			ctx.fill();
+			ctx.stroke();
+			ctx.strokeStyle = '#fdf6e3';
+			ctx.lineWidth = 2;
+			ctx.beginPath();
+			ctx.moveTo(0, -object.radius * 0.58);
+			ctx.lineTo(0, object.radius * 0.38);
+			ctx.moveTo(-object.radius * 0.48, object.radius * 0.08);
+			ctx.lineTo(0, object.radius * 0.52);
+			ctx.lineTo(object.radius * 0.48, object.radius * 0.08);
+			ctx.stroke();
 		} else {
 			ctx.fillStyle = '#d33682';
 			ctx.strokeStyle = '#073642';
@@ -769,6 +926,22 @@
 	}
 
 	function drawCanvasEndState(ctx: CanvasRenderingContext2D) {
+		const title =
+			phase === 'ready'
+				? 'READY TO DIG'
+				: phase === 'paused'
+					? 'CLOCK PAUSED'
+					: phase === 'level-clear'
+						? 'LEVEL CLEAR'
+						: 'CAME UP SHORT';
+		const subtitle =
+			phase === 'ready'
+				? `${levelSeconds} seconds. Reach ${targetText}.`
+				: phase === 'paused'
+					? `${timerText} seconds remain.`
+					: phase === 'level-clear'
+						? `Score ${scoreText}. Choose a rig upgrade for level ${level + 1}.`
+						: `Score ${scoreText}. Short by ${shortfallText}.`;
 		ctx.save();
 		ctx.fillStyle = 'rgba(7, 54, 66, 0.76)';
 		ctx.fillRect(0, UI_HEIGHT, WIDTH, HEIGHT - UI_HEIGHT);
@@ -776,15 +949,9 @@
 		ctx.textBaseline = 'middle';
 		ctx.fillStyle = '#fdf6e3';
 		ctx.font = '700 52px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-		ctx.fillText(phase === 'level-clear' ? 'LEVEL CLEAR' : 'CAME UP SHORT', WIDTH / 2, 276);
+		ctx.fillText(title, WIDTH / 2, 276);
 		ctx.font = '22px ui-serif, Georgia, serif';
-		ctx.fillText(
-			phase === 'level-clear'
-				? `Score ${scoreText}. Next target ${nextTargetText}.`
-				: `Score ${scoreText}. Short by ${shortfallText}.`,
-			WIDTH / 2,
-			324
-		);
+		ctx.fillText(subtitle, WIDTH / 2, 324);
 		ctx.restore();
 	}
 
@@ -792,13 +959,17 @@
 		if (!lastFrameAt) lastFrameAt = timestamp;
 		const dt = Math.min(0.05, (timestamp - lastFrameAt) / 1000);
 		lastFrameAt = timestamp;
-		updateGame(dt, timestamp);
+		updateGame(dt);
 		draw();
 		rafId = requestAnimationFrame(loop);
 	}
 
 	onMount(() => {
 		context = canvasEl.getContext('2d');
+		const record = loadArcadeRecord(GAME_ID);
+		best = record.bestScore;
+		bestLevel = recordNumber(record.highlights.bestLevel) ?? 0;
+		fastestClearSeconds = recordNumber(record.highlights.fastestClearSeconds);
 		resetRun();
 		window.addEventListener('keydown', handleKeydown);
 		rafId = requestAnimationFrame(loop);
@@ -813,7 +984,7 @@
 <div class="miner-shell">
 	<ArcadeHud
 		title="Margin Miner"
-		hint="pendulum claw, hard weights, sixty seconds"
+		hint="pendulum claw, hard weights, fifteen seconds"
 		maxWidth="800px"
 		scores={[
 			{ label: 'score', value: scoreText },
@@ -826,8 +997,8 @@
 			},
 			{ label: 'state', value: stateLabel }
 		]}
-		startLabel={phase === 'level-clear' ? 'next level' : 'new game'}
-		onstart={() => (phase === 'level-clear' ? startLevel(level + 1) : resetRun())}
+		startLabel={primaryLabel}
+		onstart={handlePrimaryAction}
 		{onclose}
 	/>
 
@@ -835,12 +1006,31 @@
 
 	<div class="status-row" aria-label="Margin Miner status">
 		<span>level <b>{level}</b></span>
-		<span>best <b>{fmt(best)}</b></span>
+		<span>best haul <b>{fmt(best)}</b></span>
 		<span class:lit={extensions > 0}>stretch <b>{extensions}</b></span>
-		<span class={modeClass}>{lastHaul}</span>
+		<span class={modeClass} aria-live="polite">{lastHaul}</span>
+	</div>
+	<div class="mastery-row" aria-label="Margin Miner mastery records">
+		<span>best level <b>{bestLevel || '—'}</b></span>
+		<span>fastest clear <b>{fastestClearText}</b></span>
 	</div>
 
 	<ArcadeProgress value={targetProgress} label="haul toward target" tone="yellow" maxWidth="800px" />
+	<p class="target-hint">{targetHint}</p>
+	<p class="rig-summary" aria-label="run-scoped rig upgrades">{rigSummary}</p>
+
+	<div class="loot-guide" aria-label="loot value and weight guide">
+		<span><b>diamond</b> $600 · very light</span>
+		<span><b>large gold</b> $500 · medium</span>
+		<span><b>small gold</b> $50 · light</span>
+		<span><b>rocks</b> $11–20 · heavy</span>
+		<span><b>unstable cache</b> $800 → $200 · decays</span>
+		<span><b>anchored ore</b> $900 · very heavy</span>
+		<span><b>mystery</b> unknown</span>
+	</div>
+	{#if mindTier > 0}
+		<p class="scan-readout">{scanReadout}</p>
+	{/if}
 
 	<div
 		class="canvas-frame"
@@ -854,25 +1044,56 @@
 		>
 		{#if phase !== 'playing'}
 			<div class="game-overlay">
-				<p class="overlay-title">{phase === 'level-clear' ? 'level clear' : 'came up short'}</p>
-				<p class="overlay-sub">
-					{phase === 'level-clear'
-						? `Score ${scoreText}. +${fmt(awarded)} insight. Next target ${nextTargetText}.`
-						: `Score ${scoreText}. Short by ${shortfallText}. +${fmt(awarded)} insight.`}
+				<p class="overlay-title">
+					{phase === 'ready'
+						? 'ready to dig'
+						: phase === 'paused'
+							? 'clock paused'
+							: phase === 'level-clear'
+								? 'level clear'
+								: 'came up short'}
 				</p>
-				<p class="overlay-meta">
-					best haul {formatMoney(best)}{#if extensionsUsed > 0} · {extensionsUsed} stretch used{/if}
+				<p class="overlay-sub">
+					{phase === 'ready'
+						? `You have ${levelSeconds} seconds to reach ${targetText}. Large gold or a diamond starts you strong.`
+						: phase === 'paused'
+							? `${timerText} seconds remain. The claw and clock will wait.`
+							: phase === 'level-clear'
+								? `Score ${scoreText}. +${fmt(awarded)} insight. Choose one rig upgrade for level ${level + 1}.`
+								: `Score ${scoreText}. Short by ${shortfallText}. +${fmt(awarded)} insight.`}
 				</p>
 				{#if phase === 'level-clear'}
-					<button onclick={() => startLevel(level + 1)}>next level</button>
+					<div class="upgrade-grid" aria-label="choose one rig upgrade">
+						{#each MARGIN_MINER_RIG_UPGRADES as upgrade (upgrade.id)}
+							<button class="upgrade-choice" onclick={() => chooseUpgrade(upgrade.id)}>
+								<b>{upgrade.title}</b>
+								<span>{upgrade.description}</span>
+							</button>
+						{/each}
+					</div>
 				{:else}
-					<button onclick={resetRun}>try again</button>
+					<p class="overlay-meta">
+						best haul {formatMoney(best)}{#if extensionsUsed > 0} · {extensionsUsed} stretch used{/if}
+					</p>
+					<button onclick={phase === 'ready' || phase === 'paused' ? startLevel : resetRun}>
+						{phase === 'ready' ? 'start dig' : phase === 'paused' ? 'resume' : 'try again'}
+					</button>
 				{/if}
 			</div>
 		{/if}
 	</div>
 
-	<p class="control-hint">
+	<button
+		class="drop-control"
+		onclick={fireClaw}
+		disabled={phase !== 'playing' || clawMode !== 'swinging'}
+		aria-describedby="miner-controls"
+		aria-keyshortcuts="ArrowDown Space Enter"
+	>
+		drop claw
+	</button>
+
+	<p class="control-hint" id="miner-controls">
 		Click, tap, Down, Space, or Enter drops the claw. The claw swings on its own —
 		time the release.
 	</p>
@@ -901,6 +1122,53 @@
 		font-style: italic;
 		font-size: 0.8rem;
 		color: var(--sol-base1);
+	}
+
+	.target-hint,
+	.rig-summary,
+	.scan-readout {
+		width: min(800px, calc(100vw - 3rem));
+		margin: -0.35rem 0 0;
+		text-align: center;
+		font-family: var(--font-body);
+		font-size: 0.78rem;
+		color: var(--sol-base1);
+	}
+
+	.rig-summary {
+		font-family: var(--font-ui);
+		font-size: 0.58rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--sol-base0);
+	}
+
+	.scan-readout {
+		color: var(--sol-blue);
+	}
+
+	.loot-guide {
+		width: min(800px, calc(100vw - 3rem));
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.25rem 0.5rem;
+		font-family: var(--font-ui);
+		font-size: 0.56rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--sol-base1);
+	}
+
+	.loot-guide span {
+		padding: 0.2rem 0.35rem;
+		border: 1px solid var(--sol-base2);
+		border-radius: 3px;
+		background: rgba(238, 232, 213, 0.32);
+	}
+
+	.loot-guide b {
+		color: var(--sol-base01);
 	}
 
 	.overlay-meta {
@@ -991,6 +1259,11 @@
 		cursor: default;
 	}
 
+	.drop-control:focus-visible {
+		outline: 3px solid var(--sol-yellow);
+		outline-offset: 3px;
+	}
+
 	canvas {
 		width: 100% !important;
 		height: 100% !important;
@@ -1040,8 +1313,85 @@
 		padding: 0.34rem 0.72rem;
 	}
 
+	.mastery-row {
+		width: min(800px, calc(100vw - 3rem));
+		display: flex;
+		justify-content: center;
+		gap: 0.4rem;
+	}
+
+	.mastery-row span {
+		padding: 0.26rem 0.5rem;
+		border: 1px solid var(--sol-base2);
+		border-radius: 3px;
+		background: rgba(238, 232, 213, 0.32);
+		font-family: var(--font-ui);
+		font-size: 0.56rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--sol-base1);
+	}
+
+	.mastery-row b {
+		font-family: var(--font-counter);
+		font-size: 0.9rem;
+		font-weight: 400;
+		letter-spacing: 0;
+		color: var(--sol-base01);
+	}
+
+	.upgrade-grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0.5rem;
+		width: min(620px, 100%);
+	}
+
+	.game-overlay .upgrade-choice {
+		display: flex;
+		flex-direction: column;
+		gap: 0.24rem;
+		align-items: flex-start;
+		text-align: left;
+		padding: 0.6rem;
+	}
+
+	.upgrade-choice b {
+		font-family: var(--font-ui);
+		font-size: 0.64rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+	}
+
+	.upgrade-choice span {
+		font-family: var(--font-body);
+		font-size: 0.74rem;
+		font-style: italic;
+		color: rgba(253, 246, 227, 0.8);
+	}
+
 	.game-overlay button:hover {
 		background: rgba(253, 246, 227, 0.32);
+	}
+
+	.drop-control {
+		min-width: min(18rem, calc(100vw - 3rem));
+		min-height: 3rem;
+		border: 1px solid var(--sol-base1);
+		border-radius: 4px;
+		background: var(--sol-yellow);
+		color: var(--sol-base03);
+		font-family: var(--font-ui);
+		font-size: 0.76rem;
+		font-weight: 700;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		cursor: pointer;
+	}
+
+	.drop-control:disabled {
+		cursor: not-allowed;
+		opacity: 0.45;
 	}
 
 	@media (max-width: 740px) {
@@ -1052,6 +1402,15 @@
 		.status-row span:last-child {
 			grid-column: 1 / -1;
 			justify-content: center;
+		}
+
+		.upgrade-grid {
+			grid-template-columns: 1fr;
+			max-width: 290px;
+		}
+
+		.control-hint {
+			font-size: 0.76rem;
 		}
 	}
 </style>

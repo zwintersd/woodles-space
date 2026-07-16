@@ -201,11 +201,11 @@ Current progress: A claw-machine game with a pendulum, object value, object
 weight, reeling speed, level targets, and timed rounds. It is one of the best
 pure timing/estimation loops in the cabinet.
 
-Next expansions:
-- Add insight payout on level clear or game over.
-- Add a small shop between levels: stronger reel, wider claw, one scan pulse.
-- Add object variety that changes timing, not only value.
-- Add a visible "best level" and "best haul."
+Post-release backlog:
+- Add new loot only after repeat-play evidence shows which current timing choice
+  needs more variation.
+- Consider a run-end recap only if the compact mastery record stops answering
+  what players want to improve.
 
 Resolved in Week 7:
 - It now pays insight on level clear and game over through `arcadeRewards`
@@ -219,10 +219,23 @@ Resolved in Week 9:
   bar, and its end-state copy reads "came up short" instead of a flat "game
   over" to match the rest of the cabinet's tone.
 
+Resolved in Margin Miner follow-through:
+- The opening round is a deliberate 15 seconds; clockwork spool upgrades add
+  five seconds to later levels rather than making the first dig slow.
+- Between-level choices are now motor, claw spring, or clockwork spool.
+- Level 2 introduces two readable timing tradeoffs: a decaying unstable cache
+  and very-heavy anchored ore.
+- Best haul, best level, and fastest clear persist locally. A level ends as
+  soon as its target haul is banked, so fastest clear is a real record.
+- A dedicated "drop claw" button keeps the same action available to touch,
+  pointer, and keyboard players.
+- Target progression and the capped reward curve are covered by focused tests.
+
 Rough edges:
-- The canvas still has no pointer-free aiming; firing is keyboard-accessible but
-  timing still relies on watching the swing.
-- Level difficulty may need tuning now that payouts exist.
+- The game still depends on visual swing timing by design; the button makes the
+  action accessible, not automatic.
+- Revisit target growth only after real run data, rather than pre-emptively
+  weakening the 15-second opening loop.
 
 Stat pitch (now implemented):
 - Body: faster reeling for heavy objects and slightly stronger claw grip.

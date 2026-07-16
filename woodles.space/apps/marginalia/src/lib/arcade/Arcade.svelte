@@ -72,7 +72,7 @@
 			id: 'margin-miner',
 			icon: '$',
 			title: 'Margin Miner',
-			tagline: 'Swing the claw, snag treasure, and beat the target before the minute runs out.',
+			tagline: 'Swing the claw, snag treasure, and beat the target before time runs out.',
 			tags: ['claw', 'timed'],
 			status: 'play'
 		},
