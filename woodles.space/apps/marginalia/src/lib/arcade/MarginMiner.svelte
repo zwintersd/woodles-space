@@ -13,10 +13,13 @@
 	import { loadArcadeRecord, recordArcadeRun } from './arcadeRecords';
 	import {
 		MARGIN_MINER_CLOCK_UPGRADE_SECONDS,
+		MARGIN_MINER_MAX_REWARD,
 		MARGIN_MINER_RIG_UPGRADES,
 		marginMinerLootPlan,
+		marginMinerRawReward,
 		marginMinerSeconds,
 		marginMinerTarget,
+		marginMinerUnstableCacheValue,
 		type MarginMinerLootKind,
 		type MarginMinerRigUpgrade
 	} from './marginMinerTuning';
@@ -46,6 +49,7 @@
 		radius: number;
 		collisionRadius: number;
 		spin: number;
+		age: number;
 		captured: boolean;
 	}
 
@@ -74,7 +78,6 @@
 	const WEIGHT_MULTIPLIER = 52;
 	const MIN_RETRACT_SPEED = 42;
 	const GAME_ID = 'margin-miner';
-	const MAX_REWARD = 20;
 	const EXTENSION_SECONDS = 12;
 	const EXTENSION_THRESHOLD = 0.6;
 
@@ -136,6 +139,22 @@
 			weightClass: 'Very Light',
 			radius: 14,
 			collisionRadius: 16
+		},
+		'unstable-cache': {
+			name: 'Unstable Cache',
+			value: 800,
+			weight: weights.medium,
+			weightClass: 'Medium',
+			radius: 24,
+			collisionRadius: 25
+		},
+		'anchored-ore': {
+			name: 'Anchored Ore',
+			value: 900,
+			weight: 11.5,
+			weightClass: 'Very Heavy',
+			radius: 31,
+			collisionRadius: 32
 		}
 	};
 
@@ -160,7 +179,10 @@
 	let remaining = $state(marginMinerSeconds(0));
 	let lastHaul = $state('Click, tap, or press Down to fire.');
 	let awarded = $state(0);
-	let best = $state(loadArcadeRecord(GAME_ID).bestScore);
+	const initialRecord = loadArcadeRecord(GAME_ID);
+	let best = $state(initialRecord.bestScore);
+	let bestLevel = $state(recordNumber(initialRecord.highlights.bestLevel) ?? 0);
+	let fastestClearSeconds = $state(recordNumber(initialRecord.highlights.fastestClearSeconds));
 	let extensions = $state(0);
 	let extensionsUsed = $state(0);
 	let rigUpgrades = $state<Record<RigUpgrade, number>>({ motor: 0, grip: 0, clock: 0 });
@@ -202,6 +224,9 @@
 	const rigSummary = $derived(
 		`motor ${rigUpgrades.motor} · grip ${rigUpgrades.grip} · clock +${rigUpgrades.clock * MARGIN_MINER_CLOCK_UPGRADE_SECONDS}s`
 	);
+	const fastestClearText = $derived(
+		fastestClearSeconds === null ? '—' : `${fastestClearSeconds.toFixed(1)}s`
+	);
 	const targetHint = $derived.by(() => {
 		if (phase === 'ready') return `You have ${levelSeconds}s. A large gold nugget meets this first target.`;
 		if (phase === 'paused') return `${formatMoney(Math.max(0, targetScore - score))} left when you resume.`;
@@ -229,8 +254,7 @@
 	});
 
 	function rewardForLevel(forLevel: number, cleared: boolean): number {
-		const raw = cleared ? forLevel * 4 + 4 : forLevel * 2;
-		return previewReward(raw, MAX_REWARD);
+		return previewReward(marginMinerRawReward(forLevel, cleared), MARGIN_MINER_MAX_REWARD);
 	}
 
 	function formatMoney(value: number): string {
@@ -266,6 +290,16 @@
 		return Math.max(MIN_RETRACT_SPEED, BASE_RETRACT_SPEED + reelBonus - object.weight * weightPenalty);
 	}
 
+	function recordNumber(value: unknown): number | null {
+		return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+	}
+
+	function objectValue(object: MineObject): number {
+		return object.kind === 'unstable-cache'
+			? marginMinerUnstableCacheValue(object.age)
+			: object.value;
+	}
+
 	function createMineObject(kind: MineKind): MineObject {
 		const spec =
 			kind === 'mystery-bag'
@@ -291,6 +325,7 @@
 			radius: spec.radius,
 			collisionRadius: spec.collisionRadius,
 			spin: randomBetween(-0.7, 0.7),
+			age: 0,
 			captured: false
 		};
 	}
@@ -306,7 +341,13 @@
 			const x = randomBetween(minX, maxX);
 			const y = randomBetween(minY, maxY);
 			const separated = result.every((other) => {
-				const padding = object.kind === 'large-rock' || other.kind === 'large-rock' ? 15 : 10;
+				const padding =
+					object.kind === 'large-rock' ||
+					object.kind === 'anchored-ore' ||
+					other.kind === 'large-rock' ||
+					other.kind === 'anchored-ore'
+						? 15
+						: 10;
 				return Math.hypot(x - other.x, y - other.y) > object.radius + other.radius + padding;
 			});
 
@@ -389,18 +430,33 @@
 		resetRun();
 	}
 
-	function recordRun(cleared: boolean) {
+	function recordRun(cleared: boolean, clearSeconds: number | null = null) {
+		const current = loadArcadeRecord(GAME_ID);
+		const priorBestLevel = recordNumber(current.highlights.bestLevel) ?? 0;
+		const priorFastest = recordNumber(current.highlights.fastestClearSeconds);
+		const nextFastest =
+			cleared && clearSeconds !== null
+				? priorFastest === null
+					? clearSeconds
+					: Math.min(priorFastest, clearSeconds)
+				: priorFastest;
 		const record = recordArcadeRun(GAME_ID, {
 			score,
 			summary: {
 				level,
 				cleared,
 				haul: score,
+				clearSeconds,
 				extensions: extensionsUsed,
 				awarded
-			}
+			},
+			highlights: cleared
+				? { bestLevel: Math.max(priorBestLevel, level), fastestClearSeconds: nextFastest }
+				: undefined
 		});
 		best = record.bestScore;
+		bestLevel = recordNumber(record.highlights.bestLevel) ?? 0;
+		fastestClearSeconds = recordNumber(record.highlights.fastestClearSeconds);
 	}
 
 	function fireClaw() {
@@ -427,11 +483,12 @@
 		if (phase !== 'playing') return;
 
 		if (score >= targetScore) {
+			const clearSeconds = Math.max(0, levelSeconds - remaining);
 			remaining = 0;
 			phase = 'level-clear';
 			awarded = rewardForLevel(level, true);
-			payReward(awarded, MAX_REWARD);
-			recordRun(true);
+			payReward(awarded, MARGIN_MINER_MAX_REWARD);
+			recordRun(true, clearSeconds);
 			lastHaul = `Level ${level} cleared. Choose one rig upgrade for the next dig.`;
 			return;
 		}
@@ -449,7 +506,7 @@
 		remaining = 0;
 		phase = 'game-over';
 		awarded = rewardForLevel(level, false);
-		payReward(awarded, MAX_REWARD);
+		payReward(awarded, MARGIN_MINER_MAX_REWARD);
 		recordRun(false);
 		lastHaul = `Short by ${formatMoney(targetScore - score)}.`;
 	}
@@ -458,7 +515,7 @@
 		caughtObject = object;
 		if (caughtObject) {
 			caughtObject.captured = true;
-			lastHaul = `${caughtObject.name}: ${formatMoney(caughtObject.value)} / ${caughtObject.weightClass}.`;
+			lastHaul = `${caughtObject.name}: ${formatMoney(objectValue(caughtObject))} / ${caughtObject.weightClass}.`;
 		} else {
 			lastHaul = 'Nothing but air.';
 		}
@@ -469,14 +526,16 @@
 		currentLength = IDLE_LENGTH;
 
 		if (caughtObject) {
-			score += caughtObject.value;
-			addFloater(ORIGIN_X, ORIGIN_Y + 16, `+${formatMoney(caughtObject.value)}`, caughtObject.value <= 20 ? 'bad' : 'good');
+			const haulValue = objectValue(caughtObject);
+			score += haulValue;
+			addFloater(ORIGIN_X, ORIGIN_Y + 16, `+${formatMoney(haulValue)}`, haulValue <= 20 ? 'bad' : 'good');
 			objects = objects.filter((object) => object.id !== caughtObject?.id);
-			lastHaul = `${caughtObject.name} banked for ${formatMoney(caughtObject.value)}.`;
+			lastHaul = `${caughtObject.name} banked for ${formatMoney(haulValue)}.`;
 			caughtObject = null;
 		}
 
 		clawMode = 'swinging';
+		if (score >= targetScore) finishLevel();
 	}
 
 	function addFloater(x: number, y: number, text: string, tone: FloatingText['tone']) {
@@ -489,6 +548,15 @@
 			.filter((floater) => floater.age < 1.1);
 	}
 
+	function updateObjects(dt: number) {
+		// A cache stops decaying once the claw has it, so its displayed value is the haul value.
+		objects = objects.map((object) =>
+			object.kind === 'unstable-cache' && !object.captured
+				? { ...object, age: object.age + dt }
+				: object
+		);
+	}
+
 	function updateGame(dt: number) {
 		updateFloaters(dt);
 		if (phase !== 'playing') return;
@@ -498,6 +566,7 @@
 			finishLevel();
 			return;
 		}
+		updateObjects(dt);
 
 		if (clawMode === 'swinging') {
 			swingTime += dt;
@@ -580,8 +649,8 @@
 
 			const label =
 				mindTier > 1
-					? `${formatMoney(object.value)} · ${object.weightClass}`
-					: formatMoney(object.value);
+					? `${formatMoney(objectValue(object))} · ${object.weightClass}`
+					: formatMoney(objectValue(object));
 			const width = ctx.measureText(label).width + 12;
 			const tagY = object.y - object.radius - 13;
 
@@ -782,6 +851,42 @@
 			ctx.moveTo(0, -object.radius + 3);
 			ctx.lineTo(0, object.radius - 4);
 			ctx.stroke();
+		} else if (object.kind === 'unstable-cache') {
+			const pulse = 0.56 + Math.sin(object.age * 7) * 0.22;
+			ctx.fillStyle = `rgba(211, 54, 130, ${pulse})`;
+			ctx.strokeStyle = '#6c1f4a';
+			ctx.lineWidth = 2;
+			ctx.fillRect(-object.radius * 0.76, -object.radius * 0.62, object.radius * 1.52, object.radius * 1.24);
+			ctx.strokeRect(-object.radius * 0.76, -object.radius * 0.62, object.radius * 1.52, object.radius * 1.24);
+			ctx.fillStyle = '#fdf6e3';
+			ctx.fillRect(-object.radius * 0.44, -object.radius * 0.28, object.radius * 0.88, object.radius * 0.12);
+			ctx.font = '700 17px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			ctx.fillText('!', 0, object.radius * 0.24);
+		} else if (object.kind === 'anchored-ore') {
+			ctx.fillStyle = '#586e75';
+			ctx.strokeStyle = '#073642';
+			ctx.lineWidth = 3;
+			ctx.beginPath();
+			for (let i = 0; i < 7; i += 1) {
+				const angle = (i / 7) * Math.PI * 2;
+				const radius = object.radius * (0.78 + (i % 2) * 0.14);
+				if (i === 0) ctx.moveTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+				else ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+			}
+			ctx.closePath();
+			ctx.fill();
+			ctx.stroke();
+			ctx.strokeStyle = '#fdf6e3';
+			ctx.lineWidth = 2;
+			ctx.beginPath();
+			ctx.moveTo(0, -object.radius * 0.58);
+			ctx.lineTo(0, object.radius * 0.38);
+			ctx.moveTo(-object.radius * 0.48, object.radius * 0.08);
+			ctx.lineTo(0, object.radius * 0.52);
+			ctx.lineTo(object.radius * 0.48, object.radius * 0.08);
+			ctx.stroke();
 		} else {
 			ctx.fillStyle = '#d33682';
 			ctx.strokeStyle = '#073642';
@@ -861,6 +966,10 @@
 
 	onMount(() => {
 		context = canvasEl.getContext('2d');
+		const record = loadArcadeRecord(GAME_ID);
+		best = record.bestScore;
+		bestLevel = recordNumber(record.highlights.bestLevel) ?? 0;
+		fastestClearSeconds = recordNumber(record.highlights.fastestClearSeconds);
 		resetRun();
 		window.addEventListener('keydown', handleKeydown);
 		rafId = requestAnimationFrame(loop);
@@ -897,9 +1006,13 @@
 
 	<div class="status-row" aria-label="Margin Miner status">
 		<span>level <b>{level}</b></span>
-		<span>best <b>{fmt(best)}</b></span>
+		<span>best haul <b>{fmt(best)}</b></span>
 		<span class:lit={extensions > 0}>stretch <b>{extensions}</b></span>
 		<span class={modeClass} aria-live="polite">{lastHaul}</span>
+	</div>
+	<div class="mastery-row" aria-label="Margin Miner mastery records">
+		<span>best level <b>{bestLevel || '—'}</b></span>
+		<span>fastest clear <b>{fastestClearText}</b></span>
 	</div>
 
 	<ArcadeProgress value={targetProgress} label="haul toward target" tone="yellow" maxWidth="800px" />
@@ -911,6 +1024,8 @@
 		<span><b>large gold</b> $500 · medium</span>
 		<span><b>small gold</b> $50 · light</span>
 		<span><b>rocks</b> $11–20 · heavy</span>
+		<span><b>unstable cache</b> $800 → $200 · decays</span>
+		<span><b>anchored ore</b> $900 · very heavy</span>
 		<span><b>mystery</b> unknown</span>
 	</div>
 	{#if mindTier > 0}
@@ -968,7 +1083,17 @@
 		{/if}
 	</div>
 
-	<p class="control-hint">
+	<button
+		class="drop-control"
+		onclick={fireClaw}
+		disabled={phase !== 'playing' || clawMode !== 'swinging'}
+		aria-describedby="miner-controls"
+		aria-keyshortcuts="ArrowDown Space Enter"
+	>
+		drop claw
+	</button>
+
+	<p class="control-hint" id="miner-controls">
 		Click, tap, Down, Space, or Enter drops the claw. The claw swings on its own —
 		time the release.
 	</p>
@@ -1134,6 +1259,11 @@
 		cursor: default;
 	}
 
+	.drop-control:focus-visible {
+		outline: 3px solid var(--sol-yellow);
+		outline-offset: 3px;
+	}
+
 	canvas {
 		width: 100% !important;
 		height: 100% !important;
@@ -1183,6 +1313,33 @@
 		padding: 0.34rem 0.72rem;
 	}
 
+	.mastery-row {
+		width: min(800px, calc(100vw - 3rem));
+		display: flex;
+		justify-content: center;
+		gap: 0.4rem;
+	}
+
+	.mastery-row span {
+		padding: 0.26rem 0.5rem;
+		border: 1px solid var(--sol-base2);
+		border-radius: 3px;
+		background: rgba(238, 232, 213, 0.32);
+		font-family: var(--font-ui);
+		font-size: 0.56rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--sol-base1);
+	}
+
+	.mastery-row b {
+		font-family: var(--font-counter);
+		font-size: 0.9rem;
+		font-weight: 400;
+		letter-spacing: 0;
+		color: var(--sol-base01);
+	}
+
 	.upgrade-grid {
 		display: grid;
 		grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1217,6 +1374,26 @@
 		background: rgba(253, 246, 227, 0.32);
 	}
 
+	.drop-control {
+		min-width: min(18rem, calc(100vw - 3rem));
+		min-height: 3rem;
+		border: 1px solid var(--sol-base1);
+		border-radius: 4px;
+		background: var(--sol-yellow);
+		color: var(--sol-base03);
+		font-family: var(--font-ui);
+		font-size: 0.76rem;
+		font-weight: 700;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		cursor: pointer;
+	}
+
+	.drop-control:disabled {
+		cursor: not-allowed;
+		opacity: 0.45;
+	}
+
 	@media (max-width: 740px) {
 		.status-row {
 			grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1230,6 +1407,10 @@
 		.upgrade-grid {
 			grid-template-columns: 1fr;
 			max-width: 290px;
+		}
+
+		.control-hint {
+			font-size: 0.76rem;
 		}
 	}
 </style>

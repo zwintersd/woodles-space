@@ -5,6 +5,7 @@ export interface ArcadeGameRecord {
 	v: 1;
 	gameId: string;
 	bestScore: number;
+	highlights: ArcadeRunSummary;
 	plays: number;
 	recentRuns: ArcadeRunSummary[];
 	updatedAt: string | null;
@@ -13,6 +14,7 @@ export interface ArcadeGameRecord {
 export interface ArcadeRunResult {
 	score?: number;
 	summary?: ArcadeRunSummary;
+	highlights?: ArcadeRunSummary;
 	endedAt?: string;
 }
 
@@ -28,6 +30,7 @@ function emptyRecord(gameId: string): ArcadeGameRecord {
 		v: RECORD_VERSION,
 		gameId,
 		bestScore: 0,
+		highlights: {},
 		plays: 0,
 		recentRuns: [],
 		updatedAt: null
@@ -43,6 +46,7 @@ function normalizeRecord(gameId: string, parsed: unknown): ArcadeGameRecord | nu
 		v: RECORD_VERSION,
 		gameId,
 		bestScore: typeof record.bestScore === 'number' ? record.bestScore : 0,
+		highlights: record.highlights && typeof record.highlights === 'object' ? record.highlights : {},
 		plays: typeof record.plays === 'number' ? record.plays : 0,
 		recentRuns: Array.isArray(record.recentRuns) ? record.recentRuns.slice(0, MAX_RECENT_RUNS) : [],
 		updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : null
@@ -83,6 +87,7 @@ export function recordArcadeRun(gameId: string, result: ArcadeRunResult): Arcade
 	const next: ArcadeGameRecord = {
 		...current,
 		bestScore: Math.max(current.bestScore, score),
+		highlights: result.highlights ? { ...current.highlights, ...result.highlights } : current.highlights,
 		plays: current.plays + 1,
 		recentRuns: summary,
 		updatedAt: result.endedAt ?? new Date().toISOString()

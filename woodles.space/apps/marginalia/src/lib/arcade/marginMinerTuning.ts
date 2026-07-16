@@ -13,6 +13,7 @@ export type MarginMinerRigUpgrade = 'motor' | 'grip' | 'clock';
 export const MARGIN_MINER_BASE_SECONDS = 15;
 export const MARGIN_MINER_CLOCK_UPGRADE_SECONDS = 5;
 export const MARGIN_MINER_UNSTABLE_CACHE_FLOOR = 200;
+export const MARGIN_MINER_MAX_REWARD = 20;
 
 export function marginMinerUnstableCacheValue(ageSeconds: number): number {
 	const drops = Math.floor(Math.max(0, ageSeconds) / 2);
@@ -42,10 +43,15 @@ export function marginMinerTarget(value: number): number {
 	return Math.round(500 + (level - 1) * 650 + Math.pow(level - 1, 2) * 160);
 }
 
+export function marginMinerRawReward(forLevel: number, cleared: boolean): number {
+	const level = Math.max(1, Math.floor(forLevel));
+	return cleared ? level * 4 + 4 : level * 2;
+}
+
 // The board positions remain handmade/random, but each level's loot mix is deterministic.
 export function marginMinerLootPlan(forLevel: number): Array<[MarginMinerLootKind, number]> {
 	const level = Math.max(1, Math.floor(forLevel));
-	return [
+	const plan: Array<[MarginMinerLootKind, number]> = [
 		['small-gold', 6 + level],
 		['large-gold', 2 + Math.ceil(level / 2)],
 		['small-rock', 4 + level],
@@ -54,5 +60,6 @@ export function marginMinerLootPlan(forLevel: number): Array<[MarginMinerLootKin
 		['unstable-cache', level >= 2 ? 1 + Math.floor((level - 2) / 2) : 0],
 		['anchored-ore', Math.floor(level / 2)],
 		['mystery-bag', 1 + Math.floor(level / 2)]
-	].filter(([, count]) => count > 0);
+	];
+	return plan.filter(([, count]) => count > 0);
 }

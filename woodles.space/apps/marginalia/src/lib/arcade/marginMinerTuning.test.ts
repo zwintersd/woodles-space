@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
 	MARGIN_MINER_RIG_UPGRADES,
+	MARGIN_MINER_MAX_REWARD,
 	marginMinerLootPlan,
+	marginMinerRawReward,
 	marginMinerSeconds,
 	marginMinerTarget,
 	marginMinerUnstableCacheValue
@@ -18,6 +20,15 @@ describe('Margin Miner tuning', () => {
 		expect(marginMinerTarget(1)).toBe(500);
 		expect(marginMinerTarget(1)).toBeLessThanOrEqual(600);
 		expect(marginMinerTarget(2)).toBeGreaterThan(marginMinerTarget(1));
+	});
+
+	it('keeps level and payout growth explicit for release balancing', () => {
+		expect(marginMinerTarget(2)).toBe(1310);
+		expect(marginMinerTarget(3)).toBe(2440);
+		expect(marginMinerRawReward(1, true)).toBe(8);
+		expect(marginMinerRawReward(1, false)).toBe(2);
+		expect(marginMinerRawReward(4, true)).toBe(MARGIN_MINER_MAX_REWARD);
+		expect(marginMinerRawReward(7, true)).toBeGreaterThan(MARGIN_MINER_MAX_REWARD);
 	});
 
 	it('uses a deterministic loot composition for each level', () => {

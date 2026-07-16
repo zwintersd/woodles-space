@@ -15,6 +15,7 @@ describe('arcadeRecords', () => {
 		expect(loadArcadeRecord('type-witch')).toMatchObject({
 			gameId: 'type-witch',
 			bestScore: 0,
+			highlights: {},
 			plays: 0,
 			recentRuns: [],
 			updatedAt: null
@@ -30,7 +31,7 @@ describe('arcadeRecords', () => {
 		const record = recordArcadeRun('type-witch', {
 			score: 4,
 			summary: { chars: 20 },
-			endedAt: '2026-06-28T12:01:00.000Z'
+		endedAt: '2026-06-28T12:01:00.000Z'
 		});
 
 		expect(record.plays).toBe(2);
@@ -40,6 +41,19 @@ describe('arcadeRecords', () => {
 			{ chars: 20, score: 4 },
 			{ chars: 40, score: 8 }
 		]);
+	});
+
+	it('preserves game-specific highlights beyond the recent-run limit', () => {
+		recordArcadeRun('margin-miner', {
+			score: 500,
+			highlights: { bestLevel: 2, fastestClearSeconds: 8.4 }
+		});
+		const record = recordArcadeRun('margin-miner', {
+			score: 900,
+			highlights: { bestLevel: 3 }
+		});
+
+		expect(record.highlights).toEqual({ bestLevel: 3, fastestClearSeconds: 8.4 });
 	});
 
 	it('caps recent runs to the latest five', () => {
