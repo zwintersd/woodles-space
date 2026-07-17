@@ -6,6 +6,7 @@
 	import BubbleShooter from './BubbleShooter.svelte';
 	import BubbleSpinner from './BubbleSpinner.svelte';
 	import BulletHeaven from './BulletHeaven.svelte';
+	import ConditionMatch from './ConditionMatch.svelte';
 	import GetBig from './GetBig.svelte';
 	import MarginHollow from './MarginHollow.svelte';
 	import PaddleBreak from './PaddleBreak.svelte';
@@ -106,7 +107,7 @@
 			title: 'Condition Match',
 			tagline: 'Flip tiles to pair conditions with their emergences. Memory as magic.',
 			tags: ['memory', 'puzzle'],
-			status: 'soon'
+			status: 'play'
 		},
 		{
 			id: 'insight-rush',
@@ -279,6 +280,8 @@
 				<BubbleShooter onclose={closeGame} {activePet} />
 			{:else if activeGame === 'type-witch'}
 				<TypeWitch onclose={closeGame} {activePet} />
+			{:else if activeGame === 'condition-match'}
+				<ConditionMatch onclose={closeGame} {activePet} />
 			{/if}
 		</section>
 	{:else}

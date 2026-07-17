@@ -1,6 +1,12 @@
 # Marginalia Arcade Implementation Plan
 
-Status snapshot: June 30, 2026.
+Status snapshot: June 30, 2026. Post-cycle update: the 10-week polish cycle
+below finished (see `ARCADE_ROADMAP.md`'s "Week 10 — Release Hardening"), and
+Condition Match — item 1 of "Backlog Order After The Polish Cycle" below —
+shipped its first playable loop on July 16, 2026. See
+`ARCADE_ROADMAP.md`'s "Week 11 — Condition Match Ships" for what landed. The
+rest of this plan is left as-written as the historical record of the polish
+cycle; it does not need to be rewritten now that the cycle is over.
 
 This plan turns `ARCADE_ROADMAP.md` into a staged build sequence. It assumes one
 primary developer working in focused passes, with browser smoke tests after each
@@ -119,7 +125,8 @@ Acceptance criteria:
 Deliverables:
 
 - Condition Match remains `soon`, or gets a scoped placeholder with real unlock
-  logic.
+  logic. (Superseded post-cycle: Condition Match shipped a full playable loop
+  on July 16, 2026, per "Backlog Order After The Polish Cycle" below.)
 - Word Weave, Star Catcher, and The Long Game either wire to real Book state or
   are relabeled as roadmap cards.
 - Locked hints do not promise mechanisms that do not exist.
@@ -524,7 +531,8 @@ What gets deferred in the six-week version:
 
 ## Backlog Order After The Polish Cycle
 
-1. Condition Match as the first new game after the pause.
+1. ~~Condition Match as the first new game after the pause.~~ Shipped July 16,
+   2026 — see `ARCADE_ROADMAP.md`'s "Week 11 — Condition Match Ships".
 2. Word Weave only after condition-writing unlock state is real.
 3. Star Catcher only if it feels distinct from Paddle Break and Bullet Dot.
 4. The Long Game only after lifecycle state has a clear source of truth.
