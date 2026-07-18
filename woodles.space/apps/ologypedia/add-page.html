@@ -138,6 +138,7 @@
   .shelf-list li{display:flex; align-items:center; gap:12px; padding:11px 14px; border:1px solid var(--rose-dust); border-radius:8px; background:#fffdfa; margin-bottom:8px;}
   .shelf-num{flex:none; width:26px; height:26px; border-radius:50%; background:var(--blush); color:var(--rose-deep); border:1px solid var(--rose-dust); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:600; font-size:13px;}
   .shelf-meta{flex:1 1 auto; min-width:0;}
+  .shelf-kicker{font-family:var(--font-display); font-weight:600; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--rose-dust); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .shelf-title{font-family:var(--font-display); font-weight:600; font-size:15px; color:var(--rose-deep); margin:0; line-height:1.25; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .shelf-file{font-family:'DM Mono',monospace; font-size:11px; color:var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .shelf-row-actions{flex:none; display:flex; gap:4px;}
@@ -202,6 +203,11 @@
       <input type="text" id="topic" placeholder="e.g., Bioluminescence, The Domestication of the Cat, Mirror Neurons&hellip;" autocomplete="off">
     </div>
     <div class="field">
+      <label for="subject">Subject <span style="text-transform:none; font-weight:400; color:var(--ink-soft);">(optional)</span></label>
+      <input type="text" id="subject" placeholder="e.g., Biology · Biochemistry" autocomplete="off">
+      <p class="hint">The domain, for the masthead kicker and the book's spine label on the shelf. Leave blank to skip.</p>
+    </div>
+    <div class="field">
       <label for="context">Your Own Relationship to the Topic <span style="text-transform:none; font-weight:400; color:var(--ink-soft);">(optional)</span></label>
       <textarea id="context" rows="2" placeholder="Brief background on your own knowledge of or relation to the topic, if relevant. Leave blank to skip."></textarea>
       <p class="hint">Per the spec: personal context is too idiosyncratic to generalize, so it belongs in the request, not the reusable template.</p>
@@ -209,7 +215,7 @@
     <div class="field">
       <label for="desc">One-Line Description <span style="text-transform:none; font-weight:400; color:var(--ink-soft);">(optional)</span></label>
       <input type="text" id="desc" placeholder="e.g., How a firefly makes cold light — the luciferin reaction, and the cost of a glow." autocomplete="off">
-      <p class="hint">Becomes the entry's card text on the front door. Leave it blank now and the card gets a placeholder you can fill in later.</p>
+      <p class="hint">Becomes the book's blurb on the shelf. Leave it blank now and the book gets a placeholder you can fill in later.</p>
     </div>
     <div class="checkbox-field">
       <input type="checkbox" id="diagnosis">
@@ -257,29 +263,24 @@
     <p class="note" id="save-msg" role="status" aria-live="polite" style="font-size:12.5px; color:var(--ink-soft); margin-top:10px; min-height:1.1em;"></p>
 
     <div class="sec-head"><span class="num">5</span><h3>Your Textbook</h3></div>
-    <p class="step-lede">Every entry you save lands here and stays — kept in this browser, so a whole textbook can grow across many sessions without losing your place. Re-open one to edit and re-download it; when you're ready, copy the entire index grid in a single pass instead of pasting cards one at a time.</p>
+    <p class="step-lede">Every entry you save lands here and stays — kept in this browser, so a whole textbook can grow across many sessions without losing your place. Each one also shows up as a <b>draft book on the shelf</b> at the <a href="/ologypedia/" style="color:var(--rose-deep);">front door</a>, waiting there until you publish it. Re-open one to edit and re-download it; when you're ready, copy every book's markup in a single pass.</p>
     <div class="shelf" id="shelf">
       <div class="shelf-empty" id="shelf-empty">Nothing saved yet. Build an entry above, then <b>Add to my textbook</b> — it'll appear here, and outlast this session.</div>
       <ol class="shelf-list" id="shelf-list"></ol>
     </div>
-    <div class="btn-row" id="shelf-actions" style="display:none; align-items:center;">
-      <label class="startat">First card's number
-        <input type="number" id="start-at" min="1" value="1" inputmode="numeric">
-      </label>
-    </div>
-    <div class="output-wrap" id="grid-wrap" style="display:none; margin-top:12px;">
+    <div class="output-wrap" id="grid-wrap" style="display:none; margin-top:16px;">
       <div class="output-head">
-        <span>Full Library Grid &middot; <span id="grid-count">0</span> entr<span id="grid-plural">ies</span></span>
-        <button class="copy-btn" id="copy-grid" type="button">Copy Grid</button>
+        <span>Bookshelf Markup &middot; <span id="grid-count">0</span> book<span id="grid-plural">s</span></span>
+        <button class="copy-btn" id="copy-grid" type="button">Copy Markup</button>
       </div>
       <textarea id="grid-output" rows="8" readonly></textarea>
     </div>
     <div class="box notes" id="register-note" style="display:none;">
-      <h4>Registering the Whole Set</h4>
+      <h4>Publishing to the Shelf</h4>
+      <p style="font-size:13.5px; line-height:1.6; color:var(--ink-soft); margin:0 0 10px;">Saving an entry only shelves a <em>draft</em>, visible to you in this browser. Publishing it — so any visitor can read it — is two small steps:</p>
       <ol>
         <li>Make sure each downloaded <code>textbook-*.html</code> is sitting in <code>apps/ologypedia/</code>.</li>
-        <li>Open <code>index.html</code>, find the <code>.lib-grid.full</code> block, and paste the grid above in — after the existing worked-page cards.</li>
-        <li>Set <b>First card's number</b> so the numbering continues from whatever's already there, then reload the front door.</li>
+        <li>Open <code>index.html</code>, find the <code>.shelf</code> grid, and paste the markup above in — after the last <code>&lt;a class="book"&gt;</code>. Reload the front door and the draft becomes a shelved book.</li>
       </ol>
     </div>
     <div class="shelf-tools" id="shelf-tools" style="display:none;">
@@ -307,20 +308,20 @@
   var downloadEl = document.getElementById('download');
   var dlName = document.getElementById('dl-name');
   var openTabEl = document.getElementById('open-tab');
+  var subjectEl = document.getElementById('subject');
   var addShelfEl = document.getElementById('add-shelf');
   var saveMsgEl = document.getElementById('save-msg');
   var shelfEl = document.getElementById('shelf');
   var shelfListEl = document.getElementById('shelf-list');
-  var shelfActionsEl = document.getElementById('shelf-actions');
   var gridWrapEl = document.getElementById('grid-wrap');
   var gridOutputEl = document.getElementById('grid-output');
   var gridCountEl = document.getElementById('grid-count');
   var gridPluralEl = document.getElementById('grid-plural');
   var registerNoteEl = document.getElementById('register-note');
   var shelfToolsEl = document.getElementById('shelf-tools');
-  var startAtEl = document.getElementById('start-at');
   var importFileEl = document.getElementById('import-file');
   var lastBlobUrl = null;
+  var SPINES = ['book--rose','book--sage','book--gold','book--dust','book--plum'];
 
   var SHELF_KEY = 'ologypedia-studio-v1';
   var shelf = loadShelf();
@@ -335,12 +336,16 @@
   function escapeHtml(s){
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
-  function cardFor(slug, title, desc, number){
-    return '<a class="card" href="/ologypedia/textbook-' + slug + '.html">\n' +
-      '  <span class="card-eyebrow">Worked Page &middot; No. ' + number + '</span>\n' +
-      '  <h4>' + escapeHtml(title) + '</h4>\n' +
-      '  <p>' + escapeHtml(desc || 'One line on what it covers and which example blocks it uses.') + '</p>\n' +
-      '</a>';
+  function bookFor(entry, i){
+    var spine = SPINES[i % SPINES.length];
+    var lines = [];
+    lines.push('<a class="book ' + spine + '" data-slug="' + entry.slug + '" href="/ologypedia/textbook-' + entry.slug + '.html">');
+    if (entry.subject) lines.push('  <span class="book-kicker">' + escapeHtml(entry.subject) + '</span>');
+    lines.push('  <h2 class="book-title">' + escapeHtml(entry.title) + '</h2>');
+    lines.push('  <p class="book-desc">' + escapeHtml(entry.desc || 'One line on what it covers and which example blocks it uses.') + '</p>');
+    lines.push('  <span class="book-read">Read &#10022;</span>');
+    lines.push('</a>');
+    return lines.join('\n');
   }
 
   var VISUAL_SYSTEM =
@@ -379,11 +384,16 @@
   function buildPrompt(){
     var topic = topicEl.value.trim() || '[TOPIC]';
     var context = contextEl.value.trim();
+    var subject = subjectEl.value.trim();
     var slug = currentSlug();
 
     var lines = [];
     lines.push('Write this as a personal-textbook-style page or chapter on: ' + topic);
     lines.push('');
+    if (subject){
+      lines.push('Domain / subdomain for the masthead kicker: ' + subject);
+      lines.push('');
+    }
     if (context){
       lines.push('Optional context: ' + context);
       lines.push('');
@@ -524,7 +534,8 @@
     var slug = currentSlug();
     var title = topicEl.value.trim() || 'Untitled entry';
     var desc = descEl.value.trim();
-    var entry = { slug: slug, title: title, desc: desc, html: html, savedAt: Date.now() };
+    var subject = subjectEl.value.trim();
+    var entry = { slug: slug, title: title, subject: subject, desc: desc, html: html, savedAt: Date.now() };
     var backup = shelf.slice();
     var existing = findEntry(slug);
     if (existing){ shelf[shelf.indexOf(existing)] = entry; }
@@ -542,6 +553,7 @@
   function openEntry(slug){
     var e = findEntry(slug); if (!e) return;
     topicEl.value = e.title === 'Untitled entry' ? '' : e.title;
+    subjectEl.value = e.subject || '';
     descEl.value = e.desc || '';
     pasteEl.value = e.html;
     buildPrompt();
@@ -587,6 +599,7 @@
       var li = document.createElement('li');
       var num = document.createElement('span'); num.className = 'shelf-num'; num.textContent = (i + 1);
       var meta = document.createElement('div'); meta.className = 'shelf-meta';
+      if (e.subject){ var k = document.createElement('div'); k.className = 'shelf-kicker'; k.textContent = e.subject; meta.appendChild(k); }
       var t = document.createElement('p'); t.className = 'shelf-title'; t.textContent = e.title;
       var f = document.createElement('div'); f.className = 'shelf-file'; f.textContent = 'textbook-' + e.slug + '.html';
       meta.appendChild(t); meta.appendChild(f);
@@ -600,20 +613,15 @@
     });
     var has = shelf.length > 0;
     shelfEl.classList.toggle('has-entries', has);
-    shelfActionsEl.style.display = has ? 'flex' : 'none';
     gridWrapEl.style.display = has ? '' : 'none';
     registerNoteEl.style.display = has ? '' : 'none';
     shelfToolsEl.style.display = has ? 'flex' : 'none';
     updateGrid();
   }
   function updateGrid(){
-    var start = parseInt(startAtEl.value, 10);
-    if (isNaN(start) || start < 1) start = 1;
-    gridOutputEl.value = shelf.map(function(e, i){
-      return cardFor(e.slug, e.title, e.desc, start + i);
-    }).join('\n');
+    gridOutputEl.value = shelf.map(function(e, i){ return bookFor(e, i); }).join('\n\n');
     gridCountEl.textContent = shelf.length;
-    gridPluralEl.textContent = shelf.length === 1 ? 'y' : 'ies';
+    gridPluralEl.textContent = shelf.length === 1 ? '' : 's';
   }
 
   function exportShelf(){
@@ -632,7 +640,7 @@
       var added = 0;
       incoming.forEach(function(e){
         if (!e || !e.slug || !e.html) return;
-        var clean = { slug: e.slug, title: e.title || 'Untitled entry', desc: e.desc || '', html: e.html, savedAt: e.savedAt || Date.now() };
+        var clean = { slug: e.slug, title: e.title || 'Untitled entry', subject: e.subject || '', desc: e.desc || '', html: e.html, savedAt: e.savedAt || Date.now() };
         var existing = findEntry(clean.slug);
         if (existing){ shelf[shelf.indexOf(existing)] = clean; } else { shelf.push(clean); }
         added++;
@@ -652,7 +660,7 @@
     showSave('Textbook cleared.', false);
   }
 
-  [topicEl, contextEl, descEl, diagnosisEl].forEach(function(el){
+  [topicEl, subjectEl, contextEl, descEl, diagnosisEl].forEach(function(el){
     el.addEventListener('input', buildPrompt);
     el.addEventListener('change', buildPrompt);
   });
@@ -661,7 +669,6 @@
     if (lastBlobUrl) window.open(lastBlobUrl, '_blank', 'noopener');
   });
   addShelfEl.addEventListener('click', addCurrentToShelf);
-  startAtEl.addEventListener('input', updateGrid);
   document.getElementById('export-shelf').addEventListener('click', exportShelf);
   document.getElementById('import-shelf').addEventListener('click', function(){ importFileEl.click(); });
   importFileEl.addEventListener('change', function(){ if (importFileEl.files[0]) importShelf(importFileEl.files[0]); importFileEl.value = ''; });
@@ -670,6 +677,12 @@
   buildPrompt();
   refreshPreview();
   renderShelf();
+
+  // deep link from a draft book on the shelf: /add-page.html?open=<slug>
+  (function(){
+    var m = /[?&]open=([^&]+)/.exec(location.search);
+    if (m){ var slug = decodeURIComponent(m[1]); if (findEntry(slug)) openEntry(slug); }
+  })();
 
   function wireCopy(btnId, sourceEl){
     var btn = document.getElementById(btnId);
