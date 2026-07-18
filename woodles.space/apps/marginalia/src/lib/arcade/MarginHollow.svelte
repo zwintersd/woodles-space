@@ -234,8 +234,12 @@
 	let checkpointSavesUsed = $state(0);
 	let awarded = $state(0);
 	let rounds = $state(0);
-	let best = $state(loadArcadeRecord(GAME_ID).bestScore);
+	const initialRecord = loadArcadeRecord(GAME_ID);
+	let best = $state(initialRecord.bestScore);
+	let bestClearSeconds = $state<number | null>(numberHighlight(initialRecord.highlights.fastestClearSeconds));
 	let collected = $state<string[]>([]);
+	let exploredRooms = $state<string[]>([ROOMS[0].id]);
+	let runSeconds = $state(0);
 	let message = $state('find the wing');
 	let messageClock = $state(0);
 	let hurtClock = $state(0);
@@ -292,6 +296,7 @@
 	});
 	const hintLabel = $derived(messageClock > 0 ? message : mapHint ?? currentRoom.hint);
 	const roomLabel = $derived(`${roomIndex + 1}/${ROOMS.length}`);
+	const archiveGrade = $derived(archiveGradeFor(glyphs, deaths, phase === 'complete'));
 	const outcomeLabel = $derived.by(() => {
 		if (phase === 'complete') return awarded > 0 ? `+${fmt(awarded)} insight` : 'opened';
 		if (phase === 'over') return 'sent back';
@@ -302,6 +307,24 @@
 	function rewardFor(foundGlyphs: number, wing: boolean, key: boolean, complete: boolean): number {
 		const raw = foundGlyphs * 2 + (wing ? 3 : 0) + (key ? 4 : 0) + (complete ? 7 : 0);
 		return previewReward(raw, MAX_REWARD);
+	}
+
+	function numberHighlight(value: unknown): number | null {
+		return typeof value === 'number' && Number.isFinite(value) ? value : null;
+	}
+
+	function formatRunTime(seconds: number): string {
+		const wholeMinutes = Math.floor(seconds / 60);
+		const remaining = seconds - wholeMinutes * 60;
+		return `${wholeMinutes}:${remaining.toFixed(1).padStart(4, '0')}`;
+	}
+
+	function archiveGradeFor(foundGlyphs: number, falls: number, complete: boolean): string {
+		if (!complete) return 'unopened';
+		if (foundGlyphs === TOTAL_GLYPHS && falls === 0) return 'whole archive';
+		if (foundGlyphs === TOTAL_GLYPHS) return 'full archive';
+		if (foundGlyphs >= Math.ceil(TOTAL_GLYPHS / 2)) return 'partial archive';
+		return 'opened';
 	}
 
 	function playerRect(next: Player = player): Rect {
@@ -351,6 +374,8 @@
 		checkpointSavesUsed = 0;
 		awarded = 0;
 		collected = [];
+		exploredRooms = [ROOMS[0].id];
+		runSeconds = 0;
 		hurtClock = 0;
 		message = 'find the wing';
 		messageClock = 0;
@@ -378,18 +403,38 @@
 		stop();
 		rounds += 1;
 		awarded = payReward(rewardFor(glyphs, hasWing, hasKey, nextPhase === 'complete'), MAX_REWARD);
+		const previous = loadArcadeRecord(GAME_ID);
+		const previousFastest = numberHighlight(previous.highlights.fastestClearSeconds);
+		const previousFewestFalls = numberHighlight(previous.highlights.fewestFallsForClear);
+		const opened = nextPhase === 'complete';
+		const fastestClearSeconds = opened
+			? Math.min(previousFastest ?? runSeconds, runSeconds)
+			: previousFastest;
+		const fewestFallsForClear = opened
+			? Math.min(previousFewestFalls ?? deaths, deaths)
+			: previousFewestFalls;
+		const flawlessArchive = previous.highlights.flawlessArchive === true ||
+			(opened && glyphs === TOTAL_GLYPHS && deaths === 0);
 		const record = recordArcadeRun(GAME_ID, {
 			score: glyphs,
 			summary: {
-				opened: nextPhase === 'complete',
+				opened,
 				hasWing,
 				hasKey,
 				deaths,
+				seconds: Number(runSeconds.toFixed(1)),
+				archive: archiveGradeFor(glyphs, deaths, opened),
 				checkpointSavesUsed,
 				awarded
+			},
+			highlights: {
+				...(fastestClearSeconds === null ? {} : { fastestClearSeconds }),
+				...(fewestFallsForClear === null ? {} : { fewestFallsForClear }),
+				...(flawlessArchive ? { flawlessArchive: true } : {})
 			}
 		});
 		best = record.bestScore;
+		bestClearSeconds = numberHighlight(record.highlights.fastestClearSeconds);
 	}
 
 	function loop(now: number) {
@@ -400,6 +445,7 @@
 	}
 
 	function step(dt: number) {
+		runSeconds += dt;
 		messageClock = Math.max(0, messageClock - dt);
 		hurtClock = Math.max(0, hurtClock - dt);
 		movePlayer(dt);
@@ -571,6 +617,7 @@
 		}
 		if (door.to === undefined || !door.spawn) return;
 		roomIndex = door.to;
+		if (!exploredRooms.includes(ROOMS[door.to].id)) exploredRooms = [...exploredRooms, ROOMS[door.to].id];
 		player = { x: door.spawn.x, y: door.spawn.y, vx: 0, vy: 0 };
 		onGround = false;
 		jumpsUsed = 0;
@@ -620,6 +667,15 @@
 
 	function gateClass(gate: Gate): string {
 		return `gate ${requirementMet(gate.requires) ? 'open' : 'closed'}`;
+	}
+
+	function gateLabel(gate: Gate): string {
+		return requirementMet(gate.requires) ? `${gate.label} open` : `${gate.label} needs ${gate.requires}`;
+	}
+
+	function roomMapClass(room: Room, index: number): string {
+		if (index === roomIndex) return 'map-room current';
+		return `map-room ${exploredRooms.includes(room.id) ? 'explored' : 'unknown'}`;
 	}
 
 	function pickupPoints(pickup: Pickup): string {
@@ -673,6 +729,8 @@
 			{ label: 'lives', value: lives, live: true, tone: 'green' },
 			{ label: 'glyphs', value: `${glyphs}/${TOTAL_GLYPHS}` },
 			{ label: 'best', value: Math.max(glyphs, best) },
+			{ label: 'time', value: formatRunTime(runSeconds), live: phase === 'running', tone: 'blue' },
+			{ label: 'best clear', value: bestClearSeconds === null ? '—' : formatRunTime(bestClearSeconds) },
 			{ label: 'wing', value: hasWing ? 'yes' : 'no' },
 			{ label: 'save', value: checkpointSaves, live: checkpointSaves > 0, tone: 'violet' },
 			{ label: 'prize', value: fmt(phase === 'complete' || phase === 'over' ? awarded : rewardPreview) }
@@ -699,6 +757,16 @@
 	>
 		<rect class="hit-flash" class:active={hurtClock > 0} width={WORLD_W} height={WORLD_H} rx="6" />
 		<text class="room-title" x="18" y="28">{currentRoom.title}</text>
+		<g class="room-map" aria-label="explored rooms">
+			<text class="map-title" x="412" y="18">map</text>
+			<line class="map-path" x1="418" y1="31" x2="522" y2="31" />
+			{#each ROOMS as room, index (room.id)}
+				<rect class={roomMapClass(room, index)} x={408 + index * 32} y="21" width="20" height="20" rx="4" />
+				<text class="map-room-label" x={418 + index * 32} y="35" text-anchor="middle">
+					{exploredRooms.includes(room.id) ? index + 1 : '?'}
+				</text>
+			{/each}
+		</g>
 
 		{#each currentRoom.doors as door (door.id)}
 			<rect
@@ -727,7 +795,7 @@
 
 		{#each currentRoom.gates as gate (gate.id)}
 			<rect class={gateClass(gate)} x={gate.x} y={gate.y} width={gate.w} height={gate.h} rx="4" />
-			<text class="gate-label" x={gate.x - 4} y={gate.y + gate.h / 2} text-anchor="end">{gate.label}</text>
+			<text class="gate-label" x={gate.x - 4} y={gate.y + gate.h / 2} text-anchor="end">{gateLabel(gate)}</text>
 		{/each}
 
 		{#each currentRoom.hazards as hazard (hazard.id)}
@@ -764,8 +832,13 @@
 			<text class="center-sub" x={WORLD_W / 2} y={WORLD_H / 2 + 20} text-anchor="middle">
 				{phase === 'ready'
 					? 'run, jump, pick up, open the margin'
-					: `glyphs ${glyphs}/${TOTAL_GLYPHS} - falls ${deaths} - best ${best}${checkpointSavesUsed > 0 ? ` - ${checkpointSavesUsed} saved` : ''}`}
+					: `${archiveGrade} - glyphs ${glyphs}/${TOTAL_GLYPHS} - falls ${deaths} - ${formatRunTime(runSeconds)}`}
 			</text>
+			{#if phase !== 'ready' && (bestClearSeconds !== null || checkpointSavesUsed > 0)}
+				<text class="center-sub" x={WORLD_W / 2} y={WORLD_H / 2 + 42} text-anchor="middle">
+					{bestClearSeconds === null ? '' : `best clear ${formatRunTime(bestClearSeconds)}`}{checkpointSavesUsed > 0 ? `${bestClearSeconds === null ? '' : ' - '}${checkpointSavesUsed} saved` : ''}
+				</text>
+			{/if}
 		{/if}
 	</SvgArena>
 
@@ -829,12 +902,44 @@
 	.room-title,
 	.door-label,
 	.gate-label,
-	.pickup-label {
+	.pickup-label,
+	.map-title,
+	.map-room-label {
 		font-family: var(--font-ui);
 		font-size: 10px;
 		text-transform: uppercase;
 		fill: var(--sol-base1);
 		pointer-events: none;
+	}
+	.map-title {
+		font-size: 8px;
+		letter-spacing: 0.08em;
+	}
+	.map-room-label {
+		font-size: 9px;
+		fill: var(--sol-base3);
+	}
+	.map-path {
+		stroke: var(--sol-base1);
+		stroke-width: 2;
+		stroke-dasharray: 3 3;
+		opacity: 0.58;
+	}
+	.map-room {
+		stroke-width: 1.5;
+	}
+	.map-room.unknown {
+		fill: var(--sol-base2);
+		stroke: var(--sol-base1);
+	}
+	.map-room.explored {
+		fill: var(--sol-cyan);
+		stroke: var(--sol-base3);
+	}
+	.map-room.current {
+		fill: var(--sol-violet);
+		stroke: var(--sol-base3);
+		stroke-width: 3;
 	}
 	.platform-shadow {
 		fill: rgba(7, 54, 66, 0.1);
@@ -883,6 +988,19 @@
 	}
 	.pickup-key {
 		fill: var(--sol-yellow);
+		animation: important-pickup 1.2s ease-in-out infinite;
+		transform-box: fill-box;
+		transform-origin: center;
+	}
+	.pickup-wing {
+		animation: important-pickup 1.2s ease-in-out infinite;
+		transform-box: fill-box;
+		transform-origin: center;
+	}
+	@keyframes important-pickup {
+		50% {
+		transform: scale(1.18);
+		}
 	}
 	.player-shadow {
 		fill: rgba(7, 54, 66, 0.12);
@@ -938,6 +1056,12 @@
 	@media (max-width: 560px) {
 		.center-title {
 			font-size: 34px;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.pickup-wing,
+		.pickup-key {
+			animation: none;
 		}
 	}
 </style>
