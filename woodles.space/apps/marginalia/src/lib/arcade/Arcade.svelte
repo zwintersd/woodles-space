@@ -97,7 +97,7 @@
 			id: 'margin-hollow',
 			icon: '▣',
 			title: 'Margin Hollow',
-			tagline: 'A tiny metroidvania-like: jump, collect a wing, open gates, and reach the vault.',
+			tagline: 'A tiny metroidvania-like: jump, open wing and key routes, and chart the archive.',
 			tags: ['platform', 'gates'],
 			status: 'play'
 		},

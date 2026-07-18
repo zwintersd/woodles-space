@@ -65,6 +65,7 @@
 		id: string;
 		title: string;
 		hint: string;
+		map: Dot;
 		spawn: Dot;
 		platforms: Platform[];
 		gates: Gate[];
@@ -98,6 +99,7 @@
 			id: 'foyer',
 			title: 'Foyer',
 			hint: 'find the wing, then press right',
+			map: { x: 414, y: 31 },
 			spawn: { x: 42, y: 272 },
 			platforms: [
 				{ id: 'floor', x: 0, y: 296, w: 540, h: 24 },
@@ -120,6 +122,7 @@
 			id: 'shaft',
 			title: 'Sill Shaft',
 			hint: 'double jump through the high gate',
+			map: { x: 448, y: 31 },
 			spawn: { x: 34, y: 272 },
 			platforms: [
 				{ id: 'floor', x: 0, y: 296, w: 540, h: 24 },
@@ -131,8 +134,19 @@
 			gates: [
 				{ id: 'wing-gate', x: 504, y: 148, w: 14, h: 70, requires: 'wing', label: 'wing gate' }
 			],
-			doors: [
+				doors: [
 				{ id: 'back-foyer', x: 0, y: 236, w: 30, h: 60, to: 0, spawn: { x: 468, y: 272 }, label: 'west sill' },
+				{
+					id: 'to-wing-walk',
+					x: 338,
+					y: 116,
+					w: 30,
+					h: 68,
+					to: 4,
+					spawn: { x: 40, y: 272 },
+					requires: 'wing',
+					label: 'wing walk'
+				},
 				{
 					id: 'to-alcove',
 					x: 510,
@@ -155,6 +169,7 @@
 			id: 'alcove',
 			title: 'Key Alcove',
 			hint: 'cross the thorns and take the key',
+			map: { x: 482, y: 31 },
 			spawn: { x: 38, y: 272 },
 			platforms: [
 				{ id: 'floor-left', x: 0, y: 296, w: 150, h: 24 },
@@ -193,6 +208,7 @@
 			id: 'vault',
 			title: 'Small Vault',
 			hint: 'reach the right margin',
+			map: { x: 516, y: 31 },
 			spawn: { x: 36, y: 272 },
 			platforms: [
 				{ id: 'floor', x: 0, y: 296, w: 540, h: 24 },
@@ -203,6 +219,17 @@
 			gates: [],
 			doors: [
 				{ id: 'back-alcove', x: 0, y: 236, w: 30, h: 60, to: 2, spawn: { x: 468, y: 272 }, label: 'west sill' },
+				{
+					id: 'to-return-press',
+					x: 438,
+					y: 236,
+					w: 32,
+					h: 60,
+					to: 5,
+					spawn: { x: 40, y: 272 },
+					requires: 'key',
+					label: 'return press'
+				},
 				{ id: 'exit', x: 508, y: 130, w: 32, h: 78, requires: 'key', exit: true, label: 'archive door' }
 			],
 			pickups: [
@@ -211,7 +238,67 @@
 				{ id: 'vault-glyph-3', kind: 'glyph', x: 392, y: 150, label: 'glyph' }
 			],
 			hazards: [{ id: 'last-thorns', x: 258, y: 286, w: 76, h: 10 }]
+		},
+		{
+			id: 'wing-walk',
+			title: 'Wing Walk',
+			hint: 'take the high loop back to the foyer',
+			map: { x: 448, y: 57 },
+			spawn: { x: 40, y: 272 },
+			platforms: [
+				{ id: 'floor-left', x: 0, y: 296, w: 124, h: 24 },
+				{ id: 'low-ledge', x: 146, y: 248, w: 84, h: 12 },
+				{ id: 'middle-ledge', x: 266, y: 202, w: 84, h: 12 },
+				{ id: 'high-ledge', x: 388, y: 156, w: 92, h: 12 },
+				{ id: 'floor-right', x: 486, y: 296, w: 54, h: 24 }
+			],
+			gates: [],
+			doors: [
+				{ id: 'back-shaft-high', x: 0, y: 236, w: 30, h: 60, to: 1, spawn: { x: 378, y: 160 }, label: 'shaft ledge' },
+				{ id: 'loop-foyer', x: 510, y: 96, w: 30, h: 72, to: 0, spawn: { x: 444, y: 230 }, label: 'foyer loop' }
+			],
+			pickups: [
+				{ id: 'wing-walk-glyph-1', kind: 'glyph', x: 178, y: 222, label: 'glyph' },
+				{ id: 'wing-walk-glyph-2', kind: 'glyph', x: 420, y: 130, label: 'glyph' }
+			],
+			hazards: [
+				{ id: 'wing-walk-pit-a', x: 126, y: 286, w: 82, h: 10 },
+				{ id: 'wing-walk-pit-b', x: 356, y: 286, w: 98, h: 10 }
+			]
+		},
+		{
+			id: 'return-press',
+			title: 'Return Press',
+			hint: 'take the key shortcut home',
+			map: { x: 482, y: 57 },
+			spawn: { x: 40, y: 272 },
+			platforms: [
+				{ id: 'floor', x: 0, y: 296, w: 540, h: 24 },
+				{ id: 'first-shelf', x: 112, y: 248, w: 84, h: 12 },
+				{ id: 'second-shelf', x: 244, y: 208, w: 84, h: 12 },
+				{ id: 'third-shelf', x: 376, y: 168, w: 84, h: 12 }
+			],
+			gates: [],
+			doors: [
+				{ id: 'back-vault', x: 0, y: 236, w: 30, h: 60, to: 3, spawn: { x: 416, y: 272 }, label: 'vault press' },
+				{ id: 'shortcut-foyer', x: 510, y: 132, w: 30, h: 72, to: 0, spawn: { x: 444, y: 230 }, label: 'foyer shortcut' }
+			],
+			pickups: [
+				{ id: 'return-press-glyph-1', kind: 'glyph', x: 142, y: 222, label: 'glyph' },
+				{ id: 'return-press-glyph-2', kind: 'glyph', x: 406, y: 140, label: 'glyph' }
+			],
+			hazards: [{ id: 'return-press-thorns', x: 254, y: 286, w: 88, h: 10 }]
 		}
+	];
+
+	const MAP_LINKS: Array<[number, number]> = [
+		[0, 1],
+		[1, 2],
+		[2, 3],
+		[3, 5],
+		[5, 0],
+		[1, 4],
+		[4, 0]
 	];
 
 	const TOTAL_GLYPHS = ROOMS.flatMap((room) => room.pickups).filter((pickup) => pickup.kind === 'glyph').length;
@@ -250,7 +337,13 @@
 
 	const currentRoom = $derived(ROOMS[roomIndex]);
 	const progress = $derived(
-		clamp((roomIndex + glyphs / Math.max(1, TOTAL_GLYPHS) + (hasWing ? 0.45 : 0) + (hasKey ? 0.55 : 0)) / 5, 0, 1)
+		clamp(
+			(exploredRooms.length / ROOMS.length) * 0.45 +
+				(glyphs / Math.max(1, TOTAL_GLYPHS)) * 0.35 +
+				(phase === 'complete' ? 0.2 : 0),
+			0,
+			1
+		)
 	);
 	const bodyTier = $derived(statTier(coreStatValue(activePet, 'body')));
 	const mindTier = $derived(statTier(coreStatValue(activePet, 'mind')));
@@ -673,6 +766,11 @@
 		return requirementMet(gate.requires) ? `${gate.label} open` : `${gate.label} needs ${gate.requires}`;
 	}
 
+	function doorLabel(door: Door): string {
+		if (!door.requires) return door.label;
+		return requirementMet(door.requires) ? `${door.label} open` : `${door.label} needs ${door.requires}`;
+	}
+
 	function roomMapClass(room: Room, index: number): string {
 		if (index === roomIndex) return 'map-room current';
 		return `map-room ${exploredRooms.includes(room.id) ? 'explored' : 'unknown'}`;
@@ -759,10 +857,18 @@
 		<text class="room-title" x="18" y="28">{currentRoom.title}</text>
 		<g class="room-map" aria-label="explored rooms">
 			<text class="map-title" x="412" y="18">map</text>
-			<line class="map-path" x1="418" y1="31" x2="522" y2="31" />
+			{#each MAP_LINKS as link (`${link[0]}-${link[1]}`)}
+				<line
+					class="map-path"
+					x1={ROOMS[link[0]].map.x}
+					y1={ROOMS[link[0]].map.y}
+					x2={ROOMS[link[1]].map.x}
+					y2={ROOMS[link[1]].map.y}
+				/>
+			{/each}
 			{#each ROOMS as room, index (room.id)}
-				<rect class={roomMapClass(room, index)} x={408 + index * 32} y="21" width="20" height="20" rx="4" />
-				<text class="map-room-label" x={418 + index * 32} y="35" text-anchor="middle">
+				<rect class={roomMapClass(room, index)} x={room.map.x - 10} y={room.map.y - 10} width="20" height="20" rx="4" />
+				<text class="map-room-label" x={room.map.x} y={room.map.y + 4} text-anchor="middle">
 					{exploredRooms.includes(room.id) ? index + 1 : '?'}
 				</text>
 			{/each}
@@ -778,7 +884,7 @@
 				height={door.h}
 				rx="3"
 			/>
-			<text class="door-label" x={door.x + door.w / 2} y={door.y - 8} text-anchor="middle">{door.label}</text>
+			<text class="door-label" x={door.x + door.w / 2} y={door.y - 8} text-anchor="middle">{doorLabel(door)}</text>
 		{/each}
 
 		{#each currentRoom.platforms as platform (platform.id)}
