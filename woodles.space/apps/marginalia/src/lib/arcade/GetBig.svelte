@@ -45,6 +45,7 @@
 		growth: number;
 		tier: BlobTier;
 		tone: BlobTone;
+		nearMissed: boolean;
 	}
 
 	interface Burst extends Dot {
@@ -117,6 +118,8 @@
 	let lastSnack = $state<BlobTone | null>(null);
 	let bumpSaves = $state(0);
 	let bumpSavesUsed = $state(0);
+	let dangerDodges = $state(0);
+	let eatenByTier = $state<Record<BlobTier, number>>(emptyTierCounts());
 	let raf = 0;
 	let lastTime = 0;
 	let spawnClock = 0;
@@ -133,6 +136,11 @@
 	const speedLabel = $derived(Math.round(playerSpeed()));
 	const sizeLabel = $derived(playerRadius.toFixed(1));
 	const rewardPreview = $derived(rewardFor(score, playerRadius, phase === 'complete'));
+	const yellowGoalLabel = $derived.by(() => {
+		if (canEatYellow()) return 'yellow is edible — eat it to win';
+		const remaining = Math.max(0.1, MASSIVE_RADIUS - playerRadius + 0.1);
+		return `grow ${remaining.toFixed(1)} more for yellow`;
+	});
 	const outcomeLabel = $derived.by(() => {
 		if (phase === 'complete') return 'jellyworld';
 		if (phase === 'over') return 'squished';
@@ -147,7 +155,7 @@
 	});
 	const statEffects = $derived<ArcadeStatEffects>({
 		body: (_value, tier) => (tier > 0 ? `start size +${(tier * 1.4).toFixed(1)}` : 'standard start'),
-		mind: (_value, tier) => (tier > 0 ? 'edge warnings + outlines' : 'standard outlines'),
+		mind: (_value, tier) => (tier > 0 ? 'stronger warnings + outlines' : 'standard outlines'),
 		grace: (_value, tier) => (tier > 0 ? `brake/turn +${tier}` : 'ice feet'),
 		heart: (_value, tier) => (tier > 0 ? `${tier} bump save${tier === 1 ? '' : 's'}` : 'strict bump')
 	});
@@ -159,6 +167,10 @@
 
 	function canEatYellow(): boolean {
 		return playerRadius > MASSIVE_RADIUS;
+	}
+
+	function emptyTierCounts(): Record<BlobTier, number> {
+		return { tiny: 0, small: 0, mid: 0, massive: 0 };
 	}
 
 	function playerSpeed(): number {
@@ -227,6 +239,8 @@
 		lastSnack = null;
 		bumpSaves = heartTier;
 		bumpSavesUsed = 0;
+		dangerDodges = 0;
+		eatenByTier = emptyTierCounts();
 		spawnClock = 0.18;
 	}
 
@@ -256,6 +270,11 @@
 				seconds: Math.round(elapsed),
 				won: nextPhase === 'complete',
 				bumpSaves: bumpSavesUsed,
+				dangerDodges,
+				tiny: eatenByTier.tiny,
+				small: eatenByTier.small,
+				mid: eatenByTier.mid,
+				yellow: eatenByTier.massive,
 				awarded: rewardFor(score, playerRadius, nextPhase === 'complete')
 			}
 		});
@@ -359,7 +378,8 @@
 			points: spec.points,
 			growth: spec.growth,
 			tier: spec.tier,
-			tone: spec.tone
+			tone: spec.tone,
+			nearMissed: false
 		};
 	}
 
@@ -404,11 +424,23 @@
 			);
 
 		const radiusAtImpact = playerRadius;
+		const checked = moved.map((enemy) => {
+			if (
+				enemy.nearMissed ||
+				enemy.radius < radiusAtImpact ||
+				touchesPlayer(enemy) ||
+				!justMissedPlayer(enemy)
+			) {
+				return enemy;
+			}
+			dangerDodges += 1;
+			return { ...enemy, nearMissed: true };
+		});
 		const consumed: Enemy[] = [];
 		let doomed = false;
 		let lethal: Enemy | null = null;
 
-		for (const enemy of moved) {
+		for (const enemy of checked) {
 			if (!touchesPlayer(enemy)) continue;
 			if (radiusAtImpact > enemy.radius) {
 				consumed.push(enemy);
@@ -424,18 +456,18 @@
 				bumpSaves -= 1;
 				bumpSavesUsed += 1;
 				playerRadius = Math.max(START_RADIUS, playerRadius - Math.max(2, lethal.radius * 0.16));
-				enemies = moved.filter((enemy) => enemy.id !== lethal?.id);
+				enemies = checked.filter((enemy) => enemy.id !== lethal?.id);
 				addBurst(player.x, player.y, 'heart save', 'ink');
 				return;
 			}
 			if (lethal) addBurst(player.x, player.y, `${lethal.radius.toFixed(0)} > ${radiusAtImpact.toFixed(0)}`, 'ink');
-			enemies = moved;
+			enemies = checked;
 			finish('over');
 			return;
 		}
 
 		if (consumed.length === 0) {
-			enemies = moved;
+			enemies = checked;
 			return;
 		}
 
@@ -444,9 +476,12 @@
 		const growth = consumed.reduce((total, enemy) => total + enemy.growth, 0);
 		const won = consumed.some((enemy) => enemy.tier === 'massive');
 
-		enemies = moved.filter((enemy) => !consumedIds.has(enemy.id));
+		enemies = checked.filter((enemy) => !consumedIds.has(enemy.id));
 		score += gained;
 		eaten += consumed.length;
+		const nextEatenByTier = { ...eatenByTier };
+		for (const enemy of consumed) nextEatenByTier[enemy.tier] += 1;
+		eatenByTier = nextEatenByTier;
 		playerRadius = Math.min(MAX_PLAYER_RADIUS, playerRadius + growth);
 		lastSnack = consumed[consumed.length - 1]?.tone ?? null;
 		for (const enemy of consumed) addBurst(enemy.x, enemy.y, `+${enemy.points}`, enemy.tone);
@@ -459,6 +494,18 @@
 	}
 
 	function circleTouchesPlayerBox(enemy: Enemy, center: Dot): boolean {
+		return circleDistanceToPlayerBox(enemy, center) <= enemy.radius;
+	}
+
+	function justMissedPlayer(enemy: Enemy): boolean {
+		const DODGE_CLEARANCE = 13;
+		return playerCopies().some((copy) => {
+			const distanceToBox = circleDistanceToPlayerBox(enemy, copy);
+			return distanceToBox > enemy.radius && distanceToBox <= enemy.radius + DODGE_CLEARANCE;
+		});
+	}
+
+	function circleDistanceToPlayerBox(enemy: Enemy, center: Dot): number {
 		const { width, height } = playerBoxRadius();
 		const left = center.x - width / 2;
 		const right = center.x + width / 2;
@@ -468,7 +515,7 @@
 			x: clamp(enemy.x, left, right),
 			y: clamp(enemy.y, top, bottom)
 		};
-		return distance(enemy, closest) <= enemy.radius;
+		return distance(enemy, closest);
 	}
 
 	function updateBursts(dt: number) {
@@ -490,11 +537,11 @@
 	function enemyClass(enemy: Enemy): string {
 		const danger = playerRadius > enemy.radius ? ' edible' : ' danger';
 		const readable = mindTier > 0 ? ' stat-read' : '';
-		return `enemy enemy-${enemy.tone}${danger}${readable}`;
+		const goal = enemy.tone === 'yellow' ? (canEatYellow() ? ' goal-ready' : ' goal-locked') : '';
+		return `enemy enemy-${enemy.tone}${danger}${readable}${goal}`;
 	}
 
 	function incomingPreview(enemy: Enemy): Dot | null {
-		if (mindTier === 0) return null;
 		const offX = enemy.x < 0 || enemy.x > WORLD_W;
 		const offY = enemy.y < 0 || enemy.y > WORLD_H;
 		if (!offX && !offY) return null;
@@ -560,6 +607,7 @@
 	/>
 
 	<ArcadeProgress value={growthProgress} label="jelly appetite" tone="green" maxWidth="560px" />
+	<p class:yellow-ready={canEatYellow()} class="yellow-status" aria-live="polite">{yellowGoalLabel}</p>
 
 	<div class="perks-wrap">
 		<ArcadePetPerks creature={activePet} effects={statEffects} />
@@ -586,7 +634,22 @@
 		{#each enemies as enemy (enemy.id)}
 			{@const preview = incomingPreview(enemy)}
 			{#if preview}
-				<circle class="incoming-ring" cx={preview.x} cy={preview.y} r={Math.max(7, enemy.radius * 0.5)} />
+				<circle
+					class:mind-read={mindTier > 0}
+					class="incoming-ring"
+					cx={preview.x}
+					cy={preview.y}
+					r={Math.max(6, enemy.radius * (mindTier > 0 ? 0.5 : 0.34))}
+				/>
+			{/if}
+			{#if enemy.tone === 'yellow'}
+				<circle
+					class:goal-ready={canEatYellow()}
+					class="yellow-goal-ring"
+					cx={enemy.x}
+					cy={enemy.y}
+					r={enemy.radius + 6}
+				/>
 			{/if}
 			<circle class="enemy-shadow" cx={enemy.x} cy={enemy.y + enemy.radius * 0.34} r={enemy.radius * 0.92} />
 			<circle class={enemyClass(enemy)} cx={enemy.x} cy={enemy.y} r={enemy.radius} />
@@ -637,13 +700,18 @@
 			<text class="center-title" x={WORLD_W / 2} y={WORLD_H / 2 - 14} text-anchor="middle">
 				{outcomeLabel}
 			</text>
-			<text class="center-sub" x={WORLD_W / 2} y={WORLD_H / 2 + 20} text-anchor="middle">
+			<text class="center-sub" x={WORLD_W / 2} y={WORLD_H / 2 + 16} text-anchor="middle">
 				{phase === 'complete'
-					? 'You ate all the jelly in jellyworld.'
+					? `score ${score} · ${Math.round(elapsed)}s · ${eaten} eaten · ${dangerDodges} dodges`
 					: phase === 'ready'
 						? 'strictly larger or not at all'
-						: `score ${score} · eaten ${eaten} · best ${best} · ${rounds} run${rounds === 1 ? '' : 's'}`}
+						: `score ${score} · ${Math.round(elapsed)}s · ${eaten} eaten · ${dangerDodges} dodges`}
 			</text>
+			{#if phase === 'complete' || phase === 'over'}
+				<text class="center-detail" x={WORLD_W / 2} y={WORLD_H / 2 + 42} text-anchor="middle">
+					tiny {eatenByTier.tiny} · small {eatenByTier.small} · mid {eatenByTier.mid} · yellow {eatenByTier.massive}
+				</text>
+			{/if}
 		{/if}
 	</SvgArena>
 
@@ -738,10 +806,26 @@
 	}
 	.incoming-ring {
 		fill: none;
-		stroke: rgba(108, 113, 196, 0.6);
+		stroke: rgba(88, 110, 117, 0.34);
+		stroke-width: 1.4;
+		pointer-events: none;
+	}
+	.incoming-ring.mind-read {
+		stroke: rgba(108, 113, 196, 0.76);
 		stroke-width: 2;
 		stroke-dasharray: 3 4;
-		pointer-events: none;
+	}
+	.yellow-goal-ring {
+		fill: none;
+		stroke: rgba(181, 137, 0, 0.55);
+		stroke-width: 2;
+		stroke-dasharray: 3 4;
+	}
+	.yellow-goal-ring.goal-ready {
+		stroke: rgba(42, 161, 152, 0.92);
+		stroke-width: 3;
+		stroke-dasharray: none;
+		animation: yellow-ready 0.9s ease-in-out infinite alternate;
 	}
 	.enemy-cyan {
 		fill: var(--sol-cyan);
@@ -763,6 +847,10 @@
 	}
 	.enemy-yellow {
 		fill: var(--sol-yellow);
+	}
+	.enemy-yellow.goal-ready {
+		stroke: var(--sol-green);
+		stroke-width: 3.4;
 	}
 	.enemy-shine,
 	.player-shine {
@@ -845,6 +933,24 @@
 		font-style: italic;
 		fill: var(--sol-base0);
 	}
+	.center-detail {
+		font-family: var(--font-counter);
+		font-size: 12px;
+		fill: var(--sol-base01);
+	}
+	.yellow-status {
+		width: min(560px, 100%);
+		margin: -0.35rem 0 0;
+		font-family: var(--font-counter);
+		font-size: 0.7rem;
+		letter-spacing: 0.04em;
+		text-align: center;
+		text-transform: uppercase;
+		color: var(--sol-base0);
+	}
+	.yellow-status.yellow-ready {
+		color: var(--sol-green);
+	}
 	.pad-row {
 		width: min(560px, 100%);
 		display: grid;
@@ -889,6 +995,18 @@
 	}
 	.perks-wrap {
 		width: min(560px, 100%);
+	}
+	@keyframes yellow-ready {
+		from {
+			opacity: 0.55;
+			transform: scale(0.94);
+			transform-origin: center;
+		}
+		to {
+			opacity: 1;
+			transform: scale(1.08);
+			transform-origin: center;
+		}
 	}
 	@media (max-width: 560px) {
 		.center-title {
