@@ -265,6 +265,7 @@
     <div class="field">
       <label for="topic">Topic</label>
       <input type="text" id="topic" placeholder="e.g., Bioluminescence, The Domestication of the Cat, Mirror Neurons&hellip;" autocomplete="off">
+      <p class="hint" id="slug-status"></p>
     </div>
     <div class="field">
       <label for="subject">Subject <span style="text-transform:none; font-weight:400; color:var(--ink-soft);">(optional)</span></label>
@@ -341,6 +342,9 @@
       <div class="chk" id="chk-doc"><span class="dot">–</span> Complete HTML document</div>
       <div class="chk" id="chk-fonts"><span class="dot">–</span> Loads the shared fonts</div>
       <div class="chk" id="chk-blocks"><span class="dot">–</span> Uses the block classes</div>
+      <div class="chk" id="chk-noplaceholder"><span class="dot">–</span> No leftover template placeholders</div>
+      <div class="chk" id="chk-nopalette"><span class="dot">–</span> Doesn't load shared/palette.css</div>
+      <div class="chk" id="chk-noscript"><span class="dot">–</span> No embedded scripts</div>
     </div>
     <div class="preview-frame" id="preview-frame">
       <div class="preview-head">
@@ -418,6 +422,7 @@
   var gridPluralEl = document.getElementById('grid-plural');
   var registerNoteEl = document.getElementById('register-note');
   var shelfToolsEl = document.getElementById('shelf-tools');
+  var slugStatusEl = document.getElementById('slug-status');
   var importFileEl = document.getElementById('import-file');
   var lastBlobUrl = null;
 
@@ -450,6 +455,31 @@
       .replace(/(^-+|-+$)/g, '') || 'topic';
   }
   function currentSlug(){ return slugify(topicEl.value.trim()); }
+
+  /* ===== slug-availability: warn before a download silently overwrites a
+     live, already-published page ===== */
+  var publishedSlugs = null; // null until the fetch below resolves (or fails)
+  fetch('/ologypedia/index.html').then(function(r){ return r.ok ? r.text() : ''; }).then(function(text){
+    var set = new Set();
+    var re = /data-slug="([^"]+)"/g, m;
+    while ((m = re.exec(text))) set.add(m[1]);
+    publishedSlugs = set;
+    updateSlugStatus();
+  }).catch(function(){ publishedSlugs = new Set(); });
+
+  function updateSlugStatus(){
+    var topic = topicEl.value.trim();
+    if (!topic || !publishedSlugs){ slugStatusEl.textContent = ''; return; }
+    var slug = currentSlug();
+    if (publishedSlugs.has(slug)){
+      slugStatusEl.textContent = 'Slug "' + slug + '" is already published — downloading or shelving under this title will overwrite that live page once you republish.';
+      slugStatusEl.style.color = '#a8434f';
+    } else {
+      slugStatusEl.textContent = 'Slug "' + slug + '" — not published yet.';
+      slugStatusEl.style.color = 'var(--ink-soft)';
+    }
+  }
+
   function escapeHtml(s){
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
@@ -645,6 +675,9 @@
     setChk('chk-doc', /<!doctype html|<html[\s>]/i.test(html));
     setChk('chk-fonts', html.toLowerCase().indexOf('/shared/fonts.css') !== -1);
     setChk('chk-blocks', /class="[^"]*(kicker-tag|sec-head|figure-box|ex-|pullquote|tagline|artifact-meta)/.test(html));
+    setChk('chk-noplaceholder', !/\{SLUG\}|\[TOPIC\]/.test(html));
+    setChk('chk-nopalette', html.toLowerCase().indexOf('/shared/palette.css') === -1);
+    setChk('chk-noscript', !/<script[\s>]/i.test(html));
   }
 
   function refreshPreview(){
@@ -658,6 +691,7 @@
       addShelfEl.classList.add('is-disabled');
       if (lastBlobUrl){ URL.revokeObjectURL(lastBlobUrl); lastBlobUrl = null; }
       setChk('chk-doc', false); setChk('chk-fonts', false); setChk('chk-blocks', false);
+      setChk('chk-noplaceholder', false); setChk('chk-nopalette', false); setChk('chk-noscript', false);
       return;
     }
     updateChecks(html);
@@ -731,6 +765,7 @@
     pasteEl.value = e.html;
     buildPrompt();
     updateCover();
+    updateSlugStatus();
     refreshPreview();
     showSave('Opened “' + e.title + '” — edit above, then Add to my textbook to save your changes.', false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -843,8 +878,8 @@
   }
 
   [topicEl, subjectEl, contextEl, descEl, diagnosisEl].forEach(function(el){
-    el.addEventListener('input', function(){ buildPrompt(); updateCover(); });
-    el.addEventListener('change', function(){ buildPrompt(); updateCover(); });
+    el.addEventListener('input', function(){ buildPrompt(); updateCover(); updateSlugStatus(); });
+    el.addEventListener('change', function(){ buildPrompt(); updateCover(); updateSlugStatus(); });
   });
   pasteEl.addEventListener('input', refreshPreview);
   openTabEl.addEventListener('click', function(){
@@ -859,6 +894,7 @@
   buildCoverControls();
   buildPrompt();
   updateCover();
+  updateSlugStatus();
   refreshPreview();
   renderShelf();
 
