@@ -26,9 +26,37 @@
   .shelf-head .sub{display:flex; align-items:center; justify-content:center; gap:12px; font-family:var(--font-display); font-style:italic; font-size:18px; color:var(--rose-dust); margin:0;}
   .shelf-head .sub .orn{color:var(--gold); font-style:normal; font-size:13px;}
 
+  /* ===== deck controls: search, subject filter, view toggle ===== */
+  .deck-controls{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:18px;}
+  .dc-search{flex:1 1 220px; min-width:160px; font-family:var(--font-body); font-size:14px; color:var(--ink); background:#fffdfa; border:1px solid var(--rose-dust); border-radius:999px; padding:8px 16px;}
+  .dc-search:focus{outline:2px solid var(--gold); outline-offset:1px;}
+  .dc-select{flex:0 0 auto; font-family:var(--font-body); font-size:13px; color:var(--ink); background:#fffdfa; border:1px solid var(--rose-dust); border-radius:999px; padding:7px 14px;}
+  .dc-view{flex:0 0 auto; display:flex; border:1px solid var(--rose-dust); border-radius:999px; overflow:hidden;}
+  .dc-view-btn{font-family:var(--font-display); font-weight:600; font-size:12px; letter-spacing:.04em; color:var(--rose-deep); background:var(--paper); border:none; padding:7px 16px; cursor:pointer;}
+  .dc-view-btn+.dc-view-btn{border-left:1px solid var(--rose-dust);}
+  .dc-view-btn.active{background:var(--rose-deep); color:var(--paper);}
+  .deck-empty{grid-column:1/-1; text-align:center; padding:30px 20px; color:var(--ink-soft); font-style:italic; font-size:14px;}
+
   /* ===== the deck ===== */
   .deck{display:grid; grid-template-columns:repeat(auto-fill, minmax(170px,1fr)); gap:18px; grid-auto-rows:max-content; align-items:start;}
   @media(max-width:420px){ .deck{grid-template-columns:repeat(auto-fill, minmax(150px,1fr));} }
+
+  /* ===== spine view — a scan-friendly list alternative to the grid ===== */
+  .spine-list{list-style:none; margin:0; padding:0;}
+  .spine-row{display:flex; align-items:center; gap:14px; padding:12px 16px; border:1px solid var(--paper-edge); border-radius:9px; background:#fffdfa; margin-bottom:8px; text-decoration:none; color:inherit; transition:border-color .15s ease, transform .15s ease;}
+  .spine-row:hover{border-color:var(--rose-dust); transform:translateX(2px);}
+  .spine-accent{flex:none; width:7px; align-self:stretch; border-radius:4px; background:var(--dc, var(--rose-dust));}
+  .spine-glyph{flex:none; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; background:color-mix(in srgb, var(--dc, var(--rose-dust)) 12%, #fffdfa); border:1px solid color-mix(in srgb, var(--dc, var(--rose-dust)) 45%, transparent); color:var(--rose-deep);}
+  .spine-meta{flex:1 1 auto; min-width:0;}
+  .spine-subject{display:block; font-family:var(--font-display); font-weight:600; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--rose-dust);}
+  .spine-title{font-family:var(--font-display); font-weight:600; font-size:17px; color:var(--rose-deep); margin:0; line-height:1.2;}
+  .spine-blurb{font-size:12.5px; color:var(--ink-soft); margin:2px 0 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .spine-row.is-draft{border-style:dashed;}
+  .spine-tag{flex:none; font-family:var(--font-display); font-weight:600; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--rose-deep); background:var(--blush); border:1px solid var(--rose-dust); border-radius:999px; padding:2px 10px;}
+  .spine-arrow{flex:none; color:var(--gold); font-size:16px;}
+  .spine-add{border-style:dashed; border-color:var(--gold);}
+  .spine-add .spine-accent{background:var(--gold);}
+  .spine-add .spine-glyph{background:var(--blush); border-color:var(--gold);}
 
   /* editor card — the sizeable top-left way in */
   .editor-card{
@@ -131,6 +159,17 @@
     <p class="sub"><span class="orn">✦</span> A textbook, grown one entry at a time <span class="orn">✦</span></p>
   </header>
 
+  <div class="deck-controls" id="deck-controls">
+    <input type="search" id="deck-search" class="dc-search" placeholder="Search titles, subjects, blurbs&hellip;" aria-label="Search entries">
+    <select id="deck-subject" class="dc-select" aria-label="Filter by subject">
+      <option value="">All subjects</option>
+    </select>
+    <div class="dc-view" role="group" aria-label="View">
+      <button type="button" class="dc-view-btn" id="view-grid" aria-pressed="true">Grid</button>
+      <button type="button" class="dc-view-btn" id="view-spine" aria-pressed="false">Spine</button>
+    </div>
+  </div>
+
   <main class="deck" id="deck">
 
     <a class="editor-card" href="/ologypedia/add-page.html">
@@ -173,6 +212,8 @@
     <!-- draft cards (from your editor, this browser) are injected here -->
   </main>
 
+  <ul class="spine-list" id="spine-list" style="display:none"></ul>
+
   <footer class="undertow">
     <p>Every page is plain HTML, cut from one block system so the whole deck reads as one book.</p>
     <p>
@@ -200,7 +241,6 @@
   if (!Array.isArray(shelf)) shelf = [];
 
   var drafts = shelf.filter(function(e){ return e && e.slug && !published[e.slug]; });
-  if (!drafts.length) return;
 
   var ACCENTS = ['acc-rose','acc-sage','acc-gold','acc-dust','acc-plum'];
   var FINISHES = { pulse:1, shimmer:1, halo:1, drift:1 };
@@ -235,9 +275,11 @@
     deck.appendChild(a);
   });
 
-  var note = el('div', 'deck-note', '');
-  note.appendChild(el('span', '', 'Dashed cards are drafts — saved only in this browser, until you publish them from the editor'));
-  deck.appendChild(note);
+  if (drafts.length){
+    var note = el('div', 'deck-note', '');
+    note.appendChild(el('span', '', 'Dashed cards are drafts — saved only in this browser, until you publish them from the editor'));
+    deck.appendChild(note);
+  }
 
   function el(tag, cls, text){
     var n = document.createElement(tag);
@@ -246,6 +288,122 @@
     return n;
   }
   function corner(pos){ return el('span', 'corner ' + pos, ''); }
+
+  setupDeckControls();
+
+  /* ===== search, subject filter, and the grid/spine view toggle —
+     covers both shelved cards and the drafts just injected above ===== */
+  function setupDeckControls(){
+    var cards = Array.prototype.slice.call(deck.querySelectorAll('.card63'));
+    if (!cards.length) return;
+
+    var searchEl = document.getElementById('deck-search');
+    var subjectEl = document.getElementById('deck-subject');
+    var gridBtn = document.getElementById('view-grid');
+    var spineBtn = document.getElementById('view-spine');
+    var spineList = document.getElementById('spine-list');
+
+    var addRow = document.createElement('a');
+    addRow.className = 'spine-row spine-add';
+    addRow.href = '/ologypedia/add-page.html';
+    addRow.appendChild(el('span', 'spine-accent', ''));
+    addRow.appendChild(el('span', 'spine-glyph', '+'));
+    var addMeta = el('span', 'spine-meta', '');
+    addMeta.appendChild(el('span', 'spine-subject', 'The Editor'));
+    addMeta.appendChild(el('h3', 'spine-title', 'Add a Page'));
+    addRow.appendChild(addMeta);
+    addRow.appendChild(el('span', 'spine-arrow', '→'));
+    spineList.appendChild(addRow);
+
+    var items = cards.map(function(card){
+      var accMatch = /acc-[a-z]+/.exec(card.className);
+      var titleEl = card.querySelector('.c-title');
+      var kickerEl = card.querySelector('.c-kicker');
+      var blurbEl = card.querySelector('.c-blurb');
+      var glyphEl = card.querySelector('.c-glyph');
+      return {
+        card: card,
+        href: card.getAttribute('href'),
+        title: titleEl ? titleEl.textContent : '',
+        subject: kickerEl ? kickerEl.textContent.trim() : '',
+        blurb: blurbEl ? blurbEl.textContent : '',
+        glyph: glyphEl ? glyphEl.textContent : '✦',
+        accent: accMatch ? accMatch[0] : 'acc-rose',
+        isDraft: card.classList.contains('is-draft')
+      };
+    });
+
+    var subjects = [];
+    items.forEach(function(it){
+      if (it.subject && subjects.indexOf(it.subject) === -1) subjects.push(it.subject);
+    });
+    subjects.sort();
+    subjects.forEach(function(s){
+      var opt = document.createElement('option');
+      opt.value = s; opt.textContent = s;
+      subjectEl.appendChild(opt);
+    });
+
+    items.forEach(function(it){
+      var row = document.createElement('a');
+      row.className = 'spine-row ' + it.accent + (it.isDraft ? ' is-draft' : '');
+      row.href = it.href;
+      row.appendChild(el('span', 'spine-accent', ''));
+      row.appendChild(el('span', 'spine-glyph', it.glyph));
+      var meta = el('span', 'spine-meta', '');
+      if (it.subject) meta.appendChild(el('span', 'spine-subject', it.subject));
+      meta.appendChild(el('h3', 'spine-title', it.title));
+      if (it.blurb) meta.appendChild(el('p', 'spine-blurb', it.blurb));
+      row.appendChild(meta);
+      if (it.isDraft) row.appendChild(el('span', 'spine-tag', 'Draft'));
+      row.appendChild(el('span', 'spine-arrow', '→'));
+      spineList.appendChild(row);
+      it.row = row;
+    });
+
+    var gridEmpty = el('div', 'deck-empty', 'No entries match your search.');
+    gridEmpty.hidden = true;
+    deck.appendChild(gridEmpty);
+    var spineEmpty = el('li', 'deck-empty', 'No entries match your search.');
+    spineEmpty.hidden = true;
+    spineList.appendChild(spineEmpty);
+
+    function applyFilter(){
+      var q = searchEl.value.trim().toLowerCase();
+      var subj = subjectEl.value;
+      var visible = 0;
+      items.forEach(function(it){
+        var matches = (!q || (it.title + ' ' + it.subject + ' ' + it.blurb).toLowerCase().indexOf(q) !== -1)
+          && (!subj || it.subject === subj);
+        it.card.style.display = matches ? '' : 'none';
+        it.row.style.display = matches ? '' : 'none';
+        if (matches) visible++;
+      });
+      gridEmpty.hidden = visible > 0;
+      spineEmpty.hidden = visible > 0;
+    }
+
+    searchEl.addEventListener('input', applyFilter);
+    subjectEl.addEventListener('change', applyFilter);
+
+    var VIEW_KEY = 'ologypedia-view';
+    function setView(view){
+      var isSpine = view === 'spine';
+      deck.style.display = isSpine ? 'none' : '';
+      spineList.style.display = isSpine ? '' : 'none';
+      gridBtn.classList.toggle('active', !isSpine);
+      gridBtn.setAttribute('aria-pressed', String(!isSpine));
+      spineBtn.classList.toggle('active', isSpine);
+      spineBtn.setAttribute('aria-pressed', String(isSpine));
+      try { localStorage.setItem(VIEW_KEY, view); } catch (e) {}
+    }
+    gridBtn.addEventListener('click', function(){ setView('grid'); });
+    spineBtn.addEventListener('click', function(){ setView('spine'); });
+
+    var savedView = 'grid';
+    try { savedView = localStorage.getItem(VIEW_KEY) === 'spine' ? 'spine' : 'grid'; } catch (e) {}
+    setView(savedView);
+  }
 })();
 </script>
 

@@ -121,6 +121,31 @@ to a shared stylesheet the way `shared/fonts.css` is. It does pull
 pattern as the SvelteKit apps that own their own look, just on a static app
 instead.
 
+publishing an entry no longer means hand-pasting card markup into
+`index.html`: `apps/ologypedia/scripts/publish.mjs <shelf-export.json>`
+(the JSON from `add-page.html`'s "Export shelf as JSON") writes each
+entry's `textbook-{slug}.html` and inserts or, for a slug already on the
+shelf, in-place-replaces its card in `index.html`'s deck. Re-running it is
+safe — a card is matched by `data-slug`, never duplicated. `--dry-run`
+previews the change without writing. It's a plain Node script, no
+dependencies, run directly (`node apps/ologypedia/scripts/publish.mjs …`)
+rather than through pnpm, since the app itself has no `package.json` and
+isn't a pnpm workspace member.
+
+`add-page.html`'s validity checks also cross-reference the live deck now:
+alongside the original three (complete document, loads the shared fonts,
+uses a block class), it fetches `index.html` once on load to warn — next
+to the Topic field, not blocking — when the slug you're about to
+download or shelve is already published, plus three more pass/fail
+checks on the pasted HTML (no leftover `{SLUG}`/`[TOPIC]` template text,
+doesn't accidentally load `shared/palette.css`, no embedded `<script>`).
+
+`index.html`'s deck also carries a search box, a subject filter, and a
+Grid/Spine view toggle (the latter persisted per-browser under
+`ologypedia-view`) — covering both shelved cards and the drafts injected
+from `localStorage`, so the deck stays scannable as it grows past a
+handful of entries.
+
 `marginalia` is the biggest app by built size (`dist/` ~3.1 MB, week 10
 perf-sanity check) — but the number that actually matters, first-load
 transfer, is a much healthier ~290 KB. the difference is the reading
