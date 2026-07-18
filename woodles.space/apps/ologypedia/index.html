@@ -103,6 +103,11 @@
      (a container element sizes its descendants, never itself) */
   .c-inner{flex:1; min-height:0; display:flex; flex-direction:column; padding:1.5em 1.25em 1.2em; font-size:5cqw; position:relative; z-index:2;}
   .card63 .corner{position:absolute; z-index:2; width:.62em; height:.62em; border:0 solid color-mix(in srgb, var(--dc) 60%, transparent);}
+
+  /* custom cover layers, designed in the Cover Studio */
+  .c-layers{position:absolute; inset:0; z-index:1; overflow:hidden; border-radius:inherit;}
+  .c-layer{position:absolute; z-index:1;}
+  .c-layer-shape{display:block;}
   .card63 .corner.tl{top:.5em; left:.5em; border-top-width:1.5px; border-left-width:1.5px;}
   .card63 .corner.tr{top:.5em; right:.5em; border-top-width:1.5px; border-right-width:1.5px;}
   .card63 .corner.bl{bottom:.5em; left:.5em; border-bottom-width:1.5px; border-left-width:1.5px;}
@@ -227,6 +232,7 @@
 
 </div>
 
+<script src="cover-render.js"></script>
 <script>
 (function(){
   var deck = document.getElementById('deck');
@@ -251,6 +257,10 @@
     var a = document.createElement('a');
     a.className = 'card63 is-draft ' + acc + fx;
     a.href = '/ologypedia/add-page.html?open=' + encodeURIComponent(e.slug);
+
+    if (e.layers && e.layers.length && window.OlogypediaCover){
+      a.insertAdjacentHTML('beforeend', OlogypediaCover.layersHTML(e.layers));
+    }
 
     var inner = el('div', 'c-inner', '');
     inner.appendChild(corner('tl')); inner.appendChild(corner('tr'));
