@@ -45,6 +45,7 @@
 	</div>
 
 	<div class="sidebar-bottom">
+		<a class="site-home" href="/" title="back to woodles.space">·space</a>
 		<button
 			class="spell-btn"
 			class:active={isSpell}
@@ -163,6 +164,22 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--g-space-sm);
+	}
+
+	.site-home {
+		font-family: var(--g-font-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.06em;
+		color: var(--g-muted);
+		text-decoration: none;
+		opacity: 0.7;
+		align-self: flex-start;
+		transition: opacity var(--g-transition-fast), color var(--g-transition-fast);
+	}
+
+	.site-home:hover {
+		opacity: 1;
+		color: var(--g-flight);
 	}
 
 	.spell-btn {

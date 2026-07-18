@@ -63,6 +63,7 @@
 	<!-- header -->
 	<header class="list-header">
 		<div class="list-title">
+			<a class="home-link" href="/" title="back to woodles.space">·space</a>
 			<h1><span class="wordmark" data-text="marginalia devlog">marginalia devlog</span> <span class="wordmark-star">✦</span></h1>
 			<span class="list-subtitle">⋆ making the witch's world ⋆</span>
 		</div>
@@ -205,6 +206,23 @@
 		justify-content: space-between;
 		gap: var(--d-space-md);
 		margin-bottom: var(--d-space-xl);
+	}
+
+	.home-link {
+		display: inline-block;
+		font-family: var(--d-font-mono);
+		font-size: 0.7rem;
+		letter-spacing: 0.08em;
+		color: var(--d-text-faint);
+		text-decoration: none;
+		opacity: 0.75;
+		margin-bottom: 0.3rem;
+		transition: opacity var(--d-transition-fast), color var(--d-transition-fast);
+	}
+
+	.home-link:hover {
+		opacity: 1;
+		color: var(--d-accent);
 	}
 
 	.list-title h1 {

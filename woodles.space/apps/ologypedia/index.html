@@ -20,7 +20,8 @@
 
   /* ===== header ===== */
   .shelf-head{text-align:center; margin-bottom:34px;}
-  .shelf-head .eyebrow{display:inline-block; font-family:var(--font-display); font-weight:600; letter-spacing:.2em; font-size:12px; text-transform:uppercase; color:var(--rose-deep); border:1px solid var(--rose-dust); border-radius:999px; padding:4px 16px; background:var(--blush);}
+  .shelf-head .eyebrow{display:inline-block; font-family:var(--font-display); font-weight:600; letter-spacing:.2em; font-size:12px; text-transform:uppercase; color:var(--rose-deep); border:1px solid var(--rose-dust); border-radius:999px; padding:4px 16px; background:var(--blush); text-decoration:none; transition:border-color .16s ease, color .16s ease;}
+  .shelf-head .eyebrow:hover{color:var(--rose-dust); border-color:var(--rose-dust);}
   .shelf-head h1{font-family:var(--font-display); font-weight:600; font-size:clamp(42px,7vw,60px); color:var(--rose-deep); margin:16px 0 4px; line-height:1;}
   .shelf-head .sub{display:flex; align-items:center; justify-content:center; gap:12px; font-family:var(--font-display); font-style:italic; font-size:18px; color:var(--rose-dust); margin:0;}
   .shelf-head .sub .orn{color:var(--gold); font-style:normal; font-size:13px;}
@@ -97,7 +98,7 @@
 <div class="wrap">
 
   <header class="shelf-head">
-    <span class="eyebrow">A Woodle</span>
+    <a class="eyebrow" href="/" title="back to woodles.space">&larr; woodles.space</a>
     <h1>Ologypedia</h1>
     <p class="sub"><span class="orn">✦</span> A textbook, grown one entry at a time <span class="orn">✦</span></p>
   </header>
