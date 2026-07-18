@@ -138,6 +138,7 @@
   .shelf-list li{display:flex; align-items:center; gap:12px; padding:11px 14px; border:1px solid var(--rose-dust); border-radius:8px; background:#fffdfa; margin-bottom:8px;}
   .shelf-num{flex:none; width:26px; height:26px; border-radius:50%; background:var(--blush); color:var(--rose-deep); border:1px solid var(--rose-dust); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:600; font-size:13px;}
   .shelf-meta{flex:1 1 auto; min-width:0;}
+  .shelf-cover{flex:none; width:30px; height:30px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:15px; color:#fffdfa; box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);}
   .shelf-kicker{font-family:var(--font-display); font-weight:600; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--rose-dust); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .shelf-title{font-family:var(--font-display); font-weight:600; font-size:15px; color:var(--rose-deep); margin:0; line-height:1.25; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .shelf-file{font-family:'DM Mono',monospace; font-size:11px; color:var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
@@ -152,7 +153,70 @@
   .linkbtn:hover{color:var(--rose-dust);}
   .linkbtn.danger{color:#a8434f; border-bottom-color:#a8434f;}
 
+  /* ===== cover designer (card-back editor, pulled from the bestiary) ===== */
+  .cover-designer{display:flex; gap:22px; align-items:flex-start; margin-top:6px;}
+  @media(max-width:560px){ .cover-designer{flex-direction:column; align-items:center;} }
+  .cd-preview{flex:none;}
+  .cd-controls{flex:1 1 auto; display:flex; flex-direction:column; gap:16px; min-width:0;}
+  .cd-group{display:flex; flex-direction:column; gap:7px;}
+  .cd-label{font-family:var(--font-display); font-weight:600; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--rose-deep);}
+  .cd-row{display:flex; flex-wrap:wrap; gap:7px;}
+  .cd-swatch{width:30px; height:30px; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0; transition:transform .12s ease, border-color .12s ease;}
+  .cd-swatch:hover{transform:scale(1.1);}
+  .cd-swatch.active{border-color:var(--ink);}
+  .cd-chip{display:inline-flex; align-items:center; gap:5px; font-family:var(--font-body); font-size:12px; color:var(--ink-soft); background:#fffdfa; border:1px solid var(--rose-dust); border-radius:999px; padding:4px 12px; cursor:pointer; transition:background .12s ease, color .12s ease, border-color .12s ease;}
+  .cd-chip .sym{font-size:13px; line-height:1; color:var(--rose-dust);}
+  .cd-chip:hover{border-color:var(--rose-deep);}
+  .cd-chip.active{background:var(--rose-deep); border-color:var(--rose-deep); color:var(--paper);}
+  .cd-chip.active .sym{color:var(--gold);}
+  .cd-glyph-btn{width:32px; height:32px; border-radius:8px; border:1px solid var(--rose-dust); background:#fffdfa; color:var(--rose-deep); font-size:16px; line-height:1; cursor:pointer; transition:background .12s ease, border-color .12s ease;}
+  .cd-glyph-btn:hover{border-color:var(--rose-deep);}
+  .cd-glyph-btn.active{background:var(--blush); border-color:var(--rose-deep);}
+
   footer.tagline{text-align:center; font-family:var(--font-display); font-style:italic; font-size:15px; color:var(--rose-dust); margin-top:30px;}
+
+  /* ===== cover-card (shared with the bookshelf deck) ===== */
+  .card63{
+    --dc:var(--rose-dust);
+    position:relative; display:flex; width:176px;
+    aspect-ratio:63/88; border-radius:11px; overflow:hidden;
+    container-type:inline-size;
+    border:1px solid color-mix(in srgb, var(--dc) 45%, var(--gold));
+    background:
+      repeating-linear-gradient(-45deg, transparent 0 7px, color-mix(in srgb, var(--dc) 7%, transparent) 7px 8px),
+      radial-gradient(ellipse 80% 62% at 50% 37%, color-mix(in srgb, var(--dc) 16%, #fffdfa) 0%, var(--paper) 66%, var(--paper-edge) 100%);
+    box-shadow:2px 3px 0 var(--paper-edge);
+  }
+  .acc-rose{--dc:var(--rose-deep);}
+  .acc-sage{--dc:var(--sage);}
+  .acc-gold{--dc:var(--gold);}
+  .acc-dust{--dc:var(--rose-dust);}
+  .acc-plum{--dc:#6f4a63;}
+  .c-inner{flex:1; min-height:0; display:flex; flex-direction:column; padding:1.5em 1.25em 1.2em; font-size:5cqw; position:relative; z-index:2;}
+  .card63 .corner{position:absolute; z-index:2; width:.62em; height:.62em; border:0 solid color-mix(in srgb, var(--dc) 60%, transparent);}
+  .card63 .corner.tl{top:.5em; left:.5em; border-top-width:1.5px; border-left-width:1.5px;}
+  .card63 .corner.tr{top:.5em; right:.5em; border-top-width:1.5px; border-right-width:1.5px;}
+  .card63 .corner.bl{bottom:.5em; left:.5em; border-bottom-width:1.5px; border-left-width:1.5px;}
+  .card63 .corner.br{bottom:.5em; right:.5em; border-bottom-width:1.5px; border-right-width:1.5px;}
+  .c-kicker{text-align:center; font-family:var(--font-display); font-weight:600; font-size:.6em; letter-spacing:.14em; text-transform:uppercase; color:color-mix(in srgb, var(--dc) 72%, var(--ink)); min-height:1.1em;}
+  .c-core{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:.5em; min-height:0;}
+  .c-medallion{width:3.2em; height:3.2em; flex:none; border-radius:50%; border:1px solid color-mix(in srgb, var(--dc) 55%, transparent); background:color-mix(in srgb, var(--dc) 8%, #fffdfa); box-shadow:0 0 1.1em color-mix(in srgb, var(--dc) 22%, transparent), inset 0 0 .7em color-mix(in srgb, var(--dc) 12%, transparent); display:flex; align-items:center; justify-content:center;}
+  .c-glyph{font-size:1.5em; line-height:1; color:color-mix(in srgb, var(--dc) 82%, var(--rose-deep));}
+  .c-title{font-family:var(--font-display); font-weight:600; font-size:1.42em; line-height:1.05; color:var(--rose-deep); margin:0;}
+  .c-blurb{font-size:.62em; line-height:1.4; color:var(--ink-soft); margin:0; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;}
+  .c-foot{display:flex; align-items:center; justify-content:space-between; gap:.5em;}
+  .c-read{font-family:var(--font-display); font-weight:600; font-size:.56em; letter-spacing:.04em; color:var(--gold);}
+  .c-brand{font-family:var(--font-display); font-size:.46em; letter-spacing:.16em; text-transform:uppercase; color:color-mix(in srgb, var(--dc) 60%, transparent);}
+  @keyframes cb-pulse{0%,100%{opacity:.3}50%{opacity:.8}}
+  @keyframes cb-shimmer{0%{transform:translateX(-160%) skewX(-18deg);opacity:0}8%{opacity:1}55%{opacity:.85}60%,100%{transform:translateX(210%) skewX(-18deg);opacity:0}}
+  @keyframes cb-halo{to{transform:rotate(360deg)}}
+  @keyframes cb-drift{0%{transform:translate(0,0) scale(1);opacity:.4}25%{transform:translate(-7%,5%) scale(1.08);opacity:.6}50%{transform:translate(5%,-6%) scale(.96);opacity:.45}75%{transform:translate(-4%,-3%) scale(1.05);opacity:.6}100%{transform:translate(0,0) scale(1);opacity:.4}}
+  .fx-pulse::after,.fx-shimmer::after,.fx-halo::after,.fx-drift::after{content:''; position:absolute; pointer-events:none;}
+  .fx-pulse::after{inset:0; border-radius:inherit; z-index:1; box-shadow:inset 0 0 1.7em .45em color-mix(in srgb, var(--dc) 26%, transparent), inset 0 0 .5em 0 color-mix(in srgb, var(--dc) 40%, transparent); animation:cb-pulse 3.4s ease-in-out infinite;}
+  .fx-shimmer::after{top:-10%; left:0; width:55%; height:120%; z-index:3; background:linear-gradient(105deg, transparent 12%, rgba(255,255,255,.14) 32%, color-mix(in srgb, var(--gold) 45%, rgba(255,255,255,.7)) 50%, rgba(255,255,255,.14) 68%, transparent 88%); transform:translateX(-160%) skewX(-18deg); animation:cb-shimmer 7.5s ease-in-out infinite;}
+  .fx-halo::after{top:-50%; left:-50%; width:200%; height:200%; z-index:1; background:conic-gradient(from 0deg at 50% 50%, transparent 0deg, color-mix(in srgb, var(--dc) 18%, transparent) 42deg, transparent 92deg, transparent 200deg, color-mix(in srgb, var(--gold) 20%, transparent) 250deg, transparent 300deg); mix-blend-mode:multiply; animation:cb-halo 17s linear infinite;}
+  .fx-drift::after{top:-20%; left:-20%; width:140%; height:140%; z-index:1; background:radial-gradient(ellipse 74% 60% at 40% 45%, color-mix(in srgb, var(--dc) 22%, transparent), transparent 66%); mix-blend-mode:multiply; animation:cb-drift 12s ease-in-out infinite;}
+  @media(prefers-reduced-motion:reduce){ .fx-pulse::after,.fx-shimmer::after,.fx-halo::after,.fx-drift::after{animation:none;} }
 </style>
 </head>
 <body>
@@ -222,6 +286,41 @@
       <label for="diagnosis" style="text-transform:none; font-family:var(--font-body); font-weight:400; font-size:13.5px; color:var(--ink);">This topic is a diagnosis or health condition — add the four extra sections (supporting a loved one, personal risk-assessment, professional/clinical application, prerequisite-study map).</label>
     </div>
 
+    <div class="field" style="margin-top:22px;">
+      <label>Design its cover</label>
+      <p class="hint" style="margin:0 0 12px;">The card-back this entry wears on the shelf — accent, animated finish (pulled from the bestiary's card-back editor), and a medallion glyph. It previews live as you type.</p>
+      <div class="cover-designer">
+        <div class="cd-preview">
+          <a class="card63 acc-rose" id="cover-card" aria-label="cover preview">
+            <div class="c-inner">
+              <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+              <span class="c-kicker" id="cov-kicker"></span>
+              <div class="c-core">
+                <div class="c-medallion"><span class="c-glyph" id="cov-glyph">✦</span></div>
+                <h2 class="c-title" id="cov-title">Your Title</h2>
+                <p class="c-blurb" id="cov-blurb">A one-line blurb appears here.</p>
+              </div>
+              <span class="c-foot"><span class="c-read">Read &#10022;</span><span class="c-brand">Ologypedia</span></span>
+            </div>
+          </a>
+        </div>
+        <div class="cd-controls">
+          <div class="cd-group">
+            <span class="cd-label">Accent</span>
+            <div class="cd-row" id="cd-accents"></div>
+          </div>
+          <div class="cd-group">
+            <span class="cd-label">Finish</span>
+            <div class="cd-row" id="cd-finishes"></div>
+          </div>
+          <div class="cd-group">
+            <span class="cd-label">Glyph</span>
+            <div class="cd-row" id="cd-glyphs"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="sec-head"><span class="num">2</span><h3>Copy the Prompt &amp; Ask a Model</h3></div>
     <p class="step-lede">This is the whole spec, assembled and ready — it updates live as you type above. Copy it, paste it to any capable model, and ask for the page. If the model can read files, point it at <code>textbook-chrome-blocks.html</code> and <code>textbook-example-blocks.html</code> so it copies the exact CSS instead of rebuilding it. The prompt already asks for exactly one thing back: a single complete HTML file — no explanation, no code fences.</p>
     <div class="output-wrap">
@@ -263,24 +362,24 @@
     <p class="note" id="save-msg" role="status" aria-live="polite" style="font-size:12.5px; color:var(--ink-soft); margin-top:10px; min-height:1.1em;"></p>
 
     <div class="sec-head"><span class="num">5</span><h3>Your Textbook</h3></div>
-    <p class="step-lede">Every entry you save lands here and stays — kept in this browser, so a whole textbook can grow across many sessions without losing your place. Each one also shows up as a <b>draft book on the shelf</b> at the <a href="/ologypedia/" style="color:var(--rose-deep);">front door</a>, waiting there until you publish it. Re-open one to edit and re-download it; when you're ready, copy every book's markup in a single pass.</p>
+    <p class="step-lede">Every entry you save lands here and stays — kept in this browser, so a whole textbook can grow across many sessions without losing your place. Each one also shows up as a <b>draft card in the deck</b> at the <a href="/ologypedia/" style="color:var(--rose-deep);">front door</a>, waiting there until you publish it. Re-open one to edit and re-download it; when you're ready, copy every card's markup in a single pass.</p>
     <div class="shelf" id="shelf">
       <div class="shelf-empty" id="shelf-empty">Nothing saved yet. Build an entry above, then <b>Add to my textbook</b> — it'll appear here, and outlast this session.</div>
       <ol class="shelf-list" id="shelf-list"></ol>
     </div>
     <div class="output-wrap" id="grid-wrap" style="display:none; margin-top:16px;">
       <div class="output-head">
-        <span>Bookshelf Markup &middot; <span id="grid-count">0</span> book<span id="grid-plural">s</span></span>
+        <span>Deck Markup &middot; <span id="grid-count">0</span> card<span id="grid-plural">s</span></span>
         <button class="copy-btn" id="copy-grid" type="button">Copy Markup</button>
       </div>
       <textarea id="grid-output" rows="8" readonly></textarea>
     </div>
     <div class="box notes" id="register-note" style="display:none;">
-      <h4>Publishing to the Shelf</h4>
+      <h4>Publishing to the Deck</h4>
       <p style="font-size:13.5px; line-height:1.6; color:var(--ink-soft); margin:0 0 10px;">Saving an entry only shelves a <em>draft</em>, visible to you in this browser. Publishing it — so any visitor can read it — is two small steps:</p>
       <ol>
         <li>Make sure each downloaded <code>textbook-*.html</code> is sitting in <code>apps/ologypedia/</code>.</li>
-        <li>Open <code>index.html</code>, find the <code>.shelf</code> grid, and paste the markup above in — after the last <code>&lt;a class="book"&gt;</code>. Reload the front door and the draft becomes a shelved book.</li>
+        <li>Open <code>index.html</code>, find the <code>.deck</code> grid, and paste the markup above in — after the last <code>&lt;a class="card63"&gt;</code>. Reload the front door and the draft becomes a shelved card.</li>
       </ol>
     </div>
     <div class="shelf-tools" id="shelf-tools" style="display:none;">
@@ -321,7 +420,25 @@
   var shelfToolsEl = document.getElementById('shelf-tools');
   var importFileEl = document.getElementById('import-file');
   var lastBlobUrl = null;
-  var SPINES = ['book--rose','book--sage','book--gold','book--dust','book--plum'];
+
+  // ── cover designer ──
+  var coverCardEl = document.getElementById('cover-card');
+  var covKickerEl = document.getElementById('cov-kicker');
+  var covTitleEl = document.getElementById('cov-title');
+  var covBlurbEl = document.getElementById('cov-blurb');
+  var covGlyphEl = document.getElementById('cov-glyph');
+  var ACCENTS = [
+    { id:'rose', color:'#8C3B4A' }, { id:'sage', color:'#8FA37E' },
+    { id:'gold', color:'#C9A66B' }, { id:'dust', color:'#C77C8E' }, { id:'plum', color:'#6f4a63' }
+  ];
+  var FINISHES = [
+    { id:'none', label:'none', sym:'○' }, { id:'pulse', label:'pulse', sym:'◉' },
+    { id:'shimmer', label:'shimmer', sym:'◈' }, { id:'halo', label:'halo', sym:'⊙' },
+    { id:'drift', label:'drift', sym:'≋' }
+  ];
+  var GLYPHS = ['✦','❀','☽','◆','∞','✶','☉','❦','✧','⚘'];
+  var ACCENT_IDS = ACCENTS.map(function(a){ return a.id; });
+  var cover = { accent:'rose', finish:'none', glyph:'✦' };
 
   var SHELF_KEY = 'ologypedia-studio-v1';
   var shelf = loadShelf();
@@ -337,15 +454,66 @@
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
   function bookFor(entry, i){
-    var spine = SPINES[i % SPINES.length];
+    var accent = (entry.accent && ACCENT_IDS.indexOf(entry.accent) >= 0) ? entry.accent : ACCENT_IDS[i % ACCENT_IDS.length];
+    var fx = (entry.finish && entry.finish !== 'none') ? ' fx-' + entry.finish : '';
+    var glyph = entry.glyph || '✦';
     var lines = [];
-    lines.push('<a class="book ' + spine + '" data-slug="' + entry.slug + '" href="/ologypedia/textbook-' + entry.slug + '.html">');
-    if (entry.subject) lines.push('  <span class="book-kicker">' + escapeHtml(entry.subject) + '</span>');
-    lines.push('  <h2 class="book-title">' + escapeHtml(entry.title) + '</h2>');
-    lines.push('  <p class="book-desc">' + escapeHtml(entry.desc || 'One line on what it covers and which example blocks it uses.') + '</p>');
-    lines.push('  <span class="book-read">Read &#10022;</span>');
+    lines.push('<a class="card63 acc-' + accent + fx + '" data-slug="' + entry.slug + '" href="/ologypedia/textbook-' + entry.slug + '.html">');
+    lines.push('  <div class="c-inner">');
+    lines.push('    <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>');
+    if (entry.subject) lines.push('    <span class="c-kicker">' + escapeHtml(entry.subject) + '</span>');
+    lines.push('    <div class="c-core">');
+    lines.push('      <div class="c-medallion"><span class="c-glyph">' + escapeHtml(glyph) + '</span></div>');
+    lines.push('      <h2 class="c-title">' + escapeHtml(entry.title) + '</h2>');
+    lines.push('      <p class="c-blurb">' + escapeHtml(entry.desc || 'One line on what it covers and which example blocks it uses.') + '</p>');
+    lines.push('    </div>');
+    lines.push('    <span class="c-foot"><span class="c-read">Read &#10022;</span><span class="c-brand">Ologypedia</span></span>');
+    lines.push('  </div>');
     lines.push('</a>');
     return lines.join('\n');
+  }
+
+  /* ===== cover designer ===== */
+  function buildCoverControls(){
+    ACCENTS.forEach(function(a){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'cd-swatch'; b.dataset.accent = a.id;
+      b.style.background = a.color; b.title = a.id;
+      b.setAttribute('aria-label', a.id + ' accent');
+      b.addEventListener('click', function(){ cover.accent = a.id; updateCover(); });
+      document.getElementById('cd-accents').appendChild(b);
+    });
+    FINISHES.forEach(function(f){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'cd-chip'; b.dataset.finish = f.id;
+      b.innerHTML = '<span class="sym">' + f.sym + '</span>' + f.label;
+      b.title = f.label + ' finish';
+      b.addEventListener('click', function(){ cover.finish = f.id; updateCover(); });
+      document.getElementById('cd-finishes').appendChild(b);
+    });
+    GLYPHS.forEach(function(g){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'cd-glyph-btn'; b.dataset.glyph = g;
+      b.textContent = g; b.setAttribute('aria-label', 'glyph ' + g);
+      b.addEventListener('click', function(){ cover.glyph = g; updateCover(); });
+      document.getElementById('cd-glyphs').appendChild(b);
+    });
+  }
+  function updateCover(){
+    coverCardEl.className = 'card63 acc-' + cover.accent + (cover.finish !== 'none' ? ' fx-' + cover.finish : '');
+    covKickerEl.textContent = subjectEl.value.trim();
+    covTitleEl.textContent = topicEl.value.trim() || 'Your Title';
+    covBlurbEl.textContent = descEl.value.trim() || 'A one-line blurb appears here.';
+    covGlyphEl.textContent = cover.glyph;
+    setActive('cd-accents', 'accent', cover.accent);
+    setActive('cd-finishes', 'finish', cover.finish);
+    setActive('cd-glyphs', 'glyph', cover.glyph);
+  }
+  function setActive(containerId, attr, value){
+    var kids = document.getElementById(containerId).children;
+    for (var i = 0; i < kids.length; i++){
+      kids[i].classList.toggle('active', kids[i].dataset[attr] === value);
+    }
   }
 
   var VISUAL_SYSTEM =
@@ -535,7 +703,9 @@
     var title = topicEl.value.trim() || 'Untitled entry';
     var desc = descEl.value.trim();
     var subject = subjectEl.value.trim();
-    var entry = { slug: slug, title: title, subject: subject, desc: desc, html: html, savedAt: Date.now() };
+    var entry = { slug: slug, title: title, subject: subject, desc: desc,
+      accent: cover.accent, finish: cover.finish, glyph: cover.glyph,
+      html: html, savedAt: Date.now() };
     var backup = shelf.slice();
     var existing = findEntry(slug);
     if (existing){ shelf[shelf.indexOf(existing)] = entry; }
@@ -555,8 +725,12 @@
     topicEl.value = e.title === 'Untitled entry' ? '' : e.title;
     subjectEl.value = e.subject || '';
     descEl.value = e.desc || '';
+    cover.accent = (e.accent && ACCENT_IDS.indexOf(e.accent) >= 0) ? e.accent : 'rose';
+    cover.finish = e.finish || 'none';
+    cover.glyph = e.glyph || '✦';
     pasteEl.value = e.html;
     buildPrompt();
+    updateCover();
     refreshPreview();
     showSave('Opened “' + e.title + '” — edit above, then Add to my textbook to save your changes.', false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -598,6 +772,11 @@
     shelf.forEach(function(e, i){
       var li = document.createElement('li');
       var num = document.createElement('span'); num.className = 'shelf-num'; num.textContent = (i + 1);
+      var chip = document.createElement('span'); chip.className = 'shelf-cover';
+      var accHex = { rose:'#8C3B4A', sage:'#8FA37E', gold:'#C9A66B', dust:'#C77C8E', plum:'#6f4a63' };
+      chip.style.background = accHex[e.accent] || accHex.rose;
+      chip.textContent = e.glyph || '✦';
+      chip.title = (e.accent || 'rose') + (e.finish && e.finish !== 'none' ? ' · ' + e.finish : '');
       var meta = document.createElement('div'); meta.className = 'shelf-meta';
       if (e.subject){ var k = document.createElement('div'); k.className = 'shelf-kicker'; k.textContent = e.subject; meta.appendChild(k); }
       var t = document.createElement('p'); t.className = 'shelf-title'; t.textContent = e.title;
@@ -608,7 +787,7 @@
       acts.appendChild(iconBtn('↗', 'Preview in a new tab', function(){ previewEntry(e.slug); }));
       acts.appendChild(iconBtn('↓', 'Download this file', function(){ downloadEntry(e.slug); }));
       acts.appendChild(iconBtn('✕', 'Remove from textbook', function(){ removeEntry(e.slug); }, true));
-      li.appendChild(num); li.appendChild(meta); li.appendChild(acts);
+      li.appendChild(num); li.appendChild(chip); li.appendChild(meta); li.appendChild(acts);
       shelfListEl.appendChild(li);
     });
     var has = shelf.length > 0;
@@ -640,7 +819,10 @@
       var added = 0;
       incoming.forEach(function(e){
         if (!e || !e.slug || !e.html) return;
-        var clean = { slug: e.slug, title: e.title || 'Untitled entry', subject: e.subject || '', desc: e.desc || '', html: e.html, savedAt: e.savedAt || Date.now() };
+        var clean = { slug: e.slug, title: e.title || 'Untitled entry', subject: e.subject || '', desc: e.desc || '',
+          accent: (e.accent && ACCENT_IDS.indexOf(e.accent) >= 0) ? e.accent : 'rose',
+          finish: e.finish || 'none', glyph: e.glyph || '✦',
+          html: e.html, savedAt: e.savedAt || Date.now() };
         var existing = findEntry(clean.slug);
         if (existing){ shelf[shelf.indexOf(existing)] = clean; } else { shelf.push(clean); }
         added++;
@@ -661,8 +843,8 @@
   }
 
   [topicEl, subjectEl, contextEl, descEl, diagnosisEl].forEach(function(el){
-    el.addEventListener('input', buildPrompt);
-    el.addEventListener('change', buildPrompt);
+    el.addEventListener('input', function(){ buildPrompt(); updateCover(); });
+    el.addEventListener('change', function(){ buildPrompt(); updateCover(); });
   });
   pasteEl.addEventListener('input', refreshPreview);
   openTabEl.addEventListener('click', function(){
@@ -674,7 +856,9 @@
   importFileEl.addEventListener('change', function(){ if (importFileEl.files[0]) importShelf(importFileEl.files[0]); importFileEl.value = ''; });
   document.getElementById('clear-shelf').addEventListener('click', clearShelf);
 
+  buildCoverControls();
   buildPrompt();
+  updateCover();
   refreshPreview();
   renderShelf();
 
