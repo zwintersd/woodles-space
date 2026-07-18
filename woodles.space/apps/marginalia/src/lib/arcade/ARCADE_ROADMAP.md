@@ -278,23 +278,43 @@ Stat pitch:
 
 Current progress: A tight growth-survival game. The player eats strictly smaller
 blobs, avoids bigger ones, slows as they grow, wraps around edges, and wins by
-becoming large enough to eat the yellow blob. The hard rule is clear and good.
+becoming large enough to eat the yellow blob. The hard rule remains clear and
+unchanged: equal size is still dangerous.
+
+Current demo baseline:
+- Active-pet stats are live: Body increases starting radius; Mind adds edible /
+  danger outlines and stronger edge-entry markers; Grace improves braking and
+  turning; Heart supplies growth-costing bump saves.
+- Local records retain best score and recent run summaries; the planned normal
+  target is a 2–4 minute first victory, to be checked in playtesting rather
+  than treated as a current measured claim.
+- The run now teaches itself: every off-screen entrant leaves a subtle edge
+  marker, yellow shows a locked/ready goal state, and end screens report time,
+  food tiers, and narrowly avoided danger blobs.
 
 Next expansions:
-- Add difficulty bands: calm, normal, hungry.
-- Add a post-run breakdown of edible contacts, danger dodges, and time.
-- Add subtle spawn warning at screen edges.
-- Add pet-stat tuning without weakening the "strictly bigger" rule.
+- Add difficulty bands: calm, normal, hungry. Change only local spawn cadence,
+  enemy mix, and speed; never weaken the strictly-larger collision rule.
+- Add per-band personal bests and optional mastery badges after the three bands
+  have received real playtesting.
 
 Resolved in Week 9:
 - Its hand-rolled `<svg class="field">` wrapper now uses the shared
   `SvgArena` component for the grid background and frame.
 
+Resolved in Get Big! phases 0–2:
+- The roadmap now reflects the live stats and records rather than the earlier
+  demo state.
+- Mobile controls have tactile pressed states, and the pre-win yellow target is
+  visibly distinct once it is edible.
+- The post-run breakdown includes score, elapsed time, total food, food tiers,
+  and danger dodges. A dodge is one larger-or-equal blob that passes within 13
+  arena units of the player without touching; each blob can count once.
+
 Rough edges:
-- No active-pet stats yet.
-- Mobile directional controls work, but could use more tactile pressed states.
-- The win target is strong but could use a clearer pre-win signal.
-- No saved best run.
+- Difficulty has one live tuning profile only.
+- The new first-win target needs browser playtesting before its spawn numbers
+  should be treated as balanced.
 
 Stat pitch:
 - Body: slightly larger starting radius or stronger acceleration.
