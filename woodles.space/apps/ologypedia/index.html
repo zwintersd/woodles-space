@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ologypedia · woodles.space</title>
-<meta name="description" content="A textbook, grown one entry at a time — a bookshelf of worked pages, and an editor to add more.">
+<meta name="description" content="A textbook, grown one entry at a time — a deck of worked pages as cover-cards, and an editor to add more.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="/shared/fonts.css">
@@ -16,7 +16,7 @@
   }
   *{box-sizing:border-box;}
   body{margin:0; background:#E9DCCB; padding:40px 20px 64px; font-family:var(--font-body); color:var(--ink); line-height:1.6;}
-  .wrap{max-width:1060px; margin:0 auto;}
+  .wrap{max-width:1000px; margin:0 auto;}
 
   /* ===== header ===== */
   .shelf-head{text-align:center; margin-bottom:34px;}
@@ -26,64 +26,92 @@
   .shelf-head .sub{display:flex; align-items:center; justify-content:center; gap:12px; font-family:var(--font-display); font-style:italic; font-size:18px; color:var(--rose-dust); margin:0;}
   .shelf-head .sub .orn{color:var(--gold); font-style:normal; font-size:13px;}
 
-  /* ===== the shelf grid ===== */
-  .shelf{display:grid; grid-template-columns:repeat(auto-fill, minmax(210px,1fr)); gap:16px; grid-auto-rows:minmax(168px,auto); align-items:stretch;}
+  /* ===== the deck ===== */
+  .deck{display:grid; grid-template-columns:repeat(auto-fill, minmax(170px,1fr)); gap:18px; grid-auto-rows:max-content; align-items:start;}
+  @media(max-width:420px){ .deck{grid-template-columns:repeat(auto-fill, minmax(150px,1fr));} }
 
-  /* editor tile — the sizeable top-left way in */
-  .editor-tile{
-    grid-column:span 1; grid-row:span 1;
+  /* editor card — the sizeable top-left way in */
+  .editor-card{
+    grid-column:span 1; grid-row:span 1; align-self:stretch;
     display:flex; flex-direction:column; justify-content:space-between;
-    text-decoration:none; color:inherit;
+    text-decoration:none; color:inherit; min-height:250px;
     border:2px dashed var(--gold); border-radius:12px;
-    background:linear-gradient(150deg, var(--blush), #fffdfa 70%);
-    padding:22px 24px;
+    background:linear-gradient(150deg, var(--blush), #fffdfa 72%);
+    padding:22px 22px 20px;
     transition:transform .16s ease, border-color .16s ease, box-shadow .16s ease;
   }
-  @media(min-width:640px){ .editor-tile{ grid-column:span 2; grid-row:span 2; } }
-  .editor-tile:hover{transform:translateY(-3px); border-color:var(--rose-deep); box-shadow:0 14px 30px -18px var(--rose-deep);}
-  .et-plus{width:46px; height:46px; border-radius:50%; border:2px solid var(--gold); color:var(--rose-deep); display:flex; align-items:center; justify-content:center; font-size:30px; font-weight:300; line-height:1; margin-bottom:auto;}
-  .editor-tile:hover .et-plus{border-color:var(--rose-deep); background:var(--paper);}
-  .et-body{margin-top:20px;}
+  @media(min-width:620px){ .editor-card{ grid-column:span 2; grid-row:span 2; } }
+  .editor-card:hover{transform:translateY(-3px); border-color:var(--rose-deep); box-shadow:0 14px 30px -18px var(--rose-deep);}
+  .et-plus{width:46px; height:46px; border-radius:50%; border:2px solid var(--gold); color:var(--rose-deep); display:flex; align-items:center; justify-content:center; font-size:30px; font-weight:300; line-height:1;}
+  .editor-card:hover .et-plus{border-color:var(--rose-deep); background:var(--paper);}
   .et-kicker{display:block; font-family:var(--font-display); font-weight:600; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--rose-dust); margin-bottom:5px;}
-  .et-title{font-family:var(--font-display); font-weight:600; font-size:clamp(26px,4.4vw,34px); color:var(--rose-deep); margin:0 0 8px; line-height:1.02;}
-  .et-sub{font-size:13.5px; line-height:1.5; color:var(--ink-soft); margin:0;}
-  .et-cta{display:inline-block; margin-top:16px; font-family:var(--font-display); font-weight:600; font-size:14px; letter-spacing:.03em; color:var(--rose-deep);}
-  .editor-tile:hover .et-cta{color:var(--rose-dust);}
+  .et-title{font-family:var(--font-display); font-weight:600; font-size:clamp(24px,4vw,32px); color:var(--rose-deep); margin:0 0 8px; line-height:1.02;}
+  .et-sub{font-size:13px; line-height:1.5; color:var(--ink-soft); margin:0;}
+  .et-cta{display:inline-block; margin-top:14px; font-family:var(--font-display); font-weight:600; font-size:14px; letter-spacing:.03em; color:var(--rose-deep);}
+  .editor-card:hover .et-cta{color:var(--rose-dust);}
 
-  /* a book */
-  .book{
-    position:relative; display:flex; flex-direction:column;
+  /* ===== a cover-card (the card-back / book cover) ===== */
+  .card63{
+    --dc:var(--rose-dust);
+    position:relative; display:flex;
+    aspect-ratio:63/88; border-radius:11px; overflow:hidden;
+    container-type:inline-size;
     text-decoration:none; color:inherit;
-    background:#fffdfa; border:1px solid var(--gold);
-    border-radius:5px 11px 11px 5px;
-    padding:18px 20px 16px 28px; overflow:hidden;
+    border:1px solid color-mix(in srgb, var(--dc) 45%, var(--gold));
+    background:
+      repeating-linear-gradient(-45deg, transparent 0 7px, color-mix(in srgb, var(--dc) 7%, transparent) 7px 8px),
+      radial-gradient(ellipse 80% 62% at 50% 37%, color-mix(in srgb, var(--dc) 16%, #fffdfa) 0%, var(--paper) 66%, var(--paper-edge) 100%);
     box-shadow:2px 3px 0 var(--paper-edge);
     transition:transform .16s ease, box-shadow .16s ease;
   }
-  .book::before{content:''; position:absolute; left:0; top:0; bottom:0; width:9px; background:var(--rose-dust);}
-  .book::after{content:''; position:absolute; right:0; top:6px; bottom:6px; width:3px; border-left:1px solid var(--paper-edge); background:linear-gradient(90deg, transparent, rgba(0,0,0,.04));}
-  .book:hover{transform:translateY(-4px); box-shadow:4px 8px 20px -8px var(--rose-deep);}
-  .book--rose::before{background:var(--rose-deep);}
-  .book--sage::before{background:var(--sage);}
-  .book--gold::before{background:var(--gold);}
-  .book--dust::before{background:var(--rose-dust);}
-  .book--plum::before{background:#6f4a63;}
-  .book-kicker{display:block; font-family:var(--font-display); font-weight:600; font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--rose-dust); margin-bottom:6px;}
-  .book-title{font-family:var(--font-display); font-weight:600; font-size:22px; line-height:1.08; color:var(--rose-deep); margin:0 0 8px;}
-  .book-desc{font-size:13px; line-height:1.5; color:var(--ink-soft); margin:0 0 14px;}
-  .book-read{margin-top:auto; font-family:var(--font-display); font-weight:600; font-size:12.5px; letter-spacing:.04em; color:var(--gold);}
-  .book:hover .book-read{color:var(--rose-deep);}
+  .card63:hover{transform:translateY(-5px); box-shadow:5px 11px 26px -10px color-mix(in srgb, var(--dc) 65%, transparent);}
+  .acc-rose{--dc:var(--rose-deep);}
+  .acc-sage{--dc:var(--sage);}
+  .acc-gold{--dc:var(--gold);}
+  .acc-dust{--dc:var(--rose-dust);}
+  .acc-plum{--dc:#6f4a63;}
 
-  /* a draft book (from your editor, this browser) */
-  .book--draft{background:repeating-linear-gradient(135deg,#fffdfa,#fffdfa 11px,var(--paper) 11px,var(--paper) 22px); border-style:dashed;}
-  .book--draft::before{background:var(--rose-dust); opacity:.55;}
-  .book-tag{align-self:flex-start; font-family:var(--font-display); font-weight:600; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--rose-deep); background:var(--blush); border:1px solid var(--rose-dust); border-radius:999px; padding:1px 9px; margin-bottom:8px;}
-  .book--draft .book-read{color:var(--rose-dust);}
+  /* inner wrapper carries the cqw font-size so text scales to card width
+     (a container element sizes its descendants, never itself) */
+  .c-inner{flex:1; min-height:0; display:flex; flex-direction:column; padding:1.5em 1.25em 1.2em; font-size:5cqw; position:relative; z-index:2;}
+  .card63 .corner{position:absolute; z-index:2; width:.62em; height:.62em; border:0 solid color-mix(in srgb, var(--dc) 60%, transparent);}
+  .card63 .corner.tl{top:.5em; left:.5em; border-top-width:1.5px; border-left-width:1.5px;}
+  .card63 .corner.tr{top:.5em; right:.5em; border-top-width:1.5px; border-right-width:1.5px;}
+  .card63 .corner.bl{bottom:.5em; left:.5em; border-bottom-width:1.5px; border-left-width:1.5px;}
+  .card63 .corner.br{bottom:.5em; right:.5em; border-bottom-width:1.5px; border-right-width:1.5px;}
+
+  .c-kicker{text-align:center; font-family:var(--font-display); font-weight:600; font-size:.6em; letter-spacing:.14em; text-transform:uppercase; color:color-mix(in srgb, var(--dc) 72%, var(--ink)); min-height:1.1em;}
+  .c-core{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:.5em; min-height:0;}
+  .c-medallion{width:3.2em; height:3.2em; flex:none; border-radius:50%; border:1px solid color-mix(in srgb, var(--dc) 55%, transparent); background:color-mix(in srgb, var(--dc) 8%, #fffdfa); box-shadow:0 0 1.1em color-mix(in srgb, var(--dc) 22%, transparent), inset 0 0 .7em color-mix(in srgb, var(--dc) 12%, transparent); display:flex; align-items:center; justify-content:center;}
+  .c-glyph{font-size:1.5em; line-height:1; color:color-mix(in srgb, var(--dc) 82%, var(--rose-deep));}
+  .c-title{font-family:var(--font-display); font-weight:600; font-size:1.42em; line-height:1.05; color:var(--rose-deep); margin:0;}
+  .c-blurb{font-size:.62em; line-height:1.4; color:var(--ink-soft); margin:0; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;}
+  .c-foot{display:flex; align-items:center; justify-content:space-between; gap:.5em;}
+  .c-read{font-family:var(--font-display); font-weight:600; font-size:.56em; letter-spacing:.04em; color:var(--gold);}
+  .card63:hover .c-read{color:var(--rose-deep);}
+  .c-brand{font-family:var(--font-display); font-size:.46em; letter-spacing:.16em; text-transform:uppercase; color:color-mix(in srgb, var(--dc) 60%, transparent);}
+
+  /* draft variant */
+  .card63.is-draft{border-style:dashed;}
+  .card63.is-draft .c-read{color:var(--rose-dust);}
+  .c-tag{position:absolute; top:.7em; left:50%; transform:translateX(-50%); z-index:3; font-family:var(--font-display); font-weight:600; font-size:.5em; letter-spacing:.12em; text-transform:uppercase; color:var(--rose-deep); background:var(--blush); border:1px solid var(--rose-dust); border-radius:999px; padding:.12em .9em;}
+
+  /* ── finishes, pulled from the bestiary card-back editor, tuned for light ── */
+  @keyframes cb-pulse{0%,100%{opacity:.3}50%{opacity:.8}}
+  @keyframes cb-shimmer{0%{transform:translateX(-160%) skewX(-18deg);opacity:0}8%{opacity:1}55%{opacity:.85}60%,100%{transform:translateX(210%) skewX(-18deg);opacity:0}}
+  @keyframes cb-halo{to{transform:rotate(360deg)}}
+  @keyframes cb-drift{0%{transform:translate(0,0) scale(1);opacity:.4}25%{transform:translate(-7%,5%) scale(1.08);opacity:.6}50%{transform:translate(5%,-6%) scale(.96);opacity:.45}75%{transform:translate(-4%,-3%) scale(1.05);opacity:.6}100%{transform:translate(0,0) scale(1);opacity:.4}}
+  .fx-pulse::after,.fx-shimmer::after,.fx-halo::after,.fx-drift::after{content:''; position:absolute; pointer-events:none;}
+  .fx-pulse::after{inset:0; border-radius:inherit; z-index:1; box-shadow:inset 0 0 1.7em .45em color-mix(in srgb, var(--dc) 26%, transparent), inset 0 0 .5em 0 color-mix(in srgb, var(--dc) 40%, transparent); animation:cb-pulse 3.4s ease-in-out infinite;}
+  .fx-shimmer::after{top:-10%; left:0; width:55%; height:120%; z-index:3; background:linear-gradient(105deg, transparent 12%, rgba(255,255,255,.14) 32%, color-mix(in srgb, var(--gold) 45%, rgba(255,255,255,.7)) 50%, rgba(255,255,255,.14) 68%, transparent 88%); transform:translateX(-160%) skewX(-18deg); animation:cb-shimmer 7.5s ease-in-out infinite;}
+  .fx-halo::after{top:-50%; left:-50%; width:200%; height:200%; z-index:1; background:conic-gradient(from 0deg at 50% 50%, transparent 0deg, color-mix(in srgb, var(--dc) 18%, transparent) 42deg, transparent 92deg, transparent 200deg, color-mix(in srgb, var(--gold) 20%, transparent) 250deg, transparent 300deg); mix-blend-mode:multiply; animation:cb-halo 17s linear infinite;}
+  .fx-drift::after{top:-20%; left:-20%; width:140%; height:140%; z-index:1; background:radial-gradient(ellipse 74% 60% at 40% 45%, color-mix(in srgb, var(--dc) 22%, transparent), transparent 66%); mix-blend-mode:multiply; animation:cb-drift 12s ease-in-out infinite;}
+  @media(prefers-reduced-motion:reduce){ .fx-pulse::after,.fx-shimmer::after,.fx-halo::after,.fx-drift::after{animation:none;} }
 
   /* trailing caption when drafts are present */
-  .shelf-note{grid-column:1/-1; display:flex; align-items:center; gap:14px; margin:6px 2px 0; color:var(--rose-dust);}
-  .shelf-note::before, .shelf-note::after{content:''; flex:1; height:1px; background:var(--rose-dust); opacity:.45;}
-  .shelf-note span{font-family:var(--font-display); font-style:italic; font-size:12.5px; text-align:center;}
+  .deck-note{grid-column:1/-1; display:flex; align-items:center; gap:14px; margin:6px 2px 0; color:var(--rose-dust);}
+  .deck-note::before, .deck-note::after{content:''; flex:1; height:1px; background:var(--rose-dust); opacity:.45;}
+  .deck-note span{font-family:var(--font-display); font-style:italic; font-size:12.5px; text-align:center;}
 
   /* ===== under-the-hood footer ===== */
   .undertow{margin-top:40px; text-align:center; border-top:1px solid var(--rose-dust); padding-top:22px;}
@@ -103,38 +131,50 @@
     <p class="sub"><span class="orn">✦</span> A textbook, grown one entry at a time <span class="orn">✦</span></p>
   </header>
 
-  <main class="shelf" id="shelf">
+  <main class="deck" id="deck">
 
-    <a class="editor-tile" href="/ologypedia/add-page.html">
+    <a class="editor-card" href="/ologypedia/add-page.html">
       <span class="et-plus">+</span>
-      <div class="et-body">
+      <div>
         <span class="et-kicker">The Editor</span>
         <h2 class="et-title">Add a Page</h2>
-        <p class="et-sub">Write a new entry, preview it live, and shelve it — the studio runs the whole loop, no backend required.</p>
+        <p class="et-sub">Write a new entry, design its cover, preview it live, and shelve it — the studio runs the whole loop, no backend required.</p>
         <span class="et-cta">Open the editor &rarr;</span>
       </div>
     </a>
 
-    <!-- shelved books — committed, readable by anyone -->
-    <a class="book book--sage" data-slug="photosynthesis" href="/ologypedia/textbook-photosynthesis.html">
-      <span class="book-kicker">Biology &middot; Biochemistry</span>
-      <h2 class="book-title">Photosynthesis</h2>
-      <p class="book-desc">How light becomes sugar — the mechanism, two centuries of discovery, C3 vs. C4, and two billion years of atmospheric oxygen.</p>
-      <span class="book-read">Read &#10022;</span>
+    <!-- shelved cards — committed, readable by anyone -->
+    <a class="card63 acc-sage fx-drift" data-slug="photosynthesis" href="/ologypedia/textbook-photosynthesis.html">
+      <div class="c-inner">
+        <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+        <span class="c-kicker">Biology &middot; Biochemistry</span>
+        <div class="c-core">
+          <div class="c-medallion"><span class="c-glyph">❀</span></div>
+          <h2 class="c-title">Photosynthesis</h2>
+          <p class="c-blurb">How light becomes sugar — the mechanism, two centuries of discovery, C3 vs. C4, and two billion years of oxygen.</p>
+        </div>
+        <span class="c-foot"><span class="c-read">Read &#10022;</span><span class="c-brand">Ologypedia</span></span>
+      </div>
     </a>
 
-    <a class="book book--rose" data-slug="challenger" href="/ologypedia/textbook-challenger.html">
-      <span class="book-kicker">History &middot; Engineering</span>
-      <h2 class="book-title">The Challenger Disaster</h2>
-      <p class="book-desc">A cold morning, a reversed recommendation, seventy-three seconds — and the number Feynman couldn't let go of.</p>
-      <span class="book-read">Read &#10022;</span>
+    <a class="card63 acc-rose fx-shimmer" data-slug="challenger" href="/ologypedia/textbook-challenger.html">
+      <div class="c-inner">
+        <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+        <span class="c-kicker">History &middot; Engineering</span>
+        <div class="c-core">
+          <div class="c-medallion"><span class="c-glyph">✶</span></div>
+          <h2 class="c-title">The Challenger Disaster</h2>
+          <p class="c-blurb">A cold morning, a reversed recommendation, seventy-three seconds — and the number Feynman couldn't let go of.</p>
+        </div>
+        <span class="c-foot"><span class="c-read">Read &#10022;</span><span class="c-brand">Ologypedia</span></span>
+      </div>
     </a>
 
-    <!-- draft books (from your editor, this browser) are injected here -->
+    <!-- draft cards (from your editor, this browser) are injected here -->
   </main>
 
   <footer class="undertow">
-    <p>Every page is plain HTML, cut from one block system so the whole shelf reads as one book.</p>
+    <p>Every page is plain HTML, cut from one block system so the whole deck reads as one book.</p>
     <p>
       Under the hood:
       <a href="/ologypedia/textbook-chrome-blocks.html">Chrome blocks</a>
@@ -148,10 +188,10 @@
 
 <script>
 (function(){
-  var grid = document.getElementById('shelf');
+  var deck = document.getElementById('deck');
   var published = {};
-  Array.prototype.forEach.call(grid.querySelectorAll('.book[data-slug]'), function(b){
-    published[b.getAttribute('data-slug')] = true;
+  Array.prototype.forEach.call(deck.querySelectorAll('.card63[data-slug]'), function(c){
+    published[c.getAttribute('data-slug')] = true;
   });
 
   var shelf;
@@ -162,32 +202,50 @@
   var drafts = shelf.filter(function(e){ return e && e.slug && !published[e.slug]; });
   if (!drafts.length) return;
 
-  // drafts flow inline right after the shelved books, distinguished by the
-  // dashed "Draft" treatment rather than a divider that would strand them
-  // in a far row.
-  drafts.forEach(function(e){
+  var ACCENTS = ['acc-rose','acc-sage','acc-gold','acc-dust','acc-plum'];
+  var FINISHES = { pulse:1, shimmer:1, halo:1, drift:1 };
+
+  drafts.forEach(function(e, i){
+    var acc = (e.accent && ACCENTS.indexOf('acc-' + e.accent) >= 0) ? 'acc-' + e.accent : ACCENTS[i % ACCENTS.length];
+    var fx = (e.finish && FINISHES[e.finish]) ? ' fx-' + e.finish : '';
     var a = document.createElement('a');
-    a.className = 'book book--draft';
+    a.className = 'card63 is-draft ' + acc + fx;
     a.href = '/ologypedia/add-page.html?open=' + encodeURIComponent(e.slug);
-    a.appendChild(el('span', 'book-tag', 'Draft'));
-    if (e.subject) a.appendChild(el('span', 'book-kicker', e.subject));
-    a.appendChild(el('h2', 'book-title', e.title || 'Untitled entry'));
-    a.appendChild(el('p', 'book-desc', e.desc || 'Started in the editor — not shelved yet.'));
-    a.appendChild(el('span', 'book-read', 'Continue in the editor →'));
-    grid.appendChild(a);
+
+    var inner = el('div', 'c-inner', '');
+    inner.appendChild(corner('tl')); inner.appendChild(corner('tr'));
+    inner.appendChild(corner('bl')); inner.appendChild(corner('br'));
+    inner.appendChild(el('span', 'c-tag', 'Draft'));
+    inner.appendChild(el('span', 'c-kicker', e.subject || ''));
+
+    var core = el('div', 'c-core', '');
+    var med = el('div', 'c-medallion', '');
+    med.appendChild(el('span', 'c-glyph', e.glyph || '✦'));
+    core.appendChild(med);
+    core.appendChild(el('h2', 'c-title', e.title || 'Untitled entry'));
+    core.appendChild(el('p', 'c-blurb', e.desc || 'Started in the editor — not shelved yet.'));
+    inner.appendChild(core);
+
+    var foot = el('span', 'c-foot', '');
+    foot.appendChild(el('span', 'c-read', 'Continue →'));
+    foot.appendChild(el('span', 'c-brand', 'Draft'));
+    inner.appendChild(foot);
+
+    a.appendChild(inner);
+    deck.appendChild(a);
   });
 
-  var note = document.createElement('div');
-  note.className = 'shelf-note';
-  note.appendChild(el('span', '', 'Dashed books are drafts — saved only in this browser, until you publish them from the editor'));
-  grid.appendChild(note);
+  var note = el('div', 'deck-note', '');
+  note.appendChild(el('span', '', 'Dashed cards are drafts — saved only in this browser, until you publish them from the editor'));
+  deck.appendChild(note);
 
   function el(tag, cls, text){
     var n = document.createElement(tag);
-    n.className = cls;
-    n.textContent = text;
+    if (cls) n.className = cls;
+    if (text) n.textContent = text;
     return n;
   }
+  function corner(pos){ return el('span', 'corner ' + pos, ''); }
 })();
 </script>
 
