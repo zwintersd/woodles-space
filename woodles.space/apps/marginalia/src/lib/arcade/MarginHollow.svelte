@@ -3,6 +3,7 @@
 	import ArcadeHud from './ArcadeHud.svelte';
 	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
+	import MarginHollowScene from './MarginHollowScene.svelte';
 	import SvgArena from './SvgArena.svelte';
 	import { clamp, type Dot } from './arcadeMath';
 	import { arcadeStartLabel } from './arcadeLabels';
@@ -853,6 +854,7 @@
 		gridSize={30}
 		gridOpacity={0.66}
 	>
+		<MarginHollowScene roomId={currentRoom.id} />
 		<rect class="hit-flash" class:active={hurtClock > 0} width={WORLD_W} height={WORLD_H} rx="6" />
 		<text class="room-title" x="18" y="28">{currentRoom.title}</text>
 		<g class="room-map" aria-label="explored rooms">
@@ -875,6 +877,10 @@
 		</g>
 
 		{#each currentRoom.doors as door (door.id)}
+			<path
+				class="door-ribbon"
+				d={`M ${door.x + 5} ${door.y + 8} q ${door.w / 2 - 5} -8 ${door.w - 10} 0 M ${door.x + 5} ${door.y + door.h - 8} q ${door.w / 2 - 5} 8 ${door.w - 10} 0`}
+			/>
 			<rect
 				class="door"
 				class:locked={!requirementMet(door.requires)}
@@ -901,6 +907,10 @@
 
 		{#each currentRoom.gates as gate (gate.id)}
 			<rect class={gateClass(gate)} x={gate.x} y={gate.y} width={gate.w} height={gate.h} rx="4" />
+			<path
+				class="gate-stitch"
+				d={`M ${gate.x + gate.w / 2} ${gate.y + 7} v ${Math.max(0, gate.h - 14)}`}
+			/>
 			<text class="gate-label" x={gate.x - 4} y={gate.y + gate.h / 2} text-anchor="end">{gateLabel(gate)}</text>
 		{/each}
 
@@ -910,7 +920,21 @@
 
 		{#each currentRoom.pickups as pickup (pickup.id)}
 			{#if !collected.includes(pickup.id)}
-				<polygon class={pickupClass(pickup)} points={pickupPoints(pickup)} />
+				<circle class="pickup-halo" cx={pickup.x + PICKUP_SIZE / 2} cy={pickup.y + PICKUP_SIZE / 2} r="12" />
+				{#if pickup.kind === 'wing'}
+					<path
+						class={pickupClass(pickup)}
+						d={`M ${pickup.x + 4} ${pickup.y + 14} q 4 -15 12 -10 q 2 9 -7 12 q 6 1 8 -5 q 1 8 -8 9 q -7 0 -9 -6 Z`}
+					/>
+				{:else if pickup.kind === 'key'}
+					<g class={pickupClass(pickup)}>
+						<circle cx={pickup.x + 6} cy={pickup.y + 6} r="4" />
+						<path d={`M ${pickup.x + 9} ${pickup.y + 9} l 7 7 m -4 -4 l -3 3 m 6 1 l -3 3`} />
+					</g>
+				{:else}
+					<polygon class={pickupClass(pickup)} points={pickupPoints(pickup)} />
+					<path class="glyph-mark" d={`M ${pickup.x + 8} ${pickup.y + 3} v 10 m -4 -5 h 8`} />
+				{/if}
 				<text class="pickup-label" x={pickup.x + PICKUP_SIZE / 2} y={pickup.y - 6} text-anchor="middle">
 					{pickup.label}
 				</text>
@@ -918,17 +942,16 @@
 		{/each}
 
 		<ellipse class="player-shadow" cx={player.x + PLAYER_W / 2} cy={player.y + PLAYER_H + 3} rx="12" ry="4" />
-		<rect class={playerClass()} x={player.x} y={player.y} width={PLAYER_W} height={PLAYER_H} rx="5" />
-		<circle
-			class="player-eye"
-			cx={facing === 'right' ? player.x + 11 : player.x + 5}
-			cy={player.y + 8}
-			r="1.8"
-		/>
-		{#if hasWing}
-			<path class="wing left" d={`M ${player.x + 2} ${player.y + 10} q -12 -4 -15 8 q 10 -2 15 -8`} />
-			<path class="wing right" d={`M ${player.x + PLAYER_W - 2} ${player.y + 10} q 12 -4 15 8 q -10 -2 -15 -8`} />
-		{/if}
+		<g class={playerClass()} transform={`translate(${player.x} ${player.y})`}>
+			<path class="familiar-body" d="M 8 1 L 15 7 L 13 21 L 8 24 L 3 21 L 1 7 Z" />
+			<path class="familiar-fold" d="M 8 1 v 19 l 5 -5" />
+			<circle class="familiar-core" cx={facing === 'right' ? 10.8 : 5.2} cy="8" r="2" />
+			<path class="familiar-thread" d="M 4 13 q 4 4 8 0" />
+			{#if hasWing}
+				<path class="wing left" d="M 3 10 q -12 -4 -15 8 q 10 -2 15 -8" />
+				<path class="wing right" d="M 13 10 q 12 -4 15 8 q -10 -2 -15 -8" />
+			{/if}
+		</g>
 
 		{#if phase === 'ready' || phase === 'complete' || phase === 'over'}
 			<rect class="veil" width={WORLD_W} height={WORLD_H} rx="6" />
@@ -1056,9 +1079,16 @@
 		stroke-width: 1.5;
 	}
 	.door {
-		fill: rgba(42, 161, 152, 0.22);
+		fill: rgba(42, 161, 152, 0.16);
 		stroke: var(--sol-cyan);
 		stroke-width: 2;
+	}
+	.door-ribbon {
+		fill: none;
+		stroke: rgba(42, 161, 152, 0.5);
+		stroke-width: 1.25;
+		stroke-linecap: round;
+		pointer-events: none;
 	}
 	.door.locked {
 		fill: rgba(181, 137, 0, 0.16);
@@ -1077,6 +1107,13 @@
 		stroke: rgba(42, 161, 152, 0.35);
 		stroke-dasharray: 4 5;
 	}
+	.gate-stitch {
+		fill: none;
+		stroke: rgba(253, 246, 227, 0.78);
+		stroke-dasharray: 2 3;
+		stroke-width: 1.4;
+		pointer-events: none;
+	}
 	.hazard {
 		fill: var(--sol-red);
 		stroke: var(--sol-base3);
@@ -1085,6 +1122,14 @@
 	.pickup {
 		stroke: var(--sol-base3);
 		stroke-width: 2;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+	.pickup-halo {
+		fill: rgba(253, 246, 227, 0.64);
+		stroke: rgba(181, 137, 0, 0.2);
+		stroke-width: 1;
+		pointer-events: none;
 	}
 	.pickup-glyph {
 		fill: var(--sol-cyan);
@@ -1103,6 +1148,16 @@
 		transform-box: fill-box;
 		transform-origin: center;
 	}
+	.pickup-key path {
+		fill: none;
+	}
+	.glyph-mark {
+		fill: none;
+		stroke: var(--sol-base3);
+		stroke-width: 1.5;
+		stroke-linecap: round;
+		pointer-events: none;
+	}
 	@keyframes important-pickup {
 		50% {
 		transform: scale(1.18);
@@ -1111,16 +1166,26 @@
 	.player-shadow {
 		fill: rgba(7, 54, 66, 0.12);
 	}
-	.player {
+	.familiar-body {
 		fill: var(--sol-blue);
 		stroke: var(--sol-base3);
 		stroke-width: 2.5;
+		stroke-linejoin: round;
 	}
-	.player.hurt {
+	.player.hurt .familiar-body {
 		fill: var(--sol-red);
 	}
-	.player-eye {
+	.familiar-fold,
+	.familiar-thread {
+		fill: none;
+		stroke: rgba(253, 246, 227, 0.76);
+		stroke-linecap: round;
+		stroke-width: 1.3;
+	}
+	.familiar-core {
 		fill: var(--sol-base3);
+		stroke: rgba(253, 246, 227, 0.78);
+		stroke-width: 1;
 	}
 	.wing {
 		fill: none;
