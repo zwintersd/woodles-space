@@ -33,6 +33,61 @@ function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// ── cover layers ── kept byte-for-byte in step with cover-render.js's
+// layersHTML, so a published card matches the draft the studio previewed.
+const STAR_CLIP =
+  'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)';
+
+function shapeInnerStyle(layer) {
+  const color = layer.color || '#8C3B4A';
+  switch (layer.kind) {
+    case 'ring':
+      return `width:100%;height:100%;border-radius:50%;background:transparent;box-sizing:border-box;border:${layer.thickness || 10}px solid ${color};`;
+    case 'diamond':
+      return `width:100%;height:100%;background:${color};`;
+    case 'star':
+      return `width:100%;height:100%;background:${color};clip-path:${STAR_CLIP};`;
+    case 'blob':
+      return `width:100%;height:100%;background:${color};border-radius:58% 42% 63% 37% / 41% 58% 42% 59%;filter:blur(1px);`;
+    case 'rays':
+      return `width:100%;height:100%;border-radius:50%;background:repeating-conic-gradient(from 0deg, ${color} 0deg 8deg, transparent 8deg 30deg);`;
+    default:
+      return `width:100%;height:100%;border-radius:50%;background:${color};`;
+  }
+}
+
+function layerOuterStyle(layer) {
+  const rot = (layer.rotation || 0) + (layer.kind === 'diamond' ? 45 : 0);
+  const box = layer.kind === 'image'
+    ? `width:${layer.size}%;height:auto;`
+    : `width:${layer.size}%;aspect-ratio:1/1;`;
+  return (
+    `position:absolute;left:${layer.x * 100}%;top:${layer.y * 100}%;${box}` +
+    `transform:translate(-50%,-50%) rotate(${rot}deg);` +
+    `opacity:${layer.opacity};mix-blend-mode:${layer.blend || 'normal'};pointer-events:none;`
+  );
+}
+
+function imageInnerHTML(layer) {
+  const render = layer.smooth === false ? 'pixelated' : 'auto';
+  const src = String(layer.src || '').replace(/"/g, '&quot;');
+  return `<img class="c-layer-shape c-layer-img" src="${src}" alt="" draggable="false" style="display:block;width:100%;height:auto;image-rendering:${render};">`;
+}
+
+function layersHTML(layers) {
+  if (!Array.isArray(layers) || !layers.length) return '';
+  const visible = layers.filter((l) => l && !l.hidden);
+  if (!visible.length) return '';
+  let out = '<div class="c-layers">';
+  for (const l of visible) {
+    out += `<div class="c-layer" style="${layerOuterStyle(l)}">`;
+    out += l.kind === 'image' ? imageInnerHTML(l) : `<div class="c-layer-shape" style="${shapeInnerStyle(l)}"></div>`;
+    out += '</div>';
+  }
+  out += '</div>';
+  return out;
+}
+
 function renderCard(entry) {
   const accent = entry.accent || 'rose';
   const fx = entry.finish && entry.finish !== 'none' ? ` fx-${entry.finish}` : '';
@@ -40,9 +95,13 @@ function renderCard(entry) {
   const blurb = escapeHtml(entry.desc || 'One line on what it covers and which example blocks it uses.');
   const lines = [
     `    <a class="card63 acc-${accent}${fx}" data-slug="${entry.slug}" href="/ologypedia/textbook-${entry.slug}.html">`,
+  ];
+  const layers = layersHTML(entry.layers);
+  if (layers) lines.push(`      ${layers}`);
+  lines.push(
     `      <div class="c-inner">`,
     `        <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>`,
-  ];
+  );
   if (entry.subject) lines.push(`        <span class="c-kicker">${escapeHtml(entry.subject)}</span>`);
   lines.push(
     `        <div class="c-core">`,

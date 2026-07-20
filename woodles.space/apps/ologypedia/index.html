@@ -13,86 +13,179 @@
     --paper:#FBF3EC; --paper-edge:#F3E6D9; --ink:#3D2B2B; --ink-soft:#6B5656;
     --rose-deep:#8C3B4A; --rose-dust:#C77C8E; --blush:#F7DFE3; --lavender:#EAE0F2;
     --gold:#C9A66B; --sage:#8FA37E;
+    /* the room the books live in: a warm walnut-and-rose reading nook */
+    --wall-1:#c8ab9c; --wall-2:#b8917f; --wall-edge:#a67e6d;
+    --wood-1:#6d443c; --wood-2:#8a5949; --wood-hi:#d3ac78; --wood-lo:#4e2f2a;
+    /* one book in the grid — width drives everything; height follows 63:88 */
+    --book-w:172px; --book-h:240px; --shelf-gap:58px; --col-gap:24px;
   }
   *{box-sizing:border-box;}
-  body{margin:0; background:#E9DCCB; padding:40px 20px 64px; font-family:var(--font-body); color:var(--ink); line-height:1.6;}
-  .wrap{max-width:1000px; margin:0 auto;}
+  body{
+    margin:0; padding:44px 20px 70px; font-family:var(--font-body); color:var(--ink); line-height:1.6;
+    background:
+      radial-gradient(130% 100% at 50% -10%, rgba(255,246,235,.55), transparent 46%),
+      radial-gradient(120% 120% at 50% 120%, var(--wall-edge), transparent 55%),
+      linear-gradient(168deg, var(--wall-1) 0%, var(--wall-2) 62%, var(--wall-edge) 100%);
+    min-height:100vh;
+  }
+  .wrap{max-width:1040px; margin:0 auto;}
 
-  /* ===== header ===== */
-  .shelf-head{text-align:center; margin-bottom:34px;}
-  .shelf-head .eyebrow{display:inline-block; font-family:var(--font-display); font-weight:600; letter-spacing:.2em; font-size:12px; text-transform:uppercase; color:var(--rose-deep); border:1px solid var(--rose-dust); border-radius:999px; padding:4px 16px; background:var(--blush); text-decoration:none; transition:border-color .16s ease, color .16s ease;}
-  .shelf-head .eyebrow:hover{color:var(--rose-dust); border-color:var(--rose-dust);}
-  .shelf-head h1{font-family:var(--font-display); font-weight:600; font-size:clamp(42px,7vw,60px); color:var(--rose-deep); margin:16px 0 4px; line-height:1;}
-  .shelf-head .sub{display:flex; align-items:center; justify-content:center; gap:12px; font-family:var(--font-display); font-style:italic; font-size:18px; color:var(--rose-dust); margin:0;}
+  /* ===== header — a brass plate on the wall above the case ===== */
+  .shelf-head{text-align:center; margin-bottom:26px;}
+  .shelf-head .eyebrow{display:inline-block; font-family:var(--font-display); font-weight:600; letter-spacing:.2em; font-size:12px; text-transform:uppercase; color:var(--paper); border:1px solid color-mix(in srgb, var(--gold) 70%, #fff); border-radius:999px; padding:5px 18px; background:color-mix(in srgb, var(--rose-deep) 62%, var(--wood-lo)); box-shadow:0 2px 10px -4px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.18); text-decoration:none; transition:transform .16s ease, box-shadow .16s ease;}
+  .shelf-head .eyebrow:hover{transform:translateY(-1px); box-shadow:0 5px 14px -5px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.22);}
+  .shelf-head h1{font-family:var(--font-display); font-weight:600; font-size:clamp(46px,8vw,72px); color:#fbeee2; margin:18px 0 2px; line-height:.98; letter-spacing:.01em; text-shadow:0 2px 1px rgba(78,47,42,.45), 0 0 26px rgba(255,236,214,.28);}
+  .shelf-head .sub{display:flex; align-items:center; justify-content:center; gap:13px; font-family:var(--font-display); font-style:italic; font-size:19px; color:#f3d9cf; margin:0; text-shadow:0 1px 1px rgba(78,47,42,.4);}
   .shelf-head .sub .orn{color:var(--gold); font-style:normal; font-size:13px;}
 
   /* ===== deck controls: search, subject filter, view toggle ===== */
-  .deck-controls{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:18px;}
-  .dc-search{flex:1 1 220px; min-width:160px; font-family:var(--font-body); font-size:14px; color:var(--ink); background:#fffdfa; border:1px solid var(--rose-dust); border-radius:999px; padding:8px 16px;}
+  .deck-controls{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:16px;}
+  .dc-search{flex:1 1 220px; min-width:160px; font-family:var(--font-body); font-size:14px; color:var(--ink); background:#fffdfa; border:1px solid transparent; border-radius:999px; padding:9px 18px; box-shadow:0 2px 8px -4px rgba(0,0,0,.35), inset 0 0 0 1px rgba(140,59,74,.16);}
+  .dc-search::placeholder{color:#a98a86;}
   .dc-search:focus{outline:2px solid var(--gold); outline-offset:1px;}
-  .dc-select{flex:0 0 auto; font-family:var(--font-body); font-size:13px; color:var(--ink); background:#fffdfa; border:1px solid var(--rose-dust); border-radius:999px; padding:7px 14px;}
-  .dc-view{flex:0 0 auto; display:flex; border:1px solid var(--rose-dust); border-radius:999px; overflow:hidden;}
-  .dc-view-btn{font-family:var(--font-display); font-weight:600; font-size:12px; letter-spacing:.04em; color:var(--rose-deep); background:var(--paper); border:none; padding:7px 16px; cursor:pointer;}
-  .dc-view-btn+.dc-view-btn{border-left:1px solid var(--rose-dust);}
+  .dc-select{flex:0 0 auto; font-family:var(--font-body); font-size:13px; color:var(--ink); background:#fffdfa; border:1px solid transparent; border-radius:999px; padding:8px 16px; box-shadow:0 2px 8px -4px rgba(0,0,0,.35), inset 0 0 0 1px rgba(140,59,74,.16);}
+  .dc-view{flex:0 0 auto; display:flex; border-radius:999px; overflow:hidden; box-shadow:0 2px 8px -4px rgba(0,0,0,.35), inset 0 0 0 1px rgba(140,59,74,.22);}
+  .dc-view-btn{font-family:var(--font-display); font-weight:600; font-size:12px; letter-spacing:.05em; color:var(--rose-deep); background:#fffdfa; border:none; padding:8px 18px; cursor:pointer; transition:background .14s ease, color .14s ease;}
   .dc-view-btn.active{background:var(--rose-deep); color:var(--paper);}
-  .deck-empty{grid-column:1/-1; text-align:center; padding:30px 20px; color:var(--ink-soft); font-style:italic; font-size:14px;}
+  .deck-empty{flex-basis:100%; width:100%; text-align:center; padding:34px 20px; color:#f3d9cf; font-style:italic; font-size:14px;}
 
-  /* ===== the deck ===== */
-  .deck{display:grid; grid-template-columns:repeat(auto-fill, minmax(170px,1fr)); gap:18px; grid-auto-rows:max-content; align-items:start;}
-  @media(max-width:420px){ .deck{grid-template-columns:repeat(auto-fill, minmax(150px,1fr));} }
-
-  /* ===== spine view — a scan-friendly list alternative to the grid ===== */
-  .spine-list{list-style:none; margin:0; padding:0;}
-  .spine-row{display:flex; align-items:center; gap:14px; padding:12px 16px; border:1px solid var(--paper-edge); border-radius:9px; background:#fffdfa; margin-bottom:8px; text-decoration:none; color:inherit; transition:border-color .15s ease, transform .15s ease;}
-  .spine-row:hover{border-color:var(--rose-dust); transform:translateX(2px);}
-  .spine-accent{flex:none; width:7px; align-self:stretch; border-radius:4px; background:var(--dc, var(--rose-dust));}
-  .spine-glyph{flex:none; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; background:color-mix(in srgb, var(--dc, var(--rose-dust)) 12%, #fffdfa); border:1px solid color-mix(in srgb, var(--dc, var(--rose-dust)) 45%, transparent); color:var(--rose-deep);}
-  .spine-meta{flex:1 1 auto; min-width:0;}
-  .spine-subject{display:block; font-family:var(--font-display); font-weight:600; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--rose-dust);}
-  .spine-title{font-family:var(--font-display); font-weight:600; font-size:17px; color:var(--rose-deep); margin:0; line-height:1.2;}
-  .spine-blurb{font-size:12.5px; color:var(--ink-soft); margin:2px 0 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .spine-row.is-draft{border-style:dashed;}
-  .spine-tag{flex:none; font-family:var(--font-display); font-weight:600; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--rose-deep); background:var(--blush); border:1px solid var(--rose-dust); border-radius:999px; padding:2px 10px;}
-  .spine-arrow{flex:none; color:var(--gold); font-size:16px;}
-  .spine-add{border-style:dashed; border-color:var(--gold);}
-  .spine-add .spine-accent{background:var(--gold);}
-  .spine-add .spine-glyph{background:var(--blush); border-color:var(--gold);}
-
-  /* editor card — the sizeable top-left way in */
-  .editor-card{
-    grid-column:span 1; grid-row:span 1; align-self:stretch;
-    display:flex; flex-direction:column; justify-content:space-between;
-    text-decoration:none; color:inherit; min-height:250px;
-    border:2px dashed var(--gold); border-radius:12px;
-    background:linear-gradient(150deg, var(--blush), #fffdfa 72%);
-    padding:22px 22px 20px;
-    transition:transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+  /* ═══════════ THE BOOKCASE — a framed wooden case on the wall ═══════════ */
+  .bookcase{
+    position:relative; border-radius:12px; padding:26px 22px 8px;
+    background:
+      linear-gradient(180deg, color-mix(in srgb,var(--wood-2) 60%,var(--wood-1)) 0%, var(--wood-1) 100%);
+    box-shadow:
+      0 30px 60px -30px rgba(40,20,18,.7),
+      0 2px 0 rgba(255,255,255,.06) inset,
+      0 0 0 1px rgba(78,47,42,.6);
   }
-  @media(min-width:620px){ .editor-card{ grid-column:span 2; grid-row:span 2; } }
-  .editor-card:hover{transform:translateY(-3px); border-color:var(--rose-deep); box-shadow:0 14px 30px -18px var(--rose-deep);}
-  .et-plus{width:46px; height:46px; border-radius:50%; border:2px solid var(--gold); color:var(--rose-deep); display:flex; align-items:center; justify-content:center; font-size:30px; font-weight:300; line-height:1;}
-  .editor-card:hover .et-plus{border-color:var(--rose-deep); background:var(--paper);}
-  .et-kicker{display:block; font-family:var(--font-display); font-weight:600; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--rose-dust); margin-bottom:5px;}
-  .et-title{font-family:var(--font-display); font-weight:600; font-size:clamp(24px,4vw,32px); color:var(--rose-deep); margin:0 0 8px; line-height:1.02;}
-  .et-sub{font-size:13px; line-height:1.5; color:var(--ink-soft); margin:0;}
-  .et-cta{display:inline-block; margin-top:14px; font-family:var(--font-display); font-weight:600; font-size:14px; letter-spacing:.03em; color:var(--rose-deep);}
+  /* the inner back-wall the shelves and books stand against */
+  .case-back{
+    position:relative; border-radius:5px; padding:16px 20px 0;
+    background:
+      repeating-linear-gradient(90deg, rgba(78,47,42,.05) 0 1px, transparent 1px 46px),
+      linear-gradient(180deg, #cdb2a4 0%, #c19c8d 100%);
+    box-shadow:
+      inset 0 3px 14px -4px rgba(40,20,18,.55),
+      inset 0 -3px 10px -6px rgba(40,20,18,.4),
+      inset 0 0 0 1px rgba(78,47,42,.25);
+  }
+
+  /* ===== the grid: books standing on repeating wooden shelves ===== */
+  .deck{
+    display:flex; flex-wrap:wrap; align-items:flex-end; align-content:flex-start;
+    column-gap:var(--col-gap); row-gap:var(--shelf-gap); padding-bottom:12px;
+    background-image:repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent var(--book-h),
+      var(--wood-hi) var(--book-h),
+      color-mix(in srgb,var(--wood-2) 70%,var(--wood-hi)) calc(var(--book-h) + 2px),
+      var(--wood-2) calc(var(--book-h) + 5px),
+      var(--wood-1) calc(var(--book-h) + 20px),
+      var(--wood-lo) calc(var(--book-h) + 22px),
+      rgba(50,26,22,.34) calc(var(--book-h) + 23px),
+      transparent calc(var(--book-h) + 44px),
+      transparent calc(var(--book-h) + var(--shelf-gap))
+    );
+    background-position:left top; background-repeat:repeat;
+  }
+  @media(max-width:640px){
+    :root{ --book-w:132px; --book-h:184px; --shelf-gap:48px; --col-gap:16px; }
+  }
+  @media(max-width:380px){
+    :root{ --book-w:118px; --book-h:165px; --shelf-gap:44px; --col-gap:12px; }
+  }
+
+  /* ===== spine view — real book spines standing in a row ===== */
+  .spine-shelf{
+    display:flex; flex-wrap:wrap; align-items:flex-end; gap:6px 4px;
+    padding:0 6px;
+    background-image:repeating-linear-gradient(
+      to bottom,
+      transparent 0, transparent 300px,
+      var(--wood-hi) 300px, var(--wood-2) 303px, var(--wood-1) 320px,
+      var(--wood-lo) 322px, rgba(50,26,22,.34) 323px, transparent 344px,
+      transparent 360px
+    );
+  }
+  .spine{
+    --dc:var(--rose-dust);
+    position:relative; flex:none; width:46px; min-height:210px; align-self:flex-end;
+    display:flex; flex-direction:column; align-items:center; justify-content:space-between;
+    padding:12px 4px 14px; text-decoration:none; color:inherit; cursor:pointer;
+    border-radius:3px 5px 5px 3px;
+    background:
+      linear-gradient(90deg, rgba(0,0,0,.28) 0 2px, rgba(255,255,255,.16) 3px 5px, transparent 6px 40px, rgba(0,0,0,.16) 41px 44px, rgba(0,0,0,.34) 44px 46px),
+      linear-gradient(180deg, color-mix(in srgb,var(--dc) 86%,#fff) 0%, var(--dc) 12%, var(--dc) 88%, color-mix(in srgb,var(--dc) 78%,#000) 100%);
+    box-shadow:2px 6px 12px -6px rgba(40,20,18,.7), inset 0 0 0 1px rgba(0,0,0,.08);
+    transition:transform .16s ease, box-shadow .16s ease, margin-top .16s ease;
+  }
+  .spine:hover{transform:translateY(-8px) rotate(-1.2deg); box-shadow:3px 12px 20px -8px rgba(40,20,18,.75);}
+  .spine .foil{width:80%; height:0; border-top:1px solid color-mix(in srgb,var(--gold) 80%,#fff); box-shadow:0 3px 0 -1px color-mix(in srgb,var(--gold) 55%,transparent), 0 -3px 0 -1px color-mix(in srgb,var(--gold) 55%,transparent);}
+  .spine-title-v{
+    flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center;
+    writing-mode:vertical-rl; text-orientation:mixed;
+    font-family:var(--font-display); font-weight:600; font-size:15px; line-height:1.05;
+    color:#fff7f0; text-shadow:0 1px 1px rgba(0,0,0,.3);
+    max-height:180px; overflow:hidden; text-align:center; letter-spacing:.01em;
+    padding:6px 0;
+  }
+  .spine-emblem{flex:none; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; color:#fff7f0; background:color-mix(in srgb,#000 16%,var(--dc)); border:1px solid color-mix(in srgb,var(--gold) 65%,transparent); box-shadow:inset 0 0 6px rgba(0,0,0,.25);}
+  .spine.is-draft{background:linear-gradient(180deg, color-mix(in srgb,var(--dc) 40%,#efe2dc), color-mix(in srgb,var(--dc) 32%,#e6d6cf)); }
+  .spine.is-draft .spine-title-v{color:var(--rose-deep); text-shadow:none;}
+  .spine.is-draft .spine-emblem{color:var(--rose-deep); background:#fffdfa;}
+  .spine.is-draft::after{content:'DRAFT'; position:absolute; top:8px; left:50%; transform:translateX(-50%) rotate(90deg); transform-origin:center; font-family:var(--font-display); font-weight:600; font-size:7px; letter-spacing:.14em; color:var(--rose-deep); opacity:.6; white-space:nowrap; display:none;}
+  .spine-add{width:46px; background:linear-gradient(180deg,#e9c98f,#c9a66b 55%,#b28f52); }
+  .spine-add .spine-emblem{background:var(--rose-deep); color:var(--paper); border-color:#fff2df; font-size:16px; font-weight:300;}
+  .spine-add .spine-title-v{color:#4e2f2a;}
+  .spine-empty{flex-basis:100%; text-align:center; padding:34px 20px; color:var(--rose-deep); font-style:italic; font-size:14px;}
+
+  /* ===== editor entry — a special "new volume" standing first on the shelf ===== */
+  .editor-card{
+    position:relative; flex:none; width:var(--book-w); aspect-ratio:63/88; align-self:flex-end;
+    display:flex; flex-direction:column; justify-content:space-between; overflow:hidden;
+    text-decoration:none; color:inherit;
+    border-radius:3px 11px 11px 3px;
+    border:1px solid color-mix(in srgb,var(--gold) 60%, var(--rose-deep));
+    background:
+      repeating-linear-gradient(-45deg, transparent 0 7px, rgba(201,166,107,.1) 7px 8px),
+      linear-gradient(160deg, #fbe6c8 0%, #f7dfe3 55%, #fffdfa 100%);
+    box-shadow:2px 8px 16px -8px rgba(40,20,18,.7), inset 3px 0 0 rgba(0,0,0,.08), inset 0 0 0 1px rgba(255,255,255,.4);
+    container-type:inline-size;
+    transition:transform .16s ease, box-shadow .16s ease;
+  }
+  /* the inner wrapper carries the cqw font-size so text scales to the book's
+     width — an element can't size its own text against the container it makes */
+  .et-inner{flex:1; min-height:0; display:flex; flex-direction:column; padding:1.5em 1.25em 1.3em; font-size:5cqw;}
+  .editor-card:hover{transform:translateY(-6px); box-shadow:4px 16px 26px -10px rgba(40,20,18,.7), inset 3px 0 0 rgba(0,0,0,.08), inset 0 0 0 1px rgba(255,255,255,.5);}
+  .editor-card::before{content:''; position:absolute; inset:.5em; z-index:2; border:1px solid color-mix(in srgb,var(--gold) 55%,transparent); border-radius:2px 7px 7px 2px; pointer-events:none;}
+  .et-plus{width:2.6em; height:2.6em; border-radius:50%; border:1.5px solid var(--gold); color:var(--rose-deep); display:flex; align-items:center; justify-content:center; font-size:1.4em; font-weight:300; line-height:1; background:rgba(255,255,255,.5); box-shadow:0 0 .8em rgba(201,166,107,.4);}
+  .editor-card:hover .et-plus{border-color:var(--rose-deep); background:#fff;}
+  .et-kicker{display:block; font-family:var(--font-display); font-weight:600; font-size:.58em; letter-spacing:.16em; text-transform:uppercase; color:var(--rose-dust); text-align:center;}
+  .et-title{font-family:var(--font-display); font-weight:600; font-size:1.5em; color:var(--rose-deep); margin:.15em 0 .2em; line-height:1; text-align:center;}
+  .et-sub{font-size:.6em; line-height:1.4; color:var(--ink-soft); margin:0; text-align:center; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;}
+  .et-cta{display:block; margin-top:.4em; font-family:var(--font-display); font-weight:600; font-size:.62em; letter-spacing:.03em; color:var(--rose-deep); text-align:center;}
   .editor-card:hover .et-cta{color:var(--rose-dust);}
+  .et-core{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:.35em; min-height:0;}
 
   /* ===== a cover-card (the card-back / book cover) ===== */
   .card63{
     --dc:var(--rose-dust);
-    position:relative; display:flex;
-    aspect-ratio:63/88; border-radius:11px; overflow:hidden;
+    position:relative; display:flex; flex:none; width:var(--book-w); align-self:flex-end;
+    aspect-ratio:63/88; border-radius:3px 11px 11px 3px; overflow:hidden;
     container-type:inline-size;
     text-decoration:none; color:inherit;
     border:1px solid color-mix(in srgb, var(--dc) 45%, var(--gold));
     background:
       repeating-linear-gradient(-45deg, transparent 0 7px, color-mix(in srgb, var(--dc) 7%, transparent) 7px 8px),
       radial-gradient(ellipse 80% 62% at 50% 37%, color-mix(in srgb, var(--dc) 16%, #fffdfa) 0%, var(--paper) 66%, var(--paper-edge) 100%);
-    box-shadow:2px 3px 0 var(--paper-edge);
+    /* the drop is the book's own shadow onto the shelf + wall behind it;
+       the inset dark spine down the left edge reads as the bound side */
+    box-shadow:2px 9px 15px -8px rgba(40,20,18,.72), inset 3px 0 5px -2px rgba(78,47,42,.4), inset 5px 0 0 -4px rgba(78,47,42,.35);
     transition:transform .16s ease, box-shadow .16s ease;
   }
-  .card63:hover{transform:translateY(-5px); box-shadow:5px 11px 26px -10px color-mix(in srgb, var(--dc) 65%, transparent);}
+  .card63:hover{transform:translateY(-7px); box-shadow:3px 16px 24px -10px rgba(40,20,18,.7), inset 3px 0 5px -2px rgba(78,47,42,.4), inset 5px 0 0 -4px rgba(78,47,42,.35);}
   .acc-rose{--dc:var(--rose-deep);}
   .acc-sage{--dc:var(--sage);}
   .acc-gold{--dc:var(--gold);}
@@ -141,18 +234,18 @@
   .fx-drift::after{top:-20%; left:-20%; width:140%; height:140%; z-index:1; background:radial-gradient(ellipse 74% 60% at 40% 45%, color-mix(in srgb, var(--dc) 22%, transparent), transparent 66%); mix-blend-mode:multiply; animation:cb-drift 12s ease-in-out infinite;}
   @media(prefers-reduced-motion:reduce){ .fx-pulse::after,.fx-shimmer::after,.fx-halo::after,.fx-drift::after{animation:none;} }
 
-  /* trailing caption when drafts are present */
-  .deck-note{grid-column:1/-1; display:flex; align-items:center; gap:14px; margin:6px 2px 0; color:var(--rose-dust);}
-  .deck-note::before, .deck-note::after{content:''; flex:1; height:1px; background:var(--rose-dust); opacity:.45;}
-  .deck-note span{font-family:var(--font-display); font-style:italic; font-size:12.5px; text-align:center;}
+  /* trailing caption when drafts are present — a slip of paper on the shelf */
+  .deck-note{flex-basis:100%; width:100%; display:flex; align-items:center; gap:14px; margin:10px 2px 2px; color:var(--wood-lo);}
+  .deck-note::before, .deck-note::after{content:''; flex:1; height:1px; background:var(--wood-lo); opacity:.3;}
+  .deck-note span{font-family:var(--font-display); font-style:italic; font-size:12.5px; text-align:center; color:#5a3a34;}
 
   /* ===== under-the-hood footer ===== */
-  .undertow{margin-top:40px; text-align:center; border-top:1px solid var(--rose-dust); padding-top:22px;}
-  .undertow p{margin:0 0 8px; font-size:13px; color:var(--ink-soft);}
-  .undertow a{color:var(--rose-deep); text-decoration:none; border-bottom:1px dotted var(--rose-dust);}
-  .undertow a:hover{color:var(--rose-dust);}
+  .undertow{margin-top:36px; text-align:center; border-top:1px solid color-mix(in srgb,var(--gold) 55%,transparent); padding-top:22px;}
+  .undertow p{margin:0 0 8px; font-size:13px; color:#f2d7cc;}
+  .undertow a{color:#fbeee2; text-decoration:none; border-bottom:1px dotted color-mix(in srgb,var(--gold) 70%,transparent);}
+  .undertow a:hover{color:var(--gold);}
   .undertow .dot{color:var(--gold); margin:0 8px;}
-  .undertow .tagline{font-family:var(--font-display); font-style:italic; font-size:15px; color:var(--rose-dust); margin-top:14px;}
+  .undertow .tagline{font-family:var(--font-display); font-style:italic; font-size:15px; color:#f3d9cf; margin-top:14px;}
 </style>
 </head>
 <body>
@@ -175,16 +268,20 @@
     </div>
   </div>
 
+  <div class="bookcase">
+  <div class="case-back">
   <main class="deck" id="deck">
 
     <a class="editor-card" href="/ologypedia/add-page.html">
-      <span class="et-plus">+</span>
-      <div>
+      <span class="et-inner">
         <span class="et-kicker">The Editor</span>
-        <h2 class="et-title">Add a Page</h2>
-        <p class="et-sub">Write a new entry, design its cover, preview it live, and shelve it — the studio runs the whole loop, no backend required.</p>
+        <span class="et-core">
+          <span class="et-plus">+</span>
+          <h2 class="et-title">Add a Page</h2>
+          <p class="et-sub">Write a new entry, design its cover, and shelve it — the whole loop, no backend.</p>
+        </span>
         <span class="et-cta">Open the editor &rarr;</span>
-      </div>
+      </span>
     </a>
 
     <!-- shelved cards — committed, readable by anyone -->
@@ -217,7 +314,9 @@
     <!-- draft cards (from your editor, this browser) are injected here -->
   </main>
 
-  <ul class="spine-list" id="spine-list" style="display:none"></ul>
+  <div class="spine-shelf" id="spine-list" style="display:none"></div>
+  </div>
+  </div>
 
   <footer class="undertow">
     <p>Every page is plain HTML, cut from one block system so the whole deck reads as one book.</p>
@@ -313,17 +412,15 @@
     var spineBtn = document.getElementById('view-spine');
     var spineList = document.getElementById('spine-list');
 
-    var addRow = document.createElement('a');
-    addRow.className = 'spine-row spine-add';
-    addRow.href = '/ologypedia/add-page.html';
-    addRow.appendChild(el('span', 'spine-accent', ''));
-    addRow.appendChild(el('span', 'spine-glyph', '+'));
-    var addMeta = el('span', 'spine-meta', '');
-    addMeta.appendChild(el('span', 'spine-subject', 'The Editor'));
-    addMeta.appendChild(el('h3', 'spine-title', 'Add a Page'));
-    addRow.appendChild(addMeta);
-    addRow.appendChild(el('span', 'spine-arrow', '→'));
-    spineList.appendChild(addRow);
+    // the "new volume" spine, always first on the shelf
+    var addSpine = document.createElement('a');
+    addSpine.className = 'spine spine-add';
+    addSpine.href = '/ologypedia/add-page.html';
+    addSpine.style.minHeight = '260px';
+    addSpine.appendChild(el('span', 'foil', ''));
+    addSpine.appendChild(el('span', 'spine-title-v', 'Add a Page'));
+    addSpine.appendChild(el('span', 'spine-emblem', '+'));
+    spineList.appendChild(addSpine);
 
     var items = cards.map(function(card){
       var accMatch = /acc-[a-z]+/.exec(card.className);
@@ -354,27 +451,26 @@
       subjectEl.appendChild(opt);
     });
 
-    items.forEach(function(it){
-      var row = document.createElement('a');
-      row.className = 'spine-row ' + it.accent + (it.isDraft ? ' is-draft' : '');
-      row.href = it.href;
-      row.appendChild(el('span', 'spine-accent', ''));
-      row.appendChild(el('span', 'spine-glyph', it.glyph));
-      var meta = el('span', 'spine-meta', '');
-      if (it.subject) meta.appendChild(el('span', 'spine-subject', it.subject));
-      meta.appendChild(el('h3', 'spine-title', it.title));
-      if (it.blurb) meta.appendChild(el('p', 'spine-blurb', it.blurb));
-      row.appendChild(meta);
-      if (it.isDraft) row.appendChild(el('span', 'spine-tag', 'Draft'));
-      row.appendChild(el('span', 'spine-arrow', '→'));
-      spineList.appendChild(row);
-      it.row = row;
+    // a book stands as tall as its title is long — gives the shelf a natural,
+    // uneven skyline instead of a wall of identical rectangles.
+    items.forEach(function(it, i){
+      var spine = document.createElement('a');
+      spine.className = 'spine ' + it.accent + (it.isDraft ? ' is-draft' : '');
+      spine.href = it.href;
+      var h = 232 + ((it.title.length * 7 + i * 13) % 66); // 232–298px
+      spine.style.minHeight = h + 'px';
+      spine.title = it.title + (it.subject ? ' · ' + it.subject : '');
+      spine.appendChild(el('span', 'foil', ''));
+      spine.appendChild(el('span', 'spine-title-v', it.title));
+      spine.appendChild(el('span', 'spine-emblem', it.glyph));
+      spineList.appendChild(spine);
+      it.row = spine;
     });
 
     var gridEmpty = el('div', 'deck-empty', 'No entries match your search.');
     gridEmpty.hidden = true;
     deck.appendChild(gridEmpty);
-    var spineEmpty = el('li', 'deck-empty', 'No entries match your search.');
+    var spineEmpty = el('div', 'spine-empty', 'No entries match your search.');
     spineEmpty.hidden = true;
     spineList.appendChild(spineEmpty);
 
