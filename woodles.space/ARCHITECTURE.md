@@ -191,6 +191,29 @@ same blurb rule) so a card looks identical whether or not a cover was
 ever chosen. De-duplication is by id: a published slug or a studio draft
 of the same id wins, so nothing doubles.
 
+**Draft with a prompt** is the bridge between the Textbook's live editing
+and `add-page.html`'s authoring workflow, brought *into* the reader rather
+than sent out to the Studio. Facing an empty seed (or from the edit
+toolbar on any entry), "✦ Draft it with a prompt" opens a sheet with a
+ready-made authoring brief — the same voice/structure/etymology/bridges/
+standing-lenses/conversions/reading-list spec as the Studio's prompt
+(`add-page.html`'s `buildPrompt`), reused faithfully and inline per the
+app's self-contained-file convention. The one difference is the OUTPUT
+contract: the Studio asks for a complete `textbook-{slug}.html` file; the
+Textbook asks for a **body fragment** (only `<p>/<h3>/<blockquote>/<ul>/
+<li>/<strong>/<em>`, no masthead or CSS) with 3–8 key concepts wrapped in
+`[[double brackets]]`. You paste the brief to any model, paste the answer
+back, and `ingestDraft` strips code fences, accepts HTML *or* Markdown
+(a small `markdownLite` fallback), converts `[[Concept]]` / `[[Concept|
+display]]` into `entry-link`s — creating a seed entry for each new one and
+reusing an existing entry when the title matches — sanitizes the result,
+and drops it into the entry (replace, or append to existing prose). So one
+AI draft both fills a blank seed *and* spawns a cluster of new linked
+seeds, which is the whole stitching-together thesis, now assisted. An
+optional diagnosis/health-condition toggle adds the Studio's four extra
+sections to the brief. Nothing calls a model directly — the app stays
+backend-free; the human carries the prompt and the answer across.
+
 `marginalia` is the biggest app by built size (`dist/` ~3.1 MB, week 10
 perf-sanity check) — but the number that actually matters, first-load
 transfer, is a much healthier ~290 KB. the difference is the reading

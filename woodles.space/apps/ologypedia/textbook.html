@@ -311,6 +311,36 @@
     .pane{padding:20px 18px 100px;}
     .saved{display:none;}
   }
+
+  /* ===== the seed scaffold — what an empty entry offers instead of a blank ===== */
+  .seed-scaffold{display:none; margin:6px 0 8px; padding:22px 24px; border:1px dashed var(--rose-dust); border-radius:12px; background:repeating-linear-gradient(135deg,#fffdfa,#fffdfa 14px,color-mix(in srgb,var(--paper) 60%,#fffdfa) 14px,color-mix(in srgb,var(--paper) 60%,#fffdfa) 28px);}
+  body[data-mode="read"] .seed-scaffold.show{display:block;}
+  .seed-scaffold p{margin:0 0 14px; color:var(--ink-soft); font-size:15.5px;}
+  .seed-scaffold .ss-actions{display:flex; flex-wrap:wrap; gap:10px;}
+
+  /* ===== the Draft-with-a-prompt sheet ===== */
+  .draft-sheet{max-width:640px;}
+  .draft-sheet .cols{display:flex; flex-direction:column; gap:16px;}
+  .dp-step{border:1px solid var(--paper-edge); border-radius:11px; padding:14px 16px; background:#fffdfa;}
+  .dp-step h3{font-family:var(--font-display); font-weight:600; font-size:16px; color:var(--rose-deep); margin:0 0 4px; display:flex; align-items:center; gap:8px;}
+  .dp-step h3 .n{flex:none; width:22px; height:22px; border-radius:50%; background:var(--rose-deep); color:var(--paper); font-size:12px; display:flex; align-items:center; justify-content:center;}
+  .dp-step p.hint{margin:0 0 10px; font-size:12.5px; color:var(--ink-soft); line-height:1.5;}
+  .dp-field{margin-bottom:10px;}
+  .dp-field label{display:block; font-size:11.5px; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:4px;}
+  .dp-input,.dp-area{width:100%; font-family:var(--font-body); font-size:13.5px; color:var(--ink); background:#fff; border:1px solid var(--paper-edge); border-radius:8px; padding:8px 11px; line-height:1.5;}
+  .dp-area{resize:vertical; min-height:88px;}
+  #dp-prompt{font-family:'DM Mono',ui-monospace,monospace; font-size:12px; color:var(--ink-soft); background:#fbf6f0; min-height:130px; max-height:240px;}
+  .dp-input:focus-visible,.dp-area:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+  .dp-check{display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:var(--ink); margin-bottom:4px; cursor:pointer;}
+  .dp-check input{margin-top:2px;}
+  .dp-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:8px;}
+  .dp-row .grow{flex:1;}
+  .dp-note{font-size:12px; color:var(--ink-soft); line-height:1.5; background:var(--blush); border:1px solid var(--rose-dust); border-radius:8px; padding:9px 12px; margin:0 0 4px;}
+  .dp-note code{background:#fffdfa; border:1px solid var(--rose-dust); border-radius:4px; padding:0 5px; font-size:11.5px; color:var(--rose-deep);}
+  .dp-modes{display:inline-flex; border:1px solid var(--rose-dust); border-radius:999px; overflow:hidden;}
+  .dp-modes button{font-family:var(--font-body); font-size:12px; color:var(--rose-deep); background:#fffdfa; border:none; padding:6px 13px; cursor:pointer;}
+  .dp-modes button[aria-pressed="true"]{background:var(--rose-deep); color:var(--paper);}
+  .fmt-btn.fmt-draft{color:var(--rose-deep); font-weight:600;}
 </style>
 </head>
 <body data-mode="read" data-focus="0">
@@ -408,10 +438,20 @@
           <button class="fmt-btn" data-cmd="ul" title="Bulleted list">&bull; List</button>
           <span class="fmt-sep"></span>
           <button class="fmt-btn" data-cmd="link" title="Link selection to another entry">&#128279; Link</button>
+          <span class="fmt-sep"></span>
+          <button class="fmt-btn fmt-draft" id="fmt-draft" title="Draft this entry with an AI prompt">✦ Draft</button>
           <span class="fmt-hint">Select text for the ✦ menu anywhere &mdash; even while reading.</span>
         </div>
 
         <div class="entry-content" id="entry-content"></div>
+
+        <div class="seed-scaffold" id="seed-scaffold">
+          <p>This one’s a <b>seed</b> — a real, finished thing to be. Grow it whenever you like; nothing’s lost by leaving it small.</p>
+          <div class="ss-actions">
+            <button class="tb-btn primary" id="ss-draft"><span class="glyph">✦</span> Draft it with a prompt</button>
+            <button class="tb-btn" id="ss-write"><span class="glyph">✎</span> Write it myself</button>
+          </div>
+        </div>
 
         <footer class="connections" id="connections">
           <div class="conn">
@@ -465,6 +505,7 @@
         <li><b>Read an entry.</b> Pick anything from the index on the left, or follow a link inside a page.</li>
         <li><b>Highlight to go deeper.</b> Select any phrase &mdash; a name, a season, a term &mdash; and a small ✦ menu appears. Choose <b>New entry</b> and that phrase becomes its own page, already titled and already linked back to where you found it.</li>
         <li><b>Build it out whenever.</b> A new page starts as a <b>seed</b> &mdash; that's a real, finished thing to be, not a chore. Come back and grow it when you want. Hit <span class="k">Edit</span> to write, or just keep reading.</li>
+        <li><b>Or let a prompt start it.</b> Facing a blank seed, hit <span class="k">✦ Draft it with a prompt</span>. You get a ready-made writing brief in the textbook's own voice &mdash; paste it to any capable model, paste the answer back, and it lands as editable prose. Concepts the draft wraps in <code>[[double brackets]]</code> become their own linked seeds automatically, so one draft can grow a whole cluster.</li>
         <li><b>Never lose your place.</b> The <b>trail</b> at the top of each page is the path you took to get there; click any step to walk back. Everything saves itself as you go.</li>
       </ol>
       <div class="care">
@@ -472,6 +513,42 @@
       </div>
       <div class="close-row">
         <button class="tb-btn primary" id="sheet-close">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- draft-with-a-prompt sheet -->
+  <div class="sheet-back" id="draft-back" role="dialog" aria-modal="true" aria-labelledby="draft-title">
+    <div class="sheet draft-sheet">
+      <h2 id="draft-title">Draft this with a prompt</h2>
+      <p class="lede" id="draft-lede">A ready-made writing brief, in the textbook's own voice. Paste it to any capable model, paste the answer back, and it becomes editable prose — no blank page.</p>
+      <div class="cols">
+        <div class="dp-step">
+          <h3><span class="n">1</span> Copy the prompt</h3>
+          <p class="hint">Pre-filled from this entry. Add your own angle if you have one — it sharpens the draft.</p>
+          <div class="dp-field">
+            <label for="dp-context">Your angle or context <span style="text-transform:none;font-style:italic;">(optional)</span></label>
+            <input type="text" class="dp-input" id="dp-context" placeholder="e.g. why this matters to you, an aspect to emphasise">
+          </div>
+          <label class="dp-check"><input type="checkbox" id="dp-diagnosis"> <span>This is a diagnosis or health condition — add the supporting-a-loved-one, self-assessment, clinical, and study-map angles.</span></label>
+          <div class="dp-field" style="margin-top:10px;">
+            <textarea class="dp-area" id="dp-prompt" readonly aria-label="The prompt"></textarea>
+          </div>
+          <div class="dp-row"><button class="tb-btn primary" id="dp-copy"><span class="glyph">⧉</span> Copy prompt</button><span class="grow"></span></div>
+        </div>
+        <div class="dp-step">
+          <h3><span class="n">2</span> Paste what it writes back</h3>
+          <p class="dp-note">Concepts the model wraps in <code>[[double brackets]]</code> become their own linked seeds in your index. HTML, Markdown, or plain text all work — code fences are stripped for you.</p>
+          <div class="dp-field">
+            <textarea class="dp-area" id="dp-paste" placeholder="Paste the model's answer here…" aria-label="Paste the draft"></textarea>
+          </div>
+          <div class="dp-row">
+            <span id="dp-mode-wrap" hidden>Bring it in as: <span class="dp-modes"><button id="dp-mode-replace" aria-pressed="true">Replace</button><button id="dp-mode-append" aria-pressed="false">Add to end</button></span></span>
+            <span class="grow"></span>
+            <button class="tb-btn" id="draft-cancel">Cancel</button>
+            <button class="tb-btn primary" id="dp-ingest"><span class="glyph">✦</span> Bring it into the entry</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -736,11 +813,13 @@
 
     $('edited-note').textContent = 'Edited ' + relTime(e.updated);
 
-    // body — links resolved (broken links flagged)
+    // body — links resolved (broken links flagged); empty entries show the seed scaffold
     var content = $('entry-content');
     content.innerHTML = e.body || '';
     resolveLinks(content);
-    if (!plainText(e.body)) content.innerHTML = '<p class="scaffold">This one’s a seed. Hit <b>Edit</b> and start wherever you like — a sentence is plenty. It’s already linked from where you made it.</p>';
+    var empty = !plainText(e.body);
+    $('seed-scaffold').classList.toggle('show', empty);
+    if (empty) content.innerHTML = '';
 
     // coach note only on the sample she-ra entry, until dismissed
     $('coach').hidden = !(currentId === 'she-ra' && !prefs.coachDismissed);
@@ -1020,6 +1099,208 @@
   }
   function closeCover(){ $('cover-pop').classList.remove('open'); $('cover-btn').setAttribute('aria-expanded','false'); }
 
+  // ======================================================================
+  //  Draft with a prompt — the new-page authoring workflow, brought into
+  //  the Textbook. The voice/structure/lenses are reused faithfully from
+  //  add-page.html's Studio prompt; only the OUTPUT contract differs: a
+  //  body *fragment* (not a whole HTML file), with [[bracketed]] concepts
+  //  that become their own linked seeds.
+  // ======================================================================
+  var draftMode = 'replace';
+  // the shared authorial voice — kept in step with add-page.html's Studio prompt
+  var DRAFT_VOICE = [
+    'Voice: conversational but rigorous, standard intro-course background assumed.',
+    'Slightly more playful than neutral — except where the topic is genuinely',
+    'heavy, where the register shifts to hope/awe/significance rather than',
+    'forced levity or flat solemnity. The narrator is an implied presence —',
+    'never says "I" — but has clear judgment and speaks directly to "you,"',
+    'steering attention rather than narrating past it. External, curious,',
+    'helpful, a little magical — not an oracle, not a casual friend.',
+    '',
+    'Structure: headers, generously used, once there’s enough to warrant them.',
+    'Any length — a few paragraphs is a perfectly good entry. No closing',
+    'synthesis/wrap-up paragraph — end on the last substantive section.',
+    '',
+    'Etymology: track key terms as semantic drift — how the meaning moved and',
+    'why — at first use, not just the root. Foreign/loan terms get a quick',
+    'pronunciation gloss on first appearance.',
+    '',
+    'Bridges: metaphors only from educational psychology, game/systems design,',
+    'sociology & media studies, or neuroscience/cognitive science. Never sports.',
+    '',
+    'Worked example(s): grounded in real, checkable material only — a mechanism,',
+    'a real historical artifact/event, real data. Never an interpretive reading',
+    'of the topic’s own fictional content.',
+    '',
+    'Standing lenses — check for a genuine connection to: (1) autism/',
+    'neurodivergence, including special-interest culture, not just clinical',
+    'application; (2) ABA & behavior-analytic clinical practice; (3)',
+    'anti-essentialism, queerness, or systems-thinking approaches. Skip silently',
+    'if there’s no real connection — no mention of absence. When there is one,',
+    'weave it into the prose without ever naming the lens. Length scales to how',
+    'much it adds.',
+    '',
+    'Conversions, every time relevant: distance in mi + km, temperature in °F +',
+    '°C, weight in lb + kg, volume in gal/cups + L/mL, historical dollar figures',
+    'with a current-year inflation-adjusted equivalent, historical dates with',
+    '"X years ago," chemical formula alongside common name where relevant,',
+    'population/count figures alongside their share of the relevant total. Do not',
+    'anchor big numbers to a forced concrete-object comparison.',
+    '',
+    'Reading list: primary/seminal sources preferred; one accessible on-ramp only',
+    'if the primary source is a genuinely rough entry point.'
+  ].join('\n');
+  var DRAFT_DIAGNOSIS = [
+    'This topic is a diagnosis or health condition — also weave in: supporting a',
+    'loved one who has it, personal risk-assessment (what to know if diagnosed,',
+    'or whether to get assessed), professional/clinical application (relevant to',
+    'ABA/behavior-analytic work), and a prerequisite-study map (what to learn',
+    'first for real depth).'
+  ].join('\n');
+
+  function buildDraftPrompt(){
+    var e = getEntry(currentId); if (!e) return '';
+    var ctx = $('dp-context').value.trim();
+    var existing = plainText(e.body);
+    var lines = [];
+    lines.push('Write a personal-textbook entry on: ' + e.title);
+    lines.push('');
+    if (e.subject){ lines.push('Domain / subdomain: ' + e.subject); lines.push(''); }
+    if (ctx){ lines.push('Angle / context: ' + ctx); lines.push(''); }
+    if (existing){
+      lines.push('Already on the page (extend and refine this — don’t discard it):');
+      lines.push(existing.length > 600 ? existing.slice(0, 600) + '…' : existing);
+      lines.push('');
+    }
+    lines.push(DRAFT_VOICE);
+    if ($('dp-diagnosis').checked){ lines.push(''); lines.push(DRAFT_DIAGNOSIS); }
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+    lines.push('OUTPUT — a body fragment, not a whole page. Return only the HTML that');
+    lines.push('goes *inside* this entry: no <html>/<head>/<body>, no <title> and no');
+    lines.push('masthead (the entry is already titled "' + e.title + '"), no CSS, no');
+    lines.push('<style>, no scripts, no code fences. Use only these tags: <p> for prose;');
+    lines.push('<h3> for section headings; <blockquote> for a single load-bearing line;');
+    lines.push('<ul>/<li> for lists; <strong>/<em> for emphasis.');
+    lines.push('');
+    lines.push('Links — this is a linked textbook. Wrap 3–8 concepts that each deserve');
+    lines.push('their own page — names, terms, events, works, places — in [[double');
+    lines.push('brackets]] at their most important mention. Use [[Concept]], or');
+    lines.push('[[Concept|the exact words as they read in the sentence]] when the display');
+    lines.push('text should differ. Link a concept once; only the ones genuinely worth');
+    lines.push('their own entry.');
+    return lines.join('\n');
+  }
+
+  function refreshDraftPrompt(){ $('dp-prompt').value = buildDraftPrompt(); }
+  function updateDraftModeUI(){
+    $('dp-mode-replace').setAttribute('aria-pressed', String(draftMode === 'replace'));
+    $('dp-mode-append').setAttribute('aria-pressed', String(draftMode === 'append'));
+  }
+  function openDraft(){
+    var e = getEntry(currentId); if (!e) return;
+    hideMenu(); closeCover();
+    $('draft-title').textContent = 'Draft “' + e.title + '” with a prompt';
+    $('dp-context').value = ''; $('dp-diagnosis').checked = false; $('dp-paste').value = '';
+    draftMode = 'replace'; updateDraftModeUI();
+    $('dp-mode-wrap').hidden = !plainText(e.body);
+    refreshDraftPrompt();
+    $('draft-back').classList.add('open');
+    setTimeout(function(){ $('dp-context').focus(); }, 30);
+  }
+  function closeDraft(){ $('draft-back').classList.remove('open'); }
+
+  // ---- paste ingestion: fences, HTML or Markdown, then [[links]] → seeds ----
+  function stripFences(s){
+    s = String(s || '').trim();
+    var m = /^```[a-zA-Z]*\s*\n([\s\S]*?)\n```$/.exec(s);
+    if (m) return m[1].trim();
+    return s.replace(/^```[a-zA-Z]*\s*\n?/, '').replace(/\n?```\s*$/, '').trim();
+  }
+  function looksLikeHTML(s){ return /<(p|h[1-6]|ul|ol|li|blockquote|strong|em|b|i|div|section|br|figure)\b/i.test(s); }
+  function extractHTMLBody(s){
+    var bm = /<body[^>]*>([\s\S]*?)<\/body>/i.exec(s);
+    if (bm) s = bm[1];
+    return s.replace(/<h1[\s\S]*?<\/h1>/gi, '');   // drop any stray masthead title
+  }
+  function mdInline(t){
+    t = esc(t);
+    return t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+            .replace(/(^|[^_])_([^_\n]+)_/g, '$1<em>$2</em>');
+  }
+  function markdownLite(md){
+    var blocks = String(md).replace(/\r/g, '').split(/\n{2,}/), out = [];
+    blocks.forEach(function(b){
+      b = b.trim(); if (!b) return;
+      if (/^\s*([-*]|\d+\.)\s+/.test(b)){
+        var items = b.split(/\n/).filter(function(l){ return l.trim(); })
+          .map(function(l){ return '<li>' + mdInline(l.replace(/^\s*([-*]|\d+\.)\s+/, '').trim()) + '</li>'; });
+        out.push('<ul>' + items.join('') + '</ul>'); return;
+      }
+      if (/^>\s?/.test(b)){ out.push('<blockquote>' + mdInline(b.replace(/^>\s?/gm, '').trim()) + '</blockquote>'); return; }
+      var h = /^(#{1,6})\s+(.*)$/.exec(b);
+      if (h){ out.push('<h3>' + mdInline(h[2].trim()) + '</h3>'); return; }
+      out.push('<p>' + mdInline(b.replace(/\n/g, ' ')) + '</p>');
+    });
+    return out.join('\n');
+  }
+  function findOrCreateTarget(label, created){
+    var id = slugify(label);
+    if (id === currentId) return null;
+    if (db.entries[id]) return id;
+    for (var i = 0; i < db.order.length; i++){
+      var oe = getEntry(db.order[i]);
+      if (oe && oe.title.toLowerCase() === label.toLowerCase()) return oe.id;
+    }
+    var e = getEntry(currentId);
+    makeEntry({ id:id, title:label, subject: e ? e.subject : '', status:'seed', body:'' });
+    created.push(id);
+    return id;
+  }
+  function convertWikiLinks(html, created){
+    return String(html).replace(/\[\[([^\]|\n]{1,80})(?:\|([^\]\n]{1,80}))?\]\]/g, function(_, target, label){
+      target = target.trim(); label = (label != null ? label : target).trim();
+      if (!target) return esc(label);
+      var id = findOrCreateTarget(target, created);
+      if (!id) return '<strong>' + esc(label) + '</strong>';
+      return '<a class="entry-link" data-entry="' + id + '">' + esc(label) + '</a>';
+    });
+  }
+  function ingestDraft(){
+    var raw = $('dp-paste').value;
+    if (!raw.trim()){ toast('Paste the model’s answer first.'); return; }
+    var s = stripFences(raw);
+    var html = looksLikeHTML(s) ? extractHTMLBody(s) : markdownLite(s);
+    var created = [];
+    html = convertWikiLinks(html, created);
+    html = sanitize(html);
+    if (!plainText(html)){
+      // roll back any seeds spawned before we discovered there was no real text
+      created.forEach(function(id){ delete db.entries[id]; var k = db.order.indexOf(id); if (k >= 0) db.order.splice(k, 1); });
+      toast('Couldn’t find any usable text in that paste.'); return;
+    }
+    var e = getEntry(currentId);
+    var had = plainText(e.body);
+    e.body = (had && draftMode === 'append') ? (e.body + html) : html;
+    if (e.status === 'seed' && plainText(e.body).length >= 12) e.status = 'growing';
+    e.updated = now();
+    persist();
+    closeDraft();
+    applyModeDOM(false);   // read mode without committing stale DOM
+    renderAll();
+    var msg = 'Drafted “' + trim(e.title, 26) + '”.';
+    if (created.length) msg += ' ' + created.length + ' new linked seed' + (created.length === 1 ? '' : 's') + ' in your index.';
+    toast(msg, created.length ? 'See them below' : null, created.length ? function(){ document.querySelector('.pane-scroll').scrollTo(0, document.querySelector('#connections').offsetTop); } : null);
+  }
+  function copyText(text, btn){
+    function flash(){ var o = btn.innerHTML; btn.innerHTML = '<span class="glyph">✓</span> Copied'; setTimeout(function(){ btn.innerHTML = o; }, 1400); }
+    if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(flash, function(){ selPromptFallback(); flash(); }); }
+    else { selPromptFallback(); flash(); }
+  }
+  function selPromptFallback(){ var ta = $('dp-prompt'); ta.focus(); ta.select(); try { document.execCommand('copy'); } catch(e){} }
+
   // ---------- formatting toolbar ----------
   function fmt(cmd){
     var content = $('entry-content');
@@ -1139,8 +1420,21 @@
     // formatting buttons
     Array.prototype.forEach.call(document.querySelectorAll('.fmt-btn'), function(btn){
       btn.addEventListener('mousedown', function(ev){ ev.preventDefault(); }); // keep selection
-      btn.addEventListener('click', function(){ fmt(btn.getAttribute('data-cmd')); });
+      if (btn.hasAttribute('data-cmd')) btn.addEventListener('click', function(){ fmt(btn.getAttribute('data-cmd')); });
     });
+
+    // draft-with-a-prompt
+    $('fmt-draft').addEventListener('click', openDraft);
+    $('ss-draft').addEventListener('click', openDraft);
+    $('ss-write').addEventListener('click', function(){ setMode('edit'); });
+    $('dp-context').addEventListener('input', refreshDraftPrompt);
+    $('dp-diagnosis').addEventListener('change', refreshDraftPrompt);
+    $('dp-copy').addEventListener('click', function(){ copyText($('dp-prompt').value, $('dp-copy')); });
+    $('dp-mode-replace').addEventListener('click', function(){ draftMode = 'replace'; updateDraftModeUI(); });
+    $('dp-mode-append').addEventListener('click', function(){ draftMode = 'append'; updateDraftModeUI(); });
+    $('dp-ingest').addEventListener('click', ingestDraft);
+    $('draft-cancel').addEventListener('click', closeDraft);
+    $('draft-back').addEventListener('click', function(ev){ if (ev.target === $('draft-back')) closeDraft(); });
 
     // live edit
     var content = $('entry-content');
@@ -1185,7 +1479,7 @@
       if (m.classList.contains('open') && !m.contains(ev.target)){ setTimeout(function(){ if (!currentSelectionInContent()) hideMenu(); }, 0); }
     });
     document.addEventListener('keydown', function(ev){
-      if (ev.key === 'Escape'){ hideMenu(); toggleMore(false); closeCover(); $('sheet-back').classList.remove('open'); }
+      if (ev.key === 'Escape'){ hideMenu(); toggleMore(false); closeCover(); closeDraft(); $('sheet-back').classList.remove('open'); }
       // Ctrl/Cmd+E — new entry from selection (works in read mode)
       var mod = isMac ? ev.metaKey : ev.ctrlKey;
       if (mod && (ev.key === 'e' || ev.key === 'E')){
