@@ -63,7 +63,7 @@
 		</div>
 	</header>
 
-	<main class="arcade-layout">
+	<main class="arcade-layout" class:playing={activeGame !== null}>
 		<section class="game-column" aria-label="arcade games">
 			<Arcade {activePet} bestiaryCreatures={book.bestiaryCreatures} onactivechange={setActiveGame} />
 		</section>
@@ -148,6 +148,10 @@
 		gap: 1rem;
 		align-items: start;
 	}
+	.arcade-layout.playing {
+		width: min(100%, 96rem);
+		grid-template-columns: minmax(0, 1fr) minmax(17rem, 20rem);
+	}
 	.game-column {
 		min-width: 0;
 	}
@@ -165,6 +169,9 @@
 			justify-content: center;
 		}
 		.arcade-layout {
+			grid-template-columns: 1fr;
+		}
+		.arcade-layout.playing {
 			grid-template-columns: 1fr;
 		}
 	}
