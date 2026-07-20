@@ -214,6 +214,18 @@
   .cs-shape-btn[data-kind="rays"] .cs-shape-preview{border-radius:50%; background:repeating-conic-gradient(from 0deg, var(--rose-dust) 0deg 8deg, transparent 8deg 30deg);}
   .cs-shape-label{font-family:var(--font-display); font-size:10px; letter-spacing:.04em; color:var(--ink-soft); text-align:center; margin-top:4px;}
 
+  /* upload tile — drop a picture in as its own layer (mirrors the bestiary
+     card-back editor's upload tab) */
+  .cs-upload{margin-top:10px;}
+  .cs-drop{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; width:100%; aspect-ratio:5/2; border:1px dashed var(--rose-dust); border-radius:8px; background:#fffdfa; color:var(--ink-soft); cursor:pointer; text-align:center; padding:8px; transition:border-color .12s ease, background .12s ease;}
+  .cs-drop:hover{border-color:var(--rose-deep); background:var(--blush);}
+  .cs-drop.dragging{border-color:var(--gold); border-style:solid; background:var(--blush);}
+  .cs-drop-glyph{font-size:20px; color:var(--gold); line-height:1;}
+  .cs-drop-hint{font-family:var(--font-display); font-weight:600; font-size:11.5px; color:var(--rose-deep);}
+  .cs-drop-sub{font-family:var(--font-body); font-size:10.5px; color:var(--ink-soft);}
+  .cs-drop.busy{opacity:.6; pointer-events:none;}
+  .cs-upload-err{font-family:var(--font-body); font-size:11px; color:#a8434f; margin:6px 0 0; min-height:1em;}
+
   /* finish chips + glyph buttons (left rail "base" controls) */
   .cd-row{display:flex; flex-wrap:wrap; gap:7px;}
   .cd-chip{display:inline-flex; align-items:center; gap:5px; font-family:var(--font-body); font-size:12px; color:var(--ink-soft); background:#fffdfa; border:1px solid var(--rose-dust); border-radius:999px; padding:4px 12px; cursor:pointer; transition:background .12s ease, color .12s ease, border-color .12s ease;}
@@ -235,7 +247,13 @@
   .c-layer.studio-layer{cursor:grab; touch-action:none;}
   .c-layer.studio-layer:active{cursor:grabbing;}
   .c-layer.studio-layer.selected .c-layer-shape{outline:2px dashed var(--rose-deep); outline-offset:3px;}
-  .c-layer-handle{position:absolute; right:-7px; bottom:-7px; width:16px; height:16px; border-radius:50%; background:var(--paper); border:2px solid var(--rose-deep); cursor:nwse-resize; touch-action:none;}
+  .c-layer.studio-layer.selected .c-layer-img{outline:2px dashed var(--rose-deep); outline-offset:2px;}
+  .c-layer-handle{position:absolute; right:-7px; bottom:-7px; width:16px; height:16px; border-radius:50%; background:var(--paper); border:2px solid var(--rose-deep); cursor:nwse-resize; touch-action:none; z-index:4;}
+  /* rotation knob, on a short stem above the layer — matches the cardback
+     editor's "top knob to spin" affordance */
+  .c-layer-spin{position:absolute; left:50%; top:-22px; width:14px; height:14px; margin-left:-7px; border-radius:50%; background:var(--paper); border:2px solid var(--gold); cursor:grab; touch-action:none; z-index:4;}
+  .c-layer-spin::before{content:''; position:absolute; left:50%; top:14px; width:1.5px; height:14px; margin-left:-.75px; background:var(--gold);}
+  .c-layer-spin:active{cursor:grabbing;}
 
   /* right rail: layer list + selected-layer controls */
   .cs-layer-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px; max-height:26vh; overflow-y:auto;}
@@ -387,7 +405,7 @@
 
     <div class="field" style="margin-top:22px;">
       <label>Design its cover</label>
-      <p class="hint" style="margin:0 0 12px;">The card-back this entry wears on the deck — a full studio, adapted from the bestiary's card-back editor: layer shapes, drag and resize them, pick a color and finish for each. It previews live as you type.</p>
+      <p class="hint" style="margin:0 0 12px;">The card-back this entry wears on the deck — a full studio, adapted from the bestiary's card-back editor: layer shapes or upload your own images, drag, resize and spin them, pick a color and finish for each. It previews live as you type.</p>
       <div class="cover-preview-row">
         <a class="card63 acc-rose" id="cover-card" aria-label="cover preview">
           <div id="cov-layers"></div>
@@ -491,7 +509,7 @@
       <button class="cs-close" id="cs-close-btn" type="button" aria-label="close studio">&larr;</button>
       <div class="cs-titles">
         <span class="cs-title">Cover Studio</span>
-        <span class="cs-sub">layer shapes, colors, and finishes onto the card back</span>
+        <span class="cs-sub">layer shapes, uploaded images, colors, and finishes onto the card back</span>
       </div>
     </div>
     <div class="cs-bar-right">
@@ -508,6 +526,15 @@
       <div class="cs-panel">
         <h3>Add a Layer</h3>
         <div class="cs-shape-grid" id="cs-shapes"></div>
+        <div class="cs-upload">
+          <button type="button" class="cs-drop" id="cs-drop">
+            <span class="cs-drop-glyph">⬓</span>
+            <span class="cs-drop-hint">Upload an image</span>
+            <span class="cs-drop-sub">drop a picture, or click — it lands as a layer</span>
+          </button>
+          <p class="cs-upload-err" id="cs-upload-err" role="status" aria-live="polite"></p>
+          <input type="file" id="cs-file" accept="image/*" hidden>
+        </div>
       </div>
       <div class="cs-panel">
         <h3>Accent</h3>
@@ -540,7 +567,7 @@
           </div>
         </a>
       </div>
-      <p class="cs-tip">drag a layer to move it &middot; drag its corner dot to resize &middot; select one to edit on the right</p>
+      <p class="cs-tip">drag to move &middot; corner dot to resize &middot; top knob to spin &middot; scroll to scale &middot; select one to edit on the right</p>
     </section>
 
     <!-- right rail: layer list + selected-layer controls -->
@@ -552,9 +579,16 @@
       </div>
       <div class="cs-panel" id="cs-layer-panel" style="display:none;">
         <h3>Selected Layer</h3>
-        <div class="cs-field">
+        <div class="cs-field" id="cs-color-field">
           <span class="cs-field-label">Color</span>
           <div class="cs-swatch-row" id="cs-layer-colors"></div>
+        </div>
+        <div class="cs-field" id="cs-render-field" style="display:none;">
+          <span class="cs-field-label">Rendering</span>
+          <div class="cd-row" id="cs-render">
+            <button type="button" class="cd-chip" data-smooth="1"><span class="sym">◇</span>smooth</button>
+            <button type="button" class="cd-chip" data-smooth="0"><span class="sym">▦</span>crisp</button>
+          </div>
         </div>
         <div class="cs-field">
           <span class="cs-field-label">Opacity <span class="val" id="cs-opacity-val">55%</span></span>
@@ -999,21 +1033,39 @@
       wrap.className = 'c-layer studio-layer' + (l.id === studio.selectedId ? ' selected' : '');
       wrap.style.cssText = OlogypediaCover.outerStyle(l);
       wrap.dataset.id = l.id;
-      var shape = document.createElement('div');
-      shape.className = 'c-layer-shape';
-      shape.style.cssText = OlogypediaCover.shapeInnerStyle(l);
-      wrap.appendChild(shape);
+      if (l.kind === 'image'){
+        wrap.insertAdjacentHTML('beforeend', OlogypediaCover.imageInnerHTML(l));
+      } else {
+        var shape = document.createElement('div');
+        shape.className = 'c-layer-shape';
+        shape.style.cssText = OlogypediaCover.shapeInnerStyle(l);
+        wrap.appendChild(shape);
+      }
       if (l.id === studio.selectedId){
+        var spin = document.createElement('div');
+        spin.className = 'c-layer-spin';
+        spin.addEventListener('pointerdown', function(e){ startLayerGesture(e, l, 'rotate'); });
+        wrap.appendChild(spin);
         var handle = document.createElement('div');
         handle.className = 'c-layer-handle';
         handle.addEventListener('pointerdown', function(e){ startLayerGesture(e, l, 'resize'); });
         wrap.appendChild(handle);
       }
       wrap.addEventListener('pointerdown', function(e){
-        if (e.target.classList.contains('c-layer-handle')) return;
+        if (e.target.classList.contains('c-layer-handle') || e.target.classList.contains('c-layer-spin')) return;
         studio.selectedId = l.id;
         startLayerGesture(e, l, 'move');
       });
+      wrap.addEventListener('wheel', function(e){
+        e.preventDefault();
+        studio.selectedId = l.id;
+        studioSnapshot();
+        var step = e.deltaY < 0 ? 3 : -3;
+        l.size = Math.max(8, Math.min(98, l.size + step));
+        renderStudioStageOnly();
+        renderLayerPanel();
+        csUndoBtn.disabled = !studio.undoStack.length;
+      }, { passive: false });
       studioLayersEl.appendChild(wrap);
     });
   }
@@ -1039,8 +1091,16 @@
       eye.addEventListener('click', function(){ studioSnapshot(); l.hidden = !l.hidden; renderStudio(); });
       var name = document.createElement('button');
       name.type = 'button'; name.className = 'cs-lname';
-      var dot = document.createElement('span'); dot.className = 'swatch-dot'; dot.style.background = l.color;
-      var text = document.createElement('span'); text.className = 'ltext'; text.textContent = SHAPE_LABELS[l.kind] || l.kind;
+      var dot = document.createElement('span'); dot.className = 'swatch-dot';
+      if (l.kind === 'image'){
+        dot.style.backgroundImage = 'url("' + l.src + '")';
+        dot.style.backgroundSize = 'cover';
+        dot.style.backgroundPosition = 'center';
+      } else {
+        dot.style.background = l.color;
+      }
+      var text = document.createElement('span'); text.className = 'ltext';
+      text.textContent = l.kind === 'image' ? (l.name || 'Image') : (SHAPE_LABELS[l.kind] || l.kind);
       name.appendChild(dot); name.appendChild(text);
       name.addEventListener('click', function(){ studio.selectedId = l.id; renderStudio(); });
       var acts = document.createElement('div'); acts.className = 'cs-lacts';
@@ -1091,12 +1151,27 @@
   var csThicknessEl = document.getElementById('cs-thickness');
   var csThicknessValEl = document.getElementById('cs-thickness-val');
   var csBlendEl = document.getElementById('cs-blend');
+  var csColorFieldEl = document.getElementById('cs-color-field');
+  var csRenderFieldEl = document.getElementById('cs-render-field');
+  var csRenderEl = document.getElementById('cs-render');
 
   function renderLayerPanel(){
     var l = studioSelected();
     csLayerPanelEl.style.display = l ? '' : 'none';
     if (!l) return;
-    setActiveByHex('cs-layer-colors', l.color);
+    var isImage = l.kind === 'image';
+    // color is meaningless for a photograph; a "rendering" toggle takes its
+    // place, and ring-thickness only exists on rings
+    csColorFieldEl.style.display = isImage ? 'none' : '';
+    csRenderFieldEl.style.display = isImage ? '' : 'none';
+    if (isImage){
+      var smooth = l.smooth !== false;
+      Array.prototype.forEach.call(csRenderEl.children, function(btn){
+        btn.classList.toggle('active', (btn.dataset.smooth === '1') === smooth);
+      });
+    } else {
+      setActiveByHex('cs-layer-colors', l.color);
+    }
     csOpacityEl.value = Math.round(l.opacity * 100);
     csOpacityValEl.textContent = csOpacityEl.value + '%';
     csRotationEl.value = l.rotation;
@@ -1108,6 +1183,12 @@
     csThicknessValEl.textContent = (l.thickness || 10) + 'px';
     csBlendEl.value = l.blend || 'normal';
   }
+  Array.prototype.forEach.call(csRenderEl.children, function(btn){
+    btn.addEventListener('click', function(){
+      var l = studioSelected(); if (!l || l.kind !== 'image') return;
+      studioSnapshot(); l.smooth = btn.dataset.smooth === '1'; renderStudio();
+    });
+  });
   function setActiveByHex(containerId, hex){
     var kids = document.getElementById(containerId).children;
     for (var i = 0; i < kids.length; i++){
@@ -1138,12 +1219,21 @@
   function startLayerGesture(e, layer, mode){
     e.preventDefault(); e.stopPropagation();
     studioSnapshot();
+    // the card is the real positioned box the layer percentages resolve
+    // against (#studio-layers is display:contents, so it has no box of its own)
+    var rect = studioCardEl.getBoundingClientRect();
     gesture = {
       mode: mode, layer: layer,
-      stageRect: studioLayersEl.getBoundingClientRect(),
-      startX: layer.x, startY: layer.y, startSize: layer.size,
-      startPX: e.clientX, startPY: e.clientY
+      stageRect: rect,
+      startX: layer.x, startY: layer.y, startSize: layer.size, startRot: layer.rotation || 0,
+      startPX: e.clientX, startPY: e.clientY,
+      // layer centre in page coords, for angle-based rotation
+      cx: rect.left + layer.x * rect.width, cy: rect.top + layer.y * rect.height,
+      startAngle: 0
     };
+    if (mode === 'rotate'){
+      gesture.startAngle = Math.atan2(e.clientY - gesture.cy, e.clientX - gesture.cx) * 180 / Math.PI;
+    }
     if (e.target.setPointerCapture) { try { e.target.setPointerCapture(e.pointerId); } catch (err) {} }
   }
   document.addEventListener('pointermove', function(e){
@@ -1153,6 +1243,10 @@
     if (gesture.mode === 'move'){
       gesture.layer.x = clamp01(gesture.startX + dx / w);
       gesture.layer.y = clamp01(gesture.startY + dy / h);
+    } else if (gesture.mode === 'rotate'){
+      var ang = Math.atan2(e.clientY - gesture.cy, e.clientX - gesture.cx) * 180 / Math.PI;
+      var next = Math.round(gesture.startRot + (ang - gesture.startAngle));
+      gesture.layer.rotation = ((next % 360) + 360) % 360;
     } else {
       var deltaPx = (dx + dy) / 2; // corner drag: down-right grows, up-left shrinks
       var deltaPct = (deltaPx / w) * 100;
@@ -1164,6 +1258,53 @@
     if (gesture){ gesture = null; renderLayerPanel(); csUndoBtn.disabled = !studio.undoStack.length; }
   });
   function clamp01(n){ return Math.max(0.02, Math.min(0.98, n)); }
+
+  // ── image upload: drop a picture in as a new layer ──
+  var csDropEl = document.getElementById('cs-drop');
+  var csFileEl = document.getElementById('cs-file');
+  var csUploadErrEl = document.getElementById('cs-upload-err');
+  var uploadBusy = false;
+
+  function addImageFromFile(file){
+    if (!file || uploadBusy) return;
+    uploadBusy = true;
+    csUploadErrEl.textContent = '';
+    csDropEl.classList.add('busy');
+    OlogypediaCover.processImageFile(file).then(function(img){
+      studioSnapshot();
+      var layer = OlogypediaCover.newImageLayer(img.src, img.naturalW, img.naturalH, {
+        name: (file.name || 'Image').replace(/\.[a-z0-9]+$/i, '').slice(0, 40) || 'Image',
+        smooth: !img.pixelated
+      });
+      studio.layers.push(layer);
+      studio.selectedId = layer.id;
+      renderStudio();
+    }).catch(function(err){
+      csUploadErrEl.textContent = (err && err.message) || 'Could not add that image.';
+    }).then(function(){
+      uploadBusy = false;
+      csDropEl.classList.remove('busy');
+    });
+  }
+
+  csDropEl.addEventListener('click', function(){ csFileEl.click(); });
+  csFileEl.addEventListener('change', function(){
+    if (csFileEl.files && csFileEl.files[0]) addImageFromFile(csFileEl.files[0]);
+    csFileEl.value = '';
+  });
+  csDropEl.addEventListener('dragover', function(e){ e.preventDefault(); csDropEl.classList.add('dragging'); });
+  csDropEl.addEventListener('dragleave', function(){ csDropEl.classList.remove('dragging'); });
+  csDropEl.addEventListener('drop', function(e){
+    e.preventDefault(); csDropEl.classList.remove('dragging');
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) addImageFromFile(f);
+  });
+  // dropping anywhere on the open studio also works
+  studioEl.addEventListener('dragover', function(e){ if (e.dataTransfer) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+  studioEl.addEventListener('drop', function(e){
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f && /^image\//.test(f.type)){ e.preventDefault(); addImageFromFile(f); }
+  });
 
   // ── studio chrome: bar buttons + keyboard ──
   openStudioEl.addEventListener('click', openStudio);
