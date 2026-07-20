@@ -69,7 +69,7 @@ woodles.space/
     ├── hygge/               static · design playground (fonts, palette, motifs)
     ├── digits/              static · an SVG pen that writes the time
     ├── quiet-room/          static · an immersive three.js room of light
-    ├── ologypedia/          static · a block system for textbook-style pages, and the pages it renders
+    ├── ologypedia/          static · a block system for textbook-style pages, the pages it renders, and a personal editable Textbook that stitches entries together
     ├── letter/              static · echoes — the published-letter reader
     ├── animations/          Python · Manim playspace, outside the workspace
     ├── write/               SvelteKit · the letter editor
@@ -145,6 +145,34 @@ Grid/Spine view toggle (the latter persisted per-browser under
 `ologypedia-view`) — covering both shelved cards and the drafts injected
 from `localStorage`, so the deck stays scannable as it grows past a
 handful of entries.
+
+`textbook.html` is the other half of the app, and the one that makes the
+"a textbook, grown one entry at a time" tagline literal: a personal,
+editable, interconnected reading room. Where `index.html` shows finished
+covers and `add-page.html` runs the prompt-and-publish pipeline for
+authored pages, `textbook.html` is where entries are *read, written, and
+stitched together* directly in the browser, no backend and no build. Its
+whole content lives in one versioned localStorage blob
+(`ologypedia-textbook-v1` — `{ v, entries, order, last }`), deliberately
+shaped as the unit you'd sync: stitching happens at the whole-blob level,
+with cross-entry links stored inline in each entry's body as
+`<a class="entry-link" data-entry="…">` and backlinks derived across the
+set. The core gesture: highlight any phrase while reading, and the ✦ menu
+turns it into a new entry (title pre-filled from the selection) with the
+link planted where you found it — "new entry & open" to go build it out,
+or "seed it & stay" to keep your place. Following a link to an entry that
+doesn't exist yet creates it (wiki red-links). It's built to be
+low-friction for ADHD/autism specifically: a breadcrumb trail so you
+never lose your way back, seeds as a legitimate finished state (not a
+nag), autosave with a visible saved state, resume-where-you-left-off,
+forward-only status you don't have to manage, a Focus mode that quiets
+the room to one page, a Calm-motion toggle, and one predictable page
+shape throughout. Prefs persist under `ologypedia-textbook-prefs-v1`;
+export/import JSON is the hands-on stand-in for sync. It shares
+`shared/fonts.css` and the cream/rose token set inline, same pattern as
+the rest of the app; its store is intentionally separate from
+`add-page.html`'s `ologypedia-studio-v1` shelf so neither can corrupt the
+other.
 
 `marginalia` is the biggest app by built size (`dist/` ~3.1 MB, week 10
 perf-sanity check) — but the number that actually matters, first-load

@@ -37,6 +37,14 @@
   .shelf-head h1{font-family:var(--font-display); font-weight:600; font-size:clamp(46px,8vw,72px); color:#fbeee2; margin:18px 0 2px; line-height:.98; letter-spacing:.01em; text-shadow:0 2px 1px rgba(78,47,42,.45), 0 0 26px rgba(255,236,214,.28);}
   .shelf-head .sub{display:flex; align-items:center; justify-content:center; gap:13px; font-family:var(--font-display); font-style:italic; font-size:19px; color:#f3d9cf; margin:0; text-shadow:0 1px 1px rgba(78,47,42,.4);}
   .shelf-head .sub .orn{color:var(--gold); font-style:normal; font-size:13px;}
+  /* the invitation into the living, editable textbook */
+  .reading-room{display:inline-flex; align-items:center; gap:8px; margin-top:16px; font-family:var(--font-body); font-size:14px; color:#fbeee2; text-decoration:none; background:color-mix(in srgb, var(--rose-deep) 58%, var(--wood-lo)); border:1px solid color-mix(in srgb, var(--gold) 60%, #fff); border-radius:999px; padding:8px 20px; box-shadow:0 3px 12px -5px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.18); transition:transform .16s ease, box-shadow .16s ease, background .16s ease;}
+  .reading-room:hover{transform:translateY(-1px); background:color-mix(in srgb, var(--rose-deep) 68%, var(--wood-lo)); box-shadow:0 6px 16px -6px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.22);}
+  .reading-room .rr-glyph{color:var(--gold);}
+  .reading-room .rr-sub{color:#f3d9cf; font-style:italic;}
+  .reading-room .rr-arrow{color:var(--gold); transition:transform .16s ease;}
+  .reading-room:hover .rr-arrow{transform:translateX(3px);}
+  @media(max-width:520px){ .reading-room .rr-sub{display:none;} }
 
   /* ===== deck controls: search, subject filter, view toggle ===== */
   .deck-controls{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:16px;}
@@ -255,6 +263,9 @@
     <a class="eyebrow" href="/" title="back to woodles.space">&larr; woodles.space</a>
     <h1>Ologypedia</h1>
     <p class="sub"><span class="orn">✦</span> A textbook, grown one entry at a time <span class="orn">✦</span></p>
+    <a class="reading-room" href="/ologypedia/textbook.html" title="Read your entries, highlight anything, and grow it into a new linked page">
+      <span class="rr-glyph">✦</span> Open your Textbook <span class="rr-sub">— read, highlight, and grow linked entries</span> <span class="rr-arrow">&rarr;</span>
+    </a>
   </header>
 
   <div class="deck-controls" id="deck-controls">
