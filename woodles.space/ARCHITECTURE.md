@@ -174,6 +174,23 @@ the rest of the app; its store is intentionally separate from
 `add-page.html`'s `ologypedia-studio-v1` shelf so neither can corrupt the
 other.
 
+Textbook entries are also **first-class on the bookcase**: `index.html`
+reads `ologypedia-textbook-v1` and renders each entry as a `.card63`
+cover-card alongside the published cards and the studio drafts — grid and
+spine views, search, and the subject filter all pick them up (they're
+injected into `.deck` before `setupDeckControls` runs). Each card links
+to `/ologypedia/textbook.html#<id>` (the reader deep-links on hash), is
+tagged by status (Seed/Growing/Grown — seeds render dashed like drafts),
+and carries a cover. Covers need no design step: accent is a stable hash
+of the id, the emblem defaults to ✦, and the shelf blurb is auto-excerpted
+from the entry's opening lines — but the Textbook's optional **Cover**
+control (a small popover on each entry) lets you choose an accent, an
+emblem, and a custom blurb, stored as `accent`/`glyph`/`blurb` on the
+entry. The two files keep their derivation in step (same accent-hash,
+same blurb rule) so a card looks identical whether or not a cover was
+ever chosen. De-duplication is by id: a published slug or a studio draft
+of the same id wins, so nothing doubles.
+
 `marginalia` is the biggest app by built size (`dist/` ~3.1 MB, week 10
 perf-sanity check) — but the number that actually matters, first-load
 transfer, is a much healthier ~290 KB. the difference is the reading

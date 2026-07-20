@@ -228,7 +228,15 @@
   /* draft variant */
   .card63.is-draft{border-style:dashed;}
   .card63.is-draft .c-read{color:var(--rose-dust);}
-  .c-tag{position:absolute; top:.7em; left:50%; transform:translateX(-50%); z-index:3; font-family:var(--font-display); font-weight:600; font-size:.5em; letter-spacing:.12em; text-transform:uppercase; color:var(--rose-deep); background:var(--blush); border:1px solid var(--rose-dust); border-radius:999px; padding:.12em .9em;}
+  .c-tag{position:absolute; top:.7em; left:50%; transform:translateX(-50%); z-index:3; font-family:var(--font-display); font-weight:600; font-size:.5em; letter-spacing:.12em; text-transform:uppercase; color:var(--rose-deep); background:var(--blush); border:1px solid var(--rose-dust); border-radius:999px; padding:.12em .9em; white-space:nowrap;}
+
+  /* Textbook cards — real, readable entries from your reading room */
+  .card63.is-seed{border-style:dashed;}
+  .card63.is-textbook .c-read{color:var(--gold);}
+  .card63.is-textbook:hover .c-read{color:var(--rose-deep);}
+  .c-tag.tag-seed{color:#6B5656; background:#fbf3ec; border-color:#d9c3b3;}
+  .c-tag.tag-growing{color:#7a5a1e; background:#f7ecd6; border-color:var(--gold);}
+  .c-tag.tag-grown{color:#4c6146; background:#e7efe1; border-color:var(--sage);}
 
   /* ── finishes, pulled from the bestiary card-back editor, tuned for light ── */
   @keyframes cb-pulse{0%,100%{opacity:.3}50%{opacity:.8}}
@@ -362,6 +370,7 @@
   var FINISHES = { pulse:1, shimmer:1, halo:1, drift:1 };
 
   drafts.forEach(function(e, i){
+    published[e.slug] = true;   // so a Textbook entry with the same id isn't doubled below
     var acc = (e.accent && ACCENTS.indexOf('acc-' + e.accent) >= 0) ? 'acc-' + e.accent : ACCENTS[i % ACCENTS.length];
     var fx = (e.finish && FINISHES[e.finish]) ? ' fx-' + e.finish : '';
     var a = document.createElement('a');
@@ -401,6 +410,53 @@
     deck.appendChild(note);
   }
 
+  // ===== entries from your editable Textbook (textbook.html), as cover-cards =====
+  var tb;
+  try { tb = JSON.parse(localStorage.getItem('ologypedia-textbook-v1')); }
+  catch (e) { tb = null; }
+  var tbOrder = (tb && tb.entries && Array.isArray(tb.order)) ? tb.order : [];
+  var tbShown = 0;
+  tbOrder.forEach(function(id){
+    var e = tb.entries[id];
+    if (!e || published[id]) return;          // skip published slugs and already-shown drafts
+    published[id] = true;
+    tbShown++;
+    var status = e.status || 'seed';
+    var seed = status === 'seed';
+    var a = document.createElement('a');
+    a.className = 'card63 is-textbook acc-' + tbAccent(id, e.accent) + (seed ? ' is-seed' : '');
+    a.setAttribute('data-slug', id);
+    a.href = '/ologypedia/textbook.html#' + encodeURIComponent(id);
+
+    var inner = el('div', 'c-inner', '');
+    inner.appendChild(corner('tl')); inner.appendChild(corner('tr'));
+    inner.appendChild(corner('bl')); inner.appendChild(corner('br'));
+    inner.appendChild(el('span', 'c-tag tag-' + status, tbStatusLabel(status)));
+    inner.appendChild(el('span', 'c-kicker', e.subject || ''));
+
+    var core = el('div', 'c-core', '');
+    var med = el('div', 'c-medallion', '');
+    med.appendChild(el('span', 'c-glyph', tbGlyph(e)));
+    core.appendChild(med);
+    core.appendChild(el('h2', 'c-title', e.title || 'Untitled entry'));
+    core.appendChild(el('p', 'c-blurb', tbBlurb(e)));
+    inner.appendChild(core);
+
+    var foot = el('span', 'c-foot', '');
+    foot.appendChild(el('span', 'c-read', 'Open ✦'));
+    foot.appendChild(el('span', 'c-brand', 'My Textbook'));
+    inner.appendChild(foot);
+
+    a.appendChild(inner);
+    deck.appendChild(a);
+  });
+
+  if (tbShown){
+    var tnote = el('div', 'deck-note', '');
+    tnote.appendChild(el('span', '', '✦ My Textbook cards open in your reading room — highlight anything inside to grow a new linked page'));
+    deck.appendChild(tnote);
+  }
+
   function el(tag, cls, text){
     var n = document.createElement(tag);
     if (cls) n.className = cls;
@@ -408,6 +464,23 @@
     return n;
   }
   function corner(pos){ return el('span', 'corner ' + pos, ''); }
+
+  // cover derivation for Textbook cards — stable defaults, no design step required
+  function tbAccent(id, stored){
+    var A = ['rose', 'sage', 'gold', 'dust', 'plum'];
+    if (stored && A.indexOf(stored) >= 0) return stored;
+    var h = 0; for (var i = 0; i < id.length; i++){ h = (h * 31 + id.charCodeAt(i)) >>> 0; }
+    return A[h % A.length];
+  }
+  function tbGlyph(e){ return (e.glyph && String(e.glyph).slice(0, 2)) || '✦'; }
+  function tbStatusLabel(s){ return s === 'grown' ? 'Grown' : s === 'growing' ? 'Growing' : 'Seed'; }
+  function tbBlurb(e){
+    if (e.blurb) return String(e.blurb);
+    var d = document.createElement('div'); d.innerHTML = e.body || '';   // detached, never inserted → inert
+    var txt = (d.textContent || '').replace(/\s+/g, ' ').trim();
+    if (!txt) return 'A seed — a title and a link, waiting to grow.';
+    return txt.length > 150 ? txt.slice(0, 147).replace(/\s+\S*$/, '') + '…' : txt;
+  }
 
   setupDeckControls();
 
@@ -447,7 +520,7 @@
         blurb: blurbEl ? blurbEl.textContent : '',
         glyph: glyphEl ? glyphEl.textContent : '✦',
         accent: accMatch ? accMatch[0] : 'acc-rose',
-        isDraft: card.classList.contains('is-draft')
+        isDraft: card.classList.contains('is-draft') || card.classList.contains('is-seed')
       };
     });
 

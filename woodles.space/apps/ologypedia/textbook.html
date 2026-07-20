@@ -153,6 +153,33 @@
   .status-pill .lbl{font-weight:600; color:var(--ink);}
   .meta-note{font-size:11.5px; color:var(--ink-soft); font-style:italic;}
 
+  /* the optional Cover control — how this entry looks on the bookshelf */
+  .cover-wrap{position:relative;}
+  #cover-dot{background:var(--rose-deep);}
+  .cover-pop{position:absolute; left:0; top:calc(100% + 8px); z-index:55; display:none; width:280px; max-width:86vw; background:#fffdfa; border:1px solid var(--rose-dust); border-radius:12px; padding:14px 15px; box-shadow:var(--shadow-2);}
+  .cover-pop.open{display:block;}
+  .cp-title{font-family:var(--font-display); font-weight:600; font-size:13px; letter-spacing:.06em; text-transform:uppercase; color:var(--rose-deep); margin-bottom:10px;}
+  .cp-preview{height:60px; border-radius:8px; display:flex; align-items:center; justify-content:center; margin-bottom:12px; border:1px solid color-mix(in srgb, var(--cp-dc, var(--rose-deep)) 40%, var(--gold)); background:radial-gradient(ellipse 80% 70% at 50% 40%, color-mix(in srgb, var(--cp-dc, var(--rose-deep)) 16%, #fffdfa), var(--paper) 72%);}
+  .cp-pv-glyph{font-family:var(--font-display); font-size:24px; color:color-mix(in srgb, var(--cp-dc, var(--rose-deep)) 82%, var(--rose-deep));}
+  .cp-label{font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-soft); margin:0 0 6px;}
+  .cp-label span{text-transform:none; letter-spacing:0; font-style:italic;}
+  .cp-swatches{display:flex; gap:8px; margin-bottom:12px;}
+  .cp-sw{width:26px; height:26px; border-radius:50%; cursor:pointer; border:2px solid transparent; box-shadow:inset 0 0 0 1px rgba(255,255,255,.5); padding:0;}
+  .cp-sw[aria-pressed="true"]{border-color:var(--ink); box-shadow:inset 0 0 0 1px rgba(255,255,255,.7), 0 0 0 2px color-mix(in srgb, var(--gold) 60%, transparent);}
+  .cp-sw:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+  .cp-glyphs{display:flex; flex-wrap:wrap; gap:5px; margin-bottom:8px;}
+  .cp-gl{width:28px; height:28px; border-radius:7px; cursor:pointer; border:1px solid var(--paper-edge); background:#fff; font-size:15px; color:var(--rose-deep); display:flex; align-items:center; justify-content:center; padding:0;}
+  .cp-gl:hover{background:var(--blush);}
+  .cp-gl[aria-pressed="true"]{background:var(--blush); border-color:var(--rose-dust); box-shadow:inset 0 0 0 1px var(--rose-dust);}
+  .cp-gl:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+  .cp-glyph-input{width:100%; font-family:var(--font-body); font-size:13px; color:var(--ink); background:#fff; border:1px solid var(--paper-edge); border-radius:7px; padding:6px 10px; margin-bottom:12px;}
+  .cp-glyph-input:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+  .cp-blurb{width:100%; font-family:var(--font-body); font-size:13px; line-height:1.5; color:var(--ink); background:#fff; border:1px solid var(--paper-edge); border-radius:7px; padding:8px 10px; resize:vertical; margin-bottom:8px;}
+  .cp-blurb:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+  .cp-foot{display:flex; align-items:center; gap:10px;}
+  .cp-hint{flex:1; font-size:11px; color:var(--ink-soft); font-style:italic; line-height:1.35;}
+  .cp-foot .tb-btn{padding:6px 14px;}
+
   /* the editing toolbar (edit mode only) */
   .fmt-bar{display:none; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:16px; padding:8px 10px; background:#fffdfa; border:1px solid var(--paper-edge); border-radius:10px; box-shadow:var(--shadow-1);}
   body[data-mode="edit"] .fmt-bar{display:flex;}
@@ -349,6 +376,26 @@
           <button class="status-pill" id="status-pill" title="Click to change how far along this entry is">
             <span class="idx-dot"></span><span>Status: <span class="lbl" id="status-lbl">Seed</span></span>
           </button>
+          <div class="cover-wrap">
+            <button class="status-pill" id="cover-btn" aria-haspopup="dialog" aria-expanded="false" title="How this entry looks on the bookshelf">
+              <span class="idx-dot" id="cover-dot"></span><span>Cover</span>
+            </button>
+            <div class="cover-pop" id="cover-pop" role="dialog" aria-label="Bookshelf cover">
+              <div class="cp-title">On the bookshelf</div>
+              <div class="cp-preview" id="cp-preview"><span class="cp-pv-glyph" id="cp-pv-glyph">✦</span></div>
+              <p class="cp-label">Colour</p>
+              <div class="cp-swatches" id="cp-swatches"></div>
+              <p class="cp-label">Emblem</p>
+              <div class="cp-glyphs" id="cp-glyphs"></div>
+              <input class="cp-glyph-input" id="cp-glyph-input" maxlength="2" placeholder="or type your own" aria-label="Custom emblem">
+              <p class="cp-label">Shelf blurb <span>optional</span></p>
+              <textarea class="cp-blurb" id="cp-blurb" rows="3" aria-label="Shelf blurb"></textarea>
+              <div class="cp-foot">
+                <span class="cp-hint" id="cp-hint">Left blank, it’s taken from your opening lines.</span>
+                <button class="tb-btn" id="cp-done">Done</button>
+              </div>
+            </div>
+          </div>
           <span class="meta-note" id="edited-note"></span>
         </div>
 
@@ -445,6 +492,9 @@
   var PREF_KEY  = 'ologypedia-textbook-prefs-v1';
   var STATUSES  = ['seed','growing','grown'];
   var STATUS_LABEL = { seed:'Seed', growing:'Growing', grown:'Grown' };
+  var ACCENTS   = ['rose','sage','gold','dust','plum'];
+  var ACCENT_COLOR = { rose:'#8C3B4A', sage:'#8FA37E', gold:'#C9A66B', dust:'#C77C8E', plum:'#6f4a63' };
+  var GLYPH_PRESETS = ['✦','✶','✧','❀','❋','✷','☾','✵','❖','✿'];
   var isMac = /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 
   var db, prefs, currentId, trail = [], savedRange = null, saveTimer = null, savedFlashTimer = null;
@@ -563,9 +613,26 @@
       created: fields.created || now(),
       updated: fields.updated || now()
     };
+    if (fields.accent && ACCENTS.indexOf(fields.accent) >= 0) e.accent = fields.accent;
+    if (fields.glyph) e.glyph = String(fields.glyph).slice(0, 2);
+    if (fields.blurb) e.blurb = String(fields.blurb).slice(0, 300);
     db.entries[id] = e;
     db.order.push(id);
     return e;
+  }
+
+  // ---------- cover derivation (kept in step with index.html's shelf cards) ----------
+  function coverAccent(e){
+    if (e.accent && ACCENTS.indexOf(e.accent) >= 0) return e.accent;
+    var id = e.id || '', h = 0;
+    for (var i = 0; i < id.length; i++){ h = (h * 31 + id.charCodeAt(i)) >>> 0; }
+    return ACCENTS[h % ACCENTS.length];
+  }
+  function coverGlyph(e){ return (e.glyph && String(e.glyph).slice(0, 2)) || '✦'; }
+  function deriveBlurb(e){
+    var txt = plainText(e.body || '');
+    if (!txt) return 'A seed — a title and a link, waiting to grow.';
+    return txt.length > 150 ? txt.slice(0, 147).replace(/\s+\S*$/, '') + '…' : txt;
   }
   function outgoingOf(id){
     var e = getEntry(id); if (!e) return [];
@@ -662,6 +729,10 @@
     $('status-lbl').textContent = STATUS_LABEL[e.status];
     var pd = $('status-pill').querySelector('.idx-dot');
     pd.style.background = e.status === 'grown' ? 'var(--grown)' : e.status === 'growing' ? 'var(--gold)' : 'var(--seed)';
+
+    // cover dot reflects the shelf accent; rebuild the picker if it's open
+    $('cover-dot').style.background = ACCENT_COLOR[coverAccent(e)];
+    if ($('cover-pop').classList.contains('open')) buildCoverUI(e);
 
     $('edited-note').textContent = 'Edited ' + relTime(e.updated);
 
@@ -889,6 +960,66 @@
     function dismiss(){ clearTimeout(to); if (t.parentNode){ t.style.opacity='0'; setTimeout(function(){ t.remove(); }, 180); } }
   }
 
+  // ---------- the cover picker (how an entry looks on the bookshelf) ----------
+  function buildCoverUI(e){
+    var acc = coverAccent(e), gl = coverGlyph(e);
+    document.querySelector('.cp-preview').style.setProperty('--cp-dc', ACCENT_COLOR[acc]);
+    $('cp-pv-glyph').textContent = gl;
+
+    var sw = $('cp-swatches'); sw.innerHTML = '';
+    ACCENTS.forEach(function(a){
+      var b = document.createElement('button');
+      b.className = 'cp-sw'; b.type = 'button'; b.title = a;
+      b.style.background = ACCENT_COLOR[a];
+      b.setAttribute('aria-pressed', String(a === acc));
+      b.addEventListener('click', function(){ setCover(e, { accent:a }); });
+      sw.appendChild(b);
+    });
+
+    var gg = $('cp-glyphs'); gg.innerHTML = '';
+    GLYPH_PRESETS.forEach(function(g){
+      var b = document.createElement('button');
+      b.className = 'cp-gl'; b.type = 'button'; b.textContent = g;
+      b.setAttribute('aria-pressed', String(g === gl));
+      b.addEventListener('click', function(){ setCover(e, { glyph:g }); });
+      gg.appendChild(b);
+    });
+    $('cp-glyph-input').value = (e.glyph && GLYPH_PRESETS.indexOf(e.glyph) < 0) ? e.glyph : '';
+
+    $('cp-blurb').value = e.blurb || '';
+    $('cp-blurb').placeholder = deriveBlurb(e);
+  }
+  function setCover(e, patch){
+    if (patch.accent !== undefined){ if (patch.accent) e.accent = patch.accent; else delete e.accent; }
+    if (patch.glyph !== undefined){ var g = String(patch.glyph || '').slice(0,2); if (g) e.glyph = g; else delete e.glyph; }
+    if (patch.blurb !== undefined){ var b = String(patch.blurb || '').trim().slice(0,300); if (b) e.blurb = b; else delete e.blurb; }
+    persist();
+    $('cover-dot').style.background = ACCENT_COLOR[coverAccent(e)];
+    buildCoverUI(e);
+  }
+  // typing paths — persist + refresh preview/dot without rebuilding the field being typed in
+  function setCoverGlyphOnly(e){
+    var g = String($('cp-glyph-input').value || '').slice(0,2);
+    if (g) e.glyph = g; else delete e.glyph;
+    persist();
+    var shown = coverGlyph(e);
+    $('cp-pv-glyph').textContent = shown;
+    $('cover-dot').style.background = ACCENT_COLOR[coverAccent(e)];
+    Array.prototype.forEach.call($('cp-glyphs').children, function(b){ b.setAttribute('aria-pressed', String(b.textContent === shown)); });
+  }
+  function setCoverBlurbOnly(e){
+    var b = String($('cp-blurb').value || '').trim().slice(0,300);
+    if (b) e.blurb = b; else delete e.blurb;
+    persist();
+  }
+  function openCover(){
+    var e = getEntry(currentId); if (!e) return;
+    buildCoverUI(e);
+    $('cover-pop').classList.add('open');
+    $('cover-btn').setAttribute('aria-expanded','true');
+  }
+  function closeCover(){ $('cover-pop').classList.remove('open'); $('cover-btn').setAttribute('aria-expanded','false'); }
+
   // ---------- formatting toolbar ----------
   function fmt(cmd){
     var content = $('entry-content');
@@ -925,8 +1056,14 @@
       try {
         var data = JSON.parse(r.result);
         if (!data || !data.entries || !Array.isArray(data.order)) throw new Error('shape');
-        // sanitize every incoming body
-        Object.keys(data.entries).forEach(function(id){ if (data.entries[id]) data.entries[id].body = sanitize(data.entries[id].body || ''); });
+        // sanitize every incoming body and clamp cover fields
+        Object.keys(data.entries).forEach(function(id){
+          var e = data.entries[id]; if (!e) return;
+          e.body = sanitize(e.body || '');
+          if (e.accent && ACCENTS.indexOf(e.accent) < 0) delete e.accent;
+          if (e.glyph) e.glyph = String(e.glyph).slice(0, 2); else delete e.glyph;
+          if (e.blurb) e.blurb = String(e.blurb).slice(0, 300); else delete e.blurb;
+        });
         db = data; if (typeof db.v !== 'number') db.v = 1;
         currentId = db.last && getEntry(db.last) ? db.last : db.order[0];
         trail = currentId ? [currentId] : [];
@@ -989,6 +1126,14 @@
       e.updated = now(); persist(); renderPane(); renderIndex();
     });
 
+    // cover picker
+    $('cover-btn').addEventListener('click', function(ev){ ev.stopPropagation(); if ($('cover-pop').classList.contains('open')) closeCover(); else openCover(); });
+    $('cover-pop').addEventListener('click', function(ev){ ev.stopPropagation(); });
+    $('cp-glyph-input').addEventListener('input', function(){ var e = getEntry(currentId); if (e) setCoverGlyphOnly(e); });
+    $('cp-blurb').addEventListener('input', function(){ var e = getEntry(currentId); if (!e) return; clearTimeout($('cp-blurb')._t); $('cp-blurb')._t = setTimeout(function(){ setCoverBlurbOnly(e); }, 400); });
+    $('cp-done').addEventListener('click', closeCover);
+    document.addEventListener('click', function(ev){ var w = document.querySelector('.cover-wrap'); if (w && !w.contains(ev.target)) closeCover(); });
+
     $('coach-dismiss').addEventListener('click', function(){ prefs.coachDismissed = true; savePrefs(); $('coach').hidden = true; });
 
     // formatting buttons
@@ -1040,7 +1185,7 @@
       if (m.classList.contains('open') && !m.contains(ev.target)){ setTimeout(function(){ if (!currentSelectionInContent()) hideMenu(); }, 0); }
     });
     document.addEventListener('keydown', function(ev){
-      if (ev.key === 'Escape'){ hideMenu(); toggleMore(false); $('sheet-back').classList.remove('open'); }
+      if (ev.key === 'Escape'){ hideMenu(); toggleMore(false); closeCover(); $('sheet-back').classList.remove('open'); }
       // Ctrl/Cmd+E — new entry from selection (works in read mode)
       var mod = isMac ? ev.metaKey : ev.ctrlKey;
       if (mod && (ev.key === 'e' || ev.key === 'E')){
@@ -1088,6 +1233,8 @@
     function put(e){ e.created = t; e.updated = t; entries[e.id] = e; }
 
     put({ id:'she-ra', title:'She-Ra and the Princesses of Power', subject:'Media · Animation (2018)', status:'grown',
+      accent:'rose', glyph:'✶',
+      blurb:'A five-season study in loyalty, indoctrination, and the slow work of unlearning a story you were raised inside.',
       body:
         '<p class="entry-intro">A Netflix reboot of the 1985 cartoon, developed by Noelle Stevenson across five seasons from 2018 to 2020. Under the magical-girl surface it is a study in loyalty, indoctrination, and the slow work of unlearning a story you were raised inside — which is exactly why it rewards going deeper than any one page can hold.</p>' +
         '<div class="sec-head"><span class="num">1</span><h3>The world</h3></div>' +
@@ -1099,6 +1246,8 @@
     });
 
     put({ id:'etheria', title:'Etheria', subject:'Media · Animation (2018)', status:'growing',
+      accent:'sage', glyph:'✧',
+      blurb:'A planet sealed inside a pocket dimension, its ground full of abandoned First Ones technology.',
       body:
         '<p class="entry-intro">The planet where <a class="entry-link" data-entry="she-ra" href="#she-ra">She-Ra</a> takes place — and, it turns out, not an ordinary planet at all.</p>' +
         '<p>Etheria sits inside <strong>Despondos</strong>, a pocket dimension the sorceress Light Hope pulled it into a thousand years ago to hide it. That isolation is why its history feels sealed off, and why the First Ones’ abandoned technology is everywhere in the ground. This page is <em>growing</em> — there’s plenty more to add: the Whispering Woods, the runestones, the Heart of Etheria. Highlight any of those and spin them out too.</p>'
