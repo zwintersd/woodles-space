@@ -1,4 +1,6 @@
 <script lang="ts">
+	import PaperTextureLayer from './paperTheater/PaperTextureLayer.svelte';
+
 	interface Props {
 		roomId: string;
 	}
@@ -7,14 +9,7 @@
 </script>
 
 <g class="paper-scene" aria-hidden="true">
-	<image
-		class="paper-texture"
-		href="/arcade/living-paper-texture.webp"
-		width="540"
-		height="320"
-		preserveAspectRatio="none"
-	/>
-	<rect class="paper-wash" width="540" height="320" rx="6" />
+	<PaperTextureLayer width={540} height={320} />
 
 	{#if roomId === 'foyer'}
 		<g class="scene-foyer">
@@ -69,13 +64,6 @@
 </g>
 
 <style>
-	.paper-texture {
-		opacity: 0.28;
-		mix-blend-mode: multiply;
-	}
-	.paper-wash {
-		fill: rgba(253, 246, 227, 0.36);
-	}
 	.paper-scene :global(path),
 	.paper-scene :global(circle) {
 		vector-effect: non-scaling-stroke;

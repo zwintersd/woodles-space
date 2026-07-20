@@ -3,6 +3,8 @@
 	import ArcadeHud from './ArcadeHud.svelte';
 	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
+	import PaperGarden, { type PaperGardenItem } from './paperTheater/PaperGarden.svelte';
+	import PaperTextureLayer from './paperTheater/PaperTextureLayer.svelte';
 	import SvgArena from './SvgArena.svelte';
 	import { clamp, distance, normalize, type Dot } from './arcadeMath';
 	import { arcadeStartLabel } from './arcadeLabels';
@@ -86,6 +88,18 @@
 		{ id: 'f', x: 420, y: 82 },
 		{ id: 'g', x: 432, y: 178 },
 		{ id: 'h', x: 260, y: 34 }
+	];
+
+	// Decorative only: these positions deliberately stay clear of the route,
+	// sigils, towers, enemies, and shots. The reusable paper-garden vocabulary
+	// belongs to Marginalia's visual layer, not to tower-defense game rules.
+	const DEFENSE_GARDEN: PaperGardenItem[] = [
+		{ id: 'entry-sprig', kind: 'sprig', x: 38, y: 310, scale: 1.05 },
+		{ id: 'left-fern', kind: 'fern', x: 58, y: 145, scale: 0.8 },
+		{ id: 'upper-flower', kind: 'flower', x: 188, y: 54, scale: 0.78 },
+		{ id: 'lower-mushroom', kind: 'mushroom', x: 378, y: 316, scale: 0.9 },
+		{ id: 'right-flower', kind: 'flower', x: 472, y: 260, scale: 0.82, flip: true },
+		{ id: 'exit-lantern', kind: 'lantern', x: 488, y: 92, scale: 0.78 }
 	];
 
 	let phase = $state<Phase>('ready');
@@ -511,10 +525,15 @@
 		gridId="defense-grid"
 		gridOpacity={0.58}
 	>
+		<PaperTextureLayer width={WORLD_W} height={WORLD_H} opacity={0.2} />
+		<PaperGarden items={DEFENSE_GARDEN} />
 		<polyline class="route-shadow" points={pathPoints} />
 		<polyline class="route" points={pathPoints} />
+		<polyline class="route-stitch" points={pathPoints} />
 		<circle class="gate start" cx={PATH[0].x} cy={PATH[0].y} r="12" />
 		<circle class="gate end" cx={PATH[PATH.length - 1].x} cy={PATH[PATH.length - 1].y} r="12" />
+		<path class="gate-mark start" d={`M ${PATH[0].x - 5} ${PATH[0].y} h 10 M ${PATH[0].x} ${PATH[0].y - 5} v 10`} />
+		<path class="gate-mark end" d={`M ${PATH[PATH.length - 1].x - 5} ${PATH[PATH.length - 1].y - 5} l 10 10 M ${PATH[PATH.length - 1].x + 5} ${PATH[PATH.length - 1].y - 5} l -10 10`} />
 
 		{#each PADS as pad (pad.id)}
 			{@const tower = towerForPad(pad.id)}
@@ -615,6 +634,15 @@
 		stroke: rgba(181, 137, 0, 0.52);
 		stroke-width: 20;
 	}
+	.route-stitch {
+		fill: none;
+		stroke: rgba(253, 246, 227, 0.72);
+		stroke-dasharray: 2 5;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		stroke-width: 1.5;
+		pointer-events: none;
+	}
 	.gate {
 		stroke: var(--sol-base3);
 		stroke-width: 3;
@@ -624,6 +652,13 @@
 	}
 	.gate.end {
 		fill: var(--sol-red);
+	}
+	.gate-mark {
+		fill: none;
+		stroke: var(--sol-base3);
+		stroke-linecap: round;
+		stroke-width: 1.8;
+		pointer-events: none;
 	}
 	.pad {
 		cursor: pointer;
