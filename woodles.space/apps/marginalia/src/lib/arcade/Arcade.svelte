@@ -252,37 +252,39 @@
 				</div>
 			</header>
 
-			{#if activeGame === 'inkblot'}
-				<Inkblot onclose={closeGame} creatures={bestiaryCreatures} {activePet} />
-			{:else if activeGame === 'stack-2048'}
-				<TwoZeroFourEight onclose={closeGame} {activePet} />
-			{:else if activeGame === 'color-pop'}
-				<ColorPop onclose={closeGame} {activePet} />
-			{:else if activeGame === 'margin-miner'}
-				<MarginMiner onclose={closeGame} {activePet} />
-			{:else if activeGame === 'get-big'}
-				<GetBig onclose={closeGame} {activePet} />
-			{:else if activeGame === 'margin-hollow'}
-				<MarginHollow onclose={closeGame} {activePet} />
-			{:else if activeGame === 'insight-rush'}
-				<InsightRush onclose={closeGame} {activePet} />
-			{:else if activeGame === 'bullet-dot'}
-				<BulletHeaven onclose={closeGame} {activePet} />
-			{:else if activeGame === 'margin-defense'}
-				<TowerDefense onclose={closeGame} {activePet} />
-			{:else if activeGame === 'margin-snake'}
-				<Snake onclose={closeGame} {activePet} />
-			{:else if activeGame === 'paddle-break'}
-				<PaddleBreak onclose={closeGame} {activePet} />
-			{:else if activeGame === 'bubble-spinner'}
-				<BubbleSpinner onclose={closeGame} {activePet} />
-			{:else if activeGame === 'margin-bubbles'}
-				<BubbleShooter onclose={closeGame} {activePet} />
-			{:else if activeGame === 'type-witch'}
-				<TypeWitch onclose={closeGame} {activePet} />
-			{:else if activeGame === 'condition-match'}
-				<ConditionMatch onclose={closeGame} {activePet} />
-			{/if}
+			<div class="active-game-body" data-active-game={activeGame}>
+				{#if activeGame === 'inkblot'}
+					<Inkblot onclose={closeGame} creatures={bestiaryCreatures} {activePet} />
+				{:else if activeGame === 'stack-2048'}
+					<TwoZeroFourEight onclose={closeGame} {activePet} />
+				{:else if activeGame === 'color-pop'}
+					<ColorPop onclose={closeGame} {activePet} />
+				{:else if activeGame === 'margin-miner'}
+					<MarginMiner onclose={closeGame} {activePet} />
+				{:else if activeGame === 'get-big'}
+					<GetBig onclose={closeGame} {activePet} />
+				{:else if activeGame === 'margin-hollow'}
+					<MarginHollow onclose={closeGame} {activePet} />
+				{:else if activeGame === 'insight-rush'}
+					<InsightRush onclose={closeGame} {activePet} />
+				{:else if activeGame === 'bullet-dot'}
+					<BulletHeaven onclose={closeGame} {activePet} />
+				{:else if activeGame === 'margin-defense'}
+					<TowerDefense onclose={closeGame} {activePet} />
+				{:else if activeGame === 'margin-snake'}
+					<Snake onclose={closeGame} {activePet} />
+				{:else if activeGame === 'paddle-break'}
+					<PaddleBreak onclose={closeGame} {activePet} />
+				{:else if activeGame === 'bubble-spinner'}
+					<BubbleSpinner onclose={closeGame} {activePet} />
+				{:else if activeGame === 'margin-bubbles'}
+					<BubbleShooter onclose={closeGame} {activePet} />
+				{:else if activeGame === 'type-witch'}
+					<TypeWitch onclose={closeGame} {activePet} />
+				{:else if activeGame === 'condition-match'}
+					<ConditionMatch onclose={closeGame} {activePet} />
+				{/if}
+			</div>
 		</section>
 	{:else}
 		<div class="game-grid">
@@ -515,6 +517,51 @@
 		font-size: 0.7rem;
 		color: var(--sol-base1);
 		margin: 0.2rem 0 0;
+	}
+	.active-game-body {
+		min-width: 0;
+		container-type: inline-size;
+	}
+
+	/* Wide-play mode: every game keeps its own rules and markup, while the
+	   cabinet arranges the repeated chrome beside the playable surface. */
+	@container (min-width: 44rem) {
+		.active-game-body :global(.inkblot-shell),
+		.active-game-body :global(.game-shell),
+		.active-game-body :global(.pop-shell),
+		.active-game-body :global(.miner-shell),
+		.active-game-body :global(.witch-shell),
+		.active-game-body :global(.big-shell),
+		.active-game-body :global(.hollow-shell),
+		.active-game-body :global(.rush-shell),
+		.active-game-body :global(.heaven-shell),
+		.active-game-body :global(.defense-shell),
+		.active-game-body :global(.snake-shell),
+		.active-game-body :global(.paddle-shell),
+		.active-game-body :global(.spinner-shell),
+		.active-game-body :global(.bubble-shell) {
+			display: grid;
+			grid-template-columns: minmax(20rem, 22rem) minmax(20rem, 1fr);
+			grid-auto-flow: row;
+			grid-auto-rows: min-content;
+			align-items: start;
+			justify-items: stretch;
+			column-gap: clamp(1rem, 2.4vw, 2rem);
+			row-gap: 0.8rem;
+		}
+		.active-game-body :global(.svg-arena),
+		.active-game-body :global(.board-wrap),
+		.active-game-body :global(.canvas-frame),
+		.active-game-body :global(.inkblot-field),
+		.active-game-body :global(.witch-field),
+		.active-game-body :global(.rush-field),
+		.active-game-body :global(.spinner-canvas) {
+			grid-column: 2;
+			grid-row: 1 / span 20;
+			align-self: start;
+			justify-self: center;
+			max-width: 100%;
+		}
 	}
 
 	/* ── card footer ────────────────────────────────────────────────────── */
