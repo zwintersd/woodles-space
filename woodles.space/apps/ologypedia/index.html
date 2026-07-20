@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ologypedia · woodles.space</title>
-<meta name="description" content="a block system for textbook-style pages on anything — a content spec, a chrome library, and a growing set of worked-example blocks.">
+<meta name="description" content="A textbook, grown one entry at a time — a deck of worked pages as cover-cards, and an editor to add more.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="/shared/fonts.css">
@@ -13,168 +13,589 @@
     --paper:#FBF3EC; --paper-edge:#F3E6D9; --ink:#3D2B2B; --ink-soft:#6B5656;
     --rose-deep:#8C3B4A; --rose-dust:#C77C8E; --blush:#F7DFE3; --lavender:#EAE0F2;
     --gold:#C9A66B; --sage:#8FA37E;
+    /* the room the books live in: a warm walnut-and-rose reading nook */
+    --wall-1:#c8ab9c; --wall-2:#b8917f; --wall-edge:#a67e6d;
+    --wood-1:#6d443c; --wood-2:#8a5949; --wood-hi:#d3ac78; --wood-lo:#4e2f2a;
+    /* one book in the grid — width drives everything; height follows 63:88 */
+    --book-w:172px; --book-h:240px; --shelf-gap:58px; --col-gap:24px;
   }
   *{box-sizing:border-box;}
-  body{margin:0; background:#E9DCCB; padding:32px 16px 64px; font-family:var(--font-body); color:var(--ink); line-height:1.65;}
-  .wrap{max-width:820px; margin:0 auto;}
-  .page{background:var(--paper); border:1px solid var(--gold); border-radius:10px; padding:34px 40px 30px;}
-  @media (max-width:600px){ .page{padding:24px 20px 22px;} }
-  p{margin:0 0 16px; font-size:15.5px;}
-  a{color:var(--rose-deep);}
+  body{
+    margin:0; padding:44px 20px 70px; font-family:var(--font-body); color:var(--ink); line-height:1.6;
+    background:
+      radial-gradient(130% 100% at 50% -10%, rgba(255,246,235,.55), transparent 46%),
+      radial-gradient(120% 120% at 50% 120%, var(--wall-edge), transparent 55%),
+      linear-gradient(168deg, var(--wall-1) 0%, var(--wall-2) 62%, var(--wall-edge) 100%);
+    min-height:100vh;
+  }
+  .wrap{max-width:1040px; margin:0 auto;}
 
-  /* ===== masthead ===== */
-  .kicker-tag{display:inline-block; font-family:var(--font-display); font-weight:600; letter-spacing:.16em; font-size:12.5px; color:var(--rose-deep); border:1px solid var(--rose-dust); border-radius:999px; padding:4px 16px; background:var(--blush);}
-  h1.title{font-family:var(--font-display); font-weight:600; font-size:44px; color:var(--rose-deep); margin:14px 0 6px; line-height:1.05;}
-  .subtitle-row{display:flex; align-items:center; gap:14px; margin-bottom:16px;}
-  .subtitle-row .orn{color:var(--gold); font-size:14px;}
-  h2.subtitle{font-family:var(--font-display); font-weight:500; letter-spacing:.12em; font-size:15px; color:var(--rose-dust); text-transform:uppercase; margin:0;}
-  p.intro{font-size:16.5px; line-height:1.7; color:var(--ink-soft); margin:0 0 28px;}
+  /* ===== header — a brass plate on the wall above the case ===== */
+  .shelf-head{text-align:center; margin-bottom:26px;}
+  .shelf-head .eyebrow{display:inline-block; font-family:var(--font-display); font-weight:600; letter-spacing:.2em; font-size:12px; text-transform:uppercase; color:var(--paper); border:1px solid color-mix(in srgb, var(--gold) 70%, #fff); border-radius:999px; padding:5px 18px; background:color-mix(in srgb, var(--rose-deep) 62%, var(--wood-lo)); box-shadow:0 2px 10px -4px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.18); text-decoration:none; transition:transform .16s ease, box-shadow .16s ease;}
+  .shelf-head .eyebrow:hover{transform:translateY(-1px); box-shadow:0 5px 14px -5px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.22);}
+  .shelf-head h1{font-family:var(--font-display); font-weight:600; font-size:clamp(46px,8vw,72px); color:#fbeee2; margin:18px 0 2px; line-height:.98; letter-spacing:.01em; text-shadow:0 2px 1px rgba(78,47,42,.45), 0 0 26px rgba(255,236,214,.28);}
+  .shelf-head .sub{display:flex; align-items:center; justify-content:center; gap:13px; font-family:var(--font-display); font-style:italic; font-size:19px; color:#f3d9cf; margin:0; text-shadow:0 1px 1px rgba(78,47,42,.4);}
+  .shelf-head .sub .orn{color:var(--gold); font-style:normal; font-size:13px;}
+  /* the invitation into the living, editable textbook */
+  .reading-room{display:inline-flex; align-items:center; gap:8px; margin-top:16px; font-family:var(--font-body); font-size:14px; color:#fbeee2; text-decoration:none; background:color-mix(in srgb, var(--rose-deep) 58%, var(--wood-lo)); border:1px solid color-mix(in srgb, var(--gold) 60%, #fff); border-radius:999px; padding:8px 20px; box-shadow:0 3px 12px -5px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.18); transition:transform .16s ease, box-shadow .16s ease, background .16s ease;}
+  .reading-room:hover{transform:translateY(-1px); background:color-mix(in srgb, var(--rose-deep) 68%, var(--wood-lo)); box-shadow:0 6px 16px -6px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.22);}
+  .reading-room .rr-glyph{color:var(--gold);}
+  .reading-room .rr-sub{color:#f3d9cf; font-style:italic;}
+  .reading-room .rr-arrow{color:var(--gold); transition:transform .16s ease;}
+  .reading-room:hover .rr-arrow{transform:translateX(3px);}
+  @media(max-width:520px){ .reading-room .rr-sub{display:none;} }
 
-  /* ===== numbered section ===== */
-  .sec-head{display:flex; align-items:center; gap:12px; margin:34px 0 14px;}
-  .num{flex:none; width:30px; height:30px; border-radius:50%; background:var(--rose-deep); color:var(--paper); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:600; font-size:15px;}
-  .sec-head h3{font-family:var(--font-display); font-weight:600; font-size:20px; letter-spacing:.04em; color:var(--rose-deep); margin:0; text-transform:uppercase; flex:1; border-bottom:1px solid var(--rose-dust); padding-bottom:8px;}
+  /* ===== deck controls: search, subject filter, view toggle ===== */
+  .deck-controls{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:16px;}
+  .dc-search{flex:1 1 220px; min-width:160px; font-family:var(--font-body); font-size:14px; color:var(--ink); background:#fffdfa; border:1px solid transparent; border-radius:999px; padding:9px 18px; box-shadow:0 2px 8px -4px rgba(0,0,0,.35), inset 0 0 0 1px rgba(140,59,74,.16);}
+  .dc-search::placeholder{color:#a98a86;}
+  .dc-search:focus{outline:2px solid var(--gold); outline-offset:1px;}
+  .dc-select{flex:0 0 auto; font-family:var(--font-body); font-size:13px; color:var(--ink); background:#fffdfa; border:1px solid transparent; border-radius:999px; padding:8px 16px; box-shadow:0 2px 8px -4px rgba(0,0,0,.35), inset 0 0 0 1px rgba(140,59,74,.16);}
+  .dc-view{flex:0 0 auto; display:flex; border-radius:999px; overflow:hidden; box-shadow:0 2px 8px -4px rgba(0,0,0,.35), inset 0 0 0 1px rgba(140,59,74,.22);}
+  .dc-view-btn{font-family:var(--font-display); font-weight:600; font-size:12px; letter-spacing:.05em; color:var(--rose-deep); background:#fffdfa; border:none; padding:8px 18px; cursor:pointer; transition:background .14s ease, color .14s ease;}
+  .dc-view-btn.active{background:var(--rose-deep); color:var(--paper);}
+  .deck-empty{flex-basis:100%; width:100%; text-align:center; padding:34px 20px; color:#f3d9cf; font-style:italic; font-size:14px;}
 
-  /* ===== figure box ===== */
-  figure.figure-box{margin:22px 0 24px; padding:18px 20px 14px; border:1px solid var(--gold); border-radius:8px; background:#fffdfa;}
-  figure.figure-box figcaption{font-family:var(--font-display); font-weight:600; letter-spacing:.06em; color:var(--rose-deep); font-size:14px; text-transform:uppercase; margin-bottom:14px; text-align:center;}
+  /* ═══════════ THE BOOKCASE — a framed wooden case on the wall ═══════════ */
+  .bookcase{
+    position:relative; border-radius:12px; padding:26px 22px 8px;
+    background:
+      linear-gradient(180deg, color-mix(in srgb,var(--wood-2) 60%,var(--wood-1)) 0%, var(--wood-1) 100%);
+    box-shadow:
+      0 30px 60px -30px rgba(40,20,18,.7),
+      0 2px 0 rgba(255,255,255,.06) inset,
+      0 0 0 1px rgba(78,47,42,.6);
+  }
+  /* the inner back-wall the shelves and books stand against */
+  .case-back{
+    position:relative; border-radius:5px; padding:16px 20px 0;
+    background:
+      repeating-linear-gradient(90deg, rgba(78,47,42,.05) 0 1px, transparent 1px 46px),
+      linear-gradient(180deg, #cdb2a4 0%, #c19c8d 100%);
+    box-shadow:
+      inset 0 3px 14px -4px rgba(40,20,18,.55),
+      inset 0 -3px 10px -6px rgba(40,20,18,.4),
+      inset 0 0 0 1px rgba(78,47,42,.25);
+  }
 
-  /* ===== mechanism (reused to document the system's own architecture) ===== */
-  .ex-mechanism{display:flex; flex-wrap:wrap; align-items:stretch; gap:10px; justify-content:center;}
-  .ex-mechanism .node{flex:1 1 150px; max-width:200px; background:var(--paper); border:1px solid var(--rose-dust); border-radius:8px; padding:12px 14px;}
-  .ex-mechanism .node-accent{background:var(--blush); border-color:var(--rose-deep);}
-  .ex-mechanism .node-tag{display:inline-block; font-family:var(--font-display); font-weight:600; font-size:11px; letter-spacing:.08em; color:var(--paper); background:var(--rose-deep); border-radius:999px; padding:1px 9px; margin-bottom:7px;}
-  .ex-mechanism .node-title{font-family:var(--font-display); font-weight:600; font-size:14.5px; color:var(--rose-deep); margin:0 0 4px;}
-  .ex-mechanism .node-detail{font-size:12.5px; line-height:1.45; color:var(--ink-soft); margin:0;}
-  .ex-mechanism .arrow{flex:0 0 auto; align-self:center; color:var(--gold); font-size:20px; line-height:1;}
-  @media (max-width:520px){ .ex-mechanism .arrow{transform:rotate(90deg);} }
+  /* ===== the grid: books standing on repeating wooden shelves ===== */
+  .deck{
+    display:flex; flex-wrap:wrap; align-items:flex-end; align-content:flex-start;
+    column-gap:var(--col-gap); row-gap:var(--shelf-gap); padding-bottom:12px;
+    background-image:repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent var(--book-h),
+      var(--wood-hi) var(--book-h),
+      color-mix(in srgb,var(--wood-2) 70%,var(--wood-hi)) calc(var(--book-h) + 2px),
+      var(--wood-2) calc(var(--book-h) + 5px),
+      var(--wood-1) calc(var(--book-h) + 20px),
+      var(--wood-lo) calc(var(--book-h) + 22px),
+      rgba(50,26,22,.34) calc(var(--book-h) + 23px),
+      transparent calc(var(--book-h) + 44px),
+      transparent calc(var(--book-h) + var(--shelf-gap))
+    );
+    background-position:left top; background-repeat:repeat;
+  }
+  @media(max-width:640px){
+    :root{ --book-w:132px; --book-h:184px; --shelf-gap:48px; --col-gap:16px; }
+  }
+  @media(max-width:380px){
+    :root{ --book-w:118px; --book-h:165px; --shelf-gap:44px; --col-gap:12px; }
+  }
 
-  /* ===== library cards ===== */
-  .lib-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:6px;}
-  @media (max-width:600px){ .lib-grid{grid-template-columns:1fr;} }
-  .lib-grid.full{grid-template-columns:1fr;}
-  .card{display:block; text-decoration:none; background:#fffdfa; border:1px solid var(--gold); border-radius:8px; padding:16px 18px; transition:border-color .15s ease, background .15s ease;}
-  .card:hover{border-color:var(--rose-deep); background:var(--blush);}
-  .card .card-eyebrow{display:block; font-family:var(--font-display); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--rose-dust); margin-bottom:5px;}
-  .card h4{font-family:var(--font-display); font-weight:600; font-size:17px; color:var(--rose-deep); margin:0 0 5px;}
-  .card p{font-size:13.2px; color:var(--ink-soft); margin:0;}
-  .card.card-add{background:transparent; border-style:dashed; border-color:var(--rose-dust); text-align:center; padding:20px 18px;}
-  .card.card-add:hover{border-style:dashed; border-color:var(--rose-deep);}
-  .card.card-add .card-eyebrow{color:var(--rose-dust);}
-  .card.card-add h4::before{content:"+ "; color:var(--gold);}
+  /* ===== spine view — real book spines standing in a row ===== */
+  .spine-shelf{
+    display:flex; flex-wrap:wrap; align-items:flex-end; gap:6px 4px;
+    padding:0 6px;
+    background-image:repeating-linear-gradient(
+      to bottom,
+      transparent 0, transparent 300px,
+      var(--wood-hi) 300px, var(--wood-2) 303px, var(--wood-1) 320px,
+      var(--wood-lo) 322px, rgba(50,26,22,.34) 323px, transparent 344px,
+      transparent 360px
+    );
+  }
+  .spine{
+    --dc:var(--rose-dust);
+    position:relative; flex:none; width:46px; min-height:210px; align-self:flex-end;
+    display:flex; flex-direction:column; align-items:center; justify-content:space-between;
+    padding:12px 4px 14px; text-decoration:none; color:inherit; cursor:pointer;
+    border-radius:3px 5px 5px 3px;
+    background:
+      linear-gradient(90deg, rgba(0,0,0,.28) 0 2px, rgba(255,255,255,.16) 3px 5px, transparent 6px 40px, rgba(0,0,0,.16) 41px 44px, rgba(0,0,0,.34) 44px 46px),
+      linear-gradient(180deg, color-mix(in srgb,var(--dc) 86%,#fff) 0%, var(--dc) 12%, var(--dc) 88%, color-mix(in srgb,var(--dc) 78%,#000) 100%);
+    box-shadow:2px 6px 12px -6px rgba(40,20,18,.7), inset 0 0 0 1px rgba(0,0,0,.08);
+    transition:transform .16s ease, box-shadow .16s ease, margin-top .16s ease;
+  }
+  .spine:hover{transform:translateY(-8px) rotate(-1.2deg); box-shadow:3px 12px 20px -8px rgba(40,20,18,.75);}
+  .spine .foil{width:80%; height:0; border-top:1px solid color-mix(in srgb,var(--gold) 80%,#fff); box-shadow:0 3px 0 -1px color-mix(in srgb,var(--gold) 55%,transparent), 0 -3px 0 -1px color-mix(in srgb,var(--gold) 55%,transparent);}
+  .spine-title-v{
+    flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center;
+    writing-mode:vertical-rl; text-orientation:mixed;
+    font-family:var(--font-display); font-weight:600; font-size:15px; line-height:1.05;
+    color:#fff7f0; text-shadow:0 1px 1px rgba(0,0,0,.3);
+    max-height:180px; overflow:hidden; text-align:center; letter-spacing:.01em;
+    padding:6px 0;
+  }
+  .spine-emblem{flex:none; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; color:#fff7f0; background:color-mix(in srgb,#000 16%,var(--dc)); border:1px solid color-mix(in srgb,var(--gold) 65%,transparent); box-shadow:inset 0 0 6px rgba(0,0,0,.25);}
+  .spine.is-draft{background:linear-gradient(180deg, color-mix(in srgb,var(--dc) 40%,#efe2dc), color-mix(in srgb,var(--dc) 32%,#e6d6cf)); }
+  .spine.is-draft .spine-title-v{color:var(--rose-deep); text-shadow:none;}
+  .spine.is-draft .spine-emblem{color:var(--rose-deep); background:#fffdfa;}
+  .spine.is-draft::after{content:'DRAFT'; position:absolute; top:8px; left:50%; transform:translateX(-50%) rotate(90deg); transform-origin:center; font-family:var(--font-display); font-weight:600; font-size:7px; letter-spacing:.14em; color:var(--rose-deep); opacity:.6; white-space:nowrap; display:none;}
+  .spine-add{width:46px; background:linear-gradient(180deg,#e9c98f,#c9a66b 55%,#b28f52); }
+  .spine-add .spine-emblem{background:var(--rose-deep); color:var(--paper); border-color:#fff2df; font-size:16px; font-weight:300;}
+  .spine-add .spine-title-v{color:#4e2f2a;}
+  .spine-empty{flex-basis:100%; text-align:center; padding:34px 20px; color:var(--rose-deep); font-style:italic; font-size:14px;}
 
-  /* ===== sidebar box ===== */
-  .box{border:1px solid var(--rose-dust); border-radius:8px; padding:16px 18px; background:var(--blush); margin-top:8px;}
-  .box h4{font-family:var(--font-display); font-weight:600; letter-spacing:.06em; font-size:14.5px; text-transform:uppercase; color:var(--rose-deep); margin:0 0 10px;}
-  .box ul{margin:0; padding-left:18px; font-size:13.5px; line-height:1.6; columns:2; column-gap:24px;}
-  @media (max-width:600px){ .box ul{columns:1;} }
-  .box li{margin-bottom:6px; break-inside:avoid;}
-  .box li.done{color:var(--ink-soft);}
-  .box li.done::marker{color:var(--sage);}
-  .box li.composed{color:var(--ink-soft);}
-  .box li.composed::marker{color:var(--gold);}
-  .box li .why{display:block; color:var(--ink-soft); font-size:11.5px; font-style:italic; margin-top:1px;}
+  /* ===== editor entry — a special "new volume" standing first on the shelf ===== */
+  .editor-card{
+    position:relative; flex:none; width:var(--book-w); aspect-ratio:63/88; align-self:flex-end;
+    display:flex; flex-direction:column; justify-content:space-between; overflow:hidden;
+    text-decoration:none; color:inherit;
+    border-radius:3px 11px 11px 3px;
+    border:1px solid color-mix(in srgb,var(--gold) 60%, var(--rose-deep));
+    background:
+      repeating-linear-gradient(-45deg, transparent 0 7px, rgba(201,166,107,.1) 7px 8px),
+      linear-gradient(160deg, #fbe6c8 0%, #f7dfe3 55%, #fffdfa 100%);
+    box-shadow:2px 8px 16px -8px rgba(40,20,18,.7), inset 3px 0 0 rgba(0,0,0,.08), inset 0 0 0 1px rgba(255,255,255,.4);
+    container-type:inline-size;
+    transition:transform .16s ease, box-shadow .16s ease;
+  }
+  /* the inner wrapper carries the cqw font-size so text scales to the book's
+     width — an element can't size its own text against the container it makes */
+  .et-inner{flex:1; min-height:0; display:flex; flex-direction:column; padding:1.5em 1.25em 1.3em; font-size:5cqw;}
+  .editor-card:hover{transform:translateY(-6px); box-shadow:4px 16px 26px -10px rgba(40,20,18,.7), inset 3px 0 0 rgba(0,0,0,.08), inset 0 0 0 1px rgba(255,255,255,.5);}
+  .editor-card::before{content:''; position:absolute; inset:.5em; z-index:2; border:1px solid color-mix(in srgb,var(--gold) 55%,transparent); border-radius:2px 7px 7px 2px; pointer-events:none;}
+  .et-plus{width:2.6em; height:2.6em; border-radius:50%; border:1.5px solid var(--gold); color:var(--rose-deep); display:flex; align-items:center; justify-content:center; font-size:1.4em; font-weight:300; line-height:1; background:rgba(255,255,255,.5); box-shadow:0 0 .8em rgba(201,166,107,.4);}
+  .editor-card:hover .et-plus{border-color:var(--rose-deep); background:#fff;}
+  .et-kicker{display:block; font-family:var(--font-display); font-weight:600; font-size:.58em; letter-spacing:.16em; text-transform:uppercase; color:var(--rose-dust); text-align:center;}
+  .et-title{font-family:var(--font-display); font-weight:600; font-size:1.5em; color:var(--rose-deep); margin:.15em 0 .2em; line-height:1; text-align:center;}
+  .et-sub{font-size:.6em; line-height:1.4; color:var(--ink-soft); margin:0; text-align:center; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;}
+  .et-cta{display:block; margin-top:.4em; font-family:var(--font-display); font-weight:600; font-size:.62em; letter-spacing:.03em; color:var(--rose-deep); text-align:center;}
+  .editor-card:hover .et-cta{color:var(--rose-dust);}
+  .et-core{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:.35em; min-height:0;}
 
-  footer.tagline{text-align:center; font-family:var(--font-display); font-style:italic; font-size:15px; color:var(--rose-dust); margin-top:30px;}
+  /* ===== a cover-card (the card-back / book cover) ===== */
+  .card63{
+    --dc:var(--rose-dust);
+    position:relative; display:flex; flex:none; width:var(--book-w); align-self:flex-end;
+    aspect-ratio:63/88; border-radius:3px 11px 11px 3px; overflow:hidden;
+    container-type:inline-size;
+    text-decoration:none; color:inherit;
+    border:1px solid color-mix(in srgb, var(--dc) 45%, var(--gold));
+    background:
+      repeating-linear-gradient(-45deg, transparent 0 7px, color-mix(in srgb, var(--dc) 7%, transparent) 7px 8px),
+      radial-gradient(ellipse 80% 62% at 50% 37%, color-mix(in srgb, var(--dc) 16%, #fffdfa) 0%, var(--paper) 66%, var(--paper-edge) 100%);
+    /* the drop is the book's own shadow onto the shelf + wall behind it;
+       the inset dark spine down the left edge reads as the bound side */
+    box-shadow:2px 9px 15px -8px rgba(40,20,18,.72), inset 3px 0 5px -2px rgba(78,47,42,.4), inset 5px 0 0 -4px rgba(78,47,42,.35);
+    transition:transform .16s ease, box-shadow .16s ease;
+  }
+  .card63:hover{transform:translateY(-7px); box-shadow:3px 16px 24px -10px rgba(40,20,18,.7), inset 3px 0 5px -2px rgba(78,47,42,.4), inset 5px 0 0 -4px rgba(78,47,42,.35);}
+  .acc-rose{--dc:var(--rose-deep);}
+  .acc-sage{--dc:var(--sage);}
+  .acc-gold{--dc:var(--gold);}
+  .acc-dust{--dc:var(--rose-dust);}
+  .acc-plum{--dc:#6f4a63;}
+
+  /* inner wrapper carries the cqw font-size so text scales to card width
+     (a container element sizes its descendants, never itself) */
+  .c-inner{flex:1; min-height:0; display:flex; flex-direction:column; padding:1.5em 1.25em 1.2em; font-size:5cqw; position:relative; z-index:2;}
+  .card63 .corner{position:absolute; z-index:2; width:.62em; height:.62em; border:0 solid color-mix(in srgb, var(--dc) 60%, transparent);}
+
+  /* custom cover layers, designed in the Cover Studio */
+  .c-layers{position:absolute; inset:0; z-index:1; overflow:hidden; border-radius:inherit;}
+  .c-layer{position:absolute; z-index:1;}
+  .c-layer-shape{display:block;}
+  .card63 .corner.tl{top:.5em; left:.5em; border-top-width:1.5px; border-left-width:1.5px;}
+  .card63 .corner.tr{top:.5em; right:.5em; border-top-width:1.5px; border-right-width:1.5px;}
+  .card63 .corner.bl{bottom:.5em; left:.5em; border-bottom-width:1.5px; border-left-width:1.5px;}
+  .card63 .corner.br{bottom:.5em; right:.5em; border-bottom-width:1.5px; border-right-width:1.5px;}
+
+  .c-kicker{text-align:center; font-family:var(--font-display); font-weight:600; font-size:.6em; letter-spacing:.14em; text-transform:uppercase; color:color-mix(in srgb, var(--dc) 72%, var(--ink)); min-height:1.1em;}
+  .c-core{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:.5em; min-height:0;}
+  .c-medallion{width:3.2em; height:3.2em; flex:none; border-radius:50%; border:1px solid color-mix(in srgb, var(--dc) 55%, transparent); background:color-mix(in srgb, var(--dc) 8%, #fffdfa); box-shadow:0 0 1.1em color-mix(in srgb, var(--dc) 22%, transparent), inset 0 0 .7em color-mix(in srgb, var(--dc) 12%, transparent); display:flex; align-items:center; justify-content:center;}
+  .c-glyph{font-size:1.5em; line-height:1; color:color-mix(in srgb, var(--dc) 82%, var(--rose-deep));}
+  .c-title{font-family:var(--font-display); font-weight:600; font-size:1.42em; line-height:1.05; color:var(--rose-deep); margin:0;}
+  .c-blurb{font-size:.62em; line-height:1.4; color:var(--ink-soft); margin:0; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;}
+  .c-foot{display:flex; align-items:center; justify-content:space-between; gap:.5em;}
+  .c-read{font-family:var(--font-display); font-weight:600; font-size:.56em; letter-spacing:.04em; color:var(--gold);}
+  .card63:hover .c-read{color:var(--rose-deep);}
+  .c-brand{font-family:var(--font-display); font-size:.46em; letter-spacing:.16em; text-transform:uppercase; color:color-mix(in srgb, var(--dc) 60%, transparent);}
+
+  /* draft variant */
+  .card63.is-draft{border-style:dashed;}
+  .card63.is-draft .c-read{color:var(--rose-dust);}
+  .c-tag{position:absolute; top:.7em; left:50%; transform:translateX(-50%); z-index:3; font-family:var(--font-display); font-weight:600; font-size:.5em; letter-spacing:.12em; text-transform:uppercase; color:var(--rose-deep); background:var(--blush); border:1px solid var(--rose-dust); border-radius:999px; padding:.12em .9em; white-space:nowrap;}
+
+  /* Textbook cards — real, readable entries from your reading room */
+  .card63.is-seed{border-style:dashed;}
+  .card63.is-textbook .c-read{color:var(--gold);}
+  .card63.is-textbook:hover .c-read{color:var(--rose-deep);}
+  .c-tag.tag-seed{color:#6B5656; background:#fbf3ec; border-color:#d9c3b3;}
+  .c-tag.tag-growing{color:#7a5a1e; background:#f7ecd6; border-color:var(--gold);}
+  .c-tag.tag-grown{color:#4c6146; background:#e7efe1; border-color:var(--sage);}
+
+  /* ── finishes, pulled from the bestiary card-back editor, tuned for light ── */
+  @keyframes cb-pulse{0%,100%{opacity:.3}50%{opacity:.8}}
+  @keyframes cb-shimmer{0%{transform:translateX(-160%) skewX(-18deg);opacity:0}8%{opacity:1}55%{opacity:.85}60%,100%{transform:translateX(210%) skewX(-18deg);opacity:0}}
+  @keyframes cb-halo{to{transform:rotate(360deg)}}
+  @keyframes cb-drift{0%{transform:translate(0,0) scale(1);opacity:.4}25%{transform:translate(-7%,5%) scale(1.08);opacity:.6}50%{transform:translate(5%,-6%) scale(.96);opacity:.45}75%{transform:translate(-4%,-3%) scale(1.05);opacity:.6}100%{transform:translate(0,0) scale(1);opacity:.4}}
+  .fx-pulse::after,.fx-shimmer::after,.fx-halo::after,.fx-drift::after{content:''; position:absolute; pointer-events:none;}
+  .fx-pulse::after{inset:0; border-radius:inherit; z-index:1; box-shadow:inset 0 0 1.7em .45em color-mix(in srgb, var(--dc) 26%, transparent), inset 0 0 .5em 0 color-mix(in srgb, var(--dc) 40%, transparent); animation:cb-pulse 3.4s ease-in-out infinite;}
+  .fx-shimmer::after{top:-10%; left:0; width:55%; height:120%; z-index:3; background:linear-gradient(105deg, transparent 12%, rgba(255,255,255,.14) 32%, color-mix(in srgb, var(--gold) 45%, rgba(255,255,255,.7)) 50%, rgba(255,255,255,.14) 68%, transparent 88%); transform:translateX(-160%) skewX(-18deg); animation:cb-shimmer 7.5s ease-in-out infinite;}
+  .fx-halo::after{top:-50%; left:-50%; width:200%; height:200%; z-index:1; background:conic-gradient(from 0deg at 50% 50%, transparent 0deg, color-mix(in srgb, var(--dc) 18%, transparent) 42deg, transparent 92deg, transparent 200deg, color-mix(in srgb, var(--gold) 20%, transparent) 250deg, transparent 300deg); mix-blend-mode:multiply; animation:cb-halo 17s linear infinite;}
+  .fx-drift::after{top:-20%; left:-20%; width:140%; height:140%; z-index:1; background:radial-gradient(ellipse 74% 60% at 40% 45%, color-mix(in srgb, var(--dc) 22%, transparent), transparent 66%); mix-blend-mode:multiply; animation:cb-drift 12s ease-in-out infinite;}
+  @media(prefers-reduced-motion:reduce){ .fx-pulse::after,.fx-shimmer::after,.fx-halo::after,.fx-drift::after{animation:none;} }
+
+  /* trailing caption when drafts are present — a slip of paper on the shelf */
+  .deck-note{flex-basis:100%; width:100%; display:flex; align-items:center; gap:14px; margin:10px 2px 2px; color:var(--wood-lo);}
+  .deck-note::before, .deck-note::after{content:''; flex:1; height:1px; background:var(--wood-lo); opacity:.3;}
+  .deck-note span{font-family:var(--font-display); font-style:italic; font-size:12.5px; text-align:center; color:#5a3a34;}
+
+  /* ===== under-the-hood footer ===== */
+  .undertow{margin-top:36px; text-align:center; border-top:1px solid color-mix(in srgb,var(--gold) 55%,transparent); padding-top:22px;}
+  .undertow p{margin:0 0 8px; font-size:13px; color:#f2d7cc;}
+  .undertow a{color:#fbeee2; text-decoration:none; border-bottom:1px dotted color-mix(in srgb,var(--gold) 70%,transparent);}
+  .undertow a:hover{color:var(--gold);}
+  .undertow .dot{color:var(--gold); margin:0 8px;}
+  .undertow .tagline{font-family:var(--font-display); font-style:italic; font-size:15px; color:#f3d9cf; margin-top:14px;}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <article class="page">
 
-    <span class="kicker-tag">A Woodle</span>
-    <h1 class="title">Ologypedia</h1>
-    <div class="subtitle-row"><span class="orn">✦</span><h2 class="subtitle">A Block System for Textbook-Style Pages</h2><span class="orn">✦</span></div>
-    <p class="intro">Not an app you click around in — a system you write with. Give any capable model the voice spec below and it writes in a consistent register; give it the chrome and it drops that writing into a page that looks like every other page here; give it the example blocks and its worked examples get a real diagram instead of a wall of description. Three layers, one look, no proprietary tooling required — it's all plain HTML, CSS, and SVG, readable straight from the source of any page in this library.</p>
+  <header class="shelf-head">
+    <a class="eyebrow" href="/" title="back to woodles.space">&larr; woodles.space</a>
+    <h1>Ologypedia</h1>
+    <p class="sub"><span class="orn">✦</span> A textbook, grown one entry at a time <span class="orn">✦</span></p>
+    <a class="reading-room" href="/ologypedia/textbook.html" title="Read your entries, highlight anything, and grow it into a new linked page">
+      <span class="rr-glyph">✦</span> Open your Textbook <span class="rr-sub">— read, highlight, and grow linked entries</span> <span class="rr-arrow">&rarr;</span>
+    </a>
+  </header>
 
-    <div class="sec-head"><span class="num">1</span><h3>How the Three Layers Fit</h3></div>
-    <p>The content spec shapes the writing. The chrome wraps it in the same masthead, headers, and callouts every time. The example blocks give topic-specific worked examples — a mechanism, a comparison, a timeline, a chart — an actual visual shape instead of another paragraph.</p>
-    <figure class="figure-box">
-      <figcaption>Figure · The Pipeline, in One Glance</figcaption>
-      <div class="ex-mechanism">
-        <div class="node">
-          <span class="node-tag">Spec</span>
-          <h5 class="node-title">Content spec</h5>
-          <p class="node-detail">Voice, structure, worked-example rules — gets any model writing in the same register.</p>
+  <div class="deck-controls" id="deck-controls">
+    <input type="search" id="deck-search" class="dc-search" placeholder="Search titles, subjects, blurbs&hellip;" aria-label="Search entries">
+    <select id="deck-subject" class="dc-select" aria-label="Filter by subject">
+      <option value="">All subjects</option>
+    </select>
+    <div class="dc-view" role="group" aria-label="View">
+      <button type="button" class="dc-view-btn" id="view-grid" aria-pressed="true">Grid</button>
+      <button type="button" class="dc-view-btn" id="view-spine" aria-pressed="false">Spine</button>
+    </div>
+  </div>
+
+  <div class="bookcase">
+  <div class="case-back">
+  <main class="deck" id="deck">
+
+    <a class="editor-card" href="/ologypedia/add-page.html">
+      <span class="et-inner">
+        <span class="et-kicker">The Editor</span>
+        <span class="et-core">
+          <span class="et-plus">+</span>
+          <h2 class="et-title">Add a Page</h2>
+          <p class="et-sub">Write a new entry, design its cover, and shelve it — the whole loop, no backend.</p>
+        </span>
+        <span class="et-cta">Open the editor &rarr;</span>
+      </span>
+    </a>
+
+    <!-- shelved cards — committed, readable by anyone -->
+    <a class="card63 acc-sage fx-drift" data-slug="photosynthesis" href="/ologypedia/textbook-photosynthesis.html">
+      <div class="c-inner">
+        <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+        <span class="c-kicker">Biology &middot; Biochemistry</span>
+        <div class="c-core">
+          <div class="c-medallion"><span class="c-glyph">❀</span></div>
+          <h2 class="c-title">Photosynthesis</h2>
+          <p class="c-blurb">How light becomes sugar — the mechanism, two centuries of discovery, C3 vs. C4, and two billion years of oxygen.</p>
         </div>
-        <div class="arrow">→</div>
-        <div class="node">
-          <span class="node-tag">Chrome</span>
-          <h5 class="node-title">Chrome blocks</h5>
-          <p class="node-detail">Masthead, section headers, callouts, tables, sidebar boxes — the near-universal wrapper.</p>
-        </div>
-        <div class="arrow">→</div>
-        <div class="node">
-          <span class="node-tag">Example</span>
-          <h5 class="node-title">Example blocks</h5>
-          <p class="node-detail">Mechanism, comparative pair, timeline, data deep-dive — the topic-dependent worked-example patterns.</p>
-        </div>
-        <div class="arrow">→</div>
-        <div class="node node-accent">
-          <span class="node-tag">Out</span>
-          <h5 class="node-title">A rendered page</h5>
-          <p class="node-detail">Same palette, same structure, same rigor, on whatever topic you hand it.</p>
-        </div>
+        <span class="c-foot"><span class="c-read">Read &#10022;</span><span class="c-brand">Ologypedia</span></span>
       </div>
-    </figure>
+    </a>
 
-    <div class="sec-head"><span class="num">2</span><h3>The Library</h3></div>
-    <p>Two reference files, documented and live-rendered so a fresh model session can read the source and replicate the classes exactly — plus worked pages proving the pipeline end to end on real material, one light topic and one heavy one.</p>
-    <div class="lib-grid">
-      <a class="card" href="/ologypedia/textbook-chrome-blocks.html">
-        <span class="card-eyebrow">Reference</span>
-        <h4>Chrome Blocks</h4>
-        <p>Tokens, masthead, section headers, pullquote, figure frame, comparison table, sidebar boxes, footer.</p>
-      </a>
-      <a class="card" href="/ologypedia/textbook-example-blocks.html">
-        <span class="card-eyebrow">Reference</span>
-        <h4>Example Blocks</h4>
-        <p>The topic-dependent family: mechanism, comparative pair, timeline, data deep-dive.</p>
-      </a>
-    </div>
-    <div class="lib-grid full">
-      <a class="card" href="/ologypedia/textbook-photosynthesis.html">
-        <span class="card-eyebrow">Worked Page &middot; No. 1</span>
-        <h4>Photosynthesis — How Light Becomes Sugar</h4>
-        <p>The first integration test: chrome plus the first four example blocks, on one real, checkable topic — the mechanism, the two centuries it took to work out, C3 vs. C4, two billion years of atmospheric oxygen, and Hill's 1937 experiment composed live from three of those blocks.</p>
-      </a>
-      <a class="card" href="/ologypedia/textbook-challenger.html">
-        <span class="card-eyebrow">Worked Page &middot; No. 2</span>
-        <h4>The Challenger Disaster</h4>
-        <p>The second integration test, on a genuinely heavy topic: chrome plus six more example blocks — the failure mechanism, the teleconference, the institutional aftermath, and the number Feynman couldn't let go of.</p>
-      </a>
-      <a class="card card-add" href="/ologypedia/add-page.html">
-        <span class="card-eyebrow">The Studio</span>
-        <h4>Add a Page</h4>
-        <p>Build the textbook one entry at a time: describe a topic, copy the assembled prompt, paste the model's page back, preview it live, download it ready to drop in — and keep a running shelf of every entry that emits the whole index in one pass.</p>
-      </a>
-    </div>
+    <a class="card63 acc-rose fx-shimmer" data-slug="challenger" href="/ologypedia/textbook-challenger.html">
+      <div class="c-inner">
+        <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+        <span class="c-kicker">History &middot; Engineering</span>
+        <div class="c-core">
+          <div class="c-medallion"><span class="c-glyph">✶</span></div>
+          <h2 class="c-title">The Challenger Disaster</h2>
+          <p class="c-blurb">A cold morning, a reversed recommendation, seventy-three seconds — and the number Feynman couldn't let go of.</p>
+        </div>
+        <span class="c-foot"><span class="c-read">Read &#10022;</span><span class="c-brand">Ologypedia</span></span>
+      </div>
+    </a>
 
-    <div class="box">
-      <h4>The Full Menu — Sixteen for Sixteen</h4>
-      <ul>
-        <li class="done">Mechanism walkthrough</li>
-        <li class="done">Comparative pair</li>
-        <li class="done">Timeline of one event</li>
-        <li class="done">Data deep-dive</li>
-        <li class="done">Legal case</li>
-        <li class="done">Single documented case</li>
-        <li class="done">Policy/institutional episode</li>
-        <li class="done">Biographical vignette</li>
-        <li class="done">Primary document excerpt</li>
-        <li class="done">Documented exchange</li>
-        <li class="done">Edge case / boundary stress-test</li>
-        <li class="done">Back-of-envelope math</li>
-        <li class="done">Failure case</li>
-        <li class="composed">Artifact close-reading <span class="why">a 2-line convention, not a pattern — live-demoed in the reference</span></li>
-        <li class="composed">Geographic case <span class="why">reuses .ex-case again — live-demoed in the reference</span></li>
-        <li class="composed">Experiment walkthrough <span class="why">3 existing blocks stacked — live-demoed in the reference</span></li>
-      </ul>
-    </div>
+    <!-- draft cards (from your editor, this browser) are injected here -->
+  </main>
 
-    <footer class="tagline">Formalized once, so nobody has to re-derive the palette from a paragraph again. ✦</footer>
+  <div class="spine-shelf" id="spine-list" style="display:none"></div>
+  </div>
+  </div>
 
-  </article>
+  <footer class="undertow">
+    <p>Every page is plain HTML, cut from one block system so the whole deck reads as one book.</p>
+    <p>
+      Under the hood:
+      <a href="/ologypedia/textbook-chrome-blocks.html">Chrome blocks</a>
+      <span class="dot">&middot;</span>
+      <a href="/ologypedia/textbook-example-blocks.html">Example blocks</a>
+    </p>
+    <p class="tagline">Formalized once, so nobody has to re-derive the palette from a paragraph again. ✦</p>
+  </footer>
+
 </div>
+
+<script src="cover-render.js"></script>
+<script>
+(function(){
+  var deck = document.getElementById('deck');
+  var published = {};
+  Array.prototype.forEach.call(deck.querySelectorAll('.card63[data-slug]'), function(c){
+    published[c.getAttribute('data-slug')] = true;
+  });
+
+  var shelf;
+  try { shelf = JSON.parse(localStorage.getItem('ologypedia-studio-v1')) || []; }
+  catch (e) { shelf = []; }
+  if (!Array.isArray(shelf)) shelf = [];
+
+  var drafts = shelf.filter(function(e){ return e && e.slug && !published[e.slug]; });
+
+  var ACCENTS = ['acc-rose','acc-sage','acc-gold','acc-dust','acc-plum'];
+  var FINISHES = { pulse:1, shimmer:1, halo:1, drift:1 };
+
+  drafts.forEach(function(e, i){
+    published[e.slug] = true;   // so a Textbook entry with the same id isn't doubled below
+    var acc = (e.accent && ACCENTS.indexOf('acc-' + e.accent) >= 0) ? 'acc-' + e.accent : ACCENTS[i % ACCENTS.length];
+    var fx = (e.finish && FINISHES[e.finish]) ? ' fx-' + e.finish : '';
+    var a = document.createElement('a');
+    a.className = 'card63 is-draft ' + acc + fx;
+    a.href = '/ologypedia/add-page.html?open=' + encodeURIComponent(e.slug);
+
+    if (e.layers && e.layers.length && window.OlogypediaCover){
+      a.insertAdjacentHTML('beforeend', OlogypediaCover.layersHTML(e.layers));
+    }
+
+    var inner = el('div', 'c-inner', '');
+    inner.appendChild(corner('tl')); inner.appendChild(corner('tr'));
+    inner.appendChild(corner('bl')); inner.appendChild(corner('br'));
+    inner.appendChild(el('span', 'c-tag', 'Draft'));
+    inner.appendChild(el('span', 'c-kicker', e.subject || ''));
+
+    var core = el('div', 'c-core', '');
+    var med = el('div', 'c-medallion', '');
+    med.appendChild(el('span', 'c-glyph', e.glyph || '✦'));
+    core.appendChild(med);
+    core.appendChild(el('h2', 'c-title', e.title || 'Untitled entry'));
+    core.appendChild(el('p', 'c-blurb', e.desc || 'Started in the editor — not shelved yet.'));
+    inner.appendChild(core);
+
+    var foot = el('span', 'c-foot', '');
+    foot.appendChild(el('span', 'c-read', 'Continue →'));
+    foot.appendChild(el('span', 'c-brand', 'Draft'));
+    inner.appendChild(foot);
+
+    a.appendChild(inner);
+    deck.appendChild(a);
+  });
+
+  if (drafts.length){
+    var note = el('div', 'deck-note', '');
+    note.appendChild(el('span', '', 'Dashed cards are drafts — saved only in this browser, until you publish them from the editor'));
+    deck.appendChild(note);
+  }
+
+  // ===== entries from your editable Textbook (textbook.html), as cover-cards =====
+  var tb;
+  try { tb = JSON.parse(localStorage.getItem('ologypedia-textbook-v1')); }
+  catch (e) { tb = null; }
+  var tbOrder = (tb && tb.entries && Array.isArray(tb.order)) ? tb.order : [];
+  var tbShown = 0;
+  tbOrder.forEach(function(id){
+    var e = tb.entries[id];
+    if (!e || published[id]) return;          // skip published slugs and already-shown drafts
+    published[id] = true;
+    tbShown++;
+    var status = e.status || 'seed';
+    var seed = status === 'seed';
+    var a = document.createElement('a');
+    a.className = 'card63 is-textbook acc-' + tbAccent(id, e.accent) + (seed ? ' is-seed' : '');
+    a.setAttribute('data-slug', id);
+    a.href = '/ologypedia/textbook.html#' + encodeURIComponent(id);
+
+    var inner = el('div', 'c-inner', '');
+    inner.appendChild(corner('tl')); inner.appendChild(corner('tr'));
+    inner.appendChild(corner('bl')); inner.appendChild(corner('br'));
+    inner.appendChild(el('span', 'c-tag tag-' + status, tbStatusLabel(status)));
+    inner.appendChild(el('span', 'c-kicker', e.subject || ''));
+
+    var core = el('div', 'c-core', '');
+    var med = el('div', 'c-medallion', '');
+    med.appendChild(el('span', 'c-glyph', tbGlyph(e)));
+    core.appendChild(med);
+    core.appendChild(el('h2', 'c-title', e.title || 'Untitled entry'));
+    core.appendChild(el('p', 'c-blurb', tbBlurb(e)));
+    inner.appendChild(core);
+
+    var foot = el('span', 'c-foot', '');
+    foot.appendChild(el('span', 'c-read', 'Open ✦'));
+    foot.appendChild(el('span', 'c-brand', 'My Textbook'));
+    inner.appendChild(foot);
+
+    a.appendChild(inner);
+    deck.appendChild(a);
+  });
+
+  if (tbShown){
+    var tnote = el('div', 'deck-note', '');
+    tnote.appendChild(el('span', '', '✦ My Textbook cards open in your reading room — highlight anything inside to grow a new linked page'));
+    deck.appendChild(tnote);
+  }
+
+  function el(tag, cls, text){
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text) n.textContent = text;
+    return n;
+  }
+  function corner(pos){ return el('span', 'corner ' + pos, ''); }
+
+  // cover derivation for Textbook cards — stable defaults, no design step required
+  function tbAccent(id, stored){
+    var A = ['rose', 'sage', 'gold', 'dust', 'plum'];
+    if (stored && A.indexOf(stored) >= 0) return stored;
+    var h = 0; for (var i = 0; i < id.length; i++){ h = (h * 31 + id.charCodeAt(i)) >>> 0; }
+    return A[h % A.length];
+  }
+  function tbGlyph(e){ return (e.glyph && String(e.glyph).slice(0, 2)) || '✦'; }
+  function tbStatusLabel(s){ return s === 'grown' ? 'Grown' : s === 'growing' ? 'Growing' : 'Seed'; }
+  function tbBlurb(e){
+    if (e.blurb) return String(e.blurb);
+    var d = document.createElement('div'); d.innerHTML = e.body || '';   // detached, never inserted → inert
+    var txt = (d.textContent || '').replace(/\s+/g, ' ').trim();
+    if (!txt) return 'A seed — a title and a link, waiting to grow.';
+    return txt.length > 150 ? txt.slice(0, 147).replace(/\s+\S*$/, '') + '…' : txt;
+  }
+
+  setupDeckControls();
+
+  /* ===== search, subject filter, and the grid/spine view toggle —
+     covers both shelved cards and the drafts just injected above ===== */
+  function setupDeckControls(){
+    var cards = Array.prototype.slice.call(deck.querySelectorAll('.card63'));
+    if (!cards.length) return;
+
+    var searchEl = document.getElementById('deck-search');
+    var subjectEl = document.getElementById('deck-subject');
+    var gridBtn = document.getElementById('view-grid');
+    var spineBtn = document.getElementById('view-spine');
+    var spineList = document.getElementById('spine-list');
+
+    // the "new volume" spine, always first on the shelf
+    var addSpine = document.createElement('a');
+    addSpine.className = 'spine spine-add';
+    addSpine.href = '/ologypedia/add-page.html';
+    addSpine.style.minHeight = '260px';
+    addSpine.appendChild(el('span', 'foil', ''));
+    addSpine.appendChild(el('span', 'spine-title-v', 'Add a Page'));
+    addSpine.appendChild(el('span', 'spine-emblem', '+'));
+    spineList.appendChild(addSpine);
+
+    var items = cards.map(function(card){
+      var accMatch = /acc-[a-z]+/.exec(card.className);
+      var titleEl = card.querySelector('.c-title');
+      var kickerEl = card.querySelector('.c-kicker');
+      var blurbEl = card.querySelector('.c-blurb');
+      var glyphEl = card.querySelector('.c-glyph');
+      return {
+        card: card,
+        href: card.getAttribute('href'),
+        title: titleEl ? titleEl.textContent : '',
+        subject: kickerEl ? kickerEl.textContent.trim() : '',
+        blurb: blurbEl ? blurbEl.textContent : '',
+        glyph: glyphEl ? glyphEl.textContent : '✦',
+        accent: accMatch ? accMatch[0] : 'acc-rose',
+        isDraft: card.classList.contains('is-draft') || card.classList.contains('is-seed')
+      };
+    });
+
+    var subjects = [];
+    items.forEach(function(it){
+      if (it.subject && subjects.indexOf(it.subject) === -1) subjects.push(it.subject);
+    });
+    subjects.sort();
+    subjects.forEach(function(s){
+      var opt = document.createElement('option');
+      opt.value = s; opt.textContent = s;
+      subjectEl.appendChild(opt);
+    });
+
+    // a book stands as tall as its title is long — gives the shelf a natural,
+    // uneven skyline instead of a wall of identical rectangles.
+    items.forEach(function(it, i){
+      var spine = document.createElement('a');
+      spine.className = 'spine ' + it.accent + (it.isDraft ? ' is-draft' : '');
+      spine.href = it.href;
+      var h = 232 + ((it.title.length * 7 + i * 13) % 66); // 232–298px
+      spine.style.minHeight = h + 'px';
+      spine.title = it.title + (it.subject ? ' · ' + it.subject : '');
+      spine.appendChild(el('span', 'foil', ''));
+      spine.appendChild(el('span', 'spine-title-v', it.title));
+      spine.appendChild(el('span', 'spine-emblem', it.glyph));
+      spineList.appendChild(spine);
+      it.row = spine;
+    });
+
+    var gridEmpty = el('div', 'deck-empty', 'No entries match your search.');
+    gridEmpty.hidden = true;
+    deck.appendChild(gridEmpty);
+    var spineEmpty = el('div', 'spine-empty', 'No entries match your search.');
+    spineEmpty.hidden = true;
+    spineList.appendChild(spineEmpty);
+
+    function applyFilter(){
+      var q = searchEl.value.trim().toLowerCase();
+      var subj = subjectEl.value;
+      var visible = 0;
+      items.forEach(function(it){
+        var matches = (!q || (it.title + ' ' + it.subject + ' ' + it.blurb).toLowerCase().indexOf(q) !== -1)
+          && (!subj || it.subject === subj);
+        it.card.style.display = matches ? '' : 'none';
+        it.row.style.display = matches ? '' : 'none';
+        if (matches) visible++;
+      });
+      gridEmpty.hidden = visible > 0;
+      spineEmpty.hidden = visible > 0;
+    }
+
+    searchEl.addEventListener('input', applyFilter);
+    subjectEl.addEventListener('change', applyFilter);
+
+    var VIEW_KEY = 'ologypedia-view';
+    function setView(view){
+      var isSpine = view === 'spine';
+      deck.style.display = isSpine ? 'none' : '';
+      spineList.style.display = isSpine ? '' : 'none';
+      gridBtn.classList.toggle('active', !isSpine);
+      gridBtn.setAttribute('aria-pressed', String(!isSpine));
+      spineBtn.classList.toggle('active', isSpine);
+      spineBtn.setAttribute('aria-pressed', String(isSpine));
+      try { localStorage.setItem(VIEW_KEY, view); } catch (e) {}
+    }
+    gridBtn.addEventListener('click', function(){ setView('grid'); });
+    spineBtn.addEventListener('click', function(){ setView('spine'); });
+
+    var savedView = 'grid';
+    try { savedView = localStorage.getItem(VIEW_KEY) === 'spine' ? 'spine' : 'grid'; } catch (e) {}
+    setView(savedView);
+  }
+})();
+</script>
+
 </body>
 </html>

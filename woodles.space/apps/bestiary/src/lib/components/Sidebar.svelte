@@ -32,6 +32,7 @@
 	</div>
 
 	<div class="bottom">
+		<a class="site-home" href="/" title="back to woodles.space">·space</a>
 		<a class="margin-link" href="/marginalia" title="where creatures are discovered">
 			↩ marginalia
 		</a>
@@ -161,6 +162,7 @@
 		flex-direction: column;
 		gap: var(--b-space-md);
 	}
+	.site-home,
 	.margin-link,
 	.echoes-link {
 		font-family: var(--b-font-mono);
@@ -169,6 +171,10 @@
 		text-decoration: none;
 		transition: color var(--b-transition-fast);
 	}
+	.site-home {
+		opacity: 0.8;
+	}
+	.site-home:hover,
 	.margin-link:hover,
 	.echoes-link:hover { color: var(--b-relational); }
 

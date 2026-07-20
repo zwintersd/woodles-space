@@ -1,6 +1,6 @@
 # Marginalia Arcade - Progress Roadmap
 
-*Last updated: 2026-06-28. Companion to [`ARCADE_REUSE.md`](./ARCADE_REUSE.md),
+*Last updated: 2026-07-18. Companion to [`ARCADE_REUSE.md`](./ARCADE_REUSE.md),
 which still defines the extraction philosophy: share the room, palette, shell,
 and economy touch-points; keep each cabinet's core rules local until repetition
 is real.*
@@ -27,6 +27,10 @@ Recommendation #1 landed in [`arcadeRewards.ts`](./arcadeRewards.ts):
   Paddle Break, and Margin Snake: each now has visible Body/Mind/Grace/Heart
   effects, active-pet perk rows, local records, and the planned kinder fail
   mechanics.
+- Get Big! phases 0–2 are complete: its docs now match the live pet perks and
+  records, every edge entrant has a subtle warning, yellow clearly switches
+  from locked to edible, and the end screen records time, food-tier totals,
+  and one-count-per-blob danger dodges.
 - Week 6's bubble pass is complete: Margin Bubbles has `SvgArena`, both bubble
   games have active-pet stat effects, local records, mobile aim/fire separation,
   and color-safe palette controls.
@@ -66,7 +70,7 @@ round of growth makes the copy-paste expensive.
 | Color POP! | `ColorPop.svelte` | play | Matter.js runner + UI interval | 22 | yes | Active-pet stats, local records, bundled `matter-js`. |
 | Margin Miner | `MarginMiner.svelte` | play | rAF canvas | 20 | yes | Active-pet stats, local records, level payouts. |
 | Type Witch | `TypeWitch.svelte` | play | interval | 32 | yes | Shared reward helper and HUD/progress shell. |
-| Get Big! | `GetBig.svelte` | play | rAF | 28 | yes | Shared reward helper and HUD/progress shell. |
+| Get Big! | `GetBig.svelte` | play | rAF | 28 | yes | Shared shell; pet perks, records, edge warnings, goal state, and run recap. |
 | Margin Hollow | `MarginHollow.svelte` | play | rAF | 24 | yes | First platform / gate / pickup shape; shared HUD/progress shell. |
 | Condition Match | - | soon | - | - | no | Placeholder only. |
 | Insight Rush | `InsightRush.svelte` | play | interval + timeouts | 24 | yes | Shared reward helper and HUD/progress shell; explicitly repeatable. |

@@ -138,6 +138,8 @@
   .shelf-list li{display:flex; align-items:center; gap:12px; padding:11px 14px; border:1px solid var(--rose-dust); border-radius:8px; background:#fffdfa; margin-bottom:8px;}
   .shelf-num{flex:none; width:26px; height:26px; border-radius:50%; background:var(--blush); color:var(--rose-deep); border:1px solid var(--rose-dust); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:600; font-size:13px;}
   .shelf-meta{flex:1 1 auto; min-width:0;}
+  .shelf-cover{flex:none; width:30px; height:30px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:15px; color:#fffdfa; box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);}
+  .shelf-kicker{font-family:var(--font-display); font-weight:600; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--rose-dust); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .shelf-title{font-family:var(--font-display); font-weight:600; font-size:15px; color:var(--rose-deep); margin:0; line-height:1.25; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .shelf-file{font-family:'DM Mono',monospace; font-size:11px; color:var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .shelf-row-actions{flex:none; display:flex; gap:4px;}
@@ -151,7 +153,186 @@
   .linkbtn:hover{color:var(--rose-dust);}
   .linkbtn.danger{color:#a8434f; border-bottom-color:#a8434f;}
 
+  /* ===== cover preview + entry point into the Cover Studio ===== */
+  .cover-preview-row{display:flex; align-items:center; gap:22px; margin-top:6px; flex-wrap:wrap;}
+  .cp-info{flex:1 1 240px; min-width:200px;}
+  .cp-info p{margin:0 0 14px; font-size:13.5px; color:var(--ink-soft); line-height:1.55;}
+
+  /* ══════════════════════════════════════════════════════════════
+     COVER STUDIO — a full-screen layered composer, adapted from the
+     bestiary's card-back editor (stage + layer list + per-layer
+     controls) to plain HTML/CSS/JS and Ologypedia's light palette.
+     ══════════════════════════════════════════════════════════════ */
+  #cover-studio{position:fixed; inset:0; z-index:200; display:none; flex-direction:column; background:linear-gradient(150deg, #f3e6da, #ece0ee 60%, #e9dccb); outline:none;}
+  #cover-studio.open{display:flex;}
+  .cs-bar{flex:none; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 20px; background:color-mix(in srgb, var(--paper) 88%, transparent); border-bottom:1px solid var(--rose-dust); backdrop-filter:blur(8px); flex-wrap:wrap;}
+  .cs-bar-left{display:flex; align-items:center; gap:12px;}
+  .cs-close{width:34px; height:34px; border-radius:50%; border:1px solid var(--rose-dust); background:#fffdfa; color:var(--rose-deep); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .12s ease, border-color .12s ease;}
+  .cs-close:hover{background:var(--blush); border-color:var(--rose-deep);}
+  .cs-titles{display:flex; flex-direction:column; line-height:1.2;}
+  .cs-title{font-family:var(--font-display); font-weight:600; font-size:18px; color:var(--rose-deep);}
+  .cs-sub{font-family:var(--font-body); font-style:italic; font-size:12px; color:var(--ink-soft);}
+  .cs-bar-right{display:flex; align-items:center; gap:8px;}
+  .cs-ghost{border:1px solid var(--rose-dust); border-radius:7px; padding:6px 11px; font-family:var(--font-display); font-weight:600; font-size:12.5px; color:var(--ink-soft); background:#fffdfa; cursor:pointer; transition:border-color .12s ease, color .12s ease, opacity .12s ease;}
+  .cs-ghost:hover:not(:disabled){border-color:var(--rose-deep); color:var(--rose-deep);}
+  .cs-ghost:disabled{opacity:.4; cursor:default;}
+  .cs-ghost.danger:hover:not(:disabled){border-color:#a8434f; color:#a8434f;}
+  .cs-save{border:1px solid var(--rose-deep); border-radius:7px; padding:7px 18px; font-family:var(--font-display); font-weight:600; font-size:13px; letter-spacing:.03em; color:var(--paper); background:var(--rose-deep); cursor:pointer; transition:background .12s ease;}
+  .cs-save:hover{background:var(--rose-dust);}
+
+  .cs-work{flex:1; min-height:0; display:grid; grid-template-columns:240px minmax(0,1fr) 280px; gap:16px; padding:16px; overflow:auto;}
+  @media(max-width:980px){
+    /* below the two-rail breakpoint, drop grid entirely rather than
+       collapsing to a 1-column grid: a grid row still stretches to share
+       the container's full height even at one column (align-content
+       defaults to stretch), which forced the tall stage to vertically
+       center within an undersized row and spill into the panel above it.
+       A plain flex column sizes each section to its own content instead —
+       and each section needs flex:none (not the default shrink:1) plus
+       min-height:auto (overriding the desktop grid-item min-height:0), or
+       the flex algorithm still compresses them below their own content
+       and the overflow spills into the neighbor the same way. */
+    .cs-work{display:flex; flex-direction:column; gap:16px; overflow-y:auto;}
+    .cs-rail, .cs-center{flex:none; min-height:auto;}
+  }
+
+  .cs-rail{min-height:0; display:flex; flex-direction:column; gap:14px;}
+  .cs-panel{background:color-mix(in srgb, #fffdfa 92%, transparent); border:1px solid var(--rose-dust); border-radius:10px; padding:12px 14px 14px; box-shadow:0 2px 10px -4px rgba(140,59,74,.18);}
+  .cs-panel h3{font-family:var(--font-display); font-weight:600; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--rose-deep); margin:0 0 10px; display:flex; align-items:center; gap:6px;}
+  .cs-panel h3 .cnt{color:var(--ink-soft); font-weight:400; letter-spacing:0;}
+
+  /* left rail: add-layer + base controls */
+  .cs-shape-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+  .cs-shape-btn{aspect-ratio:1; border:1px solid var(--rose-dust); border-radius:8px; background:#fffdfa; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:border-color .12s ease, background .12s ease;}
+  .cs-shape-btn:hover{border-color:var(--rose-deep); background:var(--blush);}
+  .cs-shape-preview{width:60%; height:60%; background:var(--rose-dust);}
+  .cs-shape-btn[data-kind="circle"] .cs-shape-preview{border-radius:50%;}
+  .cs-shape-btn[data-kind="ring"] .cs-shape-preview{border-radius:50%; background:transparent; border:4px solid var(--rose-dust);}
+  .cs-shape-btn[data-kind="diamond"] .cs-shape-preview{transform:rotate(45deg);}
+  .cs-shape-btn[data-kind="star"] .cs-shape-preview{clip-path:polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);}
+  .cs-shape-btn[data-kind="blob"] .cs-shape-preview{border-radius:58% 42% 63% 37% / 41% 58% 42% 59%;}
+  .cs-shape-btn[data-kind="rays"] .cs-shape-preview{border-radius:50%; background:repeating-conic-gradient(from 0deg, var(--rose-dust) 0deg 8deg, transparent 8deg 30deg);}
+  .cs-shape-label{font-family:var(--font-display); font-size:10px; letter-spacing:.04em; color:var(--ink-soft); text-align:center; margin-top:4px;}
+
+  /* upload tile — drop a picture in as its own layer (mirrors the bestiary
+     card-back editor's upload tab) */
+  .cs-upload{margin-top:10px;}
+  .cs-drop{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; width:100%; aspect-ratio:5/2; border:1px dashed var(--rose-dust); border-radius:8px; background:#fffdfa; color:var(--ink-soft); cursor:pointer; text-align:center; padding:8px; transition:border-color .12s ease, background .12s ease;}
+  .cs-drop:hover{border-color:var(--rose-deep); background:var(--blush);}
+  .cs-drop.dragging{border-color:var(--gold); border-style:solid; background:var(--blush);}
+  .cs-drop-glyph{font-size:20px; color:var(--gold); line-height:1;}
+  .cs-drop-hint{font-family:var(--font-display); font-weight:600; font-size:11.5px; color:var(--rose-deep);}
+  .cs-drop-sub{font-family:var(--font-body); font-size:10.5px; color:var(--ink-soft);}
+  .cs-drop.busy{opacity:.6; pointer-events:none;}
+  .cs-upload-err{font-family:var(--font-body); font-size:11px; color:#a8434f; margin:6px 0 0; min-height:1em;}
+
+  /* finish chips + glyph buttons (left rail "base" controls) */
+  .cd-row{display:flex; flex-wrap:wrap; gap:7px;}
+  .cd-chip{display:inline-flex; align-items:center; gap:5px; font-family:var(--font-body); font-size:12px; color:var(--ink-soft); background:#fffdfa; border:1px solid var(--rose-dust); border-radius:999px; padding:4px 12px; cursor:pointer; transition:background .12s ease, color .12s ease, border-color .12s ease;}
+  .cd-chip .sym{font-size:13px; line-height:1; color:var(--rose-dust);}
+  .cd-chip:hover{border-color:var(--rose-deep);}
+  .cd-chip.active{background:var(--rose-deep); border-color:var(--rose-deep); color:var(--paper);}
+  .cd-chip.active .sym{color:var(--gold);}
+  .cd-glyph-btn{width:32px; height:32px; border-radius:8px; border:1px solid var(--rose-dust); background:#fffdfa; color:var(--rose-deep); font-size:16px; line-height:1; cursor:pointer; transition:background .12s ease, border-color .12s ease;}
+  .cd-glyph-btn:hover{border-color:var(--rose-deep);}
+  .cd-glyph-btn.active{background:var(--blush); border-color:var(--rose-deep);}
+
+  /* center: stage */
+  .cs-center{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; min-height:0;}
+  .cs-stage-wrap{width:min(100%, 46vh); flex:none;}
+  #studio-card{width:100%;}
+  #studio-card .c-inner{pointer-events:none;}
+  .cs-tip{font-family:var(--font-body); font-style:italic; font-size:11.5px; color:var(--ink-soft); text-align:center;}
+
+  .c-layer.studio-layer{cursor:grab; touch-action:none;}
+  .c-layer.studio-layer:active{cursor:grabbing;}
+  .c-layer.studio-layer.selected .c-layer-shape{outline:2px dashed var(--rose-deep); outline-offset:3px;}
+  .c-layer.studio-layer.selected .c-layer-img{outline:2px dashed var(--rose-deep); outline-offset:2px;}
+  .c-layer-handle{position:absolute; right:-7px; bottom:-7px; width:16px; height:16px; border-radius:50%; background:var(--paper); border:2px solid var(--rose-deep); cursor:nwse-resize; touch-action:none; z-index:4;}
+  /* rotation knob, on a short stem above the layer — matches the cardback
+     editor's "top knob to spin" affordance */
+  .c-layer-spin{position:absolute; left:50%; top:-22px; width:14px; height:14px; margin-left:-7px; border-radius:50%; background:var(--paper); border:2px solid var(--gold); cursor:grab; touch-action:none; z-index:4;}
+  .c-layer-spin::before{content:''; position:absolute; left:50%; top:14px; width:1.5px; height:14px; margin-left:-.75px; background:var(--gold);}
+  .c-layer-spin:active{cursor:grabbing;}
+
+  /* right rail: layer list + selected-layer controls */
+  .cs-layer-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px; max-height:26vh; overflow-y:auto;}
+  .cs-lrow{display:flex; align-items:center; gap:6px; padding:5px 6px; border-radius:7px; border:1px solid transparent;}
+  .cs-lrow.selected{border-color:var(--rose-dust); background:var(--blush);}
+  .cs-eye{flex:none; width:22px; height:22px; border-radius:6px; color:var(--ink-soft); font-size:12px; display:flex; align-items:center; justify-content:center; cursor:pointer;}
+  .cs-eye.off{opacity:.4;}
+  .cs-eye:hover{background:var(--paper-edge);}
+  .cs-lname{flex:1; min-width:0; display:flex; align-items:center; gap:6px; text-align:left; cursor:pointer; background:none; border:none; font-family:var(--font-body); font-size:12.5px; color:var(--ink); padding:2px 0;}
+  .cs-lname .swatch-dot{width:12px; height:12px; border-radius:50%; flex:none; box-shadow:inset 0 0 0 1px rgba(0,0,0,.15);}
+  .cs-lname span.ltext{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .cs-lacts{flex:none; display:flex; gap:1px;}
+  .cs-lacts button{width:20px; height:20px; border-radius:5px; color:var(--ink-soft); font-size:11px; display:flex; align-items:center; justify-content:center; cursor:pointer;}
+  .cs-lacts button:hover{background:var(--paper-edge); color:var(--rose-deep);}
+  .cs-lacts button.del:hover{color:#a8434f;}
+  .cs-empty-note{font-family:var(--font-body); font-style:italic; font-size:12.5px; color:var(--ink-soft);}
+
+  .cs-field{display:flex; flex-direction:column; gap:5px; margin-bottom:12px;}
+  .cs-field:last-child{margin-bottom:0;}
+  .cs-field-label{display:flex; align-items:center; justify-content:space-between; font-family:var(--font-display); font-weight:600; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--rose-dust);}
+  .cs-field-label .val{font-family:'DM Mono',monospace; color:var(--ink-soft); text-transform:none; letter-spacing:0;}
+  .cs-field input[type="range"]{width:100%; accent-color:var(--rose-deep);}
+  .cs-field select{width:100%; font-family:var(--font-body); font-size:12.5px; color:var(--ink); background:#fffdfa; border:1px solid var(--rose-dust); border-radius:6px; padding:5px 8px;}
+  .cs-swatch-row{display:flex; flex-wrap:wrap; gap:6px; align-items:center;}
+  .cs-color-swatch{width:24px; height:24px; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0;}
+  .cs-color-swatch.active{border-color:var(--ink);}
+  .cs-color-custom{width:26px; height:26px; border-radius:50%; border:1px dashed var(--rose-dust); padding:0; cursor:pointer; background:none;}
+
   footer.tagline{text-align:center; font-family:var(--font-display); font-style:italic; font-size:15px; color:var(--rose-dust); margin-top:30px;}
+
+  /* ===== cover-card (shared with the bookshelf deck) ===== */
+  .card63{
+    --dc:var(--rose-dust);
+    position:relative; display:flex; width:176px;
+    aspect-ratio:63/88; border-radius:11px; overflow:hidden;
+    container-type:inline-size;
+    border:1px solid color-mix(in srgb, var(--dc) 45%, var(--gold));
+    background:
+      repeating-linear-gradient(-45deg, transparent 0 7px, color-mix(in srgb, var(--dc) 7%, transparent) 7px 8px),
+      radial-gradient(ellipse 80% 62% at 50% 37%, color-mix(in srgb, var(--dc) 16%, #fffdfa) 0%, var(--paper) 66%, var(--paper-edge) 100%);
+    box-shadow:2px 3px 0 var(--paper-edge);
+  }
+  .acc-rose{--dc:var(--rose-deep);}
+  .acc-sage{--dc:var(--sage);}
+  .acc-gold{--dc:var(--gold);}
+  .acc-dust{--dc:var(--rose-dust);}
+  .acc-plum{--dc:#6f4a63;}
+  .c-inner{flex:1; min-height:0; display:flex; flex-direction:column; padding:1.5em 1.25em 1.2em; font-size:5cqw; position:relative; z-index:2;}
+  .card63 .corner{position:absolute; z-index:2; width:.62em; height:.62em; border:0 solid color-mix(in srgb, var(--dc) 60%, transparent);}
+
+  /* ===== custom cover layers (Cover Studio) — sit above the background wash,
+     below the chrome text ===== */
+  #cov-layers, #studio-layers{display:contents;}
+  .c-layers{position:absolute; inset:0; z-index:1; overflow:hidden; border-radius:inherit;}
+  .c-layer{position:absolute; z-index:1;}
+  .c-layer-shape{display:block;}
+  .card63 .corner.tl{top:.5em; left:.5em; border-top-width:1.5px; border-left-width:1.5px;}
+  .card63 .corner.tr{top:.5em; right:.5em; border-top-width:1.5px; border-right-width:1.5px;}
+  .card63 .corner.bl{bottom:.5em; left:.5em; border-bottom-width:1.5px; border-left-width:1.5px;}
+  .card63 .corner.br{bottom:.5em; right:.5em; border-bottom-width:1.5px; border-right-width:1.5px;}
+  .c-kicker{text-align:center; font-family:var(--font-display); font-weight:600; font-size:.6em; letter-spacing:.14em; text-transform:uppercase; color:color-mix(in srgb, var(--dc) 72%, var(--ink)); min-height:1.1em;}
+  .c-core{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:.5em; min-height:0;}
+  .c-medallion{width:3.2em; height:3.2em; flex:none; border-radius:50%; border:1px solid color-mix(in srgb, var(--dc) 55%, transparent); background:color-mix(in srgb, var(--dc) 8%, #fffdfa); box-shadow:0 0 1.1em color-mix(in srgb, var(--dc) 22%, transparent), inset 0 0 .7em color-mix(in srgb, var(--dc) 12%, transparent); display:flex; align-items:center; justify-content:center;}
+  .c-glyph{font-size:1.5em; line-height:1; color:color-mix(in srgb, var(--dc) 82%, var(--rose-deep));}
+  .c-title{font-family:var(--font-display); font-weight:600; font-size:1.42em; line-height:1.05; color:var(--rose-deep); margin:0;}
+  .c-blurb{font-size:.62em; line-height:1.4; color:var(--ink-soft); margin:0; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;}
+  .c-foot{display:flex; align-items:center; justify-content:space-between; gap:.5em;}
+  .c-read{font-family:var(--font-display); font-weight:600; font-size:.56em; letter-spacing:.04em; color:var(--gold);}
+  .c-brand{font-family:var(--font-display); font-size:.46em; letter-spacing:.16em; text-transform:uppercase; color:color-mix(in srgb, var(--dc) 60%, transparent);}
+  @keyframes cb-pulse{0%,100%{opacity:.3}50%{opacity:.8}}
+  @keyframes cb-shimmer{0%{transform:translateX(-160%) skewX(-18deg);opacity:0}8%{opacity:1}55%{opacity:.85}60%,100%{transform:translateX(210%) skewX(-18deg);opacity:0}}
+  @keyframes cb-halo{to{transform:rotate(360deg)}}
+  @keyframes cb-drift{0%{transform:translate(0,0) scale(1);opacity:.4}25%{transform:translate(-7%,5%) scale(1.08);opacity:.6}50%{transform:translate(5%,-6%) scale(.96);opacity:.45}75%{transform:translate(-4%,-3%) scale(1.05);opacity:.6}100%{transform:translate(0,0) scale(1);opacity:.4}}
+  .fx-pulse::after,.fx-shimmer::after,.fx-halo::after,.fx-drift::after{content:''; position:absolute; pointer-events:none;}
+  .fx-pulse::after{inset:0; border-radius:inherit; z-index:1; box-shadow:inset 0 0 1.7em .45em color-mix(in srgb, var(--dc) 26%, transparent), inset 0 0 .5em 0 color-mix(in srgb, var(--dc) 40%, transparent); animation:cb-pulse 3.4s ease-in-out infinite;}
+  .fx-shimmer::after{top:-10%; left:0; width:55%; height:120%; z-index:3; background:linear-gradient(105deg, transparent 12%, rgba(255,255,255,.14) 32%, color-mix(in srgb, var(--gold) 45%, rgba(255,255,255,.7)) 50%, rgba(255,255,255,.14) 68%, transparent 88%); transform:translateX(-160%) skewX(-18deg); animation:cb-shimmer 7.5s ease-in-out infinite;}
+  .fx-halo::after{top:-50%; left:-50%; width:200%; height:200%; z-index:1; background:conic-gradient(from 0deg at 50% 50%, transparent 0deg, color-mix(in srgb, var(--dc) 18%, transparent) 42deg, transparent 92deg, transparent 200deg, color-mix(in srgb, var(--gold) 20%, transparent) 250deg, transparent 300deg); mix-blend-mode:multiply; animation:cb-halo 17s linear infinite;}
+  .fx-drift::after{top:-20%; left:-20%; width:140%; height:140%; z-index:1; background:radial-gradient(ellipse 74% 60% at 40% 45%, color-mix(in srgb, var(--dc) 22%, transparent), transparent 66%); mix-blend-mode:multiply; animation:cb-drift 12s ease-in-out infinite;}
+  @media(prefers-reduced-motion:reduce){ .fx-pulse::after,.fx-shimmer::after,.fx-halo::after,.fx-drift::after{animation:none;} }
 </style>
 </head>
 <body>
@@ -161,7 +342,7 @@
 
   <article class="page">
 
-    <span class="kicker-tag">A Woodle &middot; The Studio</span>
+    <span class="kicker-tag">Ologypedia &middot; The Studio</span>
     <h1 class="title">Add a Page</h1>
     <div class="subtitle-row"><span class="orn">✦</span><h2 class="subtitle">One Entry at a Time, Start to Finished File</h2><span class="orn">✦</span></div>
     <p class="intro">There's no database behind this site, no "save" button writing to a server — Ologypedia is a static block library, on purpose. So a whole textbook gets built the honest way: one entry at a time. Name a topic and this studio hands you the exact prompt to grow it. Paste back what the model writes, it renders live right here, then downloads as a finished file — and joins a shelf that remembers your whole textbook as it grows, so you never lose your place between sessions and can register every entry in a single pass at the end.</p>
@@ -200,6 +381,12 @@
     <div class="field">
       <label for="topic">Topic</label>
       <input type="text" id="topic" placeholder="e.g., Bioluminescence, The Domestication of the Cat, Mirror Neurons&hellip;" autocomplete="off">
+      <p class="hint" id="slug-status"></p>
+    </div>
+    <div class="field">
+      <label for="subject">Subject <span style="text-transform:none; font-weight:400; color:var(--ink-soft);">(optional)</span></label>
+      <input type="text" id="subject" placeholder="e.g., Biology · Biochemistry" autocomplete="off">
+      <p class="hint">The domain, for the masthead kicker and the book's spine label on the shelf. Leave blank to skip.</p>
     </div>
     <div class="field">
       <label for="context">Your Own Relationship to the Topic <span style="text-transform:none; font-weight:400; color:var(--ink-soft);">(optional)</span></label>
@@ -209,11 +396,35 @@
     <div class="field">
       <label for="desc">One-Line Description <span style="text-transform:none; font-weight:400; color:var(--ink-soft);">(optional)</span></label>
       <input type="text" id="desc" placeholder="e.g., How a firefly makes cold light — the luciferin reaction, and the cost of a glow." autocomplete="off">
-      <p class="hint">Becomes the entry's card text on the front door. Leave it blank now and the card gets a placeholder you can fill in later.</p>
+      <p class="hint">Becomes the book's blurb on the shelf. Leave it blank now and the book gets a placeholder you can fill in later.</p>
     </div>
     <div class="checkbox-field">
       <input type="checkbox" id="diagnosis">
       <label for="diagnosis" style="text-transform:none; font-family:var(--font-body); font-weight:400; font-size:13.5px; color:var(--ink);">This topic is a diagnosis or health condition — add the four extra sections (supporting a loved one, personal risk-assessment, professional/clinical application, prerequisite-study map).</label>
+    </div>
+
+    <div class="field" style="margin-top:22px;">
+      <label>Design its cover</label>
+      <p class="hint" style="margin:0 0 12px;">The card-back this entry wears on the deck — a full studio, adapted from the bestiary's card-back editor: layer shapes or upload your own images, drag, resize and spin them, pick a color and finish for each. It previews live as you type.</p>
+      <div class="cover-preview-row">
+        <a class="card63 acc-rose" id="cover-card" aria-label="cover preview">
+          <div id="cov-layers"></div>
+          <div class="c-inner">
+            <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+            <span class="c-kicker" id="cov-kicker"></span>
+            <div class="c-core">
+              <div class="c-medallion"><span class="c-glyph" id="cov-glyph">✦</span></div>
+              <h2 class="c-title" id="cov-title">Your Title</h2>
+              <p class="c-blurb" id="cov-blurb">A one-line blurb appears here.</p>
+            </div>
+            <span class="c-foot"><span class="c-read">Read &#10022;</span><span class="c-brand">Ologypedia</span></span>
+          </div>
+        </a>
+        <div class="cp-info">
+          <p>This is a live preview only — open the studio to actually change the accent, finish, glyph, or layer in shapes.</p>
+          <button class="btn" id="open-studio" type="button"><span class="glyph">✎</span> Open in the Studio</button>
+        </div>
+      </div>
     </div>
 
     <div class="sec-head"><span class="num">2</span><h3>Copy the Prompt &amp; Ask a Model</h3></div>
@@ -236,6 +447,9 @@
       <div class="chk" id="chk-doc"><span class="dot">–</span> Complete HTML document</div>
       <div class="chk" id="chk-fonts"><span class="dot">–</span> Loads the shared fonts</div>
       <div class="chk" id="chk-blocks"><span class="dot">–</span> Uses the block classes</div>
+      <div class="chk" id="chk-noplaceholder"><span class="dot">–</span> No leftover template placeholders</div>
+      <div class="chk" id="chk-nopalette"><span class="dot">–</span> Doesn't load shared/palette.css</div>
+      <div class="chk" id="chk-noscript"><span class="dot">–</span> No embedded scripts</div>
     </div>
     <div class="preview-frame" id="preview-frame">
       <div class="preview-head">
@@ -257,29 +471,24 @@
     <p class="note" id="save-msg" role="status" aria-live="polite" style="font-size:12.5px; color:var(--ink-soft); margin-top:10px; min-height:1.1em;"></p>
 
     <div class="sec-head"><span class="num">5</span><h3>Your Textbook</h3></div>
-    <p class="step-lede">Every entry you save lands here and stays — kept in this browser, so a whole textbook can grow across many sessions without losing your place. Re-open one to edit and re-download it; when you're ready, copy the entire index grid in a single pass instead of pasting cards one at a time.</p>
+    <p class="step-lede">Every entry you save lands here and stays — kept in this browser, so a whole textbook can grow across many sessions without losing your place. Each one also shows up as a <b>draft card in the deck</b> at the <a href="/ologypedia/" style="color:var(--rose-deep);">front door</a>, waiting there until you publish it. Re-open one to edit and re-download it; when you're ready, copy every card's markup in a single pass.</p>
     <div class="shelf" id="shelf">
       <div class="shelf-empty" id="shelf-empty">Nothing saved yet. Build an entry above, then <b>Add to my textbook</b> — it'll appear here, and outlast this session.</div>
       <ol class="shelf-list" id="shelf-list"></ol>
     </div>
-    <div class="btn-row" id="shelf-actions" style="display:none; align-items:center;">
-      <label class="startat">First card's number
-        <input type="number" id="start-at" min="1" value="1" inputmode="numeric">
-      </label>
-    </div>
-    <div class="output-wrap" id="grid-wrap" style="display:none; margin-top:12px;">
+    <div class="output-wrap" id="grid-wrap" style="display:none; margin-top:16px;">
       <div class="output-head">
-        <span>Full Library Grid &middot; <span id="grid-count">0</span> entr<span id="grid-plural">ies</span></span>
-        <button class="copy-btn" id="copy-grid" type="button">Copy Grid</button>
+        <span>Deck Markup &middot; <span id="grid-count">0</span> card<span id="grid-plural">s</span></span>
+        <button class="copy-btn" id="copy-grid" type="button">Copy Markup</button>
       </div>
       <textarea id="grid-output" rows="8" readonly></textarea>
     </div>
     <div class="box notes" id="register-note" style="display:none;">
-      <h4>Registering the Whole Set</h4>
+      <h4>Publishing to the Deck</h4>
+      <p style="font-size:13.5px; line-height:1.6; color:var(--ink-soft); margin:0 0 10px;">Saving an entry only shelves a <em>draft</em>, visible to you in this browser. Publishing it — so any visitor can read it — is two small steps:</p>
       <ol>
         <li>Make sure each downloaded <code>textbook-*.html</code> is sitting in <code>apps/ologypedia/</code>.</li>
-        <li>Open <code>index.html</code>, find the <code>.lib-grid.full</code> block, and paste the grid above in — after the existing worked-page cards.</li>
-        <li>Set <b>First card's number</b> so the numbering continues from whatever's already there, then reload the front door.</li>
+        <li>Open <code>index.html</code>, find the <code>.deck</code> grid, and paste the markup above in — after the last <code>&lt;a class="card63"&gt;</code>. Reload the front door and the draft becomes a shelved card.</li>
       </ol>
     </div>
     <div class="shelf-tools" id="shelf-tools" style="display:none;">
@@ -294,6 +503,125 @@
   </article>
 </div>
 
+<div id="cover-studio" role="dialog" aria-modal="true" aria-label="cover studio" tabindex="-1">
+  <header class="cs-bar">
+    <div class="cs-bar-left">
+      <button class="cs-close" id="cs-close-btn" type="button" aria-label="close studio">&larr;</button>
+      <div class="cs-titles">
+        <span class="cs-title">Cover Studio</span>
+        <span class="cs-sub">layer shapes, uploaded images, colors, and finishes onto the card back</span>
+      </div>
+    </div>
+    <div class="cs-bar-right">
+      <button class="cs-ghost" id="cs-undo" type="button" title="undo (Ctrl/Cmd+Z)" disabled>&#8630; Undo</button>
+      <button class="cs-ghost" id="cs-redo" type="button" title="redo (Shift+Ctrl/Cmd+Z)" disabled>&#8631; Redo</button>
+      <button class="cs-ghost danger" id="cs-clear" type="button">Clear Layers</button>
+      <button class="cs-save" id="cs-save" type="button">Save Cover</button>
+    </div>
+  </header>
+
+  <div class="cs-work">
+    <!-- left rail: add a layer + base controls -->
+    <aside class="cs-rail">
+      <div class="cs-panel">
+        <h3>Add a Layer</h3>
+        <div class="cs-shape-grid" id="cs-shapes"></div>
+        <div class="cs-upload">
+          <button type="button" class="cs-drop" id="cs-drop">
+            <span class="cs-drop-glyph">⬓</span>
+            <span class="cs-drop-hint">Upload an image</span>
+            <span class="cs-drop-sub">drop a picture, or click — it lands as a layer</span>
+          </button>
+          <p class="cs-upload-err" id="cs-upload-err" role="status" aria-live="polite"></p>
+          <input type="file" id="cs-file" accept="image/*" hidden>
+        </div>
+      </div>
+      <div class="cs-panel">
+        <h3>Accent</h3>
+        <div class="cs-swatch-row" id="cs-accents"></div>
+      </div>
+      <div class="cs-panel">
+        <h3>Finish</h3>
+        <div class="cd-row" id="cs-finishes"></div>
+      </div>
+      <div class="cs-panel">
+        <h3>Medallion Glyph</h3>
+        <div class="cd-row" id="cs-glyphs"></div>
+      </div>
+    </aside>
+
+    <!-- center: the stage -->
+    <section class="cs-center">
+      <div class="cs-stage-wrap">
+        <a class="card63 acc-rose" id="studio-card" aria-hidden="true">
+          <div id="studio-layers"></div>
+          <div class="c-inner">
+            <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+            <span class="c-kicker" id="studio-kicker"></span>
+            <div class="c-core">
+              <div class="c-medallion"><span class="c-glyph" id="studio-glyph">✦</span></div>
+              <h2 class="c-title" id="studio-title">Your Title</h2>
+              <p class="c-blurb" id="studio-blurb">A one-line blurb appears here.</p>
+            </div>
+            <span class="c-foot"><span class="c-read">Read &#10022;</span><span class="c-brand">Ologypedia</span></span>
+          </div>
+        </a>
+      </div>
+      <p class="cs-tip">drag to move &middot; corner dot to resize &middot; top knob to spin &middot; scroll to scale &middot; select one to edit on the right</p>
+    </section>
+
+    <!-- right rail: layer list + selected-layer controls -->
+    <aside class="cs-rail">
+      <div class="cs-panel">
+        <h3>Layers <span class="cnt" id="cs-layer-count">0</span></h3>
+        <p class="cs-empty-note" id="cs-layers-empty">Nothing yet — add a shape from the left.</p>
+        <ol class="cs-layer-list" id="cs-layer-list"></ol>
+      </div>
+      <div class="cs-panel" id="cs-layer-panel" style="display:none;">
+        <h3>Selected Layer</h3>
+        <div class="cs-field" id="cs-color-field">
+          <span class="cs-field-label">Color</span>
+          <div class="cs-swatch-row" id="cs-layer-colors"></div>
+        </div>
+        <div class="cs-field" id="cs-render-field" style="display:none;">
+          <span class="cs-field-label">Rendering</span>
+          <div class="cd-row" id="cs-render">
+            <button type="button" class="cd-chip" data-smooth="1"><span class="sym">◇</span>smooth</button>
+            <button type="button" class="cd-chip" data-smooth="0"><span class="sym">▦</span>crisp</button>
+          </div>
+        </div>
+        <div class="cs-field">
+          <span class="cs-field-label">Opacity <span class="val" id="cs-opacity-val">55%</span></span>
+          <input type="range" id="cs-opacity" min="10" max="100" step="1">
+        </div>
+        <div class="cs-field">
+          <span class="cs-field-label">Rotation <span class="val" id="cs-rotation-val">0&deg;</span></span>
+          <input type="range" id="cs-rotation" min="0" max="359" step="1">
+        </div>
+        <div class="cs-field">
+          <span class="cs-field-label">Size <span class="val" id="cs-size-val">46%</span></span>
+          <input type="range" id="cs-size" min="12" max="95" step="1">
+        </div>
+        <div class="cs-field" id="cs-thickness-field" style="display:none;">
+          <span class="cs-field-label">Ring Thickness <span class="val" id="cs-thickness-val">10px</span></span>
+          <input type="range" id="cs-thickness" min="2" max="40" step="1">
+        </div>
+        <div class="cs-field">
+          <span class="cs-field-label">Blend</span>
+          <select id="cs-blend">
+            <option value="normal">normal</option>
+            <option value="multiply">multiply</option>
+            <option value="screen">screen</option>
+            <option value="overlay">overlay</option>
+            <option value="soft-light">soft-light</option>
+          </select>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script src="cover-render.js"></script>
 <script>
 (function(){
   var topicEl = document.getElementById('topic');
@@ -307,20 +635,41 @@
   var downloadEl = document.getElementById('download');
   var dlName = document.getElementById('dl-name');
   var openTabEl = document.getElementById('open-tab');
+  var subjectEl = document.getElementById('subject');
   var addShelfEl = document.getElementById('add-shelf');
   var saveMsgEl = document.getElementById('save-msg');
   var shelfEl = document.getElementById('shelf');
   var shelfListEl = document.getElementById('shelf-list');
-  var shelfActionsEl = document.getElementById('shelf-actions');
   var gridWrapEl = document.getElementById('grid-wrap');
   var gridOutputEl = document.getElementById('grid-output');
   var gridCountEl = document.getElementById('grid-count');
   var gridPluralEl = document.getElementById('grid-plural');
   var registerNoteEl = document.getElementById('register-note');
   var shelfToolsEl = document.getElementById('shelf-tools');
-  var startAtEl = document.getElementById('start-at');
+  var slugStatusEl = document.getElementById('slug-status');
   var importFileEl = document.getElementById('import-file');
   var lastBlobUrl = null;
+
+  // ── cover: static preview + entry point into the Cover Studio ──
+  var coverCardEl = document.getElementById('cover-card');
+  var covLayersEl = document.getElementById('cov-layers');
+  var covKickerEl = document.getElementById('cov-kicker');
+  var covTitleEl = document.getElementById('cov-title');
+  var covBlurbEl = document.getElementById('cov-blurb');
+  var covGlyphEl = document.getElementById('cov-glyph');
+  var openStudioEl = document.getElementById('open-studio');
+  var ACCENTS = [
+    { id:'rose', color:'#8C3B4A' }, { id:'sage', color:'#8FA37E' },
+    { id:'gold', color:'#C9A66B' }, { id:'dust', color:'#C77C8E' }, { id:'plum', color:'#6f4a63' }
+  ];
+  var FINISHES = [
+    { id:'none', label:'none', sym:'○' }, { id:'pulse', label:'pulse', sym:'◉' },
+    { id:'shimmer', label:'shimmer', sym:'◈' }, { id:'halo', label:'halo', sym:'⊙' },
+    { id:'drift', label:'drift', sym:'≋' }
+  ];
+  var GLYPHS = ['✦','❀','☽','◆','∞','✶','☉','❦','✧','⚘'];
+  var ACCENT_IDS = ACCENTS.map(function(a){ return a.id; });
+  var cover = { accent:'rose', finish:'none', glyph:'✦', layers:[] };
 
   var SHELF_KEY = 'ologypedia-studio-v1';
   var shelf = loadShelf();
@@ -332,15 +681,63 @@
       .replace(/(^-+|-+$)/g, '') || 'topic';
   }
   function currentSlug(){ return slugify(topicEl.value.trim()); }
+
+  /* ===== slug-availability: warn before a download silently overwrites a
+     live, already-published page ===== */
+  var publishedSlugs = null; // null until the fetch below resolves (or fails)
+  fetch('/ologypedia/index.html').then(function(r){ return r.ok ? r.text() : ''; }).then(function(text){
+    var set = new Set();
+    var re = /data-slug="([^"]+)"/g, m;
+    while ((m = re.exec(text))) set.add(m[1]);
+    publishedSlugs = set;
+    updateSlugStatus();
+  }).catch(function(){ publishedSlugs = new Set(); });
+
+  function updateSlugStatus(){
+    var topic = topicEl.value.trim();
+    if (!topic || !publishedSlugs){ slugStatusEl.textContent = ''; return; }
+    var slug = currentSlug();
+    if (publishedSlugs.has(slug)){
+      slugStatusEl.textContent = 'Slug "' + slug + '" is already published — downloading or shelving under this title will overwrite that live page once you republish.';
+      slugStatusEl.style.color = '#a8434f';
+    } else {
+      slugStatusEl.textContent = 'Slug "' + slug + '" — not published yet.';
+      slugStatusEl.style.color = 'var(--ink-soft)';
+    }
+  }
+
   function escapeHtml(s){
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
-  function cardFor(slug, title, desc, number){
-    return '<a class="card" href="/ologypedia/textbook-' + slug + '.html">\n' +
-      '  <span class="card-eyebrow">Worked Page &middot; No. ' + number + '</span>\n' +
-      '  <h4>' + escapeHtml(title) + '</h4>\n' +
-      '  <p>' + escapeHtml(desc || 'One line on what it covers and which example blocks it uses.') + '</p>\n' +
-      '</a>';
+  function bookFor(entry, i){
+    var accent = (entry.accent && ACCENT_IDS.indexOf(entry.accent) >= 0) ? entry.accent : ACCENT_IDS[i % ACCENT_IDS.length];
+    var fx = (entry.finish && entry.finish !== 'none') ? ' fx-' + entry.finish : '';
+    var glyph = entry.glyph || '✦';
+    var lines = [];
+    lines.push('<a class="card63 acc-' + accent + fx + '" data-slug="' + entry.slug + '" href="/ologypedia/textbook-' + entry.slug + '.html">');
+    if (entry.layers && entry.layers.length) lines.push('  ' + OlogypediaCover.layersHTML(entry.layers));
+    lines.push('  <div class="c-inner">');
+    lines.push('    <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>');
+    if (entry.subject) lines.push('    <span class="c-kicker">' + escapeHtml(entry.subject) + '</span>');
+    lines.push('    <div class="c-core">');
+    lines.push('      <div class="c-medallion"><span class="c-glyph">' + escapeHtml(glyph) + '</span></div>');
+    lines.push('      <h2 class="c-title">' + escapeHtml(entry.title) + '</h2>');
+    lines.push('      <p class="c-blurb">' + escapeHtml(entry.desc || 'One line on what it covers and which example blocks it uses.') + '</p>');
+    lines.push('    </div>');
+    lines.push('    <span class="c-foot"><span class="c-read">Read &#10022;</span><span class="c-brand">Ologypedia</span></span>');
+    lines.push('  </div>');
+    lines.push('</a>');
+    return lines.join('\n');
+  }
+
+  /* ===== cover: static (non-interactive) preview ===== */
+  function updateCover(){
+    coverCardEl.className = 'card63 acc-' + cover.accent + (cover.finish !== 'none' ? ' fx-' + cover.finish : '');
+    covLayersEl.innerHTML = OlogypediaCover.layersHTML(cover.layers);
+    covKickerEl.textContent = subjectEl.value.trim();
+    covTitleEl.textContent = topicEl.value.trim() || 'Your Title';
+    covBlurbEl.textContent = descEl.value.trim() || 'A one-line blurb appears here.';
+    covGlyphEl.textContent = cover.glyph;
   }
 
   var VISUAL_SYSTEM =
@@ -379,11 +776,16 @@
   function buildPrompt(){
     var topic = topicEl.value.trim() || '[TOPIC]';
     var context = contextEl.value.trim();
+    var subject = subjectEl.value.trim();
     var slug = currentSlug();
 
     var lines = [];
     lines.push('Write this as a personal-textbook-style page or chapter on: ' + topic);
     lines.push('');
+    if (subject){
+      lines.push('Domain / subdomain for the masthead kicker: ' + subject);
+      lines.push('');
+    }
     if (context){
       lines.push('Optional context: ' + context);
       lines.push('');
@@ -451,6 +853,501 @@
     if (!downloadEl.classList.contains('is-disabled')) downloadEl.download = filename;
   }
 
+  /* ══════════════════════════════════════════════════════════════
+     COVER STUDIO — a self-contained layered composer. Edits happen on
+     a working copy (studio.*) and only land on `cover` via Save, so
+     Escape/Close can discard cleanly. Undo/redo is snapshot-based:
+     one JSON snapshot of the layer array per committed mutation,
+     mirroring the bestiary studio's commit()/undo()/redo() shape.
+     ══════════════════════════════════════════════════════════════ */
+  var studioEl = document.getElementById('cover-studio');
+  var studioCardEl = document.getElementById('studio-card');
+  var studioLayersEl = document.getElementById('studio-layers');
+  var studioKickerEl = document.getElementById('studio-kicker');
+  var studioTitleEl = document.getElementById('studio-title');
+  var studioBlurbEl = document.getElementById('studio-blurb');
+  var studioGlyphEl = document.getElementById('studio-glyph');
+  var csLayerListEl = document.getElementById('cs-layer-list');
+  var csLayersEmptyEl = document.getElementById('cs-layers-empty');
+  var csLayerCountEl = document.getElementById('cs-layer-count');
+  var csLayerPanelEl = document.getElementById('cs-layer-panel');
+  var csUndoBtn = document.getElementById('cs-undo');
+  var csRedoBtn = document.getElementById('cs-redo');
+  var SHAPE_LABELS = { circle:'Circle', ring:'Ring', diamond:'Diamond', star:'Star', blob:'Blob', rays:'Rays' };
+
+  var studio = {
+    layers: [],
+    selectedId: null,
+    accent: 'rose',
+    finish: 'none',
+    glyph: '✦',
+    undoStack: [],
+    redoStack: []
+  };
+
+  function studioSelected(){
+    for (var i = 0; i < studio.layers.length; i++){ if (studio.layers[i].id === studio.selectedId) return studio.layers[i]; }
+    return null;
+  }
+  function studioSnapshot(){
+    studio.undoStack.push(JSON.stringify(studio.layers));
+    studio.redoStack.length = 0;
+    if (studio.undoStack.length > 60) studio.undoStack.shift();
+  }
+  function studioUndo(){
+    if (!studio.undoStack.length) return;
+    studio.redoStack.push(JSON.stringify(studio.layers));
+    studio.layers = JSON.parse(studio.undoStack.pop());
+    if (!studioSelected()) studio.selectedId = null;
+    renderStudio();
+  }
+  function studioRedo(){
+    if (!studio.redoStack.length) return;
+    studio.undoStack.push(JSON.stringify(studio.layers));
+    studio.layers = JSON.parse(studio.redoStack.pop());
+    if (!studioSelected()) studio.selectedId = null;
+    renderStudio();
+  }
+
+  function openStudio(){
+    studio.layers = JSON.parse(JSON.stringify(cover.layers || []));
+    studio.accent = cover.accent;
+    studio.finish = cover.finish;
+    studio.glyph = cover.glyph;
+    studio.selectedId = studio.layers.length ? studio.layers[studio.layers.length - 1].id : null;
+    studio.undoStack = [];
+    studio.redoStack = [];
+    renderStudio();
+    studioEl.classList.add('open');
+    studioEl.focus();
+  }
+  function closeStudio(){
+    if (studio.undoStack.length && !window.confirm('Close the studio? Unsaved cover changes will be lost.')) return;
+    studioEl.classList.remove('open');
+  }
+  function saveStudio(){
+    cover.layers = JSON.parse(JSON.stringify(studio.layers));
+    cover.accent = studio.accent;
+    cover.finish = studio.finish;
+    cover.glyph = studio.glyph;
+    updateCover();
+    studioEl.classList.remove('open');
+  }
+
+  function buildShapeButtons(){
+    OlogypediaCover.SHAPES.forEach(function(kind){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'cs-shape-btn'; b.dataset.kind = kind;
+      b.title = 'add a ' + kind;
+      var prev = document.createElement('span'); prev.className = 'cs-shape-preview';
+      b.appendChild(prev);
+      b.addEventListener('click', function(){
+        studioSnapshot();
+        var layer = OlogypediaCover.newLayer(kind);
+        studio.layers.push(layer);
+        studio.selectedId = layer.id;
+        renderStudio();
+      });
+      document.getElementById('cs-shapes').appendChild(b);
+    });
+    // labels live outside the grid buttons for a cleaner hit target
+    var grid = document.getElementById('cs-shapes');
+    Array.prototype.forEach.call(grid.children, function(btn){
+      var label = document.createElement('span');
+      label.className = 'cs-shape-label';
+      label.textContent = SHAPE_LABELS[btn.dataset.kind];
+      btn.appendChild(label);
+    });
+  }
+  function buildBaseControls(){
+    ACCENTS.forEach(function(a){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'cs-color-swatch'; b.dataset.accent = a.id;
+      b.style.background = a.color; b.title = a.id;
+      b.setAttribute('aria-label', a.id + ' accent');
+      b.addEventListener('click', function(){ studio.accent = a.id; renderStudio(); });
+      document.getElementById('cs-accents').appendChild(b);
+    });
+    FINISHES.forEach(function(f){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'cd-chip'; b.dataset.finish = f.id;
+      b.innerHTML = '<span class="sym">' + f.sym + '</span>' + f.label;
+      b.title = f.label + ' finish';
+      b.addEventListener('click', function(){ studio.finish = f.id; renderStudio(); });
+      document.getElementById('cs-finishes').appendChild(b);
+    });
+    GLYPHS.forEach(function(g){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'cd-glyph-btn'; b.dataset.glyph = g;
+      b.textContent = g; b.setAttribute('aria-label', 'glyph ' + g);
+      b.addEventListener('click', function(){ studio.glyph = g; renderStudio(); });
+      document.getElementById('cs-glyphs').appendChild(b);
+    });
+    OlogypediaCover.SWATCHES.forEach(function(s){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'cs-color-swatch'; b.dataset.hex = s.hex;
+      b.style.background = s.hex; b.title = s.id;
+      b.setAttribute('aria-label', s.id);
+      b.addEventListener('click', function(){
+        var l = studioSelected(); if (!l) return;
+        studioSnapshot(); l.color = s.hex; renderStudio();
+      });
+      document.getElementById('cs-layer-colors').appendChild(b);
+    });
+    var custom = document.createElement('input');
+    custom.type = 'color'; custom.className = 'cs-color-custom'; custom.value = '#8C3B4A';
+    custom.title = 'custom color';
+    var customSnapped = false;
+    custom.addEventListener('input', function(){
+      var l = studioSelected(); if (!l) return;
+      if (!customSnapped){ studioSnapshot(); customSnapped = true; }
+      l.color = custom.value; renderStudioStageOnly();
+    });
+    custom.addEventListener('change', function(){ customSnapped = false; });
+    document.getElementById('cs-layer-colors').appendChild(custom);
+  }
+
+  function renderStudio(){
+    studioCardEl.className = 'card63 acc-' + studio.accent + (studio.finish !== 'none' ? ' fx-' + studio.finish : '');
+    studioKickerEl.textContent = subjectEl.value.trim();
+    studioTitleEl.textContent = topicEl.value.trim() || 'Your Title';
+    studioBlurbEl.textContent = descEl.value.trim() || 'A one-line blurb appears here.';
+    studioGlyphEl.textContent = studio.glyph;
+    setActiveByData('cs-accents', 'accent', studio.accent);
+    setActiveByData('cs-finishes', 'finish', studio.finish);
+    setActiveByData('cs-glyphs', 'glyph', studio.glyph);
+
+    renderStudioStageOnly();
+    renderLayerList();
+    renderLayerPanel();
+    csUndoBtn.disabled = !studio.undoStack.length;
+    csRedoBtn.disabled = !studio.redoStack.length;
+  }
+  // just the draggable layers on the stage — used during live drag so we
+  // don't rebuild the whole rail (and lose focus/scroll) on every pointermove
+  function renderStudioStageOnly(){
+    studioLayersEl.innerHTML = '';
+    studio.layers.forEach(function(l){
+      if (l.hidden) return;
+      var wrap = document.createElement('div');
+      wrap.className = 'c-layer studio-layer' + (l.id === studio.selectedId ? ' selected' : '');
+      wrap.style.cssText = OlogypediaCover.outerStyle(l);
+      wrap.dataset.id = l.id;
+      if (l.kind === 'image'){
+        wrap.insertAdjacentHTML('beforeend', OlogypediaCover.imageInnerHTML(l));
+      } else {
+        var shape = document.createElement('div');
+        shape.className = 'c-layer-shape';
+        shape.style.cssText = OlogypediaCover.shapeInnerStyle(l);
+        wrap.appendChild(shape);
+      }
+      if (l.id === studio.selectedId){
+        var spin = document.createElement('div');
+        spin.className = 'c-layer-spin';
+        spin.addEventListener('pointerdown', function(e){ startLayerGesture(e, l, 'rotate'); });
+        wrap.appendChild(spin);
+        var handle = document.createElement('div');
+        handle.className = 'c-layer-handle';
+        handle.addEventListener('pointerdown', function(e){ startLayerGesture(e, l, 'resize'); });
+        wrap.appendChild(handle);
+      }
+      wrap.addEventListener('pointerdown', function(e){
+        if (e.target.classList.contains('c-layer-handle') || e.target.classList.contains('c-layer-spin')) return;
+        studio.selectedId = l.id;
+        startLayerGesture(e, l, 'move');
+      });
+      wrap.addEventListener('wheel', function(e){
+        e.preventDefault();
+        studio.selectedId = l.id;
+        studioSnapshot();
+        var step = e.deltaY < 0 ? 3 : -3;
+        l.size = Math.max(8, Math.min(98, l.size + step));
+        renderStudioStageOnly();
+        renderLayerPanel();
+        csUndoBtn.disabled = !studio.undoStack.length;
+      }, { passive: false });
+      studioLayersEl.appendChild(wrap);
+    });
+  }
+  function setActiveByData(containerId, attr, value){
+    var kids = document.getElementById(containerId).children;
+    for (var i = 0; i < kids.length; i++){
+      kids[i].classList.toggle('active', kids[i].dataset[attr] === value);
+    }
+  }
+
+  function renderLayerList(){
+    csLayerListEl.innerHTML = '';
+    var topFirst = studio.layers.slice().reverse();
+    csLayerCountEl.textContent = studio.layers.length;
+    csLayersEmptyEl.style.display = studio.layers.length ? 'none' : '';
+    topFirst.forEach(function(l){
+      var li = document.createElement('li');
+      li.className = 'cs-lrow' + (l.id === studio.selectedId ? ' selected' : '');
+      var eye = document.createElement('button');
+      eye.type = 'button'; eye.className = 'cs-eye' + (l.hidden ? ' off' : '');
+      eye.textContent = l.hidden ? '○' : '◉';
+      eye.title = l.hidden ? 'show' : 'hide';
+      eye.addEventListener('click', function(){ studioSnapshot(); l.hidden = !l.hidden; renderStudio(); });
+      var name = document.createElement('button');
+      name.type = 'button'; name.className = 'cs-lname';
+      var dot = document.createElement('span'); dot.className = 'swatch-dot';
+      if (l.kind === 'image'){
+        dot.style.backgroundImage = 'url("' + l.src + '")';
+        dot.style.backgroundSize = 'cover';
+        dot.style.backgroundPosition = 'center';
+      } else {
+        dot.style.background = l.color;
+      }
+      var text = document.createElement('span'); text.className = 'ltext';
+      text.textContent = l.kind === 'image' ? (l.name || 'Image') : (SHAPE_LABELS[l.kind] || l.kind);
+      name.appendChild(dot); name.appendChild(text);
+      name.addEventListener('click', function(){ studio.selectedId = l.id; renderStudio(); });
+      var acts = document.createElement('div'); acts.className = 'cs-lacts';
+      acts.appendChild(csIconBtn('↑', 'move up (toward front)', function(){ studioSnapshot(); moveLayer(l, 1); renderStudio(); }));
+      acts.appendChild(csIconBtn('↓', 'move down (toward back)', function(){ studioSnapshot(); moveLayer(l, -1); renderStudio(); }));
+      acts.appendChild(csIconBtn('⧉', 'duplicate', function(){
+        studioSnapshot();
+        var copy = JSON.parse(JSON.stringify(l));
+        copy.id = 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        copy.x = Math.min(0.92, l.x + 0.05); copy.y = Math.min(0.92, l.y + 0.05);
+        studio.layers.splice(studio.layers.indexOf(l) + 1, 0, copy);
+        studio.selectedId = copy.id;
+        renderStudio();
+      }));
+      var del = csIconBtn('✕', 'delete', function(){
+        studioSnapshot();
+        studio.layers.splice(studio.layers.indexOf(l), 1);
+        if (studio.selectedId === l.id) studio.selectedId = studio.layers.length ? studio.layers[studio.layers.length - 1].id : null;
+        renderStudio();
+      });
+      del.classList.add('del');
+      acts.appendChild(del);
+      li.appendChild(eye); li.appendChild(name); li.appendChild(acts);
+      csLayerListEl.appendChild(li);
+    });
+  }
+  function csIconBtn(glyph, label, fn){
+    var b = document.createElement('button');
+    b.type = 'button'; b.textContent = glyph; b.title = label; b.setAttribute('aria-label', label);
+    b.addEventListener('click', fn);
+    return b;
+  }
+  function moveLayer(layer, dir){
+    var i = studio.layers.indexOf(layer);
+    var j = i + dir;
+    if (j < 0 || j >= studio.layers.length) return;
+    studio.layers.splice(i, 1);
+    studio.layers.splice(j, 0, layer);
+  }
+
+  var csOpacityEl = document.getElementById('cs-opacity');
+  var csOpacityValEl = document.getElementById('cs-opacity-val');
+  var csRotationEl = document.getElementById('cs-rotation');
+  var csRotationValEl = document.getElementById('cs-rotation-val');
+  var csSizeEl = document.getElementById('cs-size');
+  var csSizeValEl = document.getElementById('cs-size-val');
+  var csThicknessFieldEl = document.getElementById('cs-thickness-field');
+  var csThicknessEl = document.getElementById('cs-thickness');
+  var csThicknessValEl = document.getElementById('cs-thickness-val');
+  var csBlendEl = document.getElementById('cs-blend');
+  var csColorFieldEl = document.getElementById('cs-color-field');
+  var csRenderFieldEl = document.getElementById('cs-render-field');
+  var csRenderEl = document.getElementById('cs-render');
+
+  function renderLayerPanel(){
+    var l = studioSelected();
+    csLayerPanelEl.style.display = l ? '' : 'none';
+    if (!l) return;
+    var isImage = l.kind === 'image';
+    // color is meaningless for a photograph; a "rendering" toggle takes its
+    // place, and ring-thickness only exists on rings
+    csColorFieldEl.style.display = isImage ? 'none' : '';
+    csRenderFieldEl.style.display = isImage ? '' : 'none';
+    if (isImage){
+      var smooth = l.smooth !== false;
+      Array.prototype.forEach.call(csRenderEl.children, function(btn){
+        btn.classList.toggle('active', (btn.dataset.smooth === '1') === smooth);
+      });
+    } else {
+      setActiveByHex('cs-layer-colors', l.color);
+    }
+    csOpacityEl.value = Math.round(l.opacity * 100);
+    csOpacityValEl.textContent = csOpacityEl.value + '%';
+    csRotationEl.value = l.rotation;
+    csRotationValEl.textContent = l.rotation + '°';
+    csSizeEl.value = l.size;
+    csSizeValEl.textContent = l.size + '%';
+    csThicknessFieldEl.style.display = l.kind === 'ring' ? '' : 'none';
+    csThicknessEl.value = l.thickness || 10;
+    csThicknessValEl.textContent = (l.thickness || 10) + 'px';
+    csBlendEl.value = l.blend || 'normal';
+  }
+  Array.prototype.forEach.call(csRenderEl.children, function(btn){
+    btn.addEventListener('click', function(){
+      var l = studioSelected(); if (!l || l.kind !== 'image') return;
+      studioSnapshot(); l.smooth = btn.dataset.smooth === '1'; renderStudio();
+    });
+  });
+  function setActiveByHex(containerId, hex){
+    var kids = document.getElementById(containerId).children;
+    for (var i = 0; i < kids.length; i++){
+      if (kids[i].dataset && kids[i].dataset.hex) kids[i].classList.toggle('active', kids[i].dataset.hex === hex);
+    }
+  }
+  function liveField(input, apply){
+    var snapped = false;
+    input.addEventListener('input', function(){
+      var l = studioSelected(); if (!l) return;
+      if (!snapped){ studioSnapshot(); snapped = true; }
+      apply(l, input);
+      renderStudioStageOnly();
+    });
+    input.addEventListener('change', function(){ snapped = false; });
+  }
+  liveField(csOpacityEl, function(l, input){ l.opacity = (+input.value) / 100; csOpacityValEl.textContent = input.value + '%'; });
+  liveField(csRotationEl, function(l, input){ l.rotation = +input.value; csRotationValEl.textContent = input.value + '°'; });
+  liveField(csSizeEl, function(l, input){ l.size = +input.value; csSizeValEl.textContent = input.value + '%'; });
+  liveField(csThicknessEl, function(l, input){ l.thickness = +input.value; csThicknessValEl.textContent = input.value + 'px'; });
+  csBlendEl.addEventListener('change', function(){
+    var l = studioSelected(); if (!l) return;
+    studioSnapshot(); l.blend = csBlendEl.value; renderStudioStageOnly();
+  });
+
+  // ── pointer-driven move / resize on the stage ──
+  var gesture = null; // { mode, layer, stageRect, startX, startY, startPX, startPY, startSize }
+  function startLayerGesture(e, layer, mode){
+    e.preventDefault(); e.stopPropagation();
+    studioSnapshot();
+    // the card is the real positioned box the layer percentages resolve
+    // against (#studio-layers is display:contents, so it has no box of its own)
+    var rect = studioCardEl.getBoundingClientRect();
+    gesture = {
+      mode: mode, layer: layer,
+      stageRect: rect,
+      startX: layer.x, startY: layer.y, startSize: layer.size, startRot: layer.rotation || 0,
+      startPX: e.clientX, startPY: e.clientY,
+      // layer centre in page coords, for angle-based rotation
+      cx: rect.left + layer.x * rect.width, cy: rect.top + layer.y * rect.height,
+      startAngle: 0
+    };
+    if (mode === 'rotate'){
+      gesture.startAngle = Math.atan2(e.clientY - gesture.cy, e.clientX - gesture.cx) * 180 / Math.PI;
+    }
+    if (e.target.setPointerCapture) { try { e.target.setPointerCapture(e.pointerId); } catch (err) {} }
+  }
+  document.addEventListener('pointermove', function(e){
+    if (!gesture) return;
+    var dx = e.clientX - gesture.startPX, dy = e.clientY - gesture.startPY;
+    var w = gesture.stageRect.width || 1, h = gesture.stageRect.height || 1;
+    if (gesture.mode === 'move'){
+      gesture.layer.x = clamp01(gesture.startX + dx / w);
+      gesture.layer.y = clamp01(gesture.startY + dy / h);
+    } else if (gesture.mode === 'rotate'){
+      var ang = Math.atan2(e.clientY - gesture.cy, e.clientX - gesture.cx) * 180 / Math.PI;
+      var next = Math.round(gesture.startRot + (ang - gesture.startAngle));
+      gesture.layer.rotation = ((next % 360) + 360) % 360;
+    } else {
+      var deltaPx = (dx + dy) / 2; // corner drag: down-right grows, up-left shrinks
+      var deltaPct = (deltaPx / w) * 100;
+      gesture.layer.size = Math.max(8, Math.min(98, gesture.startSize + deltaPct));
+    }
+    renderStudioStageOnly();
+  });
+  document.addEventListener('pointerup', function(){
+    if (gesture){ gesture = null; renderLayerPanel(); csUndoBtn.disabled = !studio.undoStack.length; }
+  });
+  function clamp01(n){ return Math.max(0.02, Math.min(0.98, n)); }
+
+  // ── image upload: drop a picture in as a new layer ──
+  var csDropEl = document.getElementById('cs-drop');
+  var csFileEl = document.getElementById('cs-file');
+  var csUploadErrEl = document.getElementById('cs-upload-err');
+  var uploadBusy = false;
+
+  function addImageFromFile(file){
+    if (!file || uploadBusy) return;
+    uploadBusy = true;
+    csUploadErrEl.textContent = '';
+    csDropEl.classList.add('busy');
+    OlogypediaCover.processImageFile(file).then(function(img){
+      studioSnapshot();
+      var layer = OlogypediaCover.newImageLayer(img.src, img.naturalW, img.naturalH, {
+        name: (file.name || 'Image').replace(/\.[a-z0-9]+$/i, '').slice(0, 40) || 'Image',
+        smooth: !img.pixelated
+      });
+      studio.layers.push(layer);
+      studio.selectedId = layer.id;
+      renderStudio();
+    }).catch(function(err){
+      csUploadErrEl.textContent = (err && err.message) || 'Could not add that image.';
+    }).then(function(){
+      uploadBusy = false;
+      csDropEl.classList.remove('busy');
+    });
+  }
+
+  csDropEl.addEventListener('click', function(){ csFileEl.click(); });
+  csFileEl.addEventListener('change', function(){
+    if (csFileEl.files && csFileEl.files[0]) addImageFromFile(csFileEl.files[0]);
+    csFileEl.value = '';
+  });
+  csDropEl.addEventListener('dragover', function(e){ e.preventDefault(); csDropEl.classList.add('dragging'); });
+  csDropEl.addEventListener('dragleave', function(){ csDropEl.classList.remove('dragging'); });
+  csDropEl.addEventListener('drop', function(e){
+    e.preventDefault(); csDropEl.classList.remove('dragging');
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) addImageFromFile(f);
+  });
+  // dropping anywhere on the open studio also works
+  studioEl.addEventListener('dragover', function(e){ if (e.dataTransfer) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+  studioEl.addEventListener('drop', function(e){
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f && /^image\//.test(f.type)){ e.preventDefault(); addImageFromFile(f); }
+  });
+
+  // ── studio chrome: bar buttons + keyboard ──
+  openStudioEl.addEventListener('click', openStudio);
+  document.getElementById('cs-close-btn').addEventListener('click', closeStudio);
+  document.getElementById('cs-save').addEventListener('click', saveStudio);
+  document.getElementById('cs-undo').addEventListener('click', studioUndo);
+  document.getElementById('cs-redo').addEventListener('click', studioRedo);
+  document.getElementById('cs-clear').addEventListener('click', function(){
+    if (!studio.layers.length) return;
+    if (!window.confirm('Remove all layers from this cover?')) return;
+    studioSnapshot();
+    studio.layers = [];
+    studio.selectedId = null;
+    renderStudio();
+  });
+  studioEl.addEventListener('keydown', function(e){
+    var tag = (e.target && e.target.tagName || '').toLowerCase();
+    var typing = tag === 'input' || tag === 'textarea' || tag === 'select';
+    if (e.key === 'Escape'){ e.stopPropagation(); closeStudio(); return; }
+    var mod = e.metaKey || e.ctrlKey;
+    if (mod && e.key.toLowerCase() === 'z'){
+      e.preventDefault();
+      if (e.shiftKey) studioRedo(); else studioUndo();
+      return;
+    }
+    if (typing) return;
+    var l = studioSelected();
+    if (!l) return;
+    if (e.key === 'Delete' || e.key === 'Backspace'){
+      e.preventDefault();
+      studioSnapshot();
+      studio.layers.splice(studio.layers.indexOf(l), 1);
+      studio.selectedId = studio.layers.length ? studio.layers[studio.layers.length - 1].id : null;
+      renderStudio();
+      return;
+    }
+    var step = e.shiftKey ? 0.03 : 0.006;
+    if (e.key === 'ArrowLeft'){ e.preventDefault(); studioSnapshot(); l.x = clamp01(l.x - step); renderStudioStageOnly(); }
+    else if (e.key === 'ArrowRight'){ e.preventDefault(); studioSnapshot(); l.x = clamp01(l.x + step); renderStudioStageOnly(); }
+    else if (e.key === 'ArrowUp'){ e.preventDefault(); studioSnapshot(); l.y = clamp01(l.y - step); renderStudioStageOnly(); }
+    else if (e.key === 'ArrowDown'){ e.preventDefault(); studioSnapshot(); l.y = clamp01(l.y + step); renderStudioStageOnly(); }
+  });
+
   // strip a leading ```html / ``` fence and a trailing ``` if the model added them
   function cleanedHTML(){
     var v = pasteEl.value.trim();
@@ -467,6 +1364,9 @@
     setChk('chk-doc', /<!doctype html|<html[\s>]/i.test(html));
     setChk('chk-fonts', html.toLowerCase().indexOf('/shared/fonts.css') !== -1);
     setChk('chk-blocks', /class="[^"]*(kicker-tag|sec-head|figure-box|ex-|pullquote|tagline|artifact-meta)/.test(html));
+    setChk('chk-noplaceholder', !/\{SLUG\}|\[TOPIC\]/.test(html));
+    setChk('chk-nopalette', html.toLowerCase().indexOf('/shared/palette.css') === -1);
+    setChk('chk-noscript', !/<script[\s>]/i.test(html));
   }
 
   function refreshPreview(){
@@ -480,6 +1380,7 @@
       addShelfEl.classList.add('is-disabled');
       if (lastBlobUrl){ URL.revokeObjectURL(lastBlobUrl); lastBlobUrl = null; }
       setChk('chk-doc', false); setChk('chk-fonts', false); setChk('chk-blocks', false);
+      setChk('chk-noplaceholder', false); setChk('chk-nopalette', false); setChk('chk-noscript', false);
       return;
     }
     updateChecks(html);
@@ -524,7 +1425,11 @@
     var slug = currentSlug();
     var title = topicEl.value.trim() || 'Untitled entry';
     var desc = descEl.value.trim();
-    var entry = { slug: slug, title: title, desc: desc, html: html, savedAt: Date.now() };
+    var subject = subjectEl.value.trim();
+    var entry = { slug: slug, title: title, subject: subject, desc: desc,
+      accent: cover.accent, finish: cover.finish, glyph: cover.glyph,
+      layers: JSON.parse(JSON.stringify(cover.layers || [])),
+      html: html, savedAt: Date.now() };
     var backup = shelf.slice();
     var existing = findEntry(slug);
     if (existing){ shelf[shelf.indexOf(existing)] = entry; }
@@ -542,9 +1447,16 @@
   function openEntry(slug){
     var e = findEntry(slug); if (!e) return;
     topicEl.value = e.title === 'Untitled entry' ? '' : e.title;
+    subjectEl.value = e.subject || '';
     descEl.value = e.desc || '';
+    cover.accent = (e.accent && ACCENT_IDS.indexOf(e.accent) >= 0) ? e.accent : 'rose';
+    cover.finish = e.finish || 'none';
+    cover.glyph = e.glyph || '✦';
+    cover.layers = JSON.parse(JSON.stringify(e.layers || []));
     pasteEl.value = e.html;
     buildPrompt();
+    updateCover();
+    updateSlugStatus();
     refreshPreview();
     showSave('Opened “' + e.title + '” — edit above, then Add to my textbook to save your changes.', false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -586,7 +1498,13 @@
     shelf.forEach(function(e, i){
       var li = document.createElement('li');
       var num = document.createElement('span'); num.className = 'shelf-num'; num.textContent = (i + 1);
+      var chip = document.createElement('span'); chip.className = 'shelf-cover';
+      var accHex = { rose:'#8C3B4A', sage:'#8FA37E', gold:'#C9A66B', dust:'#C77C8E', plum:'#6f4a63' };
+      chip.style.background = accHex[e.accent] || accHex.rose;
+      chip.textContent = e.glyph || '✦';
+      chip.title = (e.accent || 'rose') + (e.finish && e.finish !== 'none' ? ' · ' + e.finish : '');
       var meta = document.createElement('div'); meta.className = 'shelf-meta';
+      if (e.subject){ var k = document.createElement('div'); k.className = 'shelf-kicker'; k.textContent = e.subject; meta.appendChild(k); }
       var t = document.createElement('p'); t.className = 'shelf-title'; t.textContent = e.title;
       var f = document.createElement('div'); f.className = 'shelf-file'; f.textContent = 'textbook-' + e.slug + '.html';
       meta.appendChild(t); meta.appendChild(f);
@@ -595,25 +1513,20 @@
       acts.appendChild(iconBtn('↗', 'Preview in a new tab', function(){ previewEntry(e.slug); }));
       acts.appendChild(iconBtn('↓', 'Download this file', function(){ downloadEntry(e.slug); }));
       acts.appendChild(iconBtn('✕', 'Remove from textbook', function(){ removeEntry(e.slug); }, true));
-      li.appendChild(num); li.appendChild(meta); li.appendChild(acts);
+      li.appendChild(num); li.appendChild(chip); li.appendChild(meta); li.appendChild(acts);
       shelfListEl.appendChild(li);
     });
     var has = shelf.length > 0;
     shelfEl.classList.toggle('has-entries', has);
-    shelfActionsEl.style.display = has ? 'flex' : 'none';
     gridWrapEl.style.display = has ? '' : 'none';
     registerNoteEl.style.display = has ? '' : 'none';
     shelfToolsEl.style.display = has ? 'flex' : 'none';
     updateGrid();
   }
   function updateGrid(){
-    var start = parseInt(startAtEl.value, 10);
-    if (isNaN(start) || start < 1) start = 1;
-    gridOutputEl.value = shelf.map(function(e, i){
-      return cardFor(e.slug, e.title, e.desc, start + i);
-    }).join('\n');
+    gridOutputEl.value = shelf.map(function(e, i){ return bookFor(e, i); }).join('\n\n');
     gridCountEl.textContent = shelf.length;
-    gridPluralEl.textContent = shelf.length === 1 ? 'y' : 'ies';
+    gridPluralEl.textContent = shelf.length === 1 ? '' : 's';
   }
 
   function exportShelf(){
@@ -632,7 +1545,11 @@
       var added = 0;
       incoming.forEach(function(e){
         if (!e || !e.slug || !e.html) return;
-        var clean = { slug: e.slug, title: e.title || 'Untitled entry', desc: e.desc || '', html: e.html, savedAt: e.savedAt || Date.now() };
+        var clean = { slug: e.slug, title: e.title || 'Untitled entry', subject: e.subject || '', desc: e.desc || '',
+          accent: (e.accent && ACCENT_IDS.indexOf(e.accent) >= 0) ? e.accent : 'rose',
+          finish: e.finish || 'none', glyph: e.glyph || '✦',
+          layers: Array.isArray(e.layers) ? e.layers : [],
+          html: e.html, savedAt: e.savedAt || Date.now() };
         var existing = findEntry(clean.slug);
         if (existing){ shelf[shelf.indexOf(existing)] = clean; } else { shelf.push(clean); }
         added++;
@@ -652,24 +1569,33 @@
     showSave('Textbook cleared.', false);
   }
 
-  [topicEl, contextEl, descEl, diagnosisEl].forEach(function(el){
-    el.addEventListener('input', buildPrompt);
-    el.addEventListener('change', buildPrompt);
+  [topicEl, subjectEl, contextEl, descEl, diagnosisEl].forEach(function(el){
+    el.addEventListener('input', function(){ buildPrompt(); updateCover(); updateSlugStatus(); });
+    el.addEventListener('change', function(){ buildPrompt(); updateCover(); updateSlugStatus(); });
   });
   pasteEl.addEventListener('input', refreshPreview);
   openTabEl.addEventListener('click', function(){
     if (lastBlobUrl) window.open(lastBlobUrl, '_blank', 'noopener');
   });
   addShelfEl.addEventListener('click', addCurrentToShelf);
-  startAtEl.addEventListener('input', updateGrid);
   document.getElementById('export-shelf').addEventListener('click', exportShelf);
   document.getElementById('import-shelf').addEventListener('click', function(){ importFileEl.click(); });
   importFileEl.addEventListener('change', function(){ if (importFileEl.files[0]) importShelf(importFileEl.files[0]); importFileEl.value = ''; });
   document.getElementById('clear-shelf').addEventListener('click', clearShelf);
 
+  buildShapeButtons();
+  buildBaseControls();
   buildPrompt();
+  updateCover();
+  updateSlugStatus();
   refreshPreview();
   renderShelf();
+
+  // deep link from a draft book on the shelf: /add-page.html?open=<slug>
+  (function(){
+    var m = /[?&]open=([^&]+)/.exec(location.search);
+    if (m){ var slug = decodeURIComponent(m[1]); if (findEntry(slug)) openEntry(slug); }
+  })();
 
   function wireCopy(btnId, sourceEl){
     var btn = document.getElementById(btnId);

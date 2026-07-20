@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Textbook · Ologypedia</title>
+<meta name="description" content="A personal, editable textbook — read an entry, highlight a phrase, and grow it into its own linked page. Local-first, kept in one place.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="/shared/fonts.css">
+<style>
+  :root{
+    --paper:#FBF3EC; --paper-edge:#F3E6D9; --ink:#3D2B2B; --ink-soft:#6B5656;
+    --rose-deep:#8C3B4A; --rose-dust:#C77C8E; --blush:#F7DFE3; --lavender:#EAE0F2;
+    --gold:#C9A66B; --sage:#8FA37E; --seed:#a9b39a; --grown:#8FA37E;
+    --room:#E9DCCB; --room-edge:#dccbb4;
+    --shadow-1:0 2px 8px -4px rgba(78,47,42,.35);
+    --shadow-2:0 10px 30px -14px rgba(78,47,42,.5);
+    --focus-ring:0 0 0 2px var(--gold);
+    --motion:.16s;
+  }
+  [data-reduce-motion="1"]{ --motion:0s; }
+  @media(prefers-reduced-motion:reduce){ :root{ --motion:0s; } }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; font-family:var(--font-body); color:var(--ink); line-height:1.65;
+    background:
+      radial-gradient(120% 90% at 50% -10%, rgba(255,250,242,.7), transparent 55%),
+      linear-gradient(170deg, var(--room) 0%, var(--room-edge) 100%);
+    min-height:100vh; -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;}
+  button{font-family:inherit;}
+  ::selection{background:color-mix(in srgb, var(--blush) 70%, var(--gold)); color:var(--rose-deep);}
+
+  /* ============================ chrome ============================ */
+  .topbar{
+    position:sticky; top:0; z-index:40;
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    padding:12px 20px; background:color-mix(in srgb, var(--paper) 82%, transparent);
+    backdrop-filter:blur(8px); border-bottom:1px solid color-mix(in srgb, var(--gold) 45%, transparent);
+  }
+  .brand{display:flex; align-items:baseline; gap:10px; margin-right:auto; min-width:0;}
+  .brand .home{font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); text-decoration:none; border-bottom:1px dotted var(--rose-dust); padding-bottom:1px; white-space:nowrap;}
+  .brand .home:hover{color:var(--rose-deep);}
+  .brand h1{font-family:var(--font-display); font-weight:600; font-size:20px; color:var(--rose-deep); margin:0; white-space:nowrap;}
+  .brand .glyph{color:var(--gold);}
+  .saved{font-size:11.5px; color:var(--ink-soft); font-style:italic; min-width:96px; white-space:nowrap; transition:opacity var(--motion) ease;}
+  .saved b{font-style:normal; color:var(--sage); font-weight:600;}
+
+  .tb-btn{
+    display:inline-flex; align-items:center; gap:7px; cursor:pointer;
+    font-family:var(--font-body); font-size:13px; color:var(--rose-deep);
+    background:#fffdfa; border:1px solid var(--rose-dust); border-radius:999px;
+    padding:7px 14px; box-shadow:var(--shadow-1);
+    transition:transform var(--motion) ease, background var(--motion) ease, color var(--motion) ease, border-color var(--motion) ease;
+  }
+  .tb-btn:hover{background:var(--blush); transform:translateY(-1px);}
+  .tb-btn:focus-visible{outline:none; box-shadow:var(--focus-ring), var(--shadow-1);}
+  .tb-btn.primary{background:var(--rose-deep); color:var(--paper); border-color:var(--rose-deep);}
+  .tb-btn.primary:hover{background:color-mix(in srgb, var(--rose-deep) 88%, #000);}
+  .tb-btn.ghost{background:transparent; box-shadow:none; border-color:transparent; color:var(--ink-soft); padding:7px 8px;}
+  .tb-btn.ghost:hover{background:color-mix(in srgb, var(--blush) 60%, transparent); color:var(--rose-deep);}
+  .tb-btn[aria-pressed="true"]{background:var(--lavender); border-color:var(--rose-dust); color:var(--rose-deep);}
+  .tb-btn .glyph{font-size:15px; line-height:1;}
+
+  .toolset{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .more-wrap{position:relative;}
+  .more-menu{position:absolute; right:0; top:calc(100% + 6px); z-index:50; display:none; flex-direction:column; min-width:186px; background:#fffdfa; border:1px solid var(--rose-dust); border-radius:11px; padding:6px; box-shadow:var(--shadow-2);}
+  .more-menu.open{display:flex;}
+  .more-item{display:flex; align-items:center; gap:10px; text-align:left; cursor:pointer; background:transparent; border:none; border-radius:7px; padding:8px 10px; font-family:var(--font-body); font-size:13.5px; color:var(--ink);}
+  .more-item:hover{background:var(--blush); color:var(--rose-deep);}
+  .more-item:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+  .more-item.danger{color:var(--rose-deep);}
+  .more-item.danger:hover{background:#f6dede;}
+  .more-item .ic{flex:none; width:18px; text-align:center; color:var(--rose-dust);}
+
+  /* ============================ layout ============================ */
+  .shell{display:grid; grid-template-columns:290px minmax(0,1fr); gap:0; min-height:calc(100vh - 57px);}
+  body[data-focus="1"] .shell{grid-template-columns:0 minmax(0,1fr);}
+  body[data-focus="1"] .sidebar{transform:translateX(-100%); opacity:0; pointer-events:none;}
+
+  /* ============================ sidebar (the index) ============================ */
+  .sidebar{
+    position:relative; border-right:1px solid color-mix(in srgb, var(--gold) 40%, transparent);
+    padding:18px 16px 40px; overflow-y:auto; max-height:calc(100vh - 57px); position:sticky; top:57px;
+    background:color-mix(in srgb, var(--paper) 55%, transparent);
+    transition:transform var(--motion) ease, opacity var(--motion) ease;
+  }
+  .idx-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
+  .idx-head .eyebrow{font-family:var(--font-display); font-weight:600; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--rose-dust);}
+  .idx-count{font-size:11px; color:var(--ink-soft);}
+  .idx-search{width:100%; font-family:var(--font-body); font-size:13.5px; color:var(--ink); background:#fffdfa; border:1px solid var(--rose-dust); border-radius:999px; padding:8px 14px; margin-bottom:12px; box-shadow:inset 0 1px 2px rgba(78,47,42,.06);}
+  .idx-search:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+  .idx-new{width:100%; margin-bottom:14px; justify-content:center;}
+
+  .idx-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px;}
+  .idx-item{
+    display:flex; align-items:center; gap:10px; width:100%; text-align:left; cursor:pointer;
+    background:transparent; border:1px solid transparent; border-radius:9px; padding:9px 11px;
+    color:var(--ink); transition:background var(--motion) ease, border-color var(--motion) ease;
+  }
+  .idx-item:hover{background:#fffdfa; border-color:var(--paper-edge);}
+  .idx-item:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+  .idx-item.active{background:#fffdfa; border-color:var(--rose-dust); box-shadow:var(--shadow-1);}
+  .idx-dot{flex:none; width:9px; height:9px; border-radius:50%; background:var(--seed); box-shadow:0 0 0 2px color-mix(in srgb, var(--seed) 30%, transparent);}
+  .idx-item[data-status="growing"] .idx-dot{background:var(--gold); box-shadow:0 0 0 2px color-mix(in srgb, var(--gold) 30%, transparent);}
+  .idx-item[data-status="grown"] .idx-dot{background:var(--grown); box-shadow:0 0 0 2px color-mix(in srgb, var(--grown) 30%, transparent);}
+  .idx-body{flex:1 1 auto; min-width:0;}
+  .idx-title{font-family:var(--font-display); font-weight:600; font-size:14.5px; color:var(--rose-deep); line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .idx-sub{font-size:11px; color:var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .idx-links{flex:none; font-size:10.5px; color:var(--ink-soft); display:flex; align-items:center; gap:3px;}
+  .idx-empty{font-size:12.5px; font-style:italic; color:var(--ink-soft); padding:16px 6px; text-align:center;}
+  .idx-legend{margin-top:20px; padding-top:14px; border-top:1px dotted var(--rose-dust); display:flex; flex-direction:column; gap:6px; font-size:11px; color:var(--ink-soft);}
+  .idx-legend .row{display:flex; align-items:center; gap:8px;}
+  .idx-legend .idx-dot{width:8px; height:8px;}
+
+  /* ============================ the reading pane ============================ */
+  .pane-scroll{overflow-y:auto; max-height:calc(100vh - 57px);}
+  .pane{max-width:760px; margin:0 auto; padding:26px 30px 120px;}
+  body[data-focus="1"] .pane{max-width:720px;}
+
+  .breadcrumb{display:flex; align-items:center; flex-wrap:wrap; gap:4px; margin-bottom:16px; font-size:12px; color:var(--ink-soft); min-height:18px;}
+  .breadcrumb .crumb{cursor:pointer; background:none; border:none; padding:2px 4px; color:var(--ink-soft); font-family:var(--font-body); font-size:12px; border-radius:5px;}
+  .breadcrumb .crumb:hover{color:var(--rose-deep); background:color-mix(in srgb, var(--blush) 60%, transparent);}
+  .breadcrumb .crumb.here{color:var(--rose-deep); font-weight:600; cursor:default;}
+  .breadcrumb .sep{color:var(--gold);}
+
+  .entry-head{margin-bottom:8px;}
+  .entry-kicker{
+    display:inline-block; font-family:var(--font-display); font-weight:600; letter-spacing:.14em; font-size:11.5px;
+    text-transform:uppercase; color:var(--rose-deep); border:1px solid var(--rose-dust); border-radius:999px;
+    padding:3px 13px; background:var(--blush); min-width:40px; outline:none;
+  }
+  body[data-mode="edit"] .entry-kicker:empty::before{content:'Subject · subdomain'; color:var(--rose-dust); opacity:.7;}
+  body[data-mode="read"] .entry-kicker:empty{display:none;}
+  .entry-kicker[contenteditable="true"]:focus-visible{box-shadow:var(--focus-ring);}
+  .entry-title{
+    font-family:var(--font-display); font-weight:600; font-size:clamp(30px,5vw,42px); color:var(--rose-deep);
+    margin:12px 0 6px; line-height:1.06; outline:none;
+  }
+  .entry-title[contenteditable="true"]:focus-visible{box-shadow:var(--focus-ring); border-radius:4px;}
+  .entry-meta{display:flex; align-items:center; flex-wrap:wrap; gap:10px 14px; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--rose-dust);}
+  .status-pill{
+    display:inline-flex; align-items:center; gap:7px; cursor:pointer; font-size:12px; color:var(--ink-soft);
+    background:#fffdfa; border:1px solid var(--paper-edge); border-radius:999px; padding:4px 11px;
+    transition:border-color var(--motion) ease;
+  }
+  .status-pill:hover{border-color:var(--rose-dust);}
+  .status-pill:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+  .status-pill .idx-dot{width:8px; height:8px;}
+  .status-pill .lbl{font-weight:600; color:var(--ink);}
+  .meta-note{font-size:11.5px; color:var(--ink-soft); font-style:italic;}
+
+  /* the optional Cover control — how this entry looks on the bookshelf */
+  .cover-wrap{position:relative;}
+  #cover-dot{background:var(--rose-deep);}
+  .cover-pop{position:absolute; left:0; top:calc(100% + 8px); z-index:55; display:none; width:280px; max-width:86vw; background:#fffdfa; border:1px solid var(--rose-dust); border-radius:12px; padding:14px 15px; box-shadow:var(--shadow-2);}
+  .cover-pop.open{display:block;}
+  .cp-title{font-family:var(--font-display); font-weight:600; font-size:13px; letter-spacing:.06em; text-transform:uppercase; color:var(--rose-deep); margin-bottom:10px;}
+  .cp-preview{height:60px; border-radius:8px; display:flex; align-items:center; justify-content:center; margin-bottom:12px; border:1px solid color-mix(in srgb, var(--cp-dc, var(--rose-deep)) 40%, var(--gold)); background:radial-gradient(ellipse 80% 70% at 50% 40%, color-mix(in srgb, var(--cp-dc, var(--rose-deep)) 16%, #fffdfa), var(--paper) 72%);}
+  .cp-pv-glyph{font-family:var(--font-display); font-size:24px; color:color-mix(in srgb, var(--cp-dc, var(--rose-deep)) 82%, var(--rose-deep));}
+  .cp-label{font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-soft); margin:0 0 6px;}
+  .cp-label span{text-transform:none; letter-spacing:0; font-style:italic;}
+  .cp-swatches{display:flex; gap:8px; margin-bottom:12px;}
+  .cp-sw{width:26px; height:26px; border-radius:50%; cursor:pointer; border:2px solid transparent; box-shadow:inset 0 0 0 1px rgba(255,255,255,.5); padding:0;}
+  .cp-sw[aria-pressed="true"]{border-color:var(--ink); box-shadow:inset 0 0 0 1px rgba(255,255,255,.7), 0 0 0 2px color-mix(in srgb, var(--gold) 60%, transparent);}
+  .cp-sw:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+  .cp-glyphs{display:flex; flex-wrap:wrap; gap:5px; margin-bottom:8px;}
+  .cp-gl{width:28px; height:28px; border-radius:7px; cursor:pointer; border:1px solid var(--paper-edge); background:#fff; font-size:15px; color:var(--rose-deep); display:flex; align-items:center; justify-content:center; padding:0;}
+  .cp-gl:hover{background:var(--blush);}
+  .cp-gl[aria-pressed="true"]{background:var(--blush); border-color:var(--rose-dust); box-shadow:inset 0 0 0 1px var(--rose-dust);}
+  .cp-gl:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+  .cp-glyph-input{width:100%; font-family:var(--font-body); font-size:13px; color:var(--ink); background:#fff; border:1px solid var(--paper-edge); border-radius:7px; padding:6px 10px; margin-bottom:12px;}
+  .cp-glyph-input:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+  .cp-blurb{width:100%; font-family:var(--font-body); font-size:13px; line-height:1.5; color:var(--ink); background:#fff; border:1px solid var(--paper-edge); border-radius:7px; padding:8px 10px; resize:vertical; margin-bottom:8px;}
+  .cp-blurb:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+  .cp-foot{display:flex; align-items:center; gap:10px;}
+  .cp-hint{flex:1; font-size:11px; color:var(--ink-soft); font-style:italic; line-height:1.35;}
+  .cp-foot .tb-btn{padding:6px 14px;}
+
+  /* the editing toolbar (edit mode only) */
+  .fmt-bar{display:none; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:16px; padding:8px 10px; background:#fffdfa; border:1px solid var(--paper-edge); border-radius:10px; box-shadow:var(--shadow-1);}
+  body[data-mode="edit"] .fmt-bar{display:flex;}
+  .fmt-btn{cursor:pointer; font-family:var(--font-body); font-size:13px; color:var(--ink); background:transparent; border:1px solid transparent; border-radius:7px; padding:5px 10px; min-width:32px;}
+  .fmt-btn:hover{background:var(--blush); color:var(--rose-deep);}
+  .fmt-btn:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+  .fmt-btn b,.fmt-btn i{pointer-events:none;}
+  .fmt-sep{width:1px; align-self:stretch; background:var(--paper-edge); margin:2px 2px;}
+  .fmt-hint{font-size:11.5px; color:var(--ink-soft); font-style:italic; margin-left:auto;}
+
+  /* the content itself — the ologypedia block voice, made writable */
+  .entry-content{font-size:16.5px; line-height:1.75; color:var(--ink); outline:none; min-height:40px;}
+  .entry-content[contenteditable="true"]{cursor:text;}
+  .entry-content:focus-visible{outline:none;}
+  .entry-content > *:first-child{margin-top:0;}
+  .entry-content p{margin:0 0 1.05em;}
+  .entry-content .entry-intro,.entry-content > p.lede{font-size:17.5px; color:var(--ink-soft); line-height:1.8;}
+  .entry-content h2,.entry-content h3{
+    font-family:var(--font-display); font-weight:600; font-size:20px; letter-spacing:.03em; color:var(--rose-deep);
+    text-transform:uppercase; margin:1.5em 0 .5em; padding-bottom:8px; border-bottom:1px solid var(--rose-dust);
+  }
+  .entry-content h4{font-family:var(--font-display); font-weight:600; font-size:16px; color:var(--rose-deep); margin:1.3em 0 .4em;}
+  .entry-content .sec-head{display:flex; align-items:center; gap:12px; margin:1.5em 0 .55em; border:none; padding:0;}
+  .entry-content .sec-head .num{flex:none; width:30px; height:30px; border-radius:50%; background:var(--rose-deep); color:var(--paper); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:600; font-size:15px;}
+  .entry-content .sec-head h3{margin:0; padding-bottom:8px; flex:1; border-bottom:1px solid var(--rose-dust); font-size:19px;}
+  .entry-content blockquote,.entry-content .pullquote{
+    margin:1.3em 0; padding:16px 24px; text-align:center; background:var(--blush); border:1px solid var(--rose-dust);
+    border-radius:8px; font-family:var(--font-display); font-style:italic; font-size:19px; color:var(--rose-deep);
+  }
+  .entry-content blockquote::before,.entry-content .pullquote::before{content:"✦"; display:block; color:var(--gold); margin-bottom:6px; font-style:normal; font-size:15px;}
+  .entry-content ul,.entry-content ol{margin:0 0 1.1em; padding-left:24px;}
+  .entry-content li{margin-bottom:.4em;}
+  .entry-content strong,.entry-content b{color:var(--rose-deep);}
+  .entry-content hr{border:none; border-top:1px dotted var(--rose-dust); margin:1.6em 0;}
+  .entry-content code{background:var(--paper-edge); padding:1px 6px; border-radius:4px; font-size:.92em;}
+  .entry-content mark,.entry-content .entry-highlight{background:color-mix(in srgb, var(--gold) 40%, #fff6dd); padding:.05em .15em; border-radius:3px; color:inherit;}
+
+  /* the links between entries — the stitching */
+  .entry-link{
+    color:var(--rose-deep); text-decoration:none; cursor:pointer;
+    background:linear-gradient(color-mix(in srgb, var(--gold) 42%, transparent), color-mix(in srgb, var(--gold) 42%, transparent)) 0 88%/100% 2px no-repeat;
+    padding:0 1px; border-radius:2px; transition:background-color var(--motion) ease;
+  }
+  .entry-link:hover{background-color:var(--blush);}
+  .entry-link.is-broken{color:var(--rose-dust); background-image:linear-gradient(color-mix(in srgb, var(--rose-dust) 55%, transparent), color-mix(in srgb, var(--rose-dust) 55%, transparent)); background-size:100% 1px; background-repeat:repeat-x; background-position:0 92%; border-bottom:1px dashed var(--rose-dust);}
+  .entry-link.is-broken::after{content:'+'; font-size:.7em; vertical-align:super; color:var(--rose-dust); margin-left:1px;}
+  body[data-mode="read"] .entry-content .entry-link{cursor:alias;}
+
+  /* the placeholder scaffold shown inside a fresh seed */
+  .entry-content:empty::before,.entry-content .scaffold{color:var(--ink-soft); font-style:italic;}
+
+  /* footer: the connections */
+  .connections{margin-top:44px; padding-top:22px; border-top:1px solid var(--rose-dust); display:grid; grid-template-columns:1fr 1fr; gap:22px;}
+  @media(max-width:620px){ .connections{grid-template-columns:1fr;} }
+  .conn h5{font-family:var(--font-display); font-weight:600; letter-spacing:.06em; font-size:13px; text-transform:uppercase; color:var(--rose-deep); margin:0 0 10px; display:flex; align-items:center; gap:7px;}
+  .conn h5 .n{font-size:11px; color:var(--paper); background:var(--rose-dust); border-radius:999px; padding:1px 8px; font-family:var(--font-body);}
+  .conn-list{display:flex; flex-wrap:wrap; gap:7px;}
+  .conn-chip{cursor:pointer; font-family:var(--font-body); font-size:13px; color:var(--ink); background:#fffdfa; border:1px solid var(--rose-dust); border-radius:999px; padding:5px 13px; display:inline-flex; align-items:center; gap:6px; transition:background var(--motion) ease;}
+  .conn-chip:hover{background:var(--lavender);}
+  .conn-chip:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+  .conn-chip .idx-dot{width:7px; height:7px;}
+  .conn-empty{font-size:12.5px; color:var(--ink-soft); font-style:italic;}
+
+  /* the "try it" coach note on the sample entry */
+  .coach{
+    margin:0 0 22px; padding:14px 18px; background:#fffdfa; border:1px dashed var(--gold); border-radius:10px;
+    display:flex; gap:14px; align-items:flex-start; font-size:14px; box-shadow:var(--shadow-1);
+  }
+  .coach .spark{flex:none; font-size:20px; color:var(--gold); line-height:1.3;}
+  .coach p{margin:0 0 4px;}
+  .coach .k{display:inline-block; font-family:var(--font-display); font-weight:600; color:var(--rose-deep); background:var(--blush); border:1px solid var(--rose-dust); border-radius:5px; padding:0 6px;}
+  .coach .dismiss{margin-left:auto; flex:none; background:none; border:none; cursor:pointer; color:var(--ink-soft); font-size:18px; line-height:1; padding:2px 4px; border-radius:5px;}
+  .coach .dismiss:hover{color:var(--rose-deep); background:var(--blush);}
+
+  /* ============================ the selection menu ============================ */
+  .sel-menu{
+    position:absolute; z-index:60; display:none; flex-direction:column; gap:1px; min-width:210px;
+    background:#fffdfa; border:1px solid var(--rose-dust); border-radius:11px; padding:6px;
+    box-shadow:var(--shadow-2); font-size:13.5px;
+  }
+  .sel-menu.open{display:flex;}
+  .sel-menu .sel-head{padding:5px 9px 6px; font-size:11px; color:var(--ink-soft); border-bottom:1px dotted var(--paper-edge); margin-bottom:3px; line-height:1.4;}
+  .sel-menu .sel-head b{color:var(--rose-deep); font-style:normal;}
+  .sel-btn{display:flex; align-items:center; gap:10px; width:100%; text-align:left; cursor:pointer; background:transparent; border:none; border-radius:7px; padding:8px 9px; color:var(--ink); font-family:var(--font-body); font-size:13.5px;}
+  .sel-btn:hover{background:var(--blush); color:var(--rose-deep);}
+  .sel-btn:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+  .sel-btn .ic{flex:none; width:20px; text-align:center; color:var(--rose-deep); font-size:15px;}
+  .sel-btn .sub{display:block; font-size:11px; color:var(--ink-soft);}
+  .sel-btn .kbd{margin-left:auto; font-size:10.5px; color:var(--ink-soft); border:1px solid var(--paper-edge); border-radius:4px; padding:1px 5px;}
+  .sel-existing{max-height:150px; overflow-y:auto; margin-top:3px; border-top:1px dotted var(--paper-edge); padding-top:3px; display:none;}
+  .sel-existing.open{display:block;}
+  .sel-existing .sel-btn .ic{color:var(--gold);}
+
+  /* ============================ toast ============================ */
+  .toast-wrap{position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:80; display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none;}
+  .toast{
+    pointer-events:auto; background:var(--ink); color:var(--paper); border-radius:10px; padding:11px 16px; font-size:13.5px;
+    box-shadow:var(--shadow-2); display:flex; align-items:center; gap:14px; max-width:90vw;
+    animation:toast-in var(--motion) ease;
+  }
+  @keyframes toast-in{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;}}
+  [data-reduce-motion="1"] .toast{animation:none;}
+  .toast .glyph{color:var(--gold);}
+  .toast button{background:none; border:none; color:var(--gold); cursor:pointer; font-family:inherit; font-size:13px; font-weight:600; padding:2px 4px; border-radius:5px;}
+  .toast button:hover{text-decoration:underline;}
+
+  /* ============================ help sheet ============================ */
+  .sheet-back{position:fixed; inset:0; z-index:90; background:rgba(61,43,43,.4); display:none; align-items:flex-start; justify-content:center; padding:40px 18px; overflow-y:auto;}
+  .sheet-back.open{display:flex;}
+  .sheet{background:var(--paper); border:1px solid var(--gold); border-radius:14px; max-width:560px; width:100%; padding:26px 30px 30px; box-shadow:var(--shadow-2);}
+  .sheet h2{font-family:var(--font-display); font-weight:600; font-size:26px; color:var(--rose-deep); margin:0 0 4px;}
+  .sheet .lede{color:var(--ink-soft); margin:0 0 20px; font-size:14.5px;}
+  .sheet ol{margin:0 0 18px; padding-left:20px;}
+  .sheet li{margin-bottom:12px; font-size:14.5px;}
+  .sheet li b{color:var(--rose-deep);}
+  .sheet .k{display:inline-block; font-family:var(--font-display); font-weight:600; color:var(--rose-deep); background:var(--blush); border:1px solid var(--rose-dust); border-radius:5px; padding:0 6px;}
+  .sheet .close-row{display:flex; justify-content:flex-end; gap:10px;}
+  .sheet .care{background:#fffdfa; border:1px solid var(--paper-edge); border-radius:10px; padding:14px 16px; font-size:13.5px; color:var(--ink-soft); margin:0 0 20px;}
+  .sheet .care b{color:var(--rose-deep);}
+
+  .file-hidden{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;}
+
+  @media(max-width:760px){
+    .shell{grid-template-columns:1fr;}
+    .sidebar{position:relative; top:0; max-height:none; border-right:none; border-bottom:1px solid color-mix(in srgb, var(--gold) 40%, transparent);}
+    body[data-focus="1"] .sidebar{transform:none; opacity:1; pointer-events:auto;}
+    body[data-focus="1"] .shell{grid-template-columns:1fr;}
+    .pane-scroll{max-height:none;}
+    .pane{padding:20px 18px 100px;}
+    .saved{display:none;}
+  }
+</style>
+</head>
+<body data-mode="read" data-focus="0">
+
+  <header class="topbar">
+    <div class="brand">
+      <a class="home" href="/ologypedia">&larr; Ologypedia</a>
+      <h1><span class="glyph">✦</span> My Textbook</h1>
+    </div>
+    <span class="saved" id="saved" aria-live="polite"></span>
+    <div class="toolset">
+      <button class="tb-btn" id="mode-toggle" aria-pressed="false" title="Switch between reading and building this entry"><span class="glyph" id="mode-glyph">✎</span> <span id="mode-label">Edit</span></button>
+      <button class="tb-btn ghost" id="focus-toggle" aria-pressed="false" title="Hide the index and everything but this one page">Focus</button>
+      <button class="tb-btn ghost" id="motion-toggle" aria-pressed="false" title="Turn off animations and motion">Calm motion</button>
+      <div class="more-wrap">
+        <button class="tb-btn ghost" id="menu-more" aria-haspopup="true" aria-expanded="false" title="Export, import, or reset your textbook" aria-label="More">&#8942;</button>
+        <div class="more-menu" id="more-menu" role="menu">
+          <button class="more-item" id="more-export" role="menuitem"><span class="ic">&#8595;</span> Export as a file</button>
+          <button class="more-item" id="more-import" role="menuitem"><span class="ic">&#8593;</span> Import a file&hellip;</button>
+          <button class="more-item danger" id="more-reset" role="menuitem"><span class="ic">&#8635;</span> Reset to the sample</button>
+        </div>
+      </div>
+      <button class="tb-btn ghost" id="help-btn" title="How the textbook works" aria-label="Help">?</button>
+    </div>
+  </header>
+
+  <div class="shell">
+    <aside class="sidebar" id="sidebar" aria-label="Textbook index">
+      <div class="idx-head">
+        <span class="eyebrow">The Index</span>
+        <span class="idx-count" id="idx-count"></span>
+      </div>
+      <input type="search" class="idx-search" id="idx-search" placeholder="Search your entries&hellip;" aria-label="Search entries">
+      <button class="tb-btn idx-new" id="idx-new"><span class="glyph">+</span> New blank entry</button>
+      <ul class="idx-list" id="idx-list"></ul>
+      <div class="idx-empty" id="idx-empty" hidden>No entries match.</div>
+      <div class="idx-legend">
+        <div class="row"><span class="idx-dot" style="background:var(--seed)"></span> Seed — a title and a link, nothing more yet</div>
+        <div class="row"><span class="idx-dot" style="background:var(--gold)"></span> Growing — you've started building it out</div>
+        <div class="row"><span class="idx-dot" style="background:var(--grown)"></span> Grown — you've called it done</div>
+      </div>
+    </aside>
+
+    <div class="pane-scroll">
+      <main class="pane" id="pane">
+
+        <nav class="breadcrumb" id="breadcrumb" aria-label="Trail"></nav>
+
+        <div class="coach" id="coach" hidden>
+          <span class="spark">✦</span>
+          <div>
+            <p><b>The one move worth learning.</b> Select any phrase below &mdash; try the words <span class="k">Season&nbsp;1</span> &mdash; and choose <span class="k">✦ New entry</span>. It becomes its own page, pre-titled and linked, and you can build it out whenever. Nothing is lost by starting one.</p>
+            <p style="margin:0; color:var(--ink-soft); font-size:12.5px;">You never have to leave this page to make one. Your trail up top always brings you back.</p>
+          </div>
+          <button class="dismiss" id="coach-dismiss" aria-label="Dismiss tip" title="Dismiss">&times;</button>
+        </div>
+
+        <header class="entry-head">
+          <span class="entry-kicker" id="entry-kicker" aria-label="Subject"></span>
+          <h1 class="entry-title" id="entry-title"></h1>
+        </header>
+        <div class="entry-meta">
+          <button class="status-pill" id="status-pill" title="Click to change how far along this entry is">
+            <span class="idx-dot"></span><span>Status: <span class="lbl" id="status-lbl">Seed</span></span>
+          </button>
+          <div class="cover-wrap">
+            <button class="status-pill" id="cover-btn" aria-haspopup="dialog" aria-expanded="false" title="How this entry looks on the bookshelf">
+              <span class="idx-dot" id="cover-dot"></span><span>Cover</span>
+            </button>
+            <div class="cover-pop" id="cover-pop" role="dialog" aria-label="Bookshelf cover">
+              <div class="cp-title">On the bookshelf</div>
+              <div class="cp-preview" id="cp-preview"><span class="cp-pv-glyph" id="cp-pv-glyph">✦</span></div>
+              <p class="cp-label">Colour</p>
+              <div class="cp-swatches" id="cp-swatches"></div>
+              <p class="cp-label">Emblem</p>
+              <div class="cp-glyphs" id="cp-glyphs"></div>
+              <input class="cp-glyph-input" id="cp-glyph-input" maxlength="2" placeholder="or type your own" aria-label="Custom emblem">
+              <p class="cp-label">Shelf blurb <span>optional</span></p>
+              <textarea class="cp-blurb" id="cp-blurb" rows="3" aria-label="Shelf blurb"></textarea>
+              <div class="cp-foot">
+                <span class="cp-hint" id="cp-hint">Left blank, it’s taken from your opening lines.</span>
+                <button class="tb-btn" id="cp-done">Done</button>
+              </div>
+            </div>
+          </div>
+          <span class="meta-note" id="edited-note"></span>
+        </div>
+
+        <div class="fmt-bar" id="fmt-bar" aria-label="Formatting">
+          <button class="fmt-btn" data-cmd="bold" title="Bold (Ctrl/Cmd+B)"><b>B</b></button>
+          <button class="fmt-btn" data-cmd="italic" title="Italic (Ctrl/Cmd+I)"><i>I</i></button>
+          <span class="fmt-sep"></span>
+          <button class="fmt-btn" data-cmd="h3" title="Section heading">H</button>
+          <button class="fmt-btn" data-cmd="quote" title="Pull-quote">&ldquo;&rdquo;</button>
+          <button class="fmt-btn" data-cmd="ul" title="Bulleted list">&bull; List</button>
+          <span class="fmt-sep"></span>
+          <button class="fmt-btn" data-cmd="link" title="Link selection to another entry">&#128279; Link</button>
+          <span class="fmt-hint">Select text for the ✦ menu anywhere &mdash; even while reading.</span>
+        </div>
+
+        <div class="entry-content" id="entry-content"></div>
+
+        <footer class="connections" id="connections">
+          <div class="conn">
+            <h5>Leads to <span class="n" id="out-n">0</span></h5>
+            <div class="conn-list" id="out-list"></div>
+            <div class="conn-empty" id="out-empty">Highlight a phrase to grow a link from here.</div>
+          </div>
+          <div class="conn">
+            <h5>Linked from <span class="n" id="back-n">0</span></h5>
+            <div class="conn-list" id="back-list"></div>
+            <div class="conn-empty" id="back-empty">No other entry points here yet.</div>
+          </div>
+        </footer>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- floating selection menu -->
+  <div class="sel-menu" id="sel-menu" role="menu" aria-label="Selection actions">
+    <div class="sel-head">From &ldquo;<b id="sel-text"></b>&rdquo;</div>
+    <button class="sel-btn" id="sel-new-open" role="menuitem">
+      <span class="ic">✦</span>
+      <span>New entry &amp; open<span class="sub">Make its page and go build it out</span></span>
+      <span class="kbd" id="sel-kbd">⌘E</span>
+    </button>
+    <button class="sel-btn" id="sel-new-stay" role="menuitem">
+      <span class="ic">⋆</span>
+      <span>Seed it &amp; stay here<span class="sub">Just plant the link, keep your place</span></span>
+    </button>
+    <button class="sel-btn" id="sel-link" role="menuitem">
+      <span class="ic">&#128279;</span>
+      <span>Link to an existing entry<span class="sub">Point this phrase at a page you already have</span></span>
+    </button>
+    <button class="sel-btn" id="sel-mark" role="menuitem">
+      <span class="ic">✎</span>
+      <span>Highlight<span class="sub">Mark it to come back to &mdash; no page made</span></span>
+    </button>
+    <div class="sel-existing" id="sel-existing"></div>
+  </div>
+
+  <!-- toasts -->
+  <div class="toast-wrap" id="toast-wrap" aria-live="polite"></div>
+
+  <!-- help / colophon sheet -->
+  <div class="sheet-back" id="sheet-back" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <div class="sheet">
+      <h2 id="sheet-title">A textbook you grow</h2>
+      <p class="lede">This is one book, kept in your browser, that gets deeper the more you read. There's no blank page to face and no order you have to follow &mdash; you follow your own curiosity and the links catch up.</p>
+      <ol>
+        <li><b>Read an entry.</b> Pick anything from the index on the left, or follow a link inside a page.</li>
+        <li><b>Highlight to go deeper.</b> Select any phrase &mdash; a name, a season, a term &mdash; and a small ✦ menu appears. Choose <b>New entry</b> and that phrase becomes its own page, already titled and already linked back to where you found it.</li>
+        <li><b>Build it out whenever.</b> A new page starts as a <b>seed</b> &mdash; that's a real, finished thing to be, not a chore. Come back and grow it when you want. Hit <span class="k">Edit</span> to write, or just keep reading.</li>
+        <li><b>Never lose your place.</b> The <b>trail</b> at the top of each page is the path you took to get there; click any step to walk back. Everything saves itself as you go.</li>
+      </ol>
+      <div class="care">
+        <b>Made to be low-friction on purpose.</b> Starting a page never forces you to finish it, and never makes you leave the one you're on. Motion can be turned off (<b>Calm motion</b>), the room can be quieted down to one page (<b>Focus</b>), and the shape of every page is the same so nothing surprises you. Deep dives are the point, not a detour.
+      </div>
+      <div class="close-row">
+        <button class="tb-btn primary" id="sheet-close">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="import-file" class="file-hidden" accept="application/json,.json" aria-hidden="true">
+
+<script>
+(function(){
+  'use strict';
+
+  /* ======================================================================
+     the textbook is stored as ONE versioned blob — the unit you'd sync.
+     stitching entries together happens at this whole-blob level: links
+     live inside each entry's body as data, backlinks are derived from
+     the set. local-first; export/import is the hands-on version of sync.
+     ====================================================================== */
+  var STORE_KEY = 'ologypedia-textbook-v1';
+  var PREF_KEY  = 'ologypedia-textbook-prefs-v1';
+  var STATUSES  = ['seed','growing','grown'];
+  var STATUS_LABEL = { seed:'Seed', growing:'Growing', grown:'Grown' };
+  var ACCENTS   = ['rose','sage','gold','dust','plum'];
+  var ACCENT_COLOR = { rose:'#8C3B4A', sage:'#8FA37E', gold:'#C9A66B', dust:'#C77C8E', plum:'#6f4a63' };
+  var GLYPH_PRESETS = ['✦','✶','✧','❀','❋','✷','☾','✵','❖','✿'];
+  var isMac = /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+
+  var db, prefs, currentId, trail = [], savedRange = null, saveTimer = null, savedFlashTimer = null;
+
+  // ---------- small helpers ----------
+  function now(){ return Date.now(); }
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function el(tag, cls, text){ var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+
+  function slugify(text){
+    return String(text || '').toLowerCase()
+      .replace(/['’]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60) || 'entry';
+  }
+  function uniqueId(base){
+    var slug = slugify(base), id = slug, n = 2;
+    while (db.entries[id]) { id = slug + '-' + n; n++; }
+    return id;
+  }
+
+  // ---------- sanitizer: a safe, on-voice subset ----------
+  var ALLOWED_TAGS = {P:1,BR:1,HR:1,H2:1,H3:1,H4:1,UL:1,OL:1,LI:1,BLOCKQUOTE:1,STRONG:1,B:1,EM:1,I:1,U:1,A:1,MARK:1,CODE:1,DIV:1,SPAN:1,FIGURE:1,FIGCAPTION:1};
+  var DROP_TAGS = {SCRIPT:1,STYLE:1,IFRAME:1,OBJECT:1,EMBED:1,LINK:1,META:1,FORM:1,INPUT:1,BUTTON:1};
+  var ALLOWED_CLASS = {'entry-intro':1,'lede':1,'sec-head':1,'num':1,'pullquote':1,'entry-highlight':1,'entry-link':1,'is-broken':1,'scaffold':1,'chain':1,'chip':1,'box':1,'reading':1,'notes':1,'figure-box':1};
+
+  function filterClasses(cls){
+    return String(cls || '').split(/\s+/).filter(function(c){ return ALLOWED_CLASS[c]; }).join(' ');
+  }
+  function sanitize(html){
+    var t = document.createElement('div');
+    t.innerHTML = String(html || '');
+    (function walk(node){
+      var kids = Array.prototype.slice.call(node.childNodes);
+      kids.forEach(function(child){
+        if (child.nodeType === 1){
+          var tag = child.tagName;
+          if (DROP_TAGS[tag]) { child.remove(); return; }
+          if (!ALLOWED_TAGS[tag]) {           // unknown formatting → unwrap, keep text
+            while (child.firstChild) node.insertBefore(child.firstChild, child);
+            child.remove();
+            return;
+          }
+          walk(child);
+          // strip every attribute except a per-tag allowlist
+          Array.prototype.slice.call(child.attributes).forEach(function(attr){
+            var name = attr.name.toLowerCase();
+            if (name === 'class'){ var f = filterClasses(child.className); if (f) child.className = f; else child.removeAttribute('class'); return; }
+            if (tag === 'A' && (name === 'href' || name === 'data-entry')) return;
+            child.removeAttribute(attr.name);
+          });
+          if (tag === 'A'){
+            var to = child.getAttribute('data-entry');
+            if (to){
+              child.classList.add('entry-link');
+              child.setAttribute('href', '#' + to);
+            } else {
+              var href = child.getAttribute('href') || '';
+              if (/^https?:\/\//i.test(href)) { child.setAttribute('target','_blank'); child.setAttribute('rel','noopener noreferrer'); }
+              else { // no target and not external → drop the link, keep text
+                while (child.firstChild) node.insertBefore(child.firstChild, child); child.remove();
+              }
+            }
+          }
+        } else if (child.nodeType === 8){ child.remove(); } // comments
+      });
+    })(t);
+    return t.innerHTML;
+  }
+
+  function plainText(html){ var t = document.createElement('div'); t.innerHTML = sanitize(html); return (t.textContent || '').replace(/\s+/g,' ').trim(); }
+
+  // ---------- persistence ----------
+  function loadPrefs(){
+    try { prefs = JSON.parse(localStorage.getItem(PREF_KEY)) || {}; } catch(e){ prefs = {}; }
+    if (typeof prefs !== 'object' || !prefs) prefs = {};
+  }
+  function savePrefs(){ try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch(e){} }
+
+  function load(){
+    var raw;
+    try { raw = JSON.parse(localStorage.getItem(STORE_KEY)); } catch(e){ raw = null; }
+    if (raw && raw.entries && typeof raw.entries === 'object' && Array.isArray(raw.order)){
+      db = raw;
+    } else {
+      db = seedTextbook();
+      persist(true);
+    }
+    if (typeof db.v !== 'number') db.v = 1;
+  }
+  function persist(silent){
+    db.updated = now();
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(db)); }
+    catch(e){ flashSaved('Couldn’t save — storage may be full', true); return; }
+    if (!silent) flashSaved();
+  }
+  function flashSaved(msg, isErr){
+    var s = $('saved');
+    if (isErr){ s.innerHTML = esc(msg); s.style.color = 'var(--rose-deep)'; return; }
+    s.style.color = '';
+    s.innerHTML = '<b>Saved</b> · kept in this browser';
+    if (savedFlashTimer) clearTimeout(savedFlashTimer);
+    s.style.opacity = '1';
+    savedFlashTimer = setTimeout(function(){ s.innerHTML = 'Saved in this browser'; }, 1600);
+  }
+
+  // ---------- entry model ----------
+  function getEntry(id){ return db.entries[id]; }
+  function makeEntry(fields){
+    var id = fields.id || uniqueId(fields.title || 'entry');
+    var e = {
+      id: id,
+      title: fields.title || 'Untitled entry',
+      subject: fields.subject || '',
+      body: sanitize(fields.body || ''),
+      status: STATUSES.indexOf(fields.status) >= 0 ? fields.status : 'seed',
+      created: fields.created || now(),
+      updated: fields.updated || now()
+    };
+    if (fields.accent && ACCENTS.indexOf(fields.accent) >= 0) e.accent = fields.accent;
+    if (fields.glyph) e.glyph = String(fields.glyph).slice(0, 2);
+    if (fields.blurb) e.blurb = String(fields.blurb).slice(0, 300);
+    db.entries[id] = e;
+    db.order.push(id);
+    return e;
+  }
+
+  // ---------- cover derivation (kept in step with index.html's shelf cards) ----------
+  function coverAccent(e){
+    if (e.accent && ACCENTS.indexOf(e.accent) >= 0) return e.accent;
+    var id = e.id || '', h = 0;
+    for (var i = 0; i < id.length; i++){ h = (h * 31 + id.charCodeAt(i)) >>> 0; }
+    return ACCENTS[h % ACCENTS.length];
+  }
+  function coverGlyph(e){ return (e.glyph && String(e.glyph).slice(0, 2)) || '✦'; }
+  function deriveBlurb(e){
+    var txt = plainText(e.body || '');
+    if (!txt) return 'A seed — a title and a link, waiting to grow.';
+    return txt.length > 150 ? txt.slice(0, 147).replace(/\s+\S*$/, '') + '…' : txt;
+  }
+  function outgoingOf(id){
+    var e = getEntry(id); if (!e) return [];
+    var t = document.createElement('div'); t.innerHTML = e.body || '';
+    var seen = {}, out = [];
+    Array.prototype.forEach.call(t.querySelectorAll('a.entry-link[data-entry], a[data-entry]'), function(a){
+      var to = a.getAttribute('data-entry');
+      if (to && !seen[to]) { seen[to] = 1; out.push(to); }
+    });
+    return out;
+  }
+  function backlinksOf(id){
+    var refs = [];
+    db.order.forEach(function(otherId){
+      if (otherId === id) return;
+      if (outgoingOf(otherId).indexOf(id) >= 0) refs.push(otherId);
+    });
+    return refs;
+  }
+
+  // ---------- navigation & trail ----------
+  function navigate(id, opts){
+    opts = opts || {};
+    if (!getEntry(id)) return;
+    // commit any in-progress edits on the entry we're LEAVING, before currentId moves
+    if (document.body.getAttribute('data-mode') === 'edit') commitEdits();
+    if (opts.fresh){ trail = [id]; }
+    else if (currentId && currentId !== id){
+      var at = trail.indexOf(id);
+      if (at >= 0) trail = trail.slice(0, at + 1);     // walking back
+      else { if (trail[trail.length - 1] !== currentId) trail.push(currentId); trail.push(id); }
+    } else if (trail.indexOf(id) < 0){ trail = [id]; }
+    if (trail.length > 8) trail = trail.slice(trail.length - 8);
+    currentId = id;
+    db.last = id;
+    persist(true);
+    applyModeDOM(false);
+    renderAll();
+    var ps = document.querySelector('.pane-scroll'); if (ps) ps.scrollTop = 0;
+  }
+
+  // ---------- rendering ----------
+  function renderAll(){ renderIndex(); renderPane(); }
+
+  function renderIndex(){
+    var list = $('idx-list'), q = ($('idx-search').value || '').trim().toLowerCase();
+    list.innerHTML = '';
+    var shown = 0;
+    db.order.forEach(function(id){
+      var e = getEntry(id); if (!e) return;
+      var hay = (e.title + ' ' + e.subject + ' ' + plainText(e.body)).toLowerCase();
+      if (q && hay.indexOf(q) < 0) return;
+      shown++;
+      var li = el('li');
+      var b = el('button', 'idx-item'); b.setAttribute('data-status', e.status); b.setAttribute('data-id', id);
+      if (id === currentId) b.classList.add('active');
+      b.appendChild(el('span','idx-dot'));
+      var body = el('div','idx-body');
+      body.appendChild(el('div','idx-title', e.title));
+      if (e.subject) body.appendChild(el('div','idx-sub', e.subject));
+      b.appendChild(body);
+      var nOut = outgoingOf(id).length;
+      if (nOut){ var lk = el('span','idx-links'); lk.appendChild(el('span','', '↝')); lk.appendChild(el('span','', String(nOut))); b.appendChild(lk); }
+      b.addEventListener('click', function(){ navigate(id, { fresh:true }); });
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+    $('idx-empty').hidden = shown > 0;
+    $('idx-count').textContent = db.order.length + (db.order.length === 1 ? ' entry' : ' entries');
+  }
+
+  function renderBreadcrumb(){
+    var bc = $('breadcrumb'); bc.innerHTML = '';
+    if (trail.length <= 1){ bc.appendChild(el('span','', ' ')); return; }
+    trail.forEach(function(id, i){
+      var e = getEntry(id); if (!e) return;
+      if (i) { var sep = el('span','sep','›'); bc.appendChild(sep); }
+      var here = (i === trail.length - 1);
+      var c = el('button','crumb' + (here ? ' here':''), e.title);
+      if (!here) c.addEventListener('click', function(){ navigate(id); });
+      bc.appendChild(c);
+    });
+  }
+
+  function renderPane(){
+    var e = getEntry(currentId);
+    if (!e){ if (db.order.length){ navigate(db.order[0], { fresh:true }); } return; }
+    renderBreadcrumb();
+
+    $('entry-kicker').textContent = e.subject || '';
+    $('entry-title').textContent = e.title;
+
+    // status pill
+    $('status-lbl').textContent = STATUS_LABEL[e.status];
+    var pd = $('status-pill').querySelector('.idx-dot');
+    pd.style.background = e.status === 'grown' ? 'var(--grown)' : e.status === 'growing' ? 'var(--gold)' : 'var(--seed)';
+
+    // cover dot reflects the shelf accent; rebuild the picker if it's open
+    $('cover-dot').style.background = ACCENT_COLOR[coverAccent(e)];
+    if ($('cover-pop').classList.contains('open')) buildCoverUI(e);
+
+    $('edited-note').textContent = 'Edited ' + relTime(e.updated);
+
+    // body — links resolved (broken links flagged)
+    var content = $('entry-content');
+    content.innerHTML = e.body || '';
+    resolveLinks(content);
+    if (!plainText(e.body)) content.innerHTML = '<p class="scaffold">This one’s a seed. Hit <b>Edit</b> and start wherever you like — a sentence is plenty. It’s already linked from where you made it.</p>';
+
+    // coach note only on the sample she-ra entry, until dismissed
+    $('coach').hidden = !(currentId === 'she-ra' && !prefs.coachDismissed);
+
+    renderConnections(e);
+  }
+
+  function resolveLinks(root){
+    Array.prototype.forEach.call(root.querySelectorAll('a.entry-link[data-entry], a[data-entry]'), function(a){
+      var to = a.getAttribute('data-entry');
+      a.classList.add('entry-link');
+      a.classList.toggle('is-broken', !getEntry(to));
+      a.setAttribute('href', '#' + to);
+      a.title = getEntry(to) ? 'Go to “' + getEntry(to).title + '”' : 'Start “' + (a.textContent||'').trim() + '” — not written yet';
+    });
+  }
+
+  function renderConnections(e){
+    var out = outgoingOf(e.id), back = backlinksOf(e.id);
+    fillConn('out-list','out-empty','out-n', out);
+    fillConn('back-list','back-empty','back-n', back);
+  }
+  function fillConn(listId, emptyId, nId, ids){
+    var wrap = $(listId); wrap.innerHTML = '';
+    $(nId).textContent = String(ids.length);
+    $(emptyId).style.display = ids.length ? 'none' : '';
+    ids.forEach(function(id){
+      var e = getEntry(id);
+      var chip = el('button','conn-chip');
+      var dot = el('span','idx-dot');
+      dot.style.background = !e ? 'var(--rose-dust)' : e.status === 'grown' ? 'var(--grown)' : e.status === 'growing' ? 'var(--gold)' : 'var(--seed)';
+      chip.appendChild(dot);
+      chip.appendChild(el('span','', e ? e.title : 'Start this one'));
+      chip.addEventListener('click', function(){ if (!e){ e = makeEntry({ id:id, title:id.replace(/-/g,' '), status:'seed' }); persist(); } navigate(id); });
+      wrap.appendChild(chip);
+    });
+  }
+
+  function relTime(ts){
+    if (!ts) return 'just now';
+    var d = (now() - ts)/1000;
+    if (d < 45) return 'just now';
+    if (d < 3600) return Math.round(d/60) + ' min ago';
+    if (d < 86400) return Math.round(d/3600) + ' hr ago';
+    var days = Math.round(d/86400);
+    if (days < 30) return days + (days===1?' day':' days') + ' ago';
+    try { return new Date(ts).toLocaleDateString(undefined,{month:'short',day:'numeric'}); } catch(e){ return 'a while ago'; }
+  }
+
+  // ---------- mode (read / edit) ----------
+  function applyModeDOM(editing){
+    document.body.setAttribute('data-mode', editing ? 'edit' : 'read');
+    $('entry-content').setAttribute('contenteditable', editing ? 'true' : 'false');
+    $('entry-title').setAttribute('contenteditable', editing ? 'true' : 'false');
+    $('entry-kicker').setAttribute('contenteditable', editing ? 'true' : 'false');
+    $('mode-label').textContent = editing ? 'Done' : 'Edit';
+    $('mode-glyph').textContent = editing ? '✓' : '✎';
+    $('mode-toggle').setAttribute('aria-pressed', String(editing));
+  }
+  function setMode(m){
+    var editing = m === 'edit';
+    var wasEditing = document.body.getAttribute('data-mode') === 'edit';
+    if (!editing && wasEditing) commitEdits();   // leaving edit → save the current entry
+    applyModeDOM(editing);
+    if (editing){
+      // clear a bare scaffold so the writer starts on a clean line
+      var e = getEntry(currentId);
+      if (e && !plainText(e.body)) $('entry-content').innerHTML = '<p><br></p>';
+      $('entry-content').focus();
+    } else if (wasEditing){
+      renderPane();   // refresh the read view: status, resolved links, connections, edited time
+    }
+  }
+
+  function commitEdits(){
+    var e = getEntry(currentId); if (!e) return;
+    var newTitle = ($('entry-title').textContent || '').trim() || 'Untitled entry';
+    var newSubject = ($('entry-kicker').textContent || '').trim();
+    var newBody = sanitize($('entry-content').innerHTML);
+    var changed = (newTitle !== e.title) || (newSubject !== e.subject) || (newBody !== e.body);
+    e.title = newTitle; e.subject = newSubject; e.body = newBody;
+    // gently promote seed → growing once there's a real sentence; never auto-demote,
+    // and never touch a status you set yourself — this is bookkeeping you don't have to do
+    if (e.status === 'seed' && plainText(newBody).length >= 12) e.status = 'growing';
+    if (changed){ e.updated = now(); persist(); }
+    renderIndex();
+  }
+
+  // debounce autosave while typing
+  function scheduleSave(){
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(function(){ commitEdits(); resolveLinks($('entry-content')); renderConnections(getEntry(currentId)); }, 700);
+  }
+
+  // ---------- the selection menu ----------
+  function currentSelectionInContent(){
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+    var range = sel.getRangeAt(0);
+    var content = $('entry-content');
+    if (!content.contains(range.commonAncestorContainer)) return null;
+    var text = sel.toString().replace(/\s+/g,' ').trim();
+    if (!text || text.length > 120) return null;
+    return { range: range.cloneRange(), text: text };
+  }
+  function updateMenu(){
+    var info = currentSelectionInContent();
+    var menu = $('sel-menu');
+    if (!info){ hideMenu(); return; }
+    savedRange = info.range;
+    $('sel-text').textContent = info.text.length > 42 ? info.text.slice(0,42) + '…' : info.text;
+    $('sel-existing').classList.remove('open');
+    $('sel-existing').innerHTML = '';
+    var rect = info.range.getBoundingClientRect();
+    menu.classList.add('open');
+    var mw = menu.offsetWidth, mh = menu.offsetHeight;
+    var left = window.scrollX + rect.left + rect.width/2 - mw/2;
+    left = Math.max(window.scrollX + 8, Math.min(left, window.scrollX + document.documentElement.clientWidth - mw - 8));
+    var top = window.scrollY + rect.top - mh - 10;
+    if (top < window.scrollY + 8) top = window.scrollY + rect.bottom + 10;   // flip below if no room above
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+  }
+  function hideMenu(){ $('sel-menu').classList.remove('open'); }
+
+  // insert an entry-link around the saved selection, return {text}
+  function insertLinkAtSaved(targetId){
+    var range = savedRange; if (!range) return null;
+    var content = $('entry-content');
+    if (!content.contains(range.commonAncestorContainer)) return null;
+    var text = range.toString().replace(/\s+/g,' ').trim();
+    var a = document.createElement('a');
+    a.className = 'entry-link'; a.setAttribute('data-entry', targetId); a.setAttribute('href', '#' + targetId);
+    a.textContent = text;
+    try { range.deleteContents(); range.insertNode(a); }
+    catch(err){ return null; }
+    // persist the source body
+    var e = getEntry(currentId);
+    e.body = sanitize(content.innerHTML);
+    e.updated = now();
+    persist();
+    window.getSelection().removeAllRanges();
+    return { text: text };
+  }
+
+  function addEntryFromSelection(open){
+    var info = savedRange ? { text: savedRange.toString().replace(/\s+/g,' ').trim() } : null;
+    if (!info || !info.text){ hideMenu(); return; }
+    var e = getEntry(currentId);
+    var newId = uniqueId(info.text);
+    // create the seed first so the link resolves immediately
+    makeEntry({ id:newId, title:info.text, subject: e ? e.subject : '', status:'seed', body:'' });
+    var res = insertLinkAtSaved(newId);
+    hideMenu();
+    if (!res){ // selection couldn't be linked (spanned blocks) — undo the orphan seed
+      delete db.entries[newId]; db.order.splice(db.order.indexOf(newId),1); persist(true);
+      toast('That selection crossed a paragraph — try selecting within one line.', null, null);
+      return;
+    }
+    if (open){
+      navigate(newId);
+      setMode('edit');
+      toast('“' + trim(res.text, 30) + '” created and linked.', 'Back to ' + trim(e.title, 20), function(){ navigate(e.id); });
+    } else {
+      renderPane();
+      toast('Seeded “' + trim(res.text, 30) + '” — it’s in your index and linked from here.', 'Open it', function(){ navigate(newId); setMode('edit'); });
+    }
+  }
+
+  function openExistingPicker(){
+    var box = $('sel-existing'); box.innerHTML = ''; box.classList.add('open');
+    var others = db.order.filter(function(id){ return id !== currentId; });
+    if (!others.length){ box.appendChild(elText('sel-head','No other entries yet — make one first.')); return; }
+    others.slice(0,40).forEach(function(id){
+      var e = getEntry(id);
+      var b = el('button','sel-btn');
+      b.appendChild(el('span','ic','↝'));
+      b.appendChild(el('span','', e.title));
+      b.addEventListener('mousedown', function(ev){ ev.preventDefault(); });
+      b.addEventListener('click', function(){
+        var res = insertLinkAtSaved(id);
+        hideMenu();
+        if (res){ renderPane(); toast('Linked to “' + trim(getEntry(id).title,26) + '”.', 'Go there', function(){ navigate(id); }); }
+      });
+      box.appendChild(b);
+    });
+  }
+  function elText(cls, text){ return el('div', cls, text); }
+
+  function highlightSelection(){
+    var range = savedRange; if (!range) return;
+    var content = $('entry-content');
+    if (!content.contains(range.commonAncestorContainer)) { hideMenu(); return; }
+    var text = range.toString();
+    var mk = document.createElement('mark'); mk.className = 'entry-highlight'; mk.textContent = text;
+    try { range.deleteContents(); range.insertNode(mk); } catch(e){ hideMenu(); return; }
+    var en = getEntry(currentId); en.body = sanitize(content.innerHTML); en.updated = now(); persist();
+    window.getSelection().removeAllRanges();
+    hideMenu(); renderPane();
+  }
+
+  function trim(s, n){ s = String(s||''); return s.length > n ? s.slice(0,n-1)+'…' : s; }
+
+  // ---------- toast ----------
+  function toast(msg, actionLabel, actionFn){
+    var wrap = $('toast-wrap');
+    var t = el('div','toast');
+    t.appendChild(el('span','glyph','✦'));
+    t.appendChild(el('span','', msg));
+    if (actionLabel && actionFn){
+      var b = el('button','', actionLabel);
+      b.addEventListener('click', function(){ actionFn(); dismiss(); });
+      t.appendChild(b);
+    }
+    wrap.appendChild(t);
+    var to = setTimeout(dismiss, actionLabel ? 6500 : 3600);
+    function dismiss(){ clearTimeout(to); if (t.parentNode){ t.style.opacity='0'; setTimeout(function(){ t.remove(); }, 180); } }
+  }
+
+  // ---------- the cover picker (how an entry looks on the bookshelf) ----------
+  function buildCoverUI(e){
+    var acc = coverAccent(e), gl = coverGlyph(e);
+    document.querySelector('.cp-preview').style.setProperty('--cp-dc', ACCENT_COLOR[acc]);
+    $('cp-pv-glyph').textContent = gl;
+
+    var sw = $('cp-swatches'); sw.innerHTML = '';
+    ACCENTS.forEach(function(a){
+      var b = document.createElement('button');
+      b.className = 'cp-sw'; b.type = 'button'; b.title = a;
+      b.style.background = ACCENT_COLOR[a];
+      b.setAttribute('aria-pressed', String(a === acc));
+      b.addEventListener('click', function(){ setCover(e, { accent:a }); });
+      sw.appendChild(b);
+    });
+
+    var gg = $('cp-glyphs'); gg.innerHTML = '';
+    GLYPH_PRESETS.forEach(function(g){
+      var b = document.createElement('button');
+      b.className = 'cp-gl'; b.type = 'button'; b.textContent = g;
+      b.setAttribute('aria-pressed', String(g === gl));
+      b.addEventListener('click', function(){ setCover(e, { glyph:g }); });
+      gg.appendChild(b);
+    });
+    $('cp-glyph-input').value = (e.glyph && GLYPH_PRESETS.indexOf(e.glyph) < 0) ? e.glyph : '';
+
+    $('cp-blurb').value = e.blurb || '';
+    $('cp-blurb').placeholder = deriveBlurb(e);
+  }
+  function setCover(e, patch){
+    if (patch.accent !== undefined){ if (patch.accent) e.accent = patch.accent; else delete e.accent; }
+    if (patch.glyph !== undefined){ var g = String(patch.glyph || '').slice(0,2); if (g) e.glyph = g; else delete e.glyph; }
+    if (patch.blurb !== undefined){ var b = String(patch.blurb || '').trim().slice(0,300); if (b) e.blurb = b; else delete e.blurb; }
+    persist();
+    $('cover-dot').style.background = ACCENT_COLOR[coverAccent(e)];
+    buildCoverUI(e);
+  }
+  // typing paths — persist + refresh preview/dot without rebuilding the field being typed in
+  function setCoverGlyphOnly(e){
+    var g = String($('cp-glyph-input').value || '').slice(0,2);
+    if (g) e.glyph = g; else delete e.glyph;
+    persist();
+    var shown = coverGlyph(e);
+    $('cp-pv-glyph').textContent = shown;
+    $('cover-dot').style.background = ACCENT_COLOR[coverAccent(e)];
+    Array.prototype.forEach.call($('cp-glyphs').children, function(b){ b.setAttribute('aria-pressed', String(b.textContent === shown)); });
+  }
+  function setCoverBlurbOnly(e){
+    var b = String($('cp-blurb').value || '').trim().slice(0,300);
+    if (b) e.blurb = b; else delete e.blurb;
+    persist();
+  }
+  function openCover(){
+    var e = getEntry(currentId); if (!e) return;
+    buildCoverUI(e);
+    $('cover-pop').classList.add('open');
+    $('cover-btn').setAttribute('aria-expanded','true');
+  }
+  function closeCover(){ $('cover-pop').classList.remove('open'); $('cover-btn').setAttribute('aria-expanded','false'); }
+
+  // ---------- formatting toolbar ----------
+  function fmt(cmd){
+    var content = $('entry-content');
+    content.focus();
+    if (cmd === 'bold') document.execCommand('bold');
+    else if (cmd === 'italic') document.execCommand('italic');
+    else if (cmd === 'h3') document.execCommand('formatBlock', false, '<h3>');
+    else if (cmd === 'quote') document.execCommand('formatBlock', false, '<blockquote>');
+    else if (cmd === 'ul') document.execCommand('insertUnorderedList');
+    else if (cmd === 'link'){ savedRange = window.getSelection().rangeCount ? window.getSelection().getRangeAt(0).cloneRange() : null; if (savedRange && !savedRange.collapsed){ updateMenuForEdit(); } else { toast('Select the words you want to link first.'); return; } }
+    scheduleSave();
+  }
+  function updateMenuForEdit(){
+    // reuse the selection menu but jump straight to the existing-entry picker feel:
+    var info = currentSelectionInContent(); if (!info){ return; }
+    savedRange = info.range;
+    updateMenu();
+    openExistingPicker();
+  }
+
+  // ---------- more menu (export / import / reset) ----------
+  function exportJSON(){
+    var blob = new Blob([JSON.stringify(db, null, 2)], { type:'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'my-textbook.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    toast('Exported your whole textbook as one file.');
+  }
+  function importJSON(file){
+    var r = new FileReader();
+    r.onload = function(){
+      try {
+        var data = JSON.parse(r.result);
+        if (!data || !data.entries || !Array.isArray(data.order)) throw new Error('shape');
+        // sanitize every incoming body and clamp cover fields
+        Object.keys(data.entries).forEach(function(id){
+          var e = data.entries[id]; if (!e) return;
+          e.body = sanitize(e.body || '');
+          if (e.accent && ACCENTS.indexOf(e.accent) < 0) delete e.accent;
+          if (e.glyph) e.glyph = String(e.glyph).slice(0, 2); else delete e.glyph;
+          if (e.blurb) e.blurb = String(e.blurb).slice(0, 300); else delete e.blurb;
+        });
+        db = data; if (typeof db.v !== 'number') db.v = 1;
+        currentId = db.last && getEntry(db.last) ? db.last : db.order[0];
+        trail = currentId ? [currentId] : [];
+        persist(); renderAll();
+        toast('Imported ' + db.order.length + ' entries.');
+      } catch(e){ toast('That file didn’t look like a textbook export.'); }
+    };
+    r.readAsText(file);
+  }
+  function toggleMore(open){
+    var m = $('more-menu');
+    var show = open == null ? !m.classList.contains('open') : open;
+    m.classList.toggle('open', show);
+    $('menu-more').setAttribute('aria-expanded', String(show));
+  }
+  function resetToSample(){
+    if (window.confirm('Replace everything with the fresh sample textbook?\n\nYour current entries will be gone unless you’ve exported them first.')){
+      db = seedTextbook(); prefs.coachDismissed = false; savePrefs(); persist();
+      currentId = 'she-ra'; trail = ['she-ra']; applyModeDOM(false); renderAll();
+      toast('Reset to the sample textbook.');
+    }
+  }
+
+  // ---------- preferences: focus, motion ----------
+  function applyPrefs(){
+    document.documentElement.setAttribute('data-reduce-motion', prefs.reduceMotion ? '1' : '0');
+    $('motion-toggle').setAttribute('aria-pressed', String(!!prefs.reduceMotion));
+    document.body.setAttribute('data-focus', prefs.focus ? '1' : '0');
+    $('focus-toggle').setAttribute('aria-pressed', String(!!prefs.focus));
+  }
+
+  // ======================================================================
+  //  wiring
+  // ======================================================================
+  function wire(){
+    $('mode-toggle').addEventListener('click', function(){ setMode(document.body.getAttribute('data-mode') === 'edit' ? 'read' : 'edit'); });
+    $('focus-toggle').addEventListener('click', function(){ prefs.focus = !prefs.focus; savePrefs(); applyPrefs(); });
+    $('motion-toggle').addEventListener('click', function(){ prefs.reduceMotion = !prefs.reduceMotion; savePrefs(); applyPrefs(); });
+    $('help-btn').addEventListener('click', function(){ $('sheet-back').classList.add('open'); });
+    $('sheet-close').addEventListener('click', function(){ $('sheet-back').classList.remove('open'); });
+    $('sheet-back').addEventListener('click', function(ev){ if (ev.target === $('sheet-back')) $('sheet-back').classList.remove('open'); });
+    $('menu-more').addEventListener('click', function(ev){ ev.stopPropagation(); toggleMore(); });
+    $('more-export').addEventListener('click', function(){ toggleMore(false); exportJSON(); });
+    $('more-import').addEventListener('click', function(){ toggleMore(false); $('import-file').click(); });
+    $('more-reset').addEventListener('click', function(){ toggleMore(false); resetToSample(); });
+    document.addEventListener('click', function(ev){ var w = document.querySelector('.more-wrap'); if (w && !w.contains(ev.target)) toggleMore(false); });
+    $('import-file').addEventListener('change', function(ev){ if (ev.target.files && ev.target.files[0]) importJSON(ev.target.files[0]); ev.target.value=''; });
+
+    $('idx-search').addEventListener('input', renderIndex);
+    $('idx-new').addEventListener('click', function(){
+      var e = makeEntry({ title:'Untitled entry', status:'seed', body:'' });
+      persist(); navigate(e.id, { fresh:true }); setMode('edit');
+      $('entry-title').focus();
+      try { document.getSelection().selectAllChildren($('entry-title')); } catch(err){}
+    });
+
+    $('status-pill').addEventListener('click', function(){
+      var e = getEntry(currentId); if (!e) return;
+      e.status = STATUSES[(STATUSES.indexOf(e.status) + 1) % STATUSES.length];
+      e.updated = now(); persist(); renderPane(); renderIndex();
+    });
+
+    // cover picker
+    $('cover-btn').addEventListener('click', function(ev){ ev.stopPropagation(); if ($('cover-pop').classList.contains('open')) closeCover(); else openCover(); });
+    $('cover-pop').addEventListener('click', function(ev){ ev.stopPropagation(); });
+    $('cp-glyph-input').addEventListener('input', function(){ var e = getEntry(currentId); if (e) setCoverGlyphOnly(e); });
+    $('cp-blurb').addEventListener('input', function(){ var e = getEntry(currentId); if (!e) return; clearTimeout($('cp-blurb')._t); $('cp-blurb')._t = setTimeout(function(){ setCoverBlurbOnly(e); }, 400); });
+    $('cp-done').addEventListener('click', closeCover);
+    document.addEventListener('click', function(ev){ var w = document.querySelector('.cover-wrap'); if (w && !w.contains(ev.target)) closeCover(); });
+
+    $('coach-dismiss').addEventListener('click', function(){ prefs.coachDismissed = true; savePrefs(); $('coach').hidden = true; });
+
+    // formatting buttons
+    Array.prototype.forEach.call(document.querySelectorAll('.fmt-btn'), function(btn){
+      btn.addEventListener('mousedown', function(ev){ ev.preventDefault(); }); // keep selection
+      btn.addEventListener('click', function(){ fmt(btn.getAttribute('data-cmd')); });
+    });
+
+    // live edit
+    var content = $('entry-content');
+    content.addEventListener('input', scheduleSave);
+    $('entry-title').addEventListener('input', scheduleSave);
+    $('entry-kicker').addEventListener('input', scheduleSave);
+    $('entry-title').addEventListener('keydown', function(ev){ if (ev.key === 'Enter'){ ev.preventDefault(); setMode('edit'); content.focus(); } });
+
+    // clicking an entry-link navigates (read mode) — in edit mode a click just places the caret
+    content.addEventListener('click', function(ev){
+      var a = ev.target.closest && ev.target.closest('a.entry-link, a[data-entry]');
+      if (!a) return;
+      var to = a.getAttribute('data-entry');
+      if (document.body.getAttribute('data-mode') === 'edit'){
+        if (ev.metaKey || ev.ctrlKey){ ev.preventDefault(); followLink(to, a); }
+        return;
+      }
+      ev.preventDefault();
+      followLink(to, a);
+    });
+
+    // selection → menu
+    document.addEventListener('selectionchange', function(){
+      // small debounce so the menu settles after the drag ends
+      clearTimeout(updateMenu._t);
+      updateMenu._t = setTimeout(function(){
+        if (document.body.getAttribute('data-mode') === 'edit') return; // in edit mode, menu is opened via toolbar Link
+        updateMenu();
+      }, 30);
+    });
+    document.addEventListener('scroll', function(){ if ($('sel-menu').classList.contains('open')) updateMenu(); }, true);
+
+    $('sel-menu').addEventListener('mousedown', function(ev){ ev.preventDefault(); }); // don't lose the selection
+    $('sel-new-open').addEventListener('click', function(){ addEntryFromSelection(true); });
+    $('sel-new-stay').addEventListener('click', function(){ addEntryFromSelection(false); });
+    $('sel-link').addEventListener('click', function(){ openExistingPicker(); });
+    $('sel-mark').addEventListener('click', highlightSelection);
+
+    // hide the menu when clicking elsewhere / pressing escape
+    document.addEventListener('mousedown', function(ev){
+      var m = $('sel-menu');
+      if (m.classList.contains('open') && !m.contains(ev.target)){ setTimeout(function(){ if (!currentSelectionInContent()) hideMenu(); }, 0); }
+    });
+    document.addEventListener('keydown', function(ev){
+      if (ev.key === 'Escape'){ hideMenu(); toggleMore(false); closeCover(); $('sheet-back').classList.remove('open'); }
+      // Ctrl/Cmd+E — new entry from selection (works in read mode)
+      var mod = isMac ? ev.metaKey : ev.ctrlKey;
+      if (mod && (ev.key === 'e' || ev.key === 'E')){
+        var info = currentSelectionInContent();
+        if (info){ ev.preventDefault(); savedRange = info.range; addEntryFromSelection(true); }
+      }
+    });
+
+    window.addEventListener('hashchange', function(){
+      var id = decodeURIComponent(location.hash.replace(/^#/,''));
+      if (id && getEntry(id) && id !== currentId) navigate(id);
+    });
+  }
+
+  function followLink(to, a){
+    if (!getEntry(to)){ // wiki red-link: create the seed on follow, using the link's own text as the title
+      makeEntry({ id:to, title:(a && a.textContent.trim()) || to.replace(/-/g,' '), status:'seed', body:'' });
+      persist();
+    }
+    navigate(to);
+  }
+
+  function boot(){
+    loadPrefs(); load(); applyPrefs();
+    currentId = (db.last && getEntry(db.last)) ? db.last : db.order[0];
+    trail = currentId ? [currentId] : [];
+    // deep link via hash wins
+    var hid = decodeURIComponent((location.hash||'').replace(/^#/,''));
+    if (hid && getEntry(hid)) { currentId = hid; trail = [hid]; }
+    $('sel-kbd').textContent = isMac ? '⌘E' : 'Ctrl+E';
+    wire();
+    renderAll();
+    if (!prefs.welcomed){ prefs.welcomed = true; savePrefs(); $('sheet-back').classList.add('open'); }
+    $('saved').innerHTML = 'Saved in this browser';
+  }
+
+  // ======================================================================
+  //  the seed textbook — the She-Ra example, ready to grow the moment
+  //  you open the door. one built link, one companion page, one plain
+  //  phrase ("Season 1") left for you to try the core move on.
+  // ======================================================================
+  function seedTextbook(){
+    var t = now();
+    var entries = {};
+    function put(e){ e.created = t; e.updated = t; entries[e.id] = e; }
+
+    put({ id:'she-ra', title:'She-Ra and the Princesses of Power', subject:'Media · Animation (2018)', status:'grown',
+      accent:'rose', glyph:'✶',
+      blurb:'A five-season study in loyalty, indoctrination, and the slow work of unlearning a story you were raised inside.',
+      body:
+        '<p class="entry-intro">A Netflix reboot of the 1985 cartoon, developed by Noelle Stevenson across five seasons from 2018 to 2020. Under the magical-girl surface it is a study in loyalty, indoctrination, and the slow work of unlearning a story you were raised inside — which is exactly why it rewards going deeper than any one page can hold.</p>' +
+        '<div class="sec-head"><span class="num">1</span><h3>The world</h3></div>' +
+        '<p>The series is set on <a class="entry-link" data-entry="etheria" href="#etheria">Etheria</a>, a planet sealed away from the rest of the universe inside a pocket dimension. Its magic runs on buried First Ones technology — runestones bonded to the princesses who can wield them. Adora, raised by the occupying Horde, discovers she can become the lost warrior She-Ra, and defects.</p>' +
+        '<blockquote class="pullquote">Adora doesn’t learn that she’s good and the Horde is evil. She learns that the story she was raised inside was written by the people it benefited.</blockquote>' +
+        '<div class="sec-head"><span class="num">2</span><h3>Where the whole thing begins</h3></div>' +
+        '<p>Everything the show becomes is seeded early: Adora finds the Sword of Protection, walks away from the only family she’s known, and leaves Catra behind — the wound the entire series is built around. If you want to build out your knowledge of this world, Season 1 is the root to grow from.</p>' +
+        '<p>Try it now, on the words just above: highlight <strong>Season 1</strong>, and choose <em>✦ New entry</em>. You’ll have a page for it in a second, linked right back to here.</p>'
+    });
+
+    put({ id:'etheria', title:'Etheria', subject:'Media · Animation (2018)', status:'growing',
+      accent:'sage', glyph:'✧',
+      blurb:'A planet sealed inside a pocket dimension, its ground full of abandoned First Ones technology.',
+      body:
+        '<p class="entry-intro">The planet where <a class="entry-link" data-entry="she-ra" href="#she-ra">She-Ra</a> takes place — and, it turns out, not an ordinary planet at all.</p>' +
+        '<p>Etheria sits inside <strong>Despondos</strong>, a pocket dimension the sorceress Light Hope pulled it into a thousand years ago to hide it. That isolation is why its history feels sealed off, and why the First Ones’ abandoned technology is everywhere in the ground. This page is <em>growing</em> — there’s plenty more to add: the Whispering Woods, the runestones, the Heart of Etheria. Highlight any of those and spin them out too.</p>'
+    });
+
+    return { v:1, entries:entries, order:['she-ra','etheria'], last:'she-ra', created:t, updated:t };
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>

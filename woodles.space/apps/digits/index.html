@@ -22,6 +22,25 @@
 
     .wrap { max-width: 880px; margin: 0 auto; }
 
+    .topbar {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      margin-bottom: 1.6rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    .home {
+      text-decoration: none;
+      opacity: 0.76;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+    .home:hover {
+      opacity: 1;
+      transform: translateX(-2px);
+    }
+
     .eyebrow {
       font-size: 0.62rem;
       letter-spacing: 0.22em;
@@ -155,6 +174,9 @@
 </head>
 <body>
   <div class="wrap">
+    <nav class="topbar" aria-label="digits navigation">
+      <a class="home" href="/">back to woodles.space</a>
+    </nav>
     <p class="eyebrow">math practice · proof of concept</p>
     <h1>digits</h1>
     <p class="lede">
