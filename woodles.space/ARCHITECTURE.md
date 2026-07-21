@@ -62,6 +62,7 @@ woodles.space/
 │   ├── sync.ts              Neon edge function — single-user sync
 │   └── schema.sql
 ├── packages/
+│   ├── app-manifest/        @woodles/app-manifest — canonical app and route inventory
 │   ├── persistence/         @woodles/persistence — versioned local storage mechanics
 │   └── sync/                @woodles/sync — the sync client
 └── apps/
@@ -85,6 +86,24 @@ woodles.space/
 
 `animations/` is a Python/Manim playspace. it has no `package.json` and isn't a
 member of the pnpm workspace; `vercel.json` serves its `index.html` directly.
+
+## the app manifest
+
+`packages/app-manifest/src/index.js` is the canonical deployable-app inventory.
+It owns the 17 app ids, names, public paths and aliases, app shape, source and
+output locations, maturity, and landing visibility. It also owns the landing
+tile order/copy, default pins, featured fallback, and Marginalia's Reading Room
+sub-surface. The static landing page imports that browser-ready module directly;
+its hand-drawn `ICONS` stay local because they are artwork, not deployment
+metadata.
+
+Vercel rewrites and each SvelteKit `paths.base` remain explicit in their native
+configuration files, including Marginalia's special asset routes. The manifest
+suite verifies that every primary route, alias, package name, output directory,
+static entrypoint, and Svelte base agrees with the canonical record. It also
+fails when a directory appears under `apps/` without a manifest entry. The
+maintenance workflow is in
+[`packages/app-manifest/README.md`](./packages/app-manifest/README.md).
 
 ## the two app shapes
 
@@ -394,13 +413,14 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-913 tests total: 16 in `api/` (its own
+920 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 897 across nine pnpm
+instead of the recursive `pnpm -r test`), plus 904 across ten pnpm
 packages — `write` 65, `marginalia` 249, `planner` 283, `notebook` 14,
 `spores` 46, `bestiary` 160, `packages/sync` 5,
-`packages/persistence` 6, and `thinking-about` 69.
+`packages/persistence` 6, `packages/app-manifest` 7, and
+`thinking-about` 69.
 `marginalia-devlog` has no test script. keep this inventory current when a
 suite changes; the root command is the release contract, not the prose count.
 
@@ -443,7 +463,7 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (913 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (920 tests)
 pnpm check              svelte-check in every app
 pnpm build              build the eight SvelteKit apps
 ```
