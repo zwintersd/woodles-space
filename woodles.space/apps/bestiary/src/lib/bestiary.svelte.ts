@@ -28,6 +28,7 @@ import { idbAvailable, idbGet, idbSet } from './idb';
 import { applyPublishedFlags } from './publish';
 import { buildAdoptedCreature } from './gallery';
 import type { PublicCreature } from '@woodles/sync';
+import { browserStorageEstimate, serializedBytes } from '@woodles/persistence';
 
 // Older creatures in storage predate the stat block (and, later, the studio
 // composition). Fill any missing structure so an old record loads cleanly, and
@@ -69,6 +70,7 @@ function save<T>(key: string, value: T): void {
 }
 
 const CREATURES_KEY = 'bestiary.creatures.v1';
+const CREATURES_BACKUP_KEY = 'bestiary.creatures.v1.backup';
 const SETTINGS_KEY = 'bestiary.settings.v1';
 const CARD_BACKS_KEY = 'bestiary.cardbacks.v1';
 
@@ -80,6 +82,14 @@ type CardBackData = {
 type CardBackMap = Partial<Record<Domain, CardBackData>>;
 
 const DEFAULT_SETTINGS: BestiarySettings = { sort: 'recent' };
+
+export type BestiaryStorageHealth = {
+	status: 'loading' | 'saving' | 'saved' | 'recovered' | 'error';
+	message: string;
+	collectionBytes: number;
+	usageBytes: number | null;
+	quotaBytes: number | null;
+};
 
 // The workshop opens roomy, hint-lit, and gently alive — but every one of these
 // is a knob the player can turn, and the choice is remembered.
@@ -98,6 +108,13 @@ export class Bestiary {
 	// empty-state until we actually know the shelf is empty.
 	creatures = $state<Creature[]>([]);
 	ready = $state(false);
+	storageHealth = $state<BestiaryStorageHealth>({
+		status: 'loading',
+		message: 'checking local shelf…',
+		collectionBytes: 0,
+		usageBytes: null,
+		quotaBytes: null
+	});
 
 	// True for the remainder of this session when IndexedDB held nothing at
 	// all before the seed deck was planted — a browser that has never opened
@@ -148,12 +165,23 @@ export class Bestiary {
 	// (a brief race) is merged in rather than dropped.
 	async #hydrate(): Promise<void> {
 		let loaded: Creature[] = [];
+		let recovered = false;
 		if (idbAvailable()) {
 			try {
-				let stored = await idbGet<Creature[]>(CREATURES_KEY);
+				let stored = await idbGet<unknown>(CREATURES_KEY);
+				if (stored !== undefined && !isCreatureCollection(stored)) {
+					const backup = await idbGet<unknown>(CREATURES_BACKUP_KEY);
+					if (!isCreatureCollection(backup)) {
+						throw new Error('The creature collection and its backup are invalid.');
+					}
+					stored = backup;
+					recovered = true;
+					await idbSet(CREATURES_KEY, backup);
+				}
 				if (stored === undefined) {
 					// One-time migration of whatever survived in localStorage.
-					const legacy = load<Creature[]>(CREATURES_KEY, []);
+					const legacyValue = load<unknown>(CREATURES_KEY, []);
+					const legacy = isCreatureCollection(legacyValue) ? legacyValue : [];
 					if (legacy.length) {
 						await idbSet(CREATURES_KEY, legacy);
 						try {
@@ -164,14 +192,16 @@ export class Bestiary {
 						stored = legacy;
 					}
 				}
-				loaded = stored ?? [];
+				loaded = isCreatureCollection(stored) ? stored : [];
 			} catch (err) {
 				console.error('[bestiary] could not read creatures from IndexedDB', err);
 				// Best effort: fall back to anything still in localStorage.
-				loaded = load<Creature[]>(CREATURES_KEY, []);
+				const legacy = load<unknown>(CREATURES_KEY, []);
+				loaded = isCreatureCollection(legacy) ? legacy : [];
 			}
 		} else {
-			loaded = load<Creature[]>(CREATURES_KEY, []);
+			const legacy = load<unknown>(CREATURES_KEY, []);
+			loaded = isCreatureCollection(legacy) ? legacy : [];
 		}
 
 		// A sync rehydrate may have set authoritative state while we were reading;
@@ -190,6 +220,11 @@ export class Bestiary {
 		this.#hydrated = true;
 		this.ready = true;
 		this.#resolveReady();
+		await this.#updateStorageHealth(
+			loaded,
+			recovered ? 'recovered' : 'saved',
+			recovered ? 'restored the last-known-good creature shelf' : 'local shelf ready'
+		);
 		// Seed IDB with the merged result (and persist any pre-hydrate edits).
 		this.#persistCreatures();
 	}
@@ -200,6 +235,25 @@ export class Bestiary {
 		if (!this.#hydrated) return;
 		// $state proxies aren't structured-cloneable; snapshot to a plain copy.
 		this.#pendingWrite = $state.snapshot(this.creatures) as Creature[];
+		this.storageHealth = { ...this.storageHealth, status: 'saving', message: 'saving local shelf…' };
+		if (!idbAvailable()) {
+			const next = this.#pendingWrite;
+			this.#pendingWrite = null;
+			if (!next || typeof localStorage === 'undefined') return;
+			try {
+				const current = localStorage.getItem(CREATURES_KEY);
+				if (current) {
+					const parsed: unknown = JSON.parse(current);
+					if (isCreatureCollection(parsed)) localStorage.setItem(CREATURES_BACKUP_KEY, current);
+				}
+				localStorage.setItem(CREATURES_KEY, JSON.stringify(next));
+				void this.#updateStorageHealth(next, 'saved', 'local shelf saved');
+			} catch (err) {
+				console.error('[bestiary] could not persist creatures to localStorage', err);
+				this.#setStorageError();
+			}
+			return;
+		}
 		void this.#drainWrites();
 	}
 
@@ -211,14 +265,43 @@ export class Bestiary {
 				const next = this.#pendingWrite;
 				this.#pendingWrite = null;
 				try {
+					const current = await idbGet<unknown>(CREATURES_KEY);
+					if (isCreatureCollection(current)) {
+						await idbSet(CREATURES_BACKUP_KEY, current);
+					}
 					await idbSet(CREATURES_KEY, next);
+					await this.#updateStorageHealth(next, 'saved', 'local shelf saved');
 				} catch (err) {
 					console.error('[bestiary] could not persist creatures to IndexedDB', err);
+					this.#setStorageError();
 				}
 			}
 		} finally {
 			this.#writing = false;
 		}
+	}
+
+	async #updateStorageHealth(
+		creatures: Creature[],
+		status: BestiaryStorageHealth['status'],
+		message: string
+	): Promise<void> {
+		const estimate = await browserStorageEstimate();
+		this.storageHealth = {
+			status,
+			message,
+			collectionBytes: serializedBytes(creatures),
+			usageBytes: estimate?.usage ?? null,
+			quotaBytes: estimate?.quota ?? null
+		};
+	}
+
+	#setStorageError(): void {
+		this.storageHealth = {
+			...this.storageHealth,
+			status: 'error',
+			message: 'could not save the local shelf — export a backup before closing'
+		};
 	}
 
 	// Transient navigation
@@ -604,3 +687,16 @@ export const bestiary = new Bestiary();
 
 // Re-export so components can pull the singleton and the rarity list together.
 export { rarities };
+
+function isCreatureCollection(value: unknown): value is Creature[] {
+	return (
+		Array.isArray(value) &&
+		value.every(
+			(creature) =>
+				typeof creature === 'object' &&
+				creature !== null &&
+				typeof (creature as Partial<Creature>).id === 'string' &&
+				typeof (creature as Partial<Creature>).name === 'string'
+		)
+	);
+}

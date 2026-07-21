@@ -62,6 +62,7 @@ woodles.space/
 │   ├── sync.ts              Neon edge function — single-user sync
 │   └── schema.sql
 ├── packages/
+│   ├── persistence/         @woodles/persistence — versioned local storage mechanics
 │   └── sync/                @woodles/sync — the sync client
 └── apps/
     ├── landing/             static · the homepage
@@ -250,6 +251,27 @@ visitor actually opens that one feature. confirmed by measuring real
 network transfer against a `vite preview` build, not just `dist/`'s total
 size.
 
+## the local-first persistence layer
+
+Domain stores remain app-owned. `packages/persistence` provides the narrower
+mechanical contract they can opt into: versioned envelopes and migrations,
+runtime validation, last-known-good recovery, explicit quota/write errors,
+export/import round trips, and byte/storage estimates. The full adoption
+contract and reference API live in
+[`packages/persistence/README.md`](./packages/persistence/README.md).
+
+`notebook` is the reference localStorage adoption. It migrates the former four
+v1 keys into one v2 workspace document, validates stored and imported data,
+shows save/recovery failures in the page, and exports the same envelope that it
+imports. `bestiary` remains IndexedDB-native because of its embedded image data;
+it validates its collection, keeps a last-known-good shelf, and reports both
+collection size and the browser origin's usage/quota in `SyncPanel`.
+
+This is intentionally incremental. Planner, Spores, Thinking About, Write, and
+Marginalia keep their existing domain persistence until each is changed for a
+product reason; adoption should migrate one store at a time rather than create
+a central Woodles state service.
+
 ## the sync layer
 
 a single-user sync spine that a few apps opt into. localStorage stays the source
@@ -421,19 +443,15 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-840 tests total, as of `thinking-about`'s addition: 16 in `api/` (its own
+913 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 824 across seven pnpm
-packages — `write` 65, `marginalia` 230, `planner` 283, `spores` 46,
-`bestiary` 160, `packages/sync` 5, `thinking-about` 35. `marginalia-devlog`
-has no test script. this table has already gone stale more than once — it
-read 620 before weeks 1–9's own new test files, then 764 right after
-week-10's own pass, then 805 once a same-week, separately-developed effort
-(week 4's cards-that-travel, plus an unrelated epub reader) merged into
-this branch and brought its own new tests along, then 840 once
-`thinking-about` shipped. keep it updated when that happens again — it
-will.
+instead of the recursive `pnpm -r test`), plus 897 across nine pnpm
+packages — `write` 65, `marginalia` 249, `planner` 283, `notebook` 14,
+`spores` 46, `bestiary` 160, `packages/sync` 5,
+`packages/persistence` 6, and `thinking-about` 69.
+`marginalia-devlog` has no test script. keep this inventory current when a
+suite changes; the root command is the release contract, not the prose count.
 
 each app's `test` runs `svelte-kit sync && vitest run`. the `sync` matters: a
 SvelteKit app's `tsconfig.json` extends `./.svelte-kit/tsconfig.json`, which
@@ -441,10 +459,11 @@ SvelteKit app's `tsconfig.json` extends `./.svelte-kit/tsconfig.json`, which
 can't resolve the tsconfig. because the scripts sync first, `pnpm test` works
 straight from a clean checkout.
 
-`write` and `marginalia` load the workspace-level `vitest.setup.ts` to install a
-browser-like in-memory `localStorage` under Node. planner keeps its own
-localStorage mock in `store.test.ts`; under the current Node runtime that suite
-passes but may still print a `--localstorage-file` warning.
+`write`, `marginalia`, and `notebook` load the workspace-level
+`vitest.setup.ts` to install a browser-like in-memory `localStorage` under
+Node. planner keeps its own localStorage mock in `store.test.ts`; under the
+current Node runtime that suite passes but may still print a
+`--localstorage-file` warning.
 
 `planner`'s `vitest.config.ts` loads the SvelteKit plugin, and it has to:
 `planner`'s store is a `.svelte.ts` module that uses `$state`, instantiated at
@@ -455,25 +474,17 @@ are written up in [apps/planner/KNOWN_ISSUES.md](./apps/planner/KNOWN_ISSUES.md)
 
 ## svelte-check
 
-| app                 | status                                  |
-| ------------------- | --------------------------------------- |
-| `write`             | clean                                   |
-| `marginalia`        | clean                                   |
-| `planner`           | clean                                   |
-| `notebook`          | clean                                   |
-| `bestiary`          | clean                                   |
-| `spores`            | **2 errors**, 6 warnings — `GraphRenderer.svelte`/`SporeView.svelte` type errors, plus `autofocus` a11y warnings |
-| `marginalia-devlog` | 1 warning — `line-clamp` in `EntryList` |
-| `thinking-about`    | clean                                   |
+All eight SvelteKit apps currently pass with zero errors and zero warnings.
+`pnpm -r check` runs all eight in turn. it stops at the first app that fails,
+so when diagnosing a new break, run the app directly to see past it.
 
-`pnpm -r check` runs all eight in turn and reaches every one. it stops at the
-first app that fails, though, so if you break an early one, run the app you care
-about directly to see past it. `spores`'s 2 errors are exactly that case today
-— pre-existing (last touched by an unrelated commit, well before this
-roadmap's work started, confirmed via `git log`/`git diff` against every
-commit in weeks 1–10), not introduced by anything in the public-facing
-roadmap. left unfixed here: out of scope for a hardening pass whose job was
-this roadmap's own work, not an unrelated app's stale type errors.
+## continuous integration
+
+The repository-level workflow at `../.github/workflows/quality.yml` runs on
+pushes and pull requests with Node 22 and pnpm 10.32.1. It installs from the
+lockfile, then runs `pnpm check`, `pnpm test`, and `pnpm build` from this
+workspace. Keep the local root commands and that workflow identical so a green
+checkout means the same thing locally and on GitHub.
 
 ## running things locally
 
@@ -481,7 +492,7 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (840 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (913 tests)
 pnpm check              svelte-check in every app
 pnpm build              build the eight SvelteKit apps
 ```

@@ -2,6 +2,7 @@
 	import { garden } from '$lib/garden.svelte';
 	import type { Spore, Spellbook } from '$lib/types';
 	import { formatDate, formatDateShort } from '$lib/utils';
+	import { focusOnMount } from '$lib/focus';
 
 	let sb = $derived(garden.activeSpellbook);
 	let spores = $derived(sb ? garden.sporesInSpellbook(sb.id) : []);
@@ -61,7 +62,7 @@
 		{#if showNew}
 			<form class="new-spore-form" onsubmit={handleNew}>
 				<input
-					autofocus
+					use:focusOnMount
 					class="new-input"
 					type="text"
 					placeholder={sb.archetype === 'diary' ? 'today…' : sb.archetype === 'media' ? 'title…' : 'new spore…'}

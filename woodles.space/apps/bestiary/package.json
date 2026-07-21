@@ -12,6 +12,7 @@
 		"screenshot": "node scripts/screenshot.mjs"
 	},
 	"dependencies": {
+		"@woodles/persistence": "workspace:*",
 		"@woodles/sync": "workspace:*",
 		"modern-screenshot": "^4.7.0"
 	},

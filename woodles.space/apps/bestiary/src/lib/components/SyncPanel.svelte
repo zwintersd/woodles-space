@@ -2,6 +2,7 @@
 	import { syncState, connectAndHydrate, disconnect, flushSync } from '$lib/sync.svelte';
 	import { bestiary } from '$lib/bestiary.svelte';
 	import PublishPanel from './PublishPanel.svelte';
+	import { formatBytes } from '@woodles/persistence';
 
 	let pass = $state('');
 	let connecting = $state(false);
@@ -18,6 +19,16 @@
 
 <div class="sync-panel">
 	<h3 class="panel-title">sync &amp; export</h3>
+
+	<div class="local-storage" class:error={bestiary.storageHealth.status === 'error'} aria-live="polite">
+		<strong>{bestiary.storageHealth.message}</strong>
+		<span>
+			collection {formatBytes(bestiary.storageHealth.collectionBytes)}
+			{#if bestiary.storageHealth.usageBytes !== null && bestiary.storageHealth.quotaBytes !== null}
+				· browser {formatBytes(bestiary.storageHealth.usageBytes)} / {formatBytes(bestiary.storageHealth.quotaBytes)}
+			{/if}
+		</span>
+	</div>
 
 	{#if syncState.connected}
 		<div class="sync-status ok">
@@ -134,6 +145,21 @@
 	.btn-ghost.muted { color: var(--b-muted); }
 	.btn-ghost.muted:hover { color: var(--b-text-dim); border-color: var(--b-border-strong); }
 	.error-msg { font-size: 0.82rem; color: var(--b-mythic); font-family: var(--b-font-mono); }
+	.local-storage {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+		padding: var(--b-space-sm) var(--b-space-md);
+		border: 1px solid var(--b-border);
+		border-radius: var(--b-radius-sm);
+		background: var(--b-surface-2);
+		font-family: var(--b-font-mono);
+		font-size: 0.72rem;
+		color: var(--b-muted);
+	}
+	.local-storage strong { color: var(--b-text-dim); font-weight: 500; }
+	.local-storage.error { border-color: var(--b-mythic); }
+	.local-storage.error strong { color: var(--b-mythic); }
 	.publish-row { padding-top: var(--b-space-sm); }
 	.export-row { padding-top: var(--b-space-md); border-top: 1px solid var(--b-rule); }
 </style>

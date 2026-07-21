@@ -5,6 +5,7 @@
 	import PromotePanel from './spell/PromotePanel.svelte';
 	import TagInput from './TagInput.svelte';
 	import GraphRenderer from './GraphRenderer.svelte';
+	import { focusOnMount } from '$lib/focus';
 
 	let spore = $derived(garden.activeSpore);
 	let editing = $derived(garden.editingSporeId === garden.activeSporeId);
@@ -87,7 +88,7 @@
 		edges: { from: string; to: string; type?: string; label?: string }[];
 	}
 
-	let graphScript = $derived((): GraphScriptData | null => {
+	let graphScript = $derived.by<GraphScriptData | null>(() => {
 		const d = spore?.data;
 		if (d?.kind === 'anime-relationship-graph' && Array.isArray(d.nodes)) {
 			return d as unknown as GraphScriptData;
@@ -109,9 +110,9 @@
 
 </script>
 
-{#if showGraph && graphScript()}
+{#if showGraph && graphScript}
 	<GraphRenderer
-		graphScript={graphScript()}
+		{graphScript}
 		onclose={() => (showGraph = false)}
 	/>
 {/if}
@@ -132,7 +133,7 @@
 			<div class="header-meta">
 				<span class="spore-date">{formatDate(spore.updated)}</span>
 				<div class="header-actions">
-					{#if graphScript()}
+					{#if graphScript}
 						<button class="btn-graph" onclick={() => (showGraph = true)}>
 							◉ view graph
 						</button>
@@ -189,7 +190,7 @@
 			{#if garden.showAddFlight}
 				<div class="flight-search">
 					<input
-						autofocus
+						use:focusOnMount
 						class="flight-input"
 						type="text"
 						placeholder="search spores…"
