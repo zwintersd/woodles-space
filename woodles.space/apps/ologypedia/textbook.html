@@ -75,6 +75,7 @@
   .more-item.danger{color:var(--rose-deep);}
   .more-item.danger:hover{background:#f6dede;}
   .more-item .ic{flex:none; width:18px; text-align:center; color:var(--rose-dust);}
+  .more-badge{margin-left:auto; font-size:11px; font-weight:600; color:var(--paper); background:var(--rose-deep); border-radius:999px; padding:1px 8px;}
 
   /* ============================ layout ============================ */
   .shell{display:grid; grid-template-columns:290px minmax(0,1fr); gap:0; min-height:calc(100vh - 57px);}
@@ -215,6 +216,11 @@
   .entry-content strong,.entry-content b{color:var(--rose-deep);}
   .entry-content hr{border:none; border-top:1px dotted var(--rose-dust); margin:1.6em 0;}
   .entry-content code{background:var(--paper-edge); padding:1px 6px; border-radius:4px; font-size:.92em;}
+  .entry-content table{width:100%; border-collapse:collapse; font-size:.9em; margin:0 0 1.1em; display:block; overflow-x:auto;}
+  .entry-content th,.entry-content td{border:1px solid color-mix(in srgb, var(--gold) 60%, transparent); padding:8px 11px; text-align:left; vertical-align:top;}
+  .entry-content th{font-family:var(--font-display); font-weight:600; color:var(--rose-deep); background:color-mix(in srgb, var(--blush) 55%, transparent);}
+  .entry-content figure{margin:0 0 1.2em; padding:14px 16px; border:1px solid color-mix(in srgb, var(--gold) 55%, transparent); border-radius:8px; background:#fffdfa;}
+  .entry-content figcaption{font-family:var(--font-display); font-weight:600; font-size:.82em; letter-spacing:.04em; text-transform:uppercase; color:var(--rose-deep); margin-bottom:6px;}
   .entry-content mark,.entry-content .entry-highlight{background:color-mix(in srgb, var(--gold) 40%, #fff6dd); padding:.05em .15em; border-radius:3px; color:inherit;}
 
   /* the links between entries — the stitching */
@@ -358,6 +364,7 @@
       <div class="more-wrap">
         <button class="tb-btn ghost" id="menu-more" aria-haspopup="true" aria-expanded="false" title="Export, import, or reset your textbook" aria-label="More">&#8942;</button>
         <div class="more-menu" id="more-menu" role="menu">
+          <button class="more-item" id="more-studio" role="menuitem"><span class="ic">&#8623;</span> Import from the Studio<span id="more-studio-n" class="more-badge" hidden></span></button>
           <button class="more-item" id="more-export" role="menuitem"><span class="ic">&#8595;</span> Export as a file</button>
           <button class="more-item" id="more-import" role="menuitem"><span class="ic">&#8593;</span> Import a file&hellip;</button>
           <button class="more-item danger" id="more-reset" role="menuitem"><span class="ic">&#8635;</span> Reset to the sample</button>
@@ -511,6 +518,9 @@
       <div class="care">
         <b>Made to be low-friction on purpose.</b> Starting a page never forces you to finish it, and never makes you leave the one you're on. Motion can be turned off (<b>Calm motion</b>), the room can be quieted down to one page (<b>Focus</b>), and the shape of every page is the same so nothing surprises you. Deep dives are the point, not a detour.
       </div>
+      <div class="care">
+        <b>Already built pages in the Studio?</b> Anything you made in <span class="k">Add a Page</span> shows up here automatically as a living, editable entry — prose, headings, tables, and the links between pages all come across. You can re-pull anytime from the <b>⋮</b> menu.
+      </div>
       <div class="close-row">
         <button class="tb-btn primary" id="sheet-close">Got it</button>
       </div>
@@ -593,9 +603,9 @@
   }
 
   // ---------- sanitizer: a safe, on-voice subset ----------
-  var ALLOWED_TAGS = {P:1,BR:1,HR:1,H2:1,H3:1,H4:1,UL:1,OL:1,LI:1,BLOCKQUOTE:1,STRONG:1,B:1,EM:1,I:1,U:1,A:1,MARK:1,CODE:1,DIV:1,SPAN:1,FIGURE:1,FIGCAPTION:1};
-  var DROP_TAGS = {SCRIPT:1,STYLE:1,IFRAME:1,OBJECT:1,EMBED:1,LINK:1,META:1,FORM:1,INPUT:1,BUTTON:1};
-  var ALLOWED_CLASS = {'entry-intro':1,'lede':1,'sec-head':1,'num':1,'pullquote':1,'entry-highlight':1,'entry-link':1,'is-broken':1,'scaffold':1,'chain':1,'chip':1,'box':1,'reading':1,'notes':1,'figure-box':1};
+  var ALLOWED_TAGS = {P:1,BR:1,HR:1,H2:1,H3:1,H4:1,UL:1,OL:1,LI:1,BLOCKQUOTE:1,STRONG:1,B:1,EM:1,I:1,U:1,A:1,MARK:1,CODE:1,DIV:1,SPAN:1,FIGURE:1,FIGCAPTION:1,TABLE:1,THEAD:1,TBODY:1,TR:1,TD:1,TH:1,CAPTION:1};
+  var DROP_TAGS = {SCRIPT:1,STYLE:1,IFRAME:1,OBJECT:1,EMBED:1,LINK:1,META:1,FORM:1,INPUT:1,BUTTON:1,SVG:1,CANVAS:1,IMG:1};
+  var ALLOWED_CLASS = {'entry-intro':1,'lede':1,'sec-head':1,'num':1,'pullquote':1,'entry-highlight':1,'entry-link':1,'is-broken':1,'scaffold':1,'chain':1,'chip':1,'box':1,'reading':1,'notes':1,'figure-box':1,'compare':1};
 
   function filterClasses(cls){
     return String(cls || '').split(/\s+/).filter(function(c){ return ALLOWED_CLASS[c]; }).join(' ');
@@ -1373,6 +1383,73 @@
     }
   }
 
+  // ======================================================================
+  //  Import from the Studio — the pages you built in add-page.html
+  //  (localStorage 'ologypedia-studio-v1') become living Textbook entries.
+  //  Each studio entry's full HTML page is reduced to an editable body
+  //  fragment; cross-page links become entry-links. Additive and tracked
+  //  (never clobbers a Textbook entry you've since edited or deleted).
+  // ======================================================================
+  function readStudio(){
+    var s; try { s = JSON.parse(localStorage.getItem('ologypedia-studio-v1')); } catch(e){ s = null; }
+    return Array.isArray(s) ? s : [];
+  }
+  function studioBodyToFragment(html){
+    var parsed;
+    try { parsed = new DOMParser().parseFromString(String(html || ''), 'text/html'); }
+    catch(e){ return ''; }
+    var root = parsed.querySelector('article') || parsed.querySelector('.wrap') || parsed.body;
+    if (!root) return '';
+    // strip page chrome + the masthead (its title/subtitle duplicate the entry's own)
+    root.querySelectorAll('script,style,nav,header,footer,.tb-back,.tagline,.kicker-tag,.subtitle-row,h1,.masthead,svg,canvas,img').forEach(function(n){ n.remove(); });
+    // turn cross-page links into entry-links so the web of pages survives the move
+    Array.prototype.forEach.call(root.querySelectorAll('a[href]'), function(a){
+      var href = a.getAttribute('href') || '';
+      var m = /textbook-([a-z0-9-]+)\.html/i.exec(href) || /textbook\.html#([a-z0-9-]+)/i.exec(href);
+      if (m){ a.setAttribute('data-entry', m[1]); a.removeAttribute('href'); }
+    });
+    return sanitize(root.innerHTML);
+  }
+  function makeEntryFromStudio(s){
+    var frag = s.html ? studioBodyToFragment(s.html) : '';
+    var len = plainText(frag).length;
+    makeEntry({
+      id: s.slug,
+      title: s.title || s.slug.replace(/-/g, ' '),
+      subject: s.subject || '',
+      body: frag,
+      status: len > 200 ? 'grown' : (len ? 'growing' : 'seed'),
+      accent: (s.accent && ACCENTS.indexOf(s.accent) >= 0) ? s.accent : undefined,
+      glyph: s.glyph || undefined,
+      blurb: s.desc || undefined
+    });
+  }
+  // slugs in the Studio that could still be pulled in (not already a Textbook entry)
+  function studioPending(){
+    return readStudio().filter(function(s){ return s && s.slug && !db.entries[s.slug]; });
+  }
+  // opts.respectImported: skip slugs the user has already imported once (so a
+  // deleted entry doesn't silently come back). Used for the automatic pass.
+  function importFromStudio(opts){
+    opts = opts || {};
+    prefs.importedStudioSlugs = prefs.importedStudioSlugs || {};
+    var added = 0;
+    readStudio().forEach(function(s){
+      if (!s || !s.slug) return;
+      if (db.entries[s.slug]) return;                                   // already here → never clobber
+      if (opts.respectImported && prefs.importedStudioSlugs[s.slug]) return;
+      makeEntryFromStudio(s);
+      prefs.importedStudioSlugs[s.slug] = true;
+      added++;
+    });
+    if (added){ savePrefs(); persist(); renderAll(); }
+    return added;
+  }
+  function refreshStudioBadge(){
+    var n = studioPending().length, b = $('more-studio-n');
+    if (n){ b.textContent = n; b.hidden = false; } else { b.hidden = true; }
+  }
+
   // ---------- preferences: focus, motion ----------
   function applyPrefs(){
     document.documentElement.setAttribute('data-reduce-motion', prefs.reduceMotion ? '1' : '0');
@@ -1391,7 +1468,13 @@
     $('help-btn').addEventListener('click', function(){ $('sheet-back').classList.add('open'); });
     $('sheet-close').addEventListener('click', function(){ $('sheet-back').classList.remove('open'); });
     $('sheet-back').addEventListener('click', function(ev){ if (ev.target === $('sheet-back')) $('sheet-back').classList.remove('open'); });
-    $('menu-more').addEventListener('click', function(ev){ ev.stopPropagation(); toggleMore(); });
+    $('menu-more').addEventListener('click', function(ev){ ev.stopPropagation(); refreshStudioBadge(); toggleMore(); });
+    $('more-studio').addEventListener('click', function(){
+      toggleMore(false);
+      var n = importFromStudio({ respectImported: false });   // manual: bring in anything missing
+      refreshStudioBadge();
+      toast(n ? ('Imported ' + n + ' entr' + (n === 1 ? 'y' : 'ies') + ' from the Studio.') : 'Your Textbook already has every Studio entry.');
+    });
     $('more-export').addEventListener('click', function(){ toggleMore(false); exportJSON(); });
     $('more-import').addEventListener('click', function(){ toggleMore(false); $('import-file').click(); });
     $('more-reset').addEventListener('click', function(){ toggleMore(false); resetToSample(); });
@@ -1523,6 +1606,11 @@
     $('sel-kbd').textContent = isMac ? '⌘E' : 'Ctrl+E';
     wire();
     renderAll();
+    // pull in the pages you built in the Studio (add-page.html) so they live
+    // here too — additive, and tracked so a deleted one won't silently return
+    var auto = importFromStudio({ respectImported: true });
+    if (auto){ toast('Brought ' + auto + ' entr' + (auto === 1 ? 'y' : 'ies') + ' in from the Studio — they’re in your index now.'); }
+    refreshStudioBadge();
     if (!prefs.welcomed){ prefs.welcomed = true; savePrefs(); $('sheet-back').classList.add('open'); }
     $('saved').innerHTML = 'Saved in this browser';
   }
