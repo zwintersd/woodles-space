@@ -34,11 +34,13 @@
 		activePet?: BestiaryCreature | null;
 		bestiaryCreatures?: BestiaryCreature[];
 		onactivechange?: (gameId: string | null) => void;
+		ontheaterchange?: (enabled: boolean) => void;
 	}
 
-	let { activePet = null, bestiaryCreatures = [], onactivechange }: Props = $props();
+	let { activePet = null, bestiaryCreatures = [], onactivechange, ontheaterchange }: Props = $props();
 
 	let activeGame = $state<string | null>(null);
+	let theaterMode = $state(false);
 	let rootEl: HTMLDivElement;
 
 	const WORD_WEAVE_TARGET = 8;
@@ -209,13 +211,23 @@
 
 	function openGame(gameId: string) {
 		activeGame = gameId;
+		theaterMode = false;
+		ontheaterchange?.(false);
 		onactivechange?.(activeGame);
 		void showCabinetTop();
 	}
 
 	function closeGame() {
+		theaterMode = false;
+		ontheaterchange?.(false);
 		activeGame = null;
 		onactivechange?.(activeGame);
+		void showCabinetTop();
+	}
+
+	function toggleTheaterMode() {
+		theaterMode = !theaterMode;
+		ontheaterchange?.(theaterMode);
 		void showCabinetTop();
 	}
 
@@ -240,7 +252,7 @@
 	</header>
 
 	{#if activeGameData}
-		<section class="active-game" aria-label="{activeGameData.title} game">
+		<section class="active-game" class:theater-mode={theaterMode} aria-label="{activeGameData.title} game">
 			<header class="active-head">
 				<button class="back-to-games" onclick={closeGame}>← games</button>
 				<div>
@@ -250,6 +262,14 @@
 						<p class="pet-lock-note">{activePet.name} is locked in for this game</p>
 					{/if}
 				</div>
+				<button
+					class="theater-toggle"
+					aria-pressed={theaterMode}
+					onclick={toggleTheaterMode}
+					title={theaterMode ? 'Return to the arcade layout' : 'Make the game larger and centered'}
+				>
+					{theaterMode ? '↙ arcade view' : '⌑ theater view'}
+				</button>
 			</header>
 
 			<div class="active-game-body" data-active-game={activeGame}>
@@ -474,7 +494,7 @@
 	}
 	.active-head {
 		display: grid;
-		grid-template-columns: auto minmax(0, 1fr);
+		grid-template-columns: auto minmax(0, 1fr) auto;
 		align-items: center;
 		gap: 0.85rem;
 		padding: 0.85rem 1.4rem;
@@ -494,6 +514,24 @@
 	}
 	.back-to-games:hover {
 		background: var(--sol-base00);
+	}
+	.theater-toggle {
+		font-family: var(--font-ui);
+		font-size: 0.66rem;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--sol-base00);
+		background: transparent;
+		border: 1px solid var(--sol-base1);
+		border-radius: 3px;
+		padding: 0.32rem 0.58rem;
+		white-space: nowrap;
+	}
+	.theater-toggle:hover,
+	.theater-toggle[aria-pressed='true'] {
+		color: var(--sol-base3);
+		background: var(--sol-violet);
+		border-color: var(--sol-violet);
 	}
 	.active-kicker {
 		font-family: var(--font-ui);
@@ -521,6 +559,12 @@
 	.active-game-body {
 		min-width: 0;
 		container-type: inline-size;
+	}
+	.active-game.theater-mode {
+		box-shadow: 0 0 0 1px rgba(108, 113, 196, 0.3), 0 1.2rem 3rem rgba(7, 54, 66, 0.16);
+	}
+	.active-game.theater-mode .active-game-body {
+		padding: clamp(0.6rem, 1.6vw, 1.25rem);
 	}
 
 	/* Wide-play mode: every game keeps its own rules and markup, while the
@@ -561,6 +605,16 @@
 			align-self: start;
 			justify-self: center;
 			max-width: 100%;
+		}
+	}
+
+	/* Theater mode has more room for the board without changing its game rules. */
+	@container (min-width: 58rem) {
+		.theater-mode .active-game-body :global(.game-shell) {
+			grid-template-columns: minmax(20rem, 23rem) minmax(28rem, 1fr);
+		}
+		.theater-mode .active-game-body :global(.board-wrap) {
+			width: min(34rem, 100%);
 		}
 	}
 
@@ -633,7 +687,8 @@
 		.active-head {
 			grid-template-columns: 1fr;
 		}
-		.back-to-games {
+		.back-to-games,
+		.theater-toggle {
 			justify-self: start;
 		}
 	}

@@ -8,6 +8,7 @@
 
 	let activeGame = $state<string | null>(null);
 	let activePet = $state<BestiaryCreature | null>(null);
+	let theaterMode = $state(false);
 
 	function onFocus() {
 		void book.refreshBestiaryCreatures();
@@ -19,12 +20,17 @@
 
 	function setActiveGame(gameId: string | null) {
 		activeGame = gameId;
+		if (!gameId) theaterMode = false;
 		if (gameId) {
 			stopTick();
 			book.persist();
 		} else {
 			startTick();
 		}
+	}
+
+	function setTheaterMode(enabled: boolean) {
+		theaterMode = enabled;
 	}
 
 	onMount(() => {
@@ -63,11 +69,18 @@
 		</div>
 	</header>
 
-	<main class="arcade-layout" class:playing={activeGame !== null}>
+	<main class="arcade-layout" class:playing={activeGame !== null} class:theater={theaterMode}>
 		<section class="game-column" aria-label="arcade games">
-			<Arcade {activePet} bestiaryCreatures={book.bestiaryCreatures} onactivechange={setActiveGame} />
+			<Arcade
+				{activePet}
+				bestiaryCreatures={book.bestiaryCreatures}
+				onactivechange={setActiveGame}
+				ontheaterchange={setTheaterMode}
+			/>
 		</section>
-		<ActivePetPanel locked={activeGame !== null} onpetchange={(pet) => (activePet = pet)} />
+		<aside class="companion-column" class:theater-hidden={theaterMode} aria-hidden={theaterMode}>
+			<ActivePetPanel locked={activeGame !== null} onpetchange={(pet) => (activePet = pet)} />
+		</aside>
 	</main>
 </div>
 
@@ -151,6 +164,13 @@
 	.arcade-layout.playing {
 		width: min(100%, 96rem);
 		grid-template-columns: minmax(0, 1fr) minmax(17rem, 20rem);
+	}
+	.arcade-layout.playing.theater {
+		width: min(100%, 92rem);
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.companion-column.theater-hidden {
+		display: none;
 	}
 	.game-column {
 		min-width: 0;
