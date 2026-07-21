@@ -221,6 +221,25 @@ optional diagnosis/health-condition toggle adds the Studio's four extra
 sections to the brief. Nothing calls a model directly — the app stays
 backend-free; the human carries the prompt and the answer across.
 
+**Import from the Studio** closes the other direction: the pages you built
+in `add-page.html` (the `ologypedia-studio-v1` shelf — each a full standalone
+HTML page) become living Textbook entries. On load the reader auto-imports
+any Studio entry that isn't already a Textbook entry, and the `⋮` menu has a
+manual "Import from the Studio" (with a badge count) that pulls in anything
+missing. Import is **additive and tracked** (`prefs.importedStudioSlugs`): it
+never clobbers an entry you've since edited, and a deleted import won't
+silently return on the next load — but the manual action can pull it back.
+`studioBodyToFragment` reduces each full page to an editable body fragment via
+`DOMParser`: it drops page chrome and the masthead (whose title/subtitle
+duplicate the entry's own), strips `svg`/`canvas`/`img` (the block system's
+charts have no Textbook CSS), rewrites `textbook-<slug>.html` and
+`textbook.html#<slug>` links into `entry-link`s so the web of pages survives
+the move, and sanitizes the rest — which now keeps `table`/`thead`/`tbody`/
+`tr`/`td`/`th` (Studio `.compare` tables) alongside the prose, headings,
+pull-quotes and lists. Because a Textbook entry uses the Studio slug as its
+id, the imported entry then takes precedence on the bookcase (per the dedup
+rule above), so its shelf card opens the reader rather than the Studio editor.
+
 `marginalia` is the biggest app by built size (`dist/` ~3.1 MB, week 10
 perf-sanity check) — but the number that actually matters, first-load
 transfer, is a much healthier ~290 KB. the difference is the reading
