@@ -390,24 +390,28 @@
 	// ── tile appearance ───────────────────────────────────────────────────
 	const TILE_COLORS: Record<number, [string, string]> = {
 		0:    ['transparent', 'transparent'],
-		2:    ['#eee8d5', '#586e75'],
-		4:    ['#d0c9b5', '#586e75'],
-		8:    ['#b58900', '#fdf6e3'],
-		16:   ['#cb4b16', '#fdf6e3'],
-		32:   ['#dc322f', '#fdf6e3'],
-		64:   ['#d33682', '#fdf6e3'],
-		128:  ['#6c71c4', '#fdf6e3'],
-		256:  ['#268bd2', '#fdf6e3'],
-		512:  ['#2aa198', '#fdf6e3'],
-		1024: ['#859900', '#fdf6e3'],
-		2048: ['#b58900', '#fdf6e3']
+		2:    ['linear-gradient(145deg, #fff9fc, #f6e4ef)', '#67566f'],
+		4:    ['linear-gradient(145deg, #faf7ff, #e8def7)', '#635672'],
+		8:    ['linear-gradient(145deg, #fff4e9, #f8d9cf)', '#76545d'],
+		16:   ['linear-gradient(145deg, #ffeaf5, #f4cbe2)', '#71465f'],
+		32:   ['linear-gradient(145deg, #f1efff, #d8d9f7)', '#54577b'],
+		64:   ['linear-gradient(145deg, #e9f7ff, #c9e5f3)', '#426274'],
+		128:  ['linear-gradient(145deg, #ecfff9, #c8eadf)', '#42695e'],
+		256:  ['linear-gradient(145deg, #f3eaff, #d8c6f0)', '#604b7a'],
+		512:  ['linear-gradient(145deg, #ffe4f1, #ebb7d4)', '#6f3f5a'],
+		1024: ['linear-gradient(145deg, #fff5cf, #f1d996)', '#705d34'],
+		2048: ['linear-gradient(145deg, #f5dcff, #cda8ed)', '#513763']
 	};
 
 	function tileStyle(val: number): string {
-		const [bg, fg] = TILE_COLORS[val] ?? ['#073642', '#fdf6e3'];
+		const [bg, fg] = TILE_COLORS[val] ?? ['linear-gradient(145deg, #dec7f4, #a98bc8)', '#463254'];
 		const fs = val >= 1000 ? '1.1rem' : val >= 100 ? '1.35rem' : '1.7rem';
-		const shadow = val !== 0 ? 'box-shadow:inset 0 -3px 0 rgba(0,0,0,0.18);' : '';
-		return `background:${bg};color:${fg};font-size:${fs};${shadow}`;
+		const glow = val >= 2048
+			? 'box-shadow:inset 0 1px 0 rgba(255,255,255,0.88),0 0 20px rgba(220,183,242,0.78),0 6px 14px rgba(83,55,99,0.18);'
+			: val !== 0
+				? 'box-shadow:inset 0 1px 0 rgba(255,255,255,0.82),0 5px 12px rgba(95,72,112,0.14);'
+				: '';
+		return `background:${bg};color:${fg};font-size:${fs};${glow}`;
 	}
 </script>
 
@@ -531,49 +535,94 @@
 <style>
 	/* inherits --sol-* tokens from .arcade-root ancestor */
 	.game-shell {
+		--magic-ink: #67566f;
+		--magic-deep: #71587d;
+		--magic-rose: #d88fb8;
+		--magic-lilac: #b99bdd;
+		position: relative;
+		isolation: isolate;
+		overflow: hidden;
 		padding: 1.2rem 1.4rem 1.6rem;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		gap: 1.1rem;
-		background: var(--sol-base3);
-		border-top: 2px solid var(--sol-base2);
+		background:
+			radial-gradient(circle at 12% 12%, rgba(255, 255, 255, 0.95) 0 2px, transparent 2.8px),
+			radial-gradient(circle at 88% 23%, rgba(216, 143, 184, 0.45) 0 1.5px, transparent 2.4px),
+			radial-gradient(circle at 22% 70%, rgba(185, 155, 221, 0.44) 0 1.5px, transparent 2.4px),
+			linear-gradient(150deg, #fffafc 0%, #f8eff8 46%, #eef2ff 100%);
+		background-size: 92px 92px, 118px 118px, 137px 137px, auto;
+		border-top: 2px solid #ead7e8;
+	}
+	.game-shell::before,
+	.game-shell::after {
+		content: '';
+		position: absolute;
+		z-index: -1;
+		border-radius: 999px;
+		filter: blur(2px);
+		pointer-events: none;
+	}
+	.game-shell::before {
+		width: 13rem;
+		height: 13rem;
+		top: 8rem;
+		left: -8rem;
+		background: rgba(243, 193, 219, 0.2);
+		box-shadow: 0 22rem 0 rgba(196, 226, 222, 0.18);
+	}
+	.game-shell::after {
+		width: 11rem;
+		height: 11rem;
+		top: 24rem;
+		right: -7rem;
+		background: rgba(194, 176, 229, 0.22);
 	}
 
 	.mode-row {
 		width: min(360px, calc(100vw - 3rem));
 		display: grid;
 		grid-template-columns: repeat(2, 1fr);
-		gap: 1px;
+		gap: 3px;
 		overflow: hidden;
-		border: 1px solid var(--sol-base2);
-		border-radius: 4px;
-		background: var(--sol-base2);
+		border: 1px solid rgba(185, 155, 221, 0.42);
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.5);
+		padding: 3px;
+		box-shadow: 0 7px 20px rgba(105, 78, 120, 0.08);
 	}
 	.mode-row button {
 		font-family: var(--font-ui);
 		font-size: 0.66rem;
 		letter-spacing: 0.16em;
 		text-transform: uppercase;
-		color: var(--sol-base0);
-		background: var(--sol-base3);
+		color: var(--magic-ink);
+		background: transparent;
 		padding: 0.45rem 0.5rem;
+		border-radius: 999px;
 		transition:
-			background 0.1s,
-			color 0.1s;
+			background 0.18s,
+			color 0.18s,
+			box-shadow 0.18s;
 	}
 	.mode-row button.active {
-		color: var(--sol-base3);
-		background: var(--sol-blue);
+		color: #fffaff;
+		background: linear-gradient(135deg, var(--magic-rose), var(--magic-lilac));
+		box-shadow: 0 4px 12px rgba(185, 155, 221, 0.28);
 	}
 
 	/* ── powers ─────────────────────────────────────────────────────────── */
 	.power-panel {
 		width: min(360px, calc(100vw - 3rem));
-		border: 1px solid var(--sol-base2);
-		border-radius: 5px;
-		background: rgba(238, 232, 213, 0.46);
-		padding: 0.65rem;
+		border: 1px solid rgba(255, 255, 255, 0.88);
+		border-radius: 16px;
+		background: rgba(255, 250, 253, 0.68);
+		box-shadow:
+			0 12px 30px rgba(100, 73, 116, 0.1),
+			inset 0 0 0 1px rgba(216, 143, 184, 0.14);
+		backdrop-filter: blur(8px);
+		padding: 0.78rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.55rem;
@@ -587,7 +636,7 @@
 		font-size: 0.58rem;
 		letter-spacing: 0.18em;
 		text-transform: uppercase;
-		color: var(--sol-base1);
+		color: var(--magic-deep);
 	}
 	.power-grid {
 		display: grid;
@@ -596,10 +645,10 @@
 	}
 	.power-grid button {
 		min-height: 3.3rem;
-		border: 1px solid var(--sol-base2);
-		border-radius: 4px;
-		background: var(--sol-base3);
-		color: var(--sol-base0);
+		border: 1px solid rgba(185, 155, 221, 0.34);
+		border-radius: 10px;
+		background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(246, 236, 249, 0.88));
+		color: var(--magic-ink);
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -607,15 +656,19 @@
 		gap: 0.16rem;
 		padding: 0.35rem 0.3rem;
 		transition:
-			background 0.1s,
-			border-color 0.1s,
-			color 0.1s;
+			background 0.18s,
+			border-color 0.18s,
+			color 0.18s,
+			transform 0.18s,
+			box-shadow 0.18s;
 	}
 	.power-grid button:not(:disabled):hover,
 	.power-grid button.armed {
-		color: var(--sol-base3);
-		background: var(--sol-cyan);
-		border-color: var(--sol-cyan);
+		color: #fffaff;
+		background: linear-gradient(135deg, var(--magic-rose), var(--magic-lilac));
+		border-color: rgba(255, 255, 255, 0.78);
+		box-shadow: 0 6px 15px rgba(185, 155, 221, 0.28);
+		transform: translateY(-1px);
 	}
 	.power-grid button:disabled {
 		opacity: 0.45;
@@ -639,7 +692,7 @@
 		font-style: italic;
 		font-size: 0.74rem;
 		text-align: center;
-		color: var(--sol-base0);
+		color: var(--magic-ink);
 		margin: -0.05rem 0 0;
 	}
 	.support-note {
@@ -648,27 +701,30 @@
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
 		text-align: center;
-		color: var(--sol-base1);
+		color: #8a7592;
 		margin: -0.2rem 0 0;
 	}
 	/* ── board ──────────────────────────────────────────────────────────── */
 	.board-wrap {
 		position: relative;
 		width: min(360px, calc(100vw - 3rem));
+		filter: drop-shadow(0 18px 24px rgba(91, 64, 105, 0.16));
 	}
 	.board {
 		display: grid;
 		grid-template-columns: repeat(4, 1fr);
-		gap: 7px;
-		background: var(--sol-base01);
-		border-radius: 6px;
-		padding: 7px;
+		gap: 8px;
+		background:
+			linear-gradient(145deg, rgba(132, 103, 149, 0.94), rgba(173, 145, 188, 0.92));
+		border: 1px solid rgba(255, 255, 255, 0.72);
+		border-radius: 18px;
+		padding: 9px;
 		aspect-ratio: 1;
 		user-select: none;
 		touch-action: none;
 	}
 	.cell {
-		border-radius: 4px;
+		border-radius: 12px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -681,28 +737,30 @@
 			background 0.08s,
 			color 0.08s,
 			outline-color 0.08s,
-			transform 0.08s;
+			transform 0.08s,
+			box-shadow 0.12s;
 	}
 	.cell.empty {
-		background: rgba(255, 255, 255, 0.06);
-		box-shadow: none;
+		background: rgba(255, 249, 253, 0.14) !important;
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
 	}
 	.cell.targetable {
 		cursor: crosshair;
-		outline: 2px solid rgba(253, 246, 227, 0.68);
+		outline: 2px solid rgba(255, 255, 255, 0.82);
 		outline-offset: -5px;
 	}
 	.cell.targetable:hover,
 	.cell.targetable:focus-visible {
 		transform: scale(0.96);
-		outline-color: var(--sol-cyan);
+		outline-color: #f4b9db;
+		box-shadow: 0 0 0 4px rgba(244, 185, 219, 0.25) !important;
 	}
 
 	/* ── overlays ───────────────────────────────────────────────────────── */
 	.overlay {
 		position: absolute;
 		inset: 0;
-		border-radius: 6px;
+		border-radius: 18px;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -712,15 +770,18 @@
 		padding: 1.5rem;
 	}
 	.overlay.win {
-		background: rgba(181, 137, 0, 0.88);
+		background: linear-gradient(145deg, rgba(225, 169, 208, 0.92), rgba(174, 145, 217, 0.94));
+		backdrop-filter: blur(4px);
 	}
 	.overlay.lose {
-		background: rgba(88, 110, 117, 0.88);
+		background: linear-gradient(145deg, rgba(113, 88, 125, 0.9), rgba(111, 116, 153, 0.92));
+		backdrop-filter: blur(4px);
 	}
 	.overlay-title {
 		font-family: var(--font-counter);
 		font-size: 3rem;
 		color: #fdf6e3;
+		text-shadow: 0 3px 16px rgba(83, 55, 99, 0.3);
 		margin: 0;
 		line-height: 1;
 	}
@@ -744,7 +805,7 @@
 		background: rgba(253, 246, 227, 0.22);
 		color: #fdf6e3;
 		border: 1px solid rgba(253, 246, 227, 0.5);
-		border-radius: 3px;
+		border-radius: 999px;
 		padding: 0.3rem 0.7rem;
 		cursor: pointer;
 		transition: background 0.1s;
