@@ -24,6 +24,9 @@ importers:
 
   apps/bestiary:
     dependencies:
+      '@woodles/persistence':
+        specifier: workspace:*
+        version: link:../../packages/persistence
       '@woodles/sync':
         specifier: workspace:*
         version: link:../../packages/sync
@@ -146,6 +149,10 @@ importers:
         version: 7.3.5(@types/node@22.19.17)
 
   apps/notebook:
+    dependencies:
+      '@woodles/persistence':
+        specifier: workspace:*
+        version: link:../../packages/persistence
     devDependencies:
       '@sveltejs/adapter-static':
         specifier: ^3.0.0
@@ -316,6 +323,15 @@ importers:
       vite:
         specifier: ^7.3.5
         version: 7.3.5(@types/node@22.19.17)
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@22.19.17)(happy-dom@20.10.6)
+
+  packages/persistence:
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
       vitest:
         specifier: ^3.2.6
         version: 3.2.6(@types/node@22.19.17)(happy-dom@20.10.6)

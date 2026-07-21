@@ -117,7 +117,8 @@
 		panY = panStartPY + (e.clientY - panStartY);
 	}
 
-	function handleBgUp() {
+	function handleBgUp(e: PointerEvent) {
+		if (!(e.target as SVGElement).closest('.graph-node')) selectedId = null;
 		isPanning = false;
 	}
 
@@ -159,13 +160,16 @@
 	let selectedId = $state<string | null>(null);
 	let hoveredId = $state<string | null>(null);
 
-	function handleNodeClick(e: PointerEvent, id: string) {
+	function handleNodeClick(e: MouseEvent, id: string) {
 		e.stopPropagation();
 		selectedId = selectedId === id ? null : id;
 	}
 
-	function handleCanvasClick() {
-		selectedId = null;
+	function handleNodeKeydown(e: KeyboardEvent, id: string) {
+		if (e.key !== 'Enter' && e.key !== ' ') return;
+		e.preventDefault();
+		e.stopPropagation();
+		selectedId = selectedId === id ? null : id;
 	}
 
 	let selectedNode = $derived(
@@ -315,7 +319,6 @@
 				class="graph-svg"
 				width={svgWidth}
 				height={svgHeight}
-				onclick={handleCanvasClick}
 				onwheel={handleWheel}
 				onpointerdown={handleBgDown}
 				onpointermove={handleBgMove}
@@ -363,7 +366,6 @@
 							{@const isSelected = selectedId === sn.id}
 							{@const isHovered = hoveredId === sn.id}
 							{@const dimmed = nodeDimmed(sn.id)}
-							<!-- svelte-ignore a11y_click_events_have_key_events -->
 							<g
 								class="graph-node"
 								transform="translate({sn.x},{sn.y})"
@@ -373,6 +375,7 @@
 								onpointermove={(e) => handleNodeMove(e, sn.id)}
 								onpointerup={(e) => handleNodeUp(e, sn.id)}
 								onclick={(e) => handleNodeClick(e, sn.id)}
+								onkeydown={(e) => handleNodeKeydown(e, sn.id)}
 								onpointerenter={() => (hoveredId = sn.id)}
 								onpointerleave={() => (hoveredId = null)}
 								role="button"
@@ -545,6 +548,7 @@
 		margin: 0;
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
+		line-clamp: 2;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
 	}

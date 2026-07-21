@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { notebook } from '$lib/notebook.svelte';
 	import type { Idea, NotebookMode, NotebookTask } from '$lib/types';
+	import { formatBytes } from '@woodles/persistence';
 
 	const MODES: { id: NotebookMode; label: string }[] = [
 		{ id: 'notes', label: 'notes' },
@@ -18,6 +19,7 @@
 	let taskPriority = $state<NotebookTask['priority']>('normal');
 	let ideaText = $state('');
 	let ideaLane = $state<Idea['lane']>('spark');
+	let importInput = $state<HTMLInputElement>();
 
 	const note = $derived(notebook.selectedNote);
 	const noteTags = $derived(note?.tags.join(', ') ?? '');
@@ -52,6 +54,28 @@
 		if (e.key === '2') notebook.setMode('tasks');
 		if (e.key === '3') notebook.setMode('ideas');
 		if (e.key === 'n' || e.key === 'N') notebook.addNote();
+	}
+
+	function downloadNotebook() {
+		const url = URL.createObjectURL(new Blob([notebook.exportJSON()], { type: 'application/json' }));
+		const anchor = document.createElement('a');
+		anchor.href = url;
+		anchor.download = `notebook-${new Date().toISOString().slice(0, 10)}.json`;
+		anchor.click();
+		URL.revokeObjectURL(url);
+	}
+
+	async function importNotebook(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+		try {
+			notebook.importJSON(await file.text());
+		} catch {
+			notebook.importJSON('');
+		} finally {
+			input.value = '';
+		}
 	}
 </script>
 
@@ -155,10 +179,30 @@
 					</button>
 				{/each}
 			</div>
-			<div class="sort-pill" aria-hidden="true">
-				<span></span>
-				recent
-				<i></i>
+			<div class="persistence-tools">
+				<p
+					class="persistence-status"
+					class:error={notebook.persistenceHealth.status === 'error'}
+					class:recovered={notebook.persistenceHealth.status === 'recovered'}
+					aria-live="polite"
+				>
+					<span aria-hidden="true"></span>
+					{notebook.persistenceHealth.message}
+					{#if notebook.persistenceHealth.bytes > 0}
+						· {formatBytes(notebook.persistenceHealth.bytes)}
+					{/if}
+				</p>
+				<div class="persistence-actions">
+					<button type="button" onclick={downloadNotebook}>export</button>
+					<button type="button" onclick={() => importInput?.click()}>import</button>
+					<input
+						bind:this={importInput}
+						class="file-input"
+						type="file"
+						accept="application/json,.json"
+						onchange={importNotebook}
+					/>
+				</div>
 			</div>
 		</div>
 
@@ -1498,19 +1542,68 @@
 		box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.68);
 	}
 
-	.sort-pill span {
-		width: 1.1rem;
-		height: 1.1rem;
-		background: #ffd84d;
-		clip-path: polygon(50% 0, 62% 35%, 100% 35%, 69% 56%, 80% 96%, 50% 72%, 20% 96%, 31% 56%, 0 35%, 38% 35%);
+	.persistence-tools {
+		justify-self: end;
+		display: flex;
+		align-items: center;
+		gap: 0.65rem;
+		flex-wrap: wrap;
+		justify-content: flex-end;
 	}
 
-	.sort-pill i {
-		width: 0;
-		height: 0;
-		border-left: 0.45rem solid transparent;
-		border-right: 0.45rem solid transparent;
-		border-top: 0.55rem solid #a56af3;
+	.persistence-status {
+		min-height: 2.8rem;
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		margin: 0;
+		padding: 0.45rem 0.8rem;
+		border: 2px solid rgba(255, 117, 205, 0.58);
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.68);
+		color: #8d55f0;
+		font-size: 0.68rem;
+		font-weight: 700;
+	}
+
+	.persistence-status span {
+		width: 0.65rem;
+		height: 0.65rem;
+		border-radius: 50%;
+		background: #71d9a6;
+		box-shadow: 0 0 0 2px #fff;
+	}
+
+	.persistence-status.recovered { color: #a46619; border-color: #ffd25f; }
+	.persistence-status.recovered span { background: #ffd25f; }
+	.persistence-status.error { color: #b72f6b; border-color: #ff71a9; }
+	.persistence-status.error span { background: #ff4f8d; }
+
+	.persistence-actions {
+		display: flex;
+		gap: 0.35rem;
+	}
+
+	.persistence-actions button {
+		min-height: 2.8rem;
+		padding: 0.4rem 0.72rem;
+		border: 2px solid #fff;
+		border-radius: 999px;
+		background: linear-gradient(180deg, #fff, #ffe4f6);
+		box-shadow: 0 3px 0 rgba(141, 85, 240, 0.35);
+		color: #8d55f0;
+		font-size: 0.66rem;
+		font-weight: 700;
+	}
+
+	.file-input {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		clip-path: inset(50%);
+		white-space: nowrap;
 	}
 
 	.workspace {
@@ -1707,6 +1800,11 @@
 		.title-input {
 			font-size: clamp(2rem, 12vw, 3.4rem);
 			min-height: 6rem;
+		}
+
+		.persistence-tools {
+			justify-self: stretch;
+			justify-content: flex-start;
 		}
 	}
 </style>

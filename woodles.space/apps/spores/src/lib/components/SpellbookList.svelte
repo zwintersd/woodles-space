@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { garden } from '$lib/garden.svelte';
 	import type { Spellbook } from '$lib/types';
+	import { focusOnMount } from '$lib/focus';
 
 	const ARCHETYPE_GLYPHS: Record<string, string> = {
 		plain: '◦',
@@ -47,7 +48,7 @@
 	{#if garden.showNewSpellbook}
 		<form class="new-form" onsubmit={handleSubmitSpellbook}>
 			<input
-				autofocus
+				use:focusOnMount
 				class="new-input"
 				type="text"
 				placeholder="spellbook title…"

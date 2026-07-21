@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { garden } from '$lib/garden.svelte';
 	import type { Spore } from '$lib/types';
+	import { focusOnMount } from '$lib/focus';
 
 	let tag = $derived(garden.activeTag);
 	let spores = $derived(garden.activeTagSpores);
@@ -44,7 +45,7 @@
 					}}
 				>
 					<span class="hash">#</span>
-					<input class="rename-input" bind:value={renameValue} autofocus />
+					<input class="rename-input" bind:value={renameValue} use:focusOnMount />
 					<button type="submit" class="btn-primary">rename</button>
 					<button type="button" class="btn-ghost" onclick={() => (renaming = false)}>cancel</button>
 				</form>
