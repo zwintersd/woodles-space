@@ -47,14 +47,15 @@
 		return Array.from({ length: 4 }, () => [0, 0, 0, 0]);
 	}
 
-	function addTile(b: Board, value?: number): void {
+	function addTile(b: Board, value?: number): [number, number] | null {
 		const empties: [number, number][] = [];
 		for (let r = 0; r < 4; r++)
 			for (let c = 0; c < 4; c++)
 				if (b[r][c] === 0) empties.push([r, c]);
-		if (!empties.length) return;
+		if (!empties.length) return null;
 		const [r, c] = empties[Math.floor(Math.random() * empties.length)];
 		b[r][c] = value ?? (Math.random() < 0.9 ? 2 : 4);
+		return [r, c];
 	}
 
 	function statValue(stat: ArcadeCoreStat): number {
@@ -171,6 +172,9 @@
 	let activePower = $state<TargetPowerUpId | null>(null);
 	let undoStack = $state<TurnSnapshot[]>([]);
 	let recordedRun = $state(false);
+	let tileMotion = $state(0);
+	let motionKind = $state<Dir | 'magic' | 'rewind' | null>(null);
+	let accentCell = $state<string | null>(null);
 
 	const turnLimit = $derived(
 		mode === 'turn-100' ? BASE_TURN_LIMIT + statTier(supportStatValue('will')) * 10 : null
@@ -241,8 +245,11 @@
 		undoStack = [...undoStack, snapshotTurn()].slice(-20);
 		score += gained;
 		if (score > best) best = score;
-		addTile(nb);
+		const addedCell = addTile(nb);
 		board = nb;
+		motionKind = dir;
+		accentCell = addedCell ? `${addedCell[0]}-${addedCell[1]}` : null;
+		tileMotion += 1;
 		turns += 1;
 		if (!won && nb.some((row) => row.includes(2048))) won = true;
 		if (turnLimit !== null && turns >= turnLimit) {
@@ -268,6 +275,9 @@
 		activePower = null;
 		undoStack = [];
 		recordedRun = false;
+		motionKind = null;
+		accentCell = null;
+		tileMotion += 1;
 	}
 
 	function reset() {
@@ -315,6 +325,9 @@
 			if (!won && nb[r][c] >= 2048) won = true;
 		}
 		board = nb;
+		motionKind = 'magic';
+		accentCell = `${r}-${c}`;
+		tileMotion += 1;
 		activePower = null;
 		if (!hasMovesLeft(nb)) {
 			over = true;
@@ -335,6 +348,9 @@
 		turns = last.turns;
 		overReason = last.overReason;
 		activePower = null;
+		motionKind = 'rewind';
+		accentCell = null;
+		tileMotion += 1;
 	}
 
 	function onCellKey(e: KeyboardEvent, r: number, c: number) {
@@ -487,24 +503,34 @@
 		role="application"
 		aria-label="2048 game board"
 	>
-		<div class="board">
-			{#each board as row, r (r)}
-				{#each row as val, c (c)}
-					<div
-						class="cell"
-						class:empty={val === 0}
-						class:targetable={activePower !== null && val !== 0}
-						style={tileStyle(val)}
-						role="button"
-						aria-disabled={activePower === null || val === 0}
-						tabindex={activePower && val !== 0 ? 0 : undefined}
-						onclick={() => useTargetPower(r, c)}
-						onkeydown={(event) => onCellKey(event, r, c)}
-					>
-						{#if val !== 0}{val}{/if}
-					</div>
+		<div
+			class="board"
+			class:shift-left={motionKind === 'left'}
+			class:shift-right={motionKind === 'right'}
+			class:shift-up={motionKind === 'up'}
+			class:shift-down={motionKind === 'down'}
+			class:rewinding={motionKind === 'rewind'}
+		>
+			{#key tileMotion}
+				{#each board as row, r (r)}
+					{#each row as val, c (c)}
+						<div
+							class="cell"
+							class:empty={val === 0}
+							class:targetable={activePower !== null && val !== 0}
+							class:accented={accentCell === `${r}-${c}`}
+							style={`${tileStyle(val)}--cell-delay:${(r + c) * 9}ms;`}
+							role="button"
+							aria-disabled={activePower === null || val === 0}
+							tabindex={activePower && val !== 0 ? 0 : undefined}
+							onclick={() => useTargetPower(r, c)}
+							onkeydown={(event) => onCellKey(event, r, c)}
+						>
+							{#if val !== 0}{val}{/if}
+						</div>
+					{/each}
 				{/each}
-			{/each}
+			{/key}
 		</div>
 
 		<!-- overlays -->
@@ -724,6 +750,7 @@
 		touch-action: none;
 	}
 	.cell {
+		position: relative;
 		border-radius: 12px;
 		display: flex;
 		align-items: center;
@@ -740,6 +767,40 @@
 			transform 0.08s,
 			box-shadow 0.12s;
 	}
+	.board.shift-left .cell:not(.empty) {
+		animation: drift-left 220ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--cell-delay) both;
+	}
+	.board.shift-right .cell:not(.empty) {
+		animation: drift-right 220ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--cell-delay) both;
+	}
+	.board.shift-up .cell:not(.empty) {
+		animation: drift-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--cell-delay) both;
+	}
+	.board.shift-down .cell:not(.empty) {
+		animation: drift-down 220ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--cell-delay) both;
+	}
+	.board.rewinding .cell:not(.empty) {
+		animation: rewind-settle 260ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--cell-delay) both;
+	}
+	.board .cell.accented {
+		animation: tile-bloom 300ms cubic-bezier(0.18, 0.9, 0.28, 1.2) 70ms both !important;
+	}
+	.cell.accented::after {
+		content: '';
+		position: absolute;
+		width: 5px;
+		height: 5px;
+		top: 13%;
+		right: 14%;
+		border-radius: 1px;
+		background: rgba(255, 255, 255, 0.96);
+		box-shadow:
+			-8px 10px 0 -1px rgba(255, 244, 201, 0.9),
+			3px 17px 0 -1.5px rgba(255, 255, 255, 0.8);
+		transform: rotate(45deg);
+		animation: spell-sparkle 420ms ease-out 90ms both;
+		pointer-events: none;
+	}
 	.cell.empty {
 		background: rgba(255, 249, 253, 0.14) !important;
 		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
@@ -754,6 +815,42 @@
 		transform: scale(0.96);
 		outline-color: #f4b9db;
 		box-shadow: 0 0 0 4px rgba(244, 185, 219, 0.25) !important;
+	}
+
+	@keyframes drift-left {
+		0% { opacity: 0.56; transform: translateX(15px) scale(0.97); }
+		70% { opacity: 1; transform: translateX(-2px) scale(1.015); }
+		100% { opacity: 1; transform: translateX(0) scale(1); }
+	}
+	@keyframes drift-right {
+		0% { opacity: 0.56; transform: translateX(-15px) scale(0.97); }
+		70% { opacity: 1; transform: translateX(2px) scale(1.015); }
+		100% { opacity: 1; transform: translateX(0) scale(1); }
+	}
+	@keyframes drift-up {
+		0% { opacity: 0.56; transform: translateY(15px) scale(0.97); }
+		70% { opacity: 1; transform: translateY(-2px) scale(1.015); }
+		100% { opacity: 1; transform: translateY(0) scale(1); }
+	}
+	@keyframes drift-down {
+		0% { opacity: 0.56; transform: translateY(-15px) scale(0.97); }
+		70% { opacity: 1; transform: translateY(2px) scale(1.015); }
+		100% { opacity: 1; transform: translateY(0) scale(1); }
+	}
+	@keyframes rewind-settle {
+		0% { opacity: 0.45; transform: scale(0.9) rotate(-1.5deg); }
+		65% { opacity: 1; transform: scale(1.025) rotate(0.4deg); }
+		100% { opacity: 1; transform: scale(1) rotate(0); }
+	}
+	@keyframes tile-bloom {
+		0% { opacity: 0; transform: scale(0.62) rotate(-5deg); }
+		68% { opacity: 1; transform: scale(1.08) rotate(1deg); }
+		100% { opacity: 1; transform: scale(1) rotate(0); }
+	}
+	@keyframes spell-sparkle {
+		0% { opacity: 0; transform: rotate(30deg) scale(0.2); }
+		42% { opacity: 1; transform: rotate(45deg) scale(1.2); }
+		100% { opacity: 0; transform: rotate(62deg) scale(0.35); }
 	}
 
 	/* ── overlays ───────────────────────────────────────────────────────── */
@@ -817,6 +914,14 @@
 	@media (max-width: 420px) {
 		.power-grid span {
 			font-size: 0.52rem;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.board .cell,
+		.cell.accented::after {
+			animation-duration: 1ms !important;
+			animation-delay: 0ms !important;
 		}
 	}
 </style>
