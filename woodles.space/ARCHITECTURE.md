@@ -188,8 +188,15 @@ control (a small popover on each entry) lets you choose an accent, an
 emblem, and a custom blurb, stored as `accent`/`glyph`/`blurb` on the
 entry. The two files keep their derivation in step (same accent-hash,
 same blurb rule) so a card looks identical whether or not a cover was
-ever chosen. De-duplication is by id: a published slug or a studio draft
-of the same id wins, so nothing doubles.
+ever chosen. De-duplication is by id, with a deliberate precedence: a
+committed **published** page wins (it's the real public artifact); then a
+**Textbook** entry wins over a **Studio draft** of the same slug — a live
+entry owns its shelf card and opens the reader, so a leftover Studio draft
+can't shadow it with an `add-page.html?open=…` card. A Studio draft whose
+slug isn't a Textbook entry still shows as its own draft card, as before.
+The reader also keeps the URL hash in step with the current entry
+(`history.replaceState`), so reload/share/deep-link land on what you're
+actually reading rather than a stale `#id`.
 
 **Draft with a prompt** is the bridge between the Textbook's live editing
 and `add-page.html`'s authoring workflow, brought *into* the reader rather

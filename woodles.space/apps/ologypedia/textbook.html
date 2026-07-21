@@ -734,6 +734,7 @@
   function navigate(id, opts){
     opts = opts || {};
     if (!getEntry(id)) return;
+    hideMenu();
     // commit any in-progress edits on the entry we're LEAVING, before currentId moves
     if (document.body.getAttribute('data-mode') === 'edit') commitEdits();
     if (opts.fresh){ trail = [id]; }
@@ -746,6 +747,9 @@
     currentId = id;
     db.last = id;
     persist(true);
+    // keep the URL in step with the entry you're reading — no stale/sticky hash,
+    // correct reload + share. replaceState doesn't fire hashchange, so no re-entry.
+    if ((location.hash || '').replace(/^#/, '') !== id){ try { history.replaceState(null, '', '#' + id); } catch(e){} }
     applyModeDOM(false);
     renderAll();
     var ps = document.querySelector('.pane-scroll'); if (ps) ps.scrollTop = 0;
@@ -882,6 +886,7 @@
   function setMode(m){
     var editing = m === 'edit';
     var wasEditing = document.body.getAttribute('data-mode') === 'edit';
+    hideMenu();
     if (!editing && wasEditing) commitEdits();   // leaving edit → save the current entry
     applyModeDOM(editing);
     if (editing){
@@ -1476,7 +1481,13 @@
     // hide the menu when clicking elsewhere / pressing escape
     document.addEventListener('mousedown', function(ev){
       var m = $('sel-menu');
-      if (m.classList.contains('open') && !m.contains(ev.target)){ setTimeout(function(){ if (!currentSelectionInContent()) hideMenu(); }, 0); }
+      if (!m.classList.contains('open')) return;
+      if (m.contains(ev.target)) return;                     // a menu action — let it run
+      if ($('entry-content').contains(ev.target)){           // starting a new selection in the text
+        setTimeout(function(){ if (!currentSelectionInContent()) hideMenu(); }, 0);
+      } else {
+        hideMenu();                                          // clicked any other chrome → dismiss now
+      }
     });
     document.addEventListener('keydown', function(ev){
       if (ev.key === 'Escape'){ hideMenu(); toggleMore(false); closeCover(); closeDraft(); $('sheet-back').classList.remove('open'); }

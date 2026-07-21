@@ -364,13 +364,23 @@
   catch (e) { shelf = []; }
   if (!Array.isArray(shelf)) shelf = [];
 
-  var drafts = shelf.filter(function(e){ return e && e.slug && !published[e.slug]; });
+  // read the Textbook store first: a live Textbook entry OWNS its slug on the
+  // shelf — it opens the reader — so a Studio draft of the same slug must not
+  // shadow it with an add-page.html card.
+  var tb;
+  try { tb = JSON.parse(localStorage.getItem('ologypedia-textbook-v1')); }
+  catch (e) { tb = null; }
+  var tbOrder = (tb && tb.entries && Array.isArray(tb.order)) ? tb.order : [];
+  var tbIds = {};
+  tbOrder.forEach(function(id){ if (tb.entries[id] && !published[id]) tbIds[id] = true; });
+
+  var drafts = shelf.filter(function(e){ return e && e.slug && !published[e.slug] && !tbIds[e.slug]; });
 
   var ACCENTS = ['acc-rose','acc-sage','acc-gold','acc-dust','acc-plum'];
   var FINISHES = { pulse:1, shimmer:1, halo:1, drift:1 };
 
   drafts.forEach(function(e, i){
-    published[e.slug] = true;   // so a Textbook entry with the same id isn't doubled below
+    published[e.slug] = true;
     var acc = (e.accent && ACCENTS.indexOf('acc-' + e.accent) >= 0) ? 'acc-' + e.accent : ACCENTS[i % ACCENTS.length];
     var fx = (e.finish && FINISHES[e.finish]) ? ' fx-' + e.finish : '';
     var a = document.createElement('a');
@@ -411,14 +421,10 @@
   }
 
   // ===== entries from your editable Textbook (textbook.html), as cover-cards =====
-  var tb;
-  try { tb = JSON.parse(localStorage.getItem('ologypedia-textbook-v1')); }
-  catch (e) { tb = null; }
-  var tbOrder = (tb && tb.entries && Array.isArray(tb.order)) ? tb.order : [];
   var tbShown = 0;
   tbOrder.forEach(function(id){
     var e = tb.entries[id];
-    if (!e || published[id]) return;          // skip published slugs and already-shown drafts
+    if (!e || published[id]) return;          // skip only slugs already shown as published cards
     published[id] = true;
     tbShown++;
     var status = e.status || 'seed';
