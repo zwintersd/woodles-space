@@ -15,7 +15,12 @@ or local workflow changes.
 other docs have narrower jobs:
 
 - [README.md](./README.md) is the deployment reference.
-- [REFACTORING.md](./REFACTORING.md) is the living consolidation log.
+- [REFACTORING.md](./REFACTORING.md) is the living consolidation log — code
+  that exists in more than one place.
+- [CONVERGENCE.md](./CONVERGENCE.md) is the product-shape counterpart: why
+  spores, notebook, dev log, ologypedia and write overlap, and three options
+  for collapsing them. a proposal, not a decision — nothing in it has been
+  actioned.
 - [ROADMAP.md](./ROADMAP.md) is the 10-week plan for making marginalia and
   the bestiary public-facing — all ten weeks are marked `✅ shipped` in its
   own headers, week 4 (share links, save-as-image, adopt-a-card) having
