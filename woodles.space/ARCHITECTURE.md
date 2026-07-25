@@ -465,10 +465,25 @@ for it to leak onto), and `thinking-about` uses `--ta-*` under
 `.thinking-about-root`. `data-theme` and the eleven shared themes don't reach
 any of them; they own their own look.
 
+`spores` left the house style in week-11's convergence work: it now wears the
+cream/rose/gold palette it inherited from the Ologypedia Textbook it is
+absorbing (see [CONVERGENCE.md](./CONVERGENCE.md) step 3). the `--g-*` token
+names and their roles are unchanged — only the values moved — plus four
+tokens that had to be *added* because the old theme encoded them as literals
+or conflated them with the accent: `--g-on-flight` (text on an accent fill,
+hard-coded as the dark background in a dozen components), `--g-danger` and
+`--g-danger-soft` (errors and destructive hovers, previously the accent pink
+doing double duty), and `--g-scrim`. every token that carries text clears
+4.5:1 against both `--g-bg` and `--g-surface`; the old muted and accent tones
+did not, and re-valuing was the moment to fix that rather than port it
+forward. `GraphRenderer`'s SVG node and edge palettes were re-valued too —
+they are artwork tuned to their ground, and pastels that glowed on near-black
+vanish on paper.
+
 `thinking-about`'s look is a deliberate departure even from its SvelteKit
-siblings' own house style: the rest lean into a dark, serif-display,
-jewel-toned "Twilight Webcore" (marginalia and spores' own tokens.css files
-name it outright); `thinking-about` goes the other way on purpose — white/
+siblings' own house style: marginalia and bestiary still lean into the dark,
+serif-display, jewel-toned "Twilight Webcore" (marginalia's own tokens.css
+names it outright); `thinking-about` goes the other way on purpose — white/
 near-white chrome, thin gray rules, a plain sans (`--font-sans`, already in
 `shared/fonts.css`), and color living only in the entries themselves as
 calendar-event-style chips. Google Calendar light-mode logic, not another

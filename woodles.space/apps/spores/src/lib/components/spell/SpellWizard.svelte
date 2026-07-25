@@ -1004,7 +1004,7 @@
 		transition: background var(--g-transition-fast), color var(--g-transition-fast);
 	}
 
-	.btn-copy:hover { background: var(--g-flight); color: #0d0d1a; }
+	.btn-copy:hover { background: var(--g-flight); color: var(--g-on-flight); }
 
 	.spell-text {
 		font-family: var(--g-font-mono);
@@ -1053,7 +1053,7 @@
 
 	.btn-grow {
 		background: var(--g-flight);
-		color: #0d0d1a;
+		color: var(--g-on-flight);
 		border-radius: var(--g-radius-sm);
 		padding: var(--g-space-sm) var(--g-space-xl);
 		font-size: 0.9rem;
@@ -1065,8 +1065,8 @@
 	.btn-grow:disabled { opacity: 0.4; }
 
 	.import-errors {
-		background: rgba(240, 143, 184, 0.08);
-		border: 1px solid rgba(240, 143, 184, 0.2);
+		background: var(--g-danger-soft);
+		border: 1px solid var(--g-danger);
 		border-radius: var(--g-radius-md);
 		padding: var(--g-space-md);
 		display: flex;
@@ -1154,7 +1154,7 @@
 
 	.btn-plant {
 		background: var(--g-flight-active);
-		color: #0d0d1a;
+		color: var(--g-on-flight);
 		border-radius: var(--g-radius-sm);
 		padding: var(--g-space-sm) var(--g-space-xl);
 		font-size: 0.9rem;
@@ -1172,7 +1172,7 @@
 
 	.btn-primary {
 		background: var(--g-flight);
-		color: #0d0d1a;
+		color: var(--g-on-flight);
 		border-radius: var(--g-radius-sm);
 		padding: var(--g-space-sm) var(--g-space-lg);
 		font-size: 0.88rem;
@@ -1312,7 +1312,7 @@
 		transition: background var(--g-transition-fast), color var(--g-transition-fast);
 	}
 
-	.onb-launch-link:hover { background: var(--g-flight); color: #0d0d1a; }
+	.onb-launch-link:hover { background: var(--g-flight); color: var(--g-on-flight); }
 
 	.onb-example[open] { padding-bottom: var(--g-space-md); }
 

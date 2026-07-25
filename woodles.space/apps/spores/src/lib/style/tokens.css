@@ -1,23 +1,53 @@
-/* spores · twilight webcore design tokens
-   scoped to .spores-root — never bleeds into the rest of woodles.space */
+/* spores · cream / rose / gold design tokens
+   scoped to .spores-root — never bleeds into the rest of woodles.space
+
+   The Garden used to wear "twilight webcore" — near-black ground, pale
+   lavender text, leafeon pink. It now wears the palette it inherited from the
+   Ologypedia Textbook, which it absorbs (CONVERGENCE.md §0, step 3). Every
+   token name and the role it plays are unchanged; only the values moved, so
+   components did not need rewriting.
+
+   The one exception is `--g-on-flight`, which is new. A dozen components
+   hard-coded the old dark background as the text colour sitting on top of an
+   accent fill. That is a real role, and it inverts with the theme — dark text
+   on pale pink, light text on deep rose — so it could not survive as a
+   literal. */
 
 .spores-root {
 	/* ── palette ───────────────────────────────────────────────────── */
-	--g-bg:            #0d0d1a;
-	--g-surface:       #13132a;
-	--g-surface-2:     #1a1a35;
-	--g-text:          #e2daf0;
-	--g-text-dim:      #a09ab8;
-	--g-muted:         #6a6480;
-	--g-border:        rgba(240, 143, 184, 0.12);
-	--g-border-strong: rgba(240, 143, 184, 0.25);
-	--g-rule:          rgba(162, 150, 200, 0.15);
+	/* Every colour that carries text clears 4.5:1 against both --g-bg and
+	   --g-surface. The old theme's muted and accent tones did not; re-valuing
+	   the palette was the moment to fix that rather than port it forward. */
+	--g-bg:            #fbf3ec;   /* paper */
+	--g-surface:       #fffdfa;   /* a card, lifted off the paper */
+	--g-surface-2:     #f3e6d9;   /* paper edge — recessed, or an alternate row */
+	--g-text:          #3d2b2b;   /* ink */
+	--g-text-dim:      #6b5656;   /* soft ink */
+	--g-muted:         #806a62;
+	--g-border:        rgba(140, 59, 74, 0.14);
+	--g-border-strong: rgba(140, 59, 74, 0.3);
+	--g-rule:          rgba(78, 47, 42, 0.12);
+
+	/* Text sitting on a --g-flight fill. Never assume light or dark in a
+	   component — that is exactly what this token exists to hold. */
+	--g-on-flight:     #fffdfa;
+
+	/* Errors and destructive hovers. Under the old theme these reused the
+	   accent pink, which worked only because pink read as a warning on
+	   near-black. On paper the accent *is* rose, so "danger" needed to become
+	   its own colour rather than a second meaning for the first one. */
+	--g-danger:      #a62d2d;
+	--g-danger-soft: rgba(166, 45, 45, 0.08);
+
+	/* The wash behind a modal. Warm, so it dims the paper rather than
+	   punching a cold hole in it. */
+	--g-scrim: rgba(78, 47, 42, 0.35);
 
 	/* ── lines of flight ───────────────────────────────────────────── */
-	--g-flight:        #f08fb8;   /* leafeon pink */
-	--g-flight-soft:   rgba(240, 143, 184, 0.18);
-	--g-flight-active: #6ce5e8;   /* cyan — hovered / active connections */
-	--g-flight-active-soft: rgba(108, 229, 232, 0.18);
+	--g-flight:        #8c3b4a;   /* deep rose */
+	--g-flight-soft:   rgba(199, 124, 142, 0.2);   /* rose dust */
+	--g-flight-active: #856428;   /* gold — hovered / active connections */
+	--g-flight-active-soft: rgba(133, 100, 40, 0.18);
 
 	/* ── typography ────────────────────────────────────────────────── */
 	--g-font-display: var(--font-display, 'Cormorant Garamond', Georgia, serif);
@@ -50,7 +80,9 @@
 	--g-transition-spring: 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
 
 	/* ── shadows ───────────────────────────────────────────────────── */
-	--g-shadow-card:  0 2px 20px rgba(13, 13, 26, 0.6);
-	--g-shadow-hover: 0 4px 28px rgba(240, 143, 184, 0.12);
-	--g-shadow-flight: 0 0 12px rgba(240, 143, 184, 0.25);
+	/* Warm and short. A glow reads as depth on a dark ground and as smudge on
+	   a light one, so these became cast shadows rather than halos. */
+	--g-shadow-card:   0 2px 10px -6px rgba(78, 47, 42, 0.3);
+	--g-shadow-hover:  0 10px 30px -14px rgba(78, 47, 42, 0.45);
+	--g-shadow-flight: 0 0 10px rgba(140, 59, 74, 0.22);
 }

@@ -33,7 +33,7 @@
 	}
 
 	:global(body) {
-		background: var(--g-bg, #0d0d1a);
+		background: var(--g-bg, #fbf3ec);
 		overflow-x: hidden;
 	}
 

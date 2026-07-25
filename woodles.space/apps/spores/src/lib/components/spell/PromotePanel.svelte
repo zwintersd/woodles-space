@@ -247,7 +247,7 @@
 
 	.btn-promote:hover {
 		background: var(--g-flight);
-		color: #0d0d1a;
+		color: var(--g-on-flight);
 	}
 
 	.btn-prune {

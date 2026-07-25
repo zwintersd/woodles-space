@@ -178,10 +178,13 @@
 
 	// ── visual helpers ─────────────────────────────────────────────────
 
+	// Node fills, deepened for a cream ground (CONVERGENCE.md step 3). The
+	// old set was pastel because it sat on near-black; the same values on
+	// paper are barely visible. Kept to ten so the faction hash is unchanged.
 	const FACTION_PALETTE = [
-		'#f08fb8', '#6ce5e8', '#c4a86a', '#b8a8e8',
-		'#a8c4e8', '#e8a8c4', '#a8e8c4', '#e8c4a8',
-		'#c8a8e8', '#a8e8e8'
+		'#8c3b4a', '#3f7a7d', '#a8813a', '#6b5a9e',
+		'#4a6f9e', '#b06080', '#4f8a63', '#a86a44',
+		'#7d5490', '#3d7f84'
 	];
 
 	function factionHash(s: string): number {
@@ -205,20 +208,22 @@
 		}
 	}
 
+	// Edges likewise: darker and more opaque, since a thin pale line vanishes
+	// on paper where it glowed on ink.
 	const EDGE_COLORS: Record<string, string> = {
-		bond:       'rgba(240,143,184,0.55)',
-		friendship: 'rgba(240,143,184,0.55)',
-		rivalry:    'rgba(232,120,100,0.65)',
-		enemy:      'rgba(200,70,70,0.65)',
-		romance:    'rgba(255,100,170,0.75)',
-		family:     'rgba(200,168,100,0.62)',
-		ally:       'rgba(108,229,232,0.55)',
-		mentor:     'rgba(168,196,232,0.6)',
-		voiced_by:  'rgba(130,120,180,0.35)'
+		bond:       'rgba(140,59,74,0.55)',
+		friendship: 'rgba(140,59,74,0.55)',
+		rivalry:    'rgba(178,84,58,0.62)',
+		enemy:      'rgba(166,45,45,0.62)',
+		romance:    'rgba(190,60,120,0.68)',
+		family:     'rgba(160,124,52,0.62)',
+		ally:       'rgba(45,120,124,0.55)',
+		mentor:     'rgba(62,98,150,0.55)',
+		voiced_by:  'rgba(110,96,140,0.35)'
 	};
 
 	function edgeColor(type?: string): string {
-		return EDGE_COLORS[type ?? ''] ?? 'rgba(162,150,200,0.38)';
+		return EDGE_COLORS[type ?? ''] ?? 'rgba(78,47,42,0.32)';
 	}
 
 	function edgePath(ax: number, ay: number, bx: number, by: number): string {
@@ -348,7 +353,7 @@
 										x={lp.x}
 										y={lp.y}
 										class="edge-label"
-										fill="rgba(226,218,240,0.85)"
+										fill="var(--g-text-dim)"
 										text-anchor="middle"
 										font-size="10"
 									>{edge.label}</text>
@@ -404,7 +409,7 @@
 									class="node-label"
 									text-anchor="middle"
 									font-size="11"
-									fill={isSelected || isHovered ? col : 'rgba(226,218,240,0.85)'}
+									fill={isSelected || isHovered ? col : 'var(--g-text)'}
 									font-weight={isSelected ? '600' : '400'}
 								>{gn.name}</text>
 								{#if gn.faction && (isSelected || isHovered)}
@@ -413,7 +418,7 @@
 										class="node-sublabel"
 										text-anchor="middle"
 										font-size="9"
-										fill="rgba(162,150,200,0.75)"
+										fill="var(--g-muted)"
 									>{gn.faction}</text>
 								{/if}
 							</g>
@@ -502,7 +507,7 @@
 		position: fixed;
 		inset: 0;
 		z-index: var(--g-z-overlay, 40);
-		background: var(--g-bg, #0d0d1a);
+		background: var(--g-bg, #fbf3ec);
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
@@ -515,7 +520,7 @@
 		align-items: flex-start;
 		gap: var(--g-space-lg, 1.75rem);
 		padding: var(--g-space-md, 1rem) var(--g-space-lg, 1.75rem);
-		border-bottom: 1px solid var(--g-rule, rgba(162,150,200,0.15));
+		border-bottom: 1px solid var(--g-rule, rgba(78,47,42,0.12));
 		background: var(--g-surface, #13132a);
 	}
 
@@ -528,7 +533,7 @@
 		transition: color 0.15s ease;
 		white-space: nowrap;
 	}
-	.close-btn:hover { color: var(--g-flight, #f08fb8); }
+	.close-btn:hover { color: var(--g-flight, #8c3b4a); }
 
 	.header-info { flex: 1; min-width: 0; }
 
@@ -536,14 +541,14 @@
 		font-family: var(--g-font-display);
 		font-size: 1.5rem;
 		font-weight: 400;
-		color: var(--g-text, #e2daf0);
+		color: var(--g-text, #3d2b2b);
 		line-height: 1.2;
 		margin: 0 0 0.25rem;
 	}
 
 	.series-desc {
 		font-size: 0.82rem;
-		color: var(--g-text-dim, #a09ab8);
+		color: var(--g-text-dim, #6b5656);
 		line-height: 1.5;
 		margin: 0;
 		display: -webkit-box;
@@ -649,7 +654,7 @@
 		background: var(--g-surface, #13132a);
 		border: 1px solid var(--g-border);
 		border-radius: var(--g-radius-sm);
-		color: var(--g-text-dim, #a09ab8);
+		color: var(--g-text-dim, #6b5656);
 		font-size: 1rem;
 		display: flex;
 		align-items: center;
@@ -687,7 +692,7 @@
 		font-family: var(--g-font-display);
 		font-size: 1.25rem;
 		font-weight: 400;
-		color: var(--g-text, #e2daf0);
+		color: var(--g-text, #3d2b2b);
 		margin: 0;
 		line-height: 1.2;
 	}
@@ -710,14 +715,14 @@
 
 	.panel-val {
 		font-size: 0.88rem;
-		color: var(--g-text-dim, #a09ab8);
+		color: var(--g-text-dim, #6b5656);
 	}
 
 	.panel-desc {
 		font-family: var(--g-font-body);
 		font-size: 0.88rem;
 		line-height: 1.6;
-		color: var(--g-text-dim, #a09ab8);
+		color: var(--g-text-dim, #6b5656);
 		margin: 0;
 	}
 
@@ -750,7 +755,7 @@
 
 	.conn-name {
 		font-size: 0.85rem;
-		color: var(--g-text-dim, #a09ab8);
+		color: var(--g-text-dim, #6b5656);
 		flex: 1;
 	}
 
