@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { garden } from '$lib/garden.svelte';
+	import { importDevlogOnce } from '$lib/devlogImport';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import SpellbookList from '$lib/components/SpellbookList.svelte';
 	import SpellbookView from '$lib/components/SpellbookView.svelte';
@@ -14,6 +15,13 @@
 		// Dev backdoor: ?dev=1 reveals the onboarding dev panel.
 		if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('dev') === '1') {
 			garden.devMode = true;
+		}
+		// The retired Dev Log folds in on first open, once.
+		const devlog = importDevlogOnce(garden);
+		if (devlog) {
+			garden.handoffNotice =
+				`folded in the Dev Log — ${devlog.entries} ${devlog.entries === 1 ? 'entry' : 'entries'}` +
+				` and ${devlog.records} ${devlog.records === 1 ? 'record' : 'records'}, in a new spellbook`;
 		}
 		// Anything sent here from another app is planted before onboarding is
 		// considered, so a Garden that only looks empty doesn't trigger the

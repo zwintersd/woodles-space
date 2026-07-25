@@ -17,8 +17,10 @@ import {
 const ROOT = dirname(dirname(dirname(dirname(fileURLToPath(import.meta.url)))));
 const VERCEL = JSON.parse(readFileSync(join(ROOT, 'vercel.json'), 'utf8')) as {
 	rewrites: { source: string; destination: string }[];
+	redirects?: { source: string; destination: string; permanent?: boolean }[];
 };
 const rewrites = new Map(VERCEL.rewrites.map((rewrite) => [rewrite.source, rewrite.destination]));
+const redirects = new Map((VERCEL.redirects ?? []).map((entry) => [entry.source, entry]));
 
 describe('canonical app inventory', () => {
 	it('accounts for every deployable app directory exactly once', () => {
@@ -62,12 +64,31 @@ describe('route smoke contract', () => {
 	it('finds static entrypoints and verifies Svelte build/base contracts', () => {
 		for (const app of appManifest) verifyAppShape(app);
 	});
+
+	it('keeps a retired app’s route alive as a redirect rather than a 404', () => {
+		// Dev Log was folded into Spores (CONVERGENCE.md step 2). Its manifest
+		// entry is gone, so nothing else in this suite would notice if the old
+		// bookmark started 404ing.
+		for (const source of ['/marginalia-devlog', '/marginalia-devlog/:path*']) {
+			const redirect = redirects.get(source);
+			expect(redirect, source).toBeDefined();
+			expect(redirect?.destination).toBe('/spores');
+			expect(redirect?.permanent).toBe(true);
+		}
+		expect(appManifest.some((app) => app.id === 'marginalia-devlog')).toBe(false);
+	});
+
+	it('never redirects a route that an app still serves', () => {
+		for (const app of appManifest) {
+			expect(redirects.has(app.publicPath), app.id).toBe(false);
+		}
+	});
 });
 
 describe('landing catalogue', () => {
-	it('derives the fifteen ordered tiles, pins, and featured fallbacks from the manifest', () => {
-		expect(landingApps).toHaveLength(15);
-		expect(landingApps.map((app) => app.order)).toEqual([...Array(15)].map((_, index) => index + 1));
+	it('derives the fourteen ordered tiles, pins, and featured fallbacks from the manifest', () => {
+		expect(landingApps).toHaveLength(14);
+		expect(landingApps.map((app) => app.order)).toEqual([...Array(14)].map((_, index) => index + 1));
 		expect(new Set(landingApps.map((app) => app.id)).size).toBe(landingApps.length);
 		expect(defaultLandingPins).toEqual(['hygge', 'write', 'marg', 'planner', 'notebook', 'quiet']);
 		expect(featuredLandingApps.map((app) => app.id)).toEqual(['marg', 'bestiary', 'write']);

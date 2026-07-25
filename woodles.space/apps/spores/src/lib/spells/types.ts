@@ -27,7 +27,7 @@ export type Modifier = {
 export type Category = {
 	id: string;
 	label: string;
-	group: 'person' | 'media' | 'custom';
+	group: 'person' | 'media' | 'anime' | 'worldbuilding' | 'custom';
 	glyph?: string;
 	rootKind: string;
 	rootFields: FieldDef[];

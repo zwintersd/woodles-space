@@ -255,7 +255,7 @@
 					/>
 				{:else}
 					<div class="category-groups">
-						{#each ['person', 'media', 'anime'] as grp}
+						{#each ['person', 'media', 'anime', 'worldbuilding'] as grp}
 							{@const grpCats = allCategories.filter((c) => c.group === grp)}
 							{#if grpCats.length > 0 || grp === 'media'}
 								<div class="cat-group">

@@ -29,6 +29,8 @@ export type GardenSettings = {
 	passphrase?: string;
 	customCategories?: import('./spells/types').Category[];
 	onboarded?: boolean;
+	/** The retired Dev Log has been folded in — see devlogImport.ts. */
+	devlogImported?: boolean;
 };
 
 export type GardenBlob = {

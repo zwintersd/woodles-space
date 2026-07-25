@@ -20,15 +20,14 @@ Notes:   what consolidation needs, or what's holding it
 
 ## sync.svelte.ts
 **Status:** done
-**Copies:** `apps/{planner,bestiary,spores,marginalia-devlog}/src/lib/sync.svelte.ts`
+**Copies:** `apps/{planner,bestiary,spores}/src/lib/sync.svelte.ts`
 **State:** consolidated
 **Notes:** extracted into `createAppSync` in `packages/sync/src/index.ts`. each
 app's file is now ~30 lines: a `SyncState` class with `$state` fields, its
 instantiation, and a `createAppSync` call that wires up the app-specific adapter
 (blob type, read/write/isNewer). the factory owns passphrase persistence,
 connect/disconnect, status tracking, and the hydrate/flush cycle. `passKey`
-defaults to `'woodles_sync_passphrase'`; `marginalia-devlog` passes
-`'woodles_sync_passphrase_devlog'`. the `SyncState` class itself stays in each
+defaults to `'woodles_sync_passphrase'`. the `SyncState` class itself stays in each
 app's `.svelte.ts` so `$state` compiles under the app's Svelte plugin rather than
 in the package.
 
