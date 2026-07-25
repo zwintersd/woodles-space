@@ -1,5 +1,6 @@
 import type {
 	Spore,
+	SporeStatus,
 	Spellbook,
 	Flight,
 	GardenBlob,
@@ -7,6 +8,14 @@ import type {
 	GardenView,
 	OnboardingStep
 } from './types';
+import { nextStatus, sporeStatus } from './cover';
+import {
+	backlinksOf,
+	plantLink,
+	sameTitle,
+	toSegments,
+	type Segment
+} from './wikilinks';
 import type { Category } from './spells/types';
 import { createHandoffQueue, type HandoffTarget, type SendResult } from '@woodles/handoff';
 import { uid, now } from './utils';
@@ -236,6 +245,12 @@ export class GardenStore {
 		save('spores.settings.v1', this.settings);
 	}
 
+	// Set once the Ologypedia Textbook has been folded in.
+	markTextbookImported(): void {
+		this.settings = { ...this.settings, textbookImported: true };
+		save('spores.settings.v1', this.settings);
+	}
+
 	completeOnboarding(): void {
 		this.markOnboarded();
 		this.showOnboarding = false;
@@ -316,8 +331,12 @@ export class GardenStore {
 			spellbookIds: partial.spellbookIds ?? [],
 			tags: cleanTags(partial.tags ?? []),
 			created: now(),
-			updated: now()
+			updated: now(),
+			status: partial.status ?? 'seed'
 		};
+		if (partial.accent) s.accent = partial.accent;
+		if (partial.glyph) s.glyph = partial.glyph;
+		if (partial.blurb) s.blurb = partial.blurb;
 		this.spores = [...this.spores, s];
 		save('spores.spores.v1', this.spores);
 		return s;
@@ -508,6 +527,72 @@ export class GardenStore {
 			customCategories: (this.settings.customCategories ?? []).filter((c) => c.id !== id)
 		};
 		save('spores.settings.v1', this.settings);
+	}
+
+	// ── wikilinks, status, covers ───────────────────────────────────
+	// Ported from the Ologypedia Textbook (CONVERGENCE.md step 4).
+
+	/** How far along a spore is, defaulting for pre-merge spores. */
+	statusOf(spore: Spore): SporeStatus {
+		return sporeStatus(spore);
+	}
+
+	/** Forward-only: seed → growing → grown, and grown stays put. */
+	advanceStatus(id: string): void {
+		const spore = this.spores.find((s) => s.id === id);
+		if (!spore) return;
+		this.updateSpore(id, { status: nextStatus(sporeStatus(spore)) });
+	}
+
+	setStatus(id: string, status: SporeStatus): void {
+		this.updateSpore(id, { status });
+	}
+
+	setCover(id: string, cover: Pick<Spore, 'accent' | 'glyph' | 'blurb'>): void {
+		this.updateSpore(id, cover);
+	}
+
+	/** The body split into text and link segments, ready to render. */
+	segmentsOf(spore: Spore): Segment[] {
+		return toSegments(spore.body, this.spores);
+	}
+
+	/** Spores whose bodies link here. Derived, never stored. */
+	backlinksOf(spore: Spore): Spore[] {
+		return backlinksOf(spore, this.spores);
+	}
+
+	/**
+	 * Follow a `[[link]]`. An unwritten target becomes a seed rather than a
+	 * dead end — the wiki red-link gesture, and the reason a link is a cheap
+	 * thing to write mid-sentence.
+	 */
+	followLink(target: string, opts: { from?: Spore } = {}): Spore {
+		const existing = this.spores.find((s) => sameTitle(s.title, target));
+		if (existing) return existing;
+		return this.addSpore({
+			title: target.trim(),
+			// A seed inherits where it was sown, so it lands on the same shelf
+			// as the entry that wanted it.
+			spellbookIds: opts.from ? [...opts.from.spellbookIds] : [],
+			status: 'seed'
+		});
+	}
+
+	/**
+	 * Turn a highlighted phrase into a new seed, planting the link where the
+	 * phrase was. The Textbook's core gesture: you are reading, you notice a
+	 * thing that wants its own page, and saying so costs one click.
+	 */
+	sowFromSelection(sporeId: string, phrase: string, title?: string): Spore | null {
+		const spore = this.spores.find((s) => s.id === sporeId);
+		const clean = phrase.trim();
+		if (!spore || !clean) return null;
+
+		const target = (title ?? clean).trim();
+		const planted = plantLink(spore.body, clean, target);
+		if (planted !== spore.body) this.updateSpore(sporeId, { body: planted });
+		return this.followLink(target, { from: spore });
 	}
 
 	// ── handoffs ────────────────────────────────────────────────────
