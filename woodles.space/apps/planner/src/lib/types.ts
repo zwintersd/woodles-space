@@ -89,6 +89,8 @@ export type PlannerSettings = {
 	wakeAnchor: string; // "HH:MM" — when the day actually starts
 	sleepAnchor: string;
 	tone: ToneName;
+	/** Notebook's tasks have been taken over — see notebookTasks.ts. */
+	notebookTasksImported?: boolean;
 };
 
 export type Bell = {

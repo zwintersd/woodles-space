@@ -20,8 +20,8 @@ other docs have narrower jobs:
 - [CONVERGENCE.md](./CONVERGENCE.md) is the product-shape counterpart: why
   spores, notebook, dev log, ologypedia and write overlap, and the plan for
   collapsing them into *one knowledge base, one writing surface, one front
-  door*. decided, and part-built — its §5 table tracks which steps have
-  landed. read it before reshaping any of those five apps.
+  door*. all three rooms are built; its §5 table tracks which steps have
+  landed and which remain. read it before reshaping any of those apps.
 - [ROADMAP.md](./ROADMAP.md) is the 10-week plan for making marginalia and
   the bestiary public-facing — all ten weeks are marked `✅ shipped` in its
   own headers, week 4 (share links, save-as-image, adopt-a-card) having
@@ -84,7 +84,7 @@ woodles.space/
     ├── write/               SvelteKit · the letter editor
     ├── marginalia/          SvelteKit · a witch writes worlds + a reading room
     ├── planner/             SvelteKit · carillon — calendar, schedule, and time
-    ├── notebook/            SvelteKit · notes, tasks, and ideas kept close
+    ├── notebook/            SvelteKit · the front door — one stream of captures
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
     ├── spores/              SvelteKit · the knowledge base — linked entries, gathered into spellbooks
     └── thinking-about/      SvelteKit · a board for what's being read, played, and watched
@@ -294,10 +294,16 @@ export/import round trips, and byte/storage estimates. The full adoption
 contract and reference API live in
 [`packages/persistence/README.md`](./packages/persistence/README.md).
 
-`notebook` is the reference localStorage adoption. It migrates the former four
-v1 keys into one v2 workspace document, validates stored and imported data,
-shows save/recovery failures in the page, and exports the same envelope that it
-imports. `bestiary` remains IndexedDB-native because of its embedded image data;
+`notebook` is the reference localStorage adoption. It now stores one v3
+workspace document of **captures**, carrying forward the v1 keys and the v2
+document, validating stored and imported data, showing save/recovery failures
+in the page, and exporting the same envelope that it imports.
+
+Its v3 upgrade is deliberately **non-destructive**: it reads `notebook.workspace.v2`
+for notes and ideas and leaves it in place, because Carillon reads the same key
+for the tasks it took over (see below). That makes the two migrations
+order-independent — whichever app you open first, neither reads data out from
+under the other. `bestiary` remains IndexedDB-native because of its embedded image data;
 it validates its collection, keeps a last-known-good shelf, and reports both
 collection size and the browser origin's usage/quota in `SyncPanel`.
 
@@ -352,6 +358,26 @@ synced blob.
 them, but `textbook.html` is a signpost that points at `/spores` and hands
 back the original `ologypedia-textbook-v1` blob as a download. Nothing is
 deleted on migration, so that page keeps working as an escape hatch.
+
+## the front door
+
+`notebook` holds one kind of thing. It used to hold three — notes, tasks, and
+ideas — behind three mode tabs, so arriving with a thought meant answering
+"which of these is it?" before you could type, which is exactly the decision a
+front door exists to remove (CONVERGENCE.md §3).
+
+**Tasks went to Carillon**, where time lives. `apps/planner/src/lib/notebookTasks.ts`
+imports them once, flagged in planner settings. Carillon has no priority — it
+organizes by domain and by time — so an off-normal priority is recorded in the
+task's `notes` rather than invented as a field or dropped. Nothing ever maps to
+Carillon's `dropped` state, which Notebook never had.
+
+**Notes and ideas were always the same gesture at different lengths** and are
+now both `Capture`s: title (which may be empty — a thought does not owe you
+one), body, tags, and a `lane` (`spark` / `shape` / `later`). A lane is triage,
+not status: where a thing sits in your head, not how finished it is. The
+default filter is *everything*, because filtering is a choice; the number keys
+filter rather than switch modes, and pressing the same one again clears it.
 
 ## the handoff spine
 
@@ -578,11 +604,11 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1048 tests total: 16 in `api/` (its own
+1069 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1032 across eleven pnpm
-packages — `write` 72, `marginalia` 249, `planner` 283, `notebook` 22,
+instead of the recursive `pnpm -r test`), plus 1053 across eleven pnpm
+packages — `write` 72, `marginalia` 249, `planner` 298, `notebook` 28,
 `spores` 140, `bestiary` 160, `packages/sync` 5,
 `packages/persistence` 6, `packages/app-manifest` 11,
 `packages/handoff` 15, and `thinking-about` 69.
@@ -632,7 +658,7 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (1048 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (1069 tests)
 pnpm check              svelte-check in every app
 pnpm build              build the seven SvelteKit apps
 ```

@@ -1,13 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHandoffQueue, sendHandoff } from '@woodles/handoff';
-import { NotebookStore } from './notebook.svelte';
-import type { Note } from './types';
+import { NotebookStore, toCaptures } from './notebook.svelte';
 
 const FIXED_NOW = new Date('2026-07-21T16:00:00.000Z');
-const WORKSPACE_KEY = 'notebook.workspace.v2';
+const WORKSPACE_KEY = 'notebook.workspace.v3';
+const V2_KEY = 'notebook.workspace.v2';
 
 function savedDocument() {
 	return JSON.parse(localStorage.getItem(WORKSPACE_KEY) ?? '{}').data;
+}
+
+function v2(notes: unknown[], ideas: unknown[], tasks: unknown[] = []) {
+	return JSON.stringify({
+		woodles: 'workspace',
+		schemaVersion: 2,
+		savedAt: '2026-01-01T00:00:00.000Z',
+		data: { selectedNoteId: null, notes, tasks, ideas }
+	});
 }
 
 beforeEach(() => {
@@ -20,245 +29,215 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
-describe('NotebookStore notes', () => {
-	it('starts with a selected Home note', () => {
+describe('capturing', () => {
+	it('starts with one capture so the page is never empty', () => {
 		const store = new NotebookStore();
-
-		expect(store.notes).toHaveLength(1);
-		expect(store.selectedNote?.title).toBe('Home');
-		expect(store.selectedNote?.tags).toEqual(['inbox']);
+		expect(store.captures).toHaveLength(1);
+		expect(store.selected?.title).toBe('Home');
 	});
 
-	it('adds, selects, and persists a note', () => {
+	it('accepts a capture with nothing in it — the front door never asks first', () => {
 		const store = new NotebookStore();
-		store.setMode('tasks');
+		const capture = store.add();
 
-		const note = store.addNote();
-
-		expect(store.mode).toBe('notes');
-		expect(store.selectedNoteId).toBe(note.id);
-		expect(savedDocument().notes).toHaveLength(2);
-		expect(savedDocument().selectedNoteId).toBe(note.id);
+		expect(capture.title).toBe('');
+		expect(capture.body).toBe('');
+		expect(capture.lane).toBe('spark');
+		expect(store.selectedId).toBe(capture.id);
+		expect(savedDocument().captures).toHaveLength(2);
 	});
 
-	it('updates note content, tags, timestamp, and persisted state', () => {
+	it('puts the newest first, so what you just wrote is where you look', () => {
 		const store = new NotebookStore();
-		const note = store.selectedNote!;
+		store.add({ title: 'first' });
+		store.add({ title: 'second' });
 
-		store.updateNote(note.id, { title: 'Reading', body: 'A useful line', tags: ['books'] });
-
-		expect(store.selectedNote).toMatchObject({
-			title: 'Reading',
-			body: 'A useful line',
-			tags: ['books'],
-			updatedAt: FIXED_NOW.toISOString()
-		});
-		expect(savedDocument().notes[0].title).toBe('Reading');
+		expect(store.captures.slice(0, 2).map((c) => c.title)).toEqual(['second', 'first']);
 	});
 
-	it('searches title, body, and tags without case sensitivity', () => {
+	it('updates and persists', () => {
 		const store = new NotebookStore();
-		store.notes = [
-			note('one', 'Garden', 'Moss and rain', ['world'], '2026-07-20T00:00:00.000Z'),
-			note('two', 'Reading', 'A ROSE in the margin', ['books'], '2026-07-21T00:00:00.000Z')
-		];
+		const capture = store.add();
+		store.update(capture.id, { title: 'named later', tags: ['x'] });
 
-		store.query = 'rose';
-		expect(store.filteredNotes.map((item) => item.id)).toEqual(['two']);
-		store.query = 'WORLD';
-		expect(store.filteredNotes.map((item) => item.id)).toEqual(['one']);
+		expect(savedDocument().captures[0]).toMatchObject({ title: 'named later', tags: ['x'] });
 	});
 
-	it('sorts unfiltered notes by most recently updated', () => {
+	it('refuses to delete the last one, so there is always somewhere to type', () => {
 		const store = new NotebookStore();
-		store.notes = [
-			note('old', 'Old', '', [], '2026-07-19T00:00:00.000Z'),
-			note('new', 'New', '', [], '2026-07-21T00:00:00.000Z')
-		];
-
-		expect(store.filteredNotes.map((item) => item.id)).toEqual(['new', 'old']);
+		store.remove(store.captures[0].id);
+		expect(store.captures).toHaveLength(1);
 	});
 
-	it('will not delete the last note and selects a survivor after deletion', () => {
+	it('selects a neighbour when the selected one is deleted', () => {
 		const store = new NotebookStore();
-		const firstId = store.selectedNoteId!;
-		store.deleteNote(firstId);
-		expect(store.notes).toHaveLength(1);
+		const capture = store.add({ title: 'doomed' });
+		store.remove(capture.id);
 
-		const second = store.addNote();
-		store.deleteNote(second.id);
-		expect(store.notes.map((item) => item.id)).toEqual([firstId]);
-		expect(store.selectedNoteId).toBe(firstId);
+		expect(store.selectedId).toBe(store.captures[0].id);
+		expect(store.captures.some((c) => c.title === 'doomed')).toBe(false);
+	});
+});
+
+describe('lanes are triage, not status', () => {
+	it('moves a capture between lanes', () => {
+		const store = new NotebookStore();
+		const capture = store.add();
+		store.move(capture.id, 'later');
+
+		expect(store.captures[0].lane).toBe('later');
+		expect(savedDocument().captures[0].lane).toBe('later');
 	});
 
-	it('rehydrates saved state and restores a last-known-good backup from corrupt JSON', () => {
-		const first = new NotebookStore();
-		const added = first.addNote();
-		first.updateNote(added.id, { title: 'Kept' });
+	it('filters to one lane and counts each', () => {
+		const store = new NotebookStore();
+		store.add({ title: 'a', lane: 'later' });
+		store.add({ title: 'b', lane: 'later' });
 
-		const restored = new NotebookStore();
-		expect(restored.selectedNote?.title).toBe('Kept');
-
-		localStorage.setItem(WORKSPACE_KEY, '{broken');
-		const recovered = new NotebookStore();
-		expect(recovered.notes).toHaveLength(2);
-		expect(recovered.persistenceHealth.status).toBe('recovered');
-		expect(recovered.persistenceHealth.message).toContain('last-known-good');
+		store.setLaneFilter('later');
+		expect(store.filtered.map((c) => c.title)).toEqual(['b', 'a']);
+		expect(store.laneCount('later')).toBe(2);
 	});
 
-	it('migrates the four legacy keys into one versioned workspace', () => {
-		localStorage.setItem('notebook.selectedNote.v1', JSON.stringify('legacy'));
-		localStorage.setItem(
-			'notebook.notes.v1',
-			JSON.stringify([note('legacy', 'Legacy note', 'kept', ['old'], FIXED_NOW.toISOString())])
+	it('shows everything by default, because filtering is a choice', () => {
+		const store = new NotebookStore();
+		store.add({ title: 'a', lane: 'later' });
+
+		expect(store.laneFilter).toBeNull();
+		expect(store.filtered).toHaveLength(2);
+	});
+
+	it('clears the filter when the same lane is picked again', () => {
+		const store = new NotebookStore();
+		store.setLaneFilter('shape');
+		store.setLaneFilter('shape');
+		expect(store.laneFilter).toBeNull();
+	});
+});
+
+describe('searching', () => {
+	it('matches title, body, and tags at once', () => {
+		const store = new NotebookStore();
+		store.add({ title: 'moss', body: 'green' });
+		store.add({ title: 'fern', tags: ['damp'] });
+
+		store.query = 'green';
+		expect(store.filtered.map((c) => c.title)).toEqual(['moss']);
+		store.query = 'damp';
+		expect(store.filtered.map((c) => c.title)).toEqual(['fern']);
+	});
+
+	it('combines with the lane filter rather than replacing it', () => {
+		const store = new NotebookStore();
+		store.add({ title: 'moss', lane: 'later' });
+		store.add({ title: 'moss', lane: 'spark' });
+
+		store.query = 'moss';
+		store.setLaneFilter('later');
+		expect(store.filtered).toHaveLength(1);
+	});
+});
+
+describe('carrying the old notebook forward', () => {
+	it('turns notes and ideas into captures, and reads past tasks', () => {
+		const captures = toCaptures(
+			[{ id: 'n1', title: 'a note', body: 'words', tags: ['t'], createdAt: 'x', updatedAt: '2026-01-02' }],
+			[{ id: 'i1', text: 'an idea', lane: 'later', createdAt: '2026-01-01' }]
 		);
-		localStorage.setItem('notebook.tasks.v1', '[]');
-		localStorage.setItem('notebook.ideas.v1', '[]');
 
-		const migrated = new NotebookStore();
-		expect(migrated.selectedNote?.title).toBe('Legacy note');
-		expect(savedDocument().notes[0].id).toBe('legacy');
-		expect(localStorage.getItem('notebook.notes.v1')).toBeNull();
+		expect(captures.map((c) => c.title)).toEqual(['a note', '']);
+		expect(captures[0].lane).toBe('shape');
+		expect(captures[1]).toMatchObject({ body: 'an idea', lane: 'later' });
 	});
 
-	it('round-trips an export and rejects malformed imports', () => {
-		const source = new NotebookStore();
-		source.updateNote(source.selectedNoteId!, { title: 'Portable' });
-		const exported = source.exportJSON();
-
-		localStorage.clear();
-		const target = new NotebookStore();
-		expect(target.importJSON(exported)).toMatchObject({ ok: true });
-		expect(target.selectedNote?.title).toBe('Portable');
-
-		expect(target.importJSON(JSON.stringify({ notes: 'bad' }))).toMatchObject({ ok: false });
-		expect(target.selectedNote?.title).toBe('Portable');
+	it('leaves an idea untitled rather than inventing one from its own body', () => {
+		const [capture] = toCaptures([], [{ id: 'i1', text: 'a small thought', lane: 'spark' }]);
+		expect(capture.title).toBe('');
+		expect(capture.body).toBe('a small thought');
 	});
 
-	it('surfaces quota failures instead of pretending a change was saved', () => {
-		const setItem = vi
-			.spyOn(localStorage, 'setItem')
-			.mockImplementation(() => {
-				throw new DOMException('full', 'QuotaExceededError');
-			});
+	it('defaults an unknown lane instead of dropping the idea', () => {
+		const [capture] = toCaptures([], [{ id: 'i1', text: 'x', lane: 'nonsense' }]);
+		expect(capture.lane).toBe('spark');
+	});
+
+	it('upgrades a stored v2 notebook on first load', () => {
+		localStorage.setItem(
+			V2_KEY,
+			v2(
+				[{ id: 'n1', title: 'kept', body: '', tags: [], createdAt: 'x', updatedAt: 'x' }],
+				[{ id: 'i1', text: 'also kept', lane: 'spark', createdAt: 'x' }],
+				[{ id: 't1', title: 'a task', status: 'open', priority: 'high', createdAt: 'x' }]
+			)
+		);
+
 		const store = new NotebookStore();
+		expect(store.captures.map((c) => c.title)).toEqual(['kept', '']);
+		expect(store.captures.some((c) => c.body === 'a task')).toBe(false);
+	});
 
-		store.addTask('Visible failure');
+	it('leaves v2 in place, because carillon still needs the tasks', () => {
+		// The two migrations are order-independent by design — notebook must not
+		// read the tasks out from under Carillon.
+		const raw = v2([], [], [{ id: 't1', title: 'a task', status: 'open', createdAt: 'x' }]);
+		localStorage.setItem(V2_KEY, raw);
 
-		expect(store.persistenceHealth).toMatchObject({
-			status: 'error',
-			message: expect.stringContaining('storage is full')
-		});
-		setItem.mockRestore();
+		new NotebookStore();
+		expect(localStorage.getItem(V2_KEY)).toBe(raw);
+	});
+
+	it('keeps the starter capture when v2 held only tasks', () => {
+		localStorage.setItem(V2_KEY, v2([], [], [{ id: 't1', title: 'a task', status: 'open' }]));
+
+		const store = new NotebookStore();
+		expect(store.captures).toHaveLength(1);
+		expect(store.selected?.title).toBe('Home');
+	});
+
+	it('reports rather than swallows unreadable earlier data', () => {
+		localStorage.setItem(V2_KEY, '{ not json');
+		expect(new NotebookStore().persistenceHealth.status).toBe('error');
 	});
 });
 
-describe('NotebookStore tasks', () => {
-	it('ignores blank tasks and links new tasks to the selected note', () => {
-		const store = new NotebookStore();
-		store.addTask('   ');
-		expect(store.tasks).toEqual([]);
-
-		store.addTask('  Ship review  ', 'high');
-		expect(store.tasks[0]).toMatchObject({
-			title: 'Ship review',
-			priority: 'high',
-			noteId: store.selectedNoteId,
-			status: 'open'
-		});
-	});
-
-	it('orders open tasks by priority and separates completed work', () => {
-		const store = new NotebookStore();
-		store.addTask('Low', 'low');
-		store.addTask('High', 'high');
-		store.addTask('Normal', 'normal');
-
-		expect(store.openTasks.map((task) => task.title)).toEqual(['High', 'Normal', 'Low']);
-		const normal = store.tasks.find((task) => task.title === 'Normal')!;
-		store.toggleTask(normal.id);
-		expect(store.doneTasks.map((task) => task.title)).toEqual(['Normal']);
-		expect(store.doneTasks[0].completedAt).toBe(FIXED_NOW.toISOString());
-	});
-
-	it('reopens and deletes tasks while persisting each change', () => {
-		const store = new NotebookStore();
-		store.addTask('Keep me');
-		const id = store.tasks[0].id;
-		store.toggleTask(id);
-		store.toggleTask(id);
-		expect(store.tasks[0].completedAt).toBeUndefined();
-
-		store.deleteTask(id);
-		expect(store.tasks).toEqual([]);
-		expect(savedDocument().tasks).toEqual([]);
-	});
-});
-
-describe('NotebookStore ideas', () => {
-	it('ignores blank ideas and persists lane movement and deletion', () => {
-		const store = new NotebookStore();
-		store.addIdea('   ');
-		expect(store.ideas).toEqual([]);
-
-		store.addIdea('  Paper garden  ');
-		const id = store.ideas[0].id;
-		expect(store.ideas[0]).toMatchObject({ text: 'Paper garden', lane: 'spark' });
-
-		store.moveIdea(id, 'shape');
-		expect(store.ideas[0].lane).toBe('shape');
-		expect(savedDocument().ideas[0].lane).toBe('shape');
-
-		store.deleteIdea(id);
-		expect(store.ideas).toEqual([]);
-	});
-});
-
-describe('NotebookStore handoffs', () => {
-	it('turns everything waiting into notes and selects the newest', () => {
-		sendHandoff('notebook', {
-			title: 'from spores',
-			body: 'a body',
-			tags: ['garden'],
-			source: { app: 'spores' }
-		});
+describe('handoffs', () => {
+	it('turns everything waiting into captures and selects the newest', () => {
+		sendHandoff('notebook', { title: 'from spores', body: 'a body', source: { app: 'spores' } });
 		sendHandoff('notebook', { title: 'second', source: { app: 'write' } });
 
 		const store = new NotebookStore();
 		expect(store.ingestHandoffs()).toBe(2);
-
-		expect(store.mode).toBe('notes');
-		expect(store.notes.slice(0, 2).map((item) => item.title)).toEqual(['from spores', 'second']);
-		expect(store.selectedNote?.title).toBe('from spores');
-		expect(savedDocument().notes).toHaveLength(3);
+		expect(store.captures.slice(0, 2).map((c) => c.title)).toEqual(['from spores', 'second']);
+		expect(store.selected?.title).toBe('from spores');
 	});
 
-	it('tags each arrival with where it came from, without duplicating tags', () => {
-		sendHandoff('notebook', {
-			title: 'tagged',
-			tags: ['garden', 'from:spores'],
-			source: { app: 'spores' }
-		});
+	it('tags each arrival with where it came from', () => {
+		sendHandoff('notebook', { title: 'x', tags: ['garden'], source: { app: 'spores' } });
 
 		const store = new NotebookStore();
 		store.ingestHandoffs();
-
-		expect(store.notes[0].tags).toEqual(['garden', 'from:spores']);
+		expect(store.captures[0].tags).toEqual(['garden', 'from:spores']);
 	});
 
-	it('empties the inbox, so re-opening does not re-add the same notes', () => {
+	it('lands arrivals in sparks — they have not been triaged yet', () => {
+		sendHandoff('notebook', { title: 'x', source: { app: 'write' } });
+
+		const store = new NotebookStore();
+		store.ingestHandoffs();
+		expect(store.captures[0].lane).toBe('spark');
+	});
+
+	it('empties the inbox, so re-opening does not re-add', () => {
 		sendHandoff('notebook', { title: 'once', source: { app: 'write' } });
 
 		const store = new NotebookStore();
 		expect(store.ingestHandoffs()).toBe(1);
 		expect(store.pendingHandoffs()).toBe(0);
 		expect(store.ingestHandoffs()).toBe(0);
-		expect(store.notes.filter((item) => item.title === 'once')).toHaveLength(1);
 	});
 
-	it('flattens an html body into something the plain textarea can edit', () => {
+	it('flattens an html body into something the textarea can edit', () => {
 		sendHandoff('notebook', {
-			title: '',
 			body: '<p>first line</p><p>second <em>line</em></p>',
 			format: 'html',
 			source: { app: 'write' }
@@ -266,69 +245,45 @@ describe('NotebookStore handoffs', () => {
 
 		const store = new NotebookStore();
 		store.ingestHandoffs();
-
-		expect(store.notes[0].body).toBe('first line\n\nsecond line');
-		// No title supplied, so the opening line becomes one.
-		expect(store.notes[0].title).toBe('first line');
+		expect(store.captures[0].body).toBe('first line\n\nsecond line');
+		expect(store.captures[0].title).toBe('first line');
 	});
 
-	it('accepts a wholly empty capture rather than dropping it', () => {
-		sendHandoff('notebook', { source: { app: 'spores' } });
-
+	it('hands a capture on with its tags and provenance', () => {
 		const store = new NotebookStore();
-		expect(store.ingestHandoffs()).toBe(1);
-		expect(store.notes[0].title).toBe('Untitled');
-	});
+		const capture = store.add({ title: 'worth keeping', body: 'words', tags: ['seed'] });
 
-	it('hands a note on to another app with its tags and provenance', () => {
-		const store = new NotebookStore();
-		const created = store.addNote();
-		store.updateNote(created.id, { title: 'worth keeping', body: 'words', tags: ['seed'] });
-
-		const result = store.promoteNote(created.id, 'spores');
-		expect(result?.ok).toBe(true);
-
-		const waiting = createHandoffQueue('spores').peek();
-		expect(waiting).toHaveLength(1);
-		expect(waiting[0]).toMatchObject({
+		expect(store.promote(capture.id, 'spores')?.ok).toBe(true);
+		expect(createHandoffQueue('spores').peek()[0]).toMatchObject({
 			title: 'worth keeping',
 			body: 'words',
 			tags: ['seed'],
-			source: { app: 'notebook', label: 'worth keeping' }
+			source: { app: 'notebook' }
 		});
 	});
 
-	it('hands an idea on, carrying its lane as a tag', () => {
-		const store = new NotebookStore();
-		store.addIdea('a small thought', 'shape');
-
-		const result = store.promoteIdea(store.ideas[0].id, 'write');
-		expect(result?.ok).toBe(true);
-
-		const waiting = createHandoffQueue('write').peek();
-		expect(waiting[0]).toMatchObject({ body: 'a small thought', tags: ['shape'] });
-	});
-
 	it('reports nothing to promote for an id that is gone', () => {
-		const store = new NotebookStore();
-		expect(store.promoteNote('missing', 'spores')).toBeNull();
-		expect(store.promoteIdea('missing', 'spores')).toBeNull();
+		expect(new NotebookStore().promote('missing', 'spores')).toBeNull();
 	});
 });
 
-function note(
-	id: string,
-	title: string,
-	body: string,
-	tags: string[],
-	updatedAt: string
-): Note {
-	return {
-		id,
-		title,
-		body,
-		tags,
-		createdAt: updatedAt,
-		updatedAt
-	};
-}
+describe('export and import', () => {
+	it('round-trips the captures', () => {
+		const store = new NotebookStore();
+		store.add({ title: 'kept', lane: 'later' });
+		const text = store.exportJSON();
+
+		localStorage.clear();
+		const fresh = new NotebookStore();
+		expect(fresh.importJSON(text).ok).toBe(true);
+		expect(fresh.captures.map((c) => c.title)).toContain('kept');
+	});
+
+	it('refuses nonsense without losing what is already there', () => {
+		const store = new NotebookStore();
+		store.add({ title: 'mine' });
+
+		expect(store.importJSON('not json').ok).toBe(false);
+		expect(store.captures.some((c) => c.title === 'mine')).toBe(true);
+	});
+});
