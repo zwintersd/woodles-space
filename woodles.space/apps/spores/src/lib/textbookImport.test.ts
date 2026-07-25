@@ -96,9 +96,14 @@ describe('turning HTML into a spore body', () => {
 		expect(text).toBe('one\n\ntwo');
 	});
 
-	it('turns list items into dashes rather than running them together', () => {
+	it('turns list items into dashes, single-spaced so they stay a list', () => {
 		const { text } = bodyToText('<ul><li>first</li><li>second</li></ul>', titles);
-		expect(text).toBe('— first\n\n— second');
+		expect(text).toBe('— first\n— second');
+	});
+
+	it('keeps a list separate from the paragraph after it', () => {
+		const { text } = bodyToText('<ul><li>one</li></ul><p>after</p>', titles);
+		expect(text).toBe('— one\n\nafter');
 	});
 
 	it('decodes entities so text reads as it was written', () => {

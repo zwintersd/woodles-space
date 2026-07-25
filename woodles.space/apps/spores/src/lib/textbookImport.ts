@@ -71,7 +71,7 @@ export function readTextbook(raw: string | null): RawTextbook | null {
 	return order.length > 0 ? { entries, order } : null;
 }
 
-const BLOCK_TAGS = /<\/(?:p|div|h[1-6]|li|blockquote|tr|figcaption|caption)>/gi;
+const BLOCK_TAGS = /<\/(?:p|div|h[1-6]|blockquote|tr|figcaption|caption)>/gi;
 
 function decodeEntities(text: string): string {
 	return text
@@ -115,7 +115,11 @@ export function bodyToText(
 	);
 
 	out = out
+		// A list is a list, not a run of paragraphs: single-spaced, so the
+		// items stay visibly grouped in the plain-text body.
 		.replace(/<li\b[^>]*>/gi, '— ')
+		.replace(/<\/li>/gi, '\n')
+		.replace(/<\/(?:ul|ol)>/gi, '\n\n')
 		.replace(/<br\s*\/?>/gi, '\n')
 		.replace(BLOCK_TAGS, '\n\n')
 		.replace(/<[^>]*>/g, '');

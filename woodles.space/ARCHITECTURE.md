@@ -78,7 +78,7 @@ woodles.space/
     ├── hygge/               static · design playground (fonts, palette, motifs)
     ├── digits/              static · an SVG pen that writes the time
     ├── quiet-room/          static · an immersive three.js room of light
-    ├── ologypedia/          static · a block system for textbook-style pages, the pages it renders, and a personal editable Textbook that stitches entries together
+    ├── ologypedia/          static · a block system for textbook-style pages, and the pages it renders
     ├── letter/              static · echoes — the published-letter reader
     ├── animations/          Python · Manim playspace, outside the workspace
     ├── write/               SvelteKit · the letter editor
@@ -86,7 +86,7 @@ woodles.space/
     ├── planner/             SvelteKit · carillon — calendar, schedule, and time
     ├── notebook/            SvelteKit · notes, tasks, and ideas kept close
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
-    ├── spores/              SvelteKit · a garden of spores, gathered into spellbooks
+    ├── spores/              SvelteKit · the knowledge base — linked entries, gathered into spellbooks
     └── thinking-about/      SvelteKit · a board for what's being read, played, and watched
 ```
 
@@ -308,6 +308,50 @@ This is intentionally incremental. Planner, Spores, Thinking About, Write, and
 Marginalia keep their existing domain persistence until each is changed for a
 product reason; adoption should migrate one store at a time rather than create
 a central Woodles state service.
+
+## the knowledge base
+
+`spores` is where entries are tended. It absorbed the Dev Log (step 2) and the
+Ologypedia Textbook (step 4); see [CONVERGENCE.md](./CONVERGENCE.md) for why.
+Beyond spores/spellbooks/flights/tags, it now carries the Textbook's half:
+
+**`[[wikilinks]]` in a plain-text body.** The Textbook stored links as
+`<a class="entry-link" data-entry>` inside sanitized HTML. A spore body is
+plain text, so the port uses bracket syntax — which is what the Textbook's own
+"draft it with a prompt" already asked models to emit, so the authoring format
+and the storage format now agree. `wikilinks.ts` turns a body into text and
+link **segments**, which `SporeBody.svelte` renders directly: no `innerHTML`
+anywhere on the read path, and therefore no sanitizer to get wrong. Links
+resolve by title, case- and space-insensitively.
+
+**Red links and sowing.** A link to a title nothing answers to is drawn dashed
+with a `+`, and clicking it sows a seed rather than failing. Highlighting a
+phrase while reading offers the same, planting the link where the phrase sat.
+If the selection went stale and the phrase is no longer in the body, the seed
+is still sown — losing the link is acceptable, losing the thought is not.
+
+**Backlinks are derived, never stored** (`backlinksOf`), so they follow edits.
+A rename therefore turns inbound links red rather than silently rewriting text
+the person wrote; that is a deliberate choice, pinned by a test. They are shown
+separately from `Flight`s, which are links you drew rather than wrote.
+
+**Status and covers.** `seed → growing → grown`, forward-only, defaulting for
+pre-merge spores by whether anything was written and never guessing "grown".
+Covers need no design step — accent is a stable hash of the id, the emblem
+defaults to ✦, the blurb is excerpted from the body with links read as their
+display text — and `CoverEditor` only exists for the entry you care about.
+Accents are stored as *names*, not hex, so a re-skin cannot strand them.
+
+`SporeShelf.svelte` renders cover cards, toggled against the existing
+archetype lists and persisted per-browser under `spores.spellbookView.v1` — a
+view preference is about this screen on this device, so it stays out of the
+synced blob.
+
+`ologypedia` is now the publish target rather than a second editor:
+`index.html` still shelves finished pages and `add-page.html` still builds
+them, but `textbook.html` is a signpost that points at `/spores` and hands
+back the original `ologypedia-textbook-v1` blob as a download. Nothing is
+deleted on migration, so that page keeps working as an escape hatch.
 
 ## the handoff spine
 
@@ -534,12 +578,12 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-979 tests total: 16 in `api/` (its own
+1048 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 963 across eleven pnpm
+instead of the recursive `pnpm -r test`), plus 1032 across eleven pnpm
 packages — `write` 72, `marginalia` 249, `planner` 283, `notebook` 22,
-`spores` 71, `bestiary` 160, `packages/sync` 5,
+`spores` 140, `bestiary` 160, `packages/sync` 5,
 `packages/persistence` 6, `packages/app-manifest` 11,
 `packages/handoff` 15, and `thinking-about` 69.
 keep this inventory current when a suite changes; the root command is the
@@ -588,7 +632,7 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (979 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (1048 tests)
 pnpm check              svelte-check in every app
 pnpm build              build the seven SvelteKit apps
 ```

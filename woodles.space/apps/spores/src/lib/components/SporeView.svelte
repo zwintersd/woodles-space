@@ -5,6 +5,9 @@
 	import PromotePanel from './spell/PromotePanel.svelte';
 	import TagInput from './TagInput.svelte';
 	import GraphRenderer from './GraphRenderer.svelte';
+	import SporeBody from './SporeBody.svelte';
+	import StatusPill from './StatusPill.svelte';
+	import CoverEditor from './CoverEditor.svelte';
 	import { focusOnMount } from '$lib/focus';
 
 	let spore = $derived(garden.activeSpore);
@@ -107,6 +110,35 @@
 		}
 	}
 
+	// ── backlinks, covers, sowing ───────────────────────────────────
+	// Ported from the Ologypedia Textbook (CONVERGENCE.md step 4).
+
+	let backlinks = $derived(spore ? garden.backlinksOf(spore) : []);
+	let showCover = $state(false);
+
+	// The Textbook's core gesture: highlight a phrase while reading and it
+	// becomes an entry, with the link planted where you found it. Reading, not
+	// editing — you shouldn't have to enter a mode to notice something.
+	let selection = $state('');
+
+	function captureSelection() {
+		if (editing) return;
+		const text = document.getSelection()?.toString().trim() ?? '';
+		// A whole-paragraph selection is almost never a title; a stray click is
+		// never one either. Anything in between probably is.
+		selection = text.length > 1 && text.length <= 80 ? text : '';
+	}
+
+	function sow(andOpen: boolean) {
+		if (!spore || !selection) return;
+		const seed = garden.sowFromSelection(spore.id, selection);
+		const phrase = selection;
+		selection = '';
+		document.getSelection()?.removeAllRanges();
+		if (seed && andOpen) garden.openSpore(seed.id);
+		else if (seed) garden.handoffNotice = `sowed "${phrase}" — it's waiting when you want it`;
+	}
+
 	// ── handoff ─────────────────────────────────────────────────────
 	// When a spore turns out to want real prose, send it to the editor that
 	// can give it that, rather than retyping it there.
@@ -129,6 +161,8 @@
 	/>
 {/if}
 
+<svelte:document onselectionchange={captureSelection} />
+
 {#if spore}
 	<article class="spore-view">
 		<header class="spore-header">
@@ -144,6 +178,18 @@
 
 			<div class="header-meta">
 				<span class="spore-date">{formatDate(spore.updated)}</span>
+				<StatusPill {spore} />
+				<div class="cover-wrap">
+					<button
+						class="btn-ghost"
+						onclick={() => (showCover = !showCover)}
+						aria-expanded={showCover}
+						title="How this spore looks on the shelf"
+					>cover</button>
+					{#if showCover}
+						<CoverEditor {spore} onclose={() => (showCover = false)} />
+					{/if}
+				</div>
 				<div class="header-actions">
 					{#if graphScript}
 						<button class="btn-graph" onclick={() => (showGraph = true)}>
@@ -174,9 +220,17 @@
 					rows={10}
 				></textarea>
 			{:else if spore.body}
-				<div class="body-text">{spore.body}</div>
+				<SporeBody {spore} />
 			{:else}
 				<button class="body-placeholder" onclick={startEdit}>add a body…</button>
+			{/if}
+
+			{#if selection && !editing}
+				<div class="sow-bar">
+					<span class="sow-phrase">“{selection}”</span>
+					<button class="btn-primary" onclick={() => sow(true)}>✦ new entry &amp; open</button>
+					<button class="btn-ghost" onclick={() => sow(false)}>seed it &amp; stay</button>
+				</div>
 			{/if}
 		</div>
 
@@ -191,6 +245,23 @@
 				onnavigate={(t) => garden.openTag(t)}
 			/>
 		</section>
+
+		<!-- what points here — derived from [[links]], never stored -->
+		{#if backlinks.length > 0}
+			<section class="backlinks-section">
+				<h3 class="section-label">mentioned in</h3>
+				<ul class="backlinks-list">
+					{#each backlinks as source (source.id)}
+						<li>
+							<button class="backlink" onclick={() => garden.openSpore(source.id)}>
+								<span class="backlink-glyph">⟵</span>
+								{source.title}
+							</button>
+						</li>
+					{/each}
+				</ul>
+			</section>
+		{/if}
 
 		<!-- promote to spore (import data) -->
 		<PromotePanel {spore} />
@@ -412,13 +483,6 @@
 		border-bottom: 1px solid var(--g-rule);
 	}
 
-	.body-text {
-		font-family: var(--g-font-body);
-		font-size: 1rem;
-		line-height: 1.75;
-		color: var(--g-text);
-		white-space: pre-wrap;
-	}
 
 	.body-editor {
 		width: 100%;
@@ -450,6 +514,76 @@
 		color: var(--g-muted);
 		font-weight: 400;
 		margin-bottom: var(--g-space-sm);
+	}
+
+	/* ── sowing from a selection ──
+	   highlight a phrase while reading and it becomes an entry, with the link
+	   planted where you found it. no mode to enter first. */
+	.sow-bar {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: var(--g-space-sm);
+		margin-top: var(--g-space-md);
+		padding: var(--g-space-sm) var(--g-space-md);
+		background: var(--g-surface);
+		border: 1px solid var(--g-border-strong);
+		border-radius: var(--g-radius-pill);
+		box-shadow: var(--g-shadow-card);
+	}
+
+	.sow-phrase {
+		font-family: var(--g-font-body);
+		font-size: 0.85rem;
+		font-style: italic;
+		color: var(--g-text-dim);
+		max-width: 22rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* ── backlinks ──
+	   derived from what other spores wrote, so this is "who mentioned me",
+	   distinct from the flights below, which are links you drew on purpose. */
+	.backlinks-section {
+		margin-bottom: var(--g-space-2xl);
+		padding-bottom: var(--g-space-xl);
+		border-bottom: 1px solid var(--g-rule);
+	}
+
+	.backlinks-list {
+		list-style: none;
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--g-space-sm);
+	}
+
+	.backlink {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--g-space-xs);
+		font-family: var(--g-font-body);
+		font-size: 0.88rem;
+		color: var(--g-text);
+		background: var(--g-surface);
+		border: 1px solid var(--g-border);
+		border-radius: var(--g-radius-pill);
+		padding: 0.25rem 0.75rem;
+		cursor: pointer;
+		transition: border-color var(--g-transition-fast);
+	}
+
+	.backlink:hover {
+		border-color: var(--g-border-strong);
+	}
+
+	.backlink-glyph {
+		color: var(--g-muted);
+	}
+
+	.cover-wrap {
+		position: relative;
 	}
 
 	/* ── flights ── */

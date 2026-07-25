@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { garden } from '$lib/garden.svelte';
 	import { importDevlogOnce } from '$lib/devlogImport';
+	import { importTextbookOnce } from '$lib/textbookImport';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import SpellbookList from '$lib/components/SpellbookList.svelte';
 	import SpellbookView from '$lib/components/SpellbookView.svelte';
@@ -22,6 +23,15 @@
 			garden.handoffNotice =
 				`folded in the Dev Log — ${devlog.entries} ${devlog.entries === 1 ? 'entry' : 'entries'}` +
 				` and ${devlog.records} ${devlog.records === 1 ? 'record' : 'records'}, in a new spellbook`;
+		}
+		// The Ologypedia Textbook folds in on first open, once.
+		const textbook = importTextbookOnce(garden);
+		if (textbook) {
+			garden.handoffNotice =
+				`folded in the Textbook — ${textbook.entries} ${textbook.entries === 1 ? 'entry' : 'entries'}` +
+				(textbook.danglingLinks > 0
+					? `, ${textbook.danglingLinks} link${textbook.danglingLinks === 1 ? '' : 's'} left to sow`
+					: '');
 		}
 		// Anything sent here from another app is planted before onboarding is
 		// considered, so a Garden that only looks empty doesn't trigger the
