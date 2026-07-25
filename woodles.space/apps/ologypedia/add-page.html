@@ -622,7 +622,8 @@
 </div>
 
 <script src="cover-render.js"></script>
-<script>
+<script type="module">
+  import { buildBrief } from '/packages/spellcraft/src/index.js';
 (function(){
   var topicEl = document.getElementById('topic');
   var contextEl = document.getElementById('context');
@@ -774,81 +775,19 @@
 "after it, and no Markdown code fences.";
 
   function buildPrompt(){
-    var topic = topicEl.value.trim() || '[TOPIC]';
-    var context = contextEl.value.trim();
-    var subject = subjectEl.value.trim();
-    var slug = currentSlug();
+    // The brief lives in @woodles/spellcraft so the Garden's "draft with a
+    // prompt" and this studio can never drift apart. What stays here is the
+    // VISUAL SYSTEM — that is this app's page format, not part of the brief.
+    promptOut.value = buildBrief({
+      topic: topicEl.value,
+      output: 'page',
+      subject: subjectEl.value,
+      context: contextEl.value,
+      diagnosis: diagnosisEl.checked,
+      appendix: VISUAL_SYSTEM.replace('{SLUG}', currentSlug())
+    });
 
-    var lines = [];
-    lines.push('Write this as a personal-textbook-style page or chapter on: ' + topic);
-    lines.push('');
-    if (subject){
-      lines.push('Domain / subdomain for the masthead kicker: ' + subject);
-      lines.push('');
-    }
-    if (context){
-      lines.push('Optional context: ' + context);
-      lines.push('');
-    }
-    lines.push('Voice: conversational but rigorous, standard intro-course background assumed.');
-    lines.push('Slightly more playful than neutral — except where the topic is genuinely');
-    lines.push('heavy, where the register shifts to hope/awe/significance rather than');
-    lines.push('forced levity or flat solemnity. The narrator is an implied presence —');
-    lines.push('never says "I" — but has clear judgment and speaks directly to "you,"');
-    lines.push('steering attention rather than narrating past it. External, curious,');
-    lines.push('helpful, a little magical — not an oracle, not a casual friend.');
-    lines.push('');
-    lines.push('Structure: headers, generously used. No length ceiling. No closing');
-    lines.push('synthesis/wrap-up paragraph — end on the last substantive section. Include');
-    lines.push('a figure or diagram whenever a mechanism, process, or structure would');
-    lines.push('genuinely be clearer shown than described.');
-    lines.push('');
-    lines.push('Etymology: track key terms as semantic drift — how the meaning moved and');
-    lines.push('why — at first use, not just the root. Foreign/loan terms get a quick');
-    lines.push('pronunciation gloss on first appearance.');
-    lines.push('');
-    lines.push('Bridges: metaphors only from educational psychology, game/systems design,');
-    lines.push('sociology & media studies, or neuroscience/cognitive science. Never sports.');
-    lines.push('');
-    lines.push('Worked example(s): grounded in real, checkable material only — a');
-    lines.push('mechanism, a real historical artifact/event, real data. Never an');
-    lines.push('interpretive reading of the topic\'s own fictional content.');
-    lines.push('');
-    lines.push('Standing lenses — check for a genuine connection to: (1) autism/');
-    lines.push('neurodivergence, including special-interest culture, not just clinical');
-    lines.push('application; (2) ABA & behavior-analytic clinical practice; (3)');
-    lines.push('anti-essentialism, queerness, or systems-thinking approaches. Skip');
-    lines.push('silently if there\'s no real connection — no mention of absence. When');
-    lines.push('there is one, weave it into the prose without ever naming the lens.');
-    lines.push('Length scales to how much it adds.');
-    lines.push('');
-    lines.push('Conversions, every time relevant: distance in mi + km, temperature in');
-    lines.push('°F + °C, weight in lb + kg, volume in gal/cups + L/mL, historical dollar');
-    lines.push('figures with a current-year inflation-adjusted equivalent, historical');
-    lines.push('dates with "X years ago," chemical formula alongside common name where');
-    lines.push('relevant, population/count figures alongside their share of the relevant');
-    lines.push('total. Do not anchor big numbers to a forced concrete-object comparison.');
-    lines.push('');
-    lines.push('Reading list: primary/seminal sources preferred; one accessible on-ramp');
-    lines.push('only if the primary source is a genuinely rough entry point.');
-
-    if (diagnosisEl.checked){
-      lines.push('');
-      lines.push('This topic is a diagnosis or health condition — also add: supporting a');
-      lines.push('loved one who has it, personal risk-assessment (what to know if');
-      lines.push('diagnosed, or whether to get assessed), professional/clinical');
-      lines.push('application (relevant to ABA/behavior-analytic work), and a');
-      lines.push('prerequisite-study map (what to learn first for real depth).');
-    }
-
-    lines.push('');
-    lines.push('---');
-    lines.push('');
-    lines.push(VISUAL_SYSTEM.replace('{SLUG}', slug));
-
-    promptOut.value = lines.join('\n');
-
-    var filename = 'textbook-' + slug + '.html';
+    var filename = 'textbook-' + currentSlug() + '.html';
     dlName.textContent = filename;
     if (!downloadEl.classList.contains('is-disabled')) downloadEl.download = filename;
   }

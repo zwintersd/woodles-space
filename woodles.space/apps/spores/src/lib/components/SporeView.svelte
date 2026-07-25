@@ -8,6 +8,7 @@
 	import SporeBody from './SporeBody.svelte';
 	import StatusPill from './StatusPill.svelte';
 	import CoverEditor from './CoverEditor.svelte';
+	import DraftPanel from './DraftPanel.svelte';
 	import { focusOnMount } from '$lib/focus';
 
 	let spore = $derived(garden.activeSpore);
@@ -115,6 +116,7 @@
 
 	let backlinks = $derived(spore ? garden.backlinksOf(spore) : []);
 	let showCover = $state(false);
+	let showDraft = $state(false);
 
 	// The Textbook's core gesture: highlight a phrase while reading and it
 	// becomes an entry, with the link planted where you found it. Reading, not
@@ -201,6 +203,12 @@
 						<button class="btn-ghost" onclick={cancelEdit}>cancel</button>
 					{:else}
 						<button class="btn-ghost" onclick={startEdit}>edit</button>
+						<button
+							class="btn-ghost"
+							onclick={() => (showDraft = !showDraft)}
+							aria-expanded={showDraft}
+							title="build a prompt for this entry, and bring the answer back"
+						>✦ draft</button>
 						<button class="btn-ghost" onclick={sendToWrite} title="hand this spore to write">
 							→ write
 						</button>
@@ -223,6 +231,10 @@
 				<SporeBody {spore} />
 			{:else}
 				<button class="body-placeholder" onclick={startEdit}>add a body…</button>
+			{/if}
+
+			{#if showDraft && !editing}
+				<DraftPanel {spore} onclose={() => (showDraft = false)} />
 			{/if}
 
 			{#if selection && !editing}
