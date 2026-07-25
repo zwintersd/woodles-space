@@ -15,6 +15,16 @@
 		if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('dev') === '1') {
 			garden.devMode = true;
 		}
+		// Anything sent here from another app is planted before onboarding is
+		// considered, so a Garden that only looks empty doesn't trigger the
+		// first-run flow over the top of what just arrived.
+		const caught = garden.ingestHandoffs();
+		if (caught.length > 0) {
+			garden.handoffNotice =
+				caught.length === 1
+					? `caught "${caught[0].title}" from elsewhere`
+					: `caught ${caught.length} things from elsewhere`;
+		}
 		// First-run: empty Garden + never onboarded → run the guided first cast.
 		garden.maybeStartOnboarding();
 	});
@@ -47,6 +57,12 @@
 	<Sidebar />
 
 	<main class="main-content">
+		{#if garden.handoffNotice}
+			<p class="handoff-notice" aria-live="polite">
+				{garden.handoffNotice}
+				<button type="button" onclick={() => (garden.handoffNotice = '')} aria-label="dismiss">×</button>
+			</p>
+		{/if}
 		{#if garden.currentView === 'spell'}
 			<SpellWizard />
 		{:else if garden.currentView === 'garden'}
@@ -78,5 +94,34 @@
 	.main-content {
 		flex: 1;
 		overflow-y: auto;
+	}
+
+	/* things sent here from another app, announced once on arrival */
+	.handoff-notice {
+		display: flex;
+		align-items: center;
+		gap: var(--g-space-sm);
+		margin: var(--g-space-md) var(--g-space-md) 0;
+		padding: var(--g-space-sm) var(--g-space-md);
+		border: 1px solid var(--g-border-strong);
+		border-radius: 999px;
+		background: var(--g-flight-soft);
+		color: var(--g-text);
+		font-family: var(--g-font-mono);
+		font-size: 0.72rem;
+	}
+
+	.handoff-notice button {
+		margin-left: auto;
+		border: none;
+		background: none;
+		color: var(--g-text-dim);
+		font-size: 1rem;
+		line-height: 1;
+		cursor: pointer;
+	}
+
+	.handoff-notice button:hover {
+		color: var(--g-flight);
 	}
 </style>

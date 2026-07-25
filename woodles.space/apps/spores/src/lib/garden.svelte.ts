@@ -8,6 +8,7 @@ import type {
 	OnboardingStep
 } from './types';
 import type { Category } from './spells/types';
+import { createHandoffQueue, type HandoffTarget, type SendResult } from '@woodles/handoff';
 import { uid, now } from './utils';
 import {
 	tagCounts,
@@ -48,6 +49,27 @@ function save<T>(key: string, value: T): void {
 
 const DEFAULT_SETTINGS: GardenSettings = {};
 
+const handoffQueue = createHandoffQueue('spores');
+
+// A handoff may arrive as HTML from a rich editor; a spore body is a plain
+// textarea, so flatten rather than store markup the user can't edit.
+function htmlToText(html: string): string {
+	return html
+		.replace(/<br\s*\/?>/gi, '\n')
+		.replace(/<\/(?:p|div|li|h[1-6]|blockquote)>/gi, '\n\n')
+		.replace(/<[^>]*>/g, '')
+		.replace(/&nbsp;/g, ' ')
+		.replace(/&amp;/g, '&')
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.replace(/\n{3,}/g, '\n\n')
+		.trim();
+}
+
+function firstLine(text: string): string {
+	return text.split('\n').find((line) => line.trim())?.trim().slice(0, 60) ?? '';
+}
+
 export class GardenStore {
 	// Persisted
 	spores = $state<Spore[]>(migrateSpores(load('spores.spores.v1', [])));
@@ -85,6 +107,11 @@ export class GardenStore {
 	// Bumped to force the embedded wizard to remount at a chosen step (dev jumps).
 	onboardingMountToken = $state(0);
 	devMode = $state(false);
+
+	// Handoffs already planted, so a re-delivery is a no-op.
+	private ingestedHandoffIds = new Set<string>();
+	// Set when a visit began by catching things from elsewhere.
+	handoffNotice = $state('');
 
 	// ── derived views ──────────────────────────────────────────────
 
@@ -475,6 +502,52 @@ export class GardenStore {
 			customCategories: (this.settings.customCategories ?? []).filter((c) => c.id !== id)
 		};
 		save('spores.settings.v1', this.settings);
+	}
+
+	// ── handoffs ────────────────────────────────────────────────────
+	// A thought captured anywhere else can be sent here rather than retyped.
+	// See CONVERGENCE.md §3.
+
+	/**
+	 * Turn everything waiting into spores. Safe to call repeatedly — an id
+	 * already ingested is skipped, so a queue that failed to clear re-delivers
+	 * without planting the same thing twice.
+	 */
+	ingestHandoffs(): Spore[] {
+		const drained = handoffQueue.drain();
+		const fresh = drained.items.filter((item) => !this.ingestedHandoffIds.has(item.id));
+		const grown: Spore[] = [];
+		for (const item of fresh) {
+			this.ingestedHandoffIds.add(item.id);
+			const body = item.format === 'html' ? htmlToText(item.body) : item.body;
+			const title = item.title.trim() || firstLine(body) || 'untitled';
+			grown.push(
+				this.addSpore({
+					title,
+					body,
+					tags: [...item.tags, `from:${item.source.app}`]
+				})
+			);
+		}
+		return grown;
+	}
+
+	/** How many are waiting, for a badge. Does not consume them. */
+	pendingHandoffs(): number {
+		return handoffQueue.count();
+	}
+
+	/** Hand a spore on to an app that can do more with it than spores can. */
+	promoteSpore(id: string, target: HandoffTarget): SendResult | null {
+		const spore = this.spores.find((s) => s.id === id);
+		if (!spore) return null;
+		return createHandoffQueue(target).send({
+			title: spore.title,
+			body: spore.body,
+			format: 'text',
+			tags: spore.tags,
+			source: { app: 'spores', label: spore.title || 'a spore', href: '/spores' }
+		});
 	}
 
 	// ── rehydrate from sync ─────────────────────────────────────────

@@ -1,7 +1,14 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { notebook } from '$lib/notebook.svelte';
 	import type { Idea, NotebookMode, NotebookTask } from '$lib/types';
 	import { formatBytes } from '@woodles/persistence';
+	import type { HandoffTarget } from '@woodles/handoff';
+
+	const SEND_TO: { id: HandoffTarget; label: string }[] = [
+		{ id: 'spores', label: 'spores' },
+		{ id: 'write', label: 'write' }
+	];
 
 	const MODES: { id: NotebookMode; label: string }[] = [
 		{ id: 'notes', label: 'notes' },
@@ -20,9 +27,32 @@
 	let ideaText = $state('');
 	let ideaLane = $state<Idea['lane']>('spark');
 	let importInput = $state<HTMLInputElement>();
+	let handoffNotice = $state('');
 
 	const note = $derived(notebook.selectedNote);
 	const noteTags = $derived(note?.tags.join(', ') ?? '');
+
+	// Anything another app couldn't place lands here on open, so nothing ever
+	// needs filing at the moment it's captured. See CONVERGENCE.md §3.
+	onMount(() => {
+		const caught = notebook.ingestHandoffs();
+		if (caught > 0) {
+			handoffNotice = `caught ${caught} ${caught === 1 ? 'thing' : 'things'} from elsewhere`;
+		}
+	});
+
+	function sendNote(target: HandoffTarget) {
+		if (!note) return;
+		const result = notebook.promoteNote(note.id, target);
+		handoffNotice = result?.ok
+			? `sent to ${target} — it'll be waiting when you open it`
+			: `couldn't send to ${target}`;
+	}
+
+	function sendIdea(id: string, target: HandoffTarget) {
+		const result = notebook.promoteIdea(id, target);
+		handoffNotice = result?.ok ? `sent to ${target}` : `couldn't send to ${target}`;
+	}
 
 	function addTask(e: Event) {
 		e.preventDefault();
@@ -179,6 +209,12 @@
 					</button>
 				{/each}
 			</div>
+			{#if handoffNotice}
+				<p class="handoff-notice" aria-live="polite">
+					{handoffNotice}
+					<button type="button" onclick={() => (handoffNotice = '')} aria-label="dismiss">×</button>
+				</p>
+			{/if}
 			<div class="persistence-tools">
 				<p
 					class="persistence-status"
@@ -230,9 +266,20 @@
 							aria-label="note title"
 							oninput={(e) => notebook.updateNote(note.id, { title: e.currentTarget.value })}
 						/>
-						<button class="delete-note" onclick={() => notebook.deleteNote(note.id)} disabled={notebook.notes.length <= 1}>
-							delete
-						</button>
+						<div class="head-actions">
+							{#each SEND_TO as target}
+								<button
+									class="send-note"
+									onclick={() => sendNote(target.id)}
+									title="hand this note to {target.label}"
+								>
+									→ {target.label}
+								</button>
+							{/each}
+							<button class="delete-note" onclick={() => notebook.deleteNote(note.id)} disabled={notebook.notes.length <= 1}>
+								delete
+							</button>
+						</div>
 					</div>
 					<input
 						class="tag-input"
@@ -308,6 +355,13 @@
 									<div class="idea-actions">
 										{#each LANES.filter((target) => target.id !== lane.id) as target}
 											<button onclick={() => notebook.moveIdea(idea.id, target.id)}>{target.label}</button>
+										{/each}
+										{#each SEND_TO as target}
+											<button
+												class="send"
+												onclick={() => sendIdea(idea.id, target.id)}
+												title="hand this idea to {target.label}"
+											>→ {target.label}</button>
 										{/each}
 										<button onclick={() => notebook.deleteIdea(idea.id)}>×</button>
 									</div>
@@ -753,6 +807,62 @@
 		font-size: 1rem;
 		line-height: 1.35;
 		margin-bottom: 0.65rem;
+	}
+
+	/* ── handoffs ──
+	   notebook is the front door: things arrive here from other apps, and
+	   leave here for the app that can do more with them. see CONVERGENCE.md. */
+	.head-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+
+	.send-note {
+		padding: 0.48rem 0.7rem;
+		border: 2px solid #fff;
+		border-radius: 999px;
+		font-size: 0.6rem;
+		letter-spacing: 0.06em;
+		font-weight: 700;
+		color: var(--nb-violet);
+		background: linear-gradient(180deg, var(--nb-cream), var(--nb-paper-alt));
+		box-shadow: 0 4px 0 var(--nb-line);
+		transition: transform 120ms ease, box-shadow 120ms ease;
+	}
+
+	.send-note:hover {
+		transform: translateY(2px);
+		box-shadow: 0 2px 0 var(--nb-line);
+	}
+
+	.idea-actions button.send {
+		color: var(--nb-ink);
+		border-color: rgba(255, 117, 205, 0.7);
+	}
+
+	.handoff-notice {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin: 0 0 0.6rem;
+		padding: 0.45rem 0.8rem;
+		border: 2px solid rgba(141, 85, 240, 0.45);
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.72);
+		color: #8d55f0;
+		font-size: 0.68rem;
+		font-weight: 700;
+	}
+
+	.handoff-notice button {
+		margin-left: auto;
+		border: none;
+		background: none;
+		color: inherit;
+		font-size: 0.85rem;
+		line-height: 1;
+		cursor: pointer;
 	}
 
 	.idea-actions {

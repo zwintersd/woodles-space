@@ -32,6 +32,19 @@ defaults to `'woodles_sync_passphrase'`; `marginalia-devlog` passes
 app's `.svelte.ts` so `$state` compiles under the app's Svelte plugin rather than
 in the package.
 
+## htmlToText
+**Status:** candidate · watch
+**Copies:** `notebook/src/lib/notebook.svelte.ts`,
+`spores/src/lib/garden.svelte.ts`
+**State:** identical
+**Notes:** flattening an incoming HTML handoff body into the plain text a
+`<textarea>` can edit. born duplicated in the same change (the handoff wiring),
+which normally means waiting — but there are only two copies and they are
+byte-identical, so the moment a third appears this should go into
+`@woodles/handoff` as a `flatten` helper rather than being copied again. it is
+*not* the same job as `htmlTools.stripTags` below: this one preserves paragraph
+breaks as blank lines, because the result is something a person then edits.
+
 ## text / HTML utilities
 **Status:** candidate · strong
 **Copies:** `write/src/lib/htmlTools.ts`, `marginalia/src/lib/reading/text.ts`,

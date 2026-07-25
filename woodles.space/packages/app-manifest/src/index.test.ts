@@ -8,6 +8,8 @@ import {
 	defaultLandingPins,
 	featuredLandingApps,
 	landingApps,
+	landingAppsByBand,
+	landingBands,
 	primaryDestination,
 	type AppDefinition
 } from './index.js';
@@ -69,6 +71,32 @@ describe('landing catalogue', () => {
 		expect(new Set(landingApps.map((app) => app.id)).size).toBe(landingApps.length);
 		expect(defaultLandingPins).toEqual(['hygge', 'write', 'marg', 'planner', 'notebook', 'quiet']);
 		expect(featuredLandingApps.map((app) => app.id)).toEqual(['marg', 'bestiary', 'write']);
+	});
+
+	it('sorts every tile into exactly one known band, losing none', () => {
+		const bandIds = landingBands.map((band) => band.id);
+		expect(new Set(bandIds).size).toBe(landingBands.length);
+		expect(landingBands.map((band) => band.order)).toEqual(
+			[...Array(landingBands.length)].map((_, index) => index + 1)
+		);
+
+		for (const app of landingApps) {
+			expect(bandIds, app.id).toContain(app.band);
+		}
+
+		const grouped = landingAppsByBand.flatMap((group) => group.apps);
+		expect(grouped).toHaveLength(landingApps.length);
+		expect(new Set(grouped.map((app) => app.id)).size).toBe(landingApps.length);
+		expect(landingAppsByBand.map((group) => group.band.order)).toEqual(
+			[...landingAppsByBand.map((group) => group.band.order)].sort((a, b) => a - b)
+		);
+	});
+
+	it('keeps the front door alone in its band', () => {
+		// "catch" is the one-way-in band. more than one app in it means the
+		// routing decision CONVERGENCE.md set out to remove has grown back.
+		const catchBand = landingAppsByBand.find((group) => group.band.id === 'catch');
+		expect(catchBand?.apps.map((app) => app.id)).toEqual(['notebook']);
 	});
 
 	it('imports the canonical catalogue and retains artwork for every tile', () => {

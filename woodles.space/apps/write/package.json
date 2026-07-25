@@ -23,6 +23,7 @@
     "vitest": "^3.2.6"
   },
   "dependencies": {
+    "@woodles/handoff": "workspace:*",
     "@woodles/sync": "workspace:*"
   }
 }

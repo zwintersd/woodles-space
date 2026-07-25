@@ -107,6 +107,18 @@
 		}
 	}
 
+	// ── handoff ─────────────────────────────────────────────────────
+	// When a spore turns out to want real prose, send it to the editor that
+	// can give it that, rather than retyping it there.
+
+	function sendToWrite() {
+		if (!spore) return;
+		const result = garden.promoteSpore(spore.id, 'write');
+		garden.handoffNotice = result?.ok
+			? 'sent to write — it will be waiting when you open it'
+			: 'could not send to write';
+	}
+
 
 </script>
 
@@ -143,6 +155,9 @@
 						<button class="btn-ghost" onclick={cancelEdit}>cancel</button>
 					{:else}
 						<button class="btn-ghost" onclick={startEdit}>edit</button>
+						<button class="btn-ghost" onclick={sendToWrite} title="hand this spore to write">
+							→ write
+						</button>
 						<button class="btn-danger-ghost" onclick={handleDelete}>delete</button>
 					{/if}
 				</div>
