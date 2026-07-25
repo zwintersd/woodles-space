@@ -196,7 +196,7 @@
 	.spell-btn:hover,
 	.spell-btn.active {
 		background: var(--g-flight);
-		color: #0d0d1a;
+		color: var(--g-on-flight);
 	}
 
 	.sync-btn {
@@ -233,7 +233,7 @@
 	.sync-overlay {
 		position: fixed;
 		inset: 0;
-		background: rgba(13, 13, 26, 0.6);
+		background: var(--g-scrim);
 		z-index: var(--g-z-overlay);
 		display: flex;
 		align-items: flex-end;

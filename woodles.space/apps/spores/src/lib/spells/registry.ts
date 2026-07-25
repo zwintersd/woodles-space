@@ -318,7 +318,7 @@ const MOD_VOICE_ACTORS: Modifier = {
 const CAT_ANIME_GRAPH: Category = {
 	id: 'anime-graph',
 	label: 'Anime — Relationship Graph',
-	group: 'anime' as 'media',
+	group: 'anime',
 	glyph: '◉',
 	rootKind: 'anime-relationship-graph',
 	rootFields: [
@@ -345,7 +345,112 @@ const CAT_WORK: Category = {
 	modifiers: [MOD_CITATIONS]
 };
 
+// ── worldbuilding ─────────────────────────────────────────────────
+// Absorbed from the Dev Log, which was a fixed seven-type block editor for
+// one subject (marginalia's world). Those types are just a schema registry
+// with a link type between records — which is what this file already is, only
+// data-driven and extensible. See CONVERGENCE.md §2E.
+//
+// The Dev Log's `prose` block has no category here on purpose: it was never a
+// typed record, only body text, and a Spore already has a body.
+
+const CAT_CREATURE: Category = {
+	id: 'creature',
+	label: 'Creature',
+	group: 'worldbuilding',
+	glyph: '❋',
+	rootKind: 'creature',
+	rootFields: [
+		{ key: 'biome', label: 'Biome', example: 'where it lives', default: true },
+		{ key: 'loreFragment', label: 'Lore fragment', example: 'a scrap of its story', default: true },
+		{ key: 'interventionBehavior', label: 'Intervention behavior', example: 'what it does when the witch acts', default: true },
+		{ key: 'visualNotes', label: 'Visual notes', example: 'silhouette, palette, motion', default: true },
+		{ key: 'relationships', label: 'Relationships', example: 'what it needs, avoids, follows', default: true }
+	],
+	modifiers: [MOD_CITATIONS]
+};
+
+const CAT_BIOME: Category = {
+	id: 'biome',
+	label: 'Biome',
+	group: 'worldbuilding',
+	glyph: '⬡',
+	rootKind: 'biome',
+	rootFields: [
+		{ key: 'hexGridPosition', label: 'Hex grid position', example: 'q,r', default: true },
+		{ key: 'climateMood', label: 'Climate & mood', example: 'what it feels like to stand in', default: true },
+		{ key: 'nativeCreatures', label: 'Native creatures', example: '["…"]', default: true },
+		{ key: 'mechanicExpression', label: 'Mechanic expression', example: 'how the rules read here', default: true },
+		{ key: 'atmosphereNotes', label: 'Atmosphere notes', example: 'light, sound, weather', default: true }
+	]
+};
+
+const CAT_ABILITY: Category = {
+	id: 'ability',
+	label: 'Ability',
+	group: 'worldbuilding',
+	glyph: '✦',
+	rootKind: 'ability',
+	rootFields: [
+		{ key: 'mechanicalEffect', label: 'Mechanical effect', example: 'what it does, in rules', default: true },
+		{ key: 'tiedTo', label: 'Tied to', example: '["…"]', default: true },
+		{ key: 'narrativeJustification', label: 'Narrative justification', example: 'why it makes sense', default: true },
+		{ key: 'costLimitation', label: 'Cost / limitation', example: 'what it takes to use', default: true }
+	]
+};
+
+const CAT_STAT: Category = {
+	id: 'stat',
+	label: 'Stat',
+	group: 'worldbuilding',
+	glyph: '◈',
+	rootKind: 'stat',
+	rootFields: [
+		{ key: 'narrativeMeaning', label: 'Narrative meaning', example: 'what it measures about a person', default: true },
+		{ key: 'highExamples', label: 'High examples', example: 'what a high score looks like', default: true },
+		{ key: 'lowExamples', label: 'Low examples', example: 'what a low score looks like', default: true },
+		{ key: 'crossRpgEquivalents', label: 'Cross-RPG equivalents', example: 'the nearest stat elsewhere', default: false },
+		{ key: 'operationalizationIdeas', label: 'Operationalization ideas', example: 'how it could be measured in play', default: false }
+	]
+};
+
+const CAT_MINIGAME: Category = {
+	id: 'minigame',
+	label: 'Minigame',
+	group: 'worldbuilding',
+	glyph: '◐',
+	rootKind: 'minigame',
+	rootFields: [
+		{ key: 'purpose', label: 'Purpose', example: 'why it exists in the game', default: true },
+		{ key: 'coreLoop', label: 'Core loop', example: 'the repeated action', default: true },
+		{ key: 'winFailState', label: 'Win / fail state', example: 'how it ends', default: true },
+		{ key: 'feelsLike', label: 'Feels like', example: 'the texture of playing it', default: true },
+		{ key: 'statsOperationalized', label: 'Stats operationalized', example: '["…"]', default: true },
+		{ key: 'openQuestions', label: 'Open questions', example: 'what is still undecided', default: false }
+	]
+};
+
+const CAT_LORE: Category = {
+	id: 'lore',
+	label: 'Lore',
+	group: 'worldbuilding',
+	glyph: '❧',
+	rootKind: 'lore',
+	rootFields: [
+		{ key: 'content', label: 'Content', example: 'the fragment itself', default: true }
+	]
+};
+
 // ── catalogue ─────────────────────────────────────────────────────
+
+export const WORLDBUILDING_CATEGORIES: Category[] = [
+	CAT_CREATURE,
+	CAT_BIOME,
+	CAT_ABILITY,
+	CAT_STAT,
+	CAT_MINIGAME,
+	CAT_LORE
+];
 
 export const CURATED_CATEGORIES: Category[] = [
 	CAT_AUTHOR,
@@ -359,7 +464,8 @@ export const CURATED_CATEGORIES: Category[] = [
 	CAT_ALBUM,
 	CAT_GAME,
 	CAT_WORK,
-	CAT_ANIME_GRAPH
+	CAT_ANIME_GRAPH,
+	...WORLDBUILDING_CATEGORIES
 ];
 
 export const ANIME_GROUPS = new Set(['anime']);

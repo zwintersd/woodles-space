@@ -23,7 +23,7 @@ README only for deployment details.
 
 the static apps go up as-is — one HTML file each, no build step. the eight
 SvelteKit apps (`write`, `marginalia`, `planner`, `bestiary`, `spores`,
-`marginalia-devlog`, `notebook`, `thinking-about`) build to `apps/<name>/dist/`. `vercel.json` rewrites each
+`notebook`, `thinking-about`) build to `apps/<name>/dist/`. `vercel.json` rewrites each
 friendly path to the right file: `/write` → `/apps/write/dist/index.html`,
 `/lab` → `/apps/lab/index.html`, `/digits` → `/apps/digits/index.html`, and so
 on. `lab` is the homepage-facing shelf for stub experiments; the direct

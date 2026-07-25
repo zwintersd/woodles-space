@@ -15,9 +15,11 @@ they're actually built.
 knowledge base, one writing surface, one front door*. the six open questions
 have been answered; see §0. §5 is the live plan, and marks what has shipped.
 
-steps 0 and 1 are done: the landing page now groups apps by the moment they're
-for rather than listing sixteen peers, and `@woodles/handoff` lets any app pass
-a thought to any other instead of making you guess right the first time.
+steps 0–3 are done: the landing page groups apps by the moment they're for
+rather than listing sixteen peers, `@woodles/handoff` lets any app pass a
+thought to any other instead of making you guess right the first time, and the
+Dev Log has been folded into Spores and retired — **five surfaces are now
+four.**
 
 ---
 
@@ -78,7 +80,9 @@ skeleton; `parser.ts` ingests the model's answer back into a `Spore`;
 `promoteChild` turns any child record (an album, an episode) into its own spore
 with a flight back to the parent. syncs via `@woodles/sync`. 46 tests.
 
-### dev log — `/marginalia-devlog` · sveltekit · growing
+### dev log — *retired, folded into spores (step 2)*
+
+`/marginalia-devlog` now permanently redirects to `/spores`. what it was:
 
 dated entries (`YYYY-MM-DD` + title) containing an ordered list of **typed
 blocks**: `prose`, `creature`, `biome`, `ability`, `stat`, `minigame`, `lore`.
@@ -362,8 +366,8 @@ cheap, it's most of the benefit, and it's not wasted work if B stalls.
 | --- | --- | --- | --- |
 | 0 | ✅ **write the five sentences.** one line per app naming the *moment*, into the manifest descriptions. regroup the landing tiles into bands. | hours | everything — you can't merge what you can't describe |
 | 1 | ✅ **`@woodles/handoff`.** shared envelope, drain-on-load, "send to…" actions between notebook, spores and write. | ~1 day | kills the routing tax immediately, survives every later step |
-| 2 | **dev log → spores.** worldbuilding category pack + a migration for `woodles_devlog`. no dated view (§0). retire the app, redirect the route. | ~2 days | proves the category registry generalizes; removes an untested app |
-| 3 | **spores re-skin.** re-value the `--g-*` tokens to cream/rose/gold (§0) *before* the textbook lands, so the port isn't restyled twice. | ~half a day | step 4 arrives into a room that already looks right |
+| 2 | ✅ **dev log → spores.** worldbuilding category pack + a migration for `woodles_devlog`. no dated view (§0). app retired, route redirected. | ~2 days | proves the category registry generalizes; removes an untested app |
+| 3 | ✅ **spores re-skin.** re-valued the `--g-*` tokens to cream/rose/gold (§0) *before* the textbook lands, so the port isn't restyled twice. | ~half a day | step 4 arrives into a room that already looks right |
 | 4 | **textbook → spores.** wikilinks, backlinks, status, covers, focus mode, breadcrumbs. migrate `ologypedia-textbook-v1`. ologypedia keeps the bookcase and the studio. | ~1 week | the actual consolidation; makes one knowledge base real |
 | 5 | **tasks → carillon.** move `NotebookTask` into planner, migrating from `notebook.workspace.v2`. | ~1 day | clears notebook for step 6 |
 | 6 | **notebook → inbox.** merge notes and ideas into captures; promotion actions land against step 1's envelope. | ~1 day | one front door |
@@ -418,6 +422,66 @@ write's drafts can reach the public publish path.
 41 new tests (920 → 961). spores gained a `vitest.config.ts` on the way, for
 the same rune-store reason planner has one.
 
+### what landed in step 2
+
+**the worldbuilding pack.** six categories in `spells/registry.ts` — creature,
+biome, ability, stat, minigame, lore — carrying the Dev Log's own field names.
+there's deliberately no `prose` category: prose was never a typed record, and a
+Spore already has a body. the wizard grew a fourth group to show them, and
+`Category.group` was widened to a real union in the process, which removed an
+existing `'anime' as 'media'` cast.
+
+**the import** (`devlogImport.ts`) runs once on first open, flagged in settings
+so it can't double the Garden. one spellbook, one spore per entry with its
+prose blocks as the body, one spore per typed block with its fields in `data`,
+a flight from each entry to the blocks it held, and every `SmartLink` resolved
+into a flight — resolved *after* every block exists, so a link can point
+forward to a block defined in a later entry. a link naming a block that was
+never exported is counted, not fatal.
+
+one bug worth recording: the first cut treated every string field as a possible
+link, so `type` and `id` counted as unresolved references. a SmartLink is
+specifically `{ kind, label }`, and only that shape should be followed —
+a bare string is a lore fragment, not a reference.
+
+**the retirement.** app directory deleted, manifest entry removed, tile orders
+renumbered to stay contiguous, dead icon artwork dropped, and `/marginalia-devlog`
+turned from a rewrite into a permanent redirect.
+
+961 → 979 tests.
+
+### what landed in step 3
+
+the re-skin was billed as one token file. it was mostly that — every `--g-*`
+name and role survived, so no component logic changed — but three things made
+it bigger than a find-and-replace, and all three were the theme *inverting*
+rather than shifting hue.
+
+**literals that encoded the old ground.** a dozen components hard-coded the
+near-black background as the text colour on top of an accent fill. that's a
+real role, and it flips with the theme, so it became `--g-on-flight`. two more
+followed: `--g-danger` (+ `--g-danger-soft`), because error text and
+destructive hovers had been reusing the accent pink — which only worked
+because pink reads as a warning on near-black, and on paper the accent *is*
+rose; and `--g-scrim`, because a near-black wash over cream is a hole rather
+than a dimming.
+
+**contrast.** the old `--g-muted` and both accent tones failed 4.5:1 on the new
+ground, and two of them carry text. re-valuing was the moment to fix that
+rather than port it forward, so the palette was chosen against measured ratios:
+everything that carries text now clears 4.5:1 on both `--g-bg` and
+`--g-surface`.
+
+**the graph.** `GraphRenderer`'s node and edge palettes are SVG literals, not
+tokens — artwork tuned to its ground. the pastels that glowed on near-black are
+invisible on paper, so both sets were deepened; the faction palette kept its
+length of ten so the existing hash still maps the same way. its three label
+fills moved onto tokens, which is where they should have been.
+
+verified in a browser across the garden, a spellbook, a spore, the relationship
+graph, and a form. no console errors, and the test/check/build numbers are
+unchanged — this step touched no behaviour.
+
 ### infrastructure that has to come along
 
 - **notebook and the textbook need sync** before their data can merge with
@@ -426,8 +490,8 @@ the same rune-store reason planner has one.
   knowledge base — it's about to hold the union of three apps' data on four
   hand-rolled `save()` calls with silent `catch {}` on quota.
 - **spores needs a versioned envelope**, not four v1 keys, for the same reason.
-- **dev log's zero tests** shouldn't be inherited. write the migration test
-  before the migration.
+- ~~**dev log's zero tests** shouldn't be inherited.~~ done — the import is
+  the best-tested thing that app ever had (16 tests).
 
 ---
 
@@ -439,13 +503,14 @@ the six questions this doc opened with are answered in §0. what remains:
    the honest read is that it can't be answered until step 7 exists: once
    spores and write share an editor, whether a letter wants tags and links
    becomes an observation rather than a guess. revisit then.
-2. **what happens to the `/marginalia-devlog` route** once step 2 lands. a
-   redirect to `/spores` keeps old links alive; dropping it is cleaner. leaning
-   redirect, since the manifest suite will notice either way.
-3. **twilight webcore's fate.** §0 says deprioritized, not deleted — marginalia
-   and bestiary still wear it and aren't in scope here. the question is only
-   whether spores' `--g-*` values are re-pointed in place (recommended, one
-   file) or kept switchable as a second theme (more code, unclear payoff).
+2. ~~what happens to the `/marginalia-devlog` route~~ — **resolved**: a
+   permanent redirect to `/spores`, pinned by a manifest test so a retired
+   route can't quietly start 404ing, plus a companion test that no live app's
+   route is ever shadowed by a redirect.
+3. ~~twilight webcore's fate~~ — **resolved**: spores' `--g-*` values were
+   re-pointed in place rather than kept switchable, so there is one palette,
+   not a theme toggle. marginalia and bestiary still wear twilight webcore and
+   were not in scope.
 4. **whether `@woodles/handoff` should become sync-aware.** step 1 ships it as
    a same-origin localStorage envelope, which is enough for one browser. making
    a capture on the phone show up on the laptop means putting it through

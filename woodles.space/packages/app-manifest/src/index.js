@@ -45,7 +45,7 @@ export const appManifest = Object.freeze([
 		sourceDir: 'apps/lab',
 		outputDir: 'apps/lab',
 		entryFile: 'index.html',
-		landing: tile('lab', 11, 'play', 'experiments, sketches, and stub apps', 'var(--aqua)', 'var(--plum)', '185deg')
+		landing: tile('lab', 10, 'play', 'experiments, sketches, and stub apps', 'var(--aqua)', 'var(--plum)', '185deg')
 	},
 	{
 		id: 'piano',
@@ -57,7 +57,7 @@ export const appManifest = Object.freeze([
 		sourceDir: 'apps/piano',
 		outputDir: 'apps/piano',
 		entryFile: 'index.html',
-		landing: tile('piano', 10, 'play', 'a purple keyboard with soft synth strings', 'var(--lavender)', 'var(--aqua)', '125deg')
+		landing: tile('piano', 9, 'play', 'a purple keyboard with soft synth strings', 'var(--lavender)', 'var(--aqua)', '125deg')
 	},
 	{
 		id: 'digits',
@@ -80,7 +80,7 @@ export const appManifest = Object.freeze([
 		sourceDir: 'apps/quiet-room',
 		outputDir: 'apps/quiet-room',
 		entryFile: 'index.html',
-		landing: tile('quiet', 15, 'play', 'an immersive room of light, drawn in three.js', 'var(--lapis)', 'var(--lilac)', '195deg', { defaultPin: 6 })
+		landing: tile('quiet', 14, 'play', 'an immersive room of light, drawn in three.js', 'var(--lapis)', 'var(--lilac)', '195deg', { defaultPin: 6 })
 	},
 	{
 		id: 'ologypedia',
@@ -92,7 +92,7 @@ export const appManifest = Object.freeze([
 		sourceDir: 'apps/ologypedia',
 		outputDir: 'apps/ologypedia',
 		entryFile: 'index.html',
-		landing: tile('ologypedia', 13, 'read', 'finished entries, bound and shelved to be read', 'var(--plum)', 'var(--peach)', '160deg')
+		landing: tile('ologypedia', 12, 'read', 'finished entries, bound and shelved to be read', 'var(--plum)', 'var(--peach)', '160deg')
 	},
 	{
 		id: 'write',
@@ -132,7 +132,7 @@ export const appManifest = Object.freeze([
 		packageName: 'marginalia',
 		landing: tile('marg', 4, 'play', "tend a small witch, grow her world, and meet the creatures Z's already brought into it", 'var(--plum)', 'var(--lavender)', '150deg', { defaultPin: 3, featured: 1 }),
 		landingSurfaces: [
-			tile('reading', 6, 'read', 'a quiet timer, read for stars', 'var(--peach)', 'var(--aqua)', '115deg', {
+			tile('reading', 5, 'read', 'a quiet timer, read for stars', 'var(--peach)', 'var(--aqua)', '115deg', {
 				name: 'Reading Room',
 				href: '/marginalia#reading-room'
 			})
@@ -149,7 +149,7 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/planner/dist',
 		entryFile: 'index.html',
 		packageName: 'planner',
-		landing: tile('planner', 7, 'tend', 'calendar, schedule, and time', 'var(--peach)', 'var(--lavender)', '170deg', { defaultPin: 4 })
+		landing: tile('planner', 6, 'tend', 'calendar, schedule, and time', 'var(--peach)', 'var(--lavender)', '170deg', { defaultPin: 4 })
 	},
 	{
 		id: 'notebook',
@@ -162,7 +162,7 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/notebook/dist',
 		entryFile: 'index.html',
 		packageName: 'notebook',
-		landing: tile('notebook', 8, 'catch', "when a thought arrives and you don't want to decide where it goes", 'var(--aqua)', 'var(--peach)', '205deg', { defaultPin: 5 })
+		landing: tile('notebook', 7, 'catch', "when a thought arrives and you don't want to decide where it goes", 'var(--aqua)', 'var(--peach)', '205deg', { defaultPin: 5 })
 	},
 	{
 		id: 'animations',
@@ -186,7 +186,7 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/spores/dist',
 		entryFile: 'index.html',
 		packageName: 'spores',
-		landing: tile('spores', 12, 'tend', 'when you want to be able to find it, and what it connects to, later', 'var(--lilac)', 'var(--aqua)', '145deg')
+		landing: tile('spores', 11, 'tend', 'when you want to be able to find it, and what it connects to, later', 'var(--lilac)', 'var(--aqua)', '145deg')
 	},
 	{
 		id: 'bestiary',
@@ -199,20 +199,7 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/bestiary/dist',
 		entryFile: 'index.html',
 		packageName: 'bestiary',
-		landing: tile('bestiary', 14, 'tend', 'bring a png of anything, leave with a card that belongs', 'var(--peach)', 'var(--plum)', '110deg', { featured: 2 })
-	},
-	{
-		id: 'marginalia-devlog',
-		name: 'Dev Log',
-		publicPath: '/marginalia-devlog',
-		aliases: [],
-		kind: 'sveltekit',
-		maturity: 'growing',
-		sourceDir: 'apps/marginalia-devlog',
-		outputDir: 'apps/marginalia-devlog/dist',
-		entryFile: 'index.html',
-		packageName: 'marginalia-devlog',
-		landing: tile('devlog', 5, 'write', "notes from making the witch's world", 'var(--lilac)', 'var(--plum)', '200deg')
+		landing: tile('bestiary', 13, 'tend', 'bring a png of anything, leave with a card that belongs', 'var(--peach)', 'var(--plum)', '110deg', { featured: 2 })
 	},
 	{
 		id: 'thinking-about',
@@ -225,7 +212,7 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/thinking-about/dist',
 		entryFile: 'index.html',
 		packageName: 'thinking-about',
-		landing: tile('thinking', 9, 'tend', 'a landing spot for what you are reading, playing, and watching', 'var(--lapis)', 'var(--aqua)', '140deg')
+		landing: tile('thinking', 8, 'tend', 'a landing spot for what you are reading, playing, and watching', 'var(--lapis)', 'var(--aqua)', '140deg')
 	}
 ]);
 

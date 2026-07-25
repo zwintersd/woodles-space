@@ -261,7 +261,7 @@
 	.btn-enter {
 		margin-top: var(--g-space-md);
 		background: var(--g-flight);
-		color: #0d0d1a;
+		color: var(--g-on-flight);
 		border-radius: var(--g-radius-pill);
 		padding: var(--g-space-sm) var(--g-space-xl);
 		font-size: 1rem;
@@ -332,8 +332,8 @@
 	}
 
 	@keyframes pulse {
-		0%, 100% { box-shadow: 0 0 0 1px var(--g-flight-soft), 0 0 8px rgba(240, 143, 184, 0.2); }
-		50% { box-shadow: 0 0 0 1px var(--g-flight), 0 0 18px rgba(240, 143, 184, 0.45); }
+		0%, 100% { box-shadow: 0 0 0 1px var(--g-flight-soft), 0 0 8px rgba(140, 59, 74, 0.16); }
+		50% { box-shadow: 0 0 0 1px var(--g-flight), 0 0 18px rgba(140, 59, 74, 0.3); }
 	}
 
 	.season-name {
@@ -366,7 +366,7 @@
 
 	.btn-promote-glow {
 		background: var(--g-flight);
-		color: #0d0d1a;
+		color: var(--g-on-flight);
 		border-radius: var(--g-radius-pill);
 		padding: var(--g-space-sm) var(--g-space-xl);
 		font-size: 0.95rem;
@@ -377,7 +377,7 @@
 
 	.btn-promote-glow:hover {
 		transform: translateY(-1px);
-		box-shadow: 0 0 20px rgba(240, 143, 184, 0.55);
+		box-shadow: var(--g-shadow-hover);
 	}
 
 	.btn-quiet {

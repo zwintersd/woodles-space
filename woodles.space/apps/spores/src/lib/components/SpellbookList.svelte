@@ -149,7 +149,7 @@
 
 	.btn-new:hover {
 		background: var(--g-flight);
-		color: #0d0d1a;
+		color: var(--g-on-flight);
 	}
 
 	.new-form {
@@ -208,7 +208,7 @@
 
 	.btn-primary {
 		background: var(--g-flight);
-		color: #0d0d1a;
+		color: var(--g-on-flight);
 		border-radius: var(--g-radius-sm);
 		padding: var(--g-space-sm) var(--g-space-md);
 		font-size: 0.85rem;

@@ -190,7 +190,7 @@
 
 	.btn-new:hover {
 		background: var(--g-flight);
-		color: #0d0d1a;
+		color: var(--g-on-flight);
 	}
 
 	.btn-danger-ghost {
@@ -204,8 +204,8 @@
 	}
 
 	.btn-danger-ghost:hover {
-		color: #f08fb8;
-		border-color: #f08fb8;
+		color: var(--g-danger);
+		border-color: var(--g-danger);
 	}
 
 	.new-spore-form {
@@ -236,7 +236,7 @@
 
 	.btn-primary {
 		background: var(--g-flight);
-		color: #0d0d1a;
+		color: var(--g-on-flight);
 		border-radius: var(--g-radius-sm);
 		padding: var(--g-space-sm) var(--g-space-md);
 		font-size: 0.85rem;

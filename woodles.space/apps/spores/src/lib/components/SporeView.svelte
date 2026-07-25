@@ -361,13 +361,13 @@
 	}
 	.btn-graph:hover {
 		background: var(--g-flight);
-		color: #0d0d1a;
+		color: var(--g-on-flight);
 		border-color: var(--g-flight);
 	}
 
 	.btn-primary {
 		background: var(--g-flight);
-		color: #0d0d1a;
+		color: var(--g-on-flight);
 		border-radius: var(--g-radius-sm);
 		padding: 0.3rem 0.8rem;
 		font-size: 0.82rem;
@@ -484,7 +484,7 @@
 
 	.btn-add-flight:hover {
 		background: var(--g-flight);
-		color: #0d0d1a;
+		color: var(--g-on-flight);
 	}
 
 	.flight-search {

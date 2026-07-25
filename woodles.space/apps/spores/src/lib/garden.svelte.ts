@@ -230,6 +230,12 @@ export class GardenStore {
 		save('spores.settings.v1', this.settings);
 	}
 
+	// Set once the retired Dev Log has been folded in, so it can't run twice.
+	markDevlogImported(): void {
+		this.settings = { ...this.settings, devlogImported: true };
+		save('spores.settings.v1', this.settings);
+	}
+
 	completeOnboarding(): void {
 		this.markOnboarded();
 		this.showOnboarding = false;

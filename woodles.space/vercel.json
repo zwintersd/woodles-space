@@ -5,6 +5,10 @@
   "buildCommand": "pnpm build",
   "outputDirectory": ".",
   "trailingSlash": false,
+  "redirects": [
+    { "source": "/marginalia-devlog",        "destination": "/spores", "permanent": true },
+    { "source": "/marginalia-devlog/:path*", "destination": "/spores", "permanent": true }
+  ],
   "rewrites": [
     { "source": "/",                "destination": "/apps/landing/index.html" },
     { "source": "/hygge",            "destination": "/apps/hygge/index.html" },
@@ -46,8 +50,6 @@
     { "source": "/spores/:path*",      "destination": "/apps/spores/dist/:path*" },
     { "source": "/bestiary",                  "destination": "/apps/bestiary/dist/index.html" },
     { "source": "/bestiary/:path*",           "destination": "/apps/bestiary/dist/:path*" },
-    { "source": "/marginalia-devlog",         "destination": "/apps/marginalia-devlog/dist/index.html" },
-    { "source": "/marginalia-devlog/:path*",  "destination": "/apps/marginalia-devlog/dist/:path*" },
     { "source": "/thinking-about",            "destination": "/apps/thinking-about/dist/index.html" },
     { "source": "/thinking-about/:path*",     "destination": "/apps/thinking-about/dist/:path*" }
   ]
