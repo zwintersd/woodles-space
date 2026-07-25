@@ -3,12 +3,30 @@
 	import type { Spore, Spellbook } from '$lib/types';
 	import { formatDate, formatDateShort } from '$lib/utils';
 	import { focusOnMount } from '$lib/focus';
+	import SporeShelf from './SporeShelf.svelte';
 
 	let sb = $derived(garden.activeSpellbook);
 	let spores = $derived(sb ? garden.sporesInSpellbook(sb.id) : []);
 
 	let showNew = $state(false);
 	let newTitle = $state('');
+
+	// Shelf vs. list, ported from the Ologypedia bookcase's Grid/Spine toggle
+	// and persisted per-browser the same way. A view preference is about this
+	// screen on this device, so it stays out of the synced blob.
+	const VIEW_KEY = 'spores.spellbookView.v1';
+	let shelf = $state(
+		typeof localStorage !== 'undefined' && localStorage.getItem(VIEW_KEY) === 'shelf'
+	);
+
+	function setShelf(next: boolean) {
+		shelf = next;
+		try {
+			localStorage.setItem(VIEW_KEY, next ? 'shelf' : 'list');
+		} catch {
+			// a view preference is not worth surfacing a storage error for
+		}
+	}
 
 	function handleNew(e: Event) {
 		e.preventDefault();
@@ -50,6 +68,10 @@
 				<span class="arch-tag">{sb.archetype}</span>
 			</div>
 			<div class="header-actions">
+				<div class="view-toggle" role="group" aria-label="view">
+					<button class="toggle-btn" aria-pressed={!shelf} onclick={() => setShelf(false)}>list</button>
+					<button class="toggle-btn" aria-pressed={shelf} onclick={() => setShelf(true)}>shelf</button>
+				</div>
 				<button class="btn-new" onclick={() => { showNew = true; newTitle = ''; }}>
 					+ spore
 				</button>
@@ -79,6 +101,8 @@
 			<div class="empty-state">
 				<p class="empty-hint">No spores yet.</p>
 			</div>
+		{:else if shelf}
+			<SporeShelf spores={sorted} />
 		{:else if sb.archetype === 'diary'}
 			<ul class="diary-list">
 				{#each sorted as spore (spore.id)}
@@ -206,6 +230,28 @@
 	.btn-danger-ghost:hover {
 		color: var(--g-danger);
 		border-color: var(--g-danger);
+	}
+
+	.view-toggle {
+		display: inline-flex;
+		border: 1px solid var(--g-border);
+		border-radius: var(--g-radius-pill);
+		overflow: hidden;
+	}
+
+	.toggle-btn {
+		font-family: var(--g-font-mono);
+		font-size: 0.68rem;
+		padding: 0.3rem 0.7rem;
+		background: transparent;
+		color: var(--g-text-dim);
+		border: none;
+		cursor: pointer;
+	}
+
+	.toggle-btn[aria-pressed='true'] {
+		background: var(--g-flight-soft);
+		color: var(--g-flight);
 	}
 
 	.new-spore-form {

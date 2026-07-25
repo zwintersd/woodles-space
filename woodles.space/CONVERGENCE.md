@@ -15,11 +15,17 @@ they're actually built.
 knowledge base, one writing surface, one front door*. the six open questions
 have been answered; see §0. §5 is the live plan, and marks what has shipped.
 
-steps 0–3 are done: the landing page groups apps by the moment they're for
-rather than listing sixteen peers, `@woodles/handoff` lets any app pass a
-thought to any other instead of making you guess right the first time, and the
-Dev Log has been folded into Spores and retired — **five surfaces are now
-four.**
+steps 0–4 are done, and **one knowledge base is real.** the landing page groups
+apps by the moment they're for rather than listing sixteen peers;
+`@woodles/handoff` lets any app pass a thought to any other instead of making
+you guess right the first time; the Dev Log has been folded into Spores and
+retired; Spores wears the cream/rose/gold it will keep; and the Ologypedia
+Textbook has moved across too. **five surfaces are now three, plus a publish
+target.**
+
+what remains is the *writing surface* half — steps 5–8 — which is about
+Notebook shedding tasks, becoming the inbox, and Write's editor being
+extractable. none of it blocks using what's already here.
 
 ---
 
@@ -93,10 +99,11 @@ references another block by `{ kind, label }`. a font panel. syncs via
 
 scope: one subject — making marginalia's world.
 
-### ologypedia — `/ologypedia` · static · growing
+### ologypedia — `/ologypedia` · static · *now the publish target*
 
-three surfaces in one directory, and the only one of the five that is really
-three products:
+three surfaces in one directory. after step 4, `textbook.html` is a signpost
+pointing at `/spores` (and a download button for the original blob, so nothing
+is stranded); the other two are unchanged. what it was:
 
 1. **`index.html`** — the bookcase. cards for published pages, studio drafts,
    and textbook entries; search, subject filter, grid/spine toggle.
@@ -368,7 +375,7 @@ cheap, it's most of the benefit, and it's not wasted work if B stalls.
 | 1 | ✅ **`@woodles/handoff`.** shared envelope, drain-on-load, "send to…" actions between notebook, spores and write. | ~1 day | kills the routing tax immediately, survives every later step |
 | 2 | ✅ **dev log → spores.** worldbuilding category pack + a migration for `woodles_devlog`. no dated view (§0). app retired, route redirected. | ~2 days | proves the category registry generalizes; removes an untested app |
 | 3 | ✅ **spores re-skin.** re-valued the `--g-*` tokens to cream/rose/gold (§0) *before* the textbook lands, so the port isn't restyled twice. | ~half a day | step 4 arrives into a room that already looks right |
-| 4 | **textbook → spores.** wikilinks, backlinks, status, covers, focus mode, breadcrumbs. migrate `ologypedia-textbook-v1`. ologypedia keeps the bookcase and the studio. | ~1 week | the actual consolidation; makes one knowledge base real |
+| 4 | ✅ **textbook → spores.** wikilinks, backlinks, status, covers, the sowing gesture. migrated `ologypedia-textbook-v1`. ologypedia keeps the bookcase and the studio. | ~1 week | the actual consolidation; makes one knowledge base real |
 | 5 | **tasks → carillon.** move `NotebookTask` into planner, migrating from `notebook.workspace.v2`. | ~1 day | clears notebook for step 6 |
 | 6 | **notebook → inbox.** merge notes and ideas into captures; promotion actions land against step 1's envelope. | ~1 day | one front door |
 | 7 | **`@woodles/editor`.** extract from write, consume in spores; settle the API that REFACTORING.md has been waiting on. | ~1 week | rich bodies everywhere; unblocks the marginalia margin-notes merge too |
@@ -481,6 +488,51 @@ fills moved onto tokens, which is where they should have been.
 verified in a browser across the garden, a spellbook, a spore, the relationship
 graph, and a form. no console errors, and the test/check/build numbers are
 unchanged — this step touched no behaviour.
+
+### what landed in step 4
+
+split across two commits — the model first, then the UI onto a model already
+tested.
+
+**`[[wikilinks]]` instead of HTML.** the Textbook stored links as
+`<a class="entry-link" data-entry>` inside sanitized HTML. a spore body is
+plain text, so the port uses bracket syntax — and that turned out to be a
+convergence rather than a compromise: it's exactly what the Textbook's own
+"draft it with a prompt" already asked models to emit, so the authoring format
+and the storage format finally agree. rendering became *segments* (text runs
+and links) rather than `innerHTML`, so the read path has no sanitizer to get
+wrong at all.
+
+**red links and the sowing gesture.** a link to a title nothing answers to is
+drawn dashed with a `+`, and clicking sows a seed. highlighting a phrase while
+reading offers the same, planting the link where the phrase sat — no mode to
+enter first. if the selection went stale and the phrase is gone from the body,
+the seed is *still* sown: losing the link is acceptable, losing the thought is
+not.
+
+**backlinks derived, never stored**, so they follow edits — which means a
+rename turns inbound links red rather than silently rewriting text the person
+wrote. that is a choice, not an oversight, so it's pinned by a test. they're
+shown apart from flights: a flight is a link you drew, a backlink is one you
+wrote.
+
+**status and covers** ported whole. accents are stored as *names* rather than
+hex, which is the detail that would have bitten later — step 3's re-skin would
+have stranded stored hex values.
+
+**the migration** rewrites `data-entry` links to `[[Title]]` by looking titles
+up in the export, and runs on regex rather than `DOMParser` so it's testable
+under Node. HTML→text is deliberately lossy: what survives is what a person
+wrote, what goes is markup they never typed. one bug caught by looking at it in
+a browser rather than by a test — list items were being separated like
+paragraphs, so a list stopped reading as a list.
+
+**ologypedia demoted, not deleted.** `textbook.html` became a signpost with a
+download button; the migration leaves `ologypedia-textbook-v1` in place, so
+that page and the bookcase's textbook cards keep working as an escape hatch.
+
+979 → 1048 tests. verified in a browser end to end: migration, link following,
+backlinks, red-link sowing, and the shelf.
 
 ### infrastructure that has to come along
 
