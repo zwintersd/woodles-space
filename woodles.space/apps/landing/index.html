@@ -373,6 +373,111 @@
       color-scheme: inherit;
       cursor: text;
     }
+    /* bookmarks — a quick web search plus a small holder of saved links */
+    .dw-bookmarks { width: 226px; }
+    .bm-search { margin-bottom: 0.6rem; }
+    .bm-search-input {
+      width: 100%;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.62rem;
+      padding: 0.42rem 0.6rem;
+      border-radius: 8px;
+      border: 1px solid var(--rule);
+      background: color-mix(in srgb, var(--bg) 65%, transparent);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.16s ease, box-shadow 0.16s ease;
+    }
+    .bm-search-input::placeholder { color: var(--muted); }
+    .bm-search-input:focus {
+      border-color: var(--accent-strong);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 26%, transparent);
+    }
+    .bm-list {
+      display: flex; flex-direction: column; gap: 0.1rem;
+      max-height: 168px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      margin: 0 -0.35rem;
+    }
+    .bm-item {
+      display: flex; align-items: center; gap: 0.55rem;
+      padding: 0.4rem 0.35rem;
+      border-radius: 9px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.14s ease;
+    }
+    .bm-item:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+    .bm-glyph {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      display: grid; place-items: center;
+      flex: none;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem;
+      color: #fff;
+      background: conic-gradient(from 90deg, var(--lilac), var(--peach), var(--aqua), var(--lilac));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.5);
+    }
+    .bm-label {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-size: 0.94rem;
+      color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .bm-x {
+      flex: none;
+      width: 18px; height: 18px;
+      border: none; border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.56rem;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.14s ease, background 0.14s ease, color 0.14s ease;
+    }
+    .bm-item:hover .bm-x { opacity: 1; }
+    .bm-x:hover { background: #e8859a; color: #fff; }
+    .bm-empty {
+      font-style: italic;
+      font-size: 0.85rem;
+      color: var(--muted);
+      padding: 0.3rem 0.35rem 0.15rem;
+    }
+    .bm-add {
+      display: flex; gap: 0.3rem;
+      margin-top: 0.55rem;
+      padding-top: 0.55rem;
+      border-top: 1px solid var(--rule);
+    }
+    .bm-add-label, .bm-add-url {
+      min-width: 0;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem;
+      padding: 0.4rem 0.5rem;
+      border-radius: 8px;
+      border: 1px solid var(--rule);
+      background: color-mix(in srgb, var(--bg) 65%, transparent);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.16s ease;
+    }
+    .bm-add-label { flex: 0 1 62px; }
+    .bm-add-url { flex: 1 1 auto; }
+    .bm-add-label:focus, .bm-add-url:focus { border-color: var(--accent-strong); }
+    .bm-add-btn {
+      flex: none;
+      width: 28px; height: 28px;
+      border: none; border-radius: 8px;
+      background: color-mix(in srgb, var(--accent) 35%, transparent);
+      color: var(--accent-strong);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.16s ease;
+    }
+    .bm-add-btn:hover { background: color-mix(in srgb, var(--accent) 55%, transparent); }
     /* widget picker rows */
     .wt-glyph {
       width: 34px; height: 34px;
@@ -1867,6 +1972,11 @@
       return { illum, idx, name: MOON_NAMES[idx] };
     }
 
+    function bmGlyph(url) {
+      try { return new URL(url).hostname.replace(/^www\./, '')[0].toUpperCase(); }
+      catch { return '?'; }
+    }
+
     const WTYPES = {
       sticky: {
         title: 'sticky note', glyph: '&#10002;', desc: 'a little note to self',
@@ -1941,13 +2051,96 @@
             diff !== null && diff < 0 ? 'days since' : 'days until';
         },
       },
+      bookmarks: {
+        title: 'bookmarks', glyph: '&#128278;', desc: 'a search bar and your saved links',
+        data: () => ({ links: [] }),
+        build(el, w) {
+          el.innerHTML =
+            '<p class="dw-title">bookmarks</p>' +
+            '<form class="bm-search" autocomplete="off">' +
+              '<input class="bm-search-input" type="text" placeholder="search the web&hellip;" maxlength="200" />' +
+            '</form>' +
+            '<div class="bm-list"></div>' +
+            '<form class="bm-add" autocomplete="off">' +
+              '<input class="bm-add-label" type="text" placeholder="label" maxlength="24" />' +
+              '<input class="bm-add-url" type="text" placeholder="url" maxlength="300" />' +
+              '<button class="bm-add-btn" type="submit" aria-label="Add bookmark">&#43;</button>' +
+            '</form>';
+
+          el.querySelector('.bm-search').addEventListener('submit', e => {
+            e.preventDefault();
+            const input = el.querySelector('.bm-search-input');
+            const q = input.value.trim();
+            if (!q) return;
+            window.open('https://duckduckgo.com/?q=' + encodeURIComponent(q), '_blank', 'noopener');
+            input.value = '';
+          });
+
+          const list = el.querySelector('.bm-list');
+          const renderLinks = () => {
+            list.innerHTML = '';
+            if (!w.data.links.length) {
+              list.innerHTML = '<p class="bm-empty">no links yet</p>';
+              return;
+            }
+            w.data.links.forEach(link => {
+              const a = document.createElement('a');
+              a.className = 'bm-item';
+              a.href = link.url;
+              a.target = '_blank';
+              a.rel = 'noopener noreferrer';
+              const glyph = document.createElement('span');
+              glyph.className = 'bm-glyph';
+              glyph.textContent = bmGlyph(link.url);
+              const label = document.createElement('span');
+              label.className = 'bm-label';
+              label.textContent = link.label;
+              const rm = document.createElement('button');
+              rm.type = 'button';
+              rm.className = 'bm-x';
+              rm.dataset.id = link.id;
+              rm.setAttribute('aria-label', 'Remove bookmark');
+              rm.innerHTML = '&#10005;';
+              a.append(glyph, label, rm);
+              list.appendChild(a);
+            });
+          };
+          renderLinks();
+
+          list.addEventListener('click', e => {
+            const rm = e.target.closest('.bm-x');
+            if (!rm) return;
+            e.preventDefault(); e.stopPropagation();
+            w.data.links = w.data.links.filter(l => l.id !== rm.dataset.id);
+            saveWidgets();
+            renderLinks();
+          });
+
+          el.querySelector('.bm-add').addEventListener('submit', e => {
+            e.preventDefault();
+            const labelInput = el.querySelector('.bm-add-label');
+            const urlInput = el.querySelector('.bm-add-url');
+            let url = urlInput.value.trim();
+            if (!url) return;
+            if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+            const label = labelInput.value.trim() || url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+            w.data.links.push({
+              id: 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+              label, url,
+            });
+            saveWidgets();
+            labelInput.value = ''; urlInput.value = '';
+            renderLinks();
+          });
+        },
+      },
     };
 
     function makeWidgetElDraggable(el, w) {
       let sx, sy, ox, oy, active = false, moved = false;
       el.addEventListener('pointerdown', e => {
         if (e.button !== 0) return;
-        if (e.target.closest('textarea, input, .dw-x')) return;
+        if (e.target.closest('textarea, input, a, button')) return;
         active = true; moved = false;
         const r = el.getBoundingClientRect();
         sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top;
