@@ -1,5 +1,11 @@
 import type { Idea, Note, NotebookMode, NotebookTask } from './types';
 import { createVersionedStorage, type PersistenceIssue } from '@woodles/persistence';
+import {
+	createHandoffQueue,
+	type Handoff,
+	type HandoffTarget,
+	type SendResult
+} from '@woodles/handoff';
 
 function uid(): string {
 	return Math.random().toString(36).slice(2, 10);
@@ -62,6 +68,35 @@ const persistence = createVersionedStorage<NotebookDocument>({
 	}
 });
 
+const handoffQueue = createHandoffQueue('notebook');
+
+function htmlToText(html: string): string {
+	return html
+		.replace(/<br\s*\/?>/gi, '\n')
+		.replace(/<\/(?:p|div|li|h[1-6]|blockquote)>/gi, '\n\n')
+		.replace(/<[^>]*>/g, '')
+		.replace(/&nbsp;/g, ' ')
+		.replace(/&amp;/g, '&')
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.replace(/\n{3,}/g, '\n\n')
+		.trim();
+}
+
+function firstLine(text: string): string {
+	return text.split('\n').find((line) => line.trim())?.trim().slice(0, 60) ?? '';
+}
+
+function dedupeTags(tags: string[]): string[] {
+	const seen = new Set<string>();
+	return tags.filter((tag) => {
+		const key = tag.toLowerCase();
+		if (!tag || seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
+}
+
 export class NotebookStore {
 	mode = $state<NotebookMode>('notes');
 	query = $state('');
@@ -75,6 +110,8 @@ export class NotebookStore {
 		bytes: 0,
 		savedAt: null
 	});
+	/** Handoff ids already turned into notes, so a re-delivery is a no-op. */
+	private ingestedHandoffIds = new Set<string>();
 
 	constructor() {
 		let result = persistence.load();
@@ -235,6 +272,80 @@ export class NotebookStore {
 	deleteIdea(id: string): void {
 		this.ideas = this.ideas.filter((idea) => idea.id !== id);
 		this.persistIdeas();
+	}
+
+	// ── handoffs ────────────────────────────────────────────────────
+	// Notebook is the front door: anything any other app couldn't place ends
+	// up here rather than forcing a filing decision at capture time.
+	// See CONVERGENCE.md §3.
+
+	/**
+	 * Take everything waiting in the inbox and turn each into a note. Safe to
+	 * call repeatedly — an id already ingested is skipped, so a queue that
+	 * failed to clear re-delivers without duplicating.
+	 */
+	ingestHandoffs(): number {
+		const drained = handoffQueue.drain();
+		if (drained.items.length === 0) return 0;
+
+		const fresh = drained.items.filter((item) => !this.ingestedHandoffIds.has(item.id));
+		for (const item of fresh) this.ingestedHandoffIds.add(item.id);
+		if (fresh.length === 0) return 0;
+
+		const notes = fresh.map((item) => this.handoffToNote(item));
+		this.notes = [...notes, ...this.notes];
+		this.mode = 'notes';
+		this.selectedNoteId = notes[0].id;
+		this.persist();
+		return notes.length;
+	}
+
+	/** How many are waiting, for a badge. Does not consume them. */
+	pendingHandoffs(): number {
+		return handoffQueue.count();
+	}
+
+	/** Hand a note on to an app that can do more with it than notebook can. */
+	promoteNote(id: string, target: HandoffTarget): SendResult | null {
+		const note = this.notes.find((item) => item.id === id);
+		if (!note) return null;
+		return createHandoffQueue(target).send({
+			title: note.title,
+			body: note.body,
+			format: 'text',
+			tags: note.tags,
+			source: { app: 'notebook', label: note.title || 'a note', href: '/notebook' }
+		});
+	}
+
+	/** Hand an idea on — the same gesture, for the shorter kind of thought. */
+	promoteIdea(id: string, target: HandoffTarget): SendResult | null {
+		const idea = this.ideas.find((item) => item.id === id);
+		if (!idea) return null;
+		return createHandoffQueue(target).send({
+			title: idea.text.slice(0, 60),
+			body: idea.text,
+			format: 'text',
+			tags: [idea.lane],
+			source: { app: 'notebook', label: 'an idea', href: '/notebook' }
+		});
+	}
+
+	private handoffToNote(item: Handoff): Note {
+		const stamp = nowIso();
+		// An HTML body arrives from a rich editor; notebook's body is a plain
+		// textarea, so flatten rather than render markup the user can't edit.
+		const body = item.format === 'html' ? htmlToText(item.body) : item.body;
+		const title = item.title.trim() || firstLine(body) || 'Untitled';
+		const from = item.source.app;
+		return {
+			id: uid(),
+			title,
+			body,
+			tags: dedupeTags([...item.tags, `from:${from}`]),
+			createdAt: item.createdAt,
+			updatedAt: stamp
+		};
 	}
 
 	private persistNotes(): void {

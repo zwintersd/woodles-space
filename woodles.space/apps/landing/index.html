@@ -612,6 +612,32 @@
     .start-grid-all { grid-template-columns: repeat(5, 1fr); }
     .start-grid-all .start-app { padding: 0.6rem 0.2rem; gap: 0.4rem; }
     .start-grid-all .tile { width: 38px; height: 38px; }
+
+    /* bands — apps grouped by the moment they're for, not the thing they
+       hold, so the menu stops reading as a flat list of peers to choose
+       between. see CONVERGENCE.md. */
+    .start-bands { display: block; }
+    .band + .band { margin-top: 1.1rem; }
+    .band-head {
+      display: flex; align-items: baseline; gap: 0.5rem;
+      margin: 0 0 0.5rem;
+      padding-bottom: 0.3rem;
+      border-bottom: 1px solid var(--rule, rgba(0,0,0,.08));
+    }
+    .band-name {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text);
+      opacity: 0.75;
+    }
+    .band-blurb {
+      font-size: 0.62rem;
+      color: var(--muted);
+      line-height: 1.3;
+    }
+    @media (max-width: 560px) { .band-blurb { display: none; } }
     .start-actions { display: flex; gap: 0.15rem; }
     /* recommended row */
     .recommended { display: flex; flex-direction: column; gap: 0.15rem; }
@@ -1177,7 +1203,8 @@
     <p class="start-section" id="pinned-label">pinned</p>
     <div class="start-grid" id="start-grid"></div>
     <p class="start-section" id="all-label">all apps</p>
-    <div class="start-grid start-grid-all" id="all-grid"></div>
+    <!-- a plain block: each band inside brings its own grid -->
+    <div class="start-bands" id="all-grid"></div>
     <p class="start-section" id="rec-label">recently opened</p>
     <div class="recommended" id="recommended"></div>
     <div class="start-foot">
@@ -1322,6 +1349,7 @@
       defaultLandingPins,
       featuredLandingApps,
       landingApps as apps,
+      landingAppsByBand,
     } from '/packages/app-manifest/src/index.js';
 
     /* ── app catalogue ─────────────────────────────────────────────── */
@@ -1526,6 +1554,27 @@
       target.innerHTML = '';
       list.forEach(a => target.appendChild(startAppEl(a)));
     }
+    /* the "all apps" section renders in bands. a band is dropped entirely
+       when every app in it is already pinned above. */
+    function fillBands(target, list) {
+      target.innerHTML = '';
+      const keep = new Set(list.map(a => a.id));
+      landingAppsByBand.forEach(({ band, apps: bandApps }) => {
+        const shown = bandApps.filter(a => keep.has(a.id));
+        if (!shown.length) return;
+        const section = document.createElement('section');
+        section.className = 'band';
+        const head = document.createElement('p');
+        head.className = 'band-head';
+        head.innerHTML = '<span class="band-name">' + band.label +
+          '</span><span class="band-blurb">' + band.blurb + '</span>';
+        const bandGrid = document.createElement('div');
+        bandGrid.className = 'start-grid start-grid-all';
+        shown.forEach(a => bandGrid.appendChild(startAppEl(a)));
+        section.append(head, bandGrid);
+        target.appendChild(section);
+      });
+    }
     function renderRecents() {
       rec.innerHTML = '';
       const opened = recents.map(byId).filter(Boolean).slice(0, 3);
@@ -1570,7 +1619,10 @@
       allGrid.style.display = '';
       recLabel.style.display = '';
       rec.style.display = '';
-      fillGrid(allGrid, apps.filter(a => !isPinned(a.id)));
+      /* every app, banded — not just the unpinned remainder. a band whose
+         only app is pinned (notebook, the front door) would otherwise never
+         show its name, which is the part that says what the app is for. */
+      fillBands(allGrid, apps);
       renderRecents();
     }
     renderStart('');

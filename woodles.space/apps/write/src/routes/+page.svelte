@@ -142,6 +142,8 @@
 
 	let draftsList = $state<DraftIndexItem[]>([]);
 	let currentDraftId = $state<string | null>(null);
+	// Announced once when a draft arrived here from another app.
+	let handoffNotice = $state('');
 	let draftsOpen = $state(false);
 
 	const nextPocketLayer = $derived<PocketLayer>(
@@ -289,6 +291,12 @@
 		const boot = bootstrapDrafts();
 		draftsList = boot.drafts;
 		currentDraftId = boot.activeId;
+		if (boot.handoffs > 0) {
+			handoffNotice =
+				boot.handoffs === 1
+					? 'opened something sent here from elsewhere'
+					: `opened the newest of ${boot.handoffs} things sent here — the rest are in drafts`;
+		}
 
 		if (boot.body) {
 			try {
@@ -919,6 +927,13 @@
 
 <PublishOverlay status={publishStatus} errorMessage={publishErrorMessage} />
 
+{#if handoffNotice}
+	<p class="handoff-notice" aria-live="polite">
+		{handoffNotice}
+		<button type="button" onclick={() => (handoffNotice = '')} aria-label="dismiss">×</button>
+	</p>
+{/if}
+
 <div class="editor-page" data-layer={activeLayer} bind:this={editorPageEl}>
 	<div class="editor-wrap" data-layer={activeLayer}>
 		{#if replyTo && replyToTitle}
@@ -1108,6 +1123,38 @@
 		color: var(--muted);
 		opacity: 0.45;
 		margin-bottom: 1rem;
+	}
+
+	/* a draft that arrived from another app, announced once on load */
+	.handoff-notice {
+		position: fixed;
+		left: 50%;
+		bottom: 4.5rem;
+		z-index: 40;
+		transform: translateX(-50%);
+		display: inline-flex;
+		align-items: center;
+		gap: 0.65rem;
+		max-width: min(28rem, calc(100vw - 2rem));
+		padding: 8px 14px;
+		border-radius: 100px;
+		border: 1px solid var(--rule);
+		background: color-mix(in srgb, var(--surface) 92%, transparent);
+		color: var(--text);
+		font-size: 0.8rem;
+		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+	}
+	.handoff-notice button {
+		border: none;
+		background: none;
+		color: inherit;
+		opacity: 0.6;
+		font-size: 1rem;
+		line-height: 1;
+		cursor: pointer;
+	}
+	.handoff-notice button:hover {
+		opacity: 1;
 	}
 
 	.reply-breadcrumb {

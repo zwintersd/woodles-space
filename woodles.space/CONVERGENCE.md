@@ -11,8 +11,32 @@ duplication log is [REFACTORING.md](./REFACTORING.md); this file is about what
 the apps are *for*. read alongside [ARCHITECTURE.md](./ARCHITECTURE.md) for how
 they're actually built.
 
-nothing here is decided. it's a map, a diagnosis, three options, and a
-recommendation.
+**status: decided, and started.** option B below is the chosen shape — *one
+knowledge base, one writing surface, one front door*. the six open questions
+have been answered; see §0. §5 is the live plan, and marks what has shipped.
+
+steps 0 and 1 are done: the landing page now groups apps by the moment they're
+for rather than listing sixteen peers, and `@woodles/handoff` lets any app pass
+a thought to any other instead of making you guess right the first time.
+
+---
+
+## 0. the decisions
+
+| question | answer | consequence |
+| --- | --- | --- |
+| preserve dev log's chronological lens? | **no** | no dated view to port. the merge is a category pack, nothing more |
+| move the devlog into marginalia? | **no** — makes Z nervous even if it's the tidier home | it goes into spores like everything else. marginalia stays a game |
+| where do tasks belong? | **carillon** | notebook sheds tasks entirely and becomes captures-only |
+| is ologypedia's self-containment worth keeping? | **no** — it was an invention Z liked, and it now lives as its own project outside this monorepo | the textbook can be absorbed without losing anything |
+| which aesthetic wins? | **cream/rose/gold** | spores gets re-skinned. twilight webcore is deprioritized, not deleted |
+| is write's flat drafts list a problem? | **unsure** | deferred. not in the plan; revisit after the editor extraction |
+
+two of these change the plan materially. **tasks → carillon** means notebook
+loses a third of its data model, which makes the "front door" simpler than
+originally drafted. **cream/rose wins** means the knowledge-base merge carries a
+re-skin of spores, not just a data migration — the surviving app wears the
+absorbed app's clothes.
 
 ---
 
@@ -246,10 +270,10 @@ biggest causes.
 **doesn't fix:** spores and the textbook stay two knowledge bases; three prompt
 pipelines stay three; write's editor stays unreachable; dev log stays untested.
 
-### option B — converge to three products *(recommended)*
+### option B — converge to three products *(chosen)*
 
 split by **what you're doing**, not by what the data is. three rooms, plus
-ologypedia demoted from an app to an output format.
+ologypedia demoted from an app to an output format. amended below to match §0.
 
 **1. one knowledge base — spores absorbs the textbook.**
 
@@ -263,6 +287,10 @@ graph, sync, 46 tests) and gains the textbook's *reading* experience:
 - covers and a shelf view alongside the graph
 - focus mode, breadcrumbs, calm-motion — ported wholesale, they're the
   accessibility work and it's the best part of the textbook
+- **the cream/rose/gold palette** — per §0, the absorbed app's look wins.
+  spores' twilight-webcore `--g-*` tokens get re-valued, not replaced; the
+  variable names and their roles stay, so this is a token edit rather than a
+  component rewrite.
 
 **ologypedia becomes the publish target, not a second editor.** `index.html`
 stays the public bookcase, `textbook-*.html` stay the published artifacts,
@@ -273,11 +301,13 @@ has, and it works there.
 
 **2. dev log becomes a spores category pack.**
 
-seven block types → seven categories in the registry (or a `worldbuilding`
-custom pack). `SmartLink` → `Flight`. dated entries → a spellbook with the
-`diary` archetype, which already exists. retire the app; keep the route as a
-filtered view if the dated framing is worth preserving, or fold it into
-marginalia as a surface, since it's *about* marginalia.
+seven block types → seven categories in the registry, as a `worldbuilding`
+pack. `SmartLink` → `Flight`. entries → a spellbook.
+
+per §0 there is **no chronological view to port** — the date becomes an
+ordinary field on the entry and nothing renders a timeline — and the devlog
+**does not move into marginalia**, tidier though that would be. it lands in
+spores like everything else, and marginalia stays a game.
 
 this is the highest-confidence merge in the list: one subject, zero tests, and
 a target that already models everything it needs.
@@ -293,9 +323,12 @@ API. write keeps letters and the public path as its own thing.
 **4. notebook becomes the inbox.**
 
 one stream that always accepts, plus promotion. `notes` and `ideas` collapse
-into captures with a lane; each carries "promote to spore / draft / task."
-tasks stay — a different object with a different lifecycle — though it's worth
-asking whether they belong in carillon instead.
+into captures with a lane; each carries "promote to spore / promote to draft."
+
+per §0, **tasks leave for carillon.** notebook drops the `NotebookTask` model
+entirely and the mode tabs go from three to one. this is a net simplification
+of the front door: it stops being a three-mode app you have to navigate and
+becomes a single stream you type into.
 
 **5. one prompt pipeline — `@woodles/spellcraft`.**
 
@@ -327,17 +360,63 @@ cheap, it's most of the benefit, and it's not wasted work if B stalls.
 
 | # | step | size | unblocks |
 | --- | --- | --- | --- |
-| 0 | **write the five sentences.** one line per app naming the *moment*, into the manifest descriptions and each app's header. regroup the landing tiles into bands. | hours | everything — you can't merge what you can't describe |
-| 1 | **`@woodles/handoff` + one capture box.** shared envelope, drain-on-load, "send to…" actions between all five. | ~1 day | kills the routing tax immediately, survives every later step |
-| 2 | **dev log → spores.** category pack + diary spellbook + a migration for `woodles_devlog`. retire or redirect the route. | ~2 days | proves the category registry generalizes; removes an untested app |
-| 3 | **textbook → spores.** wikilinks, backlinks, status, covers, focus mode, breadcrumbs. migrate `ologypedia-textbook-v1`. ologypedia keeps the bookcase and the studio. | ~1 week | the actual consolidation; makes one knowledge base real |
-| 4 | **notebook → inbox.** merge notes and ideas into captures; promotion actions land against step 1's envelope. | ~2 days | one front door |
-| 5 | **`@woodles/editor`.** extract from write, consume in spores; settle the API that REFACTORING.md has been waiting on. | ~1 week | rich bodies everywhere; unblocks the marginalia margin-notes merge too |
-| 6 | **`@woodles/spellcraft`.** one prompt spec, three output contracts. | ~3 days | the authoring spec stops drifting |
+| 0 | ✅ **write the five sentences.** one line per app naming the *moment*, into the manifest descriptions. regroup the landing tiles into bands. | hours | everything — you can't merge what you can't describe |
+| 1 | ✅ **`@woodles/handoff`.** shared envelope, drain-on-load, "send to…" actions between notebook, spores and write. | ~1 day | kills the routing tax immediately, survives every later step |
+| 2 | **dev log → spores.** worldbuilding category pack + a migration for `woodles_devlog`. no dated view (§0). retire the app, redirect the route. | ~2 days | proves the category registry generalizes; removes an untested app |
+| 3 | **spores re-skin.** re-value the `--g-*` tokens to cream/rose/gold (§0) *before* the textbook lands, so the port isn't restyled twice. | ~half a day | step 4 arrives into a room that already looks right |
+| 4 | **textbook → spores.** wikilinks, backlinks, status, covers, focus mode, breadcrumbs. migrate `ologypedia-textbook-v1`. ologypedia keeps the bookcase and the studio. | ~1 week | the actual consolidation; makes one knowledge base real |
+| 5 | **tasks → carillon.** move `NotebookTask` into planner, migrating from `notebook.workspace.v2`. | ~1 day | clears notebook for step 6 |
+| 6 | **notebook → inbox.** merge notes and ideas into captures; promotion actions land against step 1's envelope. | ~1 day | one front door |
+| 7 | **`@woodles/editor`.** extract from write, consume in spores; settle the API that REFACTORING.md has been waiting on. | ~1 week | rich bodies everywhere; unblocks the marginalia margin-notes merge too |
+| 8 | **`@woodles/spellcraft`.** one prompt spec, three output contracts. | ~3 days | the authoring spec stops drifting |
 
 if only one thing gets done: **steps 0 and 1.** they're a day and a half
 together and they address the two causes that actually stop you from opening
-an app.
+an app. *(both have shipped — see "what landed" below.)*
+
+two ordering notes. **step 3 goes before step 4** because re-skinning after the
+port means restyling the ported components too — cheaper to land the tokens
+first. **step 5 goes before step 6** because notebook's task model is entangled
+with its workspace document; moving tasks out first leaves a smaller, cleaner
+thing to reshape into the inbox.
+
+### what landed in steps 0 and 1
+
+**bands.** the manifest gained a `band` per landing tile — `catch`, `write`,
+`tend`, `read`, `play` — plus `landingBands` and `landingAppsByBand`. the start
+menu's "all apps" section renders grouped under them with a one-line blurb
+naming the moment. it also now lists *every* app rather than the unpinned
+remainder, because notebook is default-pinned and `catch` would otherwise never
+show its name. the suite fails if a tile lands in an unknown band, if grouping
+loses one, or if anything but notebook appears in `catch` — the last is a
+tripwire against the routing decision growing back.
+
+**sentences.** three of the five descriptions now name a moment instead of a
+noun: notebook is "when a thought arrives and you don't want to decide where it
+goes", spores is "when you want to be able to find it, and what it connects to,
+later", write is "when a thought deserves to be written properly — and maybe
+sent". ologypedia's became "finished entries, bound and shelved to be read",
+which is what step 4 will make literally true. dev log's is untouched — it's
+being retired in step 2.
+
+**`@woodles/handoff`.** one versioned queue per receiving app. the full
+contract is in ARCHITECTURE.md under "the handoff spine"; the three choices
+worth restating here are that a capture is never refused (empty draft, corrupt
+queue, absent localStorage all still accept), that duplicates beat losses
+(`drain()` hands items back even when it can't clear, flagging it, and
+receivers dedupe on id), and that queues are bounded at 200 with the oldest
+dropped.
+
+wired: notebook drains into notes tagged `from:<app>` and can send any note or
+idea onward; spores plants arrivals as spores — *before* the first-run
+onboarding check, so a garden that only looks empty doesn't open the tutorial
+over the top of what just arrived — and can send a spore to write; write gives
+each arrival its own draft and opens the newest, running HTML through
+`sanitizeHtml` first, since a body may be model output from two apps ago and
+write's drafts can reach the public publish path.
+
+41 new tests (920 → 961). spores gained a `vitest.config.ts` on the way, for
+the same rune-store reason planner has one.
 
 ### infrastructure that has to come along
 
@@ -352,25 +431,22 @@ an app.
 
 ---
 
-## 6. open questions
+## 6. what's still open
 
-these change the plan and only Z can answer them.
+the six questions this doc opened with are answered in §0. what remains:
 
-1. **is dev log's dated, chronological framing load-bearing?** if yes, it wants
-   to be a *view* in spores, not just a spellbook. if no, step 2 is trivial.
-2. **should the devlog live inside marginalia instead?** it's notes about
-   making that world; marginalia is right there.
-3. **do tasks belong in notebook or carillon?** notebook's tasks have priority
-   and an optional note link; carillon owns time. a task with a date is
-   carillon's; a task attached to a thought is notebook's — or they're one
-   thing in the wrong place.
-4. **is the ologypedia textbook's separateness the point?** it's the only one
-   of the five that is deliberately, defensibly self-contained — a file another
-   model can read and replicate exactly. absorbing it into spores trades that
-   property for a shared engine. that's a real loss, and it might be the wrong
-   trade.
-5. **how much aesthetic merging is acceptable?** spores' twilight webcore and
-   the textbook's cream/rose are both deliberate. step 3 has to pick one, or
-   carry both as themes.
-6. **is write's flat drafts list actually a problem**, or is a letter
-   deliberately a thing without a filing system?
+1. **write's flat drafts list** — undecided, and deliberately not in the plan.
+   the honest read is that it can't be answered until step 7 exists: once
+   spores and write share an editor, whether a letter wants tags and links
+   becomes an observation rather than a guess. revisit then.
+2. **what happens to the `/marginalia-devlog` route** once step 2 lands. a
+   redirect to `/spores` keeps old links alive; dropping it is cleaner. leaning
+   redirect, since the manifest suite will notice either way.
+3. **twilight webcore's fate.** §0 says deprioritized, not deleted — marginalia
+   and bestiary still wear it and aren't in scope here. the question is only
+   whether spores' `--g-*` values are re-pointed in place (recommended, one
+   file) or kept switchable as a second theme (more code, unclear payoff).
+4. **whether `@woodles/handoff` should become sync-aware.** step 1 ships it as
+   a same-origin localStorage envelope, which is enough for one browser. making
+   a capture on the phone show up on the laptop means putting it through
+   `api/sync.ts`, which is a bigger ask than the routing problem needs today.

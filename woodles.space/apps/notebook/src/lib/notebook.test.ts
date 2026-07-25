@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHandoffQueue, sendHandoff } from '@woodles/handoff';
 import { NotebookStore } from './notebook.svelte';
 import type { Note } from './types';
 
@@ -210,6 +211,108 @@ describe('NotebookStore ideas', () => {
 
 		store.deleteIdea(id);
 		expect(store.ideas).toEqual([]);
+	});
+});
+
+describe('NotebookStore handoffs', () => {
+	it('turns everything waiting into notes and selects the newest', () => {
+		sendHandoff('notebook', {
+			title: 'from spores',
+			body: 'a body',
+			tags: ['garden'],
+			source: { app: 'spores' }
+		});
+		sendHandoff('notebook', { title: 'second', source: { app: 'write' } });
+
+		const store = new NotebookStore();
+		expect(store.ingestHandoffs()).toBe(2);
+
+		expect(store.mode).toBe('notes');
+		expect(store.notes.slice(0, 2).map((item) => item.title)).toEqual(['from spores', 'second']);
+		expect(store.selectedNote?.title).toBe('from spores');
+		expect(savedDocument().notes).toHaveLength(3);
+	});
+
+	it('tags each arrival with where it came from, without duplicating tags', () => {
+		sendHandoff('notebook', {
+			title: 'tagged',
+			tags: ['garden', 'from:spores'],
+			source: { app: 'spores' }
+		});
+
+		const store = new NotebookStore();
+		store.ingestHandoffs();
+
+		expect(store.notes[0].tags).toEqual(['garden', 'from:spores']);
+	});
+
+	it('empties the inbox, so re-opening does not re-add the same notes', () => {
+		sendHandoff('notebook', { title: 'once', source: { app: 'write' } });
+
+		const store = new NotebookStore();
+		expect(store.ingestHandoffs()).toBe(1);
+		expect(store.pendingHandoffs()).toBe(0);
+		expect(store.ingestHandoffs()).toBe(0);
+		expect(store.notes.filter((item) => item.title === 'once')).toHaveLength(1);
+	});
+
+	it('flattens an html body into something the plain textarea can edit', () => {
+		sendHandoff('notebook', {
+			title: '',
+			body: '<p>first line</p><p>second <em>line</em></p>',
+			format: 'html',
+			source: { app: 'write' }
+		});
+
+		const store = new NotebookStore();
+		store.ingestHandoffs();
+
+		expect(store.notes[0].body).toBe('first line\n\nsecond line');
+		// No title supplied, so the opening line becomes one.
+		expect(store.notes[0].title).toBe('first line');
+	});
+
+	it('accepts a wholly empty capture rather than dropping it', () => {
+		sendHandoff('notebook', { source: { app: 'spores' } });
+
+		const store = new NotebookStore();
+		expect(store.ingestHandoffs()).toBe(1);
+		expect(store.notes[0].title).toBe('Untitled');
+	});
+
+	it('hands a note on to another app with its tags and provenance', () => {
+		const store = new NotebookStore();
+		const created = store.addNote();
+		store.updateNote(created.id, { title: 'worth keeping', body: 'words', tags: ['seed'] });
+
+		const result = store.promoteNote(created.id, 'spores');
+		expect(result?.ok).toBe(true);
+
+		const waiting = createHandoffQueue('spores').peek();
+		expect(waiting).toHaveLength(1);
+		expect(waiting[0]).toMatchObject({
+			title: 'worth keeping',
+			body: 'words',
+			tags: ['seed'],
+			source: { app: 'notebook', label: 'worth keeping' }
+		});
+	});
+
+	it('hands an idea on, carrying its lane as a tag', () => {
+		const store = new NotebookStore();
+		store.addIdea('a small thought', 'shape');
+
+		const result = store.promoteIdea(store.ideas[0].id, 'write');
+		expect(result?.ok).toBe(true);
+
+		const waiting = createHandoffQueue('write').peek();
+		expect(waiting[0]).toMatchObject({ body: 'a small thought', tags: ['shape'] });
+	});
+
+	it('reports nothing to promote for an id that is gone', () => {
+		const store = new NotebookStore();
+		expect(store.promoteNote('missing', 'spores')).toBeNull();
+		expect(store.promoteIdea('missing', 'spores')).toBeNull();
 	});
 });
 

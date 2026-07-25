@@ -1,15 +1,19 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { sendHandoff } from '@woodles/handoff';
 import {
 	bootstrap,
 	clearActiveDraftId,
 	createDraftId,
 	getActiveDraftId,
+	handoffToDraftBody,
 	listDrafts,
 	loadDraft,
 	migrateLegacyDraft,
+	pendingHandoffs,
 	removeDraftBody,
 	saveDraft,
 	setActiveDraftId,
+	textToHtml,
 	upsertIndex,
 	writeIndex,
 	type DraftBody,
@@ -163,5 +167,77 @@ describe('bootstrap', () => {
 		expect(boot.drafts[0].title).toBe('legacy');
 		expect(boot.body?.title).toBe('legacy');
 		expect(localStorage.getItem(KEY_LEGACY)).toBeNull();
+	});
+});
+
+describe('handoffs', () => {
+	it('turns plain text into paragraphs, keeping soft breaks inside one', () => {
+		expect(textToHtml('one\ntwo\n\nthree')).toBe('<p>one<br>two</p><p>three</p>');
+		expect(textToHtml('   ')).toBe('');
+	});
+
+	it('escapes text so a thought about markup does not become markup', () => {
+		expect(textToHtml('<script>alert(1)</script>')).toBe(
+			'<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>'
+		);
+	});
+
+	it('sanitizes an html body — it may be model output from two apps ago', () => {
+		const body = handoffToDraftBody({
+			id: 'h-1',
+			target: 'write',
+			title: 'risky',
+			body: '<p>keep</p><script>alert(1)</script>',
+			format: 'html',
+			tags: [],
+			source: { app: 'spores' },
+			createdAt: '2026-07-25T00:00:00.000Z'
+		});
+		expect(body.layers?.foreground?.html).toContain('keep');
+		expect(body.layers?.foreground?.html).not.toContain('script');
+	});
+
+	it('lands each arrival in its own draft, opening the newest', () => {
+		sendHandoff('write', { title: 'first', body: 'a', source: { app: 'notebook' } });
+		sendHandoff('write', { title: 'second', body: 'b', source: { app: 'spores' } });
+
+		const boot = bootstrap();
+
+		expect(boot.handoffs).toBe(2);
+		expect(boot.body?.title).toBe('second');
+		expect(boot.drafts.map((d) => d.title)).toContain('first');
+		expect(boot.drafts.map((d) => d.title)).toContain('second');
+		expect(getActiveDraftId()).toBe(boot.activeId);
+	});
+
+	it('puts the arrival in the foreground layer, where writing starts', () => {
+		sendHandoff('write', { title: 'note', body: 'some words', source: { app: 'notebook' } });
+
+		const boot = bootstrap();
+		expect(boot.body?.layers?.foreground?.html).toBe('<p>some words</p>');
+	});
+
+	it('does not re-open the same handoff on the next load', () => {
+		sendHandoff('write', { title: 'once', body: 'x', source: { app: 'notebook' } });
+
+		const first = bootstrap();
+		expect(first.handoffs).toBe(1);
+		expect(pendingHandoffs()).toBe(0);
+
+		const second = bootstrap();
+		expect(second.handoffs).toBe(0);
+		expect(second.activeId).toBe(first.activeId);
+		expect(listDrafts().filter((d) => d.title === 'once')).toHaveLength(1);
+	});
+
+	it('leaves an ordinary load untouched when nothing was sent', () => {
+		setActiveDraftId('d-mine');
+		saveDraft('d-mine', { title: 'mine' });
+		writeIndex([{ id: 'd-mine', title: 'mine', updatedAt: '2026-01-01T00:00:00.000Z' }]);
+
+		const boot = bootstrap();
+		expect(boot.handoffs).toBe(0);
+		expect(boot.activeId).toBe('d-mine');
+		expect(boot.body?.title).toBe('mine');
 	});
 });

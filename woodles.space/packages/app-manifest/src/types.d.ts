@@ -1,9 +1,25 @@
 export type AppKind = 'static' | 'sveltekit' | 'external';
 export type AppMaturity = 'stable' | 'growing' | 'incubator' | 'private';
 
+/**
+ * The moment an app is for, rather than the thing it holds. Tiles group under
+ * these on the landing page so the homepage stops presenting every app as a
+ * peer you have to choose between. See CONVERGENCE.md §3.
+ */
+export type LandingBandId = 'catch' | 'write' | 'tend' | 'read' | 'play';
+
+export interface LandingBand {
+	id: LandingBandId;
+	label: string;
+	/** One line naming the moment, shown under the band heading. */
+	blurb: string;
+	order: number;
+}
+
 export interface LandingTileDefinition {
 	tileId: string;
 	order: number;
+	band: LandingBandId;
 	description: string;
 	gradientFrom: string;
 	gradientTo: string;
@@ -35,6 +51,7 @@ export interface LandingApp {
 	name: string;
 	href: string;
 	desc: string;
+	band: LandingBandId;
 	g1: string;
 	g2: string;
 	ga: string;

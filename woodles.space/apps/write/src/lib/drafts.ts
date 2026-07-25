@@ -4,6 +4,8 @@ import {
 	DRAFT_PREFIX,
 	LEGACY_DRAFT_KEY
 } from './storage';
+import { createHandoffQueue, type Handoff } from '@woodles/handoff';
+import { sanitizeHtml } from './htmlTools';
 import type { LayerId, PocketNote, MarginNote } from './types';
 
 export type DraftIndexItem = { id: string; title: string; updatedAt: string };
@@ -126,10 +128,85 @@ export function migrateLegacyDraft(): { id: string; entry: DraftIndexItem } | nu
 	return { id, entry };
 }
 
+// ── handoffs ────────────────────────────────────────────────────────
+// A thought that started somewhere else — a note, a spore — and turned out
+// to want real prose. It arrives as its own draft rather than being pasted
+// into whatever happened to be open. See CONVERGENCE.md §3.
+
+const handoffQueue = createHandoffQueue('write');
+
+function escapeHtml(text: string): string {
+	return text
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;');
+}
+
+// Plain text arrives from apps whose bodies are bare textareas. Blank lines
+// separate paragraphs; single newlines stay soft breaks within one.
+export function textToHtml(text: string): string {
+	const blocks = text
+		.split(/\n{2,}/)
+		.map((block) => block.trim())
+		.filter(Boolean);
+	if (blocks.length === 0) return '';
+	return blocks
+		.map((block) => '<p>' + escapeHtml(block).replace(/\n/g, '<br>') + '</p>')
+		.join('');
+}
+
+export function handoffToDraftBody(item: Handoff): DraftBody {
+	const stamp = new Date().toISOString();
+	// An HTML body is untrusted the same way pasted content is — it may have
+	// come from a model's output two apps ago — so it goes through the same
+	// sanitizer before it can ever reach the publish path.
+	const html = item.format === 'html' ? sanitizeHtml(item.body) : textToHtml(item.body);
+	return {
+		title: item.title,
+		layers: { foreground: { html, updatedAt: stamp } },
+		savedAt: stamp
+	};
+}
+
+export interface HandoffIngestResult {
+	drafts: DraftIndexItem[];
+	/** The newest arrival, to open on load. Null when nothing was waiting. */
+	activeId: string | null;
+	count: number;
+}
+
+/**
+ * Turn everything waiting into drafts, newest last so it lands on top of the
+ * index and becomes the one that opens.
+ */
+export function ingestHandoffs(index: DraftIndexItem[]): HandoffIngestResult {
+	const { items } = handoffQueue.drain();
+	if (items.length === 0) return { drafts: index, activeId: null, count: 0 };
+
+	let drafts = index;
+	let activeId: string | null = null;
+	for (const item of items) {
+		const id = createDraftId() + '-' + item.id.slice(-4);
+		const body = handoffToDraftBody(item);
+		saveDraft(id, body);
+		drafts = upsertIndex(drafts, id, body.title ?? '', body.savedAt ?? new Date().toISOString());
+		activeId = id;
+	}
+	writeIndex(drafts);
+	return { drafts, activeId, count: items.length };
+}
+
+/** How many are waiting, for a badge. Does not consume them. */
+export function pendingHandoffs(): number {
+	return handoffQueue.count();
+}
+
 export interface BootstrapResult {
 	drafts: DraftIndexItem[];
 	activeId: string;
 	body: DraftBody | null;
+	/** How many arrived from another app on this load. */
+	handoffs: number;
 }
 
 // Returns the initial draft state for the app on first paint. Performs
@@ -152,6 +229,15 @@ export function bootstrap(): BootstrapResult {
 		setActiveDraftId(activeId);
 	}
 
+	// Anything sent here from another app becomes its own draft and wins the
+	// opening slot — it's the thing you came to write.
+	const caught = ingestHandoffs(drafts);
+	drafts = caught.drafts;
+	if (caught.activeId) {
+		activeId = caught.activeId;
+		setActiveDraftId(activeId);
+	}
+
 	const body = loadDraft(activeId);
-	return { drafts, activeId, body };
+	return { drafts, activeId, body, handoffs: caught.count };
 }

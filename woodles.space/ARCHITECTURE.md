@@ -18,9 +18,10 @@ other docs have narrower jobs:
 - [REFACTORING.md](./REFACTORING.md) is the living consolidation log — code
   that exists in more than one place.
 - [CONVERGENCE.md](./CONVERGENCE.md) is the product-shape counterpart: why
-  spores, notebook, dev log, ologypedia and write overlap, and three options
-  for collapsing them. a proposal, not a decision — nothing in it has been
-  actioned.
+  spores, notebook, dev log, ologypedia and write overlap, and the plan for
+  collapsing them into *one knowledge base, one writing surface, one front
+  door*. decided, and part-built — its §5 table tracks which steps have
+  landed. read it before reshaping any of those five apps.
 - [ROADMAP.md](./ROADMAP.md) is the 10-week plan for making marginalia and
   the bestiary public-facing — all ten weeks are marked `✅ shipped` in its
   own headers, week 4 (share links, save-as-image, adopt-a-card) having
@@ -68,6 +69,7 @@ woodles.space/
 │   └── schema.sql
 ├── packages/
 │   ├── app-manifest/        @woodles/app-manifest — canonical app and route inventory
+│   ├── handoff/             @woodles/handoff — passing a thought between apps
 │   ├── persistence/         @woodles/persistence — versioned local storage mechanics
 │   └── sync/                @woodles/sync — the sync client
 └── apps/
@@ -97,8 +99,17 @@ member of the pnpm workspace; `vercel.json` serves its `index.html` directly.
 `packages/app-manifest/src/index.js` is the canonical deployable-app inventory.
 It owns the 17 app ids, names, public paths and aliases, app shape, source and
 output locations, maturity, and landing visibility. It also owns the landing
-tile order/copy, default pins, featured fallback, and Marginalia's Reading Room
-sub-surface. The static landing page imports that browser-ready module directly;
+tile order/copy, **band**, default pins, featured fallback, and Marginalia's
+Reading Room sub-surface. A band is the *moment* a tile is for rather than the
+thing it holds — `catch`, `write`, `tend`, `read`, `play` — and the start
+menu's "all apps" section renders grouped under them (`landingAppsByBand`),
+so the homepage stops presenting sixteen peers to choose between. That section
+now lists every app, not just the unpinned remainder, because a band whose only
+app is pinned would otherwise never show its name. The suite fails if a tile
+lands in an unknown band, if grouping loses one, or if anything but `notebook`
+appears in `catch`. See [CONVERGENCE.md](./CONVERGENCE.md).
+
+The static landing page imports that browser-ready module directly;
 its hand-drawn `ICONS` stay local because they are artwork, not deployment
 metadata.
 
@@ -291,10 +302,52 @@ imports. `bestiary` remains IndexedDB-native because of its embedded image data;
 it validates its collection, keeps a last-known-good shelf, and reports both
 collection size and the browser origin's usage/quota in `SyncPanel`.
 
+`packages/handoff` is the second adopter, and the first one that isn't an app:
+each handoff queue is a versioned document in its own right.
+
 This is intentionally incremental. Planner, Spores, Thinking About, Write, and
 Marginalia keep their existing domain persistence until each is changed for a
 product reason; adoption should migrate one store at a time rather than create
 a central Woodles state service.
+
+## the handoff spine
+
+A third spine, alongside sync and the public read path, and the smallest of the
+three: **moving one thought from the app that caught it to the app that can do
+something with it.** The problem it exists for is written up in
+[CONVERGENCE.md](./CONVERGENCE.md) §3 — four apps accept "a title and some
+words", nothing routes between them, so the app you picked at capture time is
+the app it stays in forever.
+
+**`packages/handoff` (`@woodles/handoff`)** — `createHandoffQueue(target)` over
+one versioned localStorage document per target (`woodles.handoff.<target>.v1`),
+one queue each for the three apps that can receive: `notebook`, `spores`,
+`write`. Read-only surfaces (echoes, ologypedia) are not targets. `send()`
+appends, `drain()` empties, `peek()`/`count()` don't consume. The envelope is
+`{ id, target, title, body, format, tags, source, createdAt }`, where `format`
+is `text` or `html` and `source` carries the originating app for provenance.
+
+Three deliberate choices, each tested:
+
+- **a capture is never refused.** an empty draft, a corrupt queue, and a
+  missing localStorage all still accept — the front door failing closed is
+  worse than any data it could mangle.
+- **duplicates beat losses.** `drain()` returns items even when it can't clear
+  the queue, flagging `cleared: false`; receivers dedupe on id. nothing
+  recovers a thought that was silently dropped.
+- **queues are bounded** (`QUEUE_LIMIT`, 200, oldest dropped). a queue is a
+  hallway, not a home.
+
+**receivers** drain on load and announce it once: `notebook` turns each into a
+note tagged `from:<app>`, `spores` plants each as a spore, `write` gives each
+its own draft and opens the newest. HTML bodies are flattened for the two
+plain-textarea apps and run through `sanitizeHtml` for `write` — a body may be
+model output from two apps ago, and write's drafts can reach the public
+publish path.
+
+**senders** are `notebook` (per note and per idea, → spores / write) and
+`spores` (per spore, → write). Everything can reach the front door; the front
+door can reach everything.
 
 ## the sync layer
 
@@ -467,14 +520,14 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-920 tests total: 16 in `api/` (its own
+961 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 904 across ten pnpm
-packages — `write` 65, `marginalia` 249, `planner` 283, `notebook` 14,
-`spores` 46, `bestiary` 160, `packages/sync` 5,
-`packages/persistence` 6, `packages/app-manifest` 7, and
-`thinking-about` 69.
+instead of the recursive `pnpm -r test`), plus 945 across eleven pnpm
+packages — `write` 72, `marginalia` 249, `planner` 283, `notebook` 22,
+`spores` 55, `bestiary` 160, `packages/sync` 5,
+`packages/persistence` 6, `packages/app-manifest` 9,
+`packages/handoff` 15, and `thinking-about` 69.
 `marginalia-devlog` has no test script. keep this inventory current when a
 suite changes; the root command is the release contract, not the prose count.
 
@@ -484,11 +537,15 @@ SvelteKit app's `tsconfig.json` extends `./.svelte-kit/tsconfig.json`, which
 can't resolve the tsconfig. because the scripts sync first, `pnpm test` works
 straight from a clean checkout.
 
-`write`, `marginalia`, and `notebook` load the workspace-level
+`write`, `marginalia`, `notebook`, and `spores` load the workspace-level
 `vitest.setup.ts` to install a browser-like in-memory `localStorage` under
 Node. planner keeps its own localStorage mock in `store.test.ts`; under the
 current Node runtime that suite passes but may still print a
 `--localstorage-file` warning.
+
+`spores` gained its own `vitest.config.ts` for the same reason planner has one
+— `garden.svelte.ts` builds a `$state` store at import time, so the Svelte
+plugin has to compile it before the store tests can construct a `GardenStore`.
 
 `planner`'s `vitest.config.ts` loads the SvelteKit plugin, and it has to:
 `planner`'s store is a `.svelte.ts` module that uses `$state`, instantiated at
