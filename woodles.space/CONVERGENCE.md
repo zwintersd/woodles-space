@@ -11,21 +11,23 @@ duplication log is [REFACTORING.md](./REFACTORING.md); this file is about what
 the apps are *for*. read alongside [ARCHITECTURE.md](./ARCHITECTURE.md) for how
 they're actually built.
 
-**status: decided, and started.** option B below is the chosen shape — *one
-knowledge base, one writing surface, one front door*. the six open questions
-have been answered; see §0. §5 is the live plan, and marks what has shipped.
+**status: decided, and mostly built.** option B below is the chosen shape —
+*one knowledge base, one writing surface, one front door*. the six open
+questions have been answered; see §0. §5 is the live plan, and marks what has
+shipped.
 
-steps 0–4 are done, and **one knowledge base is real.** the landing page groups
+steps 0–6 are done, and **all three rooms are real.** the landing page groups
 apps by the moment they're for rather than listing sixteen peers;
 `@woodles/handoff` lets any app pass a thought to any other instead of making
 you guess right the first time; the Dev Log has been folded into Spores and
 retired; Spores wears the cream/rose/gold it will keep; and the Ologypedia
-Textbook has moved across too. **five surfaces are now three, plus a publish
-target.**
+Textbook has moved across too. Notebook has shed its tasks to
+Carillon and become one stream you type into. **five surfaces are now three,
+plus a publish target.**
 
-what remains is the *writing surface* half — steps 5–8 — which is about
-Notebook shedding tasks, becoming the inbox, and Write's editor being
-extractable. none of it blocks using what's already here.
+what remains is steps 7–8 — the shared editor and the shared prompt spec.
+both are consolidation of *code* rather than of product shape; neither blocks
+using what's already here.
 
 ---
 
@@ -52,9 +54,11 @@ absorbed app's clothes.
 
 stripped of its voice, here is the data model and the gesture each app owns.
 
-### notebook — `/notebook` · sveltekit · growing
+### notebook — `/notebook` · sveltekit · *now the front door*
 
-three modes over one localStorage document (`notebook.workspace.v2`):
+after steps 5–6 it holds one kind of thing — a `Capture` (title, body, tags,
+lane) in `notebook.workspace.v3`. what it was: three modes over one
+localStorage document (`notebook.workspace.v2`):
 
 | object | fields | organized by |
 | --- | --- | --- |
@@ -66,9 +70,10 @@ no links between notes. no sync. the **only** adopter of
 `@woodles/persistence` among the five — versioned envelope, validation,
 last-known-good recovery, export/import round trip. 14 tests.
 
-### spores — `/spores` · sveltekit · growing
+### spores — `/spores` · sveltekit · *now the knowledge base*
 
-landing copy: *"a personal wikipedia, tended by hand."*
+after steps 2–4 it also carries the Dev Log's worldbuilding records and the
+Textbook's wikilinks, backlinks, status and covers. what it was:
 
 | object | fields |
 | --- | --- |
@@ -376,8 +381,8 @@ cheap, it's most of the benefit, and it's not wasted work if B stalls.
 | 2 | ✅ **dev log → spores.** worldbuilding category pack + a migration for `woodles_devlog`. no dated view (§0). app retired, route redirected. | ~2 days | proves the category registry generalizes; removes an untested app |
 | 3 | ✅ **spores re-skin.** re-valued the `--g-*` tokens to cream/rose/gold (§0) *before* the textbook lands, so the port isn't restyled twice. | ~half a day | step 4 arrives into a room that already looks right |
 | 4 | ✅ **textbook → spores.** wikilinks, backlinks, status, covers, the sowing gesture. migrated `ologypedia-textbook-v1`. ologypedia keeps the bookcase and the studio. | ~1 week | the actual consolidation; makes one knowledge base real |
-| 5 | **tasks → carillon.** move `NotebookTask` into planner, migrating from `notebook.workspace.v2`. | ~1 day | clears notebook for step 6 |
-| 6 | **notebook → inbox.** merge notes and ideas into captures; promotion actions land against step 1's envelope. | ~1 day | one front door |
+| 5 | ✅ **tasks → carillon.** moved `NotebookTask` into planner, migrating from `notebook.workspace.v2`. | ~1 day | clears notebook for step 6 |
+| 6 | ✅ **notebook → inbox.** notes and ideas merged into captures; promotion actions land against step 1's envelope. | ~1 day | one front door |
 | 7 | **`@woodles/editor`.** extract from write, consume in spores; settle the API that REFACTORING.md has been waiting on. | ~1 week | rich bodies everywhere; unblocks the marginalia margin-notes merge too |
 | 8 | **`@woodles/spellcraft`.** one prompt spec, three output contracts. | ~3 days | the authoring spec stops drifting |
 
@@ -533,6 +538,34 @@ that page and the bookcase's textbook cards keep working as an escape hatch.
 
 979 → 1048 tests. verified in a browser end to end: migration, link following,
 backlinks, red-link sowing, and the shelf.
+
+### what landed in steps 5 and 6
+
+**the ordering problem, and its answer.** these two migrations both read
+Notebook's v2 document — Carillon for the tasks, Notebook for the notes and
+ideas — so whichever ran first could have read the data out from under the
+other. rather than force an order, Notebook's v3 upgrade writes to a *new key*
+and leaves v2 untouched. both migrations are now order-independent and
+non-destructive, which is the same stance taken with the Textbook in step 4.
+pinned by a test on each side.
+
+**what Carillon would not take.** it has no priority — it organizes by domain
+and by time — so an off-normal priority is written into the task's `notes`
+rather than invented as a field or silently dropped. nothing maps to Carillon's
+`dropped` state, which Notebook never had, and a task with no title is skipped
+rather than created empty.
+
+**notebook got smaller, which was the point.** three modes became one stream;
+`Note` and `Idea` became `Capture`. a lane is triage rather than status —
+where a thing sits in your head, not how finished it is — the default filter is
+*everything*, and the number keys now filter rather than switch modes. removing
+the task and idea panes left 25 dead CSS rules and 10 stale selectors inside
+live ones; both were cleared, so the app still passes at zero warnings.
+
+1048 → 1069 tests. verified in a browser across both apps in sequence: notes
+and ideas became captures, v2 survived untouched, no task leaked into the
+inbox, and Carillon then took both tasks with the high priority preserved in
+its notes.
 
 ### infrastructure that has to come along
 

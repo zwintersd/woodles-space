@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { notebook } from '$lib/notebook.svelte';
-	import type { Idea, NotebookMode, NotebookTask } from '$lib/types';
+	import { LANES, LANE_LABEL, type Lane } from '$lib/types';
 	import { formatBytes } from '@woodles/persistence';
 	import type { HandoffTarget } from '@woodles/handoff';
 
@@ -10,27 +10,11 @@
 		{ id: 'write', label: 'write' }
 	];
 
-	const MODES: { id: NotebookMode; label: string }[] = [
-		{ id: 'notes', label: 'notes' },
-		{ id: 'tasks', label: 'tasks' },
-		{ id: 'ideas', label: 'ideas' }
-	];
-
-	const LANES: { id: Idea['lane']; label: string }[] = [
-		{ id: 'spark', label: 'sparks' },
-		{ id: 'shape', label: 'shaping' },
-		{ id: 'later', label: 'later' }
-	];
-
-	let taskTitle = $state('');
-	let taskPriority = $state<NotebookTask['priority']>('normal');
-	let ideaText = $state('');
-	let ideaLane = $state<Idea['lane']>('spark');
 	let importInput = $state<HTMLInputElement>();
 	let handoffNotice = $state('');
 
-	const note = $derived(notebook.selectedNote);
-	const noteTags = $derived(note?.tags.join(', ') ?? '');
+	const capture = $derived(notebook.selected);
+	const captureTags = $derived(capture?.tags.join(', ') ?? '');
 
 	// Anything another app couldn't place lands here on open, so nothing ever
 	// needs filing at the moment it's captured. See CONVERGENCE.md §3.
@@ -41,49 +25,33 @@
 		}
 	});
 
-	function sendNote(target: HandoffTarget) {
-		if (!note) return;
-		const result = notebook.promoteNote(note.id, target);
+	function send(target: HandoffTarget) {
+		if (!capture) return;
+		const result = notebook.promote(capture.id, target);
 		handoffNotice = result?.ok
 			? `sent to ${target} — it'll be waiting when you open it`
 			: `couldn't send to ${target}`;
 	}
 
-	function sendIdea(id: string, target: HandoffTarget) {
-		const result = notebook.promoteIdea(id, target);
-		handoffNotice = result?.ok ? `sent to ${target}` : `couldn't send to ${target}`;
-	}
-
-	function addTask(e: Event) {
-		e.preventDefault();
-		notebook.addTask(taskTitle, taskPriority);
-		taskTitle = '';
-		taskPriority = 'normal';
-	}
-
-	function addIdea(e: Event) {
-		e.preventDefault();
-		notebook.addIdea(ideaText, ideaLane);
-		ideaText = '';
-		ideaLane = 'spark';
-	}
-
 	function updateTags(value: string) {
-		if (!note) return;
+		if (!capture) return;
 		const tags = value
 			.split(',')
 			.map((tag) => tag.trim())
 			.filter(Boolean);
-		notebook.updateNote(note.id, { tags });
+		notebook.update(capture.id, { tags });
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
 		const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
 		if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-		if (e.key === '1') notebook.setMode('notes');
-		if (e.key === '2') notebook.setMode('tasks');
-		if (e.key === '3') notebook.setMode('ideas');
-		if (e.key === 'n' || e.key === 'N') notebook.addNote();
+		// One stream, so the number keys filter rather than switch modes — and
+		// pressing the same one again clears the filter.
+		if (e.key === '1') notebook.setLaneFilter('spark');
+		if (e.key === '2') notebook.setLaneFilter('shape');
+		if (e.key === '3') notebook.setLaneFilter('later');
+		if (e.key === '0' || e.key === 'Escape') notebook.setLaneFilter(null);
+		if (e.key === 'n' || e.key === 'N') notebook.add();
 	}
 
 	function downloadNotebook() {
@@ -132,14 +100,22 @@
 				<span class="rail-icon home-icon"></span>
 				<span>home</span>
 			</a>
-			{#each MODES as mode}
+			<button
+				class="rail-link"
+				class:active={notebook.laneFilter === null}
+				onclick={() => notebook.setLaneFilter(null)}
+			>
+				<span class="rail-icon notes-icon"></span>
+				<span>everything</span>
+			</button>
+			{#each LANES as lane}
 				<button
 					class="rail-link"
-					class:active={notebook.mode === mode.id}
-					onclick={() => notebook.setMode(mode.id)}
+					class:active={notebook.laneFilter === lane}
+					onclick={() => notebook.setLaneFilter(lane)}
 				>
-					<span class="rail-icon {mode.id}-icon"></span>
-					<span>{mode.label}</span>
+					<span class="rail-icon {lane === 'later' ? 'ideas' : 'tasks'}-icon"></span>
+					<span>{LANE_LABEL[lane]}</span>
 				</button>
 			{/each}
 		</nav>
@@ -168,7 +144,7 @@
 			</div>
 			<div class="brand">
 				<h1>Notebook</h1>
-				<p>{notebook.notes.length} notes <span></span> {notebook.openTasks.length} open <span></span> {notebook.ideas.length} ideas</p>
+				<p>{notebook.captures.length} {notebook.captures.length === 1 ? 'thing' : 'things'} caught<span></span>{notebook.laneFilter ? LANE_LABEL[notebook.laneFilter] : 'everything'}</p>
 			</div>
 			<div class="top-actions">
 				<label class="search-wrap" aria-label="search notebook">
@@ -180,7 +156,7 @@
 					/>
 					<span class="search-glass" aria-hidden="true"></span>
 				</label>
-				<button class="new-note" onclick={() => notebook.addNote()}>
+				<button class="new-note" onclick={() => notebook.add()}>
 					<span aria-hidden="true">+</span>
 					new
 				</button>
@@ -189,23 +165,31 @@
 
 		<div class="rainbow-marquee" aria-label="rainbow notebook marquee">
 			<div class="marquee-track">
-				<span>notebook hotline * moonbeam drafts * cloud-soft tasks * candy tabs * tiny ideas * sparkle storage * </span>
-				<span>notebook hotline * moonbeam drafts * cloud-soft tasks * candy tabs * tiny ideas * sparkle storage * </span>
+				<span>notebook hotline * moonbeam drafts * put it down first * candy tabs * tiny ideas * sparkle storage * </span>
+				<span>notebook hotline * moonbeam drafts * put it down first * candy tabs * tiny ideas * sparkle storage * </span>
 			</div>
 		</div>
 
 		<div class="mode-row">
-			<div class="mode-tabs" role="tablist" aria-label="notebook mode">
-				{#each MODES as mode}
+			<div class="mode-tabs" aria-label="filter by lane">
+				<button
+					class="mode-tab"
+					class:active={notebook.laneFilter === null}
+					aria-pressed={notebook.laneFilter === null}
+					onclick={() => notebook.setLaneFilter(null)}
+				>
+					<span class="mode-gem"></span>
+					everything
+				</button>
+				{#each LANES as lane}
 					<button
 						class="mode-tab"
-						class:active={notebook.mode === mode.id}
-						role="tab"
-						aria-selected={notebook.mode === mode.id}
-						onclick={() => notebook.setMode(mode.id)}
+						class:active={notebook.laneFilter === lane}
+						aria-pressed={notebook.laneFilter === lane}
+						onclick={() => notebook.setLaneFilter(lane)}
 					>
 						<span class="mode-gem"></span>
-						{mode.label}
+						{LANE_LABEL[lane]} {notebook.laneCount(lane)}
 					</button>
 				{/each}
 			</div>
@@ -243,135 +227,81 @@
 		</div>
 
 		<main class="workspace">
-		<aside class="note-list" aria-label="notes">
-			{#each notebook.filteredNotes as listedNote (listedNote.id)}
+		<aside class="note-list" aria-label="captures">
+			{#each notebook.filtered as listed (listed.id)}
 				<button
 					class="note-row"
-					class:active={note?.id === listedNote.id}
-					onclick={() => notebook.selectNote(listedNote.id)}
+					class:active={capture?.id === listed.id}
+					data-lane={listed.lane}
+					onclick={() => notebook.select(listed.id)}
 				>
-					<span class="note-row-title">{listedNote.title || 'Untitled'}</span>
-					<span class="note-row-body">{listedNote.body || listedNote.tags.join(', ') || 'blank'}</span>
+					<span class="note-row-title">{listed.title || listed.body.split('\n')[0] || 'Untitled'}</span>
+					<span class="note-row-body">{listed.body || listed.tags.join(', ') || 'blank'}</span>
 				</button>
+			{:else}
+				<p class="list-empty">
+					{notebook.query || notebook.laneFilter ? 'nothing here' : 'nothing caught yet'}
+				</p>
 			{/each}
 		</aside>
 
-		{#if notebook.mode === 'notes'}
-			<section class="editor-pane">
-				{#if note}
-					<div class="editor-head">
-						<input
-							class="title-input"
-							value={note.title}
-							aria-label="note title"
-							oninput={(e) => notebook.updateNote(note.id, { title: e.currentTarget.value })}
-						/>
-						<div class="head-actions">
-							{#each SEND_TO as target}
-								<button
-									class="send-note"
-									onclick={() => sendNote(target.id)}
-									title="hand this note to {target.label}"
-								>
-									→ {target.label}
-								</button>
-							{/each}
-							<button class="delete-note" onclick={() => notebook.deleteNote(note.id)} disabled={notebook.notes.length <= 1}>
-								delete
-							</button>
-						</div>
-					</div>
+		<section class="editor-pane">
+			{#if capture}
+				<div class="editor-head">
 					<input
-						class="tag-input"
-						value={noteTags}
-						placeholder="tags"
-						aria-label="note tags"
-						onchange={(e) => updateTags(e.currentTarget.value)}
+						class="title-input"
+						value={capture.title}
+						placeholder="untitled"
+						aria-label="capture title"
+						oninput={(e) => notebook.update(capture.id, { title: e.currentTarget.value })}
 					/>
-					<textarea
-						class="body-input"
-						value={note.body}
-						aria-label="note body"
-						spellcheck="true"
-						oninput={(e) => notebook.updateNote(note.id, { body: e.currentTarget.value })}
-					></textarea>
-				{/if}
-			</section>
-		{:else if notebook.mode === 'tasks'}
-			<section class="task-pane">
-				<form class="task-form" onsubmit={addTask}>
-					<input class="task-input" bind:value={taskTitle} placeholder="task" autocomplete="off" />
-					<select class="priority-select" bind:value={taskPriority} aria-label="priority">
-						<option value="normal">normal</option>
-						<option value="high">high</option>
-						<option value="low">low</option>
-					</select>
-					<button class="submit-btn" type="submit" disabled={!taskTitle.trim()}>add</button>
-				</form>
-
-				<div class="task-columns">
-					<section class="task-column">
-						<h2>open</h2>
-						{#each notebook.openTasks as task (task.id)}
-							<div class="task-row">
-								<button class="check" onclick={() => notebook.toggleTask(task.id)} aria-label="complete task"></button>
-								<span class="task-title">{task.title}</span>
-								<span class="priority" data-priority={task.priority}>{task.priority}</span>
-								<button class="row-delete" onclick={() => notebook.deleteTask(task.id)} aria-label="delete task">×</button>
-							</div>
+					<div class="head-actions">
+						{#each SEND_TO as target}
+							<button
+								class="send-note"
+								onclick={() => send(target.id)}
+								title="hand this to {target.label}"
+							>
+								→ {target.label}
+							</button>
 						{/each}
-					</section>
-					<section class="task-column">
-						<h2>done</h2>
-						{#each notebook.doneTasks as task (task.id)}
-							<div class="task-row done">
-								<button class="check checked" onclick={() => notebook.toggleTask(task.id)} aria-label="reopen task"></button>
-								<span class="task-title">{task.title}</span>
-								<button class="row-delete" onclick={() => notebook.deleteTask(task.id)} aria-label="delete task">×</button>
-							</div>
-						{/each}
-					</section>
+						<button
+							class="delete-note"
+							onclick={() => notebook.remove(capture.id)}
+							disabled={notebook.captures.length <= 1}
+						>delete</button>
+					</div>
 				</div>
-			</section>
-		{:else}
-			<section class="ideas-pane">
-				<form class="idea-form" onsubmit={addIdea}>
-					<input class="idea-input" bind:value={ideaText} placeholder="idea" autocomplete="off" />
-					<select class="lane-select" bind:value={ideaLane} aria-label="lane">
-						{#each LANES as lane}
-							<option value={lane.id}>{lane.label}</option>
-						{/each}
-					</select>
-					<button class="submit-btn" type="submit" disabled={!ideaText.trim()}>add</button>
-				</form>
 
-				<div class="idea-board">
+				<!-- lane is triage, not status: where it sits in your head. -->
+				<div class="lane-row" role="group" aria-label="lane">
 					{#each LANES as lane}
-						<section class="idea-lane">
-							<h2>{lane.label}</h2>
-							{#each notebook.ideas.filter((idea) => idea.lane === lane.id) as idea (idea.id)}
-								<div class="idea-card">
-									<p>{idea.text}</p>
-									<div class="idea-actions">
-										{#each LANES.filter((target) => target.id !== lane.id) as target}
-											<button onclick={() => notebook.moveIdea(idea.id, target.id)}>{target.label}</button>
-										{/each}
-										{#each SEND_TO as target}
-											<button
-												class="send"
-												onclick={() => sendIdea(idea.id, target.id)}
-												title="hand this idea to {target.label}"
-											>→ {target.label}</button>
-										{/each}
-										<button onclick={() => notebook.deleteIdea(idea.id)}>×</button>
-									</div>
-								</div>
-							{/each}
-						</section>
+						<button
+							class="lane-chip"
+							class:active={capture.lane === lane}
+							aria-pressed={capture.lane === lane}
+							onclick={() => notebook.move(capture.id, lane)}
+						>{LANE_LABEL[lane]}</button>
 					{/each}
 				</div>
-			</section>
-		{/if}
+
+				<input
+					class="tag-input"
+					value={captureTags}
+					placeholder="tags"
+					aria-label="capture tags"
+					onchange={(e) => updateTags(e.currentTarget.value)}
+				/>
+				<textarea
+					class="body-input"
+					value={capture.body}
+					aria-label="capture body"
+					placeholder="whatever it is"
+					spellcheck="true"
+					oninput={(e) => notebook.update(capture.id, { body: e.currentTarget.value })}
+				></textarea>
+			{/if}
+		</section>
 		</main>
 	</div>
 </div>
@@ -457,12 +387,9 @@
 		gap: 0.55rem;
 	}
 
-	.search,
+.search,
 	.new-note,
 	.mode-tab,
-	.submit-btn,
-	.priority-select,
-	.lane-select,
 	.delete-note {
 		border: 2px solid #fff;
 		border-radius: 999px;
@@ -478,8 +405,7 @@
 		color: var(--nb-ink);
 	}
 
-	.new-note,
-	.submit-btn,
+.new-note,
 	.delete-note {
 		padding: 0.48rem 0.85rem;
 		font-size: 0.62rem;
@@ -490,8 +416,7 @@
 		transition: transform 120ms ease, box-shadow 120ms ease;
 	}
 
-	.new-note:hover,
-	.submit-btn:hover:not(:disabled),
+.new-note:hover,
 	.delete-note:hover:not(:disabled),
 	.mode-tab:hover {
 		transform: translateY(-2px);
@@ -542,6 +467,7 @@
 		letter-spacing: 0.12em;
 		color: var(--nb-violet);
 		text-transform: lowercase;
+		white-space: nowrap;
 	}
 
 	.mode-tab.active {
@@ -559,10 +485,8 @@
 		align-items: start;
 	}
 
-	.note-list,
-	.editor-pane,
-	.task-pane,
-	.ideas-pane {
+.note-list,
+	.editor-pane {
 		background:
 			linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 241, 253, 0.96));
 		border: 3px solid #fff;
@@ -571,10 +495,8 @@
 		position: relative;
 	}
 
-	.note-list::before,
-	.editor-pane::before,
-	.task-pane::before,
-	.ideas-pane::before {
+.note-list::before,
+	.editor-pane::before {
 		content: "dreamy";
 		position: absolute;
 		top: -0.72rem;
@@ -592,8 +514,6 @@
 	}
 
 	.editor-pane::before { content: "moon notes"; }
-	.task-pane::before { content: "heart tasks"; }
-	.ideas-pane::before { content: "cloud ideas"; }
 
 	.note-list {
 		display: flex;
@@ -686,129 +606,6 @@
 			);
 	}
 
-	.task-pane,
-	.ideas-pane {
-		padding: 1.15rem;
-	}
-
-	.task-form,
-	.idea-form {
-		display: grid;
-		grid-template-columns: 1fr auto auto;
-		gap: 0.55rem;
-		padding-bottom: 0.85rem;
-		border-bottom: 2px dashed var(--nb-line);
-	}
-
-	.task-input,
-	.idea-input {
-		border: 2px solid #fff;
-		border-radius: 999px;
-		padding: 0.48rem 0.75rem;
-		background: rgba(255, 255, 255, 0.72);
-		box-shadow: inset 0 2px 0 rgba(255, 158, 222, 0.42);
-	}
-
-	.priority-select,
-	.lane-select {
-		padding: 0.42rem 0.55rem;
-		font-size: 0.64rem;
-		color: var(--nb-violet);
-	}
-
-	.task-columns,
-	.idea-board {
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 0.9rem;
-		padding-top: 0.9rem;
-	}
-
-	.idea-board {
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-	}
-
-	.task-column h2,
-	.idea-lane h2 {
-		font-size: 0.62rem;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-		color: var(--nb-violet);
-		margin-bottom: 0.45rem;
-		text-shadow: 1px 1px 0 #fff;
-	}
-
-	.task-row,
-	.idea-card {
-		background:
-			linear-gradient(180deg, #ffffff, #ffe4f7);
-		border: 2px solid #fff;
-		border-radius: 18px;
-		box-shadow: 0 4px 0 rgba(255, 97, 199, 0.48);
-	}
-
-	.task-row {
-		display: grid;
-		grid-template-columns: auto 1fr auto auto;
-		align-items: center;
-		gap: 0.55rem;
-		padding: 0.55rem;
-		margin-bottom: 0.45rem;
-	}
-
-	.task-row.done {
-		opacity: 0.62;
-	}
-
-	.check {
-		width: 1rem;
-		height: 1rem;
-		border: 2px solid var(--nb-line-strong);
-		border-radius: 50%;
-		background:
-			linear-gradient(180deg, #fff, #ffd7f2);
-	}
-
-	.check.checked {
-		background:
-			linear-gradient(180deg, var(--nb-cyan), var(--nb-green));
-		border-color: var(--nb-green);
-	}
-
-	.task-title {
-		font-family: var(--nb-font-body);
-		font-size: 1rem;
-		line-height: 1.25;
-	}
-
-	.priority {
-		font-size: 0.54rem;
-		letter-spacing: 0.08em;
-		color: var(--nb-muted);
-	}
-
-	.priority[data-priority='high'] {
-		color: var(--nb-red);
-		font-weight: 700;
-	}
-
-	.row-delete {
-		color: var(--nb-muted);
-		font-size: 0.9rem;
-	}
-
-	.idea-card {
-		padding: 0.7rem;
-		margin-bottom: 0.55rem;
-	}
-
-	.idea-card p {
-		font-family: var(--nb-font-body);
-		font-size: 1rem;
-		line-height: 1.35;
-		margin-bottom: 0.65rem;
-	}
-
 	/* ── handoffs ──
 	   notebook is the front door: things arrive here from other apps, and
 	   leave here for the app that can do more with them. see CONVERGENCE.md. */
@@ -836,11 +633,6 @@
 		box-shadow: 0 2px 0 var(--nb-line);
 	}
 
-	.idea-actions button.send {
-		color: var(--nb-ink);
-		border-color: rgba(255, 117, 205, 0.7);
-	}
-
 	.handoff-notice {
 		display: flex;
 		align-items: center;
@@ -865,32 +657,13 @@
 		cursor: pointer;
 	}
 
-	.idea-actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.35rem;
-	}
-
-	.idea-actions button {
-		border: 2px solid #fff;
-		border-radius: 999px;
-		padding: 0.25rem 0.5rem;
-		font-size: 0.55rem;
-		color: var(--nb-violet);
-		background:
-			linear-gradient(180deg, var(--nb-cream), var(--nb-paper-alt));
-		box-shadow: 0 2px 0 var(--nb-line);
-	}
-
 	@media (max-width: 760px) {
 		.notebook-page {
 			width: min(100vw - 1rem, 1180px);
 		}
 
 		.topbar,
-		.workspace,
-		.task-columns,
-		.idea-board {
+		.workspace {
 			grid-template-columns: 1fr;
 		}
 
@@ -1445,12 +1218,9 @@
 		display: block;
 	}
 
-	.search,
+.search,
 	.new-note,
 	.mode-tab,
-	.submit-btn,
-	.priority-select,
-	.lane-select,
 	.delete-note {
 		border: 3px solid #fff;
 		box-shadow: 0 6px 0 rgba(255, 98, 199, 0.55);
@@ -1548,15 +1318,17 @@
 	}
 
 	.mode-row {
-		display: grid;
-		grid-template-columns: minmax(0, auto) auto;
+		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
-		gap: 1rem;
+		justify-content: space-between;
+		gap: 0.75rem 1rem;
 		margin-bottom: 1.2rem;
 	}
 
 	.mode-tabs {
 		width: fit-content;
+		flex-wrap: wrap;
 		padding: 0;
 		border: 2px solid rgba(255, 117, 205, 0.58);
 		border-radius: 28px;
@@ -1635,23 +1407,6 @@
 		clip-path: none;
 	}
 
-	.sort-pill {
-		justify-self: end;
-		min-width: 13rem;
-		min-height: 3.25rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.65rem;
-		border: 2px solid rgba(255, 117, 205, 0.58);
-		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.58);
-		color: #ff4fb8;
-		font-size: 0.78rem;
-		font-weight: 700;
-		box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.68);
-	}
-
 	.persistence-tools {
 		justify-self: end;
 		display: flex;
@@ -1721,10 +1476,8 @@
 		gap: 1rem;
 	}
 
-	.note-list,
-	.editor-pane,
-	.task-pane,
-	.ideas-pane {
+.note-list,
+	.editor-pane {
 		border: 3px solid rgba(255, 117, 205, 0.7);
 		border-radius: 30px;
 		background:
@@ -1734,10 +1487,8 @@
 			0 8px 0 rgba(255, 132, 213, 0.38);
 	}
 
-	.note-list::before,
-	.editor-pane::before,
-	.task-pane::before,
-	.ideas-pane::before {
+.note-list::before,
+	.editor-pane::before {
 		top: 1.05rem;
 		left: 1.5rem;
 		background: #fff8b8;
@@ -1770,16 +1521,12 @@
 		text-shadow: 1px 1px 0 #fff;
 	}
 
-	.editor-pane,
-	.task-pane,
-	.ideas-pane {
+.editor-pane {
 		min-height: 27.5rem;
 		padding: 4.3rem 1.8rem 1.8rem;
 	}
 
-	.editor-pane::after,
-	.task-pane::after,
-	.ideas-pane::after {
+.editor-pane::after {
 		content: "";
 		position: absolute;
 		right: 1.3rem;
@@ -1821,17 +1568,6 @@
 		font-family: var(--nb-font-mono);
 		font-size: 0.88rem;
 		line-height: 1.7;
-	}
-
-	.task-form,
-	.idea-form {
-		border-bottom-color: rgba(255, 117, 205, 0.55);
-	}
-
-	.task-row,
-	.idea-card {
-		border-color: #fff;
-		background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 225, 246, 0.86));
 	}
 
 	@media (max-width: 920px) {
@@ -1884,7 +1620,7 @@
 		.mode-tabs {
 			width: 100%;
 			display: grid;
-			grid-template-columns: repeat(3, minmax(0, 1fr));
+			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
 
 		.mode-tab {
@@ -1897,10 +1633,6 @@
 
 		.mode-tab.active::after {
 			display: none;
-		}
-
-		.sort-pill {
-			justify-self: stretch;
 		}
 
 		.editor-head {

@@ -1,4 +1,5 @@
-import type { Idea, Note, NotebookMode, NotebookTask } from './types';
+import type { Capture, Lane } from './types';
+import { LANES } from './types';
 import { createVersionedStorage, type PersistenceIssue } from '@woodles/persistence';
 import {
 	createHandoffQueue,
@@ -15,20 +16,28 @@ function nowIso(): string {
 	return new Date().toISOString();
 }
 
-const STARTER_NOTE_ID = 'note-home';
-const WORKSPACE_KEY = 'notebook.workspace.v2';
-const LEGACY_KEYS = {
+const WORKSPACE_KEY = 'notebook.workspace.v3';
+
+/**
+ * The v2 document is read for its notes and ideas and then **left alone**.
+ * Carillon reads the same key for the tasks it took over, so leaving it makes
+ * the two migrations order-independent — whichever app you open first, nothing
+ * is read out from under the other and nothing is stranded.
+ */
+const WORKSPACE_V2_KEY = 'notebook.workspace.v2';
+
+const LEGACY_V1_KEYS = {
 	selectedNoteId: 'notebook.selectedNote.v1',
 	notes: 'notebook.notes.v1',
 	tasks: 'notebook.tasks.v1',
 	ideas: 'notebook.ideas.v1'
 } as const;
 
+const STARTER_ID = 'capture-home';
+
 type NotebookDocument = {
-	selectedNoteId: string | null;
-	notes: Note[];
-	tasks: NotebookTask[];
-	ideas: Idea[];
+	selectedId: string | null;
+	captures: Capture[];
 };
 
 export type NotebookPersistenceHealth = {
@@ -41,31 +50,26 @@ export type NotebookPersistenceHealth = {
 function starterDocument(): NotebookDocument {
 	const stamp = nowIso();
 	return {
-		selectedNoteId: STARTER_NOTE_ID,
-		notes: [
+		selectedId: STARTER_ID,
+		captures: [
 			{
-				id: STARTER_NOTE_ID,
+				id: STARTER_ID,
 				title: 'Home',
 				body: '',
 				tags: ['inbox'],
+				lane: 'spark',
 				createdAt: stamp,
 				updatedAt: stamp
 			}
-		],
-		tasks: [],
-		ideas: []
+		]
 	};
 }
 
 const persistence = createVersionedStorage<NotebookDocument>({
 	key: WORKSPACE_KEY,
-	version: 2,
+	version: 3,
 	fallback: starterDocument,
-	validate: isNotebookDocument,
-	migrate: (value, fromVersion) => {
-		if ((fromVersion === 0 || fromVersion === 1) && isNotebookDocument(value)) return value;
-		return value;
-	}
+	validate: isNotebookDocument
 });
 
 const handoffQueue = createHandoffQueue('notebook');
@@ -98,38 +102,35 @@ function dedupeTags(tags: string[]): string[] {
 }
 
 export class NotebookStore {
-	mode = $state<NotebookMode>('notes');
 	query = $state('');
-	selectedNoteId = $state<string | null>(STARTER_NOTE_ID);
-	notes = $state<Note[]>([]);
-	tasks = $state<NotebookTask[]>([]);
-	ideas = $state<Idea[]>([]);
+	/** null means "everything" — the default, because filtering is a choice. */
+	laneFilter = $state<Lane | null>(null);
+	selectedId = $state<string | null>(STARTER_ID);
+	captures = $state<Capture[]>([]);
 	persistenceHealth = $state<NotebookPersistenceHealth>({
 		status: 'idle',
 		message: 'stored on this device',
 		bytes: 0,
 		savedAt: null
 	});
-	/** Handoff ids already turned into notes, so a re-delivery is a no-op. */
 	private ingestedHandoffIds = new Set<string>();
 
 	constructor() {
 		let result = persistence.load();
 		if (result.source === 'fallback' && !result.issue) {
-			const legacy = readLegacyDocument();
-			if (legacy.issue) {
-				result = { ...result, issue: legacy.issue };
-			} else if (legacy.value) {
-				const migrated = persistence.save(legacy.value);
-				if (migrated.ok) {
-					removeLegacyDocument();
+			const carried = readEarlierDocument();
+			if (carried.issue) {
+				result = { ...result, issue: carried.issue };
+			} else if (carried.value) {
+				const saved = persistence.save(carried.value);
+				if (saved.ok) {
 					result = {
-						value: legacy.value,
+						value: carried.value,
 						source: 'primary',
 						migrated: true,
 						issue: null,
-						savedAt: migrated.savedAt,
-						bytes: migrated.bytes
+						savedAt: saved.savedAt,
+						bytes: saved.bytes
 					};
 				}
 			}
@@ -155,210 +156,116 @@ export class NotebookStore {
 		}
 	}
 
-	get selectedNote(): Note | null {
-		return this.notes.find((note) => note.id === this.selectedNoteId) ?? this.notes[0] ?? null;
+	get selected(): Capture | null {
+		return this.captures.find((c) => c.id === this.selectedId) ?? this.captures[0] ?? null;
 	}
 
-	get filteredNotes(): Note[] {
+	get filtered(): Capture[] {
 		const q = this.query.trim().toLowerCase();
-		const notes = [...this.notes].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-		if (!q) return notes;
-		return notes.filter((note) =>
-			[note.title, note.body, note.tags.join(' ')].join(' ').toLowerCase().includes(q)
+		let list = [...this.captures].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+		if (this.laneFilter) list = list.filter((c) => c.lane === this.laneFilter);
+		if (!q) return list;
+		return list.filter((c) =>
+			[c.title, c.body, c.tags.join(' ')].join(' ').toLowerCase().includes(q)
 		);
 	}
 
-	get openTasks(): NotebookTask[] {
-		return this.tasks
-			.filter((task) => task.status === 'open')
-			.sort((a, b) => priorityRank(b.priority) - priorityRank(a.priority));
+	laneCount(lane: Lane): number {
+		return this.captures.filter((c) => c.lane === lane).length;
 	}
 
-	get doneTasks(): NotebookTask[] {
-		return this.tasks.filter((task) => task.status === 'done');
+	setLaneFilter(lane: Lane | null): void {
+		this.laneFilter = this.laneFilter === lane ? null : lane;
 	}
 
-	setMode(mode: NotebookMode): void {
-		this.mode = mode;
-	}
-
-	selectNote(id: string): void {
-		this.selectedNoteId = id;
+	select(id: string): void {
+		this.selectedId = id;
 		this.persist();
 	}
 
-	addNote(): Note {
+	/** The whole point of the front door: this never asks anything first. */
+	add(partial: Partial<Pick<Capture, 'title' | 'body' | 'tags' | 'lane'>> = {}): Capture {
 		const stamp = nowIso();
-		const note: Note = {
+		const capture: Capture = {
 			id: uid(),
-			title: 'Untitled',
-			body: '',
-			tags: [],
+			title: partial.title ?? '',
+			body: partial.body ?? '',
+			tags: partial.tags ?? [],
+			lane: partial.lane ?? 'spark',
 			createdAt: stamp,
 			updatedAt: stamp
 		};
-		this.notes = [note, ...this.notes];
-		this.persistNotes();
-		this.selectNote(note.id);
-		this.mode = 'notes';
-		return note;
+		this.captures = [capture, ...this.captures];
+		this.selectedId = capture.id;
+		this.persist();
+		return capture;
 	}
 
-	updateNote(id: string, patch: Partial<Pick<Note, 'title' | 'body' | 'tags'>>): void {
+	update(id: string, patch: Partial<Pick<Capture, 'title' | 'body' | 'tags' | 'lane'>>): void {
 		const stamp = nowIso();
-		this.notes = this.notes.map((note) =>
-			note.id === id ? { ...note, ...patch, updatedAt: stamp } : note
-		);
-		this.persistNotes();
+		this.captures = this.captures.map((c) => (c.id === id ? { ...c, ...patch, updatedAt: stamp } : c));
+		this.persist();
 	}
 
-	deleteNote(id: string): void {
-		if (this.notes.length <= 1) return;
-		this.notes = this.notes.filter((note) => note.id !== id);
-		this.persistNotes();
-		if (this.selectedNoteId === id) {
-			this.selectNote(this.notes[0]?.id ?? '');
-		}
+	move(id: string, lane: Lane): void {
+		this.update(id, { lane });
 	}
 
-	addTask(title: string, priority: NotebookTask['priority'] = 'normal'): void {
-		const trimmed = title.trim();
-		if (!trimmed) return;
-		this.tasks = [
-			{
-				id: uid(),
-				title: trimmed,
-				status: 'open',
-				priority,
-				noteId: this.selectedNoteId ?? undefined,
-				createdAt: nowIso()
-			},
-			...this.tasks
-		];
-		this.persistTasks();
-	}
-
-	toggleTask(id: string): void {
-		const stamp = nowIso();
-		this.tasks = this.tasks.map((task) =>
-			task.id === id
-				? {
-						...task,
-						status: task.status === 'open' ? 'done' : 'open',
-						completedAt: task.status === 'open' ? stamp : undefined
-					}
-				: task
-		);
-		this.persistTasks();
-	}
-
-	deleteTask(id: string): void {
-		this.tasks = this.tasks.filter((task) => task.id !== id);
-		this.persistTasks();
-	}
-
-	addIdea(text: string, lane: Idea['lane'] = 'spark'): void {
-		const trimmed = text.trim();
-		if (!trimmed) return;
-		this.ideas = [{ id: uid(), text: trimmed, lane, createdAt: nowIso() }, ...this.ideas];
-		this.persistIdeas();
-	}
-
-	moveIdea(id: string, lane: Idea['lane']): void {
-		this.ideas = this.ideas.map((idea) => (idea.id === id ? { ...idea, lane } : idea));
-		this.persistIdeas();
-	}
-
-	deleteIdea(id: string): void {
-		this.ideas = this.ideas.filter((idea) => idea.id !== id);
-		this.persistIdeas();
+	remove(id: string): void {
+		if (this.captures.length <= 1) return;
+		this.captures = this.captures.filter((c) => c.id !== id);
+		if (this.selectedId === id) this.selectedId = this.captures[0]?.id ?? null;
+		this.persist();
 	}
 
 	// ── handoffs ────────────────────────────────────────────────────
-	// Notebook is the front door: anything any other app couldn't place ends
-	// up here rather than forcing a filing decision at capture time.
-	// See CONVERGENCE.md §3.
 
-	/**
-	 * Take everything waiting in the inbox and turn each into a note. Safe to
-	 * call repeatedly — an id already ingested is skipped, so a queue that
-	 * failed to clear re-delivers without duplicating.
-	 */
+	/** Take everything waiting and turn each into a capture. Safe to repeat. */
 	ingestHandoffs(): number {
 		const drained = handoffQueue.drain();
-		if (drained.items.length === 0) return 0;
-
 		const fresh = drained.items.filter((item) => !this.ingestedHandoffIds.has(item.id));
 		for (const item of fresh) this.ingestedHandoffIds.add(item.id);
 		if (fresh.length === 0) return 0;
 
-		const notes = fresh.map((item) => this.handoffToNote(item));
-		this.notes = [...notes, ...this.notes];
-		this.mode = 'notes';
-		this.selectedNoteId = notes[0].id;
+		const arrivals = fresh.map((item) => this.handoffToCapture(item));
+		this.captures = [...arrivals, ...this.captures];
+		this.selectedId = arrivals[0].id;
 		this.persist();
-		return notes.length;
+		return arrivals.length;
 	}
 
-	/** How many are waiting, for a badge. Does not consume them. */
 	pendingHandoffs(): number {
 		return handoffQueue.count();
 	}
 
-	/** Hand a note on to an app that can do more with it than notebook can. */
-	promoteNote(id: string, target: HandoffTarget): SendResult | null {
-		const note = this.notes.find((item) => item.id === id);
-		if (!note) return null;
+	/** Hand a capture on to an app that can do more with it than this can. */
+	promote(id: string, target: HandoffTarget): SendResult | null {
+		const capture = this.captures.find((c) => c.id === id);
+		if (!capture) return null;
 		return createHandoffQueue(target).send({
-			title: note.title,
-			body: note.body,
+			title: capture.title,
+			body: capture.body,
 			format: 'text',
-			tags: note.tags,
-			source: { app: 'notebook', label: note.title || 'a note', href: '/notebook' }
+			tags: capture.tags,
+			source: { app: 'notebook', label: capture.title || 'a capture', href: '/notebook' }
 		});
 	}
 
-	/** Hand an idea on — the same gesture, for the shorter kind of thought. */
-	promoteIdea(id: string, target: HandoffTarget): SendResult | null {
-		const idea = this.ideas.find((item) => item.id === id);
-		if (!idea) return null;
-		return createHandoffQueue(target).send({
-			title: idea.text.slice(0, 60),
-			body: idea.text,
-			format: 'text',
-			tags: [idea.lane],
-			source: { app: 'notebook', label: 'an idea', href: '/notebook' }
-		});
-	}
-
-	private handoffToNote(item: Handoff): Note {
+	private handoffToCapture(item: Handoff): Capture {
 		const stamp = nowIso();
-		// An HTML body arrives from a rich editor; notebook's body is a plain
-		// textarea, so flatten rather than render markup the user can't edit.
 		const body = item.format === 'html' ? htmlToText(item.body) : item.body;
-		const title = item.title.trim() || firstLine(body) || 'Untitled';
-		const from = item.source.app;
 		return {
 			id: uid(),
-			title,
+			title: item.title.trim() || firstLine(body),
 			body,
-			tags: dedupeTags([...item.tags, `from:${from}`]),
+			tags: dedupeTags([...item.tags, `from:${item.source.app}`]),
+			lane: 'spark',
 			createdAt: item.createdAt,
 			updatedAt: stamp
 		};
 	}
 
-	private persistNotes(): void {
-		this.persist();
-	}
-
-	private persistTasks(): void {
-		this.persist();
-	}
-
-	private persistIdeas(): void {
-		this.persist();
-	}
+	// ── persistence ─────────────────────────────────────────────────
 
 	exportJSON(): string {
 		return persistence.exportText(this.document);
@@ -381,22 +288,15 @@ export class NotebookStore {
 	}
 
 	private get document(): NotebookDocument {
-		return {
-			selectedNoteId: this.selectedNoteId,
-			notes: this.notes,
-			tasks: this.tasks,
-			ideas: this.ideas
-		};
+		return { selectedId: this.selectedId, captures: this.captures };
 	}
 
 	private applyDocument(document: NotebookDocument): void {
-		this.notes = document.notes;
-		this.tasks = document.tasks;
-		this.ideas = document.ideas;
-		this.selectedNoteId =
-			document.selectedNoteId && document.notes.some((note) => note.id === document.selectedNoteId)
-				? document.selectedNoteId
-				: document.notes[0]?.id ?? null;
+		this.captures = document.captures;
+		this.selectedId =
+			document.selectedId && document.captures.some((c) => c.id === document.selectedId)
+				? document.selectedId
+				: document.captures[0]?.id ?? null;
 	}
 
 	private persist(): void {
@@ -423,30 +323,86 @@ export class NotebookStore {
 	}
 }
 
-function priorityRank(priority: NotebookTask['priority']): number {
-	if (priority === 'high') return 2;
-	if (priority === 'normal') return 1;
-	return 0;
+// ── carrying earlier versions forward ─────────────────────────────
+
+/** Notes and ideas become captures. Tasks are Carillon's now, so they are
+ *  read past rather than converted — see notebookTasks.ts over there. */
+export function toCaptures(notes: unknown, ideas: unknown): Capture[] {
+	const captures: Capture[] = [];
+
+	if (Array.isArray(notes)) {
+		for (const note of notes) {
+			if (!isRecord(note)) continue;
+			const stamp = typeof note.updatedAt === 'string' ? note.updatedAt : nowIso();
+			captures.push({
+				id: typeof note.id === 'string' ? note.id : uid(),
+				title: typeof note.title === 'string' ? note.title : '',
+				body: typeof note.body === 'string' ? note.body : '',
+				tags: Array.isArray(note.tags) ? note.tags.filter((t) => typeof t === 'string') : [],
+				// A note was something being worked on rather than a passing
+				// spark, so it lands mid-stream rather than at the front.
+				lane: 'shape',
+				createdAt: typeof note.createdAt === 'string' ? note.createdAt : stamp,
+				updatedAt: stamp
+			});
+		}
+	}
+
+	if (Array.isArray(ideas)) {
+		for (const idea of ideas) {
+			if (!isRecord(idea) || typeof idea.text !== 'string') continue;
+			const stamp = typeof idea.createdAt === 'string' ? idea.createdAt : nowIso();
+			captures.push({
+				id: typeof idea.id === 'string' ? idea.id : uid(),
+				// An idea was one line with no title. Keeping the title empty is
+				// truer than inventing one from its own body.
+				title: '',
+				body: idea.text,
+				tags: [],
+				lane: LANES.find((lane) => lane === idea.lane) ?? 'spark',
+				createdAt: stamp,
+				updatedAt: stamp
+			});
+		}
+	}
+
+	return captures.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
-function readLegacyDocument(): { value: NotebookDocument | null; issue: PersistenceIssue | null } {
+function readEarlierDocument(): {
+	value: NotebookDocument | null;
+	issue: PersistenceIssue | null;
+} {
 	if (typeof localStorage === 'undefined') return { value: null, issue: null };
-	const values = Object.values(LEGACY_KEYS).map((key) => localStorage.getItem(key));
+
+	const v2 = localStorage.getItem(WORKSPACE_V2_KEY);
+	if (v2) {
+		try {
+			const parsed = JSON.parse(v2);
+			const document = isRecord(parsed) && isRecord(parsed.data) ? parsed.data : parsed;
+			if (!isRecord(document)) throw new Error('shape');
+			const captures = toCaptures(document.notes, document.ideas);
+			return captures.length > 0
+				? { value: { selectedId: captures[0].id, captures }, issue: null }
+				: { value: null, issue: null };
+		} catch {
+			return {
+				value: null,
+				issue: { kind: 'parse', message: 'The previous notebook data is not valid JSON.' }
+			};
+		}
+	}
+
+	const values = Object.values(LEGACY_V1_KEYS).map((key) => localStorage.getItem(key));
 	if (values.every((value) => value === null)) return { value: null, issue: null };
 	try {
-		const fallback = starterDocument();
-		const document: NotebookDocument = {
-			selectedNoteId: values[0] === null ? fallback.selectedNoteId : JSON.parse(values[0]),
-			notes: values[1] === null ? fallback.notes : JSON.parse(values[1]),
-			tasks: values[2] === null ? [] : JSON.parse(values[2]),
-			ideas: values[3] === null ? [] : JSON.parse(values[3])
-		};
-		return isNotebookDocument(document)
-			? { value: document, issue: null }
-			: {
-					value: null,
-					issue: { kind: 'validation', message: 'The legacy notebook data has an invalid shape.' }
-				};
+		const captures = toCaptures(
+			values[1] === null ? [] : JSON.parse(values[1]),
+			values[3] === null ? [] : JSON.parse(values[3])
+		);
+		return captures.length > 0
+			? { value: { selectedId: captures[0].id, captures }, issue: null }
+			: { value: null, issue: null };
 	} catch {
 		return {
 			value: null,
@@ -455,54 +411,25 @@ function readLegacyDocument(): { value: NotebookDocument | null; issue: Persiste
 	}
 }
 
-function removeLegacyDocument(): void {
-	if (typeof localStorage === 'undefined') return;
-	for (const key of Object.values(LEGACY_KEYS)) localStorage.removeItem(key);
-}
-
 function isNotebookDocument(value: unknown): value is NotebookDocument {
 	if (!isRecord(value)) return false;
 	return (
-		(value.selectedNoteId === null || typeof value.selectedNoteId === 'string') &&
-		Array.isArray(value.notes) &&
-		value.notes.length > 0 &&
-		value.notes.every(isNote) &&
-		Array.isArray(value.tasks) &&
-		value.tasks.every(isTask) &&
-		Array.isArray(value.ideas) &&
-		value.ideas.every(isIdea)
+		(value.selectedId === null || typeof value.selectedId === 'string') &&
+		Array.isArray(value.captures) &&
+		value.captures.length > 0 &&
+		value.captures.every(isCapture)
 	);
 }
 
-function isNote(value: unknown): value is Note {
+function isCapture(value: unknown): value is Capture {
 	return (
 		isRecord(value) &&
-		['id', 'title', 'body', 'createdAt', 'updatedAt'].every((key) => typeof value[key] === 'string') &&
+		['id', 'title', 'body', 'createdAt', 'updatedAt'].every(
+			(key) => typeof value[key] === 'string'
+		) &&
+		LANES.some((lane) => lane === value.lane) &&
 		Array.isArray(value.tags) &&
 		value.tags.every((tag) => typeof tag === 'string')
-	);
-}
-
-function isTask(value: unknown): value is NotebookTask {
-	return (
-		isRecord(value) &&
-		typeof value.id === 'string' &&
-		typeof value.title === 'string' &&
-		(value.status === 'open' || value.status === 'done') &&
-		(value.priority === 'low' || value.priority === 'normal' || value.priority === 'high') &&
-		typeof value.createdAt === 'string' &&
-		(value.noteId === undefined || typeof value.noteId === 'string') &&
-		(value.completedAt === undefined || typeof value.completedAt === 'string')
-	);
-}
-
-function isIdea(value: unknown): value is Idea {
-	return (
-		isRecord(value) &&
-		typeof value.id === 'string' &&
-		typeof value.text === 'string' &&
-		(value.lane === 'spark' || value.lane === 'shape' || value.lane === 'later') &&
-		typeof value.createdAt === 'string'
 	);
 }
 
