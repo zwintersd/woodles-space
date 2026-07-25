@@ -1,6 +1,7 @@
 import type { Capture, Lane } from './types';
 import { LANES } from './types';
 import { createVersionedStorage, type PersistenceIssue } from '@woodles/persistence';
+import { htmlToText } from '@woodles/text';
 import {
 	createHandoffQueue,
 	type Handoff,
@@ -73,19 +74,6 @@ const persistence = createVersionedStorage<NotebookDocument>({
 });
 
 const handoffQueue = createHandoffQueue('notebook');
-
-function htmlToText(html: string): string {
-	return html
-		.replace(/<br\s*\/?>/gi, '\n')
-		.replace(/<\/(?:p|div|li|h[1-6]|blockquote)>/gi, '\n\n')
-		.replace(/<[^>]*>/g, '')
-		.replace(/&nbsp;/g, ' ')
-		.replace(/&amp;/g, '&')
-		.replace(/&lt;/g, '<')
-		.replace(/&gt;/g, '>')
-		.replace(/\n{3,}/g, '\n\n')
-		.trim();
-}
 
 function firstLine(text: string): string {
 	return text.split('\n').find((line) => line.trim())?.trim().slice(0, 60) ?? '';

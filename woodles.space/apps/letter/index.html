@@ -988,6 +988,12 @@
 
   <script type="module">
     import { findFont, findPalette, findMotif } from '/shared/library.js';
+    import {
+      countWords,
+      previewText,
+      sanitizeHtml as sanitizeShared,
+      stripTags
+    } from '/packages/text/src/index.js';
 
     /* ── clock ── */
     const DAYS   = ['sun','mon','tue','wed','thu','fri','sat'];
@@ -1119,40 +1125,12 @@
      * href on <a> and data-anchor (this reader, unlike write's editor, never
      * re-stamps anchors — it only ever displays what it's given, so the
      * anchor a margin note points at has to survive). */
-    var SANITIZE_ALLOWED_TAGS = new Set([
-      'P','H1','H2','H3','H4','H5','H6','BLOCKQUOTE','UL','OL','LI',
-      'B','STRONG','I','EM','U','S','STRIKE','MARK','A','BR','PRE','CODE'
-    ]);
-    var SANITIZE_UNWRAP_TAGS = new Set(['SPAN', 'FONT', 'DIV', 'SECTION', 'ARTICLE']);
-    var SAFE_HREF_PROTOCOL = /^(https?:|mailto:|#)/i;
+    /* Echoes is a reader, never an editor: it displays what it is given and
+       never re-stamps anchors, so `data-anchor` has to survive a sanitize or
+       every margin note in a published letter loses what it points at. Write
+       does the opposite — see @woodles/text. */
     function sanitizeHtml(html) {
-      if (typeof DOMParser === 'undefined' || !html) return html || '';
-      const doc = new DOMParser().parseFromString('<div id="__r">' + html + '</div>', 'text/html');
-      const root = doc.getElementById('__r');
-      if (!root) return html;
-      root.querySelectorAll('*').forEach((el) => {
-        const tag = el.tagName;
-        if (!SANITIZE_ALLOWED_TAGS.has(tag) && !SANITIZE_UNWRAP_TAGS.has(tag)) {
-          el.remove();
-          return;
-        }
-        Array.from(el.attributes).forEach((attr) => {
-          const name = attr.name.toLowerCase();
-          if (name === 'data-anchor') return;
-          if (name === 'href' && tag === 'A') {
-            if (!SAFE_HREF_PROTOCOL.test(attr.value.trim())) el.removeAttribute('href');
-            return;
-          }
-          el.removeAttribute(attr.name);
-        });
-        if (SANITIZE_UNWRAP_TAGS.has(tag)) {
-          const parent = el.parentNode;
-          if (!parent) return;
-          while (el.firstChild) parent.insertBefore(el.firstChild, el);
-          parent.removeChild(el);
-        }
-      });
-      return root.innerHTML;
+      return sanitizeShared(html || '', { keepAttributes: ['data-anchor'] });
     }
 
     function getLayers(letter) {
@@ -1505,20 +1483,6 @@
       let binderOpen = null;
       let pocketsFilter = 'all';
 
-      function stripTags(html) {
-        return String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-      }
-      function countWords(html) {
-        const t = stripTags(html);
-        return t ? t.split(/\s+/).filter((w) => w.length).length : 0;
-      }
-      function previewText(html, max) {
-        const m = max == null ? 90 : max;
-        const t = stripTags(html);
-        if (!t) return '';
-        if (t.length <= m) return t;
-        return t.slice(0, m).replace(/\s+\S*$/, '') + '…';
-      }
 
       function renderBinderLayers() {
         const layers = getLayers(letter);

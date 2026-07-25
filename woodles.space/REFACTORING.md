@@ -31,29 +31,33 @@ defaults to `'woodles_sync_passphrase'`. the `SyncState` class itself stays in e
 app's `.svelte.ts` so `$state` compiles under the app's Svelte plugin rather than
 in the package.
 
-## htmlToText
-**Status:** candidate · watch
-**Copies:** `notebook/src/lib/notebook.svelte.ts`,
-`spores/src/lib/garden.svelte.ts`
-**State:** identical
-**Notes:** flattening an incoming HTML handoff body into the plain text a
-`<textarea>` can edit. born duplicated in the same change (the handoff wiring),
-which normally means waiting — but there are only two copies and they are
-byte-identical, so the moment a third appears this should go into
-`@woodles/handoff` as a `flatten` helper rather than being copied again. it is
-*not* the same job as `htmlTools.stripTags` below: this one preserves paragraph
-breaks as blank lines, because the result is something a person then edits.
-
 ## text / HTML utilities
-**Status:** candidate · strong
-**Copies:** `write/src/lib/htmlTools.ts`, `marginalia/src/lib/reading/text.ts`,
-`letter/index.html` (inline `<script>`)
-**State:** converged in contract, diverged in detail
-**Notes:** `sanitize`, `isEmptyHtml`, `stripTags`, `countWords`, `previewText`,
-and anchor stamping. the contract is the same across all three. `write`'s and
-`marginalia`'s copies are tested; `letter` reimplements them inline and is
-untested. a small shared module would cover all three — `letter` is static, so it
-would import the result as plain `.js`.
+**Status:** done
+**Copies:** `packages/text` (`@woodles/text`)
+**State:** consolidated
+**Notes:** `sanitizeHtml`, `stripPresentation`, `ensureAnchorsOn`,
+`stampAnchorsHtml`, `isEmptyHtml`, `stripTags`, `htmlToText`, `countWords`,
+`countWordsInText`, `previewText`. five consumers: `write` (now a pure
+re-export), `marginalia` (keeps its paragraph model and its two sanitizer
+policies), `letter` (imports the `.js` directly — it is static, so the package
+ships browser-ready `.js` + a `.d.ts` sidecar, same shape as
+`@woodles/app-manifest`), and `notebook`/`spores` for `htmlToText`.
+
+extraction turned up **two real divergences the copies had been hiding**, both
+now parameters rather than a winner:
+- **`data-anchor` on sanitize.** `write` strips it and re-stamps; `marginalia`
+  and `letter` keep it, because they display what they are given and a strip
+  would orphan every margin note. `keepAttributes` covers both. write's own
+  test suite caught this — the first version of the shared sanitizer changed
+  write's semantics and a test that had been asserting the strip failed.
+- **the anchor prefix.** `write` stamps `a-001`, marginalia's reading room
+  stamps `p-001`, and both are already in stored documents. picking one would
+  silently orphan the other app's notes, so `ensureAnchorsOn` takes a prefix.
+
+the sanitizer body is marginalia's recursive `clean()` rather than write's flat
+`querySelectorAll`, including its documented never-clean-the-root gotcha —
+recursion handles nesting order correctly and the flat version happened not to
+hit the difference.
 
 ## EditorToolbar.svelte
 **Status:** candidate

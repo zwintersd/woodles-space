@@ -71,7 +71,8 @@ woodles.space/
 │   ├── app-manifest/        @woodles/app-manifest — canonical app and route inventory
 │   ├── handoff/             @woodles/handoff — passing a thought between apps
 │   ├── persistence/         @woodles/persistence — versioned local storage mechanics
-│   └── sync/                @woodles/sync — the sync client
+│   ├── sync/                @woodles/sync — the sync client
+│   └── text/                @woodles/text — HTML sanitizing, anchors, text helpers
 └── apps/
     ├── landing/             static · the homepage
     ├── lab/                 static · future shelf for stub experiments
@@ -586,12 +587,14 @@ in motion. the full log is in [REFACTORING.md](./REFACTORING.md); the shape of i
 - **`sync.svelte.ts`** — consolidated. `createAppSync` in `@woodles/sync` now
   owns the passphrase lifecycle, connect/disconnect, and status tracking. each
   app's file is ~30 lines of adapter wiring. see [REFACTORING.md](./REFACTORING.md).
-- **text / HTML utilities** — `sanitize`, `isEmptyHtml`, `stripTags`,
-  `countWords`, `previewText`, and anchor stamping. they live in
-  `write/src/lib/htmlTools.ts`, are mirrored in `marginalia/src/lib/reading/text.ts`,
-  and are reimplemented inline in `letter/index.html` as a third copy. the
-  contract has converged across all three; `write`'s and `marginalia`'s copies
-  are tested, `letter`'s inline one isn't.
+- **text / HTML utilities** — consolidated into `@woodles/text`, with five
+  consumers. it ships browser-ready `.js` plus a `.d.ts` sidecar (the
+  `@woodles/app-manifest` shape) so `letter`, a static page with no build step,
+  can import it directly. Two policies stayed *parameters* rather than being
+  reconciled, because both sides already have stored data: whether a sanitize
+  keeps `data-anchor` (`write` strips and re-stamps; `marginalia` and `letter`
+  keep), and the anchor prefix (`write` stamps `a-`, the reading room `p-`).
+  see [REFACTORING.md](./REFACTORING.md).
 - **`EditorToolbar.svelte`** — `write` (89 lines) and `marginalia` (113).
   diverged, still moving.
 - **`MarginNotes.svelte`** — `write` (204 lines) and `marginalia` (193).
@@ -604,14 +607,14 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1069 tests total: 16 in `api/` (its own
+1092 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1053 across eleven pnpm
+instead of the recursive `pnpm -r test`), plus 1076 across twelve pnpm
 packages — `write` 72, `marginalia` 249, `planner` 298, `notebook` 28,
 `spores` 140, `bestiary` 160, `packages/sync` 5,
 `packages/persistence` 6, `packages/app-manifest` 11,
-`packages/handoff` 15, and `thinking-about` 69.
+`packages/handoff` 15, `packages/text` 23, and `thinking-about` 69.
 keep this inventory current when a suite changes; the root command is the
 release contract, not the prose count.
 
@@ -658,7 +661,7 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (1069 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (1092 tests)
 pnpm check              svelte-check in every app
 pnpm build              build the seven SvelteKit apps
 ```
