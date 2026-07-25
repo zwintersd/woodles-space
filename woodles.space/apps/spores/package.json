@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@woodles/handoff": "workspace:*",
-    "@woodles/sync": "workspace:*"
+    "@woodles/sync": "workspace:*",
+    "@woodles/text": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.0",

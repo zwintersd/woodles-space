@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@woodles/handoff": "workspace:*",
-    "@woodles/persistence": "workspace:*"
+    "@woodles/persistence": "workspace:*",
+    "@woodles/text": "workspace:*"
   }
 }

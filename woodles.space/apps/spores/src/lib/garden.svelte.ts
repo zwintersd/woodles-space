@@ -18,6 +18,7 @@ import {
 } from './wikilinks';
 import type { Category } from './spells/types';
 import { createHandoffQueue, type HandoffTarget, type SendResult } from '@woodles/handoff';
+import { htmlToText } from '@woodles/text';
 import { uid, now } from './utils';
 import {
 	tagCounts,
@@ -59,21 +60,6 @@ function save<T>(key: string, value: T): void {
 const DEFAULT_SETTINGS: GardenSettings = {};
 
 const handoffQueue = createHandoffQueue('spores');
-
-// A handoff may arrive as HTML from a rich editor; a spore body is a plain
-// textarea, so flatten rather than store markup the user can't edit.
-function htmlToText(html: string): string {
-	return html
-		.replace(/<br\s*\/?>/gi, '\n')
-		.replace(/<\/(?:p|div|li|h[1-6]|blockquote)>/gi, '\n\n')
-		.replace(/<[^>]*>/g, '')
-		.replace(/&nbsp;/g, ' ')
-		.replace(/&amp;/g, '&')
-		.replace(/&lt;/g, '<')
-		.replace(/&gt;/g, '>')
-		.replace(/\n{3,}/g, '\n\n')
-		.trim();
-}
 
 function firstLine(text: string): string {
 	return text.split('\n').find((line) => line.trim())?.trim().slice(0, 60) ?? '';

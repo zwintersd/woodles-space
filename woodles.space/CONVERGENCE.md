@@ -16,7 +16,7 @@ they're actually built.
 questions have been answered; see §0. §5 is the live plan, and marks what has
 shipped.
 
-steps 0–6 are done, and **all three rooms are real.** the landing page groups
+steps 0–7 are done, and **all three rooms are real.** the landing page groups
 apps by the moment they're for rather than listing sixteen peers;
 `@woodles/handoff` lets any app pass a thought to any other instead of making
 you guess right the first time; the Dev Log has been folded into Spores and
@@ -25,9 +25,8 @@ Textbook has moved across too. Notebook has shed its tasks to
 Carillon and become one stream you type into. **five surfaces are now three,
 plus a publish target.**
 
-what remains is steps 7–8 — the shared editor and the shared prompt spec.
-both are consolidation of *code* rather than of product shape; neither blocks
-using what's already here.
+what remains is step 8, the shared prompt spec — consolidation of *code*
+rather than of product shape, and it blocks nothing.
 
 ---
 
@@ -383,7 +382,7 @@ cheap, it's most of the benefit, and it's not wasted work if B stalls.
 | 4 | ✅ **textbook → spores.** wikilinks, backlinks, status, covers, the sowing gesture. migrated `ologypedia-textbook-v1`. ologypedia keeps the bookcase and the studio. | ~1 week | the actual consolidation; makes one knowledge base real |
 | 5 | ✅ **tasks → carillon.** moved `NotebookTask` into planner, migrating from `notebook.workspace.v2`. | ~1 day | clears notebook for step 6 |
 | 6 | ✅ **notebook → inbox.** notes and ideas merged into captures; promotion actions land against step 1's envelope. | ~1 day | one front door |
-| 7 | **`@woodles/editor`.** extract from write, consume in spores; settle the API that REFACTORING.md has been waiting on. | ~1 week | rich bodies everywhere; unblocks the marginalia margin-notes merge too |
+| 7 | ✅ **`@woodles/text`** — *not* `@woodles/editor`; see below. extracted the converged utilities from write, marginalia and letter. | ~2 days | one sanitizer, one anchor scheme, five consumers |
 | 8 | **`@woodles/spellcraft`.** one prompt spec, three output contracts. | ~3 days | the authoring spec stops drifting |
 
 if only one thing gets done: **steps 0 and 1.** they're a day and a half
@@ -566,6 +565,44 @@ live ones; both were cleared, so the app still passes at zero warnings.
 and ideas became captures, v2 survived untouched, no task leaked into the
 inbox, and Carillon then took both tasks with the high priority preserved in
 its notes.
+
+### what landed in step 7, and why it isn't what was planned
+
+this step was drafted as "**`@woodles/editor`** — extract write's rich editor,
+consume it in spores." that premise expired in step 4. spore bodies are now
+**plain text** with `[[wikilinks]]`, and rendering them as segments rather than
+`innerHTML` is a property worth keeping — putting a rich contenteditable in
+spores would undo that and force HTML back into the store. so the editor was
+not extracted, and spores does not consume one.
+
+what *was* ready is what REFACTORING.md had already flagged as the workspace's
+strongest candidate and been waiting on: the **text/HTML utilities**, in three
+copies with a converged contract, only two of them tested. the handoff spine
+added two more copies of `htmlToText`, making five. that is the extraction the
+repo's own habit — duplicate until converged, then extract — was asking for.
+
+`@woodles/text` now has five consumers. it ships browser-ready `.js` with a
+`.d.ts` sidecar so `letter`, a static page, can import it directly; its inline
+untested third copy is gone.
+
+**two divergences the copies had been hiding**, both now parameters:
+whether a sanitize keeps `data-anchor` (write strips and re-stamps; marginalia
+and letter keep, because they display what they're given and a strip would
+orphan every margin note), and the anchor prefix (`a-` vs `p-`, both already in
+stored documents). picking a winner on either would have silently broken one
+app's notes.
+
+the first was caught by **write's existing test suite** — the shared sanitizer's
+first version changed write's semantics and a test asserting the strip failed.
+that is the extraction working as intended.
+
+what stays duplicated, per the log's own rule: `EditorToolbar`, `MarginNotes`,
+and `SelectionPopover`/`SelectionBubble` are all still marked *diverged*, and
+extracting them now would freeze an API before the copies have stopped moving.
+`SelectionPopover` is closest — spores' sow-bar is arguably a third consumer of
+the same idea — and is the natural next one when it settles.
+
+1069 → 1092 tests.
 
 ### infrastructure that has to come along
 

@@ -73,6 +73,9 @@ importers:
       '@woodles/sync':
         specifier: workspace:*
         version: link:../../packages/sync
+      '@woodles/text':
+        specifier: workspace:*
+        version: link:../../packages/text
       fflate:
         specifier: ^0.8.2
         version: 0.8.3
@@ -125,6 +128,9 @@ importers:
       '@woodles/persistence':
         specifier: workspace:*
         version: link:../../packages/persistence
+      '@woodles/text':
+        specifier: workspace:*
+        version: link:../../packages/text
     devDependencies:
       '@sveltejs/adapter-static':
         specifier: ^3.0.0
@@ -199,6 +205,9 @@ importers:
       '@woodles/sync':
         specifier: workspace:*
         version: link:../../packages/sync
+      '@woodles/text':
+        specifier: workspace:*
+        version: link:../../packages/text
     devDependencies:
       '@sveltejs/adapter-static':
         specifier: ^3.0.0
@@ -273,6 +282,9 @@ importers:
       '@woodles/sync':
         specifier: workspace:*
         version: link:../../packages/sync
+      '@woodles/text':
+        specifier: workspace:*
+        version: link:../../packages/text
     devDependencies:
       '@sveltejs/adapter-static':
         specifier: ^3.0.0
@@ -341,6 +353,21 @@ importers:
 
   packages/sync:
     devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@22.19.17)(happy-dom@20.10.6)
+
+  packages/text:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.17
+      happy-dom:
+        specifier: ^20.0.0
+        version: 20.10.6
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

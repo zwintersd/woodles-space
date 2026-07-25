@@ -1,4 +1,13 @@
-// Text utilities for the reading room editor.
+import {
+	ANCHOR_BLOCK_SELECTOR,
+	ensureAnchorsOn as stampAnchors,
+	sanitizeHtml,
+	stripPresentation
+} from '@woodles/text';
+
+// Text utilities for the reading room editor. The HTML mechanics live in
+// `@woodles/text` now; what stays here is the reading room's own shape —
+// paragraphs, the text cap, and the two sanitizer policies it needs.
 //
 // Paragraph storage is now HTML, not plain text — the passage is a live
 // contenteditable surface, and we serialize blocks back to `{id, html}` records
@@ -11,34 +20,16 @@
 // (PDF, epub), regardless of source.
 export const READING_TEXT_CAP = 500_000;
 
-const ANCHOR_BLOCK_SELECTOR = 'p,h1,h2,h3,h4,h5,h6,blockquote,ul,ol,li,pre';
+export { ANCHOR_BLOCK_SELECTOR, countWordsInText, stripTags } from '@woodles/text';
 
-const PASSAGE_ALLOWED_TAGS = new Set([
-	'P',
-	'H1',
-	'H2',
-	'H3',
-	'H4',
-	'H5',
-	'H6',
-	'BLOCKQUOTE',
-	'UL',
-	'OL',
-	'LI',
-	'B',
-	'STRONG',
-	'I',
-	'EM',
-	'U',
-	'S',
-	'STRIKE',
-	'MARK',
-	'A',
-	'BR',
-	'PRE',
-	'CODE'
-]);
-const UNWRAP_TAGS = new Set(['SPAN', 'FONT', 'DIV', 'SECTION', 'ARTICLE']);
+// The reading room stamps `p-`, not the shared default `a-`. Both prefixes are
+// already in stored documents, so this is a fact to preserve rather than a
+// preference to reconcile.
+const ANCHOR_PREFIX = 'p-';
+
+export function ensureAnchorsOn(blocks: ArrayLike<Element>): void {
+	stampAnchors(blocks, ANCHOR_PREFIX);
+}
 
 export interface Paragraph {
 	id: string;
@@ -87,33 +78,6 @@ function escapeHtml(s: string): string {
 
 // ── anchor stamping ────────────────────────────────────────────────────────
 
-export function ensureAnchorsOn(blocks: Element[]) {
-	let max = 0;
-	const seen = new Set<string>();
-	for (const b of blocks) {
-		const id = b.getAttribute('data-anchor');
-		if (id) {
-			if (seen.has(id)) {
-				// duplicate after a copy-paste — strip and re-stamp below
-				b.removeAttribute('data-anchor');
-			} else {
-				seen.add(id);
-				const m = /^p-(\d+)$/.exec(id);
-				if (m) {
-					const n = parseInt(m[1], 10);
-					if (!isNaN(n) && n > max) max = n;
-				}
-			}
-		}
-	}
-	let next = max + 1;
-	for (const b of blocks) {
-		if (!b.getAttribute('data-anchor')) {
-			b.setAttribute('data-anchor', 'p-' + String(next++).padStart(3, '0'));
-		}
-	}
-}
-
 export function stampLiveAnchors(root: HTMLElement) {
 	ensureAnchorsOn(Array.from(root.querySelectorAll(ANCHOR_BLOCK_SELECTOR)));
 }
@@ -144,81 +108,18 @@ const SAFE_PROTOCOL = /^(https?:|mailto:|#)/i;
 
 // For the passage: allow a curated tag set, strip unsafe attrs, unwrap noisy
 // wrappers, sanitize href, and re-stamp data-anchor only on top-level blocks.
+// The passage sanitizer keeps `data-anchor` — margin notes point at those
+// blocks, so stripping them would orphan every note in the room. Write does the
+// opposite and re-stamps instead; the shared sanitizer takes options rather
+// than picking a side.
 export function sanitizePassageHtml(html: string): string {
-	if (typeof DOMParser === 'undefined' || !html) return html;
-	const doc = new DOMParser().parseFromString('<div id="__r">' + html + '</div>', 'text/html');
-	const root = doc.getElementById('__r');
-	if (!root) return html;
-
-	function clean(node: Element) {
-		// process children first (snapshot, since we mutate)
-		const kids = Array.from(node.children);
-		for (const k of kids) clean(k);
-
-		const tag = node.tagName;
-		if (!PASSAGE_ALLOWED_TAGS.has(tag) && !UNWRAP_TAGS.has(tag)) {
-			node.remove();
-			return;
-		}
-		// Strip dangerous / noisy attributes.
-		for (const attr of Array.from(node.attributes)) {
-			const name = attr.name.toLowerCase();
-			if (name === 'data-anchor') continue;
-			if (name === 'href' && tag === 'A') {
-				const v = attr.value.trim();
-				if (!SAFE_PROTOCOL.test(v)) node.removeAttribute('href');
-				continue;
-			}
-			node.removeAttribute(attr.name);
-		}
-		if (UNWRAP_TAGS.has(tag)) {
-			const parent = node.parentNode;
-			if (parent) {
-				while (node.firstChild) parent.insertBefore(node.firstChild, node);
-				parent.removeChild(node);
-			}
-		}
-	}
-
-	// clean() itself decides whether a node gets removed or unwrapped — never
-	// call it on `root`: root is the synthetic #__r wrapper, not real content,
-	// and DIV is one of the UNWRAP_TAGS, so clean(root) unwraps root right out
-	// from under itself (moves every child up to root's own parent, then
-	// removes root), leaving root permanently empty. Only its children are
-	// real content to walk.
-	for (const child of Array.from(root.children)) clean(child);
-	return root.innerHTML;
+	return sanitizeHtml(html, { keepAttributes: ['data-anchor'] });
 }
 
-// Margin note sanitizer (unchanged shape, retained for back-compat).
+// A margin note is short and already trusted: keep its structure, drop the
+// styling that would fight the room's own fonts.
 export function sanitizeNoteHtml(html: string): string {
-	if (typeof DOMParser === 'undefined' || !html) return html;
-	const doc = new DOMParser().parseFromString('<div id="__r">' + html + '</div>', 'text/html');
-	const root = doc.getElementById('__r');
-	if (!root) return html;
-	root.querySelectorAll('*').forEach((el) => {
-		el.removeAttribute('style');
-		el.removeAttribute('color');
-		el.removeAttribute('face');
-		el.removeAttribute('size');
-		el.removeAttribute('bgcolor');
-		el.removeAttribute('class');
-		if (el.tagName === 'FONT' || el.tagName === 'SPAN') {
-			const parent = el.parentNode;
-			if (!parent) return;
-			while (el.firstChild) parent.insertBefore(el.firstChild, el);
-			parent.removeChild(el);
-		}
-	});
-	return root.innerHTML;
-}
-
-// ── word counting ──────────────────────────────────────────────────────────
-
-export function countWordsInText(s: string): number {
-	const trimmed = s.trim();
-	if (!trimmed) return 0;
-	return trimmed.split(/\s+/).length;
+	return stripPresentation(html);
 }
 
 // ── margin notes ───────────────────────────────────────────────────────────
