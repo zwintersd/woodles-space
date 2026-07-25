@@ -72,6 +72,7 @@ woodles.space/
 │   ├── handoff/             @woodles/handoff — passing a thought between apps
 │   ├── persistence/         @woodles/persistence — versioned local storage mechanics
 │   ├── sync/                @woodles/sync — the sync client
+│   ├── spellcraft/          @woodles/spellcraft — the authoring brief + output contracts
 │   └── text/                @woodles/text — HTML sanitizing, anchors, text helpers
 └── apps/
     ├── landing/             static · the homepage
@@ -234,7 +235,7 @@ The reader also keeps the URL hash in step with the current entry
 (`history.replaceState`), so reload/share/deep-link land on what you're
 actually reading rather than a stale `#id`.
 
-**Draft with a prompt** is the bridge between the Textbook's live editing
+**Draft with a prompt** was the bridge between the Textbook's live editing
 and `add-page.html`'s authoring workflow, brought *into* the reader rather
 than sent out to the Studio. Facing an empty seed (or from the edit
 toolbar on any entry), "✦ Draft it with a prompt" opens a sheet with a
@@ -379,6 +380,35 @@ one), body, tags, and a `lane` (`spark` / `shape` / `later`). A lane is triage,
 not status: where a thing sits in your head, not how finished it is. The
 default filter is *everything*, because filtering is a choice; the number keys
 filter rather than switch modes, and pressing the same one again clears it.
+
+## the authoring brief
+
+`packages/spellcraft` holds the prompt spec Z writes entries against — voice,
+structure, etymology-as-semantic-drift, the metaphor sources, the standing
+lenses, the conversions, the reading-list rule. **Nothing here calls a model.**
+The human carries the prompt out and the answer back, which is what keeps every
+app in this workspace backend-free.
+
+The brief is the part that must not drift; what varies is only the **output
+contract** — what shape the answer comes back in:
+
+- `page` — one complete standalone file. Ologypedia's studio uses it, appending
+  its own VISUAL SYSTEM as the trailer. That trailer is the app's page format,
+  not part of the brief, which is why it stays in `add-page.html`.
+- `fragment` — plain prose with `[[wikilinks]]`, which is exactly what a spore
+  body already stores, so the authoring format and the storage format are the
+  same thing. Spores' `DraftPanel` uses it.
+
+`ingestDraft` takes the answer back in whatever shape it arrives — fenced,
+HTML, markdown, or plain — and reduces it to that stored format. It takes
+`htmlToText` as an argument rather than importing it, so the package needs no
+DOM. In Spores, bringing a draft in also **sows a seed for every `[[link]]`
+nothing answers to yet**, so one answer both fills the entry and spawns the
+cluster around it.
+
+Like `@woodles/app-manifest` and `@woodles/text`, this ships browser-ready
+`.js` with a `.d.ts` sidecar, because `add-page.html` is static and has no
+build step.
 
 ## the handoff spine
 
@@ -607,14 +637,15 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1092 tests total: 16 in `api/` (its own
+1108 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1076 across twelve pnpm
+instead of the recursive `pnpm -r test`), plus 1092 across thirteen pnpm
 packages — `write` 72, `marginalia` 249, `planner` 298, `notebook` 28,
 `spores` 140, `bestiary` 160, `packages/sync` 5,
 `packages/persistence` 6, `packages/app-manifest` 11,
-`packages/handoff` 15, `packages/text` 23, and `thinking-about` 69.
+`packages/handoff` 15, `packages/text` 23, `packages/spellcraft` 16,
+and `thinking-about` 69.
 keep this inventory current when a suite changes; the root command is the
 release contract, not the prose count.
 
@@ -661,7 +692,7 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (1092 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (1108 tests)
 pnpm check              svelte-check in every app
 pnpm build              build the seven SvelteKit apps
 ```

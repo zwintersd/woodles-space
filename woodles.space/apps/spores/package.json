@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@woodles/handoff": "workspace:*",
+    "@woodles/spellcraft": "workspace:*",
     "@woodles/sync": "workspace:*",
     "@woodles/text": "workspace:*"
   },

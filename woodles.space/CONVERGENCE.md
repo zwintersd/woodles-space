@@ -16,7 +16,7 @@ they're actually built.
 questions have been answered; see §0. §5 is the live plan, and marks what has
 shipped.
 
-steps 0–7 are done, and **all three rooms are real.** the landing page groups
+**all eight steps are done.** all three rooms are real: the landing page groups
 apps by the moment they're for rather than listing sixteen peers;
 `@woodles/handoff` lets any app pass a thought to any other instead of making
 you guess right the first time; the Dev Log has been folded into Spores and
@@ -25,8 +25,8 @@ Textbook has moved across too. Notebook has shed its tasks to
 Carillon and become one stream you type into. **five surfaces are now three,
 plus a publish target.**
 
-what remains is step 8, the shared prompt spec — consolidation of *code*
-rather than of product shape, and it blocks nothing.
+the plan is finished. what's left is in §6 — a handful of things deliberately
+left duplicated, and one question that is still open.
 
 ---
 
@@ -383,7 +383,7 @@ cheap, it's most of the benefit, and it's not wasted work if B stalls.
 | 5 | ✅ **tasks → carillon.** moved `NotebookTask` into planner, migrating from `notebook.workspace.v2`. | ~1 day | clears notebook for step 6 |
 | 6 | ✅ **notebook → inbox.** notes and ideas merged into captures; promotion actions land against step 1's envelope. | ~1 day | one front door |
 | 7 | ✅ **`@woodles/text`** — *not* `@woodles/editor`; see below. extracted the converged utilities from write, marginalia and letter. | ~2 days | one sanitizer, one anchor scheme, five consumers |
-| 8 | **`@woodles/spellcraft`.** one prompt spec, three output contracts. | ~3 days | the authoring spec stops drifting |
+| 8 | ✅ **`@woodles/spellcraft`.** one brief, two output contracts — and the Textbook gesture step 4 missed. | ~2 days | the authoring spec stops drifting |
 
 if only one thing gets done: **steps 0 and 1.** they're a day and a half
 together and they address the two causes that actually stop you from opening
@@ -603,6 +603,36 @@ extracting them now would freeze an API before the copies have stopped moving.
 the same idea — and is the natural next one when it settles.
 
 1069 → 1092 tests.
+
+### what landed in step 8
+
+this step's premise had expired too, and for a reason worth recording: it was
+drafted as "one prompt spec, **three** output contracts," but one of the three
+lived in `textbook.html`, which step 4 replaced with a signpost. that left the
+brief in exactly *one* place — and extracting something with one consumer is
+premature by this repo's own rule.
+
+chasing that turned up a real gap instead. the Textbook's **"draft it with a
+prompt"** was listed in §1 among the things being ported, and step 4 ported
+everything else — wikilinks, backlinks, status, covers, sowing — but not that.
+step 4's own notes even cite the gesture as the reason `[[brackets]]` were the
+right syntax, without ever building it.
+
+so step 8 became: extract the brief **because a second consumer now genuinely
+needs it**, and build that consumer. `@woodles/spellcraft` holds the spec; the
+studio asks for a `page` and appends its own VISUAL SYSTEM, the Garden asks for
+a `fragment` of prose with `[[links]]`. two consumers, two contracts, one brief.
+
+the Garden's panel closes the loop the syntax choice opened: paste an answer in
+any shape — fenced, HTML, markdown, plain — and `ingestDraft` reduces it to a
+body, then **every `[[link]]` nothing answers to yet becomes a seed**. one
+answer fills the entry and sows the cluster around it.
+
+one bug the tests caught: `\s` in a multiline regex crosses newlines, so
+stripping markdown bullets was eating the blank line before a list and
+collapsing two paragraphs into one.
+
+1092 → 1108 tests.
 
 ### infrastructure that has to come along
 
