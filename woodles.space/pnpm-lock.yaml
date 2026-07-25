@@ -327,6 +327,18 @@ importers:
         specifier: ^3.2.6
         version: 3.2.6(@types/node@22.19.17)(happy-dom@20.10.6)
 
+  packages/app-manifest:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.17
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@22.19.17)(happy-dom@20.10.6)
+
   packages/persistence:
     devDependencies:
       typescript:

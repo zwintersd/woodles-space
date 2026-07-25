@@ -1317,28 +1317,17 @@
     </div>
   </div>
 
-  <script>
+  <script type="module">
+    import {
+      defaultLandingPins,
+      featuredLandingApps,
+      landingApps as apps,
+    } from '/packages/app-manifest/src/index.js';
+
     /* ── app catalogue ─────────────────────────────────────────────── */
-    /* every tile draws from the shared palette vars (never raw hex),
-       so the whole set re-colors when the theme changes. `ga` varies the
-       gradient angle so neighbours don't read as copies of each other. */
-    const apps = [
-      { id:'hygge',   name:'Hygge',        href:'/hygge',                  desc:'design playground: fonts, motifs & palette', g1:'var(--lavender)', g2:'var(--peach)', ga:'135deg' },
-      { id:'write',   name:'Write',        href:'/write',                  desc:'compose, save, send a letter', g1:'var(--aqua)',     g2:'var(--lavender)', ga:'160deg' },
-      { id:'echoes',  name:'Echoes',       href:'/letter',                 desc:'letters left here, words that stayed', g1:'var(--peach)', g2:'var(--lilac)', ga:'120deg' },
-      { id:'marg',    name:'Marginalia',   href:'/marginalia',             desc:'tend a small witch, grow her world, and meet the creatures Z\'s already brought into it', g1:'var(--plum)', g2:'var(--lavender)', ga:'150deg' },
-      { id:'devlog',  name:'Dev Log',      href:'/marginalia-devlog',      desc:'notes from making the witch\'s world',  g1:'var(--lilac)',   g2:'var(--plum)', ga:'200deg' },
-      { id:'reading', name:'Reading Room', href:'/marginalia#reading-room',desc:'a quiet timer, read for stars', g1:'var(--peach)',    g2:'var(--aqua)', ga:'115deg' },
-      { id:'planner',    name:'Carillon',    href:'/planner',     desc:'calendar, schedule, and time',       g1:'var(--peach)',    g2:'var(--lavender)', ga:'170deg' },
-      { id:'notebook',   name:'Notebook',    href:'/notebook',    desc:'notes, tasks, and ideas kept close', g1:'var(--aqua)',    g2:'var(--peach)', ga:'205deg' },
-      { id:'thinking',   name:'Thinking About', href:'/thinking-about', desc:'a landing spot for what you are reading, playing, and watching', g1:'var(--lapis)', g2:'var(--aqua)', ga:'140deg' },
-      { id:'piano',      name:'Piano',       href:'/piano',      desc:'a purple keyboard with soft synth strings', g1:'var(--lavender)', g2:'var(--aqua)', ga:'125deg' },
-      { id:'lab',        name:'Lab',         href:'/lab',        desc:'experiments, sketches, and stub apps', g1:'var(--aqua)',     g2:'var(--plum)', ga:'185deg' },
-      { id:'spores',     name:'Spores',      href:'/spores',     desc:'a personal wikipedia, tended by hand', g1:'var(--lilac)',    g2:'var(--aqua)', ga:'145deg' },
-      { id:'ologypedia', name:'Ologypedia',  href:'/ologypedia', desc:'a block system for textbook-style pages, and the pages it renders', g1:'var(--plum)', g2:'var(--peach)', ga:'160deg' },
-      { id:'bestiary',   name:'Bestiary',    href:'/bestiary',   desc:'bring a png of anything, leave with a card that belongs', g1:'var(--peach)', g2:'var(--plum)', ga:'110deg' },
-      { id:'quiet',      name:'Quiet Room',  href:'/quiet-room', desc:'an immersive room of light, drawn in three.js', g1:'var(--lapis)', g2:'var(--lilac)', ga:'195deg' },
-    ];
+    /* Tile copy, ordering, routes, maturity, and default pins come from the
+       canonical app manifest. Icons remain here because they are landing-only
+       artwork rather than deployable-app metadata. */
 
     /* hand-drawn icon set — one stroke-based motif per app, all sharing
        the same 24×24 grid, 1.7 stroke, round caps. replaces the old
@@ -1376,8 +1365,7 @@
     function savePrefs() { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }
 
     /* pinned apps live in prefs; recents are tracked on every launch */
-    const DEFAULT_PINS = ['hygge', 'write', 'marg', 'planner', 'notebook', 'quiet'];
-    if (!Array.isArray(prefs.pins)) prefs.pins = DEFAULT_PINS.slice();
+    if (!Array.isArray(prefs.pins)) prefs.pins = defaultLandingPins.slice();
     const RECENTS_KEY = 'woodles-recents';
     let recents = [];
     try { recents = JSON.parse(localStorage.getItem(RECENTS_KEY)) || []; } catch {}
@@ -1543,7 +1531,7 @@
       const opened = recents.map(byId).filter(Boolean).slice(0, 3);
       const list = opened.length
         ? opened
-        : ['marg', 'bestiary', 'write'].map(byId);
+        : featuredLandingApps;
       recLabel.textContent = opened.length ? 'recently opened' : 'worth a visit';
       list.forEach(a => {
         const el = document.createElement('a');
