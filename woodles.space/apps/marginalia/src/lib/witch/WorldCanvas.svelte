@@ -261,10 +261,10 @@
 			return entry.ok && !entry.failed ? entry.img : null;
 		}
 
-		function spriteFor(lifeId: string): { src: string; pixelated: boolean } | null {
+		function spriteFor(lifeId: string): { src: string; pixelated: boolean; sizeScale: number } | null {
 			const c = book.boundCreatureFor(lifeId);
 			const src = c ? (c.isolatedSprite ?? c.sprite ?? null) : null;
-			return src ? { src, pixelated: c!.pixelated } : null;
+			return src ? { src, pixelated: c!.pixelated, sizeScale: c!.sizeScale } : null;
 		}
 
 		function drawSky(T: number) {
@@ -609,7 +609,8 @@
 
 				const seed = point.x + point.y + life.id.length * 0.013;
 				const stage = book.stageOf(life.id);
-				const box = H * CREATURE_BOX * point.scale * (0.58 + 0.42 * (stage / 3));
+				const box =
+					H * CREATURE_BOX * point.scale * info.sizeScale * (0.58 + 0.42 * (stage / 3));
 				const scale = box / Math.max(entry.img.naturalWidth, entry.img.naturalHeight);
 				const dw = entry.img.naturalWidth * scale;
 				const dh = entry.img.naturalHeight * scale;

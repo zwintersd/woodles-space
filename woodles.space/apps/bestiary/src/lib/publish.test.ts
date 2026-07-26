@@ -118,6 +118,7 @@ describe('buildPublicCreature', () => {
 			isolatedSprite: 'data:plain',
 			hasIsolatedSprite: false,
 			pixelated: false,
+			sizeScale: 1,
 			publishedAt: '2026-07-02T00:00:00.000Z'
 		});
 		expect(out).not.toHaveProperty('sourceImage');
@@ -127,6 +128,18 @@ describe('buildPublicCreature', () => {
 		const c = make({ sprite: 'data:plain', pixelated: true });
 		const out = buildPublicCreature(c, 'data:card-image', '2026-07-02T00:00:00.000Z');
 		expect(out.pixelated).toBe(true);
+	});
+
+	it('carries sizeScale through so a visitor sees the same diorama scale Z chose', () => {
+		const c = make({ sprite: 'data:plain', sizeScale: 1.4 });
+		const out = buildPublicCreature(c, 'data:card-image', '2026-07-02T00:00:00.000Z');
+		expect(out.sizeScale).toBe(1.4);
+	});
+
+	it('resolves a missing sizeScale to 1, the house default', () => {
+		const c = make({ sprite: 'data:plain' });
+		const out = buildPublicCreature(c, 'data:card-image', '2026-07-02T00:00:00.000Z');
+		expect(out.sizeScale).toBe(1);
 	});
 
 	it('flags hasIsolatedSprite true for a real studio cutout', () => {

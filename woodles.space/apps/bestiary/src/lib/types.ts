@@ -26,6 +26,12 @@ export type Creature = {
 	sprite: string | null;
 	// pixel-art sprites read best un-smoothed; photos read better smoothed.
 	pixelated: boolean;
+	// how large this creature renders in marginalia's diorama, as a multiplier
+	// on the house default box size — lets a 256px sprite and a 512px sprite
+	// (or just a creature meant to read bigger/smaller) sit at the same felt
+	// scale without re-exporting art. absent/null = 1 (house default); the
+	// diorama is the only consumer, the card itself is unaffected.
+	sizeScale?: number | null;
 	// the editable layer stack behind the sprite, when it was built in the studio.
 	// absent for plain uploads and pre-studio cards — sprite is then the whole art.
 	composition?: Composition | null;

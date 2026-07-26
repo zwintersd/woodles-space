@@ -64,6 +64,7 @@ describe('mergeWorldCreatures', () => {
 			sprite: 'data:flat',
 			isolatedSprite: 'data:cut',
 			pixelated: true,
+			sizeScale: 1,
 			source: 'local'
 		});
 	});
@@ -125,5 +126,29 @@ describe('mergeWorldCreatures', () => {
 		const p = published({ id: 'p1', pixelated: true });
 		const [out] = mergeWorldCreatures([], [p]);
 		expect(out.pixelated).toBe(true);
+	});
+
+	it('defaults sizeScale to 1 (house default) when a local creature has none set', () => {
+		const c = local({ id: 'l1' });
+		const [out] = mergeWorldCreatures([c], []);
+		expect(out.sizeScale).toBe(1);
+	});
+
+	it("carries a local creature's sizeScale through when present", () => {
+		const c = local({ id: 'l1', sizeScale: 1.5 });
+		const [out] = mergeWorldCreatures([c], []);
+		expect(out.sizeScale).toBe(1.5);
+	});
+
+	it('defaults a published creature with no sizeScale to 1 (pre-existing snapshots)', () => {
+		const p = published({ id: 'p1' });
+		const [out] = mergeWorldCreatures([], [p]);
+		expect(out.sizeScale).toBe(1);
+	});
+
+	it("carries a published creature's sizeScale through when present", () => {
+		const p = published({ id: 'p1', sizeScale: 0.75 });
+		const [out] = mergeWorldCreatures([], [p]);
+		expect(out.sizeScale).toBe(0.75);
 	});
 });

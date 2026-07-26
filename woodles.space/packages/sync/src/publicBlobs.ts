@@ -52,6 +52,11 @@ export type PublicCreature = {
 	// way Z's own device does. optional: blobs published before this field
 	// existed simply read as smoothed.
 	pixelated?: boolean;
+	// diorama size multiplier (mirrors Creature.sizeScale), resolved to a
+	// concrete number at publish time — a visitor's world scales published
+	// sprites the same way Z's own device does. optional: blobs published
+	// before this field existed simply read as 1 (house default).
+	sizeScale?: number;
 	// "show the source" opt-in (week 2): the raw dropped png, for the
 	// before/after gallery spots. off by default — absent unless chosen.
 	sourceImage?: string | null;
