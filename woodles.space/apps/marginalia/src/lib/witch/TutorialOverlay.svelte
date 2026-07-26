@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { fade } from 'svelte/transition';
+	import { base } from '$app/paths';
 	import { book, fmt, STAGE_KNOWN } from './book.svelte';
 	import { ATTENTION_START } from './tuning';
 
@@ -13,12 +15,24 @@
 		| 'known'
 		| 'loop';
 
+	type Mood =
+		| 'content'
+		| 'delighted'
+		| 'happy'
+		| 'mad'
+		| 'neutral'
+		| 'sad'
+		| 'sleepy'
+		| 'surprised'
+		| 'worried';
+
 	interface Step {
 		id: StepId;
 		label: string;
 		title: string;
 		body: string;
 		action: string;
+		mood: Mood;
 		mode?: 'web' | 'world';
 	}
 
@@ -26,13 +40,16 @@
 
 	let { onclose }: { onclose: () => void } = $props();
 
+	const witchSrc = (mood: Mood) => `${base}/witchSprites/brianna_${mood}.png`;
+
 	const steps: Step[] = [
 		{
 			id: 'open',
 			label: 'Start',
 			title: 'Open the Book',
 			body: 'The idle system begins inside the Book. The Web is where you spend Essence to write conditions; the World is where those conditions become life.',
-			action: 'Click "open the Book" to enter the idle loop.'
+			action: 'Click "open the Book" to enter the idle loop.',
+			mood: 'delighted'
 		},
 		{
 			id: 'write',
@@ -40,6 +57,7 @@
 			title: 'Write a condition',
 			body: 'Essence is the creative budget. Each condition costs Essence, and combinations of conditions unlock emergent life.',
 			action: 'Pick any available write button in tier i. "Holding" reveals life fastest; other choices may need a partner.',
+			mood: 'content',
 			mode: 'web'
 		},
 		{
@@ -48,6 +66,7 @@
 			title: 'See what answered',
 			body: 'The World tab shows life once your conditions imply it. Some conditions reveal a life alone; others need a matching second condition.',
 			action: 'If the World is still empty, return to the Web and write a condition that pairs with what you already chose.',
+			mood: 'surprised',
 			mode: 'world'
 		},
 		{
@@ -56,6 +75,7 @@
 			title: 'Attend to life',
 			body: 'Attention slots are the idle engine. Attended life deepens through stages over time: noticed, observed, studied, then known.',
 			action: 'Click attend on one life. You start with two attention slots.',
+			mood: 'happy',
 			mode: 'world'
 		},
 		{
@@ -64,6 +84,7 @@
 			title: 'Deepen an observation',
 			body: 'A watched life advances when its progress bar fills. "Look closer" adds a small burst, but time alone also carries it forward.',
 			action: 'Let the bar fill, or press look closer until the life reaches observed.',
+			mood: 'sleepy',
 			mode: 'world'
 		},
 		{
@@ -72,6 +93,7 @@
 			title: 'Read the numbers',
 			body: 'Observed life starts yielding Insight each second. Favor multiplies that yield; Attention shows how many lives can deepen at once.',
 			action: 'Watch the ledger until Insight is visibly climbing.',
+			mood: 'content',
 			mode: 'world'
 		},
 		{
@@ -80,6 +102,7 @@
 			title: 'Spend Insight deliberately',
 			body: 'Insight has two early jobs: widen attention so more life can advance in parallel, or distill back into Essence to write more conditions.',
 			action: `Try widening attention when you reach ${fmt(45)} Insight, or distill ${fmt(60)} Insight into Essence.`,
+			mood: 'neutral',
 			mode: 'world'
 		},
 		{
@@ -88,6 +111,7 @@
 			title: 'Reach a decision point',
 			body: 'Known life has fully revealed itself. At that point you can spend resources to intervene, or leave it witnessed and unforced.',
 			action: 'Bring one life to known, then read the intervention choice that appears.',
+			mood: 'worried',
 			mode: 'world'
 		},
 		{
@@ -96,6 +120,7 @@
 			title: 'Return to the Web',
 			body: 'Studied and Known stages award Essence. That closes the loop: witness life, earn creative power, then write the next shape of the world.',
 			action: 'Go back to the Web when you have Essence to spend.',
+			mood: 'happy',
 			mode: 'web'
 		}
 	];
@@ -191,9 +216,21 @@
 		aria-describedby="tutorial-body"
 	>
 		<header class="tutorial-head">
-			<div>
-				<p class="eyebrow">idle tutorial</p>
-				<p class="progress">{completedCount}/{steps.length} checks complete</p>
+			<div class="head-who">
+				{#key step.mood}
+					<img
+						class="witch-portrait"
+						src={witchSrc(step.mood)}
+						alt={`Brianna, looking ${step.mood}`}
+						width="72"
+						height="63"
+						transition:fade={{ duration: 120 }}
+					/>
+				{/key}
+				<div>
+					<p class="eyebrow">idle tutorial · with Brianna</p>
+					<p class="progress">{completedCount}/{steps.length} checks complete</p>
+				</div>
 			</div>
 			<button class="close" type="button" aria-label="hide tutorial" title="resume from the top bar" onclick={onclose}>hide</button>
 		</header>
@@ -275,6 +312,21 @@
 		align-items: flex-start;
 		justify-content: space-between;
 		gap: 1rem;
+	}
+	.head-who {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+	}
+	.witch-portrait {
+		width: 2.75rem;
+		height: auto;
+		flex-shrink: 0;
+		border: 1px solid var(--rule);
+		border-radius: 50%;
+		background: var(--bg);
+		object-fit: cover;
+		object-position: center 30%;
 	}
 	.eyebrow,
 	.progress,
