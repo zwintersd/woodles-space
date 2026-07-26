@@ -488,8 +488,12 @@
 				const spec = featureById(placed.featureId);
 				if (!spec) continue;
 				const x = placed.x * W;
-				const y = H * waterGridYToWorld(placed.y);
 				const size = H * 0.13 * placed.scale;
+				// features are placed on the deepest sediment rows by design
+				// (placeFeatureOnBestSediment favors them), which can sit close
+				// enough to y=1 that the feature — plus its grounding shadow at
+				// y + size * 0.35 — would spill past the bottom of the canvas.
+				const y = Math.min(H * waterGridYToWorld(placed.y), H - size * 0.5 - H * 0.01);
 				ctx!.save();
 				ctx!.globalAlpha = 0.2;
 				ctx!.fillStyle = 'rgb(14, 14, 40)';
@@ -534,7 +538,15 @@
 				const dh = entry.img.naturalHeight * scale;
 				const jitter = (point.id.length % 7) * W * 0.002;
 				const cx = point.x * W + jitter;
-				const cy = point.y * H + layerBob(point.layer, T, seed);
+				// floor spawns (dense sediment, placed features) are biased toward
+				// the deepest rows and can sit close enough to y=1 that a
+				// full-size sprite's bottom edge — plus its bob — would fall past
+				// the canvas. Keep the whole sprite (and its grounding shadow, at
+				// cy + dh * 0.35 below) inside the frame.
+				const minCy = dh * 0.5 + H * 0.01;
+				const maxCy = H - dh * 0.65 - H * 0.01;
+				const rawCy = point.y * H + layerBob(point.layer, T, seed);
+				const cy = Math.min(Math.max(rawCy, minCy), Math.max(minCy, maxCy));
 				const alpha = clamp01(stage === 0 ? 0.3 : 0.55 + 0.45 * book.vitalityOf(life.id));
 
 				if (point.layer === 'floor' || point.layer === 'shore') {
@@ -814,10 +826,10 @@
 				const row = Math.min(3, rowBase + (Math.sin(T * 0.7 + i) > 0.7 ? 1 : 0));
 				const placed = book.worldShape.placedFeatures[i % Math.max(1, book.worldShape.placedFeatures.length)];
 				const x = placed ? placed.x * W : W * (0.17 + i * 0.22 + (stable01(`${seed}-x`) - 0.5) * 0.05);
-				const y = placed
-					? H * waterGridYToWorld(placed.y)
-					: H * (WATER_TOP + 0.12 + stable01(`${seed}-y`) * 0.28);
 				const size = H * (0.15 + stable01(`${seed}-size`) * 0.05);
+				const y = placed
+					? Math.min(H * waterGridYToWorld(placed.y), H - size * 0.5 - H * 0.01)
+					: H * (WATER_TOP + 0.12 + stable01(`${seed}-y`) * 0.28);
 				const pulse = 0.78 + 0.22 * Math.sin(T * (0.8 + stable01(`${seed}-pulse`)) + i);
 				drawGlow(x, y, size * 0.6, AURA_TINTS[row] ?? [200, 190, 220], (0.18 + intensity * 0.32) * pulse);
 				drawSheetSprite(
