@@ -589,6 +589,20 @@ export function generateSpawnPoints(shape: WorldShape): SpawnPoint[] {
 	return points;
 }
 
+// The raw floor's own character, independent of anything placed on it —
+// reuses the exact vocabulary spawnWeightForLife already knows how to read
+// (mineral/nutrient/shelter/bottom), so a naturally mineral-rich patch of
+// sediment can draw geology life before a mineral_glint feature ever lands
+// there. Varies by grid position, not by world/save — spatial variety
+// within one world is what spawn points need; per-world reseeding is a
+// procedural-worlds (DESIGN.md phase E) concern, not this one.
+const SEDIMENT_SURFACE_TAGS = ['mineral', 'nutrient', 'shelter', 'bottom'] as const;
+
+function sedimentSurfaceTag(bx: number, by: number): string {
+	const roll = stable01(`sediment-surface:${bx}:${by}`);
+	return SEDIMENT_SURFACE_TAGS[Math.floor(roll * SEDIMENT_SURFACE_TAGS.length)];
+}
+
 function sedimentSpawnPoints(grid: SedimentGrid): SpawnPoint[] {
 	const points: SpawnPoint[] = [];
 	const blockW = 6;
@@ -612,7 +626,7 @@ function sedimentSpawnPoints(grid: SedimentGrid): SpawnPoint[] {
 				x,
 				y: waterGridYToWorld(waterY),
 				category: 'aquatic',
-				tags: ['sediment', waterY > 0.55 ? 'bottom' : 'shallow'],
+				tags: ['sediment', waterY > 0.55 ? 'bottom' : 'shallow', sedimentSurfaceTag(bx, by)],
 				weight: 0.45 + avg,
 				rarity: avg > 0.62 ? 'uncommon' : 'common',
 				layer: 'floor',

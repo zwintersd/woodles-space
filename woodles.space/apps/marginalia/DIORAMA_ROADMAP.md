@@ -30,6 +30,14 @@ same constant now, so they stay in sync. the "shallows" shelf wash is anchored t
 so it reads as one place instead of the tinge starting well above where any floor shows.
 the color-science pass below is still open and separate from this.
 
+**sediment now has surface character, not just density.** dense sediment blocks roll a
+procedural surface tag from the vocabulary `spawnWeightForLife` already reads —
+`mineral`/`nutrient`/`shelter`/`bottom` — independent of whether a feature has been
+placed there. varies by grid position within a world (not per-world/seeded yet — that's
+a procedural-worlds, DESIGN.md phase E, concern). the point: a naturally mineral-rich
+patch of raw floor can now draw geology-domain life on its own, which is the "more
+complicated spawn points" hook future organisms can lean on.
+
 ---
 
 ## already shipped

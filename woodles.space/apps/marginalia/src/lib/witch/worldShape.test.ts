@@ -138,6 +138,26 @@ describe('worldShape features and spawns', () => {
 		const second = resolveSpawnPointForLife(aquaticLife, withFeature);
 		expect(second).toEqual(first);
 	});
+
+	it('gives dense sediment blocks a procedural surface tag, independent of features', () => {
+		const w = 12;
+		const h = 6;
+		const shape = normalizeWorldShape({
+			unlockedWorldspaces: ['water', 'shallows'],
+			sedimentGrid: { w, h, cells: new Array(w * h).fill(0.7) }
+		});
+		const sedimentPoints = generateSpawnPoints(shape).filter((point) => point.tags.includes('sediment'));
+		const surfaceVocab = ['mineral', 'nutrient', 'shelter', 'bottom'];
+		expect(sedimentPoints.length).toBeGreaterThan(1);
+		for (const point of sedimentPoints) {
+			expect(point.tags.some((tag) => surfaceVocab.includes(tag))).toBe(true);
+		}
+		// different blocks get their own (deterministic) roll, not one fixed tag
+		const distinctSurfaceTags = new Set(
+			sedimentPoints.map((point) => point.tags.find((tag) => surfaceVocab.includes(tag)))
+		);
+		expect(distinctSurfaceTags.size).toBeGreaterThan(1);
+	});
 });
 
 describe('worldShape decorative creatures', () => {
