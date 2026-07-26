@@ -395,7 +395,6 @@
     }
     .bm-list {
       display: flex; flex-direction: column; gap: 0.1rem;
-      max-height: 168px;
       overflow-y: auto;
       scrollbar-width: thin;
       margin: 0 -0.35rem;
@@ -2087,10 +2086,25 @@
           });
 
           const list = el.querySelector('.bm-list');
+          /* grow the list to fit its links; only cap (and scroll) once it
+             would run past the bottom of the screen from wherever the
+             widget currently sits */
+          function sizeList() {
+            if (!el.isConnected) return;
+            const GAP = 16, MIN_LIST = 90;
+            list.style.maxHeight = 'none';
+            const otherHeight = el.offsetHeight - list.scrollHeight;
+            const taskbar = document.getElementById('taskbar');
+            const floor = (taskbar ? taskbar.getBoundingClientRect().top : innerHeight) - GAP;
+            const budget = floor - el.getBoundingClientRect().top - otherHeight;
+            if (list.scrollHeight > budget)
+              list.style.maxHeight = Math.max(MIN_LIST, budget) + 'px';
+          }
           const renderLinks = () => {
             list.innerHTML = '';
             if (!w.data.links.length) {
               list.innerHTML = '<p class="bm-empty">no links yet</p>';
+              sizeList();
               return;
             }
             w.data.links.forEach(link => {
@@ -2130,8 +2144,17 @@
               a.append(glyph, label, rm);
               list.appendChild(a);
             });
+            sizeList();
           };
           renderLinks();
+          requestAnimationFrame(sizeList);
+
+          function onResize() {
+            if (!el.isConnected) { removeEventListener('resize', onResize); return; }
+            sizeList();
+          }
+          addEventListener('resize', onResize);
+          el.addEventListener('pointerup', sizeList);
 
           list.addEventListener('click', e => {
             const rm = e.target.closest('.bm-x');
