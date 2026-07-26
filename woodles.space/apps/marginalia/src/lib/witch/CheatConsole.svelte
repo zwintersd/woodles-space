@@ -79,12 +79,12 @@
 		left: 0.72rem;
 		z-index: 120;
 		width: min(23rem, calc(100vw - 1.44rem));
-		border: 1px solid rgba(108, 229, 232, 0.55);
+		border: 1px solid rgba(95, 122, 82, 0.55);
 		border-radius: 3px;
 		background: rgba(14, 14, 40, 0.92);
 		box-shadow:
 			0 8px 28px rgba(0, 0, 0, 0.28),
-			0 0 18px rgba(108, 229, 232, 0.12);
+			0 0 18px rgba(95, 122, 82, 0.12);
 		padding: 0.35rem;
 	}
 	label {
@@ -103,10 +103,10 @@
 	input {
 		min-width: 0;
 		height: 1.7rem;
-		border: 1px solid rgba(154, 150, 201, 0.38);
+		border: 1px solid rgba(138, 85, 104, 0.38);
 		border-radius: 2px;
-		background: rgba(245, 242, 232, 0.94);
-		color: #171739;
+		background: rgba(255, 252, 244, 0.94);
+		color: #34281d;
 		font-family: var(--font-counter);
 		font-size: 1rem;
 		padding: 0 0.42rem;
@@ -114,7 +114,7 @@
 	}
 	input:focus {
 		border-color: var(--leafeon-pink);
-		box-shadow: 0 0 0 2px rgba(240, 143, 184, 0.18);
+		box-shadow: 0 0 0 2px rgba(184, 80, 108, 0.18);
 	}
 	p {
 		margin: 0.35rem 0 0;

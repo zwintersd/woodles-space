@@ -62,9 +62,9 @@
 
 <style>
 	.details {
-		border: 1px solid rgba(154, 150, 201, 0.22);
+		border: 1px solid rgba(138, 85, 104, 0.22);
 		border-radius: 4px;
-		background: rgba(26, 26, 62, 0.46);
+		background: rgba(52, 40, 29, 0.46);
 		padding: 0.65rem;
 		display: flex;
 		flex-direction: column;

@@ -185,138 +185,6 @@
 
 	<WorldCanvas />
 
-	{#if book.pendingWorldspaceUnlock}
-		<NewWorldspaceUnlock worldspace={book.pendingWorldspaceUnlock} />
-	{/if}
-
-	{#if showWorldShaping}
-		<section class="shape-panel">
-			<div class="shape-head">
-				<div>
-					<span class="shape-kicker">world shaping</span>
-					<h3>{book.worldShape.activeWorldspace === 'shallows' ? 'the shallows' : 'water world'}</h3>
-				</div>
-				<button
-					class="aperture"
-					class:open={shapingDetailsOpen}
-					aria-label={shapingDetailsOpen ? 'hide world details' : 'show world details'}
-					aria-pressed={shapingDetailsOpen}
-					onclick={() => (shapingDetailsOpen = !shapingDetailsOpen)}
-				>
-					<span></span>
-				</button>
-			</div>
-
-			{#if !book.worldShape.sedimentUnlocked}
-				<div class="shape-buy-row">
-					<p>
-						the first water has no floor yet. once she understands one aquatic life,
-						she can spend the world's surplus on sediment.
-					</p>
-					<button class="shape-buy" disabled={!book.canBuySediment} onclick={() => book.buySediment()}>
-						sift sediment · {fmt(book.sedimentUnlockCost)} insight
-					</button>
-				</div>
-			{:else}
-				<div class="sediment-readout">
-					<div class="sediment-line">
-						<span>{sedimentPhrase}</span>
-						<strong>{sedimentPct}/{sedimentUnlockPct}%</strong>
-					</div>
-					<div class="sediment-meter" aria-hidden="true">
-						<div style:width="{Math.min(100, (book.sedimentCoverage / SEDIMENT_UNLOCK_COVERAGE) * 100)}%"></div>
-					</div>
-					<p class="shape-note">
-						sift sediment where her hand rests · {fmt(book.sedimentPourRate)} insight/s
-					</p>
-				</div>
-			{/if}
-
-			{#if book.worldShape.unlockedWorldspaces.includes('shallows')}
-				<div class="worldspace-switch" aria-label="worldspace">
-					<button
-						class:active={book.worldShape.activeWorldspace === 'water'}
-						onclick={() => book.enterWorldspace('water')}
-					>
-						water
-					</button>
-					<button
-						class:active={book.worldShape.activeWorldspace === 'shallows'}
-						onclick={() => book.enterWorldspace('shallows')}
-					>
-						shallows
-					</button>
-				</div>
-
-				<section class="feature-panel">
-					<div class="feature-head">
-						<span>archaeological features</span>
-						<small>{book.worldShape.placedFeatures.length}/{FEATURE_SPECS.length} settled</small>
-					</div>
-					<div class="feature-list">
-						{#each FEATURE_SPECS as feature (feature.id)}
-							<article class="feature-row" class:placed={featurePlaced(feature.id)}>
-								<div>
-									<h4>{feature.name}</h4>
-									<p>{feature.short}</p>
-									<span>{feature.effect}</span>
-								</div>
-								<button
-									disabled={!book.canPlaceFeature(feature.id)}
-									onclick={() => book.placeFeature(feature.id)}
-								>
-									{featureActionLabel(feature.id)}
-								</button>
-							</article>
-						{/each}
-					</div>
-				</section>
-			{/if}
-
-			{#if shapingDetailsOpen}
-				<WorldShapingDetails />
-			{/if}
-		</section>
-	{/if}
-
-	<section class="attention-panel">
-		<div class="ap-line">
-			<span class="ap-label">her attention</span>
-			<span class="ap-meta">
-				watching <span class="num">{book.attentionUsed}</span> of
-				<span class="num">{book.attentionCapacity}</span>
-			</span>
-		</div>
-		<div class="ap-actions">
-			{#if book.attentionUpgradeCost !== null}
-				<div class="ap-action">
-					<button
-						class="ap-btn"
-						disabled={book.insight < book.attentionUpgradeCost}
-						onclick={() => book.expandAttention()}
-					>
-						widen her attention — {fmt(book.attentionUpgradeCost)} insight
-					</button>
-					{#if book.insight < book.attentionUpgradeCost}
-						<span class="ap-eta">{humanizeSeconds(book.attentionUpgradeEtaSeconds)} at this rate</span>
-					{/if}
-				</div>
-			{:else}
-				<span class="ap-note">her attention is as wide as it goes, in this world.</span>
-			{/if}
-			<div class="ap-action">
-				<button class="ap-btn" disabled={!book.canDistill()} onclick={() => book.distillEssence()}>
-					distill {DISTILL_INSIGHT_COST} insight → {DISTILL_ESSENCE_GAIN} essence
-				</button>
-				{#if !book.canDistill()}
-					<span class="ap-eta">{humanizeSeconds(book.distillEtaSeconds)} at this rate</span>
-				{/if}
-			</div>
-		</div>
-	</section>
-
-	<FieldNotes />
-
 	{#if attendedLife.length > 0}
 		<section class="attended-strip">
 			<h3 class="strip-head">
@@ -546,6 +414,138 @@
 			{/if}
 		{/each}
 	{/if}
+
+	{#if book.pendingWorldspaceUnlock}
+		<NewWorldspaceUnlock worldspace={book.pendingWorldspaceUnlock} />
+	{/if}
+
+	{#if showWorldShaping}
+		<section class="shape-panel">
+			<div class="shape-head">
+				<div>
+					<span class="shape-kicker">world shaping</span>
+					<h3>{book.worldShape.activeWorldspace === 'shallows' ? 'the shallows' : 'water world'}</h3>
+				</div>
+				<button
+					class="aperture"
+					class:open={shapingDetailsOpen}
+					aria-label={shapingDetailsOpen ? 'hide world details' : 'show world details'}
+					aria-pressed={shapingDetailsOpen}
+					onclick={() => (shapingDetailsOpen = !shapingDetailsOpen)}
+				>
+					<span></span>
+				</button>
+			</div>
+
+			{#if !book.worldShape.sedimentUnlocked}
+				<div class="shape-buy-row">
+					<p>
+						the first water has no floor yet. once she understands one aquatic life,
+						she can spend the world's surplus on sediment.
+					</p>
+					<button class="shape-buy" disabled={!book.canBuySediment} onclick={() => book.buySediment()}>
+						sift sediment · {fmt(book.sedimentUnlockCost)} insight
+					</button>
+				</div>
+			{:else}
+				<div class="sediment-readout">
+					<div class="sediment-line">
+						<span>{sedimentPhrase}</span>
+						<strong>{sedimentPct}/{sedimentUnlockPct}%</strong>
+					</div>
+					<div class="sediment-meter" aria-hidden="true">
+						<div style:width="{Math.min(100, (book.sedimentCoverage / SEDIMENT_UNLOCK_COVERAGE) * 100)}%"></div>
+					</div>
+					<p class="shape-note">
+						sift sediment where her hand rests · {fmt(book.sedimentPourRate)} insight/s
+					</p>
+				</div>
+			{/if}
+
+			{#if book.worldShape.unlockedWorldspaces.includes('shallows')}
+				<div class="worldspace-switch" aria-label="worldspace">
+					<button
+						class:active={book.worldShape.activeWorldspace === 'water'}
+						onclick={() => book.enterWorldspace('water')}
+					>
+						water
+					</button>
+					<button
+						class:active={book.worldShape.activeWorldspace === 'shallows'}
+						onclick={() => book.enterWorldspace('shallows')}
+					>
+						shallows
+					</button>
+				</div>
+
+				<section class="feature-panel">
+					<div class="feature-head">
+						<span>archaeological features</span>
+						<small>{book.worldShape.placedFeatures.length}/{FEATURE_SPECS.length} settled</small>
+					</div>
+					<div class="feature-list">
+						{#each FEATURE_SPECS as feature (feature.id)}
+							<article class="feature-row" class:placed={featurePlaced(feature.id)}>
+								<div>
+									<h4>{feature.name}</h4>
+									<p>{feature.short}</p>
+									<span>{feature.effect}</span>
+								</div>
+								<button
+									disabled={!book.canPlaceFeature(feature.id)}
+									onclick={() => book.placeFeature(feature.id)}
+								>
+									{featureActionLabel(feature.id)}
+								</button>
+							</article>
+						{/each}
+					</div>
+				</section>
+			{/if}
+
+			{#if shapingDetailsOpen}
+				<WorldShapingDetails />
+			{/if}
+		</section>
+	{/if}
+
+	<section class="attention-panel">
+		<div class="ap-line">
+			<span class="ap-label">her attention</span>
+			<span class="ap-meta">
+				watching <span class="num">{book.attentionUsed}</span> of
+				<span class="num">{book.attentionCapacity}</span>
+			</span>
+		</div>
+		<div class="ap-actions">
+			{#if book.attentionUpgradeCost !== null}
+				<div class="ap-action">
+					<button
+						class="ap-btn"
+						disabled={book.insight < book.attentionUpgradeCost}
+						onclick={() => book.expandAttention()}
+					>
+						widen her attention — {fmt(book.attentionUpgradeCost)} insight
+					</button>
+					{#if book.insight < book.attentionUpgradeCost}
+						<span class="ap-eta">{humanizeSeconds(book.attentionUpgradeEtaSeconds)} at this rate</span>
+					{/if}
+				</div>
+			{:else}
+				<span class="ap-note">her attention is as wide as it goes, in this world.</span>
+			{/if}
+			<div class="ap-action">
+				<button class="ap-btn" disabled={!book.canDistill()} onclick={() => book.distillEssence()}>
+					distill {DISTILL_INSIGHT_COST} insight → {DISTILL_ESSENCE_GAIN} essence
+				</button>
+				{#if !book.canDistill()}
+					<span class="ap-eta">{humanizeSeconds(book.distillEtaSeconds)} at this rate</span>
+				{/if}
+			</div>
+		</div>
+	</section>
+
+	<FieldNotes />
 </div>
 
 <style>
@@ -576,10 +576,10 @@
 
 	/* ── world shaping ───────────────────────────────────────────────────── */
 	.shape-panel {
-		border: 1px solid rgba(108, 229, 232, 0.24);
+		border: 1px solid rgba(95, 122, 82, 0.24);
 		border-radius: 4px;
 		background:
-			linear-gradient(180deg, rgba(108, 229, 232, 0.05), rgba(45, 45, 95, 0.24)),
+			linear-gradient(180deg, rgba(95, 122, 82, 0.05), rgba(52, 40, 29, 0.24)),
 			var(--panel);
 		padding: 0.75rem 0.85rem;
 		display: flex;
@@ -619,7 +619,7 @@
 		border-radius: 50%;
 		display: grid;
 		place-items: center;
-		background: rgba(26, 26, 62, 0.55);
+		background: rgba(52, 40, 29, 0.55);
 	}
 	.aperture span,
 	.aperture::before,
@@ -632,19 +632,19 @@
 		width: 0.58rem;
 		height: 0.58rem;
 		background: var(--periwinkle);
-		box-shadow: 0 0 8px rgba(154, 150, 201, 0.35);
+		box-shadow: 0 0 8px rgba(138, 85, 104, 0.35);
 	}
 	.aperture::before {
 		position: absolute;
 		width: 1.35rem;
 		height: 1.35rem;
-		border: 1px solid rgba(154, 150, 201, 0.42);
+		border: 1px solid rgba(138, 85, 104, 0.42);
 	}
 	.aperture::after {
 		position: absolute;
 		width: 1.82rem;
 		height: 1.82rem;
-		border: 1px solid rgba(108, 229, 232, 0.2);
+		border: 1px solid rgba(95, 122, 82, 0.2);
 	}
 	.aperture:hover,
 	.aperture.open {
@@ -709,7 +709,7 @@
 	}
 	.sediment-meter div {
 		height: 100%;
-		background: linear-gradient(90deg, rgba(255, 255, 255, 0.92), #f8e7f4, #cddff8);
+		background: linear-gradient(90deg, var(--leafeon-pink), var(--cyan));
 		transition: width 160ms linear;
 	}
 	.worldspace-switch {
@@ -720,7 +720,7 @@
 	.worldspace-switch button.active {
 		border-color: var(--cyan);
 		color: var(--cyan);
-		background: rgba(108, 229, 232, 0.07);
+		background: rgba(95, 122, 82, 0.07);
 	}
 	.feature-panel {
 		display: flex;
@@ -841,7 +841,7 @@
 
 	/* ── attended strip ─────────────────────────────────────────────────────── */
 	.attended-strip {
-		border: 1px solid rgba(108, 229, 232, 0.22);
+		border: 1px solid rgba(95, 122, 82, 0.22);
 		border-radius: 4px;
 		background: var(--panel);
 		padding: 0.7rem 0.8rem;
@@ -932,7 +932,7 @@
 		letter-spacing: 0.14em;
 		text-transform: uppercase;
 		color: var(--cyan);
-		border: 1px solid rgba(108, 229, 232, 0.38);
+		border: 1px solid rgba(95, 122, 82, 0.38);
 		border-radius: 3px;
 		padding: 0.32rem 0.6rem;
 		text-align: center;
@@ -940,10 +940,10 @@
 	}
 	.look-btn:hover {
 		border-color: var(--cyan);
-		background: rgba(108, 229, 232, 0.07);
+		background: rgba(95, 122, 82, 0.07);
 	}
 	.look-btn:active {
-		background: rgba(108, 229, 232, 0.14);
+		background: rgba(95, 122, 82, 0.14);
 		transform: scale(0.94);
 	}
 
@@ -968,7 +968,7 @@
 	.float-label.boosted {
 		color: var(--leafeon-pink);
 		font-size: 1.02rem;
-		text-shadow: 0 0 6px rgba(240, 143, 184, 0.4);
+		text-shadow: 0 0 6px rgba(184, 80, 108, 0.4);
 	}
 
 	/* card-actions needs position:relative for the card float anchor */
@@ -1021,7 +1021,7 @@
 	}
 	.card.known {
 		background: var(--panel-accent);
-		border-color: rgba(240, 143, 184, 0.4);
+		border-color: rgba(184, 80, 108, 0.4);
 	}
 	.card.just-crossed {
 		animation: stage-flash 900ms ease-out;
@@ -1029,7 +1029,7 @@
 	@keyframes stage-flash {
 		0% {
 			border-color: var(--cyan);
-			box-shadow: 0 0 12px rgba(108, 229, 232, 0.5);
+			box-shadow: 0 0 12px rgba(95, 122, 82, 0.5);
 		}
 		100% {
 			box-shadow: none;
@@ -1187,7 +1187,7 @@
 	}
 	.act:hover:not(:disabled) {
 		color: var(--leafeon-pink);
-		box-shadow: 0 0 8px rgba(240, 143, 184, 0.25);
+		box-shadow: 0 0 8px rgba(184, 80, 108, 0.25);
 	}
 	.act:active:not(:disabled) {
 		transform: scale(0.96);

@@ -72,7 +72,7 @@
 	}
 	.bub-btn:hover {
 		color: var(--leafeon-pink);
-		background: rgba(154, 150, 201, 0.12);
+		background: rgba(138, 85, 104, 0.12);
 	}
 	.bub-btn.bold {
 		font-weight: 700;

@@ -46,25 +46,25 @@
 	.unlock {
 		position: relative;
 		overflow: hidden;
-		border: 1px solid rgba(108, 229, 232, 0.38);
+		border: 1px solid rgba(95, 122, 82, 0.38);
 		border-radius: 4px;
 		background:
-			linear-gradient(120deg, rgba(26, 26, 62, 0.92), rgba(45, 45, 95, 0.82)),
+			linear-gradient(120deg, rgba(52, 40, 29, 0.92), rgba(52, 40, 29, 0.82)),
 			var(--panel);
 		display: grid;
 		grid-template-columns: minmax(8rem, 14rem) 1fr;
 		gap: 1rem;
 		padding: 0.85rem;
-		box-shadow: 0 0 24px rgba(108, 229, 232, 0.08);
+		box-shadow: 0 0 24px rgba(95, 122, 82, 0.08);
 	}
 	.unlock-art {
 		position: relative;
 		min-height: 9rem;
-		border: 1px solid rgba(154, 150, 201, 0.22);
+		border: 1px solid rgba(138, 85, 104, 0.22);
 		border-radius: 3px;
 		overflow: hidden;
 		background:
-			linear-gradient(#273f71 0 38%, rgba(108, 229, 232, 0.32) 38% 100%),
+			linear-gradient(#f3ecda 0 38%, rgba(95, 122, 82, 0.32) 38% 100%),
 			var(--bg);
 	}
 	.sun {
@@ -74,17 +74,17 @@
 		width: 2rem;
 		aspect-ratio: 1;
 		border-radius: 50%;
-		background: rgba(245, 242, 232, 0.42);
-		box-shadow: 0 0 22px rgba(240, 143, 184, 0.36);
+		background: rgba(255, 252, 244, 0.42);
+		box-shadow: 0 0 22px rgba(184, 80, 108, 0.36);
 	}
 	.water {
 		position: absolute;
 		inset: 38% 0 0;
 		background:
-			linear-gradient(rgba(108, 229, 232, 0.26), rgba(154, 150, 201, 0.42)),
+			linear-gradient(rgba(95, 122, 82, 0.26), rgba(138, 85, 104, 0.42)),
 			repeating-linear-gradient(
 				180deg,
-				rgba(245, 242, 232, 0.08) 0 1px,
+				rgba(255, 252, 244, 0.08) 0 1px,
 				transparent 1px 18px
 			);
 	}
@@ -172,7 +172,7 @@
 	.primary {
 		border-color: var(--cyan);
 		color: var(--cyan);
-		background: rgba(108, 229, 232, 0.08);
+		background: rgba(95, 122, 82, 0.08);
 	}
 	@media (max-width: 680px) {
 		.unlock {

@@ -10,7 +10,7 @@
 <style>
 	:global(body) {
 		margin: 0;
-		background: #1a1a3e;
+		background: #f3ecda;
 	}
 	/* base type scale — % keeps it relative to the reader's browser font size,
 	   so every rem in the app scales from here (and large-text prefs are honored) */
