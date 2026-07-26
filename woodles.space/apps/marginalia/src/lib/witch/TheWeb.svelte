@@ -166,7 +166,7 @@
 	}
 	.node.written {
 		background: var(--panel-accent);
-		border-color: rgba(240, 143, 184, 0.4);
+		border-color: rgba(184, 80, 108, 0.4);
 	}
 	.phrase {
 		font-family: var(--font-display);

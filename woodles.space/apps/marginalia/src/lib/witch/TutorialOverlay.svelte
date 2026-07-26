@@ -260,7 +260,7 @@
 	}
 	.tutorial {
 		width: min(25rem, calc(100vw - 2.4rem));
-		border: 1px solid rgba(108, 229, 232, 0.38);
+		border: 1px solid rgba(95, 122, 82, 0.38);
 		border-radius: 6px;
 		background: color-mix(in srgb, var(--panel) 92%, var(--bg));
 		box-shadow: 0 18px 60px rgba(0, 0, 0, 0.36);
@@ -334,7 +334,7 @@
 		line-height: 1;
 	}
 	.dot.done {
-		border-color: rgba(108, 229, 232, 0.55);
+		border-color: rgba(95, 122, 82, 0.55);
 		color: var(--cyan);
 	}
 	.dot.active {
@@ -345,7 +345,7 @@
 	.copy {
 		border: 1px solid var(--rule);
 		border-radius: 5px;
-		background: rgba(26, 26, 62, 0.55);
+		background: rgba(52, 40, 29, 0.55);
 		padding: 0.85rem;
 	}
 	.label {

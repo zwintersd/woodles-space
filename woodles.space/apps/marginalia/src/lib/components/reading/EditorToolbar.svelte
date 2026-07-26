@@ -105,7 +105,7 @@
 	}
 	.tool:hover {
 		color: var(--leafeon-pink);
-		background: rgba(154, 150, 201, 0.08);
+		background: rgba(138, 85, 104, 0.08);
 	}
 	.tool:active {
 		color: var(--cyan);

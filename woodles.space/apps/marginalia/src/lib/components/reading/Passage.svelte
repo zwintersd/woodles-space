@@ -131,7 +131,7 @@
 		padding-left: 1.4rem;
 	}
 	.passage :global(mark) {
-		background: rgba(240, 143, 184, 0.28);
+		background: rgba(184, 80, 108, 0.28);
 		color: inherit;
 		padding: 0 0.1em;
 		border-radius: 2px;
@@ -152,6 +152,6 @@
 		border-radius: 2px;
 	}
 	.passage :global(::selection) {
-		background: rgba(108, 229, 232, 0.28);
+		background: rgba(95, 122, 82, 0.28);
 	}
 </style>

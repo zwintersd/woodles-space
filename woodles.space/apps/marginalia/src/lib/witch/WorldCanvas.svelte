@@ -888,7 +888,7 @@
 		border: 1px solid var(--rule);
 		border-radius: 4px;
 		overflow: hidden;
-		background: linear-gradient(180deg, #f8cdd9 0%, #e7b6ce 38%, #b8b2db 100%);
+		background: linear-gradient(180deg, #f3ecda 0%, #e7cdc6 45%, #b9c9a8 100%);
 		aspect-ratio: 960 / 480;
 	}
 	.diorama.pourable canvas {

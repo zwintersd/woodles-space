@@ -612,7 +612,7 @@
 	.book-spine button.active {
 		color: var(--cream);
 		border-left-color: var(--leafeon-pink);
-		background: linear-gradient(90deg, rgba(240, 143, 184, 0.12), transparent);
+		background: linear-gradient(90deg, rgba(184, 80, 108, 0.12), transparent);
 	}
 	.spine-mark {
 		width: 1.5rem;
@@ -646,15 +646,15 @@
 		position: relative;
 		width: min(9rem, 100%);
 		aspect-ratio: 1;
-		border: 1px solid rgba(108, 229, 232, 0.42);
+		border: 1px solid rgba(95, 122, 82, 0.4);
 		border-radius: 50%;
 		overflow: hidden;
 		background:
-			radial-gradient(circle at 50% 42%, rgba(245, 242, 232, calc(0.08 + var(--portal-favor) * 0.18)), transparent 34%),
-			linear-gradient(180deg, #23235a 0%, #31306c 52%, #171739 100%);
+			radial-gradient(circle at 50% 42%, rgba(216, 150, 140, calc(0.1 + var(--portal-favor) * 0.22)), transparent 34%),
+			var(--bg);
 		box-shadow:
-			0 0 calc(10px + var(--portal-favor) * 22px) rgba(108, 229, 232, 0.22),
-			inset 0 0 26px rgba(26, 26, 62, calc(0.25 + (1 - var(--portal-stability)) * 0.45));
+			0 0 calc(10px + var(--portal-favor) * 22px) rgba(95, 122, 82, 0.22),
+			inset 0 0 26px rgba(52, 40, 29, calc(0.16 + (1 - var(--portal-stability)) * 0.32));
 		transition:
 			border-color 120ms,
 			box-shadow 140ms,
@@ -664,8 +664,8 @@
 		border-color: var(--cyan);
 		transform: translateY(-1px);
 		box-shadow:
-			0 0 calc(14px + var(--portal-favor) * 26px) rgba(108, 229, 232, 0.28),
-			inset 0 0 26px rgba(26, 26, 62, calc(0.25 + (1 - var(--portal-stability)) * 0.45));
+			0 0 calc(14px + var(--portal-favor) * 26px) rgba(95, 122, 82, 0.28),
+			inset 0 0 26px rgba(52, 40, 29, calc(0.16 + (1 - var(--portal-stability)) * 0.32));
 	}
 	.portal:active,
 	.portal.popping {
@@ -676,7 +676,7 @@
 		content: '';
 		position: absolute;
 		inset: 8%;
-		border: 1px solid rgba(245, 242, 232, 0.18);
+		border: 1px solid rgba(52, 40, 29, 0.14);
 		border-radius: 50%;
 		z-index: 5;
 		pointer-events: none;
@@ -692,8 +692,8 @@
 	.portal-sky {
 		inset: 0 0 38%;
 		background:
-			radial-gradient(circle at 66% 28%, rgba(245, 242, 232, calc(0.12 + var(--portal-favor) * 0.26)), transparent 17%),
-			radial-gradient(ellipse at 35% 45%, rgba(108, 229, 232, calc(var(--portal-oxygen) * 0.28)), transparent 50%);
+			radial-gradient(circle at 66% 28%, rgba(255, 252, 244, calc(0.35 + var(--portal-favor) * 0.35)), transparent 17%),
+			radial-gradient(ellipse at 35% 45%, rgba(95, 122, 82, calc(var(--portal-oxygen) * 0.22)), transparent 50%);
 	}
 	.portal-water {
 		left: -8%;
@@ -701,8 +701,8 @@
 		bottom: 0;
 		height: calc(24% + var(--portal-moisture) * 18%);
 		background:
-			radial-gradient(ellipse at 35% 0%, rgba(108, 229, 232, 0.42), transparent 55%),
-			linear-gradient(180deg, rgba(108, 229, 232, 0.32), rgba(45, 45, 95, 0.82));
+			radial-gradient(ellipse at 35% 0%, rgba(95, 122, 82, 0.42), transparent 55%),
+			linear-gradient(180deg, rgba(95, 122, 82, 0.34), rgba(58, 74, 48, 0.82));
 		border-radius: 48% 52% 0 0;
 	}
 	.portal-land {
@@ -711,8 +711,8 @@
 		bottom: calc(18% + var(--portal-moisture) * 9%);
 		height: calc(18% + var(--portal-life) * 12%);
 		background:
-			radial-gradient(ellipse at 48% 0%, rgba(240, 143, 184, calc(var(--portal-life) * 0.22)), transparent 55%),
-			linear-gradient(180deg, #4f426d, #272751);
+			radial-gradient(ellipse at 48% 0%, rgba(184, 80, 108, calc(var(--portal-life) * 0.22)), transparent 55%),
+			linear-gradient(180deg, #c9a877, #5c4630);
 		border-radius: 52% 48% 38% 42%;
 	}
 	.portal-life {
@@ -720,8 +720,8 @@
 		height: calc(14px + var(--portal-life) * 12px);
 		bottom: calc(34% + var(--portal-moisture) * 4%);
 		border-radius: 50% 50% 46% 46%;
-		background: rgba(108, 229, 232, calc(var(--portal-life) * 0.9));
-		box-shadow: 0 0 10px rgba(108, 229, 232, calc(var(--portal-life) * 0.45));
+		background: rgba(95, 122, 82, calc(var(--portal-life) * 0.9));
+		box-shadow: 0 0 10px rgba(95, 122, 82, calc(var(--portal-life) * 0.45));
 		transform-origin: 50% 100%;
 	}
 	.portal-life.one {
@@ -730,7 +730,7 @@
 	}
 	.portal-life.two {
 		left: 50%;
-		background: rgba(240, 143, 184, calc(var(--portal-life) * 0.82));
+		background: rgba(184, 80, 108, calc(var(--portal-life) * 0.82));
 		transform: rotate(5deg) scale(calc(0.5 + var(--portal-life) * 0.3));
 	}
 	.portal-life.three {
@@ -747,14 +747,14 @@
 		font-size: 1.05rem;
 		line-height: 1;
 		color: var(--cyan);
-		text-shadow: 0 0 8px rgba(108, 229, 232, 0.75);
+		text-shadow: 0 0 8px rgba(255, 252, 244, 0.85);
 		white-space: nowrap;
 		pointer-events: none;
 		animation: portal-pop 0.9s ease-out forwards;
 	}
 	.portal-float.attend {
 		color: var(--leafeon-pink);
-		text-shadow: 0 0 8px rgba(240, 143, 184, 0.72);
+		text-shadow: 0 0 8px rgba(255, 252, 244, 0.85);
 	}
 	.portal-float.guide {
 		font-family: var(--font-ui);
@@ -762,7 +762,7 @@
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
 		color: var(--cream);
-		text-shadow: 0 0 8px rgba(245, 242, 232, 0.5);
+		text-shadow: 0 0 8px rgba(255, 252, 244, 0.85);
 	}
 	@keyframes portal-pop {
 		0% {

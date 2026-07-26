@@ -89,8 +89,8 @@
 		min-height: 100vh;
 		padding: 1rem clamp(0.8rem, 3vw, 2rem) 3rem;
 		background:
-			radial-gradient(circle at 12% 8%, rgba(108, 229, 232, 0.12), transparent 22rem),
-			radial-gradient(circle at 88% 12%, rgba(240, 143, 184, 0.1), transparent 24rem),
+			radial-gradient(circle at 12% 8%, rgba(95, 122, 82, 0.12), transparent 22rem),
+			radial-gradient(circle at 88% 12%, rgba(184, 80, 108, 0.1), transparent 24rem),
 			var(--bg);
 	}
 	.arcade-top {

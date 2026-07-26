@@ -1,21 +1,24 @@
-/* marginalia · twilight webcore tokens
-   scoped to the app via the layout wrapper class. */
+/* marginalia · parchment, roses, sage
+   scoped to the app via the layout wrapper class.
+   (formerly "twilight webcore" — same token names, repainted lighter and
+   calmer to match the game's own thesis: attention and restraint, not
+   maximum-brightness urgency.) */
 
 .marginalia-root {
-	--bg: #1a1a3e;
-	--panel: #2d2d5f;
-	--panel-accent: #3d2d4d;
+	--bg: #f3ecda;
+	--panel: #ecdfc2;
+	--panel-accent: #f0dcd6;
 
-	--text: #f5f2e8;
-	--muted: #b9b4d8;
-	--periwinkle: #9a96c9;
-	--rule: rgba(154, 150, 201, 0.22);
+	--text: #34281d;
+	--muted: #6f5d45;
+	--periwinkle: #8a5568;
+	--rule: rgba(52, 40, 29, 0.15);
 
-	--leafeon-pink: #f08fb8;
-	--cyan: #6ce5e8;
-	--print-pink: #b54a85;
-	--ink: #1a1a3e;
-	--cream: #f5f2e8;
+	--leafeon-pink: #b8506c;
+	--cyan: #5f7a52;
+	--print-pink: #7c3349;
+	--ink: #34281d;
+	--cream: #34281d;
 
 	--font-display: 'DM Serif Display', Georgia, serif;
 	--font-body: 'Lora', Georgia, serif;
@@ -23,5 +26,5 @@
 	--font-counter: 'VT323', 'DM Mono', monospace;
 	--font-hand: 'Caveat', cursive;
 
-	color-scheme: dark;
+	color-scheme: light;
 }
