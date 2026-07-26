@@ -185,138 +185,6 @@
 
 	<WorldCanvas />
 
-	{#if book.pendingWorldspaceUnlock}
-		<NewWorldspaceUnlock worldspace={book.pendingWorldspaceUnlock} />
-	{/if}
-
-	{#if showWorldShaping}
-		<section class="shape-panel">
-			<div class="shape-head">
-				<div>
-					<span class="shape-kicker">world shaping</span>
-					<h3>{book.worldShape.activeWorldspace === 'shallows' ? 'the shallows' : 'water world'}</h3>
-				</div>
-				<button
-					class="aperture"
-					class:open={shapingDetailsOpen}
-					aria-label={shapingDetailsOpen ? 'hide world details' : 'show world details'}
-					aria-pressed={shapingDetailsOpen}
-					onclick={() => (shapingDetailsOpen = !shapingDetailsOpen)}
-				>
-					<span></span>
-				</button>
-			</div>
-
-			{#if !book.worldShape.sedimentUnlocked}
-				<div class="shape-buy-row">
-					<p>
-						the first water has no floor yet. once she understands one aquatic life,
-						she can spend the world's surplus on sediment.
-					</p>
-					<button class="shape-buy" disabled={!book.canBuySediment} onclick={() => book.buySediment()}>
-						sift sediment · {fmt(book.sedimentUnlockCost)} insight
-					</button>
-				</div>
-			{:else}
-				<div class="sediment-readout">
-					<div class="sediment-line">
-						<span>{sedimentPhrase}</span>
-						<strong>{sedimentPct}/{sedimentUnlockPct}%</strong>
-					</div>
-					<div class="sediment-meter" aria-hidden="true">
-						<div style:width="{Math.min(100, (book.sedimentCoverage / SEDIMENT_UNLOCK_COVERAGE) * 100)}%"></div>
-					</div>
-					<p class="shape-note">
-						sift sediment where her hand rests · {fmt(book.sedimentPourRate)} insight/s
-					</p>
-				</div>
-			{/if}
-
-			{#if book.worldShape.unlockedWorldspaces.includes('shallows')}
-				<div class="worldspace-switch" aria-label="worldspace">
-					<button
-						class:active={book.worldShape.activeWorldspace === 'water'}
-						onclick={() => book.enterWorldspace('water')}
-					>
-						water
-					</button>
-					<button
-						class:active={book.worldShape.activeWorldspace === 'shallows'}
-						onclick={() => book.enterWorldspace('shallows')}
-					>
-						shallows
-					</button>
-				</div>
-
-				<section class="feature-panel">
-					<div class="feature-head">
-						<span>archaeological features</span>
-						<small>{book.worldShape.placedFeatures.length}/{FEATURE_SPECS.length} settled</small>
-					</div>
-					<div class="feature-list">
-						{#each FEATURE_SPECS as feature (feature.id)}
-							<article class="feature-row" class:placed={featurePlaced(feature.id)}>
-								<div>
-									<h4>{feature.name}</h4>
-									<p>{feature.short}</p>
-									<span>{feature.effect}</span>
-								</div>
-								<button
-									disabled={!book.canPlaceFeature(feature.id)}
-									onclick={() => book.placeFeature(feature.id)}
-								>
-									{featureActionLabel(feature.id)}
-								</button>
-							</article>
-						{/each}
-					</div>
-				</section>
-			{/if}
-
-			{#if shapingDetailsOpen}
-				<WorldShapingDetails />
-			{/if}
-		</section>
-	{/if}
-
-	<section class="attention-panel">
-		<div class="ap-line">
-			<span class="ap-label">her attention</span>
-			<span class="ap-meta">
-				watching <span class="num">{book.attentionUsed}</span> of
-				<span class="num">{book.attentionCapacity}</span>
-			</span>
-		</div>
-		<div class="ap-actions">
-			{#if book.attentionUpgradeCost !== null}
-				<div class="ap-action">
-					<button
-						class="ap-btn"
-						disabled={book.insight < book.attentionUpgradeCost}
-						onclick={() => book.expandAttention()}
-					>
-						widen her attention — {fmt(book.attentionUpgradeCost)} insight
-					</button>
-					{#if book.insight < book.attentionUpgradeCost}
-						<span class="ap-eta">{humanizeSeconds(book.attentionUpgradeEtaSeconds)} at this rate</span>
-					{/if}
-				</div>
-			{:else}
-				<span class="ap-note">her attention is as wide as it goes, in this world.</span>
-			{/if}
-			<div class="ap-action">
-				<button class="ap-btn" disabled={!book.canDistill()} onclick={() => book.distillEssence()}>
-					distill {DISTILL_INSIGHT_COST} insight → {DISTILL_ESSENCE_GAIN} essence
-				</button>
-				{#if !book.canDistill()}
-					<span class="ap-eta">{humanizeSeconds(book.distillEtaSeconds)} at this rate</span>
-				{/if}
-			</div>
-		</div>
-	</section>
-
-	<FieldNotes />
-
 	{#if attendedLife.length > 0}
 		<section class="attended-strip">
 			<h3 class="strip-head">
@@ -546,6 +414,138 @@
 			{/if}
 		{/each}
 	{/if}
+
+	{#if book.pendingWorldspaceUnlock}
+		<NewWorldspaceUnlock worldspace={book.pendingWorldspaceUnlock} />
+	{/if}
+
+	{#if showWorldShaping}
+		<section class="shape-panel">
+			<div class="shape-head">
+				<div>
+					<span class="shape-kicker">world shaping</span>
+					<h3>{book.worldShape.activeWorldspace === 'shallows' ? 'the shallows' : 'water world'}</h3>
+				</div>
+				<button
+					class="aperture"
+					class:open={shapingDetailsOpen}
+					aria-label={shapingDetailsOpen ? 'hide world details' : 'show world details'}
+					aria-pressed={shapingDetailsOpen}
+					onclick={() => (shapingDetailsOpen = !shapingDetailsOpen)}
+				>
+					<span></span>
+				</button>
+			</div>
+
+			{#if !book.worldShape.sedimentUnlocked}
+				<div class="shape-buy-row">
+					<p>
+						the first water has no floor yet. once she understands one aquatic life,
+						she can spend the world's surplus on sediment.
+					</p>
+					<button class="shape-buy" disabled={!book.canBuySediment} onclick={() => book.buySediment()}>
+						sift sediment · {fmt(book.sedimentUnlockCost)} insight
+					</button>
+				</div>
+			{:else}
+				<div class="sediment-readout">
+					<div class="sediment-line">
+						<span>{sedimentPhrase}</span>
+						<strong>{sedimentPct}/{sedimentUnlockPct}%</strong>
+					</div>
+					<div class="sediment-meter" aria-hidden="true">
+						<div style:width="{Math.min(100, (book.sedimentCoverage / SEDIMENT_UNLOCK_COVERAGE) * 100)}%"></div>
+					</div>
+					<p class="shape-note">
+						sift sediment where her hand rests · {fmt(book.sedimentPourRate)} insight/s
+					</p>
+				</div>
+			{/if}
+
+			{#if book.worldShape.unlockedWorldspaces.includes('shallows')}
+				<div class="worldspace-switch" aria-label="worldspace">
+					<button
+						class:active={book.worldShape.activeWorldspace === 'water'}
+						onclick={() => book.enterWorldspace('water')}
+					>
+						water
+					</button>
+					<button
+						class:active={book.worldShape.activeWorldspace === 'shallows'}
+						onclick={() => book.enterWorldspace('shallows')}
+					>
+						shallows
+					</button>
+				</div>
+
+				<section class="feature-panel">
+					<div class="feature-head">
+						<span>archaeological features</span>
+						<small>{book.worldShape.placedFeatures.length}/{FEATURE_SPECS.length} settled</small>
+					</div>
+					<div class="feature-list">
+						{#each FEATURE_SPECS as feature (feature.id)}
+							<article class="feature-row" class:placed={featurePlaced(feature.id)}>
+								<div>
+									<h4>{feature.name}</h4>
+									<p>{feature.short}</p>
+									<span>{feature.effect}</span>
+								</div>
+								<button
+									disabled={!book.canPlaceFeature(feature.id)}
+									onclick={() => book.placeFeature(feature.id)}
+								>
+									{featureActionLabel(feature.id)}
+								</button>
+							</article>
+						{/each}
+					</div>
+				</section>
+			{/if}
+
+			{#if shapingDetailsOpen}
+				<WorldShapingDetails />
+			{/if}
+		</section>
+	{/if}
+
+	<section class="attention-panel">
+		<div class="ap-line">
+			<span class="ap-label">her attention</span>
+			<span class="ap-meta">
+				watching <span class="num">{book.attentionUsed}</span> of
+				<span class="num">{book.attentionCapacity}</span>
+			</span>
+		</div>
+		<div class="ap-actions">
+			{#if book.attentionUpgradeCost !== null}
+				<div class="ap-action">
+					<button
+						class="ap-btn"
+						disabled={book.insight < book.attentionUpgradeCost}
+						onclick={() => book.expandAttention()}
+					>
+						widen her attention — {fmt(book.attentionUpgradeCost)} insight
+					</button>
+					{#if book.insight < book.attentionUpgradeCost}
+						<span class="ap-eta">{humanizeSeconds(book.attentionUpgradeEtaSeconds)} at this rate</span>
+					{/if}
+				</div>
+			{:else}
+				<span class="ap-note">her attention is as wide as it goes, in this world.</span>
+			{/if}
+			<div class="ap-action">
+				<button class="ap-btn" disabled={!book.canDistill()} onclick={() => book.distillEssence()}>
+					distill {DISTILL_INSIGHT_COST} insight → {DISTILL_ESSENCE_GAIN} essence
+				</button>
+				{#if !book.canDistill()}
+					<span class="ap-eta">{humanizeSeconds(book.distillEtaSeconds)} at this rate</span>
+				{/if}
+			</div>
+		</div>
+	</section>
+
+	<FieldNotes />
 </div>
 
 <style>

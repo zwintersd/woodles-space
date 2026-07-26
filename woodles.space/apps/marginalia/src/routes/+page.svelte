@@ -326,8 +326,6 @@
 						</aside>
 					{/if}
 
-					<Ledger />
-
 					<nav class="tabs">
 						<button class:active={book.mode === 'web'} onclick={() => (book.mode = 'web')}>
 							the web
@@ -354,6 +352,8 @@
 							<TheWorld />
 						{/if}
 					</div>
+
+					<Ledger />
 				</section>
 			{/if}
 
@@ -572,7 +572,7 @@
 		width: min(100%, 82rem);
 		margin: 0 auto;
 		display: grid;
-		grid-template-columns: 7.5rem minmax(0, 1fr) 11rem;
+		grid-template-columns: 7.5rem minmax(0, 1fr) 9.5rem;
 		gap: 1.1rem;
 		padding: 0 1rem 4rem;
 	}
@@ -633,8 +633,6 @@
 		color: var(--cyan);
 	}
 	.world-portal-panel {
-		position: sticky;
-		top: 4.2rem;
 		align-self: start;
 		padding-top: 1.4rem;
 		display: flex;
