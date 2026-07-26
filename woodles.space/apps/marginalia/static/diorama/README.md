@@ -1,26 +1,23 @@
 # diorama assets
 
-The world-canvas art lives here. `WorldCanvas.svelte` loads these by exact
-filename and serves them at `/marginalia/diorama/<file>`; missing files are
-skipped (the sky is painted in code), so the scene degrades gracefully and
-fills in as art lands.
+The world-canvas art lives here, served at `/marginalia/diorama/<file>`.
+`WorldCanvas.svelte` paints the sky, weather, water, terrain shelf, and
+sediment floor **procedurally** — no image files back those layers, so
+there is nothing to drop in for them.
 
-See [`../../ASSETS.md`](../../ASSETS.md) for the full brief — sizes, palette,
-and what each sign drives. P1 (the minimum for a living scene):
+The files actually loaded are the sprite sheets layered over that painted
+scene:
 
-- `sky-sun.png`
-- `cloud-a.png`, `cloud-b.png`, `cloud-c.png`
-- `rain.png`
-- `mist.png`
-- `terrain.png` (or `terrain.svg`)
-- `soil.png`
-- `water.png`
-
-P2 (flora & particles) and P3 (gauge frame & icons) are optional richness.
-
-Witch-influence sheets layer over the scene when the world is active:
-
+- `pearl_sediment_bits.png` / `pearl_sediment_clusters.png` — the sifted
+  sediment floor's texture.
 - `witch_influence_motes.png` — ambient magical motes.
 - `witch_water_ripples.png` — water response rings.
 - `sift_sediment_cast.png` — pearlescent falling sediment and impact puffs.
 - `feature_awakenings.png` — soft auras for known/intervened world features.
+
+See [`../../ASSETS.md`](../../ASSETS.md) for sizes and palette. Its P1
+image-layer brief (sky/cloud/rain/mist/terrain/soil/water) describes an
+earlier architecture that the procedural rendering replaced — see
+[`../../DIORAMA_ROADMAP.md`](../../DIORAMA_ROADMAP.md) for the story. P2
+(flora & particles) and P3 (gauge frame & icons) in ASSETS.md are still
+unbuilt, optional richness.
