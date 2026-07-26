@@ -181,6 +181,26 @@
 			ctx!.restore();
 		}
 
+		// The witch-influence sheets (motes, auras) are drawn in 'screen' blend
+		// mode, which barely moves a pixel that's already near-white — and the
+		// sky/water here mostly are. A plain alpha-blended tinted halo behind the
+		// sprite always shows, regardless of how pale the background is, so the
+		// glow reads even where 'screen' alone would wash out invisibly.
+		function drawGlow(x: number, y: number, radius: number, tint: readonly [number, number, number], alpha: number) {
+			if (alpha <= 0.002 || radius <= 0) return;
+			const [r, g, b] = tint;
+			const glow = ctx!.createRadialGradient(x, y, 0, x, y, radius);
+			glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${alpha})`);
+			glow.addColorStop(0.55, `rgba(${r}, ${g}, ${b}, ${alpha * 0.4})`);
+			glow.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+			ctx!.save();
+			ctx!.fillStyle = glow;
+			ctx!.beginPath();
+			ctx!.arc(x, y, radius, 0, TAU);
+			ctx!.fill();
+			ctx!.restore();
+		}
+
 		const spriteCache = new Map<string, { img: HTMLImageElement; ok: boolean }>();
 		function getSprite(src: string) {
 			let entry = spriteCache.get(src);
@@ -658,10 +678,22 @@
 			}
 		}
 
+		// tint per sheet row, so each mote's halo matches its sparkle's own
+		// color instead of one generic glow.
+		const MOTE_TINTS: Record<number, readonly [number, number, number]> = {
+			0: [214, 120, 150],
+			1: [120, 205, 205],
+			2: [235, 230, 245],
+			4: [165, 155, 225],
+			5: [230, 195, 90],
+			6: [200, 210, 235],
+			7: [200, 210, 235]
+		};
+
 		function drawWitchMotes(T: number, intensity: number) {
 			if (!witchMotes.ok || intensity <= 0.02) return;
 			const rows = [0, 1, 2, 4, 5, 6, 7];
-			const count = Math.round(6 + intensity * 16 + book.attentionUsed * 1.5);
+			const count = Math.round(8 + intensity * 22 + book.attentionUsed * 1.5);
 			for (let i = 0; i < count; i++) {
 				const seed = `witch-mote-${book.worldIndex}-${i}`;
 				const drift = (T * (0.018 + stable01(`${seed}-speed`) * 0.025) + stable01(`${seed}-phase`)) % 1;
@@ -672,6 +704,7 @@
 				const col = Math.floor(stable01(`${seed}-col`) * 8);
 				const size = H * (0.018 + stable01(`${seed}-size`) * 0.026);
 				const twinkle = 0.65 + 0.35 * Math.sin(T * (1.2 + stable01(`${seed}-blink`)) + i);
+				drawGlow(x, y, size * 0.95, MOTE_TINTS[row] ?? [200, 210, 235], (0.22 + 0.5 * intensity) * twinkle);
 				drawSheetSprite(
 					witchMotes,
 					row * 8 + col,
@@ -679,7 +712,7 @@
 					y,
 					size,
 					0,
-					(0.1 + 0.42 * intensity) * twinkle,
+					(0.16 + 0.58 * intensity) * twinkle,
 					1,
 					'screen'
 				);
@@ -696,7 +729,7 @@
 				const x = W * (0.12 + stable01(`${seed}-x`) * 0.76);
 				const y = H * (WATER_TOP + 0.06 + stable01(`${seed}-y`) * 0.2);
 				const size = H * (0.12 + stable01(`${seed}-size`) * 0.15);
-				const alpha = (0.1 + 0.22 * intensity) * (0.75 + 0.25 * Math.sin(T + i));
+				const alpha = (0.14 + 0.34 * intensity) * (0.75 + 0.25 * Math.sin(T + i));
 				drawSheetSprite(
 					waterRipples,
 					row * 8 + frame,
@@ -723,7 +756,7 @@
 				const x = W * (0.28 + stable01(`${seed}-x`) * 0.44);
 				const lean = (stable01(`${seed}-lean`) - 0.5) * 0.18;
 				const streamW = H * (0.12 + stable01(`${seed}-w`) * 0.05);
-				const streamAlpha = 0.11 + intensity * 0.2;
+				const streamAlpha = 0.14 + intensity * 0.3;
 				drawSheetRegion(
 					sedimentCast,
 					frame * sw,
@@ -755,6 +788,13 @@
 			}
 		}
 
+		const AURA_TINTS: Record<number, readonly [number, number, number]> = {
+			0: [235, 230, 245],
+			1: [150, 140, 150],
+			2: [230, 200, 110],
+			3: [214, 130, 150]
+		};
+
 		function drawFeatureAuras(T: number, intensity: number) {
 			if (!featureAwakenings.ok || intensity <= 0.02) return;
 			const interventions = Object.keys(book.interventionsDone).length;
@@ -779,6 +819,7 @@
 					: H * (WATER_TOP + 0.12 + stable01(`${seed}-y`) * 0.28);
 				const size = H * (0.15 + stable01(`${seed}-size`) * 0.05);
 				const pulse = 0.78 + 0.22 * Math.sin(T * (0.8 + stable01(`${seed}-pulse`)) + i);
+				drawGlow(x, y, size * 0.6, AURA_TINTS[row] ?? [200, 190, 220], (0.18 + intensity * 0.32) * pulse);
 				drawSheetSprite(
 					featureAwakenings,
 					row * 4 + (i % 4),
@@ -786,12 +827,17 @@
 					y,
 					size,
 					0,
-					(0.08 + intensity * 0.16) * pulse,
+					(0.13 + intensity * 0.26) * pulse,
 					1,
 					'screen'
 				);
 			}
 		}
+
+		// A perceptual ramp: raw signals below get compressed toward the top of
+		// their [0,1] range, so a little tending reads as a visible glow right
+		// away instead of needing everything maxed before anything shows.
+		const shine = (x: number) => Math.pow(clamp01(x), 0.55);
 
 		function draw(tMs: number) {
 			const T = tMs / 1000;
@@ -801,30 +847,35 @@
 			const m = clamp01(book.stocks.moisture / 100);
 			const fav = clamp01(book.favor / 100);
 			const attention = clamp01(book.attentionUsed / Math.max(1, book.attentionCapacity));
-			const witchInfluence = clamp01(
-				book.life.length * 0.03 +
-					book.knownCount * 0.035 +
-					book.worldShape.placedFeatures.length * 0.08 +
-					attention * 0.24 +
-					Math.min(book.insightPerSec / 4, 0.25) +
-					fav * 0.14 +
-					(isPouring ? 0.28 : 0)
+
+			// how present she is *right now* — attention spent, insight flowing,
+			// trust earned. fast-moving; this is what the motes/ripples/sediment
+			// answer to.
+			const tending = clamp01(
+				attention * 0.42 + Math.min(book.insightPerSec / 4, 1) * 0.36 + fav * 0.22
+			);
+			// how deeply the world has come to be known and shaped — slow and
+			// structural, unlike `tending`. this is what the feature auras answer to.
+			const witnessed = clamp01(
+				book.knownCount * 0.05 +
+					book.worldShape.placedFeatures.length * 0.12 +
+					(book.selfBalancing ? 0.22 : 0)
 			);
 
 			drawSky(T);
 			drawWeather(T);
 			drawWaterBase(T);
 			drawSedimentGrid();
-			drawSedimentCast(T, isPouring ? 1 : witchInfluence * 0.35);
+			drawSedimentCast(T, isPouring ? 1 : shine(tending) * 0.45);
 			drawShallowsShelf();
 			drawFeatures();
-			drawFeatureAuras(T, witchInfluence);
+			drawFeatureAuras(T, shine(witnessed));
 			drawCreatureLayers(['water', 'floor'], T);
 			drawWaterGlaze(T);
-			drawWaterRipples(T, m, witchInfluence);
+			drawWaterRipples(T, m, shine(tending * 0.6 + m * 0.4));
 			drawCreatureLayers(['shore', 'air'], T);
 			drawRain(T);
-			drawWitchMotes(T, witchInfluence);
+			drawWitchMotes(T, shine(tending));
 			drawOverlays(T);
 		}
 
