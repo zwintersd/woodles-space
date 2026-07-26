@@ -38,6 +38,18 @@ a procedural-worlds, DESIGN.md phase E, concern). the point: a naturally mineral
 patch of raw floor can now draw geology-domain life on its own, which is the "more
 complicated spawn points" hook future organisms can lean on.
 
+**waymarks — a fourth spawn-point source, player-authored.** alongside the hardcoded
+defaults, sediment, and features, she can now author a spawn point directly: position,
+layer, category, tags (the same five-tag vocabulary above, checkboxes only, no
+free-text), weight, and rarity — a real, persisted mechanic (`worldShape.customSpawnPoints`,
+capped at `MAX_CUSTOM_SPAWN_POINTS` = 6, cost scaling with weight/rarity like an
+intervention does). New panel: `Waymarks.svelte` ("the chart"). Position is set via
+sliders, not click-to-place on the canvas — deliberately, to avoid touching
+`WorldCanvas.svelte`'s already-tuned pointer-event code; worth revisiting if placing
+"blind" feels wrong in practice. `generateSpawnPoints`/`spawnWeightForLife` needed zero
+changes to support this — confirmed live, the world-shaping panel's spawn-points count
+ticks up the instant a waymark is placed.
+
 ---
 
 ## already shipped

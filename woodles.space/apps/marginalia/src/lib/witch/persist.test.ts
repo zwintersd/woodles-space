@@ -117,6 +117,19 @@ describe('load/save/wipe', () => {
 		expect(back?.worldShape.sedimentUnlocked).toBe(true);
 		expect(back?.worldShape.placedCreatures).toEqual([]);
 	});
+	it('fills in customSpawnPoints for a worldShape saved before waymarks shipped', () => {
+		localStorage.setItem(
+			'witch.book.save.v1',
+			JSON.stringify({
+				v: 1,
+				essence: 5,
+				worldShape: { activeWorldspace: 'water', placedFeatures: [], placedCreatures: [] }
+			})
+		);
+		const back = load();
+		expect(back?.essence).toBe(5);
+		expect(back?.worldShape.customSpawnPoints).toEqual([]);
+	});
 });
 
 describe('legacy migration', () => {

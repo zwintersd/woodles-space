@@ -19,6 +19,13 @@ export const WORLD_WATER_TOP = 0.34;
 // read against, rather than sediment texture filling the entire depth.
 export const SEDIMENT_BAND_TOP = 0.8;
 
+// waymarks — spawn points she authors directly, in full. reuses the exact
+// tag vocabulary spawnWeightForLife already reads (excludes 'rare', which is
+// the dedicated `rarity` field below, not a tag). a flat cap keeps this from
+// letting her carpet the world with points.
+export const CUSTOM_SPAWN_TAGS = ['mineral', 'nutrient', 'shelter', 'bottom', 'perch'] as const;
+export const MAX_CUSTOM_SPAWN_POINTS = 6;
+
 export interface SedimentGrid {
 	w: number;
 	h: number;
@@ -45,6 +52,21 @@ export interface PlacedCreature {
 	scale: number;
 }
 
+// A spawn point she authors herself, in full — "waymarks." x/y are plain
+// canvas fractions, the same convention DEFAULT_WATER_SPAWNS/SHALLOWS_SPAWNS
+// already use (not the sediment-grid-normalized space PlacedWorldFeature.y
+// uses, since a waymark isn't sediment-anchored).
+export interface PlacedSpawnPoint {
+	id: string;
+	x: number;
+	y: number;
+	category: LifeCategory;
+	layer: SpawnLayer;
+	tags: string[];
+	weight: number;
+	rarity: SpawnRarity;
+}
+
 export interface WorldShape {
 	activeWorldspace: Worldspace;
 	unlockedWorldspaces: Worldspace[];
@@ -53,6 +75,7 @@ export interface WorldShape {
 	seenUnlocks: Worldspace[];
 	placedFeatures: PlacedWorldFeature[];
 	placedCreatures: PlacedCreature[];
+	customSpawnPoints: PlacedSpawnPoint[];
 	spawnRevision: number;
 }
 
@@ -319,6 +342,7 @@ export function emptyWorldShape(): WorldShape {
 		seenUnlocks: [],
 		placedFeatures: [],
 		placedCreatures: [],
+		customSpawnPoints: [],
 		spawnRevision: 0
 	};
 }
@@ -352,8 +376,48 @@ export function normalizeWorldShape(input: unknown): WorldShape {
 		seenUnlocks: uniqueWorldspaces(maybe.seenUnlocks).filter((space) => space !== 'water'),
 		placedFeatures: normalizePlacedFeatures(maybe.placedFeatures),
 		placedCreatures: normalizePlacedCreatures(maybe.placedCreatures),
+		customSpawnPoints: normalizePlacedSpawnPoints(maybe.customSpawnPoints),
 		spawnRevision: Number.isFinite(maybe.spawnRevision) ? Math.max(0, maybe.spawnRevision ?? 0) : 0
 	};
+}
+
+const LIFE_CATEGORIES: readonly LifeCategory[] = ['aquatic', 'terrestrial', 'atmospheric'];
+const SPAWN_LAYERS: readonly SpawnLayer[] = ['water', 'floor', 'shore', 'air'];
+const SPAWN_RARITIES: readonly SpawnRarity[] = ['common', 'uncommon', 'rare'];
+
+function normalizePlacedSpawnPoints(input: unknown): PlacedSpawnPoint[] {
+	if (!Array.isArray(input)) return [];
+	const seen = new Set<string>();
+	const out: PlacedSpawnPoint[] = [];
+	for (const item of input) {
+		if (!item || typeof item !== 'object') continue;
+		const maybe = item as Partial<PlacedSpawnPoint>;
+		if (
+			!maybe.id ||
+			seen.has(maybe.id) ||
+			!LIFE_CATEGORIES.includes(maybe.category as LifeCategory) ||
+			!SPAWN_LAYERS.includes(maybe.layer as SpawnLayer) ||
+			!SPAWN_RARITIES.includes(maybe.rarity as SpawnRarity)
+		) {
+			continue;
+		}
+		seen.add(maybe.id);
+		const tags = Array.isArray(maybe.tags)
+			? maybe.tags.filter((tag): tag is string => CUSTOM_SPAWN_TAGS.includes(tag as (typeof CUSTOM_SPAWN_TAGS)[number]))
+			: [];
+		out.push({
+			id: maybe.id,
+			x: clamp01(Number(maybe.x ?? 0.5)),
+			y: clamp01(Number(maybe.y ?? 0.5)),
+			category: maybe.category as LifeCategory,
+			layer: maybe.layer as SpawnLayer,
+			tags,
+			weight: Number.isFinite(maybe.weight) ? Math.max(0.3, Math.min(2, maybe.weight!)) : 1,
+			rarity: maybe.rarity as SpawnRarity
+		});
+		if (out.length >= MAX_CUSTOM_SPAWN_POINTS) break;
+	}
+	return out;
 }
 
 function normalizePlacedFeatures(input: unknown): PlacedWorldFeature[] {
@@ -532,6 +596,69 @@ export function placeCreature(shape: WorldShape, creatureId: string): WorldShape
 	};
 }
 
+// waymarks — spawn points she authors directly. cost scales with how much
+// pull she's asking for, in the same range interventions already cost
+// (25–150 insight, content/interventions.ts): a cheap, common, low-weight
+// mark is close to free; a rare, high-weight one costs like a real
+// intervention.
+export function customSpawnPointCost(weight: number, rarity: SpawnRarity): number {
+	const rarityBonus = rarity === 'rare' ? 50 : rarity === 'uncommon' ? 20 : 0;
+	return Math.round(20 + weight * 25 + rarityBonus);
+}
+
+export function canPlaceCustomSpawnPoint(shape: WorldShape, layer: SpawnLayer): boolean {
+	if (shape.customSpawnPoints.length >= MAX_CUSTOM_SPAWN_POINTS) return false;
+	if ((layer === 'shore' || layer === 'air') && !isShallowsUnlocked(shape)) return false;
+	return true;
+}
+
+export interface CustomSpawnPointInput {
+	x: number;
+	y: number;
+	category: LifeCategory;
+	layer: SpawnLayer;
+	tags: string[];
+	weight: number;
+	rarity: SpawnRarity;
+}
+
+// spawnRevision is monotonically increasing and bumped exactly once per
+// mutation (including removals below), so shape.spawnRevision + 1 has never
+// been used as an id before — collision-free even after a mark is removed
+// and a new one takes its place, unlike a plain array-length-based id would be.
+export function placeCustomSpawnPoint(shape: WorldShape, input: CustomSpawnPointInput): WorldShape {
+	if (!canPlaceCustomSpawnPoint(shape, input.layer)) return shape;
+	const id = `waymark-${shape.spawnRevision + 1}`;
+	return {
+		...shape,
+		customSpawnPoints: [
+			...shape.customSpawnPoints,
+			{
+				id,
+				x: clamp01(input.x),
+				y: clamp01(input.y),
+				category: input.category,
+				layer: input.layer,
+				tags: input.tags.filter((tag) =>
+					CUSTOM_SPAWN_TAGS.includes(tag as (typeof CUSTOM_SPAWN_TAGS)[number])
+				),
+				weight: Math.max(0.3, Math.min(2, input.weight)),
+				rarity: input.rarity
+			}
+		],
+		spawnRevision: shape.spawnRevision + 1
+	};
+}
+
+export function removeCustomSpawnPoint(shape: WorldShape, id: string): WorldShape {
+	if (!shape.customSpawnPoints.some((point) => point.id === id)) return shape;
+	return {
+		...shape,
+		customSpawnPoints: shape.customSpawnPoints.filter((point) => point.id !== id),
+		spawnRevision: shape.spawnRevision + 1
+	};
+}
+
 function findFeatureAnchor(
 	grid: SedimentGrid,
 	minSediment: number
@@ -585,6 +712,19 @@ export function generateSpawnPoints(shape: WorldShape): SpawnPoint[] {
 				featureId: placed.id
 			});
 		}
+	}
+	for (const mark of shape.customSpawnPoints) {
+		points.push({
+			id: mark.id,
+			x: mark.x,
+			y: mark.y,
+			category: mark.category,
+			tags: mark.tags,
+			weight: mark.weight,
+			rarity: mark.rarity,
+			layer: mark.layer,
+			scale: 1
+		});
 	}
 	return points;
 }

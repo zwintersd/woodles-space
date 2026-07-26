@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { Life } from './content/life';
 import {
+	MAX_CUSTOM_SPAWN_POINTS,
 	SEDIMENT_BAND_TOP,
 	SEDIMENT_CELL_THRESHOLD,
 	SEDIMENT_UNLOCK_COVERAGE,
 	applySedimentPour,
+	canPlaceCustomSpawnPoint,
 	creaturePlacementStatus,
+	customSpawnPointCost,
 	emptySedimentGrid,
 	emptyWorldShape,
 	featurePlacementStatus,
@@ -13,7 +16,9 @@ import {
 	lifeVisibleInWorldspace,
 	normalizeWorldShape,
 	placeCreature,
+	placeCustomSpawnPoint,
 	placeFeatureOnBestSediment,
+	removeCustomSpawnPoint,
 	resolveSpawnPointForLife,
 	sedimentCoverage,
 	unlockWorldspacesForCoverage,
@@ -191,5 +196,67 @@ describe('worldShape decorative creatures', () => {
 		const withTwo = placeCreature(withOne, 'spotted_swimmer');
 		const [first, second] = withTwo.placedCreatures;
 		expect(first.x).not.toBeCloseTo(second.x, 1);
+	});
+});
+
+describe('worldShape waymarks (player-authored spawn points)', () => {
+	const mark = {
+		x: 0.4,
+		y: 0.5,
+		category: 'aquatic' as const,
+		layer: 'water' as const,
+		tags: ['mineral'],
+		weight: 1,
+		rarity: 'common' as const
+	};
+
+	it('costs more for higher weight and rarer marks', () => {
+		const cheap = customSpawnPointCost(0.3, 'common');
+		const dear = customSpawnPointCost(2, 'rare');
+		expect(dear).toBeGreaterThan(cheap);
+		expect(cheap).toBeGreaterThan(0);
+	});
+
+	it('places a water-layer waymark with no shallows requirement', () => {
+		const shape = emptyWorldShape();
+		expect(canPlaceCustomSpawnPoint(shape, 'water')).toBe(true);
+		const placed = placeCustomSpawnPoint(shape, mark);
+		expect(placed.customSpawnPoints).toHaveLength(1);
+		expect(placed.spawnRevision).toBe(shape.spawnRevision + 1);
+		expect(generateSpawnPoints(placed).some((point) => point.id === placed.customSpawnPoints[0].id)).toBe(
+			true
+		);
+	});
+
+	it('gates shore/air waymarks behind the shallows unlock', () => {
+		const shape = emptyWorldShape();
+		expect(canPlaceCustomSpawnPoint(shape, 'shore')).toBe(false);
+		expect(placeCustomSpawnPoint(shape, { ...mark, layer: 'shore', category: 'terrestrial' })).toBe(shape);
+		const unlocked = { ...shape, unlockedWorldspaces: ['water', 'shallows'] as Worldspace[] };
+		expect(canPlaceCustomSpawnPoint(unlocked, 'shore')).toBe(true);
+	});
+
+	it('enforces the flat cap', () => {
+		let shape = emptyWorldShape();
+		for (let i = 0; i < MAX_CUSTOM_SPAWN_POINTS; i++) {
+			shape = placeCustomSpawnPoint(shape, mark);
+		}
+		expect(shape.customSpawnPoints).toHaveLength(MAX_CUSTOM_SPAWN_POINTS);
+		expect(canPlaceCustomSpawnPoint(shape, 'water')).toBe(false);
+		expect(placeCustomSpawnPoint(shape, mark)).toBe(shape);
+	});
+
+	it('drops unrecognized tags rather than storing arbitrary strings', () => {
+		const placed = placeCustomSpawnPoint(emptyWorldShape(), { ...mark, tags: ['mineral', 'made-up-tag'] });
+		expect(placed.customSpawnPoints[0].tags).toEqual(['mineral']);
+	});
+
+	it('removes a waymark and drops it from generated spawn points', () => {
+		const placed = placeCustomSpawnPoint(emptyWorldShape(), mark);
+		const id = placed.customSpawnPoints[0].id;
+		const removed = removeCustomSpawnPoint(placed, id);
+		expect(removed.customSpawnPoints).toHaveLength(0);
+		expect(removed.spawnRevision).toBe(placed.spawnRevision + 1);
+		expect(generateSpawnPoints(removed).some((point) => point.id === id)).toBe(false);
 	});
 });

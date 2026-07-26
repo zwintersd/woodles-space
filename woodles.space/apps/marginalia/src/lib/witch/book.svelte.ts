@@ -71,15 +71,22 @@ import {
 	SEDIMENT_UNLOCK_COST,
 	SEDIMENT_POUR_RATE,
 	applySedimentPour,
+	canPlaceCustomSpawnPoint as canPlaceCustomSpawnPointInShape,
 	creaturePlacementStatus,
+	customSpawnPointCost,
 	emptyWorldShape,
 	featurePlacementStatus,
 	normalizeWorldShape,
 	placeCreature as placeCreatureIntoShape,
+	placeCustomSpawnPoint as placeCustomSpawnPointIntoShape,
 	placeFeatureOnBestSediment,
+	removeCustomSpawnPoint as removeCustomSpawnPointFromShape,
 	sedimentCoverage as sedimentCoverageOf,
 	unlockWorldspacesForCoverage,
 	visibleLifeForWorldspace,
+	type CustomSpawnPointInput,
+	type SpawnLayer,
+	type SpawnRarity,
 	type WorldFeatureId,
 	type WorldShape,
 	type Worldspace
@@ -751,6 +758,36 @@ export class Book {
 
 	placeCreature(creatureId: string) {
 		const next = placeCreatureIntoShape(this.worldShape, creatureId);
+		if (next === this.worldShape) return;
+		this.worldShape = next;
+		this.persist();
+	}
+
+	// waymarks — spawn points she authors herself, in full: position, layer,
+	// category, tags, weight, rarity. paid in Insight, capped, gated the same
+	// way shore/air menagerie creatures are.
+	canPlaceCustomSpawnPoint(layer: SpawnLayer): boolean {
+		return canPlaceCustomSpawnPointInShape(this.worldShape, layer);
+	}
+
+	customSpawnPointCostFor(weight: number, rarity: SpawnRarity): number {
+		return customSpawnPointCost(weight, rarity);
+	}
+
+	placeCustomSpawnPoint(input: CustomSpawnPointInput): boolean {
+		if (!this.canPlaceCustomSpawnPoint(input.layer)) return false;
+		const cost = this.customSpawnPointCostFor(input.weight, input.rarity);
+		if (this.insight < cost) return false;
+		const next = placeCustomSpawnPointIntoShape(this.worldShape, input);
+		if (next === this.worldShape) return false;
+		this.insight -= cost;
+		this.worldShape = next;
+		this.persist();
+		return true;
+	}
+
+	removeCustomSpawnPoint(id: string) {
+		const next = removeCustomSpawnPointFromShape(this.worldShape, id);
 		if (next === this.worldShape) return;
 		this.worldShape = next;
 		this.persist();

@@ -14,6 +14,7 @@
 	import FieldNotes from './FieldNotes.svelte';
 	import WorldShapingDetails from './WorldShapingDetails.svelte';
 	import CreatureCall from './CreatureCall.svelte';
+	import Waymarks from './Waymarks.svelte';
 	import { FEATURE_SPECS, SEDIMENT_UNLOCK_COVERAGE, type WorldFeatureId } from './worldShape';
 
 	const categories: { id: LifeCategory; label: string }[] = [
@@ -511,6 +512,8 @@
 	{/if}
 
 	<CreatureCall />
+
+	<Waymarks />
 
 	<section class="attention-panel">
 		<div class="ap-line">
