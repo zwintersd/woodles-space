@@ -31,3 +31,12 @@ export function clampStatus(value: number): number {
 	const clamped = Math.max(0, Math.min(10, value));
 	return Math.round(clamped * 10) / 10;
 }
+
+// Clamp a creature's diorama size multiplier into [0.25, 2.5], kept to two
+// decimals so the slider doesn't spray float dust into storage. NaN → 1, the
+// house default.
+export function clampSizeScale(value: number): number {
+	if (Number.isNaN(value)) return 1;
+	const clamped = Math.max(0.25, Math.min(2.5, value));
+	return Math.round(clamped * 100) / 100;
+}

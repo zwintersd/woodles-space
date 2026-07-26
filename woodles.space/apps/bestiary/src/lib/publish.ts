@@ -78,6 +78,7 @@ export function buildPublicCreature(
 		isolatedSprite: resolvedSpriteFor(creature),
 		hasIsolatedSprite: !isCardOnly(creature),
 		pixelated: creature.pixelated,
+		sizeScale: creature.sizeScale ?? 1,
 		...(source ? { sourceImage: source } : {}),
 		publishedAt
 	};

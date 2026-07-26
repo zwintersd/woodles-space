@@ -3,7 +3,7 @@
 	import { domains, rarities } from '$lib/content/domains';
 	import type { Domain, Rarity } from '$lib/content/domains';
 	import type { CardSize } from '$lib/types';
-	import { clampInt } from '$lib/utils';
+	import { clampInt, clampSizeScale } from '$lib/utils';
 	import {
 		emptyComposition,
 		cloneComposition,
@@ -132,6 +132,10 @@
 	function step(field: 'cost' | 'power' | 'toughness', delta: number) {
 		if (!creature) return;
 		setNumber(field, creature[field] + delta);
+	}
+
+	function setSizeScale(raw: number) {
+		set({ sizeScale: clampSizeScale(raw) });
 	}
 
 	function handleSprite(dataUrl: string, pixelated: boolean) {
@@ -514,6 +518,28 @@
 								/>
 								pixel art — keep edges crisp
 							</label>
+						{/if}
+
+						{#if creature.sprite}
+							{@const scale = creature.sizeScale ?? 1}
+							<label class="row">
+								<span class="row-label">
+									size in the diorama
+									<span class="read">{scale.toFixed(2)}×</span>
+								</span>
+								<input
+									type="range"
+									min="0.25"
+									max="2.5"
+									step="0.05"
+									value={scale}
+									oninput={(e) => setSizeScale(e.currentTarget.valueAsNumber)}
+								/>
+							</label>
+							<p class="hint-note">
+								tunes how big this sprite reads against the others — handy since some art comes in
+								at 256px and some at 512px. the card itself is unaffected.
+							</p>
 						{/if}
 					</fieldset>
 				{:else if section === 'lore'}
@@ -1156,6 +1182,17 @@
 		cursor: pointer;
 	}
 	.check input { accent-color: var(--b-gold); width: 14px; height: 14px; }
+
+	.row { display: flex; flex-direction: column; gap: 0.2rem; }
+	.row-label {
+		display: flex;
+		justify-content: space-between;
+		font-family: var(--b-font-mono);
+		font-size: 0.72rem;
+		color: var(--b-text-dim);
+	}
+	.row .read { color: var(--b-muted); }
+	.row input[type='range'] { width: 100%; accent-color: var(--b-gold); }
 
 	/* studio entry */
 	.studio-open {

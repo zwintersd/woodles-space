@@ -136,6 +136,9 @@ export interface WorldCreature {
 	sprite: string | null;
 	isolatedSprite?: string | null;
 	pixelated: boolean;
+	// diorama size multiplier, resolved to a concrete number (1 = house
+	// default) regardless of whether the source creature ever set one.
+	sizeScale: number;
 	source: WorldCreatureSource;
 }
 
@@ -156,6 +159,7 @@ function toLocalWorldCreature(c: BestiaryCreature): WorldCreature {
 		sprite: c.sprite,
 		isolatedSprite: c.isolatedSprite,
 		pixelated: c.pixelated,
+		sizeScale: c.sizeScale ?? 1,
 		source: 'local'
 	};
 }
@@ -175,6 +179,7 @@ function toPublishedWorldCreature(c: PublicCreature): WorldCreature {
 		sprite: isolated ? null : c.isolatedSprite,
 		isolatedSprite: isolated ? c.isolatedSprite : null,
 		pixelated: c.pixelated ?? false,
+		sizeScale: c.sizeScale ?? 1,
 		source: 'published'
 	};
 }
