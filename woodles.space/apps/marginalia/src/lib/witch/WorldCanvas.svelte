@@ -4,6 +4,7 @@
 	import { book } from './book.svelte';
 	import {
 		CREATURE_SPECS,
+		SEDIMENT_BAND_TOP,
 		WORLD_WATER_TOP,
 		creatureById,
 		featureById,
@@ -19,6 +20,7 @@
 
 	const ASPECT = 960 / 480;
 	const WATER_TOP = WORLD_WATER_TOP;
+	const FLOOR_TOP = SEDIMENT_BAND_TOP;
 	const CREATURE_BOX = 0.2;
 	const PEARL_BIT_SPRITES = [0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 14, 15, 48, 49, 50, 55, 57, 60, 61, 62, 63];
 	const PASTEL_BIT_SPRITES = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 52, 53, 56, 59];
@@ -368,7 +370,10 @@
 
 		function drawSedimentGrid() {
 			const grid = book.worldShape.sedimentGrid;
-			const waterY = H * WATER_TOP;
+			// confined to the bottom fraction of the canvas (FLOOR_TOP), not the
+			// whole water column, so open water stays clear for creatures to
+			// read against instead of sediment texture filling the entire depth.
+			const waterY = H * FLOOR_TOP;
 			const waterH = H - waterY;
 			const cellW = W / grid.w;
 			const cellH = waterH / grid.h;
@@ -480,7 +485,10 @@
 
 		function drawShallowsShelf() {
 			if (book.worldShape.activeWorldspace !== 'shallows') return;
-			const y = H * 0.57;
+			// anchored to where the sediment floor actually starts now (FLOOR_TOP),
+			// so the shallow-water tinge and the visible floor read as one place
+			// instead of the wash starting well above where any floor shows.
+			const y = H * FLOOR_TOP;
 			const shelf = ctx!.createLinearGradient(0, y - 16, 0, y + 52);
 			shelf.addColorStop(0, 'rgba(255, 255, 255, 0)');
 			shelf.addColorStop(0.4, 'rgba(248, 241, 255, 0.32)');

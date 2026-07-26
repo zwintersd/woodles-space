@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Life } from './content/life';
 import {
+	SEDIMENT_BAND_TOP,
 	SEDIMENT_CELL_THRESHOLD,
 	SEDIMENT_UNLOCK_COVERAGE,
 	applySedimentPour,
@@ -17,6 +18,8 @@ import {
 	sedimentCoverage,
 	unlockWorldspacesForCoverage,
 	visibleLifeForWorldspace,
+	waterGridYToWorld,
+	worldYToWaterGrid,
 	type Worldspace
 } from './worldShape';
 
@@ -73,6 +76,14 @@ describe('worldShape sediment', () => {
 		});
 		expect(next.unlockedWorldspaces).toContain('shallows');
 		expect(next.spawnRevision).toBe(1);
+	});
+
+	it('confines the sediment/floor band to the bottom fraction of the canvas', () => {
+		expect(waterGridYToWorld(0)).toBeCloseTo(SEDIMENT_BAND_TOP);
+		expect(waterGridYToWorld(1)).toBeCloseTo(1);
+		expect(worldYToWaterGrid(SEDIMENT_BAND_TOP - 0.01)).toBeNull();
+		expect(worldYToWaterGrid(SEDIMENT_BAND_TOP)).toBeCloseTo(0);
+		expect(worldYToWaterGrid(1)).toBeCloseTo(1);
 	});
 });
 

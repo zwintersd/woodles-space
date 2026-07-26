@@ -22,6 +22,14 @@ auto-placed, no vitals/insight participation, deliberately kept that simple. See
 fps, filenames) — two entries are wired up (`star_drifter`, `spotted_swimmer`) but their
 actual PNG files still need to land in `static/diorama/`.
 
+**update once real sprites landed:** the sediment/floor was filling the *entire* water
+column, competing visually with the new creature art for attention. confined it to the
+bottom `SEDIMENT_BAND_TOP` (20%) of the canvas instead — sediment rendering, placed
+features, the pour interaction, and the "floor" creature-layer band all reference the
+same constant now, so they stay in sync. the "shallows" shelf wash is anchored to it too,
+so it reads as one place instead of the tinge starting well above where any floor shows.
+the color-science pass below is still open and separate from this.
+
 ---
 
 ## already shipped
