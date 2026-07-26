@@ -71,9 +71,11 @@ import {
 	SEDIMENT_UNLOCK_COST,
 	SEDIMENT_POUR_RATE,
 	applySedimentPour,
+	creaturePlacementStatus,
 	emptyWorldShape,
 	featurePlacementStatus,
 	normalizeWorldShape,
+	placeCreature as placeCreatureIntoShape,
 	placeFeatureOnBestSediment,
 	sedimentCoverage as sedimentCoverageOf,
 	unlockWorldspacesForCoverage,
@@ -731,6 +733,24 @@ export class Book {
 
 	placeFeature(featureId: WorldFeatureId) {
 		const next = placeFeatureOnBestSediment(this.worldShape, featureId);
+		if (next === this.worldShape) return;
+		this.worldShape = next;
+		this.persist();
+	}
+
+	// decorative shared creatures — no vitals/insight participation, see
+	// CREATURE_SPECS in worldShape.ts. free and auto-placed, same shape as
+	// the feature-placement trio above.
+	canPlaceCreature(creatureId: string): boolean {
+		return creaturePlacementStatus(this.worldShape, creatureId).ok;
+	}
+
+	creaturePlacementReason(creatureId: string): string {
+		return creaturePlacementStatus(this.worldShape, creatureId).reason;
+	}
+
+	placeCreature(creatureId: string) {
+		const next = placeCreatureIntoShape(this.worldShape, creatureId);
 		if (next === this.worldShape) return;
 		this.worldShape = next;
 		this.persist();

@@ -13,6 +13,7 @@
 	import WorldCanvas from './WorldCanvas.svelte';
 	import FieldNotes from './FieldNotes.svelte';
 	import WorldShapingDetails from './WorldShapingDetails.svelte';
+	import CreatureCall from './CreatureCall.svelte';
 	import { FEATURE_SPECS, SEDIMENT_UNLOCK_COVERAGE, type WorldFeatureId } from './worldShape';
 
 	const categories: { id: LifeCategory; label: string }[] = [
@@ -508,6 +509,8 @@
 			{/if}
 		</section>
 	{/if}
+
+	<CreatureCall />
 
 	<section class="attention-panel">
 		<div class="ap-line">

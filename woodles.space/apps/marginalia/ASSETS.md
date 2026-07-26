@@ -1,8 +1,10 @@
 # marginalia — visual asset brief (the world canvas)
 
 what to draw for the §1.6 **biome diorama** in [DESIGN.md](./DESIGN.md), for the parts
-that still need art: the creatures come from your Bestiary sprites via the existing
-binding, and the sky/weather/water/sediment floor are painted procedurally in
+that still need art: life's creatures come from your Bestiary sprites via the existing
+binding; the diorama also has a second, separate creature pool now — **shared, public,
+decorative sprite sheets** ("the menagerie" — see below) that anyone gets, not tied to a
+user's own Bestiary. the sky/weather/water/sediment floor are painted procedurally in
 `WorldCanvas.svelte` (`drawSky`, `drawWeather`, `drawWaterBase`, `drawShallowsShelf`,
 `drawSedimentGrid`) — there is no P1 image-layer brief to fill anymore; the version of
 this doc that asked for `sky-sun.png`, `cloud-a/b/c.png`, `rain.png`, `mist.png`,
@@ -46,6 +48,43 @@ what's left to draw is **P2/P3 below** — richness on top of the procedural sce
   `/marginalia/diorama/<file>`; the code loads them base-prefixed, so you only need the
   right filenames. Sizes are targets — within ±25% is fine; **aspect ratio matters more
   than exact pixels.**
+
+---
+
+## the menagerie — shared creature sprite sheets
+
+**this is live and already wired up** — `worldShape.ts`'s `CREATURE_SPECS` lists two
+entries (`star_drifter`, `spotted_swimmer`) and the in-fiction panel to call them into
+the scene exists (`CreatureCall.svelte`), but the actual sprite sheets aren't in the repo
+yet — the canvas just skips them gracefully until they land, same as any other missing
+diorama asset. this is the pipeline your animator app should target:
+
+- **grid:** a sprite sheet, cols × rows of equal-size cells, one animation frame each.
+  the two references you've shown are 4 cols × 3 rows (12 frames) — that's not a hard
+  rule, `CreatureSpec.cols`/`rows`/`frameCount` are declared per creature, so a sheet can
+  be any grid as long as the code entry matches it.
+- **playback:** `fps` (also per-creature) — the code just does
+  `frame = floor(T * fps) % frameCount` and blits that cell. loops seamlessly if your
+  last frame flows back into your first.
+- **style:** transparent background, soft/painterly (matches the existing convention
+  above) — these render at normal opacity, no pixelation.
+- **filename:** whatever you set as `CreatureSpec.sprite`, dropped into
+  `apps/marginalia/static/diorama/` (flat, same folder as everything else here).
+- **adding a new creature:** drop the sheet in, add one entry to `CREATURE_SPECS` with
+  its `id`/`name`/`blurb`/`sprite`/`cols`/`rows`/`frameCount`/`fps`/`layer`/`boxScale` —
+  it shows up in the menagerie panel automatically, no other wiring needed.
+- **`layer`** places it like life's own spawn layers do: `water` (mid-water, both
+  current entries), `floor` (bottom), `shore`, or `air`. `shore`/`air` creatures are
+  gated behind the shallows being unlocked (they'd have nowhere sensible to sit before
+  that); `water`/`floor` are available immediately.
+- **decorative only, deliberately:** no vitals, no stages, no cost — see
+  [DIORAMA_ROADMAP.md](./DIORAMA_ROADMAP.md) for why, and for the "room to grow later"
+  note if that ever changes.
+
+**still needed:** `star-drifter.png` and `spotted-swimmer.png`, matching the reference
+images already shared, at whatever grid/fps you actually rendered them at (update
+`CREATURE_SPECS` in `worldShape.ts` if it doesn't match the 4×3 @ 8/10fps placeholder
+currently there).
 
 ---
 

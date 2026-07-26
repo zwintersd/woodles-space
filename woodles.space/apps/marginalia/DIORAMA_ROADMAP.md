@@ -12,6 +12,18 @@ where it lives.
 
 ---
 
+## the menagerie — a new pillar, not on the original list
+
+a new decorative-creature system landed after the items below: a shared, public sprite
+pool (`CREATURE_SPECS` in `worldShape.ts`, distinct from per-user Bestiary bindings) that
+Brianna can call into the scene via a new panel (`CreatureCall.svelte`) — free,
+auto-placed, no vitals/insight participation, deliberately kept that simple. See
+[ASSETS.md](./ASSETS.md)'s "the menagerie" section for the sprite-sheet convention (grid,
+fps, filenames) — two entries are wired up (`star_drifter`, `spotted_swimmer`) but their
+actual PNG files still need to land in `static/diorama/`.
+
+---
+
 ## already shipped
 
 - **witch-influence overlays were nearly invisible.** motes/ripples/sediment-cast/

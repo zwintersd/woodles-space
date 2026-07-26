@@ -29,6 +29,17 @@ export interface PlacedWorldFeature {
 	scale: number;
 }
 
+// A placed instance of a CREATURE_SPECS entry — decorative only, no vitals/
+// insight participation. Parallels PlacedWorldFeature exactly.
+export interface PlacedCreature {
+	id: string;
+	creatureId: string;
+	x: number;
+	y: number;
+	rotation: number;
+	scale: number;
+}
+
 export interface WorldShape {
 	activeWorldspace: Worldspace;
 	unlockedWorldspaces: Worldspace[];
@@ -36,6 +47,7 @@ export interface WorldShape {
 	sedimentGrid: SedimentGrid;
 	seenUnlocks: Worldspace[];
 	placedFeatures: PlacedWorldFeature[];
+	placedCreatures: PlacedCreature[];
 	spawnRevision: number;
 }
 
@@ -103,6 +115,63 @@ export const FEATURE_SPECS = [
 ] as const satisfies readonly WorldFeatureSpec[];
 
 export type WorldFeatureId = (typeof FEATURE_SPECS)[number]['id'];
+
+// Shared, public, decorative creature sprites — separate from Bestiary
+// bindings (which are per-user) and from Life (which has vitals/stages).
+// These are pure visual flourish: Brianna can call one into the scene, it
+// gets a spot and plays its animation loop, and that's the whole mechanic.
+// `cols`/`rows`/`frameCount`/`fps` describe the sprite sheet exactly the way
+// witch-influence sheets already do (see WorldCanvas.svelte's loadSheet).
+export interface CreatureSpec {
+	id: string;
+	name: string;
+	blurb: string;
+	sprite: string;
+	cols: number;
+	rows: number;
+	frameCount: number;
+	fps: number;
+	layer: SpawnLayer;
+	boxScale: number;
+}
+
+// names/blurbs below are a placeholder draft in Brianna's voice — redline freely.
+export const CREATURE_SPECS = [
+	{
+		id: 'star_drifter',
+		name: 'star-drifter',
+		blurb: 'something with more points than it needs, going nowhere in particular.',
+		sprite: 'star-drifter.png',
+		cols: 4,
+		rows: 3,
+		frameCount: 12,
+		fps: 8,
+		layer: 'water',
+		boxScale: 0.9
+	},
+	{
+		id: 'spotted_swimmer',
+		name: 'spotted swimmer',
+		blurb: 'small, spotted, unbothered. it was already here when she looked.',
+		sprite: 'spotted-swimmer.png',
+		cols: 4,
+		rows: 3,
+		frameCount: 12,
+		fps: 10,
+		layer: 'water',
+		boxScale: 1.05
+	}
+] as const satisfies readonly CreatureSpec[];
+
+export type CreatureId = (typeof CREATURE_SPECS)[number]['id'];
+
+export function creatureById(id: unknown): CreatureSpec | null {
+	return CREATURE_SPECS.find((creature) => creature.id === id) ?? null;
+}
+
+export function isCreatureId(id: unknown): id is CreatureId {
+	return CREATURE_SPECS.some((creature) => creature.id === id);
+}
 
 const DEFAULT_WATER_SPAWNS: SpawnPoint[] = [
 	{
@@ -244,6 +313,7 @@ export function emptyWorldShape(): WorldShape {
 		sedimentGrid: emptySedimentGrid(),
 		seenUnlocks: [],
 		placedFeatures: [],
+		placedCreatures: [],
 		spawnRevision: 0
 	};
 }
@@ -276,6 +346,7 @@ export function normalizeWorldShape(input: unknown): WorldShape {
 		sedimentGrid,
 		seenUnlocks: uniqueWorldspaces(maybe.seenUnlocks).filter((space) => space !== 'water'),
 		placedFeatures: normalizePlacedFeatures(maybe.placedFeatures),
+		placedCreatures: normalizePlacedCreatures(maybe.placedCreatures),
 		spawnRevision: Number.isFinite(maybe.spawnRevision) ? Math.max(0, maybe.spawnRevision ?? 0) : 0
 	};
 }
@@ -292,6 +363,27 @@ function normalizePlacedFeatures(input: unknown): PlacedWorldFeature[] {
 		out.push({
 			id: maybe.id,
 			featureId: maybe.featureId,
+			x: clamp01(Number(maybe.x ?? 0.5)),
+			y: clamp01(Number(maybe.y ?? 0.5)),
+			rotation: Number.isFinite(maybe.rotation) ? maybe.rotation! : 0,
+			scale: Number.isFinite(maybe.scale) ? Math.max(0.5, Math.min(1.6, maybe.scale!)) : 1
+		});
+	}
+	return out;
+}
+
+function normalizePlacedCreatures(input: unknown): PlacedCreature[] {
+	if (!Array.isArray(input)) return [];
+	const seen = new Set<string>();
+	const out: PlacedCreature[] = [];
+	for (const item of input) {
+		if (!item || typeof item !== 'object') continue;
+		const maybe = item as Partial<PlacedCreature>;
+		if (!maybe.id || seen.has(maybe.id) || !isCreatureId(maybe.creatureId)) continue;
+		seen.add(maybe.id);
+		out.push({
+			id: maybe.id,
+			creatureId: maybe.creatureId,
 			x: clamp01(Number(maybe.x ?? 0.5)),
 			y: clamp01(Number(maybe.y ?? 0.5)),
 			rotation: Number.isFinite(maybe.rotation) ? maybe.rotation! : 0,
@@ -376,6 +468,60 @@ export function placeFeatureOnBestSediment(
 				rotation: -0.35 + seed * 0.7,
 				scale: 0.82 + seed * 0.36
 			}
+		],
+		spawnRevision: shape.spawnRevision + 1
+	};
+}
+
+export type CreaturePlacementReason = 'ready' | 'locked' | 'already-placed' | 'unknown';
+
+export function creaturePlacementStatus(
+	shape: WorldShape,
+	creatureId: string
+): { ok: boolean; reason: CreaturePlacementReason } {
+	const creature = creatureById(creatureId);
+	if (!creature) return { ok: false, reason: 'unknown' };
+	if ((creature.layer === 'shore' || creature.layer === 'air') && !isShallowsUnlocked(shape)) {
+		return { ok: false, reason: 'locked' };
+	}
+	if (shape.placedCreatures.some((placed) => placed.creatureId === creatureId)) {
+		return { ok: false, reason: 'already-placed' };
+	}
+	return { ok: true, reason: 'ready' };
+}
+
+// the band each layer occupies, in plain canvas-fraction terms — not the
+// sediment-grid-normalized space placedFeatures.y uses, since creatures
+// aren't sediment-anchored. matches DEFAULT_WATER_SPAWNS/SHALLOWS_SPAWNS'
+// own y values for each layer.
+const CREATURE_LAYER_BANDS: Record<SpawnLayer, { lo: number; hi: number }> = {
+	air: { lo: 0.14, hi: 0.3 },
+	shore: { lo: 0.5, hi: 0.6 },
+	water: { lo: 0.42, hi: 0.72 },
+	floor: { lo: 0.76, hi: 0.9 }
+};
+
+// free and auto-placed, same as placeFeatureOnBestSediment but with no
+// sediment anchor to seek — decorative creatures just need a spot within
+// their layer's natural band.
+export function placeCreature(shape: WorldShape, creatureId: string): WorldShape {
+	const status = creaturePlacementStatus(shape, creatureId);
+	const creature = creatureById(creatureId);
+	if (!status.ok || !creature) return shape;
+	const index = shape.placedCreatures.length;
+	const id = `${creatureId}-${index + 1}`;
+	const band = CREATURE_LAYER_BANDS[creature.layer];
+	const seed = stable01(`${id}:seed`);
+	// successive placements spread across the width by index rather than
+	// clustering — the same crowding problem spawn points have (see
+	// WorldCanvas.svelte's drawCreatureLayers), avoided here by construction.
+	const x = 0.12 + ((index * 0.37 + seed * 0.16) % 0.76);
+	const y = band.lo + seed * (band.hi - band.lo);
+	return {
+		...shape,
+		placedCreatures: [
+			...shape.placedCreatures,
+			{ id, creatureId, x, y, rotation: -0.2 + seed * 0.4, scale: 0.88 + seed * 0.28 }
 		],
 		spawnRevision: shape.spawnRevision + 1
 	};

@@ -3,7 +3,9 @@
 	import { base } from '$app/paths';
 	import { book } from './book.svelte';
 	import {
+		CREATURE_SPECS,
 		WORLD_WATER_TOP,
+		creatureById,
 		featureById,
 		resolveSpawnPointForLife,
 		stable01,
@@ -142,6 +144,13 @@
 		const waterRipples = loadSheet('witch_water_ripples.png', 8, 2);
 		const sedimentCast = loadSheet('sift_sediment_cast.png', 8, 4);
 		const featureAwakenings = loadSheet('feature_awakenings.png', 4, 4);
+
+		// the shared, public decorative-creature pool (CREATURE_SPECS) — a
+		// small fixed list, so eagerly loading all of them (like the sheets
+		// above) is fine regardless of what's actually been placed yet.
+		const creatureSheets = new Map<string, SpriteSheet>(
+			CREATURE_SPECS.map((spec) => [spec.id, loadSheet(spec.sprite, spec.cols, spec.rows)])
+		);
 
 		function pickSprite(options: number[], seed: string): number {
 			return options[Math.floor(stable01(seed) * options.length) % options.length];
@@ -633,6 +642,48 @@
 			}
 		}
 
+		// the shared decorative creatures Brianna calls into the scene
+		// (CREATURE_SPECS / worldShape.placedCreatures) — no vitals/stage
+		// concept, just an animated sprite sheet at a fixed placed spot.
+		function drawPlacedCreatures(layers: SpawnLayer[], T: number) {
+			for (const placed of book.worldShape.placedCreatures) {
+				const spec = creatureById(placed.creatureId);
+				if (!spec || !layers.includes(spec.layer)) continue;
+				const sheet = creatureSheets.get(spec.id);
+				if (!sheet || !sheet.ok || !sheet.img.naturalWidth) continue;
+
+				const cellW = sheet.img.naturalWidth / sheet.cols;
+				const cellH = sheet.img.naturalHeight / sheet.rows;
+				const yScale = cellW > 0 ? cellH / cellW : 1;
+				const size = H * CREATURE_BOX * spec.boxScale * placed.scale;
+				const dh = size * yScale;
+
+				const seed = placed.x + placed.y + placed.id.length * 0.013;
+				const jitter = (placed.id.length % 7) * W * 0.002;
+				const cx = Math.min(Math.max(placed.x * W + jitter, size * 0.5), W - size * 0.5);
+				// same floor/bottom-edge clamp as drawCreatureLayers, for the same
+				// reason: a floor-layer creature's band goes fairly deep, and its
+				// bob shouldn't be able to carry it past the canvas.
+				const minCy = dh * 0.5 + H * 0.01;
+				const maxCy = H - dh * 0.65 - H * 0.01;
+				const rawCy = placed.y * H + layerBob(spec.layer, T, seed);
+				const cy = Math.min(Math.max(rawCy, minCy), Math.max(minCy, maxCy));
+
+				if (spec.layer === 'floor' || spec.layer === 'shore') {
+					ctx!.save();
+					ctx!.globalAlpha = 0.22;
+					ctx!.fillStyle = 'rgb(14, 14, 40)';
+					ctx!.beginPath();
+					ctx!.ellipse(cx, cy + dh * 0.35, size * 0.32, dh * 0.06, 0, 0, Math.PI * 2);
+					ctx!.fill();
+					ctx!.restore();
+				}
+
+				const frame = Math.floor(T * spec.fps) % spec.frameCount;
+				drawSheetSprite(sheet, frame, cx, cy, size, placed.rotation, 1, yScale);
+			}
+		}
+
 		function drawRain(T: number) {
 			const m = clamp01(book.stocks.moisture / 100);
 			const ro2 = clamp01((m - 0.7) / 0.3) * 0.7;
@@ -950,9 +1001,11 @@
 			drawFeatures();
 			drawFeatureAuras(T, shine(witnessed));
 			drawCreatureLayers(['water', 'floor'], T);
+			drawPlacedCreatures(['water', 'floor'], T);
 			drawWaterGlaze(T);
 			drawWaterRipples(T, m, shine(tending * 0.6 + m * 0.4));
 			drawCreatureLayers(['shore', 'air'], T);
+			drawPlacedCreatures(['shore', 'air'], T);
 			drawRain(T);
 			drawWitchMotes(T, shine(tending));
 			drawOverlays(T);

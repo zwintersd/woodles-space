@@ -4,12 +4,14 @@ import {
 	SEDIMENT_CELL_THRESHOLD,
 	SEDIMENT_UNLOCK_COVERAGE,
 	applySedimentPour,
+	creaturePlacementStatus,
 	emptySedimentGrid,
 	emptyWorldShape,
 	featurePlacementStatus,
 	generateSpawnPoints,
 	lifeVisibleInWorldspace,
 	normalizeWorldShape,
+	placeCreature,
 	placeFeatureOnBestSediment,
 	resolveSpawnPointForLife,
 	sedimentCoverage,
@@ -124,5 +126,39 @@ describe('worldShape features and spawns', () => {
 		const first = resolveSpawnPointForLife(aquaticLife, withFeature);
 		const second = resolveSpawnPointForLife(aquaticLife, withFeature);
 		expect(second).toEqual(first);
+	});
+});
+
+describe('worldShape decorative creatures', () => {
+	it('places a water-layer creature for free with no shallows requirement', () => {
+		const shape = emptyWorldShape();
+		expect(creaturePlacementStatus(shape, 'star_drifter')).toEqual({ ok: true, reason: 'ready' });
+		const placed = placeCreature(shape, 'star_drifter');
+		expect(placed.placedCreatures).toHaveLength(1);
+		expect(placed.placedCreatures[0].creatureId).toBe('star_drifter');
+		expect(placed.spawnRevision).toBe(shape.spawnRevision + 1);
+	});
+
+	it('refuses a second placement of the same creature', () => {
+		const shape = placeCreature(emptyWorldShape(), 'star_drifter');
+		expect(creaturePlacementStatus(shape, 'star_drifter')).toEqual({
+			ok: false,
+			reason: 'already-placed'
+		});
+		expect(placeCreature(shape, 'star_drifter')).toBe(shape);
+	});
+
+	it('rejects an unknown creature id', () => {
+		expect(creaturePlacementStatus(emptyWorldShape(), 'not_a_creature')).toEqual({
+			ok: false,
+			reason: 'unknown'
+		});
+	});
+
+	it('spreads successive placements across the width instead of stacking', () => {
+		const withOne = placeCreature(emptyWorldShape(), 'star_drifter');
+		const withTwo = placeCreature(withOne, 'spotted_swimmer');
+		const [first, second] = withTwo.placedCreatures;
+		expect(first.x).not.toBeCloseTo(second.x, 1);
 	});
 });

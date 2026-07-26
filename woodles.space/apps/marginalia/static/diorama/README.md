@@ -15,6 +15,12 @@ scene:
 - `sift_sediment_cast.png` — pearlescent falling sediment and impact puffs.
 - `feature_awakenings.png` — soft auras for known/intervened world features.
 
+Also expected here (not yet delivered — the canvas skips them gracefully
+until they land): `star-drifter.png`, `spotted-swimmer.png` — the shared,
+public decorative-creature sprite sheets declared in `worldShape.ts`'s
+`CREATURE_SPECS`. See ASSETS.md's "the menagerie" section for the exact
+grid/fps convention before adding more.
+
 See [`../../ASSETS.md`](../../ASSETS.md) for sizes and palette. Its P1
 image-layer brief (sky/cloud/rain/mist/terrain/soil/water) describes an
 earlier architecture that the procedural rendering replaced — see

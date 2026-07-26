@@ -101,6 +101,22 @@ describe('load/save/wipe', () => {
 		wipe();
 		expect(load()).toBeNull();
 	});
+	it('fills in placedCreatures for a worldShape saved before it existed', () => {
+		// simulates a save from before CREATURE_SPECS/placedCreatures shipped —
+		// worldShape itself is present (so it isn't just emptyWorldShape's
+		// default), but has no placedCreatures field at all.
+		localStorage.setItem(
+			'witch.book.save.v1',
+			JSON.stringify({
+				v: 1,
+				essence: 3,
+				worldShape: { activeWorldspace: 'water', sedimentUnlocked: true, placedFeatures: [] }
+			})
+		);
+		const back = load();
+		expect(back?.worldShape.sedimentUnlocked).toBe(true);
+		expect(back?.worldShape.placedCreatures).toEqual([]);
+	});
 });
 
 describe('legacy migration', () => {
