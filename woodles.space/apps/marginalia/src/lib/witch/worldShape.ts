@@ -13,6 +13,11 @@ export const SEDIMENT_POUR_RATE = 0.8;
 export const SEDIMENT_POUR_RADIUS = 2.5;
 export const SEDIMENT_POUR_STRENGTH = 0.46;
 export const WORLD_WATER_TOP = 0.34;
+// the sediment floor — and anything anchored to it (placed features, the
+// pour interaction) — is confined to this bottom fraction of the canvas,
+// not the whole water column. keeps the open water clear for creatures to
+// read against, rather than sediment texture filling the entire depth.
+export const SEDIMENT_BAND_TOP = 0.8;
 
 export interface SedimentGrid {
 	w: number;
@@ -498,7 +503,7 @@ const CREATURE_LAYER_BANDS: Record<SpawnLayer, { lo: number; hi: number }> = {
 	air: { lo: 0.14, hi: 0.3 },
 	shore: { lo: 0.5, hi: 0.6 },
 	water: { lo: 0.42, hi: 0.72 },
-	floor: { lo: 0.76, hi: 0.9 }
+	floor: { lo: SEDIMENT_BAND_TOP, hi: 0.93 }
 };
 
 // free and auto-placed, same as placeFeatureOnBestSediment but with no
@@ -550,12 +555,12 @@ function findFeatureAnchor(
 }
 
 export function waterGridYToWorld(y: number): number {
-	return WORLD_WATER_TOP + clamp01(y) * (1 - WORLD_WATER_TOP);
+	return SEDIMENT_BAND_TOP + clamp01(y) * (1 - SEDIMENT_BAND_TOP);
 }
 
 export function worldYToWaterGrid(y: number): number | null {
-	if (y < WORLD_WATER_TOP || y > 1) return null;
-	return clamp01((y - WORLD_WATER_TOP) / (1 - WORLD_WATER_TOP));
+	if (y < SEDIMENT_BAND_TOP || y > 1) return null;
+	return clamp01((y - SEDIMENT_BAND_TOP) / (1 - SEDIMENT_BAND_TOP));
 }
 
 export function generateSpawnPoints(shape: WorldShape): SpawnPoint[] {
@@ -584,6 +589,20 @@ export function generateSpawnPoints(shape: WorldShape): SpawnPoint[] {
 	return points;
 }
 
+// The raw floor's own character, independent of anything placed on it —
+// reuses the exact vocabulary spawnWeightForLife already knows how to read
+// (mineral/nutrient/shelter/bottom), so a naturally mineral-rich patch of
+// sediment can draw geology life before a mineral_glint feature ever lands
+// there. Varies by grid position, not by world/save — spatial variety
+// within one world is what spawn points need; per-world reseeding is a
+// procedural-worlds (DESIGN.md phase E) concern, not this one.
+const SEDIMENT_SURFACE_TAGS = ['mineral', 'nutrient', 'shelter', 'bottom'] as const;
+
+function sedimentSurfaceTag(bx: number, by: number): string {
+	const roll = stable01(`sediment-surface:${bx}:${by}`);
+	return SEDIMENT_SURFACE_TAGS[Math.floor(roll * SEDIMENT_SURFACE_TAGS.length)];
+}
+
 function sedimentSpawnPoints(grid: SedimentGrid): SpawnPoint[] {
 	const points: SpawnPoint[] = [];
 	const blockW = 6;
@@ -607,7 +626,7 @@ function sedimentSpawnPoints(grid: SedimentGrid): SpawnPoint[] {
 				x,
 				y: waterGridYToWorld(waterY),
 				category: 'aquatic',
-				tags: ['sediment', waterY > 0.55 ? 'bottom' : 'shallow'],
+				tags: ['sediment', waterY > 0.55 ? 'bottom' : 'shallow', sedimentSurfaceTag(bx, by)],
 				weight: 0.45 + avg,
 				rarity: avg > 0.62 ? 'uncommon' : 'common',
 				layer: 'floor',

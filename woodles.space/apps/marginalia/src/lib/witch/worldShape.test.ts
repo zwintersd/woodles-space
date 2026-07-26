@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Life } from './content/life';
 import {
+	SEDIMENT_BAND_TOP,
 	SEDIMENT_CELL_THRESHOLD,
 	SEDIMENT_UNLOCK_COVERAGE,
 	applySedimentPour,
@@ -17,6 +18,8 @@ import {
 	sedimentCoverage,
 	unlockWorldspacesForCoverage,
 	visibleLifeForWorldspace,
+	waterGridYToWorld,
+	worldYToWaterGrid,
 	type Worldspace
 } from './worldShape';
 
@@ -74,6 +77,14 @@ describe('worldShape sediment', () => {
 		expect(next.unlockedWorldspaces).toContain('shallows');
 		expect(next.spawnRevision).toBe(1);
 	});
+
+	it('confines the sediment/floor band to the bottom fraction of the canvas', () => {
+		expect(waterGridYToWorld(0)).toBeCloseTo(SEDIMENT_BAND_TOP);
+		expect(waterGridYToWorld(1)).toBeCloseTo(1);
+		expect(worldYToWaterGrid(SEDIMENT_BAND_TOP - 0.01)).toBeNull();
+		expect(worldYToWaterGrid(SEDIMENT_BAND_TOP)).toBeCloseTo(0);
+		expect(worldYToWaterGrid(1)).toBeCloseTo(1);
+	});
 });
 
 describe('worldShape life gating', () => {
@@ -126,6 +137,26 @@ describe('worldShape features and spawns', () => {
 		const first = resolveSpawnPointForLife(aquaticLife, withFeature);
 		const second = resolveSpawnPointForLife(aquaticLife, withFeature);
 		expect(second).toEqual(first);
+	});
+
+	it('gives dense sediment blocks a procedural surface tag, independent of features', () => {
+		const w = 12;
+		const h = 6;
+		const shape = normalizeWorldShape({
+			unlockedWorldspaces: ['water', 'shallows'],
+			sedimentGrid: { w, h, cells: new Array(w * h).fill(0.7) }
+		});
+		const sedimentPoints = generateSpawnPoints(shape).filter((point) => point.tags.includes('sediment'));
+		const surfaceVocab = ['mineral', 'nutrient', 'shelter', 'bottom'];
+		expect(sedimentPoints.length).toBeGreaterThan(1);
+		for (const point of sedimentPoints) {
+			expect(point.tags.some((tag) => surfaceVocab.includes(tag))).toBe(true);
+		}
+		// different blocks get their own (deterministic) roll, not one fixed tag
+		const distinctSurfaceTags = new Set(
+			sedimentPoints.map((point) => point.tags.find((tag) => surfaceVocab.includes(tag)))
+		);
+		expect(distinctSurfaceTags.size).toBeGreaterThan(1);
 	});
 });
 
