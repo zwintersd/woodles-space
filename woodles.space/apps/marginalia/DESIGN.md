@@ -332,9 +332,11 @@ register for you to redline.
 
 ## 5. asset list (for you)
 
-moved to a dedicated brief with composition, exact sizes, palette hexes, and delivery
-conventions: **[ASSETS.md](./ASSETS.md)**. (P1 is the minimum for a living diorama;
-P2/P3 are richness. creatures come from Bestiary bindings, so you don't draw those.)
+moved to a dedicated brief with palette hexes and delivery conventions:
+**[ASSETS.md](./ASSETS.md)**. its original P1 (the image-layer diorama environment) is
+retired — the canvas paints sky/weather/water/sediment procedurally instead, see
+[DIORAMA_ROADMAP.md](./DIORAMA_ROADMAP.md). P2/P3 there are still open, unbuilt
+richness. creatures come from Bestiary bindings, so you don't draw those.
 
 ---
 
@@ -345,7 +347,7 @@ each phase is shippable on its own and unblocks the next.
 | phase | what | depends on | status |
 | --- | --- | --- | --- |
 | **A** | vital-signs math — stocks, bands, stress, vitality, gating; the `quiet` placeholder; surfaced as numbers in the Ledger | — | ✅ shipped |
-| **B** | the canvas diorama (environment + creatures), **+ visible decline/death** (loss made legible alongside the art) | A · P1 assets | ✅ scaffold shipped (decline/death still pending) |
+| **B** | the canvas diorama (environment + creatures), **+ visible decline/death** (loss made legible alongside the art) | A | ✅ scaffold shipped (decline/death still pending) |
 | **C** | interventions — the five verbs, intervention load, equilibrium dividend | A | ✅ shipped |
 | **D** | prestige — close the Book, Concepts, the Study meta-tree, Essence/attention reset | A, C | — |
 | **E** | procedural worlds — generator, name-gen, creature-cap scaling, worlds 2+ | D | — |

@@ -9,8 +9,11 @@
 		stable01,
 		waterGridYToWorld,
 		worldYToWaterGrid,
-		type SpawnLayer
+		type SedimentGrid,
+		type SpawnLayer,
+		type SpawnPoint
 	} from './worldShape';
+	import type { Life } from './content/life';
 
 	const ASPECT = 960 / 480;
 	const WATER_TOP = WORLD_WATER_TOP;
@@ -78,12 +81,27 @@
 	onMount(() => {
 		const canvas = canvasEl!;
 		const wrap = wrapEl!;
-		const ctx = canvas.getContext('2d');
+		let ctx = canvas.getContext('2d');
 		if (!ctx) return;
 
-		const reduce =
-			typeof matchMedia !== 'undefined' &&
-			matchMedia('(prefers-reduced-motion: reduce)').matches;
+		// the sediment floor doesn't animate — every cell's sprite choice and
+		// placement is seeded off (x, y, spawnRevision), not time — but it was
+		// still being fully repainted (up to 48x12 cells, several sprite draws
+		// each) on every single animation frame. bake it to this offscreen
+		// canvas once per actual change and blit the result instead.
+		const sedimentCanvas = document.createElement('canvas');
+		const sedimentCtx = sedimentCanvas.getContext('2d');
+		let sedimentBakedGrid: SedimentGrid | null = null;
+		let sedimentBakedW = 0;
+		let sedimentBakedH = 0;
+
+		const motionQuery =
+			typeof matchMedia !== 'undefined' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+		let reduce = motionQuery?.matches ?? false;
+		const onMotionChange = (event: MediaQueryListEvent) => {
+			reduce = event.matches;
+		};
+		motionQuery?.addEventListener('change', onMotionChange);
 
 		let dpr = 1;
 		let W = 0;
@@ -431,6 +449,26 @@
 			}
 		}
 
+		// rebakes drawSedimentGrid() into the offscreen sediment canvas by
+		// temporarily pointing the shared `ctx` at it — every draw helper below
+		// already reads `ctx` dynamically, so nothing else needs to change.
+		function ensureSedimentBaked() {
+			if (!sedimentCtx) return;
+			const grid = book.worldShape.sedimentGrid;
+			if (grid === sedimentBakedGrid && W === sedimentBakedW && H === sedimentBakedH) return;
+			sedimentCanvas.width = Math.max(1, Math.round(W * dpr));
+			sedimentCanvas.height = Math.max(1, Math.round(H * dpr));
+			const liveCtx = ctx;
+			ctx = sedimentCtx;
+			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+			ctx.clearRect(0, 0, W, H);
+			drawSedimentGrid();
+			ctx = liveCtx;
+			sedimentBakedGrid = grid;
+			sedimentBakedW = W;
+			sedimentBakedH = H;
+		}
+
 		function drawShallowsShelf() {
 			if (book.worldShape.activeWorldspace !== 'shallows') return;
 			const y = H * 0.57;
@@ -521,11 +559,33 @@
 			return Math.sin(T * speed + seed * Math.PI * 2) * H * amp;
 		}
 
+		// resolveSpawnPointForLife regenerates the entire spawn-point pool —
+		// including a scan of the sediment grid — on every call, but the point it
+		// resolves to for a given life only changes when the worldspace or
+		// spawnRevision does. it was being called twice per life on every single
+		// animation frame; cache it instead, invalidating on those two keys.
+		let spawnPointCacheKey = '';
+		const spawnPointCache = new Map<string, SpawnPoint>();
+		function spawnPointFor(life: Life): SpawnPoint {
+			const shape = book.worldShape;
+			const key = `${shape.activeWorldspace}:${shape.spawnRevision}`;
+			if (key !== spawnPointCacheKey) {
+				spawnPointCache.clear();
+				spawnPointCacheKey = key;
+			}
+			let point = spawnPointCache.get(life.id);
+			if (!point) {
+				point = resolveSpawnPointForLife(life, shape);
+				spawnPointCache.set(life.id, point);
+			}
+			return point;
+		}
+
 		function drawCreatureLayers(layers: SpawnLayer[], T: number) {
 			for (const life of book.life) {
 				const info = spriteFor(life.id);
 				if (!info) continue;
-				const point = resolveSpawnPointForLife(life, book.worldShape);
+				const point = spawnPointFor(life);
 				if (!layers.includes(point.layer)) continue;
 				const entry = getSprite(info.src);
 				if (!entry.ok || !entry.img.naturalWidth) continue;
@@ -536,8 +596,14 @@
 				const scale = box / Math.max(entry.img.naturalWidth, entry.img.naturalHeight);
 				const dw = entry.img.naturalWidth * scale;
 				const dh = entry.img.naturalHeight * scale;
-				const jitter = (point.id.length % 7) * W * 0.002;
-				const cx = point.x * W + jitter;
+				// a handful of spawn points serve many lives before sediment/features
+				// expand the pool (world 1 alone has 4 aquatic life sharing 3 points,
+				// and 4 terrestrial life sharing 1) — offsetting by the *point* rather
+				// than the *life* meant co-located creatures rendered at the exact same
+				// x. key the fan-out on the (point, life) pair so it's stable across
+				// frames/reloads but distinct per creature.
+				const fan = (stable01(`${point.id}:${life.id}:fan`) - 0.5) * W * 0.09;
+				const cx = Math.min(Math.max(point.x * W + fan, dw * 0.5), W - dw * 0.5);
 				// floor spawns (dense sediment, placed features) are biased toward
 				// the deepest rows and can sit close enough to y=1 that a
 				// full-size sprite's bottom edge — plus its bob — would fall past
@@ -877,7 +943,8 @@
 			drawSky(T);
 			drawWeather(T);
 			drawWaterBase(T);
-			drawSedimentGrid();
+			ensureSedimentBaked();
+			ctx!.drawImage(sedimentCanvas, 0, 0, W, H);
 			drawSedimentCast(T, isPouring ? 1 : shine(tending) * 0.45);
 			drawShallowsShelf();
 			drawFeatures();
@@ -928,6 +995,7 @@
 			if (raf) cancelAnimationFrame(raf);
 			ro.disconnect();
 			document.removeEventListener('visibilitychange', onVisibility);
+			motionQuery?.removeEventListener('change', onMotionChange);
 		};
 	});
 </script>
@@ -935,7 +1003,9 @@
 <div class="diorama" bind:this={wrapEl} class:pourable={book.canPourSediment()} class:pouring={isPouring}>
 	<canvas
 		bind:this={canvasEl}
-		aria-label="a living water world where sediment can gather into shallows"
+		aria-label={book.canPourSediment()
+			? 'a living water world — tap and drag on the water to sift sediment into shallows'
+			: 'a living water world where sediment can gather into shallows'}
 		onpointerdown={startPour}
 		onpointermove={movePour}
 		onpointerup={stopPour}

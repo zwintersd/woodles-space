@@ -1,96 +1,51 @@
 # marginalia — visual asset brief (the world canvas)
 
-what to draw for the §1.6 **biome diorama** in [DESIGN.md](./DESIGN.md): a side-on
-slice of Brianna's world — sky over land over water — that fills and animates from
-the vital signs. this is the **phase B** art; phase A (the sign math) ships first as
-numbers, so nothing is blocked on these.
+what to draw for the §1.6 **biome diorama** in [DESIGN.md](./DESIGN.md), for the parts
+that still need art: the creatures come from your Bestiary sprites via the existing
+binding, and the sky/weather/water/sediment floor are painted procedurally in
+`WorldCanvas.svelte` (`drawSky`, `drawWeather`, `drawWaterBase`, `drawShallowsShelf`,
+`drawSedimentGrid`) — there is no P1 image-layer brief to fill anymore; the version of
+this doc that asked for `sky-sun.png`, `cloud-a/b/c.png`, `rain.png`, `mist.png`,
+`terrain.svg`, `soil.png`, `water.png` described an earlier architecture that the
+procedural rendering replaced, and those files have been removed. see
+[DIORAMA_ROADMAP.md](./DIORAMA_ROADMAP.md) for the current punch list, including the
+still-open **nutrients has no visual hook** gap (oxygen/moisture/favor/stability all
+drive something on the canvas; nutrients doesn't, yet).
 
-**you don't draw the creatures.** living things come from your Bestiary sprites via
-the existing binding. these assets are the *stage* they stand on: sky, weather, land,
-water, and a few ambient bits.
-
----
-
-## the composition
-
-a wide, short band. three parallax layers between a back and front:
-
-```
-   ┌───────────────────────────────────────────────────────────┐
-   │  ☀ sun/glow            ☁ clouds  (drift)                   │  SKY      (back)
-   │                                              ~ mist ~       │
-   │ - - - - - - - - - - horizon - - - - - - - - - - - - - - - - │
-   │            ▓▓▓ terrain: rock strata ▓▓▓                     │  LAND     (mid)
-   │      ▒▒ soil band (tinted by nutrients) ▒▒                  │
-   │ ≈≈≈≈≈≈≈≈≈≈≈ water (shimmer) ≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈ │  WATER    (front)
-   └───────────────────────────────────────────────────────────┘
-        rain falls over the whole frame when moisture is high
-```
-
-**reference frame:** design at **1920 × 680 px (= the @2x of a 960 × 340 logical
-canvas)**. the canvas is responsive-width and will crop/letterbox slightly, so keep
-anything essential within the centre **80%** horizontally and away from the very top.
-full-width pieces (terrain, water, soil, mist) should **bleed past both edges** by
-~5%.
-
-**what each sign does to the scene** (driven in code — you just supply the art):
-
-| sign | drives |
-| --- | --- |
-| oxygen | sky brightness/hue — thin air is dim and violet, rich air clears toward blue |
-| moisture | cloud count & opacity, rain intensity, mist density |
-| nutrients | how dark/rich the **soil band** tints |
-| stability | overall steadiness — low stability adds a faint desaturation/flicker |
-| (life vitality) | a stressed creature dims; healthy life sits brighter |
+what's left to draw is **P2/P3 below** — richness on top of the procedural scene.
 
 ---
 
 ## conventions (please read once)
 
 - **format:** PNG-24 with alpha, exported **@2x** (deliver the 1920-wide-class files;
-  code downsamples). **SVG is welcome** for the terrain silhouette and the icons,
-  where crisp scaling helps.
+  code downsamples). **SVG is welcome** where crisp scaling helps.
 - **motion is done in code** — drift, fall, shimmer, sway, breathe, glow-pulse. Do
-  **not** bake animation or motion blur. Deliver single still frames. For clouds,
-  three shape variants are plenty; code moves and fades them.
-- **style:** soft and painterly, matching the existing glow aesthetic (see
-  `HexStage.svelte`). **Not pixel art** — that's Bestiary's mode. Avoid hard 1px
-  outlines; let edges feather.
-- **palette** — stay within the app tokens (`src/lib/style/tokens.css`):
+  **not** bake animation or motion blur. Deliver single still frames.
+- **style:** soft and painterly. **Not pixel art** — that's Bestiary's mode. Avoid hard
+  1px outlines; let edges feather.
+- **palette** — stay within the current app tokens (`src/lib/style/tokens.css`):
 
   | token | hex | use |
   | --- | --- | --- |
-  | stage / bg | `#1a1a3e` | deep indigo — the night ground tone |
-  | panel | `#2d2d5f` | raised indigo |
-  | periwinkle | `#9a96c9` | soft violet — mist, cloud shadow |
-  | cyan | `#6ce5e8` | water, oxygen, cool light |
-  | leafeon-pink | `#f08fb8` | warm accent — sun halo, nutrient motes |
-  | cream | `#f5f2e8` | highlights, cloud tops |
-  | print-pink | `#b54a85` | deep warm — sparingly |
+  | bg | `#f3ecda` | parchment ground |
+  | panel | `#ecdfc2` | raised parchment |
+  | periwinkle | `#8a5568` | muted rose-brown — shadow, secondary accent |
+  | cyan | `#5f7a52` | sage green — the "cool" accent role, despite the name |
+  | leafeon-pink | `#b8506c` | warm accent — halo, nutrient motes |
+  | cream | `#34281d` | ink-dark text/detail tone (the *dark* accent here, not a highlight — the repaint inverted this role from the old palette) |
+  | print-pink | `#7c3349` | deep warm — sparingly |
 
-  greens for flora are fine, but **mute them** so they sit inside this twilight
-  webcore rather than fighting it.
-- **transparency:** everything is on a transparent background **except** the terrain
-  and water layers, which may be full-bleed.
+  these are the **parchment/rose/sage** repaint's values (`fe87f8a`). don't paint for
+  the old indigo/cyan/pink "twilight webcore" palette — if you're looking at an older
+  reference image of this diorama, the colors it shows predate this table.
+- **transparency:** everything here is on a transparent background — these are overlays
+  on the procedural scene, not full-bleed layers.
 - **naming:** lowercase-hyphen, exactly as listed below.
-- **delivery:** drop files into **`apps/marginalia/static/diorama/`** (create it).
-  They'll serve at `/marginalia/diorama/<file>`; the code loads them base-prefixed, so
-  you only need the right filenames. Sizes are targets — within ±25% is fine; **aspect
-  ratio matters more than exact pixels.**
-
----
-
-## P1 — the diorama (the minimum for a living scene)
-
-| file | size @2x | alpha / tiling | notes & what drives it |
-| --- | --- | --- | --- |
-| `sky-sun.png` | 256² | alpha | soft radial star/sun with a warm cream→leafeon-pink halo. halo intensity tracks favor. |
-| `cloud-a.png` `cloud-b.png` `cloud-c.png` | 512×256 each | alpha | three soft puff shapes, periwinkle-shadowed / cream-topped, feathered edges. count + opacity ∝ moisture; they drift in code. |
-| `rain.png` | 256×512 | alpha · **tiles both ways** | faint diagonal cyan/periwinkle streaks on transparent. opacity ∝ moisture; scrolls in code. keep it subtle. |
-| `mist.png` | 1024×384 | alpha · tiles horizontally | very soft low haze, cream/periwinkle, low opacity. density ∝ moisture near the shore. |
-| `terrain.png` *(or .svg)* | 1920×680 | alpha above the land line | the land cross-section: rock strata in indigo (`#1a1a3e`/`#2d2d5f`), an irregular soil/rock top edge, sloping toward the waterline. full-bleed; anchored to the bottom. **SVG preferred.** |
-| `soil.png` | 1920×160 | alpha · tiles horizontally | the topmost earth band that rides the terrain's top edge. paint it **neutral/mid** so code can multiply-tint it darker & richer as nutrients rise. |
-| `water.png` | 1920×280 | alpha | translucent sea: cyan→periwinkle vertical gradient, a brighter surface line near the top. sits in front of the lower terrain; shimmer is animated in code. |
+- **delivery:** drop files into **`apps/marginalia/static/diorama/`**. they'll serve at
+  `/marginalia/diorama/<file>`; the code loads them base-prefixed, so you only need the
+  right filenames. Sizes are targets — within ±25% is fine; **aspect ratio matters more
+  than exact pixels.**
 
 ---
 
@@ -102,8 +57,9 @@ full-width pieces (terrain, water, soil, mist) should **bleed past both edges** 
 | `lichen.png` | 192² | grey-gold crust patch for bare rock. |
 | `moss.png` | 192² | low green cushion for the hollows. |
 | `fungal.png` | 256² | pale underground thread mat; very low opacity, dreamlike. |
-| `mote-oxygen.png` | 32² | a tiny cyan bubble. drifts up over water. |
-| `mote-nutrient.png` | 32² | a tiny warm-pink speck. drifts in soil. |
+| `mote-oxygen.png` | 32² | a tiny bubble. drifts up over water. |
+| `mote-nutrient.png` | 32² | a tiny warm speck. drifts in soil — currently the only
+  place nutrients would get a visual hook at all (see the gap noted above). |
 | `crystal-salt.png` | 48² | a small pale crystal cluster for the tide line. |
 
 motes are spawned and animated in code — one of each shape is enough.
@@ -114,18 +70,18 @@ motes are spawned and animated in code — one of each shape is enough.
 
 | file | size @2x | notes |
 | --- | --- | --- |
-| `gauge-ring.png` | 192² | a soft hex or ring frame, transparent centre, gradient `cyan → periwinkle → leafeon-pink` edge (same family as the hex in `HexStage.svelte`). re-tinted per sign in code. |
+| `gauge-ring.png` | 192² | a soft hex or ring frame, transparent centre, gradient edge in the current accent tones (see palette above). re-tinted per sign in code. |
 | `icon-nutrients.svg` `icon-oxygen.svg` `icon-moisture.svg` `icon-stability.svg` `icon-complexity.svg` | 48² logical | simple single-colour line glyphs (so code can recolour). e.g. nutrients = a seed/grain, oxygen = a bubble, moisture = a droplet, stability = a balance/keystone, complexity = a small web. |
 
 ---
 
 ## delivery checklist
 
-- [ ] **P1 (7 files + 2 extra cloud variants)** — the scene stands up with just these.
 - [ ] P2 (7 files) — flora and motes.
 - [ ] P3 (1 frame + 5 icons) — the readout dressing.
 - [ ] all in `apps/marginalia/static/diorama/`, named as above, transparent PNG-24
       @2x (or SVG where noted).
 
-if anything here is awkward to produce, tell me and I'll adjust the composition to fit
-what's easy to draw — the code reads the filenames, so the plan can bend around the art.
+neither tier is blocking anything — the scene already reads as a living place without
+them. if anything here is awkward to produce, tell me and I'll adjust to fit what's easy
+to draw.
