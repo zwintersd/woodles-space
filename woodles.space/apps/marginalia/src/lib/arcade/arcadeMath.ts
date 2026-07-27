@@ -44,6 +44,21 @@ export function cappedReward(raw: number, max: number): number {
 	return Math.max(0, Math.min(max, raw));
 }
 
+// An SVG path `d` string for a spiky star/sigil shape, centered on (0, 0) with
+// its first point aimed up. Pair with a `translate(x y) rotate(deg)` transform
+// on the containing element to place and orient it.
+export function starPath(spikes: number, outerRadius: number, innerRadius: number): string {
+	const step = Math.PI / spikes;
+	let angle = -Math.PI / 2;
+	const points: string[] = [];
+	for (let i = 0; i < spikes * 2; i++) {
+		const radius = i % 2 === 0 ? outerRadius : innerRadius;
+		points.push(`${(Math.cos(angle) * radius).toFixed(2)} ${(Math.sin(angle) * radius).toFixed(2)}`);
+		angle += step;
+	}
+	return `M ${points.join(' L ')} Z`;
+}
+
 export function hexKey(hex: CubeHex): string {
 	return `${hex.q}:${hex.r}:${hex.s}`;
 }
