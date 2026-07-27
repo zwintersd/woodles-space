@@ -3,6 +3,7 @@
 	import { book, fmt } from '$lib/witch/book.svelte';
 	import { startTick, stopTick } from '$lib/witch/tick';
 	import { resourceGains, type ResourceGain } from '$lib/witch/resourceGains.svelte';
+	import { arcadeNotices, type ArcadeNotice } from '$lib/arcade/arcadeNotices.svelte';
 	import Arcade from '$lib/arcade/Arcade.svelte';
 	import ActivePetPanel from '$lib/arcade/ActivePetPanel.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
@@ -31,6 +32,26 @@
 				activeGains = activeGains.filter((g) => g.id !== gain.id);
 			}, 1100);
 			gainTimers.push(timer);
+		}
+	});
+
+	// short-lived toolbar banners — e.g. "today's plays are spent" — same
+	// queue-and-seed pattern as the gain popups above, just longer-lived
+	// since they carry a sentence instead of a number.
+	let activeNotices = $state<ArcadeNotice[]>([]);
+	let lastSeenNoticeId = arcadeNotices.length ? arcadeNotices[arcadeNotices.length - 1].id : 0;
+	let noticeTimers: ReturnType<typeof setTimeout>[] = [];
+
+	$effect(() => {
+		const fresh = arcadeNotices.filter((n) => n.id > lastSeenNoticeId);
+		if (fresh.length === 0) return;
+		lastSeenNoticeId = arcadeNotices[arcadeNotices.length - 1].id;
+		for (const notice of fresh) {
+			activeNotices = [...activeNotices, notice];
+			const timer = setTimeout(() => {
+				activeNotices = activeNotices.filter((n) => n.id !== notice.id);
+			}, 4000);
+			noticeTimers.push(timer);
 		}
 	});
 
@@ -68,6 +89,7 @@
 	onDestroy(() => {
 		stopTick();
 		for (const timer of gainTimers) clearTimeout(timer);
+		for (const timer of noticeTimers) clearTimeout(timer);
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('beforeunload', persist);
 			window.removeEventListener('focus', onFocus);
@@ -90,6 +112,9 @@
 		<div class="meters" aria-label="current book resources">
 			<span class="meter">
 				<b>{fmt(book.insight)}</b> insight
+				{#if book.insightPerSec > 0.05}
+					<span class="rate">· {fmt(book.insightPerSec)}/s</span>
+				{/if}
 				{#each gainsFor('insight') as gain (gain.id)}
 					<b class="gain-pop" class:trickle={gain.tone === 'trickle'} aria-hidden="true">
 						+{gain.amount}
@@ -103,7 +128,12 @@
 				{/each}
 			</span>
 			<span class="meter"><b>{Math.round(book.favor)}</b> favor</span>
-		</div>
+			</div>
+			<div class="notice-stack">
+				{#each activeNotices as notice (notice.id)}
+					<p class="arcade-notice">{notice.text}</p>
+				{/each}
+			</div>
 	</header>
 
 	<main class="arcade-layout" class:playing={activeGame !== null} class:theater={theaterMode}>
@@ -199,6 +229,11 @@
 	.meter {
 		position: relative;
 	}
+	.rate {
+		font-size: 0.55rem;
+		letter-spacing: 0.08em;
+		opacity: 0.75;
+	}
 	.meters .gain-pop {
 		position: absolute;
 		left: 50%;
@@ -229,6 +264,52 @@
 		100% {
 			opacity: 0;
 			transform: translate(-50%, -0.85rem);
+		}
+	}
+	.notice-stack {
+		position: absolute;
+		top: 100%;
+		right: 0;
+		margin-top: 0.4rem;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.4rem;
+		z-index: 21;
+		pointer-events: none;
+	}
+	.arcade-notice {
+		margin: 0;
+		padding: 0.4rem 0.7rem;
+		max-width: 20rem;
+		font-family: var(--font-ui);
+		font-size: 0.62rem;
+		letter-spacing: 0.02em;
+		line-height: 1.4;
+		text-align: right;
+		color: var(--text);
+		background: var(--panel);
+		border: 1px solid var(--rule);
+		border-radius: 0.4rem;
+		box-shadow: 0 4px 14px rgba(52, 40, 29, 0.12);
+		animation: notice-pop 4s ease-out forwards;
+	}
+	@keyframes notice-pop {
+		0% {
+			opacity: 0;
+			transform: translateY(-0.3rem);
+		}
+		8% {
+			opacity: 1;
+			transform: translateY(0);
+		}
+		85% {
+			opacity: 1;
+			transform: translateY(0);
+		}
+		100% {
+			opacity: 0;
+			transform: translateY(-0.2rem);
 		}
 	}
 	.arcade-layout {
@@ -265,6 +346,14 @@
 		}
 		.meters {
 			justify-content: center;
+		}
+		.notice-stack {
+			right: 50%;
+			transform: translateX(50%);
+			align-items: center;
+		}
+		.arcade-notice {
+			text-align: center;
 		}
 		.arcade-layout {
 			grid-template-columns: 1fr;

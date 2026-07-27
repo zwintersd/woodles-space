@@ -1,3 +1,5 @@
+import { announceNotice } from './arcadeNotices.svelte';
+
 interface DailyRecord {
 	date: string;
 	count: number;
@@ -66,8 +68,15 @@ export function dailyLimit(gameId: string, limit: number): DailyLimit {
 		invalidate,
 		increment() {
 			const record = current();
-			save({ date: record.date, count: record.count + 1 });
+			const count = record.count + 1;
+			save({ date: record.date, count });
 			invalidate();
+			// fires exactly once, the moment the cap is reached — not on every
+			// subsequent (already-blocked) attempt.
+			if (count === limit) {
+				const label = gameId.charAt(0).toUpperCase() + gameId.slice(1);
+				announceNotice(`${label}'s paid plays are spent for today — practice stays open`);
+			}
 		}
 	};
 }
