@@ -4,7 +4,7 @@
 	import ArcadePetPerks from './ArcadePetPerks.svelte';
 	import ArcadeProgress from './ArcadeProgress.svelte';
 	import SvgArena from './SvgArena.svelte';
-	import { clamp, distance, normalize, type Dot } from './arcadeMath';
+	import { clamp, distance, normalize, starPath, type Dot } from './arcadeMath';
 	import { arcadeStartLabel } from './arcadeLabels';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { payReward, previewReward } from './arcadeRewards';
@@ -48,6 +48,27 @@
 	const PLAYER_R = 9;
 	const ROUND_SECONDS = 45;
 	const MAX_REWARD = 18;
+
+	// A quiet, fixed backdrop of twinkling points. Purely decorative — never
+	// touched by game state — so it costs nothing to keep off to the side of
+	// where enemies actually spawn and travel.
+	const STARFIELD: { x: number; y: number; r: number; delay: number }[] = [
+		{ x: 36, y: 42, r: 1.4, delay: 0 },
+		{ x: 92, y: 268, r: 1.1, delay: 0.6 },
+		{ x: 168, y: 56, r: 1.6, delay: 1.2 },
+		{ x: 244, y: 300, r: 1.2, delay: 1.8 },
+		{ x: 318, y: 44, r: 1.3, delay: 0.3 },
+		{ x: 388, y: 268, r: 1.5, delay: 2.1 },
+		{ x: 462, y: 60, r: 1.2, delay: 0.9 },
+		{ x: 492, y: 236, r: 1.4, delay: 1.5 },
+		{ x: 60, y: 148, r: 1.1, delay: 2.4 },
+		{ x: 432, y: 158, r: 1.3, delay: 0.5 }
+	];
+
+	// Enemies are colored embers in one of three warm tones. Kept as a small
+	// stable spread rather than one flat hue so the swarm reads with a little
+	// more life without losing the "this is an enemy" read at a glance.
+	const EMBER_TONES = ['ember-a', 'ember-b', 'ember-c'] as const;
 
 	let phase = $state<Phase>('ready');
 	let player = $state<Dot>({ x: WORLD_W / 2, y: WORLD_H / 2 });
@@ -280,6 +301,11 @@
 		};
 	}
 
+	function enemyHeadingDeg(enemy: Enemy): number {
+		const dir = normalize(player.x - enemy.x, player.y - enemy.y);
+		return (Math.atan2(dir.y, dir.x) * 180) / Math.PI;
+	}
+
 	function updateShots(dt: number) {
 		shots = shots
 			.map((shot) => ({ ...shot, x: shot.x + shot.vx * dt, y: shot.y + shot.vy * dt }))
@@ -396,7 +422,7 @@
 <div class="heaven-shell">
 	<ArcadeHud
 		title="Bullet Dot"
-		hint="small arena survival"
+		hint="a small star wards off drifting sparks"
 		scores={[
 			{ label: 'time', value: Math.ceil(remaining) },
 			{ label: 'hearts', value: health, live: true, tone: 'red' },
@@ -429,6 +455,27 @@
 		onpointerup={onPointerUp}
 		onpointercancel={onPointerUp}
 	>
+		<defs>
+			<radialGradient id="heaven-star-glow" cx="50%" cy="50%" r="50%">
+				<stop offset="0%" class="glow-stop-star-a" />
+				<stop offset="100%" class="glow-stop-star-b" />
+			</radialGradient>
+			<radialGradient id="heaven-ember-glow" cx="50%" cy="50%" r="50%">
+				<stop offset="0%" class="glow-stop-ember-a" />
+				<stop offset="100%" class="glow-stop-ember-b" />
+			</radialGradient>
+		</defs>
+
+		{#each STARFIELD as star, index (index)}
+			<circle
+				class="bg-star"
+				cx={star.x}
+				cy={star.y}
+				r={star.r}
+				style={`animation-delay:-${star.delay}s`}
+			/>
+		{/each}
+
 		<rect class="hit-flash" class:active={hurtClock > 0} width={WORLD_W} height={WORLD_H} rx="6" />
 		{#if phase === 'running' && pointerGoal}
 			<circle class="pointer-goal" cx={pointerGoal.x} cy={pointerGoal.y} r="11" />
@@ -445,23 +492,41 @@
 			</text>
 			<text class="center-sub" x={WORLD_W / 2} y={WORLD_H / 2 + 22} text-anchor="middle">
 				{phase === 'ready'
-					? 'one dot, one swarm, one button'
+					? 'one small star, one shower of sparks, one button'
 					: `score ${kills} · best ${best} · ${rounds} run${rounds === 1 ? '' : 's'}`}
 			</text>
 		{/if}
 
 		{#each shots as shot (shot.id)}
-			<circle class="shot" cx={shot.x} cy={shot.y} r="3.5" />
+			<path
+				class="shot"
+				d={starPath(4, 5, 1.6)}
+				transform={`translate(${shot.x} ${shot.y}) rotate(${(Math.atan2(shot.vy, shot.vx) * 180) / Math.PI})`}
+			/>
 		{/each}
 		{#each enemies as enemy (enemy.id)}
-			<circle class="enemy" cx={enemy.x} cy={enemy.y} r={enemy.size} />
+			{@const heading = enemyHeadingDeg(enemy)}
+			<g
+				class={`ember ${EMBER_TONES[enemy.id % EMBER_TONES.length]}`}
+				transform={`translate(${enemy.x} ${enemy.y}) rotate(${heading})`}
+			>
+				<path
+					class="ember-tail"
+					d={`M ${-enemy.size * 2.6} 0 Q ${-enemy.size * 1.2} ${enemy.size * 0.55} 0 0 Q ${-enemy.size * 1.2} ${-enemy.size * 0.55} ${-enemy.size * 2.6} 0 Z`}
+				/>
+				<circle class="ember-glow" r={enemy.size * 2.1} />
+				<circle class="ember-core" r={enemy.size * 0.6} />
+			</g>
 		{/each}
 		{#each bursts as burst (burst.id)}
 			<text class="burst" x={burst.x} y={burst.y} text-anchor="middle">{burst.text}</text>
 		{/each}
 		{#if phase === 'running'}
-			<circle class="player-aura" cx={player.x} cy={player.y} r={hurtClock > 0 ? 23 : 18} />
-			<circle class="player" cx={player.x} cy={player.y} r={playerHitRadius} />
+			<g class="wandering-star" class:hurt={hurtClock > 0} transform={`translate(${player.x} ${player.y})`}>
+				<circle class="star-halo" r={hurtClock > 0 ? 25 : 19} />
+				<path class="star-body" d={starPath(5, playerHitRadius * 1.6, playerHitRadius * 0.64)} />
+				<circle class="star-core" r={playerHitRadius * 0.4} />
+			</g>
 		{/if}
 	</SvgArena>
 
@@ -509,25 +574,109 @@
 		stroke-width: 2;
 		pointer-events: none;
 	}
-	.enemy {
+	.glow-stop-star-a {
+		stop-color: var(--sol-blue);
+		stop-opacity: 0.5;
+	}
+	.glow-stop-star-b {
+		stop-color: var(--sol-blue);
+		stop-opacity: 0;
+	}
+	.glow-stop-ember-a {
+		stop-color: var(--sol-orange);
+		stop-opacity: 0.55;
+	}
+	.glow-stop-ember-b {
+		stop-color: var(--sol-orange);
+		stop-opacity: 0;
+	}
+	.bg-star {
+		fill: var(--sol-yellow);
+		opacity: 0.4;
+		animation: bg-twinkle 4.6s ease-in-out infinite;
+		pointer-events: none;
+	}
+	.ember {
+		pointer-events: none;
+	}
+	.ember-tail {
 		fill: var(--sol-orange);
-		stroke: rgba(253, 246, 227, 0.8);
-		stroke-width: 1.5;
+		opacity: 0.45;
+	}
+	.ember.ember-b .ember-tail,
+	.ember.ember-b .ember-core {
+		fill: var(--sol-red);
+	}
+	.ember.ember-c .ember-tail,
+	.ember.ember-c .ember-core {
+		fill: var(--sol-yellow);
+	}
+	.ember-glow {
+		fill: url(#heaven-ember-glow);
+	}
+	.ember-core {
+		fill: var(--sol-orange);
+		stroke: rgba(253, 246, 227, 0.85);
+		stroke-width: 1.2;
 	}
 	.shot {
 		fill: var(--sol-cyan);
 		stroke: var(--sol-base3);
-		stroke-width: 1.5;
+		stroke-width: 1;
+		pointer-events: none;
 	}
-	.player-aura {
-		fill: rgba(38, 139, 210, 0.14);
-		stroke: rgba(38, 139, 210, 0.42);
-		stroke-width: 1.5;
+	.wandering-star {
+		pointer-events: none;
 	}
-	.player {
+	.star-halo {
+		fill: url(#heaven-star-glow);
+	}
+	.wandering-star.hurt .star-halo {
+		fill: rgba(220, 50, 47, 0.32);
+	}
+	.star-body {
 		fill: var(--sol-blue);
 		stroke: var(--sol-base3);
-		stroke-width: 3;
+		stroke-width: 2;
+		animation: star-spin 22s linear infinite;
+		transform-origin: 0 0;
+	}
+	.star-core {
+		fill: rgba(253, 246, 227, 0.92);
+		animation: star-twinkle 2.3s ease-in-out infinite;
+		transform-origin: 0 0;
+	}
+	@keyframes bg-twinkle {
+		0%,
+		100% {
+			opacity: 0.18;
+		}
+		50% {
+			opacity: 0.55;
+		}
+	}
+	@keyframes star-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+	@keyframes star-twinkle {
+		0%,
+		100% {
+			opacity: 0.6;
+			transform: scale(0.86);
+		}
+		50% {
+			opacity: 1;
+			transform: scale(1.18);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.bg-star,
+		.star-body,
+		.star-core {
+			animation: none;
+		}
 	}
 	.center-title {
 		font-family: var(--font-counter);

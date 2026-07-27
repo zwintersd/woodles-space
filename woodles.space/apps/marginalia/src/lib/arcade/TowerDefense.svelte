@@ -6,7 +6,7 @@
 	import PaperGarden, { type PaperGardenItem } from './paperTheater/PaperGarden.svelte';
 	import PaperTextureLayer from './paperTheater/PaperTextureLayer.svelte';
 	import SvgArena from './SvgArena.svelte';
-	import { clamp, distance, normalize, type Dot } from './arcadeMath';
+	import { clamp, distance, normalize, starPath, type Dot } from './arcadeMath';
 	import { arcadeStartLabel } from './arcadeLabels';
 	import { fmt } from '$lib/witch/book.svelte';
 	import { payReward, previewReward } from './arcadeRewards';
@@ -88,6 +88,21 @@
 		{ id: 'f', x: 420, y: 82 },
 		{ id: 'g', x: 432, y: 178 },
 		{ id: 'h', x: 260, y: 34 }
+	];
+
+	// A quiet, fixed backdrop of twinkling points, same spirit as the paper
+	// garden below: decorative only, never touched by game state.
+	const STARFIELD: { x: number; y: number; r: number; delay: number }[] = [
+		{ x: 470, y: 42, r: 1.4, delay: 0 },
+		{ x: 24, y: 220, r: 1.2, delay: 0.7 },
+		{ x: 248, y: 272, r: 1.5, delay: 1.4 },
+		{ x: 402, y: 200, r: 1.1, delay: 2 },
+		{ x: 132, y: 296, r: 1.3, delay: 0.4 },
+		{ x: 328, y: 58, r: 1.4, delay: 1.8 },
+		{ x: 58, y: 268, r: 1.1, delay: 2.3 },
+		{ x: 486, y: 300, r: 1.3, delay: 1 },
+		{ x: 112, y: 112, r: 1.2, delay: 0.2 },
+		{ x: 296, y: 168, r: 1.5, delay: 1.6 }
 	];
 
 	// Decorative only: these positions deliberately stay clear of the route,
@@ -491,6 +506,12 @@
 			.filter((burst) => burst.life > 0);
 	}
 
+	function enemyHeadingDeg(enemy: Enemy): number {
+		const target = PATH[Math.min(enemy.pathIndex, PATH.length - 1)];
+		const dir = normalize(target.x - enemy.x, target.y - enemy.y);
+		return (Math.atan2(dir.y, dir.x) * 180) / Math.PI;
+	}
+
 	onDestroy(() => stop());
 </script>
 
@@ -525,11 +546,38 @@
 		gridId="defense-grid"
 		gridOpacity={0.58}
 	>
+		<defs>
+			<radialGradient id="defense-sigil-glow" cx="50%" cy="50%" r="50%">
+				<stop offset="0%" class="glow-stop-sigil-a" />
+				<stop offset="100%" class="glow-stop-sigil-b" />
+			</radialGradient>
+			<radialGradient id="defense-mark-glow" cx="50%" cy="50%" r="50%">
+				<stop offset="0%" class="glow-stop-mark-a" />
+				<stop offset="100%" class="glow-stop-mark-b" />
+			</radialGradient>
+			<radialGradient id="defense-gate-glow" cx="50%" cy="50%" r="50%">
+				<stop offset="0%" class="glow-stop-gate-a" />
+				<stop offset="100%" class="glow-stop-gate-b" />
+			</radialGradient>
+		</defs>
+
+		{#each STARFIELD as star, index (index)}
+			<circle
+				class="bg-star"
+				cx={star.x}
+				cy={star.y}
+				r={star.r}
+				style={`animation-delay:-${star.delay}s`}
+			/>
+		{/each}
+
 		<PaperTextureLayer width={WORLD_W} height={WORLD_H} opacity={0.2} />
 		<PaperGarden items={DEFENSE_GARDEN} />
 		<polyline class="route-shadow" points={pathPoints} />
 		<polyline class="route" points={pathPoints} />
 		<polyline class="route-stitch" points={pathPoints} />
+		<circle class="gate-glow start" cx={PATH[0].x} cy={PATH[0].y} r="20" />
+		<circle class="gate-glow end" cx={PATH[PATH.length - 1].x} cy={PATH[PATH.length - 1].y} r="20" />
 		<circle class="gate start" cx={PATH[0].x} cy={PATH[0].y} r="12" />
 		<circle class="gate end" cx={PATH[PATH.length - 1].x} cy={PATH[PATH.length - 1].y} r="12" />
 		<path class="gate-mark start" d={`M ${PATH[0].x - 5} ${PATH[0].y} h 10 M ${PATH[0].x} ${PATH[0].y - 5} v 10`} />
@@ -551,18 +599,41 @@
 				<circle class="pad-core" cx={pad.x} cy={pad.y} r="8" />
 				{#if tower}
 					<circle class="tower-range" cx={tower.x} cy={tower.y} r={towerRange(tower)} />
-					<circle class="tower-body" cx={tower.x} cy={tower.y} r={9 + tower.level} />
+					<circle class="sigil-halo" cx={tower.x} cy={tower.y} r={16 + tower.level * 2} />
+					<g
+						class="sigil"
+						transform={`translate(${tower.x} ${tower.y})`}
+						style={`animation-delay:-${(tower.id % 5) * 0.7}s`}
+					>
+						<path class="sigil-star" d={starPath(3 + tower.level, 9 + tower.level * 2.4, 4 + tower.level)} />
+						{#if tower.level >= 2}
+							<circle class="sigil-ring" r={7 + tower.level * 1.4} />
+						{/if}
+						<circle class="sigil-core" r="2.4" />
+					</g>
 					<text class="tower-level" x={tower.x} y={tower.y + 4} text-anchor="middle">{tower.level}</text>
 				{/if}
 			</g>
 		{/each}
 
 		{#each shots as shot (shot.id)}
-			<circle class="shot" cx={shot.x} cy={shot.y} r="3.6" />
+			<path
+				class="shot"
+				d={starPath(4, 5.2, 1.7)}
+				transform={`translate(${shot.x} ${shot.y}) rotate(${(Math.atan2(shot.vy, shot.vx) * 180) / Math.PI})`}
+			/>
 		{/each}
 		{#each enemies as enemy (enemy.id)}
+			{@const heading = enemyHeadingDeg(enemy)}
+			<g class="mark" transform={`translate(${enemy.x} ${enemy.y}) rotate(${heading})`}>
+				<path
+					class="mark-tail"
+					d={`M ${-enemy.size * 2.4} 0 Q ${-enemy.size * 1.1} ${enemy.size * 0.5} 0 0 Q ${-enemy.size * 1.1} ${-enemy.size * 0.5} ${-enemy.size * 2.4} 0 Z`}
+				/>
+				<circle class="mark-glow" r={enemy.size * 1.9} />
+				<circle class="mark-core" r={enemy.size * 0.6} />
+			</g>
 			<g>
-				<circle class="enemy" cx={enemy.x} cy={enemy.y} r={enemy.size} />
 				<rect
 					class="hp-bg"
 					x={enemy.x - 10}
@@ -643,6 +714,40 @@
 		stroke-width: 1.5;
 		pointer-events: none;
 	}
+	.glow-stop-sigil-a {
+		stop-color: var(--sol-blue);
+		stop-opacity: 0.42;
+	}
+	.glow-stop-sigil-b {
+		stop-color: var(--sol-blue);
+		stop-opacity: 0;
+	}
+	.glow-stop-mark-a {
+		stop-color: var(--sol-orange);
+		stop-opacity: 0.5;
+	}
+	.glow-stop-mark-b {
+		stop-color: var(--sol-orange);
+		stop-opacity: 0;
+	}
+	.glow-stop-gate-a {
+		stop-color: var(--sol-yellow);
+		stop-opacity: 0.4;
+	}
+	.glow-stop-gate-b {
+		stop-color: var(--sol-yellow);
+		stop-opacity: 0;
+	}
+	.bg-star {
+		fill: var(--sol-yellow);
+		opacity: 0.4;
+		animation: bg-twinkle 4.6s ease-in-out infinite;
+		pointer-events: none;
+	}
+	.gate-glow {
+		fill: url(#defense-gate-glow);
+		pointer-events: none;
+	}
 	.gate {
 		stroke: var(--sol-base3);
 		stroke-width: 3;
@@ -668,12 +773,17 @@
 		fill: rgba(253, 246, 227, 0.72);
 		stroke: rgba(88, 110, 117, 0.38);
 		stroke-width: 2;
+		stroke-dasharray: 2 4;
 	}
 	.pad-core {
 		fill: rgba(88, 110, 117, 0.22);
 	}
 	.pad.buildable .pad-ring {
 		stroke: var(--sol-cyan);
+		animation: pad-invite 2.6s ease-in-out infinite;
+	}
+	.pad.occupied .pad-ring {
+		stroke-dasharray: none;
 	}
 	.pad:focus-visible .pad-ring,
 	.pad:hover .pad-ring {
@@ -686,11 +796,28 @@
 		stroke-width: 1;
 		pointer-events: none;
 	}
-	.tower-body {
+	.sigil-halo {
+		fill: url(#defense-sigil-glow);
+		pointer-events: none;
+	}
+	.sigil {
+		pointer-events: none;
+		animation: sigil-spin 18s linear infinite;
+		transform-origin: 0 0;
+	}
+	.sigil-star {
 		fill: var(--sol-blue);
 		stroke: var(--sol-base3);
-		stroke-width: 3;
-		pointer-events: none;
+		stroke-width: 1.6;
+	}
+	.sigil-ring {
+		fill: none;
+		stroke: rgba(181, 137, 0, 0.55);
+		stroke-width: 1.3;
+		stroke-dasharray: 2.5 3;
+	}
+	.sigil-core {
+		fill: var(--sol-base3);
 	}
 	.tower-level {
 		font-family: var(--font-counter);
@@ -698,10 +825,20 @@
 		fill: var(--sol-base3);
 		pointer-events: none;
 	}
-	.enemy {
+	.mark {
+		pointer-events: none;
+	}
+	.mark-tail {
 		fill: var(--sol-orange);
-		stroke: rgba(253, 246, 227, 0.82);
-		stroke-width: 1.5;
+		opacity: 0.45;
+	}
+	.mark-glow {
+		fill: url(#defense-mark-glow);
+	}
+	.mark-core {
+		fill: var(--sol-orange);
+		stroke: rgba(253, 246, 227, 0.85);
+		stroke-width: 1.3;
 	}
 	.hp-bg {
 		fill: rgba(7, 54, 66, 0.18);
@@ -712,7 +849,38 @@
 	.shot {
 		fill: var(--sol-cyan);
 		stroke: var(--sol-base3);
-		stroke-width: 1.5;
+		stroke-width: 1;
+		pointer-events: none;
+	}
+	@keyframes bg-twinkle {
+		0%,
+		100% {
+			opacity: 0.18;
+		}
+		50% {
+			opacity: 0.55;
+		}
+	}
+	@keyframes sigil-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+	@keyframes pad-invite {
+		0%,
+		100% {
+			opacity: 0.75;
+		}
+		50% {
+			opacity: 1;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.bg-star,
+		.sigil,
+		.pad.buildable .pad-ring {
+			animation: none;
+		}
 	}
 	.burst {
 		font-family: var(--font-counter);

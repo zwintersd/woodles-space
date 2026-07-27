@@ -7,7 +7,8 @@ import {
 	hexNeighbors,
 	hexesWithinRadius,
 	pointToHex,
-	rotate
+	rotate,
+	starPath
 } from './arcadeMath';
 
 describe('clamp', () => {
@@ -61,5 +62,25 @@ describe('arcade hex helpers', () => {
 
 		expect(rotated.x).toBeCloseTo(0);
 		expect(rotated.y).toBeCloseTo(1);
+	});
+});
+
+describe('starPath', () => {
+	it('starts at the top point and closes the shape', () => {
+		const d = starPath(5, 10, 4);
+
+		expect(d.startsWith('M 0.00 -10.00')).toBe(true);
+		expect(d.endsWith('Z')).toBe(true);
+	});
+
+	it('alternates outer and inner radius for every spike', () => {
+		const d = starPath(4, 10, 4);
+		const points = d.slice(2, -2).split(' L ').map((pair) => pair.split(' ').map(Number));
+
+		expect(points).toHaveLength(8);
+		points.forEach(([x, y], index) => {
+			const expectedRadius = index % 2 === 0 ? 10 : 4;
+			expect(Math.hypot(x, y)).toBeCloseTo(expectedRadius, 1);
+		});
 	});
 });
