@@ -18,6 +18,11 @@ export const LOOK_CLOSER_SECONDS = 2.5;
 // deepest reached stage.
 export const STAGE_INSIGHT_MULT = [0, 0.2, 0.6, 1.0]; // by stage
 
+// How often the idle trickle batches into a "+N insight" popup, in sim-
+// seconds. Announcing every frame's fractional gain would be noise; this
+// keeps the ambient drip visible without a popup storm.
+export const INSIGHT_TRICKLE_ANNOUNCE_SEC = 3;
+
 // ── attention: the one capacity upgrade ───────────────────────────────────
 export const ATTENTION_START = 2;
 // Insight cost to raise capacity to 3, 4, 5, 6. Empty = at maximum.

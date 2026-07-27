@@ -20,6 +20,7 @@ import {
 	STAGE_SECONDS,
 	LOOK_CLOSER_SECONDS,
 	STAGE_INSIGHT_MULT,
+	INSIGHT_TRICKLE_ANNOUNCE_SEC,
 	ATTENTION_START,
 	ATTENTION_COSTS,
 	DISTILL_INSIGHT_COST,
@@ -67,6 +68,7 @@ import { pushSample } from './history';
 import { interventionForDomain } from './content/interventions';
 import { emptySave, load, save, wipe, type BookSave, type FieldNote } from './persist';
 import { getBestiaryCreatures, getWorldCreatures, type BestiaryCreature, type WorldCreature } from './bestiaryDb';
+import { announceGain } from './resourceGains.svelte';
 import {
 	SEDIMENT_UNLOCK_COST,
 	SEDIMENT_POUR_RATE,
@@ -180,6 +182,14 @@ export class Book {
 	fieldNotes = $state<FieldNote[]>([]);
 	private wasSelfBalancing = false;
 	private wasQuiet = false;
+
+	// ── resource-gain announcements: batching for the idle insight trickle ───
+	private insightTrickleAccum = 0;
+	private insightTrickleTimer = 0;
+	// true only while creditOffline() fast-forwards many ticks at once — the
+	// offline report already summarizes that catch-up, so per-tick gain
+	// popups would just be noise (and a lot of it, for a long absence).
+	private suppressGainAnnouncements = false;
 
 	// ── category mastery: a completion bonus, sticky once earned ─────────────
 	categoryMastered = $state<Record<string, boolean>>({});
@@ -524,8 +534,14 @@ export class Book {
 			crossed += 1;
 			this.observation = { ...this.observation, [lifeId]: stage };
 			this.knowing += 1;
-			if (stage === STAGE_STUDIED) this.essence += ESSENCE_ON_STUDIED;
-			if (stage === STAGE_KNOWN) this.essence += ESSENCE_ON_KNOWN;
+			if (stage === STAGE_STUDIED) {
+				this.essence += ESSENCE_ON_STUDIED;
+				if (!this.suppressGainAnnouncements) announceGain('essence', ESSENCE_ON_STUDIED);
+			}
+			if (stage === STAGE_KNOWN) {
+				this.essence += ESSENCE_ON_KNOWN;
+				if (!this.suppressGainAnnouncements) announceGain('essence', ESSENCE_ON_KNOWN);
+			}
 			if (life) {
 				const line = pickLine(stageFieldNoteOptions(life.domain, stage), Math.random());
 				if (line) this.pushFieldNote(fillTemplate(line, life.name));
@@ -676,6 +692,7 @@ export class Book {
 		if (!this.canDistill()) return;
 		this.insight -= DISTILL_INSIGHT_COST;
 		this.essence += DISTILL_ESSENCE_GAIN;
+		announceGain('essence', DISTILL_ESSENCE_GAIN);
 		this.persist();
 	}
 
@@ -847,8 +864,21 @@ export class Book {
 			this.stockHistory = h;
 		}
 
-		// 4) the world yields Insight every second it is witnessed.
+		// 4) the world yields Insight every second it is witnessed. The gain is
+		//    batched into an occasional popup rather than announced every frame.
 		this.insight += this.insightPerSec * dt;
+		if (!this.suppressGainAnnouncements) {
+			this.insightTrickleAccum += this.insightPerSec * dt;
+			this.insightTrickleTimer += dt;
+			if (this.insightTrickleTimer >= INSIGHT_TRICKLE_ANNOUNCE_SEC) {
+				this.insightTrickleTimer = 0;
+				const whole = Math.floor(this.insightTrickleAccum);
+				if (whole > 0) {
+					this.insightTrickleAccum -= whole;
+					announceGain('insight', whole, 'trickle');
+				}
+			}
+		}
 
 		// 5) her hand grows light again, and a balanced world she isn't propping up
 		//    banks the equilibrium dividend.
@@ -897,9 +927,14 @@ export class Book {
 		const knowingBefore = this.knowing;
 		let remaining = seconds;
 		const step = 5;
-		while (remaining > 0) {
-			this.tick(Math.min(step, remaining));
-			remaining -= step;
+		this.suppressGainAnnouncements = true;
+		try {
+			while (remaining > 0) {
+				this.tick(Math.min(step, remaining));
+				remaining -= step;
+			}
+		} finally {
+			this.suppressGainAnnouncements = false;
 		}
 		this.offlineReport = {
 			seconds,
@@ -1017,6 +1052,8 @@ export class Book {
 		this.historySampleAccum = 0;
 		this.wasSelfBalancing = false;
 		this.wasQuiet = false;
+		this.insightTrickleAccum = 0;
+		this.insightTrickleTimer = 0;
 	}
 
 	hydrate() {

@@ -9,6 +9,7 @@
 // See ARCADE_REVIEW.md findings #1-#3.
 
 import { book } from '$lib/witch/book.svelte';
+import { announceGain } from '$lib/witch/resourceGains.svelte';
 import { cappedReward } from './arcadeMath';
 
 // 2048 stays a deliberate pet-training toy: its powers spend active-pet stats
@@ -27,6 +28,7 @@ export function creditInsight(amount: number): number {
 	if (amount > 0) {
 		book.insight += amount;
 		book.persist();
+		announceGain('insight', amount);
 		return amount;
 	}
 	return 0;
