@@ -38,6 +38,7 @@
     { "source": "/marginalia",                "destination": "/apps/marginalia/dist/index.html" },
     { "source": "/marginalia/_app/:path*",    "destination": "/apps/marginalia/dist/_app/:path*" },
     { "source": "/marginalia/diorama/:path*", "destination": "/apps/marginalia/dist/diorama/:path*" },
+    { "source": "/marginalia/witchSprites/:path*", "destination": "/apps/marginalia/dist/witchSprites/:path*" },
     { "source": "/marginalia/og.png",         "destination": "/apps/marginalia/dist/og.png" },
     { "source": "/marginalia/:path*",         "destination": "/apps/marginalia/dist/index.html" },
     { "source": "/planner",            "destination": "/apps/planner/dist/index.html" },
