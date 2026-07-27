@@ -94,12 +94,18 @@
 			var(--bg);
 	}
 	.arcade-top {
+		position: sticky;
+		top: 0;
+		z-index: 20;
 		width: min(100%, 76rem);
 		margin: 0 auto 1rem;
+		padding: 0.6rem 0;
 		display: grid;
 		grid-template-columns: 1fr auto 1fr;
 		align-items: center;
 		gap: 1rem;
+		background: var(--bg);
+		border-bottom: 1px solid var(--rule);
 	}
 	.brand {
 		justify-self: start;
