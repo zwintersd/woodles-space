@@ -32,7 +32,7 @@
 
 	type MatterBody = any;
 	type MatterPair = { bodyA: MatterBody; bodyB: MatterBody };
-	type PopData = { tier: number; bornAt: number; merging: boolean };
+	type PopData = { tier: number; bornAt: number; merging: boolean; seed: number; phase: number };
 	type MergeJob = {
 		first: MatterBody;
 		second: MatterBody;
@@ -68,10 +68,55 @@
 		{ radius: 82, color: '#cb4b16', density: BODY_DENSITY, points: 640 },
 		{ radius: 102, color: '#b58900', density: BODY_DENSITY, points: 1280 },
 		{ radius: 124, color: '#859900', density: BODY_DENSITY, points: 2560 },
-		{ radius: 148, color: '#16a085', density: BODY_DENSITY, points: 5120 },
-		{ radius: 170, color: '#8e44ad', density: BODY_DENSITY, points: 10240 },
+		// tiers 8-9 used to break from the shared palette (Flat-UI turquoise/wisteria);
+		// these are ink-deepened shades of orange/violet instead, so the biggest planets
+		// read as denser gas giants rather than switching palettes.
+		{ radius: 148, color: '#73422a', density: BODY_DENSITY, points: 5120 },
+		{ radius: 170, color: '#3a5483', density: BODY_DENSITY, points: 10240 },
 		{ radius: 188, color: '#073642', density: BODY_DENSITY, points: 20480 }
 	];
+
+	const PAPER = '#fdf6e3';
+	const INK = '#073642';
+
+	type PlanetPalette = { tint: string; base: string; shade: string; accent: string };
+
+	function hexToRgb(hex: string): [number, number, number] {
+		const value = parseInt(hex.replace('#', ''), 16);
+		return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+	}
+
+	function rgbToHex(r: number, g: number, b: number): string {
+		const toHex = (v: number) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0');
+		return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+	}
+
+	function mixHex(hexA: string, hexB: string, t: number): string {
+		const [ar, ag, ab] = hexToRgb(hexA);
+		const [br, bg, bb] = hexToRgb(hexB);
+		return rgbToHex(ar + (br - ar) * t, ag + (bg - ag) * t, ab + (bb - ab) * t);
+	}
+
+	// Each ball gets a tonal family off its own tier color (tinted toward paper, shaded
+	// toward ink) plus a thin accent thread borrowed from the next tier, so the swirl
+	// stays multi-hue without ever losing the dominant color players merge by.
+	function buildPlanetPalette(tier: Tier, accentColor: string): PlanetPalette {
+		return {
+			tint: mixHex(tier.color, PAPER, 0.55),
+			base: tier.color,
+			shade: mixHex(tier.color, INK, 0.42),
+			accent: accentColor
+		};
+	}
+
+	const planetPalettes: PlanetPalette[] = tiers.map((tier, index) =>
+		buildPlanetPalette(tier, tiers[(index + 1) % tiers.length].color)
+	);
+
+	function swirlSwatchCss(tier: number): string {
+		const palette = planetPalettes[tier];
+		return `radial-gradient(circle at 32% 28%, ${palette.tint}, ${palette.base} 55%, ${palette.shade} 100%)`;
+	}
 
 	let canvasEl: HTMLCanvasElement;
 	let M: MatterApi | null = null;
@@ -84,6 +129,12 @@
 	let uiTimer: ReturnType<typeof setInterval> | null = null;
 	let pendingMerges: MergeJob[] = [];
 	let mounted = false;
+	// drawPlanet's swirl uses time elapsed since this reference, not raw Date.now().
+	// A raw epoch timestamp (~1.8e9 seconds) fed into a rotation angle sits far
+	// outside where the canvas's transform math keeps sub-radian precision, so
+	// the per-second rotation term rounds away to nothing and every planet looks
+	// frozen. Counting from a recent reference keeps the magnitude small.
+	const animStartMs = Date.now();
 
 	let matterReady = $state(false);
 	let loadError = $state('');
@@ -129,8 +180,8 @@
 		if (cooldownSeconds > 0) return cooldownSeconds.toFixed(1);
 		return 'ready';
 	});
-	const nextTierStyle = $derived(`background:${tiers[nextTier].color}`);
-	const highTierStyle = $derived(`background:${tiers[Math.max(0, highTier)].color}`);
+	const nextTierStyle = $derived(`background:${swirlSwatchCss(nextTier)}`);
+	const highTierStyle = $derived(`background:${swirlSwatchCss(Math.max(0, highTier))}`);
 	const statEffects = $derived<ArcadeStatEffects>({
 		body: (_value, tier) => (tier > 0 ? `pop punch +${tier}` : 'standard pop'),
 		mind: (_value, tier) => (tier > 0 ? `see ${tier} ahead` : 'next only'),
@@ -206,11 +257,9 @@
 			frictionAir: 0,
 			restitution: 0.3,
 			slop: 0.02,
-			render: {
-				fillStyle: spec.color,
-				strokeStyle: tier >= 9 ? '#fdf6e3' : '#073642',
-				lineWidth: tier >= 6 ? 2 : 1
-			}
+			// Matter's own flat-fill renderer stays off for these bodies; drawPlanet()
+			// paints them itself in afterRender so each one can swirl and spin.
+			render: { visible: false }
 		});
 
 		body.label = 'color-pop-circle';
@@ -219,7 +268,9 @@
 			colorPop: {
 				tier,
 				bornAt: Date.now(),
-				merging: false
+				merging: false,
+				seed: Math.random(),
+				phase: Math.random() * Math.PI * 2
 			}
 		};
 		return body;
@@ -510,14 +561,126 @@
 		best = record.bestScore;
 	}
 
+	// Draws one circle as a small swirling planet: a shaded sphere gradient, two or
+	// three rotating color bands plus one accent thread borrowed from the next tier,
+	// a fixed gloss highlight, and (for the rarest, biggest tiers) a Saturn-style ring
+	// drawn behind the sphere so it reads as passing through rather than floating over it.
+	// Rotation blends the body's real physics angle with a slow per-ball drift, so even a
+	// resting pile keeps a faint, hypnotic churn — each ball spins at its own seeded rate.
+	function drawPlanet(
+		context: CanvasRenderingContext2D,
+		x: number,
+		y: number,
+		angle: number,
+		tier: number,
+		seed: number,
+		phase: number,
+		timeMs: number,
+		alpha = 1
+	) {
+		const radius = tiers[tier].radius;
+		const palette = planetPalettes[tier];
+		const spin = seed > 0.5 ? 1 : -1;
+		const swirlAngle = angle + phase + spin * (timeMs / 1000) * (0.3 + seed * 0.35);
+
+		context.save();
+		context.globalAlpha = alpha;
+		context.translate(x, y);
+
+		if (tier >= 7) {
+			context.save();
+			context.rotate(phase * 1.7 + timeMs * 0.00012 * spin);
+			context.scale(1, 0.38);
+			context.beginPath();
+			context.arc(0, 0, radius * 1.32, 0, Math.PI * 2);
+			context.strokeStyle = palette.tint;
+			context.lineWidth = Math.max(2, radius * 0.09);
+			context.globalAlpha = alpha * 0.6;
+			context.stroke();
+			context.restore();
+		}
+
+		context.beginPath();
+		context.arc(0, 0, radius, 0, Math.PI * 2);
+		context.clip();
+
+		const sphere = context.createRadialGradient(
+			-radius * 0.32,
+			-radius * 0.38,
+			radius * 0.1,
+			0,
+			0,
+			radius * 1.05
+		);
+		sphere.addColorStop(0, palette.tint);
+		sphere.addColorStop(0.55, palette.base);
+		sphere.addColorStop(1, palette.shade);
+		context.globalAlpha = alpha;
+		context.fillStyle = sphere;
+		context.fillRect(-radius, -radius, radius * 2, radius * 2);
+
+		context.rotate(swirlAngle);
+		const bandCount = seed > 0.66 ? 4 : 3;
+		for (let i = 0; i < bandCount; i++) {
+			const start = (i / bandCount) * Math.PI * 2;
+			const sweep = ((Math.PI * 2) / bandCount) * (0.3 + 0.22 * ((seed + i * 0.37) % 1));
+			context.beginPath();
+			context.moveTo(0, 0);
+			context.arc(0, 0, radius, start, start + sweep);
+			context.closePath();
+			context.fillStyle = i % 2 === 0 ? palette.shade : palette.tint;
+			context.globalAlpha = alpha * 0.24;
+			context.fill();
+		}
+		context.beginPath();
+		context.moveTo(0, 0);
+		context.arc(0, 0, radius, phase, phase + 0.85 + seed * 0.4);
+		context.closePath();
+		context.fillStyle = palette.accent;
+		context.globalAlpha = alpha * 0.3;
+		context.fill();
+		context.rotate(-swirlAngle);
+
+		const gloss = context.createRadialGradient(
+			-radius * 0.3,
+			-radius * 0.36,
+			0,
+			-radius * 0.26,
+			-radius * 0.32,
+			radius * 0.72
+		);
+		gloss.addColorStop(0, 'rgba(253, 246, 227, 0.55)');
+		gloss.addColorStop(1, 'rgba(253, 246, 227, 0)');
+		context.globalAlpha = alpha;
+		context.fillStyle = gloss;
+		context.beginPath();
+		context.arc(0, 0, radius, 0, Math.PI * 2);
+		context.fill();
+
+		context.strokeStyle = tier >= 9 ? PAPER : INK;
+		context.lineWidth = tier >= 6 ? 2 : 1;
+		context.beginPath();
+		context.arc(0, 0, radius, 0, Math.PI * 2);
+		context.stroke();
+
+		context.restore();
+	}
+
 	function drawCanvasOverlay() {
 		if (!render) return;
 		const context = render.context as CanvasRenderingContext2D;
+		const timeMs = Date.now() - animStartMs;
 		const radius = tiers[nextTier].radius;
 		const ghostX = clamp(cursorX, radius + 6, WIDTH - radius - 6);
 		const ghostY = radius + 12;
 
 		context.save();
+
+		for (const body of allCircles()) {
+			const data = circleData(body);
+			if (!data) continue;
+			drawPlanet(context, body.position.x, body.position.y, body.angle, data.tier, data.seed, data.phase, timeMs);
+		}
 
 		context.setLineDash([7, 8]);
 		context.strokeStyle = 'rgba(220, 50, 47, 0.58)';
@@ -529,14 +692,8 @@
 		context.setLineDash([]);
 
 		if (!gameOver) {
-			context.globalAlpha = cooldownSeconds > 0 ? 0.28 : 0.58;
-			context.fillStyle = tiers[nextTier].color;
-			context.strokeStyle = '#073642';
-			context.lineWidth = 2;
-			context.beginPath();
-			context.arc(ghostX, ghostY, radius, 0, Math.PI * 2);
-			context.fill();
-			context.stroke();
+			const ghostAlpha = cooldownSeconds > 0 ? 0.32 : 0.62;
+			drawPlanet(context, ghostX, ghostY, timeMs * 0.0006, nextTier, 0.5, 0, timeMs, ghostAlpha);
 
 			context.globalAlpha = cooldownSeconds > 0 ? 0.12 : 0.2;
 			context.strokeStyle = '#073642';
@@ -604,7 +761,7 @@
 <div class="pop-shell">
 	<ArcadeHud
 		title="Color POP!"
-		hint="match colors into heavier circles"
+		hint="match colors, spin them into bigger planets"
 		maxWidth="400px"
 		scores={[
 			{ label: 'score', value: score },
@@ -624,7 +781,7 @@
 		{#each previewTiers as tier, index (index)}
 			<i
 				class="swatch preview"
-				style={`background:${tiers[tier].color}`}
+				style={`background:${swirlSwatchCss(tier)}`}
 				aria-label="upcoming tier color"
 			></i>
 		{/each}
@@ -634,7 +791,7 @@
 
 	<div class="stat-row" aria-label="Color POP status">
 		<span>tier <b>{highTier}</b><i style={highTierStyle}></i></span>
-		<span>circles <b>{bodyCount}</b></span>
+		<span>planets <b>{bodyCount}</b></span>
 		<span>last <b>{lastPopTier === null ? '-' : lastPopTier}</b></span>
 		<span class:lit={settleSaves > 0}>saves <b>{settleSaves}</b></span>
 	</div>
@@ -651,8 +808,8 @@
 		role="application"
 		aria-label="Color POP physics board"
 	>
-		<canvas bind:this={canvasEl} width={WIDTH} height={HEIGHT} aria-label="the physics board: circles dropping and merging toward the ceiling line"
-			>circles dropping and merging toward the ceiling line</canvas
+		<canvas bind:this={canvasEl} width={WIDTH} height={HEIGHT} aria-label="the physics board: swirling planets dropping and merging toward the ceiling line"
+			>swirling planets dropping and merging toward the ceiling line</canvas
 		>
 		{#if loadError}
 			<div class="game-overlay">
