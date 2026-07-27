@@ -2,6 +2,7 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { book, fmt } from '$lib/witch/book.svelte';
 	import { startTick, stopTick } from '$lib/witch/tick';
+	import { resourceGains, type ResourceGain } from '$lib/witch/resourceGains.svelte';
 	import Arcade from '$lib/arcade/Arcade.svelte';
 	import ActivePetPanel from '$lib/arcade/ActivePetPanel.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
@@ -9,6 +10,29 @@
 	let activeGame = $state<string | null>(null);
 	let activePet = $state<BestiaryCreature | null>(null);
 	let theaterMode = $state(false);
+
+	// resource-gain popups, anchored to the meter they belong to. Seeded to
+	// the queue's current tail so a fresh mount doesn't replay stale gains.
+	let activeGains = $state<ResourceGain[]>([]);
+	let lastSeenGainId = resourceGains.length ? resourceGains[resourceGains.length - 1].id : 0;
+	let gainTimers: ReturnType<typeof setTimeout>[] = [];
+
+	function gainsFor(kind: ResourceGain['kind']) {
+		return activeGains.filter((g) => g.kind === kind);
+	}
+
+	$effect(() => {
+		const fresh = resourceGains.filter((g) => g.id > lastSeenGainId);
+		if (fresh.length === 0) return;
+		lastSeenGainId = resourceGains[resourceGains.length - 1].id;
+		for (const gain of fresh) {
+			activeGains = [...activeGains, gain];
+			const timer = setTimeout(() => {
+				activeGains = activeGains.filter((g) => g.id !== gain.id);
+			}, 1100);
+			gainTimers.push(timer);
+		}
+	});
 
 	function onFocus() {
 		void book.refreshBestiaryCreatures();
@@ -43,6 +67,7 @@
 
 	onDestroy(() => {
 		stopTick();
+		for (const timer of gainTimers) clearTimeout(timer);
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('beforeunload', persist);
 			window.removeEventListener('focus', onFocus);
@@ -63,9 +88,21 @@
 			<h1>arcade</h1>
 		</div>
 		<div class="meters" aria-label="current book resources">
-			<span><b>{fmt(book.insight)}</b> insight</span>
-			<span><b>{book.essence}</b> essence</span>
-			<span><b>{Math.round(book.favor)}</b> favor</span>
+			<span class="meter">
+				<b>{fmt(book.insight)}</b> insight
+				{#each gainsFor('insight') as gain (gain.id)}
+					<b class="gain-pop" class:trickle={gain.tone === 'trickle'} aria-hidden="true">
+						+{gain.amount}
+					</b>
+				{/each}
+			</span>
+			<span class="meter">
+				<b>{book.essence}</b> essence
+				{#each gainsFor('essence') as gain (gain.id)}
+					<b class="gain-pop essence" aria-hidden="true">+{gain.amount}</b>
+				{/each}
+			</span>
+			<span class="meter"><b>{Math.round(book.favor)}</b> favor</span>
 		</div>
 	</header>
 
@@ -158,6 +195,41 @@
 		color: var(--cyan);
 		font-weight: 400;
 		letter-spacing: 0;
+	}
+	.meter {
+		position: relative;
+	}
+	.meters .gain-pop {
+		position: absolute;
+		left: 50%;
+		bottom: 100%;
+		margin-bottom: 0.15rem;
+		font-size: 0.95rem;
+		color: var(--cyan);
+		white-space: nowrap;
+		pointer-events: none;
+		animation: gain-pop-up 1.1s ease-out forwards;
+	}
+	.gain-pop.essence {
+		color: var(--leafeon-pink);
+	}
+	.gain-pop.trickle {
+		font-size: 0.78rem;
+		opacity: 0.8;
+	}
+	@keyframes gain-pop-up {
+		0% {
+			opacity: 0;
+			transform: translate(-50%, 0.3rem);
+		}
+		20% {
+			opacity: 1;
+			transform: translate(-50%, 0);
+		}
+		100% {
+			opacity: 0;
+			transform: translate(-50%, -0.85rem);
+		}
 	}
 	.arcade-layout {
 		width: min(100%, 76rem);
