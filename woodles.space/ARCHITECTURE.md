@@ -404,6 +404,29 @@ defined`. the apps that test rune modules either inherit the plugin from
 `vite.config.ts` or don't construct a rune store at import. planner's sharp edges
 are written up in [apps/planner/KNOWN_ISSUES.md](./apps/planner/KNOWN_ISSUES.md).
 
+### browser integration tests
+
+`e2e/` is the deliberately small Playwright layer above the unit suites. Its
+local server reads `vercel.json` and applies the production rewrites, so route
+coverage tests the paths people actually visit instead of eight unrelated Vite
+ports. The suite covers every published entry route, Write → Echoes publishing,
+Bestiary gallery/adopt/share and Marginalia consumption, an Arcade state change,
+Ologypedia shelf export → publish script → indexed card, legacy localStorage
+migration across reload, keyboard operation, and serious/critical WCAG A axe
+findings.
+
+Run it after installing Chromium once on the machine:
+
+```bash
+pnpm exec playwright install chromium
+pnpm test:e2e
+```
+
+`pnpm test:e2e` builds all SvelteKit apps first. Ologypedia's publisher test
+uses `--app-dir` with a temporary copy of the app, so it exercises the real
+script without changing `apps/ologypedia/index.html` or adding a page to the
+working tree.
+
 ## svelte-check
 
 | app                 | status                                  |
