@@ -1617,6 +1617,7 @@
         b.className = 'tb-btn tb-app';
         b.dataset.id = a.id;
         b.dataset.label = a.name.toLowerCase();
+        b.setAttribute('aria-label', a.name);
         if (recents.includes(a.id)) b.classList.add('recent');
         b.innerHTML = tileHTML(a);
         b.addEventListener('click', () => launch(a));

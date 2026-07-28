@@ -11,15 +11,16 @@
 // Usage:
 //   node apps/ologypedia/scripts/publish.mjs <shelf-export.json> [--dry-run]
 //
-// --dry-run prints what would change without writing anything.
+// --dry-run prints what would change without writing anything. --app-dir is
+// an integration-test seam: it points the same publisher at an isolated copy
+// of Ologypedia so a test run never edits checked-in pages.
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const appDir = path.resolve(here, '..');
-const indexPath = path.join(appDir, 'index.html');
+const defaultAppDir = path.resolve(here, '..');
 
 const RESERVED_SLUGS = new Set(['chrome-blocks', 'example-blocks']);
 const SLUG_RE = /^[a-z0-9-]+$/;
@@ -173,10 +174,20 @@ function publishToIndex(indexHtml, entries) {
 function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run');
-  const shelfPath = args.find((a) => !a.startsWith('--'));
+  const appDirFlag = args.indexOf('--app-dir');
+  const appDir = appDirFlag === -1
+    ? defaultAppDir
+    : path.resolve(args[appDirFlag + 1] || '');
+  const indexPath = path.join(appDir, 'index.html');
+  const positional = args.filter((arg, index) => {
+    if (arg === '--dry-run' || arg === '--app-dir') return false;
+    if (index === appDirFlag + 1) return false;
+    return !arg.startsWith('--');
+  });
+  const shelfPath = positional[0];
 
   if (!shelfPath) {
-    console.error('Usage: node apps/ologypedia/scripts/publish.mjs <shelf-export.json> [--dry-run]');
+    console.error('Usage: node apps/ologypedia/scripts/publish.mjs <shelf-export.json> [--dry-run] [--app-dir <dir>]');
     process.exit(1);
   }
   if (!existsSync(shelfPath)) {

@@ -966,6 +966,7 @@
 			contenteditable="true"
 			spellcheck="true"
 			data-placeholder={LAYER_PLACEHOLDERS.foreground}
+			aria-label="foreground letter content"
 			oninput={onFgInput}
 			onpaste={handlePaste}
 			onkeyup={updateToolbarState}
@@ -981,6 +982,7 @@
 			contenteditable="true"
 			spellcheck="true"
 			data-placeholder={LAYER_PLACEHOLDERS.midground}
+			aria-label="midground letter content"
 			oninput={() => { updateMeta(); scheduleSave(); fgVersion += 1; }}
 			onpaste={handlePaste}
 			role="textbox"
@@ -994,6 +996,7 @@
 			contenteditable="true"
 			spellcheck="true"
 			data-placeholder={LAYER_PLACEHOLDERS.background}
+			aria-label="background letter content"
 			oninput={() => { updateMeta(); scheduleSave(); fgVersion += 1; }}
 			onpaste={handlePaste}
 			role="textbox"
