@@ -85,7 +85,7 @@ woodles.space/
     ├── animations/          Python · Manim playspace, outside the workspace
     ├── write/               SvelteKit · the letter editor
     ├── marginalia/          SvelteKit · a witch writes worlds + a reading room
-    ├── planner/             SvelteKit · carillon — calendar, schedule, and time
+    ├── planner/             SvelteKit · carillon — self-observation, day piles, and reinforcement
     ├── notebook/            SvelteKit · the front door — one stream of captures
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
     ├── spores/              SvelteKit · the knowledge base — linked entries, gathered into spellbooks
@@ -317,6 +317,91 @@ Marginalia keep their existing domain persistence until each is changed for a
 product reason; adoption should migrate one store at a time rather than create
 a central Woodles state service.
 
+## carillon, the self-observation instrument
+
+`apps/planner` is Carillon. Its schedule is a hypothesis shown beside
+momentary time-sampling data, not a compliance ledger. `buildDayIntervals()`
+expands the configured wake/sleep anchors into intervals (15 minutes by
+default); the bell asks what is actually happening in the current interval.
+Past intervals only become editable when paper-entry mode is on. Its date
+picker can reopen any earlier sheet, and those marks keep `source: "paper"` so
+a later clipboard transcription never poses as a live sample. Correcting an
+existing live sample preserves its original provenance. A blank interval is
+unobserved, not failed.
+
+Each observation has the deterministic identity
+`observation-<date>@<startTime>`, stores both its observed kind/label and the
+pile's `plannedLabel`, and carries `capturedAt`/`updatedAt`. Correcting a mark
+updates that record without editing the plan or manufacturing another sample;
+its capture-time plan label, interval duration, and source provenance remain
+fixed. The seven observation kinds are clinic, writing, build, movement, care,
+rest, and elsewhere.
+
+**Prompt-fading routines** begin as full task analyses. A dated practice records
+each step as `independent`, `prompted`, or `missed` and derives an independence
+ratio. At least 80% on each of the latest three days moves the routine to
+`faded`, where only its opening and closing prompts are shown; a second
+adjacent three-day window at the same criterion moves it to `mastered`, rendered
+as one quiet chip. Faded and mastered routines always offer the full steps on
+request. Practice ids are routine-plus-date, so correcting today's data replaces
+today's record rather than pretending it was another day.
+
+**Day piles** are complete reusable day shapes rather than schedules assigned
+in advance to dates. The starter rack has five: office, maker, out, recovery,
+and writing. `weekPattern` supplies one suggested pile per weekday while a
+`DayInstance` is an explicit one-day override, so choosing today's pile does
+not silently rewrite every future Thursday. Blocks are rated `easy`, `steady`,
+or `stretch`; `sequenceDayPile()` puts high-probability on-ramps before the
+lower-probability work while preserving the authored time slots. Obligations
+and rituals are overlays and are never reordered by that operation.
+
+**Surge drafts** separate capture from commitment. Every draft stores its
+creation timestamp and the `PlannerStore` session id that created it.
+`canPromoteSurgeDraft()` refuses promotion while that same app session is
+alive; a later session may promote it, but promotion only creates an
+unscheduled task in loose pieces, never a block or a calendar commitment.
+The original body, drafted-at time, promoted-at time, and resulting task id
+stay attached as provenance. The resulting task id is deterministic per draft,
+so two devices cannot manufacture duplicate loose pieces; the loose piece opens
+the ordinary task editor for scheduling. Archiving a draft never touches the
+plan and remains reversible from the closed-draft shelf.
+
+**Spores and Echo** are the reinforcement layer. One honest observation creates
+one deterministic, amount-1 `SporeEvent`; correcting the observation updates
+the same Spore's kind instead of double-paying it. Echo's seven visible traits
+grow from lifetime totals by observation kind, while the last seven days only
+decide whether the creature is awake or taking an ordinary nap — there is no
+streak penalty. `buildEchoesExport()` emits the stable
+`carillon-spores` version-1 JSON ledger, which is the narrow surface Echoes can
+consume without importing Carillon's private planner blob.
+
+**Print-first evenings and edition review** close the paper loop. The Today
+screen always carries a print-only sheet for tomorrow's chosen pile: a
+letter-portrait, two-column interval ledger with the plan beside an empty mark,
+the cream/print-pink inversion, and VT323 timestamps under `@media print`.
+Paper marks come back through the explicitly labeled, date-addressable
+paper-entry mode. `EditionReview` only offers days with observations and builds
+each historical row from the observation's stored interval duration and
+`plannedLabel`; changing today's pile or sampling interval cannot rewrite the
+old edition. It can overlay pop-up commentary for repeated weekday/interval
+changes and Surge provenance. The commentary is a pattern-finding bonus track,
+not an audit, and the same view exports the Spores JSON.
+
+Carillon remains local-first: its domain records live in app-owned localStorage
+keys and `PlannerBlob` treats the instrument fields as optional so older synced
+blobs still hydrate. When passphrase sync is connected, `@woodles/sync` mirrors
+one whole `PlannerBlob` into Neon's `sync.blob` JSONB column. Carillon opts into
+the deterministic merge path: id-keyed collections are unioned; an observation
+collision takes the later `updatedAt`, a routine-practice collision the later
+`recordedAt`, mutable piles/tasks/routines/day choices take the later
+`updatedAt`, and a Surge collision takes its later update with status precedence
+as a tie-break. The Spore ledger is then reconciled against the merged
+observations so kind, date, and amount stay canonical. Legacy settings and
+overlay collections remain remote-winning. A compare-and-swap conflict merges
+against each returned server version for up to three total pushes; persistent
+contention remains safe locally and surfaces as not-yet-synced instead of a
+false success. See "the sync layer" below for the transport contract.
+
 ## the knowledge base
 
 `spores` is where entries are tended. It absorbed the Dev Log (step 2) and the
@@ -455,28 +540,36 @@ a single-user sync spine that a few apps opt into. localStorage stays the source
 of truth on each device; sync mirrors it to a server so the same data follows you
 between machines.
 
-**`api/sync.ts`** — a Vercel edge function over a Neon Postgres table. `GET
-/api/sync?app=<name>` returns `{ blob, version }`; `POST` with `{ app, blob,
-baseVersion }` is a compare-and-swap — it writes only if the version still
-matches what you read, and answers `409 { conflict, server }` when the server
-moved first. auth is one passphrase, sent as `Authorization: Bearer …`. the
-server never stores it — only its SHA-256, compared in constant time against the
-`SYNC_PASS_HASH` env var. `DATABASE_URL` comes from the Neon integration.
+**`api/sync.ts`** — a Vercel edge function over a Neon Postgres table whose
+`blob` column is JSONB. `GET /api/sync?app=<name>` returns `{ blob, version }`;
+`POST` with `{ app, blob, baseVersion }` is a compare-and-swap — it writes only
+if the version still matches what you read, and answers
+`409 { conflict, server }` when the server moved first. auth is one passphrase,
+sent as `Authorization: Bearer …`. the server never stores it — only its
+SHA-256, compared in constant time against the `SYNC_PASS_HASH` env var.
+`DATABASE_URL` comes from the Neon integration.
 
 **`packages/sync` (`@woodles/sync`)** — the client half. `pull(app)` and
 `push(app, blob, baseVersion)` wrap the endpoint; `createSyncedStore(adapter)`
-owns the version bookkeeping and the "ask before clobber" decision — its
-`onConflict` returns `mine`, `theirs`, or `cancel`. the passphrase lives in
-memory for the session; the last-seen version is cached in localStorage.
+owns the version bookkeeping. Ordinary adapters keep the "ask before clobber"
+decision — `onConflict` returns `mine`, `theirs`, or `cancel`. An append-like
+adapter may instead provide a deterministic `merge(local, remote)`: hydration
+applies and, when needed, flushes the merged blob; a compare-and-swap conflict
+merges against the server snapshot, adopts that returned version, and retries
+the push once. The active passphrase lives in module memory, while
+`createAppSync` also caches it under the shared `woodles_sync_passphrase`
+localStorage key so apps can reconnect after a reload; disconnect removes that
+bearer credential. the last-seen version is cached in localStorage too.
 
-**`apps/*/src/lib/sync.svelte.ts`** — the per-app glue. each file is ~30 lines:
+**`apps/*/src/lib/sync.svelte.ts`** — the per-app glue. Most are small:
 a `SyncState` class with `$state` fields, its instantiation, and a call to
 `createAppSync` (from `@woodles/sync`) that wires up the app-specific adapter.
 the adapter's `read()` maps the store into the blob type (`PlannerBlob`,
 `BestiaryBlob`, `GardenBlob`, `DevlogBlob`, `ThinkingAboutBlob`); `write()` calls
 the store's `rehydrate()`; `isNewer` is optionally provided (`bestiary` and
-`thinking-about` use it). `marginalia` still has none of
-this — it never syncs privately.
+`thinking-about` use it). Carillon's file is deliberately larger because it
+owns the merge described above and coalesces queued instrument writes before
+flushing. `marginalia` still has none of this — it never syncs privately.
 `write` gained a file in week 7, but it has no private blob to sync at all;
 its adapter's `read`/`write` are no-ops, kept only to reuse `createAppSync`'s
 passphrase connect/disconnect/persistence for gating the public echoes

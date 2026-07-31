@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { store } from '$lib/store.svelte';
+	import { queueSync } from '$lib/sync.svelte';
 	import { dateKey } from '$lib/utils';
 
 	let localTitle = $state('');
@@ -76,6 +77,7 @@
 				});
 			}
 			store.cancelCompose();
+			queueSync();
 			return;
 		}
 
@@ -92,6 +94,7 @@
 			});
 		}
 		store.closeTaskEdit();
+		queueSync();
 	}
 
 	function handleDrop() {
@@ -99,6 +102,7 @@
 		if (!id) return;
 		store.dropTask(id);
 		store.closeTaskEdit();
+		queueSync();
 	}
 
 	function handleStatusToggle() {
@@ -111,6 +115,7 @@
 			store.completeTask(id);
 			localStatus = 'done';
 		}
+		queueSync();
 	}
 </script>
 
