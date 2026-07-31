@@ -149,7 +149,7 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/planner/dist',
 		entryFile: 'index.html',
 		packageName: 'planner',
-		landing: tile('planner', 6, 'tend', 'calendar, schedule, and time', 'var(--peach)', 'var(--lavender)', '170deg', { defaultPin: 4 })
+		landing: tile('planner', 6, 'tend', 'interval data, fading routines, and day piles', 'var(--peach)', 'var(--lavender)', '170deg', { defaultPin: 4 })
 	},
 	{
 		id: 'notebook',
