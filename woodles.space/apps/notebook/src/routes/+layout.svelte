@@ -65,10 +65,19 @@
 		background:
 			radial-gradient(circle at 12% 5%, rgba(255, 247, 252, 0.72), transparent 23rem),
 			radial-gradient(circle at 92% 86%, rgba(178, 146, 209, 0.24), transparent 24rem),
+			radial-gradient(circle, rgba(232, 70, 143, 0.1) 0 1px, transparent 1.5px) 0 0 / 16px
+				16px,
+			radial-gradient(circle, rgba(66, 190, 203, 0.09) 0 1px, transparent 1.5px) 8px 8px /
+				16px 16px,
 			linear-gradient(115deg, rgba(255, 255, 255, 0.2), transparent 48%),
 			var(--nb-bg);
 		position: relative;
 		line-height: 1.5;
+	}
+
+	:global(::selection) {
+		background: var(--nb-cyan-soft);
+		color: var(--nb-ink);
 	}
 
 	:global(:focus-visible) {
