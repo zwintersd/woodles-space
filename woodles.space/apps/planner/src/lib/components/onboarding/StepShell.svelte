@@ -56,11 +56,12 @@
 	</div>
 
 	<footer class="step-footer">
-		{#if stage > 1}
-			<button class="step-back" onclick={() => onboarding.back()} title="back">← back</button>
-		{:else}
-			<span></span>
-		{/if}
+		<div class="step-exit-actions">
+			{#if stage > 1}
+				<button class="step-back" onclick={() => onboarding.back()} title="back">← back</button>
+			{/if}
+			<button class="step-later" onclick={() => onboarding.finishLater()}>finish later</button>
+		</div>
 		<button class="step-cta" onclick={onAdvance} disabled={!canAdvance}>{cta}</button>
 	</footer>
 </div>
@@ -222,6 +223,13 @@
 		line-height: 1;
 	}
 
+	.step-exit-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.2rem;
+		min-width: 0;
+	}
+
 	.step-back {
 		font-family: var(--pl-font-mono);
 		font-size: 0.65rem;
@@ -234,6 +242,20 @@
 	}
 
 	.step-back:hover { opacity: 1; color: var(--p-accent); }
+
+	.step-later {
+		font-family: var(--pl-font-mono);
+		font-size: 0.58rem;
+		letter-spacing: 0.1em;
+		color: var(--p-muted);
+		padding: 6px 8px;
+		border-radius: var(--pl-radius-pill);
+		opacity: 0.5;
+		white-space: nowrap;
+		transition: opacity var(--pl-transition-fast), color var(--pl-transition-fast);
+	}
+
+	.step-later:hover { opacity: 1; color: var(--p-text); }
 
 	.step-cta {
 		font-family: var(--pl-font-mono);

@@ -77,6 +77,10 @@ export type DayInstance = {
 
 export type ToneName = 'wry' | 'gentle' | 'minimal' | 'earnest';
 
+// A saved checkpoint in Carillon's first-run flow. It deliberately lives with
+// settings so a draft can travel with the rest of a planner profile.
+export type OnboardingStep = 1 | 2 | 3 | 4 | 5 | 6;
+
 export type PlannerSettings = {
 	flourishEnabled: boolean;
 	quietHoursStart: string; // "HH:MM"
@@ -86,6 +90,8 @@ export type PlannerSettings = {
 	dayCycleEnabled: boolean;
 	fixedPaletteMode: string | null;
 	onboardingComplete: boolean;
+	/** The next setup question to show when onboarding is resumed. */
+	onboardingStep?: OnboardingStep;
 	wakeAnchor: string; // "HH:MM" — when the day actually starts
 	sleepAnchor: string;
 	tone: ToneName;

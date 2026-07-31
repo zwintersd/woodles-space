@@ -126,7 +126,15 @@
 	<div class="ted-backdrop" onclick={commitAndClose}></div>
 {/if}
 
-<div class="ted-sheet" class:open>
+<div
+	class="ted-sheet"
+	class:open
+	role={open ? 'dialog' : undefined}
+	aria-modal={open ? 'true' : undefined}
+	aria-hidden={open ? undefined : 'true'}
+	aria-label={open ? (composing ? 'Add a task' : 'Edit a task') : undefined}
+	data-testid="task-editor"
+>
 	{#if open}
 		<div class="ted-handle"></div>
 
@@ -142,6 +150,7 @@
 				bind:this={titleInput}
 				bind:value={localTitle}
 				class="ted-title-input"
+				aria-label="Task title"
 				placeholder="what is it?"
 				autocomplete="off"
 				spellcheck="false"

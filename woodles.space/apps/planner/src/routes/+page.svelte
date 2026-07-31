@@ -8,6 +8,7 @@
 	import DayPanel from '$lib/components/DayPanel.svelte';
 	import Binder from '$lib/components/Binder.svelte';
 	import Dock from '$lib/components/Dock.svelte';
+	import TaskEditDrawer from '$lib/components/TaskEditDrawer.svelte';
 	import Onboarding from '$lib/components/onboarding/Onboarding.svelte';
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -63,6 +64,7 @@
 		<DayPanel />
 		<Binder />
 		<Dock />
+		<TaskEditDrawer />
 	</div>
 {/if}
 

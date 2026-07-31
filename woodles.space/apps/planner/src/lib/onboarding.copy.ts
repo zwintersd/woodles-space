@@ -74,8 +74,9 @@ export const WELCOME = {
 
 export const COMPLETION = {
 	heading: 'The structure is in place.',
-	body: 'The day is yours to occupy.',
-	cta: 'open carillon →'
+	body: 'Give the day one real thing to hold, then let the rest stay adjustable.',
+	cta: 'add the first thing →',
+	skipCta: 'open carillon'
 };
 
 // ── Empty states ───────────────────────────────────────────────────
