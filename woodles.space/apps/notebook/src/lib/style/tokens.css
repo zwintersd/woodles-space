@@ -1,5 +1,5 @@
 :root {
-	--nb-bg: #ead4e7;
+	--nb-bg: #f0d9ec;
 	--nb-paper: #fffaf5;
 	--nb-paper-rose: #fff7fb;
 	--nb-ink: #403047;
@@ -12,6 +12,12 @@
 	--nb-violet-soft: #e9e3f6;
 	--nb-yellow: #d7aa3f;
 	--nb-yellow-soft: #fbefd0;
+	--nb-pink-pop: #e8468f;
+	--nb-cyan: #42becb;
+	--nb-cyan-soft: #dcf7f8;
+	--nb-yellow-pop: #f4d85d;
+	--nb-violet-pop: #8373dc;
+	--nb-web-shadow: #6f74c9;
 	--nb-green: #4f846d;
 	--nb-green-soft: #dceee5;
 	--nb-danger: #a63f61;
@@ -20,4 +26,5 @@
 	--nb-font-body: var(--font-body, "Lora", Georgia, serif);
 	--nb-font-sans: var(--font-sans, "Plus Jakarta Sans", system-ui, sans-serif);
 	--nb-font-mono: var(--font-mono, "DM Mono", "SFMono-Regular", Consolas, monospace);
+	--nb-font-pixel: var(--font-pixel, "Coral Pixels", var(--nb-font-mono));
 }

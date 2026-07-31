@@ -22,16 +22,24 @@
 	onMount(() => {
 		const caught = notebook.ingestHandoffs();
 		if (caught > 0) {
-			handoffNotice = `Caught ${caught} ${caught === 1 ? 'thought' : 'thoughts'} from elsewhere.`;
+			handoffNotice =
+				caught === 1
+					? 'A little thought drifted in from elsewhere.'
+					: `${caught} little thoughts drifted in from elsewhere.`;
 		}
 	});
 
 	function send(target: HandoffTarget) {
 		if (!capture) return;
 		const result = notebook.promote(capture.id, target);
-		handoffNotice = result?.ok
-			? `Sent to ${target}. It will be waiting when you open it.`
-			: `Could not send this page to ${target}.`;
+		if (!result?.ok) {
+			handoffNotice = 'The paper airplane missed. Try again?';
+			return;
+		}
+		handoffNotice =
+			target === 'spores'
+				? 'Tucked into Spores. It will be waiting.'
+				: 'Sent to Write. Ready when you are.';
 	}
 
 	function updateTags(value: string) {
@@ -142,7 +150,7 @@
 		<div class="identity">
 			<span class="identity-mark" aria-hidden="true">✦</span>
 			<div>
-				<p>catch it before it goes</p>
+				<p><span class="signal-pixel" aria-hidden="true"></span>catch it before it goes</p>
 				<h1>Notebook</h1>
 			</div>
 		</div>
@@ -157,11 +165,16 @@
 					placeholder="Search pages"
 					aria-label="Search notebook"
 				/>
-				<kbd>⌘K</kbd>
+				<kbd>Ctrl/⌘ K</kbd>
 			</label>
-			<button class="new-page-button" type="button" onclick={newCapture}>
+			<button
+				class="new-page-button"
+				type="button"
+				onclick={newCapture}
+				aria-label="New page"
+			>
 				<span aria-hidden="true">＋</span>
-				New page
+				New
 			</button>
 		</div>
 	</header>
@@ -178,15 +191,19 @@
 		<aside class="capture-page" aria-label="Notebook pages">
 			<header class="capture-header">
 				<div>
-					<p class="eyebrow">your notebook</p>
+					<p class="eyebrow">pages caught</p>
 					<h2>Open pages</h2>
 				</div>
-				<span class="capture-count">{notebook.captures.length}</span>
+				<span class="capture-count" aria-label="{notebook.captures.length} pages">
+					<small>pages</small>
+					<strong>{notebook.captures.length.toString().padStart(3, '0')}</strong>
+				</span>
 			</header>
 
 			<div class="lane-filters" aria-label="Filter pages by lane">
 				<button
 					type="button"
+					data-lane="all"
 					class:active={notebook.laneFilter === null}
 					aria-pressed={notebook.laneFilter === null}
 					onclick={() => notebook.setLaneFilter(null)}
@@ -197,6 +214,7 @@
 				{#each LANES as lane}
 					<button
 						type="button"
+						data-lane={lane}
 						class:active={notebook.laneFilter === lane}
 						aria-pressed={notebook.laneFilter === lane}
 						onclick={() => notebook.setLaneFilter(lane)}
@@ -236,9 +254,9 @@
 				{:else}
 					<div class="list-empty">
 						<span aria-hidden="true">☾</span>
-						<strong>No pages found</strong>
-						<p>Try another search or clear the lane filter.</p>
-						<button type="button" onclick={() => notebook.setLaneFilter(null)}>Show everything</button>
+						<strong>Nothing on this frequency</strong>
+						<p>Try another search, or tune back to every lane.</p>
+						<button type="button" onclick={() => notebook.setLaneFilter(null)}>Tune to everything</button>
 					</div>
 				{/each}
 			</div>
@@ -282,7 +300,7 @@
 			{#if capture}
 				<header class="editor-header">
 					<div class="lane-picker" role="group" aria-label="Move page to lane">
-						<span>Keep in</span>
+						<span>Tuck into</span>
 						{#each LANES as lane}
 							<button
 								type="button"
@@ -296,10 +314,13 @@
 							</button>
 						{/each}
 					</div>
-					<time class="updated-time" datetime={capture.updatedAt}>
-						<span>last changed</span>
-						{longDate(capture.updatedAt)}
-					</time>
+					<div class="editor-status">
+						<span class="page-sticker" aria-hidden="true">moon note ✦</span>
+						<time class="updated-time" datetime={capture.updatedAt}>
+							<span>last changed</span>
+							{longDate(capture.updatedAt)}
+						</time>
+					</div>
 				</header>
 
 				<div class="writing-area">
@@ -308,7 +329,7 @@
 						<input
 							class="title-input"
 							value={capture.title}
-							placeholder="Untitled thought"
+							placeholder="Give it a name (or don't)"
 							aria-label="Capture title"
 							oninput={(event) =>
 								notebook.update(capture.id, { title: event.currentTarget.value })}
@@ -335,7 +356,7 @@
 							bind:this={bodyInput}
 							value={capture.body}
 							aria-label="Capture body"
-							placeholder="Start anywhere. This page can be messy."
+							placeholder="Start anywhere. Scribbles, fragments, and half-ideas are welcome."
 							spellcheck="true"
 							oninput={(event) =>
 								notebook.update(capture.id, { body: event.currentTarget.value })}
@@ -345,7 +366,7 @@
 
 				<footer class="editor-footer">
 					<div class="send-actions">
-						<span>Ready for more?</span>
+						<span>Give this thought somewhere to grow:</span>
 						{#each SEND_TO as target}
 							<button
 								type="button"
@@ -379,7 +400,10 @@
 		</section>
 	</main>
 
-	<p class="keyboard-hint"><kbd>N</kbd> new page · <kbd>1–3</kbd> filter lanes · <kbd>0</kbd> show all</p>
+	<p class="keyboard-hint">
+		<span>tiny shortcuts:</span>
+		<kbd>N</kbd> new page · <kbd>1–3</kbd> filter lanes · <kbd>0</kbd> show all
+	</p>
 </div>
 
 <style>
@@ -400,11 +424,33 @@
 		align-items: center;
 		gap: 1rem;
 		padding: 0.55rem 0.7rem;
-		border: 1px solid rgba(111, 70, 125, 0.16);
-		border-radius: 16px;
-		background: rgba(255, 250, 253, 0.76);
-		box-shadow: 0 10px 30px rgba(83, 42, 92, 0.08);
-		backdrop-filter: blur(14px);
+		border: 2px solid color-mix(in srgb, var(--nb-rose) 72%, var(--nb-violet));
+		border-radius: 10px;
+		background:
+			linear-gradient(180deg, rgba(255, 255, 255, 0.82), transparent 42%),
+			#fff1fa;
+		box-shadow:
+			inset 0 0 0 2px rgba(255, 255, 255, 0.72),
+			3px 4px 0 var(--nb-web-shadow);
+		position: relative;
+	}
+
+	.app-bar::after {
+		content: "";
+		position: absolute;
+		right: 0.35rem;
+		bottom: 0.22rem;
+		left: 0.35rem;
+		height: 3px;
+		border-radius: 2px;
+		background: linear-gradient(
+			90deg,
+			var(--nb-pink-pop),
+			var(--nb-yellow-pop),
+			var(--nb-cyan),
+			var(--nb-violet-pop)
+		);
+		pointer-events: none;
 	}
 
 	.back-home {
@@ -414,8 +460,9 @@
 		align-items: center;
 		gap: 0.5rem;
 		padding: 0 0.65rem;
-		border-radius: 10px;
+		border-radius: 6px;
 		color: var(--nb-muted);
+		font-family: var(--nb-font-mono);
 		font-size: 0.75rem;
 		font-weight: 600;
 		text-decoration: none;
@@ -443,30 +490,55 @@
 		height: 2.3rem;
 		display: grid;
 		place-items: center;
-		border: 1px solid rgba(164, 71, 126, 0.24);
-		border-radius: 50%;
-		background: linear-gradient(145deg, var(--nb-yellow-soft), var(--nb-rose-soft));
+		border: 2px solid var(--nb-rose);
+		border-radius: 7px;
+		background:
+			linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0 48%, transparent 49%),
+			var(--nb-yellow-pop);
 		color: var(--nb-rose);
-		box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.62);
+		font-family: var(--nb-font-pixel);
+		box-shadow:
+			inset 0 0 0 2px rgba(255, 255, 255, 0.58),
+			2px 2px 0 var(--nb-cyan),
+			4px 4px 0 rgba(111, 90, 168, 0.3);
+		transform: rotate(-2deg);
 	}
 
 	.identity p,
 	.eyebrow,
 	.title-label > span {
-		font-family: var(--nb-font-sans);
-		font-size: 0.62rem;
+		font-family: var(--nb-font-mono);
+		font-size: 0.72rem;
 		font-weight: 600;
-		letter-spacing: 0.1em;
+		letter-spacing: 0.08em;
 		text-transform: uppercase;
 		color: var(--nb-muted);
 	}
 
+	.identity p {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+	}
+
+	.signal-pixel {
+		width: 0.45rem;
+		height: 0.45rem;
+		border: 1px solid var(--nb-ink);
+		border-radius: 1px;
+		background: var(--nb-cyan);
+		box-shadow: 1px 1px 0 var(--nb-violet-pop);
+	}
+
 	.identity h1 {
 		font-family: var(--nb-font-display);
-		font-size: 1.65rem;
+		font-size: 1.72rem;
 		font-weight: 600;
 		line-height: 0.9;
-		color: var(--nb-ink);
+		color: var(--nb-rose);
+		text-shadow:
+			1px 1px 0 #fff,
+			2px 2px 0 var(--nb-cyan-soft);
 	}
 
 	.app-actions {
@@ -483,9 +555,12 @@
 		align-items: center;
 		gap: 0.55rem;
 		padding: 0 0.65rem;
-		border: 1px solid var(--nb-rule-strong);
-		border-radius: 11px;
-		background: rgba(255, 255, 255, 0.7);
+		border: 2px solid var(--nb-violet);
+		border-radius: 7px;
+		background: #fff;
+		box-shadow:
+			inset 0 2px 0 rgba(247, 219, 234, 0.7),
+			0 2px 0 var(--nb-cyan);
 		transition:
 			border-color 140ms ease,
 			box-shadow 140ms ease;
@@ -520,6 +595,7 @@
 	.search-field input {
 		min-width: 0;
 		flex: 1;
+		font-family: var(--nb-font-mono);
 		font-size: 0.78rem;
 	}
 
@@ -530,13 +606,13 @@
 	kbd {
 		padding: 0.12rem 0.3rem;
 		border: 1px solid var(--nb-rule-strong);
-		border-radius: 5px;
+		border-radius: 3px;
 		background: rgba(255, 255, 255, 0.65);
 		color: var(--nb-muted);
 		font-family: var(--nb-font-mono);
-		font-size: 0.58rem;
+		font-size: 0.66rem;
 		font-weight: 500;
-		box-shadow: 0 1px 0 rgba(76, 45, 86, 0.12);
+		box-shadow: 1px 1px 0 rgba(76, 45, 86, 0.18);
 	}
 
 	.new-page-button {
@@ -545,13 +621,17 @@
 		align-items: center;
 		gap: 0.38rem;
 		padding: 0 0.9rem;
-		border: 1px solid #a5427e;
-		border-radius: 11px;
-		background: linear-gradient(180deg, #d760a4, #bd478c);
+		border: 2px solid #7f285d;
+		border-radius: 7px;
+		background: linear-gradient(180deg, #b83d7e, #963064);
 		color: #fff;
+		font-family: var(--nb-font-mono);
 		font-size: 0.76rem;
 		font-weight: 600;
-		box-shadow: 0 3px 8px rgba(165, 66, 126, 0.2);
+		box-shadow:
+			inset 0 2px 0 rgba(255, 255, 255, 0.25),
+			0 3px 0 #76234f,
+			0 5px 0 var(--nb-cyan);
 		transition:
 			transform 120ms ease,
 			box-shadow 120ms ease;
@@ -559,7 +639,10 @@
 
 	.new-page-button:hover {
 		transform: translateY(-1px);
-		box-shadow: 0 5px 12px rgba(165, 66, 126, 0.24);
+		box-shadow:
+			inset 0 2px 0 rgba(255, 255, 255, 0.25),
+			0 4px 0 #76234f,
+			0 6px 0 var(--nb-cyan);
 	}
 
 	.notice {
@@ -587,8 +670,8 @@
 	}
 
 	.notice button {
-		width: 2rem;
-		height: 2rem;
+		width: 2.5rem;
+		height: 2.5rem;
 		border-radius: 8px;
 		color: var(--nb-muted);
 	}
@@ -606,14 +689,18 @@
 		display: grid;
 		grid-template-columns: minmax(17rem, 21rem) 1.15rem minmax(0, 1fr);
 		padding: 0.72rem;
-		border: 1px solid rgba(86, 46, 95, 0.34);
-		border-radius: 21px;
+		border: 2px solid #593677;
+		border-radius: 17px;
 		background:
-			linear-gradient(135deg, rgba(255, 255, 255, 0.18), transparent 32%),
-			linear-gradient(145deg, #8a608f, #c35991 68%, #a14e85);
+			repeating-linear-gradient(
+				135deg,
+				transparent 0 8px,
+				rgba(255, 255, 255, 0.09) 8px 16px
+			),
+			linear-gradient(145deg, #7654ad, var(--nb-pink-pop) 64%, #4eaeba);
 		box-shadow:
-			0 24px 60px rgba(66, 31, 72, 0.2),
-			0 5px 10px rgba(66, 31, 72, 0.15);
+			4px 5px 0 rgba(91, 64, 144, 0.48),
+			0 24px 60px rgba(66, 31, 72, 0.2);
 		position: relative;
 	}
 
@@ -621,8 +708,41 @@
 		content: "";
 		position: absolute;
 		inset: 0.3rem;
-		border: 1px solid rgba(255, 255, 255, 0.23);
-		border-radius: 17px;
+		border: 1px solid rgba(188, 248, 250, 0.72);
+		border-radius: 13px;
+		pointer-events: none;
+	}
+
+	.notebook-spread::after {
+		content: "NOTEBOOK HOTLINE  ✦  PUT IT DOWN FIRST  ✦  SORT IT LATER  ☾  TINY IDEAS WELCOME";
+		position: absolute;
+		z-index: 4;
+		top: -0.48rem;
+		left: 50%;
+		max-width: calc(100% - 4rem);
+		padding: 0.26rem 0.8rem 0.22rem;
+		overflow: hidden;
+		border: 2px solid #fff;
+		border-radius: 5px;
+		background: linear-gradient(
+			90deg,
+			var(--nb-pink-pop),
+			var(--nb-violet-pop),
+			var(--nb-cyan)
+		);
+		box-shadow:
+			0 0 0 1px var(--nb-violet),
+			2px 3px 0 var(--nb-yellow-pop);
+		color: #fff;
+		font-family: var(--nb-font-mono);
+		font-size: 0.62rem;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-align: center;
+		text-overflow: ellipsis;
+		text-shadow: 1px 1px 0 rgba(64, 48, 71, 0.55);
+		white-space: nowrap;
+		transform: translateX(-50%);
 		pointer-events: none;
 	}
 
@@ -657,7 +777,12 @@
 		width: 0.28rem;
 		height: 5.4rem;
 		border-radius: 0 4px 4px 0;
-		background: linear-gradient(var(--nb-rose), var(--nb-yellow), var(--nb-violet));
+		background: linear-gradient(
+			var(--nb-pink-pop),
+			var(--nb-yellow-pop),
+			var(--nb-cyan),
+			var(--nb-violet-pop)
+		);
 	}
 
 	.capture-header {
@@ -677,18 +802,48 @@
 		color: var(--nb-ink);
 	}
 
+	.capture-header h2::after {
+		content: " ✦";
+		color: var(--nb-cyan);
+		font-family: var(--nb-font-pixel);
+		font-size: 0.8rem;
+		vertical-align: 0.35rem;
+	}
+
 	.capture-count {
-		min-width: 2.05rem;
-		height: 2.05rem;
-		display: grid;
-		place-items: center;
-		border: 1px solid rgba(166, 69, 126, 0.2);
-		border-radius: 50%;
-		background: rgba(255, 255, 255, 0.76);
-		color: var(--nb-rose);
+		min-width: 3.8rem;
+		min-height: 2.35rem;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		border: 2px solid var(--nb-violet);
+		border-radius: 5px;
+		background:
+			linear-gradient(rgba(66, 190, 203, 0.07) 1px, transparent 1px) 0 0 / 4px 4px,
+			var(--nb-ink);
+		color: var(--nb-cyan-soft);
 		font-family: var(--nb-font-mono);
-		font-size: 0.7rem;
+		box-shadow:
+			inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+			2px 2px 0 var(--nb-cyan);
+	}
+
+	.capture-count small {
+		color: var(--nb-yellow-pop);
+		font-size: 0.56rem;
 		font-weight: 500;
+		letter-spacing: 0.12em;
+		line-height: 1;
+		text-transform: uppercase;
+	}
+
+	.capture-count strong {
+		font-family: var(--nb-font-pixel);
+		font-size: 0.88rem;
+		font-weight: 400;
+		letter-spacing: 0.12em;
+		line-height: 1.15;
 	}
 
 	.lane-filters {
@@ -704,15 +859,16 @@
 	}
 
 	.lane-filters button {
-		min-height: 2.25rem;
+		min-height: 2.5rem;
 		display: inline-flex;
 		align-items: center;
 		gap: 0.35rem;
 		padding: 0 0.58rem;
 		border: 1px solid transparent;
-		border-radius: 9px;
+		border-radius: 5px;
 		color: var(--nb-muted);
-		font-size: 0.67rem;
+		font-family: var(--nb-font-mono);
+		font-size: 0.75rem;
 		font-weight: 600;
 		white-space: nowrap;
 	}
@@ -726,26 +882,27 @@
 		border-color: var(--nb-rule-strong);
 		background: rgba(255, 255, 255, 0.86);
 		color: var(--nb-ink);
-		box-shadow: 0 2px 7px rgba(78, 43, 83, 0.07);
+		box-shadow: 0 2px 0 var(--lane-color, var(--nb-cyan));
 	}
 
 	.lane-filters small {
 		color: var(--nb-muted);
 		font-family: var(--nb-font-mono);
-		font-size: 0.56rem;
+		font-size: 0.72rem;
 	}
 
 	.lane-dot,
 	.row-marker,
 	.lane-picker button > span {
-		width: 0.48rem;
-		height: 0.48rem;
+		width: 0.56rem;
+		height: 0.56rem;
 		flex: 0 0 auto;
-		border-radius: 50%;
+		border-radius: 2px;
 		background: var(--nb-rose);
 	}
 
 	.lane-dot.all {
+		border-radius: 50%;
 		background: conic-gradient(
 			var(--nb-rose) 0 33%,
 			var(--nb-yellow) 33% 66%,
@@ -768,10 +925,40 @@
 		--lane-soft: var(--nb-violet-soft);
 	}
 
-	.lane-dot[data-lane],
-	.capture-row[data-lane] .row-marker,
-	.lane-picker button[data-lane] > span {
-		background: var(--lane-color);
+	[data-lane='all'] {
+		--lane-color: var(--nb-cyan);
+	}
+
+	.lane-dot[data-lane='spark'],
+	.capture-row[data-lane='spark'] .row-marker,
+	.lane-picker button[data-lane='spark'] > span {
+		border-radius: 0;
+		background: var(--nb-yellow-pop);
+		clip-path: polygon(
+			50% 0,
+			61% 36%,
+			100% 50%,
+			61% 64%,
+			50% 100%,
+			39% 64%,
+			0 50%,
+			39% 36%
+		);
+	}
+
+	.lane-dot[data-lane='shape'],
+	.capture-row[data-lane='shape'] .row-marker,
+	.lane-picker button[data-lane='shape'] > span {
+		border-radius: 1px;
+		background: var(--nb-pink-pop);
+		transform: rotate(45deg);
+	}
+
+	.lane-dot[data-lane='later'],
+	.capture-row[data-lane='later'] .row-marker,
+	.lane-picker button[data-lane='later'] > span {
+		border-radius: 50%;
+		background: radial-gradient(circle at 67% 42%, transparent 0 43%, var(--nb-violet-pop) 46%);
 	}
 
 	.capture-list {
@@ -790,7 +977,7 @@
 		gap: 0 0.62rem;
 		padding: 0.75rem 0.7rem;
 		border: 1px solid transparent;
-		border-radius: 11px;
+		border-radius: 7px;
 		color: var(--nb-ink);
 		text-align: left;
 		transition:
@@ -810,7 +997,9 @@
 	.capture-row.active {
 		border-color: color-mix(in srgb, var(--lane-color) 32%, transparent);
 		background: linear-gradient(90deg, var(--lane-soft), rgba(255, 255, 255, 0.78));
-		box-shadow: 0 3px 10px rgba(78, 43, 83, 0.07);
+		box-shadow:
+			2px 3px 0 color-mix(in srgb, var(--lane-color) 54%, transparent),
+			inset 0 0 0 1px rgba(255, 255, 255, 0.72);
 		transform: translateX(2px);
 	}
 
@@ -843,7 +1032,7 @@
 		flex: 0 0 auto;
 		color: var(--nb-muted);
 		font-family: var(--nb-font-mono);
-		font-size: 0.53rem;
+		font-size: 0.72rem;
 	}
 
 	.capture-preview {
@@ -851,7 +1040,7 @@
 		overflow: hidden;
 		color: var(--nb-muted);
 		font-family: var(--nb-font-sans);
-		font-size: 0.68rem;
+		font-size: 0.78rem;
 		line-height: 1.45;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -866,11 +1055,15 @@
 
 	.tag-preview small {
 		padding: 0.12rem 0.3rem;
-		border-radius: 5px;
-		background: rgba(123, 97, 176, 0.08);
+		border: 1px solid rgba(111, 90, 168, 0.12);
+		border-radius: 3px;
+		background:
+			linear-gradient(90deg, rgba(66, 190, 203, 0.08) 1px, transparent 1px) 0 0 / 4px
+				4px,
+			rgba(123, 97, 176, 0.07);
 		color: var(--nb-violet);
 		font-family: var(--nb-font-mono);
-		font-size: 0.52rem;
+		font-size: 0.7rem;
 		white-space: nowrap;
 	}
 
@@ -900,14 +1093,14 @@
 
 	.list-empty p {
 		max-width: 12rem;
-		font-size: 0.68rem;
+		font-size: 0.78rem;
 		line-height: 1.5;
 	}
 
 	.list-empty button {
 		margin-top: 0.4rem;
 		color: var(--nb-rose);
-		font-size: 0.66rem;
+		font-size: 0.75rem;
 		font-weight: 600;
 		text-decoration: underline;
 		text-underline-offset: 0.2rem;
@@ -958,7 +1151,7 @@
 
 	.save-state strong {
 		overflow: hidden;
-		font-size: 0.58rem;
+		font-size: 0.7rem;
 		font-weight: 600;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -966,7 +1159,7 @@
 
 	.save-state small {
 		font-family: var(--nb-font-mono);
-		font-size: 0.48rem;
+		font-size: 0.7rem;
 	}
 
 	.file-actions {
@@ -975,11 +1168,12 @@
 	}
 
 	.file-actions button {
-		min-height: 2rem;
-		padding: 0 0.38rem;
-		border-radius: 7px;
+		min-height: 2.5rem;
+		padding: 0 0.5rem;
+		border-radius: 5px;
 		color: var(--nb-violet);
-		font-size: 0.58rem;
+		font-family: var(--nb-font-mono);
+		font-size: 0.75rem;
 		font-weight: 600;
 	}
 
@@ -1012,12 +1206,29 @@
 	}
 
 	.book-seam span {
-		width: 0.42rem;
-		height: 0.42rem;
+		width: 0.5rem;
+		height: 0.5rem;
 		border: 1px solid rgba(66, 38, 72, 0.28);
-		border-radius: 50%;
-		background: #f6c8dd;
-		box-shadow: inset 0 1px 2px rgba(66, 38, 72, 0.2);
+		border-radius: 2px;
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.45),
+			1px 1px 0 rgba(66, 38, 72, 0.3);
+	}
+
+	.book-seam span:nth-child(4n + 1) {
+		background: var(--nb-yellow-pop);
+	}
+
+	.book-seam span:nth-child(4n + 2) {
+		background: var(--nb-pink-pop);
+	}
+
+	.book-seam span:nth-child(4n + 3) {
+		background: var(--nb-cyan);
+	}
+
+	.book-seam span:nth-child(4n) {
+		background: var(--nb-violet-pop);
 	}
 
 	.editor-page {
@@ -1040,9 +1251,9 @@
 		border-radius: 5px 0 0 5px;
 		background: linear-gradient(
 			to bottom,
-			var(--nb-yellow) 0 33%,
-			var(--nb-rose) 33% 66%,
-			var(--nb-violet) 66%
+			var(--nb-yellow-pop) 0 33%,
+			var(--nb-pink-pop) 33% 66%,
+			var(--nb-cyan) 66%
 		);
 		box-shadow: -2px 2px 5px rgba(83, 42, 92, 0.15);
 	}
@@ -1067,20 +1278,22 @@
 	.lane-picker > span {
 		margin-right: 0.2rem;
 		color: var(--nb-muted);
-		font-size: 0.62rem;
+		font-family: var(--nb-font-mono);
+		font-size: 0.75rem;
 		font-weight: 600;
 	}
 
 	.lane-picker button {
-		min-height: 2.15rem;
+		min-height: 2.5rem;
 		display: inline-flex;
 		align-items: center;
 		gap: 0.35rem;
 		padding: 0 0.55rem;
 		border: 1px solid transparent;
-		border-radius: 8px;
+		border-radius: 5px;
 		color: var(--nb-muted);
-		font-size: 0.64rem;
+		font-family: var(--nb-font-mono);
+		font-size: 0.75rem;
 		font-weight: 600;
 	}
 
@@ -1093,6 +1306,27 @@
 		border-color: color-mix(in srgb, var(--lane-color) 32%, transparent);
 		background: var(--lane-soft);
 		color: var(--nb-ink);
+		box-shadow: 0 2px 0 var(--lane-color);
+	}
+
+	.editor-status {
+		display: flex;
+		align-items: center;
+		gap: 0.85rem;
+	}
+
+	.page-sticker {
+		padding: 0.28rem 0.48rem 0.23rem;
+		border: 1px solid var(--nb-rose);
+		border-radius: 3px;
+		background: var(--nb-yellow-soft);
+		color: var(--nb-rose);
+		font-family: var(--nb-font-mono);
+		font-size: 0.66rem;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		box-shadow: 2px 2px 0 var(--nb-cyan);
+		transform: rotate(2deg);
 	}
 
 	.updated-time {
@@ -1101,13 +1335,13 @@
 		align-items: flex-end;
 		color: var(--nb-muted);
 		font-family: var(--nb-font-mono);
-		font-size: 0.58rem;
+		font-size: 0.72rem;
 		line-height: 1.35;
 	}
 
 	.updated-time span {
 		font-family: var(--nb-font-sans);
-		font-size: 0.52rem;
+		font-size: 0.72rem;
 		font-weight: 600;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
@@ -1138,10 +1372,11 @@
 		font-weight: 600;
 		line-height: 1.12;
 		letter-spacing: -0.015em;
+		text-shadow: 1px 1px 0 var(--nb-cyan-soft);
 	}
 
 	.title-input::placeholder {
-		color: rgba(77, 55, 82, 0.34);
+		color: var(--nb-muted);
 		font-style: italic;
 	}
 
@@ -1165,8 +1400,8 @@
 
 	.tag-field input {
 		width: 100%;
-		font-family: var(--nb-font-sans);
-		font-size: 0.7rem;
+		font-family: var(--nb-font-mono);
+		font-size: 0.8rem;
 	}
 
 	.tag-field input::placeholder {
@@ -1214,7 +1449,7 @@
 	}
 
 	.body-field textarea::placeholder {
-		color: rgba(77, 55, 82, 0.37);
+		color: var(--nb-muted);
 		font-style: italic;
 	}
 
@@ -1232,10 +1467,26 @@
 	.page-holes span {
 		width: 0.58rem;
 		height: 0.58rem;
-		border: 1px solid rgba(80, 51, 83, 0.2);
+		border: 2px solid rgba(80, 51, 83, 0.2);
 		border-radius: 50%;
-		background: rgba(160, 103, 149, 0.08);
-		box-shadow: inset 0 1px 2px rgba(80, 51, 83, 0.12);
+		background: var(--nb-rose-soft);
+		box-shadow:
+			inset 0 1px 2px rgba(80, 51, 83, 0.12),
+			0 0 0 2px rgba(232, 70, 143, 0.08);
+	}
+
+	.page-holes span:nth-child(2) {
+		background: var(--nb-yellow-soft);
+		box-shadow:
+			inset 0 1px 2px rgba(80, 51, 83, 0.12),
+			0 0 0 2px rgba(244, 216, 93, 0.16);
+	}
+
+	.page-holes span:nth-child(3) {
+		background: var(--nb-cyan-soft);
+		box-shadow:
+			inset 0 1px 2px rgba(80, 51, 83, 0.12),
+			0 0 0 2px rgba(66, 190, 203, 0.12);
 	}
 
 	.editor-footer {
@@ -1259,21 +1510,22 @@
 	.send-actions > span {
 		margin-right: 0.2rem;
 		color: var(--nb-muted);
-		font-size: 0.62rem;
+		font-size: 0.75rem;
 		font-weight: 600;
 	}
 
 	.send-actions button {
-		min-height: 2.25rem;
+		min-height: 2.5rem;
 		display: inline-flex;
 		align-items: center;
 		gap: 0.35rem;
 		padding: 0 0.62rem;
 		border: 1px solid var(--nb-rule-strong);
-		border-radius: 8px;
+		border-radius: 5px;
 		background: rgba(255, 255, 255, 0.62);
 		color: var(--nb-violet);
-		font-size: 0.62rem;
+		font-family: var(--nb-font-mono);
+		font-size: 0.75rem;
 		font-weight: 600;
 	}
 
@@ -1283,10 +1535,11 @@
 	}
 
 	.delete-actions button {
-		min-height: 2.2rem;
+		min-height: 2.5rem;
 		padding: 0 0.55rem;
-		border-radius: 8px;
-		font-size: 0.6rem;
+		border-radius: 5px;
+		font-family: var(--nb-font-mono);
+		font-size: 0.75rem;
 		font-weight: 600;
 	}
 
@@ -1314,8 +1567,14 @@
 
 	.keyboard-hint {
 		align-self: center;
-		color: rgba(74, 51, 80, 0.58);
-		font-size: 0.6rem;
+		color: var(--nb-muted);
+		font-family: var(--nb-font-mono);
+		font-size: 0.75rem;
+	}
+
+	.keyboard-hint > span {
+		color: var(--nb-rose);
+		font-weight: 600;
 	}
 
 	.keyboard-hint kbd {
@@ -1380,6 +1639,7 @@
 
 		.back-home {
 			min-width: 2.5rem;
+			min-height: 2.75rem;
 			justify-content: center;
 			padding: 0;
 		}
@@ -1397,8 +1657,19 @@
 			width: 100%;
 		}
 
+		.search-field,
+		.new-page-button {
+			min-height: 2.75rem;
+		}
+
 		.new-page-button {
 			padding: 0 0.7rem;
+		}
+
+		.notice button,
+		.lane-filters button {
+			min-width: 2.75rem;
+			min-height: 2.75rem;
 		}
 
 		.notebook-spread {
@@ -1409,6 +1680,12 @@
 			gap: 0.65rem;
 			padding: 0.5rem;
 			border-radius: 17px;
+		}
+
+		.notebook-spread::after {
+			content: "PUT IT DOWN FIRST  ✦  SORT IT LATER";
+			max-width: calc(100% - 2rem);
+			font-size: 0.58rem;
 		}
 
 		.book-seam {
@@ -1448,6 +1725,7 @@
 		}
 
 		.lane-picker button {
+			min-height: 2.75rem;
 			justify-content: center;
 			padding: 0 0.3rem;
 		}
@@ -1479,6 +1757,12 @@
 			width: 100%;
 		}
 
+		.send-actions button,
+		.delete-actions button,
+		.file-actions button {
+			min-height: 2.75rem;
+		}
+
 		.delete-actions {
 			align-self: flex-end;
 		}
@@ -1489,12 +1773,8 @@
 	}
 
 	@media (max-width: 430px) {
-		.new-page-button {
-			font-size: 0;
-		}
-
-		.new-page-button span {
-			font-size: 1rem;
+		.notebook-spread::after {
+			content: "TINY IDEAS WELCOME  ✦";
 		}
 
 		.capture-header {
@@ -1527,6 +1807,37 @@
 
 		.page-holes {
 			left: 0.15rem;
+		}
+	}
+
+	@media (forced-colors: active) {
+		.app-bar,
+		.search-field,
+		.new-page-button,
+		.notebook-spread,
+		.capture-page,
+		.editor-page,
+		.capture-count,
+		.page-sticker {
+			border: 1px solid CanvasText;
+			background: Canvas;
+			color: CanvasText;
+			box-shadow: none;
+		}
+
+		.app-bar::after,
+		.notebook-spread::after,
+		.capture-header h2::after {
+			display: none;
+		}
+
+		.lane-dot,
+		.row-marker,
+		.lane-picker button > span {
+			border: 1px solid CanvasText;
+			background: CanvasText !important;
+			clip-path: none !important;
+			transform: none !important;
 		}
 	}
 
