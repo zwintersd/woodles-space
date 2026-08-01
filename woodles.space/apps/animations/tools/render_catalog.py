@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -15,6 +17,26 @@ ROOT = Path(__file__).resolve().parents[1]
 CATALOG_PATH = ROOT / "arcade-catalog.json"
 MEDIA_DIR = ROOT / "media" / "arcade-catalog"
 EXPORT_DIR = ROOT / "exports" / "arcade"
+SVG_RECIPE_VERBS = {
+    "draw",
+    "style",
+    "checkpoint",
+    "transform",
+    "restore",
+    "fade",
+    "wait",
+}
+
+
+def canonical_source_hash(path: Path) -> str:
+    normalized = (
+        path.read_text(encoding="utf-8")
+        .replace("\r\n", "\n")
+        .replace("\r", "\n")
+        .rstrip("\n")
+        .encode("utf-8")
+    )
+    return hashlib.sha256(normalized).hexdigest()
 
 
 def load_catalog() -> dict[str, Any]:
@@ -50,10 +72,28 @@ def validate_catalog(
             "preview",
             "poster",
             "behavior",
+            "durationMs",
             "status",
+            "description",
+            "useCases",
+            "palette",
         ):
-            if not study.get(key):
+            if key == "durationMs":
+                if not isinstance(study.get(key), int) or study[key] <= 0:
+                    raise ValueError(
+                        f"catalog study needs a positive integer {key!r}: {study}"
+                    )
+            elif not study.get(key):
                 raise ValueError(f"catalog study is missing {key!r}: {study}")
+
+        for key in ("useCases", "palette"):
+            values = study[key]
+            if not isinstance(values, list) or not all(
+                isinstance(value, str) and value for value in values
+            ):
+                raise ValueError(
+                    f"catalog study {key!r} must be a non-empty string array: {study}"
+                )
 
         study_id = study["id"]
         if study_id in seen:
@@ -63,6 +103,61 @@ def validate_catalog(
         source_path = ROOT / study["source"]
         if not source_path.is_file():
             raise ValueError(f"missing source for {study_id}: {source_path}")
+
+        source_asset = study.get("sourceAsset")
+        if source_asset:
+            if not isinstance(source_asset, str):
+                raise ValueError(f"sourceAsset for {study_id} must be a string")
+            source_asset_path = ROOT / source_asset
+            if not source_asset_path.is_file():
+                raise ValueError(
+                    f"missing source asset for {study_id}: {source_asset_path}"
+                )
+
+        recipe_path_value = study.get("recipe")
+        if recipe_path_value:
+            if not source_asset:
+                raise ValueError(f"recipe study {study_id} needs sourceAsset")
+            if not isinstance(recipe_path_value, str):
+                raise ValueError(f"recipe for {study_id} must be a string")
+            recipe_path = ROOT / recipe_path_value
+            if not recipe_path.is_file():
+                raise ValueError(f"missing recipe for {study_id}: {recipe_path}")
+            with recipe_path.open(encoding="utf-8") as handle:
+                recipe = json.load(handle)
+            if recipe.get("schemaVersion") != 1:
+                raise ValueError(f"recipe for {study_id} must use schemaVersion 1")
+            if recipe.get("id") != study_id:
+                raise ValueError(
+                    f"recipe id for {study_id} must match the catalog id"
+                )
+            recipe_source = recipe.get("source")
+            if not isinstance(recipe_source, dict):
+                raise ValueError(f"recipe for {study_id} needs a source object")
+            if recipe_source.get("path") != source_asset:
+                raise ValueError(
+                    f"recipe source path for {study_id} must match sourceAsset"
+                )
+            if recipe_source.get("sha256") != canonical_source_hash(source_asset_path):
+                raise ValueError(
+                    f"recipe source hash for {study_id} does not match sourceAsset"
+                )
+            if not isinstance(recipe.get("parts"), list) or not recipe["parts"]:
+                raise ValueError(f"recipe for {study_id} needs at least one part")
+            timeline = recipe.get("timeline")
+            if not isinstance(timeline, list) or not timeline:
+                raise ValueError(f"recipe for {study_id} needs a timeline")
+            for index, step in enumerate(timeline):
+                if not isinstance(step, dict) or step.get("verb") not in SVG_RECIPE_VERBS:
+                    raise ValueError(
+                        f"recipe step {index + 1} for {study_id} uses an unsupported verb"
+                    )
+                if step["verb"] != "checkpoint":
+                    duration = step.get("duration", 0)
+                    if not isinstance(duration, (int, float)) or duration < 0:
+                        raise ValueError(
+                            f"recipe step {index + 1} for {study_id} needs a non-negative duration"
+                        )
 
         expected_preview = f"/animations/exports/arcade/{study_id}.{render['format']}"
         if study["preview"] != expected_preview:
@@ -134,7 +229,13 @@ def render_output(
     command.extend((str(ROOT / study["source"]), study[scene_key]))
 
     print(f"rendering {study_id} {label} ...", flush=True)
-    subprocess.run(command, cwd=ROOT, check=True)
+    environment = os.environ.copy()
+    recipe_path_value = study.get("recipe")
+    if recipe_path_value:
+        environment["WOODLES_SVG_RECIPE"] = str((ROOT / recipe_path_value).resolve())
+    else:
+        environment.pop("WOODLES_SVG_RECIPE", None)
+    subprocess.run(command, cwd=ROOT, env=environment, check=True)
 
     matches = list(MEDIA_DIR.rglob(f"{study_id}.{extension}"))
     if not matches:

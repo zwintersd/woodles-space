@@ -13,6 +13,7 @@
     { "source": "/",                "destination": "/apps/landing/index.html" },
     { "source": "/hygge",            "destination": "/apps/hygge/index.html" },
     { "source": "/hygge/motion",     "destination": "/apps/hygge/motion.html" },
+    { "source": "/hygge/motion/svg", "destination": "/apps/hygge/motion-svg.html" },
     { "source": "/hygge/:path*",    "destination": "/apps/hygge/:path*" },
     { "source": "/fonts",           "destination": "/apps/hygge/index.html" },
     { "source": "/fonts/:path*",    "destination": "/apps/hygge/index.html" },

@@ -579,6 +579,12 @@
       font-weight: 500;
     }
 
+    .source-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.75rem;
+    }
+
     .boundary-note {
       position: relative;
       overflow: hidden;
@@ -711,6 +717,7 @@
       <span class="crumbs-current" aria-current="page">motion</span>
     </nav>
     <nav class="topbar-links" aria-label="Workshop links">
+      <a href="/hygge/motion/svg">svg motion bench</a>
       <a href="/hygge">back to hygge</a>
       <a href="/animations">manim studio ↗</a>
     </nav>
@@ -834,7 +841,11 @@
               </div>
               <div>
                 <dt>source</dt>
-                <dd><a class="source-link" id="source-link" href="/animations">open studio</a></dd>
+                <dd class="source-links">
+                  <a class="source-link" id="source-link" href="/animations">open studio</a>
+                  <a class="source-link" id="asset-link" href="/animations" hidden>source asset</a>
+                  <a class="source-link" id="bench-link" href="/hygge/motion/svg" hidden>open in SVG bench</a>
+                </dd>
               </div>
             </dl>
           </section>
@@ -881,7 +892,9 @@
       metaDuration: document.getElementById('meta-duration'),
       metaRender: document.getElementById('meta-render'),
       metaPalette: document.getElementById('meta-palette'),
-      sourceLink: document.getElementById('source-link')
+      sourceLink: document.getElementById('source-link'),
+      assetLink: document.getElementById('asset-link'),
+      benchLink: document.getElementById('bench-link')
     };
 
     const state = {
@@ -998,6 +1011,15 @@
       elements.metaRender.textContent = `${state.catalog.render.width} × ${state.catalog.render.height} · ${state.catalog.render.fps} fps · ${state.catalog.render.format}`;
       elements.sourceLink.href = `/animations/${study.source.replace(/^\/+/, '')}`;
       elements.sourceLink.textContent = study.source.split('/').pop();
+      elements.assetLink.hidden = !study.sourceAsset;
+      elements.benchLink.hidden = !study.recipe;
+      if (study.sourceAsset) {
+        elements.assetLink.href = `/animations/${study.sourceAsset.replace(/^\/+/, '')}`;
+        elements.assetLink.textContent = study.sourceAsset.split('/').pop();
+      }
+      if (study.recipe) {
+        elements.benchLink.href = `/hygge/motion/svg?recipe=${encodeURIComponent(`/animations/${study.recipe.replace(/^\/+/, '')}`)}`;
+      }
       renderUseCases(study.useCases);
       elements.poster.src = study.poster;
       elements.poster.alt = `${study.name} representative still`;

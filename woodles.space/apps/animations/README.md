@@ -21,7 +21,44 @@ python3 -m venv .venv
 ./.venv/bin/python -m pip install --editable .
 ```
 
-The current scenes use Manim geometry and Pango text only; LaTeX is not needed.
+The current scenes use Manim geometry, SVG vector inputs, and Pango text only;
+LaTeX is not needed.
+
+### SVG studies
+
+Keep original SVG inputs under `assets/` and resolve them relative to the scene
+file. Manim writes a short-lived normalized SVG beside the input while parsing,
+so source files must live in a writable authoring directory rather than being
+loaded directly from Downloads or another read-only location.
+
+`svg-recipes/` holds the small, versioned contract shared by the browser bench
+and `scenes/svg_recipe.py`. A recipe names the source element and subpath for
+every included part; omitted geometry remains visible as an explicit choice in
+the bench. It then assigns human labels, groups, colors, style, and an ordered
+timeline made from seven verbs: `draw`, `style`, `checkpoint`, `transform`,
+`restore`, `fade`, and `wait`. The source hash and expected drawable count fail
+the render early when an SVG has changed underneath its recipe. Hashing
+normalizes CRLF/LF and ignores terminal newlines so Git's Windows line-ending
+policy cannot invalidate unchanged geometry.
+
+Triple corn is the compound-path case: one opaque source backdrop is deliberately
+omitted and nine subpaths become named leaves, cobs, and kernels. Diamonds is the
+unrelated control: one drawable and one part. Both render through the same scene
+and catalog command, which is the useful seam; semantic inference, arbitrary
+Manim expressions, and automatic Arcade promotion remain outside it.
+
+The interactive authoring surface is `/hygge/motion/svg`. It makes the part map,
+groups, palette, timing, recipe JSON, source hash, and exact render command
+inspectable. Its SVG preview is intentionally fast and approximate. Download a
+recipe into `svg-recipes/`, keep its SVG at the displayed `assets/` path, review
+the diff, then use Manim for the authoritative local draft:
+
+```powershell
+.\.venv\Scripts\python.exe tools\render_svg_recipe.py svg-recipes\my-study.json
+```
+
+Drafts stay under ignored `media/svg-recipe-drafts/`. The browser and draft
+helper never write to the catalog or promote an asset.
 
 ## The Arcade-study catalog
 
@@ -33,6 +70,7 @@ of Manim's ignored scratch `media/` tree:
 .\.venv\Scripts\python.exe tools\render_catalog.py --check
 .\.venv\Scripts\python.exe tools\render_catalog.py --list
 .\.venv\Scripts\python.exe tools\render_catalog.py ink-bloom
+.\.venv\Scripts\python.exe tools\render_catalog.py triple-corn-svg diamonds-svg
 .\.venv\Scripts\python.exe tools\render_catalog.py --all
 ```
 
