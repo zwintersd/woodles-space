@@ -460,6 +460,12 @@ describe('PlannerStore', () => {
 			const newStore = new PlannerStore();
 			expect(newStore.settings.quietHoursStart).toBe('23:00');
 		});
+
+		it('persists an in-progress onboarding step', () => {
+			store.updateSettings({ onboardingStep: 4 });
+			const newStore = new PlannerStore();
+			expect(newStore.settings.onboardingStep).toBe(4);
+		});
 	});
 
 	describe('domains', () => {
@@ -513,10 +519,11 @@ describe('PlannerStore', () => {
 	// ── resetOnboarding ─────────────────────────────────────────────
 
 	describe('resetOnboarding', () => {
-		it('sets onboardingComplete to false', () => {
-			store.updateSettings({ onboardingComplete: true });
+		it('clears completion and an in-progress checkpoint', () => {
+			store.updateSettings({ onboardingComplete: true, onboardingStep: 5 });
 			store.resetOnboarding();
 			expect(store.settings.onboardingComplete).toBe(false);
+			expect(store.settings.onboardingStep).toBeUndefined();
 		});
 	});
 

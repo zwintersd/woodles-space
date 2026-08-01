@@ -661,7 +661,7 @@ export class PlannerStore {
 
 	// Wipe everything user-introductory — used by "redo onboarding" affordance.
 	resetOnboarding(): void {
-		this.updateSettings({ onboardingComplete: false });
+		this.updateSettings({ onboardingComplete: false, onboardingStep: undefined });
 	}
 
 	// Apply a blob from the sync server to all persisted state fields.

@@ -6,8 +6,17 @@
 		minutesRemaining,
 		minutesUntilBlock
 	} from '$lib/templates';
-	import { minutesToDisplay, dayOfWeekLabel, shortDateLabel, formatTime, timeToMinutes } from '$lib/utils';
+	import {
+		minutesToDisplay,
+		dayOfWeekLabel,
+		shortDateLabel,
+		formatTime,
+		timeToMinutes,
+		dateKey
+	} from '$lib/utils';
 	import { getDailyFlourish, shouldShowFlourish } from '$lib/voice';
+	import { onboarding } from '$lib/onboarding.store.svelte';
+	import TaskItem from './TaskItem.svelte';
 
 	let dayShape = $derived(store.getDayShape(store.now));
 	let blocks = $derived(store.getBlocksForDate(store.now));
@@ -52,6 +61,31 @@
 	const dayShapeLabel = $derived(dayShape?.name ?? 'no shape');
 
 	let elapsedLabel = $derived(currentBlock ? `${Math.round(progressPct)}% elapsed` : null);
+
+	// The first useful Carillon gesture is naming one thing for the part of the
+	// day that is happening now (or next). Keep it on the default landing view
+	// so setup does not end in a read-only schedule.
+	const focusBlock = $derived(currentBlock ?? nextBlock);
+	const focusDate = $derived(dateKey(store.now));
+	const focusTasks = $derived.by(() => {
+		if (focusBlock) return store.getTasksForBlock(focusBlock.id, focusDate);
+		return store
+			.getTasksForDay(focusDate)
+			.filter((task) => task.status !== 'dropped' && !task.targetBlockId);
+	});
+	const focusLabel = $derived(focusBlock ? `things for ${focusBlock.title}` : 'things for today');
+	const setupStep = $derived(store.settings.onboardingStep);
+
+	function addThing() {
+		store.startCompose({
+			targetDate: focusDate,
+			targetBlockId: focusBlock?.id
+		});
+	}
+
+	function continueSetup() {
+		onboarding.resumeFromPlanner();
+	}
 </script>
 
 <div class="now-next">
@@ -75,6 +109,16 @@
 			{dayShapeLabel}
 		</button>
 	</header>
+
+	{#if setupStep}
+		<section class="nn-setup-nudge" aria-label="unfinished setup">
+			<div>
+				<span class="nn-setup-eyebrow">SETUP PAUSED</span>
+				<p>Pick up at question {setupStep} when the week has your attention again.</p>
+			</div>
+			<button class="nn-setup-resume" onclick={continueSetup}>continue setup →</button>
+		</section>
+	{/if}
 
 	<!-- Current block card -->
 	<section class="nn-now-card" class:lead-time={leadTime}>
@@ -125,6 +169,28 @@
 			</div>
 		</section>
 	{/if}
+
+	<section class="nn-things" aria-labelledby="nn-things-heading">
+		<div class="nn-things-head">
+			<div>
+				<span class="nn-things-eyebrow">ONE REAL THING</span>
+				<h2 id="nn-things-heading" class="nn-things-title">{focusLabel}</h2>
+			</div>
+			<button class="nn-add-thing" data-testid="add-task" onclick={addThing}>
+				+ add
+			</button>
+		</div>
+
+		{#if focusTasks.length > 0}
+			<div class="nn-task-list" role="list">
+				{#each focusTasks as task (task.id)}
+					<TaskItem {task} />
+				{/each}
+			</div>
+		{:else}
+			<p class="nn-things-empty">Give this part of the day one name. It can be small.</p>
+		{/if}
+	</section>
 
 	{#if flourishText}
 		<figure class="nn-flourish-wrap">
@@ -368,6 +434,124 @@
 		opacity: 1;
 	}
 
+	/* ── gentle resume point for a deferred setup ─────────────────── */
+	.nn-setup-nudge {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-bottom: 1rem;
+		padding: 0.7rem 0.85rem;
+		border: 1px solid var(--p-border);
+		border-left: 2px solid var(--p-accent);
+		border-radius: var(--pl-radius-sm);
+		background: color-mix(in srgb, var(--p-accent-soft) 58%, transparent);
+	}
+
+	.nn-setup-eyebrow {
+		display: block;
+		font-family: var(--pl-font-mono);
+		font-size: 0.5rem;
+		letter-spacing: 0.18em;
+		color: var(--p-accent);
+		opacity: 0.8;
+	}
+
+	.nn-setup-nudge p {
+		font-family: var(--pl-font-body);
+		font-size: 0.82rem;
+		font-style: italic;
+		line-height: 1.35;
+		color: var(--p-muted);
+	}
+
+	.nn-setup-resume {
+		flex-shrink: 0;
+		font-family: var(--pl-font-mono);
+		font-size: 0.58rem;
+		letter-spacing: 0.1em;
+		color: var(--p-text);
+		border: 1px solid var(--p-border);
+		border-radius: var(--pl-radius-pill);
+		padding: 4px 9px;
+		transition: border-color var(--pl-transition-fast), color var(--pl-transition-fast);
+	}
+
+	.nn-setup-resume:hover { color: var(--p-accent); border-color: var(--p-accent); }
+
+	/* ── things ──────────────────────────────────────────────────── */
+	.nn-things {
+		border: 1px solid var(--p-border);
+		border-radius: var(--pl-radius-md);
+		background: color-mix(in srgb, var(--p-surface) 64%, transparent);
+		padding: 1rem 1.25rem;
+		margin-bottom: 1rem;
+		transition: var(--pl-transition-palette), border-color var(--pl-transition-fast);
+	}
+
+	.nn-things:focus-within { border-color: var(--p-accent); }
+
+	.nn-things-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+
+	.nn-things-eyebrow {
+		display: block;
+		font-family: var(--pl-font-mono);
+		font-size: 0.52rem;
+		letter-spacing: 0.18em;
+		color: var(--p-accent);
+		opacity: 0.75;
+	}
+
+	.nn-things-title {
+		font-family: var(--pl-font-optical);
+		font-size: 1.2rem;
+		font-weight: 400;
+		font-style: italic;
+		line-height: 1.2;
+		color: var(--p-text);
+		letter-spacing: -0.01em;
+		font-variation-settings: 'opsz' 36;
+	}
+
+	.nn-add-thing {
+		flex-shrink: 0;
+		font-family: var(--pl-font-mono);
+		font-size: 0.6rem;
+		letter-spacing: 0.12em;
+		color: var(--p-text);
+		border: 1px solid var(--p-border);
+		border-radius: var(--pl-radius-pill);
+		padding: 4px 10px;
+		transition: color var(--pl-transition-fast), border-color var(--pl-transition-fast), background var(--pl-transition-fast);
+	}
+
+	.nn-add-thing:hover {
+		color: var(--p-bg);
+		border-color: var(--p-accent);
+		background: var(--p-accent);
+	}
+
+	.nn-task-list {
+		margin-top: 0.55rem;
+		padding-top: 0.45rem;
+		border-top: 1px solid var(--p-border);
+	}
+
+	.nn-things-empty {
+		font-family: var(--pl-font-body);
+		font-size: 0.88rem;
+		font-style: italic;
+		line-height: 1.45;
+		color: var(--p-muted);
+		opacity: 0.78;
+		margin-top: 0.55rem;
+	}
+
 	.nn-flourish-wrap {
 		display: flex;
 		flex-direction: column;
@@ -445,6 +629,12 @@
 		.nn-date {
 			width: 100%;
 			text-align: center;
+		}
+
+		.nn-setup-nudge {
+			align-items: flex-start;
+			flex-direction: column;
+			gap: 0.55rem;
 		}
 
 	}

@@ -8,6 +8,7 @@
 	import EditionReview from '$lib/components/EditionReview.svelte';
 	import Binder from '$lib/components/Binder.svelte';
 	import TaskEditDrawer from '$lib/components/TaskEditDrawer.svelte';
+	import Onboarding from '$lib/components/onboarding/Onboarding.svelte';
 
 	type CarillonSection = 'today' | 'piles' | 'routines' | 'surge' | 'review';
 
@@ -36,11 +37,13 @@
 	function handleKeydown(event: KeyboardEvent): void {
 		const target = event.target as HTMLElement | null;
 		if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+
 		const match = SECTIONS.find((item) => item.key === event.key);
 		if (match) {
 			setSection(match.id);
 			event.preventDefault();
 		}
+
 		if (event.key === 'Escape' && store.binderTab !== null) {
 			store.closeBinder();
 			event.preventDefault();
@@ -57,88 +60,92 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<a class="skip-link" href="#carillon-main">skip to instrument</a>
+{#if !store.settings.onboardingComplete}
+	<Onboarding />
+{:else}
+	<a class="skip-link" href="#carillon-main">skip to instrument</a>
 
-<div class="carillon-shell" data-section={section}>
-	<header class="app-header">
-		<div class="brand-lockup">
-			<a href="/" class="world-link" aria-label="Back to woodles.space">·space</a>
-			<button type="button" class="brand" onclick={() => setSection('today')}>
-				<span class="brand-bell" aria-hidden="true">
-					<i></i>
-					<b></b>
-				</span>
-				<span>
-					<strong>Carillon</strong>
-					<small>self-observation instrument</small>
-				</span>
-			</button>
-		</div>
+	<div class="carillon-shell" data-section={section}>
+		<header class="app-header">
+			<div class="brand-lockup">
+				<a href="/" class="world-link" aria-label="Back to woodles.space">·space</a>
+				<button type="button" class="brand" onclick={() => setSection('today')}>
+					<span class="brand-bell" aria-hidden="true">
+						<i></i>
+						<b></b>
+					</span>
+					<span>
+						<strong>Carillon</strong>
+						<small>self-observation instrument</small>
+					</span>
+				</button>
+			</div>
 
-		<nav class="section-nav" aria-label="Carillon sections">
-			{#each SECTIONS as item (item.id)}
+			<nav class="section-nav" aria-label="Carillon sections">
+				{#each SECTIONS as item (item.id)}
+					<button
+						type="button"
+						class:active={section === item.id}
+						aria-current={section === item.id ? 'page' : undefined}
+						onclick={() => setSection(item.id)}
+					>
+						<span>{item.label}</span>
+						<small>{item.note} · {item.key}</small>
+					</button>
+				{/each}
+			</nav>
+
+			<div class="instrument-status">
+				<div class="spore-readout" aria-label={`${store.sporeEvents.length} Carillon spores`}>
+					<span aria-hidden="true">✦</span>
+					<strong>{store.sporeEvents.length}</strong>
+					<small>spores</small>
+				</div>
 				<button
 					type="button"
-					class:active={section === item.id}
-					aria-current={section === item.id ? 'page' : undefined}
-					onclick={() => setSection(item.id)}
+					class="sync-readout"
+					class:connected={syncState.connected}
+					onclick={() => store.toggleBinder('sync')}
+					aria-label={`Open sync panel, ${syncLabel}`}
 				>
-					<span>{item.label}</span>
-					<small>{item.note} · {item.key}</small>
+					<i aria-hidden="true"></i>
+					<span>
+						<small>data</small>
+						<strong>{syncLabel}</strong>
+					</span>
 				</button>
-			{/each}
-		</nav>
-
-		<div class="instrument-status">
-			<div class="spore-readout" aria-label={`${store.sporeEvents.length} Carillon spores`}>
-				<span aria-hidden="true">✦</span>
-				<strong>{store.sporeEvents.length}</strong>
-				<small>spores</small>
 			</div>
-			<button
-				type="button"
-				class="sync-readout"
-				class:connected={syncState.connected}
-				onclick={() => store.toggleBinder('sync')}
-				aria-label={`Open sync panel, ${syncLabel}`}
-			>
-				<i aria-hidden="true"></i>
-				<span>
-					<small>data</small>
-					<strong>{syncLabel}</strong>
-				</span>
-			</button>
-		</div>
-	</header>
+		</header>
 
-	<main id="carillon-main" class="carillon-main" tabindex="-1" bind:this={mainElement}>
-		{#if section === 'today'}
-			<TodayInstrument onopenpiles={() => setSection('piles')} />
-		{:else if section === 'piles'}
-			<DayPiles />
-		{:else if section === 'routines'}
-			<RoutinesLab />
-		{:else if section === 'surge'}
-			<SurgeWorkbench />
-		{:else}
-			<EditionReview />
-		{/if}
-	</main>
+		<main id="carillon-main" class="carillon-main" tabindex="-1" bind:this={mainElement}>
+			{#if section === 'today'}
+				<TodayInstrument onopenpiles={() => setSection('piles')} />
+			{:else if section === 'piles'}
+				<DayPiles />
+			{:else if section === 'routines'}
+				<RoutinesLab />
+			{:else if section === 'surge'}
+				<SurgeWorkbench />
+			{:else}
+				<EditionReview />
+			{/if}
+		</main>
 
-	<footer class="app-footer">
-		<p>
-			<span>interval</span>
-			<strong>{store.settings.samplingIntervalMinutes} min</strong>
-			<i></i>
-			<span>reinforcement</span>
-			<strong>observation, never compliance</strong>
-		</p>
-		<p>local first · passphrase sync to Neon · private by default</p>
-	</footer>
+		<footer class="app-footer">
+			<p>
+				<span>interval</span>
+				<strong>{store.settings.samplingIntervalMinutes} min</strong>
+				<i></i>
+				<span>reinforcement</span>
+				<strong>observation, never compliance</strong>
+			</p>
+			<p>local first · passphrase sync to Neon · private by default</p>
+		</footer>
 
-	<Binder />
-	<TaskEditDrawer />
-</div>
+		<Binder />
+		<TaskEditDrawer />
+	</div>
+{/if}
 
 <style>
 	.skip-link {
