@@ -624,7 +624,6 @@
 		drawScan(ctx);
 		drawFloaters(ctx);
 		drawCanvasHud(ctx);
-		if (phase !== 'playing') drawCanvasEndState(ctx);
 	}
 
 	function drawScan(ctx: CanvasRenderingContext2D) {
@@ -954,36 +953,6 @@
 		ctx.restore();
 	}
 
-	function drawCanvasEndState(ctx: CanvasRenderingContext2D) {
-		const title =
-			phase === 'ready'
-				? 'READY TO DIG'
-				: phase === 'paused'
-					? 'CLOCK PAUSED'
-					: phase === 'level-clear'
-						? 'LEVEL CLEAR'
-						: 'CAME UP SHORT';
-		const subtitle =
-			phase === 'ready'
-				? `${levelSeconds} seconds. Reach ${targetText}.`
-				: phase === 'paused'
-					? `${timerText} seconds remain.`
-					: phase === 'level-clear'
-						? `Score ${scoreText}. Choose a rig upgrade for level ${level + 1}.`
-						: `Score ${scoreText}. Short by ${shortfallText}.`;
-		ctx.save();
-		ctx.fillStyle = 'rgba(104, 79, 134, 0.72)';
-		ctx.fillRect(0, UI_HEIGHT, WIDTH, HEIGHT - UI_HEIGHT);
-		ctx.textAlign = 'center';
-		ctx.textBaseline = 'middle';
-		ctx.fillStyle = '#fffafd';
-		ctx.font = '700 52px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-		ctx.fillText(title, WIDTH / 2, 276);
-		ctx.font = '22px ui-serif, Georgia, serif';
-		ctx.fillText(subtitle, WIDTH / 2, 324);
-		ctx.restore();
-	}
-
 	function loop(timestamp: number) {
 		if (!lastFrameAt) lastFrameAt = timestamp;
 		const dt = Math.min(0.05, (timestamp - lastFrameAt) / 1000);
@@ -1140,11 +1109,11 @@
 	}
 
 	.miner-shell :global(.pet-perks) {
-		width: min(800px, calc(100vw - 3rem));
+		width: min(800px, 100%);
 	}
 
 	.control-hint {
-		width: min(800px, calc(100vw - 3rem));
+		width: min(800px, 100%);
 		margin: 0;
 		text-align: center;
 		font-family: var(--font-body);
@@ -1156,7 +1125,7 @@
 	.target-hint,
 	.rig-summary,
 	.scan-readout {
-		width: min(800px, calc(100vw - 3rem));
+		width: min(800px, 100%);
 		margin: -0.35rem 0 0;
 		text-align: center;
 		font-family: var(--font-body);
@@ -1177,7 +1146,7 @@
 	}
 
 	.loot-guide {
-		width: min(800px, calc(100vw - 3rem));
+		width: min(800px, 100%);
 		display: flex;
 		flex-wrap: wrap;
 		justify-content: center;
@@ -1210,7 +1179,7 @@
 	}
 
 	.status-row {
-		width: min(800px, calc(100vw - 3rem));
+		width: min(800px, 100%);
 		display: grid;
 		grid-template-columns: 5rem 6.4rem 6rem minmax(0, 1fr);
 		gap: 0.4rem;
@@ -1343,7 +1312,7 @@
 	}
 
 	.mastery-row {
-		width: min(800px, calc(100vw - 3rem));
+		width: min(800px, 100%);
 		display: flex;
 		justify-content: center;
 		gap: 0.4rem;
@@ -1404,7 +1373,7 @@
 	}
 
 	.drop-control {
-		min-width: min(18rem, calc(100vw - 3rem));
+		min-width: min(18rem, 100%);
 		min-height: 3rem;
 		border: 1px solid var(--sol-base1);
 		border-radius: 4px;
