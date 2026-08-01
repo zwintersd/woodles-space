@@ -549,7 +549,7 @@
 
 	.inkblot-field {
 		position: relative;
-		width: min(420px, calc(100vw - 3rem));
+		width: min(420px, calc(100vw - 3rem), var(--board-vh-budget, 58svh));
 		aspect-ratio: 1;
 		border-radius: 6px;
 		border: 1px solid var(--sol-base2);

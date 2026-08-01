@@ -357,10 +357,11 @@
 	/* ── main field ────────────────────────────────────────────────────────── */
 	.match-field {
 		width: min(600px, calc(100vw - 3rem));
+		max-height: var(--board-vh-budget, 58svh);
 		border-radius: 6px;
 		border: 1px solid var(--sol-base2);
 		background: linear-gradient(135deg, #eee8d5 0%, #fdf6e3 45%, #e7dfc7 100%);
-		overflow: hidden;
+		overflow: auto;
 	}
 	.match-field.idle {
 		display: grid;

@@ -733,7 +733,7 @@
 	/* ── board ──────────────────────────────────────────────────────────── */
 	.board-wrap {
 		position: relative;
-		width: min(360px, calc(100vw - 3rem));
+		width: min(360px, calc(100vw - 3rem), var(--board-vh-budget, 58svh));
 		filter: drop-shadow(0 18px 24px rgba(91, 64, 105, 0.16));
 	}
 	.board {

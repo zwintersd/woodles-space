@@ -38,7 +38,9 @@
 	}: Props = $props();
 
 	const arenaClass = $derived(active ? 'svg-arena active' : 'svg-arena');
-	const arenaStyle = $derived(`--arena-width:${maxWidth};--arena-aspect:${width} / ${height}`);
+	const arenaStyle = $derived(
+		`--arena-width:${maxWidth};--arena-aspect:${width} / ${height};--arena-ratio:${width / height}`
+	);
 </script>
 
 <svg
@@ -70,7 +72,11 @@
 
 <style>
 	.svg-arena {
-		width: min(var(--arena-width), calc(100vw - 3rem));
+		width: min(
+			var(--arena-width),
+			calc(100vw - 3rem),
+			calc(var(--board-vh-budget, 58svh) * var(--arena-ratio))
+		);
 		aspect-ratio: var(--arena-aspect);
 		border: 1px solid var(--sol-base2);
 		border-radius: 6px;
