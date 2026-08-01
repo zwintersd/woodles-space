@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "triple-corn-svg",
+  "name": "triple corn svg lab",
+  "source": {
+    "path": "assets/triple-corn.svg",
+    "sha256": "052f17dbc296a22ee2ddaf9923a8825f4a2f4f61c1395cedf00f4748d4c6560a",
+    "expectedElements": 2,
+    "viewBox": [0, 0, 512, 512]
+  },
+  "omitted": [
+    {
+      "source": { "element": 0, "subpath": 0 },
+      "reason": "opaque full-canvas source backdrop"
+    }
+  ],
+  "parts": [
+    { "id": "leaf-a", "label": "leaf A", "source": { "element": 1, "subpath": 0 }, "group": "leaves" },
+    { "id": "cob-a", "label": "cob A", "source": { "element": 1, "subpath": 1 }, "group": "cobs" },
+    { "id": "cob-b", "label": "cob B", "source": { "element": 1, "subpath": 2 }, "group": "cobs" },
+    { "id": "kernels-a", "label": "kernels A", "source": { "element": 1, "subpath": 3 }, "group": "kernels" },
+    { "id": "kernels-b", "label": "kernels B", "source": { "element": 1, "subpath": 4 }, "group": "kernels" },
+    { "id": "leaf-c", "label": "leaf C", "source": { "element": 1, "subpath": 5 }, "group": "leaves" },
+    { "id": "leaf-b", "label": "leaf B", "source": { "element": 1, "subpath": 6 }, "group": "leaves" },
+    { "id": "cob-c", "label": "cob C", "source": { "element": 1, "subpath": 7 }, "group": "cobs" },
+    { "id": "kernels-c", "label": "kernels C", "source": { "element": 1, "subpath": 8 }, "group": "kernels" }
+  ],
+  "groups": [
+    { "id": "leaves", "label": "leaves", "color": "#6f8f62" },
+    { "id": "cobs", "label": "cobs", "color": "#e8b85c" },
+    { "id": "kernels", "label": "kernels", "color": "#f7dda0" }
+  ],
+  "style": {
+    "height": 4.35,
+    "initialFill": "#f3ecda",
+    "fillOpacity": 0.96,
+    "stroke": "#34281d",
+    "strokeWidth": 1.9,
+    "strokeOpacity": 0.88
+  },
+  "timeline": [
+    { "id": "draw", "verb": "draw", "target": "all", "duration": 1.1, "ease": "smooth", "staggerRatio": 0.055 },
+    { "id": "color", "verb": "style", "target": "all", "duration": 0.58, "ease": "smooth", "staggerRatio": 0.055 },
+    { "id": "assembled", "verb": "checkpoint", "target": "all", "name": "assembled" },
+    { "id": "open", "verb": "transform", "target": "all", "mode": "radial", "duration": 0.68, "ease": "smooth", "distance": 0.62, "distanceStep": 0.1, "rotationStep": 0.18, "scaleBase": 0.92, "scaleStep": 0.035, "centerAngleDegrees": 0 },
+    { "id": "close", "verb": "restore", "target": "all", "name": "assembled", "duration": 0.68, "ease": "smooth" },
+    { "id": "turn", "verb": "transform", "target": "all", "mode": "together", "duration": 0.92, "ease": "smooth", "rotate": 6.283185307179586 },
+    { "id": "clear", "verb": "fade", "target": "all", "duration": 0.42, "ease": "smooth", "scale": 0.88 },
+    { "id": "breath", "verb": "wait", "target": "all", "duration": 0.06 }
+  ]
+}

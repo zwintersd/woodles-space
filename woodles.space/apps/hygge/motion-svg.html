@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="cream">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="A friendly, local place to take an SVG picture apart and make its pieces move." />
+  <title>picture motion studio · hygge · woodles.space</title>
+  <link rel="stylesheet" href="/shared/fonts.css" />
+  <link rel="stylesheet" href="/shared/palette.css" />
+  <link rel="stylesheet" href="/shared/motifs.css" />
+  <link rel="stylesheet" href="/hygge/motion-svg.css" />
+  <script src="/hygge/motion-svg.js" defer></script>
+</head>
+<body class="motif-blobs">
+  <a class="skip-link" href="#bench">skip to picture motion studio</a>
+  <div class="motif-grain" aria-hidden="true"></div>
+  <div class="motif-blob motif-blob-1" aria-hidden="true"></div>
+  <div class="motif-blob motif-blob-2" aria-hidden="true"></div>
+  <div class="motif-blob motif-blob-3" aria-hidden="true"></div>
+  <div class="motif-blob motif-blob-4" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <a href="/">.space</a><span aria-hidden="true">·</span>
+      <a href="/hygge">hygge</a><span aria-hidden="true">·</span>
+      <a href="/hygge/motion">motion</a><span aria-hidden="true">·</span>
+      <span aria-current="page">picture motion</span>
+    </nav>
+    <div class="topbar-note">private · local · yours</div>
+  </header>
+
+  <main class="page-shell" id="bench" tabindex="-1">
+    <header class="intro">
+      <div>
+        <p class="eyebrow">hygge · picture motion studio</p>
+        <h1>make your picture<br />move.</h1>
+      </div>
+      <div class="intro-copy">
+        <p>Bring in a picture, choose the pieces you care about, then stack a few simple motions. The exact details are always there when you want them.</p>
+        <p class="privacy-line"><span aria-hidden="true"></span>Your picture stays in this browser tab. Nothing is saved unless you download it.</p>
+      </div>
+    </header>
+
+    <div class="bench-grid">
+      <section class="panel source-panel" aria-labelledby="source-title">
+        <header class="panel-heading">
+          <p class="section-kicker">01 · choose</p>
+          <h2 id="source-title">bring in a picture</h2>
+        </header>
+
+        <div class="panel-body source-stack">
+          <fieldset class="control-group">
+            <legend>Try an example</legend>
+            <div class="inline-control">
+              <select id="sample-select" aria-label="Example picture">
+                <option value="/animations/svg-recipes/triple-corn.json">Triple corn</option>
+                <option value="/animations/svg-recipes/diamonds.json">Diamonds</option>
+              </select>
+              <button type="button" class="button primary" id="load-sample">Open example</button>
+            </div>
+          </fieldset>
+
+          <fieldset class="control-group">
+            <legend>Use your own picture</legend>
+            <label class="file-control" for="svg-file">
+              <span>Choose a picture</span>
+              <small>SVG file · or drop it here · up to 1 MB</small>
+            </label>
+            <input id="svg-file" aria-label="Choose an SVG picture" type="file" accept=".svg,image/svg+xml" />
+          </fieldset>
+
+          <details class="paste-details" data-testid="paste-drawing">
+            <summary>Or paste an SVG</summary>
+            <fieldset class="control-group">
+              <legend class="sr-only">Paste an SVG</legend>
+              <textarea id="svg-paste" aria-label="Paste an SVG" rows="5" spellcheck="false" placeholder="&lt;svg viewBox=&quot;0 0 512 512&quot;&gt;…&lt;/svg&gt;"></textarea>
+              <div class="button-row">
+                <button type="button" class="button" id="load-paste">Open pasted picture</button>
+                <button type="button" class="button quiet" id="clear-source">Clear picture</button>
+              </div>
+            </fieldset>
+          </details>
+
+          <div class="source-status" id="source-status" role="status" aria-live="polite">Try an example or choose a picture from your computer.</div>
+          <div class="error-message" id="source-error" role="alert" hidden></div>
+
+          <section class="part-map" aria-labelledby="part-map-title" data-testid="part-map">
+            <div class="section-head compact">
+              <div>
+                <p class="section-kicker">02 · pieces</p>
+                <h3 id="part-map-title">choose a piece</h3>
+              </div>
+              <button type="button" class="text-button" id="include-omitted" disabled>Add another piece</button>
+            </div>
+            <p class="omitted-note" id="omitted-note">Open a picture to see the pieces we can move.</p>
+            <div class="part-list" id="part-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="stage-column" aria-labelledby="preview-title">
+        <div class="panel stage-panel">
+          <header class="stage-heading">
+            <div>
+              <p class="section-kicker">preview</p>
+              <h2 id="preview-title">try the movement</h2>
+            </div>
+            <span class="state-pill" id="playback-status" role="status" aria-live="polite">ready</span>
+          </header>
+
+          <div class="stage-toolbar" aria-label="Picture preview controls" role="group">
+            <fieldset>
+              <legend>background</legend>
+              <div class="segmented" id="background-controls">
+                <button type="button" data-background="paper" aria-pressed="false">paper</button>
+                <button type="button" data-background="ink" aria-pressed="false">night</button>
+                <button type="button" data-background="checker" aria-pressed="true">clear</button>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>preview size</legend>
+              <div class="segmented" id="size-controls">
+                <button type="button" data-size="96" aria-label="Small preview, 96 pixels" aria-pressed="false">small</button>
+                <button type="button" data-size="160" aria-label="Medium preview, 160 pixels" aria-pressed="false">medium</button>
+                <button type="button" data-size="256" aria-label="Large preview, 256 pixels" aria-pressed="true">large</button>
+              </div>
+            </fieldset>
+            <label class="check-control"><input type="checkbox" id="show-numbers" checked /> number the pieces</label>
+          </div>
+
+          <div class="preview-stage" id="preview-stage" data-background="checker" data-playing="false">
+            <svg id="preview-svg" aria-label="Animated picture preview" role="group" viewBox="0 0 512 512" preserveAspectRatio="xMidYMid meet">
+              <g id="preview-geometry"></g>
+              <g id="preview-markers" aria-hidden="true"></g>
+            </svg>
+            <p class="empty-stage" id="empty-stage">Your picture will appear here.</p>
+          </div>
+
+          <div class="playback-bar">
+            <button type="button" class="button" id="replay-preview" aria-label="Play motion from the beginning">start over</button>
+            <button type="button" class="button primary" id="play-preview" aria-label="Play motion">play</button>
+            <button type="button" class="button" id="pause-preview" aria-label="Pause motion" disabled>pause</button>
+            <span id="motion-preference">the picture stays still until you press play</span>
+          </div>
+        </div>
+
+        <section class="panel selected-panel" id="selected-panel" aria-labelledby="selected-title" hidden>
+          <header class="section-head compact">
+            <div>
+              <p class="section-kicker">chosen piece</p>
+              <h3 id="selected-title">choose a piece</h3>
+            </div>
+            <button type="button" class="button danger" id="toggle-selected-part" disabled>Hide this piece</button>
+          </header>
+          <div class="selected-controls">
+            <label>What should we call it?<input type="text" id="part-label" aria-label="Piece name" disabled /></label>
+            <label>Move and color with<select id="part-group" aria-label="Piece color family" disabled></select></label>
+          </div>
+        </section>
+
+        <section class="panel groups-panel" id="groups-panel" aria-labelledby="groups-title" hidden>
+          <header class="section-head compact">
+            <div>
+              <p class="section-kicker">colors & movement</p>
+              <h3 id="groups-title">pieces that belong together</h3>
+            </div>
+            <button type="button" class="button" id="add-group">Create a family</button>
+          </header>
+          <p class="section-note">Pieces in the same family share a color and can move together.</p>
+          <div class="group-list" id="group-list"><p class="empty-copy">Open a picture to make color families.</p></div>
+        </section>
+      </section>
+
+      <section class="panel timeline-panel" aria-labelledby="timeline-title">
+        <header class="panel-heading">
+          <p class="section-kicker">03 · motion</p>
+          <h2 id="timeline-title">build the movement</h2>
+          <p>Each card is one thing your picture will do. Open a card whenever you want to change it.</p>
+        </header>
+        <div class="panel-body timeline-body">
+          <div class="add-step">
+            <label for="new-step-action">What should happen next?</label>
+            <select id="new-step-action" aria-label="What should happen next?">
+              <option value="draw">draw it on</option>
+              <option value="style">add color</option>
+              <option value="checkpoint">remember this pose</option>
+              <option value="transform">move, turn, or resize</option>
+              <option value="restore">return to a saved pose</option>
+              <option value="fade">fade away</option>
+              <option value="wait">pause</option>
+            </select>
+            <button type="button" class="button" id="add-step">Add this motion</button>
+          </div>
+          <ol class="timeline-list" id="timeline-list" data-testid="timeline-list"></ol>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel save-panel" aria-labelledby="save-title">
+      <div>
+        <p class="section-kicker">04 · keep</p>
+        <h2 id="save-title">keep this draft</h2>
+        <p>Download the motion and its cleaned picture when you are ready. They remain workshop drafts until you deliberately bring them into a game.</p>
+      </div>
+      <div class="save-actions">
+        <button type="button" class="button" id="undo-change" aria-label="Undo last change" disabled>undo last change</button>
+        <button type="button" class="button" id="reset-recipe" aria-label="Start over with original picture" disabled>start over</button>
+        <button type="button" class="button primary" id="download-recipe">download motion</button>
+        <button type="button" class="button" id="download-svg">download drawing</button>
+        <span class="save-status" id="save-status" role="status" aria-live="polite">Open a picture to begin.</span>
+      </div>
+    </section>
+
+    <details class="under-the-hood" id="under-the-hood" data-testid="under-the-hood">
+      <summary>
+        <span class="under-the-hood-copy">
+          <span class="section-kicker">optional</span>
+          <strong>Under the hood</strong>
+          <span>See the exact file checks, motion data, and final-render handoff.</span>
+        </span>
+        <span class="under-the-hood-toggle" aria-hidden="true">show details</span>
+      </summary>
+
+      <div class="under-the-hood-body">
+        <section class="panel source-details-panel" aria-labelledby="source-details-title">
+          <header class="section-head">
+            <div>
+              <p class="section-kicker">drawing details</p>
+              <h2 id="source-details-title">exact source record</h2>
+            </div>
+          </header>
+          <div class="source-details-body">
+            <dl class="provenance" aria-label="Source provenance">
+              <div><dt>source</dt><dd id="source-path">—</dd></div>
+              <div><dt>sha256</dt><dd id="source-hash">—</dd></div>
+              <div><dt>anatomy</dt><dd id="source-anatomy">—</dd></div>
+              <div><dt>viewBox</dt><dd id="source-viewbox">—</dd></div>
+            </dl>
+
+            <details class="audit-details" data-testid="safety-audit">
+              <summary>Drawing safety report</summary>
+              <p>Only paths, rectangles, circles, ellipses, lines, polygons, and polylines are reconstructed. Active content and external references never enter the preview.</p>
+              <ul id="safety-warnings"><li>No source inspected yet.</li></ul>
+            </details>
+          </div>
+        </section>
+
+        <section class="recipe-workbench" aria-labelledby="recipe-title">
+          <div class="panel recipe-panel">
+            <header class="section-head">
+              <div>
+                <p class="section-kicker">motion data</p>
+                <h2 id="recipe-title">exact recipe JSON</h2>
+              </div>
+            </header>
+            <label class="sr-only" for="recipe-json">Recipe JSON</label>
+            <textarea id="recipe-json" data-testid="recipe-json" aria-label="Recipe JSON" rows="24" spellcheck="false" placeholder="Open an example or picture to begin."></textarea>
+            <div class="recipe-actions">
+              <button type="button" class="button primary" id="apply-json">Apply JSON</button>
+              <span id="json-status" role="status" aria-live="polite">JSON mirrors every visible control.</span>
+            </div>
+          </div>
+
+          <aside class="panel render-panel" aria-labelledby="render-title" data-testid="render-plan">
+            <header class="section-head compact">
+              <div>
+                <p class="section-kicker">Manim handoff</p>
+                <h2 id="render-title">exact local render</h2>
+              </div>
+            </header>
+            <ol id="render-plan"><li>Load a recipe to see its ordered render plan.</li></ol>
+            <label for="render-command">Local draft render command</label>
+            <textarea id="render-command" aria-label="Local draft render command" rows="3" readonly></textarea>
+            <button type="button" class="button" id="copy-render-command">Copy render command</button>
+            <div class="handoff-note">
+              <strong>Files stay visible.</strong>
+              <p>Place the downloaded JSON and SVG at the recipe and source paths shown above before running the helper. It renders ignored local draft files only.</p>
+            </div>
+            <div class="boundary-note">
+              <strong>Workshop boundary</strong>
+              <p>A browser preview is not a catalog study, an Arcade asset, or a promotion decision. Those remain separate, explicit steps.</p>
+            </div>
+          </aside>
+        </section>
+      </div>
+    </details>
+  </main>
+</body>
+</html>

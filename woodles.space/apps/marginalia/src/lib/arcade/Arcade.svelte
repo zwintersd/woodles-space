@@ -203,7 +203,12 @@
 		requestAnimationFrame(() => {
 			requestAnimationFrame(() => {
 				if (!rootEl) return;
-				const top = rootEl.getBoundingClientRect().top + window.scrollY - 12;
+				// The page's sticky header stays pinned over whatever we scroll to, so
+				// its live height (not a guessed constant) has to be cleared too, or
+				// the "now playing" bar ends up partly hidden underneath it.
+				const stickyHeader = document.querySelector('.arcade-top');
+				const clearance = (stickyHeader?.getBoundingClientRect().height ?? 0) + 12;
+				const top = rootEl.getBoundingClientRect().top + window.scrollY - clearance;
 				window.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
 			});
 		});
@@ -239,17 +244,19 @@
 </script>
 
 <div class="arcade-root" bind:this={rootEl}>
-	<header class="arcade-header">
-		<div class="marquee-rail" aria-hidden="true">
-			<span class="marquee-inner">
-				✦ THE ARCADE ✦ MINIGAMES ✦ DIVERSIONS ✦ PLAY ✦ THE ARCADE ✦ MINIGAMES ✦ DIVERSIONS ✦ PLAY ✦ THE ARCADE ✦ MINIGAMES ✦ DIVERSIONS ✦ PLAY ✦&nbsp;
-			</span>
-		</div>
-		<div class="arcade-title-row">
-			<h2 class="arcade-title">The Arcade</h2>
-			<p class="arcade-sub">side games & small diversions — a corner of the study set aside for play</p>
-		</div>
-	</header>
+	{#if !activeGameData}
+		<header class="arcade-header">
+			<div class="marquee-rail" aria-hidden="true">
+				<span class="marquee-inner">
+					✦ THE ARCADE ✦ MINIGAMES ✦ DIVERSIONS ✦ PLAY ✦ THE ARCADE ✦ MINIGAMES ✦ DIVERSIONS ✦ PLAY ✦ THE ARCADE ✦ MINIGAMES ✦ DIVERSIONS ✦ PLAY ✦&nbsp;
+				</span>
+			</div>
+			<div class="arcade-title-row">
+				<h2 class="arcade-title">The Arcade</h2>
+				<p class="arcade-sub">side games & small diversions — a corner of the study set aside for play</p>
+			</div>
+		</header>
+	{/if}
 
 	{#if activeGameData}
 		<section class="active-game" class:theater-mode={theaterMode} aria-label="{activeGameData.title} game">
@@ -559,6 +566,15 @@
 	.active-game-body {
 		min-width: 0;
 		container-type: inline-size;
+		/* Height budget every game's canvas/svg/board frame sizes itself against
+		   (see each game's frame rule: width is capped by this * its own aspect
+		   ratio) so a tall board can never grow past the viewport and force the
+		   drop zone or floor off-screen. The stacked layout below puts the board
+		   under a variable amount of per-game HUD, so this default stays modest;
+		   the wide layout puts the board beside the HUD instead, so its chrome
+		   above the board is small and constant and the override below can be
+		   measured precisely (~160px of sticky header + "now playing" bar). */
+		--board-vh-budget: max(300px, 56svh);
 	}
 	.active-game.theater-mode {
 		box-shadow: 0 0 0 1px rgba(108, 113, 196, 0.3), 0 1.2rem 3rem rgba(7, 54, 66, 0.16);
@@ -570,6 +586,9 @@
 	/* Wide-play mode: every game keeps its own rules and markup, while the
 	   cabinet arranges the repeated chrome beside the playable surface. */
 	@container (min-width: 44rem) {
+		/* A container query can't restyle the query container itself (that would
+		   be circular), only its descendants — so the wide-mode override lives
+		   on these shell selectors rather than on .active-game-body. */
 		.active-game-body :global(.inkblot-shell),
 		.active-game-body :global(.game-shell),
 		.active-game-body :global(.pop-shell),
@@ -583,7 +602,9 @@
 		.active-game-body :global(.snake-shell),
 		.active-game-body :global(.paddle-shell),
 		.active-game-body :global(.spinner-shell),
-		.active-game-body :global(.bubble-shell) {
+		.active-game-body :global(.bubble-shell),
+		.active-game-body :global(.match-shell) {
+			--board-vh-budget: calc(100svh - 10rem);
 			display: grid;
 			grid-template-columns: minmax(20rem, 22rem) minmax(20rem, 1fr);
 			grid-auto-flow: row;
@@ -599,7 +620,8 @@
 		.active-game-body :global(.inkblot-field),
 		.active-game-body :global(.witch-field),
 		.active-game-body :global(.rush-field),
-		.active-game-body :global(.spinner-canvas) {
+		.active-game-body :global(.spinner-canvas),
+		.active-game-body :global(.match-field) {
 			grid-column: 2;
 			grid-row: 1 / span 20;
 			align-self: start;

@@ -1,63 +1,103 @@
-// Onboarding wizard state — transient working buffer that becomes
+// Onboarding wizard state — a checkpointed working buffer that becomes
 // the user's persisted settings/shapes/etc. once they reach the end.
 //
-// The wizard mutates `store` directly as the user advances (anchors,
-// domains, obligations, rituals, week pattern, tone) so progress
-// survives a refresh mid-flow. The completion screen flips
+// The wizard mutates the planner directly as the user advances (anchors,
+// domains, obligations, rituals, week pattern, tone). Its saved step lives in
+// settings alongside those changes, so a refresh can return someone to the
+// exact question they were answering. The completion screen flips
 // settings.onboardingComplete = true.
 
-import { store } from './store.svelte';
+import { store, type PlannerStore } from './store.svelte';
 import { STARTER_SHAPES_V2 } from './onboarding.copy';
-import type { WeekPattern } from './types';
+import type { OnboardingStep, WeekPattern } from './types';
 
-export type WizardStage = 'welcome' | 1 | 2 | 3 | 4 | 5 | 6 | 'done';
+export type WizardStage = 'welcome' | OnboardingStep | 'done';
 
-class OnboardingStore {
-	stage = $state<WizardStage>('welcome');
+function isOnboardingStep(value: unknown): value is OnboardingStep {
+	return typeof value === 'number' && value >= 1 && value <= 6;
+}
+
+export class OnboardingStore {
+	stage: WizardStage;
+
+	constructor(private readonly planner: PlannerStore = store) {
+		this.stage = $state<WizardStage>(this.savedStep ?? 'welcome');
+	}
+
+	get savedStep(): OnboardingStep | null {
+		const step = this.planner.settings.onboardingStep;
+		return isOnboardingStep(step) ? step : null;
+	}
 
 	advance(): void {
-		this.stage = this.nextOf(this.stage);
+		this.setStage(this.nextOf(this.stage));
 	}
 
 	back(): void {
-		this.stage = this.prevOf(this.stage);
+		this.setStage(this.prevOf(this.stage));
 	}
 
 	goto(stage: WizardStage): void {
-		this.stage = stage;
+		this.setStage(stage);
 	}
 
 	finish(): void {
-		store.updateSettings({ onboardingComplete: true });
+		this.planner.updateSettings({ onboardingComplete: true, onboardingStep: undefined });
 		this.stage = 'welcome';
+	}
+
+	finishAndCompose(): void {
+		this.finish();
+		const block =
+			this.planner.getCurrentBlockForDate(this.planner.now) ??
+			this.planner.getNextBlockForDate(this.planner.now);
+		this.planner.startCompose({ targetBlockId: block?.id });
 	}
 
 	quickStart(): void {
 		this.ensureStarterWeek();
-		store.updateSettings({ onboardingComplete: true });
+		this.planner.updateSettings({ onboardingComplete: true, onboardingStep: undefined });
 		this.stage = 'welcome';
+	}
+
+	finishLater(): void {
+		const step = isOnboardingStep(this.stage) ? this.stage : this.savedStep;
+		this.planner.updateSettings({ onboardingComplete: true, onboardingStep: step ?? undefined });
+		this.stage = 'welcome';
+	}
+
+	resumeFromPlanner(): void {
+		const step = this.savedStep ?? 1;
+		this.planner.updateSettings({ onboardingComplete: false });
+		this.stage = step;
 	}
 
 	// Called by the welcome screen — installs the four starter shapes
 	// (if the user has none yet) so by the time step 5 lands there are
 	// cards to assign.
 	beginFlow(): void {
+		if (this.savedStep) {
+			this.setStage(this.savedStep);
+			return;
+		}
 		this.ensureStarterWeek();
-		this.stage = 1;
+		this.setStage(1);
 	}
 
 	private ensureStarterWeek(): void {
-		if (store.dayShapes.length === 0) {
-			store.setDayShapes(STARTER_SHAPES_V2);
+		if (this.planner.dayShapes.length === 0) {
+			this.planner.setDayShapes(STARTER_SHAPES_V2);
 		} else {
 			// Existing users: make sure the four starters are at least available.
-			const haveIds = new Set(store.dayShapes.map((s) => s.id));
+			const haveIds = new Set(this.planner.dayShapes.map((s) => s.id));
 			const additions = STARTER_SHAPES_V2.filter((s) => !haveIds.has(s.id));
 			if (additions.length > 0) {
-				store.setDayShapes([...store.dayShapes, ...additions]);
+				this.planner.setDayShapes([...this.planner.dayShapes, ...additions]);
 			}
 		}
-		// Seed a reasonable default week pattern if the user has none.
+
+		// Only seed a default when the saved pattern is genuinely unusable. A
+		// returning person may have already tailored it before they paused setup.
 		const defaultPattern: WeekPattern = {
 			days: [
 				'starter-recovery',
@@ -69,8 +109,21 @@ class OnboardingStore {
 				'starter-recovery'
 			]
 		};
-		// Always overwrite during onboarding — the user's about to set this in step 5.
-		store.setWeekPattern(defaultPattern);
+		const hasUsableWeekPattern =
+			Array.isArray(this.planner.weekPattern?.days) &&
+			this.planner.weekPattern.days.length === 7 &&
+			this.planner.weekPattern.days.every((id) =>
+				this.planner.dayShapes.some((shape) => shape.id === id)
+			);
+		if (!hasUsableWeekPattern) {
+			this.planner.setWeekPattern(defaultPattern);
+		}
+	}
+
+	private setStage(stage: WizardStage): void {
+		this.stage = stage;
+		const savedStep = isOnboardingStep(stage) ? stage : stage === 'done' ? 6 : undefined;
+		this.planner.updateSettings({ onboardingStep: savedStep });
 	}
 
 	private nextOf(s: WizardStage): WizardStage {

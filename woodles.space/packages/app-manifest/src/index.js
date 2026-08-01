@@ -33,7 +33,7 @@ export const appManifest = Object.freeze([
 		sourceDir: 'apps/hygge',
 		outputDir: 'apps/hygge',
 		entryFile: 'index.html',
-		landing: tile('hygge', 1, 'play', 'design playground: fonts, motifs & palette', 'var(--lavender)', 'var(--peach)', '135deg', { defaultPin: 1 })
+		landing: tile('hygge', 1, 'play', 'design playground: fonts, motifs, palette & motion', 'var(--lavender)', 'var(--peach)', '135deg', { defaultPin: 1 })
 	},
 	{
 		id: 'lab',
@@ -149,7 +149,7 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/planner/dist',
 		entryFile: 'index.html',
 		packageName: 'planner',
-		landing: tile('planner', 6, 'tend', 'calendar, schedule, and time', 'var(--peach)', 'var(--lavender)', '170deg', { defaultPin: 4 })
+		landing: tile('planner', 6, 'tend', 'interval data, fading routines, and day piles', 'var(--peach)', 'var(--lavender)', '170deg', { defaultPin: 4 })
 	},
 	{
 		id: 'notebook',

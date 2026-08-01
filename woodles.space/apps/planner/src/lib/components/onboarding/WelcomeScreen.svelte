@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onboarding } from '$lib/onboarding.store.svelte';
 	import { WELCOME } from '$lib/onboarding.copy';
+
+	const savedStep = $derived(onboarding.savedStep);
 </script>
 
 <div class="welcome">
@@ -24,8 +26,14 @@
 			<span class="stamp-line"></span>
 		</p>
 
-		<h1 class="welcome-heading">{WELCOME.heading}</h1>
-		<p class="welcome-sub">{WELCOME.subheading}</p>
+		<h1 class="welcome-heading">
+			{savedStep ? 'Your week is already taking shape.' : WELCOME.heading}
+		</h1>
+		<p class="welcome-sub">
+			{savedStep
+				? `You left off at question ${savedStep} of six. Nothing you entered has been lost.`
+				: WELCOME.subheading}
+		</p>
 
 		<!-- Inner rule — narrower -->
 		<div class="welcome-rule" aria-hidden="true">
@@ -35,19 +43,27 @@
 		</div>
 
 		<div class="welcome-actions">
-			<button class="welcome-cta" onclick={() => onboarding.beginFlow()}>
+			<button
+				class="welcome-cta"
+				data-testid="onboarding-continue"
+				onclick={() => onboarding.beginFlow()}
+			>
 				<span class="cta-pre">❧</span>
-				<span>{WELCOME.cta}</span>
+				<span>{savedStep ? `continue with question ${savedStep} →` : WELCOME.cta}</span>
 			</button>
-			<button class="welcome-skip" onclick={() => onboarding.quickStart()}>
-				open planner now
+			<button
+				class="welcome-skip"
+				data-testid="onboarding-quick-start"
+				onclick={() => (savedStep ? onboarding.finishLater() : onboarding.quickStart())}
+			>
+				{savedStep ? 'open planner for now' : 'open planner now'}
 			</button>
 		</div>
 
 		<p class="welcome-foot">
-			quick-start available
+			{savedStep ? 'your answers are saved as you go' : 'quick-start available'}
 			<span class="foot-sep">·</span>
-			six small questions
+			{savedStep ? 'you can finish later' : 'six small questions'}
 			<span class="foot-sep">·</span>
 			revisable any time
 		</p>

@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="cream">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta
+    name="description"
+    content="A Hygge review room for Manim-authored Marginalia Arcade motion studies."
+  />
+  <title>motion workshop · hygge · woodles.space</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="/shared/fonts.css" />
+  <link rel="stylesheet" href="/shared/palette.css" />
+  <link rel="stylesheet" href="/shared/motifs.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root {
+      --workshop-paper: #f7f0df;
+      --workshop-ink: #211729;
+      --workshop-check-a: #f6f0e8;
+      --workshop-check-b: #e9dfd5;
+      --preview-size: 256px;
+    }
+
+    html { min-height: 100%; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-weight: 400;
+      line-height: 1.5;
+    }
+
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button { font: inherit; }
+
+    a {
+      color: inherit;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.2em;
+    }
+
+    :focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--accent-strong) 62%, white);
+      outline-offset: 3px;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 0.6rem;
+      left: 0.7rem;
+      z-index: 100;
+      padding: 0.55rem 0.8rem;
+      background: var(--accent-strong);
+      color: var(--bg);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      transform: translateY(-160%);
+      transition: transform 0.16s ease;
+    }
+
+    .skip-link:focus { transform: translateY(0); }
+
+    .motif-grain,
+    .motif-blob { position: fixed; }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.7rem clamp(1rem, 3vw, 2rem);
+      border-bottom: 1px solid var(--rule);
+      background: color-mix(in srgb, var(--surface) 88%, transparent);
+      backdrop-filter: blur(22px) saturate(1.25);
+      -webkit-backdrop-filter: blur(22px) saturate(1.25);
+    }
+
+    .crumbs,
+    .topbar-links {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.09em;
+      text-transform: lowercase;
+    }
+
+    .crumbs a,
+    .topbar-links a {
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.16s ease;
+    }
+
+    .crumbs a:hover,
+    .topbar-links a:hover { color: var(--accent-strong); }
+    .crumbs-sep { color: var(--muted); opacity: 0.42; }
+    .crumbs-current { color: var(--accent-strong); }
+
+    .page-shell {
+      position: relative;
+      z-index: 2;
+      width: min(1480px, calc(100% - clamp(1.2rem, 4vw, 4rem)));
+      margin: 0 auto;
+      padding: clamp(2.4rem, 6vw, 5.8rem) 0 3rem;
+    }
+
+    .intro {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(260px, 34rem);
+      align-items: end;
+      gap: clamp(1.5rem, 4vw, 5rem);
+      margin-bottom: clamp(2rem, 5vw, 4.5rem);
+    }
+
+    .eyebrow,
+    .section-kicker,
+    .control-label,
+    .meta-label {
+      margin: 0;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.64rem;
+      letter-spacing: 0.17em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      max-width: 9ch;
+      margin-bottom: 0;
+      color: var(--accent-deep);
+      font-family: var(--font-display);
+      font-size: clamp(3.2rem, 8vw, 7.6rem);
+      font-style: italic;
+      font-weight: 300;
+      letter-spacing: -0.045em;
+      line-height: 0.86;
+    }
+
+    .intro-copy {
+      padding-bottom: 0.35rem;
+      color: color-mix(in srgb, var(--text) 78%, var(--muted));
+      font-size: clamp(1.02rem, 1.5vw, 1.2rem);
+      line-height: 1.72;
+    }
+
+    .intro-copy p { margin-bottom: 1.1rem; }
+
+    .catalog-summary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      color: var(--accent-strong);
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.05em;
+    }
+
+    .catalog-summary::before {
+      content: "";
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 50%;
+      background: var(--aqua);
+      box-shadow: 0 0 0 5px color-mix(in srgb, var(--aqua) 20%, transparent);
+    }
+
+    .workbench {
+      display: grid;
+      grid-template-columns: minmax(250px, 310px) minmax(0, 1fr);
+      gap: clamp(1rem, 2vw, 1.7rem);
+      align-items: start;
+    }
+
+    .catalog-panel,
+    .stage-panel,
+    .detail-card,
+    .boundary-note {
+      border: 1px solid var(--rule);
+      background: color-mix(in srgb, var(--surface) 88%, transparent);
+      box-shadow: 0 28px 70px -55px color-mix(in srgb, var(--accent-deep) 65%, transparent);
+      backdrop-filter: blur(24px) saturate(1.15);
+      -webkit-backdrop-filter: blur(24px) saturate(1.15);
+    }
+
+    .catalog-panel {
+      position: sticky;
+      top: 4.7rem;
+      overflow: hidden;
+      border-radius: 1.15rem;
+    }
+
+    .panel-heading {
+      padding: 1.2rem 1.2rem 1rem;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .panel-heading h2 {
+      margin: 0.25rem 0 0;
+      color: var(--accent-deep);
+      font-family: var(--font-display);
+      font-size: 1.65rem;
+      font-style: italic;
+      font-weight: 400;
+    }
+
+    .study-list {
+      display: grid;
+      gap: 0;
+      padding: 0.45rem;
+    }
+
+    .study-button {
+      width: 100%;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 0.8rem;
+      padding: 0.9rem 0.8rem;
+      border: 0;
+      border-left: 3px solid transparent;
+      border-radius: 0.7rem;
+      background: transparent;
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+    }
+
+    .study-button:hover {
+      background: color-mix(in srgb, var(--lavender) 14%, transparent);
+      transform: translateX(2px);
+    }
+
+    .study-button[aria-pressed="true"] {
+      border-left-color: var(--accent-strong);
+      background: color-mix(in srgb, var(--lavender) 20%, transparent);
+    }
+
+    .study-number {
+      padding-top: 0.15rem;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+    }
+
+    .study-copy { min-width: 0; }
+
+    .study-name {
+      display: block;
+      overflow: hidden;
+      color: var(--accent-deep);
+      font-family: var(--font-display);
+      font-size: 1.12rem;
+      font-style: italic;
+      font-weight: 500;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .study-behavior {
+      display: block;
+      margin-top: 0.12rem;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.05em;
+    }
+
+    .loading-copy {
+      margin: 0;
+      padding: 1.2rem;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      line-height: 1.7;
+    }
+
+    .preview-column { min-width: 0; }
+
+    .stage-panel {
+      overflow: hidden;
+      border-radius: 1.35rem;
+    }
+
+    .stage-heading {
+      min-height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem clamp(1rem, 2vw, 1.45rem);
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .stage-title-wrap { min-width: 0; }
+
+    .stage-heading h2 {
+      overflow: hidden;
+      margin: 0.1rem 0 0;
+      color: var(--accent-deep);
+      font-family: var(--font-display);
+      font-size: clamp(1.45rem, 3vw, 2.15rem);
+      font-style: italic;
+      font-weight: 400;
+      line-height: 1.1;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .playback-state {
+      flex: 0 0 auto;
+      padding: 0.34rem 0.62rem;
+      border: 1px solid var(--rule);
+      border-radius: 999px;
+      color: var(--muted);
+      background: color-mix(in srgb, var(--surface) 74%, transparent);
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .preview-stage {
+      position: relative;
+      min-height: clamp(28rem, 58vh, 46rem);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      isolation: isolate;
+      transition: background 0.22s ease;
+    }
+
+    .preview-stage::after {
+      content: "";
+      position: absolute;
+      inset: 1rem;
+      z-index: -1;
+      border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+      border-radius: 0.9rem;
+      pointer-events: none;
+    }
+
+    .preview-stage[data-background="paper"] {
+      background:
+        repeating-linear-gradient(0deg, transparent 0 31px, rgba(85, 56, 42, 0.045) 31px 32px),
+        radial-gradient(circle at 25% 15%, rgba(255, 255, 255, 0.7), transparent 34%),
+        var(--workshop-paper);
+      color: #5d493f;
+    }
+
+    .preview-stage[data-background="ink"] {
+      background:
+        radial-gradient(circle at 50% 45%, rgba(201, 191, 238, 0.12), transparent 34%),
+        linear-gradient(145deg, #2d2039, var(--workshop-ink) 58%, #15101c);
+      color: #d8cce6;
+    }
+
+    .preview-stage[data-background="checker"] {
+      background-color: var(--workshop-check-a);
+      background-image:
+        linear-gradient(45deg, var(--workshop-check-b) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--workshop-check-b) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--workshop-check-b) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--workshop-check-b) 75%);
+      background-position: 0 0, 0 16px, 16px -16px, -16px 0;
+      background-size: 32px 32px;
+      color: #5d493f;
+    }
+
+    .preview-video,
+    .preview-poster {
+      width: var(--preview-size);
+      height: var(--preview-size);
+      max-width: calc(100% - 2rem);
+      max-height: calc(100% - 2rem);
+      display: block;
+      object-fit: contain;
+      background: transparent;
+      filter: drop-shadow(0 18px 28px rgba(33, 23, 41, 0.14));
+      transition: width 0.2s ease, height 0.2s ease;
+    }
+
+    .preview-poster { display: none; }
+    .preview-stage.show-poster .preview-video { display: none; }
+    .preview-stage.show-poster .preview-poster { display: block; }
+
+    .stage-message {
+      position: absolute;
+      inset: 0;
+      display: none;
+      place-items: center;
+      padding: 2rem;
+      color: currentColor;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      text-align: center;
+    }
+
+    .stage-message.visible { display: grid; }
+    .preview-stage.has-message .preview-video,
+    .preview-stage.has-message .preview-poster { visibility: hidden; }
+
+    .stage-corner {
+      position: absolute;
+      right: 1.5rem;
+      bottom: 1.35rem;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      color: currentColor;
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.08em;
+      opacity: 0.68;
+      text-transform: uppercase;
+    }
+
+    .stage-corner::before {
+      content: "";
+      width: 0.4rem;
+      height: 0.4rem;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.5;
+    }
+
+    .control-deck {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+      gap: 0.9rem;
+      padding: 1rem clamp(1rem, 2vw, 1.45rem) 1.2rem;
+      border-top: 1px solid var(--rule);
+    }
+
+    fieldset {
+      min-width: 0;
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+
+    fieldset legend { padding: 0; }
+
+    .segmented,
+    .transport {
+      display: flex;
+      align-items: stretch;
+      gap: 0.35rem;
+      margin-top: 0.5rem;
+    }
+
+    .segment-button,
+    .transport-button {
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--rule);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--surface) 82%, transparent);
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease, transform 0.14s ease;
+    }
+
+    .segment-button {
+      flex: 1 1 0;
+      min-width: 0;
+      padding: 0.48rem 0.62rem;
+    }
+
+    .transport-button {
+      flex: 0 0 auto;
+      padding: 0.48rem 0.8rem;
+    }
+
+    .segment-button:hover,
+    .transport-button:hover {
+      color: var(--accent-strong);
+      border-color: color-mix(in srgb, var(--accent-strong) 38%, var(--rule));
+      transform: translateY(-1px);
+    }
+
+    .segment-button[aria-pressed="true"],
+    .transport-button[aria-pressed="true"] {
+      border-color: color-mix(in srgb, var(--accent-strong) 46%, var(--rule));
+      background: color-mix(in srgb, var(--lavender) 24%, var(--surface));
+      color: var(--accent-strong);
+    }
+
+    .transport-wrap {
+      align-self: end;
+      min-width: max-content;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.85fr);
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .detail-card,
+    .boundary-note {
+      border-radius: 1rem;
+      padding: clamp(1rem, 2vw, 1.35rem);
+    }
+
+    .study-description {
+      max-width: 66ch;
+      margin: 0.65rem 0 1.2rem;
+      color: color-mix(in srgb, var(--text) 78%, var(--muted));
+      font-size: 1rem;
+      line-height: 1.7;
+    }
+
+    .use-cases {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin: 0.6rem 0 1.25rem;
+    }
+
+    .use-case {
+      padding: 0.3rem 0.58rem;
+      border: 1px solid var(--rule);
+      border-radius: 999px;
+      color: var(--accent-deep);
+      background: color-mix(in srgb, var(--peach) 14%, transparent);
+      font-family: var(--font-mono);
+      font-size: 0.61rem;
+    }
+
+    .metadata {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.8rem 1.1rem;
+      margin: 0;
+      padding-top: 1rem;
+      border-top: 1px solid var(--rule);
+    }
+
+    .metadata div { min-width: 0; }
+
+    .metadata dt {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .metadata dd {
+      overflow-wrap: anywhere;
+      margin: 0.22rem 0 0;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+    }
+
+    .source-link {
+      color: var(--accent-strong);
+      font-weight: 500;
+    }
+
+    .source-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.75rem;
+    }
+
+    .boundary-note {
+      position: relative;
+      overflow: hidden;
+      border-style: dashed;
+      background:
+        linear-gradient(145deg, color-mix(in srgb, var(--peach) 15%, transparent), transparent 60%),
+        color-mix(in srgb, var(--surface) 90%, transparent);
+    }
+
+    .boundary-note::after {
+      content: "workshop";
+      position: absolute;
+      right: -1.1rem;
+      bottom: 0.45rem;
+      color: color-mix(in srgb, var(--accent-strong) 8%, transparent);
+      font-family: var(--font-display);
+      font-size: 4.1rem;
+      font-style: italic;
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    .boundary-note h3 {
+      position: relative;
+      z-index: 1;
+      margin: 0.45rem 0 0.7rem;
+      color: var(--accent-deep);
+      font-family: var(--font-display);
+      font-size: 1.55rem;
+      font-style: italic;
+      font-weight: 400;
+    }
+
+    .boundary-note p {
+      position: relative;
+      z-index: 1;
+      margin-bottom: 0;
+      color: color-mix(in srgb, var(--text) 78%, var(--muted));
+      font-size: 0.88rem;
+      line-height: 1.65;
+    }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 2.8rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--rule);
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+    }
+
+    footer a { color: var(--accent-strong); }
+
+    @media (max-width: 1120px) {
+      .control-deck { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .transport-wrap { grid-column: 1 / -1; min-width: 0; }
+      .transport { flex-wrap: wrap; }
+    }
+
+    @media (max-width: 900px) {
+      .intro { grid-template-columns: 1fr; align-items: start; }
+      .intro-copy { max-width: 64ch; }
+      .workbench { grid-template-columns: 1fr; }
+      .catalog-panel { position: static; }
+      .study-list {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.35rem;
+      }
+      .study-button {
+        grid-template-columns: 1fr;
+        align-content: start;
+        min-height: 104px;
+      }
+      .study-number { padding: 0; }
+    }
+
+    @media (max-width: 700px) {
+      .topbar { align-items: flex-start; }
+      .topbar-links { flex-direction: column; align-items: flex-end; gap: 0.25rem; }
+      .page-shell { width: min(100% - 1rem, 1480px); padding-top: 2.6rem; }
+      .study-list { grid-template-columns: 1fr; }
+      .study-button { grid-template-columns: auto minmax(0, 1fr); min-height: 0; }
+      .preview-stage { min-height: clamp(24rem, 68vh, 38rem); }
+      .control-deck { grid-template-columns: 1fr; }
+      .transport-wrap { grid-column: auto; }
+      .detail-grid { grid-template-columns: 1fr; }
+      .metadata { grid-template-columns: 1fr; }
+      .stage-corner { right: 1rem; bottom: 1rem; }
+    }
+
+    @media (max-width: 440px) {
+      .crumbs { gap: 0.4rem; }
+      .crumbs .crumbs-root { display: none; }
+      .stage-heading { align-items: flex-start; }
+      .playback-state { max-width: 45%; text-align: center; }
+      .segmented { flex-wrap: wrap; }
+      .segment-button { flex-basis: calc(33.333% - 0.35rem); }
+      .transport-button { flex: 1 1 calc(50% - 0.35rem); }
+      footer { flex-direction: column; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body class="motif-blobs">
+  <a class="skip-link" href="#workshop">skip to workshop</a>
+
+  <div class="motif-grain" aria-hidden="true"></div>
+  <div class="motif-blob motif-blob-1" aria-hidden="true"></div>
+  <div class="motif-blob motif-blob-2" aria-hidden="true"></div>
+  <div class="motif-blob motif-blob-3" aria-hidden="true"></div>
+  <div class="motif-blob motif-blob-4" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <a class="crumbs-root" href="/">.space</a>
+      <span class="crumbs-sep" aria-hidden="true">·</span>
+      <a href="/hygge">hygge</a>
+      <span class="crumbs-sep" aria-hidden="true">·</span>
+      <span class="crumbs-current" aria-current="page">motion</span>
+    </nav>
+    <nav class="topbar-links" aria-label="Workshop links">
+      <a href="/hygge/motion/svg">picture motion studio</a>
+      <a href="/hygge">back to hygge</a>
+      <a href="/animations">manim studio ↗</a>
+    </nav>
+  </header>
+
+  <main class="page-shell" id="workshop">
+    <section class="intro" aria-labelledby="page-title">
+      <div>
+        <p class="eyebrow">hygge · motion workshop</p>
+        <h1 id="page-title">motion, held up to the light.</h1>
+      </div>
+      <div class="intro-copy">
+        <p>A review room for small Manim studies before any of them earn a place inside Marginalia Arcade.</p>
+        <span class="catalog-summary" id="catalog-summary" aria-live="polite">opening the specimen drawer…</span>
+      </div>
+    </section>
+
+    <div class="workbench">
+      <aside class="catalog-panel" aria-labelledby="catalog-title">
+        <div class="panel-heading">
+          <p class="section-kicker">select a study</p>
+          <h2 id="catalog-title">on the light table</h2>
+        </div>
+        <div class="study-list" id="study-list" aria-label="Motion studies">
+          <p class="loading-copy">reading the Arcade motion catalog…</p>
+        </div>
+      </aside>
+
+      <div class="preview-column">
+        <section class="stage-panel" aria-labelledby="study-title">
+          <header class="stage-heading">
+            <div class="stage-title-wrap">
+              <p class="section-kicker">transparent motion preview</p>
+              <h2 id="study-title">waiting for a study</h2>
+            </div>
+            <span class="playback-state" id="playback-state" aria-live="polite">loading</span>
+          </header>
+
+          <div class="preview-stage" id="preview-stage" data-background="paper">
+            <video
+              class="preview-video"
+              id="preview-video"
+              muted
+              playsinline
+              preload="metadata"
+              aria-label="Selected transparent motion study"
+              aria-describedby="study-description"
+            ></video>
+            <img class="preview-poster" id="preview-poster" alt="" />
+            <p class="stage-message visible" id="stage-message">preparing the light table…</p>
+            <span class="stage-corner" id="stage-corner">paper · 256px</span>
+          </div>
+
+          <div class="control-deck" aria-label="Preview controls">
+            <fieldset>
+              <legend class="control-label">ground</legend>
+              <div class="segmented" id="background-controls">
+                <button class="segment-button" type="button" data-background="paper" aria-pressed="true">paper</button>
+                <button class="segment-button" type="button" data-background="ink" aria-pressed="false">ink</button>
+                <button class="segment-button" type="button" data-background="checker" aria-pressed="false">checker</button>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend class="control-label">size</legend>
+              <div class="segmented" id="size-controls">
+                <button class="segment-button" type="button" data-size="96" aria-pressed="false">96px</button>
+                <button class="segment-button" type="button" data-size="160" aria-pressed="false">160px</button>
+                <button class="segment-button" type="button" data-size="256" aria-pressed="true">256px</button>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend class="control-label">speed</legend>
+              <div class="segmented" id="speed-controls">
+                <button class="segment-button" type="button" data-speed="0.75" aria-pressed="false">0.75×</button>
+                <button class="segment-button" type="button" data-speed="1" aria-pressed="true">1×</button>
+                <button class="segment-button" type="button" data-speed="1.25" aria-pressed="false">1.25×</button>
+              </div>
+            </fieldset>
+
+            <div class="transport-wrap">
+              <span class="control-label">playback</span>
+              <div class="transport">
+                <button class="transport-button" id="replay-button" type="button">replay</button>
+                <button class="transport-button" id="play-button" type="button">play</button>
+                <button class="transport-button" id="repeat-button" type="button" aria-pressed="false">repeat</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="detail-grid">
+          <section class="detail-card" aria-labelledby="details-title">
+            <p class="section-kicker" id="details-title">what it might become</p>
+            <p class="study-description" id="study-description">Select a study to inspect its motion, scale, and intended use.</p>
+
+            <p class="meta-label">possible uses</p>
+            <div class="use-cases" id="use-cases" aria-label="Possible uses"></div>
+
+            <dl class="metadata">
+              <div>
+                <dt>scene</dt>
+                <dd id="meta-scene">—</dd>
+              </div>
+              <div>
+                <dt>behavior</dt>
+                <dd id="meta-behavior">—</dd>
+              </div>
+              <div>
+                <dt>duration</dt>
+                <dd id="meta-duration">—</dd>
+              </div>
+              <div>
+                <dt>render</dt>
+                <dd id="meta-render">—</dd>
+              </div>
+              <div>
+                <dt>palette</dt>
+                <dd id="meta-palette">—</dd>
+              </div>
+              <div>
+                <dt>source</dt>
+                <dd class="source-links">
+                  <a class="source-link" id="source-link" href="/animations">open studio</a>
+                  <a class="source-link" id="asset-link" href="/animations" hidden>source asset</a>
+                  <a class="source-link" id="bench-link" href="/hygge/motion/svg" hidden>open in picture motion studio</a>
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <aside class="boundary-note" aria-labelledby="boundary-title">
+            <p class="section-kicker">promotion boundary</p>
+            <h3 id="boundary-title">workshop only, for now.</h3>
+            <p>Nothing in this room is an Arcade runtime dependency. A study becomes a game resource only after it is deliberately promoted into Marginalia’s static asset library, named for its use, and wired by the game that needs it.</p>
+          </aside>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <span>transparent studies · reviewed at real game sizes</span>
+      <span><a href="/hygge">hygge</a> · <a href="/animations">animations</a></span>
+    </footer>
+  </main>
+
+  <script>
+    const CATALOG_URL = '/animations/arcade-catalog.json';
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    const elements = {
+      catalogSummary: document.getElementById('catalog-summary'),
+      studyList: document.getElementById('study-list'),
+      studyTitle: document.getElementById('study-title'),
+      studyDescription: document.getElementById('study-description'),
+      useCases: document.getElementById('use-cases'),
+      video: document.getElementById('preview-video'),
+      poster: document.getElementById('preview-poster'),
+      stage: document.getElementById('preview-stage'),
+      stageMessage: document.getElementById('stage-message'),
+      stageCorner: document.getElementById('stage-corner'),
+      playbackState: document.getElementById('playback-state'),
+      playButton: document.getElementById('play-button'),
+      replayButton: document.getElementById('replay-button'),
+      repeatButton: document.getElementById('repeat-button'),
+      backgroundControls: document.getElementById('background-controls'),
+      sizeControls: document.getElementById('size-controls'),
+      speedControls: document.getElementById('speed-controls'),
+      metaScene: document.getElementById('meta-scene'),
+      metaBehavior: document.getElementById('meta-behavior'),
+      metaDuration: document.getElementById('meta-duration'),
+      metaRender: document.getElementById('meta-render'),
+      metaPalette: document.getElementById('meta-palette'),
+      sourceLink: document.getElementById('source-link'),
+      assetLink: document.getElementById('asset-link'),
+      benchLink: document.getElementById('bench-link')
+    };
+
+    const state = {
+      catalog: null,
+      activeIndex: -1,
+      background: 'paper',
+      size: 256,
+      speed: 1,
+      repeat: false,
+      loadToken: 0
+    };
+
+    function setButtonGroup(container, attribute, value) {
+      container.querySelectorAll('button').forEach((button) => {
+        button.setAttribute('aria-pressed', String(button.dataset[attribute] === String(value)));
+      });
+    }
+
+    function setStageMessage(message) {
+      const visible = Boolean(message);
+      elements.stageMessage.textContent = message || '';
+      elements.stageMessage.classList.toggle('visible', visible);
+      elements.stage.classList.toggle('has-message', visible);
+    }
+
+    function setPlaybackState(label) {
+      elements.playbackState.textContent = label;
+    }
+
+    function syncTransport() {
+      const playing = !elements.video.paused && !elements.video.ended;
+      elements.playButton.textContent = playing ? 'pause' : 'play';
+      elements.playButton.setAttribute('aria-label', playing ? 'Pause motion study' : 'Play motion study');
+      elements.repeatButton.setAttribute('aria-pressed', String(state.repeat));
+      elements.video.loop = state.repeat;
+    }
+
+    function representativeStill() {
+      elements.video.pause();
+      elements.stage.classList.add('show-poster');
+      setPlaybackState('reduced motion · still');
+      syncTransport();
+    }
+
+    async function playSelected() {
+      if (!elements.video.src) return;
+      setStageMessage('');
+      elements.stage.classList.remove('show-poster');
+      try {
+        elements.video.playbackRate = state.speed;
+        await elements.video.play();
+      } catch {
+        setPlaybackState('ready · press play');
+      }
+      syncTransport();
+    }
+
+    function renderStudyList() {
+      elements.studyList.replaceChildren();
+      state.catalog.studies.forEach((study, index) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'study-button';
+        button.setAttribute('aria-pressed', 'false');
+        button.setAttribute('aria-label', `Preview ${study.name}`);
+
+        const number = document.createElement('span');
+        number.className = 'study-number';
+        number.textContent = String(index + 1).padStart(2, '0');
+
+        const copy = document.createElement('span');
+        copy.className = 'study-copy';
+        const name = document.createElement('span');
+        name.className = 'study-name';
+        name.textContent = study.name;
+        const behavior = document.createElement('span');
+        behavior.className = 'study-behavior';
+        behavior.textContent = `${study.behavior} · ${Math.round(study.durationMs / 100) / 10}s`;
+        copy.append(name, behavior);
+        button.append(number, copy);
+        button.addEventListener('click', () => selectStudy(index));
+        elements.studyList.appendChild(button);
+      });
+    }
+
+    function renderUseCases(useCases) {
+      elements.useCases.replaceChildren();
+      useCases.forEach((useCase) => {
+        const chip = document.createElement('span');
+        chip.className = 'use-case';
+        chip.textContent = useCase;
+        elements.useCases.appendChild(chip);
+      });
+    }
+
+    function selectStudy(index) {
+      const study = state.catalog.studies[index];
+      if (!study) return;
+
+      state.activeIndex = index;
+      state.loadToken += 1;
+      const token = state.loadToken;
+
+      elements.studyList.querySelectorAll('.study-button').forEach((button, buttonIndex) => {
+        button.setAttribute('aria-pressed', String(buttonIndex === index));
+      });
+
+      elements.studyTitle.textContent = study.name;
+      elements.studyDescription.textContent = study.description;
+      elements.metaScene.textContent = study.scene;
+      elements.metaBehavior.textContent = study.behavior;
+      elements.metaDuration.textContent = `${Math.round(study.durationMs / 100) / 10} seconds`;
+      elements.metaPalette.textContent = study.palette.join(' · ');
+      elements.metaRender.textContent = `${state.catalog.render.width} × ${state.catalog.render.height} · ${state.catalog.render.fps} fps · ${state.catalog.render.format}`;
+      elements.sourceLink.href = `/animations/${study.source.replace(/^\/+/, '')}`;
+      elements.sourceLink.textContent = study.source.split('/').pop();
+      elements.assetLink.hidden = !study.sourceAsset;
+      elements.benchLink.hidden = !study.recipe;
+      if (study.sourceAsset) {
+        elements.assetLink.href = `/animations/${study.sourceAsset.replace(/^\/+/, '')}`;
+        elements.assetLink.textContent = study.sourceAsset.split('/').pop();
+      }
+      if (study.recipe) {
+        elements.benchLink.href = `/hygge/motion/svg?recipe=${encodeURIComponent(`/animations/${study.recipe.replace(/^\/+/, '')}`)}`;
+      }
+      renderUseCases(study.useCases);
+      elements.poster.src = study.poster;
+      elements.poster.alt = `${study.name} representative still`;
+
+      state.repeat = study.behavior === 'seamless loop';
+      syncTransport();
+      setPlaybackState('loading');
+      setStageMessage('loading the transparent study…');
+      elements.stage.classList.add('show-poster');
+
+      elements.video.pause();
+      elements.video.removeAttribute('src');
+      elements.video.load();
+      elements.video.src = study.preview;
+      elements.video.playbackRate = state.speed;
+      elements.video.load();
+
+      elements.video.onloadedmetadata = () => {
+        if (token !== state.loadToken) return;
+        setStageMessage('');
+        if (reducedMotion.matches) {
+          representativeStill();
+        } else {
+          setPlaybackState('playing');
+          playSelected();
+        }
+      };
+
+      elements.video.onerror = () => {
+        if (token !== state.loadToken) return;
+        setStageMessage('This preview is not available yet. The study remains in the workshop catalog.');
+        setPlaybackState('preview unavailable');
+        syncTransport();
+      };
+    }
+
+    function showCatalogError() {
+      elements.studyList.replaceChildren();
+      const message = document.createElement('p');
+      message.className = 'loading-copy';
+      message.textContent = 'The motion catalog could not be opened. Visit the Manim studio to inspect the source studies.';
+      elements.studyList.appendChild(message);
+      elements.catalogSummary.textContent = 'catalog unavailable';
+      elements.studyTitle.textContent = 'the drawer stayed closed';
+      setStageMessage('The motion catalog is unavailable.');
+      setPlaybackState('offline');
+    }
+
+    async function loadCatalog() {
+      try {
+        const response = await fetch(CATALOG_URL);
+        if (!response.ok) throw new Error(`catalog returned ${response.status}`);
+        const catalog = await response.json();
+        if (!catalog || !Array.isArray(catalog.studies) || catalog.studies.length === 0 || !catalog.render) {
+          throw new Error('catalog has no studies');
+        }
+        state.catalog = catalog;
+        elements.catalogSummary.textContent = `${catalog.studies.length} studies · ${catalog.render.format} with transparency`;
+        renderStudyList();
+        selectStudy(0);
+      } catch {
+        showCatalogError();
+      }
+    }
+
+    elements.backgroundControls.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-background]');
+      if (!button) return;
+      state.background = button.dataset.background;
+      elements.stage.dataset.background = state.background;
+      setButtonGroup(elements.backgroundControls, 'background', state.background);
+      elements.stageCorner.textContent = `${state.background} · ${state.size}px`;
+    });
+
+    elements.sizeControls.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-size]');
+      if (!button) return;
+      state.size = Number(button.dataset.size);
+      document.documentElement.style.setProperty('--preview-size', `${state.size}px`);
+      setButtonGroup(elements.sizeControls, 'size', state.size);
+      elements.stageCorner.textContent = `${state.background} · ${state.size}px`;
+    });
+
+    elements.speedControls.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-speed]');
+      if (!button) return;
+      state.speed = Number(button.dataset.speed);
+      elements.video.playbackRate = state.speed;
+      setButtonGroup(elements.speedControls, 'speed', state.speed);
+    });
+
+    elements.playButton.addEventListener('click', () => {
+      if (elements.video.paused || elements.video.ended) {
+        playSelected();
+      } else {
+        elements.video.pause();
+        syncTransport();
+      }
+    });
+
+    elements.replayButton.addEventListener('click', () => {
+      if (!elements.video.src) return;
+      elements.video.currentTime = 0;
+      playSelected();
+    });
+
+    elements.repeatButton.addEventListener('click', () => {
+      state.repeat = !state.repeat;
+      syncTransport();
+    });
+
+    elements.video.addEventListener('play', () => {
+      elements.stage.classList.remove('show-poster');
+      setPlaybackState('playing');
+      syncTransport();
+    });
+
+    elements.video.addEventListener('pause', () => {
+      if (!elements.video.ended && elements.video.readyState > 0 && elements.playbackState.textContent === 'playing') {
+        setPlaybackState('paused');
+      }
+      syncTransport();
+    });
+
+    elements.video.addEventListener('ended', () => {
+      representativeStill();
+      setPlaybackState('complete · still held');
+      syncTransport();
+    });
+
+    const onMotionPreferenceChange = () => {
+      if (reducedMotion.matches && elements.video.readyState > 0) representativeStill();
+    };
+    if (typeof reducedMotion.addEventListener === 'function') {
+      reducedMotion.addEventListener('change', onMotionPreferenceChange);
+    } else if (typeof reducedMotion.addListener === 'function') {
+      reducedMotion.addListener(onMotionPreferenceChange);
+    }
+
+    loadCatalog();
+  </script>
+</body>
+</html>

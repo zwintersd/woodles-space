@@ -1,6 +1,13 @@
 // api/_lib.ts — shared helpers for the sync and public edge functions.
 // Underscore prefix keeps Vercel from treating this as a route.
 
+// Vercel's own per-function type-check (separate from our tsconfig.json /
+// `pnpm check`, and non-fatal when it disagrees) sometimes builds these files
+// in isolation and misses @types/node's ambient Request/Response merge,
+// reporting them as empty interfaces. Pin it explicitly so that check sees
+// the same globals our project's tsconfig already resolves correctly.
+/// <reference types="node" />
+
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 
 // Lazy: defer the DATABASE_URL check + neon() call until the first request, so

@@ -74,8 +74,9 @@ export const WELCOME = {
 
 export const COMPLETION = {
 	heading: 'The structure is in place.',
-	body: 'The day is yours to occupy.',
-	cta: 'open carillon →'
+	body: 'Give the day one real thing to hold, then let the rest stay adjustable.',
+	cta: 'add the first thing →',
+	skipCta: 'open carillon'
 };
 
 // ── Empty states ───────────────────────────────────────────────────
@@ -220,42 +221,53 @@ export const STARTER_DOMAINS: Domain[] = [
 	{ id: 'projects',  name: 'projects',  color: '#78c8b0', icon: '◧' }
 ];
 
-// ── Starter day shapes (4 for step 5) ──────────────────────────────
+// ── Starter day piles (5 for step 5) ───────────────────────────────
+// Momentum is authored once here (and can be retuned in the pile rack). The
+// day then begins with high-probability on-ramps before asking for stretch work.
 
 const OFFICE_DAY_BLOCKS: Block[] = [
-	{ id: 'office-morning',  startTime: '07:30', endTime: '08:30', title: 'Morning',     flourishEligible: true },
-	{ id: 'office-commute',  startTime: '08:30', endTime: '09:00', title: 'Commute' },
-	{ id: 'office-focus-1',  startTime: '09:00', endTime: '12:00', title: 'Focus' },
-	{ id: 'office-midday',   startTime: '12:00', endTime: '13:00', title: 'Midday',      flourishEligible: true, bellId: 'meal' },
-	{ id: 'office-focus-2',  startTime: '13:00', endTime: '17:00', title: 'Focus' },
-	{ id: 'office-wind',     startTime: '17:00', endTime: '17:30', title: 'Wind-down' },
-	{ id: 'office-commute-h',startTime: '17:30', endTime: '18:00', title: 'Commute home' }
+	{ id: 'office-morning',  startTime: '07:30', endTime: '08:30', title: 'Morning',     flourishEligible: true, momentum: 'easy', sampleKind: 'care' },
+	{ id: 'office-commute',  startTime: '08:30', endTime: '09:00', title: 'Commute', momentum: 'easy', sampleKind: 'movement' },
+	{ id: 'office-focus-1',  startTime: '09:00', endTime: '12:00', title: 'Clinic', momentum: 'steady', sampleKind: 'clinic' },
+	{ id: 'office-midday',   startTime: '12:00', endTime: '13:00', title: 'Midday',      flourishEligible: true, bellId: 'meal', momentum: 'easy', sampleKind: 'rest' },
+	{ id: 'office-focus-2',  startTime: '13:00', endTime: '17:00', title: 'Clinic', momentum: 'stretch', sampleKind: 'clinic' },
+	{ id: 'office-wind',     startTime: '17:00', endTime: '17:30', title: 'Close notes', momentum: 'steady', sampleKind: 'clinic' },
+	{ id: 'office-commute-h',startTime: '17:30', endTime: '18:00', title: 'Commute home', momentum: 'easy', sampleKind: 'movement' }
 ];
 
 const MAKER_DAY_BLOCKS: Block[] = [
-	{ id: 'maker-morning',   startTime: '08:00', endTime: '09:00', title: 'Morning',     flourishEligible: true },
-	{ id: 'maker-deep-1',    startTime: '09:00', endTime: '12:30', title: 'Deep work',   flourishEligible: true },
-	{ id: 'maker-break',     startTime: '12:30', endTime: '13:30', title: 'Break',       bellId: 'meal' },
-	{ id: 'maker-deep-2',    startTime: '13:30', endTime: '16:30', title: 'Deep work',   flourishEligible: true },
-	{ id: 'maker-admin',     startTime: '16:30', endTime: '17:30', title: 'Admin' },
-	{ id: 'maker-evening',   startTime: '17:30', endTime: '19:00', title: 'Evening',     flourishEligible: true }
+	{ id: 'maker-morning',   startTime: '08:00', endTime: '09:00', title: 'Open the workshop', flourishEligible: true, momentum: 'easy', sampleKind: 'care' },
+	{ id: 'maker-deep-1',    startTime: '09:00', endTime: '12:30', title: 'Build', flourishEligible: true, momentum: 'stretch', sampleKind: 'build' },
+	{ id: 'maker-break',     startTime: '12:30', endTime: '13:30', title: 'Break', bellId: 'meal', momentum: 'easy', sampleKind: 'rest' },
+	{ id: 'maker-deep-2',    startTime: '13:30', endTime: '16:30', title: 'Build', flourishEligible: true, momentum: 'steady', sampleKind: 'build' },
+	{ id: 'maker-admin',     startTime: '16:30', endTime: '17:30', title: 'Small closures', momentum: 'easy', sampleKind: 'care' },
+	{ id: 'maker-evening',   startTime: '17:30', endTime: '19:00', title: 'Evening', flourishEligible: true, momentum: 'easy', sampleKind: 'rest' }
 ];
 
 const OUT_DAY_BLOCKS: Block[] = [
-	{ id: 'out-morning',     startTime: '08:30', endTime: '09:30', title: 'Morning',     flourishEligible: true },
-	{ id: 'out-appts',       startTime: '09:30', endTime: '12:00', title: 'Appointments' },
-	{ id: 'out-midday',      startTime: '12:00', endTime: '13:00', title: 'Midday',      bellId: 'meal' },
-	{ id: 'out-about',       startTime: '13:00', endTime: '16:00', title: 'Out & about' },
-	{ id: 'out-decompress',  startTime: '16:00', endTime: '18:00', title: 'Decompression', flourishEligible: true },
-	{ id: 'out-evening',     startTime: '18:00', endTime: '20:00', title: 'Evening',     flourishEligible: true }
+	{ id: 'out-morning',     startTime: '08:30', endTime: '09:30', title: 'Pack and leave', flourishEligible: true, momentum: 'easy', sampleKind: 'care' },
+	{ id: 'out-appts',       startTime: '09:30', endTime: '12:00', title: 'Appointments', momentum: 'steady', sampleKind: 'clinic' },
+	{ id: 'out-midday',      startTime: '12:00', endTime: '13:00', title: 'Midday', bellId: 'meal', momentum: 'easy', sampleKind: 'rest' },
+	{ id: 'out-about',       startTime: '13:00', endTime: '16:00', title: 'Out & about', momentum: 'stretch', sampleKind: 'movement' },
+	{ id: 'out-decompress',  startTime: '16:00', endTime: '18:00', title: 'Decompression', flourishEligible: true, momentum: 'easy', sampleKind: 'rest' },
+	{ id: 'out-evening',     startTime: '18:00', endTime: '20:00', title: 'Evening', flourishEligible: true, momentum: 'easy', sampleKind: 'care' }
 ];
 
 const RECOVERY_DAY_BLOCKS: Block[] = [
-	{ id: 'rec-slow',        startTime: '09:00', endTime: '10:30', title: 'Slow morning', flourishEligible: true },
-	{ id: 'rec-open-1',      startTime: '10:30', endTime: '12:30', title: 'Open',         flourishEligible: true },
-	{ id: 'rec-midday',      startTime: '12:30', endTime: '13:30', title: 'Midday',       bellId: 'meal' },
-	{ id: 'rec-open-2',      startTime: '13:30', endTime: '17:00', title: 'Open / light things', flourishEligible: true },
-	{ id: 'rec-quiet',       startTime: '17:00', endTime: '20:00', title: 'Quiet evening', flourishEligible: true, bellId: 'wind-down' }
+	{ id: 'rec-slow',        startTime: '09:00', endTime: '10:30', title: 'Slow morning', flourishEligible: true, momentum: 'easy', sampleKind: 'care' },
+	{ id: 'rec-open-1',      startTime: '10:30', endTime: '12:30', title: 'One light thing', flourishEligible: true, momentum: 'easy', sampleKind: 'care' },
+	{ id: 'rec-midday',      startTime: '12:30', endTime: '13:30', title: 'Midday', bellId: 'meal', momentum: 'easy', sampleKind: 'rest' },
+	{ id: 'rec-open-2',      startTime: '13:30', endTime: '17:00', title: 'Open / light things', flourishEligible: true, momentum: 'steady', sampleKind: 'rest' },
+	{ id: 'rec-quiet',       startTime: '17:00', endTime: '20:00', title: 'Quiet evening', flourishEligible: true, bellId: 'wind-down', momentum: 'easy', sampleKind: 'rest' }
+];
+
+const WRITING_DAY_BLOCKS: Block[] = [
+	{ id: 'writing-tea', startTime: '08:00', endTime: '08:30', title: 'Tea + reread', momentum: 'easy', sampleKind: 'care' },
+	{ id: 'writing-notes', startTime: '08:30', endTime: '09:00', title: 'Loose notes', momentum: 'easy', sampleKind: 'writing' },
+	{ id: 'writing-draft', startTime: '09:00', endTime: '12:00', title: 'Draft', momentum: 'stretch', sampleKind: 'writing', flourishEligible: true },
+	{ id: 'writing-walk', startTime: '12:00', endTime: '13:00', title: 'Walk + lunch', momentum: 'easy', sampleKind: 'movement', bellId: 'meal' },
+	{ id: 'writing-return', startTime: '13:00', endTime: '15:00', title: 'Return to the page', momentum: 'steady', sampleKind: 'writing' },
+	{ id: 'writing-close', startTime: '15:00', endTime: '16:00', title: 'Leave a door open', momentum: 'easy', sampleKind: 'care' }
 ];
 
 export const STARTER_OFFICE_DAY: DayShape = {
@@ -279,12 +291,18 @@ export const STARTER_RECOVERY_DAY: DayShape = {
 	blocks: RECOVERY_DAY_BLOCKS,
 	restful: true
 };
+export const STARTER_WRITING_DAY: DayShape = {
+	id: 'starter-writing',
+	name: 'writing day',
+	blocks: WRITING_DAY_BLOCKS
+};
 
 export const STARTER_SHAPES_V2: DayShape[] = [
 	STARTER_OFFICE_DAY,
 	STARTER_MAKER_DAY,
 	STARTER_OUT_DAY,
-	STARTER_RECOVERY_DAY
+	STARTER_RECOVERY_DAY,
+	STARTER_WRITING_DAY
 ];
 
 // Short descriptions for the step-5 cards — not user-editable; pure UI copy.
@@ -292,5 +310,6 @@ export const SHAPE_DESCRIPTIONS: Record<string, string> = {
 	'starter-office':   'Externally structured, commute-bounded, focus in the middle.',
 	'starter-maker':    'Deep work front-loaded, admin in the late afternoon, protected morning.',
 	'starter-out':      'Appointments, errands, external — high mobility, low fixed desk.',
-	'starter-recovery': 'Light, open, minimal structure. Restores capacity rather than spends it.'
+	'starter-recovery': 'Light, open, minimal structure. Restores capacity rather than spends it.',
+	'starter-writing':  'A soft on-ramp into a protected draft, with a walk before the return.'
 };

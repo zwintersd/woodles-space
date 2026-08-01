@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { onboarding } from '$lib/onboarding.store.svelte';
 	import { COMPLETION } from '$lib/onboarding.copy';
+	import { store } from '$lib/store.svelte';
+
+	const todayShape = $derived(store.getDayShape(store.now)?.name ?? 'open day');
+	const recurringCount = $derived(store.obligations.length + store.rituals.length);
 </script>
 
 <div class="completion">
@@ -38,15 +42,26 @@
 		<h1 class="completion-heading">{COMPLETION.heading}</h1>
 		<p class="completion-body">{COMPLETION.body}</p>
 
-		<button class="completion-cta" onclick={() => onboarding.finish()}>
+		<ul class="completion-recap" aria-label="your setup at a glance">
+			<li><span>today</span><strong>{todayShape}</strong></li>
+			<li><span>territories</span><strong>{store.domains.length}</strong></li>
+			<li><span>recurring things</span><strong>{recurringCount}</strong></li>
+		</ul>
+
+		<button
+			class="completion-cta"
+			data-testid="onboarding-add-first-task"
+			onclick={() => onboarding.finishAndCompose()}
+		>
 			<span class="cta-pre">❧</span>
 			<span>{COMPLETION.cta}</span>
 		</button>
+		<button class="completion-skip" onclick={() => onboarding.finish()}>{COMPLETION.skipCta}</button>
 
 		<p class="completion-foot">
-			the bells are tuned
+			the first thing can be small
 			<span class="foot-sep">·</span>
-			the calendar is calm
+			the calendar is ready
 			<span class="foot-sep">·</span>
 			you may proceed
 		</p>
@@ -168,6 +183,49 @@
 		opacity: 0.9;
 	}
 
+	/* ── compact confirmation of what was just made ──────────────── */
+	.completion-recap {
+		width: min(100%, 27rem);
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		list-style: none;
+		border: 1px solid var(--p-border);
+		border-radius: var(--pl-radius-md);
+		background: color-mix(in srgb, var(--p-surface) 72%, transparent);
+		overflow: hidden;
+		margin-top: 0.1rem;
+	}
+
+	.completion-recap li {
+		display: flex;
+		flex-direction: column;
+		gap: 0.22rem;
+		padding: 0.65rem 0.55rem;
+		min-width: 0;
+	}
+
+	.completion-recap li + li { border-left: 1px solid var(--p-border); }
+
+	.completion-recap span {
+		font-family: var(--pl-font-mono);
+		font-size: 0.47rem;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--p-muted);
+		opacity: 0.65;
+	}
+
+	.completion-recap strong {
+		font-family: var(--pl-font-body);
+		font-size: 0.82rem;
+		font-style: italic;
+		font-weight: 400;
+		color: var(--p-text);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
 	/* ── CTA ──────────────────────────────────────────────────────── */
 	.completion-cta {
 		display: inline-flex;
@@ -187,6 +245,19 @@
 
 	.completion-cta:hover { background: var(--p-accent); color: var(--p-bg); }
 	.completion-cta:hover .cta-pre { transform: rotate(-12deg) translateY(-1px); }
+
+	.completion-skip {
+		font-family: var(--pl-font-mono);
+		font-size: 0.64rem;
+		letter-spacing: 0.12em;
+		color: var(--p-muted);
+		padding: 3px 9px;
+		border-radius: var(--pl-radius-pill);
+		opacity: 0.7;
+		transition: color var(--pl-transition-fast), opacity var(--pl-transition-fast);
+	}
+
+	.completion-skip:hover { color: var(--p-accent); opacity: 1; }
 
 	.cta-pre {
 		font-family: var(--pl-font-fell);
@@ -216,5 +287,10 @@
 		color: var(--p-accent);
 		opacity: 0.6;
 		font-style: normal;
+	}
+
+	@media (max-width: 380px) {
+		.completion-recap { grid-template-columns: 1fr; }
+		.completion-recap li + li { border-left: none; border-top: 1px solid var(--p-border); }
 	}
 </style>

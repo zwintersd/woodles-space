@@ -47,8 +47,14 @@
       font-family: 'DM Mono', monospace;
       font-weight: 300;
     }
-    header a {
+    header nav {
       margin-left: auto;
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    header a {
       font-size: 0.8rem;
       font-family: 'DM Mono', monospace;
       color: var(--muted);
@@ -264,7 +270,11 @@
   <header>
     <h1>animations</h1>
     <span>manim playspace</span>
-    <a href="/">← woodles.space</a>
+    <nav aria-label="Animation links">
+      <a href="/hygge/motion">motion workshop →</a>
+      <a href="/hygge/motion/svg">SVG bench →</a>
+      <a href="/">← woodles.space</a>
+    </nav>
   </header>
 
   <aside>
@@ -364,12 +374,12 @@ function selectScene(scene) {
   } else if (hasGif) {
     player.innerHTML = `<img src="${scene.srcGif}" alt="${scene.title}" />`;
   } else {
-    const file = scene.file.split('/').pop().replace('.py', '');
+    const localFile = scene.file.replace(/^\/animations\//, '');
     player.innerHTML = `<div class="player-empty">
       <div class="icon">◎</div>
       <p>not yet rendered — run:</p>
-      <code>./render ${scene.file} ${scene.sceneClass} -qm
-./render ${scene.file} ${scene.sceneClass} --gif</code>
+      <code>./render ${localFile} ${scene.sceneClass} -qm
+./render ${localFile} ${scene.sceneClass} --gif</code>
     </div>`;
   }
 

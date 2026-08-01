@@ -26,6 +26,7 @@
 	const PASTEL_BIT_SPRITES = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 52, 53, 56, 59];
 	const GLINT_SPRITES = [32, 33, 34, 35, 36, 37, 38, 39];
 	const PUFF_SPRITES = [40, 41, 42, 43, 44, 45, 46, 47];
+	const DEEPWATER_SWIM = { columns: 4, rows: 3, frames: 12, fps: 12 } as const;
 
 	let wrapEl: HTMLDivElement | undefined = $state();
 	let canvasEl: HTMLCanvasElement | undefined = $state();
@@ -146,6 +147,14 @@
 		const waterRipples = loadSheet('witch_water_ripples.png', 8, 2);
 		const sedimentCast = loadSheet('sift_sediment_cast.png', 8, 4);
 		const featureAwakenings = loadSheet('feature_awakenings.png', 4, 4);
+		// A deliberately small proof that the Sprite Studio atlas contract plays in the
+		// real world canvas. Keep this local until Bestiary grows a reviewed animation
+		// bundle import flow; ordinary creature sprites remain single-image assets.
+		const deepwaterSwimmer = loadSheet(
+			'creatures/deepwater_fish_swim_sheet.png',
+			DEEPWATER_SWIM.columns,
+			DEEPWATER_SWIM.rows
+		);
 
 		// the shared, public decorative-creature pool (CREATURE_SPECS) — a
 		// small fixed list, so eagerly loading all of them (like the sheets
@@ -857,6 +866,29 @@
 			}
 		}
 
+		function drawAnimatorSwimmer(T: number, intensity: number) {
+			if (!deepwaterSwimmer.ok || !deepwaterSwimmer.img.naturalWidth) return;
+
+			const seed = stable01(`animator-swimmer:${book.worldIndex}`);
+			const passage = reduce ? 0.48 : (seed + T * 0.024) % 1;
+			const frame = reduce ? 0 : Math.floor(T * DEEPWATER_SWIM.fps) % DEEPWATER_SWIM.frames;
+			const bob = reduce ? 0 : Math.sin(T * 0.9 + seed * TAU) * H * 0.012;
+			const x = W * (1.12 - passage * 1.26);
+			const y = H * (WATER_TOP + 0.16 + seed * 0.15) + bob;
+			const size = H * (0.18 + seed * 0.035);
+			const alpha = 0.32 + intensity * 0.2;
+
+			ctx!.save();
+			ctx!.globalAlpha = alpha * 0.16;
+			ctx!.fillStyle = 'rgb(33, 39, 77)';
+			ctx!.beginPath();
+			ctx!.ellipse(x + size * 0.03, y + size * 0.19, size * 0.29, size * 0.045, 0, 0, TAU);
+			ctx!.fill();
+			ctx!.restore();
+
+			drawSheetSprite(deepwaterSwimmer, frame, x, y, size, 0, alpha, 1);
+		}
+
 		function drawWaterRipples(T: number, moisture: number, intensity: number) {
 			if (!waterRipples.ok || intensity <= 0.01) return;
 			const count = 2 + Math.round(moisture * 3);
@@ -1010,6 +1042,7 @@
 			drawFeatures();
 			drawFeatureAuras(T, shine(witnessed));
 			drawCreatureLayers(['water', 'floor'], T);
+			drawAnimatorSwimmer(T, shine(tending));
 			drawPlacedCreatures(['water', 'floor'], T);
 			drawWaterGlaze(T);
 			drawWaterRipples(T, m, shine(tending * 0.6 + m * 0.4));
