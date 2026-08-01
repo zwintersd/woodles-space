@@ -33,7 +33,7 @@ test.describe('Hygge motion workshop', () => {
 			'href',
 			'/animations/assets/triple-corn.svg'
 		);
-		await expect(page.getByRole('link', { name: 'open in SVG bench' })).toHaveAttribute(
+		await expect(page.getByRole('link', { name: 'open in picture motion studio' })).toHaveAttribute(
 			'href',
 			'/hygge/motion/svg?recipe=%2Fanimations%2Fsvg-recipes%2Ftriple-corn.json'
 		);
