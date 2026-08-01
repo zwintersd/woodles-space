@@ -77,12 +77,12 @@ woodles.space/
 └── apps/
     ├── landing/             static · the homepage
     ├── lab/                 static · future shelf for stub experiments
-    ├── hygge/               static · design playground (fonts, palette, motifs)
+    ├── hygge/               static · design playground (fonts, palette, motifs, motion)
     ├── digits/              static · an SVG pen that writes the time
     ├── quiet-room/          static · an immersive three.js room of light
     ├── ologypedia/          static · a block system for textbook-style pages, and the pages it renders
     ├── letter/              static · echoes — the published-letter reader
-    ├── animations/          Python · Manim playspace, outside the workspace
+    ├── animations/          Python · offline Manim scenes and curated web previews
     ├── write/               SvelteKit · the letter editor
     ├── marginalia/          SvelteKit · a witch writes worlds + a reading room
     ├── planner/             SvelteKit · carillon — self-observation, day piles, and reinforcement
@@ -92,8 +92,12 @@ woodles.space/
     └── thinking-about/      SvelteKit · a board for what's being read, played, and watched
 ```
 
-`animations/` is a Python/Manim playspace. it has no `package.json` and isn't a
-member of the pnpm workspace; `vercel.json` serves its `index.html` directly.
+`animations/` is the Python/Manim authoring side of Hygge's motion workshop. it
+has no `package.json` and isn't a member of the pnpm workspace; Manim renders to
+an ignored scratch `media/` tree, while the catalog renderer copies deliberate,
+checked-in previews to `exports/arcade/`. `vercel.json` serves those files and
+the older free-form scene gallery directly. previews remain workshop studies,
+not Marginalia runtime dependencies.
 
 ## the app manifest
 
@@ -137,9 +141,12 @@ type="importmap">`, still with no build step.
 each builds to `apps/<name>/dist/` and consumes `shared/` through the `@shared`
 Vite alias (`../../shared`). there is no SSR; every app ships as a static bundle.
 
-`hygge` is the design playground — it holds the fonts, palette, and motifs
-showcases that used to be separate pages. `/fonts`, `/palette`, and `/motifs` all
-rewrite to it; `/scaffold` rewrites to `/write`. `lab` is the home for stub
+`hygge` is the design playground — it holds the fonts, palette, motifs, and
+motion showcases that used to be separate pages. `/hygge/motion` is the review
+room for transparent Manim studies from `apps/animations/arcade-catalog.json`;
+it tests scale, speed, background, repeat behavior, and reduced-motion stills
+before any asset is promoted into a game. `/fonts`, `/palette`, and `/motifs` all
+rewrite to Hygge; `/scaffold` rewrites to `/write`. `lab` is the home for stub
 experiments that should stay reachable without appearing as separate homepage
 apps; it links out to `/digits` and `/animations`, whose direct routes still
 work for old bookmarks.

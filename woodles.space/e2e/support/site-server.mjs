@@ -21,6 +21,7 @@ const contentTypes = new Map([
 	['.mjs', 'text/javascript; charset=utf-8'],
 	['.png', 'image/png'],
 	['.svg', 'image/svg+xml'],
+	['.webm', 'video/webm'],
 	['.webp', 'image/webp'],
 	['.woff', 'font/woff'],
 	['.woff2', 'font/woff2']
