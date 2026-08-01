@@ -162,6 +162,12 @@ export interface StoreAdapter<T> {
   read(): T | null;             // current local state (your existing load())
   write(blob: T): void;         // apply a remote state locally (your existing save() + rehydrate)
   isNewer?(local: T, remote: T): boolean; // optional: domain-aware "local wins"
+  /**
+   * Optional deterministic merge for append-like stores. When present, hydrate
+   * and CAS conflicts preserve both devices, then retry the merged snapshot
+   * against the server version we just observed.
+   */
+  merge?(local: T, remote: T): T;
 }
 
 export type ConflictChoice = 'mine' | 'theirs' | 'cancel';
@@ -245,7 +251,12 @@ export function createAppSync<T>({
     } catch (err) {
       state.status = 'error';
       state.errorMessage = err instanceof SyncError ? err.message : 'sync failed';
-      if (err instanceof SyncError && err.kind === 'unauthorized') disconnect();
+      if (err instanceof SyncError && err.kind === 'unauthorized') {
+        setPassphrase('');
+        persistPassphrase(null);
+        state.connected = false;
+        state.lastSyncedAt = null;
+      }
     } finally {
       state.syncing = false;
     }
@@ -267,8 +278,21 @@ export function createAppSync<T>({
     if (!hasPassphrase()) return;
     await runWithStatus(async () => {
       const result = await synced.flush();
-      if ('conflict' in result && result.server.blob) {
-        adapter.write(result.server.blob as T);
+      if ('conflict' in result) {
+        if (result.server.blob !== null) {
+          const local = adapter.read();
+          adapter.write(
+            adapter.merge && local !== null
+              ? adapter.merge(local, result.server.blob as T)
+              : result.server.blob as T
+          );
+        }
+        if (adapter.merge) {
+          throw new SyncError(
+            'conflict',
+            'another device is still changing this data; the latest copy is safe here, but not yet synced'
+          );
+        }
       }
     });
   }
@@ -288,7 +312,12 @@ export function createSyncedStore<T>(adapter: StoreAdapter<T>) {
     if (snap.blob === null) {
       // Nothing on the server yet. If we have local data, seed the server.
       const local = adapter.read();
-      if (local !== null) await flush();
+      if (local !== null) {
+        const result = await flush();
+        if ('conflict' in result) {
+          throw new SyncError('conflict', 'sync changed repeatedly while seeding this device');
+        }
+      }
       return;
     }
     const local = adapter.read();
@@ -298,14 +327,33 @@ export function createSyncedStore<T>(adapter: StoreAdapter<T>) {
       adapter.write(snap.blob);
       return;
     }
+    if (adapter.merge) {
+      const merged = adapter.merge(local, snap.blob);
+      adapter.write(merged);
+      if (JSON.stringify(merged) !== JSON.stringify(snap.blob)) {
+        const result = await flush();
+        if ('conflict' in result) {
+          throw new SyncError('conflict', 'sync changed repeatedly while hydrating this device');
+        }
+      }
+      return;
+    }
     // Both sides have data. Cheap domain heuristic first, then ask.
     if (adapter.isNewer && adapter.isNewer(local, snap.blob)) {
-      await flush(); // local is genuinely ahead — push it
+      const result = await flush(); // local is genuinely ahead — push it
+      if ('conflict' in result) {
+        throw new SyncError('conflict', 'sync changed repeatedly while hydrating this device');
+      }
       return;
     }
     const choice = await onConflict(local, snap.blob);
     if (choice === 'theirs') adapter.write(snap.blob);
-    else if (choice === 'mine') await flush();
+    else if (choice === 'mine') {
+      const result = await flush();
+      if ('conflict' in result) {
+        throw new SyncError('conflict', 'sync changed repeatedly while hydrating this device');
+      }
+    }
     // 'cancel' leaves local untouched and server unchanged
   }
 
@@ -314,11 +362,29 @@ export function createSyncedStore<T>(adapter: StoreAdapter<T>) {
   async function flush(): Promise<{ ok: true; version: number } | Conflict<T>> {
     const local = adapter.read();
     if (local === null) return { ok: true, version: readVersion(app) };
-    const base = readVersion(app);
-    const result = await push<T>(app, local, base);
-    if ('conflict' in result) return result;
-    writeVersion(app, result.version);
-    return result;
+    let candidate: T = local;
+    let base = readVersion(app);
+    let latestConflict: Conflict<T> | null = null;
+
+    // A phone tap and a desktop tap can collide more than once. Merge and
+    // retry a bounded number of times; if contention persists, return the
+    // latest conflict so the app can say "safe locally, not yet synced."
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const result = await push<T>(app, candidate, base);
+      if (!('conflict' in result)) {
+        writeVersion(app, result.version);
+        return result;
+      }
+      latestConflict = result;
+      if (!adapter.merge || result.server.blob === null) return result;
+
+      candidate = adapter.merge(candidate, result.server.blob);
+      adapter.write(candidate);
+      base = result.server.version;
+      writeVersion(app, base);
+    }
+
+    return latestConflict!;
   }
 
   return { hydrate, flush, app };

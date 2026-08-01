@@ -95,7 +95,7 @@
 	}
 
 	:global(body) {
-		background: #e8fbff;
+		background: #17101f;
 		overflow-x: hidden;
 	}
 
@@ -121,15 +121,27 @@
 		outline: none;
 	}
 
+	:global(input:focus-visible),
+	:global(textarea:focus-visible),
+	:global(select:focus-visible) {
+		outline: 2px solid var(--car-pink) !important;
+		outline-offset: 3px;
+	}
+
 	.planner-root {
 		min-height: 100vh;
-		background: var(--p-bg);
-		color: var(--p-text);
-		font-family: var(--pl-font-mono);
+		background: var(--car-night);
+		color: var(--car-cream);
+		font-family: var(--car-body);
 		font-weight: 400;
 		font-size: 1rem;
 		line-height: 1.55;
-		transition: var(--pl-transition-palette);
 		position: relative;
+	}
+
+	@media print {
+		.task-notice {
+			display: none;
+		}
 	}
 </style>

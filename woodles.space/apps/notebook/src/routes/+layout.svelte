@@ -23,13 +23,14 @@
 	}
 
 	:global(html) {
-		font-size: 112.5%;
+		font-size: 100%;
 	}
 
 	:global(body) {
 		background: var(--nb-bg);
 		color: var(--nb-ink);
 		overflow-x: hidden;
+		font-family: var(--nb-font-sans);
 	}
 
 	:global(button),
@@ -62,52 +63,25 @@
 	.notebook-root {
 		min-height: 100vh;
 		background:
-			repeating-linear-gradient(
-				135deg,
-				rgba(255, 255, 255, 0.26) 0 8px,
-				rgba(255, 130, 218, 0.16) 8px 16px,
-				rgba(97, 232, 255, 0.14) 16px 24px,
-				rgba(255, 248, 184, 0.18) 24px 32px
-			),
-			linear-gradient(90deg, rgba(255, 255, 255, 0.38) 1px, transparent 1px),
-			linear-gradient(180deg, rgba(149, 87, 230, 0.16) 1px, transparent 1px),
+			radial-gradient(circle at 12% 5%, rgba(255, 247, 252, 0.72), transparent 23rem),
+			radial-gradient(circle at 92% 86%, rgba(178, 146, 209, 0.24), transparent 24rem),
+			radial-gradient(circle, rgba(232, 70, 143, 0.1) 0 1px, transparent 1.5px) 0 0 / 16px
+				16px,
+			radial-gradient(circle, rgba(66, 190, 203, 0.09) 0 1px, transparent 1.5px) 8px 8px /
+				16px 16px,
+			linear-gradient(115deg, rgba(255, 255, 255, 0.2), transparent 48%),
 			var(--nb-bg);
-		background-size: auto, 30px 30px, 30px 30px;
-		font-family: var(--nb-font-mono);
-		font-weight: 400;
-		line-height: 1.5;
 		position: relative;
-		overflow: hidden;
+		line-height: 1.5;
 	}
 
-	.notebook-root::before,
-	.notebook-root::after {
-		position: fixed;
-		z-index: 0;
-		pointer-events: none;
-		font-family: var(--nb-font-mono);
-		color: rgba(255, 255, 255, 0.72);
-		text-shadow: 0 2px 0 rgba(255, 97, 199, 0.32);
+	:global(::selection) {
+		background: var(--nb-cyan-soft);
+		color: var(--nb-ink);
 	}
 
-	.notebook-root::before {
-		content: "star star moon bow cloud star heart";
-		top: 0.75rem;
-		left: 1rem;
-		right: 1rem;
-		font-size: 0.58rem;
-		letter-spacing: 0.28em;
-		text-transform: uppercase;
-	}
-
-	.notebook-root::after {
-		content: "cute file cabinet";
-		right: -2rem;
-		bottom: 3rem;
-		transform: rotate(-8deg);
-		font-family: var(--nb-font-display);
-		font-size: clamp(2.6rem, 10vw, 7rem);
-		font-style: italic;
-		opacity: 0.3;
+	:global(:focus-visible) {
+		outline: 2px solid var(--nb-violet);
+		outline-offset: 2px;
 	}
 </style>

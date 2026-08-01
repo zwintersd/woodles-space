@@ -62,4 +62,10 @@ export function mergeBlocks(base: Block[], overlays: Block[]): Block[] {
 }
 
 // Make sure we re-export the shape constants used elsewhere
-export { STARTER_OFFICE_DAY, STARTER_MAKER_DAY, STARTER_OUT_DAY, STARTER_RECOVERY_DAY } from './onboarding.copy';
+export {
+	STARTER_OFFICE_DAY,
+	STARTER_MAKER_DAY,
+	STARTER_OUT_DAY,
+	STARTER_RECOVERY_DAY,
+	STARTER_WRITING_DAY
+} from './onboarding.copy';

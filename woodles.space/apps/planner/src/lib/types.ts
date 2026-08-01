@@ -9,18 +9,28 @@ export type Block = {
 	domainId?: string;
 	// Overlay metadata — set only on blocks synthesized from obligations/rituals.
 	overlay?: 'obligation' | 'ritual';
+	// The behavioral-momentum position of this block inside a day pile.
+	// `easy` blocks are high-probability on-ramps; `stretch` blocks are the
+	// lower-probability work the on-ramp is meant to carry.
+	momentum?: MomentumLevel;
+	// A suggested sampling category. The observation is still allowed to differ.
+	sampleKind?: IntervalKind;
 };
+
+export type MomentumLevel = 'easy' | 'steady' | 'stretch';
 
 export type DayShape = {
 	id: string;
 	name: string;
 	blocks: Block[];
 	restful?: boolean; // hints to UI that this is "off-like" (styling, badges)
+	updatedAt?: string;
 };
 
 // Indexed by Date.getDay() — 0=Sun .. 6=Sat. Each slot is a DayShape id.
 export type WeekPattern = {
 	days: [string, string, string, string, string, string, string];
+	updatedAt?: string;
 };
 
 // A recurring weekday-bound commitment ("past you made an agreement").
@@ -54,6 +64,7 @@ export type Task = {
 	notes?: string;
 	recurrenceRule?: string;
 	createdAt: string;
+	updatedAt?: string;
 };
 
 export type TaskRelationship = {
@@ -73,6 +84,7 @@ export type Domain = {
 export type DayInstance = {
 	date: string; // YYYY-MM-DD
 	dayShapeId: string;
+	updatedAt?: string;
 };
 
 export type ToneName = 'wry' | 'gentle' | 'minimal' | 'earnest';
@@ -86,6 +98,7 @@ export type PlannerSettings = {
 	quietHoursStart: string; // "HH:MM"
 	quietHoursEnd: string;
 	leadTimeMinutes: number;
+	samplingIntervalMinutes: number;
 	bellsEnabled: boolean;
 	dayCycleEnabled: boolean;
 	fixedPaletteMode: string | null;
@@ -118,6 +131,91 @@ export type BinderTab =
 	| 'sync'
 	| null;
 
+// ── Carillon instrument data ─────────────────────────────────────
+
+export type IntervalKind =
+	| 'clinic'
+	| 'writing'
+	| 'build'
+	| 'movement'
+	| 'care'
+	| 'rest'
+	| 'elsewhere';
+
+/**
+ * One momentary-time-sampling mark. It records what was happening without
+ * mutating the plan that supplied `plannedLabel`.
+ */
+export type IntervalObservation = {
+	id: string;
+	date: string; // YYYY-MM-DD
+	intervalStart: string; // HH:MM
+	source: 'live' | 'paper';
+	kind: IntervalKind;
+	label: string;
+	plannedLabel?: string;
+	note?: string;
+	intervalMinutes?: number;
+	capturedAt: string;
+	updatedAt: string;
+};
+
+export type RoutineStep = {
+	id: string;
+	label: string;
+};
+
+export type Routine = {
+	id: string;
+	name: string;
+	cue?: string;
+	steps: RoutineStep[];
+	createdAt: string;
+	updatedAt?: string;
+	archived?: boolean;
+};
+
+export type RoutineStepResult = 'independent' | 'prompted' | 'missed';
+
+export type RoutinePractice = {
+	id: string;
+	routineId: string;
+	date: string;
+	results: Record<string, RoutineStepResult>;
+	independence: number; // 0..1
+	recordedAt: string;
+};
+
+export type RoutineScaffoldLevel = 'full' | 'faded' | 'mastered';
+
+export type SurgeDraftStatus = 'captured' | 'promoted' | 'discarded';
+
+export type SurgeDraft = {
+	id: string;
+	title: string;
+	body: string;
+	status: SurgeDraftStatus;
+	createdAt: string;
+	updatedAt?: string;
+	createdSessionId: string;
+	promotedAt?: string;
+	discardedAt?: string;
+	promotedTaskIds?: string[];
+};
+
+/**
+ * The stable reinforcement/export event produced by an honest interval mark.
+ * Echoes can consume this ledger later without learning the whole planner blob.
+ */
+export type SporeEvent = {
+	id: string;
+	observationId: string;
+	date: string;
+	kind: IntervalKind;
+	amount: number;
+	createdAt: string;
+};
+
 export type PlannerBlob = {
 	shapes: DayShape[];
 	weekPattern: WeekPattern;
@@ -127,4 +225,11 @@ export type PlannerBlob = {
 	tasks: Task[];
 	settings: PlannerSettings;
 	domains: Domain[];
+	// Optional for backward compatibility with planner blobs written before the
+	// interval-instrument redesign.
+	observations?: IntervalObservation[];
+	routines?: Routine[];
+	routinePractices?: RoutinePractice[];
+	surgeDrafts?: SurgeDraft[];
+	spores?: SporeEvent[];
 };

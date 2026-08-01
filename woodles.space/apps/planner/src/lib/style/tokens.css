@@ -14,6 +14,20 @@
 	--p-border:      rgba(37,53,74,0.12);
 	--p-highlight:   #ffd84f;
 
+	/* ── Carillon instrument palette ─────────────────────────────── */
+	--car-night:      #17101f;
+	--car-cream:      #fff6da;
+	--car-paper:      #fff9e9;
+	--car-ink:        #403247;
+	--car-ink-soft:   #746878;
+	--car-mist:       #b9adc0;
+	--car-pink:       #f09ab8;
+	--car-pink-dark:  #8d3153;
+	--car-pink-wash:  rgba(240, 154, 184, 0.18);
+	--car-sage:       #71cfb8;
+	--car-surge:      #ff895a;
+	--car-line:       rgba(255, 246, 218, 0.14);
+
 	/* ── typography (inherits from shared/fonts.css) ──────────────── */
 	--pl-font-display: var(--font-display, 'Cormorant Garamond', Georgia, serif);
 	--pl-font-body:    var(--font-body, 'Lora', Georgia, serif);
@@ -22,6 +36,10 @@
 	   than Cormorant; IM Fell adds a slightly hand-set quality to the welcome rule. */
 	--pl-font-optical: var(--font-optical, 'Fraunces', Georgia, serif);
 	--pl-font-fell:    var(--font-fell, 'IM Fell DW Pica', Georgia, serif);
+	--car-display:     var(--font-optical, 'Fraunces', Georgia, serif);
+	--car-body:        var(--font-body, 'Lora', Georgia, serif);
+	--car-mono:        var(--font-mono, 'DM Mono', 'Courier New', monospace);
+	--car-counter:     'VT323', var(--font-mono, 'DM Mono', monospace);
 
 	/* ── spacing scale ────────────────────────────────────────────── */
 	--pl-space-xs:  0.25rem;
