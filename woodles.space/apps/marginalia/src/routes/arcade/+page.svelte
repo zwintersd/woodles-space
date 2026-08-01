@@ -106,7 +106,7 @@
 	<header class="arcade-top">
 		<a class="brand" href="/marginalia">marginalia</a>
 		<div class="room-title">
-			<p>side room</p>
+			<span class="room-kicker">side room</span>
 			<h1>arcade</h1>
 		</div>
 		<div class="meters" aria-label="current book resources">
@@ -165,8 +165,8 @@
 		top: 0;
 		z-index: 20;
 		width: min(100%, 76rem);
-		margin: 0 auto 1rem;
-		padding: 0.6rem 0;
+		margin: 0 auto 0.75rem;
+		padding: 0.4rem 0;
 		display: grid;
 		grid-template-columns: 1fr auto 1fr;
 		align-items: center;
@@ -187,13 +187,15 @@
 		color: var(--cyan);
 	}
 	.room-title {
-		text-align: center;
+		display: flex;
+		align-items: baseline;
+		gap: 0.45rem;
+		white-space: nowrap;
 	}
-	.room-title p {
-		margin: 0;
+	.room-kicker {
 		font-family: var(--font-ui);
-		font-size: 0.62rem;
-		letter-spacing: 0.24em;
+		font-size: 0.56rem;
+		letter-spacing: 0.2em;
 		text-transform: uppercase;
 		color: var(--leafeon-pink);
 	}
@@ -201,8 +203,8 @@
 		margin: 0;
 		font-family: var(--font-display);
 		font-weight: 400;
-		font-size: clamp(2.1rem, 7vw, 4.2rem);
-		line-height: 0.95;
+		font-size: clamp(1.05rem, 2.4vw, 1.4rem);
+		line-height: 1;
 		color: var(--cream);
 	}
 	.meters {
@@ -220,7 +222,7 @@
 	}
 	.meters b {
 		font-family: var(--font-counter);
-		font-size: 1.1rem;
+		font-size: 1.2rem;
 		line-height: 1;
 		color: var(--cyan);
 		font-weight: 400;

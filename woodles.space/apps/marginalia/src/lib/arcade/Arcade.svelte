@@ -203,7 +203,12 @@
 		requestAnimationFrame(() => {
 			requestAnimationFrame(() => {
 				if (!rootEl) return;
-				const top = rootEl.getBoundingClientRect().top + window.scrollY - 12;
+				// The page's sticky header stays pinned over whatever we scroll to, so
+				// its live height (not a guessed constant) has to be cleared too, or
+				// the "now playing" bar ends up partly hidden underneath it.
+				const stickyHeader = document.querySelector('.arcade-top');
+				const clearance = (stickyHeader?.getBoundingClientRect().height ?? 0) + 12;
+				const top = rootEl.getBoundingClientRect().top + window.scrollY - clearance;
 				window.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
 			});
 		});
@@ -239,17 +244,19 @@
 </script>
 
 <div class="arcade-root" bind:this={rootEl}>
-	<header class="arcade-header">
-		<div class="marquee-rail" aria-hidden="true">
-			<span class="marquee-inner">
-				✦ THE ARCADE ✦ MINIGAMES ✦ DIVERSIONS ✦ PLAY ✦ THE ARCADE ✦ MINIGAMES ✦ DIVERSIONS ✦ PLAY ✦ THE ARCADE ✦ MINIGAMES ✦ DIVERSIONS ✦ PLAY ✦&nbsp;
-			</span>
-		</div>
-		<div class="arcade-title-row">
-			<h2 class="arcade-title">The Arcade</h2>
-			<p class="arcade-sub">side games & small diversions — a corner of the study set aside for play</p>
-		</div>
-	</header>
+	{#if !activeGameData}
+		<header class="arcade-header">
+			<div class="marquee-rail" aria-hidden="true">
+				<span class="marquee-inner">
+					✦ THE ARCADE ✦ MINIGAMES ✦ DIVERSIONS ✦ PLAY ✦ THE ARCADE ✦ MINIGAMES ✦ DIVERSIONS ✦ PLAY ✦ THE ARCADE ✦ MINIGAMES ✦ DIVERSIONS ✦ PLAY ✦&nbsp;
+				</span>
+			</div>
+			<div class="arcade-title-row">
+				<h2 class="arcade-title">The Arcade</h2>
+				<p class="arcade-sub">side games & small diversions — a corner of the study set aside for play</p>
+			</div>
+		</header>
+	{/if}
 
 	{#if activeGameData}
 		<section class="active-game" class:theater-mode={theaterMode} aria-label="{activeGameData.title} game">
@@ -566,7 +573,7 @@
 		   under a variable amount of per-game HUD, so this default stays modest;
 		   the wide layout puts the board beside the HUD instead, so its chrome
 		   above the board is small and constant and the override below can be
-		   measured precisely (~275px of header/toolbar at common viewport sizes). */
+		   measured precisely (~160px of sticky header + "now playing" bar). */
 		--board-vh-budget: max(300px, 56svh);
 	}
 	.active-game.theater-mode {
@@ -597,7 +604,7 @@
 		.active-game-body :global(.spinner-shell),
 		.active-game-body :global(.bubble-shell),
 		.active-game-body :global(.match-shell) {
-			--board-vh-budget: calc(100svh - 18rem);
+			--board-vh-budget: calc(100svh - 10rem);
 			display: grid;
 			grid-template-columns: minmax(20rem, 22rem) minmax(20rem, 1fr);
 			grid-auto-flow: row;
