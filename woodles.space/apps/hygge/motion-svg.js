@@ -12,6 +12,24 @@ const SAFE_ATTRIBUTES = {
 };
 const RECIPE_VERBS = ['draw', 'style', 'checkpoint', 'transform', 'restore', 'fade', 'wait'];
 const EASINGS = ['smooth', 'linear', 'there_and_back'];
+const MOTION_LABELS = {
+  draw: { title: 'Draw it on', choice: 'draw it on' },
+  style: { title: 'Add color', choice: 'add color' },
+  checkpoint: { title: 'Remember this pose', choice: 'remember this pose' },
+  transform: { title: 'Move, turn, or resize', choice: 'move, turn, or resize' },
+  restore: { title: 'Return to a saved pose', choice: 'return to a saved pose' },
+  fade: { title: 'Fade away', choice: 'fade away' },
+  wait: { title: 'Pause', choice: 'pause' }
+};
+const EASING_LABELS = {
+  smooth: 'soft and smooth',
+  linear: 'steady',
+  there_and_back: 'out and back'
+};
+const MODE_LABELS = {
+  together: 'move as one',
+  radial: 'spread the pieces outward'
+};
 const CSS_EASINGS = {
   smooth: 'cubic-bezier(0.45, 0, 0.55, 1)',
   linear: 'linear',
@@ -50,10 +68,12 @@ const elements = {
   pausePreview: document.getElementById('pause-preview'),
   replayPreview: document.getElementById('replay-preview'),
   selectedTitle: document.getElementById('selected-title'),
+  selectedPanel: document.getElementById('selected-panel'),
   toggleSelectedPart: document.getElementById('toggle-selected-part'),
   partLabel: document.getElementById('part-label'),
   partGroup: document.getElementById('part-group'),
   groupList: document.getElementById('group-list'),
+  groupsPanel: document.getElementById('groups-panel'),
   addGroup: document.getElementById('add-group'),
   timelineList: document.getElementById('timeline-list'),
   newStepVerb: document.getElementById('new-step-action'),
@@ -65,6 +85,7 @@ const elements = {
   resetRecipe: document.getElementById('reset-recipe'),
   downloadRecipe: document.getElementById('download-recipe'),
   downloadSvg: document.getElementById('download-svg'),
+  saveStatus: document.getElementById('save-status'),
   renderPlan: document.getElementById('render-plan'),
   renderCommand: document.getElementById('render-command'),
   copyRenderCommand: document.getElementById('copy-render-command')
@@ -78,18 +99,38 @@ const state = {
   source: null,
   selectedKey: null,
   history: [],
+  removedParts: new Map(),
   runtime: new Map(),
   animations: [],
   checkpoints: new Map(),
   runToken: 0,
   running: false,
   paused: false,
+  expandedSteps: new Set(),
   background: 'checker',
   size: 256
 };
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function degreesFromRadians(value) {
+  return Number((Number(value || 0) * 180 / Math.PI).toFixed(2));
+}
+
+function radiansFromDegrees(value) {
+  return Number((Number(value || 0) * Math.PI / 180).toFixed(8));
+}
+
+function displayName(value) {
+  const cleaned = String(value || 'picture')
+    .replace(/\.svg$/i, '')
+    .replace(/\bsvg\s+(?:lab|study)\b/gi, '')
+    .replace(/\bsvg\b/gi, '')
+    .replace(/[-_]+/g, ' ')
+    .trim();
+  return (cleaned || 'picture').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function sourceKey(source) {
@@ -158,7 +199,7 @@ function parseViewBox(root) {
   if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
     return [0, 0, width, height];
   }
-  throw new Error('The SVG needs a valid viewBox or numeric width and height.');
+  throw new Error("I couldn't work out this picture's size. Add a viewBox, or a numeric width and height, then try again.");
 }
 
 function splitPathData(data) {
@@ -220,12 +261,12 @@ function inspectSafety(root) {
 
 function parseSvg(text) {
   if (new TextEncoder().encode(text).byteLength > MAX_SOURCE_BYTES) {
-    throw new Error('That SVG is larger than the 1 MB workshop limit.');
+    throw new Error('That picture is larger than the 1 MB limit. Try a smaller SVG.');
   }
   const documentValue = new DOMParser().parseFromString(text, 'image/svg+xml');
-  if (documentValue.querySelector('parsererror')) throw new Error('The supplied text is not valid SVG markup.');
+  if (documentValue.querySelector('parsererror')) throw new Error("I couldn't read that as an SVG picture. Check the pasted text and try again.");
   const root = documentValue.documentElement;
-  if (root.localName.toLowerCase() !== 'svg') throw new Error('The document root must be an SVG element.');
+  if (root.localName.toLowerCase() !== 'svg') throw new Error('That file does not begin with an SVG picture.');
 
   const viewBox = parseViewBox(root);
   const warnings = inspectSafety(root);
@@ -249,7 +290,7 @@ function parseSvg(text) {
           tag,
           attributes: { d: data },
           transform,
-          label: `path ${elementIndex + 1}.${subpath + 1}`
+          label: `piece ${candidates.length + 1}`
         });
       });
       return;
@@ -260,10 +301,10 @@ function parseSvg(text) {
       tag,
       attributes,
       transform,
-      label: `${tag} ${elementIndex + 1}`
+      label: `piece ${candidates.length + 1}`
     });
   });
-  if (!candidates.length) throw new Error('No supported SVG geometry was found.');
+  if (!candidates.length) throw new Error("I couldn't find any shapes I can animate in that picture.");
   return { viewBox, drawableCount: geometry.length, candidates, warnings: [...new Set(warnings)] };
 }
 
@@ -311,7 +352,7 @@ function defaultRecipe(name, hash, parsed) {
       source: clone(candidate.source),
       group: 'artwork'
     })),
-    groups: [{ id: 'artwork', label: 'artwork', color: '#a7d9cf' }],
+    groups: [{ id: 'artwork', label: 'picture', color: '#a7d9cf' }],
     style: {
       height: 4.2,
       initialFill: '#f3ecda',
@@ -358,16 +399,19 @@ async function installSource({ text, name, origin, path, recipe, recipePath }) {
   };
   state.selectedKey = null;
   state.history = [];
+  state.removedParts.clear();
+  state.expandedSteps.clear();
   stopRuntime();
   refreshAll();
-  setStatus(`${name} is open locally. Every included shape is named below.`);
+  setStatus(`${displayName(nextRecipe.name || name)} is ready. Choose a numbered piece to name it or change its color.`);
+  elements.saveStatus.textContent = 'Your draft is ready whenever you want to download it.';
 }
 
 async function loadRecipeUrl(recipeUrl) {
   if (!/^\/animations\/svg-recipes\/[a-z0-9-]+\.json$/i.test(recipeUrl)) {
     throw new Error('Only checked-in SVG workshop recipes can be opened by URL.');
   }
-  setStatus('Opening the recipe and its source…');
+  setStatus('Opening the example…');
   setError('');
   const recipeResponse = await fetch(recipeUrl);
   if (!recipeResponse.ok) throw new Error(`Recipe request returned ${recipeResponse.status}.`);
@@ -395,14 +439,40 @@ function snapshotRecipe() {
   return JSON.stringify(state.recipe);
 }
 
-function mutateRecipe(mutator, message = 'Recipe updated.') {
+function captureFocus() {
+  const active = document.activeElement;
+  if (!active || active === document.body) return null;
+  return {
+    id: active.id || '',
+    key: active.getAttribute('data-focus-key') || '',
+    label: active.getAttribute('aria-label') || ''
+  };
+}
+
+function restoreFocus(snapshot) {
+  if (!snapshot) return;
+  const selector = snapshot.id
+    ? `#${CSS.escape(snapshot.id)}`
+    : snapshot.key
+      ? `[data-focus-key="${CSS.escape(snapshot.key)}"]`
+      : snapshot.label
+        ? `[aria-label="${CSS.escape(snapshot.label)}"]`
+        : '';
+  const next = selector ? document.querySelector(selector) : null;
+  if (next && !next.disabled && !next.closest('[hidden]')) next.focus({ preventScroll: true });
+}
+
+function mutateRecipe(mutator, message = 'Your motion changed.') {
   if (!state.recipe) return;
+  const focusedControl = captureFocus();
   state.history.push(snapshotRecipe());
   if (state.history.length > 60) state.history.shift();
   mutator(state.recipe);
   stopRuntime();
   refreshAll();
+  restoreFocus(focusedControl);
   elements.jsonStatus.textContent = message;
+  elements.saveStatus.textContent = message;
 }
 
 function refreshAll() {
@@ -414,12 +484,15 @@ function refreshAll() {
   renderPreview(true);
   renderRecipeJson();
   renderPlan();
+  elements.selectedPanel.hidden = !state.selectedKey;
+  elements.groupsPanel.hidden = !state.recipe;
   elements.undoChange.disabled = !state.history.length;
   elements.resetRecipe.disabled = !state.recipe;
   elements.downloadRecipe.disabled = !state.recipe;
   elements.downloadSvg.disabled = !state.recipe;
   elements.copyRenderCommand.disabled = !state.recipe;
   elements.addGroup.disabled = !state.recipe;
+  elements.addStep.disabled = !state.recipe;
 }
 
 function renderProvenance() {
@@ -442,7 +515,7 @@ function renderProvenance() {
 function renderPartMap() {
   elements.partList.replaceChildren();
   if (!state.recipe || !state.source) {
-    elements.omittedNote.textContent = 'Load a source to compare its geometry with the recipe.';
+    elements.omittedNote.textContent = 'Open a picture to see the pieces we can move.';
     elements.includeOmitted.disabled = true;
     return;
   }
@@ -451,6 +524,7 @@ function renderPartMap() {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'part-button';
+    button.dataset.sourceKey = sourceKey(part.source);
     button.setAttribute('aria-pressed', String(sourceKey(part.source) === state.selectedKey));
     button.setAttribute('aria-label', `Part ${index + 1}: ${part.label}`);
     const number = document.createElement('strong');
@@ -467,8 +541,8 @@ function renderPartMap() {
   const included = new Set(state.recipe.parts.map((part) => sourceKey(part.source)));
   const omitted = state.source.candidates.filter((candidate) => !included.has(candidate.key));
   elements.omittedNote.textContent = omitted.length
-    ? `${omitted.length} source candidate${omitted.length === 1 ? '' : 's'} omitted. Inclusion is always explicit.`
-    : 'Every supported source candidate is explicitly included.';
+    ? `${omitted.length} extra piece${omitted.length === 1 ? ' is' : 's are'} tucked away. Add ${omitted.length === 1 ? 'it' : 'them'} when you want.`
+    : 'Every piece we found is part of this motion.';
   elements.includeOmitted.disabled = !omitted.length;
 }
 
@@ -477,24 +551,26 @@ function selectPart(key) {
   renderPartMap();
   renderSelectedPart();
   renderPreview(true);
+  elements.partList.querySelector(`[data-source-key="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
 }
 
 function renderSelectedPart() {
   const candidate = candidateForKey(state.selectedKey);
   const part = partForKey(state.selectedKey);
+  elements.selectedPanel.hidden = !candidate || !state.recipe;
   if (!candidate || !state.recipe) {
-    elements.selectedTitle.textContent = 'no part selected';
+    elements.selectedTitle.textContent = 'choose a piece';
     elements.partLabel.value = '';
     elements.partLabel.disabled = true;
     elements.partGroup.replaceChildren();
     elements.partGroup.disabled = true;
     elements.toggleSelectedPart.disabled = true;
-    elements.toggleSelectedPart.textContent = 'Remove selected part';
+    elements.toggleSelectedPart.textContent = 'Hide this piece';
     return;
   }
   elements.selectedTitle.textContent = part?.label || candidate.label;
   elements.toggleSelectedPart.disabled = Boolean(part && state.recipe.parts.length === 1);
-  elements.toggleSelectedPart.textContent = part ? 'Remove selected part' : 'Include selected part';
+  elements.toggleSelectedPart.textContent = part ? 'Hide this piece' : 'Bring this piece back';
   elements.partLabel.disabled = !part;
   elements.partLabel.value = part?.label || candidate.label;
   elements.partGroup.replaceChildren(...state.recipe.groups.map((group) => {
@@ -510,7 +586,7 @@ function renderSelectedPart() {
 function renderGroups() {
   elements.groupList.replaceChildren();
   if (!state.recipe) {
-    elements.groupList.appendChild(Object.assign(document.createElement('p'), { className: 'empty-copy', textContent: 'Groups arrive with a recipe.' }));
+    elements.groupList.appendChild(Object.assign(document.createElement('p'), { className: 'empty-copy', textContent: 'Open a picture to make color families.' }));
     return;
   }
   state.recipe.groups.forEach((group) => {
@@ -524,10 +600,9 @@ function renderGroups() {
     const name = document.createElement('input');
     name.type = 'text';
     name.value = group.label;
-    name.setAttribute('aria-label', `Name for ${group.label} group`);
-    const value = document.createElement('code');
-    value.textContent = group.color;
-    copy.append(name, value);
+    name.dataset.focusKey = `family-name:${group.id}`;
+    name.setAttribute('aria-label', `Name for ${group.label} color family`);
+    copy.append(name);
     input.addEventListener('change', () => {
       mutateRecipe((recipe) => {
         recipe.groups.find((candidate) => candidate.id === group.id).color = input.value;
@@ -536,18 +611,19 @@ function renderGroups() {
     name.addEventListener('change', () => {
       mutateRecipe((recipe) => {
         recipe.groups.find((candidate) => candidate.id === group.id).label = name.value.trim() || group.id;
-      }, `${group.label} group renamed.`);
+      }, `${group.label} was renamed.`);
     });
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'group-remove';
-    remove.textContent = 'remove';
-    remove.setAttribute('aria-label', `Remove ${group.label} group`);
+    remove.textContent = 'remove family';
+    remove.setAttribute('aria-label', `Remove ${group.label} color family`);
     remove.disabled = state.recipe.groups.length === 1 || state.recipe.parts.some((part) => part.group === group.id);
+    remove.hidden = remove.disabled;
     remove.addEventListener('click', () => {
       mutateRecipe((recipe) => {
         recipe.groups = recipe.groups.filter((candidate) => candidate.id !== group.id);
-      }, `${group.label} group removed.`);
+      }, `${group.label} color family was removed.`);
     });
     row.append(input, copy, remove);
     elements.groupList.appendChild(row);
@@ -565,6 +641,7 @@ function numberInput(value, label, onChange, options = {}) {
   input.type = 'number';
   input.step = options.step || '0.01';
   if (options.min != null) input.min = String(options.min);
+  if (options.max != null) input.max = String(options.max);
   input.value = String(value ?? 0);
   input.setAttribute('aria-label', label);
   input.addEventListener('change', () => onChange(Number(input.value)));
@@ -588,10 +665,32 @@ function selectInput(value, label, options, onChange) {
 function targetOptions() {
   if (!state.recipe) return [];
   return [
-    { value: 'all', label: 'all parts' },
-    ...state.recipe.groups.map((group) => ({ value: group.id, label: `group · ${group.label}` })),
-    ...state.recipe.parts.map((part) => ({ value: part.id, label: `part · ${part.label}` }))
+    { value: 'all', label: 'everything' },
+    ...state.recipe.groups.map((group) => ({ value: group.id, label: `the ${group.label} family` })),
+    ...state.recipe.parts.map((part) => ({ value: part.id, label: `just ${part.label}` }))
   ];
+}
+
+function targetLabel(target = 'all') {
+  if (!state.recipe || target === 'all') return 'everything';
+  const group = state.recipe.groups.find((candidate) => candidate.id === target);
+  if (group) return `the ${group.label} family`;
+  const part = state.recipe.parts.find((candidate) => candidate.id === target);
+  return part ? `just ${part.label}` : target;
+}
+
+function secondsLabel(value) {
+  const seconds = Number(value || 0);
+  return `${seconds} second${seconds === 1 ? '' : 's'}`;
+}
+
+function stepSummary(step) {
+  if (step.verb === 'checkpoint') return `save this as “${step.name || 'assembled'}”`;
+  if (step.verb === 'wait') return secondsLabel(step.duration);
+  const pieces = targetLabel(step.target);
+  if (step.verb === 'restore') return `${pieces} · “${step.name || 'assembled'}” · ${secondsLabel(step.duration)}`;
+  if (step.verb === 'transform') return `${pieces} · ${MODE_LABELS[step.mode || 'together']} · ${secondsLabel(step.duration)}`;
+  return `${pieces} · ${secondsLabel(step.duration)}`;
 }
 
 function updateStep(index, updater, message) {
@@ -600,80 +699,106 @@ function updateStep(index, updater, message) {
 
 function renderTimeline() {
   elements.timelineList.replaceChildren();
-  if (!state.recipe) return;
+  if (!state.recipe) {
+    elements.timelineList.appendChild(Object.assign(document.createElement('li'), {
+      className: 'empty-copy',
+      textContent: 'Open a picture and its motion steps will appear here.'
+    }));
+    return;
+  }
   state.recipe.timeline.forEach((step, index) => {
     const item = document.createElement('li');
     item.className = 'timeline-step';
+    const stepKey = step.id || `${index}-${step.verb}`;
+    const details = document.createElement('details');
+    details.className = 'step-details';
+    details.open = state.expandedSteps.has(stepKey);
+    details.addEventListener('toggle', () => {
+      if (details.open) state.expandedSteps.add(stepKey);
+      else state.expandedSteps.delete(stepKey);
+    });
+    const summary = document.createElement('summary');
     const title = document.createElement('strong');
-    title.textContent = step.verb;
+    const accessibleNumber = document.createElement('span');
+    accessibleNumber.className = 'sr-only';
+    accessibleNumber.textContent = `Step ${index + 1}: `;
+    title.append(accessibleNumber, document.createTextNode(MOTION_LABELS[step.verb]?.title || step.verb));
+    const overview = document.createElement('span');
+    overview.className = 'step-summary';
+    overview.textContent = stepSummary(step);
+    summary.append(title, overview);
     const grid = document.createElement('div');
     grid.className = 'step-grid';
 
     if (step.verb !== 'wait') {
-      grid.appendChild(makeField('target', selectInput(step.target || 'all', `Step ${index + 1} target`, targetOptions(), (value) => updateStep(index, (draft) => { draft.target = value; }, `Step ${index + 1} target changed.`))));
+      grid.appendChild(makeField('Which pieces?', selectInput(step.target || 'all', `Step ${index + 1} pieces`, targetOptions(), (value) => updateStep(index, (draft) => { draft.target = value; }, `Step ${index + 1} now applies to ${targetLabel(value)}.`))));
     }
     if (step.verb !== 'checkpoint') {
-      grid.appendChild(makeField('duration · seconds', numberInput(step.duration, `Step ${index + 1} duration`, (value) => updateStep(index, (draft) => { draft.duration = value; }, `Step ${index + 1} duration changed.`), { min: 0 })));
+      grid.appendChild(makeField('How long? (seconds)', numberInput(step.duration, `Step ${index + 1} length in seconds`, (value) => updateStep(index, (draft) => { draft.duration = value; }, `Step ${index + 1} length changed.`), { min: 0 })));
       if (step.verb !== 'wait') {
-        grid.appendChild(makeField('easing', selectInput(step.ease || 'smooth', `Step ${index + 1} easing`, EASINGS.map((value) => ({ value, label: value.replaceAll('_', ' ') })), (value) => updateStep(index, (draft) => { draft.ease = value; }, `Step ${index + 1} easing changed.`))));
+        grid.appendChild(makeField('Motion feel', selectInput(step.ease || 'smooth', `Step ${index + 1} motion feel`, EASINGS.map((value) => ({ value, label: EASING_LABELS[value] })), (value) => updateStep(index, (draft) => { draft.ease = value; }, `Step ${index + 1} now feels ${EASING_LABELS[value]}.`))));
       }
       if (!['wait', 'restore', 'fade'].includes(step.verb)) {
-        grid.appendChild(makeField('stagger ratio', numberInput(step.staggerRatio || 0, `Step ${index + 1} stagger`, (value) => updateStep(index, (draft) => { draft.staggerRatio = value; }, `Step ${index + 1} stagger changed.`), { min: 0 })));
+        grid.appendChild(makeField('Delay between pieces (%)', numberInput(Number(step.staggerRatio || 0) * 100, `Step ${index + 1} delay between pieces in percent`, (value) => updateStep(index, (draft) => { draft.staggerRatio = value / 100; }, `Step ${index + 1} piece delay changed.`), { min: 0, max: 100, step: 1 })));
       }
     }
     if (step.verb === 'checkpoint' || step.verb === 'restore') {
       const input = document.createElement('input');
       input.type = 'text';
       input.value = step.name || 'assembled';
-      input.setAttribute('aria-label', `Step ${index + 1} checkpoint name`);
-      input.addEventListener('change', () => updateStep(index, (draft) => { draft.name = input.value; }, `Step ${index + 1} checkpoint changed.`));
-      grid.appendChild(makeField('checkpoint name', input));
+      input.setAttribute('aria-label', `Step ${index + 1} saved pose name`);
+      input.addEventListener('change', () => updateStep(index, (draft) => { draft.name = input.value; }, `Step ${index + 1} saved pose changed.`));
+      grid.appendChild(makeField('Saved pose name', input));
     }
     if (step.verb === 'transform') {
-      grid.appendChild(makeField('mode', selectInput(step.mode || 'together', `Step ${index + 1} transform mode`, [
-        { value: 'together', label: 'together' },
-        { value: 'radial', label: 'radial parts' }
-      ], (value) => updateStep(index, (draft) => { draft.mode = value; }, `Step ${index + 1} transform mode changed.`))));
+      grid.appendChild(makeField('Movement', selectInput(step.mode || 'together', `Step ${index + 1} movement`, [
+        { value: 'together', label: MODE_LABELS.together },
+        { value: 'radial', label: MODE_LABELS.radial }
+      ], (value) => updateStep(index, (draft) => { draft.mode = value; }, `Step ${index + 1} will ${MODE_LABELS[value]}.`))));
       if ((step.mode || 'together') === 'together') {
-        grid.appendChild(makeField('scale', numberInput(step.scale ?? 1, `Step ${index + 1} scale`, (value) => updateStep(index, (draft) => { draft.scale = value; }, `Step ${index + 1} scale changed.`))));
-        grid.appendChild(makeField('rotate · radians', numberInput(step.rotate ?? 0, `Step ${index + 1} rotation`, (value) => updateStep(index, (draft) => { draft.rotate = value; }, `Step ${index + 1} rotation changed.`))));
-        grid.appendChild(makeField('shift x', numberInput(step.shift?.[0] ?? 0, `Step ${index + 1} shift x`, (value) => updateStep(index, (draft) => { draft.shift = draft.shift || [0, 0, 0]; draft.shift[0] = value; }, `Step ${index + 1} shift changed.`))));
-        grid.appendChild(makeField('shift y', numberInput(step.shift?.[1] ?? 0, `Step ${index + 1} shift y`, (value) => updateStep(index, (draft) => { draft.shift = draft.shift || [0, 0, 0]; draft.shift[1] = value; }, `Step ${index + 1} shift changed.`))));
+        grid.appendChild(makeField('Size (1 = same)', numberInput(step.scale ?? 1, `Step ${index + 1} size`, (value) => updateStep(index, (draft) => { draft.scale = value; }, `Step ${index + 1} size changed.`))));
+        grid.appendChild(makeField('Turn around the center (degrees)', numberInput(degreesFromRadians(step.rotate), `Step ${index + 1} turn in degrees`, (value) => updateStep(index, (draft) => { draft.rotate = radiansFromDegrees(value); }, `Step ${index + 1} turn changed.`), { step: 1 })));
+        grid.appendChild(makeField('Sideways (− left, + right)', numberInput(step.shift?.[0] ?? 0, `Step ${index + 1} sideways movement`, (value) => updateStep(index, (draft) => { draft.shift = draft.shift || [0, 0, 0]; draft.shift[0] = value; }, `Step ${index + 1} sideways movement changed.`))));
+        grid.appendChild(makeField('Up or down (− down, + up)', numberInput(step.shift?.[1] ?? 0, `Step ${index + 1} vertical movement`, (value) => updateStep(index, (draft) => { draft.shift = draft.shift || [0, 0, 0]; draft.shift[1] = value; }, `Step ${index + 1} vertical movement changed.`))));
       } else {
-        grid.appendChild(makeField('distance', numberInput(step.distance ?? 0.6, `Step ${index + 1} radial distance`, (value) => updateStep(index, (draft) => { draft.distance = value; }, `Step ${index + 1} distance changed.`))));
-        grid.appendChild(makeField('distance step', numberInput(step.distanceStep ?? 0, `Step ${index + 1} distance step`, (value) => updateStep(index, (draft) => { draft.distanceStep = value; }, `Step ${index + 1} distance step changed.`))));
-        grid.appendChild(makeField('rotation step', numberInput(step.rotationStep ?? 0, `Step ${index + 1} rotation step`, (value) => updateStep(index, (draft) => { draft.rotationStep = value; }, `Step ${index + 1} rotation step changed.`))));
-        grid.appendChild(makeField('base scale', numberInput(step.scaleBase ?? 1, `Step ${index + 1} base scale`, (value) => updateStep(index, (draft) => { draft.scaleBase = value; }, `Step ${index + 1} scale changed.`))));
-        grid.appendChild(makeField('scale step', numberInput(step.scaleStep ?? 0, `Step ${index + 1} scale step`, (value) => updateStep(index, (draft) => { draft.scaleStep = value; }, `Step ${index + 1} scale step changed.`))));
-        grid.appendChild(makeField('center angle · degrees', numberInput(step.centerAngleDegrees ?? 0, `Step ${index + 1} center angle`, (value) => updateStep(index, (draft) => { draft.centerAngleDegrees = value; }, `Step ${index + 1} center angle changed.`))));
+        grid.appendChild(makeField('Starting distance', numberInput(step.distance ?? 0.6, `Step ${index + 1} starting distance`, (value) => updateStep(index, (draft) => { draft.distance = value; }, `Step ${index + 1} starting distance changed.`))));
+        grid.appendChild(makeField('Extra distance per piece', numberInput(step.distanceStep ?? 0, `Step ${index + 1} extra distance per piece`, (value) => updateStep(index, (draft) => { draft.distanceStep = value; }, `Step ${index + 1} extra distance changed.`))));
+        grid.appendChild(makeField('Extra turn per piece (degrees)', numberInput(degreesFromRadians(step.rotationStep), `Step ${index + 1} extra turn per piece in degrees`, (value) => updateStep(index, (draft) => { draft.rotationStep = radiansFromDegrees(value); }, `Step ${index + 1} extra turn changed.`), { step: 1 })));
+        grid.appendChild(makeField('Starting size (1 = same)', numberInput(step.scaleBase ?? 1, `Step ${index + 1} starting size`, (value) => updateStep(index, (draft) => { draft.scaleBase = value; }, `Step ${index + 1} starting size changed.`))));
+        grid.appendChild(makeField('Extra size per piece', numberInput(step.scaleStep ?? 0, `Step ${index + 1} extra size per piece`, (value) => updateStep(index, (draft) => { draft.scaleStep = value; }, `Step ${index + 1} extra size changed.`))));
+        grid.appendChild(makeField('First direction (degrees)', numberInput(step.centerAngleDegrees ?? 0, `Step ${index + 1} first direction in degrees`, (value) => updateStep(index, (draft) => { draft.centerAngleDegrees = value; }, `Step ${index + 1} first direction changed.`), { step: 1 })));
       }
     }
     if (step.verb === 'fade') {
-      grid.appendChild(makeField('end scale', numberInput(step.scale ?? 1, `Step ${index + 1} fade scale`, (value) => updateStep(index, (draft) => { draft.scale = value; }, `Step ${index + 1} fade scale changed.`))));
+      grid.appendChild(makeField('Ending size (1 = same)', numberInput(step.scale ?? 1, `Step ${index + 1} ending size`, (value) => updateStep(index, (draft) => { draft.scale = value; }, `Step ${index + 1} ending size changed.`))));
     }
 
     const actions = document.createElement('div');
     actions.className = 'step-actions';
-    [['move up', -1], ['move down', 1]].forEach(([label, direction]) => {
+    [['earlier', -1], ['later', 1]].forEach(([label, direction]) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = label;
-      button.setAttribute('aria-label', `${label} step ${index + 1}`);
+      button.setAttribute('aria-label', `Move step ${index + 1} ${label}`);
       button.disabled = direction < 0 ? index === 0 : index === state.recipe.timeline.length - 1;
       button.addEventListener('click', () => mutateRecipe((recipe) => {
         const [moved] = recipe.timeline.splice(index, 1);
         recipe.timeline.splice(index + direction, 0, moved);
-      }, `Step ${index + 1} moved.`));
+      }, `Step ${index + 1} moved ${label}.`));
       actions.appendChild(button);
     });
     const remove = document.createElement('button');
     remove.type = 'button';
-    remove.textContent = 'delete';
-    remove.setAttribute('aria-label', `Delete step ${index + 1}`);
+    remove.textContent = 'remove';
+    remove.setAttribute('aria-label', `Remove step ${index + 1}`);
     remove.disabled = state.recipe.timeline.length === 1;
-    remove.addEventListener('click', () => mutateRecipe((recipe) => recipe.timeline.splice(index, 1), `Step ${index + 1} deleted.`));
+    remove.addEventListener('click', () => {
+      state.expandedSteps.delete(stepKey);
+      mutateRecipe((recipe) => recipe.timeline.splice(index, 1), `Step ${index + 1} was removed.`);
+    });
     actions.appendChild(remove);
-    item.append(title, grid, actions);
+    details.append(summary, grid, actions);
+    item.append(details);
     elements.timelineList.appendChild(item);
   });
 }
@@ -800,8 +925,8 @@ function stopRuntime() {
   elements.playPreview.disabled = !state.recipe;
   setPlaybackStatus(
     state.recipe
-      ? (reducedMotion.matches ? 'reduced motion · still' : 'still')
-      : 'empty'
+      ? (reducedMotion.matches ? 'motion reduced · ready' : 'ready')
+      : 'waiting'
   );
 }
 
@@ -969,12 +1094,12 @@ async function startPreview() {
     state.running = false;
     elements.previewStage.dataset.playing = 'false';
     elements.pausePreview.disabled = true;
-    setPlaybackStatus('complete · still held');
+    setPlaybackStatus('done');
     renderPreview(true);
   } catch (error) {
     if (error.message !== 'cancelled') {
-      setPlaybackStatus('preview error');
-      setError(`Browser preview stopped: ${error.message}`);
+      setPlaybackStatus('could not play');
+      setError(`The preview stopped: ${error.message}`);
     }
   }
 }
@@ -1046,10 +1171,12 @@ async function applyJson() {
     } else {
       state.history.push(snapshotRecipe());
       state.recipe = clone(parsed);
+      state.removedParts.clear();
       stopRuntime();
       refreshAll();
     }
     elements.jsonStatus.textContent = 'JSON applied to the visible controls.';
+    elements.saveStatus.textContent = 'The exact motion data was applied.';
   } catch (error) {
     elements.jsonStatus.textContent = `JSON not applied: ${error.message}`;
     elements.recipeJson.focus();
@@ -1057,14 +1184,14 @@ async function applyJson() {
 }
 
 elements.loadSample.addEventListener('click', async () => {
-  try { await loadRecipeUrl(elements.sampleSelect.value); } catch (error) { setError(error.message); setStatus('The sample stayed closed.'); }
+  try { await loadRecipeUrl(elements.sampleSelect.value); } catch (error) { setError(error.message); setStatus("That example couldn't be opened."); }
 });
 
 elements.svgFile.addEventListener('change', async () => {
   const file = elements.svgFile.files?.[0];
   if (!file) return;
   try {
-    if (file.size > MAX_SOURCE_BYTES) throw new Error('That SVG is larger than the 1 MB workshop limit.');
+    if (file.size > MAX_SOURCE_BYTES) throw new Error('That picture is larger than the 1 MB limit. Try a smaller SVG.');
     await installSource({ text: await file.text(), name: file.name, origin: 'local file' });
   } catch (error) { setError(error.message); }
 });
@@ -1085,7 +1212,7 @@ elements.fileControl.addEventListener('drop', async (event) => {
 
 elements.loadPaste.addEventListener('click', async () => {
   try {
-    if (!elements.svgPaste.value.trim()) throw new Error('Paste SVG markup before loading it.');
+    if (!elements.svgPaste.value.trim()) throw new Error('Paste an SVG before trying to open it.');
     await installSource({ text: elements.svgPaste.value, name: 'pasted-svg.svg', origin: 'pasted in this browser tab' });
   } catch (error) { setError(error.message); }
 });
@@ -1097,11 +1224,14 @@ elements.clearSource.addEventListener('click', () => {
   state.source = null;
   state.selectedKey = null;
   state.history = [];
+  state.removedParts.clear();
+  state.expandedSteps.clear();
   state.recipePath = '';
   elements.svgFile.value = '';
   elements.svgPaste.value = '';
   setError('');
-  setStatus('Choose a workshop sample or bring a local SVG.');
+  setStatus('Try an example or choose a picture from your computer.');
+  elements.saveStatus.textContent = 'Open a picture to begin.';
   refreshAll();
 });
 
@@ -1114,13 +1244,14 @@ elements.includeOmitted.addEventListener('click', () => {
   mutateRecipe((recipe) => {
     recipe.parts.push({ id: uniquePartId(candidate.label), label: candidate.label, source: clone(candidate.source), group: recipe.groups[0].id });
     recipe.omitted = (recipe.omitted || []).filter((entry) => sourceKey(entry.source) !== candidate.key);
-  }, `${candidate.label} explicitly included.`);
+  }, `${candidate.label} was added to the picture.`);
 });
 
 elements.toggleSelectedPart.addEventListener('click', () => {
   const candidate = candidateForKey(state.selectedKey);
   if (!candidate || !state.recipe) return;
   const part = partForKey(state.selectedKey);
+  if (part) state.removedParts.set(candidate.key, clone(part));
   mutateRecipe((recipe) => {
     if (part) {
       recipe.parts = recipe.parts.filter((entry) => sourceKey(entry.source) !== candidate.key);
@@ -1129,19 +1260,20 @@ elements.toggleSelectedPart.addEventListener('click', () => {
         recipe.omitted.push({ source: clone(candidate.source), reason: 'removed explicitly in SVG Motion Bench' });
       }
     } else {
-      recipe.parts.push({ id: uniquePartId(candidate.label), label: candidate.label, source: clone(candidate.source), group: recipe.groups[0].id });
+      recipe.parts.push(state.removedParts.get(candidate.key) || { id: uniquePartId(candidate.label), label: candidate.label, source: clone(candidate.source), group: recipe.groups[0].id });
       recipe.omitted = (recipe.omitted || []).filter((entry) => sourceKey(entry.source) !== candidate.key);
+      state.removedParts.delete(candidate.key);
     }
-  }, part ? `${candidate.label} omitted.` : `${candidate.label} included.`);
+  }, part ? `${candidate.label} is hidden from this motion.` : `${candidate.label} is back in this motion.`);
 });
 
 elements.partLabel.addEventListener('change', () => {
   const key = state.selectedKey;
-  mutateRecipe((recipe) => { recipe.parts.find((part) => sourceKey(part.source) === key).label = elements.partLabel.value.trim() || 'unnamed part'; }, 'Part label changed.');
+  mutateRecipe((recipe) => { recipe.parts.find((part) => sourceKey(part.source) === key).label = elements.partLabel.value.trim() || 'unnamed piece'; }, 'The piece has its new name.');
 });
 elements.partGroup.addEventListener('change', () => {
   const key = state.selectedKey;
-  mutateRecipe((recipe) => { recipe.parts.find((part) => sourceKey(part.source) === key).group = elements.partGroup.value; }, 'Part group changed.');
+  mutateRecipe((recipe) => { recipe.parts.find((part) => sourceKey(part.source) === key).group = elements.partGroup.value; }, 'The piece moved to its new color family.');
 });
 elements.addGroup.addEventListener('click', () => {
   if (!state.recipe) return;
@@ -1151,8 +1283,8 @@ elements.addGroup.addEventListener('click', () => {
     let id = `group-${number}`;
     const ids = new Set(recipe.groups.map((group) => group.id));
     while (ids.has(id)) id = `group-${++number}`;
-    recipe.groups.push({ id, label: `group ${number}`, color: palette[(number - 2) % palette.length] });
-  }, 'A new editable color group was added.');
+    recipe.groups.push({ id, label: `family ${number}`, color: palette[(number - 2) % palette.length] });
+  }, 'A new color family was added.');
 });
 
 elements.backgroundControls.addEventListener('click', (event) => {
@@ -1174,7 +1306,11 @@ elements.playPreview.addEventListener('click', startPreview);
 elements.pausePreview.addEventListener('click', pausePreview);
 elements.replayPreview.addEventListener('click', () => { stopRuntime(); startPreview(); });
 
-elements.addStep.addEventListener('click', () => mutateRecipe((recipe) => recipe.timeline.push(defaultStep(elements.newStepVerb.value)), `${elements.newStepVerb.value} step added.`));
+elements.addStep.addEventListener('click', () => {
+  const step = defaultStep(elements.newStepVerb.value);
+  state.expandedSteps.add(step.id);
+  mutateRecipe((recipe) => recipe.timeline.push(step), `Added: ${MOTION_LABELS[step.verb].choice}.`);
+});
 elements.applyJson.addEventListener('click', applyJson);
 elements.undoChange.addEventListener('click', () => {
   if (!state.history.length) return;
@@ -1182,23 +1318,30 @@ elements.undoChange.addEventListener('click', () => {
   stopRuntime();
   refreshAll();
   elements.jsonStatus.textContent = 'Last recipe change undone.';
+  elements.saveStatus.textContent = 'Undid the last change.';
 });
 elements.resetRecipe.addEventListener('click', () => {
-  if (!state.baseline || !window.confirm('Reset every recipe edit made in this browser tab?')) return;
+  if (!state.baseline || !window.confirm('Start over with the original drawing? This will undo every change from this visit.')) return;
   state.recipe = clone(state.baseline);
   state.history = [];
+  state.removedParts.clear();
+  state.expandedSteps.clear();
   stopRuntime();
   refreshAll();
   elements.jsonStatus.textContent = 'Recipe reset to the loaded source.';
+  elements.saveStatus.textContent = 'Back to the original drawing and motion.';
 });
 elements.downloadRecipe.addEventListener('click', () => {
   if (!state.recipe) return;
   const filename = state.recipePath.split('/').pop() || `${state.recipe.id}.json`;
   downloadText(`${JSON.stringify(state.recipe, null, 2)}\n`, filename, 'application/json');
+  elements.saveStatus.textContent = `Downloaded ${filename}.`;
 });
 elements.downloadSvg.addEventListener('click', () => {
   if (!state.recipe) return;
-  downloadText(buildSafeSvgText(), state.recipe.source.path.split('/').pop(), 'image/svg+xml');
+  const filename = state.recipe.source.path.split('/').pop();
+  downloadText(buildSafeSvgText(), filename, 'image/svg+xml');
+  elements.saveStatus.textContent = `Downloaded ${filename}.`;
 });
 elements.copyRenderCommand.addEventListener('click', async () => {
   if (!elements.renderCommand.value) return;
@@ -1215,9 +1358,9 @@ elements.copyRenderCommand.addEventListener('click', async () => {
 function motionPreferenceChanged() {
   if (reducedMotion.matches) {
     pausePreview();
-    elements.motionPreference.textContent = 'reduced motion · preview stays still until explicit play';
+    elements.motionPreference.textContent = 'motion is reduced on this device · the picture stays still until you press play';
   } else {
-    elements.motionPreference.textContent = 'preview stays still until you press play';
+    elements.motionPreference.textContent = 'the picture stays still until you press play';
   }
 }
 if (typeof reducedMotion.addEventListener === 'function') reducedMotion.addEventListener('change', motionPreferenceChanged);
@@ -1229,5 +1372,5 @@ refreshAll();
 const requestedRecipe = new URLSearchParams(window.location.search).get('recipe');
 if (requestedRecipe && /^\/animations\/svg-recipes\/[a-z0-9-]+\.json$/i.test(requestedRecipe)) {
   if ([...elements.sampleSelect.options].some((option) => option.value === requestedRecipe)) elements.sampleSelect.value = requestedRecipe;
-  loadRecipeUrl(requestedRecipe).catch((error) => { setError(error.message); setStatus('The linked recipe stayed closed.'); });
+  loadRecipeUrl(requestedRecipe).catch((error) => { setError(error.message); setStatus("That linked example couldn't be opened."); });
 }
