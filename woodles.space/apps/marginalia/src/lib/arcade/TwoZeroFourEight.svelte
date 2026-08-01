@@ -109,22 +109,28 @@
 		return { row: out, score: gained };
 	}
 
-	function applyLeft(b: Board): { board: Board; score: number; moved: boolean } {
+	function applyLeft(b: Board): { board: Board; score: number; moved: boolean; movedLines: boolean[] } {
 		let gained = 0;
 		let moved = false;
+		const movedLines: boolean[] = [];
 		const nb = b.map((row) => {
 			const { row: nr, score: s } = slideRow(row);
 			gained += s;
-			if (nr.some((v, i) => v !== row[i])) moved = true;
+			const rowMoved = nr.some((v, i) => v !== row[i]);
+			if (rowMoved) moved = true;
+			movedLines.push(rowMoved);
 			return nr;
 		});
-		return { board: nb, score: gained, moved };
+		return { board: nb, score: gained, moved, movedLines };
 	}
 
 	const transpose = (b: Board): Board => b[0].map((_, c) => b.map((row) => row[c]));
 	const flipH = (b: Board): Board => b.map((row) => [...row].reverse());
 
-	function applyMove(b: Board, dir: Dir): { board: Board; score: number; moved: boolean } {
+	function applyMove(
+		b: Board,
+		dir: Dir
+	): { board: Board; score: number; moved: boolean; movedLines: boolean[] } {
 		switch (dir) {
 			case 'left':
 				return applyLeft(b);
@@ -175,6 +181,7 @@
 	let tileMotion = $state(0);
 	let motionKind = $state<Dir | 'magic' | 'rewind' | null>(null);
 	let accentCell = $state<string | null>(null);
+	let movedLines = $state<boolean[]>([false, false, false, false]);
 
 	const turnLimit = $derived(
 		mode === 'turn-100' ? BASE_TURN_LIMIT + statTier(supportStatValue('will')) * 10 : null
@@ -240,7 +247,7 @@
 
 	function move(dir: Dir) {
 		if (!canPlay) return;
-		const { board: nb, score: gained, moved } = applyMove(board, dir);
+		const { board: nb, score: gained, moved, movedLines: ml } = applyMove(board, dir);
 		if (!moved) return;
 		undoStack = [...undoStack, snapshotTurn()].slice(-20);
 		score += gained;
@@ -248,6 +255,7 @@
 		const addedCell = addTile(nb);
 		board = nb;
 		motionKind = dir;
+		movedLines = ml;
 		accentCell = addedCell ? `${addedCell[0]}-${addedCell[1]}` : null;
 		tileMotion += 1;
 		turns += 1;
@@ -277,6 +285,7 @@
 		recordedRun = false;
 		motionKind = null;
 		accentCell = null;
+		movedLines = [false, false, false, false];
 		tileMotion += 1;
 	}
 
@@ -351,6 +360,12 @@
 		motionKind = 'rewind';
 		accentCell = null;
 		tileMotion += 1;
+	}
+
+	function lineMoved(r: number, c: number): boolean {
+		if (motionKind === 'left' || motionKind === 'right') return movedLines[r];
+		if (motionKind === 'up' || motionKind === 'down') return movedLines[c];
+		return false;
 	}
 
 	function onCellKey(e: KeyboardEvent, r: number, c: number) {
@@ -517,6 +532,7 @@
 						<div
 							class="cell"
 							class:empty={val === 0}
+							class:moving={lineMoved(r, c)}
 							class:targetable={activePower !== null && val !== 0}
 							class:accented={accentCell === `${r}-${c}`}
 							style={`${tileStyle(val)}--cell-delay:${(r + c) * 9}ms;`}
@@ -767,16 +783,16 @@
 			transform 0.08s,
 			box-shadow 0.12s;
 	}
-	.board.shift-left .cell:not(.empty) {
+	.board.shift-left .cell.moving:not(.empty) {
 		animation: drift-left 220ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--cell-delay) both;
 	}
-	.board.shift-right .cell:not(.empty) {
+	.board.shift-right .cell.moving:not(.empty) {
 		animation: drift-right 220ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--cell-delay) both;
 	}
-	.board.shift-up .cell:not(.empty) {
+	.board.shift-up .cell.moving:not(.empty) {
 		animation: drift-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--cell-delay) both;
 	}
-	.board.shift-down .cell:not(.empty) {
+	.board.shift-down .cell.moving:not(.empty) {
 		animation: drift-down 220ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--cell-delay) both;
 	}
 	.board.rewinding .cell:not(.empty) {
