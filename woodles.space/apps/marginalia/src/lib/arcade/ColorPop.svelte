@@ -936,7 +936,7 @@
 
 	.canvas-frame {
 		position: relative;
-		width: min(400px, calc(100vw - 3rem));
+		width: min(400px, calc(100vw - 3rem), calc(var(--board-vh-budget, 58svh) * 2 / 3));
 		aspect-ratio: 2 / 3;
 		border: 1px solid var(--sol-base2);
 		border-radius: 6px;

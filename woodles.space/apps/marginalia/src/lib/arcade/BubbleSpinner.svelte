@@ -1055,7 +1055,7 @@
 		background: var(--sol-base00);
 	}
 	.spinner-canvas {
-		width: min(600px, calc(100vw - 3rem));
+		width: min(600px, calc(100vw - 3rem), var(--board-vh-budget, 58svh));
 		aspect-ratio: 1 / 1;
 		border: 1px solid var(--sol-base2);
 		border-radius: 6px;

@@ -451,7 +451,7 @@
 
 	.rush-field {
 		position: relative;
-		width: min(520px, calc(100vw - 3rem));
+		width: min(520px, calc(100vw - 3rem), calc(var(--board-vh-budget, 58svh) * 16 / 10));
 		aspect-ratio: 16 / 10;
 		overflow: hidden;
 		border-radius: 6px;
