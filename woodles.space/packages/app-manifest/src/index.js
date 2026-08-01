@@ -33,7 +33,7 @@ export const appManifest = Object.freeze([
 		sourceDir: 'apps/hygge',
 		outputDir: 'apps/hygge',
 		entryFile: 'index.html',
-		landing: tile('hygge', 1, 'play', 'design playground: fonts, motifs & palette', 'var(--lavender)', 'var(--peach)', '135deg', { defaultPin: 1 })
+		landing: tile('hygge', 1, 'play', 'design playground: fonts, motifs, palette & motion', 'var(--lavender)', 'var(--peach)', '135deg', { defaultPin: 1 })
 	},
 	{
 		id: 'lab',

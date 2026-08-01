@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "name": "Marginalia motion studies",
+  "description": "Small Manim-authored motion studies. Hygge is their review room; none are Arcade runtime dependencies until explicitly promoted.",
+  "render": {
+    "width": 320,
+    "height": 320,
+    "fps": 30,
+    "format": "webm",
+    "transparent": true
+  },
+  "studies": [
+    {
+      "id": "ink-bloom",
+      "name": "ink bloom",
+      "scene": "InkBloom",
+      "posterScene": "InkBloomPoster",
+      "source": "scenes/arcade_resources.py",
+      "preview": "/animations/exports/arcade/ink-bloom.webm",
+      "poster": "/animations/exports/arcade/ink-bloom.png",
+      "behavior": "one-shot",
+      "durationMs": 1632,
+      "status": "workshop",
+      "description": "A soft impact mark that opens like ink meeting paper, then clears its own stage.",
+      "useCases": ["pickup", "score crest", "clue reveal"],
+      "palette": ["rose", "sage", "ink"]
+    },
+    {
+      "id": "orbiting-motes",
+      "name": "orbiting motes",
+      "scene": "OrbitingMotes",
+      "posterScene": "OrbitingMotesPoster",
+      "source": "scenes/arcade_resources.py",
+      "preview": "/animations/exports/arcade/orbiting-motes.webm",
+      "poster": "/animations/exports/arcade/orbiting-motes.png",
+      "behavior": "seamless loop",
+      "durationMs": 3200,
+      "status": "workshop",
+      "description": "A quiet charged-state loop: three partial rings and a handful of attentive particles.",
+      "useCases": ["charged state", "focus", "rare object"],
+      "palette": ["sage", "rose", "parchment"]
+    },
+    {
+      "id": "margin-flourish",
+      "name": "margin flourish",
+      "scene": "MarginFlourish",
+      "posterScene": "MarginFlourishPoster",
+      "source": "scenes/arcade_resources.py",
+      "preview": "/animations/exports/arcade/margin-flourish.webm",
+      "poster": "/animations/exports/arcade/margin-flourish.png",
+      "behavior": "one-shot",
+      "durationMs": 2065,
+      "status": "workshop",
+      "description": "A drawn stem, paper leaves, and a small star for unlocks that should feel discovered rather than awarded.",
+      "useCases": ["unlock", "new room", "mastery"],
+      "palette": ["ink", "sage", "rose"]
+    }
+  ]
+}
