@@ -5,7 +5,7 @@ test.describe('Hygge motion workshop', () => {
 		await page.goto('/hygge/motion');
 
 		await expect(page.getByRole('heading', { name: 'motion, held up to the light.' })).toBeVisible();
-		await expect(page.locator('.study-button')).toHaveCount(3);
+		await expect(page.locator('.study-button')).toHaveCount(5);
 
 		const video = page.locator('#preview-video');
 		const poster = page.getByRole('img', { name: 'ink bloom representative still' });
@@ -18,6 +18,34 @@ test.describe('Hygge motion workshop', () => {
 		await expect(video).toHaveAttribute('src', '/animations/exports/arcade/orbiting-motes.webm');
 		await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState)).toBeGreaterThan(0);
 		expect(await video.evaluate((element: HTMLVideoElement) => element.loop)).toBe(true);
+
+		await page.getByRole('button', { name: 'Preview triple corn svg lab' }).click();
+		await expect(page.getByRole('heading', { name: 'triple corn svg lab' })).toBeVisible();
+		await expect(video).toHaveAttribute(
+			'src',
+			'/animations/exports/arcade/triple-corn-svg.webm'
+		);
+		await expect(page.getByRole('img', { name: 'triple corn svg lab representative still' })).toHaveAttribute(
+			'src',
+			'/animations/exports/arcade/triple-corn-svg.png'
+		);
+		await expect(page.getByRole('link', { name: 'triple-corn.svg' })).toHaveAttribute(
+			'href',
+			'/animations/assets/triple-corn.svg'
+		);
+		await expect(page.getByRole('link', { name: 'open in SVG bench' })).toHaveAttribute(
+			'href',
+			'/hygge/motion/svg?recipe=%2Fanimations%2Fsvg-recipes%2Ftriple-corn.json'
+		);
+		expect(await video.evaluate((element: HTMLVideoElement) => element.loop)).toBe(false);
+
+		await page.getByRole('button', { name: 'Preview diamonds svg study' }).click();
+		await expect(page.getByRole('heading', { name: 'diamonds svg study' })).toBeVisible();
+		await expect(video).toHaveAttribute('src', '/animations/exports/arcade/diamonds-svg.webm');
+		await expect(page.getByRole('link', { name: 'diamonds.svg' })).toHaveAttribute(
+			'href',
+			'/animations/assets/diamonds.svg'
+		);
 
 		await page.getByRole('button', { name: 'ink', exact: true }).click();
 		await page.getByRole('button', { name: '160px', exact: true }).click();

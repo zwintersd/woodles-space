@@ -97,7 +97,10 @@ has no `package.json` and isn't a member of the pnpm workspace; Manim renders to
 an ignored scratch `media/` tree, while the catalog renderer copies deliberate,
 checked-in previews to `exports/arcade/`. `vercel.json` serves those files and
 the older free-form scene gallery directly. previews remain workshop studies,
-not Marginalia runtime dependencies.
+not Marginalia runtime dependencies. `/hygge/motion/svg` is the adjacent,
+ephemeral SVG Motion Bench: it exposes source anatomy, part groups, palette,
+timeline, recipe JSON, and the exact offline render command without writing to
+the repository or silently promoting an experiment into a game.
 
 ## the app manifest
 
@@ -145,7 +148,9 @@ Vite alias (`../../shared`). there is no SSR; every app ships as a static bundle
 motion showcases that used to be separate pages. `/hygge/motion` is the review
 room for transparent Manim studies from `apps/animations/arcade-catalog.json`;
 it tests scale, speed, background, repeat behavior, and reduced-motion stills
-before any asset is promoted into a game. `/fonts`, `/palette`, and `/motifs` all
+before any asset is promoted into a game. `/hygge/motion/svg` composes the small
+versioned SVG recipe vocabulary in the browser, while Manim remains the final
+renderer. `/fonts`, `/palette`, and `/motifs` all
 rewrite to Hygge; `/scaffold` rewrites to `/write`. `lab` is the home for stub
 experiments that should stay reachable without appearing as separate homepage
 apps; it links out to `/digits` and `/animations`, whose direct routes still

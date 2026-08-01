@@ -1,7 +1,14 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
-const auditRoutes = ['/', '/write', '/ologypedia', '/marginalia/arcade', '/hygge/motion'];
+const auditRoutes = [
+	'/',
+	'/write',
+	'/ologypedia',
+	'/marginalia/arcade',
+	'/hygge/motion',
+	'/hygge/motion/svg'
+];
 
 for (const route of auditRoutes) {
 	test(`${route} has no serious or critical automated accessibility violations`, async ({ page }) => {

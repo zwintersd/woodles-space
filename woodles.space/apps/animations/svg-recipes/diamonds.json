@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "diamonds-svg",
+  "name": "diamonds svg study",
+  "source": {
+    "path": "assets/diamonds.svg",
+    "sha256": "471b20119c0aad6aa1d541164cd0ffa9df6c5ffa5bfdf74657418fc5c70798fe",
+    "expectedElements": 1,
+    "viewBox": [0, 0, 512, 512]
+  },
+  "omitted": [],
+  "parts": [
+    { "id": "diamond", "label": "diamond", "source": { "element": 0, "subpath": 0 }, "group": "gem" }
+  ],
+  "groups": [
+    { "id": "gem", "label": "gem", "color": "#a7e4dd" }
+  ],
+  "style": {
+    "height": 3.85,
+    "initialFill": "#f3ecda",
+    "fillOpacity": 0.96,
+    "stroke": "#34281d",
+    "strokeWidth": 2.1,
+    "strokeOpacity": 0.9
+  },
+  "timeline": [
+    { "id": "draw", "verb": "draw", "target": "all", "duration": 0.78, "ease": "smooth", "staggerRatio": 0 },
+    { "id": "color", "verb": "style", "target": "all", "duration": 0.42, "ease": "smooth", "staggerRatio": 0 },
+    { "id": "assembled", "verb": "checkpoint", "target": "all", "name": "assembled" },
+    { "id": "lift", "verb": "transform", "target": "all", "mode": "together", "duration": 0.52, "ease": "smooth", "shift": [0, 0.62, 0], "scale": 0.76, "rotate": 0.22 },
+    { "id": "settle", "verb": "restore", "target": "all", "name": "assembled", "duration": 0.48, "ease": "smooth" },
+    { "id": "glint", "verb": "transform", "target": "all", "mode": "together", "duration": 0.62, "ease": "there_and_back", "scale": 1.13, "rotate": -0.08 },
+    { "id": "clear", "verb": "fade", "target": "all", "duration": 0.38, "ease": "smooth", "scale": 0.9 },
+    { "id": "breath", "verb": "wait", "target": "all", "duration": 0.06 }
+  ]
+}

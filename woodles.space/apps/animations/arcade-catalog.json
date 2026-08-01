@@ -54,6 +54,40 @@
       "description": "A drawn stem, paper leaves, and a small star for unlocks that should feel discovered rather than awarded.",
       "useCases": ["unlock", "new room", "mastery"],
       "palette": ["ink", "sage", "rose"]
+    },
+    {
+      "id": "triple-corn-svg",
+      "name": "triple corn svg lab",
+      "scene": "SvgRecipeScene",
+      "posterScene": "SvgRecipePoster",
+      "source": "scenes/svg_recipe.py",
+      "sourceAsset": "assets/triple-corn.svg",
+      "recipe": "svg-recipes/triple-corn.json",
+      "preview": "/animations/exports/arcade/triple-corn-svg.webm",
+      "poster": "/animations/exports/arcade/triple-corn-svg.png",
+      "behavior": "one-shot",
+      "durationMs": 4499,
+      "status": "workshop",
+      "description": "A supplied compound-path SVG becomes nine explicitly named recipe parts, then draws, recolors, opens, restores, and turns as crisp vector geometry.",
+      "useCases": ["SVG import test", "compound-path anatomy", "harvest crest"],
+      "palette": ["maize", "kernel", "sage", "ink"]
+    },
+    {
+      "id": "diamonds-svg",
+      "name": "diamonds svg study",
+      "scene": "SvgRecipeScene",
+      "posterScene": "SvgRecipePoster",
+      "source": "scenes/svg_recipe.py",
+      "sourceAsset": "assets/diamonds.svg",
+      "recipe": "svg-recipes/diamonds.json",
+      "preview": "/animations/exports/arcade/diamonds-svg.webm",
+      "poster": "/animations/exports/arcade/diamonds-svg.png",
+      "behavior": "one-shot",
+      "durationMs": 3332,
+      "status": "workshop",
+      "description": "A structurally unrelated one-path SVG runs through the same readable recipe contract: draw, color, transform, restore, and fade.",
+      "useCases": ["SVG import test", "pickup glint", "wayfinding mark"],
+      "palette": ["aqua", "lavender", "ink"]
     }
   ]
 }

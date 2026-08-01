@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="cream">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="A local SVG anatomy and motion-recipe workbench in Hygge." />
+  <title>SVG motion bench · hygge · woodles.space</title>
+  <link rel="stylesheet" href="/shared/fonts.css" />
+  <link rel="stylesheet" href="/shared/palette.css" />
+  <link rel="stylesheet" href="/shared/motifs.css" />
+  <link rel="stylesheet" href="/hygge/motion-svg.css" />
+  <script src="/hygge/motion-svg.js" defer></script>
+</head>
+<body class="motif-blobs">
+  <a class="skip-link" href="#bench">skip to SVG bench</a>
+  <div class="motif-grain" aria-hidden="true"></div>
+  <div class="motif-blob motif-blob-1" aria-hidden="true"></div>
+  <div class="motif-blob motif-blob-2" aria-hidden="true"></div>
+  <div class="motif-blob motif-blob-3" aria-hidden="true"></div>
+  <div class="motif-blob motif-blob-4" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <a href="/">.space</a><span aria-hidden="true">·</span>
+      <a href="/hygge">hygge</a><span aria-hidden="true">·</span>
+      <a href="/hygge/motion">motion</a><span aria-hidden="true">·</span>
+      <span aria-current="page">svg bench</span>
+    </nav>
+    <div class="topbar-note">local · explicit · workshop only</div>
+  </header>
+
+  <main class="page-shell" id="bench">
+    <header class="intro">
+      <div>
+        <p class="eyebrow">hygge · SVG motion bench</p>
+        <h1>move the parts<br />you can name.</h1>
+      </div>
+      <div class="intro-copy">
+        <p>Open an SVG, account for its geometry, then arrange a transparent motion recipe one deliberate step at a time.</p>
+        <p class="privacy-line"><span aria-hidden="true"></span>Nothing is uploaded, saved, rendered, or promoted automatically.</p>
+      </div>
+    </header>
+
+    <div class="bench-grid">
+      <aside class="panel source-panel" aria-labelledby="source-title">
+        <header class="panel-heading">
+          <p class="section-kicker">01 · source</p>
+          <h2 id="source-title">open the specimen</h2>
+        </header>
+
+        <div class="panel-body source-stack">
+          <fieldset class="control-group">
+            <legend>Workshop sample</legend>
+            <div class="inline-control">
+              <select id="sample-select" aria-label="Workshop sample">
+                <option value="/animations/svg-recipes/triple-corn.json">Triple corn · compound path</option>
+                <option value="/animations/svg-recipes/diamonds.json">Diamonds · single path</option>
+              </select>
+              <button type="button" class="button primary" id="load-sample">Load sample</button>
+            </div>
+          </fieldset>
+
+          <fieldset class="control-group">
+            <legend>Local SVG</legend>
+            <label class="file-control" for="svg-file">
+              <span>Choose SVG file</span>
+              <small>or drop it here · 1 MB maximum</small>
+            </label>
+            <input id="svg-file" aria-label="Choose SVG file" type="file" accept=".svg,image/svg+xml" />
+          </fieldset>
+
+          <fieldset class="control-group">
+            <legend>Paste SVG markup</legend>
+            <textarea id="svg-paste" aria-label="Paste SVG markup" rows="5" spellcheck="false" placeholder="&lt;svg viewBox=&quot;0 0 512 512&quot;&gt;…&lt;/svg&gt;"></textarea>
+            <div class="button-row">
+              <button type="button" class="button" id="load-paste">Load pasted SVG</button>
+              <button type="button" class="button quiet" id="clear-source">Clear</button>
+            </div>
+          </fieldset>
+
+          <div class="source-status" id="source-status" role="status" aria-live="polite">Choose a workshop sample or bring a local SVG.</div>
+          <div class="error-message" id="source-error" role="alert" hidden></div>
+
+          <dl class="provenance" aria-label="Source provenance">
+            <div><dt>source</dt><dd id="source-path">—</dd></div>
+            <div><dt>sha256</dt><dd id="source-hash">—</dd></div>
+            <div><dt>anatomy</dt><dd id="source-anatomy">—</dd></div>
+            <div><dt>viewBox</dt><dd id="source-viewbox">—</dd></div>
+          </dl>
+
+          <details class="audit-details">
+            <summary>preview safety audit</summary>
+            <p>Only paths, rectangles, circles, ellipses, lines, polygons, and polylines are reconstructed. Active content and external references never enter the preview.</p>
+            <ul id="safety-warnings"><li>No source inspected yet.</li></ul>
+          </details>
+
+          <section class="part-map" aria-labelledby="part-map-title" data-testid="part-map">
+            <div class="section-head compact">
+              <div>
+                <p class="section-kicker">numbered anatomy</p>
+                <h3 id="part-map-title">parts in the recipe</h3>
+              </div>
+              <button type="button" class="text-button" id="include-omitted" disabled>Include omitted geometry</button>
+            </div>
+            <p class="omitted-note" id="omitted-note">Load a source to compare its geometry with the recipe.</p>
+            <div class="part-list" id="part-list"></div>
+          </section>
+        </div>
+      </aside>
+
+      <section class="stage-column" aria-labelledby="preview-title">
+        <div class="panel stage-panel">
+          <header class="stage-heading">
+            <div>
+              <p class="section-kicker">02 · browser approximation</p>
+              <h2 id="preview-title">live SVG preview</h2>
+            </div>
+            <span class="state-pill" id="playback-status" role="status" aria-live="polite">still</span>
+          </header>
+
+          <div class="stage-toolbar" aria-label="Preview stage controls">
+            <fieldset>
+              <legend>ground</legend>
+              <div class="segmented" id="background-controls">
+                <button type="button" data-background="paper" aria-pressed="false">paper</button>
+                <button type="button" data-background="ink" aria-pressed="false">ink</button>
+                <button type="button" data-background="checker" aria-pressed="true">checker</button>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>size</legend>
+              <div class="segmented" id="size-controls">
+                <button type="button" data-size="96" aria-pressed="false">96px</button>
+                <button type="button" data-size="160" aria-pressed="false">160px</button>
+                <button type="button" data-size="256" aria-pressed="true">256px</button>
+              </div>
+            </fieldset>
+            <label class="check-control"><input type="checkbox" id="show-numbers" checked /> show part numbers</label>
+          </div>
+
+          <div class="preview-stage" id="preview-stage" data-background="checker" data-playing="false">
+            <svg id="preview-svg" aria-label="SVG recipe preview" role="img" viewBox="0 0 512 512" preserveAspectRatio="xMidYMid meet">
+              <g id="preview-geometry"></g>
+              <g id="preview-markers" aria-hidden="true"></g>
+            </svg>
+            <p class="empty-stage" id="empty-stage">The light table is empty.</p>
+          </div>
+
+          <div class="playback-bar">
+            <button type="button" class="button" id="replay-preview" aria-label="Replay preview">replay</button>
+            <button type="button" class="button primary" id="play-preview" aria-label="Play preview">play</button>
+            <button type="button" class="button" id="pause-preview" aria-label="Pause preview" disabled>pause</button>
+            <span id="motion-preference">preview stays still until you press play</span>
+          </div>
+        </div>
+
+        <section class="panel selected-panel" aria-labelledby="selected-title">
+          <header class="section-head compact">
+            <div>
+              <p class="section-kicker">selected geometry</p>
+              <h3 id="selected-title">no part selected</h3>
+            </div>
+            <button type="button" class="button danger" id="toggle-selected-part" disabled>Remove selected part</button>
+          </header>
+          <div class="selected-controls">
+            <label>Selected part label<input type="text" id="part-label" aria-label="Selected part label" disabled /></label>
+            <label>Selected part group<select id="part-group" aria-label="Selected part group" disabled></select></label>
+          </div>
+        </section>
+
+        <section class="panel groups-panel" aria-labelledby="groups-title">
+          <header class="section-head compact">
+            <div>
+              <p class="section-kicker">editable palette</p>
+              <h3 id="groups-title">groups & colors</h3>
+            </div>
+            <button type="button" class="button" id="add-group">Add group</button>
+          </header>
+          <div class="group-list" id="group-list"><p class="empty-copy">Groups arrive with a recipe.</p></div>
+        </section>
+      </section>
+
+      <aside class="panel timeline-panel" aria-labelledby="timeline-title">
+        <header class="panel-heading">
+          <p class="section-kicker">03 · sequence</p>
+          <h2 id="timeline-title">ordered timeline</h2>
+          <p>Browser motion is an approximation. The recipe remains the exact handoff to Manim.</p>
+        </header>
+        <div class="panel-body timeline-body">
+          <div class="add-step">
+            <label for="new-step-action">New step verb</label>
+            <select id="new-step-action" aria-label="New step verb">
+              <option value="draw">draw</option>
+              <option value="style">style</option>
+              <option value="checkpoint">checkpoint</option>
+              <option value="transform">transform</option>
+              <option value="restore">restore</option>
+              <option value="fade">fade</option>
+              <option value="wait">wait</option>
+            </select>
+            <button type="button" class="button" id="add-step">Add timeline step</button>
+          </div>
+          <ol class="timeline-list" id="timeline-list" data-testid="timeline-list"></ol>
+        </div>
+      </aside>
+    </div>
+
+    <section class="recipe-workbench" aria-labelledby="recipe-title">
+      <div class="panel recipe-panel">
+        <header class="section-head">
+          <div>
+            <p class="section-kicker">04 · exact artifact</p>
+            <h2 id="recipe-title">synchronized recipe JSON</h2>
+          </div>
+          <div class="button-row">
+            <button type="button" class="button" id="undo-change" aria-label="Undo last change" disabled>undo</button>
+            <button type="button" class="button" id="reset-recipe" aria-label="Reset recipe" disabled>reset</button>
+          </div>
+        </header>
+        <label class="sr-only" for="recipe-json">Recipe JSON</label>
+        <textarea id="recipe-json" data-testid="recipe-json" aria-label="Recipe JSON" rows="24" spellcheck="false" placeholder="Load a sample or SVG to begin."></textarea>
+        <div class="recipe-actions">
+          <button type="button" class="button primary" id="apply-json">Apply JSON</button>
+          <button type="button" class="button" id="download-recipe">Download recipe</button>
+          <button type="button" class="button" id="download-svg">Download safe SVG</button>
+          <span id="json-status" role="status" aria-live="polite">JSON mirrors every bench control.</span>
+        </div>
+      </div>
+
+      <aside class="panel render-panel" aria-labelledby="render-title" data-testid="render-plan">
+        <header class="section-head compact">
+          <div>
+            <p class="section-kicker">render plan</p>
+            <h2 id="render-title">what Manim will do</h2>
+          </div>
+        </header>
+        <ol id="render-plan"><li>Load a recipe to see its ordered render plan.</li></ol>
+        <label for="render-command">Local draft render command</label>
+        <textarea id="render-command" aria-label="Local draft render command" rows="3" readonly></textarea>
+        <button type="button" class="button" id="copy-render-command">Copy render command</button>
+        <div class="handoff-note">
+          <strong>Files stay visible.</strong>
+          <p>Place the downloaded JSON and SVG at the recipe and source paths shown above before running the helper. It renders ignored local draft files only.</p>
+        </div>
+        <div class="boundary-note">
+          <strong>Workshop boundary</strong>
+          <p>A browser preview is not a catalog study, an Arcade asset, or a promotion decision. Those remain separate, explicit steps.</p>
+        </div>
+      </aside>
+    </section>
+  </main>
+</body>
+</html>
