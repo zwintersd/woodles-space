@@ -343,7 +343,7 @@
 		align-items: end;
 		border: 1px solid var(--car-line);
 		border-radius: 1rem;
-		background: rgba(255, 246, 218, 0.06);
+		background: var(--car-wash);
 		padding: 1rem;
 	}
 
@@ -364,7 +364,7 @@
 	.routine-form textarea {
 		border: 1px solid var(--car-line);
 		border-radius: 0.65rem;
-		background: rgba(11, 5, 18, 0.2);
+		background: var(--car-inset);
 		padding: 0.65rem;
 		color: var(--car-cream);
 		font-family: var(--car-body);
@@ -433,7 +433,7 @@
 		border-radius: 1rem;
 		background: var(--car-paper);
 		color: var(--car-ink);
-		box-shadow: 0 1.2rem 3rem rgba(17, 7, 27, 0.2);
+		box-shadow: 0 1.2rem 3rem var(--car-shadow);
 	}
 
 	.analysis-card {

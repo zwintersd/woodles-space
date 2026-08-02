@@ -172,18 +172,26 @@
 		min-height: 100vh;
 		overflow: hidden;
 		background:
-			radial-gradient(circle at 8% 4%, rgba(240, 154, 184, 0.13), transparent 27rem),
-			radial-gradient(circle at 92% 22%, rgba(113, 207, 184, 0.08), transparent 24rem),
-			linear-gradient(180deg, #1d1428 0%, var(--car-night) 32%, #140d1d 100%);
+			radial-gradient(circle at 8% 4%, var(--car-glow-warm), transparent 27rem),
+			radial-gradient(circle at 92% 22%, var(--car-glow-cool), transparent 24rem),
+			linear-gradient(
+				180deg,
+				var(--car-ground-top) 0%,
+				var(--car-night) 32%,
+				var(--car-ground-bottom) 100%
+			);
 		color: var(--car-cream);
+		transition:
+			background 900ms linear,
+			color 900ms linear;
 	}
 
 	.carillon-shell::before {
 		position: fixed;
 		inset: 0;
 		background-image:
-			linear-gradient(rgba(255, 246, 218, 0.025) 1px, transparent 1px),
-			linear-gradient(90deg, rgba(255, 246, 218, 0.025) 1px, transparent 1px);
+			linear-gradient(var(--car-grid) 1px, transparent 1px),
+			linear-gradient(90deg, var(--car-grid) 1px, transparent 1px);
 		background-size: 2rem 2rem;
 		content: '';
 		mask-image: linear-gradient(to bottom, black, transparent 75%);
@@ -312,7 +320,7 @@
 
 	.section-nav button:hover,
 	.section-nav button.active {
-		background: rgba(255, 246, 218, 0.065);
+		background: var(--car-wash);
 		color: var(--car-cream);
 	}
 

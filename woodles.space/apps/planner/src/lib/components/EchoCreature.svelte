@@ -1,25 +1,29 @@
 <script lang="ts">
 	import { INTERVAL_KIND_OPTIONS, sporeStats, sporesSince } from '$lib/instrument';
 	import { store } from '$lib/store.svelte';
-	import type { IntervalKind } from '$lib/types';
 	import { dateKey } from '$lib/utils';
 
-	type GrowthPoint = {
-		kind: IntervalKind;
-		x: number;
-		y: number;
-	};
-
-	const GROWTH_POINTS: GrowthPoint[] = [
-		{ kind: 'clinic', x: 65, y: 62 },
-		{ kind: 'writing', x: 177, y: 34 },
-		{ kind: 'build', x: 292, y: 70 },
-		{ kind: 'movement', x: 318, y: 172 },
-		{ kind: 'care', x: 252, y: 239 },
-		{ kind: 'rest', x: 106, y: 239 },
-		{ kind: 'elsewhere', x: 38, y: 164 }
-	];
 	const componentId = $props.id();
+
+	// ── the drawing ───────────────────────────────────────────────────
+	// Echo is built from one silhouette plus seven features, one per
+	// observed interval kind. Every feature is *attached* to that
+	// silhouette and grows by geometry — a longer tail, a taller ear, a
+	// bigger bell — never by fading in. The old portrait grew by opacity,
+	// which meant a low trait rendered as a half-erased line floating
+	// beside the creature rather than as a small version of itself.
+	//
+	//   clinic    → ears          (what Echo turns toward)
+	//   writing   → the bell      (Carillon's own motif, held in its lap)
+	//   build     → mended patch  (sewn wider, more stitches, as it fills)
+	//   movement  → tail          (reach)
+	//   care      → belly + cheeks(warmth)
+	//   rest      → quiet rings   (the hush around it)
+	//   elsewhere → spore feelers (what it wonders about)
+
+	const CENTER = { x: 180, y: 170 };
+	const MOTE_RING = { rx: 156, ry: 112 };
+	const THREAD_START = { rx: 84, ry: 100 };
 
 	function beginningOfRecentWindow(now: Date): string {
 		const beginning = new Date(now);
@@ -31,12 +35,28 @@
 		return Math.min(1, Math.sqrt(Math.max(0, count)) / 4);
 	}
 
-	function moteRadius(count: number): number {
-		return 4 + growth(count) * 7;
-	}
-
 	function formatCount(count: number): string {
 		return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(count);
+	}
+
+	// The tail leaves the body at the hip and reaches further as movement
+	// accumulates. Drawn behind the silhouette so the joint never shows.
+	function tailPath(reach: number): string {
+		const tipX = 256 + reach * 20;
+		const tipY = 186 - reach * 40;
+		return `M 210 232 C ${242 + reach * 8} ${240} ${272 + reach * 12} ${218 - reach * 8} ${tipX} ${tipY}`;
+	}
+
+	// A feeler per side, rising between the ears with a spore at the tip.
+	// Rooted inside the silhouette so it appears to grow out of the crown.
+	function feelerTip(side: -1 | 1, rise: number): { x: number; y: number } {
+		return { x: CENTER.x + side * (14 + rise * 14), y: 78 - rise * 24 };
+	}
+
+	function feelerPath(side: -1 | 1, rise: number): string {
+		const tip = feelerTip(side, rise);
+		const rootX = CENTER.x + side * 6;
+		return `M ${rootX} 100 C ${rootX} ${92 - rise * 6} ${tip.x - side * 7} ${tip.y + 12} ${tip.x} ${tip.y}`;
 	}
 
 	let lifetimeStats = $derived(sporeStats(store.sporeEvents));
@@ -50,12 +70,33 @@
 	let lifetimeTotal = $derived(store.sporeEvents.reduce((sum, event) => sum + event.amount, 0));
 	let isNapping = $derived(recentTotal === 0);
 
-	let growthPoints = $derived(
-		GROWTH_POINTS.map((point) => ({
-			...point,
-			count: lifetimeStats[point.kind],
-			radius: moteRadius(lifetimeStats[point.kind])
-		}))
+	// Trait growth, 0–1, in the same order as the stat list below so the
+	// constellation and the readout agree about which mote is which.
+	let traits = $derived(
+		Object.fromEntries(
+			INTERVAL_KIND_OPTIONS.map((option) => [option.kind, growth(lifetimeStats[option.kind])])
+		) as Record<(typeof INTERVAL_KIND_OPTIONS)[number]['kind'], number>
+	);
+
+	let motes = $derived(
+		INTERVAL_KIND_OPTIONS.map((option, index) => {
+			// Half-step offset keeps a mote off the crown, where the ears are.
+			const angle = ((-90 + (360 / INTERVAL_KIND_OPTIONS.length) * (index + 0.5)) * Math.PI) / 180;
+			const cos = Math.cos(angle);
+			const sin = Math.sin(angle);
+			const count = lifetimeStats[option.kind];
+			return {
+				kind: option.kind,
+				count,
+				// Threads begin clear of the silhouette, so a thread is a whole
+				// visible line rather than a stub poking out from behind Echo.
+				x1: CENTER.x + THREAD_START.rx * cos,
+				y1: CENTER.y + THREAD_START.ry * sin,
+				x2: CENTER.x + MOTE_RING.rx * cos,
+				y2: CENTER.y + MOTE_RING.ry * sin,
+				r: 3.5 + growth(count) * 7
+			};
+		})
 	);
 
 	let statRows = $derived(
@@ -65,6 +106,15 @@
 			growth: growth(lifetimeStats[option.kind])
 		}))
 	);
+
+	let earScale = $derived(0.7 + traits.clinic * 0.65);
+	let bell = $derived(13 + traits.writing * 13);
+	// Craft is a patch sewn onto the coat: as it widens, its dashed
+	// stitching runs longer, so the marks multiply with the trait.
+	let patch = $derived({ w: 17 + traits.build * 15, h: 13 + traits.build * 8 });
+	let bellyRadius = $derived(22 + traits.care * 14);
+	let cheek = $derived(8 + traits.care * 4);
+	let hush = $derived(traits.rest);
 
 	let statusCopy = $derived.by(() => {
 		if (!isNapping) {
@@ -91,7 +141,7 @@
 	<div class="portrait-wrap">
 		<svg
 			class="echo-portrait"
-			viewBox="0 0 360 278"
+			viewBox="0 0 360 300"
 			role="img"
 			aria-labelledby={`${componentId}-svg-title ${componentId}-svg-description`}
 			focusable="false"
@@ -100,150 +150,181 @@
 			<desc id={`${componentId}-svg-description`}>{creatureDescription}</desc>
 
 			<defs>
-				<linearGradient id={`${componentId}-body-wash`} x1="0" y1="0" x2="1" y2="1">
-					<stop offset="0" stop-color="var(--p-surface)" />
-					<stop offset="0.58" stop-color="var(--p-accent-soft)" />
-					<stop offset="1" stop-color="var(--p-surface)" />
+				<linearGradient id={`${componentId}-body-wash`} x1="0" y1="0" x2="0.35" y2="1">
+					<stop offset="0" stop-color="var(--echo-body-light)" />
+					<stop offset="1" stop-color="var(--echo-body-deep)" />
 				</linearGradient>
 				<radialGradient id={`${componentId}-belly-glow`}>
-					<stop offset="0" stop-color="var(--p-highlight)" stop-opacity="0.52" />
-					<stop offset="1" stop-color="var(--p-highlight)" stop-opacity="0" />
+					<stop offset="0" stop-color="var(--p-accent)" stop-opacity="0.28" />
+					<stop offset="1" stop-color="var(--p-accent)" stop-opacity="0" />
 				</radialGradient>
 			</defs>
 
-			<circle class="echo-halo" cx="180" cy="142" r="90" />
-			<circle class="echo-halo echo-halo-inner" cx="180" cy="142" r="72" />
+			<!-- the hush: quiet rings that close up as rest accumulates -->
+			<g class="quiet-rings" aria-hidden="true">
+				<ellipse
+					cx={CENTER.x}
+					cy={CENTER.y}
+					rx="120"
+					ry="104"
+					stroke-dasharray={`${1 + hush * 4} ${9 - hush * 4}`}
+				/>
+				<ellipse
+					cx={CENTER.x}
+					cy={CENTER.y}
+					rx="101"
+					ry="88"
+					stroke-dasharray={`${1 + hush * 3} ${11 - hush * 5}`}
+				/>
+			</g>
 
 			<g class="growth-constellation" aria-hidden="true">
-				{#each growthPoints as point (point.kind)}
+				{#each motes as mote (mote.kind)}
 					<path
 						class="growth-thread"
-						class:has-growth={point.count > 0}
-						d={`M 180 142 L ${point.x} ${point.y}`}
+						class:has-growth={mote.count > 0}
+						d={`M ${mote.x1} ${mote.y1} L ${mote.x2} ${mote.y2}`}
 					/>
 					<circle
 						class="growth-mote"
-						class:has-growth={point.count > 0}
-						cx={point.x}
-						cy={point.y}
-						r={point.radius}
+						class:has-growth={mote.count > 0}
+						cx={mote.x2}
+						cy={mote.y2}
+						r={mote.r}
 					/>
-					{#if point.count > 0}
-						<circle
-							class="growth-mote-core"
-							cx={point.x}
-							cy={point.y}
-							r={Math.max(2, point.radius * 0.32)}
-						/>
+					{#if mote.count > 0}
+						<circle class="growth-mote-core" cx={mote.x2} cy={mote.y2} r={mote.r * 0.34} />
 					{/if}
 				{/each}
 			</g>
 
-			<g class="sleep-nest" aria-hidden="true">
-				<path d="M103 218 C131 240 229 240 257 218 C236 254 124 254 103 218Z" />
-				<path d="M125 226 C150 235 210 235 235 226" />
-			</g>
+			{#if isNapping}
+				<g class="sleep-nest" aria-hidden="true">
+					<path d="M100 244 C132 268 228 268 260 244 C240 282 120 282 100 244Z" />
+					<path d="M124 252 C150 262 210 262 236 252" />
+				</g>
+			{/if}
+
+			<ellipse class="echo-seat" cx={CENTER.x} cy="262" rx="70" ry="9" aria-hidden="true" />
 
 			<g class="echo-being" class:awake={!isNapping} class:asleep={isNapping}>
-				<path
-					class="echo-tail"
-					d="M232 169 C270 153 278 123 258 109 C292 111 303 147 281 174 C265 194 245 198 227 195"
-				/>
+				<!-- behind the silhouette: tail, ears, feelers -->
+				<g class="echo-tail" aria-hidden="true">
+					<path class="tail-outline" d={tailPath(traits.movement)} />
+					<path class="tail-fill" d={tailPath(traits.movement)} />
+				</g>
 
-				<path
-					class="echo-ear echo-ear-left"
-					d="M133 112 C104 104 91 79 102 57 C128 64 145 83 147 111Z"
-					fill={`url(#${componentId}-body-wash)`}
-					style:opacity={0.42 + growth(lifetimeStats.clinic) * 0.58}
-				/>
-				<path
-					class="echo-ear echo-ear-right"
-					d="M212 111 C216 82 232 64 258 57 C268 82 254 106 226 114Z"
-					fill={`url(#${componentId}-body-wash)`}
-					style:opacity={0.42 + growth(lifetimeStats.clinic) * 0.58}
-				/>
-				<path class="ear-line" d="M111 71 C124 81 135 93 139 106" />
-				<path class="ear-line" d="M249 71 C235 82 225 94 220 108" />
+				<g class="echo-ears" aria-hidden="true">
+					{#each [{ x: 148, rotate: -20, side: 1 }, { x: 212, rotate: 20, side: -1 }] as ear (ear.x)}
+						<g transform={`translate(${ear.x} 112) rotate(${ear.rotate}) scale(1 ${earScale})`}>
+							<path
+								class="ear-shell"
+								d="M -14 6 C -13 -14 -7 -31 0 -42 C 7 -31 13 -14 14 6 C 6 11 -6 11 -14 6 Z"
+								fill={`url(#${componentId}-body-wash)`}
+							/>
+							<path
+								class="ear-fold"
+								d={`M ${5 * ear.side} 0 C ${4 * ear.side} -13 ${2 * ear.side} -22 0 -30`}
+							/>
+						</g>
+					{/each}
+				</g>
+
+				<g class="echo-feelers" aria-hidden="true">
+					{#each [-1, 1] as side (side)}
+						<path class="feeler-stem" d={feelerPath(side as -1 | 1, traits.elsewhere)} />
+						<circle
+							class="feeler-spore"
+							cx={feelerTip(side as -1 | 1, traits.elsewhere).x}
+							cy={feelerTip(side as -1 | 1, traits.elsewhere).y}
+							r={2.6 + traits.elsewhere * 2}
+						/>
+					{/each}
+				</g>
 
 				<path
 					class="echo-body"
-					d="M118 124 C125 99 148 87 180 88 C213 88 237 101 243 126
-						C251 158 247 199 224 218 C204 235 156 235 136 218
-						C112 198 109 158 118 124Z"
+					d="M180 88 C215 88 244 113 248 152
+						C252 190 242 226 224 244
+						C211 256 149 256 136 244
+						C118 226 108 190 112 152
+						C116 113 145 88 180 88 Z"
 					fill={`url(#${componentId}-body-wash)`}
 				/>
 
 				<circle
 					class="belly-glow"
-					cx="180"
-					cy="176"
-					r={28 + growth(lifetimeStats.care) * 12}
+					cx={CENTER.x}
+					cy="202"
+					r={bellyRadius}
 					fill={`url(#${componentId}-belly-glow)`}
-					style:opacity={0.34 + growth(lifetimeStats.care) * 0.5}
+					aria-hidden="true"
 				/>
 
-				<g
-					class="craft-marks"
+				<!-- craft: a mended patch, sewn wider with every few spores -->
+				<rect
+					class="craft-patch"
+					x={147 - patch.w / 2}
+					y={199 - patch.h / 2}
+					width={patch.w}
+					height={patch.h}
+					rx="4"
 					aria-hidden="true"
-					style:opacity={0.25 + growth(lifetimeStats.build) * 0.68}
-				>
-					<path d="M151 193 Q180 211 209 193" />
-					<path d="M155 202 Q180 218 205 202" />
-					<path d="M163 211 Q180 221 197 211" />
+				/>
+
+				<!-- voice: the carillon bell Echo holds, growing as it writes -->
+				<g class="voice-bell" aria-hidden="true">
+					<path class="bell-handle" d={`M ${CENTER.x} ${244 - bell} V ${244 - bell - 5}`} />
+					<circle class="bell-handle-ring" cx={CENTER.x} cy={244 - bell - 7} r="2.6" />
+					<path
+						class="bell-body"
+						d={`M ${CENTER.x - bell * 0.62} 244
+							C ${CENTER.x - bell * 0.6} ${244 - bell * 0.55} ${CENTER.x - bell * 0.42} ${244 - bell} ${CENTER.x} ${244 - bell}
+							C ${CENTER.x + bell * 0.42} ${244 - bell} ${CENTER.x + bell * 0.6} ${244 - bell * 0.55} ${CENTER.x + bell * 0.62} 244 Z`}
+					/>
+					<circle class="bell-clapper" cx={CENTER.x} cy="247" r="2.2" />
 				</g>
 
-				<g
-					class="voice-bell"
-					aria-hidden="true"
-					style:opacity={0.3 + growth(lifetimeStats.writing) * 0.7}
-				>
-					<path d="M168 161 Q180 149 192 161 L188 171 Q180 177 172 171Z" />
-					<circle cx="180" cy="173" r={2.2 + growth(lifetimeStats.writing) * 2.4} />
+				<g class="cheeks" aria-hidden="true">
+					<ellipse cx="143" cy="162" rx={cheek} ry={cheek * 0.6} />
+					<ellipse cx="217" cy="162" rx={cheek} ry={cheek * 0.6} />
 				</g>
-
-				<path
-					class="range-wing range-wing-left"
-					d="M121 151 C96 154 90 176 108 189 C102 172 112 164 126 168"
-					style:opacity={0.28 + growth(lifetimeStats.movement) * 0.72}
-				/>
-				<path
-					class="range-wing range-wing-right"
-					d="M239 151 C264 154 270 176 252 189 C258 172 248 164 234 168"
-					style:opacity={0.28 + growth(lifetimeStats.movement) * 0.72}
-				/>
-
-				<path
-					class="hush-mark"
-					d="M157 104 Q180 84 203 104 Q180 96 157 104Z"
-					style:opacity={0.28 + growth(lifetimeStats.rest) * 0.72}
-				/>
 
 				{#if isNapping}
-					<g class="sleeping-face">
-						<path d="M145 139 Q155 148 165 139" />
-						<path d="M195 139 Q205 148 215 139" />
-						<path d="M175 157 Q180 160 185 157" />
+					<g class="echo-face asleep-face">
+						<path d="M147 148 Q156 157 165 148" />
+						<path d="M195 148 Q204 157 213 148" />
+						<path class="nose" d="M175 165 Q180 162 185 165 Q180 172 175 165 Z" />
+						<path d="M172 176 Q180 181 188 176" />
 					</g>
 					<g class="sleep-notes" aria-hidden="true">
-						<text x="239" y="101">z</text>
-						<text x="255" y="82">z</text>
+						<text x="248" y="118">z</text>
+						<text x="266" y="96">z</text>
 					</g>
 				{:else}
-					<g class="awake-face">
-						<ellipse cx="155" cy="140" rx="8" ry="10" />
-						<ellipse cx="205" cy="140" rx="8" ry="10" />
-						<circle cx={157 + growth(lifetimeStats.elsewhere) * 2} cy="138" r="2.5" />
-						<circle cx={207 + growth(lifetimeStats.elsewhere) * 2} cy="138" r="2.5" />
-						<path d="M169 156 Q180 166 191 156" />
+					<g class="echo-face awake-face">
+						<ellipse class="eye" cx="156" cy="148" rx="9" ry="10.5" />
+						<ellipse class="eye" cx="204" cy="148" rx="9" ry="10.5" />
+						<circle class="pupil" cx="157" cy="149" r="3.4" />
+						<circle class="pupil" cx="205" cy="149" r="3.4" />
+						<circle class="glint" cx="153.6" cy="144.6" r="1.7" />
+						<circle class="glint" cx="201.6" cy="144.6" r="1.7" />
+						<path class="nose" d="M175 165 Q180 162 185 165 Q180 172 175 165 Z" />
+						<path d="M169 174 Q180 184 191 174" />
 					</g>
 				{/if}
+
+				<g class="paws" aria-hidden="true">
+					<ellipse cx="152" cy="249" rx="15" ry="8" />
+					<ellipse cx="208" cy="249" rx="15" ry="8" />
+				</g>
 			</g>
 		</svg>
 
-		<div class="portrait-caption" aria-hidden="true">
+		<p class="portrait-caption" aria-hidden="true">
 			<span class="state-dot"></span>
 			<span>{isNapping ? 'napping softly' : 'awake in the spore garden'}</span>
-		</div>
+		</p>
 	</div>
 
 	<div class="echo-copy">
@@ -285,37 +366,41 @@
 </section>
 
 <style>
+	/* Echo is a Carillon card, not a visitor from another palette. It
+	   borrows the instrument's paper family through the --p-* names the
+	   drawing already speaks, so it sits beside the field sheet as a
+	   sibling at every hour of the day. */
 	.echo-panel {
-		--echo-line: color-mix(in srgb, var(--p-accent) 28%, var(--p-border));
+		--p-surface: var(--car-paper);
+		--p-text: var(--car-ink);
+		--p-muted: var(--car-ink-soft);
+		--p-accent: var(--car-pink-dark);
+		--p-accent-soft: var(--car-pink-wash);
+		--p-highlight: var(--car-brass);
+		--p-border: rgba(64, 50, 71, 0.16);
+		--echo-line: rgba(141, 49, 83, 0.34);
+		/* The silhouette has to be opaque: a translucent body let the tail
+		   and the ear roots read straight through it. */
+		--echo-body-light: color-mix(in srgb, var(--p-accent) 4%, var(--p-surface));
+		--echo-body-deep: color-mix(in srgb, var(--p-accent) 20%, var(--p-surface));
+
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
-		gap: clamp(1.25rem, 4vw, 2.75rem);
+		gap: clamp(1rem, 3vw, 2.25rem);
 		align-items: center;
 		position: relative;
 		overflow: hidden;
-		padding: clamp(1rem, 3vw, 1.75rem);
-		border: 1px solid var(--p-border);
-		border-radius: var(--pl-radius-lg);
+		padding: clamp(1rem, 3vw, 1.6rem);
+		border: 1px solid var(--car-line);
+		border-radius: 1rem 1rem 1rem 2.8rem;
 		background:
-			radial-gradient(circle at 14% 14%, var(--p-accent-soft), transparent 38%),
-			linear-gradient(145deg, var(--p-surface), color-mix(in srgb, var(--p-bg) 62%, var(--p-surface)));
-		box-shadow: var(--pl-shadow-card);
+			linear-gradient(rgba(81, 44, 71, 0.025) 1px, transparent 1px),
+			linear-gradient(90deg, rgba(81, 44, 71, 0.025) 1px, transparent 1px),
+			var(--p-surface);
+		background-size: 18px 18px;
+		box-shadow: 0 1.25rem 3.5rem var(--car-shadow);
 		color: var(--p-text);
 		isolation: isolate;
-	}
-
-	.echo-panel::before {
-		content: '';
-		position: absolute;
-		inset: 0;
-		z-index: -1;
-		opacity: 0.42;
-		background-image:
-			linear-gradient(var(--p-border) 1px, transparent 1px),
-			linear-gradient(90deg, var(--p-border) 1px, transparent 1px);
-		background-size: 2.25rem 2.25rem;
-		mask-image: linear-gradient(90deg, black, transparent 68%);
-		pointer-events: none;
 	}
 
 	.portrait-wrap {
@@ -325,70 +410,53 @@
 
 	.echo-portrait {
 		display: block;
-		width: min(100%, 24rem);
+		width: min(100%, 22rem);
 		height: auto;
 		margin-inline: auto;
 		overflow: visible;
-		color: var(--p-text);
 	}
 
-	.echo-halo {
-		fill: var(--p-accent-soft);
-		opacity: 0.4;
+	/* ── constellation ────────────────────────────────────────────── */
+
+	.quiet-rings ellipse {
+		fill: none;
 		stroke: var(--echo-line);
 		stroke-width: 1;
-		stroke-dasharray: 2 8;
-	}
-
-	.echo-halo-inner {
-		fill: none;
-		opacity: 0.62;
-		stroke-dasharray: 1 7;
+		opacity: 0.5;
 	}
 
 	.growth-thread {
 		fill: none;
 		stroke: var(--echo-line);
 		stroke-width: 1;
-		stroke-dasharray: 2 7;
-		opacity: 0.38;
+		stroke-dasharray: 2 6;
+		opacity: 0.4;
 	}
 
 	.growth-thread.has-growth {
-		stroke: var(--p-accent);
-		opacity: 0.44;
+		opacity: 0.72;
 	}
 
 	.growth-mote {
 		fill: var(--p-surface);
 		stroke: var(--echo-line);
-		stroke-width: 1.5;
+		stroke-width: 1.4;
 		stroke-dasharray: 2 3;
-		opacity: 0.65;
-		transition:
-			r var(--pl-transition-spring),
-			opacity var(--pl-transition-medium);
+		transition: r var(--pl-transition-spring);
 	}
 
 	.growth-mote.has-growth {
-		fill: color-mix(in srgb, var(--p-accent) 34%, var(--p-surface));
+		fill: color-mix(in srgb, var(--p-accent) 16%, var(--p-surface));
 		stroke: var(--p-accent);
 		stroke-dasharray: none;
-		opacity: 1;
 	}
 
 	.growth-mote-core {
-		fill: var(--p-highlight);
-		opacity: 0.9;
+		fill: var(--p-accent);
+		opacity: 0.85;
 	}
 
-	.sleep-nest {
-		fill: color-mix(in srgb, var(--p-accent-soft) 72%, var(--p-surface));
-		stroke: var(--echo-line);
-		stroke-width: 1.5;
-		stroke-linecap: round;
-		opacity: 0.76;
-	}
+	/* ── the creature ─────────────────────────────────────────────── */
 
 	.echo-being {
 		transform-box: fill-box;
@@ -404,27 +472,24 @@
 	}
 
 	.echo-body,
-	.echo-ear {
+	.ear-shell {
 		stroke: var(--p-text);
-		stroke-width: 2;
-		stroke-linecap: round;
+		stroke-width: 2.2;
 		stroke-linejoin: round;
 	}
 
 	.echo-body {
-		filter: drop-shadow(0 8px 8px var(--p-accent-soft));
+		filter: drop-shadow(0 6px 10px var(--p-accent-soft));
 	}
 
-	.echo-ear {
-		transition: opacity var(--pl-transition-medium);
+	.echo-seat {
+		fill: var(--p-accent-soft);
+		opacity: 0.55;
 	}
 
-	.ear-line,
-	.craft-marks,
-	.range-wing,
-	.hush-mark,
-	.sleeping-face,
-	.awake-face path {
+	.ear-fold,
+	.feeler-stem,
+	.echo-face path {
 		fill: none;
 		stroke: var(--p-text);
 		stroke-width: 2;
@@ -432,65 +497,130 @@
 		stroke-linejoin: round;
 	}
 
-	.ear-line {
-		opacity: 0.33;
+	.ear-fold {
+		opacity: 0.3;
+		stroke-width: 1.6;
 	}
 
-	.echo-tail {
-		fill: color-mix(in srgb, var(--p-accent) 22%, var(--p-surface));
-		stroke: var(--p-text);
-		stroke-width: 2;
+	/* Tail: an outline stroke under a fill stroke, so it reads as a
+	   plush limb attached at the hip rather than a floating crescent. */
+	.tail-outline,
+	.tail-fill {
+		fill: none;
 		stroke-linecap: round;
-		stroke-linejoin: round;
-		opacity: 0.82;
+		transition: d var(--pl-transition-spring);
+	}
+
+	.tail-outline {
+		stroke: var(--p-text);
+		stroke-width: 21;
+	}
+
+	.tail-fill {
+		stroke: color-mix(in srgb, var(--p-accent) 12%, var(--p-surface));
+		stroke-width: 17;
+	}
+
+	.feeler-stem {
+		stroke-width: 1.8;
+	}
+
+	.feeler-spore {
+		fill: color-mix(in srgb, var(--p-accent) 26%, var(--p-surface));
+		stroke: var(--p-text);
+		stroke-width: 1.6;
+		transition: r var(--pl-transition-spring);
 	}
 
 	.belly-glow {
-		transition:
-			r var(--pl-transition-spring),
-			opacity var(--pl-transition-medium);
+		transition: r var(--pl-transition-spring);
 	}
 
-	.craft-marks,
-	.range-wing,
-	.hush-mark {
-		transition: opacity var(--pl-transition-medium);
-	}
-
-	.voice-bell {
-		fill: color-mix(in srgb, var(--p-highlight) 48%, var(--p-surface));
+	.craft-patch {
+		fill: color-mix(in srgb, var(--p-accent) 10%, transparent);
 		stroke: var(--p-text);
 		stroke-width: 1.5;
-		stroke-linejoin: round;
-		transition: opacity var(--pl-transition-medium);
+		stroke-dasharray: 3 4;
+		opacity: 0.5;
+		transition:
+			width var(--pl-transition-spring),
+			height var(--pl-transition-spring);
 	}
 
-	.awake-face ellipse {
+	.voice-bell .bell-handle,
+	.voice-bell .bell-handle-ring {
+		fill: none;
+		stroke: var(--p-text);
+		stroke-width: 1.8;
+		stroke-linecap: round;
+	}
+
+	.voice-bell .bell-body {
+		fill: color-mix(in srgb, var(--p-highlight) 48%, var(--p-surface));
+		stroke: var(--p-text);
+		stroke-width: 1.8;
+		stroke-linejoin: round;
+	}
+
+	.voice-bell .bell-clapper {
+		fill: var(--p-text);
+	}
+
+	.cheeks ellipse {
+		fill: var(--p-accent);
+		opacity: 0.22;
+		transition: rx var(--pl-transition-spring);
+	}
+
+	.paws ellipse {
+		fill: color-mix(in srgb, var(--p-accent) 12%, var(--p-surface));
+		stroke: var(--p-text);
+		stroke-width: 2;
+	}
+
+	.echo-face .eye {
 		fill: var(--p-surface);
 		stroke: var(--p-text);
 		stroke-width: 2;
 	}
 
-	.awake-face circle {
+	.echo-face .pupil {
 		fill: var(--p-text);
-		transition: cx var(--pl-transition-medium);
+	}
+
+	.echo-face .glint {
+		fill: var(--p-surface);
+	}
+
+	.echo-face .nose {
+		fill: var(--p-accent);
+		stroke: none;
+	}
+
+	.sleep-nest {
+		fill: color-mix(in srgb, var(--p-accent-soft) 70%, var(--p-surface));
+		stroke: var(--echo-line);
+		stroke-width: 1.4;
+		stroke-linecap: round;
+		opacity: 0.8;
 	}
 
 	.sleep-notes {
 		fill: var(--p-muted);
-		font-family: var(--pl-font-display);
-		font-size: 18px;
+		font-family: var(--car-display);
+		font-size: 19px;
 		font-style: italic;
-		opacity: 0.72;
 		animation: sleep-notes 4.8s ease-in-out infinite;
 	}
+
+	/* ── copy ─────────────────────────────────────────────────────── */
 
 	.portrait-caption {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.45rem;
-		margin-top: -0.45rem;
-		font-family: var(--pl-font-mono);
+		margin-top: -0.35rem;
+		font-family: var(--car-mono);
 		font-size: 0.58rem;
 		letter-spacing: 0.11em;
 		text-transform: uppercase;
@@ -525,7 +655,7 @@
 
 	.eyebrow {
 		margin: 0 0 0.25rem;
-		font-family: var(--pl-font-mono);
+		font-family: var(--car-mono);
 		font-size: 0.57rem;
 		letter-spacing: 0.16em;
 		color: var(--p-accent);
@@ -533,7 +663,7 @@
 
 	h2 {
 		margin: 0;
-		font-family: var(--pl-font-display);
+		font-family: var(--car-display);
 		font-size: clamp(2rem, 5vw, 3.15rem);
 		font-weight: 400;
 		line-height: 0.9;
@@ -545,13 +675,13 @@
 		flex-direction: column;
 		align-items: flex-end;
 		flex: 0 0 auto;
-		font-family: var(--pl-font-mono);
+		font-family: var(--car-mono);
 		color: var(--p-muted);
 	}
 
 	.spore-total strong {
-		font-family: var(--pl-font-display);
-		font-size: 1.45rem;
+		font-family: var(--car-counter);
+		font-size: 1.6rem;
 		font-weight: 400;
 		line-height: 1;
 		color: var(--p-text);
@@ -567,7 +697,7 @@
 	.status {
 		margin: 0;
 		padding: 0.85rem 0;
-		font-family: var(--pl-font-body);
+		font-family: var(--car-body);
 		font-size: 0.84rem;
 		line-height: 1.55;
 		color: var(--p-muted);
@@ -591,17 +721,15 @@
 		padding: 0.4rem 0.5rem;
 		border: 1px solid var(--p-border);
 		border-radius: var(--pl-radius-md);
-		background:
-			linear-gradient(
-				90deg,
-				color-mix(in srgb, var(--p-accent-soft) calc(22% + var(--growth) * 58%), transparent),
-				transparent 72%
-			),
-			color-mix(in srgb, var(--p-surface) 78%, transparent);
+		background: linear-gradient(
+			90deg,
+			color-mix(in srgb, var(--p-accent-soft) calc(22% + var(--growth) * 58%), transparent),
+			transparent 72%
+		);
 	}
 
 	.stat-glyph {
-		font-family: var(--pl-font-display);
+		font-family: var(--car-display);
 		font-size: 1rem;
 		color: var(--p-accent);
 		text-align: center;
@@ -616,7 +744,7 @@
 
 	.stat-copy strong {
 		overflow: hidden;
-		font-family: var(--pl-font-body);
+		font-family: var(--car-body);
 		font-size: 0.74rem;
 		font-weight: 600;
 		color: var(--p-text);
@@ -627,7 +755,7 @@
 	.stat-copy small {
 		margin-top: 0.2rem;
 		overflow: hidden;
-		font-family: var(--pl-font-mono);
+		font-family: var(--car-mono);
 		font-size: 0.49rem;
 		letter-spacing: 0.07em;
 		color: var(--p-muted);
@@ -641,7 +769,7 @@
 		padding: 0.18rem 0.4rem;
 		border-radius: var(--pl-radius-pill);
 		background: var(--p-accent-soft);
-		font-family: var(--pl-font-mono);
+		font-family: var(--car-mono);
 		font-size: 0.62rem;
 		font-variant-numeric: tabular-nums;
 		text-align: center;
@@ -652,7 +780,7 @@
 		margin: 0.75rem 0 0;
 		padding-top: 0.65rem;
 		border-top: 1px dashed var(--p-border);
-		font-family: var(--pl-font-mono);
+		font-family: var(--car-mono);
 		font-size: 0.55rem;
 		line-height: 1.5;
 		letter-spacing: 0.04em;
@@ -698,18 +826,14 @@
 		}
 
 		.echo-portrait {
-			width: min(100%, 20rem);
-		}
-
-		.portrait-caption {
-			margin-top: -0.9rem;
+			width: min(100%, 19rem);
 		}
 	}
 
 	@media (max-width: 430px) {
 		.echo-panel {
 			padding: 0.85rem;
-			border-radius: var(--pl-radius-md);
+			border-radius: 0.8rem 0.8rem 0.8rem 1.8rem;
 		}
 
 		.echo-header {
@@ -733,12 +857,11 @@
 
 		.growth-mote,
 		.belly-glow,
-		.echo-ear,
-		.craft-marks,
-		.range-wing,
-		.hush-mark,
-		.voice-bell,
-		.awake-face circle {
+		.craft-patch,
+		.feeler-spore,
+		.cheeks ellipse,
+		.tail-outline,
+		.tail-fill {
 			transition: none;
 		}
 	}
@@ -747,10 +870,6 @@
 		.echo-panel {
 			box-shadow: none;
 			break-inside: avoid;
-		}
-
-		.echo-panel::before {
-			display: none;
 		}
 	}
 </style>

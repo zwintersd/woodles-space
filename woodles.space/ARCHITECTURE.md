@@ -341,6 +341,20 @@ a later clipboard transcription never poses as a live sample. Correcting an
 existing live sample preserves its original provenance. A blank interval is
 unobserved, not failed.
 
+Carillon's surface runs on two clocks' worth of color. `dayCycle.ts` has
+always interpolated the `--p-*` daydream palette across the day; it now also
+produces the `--car-*` **chrome** — the ground the instrument sits on, the text
+and hairlines drawn straight onto it, the graph rule, the corner washes — via
+`getChromeForTime()`, applied alongside the palette in `+layout.svelte`. The
+chrome has two families, paper by day and the night instrument after ~21:15,
+and the crossing between them is a switch rather than a blend: interpolating a
+light ground toward a dark one passes through a mid-tone that reads as mud
+under either text color. Hues still move freely *within* a family. The paper
+tokens (`--car-paper`, `--car-ink`, `--car-ink-soft`, `--car-pink-dark`) stay
+outside the cycle — a field sheet is paper at every hour, only the desk beneath
+it changes. `dayCycle.test.ts` samples every 15 minutes and holds the chrome to
+AA body text, AA-Large accents, and never landing on a mid-tone ground.
+
 Each observation has the deterministic identity
 `observation-<date>@<startTime>`, stores both its observed kind/label and the
 pile's `plannedLabel`, and carries `capturedAt`/`updatedAt`. Correcting a mark
@@ -663,7 +677,8 @@ apps consume this.
 
 the other six SvelteKit apps don't. each ships its own token file under
 `src/lib/style/tokens.css`, namespaced so it never leaks: `marginalia`
-redefines the bare names under `.marginalia-root`, `planner` uses `--p-*`,
+redefines the bare names under `.marginalia-root`, `planner` uses `--p-*`
+for its inner surfaces and `--car-*` for the Carillon shell,
 `spores` uses `--g-*`, `bestiary` uses `--b-*`,
 `notebook` defines `--nb-*` straight on `:root` (no
 scoping class — each app is its own page, so there's nothing else in the DOM

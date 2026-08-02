@@ -174,18 +174,182 @@ export function getPaletteForTime(date: Date): Record<string, string> {
 	};
 }
 
-export function getNamedPalette(mode: PaletteModeName): Record<string, string> {
-	const hours: Record<PaletteModeName, number> = {
-		'early-light': 6.5,
-		'full-day': 9,
-		'late-afternoon': 15,
-		'evening': 18,
-		'dusk': 20.5,
-		'night': 22
-	};
+const MODE_HOURS: Record<PaletteModeName, number> = {
+	'early-light': 6.5,
+	'full-day': 9,
+	'late-afternoon': 15,
+	'evening': 18,
+	'dusk': 20.5,
+	'night': 22
+};
+
+function dateForMode(mode: PaletteModeName): Date {
+	const hour = MODE_HOURS[mode];
 	const d = new Date();
-	d.setHours(Math.floor(hours[mode]), Math.round((hours[mode] % 1) * 60), 0, 0);
-	return getPaletteForTime(d);
+	d.setHours(Math.floor(hour), Math.round((hour % 1) * 60), 0, 0);
+	return d;
+}
+
+export function getNamedPalette(mode: PaletteModeName): Record<string, string> {
+	return getPaletteForTime(dateForMode(mode));
+}
+
+// ── Carillon chrome cycle ─────────────────────────────────────────
+// The --p-* palette above dresses the planner's inner surfaces. The
+// --car-* tokens dress the instrument itself: the ground the app sits
+// on, the text and hairlines drawn straight onto it, the graph-paper
+// rule, the corner washes. Those used to be a fixed night skin, so
+// Carillon opened at 9am looking like 11pm. They now ride the same
+// clock the palette does.
+//
+// Two families, not a smooth ramp between opposites: a *paper* day and
+// the *night instrument*. Hues move freely *within* a family, but the
+// crossing between them is a switch, not a dissolve. Blending paper
+// toward night necessarily passes through a mid-tone that reads as mud
+// under either text color — the daydream palette above never has to
+// solve this because none of its stops are dark. So a flip segment
+// snaps at its midpoint (about 06:00 and 21:15) and the CSS transition
+// on .planner-root softens the change. An instrument's lamp coming on
+// at dusk is a switch anyway.
+//
+// The paper cards inside the instrument (--car-paper / --car-ink /
+// --car-pink-dark) are deliberately NOT in this cycle. A field sheet is
+// paper at every hour; only the desk it lies on changes.
+
+type ChromeStop = {
+	hour: number;
+	// interpolated (hex)
+	ground: string; // --car-night   · the ground the instrument sits on
+	groundTop: string; // --car-ground-top    · shell gradient, first stop
+	groundBottom: string; // --car-ground-bottom · shell gradient, last stop
+	panel: string; // --car-panel   · elevated block on the ground
+	fg: string; // --car-cream   · primary text on the ground
+	muted: string; // --car-mist    · secondary text on the ground
+	accent: string; // --car-pink    · accent on the ground
+	surge: string; // --car-surge     · the surge accent on the ground
+	surgeInk: string; // --car-surge-ink · text on a surge-filled control
+	// snapped (alpha-bearing)
+	line: string; // --car-line    · hairline on the ground
+	wash: string; // --car-wash    · hover/active fill on the ground
+	inset: string; // --car-inset  · recessed field (inputs) on the ground
+	grid: string; // --car-grid    · graph-paper rule
+	shadow: string; // --car-shadow  · what a paper card casts
+	glowWarm: string; // --car-glow-warm · pink corner wash
+	glowCool: string; // --car-glow-cool · sage corner wash
+};
+
+const NIGHT_CHROME = {
+	ground: '#17101f',
+	groundTop: '#1d1428',
+	groundBottom: '#140d1d',
+	panel: '#24182f',
+	fg: '#fff6da',
+	muted: '#b9adc0',
+	accent: '#f09ab8',
+	surge: '#ff895a',
+	surgeInk: '#20111c',
+	line: 'rgba(255,246,218,0.14)',
+	wash: 'rgba(255,246,218,0.065)',
+	inset: 'rgba(8,4,14,0.22)',
+	grid: 'rgba(255,246,218,0.025)',
+	shadow: 'rgba(17,7,27,0.24)',
+	glowWarm: 'rgba(240,154,184,0.13)',
+	glowCool: 'rgba(113,207,184,0.08)'
+} as const;
+
+// Shared by every daylight stop: plum ink on paper, deepened Carillon
+// pink. Only the ground's hue moves across the day, echoing the --p-*
+// anchors (blush dawn, mint morning, sky noon, aqua afternoon,
+// lavender evening) so both systems agree about what hour it is.
+const DAY_INK = {
+	panel: '#fffaf4',
+	fg: '#33253c',
+	muted: '#6b6274',
+	accent: '#b8446e',
+	surge: '#b4471c',
+	surgeInk: '#fff6ea',
+	line: 'rgba(51,37,60,0.14)',
+	wash: 'rgba(51,37,60,0.055)',
+	inset: 'rgba(255,255,255,0.55)',
+	grid: 'rgba(51,37,60,0.045)',
+	shadow: 'rgba(70,48,74,0.16)',
+	glowWarm: 'rgba(240,154,184,0.18)',
+	glowCool: 'rgba(113,207,184,0.10)'
+} as const;
+
+const CHROME_STOPS: ChromeStop[] = [
+	{ hour: 0, ...NIGHT_CHROME },
+	// 05:30 — still the night instrument
+	{ hour: 5.5, ...NIGHT_CHROME },
+	// 06:30 — sunrise: blush paper
+	{ hour: 6.5, ground: '#efdfe6', groundTop: '#f8e9ec', groundBottom: '#e7d8e2', ...DAY_INK },
+	// 09:00 — bright morning: mint-tinted paper
+	{ hour: 9, ground: '#e3e9e3', groundTop: '#eef3ec', groundBottom: '#dce4de', ...DAY_INK },
+	// 12:00 — noon: pale sky
+	{ hour: 12, ground: '#e1e8ee', groundTop: '#eef4f8', groundBottom: '#dae3ea', ...DAY_INK },
+	// 15:00 — afternoon: pale aqua
+	{ hour: 15, ground: '#e0eaec', groundTop: '#edf6f7', groundBottom: '#d9e5e8', ...DAY_INK },
+	// 18:00 — evening: pale lavender
+	{ hour: 18, ground: '#e6e1ef', groundTop: '#f2eef9', groundBottom: '#ded8ea', ...DAY_INK },
+	// 20:30 — dusk: deeper lilac, still light
+	{ hour: 20.5, ground: '#d6cfe1', groundTop: '#e2dbeb', groundBottom: '#cec6dc', ...DAY_INK },
+	// 22:00 — the instrument returns
+	{ hour: 22, ...NIGHT_CHROME },
+	{ hour: 24, ...NIGHT_CHROME }
+];
+
+function isDarkChrome(stop: ChromeStop): boolean {
+	return lumOfHex(stop.ground) < 0.3;
+}
+
+export function getChromeForTime(date: Date): Record<string, string> {
+	const hour = date.getHours() + date.getMinutes() / 60;
+
+	let i = CHROME_STOPS.length - 2;
+	for (let j = 0; j < CHROME_STOPS.length - 1; j++) {
+		if (hour >= CHROME_STOPS[j].hour && hour < CHROME_STOPS[j + 1].hour) {
+			i = j;
+			break;
+		}
+	}
+
+	const a = CHROME_STOPS[i];
+	const b = CHROME_STOPS[i + 1];
+	const range = b.hour - a.hour;
+	const t = range === 0 ? 0 : (hour - a.hour) / range;
+
+	// Which family this minute belongs to. Everything that can't be
+	// interpolated — the alpha-bearing tokens, the text colors that have
+	// to stay readable — comes from it wholesale.
+	const owner = t < 0.5 ? a : b;
+	// Across a flip the ground comes from the owner too, so it is always
+	// either paper or night and never the mid-tone in between.
+	const flip = isDarkChrome(a) !== isDarkChrome(b);
+
+	return {
+		'--car-night': flip ? owner.ground : lerpColor(a.ground, b.ground, t),
+		'--car-ground-top': flip ? owner.groundTop : lerpColor(a.groundTop, b.groundTop, t),
+		'--car-ground-bottom': flip
+			? owner.groundBottom
+			: lerpColor(a.groundBottom, b.groundBottom, t),
+		'--car-panel': owner.panel,
+		'--car-cream': owner.fg,
+		'--car-mist': owner.muted,
+		'--car-pink': owner.accent,
+		'--car-surge': owner.surge,
+		'--car-surge-ink': owner.surgeInk,
+		'--car-line': owner.line,
+		'--car-wash': owner.wash,
+		'--car-inset': owner.inset,
+		'--car-grid': owner.grid,
+		'--car-shadow': owner.shadow,
+		'--car-glow-warm': owner.glowWarm,
+		'--car-glow-cool': owner.glowCool
+	};
+}
+
+export function getNamedChrome(mode: PaletteModeName): Record<string, string> {
+	return getChromeForTime(dateForMode(mode));
 }
 
 // Returns which named mode label best describes the current hour

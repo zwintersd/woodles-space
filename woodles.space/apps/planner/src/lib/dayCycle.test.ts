@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { getPaletteForTime, currentModeLabel, getNamedPalette } from './dayCycle';
+import {
+	getPaletteForTime,
+	currentModeLabel,
+	getNamedPalette,
+	getChromeForTime,
+	getNamedChrome
+} from './dayCycle';
 
 describe('getPaletteForTime', () => {
 	it('returns all token keys', () => {
@@ -107,5 +113,108 @@ describe('palette contrast across the day', () => {
 	it('muted ≥ 3:1 against bg at the worst transition moment (19:30)', () => {
 		const p = getPaletteForTime(new Date(2024, 5, 12, 19, 30));
 		expect(contrast(p['--p-muted'], p['--p-bg'])).toBeGreaterThanOrEqual(3);
+	});
+});
+
+// ── Carillon chrome ───────────────────────────────────────────────
+// The instrument chrome used to be a fixed night skin, so Carillon
+// opened at 9am looking like 11pm. It now rides the same clock. The
+// checks below are the ones that keep it honest: it must actually be
+// light during waking hours, dark at night, and readable at every
+// minute in between — including inside the two flip windows.
+
+describe('getChromeForTime', () => {
+	it('returns every chrome token', () => {
+		const c = getChromeForTime(new Date(2024, 5, 12, 9, 0));
+		expect(Object.keys(c).sort()).toEqual([
+			'--car-cream',
+			'--car-glow-cool',
+			'--car-glow-warm',
+			'--car-grid',
+			'--car-ground-bottom',
+			'--car-ground-top',
+			'--car-inset',
+			'--car-line',
+			'--car-mist',
+			'--car-night',
+			'--car-panel',
+			'--car-pink',
+			'--car-shadow',
+			'--car-surge',
+			'--car-surge-ink',
+			'--car-wash'
+		]);
+	});
+
+	// The bug this cycle exists to fix: a bright ground during the hours
+	// somebody is actually awake and looking at it.
+	const daylight: number[] = [7, 8, 9, 11, 13, 15, 17, 19];
+	for (const hour of daylight) {
+		it(`ground is light at ${String(hour).padStart(2, '0')}:00`, () => {
+			const c = getChromeForTime(new Date(2024, 5, 12, hour, 0));
+			expect(lum(parseColor(c['--car-night']))).toBeGreaterThan(0.5);
+		});
+	}
+
+	const nighttime: number[] = [0, 2, 4, 22, 23];
+	for (const hour of nighttime) {
+		it(`ground is the night instrument at ${String(hour).padStart(2, '0')}:00`, () => {
+			const c = getChromeForTime(new Date(2024, 5, 12, hour, 0));
+			expect(lum(parseColor(c['--car-night']))).toBeLessThan(0.1);
+		});
+	}
+
+	it('holds the paper cards outside the cycle', () => {
+		// --car-paper / --car-ink / --car-pink-dark are static tokens: a
+		// field sheet is paper at every hour. Nothing here may emit them.
+		const c = getChromeForTime(new Date(2024, 5, 12, 9, 0));
+		expect(c['--car-paper']).toBeUndefined();
+		expect(c['--car-ink']).toBeUndefined();
+	});
+});
+
+describe('getNamedChrome', () => {
+	it('returns a chrome for every named mode', () => {
+		const modes = ['early-light', 'full-day', 'late-afternoon', 'evening', 'dusk', 'night'] as const;
+		for (const m of modes) {
+			expect(getNamedChrome(m)['--car-night']).toBeDefined();
+		}
+	});
+
+	it('gives night the dark ground and full-day the light one', () => {
+		expect(lum(parseColor(getNamedChrome('night')['--car-night']))).toBeLessThan(0.1);
+		expect(lum(parseColor(getNamedChrome('full-day')['--car-night']))).toBeGreaterThan(0.5);
+	});
+});
+
+describe('chrome contrast across the day', () => {
+	const samples: Array<[number, number]> = [];
+	for (let h = 0; h < 24; h++) {
+		for (let m = 0; m < 60; m += 15) samples.push([h, m]);
+	}
+
+	for (const [h, m] of samples) {
+		const at = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+		it(`chrome text stays readable at ${at}`, () => {
+			const c = getChromeForTime(new Date(2024, 5, 12, h, m));
+			const ground = c['--car-night'];
+			// Body text on the ground: AA.
+			expect(contrast(c['--car-cream'], ground)).toBeGreaterThanOrEqual(4.5);
+			// Muted labels and the two accents are display-sized: AA-Large.
+			expect(contrast(c['--car-mist'], ground)).toBeGreaterThanOrEqual(3);
+			expect(contrast(c['--car-pink'], ground)).toBeGreaterThanOrEqual(3);
+			expect(contrast(c['--car-surge'], ground)).toBeGreaterThanOrEqual(3);
+			// A surge-filled control has to keep its own label legible.
+			expect(contrast(c['--car-surge-ink'], c['--car-surge'])).toBeGreaterThanOrEqual(4.5);
+		});
+	}
+
+	it('never lands on a mid-tone ground', () => {
+		// The flip windows are the dangerous part: a ground stuck halfway
+		// between paper and night reads as mud whichever text it carries.
+		for (const [h, m] of samples) {
+			const l = lum(parseColor(getChromeForTime(new Date(2024, 5, 12, h, m))['--car-night']));
+			expect(l < 0.16 || l > 0.42).toBe(true);
+		}
 	});
 });
