@@ -1,7 +1,12 @@
 <script lang="ts">
 	import '$lib/style/tokens.css';
 	import { store } from '$lib/store.svelte';
-	import { getPaletteForTime, getNamedPalette } from '$lib/dayCycle';
+	import {
+		getPaletteForTime,
+		getNamedPalette,
+		getChromeForTime,
+		getNamedChrome
+	} from '$lib/dayCycle';
 	import type { PaletteModeName } from '$lib/dayCycle';
 	import { initSync } from '$lib/sync.svelte';
 	import { importNotebookTasksOnce } from '$lib/notebookTasks';
@@ -26,11 +31,17 @@
 
 	$effect(() => {
 		if (!root) return;
-		const palette = store.settings.fixedPaletteMode
-			? getNamedPalette(store.settings.fixedPaletteMode as PaletteModeName)
-			: getPaletteForTime(store.now);
-		for (const [k, v] of Object.entries(palette)) {
+		const fixed = store.settings.fixedPaletteMode as PaletteModeName | null;
+		const palette = fixed ? getNamedPalette(fixed) : getPaletteForTime(store.now);
+		const chrome = fixed ? getNamedChrome(fixed) : getChromeForTime(store.now);
+		for (const [k, v] of Object.entries({ ...palette, ...chrome })) {
 			root.style.setProperty(k, v);
+		}
+		// The document element carries the chrome too, so the page behind
+		// the app (overscroll, the area below a short view) matches the
+		// hour instead of staying stuck at midnight.
+		for (const [k, v] of Object.entries(chrome)) {
+			document.documentElement.style.setProperty(k, v);
 		}
 	});
 </script>
@@ -95,7 +106,7 @@
 	}
 
 	:global(body) {
-		background: #17101f;
+		background: var(--car-ground-bottom, #17101f);
 		overflow-x: hidden;
 	}
 
@@ -132,6 +143,9 @@
 		min-height: 100vh;
 		background: var(--car-night);
 		color: var(--car-cream);
+		transition:
+			background 900ms linear,
+			color 900ms linear;
 		font-family: var(--car-body);
 		font-weight: 400;
 		font-size: 1rem;

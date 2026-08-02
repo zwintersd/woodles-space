@@ -379,7 +379,7 @@
 		border-radius: 1rem;
 		background: var(--car-paper);
 		color: var(--car-ink);
-		box-shadow: 0 1.2rem 3rem rgba(17, 7, 27, 0.2);
+		box-shadow: 0 1.2rem 3rem var(--car-shadow);
 	}
 
 	.edition-sheet {

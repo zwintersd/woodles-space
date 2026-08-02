@@ -483,7 +483,7 @@
 	.pile-pill:hover,
 	.print-action:hover {
 		border-color: var(--car-pink);
-		background: rgba(255, 246, 218, 0.06);
+		background: var(--car-wash);
 		transform: translateY(-1px);
 	}
 
@@ -502,7 +502,7 @@
 			linear-gradient(90deg, rgba(81, 44, 71, 0.025) 1px, transparent 1px),
 			var(--car-paper);
 		background-size: 18px 18px;
-		box-shadow: 0 1.25rem 3.5rem rgba(17, 7, 27, 0.24);
+		box-shadow: 0 1.25rem 3.5rem var(--car-shadow);
 		color: var(--car-ink);
 	}
 

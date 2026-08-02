@@ -14,19 +14,41 @@
 	--p-border:      rgba(37,53,74,0.12);
 	--p-highlight:   #ffd84f;
 
-	/* ── Carillon instrument palette ─────────────────────────────── */
-	--car-night:      #17101f;
-	--car-cream:      #fff6da;
+	/* ── Carillon chrome ─────────────────────────────────────────────
+	   The instrument's own surface: the ground it sits on, whatever is
+	   drawn straight onto that ground, and the washes behind it. These
+	   are day-cycled by dayCycle.ts (getChromeForTime) on every clock
+	   tick — paper by day, the night instrument after ~21:30. The names
+	   below describe the night anchor; the *role* is what matters, so
+	   --car-cream is "primary text on the ground" and is plum ink at
+	   9am. Fallback values here match that night anchor. */
+	--car-night:         #17101f;  /* the ground                       */
+	--car-ground-top:    #1d1428;  /* shell gradient, first stop       */
+	--car-ground-bottom: #140d1d;  /* shell gradient, last stop        */
+	--car-panel:         #24182f;  /* elevated block on the ground     */
+	--car-cream:         #fff6da;  /* primary text on the ground       */
+	--car-mist:          #b9adc0;  /* secondary text on the ground     */
+	--car-pink:          #f09ab8;  /* accent on the ground             */
+	--car-surge:         #ff895a;  /* surge accent on the ground       */
+	--car-surge-ink:     #20111c;  /* text on a surge-filled control   */
+	--car-line:          rgba(255, 246, 218, 0.14);  /* hairline       */
+	--car-wash:          rgba(255, 246, 218, 0.065); /* hover fill     */
+	--car-inset:         rgba(8, 4, 14, 0.22);       /* recessed field */
+	--car-grid:          rgba(255, 246, 218, 0.025); /* graph rule     */
+	--car-shadow:        rgba(17, 7, 27, 0.24);      /* card shadow    */
+	--car-glow-warm:     rgba(240, 154, 184, 0.13);  /* corner wash    */
+	--car-glow-cool:     rgba(113, 207, 184, 0.08);  /* corner wash    */
+
+	/* ── Carillon paper ──────────────────────────────────────────────
+	   Field sheets, editions, ledgers. Deliberately outside the cycle:
+	   paper is paper at every hour, only the desk beneath it changes. */
 	--car-paper:      #fff9e9;
 	--car-ink:        #403247;
 	--car-ink-soft:   #746878;
-	--car-mist:       #b9adc0;
-	--car-pink:       #f09ab8;
 	--car-pink-dark:  #8d3153;
 	--car-pink-wash:  rgba(240, 154, 184, 0.18);
 	--car-sage:       #71cfb8;
-	--car-surge:      #ff895a;
-	--car-line:       rgba(255, 246, 218, 0.14);
+	--car-brass:      #eaa15a;  /* Echo's bell */
 
 	/* ── typography (inherits from shared/fonts.css) ──────────────── */
 	--pl-font-display: var(--font-display, 'Cormorant Garamond', Georgia, serif);

@@ -303,7 +303,7 @@
 <style>
 	.day-piles {
 		--p-bg: var(--car-night);
-		--p-surface: #24182f;
+		--p-surface: var(--car-panel);
 		--p-text: var(--car-cream);
 		--p-muted: var(--car-mist);
 		--p-accent: var(--car-pink);

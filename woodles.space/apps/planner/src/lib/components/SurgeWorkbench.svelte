@@ -268,7 +268,7 @@
 		border-radius: 50%;
 		box-shadow:
 			inset 0 0 0 0.35rem var(--car-night),
-			inset 0 0 0 0.42rem rgba(255, 137, 90, 0.45);
+			inset 0 0 0 0.42rem color-mix(in srgb, var(--car-surge) 45%, transparent);
 		color: var(--car-surge);
 		text-align: center;
 		transform: rotate(5deg);
@@ -313,8 +313,8 @@
 		display: grid;
 		gap: 1rem;
 		background:
-			linear-gradient(135deg, rgba(255, 137, 90, 0.08), transparent 40%),
-			rgba(255, 246, 218, 0.055);
+			linear-gradient(135deg, color-mix(in srgb, var(--car-surge) 9%, transparent), transparent 40%),
+			var(--car-wash);
 		padding: 1.15rem;
 	}
 
@@ -344,9 +344,9 @@
 	.capture-card input,
 	.capture-card textarea {
 		width: 100%;
-		border: 1px solid rgba(255, 246, 218, 0.14);
+		border: 1px solid var(--car-line);
 		border-radius: 0.75rem;
-		background: rgba(6, 3, 11, 0.23);
+		background: var(--car-inset);
 		padding: 0.8rem;
 		color: var(--car-cream);
 		font-family: var(--car-body);
@@ -377,7 +377,7 @@
 		border-radius: 999px;
 		background: var(--car-surge);
 		padding: 0.58rem 0.9rem;
-		color: #20111c;
+		color: var(--car-surge-ink);
 		font-family: var(--car-mono);
 		font-size: 0.6rem;
 	}
