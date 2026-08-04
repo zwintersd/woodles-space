@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	INTERVAL_KIND_OPTIONS,
 	buildDayIntervals,
 	intervalKey,
 	routineScaffoldLevel
@@ -137,5 +138,28 @@ describe('prompt-fading thresholds', () => {
 
 		expect(routineScaffoldLevel('evening', practices)).toBe('faded');
 		expect(routineScaffoldLevel('missing', practices)).toBe('full');
+	});
+});
+
+// Echo draws one feature per interval kind. The mapping lives on the
+// options list so the compiler catches a kind with no feature, and this
+// holds the rest: every kind reaches a distinct, non-empty part.
+describe('interval kinds and Echo', () => {
+	it('gives every kind a part of Echo to grow', () => {
+		for (const option of INTERVAL_KIND_OPTIONS) {
+			expect(option.echoPart.trim().length).toBeGreaterThan(0);
+		}
+	});
+
+	it('never sends two kinds to the same part', () => {
+		const parts = INTERVAL_KIND_OPTIONS.map((option) => option.echoPart);
+		expect(new Set(parts).size).toBe(parts.length);
+	});
+
+	it('keeps a stat name and a glyph for every kind', () => {
+		for (const option of INTERVAL_KIND_OPTIONS) {
+			expect(option.stat.trim().length).toBeGreaterThan(0);
+			expect(option.glyph.trim().length).toBeGreaterThan(0);
+		}
 	});
 });
