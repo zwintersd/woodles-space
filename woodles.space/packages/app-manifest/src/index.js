@@ -213,6 +213,19 @@ export const appManifest = Object.freeze([
 		entryFile: 'index.html',
 		packageName: 'thinking-about',
 		landing: tile('thinking', 8, 'tend', 'a landing spot for what you are reading, playing, and watching', 'var(--lapis)', 'var(--aqua)', '140deg')
+	},
+	{
+		id: 'bloomforge',
+		name: 'Bloomforge',
+		publicPath: '/bloomforge',
+		aliases: [],
+		kind: 'sveltekit',
+		maturity: 'growing',
+		sourceDir: 'apps/bloomforge',
+		outputDir: 'apps/bloomforge/dist',
+		entryFile: 'index.html',
+		packageName: 'bloomforge',
+		landing: tile('bloomforge', 15, 'play', 'a studio for making incremental games: wire up an economy, then watch it run', 'var(--lavender)', 'var(--aqua)', '150deg')
 	}
 ]);
 

@@ -70,6 +70,7 @@ woodles.space/
 ├── packages/
 │   ├── app-manifest/        @woodles/app-manifest — canonical app and route inventory
 │   ├── handoff/             @woodles/handoff — passing a thought between apps
+│   ├── incremental-core/    @woodles/incremental-core — GameDef schema, validator, sim engine
 │   ├── persistence/         @woodles/persistence — versioned local storage mechanics
 │   ├── sync/                @woodles/sync — the sync client
 │   ├── spellcraft/          @woodles/spellcraft — the authoring brief + output contracts
@@ -89,7 +90,8 @@ woodles.space/
     ├── notebook/            SvelteKit · the front door — one stream of captures
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
     ├── spores/              SvelteKit · the knowledge base — linked entries, gathered into spellbooks
-    └── thinking-about/      SvelteKit · a board for what's being read, played, and watched
+    ├── thinking-about/      SvelteKit · a board for what's being read, played, and watched
+    └── bloomforge/          SvelteKit · a studio for making incremental games
 ```
 
 `animations/` is the Python/Manim authoring side of Hygge's motion workshop. it
@@ -105,7 +107,7 @@ the repository or silently promoting an experiment into a game.
 ## the app manifest
 
 `packages/app-manifest/src/index.js` is the canonical deployable-app inventory.
-It owns the 16 app ids, names, public paths and aliases, app shape, source and
+It owns the 17 app ids, names, public paths and aliases, app shape, source and
 output locations, maturity, and landing visibility. It also owns the landing
 tile order/copy, **band**, default pins, featured fallback, and Marginalia's
 Reading Room sub-surface. A band is the *moment* a tile is for rather than the
@@ -140,7 +142,7 @@ and its bloom post-processing addons from a CDN through a `<script
 type="importmap">`, still with no build step.
 
 **SvelteKit apps** — `write`, `marginalia`, `planner`, `notebook`, `bestiary`,
-`spores`, `thinking-about` — use Svelte 5 runes, Vite 7, and `@sveltejs/adapter-static`.
+`spores`, `thinking-about`, `bloomforge` — use Svelte 5 runes, Vite 7, and `@sveltejs/adapter-static`.
 each builds to `apps/<name>/dist/` and consumes `shared/` through the `@shared`
 Vite alias (`../../shared`). there is no SSR; every app ships as a static bundle.
 
@@ -298,6 +300,56 @@ from `Intake.svelte`'s own file-select handlers, so neither loads until a
 visitor actually opens that one feature. confirmed by measuring real
 network transfer against a `vite preview` build, not just `dist/`'s total
 size.
+
+## bloomforge, the incremental studio
+
+`bloomforge` is a tool for *making* incremental games, not an incremental game.
+It is the first app here built on a package rather than beside one, and the
+split is the point:
+[`packages/incremental-core`](./packages/incremental-core/README.md) owns the
+`GameDef` schema, the validator and a deterministic simulation engine, with zero
+runtime dependencies and no DOM. The editor edits a `GameDef`, the engine
+simulates one, and a player runtime (not built) would run one. None of the three
+imports another except through the core's types.
+
+**The schema is the product.** Two decisions in it are load-bearing. Curves are
+a structured union — `geometric`, `linear`, `polynomial`, `steps` — rather than
+an expression language, because `base × growth^level` covers most real
+incrementals and a parser is a rabbit hole with a foot-gun at the end. Every
+kind is normalized so **level 1 evaluates to exactly the base**, which is what
+lets the inspector plot any two curves against each other and lets `baseRate`
+mean "output at level 1" whichever kind is chosen. Conditions are structured
+predicates for the same reason: a predicate you can render as a form beats one
+you have to parse, and the condition editor is the payoff.
+
+**The engine is deterministic.** Fixed 100ms timestep, no wall-clock, no
+`Math.random` — same def + same policy + same seed produces an identical run.
+That is the whole basis for trusting a balance comparison, and it is why
+`simulate` refuses a def carrying validation errors rather than producing
+numbers that look fine and mean nothing. Ten hours of game time runs in ~150ms
+against a 500ms budget; getting there needed rates and prices cached behind one
+dirty flag (they can only change on a purchase or a reset) and integer tick
+counting, because accumulating 0.1 three hundred times loses a whole tick.
+
+**Edges are derived, never stored.** `deriveEdges(def)` computes the canvas
+graph from the def every time, so there is no second copy of "what connects to
+what" that could drift. Drawing an edge is therefore a *gesture that edits the
+def* — `connectionIntent` says what a given drag would mean, and a drag that
+wouldn't mean anything is refused with a reason instead of leaving a dangling
+line.
+
+The editor is Svelte Flow (`@xyflow/svelte`) for pan/zoom/drag, a runes store
+holding `{ def, selection }` with whole-def snapshot undo (cheap and correct at
+this data size), and a bottom dock: live Playtest stepping `createSim` on
+animation frames at 1×/10×/100× game time, a Balance tab that fast-forwards
+Idle against Greedy in a Web Worker and reports time-to-milestone, plus Log and
+Notes. Persistence is `localStorage` through `@woodles/persistence` with JSON
+export/import; `@woodles/sync` is deliberately not wired in yet.
+
+Out of scope for now, and named here so nobody goes looking: the player runtime
+that turns a `GameDef` into a playable build, and the art/audio/localization
+resource panels the mockup showed. The schema leaves room (`Currency.symbol` as
+a sprite reference) but nothing is built.
 
 ## the local-first persistence layer
 
@@ -757,15 +809,15 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1108 tests total: 16 in `api/` (its own
+1429 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1092 across thirteen pnpm
-packages — `write` 72, `marginalia` 249, `planner` 298, `notebook` 28,
-`spores` 140, `bestiary` 160, `packages/sync` 5,
+instead of the recursive `pnpm -r test`), plus 1413 across fifteen pnpm
+packages — `write` 72, `marginalia` 269, `planner` 431, `notebook` 28,
+`spores` 140, `bestiary` 162, `bloomforge` 37, `packages/sync` 9,
 `packages/persistence` 6, `packages/app-manifest` 11,
 `packages/handoff` 15, `packages/text` 23, `packages/spellcraft` 16,
-and `thinking-about` 69.
+`packages/incremental-core` 125, and `thinking-about` 69.
 keep this inventory current when a suite changes; the root command is the
 release contract, not the prose count.
 
@@ -817,8 +869,8 @@ working tree.
 
 ## svelte-check
 
-All seven SvelteKit apps currently pass with zero errors and zero warnings.
-`pnpm -r check` runs all seven in turn. it stops at the first app that fails,
+All eight SvelteKit apps currently pass with zero errors and zero warnings.
+`pnpm -r check` runs all eight in turn. it stops at the first app that fails,
 so when diagnosing a new break, run the app directly to see past it.
 
 ## continuous integration
@@ -835,9 +887,9 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (1108 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (1429 tests)
 pnpm check              svelte-check in every app
-pnpm build              build the seven SvelteKit apps
+pnpm build              build the eight SvelteKit apps
 ```
 
 both `test` and `check` generate `.svelte-kit/` themselves on a fresh clone, so
