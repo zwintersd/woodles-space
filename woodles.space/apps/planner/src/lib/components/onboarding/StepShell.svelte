@@ -57,10 +57,12 @@
 
 	<footer class="step-footer">
 		<div class="step-exit-actions">
-			{#if stage > 1}
+			{#if onboarding.canGoBack}
 				<button class="step-back" onclick={() => onboarding.back()} title="back">← back</button>
 			{/if}
-			<button class="step-later" onclick={() => onboarding.finishLater()}>finish later</button>
+			<button class="step-later" onclick={() => onboarding.finishLater()}>
+				{onboarding.isRefreshing ? 'done for now' : 'finish later'}
+			</button>
 		</div>
 		<button class="step-cta" onclick={onAdvance} disabled={!canAdvance}>{cta}</button>
 	</footer>

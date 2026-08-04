@@ -19,6 +19,14 @@ function isOnboardingStep(value: unknown): value is OnboardingStep {
 
 export class OnboardingStore {
 	stage: WizardStage;
+	// 'refresh' is a second, independent entry point into the same six step
+	// components — reached from the running app rather than from welcome,
+	// and never touching onboardingComplete/onboardingStep. It exists so
+	// changing one thing (say, the week rhythm) doesn't require "resetting
+	// setup" and doesn't risk stranding the resume-checkpoint the *real*
+	// unfinished-wizard case relies on.
+	mode: 'wizard' | 'refresh' = $state('wizard');
+	refreshSteps: OnboardingStep[] = $state([]);
 
 	constructor(private readonly planner: PlannerStore = store) {
 		this.stage = $state<WizardStage>(this.savedStep ?? 'welcome');
@@ -29,12 +37,68 @@ export class OnboardingStore {
 		return isOnboardingStep(step) ? step : null;
 	}
 
+	get isRefreshing(): boolean {
+		return this.mode === 'refresh';
+	}
+
+	get canGoBack(): boolean {
+		if (this.mode === 'refresh') {
+			return this.refreshSteps.indexOf(this.stage as OnboardingStep) > 0;
+		}
+		return typeof this.stage === 'number' && this.stage > 1;
+	}
+
+	/**
+	 * Open one or more sections for editing, in the order given, without
+	 * leaving the running app or touching onboarding progress. Steps reuse
+	 * their existing prefill-from-current-settings behavior, so nothing here
+	 * needs its own "load current values" path.
+	 */
+	startRefresh(steps: OnboardingStep[]): void {
+		if (steps.length === 0) return;
+		this.mode = 'refresh';
+		this.refreshSteps = steps;
+		this.stage = steps[0];
+	}
+
+	closeRefresh(): void {
+		this.mode = 'wizard';
+		this.refreshSteps = [];
+		this.stage = this.savedStep ?? 'welcome';
+	}
+
 	advance(): void {
+		if (this.mode === 'refresh') {
+			this.advanceRefresh();
+			return;
+		}
 		this.setStage(this.nextOf(this.stage));
 	}
 
 	back(): void {
+		if (this.mode === 'refresh') {
+			this.backRefresh();
+			return;
+		}
 		this.setStage(this.prevOf(this.stage));
+	}
+
+	private advanceRefresh(): void {
+		const idx = this.refreshSteps.indexOf(this.stage as OnboardingStep);
+		if (idx === -1 || idx === this.refreshSteps.length - 1) {
+			this.closeRefresh();
+			return;
+		}
+		this.stage = this.refreshSteps[idx + 1];
+	}
+
+	private backRefresh(): void {
+		const idx = this.refreshSteps.indexOf(this.stage as OnboardingStep);
+		if (idx <= 0) {
+			this.closeRefresh();
+			return;
+		}
+		this.stage = this.refreshSteps[idx - 1];
 	}
 
 	goto(stage: WizardStage): void {
@@ -61,6 +125,10 @@ export class OnboardingStore {
 	}
 
 	finishLater(): void {
+		if (this.mode === 'refresh') {
+			this.closeRefresh();
+			return;
+		}
 		const step = isOnboardingStep(this.stage) ? this.stage : this.savedStep;
 		this.planner.updateSettings({ onboardingComplete: true, onboardingStep: step ?? undefined });
 		this.stage = 'welcome';

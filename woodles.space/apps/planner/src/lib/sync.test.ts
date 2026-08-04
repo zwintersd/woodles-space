@@ -173,4 +173,82 @@ describe('mergePlannerBlobs', () => {
 		expect(merged.days['2026-07-30']?.dayShapeId).toBe('starter-writing');
 		expect(merged.surgeDrafts?.[0]?.status).toBe('discarded');
 	});
+
+	it('unions sleep logs from two devices and keeps the newer correction', () => {
+		const local = blob({
+			sleepLogs: [
+				{
+					id: 'sleep-2026-07-29',
+					date: '2026-07-29',
+					quality: 'okay',
+					recordedAt: '2026-07-29T07:00:00.000Z',
+					updatedAt: '2026-07-29T07:00:00.000Z'
+				},
+				{
+					id: 'sleep-2026-07-30',
+					date: '2026-07-30',
+					quality: 'rough',
+					recordedAt: '2026-07-30T07:00:00.000Z',
+					updatedAt: '2026-07-30T07:00:00.000Z'
+				}
+			]
+		});
+		const remote = blob({
+			sleepLogs: [
+				{
+					id: 'sleep-2026-07-30',
+					date: '2026-07-30',
+					quality: 'good',
+					recordedAt: '2026-07-30T07:00:00.000Z',
+					updatedAt: '2026-07-30T09:00:00.000Z'
+				}
+			]
+		});
+
+		const merged = mergePlannerBlobs(local, remote);
+
+		expect(merged.sleepLogs?.map((log) => log.id).sort()).toEqual([
+			'sleep-2026-07-29',
+			'sleep-2026-07-30'
+		]);
+		expect(merged.sleepLogs?.find((log) => log.id === 'sleep-2026-07-30')?.quality).toBe('good');
+	});
+
+	it('unions ongoing signals and keeps the newer end-date correction', () => {
+		const local = blob({
+			signals: [
+				{
+					id: 'signal-1',
+					kind: 'illness',
+					date: '2026-07-28',
+					createdAt: '2026-07-28T08:00:00.000Z',
+					updatedAt: '2026-07-28T08:00:00.000Z'
+				}
+			]
+		});
+		const remote = blob({
+			signals: [
+				{
+					id: 'signal-1',
+					kind: 'illness',
+					date: '2026-07-28',
+					endDate: '2026-07-30',
+					createdAt: '2026-07-28T08:00:00.000Z',
+					updatedAt: '2026-07-30T18:00:00.000Z'
+				},
+				{
+					id: 'signal-2',
+					kind: 'payday',
+					date: '2026-08-15',
+					createdAt: '2026-07-30T08:00:00.000Z',
+					updatedAt: '2026-07-30T08:00:00.000Z'
+				}
+			]
+		});
+
+		const merged = mergePlannerBlobs(local, remote);
+
+		expect(merged.signals?.map((entry) => entry.id).sort()).toEqual(['signal-1', 'signal-2']);
+		expect(merged.signals?.find((entry) => entry.id === 'signal-1')?.endDate).toBe('2026-07-30');
+	});
 });

@@ -221,6 +221,46 @@ export type SporeEvent = {
 	createdAt: string;
 };
 
+// ── capacity: a morning read, and the slower signals beside it ────
+
+export type SleepQuality = 'rough' | 'okay' | 'good';
+
+/** One per date — id is deterministic (`sleep-<date>`) so a re-log replaces, never doubles. */
+export type SleepLog = {
+	id: string;
+	date: string; // YYYY-MM-DD
+	quality: SleepQuality;
+	recordedAt: string;
+	updatedAt?: string;
+};
+
+/**
+ * The three kinds Carillon knows how to read a phase out of — cycle day,
+ * days to payday, an illness span — plus `custom` for anything else worth
+ * remembering that doesn't need a formula, only a name and a date. Flexible
+ * tracking without a schema change per new thing worth watching.
+ */
+export type SignalKind = 'cycle' | 'payday' | 'illness' | 'custom';
+
+/**
+ * One logged fact. `date` is the event itself: a period's start day, a known
+ * pay date, the day an illness (or anything custom) began. `endDate` is only
+ * meaningful for `illness`/`custom` spans — omitted while still ongoing.
+ * `cycle` and `payday` ignore it; a cycle's length is derived from the gap
+ * between consecutive starts, never logged directly.
+ */
+export type SignalEntry = {
+	id: string;
+	kind: SignalKind;
+	date: string; // YYYY-MM-DD
+	endDate?: string; // YYYY-MM-DD
+	/** Required for `custom`; the other three kinds carry a fixed display label. */
+	label?: string;
+	note?: string;
+	createdAt: string;
+	updatedAt?: string;
+};
+
 export type PlannerBlob = {
 	shapes: DayShape[];
 	weekPattern: WeekPattern;
@@ -237,4 +277,6 @@ export type PlannerBlob = {
 	routinePractices?: RoutinePractice[];
 	surgeDrafts?: SurgeDraft[];
 	spores?: SporeEvent[];
+	sleepLogs?: SleepLog[];
+	signals?: SignalEntry[];
 };

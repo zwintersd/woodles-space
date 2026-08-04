@@ -3,7 +3,7 @@
 // Edit this file to revise voice without touching component code.
 // Tone reference: "the day has not yet decided what it is".
 
-import type { Block, DayShape, Domain } from './types';
+import type { Block, DayShape, Domain, OnboardingStep } from './types';
 
 // ── 6-step screen copy ─────────────────────────────────────────────
 
@@ -105,6 +105,23 @@ export const BINDER_LABELS = {
 	shapes: 'day shapes',
 	weekPattern: 'week pattern'
 };
+
+// ── Refresh: revisiting a slice of setup without starting over ─────
+
+export type RefreshSection = {
+	step: OnboardingStep;
+	label: string;
+	hint: string;
+};
+
+export const REFRESH_SECTIONS: RefreshSection[] = [
+	{ step: 1, label: 'day anchors', hint: 'when the day starts and ends' },
+	{ step: 2, label: 'obligations', hint: 'fixed commitments already on the calendar' },
+	{ step: 3, label: 'rituals', hint: 'the small repeated things that are yours' },
+	{ step: 4, label: 'domains', hint: 'the territories your life moves through' },
+	{ step: 5, label: 'week rhythm', hint: 'which day pile fits which weekday' },
+	{ step: 6, label: 'voice', hint: 'how Carillon talks to you' }
+];
 
 // ── Tone presets ───────────────────────────────────────────────────
 

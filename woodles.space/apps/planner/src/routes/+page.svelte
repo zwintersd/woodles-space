@@ -9,6 +9,7 @@
 	import Binder from '$lib/components/Binder.svelte';
 	import TaskEditDrawer from '$lib/components/TaskEditDrawer.svelte';
 	import Onboarding from '$lib/components/onboarding/Onboarding.svelte';
+	import { onboarding } from '$lib/onboarding.store.svelte';
 
 	type CarillonSection = 'today' | 'piles' | 'routines' | 'surge' | 'review';
 
@@ -46,6 +47,11 @@
 
 		if (event.key === 'Escape' && store.binderTab !== null) {
 			store.closeBinder();
+			event.preventDefault();
+		}
+
+		if (event.key === 'Escape' && onboarding.isRefreshing) {
+			onboarding.closeRefresh();
 			event.preventDefault();
 		}
 	}
@@ -148,6 +154,12 @@
 
 		<Binder />
 		<TaskEditDrawer />
+
+		{#if onboarding.isRefreshing}
+			<div class="refresh-overlay" role="dialog" aria-modal="true" aria-label="refresh setup">
+				<Onboarding />
+			</div>
+		{/if}
 	</div>
 {/if}
 
@@ -467,6 +479,14 @@
 
 	:global(.binder-tabs) {
 		filter: saturate(0.72) brightness(0.92);
+	}
+
+	.refresh-overlay {
+		position: fixed;
+		inset: 0;
+		z-index: var(--pl-z-modal);
+		overflow-y: auto;
+		background: var(--p-bg);
 	}
 
 	@media (max-width: 1050px) {

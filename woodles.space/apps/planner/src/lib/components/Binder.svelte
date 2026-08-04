@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { store } from '$lib/store.svelte';
-	import { EMPTY_STATES, BINDER_LABELS } from '$lib/onboarding.copy';
+	import { EMPTY_STATES, BINDER_LABELS, REFRESH_SECTIONS } from '$lib/onboarding.copy';
+	import { onboarding } from '$lib/onboarding.store.svelte';
 	import YearScroll from './YearScroll.svelte';
 	import { syncState, connectAndHydrate, flushSync, disconnect } from '$lib/sync.svelte';
+	import type { OnboardingStep } from '$lib/types';
 
 	type BinderTabId =
 		| 'year-scroll'
@@ -21,6 +23,20 @@
 
 	let passphraseInput = $state('');
 	let confirmReset = $state(false);
+	let selectedRefreshSteps = $state<OnboardingStep[]>([]);
+
+	function toggleRefreshStep(step: OnboardingStep) {
+		selectedRefreshSteps = selectedRefreshSteps.includes(step)
+			? selectedRefreshSteps.filter((s) => s !== step)
+			: [...selectedRefreshSteps, step];
+	}
+
+	function openRefresh(steps: OnboardingStep[]) {
+		if (steps.length === 0) return;
+		onboarding.startRefresh([...steps].sort((a, b) => a - b));
+		selectedRefreshSteps = [];
+		store.closeBinder();
+	}
 
 	function handleResetSetup() {
 		if (!confirmReset) { confirmReset = true; return; }
@@ -196,15 +212,56 @@
 					<button class="sync-btn-ghost" onclick={() => disconnect()}>disconnect</button>
 				</div>
 			{/if}
-		<div class="reset-section">
+		<div class="refresh-section">
+				<p class="refresh-heading">refresh setup</p>
+				<p class="refresh-hint">
+					Revisit any part of setup without starting over — everything you've already
+					chosen stays put.
+				</p>
+				<div class="refresh-grid" role="group" aria-label="sections to revisit">
+					{#each REFRESH_SECTIONS as section (section.step)}
+						<button
+							type="button"
+							class="refresh-chip"
+							class:selected={selectedRefreshSteps.includes(section.step)}
+							aria-pressed={selectedRefreshSteps.includes(section.step)}
+							title={section.hint}
+							onclick={() => toggleRefreshStep(section.step)}
+						>
+							{section.label}
+						</button>
+					{/each}
+				</div>
+				<div class="refresh-actions">
+					<button
+						class="sync-btn-primary"
+						disabled={selectedRefreshSteps.length === 0}
+						onclick={() => openRefresh(selectedRefreshSteps)}
+					>
+						refresh selected
+					</button>
+					<button
+						class="sync-btn-ghost"
+						onclick={() => openRefresh(REFRESH_SECTIONS.map((s) => s.step))}
+					>
+						revisit everything
+					</button>
+				</div>
+			</div>
+
+			<div class="reset-section">
 				{#if confirmReset}
-					<p class="reset-confirm-text">restart the setup wizard?</p>
+					<p class="reset-confirm-text">
+						This walks the whole tutorial again from the welcome screen. Nothing
+						already saved is deleted — but you'll answer every question again, not
+						just the ones you pick.
+					</p>
 					<div class="reset-confirm-actions">
-						<button class="sync-btn-primary" onclick={handleResetSetup}>confirm</button>
+						<button class="sync-btn-primary" onclick={handleResetSetup}>start over completely</button>
 						<button class="sync-btn-ghost" onclick={() => confirmReset = false}>cancel</button>
 					</div>
 				{:else}
-					<button class="sync-btn-ghost reset-btn" onclick={handleResetSetup}>redo setup</button>
+					<button class="sync-btn-ghost reset-btn" onclick={handleResetSetup}>start setup over completely</button>
 				{/if}
 			</div>
 		</div>
@@ -579,6 +636,66 @@
 
 	.sync-btn-ghost:hover {
 		opacity: 0.9;
+	}
+
+	.refresh-section {
+		margin-top: 1.25rem;
+		padding-top: 1.25rem;
+		border-top: 1px solid var(--p-border);
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+	}
+
+	.refresh-heading {
+		font-family: var(--pl-font-display);
+		font-size: 0.95rem;
+		font-weight: 400;
+		color: var(--p-text);
+	}
+
+	.refresh-hint {
+		font-family: var(--pl-font-body);
+		font-size: 0.72rem;
+		line-height: 1.45;
+		color: var(--p-muted);
+		opacity: 0.85;
+	}
+
+	.refresh-grid {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+	}
+
+	.refresh-chip {
+		font-family: var(--pl-font-mono);
+		font-size: 0.6rem;
+		letter-spacing: 0.04em;
+		color: var(--p-muted);
+		border: 1px solid var(--p-border);
+		border-radius: var(--pl-radius-pill);
+		padding: 5px 10px;
+		transition: border-color var(--pl-transition-fast), color var(--pl-transition-fast), background var(--pl-transition-fast);
+	}
+
+	.refresh-chip:hover {
+		color: var(--p-text);
+		border-color: var(--p-accent);
+	}
+
+	.refresh-chip.selected {
+		color: var(--p-text);
+		border-color: var(--p-accent);
+		background: var(--p-accent-soft);
+	}
+
+	.refresh-actions {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		padding-top: 0.25rem;
 	}
 
 	.reset-section {

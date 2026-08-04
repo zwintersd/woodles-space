@@ -19,7 +19,11 @@ import type {
 	RoutineStepResult,
 	SurgeDraft,
 	SporeEvent,
-	MomentumLevel
+	MomentumLevel,
+	SleepLog,
+	SleepQuality,
+	SignalEntry,
+	SignalKind
 } from './types';
 import {
 	STARTER_SHAPES,
@@ -134,6 +138,8 @@ export class PlannerStore {
 	);
 	surgeDrafts = $state<SurgeDraft[]>(load('planner.surgeDrafts.v1', []));
 	sporeEvents = $state<SporeEvent[]>(load('planner.carillonSpores.v1', []));
+	sleepLogs = $state<SleepLog[]>(load('planner.sleepLogs.v1', []));
+	signalEntries = $state<SignalEntry[]>(load('planner.signals.v1', []));
 
 	// Transient
 	readonly sessionId = uid();
@@ -458,6 +464,68 @@ export class PlannerStore {
 		return practice;
 	}
 
+	// ── capacity: sleep + ongoing signals ───────────────────────────
+
+	getSleepLog(date: string): SleepLog | null {
+		return this.sleepLogs.find((log) => log.date === date) ?? null;
+	}
+
+	recordSleep(quality: SleepQuality, date = dateKey(this.now)): SleepLog {
+		const id = `sleep-${date}`;
+		const existing = this.sleepLogs.find((log) => log.id === id);
+		const timestamp = new Date().toISOString();
+		const log: SleepLog = {
+			id,
+			date,
+			quality,
+			recordedAt: existing?.recordedAt ?? timestamp,
+			updatedAt: timestamp
+		};
+		this.sleepLogs = existing
+			? this.sleepLogs.map((item) => (item.id === id ? log : item))
+			: [...this.sleepLogs, log];
+		save('planner.sleepLogs.v1', this.sleepLogs);
+		return log;
+	}
+
+	addSignalEntry(input: {
+		kind: SignalKind;
+		date: string;
+		endDate?: string;
+		label?: string;
+		note?: string;
+	}): SignalEntry | null {
+		if (input.kind === 'custom' && !input.label?.trim()) return null;
+		const timestamp = new Date().toISOString();
+		const entry: SignalEntry = {
+			id: uid(),
+			kind: input.kind,
+			date: input.date,
+			endDate: input.endDate,
+			label: input.label?.trim() || undefined,
+			note: input.note?.trim() || undefined,
+			createdAt: timestamp,
+			updatedAt: timestamp
+		};
+		this.signalEntries = [...this.signalEntries, entry];
+		save('planner.signals.v1', this.signalEntries);
+		return entry;
+	}
+
+	/** Closes an open illness/custom span without inventing a new entry. */
+	endSignalEntry(id: string, endDate = dateKey(this.now)): void {
+		const updatedAt = new Date().toISOString();
+		this.signalEntries = this.signalEntries.map((entry) =>
+			entry.id === id ? { ...entry, endDate, updatedAt } : entry
+		);
+		save('planner.signals.v1', this.signalEntries);
+	}
+
+	removeSignalEntry(id: string): void {
+		this.signalEntries = this.signalEntries.filter((entry) => entry.id !== id);
+		save('planner.signals.v1', this.signalEntries);
+	}
+
 	// ── surge quarantine ────────────────────────────────────────────
 
 	addSurgeDraft(title: string, body: string): SurgeDraft | null {
@@ -682,6 +750,8 @@ export class PlannerStore {
 		this.routinePractices = blob.routinePractices ?? this.routinePractices;
 		this.surgeDrafts = blob.surgeDrafts ?? this.surgeDrafts;
 		this.sporeEvents = blob.spores ?? this.sporeEvents;
+		this.sleepLogs = blob.sleepLogs ?? this.sleepLogs;
+		this.signalEntries = blob.signals ?? this.signalEntries;
 		save('planner.shapes.v1', this.dayShapes);
 		save('planner.weekPattern.v1', this.weekPattern);
 		save('planner.days.v2', this.dayOverrides);
@@ -695,6 +765,8 @@ export class PlannerStore {
 		save('planner.routinePractices.v1', this.routinePractices);
 		save('planner.surgeDrafts.v1', this.surgeDrafts);
 		save('planner.carillonSpores.v1', this.sporeEvents);
+		save('planner.sleepLogs.v1', this.sleepLogs);
+		save('planner.signals.v1', this.signalEntries);
 	}
 
 	// ── view + binder ───────────────────────────────────────────────
