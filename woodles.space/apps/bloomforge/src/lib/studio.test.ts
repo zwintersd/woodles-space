@@ -147,6 +147,36 @@ describe('duplicating', () => {
 	});
 });
 
+describe('renaming', () => {
+	it('changes the display name, whatever kind the entity is', () => {
+		const studio = studioWith();
+		studio.rename('green-thumb', 'Verdant Fingers');
+		expect(studio.def.upgrades.find((entry) => entry.id === 'green-thumb')?.name).toBe('Verdant Fingers');
+	});
+
+	it('leaves the id, and every reference to it, alone', () => {
+		const studio = studioWith();
+		const before = structuredClone(studio.def);
+		studio.rename('petal-farm', 'Bloom Works');
+		const after = studio.def;
+
+		expect(after.generators.find((entry) => entry.id === 'petal-farm')?.id).toBe('petal-farm');
+		expect(after.layout).toEqual(before.layout);
+		for (const upgrade of after.upgrades) {
+			expect(upgrade.effects.map((effect) => effect.target)).toEqual(
+				before.upgrades.find((entry) => entry.id === upgrade.id)!.effects.map((effect) => effect.target)
+			);
+		}
+	});
+
+	it('does nothing for an id that does not exist', () => {
+		const studio = studioWith();
+		const before = structuredClone(studio.def);
+		studio.rename('not-a-real-id', 'Ghost');
+		expect(studio.def).toEqual(before);
+	});
+});
+
 describe('undo and redo', () => {
 	it('restores what an edit changed', () => {
 		const studio = studioWith();

@@ -38,16 +38,8 @@
 	const unlock = $derived(studio.def.unlocks.find((entry) => entry.id === selected?.id));
 	const milestone = $derived(studio.def.milestones.find((entry) => entry.id === selected?.id));
 
-	/** Renames the entity in place. Ids never change — they're the join key. */
 	function rename(name: string): void {
-		const id = selected?.id;
-		if (!id) return;
-		studio.editQuietly((def) => {
-			for (const list of [def.currencies, def.generators, def.upgrades, def.prestigeLayers, def.unlocks, def.milestones]) {
-				const found = (list as { id: string; name: string }[]).find((entry) => entry.id === id);
-				if (found) found.name = name;
-			}
-		});
+		if (selected) studio.rename(selected.id, name);
 	}
 
 	const STATS: Record<EffectStat, string> = {

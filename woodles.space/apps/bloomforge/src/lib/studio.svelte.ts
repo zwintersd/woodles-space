@@ -287,6 +287,21 @@ export class Studio {
 		return copyId;
 	}
 
+	/**
+	 * Renames an entity in place. Ids never change — they're the join key — so
+	 * this only ever touches the `name` field, wherever the entity lives.
+	 * Quiet, like every other field edit: the Inspector calls it per keystroke,
+	 * and a history entry per character is not an undo stack.
+	 */
+	rename(id: string, name: string): void {
+		this.editQuietly((def) => {
+			for (const list of [def.currencies, def.generators, def.upgrades, def.prestigeLayers, def.unlocks, def.milestones]) {
+				const found = (list as { id: string; name: string }[]).find((entry) => entry.id === id);
+				if (found) found.name = name;
+			}
+		});
+	}
+
 	// ── notes ────────────────────────────────────────────────────────────
 
 	addNote(at: XY = { x: 160, y: 160 }): void {
