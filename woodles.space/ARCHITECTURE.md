@@ -435,11 +435,11 @@ a central Woodles state service.
 momentary time-sampling data, not a compliance ledger. `buildDayIntervals()`
 expands the configured wake/sleep anchors into intervals (15 minutes by
 default); the bell asks what is actually happening in the current interval.
-Past intervals only become editable when paper-entry mode is on. Its date
-picker can reopen any earlier sheet, and those marks keep `source: "paper"` so
-a later clipboard transcription never poses as a live sample. Correcting an
-existing live sample preserves its original provenance. A blank interval is
-unobserved, not failed.
+Past intervals only become editable when paper-entry mode is on or through
+the catch-up card's recalled stretches. Paper-entry's date picker can reopen
+any earlier sheet, and those marks keep `source: "paper"` so a later clipboard
+transcription never poses as a live sample. Correcting an existing live sample
+preserves its original provenance. A blank interval is unobserved, not failed.
 
 Carillon's surface runs on two clocks' worth of color. `dayCycle.ts` has
 always interpolated the `--p-*` daydream palette across the day; it now also
@@ -462,6 +462,23 @@ updates that record without editing the plan or manufacturing another sample;
 its capture-time plan label, interval duration, and source provenance remain
 fixed. The seven observation kinds are clinic, writing, build, movement, care,
 rest, and elsewhere.
+
+**Catch-up and recalled stretches** serve the opener who visits once or twice
+a day instead of living with the bell. `findCatchUpGaps()` scans today's rows
+for contiguous past, unobserved runs of at least an hour, and the Today screen
+offers to sketch each hollow stretch in broad strokes. A sketch is one
+observation with `source: "recall"` whose `intervalMinutes` spans the stretch —
+one memory is one sample and earns one Spore however many bells it covers, so
+backfilling can never out-earn live sampling. `buildDayIntervals()` spreads a
+recall mark across every row it covers while an exact sample inside the
+stretch keeps its own row; the ledger renders covered rows as labeled
+continuations, and Edition Review shows the stretch as a single time range
+with its own provenance commentary and a "recalled stretches" count in the
+extras. Declining is first-class — "leave this stretch hollow" dismisses the
+card because unobserved is an honest answer. The same card carries quiet
+nudge chips for other logging worth catching up on: routines practiced within
+the last two weeks but unmarked today, and captured Surge drafts from an
+earlier session that are ready to review.
 
 **Prompt-fading routines** begin as full task analyses. A dated practice records
 each step as `independent`, `prompted`, or `missed` and derives an independence

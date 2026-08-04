@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
 	INTERVAL_KIND_OPTIONS,
 	buildDayIntervals,
+	findCatchUpGaps,
 	intervalKey,
-	routineScaffoldLevel
+	routineScaffoldLevel,
+	spanMinutes
 } from './instrument';
 import type {
 	Block,
@@ -66,6 +68,142 @@ describe('Carillon day intervals', () => {
 		]);
 		expect(rows[1]?.observation).toBe(observations[0]);
 		expect(rows[0]?.key).toBe('2026-07-30@09:00');
+	});
+});
+
+describe('Carillon catch-up', () => {
+	const date = new Date(2026, 6, 30);
+
+	const liveSample = (intervalStart: string): IntervalObservation => ({
+		id: `observation-${intervalKey('2026-07-30', intervalStart)}`,
+		date: '2026-07-30',
+		intervalStart,
+		source: 'live',
+		kind: 'movement',
+		label: 'a walk',
+		capturedAt: '2026-07-30T13:30:00.000Z',
+		updatedAt: '2026-07-30T13:30:00.000Z'
+	});
+
+	const recalledStretch = (intervalStart: string, intervalMinutes: number): IntervalObservation => ({
+		id: `observation-${intervalKey('2026-07-30', intervalStart)}`,
+		date: '2026-07-30',
+		intervalStart,
+		source: 'recall',
+		kind: 'writing',
+		label: 'writing',
+		intervalMinutes,
+		capturedAt: '2026-07-30T16:00:00.000Z',
+		updatedAt: '2026-07-30T16:00:00.000Z'
+	});
+
+	it('spreads a recalled stretch across every row it covers', () => {
+		const stretch = recalledStretch('09:00', 90);
+		const rows = buildDayIntervals(
+			date,
+			[],
+			[stretch],
+			'09:00',
+			'11:00',
+			15,
+			new Date(2026, 6, 30, 10, 50)
+		);
+
+		expect(rows.slice(0, 6).every((row) => row.observation === stretch)).toBe(true);
+		expect(rows[0]?.continuation).toBe(false);
+		expect(rows.slice(1, 6).every((row) => row.continuation)).toBe(true);
+		expect(rows[6]?.observation).toBeNull();
+	});
+
+	it('lets an exact sample win inside a covering stretch', () => {
+		const rows = buildDayIntervals(
+			date,
+			[],
+			[recalledStretch('09:00', 90), liveSample('09:30')],
+			'09:00',
+			'10:30',
+			15,
+			new Date(2026, 6, 30, 10, 20)
+		);
+
+		const row = rows.find((item) => item.startTime === '09:30');
+		expect(row?.observation?.source).toBe('live');
+		expect(row?.continuation).toBe(false);
+	});
+
+	it('finds hollow past stretches of at least an hour', () => {
+		const rows = buildDayIntervals(
+			date,
+			[],
+			[liveSample('10:30')],
+			'09:00',
+			'13:00',
+			15,
+			new Date(2026, 6, 30, 12, 10)
+		);
+
+		const gaps = findCatchUpGaps(rows);
+		expect(gaps).toHaveLength(2);
+		expect(gaps[0]).toMatchObject({ startTime: '09:00', endTime: '10:30', minutes: 90 });
+		expect(gaps[1]).toMatchObject({ startTime: '10:45', endTime: '12:00', minutes: 75 });
+		expect(gaps[0]?.boundaries).toEqual([
+			'09:00',
+			'09:15',
+			'09:30',
+			'09:45',
+			'10:00',
+			'10:15',
+			'10:30'
+		]);
+	});
+
+	it('treats a short pause between samples as a pause, not a gap', () => {
+		const rows = buildDayIntervals(
+			date,
+			[],
+			[liveSample('09:00'), liveSample('09:45')],
+			'09:00',
+			'10:30',
+			15,
+			new Date(2026, 6, 30, 10, 5)
+		);
+
+		expect(findCatchUpGaps(rows)).toEqual([]);
+	});
+
+	it('leaves the current and future intervals to the live sampler', () => {
+		const rows = buildDayIntervals(
+			date,
+			[],
+			[],
+			'09:00',
+			'12:00',
+			15,
+			new Date(2026, 6, 30, 10, 10)
+		);
+
+		const gaps = findCatchUpGaps(rows);
+		expect(gaps).toHaveLength(1);
+		expect(gaps[0]).toMatchObject({ startTime: '09:00', endTime: '10:00', minutes: 60 });
+	});
+
+	it('covers a recalled stretch with rows so it never reads as a gap', () => {
+		const rows = buildDayIntervals(
+			date,
+			[],
+			[recalledStretch('09:00', 180)],
+			'09:00',
+			'13:00',
+			15,
+			new Date(2026, 6, 30, 12, 40)
+		);
+
+		expect(findCatchUpGaps(rows)).toEqual([]);
+	});
+
+	it('measures spans across midnight', () => {
+		expect(spanMinutes('09:00', '10:30')).toBe(90);
+		expect(spanMinutes('23:30', '00:30')).toBe(60);
 	});
 });
 

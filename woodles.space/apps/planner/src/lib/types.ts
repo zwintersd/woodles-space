@@ -145,12 +145,17 @@ export type IntervalKind =
 /**
  * One momentary-time-sampling mark. It records what was happening without
  * mutating the plan that supplied `plannedLabel`.
+ *
+ * `live` was answered at the bell, `paper` transcribed from a printed sheet,
+ * and `recall` remembered in-app after the fact. A recall mark may cover a
+ * whole stretch via `intervalMinutes` — one memory is one sample, however
+ * many bells it spans.
  */
 export type IntervalObservation = {
 	id: string;
 	date: string; // YYYY-MM-DD
 	intervalStart: string; // HH:MM
-	source: 'live' | 'paper';
+	source: 'live' | 'paper' | 'recall';
 	kind: IntervalKind;
 	label: string;
 	plannedLabel?: string;

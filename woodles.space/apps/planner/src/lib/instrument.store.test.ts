@@ -73,6 +73,38 @@ describe('Carillon instrument persistence', () => {
 		});
 	});
 
+	it('records a recalled stretch as one sample with one spore', () => {
+		const stretch = store.observeInterval({
+			date: '2026-07-30',
+			intervalStart: '09:00',
+			kind: 'care',
+			label: 'a slow morning',
+			source: 'recall',
+			intervalMinutes: 150
+		});
+
+		expect(stretch).toMatchObject({
+			source: 'recall',
+			intervalMinutes: 150,
+			label: 'a slow morning'
+		});
+		expect(store.intervalObservations).toHaveLength(1);
+		expect(store.sporeEvents).toHaveLength(1);
+		expect(store.sporeEvents[0]).toMatchObject({ kind: 'care', amount: 1 });
+
+		const corrected = store.observeInterval({
+			date: '2026-07-30',
+			intervalStart: '09:00',
+			kind: 'rest',
+			label: 'mostly resting'
+		});
+
+		expect(corrected).toMatchObject({ source: 'recall', intervalMinutes: 150 });
+		expect(store.intervalObservations).toHaveLength(1);
+		expect(store.sporeEvents).toHaveLength(1);
+		expect(store.sporeEvents[0]).toMatchObject({ kind: 'rest', amount: 1 });
+	});
+
 	it('round-trips paper provenance without changing the plan it annotates', () => {
 		const clinicDay: DayShape = {
 			id: 'clinic-day',

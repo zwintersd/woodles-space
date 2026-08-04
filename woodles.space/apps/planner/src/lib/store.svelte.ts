@@ -349,7 +349,9 @@ export class PlannerStore {
 		kind: IntervalKind;
 		label?: string;
 		note?: string;
-		source?: 'live' | 'paper';
+		source?: 'live' | 'paper' | 'recall';
+		/** Span of the mark. A recall stretch may cover several bells as one sample. */
+		intervalMinutes?: number;
 	}): IntervalObservation {
 		const date = input.date ?? dateKey(this.now);
 		const id = `observation-${intervalKey(date, input.intervalStart)}`;
@@ -374,7 +376,8 @@ export class PlannerStore {
 			label: input.label?.trim() || kindLabel(input.kind),
 			plannedLabel,
 			note: input.note?.trim() || undefined,
-			intervalMinutes: existing?.intervalMinutes ?? this.settings.samplingIntervalMinutes,
+			intervalMinutes:
+				existing?.intervalMinutes ?? input.intervalMinutes ?? this.settings.samplingIntervalMinutes,
 			capturedAt: existing?.capturedAt ?? timestamp,
 			updatedAt: timestamp
 		};
