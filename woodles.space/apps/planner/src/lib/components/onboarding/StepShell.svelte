@@ -28,7 +28,7 @@
 </script>
 
 <div class="step-shell">
-	<!-- Roman-numeral progress with ornamental fleurons between -->
+	<!-- Roman-numeral progress with dot dividers between -->
 	<div class="step-progress" aria-hidden="true">
 		{#each [1, 2, 3, 4, 5, 6] as n, idx}
 			<div class="prog-cell" class:done={n < stage} class:current={n === stage}>
@@ -43,9 +43,9 @@
 
 	<header class="step-header">
 		<div class="step-eyebrow-row">
-			<span class="eyebrow-mark" aria-hidden="true">❦</span>
+			<span class="eyebrow-mark" aria-hidden="true">✦</span>
 			<span class="step-eyebrow">{eyebrow}</span>
-			<span class="eyebrow-mark" aria-hidden="true">❦</span>
+			<span class="eyebrow-mark" aria-hidden="true">✦</span>
 		</div>
 		<h1 class="step-heading">{heading}</h1>
 		<p class="step-subprompt">{subprompt}</p>
@@ -78,7 +78,7 @@
 		position: relative;
 	}
 
-	/* ── progress: roman numerals + fleurons ───────────────────────── */
+	/* ── progress: roman numerals + dot dividers ─────────────────────── */
 	.step-progress {
 		display: flex;
 		align-items: center;

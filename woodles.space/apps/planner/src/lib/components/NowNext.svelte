@@ -94,11 +94,11 @@
 		<a href="/" class="nn-home" title="back to woodles.space">·space</a>
 
 		<div class="nn-header-center">
-			<span class="nn-header-mark" aria-hidden="true">❦</span>
+			<span class="nn-header-mark" aria-hidden="true">✦</span>
 			<span class="nn-clock">{formatTime(store.now)}</span>
 			<span class="nn-sep">·</span>
 			<span class="nn-date">{dayOfWeekLabel(store.now)} {shortDateLabel(store.now)}</span>
-			<span class="nn-header-mark" aria-hidden="true">❦</span>
+			<span class="nn-header-mark" aria-hidden="true">✦</span>
 		</div>
 
 		<button
