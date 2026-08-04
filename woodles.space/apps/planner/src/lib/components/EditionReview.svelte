@@ -72,6 +72,9 @@
 	function commentaryFor(row: DayInterval): string {
 		const observation = row.observation;
 		if (!observation) return '';
+		if (observation.source === 'recall') {
+			return 'Recalled from memory in one broad stroke. The stretch stays one sample — sketch, not footage.';
+		}
 		if (observation.source === 'paper') {
 			return 'Entered from the clipboard later. Carillon keeps it useful without pretending it was a live sample.';
 		}
@@ -187,7 +190,11 @@
 					</div>
 					{#each reviewRows as row (row.key)}
 						<div class="edition-row" class:observed={Boolean(row.observation)}>
-							<time>{displayTime(row.startTime)}</time>
+							{#if row.observation?.source === 'recall'}
+								<time class="span-time">{displayTime(row.startTime)}–{displayTime(row.endTime)}</time>
+							{:else}
+								<time>{displayTime(row.startTime)}</time>
+							{/if}
 							<span class="planned">{row.observation?.plannedLabel ?? 'open'}</span>
 							<span class="actual">
 								{#if row.observation}
@@ -245,6 +252,10 @@
 						<li>
 							<span>paper marks</span>
 							<strong>{activeObservations.filter((item) => item.source === 'paper').length}</strong>
+						</li>
+						<li>
+							<span>recalled stretches</span>
+							<strong>{activeObservations.filter((item) => item.source === 'recall').length}</strong>
 						</li>
 						<li>
 							<span>spores generated</span>
@@ -493,6 +504,12 @@
 		color: var(--car-pink-dark);
 		font-family: var(--car-counter);
 		font-size: 0.9rem;
+	}
+
+	.edition-row time.span-time {
+		padding-right: 0.3rem;
+		font-size: 0.66rem;
+		line-height: 1.15;
 	}
 
 	.edition-row .planned {

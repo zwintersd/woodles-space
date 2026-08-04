@@ -68,6 +68,8 @@ export type DayInterval = {
 	state: IntervalState;
 	plannedBlock: Block | null;
 	observation: IntervalObservation | null;
+	/** The observation started in an earlier row and covers this one. */
+	continuation?: boolean;
 };
 
 export function intervalKey(date: string, intervalStart: string): string {
@@ -104,11 +106,20 @@ export function buildDayIntervals(
 	let end = timeToMinutes(endTime);
 	if (end <= start) end += 1440;
 
+	const dayObservations = observations.filter((observation) => observation.date === day);
 	const observationMap = new Map(
-		observations
-			.filter((observation) => observation.date === day)
-			.map((observation) => [intervalKey(observation.date, observation.intervalStart), observation])
+		dayObservations.map((observation) => [
+			intervalKey(observation.date, observation.intervalStart),
+			observation
+		])
 	);
+	// Recall marks can cover a stretch longer than one row; keep their extent
+	// so every row inside the stretch shows the same single sample.
+	const spans = dayObservations.map((observation) => ({
+		observation,
+		start: timeToMinutes(observation.intervalStart),
+		end: timeToMinutes(observation.intervalStart) + (observation.intervalMinutes ?? intervalMinutes)
+	}));
 
 	const referenceDay = dateKey(reference);
 	const referenceMinutes = reference.getHours() * 60 + reference.getMinutes();
@@ -132,6 +143,23 @@ export function buildDayIntervals(
 		else if (referenceMinutes >= cursor && referenceMinutes < cursor + intervalMinutes) state = 'current';
 		else state = cursor < referenceMinutes ? 'past' : 'future';
 
+		// An exact sample owns its row; otherwise the latest-starting stretch
+		// that covers this row fills it in as a continuation.
+		const cursorMod = ((cursor % 1440) + 1440) % 1440;
+		let observation = observationMap.get(key) ?? null;
+		let continuation = false;
+		if (!observation) {
+			let covering: (typeof spans)[number] | null = null;
+			for (const span of spans) {
+				if (cursorMod < span.start || cursorMod >= span.end) continue;
+				if (!covering || span.start > covering.start) covering = span;
+			}
+			if (covering) {
+				observation = covering.observation;
+				continuation = covering.start !== cursorMod;
+			}
+		}
+
 		rows.push({
 			key,
 			date: day,
@@ -139,11 +167,61 @@ export function buildDayIntervals(
 			endTime: endLabel,
 			state,
 			plannedBlock,
-			observation: observationMap.get(key) ?? null
+			observation,
+			continuation
 		});
 	}
 
 	return rows;
+}
+
+// ── catch-up: hollow stretches worth sketching after time away ────
+
+export type CatchUpGap = {
+	date: string;
+	startTime: string;
+	endTime: string;
+	minutes: number;
+	/** Interval boundaries inside the gap: each hollow row's start, then the gap's end. */
+	boundaries: string[];
+};
+
+export function spanMinutes(startTime: string, endTime: string): number {
+	return (timeToMinutes(endTime) - timeToMinutes(startTime) + 1440) % 1440;
+}
+
+/**
+ * Contiguous runs of past, unobserved intervals — the shape of the day that
+ * went by while Carillon was closed. Runs shorter than `minimumMinutes` are
+ * ordinary pauses between samples, not absences, and are left alone. The
+ * current and future intervals are never a gap: the live sampler owns now.
+ */
+export function findCatchUpGaps(intervals: DayInterval[], minimumMinutes = 60): CatchUpGap[] {
+	const gaps: CatchUpGap[] = [];
+	let run: DayInterval[] = [];
+
+	const flush = () => {
+		if (run.length === 0) return;
+		const minutes = run.reduce((sum, row) => sum + spanMinutes(row.startTime, row.endTime), 0);
+		const last = run[run.length - 1];
+		if (minutes >= minimumMinutes) {
+			gaps.push({
+				date: run[0].date,
+				startTime: run[0].startTime,
+				endTime: last.endTime,
+				minutes,
+				boundaries: [...run.map((row) => row.startTime), last.endTime]
+			});
+		}
+		run = [];
+	};
+
+	for (const row of intervals) {
+		if (row.state === 'past' && !row.observation) run.push(row);
+		else flush();
+	}
+	flush();
+	return gaps;
 }
 
 export function routineIndependence(

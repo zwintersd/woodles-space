@@ -119,7 +119,11 @@
 
 		<main id="carillon-main" class="carillon-main" tabindex="-1" bind:this={mainElement}>
 			{#if section === 'today'}
-				<TodayInstrument onopenpiles={() => setSection('piles')} />
+				<TodayInstrument
+					onopenpiles={() => setSection('piles')}
+					onopenroutines={() => setSection('routines')}
+					onopensurge={() => setSection('surge')}
+				/>
 			{:else if section === 'piles'}
 				<DayPiles />
 			{:else if section === 'routines'}

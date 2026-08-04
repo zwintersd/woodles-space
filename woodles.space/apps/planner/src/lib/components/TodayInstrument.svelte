@@ -12,11 +12,16 @@
 	import { dateKey, dayOfWeekLabel, shortDateLabel, timeToMinutes } from '$lib/utils';
 	import type { IntervalKind } from '$lib/types';
 	import EchoCreature from './EchoCreature.svelte';
+	import CatchUp from './CatchUp.svelte';
 
 	let {
-		onopenpiles
+		onopenpiles,
+		onopenroutines,
+		onopensurge
 	}: {
 		onopenpiles?: () => void;
+		onopenroutines?: () => void;
+		onopensurge?: () => void;
 	} = $props();
 
 	let selectedStart = $state('');
@@ -147,7 +152,12 @@
 
 	function record(kind: IntervalKind): void {
 		if (!selectedInterval || !canSelect(selectedInterval)) return;
-		const existing = selectedInterval.observation;
+		// A recalled stretch that merely covers this row is not the row's own
+		// mark — recording here adds a sharper sample inside it, not a correction.
+		const existing =
+			selectedInterval.observation?.intervalStart === selectedInterval.startTime
+				? selectedInterval.observation
+				: null;
 		const label =
 			kind === 'elsewhere' && customLabel.trim()
 				? customLabel.trim()
@@ -279,7 +289,7 @@
 						{feedback}
 					{:else if selectedInterval?.observation}
 						observed as {selectedInterval.observation.label}
-						{#if selectedInterval.observation.source === 'paper'} · entered from paper{/if}
+						{#if selectedInterval.continuation} · part of a recalled stretch{:else if selectedInterval.observation.source === 'paper'} · entered from paper{:else if selectedInterval.observation.source === 'recall'} · recalled from memory{/if}
 					{:else}
 						An unplanned day is still a day. Start observing.
 					{/if}
@@ -292,6 +302,8 @@
 
 		<EchoCreature />
 	</div>
+
+	<CatchUp intervals={todayIntervals} {onopenroutines} {onopensurge} />
 
 	<section class="ledger-card" aria-labelledby="ledger-heading">
 		<header class="ledger-titlebar">
@@ -336,15 +348,15 @@
 					class:observed={Boolean(row.observation)}
 					disabled={!canSelect(row)}
 					onclick={() => selectRow(row)}
-					aria-label={`${displayTime(row.startTime)}, planned ${row.plannedBlock?.title ?? 'open'}, ${row.observation ? `observed ${row.observation.label}` : 'unobserved'}`}
+					aria-label={`${displayTime(row.startTime)}, planned ${row.plannedBlock?.title ?? 'open'}, ${row.observation ? `observed ${row.observation.label}${row.continuation ? ', same recalled stretch' : ''}` : 'unobserved'}`}
 				>
 					<span class="row-time">{displayTime(row.startTime)}</span>
 					<span class="row-plan">{row.plannedBlock?.title ?? 'open'}</span>
-					<span class="row-observed">
+					<span class="row-observed" class:continuation={row.continuation}>
 						{#if row.observation}
 							<i data-kind={row.observation.kind} aria-hidden="true"></i>
 							{row.observation.label}
-							{#if row.observation.source === 'paper'}<sup>paper</sup>{/if}
+							{#if row.continuation}<sup>same stretch</sup>{:else if row.observation.source === 'paper'}<sup>paper</sup>{:else if row.observation.source === 'recall'}<sup>recalled</sup>{/if}
 						{:else}
 							<span class="hollow">—</span>
 						{/if}
@@ -353,8 +365,8 @@
 			{/each}
 		</div>
 		<p class="ledger-footnote">
-			A hollow interval is unobserved—not failed. Paper entry is labeled because live samples and
-			remembered marks are different kinds of evidence.
+			A hollow interval is unobserved—not failed. Paper marks and recalled stretches are labeled
+			because live samples and remembered marks are different kinds of evidence.
 		</p>
 	</section>
 </section>
@@ -833,6 +845,15 @@
 		height: 0.42rem;
 		border-radius: 50%;
 		background: var(--car-pink-dark);
+	}
+
+	.row-observed.continuation {
+		opacity: 0.62;
+	}
+
+	.row-observed.continuation i {
+		border: 1px solid var(--car-pink-dark);
+		background: transparent;
 	}
 
 	.row-observed sup {
