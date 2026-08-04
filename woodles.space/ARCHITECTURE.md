@@ -346,6 +346,20 @@ Idle against Greedy in a Web Worker and reports time-to-milestone, plus Log and
 Notes. Persistence is `localStorage` through `@woodles/persistence` with JSON
 export/import; `@woodles/sync` is deliberately not wired in yet.
 
+**First run is a tour, not a manual.** A visitor lands on the example garden
+behind a one-time welcome offering two doors: take the tour, or poke at the
+example. The tour opens a genuinely blank project and walks six steps —
+currency, generator, press play, tune the curve, add an upgrade, fast-forward —
+and every step completes by *observing the def and the running simulation*,
+never by a "next" button. That constraint is what keeps it honest: the tour
+cannot claim you did something you didn't, it can't drift out of step with the
+app, and it credits you for doing the thing by a route the hint never mentioned.
+It also caught two bugs that only a first-timer would have hit — a new
+generator that started unowned (so a from-scratch game could never produce
+anything and pressing play showed zeroes forever) and a playtest that kept
+running the def it was built from, so edits were invisible until you found the
+reset button.
+
 Out of scope for now, and named here so nobody goes looking: the player runtime
 that turns a `GameDef` into a playable build, and the art/audio/localization
 resource panels the mockup showed. The schema leaves room (`Currency.symbol` as
@@ -809,12 +823,12 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1429 tests total: 16 in `api/` (its own
+1451 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1413 across fifteen pnpm
+instead of the recursive `pnpm -r test`), plus 1435 across fifteen pnpm
 packages — `write` 72, `marginalia` 269, `planner` 431, `notebook` 28,
-`spores` 140, `bestiary` 162, `bloomforge` 37, `packages/sync` 9,
+`spores` 140, `bestiary` 162, `bloomforge` 59, `packages/sync` 9,
 `packages/persistence` 6, `packages/app-manifest` 11,
 `packages/handoff` 15, `packages/text` 23, `packages/spellcraft` 16,
 `packages/incremental-core` 125, and `thinking-about` 69.
@@ -887,7 +901,7 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (1429 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (1451 tests)
 pnpm check              svelte-check in every app
 pnpm build              build the eight SvelteKit apps
 ```

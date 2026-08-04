@@ -1,6 +1,13 @@
 <script lang="ts">
-	import { ENTITY_KIND_LABELS, ENTITY_KINDS, entityIndex, type EntityKind } from '@woodles/incremental-core';
+	import {
+		ENTITY_KIND_LABELS,
+		ENTITY_KIND_SINGULAR,
+		ENTITY_KINDS,
+		entityIndex,
+		type EntityKind
+	} from '@woodles/incremental-core';
 	import { studio } from '../studio.svelte.js';
+	import { tour } from '../tour.svelte.js';
 
 	interface Props {
 		onadd: (kind: EntityKind) => void;
@@ -55,10 +62,11 @@
 					<span class="count">{group.total}</span>
 					<button
 						class="add"
+						class:bf-spotlight={tour.spotlight === `sidebar-${group.kind}`}
 						type="button"
 						onclick={() => onadd(group.kind)}
-						title="Add {group.label.replace(/s$/, '').toLowerCase()}"
-						aria-label="Add {group.label.replace(/s$/, '').toLowerCase()}"
+						title="Add {ENTITY_KIND_SINGULAR[group.kind]}"
+						aria-label="Add {ENTITY_KIND_SINGULAR[group.kind]}"
 					>
 						+
 					</button>

@@ -14,6 +14,30 @@ edits a `GameDef` and renders one running. That means the numbers you watch in
 the Playtest dock and the numbers a Balance run reports come from the same
 engine, stepped differently — they cannot drift apart.
 
+## first run
+
+A one-time welcome offers two doors: take the tour, or poke at the example
+garden loaded behind it. The tour opens a **genuinely blank** project and walks
+six steps — currency → generator → press play → tune the curve → add an upgrade
+→ fast-forward.
+
+Every step completes by **observing the def and the running simulation**, never
+by a "next" button ([`tour.svelte.ts`](./src/lib/tour.svelte.ts)). That one
+constraint does a lot of work: the tour cannot claim you did something you
+didn't, it cannot drift out of step with the app, and it gives you credit for
+doing the thing by a route the hint never mentioned. It is a banner above the
+canvas rather than a floating card, because a card that covers the button it is
+pointing at is worse than no card.
+
+The `?` in the toolbar starts it again. Skipping means "not now", never "never
+again".
+
+Walking it end to end is also how two first-timer-only bugs turned up: a new
+generator that started unowned — so a from-scratch game could never afford
+anything and pressing play showed a column of zeroes — and a playtest that kept
+simulating the def it was built from, making every edit invisible until you
+found the reset button. Both are fixed and both now have tests.
+
 ## the parts
 
 **Canvas** — Svelte Flow for pan/zoom/drag, with a custom card per entity kind
@@ -54,7 +78,7 @@ must not edit the game.
 
 ```bash
 pnpm --filter bloomforge dev
-pnpm --filter bloomforge test     # 37 tests
+pnpm --filter bloomforge test     # 59 tests
 pnpm --filter bloomforge check
 ```
 

@@ -72,6 +72,26 @@ export function serializeGameDef(def: GameDef): string {
 	return `${JSON.stringify(def, null, 2)}\n`;
 }
 
+/**
+ * Nothing at all — the identity element of the schema. Valid, simulable, and
+ * completely empty, which is what a tutorial wants: every piece the learner
+ * ends up with is a piece they put there.
+ */
+export function blankGameDef(title = 'Untitled Game'): GameDef {
+	return {
+		schemaVersion: SCHEMA_VERSION,
+		meta: { id: 'untitled', title },
+		currencies: [],
+		generators: [],
+		upgrades: [],
+		prestigeLayers: [],
+		unlocks: [],
+		milestones: [],
+		notes: [],
+		layout: {}
+	};
+}
+
 /** A blank project: one currency to spend, one generator to make it. */
 export function emptyGameDef(title = 'Untitled Game'): GameDef {
 	return {

@@ -1,15 +1,18 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { GameDefParseError, type EntityKind } from '@woodles/incremental-core';
+	import { blankGameDef, GameDefParseError, type EntityKind } from '@woodles/incremental-core';
 	import Canvas from '$lib/canvas/Canvas.svelte';
 	import Dock from '$lib/dock/Dock.svelte';
 	import Inspector from '$lib/inspector/Inspector.svelte';
 	import Sidebar from '$lib/sidebar/Sidebar.svelte';
 	import Toolbar from '$lib/Toolbar.svelte';
+	import TourCard from '$lib/TourCard.svelte';
+	import Welcome from '$lib/Welcome.svelte';
 	import { balance } from '$lib/balance.svelte.js';
 	import { playtest } from '$lib/playtest.svelte.js';
 	import { studio } from '$lib/studio.svelte.js';
-	import { lastOpenedId, listProjects, loadProject } from '$lib/projects.js';
+	import { tour } from '$lib/tour.svelte.js';
+	import { findExampleProject, lastOpenedId, listProjects, loadProject, starterProject } from '$lib/projects.js';
 
 	let projects = $state(listProjects());
 	let dockCollapsed = $state(false);
@@ -26,6 +29,9 @@
 		// Built up front rather than on first play, so the readout, the chart's
 		// currency picker and the node overlays all have something to show.
 		playtest.reset(studio.def);
+		// The example loads behind the welcome, so the first thing a visitor sees
+		// is a working economy rather than an empty grid.
+		tour.boot();
 
 		const onBeforeUnload = () => studio.flush();
 		window.addEventListener('beforeunload', onBeforeUnload);
@@ -73,6 +79,32 @@
 		} catch (error) {
 			say(error instanceof GameDefParseError ? error.message : 'That file could not be read.');
 		}
+	}
+
+	/** Opens a genuinely empty project and starts the tour on it. */
+	function startTour(): void {
+		studio.createProject('My First Game', blankGameDef());
+		playtest.reset(studio.def);
+		studio.select(null);
+		projects = listProjects();
+		tour.start();
+	}
+
+	function openExample(): void {
+		tour.close();
+		const existing = findExampleProject();
+		if (existing) {
+			const def = loadProject(existing);
+			if (def) {
+				studio.open(existing, def);
+				playtest.reset(def);
+				projects = listProjects();
+				return;
+			}
+		}
+		studio.createProject('My Cozy Incremental', starterProject());
+		playtest.reset(studio.def);
+		projects = listProjects();
 	}
 
 	function onKeydown(event: KeyboardEvent): void {
@@ -123,12 +155,14 @@
 			studio.addNote({ x: 160 + Math.random() * 260, y: 140 + Math.random() * 200 });
 			say('Note added to the canvas');
 		}}
+		ontour={() => (tour.active ? tour.skip() : startTour())}
 	/>
 
 	<main class:dock-collapsed={dockCollapsed}>
 		<Sidebar onadd={add} />
 
 		<div class="stage">
+			<TourCard onexample={openExample} />
 			<Canvas onmessage={say} />
 		</div>
 
@@ -138,6 +172,10 @@
 			<Dock collapsed={dockCollapsed} ontoggle={() => (dockCollapsed = !dockCollapsed)} />
 		</div>
 	</main>
+
+	{#if tour.showWelcome}
+		<Welcome onstart={startTour} onexplore={() => tour.dismissWelcome()} />
+	{/if}
 
 	{#if toast}
 		<p class="toast" role="status">{toast}</p>
@@ -187,7 +225,17 @@
 	.stage {
 		grid-area: stage;
 		min-width: 0;
+		min-height: 0;
 		padding: 12px;
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+
+	/* The canvas takes whatever the tour banner isn't using. */
+	.stage > :global(.canvas) {
+		flex: 1;
+		min-height: 0;
 	}
 
 	main > :global(aside:last-of-type) {

@@ -57,11 +57,15 @@ export class Playtest {
 	chartCurrencyId = $state<string | null>(null);
 	/** Why the run can't start, when it can't. */
 	blocked = $state<string | null>(null);
+	/** The def has been edited since this run was built. */
+	stale = $state(false);
 
 	#sim: Simulation | null = null;
 	#frame: number | null = null;
 	#lastFrame = 0;
 	#sampleAt = 0;
+	/** Serialized def the current run was built from, for spotting edits. */
+	#builtFrom = '';
 
 	get active(): boolean {
 		return this.#sim !== null;
@@ -91,11 +95,13 @@ export class Playtest {
 		}
 
 		this.blocked = null;
-		// Snapshotted, so edits made while a run is going don't quietly change
-		// the rules underneath it — restarting is how you pick up an edit. It
-		// goes through `$state.snapshot` first because the def handed in is a
-		// rune proxy, and `structuredClone` refuses to clone one.
-		this.#sim = createSim(structuredClone($state.snapshot(def)) as GameDef, this.#policy(), this.seed);
+		// Snapshotted, so edits made *during* a run don't quietly change the rules
+		// underneath it. It goes through `$state.snapshot` first because the def
+		// handed in is a rune proxy, and `structuredClone` refuses to clone one.
+		const plain = $state.snapshot(def) as GameDef;
+		this.#builtFrom = JSON.stringify(plain);
+		this.stale = false;
+		this.#sim = createSim(structuredClone(plain), this.#policy(), this.seed);
 		this.chartCurrencyId ??= def.currencies[0]?.id ?? null;
 		if (!def.currencies.some((currency) => currency.id === this.chartCurrencyId)) {
 			this.chartCurrencyId = def.currencies[0]?.id ?? null;
@@ -106,8 +112,18 @@ export class Playtest {
 		this.#readout();
 	}
 
+	/** Whether the def has moved on from what the current run was built with. */
+	checkStale(def: GameDef): void {
+		if (!this.#sim) return;
+		this.stale = JSON.stringify($state.snapshot(def)) !== this.#builtFrom;
+	}
+
 	start(def: GameDef): void {
-		if (!this.#sim) this.reset(def);
+		// Pressing play after an edit has to run the game you can see, not the one
+		// you had when you last pressed reset. Snapshotting protects a run in
+		// progress; it should never quietly outlive the edit that invalidated it.
+		this.checkStale(def);
+		if (!this.#sim || this.stale) this.reset(def);
 		if (!this.#sim) return;
 		if (this.running) return;
 

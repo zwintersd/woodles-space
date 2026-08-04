@@ -1,4 +1,13 @@
-import { cozyGarden, emptyGameDef, entityIndex, validateGameDef, type GameDef } from '@woodles/incremental-core';
+import {
+	blankGameDef,
+	cozyGarden,
+	emptyGameDef,
+	entityIndex,
+	idlePolicy,
+	simulate,
+	validateGameDef,
+	type GameDef
+} from '@woodles/incremental-core';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Studio } from './studio.svelte.js';
 import { deleteProject, listProjects, loadProject, newProjectId, saveProject } from './projects.js';
@@ -26,6 +35,30 @@ describe('creating entities', () => {
 			// Adding a node must never hand the author an error they didn't cause.
 			expect(errorsIn(studio.def), kind).toEqual([]);
 		}
+	});
+
+	it('makes a from-scratch game actually run', () => {
+		// The first generator has to start owned, or nothing produces, nobody can
+		// afford the thing that would produce, and pressing play shows a column of
+		// zeroes forever. That deadlock is invisible until you try to play it.
+		const studio = studioWith(blankGameDef());
+		studio.create('currency');
+		const generatorId = studio.create('generator');
+
+		const def = JSON.parse(studio.toJSON()) as GameDef;
+		expect(def.generators[0].startsOwned).toBe(1);
+
+		const result = simulate(def, idlePolicy, { duration: 60, sampleEvery: 30, seed: 1 });
+		expect(result.finalState.currencies[def.currencies[0].id].amount).toBeGreaterThan(0);
+		expect(generatorId).not.toBeNull();
+	});
+
+	it('leaves later generators unowned, so they are something to buy', () => {
+		const studio = studioWith(blankGameDef());
+		studio.create('currency');
+		studio.create('generator');
+		studio.create('generator');
+		expect(studio.def.generators.map((entry) => entry.startsOwned)).toEqual([1, 0]);
 	});
 
 	it('gives each new entity a distinct id and name', () => {

@@ -2,9 +2,20 @@
 	import { currencyById, formatAmount, signedRate } from '../format.js';
 	import { formatDuration, playtest, SPEEDS, type PolicyName } from '../playtest.svelte.js';
 	import { studio } from '../studio.svelte.js';
+	import { tour } from '../tour.svelte.js';
 	import Sparkline from './Sparkline.svelte';
 
 	const chartCurrency = $derived(currencyById(studio.def, playtest.chartCurrencyId ?? undefined));
+
+	// Watches the def so the button can say "Restart" *before* it is pressed,
+	// rather than the run silently rebuilding under the person's hands.
+	$effect(() => {
+		playtest.checkStale(studio.def);
+	});
+
+	const playLabel = $derived(
+		playtest.running ? '❙❙ Pause' : playtest.stale && playtest.elapsed > 0 ? '▶ Restart' : '▶ Play'
+	);
 </script>
 
 <div class="playtest">
@@ -44,8 +55,13 @@
 		{/if}
 
 		<div class="controls">
-			<button class="bf-button bf-button--primary" type="button" onclick={() => playtest.toggle(studio.def)}>
-				{playtest.running ? '❙❙ Pause' : '▶ Play'}
+			<button
+				class="bf-button bf-button--primary"
+				class:bf-spotlight={tour.spotlight === 'playtest' && !playtest.running}
+				type="button"
+				onclick={() => playtest.toggle(studio.def)}
+			>
+				{playLabel}
 			</button>
 			<button class="bf-button" type="button" onclick={() => playtest.reset(studio.def)}>↺ Reset</button>
 		</div>
