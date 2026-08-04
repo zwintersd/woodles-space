@@ -489,6 +489,31 @@ as one quiet chip. Faded and mastered routines always offer the full steps on
 request. Practice ids are routine-plus-date, so correcting today's data replaces
 today's record rather than pretending it was another day.
 
+**Onboarding and refresh.** First setup is a six-step wizard (`OnboardingStore`,
+`onboarding.store.svelte.ts`) — anchors, obligations, rituals, domains, week
+rhythm, voice — that mutates the planner directly as each step is answered
+rather than staging changes to commit at the end, so "finish later" is always
+safe: `settings.onboardingStep` checkpoints exactly which question was live,
+and a reload resumes there. Once `onboardingComplete` is true, though, that
+same six-step machinery had been the *only* way back into any of those
+questions — changing one setting meant "restart the wizard," which looks and
+feels like wiping progress even though the underlying data was untouched.
+**Refresh** is a second, independent entry point into the identical step
+components: `startRefresh([steps])` opens directly on whichever section(s)
+were picked from the Binder's sync tab, in that order, over the running app
+rather than in place of it — a fixed-position overlay layered above the
+Carillon shell, not a swap of `+page.svelte`'s top-level branch. Refresh
+never reads or writes `onboardingComplete`/`onboardingStep`; `mode` and its
+own `refreshSteps` queue are the only state involved, so a refresh session
+can never stub out a genuinely unfinished first-run checkpoint, and closing
+it (Escape, the backdrop-free "done for now," or completing the last chosen
+section) simply unmounts the overlay. The steps themselves needed no
+changes — they already read current settings/domains/etc. as their starting
+values, so revisiting one is inherently non-destructive. The original
+full-wizard reset (`resetOnboarding()`) still exists as a clearly separate,
+still-confirmed action for a genuine do-over, demoted beneath Refresh rather
+than removed.
+
 **Capacity** is a morning read of how much room today has, shown at the top of
 Today — before the sampler, so it lands before the day itself does. It is
 built entirely from what's already true rather than a form to fill out:
@@ -917,11 +942,11 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1544 tests total: 16 in `api/` (its own
+1552 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1528 across sixteen pnpm
-packages — `write` 72, `marginalia` 269, `planner` 478, `notebook` 28,
+instead of the recursive `pnpm -r test`), plus 1536 across sixteen pnpm
+packages — `write` 72, `marginalia` 269, `planner` 486, `notebook` 28,
 `spores` 140, `bestiary` 162, `bloomforge` 68, `bloomforge-player` 18,
 `packages/sync` 9, `packages/persistence` 6, `packages/app-manifest` 11,
 `packages/handoff` 15, `packages/text` 23, `packages/spellcraft` 16,
@@ -995,7 +1020,7 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (1544 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (1552 tests)
 pnpm check              svelte-check in every app
 pnpm build              build the nine SvelteKit apps
 ```

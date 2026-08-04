@@ -82,4 +82,74 @@ describe('OnboardingStore', () => {
 		expect(planner.settings.onboardingStep).toBeUndefined();
 		expect(planner.composing).toBe(true);
 	});
+
+	// ── refresh: revisiting a slice of setup mid-use ─────────────────
+
+	describe('refresh mode', () => {
+		beforeEach(() => {
+			planner.updateSettings({ onboardingComplete: true });
+		});
+
+		it('opens directly on the first chosen section', () => {
+			wizard.startRefresh([4, 2]);
+			expect(wizard.isRefreshing).toBe(true);
+			expect(wizard.stage).toBe(4);
+		});
+
+		it('does nothing for an empty selection', () => {
+			wizard.startRefresh([]);
+			expect(wizard.isRefreshing).toBe(false);
+		});
+
+		it('walks only the chosen sections, in the order given, then closes', () => {
+			wizard.startRefresh([1, 5]);
+			expect(wizard.stage).toBe(1);
+			wizard.advance();
+			expect(wizard.stage).toBe(5);
+			wizard.advance();
+			expect(wizard.isRefreshing).toBe(false);
+		});
+
+		it('never touches onboardingComplete or the resume checkpoint', () => {
+			wizard.startRefresh([1, 2, 3]);
+			wizard.advance();
+			wizard.advance();
+
+			expect(planner.settings.onboardingComplete).toBe(true);
+			expect(planner.settings.onboardingStep).toBeUndefined();
+		});
+
+		it('closes rather than backing past the first chosen section', () => {
+			wizard.startRefresh([3, 6]);
+			expect(wizard.canGoBack).toBe(false);
+			wizard.back();
+			expect(wizard.isRefreshing).toBe(false);
+		});
+
+		it('goes back to the previous chosen section, skipping unselected ones', () => {
+			wizard.startRefresh([2, 4]);
+			wizard.advance();
+			expect(wizard.stage).toBe(4);
+			expect(wizard.canGoBack).toBe(true);
+			wizard.back();
+			expect(wizard.stage).toBe(2);
+		});
+
+		it('closes on "done for now" (finishLater) without touching settings', () => {
+			wizard.startRefresh([1]);
+			wizard.finishLater();
+
+			expect(wizard.isRefreshing).toBe(false);
+			expect(planner.settings.onboardingComplete).toBe(true);
+			expect(planner.settings.onboardingStep).toBeUndefined();
+		});
+
+		it('leaves an in-progress real onboarding checkpoint alone if one exists', () => {
+			planner.updateSettings({ onboardingComplete: true, onboardingStep: 3 });
+			wizard.startRefresh([5]);
+			wizard.advance();
+
+			expect(planner.settings.onboardingStep).toBe(3);
+		});
+	});
 });
