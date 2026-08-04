@@ -4,8 +4,9 @@ The schema, validator, and simulation engine behind [Bloomforge](../../apps/bloo
 a studio for making incremental games, not an incremental game.
 
 Zero runtime dependencies, no DOM. The editor imports it, the balance runner
-imports it inside a Web Worker, and a player runtime would import it too. None
-of them import each other.
+imports it inside a Web Worker, and
+[the player](../../apps/bloomforge-player/README.md) imports it too. None of
+them import each other.
 
 ## the GameDef is the product
 
@@ -121,6 +122,18 @@ could drift, so drawing an edge in the editor is a *gesture that edits the def*.
 `connectionIntent(def, from, to)` says what a given drag would mean, so a drag
 either performs a real, describable edit or is refused with a reason.
 
+## saves
+
+`captureSave(sim)` and `createSim(def, policy, seed, save)` move a run in and
+out of JSON. Restoring is a **reconciliation against the current def**, not a
+load: a save outlives the design, so entities the author deleted are dropped,
+ones they added start at zero, levels past a newly-lowered cap are clamped, and
+a save from a different game is refused.
+
+The save carries the PRNG's state, not just its seed. Without that, reloading
+replays the rolls the run made in its first second — and save-and-reload
+becomes a way to reroll a bad crit.
+
 ## fixture
 
 `cozyGarden` is the garden from the mockup as a real project file
@@ -136,11 +149,12 @@ load rather than quietly producing different numbers.
 pnpm --filter @woodles/incremental-core test
 ```
 
-125 tests. The ones that matter most: determinism (two runs, same seed, deep
+144 tests. The ones that matter most: determinism (two runs, same seed, deep
 equal), a golden master worked out by hand in a comment above the test, curve
 behaviour per kind, the prestige round trip (resets wipe exactly `resets[]`,
 lifetime counters outside it survive, the multiplier applies), and greedy
-out-earning idle on every fixture.
+out-earning idle on every fixture, plus the save round trip — a resumed run has
+to produce byte-identical events to one that never stopped.
 
 That last one is measured on **lifetime**, not on the balance. Greedy spends,
 and a prestige zeroes what it holds, so the balance is not the invariant —

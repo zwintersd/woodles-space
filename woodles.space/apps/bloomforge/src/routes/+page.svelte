@@ -12,6 +12,7 @@
 	import { playtest } from '$lib/playtest.svelte.js';
 	import { studio } from '$lib/studio.svelte.js';
 	import { tour } from '$lib/tour.svelte.js';
+	import { flushSync as pushLibrary, initSync, syncState } from '$lib/sync.svelte.js';
 	import { findExampleProject, lastOpenedId, listProjects, loadProject, starterProject } from '$lib/projects.js';
 
 	let projects = $state(listProjects());
@@ -33,6 +34,9 @@
 		// is a working economy rather than an empty grid.
 		tour.boot();
 
+		// Picks up a stored passphrase and pulls whatever another device left.
+		void initSync();
+
 		const onBeforeUnload = () => studio.flush();
 		window.addEventListener('beforeunload', onBeforeUnload);
 		return () => {
@@ -41,6 +45,23 @@
 			playtest.pause();
 			balance.dispose();
 		};
+	});
+
+	/**
+	 * Pushes the shelf a beat after editing stops. Debounced well past the
+	 * autosave so a burst of typing is one request, and skipped while a sync is
+	 * already in flight so a conflict-merge write cannot feed itself.
+	 */
+	let pushTimer: ReturnType<typeof setTimeout> | null = null;
+	$effect(() => {
+		// Read the def so this reruns whenever it changes.
+		void studio.def;
+		if (!syncState.connected || syncState.syncing) return;
+		if (pushTimer) clearTimeout(pushTimer);
+		pushTimer = setTimeout(() => {
+			pushTimer = null;
+			void pushLibrary();
+		}, 2500);
 	});
 
 	function say(message: string): void {
@@ -156,6 +177,12 @@
 			say('Note added to the canvas');
 		}}
 		ontour={() => (tour.active ? tour.skip() : startTour())}
+		onplay={() => {
+			// Flushed first: the player reads the project straight out of storage,
+			// so an unsaved edit would be missing from the game it opens.
+			studio.flush();
+			window.open(`/play?game=${encodeURIComponent(studio.projectId)}`, '_blank', 'noopener');
+		}}
 	/>
 
 	<main class:dock-collapsed={dockCollapsed}>

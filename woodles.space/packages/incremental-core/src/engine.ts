@@ -15,6 +15,7 @@ import {
 	type SimResult,
 	type SimState
 } from './state.js';
+import { restoreMilestoneTimes, restoreState, saveMatches, serializeState, SAVE_VERSION, type SaveGame } from './savegame.js';
 import type { GameDef, Generator, Milestone, PrestigeLayer, Unlock, Upgrade } from './types.js';
 import { hasErrors, validateGameDef } from './validate.js';
 
@@ -110,12 +111,23 @@ export class Simulation {
 	/** The currency each generator pays into. Stable objects, resolved once. */
 	private readonly sinks: (CurrencyState | undefined)[] = [];
 
-	constructor(def: GameDef, policy: PlayerPolicy, seed: number) {
+	/** The seed this run was created with, so a save can replay it. */
+	readonly seed: number;
+
+	/** Where the random stream has got to, for a save that resumes it exactly. */
+	get rngState(): number {
+		return this.rng.state;
+	}
+
+	constructor(def: GameDef, policy: PlayerPolicy, seed: number, save?: SaveGame) {
 		this.def = def;
 		this.policy = policy;
-		this.rng = createRng(seed);
+		this.seed = seed;
+		this.rng = createRng(seed, save && saveMatches(def, save) ? save.rngState : undefined);
 		this.gated = gatedIds(def);
-		this.simState = initialState(def);
+		// A save is reconciled against the current def rather than trusted: the
+		// author keeps editing the game after people have started playing it.
+		this.simState = save && saveMatches(def, save) ? restoreState(def, save) : initialState(def);
 		this.modifiers = resolveModifiers(def, this.simState);
 
 		// Built once. A `find` per lookup is invisible at ten entities and
@@ -130,6 +142,23 @@ export class Simulation {
 
 		this.pendingUnlocks = [...def.unlocks];
 		this.pendingMilestones = [...def.milestones];
+
+		if (save && saveMatches(def, save)) {
+			this.ticks = Math.round(this.simState.gameTime * TICKS_PER_SECOND);
+			this.requested = this.simState.gameTime;
+			Object.assign(this.milestoneTimes, restoreMilestoneTimes(def, save));
+			for (const layer of def.prestigeLayers) {
+				this.prestigeCounts[layer.id] = this.simState.prestige[layer.id]?.count ?? 0;
+			}
+			// An unlock whose reveals are all already showing has fired; re-arming
+			// it would spam the log with openings the player saw sessions ago.
+			this.pendingUnlocks = this.pendingUnlocks.filter(
+				(unlock) => !unlock.reveals.length || !unlock.reveals.every((id) => this.simState.unlocked.has(id))
+			);
+			this.pendingMilestones = this.pendingMilestones.filter(
+				(milestone) => this.milestoneTimes[milestone.id] === null
+			);
+		}
 
 		// One object for the whole run, so the per-tick policy call allocates nothing.
 		this.context = {
@@ -562,9 +591,25 @@ export function simulate(def: GameDef, policy: PlayerPolicy, opts: SimOptions): 
 	};
 }
 
-/** Incremental variant for the live playtest dock. */
-export function createSim(def: GameDef, policy: PlayerPolicy, seed: number): Simulation {
-	return new Simulation(def, policy, seed);
+/**
+ * Incremental variant, for the live playtest dock and for the player runtime.
+ * Pass a `save` to resume where somebody left off.
+ */
+export function createSim(def: GameDef, policy: PlayerPolicy, seed: number, save?: SaveGame): Simulation {
+	return new Simulation(def, policy, seed, save);
+}
+
+/** Snapshots a running game into something JSON can hold. */
+export function captureSave(sim: Simulation): SaveGame {
+	return {
+		version: SAVE_VERSION,
+		gameId: sim.def.meta.id,
+		savedAt: new Date().toISOString(),
+		seed: sim.seed,
+		rngState: sim.rngState,
+		state: serializeState(sim.state()),
+		milestoneTimes: { ...sim.milestoneTimeline }
+	};
 }
 
 /**

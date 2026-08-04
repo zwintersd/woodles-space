@@ -12,13 +12,23 @@ export interface Rng {
 	next(): number;
 	/** The seed this generator was created with, for reproducing a run. */
 	readonly seed: number;
+	/**
+	 * The whole of the generator's memory, as one number. A save records it so a
+	 * reloaded game continues the same stream of luck rather than replaying the
+	 * rolls it made in its first second — which would make save-and-reload a way
+	 * to reroll a bad crit.
+	 */
+	readonly state: number;
 }
 
-export function createRng(seed: number): Rng {
+export function createRng(seed: number, resumeFrom?: number): Rng {
 	// Force to uint32 so a float or negative seed still gives a usable state.
-	let state = Math.trunc(seed) >>> 0;
+	let state = Number.isFinite(resumeFrom as number) ? (resumeFrom as number) >>> 0 : Math.trunc(seed) >>> 0;
 	return {
 		seed,
+		get state(): number {
+			return state;
+		},
 		next(): number {
 			state = (state + 0x6d2b79f5) >>> 0;
 			let t = state;

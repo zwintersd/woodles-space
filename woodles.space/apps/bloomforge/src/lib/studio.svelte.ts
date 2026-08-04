@@ -95,6 +95,22 @@ export class Studio {
 	}
 
 	/**
+	 * Re-reads the open project from storage. Called after a sync writes a newer
+	 * copy from another device, so the editor never sits showing a version that
+	 * is no longer what's on disk. The undo stack is dropped deliberately: it
+	 * describes edits to a document this one has just replaced.
+	 */
+	reloadOpenProject(): void {
+		if (!this.projectId) return;
+		const fresh = loadProject(this.projectId);
+		if (!fresh) return;
+		this.def = fresh;
+		this.#past = [];
+		this.#future = [];
+		this.saveState = 'saved';
+	}
+
+	/**
 	 * Starts a new project. Pass a `def` to seed it with something other than
 	 * the default starter — the tour uses a genuinely empty one, so every piece
 	 * the learner ends up with is a piece they put there.

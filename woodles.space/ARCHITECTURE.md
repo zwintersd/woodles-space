@@ -91,7 +91,8 @@ woodles.space/
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
     ├── spores/              SvelteKit · the knowledge base — linked entries, gathered into spellbooks
     ├── thinking-about/      SvelteKit · a board for what's being read, played, and watched
-    └── bloomforge/          SvelteKit · a studio for making incremental games
+    ├── bloomforge/          SvelteKit · a studio for making incremental games
+    └── bloomforge-player/   SvelteKit · the runtime that makes those games playable
 ```
 
 `animations/` is the Python/Manim authoring side of Hygge's motion workshop. it
@@ -107,7 +108,7 @@ the repository or silently promoting an experiment into a game.
 ## the app manifest
 
 `packages/app-manifest/src/index.js` is the canonical deployable-app inventory.
-It owns the 17 app ids, names, public paths and aliases, app shape, source and
+It owns the 18 app ids, names, public paths and aliases, app shape, source and
 output locations, maturity, and landing visibility. It also owns the landing
 tile order/copy, **band**, default pins, featured fallback, and Marginalia's
 Reading Room sub-surface. A band is the *moment* a tile is for rather than the
@@ -142,7 +143,8 @@ and its bloom post-processing addons from a CDN through a `<script
 type="importmap">`, still with no build step.
 
 **SvelteKit apps** — `write`, `marginalia`, `planner`, `notebook`, `bestiary`,
-`spores`, `thinking-about`, `bloomforge` — use Svelte 5 runes, Vite 7, and `@sveltejs/adapter-static`.
+`spores`, `thinking-about`, `bloomforge`, `bloomforge-player` — use Svelte 5 runes,
+Vite 7, and `@sveltejs/adapter-static`.
 each builds to `apps/<name>/dist/` and consumes `shared/` through the `@shared`
 Vite alias (`../../shared`). there is no SSR; every app ships as a static bundle.
 
@@ -360,10 +362,42 @@ anything and pressing play showed zeroes forever) and a playtest that kept
 running the def it was built from, so edits were invisible until you found the
 reset button.
 
-Out of scope for now, and named here so nobody goes looking: the player runtime
-that turns a `GameDef` into a playable build, and the art/audio/localization
-resource panels the mockup showed. The schema leaves room (`Currency.symbol` as
-a sprite reference) but nothing is built.
+**`bloomforge-player` is the third consumer of the schema**, and the one that
+proves the split was worth making. It takes a `GameDef` and renders a game: buy
+buttons, an upgrade shop, prestige, milestones. It drives the same `createSim`
+the studio's playtest dock does, differing in exactly two ways — 1× real time,
+and `idlePolicy`, because the engine must buy *nothing* when every purchase is
+a person deciding to make it. The buttons dispatch the same `Action`s a policy
+would have returned.
+
+The studio's "Play it" hands over `?game=<project id>` rather than a definition
+in the URL: both apps sit on one origin, so the player reads the same
+localStorage entries the studio writes, and a link can't go stale against an
+edited game. The key names and blob shapes live in the core
+(`library.ts`) rather than in either app, which is what stops the two drifting.
+
+**Saves are reconciled, not trusted.** A save outlives the design — the author
+keeps editing after people have started playing — so restoring one starts from
+a fresh state for the *current* def and lays the saved numbers over the top
+where both agree. Entities the author deleted are dropped, entities they added
+start at zero, levels past a newly-lowered cap are clamped. A save also records
+where the random stream had got to; without that, reloading replays the crit
+rolls of the first second, and save-and-reload becomes a way to reroll a bad
+one.
+
+**Sync moves the whole shelf.** The blob is the project index plus every
+definition, because syncing only the open project would quietly lose the rest.
+The merge is per project, newest wins, and deliberately order-independent —
+`createAppSync` retries a merged snapshot against the version it just observed,
+and an order-dependent merge would ping-pong instead of settling. Editing a
+different game on each device leaves you holding both.
+
+Still out of scope, and named here so nobody goes looking: offline progress
+(the player clamps a backgrounded tab's frame delta rather than paying it out,
+because offline earnings are a design decision, not an accident of rAF) and the
+art/audio/localization resource panels the mockup showed. The schema leaves
+room for the latter (`Currency.symbol` as a sprite reference) but nothing is
+built.
 
 ## the local-first persistence layer
 
@@ -823,15 +857,15 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1451 tests total: 16 in `api/` (its own
+1497 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1435 across fifteen pnpm
+instead of the recursive `pnpm -r test`), plus 1481 across sixteen pnpm
 packages — `write` 72, `marginalia` 269, `planner` 431, `notebook` 28,
-`spores` 140, `bestiary` 162, `bloomforge` 59, `packages/sync` 9,
-`packages/persistence` 6, `packages/app-manifest` 11,
+`spores` 140, `bestiary` 162, `bloomforge` 68, `bloomforge-player` 18,
+`packages/sync` 9, `packages/persistence` 6, `packages/app-manifest` 11,
 `packages/handoff` 15, `packages/text` 23, `packages/spellcraft` 16,
-`packages/incremental-core` 125, and `thinking-about` 69.
+`packages/incremental-core` 144, and `thinking-about` 69.
 keep this inventory current when a suite changes; the root command is the
 release contract, not the prose count.
 
@@ -883,8 +917,8 @@ working tree.
 
 ## svelte-check
 
-All eight SvelteKit apps currently pass with zero errors and zero warnings.
-`pnpm -r check` runs all eight in turn. it stops at the first app that fails,
+All nine SvelteKit apps currently pass with zero errors and zero warnings.
+`pnpm -r check` runs all nine in turn. it stops at the first app that fails,
 so when diagnosing a new break, run the app directly to see past it.
 
 ## continuous integration
@@ -901,9 +935,9 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (1451 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (1497 tests)
 pnpm check              svelte-check in every app
-pnpm build              build the eight SvelteKit apps
+pnpm build              build the nine SvelteKit apps
 ```
 
 both `test` and `check` generate `.svelte-kit/` themselves on a fresh clone, so

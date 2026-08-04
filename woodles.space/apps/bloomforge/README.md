@@ -69,7 +69,14 @@ at this data size, and "correct" is what you want from the thing people reach
 for right after breaking something. A drag is one undo step, not one per frame.
 
 Projects autosave to `localStorage` through `@woodles/persistence`, with JSON
-export/import. `@woodles/sync` is deliberately not wired in yet.
+export/import.
+
+**Sync moves the whole shelf**, not the open project — syncing one game would
+quietly lose the rest. The blob is the index plus every definition, and the
+merge is per project, newest wins, and deliberately *order-independent*:
+`createAppSync` retries a merged snapshot against the version it just observed,
+and an order-dependent merge would ping-pong instead of settling. Editing a
+different game on each device leaves you holding both.
 
 Playtest state is throwaway and never written back into the def: watching a run
 must not edit the game.
@@ -78,12 +85,19 @@ must not edit the game.
 
 ```bash
 pnpm --filter bloomforge dev
-pnpm --filter bloomforge test     # 59 tests
+pnpm --filter bloomforge test     # 68 tests
 pnpm --filter bloomforge check
 ```
 
+## handing it to a player
+
+**Play it** opens [the player](../bloomforge-player/README.md) on the current
+project. It passes `?game=<project id>` rather than a definition, because both
+apps share an origin and a link carrying data would go stale the moment you
+edited the game. The playtest dock simulates a player; this hands the real
+thing to a real one, off the same engine and the same def.
+
 ## not built
 
-The player runtime that turns a `GameDef` into a playable build, and the
-art/audio/localization resource panels from the mockup. The schema leaves room
-for the latter (`Currency.symbol` as a sprite reference); nothing is built.
+The art/audio/localization resource panels from the mockup. The schema leaves
+room (`Currency.symbol` as a sprite reference); nothing is built.

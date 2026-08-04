@@ -1,5 +1,5 @@
 {
-  "name": "bloomforge",
+  "name": "bloomforge-player",
   "private": true,
   "version": "0.0.1",
   "type": "module",
@@ -12,9 +12,7 @@
   },
   "dependencies": {
     "@woodles/incremental-core": "workspace:*",
-    "@woodles/persistence": "workspace:*",
-    "@woodles/sync": "workspace:*",
-    "@xyflow/svelte": "^1.6.2"
+    "@woodles/persistence": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.0",
