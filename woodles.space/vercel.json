@@ -54,6 +54,8 @@
     { "source": "/bestiary",                  "destination": "/apps/bestiary/dist/index.html" },
     { "source": "/bestiary/:path*",           "destination": "/apps/bestiary/dist/:path*" },
     { "source": "/thinking-about",            "destination": "/apps/thinking-about/dist/index.html" },
-    { "source": "/thinking-about/:path*",     "destination": "/apps/thinking-about/dist/:path*" }
+    { "source": "/thinking-about/:path*",     "destination": "/apps/thinking-about/dist/:path*" },
+    { "source": "/bloomforge",                "destination": "/apps/bloomforge/dist/index.html" },
+    { "source": "/bloomforge/:path*",         "destination": "/apps/bloomforge/dist/:path*" }
   ]
 }

@@ -1,0 +1,371 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "id": "cozy-garden",
+    "title": "My Cozy Incremental",
+    "description": "The garden from the Bloomforge mockup, built as a real definition: two currencies, two generators, four upgrades, one prestige layer."
+  },
+  "currencies": [
+    {
+      "id": "soft-petals",
+      "name": "Soft Petals",
+      "symbol": "🌸",
+      "color": "#A78BFA",
+      "format": {
+        "decimalPlaces": 2,
+        "notation": "thousands"
+      }
+    },
+    {
+      "id": "rebirth-petals",
+      "name": "Rebirth Petals",
+      "symbol": "🌺",
+      "color": "#F0A6C8",
+      "format": {
+        "decimalPlaces": 0,
+        "notation": "thousands"
+      }
+    }
+  ],
+  "generators": [
+    {
+      "id": "petal-farm",
+      "name": "Petal Farm",
+      "producesCurrencyId": "soft-petals",
+      "baseRate": 4.8,
+      "rateCurve": {
+        "kind": "polynomial",
+        "exponent": 1
+      },
+      "cost": {
+        "currencyId": "soft-petals",
+        "base": 15,
+        "curve": {
+          "kind": "geometric",
+          "growth": 1.14
+        }
+      },
+      "startsOwned": 1
+    },
+    {
+      "id": "cloud-nursery",
+      "name": "Cloud Nursery",
+      "producesCurrencyId": "soft-petals",
+      "baseRate": 20,
+      "rateCurve": {
+        "kind": "polynomial",
+        "exponent": 1
+      },
+      "cost": {
+        "currencyId": "soft-petals",
+        "base": 500,
+        "curve": {
+          "kind": "geometric",
+          "growth": 1.16
+        }
+      }
+    }
+  ],
+  "upgrades": [
+    {
+      "id": "green-thumb",
+      "name": "Green Thumb",
+      "description": "Warm hands, better beds. Petal Farm output grows by half again each level.",
+      "cost": {
+        "currencyId": "soft-petals",
+        "amount": 400
+      },
+      "repeatable": {
+        "maxLevel": 10,
+        "costCurve": {
+          "kind": "geometric",
+          "growth": 2
+        }
+      },
+      "effects": [
+        {
+          "target": {
+            "type": "generator",
+            "id": "petal-farm"
+          },
+          "stat": "rate",
+          "op": "mul",
+          "value": 1.5
+        }
+      ]
+    },
+    {
+      "id": "bloom-boost",
+      "name": "Bloom Boost",
+      "description": "Every source of Soft Petals blooms a little harder.",
+      "cost": {
+        "currencyId": "soft-petals",
+        "amount": 1000
+      },
+      "repeatable": {
+        "maxLevel": 10,
+        "costCurve": {
+          "kind": "geometric",
+          "growth": 2
+        }
+      },
+      "effects": [
+        {
+          "target": {
+            "type": "currency",
+            "id": "soft-petals"
+          },
+          "stat": "rate",
+          "op": "mul",
+          "value": 1.2
+        }
+      ]
+    },
+    {
+      "id": "golden-touch",
+      "name": "Golden Touch",
+      "description": "A five-percent chance per level that the Petal Farm's tick pays double.",
+      "cost": {
+        "currencyId": "soft-petals",
+        "amount": 25000
+      },
+      "repeatable": {
+        "maxLevel": 10,
+        "costCurve": {
+          "kind": "geometric",
+          "growth": 2.5
+        }
+      },
+      "effects": [
+        {
+          "target": {
+            "type": "generator",
+            "id": "petal-farm"
+          },
+          "stat": "critChance",
+          "op": "add",
+          "value": 0.05
+        }
+      ],
+      "visibleWhen": {
+        "metric": "generatorLevel",
+        "generatorId": "petal-farm",
+        "op": ">=",
+        "value": 10
+      }
+    },
+    {
+      "id": "eternal-garden",
+      "name": "Eternal Garden",
+      "description": "The garden keeps itself. Doubles everything, once Golden Touch is fully grown.",
+      "cost": {
+        "currencyId": "soft-petals",
+        "amount": 250000
+      },
+      "effects": [
+        {
+          "target": {
+            "type": "global"
+          },
+          "stat": "rate",
+          "op": "mul",
+          "value": 2
+        }
+      ],
+      "purchasableWhen": {
+        "metric": "upgradeOwned",
+        "upgradeId": "golden-touch",
+        "level": 10
+      }
+    }
+  ],
+  "prestigeLayers": [
+    {
+      "id": "rebirth",
+      "name": "Rebirth",
+      "currencyId": "rebirth-petals",
+      "gainFormula": {
+        "sourceCurrencyId": "soft-petals",
+        "threshold": 1000000,
+        "exponent": 0.5
+      },
+      "multiplier": {
+        "perUnit": 0.01
+      },
+      "resets": [
+        "soft-petals",
+        "petal-farm",
+        "cloud-nursery",
+        "green-thumb",
+        "bloom-boost",
+        "golden-touch",
+        "eternal-garden"
+      ],
+      "availableWhen": {
+        "metric": "currencyLifetime",
+        "currencyId": "soft-petals",
+        "op": ">=",
+        "value": 1000000
+      }
+    }
+  ],
+  "unlocks": [
+    {
+      "id": "unlock-nursery",
+      "name": "Clouds Gather",
+      "reveals": [
+        "cloud-nursery"
+      ],
+      "when": {
+        "metric": "currencyLifetime",
+        "currencyId": "soft-petals",
+        "op": ">=",
+        "value": 2000
+      }
+    },
+    {
+      "id": "unlock-eternal",
+      "name": "Something Lasting",
+      "reveals": [
+        "eternal-garden"
+      ],
+      "when": {
+        "metric": "upgradeOwned",
+        "upgradeId": "golden-touch",
+        "level": 5
+      }
+    },
+    {
+      "id": "unlock-rebirth",
+      "name": "The Long Season",
+      "reveals": [
+        "rebirth"
+      ],
+      "when": {
+        "metric": "currencyLifetime",
+        "currencyId": "soft-petals",
+        "op": ">=",
+        "value": 1000000
+      }
+    }
+  ],
+  "milestones": [
+    {
+      "id": "first-thousand",
+      "name": "1K Soft Petals",
+      "when": {
+        "metric": "currencyLifetime",
+        "currencyId": "soft-petals",
+        "op": ">=",
+        "value": 1000
+      }
+    },
+    {
+      "id": "hundred-thousand",
+      "name": "100K Soft Petals",
+      "when": {
+        "metric": "currencyLifetime",
+        "currencyId": "soft-petals",
+        "op": ">=",
+        "value": 100000
+      }
+    },
+    {
+      "id": "one-million",
+      "name": "1M Soft Petals",
+      "when": {
+        "metric": "currencyLifetime",
+        "currencyId": "soft-petals",
+        "op": ">=",
+        "value": 1000000
+      }
+    },
+    {
+      "id": "first-rebirth",
+      "name": "First Rebirth",
+      "when": {
+        "metric": "prestigeCount",
+        "layerId": "rebirth",
+        "op": ">=",
+        "value": 1
+      }
+    }
+  ],
+  "notes": [
+    {
+      "id": "note-early-game",
+      "text": "Early game feels smooth! Consider increasing Golden Touch cost or requirement. Maybe add a soft cap to Petal Farm?",
+      "position": {
+        "x": 1230,
+        "y": 640
+      },
+      "color": "#F6D488"
+    }
+  ],
+  "layout": {
+    "first-thousand": {
+      "x": 60,
+      "y": -130
+    },
+    "hundred-thousand": {
+      "x": 300,
+      "y": -130
+    },
+    "one-million": {
+      "x": 540,
+      "y": -130
+    },
+    "soft-petals": {
+      "x": 380,
+      "y": 60
+    },
+    "rebirth-petals": {
+      "x": 1120,
+      "y": 60
+    },
+    "unlock-nursery": {
+      "x": 700,
+      "y": 190
+    },
+    "unlock-rebirth": {
+      "x": 900,
+      "y": 190
+    },
+    "first-rebirth": {
+      "x": 1400,
+      "y": 200
+    },
+    "petal-farm": {
+      "x": 140,
+      "y": 330
+    },
+    "cloud-nursery": {
+      "x": 620,
+      "y": 330
+    },
+    "rebirth": {
+      "x": 1120,
+      "y": 330
+    },
+    "green-thumb": {
+      "x": 60,
+      "y": 570
+    },
+    "bloom-boost": {
+      "x": 320,
+      "y": 570
+    },
+    "golden-touch": {
+      "x": 580,
+      "y": 570
+    },
+    "eternal-garden": {
+      "x": 880,
+      "y": 570
+    },
+    "unlock-eternal": {
+      "x": 700,
+      "y": 750
+    }
+  }
+}

@@ -1,0 +1,199 @@
+/*
+ * Bloomforge owns its own look, like every other SvelteKit app here — the
+ * eleven shared themes and `data-theme` don't reach it. Namespaced `--bf-*` on
+ * :root, no scoping class: the app is its own page, so there is nothing else in
+ * the DOM for it to leak onto.
+ *
+ * The palette is the mockup's: cream and blush ground, lavender/pink/mint
+ * pastels, generous rounding, shadows soft enough to read as paper rather than
+ * as elevation. Light mode only for the MVP.
+ */
+:root {
+	--bf-bg: #fdf7f4;
+	--bf-bg-tint: #f9eef4;
+	--bf-canvas: #fdfaf8;
+	--bf-surface: #ffffff;
+	--bf-surface-sunk: #faf6f9;
+
+	--bf-ink: #453a52;
+	--bf-ink-soft: #6a5d78;
+	--bf-muted: #8d7f99;
+	--bf-faint: #b0a4ba;
+
+	--bf-rule: rgba(105, 83, 122, 0.13);
+	--bf-rule-strong: rgba(105, 83, 122, 0.24);
+
+	/* Entity tints. Each kind owns a border, a fill and a text tone, and they
+	   are the same five hues the landing gradients use. */
+	--bf-currency: #d9a418;
+	--bf-currency-soft: #fdf1d4;
+	--bf-currency-line: #f0cf82;
+
+	--bf-generator: #3f9c6d;
+	--bf-generator-soft: #ddf3e7;
+	--bf-generator-line: #a3ddc0;
+
+	--bf-upgrade: #7c5ad6;
+	--bf-upgrade-soft: #ece5fb;
+	--bf-upgrade-line: #c3aef2;
+
+	--bf-prestige: #d2568f;
+	--bf-prestige-soft: #fce0ed;
+	--bf-prestige-line: #f3b0ce;
+
+	--bf-unlock: #3d8fbf;
+	--bf-unlock-soft: #ddeffa;
+	--bf-unlock-line: #a5d6ee;
+
+	--bf-milestone: #cf7d3c;
+	--bf-milestone-soft: #fceadb;
+	--bf-milestone-line: #f2c39a;
+
+	--bf-accent: #7c5ad6;
+	--bf-accent-soft: #ece5fb;
+	--bf-accent-strong: #6845bd;
+	--bf-on-accent: #ffffff;
+
+	--bf-danger: #b2445f;
+	--bf-danger-soft: #fadfe6;
+	--bf-warn: #b07d20;
+	--bf-warn-soft: #fbf0d5;
+
+	--bf-note: #fdf3cf;
+	--bf-note-line: #eed99a;
+
+	--bf-shadow-soft: 0 1px 2px rgba(105, 83, 122, 0.06), 0 6px 18px rgba(105, 83, 122, 0.08);
+	--bf-shadow-card: 0 1px 2px rgba(105, 83, 122, 0.07), 0 10px 26px rgba(105, 83, 122, 0.11);
+	--bf-shadow-lift: 0 2px 6px rgba(105, 83, 122, 0.1), 0 18px 40px rgba(105, 83, 122, 0.16);
+
+	--bf-radius-sm: 8px;
+	--bf-radius: 14px;
+	--bf-radius-lg: 20px;
+	--bf-radius-pill: 999px;
+
+	--bf-font-display: var(--font-display, 'Cormorant Garamond', Georgia, serif);
+	--bf-font-sans: var(--font-sans, 'Plus Jakarta Sans', system-ui, sans-serif);
+	--bf-font-mono: var(--font-mono, 'DM Mono', 'SFMono-Regular', Consolas, monospace);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+	margin: 0;
+}
+
+body {
+	background: var(--bf-bg);
+	color: var(--bf-ink);
+	font-family: var(--bf-font-sans);
+	font-size: 14px;
+	line-height: 1.5;
+	-webkit-font-smoothing: antialiased;
+}
+
+button {
+	font: inherit;
+	color: inherit;
+}
+
+input,
+select,
+textarea {
+	font: inherit;
+	color: inherit;
+}
+
+:where(button, input, select, textarea, [tabindex]):focus-visible {
+	outline: 2px solid var(--bf-accent);
+	outline-offset: 2px;
+	border-radius: var(--bf-radius-sm);
+}
+
+/* Shared small controls, used across the sidebar, inspector and dock. */
+.bf-field {
+	display: grid;
+	gap: 4px;
+	margin-bottom: 12px;
+}
+
+.bf-field > label,
+.bf-label {
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--bf-muted);
+}
+
+.bf-input,
+.bf-select {
+	width: 100%;
+	padding: 7px 10px;
+	border: 1px solid var(--bf-rule-strong);
+	border-radius: var(--bf-radius-sm);
+	background: var(--bf-surface);
+	color: var(--bf-ink);
+}
+
+.bf-input:focus,
+.bf-select:focus {
+	border-color: var(--bf-accent);
+	outline: none;
+	box-shadow: 0 0 0 3px var(--bf-accent-soft);
+}
+
+.bf-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	border: 1px solid var(--bf-rule-strong);
+	border-radius: var(--bf-radius-pill);
+	background: var(--bf-surface);
+	color: var(--bf-ink-soft);
+	cursor: pointer;
+	transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.bf-button:hover {
+	background: var(--bf-accent-soft);
+	border-color: var(--bf-upgrade-line);
+	color: var(--bf-accent-strong);
+}
+
+.bf-button[aria-pressed='true'] {
+	background: var(--bf-accent-soft);
+	border-color: var(--bf-accent);
+	color: var(--bf-accent-strong);
+}
+
+.bf-button:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.bf-button--primary {
+	background: var(--bf-accent);
+	border-color: var(--bf-accent);
+	color: var(--bf-on-accent);
+}
+
+.bf-button--primary:hover {
+	background: var(--bf-accent-strong);
+	border-color: var(--bf-accent-strong);
+	color: var(--bf-on-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.001ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.001ms !important;
+	}
+}
