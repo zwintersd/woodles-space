@@ -17,6 +17,8 @@ export * from './modifiers.js';
 export * from './entities.js';
 export * from './validate.js';
 export * from './serialize.js';
+export * from './savegame.js';
+export * from './library.js';
 export * from './engine.js';
 export * from './policies.js';
 export * from './graph.js';

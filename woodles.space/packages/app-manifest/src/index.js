@@ -226,6 +226,19 @@ export const appManifest = Object.freeze([
 		entryFile: 'index.html',
 		packageName: 'bloomforge',
 		landing: tile('bloomforge', 15, 'play', 'a studio for making incremental games: wire up an economy, then watch it run', 'var(--lavender)', 'var(--aqua)', '150deg')
+	},
+	{
+		id: 'bloomforge-player',
+		name: 'Bloomforge Player',
+		publicPath: '/play',
+		aliases: [],
+		kind: 'sveltekit',
+		maturity: 'growing',
+		sourceDir: 'apps/bloomforge-player',
+		outputDir: 'apps/bloomforge-player/dist',
+		entryFile: 'index.html',
+		packageName: 'bloomforge-player',
+		landing: tile('player', 16, 'play', 'play the incremental games you built in the studio', 'var(--peach)', 'var(--lavender)', '160deg')
 	}
 ]);
 

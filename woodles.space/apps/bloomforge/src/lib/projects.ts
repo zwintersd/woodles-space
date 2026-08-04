@@ -1,5 +1,16 @@
 import { createVersionedStorage } from '@woodles/persistence';
-import { cozyGarden, emptyGameDef, parseGameDef, type GameDef } from '@woodles/incremental-core';
+import {
+	cozyGarden,
+	emptyGameDef,
+	isProjectIndex,
+	LIBRARY_VERSION,
+	parseGameDef,
+	PROJECT_INDEX_KEY,
+	projectKey,
+	type GameDef,
+	type ProjectIndex,
+	type ProjectSummary
+} from '@woodles/incremental-core';
 
 /**
  * Projects live in localStorage, one entry per project plus an index. The
@@ -8,33 +19,21 @@ import { cozyGarden, emptyGameDef, parseGameDef, type GameDef } from '@woodles/i
  * editor has stopped moving.
  */
 
-const INDEX_KEY = 'bloomforge-projects';
-const PROJECT_PREFIX = 'bloomforge-project';
-const STORAGE_VERSION = 1;
-
-export interface ProjectSummary {
-	id: string;
-	title: string;
-	updatedAt: string;
-}
-
-interface ProjectIndex {
-	projects: ProjectSummary[];
-	lastOpenedId: string | null;
-}
+// Key names and blob shapes come from the core so the player, which reads the
+// very same entries, cannot drift from what the studio writes.
+export type { ProjectSummary };
 
 const indexStore = createVersionedStorage<ProjectIndex>({
-	key: INDEX_KEY,
-	version: STORAGE_VERSION,
+	key: PROJECT_INDEX_KEY,
+	version: LIBRARY_VERSION,
 	fallback: () => ({ projects: [], lastOpenedId: null }),
-	validate: (value): value is ProjectIndex =>
-		!!value && typeof value === 'object' && Array.isArray((value as ProjectIndex).projects)
+	validate: isProjectIndex
 });
 
 function projectStore(id: string) {
 	return createVersionedStorage<GameDef>({
-		key: `${PROJECT_PREFIX}:${id}`,
-		version: STORAGE_VERSION,
+		key: projectKey(id),
+		version: LIBRARY_VERSION,
 		fallback: () => emptyGameDef(),
 		// The def is re-validated on the way in as well as on the way out: a
 		// half-written localStorage entry should fall back to the backup copy
@@ -83,8 +82,8 @@ export function markOpened(id: string): void {
 
 export function deleteProject(id: string): void {
 	try {
-		localStorage.removeItem(`${PROJECT_PREFIX}:${id}`);
-		localStorage.removeItem(`${PROJECT_PREFIX}:${id}.backup`);
+		localStorage.removeItem(projectKey(id));
+		localStorage.removeItem(`${projectKey(id)}.backup`);
 	} catch {
 		// A browser that refuses to remove an item will also refuse to save, and
 		// the index update below is what actually takes the project out of view.
@@ -95,6 +94,40 @@ export function deleteProject(id: string): void {
 		projects,
 		lastOpenedId: index.lastOpenedId === id ? (projects[0]?.id ?? null) : index.lastOpenedId
 	});
+}
+
+// ── the whole shelf, for sync ────────────────────────────────────────────
+
+/**
+ * Every project in one blob: the index, plus each definition keyed by project
+ * id. This is the unit `@woodles/sync` moves, because syncing a single project
+ * would quietly lose the rest.
+ */
+export interface LibraryBlob {
+	index: ProjectIndex;
+	defs: Record<string, GameDef>;
+}
+
+export function readLibrary(): LibraryBlob {
+	const index = indexStore.load().value;
+	const defs: Record<string, GameDef> = {};
+	for (const summary of index.projects) {
+		const def = loadProject(summary.id);
+		if (def) defs[summary.id] = def;
+	}
+	// Only projects whose definition actually loaded: shipping an index entry
+	// with nothing behind it would give the other device a phantom project.
+	return { index: { ...index, projects: index.projects.filter((summary) => defs[summary.id]) }, defs };
+}
+
+/** Applies a synced shelf locally, replacing what was here. */
+export function writeLibrary(blob: LibraryBlob): void {
+	for (const summary of blob.index.projects) {
+		const def = blob.defs[summary.id];
+		if (!def) continue;
+		projectStore(summary.id).save(def);
+	}
+	indexStore.save(blob.index);
 }
 
 /** A fresh project id. Time-ordered so the picker's sort is stable without a clock skew fight. */

@@ -3,6 +3,7 @@
 	import { playtest } from './playtest.svelte.js';
 	import { studio } from './studio.svelte.js';
 	import { tour } from './tour.svelte.js';
+	import SyncPanel from './SyncPanel.svelte';
 
 	interface Props {
 		projects: ProjectSummary[];
@@ -12,9 +13,10 @@
 		onimport: () => void;
 		onaddnote: () => void;
 		ontour: () => void;
+		onplay: () => void;
 	}
 
-	let { projects, onopen, oncreate, onexport, onimport, onaddnote, ontour }: Props = $props();
+	let { projects, onopen, oncreate, onexport, onimport, onaddnote, ontour, onplay }: Props = $props();
 
 	let menuOpen = $state(false);
 
@@ -98,8 +100,15 @@
 		</button>
 		<button class="bf-button" type="button" onclick={onimport}>Import</button>
 		<button class="bf-button" type="button" onclick={onexport}>Export</button>
+		<SyncPanel />
+		<span class="divider" aria-hidden="true"></span>
 		<button class="bf-button bf-button--primary play" type="button" onclick={() => playtest.toggle(studio.def)}>
 			{playtest.running ? '❙❙ Pause' : playtest.stale && playtest.elapsed > 0 ? '▶ Restart' : '▶ Playtest'}
+		</button>
+		<!-- The playtest is a simulation of a player; this hands the real game to
+		     a real one. Same engine, same def, no export step in between. -->
+		<button class="bf-button publish" type="button" onclick={onplay} title="Open this game in the player">
+			🌸 Play it
 		</button>
 	</div>
 </header>
@@ -277,6 +286,10 @@
 	.play {
 		min-width: 104px;
 		justify-content: center;
+	}
+
+	.publish {
+		white-space: nowrap;
 	}
 
 	.help {

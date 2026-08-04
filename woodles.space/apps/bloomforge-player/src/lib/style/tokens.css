@@ -1,0 +1,195 @@
+/*
+ * The player wears the studio's palette so a game you made looks like the tool
+ * you made it in — same cream and blush ground, same pastels. Namespaced
+ * `--bp-*` rather than importing the studio's file, because the two apps build
+ * separately and an app owning its own look is the convention here.
+ */
+:root {
+	--bp-bg: #fdf7f4;
+	--bp-bg-tint: #f9eef4;
+	--bp-canvas: #fdfaf8;
+	--bp-surface: #ffffff;
+	--bp-surface-sunk: #faf6f9;
+
+	--bp-ink: #453a52;
+	--bp-ink-soft: #6a5d78;
+	--bp-muted: #8d7f99;
+	--bp-faint: #b0a4ba;
+
+	--bp-rule: rgba(105, 83, 122, 0.13);
+	--bp-rule-strong: rgba(105, 83, 122, 0.24);
+
+	/* Entity tints. Each kind owns a border, a fill and a text tone, and they
+	   are the same five hues the landing gradients use. */
+	--bp-currency: #d9a418;
+	--bp-currency-soft: #fdf1d4;
+	--bp-currency-line: #f0cf82;
+
+	--bp-generator: #3f9c6d;
+	--bp-generator-soft: #ddf3e7;
+	--bp-generator-line: #a3ddc0;
+
+	--bp-upgrade: #7c5ad6;
+	--bp-upgrade-soft: #ece5fb;
+	--bp-upgrade-line: #c3aef2;
+
+	--bp-prestige: #d2568f;
+	--bp-prestige-soft: #fce0ed;
+	--bp-prestige-line: #f3b0ce;
+
+	--bp-unlock: #3d8fbf;
+	--bp-unlock-soft: #ddeffa;
+	--bp-unlock-line: #a5d6ee;
+
+	--bp-milestone: #cf7d3c;
+	--bp-milestone-soft: #fceadb;
+	--bp-milestone-line: #f2c39a;
+
+	--bp-accent: #7c5ad6;
+	--bp-accent-soft: #ece5fb;
+	--bp-accent-strong: #6845bd;
+	--bp-on-accent: #ffffff;
+
+	--bp-danger: #b2445f;
+	--bp-danger-soft: #fadfe6;
+	--bp-warn: #b07d20;
+	--bp-warn-soft: #fbf0d5;
+
+	--bp-note: #fdf3cf;
+	--bp-note-line: #eed99a;
+
+	--bp-shadow-soft: 0 1px 2px rgba(105, 83, 122, 0.06), 0 6px 18px rgba(105, 83, 122, 0.08);
+	--bp-shadow-card: 0 1px 2px rgba(105, 83, 122, 0.07), 0 10px 26px rgba(105, 83, 122, 0.11);
+	--bp-shadow-lift: 0 2px 6px rgba(105, 83, 122, 0.1), 0 18px 40px rgba(105, 83, 122, 0.16);
+
+	--bp-radius-sm: 8px;
+	--bp-radius: 14px;
+	--bp-radius-lg: 20px;
+	--bp-radius-pill: 999px;
+
+	--bp-font-display: var(--font-display, 'Cormorant Garamond', Georgia, serif);
+	--bp-font-sans: var(--font-sans, 'Plus Jakarta Sans', system-ui, sans-serif);
+	--bp-font-mono: var(--font-mono, 'DM Mono', 'SFMono-Regular', Consolas, monospace);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+	margin: 0;
+}
+
+body {
+	background: var(--bp-bg);
+	color: var(--bp-ink);
+	font-family: var(--bp-font-sans);
+	font-size: 14px;
+	line-height: 1.5;
+	-webkit-font-smoothing: antialiased;
+}
+
+button {
+	font: inherit;
+	color: inherit;
+}
+
+input,
+select,
+textarea {
+	font: inherit;
+	color: inherit;
+}
+
+:where(button, input, select, textarea, [tabindex]):focus-visible {
+	outline: 2px solid var(--bp-accent);
+	outline-offset: 2px;
+	border-radius: var(--bp-radius-sm);
+}
+
+/* Shared small controls, used across the sidebar, inspector and dock. */
+.bp-field {
+	display: grid;
+	gap: 4px;
+	margin-bottom: 12px;
+}
+
+.bp-field > label,
+.bp-label {
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--bp-muted);
+}
+
+.bp-input,
+.bp-select {
+	width: 100%;
+	padding: 7px 10px;
+	border: 1px solid var(--bp-rule-strong);
+	border-radius: var(--bp-radius-sm);
+	background: var(--bp-surface);
+	color: var(--bp-ink);
+}
+
+.bp-input:focus,
+.bp-select:focus {
+	border-color: var(--bp-accent);
+	outline: none;
+	box-shadow: 0 0 0 3px var(--bp-accent-soft);
+}
+
+.bp-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	border: 1px solid var(--bp-rule-strong);
+	border-radius: var(--bp-radius-pill);
+	background: var(--bp-surface);
+	color: var(--bp-ink-soft);
+	cursor: pointer;
+	transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.bp-button:hover {
+	background: var(--bp-accent-soft);
+	border-color: var(--bp-upgrade-line);
+	color: var(--bp-accent-strong);
+}
+
+.bp-button[aria-pressed='true'] {
+	background: var(--bp-accent-soft);
+	border-color: var(--bp-accent);
+	color: var(--bp-accent-strong);
+}
+
+.bp-button:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.bp-button--primary {
+	background: var(--bp-accent);
+	border-color: var(--bp-accent);
+	color: var(--bp-on-accent);
+}
+
+.bp-button--primary:hover {
+	background: var(--bp-accent-strong);
+	border-color: var(--bp-accent-strong);
+	color: var(--bp-on-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.001ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.001ms !important;
+	}
+}
