@@ -188,6 +188,28 @@ textarea {
 	color: var(--bf-on-accent);
 }
 
+/*
+ * The tour's spotlight. Applied by whichever component owns the target, which
+ * is why it lives here rather than in any one of them — a ring drawn from
+ * outside would have to guess at border radii it doesn't own.
+ */
+.bf-spotlight {
+	position: relative;
+	box-shadow: 0 0 0 3px var(--bf-accent-soft), 0 0 0 4.5px var(--bf-accent);
+	border-radius: var(--bf-radius-sm);
+	animation: bf-pulse 1.9s ease-in-out infinite;
+}
+
+@keyframes bf-pulse {
+	0%,
+	100% {
+		box-shadow: 0 0 0 3px var(--bf-accent-soft), 0 0 0 4.5px var(--bf-accent);
+	}
+	50% {
+		box-shadow: 0 0 0 6px var(--bf-accent-soft), 0 0 0 7px var(--bf-accent);
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
 	*,
 	*::before,

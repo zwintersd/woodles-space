@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { playtest } from '../playtest.svelte.js';
+	import { tour } from '../tour.svelte.js';
 	import BalanceTab from './BalanceTab.svelte';
 	import LogTab from './LogTab.svelte';
 	import NotesTab from './NotesTab.svelte';
@@ -30,6 +31,7 @@
 				role="tab"
 				type="button"
 				id="bf-tab-{tab.id}"
+				class:bf-spotlight={tour.spotlight === tab.id && active !== tab.id}
 				aria-selected={active === tab.id}
 				aria-controls="bf-panel-{tab.id}"
 				tabindex={active === tab.id ? 0 : -1}

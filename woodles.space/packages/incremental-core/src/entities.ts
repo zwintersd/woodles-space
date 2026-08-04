@@ -66,6 +66,20 @@ export const ENTITY_KIND_LABELS: Record<EntityKind, string> = {
 };
 
 /**
+ * Singular labels, written out rather than derived by trimming an "s" — that
+ * trick yields "currencie" and "prestig", which is exactly the sort of thing
+ * only a screen reader user ever hears.
+ */
+export const ENTITY_KIND_SINGULAR: Record<EntityKind, string> = {
+	currency: 'currency',
+	generator: 'generator',
+	upgrade: 'upgrade',
+	prestige: 'prestige layer',
+	unlock: 'unlock',
+	milestone: 'milestone'
+};
+
+/**
  * Turns a display name into a stable slug id, de-duplicating against ids
  * already in use. Ids are the join key for the whole schema, so they are
  * generated once and never regenerated when a name changes.

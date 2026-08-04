@@ -2,6 +2,7 @@
 	import { balance, formatMilestoneTime, HOUR_OPTIONS } from '../balance.svelte.js';
 	import { compact, currencyById } from '../format.js';
 	import { studio } from '../studio.svelte.js';
+	import { tour } from '../tour.svelte.js';
 
 	const POLICY_COLOURS = { idle: 'var(--bf-faint)', greedy: 'var(--bf-accent)' } as const;
 	const POLICY_LABELS = { idle: 'Idle', greedy: 'Greedy' } as const;
@@ -120,6 +121,7 @@
 			</div>
 			<button
 				class="bf-button bf-button--primary"
+				class:bf-spotlight={tour.spotlight === 'balance' && !balance.running}
 				type="button"
 				disabled={balance.running}
 				onclick={() => balance.run(studio.def)}

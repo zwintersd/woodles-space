@@ -110,3 +110,15 @@ export function newProjectId(): string {
 export function starterProject(): GameDef {
 	return structuredClone(cozyGarden);
 }
+
+/**
+ * The saved copy of the example garden, if one is still around. Matched on
+ * `meta.id` rather than on title, so renaming it doesn't strand it — and
+ * returning null is a fine answer, since the caller can always make a fresh one.
+ */
+export function findExampleProject(): string | null {
+	for (const summary of listProjects()) {
+		if (loadProject(summary.id)?.meta.id === cozyGarden.meta.id) return summary.id;
+	}
+	return null;
+}

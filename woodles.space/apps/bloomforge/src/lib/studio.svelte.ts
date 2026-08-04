@@ -94,10 +94,14 @@ export class Studio {
 		this.#persist();
 	}
 
-	createProject(title = 'Untitled Game'): void {
-		const def = emptyGameDef(title);
-		def.meta.id = slugify(title);
-		this.open(newProjectId(), def);
+	/**
+	 * Starts a new project. Pass a `def` to seed it with something other than
+	 * the default starter — the tour uses a genuinely empty one, so every piece
+	 * the learner ends up with is a piece they put there.
+	 */
+	createProject(title = 'Untitled Game', def: GameDef = emptyGameDef(title)): void {
+		const seeded = { ...def, meta: { ...def.meta, id: slugify(title), title } };
+		this.open(newProjectId(), seeded);
 		this.#persist();
 	}
 
@@ -388,7 +392,12 @@ function newGenerator(id: string, name: string, def: GameDef): Generator | null 
 		producesCurrencyId: currency.id,
 		baseRate: 1,
 		rateCurve: defaultCurve('polynomial'),
-		cost: { currencyId: currency.id, base: 10, curve: defaultCurve('geometric') }
+		cost: { currencyId: currency.id, base: 10, curve: defaultCurve('geometric') },
+		// The *first* generator starts owned, every later one starts at zero.
+		// Without this a from-scratch game is a deadlock: nothing produces, so
+		// nobody can afford the thing that would produce, so pressing play shows
+		// a column of zeroes forever.
+		startsOwned: def.generators.length === 0 ? 1 : 0
 	};
 }
 

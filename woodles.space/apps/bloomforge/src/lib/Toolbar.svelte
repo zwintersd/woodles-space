@@ -2,6 +2,7 @@
 	import type { ProjectSummary } from './projects.js';
 	import { playtest } from './playtest.svelte.js';
 	import { studio } from './studio.svelte.js';
+	import { tour } from './tour.svelte.js';
 
 	interface Props {
 		projects: ProjectSummary[];
@@ -10,9 +11,10 @@
 		onexport: () => void;
 		onimport: () => void;
 		onaddnote: () => void;
+		ontour: () => void;
 	}
 
-	let { projects, onopen, oncreate, onexport, onimport, onaddnote }: Props = $props();
+	let { projects, onopen, oncreate, onexport, onimport, onaddnote, ontour }: Props = $props();
 
 	let menuOpen = $state(false);
 
@@ -84,10 +86,20 @@
 			↷
 		</button>
 		<span class="divider" aria-hidden="true"></span>
+		<button
+			class="bf-button help"
+			type="button"
+			onclick={ontour}
+			aria-pressed={tour.active}
+			title="Take the tour"
+			aria-label="Take the tour"
+		>
+			?
+		</button>
 		<button class="bf-button" type="button" onclick={onimport}>Import</button>
 		<button class="bf-button" type="button" onclick={onexport}>Export</button>
 		<button class="bf-button bf-button--primary play" type="button" onclick={() => playtest.toggle(studio.def)}>
-			{playtest.running ? '❙❙ Pause' : '▶ Playtest'}
+			{playtest.running ? '❙❙ Pause' : playtest.stale && playtest.elapsed > 0 ? '▶ Restart' : '▶ Playtest'}
 		</button>
 	</div>
 </header>
@@ -265,5 +277,12 @@
 	.play {
 		min-width: 104px;
 		justify-content: center;
+	}
+
+	.help {
+		width: 30px;
+		justify-content: center;
+		padding: 6px 0;
+		font-weight: 700;
 	}
 </style>
