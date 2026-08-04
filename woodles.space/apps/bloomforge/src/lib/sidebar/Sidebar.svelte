@@ -4,8 +4,10 @@
 		ENTITY_KIND_SINGULAR,
 		ENTITY_KINDS,
 		entityIndex,
-		type EntityKind
+		type EntityKind,
+		type EntityRef
 	} from '@woodles/incremental-core';
+	import ContextMenu, { type ContextMenuItem } from '../ContextMenu.svelte';
 	import { studio } from '../studio.svelte.js';
 	import { tour } from '../tour.svelte.js';
 
@@ -40,6 +42,67 @@
 			entries: matching.filter((ref) => ref.kind === kind)
 		}));
 	});
+
+	// ── context menu ─────────────────────────────────────────────────────
+
+	let menu = $state<{ id: string; x: number; y: number } | null>(null);
+	let renamingId = $state<string | null>(null);
+
+	// A menu (or a rename box) that outlives the entity it points at — the
+	// entity removed from another tab via sync, or by the Delete key firing
+	// while the menu happens to hold focus — is worse than closing early.
+	$effect(() => {
+		if (menu && !entityIndex(studio.def).has(menu.id)) menu = null;
+	});
+	$effect(() => {
+		if (renamingId && !entityIndex(studio.def).has(renamingId)) renamingId = null;
+	});
+
+	function openMenu(event: MouseEvent, entry: EntityRef): void {
+		event.preventDefault();
+		studio.select(entry.id);
+		// A `contextmenu` event fired by a keyboard (the Menu key, Shift+F10)
+		// reports (0, 0) rather than a real point — anchor to the row instead of
+		// the corner of the screen.
+		const fromKeyboard = event.clientX === 0 && event.clientY === 0;
+		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+		menu = {
+			id: entry.id,
+			x: fromKeyboard ? rect.left : event.clientX,
+			y: fromKeyboard ? rect.bottom + 4 : event.clientY
+		};
+	}
+
+	function menuItems(id: string): ContextMenuItem[] {
+		return [
+			{ label: 'Rename', onSelect: () => (renamingId = id) },
+			{ label: 'Duplicate', onSelect: () => studio.duplicate(id) },
+			{ label: 'Delete', danger: true, onSelect: () => studio.remove(id) }
+		];
+	}
+
+	function commitRename(id: string, value: string): void {
+		if (renamingId !== id) return;
+		renamingId = null;
+		const name = value.trim();
+		if (name) studio.rename(id, name);
+	}
+
+	function onRenameKeydown(event: KeyboardEvent, id: string): void {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			commitRename(id, (event.currentTarget as HTMLInputElement).value);
+		} else if (event.key === 'Escape') {
+			event.preventDefault();
+			renamingId = null;
+			(event.currentTarget as HTMLInputElement).blur();
+		}
+	}
+
+	function autofocus(node: HTMLInputElement): void {
+		node.focus();
+		node.select();
+	}
 </script>
 
 <aside class="sidebar">
@@ -77,20 +140,31 @@
 						{#each group.entries as entry (entry.id)}
 							{@const issues = studio.issuesFor(entry.id)}
 							<li>
-								<button
-									type="button"
-									class:active={studio.selectedId === entry.id}
-									onclick={() => studio.select(entry.id)}
-								>
-									<span class="entry-name">{entry.name}</span>
-									{#if issues.length}
-										<span
-											class="dot"
-											data-severity={issues.some((issue) => issue.severity === 'error') ? 'error' : 'warning'}
-											title={issues.map((issue) => issue.message).join('\n')}
-										></span>
-									{/if}
-								</button>
+								{#if renamingId === entry.id}
+									<input
+										class="rename-input"
+										value={entry.name}
+										use:autofocus
+										onblur={(e) => commitRename(entry.id, e.currentTarget.value)}
+										onkeydown={(e) => onRenameKeydown(e, entry.id)}
+									/>
+								{:else}
+									<button
+										type="button"
+										class:active={studio.selectedId === entry.id}
+										onclick={() => studio.select(entry.id)}
+										oncontextmenu={(e) => openMenu(e, entry)}
+									>
+										<span class="entry-name">{entry.name}</span>
+										{#if issues.length}
+											<span
+												class="dot"
+												data-severity={issues.some((issue) => issue.severity === 'error') ? 'error' : 'warning'}
+												title={issues.map((issue) => issue.message).join('\n')}
+											></span>
+										{/if}
+									</button>
+								{/if}
 							</li>
 						{/each}
 					</ul>
@@ -100,6 +174,10 @@
 			</section>
 		{/each}
 	</div>
+
+	{#if menu}
+		<ContextMenu x={menu.x} y={menu.y} items={menuItems(menu.id)} onclose={() => (menu = null)} />
+	{/if}
 </aside>
 
 <style>
@@ -230,6 +308,21 @@
 		color: var(--bf-accent-strong);
 		font-weight: 600;
 		box-shadow: var(--bf-shadow-soft);
+	}
+
+	.rename-input {
+		width: 100%;
+		padding: 4px 8px;
+		border: 1px solid var(--bf-accent);
+		border-radius: var(--bf-radius-sm);
+		background: var(--bf-surface);
+		color: var(--bf-ink);
+		font-size: 12.5px;
+		box-shadow: 0 0 0 3px var(--bf-accent-soft);
+	}
+
+	.rename-input:focus {
+		outline: none;
 	}
 
 	.entry-name {
