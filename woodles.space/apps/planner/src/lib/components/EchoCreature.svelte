@@ -21,6 +21,13 @@
 	//   rest      → quiet rings   (the hush around it)
 	//   elsewhere → spore feelers (what it wonders about)
 
+	// The portrait and the readout used to be two unrelated things sitting
+	// in one card — seven anonymous motes beside seven numbers, with no way
+	// to learn that "voice · writing" is the bell in its lap. Hovering,
+	// focusing or tapping a trait now spotlights the part it grows; the
+	// mapping itself lives on INTERVAL_KIND_OPTIONS as `echoPart`, so a new
+	// interval kind cannot be added without saying what it grows.
+
 	const CENTER = { x: 180, y: 170 };
 	const MOTE_RING = { rx: 156, ry: 112 };
 	const THREAD_START = { rx: 84, ry: 100 };
@@ -116,6 +123,16 @@
 	let cheek = $derived(8 + traits.care * 4);
 	let hush = $derived(traits.rest);
 
+	// Hover and focus preview; a click pins, so touch reaches it too.
+	let hovered = $state<string | null>(null);
+	let pinned = $state<string | null>(null);
+	let spotlight = $derived(hovered ?? pinned);
+	let spotlitRow = $derived(statRows.find((row) => row.kind === spotlight) ?? null);
+
+	function togglePin(kind: string): void {
+		pinned = pinned === kind ? null : kind;
+	}
+
 	let statusCopy = $derived.by(() => {
 		if (!isNapping) {
 			return `${formatCount(recentTotal)} ${recentTotal === 1 ? 'spore has' : 'spores have'} arrived in the last seven days. Echo is awake and growing.`;
@@ -126,9 +143,17 @@
 		return 'A quiet first nap. The first honest interval mark will wake Echo.';
 	});
 
-	let creatureDescription = $derived(
-		`Echo is ${isNapping ? 'peacefully napping' : 'awake'}. ${formatCount(lifetimeTotal)} lifetime ${lifetimeTotal === 1 ? 'spore' : 'spores'} shape its seven traits.`
-	);
+	// A screen reader gets the same information the drawing carries:
+	// which traits are grown, in the order the portrait shows them off.
+	let creatureDescription = $derived.by(() => {
+		const opening = `Echo is ${isNapping ? 'peacefully napping' : 'awake'}. ${formatCount(lifetimeTotal)} lifetime ${lifetimeTotal === 1 ? 'spore' : 'spores'} shape its seven traits.`;
+		if (lifetimeTotal === 0) return `${opening} None have grown yet.`;
+		const ranked = [...statRows]
+			.sort((a, b) => b.count - a.count)
+			.filter((row) => row.count > 0)
+			.map((row) => `${row.stat} ${formatCount(row.count)}, shaping ${row.echoPart}`);
+		return `${opening} ${ranked.join('. ')}.`;
+	});
 </script>
 
 <section
@@ -141,6 +166,7 @@
 	<div class="portrait-wrap">
 		<svg
 			class="echo-portrait"
+			class:has-spotlight={spotlight !== null}
 			viewBox="0 0 360 300"
 			role="img"
 			aria-labelledby={`${componentId}-svg-title ${componentId}-svg-description`}
@@ -161,7 +187,7 @@
 			</defs>
 
 			<!-- the hush: quiet rings that close up as rest accumulates -->
-			<g class="quiet-rings" aria-hidden="true">
+			<g class="quiet-rings feature" class:spotlit={spotlight === 'rest'} aria-hidden="true">
 				<ellipse
 					cx={CENTER.x}
 					cy={CENTER.y}
@@ -183,11 +209,16 @@
 					<path
 						class="growth-thread"
 						class:has-growth={mote.count > 0}
+						class:spotlit={spotlight === mote.kind}
 						d={`M ${mote.x1} ${mote.y1} L ${mote.x2} ${mote.y2}`}
 					/>
+					{#if spotlight === mote.kind}
+						<circle class="mote-halo" cx={mote.x2} cy={mote.y2} r={mote.r + 6} />
+					{/if}
 					<circle
 						class="growth-mote"
 						class:has-growth={mote.count > 0}
+						class:spotlit={spotlight === mote.kind}
 						cx={mote.x2}
 						cy={mote.y2}
 						r={mote.r}
@@ -209,12 +240,12 @@
 
 			<g class="echo-being" class:awake={!isNapping} class:asleep={isNapping}>
 				<!-- behind the silhouette: tail, ears, feelers -->
-				<g class="echo-tail" aria-hidden="true">
+				<g class="echo-tail feature" class:spotlit={spotlight === 'movement'} aria-hidden="true">
 					<path class="tail-outline" d={tailPath(traits.movement)} />
 					<path class="tail-fill" d={tailPath(traits.movement)} />
 				</g>
 
-				<g class="echo-ears" aria-hidden="true">
+				<g class="echo-ears feature" class:spotlit={spotlight === 'clinic'} aria-hidden="true">
 					{#each [{ x: 148, rotate: -20, side: 1 }, { x: 212, rotate: 20, side: -1 }] as ear (ear.x)}
 						<g transform={`translate(${ear.x} 112) rotate(${ear.rotate}) scale(1 ${earScale})`}>
 							<path
@@ -230,7 +261,7 @@
 					{/each}
 				</g>
 
-				<g class="echo-feelers" aria-hidden="true">
+				<g class="echo-feelers feature" class:spotlit={spotlight === 'elsewhere'} aria-hidden="true">
 					{#each [-1, 1] as side (side)}
 						<path class="feeler-stem" d={feelerPath(side as -1 | 1, traits.elsewhere)} />
 						<circle
@@ -253,7 +284,8 @@
 				/>
 
 				<circle
-					class="belly-glow"
+					class="belly-glow feature"
+					class:spotlit={spotlight === 'care'}
 					cx={CENTER.x}
 					cy="202"
 					r={bellyRadius}
@@ -263,7 +295,8 @@
 
 				<!-- craft: a mended patch, sewn wider with every few spores -->
 				<rect
-					class="craft-patch"
+					class="craft-patch feature"
+					class:spotlit={spotlight === 'build'}
 					x={147 - patch.w / 2}
 					y={199 - patch.h / 2}
 					width={patch.w}
@@ -273,7 +306,7 @@
 				/>
 
 				<!-- voice: the carillon bell Echo holds, growing as it writes -->
-				<g class="voice-bell" aria-hidden="true">
+				<g class="voice-bell feature" class:spotlit={spotlight === 'writing'} aria-hidden="true">
 					<path class="bell-handle" d={`M ${CENTER.x} ${244 - bell} V ${244 - bell - 5}`} />
 					<circle class="bell-handle-ring" cx={CENTER.x} cy={244 - bell - 7} r="2.6" />
 					<path
@@ -285,7 +318,7 @@
 					<circle class="bell-clapper" cx={CENTER.x} cy="247" r="2.2" />
 				</g>
 
-				<g class="cheeks" aria-hidden="true">
+				<g class="cheeks feature" class:spotlit={spotlight === 'care'} aria-hidden="true">
 					<ellipse cx="143" cy="162" rx={cheek} ry={cheek * 0.6} />
 					<ellipse cx="217" cy="162" rx={cheek} ry={cheek * 0.6} />
 				</g>
@@ -303,12 +336,14 @@
 					</g>
 				{:else}
 					<g class="echo-face awake-face">
-						<ellipse class="eye" cx="156" cy="148" rx="9" ry="10.5" />
-						<ellipse class="eye" cx="204" cy="148" rx="9" ry="10.5" />
-						<circle class="pupil" cx="157" cy="149" r="3.4" />
-						<circle class="pupil" cx="205" cy="149" r="3.4" />
-						<circle class="glint" cx="153.6" cy="144.6" r="1.7" />
-						<circle class="glint" cx="201.6" cy="144.6" r="1.7" />
+						<g class="eye-pair">
+							<ellipse class="eye" cx="156" cy="148" rx="9" ry="10.5" />
+							<ellipse class="eye" cx="204" cy="148" rx="9" ry="10.5" />
+							<circle class="pupil" cx="157" cy="149" r="3.4" />
+							<circle class="pupil" cx="205" cy="149" r="3.4" />
+							<circle class="glint" cx="153.6" cy="144.6" r="1.7" />
+							<circle class="glint" cx="201.6" cy="144.6" r="1.7" />
+						</g>
 						<path class="nose" d="M175 165 Q180 162 185 165 Q180 172 175 165 Z" />
 						<path d="M169 174 Q180 184 191 174" />
 					</g>
@@ -321,9 +356,14 @@
 			</g>
 		</svg>
 
-		<p class="portrait-caption" aria-hidden="true">
-			<span class="state-dot"></span>
-			<span>{isNapping ? 'napping softly' : 'awake in the spore garden'}</span>
+		<p class="portrait-caption" class:naming={spotlitRow !== null} aria-hidden="true">
+			{#if spotlitRow}
+				<span class="caption-glyph">{spotlitRow.glyph}</span>
+				<span><strong>{spotlitRow.stat}</strong> shapes {spotlitRow.echoPart}</span>
+			{:else}
+				<span class="state-dot"></span>
+				<span>{isNapping ? 'napping softly' : 'awake in the spore garden'}</span>
+			{/if}
 		</p>
 	</div>
 
@@ -343,24 +383,39 @@
 
 		<ul class="stat-grid" aria-label="Echo's lifetime growth by observed interval kind">
 			{#each statRows as row (row.kind)}
-				<li class="stat" style={`--growth: ${row.growth}`}>
-					<span class="stat-glyph" aria-hidden="true">{row.glyph}</span>
-					<span class="stat-copy">
-						<strong>{row.stat}</strong>
-						<small>{row.shortLabel}</small>
-					</span>
-					<span
-						class="stat-count"
-						aria-label={`${formatCount(row.count)} ${row.kind} ${row.count === 1 ? 'spore' : 'spores'}`}
+				<li>
+					<button
+						type="button"
+						class="stat"
+						class:spotlit={spotlight === row.kind}
+						style={`--growth: ${row.growth}`}
+						aria-pressed={pinned === row.kind}
+						onmouseenter={() => (hovered = row.kind)}
+						onmouseleave={() => (hovered = null)}
+						onfocus={() => (hovered = row.kind)}
+						onblur={() => (hovered = null)}
+						onclick={() => togglePin(row.kind)}
 					>
-						{formatCount(row.count)}
-					</span>
+						<span class="stat-glyph" aria-hidden="true">{row.glyph}</span>
+						<span class="stat-copy">
+							<strong>{row.stat}</strong>
+							<small>{row.shortLabel}</small>
+						</span>
+						<span
+							class="stat-count"
+							aria-label={`${formatCount(row.count)} ${row.kind} ${row.count === 1 ? 'spore' : 'spores'}`}
+						>
+							{formatCount(row.count)}
+						</span>
+						<span class="sr-only">— shapes {row.echoPart}</span>
+					</button>
 				</li>
 			{/each}
 		</ul>
 
 		<p id={`${componentId}-rule`} class="growth-rule">
 			One spore adds one mark to its matching trait. Quiet weeks never take marks away.
+			<span>Pick a trait to see the part of Echo it grows.</span>
 		</p>
 	</div>
 </section>
@@ -417,6 +472,41 @@
 	}
 
 	/* ── constellation ────────────────────────────────────────────── */
+
+	/* Asking about one trait dims the other six. The silhouette, face and
+	   paws never dim — they are Echo, not one of its traits. */
+	.feature {
+		transition:
+			opacity var(--pl-transition-medium),
+			filter var(--pl-transition-medium);
+	}
+
+	.has-spotlight .feature:not(.spotlit) {
+		opacity: 0.38;
+	}
+
+	/* The answer also steps *forward*, so the six others only have to
+	   recede a little — Echo never has to look half-erased to point. */
+	.feature.spotlit {
+		filter: drop-shadow(0 0 5px color-mix(in srgb, var(--p-accent) 45%, transparent));
+	}
+
+	.mote-halo {
+		fill: none;
+		stroke: var(--p-accent);
+		stroke-width: 1.4;
+		opacity: 0.55;
+	}
+
+	.growth-mote.spotlit {
+		stroke-width: 2.2;
+	}
+
+	.growth-thread.spotlit {
+		stroke: var(--p-accent);
+		stroke-dasharray: none;
+		opacity: 0.9;
+	}
 
 	.quiet-rings ellipse {
 		fill: none;
@@ -619,12 +709,27 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.45rem;
+		min-height: 1.15rem;
 		margin-top: -0.35rem;
 		font-family: var(--car-mono);
 		font-size: 0.58rem;
 		letter-spacing: 0.11em;
 		text-transform: uppercase;
 		color: var(--p-muted);
+	}
+
+	.portrait-caption.naming {
+		color: var(--p-accent);
+	}
+
+	.portrait-caption strong {
+		font-weight: 500;
+	}
+
+	.caption-glyph {
+		font-family: var(--car-display);
+		font-size: 0.85rem;
+		line-height: 1;
 	}
 
 	.state-dot {
@@ -712,10 +817,15 @@
 		list-style: none;
 	}
 
+	.stat-grid li {
+		display: flex;
+	}
+
 	.stat {
 		display: grid;
 		grid-template-columns: 1.65rem minmax(0, 1fr) auto;
 		align-items: center;
+		width: 100%;
 		min-width: 0;
 		min-height: 2.65rem;
 		padding: 0.4rem 0.5rem;
@@ -726,6 +836,34 @@
 			color-mix(in srgb, var(--p-accent-soft) calc(22% + var(--growth) * 58%), transparent),
 			transparent 72%
 		);
+		text-align: left;
+		cursor: pointer;
+		transition:
+			border-color var(--pl-transition-fast),
+			transform var(--pl-transition-fast);
+	}
+
+	.stat:hover,
+	.stat:focus-visible,
+	.stat.spotlit {
+		border-color: var(--p-accent);
+	}
+
+	.stat.spotlit {
+		transform: translateY(-1px);
+	}
+
+	.stat[aria-pressed='true'] {
+		box-shadow: inset 2px 0 0 var(--p-accent);
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
 	}
 
 	.stat-glyph {
@@ -776,6 +914,12 @@
 		color: var(--p-text);
 	}
 
+	.growth-rule span {
+		display: block;
+		margin-top: 0.2rem;
+		color: var(--p-accent);
+	}
+
 	.growth-rule {
 		margin: 0.75rem 0 0;
 		padding-top: 0.65rem;
@@ -785,6 +929,22 @@
 		line-height: 1.5;
 		letter-spacing: 0.04em;
 		color: var(--p-muted);
+	}
+
+	.eye-pair {
+		transform-origin: 180px 148.5px;
+		animation: echo-blink 7.5s ease-in-out infinite;
+	}
+
+	@keyframes echo-blink {
+		0%,
+		94%,
+		100% {
+			transform: scaleY(1);
+		}
+		96.5% {
+			transform: scaleY(0.06);
+		}
 	}
 
 	@keyframes echo-breathe {
@@ -851,8 +1011,18 @@
 
 	@media (prefers-reduced-motion: reduce) {
 		.echo-being,
-		.sleep-notes {
+		.sleep-notes,
+		.eye-pair {
 			animation: none;
+		}
+
+		.feature,
+		.stat {
+			transition: none;
+		}
+
+		.stat.spotlit {
+			transform: none;
 		}
 
 		.growth-mote,

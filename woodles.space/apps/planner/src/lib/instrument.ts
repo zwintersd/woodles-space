@@ -16,14 +16,18 @@ export const INTERVAL_KIND_OPTIONS: ReadonlyArray<{
 	shortLabel: string;
 	glyph: string;
 	stat: string;
+	/** The part of Echo's portrait this kind grows (EchoCreature.svelte). */
+	echoPart: string;
 }> = [
-	{ kind: 'clinic', label: 'clinic / sessions', shortLabel: 'clinic', glyph: '◫', stat: 'attunement' },
-	{ kind: 'writing', label: 'writing', shortLabel: 'writing', glyph: '✎', stat: 'voice' },
-	{ kind: 'build', label: 'building', shortLabel: 'build', glyph: '⌁', stat: 'craft' },
-	{ kind: 'movement', label: 'moving', shortLabel: 'movement', glyph: '↗', stat: 'range' },
-	{ kind: 'care', label: 'care / life', shortLabel: 'care', glyph: '♡', stat: 'warmth' },
-	{ kind: 'rest', label: 'resting', shortLabel: 'rest', glyph: '☾', stat: 'hush' },
-	{ kind: 'elsewhere', label: 'something else', shortLabel: 'elsewhere', glyph: '…', stat: 'curiosity' }
+	// prettier-ignore-start
+	{ kind: 'clinic',    label: 'clinic / sessions', shortLabel: 'clinic',    glyph: '◫', stat: 'attunement', echoPart: 'its ears' },
+	{ kind: 'writing',   label: 'writing',           shortLabel: 'writing',   glyph: '✎', stat: 'voice',      echoPart: 'the bell it holds' },
+	{ kind: 'build',     label: 'building',          shortLabel: 'build',     glyph: '⌁', stat: 'craft',      echoPart: 'the patch on its coat' },
+	{ kind: 'movement',  label: 'moving',            shortLabel: 'movement',  glyph: '↗', stat: 'range',      echoPart: 'its tail' },
+	{ kind: 'care',      label: 'care / life',       shortLabel: 'care',      glyph: '♡', stat: 'warmth',     echoPart: 'its belly and cheeks' },
+	{ kind: 'rest',      label: 'resting',           shortLabel: 'rest',      glyph: '☾', stat: 'hush',       echoPart: 'the quiet rings around it' },
+	{ kind: 'elsewhere', label: 'something else',    shortLabel: 'elsewhere', glyph: '…', stat: 'curiosity',  echoPart: 'its spore feelers' }
+	// prettier-ignore-end
 ];
 
 export const STARTER_ROUTINES: Routine[] = [
