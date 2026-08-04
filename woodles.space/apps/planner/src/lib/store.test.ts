@@ -778,4 +778,65 @@ describe('PlannerStore', () => {
 			expect(nextBlock).toBeTruthy();
 		});
 	});
+
+	// ── capacity: sleep log + ongoing signals ───────────────────────
+
+	describe('recordSleep', () => {
+		it('creates one log for the day and lets a re-log replace it', () => {
+			store.recordSleep('rough', '2026-08-04');
+			expect(store.getSleepLog('2026-08-04')?.quality).toBe('rough');
+
+			store.recordSleep('good', '2026-08-04');
+			expect(store.sleepLogs).toHaveLength(1);
+			expect(store.getSleepLog('2026-08-04')?.quality).toBe('good');
+		});
+
+		it('keeps the original recordedAt across a same-day correction', () => {
+			const first = store.recordSleep('okay', '2026-08-04');
+			const second = store.recordSleep('good', '2026-08-04');
+			expect(second.recordedAt).toBe(first.recordedAt);
+		});
+
+		it('defaults to today when no date is given', () => {
+			const log = store.recordSleep('good');
+			expect(log.date).toBe(dateKey(store.now));
+		});
+	});
+
+	describe('signal entries', () => {
+		it('adds a cycle entry', () => {
+			const entry = store.addSignalEntry({ kind: 'cycle', date: '2026-08-01' });
+			expect(entry?.kind).toBe('cycle');
+			expect(store.signalEntries).toHaveLength(1);
+		});
+
+		it('refuses a custom entry with no label', () => {
+			expect(store.addSignalEntry({ kind: 'custom', date: '2026-08-01' })).toBeNull();
+			expect(store.signalEntries).toHaveLength(0);
+		});
+
+		it('accepts a labeled custom entry with an optional span', () => {
+			const entry = store.addSignalEntry({
+				kind: 'custom',
+				date: '2026-08-01',
+				endDate: '2026-08-10',
+				label: 'guests visiting'
+			});
+			expect(entry).not.toBeNull();
+			expect(entry?.endDate).toBe('2026-08-10');
+		});
+
+		it('closes an open span without creating a new entry', () => {
+			const entry = store.addSignalEntry({ kind: 'illness', date: '2026-08-01' })!;
+			store.endSignalEntry(entry.id, '2026-08-03');
+			expect(store.signalEntries).toHaveLength(1);
+			expect(store.signalEntries[0].endDate).toBe('2026-08-03');
+		});
+
+		it('removes an entry entirely', () => {
+			const entry = store.addSignalEntry({ kind: 'payday', date: '2026-08-15' })!;
+			store.removeSignalEntry(entry.id);
+			expect(store.signalEntries).toHaveLength(0);
+		});
+	});
 });

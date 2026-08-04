@@ -124,7 +124,9 @@ export function mergePlannerBlobs(local: PlannerBlob, remote: PlannerBlob): Plan
 			remote.surgeDrafts ?? [],
 			latestSurge
 		),
-		spores
+		spores,
+		sleepLogs: mergeById(local.sleepLogs ?? [], remote.sleepLogs ?? [], latestMutable),
+		signals: mergeById(local.signals ?? [], remote.signals ?? [], latestMutable)
 	};
 }
 
@@ -146,7 +148,9 @@ export const { connectAndHydrate, initSync, flushSync, disconnect } =
 					routines: store.routines,
 					routinePractices: store.routinePractices,
 					surgeDrafts: store.surgeDrafts,
-					spores: store.sporeEvents
+					spores: store.sporeEvents,
+					sleepLogs: store.sleepLogs,
+					signals: store.signalEntries
 				};
 			},
 			write(blob: PlannerBlob): void {

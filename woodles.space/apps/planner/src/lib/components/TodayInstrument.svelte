@@ -13,6 +13,7 @@
 	import type { IntervalKind } from '$lib/types';
 	import EchoCreature from './EchoCreature.svelte';
 	import CatchUp from './CatchUp.svelte';
+	import Capacity from './Capacity.svelte';
 
 	let {
 		onopenpiles,
@@ -214,6 +215,8 @@
 			</button>
 		</div>
 	</header>
+
+	<Capacity {onopenroutines} />
 
 	<div class="instrument-grid">
 		<article class="sampler" data-testid="interval-sampler">

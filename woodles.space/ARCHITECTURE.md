@@ -489,6 +489,48 @@ as one quiet chip. Faded and mastered routines always offer the full steps on
 request. Practice ids are routine-plus-date, so correcting today's data replaces
 today's record rather than pretending it was another day.
 
+**Capacity** is a morning read of how much room today has, shown at the top of
+Today — before the sampler, so it lands before the day itself does. It is
+built entirely from what's already true rather than a form to fill out:
+sleep quality (a same-day `SleepLog`, one per date), how independently this
+morning's routines went (today's `RoutinePractice.independence`, already
+recorded for Prompt-fading routines above), and the ongoing `signals.ts`
+reads below. `capacityRead()` folds these into a level — `low`, `steady`,
+`open` — but the level is never shown alone: every input that moved it
+appears beside it as a plain-language reason, because a hypothesis you can't
+see the working for is exactly the "compliance ledger" feel Carillon's plan
+already refuses elsewhere. An active illness overrides the level to `low`
+outright rather than just subtracting from a score — it shouldn't take a bad
+night on top of it to read as low, and a good one shouldn't wash it out.
+`capacityNudges()` turns the level into suggestions, never actions taken on
+your behalf: `open` nudges toward adding an errand or an evening stretch
+session (both just open the ordinary task composer, pre-dated to today —
+nothing is created without a name typed in), `low` nudges toward protecting
+rest and catching up rather than taking more on. A day with nothing logged
+yet reads as `steady` with no reasons, not an error.
+
+**Ongoing signals** (`signals.ts`) are the slower-moving context beside a
+single day — where in a cycle, how far to payday, whether an illness is
+still running — logged as one flat `SignalEntry[]` rather than three
+separate mechanisms, the same "derive, don't store current state" stance
+Carillon already takes toward observations and Echo's traits. `cycleRead()`
+derives cycle length from the gap between logged period-start dates (an
+average once there are two or more; a 28-day guess, marked `estimated`, from
+just one) rather than asking for a length up front. `paydayRead()` only
+ever reports a payday actually logged for today or later — never inferred
+from a schedule, so it says nothing rather than guessing wrong. `illnessRead()`
+treats a missing `endDate` as still ongoing, since an unknown recovery date
+is the normal case for being sick; closing the Capacity card's "recovered"
+chip sets `endDate` to today, which still counts today as a sick day and
+clears starting tomorrow. A fourth kind, `custom`, is the flexible-tracking
+escape hatch everything else on this page is deliberately not: any label,
+logged as a single day or a span via the same optional `endDate` — but
+unlike illness, no `endDate` there means only that one day, since most
+custom notes ("started new medication") are a point in time, not a stretch.
+Custom entries always appear in Capacity's reasons list, but never move its
+score — Carillon has no way to know a custom entry's valence, and guessing
+would be exactly the black-box behavior the reasons list exists to avoid.
+
 **Day piles** are complete reusable day shapes rather than schedules assigned
 in advance to dates. The starter rack has five: office, maker, out, recovery,
 and writing. `weekPattern` supplies one suggested pile per weekday while a
@@ -536,10 +578,11 @@ blobs still hydrate. When passphrase sync is connected, `@woodles/sync` mirrors
 one whole `PlannerBlob` into Neon's `sync.blob` JSONB column. Carillon opts into
 the deterministic merge path: id-keyed collections are unioned; an observation
 collision takes the later `updatedAt`, a routine-practice collision the later
-`recordedAt`, mutable piles/tasks/routines/day choices take the later
-`updatedAt`, and a Surge collision takes its later update with status precedence
-as a tie-break. The Spore ledger is then reconciled against the merged
-observations so kind, date, and amount stay canonical. Legacy settings and
+`recordedAt`, mutable piles/tasks/routines/day choices — and sleep logs and
+signal entries alongside them — take the later `updatedAt`, and a Surge
+collision takes its later update with status precedence as a tie-break. The
+Spore ledger is then reconciled against the merged observations so kind,
+date, and amount stay canonical. Legacy settings and
 overlay collections remain remote-winning. A compare-and-swap conflict merges
 against each returned server version for up to three total pushes; persistent
 contention remains safe locally and surfaces as not-yet-synced instead of a
@@ -874,11 +917,11 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1497 tests total: 16 in `api/` (its own
+1544 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1481 across sixteen pnpm
-packages — `write` 72, `marginalia` 269, `planner` 431, `notebook` 28,
+instead of the recursive `pnpm -r test`), plus 1528 across sixteen pnpm
+packages — `write` 72, `marginalia` 269, `planner` 478, `notebook` 28,
 `spores` 140, `bestiary` 162, `bloomforge` 68, `bloomforge-player` 18,
 `packages/sync` 9, `packages/persistence` 6, `packages/app-manifest` 11,
 `packages/handoff` 15, `packages/text` 23, `packages/spellcraft` 16,
@@ -952,7 +995,7 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (1497 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (1544 tests)
 pnpm check              svelte-check in every app
 pnpm build              build the nine SvelteKit apps
 ```
