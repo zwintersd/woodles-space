@@ -36,6 +36,11 @@
 		await connectAndHydrate(pass);
 	}
 
+	function handleAddTask() {
+		store.closeBinder();
+		store.startCompose();
+	}
+
 	const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 	const WEEKDAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 </script>
@@ -46,20 +51,32 @@
 	<div class="binder-backdrop" onclick={() => store.closeBinder()}></div>
 {/if}
 
-<div class="binder-tabs" role="tablist" aria-label="binder">
-	{#each TABS as tab}
-		<button
-			class="binder-tab"
-			class:active={store.binderTab === tab.id}
-			role="tab"
-			aria-selected={store.binderTab === tab.id}
-			onclick={() => store.toggleBinder(tab.id)}
-			title={tab.label}
-			aria-label={tab.label}
-		>
-			<span class="binder-tab-icon">{tab.icon}</span>
-		</button>
-	{/each}
+<div class="binder-dock">
+	<button
+		class="binder-add-btn"
+		data-testid="binder-add-task"
+		onclick={handleAddTask}
+		title="add a task"
+		aria-label="add a task"
+	>
+		<span class="binder-tab-icon">+</span>
+	</button>
+
+	<div class="binder-tabs" role="tablist" aria-label="binder">
+		{#each TABS as tab}
+			<button
+				class="binder-tab"
+				class:active={store.binderTab === tab.id}
+				role="tab"
+				aria-selected={store.binderTab === tab.id}
+				onclick={() => store.toggleBinder(tab.id)}
+				title={tab.label}
+				aria-label={tab.label}
+			>
+				<span class="binder-tab-icon">{tab.icon}</span>
+			</button>
+		{/each}
+	</div>
 </div>
 
 <aside
@@ -201,12 +218,44 @@
 		z-index: calc(var(--pl-z-binder) - 1);
 	}
 
-	.binder-tabs {
+	.binder-dock {
 		position: fixed;
 		right: 0;
 		top: 50%;
 		transform: translateY(-50%);
 		z-index: var(--pl-z-binder);
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 8px;
+	}
+
+	.binder-add-btn {
+		width: 36px;
+		height: 36px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--p-bg);
+		background: var(--p-accent);
+		border: 1px solid var(--p-accent);
+		border-right: none;
+		border-radius: var(--pl-radius-md) 0 0 var(--pl-radius-md);
+		box-shadow: -2px 0 12px var(--p-accent-soft);
+		transition: opacity var(--pl-transition-fast), var(--pl-transition-palette);
+	}
+
+	.binder-add-btn:hover {
+		opacity: 0.85;
+	}
+
+	.binder-add-btn .binder-tab-icon {
+		color: inherit;
+		font-size: 1.05rem;
+		line-height: 1;
+	}
+
+	.binder-tabs {
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
@@ -562,11 +611,25 @@
 	}
 
 	@media (max-width: 620px) {
-		.binder-tabs {
+		.binder-dock {
 			top: auto;
 			right: 0.75rem;
 			bottom: 4.15rem;
 			transform: none;
+			flex-direction: row;
+			align-items: center;
+			max-width: calc(100vw - 1.5rem);
+		}
+
+		.binder-add-btn {
+			width: 32px;
+			height: 32px;
+			border-radius: var(--pl-radius-md);
+			border-right: 1px solid var(--p-accent);
+			flex-shrink: 0;
+		}
+
+		.binder-tabs {
 			flex-direction: row;
 			max-width: calc(100vw - 5.4rem);
 			overflow-x: auto;
