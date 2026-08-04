@@ -10,7 +10,7 @@
 		<!-- Top flourish — broad rule with central glyph -->
 		<div class="welcome-flourish top" aria-hidden="true">
 			<span class="flo-line"></span>
-			<span class="flo-mark">❦</span>
+			<span class="flo-mark">✦</span>
 			<span class="flo-line"></span>
 		</div>
 
@@ -48,7 +48,7 @@
 				data-testid="onboarding-continue"
 				onclick={() => onboarding.beginFlow()}
 			>
-				<span class="cta-pre">❧</span>
+				<span class="cta-pre">✦</span>
 				<span>{savedStep ? `continue with question ${savedStep} →` : WELCOME.cta}</span>
 			</button>
 			<button

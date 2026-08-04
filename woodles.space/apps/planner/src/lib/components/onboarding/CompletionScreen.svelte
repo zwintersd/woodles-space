@@ -30,7 +30,7 @@
 					</textPath>
 				</text>
 			</svg>
-			<span class="seal-glyph">❦</span>
+			<span class="seal-glyph">✦</span>
 		</div>
 
 		<p class="completion-stamp">
@@ -53,7 +53,7 @@
 			data-testid="onboarding-add-first-task"
 			onclick={() => onboarding.finishAndCompose()}
 		>
-			<span class="cta-pre">❧</span>
+			<span class="cta-pre">✦</span>
 			<span>{COMPLETION.cta}</span>
 		</button>
 		<button class="completion-skip" onclick={() => onboarding.finish()}>{COMPLETION.skipCta}</button>

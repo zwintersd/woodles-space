@@ -128,7 +128,7 @@
 				<span class="weekday-dow">{WEEKDAY_LABELS[i]}</span>
 				<span class="weekday-shape">{shape?.name ?? '—'}</span>
 				{#if shape?.restful}
-					<span class="weekday-mark" aria-hidden="true">❦</span>
+					<span class="weekday-mark" aria-hidden="true">✦</span>
 				{/if}
 			</button>
 		{/each}

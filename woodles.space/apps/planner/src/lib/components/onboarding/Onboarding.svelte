@@ -11,11 +11,11 @@
 </script>
 
 <div class="onboarding-host">
-	<!-- Four corner fleurons — quietly frame the whole flow -->
-	<span class="corner tl" aria-hidden="true">❦</span>
-	<span class="corner tr" aria-hidden="true">❧</span>
-	<span class="corner bl" aria-hidden="true">❧</span>
-	<span class="corner br" aria-hidden="true">❦</span>
+	<!-- Four corner sparks — quietly frame the whole flow -->
+	<span class="corner tl" aria-hidden="true">✦</span>
+	<span class="corner tr" aria-hidden="true">✦</span>
+	<span class="corner bl" aria-hidden="true">✦</span>
+	<span class="corner br" aria-hidden="true">✦</span>
 
 	<!-- A small bell that swings briefly each time the stage advances -->
 	{#key onboarding.stage}
@@ -74,7 +74,7 @@
 		100% { opacity: 1; transform: translateY(0); }
 	}
 
-	/* ── corner fleurons ───────────────────────────────────────────── */
+	/* ── corner sparks ─────────────────────────────────────────────── */
 	.corner {
 		position: fixed;
 		font-family: var(--pl-font-fell);
