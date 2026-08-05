@@ -19,7 +19,8 @@ export interface SerializedSimState {
 	gameTime: number;
 	currencies: Record<string, { amount: number; lifetime: number }>;
 	generators: Record<string, { level: number }>;
-	upgrades: Record<string, { level: number }>;
+	/** `equipped` is optional so a save written before the field existed still loads — it just resumes equipped. */
+	upgrades: Record<string, { level: number; equipped?: boolean }>;
 	prestige: Record<string, { count: number; currencyAmount: number }>;
 	unlocked: string[];
 }
@@ -90,7 +91,10 @@ export function restoreState(def: GameDef, save: SaveGame): SimState {
 		const entry = saved.upgrades?.[upgrade.id];
 		if (!entry) continue;
 		const ceiling = upgrade.repeatable ? upgrade.repeatable.maxLevel : 1;
-		state.upgrades[upgrade.id] = { level: Math.min(Math.max(0, Math.floor(safe(entry.level))), ceiling) };
+		state.upgrades[upgrade.id] = {
+			level: Math.min(Math.max(0, Math.floor(safe(entry.level))), ceiling),
+			equipped: typeof entry.equipped === 'boolean' ? entry.equipped : true
+		};
 	}
 
 	for (const layer of def.prestigeLayers) {

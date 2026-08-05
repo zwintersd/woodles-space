@@ -380,6 +380,10 @@ export class Simulation {
 				return this.buyGenerator(action.id, action.count ?? 1, events);
 			case 'buyUpgrade':
 				return this.buyUpgrade(action.id, events);
+			case 'equipUpgrade':
+				return this.setEquipped(action.id, true, events);
+			case 'unequipUpgrade':
+				return this.setEquipped(action.id, false, events);
 			case 'prestige':
 				return this.doPrestige(action.layerId, events);
 		}
@@ -440,6 +444,31 @@ export class Simulation {
 			cost,
 			costCurrencyId: upgrade.cost.currencyId,
 			message: `Purchased ${upgrade.name}${upgrade.repeatable ? ` (Lv. ${level + 1})` : ''}`
+		});
+		return true;
+	}
+
+	/**
+	 * Toggles whether an owned upgrade's effects apply. Free and instant — the
+	 * cost was already paid at purchase; this is a loadout decision, not a
+	 * transaction. A no-op on an unowned upgrade or a state that's already
+	 * what was asked for, same as every other action here.
+	 */
+	private setEquipped(id: string, equipped: boolean, events: SimEvent[]): boolean {
+		const upgrade = this.upgradeById.get(id);
+		const record = this.simState.upgrades[id];
+		if (!upgrade || !record || record.level <= 0 || record.equipped === equipped) return false;
+
+		record.equipped = equipped;
+		// Equipping or unequipping changes both what the upgrade contributes and
+		// what any populationBoost is counting, so the whole table is stale.
+		this.modifiers = resolveModifiers(this.def, this.simState);
+		this.derivedDirty = true;
+		events.push({
+			t: this.simState.gameTime,
+			kind: equipped ? 'equip' : 'unequip',
+			id,
+			message: `${upgrade.name} ${equipped ? 'equipped' : 'unequipped'}`
 		});
 		return true;
 	}
@@ -513,7 +542,10 @@ export class Simulation {
 				this.simState.generators[id].level = generator.startsOwned ?? 0;
 				continue;
 			}
-			if (this.simState.upgrades[id]) this.simState.upgrades[id].level = 0;
+			if (this.simState.upgrades[id]) {
+				this.simState.upgrades[id].level = 0;
+				this.simState.upgrades[id].equipped = true;
+			}
 		}
 	}
 

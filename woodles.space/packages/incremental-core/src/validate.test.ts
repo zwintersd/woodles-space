@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cozyGarden } from './fixtures/index.js';
-import { prestigeDef, toyDef } from './test-defs.js';
+import { apiaryToyDef, prestigeDef, toyDef } from './test-defs.js';
 import { hasErrors, issuesFor, validateGameDef } from './validate.js';
 import type { GameDef } from './types.js';
 
@@ -11,10 +11,23 @@ const codes = (def: GameDef, severity: 'error' | 'warning' = 'error') =>
 
 describe('valid definitions', () => {
 	it('passes the shipped fixtures without errors', () => {
-		for (const def of [cozyGarden, toyDef(), prestigeDef()]) {
+		for (const def of [cozyGarden, toyDef(), prestigeDef(), apiaryToyDef()]) {
 			expect(codes(def), def.meta.id).toEqual([]);
 			expect(hasErrors(validateGameDef(def))).toBe(false);
 		}
+	});
+});
+
+describe('population boosts', () => {
+	it('rejects a negative per-unit multiplier', () => {
+		const def = apiaryToyDef();
+		def.generators[0].populationBoost = { metric: 'unequippedUpgrades', perUnit: -1 };
+		expect(codes(def)).toContain('invalid-number');
+	});
+
+	it('leaves a def with no populationBoost alone', () => {
+		const def = toyDef();
+		expect(codes(def)).toEqual([]);
 	});
 });
 

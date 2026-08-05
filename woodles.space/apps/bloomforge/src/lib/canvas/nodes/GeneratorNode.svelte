@@ -50,6 +50,9 @@
 				{formatAmount(generator.cost.base, priced)} to start
 			</div>
 		{/if}
+		{#if generator.populationBoost}
+			<span class="tag">boosted by unequipped upgrades</span>
+		{/if}
 	</NodeShell>
 {/if}
 
@@ -78,5 +81,16 @@
 		color: var(--bf-ink-soft);
 		font-size: 11px;
 		font-variant-numeric: tabular-nums;
+	}
+
+	.tag {
+		display: inline-block;
+		margin-top: 6px;
+		padding: 2px 7px;
+		border-radius: var(--bf-radius-pill);
+		background: var(--bf-generator-soft);
+		color: var(--bf-generator);
+		font-size: 10px;
+		font-weight: 600;
 	}
 </style>

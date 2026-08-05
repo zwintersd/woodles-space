@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createSim, prestigeGain, sampleIntervalFor, simulate, TICKS_PER_SECOND } from './engine.js';
 import { greedy, greedyPolicy, idlePolicy, scriptedPolicy } from './policies.js';
 import type { SimEvent } from './state.js';
-import { critDef, prestigeDef, toyDef } from './test-defs.js';
+import { apiaryToyDef, critDef, prestigeDef, toyDef } from './test-defs.js';
 import { cozyGarden } from './fixtures/index.js';
 
 const run = (def = toyDef(), policy = idlePolicy, duration = 60) =>
@@ -274,6 +274,75 @@ describe('purchase rules', () => {
 		const sim = createSim(cozyGarden, idlePolicy, 1);
 		// Eternal Garden needs Golden Touch at level 10; nothing is owned yet.
 		expect(sim.apply({ type: 'buyUpgrade', id: 'eternal-garden' }, [])).toBe(false);
+	});
+});
+
+describe('the Apiary of Bad Decisions — equip state and population boosts', () => {
+	it('applies an upgrade effect only while equipped, and a populationBoost only while not', () => {
+		const sim = createSim(apiaryToyDef(), idlePolicy, 1);
+		expect(sim.generatorRates().bees).toBeCloseTo(2, 6); // level 1, nothing owned
+
+		sim.step(10); // 20 honey banked, plenty for two 1-honey upgrades
+		expect(sim.apply({ type: 'buyUpgrade', id: 'petal-a' }, [])).toBe(true);
+		expect(sim.apply({ type: 'buyUpgrade', id: 'petal-b' }, [])).toBe(true);
+		// Both equipped by default: (2 + 3 + 3) × (1 + 0.5×0 unequipped) = 8.
+		expect(sim.generatorRates().bees).toBeCloseTo(8, 6);
+
+		expect(sim.apply({ type: 'unequipUpgrade', id: 'petal-a' }, [])).toBe(true);
+		// Petal A stops contributing +3, and now counts as one unequipped flower:
+		// (2 + 3) × (1 + 0.5×1) = 7.5.
+		expect(sim.generatorRates().bees).toBeCloseTo(7.5, 6);
+
+		expect(sim.apply({ type: 'unequipUpgrade', id: 'petal-b' }, [])).toBe(true);
+		// Both unequipped: 2 × (1 + 0.5×2) = 4 — hoarding beats leaving one on.
+		expect(sim.generatorRates().bees).toBeCloseTo(4, 6);
+
+		expect(sim.apply({ type: 'equipUpgrade', id: 'petal-a' }, [])).toBe(true);
+		expect(sim.generatorRates().bees).toBeCloseTo(7.5, 6);
+	});
+
+	it('refuses to equip or unequip an upgrade nobody owns, and is a no-op if already in that state', () => {
+		const sim = createSim(apiaryToyDef(), idlePolicy, 1);
+		expect(sim.apply({ type: 'unequipUpgrade', id: 'petal-a' }, [])).toBe(false);
+		expect(sim.apply({ type: 'equipUpgrade', id: 'petal-a' }, [])).toBe(false);
+
+		sim.step(10);
+		sim.apply({ type: 'buyUpgrade', id: 'petal-a' }, []);
+		expect(sim.apply({ type: 'equipUpgrade', id: 'petal-a' }, [])).toBe(false); // already equipped
+		expect(sim.apply({ type: 'unequipUpgrade', id: 'petal-a' }, [])).toBe(true);
+		expect(sim.apply({ type: 'unequipUpgrade', id: 'petal-a' }, [])).toBe(false); // already unequipped
+	});
+
+	it('logs an equip event distinct from a purchase', () => {
+		const sim = createSim(apiaryToyDef(), idlePolicy, 1);
+		sim.step(10);
+		sim.apply({ type: 'buyUpgrade', id: 'petal-a' }, []);
+		const events: SimEvent[] = [];
+		sim.apply({ type: 'unequipUpgrade', id: 'petal-a' }, events);
+		expect(events).toEqual([
+			expect.objectContaining({ kind: 'unequip', id: 'petal-a', message: 'Petal A unequipped' })
+		]);
+	});
+
+	it('re-equips on prestige reset, so a fresh run starts clean', () => {
+		const def = apiaryToyDef();
+		def.prestigeLayers.push({
+			id: 'swarm',
+			name: 'Swarm',
+			currencyId: 'honey',
+			gainFormula: { sourceCurrencyId: 'honey', threshold: 1, exponent: 1 },
+			multiplier: { perUnit: 0 },
+			resets: ['honey', 'bees', 'petal-a']
+		});
+		const sim = createSim(def, idlePolicy, 1);
+		sim.step(10);
+		sim.apply({ type: 'buyUpgrade', id: 'petal-a' }, []);
+		sim.apply({ type: 'unequipUpgrade', id: 'petal-a' }, []);
+		expect(sim.state().upgrades['petal-a'].equipped).toBe(false);
+
+		sim.apply({ type: 'prestige', layerId: 'swarm' }, []);
+		expect(sim.state().upgrades['petal-a'].level).toBe(0);
+		expect(sim.state().upgrades['petal-a'].equipped).toBe(true);
 	});
 });
 

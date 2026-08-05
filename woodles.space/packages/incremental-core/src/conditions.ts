@@ -1,5 +1,5 @@
 import type { Condition } from './types.js';
-import type { SimState } from './state.js';
+import { countUnequippedUpgrades, type SimState } from './state.js';
 
 /**
  * Conditions read state and nothing else — no time, no randomness — so an
@@ -21,6 +21,8 @@ export function evaluateCondition(condition: Condition, state: SimState): boolea
 			return (state.upgrades[condition.upgradeId]?.level ?? 0) >= Math.max(1, condition.level ?? 1);
 		case 'prestigeCount':
 			return compare(state.prestige[condition.layerId]?.count ?? 0, condition.op, condition.value);
+		case 'unequippedUpgrades':
+			return compare(countUnequippedUpgrades(state), condition.op, condition.value);
 		default:
 			return false;
 	}
@@ -76,6 +78,9 @@ function collectReferences(condition: Condition, into: string[]): void {
 		case 'prestigeCount':
 			into.push(condition.layerId);
 			return;
+		case 'unequippedUpgrades':
+			// A def-wide count, not a reference to any one entity.
+			return;
 	}
 }
 
@@ -103,6 +108,8 @@ export function describeCondition(condition: Condition, nameOf: (id: string) => 
 				: `${nameOf(condition.upgradeId)} owned`;
 		case 'prestigeCount':
 			return `${nameOf(condition.layerId)} count ${condition.op} ${condition.value}`;
+		case 'unequippedUpgrades':
+			return `unequipped upgrades ${condition.op} ${condition.value}`;
 		default:
 			return 'unknown condition';
 	}

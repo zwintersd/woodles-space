@@ -1,4 +1,4 @@
-import { blankGameDef, cozyGarden, saveKey, type GameDef } from '@woodles/incremental-core';
+import { apiaryOfBadDecisions, blankGameDef, cozyGarden, saveKey, type GameDef } from '@woodles/incremental-core';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Game } from './game.svelte.js';
 import { clearSave, lastPlayed, loadSave } from './library.js';
@@ -129,6 +129,45 @@ describe('what the player is shown', () => {
 		expect(game.upgrades).toEqual([]);
 		expect(game.prestigeLayers).toEqual([]);
 		expect(game.visibleCurrencies).toEqual([]);
+	});
+});
+
+describe('equipping and unequipping', () => {
+	it('starts an owned upgrade equipped, and toggles freely from there', () => {
+		const game = opened(structuredClone(apiaryOfBadDecisions));
+		game.step(60);
+		game.buyUpgrade('clover-patch');
+		expect(game.upgrades.find((entry) => entry.id === 'clover-patch')?.equipped).toBe(true);
+
+		game.unequipUpgrade('clover-patch');
+		expect(game.upgrades.find((entry) => entry.id === 'clover-patch')?.equipped).toBe(false);
+		expect(game.unequippedUpgradeCount).toBe(1);
+
+		game.equipUpgrade('clover-patch');
+		expect(game.upgrades.find((entry) => entry.id === 'clover-patch')?.equipped).toBe(true);
+		expect(game.unequippedUpgradeCount).toBe(0);
+	});
+
+	it('leaves equipped undefined for a generator, and for an upgrade nobody owns yet', () => {
+		const game = opened(structuredClone(apiaryOfBadDecisions));
+		expect(game.generators[0].equipped).toBeUndefined();
+		expect(game.upgrades.find((entry) => entry.id === 'clover-patch')?.equipped).toBeUndefined();
+	});
+
+	it('is a no-op on an upgrade nobody owns', () => {
+		const game = opened(structuredClone(apiaryOfBadDecisions));
+		game.unequipUpgrade('clover-patch');
+		expect(game.unequippedUpgradeCount).toBe(0);
+	});
+
+	it('persists the toggle across a save and reload', () => {
+		const first = opened(structuredClone(apiaryOfBadDecisions));
+		first.step(60);
+		first.buyUpgrade('clover-patch');
+		first.unequipUpgrade('clover-patch');
+
+		const second = opened(structuredClone(apiaryOfBadDecisions));
+		expect(second.upgrades.find((entry) => entry.id === 'clover-patch')?.equipped).toBe(false);
 	});
 });
 

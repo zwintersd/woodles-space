@@ -38,6 +38,16 @@ describe('evaluating conditions', () => {
 		expect(evaluateCondition({ metric: 'upgradeOwned', upgradeId: 'u', level: 4 }, state)).toBe(false);
 	});
 
+	it('counts owned-but-unequipped upgrades across the whole def', () => {
+		const hoarding = stateWith((next) => {
+			next.upgrades.u = { level: 3, equipped: false };
+		});
+		expect(evaluateCondition({ metric: 'unequippedUpgrades', op: '>=', value: 1 }, hoarding)).toBe(true);
+		expect(evaluateCondition({ metric: 'unequippedUpgrades', op: '>=', value: 2 }, hoarding)).toBe(false);
+		// Unowned or equipped upgrades don't count.
+		expect(evaluateCondition({ metric: 'unequippedUpgrades', op: '>=', value: 1 }, state)).toBe(false);
+	});
+
 	it('reads a missing entity as zero rather than throwing', () => {
 		// A dangling reference is the validator's job to report. The engine still
 		// has to not crash while the author is mid-edit.
@@ -100,6 +110,9 @@ describe('describing conditions', () => {
 		);
 		expect(describeCondition({ metric: 'upgradeOwned', upgradeId: 'u' }, nameOf)).toBe('U owned');
 		expect(describeCondition({ metric: 'upgradeOwned', upgradeId: 'u', level: 10 }, nameOf)).toBe('U level >= 10');
+		expect(describeCondition({ metric: 'unequippedUpgrades', op: '>=', value: 5 }, nameOf)).toBe(
+			'unequipped upgrades >= 5'
+		);
 	});
 
 	it('joins groups with and / or', () => {
