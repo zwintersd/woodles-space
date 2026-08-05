@@ -3,6 +3,7 @@
 	import EmojiIcon from './EmojiIcon.svelte';
 	import { playtest } from './playtest.svelte.js';
 	import { studio } from './studio.svelte.js';
+	import Tooltip from './Tooltip.svelte';
 	import { tour } from './tour.svelte.js';
 	import SyncPanel from './SyncPanel.svelte';
 
@@ -89,16 +90,17 @@
 			↷
 		</button>
 		<span class="divider" aria-hidden="true"></span>
-		<button
-			class="bf-button help"
-			type="button"
-			onclick={ontour}
-			aria-pressed={tour.active}
-			title="Take the tour"
-			aria-label="Take the tour"
-		>
-			?
-		</button>
+		<Tooltip text="Six short steps, no wall of nodes — start whenever you want a refresher." placement="bottom">
+			<button
+				class="bf-button help"
+				type="button"
+				onclick={ontour}
+				aria-pressed={tour.active}
+				aria-label="Take the tour"
+			>
+				?
+			</button>
+		</Tooltip>
 		<button class="bf-button" type="button" onclick={onimport}>Import</button>
 		<button class="bf-button" type="button" onclick={onexport}>Export</button>
 		<SyncPanel />

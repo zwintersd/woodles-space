@@ -14,6 +14,8 @@
 	} from '@woodles/incremental-core';
 	import { currencyById, formatAmount } from '../format.js';
 	import EmojiIcon from '../EmojiIcon.svelte';
+	import { GLOSSARY } from '../glossary.js';
+	import InfoTip from '../InfoTip.svelte';
 	import { studio } from '../studio.svelte.js';
 	import ConditionEditor from './ConditionEditor.svelte';
 	import CurveEditor from './CurveEditor.svelte';
@@ -180,7 +182,10 @@
 				</div>
 
 				<div class="bf-field">
-					<label for="bf-notation">Notation</label>
+					<span class="bf-field-label">
+						<label for="bf-notation">Notation</label>
+						<InfoTip text={GLOSSARY.notation} />
+					</span>
 					<select
 						id="bf-notation"
 						class="bf-select"
@@ -278,11 +283,13 @@
 
 				<CurveEditor
 					label="Cost curve"
+					help={GLOSSARY.costCurve}
 					curve={generator.cost.curve}
 					onchange={(curve) => studio.edit(() => (generator.cost.curve = curve))}
 				/>
 				<CurveEditor
 					label="Output curve"
+					help={GLOSSARY.outputCurve}
 					curve={generator.rateCurve}
 					onchange={(curve) => studio.edit(() => (generator.rateCurve = curve))}
 				/>
@@ -342,22 +349,25 @@
 				</div>
 
 				<div class="bf-field">
-					<label class="inline" for="bf-repeat">
-						<input
-							id="bf-repeat"
-							type="checkbox"
-							checked={!!upgrade.repeatable}
-							onchange={(e) =>
-								studio.edit(() => {
-									if (e.currentTarget.checked) {
-										upgrade.repeatable = { maxLevel: 10, costCurve: { kind: 'geometric', growth: 2 } };
-									} else {
-										delete upgrade.repeatable;
-									}
-								})}
-						/>
-						Repeatable
-					</label>
+					<div class="repeatable-row">
+						<label class="inline" for="bf-repeat">
+							<input
+								id="bf-repeat"
+								type="checkbox"
+								checked={!!upgrade.repeatable}
+								onchange={(e) =>
+									studio.edit(() => {
+										if (e.currentTarget.checked) {
+											upgrade.repeatable = { maxLevel: 10, costCurve: { kind: 'geometric', growth: 2 } };
+										} else {
+											delete upgrade.repeatable;
+										}
+									})}
+							/>
+							Repeatable
+						</label>
+						<InfoTip text={GLOSSARY.repeatable} />
+					</div>
 				</div>
 
 				{#if upgrade.repeatable}
@@ -376,6 +386,7 @@
 					</div>
 					<CurveEditor
 						label="Cost curve"
+						help={GLOSSARY.costCurve}
 						curve={repeatable.costCurve}
 						onchange={(curve) => studio.edit(() => (repeatable.costCurve = curve))}
 					/>
@@ -390,7 +401,10 @@
 				<hr />
 
 				<div class="section-head">
-					<span class="bf-label">Effects ({upgrade.effects.length})</span>
+					<span class="bf-field-label">
+						<span class="bf-label">Effects ({upgrade.effects.length})</span>
+						<InfoTip text={GLOSSARY.effectTarget} />
+					</span>
 					<button
 						class="bf-button tiny"
 						type="button"
@@ -462,7 +476,10 @@
 
 				{#if upgrade.purchasableWhen}
 					<hr />
-					<span class="bf-label">Requires</span>
+					<span class="bf-field-label">
+						<span class="bf-label">Requires</span>
+						<InfoTip text={GLOSSARY.requires} />
+					</span>
 					<ConditionEditor
 						def={studio.def}
 						condition={upgrade.purchasableWhen}
@@ -518,7 +535,10 @@
 				</div>
 
 				<div class="bf-field">
-					<label for="bf-threshold">Threshold</label>
+					<span class="bf-field-label">
+						<label for="bf-threshold">Threshold</label>
+						<InfoTip text={GLOSSARY.threshold} />
+					</span>
 					<input
 						id="bf-threshold"
 						class="bf-input"
@@ -531,7 +551,10 @@
 				</div>
 
 				<div class="bf-field">
-					<label for="bf-exponent">Exponent</label>
+					<span class="bf-field-label">
+						<label for="bf-exponent">Exponent</label>
+						<InfoTip text={GLOSSARY.exponent} />
+					</span>
 					<input
 						id="bf-exponent"
 						class="bf-input"
@@ -544,7 +567,10 @@
 				</div>
 
 				<div class="bf-field">
-					<label for="bf-per-unit">Multiplier Per Unit</label>
+					<span class="bf-field-label">
+						<label for="bf-per-unit">Multiplier Per Unit</label>
+						<InfoTip text={GLOSSARY.multiplierPerUnit} />
+					</span>
 					<input
 						id="bf-per-unit"
 						class="bf-input"
@@ -562,7 +588,10 @@
 
 				<hr />
 
-				<span class="bf-label">Resets ({layer.resets.length})</span>
+				<span class="bf-field-label">
+					<span class="bf-label">Resets ({layer.resets.length})</span>
+					<InfoTip text={GLOSSARY.resets} />
+				</span>
 				<ul class="checks">
 					{#each resettable() as ref (ref.id)}
 						<li>
@@ -585,7 +614,10 @@
 			{/if}
 
 			{#if unlock}
-				<span class="bf-label">Reveals ({unlock.reveals.length})</span>
+				<span class="bf-field-label">
+					<span class="bf-label">Reveals ({unlock.reveals.length})</span>
+					<InfoTip text={GLOSSARY.reveals} />
+				</span>
 				<ul class="checks">
 					{#each revealable(unlock.id) as ref (ref.id)}
 						<li>
@@ -607,7 +639,10 @@
 				</ul>
 
 				<hr />
-				<span class="bf-label">Opens when</span>
+				<span class="bf-field-label">
+					<span class="bf-label">Opens when</span>
+					<InfoTip text={GLOSSARY.opensWhen} />
+				</span>
 				<ConditionEditor
 					def={studio.def}
 					condition={unlock.when}
@@ -616,7 +651,10 @@
 			{/if}
 
 			{#if milestone}
-				<span class="bf-label">Reached when</span>
+				<span class="bf-field-label">
+					<span class="bf-label">Reached when</span>
+					<InfoTip text={GLOSSARY.reachedWhen} />
+				</span>
 				<ConditionEditor
 					def={studio.def}
 					condition={milestone.when}
@@ -799,6 +837,12 @@
 		text-transform: none;
 		letter-spacing: 0;
 		font-weight: 500;
+	}
+
+	.repeatable-row {
+		display: flex;
+		align-items: center;
+		gap: 6px;
 	}
 
 	.section-head {

@@ -81,6 +81,20 @@ different game on each device leaves you holding both.
 Playtest state is throwaway and never written back into the def: watching a run
 must not edit the game.
 
+## teaching as you build
+
+The jargon an incremental game is built from — a generator's output curve, a
+prestige layer's threshold and exponent, what an unlock actually reveals —
+used to live only in this README. Now it lives in the app: a small gold star
+([`InfoTip.svelte`](./src/lib/InfoTip.svelte)) sits next to the Systems
+panel's entity-kind headers and the Inspector's denser fields, and hovering
+or focusing it pops a candy-pink callout ([`Tooltip.svelte`](./src/lib/Tooltip.svelte))
+with a one-sentence, in-voice explanation, sourced from
+[`glossary.ts`](./src/lib/glossary.ts) so the same idea reads the same way
+everywhere it shows up. The bubble is decorative — `aria-hidden` — because
+the star's own `aria-label` already carries the explanation, so nothing here
+depends on hovering to be understood.
+
 ## icons
 
 Every glyph in the UI is [OpenMoji](https://openmoji.org) artwork (CC BY-SA
