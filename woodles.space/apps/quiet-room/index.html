@@ -31,6 +31,13 @@
       pointer-events: none;
       background: radial-gradient(125% 105% at 50% 44%,
         transparent 36%, rgba(6, 5, 12, 0.42) 78%, rgba(4, 3, 9, 0.72) 100%);
+      transition: background 1s ease;
+    }
+    /* the bright moods: a dark vignette over a sunlit room reads as murk,
+       so it lightens to a warm haze instead of crushing to black. */
+    body.light-mode .vignette {
+      background: radial-gradient(125% 105% at 50% 44%,
+        transparent 40%, rgba(255, 250, 240, 0.3) 80%, rgba(250, 238, 218, 0.5) 100%);
     }
 
     /* a held breath of darkness, lifted once the first frame is ready */
@@ -62,6 +69,7 @@
       line-height: 1;
       text-shadow: 0 0 40px rgba(150, 130, 230, 0.45);
       opacity: 0;
+      transition: color 0.8s ease, text-shadow 0.8s ease;
     }
     .hint {
       margin-top: 1.3rem;
@@ -70,6 +78,15 @@
       text-transform: uppercase;
       color: rgba(220, 214, 240, 0.62);
       opacity: 0;
+      transition: color 0.8s ease;
+    }
+    /* the bright moods: pale lavender text nearly vanishes against daylight */
+    body.light-mode .title {
+      color: #3f2f52;
+      text-shadow: 0 0 34px rgba(255, 255, 255, 0.65);
+    }
+    body.light-mode .hint {
+      color: rgba(63, 47, 82, 0.6);
     }
     body.ready .title {
       animation: breathe-in 4.2s ease forwards 0.5s;
@@ -213,6 +230,10 @@
       border-color: rgba(180, 168, 232, 0.22);
       color: #efe9ff;
     }
+    /* against a sunlit canvas the pale glyph all but disappears at rest */
+    body.light-mode .home { color: rgba(63, 47, 82, 0.55); }
+    body.light-mode .home:hover,
+    body.light-mode .home.dim:hover { color: #3f2f52; }
 
     /* a soft tooltip that names the current mood when you change it */
     .mood-name {
@@ -225,9 +246,10 @@
       color: rgba(226, 220, 246, 0.7);
       pointer-events: none;
       opacity: 0;
-      transition: opacity 0.5s ease;
+      transition: opacity 0.5s ease, color 0.8s ease;
     }
     .mood-name.show { opacity: 1; }
+    body.light-mode .mood-name { color: rgba(63, 47, 82, 0.68); }
 
     /* ─────────────────────────── fallbacks ──────────────────────────── */
     #fallback {
@@ -383,25 +405,51 @@
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     /* ── moods ──────────────────────────────────────────────────────────
-       each is a held breath of colour the whole room lerps toward. */
+       each is a held breath of colour the whole room lerps toward.
+       `ambient`/`ambientI` fill the room itself, not just the heart —
+       essential for the `bright` moods, which want the whole floor lit
+       rather than just glowing at the centre. `shell` is the geode's own
+       surface tint (previously a hardcoded dark purple, so it read as a
+       flat grey stone once the room around it turned bright). `fogD` is
+       fog density — the bright moods thin it, or the whole room dissolves
+       into a uniform pale haze. `bloomT` is the bloom threshold: the
+       bright moods raise it so a pale sky doesn't bloom wholesale,
+       leaving bloom for the heart and motes as intended. the light/core/
+       beam hues stay saturated even in the bright moods on purpose — a
+       pastel-on-pastel heart disappears into a pale room; it needs to read
+       as a held jewel, not just another light surface. */
     const MOODS = [
-      { name: 'dusk',    fog: 0x130f20, light: 0xb6a4ff, core: 0xe2d4ff, mote: 0xc9bfee, beam: 0xb0a0ff, ground: 0x0b0913 },
-      { name: 'ember',   fog: 0x1a1310, light: 0xff9a64, core: 0xffd2a4, mote: 0xf6caa6, beam: 0xff9a64, ground: 0x140d09 },
-      { name: 'tide',    fog: 0x0a1620, light: 0x6fd8d4, core: 0xb2f0ea, mote: 0x8eddd4, beam: 0x6fd8d4, ground: 0x07111a },
-      { name: 'rose',    fog: 0x1c1218, light: 0xff96b8, core: 0xffc8da, mote: 0xeab0c8, beam: 0xff96b8, ground: 0x140b10 },
-      { name: 'moss',    fog: 0x0d160e, light: 0x9fd884, core: 0xceeab0, mote: 0xa6c08e, beam: 0x9fd884, ground: 0x080f08 },
-      { name: 'pearl',   fog: 0x171a24, light: 0xcdd6ff, core: 0xf2f4ff, mote: 0xd6dcf2, beam: 0xc4cdf0, ground: 0x0c0e16 },
+      { name: 'dusk',    fog: 0x130f20, light: 0xb6a4ff, core: 0xe2d4ff, mote: 0xc9bfee, beam: 0xb0a0ff, ground: 0x0b0913, ambient: 0x262642, ambientI: 0.6, shell: 0x1a1430, fogD: 0.072, bloomT: 0.6,  bright: false },
+      { name: 'ember',   fog: 0x1a1310, light: 0xff9a64, core: 0xffd2a4, mote: 0xf6caa6, beam: 0xff9a64, ground: 0x140d09, ambient: 0x262642, ambientI: 0.6, shell: 0x1a1430, fogD: 0.072, bloomT: 0.6,  bright: false },
+      { name: 'tide',    fog: 0x0a1620, light: 0x6fd8d4, core: 0xb2f0ea, mote: 0x8eddd4, beam: 0x6fd8d4, ground: 0x07111a, ambient: 0x262642, ambientI: 0.6, shell: 0x1a1430, fogD: 0.072, bloomT: 0.6,  bright: false },
+      { name: 'rose',    fog: 0x1c1218, light: 0xff96b8, core: 0xffc8da, mote: 0xeab0c8, beam: 0xff96b8, ground: 0x140b10, ambient: 0x262642, ambientI: 0.6, shell: 0x1a1430, fogD: 0.072, bloomT: 0.6,  bright: false },
+      { name: 'moss',    fog: 0x0d160e, light: 0x9fd884, core: 0xceeab0, mote: 0xa6c08e, beam: 0x9fd884, ground: 0x080f08, ambient: 0x262642, ambientI: 0.6, shell: 0x1a1430, fogD: 0.072, bloomT: 0.6,  bright: false },
+      { name: 'pearl',   fog: 0x171a24, light: 0xcdd6ff, core: 0xf2f4ff, mote: 0xd6dcf2, beam: 0xc4cdf0, ground: 0x0c0e16, ambient: 0x262642, ambientI: 0.6, shell: 0x1a1430, fogD: 0.072, bloomT: 0.6,  bright: false },
+      /* the light-mode range: the same room, flooded with daylight instead
+         of held in the dark. ground stays a shade deeper than fog so the
+         floor still reads underfoot instead of dissolving into the sky. */
+      { name: 'sunbeam', fog: 0xf2ede3, light: 0xe19909, core: 0xf1aa1e, mote: 0xe0b45c, beam: 0xf0a50f, ground: 0xdfd6c3, ambient: 0xf3f1ed, ambientI: 1.1, shell: 0xe8dfcf, fogD: 0.05, bloomT: 0.8, bright: true },
+      { name: 'meadow',  fog: 0xe8f2e3, light: 0x51e109, core: 0x64f11e, mote: 0x88e05c, beam: 0x5af00f, ground: 0xcddfc3, ambient: 0xeff3ed, ambientI: 1.1, shell: 0xd7e8cf, fogD: 0.05, bloomT: 0.8, bright: true },
+      { name: 'sky',     fog: 0xe3ecf2, light: 0x0873c4, core: 0x0e83dd, mote: 0x4399db, beam: 0x0d7bce, ground: 0xc3d3df, ambient: 0xedf0f3, ambientI: 1.1, shell: 0xcfdde8, fogD: 0.05, bloomT: 0.8, bright: true },
+      { name: 'blossom', fog: 0xf2e3eb, light: 0xce096b, core: 0xe60f7a, mote: 0xdd4b94, beam: 0xd80e73, ground: 0xdfc3d1, ambient: 0xf3edf0, ambientI: 1.1, shell: 0xe8cfdb, fogD: 0.05, bloomT: 0.8, bright: true },
+      { name: 'citrus',  fog: 0xf2e9e3, light: 0xe16009, core: 0xf1721e, mote: 0xe0915c, beam: 0xf0690f, ground: 0xdfcec3, ambient: 0xf3efed, ambientI: 1.1, shell: 0xe8d9cf, fogD: 0.05, bloomT: 0.8, bright: true },
+      { name: 'lagoon',  fog: 0xe3f2f0, light: 0x08c4ab, core: 0x0eddc1, mote: 0x43dbc7, beam: 0x0dceb4, ground: 0xc3dfdb, ambient: 0xedf3f2, ambientI: 1.1, shell: 0xcfe8e4, fogD: 0.05, bloomT: 0.8, bright: true },
     ];
     let moodIdx = 0;
     /* working colours, lerped toward the active mood each frame */
     const cur = {
-      fog:    new THREE.Color(MOODS[0].fog),
-      light:  new THREE.Color(MOODS[0].light),
-      core:   new THREE.Color(MOODS[0].core),
-      mote:   new THREE.Color(MOODS[0].mote),
-      beam:   new THREE.Color(MOODS[0].beam),
-      ground: new THREE.Color(MOODS[0].ground),
+      fog:     new THREE.Color(MOODS[0].fog),
+      light:   new THREE.Color(MOODS[0].light),
+      core:    new THREE.Color(MOODS[0].core),
+      mote:    new THREE.Color(MOODS[0].mote),
+      beam:    new THREE.Color(MOODS[0].beam),
+      ground:  new THREE.Color(MOODS[0].ground),
+      ambient: new THREE.Color(MOODS[0].ambient),
+      shell:   new THREE.Color(MOODS[0].shell),
     };
+    let curAmbientI = MOODS[0].ambientI;
+    let curBloomT = MOODS[0].bloomT;
+    let curFogD = MOODS[0].fogD;
 
     /* ── renderer / scene / camera ─────────────────────────────────────── */
     const canvas = document.getElementById('room');
@@ -419,7 +467,7 @@
 
     const scene = new THREE.Scene();
     scene.background = cur.fog.clone();
-    scene.fog = new THREE.FogExp2(cur.fog.clone(), 0.072);
+    scene.fog = new THREE.FogExp2(cur.fog.clone(), curFogD);
 
     const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 60);
     const camHome = new THREE.Vector3(0, 1.45, 6.4);
@@ -512,7 +560,7 @@
 
     /* faceted shell catching the inner light */
     const shellMat = new THREE.MeshStandardMaterial({
-      color: 0x1a1430,
+      color: cur.shell.clone(),
       emissive: cur.core.clone(),
       emissiveIntensity: 0.35,
       roughness: 0.18,
@@ -546,7 +594,10 @@
     const coreLight = new THREE.PointLight(cur.light.clone(), 9, 24, 1.7);
     coreLight.position.copy(lookTarget);
     scene.add(coreLight);
-    scene.add(new THREE.AmbientLight(0x262642, 0.6));
+    /* lights the whole room, not just the heart — the bright moods lean on
+       this to flood the floor with daylight rather than just glow at the centre. */
+    const ambientLight = new THREE.AmbientLight(cur.ambient.clone(), curAmbientI);
+    scene.add(ambientLight);
     const fill = new THREE.DirectionalLight(0x6a5a9a, 0.32);
     fill.position.set(3, 6, 4);
     scene.add(fill);
@@ -1043,10 +1094,16 @@
 
     const moodDot = document.getElementById('mood-dot');
     const moodName = document.getElementById('mood-name');
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
     let moodNameTimer = null;
     function applyMood(showName) {
       const m = MOODS[moodIdx];
       moodDot.style.setProperty('--mood', '#' + new THREE.Color(m.light).getHexString());
+      // the bright moods need their own text contrast, vignette, and browser
+      // chrome tint — a dark-mode vignette over a sunlit room reads as murk.
+      body.classList.toggle('light-mode', !!m.bright);
+      document.documentElement.setAttribute('data-theme', m.bright ? 'cream' : 'midnight');
+      themeColorMeta.setAttribute('content', '#' + new THREE.Color(m.fog).getHexString());
       if (showName) {
         moodName.textContent = m.name;
         moodName.classList.add('show');
@@ -1162,6 +1219,16 @@
       cur.mote.lerp(tmpColor.set(m.mote), k);
       cur.beam.lerp(tmpColor.set(m.beam), k);
       cur.ground.lerp(tmpColor.set(m.ground), k);
+      cur.ambient.lerp(tmpColor.set(m.ambient), k);
+      cur.shell.lerp(tmpColor.set(m.shell), k);
+      curAmbientI += (m.ambientI - curAmbientI) * k;
+      curBloomT += (m.bloomT - curBloomT) * k;
+      curFogD += (m.fogD - curFogD) * k;
+      ambientLight.color.copy(cur.ambient);
+      ambientLight.intensity = curAmbientI;
+      bloom.threshold = curBloomT;
+      scene.fog.density = curFogD;
+      shellMat.color.copy(cur.shell);
 
       // a pastel rainbow that eases slowly round the wheel
       const hueShift = (t * 0.018) % 1;
