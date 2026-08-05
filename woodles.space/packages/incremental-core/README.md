@@ -43,6 +43,18 @@ milestone can react to it too. See
 generator whose output rewards owning upgrades you deliberately never turned
 on.
 
+**Production doesn't have to be one-directional.** `Generator.converts`
+throttles a generator's output to whatever `fromCurrencyId` can actually
+supply *this tick* — `baseRate` / `rateCurve` / every modifier still set the
+ceiling, converting only ever produces less than that, never more. Nothing
+has to feed it on purpose: `Currency.spendTax` mints a byproduct in another
+currency the instant a wallet is debited, anywhere — a generator level, an
+upgrade buy — so a converter can run on the exhaust of an economy that was
+never built to feed it. See
+[`confessionBooth`](./src/fixtures/confession-booth.json) — a generator that
+consumes instead of produces, fed entirely by a tax on every other purchase
+in the game.
+
 ## numbers
 
 Every piece of arithmetic, including the comparisons, goes through
@@ -165,9 +177,18 @@ neither bot ever chooses to leave something it owns switched off. The strategy
 is real, and it's invisible to both bounds — only a player, or a script, can
 find it.
 
-Both load through `parseGameDef` for the same reason a user's import does — if
-either ever stops being valid, every test leaning on it fails at load rather
-than quietly producing different numbers.
+`confessionBooth`
+([`src/fixtures/confession-booth.json`](./src/fixtures/confession-booth.json))
+inverts the Apiary's proof: it's a stress test for `converts` and `spendTax`
+rather than `equipped`, and unlike hoarding, nothing about it needs a
+deliberate choice — spending is spending, so a naive `greedyPolicy()` funds
+the whole loop, guilt, absolution, and an eventual prestige, purely by playing
+normally. `idlePolicy` never spends a coin, so it mints zero guilt and never
+sees the Booth at all — the cleanest possible contrast between the two bounds.
+
+Both stress-test fixtures load through `parseGameDef` for the same reason a
+user's import does — if either ever stops being valid, every test leaning on
+it fails at load rather than quietly producing different numbers.
 
 ## tests
 
@@ -175,13 +196,14 @@ than quietly producing different numbers.
 pnpm --filter @woodles/incremental-core test
 ```
 
-159 tests. The ones that matter most: determinism (two runs, same seed, deep
+176 tests. The ones that matter most: determinism (two runs, same seed, deep
 equal), a golden master worked out by hand in a comment above the test, curve
 behaviour per kind, the prestige round trip (resets wipe exactly `resets[]`,
 lifetime counters outside it survive, the multiplier applies), the Apiary's
-hand-computed rate swings as upgrades get equipped and unequipped, and greedy
-out-earning idle on every fixture, plus the save round trip — a resumed run has
-to produce byte-identical events to one that never stopped.
+hand-computed rate swings as upgrades get equipped and unequipped, the
+Confession Booth's hand-computed guilt tax and the moment its converter runs
+dry, and greedy out-earning idle on every fixture, plus the save round trip —
+a resumed run has to produce byte-identical events to one that never stopped.
 
 That last one is measured on **lifetime**, not on the balance. Greedy spends,
 and a prestige zeroes what it holds, so the balance is not the invariant —

@@ -206,6 +206,69 @@
 					<div class="preview">{num.format(1234.56, currency.format)}</div>
 					<div class="preview subtle">{num.format(1_234_567.89, currency.format)}</div>
 				</div>
+
+				<hr />
+
+				<div class="bf-field">
+					<div class="repeatable-row">
+						<label class="inline" for="bf-spend-tax">
+							<input
+								id="bf-spend-tax"
+								type="checkbox"
+								checked={!!currency.spendTax}
+								onchange={(e) =>
+									studio.edit(() => {
+										if (e.currentTarget.checked) {
+											const other = studio.def.currencies.find((entry) => entry.id !== currency.id);
+											currency.spendTax = { intoCurrencyId: other?.id ?? currency.id, rate: 0.25 };
+										} else {
+											delete currency.spendTax;
+										}
+									})}
+							/>
+							Taxes when spent
+						</label>
+						<InfoTip text={GLOSSARY.spendTax} />
+					</div>
+				</div>
+
+				{#if currency.spendTax}
+					{@const tax = currency.spendTax}
+					<div class="bf-field">
+						<label for="bf-tax-target">Feeds</label>
+						<select
+							id="bf-tax-target"
+							class="bf-select"
+							value={tax.intoCurrencyId}
+							onchange={(e) => studio.edit(() => (tax.intoCurrencyId = e.currentTarget.value))}
+						>
+							{#each studio.def.currencies.filter((entry) => entry.id !== currency.id) as entry (entry.id)}
+								<option value={entry.id}>{entry.name}</option>
+							{/each}
+						</select>
+					</div>
+
+					<div class="bf-field">
+						<span class="bf-field-label">
+							<label for="bf-tax-rate">Rate</label>
+							<InfoTip text={GLOSSARY.spendTaxRate} />
+						</span>
+						<input
+							id="bf-tax-rate"
+							class="bf-input"
+							type="number"
+							step="0.01"
+							min="0"
+							value={tax.rate}
+							oninput={(e) => studio.editQuietly(() => (tax.rate = Number(e.currentTarget.value)))}
+						/>
+					</div>
+
+					<p class="hint">
+						Spending 100 {currency.name} would mint {(tax.rate * 100).toFixed(2)}
+						{currencyById(studio.def, tax.intoCurrencyId)?.name ?? tax.intoCurrencyId}, the instant it's spent.
+					</p>
+				{/if}
 			{/if}
 
 			{#if generator}
@@ -353,6 +416,67 @@
 					</div>
 
 					<p class="hint">At 5 unequipped upgrades this reads ×{(1 + boost.perUnit * 5).toFixed(2)}.</p>
+				{/if}
+
+				<div class="bf-field">
+					<div class="repeatable-row">
+						<label class="inline" for="bf-converts">
+							<input
+								id="bf-converts"
+								type="checkbox"
+								checked={!!generator.converts}
+								onchange={(e) =>
+									studio.edit(() => {
+										if (e.currentTarget.checked) {
+											const input = studio.def.currencies.find((entry) => entry.id !== generator.producesCurrencyId);
+											generator.converts = { fromCurrencyId: input?.id ?? generator.producesCurrencyId, ratio: 1 };
+										} else {
+											delete generator.converts;
+										}
+									})}
+							/>
+							Converts a currency
+						</label>
+						<InfoTip text={GLOSSARY.converts} />
+					</div>
+				</div>
+
+				{#if generator.converts}
+					{@const conversion = generator.converts}
+					<div class="bf-field">
+						<label for="bf-converts-from">Consumes</label>
+						<select
+							id="bf-converts-from"
+							class="bf-select"
+							value={conversion.fromCurrencyId}
+							onchange={(e) => studio.edit(() => (conversion.fromCurrencyId = e.currentTarget.value))}
+						>
+							{#each studio.def.currencies as entry (entry.id)}
+								<option value={entry.id}>{entry.name}</option>
+							{/each}
+						</select>
+					</div>
+
+					<div class="bf-field">
+						<span class="bf-field-label">
+							<label for="bf-converts-ratio">Ratio</label>
+							<InfoTip text={GLOSSARY.convertsRatio} />
+						</span>
+						<input
+							id="bf-converts-ratio"
+							class="bf-input"
+							type="number"
+							step="0.1"
+							min="0.01"
+							value={conversion.ratio}
+							oninput={(e) => studio.editQuietly(() => (conversion.ratio = Number(e.currentTarget.value)))}
+						/>
+					</div>
+
+					<p class="hint">
+						{formatAmount(conversion.ratio, currencyById(studio.def, conversion.fromCurrencyId))} consumed per unit of {produces?.name ??
+							'output'} made — throttled to whatever's actually on hand, never more than the curve above allows, only ever less.
+					</p>
 				{/if}
 			{/if}
 

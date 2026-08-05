@@ -24,7 +24,8 @@ export type ValidationCode =
 	| 'unlock-cycle'
 	| 'unreachable'
 	| 'orphan-currency'
-	| 'self-reset';
+	| 'self-reset'
+	| 'self-tax';
 
 export interface ValidationIssue {
 	severity: Severity;
@@ -82,9 +83,31 @@ export function validateGameDef(def: GameDef): ValidationIssue[] {
 			error('invalid-number', 'decimal places must be zero or more', `${path}.format.decimalPlaces`, currency.id);
 		}
 
+		if (currency.spendTax) {
+			if (!currencyIds.has(currency.spendTax.intoCurrencyId)) {
+				error(
+					'dangling-reference',
+					`${currency.name || currency.id}'s spend tax feeds "${currency.spendTax.intoCurrencyId}", which is not a currency`,
+					`${path}.spendTax.intoCurrencyId`,
+					currency.id
+				);
+			} else if (currency.spendTax.intoCurrencyId === currency.id) {
+				warn(
+					'self-tax',
+					`${currency.name || currency.id} taxes itself, which just partially refunds every spend rather than creating a byproduct`,
+					`${path}.spendTax.intoCurrencyId`,
+					currency.id
+				);
+			}
+			if (!Number.isFinite(currency.spendTax.rate) || currency.spendTax.rate < 0) {
+				error('invalid-number', 'a spend tax rate cannot be negative', `${path}.spendTax.rate`, currency.id);
+			}
+		}
+
 		const produced = def.generators.some((generator) => generator.producesCurrencyId === currency.id);
 		const awarded = def.prestigeLayers.some((layer) => layer.currencyId === currency.id);
-		if (!produced && !awarded) {
+		const taxed = def.currencies.some((entry) => entry.spendTax?.intoCurrencyId === currency.id);
+		if (!produced && !awarded && !taxed) {
 			warn('orphan-currency', `nothing produces ${currency.name}`, `${path}.id`, currency.id);
 		}
 	}
@@ -130,6 +153,19 @@ export function validateGameDef(def: GameDef): ValidationIssue[] {
 				`${path}.populationBoost.perUnit`,
 				generator.id
 			);
+		}
+		if (generator.converts) {
+			if (!currencyIds.has(generator.converts.fromCurrencyId)) {
+				error(
+					'dangling-reference',
+					`${generator.name || generator.id} converts "${generator.converts.fromCurrencyId}", which is not a currency`,
+					`${path}.converts.fromCurrencyId`,
+					generator.id
+				);
+			}
+			if (!Number.isFinite(generator.converts.ratio) || generator.converts.ratio <= 0) {
+				error('invalid-number', 'a conversion ratio must be greater than zero', `${path}.converts.ratio`, generator.id);
+			}
 		}
 	}
 

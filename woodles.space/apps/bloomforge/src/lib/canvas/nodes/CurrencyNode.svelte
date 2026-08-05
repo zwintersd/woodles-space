@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { NodeProps } from '@xyflow/svelte';
 	import { num, type Currency } from '@woodles/incremental-core';
-	import { formatAmount, signedRate } from '../../format.js';
+	import { currencyById, formatAmount, signedRate } from '../../format.js';
 	import { playtest } from '../../playtest.svelte.js';
 	import { studio } from '../../studio.svelte.js';
 	import NodeShell from '../NodeShell.svelte';
@@ -9,6 +9,7 @@
 	let { id, selected }: NodeProps = $props();
 
 	const currency = $derived(studio.def.currencies.find((entry) => entry.id === id) as Currency | undefined);
+	const taxTarget = $derived(currencyById(studio.def, currency?.spendTax?.intoCurrencyId));
 	const live = $derived(playtest.showLive);
 	const amount = $derived(playtest.amounts[id] ?? 0);
 	const rate = $derived(playtest.rates[id] ?? 0);
@@ -36,6 +37,9 @@
 		<div class="rate">
 			{live ? signedRate(rate, currency) : `${currency.format.notation} · ${currency.format.decimalPlaces} dp`}
 		</div>
+		{#if currency.spendTax}
+			<span class="tag">taxes into {taxTarget?.name ?? '—'}</span>
+		{/if}
 	</NodeShell>
 {/if}
 
@@ -52,5 +56,16 @@
 		font-size: 11px;
 		color: var(--bf-muted);
 		font-variant-numeric: tabular-nums;
+	}
+
+	.tag {
+		display: inline-block;
+		margin-top: 6px;
+		padding: 2px 7px;
+		border-radius: var(--bf-radius-pill);
+		background: var(--bf-currency-soft);
+		color: var(--bf-currency);
+		font-size: 10px;
+		font-weight: 600;
 	}
 </style>

@@ -32,5 +32,11 @@ export const GLOSSARY = {
 	requires: "A gate on top of cost — the upgrade can't be bought until this is also true.",
 	populationBoost:
 		'An extra multiplier driven by a live count instead of a level — e.g. "×1 + 0.1 per owned-but-unequipped upgrade." Composes with the curve above it.',
-	populationPerUnit: 'The bonus each counted unit adds — 0.35 means +35% per unit, compounding additively with itself.'
+	populationPerUnit: 'The bonus each counted unit adds — 0.35 means +35% per unit, compounding additively with itself.',
+	spendTax:
+		"Whenever this currency is spent — anywhere, on anything — a share of what was spent quietly mints into another currency as a byproduct. No purchase has to opt in.",
+	spendTaxRate: 'The share of every spend that mints — 0.25 means spending 100 mints 25, the instant the spend happens.',
+	converts:
+		'Turns this generator into a converter: it draws down another currency instead of running purely off its own curve. The curve above still sets the ceiling — this can only ever produce less than that, never more.',
+	convertsRatio: 'How much of the input currency one unit of output costs. Higher means the ceiling gets throttled sooner.'
 } as const;

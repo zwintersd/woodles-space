@@ -164,6 +164,64 @@ export function apiaryToyDef(): GameDef {
 	};
 }
 
+/**
+ * A miniature "Confession Booth": buying `trinket` (10 coins) taxes 10 guilt
+ * into existence via `coins.spendTax`. `booth` converts guilt into absolution
+ * 1:1, ceiling 3/sec, so it runs at full rate until the 10 guilt runs dry —
+ * at 3/sec that's 3.33s, then it starves back to 0 until the next purchase.
+ */
+export function confessionToyDef(): GameDef {
+	return {
+		schemaVersion: SCHEMA_VERSION,
+		meta: { id: 'confession-toy', title: 'Confession Toy' },
+		currencies: [
+			{
+				id: 'coins',
+				name: 'Coins',
+				color: '#E8B830',
+				format: { decimalPlaces: 2, notation: 'plain' },
+				spendTax: { intoCurrencyId: 'guilt', rate: 1 }
+			},
+			{ id: 'guilt', name: 'Guilt', color: '#6B4C6E', format: { decimalPlaces: 2, notation: 'plain' } },
+			{ id: 'absolution', name: 'Absolution', color: '#F5E6C8', format: { decimalPlaces: 2, notation: 'plain' } }
+		],
+		generators: [
+			{
+				id: 'miner',
+				name: 'Miner',
+				producesCurrencyId: 'coins',
+				baseRate: 2,
+				rateCurve: { kind: 'polynomial', exponent: 1 },
+				cost: { currencyId: 'coins', base: 1000, curve: { kind: 'geometric', growth: 2 } },
+				startsOwned: 1
+			},
+			{
+				id: 'booth',
+				name: 'Confession Booth',
+				producesCurrencyId: 'absolution',
+				baseRate: 3,
+				rateCurve: { kind: 'polynomial', exponent: 1 },
+				cost: { currencyId: 'coins', base: 5, curve: { kind: 'geometric', growth: 2 } },
+				startsOwned: 1,
+				converts: { fromCurrencyId: 'guilt', ratio: 1 }
+			}
+		],
+		upgrades: [
+			{
+				id: 'trinket',
+				name: 'Trinket',
+				cost: { currencyId: 'coins', amount: 10 },
+				effects: [{ target: { type: 'generator', id: 'miner' }, stat: 'rate', op: 'add', value: 0.5 }]
+			}
+		],
+		prestigeLayers: [],
+		unlocks: [],
+		milestones: [],
+		notes: [],
+		layout: {}
+	};
+}
+
 /** A def with a crit upgrade, so the RNG path is actually exercised. */
 export function critDef(): GameDef {
 	return {

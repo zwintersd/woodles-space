@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createSim, prestigeGain, sampleIntervalFor, simulate, TICKS_PER_SECOND } from './engine.js';
 import { greedy, greedyPolicy, idlePolicy, scriptedPolicy } from './policies.js';
 import type { SimEvent } from './state.js';
-import { apiaryToyDef, critDef, prestigeDef, toyDef } from './test-defs.js';
+import { apiaryToyDef, confessionToyDef, critDef, prestigeDef, toyDef } from './test-defs.js';
 import { cozyGarden } from './fixtures/index.js';
 
 const run = (def = toyDef(), policy = idlePolicy, duration = 60) =>
@@ -343,6 +343,58 @@ describe('the Apiary of Bad Decisions — equip state and population boosts', ()
 		sim.apply({ type: 'prestige', layerId: 'swarm' }, []);
 		expect(sim.state().upgrades['petal-a'].level).toBe(0);
 		expect(sim.state().upgrades['petal-a'].equipped).toBe(true);
+	});
+});
+
+describe('the Confession Booth — spend taxes and converters', () => {
+	it('taxes a spend into another currency the instant the purchase happens', () => {
+		const sim = createSim(confessionToyDef(), idlePolicy, 1);
+		sim.step(10); // miner alone: 20 coins
+		expect(sim.state().currencies.guilt.amount).toBe(0);
+
+		expect(sim.apply({ type: 'buyUpgrade', id: 'trinket' }, [])).toBe(true);
+		// Spending 10 coins at spendTax rate 1 mints 10 guilt, synchronously.
+		expect(sim.state().currencies.coins.amount).toBeCloseTo(10, 6);
+		expect(sim.state().currencies.guilt.amount).toBeCloseTo(10, 6);
+		expect(sim.state().currencies.guilt.lifetime).toBeCloseTo(10, 6);
+	});
+
+	it('runs a converter at full ceiling while its input can sustain it, then starves', () => {
+		const sim = createSim(confessionToyDef(), idlePolicy, 1);
+		sim.step(10);
+		sim.apply({ type: 'buyUpgrade', id: 'trinket' }, []); // 10 guilt minted
+
+		// 10 guilt at a 1:1 ratio sustains the 3/sec ceiling for 3.33s.
+		expect(sim.generatorRates().booth).toBeCloseTo(3, 6);
+
+		sim.step(2); // well inside the sustainable window
+		expect(sim.state().currencies.guilt.amount).toBeCloseTo(4, 6); // 10 − 3×2
+		expect(sim.state().currencies.absolution.amount).toBeCloseTo(6, 6);
+		expect(sim.generatorRates().booth).toBeCloseTo(3, 6); // still unthrottled
+
+		sim.step(2); // crosses the point guilt runs out mid-window
+		expect(sim.state().currencies.guilt.amount).toBeCloseTo(0, 6);
+		expect(sim.state().currencies.absolution.amount).toBeCloseTo(10, 6); // all 10 guilt converted, 1:1
+
+		sim.step(5); // nothing left to convert, no new spending to feed it
+		expect(sim.state().currencies.guilt.amount).toBe(0);
+		expect(sim.state().currencies.absolution.amount).toBeCloseTo(10, 6);
+		expect(sim.generatorRates().booth).toBe(0);
+	});
+
+	it('never lets a converter run its input balance negative', () => {
+		const sim = createSim(confessionToyDef(), idlePolicy, 1);
+		sim.step(600); // plenty of time for the booth to try to run dry repeatedly
+		expect(sim.state().currencies.guilt.amount).toBeGreaterThanOrEqual(0);
+	});
+
+	it('leaves currencies with no spendTax completely unaffected by spending', () => {
+		const def = confessionToyDef();
+		delete def.currencies[0].spendTax;
+		const sim = createSim(def, idlePolicy, 1);
+		sim.step(10);
+		sim.apply({ type: 'buyUpgrade', id: 'trinket' }, []);
+		expect(sim.state().currencies.guilt.amount).toBe(0);
 	});
 });
 

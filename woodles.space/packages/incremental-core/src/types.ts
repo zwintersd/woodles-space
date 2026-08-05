@@ -31,6 +31,14 @@ export interface Currency {
 	symbol?: string;
 	color: string;
 	format: NumberFormat;
+	/**
+	 * Every time this currency is spent — a generator level, an upgrade buy —
+	 * `rate × amount spent` is quietly added to `intoCurrencyId` as a
+	 * byproduct. Applied wherever a wallet is actually debited, so nothing
+	 * has to opt in per purchase; a currency with no `spendTax` behaves
+	 * exactly as it always has.
+	 */
+	spendTax?: { intoCurrencyId: string; rate: number };
 }
 
 /**
@@ -86,6 +94,15 @@ export interface Generator {
 	 * the same way `Curve` is.
 	 */
 	populationBoost?: PopulationBoost;
+	/**
+	 * Turns this generator into a converter: `baseRate` / `rateCurve` / every
+	 * modifier still set the *ceiling*, but actual output each tick is
+	 * throttled to whatever `fromCurrencyId` can currently supply — a
+	 * converter with nothing to convert produces nothing, however fast its
+	 * curve says it could. Never produces more than the curve allows, only
+	 * ever less.
+	 */
+	converts?: Conversion;
 }
 
 export type PopulationBoost = {
@@ -93,6 +110,12 @@ export type PopulationBoost = {
 	metric: 'unequippedUpgrades';
 	perUnit: number;
 };
+
+export interface Conversion {
+	fromCurrencyId: string;
+	/** Units of `fromCurrencyId` consumed per unit of this generator's own output. */
+	ratio: number;
+}
 
 /**
  * What an upgrade does when owned *and equipped*. `value` is applied **once

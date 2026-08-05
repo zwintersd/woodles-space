@@ -16,7 +16,7 @@ import {
 	type SimState
 } from './state.js';
 import { restoreMilestoneTimes, restoreState, saveMatches, serializeState, SAVE_VERSION, type SaveGame } from './savegame.js';
-import type { GameDef, Generator, Milestone, PrestigeLayer, Unlock, Upgrade } from './types.js';
+import type { Currency, GameDef, Generator, Milestone, PrestigeLayer, Unlock, Upgrade } from './types.js';
 import { hasErrors, validateGameDef } from './validate.js';
 
 /** One tick of game time, in milliseconds. Fixed — never derived from a frame rate. */
@@ -75,6 +75,7 @@ export class Simulation {
 	private readonly generatorById = new Map<string, Generator>();
 	private readonly upgradeById = new Map<string, Upgrade>();
 	private readonly layerById = new Map<string, PrestigeLayer>();
+	private readonly currencyById = new Map<string, Currency>();
 	private readonly context: PolicyContext;
 	private simState: SimState;
 	private modifiers: Modifiers;
@@ -135,6 +136,7 @@ export class Simulation {
 		for (const generator of def.generators) this.generatorById.set(generator.id, generator);
 		for (const upgrade of def.upgrades) this.upgradeById.set(upgrade.id, upgrade);
 		for (const layer of def.prestigeLayers) this.layerById.set(layer.id, layer);
+		for (const currency of def.currencies) this.currencyById.set(currency.id, currency);
 
 		for (const milestone of def.milestones) this.milestoneTimes[milestone.id] = null;
 		for (const layer of def.prestigeLayers) this.prestigeCounts[layer.id] = 0;
@@ -189,7 +191,7 @@ export class Simulation {
 		for (const currency of this.def.currencies) rates[currency.id] = 0;
 		for (const [i, generator] of this.def.generators.entries()) {
 			const id = generator.producesCurrencyId;
-			rates[id] = num.add(rates[id] ?? 0, this.cachedRates[i]);
+			rates[id] = num.add(rates[id] ?? 0, this.throttledRate(i));
 		}
 		return rates;
 	}
@@ -198,8 +200,30 @@ export class Simulation {
 	generatorRates(): Record<string, number> {
 		if (this.derivedDirty) this.refreshDerived();
 		const rates: Record<string, number> = {};
-		for (const [i, generator] of this.def.generators.entries()) rates[generator.id] = this.cachedRates[i];
+		for (const [i, generator] of this.def.generators.entries()) rates[generator.id] = this.throttledRate(i);
 		return rates;
+	}
+
+	/**
+	 * A converter's ceiling rate, capped to what its input can sustain *right
+	 * now* — a snapshot, not a rolling average, so it reads honestly the
+	 * instant a converter runs its input dry. Crit stays out of it, the same
+	 * way it stays out of every other displayed rate; crit is a per-tick roll
+	 * `produce()` applies, never something the readout promises.
+	 */
+	private throttledRate(i: number): number {
+		const rate = this.cachedRates[i];
+		if (rate <= 0) return rate;
+		const converts = this.def.generators[i].converts;
+		if (!converts) return rate;
+		return num.min(rate, this.maxByInput(converts));
+	}
+
+	/** How much output `converts` could still produce from what's on hand right now. */
+	private maxByInput(converts: NonNullable<Generator['converts']>): number {
+		if (converts.ratio <= 0) return 0;
+		const available = this.simState.currencies[converts.fromCurrencyId]?.amount ?? 0;
+		return num.div(available, converts.ratio);
 	}
 
 	/**
@@ -309,7 +333,23 @@ export class Simulation {
 			// short, and a def with no crit upgrades consumes no randomness at all.
 			if (crit > 0 && this.rng.next() < crit) rate = num.mul(rate, CRIT_MULTIPLIER);
 
-			const produced = num.mul(rate, TICK_SECONDS);
+			let produced = num.mul(rate, TICK_SECONDS);
+
+			// A converter never overdraws its input, crit included — the bonus
+			// tick still costs proportionally more of it, and a converter with
+			// nothing to convert produces nothing this tick, full stop.
+			// `maxByInput` is already an absolute quantity (this tick's whole
+			// available stock ÷ ratio), not a rate, so it's compared directly
+			// against `produced` rather than scaled by TICK_SECONDS again.
+			const converts = this.def.generators[i].converts;
+			if (converts) produced = num.min(produced, this.maxByInput(converts));
+			if (produced <= 0) continue;
+
+			if (converts) {
+				const source = this.simState.currencies[converts.fromCurrencyId];
+				if (source) source.amount = num.sub(source.amount, num.mul(produced, converts.ratio));
+			}
+
 			const currency = this.sinks[i];
 			if (!currency) continue;
 			currency.amount = num.add(currency.amount, produced);
@@ -404,6 +444,7 @@ export class Simulation {
 			if (!wallet || !num.gte(wallet.amount, cost)) break;
 
 			wallet.amount = num.sub(wallet.amount, cost);
+			this.applySpendTax(generator.cost.currencyId, cost);
 			this.simState.generators[id].level = level + 1;
 			this.derivedDirty = true;
 			bought += 1;
@@ -431,6 +472,7 @@ export class Simulation {
 		if (!wallet || !num.gte(wallet.amount, cost)) return false;
 
 		wallet.amount = num.sub(wallet.amount, cost);
+		this.applySpendTax(upgrade.cost.currencyId, cost);
 		this.simState.upgrades[id].level = level + 1;
 		// Only upgrades change the resolved modifier table, so this is the one
 		// place that has to invalidate it — and every rate derives from it.
@@ -471,6 +513,22 @@ export class Simulation {
 			message: `${upgrade.name} ${equipped ? 'equipped' : 'unequipped'}`
 		});
 		return true;
+	}
+
+	/**
+	 * A currency's `spendTax`, applied wherever a wallet is actually debited.
+	 * Silent by design — no event, the same way ordinary production ticks
+	 * along without one. A currency with no `spendTax` costs this a map
+	 * lookup and nothing else.
+	 */
+	private applySpendTax(currencyId: string, spent: number): void {
+		const tax = this.currencyById.get(currencyId)?.spendTax;
+		if (!tax) return;
+		const target = this.simState.currencies[tax.intoCurrencyId];
+		if (!target) return;
+		const gained = num.mul(spent, tax.rate);
+		target.amount = num.add(target.amount, gained);
+		target.lifetime = num.add(target.lifetime, gained);
 	}
 
 	/** Visible, gated conditions met, and not already maxed. Affordability is checked separately. */

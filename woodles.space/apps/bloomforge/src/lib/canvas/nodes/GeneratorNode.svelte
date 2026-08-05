@@ -12,6 +12,7 @@
 	const generator = $derived(studio.def.generators.find((entry) => entry.id === id));
 	const produces = $derived(currencyById(studio.def, generator?.producesCurrencyId));
 	const priced = $derived(currencyById(studio.def, generator?.cost.currencyId));
+	const consumes = $derived(currencyById(studio.def, generator?.converts?.fromCurrencyId));
 
 	const live = $derived(playtest.showLive);
 	const level = $derived(playtest.generatorLevels[id] ?? generator?.startsOwned ?? 0);
@@ -44,7 +45,13 @@
 				</div>
 			{/if}
 		{:else}
-			<div class="rate muted">makes {produces?.name ?? '—'}</div>
+			<div class="rate muted">
+				{#if generator.converts}
+					converts {consumes?.name ?? '—'} into {produces?.name ?? '—'}
+				{:else}
+					makes {produces?.name ?? '—'}
+				{/if}
+			</div>
 			<div class="cost">
 				<EmojiIcon char={priced?.symbol ?? '🪙'} size={11} />
 				{formatAmount(generator.cost.base, priced)} to start
@@ -52,6 +59,9 @@
 		{/if}
 		{#if generator.populationBoost}
 			<span class="tag">boosted by unequipped upgrades</span>
+		{/if}
+		{#if generator.converts}
+			<span class="tag tag-converts">consumes {consumes?.name ?? '—'}</span>
 		{/if}
 	</NodeShell>
 {/if}
@@ -86,11 +96,17 @@
 	.tag {
 		display: inline-block;
 		margin-top: 6px;
+		margin-right: 4px;
 		padding: 2px 7px;
 		border-radius: var(--bf-radius-pill);
 		background: var(--bf-generator-soft);
 		color: var(--bf-generator);
 		font-size: 10px;
 		font-weight: 600;
+	}
+
+	.tag-converts {
+		background: var(--bf-currency-soft);
+		color: var(--bf-currency);
 	}
 </style>

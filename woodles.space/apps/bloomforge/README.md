@@ -68,6 +68,18 @@ Studio's own playtest — Idle or Greedy, never a human — never exercises it;
 what the Inspector edits here is just the multiplier those two bots can't
 reach.
 
+A currency can carry a **spend tax** — spend it anywhere, on anything, and a
+share mints into another currency as a byproduct — and a generator can
+**convert** one currency into another instead of producing from a bare curve,
+throttled every tick to whatever its input can actually supply. Together
+they're the second stress-test sample,
+[`confessionBooth`](../../packages/incremental-core/src/fixtures/confession-booth.json):
+a Booth that produces nothing from its own curve, fed entirely by a tax
+skimmed off every other purchase in the game. Unlike the Hive, this one needs
+no player choice at all — Greedy funds it just by playing normally, which is
+the whole point: some stress tests need a human to find the strategy, and
+some the economy finds on its own.
+
 **Dock** — Playtest steps the sim on animation frames at 1×/10×/100× game time
 (10× by default; real time is too slow to feel a curve). Balance fast-forwards
 Idle against Greedy in a Web Worker and reports time-to-milestone. Plus Log and
