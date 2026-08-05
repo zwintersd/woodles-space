@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { playtest } from '../playtest.svelte.js';
 	import { tour } from '../tour.svelte.js';
+	import EmojiIcon from '../EmojiIcon.svelte';
 	import BalanceTab from './BalanceTab.svelte';
 	import LogTab from './LogTab.svelte';
 	import NotesTab from './NotesTab.svelte';
@@ -10,7 +11,7 @@
 
 	const TABS: { id: TabId; label: string; icon: string }[] = [
 		{ id: 'playtest', label: 'Playtest', icon: '🌸' },
-		{ id: 'balance', label: 'Balance', icon: '⚖️' },
+		{ id: 'balance', label: 'Balance', icon: '⚖' },
 		{ id: 'notes', label: 'Notes', icon: '📋' },
 		{ id: 'log', label: 'Log', icon: '📜' }
 	];
@@ -40,7 +41,7 @@
 					if (collapsed) ontoggle();
 				}}
 			>
-				<span aria-hidden="true">{tab.icon}</span>
+				<span class="tab-icon"><EmojiIcon char={tab.icon} size={13} /></span>
 				{tab.label}
 				{#if tab.id === 'log' && playtest.log.length}
 					<span class="count">{playtest.log.length}</span>

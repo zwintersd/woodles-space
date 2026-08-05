@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { currencyById, formatAmount, signedRate, timeUntil } from './format.js';
+	import EmojiIcon from './EmojiIcon.svelte';
 	import { game, type Purchasable } from './game.svelte.js';
 
 	/**
@@ -36,7 +37,7 @@
 	onclick={() => onbuy(item.id)}
 	aria-label="Buy {item.name}{item.cost === null ? '' : `, costs ${formatAmount(item.cost, priced)}`}"
 >
-	<span class="icon" aria-hidden="true">{item.locked ? '🔒' : maxed ? '✅' : icon}</span>
+	<span class="icon"><EmojiIcon char={item.locked ? '🔒' : maxed ? '✅' : icon} size={16} /></span>
 
 	<span class="body">
 		<span class="head">
@@ -56,7 +57,7 @@
 			<span class="blocked">{item.blockedBy}</span>
 		{:else if item.cost !== null}
 			<span class="cost" class:short={!item.affordable}>
-				<span aria-hidden="true">{priced?.symbol ?? '🪙'}</span>
+				<EmojiIcon char={priced?.symbol ?? '🪙'} size={12} />
 				{formatAmount(item.cost, priced)}
 			</span>
 			{#if wait}<span class="wait">{wait}</span>{/if}

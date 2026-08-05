@@ -13,6 +13,7 @@
 	import { currencyById } from '../format.js';
 	import { deriveEdges, deriveNodes } from '@woodles/incremental-core';
 	import { applyConnection } from '../connect.js';
+	import EmojiIcon from '../EmojiIcon.svelte';
 	import { playtest } from '../playtest.svelte.js';
 	import { studio } from '../studio.svelte.js';
 	import CurrencyNode from './nodes/CurrencyNode.svelte';
@@ -158,8 +159,8 @@
 	</SvelteFlow>
 
 	<!-- Decorative garden corners, per the mockup. Purely atmosphere. -->
-	<span class="corner corner--tl" aria-hidden="true">✿</span>
-	<span class="corner corner--br" aria-hidden="true">🌿</span>
+	<span class="corner corner--tl"><EmojiIcon char="🌸" size={26} /></span>
+	<span class="corner corner--br"><EmojiIcon char="🌿" size={26} /></span>
 </div>
 
 <style>
@@ -175,7 +176,6 @@
 
 	.corner {
 		position: absolute;
-		font-size: 26px;
 		opacity: 0.22;
 		pointer-events: none;
 		user-select: none;

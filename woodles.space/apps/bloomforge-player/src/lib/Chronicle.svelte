@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { describeCondition, nameLookup } from '@woodles/incremental-core';
+	import EmojiIcon from './EmojiIcon.svelte';
 	import { formatDuration, game } from './game.svelte.js';
 
 	/**
@@ -20,7 +21,7 @@
 				{#each game.def.milestones as milestone (milestone.id)}
 					{@const reached = game.reachedMilestones.has(milestone.id)}
 					<li class:reached>
-						<span class="mark" aria-hidden="true">{reached ? '🏆' : '·'}</span>
+						<span class="mark" aria-hidden="true">{#if reached}<EmojiIcon char="🏆" size={12} />{:else}·{/if}</span>
 						<span class="text">
 							<span class="name">{milestone.name}</span>
 							{#if !reached}

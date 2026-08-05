@@ -8,6 +8,7 @@
 		type EntityRef
 	} from '@woodles/incremental-core';
 	import ContextMenu, { type ContextMenuItem } from '../ContextMenu.svelte';
+	import EmojiIcon from '../EmojiIcon.svelte';
 	import { studio } from '../studio.svelte.js';
 	import { tour } from '../tour.svelte.js';
 
@@ -108,7 +109,7 @@
 <aside class="sidebar">
 	<header>
 		<h2>Systems</h2>
-		<span class="sparkle" aria-hidden="true">✦</span>
+		<span class="sparkle"><EmojiIcon char="✨" size={12} /></span>
 	</header>
 
 	<div class="search">
@@ -120,7 +121,7 @@
 		{#each groups as group (group.kind)}
 			<section>
 				<div class="group-head">
-					<span class="group-icon" aria-hidden="true">{ICONS[group.kind]}</span>
+					<span class="group-icon"><EmojiIcon char={ICONS[group.kind]} size={12} /></span>
 					<h3>{group.label}</h3>
 					<span class="count">{group.total}</span>
 					<button
@@ -205,8 +206,7 @@
 	}
 
 	.sparkle {
-		color: var(--bf-prestige);
-		font-size: 12px;
+		display: inline-flex;
 	}
 
 	.search {
@@ -230,7 +230,7 @@
 	}
 
 	.group-icon {
-		font-size: 12px;
+		display: inline-flex;
 	}
 
 	h3 {

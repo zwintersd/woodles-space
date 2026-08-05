@@ -51,6 +51,15 @@ different game is refused outright.
 not just its seed. Without that, reloading replays the crit rolls the run made
 in its first second — which makes save-and-reload a way to reroll a bad one.
 
+## icons
+
+Every glyph — the currency symbol, the buy-card icons, milestone marks — is
+[OpenMoji](https://openmoji.org) artwork (CC BY-SA 4.0) rather than a native
+emoji character, off the same [`@woodles/emoji`](../../packages/emoji/src/index.ts)
+character → codepoint registry [the studio](../bloomforge/README.md) uses. A
+symbol picked there always renders identically here; the two apps cannot drift
+onto different tables.
+
 ## not built
 
 Offline progress. The frame delta is clamped when a tab has been backgrounded

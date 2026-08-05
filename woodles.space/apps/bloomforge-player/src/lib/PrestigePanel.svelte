@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { nameLookup } from '@woodles/incremental-core';
 	import { currencyById, formatAmount } from './format.js';
+	import EmojiIcon from './EmojiIcon.svelte';
 	import { game } from './game.svelte.js';
 
 	const names = $derived(game.def ? nameLookup(game.def) : (id: string) => id);
@@ -49,9 +50,12 @@
 						disabled={!layer.ready}
 						onclick={() => (confirming = layer.id)}
 					>
-						{layer.ready
-							? `Rebirth for ${formatAmount(layer.gain, currency)} ${currency?.symbol ?? ''}`
-							: 'Not enough yet'}
+						{#if layer.ready}
+							Rebirth for {formatAmount(layer.gain, currency)}
+							<EmojiIcon char={currency?.symbol ?? ''} size={13} />
+						{:else}
+							Not enough yet
+						{/if}
 					</button>
 				{/if}
 			</div>

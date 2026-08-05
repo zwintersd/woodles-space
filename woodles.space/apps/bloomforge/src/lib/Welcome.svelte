@@ -6,6 +6,8 @@
 	 * A native `<dialog>` rather than a hand-rolled overlay: focus trapping,
 	 * Escape, and the inert backdrop all come for free and all come correct.
 	 */
+	import EmojiIcon from './EmojiIcon.svelte';
+
 	interface Props {
 		onstart: () => void;
 		onexplore: () => void;
@@ -21,9 +23,9 @@
 
 <dialog bind:this={dialog} onclose={onexplore} aria-labelledby="bf-welcome-title">
 	<div class="art" aria-hidden="true">
-		<span class="bloom">🌸</span>
-		<span class="sprig sprig--a">✿</span>
-		<span class="sprig sprig--b">🌿</span>
+		<span class="bloom"><EmojiIcon char="🌸" size={34} /></span>
+		<span class="sprig sprig--a"><EmojiIcon char="🌸" size={17} /></span>
+		<span class="sprig sprig--b"><EmojiIcon char="🌿" size={17} /></span>
 	</div>
 
 	<h1 id="bf-welcome-title">Bloomforge Studio</h1>
@@ -33,9 +35,9 @@
 	</p>
 
 	<ul class="beats">
-		<li><span aria-hidden="true">🪙</span> Currencies and the generators that make them</li>
-		<li><span aria-hidden="true">📈</span> Cost and output plotted while you tune them</li>
-		<li><span aria-hidden="true">⏩</span> Ten hours of play, fast-forwarded, to find the wall</li>
+		<li><span><EmojiIcon char="🪙" size={13} /></span> Currencies and the generators that make them</li>
+		<li><span><EmojiIcon char="📈" size={13} /></span> Cost and output plotted while you tune them</li>
+		<li><span><EmojiIcon char="⏩" size={13} /></span> Ten hours of play, fast-forwarded, to find the wall</li>
 	</ul>
 
 	<div class="actions">

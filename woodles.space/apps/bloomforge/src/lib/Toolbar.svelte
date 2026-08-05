@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ProjectSummary } from './projects.js';
+	import EmojiIcon from './EmojiIcon.svelte';
 	import { playtest } from './playtest.svelte.js';
 	import { studio } from './studio.svelte.js';
 	import { tour } from './tour.svelte.js';
@@ -27,7 +28,7 @@
 
 <header class="toolbar">
 	<div class="brand">
-		<span class="mark" aria-hidden="true">🌸</span>
+		<span class="mark"><EmojiIcon char="🌸" size={19} /></span>
 		<span class="wordmark">Bloomforge <em>Studio</em></span>
 	</div>
 
@@ -74,7 +75,7 @@
 	</div>
 
 	<div class="tools">
-		<button class="bf-button" type="button" onclick={onaddnote}>📋 Note</button>
+		<button class="bf-button" type="button" onclick={onaddnote}><EmojiIcon char="📋" size={13} /> Note</button>
 		<button class="bf-button" type="button" onclick={() => studio.undo()} disabled={!studio.canUndo} title="Undo (⌘Z)">
 			↶
 		</button>
@@ -108,7 +109,7 @@
 		<!-- The playtest is a simulation of a player; this hands the real game to
 		     a real one. Same engine, same def, no export step in between. -->
 		<button class="bf-button publish" type="button" onclick={onplay} title="Open this game in the player">
-			🌸 Play it
+			<EmojiIcon char="🌸" size={13} /> Play it
 		</button>
 	</div>
 </header>
