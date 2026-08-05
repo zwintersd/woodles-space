@@ -41,6 +41,9 @@
 			{formatAmount(held, awards)}
 			{#if live && resets > 0}<span class="resets">· {resets} reset{resets === 1 ? '' : 's'}</span>{/if}
 		</div>
+		{#if layer.tags?.length}
+			<span class="tags">{layer.tags.map((entry) => `#${entry}`).join(' ')}</span>
+		{/if}
 	</NodeShell>
 {/if}
 
@@ -68,5 +71,13 @@
 
 	.resets {
 		color: var(--bf-muted);
+	}
+
+	.tags {
+		display: block;
+		margin-top: 5px;
+		font-size: 10px;
+		font-weight: 600;
+		color: var(--bf-accent);
 	}
 </style>

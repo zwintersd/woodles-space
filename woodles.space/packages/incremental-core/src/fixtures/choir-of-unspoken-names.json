@@ -1,0 +1,288 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "id": "choir-of-unspoken-names",
+    "title": "The Choir of Unspoken Names",
+    "description": "The Choir's rate is the summed level of every node tagged \"devotional\" — regardless of kind. A generator's level, an upgrade's level, a prestige layer's reset count all count the same, and nothing has to be a generator to matter."
+  },
+  "currencies": [
+    {
+      "id": "faith",
+      "name": "Faith",
+      "symbol": "🔥",
+      "color": "#D9722C",
+      "format": {
+        "decimalPlaces": 2,
+        "notation": "thousands"
+      }
+    },
+    {
+      "id": "grace",
+      "name": "Grace",
+      "symbol": "🌙",
+      "color": "#6B7FBE",
+      "format": {
+        "decimalPlaces": 0,
+        "notation": "thousands"
+      }
+    }
+  ],
+  "generators": [
+    {
+      "id": "penitent",
+      "name": "Penitent",
+      "producesCurrencyId": "faith",
+      "baseRate": 4,
+      "rateCurve": {
+        "kind": "polynomial",
+        "exponent": 1
+      },
+      "cost": {
+        "currencyId": "faith",
+        "base": 12,
+        "curve": {
+          "kind": "geometric",
+          "growth": 1.14
+        }
+      },
+      "startsOwned": 1,
+      "tags": ["devotional"]
+    },
+    {
+      "id": "choir",
+      "name": "The Choir of Unspoken Names",
+      "producesCurrencyId": "faith",
+      "baseRate": 0.8,
+      "rateCurve": {
+        "kind": "polynomial",
+        "exponent": 1
+      },
+      "cost": {
+        "currencyId": "faith",
+        "base": 100,
+        "curve": {
+          "kind": "geometric",
+          "growth": 1.2
+        }
+      },
+      "populationBoost": {
+        "metric": "taggedLevelSum",
+        "tag": "devotional",
+        "perUnit": 0.03
+      }
+    }
+  ],
+  "upgrades": [
+    {
+      "id": "whispered-vow",
+      "name": "Whispered Vow",
+      "description": "A name spoken once, kept forever. Raises Penitent's own output — and adds its level to whatever's listening for \"devotional\".",
+      "cost": {
+        "currencyId": "faith",
+        "amount": 20
+      },
+      "repeatable": {
+        "maxLevel": 10,
+        "costCurve": {
+          "kind": "geometric",
+          "growth": 1.6
+        }
+      },
+      "tags": ["devotional"],
+      "effects": [
+        {
+          "target": {
+            "type": "generator",
+            "id": "penitent"
+          },
+          "stat": "rate",
+          "op": "add",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": "kept-candle",
+      "name": "Kept Candle",
+      "description": "One candle, tended. Adds directly to the Choir's own ceiling, and its level counts toward the tag same as any vow.",
+      "cost": {
+        "currencyId": "faith",
+        "amount": 60
+      },
+      "repeatable": {
+        "maxLevel": 10,
+        "costCurve": {
+          "kind": "geometric",
+          "growth": 1.7
+        }
+      },
+      "tags": ["devotional"],
+      "effects": [
+        {
+          "target": {
+            "type": "generator",
+            "id": "choir"
+          },
+          "stat": "rate",
+          "op": "add",
+          "value": 0.3
+        }
+      ]
+    },
+    {
+      "id": "steady-faith",
+      "name": "Steady Faith",
+      "description": "A ten-percent chance a Penitent's tick pays double. Ordinary — no tag, no name the Choir would ever sum.",
+      "cost": {
+        "currencyId": "faith",
+        "amount": 80
+      },
+      "effects": [
+        {
+          "target": {
+            "type": "generator",
+            "id": "penitent"
+          },
+          "stat": "critChance",
+          "op": "add",
+          "value": 0.1
+        }
+      ]
+    },
+    {
+      "id": "reinforced-pews",
+      "name": "Reinforced Pews",
+      "description": "Cuts a tenth off everything priced in Faith. A practical upgrade, not a devotional one.",
+      "cost": {
+        "currencyId": "faith",
+        "amount": 120
+      },
+      "effects": [
+        {
+          "target": {
+            "type": "currency",
+            "id": "faith"
+          },
+          "stat": "costScale",
+          "op": "mul",
+          "value": 0.9
+        }
+      ]
+    }
+  ],
+  "prestigeLayers": [
+    {
+      "id": "order",
+      "name": "The Unspoken Order",
+      "currencyId": "grace",
+      "gainFormula": {
+        "sourceCurrencyId": "faith",
+        "threshold": 5000,
+        "exponent": 0.5
+      },
+      "multiplier": {
+        "perUnit": 0.02
+      },
+      "resets": [
+        "faith",
+        "penitent",
+        "choir",
+        "whispered-vow",
+        "kept-candle",
+        "steady-faith",
+        "reinforced-pews"
+      ],
+      "tags": ["devotional"],
+      "availableWhen": {
+        "metric": "currencyLifetime",
+        "currencyId": "faith",
+        "op": ">=",
+        "value": 5000
+      }
+    }
+  ],
+  "unlocks": [
+    {
+      "id": "the-choir-gathers",
+      "name": "The Choir Gathers",
+      "reveals": [
+        "choir"
+      ],
+      "when": {
+        "metric": "currencyLifetime",
+        "currencyId": "faith",
+        "op": ">=",
+        "value": 300
+      }
+    }
+  ],
+  "milestones": [
+    {
+      "id": "first-name",
+      "name": "A Single Unspoken Name",
+      "when": {
+        "metric": "taggedLevelSum",
+        "tag": "devotional",
+        "op": ">=",
+        "value": 5
+      }
+    },
+    {
+      "id": "hundred-names",
+      "name": "A Hundred Unspoken Names",
+      "when": {
+        "metric": "taggedLevelSum",
+        "tag": "devotional",
+        "op": ">=",
+        "value": 100
+      }
+    },
+    {
+      "id": "ten-thousand-faith",
+      "name": "10K Faith",
+      "when": {
+        "metric": "currencyLifetime",
+        "currencyId": "faith",
+        "op": ">=",
+        "value": 10000
+      }
+    },
+    {
+      "id": "first-silence",
+      "name": "First Silence",
+      "when": {
+        "metric": "prestigeCount",
+        "layerId": "order",
+        "op": ">=",
+        "value": 1
+      }
+    }
+  ],
+  "notes": [
+    {
+      "id": "note-tag-tuning",
+      "text": "The Choir carries no tag itself — it only ever reads other things, never itself. If it ever counted its own level the boost would compound on every purchase of the Choir, which reads as a bug the first time you see the number jump.",
+      "position": {
+        "x": 780,
+        "y": 620
+      },
+      "color": "#F6D488"
+    }
+  ],
+  "layout": {
+    "first-name": { "x": 60, "y": -130 },
+    "hundred-names": { "x": 300, "y": -130 },
+    "ten-thousand-faith": { "x": 540, "y": -130 },
+    "first-silence": { "x": 900, "y": -130 },
+    "faith": { "x": 380, "y": 60 },
+    "grace": { "x": 1120, "y": 60 },
+    "the-choir-gathers": { "x": 640, "y": 190 },
+    "order": { "x": 1120, "y": 330 },
+    "penitent": { "x": 140, "y": 330 },
+    "choir": { "x": 620, "y": 330 },
+    "whispered-vow": { "x": 60, "y": 570 },
+    "kept-candle": { "x": 300, "y": 570 },
+    "steady-faith": { "x": 540, "y": 570 },
+    "reinforced-pews": { "x": 900, "y": 570 }
+  }
+}

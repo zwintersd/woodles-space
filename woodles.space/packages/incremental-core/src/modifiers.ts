@@ -1,6 +1,6 @@
 import { num } from './num.js';
 import type { Effect, EffectTarget, GameDef, Generator, PopulationBoost, Upgrade } from './types.js';
-import { countUnequippedUpgrades, type SimState } from './state.js';
+import { countUnequippedUpgrades, sumTaggedLevels, type SimState } from './state.js';
 
 /**
  * Upgrades resolved into per-entity numbers, so the tick loop reads a lookup
@@ -47,7 +47,7 @@ export function resolveModifiers(def: GameDef, state: SimState): Modifiers {
 		generatorCostAdd[generator.id] = 0;
 		generatorCostMul[generator.id] = 1;
 		populationMul[generator.id] = generator.populationBoost
-			? num.add(1, num.mul(generator.populationBoost.perUnit, resolvePopulationMetric(generator.populationBoost, state)))
+			? num.add(1, num.mul(generator.populationBoost.perUnit, resolvePopulationMetric(generator.populationBoost, def, state)))
 			: 1;
 	}
 	for (const upgrade of def.upgrades) {
@@ -88,12 +88,14 @@ export function resolveModifiers(def: GameDef, state: SimState): Modifiers {
 }
 
 /** What a `populationBoost`'s metric currently counts. */
-function resolvePopulationMetric(boost: PopulationBoost, state: SimState): number {
+function resolvePopulationMetric(boost: PopulationBoost, def: GameDef, state: SimState): number {
 	switch (boost.metric) {
 		case 'unequippedUpgrades':
 			return countUnequippedUpgrades(state);
+		case 'taggedLevelSum':
+			return sumTaggedLevels(def, state, boost.tag);
 		default:
-			return assertNeverMetric(boost.metric);
+			return assertNeverMetric(boost);
 	}
 }
 

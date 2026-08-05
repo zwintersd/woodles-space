@@ -31,6 +31,14 @@ export interface Currency {
 	symbol?: string;
 	color: string;
 	format: NumberFormat;
+	/**
+	 * Every time this currency is spent — a generator level, an upgrade buy —
+	 * `rate × amount spent` is quietly added to `intoCurrencyId` as a
+	 * byproduct. Applied wherever a wallet is actually debited, so nothing
+	 * has to opt in per purchase; a currency with no `spendTax` behaves
+	 * exactly as it always has.
+	 */
+	spendTax?: { intoCurrencyId: string; rate: number };
 }
 
 /**
@@ -86,13 +94,48 @@ export interface Generator {
 	 * the same way `Curve` is.
 	 */
 	populationBoost?: PopulationBoost;
+	/**
+	 * Turns this generator into a converter: `baseRate` / `rateCurve` / every
+	 * modifier still set the *ceiling*, but actual output each tick is
+	 * throttled to whatever `fromCurrencyId` can currently supply — a
+	 * converter with nothing to convert produces nothing, however fast its
+	 * curve says it could. Never produces more than the curve allows, only
+	 * ever less.
+	 */
+	converts?: Conversion;
+	/**
+	 * Free-text labels an author hangs on this generator — no meaning to the
+	 * engine except as something `PopulationBoost`'s `taggedLevelSum` metric
+	 * (and the matching `Condition` metric) can sum across. See `Upgrade.tags`
+	 * and `PrestigeLayer.tags`.
+	 */
+	tags?: string[];
 }
 
-export type PopulationBoost = {
-	/** Owned upgrades currently sitting unequipped — see `Upgrade` effects. */
-	metric: 'unequippedUpgrades';
-	perUnit: number;
-};
+export type PopulationBoost =
+	| {
+			/** Owned upgrades currently sitting unequipped — see `Upgrade` effects. */
+			metric: 'unequippedUpgrades';
+			perUnit: number;
+	  }
+	| {
+			/**
+			 * The summed *level* of every generator, upgrade and prestige layer
+			 * carrying `tag` — a generator's level, an upgrade's level, a
+			 * prestige layer's reset count. Deliberately not restricted to one
+			 * entity kind: a tag is the designer's own grouping, not the
+			 * engine's, so the aggregation has to cross kinds to mean anything.
+			 */
+			metric: 'taggedLevelSum';
+			tag: string;
+			perUnit: number;
+	  };
+
+export interface Conversion {
+	fromCurrencyId: string;
+	/** Units of `fromCurrencyId` consumed per unit of this generator's own output. */
+	ratio: number;
+}
 
 /**
  * What an upgrade does when owned *and equipped*. `value` is applied **once
@@ -138,6 +181,8 @@ export interface Upgrade {
 	visibleWhen?: Condition;
 	/** Visible but not buyable until true, e.g. "requires Golden Touch level 10". */
 	purchasableWhen?: Condition;
+	/** See `Generator.tags`. */
+	tags?: string[];
 }
 
 export interface PrestigeLayer {
@@ -154,6 +199,13 @@ export interface PrestigeLayer {
 	/** Entity ids wiped on prestige: currencies, generators, upgrades. */
 	resets: string[];
 	availableWhen?: Condition;
+	/**
+	 * See `Generator.tags`. A layer's contribution to `taggedLevelSum` is its
+	 * reset *count* — resets never zero it the way a currency or generator
+	 * reset does, so a tagged layer only ever adds to the sum, prestige over
+	 * prestige.
+	 */
+	tags?: string[];
 }
 
 export interface PrestigeGain {
@@ -203,6 +255,8 @@ export type Condition =
 	| { metric: 'prestigeCount'; layerId: string; op: '>='; value: number }
 	/** Owned upgrades currently sitting unequipped, across the whole def. */
 	| { metric: 'unequippedUpgrades'; op: CompareOp; value: number }
+	/** The summed level of every generator, upgrade and prestige layer tagged `tag`. */
+	| { metric: 'taggedLevelSum'; tag: string; op: CompareOp; value: number }
 	| { all: Condition[] }
 	| { any: Condition[] };
 

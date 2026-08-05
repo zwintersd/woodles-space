@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createSim, prestigeGain, sampleIntervalFor, simulate, TICKS_PER_SECOND } from './engine.js';
 import { greedy, greedyPolicy, idlePolicy, scriptedPolicy } from './policies.js';
 import type { SimEvent } from './state.js';
-import { apiaryToyDef, critDef, prestigeDef, toyDef } from './test-defs.js';
+import { apiaryToyDef, choirToyDef, confessionToyDef, critDef, prestigeDef, toyDef } from './test-defs.js';
 import { cozyGarden } from './fixtures/index.js';
 
 const run = (def = toyDef(), policy = idlePolicy, duration = 60) =>
@@ -343,6 +343,103 @@ describe('the Apiary of Bad Decisions — equip state and population boosts', ()
 		sim.apply({ type: 'prestige', layerId: 'swarm' }, []);
 		expect(sim.state().upgrades['petal-a'].level).toBe(0);
 		expect(sim.state().upgrades['petal-a'].equipped).toBe(true);
+	});
+});
+
+describe('the Confession Booth — spend taxes and converters', () => {
+	it('taxes a spend into another currency the instant the purchase happens', () => {
+		const sim = createSim(confessionToyDef(), idlePolicy, 1);
+		sim.step(10); // miner alone: 20 coins
+		expect(sim.state().currencies.guilt.amount).toBe(0);
+
+		expect(sim.apply({ type: 'buyUpgrade', id: 'trinket' }, [])).toBe(true);
+		// Spending 10 coins at spendTax rate 1 mints 10 guilt, synchronously.
+		expect(sim.state().currencies.coins.amount).toBeCloseTo(10, 6);
+		expect(sim.state().currencies.guilt.amount).toBeCloseTo(10, 6);
+		expect(sim.state().currencies.guilt.lifetime).toBeCloseTo(10, 6);
+	});
+
+	it('runs a converter at full ceiling while its input can sustain it, then starves', () => {
+		const sim = createSim(confessionToyDef(), idlePolicy, 1);
+		sim.step(10);
+		sim.apply({ type: 'buyUpgrade', id: 'trinket' }, []); // 10 guilt minted
+
+		// 10 guilt at a 1:1 ratio sustains the 3/sec ceiling for 3.33s.
+		expect(sim.generatorRates().booth).toBeCloseTo(3, 6);
+
+		sim.step(2); // well inside the sustainable window
+		expect(sim.state().currencies.guilt.amount).toBeCloseTo(4, 6); // 10 − 3×2
+		expect(sim.state().currencies.absolution.amount).toBeCloseTo(6, 6);
+		expect(sim.generatorRates().booth).toBeCloseTo(3, 6); // still unthrottled
+
+		sim.step(2); // crosses the point guilt runs out mid-window
+		expect(sim.state().currencies.guilt.amount).toBeCloseTo(0, 6);
+		expect(sim.state().currencies.absolution.amount).toBeCloseTo(10, 6); // all 10 guilt converted, 1:1
+
+		sim.step(5); // nothing left to convert, no new spending to feed it
+		expect(sim.state().currencies.guilt.amount).toBe(0);
+		expect(sim.state().currencies.absolution.amount).toBeCloseTo(10, 6);
+		expect(sim.generatorRates().booth).toBe(0);
+	});
+
+	it('never lets a converter run its input balance negative', () => {
+		const sim = createSim(confessionToyDef(), idlePolicy, 1);
+		sim.step(600); // plenty of time for the booth to try to run dry repeatedly
+		expect(sim.state().currencies.guilt.amount).toBeGreaterThanOrEqual(0);
+	});
+
+	it('leaves currencies with no spendTax completely unaffected by spending', () => {
+		const def = confessionToyDef();
+		delete def.currencies[0].spendTax;
+		const sim = createSim(def, idlePolicy, 1);
+		sim.step(10);
+		sim.apply({ type: 'buyUpgrade', id: 'trinket' }, []);
+		expect(sim.state().currencies.guilt.amount).toBe(0);
+	});
+});
+
+describe('the Choir of Unspoken Names — tagged aggregation across entity kinds', () => {
+	it('sums a level across a generator, an upgrade and a prestige layer, none of them the boosted generator itself', () => {
+		const sim = createSim(choirToyDef(), idlePolicy, 1);
+		// Sum = penitent(1). choir: 2 × (1 + 0.1×1) = 2.2.
+		expect(sim.generatorRates().choir).toBeCloseTo(2.2, 6);
+
+		sim.step(20); // 7.2/sec (5 penitent + 2.2 choir) for 20s = 144 faith
+		expect(sim.apply({ type: 'buyGenerator', id: 'penitent' }, [])).toBe(true); // level 2, costs 15
+		// Sum = penitent(2). choir: 2 × 1.2 = 2.4.
+		expect(sim.generatorRates().choir).toBeCloseTo(2.4, 6);
+
+		sim.step(10);
+		expect(sim.apply({ type: 'buyGenerator', id: 'penitent' }, [])).toBe(true); // level 3, costs 22.5
+		// Sum = penitent(3). choir: 2 × 1.3 = 2.6.
+		expect(sim.generatorRates().choir).toBeCloseTo(2.6, 6);
+
+		expect(sim.apply({ type: 'buyUpgrade', id: 'vow' }, [])).toBe(true); // level 1, costs 5
+		// Sum = penitent(3) + vow(1) = 4. choir: 2 × 1.4 = 2.8.
+		expect(sim.generatorRates().choir).toBeCloseTo(2.8, 6);
+
+		expect(sim.apply({ type: 'prestige', layerId: 'order' }, [])).toBe(true);
+		// Reset wipes penitent back to startsOwned(1) and vow to 0, but order's
+		// count — the one prestige-layer contribution — only ever goes up.
+		// Sum = penitent(1) + vow(0) + order(1) = 2. choir: 2 × 1.2 = 2.4.
+		expect(sim.generatorRates().choir).toBeCloseTo(2.4, 6);
+	});
+
+	it('never lets the boosted generator count toward its own boost', () => {
+		// Choir carries no tag. Buying it up shouldn't move its own rate through
+		// the population term — only through its own curve.
+		const sim = createSim(choirToyDef(), idlePolicy, 1);
+		const before = sim.generatorRates().choir;
+		sim.step(2000);
+		sim.apply({ type: 'buyGenerator', id: 'choir', count: 3 }, []);
+		// Choir's curve is polynomial exponent 1, so a level jump changes its
+		// rate — but the change has to be explained by baseRate × level alone,
+		// not by anything reading choir's own level as part of the tag sum.
+		const level = sim.state().generators.choir.level;
+		const untaggedCeiling = 2 * level; // baseRate × level, no population term
+		const sum = 1; // penitent's untouched starting level; nothing else bought
+		expect(sim.generatorRates().choir).toBeCloseTo(untaggedCeiling * (1 + 0.1 * sum), 6);
+		expect(sim.generatorRates().choir).not.toBeCloseTo(before, 6);
 	});
 });
 

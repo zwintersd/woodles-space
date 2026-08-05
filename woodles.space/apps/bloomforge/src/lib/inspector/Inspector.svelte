@@ -21,6 +21,7 @@
 	import CurveEditor from './CurveEditor.svelte';
 	import CurvePlot from './CurvePlot.svelte';
 	import SymbolPicker from './SymbolPicker.svelte';
+	import TagsField from './TagsField.svelte';
 
 	const KIND_LABELS: Record<EntityKind, string> = {
 		currency: 'Currency',
@@ -34,6 +35,15 @@
 	const selected = $derived(studio.selected);
 	const names = $derived(nameLookup(studio.def));
 	const issues = $derived(selected ? studio.issuesFor(selected.id) : []);
+
+	/** Every tag already in use anywhere, for the tag inputs' autocomplete. */
+	const knownTags = $derived.by(() => {
+		const set = new Set<string>();
+		for (const entry of studio.def.generators) for (const tag of entry.tags ?? []) set.add(tag);
+		for (const entry of studio.def.upgrades) for (const tag of entry.tags ?? []) set.add(tag);
+		for (const entry of studio.def.prestigeLayers) for (const tag of entry.tags ?? []) set.add(tag);
+		return [...set].sort();
+	});
 
 	const currency = $derived(studio.def.currencies.find((entry) => entry.id === selected?.id));
 	const generator = $derived(studio.def.generators.find((entry) => entry.id === selected?.id));
@@ -135,6 +145,12 @@
 			</ul>
 		{/if}
 
+		<datalist id="bf-known-tags">
+			{#each knownTags as tag (tag)}
+				<option value={tag}></option>
+			{/each}
+		</datalist>
+
 		<div class="body">
 			<div class="bf-field">
 				<label for="bf-name">Display Name</label>
@@ -206,6 +222,69 @@
 					<div class="preview">{num.format(1234.56, currency.format)}</div>
 					<div class="preview subtle">{num.format(1_234_567.89, currency.format)}</div>
 				</div>
+
+				<hr />
+
+				<div class="bf-field">
+					<div class="repeatable-row">
+						<label class="inline" for="bf-spend-tax">
+							<input
+								id="bf-spend-tax"
+								type="checkbox"
+								checked={!!currency.spendTax}
+								onchange={(e) =>
+									studio.edit(() => {
+										if (e.currentTarget.checked) {
+											const other = studio.def.currencies.find((entry) => entry.id !== currency.id);
+											currency.spendTax = { intoCurrencyId: other?.id ?? currency.id, rate: 0.25 };
+										} else {
+											delete currency.spendTax;
+										}
+									})}
+							/>
+							Taxes when spent
+						</label>
+						<InfoTip text={GLOSSARY.spendTax} />
+					</div>
+				</div>
+
+				{#if currency.spendTax}
+					{@const tax = currency.spendTax}
+					<div class="bf-field">
+						<label for="bf-tax-target">Feeds</label>
+						<select
+							id="bf-tax-target"
+							class="bf-select"
+							value={tax.intoCurrencyId}
+							onchange={(e) => studio.edit(() => (tax.intoCurrencyId = e.currentTarget.value))}
+						>
+							{#each studio.def.currencies.filter((entry) => entry.id !== currency.id) as entry (entry.id)}
+								<option value={entry.id}>{entry.name}</option>
+							{/each}
+						</select>
+					</div>
+
+					<div class="bf-field">
+						<span class="bf-field-label">
+							<label for="bf-tax-rate">Rate</label>
+							<InfoTip text={GLOSSARY.spendTaxRate} />
+						</span>
+						<input
+							id="bf-tax-rate"
+							class="bf-input"
+							type="number"
+							step="0.01"
+							min="0"
+							value={tax.rate}
+							oninput={(e) => studio.editQuietly(() => (tax.rate = Number(e.currentTarget.value)))}
+						/>
+					</div>
+
+					<p class="hint">
+						Spending 100 {currency.name} would mint {(tax.rate * 100).toFixed(2)}
+						{currencyById(studio.def, tax.intoCurrencyId)?.name ?? tax.intoCurrencyId}, the instant it's spent.
+					</p>
+				{/if}
 			{/if}
 
 			{#if generator}
@@ -334,7 +413,52 @@
 
 				{#if generator.populationBoost}
 					{@const boost = generator.populationBoost}
-					<p class="hint">Counts owned upgrades the player has left unequipped, across the whole game.</p>
+					<div class="bf-field">
+						<span class="bf-field-label">
+							<label for="bf-population-metric">Counts</label>
+							<InfoTip text={GLOSSARY.populationMetric} />
+						</span>
+						<select
+							id="bf-population-metric"
+							class="bf-select"
+							value={boost.metric}
+							onchange={(e) =>
+								studio.edit(() => {
+									const perUnit = boost.perUnit;
+									generator.populationBoost =
+										e.currentTarget.value === 'taggedLevelSum'
+											? { metric: 'taggedLevelSum', tag: knownTags[0] ?? '', perUnit }
+											: { metric: 'unequippedUpgrades', perUnit };
+								})}
+						>
+							<option value="unequippedUpgrades">Owned upgrades left unequipped</option>
+							<option value="taggedLevelSum">Summed level of a tag</option>
+						</select>
+					</div>
+
+					{#if boost.metric === 'taggedLevelSum'}
+						<div class="bf-field">
+							<span class="bf-field-label">
+								<label for="bf-population-tag">Tag</label>
+								<InfoTip text={GLOSSARY.populationTag} />
+							</span>
+							<input
+								id="bf-population-tag"
+								class="bf-input"
+								type="text"
+								list="bf-known-tags"
+								placeholder="devotional"
+								value={boost.tag}
+								onchange={(e) => studio.edit(() => (boost.tag = e.currentTarget.value.trim()))}
+							/>
+						</div>
+						<p class="hint">
+							Sums the level of every generator, upgrade and prestige layer tagged "{boost.tag ||
+								'…'}" — never this generator's own level.
+						</p>
+					{:else}
+						<p class="hint">Counts owned upgrades the player has left unequipped, across the whole game.</p>
+					{/if}
 
 					<div class="bf-field">
 						<span class="bf-field-label">
@@ -352,8 +476,76 @@
 						/>
 					</div>
 
-					<p class="hint">At 5 unequipped upgrades this reads ×{(1 + boost.perUnit * 5).toFixed(2)}.</p>
+					<p class="hint">At 5 counted this reads ×{(1 + boost.perUnit * 5).toFixed(2)}.</p>
 				{/if}
+
+				<div class="bf-field">
+					<div class="repeatable-row">
+						<label class="inline" for="bf-converts">
+							<input
+								id="bf-converts"
+								type="checkbox"
+								checked={!!generator.converts}
+								onchange={(e) =>
+									studio.edit(() => {
+										if (e.currentTarget.checked) {
+											const input = studio.def.currencies.find((entry) => entry.id !== generator.producesCurrencyId);
+											generator.converts = { fromCurrencyId: input?.id ?? generator.producesCurrencyId, ratio: 1 };
+										} else {
+											delete generator.converts;
+										}
+									})}
+							/>
+							Converts a currency
+						</label>
+						<InfoTip text={GLOSSARY.converts} />
+					</div>
+				</div>
+
+				{#if generator.converts}
+					{@const conversion = generator.converts}
+					<div class="bf-field">
+						<label for="bf-converts-from">Consumes</label>
+						<select
+							id="bf-converts-from"
+							class="bf-select"
+							value={conversion.fromCurrencyId}
+							onchange={(e) => studio.edit(() => (conversion.fromCurrencyId = e.currentTarget.value))}
+						>
+							{#each studio.def.currencies as entry (entry.id)}
+								<option value={entry.id}>{entry.name}</option>
+							{/each}
+						</select>
+					</div>
+
+					<div class="bf-field">
+						<span class="bf-field-label">
+							<label for="bf-converts-ratio">Ratio</label>
+							<InfoTip text={GLOSSARY.convertsRatio} />
+						</span>
+						<input
+							id="bf-converts-ratio"
+							class="bf-input"
+							type="number"
+							step="0.1"
+							min="0.01"
+							value={conversion.ratio}
+							oninput={(e) => studio.editQuietly(() => (conversion.ratio = Number(e.currentTarget.value)))}
+						/>
+					</div>
+
+					<p class="hint">
+						{formatAmount(conversion.ratio, currencyById(studio.def, conversion.fromCurrencyId))} consumed per unit of {produces?.name ??
+							'output'} made — throttled to whatever's actually on hand, never more than the curve above allows, only ever less.
+					</p>
+				{/if}
+
+				<hr />
+				<TagsField
+					id="bf-generator-tags"
+					tags={generator.tags}
+					onchange={(tags) => studio.edit(() => (generator.tags = tags))}
+				/>
 			{/if}
 
 			{#if upgrade}
@@ -552,6 +744,11 @@
 				{/if}
 			{/if}
 
+			{#if upgrade}
+				<hr />
+				<TagsField id="bf-upgrade-tags" tags={upgrade.tags} onchange={(tags) => studio.edit(() => (upgrade.tags = tags))} />
+			{/if}
+
 			{#if layer}
 				<div class="bf-field">
 					<label for="bf-award">Awards</label>
@@ -658,6 +855,11 @@
 						</li>
 					{/each}
 				</ul>
+			{/if}
+
+			{#if layer}
+				<hr />
+				<TagsField id="bf-layer-tags" tags={layer.tags} onchange={(tags) => studio.edit(() => (layer.tags = tags))} />
 			{/if}
 
 			{#if unlock}

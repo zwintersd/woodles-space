@@ -1,0 +1,311 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "id": "confession-booth",
+    "title": "Confession Booth",
+    "description": "Inverts the flow: this generator doesn't produce a resource, it consumes one. Guilt is a byproduct of every purchase in the game — spend anything, anywhere, and some of it taxes into Guilt. The Booth converts Guilt into Absolution, the only currency lifetime enough of which lets you prestige."
+  },
+  "currencies": [
+    {
+      "id": "coins",
+      "name": "Coins",
+      "symbol": "🪙",
+      "color": "#E8B830",
+      "format": {
+        "decimalPlaces": 2,
+        "notation": "thousands"
+      },
+      "spendTax": {
+        "intoCurrencyId": "guilt",
+        "rate": 0.25
+      }
+    },
+    {
+      "id": "guilt",
+      "name": "Guilt",
+      "symbol": "💧",
+      "color": "#6B4C6E",
+      "format": {
+        "decimalPlaces": 2,
+        "notation": "thousands"
+      }
+    },
+    {
+      "id": "absolution",
+      "name": "Absolution",
+      "symbol": "✨",
+      "color": "#E8DCC0",
+      "format": {
+        "decimalPlaces": 2,
+        "notation": "thousands"
+      }
+    },
+    {
+      "id": "grace",
+      "name": "Grace",
+      "symbol": "🌈",
+      "color": "#9B6FD1",
+      "format": {
+        "decimalPlaces": 0,
+        "notation": "thousands"
+      }
+    }
+  ],
+  "generators": [
+    {
+      "id": "toiler",
+      "name": "Toiler",
+      "producesCurrencyId": "coins",
+      "baseRate": 4,
+      "rateCurve": {
+        "kind": "polynomial",
+        "exponent": 1
+      },
+      "cost": {
+        "currencyId": "coins",
+        "base": 15,
+        "curve": {
+          "kind": "geometric",
+          "growth": 1.14
+        }
+      },
+      "startsOwned": 1
+    },
+    {
+      "id": "booth",
+      "name": "Confession Booth",
+      "producesCurrencyId": "absolution",
+      "baseRate": 1,
+      "rateCurve": {
+        "kind": "polynomial",
+        "exponent": 1
+      },
+      "cost": {
+        "currencyId": "coins",
+        "base": 80,
+        "curve": {
+          "kind": "geometric",
+          "growth": 1.2
+        }
+      },
+      "converts": {
+        "fromCurrencyId": "guilt",
+        "ratio": 2
+      }
+    }
+  ],
+  "upgrades": [
+    {
+      "id": "overtime",
+      "name": "Overtime",
+      "description": "Longer shifts, faster Coins — and a bigger tax bill the moment you pay for it.",
+      "cost": {
+        "currencyId": "coins",
+        "amount": 40
+      },
+      "effects": [
+        {
+          "target": {
+            "type": "generator",
+            "id": "toiler"
+          },
+          "stat": "rate",
+          "op": "mul",
+          "value": 1.3
+        }
+      ]
+    },
+    {
+      "id": "second-shift",
+      "name": "Second Shift",
+      "description": "Another Toiler clocks in. Every one of them still spends Coins somewhere.",
+      "cost": {
+        "currencyId": "coins",
+        "amount": 100
+      },
+      "repeatable": {
+        "maxLevel": 5,
+        "costCurve": {
+          "kind": "geometric",
+          "growth": 1.8
+        }
+      },
+      "effects": [
+        {
+          "target": {
+            "type": "generator",
+            "id": "toiler"
+          },
+          "stat": "rate",
+          "op": "add",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "id": "steady-hands",
+      "name": "Steady Hands",
+      "description": "A ten-percent chance the day's take doubles. Doesn't make the guilt any lighter.",
+      "cost": {
+        "currencyId": "coins",
+        "amount": 150
+      },
+      "effects": [
+        {
+          "target": {
+            "type": "generator",
+            "id": "toiler"
+          },
+          "stat": "critChance",
+          "op": "add",
+          "value": 0.1
+        }
+      ]
+    },
+    {
+      "id": "larger-chapel",
+      "name": "Larger Chapel",
+      "description": "More room in the Booth's own ceiling — the only upgrade that actually helps you keep up with yourself.",
+      "cost": {
+        "currencyId": "coins",
+        "amount": 200
+      },
+      "repeatable": {
+        "maxLevel": 5,
+        "costCurve": {
+          "kind": "geometric",
+          "growth": 1.7
+        }
+      },
+      "effects": [
+        {
+          "target": {
+            "type": "generator",
+            "id": "booth"
+          },
+          "stat": "rate",
+          "op": "add",
+          "value": 1
+        }
+      ]
+    }
+  ],
+  "prestigeLayers": [
+    {
+      "id": "redemption",
+      "name": "Redemption",
+      "currencyId": "grace",
+      "gainFormula": {
+        "sourceCurrencyId": "absolution",
+        "threshold": 500,
+        "exponent": 0.5
+      },
+      "multiplier": {
+        "perUnit": 0.03
+      },
+      "resets": [
+        "coins",
+        "guilt",
+        "absolution",
+        "toiler",
+        "booth",
+        "overtime",
+        "second-shift",
+        "steady-hands",
+        "larger-chapel"
+      ],
+      "availableWhen": {
+        "metric": "currencyLifetime",
+        "currencyId": "absolution",
+        "op": ">=",
+        "value": 500
+      }
+    }
+  ],
+  "unlocks": [
+    {
+      "id": "guilt-catches-up",
+      "name": "Guilt Catches Up",
+      "reveals": [
+        "booth"
+      ],
+      "when": {
+        "metric": "currencyLifetime",
+        "currencyId": "guilt",
+        "op": ">=",
+        "value": 5
+      }
+    }
+  ],
+  "milestones": [
+    {
+      "id": "first-confession",
+      "name": "First Confession",
+      "when": {
+        "metric": "currencyLifetime",
+        "currencyId": "absolution",
+        "op": ">=",
+        "value": 1
+      }
+    },
+    {
+      "id": "overwhelmed",
+      "name": "Overwhelmed",
+      "when": {
+        "metric": "currencyAmount",
+        "currencyId": "guilt",
+        "op": ">=",
+        "value": 20
+      }
+    },
+    {
+      "id": "thousand-coins",
+      "name": "1K Coins",
+      "when": {
+        "metric": "currencyLifetime",
+        "currencyId": "coins",
+        "op": ">=",
+        "value": 1000
+      }
+    },
+    {
+      "id": "first-redemption",
+      "name": "First Redemption",
+      "when": {
+        "metric": "prestigeCount",
+        "layerId": "redemption",
+        "op": ">=",
+        "value": 1
+      }
+    }
+  ],
+  "notes": [
+    {
+      "id": "note-booth-tuning",
+      "text": "Guilt is a byproduct, not a resource you farm on purpose — the more you spend elsewhere, the more piles up whether you like it or not. Level the Booth (or Larger Chapel) or it just sits there unconverted.",
+      "position": {
+        "x": 780,
+        "y": 620
+      },
+      "color": "#F6D488"
+    }
+  ],
+  "layout": {
+    "first-confession": { "x": 60, "y": -130 },
+    "overwhelmed": { "x": 300, "y": -130 },
+    "thousand-coins": { "x": 540, "y": -130 },
+    "first-redemption": { "x": 900, "y": -130 },
+    "coins": { "x": 200, "y": 60 },
+    "guilt": { "x": 560, "y": 60 },
+    "absolution": { "x": 900, "y": 60 },
+    "grace": { "x": 1180, "y": 60 },
+    "guilt-catches-up": { "x": 640, "y": 190 },
+    "redemption": { "x": 1180, "y": 330 },
+    "toiler": { "x": 140, "y": 330 },
+    "booth": { "x": 700, "y": 330 },
+    "overtime": { "x": 60, "y": 570 },
+    "second-shift": { "x": 300, "y": 570 },
+    "steady-hands": { "x": 540, "y": 570 },
+    "larger-chapel": { "x": 900, "y": 570 }
+  }
+}

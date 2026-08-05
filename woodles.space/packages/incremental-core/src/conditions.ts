@@ -1,14 +1,21 @@
-import type { Condition } from './types.js';
-import { countUnequippedUpgrades, type SimState } from './state.js';
+import type { Condition, GameDef } from './types.js';
+import { countUnequippedUpgrades, sumTaggedLevels, type SimState } from './state.js';
 
 /**
  * Conditions read state and nothing else — no time, no randomness — so an
  * unlock either holds for a given state or it doesn't, and the editor can show
  * that without running a simulation.
+ *
+ * `def` is the one exception, and it's optional for exactly one reason:
+ * `taggedLevelSum` reads which entities carry a tag, and that's authoring
+ * data, not runtime state — no *entity* is named in the condition, so there's
+ * nothing in `state` alone that could answer it. Every caller that can
+ * reasonably reach a def passes it; a caller that can't gets `false` back for
+ * that one metric rather than a throw, the same way a dangling id does.
  */
-export function evaluateCondition(condition: Condition, state: SimState): boolean {
-	if ('all' in condition) return condition.all.every((child) => evaluateCondition(child, state));
-	if ('any' in condition) return condition.any.some((child) => evaluateCondition(child, state));
+export function evaluateCondition(condition: Condition, state: SimState, def?: GameDef): boolean {
+	if ('all' in condition) return condition.all.every((child) => evaluateCondition(child, state, def));
+	if ('any' in condition) return condition.any.some((child) => evaluateCondition(child, state, def));
 
 	switch (condition.metric) {
 		case 'currencyAmount':
@@ -23,6 +30,8 @@ export function evaluateCondition(condition: Condition, state: SimState): boolea
 			return compare(state.prestige[condition.layerId]?.count ?? 0, condition.op, condition.value);
 		case 'unequippedUpgrades':
 			return compare(countUnequippedUpgrades(state), condition.op, condition.value);
+		case 'taggedLevelSum':
+			return compare(def ? sumTaggedLevels(def, state, condition.tag) : 0, condition.op, condition.value);
 		default:
 			return false;
 	}
@@ -81,6 +90,9 @@ function collectReferences(condition: Condition, into: string[]): void {
 		case 'unequippedUpgrades':
 			// A def-wide count, not a reference to any one entity.
 			return;
+		case 'taggedLevelSum':
+			// References a tag, not any one entity.
+			return;
 	}
 }
 
@@ -110,6 +122,8 @@ export function describeCondition(condition: Condition, nameOf: (id: string) => 
 			return `${nameOf(condition.layerId)} count ${condition.op} ${condition.value}`;
 		case 'unequippedUpgrades':
 			return `unequipped upgrades ${condition.op} ${condition.value}`;
+		case 'taggedLevelSum':
+			return `"${condition.tag}" level sum ${condition.op} ${condition.value}`;
 		default:
 			return 'unknown condition';
 	}

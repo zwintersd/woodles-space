@@ -2,6 +2,8 @@ import { parseGameDef } from '../serialize.js';
 import type { GameDef } from '../types.js';
 import cozyGardenJson from './cozy-garden.json' with { type: 'json' };
 import apiaryOfBadDecisionsJson from './apiary-of-bad-decisions.json' with { type: 'json' };
+import confessionBoothJson from './confession-booth.json' with { type: 'json' };
+import choirOfUnspokenNamesJson from './choir-of-unspoken-names.json' with { type: 'json' };
 
 /**
  * The garden from the mockup, as a real project file rather than a TypeScript
@@ -19,4 +21,23 @@ export const cozyGarden: GameDef = parseGameDef(cozyGardenJson).def;
  */
 export const apiaryOfBadDecisions: GameDef = parseGameDef(apiaryOfBadDecisionsJson).def;
 
-export { cozyGardenJson, apiaryOfBadDecisionsJson };
+/**
+ * A second stress test, inverted from the first: `booth` produces nothing
+ * from its own curve alone — `Generator.converts` throttles it to whatever
+ * `Currency.spendTax` has quietly taxed every other purchase into. Absolution
+ * is the only currency the prestige layer reads, so playing at all is what
+ * funds the ability to reset.
+ */
+export const confessionBooth: GameDef = parseGameDef(confessionBoothJson).def;
+
+/**
+ * A third stress test, aimed at the thing `populationBoost` deliberately
+ * dodged the first time: `unequippedUpgrades` is one hardcoded metric in a
+ * closed union. `taggedLevelSum` reads a designer-defined tag instead — the
+ * Choir sums a generator's level, an upgrade's level and a prestige layer's
+ * reset count, none of them the Choir itself, because "devotional" is the
+ * def's own grouping, not the engine's.
+ */
+export const choirOfUnspokenNames: GameDef = parseGameDef(choirOfUnspokenNamesJson).def;
+
+export { cozyGardenJson, apiaryOfBadDecisionsJson, confessionBoothJson, choirOfUnspokenNamesJson };

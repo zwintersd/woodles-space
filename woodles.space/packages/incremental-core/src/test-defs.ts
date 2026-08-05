@@ -164,6 +164,130 @@ export function apiaryToyDef(): GameDef {
 	};
 }
 
+/**
+ * A miniature "Confession Booth": buying `trinket` (10 coins) taxes 10 guilt
+ * into existence via `coins.spendTax`. `booth` converts guilt into absolution
+ * 1:1, ceiling 3/sec, so it runs at full rate until the 10 guilt runs dry —
+ * at 3/sec that's 3.33s, then it starves back to 0 until the next purchase.
+ */
+export function confessionToyDef(): GameDef {
+	return {
+		schemaVersion: SCHEMA_VERSION,
+		meta: { id: 'confession-toy', title: 'Confession Toy' },
+		currencies: [
+			{
+				id: 'coins',
+				name: 'Coins',
+				color: '#E8B830',
+				format: { decimalPlaces: 2, notation: 'plain' },
+				spendTax: { intoCurrencyId: 'guilt', rate: 1 }
+			},
+			{ id: 'guilt', name: 'Guilt', color: '#6B4C6E', format: { decimalPlaces: 2, notation: 'plain' } },
+			{ id: 'absolution', name: 'Absolution', color: '#F5E6C8', format: { decimalPlaces: 2, notation: 'plain' } }
+		],
+		generators: [
+			{
+				id: 'miner',
+				name: 'Miner',
+				producesCurrencyId: 'coins',
+				baseRate: 2,
+				rateCurve: { kind: 'polynomial', exponent: 1 },
+				cost: { currencyId: 'coins', base: 1000, curve: { kind: 'geometric', growth: 2 } },
+				startsOwned: 1
+			},
+			{
+				id: 'booth',
+				name: 'Confession Booth',
+				producesCurrencyId: 'absolution',
+				baseRate: 3,
+				rateCurve: { kind: 'polynomial', exponent: 1 },
+				cost: { currencyId: 'coins', base: 5, curve: { kind: 'geometric', growth: 2 } },
+				startsOwned: 1,
+				converts: { fromCurrencyId: 'guilt', ratio: 1 }
+			}
+		],
+		upgrades: [
+			{
+				id: 'trinket',
+				name: 'Trinket',
+				cost: { currencyId: 'coins', amount: 10 },
+				effects: [{ target: { type: 'generator', id: 'miner' }, stat: 'rate', op: 'add', value: 0.5 }]
+			}
+		],
+		prestigeLayers: [],
+		unlocks: [],
+		milestones: [],
+		notes: [],
+		layout: {}
+	};
+}
+
+/**
+ * A miniature "Choir of Unspoken Names": `choir` produces 2/sec on its own
+ * curve, boosted 10% per summed level of everything tagged `devotional` —
+ * `penitent` (a generator), `vow` (an upgrade), and `order` (a prestige
+ * layer's reset count). `choir` itself carries no tag, so it never boosts
+ * itself. `order`'s multiplier is deliberately zero, so the ordinary prestige
+ * multiplier can't be mistaken for the tag sum in a test that reads it.
+ */
+export function choirToyDef(): GameDef {
+	return {
+		schemaVersion: SCHEMA_VERSION,
+		meta: { id: 'choir-toy', title: 'Choir Toy' },
+		currencies: [
+			{ id: 'faith', name: 'Faith', color: '#E8A93A', format: { decimalPlaces: 2, notation: 'plain' } },
+			{ id: 'grace', name: 'Grace', color: '#9B6FD1', format: { decimalPlaces: 0, notation: 'plain' } }
+		],
+		generators: [
+			{
+				id: 'penitent',
+				name: 'Penitent',
+				producesCurrencyId: 'faith',
+				baseRate: 5,
+				rateCurve: { kind: 'polynomial', exponent: 1 },
+				cost: { currencyId: 'faith', base: 10, curve: { kind: 'geometric', growth: 1.5 } },
+				startsOwned: 1,
+				tags: ['devotional']
+			},
+			{
+				id: 'choir',
+				name: 'Choir',
+				producesCurrencyId: 'faith',
+				baseRate: 2,
+				rateCurve: { kind: 'polynomial', exponent: 1 },
+				cost: { currencyId: 'faith', base: 1000, curve: { kind: 'geometric', growth: 2 } },
+				startsOwned: 1,
+				populationBoost: { metric: 'taggedLevelSum', tag: 'devotional', perUnit: 0.1 }
+			}
+		],
+		upgrades: [
+			{
+				id: 'vow',
+				name: 'Vow',
+				cost: { currencyId: 'faith', amount: 5 },
+				repeatable: { maxLevel: 5, costCurve: { kind: 'geometric', growth: 2 } },
+				tags: ['devotional'],
+				effects: [{ target: { type: 'generator', id: 'penitent' }, stat: 'rate', op: 'add', value: 1 }]
+			}
+		],
+		prestigeLayers: [
+			{
+				id: 'order',
+				name: 'The Unspoken Order',
+				currencyId: 'grace',
+				gainFormula: { sourceCurrencyId: 'faith', threshold: 1, exponent: 1 },
+				multiplier: { perUnit: 0 },
+				resets: ['faith', 'penitent', 'vow'],
+				tags: ['devotional']
+			}
+		],
+		unlocks: [],
+		milestones: [],
+		notes: [],
+		layout: {}
+	};
+}
+
 /** A def with a crit upgrade, so the RNG path is actually exercised. */
 export function critDef(): GameDef {
 	return {
