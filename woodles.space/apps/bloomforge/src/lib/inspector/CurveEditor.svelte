@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { CURVE_KINDS, defaultCurve, describeCurve, type Curve, type CurveKind } from '@woodles/incremental-core';
+	import InfoTip from '../InfoTip.svelte';
 
 	/**
 	 * Picks a curve kind and its parameters. Switching kind swaps in that kind's
@@ -13,9 +14,10 @@
 		label: string;
 		curve: Curve;
 		onchange: (curve: Curve) => void;
+		help?: string;
 	}
 
-	let { label, curve, onchange }: Props = $props();
+	let { label, curve, onchange, help }: Props = $props();
 
 	const KIND_LABELS: Record<CurveKind, string> = {
 		geometric: 'Geometric',
@@ -54,7 +56,10 @@
 
 <div class="curve">
 	<div class="head">
-		<span class="bf-label">{label}</span>
+		<span class="label-row">
+			<span class="bf-label">{label}</span>
+			{#if help}<InfoTip text={help} />{/if}
+		</span>
 		<span class="summary">{describeCurve(curve)}</span>
 	</div>
 
@@ -148,6 +153,12 @@
 		justify-content: space-between;
 		gap: 8px;
 		margin-bottom: 5px;
+	}
+
+	.label-row {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
 	}
 
 	.summary {

@@ -9,6 +9,8 @@
 	} from '@woodles/incremental-core';
 	import ContextMenu, { type ContextMenuItem } from '../ContextMenu.svelte';
 	import EmojiIcon from '../EmojiIcon.svelte';
+	import { ENTITY_KIND_GLOSSARY } from '../glossary.js';
+	import InfoTip from '../InfoTip.svelte';
 	import { studio } from '../studio.svelte.js';
 	import { tour } from '../tour.svelte.js';
 
@@ -123,6 +125,7 @@
 				<div class="group-head">
 					<span class="group-icon"><EmojiIcon char={ICONS[group.kind]} size={12} /></span>
 					<h3>{group.label}</h3>
+					<InfoTip text={ENTITY_KIND_GLOSSARY[group.kind]} placement="bottom" />
 					<span class="count">{group.total}</span>
 					<button
 						class="add"

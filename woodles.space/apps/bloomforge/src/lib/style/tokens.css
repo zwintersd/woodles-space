@@ -62,6 +62,14 @@
 	--bf-note: #fdf3cf;
 	--bf-note-line: #eed99a;
 
+	/* The teaching tooltip's own palette — brighter and candier than the rest
+	   of the app on purpose, so a hover callout never gets mistaken for chrome. */
+	--bf-tip-from: #ff8fc9;
+	--bf-tip-to: #ff4fa0;
+	--bf-tip-ink: #fff5fb;
+	--bf-tip-star: #ffd54a;
+	--bf-tip-shadow: 0 3px 8px rgba(214, 32, 116, 0.22), 0 10px 26px rgba(214, 32, 116, 0.24);
+
 	--bf-shadow-soft: 0 1px 2px rgba(105, 83, 122, 0.06), 0 6px 18px rgba(105, 83, 122, 0.08);
 	--bf-shadow-card: 0 1px 2px rgba(105, 83, 122, 0.07), 0 10px 26px rgba(105, 83, 122, 0.11);
 	--bf-shadow-lift: 0 2px 6px rgba(105, 83, 122, 0.1), 0 18px 40px rgba(105, 83, 122, 0.16);
@@ -121,12 +129,21 @@ textarea {
 }
 
 .bf-field > label,
+.bf-field > .bf-field-label,
 .bf-label {
 	font-size: 11px;
 	font-weight: 600;
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 	color: var(--bf-muted);
+}
+
+/* Wraps a label (or a .bf-label) with an InfoTip star beside it, without
+   breaking the typography the direct-child selector above depends on. */
+.bf-field-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
 }
 
 .bf-input,
