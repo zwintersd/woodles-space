@@ -32,6 +32,17 @@ place: `upgradeOwned` takes an optional `level`, so "requires Golden Touch level
 10" — the spec's own worked example — is expressible. Omitting it still means
 "owned at all".
 
+**An owned upgrade isn't always an active one.** `SimState.upgrades[id].equipped`
+(default `true`) gates whether its effects apply — the `equipUpgrade` /
+`unequipUpgrade` actions flip it for free, any time, no cost beyond the one
+already paid. That one bit is what lets `Generator.populationBoost` exist: a
+rate multiplier driven by a live count (`countUnequippedUpgrades`, today's only
+metric) instead of a level, and a matching `Condition` metric so an unlock or
+milestone can react to it too. See
+[`apiaryOfBadDecisions`](./src/fixtures/apiary-of-bad-decisions.json) — a
+generator whose output rewards owning upgrades you deliberately never turned
+on.
+
 ## numbers
 
 Every piece of arithmetic, including the comparisons, goes through
@@ -134,14 +145,29 @@ The save carries the PRNG's state, not just its seed. Without that, reloading
 replays the rolls the run made in its first second — and save-and-reload
 becomes a way to reroll a bad crit.
 
-## fixture
+## fixtures
 
 `cozyGarden` is the garden from the mockup as a real project file
 ([`src/fixtures/cozy-garden.json`](./src/fixtures/cozy-garden.json)): two
 currencies, two generators, four upgrades, one prestige layer, three unlocks,
-four milestones. It loads through `parseGameDef` for the same reason a user's
-import does — if it ever stops being valid, every test leaning on it fails at
-load rather than quietly producing different numbers.
+four milestones.
+
+`apiaryOfBadDecisions`
+([`src/fixtures/apiary-of-bad-decisions.json`](./src/fixtures/apiary-of-bad-decisions.json))
+is a stress test rather than a mockup: a Hive whose own curve is almost
+nothing, carried instead by `populationBoost` reading how many of the game's
+five upgrades the player owns but has left unequipped. Two milestones read the
+matching `Condition` metric directly. Its own test file
+([`src/fixtures/apiary-of-bad-decisions.test.ts`](./src/fixtures/apiary-of-bad-decisions.test.ts))
+proves something the fixture itself makes obvious once you see it: neither
+`idlePolicy` nor `greedyPolicy()` ever reaches those milestones, because
+neither bot ever chooses to leave something it owns switched off. The strategy
+is real, and it's invisible to both bounds — only a player, or a script, can
+find it.
+
+Both load through `parseGameDef` for the same reason a user's import does — if
+either ever stops being valid, every test leaning on it fails at load rather
+than quietly producing different numbers.
 
 ## tests
 
@@ -149,10 +175,11 @@ load rather than quietly producing different numbers.
 pnpm --filter @woodles/incremental-core test
 ```
 
-144 tests. The ones that matter most: determinism (two runs, same seed, deep
+159 tests. The ones that matter most: determinism (two runs, same seed, deep
 equal), a golden master worked out by hand in a comment above the test, curve
 behaviour per kind, the prestige round trip (resets wipe exactly `resets[]`,
-lifetime counters outside it survive, the multiplier applies), and greedy
+lifetime counters outside it survive, the multiplier applies), the Apiary's
+hand-computed rate swings as upgrades get equipped and unequipped, and greedy
 out-earning idle on every fixture, plus the save round trip — a resumed run has
 to produce byte-identical events to one that never stopped.
 

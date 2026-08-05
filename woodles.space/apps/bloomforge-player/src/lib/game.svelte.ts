@@ -1,5 +1,6 @@
 import {
 	captureSave,
+	countUnequippedUpgrades,
 	createSim,
 	evaluateCondition,
 	hasErrors,
@@ -41,6 +42,8 @@ export interface Purchasable {
 	locked: boolean;
 	/** Why it can't be bought yet, when it can't. */
 	blockedBy: string | null;
+	/** Owned upgrades only — whether it's contributing its effects right now. Absent for generators. */
+	equipped?: boolean;
 }
 
 export class Game {
@@ -57,6 +60,8 @@ export class Game {
 	generatorLevels = $state<Record<string, number>>({});
 	generatorRates = $state<Record<string, number>>({});
 	upgradeLevels = $state<Record<string, number>>({});
+	/** Owned upgrades currently left unequipped, across the whole def. */
+	unequippedUpgradeCount = $state(0);
 	nextCosts = $state<Record<string, number | null>>({});
 	unlocked = $state<Set<string>>(new Set());
 	prestigeCounts = $state<Record<string, number>>({});
@@ -161,6 +166,15 @@ export class Game {
 		this.#act({ type: 'buyUpgrade', id });
 	}
 
+	/** Free and instant — a loadout choice, not a purchase. */
+	equipUpgrade(id: string): void {
+		this.#act({ type: 'equipUpgrade', id });
+	}
+
+	unequipUpgrade(id: string): void {
+		this.#act({ type: 'unequipUpgrade', id });
+	}
+
 	prestige(layerId: string): void {
 		this.#act({ type: 'prestige', layerId });
 	}
@@ -226,7 +240,8 @@ export class Game {
 					affordable:
 						!gated && cost !== null && (this.amounts[upgrade.cost.currencyId] ?? 0) >= cost && level < max,
 					locked: gated,
-					blockedBy: level >= max ? 'fully grown' : gated ? 'locked' : null
+					blockedBy: level >= max ? 'fully grown' : gated ? 'locked' : null,
+					equipped: level > 0 ? (state.upgrades[upgrade.id]?.equipped ?? true) : undefined
 				};
 			});
 	}
@@ -335,6 +350,7 @@ export class Game {
 		const upgrades: Record<string, number> = {};
 		for (const [id, upgrade] of Object.entries(state.upgrades)) upgrades[id] = upgrade.level;
 		this.upgradeLevels = upgrades;
+		this.unequippedUpgradeCount = countUnequippedUpgrades(state);
 
 		const prestige: Record<string, number> = {};
 		for (const [id, layer] of Object.entries(state.prestige)) prestige[id] = layer.count;

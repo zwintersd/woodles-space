@@ -56,6 +56,18 @@ the tool most needs: a **curve editor with a live plot**. Cost and output are
 drawn against level 1–100 on a shared axis with a log toggle, because a curve
 you can't see is a curve you're guessing at.
 
+A generator can also take a **population boost** — a rate multiplier driven by
+a live count instead of its own level, off `@woodles/incremental-core`'s
+`populationBoost` field. It's what the stress-test sample
+[`apiaryOfBadDecisions`](../../packages/incremental-core/src/fixtures/apiary-of-bad-decisions.json)
+is built on: a Hive that earns almost nothing from its own curve and almost
+everything from upgrades the player owns but has deliberately left unequipped
+— hoarding as a strategy, not a mistake. Equipping is a player action in
+[the player](../bloomforge-player/README.md), not an editor concern, so the
+Studio's own playtest — Idle or Greedy, never a human — never exercises it;
+what the Inspector edits here is just the multiplier those two bots can't
+reach.
+
 **Dock** — Playtest steps the sim on animation frames at 1×/10×/100× game time
 (10× by default; real time is too slow to feel a curve). Balance fast-forwards
 Idle against Greedy in a Web Worker and reports time-to-milestone. Plus Log and

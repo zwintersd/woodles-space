@@ -115,6 +115,55 @@ export function prestigeDef(): GameDef {
 	};
 }
 
+/**
+ * A miniature "Apiary of Bad Decisions": `bees` makes 2 honey/sec at level 1,
+ * boosted 50% for every owned-but-unequipped upgrade. `petal-a` and `petal-b`
+ * each add a flat +3/sec to `bees` while equipped and nothing while not.
+ *
+ * Hand-worked rates at level 1, 0 unequipped: 2. Both equipped: 8. Both
+ * unequipped: 2 × (1 + 0.5×2) = 4. One of each: (2 + 3) × 1.5 = 7.5.
+ */
+export function apiaryToyDef(): GameDef {
+	return {
+		schemaVersion: SCHEMA_VERSION,
+		meta: { id: 'apiary-toy', title: 'Apiary Toy' },
+		currencies: [
+			{ id: 'honey', name: 'Honey', color: '#E8B830', format: { decimalPlaces: 2, notation: 'plain' } }
+		],
+		generators: [
+			{
+				id: 'bees',
+				name: 'Bees',
+				producesCurrencyId: 'honey',
+				baseRate: 2,
+				rateCurve: { kind: 'polynomial', exponent: 1 },
+				cost: { currencyId: 'honey', base: 5, curve: { kind: 'geometric', growth: 2 } },
+				startsOwned: 1,
+				populationBoost: { metric: 'unequippedUpgrades', perUnit: 0.5 }
+			}
+		],
+		upgrades: [
+			{
+				id: 'petal-a',
+				name: 'Petal A',
+				cost: { currencyId: 'honey', amount: 1 },
+				effects: [{ target: { type: 'generator', id: 'bees' }, stat: 'rate', op: 'add', value: 3 }]
+			},
+			{
+				id: 'petal-b',
+				name: 'Petal B',
+				cost: { currencyId: 'honey', amount: 1 },
+				effects: [{ target: { type: 'generator', id: 'bees' }, stat: 'rate', op: 'add', value: 3 }]
+			}
+		],
+		prestigeLayers: [],
+		unlocks: [],
+		milestones: [],
+		notes: [],
+		layout: {}
+	};
+}
+
 /** A def with a crit upgrade, so the RNG path is actually exercised. */
 export function critDef(): GameDef {
 	return {

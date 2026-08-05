@@ -10,7 +10,13 @@ export interface SimState {
 	gameTime: number;
 	currencies: Record<string, CurrencyState>;
 	generators: Record<string, { level: number }>;
-	upgrades: Record<string, { level: number }>;
+	/**
+	 * `equipped` gates whether an owned upgrade's effects apply — see the
+	 * `Upgrade` effects doc. Defaults to `true` at purchase, so a def that
+	 * never calls `equipUpgrade` / `unequipUpgrade` behaves exactly as if the
+	 * flag didn't exist.
+	 */
+	upgrades: Record<string, { level: number; equipped: boolean }>;
 	prestige: Record<string, { count: number; currencyAmount: number }>;
 	/** Ids revealed so far. Revealing is sticky; a prestige reset can't re-hide. */
 	unlocked: Set<string>;
@@ -29,9 +35,11 @@ export interface CurrencyState {
 export type Action =
 	| { type: 'buyGenerator'; id: string; count?: number }
 	| { type: 'buyUpgrade'; id: string }
+	| { type: 'equipUpgrade'; id: string }
+	| { type: 'unequipUpgrade'; id: string }
 	| { type: 'prestige'; layerId: string };
 
-export type SimEventKind = 'purchase' | 'levelUp' | 'unlock' | 'milestone' | 'prestige';
+export type SimEventKind = 'purchase' | 'levelUp' | 'unlock' | 'milestone' | 'prestige' | 'equip' | 'unequip';
 
 export interface SimEvent {
 	/** Game-seconds at which it happened. */
@@ -88,7 +96,7 @@ export function initialState(def: GameDef): SimState {
 
 	for (const currency of def.currencies) state.currencies[currency.id] = { amount: 0, lifetime: 0 };
 	for (const generator of def.generators) state.generators[generator.id] = { level: generator.startsOwned ?? 0 };
-	for (const upgrade of def.upgrades) state.upgrades[upgrade.id] = { level: 0 };
+	for (const upgrade of def.upgrades) state.upgrades[upgrade.id] = { level: 0, equipped: true };
 	for (const layer of def.prestigeLayers) state.prestige[layer.id] = { count: 0, currencyAmount: 0 };
 
 	// An id nobody hides is visible from the start; only ids some unlock claims
@@ -107,6 +115,19 @@ export function gatedIds(def: GameDef): Set<string> {
 /** True when the entity is currently visible to the player. */
 export function isRevealed(id: string, gated: Set<string>, state: SimState): boolean {
 	return !gated.has(id) || state.unlocked.has(id);
+}
+
+/**
+ * Owned upgrades currently sitting unequipped — "flowers" in the Apiary sample,
+ * a hoarding score in any def that reads it. Reads state and nothing else, the
+ * same way every metric here does, so it costs nothing to check every tick.
+ */
+export function countUnequippedUpgrades(state: SimState): number {
+	let count = 0;
+	for (const upgrade of Object.values(state.upgrades)) {
+		if (upgrade.level > 0 && !upgrade.equipped) count += 1;
+	}
+	return count;
 }
 
 /** Deep copy that survives the `unlocked` Set, for snapshots and comparisons. */

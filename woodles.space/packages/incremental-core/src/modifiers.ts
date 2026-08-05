@@ -1,6 +1,6 @@
 import { num } from './num.js';
-import type { Effect, EffectTarget, GameDef, Generator, Upgrade } from './types.js';
-import type { SimState } from './state.js';
+import type { Effect, EffectTarget, GameDef, Generator, PopulationBoost, Upgrade } from './types.js';
+import { countUnequippedUpgrades, type SimState } from './state.js';
 
 /**
  * Upgrades resolved into per-entity numbers, so the tick loop reads a lookup
@@ -21,6 +21,8 @@ export interface Modifiers {
 	generatorCostScale: Record<string, number>;
 	/** Multiplies an upgrade's next-level cost. */
 	upgradeCostScale: Record<string, number>;
+	/** A generator's `populationBoost` resolved against the current state. Defaults to 1. */
+	populationMul: Record<string, number>;
 }
 
 /** What a critical production tick is worth. Constant in the MVP. */
@@ -35,6 +37,7 @@ export function resolveModifiers(def: GameDef, state: SimState): Modifiers {
 	const generatorCostMul: Record<string, number> = {};
 	const upgradeCostAdd: Record<string, number> = {};
 	const upgradeCostMul: Record<string, number> = {};
+	const populationMul: Record<string, number> = {};
 
 	for (const generator of def.generators) {
 		rateAdd[generator.id] = 0;
@@ -43,6 +46,9 @@ export function resolveModifiers(def: GameDef, state: SimState): Modifiers {
 		critMul[generator.id] = 1;
 		generatorCostAdd[generator.id] = 0;
 		generatorCostMul[generator.id] = 1;
+		populationMul[generator.id] = generator.populationBoost
+			? num.add(1, num.mul(generator.populationBoost.perUnit, resolvePopulationMetric(generator.populationBoost, state)))
+			: 1;
 	}
 	for (const upgrade of def.upgrades) {
 		upgradeCostAdd[upgrade.id] = 0;
@@ -50,8 +56,11 @@ export function resolveModifiers(def: GameDef, state: SimState): Modifiers {
 	}
 
 	for (const upgrade of def.upgrades) {
-		const level = state.upgrades[upgrade.id]?.level ?? 0;
-		if (level <= 0) continue;
+		const record = state.upgrades[upgrade.id];
+		const level = record?.level ?? 0;
+		// Owned but unequipped is not owned, mechanically: the upgrade contributes
+		// nothing until the player equips it again, at whatever level it's at.
+		if (level <= 0 || !record?.equipped) continue;
 
 		for (const effect of upgrade.effects) {
 			switch (effect.stat) {
@@ -73,8 +82,23 @@ export function resolveModifiers(def: GameDef, state: SimState): Modifiers {
 		rateMul,
 		crit: combine(critAdd, critMul, 0),
 		generatorCostScale: combine(generatorCostAdd, generatorCostMul, 1),
-		upgradeCostScale: combine(upgradeCostAdd, upgradeCostMul, 1)
+		upgradeCostScale: combine(upgradeCostAdd, upgradeCostMul, 1),
+		populationMul
 	};
+}
+
+/** What a `populationBoost`'s metric currently counts. */
+function resolvePopulationMetric(boost: PopulationBoost, state: SimState): number {
+	switch (boost.metric) {
+		case 'unequippedUpgrades':
+			return countUnequippedUpgrades(state);
+		default:
+			return assertNeverMetric(boost.metric);
+	}
+}
+
+function assertNeverMetric(value: never): never {
+	throw new Error(`unhandled population metric: ${JSON.stringify(value)}`);
 }
 
 /**
@@ -102,7 +126,8 @@ export function effectiveRate(
 ): number {
 	if (level <= 0) return 0;
 	const flat = num.add(baseOutput, modifiers.rateAdd[generator.id] ?? 0);
-	return num.mul(num.mul(flat, modifiers.rateMul[generator.id] ?? 1), prestige);
+	const population = modifiers.populationMul[generator.id] ?? 1;
+	return num.mul(num.mul(num.mul(flat, modifiers.rateMul[generator.id] ?? 1), prestige), population);
 }
 
 function applyToGenerators(

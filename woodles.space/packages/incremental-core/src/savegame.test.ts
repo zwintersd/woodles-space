@@ -4,7 +4,7 @@ import { cozyGarden } from './fixtures/index.js';
 import { greedy, idlePolicy } from './policies.js';
 import { isSaveGame, restoreState, SAVE_VERSION, saveMatches, serializeState, type SaveGame } from './savegame.js';
 import { initialState } from './state.js';
-import { prestigeDef, toyDef } from './test-defs.js';
+import { apiaryToyDef, prestigeDef, toyDef } from './test-defs.js';
 
 /** A run with something in it worth saving. */
 function playedFor(seconds: number) {
@@ -209,6 +209,36 @@ describe('surviving a corrupt file', () => {
 		expect(isSaveGame({})).toBe(false);
 		expect(isSaveGame({ version: 99, gameId: 'x', state: {} })).toBe(false);
 		expect(isSaveGame(base())).toBe(true);
+	});
+});
+
+describe('equip state', () => {
+	it('survives a save and restore', () => {
+		const sim = createSim(apiaryToyDef(), idlePolicy, 1);
+		sim.step(10);
+		sim.apply({ type: 'buyUpgrade', id: 'petal-a' }, []);
+		sim.apply({ type: 'unequipUpgrade', id: 'petal-a' }, []);
+
+		const resumed = createSim(apiaryToyDef(), idlePolicy, 1, captureSave(sim));
+		expect(resumed.state().upgrades['petal-a'].equipped).toBe(false);
+		expect(resumed.generatorRates().bees).toBeCloseTo(sim.generatorRates().bees, 6);
+	});
+
+	it('defaults to equipped when a save predates the field', () => {
+		const save = {
+			version: SAVE_VERSION,
+			gameId: 'apiary-toy',
+			savedAt: new Date().toISOString(),
+			seed: 1,
+			state: {
+				...serializeState(initialState(apiaryToyDef())),
+				upgrades: { 'petal-a': { level: 1 }, 'petal-b': { level: 0 } }
+			},
+			milestoneTimes: {}
+		} as unknown as SaveGame;
+
+		const state = restoreState(apiaryToyDef(), save);
+		expect(state.upgrades['petal-a']).toEqual({ level: 1, equipped: true });
 	});
 });
 

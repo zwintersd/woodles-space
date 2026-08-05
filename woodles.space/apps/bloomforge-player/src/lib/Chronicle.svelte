@@ -5,12 +5,13 @@
 
 	/**
 	 * Milestones and the event log, side by side — what you're heading for and
-	 * what just happened. Purchases are filtered out of the feed: the player
-	 * made those, so echoing them back is noise that buries the events they
-	 * didn't cause.
+	 * what just happened. Purchases and equip toggles are filtered out of the
+	 * feed: the player made those, so echoing them back is noise that buries
+	 * the events they didn't cause.
 	 */
 	const names = $derived(game.def ? nameLookup(game.def) : (id: string) => id);
-	const notable = $derived(game.log.filter((event) => event.kind !== 'levelUp' && event.kind !== 'purchase'));
+	const PLAYER_CAUSED = new Set(['levelUp', 'purchase', 'equip', 'unequip']);
+	const notable = $derived(game.log.filter((event) => !PLAYER_CAUSED.has(event.kind)));
 </script>
 
 <div class="chronicle">

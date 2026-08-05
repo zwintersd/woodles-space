@@ -123,6 +123,14 @@ export function validateGameDef(def: GameDef): ValidationIssue[] {
 		}
 		checkCurve(generator.rateCurve, `${path}.rateCurve`, generator.id, issues);
 		checkCurve(generator.cost.curve, `${path}.cost.curve`, generator.id, issues);
+		if (generator.populationBoost && (!Number.isFinite(generator.populationBoost.perUnit) || generator.populationBoost.perUnit < 0)) {
+			error(
+				'invalid-number',
+				'the per-unit population boost cannot be negative',
+				`${path}.populationBoost.perUnit`,
+				generator.id
+			);
+		}
 	}
 
 	// ── upgrades ──────────────────────────────────────────────────────────

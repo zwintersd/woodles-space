@@ -79,11 +79,28 @@ export interface Generator {
 	maxLevel?: number;
 	/** Levels owned at game start — usually 0, though the first generator is often 1. */
 	startsOwned?: number;
+	/**
+	 * An extra rate multiplier driven by a live count instead of this
+	 * generator's own level: `rate × (1 + perUnit × count)`. Composes with
+	 * `rateCurve` and every upgrade effect. The union is open to extension,
+	 * the same way `Curve` is.
+	 */
+	populationBoost?: PopulationBoost;
 }
 
+export type PopulationBoost = {
+	/** Owned upgrades currently sitting unequipped — see `Upgrade` effects. */
+	metric: 'unequippedUpgrades';
+	perUnit: number;
+};
+
 /**
- * What an upgrade does when owned. `value` is applied **once per owned level**,
- * so a repeatable upgrade at level 3 applies its effect three times.
+ * What an upgrade does when owned *and equipped*. `value` is applied **once
+ * per owned level**, so a repeatable upgrade at level 3 applies its effect
+ * three times — but an owned upgrade the player has unequipped contributes
+ * nothing at all, as if it weren't owned, until it's equipped again. See
+ * `SimState.upgrades[id].equipped` and the `equipUpgrade` / `unequipUpgrade`
+ * actions.
  *
  * The two ops are deliberately literal, because a balance tool that fudges
  * arithmetic is worse than useless:
@@ -184,6 +201,8 @@ export type Condition =
 	 */
 	| { metric: 'upgradeOwned'; upgradeId: string; level?: number }
 	| { metric: 'prestigeCount'; layerId: string; op: '>='; value: number }
+	/** Owned upgrades currently sitting unequipped, across the whole def. */
+	| { metric: 'unequippedUpgrades'; op: CompareOp; value: number }
 	| { all: Condition[] }
 	| { any: Condition[] };
 

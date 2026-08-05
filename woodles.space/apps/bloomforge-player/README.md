@@ -19,6 +19,13 @@ in exactly two ways:
   would have returned, and the engine re-checks affordability, so a stale
   "affordable" flag in the UI can never conjure a level out of nothing.
 
+An owned upgrade also carries an **equipped** flag a player can flip for free,
+any time — the "Equipped" chip beside a bought upgrade's card. Neither
+`idlePolicy` nor `greedyPolicy()` ever touches it, so a def that leans on it
+(a generator's `populationBoost`, reading how many owned upgrades are
+currently left unequipped) is exercising something only a human playing here
+can actually do. See [`apiaryOfBadDecisions`](../../packages/incremental-core/src/fixtures/apiary-of-bad-decisions.json).
+
 ## getting a game into it
 
 The studio's **Play it** hands over `?game=<project id>`. Both apps sit on one
@@ -72,6 +79,6 @@ change.
 
 ```bash
 pnpm --filter bloomforge-player dev
-pnpm --filter bloomforge-player test     # 18 tests
+pnpm --filter bloomforge-player test     # 22 tests
 pnpm --filter bloomforge-player check
 ```

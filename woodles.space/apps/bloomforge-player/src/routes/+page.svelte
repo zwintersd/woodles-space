@@ -146,10 +146,27 @@
 				</div>
 
 				{#if game.upgrades.length}
-					<h2>Upgrades</h2>
+					<div class="upgrades-head">
+						<h2>Upgrades</h2>
+						{#if game.unequippedUpgradeCount > 0}
+							<span class="unequipped-count">{game.unequippedUpgradeCount} left unequipped</span>
+						{/if}
+					</div>
 					<div class="cards">
 						{#each game.upgrades as item (item.id)}
-							<BuyCard {item} kind="upgrade" icon="✨" detail={upgradeDetail(item.id)} onbuy={(id) => game.buyUpgrade(id)} />
+							<div class="upgrade-row">
+								<BuyCard {item} kind="upgrade" icon="✨" detail={upgradeDetail(item.id)} onbuy={(id) => game.buyUpgrade(id)} />
+								{#if item.equipped !== undefined}
+									<button
+										class="bp-button equip-toggle"
+										type="button"
+										aria-pressed={item.equipped}
+										onclick={() => (item.equipped ? game.unequipUpgrade(item.id) : game.equipUpgrade(item.id))}
+									>
+										{item.equipped ? '✓ Equipped' : 'Unequipped'}
+									</button>
+								{/if}
+							</div>
 						{/each}
 					</div>
 				{/if}
@@ -236,6 +253,41 @@
 		font-size: 17px;
 		font-weight: 600;
 		color: var(--bp-ink-soft);
+	}
+
+	.upgrades-head {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+	}
+
+	.upgrades-head h2 {
+		margin-right: auto;
+	}
+
+	.unequipped-count {
+		font-size: 11px;
+		font-weight: 600;
+		color: var(--bp-accent-strong);
+	}
+
+	.upgrade-row {
+		display: flex;
+		align-items: stretch;
+		gap: 6px;
+	}
+
+	.upgrade-row :global(.card) {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.equip-toggle {
+		flex: none;
+		align-self: center;
+		font-size: 11px;
+		padding: 6px 10px;
+		white-space: nowrap;
 	}
 
 	.cards {

@@ -26,7 +26,11 @@
 			generators: Object.fromEntries(
 				Object.entries(playtest.generatorLevels).map(([key, level]) => [key, { level }])
 			),
-			upgrades: Object.fromEntries(Object.entries(playtest.upgradeLevels).map(([key, level]) => [key, { level }])),
+			// The Studio's playtest is bot-driven and never unequips anything, so
+			// every owned upgrade is equipped for as long as a live check can see.
+			upgrades: Object.fromEntries(
+				Object.entries(playtest.upgradeLevels).map(([key, level]) => [key, { level, equipped: true }])
+			),
 			prestige: Object.fromEntries(
 				Object.entries(playtest.prestigeCounts).map(([key, count]) => [key, { count, currencyAmount: 0 }])
 			),

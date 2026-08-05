@@ -22,4 +22,4 @@ export * from './library.js';
 export * from './engine.js';
 export * from './policies.js';
 export * from './graph.js';
-export { cozyGarden } from './fixtures/index.js';
+export { cozyGarden, apiaryOfBadDecisions } from './fixtures/index.js';

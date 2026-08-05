@@ -29,5 +29,8 @@ export const GLOSSARY = {
 	reveals: "What this unlock shows once it opens. Hidden nodes don't exist to the player until then.",
 	opensWhen: 'The condition that flips this unlock from hidden to revealed.',
 	reachedWhen: 'The condition a balance run checks time against to report this milestone.',
-	requires: "A gate on top of cost — the upgrade can't be bought until this is also true."
+	requires: "A gate on top of cost — the upgrade can't be bought until this is also true.",
+	populationBoost:
+		'An extra multiplier driven by a live count instead of a level — e.g. "×1 + 0.1 per owned-but-unequipped upgrade." Composes with the curve above it.',
+	populationPerUnit: 'The bonus each counted unit adds — 0.35 means +35% per unit, compounding additively with itself.'
 } as const;

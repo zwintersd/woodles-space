@@ -307,6 +307,53 @@
 						priced
 					)} and makes {formatAmount(curveValue(generator.rateCurve, generator.baseRate, 50), produces)} / sec.
 				</p>
+
+				<hr />
+
+				<div class="bf-field">
+					<div class="repeatable-row">
+						<label class="inline" for="bf-population">
+							<input
+								id="bf-population"
+								type="checkbox"
+								checked={!!generator.populationBoost}
+								onchange={(e) =>
+									studio.edit(() => {
+										if (e.currentTarget.checked) {
+											generator.populationBoost = { metric: 'unequippedUpgrades', perUnit: 0.1 };
+										} else {
+											delete generator.populationBoost;
+										}
+									})}
+							/>
+							Boosted by a live count
+						</label>
+						<InfoTip text={GLOSSARY.populationBoost} />
+					</div>
+				</div>
+
+				{#if generator.populationBoost}
+					{@const boost = generator.populationBoost}
+					<p class="hint">Counts owned upgrades the player has left unequipped, across the whole game.</p>
+
+					<div class="bf-field">
+						<span class="bf-field-label">
+							<label for="bf-population-perunit">Multiplier Per Unit</label>
+							<InfoTip text={GLOSSARY.populationPerUnit} />
+						</span>
+						<input
+							id="bf-population-perunit"
+							class="bf-input"
+							type="number"
+							step="0.01"
+							min="0"
+							value={boost.perUnit}
+							oninput={(e) => studio.editQuietly(() => (boost.perUnit = Number(e.currentTarget.value)))}
+						/>
+					</div>
+
+					<p class="hint">At 5 unequipped upgrades this reads ×{(1 + boost.perUnit * 5).toFixed(2)}.</p>
+				{/if}
 			{/if}
 
 			{#if upgrade}

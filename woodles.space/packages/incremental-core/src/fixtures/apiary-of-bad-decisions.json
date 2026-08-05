@@ -1,0 +1,303 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "id": "apiary-of-bad-decisions",
+    "title": "The Apiary of Bad Decisions",
+    "description": "Your generator is a colony of bees that forage from your unused upgrades. Every upgrade you buy but don't equip becomes a flower the Hive can visit — hoarding is a strategy here, not a mistake."
+  },
+  "currencies": [
+    {
+      "id": "honey",
+      "name": "Honey",
+      "symbol": "🍯",
+      "color": "#E8A93A",
+      "format": {
+        "decimalPlaces": 2,
+        "notation": "thousands"
+      }
+    },
+    {
+      "id": "royal-jelly",
+      "name": "Royal Jelly",
+      "symbol": "💧",
+      "color": "#9B6FD1",
+      "format": {
+        "decimalPlaces": 0,
+        "notation": "thousands"
+      }
+    }
+  ],
+  "generators": [
+    {
+      "id": "forager",
+      "name": "Forager Bees",
+      "producesCurrencyId": "honey",
+      "baseRate": 1,
+      "rateCurve": {
+        "kind": "polynomial",
+        "exponent": 1
+      },
+      "cost": {
+        "currencyId": "honey",
+        "base": 10,
+        "curve": {
+          "kind": "geometric",
+          "growth": 1.15
+        }
+      },
+      "startsOwned": 1
+    },
+    {
+      "id": "hive",
+      "name": "The Hive",
+      "producesCurrencyId": "honey",
+      "baseRate": 0.5,
+      "rateCurve": {
+        "kind": "polynomial",
+        "exponent": 1
+      },
+      "cost": {
+        "currencyId": "honey",
+        "base": 200,
+        "curve": {
+          "kind": "geometric",
+          "growth": 1.2
+        }
+      },
+      "populationBoost": {
+        "metric": "unequippedUpgrades",
+        "perUnit": 0.35
+      }
+    }
+  ],
+  "upgrades": [
+    {
+      "id": "clover-patch",
+      "name": "Clover Patch",
+      "description": "Clover along the forager's route — a third more honey per trip, while it's actually running.",
+      "cost": {
+        "currencyId": "honey",
+        "amount": 15
+      },
+      "effects": [
+        {
+          "target": {
+            "type": "generator",
+            "id": "forager"
+          },
+          "stat": "rate",
+          "op": "mul",
+          "value": 1.4
+        }
+      ]
+    },
+    {
+      "id": "sunbaked-combs",
+      "name": "Sunbaked Combs",
+      "description": "Warms the Hive's own comb directly. Does nothing sitting in a drawer.",
+      "cost": {
+        "currencyId": "honey",
+        "amount": 40
+      },
+      "repeatable": {
+        "maxLevel": 5,
+        "costCurve": {
+          "kind": "geometric",
+          "growth": 2
+        }
+      },
+      "effects": [
+        {
+          "target": {
+            "type": "generator",
+            "id": "hive"
+          },
+          "stat": "rate",
+          "op": "add",
+          "value": 0.4
+        }
+      ]
+    },
+    {
+      "id": "waggle-dance-training",
+      "name": "Waggle-Dance Training",
+      "description": "Scouts report back faster — a real edge, if it's ever turned on.",
+      "cost": {
+        "currencyId": "honey",
+        "amount": 90
+      },
+      "effects": [
+        {
+          "target": {
+            "type": "generator",
+            "id": "hive"
+          },
+          "stat": "critChance",
+          "op": "add",
+          "value": 0.08
+        }
+      ]
+    },
+    {
+      "id": "pollen-baskets",
+      "name": "Pollen Baskets",
+      "description": "Bigger baskets, fuller trips. Compounds with itself.",
+      "cost": {
+        "currencyId": "honey",
+        "amount": 150
+      },
+      "repeatable": {
+        "maxLevel": 5,
+        "costCurve": {
+          "kind": "geometric",
+          "growth": 1.8
+        }
+      },
+      "effects": [
+        {
+          "target": {
+            "type": "generator",
+            "id": "forager"
+          },
+          "stat": "rate",
+          "op": "mul",
+          "value": 1.15
+        }
+      ]
+    },
+    {
+      "id": "queen-excluder",
+      "name": "Queen Excluder",
+      "description": "Keeps the queen where she belongs, and cuts a tenth off everything priced in honey — once it's actually installed.",
+      "cost": {
+        "currencyId": "honey",
+        "amount": 300
+      },
+      "effects": [
+        {
+          "target": {
+            "type": "currency",
+            "id": "honey"
+          },
+          "stat": "costScale",
+          "op": "mul",
+          "value": 0.9
+        }
+      ]
+    }
+  ],
+  "prestigeLayers": [
+    {
+      "id": "swarming",
+      "name": "Swarming",
+      "currencyId": "royal-jelly",
+      "gainFormula": {
+        "sourceCurrencyId": "honey",
+        "threshold": 50000,
+        "exponent": 0.5
+      },
+      "multiplier": {
+        "perUnit": 0.02
+      },
+      "resets": [
+        "honey",
+        "forager",
+        "hive",
+        "clover-patch",
+        "sunbaked-combs",
+        "waggle-dance-training",
+        "pollen-baskets",
+        "queen-excluder"
+      ],
+      "availableWhen": {
+        "metric": "currencyLifetime",
+        "currencyId": "honey",
+        "op": ">=",
+        "value": 50000
+      }
+    }
+  ],
+  "unlocks": [
+    {
+      "id": "bees-notice",
+      "name": "The Bees Notice",
+      "reveals": [
+        "hive"
+      ],
+      "when": {
+        "metric": "currencyLifetime",
+        "currencyId": "honey",
+        "op": ">=",
+        "value": 400
+      }
+    }
+  ],
+  "milestones": [
+    {
+      "id": "first-flower",
+      "name": "First Flower",
+      "when": {
+        "metric": "unequippedUpgrades",
+        "op": ">=",
+        "value": 1
+      }
+    },
+    {
+      "id": "overgrown-garden",
+      "name": "Overgrown Garden",
+      "when": {
+        "metric": "unequippedUpgrades",
+        "op": ">=",
+        "value": 4
+      }
+    },
+    {
+      "id": "ten-thousand-honey",
+      "name": "10K Honey",
+      "when": {
+        "metric": "currencyLifetime",
+        "currencyId": "honey",
+        "op": ">=",
+        "value": 10000
+      }
+    },
+    {
+      "id": "first-swarm",
+      "name": "First Swarm",
+      "when": {
+        "metric": "prestigeCount",
+        "layerId": "swarming",
+        "op": ">=",
+        "value": 1
+      }
+    }
+  ],
+  "notes": [
+    {
+      "id": "note-hive-tuning",
+      "text": "The Hive's base rate is deliberately tiny — the population boost is supposed to carry it. If Forager alone ever out-earns a fully-stocked Hive, raise the per-unit multiplier.",
+      "position": {
+        "x": 780,
+        "y": 620
+      },
+      "color": "#F6D488"
+    }
+  ],
+  "layout": {
+    "first-flower": { "x": 60, "y": -130 },
+    "overgrown-garden": { "x": 300, "y": -130 },
+    "ten-thousand-honey": { "x": 540, "y": -130 },
+    "first-swarm": { "x": 900, "y": -130 },
+    "honey": { "x": 380, "y": 60 },
+    "royal-jelly": { "x": 1120, "y": 60 },
+    "bees-notice": { "x": 640, "y": 190 },
+    "swarming": { "x": 1120, "y": 330 },
+    "forager": { "x": 140, "y": 330 },
+    "hive": { "x": 620, "y": 330 },
+    "clover-patch": { "x": 60, "y": 570 },
+    "sunbaked-combs": { "x": 300, "y": 570 },
+    "waggle-dance-training": { "x": 540, "y": 570 },
+    "pollen-baskets": { "x": 780, "y": 570 },
+    "queen-excluder": { "x": 1020, "y": 570 }
+  }
+}

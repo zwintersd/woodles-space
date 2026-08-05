@@ -19,14 +19,21 @@
 
 	let { def, condition, onchange }: Props = $props();
 
-	type SimpleMetric = 'currencyAmount' | 'currencyLifetime' | 'generatorLevel' | 'upgradeOwned' | 'prestigeCount';
+	type SimpleMetric =
+		| 'currencyAmount'
+		| 'currencyLifetime'
+		| 'generatorLevel'
+		| 'upgradeOwned'
+		| 'prestigeCount'
+		| 'unequippedUpgrades';
 
 	const METRIC_LABELS: Record<SimpleMetric, string> = {
 		currencyAmount: 'Currency held',
 		currencyLifetime: 'Currency earned (lifetime)',
 		generatorLevel: 'Generator level',
 		upgradeOwned: 'Upgrade level',
-		prestigeCount: 'Prestige count'
+		prestigeCount: 'Prestige count',
+		unequippedUpgrades: 'Upgrades left unequipped'
 	};
 
 	const isGroup = $derived('all' in condition || 'any' in condition);
@@ -59,6 +66,7 @@
 		if (next === 'generatorLevel') return options.generator;
 		if (next === 'upgradeOwned') return options.upgrade;
 		if (next === 'prestigeCount') return options.prestige;
+		if (next === 'unequippedUpgrades') return [];
 		return options.currency;
 	}
 
@@ -70,6 +78,9 @@
 				return { metric: 'upgradeOwned', upgradeId: id, level: Math.max(1, Math.round(value)) };
 			case 'prestigeCount':
 				return { metric: 'prestigeCount', layerId: id, op: '>=', value };
+			case 'unequippedUpgrades':
+				// A def-wide count, not a reference to any one entity.
+				return { metric: 'unequippedUpgrades', op: '>=', value };
 			default:
 				return { metric: next, currencyId: id, op: '>=', value };
 		}
@@ -102,18 +113,20 @@
 			</select>
 		</label>
 
-		<label class="row">
-			<span class="bf-label">Of</span>
-			<select
-				class="bf-select"
-				value={subjectId}
-				onchange={(event) => onchange(build(metric, event.currentTarget.value, threshold))}
-			>
-				{#each subjectsFor(metric) as ref (ref.id)}
-					<option value={ref.id}>{ref.name}</option>
-				{/each}
-			</select>
-		</label>
+		{#if subjectsFor(metric).length}
+			<label class="row">
+				<span class="bf-label">Of</span>
+				<select
+					class="bf-select"
+					value={subjectId}
+					onchange={(event) => onchange(build(metric, event.currentTarget.value, threshold))}
+				>
+					{#each subjectsFor(metric) as ref (ref.id)}
+						<option value={ref.id}>{ref.name}</option>
+					{/each}
+				</select>
+			</label>
+		{/if}
 
 		<label class="row">
 			<span class="bf-label">{metric === 'upgradeOwned' ? 'At level' : 'Reaches'}</span>
