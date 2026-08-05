@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { currencyById, formatAmount, signedRate } from './format.js';
+	import EmojiIcon from './EmojiIcon.svelte';
 	import { game } from './game.svelte.js';
 </script>
 
@@ -7,7 +8,7 @@
 	{#each game.visibleCurrencies as currency (currency.id)}
 		{@const rate = game.rates[currency.id] ?? 0}
 		<div class="currency" style:--tint={currency.color}>
-			<span class="symbol" aria-hidden="true">{currency.symbol || '🪙'}</span>
+			<span class="symbol"><EmojiIcon char={currency.symbol || '🪙'} size={17} /></span>
 			<span class="figures">
 				<span class="amount">{formatAmount(game.amounts[currency.id] ?? 0, currency)}</span>
 				<span class="name">{currency.name}</span>
@@ -21,7 +22,7 @@
 	{#if game.prestigeMultiplier > 1}
 		{@const layer = game.prestigeLayers[0]}
 		<div class="currency multiplier" title="Every prestige layer, multiplied together">
-			<span class="symbol" aria-hidden="true">✨</span>
+			<span class="symbol"><EmojiIcon char="✨" size={17} /></span>
 			<span class="figures">
 				<span class="amount">×{game.prestigeMultiplier.toFixed(2)}</span>
 				<span class="name">{layer ? `from ${currencyById(game.def, layer.currencyId)?.name ?? 'prestige'}` : 'prestige'}</span>

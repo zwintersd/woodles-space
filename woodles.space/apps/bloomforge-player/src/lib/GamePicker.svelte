@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ProjectSummary } from '@woodles/incremental-core';
+	import EmojiIcon from './EmojiIcon.svelte';
 
 	/**
 	 * What a visitor sees when they arrive without a game. Their own projects
@@ -18,7 +19,7 @@
 </script>
 
 <div class="picker">
-	<div class="art" aria-hidden="true">🌸</div>
+	<div class="art"><EmojiIcon char="🌸" size={42} /></div>
 	<h1>Bloomforge Player</h1>
 	<p class="lede">Pick something to play. Games you built in the studio show up here on their own.</p>
 

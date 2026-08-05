@@ -13,10 +13,12 @@
 		type EntityKind
 	} from '@woodles/incremental-core';
 	import { currencyById, formatAmount } from '../format.js';
+	import EmojiIcon from '../EmojiIcon.svelte';
 	import { studio } from '../studio.svelte.js';
 	import ConditionEditor from './ConditionEditor.svelte';
 	import CurveEditor from './CurveEditor.svelte';
 	import CurvePlot from './CurvePlot.svelte';
+	import SymbolPicker from './SymbolPicker.svelte';
 
 	const KIND_LABELS: Record<EntityKind, string> = {
 		currency: 'Currency',
@@ -104,7 +106,7 @@
 <aside class="inspector">
 	{#if !selected}
 		<div class="empty">
-			<span aria-hidden="true">✿</span>
+			<span><EmojiIcon char="🌸" size={26} /></span>
 			<h2>Nothing selected</h2>
 			<p>Pick a node on the canvas, or add one from the Systems list, to edit it here.</p>
 		</div>
@@ -117,7 +119,9 @@
 			</div>
 			<div class="tools">
 				<button class="icon" type="button" onclick={() => studio.duplicate(selected.id)} title="Duplicate">⧉</button>
-				<button class="icon danger" type="button" onclick={() => studio.remove(selected.id)} title="Delete">🗑</button>
+				<button class="icon danger" type="button" onclick={() => studio.remove(selected.id)} title="Delete">
+					<EmojiIcon char="🗑" size={13} label="Delete" />
+				</button>
 			</div>
 		</header>
 
@@ -138,11 +142,10 @@
 			{#if currency}
 				<div class="bf-field">
 					<label for="bf-symbol">Symbol</label>
-					<input
+					<SymbolPicker
 						id="bf-symbol"
-						class="bf-input"
 						value={currency.symbol ?? ''}
-						oninput={(e) => studio.editQuietly(() => (currency.symbol = e.currentTarget.value))}
+						onselect={(char) => studio.editQuietly(() => (currency.symbol = char))}
 					/>
 				</div>
 
@@ -878,8 +881,7 @@
 	}
 
 	.empty span {
-		font-size: 26px;
-		color: var(--bf-prestige);
+		display: inline-flex;
 	}
 
 	.empty h2 {

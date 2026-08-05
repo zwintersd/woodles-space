@@ -76,6 +76,9 @@ importers:
 
   apps/bloomforge:
     dependencies:
+      '@woodles/emoji':
+        specifier: workspace:*
+        version: link:../../packages/emoji
       '@woodles/incremental-core':
         specifier: workspace:*
         version: link:../../packages/incremental-core
@@ -119,6 +122,9 @@ importers:
 
   apps/bloomforge-player:
     dependencies:
+      '@woodles/emoji':
+        specifier: workspace:*
+        version: link:../../packages/emoji
       '@woodles/incremental-core':
         specifier: workspace:*
         version: link:../../packages/incremental-core
@@ -411,6 +417,15 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.17
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@22.19.17)(happy-dom@20.10.6)
+
+  packages/emoji:
+    devDependencies:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

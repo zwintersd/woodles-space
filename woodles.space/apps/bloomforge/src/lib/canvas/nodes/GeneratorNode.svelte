@@ -3,6 +3,7 @@
 	import { formatAmount, currencyById, signedRate } from '../../format.js';
 	import { playtest } from '../../playtest.svelte.js';
 	import { studio } from '../../studio.svelte.js';
+	import EmojiIcon from '../../EmojiIcon.svelte';
 	import NodeShell from '../NodeShell.svelte';
 	import LevelPips from '../LevelPips.svelte';
 
@@ -38,14 +39,14 @@
 			<LevelPips {level} max={generator.maxLevel ?? 10} />
 			{#if nextCost !== null && nextCost !== undefined}
 				<div class="cost">
-					<span aria-hidden="true">{priced?.symbol ?? '🪙'}</span>
+					<EmojiIcon char={priced?.symbol ?? '🪙'} size={11} />
 					{formatAmount(nextCost, priced)}
 				</div>
 			{/if}
 		{:else}
 			<div class="rate muted">makes {produces?.name ?? '—'}</div>
 			<div class="cost">
-				<span aria-hidden="true">{priced?.symbol ?? '🪙'}</span>
+				<EmojiIcon char={priced?.symbol ?? '🪙'} size={11} />
 				{formatAmount(generator.cost.base, priced)} to start
 			</div>
 		{/if}

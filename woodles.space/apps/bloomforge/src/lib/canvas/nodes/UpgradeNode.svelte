@@ -4,6 +4,7 @@
 	import { currencyById, formatAmount } from '../../format.js';
 	import { playtest } from '../../playtest.svelte.js';
 	import { studio } from '../../studio.svelte.js';
+	import EmojiIcon from '../../EmojiIcon.svelte';
 	import NodeShell from '../NodeShell.svelte';
 	import LevelPips from '../LevelPips.svelte';
 
@@ -49,7 +50,7 @@
 			<LevelPips {level} {max} />
 		{/if}
 		<div class="cost" class:done={maxed}>
-			<span aria-hidden="true">{priced?.symbol ?? '🪙'}</span>
+			<EmojiIcon char={priced?.symbol ?? '🪙'} size={11} />
 			{#if maxed}
 				fully grown
 			{:else}

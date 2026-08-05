@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { balance, formatMilestoneTime, HOUR_OPTIONS } from '../balance.svelte.js';
 	import { compact, currencyById } from '../format.js';
+	import EmojiIcon from '../EmojiIcon.svelte';
 	import { studio } from '../studio.svelte.js';
 	import { tour } from '../tour.svelte.js';
 
@@ -126,7 +127,11 @@
 				disabled={balance.running}
 				onclick={() => balance.run(studio.def)}
 			>
-				{balance.running ? 'Simulating…' : '⏩ Fast-forward'}
+				{#if balance.running}
+					Simulating…
+				{:else}
+					<EmojiIcon char="⏩" size={13} /> Fast-forward
+				{/if}
 			</button>
 			{#if balance.elapsedMs > 0 && !balance.running}
 				<span class="timing">{Math.round(balance.elapsedMs)}ms</span>

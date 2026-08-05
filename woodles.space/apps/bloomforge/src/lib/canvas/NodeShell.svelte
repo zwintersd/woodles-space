@@ -2,6 +2,7 @@
 	import { Handle, Position } from '@xyflow/svelte';
 	import type { EntityKind, ValidationIssue } from '@woodles/incremental-core';
 	import type { Snippet } from 'svelte';
+	import EmojiIcon from '../EmojiIcon.svelte';
 
 	/**
 	 * The card every entity node wears: type-tinted border, icon, name, and a
@@ -35,7 +36,7 @@
 	<Handle type="target" position={Position.Top} />
 
 	<header>
-		<span class="icon" aria-hidden="true">{icon}</span>
+		<span class="icon"><EmojiIcon char={icon} size={13} /></span>
 		<span class="name">{name}</span>
 		{#if worst}
 			<span class="badge" data-severity={worst} title={issueTitle}>

@@ -81,11 +81,21 @@ different game on each device leaves you holding both.
 Playtest state is throwaway and never written back into the def: watching a run
 must not edit the game.
 
+## icons
+
+Every glyph in the UI is [OpenMoji](https://openmoji.org) artwork (CC BY-SA
+4.0), drawn from a small bundled SVG set — never a native emoji character,
+which renders differently on every OS and browser. A currency's Symbol field
+is a picker into that same set rather than free text, so what you choose is
+always something this app (and [the player](../bloomforge-player/README.md),
+off the same [`@woodles/emoji`](../../packages/emoji/src/index.ts) registry)
+actually knows how to draw.
+
 ## running it
 
 ```bash
 pnpm --filter bloomforge dev
-pnpm --filter bloomforge test     # 68 tests
+pnpm --filter bloomforge test     # 71 tests
 pnpm --filter bloomforge check
 ```
 

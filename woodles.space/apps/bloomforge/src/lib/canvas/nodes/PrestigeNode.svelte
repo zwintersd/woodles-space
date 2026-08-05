@@ -3,6 +3,7 @@
 	import { currencyById, formatAmount } from '../../format.js';
 	import { playtest } from '../../playtest.svelte.js';
 	import { studio } from '../../studio.svelte.js';
+	import EmojiIcon from '../../EmojiIcon.svelte';
 	import NodeShell from '../NodeShell.svelte';
 
 	let { id, selected }: NodeProps = $props();
@@ -36,7 +37,7 @@
 	>
 		<div class="multiplier">×{multiplier.toFixed(2)}</div>
 		<div class="held">
-			<span aria-hidden="true">{awards?.symbol ?? '💠'}</span>
+			<EmojiIcon char={awards?.symbol ?? '💠'} size={11} />
 			{formatAmount(held, awards)}
 			{#if live && resets > 0}<span class="resets">· {resets} reset{resets === 1 ? '' : 's'}</span>{/if}
 		</div>
