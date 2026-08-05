@@ -173,7 +173,7 @@ export class Simulation {
 				const layer = this.layerById.get(id);
 				if (!layer) return 0;
 				if (!isRevealed(id, this.gated, this.simState)) return 0;
-				if (layer.availableWhen && !evaluateCondition(layer.availableWhen, this.simState)) return 0;
+				if (layer.availableWhen && !evaluateCondition(layer.availableWhen, this.simState, this.def)) return 0;
 				return prestigeGain(layer, this.simState);
 			},
 			isRevealed: (id) => isRevealed(id, this.gated, this.simState)
@@ -366,7 +366,7 @@ export class Simulation {
 		let keep = 0;
 		for (let i = 0; i < pending.length; i += 1) {
 			const unlock = pending[i];
-			if (!evaluateCondition(unlock.when, this.simState)) {
+			if (!evaluateCondition(unlock.when, this.simState, this.def)) {
 				pending[keep] = unlock;
 				keep += 1;
 				continue;
@@ -389,7 +389,7 @@ export class Simulation {
 		let keep = 0;
 		for (let i = 0; i < pending.length; i += 1) {
 			const milestone = pending[i];
-			if (!evaluateCondition(milestone.when, this.simState)) {
+			if (!evaluateCondition(milestone.when, this.simState, this.def)) {
 				pending[keep] = milestone;
 				keep += 1;
 				continue;
@@ -458,6 +458,11 @@ export class Simulation {
 				message: `${generator.name} levelled up (${level} → ${level + 1})`
 			});
 		}
+		// A generator's own level can feed a *different* generator's
+		// populationBoost via a tag, so buying one is no longer something only
+		// a rate table derived purely from upgrades can ignore. Recomputed once
+		// for the whole bulk buy, not once per level bought.
+		if (bought > 0) this.modifiers = resolveModifiers(this.def, this.simState);
 		return bought > 0;
 	}
 
@@ -535,8 +540,8 @@ export class Simulation {
 	canBuyUpgrade(upgrade: Upgrade): boolean {
 		if (!isRevealed(upgrade.id, this.gated, this.simState)) return false;
 		if ((this.simState.upgrades[upgrade.id]?.level ?? 0) >= upgradeMaxLevel(upgrade)) return false;
-		if (upgrade.visibleWhen && !evaluateCondition(upgrade.visibleWhen, this.simState)) return false;
-		if (upgrade.purchasableWhen && !evaluateCondition(upgrade.purchasableWhen, this.simState)) return false;
+		if (upgrade.visibleWhen && !evaluateCondition(upgrade.visibleWhen, this.simState, this.def)) return false;
+		if (upgrade.purchasableWhen && !evaluateCondition(upgrade.purchasableWhen, this.simState, this.def)) return false;
 		return true;
 	}
 
@@ -544,7 +549,7 @@ export class Simulation {
 		const layer = this.layerById.get(layerId);
 		if (!layer) return false;
 		if (!isRevealed(layerId, this.gated, this.simState)) return false;
-		if (layer.availableWhen && !evaluateCondition(layer.availableWhen, this.simState)) return false;
+		if (layer.availableWhen && !evaluateCondition(layer.availableWhen, this.simState, this.def)) return false;
 
 		const gain = prestigeGain(layer, this.simState);
 		if (gain < 1) return false;

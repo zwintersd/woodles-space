@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { conditionReferences, describeCondition, evaluateCondition } from './conditions.js';
 import { initialState, type SimState } from './state.js';
-import { prestigeDef } from './test-defs.js';
+import { choirToyDef, prestigeDef } from './test-defs.js';
 import type { Condition } from './types.js';
 
 function stateWith(changes: (state: SimState) => void): SimState {
@@ -46,6 +46,26 @@ describe('evaluating conditions', () => {
 		expect(evaluateCondition({ metric: 'unequippedUpgrades', op: '>=', value: 2 }, hoarding)).toBe(false);
 		// Unowned or equipped upgrades don't count.
 		expect(evaluateCondition({ metric: 'unequippedUpgrades', op: '>=', value: 1 }, state)).toBe(false);
+	});
+
+	it('sums a tagged level across a generator, an upgrade and a prestige layer, given a def', () => {
+		const def = choirToyDef();
+		const tagged = initialState(def);
+		tagged.generators.penitent.level = 4;
+		tagged.upgrades.vow.level = 2;
+		tagged.prestige.order = { count: 3, currencyAmount: 0 };
+		// Untagged, so it must not contribute even though it's owned.
+		tagged.generators.choir.level = 99;
+
+		expect(evaluateCondition({ metric: 'taggedLevelSum', tag: 'devotional', op: '>=', value: 9 }, tagged, def)).toBe(true);
+		expect(evaluateCondition({ metric: 'taggedLevelSum', tag: 'devotional', op: '>=', value: 10 }, tagged, def)).toBe(false);
+	});
+
+	it('reads a taggedLevelSum as zero rather than throwing when no def is given', () => {
+		const def = choirToyDef();
+		const tagged = initialState(def);
+		tagged.generators.penitent.level = 4;
+		expect(evaluateCondition({ metric: 'taggedLevelSum', tag: 'devotional', op: '>=', value: 1 }, tagged)).toBe(false);
 	});
 
 	it('reads a missing entity as zero rather than throwing', () => {
@@ -98,6 +118,10 @@ describe('reading references out of a condition', () => {
 		};
 		expect(conditionReferences(condition).sort()).toEqual(['a', 'p', 'reset', 'u']);
 	});
+
+	it('finds no entity reference in a taggedLevelSum — it names a tag, not an id', () => {
+		expect(conditionReferences({ metric: 'taggedLevelSum', tag: 'devotional', op: '>=', value: 1 })).toEqual([]);
+	});
 });
 
 describe('describing conditions', () => {
@@ -112,6 +136,9 @@ describe('describing conditions', () => {
 		expect(describeCondition({ metric: 'upgradeOwned', upgradeId: 'u', level: 10 }, nameOf)).toBe('U level >= 10');
 		expect(describeCondition({ metric: 'unequippedUpgrades', op: '>=', value: 5 }, nameOf)).toBe(
 			'unequipped upgrades >= 5'
+		);
+		expect(describeCondition({ metric: 'taggedLevelSum', tag: 'devotional', op: '>=', value: 10 }, nameOf)).toBe(
+			'"devotional" level sum >= 10'
 		);
 	});
 

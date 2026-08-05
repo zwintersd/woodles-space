@@ -3,6 +3,7 @@ import type { GameDef } from '../types.js';
 import cozyGardenJson from './cozy-garden.json' with { type: 'json' };
 import apiaryOfBadDecisionsJson from './apiary-of-bad-decisions.json' with { type: 'json' };
 import confessionBoothJson from './confession-booth.json' with { type: 'json' };
+import choirOfUnspokenNamesJson from './choir-of-unspoken-names.json' with { type: 'json' };
 
 /**
  * The garden from the mockup, as a real project file rather than a TypeScript
@@ -29,4 +30,14 @@ export const apiaryOfBadDecisions: GameDef = parseGameDef(apiaryOfBadDecisionsJs
  */
 export const confessionBooth: GameDef = parseGameDef(confessionBoothJson).def;
 
-export { cozyGardenJson, apiaryOfBadDecisionsJson, confessionBoothJson };
+/**
+ * A third stress test, aimed at the thing `populationBoost` deliberately
+ * dodged the first time: `unequippedUpgrades` is one hardcoded metric in a
+ * closed union. `taggedLevelSum` reads a designer-defined tag instead — the
+ * Choir sums a generator's level, an upgrade's level and a prestige layer's
+ * reset count, none of them the Choir itself, because "devotional" is the
+ * def's own grouping, not the engine's.
+ */
+export const choirOfUnspokenNames: GameDef = parseGameDef(choirOfUnspokenNamesJson).def;
+
+export { cozyGardenJson, apiaryOfBadDecisionsJson, confessionBoothJson, choirOfUnspokenNamesJson };

@@ -35,13 +35,12 @@ place: `upgradeOwned` takes an optional `level`, so "requires Golden Touch level
 **An owned upgrade isn't always an active one.** `SimState.upgrades[id].equipped`
 (default `true`) gates whether its effects apply — the `equipUpgrade` /
 `unequipUpgrade` actions flip it for free, any time, no cost beyond the one
-already paid. That one bit is what lets `Generator.populationBoost` exist: a
-rate multiplier driven by a live count (`countUnequippedUpgrades`, today's only
-metric) instead of a level, and a matching `Condition` metric so an unlock or
-milestone can react to it too. See
-[`apiaryOfBadDecisions`](./src/fixtures/apiary-of-bad-decisions.json) — a
-generator whose output rewards owning upgrades you deliberately never turned
-on.
+already paid. That one bit is what let `Generator.populationBoost` exist in
+the first place: a rate multiplier driven by a live count instead of a level,
+and a matching `Condition` metric so an unlock or milestone can react to it
+too. See [`apiaryOfBadDecisions`](./src/fixtures/apiary-of-bad-decisions.json)
+— a generator whose output rewards owning upgrades you deliberately never
+turned on.
 
 **Production doesn't have to be one-directional.** `Generator.converts`
 throttles a generator's output to whatever `fromCurrencyId` can actually
@@ -54,6 +53,21 @@ never built to feed it. See
 [`confessionBooth`](./src/fixtures/confession-booth.json) — a generator that
 consumes instead of produces, fed entirely by a tax on every other purchase
 in the game.
+
+**`populationBoost`'s first metric was one hardcoded count in a closed union
+— honest about what it was, but not a real answer to "sum something across an
+arbitrary, designer-defined set."** `taggedLevelSum` is: `Generator.tags`,
+`Upgrade.tags` and `PrestigeLayer.tags` are free-text labels with no meaning
+to the engine except as something this metric (and the matching `Condition`
+metric) can sum by *level* — a generator's level, an upgrade's level, a
+layer's reset count — across every entity carrying a tag, regardless of kind.
+It's also the one metric that needs `def`, not just `state`, to answer at all
+— which tag which entities carry is authoring data, so `evaluateCondition`
+grew an optional third parameter for it, defaulting every existing call site
+to unchanged behavior. See
+[`choirOfUnspokenNames`](./src/fixtures/choir-of-unspoken-names.json) — a
+generator whose rate sums a tag across a generator, an upgrade and a prestige
+layer at once, carefully never itself.
 
 ## numbers
 
@@ -186,9 +200,20 @@ the whole loop, guilt, absolution, and an eventual prestige, purely by playing
 normally. `idlePolicy` never spends a coin, so it mints zero guilt and never
 sees the Booth at all — the cleanest possible contrast between the two bounds.
 
-Both stress-test fixtures load through `parseGameDef` for the same reason a
-user's import does — if either ever stops being valid, every test leaning on
-it fails at load rather than quietly producing different numbers.
+`choirOfUnspokenNames`
+([`src/fixtures/choir-of-unspoken-names.json`](./src/fixtures/choir-of-unspoken-names.json))
+is a third: the Choir's rate sums `"devotional"` across Penitent (a
+generator), Whispered Vow (an upgrade) and The Unspoken Order (a prestige
+layer's reset count) — none of them the Choir, which carries no tag and never
+counts its own level. Writing its test caught a real bug: `buyGenerator`
+never invalidated the modifier table, because until this fixture existed
+nothing a generator purchase changed could ever have fed back into another
+generator's rate. It does now, and `resolveModifiers` runs again after every
+level bought, not just after every upgrade.
+
+All three stress-test fixtures load through `parseGameDef` for the same
+reason a user's import does — if any ever stops being valid, every test
+leaning on it fails at load rather than quietly producing different numbers.
 
 ## tests
 
@@ -196,14 +221,15 @@ it fails at load rather than quietly producing different numbers.
 pnpm --filter @woodles/incremental-core test
 ```
 
-176 tests. The ones that matter most: determinism (two runs, same seed, deep
+191 tests. The ones that matter most: determinism (two runs, same seed, deep
 equal), a golden master worked out by hand in a comment above the test, curve
 behaviour per kind, the prestige round trip (resets wipe exactly `resets[]`,
 lifetime counters outside it survive, the multiplier applies), the Apiary's
 hand-computed rate swings as upgrades get equipped and unequipped, the
 Confession Booth's hand-computed guilt tax and the moment its converter runs
-dry, and greedy out-earning idle on every fixture, plus the save round trip —
-a resumed run has to produce byte-identical events to one that never stopped.
+dry, the Choir's hand-computed sum across three entity kinds at once, and
+greedy out-earning idle on every fixture, plus the save round trip — a
+resumed run has to produce byte-identical events to one that never stopped.
 
 That last one is measured on **lifetime**, not on the balance. Greedy spends,
 and a prestige zeroes what it holds, so the balance is not the invariant —

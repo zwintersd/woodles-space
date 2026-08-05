@@ -57,6 +57,9 @@
 				{formatAmount(live && nextCost != null ? nextCost : upgrade.cost.amount, priced)}
 			{/if}
 		</div>
+		{#if upgrade.tags?.length}
+			<span class="tags">{upgrade.tags.map((entry) => `#${entry}`).join(' ')}</span>
+		{/if}
 	</NodeShell>
 {/if}
 
@@ -95,5 +98,13 @@
 	.cost.done {
 		background: var(--bf-generator-soft);
 		color: var(--bf-generator);
+	}
+
+	.tags {
+		display: block;
+		margin-top: 5px;
+		font-size: 10px;
+		font-weight: 600;
+		color: var(--bf-accent);
 	}
 </style>

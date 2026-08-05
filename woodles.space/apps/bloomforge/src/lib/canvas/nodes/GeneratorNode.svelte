@@ -58,10 +58,17 @@
 			</div>
 		{/if}
 		{#if generator.populationBoost}
-			<span class="tag">boosted by unequipped upgrades</span>
+			<span class="tag">
+				{generator.populationBoost.metric === 'taggedLevelSum'
+					? `boosted by "${generator.populationBoost.tag}"`
+					: 'boosted by unequipped upgrades'}
+			</span>
 		{/if}
 		{#if generator.converts}
 			<span class="tag tag-converts">consumes {consumes?.name ?? '—'}</span>
+		{/if}
+		{#if generator.tags?.length}
+			<span class="tags">{generator.tags.map((entry) => `#${entry}`).join(' ')}</span>
 		{/if}
 	</NodeShell>
 {/if}
@@ -108,5 +115,13 @@
 	.tag-converts {
 		background: var(--bf-currency-soft);
 		color: var(--bf-currency);
+	}
+
+	.tags {
+		display: block;
+		margin-top: 5px;
+		font-size: 10px;
+		font-weight: 600;
+		color: var(--bf-accent);
 	}
 </style>

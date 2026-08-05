@@ -146,13 +146,29 @@ export function validateGameDef(def: GameDef): ValidationIssue[] {
 		}
 		checkCurve(generator.rateCurve, `${path}.rateCurve`, generator.id, issues);
 		checkCurve(generator.cost.curve, `${path}.cost.curve`, generator.id, issues);
-		if (generator.populationBoost && (!Number.isFinite(generator.populationBoost.perUnit) || generator.populationBoost.perUnit < 0)) {
-			error(
-				'invalid-number',
-				'the per-unit population boost cannot be negative',
-				`${path}.populationBoost.perUnit`,
-				generator.id
-			);
+		checkTags(generator.tags, `${path}.tags`, generator.id, issues);
+		if (generator.populationBoost) {
+			if (!Number.isFinite(generator.populationBoost.perUnit) || generator.populationBoost.perUnit < 0) {
+				error(
+					'invalid-number',
+					'the per-unit population boost cannot be negative',
+					`${path}.populationBoost.perUnit`,
+					generator.id
+				);
+			}
+			if (generator.populationBoost.metric === 'taggedLevelSum') {
+				const tag = generator.populationBoost.tag;
+				if (!tag?.trim()) {
+					error('missing-meta', 'a tagged population boost needs a tag to sum', `${path}.populationBoost.tag`, generator.id);
+				} else if (!hasTag(def, tag)) {
+					warn(
+						'unreachable',
+						`nothing in this game is tagged "${tag}", so this boost always reads zero`,
+						`${path}.populationBoost.tag`,
+						generator.id
+					);
+				}
+			}
 		}
 		if (generator.converts) {
 			if (!currencyIds.has(generator.converts.fromCurrencyId)) {
@@ -212,6 +228,7 @@ export function validateGameDef(def: GameDef): ValidationIssue[] {
 
 		checkCondition(upgrade.visibleWhen, `${path}.visibleWhen`, upgrade.id, index, issues);
 		checkCondition(upgrade.purchasableWhen, `${path}.purchasableWhen`, upgrade.id, index, issues);
+		checkTags(upgrade.tags, `${path}.tags`, upgrade.id, issues);
 	}
 
 	// ── prestige ──────────────────────────────────────────────────────────
@@ -257,6 +274,7 @@ export function validateGameDef(def: GameDef): ValidationIssue[] {
 			}
 		}
 		checkCondition(layer.availableWhen, `${path}.availableWhen`, layer.id, index, issues);
+		checkTags(layer.tags, `${path}.tags`, layer.id, issues);
 	}
 
 	// ── unlocks & milestones ──────────────────────────────────────────────
@@ -362,6 +380,24 @@ function checkCondition(
 			entityId
 		});
 	}
+}
+
+function checkTags(tags: string[] | undefined, path: string, entityId: string, issues: ValidationIssue[]): void {
+	if (!tags) return;
+	for (const [i, tag] of tags.entries()) {
+		if (!tag?.trim()) {
+			issues.push({ severity: 'error', code: 'missing-meta', message: 'a tag cannot be blank', path: `${path}[${i}]`, entityId });
+		}
+	}
+}
+
+/** Whether anything in the def — a generator, an upgrade, a prestige layer — carries `tag`. */
+function hasTag(def: GameDef, tag: string): boolean {
+	return (
+		def.generators.some((generator) => generator.tags?.includes(tag)) ||
+		def.upgrades.some((upgrade) => upgrade.tags?.includes(tag)) ||
+		def.prestigeLayers.some((layer) => layer.tags?.includes(tag))
+	);
 }
 
 /**

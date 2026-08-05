@@ -32,7 +32,12 @@ export const GLOSSARY = {
 	requires: "A gate on top of cost — the upgrade can't be bought until this is also true.",
 	populationBoost:
 		'An extra multiplier driven by a live count instead of a level — e.g. "×1 + 0.1 per owned-but-unequipped upgrade." Composes with the curve above it.',
+	populationMetric: "What's being counted — a fixed thing the engine tracks, or a tag you define yourself.",
 	populationPerUnit: 'The bonus each counted unit adds — 0.35 means +35% per unit, compounding additively with itself.',
+	tags: "Free-text labels you define — carried by generators, upgrades or prestige layers. Mean nothing to the engine except as something a tagged population boost or condition can sum across, by level: a generator's level, an upgrade's level, a layer's reset count.",
+	populationTag:
+		"Which tag to sum. Reads every generator, upgrade and prestige layer carrying it — don't tag the generator this boost is on, or it would count its own level.",
+	conditionTag: 'Which tag to sum. Same aggregation a tagged population boost reads, usable as a gate instead of a multiplier.',
 	spendTax:
 		"Whenever this currency is spent — anywhere, on anything — a share of what was spent quietly mints into another currency as a byproduct. No purchase has to opt in.",
 	spendTaxRate: 'The share of every spend that mints — 0.25 means spending 100 mints 25, the instant the spend happens.',

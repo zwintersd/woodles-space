@@ -130,6 +130,26 @@ export function countUnequippedUpgrades(state: SimState): number {
 	return count;
 }
 
+/**
+ * The summed level of every generator, upgrade and prestige layer carrying
+ * `tag` — a generator's level, an upgrade's level, a layer's reset count.
+ * Unlike every other metric here, which entities are tagged is *def*
+ * information, not state, so this is the one aggregate that needs both.
+ */
+export function sumTaggedLevels(def: GameDef, state: SimState, tag: string): number {
+	let sum = 0;
+	for (const generator of def.generators) {
+		if (generator.tags?.includes(tag)) sum += state.generators[generator.id]?.level ?? 0;
+	}
+	for (const upgrade of def.upgrades) {
+		if (upgrade.tags?.includes(tag)) sum += state.upgrades[upgrade.id]?.level ?? 0;
+	}
+	for (const layer of def.prestigeLayers) {
+		if (layer.tags?.includes(tag)) sum += state.prestige[layer.id]?.count ?? 0;
+	}
+	return sum;
+}
+
 /** Deep copy that survives the `unlocked` Set, for snapshots and comparisons. */
 export function cloneState(state: SimState): SimState {
 	return {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createSim, prestigeGain, sampleIntervalFor, simulate, TICKS_PER_SECOND } from './engine.js';
 import { greedy, greedyPolicy, idlePolicy, scriptedPolicy } from './policies.js';
 import type { SimEvent } from './state.js';
-import { apiaryToyDef, confessionToyDef, critDef, prestigeDef, toyDef } from './test-defs.js';
+import { apiaryToyDef, choirToyDef, confessionToyDef, critDef, prestigeDef, toyDef } from './test-defs.js';
 import { cozyGarden } from './fixtures/index.js';
 
 const run = (def = toyDef(), policy = idlePolicy, duration = 60) =>
@@ -395,6 +395,51 @@ describe('the Confession Booth — spend taxes and converters', () => {
 		sim.step(10);
 		sim.apply({ type: 'buyUpgrade', id: 'trinket' }, []);
 		expect(sim.state().currencies.guilt.amount).toBe(0);
+	});
+});
+
+describe('the Choir of Unspoken Names — tagged aggregation across entity kinds', () => {
+	it('sums a level across a generator, an upgrade and a prestige layer, none of them the boosted generator itself', () => {
+		const sim = createSim(choirToyDef(), idlePolicy, 1);
+		// Sum = penitent(1). choir: 2 × (1 + 0.1×1) = 2.2.
+		expect(sim.generatorRates().choir).toBeCloseTo(2.2, 6);
+
+		sim.step(20); // 7.2/sec (5 penitent + 2.2 choir) for 20s = 144 faith
+		expect(sim.apply({ type: 'buyGenerator', id: 'penitent' }, [])).toBe(true); // level 2, costs 15
+		// Sum = penitent(2). choir: 2 × 1.2 = 2.4.
+		expect(sim.generatorRates().choir).toBeCloseTo(2.4, 6);
+
+		sim.step(10);
+		expect(sim.apply({ type: 'buyGenerator', id: 'penitent' }, [])).toBe(true); // level 3, costs 22.5
+		// Sum = penitent(3). choir: 2 × 1.3 = 2.6.
+		expect(sim.generatorRates().choir).toBeCloseTo(2.6, 6);
+
+		expect(sim.apply({ type: 'buyUpgrade', id: 'vow' }, [])).toBe(true); // level 1, costs 5
+		// Sum = penitent(3) + vow(1) = 4. choir: 2 × 1.4 = 2.8.
+		expect(sim.generatorRates().choir).toBeCloseTo(2.8, 6);
+
+		expect(sim.apply({ type: 'prestige', layerId: 'order' }, [])).toBe(true);
+		// Reset wipes penitent back to startsOwned(1) and vow to 0, but order's
+		// count — the one prestige-layer contribution — only ever goes up.
+		// Sum = penitent(1) + vow(0) + order(1) = 2. choir: 2 × 1.2 = 2.4.
+		expect(sim.generatorRates().choir).toBeCloseTo(2.4, 6);
+	});
+
+	it('never lets the boosted generator count toward its own boost', () => {
+		// Choir carries no tag. Buying it up shouldn't move its own rate through
+		// the population term — only through its own curve.
+		const sim = createSim(choirToyDef(), idlePolicy, 1);
+		const before = sim.generatorRates().choir;
+		sim.step(2000);
+		sim.apply({ type: 'buyGenerator', id: 'choir', count: 3 }, []);
+		// Choir's curve is polynomial exponent 1, so a level jump changes its
+		// rate — but the change has to be explained by baseRate × level alone,
+		// not by anything reading choir's own level as part of the tag sum.
+		const level = sim.state().generators.choir.level;
+		const untaggedCeiling = 2 * level; // baseRate × level, no population term
+		const sum = 1; // penitent's untouched starting level; nothing else bought
+		expect(sim.generatorRates().choir).toBeCloseTo(untaggedCeiling * (1 + 0.1 * sum), 6);
+		expect(sim.generatorRates().choir).not.toBeCloseTo(before, 6);
 	});
 });
 

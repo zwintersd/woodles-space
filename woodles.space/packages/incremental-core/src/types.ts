@@ -103,13 +103,33 @@ export interface Generator {
 	 * ever less.
 	 */
 	converts?: Conversion;
+	/**
+	 * Free-text labels an author hangs on this generator — no meaning to the
+	 * engine except as something `PopulationBoost`'s `taggedLevelSum` metric
+	 * (and the matching `Condition` metric) can sum across. See `Upgrade.tags`
+	 * and `PrestigeLayer.tags`.
+	 */
+	tags?: string[];
 }
 
-export type PopulationBoost = {
-	/** Owned upgrades currently sitting unequipped — see `Upgrade` effects. */
-	metric: 'unequippedUpgrades';
-	perUnit: number;
-};
+export type PopulationBoost =
+	| {
+			/** Owned upgrades currently sitting unequipped — see `Upgrade` effects. */
+			metric: 'unequippedUpgrades';
+			perUnit: number;
+	  }
+	| {
+			/**
+			 * The summed *level* of every generator, upgrade and prestige layer
+			 * carrying `tag` — a generator's level, an upgrade's level, a
+			 * prestige layer's reset count. Deliberately not restricted to one
+			 * entity kind: a tag is the designer's own grouping, not the
+			 * engine's, so the aggregation has to cross kinds to mean anything.
+			 */
+			metric: 'taggedLevelSum';
+			tag: string;
+			perUnit: number;
+	  };
 
 export interface Conversion {
 	fromCurrencyId: string;
@@ -161,6 +181,8 @@ export interface Upgrade {
 	visibleWhen?: Condition;
 	/** Visible but not buyable until true, e.g. "requires Golden Touch level 10". */
 	purchasableWhen?: Condition;
+	/** See `Generator.tags`. */
+	tags?: string[];
 }
 
 export interface PrestigeLayer {
@@ -177,6 +199,13 @@ export interface PrestigeLayer {
 	/** Entity ids wiped on prestige: currencies, generators, upgrades. */
 	resets: string[];
 	availableWhen?: Condition;
+	/**
+	 * See `Generator.tags`. A layer's contribution to `taggedLevelSum` is its
+	 * reset *count* — resets never zero it the way a currency or generator
+	 * reset does, so a tagged layer only ever adds to the sum, prestige over
+	 * prestige.
+	 */
+	tags?: string[];
 }
 
 export interface PrestigeGain {
@@ -226,6 +255,8 @@ export type Condition =
 	| { metric: 'prestigeCount'; layerId: string; op: '>='; value: number }
 	/** Owned upgrades currently sitting unequipped, across the whole def. */
 	| { metric: 'unequippedUpgrades'; op: CompareOp; value: number }
+	/** The summed level of every generator, upgrade and prestige layer tagged `tag`. */
+	| { metric: 'taggedLevelSum'; tag: string; op: CompareOp; value: number }
 	| { all: Condition[] }
 	| { any: Condition[] };
 

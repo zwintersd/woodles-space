@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cozyGarden } from './fixtures/index.js';
-import { apiaryToyDef, confessionToyDef, prestigeDef, toyDef } from './test-defs.js';
+import { apiaryToyDef, choirToyDef, confessionToyDef, prestigeDef, toyDef } from './test-defs.js';
 import { hasErrors, issuesFor, validateGameDef } from './validate.js';
 import type { GameDef } from './types.js';
 
@@ -11,7 +11,7 @@ const codes = (def: GameDef, severity: 'error' | 'warning' = 'error') =>
 
 describe('valid definitions', () => {
 	it('passes the shipped fixtures without errors', () => {
-		for (const def of [cozyGarden, toyDef(), prestigeDef(), apiaryToyDef(), confessionToyDef()]) {
+		for (const def of [cozyGarden, toyDef(), prestigeDef(), apiaryToyDef(), confessionToyDef(), choirToyDef()]) {
 			expect(codes(def), def.meta.id).toEqual([]);
 			expect(hasErrors(validateGameDef(def))).toBe(false);
 		}
@@ -74,6 +74,46 @@ describe('spend taxes and converters', () => {
 
 	it('leaves a def with neither feature alone', () => {
 		expect(codes(toyDef())).toEqual([]);
+	});
+});
+
+describe('tags and tagged aggregation', () => {
+	it('rejects a blank tag on any of the three taggable kinds', () => {
+		const def = choirToyDef();
+		def.generators[0].tags = [''];
+		expect(codes(def)).toContain('missing-meta');
+
+		const onUpgrade = choirToyDef();
+		onUpgrade.upgrades[0].tags = ['   '];
+		expect(codes(onUpgrade)).toContain('missing-meta');
+
+		const onLayer = choirToyDef();
+		onLayer.prestigeLayers[0].tags = [''];
+		expect(codes(onLayer)).toContain('missing-meta');
+	});
+
+	it('requires a tag on a taggedLevelSum boost', () => {
+		const def = choirToyDef();
+		def.generators[1].populationBoost = { metric: 'taggedLevelSum', tag: '', perUnit: 0.1 };
+		expect(codes(def)).toContain('missing-meta');
+	});
+
+	it('warns when a taggedLevelSum reads a tag nothing carries', () => {
+		const def = choirToyDef();
+		def.generators[1].populationBoost = { metric: 'taggedLevelSum', tag: 'ghost-tag', perUnit: 0.1 };
+		expect(codes(def, 'warning')).toContain('unreachable');
+		expect(codes(def)).toEqual([]);
+	});
+
+	it('does not warn when the tag is carried by an upgrade or a prestige layer alone', () => {
+		// devotional is carried by penitent (generator), vow (upgrade) and order
+		// (prestige layer) in the fixture — none of them needs to be a generator
+		// for the tag to count as "used".
+		const def = choirToyDef();
+		delete def.generators[0].tags; // penitent no longer tagged; vow and order still are
+		def.generators[1].populationBoost = { metric: 'taggedLevelSum', tag: 'devotional', perUnit: 0.1 };
+		expect(codes(def)).toEqual([]);
+		expect(codes(def, 'warning')).not.toContain('unreachable');
 	});
 });
 

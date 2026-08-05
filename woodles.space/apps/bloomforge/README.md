@@ -68,6 +68,36 @@ Studio's own playtest — Idle or Greedy, never a human — never exercises it;
 what the Inspector edits here is just the multiplier those two bots can't
 reach.
 
+The boost has a second metric now: instead of the engine's own count of
+unequipped upgrades, **Counts → Summed level of a tag** reads any free-text
+tag the Inspector lets you hang on a generator, an upgrade or a prestige
+layer — the same `Tags` field, in the same place, on all three kinds. The
+metric sums *level* across everything carrying that tag: a generator's level,
+an upgrade's level, a prestige layer's reset count. Nothing stops a boosted
+generator from carrying its own boost's tag except good sense — the Inspector
+doesn't forbid it, but every stress-test sample deliberately leaves the
+boosted generator untagged, so its own purchases can never feed its own
+multiplier.
+
+A currency can carry a **spend tax** — spend it anywhere, on anything, and a
+share mints into another currency as a byproduct — and a generator can
+**convert** one currency into another instead of producing from a bare curve,
+throttled every tick to whatever its input can actually supply. Together
+they're the second stress-test sample,
+[`confessionBooth`](../../packages/incremental-core/src/fixtures/confession-booth.json):
+a Booth that produces nothing from its own curve, fed entirely by a tax
+skimmed off every other purchase in the game. Unlike the Hive, this one needs
+no player choice at all — Greedy funds it just by playing normally, which is
+the whole point: some stress tests need a human to find the strategy, and
+some the economy finds on its own.
+
+The third,
+[`choirOfUnspokenNames`](../../packages/incremental-core/src/fixtures/choir-of-unspoken-names.json),
+is what the tag field and the "summed level of a tag" metric were built for:
+a Choir whose rate sums one tag across a generator, an upgrade and a prestige
+layer at once — three different kinds, one designer-defined grouping the
+engine has no fixed idea about.
+
 A currency can carry a **spend tax** — spend it anywhere, on anything, and a
 share mints into another currency as a byproduct — and a generator can
 **convert** one currency into another instead of producing from a bare curve,

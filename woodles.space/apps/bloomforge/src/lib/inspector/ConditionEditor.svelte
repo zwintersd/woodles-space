@@ -25,7 +25,8 @@
 		| 'generatorLevel'
 		| 'upgradeOwned'
 		| 'prestigeCount'
-		| 'unequippedUpgrades';
+		| 'unequippedUpgrades'
+		| 'taggedLevelSum';
 
 	const METRIC_LABELS: Record<SimpleMetric, string> = {
 		currencyAmount: 'Currency held',
@@ -33,7 +34,8 @@
 		generatorLevel: 'Generator level',
 		upgradeOwned: 'Upgrade level',
 		prestigeCount: 'Prestige count',
-		unequippedUpgrades: 'Upgrades left unequipped'
+		unequippedUpgrades: 'Upgrades left unequipped',
+		taggedLevelSum: 'Summed level of a tag'
 	};
 
 	const isGroup = $derived('all' in condition || 'any' in condition);
@@ -49,11 +51,25 @@
 		};
 	});
 
+	/** Every tag already in use anywhere, for the tag input's autocomplete. */
+	const knownTags = $derived.by(() => {
+		const set = new Set<string>();
+		for (const entry of def.generators) for (const tag of entry.tags ?? []) set.add(tag);
+		for (const entry of def.upgrades) for (const tag of entry.tags ?? []) set.add(tag);
+		for (const entry of def.prestigeLayers) for (const tag of entry.tags ?? []) set.add(tag);
+		return [...set].sort();
+	});
+
 	/** The subject id whichever metric is selected refers to. */
 	const subjectId = $derived.by(() => {
 		if (isGroup) return '';
 		const c = condition as Partial<Record<'currencyId' | 'generatorId' | 'upgradeId' | 'layerId', string>>;
 		return c.currencyId ?? c.generatorId ?? c.upgradeId ?? c.layerId ?? '';
+	});
+
+	const tagValue = $derived.by(() => {
+		if (isGroup || metric !== 'taggedLevelSum') return '';
+		return (condition as { tag: string }).tag;
 	});
 
 	const threshold = $derived.by(() => {
@@ -66,7 +82,7 @@
 		if (next === 'generatorLevel') return options.generator;
 		if (next === 'upgradeOwned') return options.upgrade;
 		if (next === 'prestigeCount') return options.prestige;
-		if (next === 'unequippedUpgrades') return [];
+		if (next === 'unequippedUpgrades' || next === 'taggedLevelSum') return [];
 		return options.currency;
 	}
 
@@ -81,6 +97,8 @@
 			case 'unequippedUpgrades':
 				// A def-wide count, not a reference to any one entity.
 				return { metric: 'unequippedUpgrades', op: '>=', value };
+			case 'taggedLevelSum':
+				return { metric: 'taggedLevelSum', tag: knownTags[0] ?? '', op: '>=', value };
 			default:
 				return { metric: next, currencyId: id, op: '>=', value };
 		}
@@ -91,7 +109,18 @@
 		const keep = candidates.some((ref) => ref.id === subjectId) ? subjectId : (candidates[0]?.id ?? '');
 		onchange(build(next, keep, threshold));
 	}
+
+	function setTag(tag: string): void {
+		if (metric !== 'taggedLevelSum') return;
+		onchange({ metric: 'taggedLevelSum', tag: tag.trim(), op: '>=', value: threshold });
+	}
 </script>
+
+<datalist id="bf-known-tags-condition">
+	{#each knownTags as tag (tag)}
+		<option value={tag}></option>
+	{/each}
+</datalist>
 
 {#if isGroup}
 	<p class="grouped">
@@ -113,7 +142,19 @@
 			</select>
 		</label>
 
-		{#if subjectsFor(metric).length}
+		{#if metric === 'taggedLevelSum'}
+			<label class="row">
+				<span class="bf-label">Tag</span>
+				<input
+					class="bf-input"
+					type="text"
+					list="bf-known-tags-condition"
+					placeholder="devotional"
+					value={tagValue}
+					onchange={(event) => setTag(event.currentTarget.value)}
+				/>
+			</label>
+		{:else if subjectsFor(metric).length}
 			<label class="row">
 				<span class="bf-label">Of</span>
 				<select
