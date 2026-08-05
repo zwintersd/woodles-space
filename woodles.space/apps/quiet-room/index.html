@@ -1005,16 +1005,19 @@
     };
     let lastCy = window.innerHeight * 0.5;   // remembered so tone tweaks apply live
 
-    /* a glide-able ladder — A-minor pentatonic across two octaves, in tune with
-       the drone. position maps continuously onto it; the voice slides between
-       rungs as you drag, so a held drag reads as a smooth pitch bend. */
+    /* a fretted ladder — A-minor pentatonic across two octaves, in tune with
+       the drone. position snaps to the nearest rung, so every note you land
+       on is in key — a pentatonic scale has no wrong notes, so quantizing it
+       makes the room foolproof to play. the portamento in bendVoice still
+       slides audibly from rung to rung as you drag (faster than it can
+       settle, so a fast sweep still glissandos the way a real Stylophone's
+       metal contacts do), so the held-note slide isn't lost — only the
+       in-between mistuning is. */
     const LADDER = [220.0, 261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25, 783.99, 880.0];
     function freqFromX(cx) {
       const nx = Math.max(0, Math.min(1, cx / window.innerWidth));
-      const fi = nx * (LADDER.length - 1);
-      const i = Math.floor(fi), f = fi - i;
-      const a = LADDER[i], b = LADDER[Math.min(LADDER.length - 1, i + 1)];
-      return a * Math.pow(b / a, f);            // log-interpolate → a smooth bend
+      const i = Math.round(nx * (LADDER.length - 1));
+      return LADDER[i];
     }
     function cutoffFromY(cy) {
       const ny = Math.max(0, Math.min(1, cy / window.innerHeight));
