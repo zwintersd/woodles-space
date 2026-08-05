@@ -121,6 +121,19 @@ export class Studio {
 		this.#persist();
 	}
 
+	/**
+	 * Retitles the open project. Routed through here rather than written
+	 * straight to storage, so the projects view can rename whichever project is
+	 * currently open without the next autosave clobbering it back — that write
+	 * would otherwise carry the in-memory title, which wouldn't know it had
+	 * just gone stale.
+	 */
+	renameProject(title: string): void {
+		this.editQuietly((def) => {
+			def.meta.title = title;
+		});
+	}
+
 	// ── editing ──────────────────────────────────────────────────────────
 
 	/**

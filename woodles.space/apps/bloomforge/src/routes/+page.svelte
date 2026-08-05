@@ -4,6 +4,7 @@
 	import Canvas from '$lib/canvas/Canvas.svelte';
 	import Dock from '$lib/dock/Dock.svelte';
 	import Inspector from '$lib/inspector/Inspector.svelte';
+	import ProjectsView from '$lib/ProjectsView.svelte';
 	import Sidebar from '$lib/sidebar/Sidebar.svelte';
 	import Toolbar from '$lib/Toolbar.svelte';
 	import TourCard from '$lib/TourCard.svelte';
@@ -17,6 +18,7 @@
 
 	let projects = $state(listProjects());
 	let dockCollapsed = $state(false);
+	let projectsViewOpen = $state(false);
 	let toast = $state<string | null>(null);
 	let toastTimer: ReturnType<typeof setTimeout> | null = null;
 	let fileInput: HTMLInputElement;
@@ -69,6 +71,24 @@
 		toast = message;
 		if (toastTimer) clearTimeout(toastTimer);
 		toastTimer = setTimeout(() => (toast = null), 2600);
+	}
+
+	function openProject(id: string): void {
+		const def = loadProject(id);
+		if (!def) {
+			say('That project could not be opened.');
+			return;
+		}
+		studio.open(id, def);
+		playtest.reset(def);
+		say(`Opened ${def.meta.title}`);
+	}
+
+	function createProject(): void {
+		studio.createProject();
+		playtest.reset(studio.def);
+		projects = listProjects();
+		say('New project');
 	}
 
 	function add(kind: EntityKind): void {
@@ -163,22 +183,7 @@
 <div class="studio">
 	<Toolbar
 		{projects}
-		onopen={(id) => {
-			const def = loadProject(id);
-			if (!def) {
-				say('That project could not be opened.');
-				return;
-			}
-			studio.open(id, def);
-			playtest.reset(def);
-			say(`Opened ${def.meta.title}`);
-		}}
-		oncreate={() => {
-			studio.createProject();
-			playtest.reset(studio.def);
-			projects = listProjects();
-			say('New project');
-		}}
+		onmanage={() => (projectsViewOpen = true)}
 		onexport={exportProject}
 		onimport={() => fileInput.click()}
 		onaddnote={() => {
@@ -211,6 +216,17 @@
 
 	{#if tour.showWelcome}
 		<Welcome onstart={startTour} onexplore={() => tour.dismissWelcome()} />
+	{/if}
+
+	{#if projectsViewOpen}
+		<ProjectsView
+			{projects}
+			onopen={openProject}
+			oncreate={createProject}
+			onclose={() => (projectsViewOpen = false)}
+			onchange={() => (projects = listProjects())}
+			onmessage={say}
+		/>
 	{/if}
 
 	{#if toast}

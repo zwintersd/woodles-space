@@ -103,6 +103,36 @@ body {
 	-webkit-font-smoothing: antialiased;
 }
 
+/*
+ * Every scrollable panel — the systems list, the dock tabs, the inspector —
+ * shares one thin, rounded scrollbar drawn from the same rule tokens as
+ * borders. Left to the browser default, a fat native bar reads as its own
+ * slab of chrome inside panels this narrow; themed and this slim, it recedes
+ * to "there when you need it" instead of competing with the content.
+ */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: var(--bf-rule-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+	background: var(--bf-rule-strong);
+	border-radius: var(--bf-radius-pill);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+	background: var(--bf-muted);
+}
+
 button {
 	font: inherit;
 	color: inherit;

@@ -9,8 +9,7 @@
 
 	interface Props {
 		projects: ProjectSummary[];
-		onopen: (id: string) => void;
-		oncreate: () => void;
+		onmanage: () => void;
 		onexport: () => void;
 		onimport: () => void;
 		onaddnote: () => void;
@@ -18,9 +17,7 @@
 		onplay: () => void;
 	}
 
-	let { projects, onopen, oncreate, onexport, onimport, onaddnote, ontour, onplay }: Props = $props();
-
-	let menuOpen = $state(false);
+	let { projects, onmanage, onexport, onimport, onaddnote, ontour, onplay }: Props = $props();
 
 	const saveLabel = $derived(
 		studio.saveState === 'error' ? 'Not saved' : studio.saveState === 'saving' ? 'Saving…' : 'Saved'
@@ -34,37 +31,12 @@
 	</div>
 
 	<div class="project">
-		<button class="title" type="button" onclick={() => (menuOpen = !menuOpen)} aria-expanded={menuOpen}>
+		<button class="title" type="button" onclick={onmanage} title="Open the projects view">
 			{studio.def.meta.title}
 			<span class="chevron" aria-hidden="true">▾</span>
 		</button>
-
-		{#if menuOpen}
-			<!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
-			<div class="backdrop" onclick={() => (menuOpen = false)}></div>
-			<div class="menu">
-				<p class="menu-head">Projects</p>
-				{#each projects as project (project.id)}
-					<button
-						type="button"
-						class:current={project.id === studio.projectId}
-						onclick={() => {
-							menuOpen = false;
-							onopen(project.id);
-						}}
-					>
-						{project.title}
-					</button>
-				{/each}
-				<hr />
-				<button
-					type="button"
-					onclick={() => {
-						menuOpen = false;
-						oncreate();
-					}}>+ New project</button
-				>
-			</div>
+		{#if projects.length > 1}
+			<span class="project-count">{projects.length} projects</span>
 		{/if}
 
 		<span class="save" data-state={studio.saveState}>{saveLabel}</span>
@@ -189,65 +161,11 @@
 		font-size: 10px;
 	}
 
-	.backdrop {
-		position: fixed;
-		inset: 0;
-		z-index: 20;
-	}
-
-	.menu {
-		position: absolute;
-		top: 100%;
-		left: 0;
-		z-index: 21;
-		min-width: 210px;
-		margin-top: 5px;
-		padding: 6px;
-		border: 1px solid var(--bf-rule);
-		border-radius: var(--bf-radius);
-		background: var(--bf-surface);
-		box-shadow: var(--bf-shadow-lift);
-		display: grid;
-		gap: 1px;
-	}
-
-	.menu-head {
-		margin: 2px 8px 4px;
-		font-size: 10px;
-		font-weight: 700;
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
+	.project-count {
+		flex: none;
+		font-size: 10.5px;
 		color: var(--bf-faint);
-	}
-
-	.menu button {
-		padding: 6px 9px;
-		border: 0;
-		border-radius: var(--bf-radius-sm);
-		background: none;
-		text-align: left;
-		font-size: 12.5px;
-		color: var(--bf-ink-soft);
-		cursor: pointer;
-		overflow: hidden;
-		text-overflow: ellipsis;
 		white-space: nowrap;
-	}
-
-	.menu button:hover {
-		background: var(--bf-accent-soft);
-		color: var(--bf-accent-strong);
-	}
-
-	.menu button.current {
-		font-weight: 650;
-		color: var(--bf-accent-strong);
-	}
-
-	.menu hr {
-		border: 0;
-		border-top: 1px solid var(--bf-rule);
-		margin: 4px 0;
 	}
 
 	.save {
