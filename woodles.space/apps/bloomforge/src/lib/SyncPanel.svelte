@@ -12,14 +12,16 @@
 	let passphrase = $state('');
 	let busy = $state(false);
 
+	// A sync round-trip is a second, maybe two — reflecting that in the trigger
+	// would mean the button relabels and recolors itself every time an edit
+	// settles, which reads as flicker rather than status. Connected shows one
+	// steady "Synced", the same green dot, whether or not a push happens to be
+	// in flight; only a real problem changes it.
 	const label = $derived(
-		syncState.syncing
-			? 'Syncing…'
-			: syncState.status === 'error'
-				? 'Sync problem'
-				: syncState.connected
-					? 'Synced'
-					: 'Sync'
+		syncState.status === 'error' ? 'Sync problem' : syncState.connected ? 'Synced' : 'Sync'
+	);
+	const dotState = $derived(
+		!syncState.connected ? 'off' : syncState.status === 'error' ? 'error' : 'ok'
 	);
 
 	async function connect(event: SubmitEvent): Promise<void> {
@@ -37,11 +39,11 @@
 	<button
 		class="bf-button trigger"
 		type="button"
-		data-state={syncState.status}
+		data-state={dotState}
 		aria-expanded={open}
 		onclick={() => (open = !open)}
 	>
-		<span class="dot" data-state={syncState.connected ? syncState.status : 'off'}></span>
+		<span class="dot" data-state={dotState}></span>
 		{label}
 	</button>
 
@@ -116,10 +118,6 @@
 
 	.dot[data-state='error'] {
 		background: var(--bf-danger);
-	}
-
-	.dot[data-state='idle'] {
-		background: var(--bf-currency);
 	}
 
 	.backdrop {

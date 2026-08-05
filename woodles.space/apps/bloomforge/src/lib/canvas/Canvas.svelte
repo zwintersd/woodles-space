@@ -1,9 +1,11 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import {
 		Background,
 		BackgroundVariant,
 		Controls,
 		SvelteFlow,
+		useSvelteFlow,
 		type Connection,
 		type Edge,
 		type Node,
@@ -17,6 +19,7 @@
 	import { playtest } from '../playtest.svelte.js';
 	import { studio } from '../studio.svelte.js';
 	import CurrencyNode from './nodes/CurrencyNode.svelte';
+	import FlowApi from './FlowApi.svelte';
 	import GeneratorNode from './nodes/GeneratorNode.svelte';
 	import MilestoneNode from './nodes/MilestoneNode.svelte';
 	import NoteNode from './nodes/NoteNode.svelte';
@@ -49,6 +52,8 @@
 	 */
 	let nodes = $state.raw<Node[]>([]);
 	let edges = $state.raw<Edge[]>([]);
+	let canvasEl: HTMLDivElement | undefined;
+	let flow: ReturnType<typeof useSvelteFlow> | null = null;
 
 	$effect(() => {
 		nodes = buildNodes();
@@ -57,6 +62,74 @@
 	$effect(() => {
 		edges = buildEdges();
 	});
+
+	/**
+	 * Selecting an entity from the sidebar (or creating one, which selects it)
+	 * is a navigation dead end if the canvas doesn't follow: the node might be
+	 * scrolled off-screen with nothing to say so. Clicking a node that's
+	 * already on-screen shouldn't cause any motion, so this only pans when the
+	 * newly selected node isn't visible — the same rule Svelte Flow's own
+	 * keyboard-focus autopan uses.
+	 */
+	$effect(() => {
+		const id = studio.selectedId;
+		if (!id) return;
+		void tick().then(() => centerOnNode(id));
+	});
+
+	/** True when the node is at least partly inside the visible viewport. */
+	function isNodeVisible(id: string): boolean {
+		if (!flow || !canvasEl) return true;
+		const node = flow.getInternalNode(id);
+		if (!node) return true;
+
+		const { x, y } = node.internals.positionAbsolute;
+		const width = node.measured?.width ?? 0;
+		const height = node.measured?.height ?? 0;
+		const rect = canvasEl.getBoundingClientRect();
+		const viewport = flow.getViewport();
+		const viewX = -viewport.x / viewport.zoom;
+		const viewY = -viewport.y / viewport.zoom;
+		const viewWidth = rect.width / viewport.zoom;
+		const viewHeight = rect.height / viewport.zoom;
+
+		return x + width > viewX && x < viewX + viewWidth && y + height > viewY && y < viewY + viewHeight;
+	}
+
+	/**
+	 * Pans (never zooms — a changed zoom level is a bigger surprise than a
+	 * node just off the edge of the screen) so the node's center lands on the
+	 * viewport's center. `force` skips the visibility check, for the
+	 * double-click case where centering is the point even if the node is
+	 * already mostly on screen.
+	 */
+	function centerOnNode(id: string, { force = false }: { force?: boolean } = {}): void {
+		if (!flow) return;
+		const node = flow.getInternalNode(id);
+		if (!node) return;
+		if (!force && isNodeVisible(id)) return;
+
+		const width = node.measured?.width ?? 0;
+		const height = node.measured?.height ?? 0;
+		const { x, y } = node.internals.positionAbsolute;
+		void flow.setCenter(x + width / 2, y + height / 2, {
+			zoom: flow.getViewport().zoom,
+			duration: 300
+		});
+	}
+
+	/**
+	 * Svelte Flow doesn't emit its own node-double-click event in this
+	 * version, so this delegates from the canvas root and reads the node id
+	 * Svelte Flow already stamps on every node's `data-id`.
+	 */
+	function ondblclick(event: MouseEvent): void {
+		const target = event.target as HTMLElement | null;
+		const nodeEl = target?.closest<HTMLElement>('.svelte-flow__node');
+		const id = nodeEl?.dataset.id;
+		if (!id) return;
+		centerOnNode(id, { force: true });
+	}
 
 	function buildNodes(): Node[] {
 		const entities = deriveNodes(studio.def).map((node) => ({
@@ -127,7 +200,8 @@
 	}
 </script>
 
-<div class="canvas">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="canvas" bind:this={canvasEl} {ondblclick}>
 	<SvelteFlow
 		bind:nodes
 		bind:edges
@@ -154,6 +228,7 @@
 		onpaneclick={() => studio.select(null)}
 		onedgeclick={({ edge }) => studio.select(edge.source)}
 	>
+		<FlowApi onready={(api) => (flow = api)} />
 		<Background variant={BackgroundVariant.Dots} gap={26} size={1.4} bgColor="var(--bf-canvas)" patternColor="#e6dbe9" />
 		<Controls showLock={false} />
 	</SvelteFlow>

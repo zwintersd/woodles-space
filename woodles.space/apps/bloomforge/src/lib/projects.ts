@@ -80,6 +80,28 @@ export function markOpened(id: string): void {
 	indexStore.save({ ...index, lastOpenedId: id });
 }
 
+/**
+ * Retitles a project on disk without touching `meta.id` — that's the key the
+ * player's save progress is filed under, and a rename that drifted it would
+ * silently orphan a save.
+ */
+export function renameProject(id: string, title: string): boolean {
+	const def = loadProject(id);
+	if (!def) return false;
+	def.meta.title = title;
+	return saveProject(id, def);
+}
+
+/** Clones a project's definition under a fresh id, `"<title> copy"` titled. */
+export function duplicateProject(id: string): string | null {
+	const def = loadProject(id);
+	if (!def) return null;
+	const clone = structuredClone(def);
+	clone.meta.title = `${def.meta.title} copy`;
+	const copyId = newProjectId();
+	return saveProject(copyId, clone) ? copyId : null;
+}
+
 export function deleteProject(id: string): void {
 	try {
 		localStorage.removeItem(projectKey(id));
