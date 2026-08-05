@@ -21,6 +21,15 @@ garden loaded behind it. The tour opens a **genuinely blank** project and walks
 six steps — currency → generator → press play → tune the curve → add an upgrade
 → fast-forward.
 
+That six-step, two-minute promise stays true for anyone who only wants the
+loop: the finish card's "Show me what's new" opens a second, separate track
+rather than lengthening the first one. Four more steps — tags, a rate that
+reads them, a currency that taxes what's spent, a generator that converts one
+currency into another — are exactly the four ideas the stress-test samples
+(`apiaryOfBadDecisions`, `confessionBooth`, `choirOfUnspokenNames`) were built
+to justify, and its own finish card opens any of those three as a new project
+to pull apart.
+
 Every step completes by **observing the def and the running simulation**, never
 by a "next" button ([`tour.svelte.ts`](./src/lib/tour.svelte.ts)). That one
 constraint does a lot of work: the tour cannot claim you did something you

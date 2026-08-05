@@ -1,15 +1,18 @@
 <script lang="ts">
+	import { apiaryOfBadDecisions, choirOfUnspokenNames, confessionBooth, type GameDef } from '@woodles/incremental-core';
 	import { balance } from './balance.svelte.js';
 	import { playtest } from './playtest.svelte.js';
 	import { studio } from './studio.svelte.js';
-	import { stepState, TOUR_STEPS, tour } from './tour.svelte.js';
+	import { stepState, tour } from './tour.svelte.js';
 
 	interface Props {
 		/** Opens the finished example once the tour is done. */
 		onexample: () => void;
+		/** Opens one of the stress-test samples once the advanced tour is done. */
+		ontryexample: (def: GameDef, title: string) => void;
 	}
 
-	let { onexample }: Props = $props();
+	let { onexample, ontryexample }: Props = $props();
 
 	/**
 	 * The tour watches the world rather than the buttons. Everything it reads is
@@ -35,7 +38,7 @@
 		in the grid reserves its own space and cannot cover anything.
 	-->
 	<aside class="tour" class:done={tour.finished} aria-live="polite">
-		{#if tour.finished}
+		{#if tour.finished && tour.track === 'core'}
 			<div class="text">
 				<p class="eyebrow">Tour complete</p>
 				<h2>That's the loop.</h2>
@@ -46,6 +49,36 @@
 			</div>
 			<div class="actions">
 				<button class="bf-button" type="button" onclick={onexample}>Open the example</button>
+				<button class="bf-button" type="button" onclick={() => tour.startAdvanced()}>Show me what's new</button>
+				<button class="bf-button bf-button--primary" type="button" onclick={() => tour.close()}>Keep building</button>
+			</div>
+		{:else if tour.finished}
+			<div class="text">
+				<p class="eyebrow">Advanced tour complete</p>
+				<h2>That's the whole schema.</h2>
+				<p class="body">
+					Tags, a rate that reads them, a currency that taxes, a generator that converts — every stress-test sample is
+					built from exactly those four ideas, combined differently. Pull one apart:
+				</p>
+			</div>
+			<div class="actions">
+				<button
+					class="bf-button"
+					type="button"
+					onclick={() => ontryexample(apiaryOfBadDecisions, 'The Apiary of Bad Decisions')}
+				>
+					Apiary
+				</button>
+				<button class="bf-button" type="button" onclick={() => ontryexample(confessionBooth, 'Confession Booth')}>
+					Confession Booth
+				</button>
+				<button
+					class="bf-button"
+					type="button"
+					onclick={() => ontryexample(choirOfUnspokenNames, 'The Choir of Unspoken Names')}
+				>
+					Choir
+				</button>
 				<button class="bf-button bf-button--primary" type="button" onclick={() => tour.close()}>Keep building</button>
 			</div>
 		{:else if tour.step}
@@ -63,7 +96,7 @@
 		{/if}
 
 		<ol class="pips">
-			{#each TOUR_STEPS as entry, index (entry.id)}
+			{#each tour.steps as entry, index (entry.id)}
 				<li data-state={stepState(index, tour.index, tour.finished)}>
 					<span class="sr-only">{entry.title}</span>
 				</li>
@@ -126,7 +159,9 @@
 
 	.actions {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
+		justify-content: flex-end;
 		gap: 7px;
 		flex: none;
 	}

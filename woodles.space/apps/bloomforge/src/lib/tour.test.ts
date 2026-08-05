@@ -1,6 +1,14 @@
-import { blankGameDef, cozyGarden, emptyGameDef, type GameDef } from '@woodles/incremental-core';
+import {
+	apiaryOfBadDecisions,
+	blankGameDef,
+	choirOfUnspokenNames,
+	confessionBooth,
+	cozyGarden,
+	emptyGameDef,
+	type GameDef
+} from '@woodles/incremental-core';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { hasTunedGenerator, stepState, Tour, TOUR_STEPS, type TourContext } from './tour.svelte.js';
+import { ADVANCED_TOUR_STEPS, hasTunedGenerator, stepState, Tour, TOUR_STEPS, type TourContext } from './tour.svelte.js';
 import { Studio } from './studio.svelte.js';
 
 function context(overrides: Partial<TourContext> = {}): TourContext {
@@ -85,6 +93,73 @@ describe('the steps themselves', () => {
 	});
 });
 
+describe('the advanced steps', () => {
+	it('starts with none of them satisfied on a blank canvas', () => {
+		const ctx = context();
+		for (const step of ADVANCED_TOUR_STEPS) expect(step.done(ctx), step.id).toBe(false);
+	});
+
+	it('reads a tag on a generator, an upgrade, or a prestige layer as the same thing', () => {
+		const step = ADVANCED_TOUR_STEPS.find((entry) => entry.id === 'tags')!;
+
+		const onGenerator = blankGameDef();
+		onGenerator.generators.push({
+			id: 'g',
+			name: 'G',
+			producesCurrencyId: 'c',
+			baseRate: 1,
+			rateCurve: { kind: 'polynomial', exponent: 1 },
+			cost: { currencyId: 'c', base: 1, curve: { kind: 'geometric', growth: 1.1 } },
+			tags: ['devotional']
+		});
+		expect(step.done(context({ def: onGenerator }))).toBe(true);
+
+		const onUpgrade = blankGameDef();
+		onUpgrade.upgrades.push({
+			id: 'u',
+			name: 'U',
+			cost: { currencyId: 'c', amount: 1 },
+			effects: [],
+			tags: ['devotional']
+		});
+		expect(step.done(context({ def: onUpgrade }))).toBe(true);
+
+		// The real shipped sample this step is drawn from.
+		expect(step.done(context({ def: choirOfUnspokenNames }))).toBe(true);
+	});
+
+	it('recognizes a populationBoost by either metric', () => {
+		const step = ADVANCED_TOUR_STEPS.find((entry) => entry.id === 'population')!;
+		expect(step.done(context({ def: apiaryOfBadDecisions }))).toBe(true); // unequippedUpgrades
+		expect(step.done(context({ def: choirOfUnspokenNames }))).toBe(true); // taggedLevelSum
+	});
+
+	it('recognizes a spendTax and a converts as two separate steps', () => {
+		const tax = ADVANCED_TOUR_STEPS.find((entry) => entry.id === 'spend-tax')!;
+		const converts = ADVANCED_TOUR_STEPS.find((entry) => entry.id === 'converts')!;
+
+		expect(tax.done(context({ def: confessionBooth }))).toBe(true);
+		expect(converts.done(context({ def: confessionBooth }))).toBe(true);
+		// Neither of the Confession Booth's own features is the other's.
+		expect(tax.done(context({ def: choirOfUnspokenNames }))).toBe(false);
+		expect(converts.done(context({ def: apiaryOfBadDecisions }))).toBe(false);
+	});
+
+	it('gives every advanced step a distinct id, a hint and a target', () => {
+		expect(new Set(ADVANCED_TOUR_STEPS.map((step) => step.id)).size).toBe(ADVANCED_TOUR_STEPS.length);
+		for (const step of ADVANCED_TOUR_STEPS) {
+			expect(step.title.length, step.id).toBeGreaterThan(0);
+			expect(step.hint.length, step.id).toBeGreaterThan(0);
+			expect(step.target.length, step.id).toBeGreaterThan(0);
+		}
+	});
+
+	it('shares no id with a core step', () => {
+		const core = new Set(TOUR_STEPS.map((step) => step.id));
+		for (const step of ADVANCED_TOUR_STEPS) expect(core.has(step.id), step.id).toBe(false);
+	});
+});
+
 describe('advancing', () => {
 	it('does nothing until the learner actually does the thing', () => {
 		const tour = new Tour();
@@ -139,6 +214,113 @@ describe('advancing', () => {
 		for (let i = 0; i < 5; i += 1) tour.observe(allDone());
 		expect(tour.index).toBeLessThan(TOUR_STEPS.length);
 		expect(tour.finished).toBe(true);
+	});
+});
+
+describe('the advanced track', () => {
+	/**
+	 * No single shipped sample satisfies all four predicates at once — each was
+	 * built to stress one or two of them. This stitches a minimal def where
+	 * every step is done simultaneously, the way `allDone()` above leans on
+	 * `cozyGarden` doing that for the core six.
+	 */
+	function allAdvancedDone(): TourContext {
+		const def = blankGameDef();
+		def.currencies.push(
+			{ id: 'c1', name: 'C1', color: '#fff', format: { decimalPlaces: 0, notation: 'plain' }, spendTax: { intoCurrencyId: 'c2', rate: 1 } },
+			{ id: 'c2', name: 'C2', color: '#fff', format: { decimalPlaces: 0, notation: 'plain' } }
+		);
+		def.generators.push(
+			{
+				id: 'g1',
+				name: 'G1',
+				producesCurrencyId: 'c1',
+				baseRate: 1,
+				rateCurve: { kind: 'polynomial', exponent: 1 },
+				cost: { currencyId: 'c1', base: 1, curve: { kind: 'geometric', growth: 1.1 } },
+				tags: ['devotional']
+			},
+			{
+				id: 'g2',
+				name: 'G2',
+				producesCurrencyId: 'c2',
+				baseRate: 1,
+				rateCurve: { kind: 'polynomial', exponent: 1 },
+				cost: { currencyId: 'c1', base: 1, curve: { kind: 'geometric', growth: 1.1 } },
+				populationBoost: { metric: 'taggedLevelSum', tag: 'devotional', perUnit: 1 },
+				converts: { fromCurrencyId: 'c1', ratio: 1 }
+			}
+		);
+		return context({ def });
+	}
+
+	it('starts a fresh pass at index 0, unfinished', () => {
+		const tour = new Tour();
+		tour.start();
+		tour.observe(allDone());
+		expect(tour.finished).toBe(true);
+
+		tour.startAdvanced();
+		expect(tour.active).toBe(true);
+		expect(tour.track).toBe('advanced');
+		expect(tour.index).toBe(0);
+		expect(tour.finished).toBe(false);
+		expect(tour.step?.id).toBe('tags');
+		expect(tour.total).toBe(ADVANCED_TOUR_STEPS.length);
+	});
+
+	it('observes against the advanced steps once switched, not the core ones', () => {
+		const tour = new Tour();
+		tour.start();
+		tour.startAdvanced();
+
+		// A currency and a generator alone satisfy every core step's early
+		// stage, but none of the advanced ones — so this must not move at all.
+		tour.observe(context({ def: cozyGarden, elapsed: 5, balanceRuns: 2 }));
+		expect(tour.index).toBe(0);
+		expect(tour.step?.id).toBe('tags');
+	});
+
+	it('advances one step per satisfied predicate, in order', () => {
+		const tour = new Tour();
+		tour.start();
+		tour.startAdvanced();
+
+		// choirOfUnspokenNames carries both tags and a taggedLevelSum
+		// populationBoost, so one observe should clear the first two steps.
+		tour.observe(context({ def: choirOfUnspokenNames }));
+		expect(tour.step?.id).toBe('spend-tax');
+	});
+
+	it('finishes when the last advanced step lands', () => {
+		const tour = new Tour();
+		tour.start();
+		tour.startAdvanced();
+		tour.observe(allAdvancedDone());
+		expect(tour.finished).toBe(true);
+		expect(tour.step).toBeNull();
+		expect(tour.spotlight).toBeNull();
+	});
+
+	it('never advances past the end of the advanced track either', () => {
+		const tour = new Tour();
+		tour.start();
+		tour.startAdvanced();
+		for (let i = 0; i < 5; i += 1) tour.observe(allAdvancedDone());
+		expect(tour.index).toBeLessThan(ADVANCED_TOUR_STEPS.length);
+	});
+
+	it('goes back to the core track on the next start()', () => {
+		const tour = new Tour();
+		tour.start();
+		tour.startAdvanced();
+		expect(tour.track).toBe('advanced');
+
+		tour.start();
+		expect(tour.track).toBe('core');
+		expect(tour.index).toBe(0);
+		expect(tour.finished).toBe(false);
+		expect(tour.step?.id).toBe('currency');
 	});
 });
 

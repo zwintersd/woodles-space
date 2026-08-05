@@ -116,6 +116,50 @@ export const TOUR_STEPS: readonly TourStep[] = Object.freeze([
 	}
 ]);
 
+/**
+ * A second, shorter pass — offered only after the core loop, never mixed into
+ * it. Four schema pieces the stress-test samples were built to justify, each
+ * one a field the Inspector already shows you once the right node is
+ * selected; the tour just watches for you to have actually set it.
+ */
+export const ADVANCED_TOUR_STEPS: readonly TourStep[] = Object.freeze([
+	{
+		id: 'tags',
+		title: 'Group anything, by anything',
+		body: "A tag means nothing to the engine by itself — it's a label you put on a generator, an upgrade, or a prestige layer. What reads it next is up to you.",
+		hint: 'Select a generator, upgrade, or prestige layer → Tags',
+		target: 'inspector',
+		done: (ctx) =>
+			ctx.def.generators.some((entry) => !!entry.tags?.length) ||
+			ctx.def.upgrades.some((entry) => !!entry.tags?.length) ||
+			ctx.def.prestigeLayers.some((entry) => !!entry.tags?.length)
+	},
+	{
+		id: 'population',
+		title: 'Make a rate read the whole board',
+		body: "A generator's output can multiply by a live count instead of its own level — upgrades left unequipped, or the summed level of everything carrying a tag.",
+		hint: 'Select a generator → Boosted by a live count',
+		target: 'inspector',
+		done: (ctx) => ctx.def.generators.some((entry) => !!entry.populationBoost)
+	},
+	{
+		id: 'spend-tax',
+		title: 'Make spending itself a resource',
+		body: "A currency can mint a byproduct into another currency the instant it's spent — anywhere, on anything, without the purchase itself knowing.",
+		hint: 'Select a currency → Taxes when spent',
+		target: 'inspector',
+		done: (ctx) => ctx.def.currencies.some((entry) => !!entry.spendTax)
+	},
+	{
+		id: 'converts',
+		title: 'Let a generator consume instead of produce',
+		body: "A generator can draw down another currency instead of running off its own curve — throttled to whatever's actually on hand, so it can fall short of its ceiling but never beat it.",
+		hint: 'Select a generator → Converts a currency',
+		target: 'inspector',
+		done: (ctx) => ctx.def.generators.some((entry) => !!entry.converts)
+	}
+]);
+
 interface OnboardingPrefs {
 	/** Whether the welcome has ever been shown. */
 	welcomed: boolean;
@@ -138,13 +182,20 @@ export class Tour {
 	index = $state(0);
 	/** The "that's the loop" card at the end. */
 	finished = $state(false);
+	/** Which set of steps is currently running. `start()` always resets this to `'core'`. */
+	track = $state<'core' | 'advanced'>('core');
+
+	/** The steps for whichever track is active. */
+	get steps(): readonly TourStep[] {
+		return this.track === 'advanced' ? ADVANCED_TOUR_STEPS : TOUR_STEPS;
+	}
 
 	get step(): TourStep | null {
-		return this.active && !this.finished ? (TOUR_STEPS[this.index] ?? null) : null;
+		return this.active && !this.finished ? (this.steps[this.index] ?? null) : null;
 	}
 
 	get total(): number {
-		return TOUR_STEPS.length;
+		return this.steps.length;
 	}
 
 	/** What the current step is pointing at, for the spotlight ring. */
@@ -165,9 +216,22 @@ export class Tour {
 	start(): void {
 		this.showWelcome = false;
 		this.active = true;
+		this.track = 'core';
 		this.index = 0;
 		this.finished = false;
 		this.#remember({ welcomed: true });
+	}
+
+	/**
+	 * A second pass, offered from the core loop's finish card rather than in
+	 * place of it — the six-step, two-minute promise stays true for anyone who
+	 * only ever wants the loop.
+	 */
+	startAdvanced(): void {
+		this.active = true;
+		this.track = 'advanced';
+		this.index = 0;
+		this.finished = false;
 	}
 
 	/** Leaves the tour without finishing it. Never offered as a dead end. */
@@ -191,13 +255,14 @@ export class Tour {
 	observe(ctx: TourContext): void {
 		if (!this.active || this.finished) return;
 
+		const steps = this.steps;
 		const at = untrack(() => this.index);
 		let next = at;
-		while (next < TOUR_STEPS.length && TOUR_STEPS[next].done(ctx)) next += 1;
+		while (next < steps.length && steps[next].done(ctx)) next += 1;
 		if (next === at) return;
 
-		if (next >= TOUR_STEPS.length) {
-			this.index = TOUR_STEPS.length - 1;
+		if (next >= steps.length) {
+			this.index = steps.length - 1;
 			this.finished = true;
 			this.#remember({ welcomed: true, toured: true });
 			return;
