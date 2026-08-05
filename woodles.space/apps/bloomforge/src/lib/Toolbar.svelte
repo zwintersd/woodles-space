@@ -90,7 +90,10 @@
 			↷
 		</button>
 		<span class="divider" aria-hidden="true"></span>
-		<Tooltip text="Six short steps, no wall of nodes — start whenever you want a refresher." placement="bottom">
+		<Tooltip
+			text="Six short steps to the core loop, four more waiting after — start whenever you want a refresher."
+			placement="bottom"
+		>
 			<button
 				class="bf-button help"
 				type="button"

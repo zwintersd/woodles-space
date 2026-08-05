@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { blankGameDef, GameDefParseError, type EntityKind } from '@woodles/incremental-core';
+	import { blankGameDef, GameDefParseError, type EntityKind, type GameDef } from '@woodles/incremental-core';
 	import Canvas from '$lib/canvas/Canvas.svelte';
 	import Dock from '$lib/dock/Dock.svelte';
 	import Inspector from '$lib/inspector/Inspector.svelte';
@@ -128,6 +128,15 @@
 		projects = listProjects();
 	}
 
+	/** Opens a stress-test sample from the advanced tour's finish card, as a new project. */
+	function tryExample(def: GameDef, title: string): void {
+		tour.close();
+		studio.createProject(title, structuredClone(def));
+		playtest.reset(studio.def);
+		projects = listProjects();
+		say(`Opened ${title}`);
+	}
+
 	function onKeydown(event: KeyboardEvent): void {
 		const target = event.target as HTMLElement | null;
 		// Never steal an undo from a text field the person is typing in.
@@ -189,7 +198,7 @@
 		<Sidebar onadd={add} />
 
 		<div class="stage">
-			<TourCard onexample={openExample} />
+			<TourCard onexample={openExample} ontryexample={tryExample} />
 			<Canvas onmessage={say} />
 		</div>
 
