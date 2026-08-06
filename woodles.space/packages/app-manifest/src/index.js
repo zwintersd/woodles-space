@@ -45,7 +45,7 @@ export const appManifest = Object.freeze([
 		sourceDir: 'apps/lab',
 		outputDir: 'apps/lab',
 		entryFile: 'index.html',
-		landing: tile('lab', 10, 'play', 'experiments, sketches, and stub apps', 'var(--aqua)', 'var(--plum)', '185deg')
+		landing: tile('lab', 9, 'play', 'experiments, sketches, and stub apps', 'var(--aqua)', 'var(--plum)', '185deg')
 	},
 	{
 		id: 'piano',
@@ -57,7 +57,7 @@ export const appManifest = Object.freeze([
 		sourceDir: 'apps/piano',
 		outputDir: 'apps/piano',
 		entryFile: 'index.html',
-		landing: tile('piano', 9, 'play', 'a purple keyboard with soft synth strings', 'var(--lavender)', 'var(--aqua)', '125deg')
+		landing: tile('piano', 8, 'play', 'a purple keyboard with soft synth strings', 'var(--lavender)', 'var(--aqua)', '125deg')
 	},
 	{
 		id: 'digits',
@@ -80,7 +80,7 @@ export const appManifest = Object.freeze([
 		sourceDir: 'apps/quiet-room',
 		outputDir: 'apps/quiet-room',
 		entryFile: 'index.html',
-		landing: tile('quiet', 14, 'play', 'an immersive room of light, drawn in three.js', 'var(--lapis)', 'var(--lilac)', '195deg', { defaultPin: 6 })
+		landing: tile('quiet', 13, 'play', 'an immersive room of light, drawn in three.js', 'var(--lapis)', 'var(--lilac)', '195deg', { defaultPin: 5 })
 	},
 	{
 		id: 'ologypedia',
@@ -92,7 +92,7 @@ export const appManifest = Object.freeze([
 		sourceDir: 'apps/ologypedia',
 		outputDir: 'apps/ologypedia',
 		entryFile: 'index.html',
-		landing: tile('ologypedia', 12, 'read', 'finished entries, bound and shelved to be read', 'var(--plum)', 'var(--peach)', '160deg')
+		landing: tile('ologypedia', 11, 'read', 'finished entries, bound and shelved to be read', 'var(--plum)', 'var(--peach)', '160deg')
 	},
 	{
 		id: 'write',
@@ -105,7 +105,7 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/write/dist',
 		entryFile: 'index.html',
 		packageName: 'write',
-		landing: tile('write', 2, 'write', 'when a thought deserves to be written properly — and maybe sent', 'var(--aqua)', 'var(--lavender)', '160deg', { defaultPin: 2, featured: 3 })
+		landing: tile('write', 2, 'write', 'every kind of writing — letters, essays, stories, poems, and the thought that just arrived', 'var(--aqua)', 'var(--lavender)', '160deg', { defaultPin: 2, featured: 3 })
 	},
 	{
 		id: 'letter',
@@ -152,19 +152,6 @@ export const appManifest = Object.freeze([
 		landing: tile('planner', 6, 'tend', 'interval data, fading routines, and day piles', 'var(--peach)', 'var(--lavender)', '170deg', { defaultPin: 4 })
 	},
 	{
-		id: 'notebook',
-		name: 'Notebook',
-		publicPath: '/notebook',
-		aliases: [],
-		kind: 'sveltekit',
-		maturity: 'growing',
-		sourceDir: 'apps/notebook',
-		outputDir: 'apps/notebook/dist',
-		entryFile: 'index.html',
-		packageName: 'notebook',
-		landing: tile('notebook', 7, 'catch', "when a thought arrives and you don't want to decide where it goes", 'var(--aqua)', 'var(--peach)', '205deg', { defaultPin: 5 })
-	},
-	{
 		id: 'animations',
 		name: 'Animations',
 		publicPath: '/animations',
@@ -186,7 +173,7 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/spores/dist',
 		entryFile: 'index.html',
 		packageName: 'spores',
-		landing: tile('spores', 11, 'tend', 'when you want to be able to find it, and what it connects to, later', 'var(--lilac)', 'var(--aqua)', '145deg')
+		landing: tile('spores', 10, 'tend', 'when you want to be able to find it, and what it connects to, later', 'var(--lilac)', 'var(--aqua)', '145deg')
 	},
 	{
 		id: 'bestiary',
@@ -199,7 +186,7 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/bestiary/dist',
 		entryFile: 'index.html',
 		packageName: 'bestiary',
-		landing: tile('bestiary', 13, 'tend', 'bring a png of anything, leave with a card that belongs', 'var(--peach)', 'var(--plum)', '110deg', { featured: 2 })
+		landing: tile('bestiary', 12, 'tend', 'bring a png of anything, leave with a card that belongs', 'var(--peach)', 'var(--plum)', '110deg', { featured: 2 })
 	},
 	{
 		id: 'thinking-about',
@@ -212,7 +199,7 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/thinking-about/dist',
 		entryFile: 'index.html',
 		packageName: 'thinking-about',
-		landing: tile('thinking', 8, 'tend', 'a landing spot for what you are reading, playing, and watching', 'var(--lapis)', 'var(--aqua)', '140deg')
+		landing: tile('thinking', 7, 'tend', 'a landing spot for what you are reading, playing, and watching', 'var(--lapis)', 'var(--aqua)', '140deg')
 	},
 	{
 		id: 'bloomforge',
@@ -225,7 +212,7 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/bloomforge/dist',
 		entryFile: 'index.html',
 		packageName: 'bloomforge',
-		landing: tile('bloomforge', 15, 'play', 'a studio for making incremental games: wire up an economy, then watch it run', 'var(--lavender)', 'var(--aqua)', '150deg')
+		landing: tile('bloomforge', 14, 'play', 'a studio for making incremental games: wire up an economy, then watch it run', 'var(--lavender)', 'var(--aqua)', '150deg')
 	},
 	{
 		id: 'bloomforge-player',
@@ -238,7 +225,7 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/bloomforge-player/dist',
 		entryFile: 'index.html',
 		packageName: 'bloomforge-player',
-		landing: tile('player', 16, 'play', 'play the incremental games you built in the studio', 'var(--peach)', 'var(--lavender)', '160deg')
+		landing: tile('player', 15, 'play', 'play the incremental games you built in the studio', 'var(--peach)', 'var(--lavender)', '160deg')
 	}
 ]);
 
@@ -269,17 +256,21 @@ export const featuredLandingApps = Object.freeze(
 
 /**
  * The bands tiles group under, in the order they should be shown. Named for the
- * moment rather than the thing, so the landing page stops presenting sixteen
+ * moment rather than the thing, so the landing page stops presenting fifteen
  * peers you have to choose between. See CONVERGENCE.md §3.
+ *
+ * There is no `catch` band anymore: Notebook, the app it existed for, retired
+ * into Write (CONVERGENCE.md §7). Catching a thought is now the write band's
+ * job — Write's drafts always accept, and a capture can grow into an essay or
+ * a story without changing rooms.
  *
  * @type {readonly import('./types').LandingBand[]}
  */
 export const landingBands = Object.freeze([
-	{ id: 'catch', label: 'catch', blurb: 'somewhere to put it before you know what it is', order: 1 },
-	{ id: 'write', label: 'write', blurb: 'when the words matter and want room', order: 2 },
-	{ id: 'tend', label: 'tend', blurb: 'the things you keep, and keep coming back to', order: 3 },
-	{ id: 'read', label: 'read', blurb: 'finished things, sitting still to be read', order: 4 },
-	{ id: 'play', label: 'play', blurb: 'no goal beyond the doing of it', order: 5 }
+	{ id: 'write', label: 'write', blurb: 'where the words go — from stray thought to finished piece', order: 1 },
+	{ id: 'tend', label: 'tend', blurb: 'the things you keep, and keep coming back to', order: 2 },
+	{ id: 'read', label: 'read', blurb: 'finished things, sitting still to be read', order: 3 },
+	{ id: 'play', label: 'play', blurb: 'no goal beyond the doing of it', order: 4 }
 ]);
 
 /**

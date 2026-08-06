@@ -1,10 +1,14 @@
 <script lang="ts">
+	import { goalLabel } from './kinds';
+
 	type LayerId = 'foreground' | 'midground' | 'background';
 	type Option = { id: string; name: string };
 
 	let {
 		saveStatus,
 		wordCount,
+		goal,
+		onSetGoal,
 		theme = $bindable(),
 		motif = $bindable(),
 		font = $bindable(),
@@ -18,6 +22,8 @@
 	}: {
 		saveStatus: 'saved' | 'saving';
 		wordCount: number;
+		goal: number | null;
+		onSetGoal: () => void;
 		theme: string;
 		motif: string;
 		font: string;
@@ -36,7 +42,12 @@
 		<span class="save-status" class:saving={saveStatus === 'saving'}>
 			{saveStatus === 'saving' ? 'saving…' : 'saved'}
 		</span>
-		<span class="word-count">{wordCount} word{wordCount !== 1 ? 's' : ''}</span>
+		<button
+			class="word-count"
+			class:met={goal !== null && wordCount >= goal}
+			onclick={onSetGoal}
+			title={goal === null ? 'set a word goal' : 'change or clear the word goal'}
+		>{goalLabel(wordCount, goal)}</button>
 		<span class="picker-sep">·</span>
 		<label class="picker">
 			<span class="picker-label">palette</span>
@@ -59,7 +70,7 @@
 	</div>
 	<div class="publish-cluster">
 		{#if activeLayer === 'foreground' && fgIsEmpty}
-			<span class="publish-warn">this letter will appear blank to others</span>
+			<span class="publish-warn">this will appear blank to others</span>
 		{/if}
 		{#if activeLayer === 'foreground'}
 			<label class="public-toggle" title="include this letter in the public echoes snapshot">
@@ -97,7 +108,15 @@
 		color: var(--muted); opacity: 0.5;
 	}
 	.save-status.saving { color: var(--accent-deep); opacity: 0.9; }
-	.word-count { color: var(--muted); opacity: 0.45; }
+	.word-count {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: inherit; letter-spacing: inherit;
+		color: var(--muted); opacity: 0.45;
+		background: none; border: none; padding: 0; cursor: pointer;
+		transition: color 0.18s ease, opacity 0.18s ease;
+	}
+	.word-count:hover { opacity: 0.85; color: var(--accent-strong); }
+	.word-count.met { color: var(--accent-strong); opacity: 0.8; }
 	.picker-sep { color: var(--muted); opacity: 0.3; }
 	.picker { display: inline-flex; align-items: center; gap: 0.4rem; }
 	.picker-label { color: var(--muted); opacity: 0.55; text-transform: uppercase; }

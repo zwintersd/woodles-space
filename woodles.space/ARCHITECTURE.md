@@ -18,10 +18,12 @@ other docs have narrower jobs:
 - [REFACTORING.md](./REFACTORING.md) is the living consolidation log — code
   that exists in more than one place.
 - [CONVERGENCE.md](./CONVERGENCE.md) is the product-shape counterpart: why
-  spores, notebook, dev log, ologypedia and write overlap, and the plan for
-  collapsing them into *one knowledge base, one writing surface, one front
-  door*. all three rooms are built; its §5 table tracks which steps have
-  landed and which remain. read it before reshaping any of those apps.
+  spores, notebook, dev log, ologypedia and write overlapped, and the plan
+  that collapsed them into *one knowledge base, one writing surface, one
+  front door*. its §5 table tracks the eight original steps (all landed);
+  its §7 records the later amendment — notebook retired into write, so the
+  writing surface and the front door are now the same room. read it before
+  reshaping any of those apps.
 - [ROADMAP.md](./ROADMAP.md) is the 10-week plan for making marginalia and
   the bestiary public-facing — all ten weeks are marked `✅ shipped` in its
   own headers, week 4 (share links, save-as-image, adopt-a-card) having
@@ -84,10 +86,9 @@ woodles.space/
     ├── ologypedia/          static · a block system for textbook-style pages, and the pages it renders
     ├── letter/              static · echoes — the published-letter reader
     ├── animations/          Python · offline Manim scenes and curated web previews
-    ├── write/               SvelteKit · the letter editor
+    ├── write/               SvelteKit · the writing surface — letters, essays, stories, poems, notes
     ├── marginalia/          SvelteKit · a witch writes worlds + a reading room
     ├── planner/             SvelteKit · carillon — self-observation, day piles, and reinforcement
-    ├── notebook/            SvelteKit · the front door — one stream of captures
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
     ├── spores/              SvelteKit · the knowledge base — linked entries, gathered into spellbooks
     ├── thinking-about/      SvelteKit · a board for what's being read, played, and watched
@@ -108,17 +109,19 @@ the repository or silently promoting an experiment into a game.
 ## the app manifest
 
 `packages/app-manifest/src/index.js` is the canonical deployable-app inventory.
-It owns the 18 app ids, names, public paths and aliases, app shape, source and
+It owns the 17 app ids, names, public paths and aliases, app shape, source and
 output locations, maturity, and landing visibility. It also owns the landing
 tile order/copy, **band**, default pins, featured fallback, and Marginalia's
 Reading Room sub-surface. A band is the *moment* a tile is for rather than the
-thing it holds — `catch`, `write`, `tend`, `read`, `play` — and the start
+thing it holds — `write`, `tend`, `read`, `play` — and the start
 menu's "all apps" section renders grouped under them (`landingAppsByBand`),
-so the homepage stops presenting sixteen peers to choose between. That section
-now lists every app, not just the unpinned remainder, because a band whose only
-app is pinned would otherwise never show its name. The suite fails if a tile
-lands in an unknown band, if grouping loses one, or if anything but `notebook`
-appears in `catch`. See [CONVERGENCE.md](./CONVERGENCE.md).
+so the homepage stops presenting fifteen peers to choose between. That section
+lists every app, not just the unpinned remainder, because a band whose only
+app is pinned would otherwise never show its name. There is no `catch` band
+anymore: Notebook, the app it existed for, retired into Write (CONVERGENCE.md
+§7), and catching a thought is the write band's job now. The suite fails if a
+tile lands in an unknown band, if grouping loses one, if a `catch` band grows
+back, or if a second app joins `write`. See [CONVERGENCE.md](./CONVERGENCE.md).
 
 The static landing page imports that browser-ready module directly;
 its hand-drawn `ICONS` stay local because they are artwork, not deployment
@@ -142,7 +145,7 @@ runtime — `<link href="/shared/palette.css">` and `import … from
 and its bloom post-processing addons from a CDN through a `<script
 type="importmap">`, still with no build step.
 
-**SvelteKit apps** — `write`, `marginalia`, `planner`, `notebook`, `bestiary`,
+**SvelteKit apps** — `write`, `marginalia`, `planner`, `bestiary`,
 `spores`, `thinking-about`, `bloomforge`, `bloomforge-player` — use Svelte 5 runes,
 Vite 7, and `@sveltejs/adapter-static`.
 each builds to `apps/<name>/dist/` and consumes `shared/` through the `@shared`
@@ -408,21 +411,20 @@ export/import round trips, and byte/storage estimates. The full adoption
 contract and reference API live in
 [`packages/persistence/README.md`](./packages/persistence/README.md).
 
-`notebook` is the reference localStorage adoption. It now stores one v3
-workspace document of **captures**, carrying forward the v1 keys and the v2
-document, validating stored and imported data, showing save/recovery failures
-in the page, and exporting the same envelope that it imports.
-
-Its v3 upgrade is deliberately **non-destructive**: it reads `notebook.workspace.v2`
-for notes and ideas and leaves it in place, because Carillon reads the same key
-for the tasks it took over (see below). That makes the two migrations
-order-independent — whichever app you open first, neither reads data out from
-under the other. `bestiary` remains IndexedDB-native because of its embedded image data;
+`notebook` was the reference localStorage adoption before it retired into
+Write (CONVERGENCE.md §7). Its stored envelopes outlive it, on purpose: the
+v3 captures document stays in localStorage, Write's one-time capture import
+(`apps/write/src/lib/notebookImport.ts`) reads it — primary, then backup —
+and leaves it in place, and Carillon still reads `notebook.workspace.v2` for
+the tasks it took over. Both migrations remain order-independent and
+non-destructive; nothing reads data out from under anything else.
+`bestiary` remains IndexedDB-native because of its embedded image data;
 it validates its collection, keeps a last-known-good shelf, and reports both
 collection size and the browser origin's usage/quota in `SyncPanel`.
 
-`packages/handoff` is the second adopter, and the first one that isn't an app:
-each handoff queue is a versioned document in its own right.
+`packages/handoff` is now the reference adopter, and the first one that isn't
+an app: each handoff queue is a versioned document in its own right.
+`bloomforge` persists its project shelf through the same contract.
 
 This is intentionally incremental. Planner, Spores, Thinking About, Write, and
 Marginalia keep their existing domain persistence until each is changed for a
@@ -657,25 +659,50 @@ them, but `textbook.html` is a signpost that points at `/spores` and hands
 back the original `ologypedia-textbook-v1` blob as a download. Nothing is
 deleted on migration, so that page keeps working as an escape hatch.
 
-## the front door
+## the writing surface
 
-`notebook` holds one kind of thing. It used to hold three — notes, tasks, and
-ideas — behind three mode tabs, so arriving with a thought meant answering
-"which of these is it?" before you could type, which is exactly the decision a
-front door exists to remove (CONVERGENCE.md §3).
+`write` is where words go — every kind of them. It began as the letter editor
+and stayed the best text surface in the workspace (the rich contenteditable
+with three composable layers, pockets, margin notes, the publish path to
+echoes); it is now also the front door, because `notebook` retired into it
+(CONVERGENCE.md §7). The routing question a front door exists to remove —
+"which app does this thought belong in?" — is answered once, at the homepage:
+words go to Write.
 
-**Tasks went to Carillon**, where time lives. `apps/planner/src/lib/notebookTasks.ts`
-imports them once, flagged in planner settings. Carillon has no priority — it
-organizes by domain and by time — so an off-normal priority is recorded in the
-task's `notes` rather than invented as a field or dropped. Nothing ever maps to
-Carillon's `dropped` state, which Notebook never had.
+**Kinds.** Every draft has a `WritingKind` — `letter`, `essay`, `story`,
+`poem`, `note` (`src/lib/kinds.ts`). A kind is a lens, not a cage: switching
+costs nothing and loses nothing. The editor dresses itself for the kind — the
+untitled fallback, and all three layers' placeholders, so the midground reads
+"characters, places, threads" under a story and "evidence, sources, the
+counterargument you owe an answer" under an essay. A stored draft with no
+`kind` field reads as `letter`, so nothing written before kinds existed ever
+needed rewriting. Publishing is unchanged: whatever the kind, what publishes
+is a letter in echoes, and only when explicitly made public.
 
-**Notes and ideas were always the same gesture at different lengths** and are
-now both `Capture`s: title (which may be empty — a thought does not owe you
-one), body, tags, and a `lane` (`spark` / `shape` / `later`). A lane is triage,
-not status: where a thing sits in your head, not how finished it is. The
-default filter is *everything*, because filtering is a choice; the number keys
-filter rather than switch modes, and pressing the same one again clears it.
+**Word goals.** A draft can carry an optional `goal` (the bottom bar's word
+count is the control). Progress is reported, never scolded — fiction gets to
+50,000 the same way an essay stays under 2,000, by being able to see where it
+stands.
+
+**The drafts list earns its size.** Index entries carry `kind` and `tags`;
+the drafts modal searches title + tags and filters by the kinds actually
+present. This answers CONVERGENCE.md §6.1 (write's flat drafts list),
+which became urgent the moment notebook's captures arrived in it.
+
+**The capture import** (`src/lib/notebookImport.ts`) runs once on load,
+flagged, like Carillon's task takeover. Each capture becomes its own draft of
+kind `note` under a deterministic id (`d-nb-<capture id>`), tags carried,
+body through `textToHtml`; the untouched starter capture is skipped; the
+stranded `woodles.handoff.notebook.v1` queue is drained into drafts and that
+key alone removed. The notebook document itself is left in place. Unlike a
+live handoff, an arriving archive does not steal the opening slot — it is
+announced once, and whatever you were writing stays open.
+
+Notebook's other half had already left before the retirement: **tasks went to
+Carillon**, where time lives. `apps/planner/src/lib/notebookTasks.ts` still
+imports them once from `notebook.workspace.v2`, flagged in planner settings —
+that key outlives the app, so the takeover works whether or not it ran before
+the retirement.
 
 ## the authoring brief
 
@@ -717,8 +744,10 @@ the app it stays in forever.
 
 **`packages/handoff` (`@woodles/handoff`)** — `createHandoffQueue(target)` over
 one versioned localStorage document per target (`woodles.handoff.<target>.v1`),
-one queue each for the three apps that can receive: `notebook`, `spores`,
-`write`. Read-only surfaces (echoes, ologypedia) are not targets. `send()`
+one queue each for the apps that can receive: `spores` and `write`. (`notebook`
+left the target list when it retired into Write; its stranded queue is drained
+by Write's capture import rather than by a receiver.) Read-only surfaces
+(echoes, ologypedia) are not targets. `send()`
 appends, `drain()` empties, `peek()`/`count()` don't consume. The envelope is
 `{ id, target, title, body, format, tags, source, createdAt }`, where `format`
 is `text` or `html` and `source` carries the originating app for provenance.
@@ -734,16 +763,15 @@ Three deliberate choices, each tested:
 - **queues are bounded** (`QUEUE_LIMIT`, 200, oldest dropped). a queue is a
   hallway, not a home.
 
-**receivers** drain on load and announce it once: `notebook` turns each into a
-note tagged `from:<app>`, `spores` plants each as a spore, `write` gives each
-its own draft and opens the newest. HTML bodies are flattened for the two
-plain-textarea apps and run through `sanitizeHtml` for `write` — a body may be
-model output from two apps ago, and write's drafts can reach the public
-publish path.
+**receivers** drain on load and announce it once: `spores` plants each as a
+spore, `write` gives each its own draft (tags carried onto the index) and
+opens the newest. HTML bodies are flattened for spores' plain textarea and run
+through `sanitizeHtml` for `write` — a body may be model output from two apps
+ago, and write's drafts can reach the public publish path.
 
-**senders** are `notebook` (per note and per idea, → spores / write) and
-`spores` (per spore, → write). Everything can reach the front door; the front
-door can reach everything.
+**senders**: `spores` hands a spore that wants real prose to `write`. The
+other direction — a write draft that turns out to be knowledge-base material —
+is still a copy-paste; wire it when it hurts.
 
 ## the sync layer
 
@@ -860,14 +888,13 @@ theme, and concrete color names (`--lavender`, `--aqua`, `--peach`, `--lilac`,
 `--plum`, `--lapis`, `--cream`) stay stable across them. `write` and the static
 apps consume this.
 
-the other six SvelteKit apps don't. each ships its own token file under
+the other five SvelteKit apps with a house style don't. each ships its own
+token file under
 `src/lib/style/tokens.css`, namespaced so it never leaks: `marginalia`
 redefines the bare names under `.marginalia-root`, `planner` uses `--p-*`
 for its inner surfaces and `--car-*` for the Carillon shell,
 `spores` uses `--g-*`, `bestiary` uses `--b-*`,
-`notebook` defines `--nb-*` straight on `:root` (no
-scoping class — each app is its own page, so there's nothing else in the DOM
-for it to leak onto), and `thinking-about` uses `--ta-*` under
+and `thinking-about` uses `--ta-*` under
 `.thinking-about-root`. `data-theme` and the eleven shared themes don't reach
 any of them; they own their own look.
 
@@ -942,15 +969,17 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1552 tests total: 16 in `api/` (its own
+1626 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1536 across sixteen pnpm
-packages — `write` 72, `marginalia` 269, `planner` 486, `notebook` 28,
-`spores` 140, `bestiary` 162, `bloomforge` 68, `bloomforge-player` 18,
+instead of the recursive `pnpm -r test`), plus 1610 across sixteen pnpm
+packages — `write` 104, `marginalia` 269, `planner` 486,
+`spores` 140, `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
 `packages/sync` 9, `packages/persistence` 6, `packages/app-manifest` 11,
 `packages/handoff` 15, `packages/text` 23, `packages/spellcraft` 16,
-`packages/incremental-core` 144, and `thinking-about` 69.
+`packages/emoji` 4, `packages/incremental-core` 191, and `thinking-about` 69.
+(`notebook`'s 28 retired with the app; write's suite grew to cover kinds,
+the drafts filter, and the capture import.)
 keep this inventory current when a suite changes; the root command is the
 release contract, not the prose count.
 
@@ -960,7 +989,7 @@ SvelteKit app's `tsconfig.json` extends `./.svelte-kit/tsconfig.json`, which
 can't resolve the tsconfig. because the scripts sync first, `pnpm test` works
 straight from a clean checkout.
 
-`write`, `marginalia`, `notebook`, and `spores` load the workspace-level
+`write`, `marginalia`, and `spores` load the workspace-level
 `vitest.setup.ts` to install a browser-like in-memory `localStorage` under
 Node. planner keeps its own localStorage mock in `store.test.ts`; under the
 current Node runtime that suite passes but may still print a
@@ -1002,8 +1031,8 @@ working tree.
 
 ## svelte-check
 
-All nine SvelteKit apps currently pass with zero errors and zero warnings.
-`pnpm -r check` runs all nine in turn. it stops at the first app that fails,
+All eight SvelteKit apps currently pass with zero errors and zero warnings.
+`pnpm -r check` runs all eight in turn. it stops at the first app that fails,
 so when diagnosing a new break, run the app directly to see past it.
 
 ## continuous integration
@@ -1020,9 +1049,9 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (1552 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (1626 tests)
 pnpm check              svelte-check in every app
-pnpm build              build the nine SvelteKit apps
+pnpm build              build the eight SvelteKit apps
 ```
 
 both `test` and `check` generate `.svelte-kit/` themselves on a fresh clone, so

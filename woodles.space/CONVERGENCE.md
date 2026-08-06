@@ -25,8 +25,14 @@ Textbook has moved across too. Notebook has shed its tasks to
 Carillon and become one stream you type into. **five surfaces are now three,
 plus a publish target.**
 
-the plan is finished. what's left is in §6 — a handful of things deliberately
-left duplicated, and one question that is still open.
+**amended since: three rooms became two.** living with the built plan showed
+that the front door and the writing surface wanted to be the same room —
+Notebook retired into Write, which now handles every kind of writing. the
+what and the why are in **§7**; the step-8 world it amends is preserved below
+as written.
+
+what else is left is in §6 — a handful of things deliberately left
+duplicated, and one question that is still open.
 
 ---
 
@@ -651,10 +657,12 @@ collapsing two paragraphs into one.
 
 the six questions this doc opened with are answered in §0. what remains:
 
-1. **write's flat drafts list** — undecided, and deliberately not in the plan.
-   the honest read is that it can't be answered until step 7 exists: once
-   spores and write share an editor, whether a letter wants tags and links
-   becomes an observation rather than a guess. revisit then.
+1. ~~**write's flat drafts list**~~ — **resolved by §7.** the retirement of
+   notebook forced the question this item was waiting on: once captures
+   landed in write's drafts, the flat list had to earn its size. index
+   entries now carry `kind` and `tags`, and the drafts modal searches and
+   filters. links between drafts remain unbuilt — that is spores' job, not
+   write's.
 2. ~~what happens to the `/marginalia-devlog` route~~ — **resolved**: a
    permanent redirect to `/spores`, pinned by a manifest test so a retired
    route can't quietly start 404ing, plus a companion test that no live app's
@@ -667,3 +675,80 @@ the six questions this doc opened with are answered in §0. what remains:
    a same-origin localStorage envelope, which is enough for one browser. making
    a capture on the phone show up on the laptop means putting it through
    `api/sync.ts`, which is a bigger ask than the routing problem needs today.
+
+---
+
+## 7. the amendment — notebook retires into write
+
+*added after the eight steps above had all shipped. everything below §0's
+table and above this line describes the world as steps 0–8 left it; this
+section records how that world changed.*
+
+### the decision
+
+Z's verdict, living with the built plan: **notebook is not a good app.** it
+was the thinnest room in the house — a bare textarea with lanes — and its one
+real job, *always accepting*, is a property, not a product. so:
+
+| question | answer | consequence |
+| --- | --- | --- |
+| keep notebook as the front door? | **no** — kill it, unclutter the desktop | the app retires the way the dev log did: data migrated, route redirected, tile removed |
+| where do words go now? | **write** | write becomes the writing surface *and* the front door — two of the three rooms turn out to be one room |
+| what about fiction and nonfiction? | **write handles every kind** | drafts gain a `kind` — letter, essay, story, poem, note — and the editor dresses for it |
+
+steps 5–6 were not wasted work, and this is worth saying plainly: shedding
+tasks to Carillon and collapsing three modes into captures is exactly what
+made notebook small enough to fold into a drafts list. the step-6 app was the
+*preparation* for this step, visible only in hindsight.
+
+### what landed
+
+**the retirement**, on the dev-log pattern (step 2): app directory deleted,
+manifest entry removed, tile orders renumbered, dead icon artwork dropped,
+`/notebook` turned into a permanent redirect to `/write`, and the `catch`
+band retired with its only tenant — the write band's blurb now names the
+catching job. the manifest suite pins all of it: the redirect can't quietly
+404, a `catch` band can't grow back, and a second app can't join `write`.
+
+**the capture import** (`apps/write/src/lib/notebookImport.ts`), on the
+Carillon-takeover pattern: runs once, flagged, **non-destructive** — the v3
+document (primary, then backup) is read and left in place, same stance as
+every other migration here. each capture becomes its own draft of kind
+`note` under a deterministic id, so even a lost flag can't double one. the
+stranded `woodles.handoff.notebook.v1` queue drains into drafts too, and that
+key alone is removed — a queue is a hallway, not a home. an arriving archive
+does not steal the opening slot the way a live handoff deliberately does.
+
+**write, empowered for fiction and nonfiction:**
+
+- **kinds** (`src/lib/kinds.ts`): `letter`, `essay`, `story`, `poem`, `note`.
+  a kind is a lens, not a cage — switchable any time, from a chip row above
+  the title. all three layers' placeholders follow it, which is the
+  three-layer metaphor generalizing: under a story the midground is
+  "characters, places, threads"; under an essay it is "evidence, sources,
+  the counterargument you owe an answer". a draft stored before kinds
+  existed has no `kind` field and reads as `letter` — nothing rewritten.
+- **word goals**: an optional per-draft `goal`, set from the bottom bar's
+  word count. progress reported, never scolded.
+- **the drafts list earns its size**: index entries carry `kind` and `tags`
+  (handoff tags now survive onto the index too); the modal searches title +
+  tags and filters by the kinds actually present.
+- **templates know their kind**: the shared library's templates each carry
+  one, and two new ones ship — an `opening-scene` (fiction) and an `essay`
+  scaffold — so /scaffold now seeds more than letters.
+- **publishing is unchanged**: whatever the kind, what publishes is a letter
+  in echoes, only when explicitly public. `notebook` also left
+  `HANDOFF_TARGETS` — spores → write remains the one wired handoff.
+
+**what was deliberately not done:** no lanes port (a capture's `spark`/
+`shape`/`later` triage dies with the app — `kind: note` plus tags is enough
+structure for an inbox that now sits inside a real editor); no tag *editor*
+in write (tags are carried and searchable, not yet authorable); no sync for
+drafts (unchanged from before); no rich editor extraction (step 7's reversal
+stands).
+
+**the doc trail**: ARCHITECTURE.md's "the front door" section became "the
+writing surface"; the persistence README's reference adopter is now
+`@woodles/handoff`; this file's §6.1 is resolved. the sentences in §5's
+"what landed in steps 0 and 1" describing notebook's tile are now history
+rather than description, which is what this section exists to say.

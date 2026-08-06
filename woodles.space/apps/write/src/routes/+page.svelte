@@ -62,6 +62,14 @@
 		type MarginGroup
 	} from '$lib/types';
 	import {
+		WRITING_KINDS,
+		kindSpec,
+		coerceKind,
+		coerceGoal,
+		parseGoalInput,
+		type WritingKind
+	} from '$lib/kinds';
+	import {
 		palettes,
 		motifs as motifList,
 		fontPairs,
@@ -78,16 +86,22 @@
 		midground: 'mg',
 		background: 'bg'
 	};
-	const LAYER_PLACEHOLDERS: Record<LayerId, string> = {
-		foreground: 'Begin writing your letter…',
-		midground: 'thinking, working notes, what shaped this…',
-		background: 'the impulse. the thing only you know.'
-	};
 
 	let title = $state('');
 	let theme = $state('cream');
 	let motif = $state('blobs');
 	let font = $state('classic');
+
+	// What this draft is becoming — letter, essay, story, poem, note. The
+	// editor dresses itself for the kind; switching is free and loses nothing.
+	let kind = $state<WritingKind>('letter');
+	// Carried from captures/handoffs that arrived with tags. Not edited here
+	// (yet), but never dropped on save — they make the drafts list searchable.
+	let tags = $state<string[]>([]);
+	// Optional word goal for the foreground — how a story gets to 50,000.
+	let goal = $state<number | null>(null);
+
+	const activeKindSpec = $derived(kindSpec(kind));
 
 	let fgEl: HTMLDivElement | undefined = $state();
 	let mgEl: HTMLDivElement | undefined = $state();
@@ -196,6 +210,9 @@
 		theme?: string;
 		motif?: string;
 		font?: string;
+		kind?: string;
+		tags?: string[];
+		goal?: number;
 		layers?: Partial<Record<LayerId, { html?: string }>>;
 		content?: string;
 		annotations?: { pocketNotes?: PocketNote[]; marginNotes?: MarginNote[] };
@@ -204,6 +221,9 @@
 		if (d.theme) theme = d.theme;
 		if (d.motif) motif = d.motif;
 		if (d.font) font = d.font;
+		kind = coerceKind(d.kind);
+		tags = Array.isArray(d.tags) ? d.tags.filter((t) => typeof t === 'string') : [];
+		goal = coerceGoal(d.goal);
 		const layers = d.layers ?? {};
 		const fgHtml = sanitizeHtml(layers.foreground?.html ?? d.content ?? '');
 		const mgHtml = sanitizeHtml(layers.midground?.html ?? '');
@@ -266,6 +286,7 @@
 					theme: t.palette,
 					motif: t.motif,
 					font: t.font,
+					kind: t.kind,
 					content: t.sampleContent
 				});
 				updateMeta();
@@ -291,12 +312,22 @@
 		const boot = bootstrapDrafts();
 		draftsList = boot.drafts;
 		currentDraftId = boot.activeId;
+		const notices: string[] = [];
+		if (boot.notebookImports > 0) {
+			notices.push(
+				boot.notebookImports === 1
+					? 'notebook retired — its one capture is now a draft here'
+					: `notebook retired — its ${boot.notebookImports} captures are now drafts here`
+			);
+		}
 		if (boot.handoffs > 0) {
-			handoffNotice =
+			notices.push(
 				boot.handoffs === 1
 					? 'opened something sent here from elsewhere'
-					: `opened the newest of ${boot.handoffs} things sent here — the rest are in drafts`;
+					: `opened the newest of ${boot.handoffs} things sent here — the rest are in drafts`
+			);
 		}
+		if (notices.length > 0) handoffNotice = notices.join(' · ');
 
 		if (boot.body) {
 			try {
@@ -365,6 +396,24 @@
 		fgIsEmpty = isEmptyHtml(fgEl?.innerHTML ?? '');
 	}
 
+	// One snapshot shape, built in one place — scheduleSave, loadDraft, and
+	// onSelectTemplate all persist through this.
+	function currentDraftBody(now: string): DraftBody {
+		return {
+			title, theme, motif, font, kind,
+			...(tags.length > 0 ? { tags } : {}),
+			...(goal !== null ? { goal } : {}),
+			layers: {
+				foreground: { html: fgEl?.innerHTML ?? '', updatedAt: now },
+				midground: { html: mgEl?.innerHTML ?? '', updatedAt: now },
+				background: { html: bgEl?.innerHTML ?? '', updatedAt: now }
+			},
+			annotations: { pocketNotes: pockets, marginNotes },
+			content: fgEl?.innerHTML ?? '',
+			savedAt: now
+		};
+	}
+
 	function scheduleSave() {
 		if (!hydrated) return;
 		if (publishing) return;
@@ -373,20 +422,9 @@
 		saveTimer = setTimeout(() => {
 			try {
 				const now = new Date().toISOString();
-				const draftData = {
-					title, theme, motif, font,
-					layers: {
-						foreground: { html: fgEl?.innerHTML ?? '', updatedAt: now },
-						midground: { html: mgEl?.innerHTML ?? '', updatedAt: now },
-						background: { html: bgEl?.innerHTML ?? '', updatedAt: now }
-					},
-					annotations: { pocketNotes: pockets, marginNotes },
-					content: fgEl?.innerHTML ?? '',
-					savedAt: now
-				};
 				if (currentDraftId) {
-					saveDraft(currentDraftId, draftData);
-					draftsList = upsertIndex(draftsList, currentDraftId, title, now);
+					saveDraft(currentDraftId, currentDraftBody(now));
+					draftsList = upsertIndex(draftsList, currentDraftId, title, now, { kind, tags });
 					writeIndex(draftsList);
 				}
 			} catch (e) {
@@ -400,6 +438,8 @@
 		void theme;
 		void motif;
 		void font;
+		void kind;
+		void goal;
 		if (hydrated) scheduleSave();
 	});
 
@@ -466,19 +506,7 @@
 		}
 		clearTimeout(saveTimer);
 		if (currentDraftId) {
-			const now = new Date().toISOString();
-			const draftData: DraftBody = {
-				title, theme, motif, font,
-				layers: {
-					foreground: { html: fgEl?.innerHTML ?? '', updatedAt: now },
-					midground: { html: mgEl?.innerHTML ?? '', updatedAt: now },
-					background: { html: bgEl?.innerHTML ?? '', updatedAt: now }
-				},
-				annotations: { pocketNotes: pockets, marginNotes },
-				content: fgEl?.innerHTML ?? '',
-				savedAt: now
-			};
-			saveDraft(currentDraftId, draftData);
+			saveDraft(currentDraftId, currentDraftBody(new Date().toISOString()));
 		}
 
 		currentDraftId = id;
@@ -487,6 +515,9 @@
 		title = '';
 		pockets = [];
 		marginNotes = [];
+		kind = 'letter';
+		tags = [];
+		goal = null;
 		// "public" is an explicit, per-letter act — it must never carry over
 		// to a different letter just because the checkbox was left checked.
 		isPublic = false;
@@ -552,7 +583,7 @@
 			const cleanedMargins = marginNotes.map((m) => ({ ...m, html: sanitizeHtml(m.html) }));
 			const letter: StoredLetter = {
 				id: newLetterId(),
-				title: title.trim() || 'untitled letter',
+				title: title.trim() || activeKindSpec.untitled,
 				theme,
 				motif,
 				font,
@@ -608,6 +639,13 @@
 		setTimeout(() => {
 			window.location.href = '/letter';
 		}, 1800);
+	}
+
+	// A goal is invited, never imposed — same gesture as insertLink's prompt.
+	function setGoal() {
+		const raw = prompt('word goal for the foreground (blank to clear):', goal === null ? '' : String(goal));
+		if (raw === null) return;
+		goal = parseGoalInput(raw);
 	}
 
 	// ── pocket notes ──
@@ -840,6 +878,7 @@
 				theme: t.palette,
 				motif: t.motif,
 				font: t.font,
+				kind: t.kind,
 				content: t.sampleContent
 			});
 			updateMeta();
@@ -847,26 +886,18 @@
 		} else {
 			// Save current draft and create new one for template
 			clearTimeout(saveTimer);
-			const now = new Date().toISOString();
-			const draftData: DraftBody = {
-				title, theme, motif, font,
-				layers: {
-					foreground: { html: fgEl?.innerHTML ?? '', updatedAt: now },
-					midground: { html: mgEl?.innerHTML ?? '', updatedAt: now },
-					background: { html: bgEl?.innerHTML ?? '', updatedAt: now }
-				},
-				annotations: { pocketNotes: pockets, marginNotes },
-				content: fgEl?.innerHTML ?? '',
-				savedAt: now
-			};
 			if (currentDraftId) {
-				saveDraft(currentDraftId, draftData);
+				saveDraft(currentDraftId, currentDraftBody(new Date().toISOString()));
 			}
 
 			// Create new draft for template
 			const newId = createDraftId();
 			const newTime = new Date().toISOString();
-			draftsList = [{ id: newId, title: t.sampleTitle, updatedAt: newTime }, ...draftsList];
+			const templateKind = coerceKind(t.kind);
+			draftsList = [
+				{ id: newId, title: t.sampleTitle, updatedAt: newTime, kind: templateKind },
+				...draftsList
+			];
 			writeIndex(draftsList);
 			currentDraftId = newId;
 			setActiveDraftId(newId);
@@ -876,6 +907,9 @@
 			theme = t.palette;
 			motif = t.motif;
 			font = t.font;
+			kind = templateKind;
+			tags = [];
+			goal = null;
 			pockets = [];
 			marginNotes = [];
 			if (fgEl) fgEl.innerHTML = sanitizeHtml(t.sampleContent);
@@ -943,14 +977,28 @@
 				<span class="reply-breadcrumb-arrow" aria-hidden="true">↗</span>
 			</a>
 		{/if}
-		<p class="doc-eyebrow">echoes · {activeLayer}</p>
+		<div class="kind-row">
+			<div class="kind-switch" role="tablist" aria-label="kind of writing">
+				{#each WRITING_KINDS as k}
+					<button
+						class="kind-btn"
+						class:active={kind === k}
+						role="tab"
+						aria-selected={kind === k}
+						onclick={() => (kind = k)}
+						title={kindSpec(k).moment}>{kindSpec(k).label}</button
+					>
+				{/each}
+			</div>
+			<span class="kind-eyebrow">· {activeLayer}</span>
+		</div>
 		<input
 			bind:this={titleEl}
 			bind:value={title}
 			oninput={scheduleSave}
 			class="doc-title"
 			type="text"
-			placeholder="untitled letter"
+			placeholder={activeKindSpec.untitled}
 			spellcheck="true"
 			autocomplete="off"
 		/>
@@ -965,8 +1013,8 @@
 			class:hidden={activeLayer !== 'foreground'}
 			contenteditable="true"
 			spellcheck="true"
-			data-placeholder={LAYER_PLACEHOLDERS.foreground}
-			aria-label="foreground letter content"
+			data-placeholder={activeKindSpec.placeholders.foreground}
+			aria-label="foreground content"
 			oninput={onFgInput}
 			onpaste={handlePaste}
 			onkeyup={updateToolbarState}
@@ -981,8 +1029,8 @@
 			class:hidden={activeLayer !== 'midground'}
 			contenteditable="true"
 			spellcheck="true"
-			data-placeholder={LAYER_PLACEHOLDERS.midground}
-			aria-label="midground letter content"
+			data-placeholder={activeKindSpec.placeholders.midground}
+			aria-label="midground content"
 			oninput={() => { updateMeta(); scheduleSave(); fgVersion += 1; }}
 			onpaste={handlePaste}
 			role="textbox"
@@ -995,8 +1043,8 @@
 			class:hidden={activeLayer !== 'background'}
 			contenteditable="true"
 			spellcheck="true"
-			data-placeholder={LAYER_PLACEHOLDERS.background}
-			aria-label="background letter content"
+			data-placeholder={activeKindSpec.placeholders.background}
+			aria-label="background content"
 			oninput={() => { updateMeta(); scheduleSave(); fgVersion += 1; }}
 			onpaste={handlePaste}
 			role="textbox"
@@ -1055,6 +1103,8 @@
 <BottomBar
 	{saveStatus}
 	{wordCount}
+	{goal}
+	onSetGoal={setGoal}
 	bind:theme
 	bind:motif
 	bind:font
@@ -1118,14 +1168,47 @@
 		}
 	}
 
-	.doc-eyebrow {
+	/* the kind row: what this draft is becoming, plus the layer eyebrow */
+	.kind-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 1rem;
+		flex-wrap: wrap;
+	}
+	.kind-switch {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+	}
+	.kind-btn {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.58rem;
+		letter-spacing: 0.16em;
+		text-transform: lowercase;
+		color: var(--muted);
+		background: none;
+		border: 1px solid transparent;
+		padding: 3px 8px;
+		border-radius: 4px;
+		cursor: pointer;
+		opacity: 0.5;
+		transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
+	}
+	.kind-btn:hover { opacity: 0.9; color: var(--accent-strong); }
+	.kind-btn.active {
+		color: var(--accent-strong);
+		opacity: 1;
+		background: color-mix(in srgb, var(--accent) 22%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+	}
+	.kind-eyebrow {
 		font-family: var(--editor-mono, var(--font-mono));
 		font-size: 0.58rem;
 		letter-spacing: 0.2em;
 		text-transform: uppercase;
 		color: var(--muted);
 		opacity: 0.45;
-		margin-bottom: 1rem;
 	}
 
 	/* a draft that arrived from another app, announced once on load */

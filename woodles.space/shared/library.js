@@ -98,6 +98,8 @@ export const fontPairs = [
 // templates are { palette, motif, font, sample } presets. /scaffold renders
 // a grid of these and links each tile to /write?template=<id>. /write reads
 // the param, applies the tokens, and seeds the editor with sample content.
+// `kind` names the kind of writing each one starts (write's kinds.ts);
+// consumers that don't know about kinds can ignore it.
 export const templates = [
 	{
 		id: 'love-letter',
@@ -106,6 +108,7 @@ export const templates = [
 		palette: 'cream',
 		motif: 'blobs',
 		font: 'classic',
+		kind: 'letter',
 		sampleTitle: 'a small thing for you',
 		sampleContent:
 			'<p>my dearest,</p>' +
@@ -121,6 +124,7 @@ export const templates = [
 		palette: 'paper',
 		motif: 'paper',
 		font: 'modern',
+		kind: 'essay',
 		sampleTitle: 'a position',
 		sampleContent:
 			'<h1>this is what we will not do.</h1>' +
@@ -138,6 +142,7 @@ export const templates = [
 		palette: 'cream',
 		motif: 'mist',
 		font: 'optical',
+		kind: 'poem',
 		sampleTitle: 'untitled, in the margin',
 		sampleContent:
 			'<p>the light is at a strange angle this morning.</p>' +
@@ -151,6 +156,7 @@ export const templates = [
 		palette: 'dusk',
 		motif: 'aurora',
 		font: 'classic',
+		kind: 'letter',
 		sampleTitle: 'from somewhere',
 		sampleContent:
 			'<p>arrived late, found the place by the river you mentioned. ' +
@@ -164,6 +170,7 @@ export const templates = [
 		palette: 'paper',
 		motif: 'paper',
 		font: 'fell',
+		kind: 'essay',
 		sampleTitle: 'what to say',
 		sampleContent:
 			'<p>I keep thinking about a thing she said, years ago, that I ' +
@@ -178,10 +185,47 @@ export const templates = [
 		palette: 'dusk',
 		motif: 'aurora',
 		font: 'pixel',
+		kind: 'note',
 		sampleTitle: 'log entry · 042',
 		sampleContent:
 			'<p>signal acquired. moon is waxing. tea is cold.</p>' +
 			'<p>writing this down so I can find it later.</p>'
+	},
+	{
+		id: 'opening-scene',
+		name: 'opening scene',
+		desc: 'fiction · a door opens',
+		palette: 'midnight',
+		motif: 'aurora',
+		font: 'fell',
+		kind: 'story',
+		sampleTitle: 'the house that was not on the map',
+		sampleContent:
+			'<p>The door had been painted shut for thirty years, which is why ' +
+			'Merit was surprised to find it open.</p>' +
+			'<p>Not ajar. Open — the way a mouth is open in the middle of a ' +
+			'sentence, waiting for you to catch up.</p>' +
+			'<p>She put down the box of her mother&rsquo;s books and listened.</p>'
+	},
+	{
+		id: 'essay',
+		name: 'essay',
+		desc: 'a case, made carefully',
+		palette: 'inkwell',
+		motif: 'clean',
+		font: 'modern',
+		kind: 'essay',
+		sampleTitle: 'in defense of the detour',
+		sampleContent:
+			'<h1>The claim.</h1>' +
+			'<p>State it plainly, in one sentence, before you earn it.</p>' +
+			'<h2>The evidence.</h2>' +
+			'<p>Three things you can point at. If you can only point at two, ' +
+			'say so — the reader can smell a stretched third.</p>' +
+			'<h2>The counterargument you owe an answer.</h2>' +
+			'<p>The strongest version of it, not the convenient one.</p>' +
+			'<h2>What follows.</h2>' +
+			'<p>If the claim is true, what should anyone do differently on Tuesday?</p>'
 	}
 ];
 

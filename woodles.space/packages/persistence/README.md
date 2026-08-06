@@ -26,9 +26,13 @@ not know what a note, creature, task, spore, or world is.
 
 ## current adopters
 
-- `notebook` is the reference localStorage adoption. Its four legacy v1 keys
-  migrate into one schema-v2 workspace document. The UI exposes save/recovery
-  state plus JSON export and import.
+- `@woodles/handoff` is the reference localStorage adoption: each handoff
+  queue is a versioned document in its own right. (`notebook` was the original
+  reference adopter; it retired into Write — CONVERGENCE.md §7 — and Write's
+  one-time capture import reads the notebook envelope this package wrote,
+  which is the adoption paying off one last time.)
+- `bloomforge` persists its project shelf through `createVersionedStorage`,
+  with JSON export/import.
 - `bestiary` keeps its image-heavy collection in IndexedDB. It validates the
   stored collection, keeps a last-known-good shelf, reports collection and
   origin usage, and exposes write failures in the existing sync/export panel.

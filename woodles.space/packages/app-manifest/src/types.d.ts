@@ -5,8 +5,11 @@ export type AppMaturity = 'stable' | 'growing' | 'incubator' | 'private';
  * The moment an app is for, rather than the thing it holds. Tiles group under
  * these on the landing page so the homepage stops presenting every app as a
  * peer you have to choose between. See CONVERGENCE.md §3.
+ *
+ * `catch` retired with Notebook (CONVERGENCE.md §7) — catching a thought is
+ * the write band's job now.
  */
-export type LandingBandId = 'catch' | 'write' | 'tend' | 'read' | 'play';
+export type LandingBandId = 'write' | 'tend' | 'read' | 'play';
 
 export interface LandingBand {
 	id: LandingBandId;

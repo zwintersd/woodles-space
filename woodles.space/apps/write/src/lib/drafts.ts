@@ -6,15 +6,29 @@ import {
 } from './storage';
 import { createHandoffQueue, type Handoff } from '@woodles/handoff';
 import { sanitizeHtml } from './htmlTools';
+import { coerceKind, WRITING_KINDS, type WritingKind } from './kinds';
+import { importNotebookCaptures } from './notebookImport';
 import type { LayerId, PocketNote, MarginNote } from './types';
 
-export type DraftIndexItem = { id: string; title: string; updatedAt: string };
+export type DraftIndexItem = {
+	id: string;
+	title: string;
+	updatedAt: string;
+	/** Absent on pre-kinds entries; read as `letter`. */
+	kind?: WritingKind;
+	/** Carried from captures that arrived with tags; searchable, not editable here yet. */
+	tags?: string[];
+};
 
 export interface DraftBody {
 	title?: string;
 	theme?: string;
 	motif?: string;
 	font?: string;
+	kind?: WritingKind;
+	tags?: string[];
+	/** Optional word goal for the foreground — see kinds.ts. */
+	goal?: number;
 	layers?: Partial<Record<LayerId, { html?: string; updatedAt?: string }>>;
 	annotations?: { pocketNotes?: PocketNote[]; marginNotes?: MarginNote[] };
 	content?: string;
@@ -89,20 +103,47 @@ export function removeDraftBody(id: string): void {
 
 // Updates the index entry for `id` to reflect the latest title / timestamp.
 // If the id isn't in the index yet, appends it. Returns the new list.
+// `extras` (kind, tags) are merged when given and left alone when not, so
+// callers that only know about titles can't erase what another caller wrote.
 export function upsertIndex(
 	list: DraftIndexItem[],
 	id: string,
 	title: string,
-	updatedAt: string
+	updatedAt: string,
+	extras: Pick<DraftIndexItem, 'kind' | 'tags'> = {}
 ): DraftIndexItem[] {
 	const next = [...list];
 	const idx = next.findIndex((d) => d.id === id);
 	if (idx >= 0) {
-		next[idx] = { ...next[idx], title, updatedAt };
+		next[idx] = { ...next[idx], title, updatedAt, ...extras };
 	} else {
-		next.push({ id, title, updatedAt });
+		next.push({ id, title, updatedAt, ...extras });
 	}
 	return next;
+}
+
+/**
+ * The drafts list, searchable and filterable — what keeps a flat list livable
+ * once letters, essays, stories, and migrated captures all share it.
+ * Matches title and tags; a null kind means everything.
+ */
+export function filterDrafts(
+	list: DraftIndexItem[],
+	query: string,
+	kind: WritingKind | null
+): DraftIndexItem[] {
+	const q = query.trim().toLowerCase();
+	return list.filter((d) => {
+		if (kind !== null && coerceKind(d.kind) !== kind) return false;
+		if (!q) return true;
+		return [d.title, ...(d.tags ?? [])].join(' ').toLowerCase().includes(q);
+	});
+}
+
+/** Which kinds actually appear in the list, in canonical order — for filter chips. */
+export function kindsPresent(list: DraftIndexItem[]): WritingKind[] {
+	const present = new Set(list.map((d) => coerceKind(d.kind)));
+	return WRITING_KINDS.filter((kind) => present.has(kind));
 }
 
 // One-time migration: if there's an old single-draft key and no
@@ -163,6 +204,7 @@ export function handoffToDraftBody(item: Handoff): DraftBody {
 	const html = item.format === 'html' ? sanitizeHtml(item.body) : textToHtml(item.body);
 	return {
 		title: item.title,
+		...(item.tags.length > 0 ? { tags: item.tags } : {}),
 		layers: { foreground: { html, updatedAt: stamp } },
 		savedAt: stamp
 	};
@@ -189,7 +231,13 @@ export function ingestHandoffs(index: DraftIndexItem[]): HandoffIngestResult {
 		const id = createDraftId() + '-' + item.id.slice(-4);
 		const body = handoffToDraftBody(item);
 		saveDraft(id, body);
-		drafts = upsertIndex(drafts, id, body.title ?? '', body.savedAt ?? new Date().toISOString());
+		drafts = upsertIndex(
+			drafts,
+			id,
+			body.title ?? '',
+			body.savedAt ?? new Date().toISOString(),
+			body.tags ? { tags: body.tags } : {}
+		);
 		activeId = id;
 	}
 	writeIndex(drafts);
@@ -207,6 +255,8 @@ export interface BootstrapResult {
 	body: DraftBody | null;
 	/** How many arrived from another app on this load. */
 	handoffs: number;
+	/** How many notebook captures moved in when that app retired. */
+	notebookImports: number;
 }
 
 // Returns the initial draft state for the app on first paint. Performs
@@ -229,6 +279,15 @@ export function bootstrap(): BootstrapResult {
 		setActiveDraftId(activeId);
 	}
 
+	// Notebook's captures, carried in once after that app retired. An archive
+	// arrives quietly — it fills the drafts list without stealing the opening
+	// slot the way a live handoff (below) deliberately does.
+	const imported = importNotebookCaptures(drafts);
+	if (imported.count > 0) {
+		drafts = imported.drafts;
+		writeIndex(drafts);
+	}
+
 	// Anything sent here from another app becomes its own draft and wins the
 	// opening slot — it's the thing you came to write.
 	const caught = ingestHandoffs(drafts);
@@ -239,5 +298,5 @@ export function bootstrap(): BootstrapResult {
 	}
 
 	const body = loadDraft(activeId);
-	return { drafts, activeId, body, handoffs: caught.count };
+	return { drafts, activeId, body, handoffs: caught.count, notebookImports: imported.count };
 }

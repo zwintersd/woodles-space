@@ -7,7 +7,9 @@
   "trailingSlash": false,
   "redirects": [
     { "source": "/marginalia-devlog",        "destination": "/spores", "permanent": true },
-    { "source": "/marginalia-devlog/:path*", "destination": "/spores", "permanent": true }
+    { "source": "/marginalia-devlog/:path*", "destination": "/spores", "permanent": true },
+    { "source": "/notebook",                 "destination": "/write",  "permanent": true },
+    { "source": "/notebook/:path*",          "destination": "/write",  "permanent": true }
   ],
   "rewrites": [
     { "source": "/",                "destination": "/apps/landing/index.html" },
@@ -45,8 +47,6 @@
     { "source": "/marginalia/:path*",         "destination": "/apps/marginalia/dist/index.html" },
     { "source": "/planner",            "destination": "/apps/planner/dist/index.html" },
     { "source": "/planner/:path*",     "destination": "/apps/planner/dist/:path*" },
-    { "source": "/notebook",           "destination": "/apps/notebook/dist/index.html" },
-    { "source": "/notebook/:path*",    "destination": "/apps/notebook/dist/:path*" },
     { "source": "/animations",         "destination": "/apps/animations/index.html" },
     { "source": "/animations/:path*",  "destination": "/apps/animations/:path*" },
 { "source": "/spores",             "destination": "/apps/spores/dist/index.html" },
