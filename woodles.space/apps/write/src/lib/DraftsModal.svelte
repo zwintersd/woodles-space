@@ -182,8 +182,8 @@
 	}
 	.draft-item-title {
 		font-family: var(--editor-display, var(--font-display)); font-size: 1.1rem;
-		color: var(--accent-strong); font-style: italic; white-space: nowrap; overflow: hidden;
-		text-overflow: ellipsis; max-width: 100%;
+		color: var(--accent-strong); font-style: italic; overflow-wrap: break-word;
+		max-width: 100%;
 	}
 	.draft-item-meta { display: inline-flex; align-items: baseline; gap: 0.6rem; }
 	.draft-item-kind {

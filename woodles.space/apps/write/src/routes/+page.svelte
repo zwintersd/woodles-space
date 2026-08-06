@@ -127,7 +127,7 @@
 	let fgEl: HTMLDivElement | undefined = $state();
 	let mgEl: HTMLDivElement | undefined = $state();
 	let bgEl: HTMLDivElement | undefined = $state();
-	let titleEl: HTMLInputElement | undefined = $state();
+	let titleEl: HTMLTextAreaElement | undefined = $state();
 	let editorPageEl: HTMLDivElement | undefined = $state();
 	let marginColumnEl: HTMLElement | undefined = $state();
 
@@ -389,6 +389,20 @@
 
 	function onResize() {
 		scheduleMeasure(80);
+		autosizeTitle();
+	}
+
+	// The title is a textarea so long titles wrap instead of scrolling out of
+	// view; it still behaves like a single-line field (see the Enter guard
+	// below), so its height has to be driven manually from content.
+	function autosizeTitle() {
+		if (!titleEl) return;
+		titleEl.style.height = 'auto';
+		titleEl.style.height = titleEl.scrollHeight + 'px';
+	}
+
+	function onTitleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') e.preventDefault();
 	}
 
 	$effect(() => {
@@ -460,6 +474,14 @@
 		updateMeta();
 		updateToolbarState();
 	}
+
+		void title;
+		// Wait for the bind:value DOM write to land before measuring —
+		// programmatic title changes (draft load, templates) update the
+		// textarea's value through this same flush, and reading scrollHeight
+		// before it lands measures the stale content.
+		tick().then(autosizeTitle);
+	});
 
 	function updateMeta() {
 		const el = elFor(activeLayer);
@@ -1100,16 +1122,17 @@
 				<span class="kind-eyebrow">· {activeLayer}</span>
 			{/if}
 		</div>
-		<input
+		<textarea
 			bind:this={titleEl}
 			bind:value={title}
 			oninput={scheduleSave}
+			onkeydown={onTitleKeydown}
 			class="doc-title"
-			type="text"
+			rows="1"
 			placeholder={activeKindSpec.untitled}
 			spellcheck="true"
 			autocomplete="off"
-		/>
+		></textarea>
 
 		{#if activeLayer === 'foreground'}
 			<EditorToolbar {bold} {italic} {underline} onCommand={exec} onInsertLink={insertLink} />
@@ -1569,9 +1592,7 @@
 		color: var(--accent-strong);
 		font-size: 0.95rem;
 		max-width: 22em;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		overflow-wrap: break-word;
 	}
 	.reply-breadcrumb-arrow {
 		font-family: var(--editor-mono, var(--font-mono));
@@ -1594,6 +1615,10 @@
 		margin-bottom: 2.4rem;
 		caret-color: var(--accent-deep);
 		line-height: 1.1;
+		display: block;
+		resize: none;
+		overflow: hidden;
+		overflow-wrap: break-word;
 	}
 	.doc-title::placeholder { color: var(--muted); opacity: 0.28; }
 
