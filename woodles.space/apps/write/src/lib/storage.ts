@@ -4,6 +4,9 @@
 export const LETTERS_KEY = 'woodles_letters';
 export const ISSUE_KEY = 'woodles_issue_count';
 export const POCKETS_ORDER_KEY = 'woodles_pockets_order';
+// How you like to sit at the desk — page or spread, ruled or plain, which
+// layer is on which page. A device preference, never part of a draft.
+export const VIEW_PREFS_KEY = 'woodles_write_view';
 
 export const ACTIVE_DRAFT_ID_KEY = 'woodles_active_draft_id';
 export const DRAFTS_INDEX_KEY = 'woodles_drafts_index';

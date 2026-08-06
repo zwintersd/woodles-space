@@ -684,6 +684,43 @@ count is the control). Progress is reported, never scolded — fiction gets to
 50,000 the same way an essay stays under 2,000, by being able to see where it
 stands.
 
+**The open notebook.** `src/lib/spread.ts` owns a second view: two facing
+pages instead of one page at a time. This is what the three layers were
+always for — the working notes stay open on the left while the prose grows on
+the right, rather than being a tab switch away. `page` view is unchanged and
+one click away; `spread` is the default for a browser that has not chosen.
+
+Four things are load-bearing:
+
+- **The layers are never unmounted.** Each contenteditable *is* the storage
+  for its content between saves (`fgEl.innerHTML` is what `scheduleSave`
+  reads), so a page is hidden and reordered with CSS — `display: none` and
+  grid `order` — never added to or removed from the DOM. Remounting would
+  silently empty a layer. Both pages sit inside always-present `.page`
+  wrappers for the same reason.
+- **verso ≠ recto, by construction.** One element cannot be in two places, so
+  asking a page for the layer the other one holds **swaps them** rather than
+  duplicating it (`assignLayer`), and `coerceViewPrefs` repairs a stored set
+  that ever lost the invariant. Both are pinned by tests.
+- **Focus decides what is "active".** The toolbar, the word count, and the
+  publish button follow the page your cursor is in. But *visible* and
+  *focused* are now different questions: margin notes and publishing key off
+  `foregroundVisible`, so writing in the midground beside the prose doesn't
+  hide the notes or take publish away.
+- **One ruling across the spread.** Ruled paper draws with a
+  `repeating-linear-gradient` whose step is the line box exactly, so a rule
+  lands under every line whatever font the template picked. In a spread all
+  three layers share one line box (`1.995rem`) so both pages rule to the same
+  rhythm across the spine — the layers keep their own type sizes, like
+  different handwriting on the same paper. Page view keeps each layer's own
+  tighter leading, since there is no facing page to agree with.
+
+View preferences — mode, ruling, and which layer is on which page — are a
+**device preference, not document content**: they live in
+`woodles_write_view` beside the pockets order, never in a draft body. Below
+1100px the notebook lies flat: pages stack, the spine goes away, and the
+verso/recto mirroring stops.
+
 **The drafts list earns its size.** Index entries carry `kind` and `tags`;
 the drafts modal searches title + tags and filters by the kinds actually
 present. This answers CONVERGENCE.md §6.1 (write's flat drafts list),
@@ -969,17 +1006,17 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1626 tests total: 16 in `api/` (its own
+1644 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1610 across sixteen pnpm
-packages — `write` 104, `marginalia` 269, `planner` 486,
+instead of the recursive `pnpm -r test`), plus 1628 across sixteen pnpm
+packages — `write` 122, `marginalia` 269, `planner` 486,
 `spores` 140, `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
 `packages/sync` 9, `packages/persistence` 6, `packages/app-manifest` 11,
 `packages/handoff` 15, `packages/text` 23, `packages/spellcraft` 16,
 `packages/emoji` 4, `packages/incremental-core` 191, and `thinking-about` 69.
 (`notebook`'s 28 retired with the app; write's suite grew to cover kinds,
-the drafts filter, and the capture import.)
+the drafts filter, the capture import, and the spread's view model.)
 keep this inventory current when a suite changes; the root command is the
 release contract, not the prose count.
 
@@ -1049,7 +1086,7 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (1626 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (1644 tests)
 pnpm check              svelte-check in every app
 pnpm build              build the eight SvelteKit apps
 ```

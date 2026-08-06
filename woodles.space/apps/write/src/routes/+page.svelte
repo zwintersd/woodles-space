@@ -70,6 +70,18 @@
 		type WritingKind
 	} from '$lib/kinds';
 	import {
+		DEFAULT_VIEW_PREFS,
+		assignLayer,
+		isLayerVisible,
+		loadViewPrefs,
+		pageOrder,
+		saveViewPrefs,
+		sideOf,
+		type PageSide,
+		type ViewMode,
+		type ViewPrefs
+	} from '$lib/spread';
+	import {
 		palettes,
 		motifs as motifList,
 		fontPairs,
@@ -85,6 +97,11 @@
 		foreground: 'fg',
 		midground: 'mg',
 		background: 'bg'
+	};
+	const LAYER_TITLES: Record<LayerId, string> = {
+		foreground: 'foreground — the prose',
+		midground: 'midground — thinking and working notes',
+		background: 'background — the impulse'
 	};
 
 	let title = $state('');
@@ -103,6 +120,10 @@
 
 	const activeKindSpec = $derived(kindSpec(kind));
 
+	// How the desk is laid out: one page, or the notebook open to two.
+	let view = $state<ViewPrefs>(DEFAULT_VIEW_PREFS);
+	const isSpread = $derived(view.mode === 'spread');
+
 	let fgEl: HTMLDivElement | undefined = $state();
 	let mgEl: HTMLDivElement | undefined = $state();
 	let bgEl: HTMLDivElement | undefined = $state();
@@ -111,6 +132,9 @@
 	let marginColumnEl: HTMLElement | undefined = $state();
 
 	let activeLayer = $state<LayerId>('foreground');
+	// In a spread the foreground can be on screen while you type on the other
+	// page, so "is the prose showing" is a different question from "is it focused".
+	const foregroundVisible = $derived(isLayerVisible(view, activeLayer, 'foreground'));
 	let saveStatus = $state<'saved' | 'saving'>('saved');
 	let wordCount = $state(0);
 	let bold = $state(false);
@@ -263,6 +287,10 @@
 			// ignore
 		}
 
+		view = loadViewPrefs();
+		// A spread opens with the prose under the cursor, not the notes.
+		if (view.mode === 'spread') activeLayer = view.recto;
+
 		const params = new URLSearchParams(window.location.search);
 		const tid = params.get('template');
 		const replyId = params.get('reply');
@@ -389,6 +417,50 @@
 		}
 	});
 
+	$effect(() => {
+		if (hydrated) saveViewPrefs(view);
+	});
+
+	// Opening or closing the notebook changes every page height at once.
+	$effect(() => {
+		void view.mode;
+		void view.verso;
+		void view.recto;
+		void view.ruled;
+		scheduleMeasure(60);
+	});
+
+	function setViewMode(mode: ViewMode) {
+		if (mode === view.mode) return;
+		view = { ...view, mode };
+		// Leaving a spread, keep reading whichever page you were in; entering
+		// one, make sure the page you were on is actually open.
+		if (mode === 'spread' && !isLayerVisible(view, activeLayer, activeLayer)) {
+			view = assignLayer(view, 'recto', activeLayer);
+		}
+		scheduleMeasure(60);
+	}
+
+	async function setPageLayer(side: PageSide, layer: LayerId) {
+		view = assignLayer(view, side, layer);
+		await tick();
+		elFor(layer)?.focus();
+		activeLayer = layer;
+		updateMeta();
+		updateToolbarState();
+		scheduleMeasure(60);
+	}
+
+	// Focus decides which layer is "active" in a spread — the toolbar, the word
+	// count, and publish all follow the page your cursor is actually in.
+	function onLayerFocus(layer: LayerId) {
+		if (activeLayer === layer) return;
+		activeLayer = layer;
+		selectionRect = null;
+		updateMeta();
+		updateToolbarState();
+	}
+
 	function updateMeta() {
 		const el = elFor(activeLayer);
 		const text = el?.textContent || '';
@@ -464,7 +536,13 @@
 	}
 
 	async function setActiveLayer(next: LayerId) {
-		if (next === activeLayer) return;
+		// In a spread, asking for a layer that isn't open brings it onto the
+		// right-hand page rather than doing nothing.
+		if (isSpread && !isLayerVisible(view, activeLayer, next)) {
+			view = assignLayer(view, 'recto', next);
+		} else if (next === activeLayer) {
+			return;
+		}
 		activeLayer = next;
 		selectionRect = null;
 		await tick();
@@ -928,6 +1006,32 @@
 
 </script>
 
+{#snippet pageHead(layer: LayerId)}
+	{@const side = sideOf(view, layer)}
+	<div class="page-head" class:verso={side === 'verso'}>
+		<div class="page-layers" role="group" aria-label="{side === 'verso' ? 'left' : 'right'} page layer">
+			{#each LAYER_IDS as id}
+				<button
+					class="page-layer-btn"
+					class:on={id === layer}
+					aria-pressed={id === layer}
+					title={LAYER_TITLES[id]}
+					onclick={() => side && setPageLayer(side, id)}>{LAYER_LABELS[id]}</button
+				>
+			{/each}
+		</div>
+	</div>
+{/snippet}
+
+{#snippet pageFoot(layer: LayerId)}
+	{@const side = sideOf(view, layer)}
+	{@const stat = layerStats.find((s) => s.id === layer)}
+	<p class="page-foot" class:verso={side === 'verso'}>
+		<span class="page-foot-name">{layer}</span>
+		<span class="page-foot-count">{stat?.words ?? 0}</span>
+	</p>
+{/snippet}
+
 <div class="motif-grain"></div>
 <div class="motif-blob motif-blob-1"></div>
 <div class="motif-blob motif-blob-2"></div>
@@ -938,6 +1042,8 @@
 	{activeLayer}
 	layerIds={LAYER_IDS}
 	layerLabels={LAYER_LABELS}
+	viewMode={view.mode}
+	onViewChange={setViewMode}
 	bind:draftsOpen
 	bind:pocketsOpen
 	pocketsCount={pockets.length}
@@ -968,8 +1074,8 @@
 	</p>
 {/if}
 
-<div class="editor-page" data-layer={activeLayer} bind:this={editorPageEl}>
-	<div class="editor-wrap" data-layer={activeLayer}>
+<div class="editor-page" data-layer={activeLayer} data-view={view.mode} bind:this={editorPageEl}>
+	<div class="editor-wrap" data-layer={activeLayer} data-view={view.mode}>
 		{#if replyTo && replyToTitle}
 			<a class="reply-breadcrumb" href="/letter?id={replyTo}" title="back to source letter">
 				<span class="reply-breadcrumb-eyebrow">in reply to</span>
@@ -990,7 +1096,9 @@
 					>
 				{/each}
 			</div>
-			<span class="kind-eyebrow">· {activeLayer}</span>
+				{#if !isSpread}
+				<span class="kind-eyebrow">· {activeLayer}</span>
+			{/if}
 		</div>
 		<input
 			bind:this={titleEl}
@@ -1007,49 +1115,100 @@
 			<EditorToolbar {bold} {italic} {underline} onCommand={exec} onInsertLink={insertLink} />
 		{/if}
 
-		<div
-			bind:this={fgEl}
-			class="doc-body layer-foreground"
-			class:hidden={activeLayer !== 'foreground'}
-			contenteditable="true"
-			spellcheck="true"
-			data-placeholder={activeKindSpec.placeholders.foreground}
-			aria-label="foreground content"
-			oninput={onFgInput}
-			onpaste={handlePaste}
-			onkeyup={updateToolbarState}
-			onmouseup={updateToolbarState}
-			role="textbox"
-			tabindex="0"
-		></div>
+		<!-- The three layers are never unmounted: each contenteditable holds its
+		     own content between saves, so a page is hidden and reordered with
+		     CSS rather than added and removed from the DOM. -->
+		<div class="pages" data-view={view.mode}>
+			{#if isSpread}
+				<div class="spine" aria-hidden="true"></div>
+			{/if}
 
-		<div
-			bind:this={mgEl}
-			class="doc-body layer-midground"
-			class:hidden={activeLayer !== 'midground'}
-			contenteditable="true"
-			spellcheck="true"
-			data-placeholder={activeKindSpec.placeholders.midground}
-			aria-label="midground content"
-			oninput={() => { updateMeta(); scheduleSave(); fgVersion += 1; }}
-			onpaste={handlePaste}
-			role="textbox"
-			tabindex="0"
-		></div>
+			<div
+				class="page"
+				class:hidden={!isLayerVisible(view, activeLayer, 'foreground')}
+				class:focused={activeLayer === 'foreground'}
+				style="order: {pageOrder(view, 'foreground')}"
+			>
+				{#if isSpread}
+					{@render pageHead('foreground')}
+				{/if}
+				<div
+					bind:this={fgEl}
+					class="doc-body layer-foreground"
+					class:ruled={view.ruled}
+					contenteditable="true"
+					spellcheck="true"
+					data-placeholder={activeKindSpec.placeholders.foreground}
+					aria-label="foreground content"
+					oninput={onFgInput}
+					onpaste={handlePaste}
+					onfocus={() => onLayerFocus('foreground')}
+					onkeyup={updateToolbarState}
+					onmouseup={updateToolbarState}
+					role="textbox"
+					tabindex="0"
+				></div>
+				{#if isSpread}
+					{@render pageFoot('foreground')}
+				{/if}
+			</div>
 
-		<div
-			bind:this={bgEl}
-			class="doc-body layer-background"
-			class:hidden={activeLayer !== 'background'}
-			contenteditable="true"
-			spellcheck="true"
-			data-placeholder={activeKindSpec.placeholders.background}
-			aria-label="background content"
-			oninput={() => { updateMeta(); scheduleSave(); fgVersion += 1; }}
-			onpaste={handlePaste}
-			role="textbox"
-			tabindex="0"
-		></div>
+			<div
+				class="page"
+				class:hidden={!isLayerVisible(view, activeLayer, 'midground')}
+				class:focused={activeLayer === 'midground'}
+				style="order: {pageOrder(view, 'midground')}"
+			>
+				{#if isSpread}
+					{@render pageHead('midground')}
+				{/if}
+				<div
+					bind:this={mgEl}
+					class="doc-body layer-midground"
+					class:ruled={view.ruled}
+					contenteditable="true"
+					spellcheck="true"
+					data-placeholder={activeKindSpec.placeholders.midground}
+					aria-label="midground content"
+					oninput={() => { updateMeta(); scheduleSave(); fgVersion += 1; }}
+					onpaste={handlePaste}
+					onfocus={() => onLayerFocus('midground')}
+					role="textbox"
+					tabindex="0"
+				></div>
+				{#if isSpread}
+					{@render pageFoot('midground')}
+				{/if}
+			</div>
+
+			<div
+				class="page"
+				class:hidden={!isLayerVisible(view, activeLayer, 'background')}
+				class:focused={activeLayer === 'background'}
+				style="order: {pageOrder(view, 'background')}"
+			>
+				{#if isSpread}
+					{@render pageHead('background')}
+				{/if}
+				<div
+					bind:this={bgEl}
+					class="doc-body layer-background"
+					class:ruled={view.ruled}
+					contenteditable="true"
+					spellcheck="true"
+					data-placeholder={activeKindSpec.placeholders.background}
+					aria-label="background content"
+					oninput={() => { updateMeta(); scheduleSave(); fgVersion += 1; }}
+					onpaste={handlePaste}
+					onfocus={() => onLayerFocus('background')}
+					role="textbox"
+					tabindex="0"
+				></div>
+				{#if isSpread}
+					{@render pageFoot('background')}
+				{/if}
+			</div>
+		</div>
 
 		{#if pocketsOpen}
 			<PocketsPanel
@@ -1071,7 +1230,7 @@
 		bind:columnEl={marginColumnEl}
 		groups={visibleMarginGroups}
 		confirmingId={confirmingMarginId}
-		hidden={activeLayer !== 'foreground'}
+		hidden={!foregroundVisible}
 		onInput={onMarginInput}
 		onPaste={handlePaste}
 		onStartConfirmDelete={startConfirmDeleteMargin}
@@ -1108,10 +1267,12 @@
 	bind:theme
 	bind:motif
 	bind:font
+	ruled={view.ruled}
+	onRuledChange={(ruled) => (view = { ...view, ruled })}
 	{palettes}
 	motifs={motifList}
 	fonts={fontPairs}
-	{activeLayer}
+	{foregroundVisible}
 	{fgIsEmpty}
 	bind:isPublic
 	onPublish={publish}
@@ -1156,8 +1317,142 @@
 		flex-shrink: 0;
 		transition: max-width 0.3s ease;
 	}
-	.editor-wrap[data-layer='midground'] { max-width: 600px; }
-	.editor-wrap[data-layer='background'] { max-width: 540px; }
+	.editor-wrap[data-view='page'][data-layer='midground'] { max-width: 600px; }
+	.editor-wrap[data-view='page'][data-layer='background'] { max-width: 540px; }
+	/* an open notebook needs room for two pages and still has to leave the
+	   margin column beside it on an ordinary laptop */
+	.editor-wrap[data-view='spread'] { max-width: 1000px; }
+
+	/* ── the pages ── */
+	.pages { position: relative; }
+	.pages[data-view='spread'] {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		align-items: stretch;
+	}
+	.page { display: flex; flex-direction: column; min-width: 0; }
+	.page.hidden { display: none; }
+	.pages[data-view='spread'] .page {
+		background: color-mix(in srgb, var(--surface) 55%, transparent);
+		border: 1px solid color-mix(in srgb, var(--rule) 45%, transparent);
+		padding: 1.1rem 1.5rem 0.7rem;
+		transition: background 0.25s ease, border-color 0.25s ease;
+	}
+	/* the two halves meet at the spine: outer corners round, inner ones don't */
+	.pages[data-view='spread'] .page:nth-child(2) { border-radius: 10px 3px 3px 10px; }
+	.pages[data-view='spread'] .page:nth-child(3) { border-radius: 3px 10px 10px 3px; }
+	.pages[data-view='spread'] .page.focused {
+		background: color-mix(in srgb, var(--surface) 85%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+	}
+	.pages[data-view='spread'] .page .doc-body { flex: 1; min-height: 46vh; }
+	/* One ruling across the whole spread, like real paper: the layers keep
+	   their own type sizes but share a line box, so both pages rule to the
+	   same rhythm and every line still lands on a rule. (Page view keeps each
+	   layer's own tighter leading — there is no facing page to agree with.) */
+	.pages[data-view='spread'] .doc-body {
+		line-height: 1.995rem;
+		--rule-step: 1.995rem;
+	}
+
+	/* the gutter — paper falling away toward the fold */
+	.spine {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: 50%;
+		width: 40px;
+		transform: translateX(-20px);
+		order: 2;
+		pointer-events: none;
+		z-index: 1;
+		background: linear-gradient(
+			to right,
+			transparent 0%,
+			color-mix(in srgb, var(--rule) 18%, transparent) 35%,
+			color-mix(in srgb, var(--rule) 55%, transparent) 50%,
+			color-mix(in srgb, var(--rule) 18%, transparent) 65%,
+			transparent 100%
+		);
+	}
+
+	.page-head {
+		display: flex;
+		margin-bottom: 0.7rem;
+		opacity: 0.75;
+		transition: opacity 0.2s ease;
+	}
+	.page-head.verso { justify-content: flex-start; }
+	.page-head:not(.verso) { justify-content: flex-end; }
+	.page:hover .page-head, .page.focused .page-head { opacity: 1; }
+	.page-layers { display: flex; gap: 2px; }
+	.page-layer-btn {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.52rem;
+		letter-spacing: 0.14em;
+		text-transform: lowercase;
+		color: var(--muted);
+		background: none;
+		border: 1px solid transparent;
+		padding: 2px 7px;
+		border-radius: 4px;
+		cursor: pointer;
+		opacity: 0.55;
+		transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
+	}
+	.page-layer-btn:hover { opacity: 1; color: var(--accent-strong); }
+	.page-layer-btn.on {
+		color: var(--accent-strong);
+		opacity: 1;
+		background: color-mix(in srgb, var(--accent) 18%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+	}
+
+	/* the outer corners, where a page number would sit on real paper */
+	.page-foot {
+		display: flex;
+		align-items: baseline;
+		gap: 0.6rem;
+		margin-top: 0.9rem;
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.5rem;
+		letter-spacing: 0.16em;
+		text-transform: lowercase;
+		color: var(--muted);
+		opacity: 0.4;
+	}
+	/* the count sits at the outer corner, where a page number would, while the
+	   pair still reads left-to-right on both pages */
+	.page-foot.verso { flex-direction: row-reverse; justify-content: flex-end; }
+	.page-foot:not(.verso) { justify-content: flex-end; }
+	.page-foot-count { font-variant-numeric: tabular-nums; }
+
+	/* ruled paper. the step is the line box exactly — font-size × line-height,
+	   both fixed per layer — so a rule lands under every line whatever font
+	   the template picked. */
+	.doc-body.ruled {
+		background-image: repeating-linear-gradient(
+			to bottom,
+			transparent 0,
+			transparent calc(var(--rule-step) - 1px),
+			color-mix(in srgb, var(--rule) 50%, transparent) calc(var(--rule-step) - 1px),
+			color-mix(in srgb, var(--rule) 50%, transparent) var(--rule-step)
+		);
+		background-origin: content-box;
+		background-clip: content-box;
+	}
+
+	@media (max-width: 1100px) {
+		/* the notebook lies flat: pages stack, spine goes away, and the
+		   verso/recto mirroring stops — stacked pages have no outer edge */
+		.pages[data-view='spread'] { grid-template-columns: 1fr; gap: 1rem; }
+		.spine { display: none; }
+		.pages[data-view='spread'] .page:nth-child(2),
+		.pages[data-view='spread'] .page:nth-child(3) { border-radius: 8px; }
+		.pages[data-view='spread'] .page .doc-body { min-height: 32vh; }
+		.page-head, .page-head.verso { justify-content: flex-start; }
+		.page-foot, .page-foot.verso { flex-direction: row; justify-content: flex-start; }
+	}
 
 	/* ── narrow screen fallback for editor-page ── */
 	@media (max-width: 1100px) {
@@ -1311,12 +1606,12 @@
 	.doc-body {
 		font-size: 1.05rem;
 		line-height: 1.9;
+		--rule-step: 1.995rem; /* 1.05 × 1.9 */
 		color: var(--text);
 		min-height: 52vh;
 		outline: none;
 		caret-color: var(--accent-deep);
 	}
-	.doc-body.hidden { display: none; }
 	.doc-body:empty::before {
 		content: attr(data-placeholder);
 		color: var(--muted);
@@ -1352,10 +1647,14 @@
 	.doc-body :global(strong) { font-weight: 600; }
 	.doc-body :global(em) { font-style: italic; }
 
-	.layer-midground { font-size: 0.98rem; line-height: 1.78; color: var(--muted); }
+	.layer-midground {
+		font-size: 0.98rem; line-height: 1.78; color: var(--muted);
+		--rule-step: 1.7444rem; /* 0.98 × 1.78 */
+	}
 	.layer-background {
 		font-size: 0.9rem; line-height: 1.7; color: var(--muted);
 		opacity: 0.78; font-style: italic;
+		--rule-step: 1.53rem; /* 0.9 × 1.7 */
 	}
 
 
