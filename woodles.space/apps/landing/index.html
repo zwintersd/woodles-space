@@ -373,6 +373,55 @@
       color-scheme: inherit;
       cursor: text;
     }
+    /* prime counter — a slow, steady tick through the integers */
+    .dw-primes { width: 202px; text-align: center; }
+    .pc-n {
+      font-family: 'DM Mono', monospace;
+      font-size: 2.3rem; font-weight: 300;
+      color: var(--text); line-height: 1;
+    }
+    .pc-n.pc-pulse { animation: pc-pulse 0.8s ease; }
+    @keyframes pc-pulse {
+      0%   { color: var(--accent-strong); transform: scale(1.2); }
+      100% { color: var(--text); transform: scale(1); }
+    }
+    .pc-trail {
+      display: flex; flex-wrap: wrap; justify-content: center;
+      gap: 0.3rem;
+      margin: 0.6rem 0 0.4rem;
+      min-height: 1.5rem;
+    }
+    .pc-bead {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 1.5rem; height: 1.5rem;
+      padding: 0 0.3rem;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--peach) 42%, var(--surface));
+      color: var(--accent-deep);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem;
+      animation: icon-in 0.4s ease;
+    }
+    .pc-found {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.58rem; letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 0.65rem;
+    }
+    .pc-found strong { color: var(--accent-strong); font-weight: 600; }
+    .pc-toggle {
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--accent) 20%, transparent);
+      color: var(--accent-strong);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.58rem; letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.7rem;
+      cursor: pointer;
+      transition: background 0.16s ease;
+    }
+    .pc-toggle:hover { background: color-mix(in srgb, var(--accent) 34%, transparent); }
     /* bookmarks — a quick web search plus a small holder of saved links */
     .dw-bookmarks { width: 226px; }
     .bm-search { margin-bottom: 0.6rem; }
@@ -2061,6 +2110,70 @@
           el.querySelector('.cd-num').textContent = diff === null ? '--' : Math.abs(diff);
           el.querySelector('.cd-until').textContent =
             diff !== null && diff < 0 ? 'days since' : 'days until';
+        },
+      },
+      primes: {
+        title: 'prime counter', glyph: '&#8473;', desc: 'a slow, steady count through the primes',
+        data: () => ({ n: 1, found: 0, lastPrime: null, recent: [], running: true }),
+        build(el, w) {
+          el.innerHTML =
+            '<p class="dw-title">prime counter</p>' +
+            '<p class="pc-n"></p>' +
+            '<div class="pc-trail"></div>' +
+            '<p class="pc-found"></p>' +
+            '<button type="button" class="pc-toggle"></button>';
+          const nEl = el.querySelector('.pc-n');
+          const trail = el.querySelector('.pc-trail');
+          const foundEl = el.querySelector('.pc-found');
+          const toggle = el.querySelector('.pc-toggle');
+
+          function isPrime(n) {
+            if (n < 2) return false;
+            if (n % 2 === 0) return n === 2;
+            for (let d = 3; d * d <= n; d += 2) if (n % d === 0) return false;
+            return true;
+          }
+          const renderN = pulse => {
+            nEl.textContent = w.data.n;
+            if (pulse) {
+              nEl.classList.remove('pc-pulse');
+              void nEl.offsetWidth;
+              nEl.classList.add('pc-pulse');
+            }
+          };
+          const renderTrail = () => {
+            trail.innerHTML = w.data.recent.map(p => '<span class="pc-bead">' + p + '</span>').join('');
+          };
+          const renderFound = () => {
+            foundEl.innerHTML = w.data.found
+              ? '<strong>' + w.data.found + '</strong> found &middot; largest ' + w.data.lastPrime
+              : 'counting begins at 2&hellip;';
+          };
+          const renderToggle = () => { toggle.textContent = w.data.running ? 'pause' : 'resume'; };
+
+          renderN(false); renderTrail(); renderFound(); renderToggle();
+
+          const timer = setInterval(() => {
+            if (!el.isConnected) { clearInterval(timer); return; }
+            if (!w.data.running) return;
+            w.data.n += 1;
+            const prime = isPrime(w.data.n);
+            if (prime) {
+              w.data.found += 1;
+              w.data.lastPrime = w.data.n;
+              w.data.recent.push(w.data.n);
+              if (w.data.recent.length > 6) w.data.recent.shift();
+              renderTrail(); renderFound();
+            }
+            renderN(prime);
+            saveWidgets();
+          }, 900);
+
+          toggle.addEventListener('click', () => {
+            w.data.running = !w.data.running;
+            renderToggle();
+            saveWidgets();
+          });
         },
       },
       bookmarks: {
