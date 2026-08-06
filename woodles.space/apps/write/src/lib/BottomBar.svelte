@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { goalLabel } from './kinds';
 
-	type LayerId = 'foreground' | 'midground' | 'background';
 	type Option = { id: string; name: string };
 
 	let {
@@ -12,10 +11,12 @@
 		theme = $bindable(),
 		motif = $bindable(),
 		font = $bindable(),
+		ruled,
+		onRuledChange,
 		palettes,
 		motifs,
 		fonts,
-		activeLayer,
+		foregroundVisible,
 		fgIsEmpty,
 		isPublic = $bindable(),
 		onPublish
@@ -27,10 +28,13 @@
 		theme: string;
 		motif: string;
 		font: string;
+		ruled: boolean;
+		onRuledChange: (ruled: boolean) => void;
 		palettes: Option[];
 		motifs: Option[];
 		fonts: Option[];
-		activeLayer: LayerId;
+		/** Publishing follows whether the prose is on screen, not what has focus. */
+		foregroundVisible: boolean;
 		fgIsEmpty: boolean;
 		isPublic: boolean;
 		onPublish: () => void;
@@ -67,19 +71,33 @@
 				{#each fonts as f}<option value={f.id}>{f.name}</option>{/each}
 			</select>
 		</label>
+		<label class="picker">
+			<span class="picker-label">paper</span>
+			<!-- named explicitly: "paper" is also a palette and a motif, so the
+			     label text alone would not tell the three selects apart -->
+			<select
+				aria-label="paper ruling"
+				value={ruled ? 'ruled' : 'plain'}
+				onchange={(e) => onRuledChange(e.currentTarget.value === 'ruled')}
+				class="picker-select"
+			>
+				<option value="plain">plain</option>
+				<option value="ruled">ruled</option>
+			</select>
+		</label>
 	</div>
 	<div class="publish-cluster">
-		{#if activeLayer === 'foreground' && fgIsEmpty}
+		{#if foregroundVisible && fgIsEmpty}
 			<span class="publish-warn">this will appear blank to others</span>
 		{/if}
-		{#if activeLayer === 'foreground'}
+		{#if foregroundVisible}
 			<label class="public-toggle" title="include this letter in the public echoes snapshot">
 				<input type="checkbox" bind:checked={isPublic} />
 				public
 			</label>
 			<button class="publish-btn" onclick={onPublish}>Publish →</button>
 		{:else}
-			<span class="publish-hint">switch to fg to publish</span>
+			<span class="publish-hint">open the fg page to publish</span>
 		{/if}
 	</div>
 </div>

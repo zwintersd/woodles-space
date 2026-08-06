@@ -7,6 +7,8 @@
 		activeLayer,
 		layerIds,
 		layerLabels,
+		viewMode,
+		onViewChange,
 		draftsOpen = $bindable(),
 		pocketsOpen = $bindable(),
 		pocketsCount,
@@ -17,6 +19,8 @@
 		activeLayer: LayerId;
 		layerIds: readonly LayerId[];
 		layerLabels: Record<LayerId, string>;
+		viewMode: 'page' | 'spread';
+		onViewChange: (mode: 'page' | 'spread') => void;
 		draftsOpen: boolean;
 		pocketsOpen: boolean;
 		pocketsCount: number;
@@ -29,18 +33,47 @@
 <header class="topbar">
 	<a href="/" class="topbar-brand">.space</a>
 	<span class="topbar-label">write · every kind of writing</span>
-	<div class="layer-switch" role="tablist" aria-label="layer">
-		{#each layerIds as id}
-			<button
-				class="layer-btn"
-				class:active={activeLayer === id}
-				role="tab"
-				aria-selected={activeLayer === id}
-				onclick={() => onLayerChange(id)}
-				title={id}>{layerLabels[id]}</button
-			>
-		{/each}
+	<div class="view-switch" role="group" aria-label="view">
+		<button
+			class="view-btn"
+			class:active={viewMode === 'page'}
+			aria-pressed={viewMode === 'page'}
+			onclick={() => onViewChange('page')}
+			title="one page at a time"
+		>
+			<svg viewBox="0 0 24 16" aria-hidden="true" class="view-icon">
+				<rect x="7.5" y="1.5" width="9" height="13" rx="1.2" />
+			</svg>
+			page
+		</button>
+		<button
+			class="view-btn"
+			class:active={viewMode === 'spread'}
+			aria-pressed={viewMode === 'spread'}
+			onclick={() => onViewChange('spread')}
+			title="the notebook, open to two pages"
+		>
+			<svg viewBox="0 0 24 16" aria-hidden="true" class="view-icon">
+				<rect x="2" y="1.5" width="9.4" height="13" rx="1.2" />
+				<rect x="12.6" y="1.5" width="9.4" height="13" rx="1.2" />
+			</svg>
+			spread
+		</button>
 	</div>
+	{#if viewMode === 'page'}
+		<div class="layer-switch" role="tablist" aria-label="layer">
+			{#each layerIds as id}
+				<button
+					class="layer-btn"
+					class:active={activeLayer === id}
+					role="tab"
+					aria-selected={activeLayer === id}
+					onclick={() => onLayerChange(id)}
+					title={id}>{layerLabels[id]}</button
+				>
+			{/each}
+		</div>
+	{/if}
 	<button
 		class="drafts-toggle"
 		class:on={draftsOpen}
@@ -122,6 +155,45 @@
 		margin-left: 1.2rem;
 		position: relative;
 		z-index: 1;
+	}
+	.view-switch {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+		margin-left: 1.4rem;
+		position: relative;
+		z-index: 1;
+	}
+	.view-btn {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.57rem;
+		letter-spacing: 0.14em;
+		text-transform: lowercase;
+		color: var(--muted);
+		background: none;
+		border: 1px solid transparent;
+		padding: 3px 8px;
+		border-radius: 4px;
+		cursor: pointer;
+		opacity: 0.5;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4em;
+		transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
+	}
+	.view-btn:hover { opacity: 0.9; color: var(--accent-strong); }
+	.view-btn.active {
+		color: var(--accent-strong);
+		opacity: 1;
+		background: color-mix(in srgb, var(--accent) 22%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+	}
+	.view-icon {
+		width: 15px;
+		height: 10px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.4;
 	}
 	.layer-switch {
 		display: flex;
@@ -230,6 +302,15 @@
 		height: 5px;
 		border-radius: 50%;
 		background: var(--accent-strong);
+	}
+	/* the tagline is the first thing to go when the bar gets tight — it is the
+	   only purely decorative item up here */
+	@media (max-width: 1000px) {
+		.topbar-label { display: none; }
+	}
+	@media (max-width: 720px) {
+		.view-btn { font-size: 0; gap: 0; padding: 3px 6px; }
+		.view-icon { width: 16px; height: 11px; }
 	}
 	.topbar-clock {
 		margin-left: auto;
