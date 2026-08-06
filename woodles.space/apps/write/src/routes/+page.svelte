@@ -129,7 +129,9 @@
 	let bgEl: HTMLDivElement | undefined = $state();
 	let titleEl: HTMLTextAreaElement | undefined = $state();
 	let editorPageEl: HTMLDivElement | undefined = $state();
+	let editorWrapEl: HTMLDivElement | undefined = $state();
 	let marginColumnEl: HTMLElement | undefined = $state();
+	let wrapObserver: ResizeObserver | undefined;
 
 	let activeLayer = $state<LayerId>('foreground');
 	// In a spread the foreground can be on screen while you type on the other
@@ -323,6 +325,7 @@
 				scheduleMeasure();
 				window.addEventListener('resize', onResize);
 				document.addEventListener('selectionchange', onSelectionChange);
+				watchWrapWidth();
 				return;
 			}
 		}
@@ -378,6 +381,7 @@
 
 		window.addEventListener('resize', onResize);
 		document.addEventListener('selectionchange', onSelectionChange);
+		watchWrapWidth();
 	});
 
 	onDestroy(() => {
@@ -385,6 +389,7 @@
 			window.removeEventListener('resize', onResize);
 			document.removeEventListener('selectionchange', onSelectionChange);
 		}
+		wrapObserver?.disconnect();
 	});
 
 	function onResize() {
@@ -399,6 +404,25 @@
 		if (!titleEl) return;
 		titleEl.style.height = 'auto';
 		titleEl.style.height = titleEl.scrollHeight + 'px';
+	}
+
+	// A wrapped title's height depends on how wide it is, and the width is
+	// animated — `.editor-wrap` transitions `max-width` when the view or the
+	// layer changes. Measuring once after the change reads a mid-transition
+	// width and leaves the title clipped, so track the width instead of
+	// guessing when it settles. Watching the *wrap* rather than the title is
+	// what keeps this from looping: autosizing changes the title's height,
+	// which never changes the wrap's width, and the guard drops the rest.
+	function watchWrapWidth() {
+		if (typeof ResizeObserver === 'undefined' || !editorWrapEl) return;
+		let lastWidth = editorWrapEl.clientWidth;
+		wrapObserver = new ResizeObserver((entries) => {
+			const width = entries[0]?.contentRect.width ?? 0;
+			if (width === lastWidth) return;
+			lastWidth = width;
+			autosizeTitle();
+		});
+		wrapObserver.observe(editorWrapEl);
 	}
 
 	function onTitleKeydown(e: KeyboardEvent) {
@@ -475,6 +499,7 @@
 		updateToolbarState();
 	}
 
+	$effect(() => {
 		void title;
 		// Wait for the bind:value DOM write to land before measuring —
 		// programmatic title changes (draft load, templates) update the
@@ -1097,7 +1122,7 @@
 {/if}
 
 <div class="editor-page" data-layer={activeLayer} data-view={view.mode} bind:this={editorPageEl}>
-	<div class="editor-wrap" data-layer={activeLayer} data-view={view.mode}>
+	<div class="editor-wrap" data-layer={activeLayer} data-view={view.mode} bind:this={editorWrapEl}>
 		{#if replyTo && replyToTitle}
 			<a class="reply-breadcrumb" href="/letter?id={replyTo}" title="back to source letter">
 				<span class="reply-breadcrumb-eyebrow">in reply to</span>
