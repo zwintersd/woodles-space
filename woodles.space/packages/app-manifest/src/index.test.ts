@@ -66,16 +66,23 @@ describe('route smoke contract', () => {
 	});
 
 	it('keeps a retired app’s route alive as a redirect rather than a 404', () => {
-		// Dev Log was folded into Spores (CONVERGENCE.md step 2). Its manifest
-		// entry is gone, so nothing else in this suite would notice if the old
-		// bookmark started 404ing.
-		for (const source of ['/marginalia-devlog', '/marginalia-devlog/:path*']) {
-			const redirect = redirects.get(source);
-			expect(redirect, source).toBeDefined();
-			expect(redirect?.destination).toBe('/spores');
-			expect(redirect?.permanent).toBe(true);
+		// Retired apps lose their manifest entry, so nothing else in this suite
+		// would notice if an old bookmark started 404ing. Dev Log folded into
+		// Spores (CONVERGENCE.md step 2); Notebook folded into Write (§7).
+		const retired: [string, string][] = [
+			['/marginalia-devlog', '/spores'],
+			['/notebook', '/write']
+		];
+		for (const [route, destination] of retired) {
+			for (const source of [route, `${route}/:path*`]) {
+				const redirect = redirects.get(source);
+				expect(redirect, source).toBeDefined();
+				expect(redirect?.destination).toBe(destination);
+				expect(redirect?.permanent).toBe(true);
+			}
 		}
 		expect(appManifest.some((app) => app.id === 'marginalia-devlog')).toBe(false);
+		expect(appManifest.some((app) => app.id === 'notebook')).toBe(false);
 	});
 
 	it('never redirects a route that an app still serves', () => {
@@ -86,11 +93,11 @@ describe('route smoke contract', () => {
 });
 
 describe('landing catalogue', () => {
-	it('derives the sixteen ordered tiles, pins, and featured fallbacks from the manifest', () => {
-		expect(landingApps).toHaveLength(16);
-		expect(landingApps.map((app) => app.order)).toEqual([...Array(16)].map((_, index) => index + 1));
+	it('derives the fifteen ordered tiles, pins, and featured fallbacks from the manifest', () => {
+		expect(landingApps).toHaveLength(15);
+		expect(landingApps.map((app) => app.order)).toEqual([...Array(15)].map((_, index) => index + 1));
 		expect(new Set(landingApps.map((app) => app.id)).size).toBe(landingApps.length);
-		expect(defaultLandingPins).toEqual(['hygge', 'write', 'marg', 'planner', 'notebook', 'quiet']);
+		expect(defaultLandingPins).toEqual(['hygge', 'write', 'marg', 'planner', 'quiet']);
 		expect(featuredLandingApps.map((app) => app.id)).toEqual(['marg', 'bestiary', 'write']);
 	});
 
@@ -113,11 +120,14 @@ describe('landing catalogue', () => {
 		);
 	});
 
-	it('keeps the front door alone in its band', () => {
-		// "catch" is the one-way-in band. more than one app in it means the
-		// routing decision CONVERGENCE.md set out to remove has grown back.
-		const catchBand = landingAppsByBand.find((group) => group.band.id === 'catch');
-		expect(catchBand?.apps.map((app) => app.id)).toEqual(['notebook']);
+	it('keeps the write band the one front door for words', () => {
+		// The catch band retired with Notebook (CONVERGENCE.md §7): catching a
+		// thought is Write's job now. A resurrected catch band — or a second
+		// app in write — means the routing decision CONVERGENCE.md set out to
+		// remove has grown back.
+		expect(landingBands.some((band) => band.id === 'catch')).toBe(false);
+		const writeBand = landingAppsByBand.find((group) => group.band.id === 'write');
+		expect(writeBand?.apps.map((app) => app.id)).toEqual(['write']);
 	});
 
 	it('imports the canonical catalogue and retains artwork for every tile', () => {

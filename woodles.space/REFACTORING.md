@@ -37,11 +37,11 @@ in the package.
 **State:** consolidated
 **Notes:** `sanitizeHtml`, `stripPresentation`, `ensureAnchorsOn`,
 `stampAnchorsHtml`, `isEmptyHtml`, `stripTags`, `htmlToText`, `countWords`,
-`countWordsInText`, `previewText`. five consumers: `write` (now a pure
-re-export), `marginalia` (keeps its paragraph model and its two sanitizer
-policies), `letter` (imports the `.js` directly — it is static, so the package
-ships browser-ready `.js` + a `.d.ts` sidecar, same shape as
-`@woodles/app-manifest`), and `notebook`/`spores` for `htmlToText`.
+`countWordsInText`, `previewText`. four consumers since notebook retired
+(CONVERGENCE.md §7): `write` (now a pure re-export), `marginalia` (keeps its
+paragraph model and its two sanitizer policies), `letter` (imports the `.js`
+directly — it is static, so the package ships browser-ready `.js` + a `.d.ts`
+sidecar, same shape as `@woodles/app-manifest`), and `spores` for `htmlToText`.
 
 extraction turned up **two real divergences the copies had been hiding**, both
 now parameters rather than a winner:

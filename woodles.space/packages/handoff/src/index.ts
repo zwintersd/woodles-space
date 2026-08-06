@@ -14,8 +14,12 @@ import { createVersionedStorage, type PersistenceIssue, type StorageLike } from 
  * bigger promise than the routing problem needs (CONVERGENCE.md §6.4).
  */
 
-/** Apps that can receive a handoff. Read targets (echoes, ologypedia) can't. */
-export const HANDOFF_TARGETS = ['notebook', 'spores', 'write'] as const;
+/**
+ * Apps that can receive a handoff. Read targets (echoes, ologypedia) can't.
+ * `notebook` left this list when the app retired into Write — its stranded
+ * queue is drained by Write's one-time capture import, not by a receiver.
+ */
+export const HANDOFF_TARGETS = ['spores', 'write'] as const;
 
 export type HandoffTarget = (typeof HANDOFF_TARGETS)[number];
 
@@ -23,7 +27,7 @@ export type HandoffTarget = (typeof HANDOFF_TARGETS)[number];
 export type HandoffFormat = 'text' | 'html';
 
 export interface HandoffSource {
-	/** Manifest app id the thought came from, e.g. `notebook`. */
+	/** Manifest app id the thought came from, e.g. `spores`. */
 	app: string;
 	/** Optional human label for provenance, e.g. the note's title. */
 	label?: string;

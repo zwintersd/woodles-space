@@ -31,7 +31,7 @@ function readOnlyStorage(seed: Map<string, string>): StorageLike {
 	};
 }
 
-const SOURCE: HandoffSource = { app: 'notebook', label: 'a thought' };
+const SOURCE: HandoffSource = { app: 'spores', label: 'a thought' };
 
 let storage: ReturnType<typeof memoryStorage>;
 let counter: number;
@@ -71,7 +71,7 @@ describe('the envelope', () => {
 
 	it('defaults an empty capture rather than refusing it', () => {
 		// The front door must never reject. An empty thought is still a thought.
-		const queue = createHandoffQueue('notebook', options());
+		const queue = createHandoffQueue('write', options());
 		const result = queue.send({ source: SOURCE });
 
 		expect(result.ok).toBe(true);
@@ -100,11 +100,10 @@ describe('queues', () => {
 			'for spores'
 		]);
 		expect(createHandoffQueue('write', options()).peek().map((h) => h.title)).toEqual(['for write']);
-		expect(createHandoffQueue('notebook', options()).peek()).toEqual([]);
 	});
 
 	it('preserves arrival order across separate sends', () => {
-		const queue = createHandoffQueue('notebook', options());
+		const queue = createHandoffQueue('write', options());
 		queue.send({ title: 'first', source: SOURCE });
 		queue.send({ title: 'second', source: SOURCE });
 		queue.send({ title: 'third', source: SOURCE });
@@ -125,7 +124,7 @@ describe('queues', () => {
 	});
 
 	it('drops the oldest rather than the newest once past the limit', () => {
-		const queue = createHandoffQueue('notebook', options());
+		const queue = createHandoffQueue('write', options());
 		for (let i = 0; i < QUEUE_LIMIT; i += 1) queue.send({ title: `n${i}`, source: SOURCE });
 		expect(queue.count()).toBe(QUEUE_LIMIT);
 
@@ -143,7 +142,7 @@ describe('queues', () => {
 		createHandoffQueue('spores', options()).send({ source: SOURCE });
 		createHandoffQueue('write', options()).send({ source: SOURCE });
 
-		expect(pendingCounts(options())).toEqual({ notebook: 0, spores: 2, write: 1 });
+		expect(pendingCounts(options())).toEqual({ spores: 2, write: 1 });
 	});
 });
 
@@ -160,10 +159,10 @@ describe('failure is never silent loss', () => {
 
 	it('discards entries of the wrong shape instead of failing the whole queue', () => {
 		storage.map.set(
-			handoffKey('notebook'),
+			handoffKey('spores'),
 			JSON.stringify({ items: [{ id: 'x', title: 'malformed' }] })
 		);
-		const queue = createHandoffQueue('notebook', options());
+		const queue = createHandoffQueue('spores', options());
 
 		queue.send({ title: 'good', source: SOURCE });
 		expect(queue.peek().map((h) => h.title)).toEqual(['good']);
@@ -194,7 +193,7 @@ describe('failure is never silent loss', () => {
 	});
 
 	it('works with no storage at all instead of throwing', () => {
-		const queue = createHandoffQueue('notebook', { ...options(), storage: null });
+		const queue = createHandoffQueue('spores', { ...options(), storage: null });
 		expect(() => queue.send({ title: 'nowhere', source: SOURCE })).not.toThrow();
 		expect(queue.peek()).toEqual([]);
 	});
@@ -202,7 +201,7 @@ describe('failure is never silent loss', () => {
 
 describe('the target list', () => {
 	it('covers only apps that can receive, and keys them distinctly', () => {
-		expect([...HANDOFF_TARGETS]).toEqual(['notebook', 'spores', 'write']);
+		expect([...HANDOFF_TARGETS]).toEqual(['spores', 'write']);
 		const keys = HANDOFF_TARGETS.map(handoffKey);
 		expect(new Set(keys).size).toBe(keys.length);
 		for (const key of keys) expect(key).toMatch(/^woodles\.handoff\.[a-z]+\.v1$/);

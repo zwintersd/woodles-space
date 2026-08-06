@@ -4,8 +4,10 @@ import {
 	bootstrap,
 	clearActiveDraftId,
 	createDraftId,
+	filterDrafts,
 	getActiveDraftId,
 	handoffToDraftBody,
+	kindsPresent,
 	listDrafts,
 	loadDraft,
 	migrateLegacyDraft,
@@ -112,6 +114,51 @@ describe('upsertIndex', () => {
 		upsertIndex(before, 'd-1', 'new', t2);
 		expect(before[0].title).toBe('old');
 	});
+
+	it('stores kind and tags when given', () => {
+		const out = upsertIndex([], 'd-1', 'a story', t1, { kind: 'story', tags: ['fic'] });
+		expect(out[0]).toEqual({ id: 'd-1', title: 'a story', updatedAt: t1, kind: 'story', tags: ['fic'] });
+	});
+
+	it('keeps an entry’s kind when a caller updates without extras', () => {
+		const before = upsertIndex([], 'd-1', 'a story', t1, { kind: 'story' });
+		const after = upsertIndex(before, 'd-1', 'renamed', t2);
+		expect(after[0].kind).toBe('story');
+	});
+});
+
+describe('filterDrafts + kindsPresent', () => {
+	const list: DraftIndexItem[] = [
+		{ id: 'd-1', title: 'to my sister', updatedAt: '3' },
+		{ id: 'd-2', title: 'the lighthouse chapter', updatedAt: '2', kind: 'story' },
+		{ id: 'd-3', title: '', updatedAt: '1', kind: 'note', tags: ['from:notebook', 'garden'] }
+	];
+
+	it('returns everything for a blank query and no kind', () => {
+		expect(filterDrafts(list, '', null)).toHaveLength(3);
+	});
+
+	it('matches titles case-insensitively', () => {
+		expect(filterDrafts(list, 'LIGHTHOUSE', null).map((d) => d.id)).toEqual(['d-2']);
+	});
+
+	it('matches tags, so a migrated capture stays findable without a title', () => {
+		expect(filterDrafts(list, 'garden', null).map((d) => d.id)).toEqual(['d-3']);
+	});
+
+	it('filters by kind, reading a missing kind as letter', () => {
+		expect(filterDrafts(list, '', 'letter').map((d) => d.id)).toEqual(['d-1']);
+		expect(filterDrafts(list, '', 'story').map((d) => d.id)).toEqual(['d-2']);
+	});
+
+	it('combines query and kind', () => {
+		expect(filterDrafts(list, 'lighthouse', 'note')).toHaveLength(0);
+	});
+
+	it('lists only the kinds present, in canonical order', () => {
+		expect(kindsPresent(list)).toEqual(['letter', 'story', 'note']);
+		expect(kindsPresent([])).toEqual([]);
+	});
 });
 
 describe('migrateLegacyDraft', () => {
@@ -208,6 +255,20 @@ describe('handoffs', () => {
 		expect(boot.drafts.map((d) => d.title)).toContain('first');
 		expect(boot.drafts.map((d) => d.title)).toContain('second');
 		expect(getActiveDraftId()).toBe(boot.activeId);
+	});
+
+	it('carries a handoff’s tags onto the draft, so provenance stays searchable', () => {
+		const body = handoffToDraftBody({
+			id: 'h-2',
+			target: 'write',
+			title: 'tagged',
+			body: 'words',
+			format: 'text',
+			tags: ['essay', 'from:spores'],
+			source: { app: 'spores' },
+			createdAt: '2026-07-25T00:00:00.000Z'
+		});
+		expect(body.tags).toEqual(['essay', 'from:spores']);
 	});
 
 	it('puts the arrival in the foreground layer, where writing starts', () => {

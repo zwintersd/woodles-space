@@ -28,7 +28,7 @@
 
 <header class="topbar">
 	<a href="/" class="topbar-brand">.space</a>
-	<span class="topbar-label">echoes · write</span>
+	<span class="topbar-label">write · every kind of writing</span>
 	<div class="layer-switch" role="tablist" aria-label="layer">
 		{#each layerIds as id}
 			<button

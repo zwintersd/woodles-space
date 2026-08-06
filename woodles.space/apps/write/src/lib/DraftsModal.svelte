@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { fade, fly } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
-	import type { DraftIndexItem } from './drafts';
+	import { filterDrafts, kindsPresent, type DraftIndexItem } from './drafts';
+	import { coerceKind, kindSpec, type WritingKind } from './kinds';
 
 	let {
 		open = $bindable(),
@@ -19,7 +20,22 @@
 		onDelete: (id: string, e: Event) => void;
 	} = $props();
 
-	const sorted = $derived([...drafts].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
+	// Search and the kind filter are this screen's state, reset each open —
+	// a filter you forgot you set is a draft you can't find.
+	let query = $state('');
+	let kindFilter = $state<WritingKind | null>(null);
+
+	$effect(() => {
+		if (open) {
+			query = '';
+			kindFilter = null;
+		}
+	});
+
+	const kinds = $derived(kindsPresent(drafts));
+	const sorted = $derived(
+		filterDrafts(drafts, query, kindFilter).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+	);
 	const dateFormat: Intl.DateTimeFormatOptions = {
 		month: 'short',
 		day: 'numeric',
@@ -45,13 +61,38 @@
 				<h2 class="drafts-title">your drafts</h2>
 				<button class="drafts-new-btn" onclick={onCreate}>+ new draft</button>
 			</div>
+			{#if drafts.length > 3 || kinds.length > 1}
+				<div class="drafts-tools">
+					<input
+						class="drafts-search"
+						type="search"
+						placeholder="search title or tags…"
+						bind:value={query}
+						aria-label="search drafts"
+					/>
+					{#if kinds.length > 1}
+						<div class="drafts-kinds" role="group" aria-label="filter by kind">
+							{#each kinds as k}
+								<button
+									class="kind-chip"
+									class:active={kindFilter === k}
+									onclick={() => (kindFilter = kindFilter === k ? null : k)}
+								>{kindSpec(k).label}</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			{/if}
 			<div class="drafts-list">
 				{#each sorted as d (d.id)}
 					<div class="draft-item" class:active={d.id === currentDraftId}>
 						<button class="draft-item-btn" onclick={() => onSelect(d.id)}>
-							<span class="draft-item-title">{d.title || 'untitled letter'}</span>
-							<span class="draft-item-date">
-								{new Date(d.updatedAt).toLocaleDateString(undefined, dateFormat)}
+							<span class="draft-item-title">{d.title || kindSpec(coerceKind(d.kind)).untitled}</span>
+							<span class="draft-item-meta">
+								<span class="draft-item-kind">{kindSpec(coerceKind(d.kind)).label}</span>
+								<span class="draft-item-date">
+									{new Date(d.updatedAt).toLocaleDateString(undefined, dateFormat)}
+								</span>
 							</span>
 						</button>
 						<button
@@ -60,6 +101,8 @@
 							title="discard draft"
 						>×</button>
 					</div>
+				{:else}
+					<p class="drafts-empty">nothing here by that name — yet</p>
 				{/each}
 			</div>
 		</div>
@@ -95,7 +138,38 @@
 		cursor: pointer; transition: background 0.18s ease, transform 0.18s ease;
 	}
 	.drafts-new-btn:hover { background: var(--accent-deep); transform: translateY(-1px); }
+	.drafts-tools {
+		display: flex; flex-direction: column; gap: 0.5rem;
+		padding: 0.8rem 1.4rem 0.2rem;
+	}
+	.drafts-search {
+		font-family: var(--editor-mono, var(--font-mono)); font-size: 0.65rem;
+		letter-spacing: 0.06em; color: var(--text);
+		background: transparent; border: 1px solid var(--rule); border-radius: 6px;
+		padding: 6px 10px; width: 100%;
+	}
+	.drafts-search:focus { outline: none; border-color: var(--accent); }
+	.drafts-search::placeholder { color: var(--muted); opacity: 0.5; }
+	.drafts-kinds { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+	.kind-chip {
+		font-family: var(--editor-mono, var(--font-mono)); font-size: 0.53rem;
+		letter-spacing: 0.12em; text-transform: lowercase; color: var(--muted);
+		background: none; border: 1px solid var(--rule); border-radius: 100px;
+		padding: 2px 9px; cursor: pointer; opacity: 0.7;
+		transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
+	}
+	.kind-chip:hover { opacity: 1; color: var(--accent-strong); }
+	.kind-chip.active {
+		color: var(--accent-strong); opacity: 1;
+		background: color-mix(in srgb, var(--accent) 18%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+	}
 	.drafts-list { padding: 0.8rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem; }
+	.drafts-empty {
+		font-family: var(--editor-mono, var(--font-mono)); font-size: 0.6rem;
+		letter-spacing: 0.1em; color: var(--muted); opacity: 0.6;
+		padding: 0.8rem; text-align: center;
+	}
 	.draft-item {
 		display: flex; align-items: center; border-radius: 8px;
 		transition: background 0.18s ease; padding: 0.4rem;
@@ -110,6 +184,13 @@
 		font-family: var(--editor-display, var(--font-display)); font-size: 1.1rem;
 		color: var(--accent-strong); font-style: italic; white-space: nowrap; overflow: hidden;
 		text-overflow: ellipsis; max-width: 100%;
+	}
+	.draft-item-meta { display: inline-flex; align-items: baseline; gap: 0.6rem; }
+	.draft-item-kind {
+		font-family: var(--editor-mono, var(--font-mono)); font-size: 0.5rem;
+		letter-spacing: 0.12em; text-transform: lowercase; color: var(--accent-deep);
+		border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+		border-radius: 100px; padding: 1px 7px; opacity: 0.8;
 	}
 	.draft-item-date {
 		font-family: var(--editor-mono, var(--font-mono)); font-size: 0.5rem;
