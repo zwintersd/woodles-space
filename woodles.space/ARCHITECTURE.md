@@ -40,6 +40,14 @@ other docs have narrower jobs:
   doing all the balancing — fixed by implementing the two passive sinks the
   design names in prose and never had. Three findings remain open and
   deliberately untouched, the restraint dividend chief among them.
+- [REFERENCES.md](./REFERENCES.md) is CONVERGENCE's mirror image, and a
+  **proposal rather than a record**: where convergence collapsed apps that
+  should have been one app, this is about apps that stay separate and learn
+  each other's names — one record pointing at a record in another app without
+  copying it. its §1 surveys the four shapes the workspace already does this
+  in (bloomforge's shared keys, marginalia's binding map, the public blobs'
+  carried ids, spores' deliberately breakable title links); its §3 is a table
+  of open questions, not answers. nothing in it is built.
 - [ROADMAP.md](./ROADMAP.md) is the 10-week plan for making marginalia and
   the bestiary public-facing — all ten weeks are marked `✅ shipped` in its
   own headers, week 4 (share links, save-as-image, adopt-a-card) having
