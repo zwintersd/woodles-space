@@ -378,6 +378,14 @@ each phase is shippable on its own and unblocks the next.
 | **E** | procedural worlds — generator, name-gen, creature-cap scaling, worlds 2+ | D | — |
 | **F** | collapse/soft-fail + favor weather events | A, D | — |
 
+**the route through D, E and F is [WORLDS.md](./WORLDS.md)** — the open
+questions each phase forces, candidate answers for each, and a sequence. Two
+things it establishes that change the order given here: the restraint dividend
+(§2.3) has to be fixed *before* D, because the mint reads `equilibriumSeconds`
+and spent Concepts can't be un-spent; and E needs the world's content to be
+data rather than module state, which is cheap and safe to do now and expensive
+later.
+
 **phase A is in.** the three stocks live and cycle, life metabolises and is stressed by
 what it lacks, vitality mediates yield/study/favor, stability and complexity are real,
 and the Ledger shows it all. **decline and death moved to phase B**: a creature wilting

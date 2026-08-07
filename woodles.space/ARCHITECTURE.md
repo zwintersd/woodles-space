@@ -51,7 +51,9 @@ other docs have narrower jobs:
   - `apps/marginalia/`: `DESIGN.md` (mechanics, the week-6 save-discipline
     policy, and a week-10 note on what it publishes vs. only reads),
     `BALANCE.md` (what the sim harness found when pointed at those
-    mechanics, and the two retunes it prompted),
+    mechanics, and the two retunes it prompted), `WORLDS.md` (the route
+    through DESIGN.md's remaining phases D/E/F — open questions, candidate
+    answers, and the order to take them in),
     `PROPOSAL.md`, `ASSETS.md`, `static/diorama/README.md` (the world-canvas
     art's filenames and its graceful-degradation contract), and four docs
     under `src/lib/arcade/` — `ARCADE_ROADMAP.md` (the cabinet's own polish
