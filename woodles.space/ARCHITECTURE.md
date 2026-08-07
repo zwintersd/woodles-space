@@ -24,12 +24,16 @@ other docs have narrower jobs:
   its §7 records the later amendment — notebook retired into write, so the
   writing surface and the front door are now the same room. read it before
   reshaping any of those apps.
-- [ABSTRACTION.md](./ABSTRACTION.md) reads marginalia's idle layer against
-  `@woodles/incremental-core`'s `GameDef` schema and lists the eleven things
-  a bloomforge author cannot yet say. it is a gap analysis, not a plan — and
-  it argues explicitly *against* porting marginalia onto the core. read it
-  before extending the schema, and before assuming the two systems are the
-  same kind of game.
+- [ABSTRACTION.md](./ABSTRACTION.md) is about simulating marginalia fast
+  enough to tune its feel. it argues explicitly *against* porting it onto
+  `@woodles/incremental-core` — the model stays marginalia's own; only the
+  harness is worth sharing. it carries measurements worth knowing before
+  touching either app: the `Book` **does** run headless (`book.test.ts` says
+  otherwise and is wrong, which is why the game loop has no test coverage),
+  it is already numerically deterministic, and it is ~180× too slow to
+  balance with — 21× of that svelte reactivity, 7× allocation in the tick.
+  its §6 lists what the `GameDef` schema can't express, for the separate
+  question of authoring marginalia-like games in bloomforge.
 - [ROADMAP.md](./ROADMAP.md) is the 10-week plan for making marginalia and
   the bestiary public-facing — all ten weeks are marked `✅ shipped` in its
   own headers, week 4 (share links, save-as-image, adopt-a-card) having
