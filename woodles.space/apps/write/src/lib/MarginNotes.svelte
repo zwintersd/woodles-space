@@ -85,7 +85,9 @@
 <style>
 	.margin-column {
 		position: relative;
-		width: 280px;
+		/* Keeps pace with the wider desktop page (see .editor-wrap in
+		   +page.svelte) instead of staying pinned at a laptop-era width. */
+		width: clamp(280px, 15vw, 380px);
 		flex-shrink: 0;
 		padding-top: 84px;
 		padding-bottom: 96px;
