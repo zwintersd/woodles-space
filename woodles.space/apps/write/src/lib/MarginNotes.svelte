@@ -34,6 +34,7 @@
 <aside
 	class="margin-column"
 	class:hidden
+	class:has-groups={groups.length > 0}
 	bind:this={columnEl}
 	aria-label="margin notes"
 >
@@ -85,15 +86,20 @@
 <style>
 	.margin-column {
 		position: relative;
-		/* Keeps pace with the wider desktop page (see .editor-wrap in
-		   +page.svelte) instead of staying pinned at a laptop-era width. */
-		width: clamp(240px, 13vw, 340px);
+		/* No margin notes yet? Don't reserve their column — editor-wrap is a
+		   flex-fill sibling (see +page.svelte), so collapsing this to 0
+		   hands the space straight to the page instead of leaving a dead
+		   strip between the notebook and the binder tabs. It opens back up,
+		   smoothly, the moment a note actually exists. */
+		width: 0;
+		transition: width 0.25s ease;
 		flex-shrink: 0;
 		padding-top: 84px;
 		padding-bottom: 96px;
 		min-height: 100vh;
 	}
 	.margin-column.hidden { visibility: hidden; }
+	.margin-column.has-groups { width: clamp(240px, 13vw, 340px); }
 
 	.margin-group {
 		position: absolute;
@@ -190,7 +196,8 @@
 	}
 
 	@media (max-width: 1100px) {
-		.margin-column {
+		.margin-column,
+		.margin-column.has-groups {
 			width: 100%;
 			max-width: 680px;
 			min-height: 0;
