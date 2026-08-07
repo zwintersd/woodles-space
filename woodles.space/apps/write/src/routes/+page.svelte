@@ -1355,21 +1355,26 @@
 		display: flex;
 		justify-content: center;
 		align-items: flex-start;
-		gap: 2.4rem;
+		gap: clamp(2.4rem, 2vw, 3.6rem);
 		padding-top: 0;
 	}
+	/* Widths grow with the viewport past an ordinary laptop, so a big desktop
+	   monitor actually gets used instead of leaving the page stranded in a
+	   fixed-width column with empty space either side. The vw term only
+	   overtakes the px minimum once the window is wide enough, so nothing
+	   changes below ~1500px — this is purely a large-desktop upgrade. */
 	.editor-wrap {
-		max-width: 680px;
+		max-width: clamp(680px, 42vw, 920px);
 		width: 100%;
 		padding: 84px clamp(1.5rem, 5vw, 2.5rem) 96px;
 		flex-shrink: 0;
 		transition: max-width 0.3s ease;
 	}
-	.editor-wrap[data-view='page'][data-layer='midground'] { max-width: 600px; }
-	.editor-wrap[data-view='page'][data-layer='background'] { max-width: 540px; }
+	.editor-wrap[data-view='page'][data-layer='midground'] { max-width: clamp(600px, 37vw, 820px); }
+	.editor-wrap[data-view='page'][data-layer='background'] { max-width: clamp(540px, 33vw, 720px); }
 	/* an open notebook needs room for two pages and still has to leave the
 	   margin column beside it on an ordinary laptop */
-	.editor-wrap[data-view='spread'] { max-width: 1000px; }
+	.editor-wrap[data-view='spread'] { max-width: clamp(1000px, 68vw, 1640px); }
 
 	/* ── the pages ── */
 	.pages { position: relative; }
