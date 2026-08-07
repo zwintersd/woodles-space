@@ -1,74 +1,49 @@
-// The Witch's Book — game state. Svelte 5 runes.
+// The Witch's Book — the reactive view over the world.
 //
-// This build adds the idle layer: the World lives on its own clock. Life she
-// is attending to deepens through the observation stages over time; witnessed
-// life yields Insight every second; Favor drifts; and time away is credited.
+// The mechanics do not live here. They live in `world.ts`, which is plain,
+// rune-free, seeded and headless, so the balance harness (`sim.ts`) can run ten
+// hours of it in the time this file takes to render one frame. **This class is
+// a view**: it holds a `World`, exposes it through runes so Svelte can track
+// it, and owns everything the economy shouldn't have to know about — the save
+// file, the wall clock, offline credit, the bestiary bindings, the reading
+// room, the field-note log and the gain popups.
+//
+// The public surface below is load-bearing: forty files across the app read
+// `book.*`, so every member the app used before the world/Book split still
+// exists here with the same name and the same meaning.
+//
+// Reactivity works through one `version` counter rather than per-field `$state`.
+// Every getter reads it, and every mutation bumps it, so Svelte invalidates on
+// any change to the world. That is coarser than tracking each field — and it is
+// what lets the world underneath be plain objects that the harness can drive
+// 360,000 times without paying for a proxy.
 
 import { conditions, conditionById } from './content/conditions';
-import { revealedEmergences } from './content/emergences';
-import { revealedLife, lifeById, world1Life, type Life, type LifeCategory } from './content/life';
+import { lifeById, type Life, type LifeCategory } from './content/life';
 import { journalSeeds, type FavorBand } from './content/journal';
-import {
-	stageFieldNoteOptions,
-	fillTemplate,
-	pickLine,
-	equilibriumFieldNotes,
-	quietFieldNotes,
-	categoryMasteryFieldNotes
-} from './content/fieldNoteTemplates';
-import {
-	STAGE_SECONDS,
-	LOOK_CLOSER_SECONDS,
-	STAGE_INSIGHT_MULT,
-	INSIGHT_TRICKLE_ANNOUNCE_SEC,
-	ATTENTION_START,
-	ATTENTION_COSTS,
-	DISTILL_INSIGHT_COST,
-	DISTILL_ESSENCE_GAIN,
-	ESSENCE_ON_STUDIED,
-	ESSENCE_ON_KNOWN,
-	FAVOR_BASE_TARGET,
-	FAVOR_PER_KNOWN,
-	FAVOR_DRIFT_PER_SEC,
-	favorMultiplier,
-	OFFLINE_CAP_SECONDS,
-	STAGE_ACTIVITY,
-	FAVOR_STRESS_PENALTY,
-	WORLD_QUIET_STABILITY,
-	TEND_BUMP,
-	INVOKE_BUMP,
-	SHAPE_BASELINE_RAISE,
-	SHAPE_BASELINE_MAX,
-	ENCOURAGE_STABILITY,
-	ENCOURAGE_STABILITY_MAX,
-	GUIDE_METABOLISM_SCALE,
-	INTERVENTION_LOAD_WEIGHT,
-	INTERVENTION_LOAD_DECAY,
-	FAVOR_EQUILIBRIUM_BONUS,
-	EQUILIBRIUM_MIN_FACTOR,
-	STOCK_HISTORY_SAMPLE_SEC,
-	FIELD_NOTES_MAX,
-	CATEGORY_MASTERY_BONUS
-} from './tuning';
-import {
-	type Stocks,
-	type StockId,
-	STOCK_IDS,
-	STOCK_BANDS,
-	neutralStocks,
-	severityFor,
-	nextVitality,
-	lifeStockRate,
-	driftRate,
-	focusStock,
-	stabilityOf
-} from './vitals';
-import { nextFocusStreak, focusMultiplier } from './focus';
+import { OFFLINE_CAP_SECONDS, DISTILL_INSIGHT_COST } from './tuning';
+import { type Stocks, type StockId, STOCK_IDS, neutralStocks } from './vitals';
 import { pushSample } from './history';
-import { interventionForDomain } from './content/interventions';
+import { STOCK_HISTORY_SAMPLE_SEC, FIELD_NOTES_MAX } from './tuning';
 import { emptySave, load, save, wipe, type BookSave, type FieldNote } from './persist';
-import { getBestiaryCreatures, getWorldCreatures, type BestiaryCreature, type WorldCreature } from './bestiaryDb';
+import {
+	getBestiaryCreatures,
+	getWorldCreatures,
+	type BestiaryCreature,
+	type WorldCreature
+} from './bestiaryDb';
 import { announceGain } from './resourceGains.svelte';
+import {
+	World,
+	createWorldState,
+	STAGE_NOTICED,
+	STAGE_OBSERVED,
+	STAGE_STUDIED,
+	STAGE_KNOWN,
+	stageLabel,
+	type WorldEvent,
+	type WorldState
+} from './world';
 import {
 	SEDIMENT_UNLOCK_COST,
 	SEDIMENT_POUR_RATE,
@@ -85,7 +60,6 @@ import {
 	removeCustomSpawnPoint as removeCustomSpawnPointFromShape,
 	sedimentCoverage as sedimentCoverageOf,
 	unlockWorldspacesForCoverage,
-	visibleLifeForWorldspace,
 	type CustomSpawnPointInput,
 	type SpawnLayer,
 	type SpawnRarity,
@@ -94,13 +68,9 @@ import {
 	type Worldspace
 } from './worldShape';
 
-// observation stages
-export const STAGE_NOTICED = 0; // it has emerged; she has not looked yet
-export const STAGE_OBSERVED = 1;
-export const STAGE_STUDIED = 2;
-export const STAGE_KNOWN = 3;
-
-export const stageLabel = ['noticed', 'observed', 'studied', 'known'] as const;
+// Re-exported from world.ts, which now owns them — the app imports these from
+// here in a dozen places and shouldn't have to care that they moved.
+export { STAGE_NOTICED, STAGE_OBSERVED, STAGE_STUDIED, STAGE_KNOWN, stageLabel };
 
 export interface OfflineReport {
 	seconds: number;
@@ -132,45 +102,138 @@ export function humanizeSeconds(s: number | null): string {
 }
 
 export class Book {
-	// ── carried resources (will cross worlds, once prestige exists) ──────────
-	essence = $state(6); // raw creative power — spent writing conditions
-	knowing = $state(0); // lifetime understanding, every stage crossed
+	/**
+	 * The economy. Plain, seeded, rune-free — see world.ts. Everything the game
+	 * *is* happens in here; this class only watches it and writes it down.
+	 */
+	readonly world = new World(createWorldState());
 
-	// ── this-world resources ─────────────────────────────────────────────────
-	insight = $state(0); // the world's idle currency
-	favor = $state(60); // the world's relationship with her, 0..100
-
-	// ── vital signs: the world's metabolism ──────────────────────────────────
-	// three stocks life produces and consumes; out-of-band stocks stress the
-	// life that needs them. vitality is each life's health, 0..1.
-	stocks = $state<Stocks>(neutralStocks());
-	vitality = $state<Record<string, number>>({}); // lifeId -> 0..1 (default 1)
-
-	vitalityOf(lifeId: string): number {
-		return this.vitality[lifeId] ?? 1;
+	/**
+	 * Bumped on every mutation. Every derived getter reads it, so Svelte
+	 * re-evaluates them when the world moves. One counter rather than a dozen
+	 * `$state` fields is what keeps the world underneath a plain object.
+	 */
+	private version = $state(0);
+	private touch() {
+		this.version += 1;
+	}
+	/** Registers the dependency. Called at the top of every reactive read. */
+	private get v(): number {
+		return this.version;
 	}
 
-	// ── interventions: the Known endgame ──────────────────────────────────────
-	// lasting modifiers an intervention can set on the world…
-	stockBaseline = $state<Stocks>(neutralStocks()); // shape raises a drift target
-	stabilityBonus = $state(0); // encourage raises resilience
-	metabolismScale = $state<Record<string, number>>({}); // guide eases an animal's draw
-	// …and the bookkeeping: which life she has acted on (→ the line she spoke),
-	// how heavy her hand has been lately, and how long the world has held itself.
-	interventionsDone = $state<Record<string, number>>({}); // lifeId -> chosen line index
-	interventionLoad = $state(0);
-	equilibriumSeconds = $state(0);
+	// ── resources ────────────────────────────────────────────────────────────
 
-	// ── attention: the capacity that drives the idle tick ────────────────────
-	attentionCapacity = $state(ATTENTION_START);
-	attending = $state<string[]>([]); // life ids currently being watched
-	study = $state<Record<string, number>>({}); // lifeId -> study-seconds banked
+	get essence(): number {
+		return this.v, this.world.state.essence;
+	}
+	set essence(n: number) {
+		this.world.state.essence = n;
+		this.touch();
+	}
 
-	// ── focus: consecutive "look closer" clicks build a bounded streak ───────
-	// transient — not persisted; a fresh session starts cold, which is fine,
-	// the streak lives on the timescale of one sitting of clicking.
-	focusStreak = $state(0);
-	private lastLookCloserAt = 0; // ms epoch, plain field: internal bookkeeping only
+	get knowing(): number {
+		return this.v, this.world.state.knowing;
+	}
+	set knowing(n: number) {
+		this.world.state.knowing = n;
+		this.touch();
+	}
+
+	get insight(): number {
+		return this.v, this.world.state.insight;
+	}
+	set insight(n: number) {
+		this.world.state.insight = n;
+		this.touch();
+	}
+
+	get favor(): number {
+		return this.v, this.world.state.favor;
+	}
+	set favor(n: number) {
+		this.world.state.favor = n;
+		this.touch();
+	}
+
+	get stocks(): Stocks {
+		return this.v, this.world.state.stocks;
+	}
+	set stocks(s: Stocks) {
+		this.world.state.stocks = s;
+		this.touch();
+	}
+
+	get vitality(): Record<string, number> {
+		return this.v, this.world.state.vitality;
+	}
+
+	vitalityOf(lifeId: string): number {
+		return this.v, this.world.vitalityOf(lifeId);
+	}
+
+	// ── interventions ────────────────────────────────────────────────────────
+
+	get stockBaseline(): Stocks {
+		return this.v, this.world.state.stockBaseline;
+	}
+	get stabilityBonus(): number {
+		return this.v, this.world.state.stabilityBonus;
+	}
+	get metabolismScale(): Record<string, number> {
+		return this.v, this.world.state.metabolismScale;
+	}
+	get interventionsDone(): Record<string, number> {
+		return this.v, this.world.state.interventionsDone;
+	}
+	get interventionLoad(): number {
+		return this.v, this.world.state.interventionLoad;
+	}
+	set interventionLoad(n: number) {
+		this.world.state.interventionLoad = n;
+		this.touch();
+	}
+	get equilibriumSeconds(): number {
+		return this.v, this.world.state.equilibriumSeconds;
+	}
+
+	// ── attention ────────────────────────────────────────────────────────────
+
+	get attentionCapacity(): number {
+		return this.v, this.world.state.attentionCapacity;
+	}
+	set attentionCapacity(n: number) {
+		this.world.state.attentionCapacity = n;
+		this.touch();
+	}
+	get attending(): string[] {
+		return this.v, this.world.state.attending;
+	}
+	get study(): Record<string, number> {
+		return this.v, this.world.state.study;
+	}
+	get focusStreak(): number {
+		return this.v, this.world.state.focusStreak;
+	}
+
+	// ── progress ─────────────────────────────────────────────────────────────
+
+	get writtenConditions(): string[] {
+		return this.v, this.world.state.writtenConditions;
+	}
+	get observation(): Record<string, number> {
+		return this.v, this.world.state.observation;
+	}
+	get categoryMastered(): Record<string, boolean> {
+		return this.v, this.world.state.categoryMastered;
+	}
+
+	journalShown = $state<string[]>([]);
+	worldIndex = $state(0);
+	bookOpen = $state(false);
+	worldShape = $state<WorldShape>(emptyWorldShape());
+
+	mode = $state<'web' | 'world'>('web');
 
 	// ── vital-sign instrumentation: rolling history for the Ledger sparklines ─
 	// transient — not persisted; rebuilds live through the session (and
@@ -180,32 +243,14 @@ export class Book {
 
 	// ── field notes: the live observation log ─────────────────────────────────
 	fieldNotes = $state<FieldNote[]>([]);
-	private wasSelfBalancing = false;
-	private wasQuiet = false;
 
-	// ── resource-gain announcements: batching for the idle insight trickle ───
-	private insightTrickleAccum = 0;
-	private insightTrickleTimer = 0;
+	// transient — surfaced once after a return, then dismissed
+	offlineReport = $state<OfflineReport | null>(null);
+
 	// true only while creditOffline() fast-forwards many ticks at once — the
 	// offline report already summarizes that catch-up, so per-tick gain
 	// popups would just be noise (and a lot of it, for a long absence).
 	private suppressGainAnnouncements = false;
-
-	// ── category mastery: a completion bonus, sticky once earned ─────────────
-	categoryMastered = $state<Record<string, boolean>>({});
-
-	// ── progress ─────────────────────────────────────────────────────────────
-	writtenConditions = $state<string[]>([]);
-	observation = $state<Record<string, number>>({}); // lifeId -> stage
-	journalShown = $state<string[]>([]);
-	worldIndex = $state(0);
-	bookOpen = $state(false);
-	worldShape = $state<WorldShape>(emptyWorldShape());
-
-	mode = $state<'web' | 'world'>('web');
-
-	// transient — surfaced once after a return, then dismissed
-	offlineReport = $state<OfflineReport | null>(null);
 
 	// ── bestiary integration ─────────────────────────────────────────────────
 	// Cached snapshot of creatures from the Bestiary app (same-origin IndexedDB).
@@ -282,41 +327,47 @@ export class Book {
 
 	// ── derived: the web ─────────────────────────────────────────────────────
 
-	private writtenSet = $derived(new Set(this.writtenConditions));
-
 	hasWritten(id: string): boolean {
-		return this.writtenSet.has(id);
+		return this.v, this.world.hasWritten(id);
 	}
 
-	emergences = $derived(revealedEmergences(this.writtenSet));
-	allRevealedLife = $derived(revealedLife(this.writtenSet));
-	life = $derived(visibleLifeForWorldspace(this.allRevealedLife, this.worldShape.activeWorldspace));
+	get emergences() {
+		return this.v, this.world.emergences;
+	}
+	get allRevealedLife(): Life[] {
+		return this.v, this.world.allRevealedLife;
+	}
+	get life(): Life[] {
+		return this.v, this.world.life;
+	}
 
 	stageOf(lifeId: string): number {
-		return this.observation[lifeId] ?? STAGE_NOTICED;
+		return this.v, this.world.stageOf(lifeId);
 	}
 
 	// ── derived: the idle engine ─────────────────────────────────────────────
 
-	// raw Insight/sec from witnessed life, before the Favor multiplier. A
-	// stressed life (low vitality) shows her less; a category she has come
-	// to fully Know pays a permanent bonus (see categoryMastered).
-	private baseInsightRate = $derived.by(() => {
-		let r = 0;
-		for (const l of this.life) {
-			const mastery = this.categoryMastered[l.category] ? 1 + CATEGORY_MASTERY_BONUS : 1;
-			r +=
-				l.insightWeight * (STAGE_INSIGHT_MULT[this.stageOf(l.id)] ?? 0) * this.vitalityOf(l.id) * mastery;
-		}
-		return r;
-	});
-
-	favorMult = $derived(favorMultiplier(this.favor));
-	insightPerSec = $derived(this.baseInsightRate * this.favorMult);
-
-	// the multiplier the next "look closer" click will land at, given her
-	// current streak — read by the UI to show the bonus before it's spent.
-	focusMult = $derived(focusMultiplier(this.focusStreak));
+	get favorMult(): number {
+		return this.v, this.world.favorMult;
+	}
+	get insightPerSec(): number {
+		return this.v, this.world.insightPerSec;
+	}
+	get focusMult(): number {
+		return this.v, this.world.focusMult;
+	}
+	get attentionUsed(): number {
+		return this.v, this.world.attentionUsed;
+	}
+	get attentionFree(): number {
+		return this.v, this.world.attentionFree;
+	}
+	get attentionUpgradeCost(): number | null {
+		return this.v, this.world.attentionUpgradeCost;
+	}
+	get knownCount(): number {
+		return this.v, this.world.knownCount;
+	}
 
 	// seconds until Insight covers a cost at the current rate, or null when
 	// the rate can't get there (0/sec) — the UI reads this as "—".
@@ -327,29 +378,38 @@ export class Book {
 		return remaining / this.insightPerSec;
 	}
 
-	attentionUpgradeEtaSeconds = $derived.by(() => {
+	get attentionUpgradeEtaSeconds(): number | null {
 		const cost = this.attentionUpgradeCost;
 		return cost === null ? null : this.etaSeconds(cost);
-	});
+	}
 
-	distillEtaSeconds = $derived(this.etaSeconds(DISTILL_INSIGHT_COST));
+	get distillEtaSeconds(): number | null {
+		return this.etaSeconds(DISTILL_INSIGHT_COST);
+	}
 
-	attentionUsed = $derived(this.attending.length);
-	attentionFree = $derived(this.attentionCapacity - this.attending.length);
+	// ── derived: world shaping ───────────────────────────────────────────────
 
 	sedimentCoverage = $derived(sedimentCoverageOf(this.worldShape.sedimentGrid));
 	sedimentUnlockCost = SEDIMENT_UNLOCK_COST;
 	sedimentPourRate = SEDIMENT_POUR_RATE;
-	hasObservedAquaticLife = $derived(
-		this.allRevealedLife.some(
-			(l) => l.category === 'aquatic' && this.stageOf(l.id) >= STAGE_OBSERVED
-		)
-	);
-	canBuySediment = $derived(
-		!this.worldShape.sedimentUnlocked &&
+
+	get hasObservedAquaticLife(): boolean {
+		return (
+			this.v,
+			this.world.allRevealedLife.some(
+				(l) => l.category === 'aquatic' && this.world.stageOf(l.id) >= STAGE_OBSERVED
+			)
+		);
+	}
+
+	get canBuySediment(): boolean {
+		return (
+			!this.worldShape.sedimentUnlocked &&
 			this.hasObservedAquaticLife &&
 			this.insight >= SEDIMENT_UNLOCK_COST
-	);
+		);
+	}
+
 	pendingWorldspaceUnlock = $derived.by(() => {
 		const unlocked = this.worldShape.unlockedWorldspaces.find(
 			(space) => space !== 'water' && !this.worldShape.seenUnlocks.includes(space)
@@ -357,74 +417,40 @@ export class Book {
 		return unlocked ?? null;
 	});
 
-	// cost to raise attention capacity by one, or null at the maximum
-	attentionUpgradeCost = $derived.by(() => {
-		const tier = this.attentionCapacity - ATTENTION_START;
-		return tier < ATTENTION_COSTS.length ? ATTENTION_COSTS[tier] : null;
-	});
-
-	knownCount = $derived(
-		world1Life.filter((l) => (this.observation[l.id] ?? 0) >= STAGE_KNOWN).length
-	);
-
 	// ── derived: world metrics & framing ─────────────────────────────────────
 
-	// richness of the world — weighted by how deeply each life is witnessed,
-	// plus what has emerged and what she has fully Known.
-	complexity = $derived.by(() => {
-		let c = 0;
-		for (const l of this.life) c += 1 + this.stageOf(l.id);
-		return c + 1.5 * this.emergences.length + 2 * this.knownCount;
-	});
-
-	private knownEcosystems = $derived(
-		this.life.filter((l) => l.domain === 'ecosystem' && this.stageOf(l.id) >= STAGE_KNOWN).length
-	);
-
-	// 0..100 resilience — how close the three stocks sit to a balanced world,
-	// lifted by the ecosystems she has come to Know and any encouragement.
-	stability = $derived(
-		Math.min(100, stabilityOf(this.stocks, this.knownEcosystems) + this.stabilityBonus)
-	);
-
-	// how stressed a life is right now: 0 (content) .. 1 (dire)
-	severityOf(life: Life): number {
-		return severityFor(life.needs, this.stocks);
+	get complexity(): number {
+		return this.v, this.world.complexity;
+	}
+	get stability(): number {
+		return this.v, this.world.stability;
+	}
+	get quiet(): boolean {
+		return this.v, this.world.quiet;
+	}
+	get equilibriumFactor(): number {
+		return this.v, this.world.equilibriumFactor;
+	}
+	get selfBalancing(): boolean {
+		return this.v, this.world.selfBalancing;
 	}
 
-	// placeholder soft-fail signal — the world is "going quiet". The collapse
-	// pass will give this consequences and a voice; for now it only surfaces.
-	quiet = $derived(this.life.length > 0 && this.stability < WORLD_QUIET_STABILITY);
+	severityOf(life: Life): number {
+		return this.v, this.world.severityOf(life);
+	}
 
-	// ── derived: the equilibrium dividend ─────────────────────────────────────
-	// the world is balanced when every stock sits inside its healthy band.
-	private allStocksInBand = $derived(
-		STOCK_IDS.every((id) => {
-			const [lo, hi] = STOCK_BANDS[id];
-			return this.stocks[id] >= lo && this.stocks[id] <= hi;
-		})
-	);
+	get favorBand(): FavorBand {
+		return this.favor >= 70 ? 'high' : this.favor <= 35 ? 'low' : 'even';
+	}
 
-	// a balanced world she is *not* propping up rewards her — the lighter her
-	// recent hand (load), the larger the dividend. 0..1.
-	equilibriumFactor = $derived(
-		this.allStocksInBand ? Math.max(0, 1 - Math.min(1, this.interventionLoad)) : 0
-	);
-
-	selfBalancing = $derived(this.life.length > 0 && this.equilibriumFactor > EQUILIBRIUM_MIN_FACTOR);
-
-	favorBand: FavorBand = $derived(
-		this.favor >= 70 ? 'high' : this.favor <= 35 ? 'low' : 'even'
-	);
-
-	title = $derived.by(() => {
+	get title(): string {
 		const tendedSomething = this.life.some(
 			(l) => l.domain === 'plant' && this.stageOf(l.id) >= STAGE_OBSERVED
 		);
 		if (tendedSomething) return 'gardener';
 		if (this.writtenConditions.length > 0) return 'dreamer';
 		return 'witch';
-	});
+	}
 
 	pendingJournal = $derived.by(() => {
 		const n = this.writtenConditions.length;
@@ -435,6 +461,46 @@ export class Book {
 			.sort((a, b) => b.atConditions - a.atConditions);
 		return eligible[0] ?? null;
 	});
+
+	// ── turning world events into what the UI shows ──────────────────────────
+
+	/**
+	 * The one place a `WorldEvent` becomes something a person sees. The world
+	 * decides *that* something happened and what it would say; this decides
+	 * whether now is a good moment to say it.
+	 */
+	private absorb(events: WorldEvent[]) {
+		for (const e of events) {
+			switch (e.kind) {
+				case 'gain':
+					if (!this.suppressGainAnnouncements) announceGain(e.resource, e.amount);
+					break;
+				case 'trickle':
+					if (!this.suppressGainAnnouncements) announceGain('insight', e.amount, 'trickle');
+					break;
+				case 'stage':
+				case 'mastery':
+				case 'equilibrium':
+				case 'quiet':
+					if (e.note) this.pushFieldNote(e.note);
+					break;
+				case 'intervention':
+					this.pushFieldNote(e.note);
+					break;
+			}
+		}
+		if (events.length) this.touch();
+	}
+
+	// append to the observation log, newest first, capped.
+	private pushFieldNote(text: string) {
+		const note: FieldNote = {
+			id: `fn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+			t: Date.now(),
+			text
+		};
+		this.fieldNotes = [note, ...this.fieldNotes].slice(0, FIELD_NOTES_MAX);
+	}
 
 	// ── the Book ─────────────────────────────────────────────────────────────
 
@@ -451,134 +517,48 @@ export class Book {
 	// ── the Web (author mode) ────────────────────────────────────────────────
 
 	canWrite(id: string): boolean {
-		const c = conditionById(id);
-		if (!c || this.hasWritten(id)) return false;
-		return this.essence >= c.cost;
+		return this.v, this.world.canWrite(id);
 	}
 
 	writeCondition(id: string) {
-		const c = conditionById(id);
-		if (!c || !this.canWrite(id)) return;
-		this.essence -= c.cost;
-		this.writtenConditions = [...this.writtenConditions, id];
-		this.knowing += 1;
+		if (!this.world.writeCondition(id)) return;
+		this.touch();
 		this.persist();
 	}
 
 	// ── the World (witness mode) ─────────────────────────────────────────────
 
 	isAttending(lifeId: string): boolean {
-		return this.attending.includes(lifeId);
+		return this.v, this.world.isAttending(lifeId);
 	}
 
 	canAttend(lifeId: string): boolean {
-		if (this.isAttending(lifeId)) return false;
-		if (!this.life.some((l) => l.id === lifeId)) return false;
-		if (this.stageOf(lifeId) >= STAGE_KNOWN) return false;
-		return this.attentionFree > 0;
+		return this.v, this.world.canAttend(lifeId);
 	}
 
 	attend(lifeId: string) {
-		if (!this.canAttend(lifeId)) return;
-		this.attending = [...this.attending, lifeId];
+		if (!this.world.attend(lifeId)) return;
+		this.touch();
 		this.persist();
 	}
 
 	unattend(lifeId: string) {
-		if (!this.isAttending(lifeId)) return;
-		this.attending = this.attending.filter((id) => id !== lifeId);
+		if (!this.world.unattend(lifeId)) return;
+		this.touch();
 		this.persist();
 	}
 
-	// study-seconds needed for the attended life's next stage advance
 	stageThreshold(lifeId: string): number {
-		const next = this.stageOf(lifeId) + 1;
-		return STAGE_SECONDS[next] ?? Infinity;
+		return this.v, this.world.stageThreshold(lifeId);
 	}
 
-	// 0..1 progress toward the next stage
 	stageProgress(lifeId: string): number {
-		const t = this.stageThreshold(lifeId);
-		if (!isFinite(t)) return 1;
-		return Math.min(1, (this.study[lifeId] ?? 0) / t);
+		return this.v, this.world.stageProgress(lifeId);
 	}
 
-	// the clicker hook: nudge an attended life along by hand. Consecutive
-	// clicks build a bounded focus streak that boosts the seconds granted.
 	lookCloser(lifeId: string) {
-		if (!this.isAttending(lifeId)) return;
-		const now = Date.now();
-		this.focusStreak = nextFocusStreak(this.focusStreak, this.lastLookCloserAt, now);
-		this.lastLookCloserAt = now;
-		const seconds = LOOK_CLOSER_SECONDS * (lifeById(lifeId)?.studyEase ?? 1) * this.focusMult;
-		this.addStudy(lifeId, seconds);
-	}
-
-	private addStudy(lifeId: string, seconds: number) {
-		const banked = (this.study[lifeId] ?? 0) + seconds;
-		this.study = { ...this.study, [lifeId]: banked };
-		this.settleStages(lifeId);
-	}
-
-	// advance as many stages as the banked study-seconds allow
-	private settleStages(lifeId: string): number {
-		let crossed = 0;
-		let stage = this.stageOf(lifeId);
-		let banked = this.study[lifeId] ?? 0;
-		const life = lifeById(lifeId);
-		while (stage < STAGE_KNOWN) {
-			const threshold = STAGE_SECONDS[stage + 1];
-			if (banked < threshold) break;
-			banked -= threshold;
-			stage += 1;
-			crossed += 1;
-			this.observation = { ...this.observation, [lifeId]: stage };
-			this.knowing += 1;
-			if (stage === STAGE_STUDIED) {
-				this.essence += ESSENCE_ON_STUDIED;
-				if (!this.suppressGainAnnouncements) announceGain('essence', ESSENCE_ON_STUDIED);
-			}
-			if (stage === STAGE_KNOWN) {
-				this.essence += ESSENCE_ON_KNOWN;
-				if (!this.suppressGainAnnouncements) announceGain('essence', ESSENCE_ON_KNOWN);
-			}
-			if (life) {
-				const line = pickLine(stageFieldNoteOptions(life.domain, stage), Math.random());
-				if (line) this.pushFieldNote(fillTemplate(line, life.name));
-				if (stage === STAGE_KNOWN) this.checkCategoryMastery(life.category);
-			}
-		}
-		if (stage >= STAGE_KNOWN) {
-			// fully known — it no longer needs watching; free the slot
-			banked = 0;
-			this.attending = this.attending.filter((id) => id !== lifeId);
-		}
-		this.study = { ...this.study, [lifeId]: banked };
-		return crossed;
-	}
-
-	// append to the observation log, newest first, capped.
-	private pushFieldNote(text: string) {
-		const note: FieldNote = {
-			id: `fn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-			t: Date.now(),
-			text
-		};
-		this.fieldNotes = [note, ...this.fieldNotes].slice(0, FIELD_NOTES_MAX);
-	}
-
-	// a category is mastered the moment its last un-Known life reaches Known —
-	// so this only ever needs checking right after a Known crossing. sticky:
-	// once true, later-emerging life in the category can't revoke it.
-	private checkCategoryMastery(category: LifeCategory) {
-		if (this.categoryMastered[category]) return;
-		const inCategory = this.life.filter((l) => l.category === category);
-		if (inCategory.length === 0 || !inCategory.every((l) => this.stageOf(l.id) >= STAGE_KNOWN)) {
-			return;
-		}
-		this.categoryMastered = { ...this.categoryMastered, [category]: true };
-		const line = pickLine(categoryMasteryFieldNotes[category], Math.random());
-		if (line) this.pushFieldNote(line);
+		this.absorb(this.world.lookCloser(lifeId, Date.now()));
+		this.touch();
 	}
 
 	stageTextFor(life: Life): string {
@@ -597,102 +577,46 @@ export class Book {
 	// ── interventions: act on a Known life, once, gently ──────────────────────
 
 	hasIntervened(lifeId: string): boolean {
-		return lifeId in this.interventionsDone;
+		return this.v, this.world.hasIntervened(lifeId);
 	}
 
 	interventionCostFor(lifeId: string): { insight: number; essence: number } {
-		const life = lifeById(lifeId);
-		return life ? interventionForDomain(life.domain).cost : { insight: 0, essence: 0 };
+		return this.world.interventionCostFor(lifeId);
 	}
 
 	canIntervene(lifeId: string): boolean {
-		if (this.stageOf(lifeId) < STAGE_KNOWN || this.hasIntervened(lifeId)) return false;
-		const c = this.interventionCostFor(lifeId);
-		return this.insight >= c.insight && this.essence >= c.essence;
+		return this.v, this.world.canIntervene(lifeId);
 	}
 
-	// the line she spoke when she acted on this life (persisted), or null
 	interventionLineFor(lifeId: string): string | null {
-		const idx = this.interventionsDone[lifeId];
-		const life = lifeById(lifeId);
-		if (idx === undefined || !life) return null;
-		return interventionForDomain(life.domain).lines[idx] ?? null;
+		return this.v, this.world.interventionLineFor(lifeId);
 	}
 
 	intervene(lifeId: string) {
-		if (!this.canIntervene(lifeId)) return;
-		const life = lifeById(lifeId)!;
-		const spec = interventionForDomain(life.domain);
-		this.insight -= spec.cost.insight;
-		this.essence -= spec.cost.essence;
-		this.applyInterventionEffect(life);
-		const idx = Math.floor(Math.random() * spec.lines.length);
-		this.interventionsDone = { ...this.interventionsDone, [lifeId]: idx };
-		this.interventionLoad += INTERVENTION_LOAD_WEIGHT[spec.permanence];
-		this.pushFieldNote(`${life.name}: "${spec.lines[idx]}"`);
+		const events = this.world.intervene(lifeId);
+		if (!events.length) return;
+		this.absorb(events);
+		this.touch();
 		this.persist();
-	}
-
-	// each verb does its own thing — see DESIGN.md §2.2.
-	private applyInterventionEffect(life: Life) {
-		const focus = focusStock(life.metabolism, life.needs);
-		switch (life.domain) {
-			case 'plant': {
-				// tend: a small, temporary bump to the stock it lives by; drift fades it
-				const s = { ...this.stocks };
-				s[focus] = Math.min(100, s[focus] + TEND_BUMP);
-				this.stocks = s;
-				break;
-			}
-			case 'weather': {
-				// invoke: a broad, uncertain moisture push — asked, never commanded
-				const s = { ...this.stocks };
-				s.moisture = Math.min(100, s.moisture + INVOKE_BUMP * (0.6 + Math.random() * 0.8));
-				this.stocks = s;
-				break;
-			}
-			case 'geology': {
-				// shape: move a stock's baseline for good — monumental, slow
-				const b = { ...this.stockBaseline };
-				b[focus] = Math.min(SHAPE_BASELINE_MAX, b[focus] + SHAPE_BASELINE_RAISE);
-				this.stockBaseline = b;
-				break;
-			}
-			case 'ecosystem': {
-				// encourage: raise the floor under everything
-				this.stabilityBonus = Math.min(
-					ENCOURAGE_STABILITY_MAX,
-					this.stabilityBonus + ENCOURAGE_STABILITY
-				);
-				break;
-			}
-			case 'animal': {
-				// guide: ease what it draws from the world
-				this.metabolismScale = { ...this.metabolismScale, [life.id]: GUIDE_METABOLISM_SCALE };
-				break;
-			}
-		}
 	}
 
 	// ── insight sinks ────────────────────────────────────────────────────────
 
 	expandAttention() {
-		const cost = this.attentionUpgradeCost;
-		if (cost === null || this.insight < cost) return;
-		this.insight -= cost;
-		this.attentionCapacity += 1;
+		if (!this.world.expandAttention()) return;
+		this.touch();
 		this.persist();
 	}
 
 	canDistill(): boolean {
-		return this.insight >= DISTILL_INSIGHT_COST;
+		return this.v, this.world.canDistill();
 	}
 
 	distillEssence() {
-		if (!this.canDistill()) return;
-		this.insight -= DISTILL_INSIGHT_COST;
-		this.essence += DISTILL_ESSENCE_GAIN;
-		announceGain('essence', DISTILL_ESSENCE_GAIN);
+		const events = this.world.distillEssence();
+		if (!events.length) return;
+		this.absorb(events);
+		this.touch();
 		this.persist();
 	}
 
@@ -735,6 +659,9 @@ export class Book {
 				(space) => space !== 'water'
 			)
 		};
+		// the world gates what is visible on this, so it has to hear about it
+		this.world.setWorldspace(worldspace);
+		this.touch();
 		this.persist();
 	}
 
@@ -814,108 +741,20 @@ export class Book {
 
 	tick(dt: number) {
 		if (dt <= 0) return;
-		const present = this.life;
-		const presentIds = new Set(present.map((life) => life.id));
-		if (this.attending.some((id) => !presentIds.has(id))) {
-			this.attending = this.attending.filter((id) => presentIds.has(id));
-		}
+		this.absorb(this.world.tick(dt));
 
-		// 1) vitality eases with each life's stress, and a wilting life metabolises
-		//    less — so a stressed world eases its own pressure. gather stock rates
-		//    and the world's total stress in the same pass.
-		const nextVit: Record<string, number> = { ...this.vitality };
-		const rate: Stocks = { nutrients: 0, oxygen: 0, moisture: 0 };
-		let stress = 0;
-		for (const l of present) {
-			const v = nextVitality(this.vitalityOf(l.id), this.severityOf(l), dt);
-			nextVit[l.id] = v;
-			stress += 1 - v;
-			const scale = this.metabolismScale[l.id] ?? 1;
-			const r = lifeStockRate(l.metabolism, (STAGE_ACTIVITY[this.stageOf(l.id)] ?? 0) * scale, v);
-			for (const id of STOCK_IDS) rate[id] += r[id] ?? 0;
-		}
-		this.vitality = nextVit;
-
-		// 2) study accrual for attended life, slowed when it is suffering.
-		for (const id of [...this.attending]) {
-			if (!presentIds.has(id)) continue;
-			const life = lifeById(id);
-			if (!life) continue;
-			this.addStudy(id, dt * life.studyEase * this.vitalityOf(id));
-		}
-
-		// 3) stocks move by metabolism, then drift back toward neutral.
-		const s = { ...this.stocks };
-		for (const id of STOCK_IDS) {
-			s[id] = Math.max(
-				0,
-				Math.min(100, s[id] + (rate[id] + driftRate(s[id], this.stockBaseline[id])) * dt)
-			);
-		}
-		this.stocks = s;
-
-		// 3b) sample the stocks every few sim-seconds for the Ledger sparklines —
-		//     an instrument reading, not every-frame noise.
+		// sample the stocks every few sim-seconds for the Ledger sparklines — an
+		// instrument reading, not every-frame noise. Presentation, so it stays
+		// here rather than in the world.
 		this.historySampleAccum += dt;
 		if (this.historySampleAccum >= STOCK_HISTORY_SAMPLE_SEC) {
 			this.historySampleAccum -= STOCK_HISTORY_SAMPLE_SEC;
 			const h = { ...this.stockHistory };
-			for (const id of STOCK_IDS) h[id] = pushSample(h[id], this.stocks[id]);
+			for (const id of STOCK_IDS) h[id] = pushSample(h[id], this.world.state.stocks[id]);
 			this.stockHistory = h;
 		}
 
-		// 4) the world yields Insight every second it is witnessed. The gain is
-		//    batched into an occasional popup rather than announced every frame.
-		this.insight += this.insightPerSec * dt;
-		if (!this.suppressGainAnnouncements) {
-			this.insightTrickleAccum += this.insightPerSec * dt;
-			this.insightTrickleTimer += dt;
-			if (this.insightTrickleTimer >= INSIGHT_TRICKLE_ANNOUNCE_SEC) {
-				this.insightTrickleTimer = 0;
-				const whole = Math.floor(this.insightTrickleAccum);
-				if (whole > 0) {
-					this.insightTrickleAccum -= whole;
-					announceGain('insight', whole, 'trickle');
-				}
-			}
-		}
-
-		// 5) her hand grows light again, and a balanced world she isn't propping up
-		//    banks the equilibrium dividend.
-		if (this.interventionLoad > 0) {
-			this.interventionLoad = Math.max(0, this.interventionLoad - INTERVENTION_LOAD_DECAY * dt);
-		}
-		const eq = this.equilibriumFactor;
-		if (eq > EQUILIBRIUM_MIN_FACTOR) this.equilibriumSeconds += dt;
-
-		// 5b) a field note the first time this world settles into balance, or
-		//     the first time it goes quiet — a beat, not a repeating alarm.
-		const balancingNow = this.selfBalancing;
-		if (balancingNow && !this.wasSelfBalancing) {
-			const line = pickLine(equilibriumFieldNotes, Math.random());
-			if (line) this.pushFieldNote(line);
-		}
-		this.wasSelfBalancing = balancingNow;
-
-		const quietNow = this.quiet;
-		if (quietNow && !this.wasQuiet) {
-			const line = pickLine(quietFieldNotes, Math.random());
-			if (line) this.pushFieldNote(line);
-		}
-		this.wasQuiet = quietNow;
-
-		// 6) Favor eases toward a target set by how much she has Known, pulled down
-		//    by the world's stress and lifted when it holds itself. Exponential
-		//    approach stays stable for any dt (incl. offline jumps).
-		const target = Math.max(
-			0,
-			FAVOR_BASE_TARGET +
-				FAVOR_PER_KNOWN * this.knownCount -
-				FAVOR_STRESS_PENALTY * stress +
-				FAVOR_EQUILIBRIUM_BONUS * eq
-		);
-		const k = 1 - Math.exp(-FAVOR_DRIFT_PER_SEC * dt);
-		this.favor = Math.max(0, Math.min(100, this.favor + (target - this.favor) * k));
+		this.touch();
 	}
 
 	// credit time away — replayed in coarse steps so rates stay honest as
@@ -928,6 +767,7 @@ export class Book {
 		let remaining = seconds;
 		const step = 5;
 		this.suppressGainAnnouncements = true;
+		this.world.quietAnnouncements = true;
 		try {
 			while (remaining > 0) {
 				this.tick(Math.min(step, remaining));
@@ -935,6 +775,7 @@ export class Book {
 			}
 		} finally {
 			this.suppressGainAnnouncements = false;
+			this.world.quietAnnouncements = false;
 		}
 		this.offlineReport = {
 			seconds,
@@ -979,26 +820,27 @@ export class Book {
 	// ── persistence ──────────────────────────────────────────────────────────
 
 	toSave(): BookSave {
+		const w = this.world.state;
 		return {
 			v: 1,
-			essence: this.essence,
-			knowing: this.knowing,
-			insight: this.insight,
-			favor: this.favor,
-			stocks: { ...this.stocks },
-			vitality: { ...this.vitality },
-			stockBaseline: { ...this.stockBaseline },
-			stabilityBonus: this.stabilityBonus,
-			metabolismScale: { ...this.metabolismScale },
-			interventionsDone: { ...this.interventionsDone },
-			interventionLoad: this.interventionLoad,
-			equilibriumSeconds: this.equilibriumSeconds,
-			attentionCapacity: this.attentionCapacity,
-			attending: [...this.attending],
-			study: { ...this.study },
-			writtenConditions: [...this.writtenConditions],
-			observation: { ...this.observation },
-			journalShown: [...this.journalShown],
+			essence: w.essence,
+			knowing: w.knowing,
+			insight: w.insight,
+			favor: w.favor,
+			stocks: { ...w.stocks },
+			vitality: { ...w.vitality },
+			stockBaseline: { ...w.stockBaseline },
+			stabilityBonus: w.stabilityBonus,
+			metabolismScale: { ...w.metabolismScale },
+			interventionsDone: { ...w.interventionsDone },
+			interventionLoad: w.interventionLoad,
+			equilibriumSeconds: w.equilibriumSeconds,
+			attentionCapacity: w.attentionCapacity,
+			attending: [...w.attending],
+			study: { ...w.study },
+			writtenConditions: [...w.writtenConditions],
+			observation: { ...w.observation },
+			journalShown: this.journalShown,
 			worldIndex: this.worldIndex,
 			bookOpen: this.bookOpen,
 			worldShape: normalizeWorldShape(this.worldShape),
@@ -1009,33 +851,44 @@ export class Book {
 			readingCumulativeWords: this.readingCumulativeWords,
 			spriteBindings: { ...this.spriteBindings },
 			fieldNotes: this.fieldNotes.map((n) => ({ ...n })),
-			categoryMastered: { ...this.categoryMastered },
+			categoryMastered: { ...w.categoryMastered },
 			lastSeen: Date.now()
 		};
 	}
 
 	fromSave(s: BookSave) {
-		this.essence = s.essence;
-		this.knowing = s.knowing;
-		this.insight = s.insight;
-		this.favor = s.favor;
-		this.stocks = { ...(s.stocks ?? neutralStocks()) };
-		this.vitality = { ...(s.vitality ?? {}) };
-		this.stockBaseline = { ...(s.stockBaseline ?? neutralStocks()) };
-		this.stabilityBonus = s.stabilityBonus ?? 0;
-		this.metabolismScale = { ...(s.metabolismScale ?? {}) };
-		this.interventionsDone = { ...(s.interventionsDone ?? {}) };
-		this.interventionLoad = s.interventionLoad ?? 0;
-		this.equilibriumSeconds = s.equilibriumSeconds ?? 0;
-		this.attentionCapacity = s.attentionCapacity;
-		this.attending = [...s.attending];
-		this.study = { ...s.study };
-		this.writtenConditions = [...s.writtenConditions];
-		this.observation = { ...s.observation };
+		const shape = normalizeWorldShape(s.worldShape);
+		const state: WorldState = {
+			...createWorldState(),
+			essence: s.essence,
+			knowing: s.knowing,
+			insight: s.insight,
+			favor: s.favor,
+			stocks: { ...(s.stocks ?? neutralStocks()) },
+			vitality: { ...(s.vitality ?? {}) },
+			stockBaseline: { ...(s.stockBaseline ?? neutralStocks()) },
+			stabilityBonus: s.stabilityBonus ?? 0,
+			metabolismScale: { ...(s.metabolismScale ?? {}) },
+			interventionsDone: { ...(s.interventionsDone ?? {}) },
+			interventionLoad: s.interventionLoad ?? 0,
+			equilibriumSeconds: s.equilibriumSeconds ?? 0,
+			attentionCapacity: s.attentionCapacity,
+			attending: [...s.attending],
+			study: { ...s.study },
+			writtenConditions: [...s.writtenConditions],
+			observation: { ...s.observation },
+			categoryMastered: { ...(s.categoryMastered ?? {}) },
+			activeWorldspace: shape.activeWorldspace
+			// the session-only fields (focus streak, trickle batching) come from
+			// createWorldState() above: a fresh load starts cold rather than
+			// trying to replay a streak that lived in one sitting of clicking.
+		};
+		this.world.replace(state);
+
 		this.journalShown = [...s.journalShown];
 		this.worldIndex = s.worldIndex;
 		this.bookOpen = s.bookOpen;
-		this.worldShape = normalizeWorldShape(s.worldShape);
+		this.worldShape = shape;
 		this.readingMsTowardNextPoint = s.readingMsTowardNextPoint;
 		this.readingStarPoints = s.readingStarPoints;
 		this.readingCompletedStars = s.readingCompletedStars;
@@ -1043,17 +896,9 @@ export class Book {
 		this.readingCumulativeWords = s.readingCumulativeWords;
 		this.spriteBindings = { ...(s.spriteBindings ?? {}) };
 		this.fieldNotes = [...(s.fieldNotes ?? [])];
-		this.categoryMastered = { ...(s.categoryMastered ?? {}) };
-		// transient state (focus streak, stock history) is session-only —
-		// a fresh load starts cold rather than trying to replay it.
-		this.focusStreak = 0;
-		this.lastLookCloserAt = 0;
 		this.stockHistory = { nutrients: [], oxygen: [], moisture: [] };
 		this.historySampleAccum = 0;
-		this.wasSelfBalancing = false;
-		this.wasQuiet = false;
-		this.insightTrickleAccum = 0;
-		this.insightTrickleTimer = 0;
+		this.touch();
 	}
 
 	hydrate() {

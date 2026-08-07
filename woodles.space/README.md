@@ -13,6 +13,7 @@ the docs have one owner each:
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | current repo layout, app inventory, shared systems, tests, checks, local workflow |
 | this README | deployment and Vercel routing notes |
 | [REFACTORING.md](./REFACTORING.md) | living list of duplicated code and consolidation candidates |
+| [ABSTRACTION.md](./ABSTRACTION.md) | simulating marginalia fast enough to tune its feel — what's in the way, measured, and what to borrow from bloomforge |
 | `apps/*/*.md` | app-specific design briefs, proposals, assets, and known issues |
 | [`../AUDIT.md`](../AUDIT.md) | dated audit snapshot only; not the current source of truth |
 
