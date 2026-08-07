@@ -6,6 +6,14 @@ we settled the framing on: **vital signs** (the world's metabolism), **intervent
 tunable defaults, not gospel — they're written so the loop is legible and balanceable
 by inspection, the way `tuning.ts` already is.
 
+> **balanceable by simulation now, too.** `pnpm --filter marginalia balance`
+> runs the shipped numbers through the harness in `witch/sim.ts`. read
+> [BALANCE.md](./BALANCE.md) before tuning anything here: it reports that the
+> phase-A vital signs never actually activate (§1.2's "oxygen climbs while
+> nutrients crash" is currently unreachable), and that phase C's restraint
+> dividend (§2.3) pays a meddler exactly what it pays an ascetic. neither has
+> been changed — what they *should* be is this document's call.
+
 three things carry through every decision:
 
 - **the thesis.** reward attention and restraint; never optimise them away. the design

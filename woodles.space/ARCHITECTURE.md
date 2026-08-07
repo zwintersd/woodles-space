@@ -25,15 +25,16 @@ other docs have narrower jobs:
   writing surface and the front door are now the same room. read it before
   reshaping any of those apps.
 - [ABSTRACTION.md](./ABSTRACTION.md) is about simulating marginalia fast
-  enough to tune its feel. it argues explicitly *against* porting it onto
+  enough to tune its feel, and argues explicitly *against* porting it onto
   `@woodles/incremental-core` — the model stays marginalia's own; only the
-  harness is worth sharing. it carries measurements worth knowing before
-  touching either app: the `Book` **does** run headless (`book.test.ts` says
-  otherwise and is wrong, which is why the game loop has no test coverage),
-  it is already numerically deterministic, and it is ~180× too slow to
-  balance with — 21× of that svelte reactivity, 7× allocation in the tick.
+  harness is shared. **§3–5 are built** (see the marginalia section below);
   its §6 lists what the `GameDef` schema can't express, for the separate
   question of authoring marginalia-like games in bloomforge.
+- [`apps/marginalia/BALANCE.md`](./apps/marginalia/BALANCE.md) is what the
+  harness found when it was pointed at the shipped numbers: the content is
+  exhausted in four minutes, the vital signs never activate, and the
+  restraint dividend pays a meddler exactly what it pays an ascetic. findings
+  only — nothing in the game was retuned.
 - [ROADMAP.md](./ROADMAP.md) is the 10-week plan for making marginalia and
   the bestiary public-facing — all ten weeks are marked `✅ shipped` in its
   own headers, week 4 (share links, save-as-image, adopt-a-card) having
@@ -44,6 +45,8 @@ other docs have narrower jobs:
   known issues — not every app has one. doc inventory, as of week 10:
   - `apps/marginalia/`: `DESIGN.md` (mechanics, the week-6 save-discipline
     policy, and a week-10 note on what it publishes vs. only reads),
+    `BALANCE.md` (what the sim harness found when pointed at those
+    mechanics — findings, not retunings),
     `PROPOSAL.md`, `ASSETS.md`, `static/diorama/README.md` (the world-canvas
     art's filenames and its graceful-degradation contract), and four docs
     under `src/lib/arcade/` — `ARCADE_ROADMAP.md` (the cabinet's own polish
@@ -315,6 +318,33 @@ from `Intake.svelte`'s own file-select handlers, so neither loads until a
 visitor actually opens that one feature. confirmed by measuring real
 network transfer against a `vite preview` build, not just `dist/`'s total
 size.
+
+**the game loop and its reactivity are separate, on purpose.**
+`witch/world.ts` holds every mechanic — the tick, the stages, the metabolism,
+the interventions — as a plain `World` over a plain `WorldState`, with no
+runes, no DOM, no `Date.now()` and no `Math.random()`; every roll goes through
+a seeded RNG. `witch/book.svelte.ts` is a *view* over it: it owns a `World`,
+and keeps persistence, the wall clock, offline credit, the bestiary bindings,
+the reading room and the gain popups. Its public surface is unchanged from
+before the split, because forty files read `book.*`.
+
+Reactivity runs through one `version` counter rather than per-field `$state` —
+every getter reads it, every mutation bumps it. Coarser than tracking each
+field, and the reason the world underneath can be plain objects that
+`witch/sim.ts` drives 360,000 times without paying for a proxy. Ten hours of
+game time went from ~33.5s through the runes to ~1.3s through `World`; the
+app's own suite dropped from 14.6s to 3.6s as a side effect.
+
+`witch/sim.ts` is the balance harness — a fixed 100ms timestep, integer tick
+counting and `createRng` all borrowed from `@woodles/incremental-core`, which
+is the *only* thing marginalia takes from bloomforge's package. It is not a
+`GameDef` and is not meant to become one; see
+[ABSTRACTION.md](./ABSTRACTION.md). Its two policies bracket play on
+marginalia's own axis — `witnessOnly` against `interventionist`, restraint
+against meddling — because the core's idle/greedy pair brackets *purchasing*
+and marginalia's scarce resource is attention. `pnpm --filter marginalia
+balance` prints the report; findings live in
+[`apps/marginalia/BALANCE.md`](./apps/marginalia/BALANCE.md).
 
 ## bloomforge, the incremental studio
 
@@ -1019,8 +1049,8 @@ different palettes, so they aren't a consolidation target.
 1644 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1628 across sixteen pnpm
-packages — `write` 122, `marginalia` 269, `planner` 486,
+instead of the recursive `pnpm -r test`), plus 1684 across sixteen pnpm
+packages — `write` 122, `marginalia` 325, `planner` 486,
 `spores` 140, `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
 `packages/sync` 9, `packages/persistence` 6, `packages/app-manifest` 11,
 `packages/handoff` 15, `packages/text` 23, `packages/spellcraft` 16,

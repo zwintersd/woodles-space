@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "test": "svelte-kit sync && vitest run"
+    "test": "svelte-kit sync && vitest run",
+    "balance": "svelte-kit sync && vitest run --config vitest.balance.config.ts"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.0",
@@ -24,6 +25,7 @@
     "vitest": "^3.2.6"
   },
   "dependencies": {
+    "@woodles/incremental-core": "workspace:*",
     "@woodles/sync": "workspace:*",
     "@woodles/text": "workspace:*",
     "fflate": "^0.8.2",

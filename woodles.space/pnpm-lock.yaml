@@ -162,6 +162,9 @@ importers:
 
   apps/marginalia:
     dependencies:
+      '@woodles/incremental-core':
+        specifier: workspace:*
+        version: link:../../packages/incremental-core
       '@woodles/sync':
         specifier: workspace:*
         version: link:../../packages/sync

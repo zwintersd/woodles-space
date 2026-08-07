@@ -1,33 +1,33 @@
+// Book — the reactive view's own surface.
+//
+// This file used to open with a note saying the Book couldn't be imported here
+// because "$state runes only work within component context", and duplicated
+// `fmt` and the stage constants to work around it. That was never true: the
+// Book uses `$state` and `$derived` and never `$effect`, and only `$effect`
+// needs a component. The cost of believing it was that the entire game loop
+// went untested.
+//
+// It is tested now, in three places: `characterization.test.ts` drives the real
+// Book and pins its numbers, `sim.test.ts` covers the harness, and this file
+// keeps what it always covered — the formatting helpers and the constants —
+// against the *real* exports rather than copies of them.
+
 import { describe, expect, it } from 'vitest';
 import type { Life } from './content/life';
 import { STAGE_SECONDS, ATTENTION_START, ATTENTION_COSTS } from './tuning';
 import { visibleLifeForWorldspace } from './worldShape';
-
-// Constants from book.svelte (duplicated here to avoid importing the Book class
-// which uses Svelte 5 $state runes that can't be instantiated in test context)
-const STAGE_NOTICED = 0;
-const STAGE_OBSERVED = 1;
-const STAGE_STUDIED = 2;
-const STAGE_KNOWN = 3;
-const stageLabel = ['noticed', 'observed', 'studied', 'known'] as const;
-
-// Copy of fmt function (same as in book.svelte)
-function fmt(n: number): string {
-	if (n < 1000) return n < 10 ? n.toFixed(1).replace(/\.0$/, '') : Math.floor(n).toString();
-	const units = ['', 'k', 'm', 'b', 't'];
-	let i = 0;
-	let v = n;
-	while (v >= 1000 && i < units.length - 1) {
-		v /= 1000;
-		i++;
-	}
-	return (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : v.toFixed(0)) + units[i];
-}
+import {
+	Book,
+	fmt,
+	humanizeSeconds,
+	stageLabel,
+	STAGE_NOTICED,
+	STAGE_OBSERVED,
+	STAGE_STUDIED,
+	STAGE_KNOWN
+} from './book.svelte';
 
 describe('Book — utilities and constants', () => {
-	// Note: Testing Book class directly is limited due to Svelte 5 $state runes
-	// which only work within component context. Testing exported utilities instead.
-
 	describe('stage constants', () => {
 		it('defines stage progression constants', () => {
 			expect(STAGE_NOTICED).toBe(0);
@@ -105,8 +105,7 @@ describe('Book — utilities and constants', () => {
 
 		it('rounds appropriately for display', () => {
 			expect(fmt(1234567)).toContain('m');
-			const formatted = fmt(1200000);
-			expect(formatted).toMatch(/1\.[0-9]+m/);
+			expect(fmt(1200000)).toMatch(/1\.[0-9]+m/);
 		});
 
 		it('handles zero', () => {
@@ -114,22 +113,11 @@ describe('Book — utilities and constants', () => {
 		});
 
 		it('handles large numbers', () => {
-			const huge = 999999999999;
-			const formatted = fmt(huge);
-			expect(formatted).toMatch(/\d+[kmbt]?/);
+			expect(fmt(999999999999)).toMatch(/\d+[kmbt]?/);
 		});
 
 		it('handles negative numbers', () => {
-			const formatted = fmt(-100);
-			expect(formatted).toBeTruthy();
-		});
-
-		it('decreases precision for large numbers', () => {
-			const small = fmt(1200);
-			const large = fmt(1200000);
-			// Small should show more precision
-			expect(small.length).toBeGreaterThanOrEqual(3);
-			expect(large.length).toBeGreaterThanOrEqual(3);
+			expect(fmt(-100)).toBeTruthy();
 		});
 
 		it('uses appropriate suffix levels', () => {
@@ -137,6 +125,23 @@ describe('Book — utilities and constants', () => {
 			expect(fmt(1000000)).toContain('m');
 			expect(fmt(1000000000)).toContain('b');
 			expect(fmt(1000000000000)).toContain('t');
+		});
+	});
+
+	// ── humanizeSeconds — the ETA readout ─────────────────────────────
+
+	describe('humanizeSeconds', () => {
+		it('reads an unreachable or nonsense ETA as a dash', () => {
+			expect(humanizeSeconds(null)).toBe('—');
+			expect(humanizeSeconds(Infinity)).toBe('—');
+			expect(humanizeSeconds(-1)).toBe('—');
+		});
+
+		it('scales its unit with the wait', () => {
+			expect(humanizeSeconds(0)).toBe('any moment');
+			expect(humanizeSeconds(30)).toBe('~30s');
+			expect(humanizeSeconds(90)).toBe('~2m');
+			expect(humanizeSeconds(7200)).toBe('~2h');
 		});
 	});
 
@@ -150,8 +155,7 @@ describe('Book — utilities and constants', () => {
 		});
 
 		it('labels match expected values', () => {
-			const labels = Array.from(stageLabel);
-			expect(labels).toEqual(['noticed', 'observed', 'studied', 'known']);
+			expect(Array.from(stageLabel)).toEqual(['noticed', 'observed', 'studied', 'known']);
 		});
 	});
 
@@ -173,5 +177,39 @@ describe('Book — utilities and constants', () => {
 				atmospheric
 			]);
 		});
+	});
+});
+
+// The thing the old comment said was impossible.
+describe('Book — it instantiates, and it is a view over a plain world', () => {
+	it('constructs outside any component', () => {
+		const b = new Book();
+		expect(b.insight).toBe(0);
+		expect(b.world.state.insight).toBe(0);
+	});
+
+	it('reads through to the world it wraps', () => {
+		const b = new Book();
+		b.essence = 100;
+		b.writeCondition('holding');
+		expect(b.world.state.writtenConditions).toEqual(['holding']);
+		expect(b.life).toEqual(b.world.life);
+		expect(b.complexity).toBe(b.world.complexity);
+	});
+
+	it('a mutation through the Book is a mutation of the world', () => {
+		const b = new Book();
+		b.insight = 42;
+		expect(b.world.state.insight).toBe(42);
+	});
+
+	it('the world can be driven without the Book at all', () => {
+		const b = new Book();
+		b.essence = 100;
+		b.writeCondition('holding');
+		b.attend('salt_deposit');
+		b.world.tick(10);
+		// the Book sees it, because there is only one copy of the state
+		expect(b.study['salt_deposit']).toBeGreaterThan(0);
 	});
 });

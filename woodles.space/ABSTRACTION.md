@@ -9,10 +9,19 @@ that turns out to be a much smaller job than it looks, and the obstacle is not
 where you'd expect. **the schema is not in the way. marginalia's own
 reactivity is.**
 
+> **status: built.** §3's split shipped — `world.ts` holds the mechanics with
+> nothing reactive in them, `book.svelte.ts` is a view over it, and `sim.ts` is
+> the harness with the two policies §5 asks for. ten hours of game time went
+> from ~33.5s to **1.3s**, the whole game loop went from zero test coverage to
+> covered, and the first readings are in
+> [`apps/marginalia/BALANCE.md`](./apps/marginalia/BALANCE.md) — they are not
+> comfortable. §6 is still open and still not the plan.
+
 read alongside [`apps/marginalia/DESIGN.md`](./apps/marginalia/DESIGN.md) for
-the mechanics and
+the mechanics, [`apps/marginalia/BALANCE.md`](./apps/marginalia/BALANCE.md) for
+what the harness found, and
 [`packages/incremental-core/README.md`](./packages/incremental-core/README.md)
-for the harness this proposes borrowing. §6 answers a different, secondary
+for the harness this borrows from. §6 answers a different, secondary
 question — what bloomforge *authors* can't yet express — and is kept because
 it's true, not because it's the plan.
 
@@ -116,25 +125,44 @@ marginalia's own codebase already believes in this seam and states it twice —
 unit-tested directly — the Book holds the `$state` and calls into this."* the
 split just stops short of the tick.
 
-carry it the rest of the way:
+carried the rest of the way, this is what shipped:
 
-- **`WorldModel`** — a plain class holding the same fields, with `tick(dt)` and
-  the actions (`writeCondition`, `attend`, `lookCloser`, `intervene`,
-  `distill`, …) and a seeded RNG. no runes, no `Date.now()`, no `localStorage`,
-  no IndexedDB. **every mechanic lives here, and it is marginalia's own** — no
-  schema, no `GameDef`, nothing it has to be expressible in.
-- **`Book`** — the existing runes class, reduced to a view: it owns a
-  `WorldModel`, exposes `$state`/`$derived` over it for the UI, and keeps
-  persistence, the rAF clock, the offline credit and the announcement queue.
+- **`world.ts`** — `World`, a plain class with `tick(dt)` and the actions
+  (`writeCondition`, `attend`, `lookCloser`, `intervene`, `distillEssence`, …)
+  over a plain `WorldState`, and a seeded RNG. no runes, no `Date.now()`, no
+  `localStorage`, no `Math.random()`. **every mechanic lives here, and it is
+  marginalia's own** — no schema, no `GameDef`, nothing it has to be
+  expressible in. things worth telling a player about come back as
+  `WorldEvent`s; it renders nothing itself.
+- **`book.svelte.ts`** — the runes class, reduced to a view. it owns a `World`
+  and keeps persistence, the wall clock, offline credit, the bestiary bindings,
+  the reading room, the field-note log and the gain popups. its public surface
+  is unchanged, because forty files read `book.*`.
 
-the UI keeps the reactivity it needs at 60fps. the simulator gets a model it
-can run 360,000 times without touching a proxy. and `hydrate`/`toSave` stop
-being the only tested-adjacent surface in the app, because the model becomes
-directly testable — which is the thing §2.1 has been silently blocking.
+reactivity runs through **one `version` counter** rather than per-field
+`$state`: every getter reads it, every mutation bumps it. that is coarser than
+tracking each field, and it is what lets the world underneath be plain objects
+the harness can drive 360,000 times without paying for a proxy. it also turned
+out to be *faster for the UI too* — one counter bump per tick beats four
+container reassignments, and the app's own test suite dropped from 14.6s to
+3.6s on the strength of it.
 
-flattening to typed arrays (§2.3) is a second, separable step. do it only if
-189 ms vs 1,348 ms turns out to matter; 1.3 s per ten-hour run is already
-usable, and the runes extraction alone is 96% of the win.
+the numbers, measured after:
+
+| | 10h of game time |
+| --- | --- |
+| before, through the Book's runes | ~33,500 ms |
+| after, through `World` | **~1,300 ms** |
+
+flattening to typed arrays (§2.3) remains a separate, unbuilt step. it would
+buy another ~7×, and 1.3 s per ten-hour run has not yet been the thing that
+hurts — a full simulated day costs about three seconds.
+
+the safety net that made this safe to do: `characterization.test.ts` pins the
+Book's behaviour to exact golden numbers, written *before* the extraction and
+passing unchanged after it. thirty cases covering the tick order, the stage
+thresholds, the metabolism, the sinks, the interventions, the equilibrium
+dividend and the save round trip.
 
 ---
 
@@ -186,12 +214,25 @@ bounds and trust anything that feels good under both. marginalia's bounds are:
   be afforded, distill aggressively. the ceiling on meddling.
 
 the gap between those two *is* the answer to "does restraint pay?", which is
-the one balance question the whole design rests on and which nobody can
-currently answer. that comparison is the reason to build any of this.
+the one balance question the whole design rests on. that comparison was the
+reason to build any of this.
 
-a third, `attention-thrash` (re-attend every tick to whatever has the highest
-marginal yield), would bound the min-maxer the design explicitly does not want
-to reward — and if it wins by much, that's the finding.
+**both shipped, and the answer is no.** across 2, 6, 12 and 24 hours, Witness
+and Interventionist bank *identical* favor, equilibrium share, equilibrium
+seconds and minted concepts — to the digit. the mechanic built to make the
+light touch worth more currently cannot tell the two apart. that finding, and
+three more like it, are in
+[`apps/marginalia/BALANCE.md`](./apps/marginalia/BALANCE.md); the four are
+pinned as assertions in `sim.test.ts` so retuning says what it changed.
+
+run them with `pnpm --filter marginalia balance`. it takes about forty seconds
+and is deliberately outside the default test glob, because a suite that slow
+stops being run.
+
+a third bound, `attention-thrash` (re-attend every tick to whatever has the
+highest marginal yield), would bound the min-maxer the design explicitly does
+not want to reward. not built — on the current numbers it would have nothing to
+optimise, since the whole visible world is Known inside five minutes.
 
 ---
 
