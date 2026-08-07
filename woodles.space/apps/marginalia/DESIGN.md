@@ -6,13 +6,30 @@ we settled the framing on: **vital signs** (the world's metabolism), **intervent
 tunable defaults, not gospel — they're written so the loop is legible and balanceable
 by inspection, the way `tuning.ts` already is.
 
-> **balanceable by simulation now, too.** `pnpm --filter marginalia balance`
-> runs the shipped numbers through the harness in `witch/sim.ts`. read
-> [BALANCE.md](./BALANCE.md) before tuning anything here: it reports that the
-> phase-A vital signs never actually activate (§1.2's "oxygen climbs while
-> nutrients crash" is currently unreachable), and that phase C's restraint
-> dividend (§2.3) pays a meddler exactly what it pays an ascetic. neither has
-> been changed — what they *should* be is this document's call.
+> **balanceable by simulation now.** `pnpm --filter marginalia balance` runs the
+> shipped numbers through the harness in `witch/sim.ts`; read
+> [BALANCE.md](./BALANCE.md) before tuning anything here.
+>
+> **two numbers below have moved since this was written.** §1.4's stage costs
+> are now `[0, 30, 210, 1100]` — the opening worldspace took four minutes at the
+> old ones. And §1.2's `baseDrift` is no longer `0.02 · (50 − stock)`: it acts on
+> distance *out of band*, not from neutral, because at the old form it was the
+> same order of magnitude as the entire world's metabolism and nothing could ever
+> leave the middle.
+>
+> that change exposed something this document gets wrong. **§1.2's metabolism
+> table is net-positive on all three stocks** (+0.12 / +0.24 / +0.29 per second),
+> so the loops do not in fact "fall out naturally" — the drift term was doing all
+> the balancing. the two sinks named in prose here but never implemented are what
+> close them: moisture "evaporates" (§1.1) and salt deposits "reduce nutrient
+> leach" (§1.2). both are live now as `STOCK_LEAK`, and needs bands got their
+> upper halves back, which is also what makes §2.2's "invoke can overshoot into
+> flood-stress" reachable. §1.2's worked lesson now actually happens; there is a
+> test for it.
+>
+> **§2.3's restraint dividend is still wrong, and now inverted** — it pays a
+> meddler *more* than an ascetic. untouched deliberately: what
+> `interventionLoad` should mean is this document's call, not the harness's.
 
 three things carry through every decision:
 

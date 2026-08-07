@@ -44,14 +44,25 @@ describe('characterization — a fresh book', () => {
 		expect(b.mode).toBe('web');
 	});
 
-	it('an empty world holds still', () => {
+	// The property the drift model exists to guarantee. It used to mean "stays at
+	// 50"; with the world's own losses (evaporation, leach) it means "dries to
+	// the floor of its bands and stops there" — still in band, still stable, and
+	// still not drifting anywhere on its own.
+	it('an empty world settles at the floor of its bands and holds', () => {
 		const b = new Book();
-		run(b, 600);
-		expect(b.stocks).toEqual({ nutrients: 50, oxygen: 50, moisture: 50 });
+		run(b, 4 * 3600);
+		expect(b.stocks.nutrients).toBeCloseTo(40, 3);
+		expect(b.stocks.oxygen).toBeCloseTo(45, 3);
+		expect(b.stocks.moisture).toBeCloseTo(35, 3);
+		// at the floor it is genuinely at rest — another hour moves nothing
+		const settled = { ...b.stocks };
+		run(b, 3600);
+		expect(b.stocks.nutrients).toBeCloseTo(settled.nutrients, 6);
+		expect(b.stocks.oxygen).toBeCloseTo(settled.oxygen, 6);
+		expect(b.stocks.moisture).toBeCloseTo(settled.moisture, 6);
+		// a floor is still inside the band, so an empty world is a stable one
+		expect(b.stability).toBe(100);
 		expect(b.insight).toBe(0);
-		// favor eases toward 50 (base) + 8 (the full equilibrium bonus — neutral
-		// stocks are all in band and nothing has been propped up), so 58, not 50.
-		expect(b.favor).toBeCloseTo(58.0, 2);
 	});
 });
 
@@ -114,11 +125,11 @@ describe('characterization — attention and study', () => {
 		b.writeCondition('holding'); // salt_deposit, studyEase 1.4
 		b.attend('salt_deposit');
 
-		run(b, 5); // 5s x 1.4 = 7 study-seconds, threshold is 8
+		run(b, 21); // 21s x 1.4 = 29.4 study-seconds, threshold is 30
 		expect(b.stageOf('salt_deposit')).toBe(0);
-		expect(b.stageProgress('salt_deposit')).toBeCloseTo(0.875, 6);
+		expect(b.stageProgress('salt_deposit')).toBeCloseTo(0.98, 6);
 
-		run(b, 1); // 8.4 — crosses into Observed
+		run(b, 1); // 30.8 — crosses into Observed
 		expect(b.stageOf('salt_deposit')).toBe(STAGE_OBSERVED);
 		expect(b.knowing).toBe(2); // 1 for the condition, 1 for the stage
 	});
@@ -129,7 +140,7 @@ describe('characterization — attention and study', () => {
 		b.attend('salt_deposit');
 		const essenceBefore = b.essence;
 
-		run(b, 200); // comfortably past 8 + 30 + 95 study-seconds at ease 1.4
+		run(b, 1000); // comfortably past 30 + 210 + 1100 study-seconds at ease 1.4
 		expect(b.stageOf('salt_deposit')).toBe(STAGE_KNOWN);
 		// ESSENCE_ON_STUDIED (1) + ESSENCE_ON_KNOWN (2)
 		expect(b.essence).toBe(essenceBefore + 3);
@@ -166,7 +177,7 @@ describe('characterization — insight and favor', () => {
 		const b = freshBook();
 		b.writeCondition('holding');
 		b.attend('salt_deposit');
-		run(b, 200); // salt_deposit reaches Known
+		run(b, 1000); // salt_deposit reaches Known
 
 		// insightWeight 0.5 x STAGE_INSIGHT_MULT[3] 1.0 x vitality 1 (no needs),
 		// x 1.12 because category mastery has fired: only 'holding' was written,
@@ -184,7 +195,7 @@ describe('characterization — insight and favor', () => {
 		const b = freshBook();
 		b.writeCondition('holding');
 		b.attend('salt_deposit');
-		run(b, 200);
+		run(b, 1000);
 		expect(b.knownCount).toBe(1);
 		// target = 50 + 6*1 - stress + equilibrium bonus; favor is easing up to it
 		expect(b.favor).toBeGreaterThan(60);
@@ -202,18 +213,19 @@ describe('characterization — insight and favor', () => {
 });
 
 describe('characterization — the metabolism', () => {
-	it('a world of plants climbs oxygen and drains nutrients', () => {
+	// The scenario itself lives in sim.test.ts, where the harness can name a
+	// worldspace and a condition set directly. This just pins that a Book with
+	// the whole web in the opening water worldspace lands where it should.
+	it('the water worldspace settles below its nutrient band', () => {
 		const b = freshBook();
 		writeAll(b);
-		// bring the algae to Known so it metabolises at full activity
 		b.attend('algae_bloom');
-		run(b, 400);
+		run(b, 1400);
 		expect(b.stageOf('algae_bloom')).toBe(STAGE_KNOWN);
-
-		const before = { ...b.stocks };
-		run(b, 300);
-		expect(b.stocks.oxygen).toBeGreaterThan(before.oxygen);
-		expect(b.stocks.nutrients).toBeLessThan(before.nutrients);
+		// four aquatic life, only one of which returns nutrients at any scale —
+		// the water world is nutrient-poor until the shallows open
+		expect(b.stocks.nutrients).toBeLessThan(45);
+		expect(b.stocks.oxygen).toBeGreaterThan(50);
 	});
 
 	// generous timeout: two hours of game time through the rune-backed Book is
@@ -278,7 +290,7 @@ describe('characterization — interventions', () => {
 		const b = freshBook();
 		writeAll(b);
 		b.attend('salt_deposit');
-		run(b, 200);
+		run(b, 1000);
 		b.insight = 10_000;
 		return b;
 	}

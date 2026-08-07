@@ -169,45 +169,109 @@ describe('sim — the prestige formula', () => {
 });
 
 // These pin the *current* pacing so that editing tuning.ts tells you what it
-// did. They are not claims that the numbers are right — BALANCE.md argues at
-// length that four of them are wrong. When you retune, expect these to fail,
-// read the new number, and update it deliberately.
+// did. They are not claims that the numbers are right. When you retune, expect
+// these to fail, read the new number, and update it deliberately.
 describe('sim — pacing, as it currently stands', () => {
-	const run = () => simulate(witnessOnly(), { duration: 2 * HOUR, seed: 1 });
-
-	it('the opening worldspace is exhausted in minutes, not hours', () => {
-		const s = run().summary;
-		expect(s.timeToFirstKnown).toBeCloseTo(95, 0); // 1.6 minutes
-		expect(s.timeToAllKnown).toBeLessThan(300); // every visible life, inside 5
+	it('the opening worldspace is an opening act, not a demo', () => {
+		const s = simulate(witnessOnly(), { duration: 4 * HOUR, seed: 1 }).summary;
+		expect(s.timeToFirstKnown).toBeCloseTo(958, -1); // ~16 minutes
+		expect(s.timeToAllKnown).toBeGreaterThan(30 * 60); // half an hour, at least
+		expect(s.timeToAllKnown).toBeLessThan(45 * 60);
 	});
 
-	it('the vital signs never bite: nothing is ever stressed', () => {
-		const s = run().summary;
-		expect(s.stressedShare).toBe(0);
-		expect(s.equilibriumShare).toBe(1);
-		expect(s.wentQuiet).toBe(false);
+	it('the shallows takes about an hour', () => {
+		const s = simulate(witnessOnly(), {
+			duration: 4 * HOUR,
+			seed: 1,
+			worldspace: 'shallows'
+		}).summary;
+		expect(s.timeToAllKnown).toBeGreaterThan(45 * 60);
+		expect(s.timeToAllKnown).toBeLessThan(80 * 60);
 	});
 
-	it('the curve is flat: the rate stops moving well inside the first hour', () => {
-		const r = simulate(witnessOnly(), { duration: 2 * HOUR, seed: 1, sampleEvery: 300 });
-		const late = r.series.filter((s) => s.t >= 15 * 60);
-		const first = late[0].insightPerSec;
-		// after 15 minutes the production rate moves by less than a thousandth
-		// of a percent across the next hour and three quarters
-		for (const s of late) {
-			expect(Math.abs(s.insightPerSec - first) / first).toBeLessThan(1e-4);
-		}
-	});
-
-	it('restraint and meddling bank the identical dividend', () => {
+	// The restraint dividend is still broken, and the retune made it worse
+	// rather than better. It used to pay a meddler and an ascetic *identically*
+	// (the load never got high enough to gate anything). Now that a world can
+	// genuinely leave its band, intervening repairs it — `shape` lifts the
+	// nutrient baseline, `tend` bumps the stock a life lives by — and repair is
+	// exactly what the dividend rewards. So meddling out-earns restraint.
+	//
+	// Nothing in §2.3 was touched by this pass, deliberately: the fix is a
+	// design decision about what `interventionLoad` should mean, and it is
+	// open. See BALANCE.md §3.
+	it('meddling out-earns restraint — the dividend is still inverted', () => {
 		const opts = { duration: 2 * HOUR, seed: 1 };
 		const w = simulate(witnessOnly(), opts).summary;
 		const i = simulate(interventionist(), opts).summary;
-		// the mechanic meant to reward the light touch cannot currently tell
-		// the two apart — see BALANCE.md §3
-		expect(i.equilibriumSeconds).toBeCloseTo(w.equilibriumSeconds, 6);
-		expect(i.concepts).toBe(w.concepts);
-		expect(i.finalFavor).toBeCloseTo(w.finalFavor, 6);
+		expect(i.equilibriumSeconds).toBeGreaterThan(w.equilibriumSeconds);
+		expect(i.interventions).toBeGreaterThan(0);
+	});
+});
+
+// DESIGN.md §1.2's worked example. Until the drift rework and the world's own
+// losses landed this was unreachable — the stocks sat within a few points of
+// neutral no matter what lived in the world, because the pull toward neutral
+// was the same order of magnitude as the entire metabolism.
+//
+//   "write only plants and oxygen climbs while nutrients crash — until you
+//    allow *returning* and the decomposers close the loop. **that** is the
+//    lesson the journal already gestures at, made mechanical."
+describe('the §1.2 lesson', () => {
+	it('plants alone: oxygen climbs, nutrients crash, the algae wilts', () => {
+		// flow + reaching reveals the algae bloom and nothing else. It produces
+		// oxygen (+0.20), eats nutrients (-0.06), and needs nutrients >= 30.
+		const r = simulate(witnessOnly(), {
+			duration: 4 * HOUR,
+			seed: 1,
+			writeConditions: ['flow', 'reaching']
+		});
+		const w = r.final;
+		expect(w.life.map((l) => l.id)).toEqual(['algae_bloom']);
+
+		expect(w.state.stocks.oxygen).toBeGreaterThan(55);
+		// nutrients crash to the algae's own need floor and stop there: as it
+		// wilts it metabolises less, so the world eases the very pressure that
+		// was hurting it. That is the equilibrium loop, holding it at the
+		// boundary rather than driving it to zero.
+		expect(w.state.stocks.nutrients).toBeLessThanOrEqual(30.01);
+		expect(w.severityOf(w.life[0])).toBeGreaterThan(0);
+		expect(w.vitalityOf('algae_bloom')).toBeLessThan(1);
+		// stressed, but dormant rather than dead — VITALITY_FLOOR holds it
+		expect(w.vitalityOf('algae_bloom')).toBeGreaterThan(0.05);
+		expect(r.summary.stressedShare).toBeGreaterThan(0.5);
+	});
+
+	it('allowing `returning` closes the loop and the world recovers', () => {
+		const r = simulate(witnessOnly(), {
+			duration: 6 * HOUR,
+			seed: 1,
+			worldspace: 'shallows'
+		});
+		const w = r.final;
+		// the fungal net (+0.15 nutrients) is the biggest single return in the
+		// game, and with the whole web written the three stocks settle mid-band
+		expect(w.state.stocks.nutrients).toBeGreaterThan(50);
+		expect(w.state.stocks.oxygen).toBeGreaterThan(55);
+		expect(w.state.stocks.moisture).toBeGreaterThan(45);
+		expect(w.allStocksInBand).toBe(true);
+		expect(w.stability).toBe(100);
+		// and nothing is left suffering
+		for (const l of w.life) expect(w.severityOf(l)).toBe(0);
+	});
+
+	it('a complete world is a balanced one; a partial world is not', () => {
+		const partial = simulate(witnessOnly(), {
+			duration: 4 * HOUR,
+			seed: 1,
+			writeConditions: ['flow', 'reaching']
+		}).summary;
+		const whole = simulate(witnessOnly(), {
+			duration: 4 * HOUR,
+			seed: 1,
+			worldspace: 'shallows'
+		}).summary;
+		expect(partial.stressedShare).toBeGreaterThan(whole.stressedShare);
+		expect(whole.equilibriumShare).toBeGreaterThan(partial.equilibriumShare);
 	});
 });
 

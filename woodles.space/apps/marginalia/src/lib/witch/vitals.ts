@@ -39,6 +39,21 @@ export function neutralStocks(): Stocks {
 	return { nutrients: STOCK_START, oxygen: STOCK_START, moisture: STOCK_START };
 }
 
+// The world's own passive losses — the sinks DESIGN.md names in prose and the
+// code never had. §1.1 says moisture "evaporates"; §1.2's salt-deposit row says
+// it "reduces nutrient leach". Both are world processes, not anything a life
+// does, and without them the authored metabolism is net-positive on all three
+// stocks (+0.12 / +0.24 / +0.29 per second at full activity) — which is why,
+// with nothing but a pull toward neutral holding them down, removing that pull
+// sent every stock to its ceiling. See BALANCE.md.
+//
+// Loss acts only on what sits *above* the band floor, so it can never drive a
+// stock below the range the world is comfortable in, and an unattended world
+// settles at that floor rather than draining to nothing.
+export function leakRate(value: number, lo: number, rate: number): number {
+	return value <= lo ? 0 : -rate * (value - lo);
+}
+
 // 100 inside the band, falling linearly to 0 at BAND_FALLOFF points outside it.
 export function bandHealth(value: number, lo: number, hi: number): number {
 	if (value >= lo && value <= hi) return 100;
@@ -85,11 +100,33 @@ export function lifeStockRate(
 	return out;
 }
 
-// The pull that returns an untouched stock toward its baseline, so an empty or
-// unwatched world sits still rather than drifting. The baseline is normally
-// neutral, but shaping geology (an intervention) can raise it.
-export function driftRate(value: number, baseline: number = STOCK_NEUTRAL): number {
-	return STOCK_DRIFT_PER_SEC * (baseline - value);
+// The pull that keeps a stock from running away, so an empty or unwatched world
+// sits still rather than drifting.
+//
+// It acts on distance *out of band*, not distance from neutral. Inside the band
+// there is no restoring force at all: a world can settle anywhere its life can
+// hold it, and only gets pulled back once it goes somewhere extreme. That is
+// what lets a metabolism of a few hundredths per second actually move a stock —
+// under a pull toward neutral, a stock ten points out was being shoved back at
+// 0.2/sec, the same order as the whole world's metabolism, so nothing could ever
+// leave the middle and DESIGN.md §1.2's "oxygen climbs while nutrients crash"
+// was unreachable. See BALANCE.md §2.
+//
+// `baseline` shifts the whole band rather than naming a point to return to, so
+// shaping geology (the one intervention that moves a baseline) still moves where
+// the world is comfortable — it raises the floor and the ceiling together.
+export function driftRate(
+	value: number,
+	baseline: number = STOCK_NEUTRAL,
+	band: readonly [number, number] = [STOCK_NEUTRAL, STOCK_NEUTRAL],
+	rate: number = STOCK_DRIFT_PER_SEC
+): number {
+	const shift = baseline - STOCK_NEUTRAL;
+	const lo = band[0] + shift;
+	const hi = band[1] + shift;
+	if (value < lo) return rate * (lo - value);
+	if (value > hi) return rate * (hi - value);
+	return 0;
 }
 
 // The stock an intervention should act on for a given life: the stock it most

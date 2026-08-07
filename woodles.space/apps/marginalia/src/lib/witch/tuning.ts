@@ -7,7 +7,12 @@
 //   1: Notice  → Observed
 //   2: Observed → Studied
 //   3: Studied  → Known
-export const STAGE_SECONDS = [0, 8, 30, 95];
+// Steeply increasing on purpose: a 21-second first beat so something happens
+// immediately, and a long final commitment so Knowing a thing is a real one.
+// At these numbers the opening water worldspace runs ~34 minutes and the
+// shallows ~58 — it was four minutes and seven, which meant the whole authored
+// world was spent before the first hour. See BALANCE.md.
+export const STAGE_SECONDS = [0, 30, 210, 1100];
 
 // A manual "look closer" click adds this many study-seconds to an
 // attended life. The clicker hook on top of the idle accrual.
@@ -57,7 +62,27 @@ export const OFFLINE_CAP_SECONDS = 8 * 60 * 60; // credit at most 8 hours away
 // an empty or unwatched world holds still.
 export const STOCK_START = 50;
 export const STOCK_NEUTRAL = 50;
-export const STOCK_DRIFT_PER_SEC = 0.02; // pull back toward neutral
+// How hard a stock is pulled back per point it sits *outside* its band. Inside
+// the band there is no pull at all, so the world is free to settle wherever its
+// life holds it. At the old 0.02-toward-neutral this was ~0.2/sec of restoring
+// force ten points out — the same order as the entire world's metabolism, so
+// nothing could ever leave the middle.
+export const STOCK_DRIFT_PER_SEC = 0.005;
+
+// The world's passive losses, per point above the band floor, per second — the
+// sinks DESIGN.md names but never had: moisture "evaporates" (§1.1) and salt
+// deposits "reduce nutrient leach" (§1.2). Sized so the *complete* world settles
+// mid-band (roughly nutrients 60, oxygen 65, moisture 55) against an authored
+// metabolism that sums to +0.12 / +0.24 / +0.29 per second.
+//
+// Oxygen has no sink named in the design — "animals burn it" is the intent, and
+// world 1 has one animal against five oxygen producers. Its rate here stands in
+// for that missing content; if world 2 brings more animals, lower it.
+export const STOCK_LEAK: Record<'nutrients' | 'oxygen' | 'moisture', number> = {
+	nutrients: 0.006, // leach
+	oxygen: 0.012, // escape (see above)
+	moisture: 0.0145 // evaporation
+};
 
 // How metabolically present life is at each observation stage. Unwitnessed life
 // (Noticed) doesn't move the world at all; deeply Known life moves it fully.

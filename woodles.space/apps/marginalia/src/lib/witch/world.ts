@@ -47,6 +47,9 @@ import {
 	LOOK_CLOSER_SECONDS,
 	STAGE_INSIGHT_MULT,
 	INSIGHT_TRICKLE_ANNOUNCE_SEC,
+	STOCK_DRIFT_PER_SEC,
+	STOCK_LEAK,
+	STOCK_NEUTRAL,
 	ATTENTION_START,
 	ATTENTION_COSTS,
 	DISTILL_INSIGHT_COST,
@@ -82,8 +85,10 @@ import {
 	nextVitality,
 	lifeStockRate,
 	driftRate,
+	leakRate,
 	focusStock,
-	stabilityOf
+	stabilityOf,
+	type StockId
 } from './vitals';
 import { nextFocusStreak, focusMultiplier } from './focus';
 import { visibleLifeForWorldspace, type Worldspace } from './worldShape';
@@ -137,6 +142,29 @@ export interface WorldState {
 	trickleAccum: number;
 	trickleTimer: number;
 }
+
+/**
+ * The handful of constants worth *sweeping* rather than just reading.
+ *
+ * Everything else in `tuning.ts` is imported directly, because a tuning value
+ * you can't change without editing the file is fine — the point of this
+ * interface is the balance harness, which needs to run the same world at four
+ * different pacings in one pass and print the comparison. See BALANCE.md.
+ */
+export interface WorldTuning {
+	/** Study-seconds to reach each stage. Index 0 unused; Notice is automatic. */
+	stageSeconds: readonly number[];
+	/** How hard a stock is pulled back per point outside its band, per second. */
+	stockDriftPerSec: number;
+	/** The world's passive loss per stock, per point above the band floor. */
+	stockLeak: Record<StockId, number>;
+}
+
+export const defaultTuning: WorldTuning = {
+	stageSeconds: STAGE_SECONDS,
+	stockDriftPerSec: STOCK_DRIFT_PER_SEC,
+	stockLeak: STOCK_LEAK
+};
 
 export function createWorldState(): WorldState {
 	return {
@@ -193,6 +221,7 @@ export type WorldEvent =
  */
 export class World {
 	state: WorldState;
+	readonly tuning: WorldTuning;
 	private rng: Rng;
 
 	/** Set true when the tick should hold back per-event announcements. */
@@ -207,8 +236,14 @@ export class World {
 	private wasSelfBalancing = false;
 	private wasQuiet = false;
 
-	constructor(state: WorldState = createWorldState(), seed = 1, resumeRngFrom?: number) {
+	constructor(
+		state: WorldState = createWorldState(),
+		seed = 1,
+		resumeRngFrom?: number,
+		tuning: WorldTuning = defaultTuning
+	) {
 		this.state = state;
+		this.tuning = tuning;
 		this.rng = createRng(seed, resumeRngFrom);
 	}
 
@@ -219,6 +254,11 @@ export class World {
 
 	get seed(): number {
 		return this.rng.seed;
+	}
+
+	/** A copy of this world's tuning with some values overridden, for a sweep. */
+	static tuned(overrides: Partial<WorldTuning>): WorldTuning {
+		return { ...defaultTuning, ...overrides };
 	}
 
 	/** Replace the whole state — a load, or a reset. Invalidates everything derived. */
@@ -420,7 +460,7 @@ export class World {
 	/** Study-seconds needed for the attended life's next stage advance. */
 	stageThreshold(lifeId: string): number {
 		const next = this.stageOf(lifeId) + 1;
-		return STAGE_SECONDS[next] ?? Infinity;
+		return this.tuning.stageSeconds[next] ?? Infinity;
 	}
 
 	/** 0..1 progress toward the next stage. */
@@ -457,7 +497,7 @@ export class World {
 		let banked = this.state.study[lifeId] ?? 0;
 		const life = lifeById(lifeId);
 		while (stage < STAGE_KNOWN) {
-			const threshold = STAGE_SECONDS[stage + 1];
+			const threshold = this.tuning.stageSeconds[stage + 1];
 			if (banked < threshold) break;
 			banked -= threshold;
 			stage += 1;
@@ -667,13 +707,22 @@ export class World {
 			this.addStudy(id, dt * life.studyEase * this.vitalityOf(id), into);
 		}
 
-		// 3) stocks move by metabolism, then drift back toward their baseline.
+		// 3) stocks move by metabolism, then get pulled back only if they have
+		//    left their band — inside it the world is free to settle wherever
+		//    its life holds it.
 		const stocks = { ...s.stocks };
 		for (const id of STOCK_IDS) {
-			stocks[id] = Math.max(
-				0,
-				Math.min(100, stocks[id] + (rate[id] + driftRate(stocks[id], s.stockBaseline[id])) * dt)
+			const shift = s.stockBaseline[id] - STOCK_NEUTRAL;
+			const drift = driftRate(
+				stocks[id],
+				s.stockBaseline[id],
+				STOCK_BANDS[id],
+				this.tuning.stockDriftPerSec
 			);
+			// the world's own losses — evaporation, leach. Never below the floor,
+			// so an unattended world settles there rather than draining away.
+			const leak = leakRate(stocks[id], STOCK_BANDS[id][0] + shift, this.tuning.stockLeak[id]);
+			stocks[id] = Math.max(0, Math.min(100, stocks[id] + (rate[id] + drift + leak) * dt));
 		}
 		s.stocks = stocks;
 

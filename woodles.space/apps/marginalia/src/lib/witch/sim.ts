@@ -20,7 +20,15 @@
 // What it deliberately does *not* do is decide whether a number is good. It
 // reports; you judge.
 
-import { World, createWorldState, STAGE_KNOWN, type WorldEvent, type WorldState } from './world';
+import {
+	World,
+	createWorldState,
+	defaultTuning,
+	STAGE_KNOWN,
+	type WorldEvent,
+	type WorldState,
+	type WorldTuning
+} from './world';
 import { conditions } from './content/conditions';
 import { world1Life } from './content/life';
 import { STOCK_IDS, type StockId } from './vitals';
@@ -170,6 +178,12 @@ export interface SimOptions {
 	worldspace?: Worldspace;
 	/** Seed a specific state instead — overrides every option above. */
 	initialState?: WorldState;
+	/**
+	 * Candidate numbers to run instead of the shipped ones. This is what makes
+	 * a sweep possible: run the same world at four pacings in one pass and
+	 * print the comparison, rather than editing `tuning.ts` and re-running.
+	 */
+	tuning?: Partial<WorldTuning>;
 }
 
 export interface SeriesSample {
@@ -242,12 +256,13 @@ export function conceptsFor(peakComplexity: number, knownCount: number, equilibr
 }
 
 export function createWorld(opts: SimOptions = { duration: 0 }): World {
-	if (opts.initialState) return new World(opts.initialState, opts.seed ?? 1);
+	const tuning: WorldTuning = opts.tuning ? { ...defaultTuning, ...opts.tuning } : defaultTuning;
+	if (opts.initialState) return new World(opts.initialState, opts.seed ?? 1, undefined, tuning);
 
 	const state = createWorldState();
 	state.essence = opts.startingEssence ?? 10_000;
 	if (opts.worldspace) state.activeWorldspace = opts.worldspace;
-	const world = new World(state, opts.seed ?? 1);
+	const world = new World(state, opts.seed ?? 1, undefined, tuning);
 	world.quietAnnouncements = true; // nothing is watching; skip the popup bookkeeping
 
 	const which = opts.writeConditions ?? 'all';

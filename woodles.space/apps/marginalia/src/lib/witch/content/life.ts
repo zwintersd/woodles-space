@@ -104,7 +104,8 @@ export const world1Life: Life[] = [
 		insightWeight: 1.4,
 		studyEase: 0.9,
 		metabolism: { oxygen: -0.1 },
-		needs: { oxygen: [45, 100] },
+		// the ceiling is supersaturation, not scarcity — see the note on moss
+		needs: { oxygen: [45, 90] },
 		notice: 'a drifting translucence in the deeper water.',
 		observe: 'a boundary that moves itself. it has no plan, only a pulse.',
 		study: 'it follows warmth and flinches from shadow. the first life here that decides anything.',
@@ -122,7 +123,8 @@ export const world1Life: Life[] = [
 		insightWeight: 0.7,
 		studyEase: 1.3,
 		metabolism: { oxygen: 0.05, nutrients: 0.02, moisture: -0.02 },
-		needs: { moisture: [15, 100] },
+		// hardy at the dry end, unhappy in sustained wet
+		needs: { moisture: [15, 70] },
 		notice: 'a grey-gold crust on the bare rock.',
 		observe: 'two lives agreeing to be one. it asks the stone for almost nothing.',
 		study: 'it advances a hair each year and unmakes the rock as it goes. the first soil is its leavings.',
@@ -138,7 +140,11 @@ export const world1Life: Life[] = [
 		insightWeight: 0.9,
 		studyEase: 1.1,
 		metabolism: { oxygen: 0.1, nutrients: -0.04, moisture: -0.05 },
-		needs: { moisture: [40, 100], nutrients: [25, 100] },
+		// needs bands are two-sided by design (DESIGN.md §1.4) and world 1 only
+		// ever used the lower half, so nothing could be harmed by *too much* of
+		// anything — which is also what made §2.2's "invoke can overshoot into
+		// flood-stress" impossible to reach. The moisture ceiling is waterlogging.
+		needs: { moisture: [40, 85], nutrients: [25, 100] },
 		notice: 'a low green softening the hollows.',
 		observe: 'it has no roots. it drinks the whole sky at once and holds the rain in place.',
 		study: 'where it spreads, the ground stops leaving. it keeps the water for everything that comes after.',
