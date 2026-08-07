@@ -31,10 +31,15 @@ other docs have narrower jobs:
   its §6 lists what the `GameDef` schema can't express, for the separate
   question of authoring marginalia-like games in bloomforge.
 - [`apps/marginalia/BALANCE.md`](./apps/marginalia/BALANCE.md) is what the
-  harness found when it was pointed at the shipped numbers: the content is
-  exhausted in four minutes, the vital signs never activate, and the
-  restraint dividend pays a meddler exactly what it pays an ascetic. findings
-  only — nothing in the game was retuned.
+  harness found when it was pointed at the shipped numbers, and what was
+  changed as a result. Two fixes landed: the content-to-time ratio (the
+  opening worldspace took four minutes; it now takes thirty-four) and the
+  stock-drift model, which acts on distance out of band rather than from
+  neutral. That second one exposed a real error in DESIGN.md — its own
+  metabolism table is net-positive on all three stocks, so the drift term was
+  doing all the balancing — fixed by implementing the two passive sinks the
+  design names in prose and never had. Three findings remain open and
+  deliberately untouched, the restraint dividend chief among them.
 - [ROADMAP.md](./ROADMAP.md) is the 10-week plan for making marginalia and
   the bestiary public-facing — all ten weeks are marked `✅ shipped` in its
   own headers, week 4 (share links, save-as-image, adopt-a-card) having
@@ -46,7 +51,9 @@ other docs have narrower jobs:
   - `apps/marginalia/`: `DESIGN.md` (mechanics, the week-6 save-discipline
     policy, and a week-10 note on what it publishes vs. only reads),
     `BALANCE.md` (what the sim harness found when pointed at those
-    mechanics — findings, not retunings),
+    mechanics, and the two retunes it prompted), `WORLDS.md` (the route
+    through DESIGN.md's remaining phases D/E/F — open questions, candidate
+    answers, and the order to take them in),
     `PROPOSAL.md`, `ASSETS.md`, `static/diorama/README.md` (the world-canvas
     art's filenames and its graceful-degradation contract), and four docs
     under `src/lib/arcade/` — `ARCADE_ROADMAP.md` (the cabinet's own polish
