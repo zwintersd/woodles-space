@@ -24,6 +24,12 @@ other docs have narrower jobs:
   its §7 records the later amendment — notebook retired into write, so the
   writing surface and the front door are now the same room. read it before
   reshaping any of those apps.
+- [ABSTRACTION.md](./ABSTRACTION.md) reads marginalia's idle layer against
+  `@woodles/incremental-core`'s `GameDef` schema and lists the eleven things
+  a bloomforge author cannot yet say. it is a gap analysis, not a plan — and
+  it argues explicitly *against* porting marginalia onto the core. read it
+  before extending the schema, and before assuming the two systems are the
+  same kind of game.
 - [ROADMAP.md](./ROADMAP.md) is the 10-week plan for making marginalia and
   the bestiary public-facing — all ten weeks are marked `✅ shipped` in its
   own headers, week 4 (share links, save-as-image, adopt-a-card) having
