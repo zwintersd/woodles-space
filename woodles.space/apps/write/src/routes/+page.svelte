@@ -1355,26 +1355,27 @@
 		display: flex;
 		justify-content: center;
 		align-items: flex-start;
-		gap: clamp(2.4rem, 2vw, 3.6rem);
+		gap: clamp(1.25rem, 1.5vw, 2.5rem);
 		padding-top: 0;
 	}
-	/* Widths grow with the viewport past an ordinary laptop, so a big desktop
-	   monitor actually gets used instead of leaving the page stranded in a
-	   fixed-width column with empty space either side. The vw term only
-	   overtakes the px minimum once the window is wide enough, so nothing
-	   changes below ~1500px — this is purely a large-desktop upgrade. */
+	/* editor-wrap is a true flex-filling item (basis 0, grow 1): it claims
+	   *everything* left over after the margin column and gap take their
+	   share, whatever that happens to be at the current window size — no
+	   vw-percentage guessing that can undershoot on an ordinary laptop, and
+	   no arithmetic that can overflow it. max-width is only a sanity ceiling
+	   so a giant monitor doesn't stretch prose into unreadable line lengths. */
 	.editor-wrap {
-		max-width: clamp(680px, 42vw, 920px);
-		width: 100%;
+		flex: 1 1 0%;
+		min-width: 0;
+		max-width: 1100px;
 		padding: 84px clamp(1.5rem, 5vw, 2.5rem) 96px;
-		flex-shrink: 0;
 		transition: max-width 0.3s ease;
 	}
-	.editor-wrap[data-view='page'][data-layer='midground'] { max-width: clamp(600px, 37vw, 820px); }
-	.editor-wrap[data-view='page'][data-layer='background'] { max-width: clamp(540px, 33vw, 720px); }
+	.editor-wrap[data-view='page'][data-layer='midground'] { max-width: 960px; }
+	.editor-wrap[data-view='page'][data-layer='background'] { max-width: 840px; }
 	/* an open notebook needs room for two pages and still has to leave the
 	   margin column beside it on an ordinary laptop */
-	.editor-wrap[data-view='spread'] { max-width: clamp(1000px, 68vw, 1640px); }
+	.editor-wrap[data-view='spread'] { max-width: 1900px; }
 
 	/* ── the pages ── */
 	.pages { position: relative; }

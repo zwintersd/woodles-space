@@ -87,7 +87,7 @@
 		position: relative;
 		/* Keeps pace with the wider desktop page (see .editor-wrap in
 		   +page.svelte) instead of staying pinned at a laptop-era width. */
-		width: clamp(280px, 15vw, 380px);
+		width: clamp(240px, 13vw, 340px);
 		flex-shrink: 0;
 		padding-top: 84px;
 		padding-bottom: 96px;
