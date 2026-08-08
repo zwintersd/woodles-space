@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { entityHref } from '@woodles/app-manifest';
 	import type { PublicCreature } from '@woodles/sync';
 	import { domainDef, rarityDef, type Domain, type Rarity } from '$lib/content/domains';
 	import { bestiary } from '$lib/bestiary.svelte';
@@ -34,7 +35,7 @@
 	}
 
 	function copyLink(): void {
-		const url = `${location.origin}/bestiary?card=${encodeURIComponent(creature.id)}`;
+		const url = `${location.origin}${entityHref('bestiary', 'card', creature.id)}`;
 		navigator.clipboard.writeText(url).then(() => {
 			copiedFlash = true;
 			setTimeout(() => { copiedFlash = false; }, 1400);

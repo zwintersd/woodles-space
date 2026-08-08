@@ -13,7 +13,7 @@ truth for how it's wired; anything here that contradicts it is out of date.
 
 ## 1. what landed
 
-Six steps, six commits, all on `claude/carillon-thinking-about-connect-9xuh3n`.
+Six steps, on `claude/carillon-thinking-about-connect-9xuh3n`.
 
 | # | what | where |
 | --- | --- | --- |
@@ -71,9 +71,8 @@ Shapes and keys live in `packages/sync/src/crossAppBlobs.ts`; the machinery
   present on a clean `main`. Filter to what you're changing.
 - **e2e needs a Chromium override in some containers.** The repo's
   `playwright.config.ts` is correct; if the pinned browser build is missing,
-  run against a temporary config that sets
-  `launchOptions.executablePath`, and delete it after. Do not commit one, and
-  do not run `playwright install`.
+  run against a temporary config that sets `launchOptions.executablePath`, and
+  delete it after. Do not commit one, and do not run `playwright install`.
 - **`e2e/carillon-thinking-about.spec.ts` seeds localStorage only when
   absent.** `addInitScript` runs on every navigation, so unconditional seeding
   silently resets state on reload and hides exactly the persistence a test is
@@ -85,130 +84,203 @@ Shapes and keys live in `packages/sync/src/crossAppBlobs.ts`; the machinery
 
 ---
 
-## 3. Write, `#`, and `@`
+## 3. Echoes stops being public — ✅ built
 
-The ask: while writing, `#` reaches a piece of media you're thinking about and
-`@` reaches a specific event, time, or day. Both are references in prose —
-which is the same problem the spine already solves, with one genuinely new
-constraint.
+**Decided: nobody is reading it, and the thing that works about it is the
+opposite of publishing.** An archive of finished writing that you re-read,
+annotate and edit — by the self, for the self — is a different product from a
+public reading room, and a better one. Making it private is mostly deletion,
+and it unblocks the Write design in §5.
 
-### 3.1 what is already done for you
+### 3.1 what actually has to move
 
-- **The shelf is the `#` index.** It already lists every active entry with an
-  id, title, colour and column. Nothing new needs publishing.
-- **Commitments are half the `@` index.** Dates, times, block titles, status.
-- **`entityHref` makes a reference clickable** without hardcoding a path, and
-  both apps already accept deep links, so `#Piranesi` can open the board on
-  that entry and `@Thursday` can open the planner on that day.
-- **The reader mechanics are shared.** `readLocalLedger` / `pullLedger` in
-  `@woodles/sync` are plain functions; only the `$state` wrapper is app-local.
-  Write's version is ~40 lines, mostly copied from
-  `thinkingAboutShelf.svelte.ts`.
+`/api/public` has **two independent tenants**, so this is a tenant leaving,
+not a demolition. Bestiary's gallery is genuinely public-facing and stays
+exactly as it is.
 
-### 3.2 the constraint that decides the design
+| piece | today | after |
+| --- | --- | --- |
+| `write/publish.ts` | builds `EchoesPublicBlob`, filters `public === true` | gone; every letter is yours |
+| `StoredLetter.public` | per-letter opt-in | gone |
+| `EchoesPublicBlob`, `ECHOES_PUBLIC_SLUG` | `packages/sync/src/publicBlobs.ts` | retire; `PublicCreature` stays |
+| `apps/letter/index.html` | hand-rolled unauthenticated fetch | same fetch, plus the passphrase |
+| `marginalia` reading room (`echoesLibrary.svelte.ts`) | `pullPublic('echoes', …)` | authenticated pull, or drop the feature |
+| letters storage | `published` table via `/api/public` | `/api/sync`, under a real `write` blob |
 
-**Write publishes to Echoes, and Echoes is public.**
+That last row is the quiet win. **Write currently has no private blob at all**
+— its sync adapter's `read`/`write` are no-ops, kept only to reuse
+`createAppSync`'s passphrase handling for gating the publish button. Moving
+letters onto `/api/sync` gives that file a real job and deletes a stub.
 
-`apps/write/src/lib/publish.ts` filters letters with `public === true` and
-`api/public.ts` serves them to anyone, unauthenticated, cached for five
-minutes. So a reference embedded in prose has two failure modes that do not
-exist anywhere else in this spine:
+`apps/letter/index.html` is static with no build step, which is why it
+hand-rolls its fetch instead of importing `@woodles/sync`. That doesn't
+change: it just adds an `Authorization: Bearer` header read from the shared
+`woodles_sync_passphrase` key on the same origin. Note the consequence
+honestly — Echoes then shows nothing until the passphrase is connected, where
+today it shows published letters to anyone.
 
-1. **Leakage.** `#Piranesi` in a published letter tells a stranger what you're
-   reading. The reference's *display text* is the leak, not the id — and the
-   display text is the part you actually wrote.
-2. **Dangling resolution.** A published letter rendered in a stranger's browser
-   cannot resolve `data-ref-id` against a shelf that only exists in your
-   localStorage. Anything that renders live will render nothing.
+### 3.2 what Echoes becomes
 
-Both point the same way: **a reference must degrade to the words you typed.**
+The annotation model is **already built**. `PublicLetter` carries
+`annotations: { pocketNotes, marginNotes }`, designed for public display and
+much better suited to private re-reading. Echoes as a self-archive is the job
+that model was always shaped for:
+
+- Write composes. Echoes is where a finished piece is **re-read over time**,
+  annotated in the margins, and edited without the pressure of a draft.
+- Because it's private, an Echoes letter can carry **live references** (§5) —
+  which turns the archive into something navigable by what it's about:
+  *everything I wrote about Piranesi*, *everything I wrote on this day.*
+
+That last property is what makes killing publicity worth doing before the
+Write work rather than after.
+
+---
+
+## 4. bestiary's card id, early — ✅ built
+
+`?card=<id>` already exists — read in `apps/bestiary/src/routes/+layout.svelte`
+and built by hand in `PublishedCardPanel.svelte:37` as
+`` `${location.origin}/bestiary?card=${encodeURIComponent(creature.id)}` ``.
+It is exactly the hardcoded-path pattern step 1 exists to replace.
+
+The chore is ten minutes: `addressableBy: ['card']` on the bestiary manifest
+entry, swap the string for `entityHref('bestiary', 'card', creature.id)`, and
+the contract test starts covering it.
+
+**Do it before the `#` picker, not after** — and for a structural reason, not
+tidiness. A picker built against the shelf alone hardcodes one source. A
+picker built against a **registry of reference sources** takes a second source
+for free, and a creature is the obvious second thing you'd want to name in
+prose after a book.
+
+```ts
+type ReferenceSource = {
+  app: string;           // manifest app id
+  kind: string;          // a kind that app declares in addressableBy
+  sigil: '#' | '@';
+  list(query: string): ReferenceCandidate[];   // for the picker
+  resolve(id: string): ReferenceCandidate | null; // live, may be null
+};
+```
+
+Three sources on day one — Thinking About entries, bestiary cards, dates —
+and Echoes letters become a fourth almost free once §3 lands. Each is a few
+lines because `readLocalLedger` / `pullLedger` already do the fetching.
+
+---
+
+## 5. Write, `#`, and `@`
+
+### 5.1 what §3 changes about this
+
+The earlier version of this design was built around a constraint that no
+longer exists. When Write published to a public Echoes, a reference in prose
+had two failure modes: it **leaked** what you were reading to a stranger, and
+it **could not resolve** in a browser with no access to your shelf. Both
+forced the same compromise — flatten every reference to plain text on publish,
+and never render anything live.
+
+With Echoes private, both evaporate. The only reader is you, on a device that
+either has the ledgers or can pull them. So:
+
+**References resolve live.** `#Piranesi` renders the entry's *current* title
+and colour. Rename the book in Thinking About and every letter that mentions
+it updates. That's the whole point of a reference over a copy, and it was
+unavailable while the audience was strangers.
+
+### 5.2 the one thing to keep from the old design
+
+Store the display text anyway.
 
 ```html
 <a class="ref" data-ref-app="thinking-about" data-ref-kind="entry"
    data-ref-id="e-piranesi">Piranesi</a>
 ```
 
-The display text is inside the element, not looked up. Strip the attributes
-and you still have a sentence. That mirrors the Task decision — the link is
-disposable, the writing is not — and it is the opposite of Spores, which
-renders `[[wikilinks]]` as *segments* precisely so there is no sanitizer on
-the read path. Write can't take that route: its body is a rich
-contenteditable, so a reference has to survive `sanitizeHtml`.
+Not for privacy any more — for **cold references**. Delete the entry and the
+sentence still has to read as a sentence. Render the live title when it
+resolves, fall back to the stored text when it doesn't. That is exactly
+marginalia's binding pool (resolve against a pool that may not be there)
+applied to prose, and exactly the Task decision from step 2: *the link is
+disposable, the writing is not.*
 
-Which is fine, because that policy is **already parameterised**: `@woodles/text`
-takes whether to keep `data-anchor` as an argument rather than picking a winner
-(REFACTORING.md's note on the two divergences). Adding `data-ref-*` to the
-allowed set is the same shape of change, not a fork.
+It also means text pasted out of a letter still says something.
 
-**The publish path should flatten by default.** `publish.ts` gets a pass that
-turns every `.ref` into its own text content before the letter reaches
-`/api/public`. Opt in per draft if you ever want the links public; default to
-plain prose. This is the one decision I would not defer — it is much easier to
-add before anyone has published a letter containing a reference.
+### 5.3 the sanitizer
 
-### 3.3 what `@` should mean
+Write's body is a rich contenteditable, so a reference has to survive
+`sanitizeHtml`. Spores dodged this by storing `[[wikilinks]]` in plain text and
+rendering *segments*, with no sanitizer on the read path at all — Write can't
+take that route.
 
-`#` is unambiguous: it names a thing on the shelf. `@` is not, and the
-temptation is to make it mean everything. Three candidates, in the order I'd
-build them:
+Fine, because the policy is **already parameterised**: `@woodles/text` takes
+whether to keep `data-anchor` as an argument rather than picking a winner
+(REFACTORING.md's two divergences). Allowing `data-ref-*` is the same shape of
+change, not a fork.
+
+### 5.4 what `@` should mean
+
+`#` names a thing. `@` is ambiguous, and the temptation is to make it mean
+everything. In build order:
 
 1. **A day.** `@2026-08-13`, rendered "Thursday". A date is the one identity
-   every app in this workspace already shares — Carillon keys observations,
-   sleep logs and commitments by `YYYY-MM-DD`, Thinking About dates every
-   session. It needs no new ledger at all, and it is the reference most likely
-   to still make sense a year later.
-2. **A commitment.** `@read a chapter` resolving to a scheduled task, from the
-   commitments ledger. Useful, already published, but narrow — it only covers
-   tasks that are about media.
-3. **An observation or a block.** Tempting and probably wrong: an observation
-   is a fifteen-minute sample, and prose almost never wants that granularity.
-   A day is the unit people actually write about.
+   every app here already shares — Carillon keys observations, sleep logs and
+   commitments by `YYYY-MM-DD`; Thinking About dates every session. No new
+   ledger, and it's the reference most likely to still make sense in a year.
+2. **A commitment.** `@read a chapter` from the commitments ledger. Already
+   published, but narrow — only covers tasks that are about media.
+3. **An observation or a block.** Probably wrong: an observation is a
+   fifteen-minute sample, and prose almost never wants that granularity. A day
+   is the unit people write about.
 
-Start with the day. It's the cheapest and the most durable.
+### 5.5 the fourth ledger, and the loop it closes
 
-### 3.4 the fourth ledger, and why it's the interesting part
+Once Write publishes **what it wrote about** — `{ draftId, title, refs: [{app,
+kind, id}], dates: [...] }` — the spine closes in the direction still open:
 
-If Write publishes **what it wrote about** — `{ draftId, title, refs: [{app,
-kind, id}], dates: [...] }` — then the spine closes a loop it hasn't yet:
-
-- Carillon's Edition Review could show *"you wrote about this day"* beside the
+- Carillon's Edition Review shows *"you wrote about this day"* beside the
   observations for it.
-- Thinking About could show *"you wrote about this"* on an entry, next to the
+- Thinking About shows *"you wrote about this"* on an entry, beside the
   sittings and the scheduled times.
+- Echoes, now private, becomes navigable **by reference**: every letter that
+  mentions this book, this creature, this day.
 
-That is the same shape as the other three (one writer, derived from drafts on
-save, deterministic ids), and it's what would make Write feel like part of the
-suite rather than a consumer of it. It is also where the privacy question
-sharpens: this ledger rides `/api/sync` behind the passphrase and must never
-be confused with the public Echoes blob. Keep them in separate files for the
-same reason `crossAppBlobs.ts` sits beside `publicBlobs.ts` rather than inside
-it.
+Same shape as the other three: one writer, derived from drafts on save,
+deterministic ids, rides `/api/sync` behind the passphrase.
 
-### 3.5 suggested order
+### 5.6 suggested order
 
 | # | step | notes |
 | --- | --- | --- |
-| 1 | `data-ref-*` through `@woodles/text`'s sanitizer, as a parameter | the enabling change; nothing works without it |
-| 2 | flatten refs on publish | do this *before* step 3, so no letter can ever publish a live reference |
-| 3 | `#` picker over the shelf, reference stored with display text | reuse `thinkingAboutShelf.svelte.ts` almost verbatim |
-| 4 | `@` picker over dates | no new ledger; render `YYYY-MM-DD` as a weekday |
-| 5 | a "what I wrote about" ledger, read by Carillon and Thinking About | the loop closes |
+| 1 | ✅ **Echoes goes private** (§3) | mostly deletion; unblocks live references |
+| 2 | ✅ **bestiary card through `entityHref`** (§4) | ten minutes, and forces the source registry |
+| 3 | `data-ref-*` through `@woodles/text`'s sanitizer, as a parameter | the enabling change |
+| 4 | reference source registry + `#` picker over entries and cards | two sources from the start |
+| 5 | `@` picker over dates | no new ledger; render `YYYY-MM-DD` as a weekday |
+| 6 | "what I wrote about" ledger, read by Carillon, Thinking About, Echoes | the loop closes |
 
-### 3.6 things that will bite
+### 5.7 things that will bite
 
 - **Write's layers are never unmounted** — each contenteditable *is* the
   storage between saves, and a page is hidden with CSS rather than removed.
   Anything that re-renders a reference must not remount a layer.
-- **Drafts don't sync.** Write's sync adapter is a no-op used only for
-  passphrase gating. A reference in a draft is same-device until that changes
-  — though the *ledgers* sync, so resolution works even where the draft
-  doesn't travel.
+- **Live rendering inside a contenteditable is genuinely fiddly.** Resolving a
+  title must not move the caret or dirty the document. Prefer rendering the
+  live title into a non-editable child (`contenteditable="false"`) so typing
+  can't land inside it, and keep the stored text as the element's own content.
+- **Drafts don't sync** (until §3 gives Write a real blob, and even then that's
+  letters, not drafts). The *ledgers* sync, so resolution works on a device
+  where the draft doesn't exist.
 - **A cold reference in prose must stay readable.** Test it the way the arrival
   sheet is tested: delete the entry, then look at the sentence.
-- **`#` and `@` are typed characters.** A person writing "#1 priority" or an
-  email address must not get a picker. Trigger on the character *plus* a
-  boundary, and let Escape dismiss without eating the keystroke.
+- **`#` and `@` are typed characters.** "#1 priority" and an email address must
+  not open a picker. Trigger on the character plus a boundary, and let Escape
+  dismiss without eating the keystroke.
 - **The manifest tripwire is real.** If Write becomes addressable, declare the
   kind in `addressableBy` *and* read that parameter, or the contract test
   fails. It matches the parameter name as a quoted literal anywhere in the
   app's source, so naming it in a constant is fine.
+- **Don't let `/api/public` rot.** Bestiary still uses it, and the 4 MB cap,
+  the cache headers and the `authed()` split all still matter for that tenant.
+  Removing Echoes from it is a deletion of *usage*, not of the endpoint.

@@ -190,6 +190,10 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/bestiary/dist',
 		entryFile: 'index.html',
 		packageName: 'bestiary',
+		// Share links have used `?card=<id>` since ROADMAP.md week 4; declaring it
+		// is what lets the link be built from the manifest that owns the path
+		// rather than from `location.origin` plus a literal.
+		addressableBy: ['card'],
 		landing: tile('bestiary', 12, 'tend', 'bring a png of anything, leave with a card that belongs', 'var(--peach)', 'var(--plum)', '110deg', { featured: 2 })
 	},
 	{

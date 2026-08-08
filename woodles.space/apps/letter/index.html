@@ -4,17 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>echoes · woodles.space</title>
-  <meta name="description" content="letters left here, words that stayed — read the ones marked to be shared" />
+  <meta name="description" content="letters left here, words that stayed — an archive to re-read and annotate" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://woodles.space/letter" />
   <meta property="og:title" content="echoes · woodles.space" />
-  <meta property="og:description" content="letters left here, words that stayed — read the ones marked to be shared" />
+  <meta property="og:description" content="letters left here, words that stayed — an archive to re-read and annotate" />
   <meta property="og:image" content="https://woodles.space/letter/og.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="echoes · woodles.space" />
-  <meta name="twitter:description" content="letters left here, words that stayed — read the ones marked to be shared" />
+  <meta name="twitter:description" content="letters left here, words that stayed — an archive to re-read and annotate" />
   <meta name="twitter:image" content="https://woodles.space/letter/og.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -1295,48 +1295,58 @@
     // @woodles/sync) because this is a plain, no-build static page — matches
     // this file's existing pattern of duplicating write's helpers inline
     // (see ARCHITECTURE.md's cross-app-duplication section). Slug must match
-    // ECHOES_PUBLIC_SLUG in packages/sync/src/publicBlobs.ts.
+    // The archive lives on the ordinary passphrase-gated sync now, not the
+    // public read path — Echoes is private (HANDOFF.md §3). This page is
+    // static with no build step, so it cannot import @woodles/sync and
+    // hand-rolls the same request; a test in packages/sync pins the key and
+    // the app name against WRITE_LETTERS_STORAGE_KEY / WRITE_ARCHIVE_APP.
     //
     // Cached under its own key, never LETTERS_KEY — that key means "my own
-    // letters, written by write" (Z's device), and must stay that way so it
-    // keeps winning as her always-fresh, no-network fast path. A visitor's
-    // cache lives separately so a later visit still tries the network first
-    // (picking up a fresh publish) and only falls back to what was cached
-    // the last time the fetch actually succeeded.
-    const ECHOES_PUBLIC_SLUG = 'letters';
-    const ECHOES_PUBLIC_CACHE_KEY = 'woodles_echoes_public_cache';
+    // letters, written by write" and must stay the always-fresh, no-network
+    // fast path on the device that wrote them. A device that has only ever
+    // read caches separately, so a later visit still tries the network first.
+    const ARCHIVE_APP = 'write';
+    const ARCHIVE_CACHE_KEY = 'woodles_echoes_archive_cache';
+    const PASSPHRASE_KEY = 'woodles_sync_passphrase';
 
-    function readCachedPublicLetters() {
+    function readCachedArchive() {
       try {
-        const parsed = JSON.parse(localStorage.getItem(ECHOES_PUBLIC_CACHE_KEY) || 'null');
+        const parsed = JSON.parse(localStorage.getItem(ARCHIVE_CACHE_KEY) || 'null');
         return Array.isArray(parsed) ? parsed : [];
       } catch (e) {
         return [];
       }
     }
-    function writeCachedPublicLetters(letters) {
-      try { localStorage.setItem(ECHOES_PUBLIC_CACHE_KEY, JSON.stringify(letters)); } catch (e) {}
+    function writeCachedArchive(letters) {
+      try { localStorage.setItem(ARCHIVE_CACHE_KEY, JSON.stringify(letters)); } catch (e) {}
     }
-    async function fetchPublicEchoes() {
+    async function fetchArchive() {
+      let pass = null;
+      try { pass = localStorage.getItem(PASSPHRASE_KEY); } catch (e) {}
+      // No passphrase is not an error — it means this device has not been
+      // connected yet, and the archive simply isn't reachable from here.
+      if (!pass) return readCachedArchive();
       try {
-        const res = await fetch('/api/public?app=echoes&slug=' + encodeURIComponent(ECHOES_PUBLIC_SLUG));
+        const res = await fetch('/api/sync?app=' + encodeURIComponent(ARCHIVE_APP), {
+          headers: { authorization: 'Bearer ' + pass }
+        });
         if (!res.ok) throw new Error('bad status ' + res.status);
         const data = await res.json();
         const letters = (data && data.blob && Array.isArray(data.blob.letters)) ? data.blob.letters : [];
-        if (letters.length > 0) writeCachedPublicLetters(letters);
+        if (letters.length > 0) writeCachedArchive(letters);
         return letters;
       } catch (e) {
-        return readCachedPublicLetters();
+        return readCachedArchive();
       }
     }
 
     (async () => {
     try {
       const localLettersList = loadLettersList();
-      // Z's own device always has this populated (via write) and always
-      // wins — her fast path, no network involved. Only a visitor with
-      // nothing local falls through to the public fetch.
-      const lettersList = localLettersList.length > 0 ? localLettersList : await fetchPublicEchoes();
+      // The device that wrote them always has this populated and always wins
+      // — the fast path, no network involved. Another of your devices falls
+      // through to the archive on the server.
+      const lettersList = localLettersList.length > 0 ? localLettersList : await fetchArchive();
       const params = new URLSearchParams(window.location.search);
       const requestedId = params.get('id');
       const letter = pickLetter(lettersList, requestedId);

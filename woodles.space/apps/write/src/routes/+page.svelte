@@ -32,9 +32,8 @@
 		writePublishedLegacy,
 		type StoredLetter
 	} from '$lib/letters';
-	import { buildEchoesPublicBlob, ECHOES_PUBLIC_SLUG } from '$lib/publish';
-	import { syncState, initSync } from '$lib/sync.svelte';
-	import { publish as publishPublicBlob, hasPassphrase, SyncError } from '@woodles/sync';
+	import { syncState, initSync, flushSync } from '$lib/sync.svelte';
+	import { hasPassphrase, SyncError } from '@woodles/sync';
 	import {
 		bootstrap as bootstrapDrafts,
 		createDraftId,
@@ -146,7 +145,6 @@
 	let publishStatus = $state<PublishStatus>('idle');
 	let publishErrorMessage = $state<string | null>(null);
 	let fgIsEmpty = $state(true);
-	let isPublic = $state(false);
 	let syncOpen = $state(false);
 
 	let pockets = $state<PocketNote[]>([]);
@@ -690,7 +688,6 @@
 		goal = null;
 		// "public" is an explicit, per-letter act — it must never carry over
 		// to a different letter just because the checkbox was left checked.
-		isPublic = false;
 		if (fgEl) fgEl.innerHTML = '';
 		if (mgEl) mgEl.innerHTML = '';
 		if (bgEl) bgEl.innerHTML = '';
@@ -720,8 +717,7 @@
 			if (bgEl) bgEl.innerHTML = '';
 			pockets = [];
 			marginNotes = [];
-			isPublic = false;
-			scheduleSave();
+				scheduleSave();
 			return;
 		}
 
@@ -766,8 +762,7 @@
 				},
 				annotations: { pocketNotes: cleanedPockets, marginNotes: cleanedMargins },
 				content: fgHtml,
-				replyTo: replyTo ?? null,
-				public: isPublic
+				replyTo: replyTo ?? null
 			};
 			// loadLettersList() must run before writePublishedLegacy() below:
 			// on a browser with no LETTERS_KEY yet, it migrates whatever is
@@ -788,19 +783,18 @@
 				clearActiveDraftId();
 			}
 
-			// Publishing locally (above) always succeeds — the world-facing push
-			// is a second, optional step that needs both the per-letter opt-in
-			// and a connected passphrase. Neither being true isn't an error:
-			// the letter is exactly as public as Z asked it to be.
-			if (isPublic && hasPassphrase()) {
+			// The archive is local first and always succeeds. Pushing it to the
+			// server is a second, optional step that only needs a connected
+			// passphrase — there is no per-letter opt-in any more, because
+			// there is no audience but you (HANDOFF.md §3).
+			if (hasPassphrase()) {
 				try {
-					const blob = buildEchoesPublicBlob(allLetters);
-					await publishPublicBlob('echoes', ECHOES_PUBLIC_SLUG, blob);
-					publishStatus = 'public';
+					await flushSync();
+					publishStatus = 'synced';
 				} catch (err) {
 					publishStatus = 'error';
 					publishErrorMessage =
-						err instanceof SyncError ? err.message : "couldn't reach the world — try again from echoes";
+						err instanceof SyncError ? err.message : "couldn't reach the archive — it's safe here";
 				}
 			}
 		} catch (e) {
@@ -1367,7 +1361,6 @@
 	fonts={fontPairs}
 	{foregroundVisible}
 	{fgIsEmpty}
-	bind:isPublic
 	onPublish={publish}
 />
 

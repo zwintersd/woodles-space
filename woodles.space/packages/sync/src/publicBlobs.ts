@@ -67,47 +67,7 @@ export type BestiaryPublicBlob = {
 	creatures: PublicCreature[];
 };
 
-// ── echoes ──────────────────────────────────────────────────────────────
-//
-// mirrors write's StoredLetter (apps/write/src/lib/letters.ts) minus
-// anything editor-only. only letters Z marks public ever land in this blob;
-// drafts and private letters stay in the (password-gated) sync table.
-
-// The slug write publishes the echoes snapshot under — shared so write's
-// publish flow, echoes' own reader, and marginalia's reading room (week 7)
-// all pull the same `pullPublic('echoes', ECHOES_PUBLIC_SLUG)`.
-export const ECHOES_PUBLIC_SLUG = 'letters';
-
-export type PublicPocketNote = {
-	id: string;
-	html: string;
-	layer: string;
-	createdAt: string;
-	updatedAt: string;
-};
-
-export type PublicMarginNote = {
-	id: string;
-	anchorId: string;
-	html: string;
-	createdAt: string;
-	updatedAt: string;
-};
-
-export type PublicLetter = {
-	id: string;
-	title: string;
-	theme: string;
-	motif: string;
-	font: string;
-	issue: number;
-	publishedAt: string;
-	layers: Record<string, { html: string; updatedAt: string }>;
-	annotations: { pocketNotes: PublicPocketNote[]; marginNotes: PublicMarginNote[] };
-	content: string;
-	replyTo: string | null;
-};
-
-export type EchoesPublicBlob = {
-	letters: PublicLetter[];
-};
+// Echoes is no longer part of the public read path. Its letters moved onto
+// the ordinary passphrase-gated sync as a private archive — see
+// `crossAppBlobs.ts` and HANDOFF.md §3. `bestiary` above is now the only
+// tenant of `/api/public`, and everything it needs is unchanged.
