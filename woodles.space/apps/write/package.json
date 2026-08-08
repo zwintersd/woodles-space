@@ -23,6 +23,7 @@
     "vitest": "^3.2.6"
   },
   "dependencies": {
+		"@woodles/app-manifest": "workspace:*",
     "@woodles/handoff": "workspace:*",
     "@woodles/sync": "workspace:*",
     "@woodles/text": "workspace:*"

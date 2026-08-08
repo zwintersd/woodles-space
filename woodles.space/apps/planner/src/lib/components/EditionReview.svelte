@@ -9,8 +9,15 @@
 		type DayInterval
 	} from '$lib/instrument';
 	import { dateKey, timeToMinutes } from '$lib/utils';
+	import { letterHref, mentions } from '$lib/mentions.svelte';
 
 	let selectedDate = $state('');
+
+	// What Write said about the day being reviewed. A fact that already
+	// happened, shown beside the day's own data — never another thing to do.
+	$effect(() => {
+		void mentions.refresh();
+	});
 	let commentaryOn = $state(true);
 
 	let availableDates = $derived(
@@ -19,6 +26,7 @@
 		)
 	);
 	let activeDateKey = $derived(selectedDate || availableDates[0] || dateKey(store.now));
+	let writtenOnDate = $derived(mentions.forDay(activeDateKey));
 	let activeDate = $derived(dateFromKey(activeDateKey));
 	let activeObservations = $derived(store.getObservationsForDate(activeDateKey));
 	let activeEvents = $derived(store.sporeEvents.filter((event) => event.date === activeDateKey));
@@ -267,6 +275,19 @@
 						</li>
 					</ul>
 				</section>
+
+				{#if writtenOnDate.length > 0}
+					<section class="extras-card" data-testid="written-about">
+						<p class="kicker">written about</p>
+						<ul>
+							{#each writtenOnDate as letter (letter.letterId)}
+								<li>
+									<a href={letterHref(letter.letterId)}>{letter.title || 'untitled letter'}</a>
+								</li>
+							{/each}
+						</ul>
+					</section>
+				{/if}
 			</aside>
 		</div>
 	{:else}

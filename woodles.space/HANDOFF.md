@@ -115,9 +115,9 @@ letters onto `/api/sync` gives that file a real job and deletes a stub.
 `apps/letter/index.html` is static with no build step, which is why it
 hand-rolls its fetch instead of importing `@woodles/sync`. That doesn't
 change: it just adds an `Authorization: Bearer` header read from the shared
-`woodles_sync_passphrase` key on the same origin. Note the consequence
-honestly — Echoes then shows nothing until the passphrase is connected, where
-today it shows published letters to anyone.
+`woodles_sync_passphrase` key on the same origin. Echoes then shows nothing until the passphrase is
+connected. That is the point rather than the price: the archive is private
+magic, and it stays shut until it knows you.
 
 ### 3.2 what Echoes becomes
 
@@ -170,7 +170,7 @@ lines because `readLocalLedger` / `pullLedger` already do the fetching.
 
 ---
 
-## 5. Write, `#`, and `@`
+## 5. Write, `#`, and `@` — ✅ built
 
 ### 5.1 what §3 changes about this
 
@@ -255,10 +255,10 @@ deterministic ids, rides `/api/sync` behind the passphrase.
 | --- | --- | --- |
 | 1 | ✅ **Echoes goes private** (§3) | mostly deletion; unblocks live references |
 | 2 | ✅ **bestiary card through `entityHref`** (§4) | ten minutes, and forces the source registry |
-| 3 | `data-ref-*` through `@woodles/text`'s sanitizer, as a parameter | the enabling change |
-| 4 | reference source registry + `#` picker over entries and cards | two sources from the start |
-| 5 | `@` picker over dates | no new ledger; render `YYYY-MM-DD` as a weekday |
-| 6 | "what I wrote about" ledger, read by Carillon, Thinking About, Echoes | the loop closes |
+| 3 | ✅ `data-ref-*` through `@woodles/text`'s sanitizer, as a parameter | the enabling change |
+| 4 | ✅ reference source registry + `#` picker | entries and days wired; a card is a few lines |
+| 5 | ✅ `@` picker over dates | no new ledger; renders `YYYY-MM-DD` as a weekday |
+| 6 | ✅ "what I wrote about" ledger, read by Carillon and Thinking About | the loop closes |
 
 ### 5.7 things that will bite
 

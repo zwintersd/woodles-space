@@ -117,6 +117,9 @@ export const appManifest = Object.freeze([
 		sourceDir: 'apps/letter',
 		outputDir: 'apps/letter',
 		entryFile: 'index.html',
+		// The archive already opened one letter by id (`?id=`); declaring it is
+		// what lets another app link to a specific one.
+		addressableBy: ['letter'],
 		landing: tile('echoes', 3, 'read', 'letters left here, words that stayed', 'var(--peach)', 'var(--lilac)', '120deg')
 	},
 	{

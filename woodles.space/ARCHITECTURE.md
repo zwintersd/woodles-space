@@ -1056,6 +1056,25 @@ All three ledgers rebuild on every write to their source (`#saveTasks`,
 `#saveLoggedSessions`, `#persist`) and on load, for the reason under the shelf
 above.
 
+**Write publishes what it wrote about.** The edge that closes the loop:
+`#` reaches a thing you're thinking about and `@` reaches a day, both stored
+in the prose as `<a data-ref-*>` with **the words you typed as the element's
+own text**. Strip the attributes and a sentence is still a sentence, which is
+why a reference whose target is gone reads as prose rather than breaking — the
+same asymmetry a Carillon task has with its title. `@woodles/text` owns the
+vocabulary (`referenceHtml`, `readReferences`, `REFERENCE_SANITIZE_OPTIONS`)
+because sanitizing is where it has to be understood, and because `apps/letter`
+can import that package directly. Write binds the sanitize option once in
+`htmlTools.ts` rather than at each call site — one site forgetting would
+silently eat a reference on save.
+
+The `write-mentions` ledger is derived from the archive by reading each
+letter's own prose, so Carillon's Edition Review can show *"written about"*
+beside a day's observations and Thinking About can show it beside an entry's
+sittings. Pickers read from a **source registry** (`references.svelte.ts`)
+rather than one source each: Thinking About entries and days today, and a
+bestiary card is a few lines away now that `?card=` is addressable.
+
 **The link runs both ways.** Each app declares itself addressable in the
 manifest (see "the app manifest" above): Thinking About by `entry`, Carillon by
 `thinking-about-entry` — a *foreign* record kind, which is the honest name for
@@ -1114,7 +1133,9 @@ sprite, or the plain upload as a fallback).
 
 **echoes left this spine.** nobody was reading the public version, and the
 part that worked — an archive you re-read, annotate and edit — is the
-opposite of publishing. its letters moved onto the ordinary passphrase-gated
+opposite of publishing. it shows nothing until a passphrase is connected, and
+that is the intent rather than a cost: the archive stays shut until it knows
+you. its letters moved onto the ordinary passphrase-gated
 sync as `write`'s own blob (see "the archive" above), and `EchoesPublicBlob`,
 `ECHOES_PUBLIC_SLUG`, `PublicLetter` and write's `publish.ts` are gone along
 with the per-letter `public` opt-in. **bestiary is now the only tenant of
@@ -1230,14 +1251,14 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1830 tests total: 16 in `api/` (its own
+1861 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1814 across sixteen pnpm
-packages — `write` 114, `marginalia` 333, `planner` 539,
+instead of the recursive `pnpm -r test`), plus 1845 across sixteen pnpm
+packages — `write` 133, `marginalia` 333, `planner` 539,
 `spores` 140, `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
-`packages/sync` 31, `packages/persistence` 6, `packages/app-manifest` 17,
-`packages/handoff` 15, `packages/text` 23, `packages/spellcraft` 16,
+`packages/sync` 36, `packages/persistence` 6, `packages/app-manifest` 17,
+`packages/handoff` 15, `packages/text` 30, `packages/spellcraft` 16,
 `packages/emoji` 4, `packages/incremental-core` 191, and `thinking-about` 118.
 (Counted by running each suite, not by adding to the previous figure — the
 inventory had drifted: the headline said 1644 against a body summing to 1700,

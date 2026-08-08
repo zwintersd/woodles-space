@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+	mentionKey,
+	readMentionsBlob,
+	WRITE_ARCHIVE_APP,
+	WRITE_MENTIONS_APP,
+	WRITE_MENTIONS_VERSION,
 	readSessionsBlob,
 	CARILLON_SESSIONS_APP,
 	CARILLON_SESSIONS_VERSION,
@@ -120,6 +125,48 @@ describe('readSessionsBlob', () => {
 		expect(CARILLON_SESSIONS_APP).toMatch(APP_PATTERN);
 		expect(new Set([CARILLON_SESSIONS_APP, CARILLON_COMMITMENTS_APP, THINKING_ABOUT_SHELF_APP]).size).toBe(3);
 		expect(CARILLON_SESSIONS_APP).not.toBe('planner');
+	});
+});
+
+describe('readMentionsBlob', () => {
+	const mention = { letterId: 'l-1', title: 'A Letter', date: '2026-08-09', refs: ['a:b:c'] };
+	const blob = (mentions: unknown[] = [mention]) => ({
+		version: WRITE_MENTIONS_VERSION,
+		mentions,
+		publishedAt: '2026-08-09T00:00:00.000Z'
+	});
+
+	it('accepts a well-formed ledger', () => {
+		expect(readMentionsBlob(blob())?.mentions).toEqual([mention]);
+	});
+
+	it('refuses anything that is not a ledger, or a future version', () => {
+		expect(readMentionsBlob(null)).toBeNull();
+		expect(readMentionsBlob({})).toBeNull();
+		expect(readMentionsBlob({ ...blob(), mentions: 'no' })).toBeNull();
+		expect(readMentionsBlob({ ...blob(), version: 2 })).toBeNull();
+	});
+
+	it('drops a malformed mention but keeps the sound ones', () => {
+		const parsed = readMentionsBlob(blob([mention, { letterId: 'partial' }]));
+		expect(parsed?.mentions.map((m) => m.letterId)).toEqual(['l-1']);
+	});
+
+	it('keys a reference the same way entityHref addresses one', () => {
+		expect(mentionKey('thinking-about', 'entry', 'e-1')).toBe('thinking-about:entry:e-1');
+	});
+
+	it('has a key of its own, distinct from every other ledger', () => {
+		expect(WRITE_MENTIONS_APP).toMatch(APP_PATTERN);
+		expect(
+			new Set([
+				WRITE_MENTIONS_APP,
+				CARILLON_SESSIONS_APP,
+				CARILLON_COMMITMENTS_APP,
+				THINKING_ABOUT_SHELF_APP,
+				WRITE_ARCHIVE_APP
+			]).size
+		).toBe(5);
 	});
 });
 

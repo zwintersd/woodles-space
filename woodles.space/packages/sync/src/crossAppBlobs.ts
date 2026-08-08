@@ -177,6 +177,68 @@ function isArchiveLetter(value: unknown): value is ArchiveLetter {
 	);
 }
 
+// ── write → everyone: what the writing was about ────────────────────────
+//
+// The loop the spine had left open. Every other ledger points *at* writing's
+// subjects; this one points back, so Carillon's Edition Review can say "you
+// wrote about this day" beside the observations for it, and Thinking About can
+// say "you wrote about this" beside the sittings.
+//
+// Derived from the archive on every save: a letter's references are read out
+// of its own prose (`readReferences`), never maintained alongside it.
+
+export const WRITE_MENTIONS_APP = 'write-mentions';
+
+export const WRITE_MENTIONS_STORAGE_KEY = 'write.mentions.v1';
+
+export const WRITE_MENTIONS_VERSION = 1;
+
+/** One piece of writing, and what it named. */
+export type Mention = {
+	/** The letter's id, so a reader can link back to it in Echoes. */
+	letterId: string;
+	title: string;
+	/** `YYYY-MM-DD` the letter was kept. */
+	date: string;
+	/** `<app>:<kind>:<id>` for each reference in the prose, deduplicated. */
+	refs: string[];
+};
+
+export type WriteMentionsBlob = {
+	version: 1;
+	mentions: Mention[];
+	publishedAt: string;
+};
+
+/** The key a reader looks up — same shape `entityHref` addresses. */
+export function mentionKey(app: string, kind: string, id: string): string {
+	return `${app}:${kind}:${id}`;
+}
+
+export function readMentionsBlob(value: unknown): WriteMentionsBlob | null {
+	if (typeof value !== 'object' || value === null) return null;
+	const blob = value as Partial<WriteMentionsBlob>;
+	if (blob.version !== WRITE_MENTIONS_VERSION) return null;
+	if (!Array.isArray(blob.mentions)) return null;
+	return {
+		version: WRITE_MENTIONS_VERSION,
+		mentions: blob.mentions.filter(isMention),
+		publishedAt: typeof blob.publishedAt === 'string' ? blob.publishedAt : ''
+	};
+}
+
+function isMention(value: unknown): value is Mention {
+	if (typeof value !== 'object' || value === null) return false;
+	const item = value as Partial<Mention>;
+	return (
+		typeof item.letterId === 'string' &&
+		typeof item.title === 'string' &&
+		typeof item.date === 'string' &&
+		Array.isArray(item.refs) &&
+		item.refs.every((ref) => typeof ref === 'string')
+	);
+}
+
 // ── carillon → thinking about: the commitments ledger ───────────────────
 //
 // The answer to the shelf, and the reason the "one writer" rule is worth

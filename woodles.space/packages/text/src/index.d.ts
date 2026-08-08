@@ -17,6 +17,18 @@ export function stripPresentation(html: string): string;
 export function ensureAnchorsOn(blocks: ArrayLike<Element>, prefix?: string): void;
 export function stampAnchorsHtml(html: string, selector?: string, prefix?: string): string;
 export function isEmptyHtml(html: string): boolean;
+
+export interface ProseReference {
+	app: string;
+	kind: string;
+	id: string;
+	text: string;
+}
+
+export const REFERENCE_ATTRIBUTES: readonly string[];
+export const REFERENCE_SANITIZE_OPTIONS: SanitizeOptions;
+export function referenceHtml(ref: ProseReference & { href?: string }): string;
+export function readReferences(html: string): ProseReference[];
 export function stripTags(html: string): string;
 export function htmlToText(html: string): string;
 export function countWords(html: string): number;
