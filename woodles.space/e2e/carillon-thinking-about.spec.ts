@@ -131,6 +131,33 @@ test.describe('Carillon ↔ Thinking About', () => {
 		});
 	});
 
+	test('what Carillon scheduled comes back to the board', async ({ page }) => {
+		await expectNoPageErrors(page, async () => {
+			await seed(page);
+
+			// Go the way a person would: from the board, which is also what
+			// publishes the shelf Carillon needs to name the thing.
+			await page.goto('/thinking-about');
+			await page.getByRole('button', { name: /Piranesi/ }).first().click();
+			await page.getByTestId('find-time').click();
+
+			await page.getByRole('button', { name: 'find it a time' }).click();
+			await page.getByLabel('when').fill('2026-08-13');
+			await page.getByRole('button', { name: 'add', exact: true }).click();
+
+			// And the board knows about it, without Thinking About being told
+			// anything about blocks, domains, or day piles.
+			await page.goto('/thinking-about');
+			await page.getByRole('button', { name: /Piranesi/ }).first().click();
+
+			const scheduled = page.getByTestId('commitments');
+			await expect(scheduled).toBeVisible();
+			await expect(scheduled).toContainText('2026-08-13');
+			await expect(scheduled).toContainText('Piranesi');
+			await expect(page.getByTestId('find-time')).toContainText('find another time');
+		});
+	});
+
 	test('a reference to something no longer on the shelf still shows the plan', async ({
 		page
 	}) => {

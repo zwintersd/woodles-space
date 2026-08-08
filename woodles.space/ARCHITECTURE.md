@@ -48,10 +48,11 @@ other docs have narrower jobs:
   in (bloomforge's shared keys, marginalia's binding map, the public blobs'
   carried ids, spores' deliberately breakable title links); its §3 is a table
   of open questions bar two. **steps 1–3 are built** — the addressing layer
-  under "the app manifest" above, and the shelf ledger plus the two-way deep
-  links under "cross-app ledgers" below. steps 4–6 are unstarted: nothing
-  Carillon knows travels back to Thinking About yet, so an entry's detail
-  can't show when it's scheduled.
+  under "the app manifest" above, and both ledgers plus the two-way deep links
+  under "cross-app ledgers" below. **steps 1–4 are built**, so the round trip
+  is closed: an entry can be taken to the day and its scheduled time comes
+  back. steps 5–6 are unstarted — no session is logged from an observation,
+  and a standing `schedule` still doesn't reach the calendar.
 - [ROADMAP.md](./ROADMAP.md) is the 10-week plan for making marginalia and
   the bestiary public-facing — all ten weeks are marked `✅ shipped` in its
   own headers, week 4 (share links, save-as-image, adopt-a-card) having
@@ -949,7 +950,15 @@ every save, so it is always safe to throw away, and it is never hydrated back
 into the app that produced it. That second rule is why publishing is a bare
 `push` rather than a `createAppSync` adapter: hydrating would be backwards.
 
-One ledger exists today. **Thinking About publishes the shelf** — active,
+The mechanics are shared: `createLedgerPublisher(app, matches)`,
+`mirrorLedgerLocally`, `readLocalLedger` and `pullLedger` in
+`packages/sync/src/ledger.ts`. Extracted when the second ledger needed the
+identical version cache, deduplication and single retry — the workspace's
+habit is to duplicate until two copies converge and then extract, and there
+was nothing left to learn from writing it twice. What stays app-side is only
+what differs: the key, and what counts as a change.
+
+**Thinking About publishes the shelf** — active,
 titled entries as `{ id, title, columnKey, sectionKey, color, lastSessionDate }`
 under sync key `thinking-about-shelf` and localStorage key
 `thinking-about.shelf.v1`. Notes, session logs and archive state stay private.
@@ -981,6 +990,20 @@ not by merging: two devices publishing a projection of their own entries are
 not in conflict about anything a person typed, and the entries underneath
 converge through Thinking About's own sync.
 
+**Carillon publishes commitments** — the answer to the shelf, and the reason
+the one-writer rule earns its keep: rather than Carillon writing into Thinking
+About's store, it publishes `{ entryId, taskId, title, date, time, blockTitle,
+status }` under sync key `planner-commitments` and localStorage key
+`planner.commitments.v1`, and Thinking About reads it. Each app still owns
+everything it writes. Domains, notes, durations and day piles stay in Carillon
+— a board about what you're reading has no use for them — and a `dropped` task
+is filtered out rather than published, because "a thing you decided not to do"
+is not an answer to "when am I doing this". An entry's detail then shows what's
+scheduled and offers "find another time" instead of "find time for this".
+
+Both ledgers rebuild on every write to their source (`#saveTasks`,
+`#persist`) and on load, for the reason under the shelf above.
+
 **The link runs both ways.** Each app declares itself addressable in the
 manifest (see "the app manifest" above): Thinking About by `entry`, Carillon by
 `thinking-about-entry` — a *foreign* record kind, which is the honest name for
@@ -994,7 +1017,7 @@ an entry that has been archived, deleted, or simply not synced to this device
 goes **cold**: the arrival still shows the tasks and says so, because the words
 someone typed outlive the link.
 
-See [REFERENCES.md](./REFERENCES.md), whose steps 2 and 3 this is.
+See [REFERENCES.md](./REFERENCES.md), whose steps 2–4 this is.
 
 ### the public read path
 
@@ -1150,15 +1173,15 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1771 tests total: 16 in `api/` (its own
+1799 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1755 across sixteen pnpm
-packages — `write` 122, `marginalia` 333, `planner` 512,
+instead of the recursive `pnpm -r test`), plus 1783 across sixteen pnpm
+packages — `write` 122, `marginalia` 333, `planner` 523,
 `spores` 140, `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
-`packages/sync` 15, `packages/persistence` 6, `packages/app-manifest` 17,
+`packages/sync` 20, `packages/persistence` 6, `packages/app-manifest` 17,
 `packages/handoff` 15, `packages/text` 23, `packages/spellcraft` 16,
-`packages/emoji` 4, `packages/incremental-core` 191, and `thinking-about` 94.
+`packages/emoji` 4, `packages/incremental-core` 191, and `thinking-about` 106.
 (Counted by running each suite, not by adding to the previous figure — the
 inventory had drifted: the headline said 1644 against a body summing to 1700,
 and marginalia's balance-harness work landed 333 tests recorded as 325. Two
@@ -1180,6 +1203,10 @@ straight from a clean checkout.
 Node. planner keeps its own localStorage mock in `store.test.ts`; under the
 current Node runtime that suite passes but may still print a
 `--localstorage-file` warning.
+
+`thinking-about` gained the SvelteKit plugin in its `vitest.config.ts` for the
+same reason, when its commitments reader became the app's first rune module
+worth testing directly.
 
 `spores` gained its own `vitest.config.ts` for the same reason planner has one
 — `garden.svelte.ts` builds a `$state` store at import time, so the Svelte

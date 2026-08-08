@@ -10,7 +10,7 @@ workspace has now built three times, three different ways, and never named.
 this file names it, surveys what already exists, and proposes the smallest
 spine that serves the whole repo rather than just this one pair.
 
-**status: steps 1–3 built, steps 4–6 proposed.** two of §3's rows are
+**status: steps 1–4 built, steps 5–6 proposed.** two of §3's rows are
 answered: the ledgers ride `api/sync.ts` *and* localStorage, and a cold
 reference goes cold rather than being dropped. the rest are still open.
 read alongside [ARCHITECTURE.md](./ARCHITECTURE.md) for how
@@ -273,7 +273,7 @@ each step ships something usable and nothing depends on finishing the next.
 | 1 | ✅ **destinations in `@woodles/app-manifest`.** app id + kind + record id → URL, with contract tests beside the existing route tests. rewired bloomforge's hardcoded `/play?game=`. | ~half a day | everything below, plus `HandoffSource.href` finally meaning something |
 | 2 | ✅ **thinking about publishes the shelf**, and carillon reads it into a picker on the composer. the "pull it in" half. | ~1–2 days | the reference exists and is useful before any deep link works |
 | 3 | ✅ **deep links both ways** — thinking about opens on `?entry=`, carillon on `?thinking-about-entry=`, both over step 1's destinations. *not* `compose=`: that named an action rather than a record, which the addressing vocabulary doesn't model. arriving shows what's already scheduled. | ~1 day | the navigation feel; the thing the google-suite comparison is actually about |
-| 4 | **carillon publishes commitments**, thinking about renders them in entry detail. the return trip. | ~1 day | the connection stops being one-way |
+| 4 | ✅ **carillon publishes commitments**, thinking about renders them in entry detail. the return trip. | ~1 day | the connection stops being one-way |
 | 5 | **session logging from an observation**, via a queue carillon writes and thinking about drains. | ~1 day | the loop; the clock finally reaches the sessions |
 | 6 | **structured `schedule` → derived overlay.** | ~1–2 days | standing dates land on the calendar |
 
@@ -324,6 +324,24 @@ board plainly full of things. every unit test passed throughout — each half
 was correct about what it wrote and what it read, and the two still failed to
 meet. that is the specific failure mode a cross-app integration test exists
 for, and the argument for keeping one per ledger as steps 4–6 add them.
+
+## 6b. what step 4 settled
+
+**the "one writer" rule paid for itself.** the obvious way to show a
+scheduled time on the board is for carillon to write into thinking about's
+store. it publishes a second ledger instead, in the opposite direction, and
+thinking about reads it — so neither app ever writes where it isn't the
+owner, and thinking about's whole-blob `isNewer` sync can't clobber a foreign
+write on its next push. the rule was written in step 2 on principle; step 4
+is the case it was for.
+
+**the mechanics extracted, the readers didn't.** writing the version cache,
+the deduplication and the single retry a second time would have taught
+nothing, so `createLedgerPublisher` moved into `@woodles/sync` — the second
+consumer earning the extraction, exactly as §4.3 predicted for the mechanics
+it *declined* to extract early. the readers stayed app-side: they are `$state`
+rune classes, which can't live in a plain TS package, and only their
+non-reactive halves (`readLocalLedger`, `pullLedger`) were worth sharing.
 
 ## 7. risks
 

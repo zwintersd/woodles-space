@@ -32,6 +32,8 @@ import {
 	getNextBlock,
 	mergeBlocks
 } from './templates';
+import { CARILLON_COMMITMENTS_STORAGE_KEY, mirrorLedgerLocally } from '@woodles/sync';
+import { buildCommitments } from './commitments';
 import { dateKey, nowMinutes, uid, timeToMinutes } from './utils';
 import { playBell } from './bells';
 import {
@@ -243,6 +245,33 @@ export class PlannerStore {
 	}
 
 	/**
+	 * Persist tasks, and rebuild the commitments ledger from them.
+	 *
+	 * Every task write goes through here so the two can't drift: the ledger is
+	 * derived, and there is no path that changes a task without changing what
+	 * Thinking About should be told about it.
+	 */
+	#saveTasks(): void {
+		save('planner.tasks.v1', this.tasks);
+		this.publishCommitmentsLocally();
+	}
+
+	/**
+	 * Mirror the commitments ledger for same-origin readers.
+	 *
+	 * Public and callable on load as well as on save: the ledger is derived, so
+	 * a planner nobody has touched since this shipped would otherwise hold
+	 * linked tasks and no ledger, and Thinking About would show nothing
+	 * scheduled for something plainly on the plan. Idempotent.
+	 */
+	publishCommitmentsLocally(): void {
+		mirrorLedgerLocally(
+			CARILLON_COMMITMENTS_STORAGE_KEY,
+			buildCommitments(this.tasks, this.getAllBlocks())
+		);
+	}
+
+	/**
 	 * Every task about one Thinking About entry, soonest first, undated last.
 	 *
 	 * Dropped tasks are excluded but done ones are kept — "you already read a
@@ -283,7 +312,7 @@ export class PlannerStore {
 			updatedAt: timestamp
 		};
 		this.tasks = [...this.tasks, t];
-		save('planner.tasks.v1', this.tasks);
+		this.#saveTasks();
 		return t;
 	}
 
@@ -292,7 +321,7 @@ export class PlannerStore {
 		this.tasks = this.tasks.map((t) =>
 			t.id === id ? { ...t, status: 'done' as const, updatedAt } : t
 		);
-		save('planner.tasks.v1', this.tasks);
+		this.#saveTasks();
 	}
 
 	dropTask(id: string): void {
@@ -300,7 +329,7 @@ export class PlannerStore {
 		this.tasks = this.tasks.map((t) =>
 			t.id === id ? { ...t, status: 'dropped' as const, updatedAt } : t
 		);
-		save('planner.tasks.v1', this.tasks);
+		this.#saveTasks();
 	}
 
 	reopenTask(id: string): void {
@@ -308,7 +337,7 @@ export class PlannerStore {
 		this.tasks = this.tasks.map((t) =>
 			t.id === id ? { ...t, status: 'open' as const, updatedAt } : t
 		);
-		save('planner.tasks.v1', this.tasks);
+		this.#saveTasks();
 	}
 
 	updateTask(id: string, changes: Partial<Omit<Task, 'id' | 'createdAt'>>): void {
@@ -325,7 +354,7 @@ export class PlannerStore {
 					}
 				: t
 		);
-		save('planner.tasks.v1', this.tasks);
+		this.#saveTasks();
 	}
 
 	openTaskEdit(id: string): void {
@@ -596,7 +625,7 @@ export class PlannerStore {
 			promotedTaskIds: [taskId]
 		};
 		this.surgeDrafts = this.surgeDrafts.map((item) => (item.id === id ? promoted : item));
-		save('planner.tasks.v1', this.tasks);
+		this.#saveTasks();
 		save('planner.surgeDrafts.v1', this.surgeDrafts);
 		return promoted;
 	}
@@ -772,7 +801,7 @@ export class PlannerStore {
 		save('planner.days.v2', this.dayOverrides);
 		save('planner.obligations.v1', this.obligations);
 		save('planner.rituals.v1', this.rituals);
-		save('planner.tasks.v1', this.tasks);
+		this.#saveTasks();
 		save('planner.settings.v1', this.settings);
 		save('planner.domains.v1', this.domains);
 		save('planner.observations.v1', this.intervalObservations);

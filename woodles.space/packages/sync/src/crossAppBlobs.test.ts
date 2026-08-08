@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+	readCommitmentsBlob,
 	readShelfBlob,
+	CARILLON_COMMITMENTS_APP,
+	CARILLON_COMMITMENTS_VERSION,
 	THINKING_ABOUT_SHELF_APP,
 	THINKING_ABOUT_SHELF_VERSION
 } from './crossAppBlobs';
@@ -30,6 +33,59 @@ describe('cross-app ledger keys', () => {
 		expect(THINKING_ABOUT_SHELF_APP.startsWith('thinking-about')).toBe(true);
 		// It must not collide with the publishing app's own private blob.
 		expect(THINKING_ABOUT_SHELF_APP).not.toBe('thinking-about');
+	});
+});
+
+describe('readCommitmentsBlob', () => {
+	const commitment = {
+		entryId: 'piranesi',
+		taskId: 't1',
+		title: 'read a chapter',
+		date: '2026-08-13',
+		time: '20:00',
+		blockTitle: 'evening',
+		status: 'open'
+	};
+	const blob = (commitments: unknown[] = [commitment]) => ({
+		version: CARILLON_COMMITMENTS_VERSION,
+		commitments,
+		publishedAt: '2026-08-09T00:00:00.000Z'
+	});
+
+	it('accepts a well-formed ledger, nulls and all', () => {
+		const parsed = readCommitmentsBlob(
+			blob([{ ...commitment, date: null, time: null, blockTitle: null }])
+		);
+		expect(parsed?.commitments).toHaveLength(1);
+	});
+
+	it('refuses anything that is not a ledger', () => {
+		expect(readCommitmentsBlob(null)).toBeNull();
+		expect(readCommitmentsBlob({})).toBeNull();
+		expect(readCommitmentsBlob({ ...blob(), commitments: 'no' })).toBeNull();
+	});
+
+	it('refuses a future version rather than guessing at its shape', () => {
+		expect(readCommitmentsBlob({ ...blob(), version: 2 })).toBeNull();
+	});
+
+	it('drops malformed entries but keeps the sound ones', () => {
+		const parsed = readCommitmentsBlob(
+			blob([
+				commitment,
+				{ ...commitment, taskId: 't2', status: 'dropped' },
+				{ ...commitment, taskId: 't3' }
+			])
+		);
+		// `dropped` is filtered out at publish time and is not a value this
+		// ledger carries — a blob claiming one is malformed, not a third state.
+		expect(parsed?.commitments.map((c) => c.taskId)).toEqual(['t1', 't3']);
+	});
+
+	it('does not collide with the shelf key', () => {
+		expect(CARILLON_COMMITMENTS_APP).toMatch(APP_PATTERN);
+		expect(CARILLON_COMMITMENTS_APP).not.toBe(THINKING_ABOUT_SHELF_APP);
+		expect(CARILLON_COMMITMENTS_APP).not.toBe('planner');
 	});
 });
 

@@ -1,5 +1,11 @@
-import { createAppSync } from '@woodles/sync';
+import {
+	createAppSync,
+	createLedgerPublisher,
+	CARILLON_COMMITMENTS_APP,
+	type CarillonCommitmentsBlob
+} from '@woodles/sync';
 import { store } from './store.svelte';
+import { buildCommitments, commitmentsMatch } from './commitments';
 import type {
 	IntervalObservation,
 	PlannerBlob,
@@ -130,8 +136,28 @@ export function mergePlannerBlobs(local: PlannerBlob, remote: PlannerBlob): Plan
 	};
 }
 
-export const { connectAndHydrate, initSync, flushSync, disconnect } =
-	createAppSync<PlannerBlob>({
+const commitmentsPublisher = createLedgerPublisher<CarillonCommitmentsBlob>({
+	app: CARILLON_COMMITMENTS_APP,
+	matches: commitmentsMatch
+});
+
+/**
+ * Push the commitments ledger so Thinking About sees it on a device where
+ * Carillon has never been opened. Never throws — a stale ledger elsewhere must
+ * not surface as a sync error here. The local mirror happens on every task
+ * write regardless (`publishCommitmentsLocally`), so same-origin readers don't
+ * depend on this succeeding.
+ */
+export async function publishCommitments(): Promise<void> {
+	await commitmentsPublisher.publish(buildCommitments(store.tasks, store.getAllBlocks()));
+}
+
+/** Test seam — the publisher's session cache would otherwise leak between cases. */
+export function resetCommitmentsCache(): void {
+	commitmentsPublisher.reset();
+}
+
+const appSync = createAppSync<PlannerBlob>({
 		adapter: {
 			app: 'planner',
 			read(): PlannerBlob {
@@ -160,6 +186,32 @@ export const { connectAndHydrate, initSync, flushSync, disconnect } =
 		},
 		state: syncState,
 	});
+
+export const { disconnect } = appSync;
+
+/**
+ * The commitments ledger rides every sync operation, hydrate included — a pull
+ * can bring in tasks scheduled on another device, and Thinking About should
+ * learn about those too. Awaited but never able to fail the caller.
+ */
+async function withCommitments<T>(operation: () => Promise<T>): Promise<T> {
+	const result = await operation();
+	store.publishCommitmentsLocally();
+	await publishCommitments();
+	return result;
+}
+
+export async function connectAndHydrate(pass: string): Promise<void> {
+	await withCommitments(() => appSync.connectAndHydrate(pass));
+}
+
+export async function initSync(): Promise<void> {
+	await withCommitments(() => appSync.initSync());
+}
+
+export async function flushSync(): Promise<void> {
+	await withCommitments(() => appSync.flushSync());
+}
 
 let queuedFlush: ReturnType<typeof setTimeout> | null = null;
 
