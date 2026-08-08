@@ -264,6 +264,7 @@ export class PlannerStore {
 			estimatedDuration: partial.estimatedDuration,
 			notes: partial.notes,
 			recurrenceRule: partial.recurrenceRule,
+			thinkingAboutEntryId: partial.thinkingAboutEntryId,
 			createdAt: timestamp,
 			updatedAt: timestamp
 		};

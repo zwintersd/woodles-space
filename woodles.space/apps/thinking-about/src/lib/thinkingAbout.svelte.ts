@@ -14,6 +14,7 @@ import {
 	updateEntry,
 	updateSession
 } from './entries';
+import { buildShelf, saveShelfLocally } from './shelf';
 import type {
 	BoardView,
 	ColumnKey,
@@ -163,6 +164,10 @@ export class ThinkingAbout {
 	#persist(): void {
 		save(ENTRIES_KEY, this.entries);
 		save(UPDATED_KEY, this.updatedAt);
+		// The shelf is derived, so it is rebuilt here rather than maintained
+		// alongside the entries — there is no path that edits one without the
+		// other, and no stale shelf can outlive the board it came from.
+		saveShelfLocally(buildShelf(this.entries, this.updatedAt));
 	}
 
 	#touch(stamp = nowIso()): void {

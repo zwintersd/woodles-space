@@ -63,6 +63,18 @@ export type Task = {
 	estimatedDuration?: number; // minutes
 	notes?: string;
 	recurrenceRule?: string;
+	/**
+	 * The Thinking About entry this task is about, if it came from the shelf.
+	 *
+	 * A reference rather than a copied title, so a rename over there doesn't
+	 * leave this lying, and so marking the block observed later knows exactly
+	 * which entry it was. The title is still stored on the task in its own
+	 * right: if the entry is archived or deleted the link goes **cold**, and
+	 * the task keeps the words that were typed (REFERENCES.md §3) — unlike
+	 * marginalia's sprite bindings, which are dropped, because a binding with
+	 * no sprite renders nothing while a task with no link is still a task.
+	 */
+	thinkingAboutEntryId?: string;
 	createdAt: string;
 	updatedAt?: string;
 };
