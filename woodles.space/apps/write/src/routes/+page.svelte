@@ -6,6 +6,7 @@
 	import BottomBar from '$lib/BottomBar.svelte';
 	import EditorToolbar from '$lib/EditorToolbar.svelte';
 	import DraftsModal from '$lib/DraftsModal.svelte';
+	import DraftPromptModal from '$lib/DraftPromptModal.svelte';
 	import PocketsPanel from '$lib/PocketsPanel.svelte';
 	import MarginNotesColumn from '$lib/MarginNotes.svelte';
 	import SelectionPopover from '$lib/SelectionPopover.svelte';
@@ -52,17 +53,21 @@
 	import {
 		bootstrap as bootstrapDrafts,
 		createDraftId,
+		cycleDraftStatus,
 		listDrafts,
 		loadDraft as loadDraftBody,
 		saveDraft,
 		removeDraftBody,
 		setActiveDraftId,
 		clearActiveDraftId,
+		statusesFor,
+		textToHtml,
 		upsertIndex,
 		writeIndex,
 		type DraftIndexItem,
 		type DraftBody
 	} from '$lib/drafts';
+	import { backlinkCounts as backlinkCountsFor } from '$lib/backlinks';
 	import {
 		newId,
 		type LayerId,
@@ -105,6 +110,11 @@
 		findPalette,
 		findMotif
 	} from '@shared/library.js';
+
+	// Declared in the manifest as write's addressableBy — a `#` reference to
+	// another draft resolves to `/write?draft=<id>` (see references.svelte.ts's
+	// draft source and REFERENCES.md).
+	const DRAFT_PARAM = 'draft';
 
 	const LAYER_IDS: LayerId[] = ['foreground', 'midground', 'background'];
 	const LAYER_LABELS: Record<LayerId, string> = {
@@ -198,6 +208,11 @@
 	// Announced once when a draft arrived here from another app.
 	let handoffNotice = $state('');
 	let draftsOpen = $state(false);
+	let promptOpen = $state(false);
+	// Recomputed only when the index itself changes — both walk every draft's
+	// stored body, so they stay out of anything that runs per keystroke.
+	const draftBacklinkCounts = $derived(backlinkCountsFor(draftsList));
+	const draftStatuses = $derived(statusesFor(draftsList));
 
 	const nextPocketLayer = $derived<PocketLayer>(
 		activeLayer === 'background' ? 'background' : 'midground'
@@ -414,6 +429,13 @@
 					: `notebook retired — its ${boot.notebookImports} captures are now drafts here`
 			);
 		}
+		if (boot.sporesImports > 0) {
+			notices.push(
+				boot.sporesImports === 1
+					? 'spores retired — its one entry is now a draft here'
+					: `spores retired — its ${boot.sporesImports} entries are now drafts here`
+			);
+		}
 		if (boot.handoffs > 0) {
 			notices.push(
 				boot.handoffs === 1
@@ -429,6 +451,14 @@
 			} catch (e) {
 				// ignore corrupt drafts
 			}
+		}
+
+		// A `#` reference to another draft, followed here (see references.svelte.ts).
+		// Stripped immediately, same reasoning as revisitId above.
+		const draftParam = params.get(DRAFT_PARAM);
+		if (draftParam && draftsList.some((d) => d.id === draftParam)) {
+			history.replaceState(null, '', window.location.pathname);
+			loadDraft(draftParam);
 		}
 
 		// Apply hygge-sourced style overrides after any draft is loaded.
@@ -726,6 +756,24 @@
 		draftsList = [{ id, title: '', updatedAt: now }, ...draftsList];
 		writeIndex(draftsList);
 		loadDraft(id);
+	}
+
+	// A model's answer, appended to whatever is already in the foreground —
+	// same insertion point as pasting, and never a silent replace of prose
+	// already there. See DraftPromptModal.svelte.
+	function insertPromptDraft(text: string) {
+		if (!fgEl) return;
+		const html = textToHtml(text);
+		fgEl.innerHTML = isEmptyHtml(fgEl.innerHTML) ? html : fgEl.innerHTML + html;
+		stampLiveAnchors();
+		updateMeta();
+		scheduleSave();
+		fgVersion += 1;
+	}
+
+	function cycleStatus(id: string, e: Event) {
+		e.stopPropagation();
+		draftsList = cycleDraftStatus(draftsList, id);
 	}
 
 	function deleteDraft(id: string, e: Event) {
@@ -1223,6 +1271,7 @@
 	pocketsCount={pockets.length}
 	bind:syncOpen
 	syncConnected={syncState.connected}
+	bind:promptOpen
 	onLayerChange={setActiveLayer}
 />
 
@@ -1230,9 +1279,18 @@
 	bind:open={draftsOpen}
 	drafts={draftsList}
 	{currentDraftId}
+	backlinkCounts={draftBacklinkCounts}
+	statuses={draftStatuses}
 	onSelect={loadDraft}
 	onCreate={newDraft}
 	onDelete={deleteDraft}
+	onCycleStatus={cycleStatus}
+/>
+
+<DraftPromptModal
+	bind:open={promptOpen}
+	defaultTopic={title.trim() || activeKindSpec.untitled}
+	onInsert={insertPromptDraft}
 />
 
 {#if syncOpen}

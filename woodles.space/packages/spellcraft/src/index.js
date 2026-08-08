@@ -1,20 +1,27 @@
 // @ts-check
 
 /**
- * The authoring brief — one spec, several output contracts.
+ * The authoring brief.
  *
  * Nothing here calls a model. The human carries the prompt out and the answer
  * back, which is what keeps every app in this workspace backend-free.
  *
  * The brief itself is Z's, and it is the part that must not drift: voice,
  * structure, etymology-as-semantic-drift, the metaphor sources, the standing
- * lenses, the conversions, the reading-list rule. What changes between callers
- * is only **what shape the answer should come back in** — a complete page for
- * Ologypedia's studio, a body fragment with `[[links]]` for the Garden.
+ * lenses, the conversions, the reading-list rule.
  *
- * Browser-ready `.js` with a `.d.ts` sidecar, because `add-page.html` is a
- * static page with no build step (same shape as `@woodles/app-manifest` and
- * `@woodles/text`).
+ * This package used to carry two output contracts — a complete standalone
+ * page for Ologypedia's studio, a body fragment with `[[links]]` for Spores'
+ * Garden. Both apps retired into Write (see CONVERGENCE.md), which took the
+ * brief with them rather than let it go down with either app: `fragment` is
+ * now Write's own "draft it with a prompt" gesture, asking for plain prose
+ * rather than a document, because that's what a draft already is. `page`
+ * had exactly one consumer and that consumer is gone, so it isn't ported —
+ * a caller that needs a full document again can add the contract back.
+ *
+ * Browser-ready `.js` with a `.d.ts` sidecar, same shape as
+ * `@woodles/app-manifest` and `@woodles/text`, so a static page could still
+ * import it directly if one ever needs to.
  */
 
 /** The voice and substance rules. Order matters — this reads as one brief. */
@@ -71,39 +78,30 @@ prerequisite-study map (what to learn first for real depth).`;
 
 /**
  * What shape the answer should come back in. The brief above is identical
- * across these; only the contract differs.
+ * regardless; this is the one contract left standing (see the header above).
  */
 export const OUTPUT_CONTRACTS = Object.freeze({
-	/** Ologypedia's studio: one complete standalone file, ready to publish. */
-	page: '',
-
 	/**
-	 * The Garden: an editable body, not a document. Plain prose with
-	 * `[[wikilinks]]`, which is exactly what a spore body already stores —
-	 * so the authoring format and the storage format are the same thing.
+	 * A draft, not a document. Plain prose, ready to drop straight into
+	 * Write's foreground layer via `textToHtml`.
 	 */
-	fragment: `OUTPUT — return only the body of the entry. No title, no masthead, no CSS,
+	fragment: `OUTPUT — return only the body of the piece. No title, no masthead, no CSS,
 no HTML document, no code fences, no explanation before or after.
 
 Write it as plain prose. Use blank lines between paragraphs and "— " at the
-start of a list item. Do not use markdown headers, bold, or italics.
-
-Wrap 3–8 key concepts in [[double brackets]] — the terms this entry would
-want its own linked entries for. Use [[Concept|the words in your sentence]]
-when the phrase in the prose differs from the entry title. Link a concept on
-first mention only.`
+start of a list item. Do not use markdown headers, bold, or italics.`
 });
 
-/** @typedef {'page' | 'fragment'} OutputContract */
+/** @typedef {'fragment'} OutputContract */
 
 /**
  * @typedef {object} BriefOptions
  * @property {string} topic
  * @property {OutputContract} [output] Defaults to `fragment`.
- * @property {string} [subject] Domain / subdomain, for the masthead kicker.
+ * @property {string} [subject] Domain / subdomain, for context.
  * @property {string} [context] Your own relationship to the topic, if any.
  * @property {boolean} [diagnosis] Adds the health-condition sections.
- * @property {string} [appendix] Caller-specific trailer, e.g. a visual system.
+ * @property {string} [appendix] Caller-specific trailer appended after a rule.
  */
 
 /**
@@ -115,10 +113,10 @@ first mention only.`
 export function buildBrief(options) {
 	const topic = (options.topic ?? '').trim() || '[TOPIC]';
 	const output = options.output ?? 'fragment';
-	const parts = [`Write this as a personal-textbook-style page or chapter on: ${topic}`];
+	const parts = [`Write this as a piece on: ${topic}`];
 
 	const subject = (options.subject ?? '').trim();
-	if (subject) parts.push(`Domain / subdomain for the masthead kicker: ${subject}`);
+	if (subject) parts.push(`Domain / subdomain: ${subject}`);
 
 	const context = (options.context ?? '').trim();
 	if (context) parts.push(`Optional context: ${context}`);

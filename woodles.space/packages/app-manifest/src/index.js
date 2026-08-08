@@ -80,19 +80,7 @@ export const appManifest = Object.freeze([
 		sourceDir: 'apps/quiet-room',
 		outputDir: 'apps/quiet-room',
 		entryFile: 'index.html',
-		landing: tile('quiet', 13, 'play', 'an immersive room of light, drawn in three.js', 'var(--lapis)', 'var(--lilac)', '195deg', { defaultPin: 5 })
-	},
-	{
-		id: 'ologypedia',
-		name: 'Ologypedia',
-		publicPath: '/ologypedia',
-		aliases: [],
-		kind: 'static',
-		maturity: 'growing',
-		sourceDir: 'apps/ologypedia',
-		outputDir: 'apps/ologypedia',
-		entryFile: 'index.html',
-		landing: tile('ologypedia', 11, 'read', 'finished entries, bound and shelved to be read', 'var(--plum)', 'var(--peach)', '160deg')
+		landing: tile('quiet', 11, 'play', 'an immersive room of light, drawn in three.js', 'var(--lapis)', 'var(--lilac)', '195deg', { defaultPin: 5 })
 	},
 	{
 		id: 'write',
@@ -105,6 +93,9 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/write/dist',
 		entryFile: 'index.html',
 		packageName: 'write',
+		// A `#` reference to another draft resolves here — the knowledge-base
+		// job Spores retired from (see references.svelte.ts's draft source).
+		addressableBy: ['draft'],
 		landing: tile('write', 2, 'write', 'every kind of writing — letters, essays, stories, poems, and the thought that just arrived', 'var(--aqua)', 'var(--lavender)', '160deg', { defaultPin: 2, featured: 3 })
 	},
 	{
@@ -170,19 +161,6 @@ export const appManifest = Object.freeze([
 		entryFile: 'index.html'
 	},
 	{
-		id: 'spores',
-		name: 'Spores',
-		publicPath: '/spores',
-		aliases: [],
-		kind: 'sveltekit',
-		maturity: 'growing',
-		sourceDir: 'apps/spores',
-		outputDir: 'apps/spores/dist',
-		entryFile: 'index.html',
-		packageName: 'spores',
-		landing: tile('spores', 10, 'tend', 'when you want to be able to find it, and what it connects to, later', 'var(--lilac)', 'var(--aqua)', '145deg')
-	},
-	{
 		id: 'bestiary',
 		name: 'Bestiary',
 		publicPath: '/bestiary',
@@ -197,7 +175,7 @@ export const appManifest = Object.freeze([
 		// is what lets the link be built from the manifest that owns the path
 		// rather than from `location.origin` plus a literal.
 		addressableBy: ['card'],
-		landing: tile('bestiary', 12, 'tend', 'bring a png of anything, leave with a card that belongs', 'var(--peach)', 'var(--plum)', '110deg', { featured: 2 })
+		landing: tile('bestiary', 10, 'tend', 'bring a png of anything, leave with a card that belongs', 'var(--peach)', 'var(--plum)', '110deg', { featured: 2 })
 	},
 	{
 		id: 'thinking-about',
@@ -224,7 +202,7 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/bloomforge/dist',
 		entryFile: 'index.html',
 		packageName: 'bloomforge',
-		landing: tile('bloomforge', 14, 'play', 'a studio for making incremental games: wire up an economy, then watch it run', 'var(--lavender)', 'var(--aqua)', '150deg')
+		landing: tile('bloomforge', 12, 'play', 'a studio for making incremental games: wire up an economy, then watch it run', 'var(--lavender)', 'var(--aqua)', '150deg')
 	},
 	{
 		id: 'bloomforge-player',
@@ -240,7 +218,7 @@ export const appManifest = Object.freeze([
 		// The studio's "Play it" hands over a project id rather than a def in the
 		// URL, so a link can't go stale against an edited game.
 		addressableBy: ['game'],
-		landing: tile('player', 15, 'play', 'play the incremental games you built in the studio', 'var(--peach)', 'var(--lavender)', '160deg')
+		landing: tile('player', 13, 'play', 'play the incremental games you built in the studio', 'var(--peach)', 'var(--lavender)', '160deg')
 	}
 ]);
 
@@ -271,7 +249,7 @@ export const featuredLandingApps = Object.freeze(
 
 /**
  * The bands tiles group under, in the order they should be shown. Named for the
- * moment rather than the thing, so the landing page stops presenting fifteen
+ * moment rather than the thing, so the landing page stops presenting a wall of
  * peers you have to choose between. See CONVERGENCE.md §3.
  *
  * There is no `catch` band anymore: Notebook, the app it existed for, retired

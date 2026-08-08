@@ -21,8 +21,10 @@ other docs have narrower jobs:
   spores, notebook, dev log, ologypedia and write overlapped, and the plan
   that collapsed them into *one knowledge base, one writing surface, one
   front door*. its §5 table tracks the eight original steps (all landed);
-  its §7 records the later amendment — notebook retired into write, so the
-  writing surface and the front door are now the same room. read it before
+  its §7 records the amendment — notebook retired into write, so the
+  writing surface and the front door became the same room; its §8 records
+  the second collapse — spores and ologypedia retired into write too, so
+  the knowledge base joined them, and there is now one room. read it before
   reshaping any of those apps.
 - [ABSTRACTION.md](./ABSTRACTION.md) is about simulating marginalia fast
   enough to tune its feel, and argues explicitly *against* porting it onto
@@ -123,15 +125,13 @@ woodles.space/
     ├── hygge/               static · design playground (fonts, palette, motifs, motion)
     ├── digits/              static · an SVG pen that writes the time
     ├── quiet-room/          static · an immersive three.js room of light
-    ├── ologypedia/          static · a block system for textbook-style pages, and the pages it renders
     ├── letter/              static · echoes — the private archive reader
     ├── animations/          Python · offline Manim scenes and curated web previews
-    ├── write/               SvelteKit · the writing surface — letters, essays, stories, poems, notes
+    ├── write/               SvelteKit · the writing surface — letters, essays, stories, poems, notes; also the knowledge base now, in a small way (cross-draft references, backlinks, "draft it with a prompt")
     ├── marginalia/          SvelteKit · a witch writes worlds + a reading room
     ├── planner/             SvelteKit · carillon — self-observation, day piles, and reinforcement
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
-    ├── spores/              SvelteKit · the knowledge base — linked entries, gathered into spellbooks
-    ├── thinking-about/      SvelteKit · a board for what's being read, played, and watched
+    ├── thinking-about/      SvelteKit · a board for what's being read, played, and watched — and, per entry, a structured record cast for it
     ├── bloomforge/          SvelteKit · a studio for making incremental games
     └── bloomforge-player/   SvelteKit · the runtime that makes those games playable
 ```
@@ -149,13 +149,13 @@ the repository or silently promoting an experiment into a game.
 ## the app manifest
 
 `packages/app-manifest/src/index.js` is the canonical deployable-app inventory.
-It owns the 17 app ids, names, public paths and aliases, app shape, source and
+It owns the 15 app ids, names, public paths and aliases, app shape, source and
 output locations, maturity, and landing visibility. It also owns the landing
 tile order/copy, **band**, default pins, featured fallback, and Marginalia's
 Reading Room sub-surface. A band is the *moment* a tile is for rather than the
 thing it holds — `write`, `tend`, `read`, `play` — and the start
 menu's "all apps" section renders grouped under them (`landingAppsByBand`),
-so the homepage stops presenting fifteen peers to choose between. That section
+so the homepage stops presenting thirteen peers to choose between. That section
 lists every app, not just the unpinned remainder, because a band whose only
 app is pinned would otherwise never show its name. There is no `catch` band
 anymore: Notebook, the app it existed for, retired into Write (CONVERGENCE.md
@@ -206,7 +206,7 @@ and its bloom post-processing addons from a CDN through a `<script
 type="importmap">`, still with no build step.
 
 **SvelteKit apps** — `write`, `marginalia`, `planner`, `bestiary`,
-`spores`, `thinking-about`, `bloomforge`, `bloomforge-player` — use Svelte 5 runes,
+`thinking-about`, `bloomforge`, `bloomforge-player` — use Svelte 5 runes,
 Vite 7, and `@sveltejs/adapter-static`.
 each builds to `apps/<name>/dist/` and consumes `shared/` through the `@shared`
 Vite alias (`../../shared`). there is no SSR; every app ships as a static bundle.
@@ -223,138 +223,14 @@ experiments that should stay reachable without appearing as separate homepage
 apps; it links out to `/digits` and `/animations`, whose direct routes still
 work for old bookmarks.
 
-`ologypedia` is a block system for textbook-style pages, not a single page —
-four static HTML files (`index.html`, `textbook-chrome-blocks.html`,
-`textbook-example-blocks.html`, one worked page per topic, starting with
-`textbook-photosynthesis.html`) that each carry their own copy of the same
-CSS tokens (`--paper`, `--ink`, `--rose-deep`, …) and block classes
-(`.masthead`, `.figure-box`, `.ex-mechanism`, …) inline, by design — the whole
-point is that the source of any one file is a complete, copy-paste-able spec
-another model can read and replicate exactly, so nothing here is factored out
-to a shared stylesheet the way `shared/fonts.css` is. It does pull
-`shared/fonts.css` for the Cormorant Garamond / Lora pairing, but skips
-`shared/palette.css` entirely — its cream/rose/gold palette is its own, same
-pattern as the SvelteKit apps that own their own look, just on a static app
-instead.
-
-publishing an entry no longer means hand-pasting card markup into
-`index.html`: `apps/ologypedia/scripts/publish.mjs <shelf-export.json>`
-(the JSON from `add-page.html`'s "Export shelf as JSON") writes each
-entry's `textbook-{slug}.html` and inserts or, for a slug already on the
-shelf, in-place-replaces its card in `index.html`'s deck. Re-running it is
-safe — a card is matched by `data-slug`, never duplicated. `--dry-run`
-previews the change without writing. It's a plain Node script, no
-dependencies, run directly (`node apps/ologypedia/scripts/publish.mjs …`)
-rather than through pnpm, since the app itself has no `package.json` and
-isn't a pnpm workspace member.
-
-`add-page.html`'s validity checks also cross-reference the live deck now:
-alongside the original three (complete document, loads the shared fonts,
-uses a block class), it fetches `index.html` once on load to warn — next
-to the Topic field, not blocking — when the slug you're about to
-download or shelve is already published, plus three more pass/fail
-checks on the pasted HTML (no leftover `{SLUG}`/`[TOPIC]` template text,
-doesn't accidentally load `shared/palette.css`, no embedded `<script>`).
-
-`index.html`'s deck also carries a search box, a subject filter, and a
-Grid/Spine view toggle (the latter persisted per-browser under
-`ologypedia-view`) — covering both shelved cards and the drafts injected
-from `localStorage`, so the deck stays scannable as it grows past a
-handful of entries.
-
-`textbook.html` is the other half of the app, and the one that makes the
-"a textbook, grown one entry at a time" tagline literal: a personal,
-editable, interconnected reading room. Where `index.html` shows finished
-covers and `add-page.html` runs the prompt-and-publish pipeline for
-authored pages, `textbook.html` is where entries are *read, written, and
-stitched together* directly in the browser, no backend and no build. Its
-whole content lives in one versioned localStorage blob
-(`ologypedia-textbook-v1` — `{ v, entries, order, last }`), deliberately
-shaped as the unit you'd sync: stitching happens at the whole-blob level,
-with cross-entry links stored inline in each entry's body as
-`<a class="entry-link" data-entry="…">` and backlinks derived across the
-set. The core gesture: highlight any phrase while reading, and the ✦ menu
-turns it into a new entry (title pre-filled from the selection) with the
-link planted where you found it — "new entry & open" to go build it out,
-or "seed it & stay" to keep your place. Following a link to an entry that
-doesn't exist yet creates it (wiki red-links). It's built to be
-low-friction for ADHD/autism specifically: a breadcrumb trail so you
-never lose your way back, seeds as a legitimate finished state (not a
-nag), autosave with a visible saved state, resume-where-you-left-off,
-forward-only status you don't have to manage, a Focus mode that quiets
-the room to one page, a Calm-motion toggle, and one predictable page
-shape throughout. Prefs persist under `ologypedia-textbook-prefs-v1`;
-export/import JSON is the hands-on stand-in for sync. It shares
-`shared/fonts.css` and the cream/rose token set inline, same pattern as
-the rest of the app; its store is intentionally separate from
-`add-page.html`'s `ologypedia-studio-v1` shelf so neither can corrupt the
-other.
-
-Textbook entries are also **first-class on the bookcase**: `index.html`
-reads `ologypedia-textbook-v1` and renders each entry as a `.card63`
-cover-card alongside the published cards and the studio drafts — grid and
-spine views, search, and the subject filter all pick them up (they're
-injected into `.deck` before `setupDeckControls` runs). Each card links
-to `/ologypedia/textbook.html#<id>` (the reader deep-links on hash), is
-tagged by status (Seed/Growing/Grown — seeds render dashed like drafts),
-and carries a cover. Covers need no design step: accent is a stable hash
-of the id, the emblem defaults to ✦, and the shelf blurb is auto-excerpted
-from the entry's opening lines — but the Textbook's optional **Cover**
-control (a small popover on each entry) lets you choose an accent, an
-emblem, and a custom blurb, stored as `accent`/`glyph`/`blurb` on the
-entry. The two files keep their derivation in step (same accent-hash,
-same blurb rule) so a card looks identical whether or not a cover was
-ever chosen. De-duplication is by id, with a deliberate precedence: a
-committed **published** page wins (it's the real public artifact); then a
-**Textbook** entry wins over a **Studio draft** of the same slug — a live
-entry owns its shelf card and opens the reader, so a leftover Studio draft
-can't shadow it with an `add-page.html?open=…` card. A Studio draft whose
-slug isn't a Textbook entry still shows as its own draft card, as before.
-The reader also keeps the URL hash in step with the current entry
-(`history.replaceState`), so reload/share/deep-link land on what you're
-actually reading rather than a stale `#id`.
-
-**Draft with a prompt** was the bridge between the Textbook's live editing
-and `add-page.html`'s authoring workflow, brought *into* the reader rather
-than sent out to the Studio. Facing an empty seed (or from the edit
-toolbar on any entry), "✦ Draft it with a prompt" opens a sheet with a
-ready-made authoring brief — the same voice/structure/etymology/bridges/
-standing-lenses/conversions/reading-list spec as the Studio's prompt
-(`add-page.html`'s `buildPrompt`), reused faithfully and inline per the
-app's self-contained-file convention. The one difference is the OUTPUT
-contract: the Studio asks for a complete `textbook-{slug}.html` file; the
-Textbook asks for a **body fragment** (only `<p>/<h3>/<blockquote>/<ul>/
-<li>/<strong>/<em>`, no masthead or CSS) with 3–8 key concepts wrapped in
-`[[double brackets]]`. You paste the brief to any model, paste the answer
-back, and `ingestDraft` strips code fences, accepts HTML *or* Markdown
-(a small `markdownLite` fallback), converts `[[Concept]]` / `[[Concept|
-display]]` into `entry-link`s — creating a seed entry for each new one and
-reusing an existing entry when the title matches — sanitizes the result,
-and drops it into the entry (replace, or append to existing prose). So one
-AI draft both fills a blank seed *and* spawns a cluster of new linked
-seeds, which is the whole stitching-together thesis, now assisted. An
-optional diagnosis/health-condition toggle adds the Studio's four extra
-sections to the brief. Nothing calls a model directly — the app stays
-backend-free; the human carries the prompt and the answer across.
-
-**Import from the Studio** closes the other direction: the pages you built
-in `add-page.html` (the `ologypedia-studio-v1` shelf — each a full standalone
-HTML page) become living Textbook entries. On load the reader auto-imports
-any Studio entry that isn't already a Textbook entry, and the `⋮` menu has a
-manual "Import from the Studio" (with a badge count) that pulls in anything
-missing. Import is **additive and tracked** (`prefs.importedStudioSlugs`): it
-never clobbers an entry you've since edited, and a deleted import won't
-silently return on the next load — but the manual action can pull it back.
-`studioBodyToFragment` reduces each full page to an editable body fragment via
-`DOMParser`: it drops page chrome and the masthead (whose title/subtitle
-duplicate the entry's own), strips `svg`/`canvas`/`img` (the block system's
-charts have no Textbook CSS), rewrites `textbook-<slug>.html` and
-`textbook.html#<slug>` links into `entry-link`s so the web of pages survives
-the move, and sanitizes the rest — which now keeps `table`/`thead`/`tbody`/
-`tr`/`td`/`th` (Studio `.compare` tables) alongside the prose, headings,
-pull-quotes and lists. Because a Textbook entry uses the Studio slug as its
-id, the imported entry then takes precedence on the bookcase (per the dedup
-rule above), so its shelf card opens the reader rather than the Studio editor.
+`ologypedia` and `spores` retired into `write` — see
+[CONVERGENCE.md](./CONVERGENCE.md)'s second collapse. Ologypedia's own
+self-contained block-page format had already been named, in that same doc,
+as an invention that lives on as its own project outside this monorepo, so
+nothing needed relocating from it; Spores' engine (wikilinks, backlinks,
+status, the spell registry) is the half that had somewhere real to go, and
+did — see "the writing surface" and "the board" below for where.
+`/ologypedia` and `/spores` are now permanent redirects to `/write`.
 
 `marginalia` is the biggest app by built size (`dist/` ~3.1 MB, week 10
 perf-sanity check) — but the number that actually matters, first-load
@@ -513,7 +389,7 @@ collection size and the browser origin's usage/quota in `SyncPanel`.
 an app: each handoff queue is a versioned document in its own right.
 `bloomforge` persists its project shelf through the same contract.
 
-This is intentionally incremental. Planner, Spores, Thinking About, Write, and
+This is intentionally incremental. Planner, Thinking About, Write, and
 Marginalia keep their existing domain persistence until each is changed for a
 product reason; adoption should migrate one store at a time rather than create
 a central Woodles state service.
@@ -702,49 +578,35 @@ against each returned server version for up to three total pushes; persistent
 contention remains safe locally and surfaces as not-yet-synced instead of a
 false success. See "the sync layer" below for the transport contract.
 
-## the knowledge base
+## the board
 
-`spores` is where entries are tended. It absorbed the Dev Log (step 2) and the
-Ologypedia Textbook (step 4); see [CONVERGENCE.md](./CONVERGENCE.md) for why.
-Beyond spores/spellbooks/flights/tags, it now carries the Textbook's half:
+`thinking-about` is a board for what's being read, played, and watched —
+columns, sections, one-tap sittings, the standing-slot and ledger machinery
+documented under "cross-app ledgers" in "the sync layer" below rather than
+here, so it isn't said twice.
 
-**`[[wikilinks]]` in a plain-text body.** The Textbook stored links as
-`<a class="entry-link" data-entry>` inside sanitized HTML. A spore body is
-plain text, so the port uses bracket syntax — which is what the Textbook's own
-"draft it with a prompt" already asked models to emit, so the authoring format
-and the storage format now agree. `wikilinks.ts` turns a body into text and
-link **segments**, which `SporeBody.svelte` renders directly: no `innerHTML`
-anywhere on the read path, and therefore no sanitizer to get wrong. Links
-resolve by title, case- and space-insensitively.
-
-**Red links and sowing.** A link to a title nothing answers to is drawn dashed
-with a `+`, and clicking it sows a seed rather than failing. Highlighting a
-phrase while reading offers the same, planting the link where the phrase sat.
-If the selection went stale and the phrase is no longer in the body, the seed
-is still sown — losing the link is acceptable, losing the thought is not.
-
-**Backlinks are derived, never stored** (`backlinksOf`), so they follow edits.
-A rename therefore turns inbound links red rather than silently rewriting text
-the person wrote; that is a deliberate choice, pinned by a test. They are shown
-separately from `Flight`s, which are links you drew rather than wrote.
-
-**Status and covers.** `seed → growing → grown`, forward-only, defaulting for
-pre-merge spores by whether anything was written and never guessing "grown".
-Covers need no design step — accent is a stable hash of the id, the emblem
-defaults to ✦, the blurb is excerpted from the body with links read as their
-display text — and `CoverEditor` only exists for the entry you care about.
-Accents are stored as *names*, not hex, so a re-skin cannot strand them.
-
-`SporeShelf.svelte` renders cover cards, toggled against the existing
-archetype lists and persisted per-browser under `spores.spellbookView.v1` — a
-view preference is about this screen on this device, so it stays out of the
-synced blob.
-
-`ologypedia` is now the publish target rather than a second editor:
-`index.html` still shelves finished pages and `add-page.html` still builds
-them, but `textbook.html` is a signpost that points at `/spores` and hands
-back the original `ologypedia-textbook-v1` blob as a download. Nothing is
-deleted on migration, so that page keeps working as an escape hatch.
+**Casting a spell.** `apps/thinking-about/src/lib/spells/` is Spores' curated
+category system (author, musician, filmmaker, actor, person, tv-series, film,
+book, album, game, the anime relationship graph), moved here because its
+categories already name almost exactly this app's `SectionKey` union — the
+knowledge-base half of Spores worth keeping had nowhere better to go than the
+app already organized around books, films and games. It is a different tool
+from `@woodles/spellcraft` (see "the authoring brief" above): a category is a
+field schema, not a voice, and casting one asks a model for a JSON record
+rather than prose. `registry.ts` keeps the schemas; `assembler.ts` builds a
+prompt that asks for every field a category knows, no per-cast field picker
+the way Spores had one — a simplification, not a port; `parser.ts` is Spores'
+own forgiving intake (fence-stripping, bounded truncation repair, unwrapping a
+model's mistakenly-stringified arrays) essentially unchanged, because getting
+JSON back from a model is the same problem regardless of what it describes.
+`SpellPanel.svelte` opens from an entry's detail view, suggests a starting
+category from the entry's `sectionKey` (`suggestedCategoryId`, a suggestion
+never a restriction), and stores the result as `entry.spell: { categoryId,
+data, castAt } | null` — optional, normalized like every other field an older
+entry might not have. Spores' worldbuilding categories (creature, biome,
+ability, stat, minigame, lore) did not come with it: they were the retired Dev
+Log's content, and nothing in this workspace's four healthy apps is about
+marginalia's world, so there was nowhere honest to put them.
 
 ## the writing surface
 
@@ -828,34 +690,78 @@ imports them once from `notebook.workspace.v2`, flagged in planner settings —
 that key outlives the app, so the takeover works whether or not it ran before
 the retirement.
 
+**Spores retired into Write too**, and brought a smaller version of its job
+rather than a second knowledge base. `references.svelte.ts`'s `#`/`@` picker
+already had a source registry — Thinking About entries, days — so a third
+source, `DraftSource`, is a few lines: `#` now also reaches another draft,
+resolved live against `listDrafts()` (same-origin, no ledger needed) and
+inserted as the same `data-ref-*` anchor every other reference uses, through
+`entityHref('write', 'draft', id)` now that Write declares `addressableBy:
+['draft']` and reads `?draft=` on load. `backlinks.ts` answers "what
+references this draft" by scanning stored bodies for those anchors — Spores'
+`backlinksOf`, ported onto a mechanism Write already had rather than a second
+link syntax; `[[wikilinks]]` did not come with it. What did: the seed →
+growing → grown status (`status.ts`), optional and forward-only exactly as it
+was in Spores and the Ologypedia Textbook before it, shown as a pill in the
+drafts modal you click to advance. Covers and `Flight`s did not make the
+trip — Write has no shelf of cards to put a cover on, and an edge with no
+prose around it had nowhere to land; both are named in `sporesImport.ts` as
+deliberate drops, not oversights.
+
+**The migration** (`src/lib/sporesImport.ts`) runs once, flagged, on the
+notebook-retirement pattern: reads `spores.spores.v1` and
+`spores.spellbooks.v1` and leaves them in place. Each spore becomes a draft
+of kind `note` under a deterministic id (`d-sp-<spore id>`), tagged
+`from:spores` plus `spellbook:<title>` for each spellbook it belonged to.
+`[[wikilinks]]` resolve into draft references against the titles in the same
+export — built as a title index before any body renders, so a link can point
+forward to a spore later in the array — and flatten to plain text when the
+target isn't in the export, the same "cold reference" stance live references
+take. A spore with no body (migrated from the old Dev Log, its fields
+entirely in `data`) gets one synthesized from those fields, so a worldbuilding
+record's words aren't stranded on an app that no longer exists.
+
+**Draft it with a prompt.** `DraftPromptModal.svelte` is Write's own use of
+`@woodles/spellcraft`'s brief (see "the authoring brief" below): assemble a
+prompt from a topic, paste it into any model, paste the answer back, and it
+lands in the foreground layer through `textToHtml` — appended to what's
+already there, never a silent replace. The Ologypedia studio's and Spores'
+Garden's versions of this gesture both retired here.
+
 ## the authoring brief
 
-`packages/spellcraft` holds the prompt spec Z writes entries against — voice,
+`packages/spellcraft` holds the prompt spec Z writes against — voice,
 structure, etymology-as-semantic-drift, the metaphor sources, the standing
 lenses, the conversions, the reading-list rule. **Nothing here calls a model.**
 The human carries the prompt out and the answer back, which is what keeps every
 app in this workspace backend-free.
 
-The brief is the part that must not drift; what varies is only the **output
-contract** — what shape the answer comes back in:
-
-- `page` — one complete standalone file. Ologypedia's studio uses it, appending
-  its own VISUAL SYSTEM as the trailer. That trailer is the app's page format,
-  not part of the brief, which is why it stays in `add-page.html`.
-- `fragment` — plain prose with `[[wikilinks]]`, which is exactly what a spore
-  body already stores, so the authoring format and the storage format are the
-  same thing. Spores' `DraftPanel` uses it.
+It used to carry two output contracts — a complete standalone page for
+Ologypedia's studio, a body fragment with `[[wikilinks]]` for Spores' Garden —
+because what varied between callers was only **what shape the answer came
+back in**. Both apps retired into Write (see "the writing surface" above and
+CONVERGENCE.md), and the brief came with them rather than going down with
+either: `fragment` is now Write's own **draft it with a prompt** gesture
+(`DraftPromptModal.svelte`), asking for plain prose rather than a document or
+bracketed links, because that's what a draft's foreground layer already is.
+`page` had exactly one consumer and that consumer is gone, so it wasn't
+ported — the contract type is just `'fragment'` now.
 
 `ingestDraft` takes the answer back in whatever shape it arrives — fenced,
-HTML, markdown, or plain — and reduces it to that stored format. It takes
-`htmlToText` as an argument rather than importing it, so the package needs no
-DOM. In Spores, bringing a draft in also **sows a seed for every `[[link]]`
-nothing answers to yet**, so one answer both fills the entry and spawns the
-cluster around it.
+HTML, markdown, or plain — and reduces it to the plain text `textToHtml`
+turns into paragraphs. It takes `htmlToText` as an argument rather than
+importing it, so the package needs no DOM.
 
 Like `@woodles/app-manifest` and `@woodles/text`, this ships browser-ready
-`.js` with a `.d.ts` sidecar, because `add-page.html` is static and has no
-build step.
+`.js` with a `.d.ts` sidecar, same shape as those two — not because anything
+static consumes it today, but because nothing about the package needs a
+build step either.
+
+Thinking About's structured-record system (`apps/thinking-about/src/lib/
+spells/`, see "the board" below) is a different tool with a similar shape —
+Spores' curated category schemas and JSON-skeleton-prompt technique, not
+Z's essay brief — and does not use this package. The two authoring pipelines
+were always separate; only one of them is `@woodles/spellcraft`.
 
 ## the handoff spine
 
@@ -867,11 +773,12 @@ words", nothing routes between them, so the app you picked at capture time is
 the app it stays in forever.
 
 **`packages/handoff` (`@woodles/handoff`)** — `createHandoffQueue(target)` over
-one versioned localStorage document per target (`woodles.handoff.<target>.v1`),
-one queue each for the apps that can receive: `spores` and `write`. (`notebook`
-left the target list when it retired into Write; its stranded queue is drained
-by Write's capture import rather than by a receiver.) Read-only surfaces
-(echoes, ologypedia) are not targets. `send()`
+one versioned localStorage document per target (`woodles.handoff.<target>.v1`).
+`write` is now the only app that can receive: `notebook` left the target list
+when it retired into Write, and `spores` left it the same way when it retired
+into Write in turn, so there is nothing left to route *between* — the handoff
+spine still exists for whatever catches a thought next. Read-only surfaces
+(echoes) are not targets. `send()`
 appends, `drain()` empties, `peek()`/`count()` don't consume. The envelope is
 `{ id, target, title, body, format, tags, source, createdAt }`, where `format`
 is `text` or `html` and `source` carries the originating app for provenance.
@@ -887,15 +794,10 @@ Three deliberate choices, each tested:
 - **queues are bounded** (`QUEUE_LIMIT`, 200, oldest dropped). a queue is a
   hallway, not a home.
 
-**receivers** drain on load and announce it once: `spores` plants each as a
-spore, `write` gives each its own draft (tags carried onto the index) and
-opens the newest. HTML bodies are flattened for spores' plain textarea and run
-through `sanitizeHtml` for `write` — a body may be model output from two apps
-ago, and write's drafts can reach the public publish path.
-
-**senders**: `spores` hands a spore that wants real prose to `write`. The
-other direction — a write draft that turns out to be knowledge-base material —
-is still a copy-paste; wire it when it hurts.
+**the receiver** drains on load and announces it once: `write` gives each
+arrival its own draft (tags carried onto the index) and opens the newest.
+HTML bodies run through `sanitizeHtml` — a body may be model output from
+another app entirely, and write's drafts can reach the public publish path.
 
 ## the sync layer
 
@@ -928,7 +830,7 @@ bearer credential. the last-seen version is cached in localStorage too.
 a `SyncState` class with `$state` fields, its instantiation, and a call to
 `createAppSync` (from `@woodles/sync`) that wires up the app-specific adapter.
 the adapter's `read()` maps the store into the blob type (`PlannerBlob`,
-`BestiaryBlob`, `GardenBlob`, `DevlogBlob`, `ThinkingAboutBlob`); `write()` calls
+`BestiaryBlob`, `DevlogBlob`, `ThinkingAboutBlob`); `write()` calls
 the store's `rehydrate()`; `isNewer` is optionally provided (`bestiary` and
 `thinking-about` use it). Carillon's file is deliberately larger because it
 owns the merge described above and coalesces queued instrument writes before
@@ -1170,30 +1072,14 @@ theme, and concrete color names (`--lavender`, `--aqua`, `--peach`, `--lilac`,
 `--plum`, `--lapis`, `--cream`) stay stable across them. `write` and the static
 apps consume this.
 
-the other five SvelteKit apps with a house style don't. each ships its own
+the other four SvelteKit apps with a house style don't. each ships its own
 token file under
 `src/lib/style/tokens.css`, namespaced so it never leaks: `marginalia`
 redefines the bare names under `.marginalia-root`, `planner` uses `--p-*`
-for its inner surfaces and `--car-*` for the Carillon shell,
-`spores` uses `--g-*`, `bestiary` uses `--b-*`,
-and `thinking-about` uses `--ta-*` under
+for its inner surfaces and `--car-*` for the Carillon shell, `bestiary` uses
+`--b-*`, and `thinking-about` uses `--ta-*` under
 `.thinking-about-root`. `data-theme` and the eleven shared themes don't reach
 any of them; they own their own look.
-
-`spores` left the house style in week-11's convergence work: it now wears the
-cream/rose/gold palette it inherited from the Ologypedia Textbook it is
-absorbing (see [CONVERGENCE.md](./CONVERGENCE.md) step 3). the `--g-*` token
-names and their roles are unchanged — only the values moved — plus four
-tokens that had to be *added* because the old theme encoded them as literals
-or conflated them with the accent: `--g-on-flight` (text on an accent fill,
-hard-coded as the dark background in a dozen components), `--g-danger` and
-`--g-danger-soft` (errors and destructive hovers, previously the accent pink
-doing double duty), and `--g-scrim`. every token that carries text clears
-4.5:1 against both `--g-bg` and `--g-surface`; the old muted and accent tones
-did not, and re-valuing was the moment to fix that rather than port it
-forward. `GraphRenderer`'s SVG node and edge palettes were re-valued too —
-they are artwork tuned to their ground, and pastels that glowed on near-black
-vanish on paper.
 
 `thinking-about`'s look is a deliberate departure even from its SvelteKit
 siblings' own house style: marginalia and bestiary still lean into the dark,
@@ -1251,24 +1137,24 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1861 tests total: 16 in `api/` (its own
+1769 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1845 across sixteen pnpm
-packages — `write` 133, `marginalia` 333, `planner` 539,
-`spores` 140, `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
+instead of the recursive `pnpm -r test`), plus 1753 across fifteen pnpm
+packages — `write` 170, `marginalia` 333, `planner` 539,
+`bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
 `packages/sync` 36, `packages/persistence` 6, `packages/app-manifest` 17,
-`packages/handoff` 15, `packages/text` 30, `packages/spellcraft` 16,
-`packages/emoji` 4, `packages/incremental-core` 191, and `thinking-about` 118.
-(Counted by running each suite, not by adding to the previous figure — the
-inventory had drifted: the headline said 1644 against a body summing to 1700,
-and marginalia's balance-harness work landed 333 tests recorded as 325. Two
-of marginalia's are currently failing on `main` — timeouts in `sim.test.ts`,
-unrelated to this count.)
-(`notebook`'s 28 retired with the app; write's suite grew to cover kinds,
-the drafts filter, the capture import, and the spread's view model.)
-keep this inventory current when a suite changes; the root command is the
-release contract, not the prose count.
+`packages/handoff` 14, `packages/text` 30, `packages/spellcraft` 15,
+`packages/emoji` 4, `packages/incremental-core` 191, and `thinking-about` 131.
+(Counted by running each suite, not by adding to the previous figure — keep
+this inventory current when a suite changes; the root command is the release
+contract, not the prose count.)
+(Spores' 140 retired with the app. Write's suite grew by 28 — `sporesImport.ts`
+(14), `backlinks.ts` (7), `status.ts` (7) — for the pieces of it that moved in;
+Thinking About's grew by 13 for the spell registry's assembler and parser;
+`packages/handoff` dropped one now-inapplicable test (a two-target isolation
+check with only one target left); `packages/spellcraft` dropped one test for
+the retired `page` contract.)
 
 each app's `test` runs `svelte-kit sync && vitest run`. the `sync` matters: a
 SvelteKit app's `tsconfig.json` extends `./.svelte-kit/tsconfig.json`, which
@@ -1276,7 +1162,7 @@ SvelteKit app's `tsconfig.json` extends `./.svelte-kit/tsconfig.json`, which
 can't resolve the tsconfig. because the scripts sync first, `pnpm test` works
 straight from a clean checkout.
 
-`write`, `marginalia`, and `spores` load the workspace-level
+`write` and `marginalia` load the workspace-level
 `vitest.setup.ts` to install a browser-like in-memory `localStorage` under
 Node. planner keeps its own localStorage mock in `store.test.ts`; under the
 current Node runtime that suite passes but may still print a
@@ -1285,10 +1171,6 @@ current Node runtime that suite passes but may still print a
 `thinking-about` gained the SvelteKit plugin in its `vitest.config.ts` for the
 same reason, when its commitments reader became the app's first rune module
 worth testing directly.
-
-`spores` gained its own `vitest.config.ts` for the same reason planner has one
-— `garden.svelte.ts` builds a `$state` store at import time, so the Svelte
-plugin has to compile it before the store tests can construct a `GardenStore`.
 
 `planner`'s `vitest.config.ts` loads the SvelteKit plugin, and it has to:
 `planner`'s store is a `.svelte.ts` module that uses `$state`, instantiated at
@@ -1301,11 +1183,11 @@ are written up in [apps/planner/KNOWN_ISSUES.md](./apps/planner/KNOWN_ISSUES.md)
 
 `e2e/` is the deliberately small Playwright layer above the unit suites. Its
 local server reads `vercel.json` and applies the production rewrites, so route
-coverage tests the paths people actually visit instead of eight unrelated Vite
+coverage tests the paths people actually visit instead of seven unrelated Vite
 ports. The suite covers every published entry route, Write → Echoes archiving,
 Bestiary gallery/adopt/share and Marginalia consumption, an Arcade state change,
-Ologypedia shelf export → publish script → indexed card, the Thinking About →
-Carillon round trip, back, and the sitting that returns from it, legacy localStorage migration across reload,
+the Thinking About → Carillon round trip, back, and the sitting that returns
+from it, legacy localStorage migration across reload,
 keyboard operation, and serious/critical WCAG A axe findings.
 
 The cross-app specs earn their cost in a way the route checks don't. The
@@ -1325,15 +1207,12 @@ pnpm exec playwright install chromium
 pnpm test:e2e
 ```
 
-`pnpm test:e2e` builds all SvelteKit apps first. Ologypedia's publisher test
-uses `--app-dir` with a temporary copy of the app, so it exercises the real
-script without changing `apps/ologypedia/index.html` or adding a page to the
-working tree.
+`pnpm test:e2e` builds all SvelteKit apps first.
 
 ## svelte-check
 
-All eight SvelteKit apps currently pass with zero errors and zero warnings.
-`pnpm -r check` runs all eight in turn. it stops at the first app that fails,
+All seven SvelteKit apps currently pass with zero errors and zero warnings.
+`pnpm -r check` runs all seven in turn. it stops at the first app that fails,
 so when diagnosing a new break, run the app directly to see past it.
 
 ## continuous integration
@@ -1350,9 +1229,9 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (1644 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (1769 tests)
 pnpm check              svelte-check in every app
-pnpm build              build the eight SvelteKit apps
+pnpm build              build the seven SvelteKit apps
 ```
 
 both `test` and `check` generate `.svelte-kit/` themselves on a fresh clone, so

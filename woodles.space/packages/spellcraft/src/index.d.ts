@@ -1,16 +1,16 @@
-export type OutputContract = 'page' | 'fragment';
+export type OutputContract = 'fragment';
 
 export interface BriefOptions {
 	topic: string;
 	/** Defaults to `fragment`. */
 	output?: OutputContract;
-	/** Domain / subdomain, for the masthead kicker. */
+	/** Domain / subdomain, for context. */
 	subject?: string;
 	/** Your own relationship to the topic, if any. */
 	context?: string;
 	/** Adds the health-condition sections. */
 	diagnosis?: boolean;
-	/** Caller-specific trailer, e.g. a visual system. */
+	/** Caller-specific trailer appended after a rule. */
 	appendix?: string;
 }
 

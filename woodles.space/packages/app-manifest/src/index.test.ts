@@ -69,11 +69,16 @@ describe('route smoke contract', () => {
 
 	it('keeps a retired app’s route alive as a redirect rather than a 404', () => {
 		// Retired apps lose their manifest entry, so nothing else in this suite
-		// would notice if an old bookmark started 404ing. Dev Log folded into
-		// Spores (CONVERGENCE.md step 2); Notebook folded into Write (§7).
+		// would notice if an old bookmark started 404ing. Dev Log and Spores
+		// both folded into Write in the end — Dev Log by way of Spores
+		// (CONVERGENCE.md step 2), then Spores itself retired into Write
+		// alongside Ologypedia — so both point straight at Write rather than
+		// chaining through a second redirect.
 		const retired: [string, string][] = [
-			['/marginalia-devlog', '/spores'],
-			['/notebook', '/write']
+			['/marginalia-devlog', '/write'],
+			['/notebook', '/write'],
+			['/spores', '/write'],
+			['/ologypedia', '/write']
 		];
 		for (const [route, destination] of retired) {
 			for (const source of [route, `${route}/:path*`]) {
@@ -85,6 +90,8 @@ describe('route smoke contract', () => {
 		}
 		expect(appManifest.some((app) => app.id === 'marginalia-devlog')).toBe(false);
 		expect(appManifest.some((app) => app.id === 'notebook')).toBe(false);
+		expect(appManifest.some((app) => app.id === 'spores')).toBe(false);
+		expect(appManifest.some((app) => app.id === 'ologypedia')).toBe(false);
 	});
 
 	it('never redirects a route that an app still serves', () => {
@@ -95,9 +102,9 @@ describe('route smoke contract', () => {
 });
 
 describe('landing catalogue', () => {
-	it('derives the fifteen ordered tiles, pins, and featured fallbacks from the manifest', () => {
-		expect(landingApps).toHaveLength(15);
-		expect(landingApps.map((app) => app.order)).toEqual([...Array(15)].map((_, index) => index + 1));
+	it('derives the thirteen ordered tiles, pins, and featured fallbacks from the manifest', () => {
+		expect(landingApps).toHaveLength(13);
+		expect(landingApps.map((app) => app.order)).toEqual([...Array(13)].map((_, index) => index + 1));
 		expect(new Set(landingApps.map((app) => app.id)).size).toBe(landingApps.length);
 		expect(defaultLandingPins).toEqual(['hygge', 'write', 'marg', 'planner', 'quiet']);
 		expect(featuredLandingApps.map((app) => app.id)).toEqual(['marg', 'bestiary', 'write']);
@@ -159,10 +166,10 @@ describe('entity addressing', () => {
 
 	it('refuses an unknown app and an undeclared kind', () => {
 		expect(() => entityHref('nonesuch', 'game', 'x')).toThrow(/not an app/);
-		// `write` is real but declares no addressable kinds — a link naming one
-		// would point at a parameter nothing reads, which is the failure mode
+		// `marginalia` is real but declares no addressable kinds — a link naming
+		// one would point at a parameter nothing reads, which is the failure mode
 		// `HandoffSource.href` already demonstrates (REFERENCES.md §2.2).
-		expect(() => entityHref('write', 'draft', 'x')).toThrow(/declares no addressable/);
+		expect(() => entityHref('marginalia', 'draft', 'x')).toThrow(/declares no addressable/);
 	});
 
 	it('keeps every declared kind url-safe, so it needs no encoding of its own', () => {

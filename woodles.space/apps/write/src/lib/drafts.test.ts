@@ -4,6 +4,7 @@ import {
 	bootstrap,
 	clearActiveDraftId,
 	createDraftId,
+	cycleDraftStatus,
 	filterDrafts,
 	getActiveDraftId,
 	handoffToDraftBody,
@@ -15,6 +16,7 @@ import {
 	removeDraftBody,
 	saveDraft,
 	setActiveDraftId,
+	tagCounts,
 	textToHtml,
 	upsertIndex,
 	writeIndex,
@@ -300,5 +302,68 @@ describe('handoffs', () => {
 		expect(boot.handoffs).toBe(0);
 		expect(boot.activeId).toBe('d-mine');
 		expect(boot.body?.title).toBe('mine');
+	});
+});
+
+describe('cycleDraftStatus', () => {
+	it('infers seed from an empty draft and advances to growing', () => {
+		const list: DraftIndexItem[] = [{ id: 'd-1', title: 'blank', updatedAt: 'x' }];
+		saveDraft('d-1', { title: 'blank' });
+		const out = cycleDraftStatus(list, 'd-1');
+		expect(out[0].status).toBe('growing');
+	});
+
+	it('infers growing from a draft with words and advances to grown', () => {
+		const list: DraftIndexItem[] = [{ id: 'd-1', title: 'has words', updatedAt: 'x' }];
+		saveDraft('d-1', { title: 'has words', layers: { foreground: { html: '<p>hi</p>' } } });
+		const out = cycleDraftStatus(list, 'd-1');
+		expect(out[0].status).toBe('grown');
+	});
+
+	it('advances an explicit status forward', () => {
+		const list: DraftIndexItem[] = [{ id: 'd-1', title: 't', updatedAt: 'x', status: 'seed' }];
+		expect(cycleDraftStatus(list, 'd-1')[0].status).toBe('growing');
+	});
+
+	it('stays at grown', () => {
+		const list: DraftIndexItem[] = [{ id: 'd-1', title: 't', updatedAt: 'x', status: 'grown' }];
+		expect(cycleDraftStatus(list, 'd-1')[0].status).toBe('grown');
+	});
+
+	it('persists the change to the index', () => {
+		const list: DraftIndexItem[] = [{ id: 'd-1', title: 't', updatedAt: 'x', status: 'seed' }];
+		cycleDraftStatus(list, 'd-1');
+		expect(listDrafts()[0].status).toBe('growing');
+	});
+
+	it('is a no-op for an id that is not in the list', () => {
+		const list: DraftIndexItem[] = [{ id: 'd-1', title: 't', updatedAt: 'x' }];
+		expect(cycleDraftStatus(list, 'd-missing')).toBe(list);
+	});
+});
+
+describe('tagCounts', () => {
+	it('aggregates case-insensitively, keeping the most common casing', () => {
+		const list: DraftIndexItem[] = [
+			{ id: 'd-1', title: 'a', updatedAt: 'x', tags: ['Fiction', 'draft'] },
+			{ id: 'd-2', title: 'b', updatedAt: 'x', tags: ['fiction'] },
+			{ id: 'd-3', title: 'c', updatedAt: 'x', tags: ['fiction'] }
+		];
+		expect(tagCounts(list)).toEqual([
+			{ tag: 'fiction', count: 3 },
+			{ tag: 'draft', count: 1 }
+		]);
+	});
+
+	it('sorts ties alphabetically', () => {
+		const list: DraftIndexItem[] = [
+			{ id: 'd-1', title: 'a', updatedAt: 'x', tags: ['zeta'] },
+			{ id: 'd-2', title: 'b', updatedAt: 'x', tags: ['alpha'] }
+		];
+		expect(tagCounts(list).map((t) => t.tag)).toEqual(['alpha', 'zeta']);
+	});
+
+	it('returns [] when nothing is tagged', () => {
+		expect(tagCounts([{ id: 'd-1', title: 'a', updatedAt: 'x' }])).toEqual([]);
 	});
 });

@@ -1,27 +1,36 @@
 <script lang="ts">
 	import { fade, fly } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
-	import { filterDrafts, kindsPresent, type DraftIndexItem } from './drafts';
+	import { filterDrafts, kindsPresent, tagCounts, type DraftIndexItem } from './drafts';
 	import { coerceKind, kindSpec, type WritingKind } from './kinds';
+	import type { DraftStatus } from './status';
 
 	let {
 		open = $bindable(),
 		drafts,
 		currentDraftId,
+		backlinkCounts,
+		statuses,
 		onSelect,
 		onCreate,
-		onDelete
+		onDelete,
+		onCycleStatus
 	}: {
 		open: boolean;
 		drafts: DraftIndexItem[];
 		currentDraftId: string | null;
+		/** Draft id -> how many other drafts reference it. See backlinks.ts. */
+		backlinkCounts: Map<string, number>;
+		/** Draft id -> effective status (explicit, or inferred). See status.ts. */
+		statuses: Map<string, DraftStatus>;
 		onSelect: (id: string) => void;
 		onCreate: () => void;
 		onDelete: (id: string, e: Event) => void;
+		onCycleStatus: (id: string, e: Event) => void;
 	} = $props();
 
-	// Search and the kind filter are this screen's state, reset each open —
-	// a filter you forgot you set is a draft you can't find.
+	// Search, the kind filter, and the tag filter are this screen's state,
+	// reset each open — a filter you forgot you set is a draft you can't find.
 	let query = $state('');
 	let kindFilter = $state<WritingKind | null>(null);
 
@@ -33,9 +42,12 @@
 	});
 
 	const kinds = $derived(kindsPresent(drafts));
+	const tags = $derived(tagCounts(drafts).slice(0, 8));
 	const sorted = $derived(
 		filterDrafts(drafts, query, kindFilter).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 	);
+
+	const STATUS_GLYPH: Record<DraftStatus, string> = { seed: '·', growing: '◐', grown: '●' };
 	const dateFormat: Intl.DateTimeFormatOptions = {
 		month: 'short',
 		day: 'numeric',
@@ -81,6 +93,17 @@
 							{/each}
 						</div>
 					{/if}
+					{#if tags.length > 0}
+						<div class="drafts-kinds" role="group" aria-label="browse by tag">
+							{#each tags as t}
+								<button
+									class="kind-chip"
+									class:active={query.trim().toLowerCase() === t.tag.toLowerCase()}
+									onclick={() => (query = query.trim().toLowerCase() === t.tag.toLowerCase() ? '' : t.tag)}
+								>{t.tag} · {t.count}</button>
+							{/each}
+						</div>
+					{/if}
 				</div>
 			{/if}
 			<div class="drafts-list">
@@ -93,8 +116,18 @@
 								<span class="draft-item-date">
 									{new Date(d.updatedAt).toLocaleDateString(undefined, dateFormat)}
 								</span>
+								{#if backlinkCounts.get(d.id)}
+									<span class="draft-item-backlinks" title="referenced by {backlinkCounts.get(d.id)} draft(s)">
+										← {backlinkCounts.get(d.id)}
+									</span>
+								{/if}
 							</span>
 						</button>
+						<button
+							class="draft-item-status"
+							onclick={(e) => onCycleStatus(d.id, e)}
+							title="status: {statuses.get(d.id) ?? 'seed'} — click to advance"
+						>{STATUS_GLYPH[statuses.get(d.id) ?? 'seed']}</button>
 						<button
 							class="draft-item-delete"
 							onclick={(e) => onDelete(d.id, e)}
@@ -195,6 +228,20 @@
 	.draft-item-date {
 		font-family: var(--editor-mono, var(--font-mono)); font-size: 0.5rem;
 		letter-spacing: 0.1em; color: var(--muted); opacity: 0.6;
+	}
+	.draft-item-backlinks {
+		font-family: var(--editor-mono, var(--font-mono)); font-size: 0.5rem;
+		letter-spacing: 0.06em; color: var(--accent-deep); opacity: 0.8;
+	}
+	.draft-item-status {
+		background: none; border: none; font-size: 0.75rem; color: var(--accent-deep);
+		opacity: 0.6; cursor: pointer; padding: 0.5rem; border-radius: 50%;
+		width: 28px; height: 28px; flex: none;
+		display: flex; align-items: center; justify-content: center;
+		transition: opacity 0.18s ease, background 0.18s ease;
+	}
+	.draft-item-status:hover {
+		opacity: 1; background: color-mix(in srgb, var(--accent) 20%, transparent);
 	}
 	.draft-item-delete {
 		background: none; border: none; font-size: 1rem; color: var(--muted); opacity: 0.3;

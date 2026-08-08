@@ -18,8 +18,9 @@
 	import { commitments } from '$lib/commitments.svelte';
 	import { mentions } from '$lib/mentions.svelte';
 	import { entityHref } from '@woodles/app-manifest';
-	import type { SectionKey } from '$lib/types';
+	import type { EntrySpell, SectionKey } from '$lib/types';
 	import ColorPicker from './ColorPicker.svelte';
+	import SpellPanel from './SpellPanel.svelte';
 
 	let entry = $derived(thinkingAbout.activeEntry);
 
@@ -110,6 +111,16 @@
 		if (!sessionId) return;
 		await tick();
 		detailPanel?.querySelector<HTMLInputElement>(`[data-session-id="${sessionId}"]`)?.focus();
+	}
+
+	function castSpell(spell: EntrySpell): void {
+		if (!entry) return;
+		thinkingAbout.updateEntry(entry.id, { spell });
+	}
+
+	function clearSpell(): void {
+		if (!entry) return;
+		thinkingAbout.updateEntry(entry.id, { spell: null });
 	}
 
 	function moveToSection(sectionKey: SectionKey): void {
@@ -371,6 +382,19 @@
 					{/each}
 				</ul>
 			{/if}
+		</div>
+
+		<div class="detail-field">
+			<span class="detail-field-label">structured record</span>
+			{#key id}
+				<SpellPanel
+					spell={entry.spell}
+					sectionKey={entry.sectionKey}
+					title={entry.title}
+					onCast={castSpell}
+					onClear={clearSpell}
+				/>
+			{/key}
 		</div>
 
 		<div class="detail-field">

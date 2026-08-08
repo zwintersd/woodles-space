@@ -31,7 +31,12 @@ function readOnlyStorage(seed: Map<string, string>): StorageLike {
 	};
 }
 
-const SOURCE: HandoffSource = { app: 'spores', label: 'a thought' };
+// A generic sender — HandoffSource.app is provenance, not validated against
+// the live app list, so a retired app's id would still be a legitimate value
+// here (an archive can say where something came from years later). Kept
+// generic instead, since "spores" would now read as a live app that never
+// sent anything.
+const SOURCE: HandoffSource = { app: 'elsewhere', label: 'a thought' };
 
 let storage: ReturnType<typeof memoryStorage>;
 let counter: number;
@@ -48,9 +53,9 @@ beforeEach(() => {
 
 describe('the envelope', () => {
 	it('stamps id, target, and time, and normalizes what the caller left loose', () => {
-		const queue = createHandoffQueue('spores', options());
+		const queue = createHandoffQueue('write', options());
 		const result = queue.send({
-			title: '  a spore  ',
+			title: '  a thought  ',
 			body: 'some words',
 			tags: [' garden ', '', '   ', 'notes'],
 			source: SOURCE
@@ -59,8 +64,8 @@ describe('the envelope', () => {
 		expect(result.ok).toBe(true);
 		expect(result.handoff).toEqual({
 			id: 'h-1',
-			target: 'spores',
-			title: 'a spore',
+			target: 'write',
+			title: 'a thought',
 			body: 'some words',
 			format: 'text',
 			tags: ['garden', 'notes'],
@@ -92,16 +97,6 @@ describe('the envelope', () => {
 });
 
 describe('queues', () => {
-	it('keeps one queue per target so targets cannot swallow each other', () => {
-		createHandoffQueue('spores', options()).send({ title: 'for spores', source: SOURCE });
-		createHandoffQueue('write', options()).send({ title: 'for write', source: SOURCE });
-
-		expect(createHandoffQueue('spores', options()).peek().map((h) => h.title)).toEqual([
-			'for spores'
-		]);
-		expect(createHandoffQueue('write', options()).peek().map((h) => h.title)).toEqual(['for write']);
-	});
-
 	it('preserves arrival order across separate sends', () => {
 		const queue = createHandoffQueue('write', options());
 		queue.send({ title: 'first', source: SOURCE });
@@ -112,7 +107,7 @@ describe('queues', () => {
 	});
 
 	it('drains everything once and leaves the queue empty', () => {
-		const queue = createHandoffQueue('spores', options());
+		const queue = createHandoffQueue('write', options());
 		queue.send({ title: 'a', source: SOURCE });
 		queue.send({ title: 'b', source: SOURCE });
 
@@ -137,19 +132,18 @@ describe('queues', () => {
 		expect(items[0].title).toBe('n1');
 	});
 
-	it('counts every target for a file-these-somewhere hint', () => {
-		createHandoffQueue('spores', options()).send({ source: SOURCE });
-		createHandoffQueue('spores', options()).send({ source: SOURCE });
+	it('counts the target for a file-these-somewhere hint', () => {
+		createHandoffQueue('write', options()).send({ source: SOURCE });
 		createHandoffQueue('write', options()).send({ source: SOURCE });
 
-		expect(pendingCounts(options())).toEqual({ spores: 2, write: 1 });
+		expect(pendingCounts(options())).toEqual({ write: 2 });
 	});
 });
 
 describe('failure is never silent loss', () => {
 	it('still accepts a capture when the existing queue is corrupt', () => {
-		storage.map.set(handoffKey('spores'), '{ not json at all');
-		const queue = createHandoffQueue('spores', options());
+		storage.map.set(handoffKey('write'), '{ not json at all');
+		const queue = createHandoffQueue('write', options());
 
 		const result = queue.send({ title: 'survives', source: SOURCE });
 		expect(result.ok).toBe(true);
@@ -159,17 +153,17 @@ describe('failure is never silent loss', () => {
 
 	it('discards entries of the wrong shape instead of failing the whole queue', () => {
 		storage.map.set(
-			handoffKey('spores'),
+			handoffKey('write'),
 			JSON.stringify({ items: [{ id: 'x', title: 'malformed' }] })
 		);
-		const queue = createHandoffQueue('spores', options());
+		const queue = createHandoffQueue('write', options());
 
 		queue.send({ title: 'good', source: SOURCE });
 		expect(queue.peek().map((h) => h.title)).toEqual(['good']);
 	});
 
 	it('reports a failed write rather than pretending the send worked', () => {
-		const queue = createHandoffQueue('spores', { ...options(), storage: readOnlyStorage(new Map()) });
+		const queue = createHandoffQueue('write', { ...options(), storage: readOnlyStorage(new Map()) });
 		const result = queue.send({ title: 'lost', source: SOURCE });
 
 		expect(result.ok).toBe(false);
@@ -193,23 +187,23 @@ describe('failure is never silent loss', () => {
 	});
 
 	it('works with no storage at all instead of throwing', () => {
-		const queue = createHandoffQueue('spores', { ...options(), storage: null });
+		const queue = createHandoffQueue('write', { ...options(), storage: null });
 		expect(() => queue.send({ title: 'nowhere', source: SOURCE })).not.toThrow();
 		expect(queue.peek()).toEqual([]);
 	});
 });
 
 describe('the target list', () => {
-	it('covers only apps that can receive, and keys them distinctly', () => {
-		expect([...HANDOFF_TARGETS]).toEqual(['spores', 'write']);
+	it('covers only the app that can receive — Write, now that Spores has retired into it too', () => {
+		expect([...HANDOFF_TARGETS]).toEqual(['write']);
 		const keys = HANDOFF_TARGETS.map(handoffKey);
 		expect(new Set(keys).size).toBe(keys.length);
 		for (const key of keys) expect(key).toMatch(/^woodles\.handoff\.[a-z]+\.v1$/);
 	});
 
 	it('exposes a one-shot send for wiring a single button', () => {
-		const result = sendHandoff('spores', { title: 'one shot', source: SOURCE }, options());
+		const result = sendHandoff('write', { title: 'one shot', source: SOURCE }, options());
 		expect(result.ok).toBe(true);
-		expect(createHandoffQueue('spores', options()).peek().map((h) => h.title)).toEqual(['one shot']);
+		expect(createHandoffQueue('write', options()).peek().map((h) => h.title)).toEqual(['one shot']);
 	});
 });

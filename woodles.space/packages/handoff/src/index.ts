@@ -15,11 +15,13 @@ import { createVersionedStorage, type PersistenceIssue, type StorageLike } from 
  */
 
 /**
- * Apps that can receive a handoff. Read targets (echoes, ologypedia) can't.
- * `notebook` left this list when the app retired into Write — its stranded
- * queue is drained by Write's one-time capture import, not by a receiver.
+ * Apps that can receive a handoff. Read targets (echoes) can't. `notebook`
+ * left this list when the app retired into Write — its stranded queue is
+ * drained by Write's one-time capture import, not by a receiver. `spores`
+ * left it the same way when it retired into Write in turn: Write is now the
+ * only app anything gets handed off to.
  */
-export const HANDOFF_TARGETS = ['spores', 'write'] as const;
+export const HANDOFF_TARGETS = ['write'] as const;
 
 export type HandoffTarget = (typeof HANDOFF_TARGETS)[number];
 

@@ -396,7 +396,7 @@ export class Studio {
 
 /**
  * The editor is a single-document app, so the store is a module singleton —
- * the same shape spores and planner use. The class stays exported so tests can
+ * the same shape planner uses. The class stays exported so tests can
  * build an isolated one.
  */
 export const studio = new Studio();

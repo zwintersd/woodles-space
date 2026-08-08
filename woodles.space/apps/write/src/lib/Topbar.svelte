@@ -14,6 +14,7 @@
 		pocketsCount,
 		syncOpen = $bindable(),
 		syncConnected,
+		promptOpen = $bindable(),
 		onLayerChange
 	}: {
 		activeLayer: LayerId;
@@ -26,6 +27,7 @@
 		pocketsCount: number;
 		syncOpen: boolean;
 		syncConnected: boolean;
+		promptOpen: boolean;
 		onLayerChange: (id: LayerId) => void;
 	} = $props();
 </script>
@@ -82,6 +84,15 @@
 		title="drafts"
 	>
 		drafts
+	</button>
+	<button
+		class="drafts-toggle"
+		class:on={promptOpen}
+		onclick={() => (promptOpen = !promptOpen)}
+		aria-pressed={promptOpen}
+		title="draft it with a prompt"
+	>
+		✦ prompt
 	</button>
 	<span class="topbar-divider" aria-hidden="true"></span>
 	<button

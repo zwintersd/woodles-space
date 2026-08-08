@@ -47,9 +47,9 @@ export class Arrival {
 	/**
 	 * Take the reference out of the address bar once it has been handled, so a
 	 * reload lands on Carillon rather than re-opening the arrival over whatever
-	 * the person moved on to. Same `replaceState` housekeeping the Ologypedia
-	 * reader does with its hash — the visit happened, the URL shouldn't keep
-	 * re-enacting it.
+	 * the person moved on to. Same `replaceState` housekeeping Write does after
+	 * following a `?draft=` reference — the visit happened, the URL shouldn't
+	 * keep re-enacting it.
 	 */
 	static clearFromAddressBar(): void {
 		if (typeof window === 'undefined' || typeof history === 'undefined') return;
