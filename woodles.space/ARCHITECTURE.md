@@ -40,6 +40,12 @@ other docs have narrower jobs:
   doing all the balancing — fixed by implementing the two passive sinks the
   design names in prose and never had. Three findings remain open and
   deliberately untouched, the restraint dividend chief among them.
+- [HANDOFF.md](./HANDOFF.md) is the pick-up-from-here note for the reference
+  spine: what the six steps landed, the sharp edges to know before touching
+  them, and a design for extending the same spine into Write — `#` to reach a
+  piece of media, `@` to reach a day. Its §3.2 is the one part to read before
+  writing any code there: Write publishes to a public Echoes, so a reference
+  in prose has to degrade to the words somebody typed.
 - [REFERENCES.md](./REFERENCES.md) is CONVERGENCE's mirror image, and
   **mostly still a proposal**: where convergence collapsed apps that
   should have been one app, this is about apps that stay separate and learn
@@ -49,10 +55,10 @@ other docs have narrower jobs:
   carried ids, spores' deliberately breakable title links); its §3 is a table
   of open questions bar two. **steps 1–3 are built** — the addressing layer
   under "the app manifest" above, and all three ledgers plus the two-way deep
-  links under "cross-app ledgers" below. **steps 1–5 are built**: an entry can
-  be taken to the day, its scheduled time comes back, and observing an
-  interval offers to log the sitting on the day it happened. only step 6 is
-  unstarted — a standing `schedule` still doesn't reach the calendar.
+  links under "cross-app ledgers" below. **all six steps are built**: an entry
+  can be taken to the day, its scheduled time comes back, observing an interval
+  offers to log the sitting on the day it happened, and a standing slot draws
+  itself on the calendar. [HANDOFF.md](./HANDOFF.md) picks up from there.
 - [ROADMAP.md](./ROADMAP.md) is the 10-week plan for making marginalia and
   the bestiary public-facing — all ten weeks are marked `✅ shipped` in its
   own headers, week 4 (share links, save-as-image, adopt-a-card) having
@@ -1022,6 +1028,17 @@ can't double-log, and records which ids it has taken (`ingestedSittings`, in
 its synced blob) so a deleted sitting stays deleted rather than returning on
 the next load.
 
+**Standing slots reach the calendar.** A Thinking About entry on the playing
+or watching columns can carry an optional `standing` slot — weekdays plus a
+time — beside its freeform `schedule` text. It rides the shelf, and Carillon
+**derives** overlay blocks from it in `getBlocksForDate` (`overlay: 'standing'`,
+id `ta-<entryId>`), so a Thursday watch date appears on the calendar with
+nothing stored twice and no obligation created by hand. The freeform text is
+never parsed into the slot: guessing "Tuesdays after work" wrong is worse than
+leaving it as the note somebody wrote. `sequenceDayPile()` cannot reorder these
+by construction — it only ever touches a pile's own blocks, and these are
+synthesized on read.
+
 All three ledgers rebuild on every write to their source (`#saveTasks`,
 `#saveLoggedSessions`, `#persist`) and on load, for the reason under the shelf
 above.
@@ -1195,15 +1212,15 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1825 tests total: 16 in `api/` (its own
+1831 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1809 across sixteen pnpm
-packages — `write` 122, `marginalia` 333, `planner` 536,
+instead of the recursive `pnpm -r test`), plus 1815 across sixteen pnpm
+packages — `write` 122, `marginalia` 333, `planner` 539,
 `spores` 140, `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
 `packages/sync` 24, `packages/persistence` 6, `packages/app-manifest` 17,
 `packages/handoff` 15, `packages/text` 23, `packages/spellcraft` 16,
-`packages/emoji` 4, `packages/incremental-core` 191, and `thinking-about` 115.
+`packages/emoji` 4, `packages/incremental-core` 191, and `thinking-about` 118.
 (Counted by running each suite, not by adding to the previous figure — the
 inventory had drifted: the headline said 1644 against a body summing to 1700,
 and marginalia's balance-harness work landed 333 tests recorded as 325. Two

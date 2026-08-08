@@ -5,7 +5,9 @@ import {
 	CARILLON_COMMITMENTS_STORAGE_KEY,
 	CARILLON_COMMITMENTS_VERSION
 } from '@woodles/sync';
+import { THINKING_ABOUT_SHELF_STORAGE_KEY, THINKING_ABOUT_SHELF_VERSION } from '@woodles/sync';
 import { buildCommitments, commitmentsMatch } from './commitments';
+import { thinkingAboutShelf } from './thinkingAboutShelf.svelte';
 import { PlannerStore } from './store.svelte';
 import type { Block, Task } from './types';
 
@@ -17,6 +19,17 @@ function task(overrides: Partial<Task> & { id: string }): Task {
 		updatedAt: '2026-08-09T09:00:00.000Z',
 		...overrides
 	};
+}
+
+function writeShelf(entries: unknown[]): void {
+	localStorage.setItem(
+		THINKING_ABOUT_SHELF_STORAGE_KEY,
+		JSON.stringify({
+			version: THINKING_ABOUT_SHELF_VERSION,
+			entries,
+			publishedAt: '2026-08-09T00:00:00.000Z'
+		})
+	);
 }
 
 const blocks: Block[] = [
@@ -178,5 +191,73 @@ describe('the local mirror', () => {
 
 		const raw = localStorage.getItem(CARILLON_COMMITMENTS_STORAGE_KEY);
 		expect(readCommitmentsBlob(JSON.parse(raw as string))?.commitments).toHaveLength(1);
+	});
+});
+
+describe('standing slots from the shelf', () => {
+	beforeEach(() => localStorage.clear());
+
+	it('draws a block on the weekdays it covers, and none on the others', () => {
+		// 2026-08-13 is a Thursday; 2026-08-12 a Wednesday.
+		writeShelf([
+			{
+				id: 'anime',
+				title: 'anime with A',
+				columnKey: 'watching',
+				sectionKey: 'anime_social',
+				color: '#f4511e',
+				lastSessionDate: null,
+				standing: { weekdays: [4], startTime: '20:00', endTime: '21:00' }
+			}
+		]);
+		thinkingAboutShelf.loadLocal();
+		const store = new PlannerStore();
+
+		const thursday = store.getBlocksForDateKey('2026-08-13');
+		expect(thursday.find((b) => b.id === 'ta-anime')).toMatchObject({
+			title: 'anime with A',
+			startTime: '20:00',
+			overlay: 'standing'
+		});
+		expect(store.getBlocksForDateKey('2026-08-12').find((b) => b.id === 'ta-anime')).toBeUndefined();
+	});
+
+	it('draws nothing for an entry with no standing slot', () => {
+		writeShelf([
+			{
+				id: 'book',
+				title: 'Piranesi',
+				columnKey: 'reading',
+				sectionKey: 'book',
+				color: '#3f51b5',
+				lastSessionDate: null,
+				standing: null
+			}
+		]);
+		thinkingAboutShelf.loadLocal();
+		const store = new PlannerStore();
+
+		expect(store.getBlocksForDateKey('2026-08-13').some((b) => b.id === 'ta-book')).toBe(false);
+	});
+
+	it('is derived, never stored — nothing lands in the pile itself', () => {
+		writeShelf([
+			{
+				id: 'anime',
+				title: 'anime with A',
+				columnKey: 'watching',
+				sectionKey: 'anime_social',
+				color: '#f4511e',
+				lastSessionDate: null,
+				standing: { weekdays: [4], startTime: '20:00', endTime: '21:00' }
+			}
+		]);
+		thinkingAboutShelf.loadLocal();
+		const store = new PlannerStore();
+		store.getBlocksForDateKey('2026-08-13');
+
+		const stored = JSON.stringify(store.dayShapes);
+		expect(stored).not.toContain('ta-anime');
+		expect(stored).not.toContain('anime with A');
 	});
 });

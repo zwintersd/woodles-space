@@ -55,6 +55,12 @@ export type ShelfEntry = {
 	color: string;
 	/** The most recent logged sitting, `YYYY-MM-DD`, or null if never opened. */
 	lastSessionDate: string | null;
+	/**
+	 * A slot this happens in most weeks, when one has been set. Weekdays are
+	 * `Date.getDay()` (0=Sun). Optional rather than nullable so a shelf written
+	 * before standing slots existed still validates.
+	 */
+	standing?: { weekdays: number[]; startTime: string; endTime: string } | null;
 };
 
 export type ThinkingAboutShelfBlob = {
@@ -218,6 +224,19 @@ function isShelfEntry(value: unknown): value is ShelfEntry {
 		typeof entry.columnKey === 'string' &&
 		typeof entry.sectionKey === 'string' &&
 		typeof entry.color === 'string' &&
-		(entry.lastSessionDate === null || typeof entry.lastSessionDate === 'string')
+		(entry.lastSessionDate === null || typeof entry.lastSessionDate === 'string') &&
+		isStanding(entry.standing)
+	);
+}
+
+function isStanding(value: unknown): boolean {
+	if (value === undefined || value === null) return true;
+	if (typeof value !== 'object') return false;
+	const slot = value as { weekdays?: unknown; startTime?: unknown; endTime?: unknown };
+	return (
+		Array.isArray(slot.weekdays) &&
+		slot.weekdays.every((day) => typeof day === 'number') &&
+		typeof slot.startTime === 'string' &&
+		typeof slot.endTime === 'string'
 	);
 }
