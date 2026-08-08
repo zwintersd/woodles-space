@@ -49,7 +49,9 @@ describe('characterization — a fresh book', () => {
 	// 50"; with the world's own losses (evaporation, leach) it means "dries to
 	// the floor of its bands and stops there" — still in band, still stable, and
 	// still not drifting anywhere on its own.
-	it('an empty world settles at the floor of its bands and holds', () => {
+	// generous timeout: this walks 5 simulated hours through the rune-backed
+	// Book (see the long-run test below for why that costs real wall clock).
+	it('an empty world settles at the floor of its bands and holds', { timeout: 20_000 }, () => {
 		const b = new Book();
 		run(b, 4 * 3600);
 		expect(b.stocks.nutrients).toBeCloseTo(40, 3);
