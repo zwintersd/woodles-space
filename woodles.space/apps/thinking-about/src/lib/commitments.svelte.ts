@@ -15,9 +15,13 @@ import {
 	pullLedger,
 	readCommitmentsBlob,
 	readLocalLedger,
+	readSessionsBlob,
 	CARILLON_COMMITMENTS_APP,
 	CARILLON_COMMITMENTS_STORAGE_KEY,
-	type Commitment
+	CARILLON_SESSIONS_APP,
+	CARILLON_SESSIONS_STORAGE_KEY,
+	type Commitment,
+	type LoggedSitting
 } from '@woodles/sync';
 
 export type CommitmentsStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error';
@@ -76,3 +80,30 @@ export class Commitments {
 }
 
 export const commitments = new Commitments();
+
+/**
+ * Read Carillon's sittings ledger, both sources, and fold it into the board.
+ *
+ * Local first so a same-origin accept lands immediately; the server too, so a
+ * sitting accepted on the phone reaches the laptop. Never throws — the whole
+ * feature failing quietly is right when the alternative is an error on a board
+ * that works perfectly well without it.
+ */
+export async function takeOfferedSittings(
+	ingest: (sittings: LoggedSitting[]) => number
+): Promise<number> {
+	let taken = 0;
+
+	const local = readLocalLedger(CARILLON_SESSIONS_STORAGE_KEY, readSessionsBlob);
+	if (local) taken += ingest(local.sittings);
+
+	if (!hasPassphrase()) return taken;
+	try {
+		const remote = await pullLedger(CARILLON_SESSIONS_APP, readSessionsBlob);
+		if (remote) taken += ingest(remote.sittings);
+	} catch {
+		// Offline, or the ledger has never been published. Whatever was on this
+		// device has already landed.
+	}
+	return taken;
+}

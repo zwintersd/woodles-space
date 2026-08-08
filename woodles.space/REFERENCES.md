@@ -10,7 +10,7 @@ workspace has now built three times, three different ways, and never named.
 this file names it, surveys what already exists, and proposes the smallest
 spine that serves the whole repo rather than just this one pair.
 
-**status: steps 1–4 built, steps 5–6 proposed.** two of §3's rows are
+**status: steps 1–5 built, step 6 proposed.** two of §3's rows are
 answered: the ledgers ride `api/sync.ts` *and* localStorage, and a cold
 reference goes cold rather than being dropped. the rest are still open.
 read alongside [ARCHITECTURE.md](./ARCHITECTURE.md) for how
@@ -274,7 +274,7 @@ each step ships something usable and nothing depends on finishing the next.
 | 2 | ✅ **thinking about publishes the shelf**, and carillon reads it into a picker on the composer. the "pull it in" half. | ~1–2 days | the reference exists and is useful before any deep link works |
 | 3 | ✅ **deep links both ways** — thinking about opens on `?entry=`, carillon on `?thinking-about-entry=`, both over step 1's destinations. *not* `compose=`: that named an action rather than a record, which the addressing vocabulary doesn't model. arriving shows what's already scheduled. | ~1 day | the navigation feel; the thing the google-suite comparison is actually about |
 | 4 | ✅ **carillon publishes commitments**, thinking about renders them in entry detail. the return trip. | ~1 day | the connection stops being one-way |
-| 5 | **session logging from an observation**, via a queue carillon writes and thinking about drains. | ~1 day | the loop; the clock finally reaches the sessions |
+| 5 | ✅ **session logging from an observation** — a projection carillon writes and thinking about ingests by id, *not* a queue: a queue must be emptied by its reader, and a reader that writes breaks the one-writer rule. | ~1 day | the loop; the clock finally reaches the sessions |
 | 6 | **structured `schedule` → derived overlay.** | ~1–2 days | standing dates land on the calendar |
 
 if only one thing gets done: **steps 1 and 2.** step 1 is the workspace-level
@@ -342,6 +342,27 @@ consumer earning the extraction, exactly as §4.3 predicted for the mechanics
 it *declined* to extract early. the readers stayed app-side: they are `$state`
 rune classes, which can't live in a plain TS package, and only their
 non-reactive halves (`readLocalLedger`, `pullLedger`) were worth sharing.
+
+## 6c. what step 5 settled
+
+**the plan said "a queue carillon writes and thinking about drains".** it
+isn't one. draining means the reader empties it, and a reader that writes is
+exactly what §4.2's one-writer rule forbids — the same rule step 4 had just
+been vindicated by. so the sittings ledger is a projection like the other two,
+and idempotence comes from deterministic ids instead: thinking about creates
+its session under the ledger's own id, so re-reading cannot double-log.
+
+**tracking what was ingested is not the same as not double-logging.** ids
+alone stop duplicates, but they also mean a sitting someone *deleted* would
+reappear on the next load. so thinking about records the ids it has taken, in
+its synced blob, and a deleted sitting stays deleted on every device. the
+ologypedia import reached the same conclusion by the same route.
+
+**the offer is the product.** carillon could convert every observation in a
+linked block into a session and never be wrong about the facts. it doesn't,
+because an observation is something that happened and a sitting is something
+a person says they did, and the instrument's whole stance is that it shows
+data rather than drawing conclusions from it.
 
 ## 7. risks
 

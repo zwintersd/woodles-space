@@ -2,6 +2,7 @@
 	import '$lib/style/tokens.css';
 	import { initSync } from '$lib/sync.svelte';
 	import { thinkingAbout } from '$lib/thinkingAbout.svelte';
+	import { takeOfferedSittings } from '$lib/commitments.svelte';
 	import { onMount } from 'svelte';
 
 	let { children } = $props();
@@ -9,7 +10,13 @@
 	onMount(() => {
 		// Publish once on load, not only on save — see the method's own note.
 		thinkingAbout.publishShelf();
-		void initSync();
+		// Sittings Carillon offered and a person accepted there. Runs before
+		// sync so a same-origin accept shows immediately, and again is safe:
+		// ingesting is idempotent by the ledger's own ids.
+		void takeOfferedSittings((sittings) => thinkingAbout.ingestSittings(sittings));
+		void initSync().then(() =>
+			takeOfferedSittings((sittings) => thinkingAbout.ingestSittings(sittings))
+		);
 	});
 </script>
 

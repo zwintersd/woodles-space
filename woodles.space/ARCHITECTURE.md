@@ -48,11 +48,11 @@ other docs have narrower jobs:
   in (bloomforge's shared keys, marginalia's binding map, the public blobs'
   carried ids, spores' deliberately breakable title links); its §3 is a table
   of open questions bar two. **steps 1–3 are built** — the addressing layer
-  under "the app manifest" above, and both ledgers plus the two-way deep links
-  under "cross-app ledgers" below. **steps 1–4 are built**, so the round trip
-  is closed: an entry can be taken to the day and its scheduled time comes
-  back. steps 5–6 are unstarted — no session is logged from an observation,
-  and a standing `schedule` still doesn't reach the calendar.
+  under "the app manifest" above, and all three ledgers plus the two-way deep
+  links under "cross-app ledgers" below. **steps 1–5 are built**: an entry can
+  be taken to the day, its scheduled time comes back, and observing an
+  interval offers to log the sitting on the day it happened. only step 6 is
+  unstarted — a standing `schedule` still doesn't reach the calendar.
 - [ROADMAP.md](./ROADMAP.md) is the 10-week plan for making marginalia and
   the bestiary public-facing — all ten weeks are marked `✅ shipped` in its
   own headers, week 4 (share links, save-as-image, adopt-a-card) having
@@ -1001,8 +1001,30 @@ is filtered out rather than published, because "a thing you decided not to do"
 is not an answer to "when am I doing this". An entry's detail then shows what's
 scheduled and offers "find another time" instead of "find time for this".
 
-Both ledgers rebuild on every write to their source (`#saveTasks`,
-`#persist`) and on load, for the reason under the shelf above.
+**Carillon publishes sittings** — the third ledger, and the one that makes the
+pair better than either alone. A Thinking About session carries a date and no
+clock, and its one-tap log always means *today*, so "I read for an hour on
+Sunday" could not be said on Tuesday. Carillon knows which day an observation
+was about — including a stretch recalled days later through the catch-up card
+— so a sitting logged from there lands on the day it happened.
+
+Marking an interval whose block holds a linked task **offers** a sitting; it
+never converts one. An observation is a fact about the day, and turning every
+one into a session would be the instrument deciding on someone's behalf,
+which is the stance it refuses everywhere else. One sitting per entry per day
+(`session-<entryId>-<date>`), because a sitting is not a fifteen-minute sample
+— eight bells across a reading evening are one sitting, not eight.
+
+It stays a projection rather than a queue: a queue must be emptied by its
+reader, and a reader that writes is what the one-writer rule forbids. Instead
+Thinking About creates its session under the ledger's own id, so re-reading
+can't double-log, and records which ids it has taken (`ingestedSittings`, in
+its synced blob) so a deleted sitting stays deleted rather than returning on
+the next load.
+
+All three ledgers rebuild on every write to their source (`#saveTasks`,
+`#saveLoggedSessions`, `#persist`) and on load, for the reason under the shelf
+above.
 
 **The link runs both ways.** Each app declares itself addressable in the
 manifest (see "the app manifest" above): Thinking About by `entry`, Carillon by
@@ -1173,15 +1195,15 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1799 tests total: 16 in `api/` (its own
+1825 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1783 across sixteen pnpm
-packages — `write` 122, `marginalia` 333, `planner` 523,
+instead of the recursive `pnpm -r test`), plus 1809 across sixteen pnpm
+packages — `write` 122, `marginalia` 333, `planner` 536,
 `spores` 140, `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
-`packages/sync` 20, `packages/persistence` 6, `packages/app-manifest` 17,
+`packages/sync` 24, `packages/persistence` 6, `packages/app-manifest` 17,
 `packages/handoff` 15, `packages/text` 23, `packages/spellcraft` 16,
-`packages/emoji` 4, `packages/incremental-core` 191, and `thinking-about` 106.
+`packages/emoji` 4, `packages/incremental-core` 191, and `thinking-about` 115.
 (Counted by running each suite, not by adding to the previous figure — the
 inventory had drifted: the headline said 1644 against a body summing to 1700,
 and marginalia's balance-harness work landed 333 tests recorded as 325. Two
@@ -1227,7 +1249,7 @@ coverage tests the paths people actually visit instead of eight unrelated Vite
 ports. The suite covers every published entry route, Write → Echoes publishing,
 Bestiary gallery/adopt/share and Marginalia consumption, an Arcade state change,
 Ologypedia shelf export → publish script → indexed card, the Thinking About →
-Carillon round trip and back, legacy localStorage migration across reload,
+Carillon round trip, back, and the sitting that returns from it, legacy localStorage migration across reload,
 keyboard operation, and serious/critical WCAG A axe findings.
 
 The cross-app specs earn their cost in a way the route checks don't. The

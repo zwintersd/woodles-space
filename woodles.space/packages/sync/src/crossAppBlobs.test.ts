@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+	readSessionsBlob,
+	CARILLON_SESSIONS_APP,
+	CARILLON_SESSIONS_VERSION,
 	readCommitmentsBlob,
 	readShelfBlob,
 	CARILLON_COMMITMENTS_APP,
@@ -86,6 +89,37 @@ describe('readCommitmentsBlob', () => {
 		expect(CARILLON_COMMITMENTS_APP).toMatch(APP_PATTERN);
 		expect(CARILLON_COMMITMENTS_APP).not.toBe(THINKING_ABOUT_SHELF_APP);
 		expect(CARILLON_COMMITMENTS_APP).not.toBe('planner');
+	});
+});
+
+describe('readSessionsBlob', () => {
+	const sitting = { id: 'session-piranesi-2026-08-04', entryId: 'piranesi', date: '2026-08-04' };
+	const blob = (sittings: unknown[] = [sitting]) => ({
+		version: CARILLON_SESSIONS_VERSION,
+		sittings,
+		publishedAt: '2026-08-09T00:00:00.000Z'
+	});
+
+	it('accepts a well-formed ledger', () => {
+		expect(readSessionsBlob(blob())?.sittings).toEqual([sitting]);
+	});
+
+	it('refuses anything that is not a ledger, or a future version', () => {
+		expect(readSessionsBlob(null)).toBeNull();
+		expect(readSessionsBlob({})).toBeNull();
+		expect(readSessionsBlob({ ...blob(), sittings: 'no' })).toBeNull();
+		expect(readSessionsBlob({ ...blob(), version: 2 })).toBeNull();
+	});
+
+	it('drops malformed sittings but keeps the sound ones', () => {
+		const parsed = readSessionsBlob(blob([sitting, { id: 'partial' }]));
+		expect(parsed?.sittings.map((s) => s.id)).toEqual([sitting.id]);
+	});
+
+	it('has a key of its own, distinct from the other two ledgers', () => {
+		expect(CARILLON_SESSIONS_APP).toMatch(APP_PATTERN);
+		expect(new Set([CARILLON_SESSIONS_APP, CARILLON_COMMITMENTS_APP, THINKING_ABOUT_SHELF_APP]).size).toBe(3);
+		expect(CARILLON_SESSIONS_APP).not.toBe('planner');
 	});
 });
 

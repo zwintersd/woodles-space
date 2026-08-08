@@ -273,6 +273,26 @@ export type SignalEntry = {
 	updatedAt?: string;
 };
 
+/**
+ * A confirmed intent to log a sitting in Thinking About.
+ *
+ * Carillon never logs one on its own: observing an interval *offers*, and this
+ * record only exists once a person said yes. It is deliberately not derived
+ * from observations — an observation is a fact about the day, and turning
+ * every one of them into a session would be Carillon deciding on someone's
+ * behalf, which is the stance the whole instrument refuses.
+ *
+ * One per entry per day (`session-<entryId>-<date>`), because a Thinking About
+ * session is a sitting, not a fifteen-minute sample — eight bells across a
+ * reading evening are one sitting, not eight.
+ */
+export type LoggedSession = {
+	id: string;
+	entryId: string;
+	date: string; // YYYY-MM-DD
+	createdAt: string;
+};
+
 export type PlannerBlob = {
 	shapes: DayShape[];
 	weekPattern: WeekPattern;
@@ -291,4 +311,5 @@ export type PlannerBlob = {
 	spores?: SporeEvent[];
 	sleepLogs?: SleepLog[];
 	signals?: SignalEntry[];
+	loggedSessions?: LoggedSession[];
 };

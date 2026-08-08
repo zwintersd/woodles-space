@@ -23,7 +23,8 @@ import type {
 	SleepLog,
 	SleepQuality,
 	SignalEntry,
-	SignalKind
+	SignalKind,
+	LoggedSession
 } from './types';
 import {
 	STARTER_SHAPES,
@@ -32,8 +33,13 @@ import {
 	getNextBlock,
 	mergeBlocks
 } from './templates';
-import { CARILLON_COMMITMENTS_STORAGE_KEY, mirrorLedgerLocally } from '@woodles/sync';
+import {
+	CARILLON_COMMITMENTS_STORAGE_KEY,
+	CARILLON_SESSIONS_STORAGE_KEY,
+	mirrorLedgerLocally
+} from '@woodles/sync';
 import { buildCommitments } from './commitments';
+import { buildSessions } from './sessions';
 import { dateKey, nowMinutes, uid, timeToMinutes } from './utils';
 import { playBell } from './bells';
 import {
@@ -142,6 +148,7 @@ export class PlannerStore {
 	sporeEvents = $state<SporeEvent[]>(load('planner.carillonSpores.v1', []));
 	sleepLogs = $state<SleepLog[]>(load('planner.sleepLogs.v1', []));
 	signalEntries = $state<SignalEntry[]>(load('planner.signals.v1', []));
+	loggedSessions = $state<LoggedSession[]>(load('planner.loggedSessions.v1', []));
 
 	// Transient
 	readonly sessionId = uid();
@@ -242,6 +249,84 @@ export class PlannerStore {
 				t.targetBlockId === blockId &&
 				(!t.targetDate || t.targetDate === dk)
 		);
+	}
+
+	// ── sittings offered to Thinking About ──────────────────────────
+
+	/**
+	 * The Thinking About entries a given interval is plausibly about: the ones
+	 * referenced by tasks scheduled into the block that covers it.
+	 *
+	 * This is what turns an observation into an offer. It reads the plan, not
+	 * the observation — Carillon knows you meant to read Piranesi in the evening
+	 * block; whether you actually were is what the mark says.
+	 */
+	linkedEntryIdsForInterval(dateStr: string, intervalStart: string): string[] {
+		const minute = timeToMinutes(intervalStart);
+		const block = this.getBlocksForDateKey(dateStr)
+			.filter((candidate) => {
+				const start = timeToMinutes(candidate.startTime);
+				let end = timeToMinutes(candidate.endTime);
+				if (end <= start) end += 1440;
+				return minute >= start && minute < end;
+			})
+			.pop();
+		if (!block) return [];
+
+		return [
+			...new Set(
+				this.getTasksForBlock(block.id, dateStr)
+					.map((task) => task.thinkingAboutEntryId)
+					.filter((id): id is string => typeof id === 'string')
+			)
+		];
+	}
+
+	loggedSessionId(entryId: string, dateStr: string): string {
+		return `session-${entryId}-${dateStr}`;
+	}
+
+	hasLoggedSession(entryId: string, dateStr: string): boolean {
+		const id = this.loggedSessionId(entryId, dateStr);
+		return this.loggedSessions.some((session) => session.id === id);
+	}
+
+	/**
+	 * Record that a sitting should be logged in Thinking About. Idempotent by
+	 * deterministic id — a day is one sitting however many bells it covered, and
+	 * tapping twice can't produce two.
+	 */
+	logThinkingAboutSession(entryId: string, dateStr: string): LoggedSession {
+		const id = this.loggedSessionId(entryId, dateStr);
+		const existing = this.loggedSessions.find((session) => session.id === id);
+		if (existing) return existing;
+
+		const session: LoggedSession = {
+			id,
+			entryId,
+			date: dateStr,
+			createdAt: new Date().toISOString()
+		};
+		this.loggedSessions = [...this.loggedSessions, session];
+		this.#saveLoggedSessions();
+		return session;
+	}
+
+	/** Undo an offer taken by mistake, before the other app has been opened. */
+	unlogThinkingAboutSession(entryId: string, dateStr: string): void {
+		const id = this.loggedSessionId(entryId, dateStr);
+		this.loggedSessions = this.loggedSessions.filter((session) => session.id !== id);
+		this.#saveLoggedSessions();
+	}
+
+	#saveLoggedSessions(): void {
+		save('planner.loggedSessions.v1', this.loggedSessions);
+		this.publishSessionsLocally();
+	}
+
+	/** Mirror the sittings ledger for same-origin readers. Idempotent. */
+	publishSessionsLocally(): void {
+		mirrorLedgerLocally(CARILLON_SESSIONS_STORAGE_KEY, buildSessions(this.loggedSessions));
 	}
 
 	/**
@@ -563,11 +648,15 @@ export class PlannerStore {
 			entry.id === id ? { ...entry, endDate, updatedAt } : entry
 		);
 		save('planner.signals.v1', this.signalEntries);
+		save('planner.loggedSessions.v1', this.loggedSessions);
+		this.publishSessionsLocally();
 	}
 
 	removeSignalEntry(id: string): void {
 		this.signalEntries = this.signalEntries.filter((entry) => entry.id !== id);
 		save('planner.signals.v1', this.signalEntries);
+		save('planner.loggedSessions.v1', this.loggedSessions);
+		this.publishSessionsLocally();
 	}
 
 	// ── surge quarantine ────────────────────────────────────────────
@@ -796,6 +885,7 @@ export class PlannerStore {
 		this.sporeEvents = blob.spores ?? this.sporeEvents;
 		this.sleepLogs = blob.sleepLogs ?? this.sleepLogs;
 		this.signalEntries = blob.signals ?? this.signalEntries;
+		this.loggedSessions = blob.loggedSessions ?? this.loggedSessions;
 		save('planner.shapes.v1', this.dayShapes);
 		save('planner.weekPattern.v1', this.weekPattern);
 		save('planner.days.v2', this.dayOverrides);
@@ -811,6 +901,8 @@ export class PlannerStore {
 		save('planner.carillonSpores.v1', this.sporeEvents);
 		save('planner.sleepLogs.v1', this.sleepLogs);
 		save('planner.signals.v1', this.signalEntries);
+		save('planner.loggedSessions.v1', this.loggedSessions);
+		this.publishSessionsLocally();
 	}
 
 	// ── view + binder ───────────────────────────────────────────────

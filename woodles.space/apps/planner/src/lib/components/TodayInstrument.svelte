@@ -9,6 +9,7 @@
 		timeForMinutes,
 		type DayInterval
 	} from '$lib/instrument';
+	import { thinkingAboutShelf } from '$lib/thinkingAboutShelf.svelte';
 	import { dateKey, dayOfWeekLabel, shortDateLabel, timeToMinutes } from '$lib/utils';
 	import type { IntervalKind } from '$lib/types';
 	import EchoCreature from './EchoCreature.svelte';
@@ -108,6 +109,12 @@
 		return quiet ? 'quiet hours · bell resting' : `next bell · ${displayTime(nextBell)}`;
 	});
 
+	// The shelf names the entries an offer is about. Loaded once here rather
+	// than per-interval — it changes in the other app, not with the cursor.
+	$effect(() => {
+		void thinkingAboutShelf.refresh();
+	});
+
 	$effect(() => {
 		const liveStart = currentIntervalStart(store.now, store.settings.samplingIntervalMinutes);
 		if (!paperEntry) {
@@ -183,6 +190,29 @@
 		customLabel = '';
 		if (feedbackTimer) clearTimeout(feedbackTimer);
 		feedbackTimer = setTimeout(() => (feedback = ''), 3200);
+	}
+
+	// After a mark lands, the entries the plan says this block was about. An
+	// offer, never an action taken: a session is a thing a person did, and
+	// Carillon converting every observation into one would be the instrument
+	// deciding on their behalf.
+	const offerableEntries = $derived.by(() => {
+		if (!selectedInterval?.observation) return [];
+		return store
+			.linkedEntryIdsForInterval(selectedInterval.date, selectedInterval.startTime)
+			.map((entryId) => ({ entryId, entry: thinkingAboutShelf.find(entryId) }));
+	});
+
+	function logSitting(entryId: string): void {
+		if (!selectedInterval) return;
+		store.logThinkingAboutSession(entryId, selectedInterval.date);
+		queueSync();
+	}
+
+	function unlogSitting(entryId: string): void {
+		if (!selectedInterval) return;
+		store.unlogThinkingAboutSession(entryId, selectedInterval.date);
+		queueSync();
 	}
 
 	function startCustom(): void {
@@ -284,6 +314,32 @@
 						<button type="submit" disabled={!customLabel.trim()}>record</button>
 					</div>
 				</form>
+			{/if}
+
+			{#if offerableEntries.length > 0}
+				<div class="sitting-offer" data-testid="sitting-offer">
+					{#each offerableEntries as { entryId, entry } (entryId)}
+						{@const logged = store.hasLoggedSession(entryId, selectedInterval?.date ?? '')}
+						{@const name = entry?.title ?? 'this'}
+						{#if logged}
+							<p class="sitting-logged">
+								<span class="sitting-dot" style:background={entry?.color ?? 'currentColor'}
+								></span>
+								logged a sitting with <strong>{name}</strong>
+								<button type="button" onclick={() => unlogSitting(entryId)}>undo</button>
+							</p>
+						{:else}
+							<button
+								type="button"
+								class="sitting-chip"
+								style:--chip={entry?.color ?? 'currentColor'}
+								onclick={() => logSitting(entryId)}
+							>
+								also log a sitting with {name}?
+							</button>
+						{/if}
+					{/each}
+				</div>
 			{/if}
 
 			<div class="sample-footer">
@@ -695,6 +751,63 @@
 		color: var(--car-paper);
 		font-family: var(--car-mono);
 		font-size: 0.62rem;
+	}
+
+	/* The offer to log a sitting in Thinking About. Deliberately quiet — it is
+	   an aside to the observation, not a second thing to answer. */
+	.sitting-offer {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		margin-top: 0.6rem;
+	}
+
+	.sitting-chip {
+		align-self: flex-start;
+		font-size: 0.78rem;
+		color: var(--p-text);
+		padding: 0.28rem 0.65rem;
+		border: 1px solid var(--p-border);
+		border-left: 3px solid var(--chip, var(--p-accent));
+		border-radius: 0.35rem;
+		background: transparent;
+		transition: border-color var(--pl-transition-fast);
+	}
+
+	.sitting-chip:hover,
+	.sitting-chip:focus-visible {
+		border-color: var(--p-accent);
+	}
+
+	.sitting-logged {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.76rem;
+		color: var(--p-muted);
+	}
+
+	.sitting-logged strong {
+		color: var(--p-text);
+		font-weight: 500;
+	}
+
+	.sitting-dot {
+		width: 0.45rem;
+		height: 0.45rem;
+		border-radius: 50%;
+		flex: none;
+	}
+
+	.sitting-logged button {
+		font-size: 0.72rem;
+		color: var(--p-muted);
+		background: transparent;
+		text-decoration: underline;
+	}
+
+	.sitting-logged button:hover {
+		color: var(--p-text);
 	}
 
 	.sample-footer {

@@ -35,16 +35,21 @@ async function seed(page: Page, options: { tasks?: unknown[] } = {}): Promise<vo
 		route.fulfill({ status: 200, body: '' })
 	);
 
+	// Written only when absent. `addInitScript` runs on every navigation, so
+	// seeding unconditionally would reset the board on each reload and hide
+	// exactly the persistence these tests are checking.
 	await page.addInitScript(
 		([entryValue, tasks]) => {
-			localStorage.setItem('thinking-about.entries.v1', JSON.stringify([entryValue]));
+			const seedOnce = (key: string, value: unknown) => {
+				if (localStorage.getItem(key) === null) {
+					localStorage.setItem(key, JSON.stringify(value));
+				}
+			};
+			seedOnce('thinking-about.entries.v1', [entryValue]);
 			// Carillon's first run is a six-step wizard; these tests are about the
 			// link between the apps, not about setup.
-			localStorage.setItem(
-				'planner.settings.v1',
-				JSON.stringify({ onboardingComplete: true })
-			);
-			localStorage.setItem('planner.tasks.v1', JSON.stringify(tasks));
+			seedOnce('planner.settings.v1', { onboardingComplete: true });
+			seedOnce('planner.tasks.v1', tasks);
 		},
 		[entry, options.tasks ?? []] as const
 	);
@@ -155,6 +160,48 @@ test.describe('Carillon ↔ Thinking About', () => {
 			await expect(scheduled).toContainText('2026-08-13');
 			await expect(scheduled).toContainText('Piranesi');
 			await expect(page.getByTestId('find-time')).toContainText('find another time');
+		});
+	});
+
+	test('a sitting accepted in Carillon lands on the board, dated the day it happened', async ({
+		page
+	}) => {
+		await expectNoPageErrors(page, async () => {
+			await seed(page);
+
+			// What Carillon writes when someone accepts the offer. Seeded rather
+			// than driven through the observation UI, because the risk this test
+			// exists for is the boundary — that Thinking About reads the key
+			// Carillon writes, in the shape it writes — not the clock.
+			await page.addInitScript(() => {
+				if (localStorage.getItem('planner.sessions.v1') !== null) return;
+				localStorage.setItem(
+					'planner.sessions.v1',
+					JSON.stringify({
+						version: 1,
+						publishedAt: '2026-08-09T00:00:00.000Z',
+						// Deliberately not today: a session logged in Thinking About
+						// always means now, so a backdated one is the whole point.
+						sittings: [
+							{
+								id: 'session-entry-piranesi-2026-08-02',
+								entryId: 'entry-piranesi',
+								date: '2026-08-02'
+							}
+						]
+					})
+				);
+			});
+
+			await page.goto('/thinking-about');
+			await page.getByRole('button', { name: /Piranesi/ }).first().click();
+
+			await expect(page.getByLabel('session date')).toHaveValue('2026-08-02');
+
+			// And a reload does not log it twice.
+			await page.reload();
+			await page.getByRole('button', { name: /Piranesi/ }).first().click();
+			await expect(page.getByLabel('session date')).toHaveCount(1);
 		});
 	});
 
