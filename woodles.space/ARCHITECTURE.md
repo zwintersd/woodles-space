@@ -43,9 +43,11 @@ other docs have narrower jobs:
 - [HANDOFF.md](./HANDOFF.md) is the pick-up-from-here note for the reference
   spine: what the six steps landed, the sharp edges to know before touching
   them, and a design for extending the same spine into Write — `#` to reach a
-  piece of media, `@` to reach a day. Its §3.2 is the one part to read before
-  writing any code there: Write publishes to a public Echoes, so a reference
-  in prose has to degrade to the words somebody typed.
+  piece of media, `@` to reach a day. It also carries two decisions not yet
+  built: **Echoes stops being public** (§3 — nobody reads it, and a private
+  self-annotated archive is the thing that actually works about it), and
+  **bestiary's `?card=` moves onto `entityHref` early** (§4), because a
+  reference picker built against one source hardcodes one source.
 - [REFERENCES.md](./REFERENCES.md) is CONVERGENCE's mirror image, and
   **mostly still a proposal**: where convergence collapsed apps that
   should have been one app, this is about apps that stay separate and learn
