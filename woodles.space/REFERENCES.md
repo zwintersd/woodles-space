@@ -10,8 +10,9 @@ workspace has now built three times, three different ways, and never named.
 this file names it, surveys what already exists, and proposes the smallest
 spine that serves the whole repo rather than just this one pair.
 
-**status: proposal.** §3's decisions are open questions, not answers. nothing
-in §5 is built. read alongside [ARCHITECTURE.md](./ARCHITECTURE.md) for how
+**status: step 1 built, the rest proposed.** §3's decisions are still open
+questions, not answers — none of them gated the addressing layer, which is
+why it went first. read alongside [ARCHITECTURE.md](./ARCHITECTURE.md) for how
 the apps are actually wired and [CONVERGENCE.md](./CONVERGENCE.md) for why
 five text surfaces became two — this file is that document's mirror image.
 convergence was about apps that should have been one app. this is about apps
@@ -41,7 +42,7 @@ rather than a background read.
 ### B. a stored reference map, resolved against a pool that may not be there
 
 `marginalia` → `bestiary`. marginalia stores
-`spriteBindings: Record<lifeId, creatureId>` (`book.svelte.ts:216`) — a map
+`spriteBindings: Record<lifeId, creatureId>` (`book.svelte.ts:287`) — a map
 from its own records into bestiary's id space, persisted in the book save.
 those ids resolve against `worldCreatures`, a pool that unions the local
 IndexedDB creatures with the *published* gallery snapshot
@@ -50,9 +51,15 @@ refreshes by a sequence number.
 
 the part worth stealing is the cleanup: a binding whose target no longer
 resolves is **dropped**, and the drop is deliberate rather than incidental
-(`book.svelte.ts:238`). a reference into a store you do not own is a
+(`book.svelte.ts:303`). a reference into a store you do not own is a
 reference that can go stale, and the app that holds it owns deciding what
 stale means.
+
+marginalia is more nuanced about that than "drop it" suggests, and the nuance
+supports §3's leaning: `resetIdleProgress()` (`book.svelte.ts:942`) wipes the
+game and deliberately carries `spriteBindings` across intact. an unresolvable
+binding goes, but the map itself outlives the state around it — it is treated
+as something the person built, not as derived cache.
 
 ### C. identity carried across the private → public boundary
 
@@ -262,7 +269,7 @@ each step ships something usable and nothing depends on finishing the next.
 
 | # | step | size | unblocks |
 | --- | --- | --- | --- |
-| 1 | **destinations in `@woodles/app-manifest`.** app id + kind + record id → URL, with contract tests beside the existing route tests. rewire bloomforge's hardcoded `/play?game=`. | ~half a day | everything below, plus `HandoffSource.href` finally meaning something |
+| 1 | ✅ **destinations in `@woodles/app-manifest`.** app id + kind + record id → URL, with contract tests beside the existing route tests. rewired bloomforge's hardcoded `/play?game=`. | ~half a day | everything below, plus `HandoffSource.href` finally meaning something |
 | 2 | **thinking about publishes the shelf**, and carillon reads it into a picker on the composer. the "pull it in" half. | ~1–2 days | the reference exists and is useful before any deep link works |
 | 3 | **deep links both ways** — carillon opens on `compose=<entryId>`, thinking about opens on an entry — over step 1's destinations. | ~1 day | the navigation feel; the thing the google-suite comparison is actually about |
 | 4 | **carillon publishes commitments**, thinking about renders them in entry detail. the return trip. | ~1 day | the connection stops being one-way |

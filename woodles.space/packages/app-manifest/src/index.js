@@ -225,6 +225,9 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/bloomforge-player/dist',
 		entryFile: 'index.html',
 		packageName: 'bloomforge-player',
+		// The studio's "Play it" hands over a project id rather than a def in the
+		// URL, so a link can't go stale against an edited game.
+		addressableBy: ['game'],
 		landing: tile('player', 15, 'play', 'play the incremental games you built in the studio', 'var(--peach)', 'var(--lavender)', '160deg')
 	}
 ]);
@@ -291,6 +294,61 @@ export const landingAppsByBand = Object.freeze(
 /** @param {AppDefinition} app */
 export function primaryDestination(app) {
 	return `/${app.outputDir}/${app.entryFile}`;
+}
+
+// ── addressing one record inside an app ───────────────────────────
+//
+// `primaryDestination` above answers "where does this app live"; these answer
+// "where does *this thing* live". The distinction is the whole subject of
+// REFERENCES.md: until now the workspace had no vocabulary for the second
+// question, so the two places that needed it hardcoded a path — the studio
+// wrote the literal `/play?game=`, and `HandoffSource.href` was documented as
+// a deep link back and populated once, with an app root.
+//
+// The shape is deliberately one convention rather than a per-app scheme:
+// `<publicPath>?<kind>=<id>`. An app declares which kinds it answers to via
+// `addressableBy`, a contract test asserts the app actually reads that
+// parameter, and nothing else is addressable. Keeping it to a query parameter
+// (rather than a path segment or a hash) is what lets every app stay a
+// prerendered static bundle with no router change.
+
+/**
+ * Whether `appId` can be opened on a record of `kind`. Use before
+ * `entityHref` anywhere the pair isn't known at author time.
+ *
+ * @param {string} appId
+ * @param {string} kind
+ * @returns {boolean}
+ */
+export function canAddress(appId, kind) {
+	return appById[appId]?.addressableBy?.includes(kind) === true;
+}
+
+/**
+ * The URL that opens one record inside an app.
+ *
+ * Throws rather than returning null on an unknown app or an undeclared kind:
+ * the manifest is static data, so neither is a runtime condition a caller
+ * could sensibly recover from — both are a bug, and a thrown error names it
+ * at the call site instead of rendering `href="null"`.
+ *
+ * @param {string} appId manifest app id, e.g. `bloomforge-player`
+ * @param {string} kind a record kind the app lists in `addressableBy`
+ * @param {string} id the record's own id, encoded here so callers needn't
+ * @returns {string}
+ */
+export function entityHref(appId, kind, id) {
+	const app = appById[appId];
+	if (!app) {
+		throw new Error(`entityHref: "${appId}" is not an app in the manifest`);
+	}
+	if (!canAddress(appId, kind)) {
+		throw new Error(
+			`entityHref: ${appId} declares no addressable "${kind}" — add it to that app's ` +
+				`addressableBy and read the parameter in the app itself`
+		);
+	}
+	return `${app.publicPath}?${kind}=${encodeURIComponent(id)}`;
 }
 
 /**

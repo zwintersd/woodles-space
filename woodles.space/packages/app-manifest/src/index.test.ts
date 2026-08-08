@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 import {
 	appById,
 	appManifest,
+	canAddress,
 	defaultLandingPins,
+	entityHref,
 	featuredLandingApps,
 	landingApps,
 	landingAppsByBand,
@@ -145,6 +147,62 @@ describe('landing catalogue', () => {
 		}
 	});
 });
+
+describe('entity addressing', () => {
+	it('builds a record URL from the public path the manifest owns', () => {
+		expect(entityHref('bloomforge-player', 'game', 'proj-1')).toBe('/play?game=proj-1');
+	});
+
+	it('encodes ids that would otherwise break the query string', () => {
+		expect(entityHref('bloomforge-player', 'game', 'a b&c=d')).toBe('/play?game=a%20b%26c%3Dd');
+	});
+
+	it('refuses an unknown app and an undeclared kind', () => {
+		expect(() => entityHref('nonesuch', 'game', 'x')).toThrow(/not an app/);
+		// `write` is real but declares no addressable kinds — a link naming one
+		// would point at a parameter nothing reads, which is the failure mode
+		// `HandoffSource.href` already demonstrates (REFERENCES.md §2.2).
+		expect(() => entityHref('write', 'draft', 'x')).toThrow(/declares no addressable/);
+	});
+
+	it('reports addressability without throwing, for callers that cannot know', () => {
+		expect(canAddress('bloomforge-player', 'game')).toBe(true);
+		expect(canAddress('bloomforge-player', 'draft')).toBe(false);
+		expect(canAddress('nonesuch', 'game')).toBe(false);
+	});
+
+	// The tripwire that makes the declaration mean something. The manifest can
+	// claim an app answers to `?game=`, but only the app can actually read it —
+	// same stance the route contract above takes toward vercel.json and each
+	// svelte.config.js: don't make them import each other, assert they agree.
+	it('declares only kinds the target app actually reads', () => {
+		for (const app of appManifest) {
+			for (const kind of app.addressableBy ?? []) {
+				const sources = sourceFilesOf(join(ROOT, app.sourceDir));
+				const reads = sources.some((file) =>
+					new RegExp(`\\.get\\(\\s*['"]${escapeRegExp(kind)}['"]\\s*\\)`).test(
+						readFileSync(file, 'utf8')
+					)
+				);
+				expect(reads, `${app.id} declares "${kind}" but never reads it`).toBe(true);
+			}
+		}
+	});
+});
+
+/** Every source file under an app, skipping build output and dependencies. */
+function sourceFilesOf(dir: string): string[] {
+	const found: string[] = [];
+	for (const entry of readdirSync(dir, { withFileTypes: true })) {
+		if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === '.svelte-kit') {
+			continue;
+		}
+		const full = join(dir, entry.name);
+		if (entry.isDirectory()) found.push(...sourceFilesOf(full));
+		else if (/\.(svelte|ts|js)$/.test(entry.name)) found.push(full);
+	}
+	return found;
+}
 
 function verifyAppShape(app: AppDefinition): void {
 	if (app.kind !== 'sveltekit') {
