@@ -8,8 +8,12 @@
 	import EditionReview from '$lib/components/EditionReview.svelte';
 	import Binder from '$lib/components/Binder.svelte';
 	import TaskEditDrawer from '$lib/components/TaskEditDrawer.svelte';
+	import ShelfArrival from '$lib/components/ShelfArrival.svelte';
 	import Onboarding from '$lib/components/onboarding/Onboarding.svelte';
 	import { onboarding } from '$lib/onboarding.store.svelte';
+	import { Arrival, arrival } from '$lib/arrival.svelte';
+	import { thinkingAboutShelf } from '$lib/thinkingAboutShelf.svelte';
+	import { onMount } from 'svelte';
 
 	type CarillonSection = 'today' | 'piles' | 'routines' | 'surge' | 'review';
 
@@ -29,6 +33,18 @@
 	let section = $state<CarillonSection>('today');
 	let mainElement = $state<HTMLElement>();
 
+	onMount(() => {
+		// Arriving with a reference from Thinking About. The shelf is refreshed
+		// so the entry can be named, but the arrival opens either way — the tasks
+		// already scheduled are the answer, and they don't depend on the shelf
+		// having reached this device.
+		const entryId = Arrival.parse(window.location.href);
+		if (!entryId) return;
+		arrival.open(entryId);
+		Arrival.clearFromAddressBar();
+		void thinkingAboutShelf.refresh();
+	});
+
 	function setSection(next: CarillonSection): void {
 		section = next;
 		window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -42,6 +58,11 @@
 		const match = SECTIONS.find((item) => item.key === event.key);
 		if (match) {
 			setSection(match.id);
+			event.preventDefault();
+		}
+
+		if (event.key === 'Escape' && arrival.active) {
+			arrival.close();
 			event.preventDefault();
 		}
 
@@ -154,6 +175,7 @@
 
 		<Binder />
 		<TaskEditDrawer />
+		<ShelfArrival />
 
 		{#if onboarding.isRefreshing}
 			<div class="refresh-overlay" role="dialog" aria-modal="true" aria-label="refresh setup">

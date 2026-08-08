@@ -86,6 +86,129 @@ export function readShelfBlob(value: unknown): ThinkingAboutShelfBlob | null {
 	};
 }
 
+// ── carillon → thinking about: the commitments ledger ───────────────────
+//
+// The answer to the shelf, and the reason the "one writer" rule is worth
+// keeping: rather than Carillon writing back into Thinking About's store, it
+// publishes what it has scheduled and Thinking About reads it. Each app still
+// owns everything it writes.
+
+export const CARILLON_COMMITMENTS_APP = 'planner-commitments';
+
+export const CARILLON_COMMITMENTS_STORAGE_KEY = 'planner.commitments.v1';
+
+export const CARILLON_COMMITMENTS_VERSION = 1;
+
+/**
+ * One scheduled intention about a Thinking About entry. Carillon's plan is
+ * much richer than this — domains, day piles, blocks, observations — and none
+ * of that belongs on a board about what you're reading. What survives is the
+ * question the board actually asks: when, and is it done.
+ */
+export type Commitment = {
+	/** The Thinking About entry this is about. */
+	entryId: string;
+	/** Carillon's own task id, so a reader can link back to the exact thing. */
+	taskId: string;
+	title: string;
+	/** `YYYY-MM-DD`, or null for something scheduled in intent but not in time. */
+	date: string | null;
+	/** `HH:MM` from the block it sits in, when it sits in one. */
+	time: string | null;
+	blockTitle: string | null;
+	status: 'open' | 'done';
+};
+
+export type CarillonCommitmentsBlob = {
+	version: 1;
+	commitments: Commitment[];
+	publishedAt: string;
+};
+
+export function readCommitmentsBlob(value: unknown): CarillonCommitmentsBlob | null {
+	if (typeof value !== 'object' || value === null) return null;
+	const blob = value as Partial<CarillonCommitmentsBlob>;
+	if (blob.version !== CARILLON_COMMITMENTS_VERSION) return null;
+	if (!Array.isArray(blob.commitments)) return null;
+	return {
+		version: CARILLON_COMMITMENTS_VERSION,
+		commitments: blob.commitments.filter(isCommitment),
+		publishedAt: typeof blob.publishedAt === 'string' ? blob.publishedAt : ''
+	};
+}
+
+function isCommitment(value: unknown): value is Commitment {
+	if (typeof value !== 'object' || value === null) return false;
+	const item = value as Partial<Commitment>;
+	return (
+		typeof item.entryId === 'string' &&
+		typeof item.taskId === 'string' &&
+		typeof item.title === 'string' &&
+		(item.date === null || typeof item.date === 'string') &&
+		(item.time === null || typeof item.time === 'string') &&
+		(item.blockTitle === null || typeof item.blockTitle === 'string') &&
+		(item.status === 'open' || item.status === 'done')
+	);
+}
+
+// ── carillon → thinking about: sittings worth logging ───────────────────
+//
+// The third ledger, and the one that makes the pair better than either alone:
+// a Thinking About session carries a date and no clock, so it can only ever be
+// logged for *today*. Carillon knows which day an observation was about —
+// including a stretch recalled days later — so a sitting backfilled here lands
+// on the day it happened.
+//
+// Still a projection rather than a queue. A queue would have to be emptied by
+// its reader, and a reader that writes is exactly what the one-writer rule
+// forbids. Instead the ids are deterministic and Thinking About creates its
+// session under the same id, so re-reading the ledger can't double-log.
+
+export const CARILLON_SESSIONS_APP = 'planner-sessions';
+
+export const CARILLON_SESSIONS_STORAGE_KEY = 'planner.sessions.v1';
+
+export const CARILLON_SESSIONS_VERSION = 1;
+
+/**
+ * One sitting Carillon was told to log. `id` is `session-<entryId>-<date>` and
+ * becomes the Thinking About session's own id, which is what makes ingesting
+ * idempotent across reloads and across devices.
+ */
+export type LoggedSitting = {
+	id: string;
+	entryId: string;
+	date: string;
+};
+
+export type CarillonSessionsBlob = {
+	version: 1;
+	sittings: LoggedSitting[];
+	publishedAt: string;
+};
+
+export function readSessionsBlob(value: unknown): CarillonSessionsBlob | null {
+	if (typeof value !== 'object' || value === null) return null;
+	const blob = value as Partial<CarillonSessionsBlob>;
+	if (blob.version !== CARILLON_SESSIONS_VERSION) return null;
+	if (!Array.isArray(blob.sittings)) return null;
+	return {
+		version: CARILLON_SESSIONS_VERSION,
+		sittings: blob.sittings.filter(isLoggedSitting),
+		publishedAt: typeof blob.publishedAt === 'string' ? blob.publishedAt : ''
+	};
+}
+
+function isLoggedSitting(value: unknown): value is LoggedSitting {
+	if (typeof value !== 'object' || value === null) return false;
+	const item = value as Partial<LoggedSitting>;
+	return (
+		typeof item.id === 'string' &&
+		typeof item.entryId === 'string' &&
+		typeof item.date === 'string'
+	);
+}
+
 function isShelfEntry(value: unknown): value is ShelfEntry {
 	if (typeof value !== 'object' || value === null) return false;
 	const entry = value as Partial<ShelfEntry>;

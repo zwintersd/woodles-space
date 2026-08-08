@@ -23,7 +23,8 @@ import type {
 	SleepLog,
 	SleepQuality,
 	SignalEntry,
-	SignalKind
+	SignalKind,
+	LoggedSession
 } from './types';
 import {
 	STARTER_SHAPES,
@@ -32,6 +33,13 @@ import {
 	getNextBlock,
 	mergeBlocks
 } from './templates';
+import {
+	CARILLON_COMMITMENTS_STORAGE_KEY,
+	CARILLON_SESSIONS_STORAGE_KEY,
+	mirrorLedgerLocally
+} from '@woodles/sync';
+import { buildCommitments } from './commitments';
+import { buildSessions } from './sessions';
 import { dateKey, nowMinutes, uid, timeToMinutes } from './utils';
 import { playBell } from './bells';
 import {
@@ -140,6 +148,7 @@ export class PlannerStore {
 	sporeEvents = $state<SporeEvent[]>(load('planner.carillonSpores.v1', []));
 	sleepLogs = $state<SleepLog[]>(load('planner.sleepLogs.v1', []));
 	signalEntries = $state<SignalEntry[]>(load('planner.signals.v1', []));
+	loggedSessions = $state<LoggedSession[]>(load('planner.loggedSessions.v1', []));
 
 	// Transient
 	readonly sessionId = uid();
@@ -242,6 +251,125 @@ export class PlannerStore {
 		);
 	}
 
+	// ── sittings offered to Thinking About ──────────────────────────
+
+	/**
+	 * The Thinking About entries a given interval is plausibly about: the ones
+	 * referenced by tasks scheduled into the block that covers it.
+	 *
+	 * This is what turns an observation into an offer. It reads the plan, not
+	 * the observation — Carillon knows you meant to read Piranesi in the evening
+	 * block; whether you actually were is what the mark says.
+	 */
+	linkedEntryIdsForInterval(dateStr: string, intervalStart: string): string[] {
+		const minute = timeToMinutes(intervalStart);
+		const block = this.getBlocksForDateKey(dateStr)
+			.filter((candidate) => {
+				const start = timeToMinutes(candidate.startTime);
+				let end = timeToMinutes(candidate.endTime);
+				if (end <= start) end += 1440;
+				return minute >= start && minute < end;
+			})
+			.pop();
+		if (!block) return [];
+
+		return [
+			...new Set(
+				this.getTasksForBlock(block.id, dateStr)
+					.map((task) => task.thinkingAboutEntryId)
+					.filter((id): id is string => typeof id === 'string')
+			)
+		];
+	}
+
+	loggedSessionId(entryId: string, dateStr: string): string {
+		return `session-${entryId}-${dateStr}`;
+	}
+
+	hasLoggedSession(entryId: string, dateStr: string): boolean {
+		const id = this.loggedSessionId(entryId, dateStr);
+		return this.loggedSessions.some((session) => session.id === id);
+	}
+
+	/**
+	 * Record that a sitting should be logged in Thinking About. Idempotent by
+	 * deterministic id — a day is one sitting however many bells it covered, and
+	 * tapping twice can't produce two.
+	 */
+	logThinkingAboutSession(entryId: string, dateStr: string): LoggedSession {
+		const id = this.loggedSessionId(entryId, dateStr);
+		const existing = this.loggedSessions.find((session) => session.id === id);
+		if (existing) return existing;
+
+		const session: LoggedSession = {
+			id,
+			entryId,
+			date: dateStr,
+			createdAt: new Date().toISOString()
+		};
+		this.loggedSessions = [...this.loggedSessions, session];
+		this.#saveLoggedSessions();
+		return session;
+	}
+
+	/** Undo an offer taken by mistake, before the other app has been opened. */
+	unlogThinkingAboutSession(entryId: string, dateStr: string): void {
+		const id = this.loggedSessionId(entryId, dateStr);
+		this.loggedSessions = this.loggedSessions.filter((session) => session.id !== id);
+		this.#saveLoggedSessions();
+	}
+
+	#saveLoggedSessions(): void {
+		save('planner.loggedSessions.v1', this.loggedSessions);
+		this.publishSessionsLocally();
+	}
+
+	/** Mirror the sittings ledger for same-origin readers. Idempotent. */
+	publishSessionsLocally(): void {
+		mirrorLedgerLocally(CARILLON_SESSIONS_STORAGE_KEY, buildSessions(this.loggedSessions));
+	}
+
+	/**
+	 * Persist tasks, and rebuild the commitments ledger from them.
+	 *
+	 * Every task write goes through here so the two can't drift: the ledger is
+	 * derived, and there is no path that changes a task without changing what
+	 * Thinking About should be told about it.
+	 */
+	#saveTasks(): void {
+		save('planner.tasks.v1', this.tasks);
+		this.publishCommitmentsLocally();
+	}
+
+	/**
+	 * Mirror the commitments ledger for same-origin readers.
+	 *
+	 * Public and callable on load as well as on save: the ledger is derived, so
+	 * a planner nobody has touched since this shipped would otherwise hold
+	 * linked tasks and no ledger, and Thinking About would show nothing
+	 * scheduled for something plainly on the plan. Idempotent.
+	 */
+	publishCommitmentsLocally(): void {
+		mirrorLedgerLocally(
+			CARILLON_COMMITMENTS_STORAGE_KEY,
+			buildCommitments(this.tasks, this.getAllBlocks())
+		);
+	}
+
+	/**
+	 * Every task about one Thinking About entry, soonest first, undated last.
+	 *
+	 * Dropped tasks are excluded but done ones are kept — "you already read a
+	 * chapter on Tuesday" is exactly the answer someone arriving from that app
+	 * is asking for, and hiding it would make Carillon look like it had
+	 * forgotten.
+	 */
+	getTasksForThinkingAboutEntry(entryId: string): Task[] {
+		return this.tasks
+			.filter((t) => t.thinkingAboutEntryId === entryId && t.status !== 'dropped')
+			.sort((a, b) => (a.targetDate ?? '9999-99-99').localeCompare(b.targetDate ?? '9999-99-99'));
+	}
+
 	getUnscheduledTasks(): Task[] {
 		return this.tasks.filter((t) => t.status !== 'dropped' && !t.targetBlockId);
 	}
@@ -269,7 +397,7 @@ export class PlannerStore {
 			updatedAt: timestamp
 		};
 		this.tasks = [...this.tasks, t];
-		save('planner.tasks.v1', this.tasks);
+		this.#saveTasks();
 		return t;
 	}
 
@@ -278,7 +406,7 @@ export class PlannerStore {
 		this.tasks = this.tasks.map((t) =>
 			t.id === id ? { ...t, status: 'done' as const, updatedAt } : t
 		);
-		save('planner.tasks.v1', this.tasks);
+		this.#saveTasks();
 	}
 
 	dropTask(id: string): void {
@@ -286,7 +414,7 @@ export class PlannerStore {
 		this.tasks = this.tasks.map((t) =>
 			t.id === id ? { ...t, status: 'dropped' as const, updatedAt } : t
 		);
-		save('planner.tasks.v1', this.tasks);
+		this.#saveTasks();
 	}
 
 	reopenTask(id: string): void {
@@ -294,7 +422,7 @@ export class PlannerStore {
 		this.tasks = this.tasks.map((t) =>
 			t.id === id ? { ...t, status: 'open' as const, updatedAt } : t
 		);
-		save('planner.tasks.v1', this.tasks);
+		this.#saveTasks();
 	}
 
 	updateTask(id: string, changes: Partial<Omit<Task, 'id' | 'createdAt'>>): void {
@@ -311,7 +439,7 @@ export class PlannerStore {
 					}
 				: t
 		);
-		save('planner.tasks.v1', this.tasks);
+		this.#saveTasks();
 	}
 
 	openTaskEdit(id: string): void {
@@ -520,11 +648,15 @@ export class PlannerStore {
 			entry.id === id ? { ...entry, endDate, updatedAt } : entry
 		);
 		save('planner.signals.v1', this.signalEntries);
+		save('planner.loggedSessions.v1', this.loggedSessions);
+		this.publishSessionsLocally();
 	}
 
 	removeSignalEntry(id: string): void {
 		this.signalEntries = this.signalEntries.filter((entry) => entry.id !== id);
 		save('planner.signals.v1', this.signalEntries);
+		save('planner.loggedSessions.v1', this.loggedSessions);
+		this.publishSessionsLocally();
 	}
 
 	// ── surge quarantine ────────────────────────────────────────────
@@ -582,7 +714,7 @@ export class PlannerStore {
 			promotedTaskIds: [taskId]
 		};
 		this.surgeDrafts = this.surgeDrafts.map((item) => (item.id === id ? promoted : item));
-		save('planner.tasks.v1', this.tasks);
+		this.#saveTasks();
 		save('planner.surgeDrafts.v1', this.surgeDrafts);
 		return promoted;
 	}
@@ -753,12 +885,13 @@ export class PlannerStore {
 		this.sporeEvents = blob.spores ?? this.sporeEvents;
 		this.sleepLogs = blob.sleepLogs ?? this.sleepLogs;
 		this.signalEntries = blob.signals ?? this.signalEntries;
+		this.loggedSessions = blob.loggedSessions ?? this.loggedSessions;
 		save('planner.shapes.v1', this.dayShapes);
 		save('planner.weekPattern.v1', this.weekPattern);
 		save('planner.days.v2', this.dayOverrides);
 		save('planner.obligations.v1', this.obligations);
 		save('planner.rituals.v1', this.rituals);
-		save('planner.tasks.v1', this.tasks);
+		this.#saveTasks();
 		save('planner.settings.v1', this.settings);
 		save('planner.domains.v1', this.domains);
 		save('planner.observations.v1', this.intervalObservations);
@@ -768,6 +901,8 @@ export class PlannerStore {
 		save('planner.carillonSpores.v1', this.sporeEvents);
 		save('planner.sleepLogs.v1', this.sleepLogs);
 		save('planner.signals.v1', this.signalEntries);
+		save('planner.loggedSessions.v1', this.loggedSessions);
+		this.publishSessionsLocally();
 	}
 
 	// ── view + binder ───────────────────────────────────────────────

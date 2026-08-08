@@ -10,9 +10,9 @@ workspace has now built three times, three different ways, and never named.
 this file names it, surveys what already exists, and proposes the smallest
 spine that serves the whole repo rather than just this one pair.
 
-**status: steps 1 and 2 built, the rest proposed.** the sync question in §3
-is answered — the ledgers ride `api/sync.ts` *and* localStorage, see that row.
-the remaining rows are still open, and none of them gated either step.
+**status: steps 1–5 built, step 6 proposed.** two of §3's rows are
+answered: the ledgers ride `api/sync.ts` *and* localStorage, and a cold
+reference goes cold rather than being dropped. the rest are still open.
 read alongside [ARCHITECTURE.md](./ARCHITECTURE.md) for how
 the apps are actually wired and [CONVERGENCE.md](./CONVERGENCE.md) for why
 five text surfaces became two — this file is that document's mirror image.
@@ -148,7 +148,7 @@ than they look.
 
 | question | options | leaning |
 | --- | --- | --- |
-| does a carillon task pointing at an archived/deleted thinking-about entry go cold, or get dropped? | marginalia **drops** stale bindings (§1B); spores lets links go **red** (§1D) | **cold, not dropped** — a sprite binding with no sprite renders nothing, so dropping is right there; a scheduled task still holds words you typed, so it keeps its own title and loses only the link |
+| does a carillon task pointing at an archived/deleted thinking-about entry go cold, or get dropped? | marginalia **drops** stale bindings (§1B); spores lets links go **red** (§1D) | **decided: cold, not dropped** — a sprite binding with no sprite renders nothing, so dropping is right there; a scheduled task still holds words you typed, so it keeps its own title and loses only the link. built in step 3: the arrival still lists the tasks and says the entry isn't on the shelf any more |
 | does observing a linked block log a thinking-about session, or offer to? | auto / offer | **offer** — carillon's stated stance is that nudges are suggestions, never actions taken on your behalf |
 | do the ledgers ride sync, or stay same-origin localStorage? | localStorage only / through `api/sync.ts` | **decided: sync** — and it turned out to be *both*, not either. localStorage stays the fast path on one device and the server carries the ledger to the next, which is the same local-first shape the rest of the workspace already has. this also answers CONVERGENCE.md §6.4 for ledgers, though not for handoff queues, which remain same-origin |
 | does thinking about's freeform `schedule` gain structure? | keep freeform / optional weekday+time | **optional structure, freeform preserved** — it's what lets a standing thursday watch date render on the calendar |
@@ -272,9 +272,9 @@ each step ships something usable and nothing depends on finishing the next.
 | --- | --- | --- | --- |
 | 1 | ✅ **destinations in `@woodles/app-manifest`.** app id + kind + record id → URL, with contract tests beside the existing route tests. rewired bloomforge's hardcoded `/play?game=`. | ~half a day | everything below, plus `HandoffSource.href` finally meaning something |
 | 2 | ✅ **thinking about publishes the shelf**, and carillon reads it into a picker on the composer. the "pull it in" half. | ~1–2 days | the reference exists and is useful before any deep link works |
-| 3 | **deep links both ways** — carillon opens on `compose=<entryId>`, thinking about opens on an entry — over step 1's destinations. | ~1 day | the navigation feel; the thing the google-suite comparison is actually about |
-| 4 | **carillon publishes commitments**, thinking about renders them in entry detail. the return trip. | ~1 day | the connection stops being one-way |
-| 5 | **session logging from an observation**, via a queue carillon writes and thinking about drains. | ~1 day | the loop; the clock finally reaches the sessions |
+| 3 | ✅ **deep links both ways** — thinking about opens on `?entry=`, carillon on `?thinking-about-entry=`, both over step 1's destinations. *not* `compose=`: that named an action rather than a record, which the addressing vocabulary doesn't model. arriving shows what's already scheduled. | ~1 day | the navigation feel; the thing the google-suite comparison is actually about |
+| 4 | ✅ **carillon publishes commitments**, thinking about renders them in entry detail. the return trip. | ~1 day | the connection stops being one-way |
+| 5 | ✅ **session logging from an observation** — a projection carillon writes and thinking about ingests by id, *not* a queue: a queue must be emptied by its reader, and a reader that writes breaks the one-writer rule. | ~1 day | the loop; the clock finally reaches the sessions |
 | 6 | **structured `schedule` → derived overlay.** | ~1–2 days | standing dates land on the calendar |
 
 if only one thing gets done: **steps 1 and 2.** step 1 is the workspace-level
@@ -305,6 +305,64 @@ smallest version of the thing that started this.
   to put a thought.
 
 ---
+
+## 6a. what step 3 turned up
+
+two things worth recording, because neither was visible from the plan.
+
+**`compose=` was the wrong name.** §4.4 originally had thinking about linking
+to `/planner?compose=<entryId>`. that doesn't fit step 1's vocabulary at all:
+`?<kind>=<id>` addresses *a record an app is addressable by*, and `compose`
+names an action. carillon is now addressable by `thinking-about-entry` — a
+foreign record kind, which is the honest description — and what it does on
+arrival is carillon's business rather than something the URL dictates.
+
+**a derived ledger needs publishing on load, not only on save.** the e2e round
+trip caught this and nothing else would have: a board nobody has edited since
+step 2 shipped holds entries and no shelf, so the picker reads empty for a
+board plainly full of things. every unit test passed throughout — each half
+was correct about what it wrote and what it read, and the two still failed to
+meet. that is the specific failure mode a cross-app integration test exists
+for, and the argument for keeping one per ledger as steps 4–6 add them.
+
+## 6b. what step 4 settled
+
+**the "one writer" rule paid for itself.** the obvious way to show a
+scheduled time on the board is for carillon to write into thinking about's
+store. it publishes a second ledger instead, in the opposite direction, and
+thinking about reads it — so neither app ever writes where it isn't the
+owner, and thinking about's whole-blob `isNewer` sync can't clobber a foreign
+write on its next push. the rule was written in step 2 on principle; step 4
+is the case it was for.
+
+**the mechanics extracted, the readers didn't.** writing the version cache,
+the deduplication and the single retry a second time would have taught
+nothing, so `createLedgerPublisher` moved into `@woodles/sync` — the second
+consumer earning the extraction, exactly as §4.3 predicted for the mechanics
+it *declined* to extract early. the readers stayed app-side: they are `$state`
+rune classes, which can't live in a plain TS package, and only their
+non-reactive halves (`readLocalLedger`, `pullLedger`) were worth sharing.
+
+## 6c. what step 5 settled
+
+**the plan said "a queue carillon writes and thinking about drains".** it
+isn't one. draining means the reader empties it, and a reader that writes is
+exactly what §4.2's one-writer rule forbids — the same rule step 4 had just
+been vindicated by. so the sittings ledger is a projection like the other two,
+and idempotence comes from deterministic ids instead: thinking about creates
+its session under the ledger's own id, so re-reading cannot double-log.
+
+**tracking what was ingested is not the same as not double-logging.** ids
+alone stop duplicates, but they also mean a sitting someone *deleted* would
+reappear on the next load. so thinking about records the ids it has taken, in
+its synced blob, and a deleted sitting stays deleted on every device. the
+ologypedia import reached the same conclusion by the same route.
+
+**the offer is the product.** carillon could convert every observation in a
+linked block into a session and never be wrong about the facts. it doesn't,
+because an observation is something that happened and a sitting is something
+a person says they did, and the instrument's whole stance is that it shows
+data rather than drawing conclusions from it.
 
 ## 7. risks
 

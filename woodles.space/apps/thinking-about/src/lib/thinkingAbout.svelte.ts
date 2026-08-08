@@ -15,6 +15,8 @@ import {
 	updateSession
 } from './entries';
 import { buildShelf, saveShelfLocally } from './shelf';
+import { ingestSittings } from './sittings';
+import type { LoggedSitting } from '@woodles/sync';
 import type {
 	BoardView,
 	ColumnKey,
@@ -45,6 +47,7 @@ function save<T>(key: string, value: T): void {
 
 const ENTRIES_KEY = 'thinking-about.entries.v1';
 const UPDATED_KEY = 'thinking-about.updatedAt.v1';
+const INGESTED_KEY = 'thinking-about.ingestedSittings.v1';
 
 export class ThinkingAbout {
 	entries = $state<ThinkingAboutEntry[]>(
@@ -53,6 +56,8 @@ export class ThinkingAbout {
 	updatedAt = $state<string>(
 		load<string | null>(UPDATED_KEY, null) ?? latestEntryTimestamp(this.entries) ?? nowIso()
 	);
+
+	ingestedSittings = $state<string[]>(load<string[]>(INGESTED_KEY, []));
 
 	// Transient navigation — never persisted, always starts on the board.
 	view = $state<BoardView>('board');
@@ -161,9 +166,40 @@ export class ThinkingAbout {
 		}
 	}
 
+	/**
+	 * Take any sittings Carillon has offered and a person accepted there.
+	 *
+	 * Returns how many landed, so a caller can say so once rather than
+	 * silently changing the board underneath someone.
+	 */
+	ingestSittings(sittings: LoggedSitting[]): number {
+		const result = ingestSittings(this.entries, sittings, this.ingestedSittings, nowIso);
+		if (result.added === 0 && result.ingested.length === this.ingestedSittings.length) return 0;
+
+		this.entries = result.entries;
+		this.ingestedSittings = result.ingested;
+		if (result.added > 0) this.#touch();
+		else this.#persist();
+		return result.added;
+	}
+
+	/**
+	 * Rebuild and mirror the shelf from what's on the board right now.
+	 *
+	 * Called on load as well as on every save. The shelf is derived, so a board
+	 * nobody has edited since this shipped would otherwise hold entries and no
+	 * shelf at all, and a reader would honestly report an empty picker for a
+	 * board plainly full of things. Idempotent, and self-repairing against a
+	 * shelf left by an older version.
+	 */
+	publishShelf(): void {
+		saveShelfLocally(buildShelf(this.entries, this.updatedAt));
+	}
+
 	#persist(): void {
 		save(ENTRIES_KEY, this.entries);
 		save(UPDATED_KEY, this.updatedAt);
+		save(INGESTED_KEY, this.ingestedSittings);
 		// The shelf is derived, so it is rebuilt here rather than maintained
 		// alongside the entries — there is no path that edits one without the
 		// other, and no stale shelf can outlive the board it came from.
@@ -179,6 +215,12 @@ export class ThinkingAbout {
 	rehydrate(blob: ThinkingAboutBlob): void {
 		this.entries = (blob.entries ?? []).map(normalizeEntry);
 		this.updatedAt = blob.updatedAt ?? latestEntryTimestamp(this.entries) ?? nowIso();
+		// Union rather than replace: a device that ingested a sitting must not
+		// forget it because another device's blob arrived without that id, or
+		// the sitting would land again as a duplicate.
+		this.ingestedSittings = [
+			...new Set([...this.ingestedSittings, ...(blob.ingestedSittings ?? [])])
+		];
 		this.#persist();
 	}
 }

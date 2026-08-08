@@ -149,6 +149,10 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/planner/dist',
 		entryFile: 'index.html',
 		packageName: 'planner',
+		// A *foreign* record kind, which is the honest name for it: arriving here
+		// with a Thinking About entry means "what does the day say about this
+		// thing", and Carillon answers with what it already has scheduled.
+		addressableBy: ['thinking-about-entry'],
 		landing: tile('planner', 6, 'tend', 'interval data, fading routines, and day piles', 'var(--peach)', 'var(--lavender)', '170deg', { defaultPin: 4 })
 	},
 	{
@@ -199,6 +203,7 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/thinking-about/dist',
 		entryFile: 'index.html',
 		packageName: 'thinking-about',
+		addressableBy: ['entry'],
 		landing: tile('thinking', 7, 'tend', 'a landing spot for what you are reading, playing, and watching', 'var(--lapis)', 'var(--aqua)', '140deg')
 	},
 	{

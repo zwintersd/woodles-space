@@ -49,6 +49,15 @@ export type ThinkingAboutEntry = {
 export type ThinkingAboutBlob = {
 	entries: ThinkingAboutEntry[];
 	updatedAt?: string;
+	/**
+	 * Sittings already taken from Carillon's ledger, by that ledger's id.
+	 *
+	 * Tracked rather than inferred from the sessions themselves, so deleting an
+	 * ingested sitting keeps it deleted instead of having it reappear on the
+	 * next load. It rides the synced blob so that holds on every device, which
+	 * is the same stance the Ologypedia import took toward its own re-imports.
+	 */
+	ingestedSittings?: string[];
 };
 
 export type SectionSize = 'minimized' | 'compact' | 'full';

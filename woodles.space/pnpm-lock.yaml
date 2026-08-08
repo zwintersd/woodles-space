@@ -220,6 +220,9 @@ importers:
 
   apps/planner:
     dependencies:
+      '@woodles/app-manifest':
+        specifier: workspace:*
+        version: link:../../packages/app-manifest
       '@woodles/sync':
         specifier: workspace:*
         version: link:../../packages/sync
@@ -300,6 +303,9 @@ importers:
 
   apps/thinking-about:
     dependencies:
+      '@woodles/app-manifest':
+        specifier: workspace:*
+        version: link:../../packages/app-manifest
       '@woodles/sync':
         specifier: workspace:*
         version: link:../../packages/sync

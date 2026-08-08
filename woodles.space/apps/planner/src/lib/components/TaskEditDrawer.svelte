@@ -3,6 +3,7 @@
 	import { store } from '$lib/store.svelte';
 	import { queueSync } from '$lib/sync.svelte';
 	import { thinkingAboutShelf } from '$lib/thinkingAboutShelf.svelte';
+	import { thinkingAboutEntryHref } from '$lib/arrival.svelte';
 	import { dateKey } from '$lib/utils';
 
 	let localTitle = $state('');
@@ -36,6 +37,7 @@
 					localTargetBlockId = t.targetBlockId ?? '';
 					localDuration = t.estimatedDuration != null ? String(t.estimatedDuration) : '';
 					localNotes = t.notes ?? '';
+					localShelfEntryId = t.thinkingAboutEntryId ?? '';
 					localStatus = t.status;
 				}
 			});
@@ -58,10 +60,11 @@
 		}
 	});
 
-	// The shelf is only offered while composing — an existing task's link is
-	// part of its record, not something the edit form re-picks.
+	// Refreshed whenever the sheet is open: composing needs the strip to pick
+	// from, and editing needs the shelf to put a title and a colour on a link
+	// the task already carries.
 	$effect(() => {
-		if (composing) void thinkingAboutShelf.refresh();
+		if (open) void thinkingAboutShelf.refresh();
 	});
 
 	const shelfEntry = $derived(
@@ -118,7 +121,8 @@
 				targetDate: localTargetDate || undefined,
 				targetBlockId: localTargetBlockId || undefined,
 				estimatedDuration: localDuration ? parseInt(localDuration, 10) : undefined,
-				notes: localNotes.trim() || undefined
+				notes: localNotes.trim() || undefined,
+				thinkingAboutEntryId: localShelfEntryId || undefined
 			});
 		}
 		store.closeTaskEdit();
@@ -189,10 +193,17 @@
 				spellcheck="false"
 			/>
 
-			{#if shelfEntry}
+			{#if localShelfEntryId}
 				<p class="ted-shelf-link" data-testid="shelf-link">
-					<span class="ted-shelf-dot" style:background={shelfEntry.color}></span>
-					<span>about <strong>{shelfEntry.title}</strong></span>
+					{#if shelfEntry}
+						<span class="ted-shelf-dot" style:background={shelfEntry.color}></span>
+					{/if}
+					<span>
+						about
+						<a href={thinkingAboutEntryHref(localShelfEntryId)}>
+							<strong>{shelfEntry?.title ?? 'something on the board'}</strong>
+						</a>
+					</span>
 					<button type="button" class="ted-shelf-clear" onclick={clearShelfLink}>
 						unlink
 					</button>

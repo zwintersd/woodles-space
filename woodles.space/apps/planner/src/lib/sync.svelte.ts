@@ -1,5 +1,14 @@
-import { createAppSync } from '@woodles/sync';
+import {
+	createAppSync,
+	createLedgerPublisher,
+	CARILLON_COMMITMENTS_APP,
+	CARILLON_SESSIONS_APP,
+	type CarillonCommitmentsBlob,
+	type CarillonSessionsBlob
+} from '@woodles/sync';
 import { store } from './store.svelte';
+import { buildCommitments, commitmentsMatch } from './commitments';
+import { buildSessions, sessionsMatch } from './sessions';
 import type {
 	IntervalObservation,
 	PlannerBlob,
@@ -126,12 +135,47 @@ export function mergePlannerBlobs(local: PlannerBlob, remote: PlannerBlob): Plan
 		),
 		spores,
 		sleepLogs: mergeById(local.sleepLogs ?? [], remote.sleepLogs ?? [], latestMutable),
-		signals: mergeById(local.signals ?? [], remote.signals ?? [], latestMutable)
+		signals: mergeById(local.signals ?? [], remote.signals ?? [], latestMutable),
+		// Union, no resolver: a sitting is identified by entry-and-date, so two
+		// devices logging the same one produce the same record, and there is
+		// nothing to pick between.
+		loggedSessions: mergeById(local.loggedSessions ?? [], remote.loggedSessions ?? [])
 	};
 }
 
-export const { connectAndHydrate, initSync, flushSync, disconnect } =
-	createAppSync<PlannerBlob>({
+const commitmentsPublisher = createLedgerPublisher<CarillonCommitmentsBlob>({
+	app: CARILLON_COMMITMENTS_APP,
+	matches: commitmentsMatch
+});
+
+/**
+ * Push the commitments ledger so Thinking About sees it on a device where
+ * Carillon has never been opened. Never throws — a stale ledger elsewhere must
+ * not surface as a sync error here. The local mirror happens on every task
+ * write regardless (`publishCommitmentsLocally`), so same-origin readers don't
+ * depend on this succeeding.
+ */
+export async function publishCommitments(): Promise<void> {
+	await commitmentsPublisher.publish(buildCommitments(store.tasks, store.getAllBlocks()));
+}
+
+const sessionsPublisher = createLedgerPublisher<CarillonSessionsBlob>({
+	app: CARILLON_SESSIONS_APP,
+	matches: sessionsMatch
+});
+
+/** Push the sittings ledger. Never throws, same reasoning as commitments. */
+export async function publishSessions(): Promise<void> {
+	await sessionsPublisher.publish(buildSessions(store.loggedSessions));
+}
+
+/** Test seam — the publishers' session caches would otherwise leak between cases. */
+export function resetCommitmentsCache(): void {
+	commitmentsPublisher.reset();
+	sessionsPublisher.reset();
+}
+
+const appSync = createAppSync<PlannerBlob>({
 		adapter: {
 			app: 'planner',
 			read(): PlannerBlob {
@@ -150,7 +194,8 @@ export const { connectAndHydrate, initSync, flushSync, disconnect } =
 					surgeDrafts: store.surgeDrafts,
 					spores: store.sporeEvents,
 					sleepLogs: store.sleepLogs,
-					signals: store.signalEntries
+					signals: store.signalEntries,
+					loggedSessions: store.loggedSessions
 				};
 			},
 			write(blob: PlannerBlob): void {
@@ -160,6 +205,34 @@ export const { connectAndHydrate, initSync, flushSync, disconnect } =
 		},
 		state: syncState,
 	});
+
+export const { disconnect } = appSync;
+
+/**
+ * Both ledgers ride every sync operation, hydrate included — a pull can bring
+ * in tasks scheduled, or sittings accepted, on another device, and Thinking
+ * About should learn about those too. Awaited but never able to fail the caller.
+ */
+async function withLedgers<T>(operation: () => Promise<T>): Promise<T> {
+	const result = await operation();
+	store.publishCommitmentsLocally();
+	store.publishSessionsLocally();
+	await publishCommitments();
+	await publishSessions();
+	return result;
+}
+
+export async function connectAndHydrate(pass: string): Promise<void> {
+	await withLedgers(() => appSync.connectAndHydrate(pass));
+}
+
+export async function initSync(): Promise<void> {
+	await withLedgers(() => appSync.initSync());
+}
+
+export async function flushSync(): Promise<void> {
+	await withLedgers(() => appSync.flushSync());
+}
 
 let queuedFlush: ReturnType<typeof setTimeout> | null = null;
 

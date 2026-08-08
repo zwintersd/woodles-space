@@ -14,6 +14,8 @@
 		showsSharedWith
 	} from '$lib/constants';
 	import { motionDuration } from '$lib/motion';
+	import { findTimeHref } from '$lib/deepLink';
+	import { commitments } from '$lib/commitments.svelte';
 	import type { SectionKey } from '$lib/types';
 	import ColorPicker from './ColorPicker.svelte';
 
@@ -44,6 +46,20 @@
 		}
 		if (!entryId) focusedEntryId = null;
 	});
+
+	// What Carillon has scheduled for the entry currently open. Refreshed when
+	// the panel opens rather than on every keystroke — the answer changes in
+	// the other app, not this one.
+	$effect(() => {
+		if (entry?.id) void commitments.refresh();
+	});
+
+	const scheduled = $derived(entry ? commitments.for(entry.id) : []);
+
+	function commitmentWhen(item: { date: string | null; time: string | null }): string {
+		if (!item.date) return 'not scheduled yet';
+		return item.time ? `${item.date} · ${item.time}` : item.date;
+	}
 
 	function close(): void {
 		const restoreTo = previousFocus;
@@ -197,6 +213,25 @@
 				/>
 			</div>
 		{/if}
+
+		<!-- The one way out of this app, and the one thing that comes back. A
+		     schedule field says when this *usually* happens; Carillon answers
+		     when it actually will. -->
+		<div class="detail-field">
+			{#if scheduled.length > 0}
+				<ul class="commitments" data-testid="commitments">
+					{#each scheduled as item (item.taskId)}
+						<li class:done={item.status === 'done'}>
+							<span class="commitment-when">{commitmentWhen(item)}</span>
+							<span class="commitment-title">{item.title}</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+			<a class="find-time" href={findTimeHref(id)} data-testid="find-time">
+				{scheduled.length > 0 ? 'find another time →' : 'find time for this →'}
+			</a>
+		</div>
 
 		<div class="detail-field">
 			<div class="sessions-heading">
@@ -442,6 +477,51 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 0.5rem;
+	}
+
+	/* Carillon's answer, styled as a quiet fact rather than a second board. */
+	.commitments {
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+		margin-bottom: 0.45rem;
+	}
+
+	.commitments li {
+		display: flex;
+		align-items: baseline;
+		gap: 0.5rem;
+		font-family: var(--ta-font-sans);
+		font-size: 0.78rem;
+	}
+
+	.commitments li.done .commitment-title {
+		text-decoration: line-through;
+	}
+
+	.commitment-when {
+		color: var(--ta-text);
+		white-space: nowrap;
+	}
+
+	.commitment-title {
+		color: var(--ta-muted);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.find-time {
+		display: inline-block;
+		font-family: var(--ta-font-sans);
+		font-size: 0.78rem;
+		color: var(--ta-accent);
+		transition: color var(--ta-transition-fast);
+	}
+
+	.find-time:hover {
+		color: var(--ta-text);
 	}
 
 	.btn-log-session {
