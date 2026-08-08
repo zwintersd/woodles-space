@@ -1,15 +1,24 @@
-// The echoes library — marginalia's reading room reading the same published
-// letters echoes itself does (ROADMAP.md week 7), so a visitor can read one
-// of Z's letters instead of (or alongside) pasting their own text. Mirrors
-// bestiary's gallery.svelte.ts: pullPublic never sends the passphrase, so
-// this is exactly what an unauthenticated visitor's browser can see.
+// The echoes library — marginalia's reading room reading the same archive
+// Echoes itself does, so you can read one of your own letters instead of (or
+// alongside) pasting text in.
+//
+// This used to read the public snapshot. Echoes is private now (HANDOFF.md
+// §3), so it reads the passphrase-gated archive instead: an unconnected
+// device sees nothing rather than seeing a stranger's-eye view, which is the
+// honest consequence of the archive being yours alone.
 
-import { pullPublic, ECHOES_PUBLIC_SLUG, type EchoesPublicBlob, type PublicLetter } from '@woodles/sync';
+import {
+	hasPassphrase,
+	pullLedger,
+	readArchiveBlob,
+	WRITE_ARCHIVE_APP,
+	type ArchiveLetter
+} from '@woodles/sync';
 
 export type EchoesLibraryStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error';
 
 class EchoesLibrary {
-	letters = $state<PublicLetter[]>([]);
+	letters = $state<ArchiveLetter[]>([]);
 	status = $state<EchoesLibraryStatus>('idle');
 
 	// Fetches once and caches the result — reopening the picker after a
@@ -18,10 +27,16 @@ class EchoesLibrary {
 	async load(force = false): Promise<void> {
 		if (this.status === 'loading') return;
 		if (!force && (this.status === 'ready' || this.status === 'empty')) return;
+		// Not connected is 'empty', not 'error' — there is nothing wrong, the
+		// archive just isn't reachable from this device yet.
+		if (!hasPassphrase()) {
+			this.status = 'empty';
+			return;
+		}
 		this.status = 'loading';
 		try {
-			const snap = await pullPublic<EchoesPublicBlob>('echoes', ECHOES_PUBLIC_SLUG);
-			const letters = snap.blob?.letters ?? [];
+			const blob = await pullLedger(WRITE_ARCHIVE_APP, readArchiveBlob);
+			const letters = blob?.letters ?? [];
 			this.letters = letters;
 			this.status = letters.length > 0 ? 'ready' : 'empty';
 		} catch {

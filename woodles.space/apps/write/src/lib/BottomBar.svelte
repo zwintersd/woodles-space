@@ -18,7 +18,6 @@
 		fonts,
 		foregroundVisible,
 		fgIsEmpty,
-		isPublic = $bindable(),
 		onPublish
 	}: {
 		saveStatus: 'saved' | 'saving';
@@ -36,7 +35,6 @@
 		/** Publishing follows whether the prose is on screen, not what has focus. */
 		foregroundVisible: boolean;
 		fgIsEmpty: boolean;
-		isPublic: boolean;
 		onPublish: () => void;
 	} = $props();
 </script>
@@ -88,13 +86,9 @@
 	</div>
 	<div class="publish-cluster">
 		{#if foregroundVisible && fgIsEmpty}
-			<span class="publish-warn">this will appear blank to others</span>
+			<span class="publish-warn">this will be blank in the archive</span>
 		{/if}
 		{#if foregroundVisible}
-			<label class="public-toggle" title="include this letter in the public echoes snapshot">
-				<input type="checkbox" bind:checked={isPublic} />
-				public
-			</label>
 			<button class="publish-btn" onclick={onPublish}>Publish →</button>
 		{:else}
 			<span class="publish-hint">open the fg page to publish</span>
@@ -156,24 +150,6 @@
 	.picker-select:focus { outline: none; border-color: var(--accent); }
 
 	.publish-cluster { display: flex; align-items: center; gap: 0.9rem; }
-	.public-toggle {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.35rem;
-		font-family: var(--editor-mono, var(--font-mono));
-		font-size: 0.57rem;
-		letter-spacing: 0.1em;
-		text-transform: lowercase;
-		color: var(--muted);
-		cursor: pointer;
-	}
-	.public-toggle:has(input:checked) { color: var(--accent-strong); }
-	.public-toggle input {
-		width: 0.85em;
-		height: 0.85em;
-		accent-color: var(--accent-strong);
-		cursor: pointer;
-	}
 	.publish-warn {
 		font-family: var(--editor-mono, var(--font-mono));
 		font-size: 0.55rem; letter-spacing: 0.12em;

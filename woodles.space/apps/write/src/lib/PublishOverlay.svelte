@@ -1,9 +1,10 @@
 <script lang="ts">
-	// 'local' (saved to this device only) is a distinct, honest state from
-	// 'public' (the world can now read it) — ROADMAP.md week 7. Before this,
-	// the overlay always claimed "woodles.space / echoes" regardless of
-	// whether anyone but Z could actually see it.
-	export type PublishStatus = 'idle' | 'local' | 'public' | 'error';
+	// 'local' (this device only) stays a distinct, honest state from 'synced'
+	// (in the archive, on every device). It used to distinguish local from
+	// *public*; Echoes is private now, so the honest distinction is no longer
+	// about audience but about reach — and the overlay still never claims more
+	// than is true.
+	export type PublishStatus = 'idle' | 'local' | 'synced' | 'error';
 
 	let { status, errorMessage = null }: { status: PublishStatus; errorMessage?: string | null } =
 		$props();
@@ -11,14 +12,14 @@
 </script>
 
 <div class="overlay" class:active={activeState}>
-	{#if status === 'public'}
-		<p class="overlay-word">published.</p>
-		<p class="overlay-sub">woodles.space / echoes</p>
+	{#if status === 'synced'}
+		<p class="overlay-word">kept.</p>
+		<p class="overlay-sub">in the archive, on every device</p>
 	{:else if status === 'error'}
-		<p class="overlay-word">saved.</p>
-		<p class="overlay-sub">{errorMessage ?? "couldn't reach the world — try again from echoes"}</p>
+		<p class="overlay-word">kept.</p>
+		<p class="overlay-sub">{errorMessage ?? "couldn't reach the archive — it's safe here"}</p>
 	{:else}
-		<p class="overlay-word">saved.</p>
+		<p class="overlay-word">kept.</p>
 		<p class="overlay-sub">just here, for now</p>
 	{/if}
 </div>

@@ -44,10 +44,9 @@ other docs have narrower jobs:
   spine: what the six steps landed, the sharp edges to know before touching
   them, and a design for extending the same spine into Write — `#` to reach a
   piece of media, `@` to reach a day. It also carries two decisions not yet
-  built: **Echoes stops being public** (§3 — nobody reads it, and a private
-  self-annotated archive is the thing that actually works about it), and
-  **bestiary's `?card=` moves onto `entityHref` early** (§4), because a
-  reference picker built against one source hardcodes one source.
+  built: its §5 design for reaching this spine from Write with `#` and `@`.
+  Its §3 (Echoes stops being public) and §4 (bestiary's card id onto
+  `entityHref`) **are** built — see "the archive" and "the app manifest" here.
 - [REFERENCES.md](./REFERENCES.md) is CONVERGENCE's mirror image, and
   **mostly still a proposal**: where convergence collapsed apps that
   should have been one app, this is about apps that stay separate and learn
@@ -125,7 +124,7 @@ woodles.space/
     ├── digits/              static · an SVG pen that writes the time
     ├── quiet-room/          static · an immersive three.js room of light
     ├── ologypedia/          static · a block system for textbook-style pages, and the pages it renders
-    ├── letter/              static · echoes — the published-letter reader
+    ├── letter/              static · echoes — the private archive reader
     ├── animations/          Python · offline Manim scenes and curated web previews
     ├── write/               SvelteKit · the writing surface — letters, essays, stories, poems, notes
     ├── marginalia/          SvelteKit · a witch writes worlds + a reading room
@@ -765,7 +764,7 @@ untitled fallback, and all three layers' placeholders, so the midground reads
 counterargument you owe an answer" under an essay. A stored draft with no
 `kind` field reads as `letter`, so nothing written before kinds existed ever
 needed rewriting. Publishing is unchanged: whatever the kind, what publishes
-is a letter in echoes, and only when explicitly made public.
+is a letter in echoes, which is your own archive rather than an audience.
 
 **Word goals.** A draft can carry an optional `goal` (the bottom bar's word
 count is the control). Progress is reported, never scolded — fiction gets to
@@ -934,10 +933,12 @@ the store's `rehydrate()`; `isNewer` is optionally provided (`bestiary` and
 `thinking-about` use it). Carillon's file is deliberately larger because it
 owns the merge described above and coalesces queued instrument writes before
 flushing. `marginalia` still has none of this — it never syncs privately.
-`write` gained a file in week 7, but it has no private blob to sync at all;
-its adapter's `read`/`write` are no-ops, kept only to reuse `createAppSync`'s
-passphrase connect/disconnect/persistence for gating the public echoes
-publish below — connecting the passphrase once, in any app, connects it
+`write`'s adapter used to be a pair of no-ops that existed only to borrow the
+passphrase handling for a public publish. Echoes is private now, so it syncs
+something real: **the archive** of finished letters, under app key `write`,
+newest-archive-wins by the most recent `publishedAt`. Drafts stay out — they
+are working state, already per-device, and an archive is a different thing
+from a desk. Connecting the passphrase once, in any app, still connects it
 everywhere, same origin, same localStorage key.
 
 ### cross-app ledgers
@@ -965,6 +966,16 @@ identical version cache, deduplication and single retry — the workspace's
 habit is to duplicate until two copies converge and then extract, and there
 was nothing left to learn from writing it twice. What stays app-side is only
 what differs: the key, and what counts as a change.
+
+**Write publishes the archive.** The one shape here that is not a projection:
+it is Write's own blob (`WriteArchiveBlob`, app key `write`, localStorage
+`woodles_letters`), with the shape written down in `crossAppBlobs.ts` so
+Echoes and Marginalia's reading room depend on a contract rather than on
+Write's internals. That's the relationship bloomforge-player has to the
+studio's project data, and Write is still the only writer. `apps/letter` is a
+static page with no build step, so it hand-rolls the same request; a test in
+`packages/sync` pins its key, app name and auth header against the constants,
+and fails if it reaches for `/api/public` again.
 
 **Thinking About publishes the shelf** — active,
 titled entries as `{ id, title, columnKey, sectionKey, color, lastSessionDate }`
@@ -1096,22 +1107,27 @@ passphrase — its whole job is to be exactly what an unauthenticated
 visitor's own fetch can see.
 
 **the published shapes** (`packages/sync/src/publicBlobs.ts`):
-`BestiaryPublicBlob` (`PublicCreature[]`) and `EchoesPublicBlob`
-(`PublicLetter[]`). each publish is a curated, explicit subset of what's
-stored privately — never a mirror of it. a creature publishes exactly two
-assets (the rendered card image, and the isolated sprite, or the plain
-upload as a fallback); a letter publishes only when its author marked it
-`public: true` — filtered with `=== true`, never a truthy check, so
-nothing ever leaks by accident.
+`BestiaryPublicBlob` (`PublicCreature[]`). each publish is a curated,
+explicit subset of what's stored privately — never a mirror of it. a creature
+publishes exactly two assets (the rendered card image, and the isolated
+sprite, or the plain upload as a fallback).
+
+**echoes left this spine.** nobody was reading the public version, and the
+part that worked — an archive you re-read, annotate and edit — is the
+opposite of publishing. its letters moved onto the ordinary passphrase-gated
+sync as `write`'s own blob (see "the archive" above), and `EchoesPublicBlob`,
+`ECHOES_PUBLIC_SLUG`, `PublicLetter` and write's `publish.ts` are gone along
+with the per-letter `public` opt-in. **bestiary is now the only tenant of
+`/api/public`**, and nothing about its half changed — the 4 MB cap, the cache
+headers and the `authed()` split all still matter for it.
 
 **who publishes what, and who only ever reads:**
 
 | app | publishes | reads (unauthenticated) |
 | --- | --- | --- |
 | `bestiary` | curated creatures, via `SyncPanel`'s publish section | its own gallery (`gallery.svelte.ts`) |
-| `write` | letters explicitly marked `public: true` (`publish.ts`) | nothing — it's the private editor |
-| `letter` | nothing (static, no editor) | the published echoes letters, for a visitor with no local copy of their own |
-| `marginalia` | nothing | both: the bestiary's creatures (diorama binding, `bestiaryDb.ts`) and echoes' letters (reading room, `echoesLibrary.svelte.ts`) |
+| `letter` | nothing (static, no editor) | nothing public any more — it reads the passphrase-gated archive instead |
+| `marginalia` | nothing | the bestiary's creatures (diorama binding, `bestiaryDb.ts`). its reading room still reads letters, but authenticated now, from the archive |
 
 every reader degrades the same way — `idle → loading → ready/empty →
 error`, never a blank crash on a slow network or a down API. `bestiary`'s
@@ -1214,13 +1230,13 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1831 tests total: 16 in `api/` (its own
+1830 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1815 across sixteen pnpm
-packages — `write` 122, `marginalia` 333, `planner` 539,
+instead of the recursive `pnpm -r test`), plus 1814 across sixteen pnpm
+packages — `write` 114, `marginalia` 333, `planner` 539,
 `spores` 140, `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
-`packages/sync` 24, `packages/persistence` 6, `packages/app-manifest` 17,
+`packages/sync` 31, `packages/persistence` 6, `packages/app-manifest` 17,
 `packages/handoff` 15, `packages/text` 23, `packages/spellcraft` 16,
 `packages/emoji` 4, `packages/incremental-core` 191, and `thinking-about` 118.
 (Counted by running each suite, not by adding to the previous figure — the
@@ -1265,7 +1281,7 @@ are written up in [apps/planner/KNOWN_ISSUES.md](./apps/planner/KNOWN_ISSUES.md)
 `e2e/` is the deliberately small Playwright layer above the unit suites. Its
 local server reads `vercel.json` and applies the production rewrites, so route
 coverage tests the paths people actually visit instead of eight unrelated Vite
-ports. The suite covers every published entry route, Write → Echoes publishing,
+ports. The suite covers every published entry route, Write → Echoes archiving,
 Bestiary gallery/adopt/share and Marginalia consumption, an Arcade state change,
 Ologypedia shelf export → publish script → indexed card, the Thinking About →
 Carillon round trip, back, and the sitting that returns from it, legacy localStorage migration across reload,

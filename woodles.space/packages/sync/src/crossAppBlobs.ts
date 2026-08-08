@@ -92,6 +92,91 @@ export function readShelfBlob(value: unknown): ThinkingAboutShelfBlob | null {
 	};
 }
 
+// ── write → echoes, marginalia: the archive ─────────────────────────────
+//
+// Echoes was a public reading room and is now a private one: an archive of
+// finished writing that gets re-read, annotated and edited by the person who
+// wrote it. Nobody was reading the public version, and self-annotation is the
+// part that worked, so the letters moved off `/api/public` and onto the
+// ordinary passphrase-gated sync every other app here uses.
+//
+// This is the one shape below that is *not* a projection. It is Write's own
+// blob, published under its own app key, with the shape written down here so
+// readers depend on a contract rather than on Write's internals — the same
+// relationship bloomforge-player has to the studio's project data. Write is
+// still the only writer.
+
+export const WRITE_ARCHIVE_APP = 'write';
+
+/**
+ * Where Write keeps the archive locally. Also hardcoded in
+ * `apps/letter/index.html`, which is a static page with no build step and so
+ * cannot import this package — a test pins the two together.
+ */
+export const WRITE_LETTERS_STORAGE_KEY = 'woodles_letters';
+
+export type ArchiveNote = {
+	id: string;
+	html: string;
+	layer: string;
+	createdAt: string;
+	updatedAt: string;
+};
+
+export type ArchiveMarginNote = {
+	id: string;
+	anchorId: string;
+	html: string;
+	createdAt: string;
+	updatedAt: string;
+};
+
+/** One finished letter, as Echoes and Marginalia's reading room read it. */
+export type ArchiveLetter = {
+	id: string;
+	title: string;
+	theme: string;
+	motif: string;
+	font: string;
+	issue: number;
+	publishedAt: string;
+	layers: Record<string, { html: string; updatedAt: string }>;
+	annotations: { pocketNotes: ArchiveNote[]; marginNotes: ArchiveMarginNote[] };
+	content: string;
+	replyTo: string | null;
+};
+
+export type WriteArchiveBlob = {
+	letters: ArchiveLetter[];
+	updatedAt?: string;
+};
+
+/**
+ * Structural check for an archive arriving from storage or the server.
+ * Deliberately shallow on the note arrays — a letter with a malformed
+ * annotation should still be readable, since the prose is the point.
+ */
+export function readArchiveBlob(value: unknown): WriteArchiveBlob | null {
+	if (typeof value !== 'object' || value === null) return null;
+	const blob = value as Partial<WriteArchiveBlob>;
+	if (!Array.isArray(blob.letters)) return null;
+	return {
+		letters: blob.letters.filter(isArchiveLetter),
+		...(typeof blob.updatedAt === 'string' ? { updatedAt: blob.updatedAt } : {})
+	};
+}
+
+function isArchiveLetter(value: unknown): value is ArchiveLetter {
+	if (typeof value !== 'object' || value === null) return false;
+	const letter = value as Partial<ArchiveLetter>;
+	return (
+		typeof letter.id === 'string' &&
+		typeof letter.title === 'string' &&
+		typeof letter.content === 'string' &&
+		typeof letter.publishedAt === 'string'
+	);
+}
+
 // ── carillon → thinking about: the commitments ledger ───────────────────
 //
 // The answer to the shelf, and the reason the "one writer" rule is worth

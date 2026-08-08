@@ -15,7 +15,7 @@
 	import { loadDoc, persistDoc as persistDocToStorage, wipeDoc } from '$lib/reading/doc';
 	import { formatHms, formatMin } from '$lib/reading/format';
 	import { echoesLibrary } from '$lib/reading/echoesLibrary.svelte';
-	import type { PublicLetter } from '@woodles/sync';
+	import type { ArchiveLetter } from '@woodles/sync';
 	import Star from './Star.svelte';
 	import StarShelf from './StarShelf.svelte';
 	import Passage from './Passage.svelte';
@@ -122,7 +122,7 @@
 	// Reads one of Z's published letters instead of pasted-in text
 	// (ROADMAP.md week 7) — same downstream pipeline (paragraphs, anchors,
 	// annotation, persistence) as paste/PDF intake; only the source differs.
-	async function readLetter(letter: PublicLetter) {
+	async function readLetter(letter: ArchiveLetter) {
 		truncated = false;
 		pasteText = '';
 		const html = letter.layers?.foreground?.html || letter.content || '';

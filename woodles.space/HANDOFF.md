@@ -84,7 +84,7 @@ Shapes and keys live in `packages/sync/src/crossAppBlobs.ts`; the machinery
 
 ---
 
-## 3. Echoes stops being public
+## 3. Echoes stops being public — ✅ built
 
 **Decided: nobody is reading it, and the thing that works about it is the
 opposite of publishing.** An archive of finished writing that you re-read,
@@ -137,7 +137,7 @@ Write work rather than after.
 
 ---
 
-## 4. bestiary's card id, early
+## 4. bestiary's card id, early — ✅ built
 
 `?card=<id>` already exists — read in `apps/bestiary/src/routes/+layout.svelte`
 and built by hand in `PublishedCardPanel.svelte:37` as
@@ -253,8 +253,8 @@ deterministic ids, rides `/api/sync` behind the passphrase.
 
 | # | step | notes |
 | --- | --- | --- |
-| 1 | **Echoes goes private** (§3) | mostly deletion; unblocks live references |
-| 2 | **bestiary card through `entityHref`** (§4) | ten minutes, and forces the source registry |
+| 1 | ✅ **Echoes goes private** (§3) | mostly deletion; unblocks live references |
+| 2 | ✅ **bestiary card through `entityHref`** (§4) | ten minutes, and forces the source registry |
 | 3 | `data-ref-*` through `@woodles/text`'s sanitizer, as a parameter | the enabling change |
 | 4 | reference source registry + `#` picker over entries and cards | two sources from the start |
 | 5 | `@` picker over dates | no new ledger; render `YYYY-MM-DD` as a weekday |
