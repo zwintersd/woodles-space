@@ -174,6 +174,61 @@ describe('mergePlannerBlobs', () => {
 		expect(merged.surgeDrafts?.[0]?.status).toBe('discarded');
 	});
 
+	it('carries a Thinking About reference through the merge', () => {
+		// The link rides `latestMutable`, which takes the whole newer task — so
+		// this is really asserting that a device without the field can't blank
+		// it on a device that has it, which is how an optional field usually
+		// gets lost.
+		const linked = blob({
+			tasks: [
+				{
+					id: 'task-1',
+					title: 'read a chapter',
+					status: 'open',
+					thinkingAboutEntryId: 'entry-piranesi',
+					createdAt: '2026-08-08T12:00:00.000Z',
+					updatedAt: '2026-08-09T15:00:00.000Z'
+				}
+			]
+		});
+		const older = blob({
+			tasks: [
+				{
+					id: 'task-1',
+					title: 'read a chapter',
+					status: 'open',
+					createdAt: '2026-08-08T12:00:00.000Z',
+					updatedAt: '2026-08-08T12:00:00.000Z'
+				}
+			]
+		});
+
+		expect(mergePlannerBlobs(linked, older).tasks[0]?.thinkingAboutEntryId).toBe(
+			'entry-piranesi'
+		);
+		expect(mergePlannerBlobs(older, linked).tasks[0]?.thinkingAboutEntryId).toBe(
+			'entry-piranesi'
+		);
+	});
+
+	it('hydrates a blob written before the reference existed', () => {
+		// Every planner blob in the wild predates this field.
+		const legacy = blob({
+			tasks: [
+				{
+					id: 'task-1',
+					title: 'an older task',
+					status: 'open',
+					createdAt: '2026-07-01T12:00:00.000Z'
+				}
+			]
+		});
+
+		const merged = mergePlannerBlobs(legacy, legacy);
+		expect(merged.tasks[0]?.thinkingAboutEntryId).toBeUndefined();
+		expect(merged.tasks[0]?.title).toBe('an older task');
+	});
+
 	it('unions sleep logs from two devices and keeps the newer correction', () => {
 		const local = blob({
 			sleepLogs: [

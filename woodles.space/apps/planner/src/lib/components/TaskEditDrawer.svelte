@@ -2,6 +2,7 @@
 	import { untrack } from 'svelte';
 	import { store } from '$lib/store.svelte';
 	import { queueSync } from '$lib/sync.svelte';
+	import { thinkingAboutShelf } from '$lib/thinkingAboutShelf.svelte';
 	import { dateKey } from '$lib/utils';
 
 	let localTitle = $state('');
@@ -11,6 +12,7 @@
 	let localDuration = $state('');
 	let localNotes = $state('');
 	let localStatus = $state<'open' | 'done' | 'dropped'>('open');
+	let localShelfEntryId = $state('');
 	let titleInput: HTMLInputElement | undefined = $state();
 
 	// The sheet serves two modes from one form: editing an existing task, or
@@ -41,17 +43,42 @@
 		} else if (isComposing) {
 			untrack(() => {
 				const d = store.composeDefaults;
-				localTitle = '';
+				// A supplied title is honoured now: the shelf picker seeds one, and
+				// `startCompose` has always accepted a Partial<Task> that could carry it.
+				localTitle = d.title ?? '';
 				localDomainId = d.domainId ?? '';
 				localTargetDate = d.targetDate ?? dateKey(store.now);
 				localTargetBlockId = d.targetBlockId ?? '';
 				localDuration = d.estimatedDuration != null ? String(d.estimatedDuration) : '';
 				localNotes = d.notes ?? '';
+				localShelfEntryId = d.thinkingAboutEntryId ?? '';
 				localStatus = 'open';
 			});
 			setTimeout(() => titleInput?.focus(), 30);
 		}
 	});
+
+	// The shelf is only offered while composing — an existing task's link is
+	// part of its record, not something the edit form re-picks.
+	$effect(() => {
+		if (composing) void thinkingAboutShelf.refresh();
+	});
+
+	const shelfEntry = $derived(
+		localShelfEntryId ? thinkingAboutShelf.find(localShelfEntryId) : null
+	);
+
+	function pickFromShelf(entry: { id: string; title: string }): void {
+		localShelfEntryId = entry.id;
+		// Only seed the title when nothing has been typed — picking what a task
+		// is *about* should never overwrite words already in the box.
+		if (!localTitle.trim()) localTitle = entry.title;
+		titleInput?.focus();
+	}
+
+	function clearShelfLink(): void {
+		localShelfEntryId = '';
+	}
 
 	// Block options follow the chosen day, so scheduling for a future date shows
 	// that day's real blocks. With no date set, fall back to every known block.
@@ -73,7 +100,8 @@
 					targetDate: localTargetDate || undefined,
 					targetBlockId: localTargetBlockId || undefined,
 					estimatedDuration: localDuration ? parseInt(localDuration, 10) : undefined,
-					notes: localNotes.trim() || undefined
+					notes: localNotes.trim() || undefined,
+					thinkingAboutEntryId: localShelfEntryId || undefined
 				});
 			}
 			store.cancelCompose();
@@ -160,6 +188,32 @@
 				autocomplete="off"
 				spellcheck="false"
 			/>
+
+			{#if shelfEntry}
+				<p class="ted-shelf-link" data-testid="shelf-link">
+					<span class="ted-shelf-dot" style:background={shelfEntry.color}></span>
+					<span>about <strong>{shelfEntry.title}</strong></span>
+					<button type="button" class="ted-shelf-clear" onclick={clearShelfLink}>
+						unlink
+					</button>
+				</p>
+			{:else if composing && thinkingAboutShelf.entries.length > 0}
+				<div class="ted-shelf" data-testid="shelf-picker">
+					<p class="ted-shelf-kicker">or something you're in the middle of</p>
+					<div class="ted-shelf-strip">
+						{#each thinkingAboutShelf.entries as entry (entry.id)}
+							<button
+								type="button"
+								class="ted-shelf-chip"
+								style:--chip={entry.color}
+								onclick={() => pickFromShelf(entry)}
+							>
+								{entry.title}
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
 
 			<div class="ted-fields">
 				<div class="ted-field">
@@ -343,6 +397,73 @@
 	.ted-title-input::placeholder {
 		color: var(--p-muted);
 		opacity: 0.4;
+	}
+
+	/* The shelf, borrowed from Thinking About — its entries carry their own
+	   colour from that board, so a chip reads as the same object here. */
+	.ted-shelf {
+		margin-bottom: 0.85rem;
+	}
+
+	.ted-shelf-kicker {
+		font-size: 0.72rem;
+		color: var(--p-muted);
+		margin-bottom: 0.4rem;
+	}
+
+	.ted-shelf-strip {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+	}
+
+	.ted-shelf-chip {
+		font-size: 0.78rem;
+		color: var(--p-text);
+		padding: 0.25rem 0.6rem;
+		border: 1px solid var(--p-border);
+		border-left: 3px solid var(--chip, var(--p-accent));
+		border-radius: 0.35rem;
+		background: transparent;
+		transition: border-color var(--pl-transition-fast);
+	}
+
+	.ted-shelf-chip:hover,
+	.ted-shelf-chip:focus-visible {
+		border-color: var(--p-accent);
+	}
+
+	.ted-shelf-link {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.78rem;
+		color: var(--p-muted);
+		margin-bottom: 0.85rem;
+	}
+
+	.ted-shelf-link strong {
+		color: var(--p-text);
+		font-weight: 500;
+	}
+
+	.ted-shelf-dot {
+		width: 0.5rem;
+		height: 0.5rem;
+		border-radius: 50%;
+		flex: none;
+	}
+
+	.ted-shelf-clear {
+		font-size: 0.72rem;
+		color: var(--p-muted);
+		background: transparent;
+		text-decoration: underline;
+		margin-left: auto;
+	}
+
+	.ted-shelf-clear:hover {
+		color: var(--p-text);
 	}
 
 	.ted-fields {

@@ -13,6 +13,7 @@
 // in here you'd be harmed to leak.
 
 export * from './publicBlobs';
+export * from './crossAppBlobs';
 
 const ENDPOINT = '/api/sync';
 const PUBLIC_ENDPOINT = '/api/public';

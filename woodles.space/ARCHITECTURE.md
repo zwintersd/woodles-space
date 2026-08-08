@@ -47,9 +47,10 @@ other docs have narrower jobs:
   copying it. its §1 surveys the four shapes the workspace already does this
   in (bloomforge's shared keys, marginalia's binding map, the public blobs'
   carried ids, spores' deliberately breakable title links); its §3 is a table
-  of open questions, not answers. **only its step 1 is built** — the
-  addressing layer described under "the app manifest" above; steps 2–6, and
-  the Carillon ↔ Thinking About connection they add up to, are unstarted.
+  of open questions bar one. **steps 1 and 2 are built** — the addressing
+  layer under "the app manifest" above, and the shelf ledger under "cross-app
+  ledgers" below; steps 3–6 are unstarted, so the Carillon ↔ Thinking About
+  connection currently runs one way only.
 - [ROADMAP.md](./ROADMAP.md) is the 10-week plan for making marginalia and
   the bestiary public-facing — all ten weeks are marked `✅ shipped` in its
   own headers, week 4 (share links, save-as-image, adopt-a-card) having
@@ -929,6 +930,52 @@ passphrase connect/disconnect/persistence for gating the public echoes
 publish below — connecting the passphrase once, in any app, connects it
 everywhere, same origin, same localStorage key.
 
+### cross-app ledgers
+
+A third use of the sync spine, alongside each app's own blob and the public
+read path below. A **ledger** is the narrow surface one app publishes for
+*another app* to read — private data following one person between their own
+devices, so it rides `/api/sync` behind the same passphrase rather than
+`/api/public`. The shapes and both keys live in
+`packages/sync/src/crossAppBlobs.ts`, next to `publicBlobs.ts` and for the same
+reason: defined in neither app, so writer and reader cannot drift.
+
+Two rules hold for every ledger. **One writer** — the app that owns the data
+publishes it, and a reader that needs to send something back gets its own
+ledger in the other direction rather than writing to this one. **Derived,
+never authoritative** — a ledger is rebuilt from the writer's own store on
+every save, so it is always safe to throw away, and it is never hydrated back
+into the app that produced it. That second rule is why publishing is a bare
+`push` rather than a `createAppSync` adapter: hydrating would be backwards.
+
+One ledger exists today. **Thinking About publishes the shelf** — active,
+titled entries as `{ id, title, columnKey, sectionKey, color, lastSessionDate }`
+under sync key `thinking-about-shelf` and localStorage key
+`thinking-about.shelf.v1`. Notes, session logs and archive state stay private.
+Carillon reads it into the task composer, where picking one seeds the title and
+stores `Task.thinkingAboutEntryId` — a *reference*, so a rename over there
+can't leave the planner lying, and so a later observation on that block knows
+exactly which entry it was.
+
+Local-first is not weakened by this riding sync: the writer mirrors every save
+to localStorage, the reader looks there first (synchronous, same origin,
+instant), and the server is only what carries the ledger to a device where the
+other app has never been opened. The reader degrades through the same
+`idle → loading → ready/empty → error` shape every other reader here uses, and
+a stale local shelf always beats an error — no shelf simply means no picker,
+never a broken composer.
+
+Two consequences worth stating. A publish is **deduplicated against the last
+one this session**, because most saves change a note or a session date, which
+the shelf doesn't carry — without that, every flush would spend a round trip
+rewriting identical bytes. And a compare-and-swap rejection is answered by
+re-pushing the same derivation against the version the server just reported,
+not by merging: two devices publishing a projection of their own entries are
+not in conflict about anything a person typed, and the entries underneath
+converge through Thinking About's own sync.
+
+See [REFERENCES.md](./REFERENCES.md), whose step 2 this is.
+
 ### the public read path
 
 a second, unrelated spine, added across ROADMAP.md's weeks 1–9: publishing a
@@ -1083,15 +1130,15 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1713 tests total: 16 in `api/` (its own
+1749 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1697 across sixteen pnpm
-packages — `write` 122, `marginalia` 333, `planner` 486,
+instead of the recursive `pnpm -r test`), plus 1733 across sixteen pnpm
+packages — `write` 122, `marginalia` 333, `planner` 499,
 `spores` 140, `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
-`packages/sync` 9, `packages/persistence` 6, `packages/app-manifest` 16,
+`packages/sync` 15, `packages/persistence` 6, `packages/app-manifest` 16,
 `packages/handoff` 15, `packages/text` 23, `packages/spellcraft` 16,
-`packages/emoji` 4, `packages/incremental-core` 191, and `thinking-about` 69.
+`packages/emoji` 4, `packages/incremental-core` 191, and `thinking-about` 86.
 (Counted by running each suite, not by adding to the previous figure — the
 inventory had drifted: the headline said 1644 against a body summing to 1700,
 and marginalia's balance-harness work landed 333 tests recorded as 325. Two

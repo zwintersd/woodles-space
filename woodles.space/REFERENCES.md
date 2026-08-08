@@ -10,9 +10,10 @@ workspace has now built three times, three different ways, and never named.
 this file names it, surveys what already exists, and proposes the smallest
 spine that serves the whole repo rather than just this one pair.
 
-**status: step 1 built, the rest proposed.** §3's decisions are still open
-questions, not answers — none of them gated the addressing layer, which is
-why it went first. read alongside [ARCHITECTURE.md](./ARCHITECTURE.md) for how
+**status: steps 1 and 2 built, the rest proposed.** the sync question in §3
+is answered — the ledgers ride `api/sync.ts` *and* localStorage, see that row.
+the remaining rows are still open, and none of them gated either step.
+read alongside [ARCHITECTURE.md](./ARCHITECTURE.md) for how
 the apps are actually wired and [CONVERGENCE.md](./CONVERGENCE.md) for why
 five text surfaces became two — this file is that document's mirror image.
 convergence was about apps that should have been one app. this is about apps
@@ -149,7 +150,7 @@ than they look.
 | --- | --- | --- |
 | does a carillon task pointing at an archived/deleted thinking-about entry go cold, or get dropped? | marginalia **drops** stale bindings (§1B); spores lets links go **red** (§1D) | **cold, not dropped** — a sprite binding with no sprite renders nothing, so dropping is right there; a scheduled task still holds words you typed, so it keeps its own title and loses only the link |
 | does observing a linked block log a thinking-about session, or offer to? | auto / offer | **offer** — carillon's stated stance is that nudges are suggestions, never actions taken on your behalf |
-| do the ledgers ride sync, or stay same-origin localStorage? | localStorage only / through `api/sync.ts` | **open, and the expensive one** — this is CONVERGENCE.md §6.4's unresolved handoff question arriving a second time. localStorage-only means the connection silently isn't there on a fresh device until both apps hydrate |
+| do the ledgers ride sync, or stay same-origin localStorage? | localStorage only / through `api/sync.ts` | **decided: sync** — and it turned out to be *both*, not either. localStorage stays the fast path on one device and the server carries the ledger to the next, which is the same local-first shape the rest of the workspace already has. this also answers CONVERGENCE.md §6.4 for ledgers, though not for handoff queues, which remain same-origin |
 | does thinking about's freeform `schedule` gain structure? | keep freeform / optional weekday+time | **optional structure, freeform preserved** — it's what lets a standing thursday watch date render on the calendar |
 | who owns the link record? | carillon's task / thinking about's entry / a third store | **carillon's task** — "i scheduled this" is carillon's sentence; thinking about should not grow a field about time |
 | extract a reference package now, or build it locally first? | package / local | **split — see §4.3** |
@@ -270,7 +271,7 @@ each step ships something usable and nothing depends on finishing the next.
 | # | step | size | unblocks |
 | --- | --- | --- | --- |
 | 1 | ✅ **destinations in `@woodles/app-manifest`.** app id + kind + record id → URL, with contract tests beside the existing route tests. rewired bloomforge's hardcoded `/play?game=`. | ~half a day | everything below, plus `HandoffSource.href` finally meaning something |
-| 2 | **thinking about publishes the shelf**, and carillon reads it into a picker on the composer. the "pull it in" half. | ~1–2 days | the reference exists and is useful before any deep link works |
+| 2 | ✅ **thinking about publishes the shelf**, and carillon reads it into a picker on the composer. the "pull it in" half. | ~1–2 days | the reference exists and is useful before any deep link works |
 | 3 | **deep links both ways** — carillon opens on `compose=<entryId>`, thinking about opens on an entry — over step 1's destinations. | ~1 day | the navigation feel; the thing the google-suite comparison is actually about |
 | 4 | **carillon publishes commitments**, thinking about renders them in entry detail. the return trip. | ~1 day | the connection stops being one-way |
 | 5 | **session logging from an observation**, via a queue carillon writes and thinking about drains. | ~1 day | the loop; the clock finally reaches the sessions |
