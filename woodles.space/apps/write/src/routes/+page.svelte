@@ -296,6 +296,7 @@
 		const params = new URLSearchParams(window.location.search);
 		const tid = params.get('template');
 		const replyId = params.get('reply');
+		const revisitId = params.get('revisit');
 
 		// Hygge design playground passes ?palette=&motif=&font= to pre-style the editor.
 		const hyggeParams = {
@@ -328,6 +329,50 @@
 				watchWrapWidth();
 				return;
 			}
+		}
+
+		// Echoes' revisit tab sends a published letter's id back here so it can
+		// be picked up as prose again. It becomes its own new draft — the
+		// published letter (and whatever's public) is left untouched, so
+		// revisiting is never destructive.
+		if (revisitId) {
+			// Strip the param immediately so a later reload of this same tab
+			// can't spawn a second draft from the same letter.
+			history.replaceState(null, '', window.location.pathname);
+			const letters = loadLettersList();
+			const source = findLetter(letters, revisitId);
+			if (source) {
+				const id = createDraftId();
+				const now = new Date().toISOString();
+				saveDraft(id, {
+					title: source.title,
+					theme: source.theme,
+					motif: source.motif,
+					font: source.font,
+					layers: source.layers,
+					annotations: source.annotations,
+					content: source.content,
+					savedAt: now
+				});
+				const index = upsertIndex(listDrafts(), id, source.title || '', now);
+				writeIndex(index);
+				setActiveDraftId(id);
+				draftsList = index;
+				currentDraftId = id;
+				if (source.replyTo) {
+					replyTo = source.replyTo;
+					replyToTitle = findLetter(letters, source.replyTo)?.title || 'untitled letter';
+				}
+				loadIntoLayers(source);
+				updateMeta();
+				hydrated = true;
+				scheduleMeasure();
+				window.addEventListener('resize', onResize);
+				document.addEventListener('selectionchange', onSelectionChange);
+				watchWrapWidth();
+				return;
+			}
+			// If the letter is gone, fall through to the normal draft bootstrap.
 		}
 
 		if (replyId) {
