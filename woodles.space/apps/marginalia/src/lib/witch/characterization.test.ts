@@ -12,6 +12,7 @@
 import { describe, expect, it } from 'vitest';
 import { Book, STAGE_KNOWN, STAGE_OBSERVED } from './book.svelte';
 import { conditions } from './content/conditions';
+import { INTERVENTION_LOAD_FULL } from './tuning';
 
 /** A book with essence to burn, so writing conditions is never the constraint. */
 function freshBook(): Book {
@@ -187,7 +188,11 @@ describe('characterization — insight and favor', () => {
 		// whether that's a balance problem.
 		expect(b.stageOf('salt_deposit')).toBe(STAGE_KNOWN);
 		expect(b.categoryMastered.aquatic).toBe(true);
-		const expected = 0.5 * 1.12 * b.favorMult;
+		// ...and by recall: reaching Known releases the slot, so it has begun to
+		// slip since. A forgotten thing is still known — the multiplier floors
+		// well above zero — but it is worth less than one freshly in mind.
+		expect(b.recallOf('salt_deposit')).toBeLessThan(1);
+		const expected = 0.5 * 1.12 * b.recallMultiplier('salt_deposit') * b.favorMult;
 		expect(b.insightPerSec).toBeCloseTo(expected, 6);
 	});
 
@@ -326,12 +331,14 @@ describe('characterization — interventions', () => {
 		expect(b.stockBaseline.nutrients).toBe(65);
 	});
 
-	it('raises intervention load, which decays', () => {
+	// Load is a lifetime measure now. It used to forget at 0.01/sec, which made
+	// a permanent act free within a minute of making it — see BALANCE.md §3.
+	it('raises intervention load, and the load does not forget', () => {
 		const b = bookWithKnownSalt();
 		b.intervene('salt_deposit');
 		expect(b.interventionLoad).toBeCloseTo(0.5, 6); // permanent → 0.5
-		run(b, 10);
-		expect(b.interventionLoad).toBeCloseTo(0.4, 6); // 0.01/s
+		run(b, 600);
+		expect(b.interventionLoad).toBeCloseTo(0.5, 6);
 	});
 
 	it('will not intervene on something not yet Known', () => {
@@ -354,10 +361,17 @@ describe('characterization — the equilibrium dividend', () => {
 		expect(b.selfBalancing).toBe(true);
 	});
 
-	it('a heavy hand suppresses the dividend', () => {
+	it('a heavy hand suppresses the dividend, in proportion to how heavy', () => {
 		const b = freshBook();
 		writeAll(b);
-		b.interventionLoad = 1;
+		// partway to the full mark costs partway — the dividend is banked in
+		// proportion to the factor now, not gated on it, which is what makes a
+		// single act cost something a player can feel
+		b.interventionLoad = INTERVENTION_LOAD_FULL / 2;
+		expect(b.equilibriumFactor).toBeCloseTo(0.5, 6);
+
+		// and touching everything the world allows ends it entirely
+		b.interventionLoad = INTERVENTION_LOAD_FULL;
 		expect(b.equilibriumFactor).toBe(0);
 		const before = b.equilibriumSeconds;
 		run(b, 10);

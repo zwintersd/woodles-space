@@ -197,6 +197,26 @@ export class Book {
 		return this.v, this.world.state.equilibriumSeconds;
 	}
 
+	// ── recall: what attention is for after Known ────────────────────────────
+
+	recallOf(lifeId: string): number {
+		return this.v, this.world.recallOf(lifeId);
+	}
+
+	fluencyOf(lifeId: string): number {
+		return this.v, this.world.fluencyOf(lifeId);
+	}
+
+	/** What recall is currently doing to a Known life's yield. */
+	recallMultiplier(lifeId: string): number {
+		return this.v, this.world.recallMultiplier(lifeId);
+	}
+
+	/** Which stocks sit outside their band — the reason a world isn't holding. */
+	get outOfBand() {
+		return this.v, this.world.outOfBand;
+	}
+
 	// ── attention ────────────────────────────────────────────────────────────
 
 	get attentionCapacity(): number {
@@ -835,6 +855,8 @@ export class Book {
 			interventionsDone: { ...w.interventionsDone },
 			interventionLoad: w.interventionLoad,
 			equilibriumSeconds: w.equilibriumSeconds,
+			recall: { ...w.recall },
+			fluency: { ...w.fluency },
 			attentionCapacity: w.attentionCapacity,
 			attending: [...w.attending],
 			study: { ...w.study },
@@ -872,6 +894,8 @@ export class Book {
 			interventionsDone: { ...(s.interventionsDone ?? {}) },
 			interventionLoad: s.interventionLoad ?? 0,
 			equilibriumSeconds: s.equilibriumSeconds ?? 0,
+			recall: { ...(s.recall ?? {}) },
+			fluency: { ...(s.fluency ?? {}) },
 			attentionCapacity: s.attentionCapacity,
 			attending: [...s.attending],
 			study: { ...s.study },

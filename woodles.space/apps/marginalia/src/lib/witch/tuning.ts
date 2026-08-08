@@ -121,17 +121,70 @@ export const ENCOURAGE_STABILITY = 8; // permanent stability add
 export const ENCOURAGE_STABILITY_MAX = 40;
 export const GUIDE_METABOLISM_SCALE = 0.5; // a guided animal eases what it draws
 
-// Restraint, rewarded. Each act adds load by its permanence; load decays, and
-// while it is low and the stocks sit in band the world banks an equilibrium
-// dividend — so the lightest touch is worth the most.
+// Restraint, rewarded. Each act adds load by its permanence, and while the load
+// is low and the stocks sit in band the world banks an equilibrium dividend —
+// so the lightest touch is worth the most.
 export const INTERVENTION_LOAD_WEIGHT = {
 	temporary: 0.1,
 	lasting: 0.3,
 	permanent: 0.5
 } as const;
-export const INTERVENTION_LOAD_DECAY = 0.01; // per second, the hand grows light again
+
+// Load is a **lifetime** measure: it counts every act she has ever made in this
+// world and does not decay. It used to forget at 0.01/sec, which meant a
+// permanent intervention's cost was gone inside a minute — and since
+// intervening *repairs* a world, and being in band is what the dividend
+// rewards, the mechanic built to reward restraint was paying a meddler more
+// than an ascetic. See BALANCE.md §3.
+//
+// §2.3's own framing is a lifetime claim — "a world she props up has high load,
+// which caps the favor it can reach; a propped world depends, it doesn't
+// trust." A world meddled with early and left alone late is still a propped
+// world. Forgetting was the bug.
+//
+// The full mark is the sum of every intervention the *opening* worldspace
+// allows — geology 0.5, ecosystem 0.3, animal 0.3, plant 0.1. Touch all four
+// aquatic life and the dividend is gone entirely. Measured against the whole
+// eleven-life world this is deliberately steep: the first act should cost
+// something a player can feel, not something they need a spreadsheet to see.
+export const INTERVENTION_LOAD_FULL = 1.2;
 export const FAVOR_EQUILIBRIUM_BONUS = 8;
 export const EQUILIBRIUM_MIN_FACTOR = 0.5; // above this, equilibrium seconds bank
+
+// ── recall: the Known endgame, and what attention is for afterwards ─────────
+// Bjork's two strengths, which the observation stages were already halfway to:
+// *storage* is how deeply she has come to know a thing, *retrieval* is how
+// readily it comes to her now. Storage never decays — a Known life stays Known,
+// nothing is ever lost. Retrieval does.
+//
+// So a Known life still yields, but yields more when it is fresh in her mind,
+// and returning to it is what freshens it. That is what attention is for once
+// the stages are done, and it is why capacity keeps mattering: before this,
+// four life finishing in half an hour meant two slots were never the constraint
+// and every capacity upgrade was strictly negative (BALANCE.md §4).
+export const RECALL_DECAY_PER_SEC = 0.001; // ~20 minutes of neglect to fade badly
+export const RECALL_RESTORE_PER_SEC = 0.011; // ~3 minutes of attention to bring back
+// A forgotten thing is still known: yield falls to this multiple, never past it.
+export const RECALL_YIELD_FLOOR = 0.5;
+
+// Fluency — the desirable-difficulty half, and the reason patience beats
+// grinding. Retrieving something you had nearly forgotten is worth far more
+// than topping up something you never let fade, so fluency accrues in
+// proportion to how far it had slipped. It is permanent, and it slows all
+// future forgetting: decay is divided by (1 + fluency).
+//
+// The consequence is the thesis in miniature. Keep everything pinned at full
+// recall and you build no fluency and need those slots forever; let things fade
+// and return at the right moment and the world eventually holds itself in her
+// memory the way it holds itself in its metabolism.
+export const FLUENCY_GAIN_PER_SEC = 0.006;
+export const FLUENCY_MAX = 3;
+// What a point of fluency adds to yield, *on top of* full recall. Without a
+// ceiling to exceed, keeping everything permanently topped up captures
+// everything there is and letting a thing fade is pure loss — which is the
+// opposite of the mechanic's point. This is the testing effect: what you had to
+// work to retrieve, you hold better than what you never let go of.
+export const FLUENCY_YIELD_BONUS = 0.12;
 
 // ── focus: consecutive "look closer" clicks build a bounded streak ─────────
 // A click within this many seconds of the last one continues the streak;

@@ -86,6 +86,11 @@ const NOTHING: readonly PolicyAction[] = Object.freeze([]);
 
 export interface WitnessOptions {
 	/**
+	 * Return to a Known life only once its recall has fallen below this. 1 tops
+	 * everything up the moment it slips; lower values let things fade first.
+	 */
+	returnBelow?: number;
+	/**
 	 * Fill attention slots with whatever is closest to its next stage. The
 	 * alternative — leaving slots empty — is a floor nobody plays, since
 	 * attending costs nothing.
@@ -102,6 +107,7 @@ export interface WitnessOptions {
 export function witnessOnly(options: WitnessOptions = {}): WorldPolicy {
 	const autoAttend = options.autoAttend ?? true;
 	const expand = options.expandAttention ?? true;
+	const returnBelow = options.returnBelow ?? 1;
 	return {
 		name: 'Witness',
 		decide({ world }) {
@@ -110,7 +116,17 @@ export function witnessOnly(options: WitnessOptions = {}): WorldPolicy {
 				const cost = world.attentionUpgradeCost;
 				if (cost !== null && world.state.insight >= cost) actions.push({ type: 'expandAttention' });
 			}
-			if (autoAttend) fillAttention(world, actions);
+			if (autoAttend) {
+				// let go of anything fully back in mind — otherwise the first
+				// things Known sit in their slots forever and capacity means
+				// nothing again
+				for (const id of world.state.attending) {
+					if (world.stageOf(id) >= STAGE_KNOWN && world.recallOf(id) >= 0.999) {
+						actions.push({ type: 'unattend', lifeId: id });
+					}
+				}
+				fillAttention(world, actions, returnBelow);
+			}
 			return actions.length ? actions : NOTHING;
 		}
 	};
@@ -139,6 +155,23 @@ export function interventionist(options: WitnessOptions = {}): WorldPolicy {
 	};
 }
 
+/**
+ * The study bound: she lets a thing fade before returning to it.
+ *
+ * The claim this exists to check is Bjork's, and the design's: retrieving
+ * something you had nearly forgotten is worth more than topping up something
+ * you never let slip. If `patient` doesn't beat `witnessOnly` on fluency — and
+ * eventually on the slots it frees — then the recall numbers are wrong and the
+ * mechanic is just a chore.
+ */
+export function patient(returnBelow = 0.4, options: WitnessOptions = {}): WorldPolicy {
+	const inner = witnessOnly({ ...options, returnBelow });
+	return {
+		name: `Patient(${returnBelow})`,
+		decide: (ctx) => inner.decide(ctx)
+	};
+}
+
 /** Does nothing at all. The true floor — not even attention. */
 export const doNothing: WorldPolicy = {
 	name: 'Nothing',
@@ -146,16 +179,35 @@ export const doNothing: WorldPolicy = {
 };
 
 /**
- * Attend whatever is closest to crossing its next stage, so a slot is never
- * idle. Shared by both bounds so the only difference between them is meddling.
+ * Fill every free slot, so attention is never idle.
+ *
+ * Deepening comes first — a life that hasn't reached Known yet is progress the
+ * world can't make any other way. Only then does she return to something Known
+ * that has slipped, worst-remembered first.
+ *
+ * `returnBelow` is the whole difference between the two study policies. At 1 it
+ * is the anxious reading: top everything up the instant it slips at all. Lower
+ * it and she lets things fade before going back to them, which is what builds
+ * fluency — see `patient`.
  */
-function fillAttention(world: World, into: PolicyAction[]): void {
+function fillAttention(world: World, into: PolicyAction[], returnBelow = 1): void {
 	let free = world.attentionFree;
 	if (free <= 0) return;
-	const candidates = world.life
+
+	const deepening = world.life
 		.filter((l) => world.stageOf(l.id) < STAGE_KNOWN && !world.isAttending(l.id))
 		.sort((a, b) => world.stageProgress(b.id) - world.stageProgress(a.id));
-	for (const l of candidates) {
+
+	const faded = world.life
+		.filter(
+			(l) =>
+				world.stageOf(l.id) >= STAGE_KNOWN &&
+				!world.isAttending(l.id) &&
+				world.recallOf(l.id) < returnBelow
+		)
+		.sort((a, b) => world.recallOf(a.id) - world.recallOf(b.id));
+
+	for (const l of [...deepening, ...faded]) {
 		if (free <= 0) break;
 		into.push({ type: 'attend', lifeId: l.id });
 		free -= 1;
@@ -197,6 +249,10 @@ export interface SeriesSample {
 	stocks: Record<StockId, number>;
 	/** Mean vitality across visible life — 1 is a contented world. */
 	vitality: number;
+	/** Mean recall across Known life — 1 is a world entirely in mind. */
+	recall: number;
+	/** Total fluency across Known life — permanent, only ever rises. */
+	fluency: number;
 	equilibriumFactor: number;
 	knownCount: number;
 }
@@ -225,6 +281,10 @@ export interface SimSummary {
 	finalKnowing: number;
 	peakComplexity: number;
 	equilibriumSeconds: number;
+	/** Mean recall at the end of the run, across Known life. */
+	finalRecall: number;
+	/** Total fluency built — the durable half of what studying bought. */
+	finalFluency: number;
 	interventions: number;
 	/** What DESIGN.md §3.3 would mint if the book closed here. */
 	concepts: number;
@@ -382,6 +442,8 @@ export function simulate(policy: WorldPolicy, opts: SimOptions): SimResult {
 			finalKnowing: world.state.knowing,
 			peakComplexity,
 			equilibriumSeconds: world.state.equilibriumSeconds,
+			finalRecall: series[series.length - 1].recall,
+			finalFluency: series[series.length - 1].fluency,
 			interventions,
 			concepts: conceptsFor(peakComplexity, world.knownCount, world.state.equilibriumSeconds)
 		},
@@ -397,6 +459,13 @@ function sampleWorld(world: World, t: number): SeriesSample {
 	for (const l of life) vitality += world.vitalityOf(l.id);
 	const stocks = {} as Record<StockId, number>;
 	for (const id of STOCK_IDS) stocks[id] = world.state.stocks[id];
+	const known = life.filter((l) => world.stageOf(l.id) >= STAGE_KNOWN);
+	let recall = 0;
+	let fluency = 0;
+	for (const l of known) {
+		recall += world.recallOf(l.id);
+		fluency += world.fluencyOf(l.id);
+	}
 	return {
 		t,
 		insight: world.state.insight,
@@ -407,6 +476,8 @@ function sampleWorld(world: World, t: number): SeriesSample {
 		complexity: world.complexity,
 		stocks,
 		vitality: life.length ? vitality / life.length : 1,
+		recall: known.length ? recall / known.length : 1,
+		fluency,
 		equilibriumFactor: world.equilibriumFactor,
 		knownCount: world.knownCount
 	};

@@ -4,16 +4,17 @@ Readings from the harness (`pnpm --filter marginalia balance`), plus the
 parameter sweeps behind the retune (`sweep.report.ts`). Re-run both after
 changing a constant; every table here should move.
 
-**Two things have been changed in the game since the first pass** — the
-content-to-time ratio and the stock-drift model, plus the two passive sinks
-DESIGN.md already names in prose. §1 and §2 record what that did. §3–5 are the
-findings that remain open; none of them has been touched, because each is a
-design decision rather than a bug.
+**Four of the six findings are now fixed.** §1 pacing, §2 the vital signs, §3
+the restraint dividend, §4 attention capacity. §6 was decided rather than
+fixed — the opening worldspace stays unbalanceable on purpose, and now says so.
+§5 is still open, along with one unproven claim inside §4.
 
-Method: the `Witness` policy (attend whatever is closest to its next stage, buy
-capacity, never intervene) against `Interventionist` (all of that, plus
-intervene the moment anything Known can be afforded, and distill spare insight).
-Both bounds are deliberately naive. Seed 1, fixed 100ms timestep.
+Method: three policies. `Witness` attends whatever is closest to its next stage,
+returns to Known life as it slips, and buys capacity, but never intervenes.
+`Interventionist` does all of that and intervenes the moment anything Known can
+be afforded. `Patient(n)` is Witness but lets a thing fall to `n` recall before
+returning to it. All are deliberately naive bounds. Seed 1, fixed 100ms
+timestep.
 
 ---
 
@@ -122,48 +123,79 @@ An empty world still holds still — it now dries to the floor of its bands
 
 ---
 
-## 3. the restraint dividend — still broken, and now inverted
+## 3. the restraint dividend — fixed
 
-The one that matters, because it is the thesis. It used to pay a meddler and an
-ascetic *identically*. It no longer does — it pays the meddler **more**.
+This was the one that mattered, because it is the thesis. It first paid a
+meddler and an ascetic *identically*; after the drift retune it paid the meddler
+**more**, because a world that can leave its band is one that intervening
+repairs, and repair is what the dividend rewards.
 
-| hours | policy | insight | eq. share | equil. seconds | concepts |
-| ---: | --- | ---: | ---: | ---: | ---: |
-| 2 | Witness | 39,162 | 6.0% | 435 | 8 |
-| 2 | Interventionist | 55 | 9.2% | **660** | **9** |
-| 24 | Witness | 567,128 | 0.5% | 435 | 8 |
-| 24 | Interventionist | 21 | 0.8% | **660** | **9** |
+Two changes fixed it, and both were needed:
 
-Why the retune made it worse rather than better: now that a world can genuinely
-leave its band, intervening *repairs* it. `shape` lifts the nutrient baseline,
-`tend` bumps the stock a life lives by — and being in band is exactly what the
-dividend rewards. `interventionLoad` decays at 0.01/sec, so a permanent act's
-0.5 is gone in under a minute, long before it can offset the repair.
+- **Load is a lifetime measure.** It used to forget at 0.01/sec, so a permanent
+  act's 0.5 was gone inside a minute. §2.3's own framing is a lifetime claim — a
+  world meddled with early and left alone late is still a propped world.
+- **The dividend banks in proportion to the factor, not gated on it.** This was
+  the deeper bug. `if (eq > 0.5) equilibriumSeconds += dt` meant any load short
+  of the threshold cost *exactly nothing*, so a light hand and a fairly heavy one
+  banked identically no matter what the load term said.
 
-BALANCE.md's original suggestion stands and is now more urgent: make the load
-decay slower than a run, or scale the dividend by interventions *ever* made
-rather than only recent ones. As it stands the load is a rate limit on clicking,
-not a measure of a heavy hand.
+Measured at 6 hours:
 
-(The insight column is not the dividend working. The Interventionist spends
-everything the moment it can, so it never accumulates — a bound behaving
-correctly, and it says nothing about restraint.)
+| worldspace | policy | equil. sec | eq. share | load | concepts |
+| --- | --- | ---: | ---: | ---: | ---: |
+| shallows | **Witness** | **20,391** | 94.4% | 0.00 | **36** |
+| shallows | Interventionist | 1,836 | 13.0% | 0.90 | 16 |
+| water | Witness | 435 | 2.0% | 0.00 | 8 |
+| water | Interventionist | 641 | 3.1% | 0.40 | 9 |
 
-## 4. attention capacity is still a trap
+**In a world that can balance, restraint out-earns meddling elevenfold** and
+more than doubles the mint. The opening water worldspace is the exception, and
+for a reason that is content rather than tuning: it is nutrient-poor by design
+(§6), so restraint *cannot* produce equilibrium there and intervening is the
+only route into band at all. Both numbers are near zero — 2% against 3% of a
+six-hour run — so it is a rounding difference between two failures, not a
+strategy. Worth knowing; not worth tuning around.
 
-6 hours, Witness, with and without buying capacity:
+## 4. attention capacity — fixed, by giving the Known endgame something to do
 
-| | capacity | known | insight |
+Capacity was strictly negative to buy: four visible life, finished in half an
+hour, against two slots. The fix is a mechanic rather than a number, and it
+leans on the learning sciences the observation stages were already halfway to.
+
+**Bjork's two strengths.** *Storage* is how deeply she has come to know a thing;
+*retrieval* is how readily it comes to her now. Storage never decays — a Known
+life stays Known, and nothing is ever lost. Retrieval does. So a Known life
+still yields, but yields more when it is fresh in her mind, and returning to it
+is what freshens it. That is what attention is for once the stages are done.
+
+**And the desirable difficulty.** Retrieving something you had nearly forgotten
+is worth more than topping up something you never let slip, so `fluency` accrues
+in proportion to how far a thing had slipped. It is permanent, it slows all
+future forgetting, and it pays *above* full recall — because durable knowledge
+is worth more than merely fresh knowledge, and without a ceiling to exceed,
+letting anything fade would be pure loss.
+
+6 hours in the shallows, with and without buying capacity:
+
+| | insight | recall | fluency |
 | --- | ---: | ---: | ---: |
-| never expand | 2 | 4 | 132,225 |
-| expand when affordable | 6 | 4 | 135,156 |
+| never expand | 263,401 | 0.658 | 17.05 |
+| expand when affordable | **445,572** | 0.969 | 23.68 |
 
-Marginally positive now rather than negative, but it still knows exactly the
-same four life and still does not change time-to-first-Known. Four visible life
-against two slots was never the constraint. This needs either more life in the
-opening worldspace or a reason to hold attention on something already Known.
+Capacity is now worth **69% more insight**. It used to be worth −2%.
 
-## 5. category mastery still fires trivially
+**What is not yet demonstrated:** that patience beats grinding. A `Patient(0.4)`
+policy — one that lets a thing fall to 40% recall before returning to it —
+builds slightly more fluency but earns less at every horizon (408,741 against
+445,572 at six hours). The reason is that slots are the binding constraint
+either way: with six slots against eleven life, *everybody* is forced to be
+patient, so the two policies barely differ in behaviour. The axis only opens up
+at high capacity, which world 1 does not reach. Either `FLUENCY_YIELD_BONUS`
+wants to be larger than 0.12, or this is a question for a world with more slots
+than life — see WORLDS.md.
+
+## 5. category mastery still fires trivially — open
 
 Unchanged. Write only `holding`, and one aquatic life is revealed; Know it, and
 the whole aquatic category is mastered forever (+12%, sticky) before the
@@ -173,7 +205,7 @@ else — terrestrial and atmospheric life aren't visible from the water
 worldspace, so `inCategory.length === 0` returns early and they are
 *unmasterable* rather than unmastered.
 
-## 6. new: the opening worldspace can never self-balance
+## 6. the opening worldspace can never self-balance — accepted, and now legible
 
 A consequence of the retune worth deciding about. The water worldspace holds
 four aquatic life whose nutrient metabolism nets to −0.01/sec, so nutrients
@@ -187,22 +219,25 @@ equilibrium dividend stops banking once the opening minutes are over:
   24h run → 0.5%
 ```
 
-Read generously this is good progression: the opening act is nutrient-poor, and
-opening the shallows is what closes the loop. Read harshly, the restraint
-mechanic is unreachable during the only part of the game a new player will see.
-Nudging one aquatic nutrient source up by ~0.01/sec would put it in band; that
-is a design call, not a fix.
+**Decided: leave it, and say so.** The opening act is nutrient-poor on purpose
+and opening the shallows is what closes the loop — that is the reason sediment
+exists. What was missing is that a player could not tell an intended state from
+a broken one, so the Ledger now names which stocks sit outside their band rather
+than showing a permanent unexplained silence where "holding itself" should be.
 
 ---
 
 ## what is still open
 
-1. **The restraint dividend (§3)** — now actively inverted. The highest-leverage
-   remaining fix, and the one the thesis depends on.
-2. **Attention capacity (§4)** and **mastery scope (§5)** — unchanged from the
-   first pass.
-3. **Whether the water worldspace should be able to balance (§6)** — new, and a
-   direct consequence of the retune.
+1. **Category mastery (§5)** — still fires on a single-member category and is
+   unreachable for any category not in the current worldspace. Three lines:
+   count over the authored world, require at least two members.
+2. **Whether patience should beat grinding (§4)** — the mechanic works, the
+   axis is flat. Needs either a larger fluency bonus or a world where slots
+   outnumber nothing.
+
+Everything else on the first pass's list is closed. The route through what
+comes next is [WORLDS.md](./WORLDS.md).
 
 Each is a one-line change, and the harness will tell you what it did in about a
 second per simulated day.
