@@ -76,6 +76,9 @@ importers:
 
   apps/bloomforge:
     dependencies:
+      '@woodles/app-manifest':
+        specifier: workspace:*
+        version: link:../../packages/app-manifest
       '@woodles/emoji':
         specifier: workspace:*
         version: link:../../packages/emoji

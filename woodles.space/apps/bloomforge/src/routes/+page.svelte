@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { entityHref } from '@woodles/app-manifest';
 	import { blankGameDef, GameDefParseError, type EntityKind, type GameDef } from '@woodles/incremental-core';
 	import Canvas from '$lib/canvas/Canvas.svelte';
 	import Dock from '$lib/dock/Dock.svelte';
@@ -195,7 +196,11 @@
 			// Flushed first: the player reads the project straight out of storage,
 			// so an unsaved edit would be missing from the game it opens.
 			studio.flush();
-			window.open(`/play?game=${encodeURIComponent(studio.projectId)}`, '_blank', 'noopener');
+			window.open(
+				entityHref('bloomforge-player', 'game', studio.projectId),
+				'_blank',
+				'noopener'
+			);
 		}}
 	/>
 

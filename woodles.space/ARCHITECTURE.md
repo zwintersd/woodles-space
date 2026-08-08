@@ -40,6 +40,16 @@ other docs have narrower jobs:
   doing all the balancing — fixed by implementing the two passive sinks the
   design names in prose and never had. Three findings remain open and
   deliberately untouched, the restraint dividend chief among them.
+- [REFERENCES.md](./REFERENCES.md) is CONVERGENCE's mirror image, and
+  **mostly still a proposal**: where convergence collapsed apps that
+  should have been one app, this is about apps that stay separate and learn
+  each other's names — one record pointing at a record in another app without
+  copying it. its §1 surveys the four shapes the workspace already does this
+  in (bloomforge's shared keys, marginalia's binding map, the public blobs'
+  carried ids, spores' deliberately breakable title links); its §3 is a table
+  of open questions, not answers. **only its step 1 is built** — the
+  addressing layer described under "the app manifest" above; steps 2–6, and
+  the Carillon ↔ Thinking About connection they add up to, are unstarted.
 - [ROADMAP.md](./ROADMAP.md) is the 10-week plan for making marginalia and
   the bestiary public-facing — all ten weeks are marked `✅ shipped` in its
   own headers, week 4 (share links, save-as-image, adopt-a-card) having
@@ -146,6 +156,26 @@ back, or if a second app joins `write`. See [CONVERGENCE.md](./CONVERGENCE.md).
 The static landing page imports that browser-ready module directly;
 its hand-drawn `ICONS` stay local because they are artwork, not deployment
 metadata.
+
+It also owns **addressing**: `primaryDestination(app)` answers "where does this
+app live", and `entityHref(appId, kind, id)` answers "where does *this thing*
+live", returning `<publicPath>?<kind>=<id>`. An app opts in by listing the
+record kinds it answers to in `addressableBy` — only `bloomforge-player`
+(`['game']`) does today — and `entityHref` throws on an unknown app or an
+undeclared kind, because the manifest is static data so neither is a runtime
+condition a caller could recover from. `canAddress(appId, kind)` is the
+non-throwing check for callers that can't know the pair at author time.
+
+The point is that a link between apps resolves through the record that owns
+the path instead of being a hardcoded string: the studio's "Play it" used to
+write the literal `/play?game=`, and `HandoffSource.href` is documented as a
+deep link back and populated once, with an app root. A contract test asserts
+every declared kind is a parameter the target app **actually reads**, the same
+stance the route tests take toward `vercel.json` and each `svelte.config.js` —
+the two sides don't import each other, they're asserted to agree. Query
+parameters rather than path segments or hashes, so every app stays a
+prerendered static bundle with no router change. See
+[REFERENCES.md](./REFERENCES.md), whose step 1 this is.
 
 Vercel rewrites and each SvelteKit `paths.base` remain explicit in their native
 configuration files, including Marginalia's special asset routes. The manifest
@@ -1053,15 +1083,20 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1644 tests total: 16 in `api/` (its own
+1713 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1684 across sixteen pnpm
-packages — `write` 122, `marginalia` 325, `planner` 486,
+instead of the recursive `pnpm -r test`), plus 1697 across sixteen pnpm
+packages — `write` 122, `marginalia` 333, `planner` 486,
 `spores` 140, `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
-`packages/sync` 9, `packages/persistence` 6, `packages/app-manifest` 11,
+`packages/sync` 9, `packages/persistence` 6, `packages/app-manifest` 16,
 `packages/handoff` 15, `packages/text` 23, `packages/spellcraft` 16,
 `packages/emoji` 4, `packages/incremental-core` 191, and `thinking-about` 69.
+(Counted by running each suite, not by adding to the previous figure — the
+inventory had drifted: the headline said 1644 against a body summing to 1700,
+and marginalia's balance-harness work landed 333 tests recorded as 325. Two
+of marginalia's are currently failing on `main` — timeouts in `sim.test.ts`,
+unrelated to this count.)
 (`notebook`'s 28 retired with the app; write's suite grew to cover kinds,
 the drafts filter, the capture import, and the spread's view model.)
 keep this inventory current when a suite changes; the root command is the

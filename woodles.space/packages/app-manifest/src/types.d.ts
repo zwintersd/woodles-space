@@ -46,6 +46,17 @@ export interface AppDefinition {
 	packageName?: string;
 	landing?: LandingTileDefinition;
 	landingSurfaces?: readonly LandingTileDefinition[];
+	/**
+	 * Record kinds this app can be opened *on*, as query parameter names —
+	 * `['game']` means the app reads `?game=<id>` and opens that record.
+	 *
+	 * This is the addressing half of REFERENCES.md: a link into another app has
+	 * to resolve through the manifest that owns its path, or it decays into a
+	 * hardcoded string pointing at an app root (see `HandoffSource.href`). An
+	 * app is only addressable by a kind it lists here, and `entityHref` refuses
+	 * anything else, so a link can never name a parameter nothing reads.
+	 */
+	addressableBy?: readonly string[];
 }
 
 export interface LandingApp {

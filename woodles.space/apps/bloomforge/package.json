@@ -11,6 +11,7 @@
     "test": "svelte-kit sync && vitest run"
   },
   "dependencies": {
+    "@woodles/app-manifest": "workspace:*",
     "@woodles/emoji": "workspace:*",
     "@woodles/incremental-core": "workspace:*",
     "@woodles/persistence": "workspace:*",
