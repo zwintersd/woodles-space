@@ -10,7 +10,7 @@ workspace has now built three times, three different ways, and never named.
 this file names it, surveys what already exists, and proposes the smallest
 spine that serves the whole repo rather than just this one pair.
 
-**status: steps 1–5 built, step 6 proposed.** two of §3's rows are
+**status: all six steps built.** [HANDOFF.md](./HANDOFF.md) carries it forward — including a design for reaching this spine from Write. two of §3's rows are
 answered: the ledgers ride `api/sync.ts` *and* localStorage, and a cold
 reference goes cold rather than being dropped. the rest are still open.
 read alongside [ARCHITECTURE.md](./ARCHITECTURE.md) for how
@@ -151,7 +151,7 @@ than they look.
 | does a carillon task pointing at an archived/deleted thinking-about entry go cold, or get dropped? | marginalia **drops** stale bindings (§1B); spores lets links go **red** (§1D) | **decided: cold, not dropped** — a sprite binding with no sprite renders nothing, so dropping is right there; a scheduled task still holds words you typed, so it keeps its own title and loses only the link. built in step 3: the arrival still lists the tasks and says the entry isn't on the shelf any more |
 | does observing a linked block log a thinking-about session, or offer to? | auto / offer | **offer** — carillon's stated stance is that nudges are suggestions, never actions taken on your behalf |
 | do the ledgers ride sync, or stay same-origin localStorage? | localStorage only / through `api/sync.ts` | **decided: sync** — and it turned out to be *both*, not either. localStorage stays the fast path on one device and the server carries the ledger to the next, which is the same local-first shape the rest of the workspace already has. this also answers CONVERGENCE.md §6.4 for ledgers, though not for handoff queues, which remain same-origin |
-| does thinking about's freeform `schedule` gain structure? | keep freeform / optional weekday+time | **optional structure, freeform preserved** — it's what lets a standing thursday watch date render on the calendar |
+| does thinking about's freeform `schedule` gain structure? | keep freeform / optional weekday+time | **decided and built: optional structure, freeform preserved, and never parsed from it.** a standing thursday watch date now renders on the calendar as a derived overlay |
 | who owns the link record? | carillon's task / thinking about's entry / a third store | **carillon's task** — "i scheduled this" is carillon's sentence; thinking about should not grow a field about time |
 | extract a reference package now, or build it locally first? | package / local | **split — see §4.3** |
 
@@ -275,7 +275,7 @@ each step ships something usable and nothing depends on finishing the next.
 | 3 | ✅ **deep links both ways** — thinking about opens on `?entry=`, carillon on `?thinking-about-entry=`, both over step 1's destinations. *not* `compose=`: that named an action rather than a record, which the addressing vocabulary doesn't model. arriving shows what's already scheduled. | ~1 day | the navigation feel; the thing the google-suite comparison is actually about |
 | 4 | ✅ **carillon publishes commitments**, thinking about renders them in entry detail. the return trip. | ~1 day | the connection stops being one-way |
 | 5 | ✅ **session logging from an observation** — a projection carillon writes and thinking about ingests by id, *not* a queue: a queue must be emptied by its reader, and a reader that writes breaks the one-writer rule. | ~1 day | the loop; the clock finally reaches the sessions |
-| 6 | **structured `schedule` → derived overlay.** | ~1–2 days | standing dates land on the calendar |
+| 6 | ✅ **structured `schedule` → derived overlay.** optional weekdays+time beside the freeform text, never parsed from it. | ~1–2 days | standing dates land on the calendar |
 
 if only one thing gets done: **steps 1 and 2.** step 1 is the workspace-level
 gap and pays for itself across three existing consumers; step 2 is the

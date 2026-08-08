@@ -3,7 +3,14 @@
 // which is a thin wrapper delegating to these functions).
 
 import { DEFAULT_COLOR, normalizeColumnSection } from './constants';
-import type { ColumnKey, EntryStatus, SectionKey, Session, ThinkingAboutEntry } from './types';
+import type {
+	ColumnKey,
+	EntryStatus,
+	SectionKey,
+	Session,
+	StandingSlot,
+	ThinkingAboutEntry
+} from './types';
 
 export function uid(): string {
 	return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -37,6 +44,21 @@ function normalizeSession(raw: Partial<Session>): Session {
 	};
 }
 
+// Every entry written before standing slots existed has no `standing` field,
+// and every one of those reads as null rather than being guessed at from the
+// freeform text beside it.
+function normalizeStanding(raw: unknown): StandingSlot | null {
+	if (typeof raw !== 'object' || raw === null) return null;
+	const slot = raw as Partial<StandingSlot>;
+	if (!Array.isArray(slot.weekdays)) return null;
+	const weekdays = slot.weekdays.filter(
+		(day): day is number => typeof day === 'number' && day >= 0 && day <= 6
+	);
+	if (weekdays.length === 0) return null;
+	if (typeof slot.startTime !== 'string' || typeof slot.endTime !== 'string') return null;
+	return { weekdays: [...new Set(weekdays)].sort(), startTime: slot.startTime, endTime: slot.endTime };
+}
+
 function normalizeSessions(raw: unknown): Session[] {
 	return Array.isArray(raw) ? raw.map(normalizeSession) : [];
 }
@@ -59,6 +81,7 @@ export function blankEntry(
 		notes: '',
 		sharedWith: null,
 		schedule: null,
+		standing: null,
 		sessions: [],
 		createdAt: stamp,
 		updatedAt: stamp
@@ -210,6 +233,7 @@ export function normalizeEntry(raw: Partial<ThinkingAboutEntry>): ThinkingAboutE
 		dateClosed: nullableString(raw.dateClosed),
 		sharedWith: nullableString(raw.sharedWith),
 		schedule: nullableString(raw.schedule),
+		standing: normalizeStanding(raw.standing),
 		sessions: normalizeSessions(raw.sessions),
 		createdAt,
 		updatedAt

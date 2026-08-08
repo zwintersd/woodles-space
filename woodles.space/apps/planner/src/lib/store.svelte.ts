@@ -40,6 +40,7 @@ import {
 } from '@woodles/sync';
 import { buildCommitments } from './commitments';
 import { buildSessions } from './sessions';
+import { thinkingAboutShelf } from './thinkingAboutShelf.svelte';
 import { dateKey, nowMinutes, uid, timeToMinutes } from './utils';
 import { playBell } from './bells';
 import {
@@ -196,7 +197,34 @@ export class PlannerStore {
 			overlay: 'ritual' as const
 		}));
 
-		return mergeBlocks(base, [...obligationBlocks, ...ritualBlocks]);
+		return mergeBlocks(base, [
+			...obligationBlocks,
+			...ritualBlocks,
+			...this.standingBlocksForWeekday(weekday)
+		]);
+	}
+
+	/**
+	 * Overlay blocks derived from Thinking About's standing slots — a Thursday
+	 * watch date appearing on the calendar without anyone creating an
+	 * obligation by hand.
+	 *
+	 * Derived on read, never stored: the slot lives in the app that owns it, and
+	 * a copy here would be a second truth free to drift. The consequence is that
+	 * on a device where the shelf hasn't arrived yet the overlay simply isn't
+	 * there — acceptable for something that draws a block, and the reason
+	 * nothing is *minted* from it.
+	 */
+	standingBlocksForWeekday(weekday: number): Block[] {
+		return thinkingAboutShelf.entries
+			.filter((entry) => entry.standing?.weekdays.includes(weekday))
+			.map((entry) => ({
+				id: `ta-${entry.id}`,
+				startTime: entry.standing!.startTime,
+				endTime: entry.standing!.endTime,
+				title: entry.title,
+				overlay: 'standing' as const
+			}));
 	}
 
 	isRestful(date: Date = this.now): boolean {

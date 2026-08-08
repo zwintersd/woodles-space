@@ -8,7 +8,10 @@ export type Block = {
 	flourishEligible?: boolean;
 	domainId?: string;
 	// Overlay metadata — set only on blocks synthesized from obligations/rituals.
-	overlay?: 'obligation' | 'ritual';
+	// `standing` is derived from Thinking About's shelf rather than stored here
+	// — a standing watch date is a commitment somebody already recorded in the
+	// app that owns it, and copying it in would create a second truth to drift.
+	overlay?: 'obligation' | 'ritual' | 'standing';
 	// The behavioral-momentum position of this block inside a day pile.
 	// `easy` blocks are high-probability on-ramps; `stretch` blocks are the
 	// lower-probability work the on-ramp is meant to carry.

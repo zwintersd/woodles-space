@@ -18,6 +18,22 @@ export type SectionKey =
 
 export type EntryStatus = 'active' | 'archived';
 
+/**
+ * A standing slot for something that happens on the same day most weeks — the
+ * structured half of `schedule`.
+ *
+ * Weekday numbering is `Date.getDay()` (0=Sun), matching Carillon's own
+ * `Obligation`, because that is what Carillon derives a calendar overlay from.
+ * The freeform `schedule` text stays alongside it and is never parsed into
+ * this: guessing "Tuesdays after work" wrong is worse than leaving it as the
+ * note a person wrote.
+ */
+export type StandingSlot = {
+	weekdays: number[];
+	startTime: string; // "HH:MM"
+	endTime: string;
+};
+
 // One sitting down with a thing being read, played, or watched — a single
 // tap logs "today, no note"; the date and note stay editable after the fact.
 export type Session = {
@@ -41,6 +57,8 @@ export type ThinkingAboutEntry = {
 	notes: string;
 	sharedWith: string | null; // only meaningful on *_social sections
 	schedule: string | null; // only meaningful on playing/watching columns
+	/** Structured counterpart to `schedule`; same columns, null when not set. */
+	standing: StandingSlot | null;
 	sessions: Session[]; // logged sittings with the thing, newest first by date
 	createdAt: string; // ISO timestamp
 	updatedAt: string; // ISO timestamp

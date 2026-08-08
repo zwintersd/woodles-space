@@ -56,6 +56,36 @@
 
 	const scheduled = $derived(entry ? commitments.for(entry.id) : []);
 
+	const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+	// Picking the first day creates the slot with a plausible evening default;
+	// unpicking the last one removes it entirely rather than leaving an empty
+	// husk that would draw a zero-day block on the calendar.
+	function toggleWeekday(day: number): void {
+		if (!entry) return;
+		const current = entry.standing;
+		const weekdays = current?.weekdays ?? [];
+		const next = weekdays.includes(day)
+			? weekdays.filter((d) => d !== day)
+			: [...weekdays, day].sort();
+
+		thinkingAbout.updateEntry(entry.id, {
+			standing:
+				next.length === 0
+					? null
+					: {
+							weekdays: next,
+							startTime: current?.startTime ?? '20:00',
+							endTime: current?.endTime ?? '21:00'
+						}
+		});
+	}
+
+	function setStandingTime(field: 'startTime' | 'endTime', value: string): void {
+		if (!entry?.standing || !value) return;
+		thinkingAbout.updateEntry(entry.id, { standing: { ...entry.standing, [field]: value } });
+	}
+
 	function commitmentWhen(item: { date: string | null; time: string | null }): string {
 		if (!item.date) return 'not scheduled yet';
 		return item.time ? `${item.date} · ${item.time}` : item.date;
@@ -83,7 +113,11 @@
 			columnKey,
 			sectionKey,
 			sharedWith: showsSharedWith(sectionKey) ? entry.sharedWith : null,
-			schedule: showsSchedule(columnKey) ? entry.schedule : null
+			schedule: showsSchedule(columnKey) ? entry.schedule : null,
+			// Moving a thing to Reading takes its standing slot off the calendar
+			// too — the field stops being shown, so leaving the value behind
+			// would keep drawing a block nobody can see the source of.
+			standing: showsSchedule(columnKey) ? entry.standing : null
 		});
 	}
 
@@ -211,6 +245,45 @@
 					placeholder="e.g. Tuesdays after work"
 					oninput={(e) => thinkingAbout.updateEntry(id, { schedule: e.currentTarget.value })}
 				/>
+			</div>
+
+			<!-- The structured half. Optional, never parsed from the text above —
+			     guessing "Tuesdays after work" wrong is worse than leaving it as
+			     the note somebody wrote. Setting it puts the slot on Carillon's
+			     calendar without creating anything there. -->
+			<div class="detail-field">
+				<span class="detail-field-label">most weeks</span>
+				<div class="standing-days" role="group" aria-label="days this happens">
+					{#each WEEKDAY_LABELS as label, day (label)}
+						<button
+							type="button"
+							class="standing-day"
+							class:on={entry.standing?.weekdays.includes(day)}
+							aria-pressed={entry.standing?.weekdays.includes(day) ?? false}
+							onclick={() => toggleWeekday(day)}
+						>
+							{label}
+						</button>
+					{/each}
+				</div>
+				{#if entry.standing}
+					<div class="standing-times">
+						<input
+							type="time"
+							aria-label="starts at"
+							value={entry.standing.startTime}
+							onchange={(e) => setStandingTime('startTime', e.currentTarget.value)}
+						/>
+						<span aria-hidden="true">–</span>
+						<input
+							type="time"
+							aria-label="ends at"
+							value={entry.standing.endTime}
+							onchange={(e) => setStandingTime('endTime', e.currentTarget.value)}
+						/>
+						<span class="standing-hint">shows on the planner</span>
+					</div>
+				{/if}
 			</div>
 		{/if}
 
@@ -477,6 +550,46 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 0.5rem;
+	}
+
+	.standing-days {
+		display: flex;
+		gap: 0.2rem;
+	}
+
+	.standing-day {
+		width: 1.7rem;
+		height: 1.7rem;
+		font-family: var(--ta-font-sans);
+		font-size: 0.72rem;
+		color: var(--ta-muted);
+		border: 1px solid var(--ta-border);
+		border-radius: 50%;
+		background: transparent;
+		transition: all var(--ta-transition-fast);
+	}
+
+	.standing-day.on {
+		color: var(--ta-surface);
+		background: var(--ta-accent);
+		border-color: var(--ta-accent);
+	}
+
+	.standing-times {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		margin-top: 0.4rem;
+	}
+
+	.standing-times input {
+		width: auto;
+	}
+
+	.standing-hint {
+		font-family: var(--ta-font-sans);
+		font-size: 0.72rem;
+		color: var(--ta-muted);
 	}
 
 	/* Carillon's answer, styled as a quiet fact rather than a second board. */

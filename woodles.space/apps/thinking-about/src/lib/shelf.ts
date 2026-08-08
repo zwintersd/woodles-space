@@ -37,7 +37,8 @@ export function buildShelf(
 			columnKey: entry.columnKey,
 			sectionKey: entry.sectionKey,
 			color: entry.color,
-			lastSessionDate: latestSessionDate(entry.sessions)
+			lastSessionDate: latestSessionDate(entry.sessions),
+			standing: entry.standing
 		}));
 
 	return { version: THINKING_ABOUT_SHELF_VERSION, entries: shelf, publishedAt };
@@ -68,7 +69,8 @@ export function shelvesMatch(a: ThinkingAboutShelfBlob, b: ThinkingAboutShelfBlo
 			entry.columnKey === other.columnKey &&
 			entry.sectionKey === other.sectionKey &&
 			entry.color === other.color &&
-			entry.lastSessionDate === other.lastSessionDate
+			entry.lastSessionDate === other.lastSessionDate &&
+			JSON.stringify(entry.standing ?? null) === JSON.stringify(other.standing ?? null)
 		);
 	});
 }

@@ -22,7 +22,8 @@ describe('buildShelf', () => {
 				columnKey: 'reading',
 				sectionKey: 'book',
 				color: '#3f51b5',
-				lastSessionDate: null
+				lastSessionDate: null,
+				standing: null
 			}
 		]);
 		// The private half of an entry must not ride along.
@@ -72,11 +73,47 @@ describe('buildShelf', () => {
 	});
 });
 
+describe('standing slots', () => {
+	it('carries a standing slot so Carillon can draw it on the calendar', () => {
+		const shelf = buildShelf([
+			entry({
+				id: 'e1',
+				columnKey: 'watching',
+				sectionKey: 'anime_social',
+				standing: { weekdays: [4], startTime: '20:00', endTime: '21:00' }
+			})
+		]);
+
+		expect(shelf.entries[0].standing).toEqual({
+			weekdays: [4],
+			startTime: '20:00',
+			endTime: '21:00'
+		});
+	});
+
+	it('publishes null for an entry that has never had one', () => {
+		expect(buildShelf([entry({ id: 'e1' })]).entries[0].standing).toBeNull();
+	});
+});
+
 describe('shelvesMatch', () => {
 	it('ignores publishedAt, which changes on every save', () => {
 		const a = buildShelf([entry({ id: 'e1' })], '2026-08-01T00:00:00.000Z');
 		const b = buildShelf([entry({ id: 'e1' })], '2026-08-09T00:00:00.000Z');
 		expect(shelvesMatch(a, b)).toBe(true);
+	});
+
+	it('notices a standing slot being set or moved', () => {
+		const plain = buildShelf([entry({ id: 'e1' })]);
+		const scheduled = buildShelf([
+			entry({ id: 'e1', standing: { weekdays: [4], startTime: '20:00', endTime: '21:00' } })
+		]);
+		const moved = buildShelf([
+			entry({ id: 'e1', standing: { weekdays: [2], startTime: '20:00', endTime: '21:00' } })
+		]);
+
+		expect(shelvesMatch(plain, scheduled)).toBe(false);
+		expect(shelvesMatch(scheduled, moved)).toBe(false);
 	});
 
 	it('notices a retitled entry', () => {
