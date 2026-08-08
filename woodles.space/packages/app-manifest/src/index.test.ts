@@ -165,6 +165,17 @@ describe('entity addressing', () => {
 		expect(() => entityHref('write', 'draft', 'x')).toThrow(/declares no addressable/);
 	});
 
+	it('keeps every declared kind url-safe, so it needs no encoding of its own', () => {
+		// entityHref encodes the id but interpolates the kind raw — a kind with
+		// a `&` or a space in it would build a URL that silently means something
+		// else. Same lowercase-and-hyphens shape the sync app keys use.
+		for (const app of appManifest) {
+			for (const kind of app.addressableBy ?? []) {
+				expect(kind, `${app.id} declares "${kind}"`).toMatch(/^[a-z0-9-]{1,40}$/);
+			}
+		}
+	});
+
 	it('reports addressability without throwing, for callers that cannot know', () => {
 		expect(canAddress('bloomforge-player', 'game')).toBe(true);
 		expect(canAddress('bloomforge-player', 'draft')).toBe(false);
@@ -175,16 +186,21 @@ describe('entity addressing', () => {
 	// claim an app answers to `?game=`, but only the app can actually read it —
 	// same stance the route contract above takes toward vercel.json and each
 	// svelte.config.js: don't make them import each other, assert they agree.
+	//
+	// It matches the parameter name as a quoted literal anywhere in the app's
+	// source rather than inside a `.get(...)` call specifically: naming it in a
+	// constant (`const ARRIVAL_PARAM = '...'`) is better than inlining it at
+	// the read site, and a contract test shouldn't push an app toward the worse
+	// shape. That makes this a tripwire against a declaration nothing
+	// implements, not a proof the wiring is correct — which is the job it is
+	// here to do.
 	it('declares only kinds the target app actually reads', () => {
 		for (const app of appManifest) {
 			for (const kind of app.addressableBy ?? []) {
 				const sources = sourceFilesOf(join(ROOT, app.sourceDir));
-				const reads = sources.some((file) =>
-					new RegExp(`\\.get\\(\\s*['"]${escapeRegExp(kind)}['"]\\s*\\)`).test(
-						readFileSync(file, 'utf8')
-					)
-				);
-				expect(reads, `${app.id} declares "${kind}" but never reads it`).toBe(true);
+				const pattern = new RegExp(`['"\`]${escapeRegExp(kind)}['"\`]`);
+				const reads = sources.some((file) => pattern.test(readFileSync(file, 'utf8')));
+				expect(reads, `${app.id} declares "${kind}" but never names it`).toBe(true);
 			}
 		}
 	});

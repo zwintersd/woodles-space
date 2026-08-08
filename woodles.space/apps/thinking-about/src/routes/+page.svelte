@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { fly } from 'svelte/transition';
 	import { thinkingAbout } from '$lib/thinkingAbout.svelte';
+	import { clearEntryLinkFromAddressBar, parseEntryLink } from '$lib/deepLink';
 	import { syncState } from '$lib/sync.svelte';
 	import { motionDuration } from '$lib/motion';
 	import Board from '$lib/components/Board.svelte';
@@ -9,6 +11,17 @@
 	import SyncPanel from '$lib/components/SyncPanel.svelte';
 
 	let showSync = $state(false);
+
+	onMount(() => {
+		// Arriving from Carillon's "about <title>" link. Read once, then taken
+		// out of the address bar so a reload lands on the board as usual.
+		const entryId = parseEntryLink(window.location.href);
+		if (!entryId) return;
+		clearEntryLinkFromAddressBar();
+		// An entry that no longer exists (deleted on another device, or a stale
+		// link) simply leaves you on the board — the id is not worth an error.
+		if (thinkingAbout.entries.some((e) => e.id === entryId)) thinkingAbout.openEntry(entryId);
+	});
 </script>
 
 <svelte:head>

@@ -47,10 +47,11 @@ other docs have narrower jobs:
   copying it. its §1 surveys the four shapes the workspace already does this
   in (bloomforge's shared keys, marginalia's binding map, the public blobs'
   carried ids, spores' deliberately breakable title links); its §3 is a table
-  of open questions bar one. **steps 1 and 2 are built** — the addressing
-  layer under "the app manifest" above, and the shelf ledger under "cross-app
-  ledgers" below; steps 3–6 are unstarted, so the Carillon ↔ Thinking About
-  connection currently runs one way only.
+  of open questions bar two. **steps 1–3 are built** — the addressing layer
+  under "the app manifest" above, and the shelf ledger plus the two-way deep
+  links under "cross-app ledgers" below. steps 4–6 are unstarted: nothing
+  Carillon knows travels back to Thinking About yet, so an entry's detail
+  can't show when it's scheduled.
 - [ROADMAP.md](./ROADMAP.md) is the 10-week plan for making marginalia and
   the bestiary public-facing — all ten weeks are marked `✅ shipped` in its
   own headers, week 4 (share links, save-as-image, adopt-a-card) having
@@ -957,6 +958,12 @@ stores `Task.thinkingAboutEntryId` — a *reference*, so a rename over there
 can't leave the planner lying, and so a later observation on that block knows
 exactly which entry it was.
 
+It republishes **on load as well as on save**, which is not redundant: a
+derived ledger means a board nobody has edited since this shipped holds entries
+and no shelf at all, and the reader would then honestly report an empty picker
+for a board plainly full of things. Publishing on mount is the migration, and
+also repairs a shelf left by an older format.
+
 Local-first is not weakened by this riding sync: the writer mirrors every save
 to localStorage, the reader looks there first (synchronous, same origin,
 instant), and the server is only what carries the ledger to a device where the
@@ -974,7 +981,20 @@ not by merging: two devices publishing a projection of their own entries are
 not in conflict about anything a person typed, and the entries underneath
 converge through Thinking About's own sync.
 
-See [REFERENCES.md](./REFERENCES.md), whose step 2 this is.
+**The link runs both ways.** Each app declares itself addressable in the
+manifest (see "the app manifest" above): Thinking About by `entry`, Carillon by
+`thinking-about-entry` — a *foreign* record kind, which is the honest name for
+it. Thinking About's entry detail carries "find time for this"; Carillon
+answers by showing **what it already has scheduled** for that entry, offering
+to add another time as a deliberate second step rather than opening a blank
+form over a thing that is already on Thursday. Both apps read the parameter
+once on load and then take it out of the address bar (`history.replaceState`),
+so a reload lands on the app rather than re-enacting the visit. A reference to
+an entry that has been archived, deleted, or simply not synced to this device
+goes **cold**: the arrival still shows the tasks and says so, because the words
+someone typed outlive the link.
+
+See [REFERENCES.md](./REFERENCES.md), whose steps 2 and 3 this is.
 
 ### the public read path
 
@@ -1130,15 +1150,15 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1749 tests total: 16 in `api/` (its own
+1771 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1733 across sixteen pnpm
-packages — `write` 122, `marginalia` 333, `planner` 499,
+instead of the recursive `pnpm -r test`), plus 1755 across sixteen pnpm
+packages — `write` 122, `marginalia` 333, `planner` 512,
 `spores` 140, `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
-`packages/sync` 15, `packages/persistence` 6, `packages/app-manifest` 16,
+`packages/sync` 15, `packages/persistence` 6, `packages/app-manifest` 17,
 `packages/handoff` 15, `packages/text` 23, `packages/spellcraft` 16,
-`packages/emoji` 4, `packages/incremental-core` 191, and `thinking-about` 86.
+`packages/emoji` 4, `packages/incremental-core` 191, and `thinking-about` 94.
 (Counted by running each suite, not by adding to the previous figure — the
 inventory had drifted: the headline said 1644 against a body summing to 1700,
 and marginalia's balance-harness work landed 333 tests recorded as 325. Two
@@ -1179,9 +1199,19 @@ local server reads `vercel.json` and applies the production rewrites, so route
 coverage tests the paths people actually visit instead of eight unrelated Vite
 ports. The suite covers every published entry route, Write → Echoes publishing,
 Bestiary gallery/adopt/share and Marginalia consumption, an Arcade state change,
-Ologypedia shelf export → publish script → indexed card, legacy localStorage
-migration across reload, keyboard operation, and serious/critical WCAG A axe
-findings.
+Ologypedia shelf export → publish script → indexed card, the Thinking About →
+Carillon round trip and back, legacy localStorage migration across reload,
+keyboard operation, and serious/critical WCAG A axe findings.
+
+The cross-app specs earn their cost in a way the route checks don't. The
+Carillon ↔ Thinking About one caught a bug no unit test could have: the shelf
+ledger is derived on save, so a board nobody had edited since the feature
+shipped had entries and no shelf, and the picker read empty for a board full of
+things. Both halves were individually correct — one about what it wrote, the
+other about what it read — and still failed to meet. Keep an integration spec
+per ledger for that reason. It stubs third-party webfonts with an empty 200
+rather than aborting them, since an abort is itself a failed request and would
+trip `expectNoPageErrors` on noise unrelated to the apps.
 
 Run it after installing Chromium once on the machine:
 

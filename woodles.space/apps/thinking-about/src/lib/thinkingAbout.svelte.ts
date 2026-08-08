@@ -161,6 +161,19 @@ export class ThinkingAbout {
 		}
 	}
 
+	/**
+	 * Rebuild and mirror the shelf from what's on the board right now.
+	 *
+	 * Called on load as well as on every save. The shelf is derived, so a board
+	 * nobody has edited since this shipped would otherwise hold entries and no
+	 * shelf at all, and a reader would honestly report an empty picker for a
+	 * board plainly full of things. Idempotent, and self-repairing against a
+	 * shelf left by an older version.
+	 */
+	publishShelf(): void {
+		saveShelfLocally(buildShelf(this.entries, this.updatedAt));
+	}
+
 	#persist(): void {
 		save(ENTRIES_KEY, this.entries);
 		save(UPDATED_KEY, this.updatedAt);

@@ -242,6 +242,20 @@ export class PlannerStore {
 		);
 	}
 
+	/**
+	 * Every task about one Thinking About entry, soonest first, undated last.
+	 *
+	 * Dropped tasks are excluded but done ones are kept — "you already read a
+	 * chapter on Tuesday" is exactly the answer someone arriving from that app
+	 * is asking for, and hiding it would make Carillon look like it had
+	 * forgotten.
+	 */
+	getTasksForThinkingAboutEntry(entryId: string): Task[] {
+		return this.tasks
+			.filter((t) => t.thinkingAboutEntryId === entryId && t.status !== 'dropped')
+			.sort((a, b) => (a.targetDate ?? '9999-99-99').localeCompare(b.targetDate ?? '9999-99-99'));
+	}
+
 	getUnscheduledTasks(): Task[] {
 		return this.tasks.filter((t) => t.status !== 'dropped' && !t.targetBlockId);
 	}

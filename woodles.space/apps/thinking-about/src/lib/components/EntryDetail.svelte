@@ -14,6 +14,7 @@
 		showsSharedWith
 	} from '$lib/constants';
 	import { motionDuration } from '$lib/motion';
+	import { findTimeHref } from '$lib/deepLink';
 	import type { SectionKey } from '$lib/types';
 	import ColorPicker from './ColorPicker.svelte';
 
@@ -197,6 +198,14 @@
 				/>
 			</div>
 		{/if}
+
+		<!-- The one way out of this app. A schedule field says when this
+		     *usually* happens; this asks Carillon when it actually will. -->
+		<div class="detail-field">
+			<a class="find-time" href={findTimeHref(id)} data-testid="find-time">
+				find time for this →
+			</a>
+		</div>
 
 		<div class="detail-field">
 			<div class="sessions-heading">
@@ -442,6 +451,18 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 0.5rem;
+	}
+
+	.find-time {
+		display: inline-block;
+		font-family: var(--ta-font-sans);
+		font-size: 0.78rem;
+		color: var(--ta-accent);
+		transition: color var(--ta-transition-fast);
+	}
+
+	.find-time:hover {
+		color: var(--ta-text);
 	}
 
 	.btn-log-session {

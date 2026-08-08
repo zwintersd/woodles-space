@@ -1,11 +1,14 @@
 <script lang="ts">
 	import '$lib/style/tokens.css';
 	import { initSync } from '$lib/sync.svelte';
+	import { thinkingAbout } from '$lib/thinkingAbout.svelte';
 	import { onMount } from 'svelte';
 
 	let { children } = $props();
 
 	onMount(() => {
+		// Publish once on load, not only on save — see the method's own note.
+		thinkingAbout.publishShelf();
 		void initSync();
 	});
 </script>
