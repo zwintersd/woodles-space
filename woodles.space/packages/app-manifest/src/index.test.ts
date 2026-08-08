@@ -206,7 +206,11 @@ describe('entity addressing', () => {
 	});
 });
 
-/** Every source file under an app, skipping build output and dependencies. */
+/**
+ * Every source file under an app, skipping build output and dependencies.
+ * `.html` is included because a static app *is* its entry file — Echoes reads
+ * its query parameter in `index.html` and nowhere else.
+ */
 function sourceFilesOf(dir: string): string[] {
 	const found: string[] = [];
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -215,7 +219,7 @@ function sourceFilesOf(dir: string): string[] {
 		}
 		const full = join(dir, entry.name);
 		if (entry.isDirectory()) found.push(...sourceFilesOf(full));
-		else if (/\.(svelte|ts|js)$/.test(entry.name)) found.push(full);
+		else if (/\.(svelte|ts|js|html)$/.test(entry.name)) found.push(full);
 	}
 	return found;
 }

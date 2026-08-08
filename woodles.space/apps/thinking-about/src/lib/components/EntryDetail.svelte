@@ -16,6 +16,8 @@
 	import { motionDuration } from '$lib/motion';
 	import { findTimeHref } from '$lib/deepLink';
 	import { commitments } from '$lib/commitments.svelte';
+	import { mentions } from '$lib/mentions.svelte';
+	import { entityHref } from '@woodles/app-manifest';
 	import type { SectionKey } from '$lib/types';
 	import ColorPicker from './ColorPicker.svelte';
 
@@ -51,10 +53,14 @@
 	// the panel opens rather than on every keystroke — the answer changes in
 	// the other app, not this one.
 	$effect(() => {
-		if (entry?.id) void commitments.refresh();
+		if (entry?.id) {
+			void commitments.refresh();
+			void mentions.refresh();
+		}
 	});
 
 	const scheduled = $derived(entry ? commitments.for(entry.id) : []);
+	const written = $derived(entry ? mentions.for(entry.id) : []);
 
 	const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -305,6 +311,22 @@
 				{scheduled.length > 0 ? 'find another time →' : 'find time for this →'}
 			</a>
 		</div>
+
+		{#if written.length > 0}
+			<div class="detail-field">
+				<span class="detail-field-label">written about</span>
+				<ul class="mentions" data-testid="mentions">
+					{#each written as letter (letter.letterId)}
+						<li>
+							<a href={entityHref('letter', 'letter', letter.letterId)}>
+								{letter.title || 'untitled letter'}
+							</a>
+							<span class="mention-date">{letter.date}</span>
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
 
 		<div class="detail-field">
 			<div class="sessions-heading">
@@ -622,6 +644,30 @@
 		color: var(--ta-muted);
 		overflow: hidden;
 		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.mentions {
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+
+	.mentions li {
+		display: flex;
+		align-items: baseline;
+		gap: 0.5rem;
+		font-family: var(--ta-font-sans);
+		font-size: 0.78rem;
+	}
+
+	.mentions a {
+		color: var(--ta-accent);
+	}
+
+	.mention-date {
+		color: var(--ta-muted);
 		white-space: nowrap;
 	}
 

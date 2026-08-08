@@ -32,8 +32,23 @@
 		writePublishedLegacy,
 		type StoredLetter
 	} from '$lib/letters';
-	import { syncState, initSync, flushSync } from '$lib/sync.svelte';
+	import { syncState, initSync, flushSync, publishMentionsLocally } from '$lib/sync.svelte';
 	import { hasPassphrase, SyncError } from '@woodles/sync';
+	import ReferencePicker from '$lib/ReferencePicker.svelte';
+	import {
+		referenceHref,
+		refreshReferenceSources,
+		shelfSource,
+		type ReferenceCandidate,
+		type Sigil
+	} from '$lib/references.svelte';
+	import {
+		caretRect,
+		insertReferenceAtCaret,
+		readTrigger,
+		textBeforeCaret,
+		type ReferenceTrigger
+	} from '$lib/referenceTrigger';
 	import {
 		bootstrap as bootstrapDrafts,
 		createDraftId,
@@ -275,6 +290,11 @@
 
 	onMount(() => {
 		void initSync();
+		// The shelf names what `#` can reach. Local first (instant, same
+		// origin), then the server so it works on a device where Thinking
+		// About has never been opened.
+		shelfSource.loadLocal();
+		void refreshReferenceSources();
 
 		try {
 			document.execCommand('defaultParagraphSeparator', false, 'p');
@@ -738,6 +758,13 @@
 				clearActiveDraftId();
 			}
 
+			// The ledger is derived, so it is rebuilt from the archive on every
+			// save — not only when connected. Without this, what you wrote about
+			// would reach the other apps only after a sync, and never at all on a
+			// device that has no passphrase. Same local-mirror-always,
+			// push-when-connected split every other ledger uses.
+			publishMentionsLocally();
+
 			// The archive is local first and always succeeds. Pushing it to the
 			// server is a second, optional step that only needs a connected
 			// passphrase — there is no per-letter opt-in any more, because
@@ -823,6 +850,67 @@
 		scheduleSave();
 		scheduleMeasure();
 		fgVersion += 1;
+		updateReferenceTrigger();
+	}
+
+	// ── references: # a thing you're thinking about, @ a day ──────────
+	let picker = $state<ReferencePicker>();
+	let refSigil = $state<Sigil | null>(null);
+	let refQuery = $state('');
+	let refX = $state(0);
+	let refY = $state(0);
+	let refTrigger: ReferenceTrigger | null = null;
+	// Set when Escape dismissed a trigger, so it stays dismissed until the
+	// caret moves off it rather than reopening on the next keystroke.
+	let refDismissed: string | null = null;
+
+	function closeReferencePicker(dismiss = false) {
+		if (dismiss && refTrigger) refDismissed = refSigil + refTrigger.query;
+		refSigil = null;
+		refQuery = '';
+		refTrigger = null;
+	}
+
+	function updateReferenceTrigger() {
+		const before = textBeforeCaret();
+		const trigger = before === null ? null : readTrigger(before);
+		if (!trigger) {
+			refDismissed = null;
+			closeReferencePicker();
+			return;
+		}
+		if (refDismissed === trigger.sigil + trigger.query) return;
+		refDismissed = null;
+
+		refTrigger = trigger;
+		refSigil = trigger.sigil;
+		refQuery = trigger.query;
+		const rect = caretRect();
+		if (rect) {
+			refX = rect.x;
+			refY = rect.y;
+		}
+	}
+
+	function pickReference(candidate: ReferenceCandidate) {
+		if (!refTrigger) return;
+		const href = referenceHref(candidate.app, candidate.kind, candidate.id);
+		const inserted = insertReferenceAtCaret(candidate, refTrigger, href);
+		closeReferencePicker();
+		if (!inserted) return;
+		// The layers *are* the storage between saves, so a programmatic edit
+		// has to go through the same save path a keystroke would.
+		updateMeta();
+		stampLiveAnchors();
+		scheduleSave();
+		fgVersion += 1;
+	}
+
+	function onEditorKeydown(event: KeyboardEvent) {
+		if (picker?.handleKey(event)) {
+			event.preventDefault();
+			if (event.key === 'Escape') closeReferencePicker(true);
+		}
 	}
 
 	function onSelectionChange() {
@@ -1106,6 +1194,16 @@
 	<EchoesSyncPanel onclose={() => (syncOpen = false)} />
 {/if}
 
+<ReferencePicker
+	bind:this={picker}
+	sigil={refSigil}
+	query={refQuery}
+	x={refX}
+	y={refY}
+	onpick={pickReference}
+	onclose={() => closeReferencePicker(true)}
+/>
+
 <PublishOverlay status={publishStatus} errorMessage={publishErrorMessage} />
 
 {#if handoffNotice}
@@ -1185,7 +1283,8 @@
 					oninput={onFgInput}
 					onpaste={handlePaste}
 					onfocus={() => onLayerFocus('foreground')}
-					onkeyup={updateToolbarState}
+					onkeydown={onEditorKeydown}
+					onkeyup={(e) => { updateToolbarState(); if (!e.isComposing) updateReferenceTrigger(); }}
 					onmouseup={updateToolbarState}
 					role="textbox"
 					tabindex="0"
@@ -1645,6 +1744,20 @@
 		overflow-wrap: break-word;
 	}
 	.doc-title::placeholder { color: var(--muted); opacity: 0.28; }
+
+	/* A reference reads as prose first and a link second — it is a word you
+	   wrote, faintly marked as pointing somewhere. Styled off the data
+	   attribute so the sanitize allowlist stays three attributes wide and
+	   never has to open `class`. */
+	.doc-body :global(a[data-ref-id]) {
+		text-decoration: none;
+		border-bottom: 1px dotted color-mix(in srgb, currentColor 45%, transparent);
+		cursor: pointer;
+	}
+
+	.doc-body :global(a[data-ref-id]:hover) {
+		border-bottom-color: currentColor;
+	}
 
 	.doc-body, .doc-body :global(*) {
 		font-family: var(--editor-body, var(--font-body));

@@ -37,6 +37,81 @@ export const UNWRAP_TAGS = Object.freeze(['SPAN', 'FONT', 'DIV', 'SECTION', 'ART
 export const SAFE_HREF_PROTOCOL = /^(https?:|mailto:|#)/i;
 
 /**
+ * A reference in prose — `#` a thing you're thinking about, `@` a day.
+ *
+ * Encoded as data attributes on an ordinary anchor, with the words somebody
+ * typed as its own text content. That is the load-bearing part: strip the
+ * attributes and a sentence is still a sentence. A reference whose target has
+ * been deleted goes cold and reads as plain prose, exactly the way a Carillon
+ * task keeps its title when its Thinking About entry is gone (REFERENCES.md §3).
+ *
+ * The vocabulary lives here rather than in an app because sanitizing is where
+ * it has to be understood, and because `apps/letter` — static, no build step —
+ * can import this package's browser-ready `.js` directly.
+ */
+export const REFERENCE_ATTRIBUTES = Object.freeze([
+	'data-ref-app',
+	'data-ref-kind',
+	'data-ref-id'
+]);
+
+/**
+ * `keepAttributes` for a surface that stores references. Deliberately *not*
+ * the default: a sanitize that keeps them everywhere would let pasted markup
+ * smuggle a reference into a surface that has no idea what one is.
+ *
+ * Note what is absent — `class`. References are styled off
+ * `a[data-ref-id]` precisely so this allowlist can stay three attributes wide
+ * rather than opening `class` on every element.
+ */
+export const REFERENCE_SANITIZE_OPTIONS = Object.freeze({
+	keepAttributes: REFERENCE_ATTRIBUTES
+});
+
+/**
+ * Build the stored form of a reference.
+ *
+ * @param {{ app: string, kind: string, id: string, text: string, href?: string }} ref
+ * @returns {string}
+ */
+export function referenceHtml(ref) {
+	const attrs = [
+		`data-ref-app="${escapeAttribute(ref.app)}"`,
+		`data-ref-kind="${escapeAttribute(ref.kind)}"`,
+		`data-ref-id="${escapeAttribute(ref.id)}"`
+	];
+	if (ref.href) attrs.push(`href="${escapeAttribute(ref.href)}"`);
+	return `<a ${attrs.join(' ')}>${escapeText(ref.text)}</a>`;
+}
+
+/**
+ * Every reference in a body, in document order. Used to derive what a piece of
+ * writing is *about* without parsing prose.
+ *
+ * @param {string} html
+ * @returns {{ app: string, kind: string, id: string, text: string }[]}
+ */
+export function readReferences(html) {
+	if (typeof DOMParser === 'undefined' || !html) return [];
+	const root = parseFragment(html);
+	if (!root) return [];
+	return Array.from(root.querySelectorAll('a[data-ref-id]')).map((el) => ({
+		app: el.getAttribute('data-ref-app') ?? '',
+		kind: el.getAttribute('data-ref-kind') ?? '',
+		id: el.getAttribute('data-ref-id') ?? '',
+		text: el.textContent ?? ''
+	}));
+}
+
+function escapeAttribute(value) {
+	return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function escapeText(value) {
+	return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
  * @typedef {object} SanitizeOptions
  * @property {readonly string[]} [allowedTags] Upper-case tag names to keep.
  * @property {readonly string[]} [unwrapTags] Upper-case tag names to replace with their children.

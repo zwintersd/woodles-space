@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
 	ANCHOR_BLOCK_SELECTOR,
+	REFERENCE_SANITIZE_OPTIONS,
 	countWords,
 	countWordsInText,
 	ensureAnchorsOn,
 	htmlToText,
 	isEmptyHtml,
 	previewText,
+	readReferences,
+	referenceHtml,
 	sanitizeHtml,
 	stampAnchorsHtml,
 	stripPresentation,
@@ -169,5 +172,81 @@ describe('reading html as text', () => {
 		expect(preview).not.toMatch(/\s…$/);
 		expect(previewText('<p>short</p>')).toBe('short');
 		expect(previewText('')).toBe('');
+	});
+});
+
+describe('references in prose', () => {
+	it('keeps the words somebody typed as the element text', () => {
+		const html = referenceHtml({
+			app: 'thinking-about',
+			kind: 'entry',
+			id: 'e-piranesi',
+			text: 'Piranesi'
+		});
+		expect(html).toContain('>Piranesi</a>');
+		expect(html).toContain('data-ref-id="e-piranesi"');
+	});
+
+	it('escapes what it is given, in attributes and in text', () => {
+		const html = referenceHtml({
+			app: 'thinking-about',
+			kind: 'entry',
+			id: 'a"b',
+			text: '<script>x</script>'
+		});
+		expect(html).toContain('data-ref-id="a&quot;b"');
+		expect(html).not.toContain('<script>');
+	});
+
+	it('survives a sanitize that opts in', () => {
+		const html = referenceHtml({
+			app: 'thinking-about',
+			kind: 'entry',
+			id: 'e-1',
+			text: 'Piranesi'
+		});
+		const cleaned = sanitizeHtml(`<p>${html}</p>`, REFERENCE_SANITIZE_OPTIONS);
+
+		expect(readReferences(cleaned)).toEqual([
+			{ app: 'thinking-about', kind: 'entry', id: 'e-1', text: 'Piranesi' }
+		]);
+	});
+
+	it('goes cold — but stays readable — through a sanitize that does not', () => {
+		// A surface with no idea what a reference is must not silently inherit
+		// one from pasted markup. Losing the link is fine; losing the word is not.
+		const html = referenceHtml({
+			app: 'thinking-about',
+			kind: 'entry',
+			id: 'e-1',
+			text: 'Piranesi'
+		});
+		const cleaned = sanitizeHtml(`<p>${html}</p>`);
+
+		expect(readReferences(cleaned)).toEqual([]);
+		expect(cleaned).toContain('Piranesi');
+	});
+
+	it('does not open `class` on everything to get there', () => {
+		const cleaned = sanitizeHtml(
+			'<p class="sneaky" data-ref-id="x">hi</p>',
+			REFERENCE_SANITIZE_OPTIONS
+		);
+		expect(cleaned).not.toContain('class=');
+	});
+
+	it('reads every reference in a body, in order', () => {
+		const body =
+			'<p>' +
+			referenceHtml({ app: 'thinking-about', kind: 'entry', id: 'a', text: 'A' }) +
+			' and ' +
+			referenceHtml({ app: 'bestiary', kind: 'card', id: 'b', text: 'B' }) +
+			'</p>';
+		expect(readReferences(body).map((r) => r.id)).toEqual(['a', 'b']);
+	});
+
+	it('finds nothing in prose that has none', () => {
+		expect(readReferences('<p>just words</p>')).toEqual([]);
+		expect(readReferences('')).toEqual([]);
 	});
 });

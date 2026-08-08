@@ -1346,7 +1346,9 @@
       // through to the archive on the server.
       const lettersList = localLettersList.length > 0 ? localLettersList : await fetchArchive();
       const params = new URLSearchParams(window.location.search);
-      const requestedId = params.get('id');
+      // `?letter=` is the manifest-declared form (entityHref); `?id=` predates
+      // it and stays working, because links to a letter already exist.
+      const requestedId = params.get('letter') || params.get('id');
       const letter = pickLetter(lettersList, requestedId);
       if (!letter) throw new Error('empty');
       applyTokens(letter);
