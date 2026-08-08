@@ -10,7 +10,7 @@
 // it takes ~40 seconds, and a suite that slow stops being run.
 
 import { describe, it, expect } from 'vitest';
-import { simulate, witnessOnly, interventionist, createWorld } from './sim';
+import { simulate, witnessOnly, interventionist, patient, createWorld } from './sim';
 import { STAGE_KNOWN } from './world';
 import { conditions } from './content/conditions';
 
@@ -97,6 +97,44 @@ describe('balance report', () => {
 		}
 		expect(true).toBe(true);
 	}, 120000);
+
+	it('Q8: the dividend, by worldspace', () => {
+		console.log('\n── Q8 · restraint vs. meddling, 6h ──');
+		console.log('  worldspace │ policy          │ equilS │ eq.share │ load │ concepts');
+		for (const ws of ['water', 'shallows'] as const) {
+			for (const p of [witnessOnly(), interventionist()]) {
+				const r = simulate(p, { duration: 6 * HOUR, seed: 1, worldspace: ws });
+				const s = r.summary;
+				console.log(
+					`  ${ws.padEnd(10)} │ ${s.policy.padEnd(15)} │ ${s.equilibriumSeconds.toFixed(0).padStart(6)} │ ${pct(s.equilibriumShare).padStart(8)} │ ${r.final.state.interventionLoad.toFixed(2)} │ ${String(s.concepts).padStart(8)}`
+				);
+			}
+		}
+		expect(true).toBe(true);
+	}, 120000);
+
+	it('Q9: recall — what attention is worth after Known', () => {
+		console.log('\n── Q9 · study (shallows, all 11 life) ──');
+		console.log('  hours │ policy          │  insight │ recall │ fluency');
+		for (const hours of [2, 6, 24]) {
+			for (const p of [witnessOnly(), patient(0.4)]) {
+				const s = simulate(p, { duration: hours * HOUR, seed: 1, worldspace: 'shallows' }).summary;
+				console.log(
+					`  ${String(hours).padStart(5)} │ ${s.policy.padEnd(15)} │ ${s.finalInsight.toFixed(0).padStart(8)} │ ${s.finalRecall.toFixed(3)} │ ${s.finalFluency.toFixed(2).padStart(7)}`
+				);
+			}
+		}
+		console.log('\n  capacity, 6h shallows:');
+		for (const expand of [false, true]) {
+			const s = simulate(witnessOnly({ expandAttention: expand }), {
+				duration: 6 * HOUR,
+				seed: 1,
+				worldspace: 'shallows'
+			}).summary;
+			console.log(`    expand=${String(expand).padEnd(5)} insight=${s.finalInsight.toFixed(0)} recall=${s.finalRecall.toFixed(3)} fluency=${s.finalFluency.toFixed(2)}`);
+		}
+		expect(true).toBe(true);
+	}, 300000);
 
 	it('Q7: category mastery — does it fire trivially?', () => {
 		console.log('\n── Q7 · category mastery ──');

@@ -6,9 +6,12 @@ them, written after the balance harness landed and changed what a few of the
 answers should be.
 
 Two things to read first: [BALANCE.md](./BALANCE.md) for what the numbers
-currently do, and DESIGN.md §3 for the loop this is building toward. Everything
-below is a proposal — the ✅ marks are recommendations I'd defend, not decisions
-already taken.
+currently do, and DESIGN.md §3 for the loop this is building toward.
+
+The ✅ marks are recommendations. **Three of them are now shipped** — the
+lifetime dividend (1.1), recall and fluency (1.2), and the legible opening
+worldspace (1.4) — and 1.6's generator answer is decided but unbuilt. 1.3 and
+the phase-D/E questions are still proposals.
 
 ---
 
@@ -31,7 +34,7 @@ problem instead of a one-line change.
 
 | candidate | what it does | cost |
 | --- | --- | --- |
-| **(a) lifetime load** ✅ | dividend scales by every intervention *ever* made, not recent ones: `inBand × (1 − clamp(Σweight / K))` | one field, one formula |
+| **(a) lifetime load** ✅ **— shipped** | dividend scales by every intervention *ever* made, not recent ones: `inBand × (1 − clamp(Σweight / K))` | one field, one formula |
 | (b) slow the decay | `INTERVENTION_LOAD_DECAY` 0.01 → 0.0005, so a 0.5 act takes ~17 minutes to clear | one constant |
 | (c) split the concepts | keep load as a rate limit; add a separate `untouchedSeconds` that banks only while a world has *no* interventions at all | a second accumulator |
 
@@ -41,8 +44,12 @@ doesn't trust."* A world meddled with early and left alone late should not read
 as untouched, and under (b) it does. (a) is also the only one that still means
 something across a prestige boundary, which matters given §1.1's whole point.
 
-**Verify:** the `meddling out-earns restraint` test in `sim.test.ts` flips, and
-Witness beats Interventionist by a real margin at 2h, 6h and 24h.
+**Shipped, and it needed a second change nobody had spotted:** the dividend was
+*gated* on the factor (`if (eq > 0.5) equilibriumSeconds += dt`) rather than
+banked in proportion to it, so any load short of the threshold cost exactly
+nothing. With both fixed, Witness banks 20,391 equilibrium-seconds against
+Interventionist's 1,836 in the shallows — elevenfold, and 36 concepts against
+16. See BALANCE.md §3.
 
 ## 1.2 attention capacity is a trap
 
@@ -53,15 +60,19 @@ move time-to-first-Known.
 | candidate | what it does |
 | --- | --- |
 | (a) more life in the opening worldspace | content work; fixes the symptom, not the shape |
-| **(b) attention keeps mattering after Known** ✅ | a Known life yields at a *remembered* rate unless attended, so slots stay valuable for the whole run |
+| **(b) attention keeps mattering after Known** ✅ **— shipped** | a Known life yields at a *remembered* rate unless attended, so slots stay valuable for the whole run |
 | (c) capacity gates concurrent intervention upkeep | ties two under-used systems together, but invents upkeep |
 | (d) make capacity cheaper and earlier | a real early choice instead of a late irrelevance; doesn't fix the endgame |
 
-✅ **(b)**, with the caveat that it changes the feel: it makes attention a
-standing decision rather than a ramp-up one, and it gives the *Known* endgame
-something to spend attention on — which is separately the thing §2 keeps
-running out of. Keep the remembered rate generous (say 0.75× rather than 0.2×)
-so it reads as "she remembers" rather than as a leash.
+✅ **(b), shipped as `recall` and `fluency`** — Bjork's two strengths, which the
+observation stages were already halfway to. Storage never decays (a Known life
+stays Known); retrieval does. Returning to something that had slipped builds
+permanent fluency, which slows future forgetting *and* pays above full recall —
+the testing effect. Capacity went from −2% to **+69%** insight over six hours.
+
+One claim in it is not yet demonstrated: that patience beats grinding. With six
+slots against eleven life everyone is forced to be patient, so the policies
+barely differ. See BALANCE.md §4.
 
 ## 1.3 category mastery fires trivially and is then unreachable
 
@@ -85,7 +96,7 @@ minutes (12.1% of a 1h run, 0.5% of a 24h one).
 | candidate | what it does |
 | --- | --- |
 | (a) nudge an aquatic nutrient source +0.01/sec | water balances; the shallows loses some of its pull |
-| **(b) leave it, make it legible** ✅ | the opening act is nutrient-poor *on purpose*, and opening the shallows is what closes the loop |
+| **(b) leave it, make it legible** ✅ **— shipped** | the opening act is nutrient-poor *on purpose*, and opening the shallows is what closes the loop |
 | (c) per-worldspace bands | most flexible, most machinery |
 
 ✅ **(b)** — it is good progression and it gives the sediment/shallows unlock a
@@ -138,7 +149,7 @@ interesting again.
 | candidate | what it does |
 | --- | --- |
 | (a) constrain the sum | sample, then rescale so Σmetabolism per stock lands in a target band |
-| **(b) derive the leak per world** ✅ | generate freely, then *solve* `STOCK_LEAK` for the surplus each stock actually has, so the world settles mid-band by construction |
+| **(b) derive the leak per world** ✅ **— decided** | generate freely, then *solve* `STOCK_LEAK` for the surplus each stock actually has, so the world settles mid-band by construction |
 
 ✅ **(b).** It is one line of algebra per stock (`leak = surplus / (target − floor)`),
 it never rejects a generated world, and it makes the world's own physics a
@@ -181,14 +192,11 @@ Four invariants. Each step below is shaped by them.
    the merge onto `emptySave()`; anything else ships a migration and a
    `persist.test.ts` case against an old-shaped blob.
 
-## 2.1 fix the dividend
+## 2.1 fix the dividend — ✅ done
 
-**Why first:** §1.1. It is the only open question that gets *more expensive*
-after phase D ships, because the mint reads it and spent concepts can't be
-un-spent.
-
-**Done when:** Witness out-banks Interventionist at 2h, 6h and 24h, and the
-`meddling out-earns restraint` test is rewritten as its opposite.
+Shipped. Witness banks 20,391 equilibrium-seconds against Interventionist's
+1,836 in the shallows, and mints 36 concepts against 16. The step that was
+blocking phase D is clear.
 
 ## 2.2 make the world take its content as data
 

@@ -163,6 +163,10 @@
 				the world's body
 				{#if book.quiet}<span class="quiet">— going quiet</span>{:else if book.selfBalancing}<span
 						class="balancing">— holding itself</span
+					>{:else if book.outOfBand.length > 0}<span
+						class="unsettled"
+						title="a world only holds itself when all three sit inside their band. this one can't yet — the shallows is where the loop closes."
+						>— {book.outOfBand.join(' and ')} out of band</span
 					>{/if}
 			</h3>
 			<div class="cells">
@@ -311,6 +315,13 @@
 	.group.body {
 		flex: 1;
 		min-width: 18rem;
+	}
+	.unsettled {
+		font-size: 0.72rem;
+		font-weight: 400;
+		opacity: 0.65;
+		font-style: italic;
+		cursor: help;
 	}
 	.quiet {
 		font-family: var(--font-ui);

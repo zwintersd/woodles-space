@@ -76,7 +76,11 @@ describe('sim — performance', () => {
 		const t0 = performance.now();
 		simulate(witnessOnly(), { duration: 10 * HOUR, seed: 1, sampleEvery: 60 });
 		const ms = performance.now() - t0;
-		expect(ms).toBeLessThan(8000);
+		// Typically ~1.3s. The bar is deliberately loose against a loaded CI box:
+		// the claim being defended is "usable for sweeping a constant", not a
+		// specific number, and a wall-clock assertion that flakes is worse than
+		// no assertion at all. Before world.ts this took ~33,500ms.
+		expect(ms).toBeLessThan(15000);
 	});
 });
 
@@ -189,22 +193,32 @@ describe('sim — pacing, as it currently stands', () => {
 		expect(s.timeToAllKnown).toBeLessThan(80 * 60);
 	});
 
-	// The restraint dividend is still broken, and the retune made it worse
-	// rather than better. It used to pay a meddler and an ascetic *identically*
-	// (the load never got high enough to gate anything). Now that a world can
-	// genuinely leave its band, intervening repairs it — `shape` lifts the
-	// nutrient baseline, `tend` bumps the stock a life lives by — and repair is
-	// exactly what the dividend rewards. So meddling out-earns restraint.
-	//
-	// Nothing in §2.3 was touched by this pass, deliberately: the fix is a
-	// design decision about what `interventionLoad` should mean, and it is
-	// open. See BALANCE.md §3.
-	it('meddling out-earns restraint — the dividend is still inverted', () => {
-		const opts = { duration: 2 * HOUR, seed: 1 };
+	// The thesis, finally mechanical. Two changes got it here: load is a
+	// lifetime measure rather than one that forgets inside a minute, and the
+	// dividend banks *in proportion to* the factor rather than being gated on
+	// it. Before, restraint and meddling banked identically; then, once a world
+	// could leave its band, meddling won outright.
+	it('restraint out-earns meddling in a world that can balance', { timeout: 30_000 }, () => {
+		const opts = { duration: 6 * HOUR, seed: 1, worldspace: 'shallows' as const };
 		const w = simulate(witnessOnly(), opts).summary;
 		const i = simulate(interventionist(), opts).summary;
-		expect(i.equilibriumSeconds).toBeGreaterThan(w.equilibriumSeconds);
 		expect(i.interventions).toBeGreaterThan(0);
+		// not a rounding difference: restraint banks an order of magnitude more
+		expect(w.equilibriumSeconds).toBeGreaterThan(i.equilibriumSeconds * 5);
+		expect(w.concepts).toBeGreaterThan(i.concepts);
+	});
+
+	// ...and the opening worldspace is the exception, for a reason that is
+	// content rather than tuning. The water world is nutrient-poor by design
+	// (BALANCE.md §6), so restraint *cannot* produce equilibrium there and
+	// intervening is the only way into band at all. Both numbers are near zero;
+	// this pins that the exception is small and known, not that it is fine.
+	it('the opening worldspace is the exception, and both bank almost nothing', { timeout: 30_000 }, () => {
+		const opts = { duration: 6 * HOUR, seed: 1 };
+		const w = simulate(witnessOnly(), opts).summary;
+		const i = simulate(interventionist(), opts).summary;
+		expect(w.equilibriumShare).toBeLessThan(0.05);
+		expect(i.equilibriumShare).toBeLessThan(0.05);
 	});
 });
 
@@ -273,6 +287,80 @@ describe('the §1.2 lesson', () => {
 		expect(partial.stressedShare).toBeGreaterThan(whole.stressedShare);
 		expect(whole.equilibriumShare).toBeGreaterThan(partial.equilibriumShare);
 	});
+});
+
+// Bjork's two strengths: storage never decays, retrieval does. A Known life
+// stays Known — nothing is ever lost — but how readily it comes to her slips,
+// and returning to it is what attention is for once the stages are done.
+describe('recall — the study mechanic', () => {
+	it('a Known life slips, and never below the yield floor', () => {
+		const w = createWorld({ duration: 0, seed: 1 });
+		w.attend('salt_deposit');
+		for (let i = 0; i < 1000 * TICKS_PER_SECOND; i++) w.tick(0.1);
+		expect(w.stageOf('salt_deposit')).toBe(STAGE_KNOWN);
+		// freshly Known is fully in mind; it has only just begun to slip
+		expect(w.recallOf('salt_deposit')).toBeGreaterThan(0.95);
+
+		for (let i = 0; i < 1800 * TICKS_PER_SECOND; i++) w.tick(0.1);
+		expect(w.recallOf('salt_deposit')).toBeLessThan(0.5);
+		// storage is untouched: it is still Known, and still yields
+		expect(w.stageOf('salt_deposit')).toBe(STAGE_KNOWN);
+		expect(w.recallMultiplier('salt_deposit')).toBeGreaterThanOrEqual(0.5);
+	});
+
+	it('returning to it brings it back, and builds fluency', () => {
+		const w = createWorld({ duration: 0, seed: 1 });
+		w.attend('salt_deposit');
+		for (let i = 0; i < 1000 * TICKS_PER_SECOND; i++) w.tick(0.1);
+		for (let i = 0; i < 1800 * TICKS_PER_SECOND; i++) w.tick(0.1); // let it fade
+		const faded = w.recallOf('salt_deposit');
+		expect(w.fluencyOf('salt_deposit')).toBe(0);
+
+		w.attend('salt_deposit');
+		for (let i = 0; i < 300 * TICKS_PER_SECOND; i++) w.tick(0.1);
+		expect(w.recallOf('salt_deposit')).toBeGreaterThan(faded);
+		expect(w.fluencyOf('salt_deposit')).toBeGreaterThan(0);
+	});
+
+	it('the desirable difficulty: a deep return is worth more than a top-up', () => {
+		const fluencyAfterFading = (fadeSeconds: number) => {
+			const w = createWorld({ duration: 0, seed: 1 });
+			w.attend('salt_deposit');
+			for (let i = 0; i < 1000 * TICKS_PER_SECOND; i++) w.tick(0.1);
+			for (let i = 0; i < fadeSeconds * TICKS_PER_SECOND; i++) w.tick(0.1);
+			w.attend('salt_deposit');
+			for (let i = 0; i < 600 * TICKS_PER_SECOND; i++) w.tick(0.1);
+			return w.fluencyOf('salt_deposit');
+		};
+		// the same 600 seconds of attention, spent on something that had slipped
+		// further, is worth substantially more
+		expect(fluencyAfterFading(2400)).toBeGreaterThan(fluencyAfterFading(120) * 2);
+	});
+
+	it('fluency slows all future forgetting', () => {
+		const w = createWorld({ duration: 0, seed: 1 });
+		w.attend('salt_deposit');
+		for (let i = 0; i < 1000 * TICKS_PER_SECOND; i++) w.tick(0.1);
+		// hand it fluency directly and compare decay against a world without
+		const fresh = createWorld({ duration: 0, seed: 1 });
+		fresh.attend('salt_deposit');
+		for (let i = 0; i < 1000 * TICKS_PER_SECOND; i++) fresh.tick(0.1);
+		w.state.fluency = { salt_deposit: 3 };
+
+		for (let i = 0; i < 1800 * TICKS_PER_SECOND; i++) {
+			w.tick(0.1);
+			fresh.tick(0.1);
+		}
+		expect(w.recallOf('salt_deposit')).toBeGreaterThan(fresh.recallOf('salt_deposit'));
+	});
+
+	it('attention capacity is worth buying now', () => {
+		const opts = { duration: 6 * HOUR, seed: 1, worldspace: 'shallows' as const };
+		const narrow = simulate(witnessOnly({ expandAttention: false }), opts).summary;
+		const wide = simulate(witnessOnly(), opts).summary;
+		// it used to know the same four life and end *poorer* — BALANCE.md §4
+		expect(wide.finalInsight).toBeGreaterThan(narrow.finalInsight * 1.2);
+	}, 30_000);
 });
 
 describe('sim — a World can be seeded into any state', () => {

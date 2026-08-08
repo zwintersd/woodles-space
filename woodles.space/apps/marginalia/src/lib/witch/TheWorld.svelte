@@ -328,6 +328,30 @@
 											</button>
 										{/if}
 									</div>
+								{:else if book.recallOf(l.id) < 0.999}
+									{@const r = book.recallOf(l.id)}
+									<div class="recall">
+										<div class="recall-bar" title="how readily it comes to her now">
+											<span class="recall-fill" style="width:{Math.round(r * 100)}%"></span>
+										</div>
+										<p class="recall-lead">
+											{#if r < 0.35}she has to reach for it now.{:else if r < 0.7}it is going quiet in
+												her.{:else}still close to hand.{/if}
+											{#if book.fluencyOf(l.id) > 0.4}<span class="fluent">·  known by heart</span
+												>{/if}
+										</p>
+										{#if book.isAttending(l.id)}
+											<button class="release" onclick={() => book.unattend(l.id)}>let it rest</button>
+										{:else}
+											<button
+												class="attend"
+												disabled={!book.canAttend(l.id)}
+												onclick={() => book.attend(l.id)}
+											>
+												{book.attentionFree > 0 ? 'return to it' : 'no attention free'}
+											</button>
+										{/if}
+									</div>
 								{:else if book.hasIntervened(l.id)}
 									<p class="intervened">
 										<span class="verb-done">{pastVerb(domainVerb[l.domain])}.</span>
@@ -1208,6 +1232,36 @@
 		font-style: italic;
 		color: var(--muted);
 		margin: 0;
+	}
+	.recall {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		margin-top: 0.4rem;
+	}
+	.recall-bar {
+		height: 3px;
+		border-radius: 2px;
+		background: rgba(255, 255, 255, 0.09);
+		overflow: hidden;
+	}
+	.recall-fill {
+		display: block;
+		height: 100%;
+		background: currentColor;
+		opacity: 0.5;
+		transition: width 0.4s linear;
+	}
+	.recall-lead {
+		margin: 0;
+		font-size: 0.75rem;
+		font-style: italic;
+		opacity: 0.7;
+	}
+	.fluent {
+		opacity: 0.75;
+		font-style: normal;
+		letter-spacing: 0.02em;
 	}
 	.intervened {
 		font-family: var(--font-body);

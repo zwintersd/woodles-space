@@ -71,7 +71,13 @@ import {
 	ENCOURAGE_STABILITY_MAX,
 	GUIDE_METABOLISM_SCALE,
 	INTERVENTION_LOAD_WEIGHT,
-	INTERVENTION_LOAD_DECAY,
+	INTERVENTION_LOAD_FULL,
+	RECALL_DECAY_PER_SEC,
+	RECALL_RESTORE_PER_SEC,
+	RECALL_YIELD_FLOOR,
+	FLUENCY_GAIN_PER_SEC,
+	FLUENCY_MAX,
+	FLUENCY_YIELD_BONUS,
 	FAVOR_EQUILIBRIUM_BONUS,
 	EQUILIBRIUM_MIN_FACTOR,
 	CATEGORY_MASTERY_BONUS
@@ -121,8 +127,13 @@ export interface WorldState {
 	stabilityBonus: number;
 	metabolismScale: Record<string, number>;
 	interventionsDone: Record<string, number>;
+	/** Lifetime weight of every act she has made here. Never decays. */
 	interventionLoad: number;
 	equilibriumSeconds: number;
+	/** How readily a Known life comes to her, 0..1. Decays; attention restores it. */
+	recall: Record<string, number>;
+	/** Permanent durability, built by returning to something that had faded. */
+	fluency: Record<string, number>;
 	// attention
 	attentionCapacity: number;
 	attending: string[];
@@ -180,6 +191,8 @@ export function createWorldState(): WorldState {
 		interventionsDone: {},
 		interventionLoad: 0,
 		equilibriumSeconds: 0,
+		recall: {},
+		fluency: {},
 		attentionCapacity: ATTENTION_START,
 		attending: [],
 		study: {},
@@ -322,6 +335,32 @@ export class World {
 		return severityFor(life.needs, this.state.stocks);
 	}
 
+	/** How readily a Known life comes to her now. Only meaningful at Known. */
+	recallOf(lifeId: string): number {
+		return this.state.recall[lifeId] ?? 1;
+	}
+
+	/** Permanent durability, built by returning to something that had faded. */
+	fluencyOf(lifeId: string): number {
+		return this.state.fluency[lifeId] ?? 0;
+	}
+
+	/**
+	 * What recall does to a Known life's yield. A forgotten thing is still
+	 * known, so this floors well above zero — the point is that returning to it
+	 * is *worth* a slot, not that neglect is punished.
+	 */
+	recallMultiplier(lifeId: string): number {
+		if (this.stageOf(lifeId) < STAGE_KNOWN) return 1;
+		const fresh = RECALL_YIELD_FLOOR + (1 - RECALL_YIELD_FLOOR) * this.recallOf(lifeId);
+		// Fluency pays *above* full recall, which is the whole point of the
+		// testing effect: durable knowledge is worth more than merely fresh
+		// knowledge. Without this there is nothing above the recall ceiling, so
+		// keeping everything topped up captures all there is and letting a thing
+		// fade is pure loss — the opposite of what the mechanic is for.
+		return fresh + FLUENCY_YIELD_BONUS * this.fluencyOf(lifeId);
+	}
+
 	// ── derived: the idle engine ─────────────────────────────────────────────
 
 	/** Insight/sec from witnessed life, before the Favor multiplier. */
@@ -333,7 +372,8 @@ export class World {
 				l.insightWeight *
 				(STAGE_INSIGHT_MULT[this.stageOf(l.id)] ?? 0) *
 				this.vitalityOf(l.id) *
-				mastery;
+				mastery *
+				this.recallMultiplier(l.id);
 		}
 		return r;
 	}
@@ -403,11 +443,32 @@ export class World {
 		});
 	}
 
-	/** A balanced world she is *not* propping up. 0..1. */
+	/**
+	 * A balanced world she is *not* propping up. 0..1.
+	 *
+	 * The load term is lifetime, not recent: it counts every act she has made
+	 * here. When it decayed, intervening was free within a minute — and since
+	 * intervening *repairs* a world, and repair is what this rewards, the
+	 * mechanic paid a meddler more than an ascetic. See BALANCE.md §3.
+	 */
 	get equilibriumFactor(): number {
-		return this.allStocksInBand
-			? Math.max(0, 1 - Math.min(1, this.state.interventionLoad))
-			: 0;
+		if (!this.allStocksInBand) return 0;
+		return Math.max(0, 1 - Math.min(1, this.state.interventionLoad / INTERVENTION_LOAD_FULL));
+	}
+
+	/**
+	 * Which stocks currently sit outside their band, so the Ledger can say *why*
+	 * a world is not holding itself. The opening water worldspace settles two
+	 * points under the nutrient floor by design (BALANCE.md §6) and a permanent
+	 * "not balanced" with no explanation reads as a bug rather than as the
+	 * reason to open the shallows.
+	 */
+	get outOfBand(): StockId[] {
+		return STOCK_IDS.filter((id) => {
+			const [lo, hi] = STOCK_BANDS[id];
+			const shift = this.state.stockBaseline[id] - STOCK_NEUTRAL;
+			return this.state.stocks[id] < lo + shift || this.state.stocks[id] > hi + shift;
+		});
 	}
 
 	get selfBalancing(): boolean {
@@ -438,10 +499,17 @@ export class World {
 		return this.state.attending.includes(lifeId);
 	}
 
+	/**
+	 * Known life is attendable again — that is what attention is *for* once the
+	 * stages are done. Reaching Known still releases the slot (see
+	 * `settleStages`), so returning to something is always a deliberate act
+	 * rather than a slot quietly staying occupied forever.
+	 */
 	canAttend(lifeId: string): boolean {
 		if (this.isAttending(lifeId)) return false;
 		if (!this.life.some((l) => l.id === lifeId)) return false;
-		if (this.stageOf(lifeId) >= STAGE_KNOWN) return false;
+		// nothing to gain from returning to something already fully in mind
+		if (this.stageOf(lifeId) >= STAGE_KNOWN && this.recallOf(lifeId) >= 1) return false;
 		return this.attentionFree > 0;
 	}
 
@@ -511,6 +579,8 @@ export class World {
 			if (stage === STAGE_KNOWN) {
 				this.state.essence += ESSENCE_ON_KNOWN;
 				into.push({ kind: 'gain', resource: 'essence', amount: ESSENCE_ON_KNOWN });
+				// freshly Known is fully in mind; it fades from here
+				this.state.recall = { ...this.state.recall, [lifeId]: 1 };
 			}
 			if (life) {
 				const line = pickLine(stageFieldNoteOptions(life.domain, stage), this.rng.next());
@@ -666,6 +736,36 @@ export class World {
 		this.invalidate();
 	}
 
+	// ── recall: what attention is for after Known ────────────────────────────
+
+	/**
+	 * She returns to it. Recall eases back toward full, and — the desirable
+	 * difficulty — the further it had slipped, the more permanent fluency the
+	 * return builds. Topping up something never allowed to fade is worth almost
+	 * nothing; recovering something half-lost is worth a great deal.
+	 */
+	private restoreRecall(lifeId: string, dt: number): void {
+		const current = this.recallOf(lifeId);
+		if (current >= 1) return;
+		const gap = 1 - current;
+		const next = Math.min(1, current + gap * (1 - Math.exp(-RECALL_RESTORE_PER_SEC * dt)));
+		this.state.recall = { ...this.state.recall, [lifeId]: next };
+		const gained = Math.min(
+			FLUENCY_MAX,
+			this.fluencyOf(lifeId) + FLUENCY_GAIN_PER_SEC * gap * dt
+		);
+		this.state.fluency = { ...this.state.fluency, [lifeId]: gained };
+	}
+
+	/** It slips, slower the more fluent she is with it. Exponential, dt-stable. */
+	private fadeRecall(lifeId: string, dt: number): void {
+		const current = this.recallOf(lifeId);
+		if (current <= 0) return;
+		const k = RECALL_DECAY_PER_SEC / (1 + this.fluencyOf(lifeId));
+		const next = Math.max(0, current * Math.exp(-k * dt));
+		this.state.recall = { ...this.state.recall, [lifeId]: next };
+	}
+
 	// ── the idle tick ────────────────────────────────────────────────────────
 
 	/**
@@ -699,12 +799,26 @@ export class World {
 		}
 		s.vitality = nextVit;
 
-		// 2) study accrual for attended life, slowed when it is suffering.
+		// 2) attended life either deepens or is returned to. Study is slowed when
+		//    a life is suffering; recall is not — she can always bring a thing to
+		//    mind, however badly the world is treating it.
+		const attendedNow = new Set(s.attending);
 		for (const id of [...s.attending]) {
 			if (!presentIds.has(id)) continue;
 			const life = lifeById(id);
 			if (!life) continue;
-			this.addStudy(id, dt * life.studyEase * this.vitalityOf(id), into);
+			if (this.stageOf(id) >= STAGE_KNOWN) {
+				this.restoreRecall(id, dt);
+			} else {
+				this.addStudy(id, dt * life.studyEase * this.vitalityOf(id), into);
+			}
+		}
+
+		// 2b) everything Known that she is *not* holding in mind slips a little.
+		//     Storage never decays — it stays Known — only retrieval does.
+		for (const l of present) {
+			if (attendedNow.has(l.id) || this.stageOf(l.id) < STAGE_KNOWN) continue;
+			this.fadeRecall(l.id, dt);
 		}
 
 		// 3) stocks move by metabolism, then get pulled back only if they have
@@ -743,13 +857,16 @@ export class World {
 			}
 		}
 
-		// 5) her hand grows light again, and a balanced world she isn't propping
-		//    up banks the equilibrium dividend.
-		if (s.interventionLoad > 0) {
-			s.interventionLoad = Math.max(0, s.interventionLoad - INTERVENTION_LOAD_DECAY * dt);
-		}
+		// 5) a balanced world she isn't propping up banks the equilibrium
+		//    dividend. Load does not decay — see tuning.ts. Forgetting was the
+		//    bug: it made every act free within a minute of making it.
 		const eq = this.equilibriumFactor;
-		if (eq > EQUILIBRIUM_MIN_FACTOR) s.equilibriumSeconds += dt;
+		// Banked *in proportion to* the factor, not gated on it. Gating was the
+		// second half of why load never mattered: a binary `eq > 0.5` meant any
+		// load short of the threshold cost exactly nothing, so the lightest hand
+		// and a fairly heavy one banked identically. Now every act she makes
+		// shows up in the dividend immediately, at its own weight.
+		if (eq > EQUILIBRIUM_MIN_FACTOR) s.equilibriumSeconds += eq * dt;
 
 		// 6) a beat the first time this world settles into balance, or the first
 		//    time it goes quiet — not a repeating alarm.
