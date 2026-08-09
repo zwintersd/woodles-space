@@ -182,17 +182,18 @@ adjacent but mechanically unrelated tabs. the app's *name* is the unifier — ma
 are notes in the margin. the margin-note editor already exists
 (`components/reading/MarginNotes.svelte`); reuse it to let the player annotate **life
 cards** and co-write the witch's **field journal**. witnessing becomes active without
-becoming extractive — the most on-theme way to add a pillar. spores' worldbuilding
-category pack already defines typed creature / biome / lore records — absorbed
-from the retired `marginalia-devlog` app — a possible content pipeline.
+becoming extractive — the most on-theme way to add a pillar. *(spores' worldbuilding
+category pack — typed creature / biome / lore records absorbed from the retired
+`marginalia-devlog` app — used to be a possible content pipeline for this; spores
+itself has since retired into write (CONVERGENCE.md §8), and the worldbuilding pack
+had no home among the four apps that stayed, so this idea needs a different source
+if it's still wanted.)*
 
 **what i need from you:**
 - is reusing the margin editor on life cards appealing, or should the reading room
   stay its own thing?
 - are player annotations purely personal (a scrapbook), or do they feed mechanics
   (annotating deepens study)?
-- any relationship to spores' worldbuilding records — pull content from there, or
-  keep them separate?
 
 ### 8. deeper content (and a second tier of *written* conditions)
 

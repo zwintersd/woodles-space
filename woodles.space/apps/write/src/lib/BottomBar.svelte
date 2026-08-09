@@ -18,6 +18,8 @@
 		fonts,
 		foregroundVisible,
 		fgIsEmpty,
+		isListKind = false,
+		liquidItemCount = 0,
 		onPublish
 	}: {
 		saveStatus: 'saved' | 'saving';
@@ -35,6 +37,9 @@
 		/** Publishing follows whether the prose is on screen, not what has focus. */
 		foregroundVisible: boolean;
 		fgIsEmpty: boolean;
+		/** Liquid has neither a word count nor a goal — an item count instead. */
+		isListKind?: boolean;
+		liquidItemCount?: number;
 		onPublish: () => void;
 	} = $props();
 </script>
@@ -44,12 +49,18 @@
 		<span class="save-status" class:saving={saveStatus === 'saving'}>
 			{saveStatus === 'saving' ? 'saving…' : 'saved'}
 		</span>
-		<button
-			class="word-count"
-			class:met={goal !== null && wordCount >= goal}
-			onclick={onSetGoal}
-			title={goal === null ? 'set a word goal' : 'change or clear the word goal'}
-		>{goalLabel(wordCount, goal)}</button>
+		{#if isListKind}
+			<span class="word-count" title="items across every list">
+				{liquidItemCount} item{liquidItemCount === 1 ? '' : 's'}
+			</span>
+		{:else}
+			<button
+				class="word-count"
+				class:met={goal !== null && wordCount >= goal}
+				onclick={onSetGoal}
+				title={goal === null ? 'set a word goal' : 'change or clear the word goal'}
+			>{goalLabel(wordCount, goal)}</button>
+		{/if}
 		<span class="picker-sep">·</span>
 		<label class="picker">
 			<span class="picker-label">palette</span>
@@ -85,13 +96,17 @@
 		</label>
 	</div>
 	<div class="publish-cluster">
-		{#if foregroundVisible && fgIsEmpty}
-			<span class="publish-warn">this will be blank in the archive</span>
-		{/if}
-		{#if foregroundVisible}
-			<button class="publish-btn" onclick={onPublish}>Publish →</button>
+		{#if isListKind}
+			<span class="publish-hint">liquid boards stay here — echoes is for finished prose</span>
 		{:else}
-			<span class="publish-hint">open the fg page to publish</span>
+			{#if foregroundVisible && fgIsEmpty}
+				<span class="publish-warn">this will be blank in the archive</span>
+			{/if}
+			{#if foregroundVisible}
+				<button class="publish-btn" onclick={onPublish}>Publish →</button>
+			{:else}
+				<span class="publish-hint">open the fg page to publish</span>
+			{/if}
 		{/if}
 	</div>
 </div>
@@ -127,6 +142,8 @@
 		background: none; border: none; padding: 0; cursor: pointer;
 		transition: color 0.18s ease, opacity 0.18s ease;
 	}
+	/* Liquid's item count is read-only, unlike the word-count/goal button. */
+	span.word-count { cursor: default; }
 	.word-count:hover { opacity: 0.85; color: var(--accent-strong); }
 	.word-count.met { color: var(--accent-strong); opacity: 0.8; }
 	.picker-sep { color: var(--muted); opacity: 0.3; }

@@ -20,6 +20,8 @@ import {
 	THINKING_ABOUT_SHELF_STORAGE_KEY,
 	type ShelfEntry
 } from '@woodles/sync';
+import { listDrafts, type DraftIndexItem } from './drafts';
+import { coerceKind, kindSpec } from './kinds';
 
 export type Sigil = '#' | '@';
 
@@ -103,6 +105,52 @@ class ShelfSource implements ReferenceSource {
 	}
 }
 
+// ── # : your other drafts ───────────────────────────────────────────────
+//
+// Spores' job — an interlinked personal knowledge base — retired into Write
+// rather than getting a second port of its `[[wikilink]]` syntax. Write
+// already had a live reference spine for *other* apps' records; a draft is
+// just one more source on the `#` sigil, resolved against `listDrafts()`
+// instead of a ledger because there is nothing to sync here — it's the same
+// origin, same app. Spores derived backlinks from these links too; Write's
+// version lives in `backlinks.ts`, reading the same `data-ref-*` anchors
+// this source writes rather than a second stored form.
+//
+// No ledger, no refresh: `listDrafts()` is a synchronous localStorage read,
+// so this stays current without a cache to invalidate.
+
+class DraftSource implements ReferenceSource {
+	sigil: Sigil = '#';
+
+	list(query: string): ReferenceCandidate[] {
+		return listDrafts()
+			.filter((draft) => matches(this.#titleOf(draft), query))
+			.map((draft) => this.#toCandidate(draft));
+	}
+
+	resolve(kind: string, id: string): ReferenceCandidate | null {
+		if (kind !== 'draft') return null;
+		const draft = listDrafts().find((candidate) => candidate.id === id);
+		return draft ? this.#toCandidate(draft) : null;
+	}
+
+	#titleOf(draft: DraftIndexItem): string {
+		return draft.title || kindSpec(coerceKind(draft.kind)).untitled;
+	}
+
+	#toCandidate(draft: DraftIndexItem): ReferenceCandidate {
+		return {
+			app: 'write',
+			kind: 'draft',
+			id: draft.id,
+			text: this.#titleOf(draft),
+			hint: kindSpec(coerceKind(draft.kind)).label
+		};
+	}
+}
+
+export const draftSource = new DraftSource();
+
 // ── @ : days ────────────────────────────────────────────────────────────
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -178,7 +226,7 @@ function offsetOf(key: string, from: Date): number {
 export const shelfSource = new ShelfSource();
 export const daySource = new DaySource();
 
-const SOURCES: ReferenceSource[] = [shelfSource, daySource];
+const SOURCES: ReferenceSource[] = [shelfSource, draftSource, daySource];
 
 export function sourcesFor(sigil: Sigil): ReferenceSource[] {
 	return SOURCES.filter((source) => source.sigil === sigil);

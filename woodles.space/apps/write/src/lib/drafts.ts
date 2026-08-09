@@ -8,6 +8,9 @@ import { createHandoffQueue, type Handoff } from '@woodles/handoff';
 import { sanitizeHtml } from './htmlTools';
 import { coerceKind, WRITING_KINDS, type WritingKind } from './kinds';
 import { importNotebookCaptures } from './notebookImport';
+import { importSporesEntries } from './sporesImport';
+import { draftStatus, nextDraftStatus, type DraftStatus } from './status';
+import type { LiquidBoard } from './liquid';
 import type { LayerId, PocketNote, MarginNote } from './types';
 
 export type DraftIndexItem = {
@@ -18,6 +21,8 @@ export type DraftIndexItem = {
 	kind?: WritingKind;
 	/** Carried from captures that arrived with tags; searchable, not editable here yet. */
 	tags?: string[];
+	/** Absent means inferred from content — see `draftStatus()` in status.ts. */
+	status?: DraftStatus;
 };
 
 export interface DraftBody {
@@ -29,8 +34,12 @@ export interface DraftBody {
 	tags?: string[];
 	/** Optional word goal for the foreground — see kinds.ts. */
 	goal?: number;
+	/** Absent means inferred from content — see `draftStatus()` in status.ts. */
+	status?: DraftStatus;
 	layers?: Partial<Record<LayerId, { html?: string; updatedAt?: string }>>;
 	annotations?: { pocketNotes?: PocketNote[]; marginNotes?: MarginNote[] };
+	/** Only present on `kind: 'list'` drafts — Liquid's board, in place of layers. */
+	liquid?: LiquidBoard;
 	content?: string;
 	savedAt?: string;
 }
@@ -110,7 +119,7 @@ export function upsertIndex(
 	id: string,
 	title: string,
 	updatedAt: string,
-	extras: Pick<DraftIndexItem, 'kind' | 'tags'> = {}
+	extras: Pick<DraftIndexItem, 'kind' | 'tags' | 'status'> = {}
 ): DraftIndexItem[] {
 	const next = [...list];
 	const idx = next.findIndex((d) => d.id === id);
@@ -146,6 +155,63 @@ export function kindsPresent(list: DraftIndexItem[]): WritingKind[] {
 	return WRITING_KINDS.filter((kind) => present.has(kind));
 }
 
+export type TagCount = { tag: string; count: number };
+
+/**
+ * Tags across the drafts list, aggregated case-insensitively and sorted by
+ * frequency then name — Spores' `tagCounts`, ported for the same job: a
+ * browse-by-tag row, now that links between drafts are Write's own job too
+ * (see `references.svelte.ts`'s draft source and `backlinks.ts`).
+ */
+export function tagCounts(list: DraftIndexItem[]): TagCount[] {
+	const groups = new Map<string, { display: Map<string, number>; count: number }>();
+	for (const d of list) {
+		for (const raw of d.tags ?? []) {
+			const tag = raw.trim();
+			if (!tag) continue;
+			const key = tag.toLowerCase();
+			const group = groups.get(key) ?? { display: new Map(), count: 0 };
+			group.count += 1;
+			group.display.set(tag, (group.display.get(tag) ?? 0) + 1);
+			groups.set(key, group);
+		}
+	}
+	const result: TagCount[] = [];
+	for (const group of groups.values()) {
+		let best = '';
+		let bestCount = -1;
+		for (const [display, count] of group.display) {
+			if (count > bestCount) {
+				best = display;
+				bestCount = count;
+			}
+		}
+		result.push({ tag: best, count: group.count });
+	}
+	return result.sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+}
+
+function hasWordsIn(id: string): boolean {
+	return Boolean(loadDraft(id)?.layers?.foreground?.html?.trim());
+}
+
+/** Advance a draft's status one step and persist it to the index. Forward-only. */
+export function cycleDraftStatus(list: DraftIndexItem[], id: string): DraftIndexItem[] {
+	const current = list.find((d) => d.id === id);
+	if (!current) return list;
+	const next = nextDraftStatus(draftStatus(current.status, hasWordsIn(id)));
+	const updated = list.map((d) => (d.id === id ? { ...d, status: next } : d));
+	writeIndex(updated);
+	return updated;
+}
+
+/** Each draft's effective status — explicit, or inferred from its foreground. */
+export function statusesFor(list: DraftIndexItem[]): Map<string, DraftStatus> {
+	const map = new Map<string, DraftStatus>();
+	for (const item of list) map.set(item.id, draftStatus(item.status, hasWordsIn(item.id)));
+	return map;
+}
+
 // One-time migration: if there's an old single-draft key and no
 // indexed drafts yet, promote it to the new format. Returns the seeded
 // index entry, or null if nothing to migrate.
@@ -176,7 +242,7 @@ export function migrateLegacyDraft(): { id: string; entry: DraftIndexItem } | nu
 
 const handoffQueue = createHandoffQueue('write');
 
-function escapeHtml(text: string): string {
+export function escapeHtml(text: string): string {
 	return text
 		.replace(/&/g, '&amp;')
 		.replace(/</g, '&lt;')
@@ -257,6 +323,8 @@ export interface BootstrapResult {
 	handoffs: number;
 	/** How many notebook captures moved in when that app retired. */
 	notebookImports: number;
+	/** How many spores moved in when that app retired. */
+	sporesImports: number;
 }
 
 // Returns the initial draft state for the app on first paint. Performs
@@ -288,6 +356,14 @@ export function bootstrap(): BootstrapResult {
 		writeIndex(drafts);
 	}
 
+	// Spores, carried in once after that app retired — same quiet-archive
+	// stance as the notebook import above. See sporesImport.ts.
+	const sporesImported = importSporesEntries(drafts);
+	if (sporesImported.count > 0) {
+		drafts = sporesImported.drafts;
+		writeIndex(drafts);
+	}
+
 	// Anything sent here from another app becomes its own draft and wins the
 	// opening slot — it's the thing you came to write.
 	const caught = ingestHandoffs(drafts);
@@ -298,5 +374,12 @@ export function bootstrap(): BootstrapResult {
 	}
 
 	const body = loadDraft(activeId);
-	return { drafts, activeId, body, handoffs: caught.count, notebookImports: imported.count };
+	return {
+		drafts,
+		activeId,
+		body,
+		handoffs: caught.count,
+		notebookImports: imported.count,
+		sporesImports: sporesImported.count
+	};
 }

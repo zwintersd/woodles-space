@@ -60,6 +60,8 @@ export type ThinkingAboutEntry = {
 	/** Structured counterpart to `schedule`; same columns, null when not set. */
 	standing: StandingSlot | null;
 	sessions: Session[]; // logged sittings with the thing, newest first by date
+	/** A cast structured record, or null — see EntrySpell above. */
+	spell: EntrySpell | null;
 	createdAt: string; // ISO timestamp
 	updatedAt: string; // ISO timestamp
 };
@@ -76,6 +78,20 @@ export type ThinkingAboutBlob = {
 	 * is the same stance the Ologypedia import took toward its own re-imports.
 	 */
 	ingestedSittings?: string[];
+};
+
+/**
+ * A structured record cast for an entry — Spores' spell system, moved here
+ * because its curated categories (book, film, tv-series, game, anime, album,
+ * person…) already name almost exactly this app's `SectionKey`s. See
+ * `spells/`. `data` is the model's answer, normalized; `categoryId` is the
+ * category the prompt was built for, kept alongside rather than trusted from
+ * the pasted JSON, which can drift on its own `kind` field.
+ */
+export type EntrySpell = {
+	categoryId: string;
+	data: Record<string, unknown>;
+	castAt: string; // ISO timestamp
 };
 
 export type SectionSize = 'minimized' | 'compact' | 'full';

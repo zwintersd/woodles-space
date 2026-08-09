@@ -6,10 +6,14 @@
   "outputDirectory": ".",
   "trailingSlash": false,
   "redirects": [
-    { "source": "/marginalia-devlog",        "destination": "/spores", "permanent": true },
-    { "source": "/marginalia-devlog/:path*", "destination": "/spores", "permanent": true },
-    { "source": "/notebook",                 "destination": "/write",  "permanent": true },
-    { "source": "/notebook/:path*",          "destination": "/write",  "permanent": true }
+    { "source": "/marginalia-devlog",        "destination": "/write", "permanent": true },
+    { "source": "/marginalia-devlog/:path*", "destination": "/write", "permanent": true },
+    { "source": "/notebook",                 "destination": "/write", "permanent": true },
+    { "source": "/notebook/:path*",          "destination": "/write", "permanent": true },
+    { "source": "/spores",                   "destination": "/write", "permanent": true },
+    { "source": "/spores/:path*",            "destination": "/write", "permanent": true },
+    { "source": "/ologypedia",               "destination": "/write", "permanent": true },
+    { "source": "/ologypedia/:path*",        "destination": "/write", "permanent": true }
   ],
   "rewrites": [
     { "source": "/",                "destination": "/apps/landing/index.html" },
@@ -33,8 +37,6 @@
     { "source": "/digits/:path*",   "destination": "/apps/digits/:path*" },
     { "source": "/quiet-room",        "destination": "/apps/quiet-room/index.html" },
     { "source": "/quiet-room/:path*", "destination": "/apps/quiet-room/:path*" },
-    { "source": "/ologypedia",        "destination": "/apps/ologypedia/index.html" },
-    { "source": "/ologypedia/:path*", "destination": "/apps/ologypedia/:path*" },
     { "source": "/write",           "destination": "/apps/write/dist/index.html" },
     { "source": "/write/:path*",    "destination": "/apps/write/dist/:path*" },
     { "source": "/letter",          "destination": "/apps/letter/index.html" },
@@ -49,9 +51,7 @@
     { "source": "/planner/:path*",     "destination": "/apps/planner/dist/:path*" },
     { "source": "/animations",         "destination": "/apps/animations/index.html" },
     { "source": "/animations/:path*",  "destination": "/apps/animations/:path*" },
-{ "source": "/spores",             "destination": "/apps/spores/dist/index.html" },
-    { "source": "/spores/:path*",      "destination": "/apps/spores/dist/:path*" },
-    { "source": "/bestiary",                  "destination": "/apps/bestiary/dist/index.html" },
+{ "source": "/bestiary",                  "destination": "/apps/bestiary/dist/index.html" },
     { "source": "/bestiary/:path*",           "destination": "/apps/bestiary/dist/:path*" },
     { "source": "/thinking-about",            "destination": "/apps/thinking-about/dist/index.html" },
     { "source": "/thinking-about/:path*",     "destination": "/apps/thinking-about/dist/:path*" },

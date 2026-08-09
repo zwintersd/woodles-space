@@ -20,7 +20,7 @@ Notes:   what consolidation needs, or what's holding it
 
 ## sync.svelte.ts
 **Status:** done
-**Copies:** `apps/{planner,bestiary,spores}/src/lib/sync.svelte.ts`
+**Copies:** `apps/{planner,bestiary,thinking-about}/src/lib/sync.svelte.ts`
 **State:** consolidated
 **Notes:** extracted into `createAppSync` in `packages/sync/src/index.ts`. each
 app's file is now ~30 lines: a `SyncState` class with `$state` fields, its
@@ -37,11 +37,12 @@ in the package.
 **State:** consolidated
 **Notes:** `sanitizeHtml`, `stripPresentation`, `ensureAnchorsOn`,
 `stampAnchorsHtml`, `isEmptyHtml`, `stripTags`, `htmlToText`, `countWords`,
-`countWordsInText`, `previewText`. four consumers since notebook retired
-(CONVERGENCE.md §7): `write` (now a pure re-export), `marginalia` (keeps its
-paragraph model and its two sanitizer policies), `letter` (imports the `.js`
-directly — it is static, so the package ships browser-ready `.js` + a `.d.ts`
-sidecar, same shape as `@woodles/app-manifest`), and `spores` for `htmlToText`.
+`countWordsInText`, `previewText`. three consumers since Spores retired
+(CONVERGENCE.md §8): `write` (a pure re-export for most of the surface, plus
+a direct `htmlToText` import in `DraftPromptModal.svelte`), `marginalia`
+(keeps its paragraph model and its two sanitizer policies), and `letter`
+(imports the `.js` directly — it is static, so the package ships
+browser-ready `.js` + a `.d.ts` sidecar, same shape as `@woodles/app-manifest`).
 
 extraction turned up **two real divergences the copies had been hiding**, both
 now parameters rather than a winner:

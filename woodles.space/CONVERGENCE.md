@@ -25,11 +25,15 @@ Textbook has moved across too. Notebook has shed its tasks to
 Carillon and become one stream you type into. **five surfaces are now three,
 plus a publish target.**
 
-**amended since: three rooms became two.** living with the built plan showed
-that the front door and the writing surface wanted to be the same room —
-Notebook retired into Write, which now handles every kind of writing. the
-what and the why are in **§7**; the step-8 world it amends is preserved below
-as written.
+**amended since: three rooms became two, then one.** living with the built
+plan showed that the front door and the writing surface wanted to be the same
+room — Notebook retired into Write, which now handles every kind of writing.
+the what and the why are in **§7**; the step-8 world it amends is preserved
+below as written. later still, the knowledge base followed: Z's verdict was
+that Ologypedia hadn't been a useful app and Spores' job — an interlinked
+personal knowledge base — was smaller than the room it had. **§8** records
+that second collapse. *five surfaces are now one* — the publish target has
+folded in too.
 
 what else is left is in §6 — a handful of things deliberately left
 duplicated, and one question that is still open.
@@ -738,7 +742,8 @@ does not steal the opening slot the way a live handoff deliberately does.
   scaffold — so /scaffold now seeds more than letters.
 - **publishing is unchanged**: whatever the kind, what publishes is a letter
   in echoes, only when explicitly public. `notebook` also left
-  `HANDOFF_TARGETS` — spores → write remains the one wired handoff.
+  `HANDOFF_TARGETS` — spores → write was the one wired handoff, until §8
+  retired spores too and left write the only target standing.
 
 **what was deliberately not done:** no lanes port (a capture's `spark`/
 `shape`/`later` triage dies with the app — `kind: note` plus tags is enough
@@ -752,3 +757,133 @@ writing surface"; the persistence README's reference adopter is now
 `@woodles/handoff`; this file's §6.1 is resolved. the sentences in §5's
 "what landed in steps 0 and 1" describing notebook's tile are now history
 rather than description, which is what this section exists to say.
+
+---
+
+## 8. the second collapse — spores and ologypedia retire into write
+
+*added after §7 had shipped. everything above describes the world §0–§7 left
+it in; this section records how that world changed again.*
+
+### the decision
+
+Z's verdict: **Ologypedia hadn't been a useful app.** Write, Carillon,
+Thinking About and Echoes were forming real, healthy connections — the
+reference spine in REFERENCES.md and HANDOFF.md, the cross-app ledgers, live
+`#`/`@` references that resolve against a manifest — and Ologypedia and
+Spores were not part of any of it. The call was to strip both for parts:
+remove them as apps entirely, and keep, refactor, or repurpose whatever in
+them was interesting or effective into the four apps that were already
+working.
+
+| question | answer | consequence |
+| --- | --- | --- |
+| is Ologypedia's remaining bookcase/studio/publish pipeline worth relocating? | **no** — §0 of this very file already recorded that its self-containment "now lives as its own project outside this monorepo" | delete it outright; nothing to port |
+| does Spores' `[[wikilink]]` syntax get ported into Write? | **no** — Write already has a live `#`/`@` reference spine with a source registry | extend that registry with a `DraftSource` instead of inventing a second link syntax |
+| does the spell system (registry/assembler/parser) get a new home? | **yes — Thinking About** | its curated categories already name almost exactly Thinking About's `SectionKey` union |
+| do the worldbuilding categories (creature/biome/ability/stat/minigame/lore) come along? | **no** | they were the retired Dev Log's content; marginalia stays a game (§0's original ruling), and none of the four healthy apps is about its world |
+| does `@woodles/spellcraft` retire with its last consumer? | **no** — it gets a new one | Write's own "draft it with a prompt", the `fragment` contract generalized off `[[wikilinks]]` |
+| does the Textbook's focus mode / calm motion get recovered? | **yes, into Echoes** | it was planned in step 4 (§5) but never actually shipped once Spores absorbed the Textbook — the accessibility work is real and worth having, and Echoes (the private re-reading archive) is where it belongs now |
+| do Flights, covers, and per-field modifiers come along? | **no** | each named explicitly below — no natural home, no forced port |
+
+### what landed
+
+**Write gained a third `#` source.** `references.svelte.ts` already had a
+source registry — Thinking About's shelf, days — built for exactly this kind
+of extension (REFERENCES.md §4.3). `DraftSource` resolves `#` against
+`listDrafts()`, no ledger needed since it's the same origin, same app; a
+reference is stored as the same `data-ref-app="write" data-ref-kind="draft"`
+anchor every other reference already uses. `write` now declares
+`addressableBy: ['draft']` in the manifest and reads `?draft=` on load, so a
+reference is a real, resolvable link, not a name with nowhere to go.
+`backlinks.ts` derives "what references this draft" by scanning stored bodies
+for those same anchors — Spores' `backlinksOf`, arrived at by reusing a
+mechanism Write already had rather than porting `wikilinks.ts`'s bracket
+parser. The status lifecycle came the same way it reached Spores from the
+Textbook before it: `seed → growing → grown`, optional, forward-only,
+inferred from whether a draft has words when nothing was chosen explicitly
+(`status.ts`).
+
+**The data moved, not just the code.** `sporesImport.ts` runs once, flagged,
+non-destructive — the `spores.spores.v1` and `spores.spellbooks.v1` keys are
+read and left in place, same shape as `notebookImport.ts` before it. Each
+spore becomes a draft of kind `note`, tagged `from:spores` and
+`spellbook:<title>` for each spellbook it belonged to; `[[wikilinks]]`
+resolve into draft references against the titles in the same export, and
+flatten to plain text — not a broken link — when the target isn't in it. A
+spore with no body (the retired Dev Log's worldbuilding records, migrated
+into Spores in step 2, whose fields lived entirely in typed `data`) gets a
+body synthesized from those fields, so the words in it survive even though
+the category itself did not get a new home.
+
+**Thinking About gained a structured-record system.** Spores' `spells/` —
+twelve curated categories, a JSON-skeleton-prompt assembler, and a forgiving
+parser built to survive real model output (fenced answers, truncation,
+stringified arrays) — moved to `apps/thinking-about/src/lib/spells/`, minus
+the worldbuilding pack and minus the per-cast field picker and modifiers
+Spores had. Casting a spell is simpler here on purpose: every field a
+category knows about, no picker, because the picker was the part fighting for
+UI space, not the part doing the work. An entry's optional `spell: {
+categoryId, data, castAt } | null` is normalized like every other field an
+older synced entry might not carry.
+
+**Echoes gained focus mode and calm motion.** Neither one was actually built
+before this — step 4's plan (§5) said "focus mode, breadcrumbs, calm-motion —
+ported wholesale," but the "what landed" log for that step only ever mentions
+wikilinks, backlinks, status and covers; the accessibility half of the plan
+quietly didn't happen. Rather than let a real, documented idea disappear with
+its last two homes, it's built fresh in `apps/letter/index.html`: two topbar
+toggles, `echoes_focus_mode` and `echoes_calm_motion` in localStorage — a
+device preference, same stance as Write's view prefs — defaulting calm motion
+on when `prefers-reduced-motion` already says so and nothing has been chosen
+explicitly. Breadcrumbs did not come along: Echoes has no multi-page reading
+path the way the Textbook did, so there is nothing for a breadcrumb to trail
+through yet.
+
+**`@woodles/spellcraft` kept its brief and lost a contract.** `page` (one
+complete standalone file, Ologypedia's studio) had exactly one consumer and
+that consumer is gone, so it wasn't ported. `fragment` (a body, not a
+document) is now Write's own "draft it with a prompt" (`DraftPromptModal.svelte`)
+— the `[[double brackets]]` instruction is gone from its OUTPUT text, since
+Write has no wikilink syntax for a model to target; what's left is Z's actual
+brief — voice, structure, etymology-as-semantic-drift, the standing lenses,
+the conversions, the reading-list rule — unchanged, because that was always
+the part that must not drift regardless of who's asking for it.
+
+**What was dropped, and why, all named rather than silently lost:**
+
+- **`Flight`s** (explicit typed edges between spores) — an edge with no prose
+  around it had no home in a body that's read as text and references.
+- **Covers** (accent/glyph/blurb) — Write has no shelf of cards to put one on.
+- **The worldbuilding category pack** (creature/biome/ability/stat/minigame/lore)
+  — the retired Dev Log's content; no home among the four apps that stayed.
+- **Per-cast field selection and modifiers** (citations, timeline detail,
+  air-date detail, voice-actor detail) — a real simplification of the spell
+  system, not an oversight; Thinking About's version always asks for
+  everything a category knows.
+- **Custom, user-defined categories** — Thinking About ships the curated set
+  only.
+- **Breadcrumbs** — no multi-page reading path in Echoes yet for one to trail.
+
+**the redirects.** `/ologypedia` and `/spores` both now point at `/write`,
+permanent, pinned by the same manifest contract test that already guarded
+`/marginalia-devlog` and `/notebook`. `/marginalia-devlog` was updated to
+point straight at `/write` too rather than chain through the now-gone
+`/spores`, since a redirect that resolves through a second redirect is a
+worse bookmark than one that doesn't.
+
+**the numbers.** Spores' 140 tests retired with the app. Write's suite grew
+by 28 (`sporesImport.ts` 14, `backlinks.ts` 7, `status.ts` 7); Thinking
+About's grew by 13 (the spell registry's assembler and parser); the app
+manifest, handoff, and spellcraft suites each lost or gained a test or two
+reflecting the narrower reality. 1769 tests total, all seven remaining
+SvelteKit apps building and checking clean. See ARCHITECTURE.md's "the test
+suite" for the current breakdown.
+
+**the doc trail**: ARCHITECTURE.md's "the knowledge base" section (Spores)
+is gone; "the board" (Thinking About) is new; "the writing surface" and "the
+authoring brief" both grew a subsection; "the handoff spine" and "shared
+design tokens" lost their Spores paragraphs. `packages/app-manifest`'s doc
+comments and `packages/spellcraft`'s header comment were rewritten in place
+rather than left describing a plan that no longer matches the code — the
+thing AUDIT.md flagged, twice, as this repo's most persistent failure mode.

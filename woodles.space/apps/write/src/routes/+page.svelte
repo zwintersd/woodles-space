@@ -6,12 +6,15 @@
 	import BottomBar from '$lib/BottomBar.svelte';
 	import EditorToolbar from '$lib/EditorToolbar.svelte';
 	import DraftsModal from '$lib/DraftsModal.svelte';
+	import DraftPromptModal from '$lib/DraftPromptModal.svelte';
 	import PocketsPanel from '$lib/PocketsPanel.svelte';
 	import MarginNotesColumn from '$lib/MarginNotes.svelte';
 	import SelectionPopover from '$lib/SelectionPopover.svelte';
 	import Binder from '$lib/Binder.svelte';
 	import PublishOverlay, { type PublishStatus } from '$lib/PublishOverlay.svelte';
 	import EchoesSyncPanel from '$lib/EchoesSyncPanel.svelte';
+	import Liquid from '$lib/Liquid.svelte';
+	import { emptyBoard, itemCount, type LiquidBoard } from '$lib/liquid';
 	import {
 		ANCHOR_BLOCK_SELECTOR,
 		sanitizeHtml,
@@ -52,17 +55,21 @@
 	import {
 		bootstrap as bootstrapDrafts,
 		createDraftId,
+		cycleDraftStatus,
 		listDrafts,
 		loadDraft as loadDraftBody,
 		saveDraft,
 		removeDraftBody,
 		setActiveDraftId,
 		clearActiveDraftId,
+		statusesFor,
+		textToHtml,
 		upsertIndex,
 		writeIndex,
 		type DraftIndexItem,
 		type DraftBody
 	} from '$lib/drafts';
+	import { backlinkCounts as backlinkCountsFor } from '$lib/backlinks';
 	import {
 		newId,
 		type LayerId,
@@ -106,6 +113,11 @@
 		findMotif
 	} from '@shared/library.js';
 
+	// Declared in the manifest as write's addressableBy — a `#` reference to
+	// another draft resolves to `/write?draft=<id>` (see references.svelte.ts's
+	// draft source and REFERENCES.md).
+	const DRAFT_PARAM = 'draft';
+
 	const LAYER_IDS: LayerId[] = ['foreground', 'midground', 'background'];
 	const LAYER_LABELS: Record<LayerId, string> = {
 		foreground: 'fg',
@@ -131,8 +143,12 @@
 	let tags = $state<string[]>([]);
 	// Optional word goal for the foreground — how a story gets to 50,000.
 	let goal = $state<number | null>(null);
+	// Liquid's board, in place of the three layers, when kind is 'list'.
+	let liquidBoard = $state<LiquidBoard>(emptyBoard());
 
 	const activeKindSpec = $derived(kindSpec(kind));
+	const isListKind = $derived(kind === 'list');
+	const liquidItemCount = $derived(itemCount(liquidBoard));
 
 	// How the desk is laid out: one page, or the notebook open to two.
 	let view = $state<ViewPrefs>(DEFAULT_VIEW_PREFS);
@@ -198,6 +214,11 @@
 	// Announced once when a draft arrived here from another app.
 	let handoffNotice = $state('');
 	let draftsOpen = $state(false);
+	let promptOpen = $state(false);
+	// Recomputed only when the index itself changes — both walk every draft's
+	// stored body, so they stay out of anything that runs per keystroke.
+	const draftBacklinkCounts = $derived(backlinkCountsFor(draftsList));
+	const draftStatuses = $derived(statusesFor(draftsList));
 
 	const nextPocketLayer = $derived<PocketLayer>(
 		activeLayer === 'background' ? 'background' : 'midground'
@@ -255,6 +276,7 @@
 		layers?: Partial<Record<LayerId, { html?: string }>>;
 		content?: string;
 		annotations?: { pocketNotes?: PocketNote[]; marginNotes?: MarginNote[] };
+		liquid?: LiquidBoard;
 	}) {
 		title = d.title || '';
 		if (d.theme) theme = d.theme;
@@ -263,6 +285,7 @@
 		kind = coerceKind(d.kind);
 		tags = Array.isArray(d.tags) ? d.tags.filter((t) => typeof t === 'string') : [];
 		goal = coerceGoal(d.goal);
+		liquidBoard = d.liquid ?? emptyBoard();
 		const layers = d.layers ?? {};
 		const fgHtml = sanitizeHtml(layers.foreground?.html ?? d.content ?? '');
 		const mgHtml = sanitizeHtml(layers.midground?.html ?? '');
@@ -414,6 +437,13 @@
 					: `notebook retired — its ${boot.notebookImports} captures are now drafts here`
 			);
 		}
+		if (boot.sporesImports > 0) {
+			notices.push(
+				boot.sporesImports === 1
+					? 'spores retired — its one entry is now a draft here'
+					: `spores retired — its ${boot.sporesImports} entries are now drafts here`
+			);
+		}
 		if (boot.handoffs > 0) {
 			notices.push(
 				boot.handoffs === 1
@@ -429,6 +459,14 @@
 			} catch (e) {
 				// ignore corrupt drafts
 			}
+		}
+
+		// A `#` reference to another draft, followed here (see references.svelte.ts).
+		// Stripped immediately, same reasoning as revisitId above.
+		const draftParam = params.get(DRAFT_PARAM);
+		if (draftParam && draftsList.some((d) => d.id === draftParam)) {
+			history.replaceState(null, '', window.location.pathname);
+			loadDraft(draftParam);
 		}
 
 		// Apply hygge-sourced style overrides after any draft is loaded.
@@ -585,6 +623,7 @@
 			title, theme, motif, font, kind,
 			...(tags.length > 0 ? { tags } : {}),
 			...(goal !== null ? { goal } : {}),
+			...(isListKind ? { liquid: liquidBoard } : {}),
 			layers: {
 				foreground: { html: fgEl?.innerHTML ?? '', updatedAt: now },
 				midground: { html: mgEl?.innerHTML ?? '', updatedAt: now },
@@ -622,6 +661,7 @@
 		void font;
 		void kind;
 		void goal;
+		void liquidBoard;
 		if (hydrated) scheduleSave();
 	});
 
@@ -726,6 +766,24 @@
 		draftsList = [{ id, title: '', updatedAt: now }, ...draftsList];
 		writeIndex(draftsList);
 		loadDraft(id);
+	}
+
+	// A model's answer, appended to whatever is already in the foreground —
+	// same insertion point as pasting, and never a silent replace of prose
+	// already there. See DraftPromptModal.svelte.
+	function insertPromptDraft(text: string) {
+		if (!fgEl) return;
+		const html = textToHtml(text);
+		fgEl.innerHTML = isEmptyHtml(fgEl.innerHTML) ? html : fgEl.innerHTML + html;
+		stampLiveAnchors();
+		updateMeta();
+		scheduleSave();
+		fgVersion += 1;
+	}
+
+	function cycleStatus(id: string, e: Event) {
+		e.stopPropagation();
+		draftsList = cycleDraftStatus(draftsList, id);
 	}
 
 	function deleteDraft(id: string, e: Event) {
@@ -1223,6 +1281,8 @@
 	pocketsCount={pockets.length}
 	bind:syncOpen
 	syncConnected={syncState.connected}
+	bind:promptOpen
+	{isListKind}
 	onLayerChange={setActiveLayer}
 />
 
@@ -1230,9 +1290,18 @@
 	bind:open={draftsOpen}
 	drafts={draftsList}
 	{currentDraftId}
+	backlinkCounts={draftBacklinkCounts}
+	statuses={draftStatuses}
 	onSelect={loadDraft}
 	onCreate={newDraft}
 	onDelete={deleteDraft}
+	onCycleStatus={cycleStatus}
+/>
+
+<DraftPromptModal
+	bind:open={promptOpen}
+	defaultTopic={title.trim() || activeKindSpec.untitled}
+	onInsert={insertPromptDraft}
 />
 
 {#if syncOpen}
@@ -1280,7 +1349,7 @@
 					>
 				{/each}
 			</div>
-				{#if !isSpread}
+				{#if !isSpread && !isListKind}
 				<span class="kind-eyebrow">· {activeLayer}</span>
 			{/if}
 		</div>
@@ -1296,14 +1365,16 @@
 			autocomplete="off"
 		></textarea>
 
-		{#if activeLayer === 'foreground'}
+		{#if activeLayer === 'foreground' && !isListKind}
 			<EditorToolbar {bold} {italic} {underline} onCommand={exec} onInsertLink={insertLink} />
 		{/if}
 
-		<!-- The three layers are never unmounted: each contenteditable holds its
-		     own content between saves, so a page is hidden and reordered with
-		     CSS rather than added and removed from the DOM. -->
-		<div class="pages" data-view={view.mode}>
+		<!-- The three layers are never unmounted, kind switch included: each
+		     contenteditable holds its own content between saves (that's what
+		     scheduleSave reads), so switching to Liquid hides this block with
+		     CSS rather than removing it — unmounting fgEl here would empty it
+		     by the time the next debounced save fired. -->
+		<div class="pages" data-view={view.mode} class:hidden={isListKind}>
 			{#if isSpread}
 				<div class="spine" aria-hidden="true"></div>
 			{/if}
@@ -1396,6 +1467,12 @@
 			</div>
 		</div>
 
+		{#if isListKind}
+			<div class="liquid-wrap">
+				<Liquid bind:board={liquidBoard} />
+			</div>
+		{/if}
+
 		{#if pocketsOpen}
 			<PocketsPanel
 				{pockets}
@@ -1416,7 +1493,7 @@
 		bind:columnEl={marginColumnEl}
 		groups={visibleMarginGroups}
 		confirmingId={confirmingMarginId}
-		hidden={!foregroundVisible}
+		hidden={!foregroundVisible || isListKind}
 		onInput={onMarginInput}
 		onPaste={handlePaste}
 		onStartConfirmDelete={startConfirmDeleteMargin}
@@ -1460,6 +1537,8 @@
 	fonts={fontPairs}
 	{foregroundVisible}
 	{fgIsEmpty}
+	{isListKind}
+	{liquidItemCount}
 	onPublish={publish}
 />
 
@@ -1516,6 +1595,8 @@
 
 	/* ── the pages ── */
 	.pages { position: relative; }
+	.pages.hidden { display: none; }
+	.liquid-wrap { position: relative; }
 	.pages[data-view='spread'] {
 		display: grid;
 		grid-template-columns: 1fr 1fr;

@@ -5,6 +5,7 @@
 import { DEFAULT_COLOR, normalizeColumnSection } from './constants';
 import type {
 	ColumnKey,
+	EntrySpell,
 	EntryStatus,
 	SectionKey,
 	Session,
@@ -63,6 +64,20 @@ function normalizeSessions(raw: unknown): Session[] {
 	return Array.isArray(raw) ? raw.map(normalizeSession) : [];
 }
 
+// Every entry written before spells existed has no `spell` field, and every
+// one of those reads as null rather than being guessed at.
+function normalizeSpell(raw: unknown): EntrySpell | null {
+	if (typeof raw !== 'object' || raw === null) return null;
+	const spell = raw as Partial<EntrySpell>;
+	if (typeof spell.categoryId !== 'string' || !spell.categoryId) return null;
+	if (typeof spell.data !== 'object' || spell.data === null || Array.isArray(spell.data)) return null;
+	return {
+		categoryId: spell.categoryId,
+		data: spell.data,
+		castAt: stringOr(spell.castAt, nowIso())
+	};
+}
+
 export function blankEntry(
 	columnKey: ColumnKey,
 	sectionKey: SectionKey,
@@ -83,6 +98,7 @@ export function blankEntry(
 		schedule: null,
 		standing: null,
 		sessions: [],
+		spell: null,
 		createdAt: stamp,
 		updatedAt: stamp
 	};
@@ -235,6 +251,7 @@ export function normalizeEntry(raw: Partial<ThinkingAboutEntry>): ThinkingAboutE
 		schedule: nullableString(raw.schedule),
 		standing: normalizeStanding(raw.standing),
 		sessions: normalizeSessions(raw.sessions),
+		spell: normalizeSpell(raw.spell),
 		createdAt,
 		updatedAt
 	};

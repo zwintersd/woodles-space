@@ -14,6 +14,8 @@
 		pocketsCount,
 		syncOpen = $bindable(),
 		syncConnected,
+		promptOpen = $bindable(),
+		isListKind = false,
 		onLayerChange
 	}: {
 		activeLayer: LayerId;
@@ -26,6 +28,9 @@
 		pocketsCount: number;
 		syncOpen: boolean;
 		syncConnected: boolean;
+		promptOpen: boolean;
+		/** Liquid replaces the page/spread layers wholesale — neither switch applies. */
+		isListKind?: boolean;
 		onLayerChange: (id: LayerId) => void;
 	} = $props();
 </script>
@@ -33,34 +38,36 @@
 <header class="topbar">
 	<a href="/" class="topbar-brand">.space</a>
 	<span class="topbar-label">write · every kind of writing</span>
-	<div class="view-switch" role="group" aria-label="view">
-		<button
-			class="view-btn"
-			class:active={viewMode === 'page'}
-			aria-pressed={viewMode === 'page'}
-			onclick={() => onViewChange('page')}
-			title="one page at a time"
-		>
-			<svg viewBox="0 0 24 16" aria-hidden="true" class="view-icon">
-				<rect x="7.5" y="1.5" width="9" height="13" rx="1.2" />
-			</svg>
-			page
-		</button>
-		<button
-			class="view-btn"
-			class:active={viewMode === 'spread'}
-			aria-pressed={viewMode === 'spread'}
-			onclick={() => onViewChange('spread')}
-			title="the notebook, open to two pages"
-		>
-			<svg viewBox="0 0 24 16" aria-hidden="true" class="view-icon">
-				<rect x="2" y="1.5" width="9.4" height="13" rx="1.2" />
-				<rect x="12.6" y="1.5" width="9.4" height="13" rx="1.2" />
-			</svg>
-			spread
-		</button>
-	</div>
-	{#if viewMode === 'page'}
+	{#if !isListKind}
+		<div class="view-switch" role="group" aria-label="view">
+			<button
+				class="view-btn"
+				class:active={viewMode === 'page'}
+				aria-pressed={viewMode === 'page'}
+				onclick={() => onViewChange('page')}
+				title="one page at a time"
+			>
+				<svg viewBox="0 0 24 16" aria-hidden="true" class="view-icon">
+					<rect x="7.5" y="1.5" width="9" height="13" rx="1.2" />
+				</svg>
+				page
+			</button>
+			<button
+				class="view-btn"
+				class:active={viewMode === 'spread'}
+				aria-pressed={viewMode === 'spread'}
+				onclick={() => onViewChange('spread')}
+				title="the notebook, open to two pages"
+			>
+				<svg viewBox="0 0 24 16" aria-hidden="true" class="view-icon">
+					<rect x="2" y="1.5" width="9.4" height="13" rx="1.2" />
+					<rect x="12.6" y="1.5" width="9.4" height="13" rx="1.2" />
+				</svg>
+				spread
+			</button>
+		</div>
+	{/if}
+	{#if viewMode === 'page' && !isListKind}
 		<div class="layer-switch" role="tablist" aria-label="layer">
 			{#each layerIds as id}
 				<button
@@ -82,6 +89,15 @@
 		title="drafts"
 	>
 		drafts
+	</button>
+	<button
+		class="drafts-toggle"
+		class:on={promptOpen}
+		onclick={() => (promptOpen = !promptOpen)}
+		aria-pressed={promptOpen}
+		title="draft it with a prompt"
+	>
+		✦ prompt
 	</button>
 	<span class="topbar-divider" aria-hidden="true"></span>
 	<button

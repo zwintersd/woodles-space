@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 const auditRoutes = [
 	'/',
 	'/write',
-	'/ologypedia',
+	'/letter',
 	'/marginalia/arcade',
 	'/hygge/motion',
 	'/hygge/motion/svg'

@@ -255,6 +255,58 @@
       border-color: color-mix(in srgb, var(--accent) 40%, transparent);
     }
 
+    /* ── reading preferences: focus mode + calm motion ──
+       A per-browser preference, like the theme/motif pickers — never part of
+       a letter. Recovers a piece of the Ologypedia Textbook's accessibility
+       work (focus mode, calm motion) that was documented but never actually
+       shipped once the Textbook became a signpost pointing at Spores; see
+       CONVERGENCE.md and ARCHITECTURE.md. */
+    .reading-toggles {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      margin-left: 0.6rem;
+      position: relative;
+      z-index: 1;
+    }
+    .reading-tog {
+      font-family: var(--letter-mono, var(--font-mono));
+      font-size: 0.57rem;
+      letter-spacing: 0.14em;
+      text-transform: lowercase;
+      color: var(--muted);
+      background: none;
+      border: 1px solid transparent;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      opacity: 0.4;
+      transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
+    }
+    .reading-tog:hover { opacity: 0.85; color: var(--accent-strong); }
+    .reading-tog.on {
+      color: var(--accent-strong);
+      opacity: 1;
+      background: color-mix(in srgb, var(--accent) 22%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    }
+    /* Calm motion turns off every animation and transition in the app,
+       topbar shimmer and clock-tick fade included — an explicit override
+       beside the OS-level prefers-reduced-motion default below. */
+    body.calm-motion, body.calm-motion * {
+      animation: none !important;
+      transition: none !important;
+    }
+    /* Focus quiets the room to one page: the ambient motifs and the links
+       to elsewhere fade out, leaving the letter and its margin notes. */
+    body.focus-mode .motif-grain,
+    body.focus-mode .motif-blob,
+    body.focus-mode .topbar-elsewhere-group {
+      display: none;
+    }
+    body.focus-mode .topbar { opacity: 0.55; }
+    body.focus-mode .topbar:hover, body.focus-mode .topbar:focus-within { opacity: 1; }
+
     .topbar-divider {
       display: inline-block;
       width: 1px;
@@ -961,6 +1013,10 @@
     <a href="/" class="topbar-brand">.space</a>
     <span class="topbar-label">echoes</span>
     <div class="layer-toggles" id="layer-toggles" role="group" aria-label="layers"></div>
+    <div class="reading-toggles" role="group" aria-label="reading preferences">
+      <button class="reading-tog" id="focus-toggle" type="button" aria-pressed="false" title="focus mode — quiet the room to the letter">focus</button>
+      <button class="reading-tog" id="calm-toggle" type="button" aria-pressed="false" title="calm motion — turn off animation">calm</button>
+    </div>
     <div class="topbar-elsewhere-group">
       <span class="topbar-divider" aria-hidden="true"></span>
       <nav class="topbar-elsewhere" aria-label="elsewhere at woodles.space">
@@ -1013,6 +1069,47 @@
       }
     }
     tick(); setInterval(tick, 1000);
+
+    /* ── reading preferences: focus mode + calm motion ──
+       Per-browser, like the theme picker — stored outside any letter. Calm
+       motion defaults on when the OS already asks for reduced motion and
+       nothing has been chosen here yet, same deference every other toggle
+       in this app gives an explicit choice over a guessed one. */
+    const FOCUS_KEY = 'echoes_focus_mode';
+    const CALM_KEY = 'echoes_calm_motion';
+    const focusToggleEl = document.getElementById('focus-toggle');
+    const calmToggleEl = document.getElementById('calm-toggle');
+
+    function readBoolPref(key) {
+      try { return localStorage.getItem(key); } catch (e) { return null; }
+    }
+    function writeBoolPref(key, on) {
+      try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) {}
+    }
+    function applyReadingPref(className, toggleEl, on) {
+      document.body.classList.toggle(className, on);
+      toggleEl.classList.toggle('on', on);
+      toggleEl.setAttribute('aria-pressed', String(on));
+    }
+
+    let focusOn = readBoolPref(FOCUS_KEY) === '1';
+    const storedCalm = readBoolPref(CALM_KEY);
+    let calmOn = storedCalm === null
+      ? (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches)
+      : storedCalm === '1';
+    applyReadingPref('focus-mode', focusToggleEl, focusOn);
+    applyReadingPref('calm-motion', calmToggleEl, calmOn);
+
+    focusToggleEl.addEventListener('click', () => {
+      focusOn = !focusOn;
+      writeBoolPref(FOCUS_KEY, focusOn);
+      applyReadingPref('focus-mode', focusToggleEl, focusOn);
+    });
+    calmToggleEl.addEventListener('click', () => {
+      calmOn = !calmOn;
+      writeBoolPref(CALM_KEY, calmOn);
+      applyReadingPref('calm-motion', calmToggleEl, calmOn);
+    });
 
     /* ── apply theme/motif/font tokens to body ── */
     function applyTokens(letter) {
