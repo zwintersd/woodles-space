@@ -10,10 +10,17 @@ import type { LayerId } from './types';
  * `letter` stays first because it is where this app started, and because a
  * draft from before kinds existed has no `kind` field at all: absent means
  * letter, so nothing stored ever needs rewriting.
+ *
+ * `list` is the one kind that isn't prose: picking it swaps the three-layer
+ * editor for Liquid (`Liquid.svelte`), a board of nested, freely-moving
+ * lists — Trello's shape, a Notion-style outline within each list. It still
+ * has a title and still lives in the drafts index like any other kind; only
+ * the body underneath it is a `LiquidBoard` instead of HTML layers, and it
+ * doesn't publish to Echoes, which is for finished prose.
  */
-export type WritingKind = 'letter' | 'essay' | 'story' | 'poem' | 'note';
+export type WritingKind = 'letter' | 'essay' | 'story' | 'poem' | 'note' | 'list';
 
-export const WRITING_KINDS: readonly WritingKind[] = ['letter', 'essay', 'story', 'poem', 'note'];
+export const WRITING_KINDS: readonly WritingKind[] = ['letter', 'essay', 'story', 'poem', 'note', 'list'];
 
 export type KindSpec = {
 	id: WritingKind;
@@ -79,6 +86,21 @@ const SPECS: Record<WritingKind, KindSpec> = {
 			foreground: 'Put it down before it fades…',
 			midground: 'context, links, where this might belong…',
 			background: 'why it snagged you.'
+		}
+	},
+	list: {
+		id: 'list',
+		label: 'liquid',
+		untitled: 'untitled list',
+		moment: 'lists that nest and move',
+		// Liquid replaces the three layers with its own board, so these are
+		// never actually shown — filled in anyway, the same stance every
+		// other kind takes toward its own spec, in case something ever
+		// falls back to rendering a list draft as plain layers.
+		placeholders: {
+			foreground: 'A list, nested and moved around until it settles…',
+			midground: 'the lists behind the list — what this is really sorting…',
+			background: 'why this needed lists instead of prose.'
 		}
 	}
 };

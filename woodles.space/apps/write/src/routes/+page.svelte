@@ -13,6 +13,8 @@
 	import Binder from '$lib/Binder.svelte';
 	import PublishOverlay, { type PublishStatus } from '$lib/PublishOverlay.svelte';
 	import EchoesSyncPanel from '$lib/EchoesSyncPanel.svelte';
+	import Liquid from '$lib/Liquid.svelte';
+	import { emptyBoard, itemCount, type LiquidBoard } from '$lib/liquid';
 	import {
 		ANCHOR_BLOCK_SELECTOR,
 		sanitizeHtml,
@@ -141,8 +143,12 @@
 	let tags = $state<string[]>([]);
 	// Optional word goal for the foreground — how a story gets to 50,000.
 	let goal = $state<number | null>(null);
+	// Liquid's board, in place of the three layers, when kind is 'list'.
+	let liquidBoard = $state<LiquidBoard>(emptyBoard());
 
 	const activeKindSpec = $derived(kindSpec(kind));
+	const isListKind = $derived(kind === 'list');
+	const liquidItemCount = $derived(itemCount(liquidBoard));
 
 	// How the desk is laid out: one page, or the notebook open to two.
 	let view = $state<ViewPrefs>(DEFAULT_VIEW_PREFS);
@@ -270,6 +276,7 @@
 		layers?: Partial<Record<LayerId, { html?: string }>>;
 		content?: string;
 		annotations?: { pocketNotes?: PocketNote[]; marginNotes?: MarginNote[] };
+		liquid?: LiquidBoard;
 	}) {
 		title = d.title || '';
 		if (d.theme) theme = d.theme;
@@ -278,6 +285,7 @@
 		kind = coerceKind(d.kind);
 		tags = Array.isArray(d.tags) ? d.tags.filter((t) => typeof t === 'string') : [];
 		goal = coerceGoal(d.goal);
+		liquidBoard = d.liquid ?? emptyBoard();
 		const layers = d.layers ?? {};
 		const fgHtml = sanitizeHtml(layers.foreground?.html ?? d.content ?? '');
 		const mgHtml = sanitizeHtml(layers.midground?.html ?? '');
@@ -615,6 +623,7 @@
 			title, theme, motif, font, kind,
 			...(tags.length > 0 ? { tags } : {}),
 			...(goal !== null ? { goal } : {}),
+			...(isListKind ? { liquid: liquidBoard } : {}),
 			layers: {
 				foreground: { html: fgEl?.innerHTML ?? '', updatedAt: now },
 				midground: { html: mgEl?.innerHTML ?? '', updatedAt: now },
@@ -652,6 +661,7 @@
 		void font;
 		void kind;
 		void goal;
+		void liquidBoard;
 		if (hydrated) scheduleSave();
 	});
 
@@ -1272,6 +1282,7 @@
 	bind:syncOpen
 	syncConnected={syncState.connected}
 	bind:promptOpen
+	{isListKind}
 	onLayerChange={setActiveLayer}
 />
 
@@ -1338,7 +1349,7 @@
 					>
 				{/each}
 			</div>
-				{#if !isSpread}
+				{#if !isSpread && !isListKind}
 				<span class="kind-eyebrow">· {activeLayer}</span>
 			{/if}
 		</div>
@@ -1354,14 +1365,16 @@
 			autocomplete="off"
 		></textarea>
 
-		{#if activeLayer === 'foreground'}
+		{#if activeLayer === 'foreground' && !isListKind}
 			<EditorToolbar {bold} {italic} {underline} onCommand={exec} onInsertLink={insertLink} />
 		{/if}
 
-		<!-- The three layers are never unmounted: each contenteditable holds its
-		     own content between saves, so a page is hidden and reordered with
-		     CSS rather than added and removed from the DOM. -->
-		<div class="pages" data-view={view.mode}>
+		<!-- The three layers are never unmounted, kind switch included: each
+		     contenteditable holds its own content between saves (that's what
+		     scheduleSave reads), so switching to Liquid hides this block with
+		     CSS rather than removing it — unmounting fgEl here would empty it
+		     by the time the next debounced save fired. -->
+		<div class="pages" data-view={view.mode} class:hidden={isListKind}>
 			{#if isSpread}
 				<div class="spine" aria-hidden="true"></div>
 			{/if}
@@ -1454,6 +1467,12 @@
 			</div>
 		</div>
 
+		{#if isListKind}
+			<div class="liquid-wrap">
+				<Liquid bind:board={liquidBoard} />
+			</div>
+		{/if}
+
 		{#if pocketsOpen}
 			<PocketsPanel
 				{pockets}
@@ -1474,7 +1493,7 @@
 		bind:columnEl={marginColumnEl}
 		groups={visibleMarginGroups}
 		confirmingId={confirmingMarginId}
-		hidden={!foregroundVisible}
+		hidden={!foregroundVisible || isListKind}
 		onInput={onMarginInput}
 		onPaste={handlePaste}
 		onStartConfirmDelete={startConfirmDeleteMargin}
@@ -1518,6 +1537,8 @@
 	fonts={fontPairs}
 	{foregroundVisible}
 	{fgIsEmpty}
+	{isListKind}
+	{liquidItemCount}
 	onPublish={publish}
 />
 
@@ -1574,6 +1595,8 @@
 
 	/* ── the pages ── */
 	.pages { position: relative; }
+	.pages.hidden { display: none; }
+	.liquid-wrap { position: relative; }
 	.pages[data-view='spread'] {
 		display: grid;
 		grid-template-columns: 1fr 1fr;

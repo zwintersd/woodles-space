@@ -10,6 +10,7 @@ import { coerceKind, WRITING_KINDS, type WritingKind } from './kinds';
 import { importNotebookCaptures } from './notebookImport';
 import { importSporesEntries } from './sporesImport';
 import { draftStatus, nextDraftStatus, type DraftStatus } from './status';
+import type { LiquidBoard } from './liquid';
 import type { LayerId, PocketNote, MarginNote } from './types';
 
 export type DraftIndexItem = {
@@ -37,6 +38,8 @@ export interface DraftBody {
 	status?: DraftStatus;
 	layers?: Partial<Record<LayerId, { html?: string; updatedAt?: string }>>;
 	annotations?: { pocketNotes?: PocketNote[]; marginNotes?: MarginNote[] };
+	/** Only present on `kind: 'list'` drafts — Liquid's board, in place of layers. */
+	liquid?: LiquidBoard;
 	content?: string;
 	savedAt?: string;
 }

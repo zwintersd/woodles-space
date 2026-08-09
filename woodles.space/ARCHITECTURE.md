@@ -127,7 +127,7 @@ woodles.space/
     ├── quiet-room/          static · an immersive three.js room of light
     ├── letter/              static · echoes — the private archive reader
     ├── animations/          Python · offline Manim scenes and curated web previews
-    ├── write/               SvelteKit · the writing surface — letters, essays, stories, poems, notes; also the knowledge base now, in a small way (cross-draft references, backlinks, "draft it with a prompt")
+    ├── write/               SvelteKit · the writing surface — letters, essays, stories, poems, notes, and lists that nest and move (Liquid); also the knowledge base now, in a small way (cross-draft references, backlinks, "draft it with a prompt")
     ├── marginalia/          SvelteKit · a witch writes worlds + a reading room
     ├── planner/             SvelteKit · carillon — self-observation, day piles, and reinforcement
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
@@ -728,6 +728,46 @@ lands in the foreground layer through `textToHtml` — appended to what's
 already there, never a silent replace. The Ologypedia studio's and Spores'
 Garden's versions of this gesture both retired here.
 
+**Liquid** is the one kind that isn't prose. `kind: 'list'` (label "liquid")
+swaps the three-layer editor for a board of lists that nest and move —
+Trello's shape, a Notion-style outline inside each list — for the writing
+that wants structure instead of sentences.
+
+`apps/write/src/lib/liquid.ts` holds the whole model as plain data and pure
+functions, no DOM, no runes: a `LiquidBoard` is `LiquidList[]`, each holding a tree of
+`LiquidItem`s. Two primitives carry every mutation — `removeNode` (take an
+item and its subtree out of the tree, wherever it's nested) and `insertNode`
+(put it back somewhere else) — so indent, outdent, reordering, and moving an
+item to a different list are all "remove, then insert at a different
+address," not four separate code paths. The one sharp edge it exists to
+avoid: computing a drop target's position *before* removing the dragged
+node reads a stale index once the node started out earlier in the same list
+— removal shifts every later sibling down by one. `moveItemRelativeTo`
+locates the target *after* the remove, which fixes the off-by-one and, as a
+side effect, is what makes "the drop target was inside the dragged subtree"
+refuse itself for free: that target simply isn't there to find any more.
+
+`Liquid.svelte` owns all the interactive state (drag tracking, hover zones)
+and is the only thing that calls liquid.ts's mutators; `LiquidNode.svelte`
+recursively renders one item and its children and is otherwise dumb, acting
+only through callbacks. Structure has two independent controls, on purpose:
+native HTML5 drag-and-drop (a row's left 20% nests as a child of the drop
+target, the rest reorders as a sibling before/after it, by which half of the
+row's height the pointer is over) for the fluid, visual "move things around"
+feel, and Tab/Shift+Tab/Alt+↑/Alt+↓/Enter/Backspace for everyone who'd rather
+not reach for the mouse. Neither is a fallback for the other.
+
+A `kind: 'list'` draft is still a draft — same index, same drafts modal,
+same autosave — with a `LiquidBoard` under `DraftBody.liquid` in place of
+`layers`. The three prose layers stay mounted underneath it rather than
+being unmounted (same reasoning as hiding a page in a spread with CSS: a
+contenteditable's `innerHTML` is what `scheduleSave` reads, and unmounting
+it before the debounced save fires would silently save it empty), so
+switching a draft's kind to and from `list` costs nothing either direction.
+It doesn't publish: Echoes is for finished prose, and flattening a board of
+lists into a letter isn't a well-defined operation yet, so the publish
+button is replaced with a plain statement of that rather than pretending.
+
 ## the authoring brief
 
 `packages/spellcraft` holds the prompt spec Z writes against — voice,
@@ -1137,11 +1177,11 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1769 tests total: 16 in `api/` (its own
+1822 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1753 across fifteen pnpm
-packages — `write` 170, `marginalia` 333, `planner` 539,
+instead of the recursive `pnpm -r test`), plus 1806 across fifteen pnpm
+packages — `write` 223, `marginalia` 333, `planner` 539,
 `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
 `packages/sync` 36, `packages/persistence` 6, `packages/app-manifest` 17,
 `packages/handoff` 14, `packages/text` 30, `packages/spellcraft` 15,
@@ -1154,7 +1194,13 @@ contract, not the prose count.)
 Thinking About's grew by 13 for the spell registry's assembler and parser;
 `packages/handoff` dropped one now-inapplicable test (a two-target isolation
 check with only one target left); `packages/spellcraft` dropped one test for
-the retired `page` contract.)
+the retired `page` contract. Write's suite grew a further 53 for Liquid —
+all in `liquid.ts`'s pure tree logic, including the regression test for the
+before/after-a-later-sibling indexing bug `moveItemRelativeTo` exists to
+avoid; the drag-and-drop wiring and the keyboard shortcuts in `Liquid.svelte`
+and `LiquidNode.svelte` are exercised by hand rather than by a unit suite —
+no `.test.ts` for either, same as every other view-only Svelte component in
+this app.)
 
 each app's `test` runs `svelte-kit sync && vitest run`. the `sync` matters: a
 SvelteKit app's `tsconfig.json` extends `./.svelte-kit/tsconfig.json`, which
@@ -1229,7 +1275,7 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (1769 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (1822 tests)
 pnpm check              svelte-check in every app
 pnpm build              build the seven SvelteKit apps
 ```
