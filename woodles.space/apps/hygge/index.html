@@ -724,6 +724,18 @@
       letter-spacing: 0.1em;
       opacity: 0.76;
     }
+    .mixer-color-role {
+      position: absolute;
+      top: 0.8rem;
+      right: 0.9rem;
+      font-family: var(--font-mono);
+      font-size: 0.48rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 100px;
+      background: color-mix(in srgb, var(--maker-ink) 16%, transparent);
+    }
     .mixer-caption {
       display: flex;
       justify-content: space-between;
@@ -999,6 +1011,21 @@
             <input class="mixer-input" id="mixer-color-name" type="text" autocomplete="off" maxlength="48" aria-label="Selected color name" />
           </div>
           <div class="mixer-field">
+            <label class="mixer-field-label" for="mixer-color-role">role in write <em>optional</em></label>
+            <select class="mixer-input" id="mixer-color-role" aria-label="This color's role when used in Write">
+              <option value="">— untagged, filled in for you —</option>
+              <option value="bg">background</option>
+              <option value="text">text</option>
+              <option value="muted">muted</option>
+              <option value="lavender">accent — lavender</option>
+              <option value="aqua">accent — aqua</option>
+              <option value="peach">accent — peach</option>
+              <option value="lilac">accent — lilac</option>
+              <option value="lapis">headings</option>
+              <option value="plum">emphasis</option>
+            </select>
+          </div>
+          <div class="mixer-field">
             <span class="mixer-field-label">color</span>
             <div class="mixer-color-line">
               <label class="mixer-well" title="Pick a color">
@@ -1027,6 +1054,11 @@
             <button class="mixer-button" id="mixer-copy-css" type="button">copy css</button>
             <button class="mixer-button" id="mixer-copy-list" type="button">copy color list</button>
           </div>
+          <div class="mixer-rule"></div>
+          <div class="mixer-controls" aria-label="Use in Write">
+            <button class="mixer-button primary" id="mixer-use-in-write" type="button" disabled>use in write &rarr;</button>
+          </div>
+          <p class="mixer-feedback" id="mixer-write-hint">tag one color as &ldquo;background&rdquo; to enable this.</p>
           <p class="mixer-feedback" id="mixer-feedback" aria-live="polite"></p>
         </div>
 
@@ -1050,7 +1082,7 @@
   </div>
 
   <script type="module">
-    import { palettes, motifs, fontPairs } from '/shared/library.js';
+    import { palettes, motifs, fontPairs, CUSTOM_PALETTE_ROLES, encodeCustomPalette } from '/shared/library.js';
 
     /* ── font full list (not in library.js) ── */
     const FONTS_FULL = [
@@ -1129,14 +1161,19 @@
 
     /* ── palette mixer ── */
     const MIXER_STORAGE_KEY = 'woodles.hygge.palette-mixer.v1';
+    // The four accent roles a mixed palette needs beyond bg/text/muted —
+    // matches shared/palette.css's own --lavender/--aqua/--peach/--lilac.
+    const MIXER_ACCENT_ROLES = ['lavender', 'aqua', 'peach', 'lilac'];
     const MIXER_DEFAULT = {
       name: 'after rain',
       colors: [
-        { name: 'milk',            hex: '#FAF6F0' },
-        { name: 'plum after rain', hex: '#5C3464' },
-        { name: 'river glass',     hex: '#8EDDD4' },
-        { name: 'warm peach',      hex: '#F5C8A8' },
-        { name: 'night ink',       hex: '#2E2040' }
+        // 'plum after rain' is left untagged on purpose — it demonstrates the
+        // auto-fill path (see resolveMixerRoles) alongside the tagged ones.
+        { name: 'milk',            hex: '#FAF6F0', role: 'bg' },
+        { name: 'plum after rain', hex: '#5C3464', role: null },
+        { name: 'river glass',     hex: '#8EDDD4', role: 'aqua' },
+        { name: 'warm peach',      hex: '#F5C8A8', role: 'peach' },
+        { name: 'night ink',       hex: '#2E2040', role: 'text' }
       ]
     };
 
@@ -1147,6 +1184,7 @@
     const mixerCount = document.getElementById('mixer-count');
     const mixerPane = document.getElementById('pane-mixer');
     const mixerColorName = document.getElementById('mixer-color-name');
+    const mixerColorRole = document.getElementById('mixer-color-role');
     const mixerColorPosition = document.getElementById('mixer-color-position');
     const mixerColorPicker = document.getElementById('mixer-color-picker');
     const mixerColorHex = document.getElementById('mixer-color-hex');
@@ -1167,6 +1205,8 @@
     const mixerRemove = document.getElementById('mixer-remove');
     const mixerCopyCss = document.getElementById('mixer-copy-css');
     const mixerCopyList = document.getElementById('mixer-copy-list');
+    const mixerUseInWrite = document.getElementById('mixer-use-in-write');
+    const mixerWriteHint = document.getElementById('mixer-write-hint');
 
     let mixerPalette;
     let mixerActiveIndex = 0;
@@ -1190,12 +1230,23 @@
 
     function normalizeMixerPalette(candidate) {
       if (!candidate || !Array.isArray(candidate.colors)) return cloneMixerDefault();
+      const usedRoles = new Set();
       const colors = candidate.colors.map(color => {
         const hex = normalizeHex(color && color.hex);
         if (!hex) return null;
+        let role = null;
+        if (
+          color && typeof color.role === 'string' &&
+          CUSTOM_PALETTE_ROLES.includes(color.role) &&
+          !usedRoles.has(color.role)
+        ) {
+          role = color.role;
+          usedRoles.add(role);
+        }
         return {
           name: typeof color.name === 'string' ? color.name.slice(0, 48) : '',
-          hex
+          hex,
+          role
         };
       }).filter(Boolean);
       if (colors.length < 2) return cloneMixerDefault();
@@ -1287,6 +1338,17 @@
       return ('#' + toHex(r) + toHex(g) + toHex(b)).toUpperCase();
     }
 
+    // Used to fill an unrolled 'muted' role: partway between two hexes in
+    // HSL space, taking the shorter way around the hue wheel.
+    function blendHex(hexA, hexB, t) {
+      const a = hexToHsl(hexA);
+      const b = hexToHsl(hexB);
+      let dh = b.h - a.h;
+      if (dh > 180) dh -= 360;
+      if (dh < -180) dh += 360;
+      return hslToHex(a.h + dh * t, a.s + (b.s - a.s) * t, a.l + (b.l - a.l) * t);
+    }
+
     function colorLuminance(hex) {
       const safeHex = normalizeHex(hex) || '#000000';
       const channel = offset => {
@@ -1315,6 +1377,60 @@
     function selectedMixerColor() {
       if (mixerActiveIndex < 0 || mixerActiveIndex >= mixerPalette.colors.length) mixerActiveIndex = 0;
       return mixerPalette.colors[mixerActiveIndex];
+    }
+
+    // Each role can point at only one color — tagging a color takes the role
+    // from wherever it was before, the same "moving it swaps it" rule the
+    // spread pages in Write use for their own two-slots-only layers.
+    function setColorRole(index, role) {
+      mixerPalette.colors.forEach((color, i) => {
+        if (i === index) color.role = role || null;
+        else if (role && color.role === role) color.role = null;
+      });
+    }
+
+    /**
+     * A mixed palette into the nine roles Write actually needs. Background
+     * is the one role nothing can stand in for, so a palette with none
+     * tagged isn't exportable yet — everything else has a fallback: text
+     * from the same dark/light-ink contrast check the "selected color"
+     * panel already shows, muted as a blend of text and bg, and the four
+     * accents filled from whatever's left untagged (synthesizing a
+     * companion color if the palette runs out), so tagging just one color
+     * is enough to get something coherent.
+     */
+    function resolveMixerRoles(palette) {
+      const tagged = {};
+      const pool = [];
+      palette.colors.forEach(color => {
+        if (color.role && !tagged[color.role]) tagged[color.role] = color.hex;
+        else if (!color.role) pool.push(color.hex);
+      });
+      if (!tagged.bg) return null;
+      const bg = tagged.bg;
+      const text = tagged.text || readableInk(bg).hex;
+      const roles = { bg, text, muted: tagged.muted || blendHex(text, bg, 0.5) };
+      let poolIndex = 0;
+      MIXER_ACCENT_ROLES.forEach(key => {
+        if (tagged[key]) { roles[key] = tagged[key]; return; }
+        roles[key] = pool.length ? pool[poolIndex++ % pool.length] : companionHex(bg);
+      });
+      roles.lapis = tagged.lapis || text;
+      roles.plum = tagged.plum || roles.lilac;
+      return roles;
+    }
+
+    function updateUseInWrite() {
+      const roles = resolveMixerRoles(mixerPalette);
+      if (!roles) {
+        mixerUseInWrite.disabled = true;
+        mixerWriteHint.textContent = 'tag one color as “background” to enable this.';
+        return;
+      }
+      mixerUseInWrite.disabled = false;
+      const code = encodeCustomPalette(roles);
+      mixerUseInWrite.dataset.href = '/write?custom=' + code + '&motif=' + activeMotif + '&font=' + activeFont;
+      mixerWriteHint.textContent = 'opens write with ' + displayMixerName(mixerPalette.name, 'this palette') + ' as the live theme.';
     }
 
     function showMixerFeedback(message) {
@@ -1352,6 +1468,12 @@
         hex.className = 'mixer-color-hex';
         hex.textContent = color.hex;
         button.append(number, name, hex);
+        if (color.role) {
+          const role = document.createElement('span');
+          role.className = 'mixer-color-role';
+          role.textContent = color.role === 'bg' ? 'background' : color.role;
+          button.append(role);
+        }
         button.addEventListener('click', () => {
           mixerActiveIndex = index;
           persistMixerDraft();
@@ -1369,6 +1491,7 @@
       const ink = readableInk(color.hex);
       mixerPane.style.setProperty('--maker-current', color.hex);
       mixerColorName.value = color.name;
+      mixerColorRole.value = color.role || '';
       mixerColorPosition.textContent = String(mixerActiveIndex + 1).padStart(2, '0') + ' / ' + String(mixerPalette.colors.length).padStart(2, '0');
       mixerColorPicker.value = color.hex;
       mixerColorHex.value = color.hex;
@@ -1384,6 +1507,7 @@
       mixerRemove.disabled = mixerPalette.colors.length <= 2;
       mixerUndo.disabled = !mixerDriftUndo;
       updateMixerPersistenceLabel();
+      updateUseInWrite();
     }
 
     function renderMixer(focusTarget) {
@@ -1548,6 +1672,12 @@
       persistMixerDraft();
       updateMixerStage();
     });
+    mixerColorRole.addEventListener('change', () => {
+      setColorRole(mixerActiveIndex, mixerColorRole.value || null);
+      persistMixerDraft();
+      updateMixerStage();
+      updateMixerControls();
+    });
     mixerColorPicker.addEventListener('input', () => {
       selectedMixerColor().hex = normalizeHex(mixerColorPicker.value) || selectedMixerColor().hex;
       clearDriftUndo();
@@ -1588,6 +1718,10 @@
     mixerRemove.addEventListener('click', removeMixerColor);
     mixerCopyCss.addEventListener('click', () => copyMixerText(mixerCssExport(), 'css copied'));
     mixerCopyList.addEventListener('click', () => copyMixerText(mixerListExport(), 'color list copied'));
+    mixerUseInWrite.addEventListener('click', () => {
+      if (mixerUseInWrite.disabled || !mixerUseInWrite.dataset.href) return;
+      window.location.href = mixerUseInWrite.dataset.href;
+    });
     document.addEventListener('keydown', event => {
       const target = event.target;
       const editingText = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');

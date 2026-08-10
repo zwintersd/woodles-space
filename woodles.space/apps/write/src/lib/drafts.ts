@@ -30,6 +30,8 @@ export interface DraftBody {
 	theme?: string;
 	motif?: string;
 	font?: string;
+	/** Present when `theme` is `'custom'` — the nine roles a mixed palette resolved to. */
+	customPalette?: Record<string, string>;
 	kind?: WritingKind;
 	tags?: string[];
 	/** Optional word goal for the foreground — see kinds.ts. */

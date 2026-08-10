@@ -252,3 +252,132 @@ export function findFont(id) {
 export function findTemplate(id) {
 	return templates.find((t) => t.id === id) || null;
 }
+
+// ── custom palettes ──────────────────────────────────────────────────
+// A ninth-and-a-half kind of theme, alongside the named ones above: a
+// palette someone mixed rather than picked. `theme: 'custom'` on a draft
+// or letter pairs with a `customPalette` object carrying these nine roles
+// — the same ones shared/palette.css defines for every named theme — as
+// hex strings. Consumers (write, letter) apply them as inline custom
+// properties instead of a `data-theme` lookup; Hygge's mixer is the only
+// producer, via `encodeCustomPalette`.
+
+export const CUSTOM_PALETTE_ROLES = [
+	'bg',
+	'text',
+	'muted',
+	'lavender',
+	'aqua',
+	'peach',
+	'lilac',
+	'lapis',
+	'plum'
+];
+
+// Every custom property a resolved custom palette can set on an element —
+// used to clear a previous custom theme before applying a named one, so
+// an inline override never outlives the palette that set it.
+export const CUSTOM_PALETTE_CSS_VARS = [
+	'--bg',
+	'--text',
+	'--muted',
+	'--lavender',
+	'--aqua',
+	'--peach',
+	'--lilac',
+	'--cream',
+	'--lapis',
+	'--plum',
+	'--accent',
+	'--accent-soft',
+	'--accent-warm',
+	'--accent-strong',
+	'--accent-deep',
+	'--surface',
+	'--rule'
+];
+
+/** @param {unknown} value */
+function isHex6(value) {
+	return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
+}
+
+/** @param {unknown} value */
+export function isValidCustomPalette(value) {
+	if (!value || typeof value !== 'object') return false;
+	return CUSTOM_PALETTE_ROLES.every((key) => isHex6(/** @type {any} */ (value)[key]));
+}
+
+/** @param {string} hex */
+function hexToRgbTriple(hex) {
+	return [hex.slice(1, 3), hex.slice(3, 5), hex.slice(5, 7)].map((h) => parseInt(h, 16));
+}
+
+/** @param {string} hex */
+function relativeLuminance(hex) {
+	const [r, g, b] = hexToRgbTriple(hex).map((v) => {
+		const c = v / 255;
+		return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+	});
+	return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/**
+ * Nine hex roles, packed into a URL-safe 54-character string — no
+ * separators needed, since every role is a fixed 6 hex digits. This is
+ * what Hygge's "use in write" link puts in `?custom=`.
+ * @param {Record<string,string>} roles
+ * @returns {string | null}
+ */
+export function encodeCustomPalette(roles) {
+	if (!isValidCustomPalette(roles)) return null;
+	return CUSTOM_PALETTE_ROLES.map((key) => roles[key].slice(1).toLowerCase()).join('');
+}
+
+/** @param {string} code */
+export function decodeCustomPalette(code) {
+	if (typeof code !== 'string' || code.length !== CUSTOM_PALETTE_ROLES.length * 6) return null;
+	if (!/^[0-9a-f]+$/i.test(code)) return null;
+	/** @type {Record<string,string>} */
+	const roles = {};
+	CUSTOM_PALETTE_ROLES.forEach((key, i) => {
+		roles[key] = '#' + code.slice(i * 6, i * 6 + 6).toLowerCase();
+	});
+	return roles;
+}
+
+/**
+ * The nine roles, expanded into the full set of custom properties a named
+ * theme's `[data-theme]` block would define — `--cream` mirrors `--bg`
+ * and the `--accent-*` aliases mirror their source colors, exactly like
+ * every block in shared/palette.css does. `--surface` and `--rule` are
+ * derived rather than asked for, the same "don't make the mixer tag
+ * everything" reasoning that lets background be the only required role.
+ * @param {Record<string,string>} roles
+ */
+export function customPaletteTokens(roles) {
+	const [br, bg_, bb] = hexToRgbTriple(roles.bg);
+	const [ar, ag, ab] = hexToRgbTriple(roles.lavender);
+	return {
+		vars: {
+			'--bg': roles.bg,
+			'--text': roles.text,
+			'--muted': roles.muted,
+			'--lavender': roles.lavender,
+			'--aqua': roles.aqua,
+			'--peach': roles.peach,
+			'--lilac': roles.lilac,
+			'--cream': roles.bg,
+			'--lapis': roles.lapis,
+			'--plum': roles.plum,
+			'--accent': roles.lavender,
+			'--accent-soft': roles.aqua,
+			'--accent-warm': roles.peach,
+			'--accent-strong': roles.lapis,
+			'--accent-deep': roles.plum,
+			'--surface': `rgba(${br}, ${bg_}, ${bb}, 0.74)`,
+			'--rule': `rgba(${ar}, ${ag}, ${ab}, 0.24)`
+		},
+		colorScheme: relativeLuminance(roles.bg) < 0.5 ? 'dark' : 'light'
+	};
+}
