@@ -257,3 +257,16 @@
 		transform: translateY(0);
 	}
 }
+
+/* every consumer of this file gets this for free. `hygge` had its own local
+   blanket override; `letter` only guessed at OS motion preference once, in
+   JS, to set a manual toggle's starting position — no CSS rule backed it
+   up; `write` had neither. one query, here, is a real guarantee for every
+   current and future app that imports shared/motifs.css. */
+@media (prefers-reduced-motion: reduce) {
+	.motif-blob,
+	.motif-shimmer-line {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+	}
+}

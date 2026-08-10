@@ -15,7 +15,13 @@ export const palettes = [
 	{ id: 'terracotta', name: 'terracotta', desc: 'clay · sun-baked' },
 	{ id: 'inkwell', name: 'inkwell', desc: 'navy · letterhead' },
 	{ id: 'typewriter', name: 'typewriter', desc: 'sepia · drafts' },
-	{ id: 'paper', name: 'paper', desc: 'monochrome · ink' }
+	{ id: 'paper', name: 'paper', desc: 'monochrome · ink' },
+	{ id: 'blossom', name: 'blossom', desc: 'petal pink · spring' },
+	{ id: 'sugar', name: 'sugar', desc: 'candy bright · loud' },
+	{ id: 'fog', name: 'fog', desc: 'blue-grey · overcast' },
+	{ id: 'glacier', name: 'glacier', desc: 'ice blue · cold hours' },
+	{ id: 'signal', name: 'signal', desc: 'high contrast · legible' },
+	{ id: 'amber', name: 'amber', desc: 'ember · after midnight' }
 ];
 
 export const motifs = [

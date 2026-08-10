@@ -1103,10 +1103,14 @@ IndexedDB-backed fallback chain land in the same place by different means.
 
 the design system is shared at the lowest level only, and not by every app.
 
-**`shared/palette.css`** defines eleven themes — `cream`, `dawn`, `dusk`,
+**`shared/palette.css`** defines fifteen themes — `cream`, `dawn`, `dusk`,
 `midnight`, `forest`, `terracotta`, `inkwell`, `typewriter`, `paper`,
-`blossom`, `sugar` — as CSS
-custom properties, switched by setting `data-theme="<id>"`. role tokens
+`blossom`, `sugar`, `fog`, `glacier`, `signal`, `amber` — as CSS
+custom properties, switched by setting `data-theme="<id>"`. all fifteen are
+registered in `shared/library.js`'s `palettes` array, so every picker (Hygge,
+Write, the `?palette=` handoff) can reach all of them — `blossom` and `sugar`
+existed in this file but weren't registered for a while; that's fixed. role
+tokens
 (`--bg`, `--text`, `--accent`, `--rule`, …) carry the same meaning through every
 theme, and concrete color names (`--lavender`, `--aqua`, `--peach`, `--lilac`,
 `--plum`, `--lapis`, `--cream`) stay stable across them. `write` and the static

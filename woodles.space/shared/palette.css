@@ -283,3 +283,115 @@
 
 	color-scheme: light;
 }
+
+/* fog — overcast light: pale blue-grey ground, deep slate text, a dusty
+   blue accent instead of a warm one. the quiet, cool-light theme the
+   original nine didn't have; good for an editing pass. */
+[data-theme='fog'] {
+	--bg: #eef1f4;
+	--text: #2b3542;
+	--muted: #7c8896;
+
+	--lavender: #9fb0c4;
+	--aqua: #7fa8a3;
+	--peach: #c9b7a3;
+	--lilac: #a8a4bd;
+	--cream: #eef1f4;
+	--lapis: #35485c;
+	--plum: #4d5f6e;
+
+	--accent: var(--lavender);
+	--accent-soft: var(--aqua);
+	--accent-warm: var(--peach);
+	--accent-strong: var(--lapis);
+	--accent-deep: var(--plum);
+
+	--surface: rgba(238, 241, 244, 0.7);
+	--rule: rgba(53, 72, 92, 0.14);
+
+	color-scheme: light;
+}
+
+/* glacier — midnight's cold counterpart: deep blue-black instead of
+   violet-black, ice blues instead of neon, one warm amber accent kept
+   for contrast the way inkwell keeps its gilt. */
+[data-theme='glacier'] {
+	--bg: #0b1420;
+	--text: #dceaf2;
+	--muted: #6f8fa3;
+
+	--lavender: #6fb8d9;
+	--aqua: #8fe0d0;
+	--peach: #d9a97a;
+	--lilac: #9fb8e0;
+	--cream: #0b1420;
+	--lapis: #cfe8f5;
+	--plum: #7fc2e0;
+
+	--accent: var(--lavender);
+	--accent-soft: var(--aqua);
+	--accent-warm: var(--peach);
+	--accent-strong: var(--lapis);
+	--accent-deep: var(--plum);
+
+	--surface: rgba(11, 20, 32, 0.82);
+	--rule: rgba(111, 184, 217, 0.24);
+
+	color-scheme: dark;
+}
+
+/* signal — built for legibility first, unlike every other theme here
+   (paper included), which are built for mood first. true black on true
+   white, one confident blue for anything interactive, red held in
+   reserve, and a heavier rule so dividers don't disappear. */
+[data-theme='signal'] {
+	--bg: #ffffff;
+	--text: #0a0a0a;
+	--muted: #45494f;
+
+	--lavender: #1d4ed8;
+	--aqua: #0f172a;
+	--peach: #b91c1c;
+	--lilac: #334155;
+	--cream: #ffffff;
+	--lapis: #0a0a0a;
+	--plum: #1d4ed8;
+
+	--accent: var(--lavender);
+	--accent-soft: var(--lilac);
+	--accent-warm: var(--peach);
+	--accent-strong: var(--lapis);
+	--accent-deep: var(--plum);
+
+	--surface: rgba(255, 255, 255, 0.92);
+	--rule: rgba(10, 10, 10, 0.32);
+
+	color-scheme: light;
+}
+
+/* amber — typewriter's nocturnal sibling: the same desk after midnight.
+   near-black ground, a warm amber glow for text, gold for headings. */
+[data-theme='amber'] {
+	--bg: #1c140c;
+	--text: #f0d9b0;
+	--muted: #a9835a;
+
+	--lavender: #d9a662;
+	--aqua: #b8814a;
+	--peach: #e8c17a;
+	--lilac: #a97848;
+	--cream: #1c140c;
+	--lapis: #f5e4bc;
+	--plum: #c9915a;
+
+	--accent: var(--lavender);
+	--accent-soft: var(--aqua);
+	--accent-warm: var(--peach);
+	--accent-strong: var(--lapis);
+	--accent-deep: var(--plum);
+
+	--surface: rgba(28, 20, 12, 0.8);
+	--rule: rgba(217, 166, 98, 0.22);
+
+	color-scheme: dark;
+}

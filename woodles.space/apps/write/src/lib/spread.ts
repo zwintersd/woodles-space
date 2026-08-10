@@ -21,6 +21,10 @@ export interface ViewPrefs {
 	mode: ViewMode;
 	/** Ruled paper. A look, independent of how many pages are open. */
 	ruled: boolean;
+	/** Turns off the ambient motif's drift — a manual override beside
+	 *  shared/motifs.css's own `prefers-reduced-motion` accommodation, for
+	 *  whoever wants it off regardless of what their OS says. */
+	calmMotion: boolean;
 	/** Left page. */
 	verso: LayerId;
 	/** Right page — where the prose sits by default. */
@@ -36,6 +40,7 @@ export const VIEW_MODES: readonly ViewMode[] = ['page', 'spread'];
 export const DEFAULT_VIEW_PREFS: ViewPrefs = {
 	mode: 'spread',
 	ruled: true,
+	calmMotion: false,
 	verso: 'midground',
 	recto: 'foreground'
 };
@@ -62,12 +67,14 @@ export function coerceViewPrefs(value: unknown): ViewPrefs {
 		? (value.mode as ViewMode)
 		: DEFAULT_VIEW_PREFS.mode;
 	const ruled = typeof value.ruled === 'boolean' ? value.ruled : DEFAULT_VIEW_PREFS.ruled;
+	const calmMotion =
+		typeof value.calmMotion === 'boolean' ? value.calmMotion : DEFAULT_VIEW_PREFS.calmMotion;
 	const verso = isLayer(value.verso) ? value.verso : DEFAULT_VIEW_PREFS.verso;
 	let recto = isLayer(value.recto) ? value.recto : DEFAULT_VIEW_PREFS.recto;
 	if (recto === verso) {
 		recto = LAYERS.find((layer) => layer !== verso) as LayerId;
 	}
-	return { mode, ruled, verso, recto };
+	return { mode, ruled, calmMotion, verso, recto };
 }
 
 /**
