@@ -548,6 +548,11 @@
 	});
 
 	$effect(() => {
+		if (typeof document === 'undefined') return;
+		document.body.classList.toggle('calm-motion', view.calmMotion);
+	});
+
+	$effect(() => {
 		if (typeof localStorage === 'undefined') return;
 		try {
 			localStorage.setItem(POCKETS_ORDER_KEY, pocketsOrder);
@@ -1532,6 +1537,8 @@
 	bind:font
 	ruled={view.ruled}
 	onRuledChange={(ruled) => (view = { ...view, ruled })}
+	calmMotion={view.calmMotion}
+	onCalmMotionChange={(calmMotion) => (view = { ...view, calmMotion })}
 	{palettes}
 	motifs={motifList}
 	fonts={fontPairs}
@@ -1551,6 +1558,15 @@
 		padding: 0;
 	}
 	:global(html), :global(body) { height: 100%; }
+	/* shared/motifs.css already stops the ambient drift for anyone whose OS
+	   asks for reduced motion; this is the explicit override beside it, for
+	   whoever wants it off regardless of what their OS says. */
+	:global(body.calm-motion .motif-blob),
+	:global(body.calm-motion .motif-grain) {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition: none !important;
+	}
 	/* base type scale — % keeps it relative to the reader's browser font size,
 	   so every rem in the app scales from here (and large-text prefs are honored) */
 	:global(html) { font-size: 112.5%; }

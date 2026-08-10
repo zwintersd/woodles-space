@@ -20,7 +20,13 @@ beforeEach(() => {
 
 describe('coerceViewPrefs', () => {
 	it('passes a well-formed set through unchanged', () => {
-		const prefs: ViewPrefs = { mode: 'page', ruled: false, verso: 'background', recto: 'foreground' };
+		const prefs: ViewPrefs = {
+			mode: 'page',
+			ruled: false,
+			calmMotion: false,
+			verso: 'background',
+			recto: 'foreground'
+		};
 		expect(coerceViewPrefs(prefs)).toEqual(prefs);
 	});
 
@@ -35,6 +41,14 @@ describe('coerceViewPrefs', () => {
 		expect(out.mode).toBe(DEFAULT_VIEW_PREFS.mode);
 		expect(out.ruled).toBe(false);
 		expect(out.verso).toBe('background');
+	});
+
+	it('defaults calm motion when absent, and keeps an explicit choice', () => {
+		expect(coerceViewPrefs({ mode: 'page' }).calmMotion).toBe(DEFAULT_VIEW_PREFS.calmMotion);
+		expect(coerceViewPrefs({ mode: 'page', calmMotion: true }).calmMotion).toBe(true);
+		expect(coerceViewPrefs({ mode: 'page', calmMotion: 'yes' }).calmMotion).toBe(
+			DEFAULT_VIEW_PREFS.calmMotion
+		);
 	});
 
 	it('never lets both pages show the same layer', () => {
@@ -52,7 +66,13 @@ describe('coerceViewPrefs', () => {
 });
 
 describe('assignLayer', () => {
-	const base: ViewPrefs = { mode: 'spread', ruled: true, verso: 'midground', recto: 'foreground' };
+	const base: ViewPrefs = {
+		mode: 'spread',
+		ruled: true,
+		calmMotion: false,
+		verso: 'midground',
+		recto: 'foreground'
+	};
 
 	it('sets a layer that is not already open', () => {
 		expect(assignLayer(base, 'verso', 'background')).toEqual({ ...base, verso: 'background' });
@@ -82,12 +102,24 @@ describe('assignLayer', () => {
 
 	it('does not mutate the prefs it was given', () => {
 		assignLayer(base, 'verso', 'foreground');
-		expect(base).toEqual({ mode: 'spread', ruled: true, verso: 'midground', recto: 'foreground' });
+		expect(base).toEqual({
+			mode: 'spread',
+			ruled: true,
+			calmMotion: false,
+			verso: 'midground',
+			recto: 'foreground'
+		});
 	});
 });
 
 describe('what is on screen', () => {
-	const spread: ViewPrefs = { mode: 'spread', ruled: true, verso: 'midground', recto: 'foreground' };
+	const spread: ViewPrefs = {
+		mode: 'spread',
+		ruled: true,
+		calmMotion: false,
+		verso: 'midground',
+		recto: 'foreground'
+	};
 	const page: ViewPrefs = { ...spread, mode: 'page' };
 
 	it('shows two layers in a spread and one in page view', () => {
@@ -116,7 +148,13 @@ describe('what is on screen', () => {
 
 describe('persistence', () => {
 	it('round trips through localStorage', () => {
-		const prefs: ViewPrefs = { mode: 'page', ruled: false, verso: 'background', recto: 'midground' };
+		const prefs: ViewPrefs = {
+			mode: 'page',
+			ruled: false,
+			calmMotion: true,
+			verso: 'background',
+			recto: 'midground'
+		};
 		saveViewPrefs(prefs);
 		expect(loadViewPrefs()).toEqual(prefs);
 	});

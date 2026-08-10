@@ -13,6 +13,8 @@
 		font = $bindable(),
 		ruled,
 		onRuledChange,
+		calmMotion,
+		onCalmMotionChange,
 		palettes,
 		motifs,
 		fonts,
@@ -31,6 +33,9 @@
 		font: string;
 		ruled: boolean;
 		onRuledChange: (ruled: boolean) => void;
+		/** Manual override for the motif's ambient drift — device preference, not draft content. */
+		calmMotion: boolean;
+		onCalmMotionChange: (calmMotion: boolean) => void;
 		palettes: Option[];
 		motifs: Option[];
 		fonts: Option[];
@@ -94,6 +99,14 @@
 				<option value="ruled">ruled</option>
 			</select>
 		</label>
+		<button
+			class="calm-toggle"
+			class:on={calmMotion}
+			type="button"
+			aria-pressed={calmMotion}
+			title={calmMotion ? 'calm motion is on — the ambient motif stays still' : 'turn off the ambient motif’s drift'}
+			onclick={() => onCalmMotionChange(!calmMotion)}
+		>calm</button>
 	</div>
 	<div class="publish-cluster">
 		{#if isListKind}
@@ -165,6 +178,25 @@
 		background-repeat: no-repeat;
 	}
 	.picker-select:focus { outline: none; border-color: var(--accent); }
+
+	.calm-toggle {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.6rem; letter-spacing: 0.06em;
+		text-transform: lowercase;
+		color: var(--muted);
+		background: transparent;
+		border: 1px solid var(--rule);
+		padding: 3px 10px; border-radius: 4px;
+		cursor: pointer;
+		transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+	}
+	.calm-toggle:hover { color: var(--accent-strong); }
+	.calm-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+	.calm-toggle.on {
+		color: var(--accent-strong);
+		border-color: var(--accent);
+		background: color-mix(in srgb, var(--accent) 16%, transparent);
+	}
 
 	.publish-cluster { display: flex; align-items: center; gap: 0.9rem; }
 	.publish-warn {
