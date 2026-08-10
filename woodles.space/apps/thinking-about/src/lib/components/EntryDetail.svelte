@@ -271,7 +271,7 @@
 			<div class="detail-field">
 				<span class="detail-field-label">most weeks</span>
 				<div class="standing-days" role="group" aria-label="days this happens">
-					{#each WEEKDAY_LABELS as label, day (label)}
+					{#each WEEKDAY_LABELS as label, day (day)}
 						<button
 							type="button"
 							class="standing-day"
