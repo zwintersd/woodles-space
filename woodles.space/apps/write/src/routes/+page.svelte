@@ -110,7 +110,11 @@
 		findTemplate,
 		findFont,
 		findPalette,
-		findMotif
+		findMotif,
+		isValidCustomPalette,
+		decodeCustomPalette,
+		customPaletteTokens,
+		CUSTOM_PALETTE_CSS_VARS
 	} from '@shared/library.js';
 
 	// Declared in the manifest as write's addressableBy — a `#` reference to
@@ -134,6 +138,16 @@
 	let theme = $state('cream');
 	let motif = $state('blobs');
 	let font = $state('classic');
+	// Set only when theme === 'custom' — a palette mixed in Hygge rather than
+	// picked, carrying the nine roles shared/palette.css defines for every
+	// named theme. The effect below is the one place that enforces "only
+	// non-null when theme is 'custom'", so nothing else has to remember to
+	// clear it when the theme changes some other way (template, revisit,
+	// the palette picker).
+	let customPalette = $state<Record<string, string> | null>(null);
+	$effect(() => {
+		if (theme !== 'custom' && customPalette) customPalette = null;
+	});
 
 	// What this draft is becoming — letter, essay, story, poem, note. The
 	// editor dresses itself for the kind; switching is free and loses nothing.
@@ -270,6 +284,7 @@
 		theme?: string;
 		motif?: string;
 		font?: string;
+		customPalette?: Record<string, string>;
 		kind?: string;
 		tags?: string[];
 		goal?: number;
@@ -282,6 +297,9 @@
 		if (d.theme) theme = d.theme;
 		if (d.motif) motif = d.motif;
 		if (d.font) font = d.font;
+		if (d.theme === 'custom' && isValidCustomPalette(d.customPalette)) {
+			customPalette = d.customPalette as Record<string, string>;
+		}
 		kind = coerceKind(d.kind);
 		tags = Array.isArray(d.tags) ? d.tags.filter((t) => typeof t === 'string') : [];
 		goal = coerceGoal(d.goal);
@@ -339,13 +357,16 @@
 		const replyId = params.get('reply');
 		const revisitId = params.get('revisit');
 
-		// Hygge design playground passes ?palette=&motif=&font= to pre-style the editor.
+		// Hygge design playground passes ?palette=&motif=&font= to pre-style the
+		// editor. The mixer's "use in write" sends ?custom= instead of ?palette=
+		// — a mixed palette rather than a named one — see the theme effect above.
 		const hyggeParams = {
 			palette: params.get('palette'),
 			motif:   params.get('motif'),
 			font:    params.get('font'),
+			custom:  params.get('custom'),
 		};
-		const hasHyggeStyle = hyggeParams.palette || hyggeParams.motif || hyggeParams.font;
+		const hasHyggeStyle = hyggeParams.palette || hyggeParams.motif || hyggeParams.font || hyggeParams.custom;
 		if (hasHyggeStyle) {
 			history.replaceState(null, '', window.location.pathname);
 		}
@@ -390,6 +411,9 @@
 					theme: source.theme,
 					motif: source.motif,
 					font: source.font,
+					...(source.theme === 'custom' && source.customPalette
+						? { customPalette: source.customPalette }
+						: {}),
 					layers: source.layers,
 					annotations: source.annotations,
 					content: source.content,
@@ -471,7 +495,15 @@
 
 		// Apply hygge-sourced style overrides after any draft is loaded.
 		if (hasHyggeStyle) {
-			if (hyggeParams.palette && findPalette(hyggeParams.palette).id === hyggeParams.palette) theme = hyggeParams.palette;
+			if (hyggeParams.custom) {
+				const decoded = decodeCustomPalette(hyggeParams.custom);
+				if (decoded) {
+					theme = 'custom';
+					customPalette = decoded;
+				}
+			} else if (hyggeParams.palette && findPalette(hyggeParams.palette).id === hyggeParams.palette) {
+				theme = hyggeParams.palette;
+			}
 			if (hyggeParams.motif   && findMotif(hyggeParams.motif).id   === hyggeParams.motif)   motif = hyggeParams.motif;
 			if (hyggeParams.font    && findFont(hyggeParams.font).id      === hyggeParams.font)    font  = hyggeParams.font;
 		}
@@ -532,7 +564,22 @@
 
 	$effect(() => {
 		if (typeof document === 'undefined') return;
-		document.body.dataset.theme = theme;
+		// A custom palette sets its roles as inline properties, which beat
+		// anything shared/palette.css's [data-theme] blocks would otherwise
+		// supply — but only for as long as they're there, so switching back to
+		// a named theme has to clear them first or they'd keep winning.
+		if (theme === 'custom' && customPalette) {
+			document.body.dataset.theme = 'custom';
+			const { vars, colorScheme } = customPaletteTokens(customPalette);
+			for (const [key, value] of Object.entries(vars)) {
+				document.body.style.setProperty(key, value);
+			}
+			document.body.style.colorScheme = colorScheme;
+		} else {
+			for (const key of CUSTOM_PALETTE_CSS_VARS) document.body.style.removeProperty(key);
+			document.body.style.removeProperty('color-scheme');
+			document.body.dataset.theme = theme;
+		}
 		Array.from(document.body.classList).forEach((c) => {
 			if (c.startsWith('motif-') && !c.startsWith('motif-blob') && c !== 'motif-grain') {
 				document.body.classList.remove(c);
@@ -626,6 +673,7 @@
 	function currentDraftBody(now: string): DraftBody {
 		return {
 			title, theme, motif, font, kind,
+			...(theme === 'custom' && customPalette ? { customPalette } : {}),
 			...(tags.length > 0 ? { tags } : {}),
 			...(goal !== null ? { goal } : {}),
 			...(isListKind ? { liquid: liquidBoard } : {}),
@@ -664,6 +712,7 @@
 		void theme;
 		void motif;
 		void font;
+		void customPalette;
 		void kind;
 		void goal;
 		void liquidBoard;
@@ -836,6 +885,7 @@
 				theme,
 				motif,
 				font,
+				...(theme === 'custom' && customPalette ? { customPalette } : {}),
 				issue,
 				publishedAt: now,
 				layers: {

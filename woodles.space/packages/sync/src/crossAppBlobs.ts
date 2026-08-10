@@ -138,6 +138,8 @@ export type ArchiveLetter = {
 	theme: string;
 	motif: string;
 	font: string;
+	/** Present when `theme` is `'custom'` — the nine roles a mixed palette resolved to. */
+	customPalette?: Record<string, string>;
 	issue: number;
 	publishedAt: string;
 	layers: Record<string, { html: string; updatedAt: string }>;

@@ -69,7 +69,8 @@
 		<span class="picker-sep">·</span>
 		<label class="picker">
 			<span class="picker-label">palette</span>
-			<select bind:value={theme} class="picker-select">
+			<select bind:value={theme} class="picker-select" title={theme === 'custom' ? 'a palette mixed in hygge — pick another to leave it' : ''}>
+				{#if theme === 'custom'}<option value="custom">custom</option>{/if}
 				{#each palettes as p}<option value={p.id}>{p.name}</option>{/each}
 			</select>
 		</label>

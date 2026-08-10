@@ -1045,7 +1045,14 @@
   <aside class="binder-panel" id="binder-panel" role="region" aria-hidden="true"></aside>
 
   <script type="module">
-    import { findFont, findPalette, findMotif } from '/shared/library.js';
+    import {
+      findFont,
+      findPalette,
+      findMotif,
+      isValidCustomPalette,
+      customPaletteTokens,
+      CUSTOM_PALETTE_CSS_VARS
+    } from '/shared/library.js';
     import {
       countWords,
       previewText,
@@ -1111,12 +1118,27 @@
       applyReadingPref('calm-motion', calmToggleEl, calmOn);
     });
 
-    /* ── apply theme/motif/font tokens to body ── */
+    /* ── apply theme/motif/font tokens to body ──
+       A letter with theme 'custom' carries its own nine roles — mixed in
+       Hygge rather than picked — instead of a named palette id. Its colors
+       go on as inline properties, which beat [data-theme] regardless, so a
+       reader switching from a custom letter to a named one has to clear
+       them first or they'd keep winning. */
     function applyTokens(letter) {
-      const palette = findPalette(letter && letter.theme);
+      const isCustom = letter && letter.theme === 'custom' && isValidCustomPalette(letter.customPalette);
+      if (isCustom) {
+        document.body.dataset.theme = 'custom';
+        const { vars, colorScheme } = customPaletteTokens(letter.customPalette);
+        Object.entries(vars).forEach(([key, value]) => document.body.style.setProperty(key, value));
+        document.body.style.colorScheme = colorScheme;
+      } else {
+        CUSTOM_PALETTE_CSS_VARS.forEach((key) => document.body.style.removeProperty(key));
+        document.body.style.removeProperty('color-scheme');
+        const palette = findPalette(letter && letter.theme);
+        document.body.dataset.theme = palette.id;
+      }
       const motif = findMotif(letter && letter.motif);
       const font = findFont(letter && letter.font);
-      document.body.dataset.theme = palette.id;
       document.body.classList.add('motif-' + motif.id);
       document.body.style.setProperty('--letter-display', font.display);
       document.body.style.setProperty('--letter-body', font.body);
