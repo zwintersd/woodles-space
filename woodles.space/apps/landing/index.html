@@ -607,6 +607,119 @@
       background: var(--accent-strong);
       color: var(--bg);
     }
+    /* take a break — a little screensaver designer */
+    .dw-break { width: 228px; }
+    .tb-preview {
+      display: block;
+      width: 100%; height: 82px;
+      border-radius: 10px;
+      border: 1px solid var(--rule);
+      background: #141126;
+      margin-bottom: 0.6rem;
+    }
+    .tb-cap {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.5rem; letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.28rem;
+    }
+    .tb-row {
+      display: flex; flex-wrap: wrap; gap: 0.25rem;
+      margin-bottom: 0.55rem;
+    }
+    .tb-chip {
+      border: 1px solid var(--rule);
+      border-radius: 7px;
+      background: transparent;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.53rem; letter-spacing: 0.05em;
+      padding: 0.28rem 0.42rem;
+      cursor: pointer;
+      transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+    }
+    .tb-chip:hover { color: var(--text); }
+    .tb-chip.on {
+      background: var(--accent-strong);
+      border-color: var(--accent-strong);
+      color: var(--bg);
+    }
+    .tb-sw {
+      width: 28px; height: 19px;
+      border-radius: 6px;
+      border: 2px solid transparent;
+      box-shadow: inset 0 0 0 1px var(--rule);
+      cursor: pointer;
+      padding: 0;
+      transition: transform 0.14s ease, border-color 0.14s ease;
+    }
+    .tb-sw:hover { transform: scale(1.12); }
+    .tb-sw.on { border-color: var(--accent-strong); }
+    .tb-go {
+      width: 100%;
+      border: none; border-radius: 9px;
+      background: var(--accent-strong);
+      color: var(--bg);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem; letter-spacing: 0.16em;
+      text-transform: uppercase;
+      padding: 0.5rem 0;
+      cursor: pointer;
+      transition: filter 0.16s ease;
+    }
+    .tb-go:hover { filter: brightness(1.1); }
+    .tb-go:active { transform: scale(0.98); }
+
+    /* the screensaver itself — everything else is behind it and out of reach */
+    .saver {
+      position: fixed; inset: 0; z-index: 90;
+      background: #000;
+      cursor: none;
+      opacity: 0;
+      transition: opacity 0.7s ease;
+    }
+    .saver.on { opacity: 1; }
+    .saver.done { opacity: 0; transition: opacity 1.6s ease; }
+    .saver-canvas { display: block; width: 100%; height: 100%; }
+    /* the readout wanders, the way these things always did to spare the phosphor */
+    .saver-hud {
+      position: absolute; left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      pointer-events: none;
+      padding: 2rem 3.4rem;
+      /* a soft halo so the readout survives the busier modes */
+      background: radial-gradient(ellipse at center,
+        rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.42) 45%, transparent 72%);
+      transition: left 7s ease-in-out, top 7s ease-in-out;
+    }
+    .saver-clock {
+      font-family: 'DM Mono', monospace;
+      font-size: 2.7rem; font-weight: 300;
+      color: rgba(255,255,255,0.92);
+      line-height: 1;
+      text-shadow: 0 2px 26px rgba(0,0,0,0.75);
+    }
+    .saver-note {
+      font-style: italic;
+      font-size: 1.15rem;
+      color: rgba(255,255,255,0.72);
+      margin-top: 0.35rem;
+      text-shadow: 0 2px 20px rgba(0,0,0,0.75);
+    }
+    .saver-esc {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.54rem; letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.4);
+      margin-top: 0.8rem;
+      text-shadow: 0 2px 14px rgba(0,0,0,0.8);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .saver-hud { transition: none; }
+    }
+
     /* widget picker rows */
     .wt-glyph {
       width: 34px; height: 34px;
@@ -974,10 +1087,14 @@
       transition: opacity 0.2s ease;
     }
     body.win-open .scrim { opacity: 1; pointer-events: auto; }
+    /* windows never outgrow the screen — the titlebar stays put and the
+       body scrolls once the contents would run past the viewport */
     .window {
       position: fixed; z-index: 40;
       top: 50%; left: 50%;
       width: min(420px, calc(100vw - 32px));
+      max-height: calc(100vh - 32px);
+      display: flex; flex-direction: column;
       transform: translate(-50%, -50%) scale(0.94);
       border-radius: 16px;
       background: color-mix(in srgb, var(--surface) 95%, var(--bg));
@@ -994,6 +1111,7 @@
       transform: translate(-50%, -50%) scale(1);
     }
     .titlebar {
+      flex: none;
       display: flex; align-items: center; justify-content: space-between;
       padding: 0.5rem 0.55rem 0.5rem 0.95rem;
       border-bottom: 1px solid var(--rule);
@@ -1014,7 +1132,13 @@
       transition: background 0.14s ease, color 0.14s ease;
     }
     .win-close:hover { background: #e8859a; color: #fff; }
-    .win-body { padding: 1.6rem 1.5rem 1.7rem; }
+    .win-body {
+      padding: 1.6rem 1.5rem 1.7rem;
+      min-height: 0;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      overscroll-behavior: contain;
+    }
     .win-body h2 {
       font-size: 2.2rem; font-weight: 400;
       color: var(--accent-strong);
@@ -2143,6 +2267,304 @@
       return { illum, idx, name: MOON_NAMES[idx] };
     }
 
+    /* ── screensaver engine ────────────────────────────────────────── */
+    /* five modes lifted straight from the display-properties dialog of
+       about 1997. one renderer drives both the widget's little preview
+       and the fullscreen break. */
+    const SAVER_STYLES = {
+      stars:   'starfield',
+      mystify: 'mystify',
+      bounce:  'bouncer',
+      pipes:   'pipes',
+      rain:    'code rain',
+    };
+    const SAVER_PALETTES = {
+      dusk:   { bg: '#141126', ink: ['#c9b6f5', '#9ad9e0', '#f5c3a8', '#d9b8ec', '#8f7fd4'] },
+      neon:   { bg: '#07060f', ink: ['#00e5ff', '#ff3ec8', '#ffe600', '#7cff2a', '#ff7a1a'] },
+      code:   { bg: '#00060a', ink: ['#39ff6a', '#1fbf47', '#9dffb5', '#57ff85', '#0d7a2b'] },
+      sunset: { bg: '#1b0d18', ink: ['#ff9a5a', '#ff5f8f', '#c04ec2', '#ffd08a', '#7b3fa0'] },
+      paper:  { bg: '#0d0d10', ink: ['#ffffff', '#cfcfd6', '#9a9aa6', '#e8e8ee', '#75757f'] },
+    };
+    const SAVER_MOTION = { calm: 0.5, easy: 1, wild: 1.9 };
+    const SAVER_MINUTES = [1, 3, 5, 10, 20];
+    const SAVER_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    const pick = a => a[Math.floor(Math.random() * a.length)];
+    function withAlpha(hex, a) {
+      const n = parseInt(hex.slice(1), 16);
+      return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+    }
+
+    function runSaver(canvas, opts) {
+      const ctx = canvas.getContext('2d');
+      const pal = SAVER_PALETTES[opts.palette] || SAVER_PALETTES.dusk;
+      const scale = opts.preview ? 0.55 : 1;
+      let speed = SAVER_MOTION[opts.motion] || 1;
+      /* the preview runs unasked-for, so it stays gentle if the system says so */
+      if (opts.preview && reducedMotion.matches) speed = Math.min(speed, SAVER_MOTION.calm);
+      let w = 0, h = 0, raf = 0, state = null;
+
+      function fit() {
+        const r = canvas.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        const dpr = Math.min(devicePixelRatio || 1, 2);
+        w = Math.round(r.width); h = Math.round(r.height);
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        state = null;                       /* rebuild the world at the new size */
+        ctx.fillStyle = pal.bg;
+        ctx.fillRect(0, 0, w, h);
+      }
+
+      const MODES = {
+        /* flying through space, the one everybody remembers */
+        stars() {
+          const stars = [];
+          const n = Math.max(24, Math.round(w * h / 5200 * scale));
+          const spawn = s => { s.x = rnd(-1, 1); s.y = rnd(-1, 1); s.z = 1; s.c = pick(pal.ink); };
+          for (let i = 0; i < n; i++) { const s = {}; spawn(s); s.z = Math.random(); stars.push(s); }
+          return () => {
+            ctx.fillStyle = withAlpha(pal.bg, 0.34);
+            ctx.fillRect(0, 0, w, h);
+            const cx = w / 2, cy = h / 2;
+            ctx.lineCap = 'round';
+            for (const s of stars) {
+              const pz = s.z;
+              s.z -= 0.0055 * speed;
+              if (s.z <= 0.03) { spawn(s); continue; }
+              const x = cx + s.x / s.z * cx, y = cy + s.y / s.z * cy;
+              if (x < -60 || x > w + 60 || y < -60 || y > h + 60) { spawn(s); continue; }
+              ctx.strokeStyle = s.c;
+              ctx.lineWidth = (1 - s.z) * 2 * scale + 0.4;
+              ctx.beginPath();
+              ctx.moveTo(cx + s.x / pz * cx, cy + s.y / pz * cy);
+              ctx.lineTo(x, y);
+              ctx.stroke();
+            }
+          };
+        },
+        /* bouncing polygons dragging a coloured wake behind them */
+        mystify() {
+          const trail = Math.max(6, Math.round(15 * scale + 4));
+          const polys = [0, 1].map(() => ({
+            pts: Array.from({ length: 4 }, () => ({
+              x: rnd(0, w), y: rnd(0, h),
+              vx: rnd(-1, 1) * 1.7 || 1, vy: rnd(-1, 1) * 1.7 || 1,
+            })),
+            hist: [],
+            hue: Math.floor(rnd(0, pal.ink.length)),
+          }));
+          return () => {
+            ctx.fillStyle = pal.bg;
+            ctx.fillRect(0, 0, w, h);
+            for (const p of polys) {
+              for (const pt of p.pts) {
+                pt.x += pt.vx * speed; pt.y += pt.vy * speed;
+                if (pt.x < 0) { pt.x = 0; pt.vx = Math.abs(pt.vx); }
+                if (pt.x > w) { pt.x = w; pt.vx = -Math.abs(pt.vx); }
+                if (pt.y < 0) { pt.y = 0; pt.vy = Math.abs(pt.vy); }
+                if (pt.y > h) { pt.y = h; pt.vy = -Math.abs(pt.vy); }
+              }
+              p.hist.push(p.pts.map(pt => ({ x: pt.x, y: pt.y })));
+              if (p.hist.length > trail) p.hist.shift();
+              p.hue += 0.007 * speed;
+              ctx.lineWidth = 1.5 * (scale < 1 ? 0.8 : 1);
+              p.hist.forEach((shape, i) => {
+                ctx.strokeStyle = withAlpha(
+                  pal.ink[(Math.floor(p.hue) + i) % pal.ink.length],
+                  (i + 1) / p.hist.length * 0.9);
+                ctx.beginPath();
+                shape.forEach((pt, j) => j ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y));
+                ctx.closePath();
+                ctx.stroke();
+              });
+            }
+          };
+        },
+        /* the logo that never quite hits the corner */
+        bounce() {
+          const fs = Math.max(13, Math.min(w, h) * 0.13);
+          const box = { x: rnd(0, w * 0.4), y: rnd(0, h * 0.4), vx: 1.6, vy: 1.25, ci: 0 };
+          let flash = 0;
+          return () => {
+            ctx.fillStyle = pal.bg;
+            ctx.fillRect(0, 0, w, h);
+            ctx.font = 'italic ' + fs + 'px "Cormorant Garamond", Georgia, serif';
+            ctx.textBaseline = 'top';
+            const tw = ctx.measureText('woodles').width, th = fs * 0.8;
+            box.x += box.vx * speed * 1.5; box.y += box.vy * speed * 1.5;
+            let hits = 0;
+            if (box.x <= 0)      { box.x = 0;      box.vx =  Math.abs(box.vx); hits++; }
+            if (box.x + tw >= w) { box.x = w - tw; box.vx = -Math.abs(box.vx); hits++; }
+            if (box.y <= 0)      { box.y = 0;      box.vy =  Math.abs(box.vy); hits++; }
+            if (box.y + th >= h) { box.y = h - th; box.vy = -Math.abs(box.vy); hits++; }
+            if (hits) box.ci = (box.ci + 1) % pal.ink.length;
+            if (hits > 1) flash = 1;                    /* the fabled corner hit */
+            if (flash > 0) {
+              ctx.fillStyle = withAlpha(pal.ink[box.ci], flash * 0.25);
+              ctx.fillRect(0, 0, w, h);
+              flash -= 0.02;
+            }
+            ctx.fillStyle = pal.ink[box.ci];
+            ctx.fillText('woodles', box.x, box.y);
+          };
+        },
+        /* plumbing that fills the screen, then washes out and starts over */
+        pipes() {
+          const cell = Math.max(11, Math.min(w, h) / 13);
+          let x = Math.round(w / 2 / cell) * cell;
+          let y = Math.round(h / 2 / cell) * cell;
+          let dir = pick(SAVER_DIRS), color = pick(pal.ink), laid = 0, wash = 0;
+          const capacity = Math.round(w * h / (cell * cell) * 1.1);
+          ctx.fillStyle = pal.bg;
+          ctx.fillRect(0, 0, w, h);
+          return () => {
+            if (wash > 0) {
+              ctx.fillStyle = withAlpha(pal.bg, 0.05);
+              ctx.fillRect(0, 0, w, h);
+              wash--;
+              return;
+            }
+            ctx.lineCap = 'round';
+            for (let s = 0, steps = Math.max(1, Math.round(speed * 1.3)); s < steps; s++) {
+              const nx = x + dir[0] * cell, ny = y + dir[1] * cell;
+              const ox = -dir[1] * cell * 0.11, oy = dir[0] * cell * 0.11;
+              ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+              ctx.lineWidth = cell * 0.52;
+              ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(nx, ny); ctx.stroke();
+              ctx.strokeStyle = color;
+              ctx.lineWidth = cell * 0.4;
+              ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(nx, ny); ctx.stroke();
+              ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+              ctx.lineWidth = cell * 0.09;
+              ctx.beginPath(); ctx.moveTo(x + ox, y + oy); ctx.lineTo(nx + ox, ny + oy); ctx.stroke();
+              x = nx; y = ny;
+              if (x < -cell || x > w + cell || y < -cell || y > h + cell) {
+                x = Math.round(rnd(0, w) / cell) * cell;
+                y = Math.round(rnd(0, h) / cell) * cell;
+                dir = pick(SAVER_DIRS);
+                color = pick(pal.ink);
+              } else if (Math.random() < 0.19) {
+                dir = pick(SAVER_DIRS.filter(d => d[0] !== -dir[0] || d[1] !== -dir[1]));
+                ctx.fillStyle = color;                  /* elbow joint */
+                ctx.beginPath(); ctx.arc(x, y, cell * 0.25, 0, Math.PI * 2); ctx.fill();
+              }
+              if (Math.random() < 0.014) color = pick(pal.ink);
+              if (++laid > capacity) { wash = 70; laid = 0; }
+            }
+          };
+        },
+        /* it was 1999 and everyone's monitor was raining */
+        rain() {
+          const GLYPHS = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホ0123456789:.=*+-<>';
+          const fs = Math.max(9, Math.min(w, h) / 24);
+          const step = fs * 0.85;
+          const cols = Math.max(1, Math.floor(w / step));
+          const drops = Array.from({ length: cols }, () => ({
+            y: rnd(-h, 0), v: rnd(0.7, 1.7), c: pick(pal.ink),
+          }));
+          const glyph = () => GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+          return () => {
+            ctx.fillStyle = withAlpha(pal.bg, 0.17);
+            ctx.fillRect(0, 0, w, h);
+            ctx.font = fs + 'px "DM Mono", ui-monospace, monospace';
+            ctx.textBaseline = 'top';
+            drops.forEach((d, i) => {
+              const x = i * step + step * 0.15;
+              ctx.fillStyle = 'rgba(255,255,255,0.92)';
+              ctx.fillText(glyph(), x, d.y);
+              ctx.fillStyle = withAlpha(d.c, 0.8);
+              ctx.fillText(glyph(), x, d.y - fs);
+              d.y += d.v * fs * 0.35 * speed;
+              if (d.y > h + fs * 2) { d.y = rnd(-h * 0.6, 0); d.v = rnd(0.7, 1.7); d.c = pick(pal.ink); }
+            });
+          };
+        },
+      };
+
+      function frame() {
+        raf = requestAnimationFrame(frame);
+        if (!w || !h) return;
+        if (!state) state = (MODES[opts.style] || MODES.stars)();
+        state();
+      }
+
+      const ro = new ResizeObserver(fit);
+      ro.observe(canvas);
+      frame();
+
+      return { stop() { cancelAnimationFrame(raf); ro.disconnect(); } };
+    }
+
+    /* the break itself: a full-screen takeover on a timer. deliberately
+       not persisted — a reload is always a way out. */
+    let saverOn = false;
+    function startSaver(cfg) {
+      if (saverOn) return;
+      saverOn = true;
+      closeWins();
+      body.classList.remove('start-open', 'flyout-open');
+
+      const host = document.createElement('div');
+      host.className = 'saver';
+      host.setAttribute('role', 'dialog');
+      host.setAttribute('aria-label', 'Taking a break');
+      host.innerHTML =
+        '<canvas class="saver-canvas" aria-hidden="true"></canvas>' +
+        '<div class="saver-hud">' +
+          '<p class="saver-clock"></p>' +
+          '<p class="saver-note">back in a moment</p>' +
+          '<p class="saver-esc">press esc to come back early</p>' +
+        '</div>';
+      document.body.appendChild(host);
+      requestAnimationFrame(() => host.classList.add('on'));
+
+      const anim = runSaver(host.querySelector('.saver-canvas'), cfg);
+      const clockEl = host.querySelector('.saver-clock');
+      const hud = host.querySelector('.saver-hud');
+      const until = Date.now() + Math.max(1, cfg.minutes) * 60000;
+      let done = false;
+
+      const showLeft = () => {
+        const left = Math.max(0, until - Date.now());
+        const s = Math.ceil(left / 1000);
+        clockEl.textContent = Math.floor(s / 60) + ':' + pad(s % 60);
+        return left;
+      };
+      showLeft();
+
+      const drift = () => {
+        hud.style.left = rnd(26, 74) + '%';
+        hud.style.top  = rnd(26, 74) + '%';
+      };
+      const driftTimer = setInterval(drift, 15000);
+      setTimeout(drift, 1200);
+
+      const tick = setInterval(() => { if (showLeft() <= 0) end(); }, 250);
+
+      /* while the break runs, the desktop's own shortcuts stay out of it */
+      function swallow(e) {
+        e.stopPropagation();
+        if (e.type === 'keydown' && e.key === 'Escape') { e.preventDefault(); end(); return; }
+        if (e.type === 'contextmenu') e.preventDefault();
+      }
+      const GUARDED = ['keydown', 'keyup', 'keypress', 'contextmenu'];
+      GUARDED.forEach(t => addEventListener(t, swallow, true));
+
+      function end() {
+        if (done) return;
+        done = true;
+        clearInterval(tick);
+        clearInterval(driftTimer);
+        GUARDED.forEach(t => removeEventListener(t, swallow, true));
+        host.classList.add('done');
+        setTimeout(() => { anim.stop(); host.remove(); saverOn = false; }, 1700);
+      }
+    }
+
     function bmGlyph(url) {
       try { return new URL(url).hostname.replace(/^www\./, '')[0].toUpperCase(); }
       catch { return '?'; }
@@ -2213,8 +2635,9 @@
           el.innerHTML =
             '<p class="cd-num">--</p>' +
             '<p class="cd-until">days until</p>' +
-            '<input class="cd-label" maxlength="40" />' +
-            '<input class="cd-date" type="date" />';
+            '<input class="cd-label" maxlength="40" placeholder="something lovely" ' +
+              'aria-label="What you are counting down to" />' +
+            '<input class="cd-date" type="date" aria-label="Countdown date" />';
           const label = el.querySelector('.cd-label');
           const date = el.querySelector('.cd-date');
           label.value = w.data.label || '';
@@ -2455,7 +2878,8 @@
         build(el, w) {
           el.innerHTML =
             '<p class="dw-title">a little streak</p>' +
-            '<input class="hb-label" maxlength="30" placeholder="something small" />' +
+            '<input class="hb-label" maxlength="30" placeholder="something small" ' +
+              'aria-label="What you are tending" />' +
             '<p class="hb-streak-num"></p>' +
             '<p class="hb-streak-label">day streak</p>' +
             '<div class="hb-week"></div>' +
@@ -2492,6 +2916,64 @@
             dot.className = 'hb-dot' + (set.has(ymd(d)) ? ' on' : '') + (i === 0 ? ' today' : '');
             week.appendChild(dot);
           }
+        },
+      },
+      break: {
+        title: 'take a break', glyph: '&#9749;', desc: 'design a screensaver, then hide behind it',
+        group: 'tools',
+        data: () => ({ style: 'stars', palette: 'dusk', motion: 'easy', minutes: 5 }),
+        build(el, w) {
+          el.innerHTML =
+            '<p class="dw-title">take a break</p>' +
+            '<canvas class="tb-preview" aria-hidden="true"></canvas>' +
+            '<p class="tb-cap">visual</p><div class="tb-row" data-key="style"></div>' +
+            '<p class="tb-cap">colours</p><div class="tb-row" data-key="palette"></div>' +
+            '<p class="tb-cap">motion</p><div class="tb-row" data-key="motion"></div>' +
+            '<p class="tb-cap">for</p><div class="tb-row" data-key="minutes"></div>' +
+            '<button type="button" class="tb-go">start</button>';
+
+          const preview = () => {
+            if (el._preview) el._preview.stop();
+            el._preview = runSaver(el.querySelector('.tb-preview'), { ...w.data, preview: true });
+          };
+
+          /* one chip row builder for every setting — the options come from
+             the saver tables, so a new mode or palette shows up here free */
+          const row = (key, options, label, decorate) => {
+            const host = el.querySelector('[data-key="' + key + '"]');
+            options.forEach(value => {
+              const chip = document.createElement('button');
+              chip.type = 'button';
+              chip.className = decorate ? 'tb-sw' : 'tb-chip';
+              chip.dataset.value = value;
+              if (decorate) decorate(chip, value); else chip.textContent = label(value);
+              chip.setAttribute('aria-label', String(label(value)));
+              if (String(w.data[key]) === String(value)) chip.classList.add('on');
+              chip.addEventListener('click', () => {
+                w.data[key] = typeof w.data[key] === 'number' ? Number(value) : value;
+                saveWidgets();
+                host.querySelectorAll('.on').forEach(c => c.classList.remove('on'));
+                chip.classList.add('on');
+                preview();
+              });
+              host.appendChild(chip);
+            });
+          };
+
+          row('style', Object.keys(SAVER_STYLES), v => SAVER_STYLES[v]);
+          row('palette', Object.keys(SAVER_PALETTES), v => v, (chip, v) => {
+            const p = SAVER_PALETTES[v];
+            chip.style.background =
+              'linear-gradient(120deg, ' + p.bg + ' 0 18%, ' + p.ink.join(', ') + ')';
+          });
+          row('motion', Object.keys(SAVER_MOTION), v => v);
+          row('minutes', SAVER_MINUTES, v => v + 'm');
+
+          el.querySelector('.tb-go').addEventListener('click', () => startSaver({ ...w.data }));
+          preview();
+        },
+        destroy(el) {
+          if (el._preview) el._preview.stop();
         },
       },
     };
@@ -2814,8 +3296,11 @@
       });
       bar.addEventListener('pointermove', e => {
         if (!dragging) return;
-        win.style.left = (ox + e.clientX - sx) + 'px';
-        win.style.top  = (oy + e.clientY - sy) + 'px';
+        /* keep the whole window on screen, the way the widgets do */
+        const maxX = Math.max(8, innerWidth - win.offsetWidth - 8);
+        const maxY = Math.max(8, innerHeight - win.offsetHeight - 8);
+        win.style.left = Math.min(Math.max(ox + e.clientX - sx, 8), maxX) + 'px';
+        win.style.top  = Math.min(Math.max(oy + e.clientY - sy, 8), maxY) + 'px';
       });
       bar.addEventListener('pointerup', () => { dragging = false; });
     }
