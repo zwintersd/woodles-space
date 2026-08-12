@@ -608,7 +608,7 @@
       color: var(--bg);
     }
     /* take a break — a little screensaver designer */
-    .dw-break { width: 228px; }
+    .dw-break { width: 248px; }
     .tb-preview {
       display: block;
       width: 100%; height: 82px;
@@ -2671,12 +2671,21 @@
     /* five modes lifted straight from the display-properties dialog of
        about 1997. one renderer drives both the widget's little preview
        and the fullscreen break. */
+    /* Ordered roughly by temperament — cosmic, then abstract, then geometric,
+       then the silly ones. The widget's chip row is generated from these keys,
+       so a mode added here shows up in the designer with no other wiring. */
     const SAVER_STYLES = {
-      stars:   'starfield',
-      mystify: 'mystify',
-      bounce:  'bouncer',
-      pipes:   'pipes',
-      rain:    'code rain',
+      stars:     'starfield',
+      mystify:   'mystify',
+      ribbons:   'ribbons',
+      spiro:     'spirograph',
+      plasma:    'plasma',
+      bubbles:   'bubbles',
+      wireframe: 'wireframe',
+      pipes:     'pipes',
+      bounce:    'bouncer',
+      toasters:  'toasters',
+      rain:      'code rain',
     };
     const SAVER_PALETTES = {
       dusk:   { bg: '#141126', ink: ['#c9b6f5', '#9ad9e0', '#f5c3a8', '#d9b8ec', '#8f7fd4'] },
@@ -2685,8 +2694,10 @@
       sunset: { bg: '#1b0d18', ink: ['#ff9a5a', '#ff5f8f', '#c04ec2', '#ffd08a', '#7b3fa0'] },
       paper:  { bg: '#0d0d10', ink: ['#ffffff', '#cfcfd6', '#9a9aa6', '#e8e8ee', '#75757f'] },
     };
-    const SAVER_MOTION = { calm: 0.5, easy: 1, wild: 1.9 };
-    const SAVER_MINUTES = [1, 3, 5, 10, 20];
+    /* `drift` is slow enough to be scenery rather than something to watch,
+       which is the point of a break — every mode below has to hold up at it. */
+    const SAVER_MOTION = { drift: 0.22, calm: 0.5, easy: 1, wild: 1.9 };
+    const SAVER_MINUTES = [1, 3, 5, 10, 20, 30, 45, 60];
     const SAVER_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -2695,6 +2706,25 @@
     function withAlpha(hex, a) {
       const n = parseInt(hex.slice(1), 16);
       return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+    }
+    function rgbOf(hex) {
+      const n = parseInt(hex.slice(1), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+    /* 256 colours running bg → each ink → bg, for the modes that map a field
+       of numbers onto a palette rather than drawing shapes in it. */
+    function paletteRamp(pal) {
+      const stops = [rgbOf(pal.bg), ...pal.ink.map(rgbOf), rgbOf(pal.bg)];
+      const ramp = new Uint8Array(256 * 3);
+      for (let i = 0; i < 256; i++) {
+        const t = i / 255 * (stops.length - 1);
+        const a = stops[Math.floor(t)], b = stops[Math.min(stops.length - 1, Math.floor(t) + 1)];
+        const f = t - Math.floor(t);
+        ramp[i * 3]     = a[0] + (b[0] - a[0]) * f;
+        ramp[i * 3 + 1] = a[1] + (b[1] - a[1]) * f;
+        ramp[i * 3 + 2] = a[2] + (b[2] - a[2]) * f;
+      }
+      return ramp;
     }
 
     function runSaver(canvas, opts) {
@@ -2784,6 +2814,300 @@
             }
           };
         },
+        /* wide bands wandering the screen, laid down as quads between the
+           points of a smoothly turning path */
+        ribbons() {
+          const bands = [0, 1, 2].map(() => ({
+            x: rnd(0, w), y: rnd(0, h), a: rnd(0, Math.PI * 2), va: rnd(-0.02, 0.02),
+            pts: [], c: pick(pal.ink), phase: rnd(0, Math.PI * 2),
+          }));
+          const LEN = 46;
+          return () => {
+            ctx.fillStyle = withAlpha(pal.bg, 0.09);
+            ctx.fillRect(0, 0, w, h);
+            const reach = Math.min(w, h);
+            for (const band of bands) {
+              band.va += rnd(-0.005, 0.005);
+              band.va = Math.max(-0.032, Math.min(0.032, band.va));
+              band.a += band.va * speed;
+              band.phase += 0.02 * speed;
+              band.x += Math.cos(band.a) * 2.4 * speed;
+              band.y += Math.sin(band.a) * 2.4 * speed;
+              /* steer back rather than bounce — a ribbon shouldn't have corners */
+              if (band.x < 0 || band.x > w || band.y < 0 || band.y > h) {
+                band.a = Math.atan2(h / 2 - band.y, w / 2 - band.x);
+                band.x = Math.max(0, Math.min(w, band.x));
+                band.y = Math.max(0, Math.min(h, band.y));
+              }
+              band.pts.push({ x: band.x, y: band.y, wide: (0.55 + Math.sin(band.phase) * 0.45) * reach * 0.055 });
+              if (band.pts.length > LEN) band.pts.shift();
+              if (band.pts.length < 3) continue;
+              /* One closed polygon per band — down one edge and back along the
+                 other — rather than a quad per segment. Segment quads each need
+                 their own alpha to fade the tail, and abutting fills at
+                 different alphas leave visible seams that splay into spokes on
+                 a tight turn. The taper carries the tail instead. */
+              const edge = [], back = [];
+              for (let i = 0; i < band.pts.length; i++) {
+                const p = band.pts[i];
+                const prev = band.pts[Math.max(0, i - 1)];
+                const next = band.pts[Math.min(band.pts.length - 1, i + 1)];
+                const dx = next.x - prev.x, dy = next.y - prev.y;
+                const len = Math.hypot(dx, dy) || 1;
+                const nx = -dy / len, ny = dx / len;
+                const taper = Math.sin(Math.PI * (i / (band.pts.length - 1)) * 0.5 + 0.08) * p.wide;
+                edge.push([p.x + nx * taper, p.y + ny * taper]);
+                back.push([p.x - nx * taper, p.y - ny * taper]);
+              }
+              ctx.fillStyle = withAlpha(band.c, 0.34);
+              ctx.beginPath();
+              edge.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+              for (let i = back.length - 1; i >= 0; i--) ctx.lineTo(back[i][0], back[i][1]);
+              ctx.closePath();
+              ctx.fill();
+            }
+          };
+        },
+        /* a harmonograph: four decaying pendulums traced one segment at a
+           time, held until the figure closes, then wiped for a new one */
+        spiro() {
+          const fresh = () => ({
+            ax: rnd(1, 5), ay: rnd(1, 5), bx: rnd(1, 5), by: rnd(1, 5),
+            px: rnd(0, 6.28), py: rnd(0, 6.28),
+            decay: rnd(0.00016, 0.0006),
+            c: pick(pal.ink), c2: pick(pal.ink),
+          });
+          let fig = fresh(), t = 0, wash = 0, last = null;
+          ctx.fillStyle = pal.bg;
+          ctx.fillRect(0, 0, w, h);
+          return () => {
+            if (wash > 0) {
+              ctx.fillStyle = withAlpha(pal.bg, 0.05);
+              ctx.fillRect(0, 0, w, h);
+              if (--wash === 0) { fig = fresh(); t = 0; last = null; }
+              return;
+            }
+            const cx = w / 2, cy = h / 2, r = Math.min(w, h) * 0.36;
+            const steps = Math.max(1, Math.round(3 * speed + 0.5));
+            ctx.lineCap = 'round';
+            for (let s = 0; s < steps; s++) {
+              t += 0.05;
+              const fade = Math.exp(-fig.decay * t * 60);
+              if (fade < 0.06) { wash = 90; return; }
+              const x = cx + r * fade * (Math.sin(t * fig.ax + fig.px) + Math.sin(t * fig.bx) * 0.6);
+              const y = cy + r * fade * (Math.sin(t * fig.ay + fig.py) + Math.sin(t * fig.by) * 0.6);
+              if (last) {
+                const mix = (Math.sin(t * 0.04) + 1) / 2;
+                ctx.strokeStyle = withAlpha(mix > 0.5 ? fig.c : fig.c2, 0.5);
+                ctx.lineWidth = 1.1 * (scale < 1 ? 0.8 : 1);
+                ctx.beginPath();
+                ctx.moveTo(last.x, last.y);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+              }
+              last = { x, y };
+            }
+          };
+        },
+        /* demoscene plasma — summed sines on a small buffer, mapped through
+           the palette and blown up, which is how it was cheap in 1993 too */
+        plasma() {
+          const ramp = paletteRamp(pal);
+          const bw = Math.max(24, Math.round(96 * (scale < 1 ? 0.6 : 1)));
+          const bh = Math.max(16, Math.round(bw * h / Math.max(1, w)));
+          const buf = document.createElement('canvas');
+          buf.width = bw; buf.height = bh;
+          const bctx = buf.getContext('2d');
+          const img = bctx.createImageData(bw, bh);
+          let t = 0;
+          return () => {
+            t += 0.02 * speed;
+            const d = img.data;
+            for (let y = 0; y < bh; y++) {
+              for (let x = 0; x < bw; x++) {
+                const v =
+                  Math.sin(x * 0.09 + t) +
+                  Math.sin(y * 0.11 - t * 0.8) +
+                  Math.sin((x + y) * 0.06 + t * 1.3) +
+                  Math.sin(Math.hypot(x - bw / 2, y - bh / 2) * 0.09 - t * 1.1);
+                const i = ((v + 4) / 8 * 255) & 255;
+                const p = (y * bw + x) * 4;
+                d[p] = ramp[i * 3];
+                d[p + 1] = ramp[i * 3 + 1];
+                d[p + 2] = ramp[i * 3 + 2];
+                d[p + 3] = 255;
+              }
+            }
+            bctx.putImageData(img, 0, 0);
+            ctx.imageSmoothingEnabled = true;
+            ctx.drawImage(buf, 0, 0, w, h);
+          };
+        },
+        /* soft things rising, which is the whole brief */
+        bubbles() {
+          const n = Math.max(6, Math.round(w * h / 26000 * scale));
+          const reach = Math.min(w, h);
+          const spawn = (b, initial) => {
+            b.r = rnd(reach * 0.03, reach * 0.11);
+            b.x = rnd(0, w);
+            b.y = initial ? rnd(0, h) : h + b.r;
+            b.rise = rnd(0.25, 0.75);
+            b.sway = rnd(0.004, 0.014);
+            b.phase = rnd(0, Math.PI * 2);
+            b.c = pick(pal.ink);
+            return b;
+          };
+          const bubbles = Array.from({ length: n }, () => spawn({}, true));
+          return () => {
+            ctx.fillStyle = withAlpha(pal.bg, 0.22);
+            ctx.fillRect(0, 0, w, h);
+            for (const b of bubbles) {
+              b.y -= b.rise * speed;
+              b.phase += b.sway * speed;
+              if (b.y + b.r < 0) spawn(b, false);
+              const x = b.x + Math.sin(b.phase) * b.r * 0.6;
+              const g = ctx.createRadialGradient(
+                x - b.r * 0.35, b.y - b.r * 0.35, b.r * 0.05, x, b.y, b.r);
+              g.addColorStop(0, withAlpha('#ffffff', 0.5));
+              g.addColorStop(0.45, withAlpha(b.c, 0.24));
+              g.addColorStop(1, withAlpha(b.c, 0.03));
+              ctx.fillStyle = g;
+              ctx.beginPath(); ctx.arc(x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+              ctx.strokeStyle = withAlpha(b.c, 0.4);
+              ctx.lineWidth = 1;
+              ctx.stroke();
+            }
+          };
+        },
+        /* a cube turning on two axes, drawn in lines, as everything was */
+        wireframe() {
+          const V = [
+            [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
+            [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1],
+          ];
+          const E = [
+            [0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4],
+            [0, 4], [1, 5], [2, 6], [3, 7],
+          ];
+          let ax = 0, ay = 0;
+          return () => {
+            ctx.fillStyle = withAlpha(pal.bg, 0.3);
+            ctx.fillRect(0, 0, w, h);
+            ax += 0.009 * speed; ay += 0.013 * speed;
+            const cx = w / 2, cy = h / 2, r = Math.min(w, h) * 0.26;
+            const project = ([x, y, z]) => {
+              let a = y * Math.cos(ax) - z * Math.sin(ax);
+              let b = y * Math.sin(ax) + z * Math.cos(ax);
+              let c = x * Math.cos(ay) - b * Math.sin(ay);
+              b = x * Math.sin(ay) + b * Math.cos(ay);
+              const depth = 3.2 / (3.2 + b);
+              return { x: cx + c * r * depth, y: cy + a * r * depth, depth };
+            };
+            /* two nested cubes, counter-turned, because one was never enough */
+            [1, 0.55].forEach((size, layer) => {
+              const pts = V.map(v => project(v.map(n => n * size)));
+              ctx.lineCap = 'round';
+              E.forEach((edge, i) => {
+                const p = pts[edge[0]], q = pts[edge[1]];
+                ctx.strokeStyle = withAlpha(pal.ink[(i + layer * 2) % pal.ink.length],
+                  Math.min(1, (p.depth + q.depth) / 2 * 0.85));
+                ctx.lineWidth = (p.depth + q.depth) * (layer ? 0.8 : 1.4);
+                ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+              });
+            });
+          };
+        },
+        /* after dark, 1989, and still the correct answer */
+        toasters() {
+          const n = Math.max(3, Math.round(w * h / 120000 * scale * 3));
+          const reach = Math.min(w, h);
+          const spawn = (t, initial) => {
+            t.s = rnd(0.55, 1.15) * (reach / 620);
+            t.x = initial ? rnd(0, w) : rnd(w * 0.15, w * 1.35);
+            t.y = initial ? rnd(0, h) : rnd(-h * 0.5, h * 0.15);
+            t.toast = Math.random() < 0.34;
+            t.flap = rnd(0, Math.PI * 2);
+            t.c = pick(pal.ink);
+            return t;
+          };
+          const flock = Array.from({ length: n }, () => spawn({}, true));
+          const drawToaster = (t) => {
+            const s = t.s * 78;
+            ctx.save();
+            ctx.translate(t.x, t.y);
+            ctx.scale(s / 78, s / 78);
+            /* wings first, so the body sits over their roots */
+            const lift = Math.sin(t.flap) * 22;
+            [-1, 1].forEach(side => {
+              ctx.save();
+              ctx.translate(side * 24, -4);
+              ctx.rotate(side * (lift * Math.PI / 180));
+              ctx.fillStyle = withAlpha('#ffffff', 0.85);
+              ctx.strokeStyle = withAlpha(t.c, 0.9);
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.moveTo(0, 0);
+              ctx.quadraticCurveTo(side * 26, -20, side * 44, -4);
+              ctx.quadraticCurveTo(side * 26, 6, 0, 8);
+              ctx.closePath();
+              ctx.fill(); ctx.stroke();
+              ctx.restore();
+            });
+            ctx.fillStyle = t.c;
+            roundRect(-26, -18, 52, 38, 8);
+            ctx.fill();
+            ctx.fillStyle = withAlpha('#ffffff', 0.28);
+            roundRect(-26, -18, 52, 14, 8);
+            ctx.fill();
+            ctx.fillStyle = withAlpha('#000000', 0.45);
+            roundRect(-15, -13, 30, 5, 2.5);
+            ctx.fill();
+            ctx.fillStyle = withAlpha('#ffffff', 0.7);
+            roundRect(12, 4, 9, 4, 2);
+            ctx.fill();
+            ctx.restore();
+          };
+          const drawToast = (t) => {
+            const s = t.s * 78;
+            ctx.save();
+            ctx.translate(t.x, t.y);
+            ctx.scale(s / 78, s / 78);
+            ctx.fillStyle = withAlpha(t.c, 0.95);
+            ctx.beginPath();
+            ctx.moveTo(-18, 6);
+            ctx.lineTo(-18, -8);
+            ctx.quadraticCurveTo(-18, -20, -6, -20);
+            ctx.quadraticCurveTo(0, -26, 6, -20);
+            ctx.quadraticCurveTo(18, -20, 18, -8);
+            ctx.lineTo(18, 6);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = withAlpha('#ffffff', 0.3);
+            roundRect(-12, -10, 24, 10, 3);
+            ctx.fill();
+            ctx.restore();
+          };
+          function roundRect(x, y, rw, rh, r) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.arcTo(x + rw, y, x + rw, y + rh, r);
+            ctx.arcTo(x + rw, y + rh, x, y + rh, r);
+            ctx.arcTo(x, y + rh, x, y, r);
+            ctx.arcTo(x, y, x + rw, y, r);
+            ctx.closePath();
+          }
+          return () => {
+            ctx.fillStyle = pal.bg;
+            ctx.fillRect(0, 0, w, h);
+            for (const t of flock) {
+              t.x -= 1.5 * speed * t.s * (620 / reach);
+              t.y += 0.95 * speed * t.s * (620 / reach);
+              t.flap += 0.13 * speed;
+              if (t.x < -w * 0.2 || t.y > h * 1.2) spawn(t, false);
+              if (t.toast) drawToast(t); else drawToaster(t);
+            }
+          };
+        },
         /* the logo that never quite hits the corner */
         bounce() {
           const fs = Math.max(13, Math.min(w, h) * 0.13);
@@ -2817,7 +3141,7 @@
           const cell = Math.max(11, Math.min(w, h) / 13);
           let x = Math.round(w / 2 / cell) * cell;
           let y = Math.round(h / 2 / cell) * cell;
-          let dir = pick(SAVER_DIRS), color = pick(pal.ink), laid = 0, wash = 0;
+          let dir = pick(SAVER_DIRS), color = pick(pal.ink), laid = 0, wash = 0, carry = 0;
           const capacity = Math.round(w * h / (cell * cell) * 1.1);
           ctx.fillStyle = pal.bg;
           ctx.fillRect(0, 0, w, h);
@@ -2829,7 +3153,12 @@
               return;
             }
             ctx.lineCap = 'round';
-            for (let s = 0, steps = Math.max(1, Math.round(speed * 1.3)); s < steps; s++) {
+            /* Carried as a fraction rather than rounded up to a whole cell —
+               a floor of one cell per frame would ignore the slow tiers. */
+            carry += speed * 1.3;
+            const steps = Math.floor(carry);
+            carry -= steps;
+            for (let s = 0; s < steps; s++) {
               const nx = x + dir[0] * cell, ny = y + dir[1] * cell;
               const ox = -dir[1] * cell * 0.11, oy = dir[0] * cell * 0.11;
               ctx.strokeStyle = 'rgba(0,0,0,0.4)';
