@@ -364,6 +364,24 @@ function isLoggedSitting(value: unknown): value is LoggedSitting {
 	);
 }
 
+// ── landing → everyone: life points ────────────────────────────────────
+//
+// The one cross-app ledger deliberately *not* defined here, and the reason is
+// the same one that put the others here. Its writer is `apps/landing`, a
+// static page with no build step, which cannot import TypeScript — so a shape
+// defined in this file would leave the writer hand-rolling both the keys and
+// the earning formula, pinned by a test, which is the drift this file exists
+// to prevent. It lives in `@woodles/life-points` instead: plain browser-ready
+// `.js` with a `.d.ts` sidecar, imported unchanged by the static writer and by
+// every built reader.
+//
+// Both rules here still hold. Landing is the only writer of the earnings
+// ledger, and it publishes a projection of its own private wallet rather than
+// the wallet itself — a currency is authoritative, so it is split rather than
+// excepted. An app that wants to *spend* publishes its own spend ledger under
+// its own key, exactly as Carillon answers Thinking About's shelf, and the
+// balance is the difference. See that package's header.
+
 function isShelfEntry(value: unknown): value is ShelfEntry {
 	if (typeof value !== 'object' || value === null) return false;
 	const entry = value as Partial<ShelfEntry>;

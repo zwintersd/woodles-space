@@ -115,6 +115,7 @@ woodles.space/
 │   ├── app-manifest/        @woodles/app-manifest — canonical app and route inventory
 │   ├── handoff/             @woodles/handoff — passing a thought between apps
 │   ├── incremental-core/    @woodles/incremental-core — GameDef schema, validator, sim engine
+│   ├── life-points/         @woodles/life-points — the cross-app currency, earned by being away
 │   ├── persistence/         @woodles/persistence — versioned local storage mechanics
 │   ├── sync/                @woodles/sync — the sync client
 │   ├── spellcraft/          @woodles/spellcraft — the authoring brief + output contracts
@@ -1031,6 +1032,46 @@ goes **cold**: the arrival still shows the tasks and says so, because the words
 someone typed outlive the link.
 
 See [REFERENCES.md](./REFERENCES.md), whose steps 2–4 this is.
+
+**Landing publishes Life Points** — the first currency here, and the one
+ledger whose shapes live outside `crossAppBlobs.ts`. Minted by the landing
+page's screensaver: a break is time deliberately spent *away*, and Life Points
+are what that time is worth. One point per whole minute, plus half the planned
+length as a bonus for seeing a break through — the only lever that tells a
+break from an interruption. Nothing rewards using an app harder.
+
+It sits in **`@woodles/life-points`** rather than with the other ledgers for
+the reason that put them there. `apps/landing` is a static page with no build
+step and cannot import TypeScript, so a shape defined in `crossAppBlobs.ts`
+would leave the *writer* hand-rolling the keys and the earning formula, pinned
+by a test — the drift that file exists to prevent. Plain `.js` with a `.d.ts`
+sidecar, the shape `@woodles/spellcraft` documents for exactly this case, means
+the static writer and every built reader import one file and there is no second
+copy. A comment in `crossAppBlobs.ts` points at it.
+
+Both rules still hold, via a split. A currency is **authoritative** — throw it
+away and it is gone, so there is no source to rebuild it from, and "derived,
+never authoritative" would be a lie rather than an exception. So there are two
+stores: the **wallet** (`woodles-life-points`), landing's own private record of
+every break, which only landing touches; and the **ledger**
+(`landing.lifePoints.v1`, sync key `landing-life-points`), a narrow projection
+of it — totals, rank, the last twelve breaks — republished on every change and
+safe to throw away. Readers get the ledger.
+
+Minutes are credited **as they pass** rather than banked until the end: a
+browser that dies twenty minutes into a walk should not cost the walk. Only the
+completion bonus waits, because finishing is the only thing it is about. A
+running break is never persisted, so a reload ends it — and keeps the minutes
+already earned, which were genuinely spent.
+
+Spending inverts the same way Carillon answers the shelf: an app that spends
+does **not** write to landing's ledger, it publishes what it took under its own
+key (`lifePointsSpendApp('marginalia')` → `marginalia-life-spend`), and
+`lifePointsBalance` is the difference, floored at zero so a spend that reaches a
+device before the earnings cannot show a negative wallet. Nothing spends yet;
+the shape is settled because the one-writer rule decides it, and it is easier
+to decide once. The landing page reads the balance back through the same helper
+with an empty spender list, so the call site is already right.
 
 ### the public read path
 
