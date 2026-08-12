@@ -532,6 +532,81 @@
       transition: background 0.16s ease;
     }
     .bm-add-btn:hover { background: color-mix(in srgb, var(--accent) 55%, transparent); }
+    /* quote / passing-thought */
+    .dw-quote { width: 224px; }
+    .qt-text {
+      font-style: italic;
+      font-size: 1.05rem; line-height: 1.5;
+      color: var(--text);
+      margin-bottom: 0.7rem;
+    }
+    .qt-more {
+      width: 26px; height: 26px;
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--accent) 20%, transparent);
+      color: var(--accent-strong);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.16s ease, transform 0.3s ease;
+    }
+    .qt-more:hover { background: color-mix(in srgb, var(--accent) 34%, transparent); }
+    .qt-more:active { transform: rotate(-40deg); }
+    /* habit streak */
+    .dw-habit { width: 198px; text-align: center; }
+    .hb-label {
+      width: 100%;
+      border: none; background: transparent; outline: none;
+      text-align: center;
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-style: italic;
+      font-size: 1.05rem;
+      color: var(--accent-deep);
+      cursor: text;
+      margin-bottom: 0.5rem;
+    }
+    .hb-streak-num {
+      font-family: 'DM Mono', monospace;
+      font-size: 2.3rem; font-weight: 300;
+      color: var(--text); line-height: 1;
+    }
+    .hb-streak-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.54rem; letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0.2rem 0 0.7rem;
+    }
+    .hb-week {
+      display: flex; justify-content: center;
+      gap: 0.32rem;
+      margin-bottom: 0.7rem;
+    }
+    .hb-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: color-mix(in srgb, var(--text) 14%, transparent);
+      transition: background 0.16s ease;
+    }
+    .hb-dot.on { background: var(--accent-strong); }
+    .hb-dot.today { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-strong) 55%, transparent); }
+    .hb-toggle {
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--accent) 20%, transparent);
+      color: var(--accent-strong);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.58rem; letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.7rem;
+      cursor: pointer;
+      transition: background 0.16s ease;
+    }
+    .hb-toggle:hover { background: color-mix(in srgb, var(--accent) 34%, transparent); }
+    .hb-toggle.hb-toggle-on {
+      background: var(--accent-strong);
+      color: var(--bg);
+    }
     /* widget picker rows */
     .wt-glyph {
       width: 34px; height: 34px;
@@ -543,6 +618,14 @@
       border: 1px solid var(--rule);
       flex: none;
     }
+    .wt-group {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.54rem; letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 1rem 0 0.35rem;
+    }
+    .wt-group:first-child { margin-top: 0.1rem; }
 
     /* ─────────────────────────── taskbar ───────────────────────────── */
     .taskbar {
@@ -2002,6 +2085,40 @@
     try { widgets = JSON.parse(localStorage.getItem(WIDGETS_KEY)) || []; } catch {}
     function saveWidgets() { localStorage.setItem(WIDGETS_KEY, JSON.stringify(widgets)); }
     const widgetEls = {};
+    /* stacking order: whichever widget was touched last floats to the top */
+    let topZ = 3;
+    function raiseWidget(el) { el.style.zIndex = String(++topZ); }
+    const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    function dayOfYear(d) {
+      return Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 86400000);
+    }
+    const primeTimers = {};
+    const THOUGHTS = [
+      "small rooms hold big feelings.",
+      "not everything needs finishing today.",
+      "the soft part is still the point.",
+      "keep the good scissors for good things.",
+      "a made thing is a kept thought.",
+      "let the desktop be a little messy.",
+      "tend what is small before it needs saving.",
+      "quiet counts as making progress.",
+      "a field guide is just paying attention, written down.",
+      "some days the whole task is opening the window.",
+      "the moon does not rush the dark away.",
+      "save a little of today for later you.",
+      "a place kept close is still a place.",
+      "you are allowed to like small, useless things.",
+      "the first draft only has to exist.",
+      "nothing here is trying to be finished.",
+      "a witch's world still needs sweeping.",
+      "gentle counts. gentle always counted.",
+      "let today be a rough shape, not a plan.",
+      "good things get better once they are kept.",
+      "a creature you named is a creature you noticed.",
+      "the shelf can hold what you are not ready to sort.",
+      "soft, made things outlast sharp, bought ones.",
+      "you do not owe today a tidy ending.",
+    ];
 
     /* moon phase, computed locally from a known new moon */
     const SYNODIC = 29.530588853;
@@ -2037,7 +2154,7 @@
 
     const WTYPES = {
       sticky: {
-        title: 'sticky note', glyph: '&#10002;', desc: 'a little note to self',
+        title: 'sticky note', glyph: '&#10002;', desc: 'a little note to self', group: 'keeping',
         data: () => ({ text: '' }),
         build(el, w) {
           el.innerHTML = '<textarea placeholder="jot something&hellip;" maxlength="400"></textarea>';
@@ -2047,23 +2164,33 @@
         },
       },
       moon: {
-        title: 'the moon', glyph: '&#9789;', desc: 'tonight, computed right here',
+        title: 'the moon', glyph: '&#9789;', desc: 'tonight, computed right here', group: 'today',
         data: () => ({}),
         build(el) {
-          const m = moonInfo(Date.now());
           el.innerHTML =
-            '<svg class="moon-svg" viewBox="0 0 40 40" aria-hidden="true">' +
+            '<svg class="moon-svg" viewBox="0 0 40 40" aria-hidden="true"></svg>' +
+            '<p class="moon-name"></p>' +
+            '<p class="moon-illum"></p>';
+          this.refresh(el);
+        },
+        refresh(el) {
+          const m = moonInfo(Date.now());
+          el.querySelector('.moon-svg').innerHTML =
             '<circle class="moon-dark" cx="20" cy="20" r="17"/>' +
             (MOON_LIT[m.idx] ? '<path class="moon-lit" d="' + MOON_LIT[m.idx] + '"/>' : '') +
-            '<circle class="moon-ring" cx="20" cy="20" r="17"/></svg>' +
-            '<p class="moon-name">' + m.name + '</p>' +
-            '<p class="moon-illum">' + Math.round(m.illum * 100) + '% lit</p>';
+            '<circle class="moon-ring" cx="20" cy="20" r="17"/>';
+          el.querySelector('.moon-name').textContent = m.name;
+          el.querySelector('.moon-illum').textContent = Math.round(m.illum * 100) + '% lit';
         },
       },
       month: {
-        title: 'this month', glyph: '&#9638;', desc: 'the month at a glance',
+        title: 'this month', glyph: '&#9638;', desc: 'the month at a glance', group: 'today',
         data: () => ({}),
         build(el) {
+          el.innerHTML = '<p class="dw-title"></p><div class="mo-grid"></div>';
+          this.refresh(el);
+        },
+        refresh(el) {
           const now = new Date();
           const y = now.getFullYear(), mo = now.getMonth();
           const first = new Date(y, mo, 1).getDay();
@@ -2072,17 +2199,15 @@
           for (let i = 0; i < first; i++) cells += '<span></span>';
           for (let d = 1; d <= len; d++)
             cells += '<span class="mo-d' + (d === now.getDate() ? ' mo-today' : '') + '">' + d + '</span>';
-          el.innerHTML =
-            '<p class="dw-title">' + MONTHS[mo] + ' ' + y + '</p>' +
-            '<div class="mo-grid">' + cells + '</div>';
+          el.querySelector('.dw-title').textContent = MONTHS[mo] + ' ' + y;
+          el.querySelector('.mo-grid').innerHTML = cells;
         },
       },
       count: {
-        title: 'counting down', glyph: '&#8987;', desc: 'days until something lovely',
+        title: 'counting down', glyph: '&#8987;', desc: 'days until something lovely', group: 'today',
         data: () => {
           const d = new Date(Date.now() + 30 * 86400000);
-          return { label: 'something lovely',
-                   date: d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) };
+          return { label: 'something lovely', date: ymd(d) };
         },
         build(el, w) {
           el.innerHTML =
@@ -2110,7 +2235,7 @@
         },
       },
       primes: {
-        title: 'prime counter', glyph: '&#8473;', desc: 'a slow, steady count through the primes',
+        title: 'prime counter', glyph: '&#8473;', desc: 'a slow, steady count through the primes', group: 'tools',
         data: () => ({ n: 1, found: 0, lastPrime: null, recent: [], running: true }),
         build(el, w) {
           el.innerHTML =
@@ -2150,8 +2275,7 @@
 
           renderN(false); renderTrail(); renderFound(); renderToggle();
 
-          const timer = setInterval(() => {
-            if (!el.isConnected) { clearInterval(timer); return; }
+          primeTimers[w.id] = setInterval(() => {
             if (!w.data.running) return;
             w.data.n += 1;
             const prime = isPrime(w.data.n);
@@ -2172,9 +2296,13 @@
             saveWidgets();
           });
         },
+        destroy(el, w) {
+          clearInterval(primeTimers[w.id]);
+          delete primeTimers[w.id];
+        },
       },
       bookmarks: {
-        title: 'bookmarks', glyph: '&#128278;', desc: 'a search bar and your saved links',
+        title: 'bookmarks', glyph: '&#128278;', desc: 'a search bar and your saved links', group: 'tools',
         data: () => ({ links: [] }),
         build(el, w) {
           el.innerHTML =
@@ -2262,11 +2390,9 @@
           renderLinks();
           requestAnimationFrame(sizeList);
 
-          function onResize() {
-            if (!el.isConnected) { removeEventListener('resize', onResize); return; }
-            sizeList();
-          }
+          function onResize() { sizeList(); }
           addEventListener('resize', onResize);
+          el._onResize = onResize;
           el.addEventListener('pointerup', sizeList);
 
           list.addEventListener('click', e => {
@@ -2295,11 +2421,84 @@
             renderLinks();
           });
         },
+        destroy(el) {
+          if (el._onResize) removeEventListener('resize', el._onResize);
+        },
+      },
+      quote: {
+        title: 'a passing thought', glyph: '&#10077;', desc: 'a small line, new each day', group: 'keeping',
+        data: () => ({}),
+        build(el) {
+          el.innerHTML =
+            '<p class="dw-title">a passing thought</p>' +
+            '<p class="qt-text"></p>' +
+            '<button type="button" class="qt-more" title="another" aria-label="Another thought">&#8635;</button>';
+          el._qtIdx = dayOfYear(new Date()) % THOUGHTS.length;
+          const render = () => { el.querySelector('.qt-text').textContent = THOUGHTS[el._qtIdx]; };
+          render();
+          el.querySelector('.qt-more').addEventListener('click', () => {
+            let next;
+            do { next = Math.floor(Math.random() * THOUGHTS.length); }
+            while (next === el._qtIdx && THOUGHTS.length > 1);
+            el._qtIdx = next;
+            render();
+          });
+        },
+        refresh(el) {
+          el._qtIdx = dayOfYear(new Date()) % THOUGHTS.length;
+          el.querySelector('.qt-text').textContent = THOUGHTS[el._qtIdx];
+        },
+      },
+      habit: {
+        title: 'a little streak', glyph: '&#9752;', desc: 'a small habit, tended daily', group: 'keeping',
+        data: () => ({ label: 'something small', dates: [] }),
+        build(el, w) {
+          el.innerHTML =
+            '<p class="dw-title">a little streak</p>' +
+            '<input class="hb-label" maxlength="30" placeholder="something small" />' +
+            '<p class="hb-streak-num"></p>' +
+            '<p class="hb-streak-label">day streak</p>' +
+            '<div class="hb-week"></div>' +
+            '<button type="button" class="hb-toggle"></button>';
+          const label = el.querySelector('.hb-label');
+          label.value = w.data.label || '';
+          label.addEventListener('input', () => { w.data.label = label.value; saveWidgets(); });
+          el.querySelector('.hb-toggle').addEventListener('click', () => {
+            const key = ymd(new Date());
+            const i = w.data.dates.indexOf(key);
+            if (i === -1) w.data.dates.push(key); else w.data.dates.splice(i, 1);
+            saveWidgets();
+            this.refresh(el, w);
+          });
+          this.refresh(el, w);
+        },
+        refresh(el, w) {
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          const set = new Set(w.data.dates);
+          let streak = 0;
+          const cursor = new Date(today);
+          if (!set.has(ymd(cursor))) cursor.setDate(cursor.getDate() - 1);
+          while (set.has(ymd(cursor))) { streak++; cursor.setDate(cursor.getDate() - 1); }
+          el.querySelector('.hb-streak-num').textContent = streak;
+          const doneToday = set.has(ymd(today));
+          const btn = el.querySelector('.hb-toggle');
+          btn.textContent = doneToday ? 'done today' : 'mark today';
+          btn.classList.toggle('hb-toggle-on', doneToday);
+          const week = el.querySelector('.hb-week');
+          week.innerHTML = '';
+          for (let i = 6; i >= 0; i--) {
+            const d = new Date(today); d.setDate(d.getDate() - i);
+            const dot = document.createElement('span');
+            dot.className = 'hb-dot' + (set.has(ymd(d)) ? ' on' : '') + (i === 0 ? ' today' : '');
+            week.appendChild(dot);
+          }
+        },
       },
     };
 
     function makeWidgetElDraggable(el, w) {
       let sx, sy, ox, oy, active = false, moved = false;
+      el.addEventListener('pointerdown', () => raiseWidget(el));
       el.addEventListener('pointerdown', e => {
         if (e.button !== 0) return;
         if (e.target.closest('textarea, input, a, button')) return;
@@ -2326,9 +2525,16 @@
     }
 
     function removeWidget(id) {
+      const w = widgets.find(w => w.id === id);
       widgets = widgets.filter(w => w.id !== id);
       saveWidgets();
-      if (widgetEls[id]) { widgetEls[id].remove(); delete widgetEls[id]; }
+      const el = widgetEls[id];
+      if (el) {
+        const t = w && WTYPES[w.type];
+        if (t && t.destroy) t.destroy(el, w);
+        el.remove();
+        delete widgetEls[id];
+      }
     }
 
     function renderWidget(w) {
@@ -2339,6 +2545,7 @@
       el.dataset.wid = w.id;
       el.style.left = Math.min(Math.max(w.x, 8), Math.max(innerWidth - 200, 8)) + 'px';
       el.style.top  = Math.min(Math.max(w.y, 8), Math.max(innerHeight - 160, 8)) + 'px';
+      el.style.zIndex = String(++topZ);
       t.build(el, w);
       const x = document.createElement('button');
       x.className = 'dw-x';
@@ -2353,15 +2560,12 @@
     }
     widgets.forEach(renderWidget);
 
+    /* every widget type's own refresh() keeps it honest as days turn over;
+       no type-specific special-casing needed here */
     function refreshWidgets() {
       widgets.forEach(w => {
         const el = widgetEls[w.id], t = WTYPES[w.type];
-        if (!el || !t) return;
-        if (w.type === 'moon' || w.type === 'month') {
-          const x = el.querySelector('.dw-x');
-          t.build(el, w);
-          el.appendChild(x);
-        } else if (t.refresh) t.refresh(el, w);
+        if (el && t && t.refresh) t.refresh(el, w);
       });
     }
 
@@ -2388,20 +2592,34 @@
       if (d !== wDay) { wDay = d; refreshWidgets(); }
     }, 60000);
 
-    /* widget picker rows */
+    /* widget picker rows — grouped by the moment a widget is for, so the
+       list reads as a small shelf rather than a flat pile of options */
+    const WIDGET_GROUPS = [
+      { key: 'today', label: 'for today' },
+      { key: 'keeping', label: 'to keep' },
+      { key: 'tools', label: 'tools & links' },
+    ];
     const wtypeList = document.getElementById('wtype-list');
-    Object.keys(WTYPES).forEach(type => {
-      const t = WTYPES[type];
-      const el = document.createElement('button');
-      el.className = 'rec-item';
-      el.style.border = 'none';
-      el.style.background = 'transparent';
-      el.style.width = '100%';
-      el.innerHTML = '<span class="wt-glyph">' + t.glyph + '</span>' +
-        '<span class="rec-text"><span class="rec-name">' + t.title +
-        '</span><span class="rec-desc">' + t.desc + '</span></span>';
-      el.addEventListener('click', () => addWidget(type));
-      wtypeList.appendChild(el);
+    WIDGET_GROUPS.forEach(g => {
+      const types = Object.keys(WTYPES).filter(type => (WTYPES[type].group || 'keeping') === g.key);
+      if (!types.length) return;
+      const head = document.createElement('p');
+      head.className = 'wt-group';
+      head.textContent = g.label;
+      wtypeList.appendChild(head);
+      types.forEach(type => {
+        const t = WTYPES[type];
+        const el = document.createElement('button');
+        el.className = 'rec-item';
+        el.style.border = 'none';
+        el.style.background = 'transparent';
+        el.style.width = '100%';
+        el.innerHTML = '<span class="wt-glyph">' + t.glyph + '</span>' +
+          '<span class="rec-text"><span class="rec-name">' + t.title +
+          '</span><span class="rec-desc">' + t.desc + '</span></span>';
+        el.addEventListener('click', () => addWidget(type));
+        wtypeList.appendChild(el);
+      });
     });
 
     /* ── start menu toggle ─────────────────────────────────────────── */
