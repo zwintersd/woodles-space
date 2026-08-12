@@ -716,6 +716,42 @@
       margin-top: 0.8rem;
       text-shadow: 0 2px 14px rgba(0,0,0,0.8);
     }
+    /* points tick up as the minutes do — the reason to stay gone */
+    .saver-lp {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem; letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.62);
+      margin-top: 0.7rem;
+      text-shadow: 0 2px 16px rgba(0,0,0,0.8);
+    }
+    .saver-lp strong {
+      font-weight: 400;
+      font-size: 1.1rem;
+      color: rgba(255,255,255,0.95);
+    }
+    .saver-lp.lp-tick strong { animation: lp-tick 0.9s ease; }
+    @keyframes lp-tick {
+      0%   { transform: scale(1.35); color: #fff; text-shadow: 0 0 18px rgba(255,255,255,0.8); }
+      100% { transform: scale(1); }
+    }
+    /* the break widget's own wallet line */
+    .tb-wallet {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 0.4rem;
+      margin-bottom: 0.6rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--rule);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.54rem; letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    .tb-wallet b {
+      font-weight: 400;
+      font-size: 0.82rem;
+      color: var(--accent-strong);
+    }
+    .tb-earns { color: var(--accent-deep); }
     @media (prefers-reduced-motion: reduce) {
       .saver-hud { transition: none; }
     }
@@ -1021,6 +1057,121 @@
       border-top: 1px solid var(--rule);
     }
     .start-user { display: flex; align-items: center; gap: 0.6rem; }
+    .user-lines { display: flex; flex-direction: column; gap: 0.1rem; }
+    .user-rank {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.52rem; letter-spacing: 0.1em;
+      color: var(--muted);
+    }
+    /* the currency counter — a game HUD's worth of pride, in one chip */
+    .lp-chip {
+      display: flex; align-items: center; gap: 0.3rem;
+      height: 32px;
+      padding: 0 0.6rem;
+      margin-right: 0.15rem;
+      border: 1px solid var(--rule);
+      border-radius: 9px;
+      background: color-mix(in srgb, var(--accent) 22%, transparent);
+      cursor: pointer;
+      transition: background 0.16s ease, transform 0.12s ease;
+    }
+    .lp-chip:hover { background: color-mix(in srgb, var(--accent) 40%, transparent); }
+    .lp-chip:active { transform: scale(0.95); }
+    .lp-mark { font-size: 0.8rem; color: var(--accent-strong); line-height: 1; }
+    .lp-count {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      color: var(--text);
+    }
+    .lp-chip.lp-bump { animation: lp-bump 0.7s ease; }
+    @keyframes lp-bump {
+      0%   { transform: scale(1); }
+      35%  { transform: scale(1.18); background: color-mix(in srgb, var(--accent) 62%, transparent); }
+      100% { transform: scale(1); }
+    }
+
+    /* ───────────────────── profile window ──────────────────────────── */
+    .lp-body { display: flex; flex-direction: column; gap: 0.85rem; }
+    .lp-hero { text-align: center; }
+    .lp-big {
+      font-family: 'DM Mono', monospace;
+      font-size: 3.2rem; font-weight: 300;
+      color: var(--text); line-height: 1;
+    }
+    .lp-unit {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.54rem; letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 0.3rem;
+    }
+    .lp-rank {
+      font-size: 1.3rem; font-style: italic;
+      color: var(--accent-strong);
+      margin-top: 0.5rem;
+    }
+    .lp-track {
+      height: 6px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--text) 10%, transparent);
+      overflow: hidden;
+    }
+    .lp-fill {
+      display: block; height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--lavender), var(--accent-strong));
+      transition: width 0.5s cubic-bezier(.2,.9,.3,1);
+    }
+    .lp-next {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.54rem; letter-spacing: 0.08em;
+      color: var(--muted);
+      text-align: center;
+    }
+    .lp-stats {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 0.4rem;
+      padding: 0.8rem 0;
+      border-top: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+    }
+    .lp-stat { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; }
+    .lp-stat-n {
+      font-family: 'DM Mono', monospace;
+      font-size: 1.35rem; font-weight: 300;
+      color: var(--accent-deep); line-height: 1;
+    }
+    .lp-stat-l {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.48rem; letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-align: center;
+    }
+    .lp-recent { display: flex; flex-direction: column; gap: 0.15rem; }
+    .lp-row {
+      display: flex; align-items: baseline; gap: 0.6rem;
+      padding: 0.3rem 0.1rem;
+    }
+    .lp-row-date {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.55rem; letter-spacing: 0.06em;
+      color: var(--muted);
+      flex: none;
+    }
+    .lp-row-what { flex: 1 1 auto; font-size: 0.95rem; color: var(--text); }
+    .lp-row-pts {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem;
+      color: var(--accent-strong);
+      flex: none;
+    }
+    .lp-row-cut { color: var(--muted); font-style: italic; }
+    .lp-empty {
+      font-style: italic; font-size: 0.95rem;
+      color: var(--muted);
+      padding: 0.2rem 0.1rem;
+    }
     .user-pic {
       width: 30px; height: 30px; border-radius: 50%;
       background: conic-gradient(from 90deg, var(--lilac), var(--peach), var(--aqua), var(--lilac));
@@ -1576,9 +1727,15 @@
     <div class="start-foot">
       <div class="start-user" id="start-user" title="personalize" role="button" tabindex="0">
         <div class="user-pic" id="user-pic">u</div>
-        <span class="user-name" id="user-name">user</span>
+        <div class="user-lines">
+          <span class="user-name" id="user-name">user</span>
+          <span class="user-rank" id="user-rank">newly here</span>
+        </div>
       </div>
       <div class="start-actions">
+        <button class="lp-chip" id="lp-chip" title="life points">
+          <span class="lp-mark">&#9752;</span><span class="lp-count" id="lp-count">0</span>
+        </button>
         <button class="start-power" id="pers-btn" title="personalize">&#10024;</button>
         <button class="start-power" id="about-btn" title="about">&#9432;</button>
       </div>
@@ -1701,6 +1858,32 @@
     </div>
   </div>
 
+  <!-- profile window — life points, and what they were spent being -->
+  <div class="window" id="lpwin" role="dialog" aria-label="Life Points">
+    <div class="titlebar" id="lp-titlebar">
+      <span class="title">life points &mdash; woodles.space</span>
+      <button class="win-close" id="lp-close" aria-label="Close">&#10005;</button>
+    </div>
+    <div class="win-body lp-body">
+      <div class="lp-hero">
+        <p class="lp-big" id="lp-big">0</p>
+        <p class="lp-unit">life points</p>
+        <p class="lp-rank" id="lp-rank">newly here</p>
+      </div>
+      <div class="lp-track" aria-hidden="true"><span class="lp-fill" id="lp-fill"></span></div>
+      <p class="lp-next" id="lp-next"></p>
+      <div class="lp-stats">
+        <div class="lp-stat"><span class="lp-stat-n" id="lp-minutes">0</span><span class="lp-stat-l">minutes away</span></div>
+        <div class="lp-stat"><span class="lp-stat-n" id="lp-breaks">0</span><span class="lp-stat-l">breaks taken</span></div>
+        <div class="lp-stat"><span class="lp-stat-n" id="lp-longest">0</span><span class="lp-stat-l">longest, min</span></div>
+      </div>
+      <p class="pers-label">lately</p>
+      <div class="lp-recent" id="lp-recent"></div>
+      <p class="pers-hint">earned by stepping away — take a break from the widget
+        shelf, and every whole minute elsewhere pays one.</p>
+    </div>
+  </div>
+
   <!-- launch overlay -->
   <div class="launch" id="launch">
     <div class="launch-card">
@@ -1717,6 +1900,20 @@
       landingApps as apps,
       landingAppsByBand,
     } from '/packages/app-manifest/src/index.js';
+    import {
+      LIFE_POINTS_APP,
+      LIFE_POINTS_STORAGE_KEY,
+      LIFE_POINTS_WALLET_KEY,
+      POINTS_PER_MINUTE,
+      WALLET_HISTORY,
+      completionBonus,
+      lifePointsBalance,
+      nextRankFor,
+      publishLifePoints,
+      rankFor,
+      readLifePointsBlob,
+      wholeMinutes,
+    } from '/packages/life-points/src/index.js';
 
     /* ── app catalogue ─────────────────────────────────────────────── */
     /* Tile copy, ordering, routes, maturity, and default pins come from the
@@ -2267,6 +2464,209 @@
       return { illum, idx, name: MOON_NAMES[idx] };
     }
 
+    /* ── life points ───────────────────────────────────────────────── */
+    /* The currency the screensaver mints. Two stores, because a wallet has no
+       richer thing behind it to be rebuilt from:
+
+         • the wallet — landing's own authoritative store, every break ever
+         • the ledger — a narrow projection of it, republished on change,
+           which is what other apps read
+
+       Keys, shapes and the economy live in @woodles/life-points rather than
+       here, so this static page and every built reader import one file and
+       cannot drift. That package's header explains why it isn't in
+       crossAppBlobs.ts with the other ledgers. */
+    const PASSPHRASE_KEY = 'woodles_sync_passphrase';
+    const LP_VERSION_KEY = 'woodles_sync_version_' + LIFE_POINTS_APP;
+
+    let wallet = loadWallet();
+
+    function loadWallet() {
+      const blank = { earned: 0, minutes: 0, breaks: 0, longest: 0, history: [] };
+      try {
+        const raw = JSON.parse(localStorage.getItem(LIFE_POINTS_WALLET_KEY) || 'null');
+        if (!raw || typeof raw !== 'object') return blank;
+        const whole = n => (typeof n === 'number' && isFinite(n) && n > 0 ? Math.floor(n) : 0);
+        return {
+          earned: whole(raw.earned),
+          minutes: whole(raw.minutes),
+          breaks: whole(raw.breaks),
+          longest: whole(raw.longest),
+          history: Array.isArray(raw.history) ? raw.history.slice(0, WALLET_HISTORY) : [],
+        };
+      } catch { return blank; }
+    }
+
+    function saveWallet() {
+      try { localStorage.setItem(LIFE_POINTS_WALLET_KEY, JSON.stringify(wallet)); } catch {}
+      const ledger = publishLifePoints(wallet, new Date().toISOString());
+      /* The mirror is the surface that matters today: every app here is the
+         same origin, so a reader gets this synchronously with no network. */
+      try { localStorage.setItem(LIFE_POINTS_STORAGE_KEY, JSON.stringify(ledger)); } catch {}
+      pushLedger(ledger);
+      paintLifePoints();
+    }
+
+    /* Best-effort publish to the sync spine, so the wallet reaches a device
+       where the landing page has never been opened. Hand-rolled because this
+       page has no build step and cannot import @woodles/sync — the same
+       compromise apps/letter makes, with the same compare-and-swap and single
+       retry createLedgerPublisher uses. Never throws: a failed publish costs
+       another device a stale view, and must not disturb the break. */
+    let lpPushing = false, lpPushed = '';
+    async function pushLedger(ledger) {
+      const body = JSON.stringify(ledger.recent) + ledger.earned;
+      if (lpPushing || body === lpPushed) return;
+      let pass = null;
+      try { pass = localStorage.getItem(PASSPHRASE_KEY); } catch {}
+      if (!pass) return;                 /* this device was never connected */
+      lpPushing = true;
+      try {
+        const send = async version => fetch('/api/sync', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: 'Bearer ' + pass },
+          body: JSON.stringify({ app: LIFE_POINTS_APP, blob: ledger, baseVersion: version }),
+        });
+        let base = 0;
+        try { base = Number(localStorage.getItem(LP_VERSION_KEY) || '0') || 0; } catch {}
+        let res = await send(base);
+        if (res.status === 409) {
+          /* The server moved under us. This is a fresh derivation of this
+             device's wallet, so re-push it against what the server reports
+             rather than merging — there is nothing here a person typed. */
+          const conflict = await res.json().catch(() => null);
+          const seen = Number(conflict && conflict.server && conflict.server.version) || 0;
+          res = await send(seen);
+        }
+        if (res.ok) {
+          const data = await res.json().catch(() => null);
+          if (data && typeof data.version === 'number') {
+            try { localStorage.setItem(LP_VERSION_KEY, String(data.version)); } catch {}
+          }
+          lpPushed = body;
+        }
+      } catch {
+        /* offline, unauthorised, or no sync configured — the mirror stands */
+      } finally {
+        lpPushing = false;
+      }
+    }
+
+    const lifeLedger = () => publishLifePoints(wallet, '');
+    /* No app spends yet. Calling through the helper anyway keeps the call site
+       correct for the day one does — it takes the spenders' own ledgers. */
+    const lifeBalance = () => lifePointsBalance(lifeLedger(), []);
+
+    /* Minutes are credited as they pass, not banked until the end: a browser
+       that dies twenty minutes into a walk should not cost the walk. The
+       completion bonus is the only part that waits, because finishing is the
+       only thing it is about. */
+    function creditMinutes(minutes) {
+      if (minutes <= 0) return 0;
+      const points = minutes * POINTS_PER_MINUTE;
+      wallet.earned += points;
+      wallet.minutes += minutes;
+      saveWallet();
+      return points;
+    }
+
+    /* Everything on screen that shows a balance, repainted from one place. */
+    let lpShown = null;
+    function paintLifePoints() {
+      const ledger = lifeLedger();
+      const balance = lifeBalance();
+      const rank = rankFor(ledger.earned);
+      const next = nextRankFor(ledger.earned);
+      const put = (id, text) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+      };
+      put('lp-count', balance);
+      put('user-rank', rank.name);
+      put('lp-big', balance);
+      put('lp-rank', rank.name);
+      put('lp-minutes', ledger.minutes);
+      put('lp-breaks', ledger.breaks);
+      put('lp-longest', ledger.longest);
+
+      const fill = document.getElementById('lp-fill');
+      if (fill && next) {
+        const span = next.at - rank.at;
+        const into = ledger.earned - rank.at;
+        fill.style.width = Math.max(2, Math.min(100, Math.round(into / span * 100))) + '%';
+        put('lp-next', (next.at - ledger.earned) + ' more to ' + next.name);
+      } else if (fill) {
+        fill.style.width = '100%';
+        put('lp-next', 'the top of the ladder');
+      }
+
+      const recent = document.getElementById('lp-recent');
+      if (recent) {
+        recent.innerHTML = '';
+        if (!ledger.recent.length) {
+          const empty = document.createElement('p');
+          empty.className = 'lp-empty';
+          empty.textContent = 'no time away yet';
+          recent.appendChild(empty);
+        }
+        ledger.recent.forEach(entry => {
+          const row = document.createElement('div');
+          row.className = 'lp-row';
+          const date = document.createElement('span');
+          date.className = 'lp-row-date';
+          date.textContent = entry.date.slice(5);
+          const what = document.createElement('span');
+          what.className = 'lp-row-what' + (entry.completed ? '' : ' lp-row-cut');
+          what.textContent = entry.minutes + ' min · ' +
+            ((typeof SAVER_STYLES !== 'undefined' && SAVER_STYLES[entry.style]) || entry.style) +
+            (entry.completed ? '' : ' (cut short)');
+          const pts = document.createElement('span');
+          pts.className = 'lp-row-pts';
+          pts.textContent = '+' + entry.points;
+          row.append(date, what, pts);
+          recent.appendChild(row);
+        });
+      }
+
+      /* Each break widget shows the wallet and what its current setting pays. */
+      document.querySelectorAll('.dw-break').forEach(el => {
+        const line = el.querySelector('.tb-wallet');
+        if (!line) return;
+        const chosen = el.querySelector('[data-key="minutes"] .on');
+        const mins = Number(chosen && chosen.dataset.value) || 0;
+        line.innerHTML = '<span><b>' + balance + '</b> life points</span>' +
+          '<span class="tb-earns">this pays ' +
+          (mins * POINTS_PER_MINUTE + completionBonus(mins)) + '</span>';
+      });
+
+      const chip = document.getElementById('lp-chip');
+      if (chip && lpShown !== null && balance !== lpShown) {
+        chip.classList.remove('lp-bump');
+        void chip.offsetWidth;
+        chip.classList.add('lp-bump');
+      }
+      lpShown = balance;
+    }
+
+    function finishBreak({ minutes, planned, completed, style }) {
+      const bonus = completed ? completionBonus(planned) : 0;
+      wallet.earned += bonus;
+      if (minutes > 0) {
+        wallet.breaks += 1;
+        wallet.longest = Math.max(wallet.longest, minutes);
+        wallet.history.unshift({
+          date: ymd(new Date()),
+          minutes,
+          points: minutes * POINTS_PER_MINUTE + bonus,
+          completed,
+          style,
+        });
+        wallet.history = wallet.history.slice(0, WALLET_HISTORY);
+      }
+      saveWallet();
+      return bonus;
+    }
+
     /* ── screensaver engine ────────────────────────────────────────── */
     /* five modes lifted straight from the display-properties dialog of
        about 1997. one renderer drives both the widget's little preview
@@ -2517,6 +2917,7 @@
         '<div class="saver-hud">' +
           '<p class="saver-clock"></p>' +
           '<p class="saver-note">back in a moment</p>' +
+          '<p class="saver-lp"><strong>0</strong> life points</p>' +
           '<p class="saver-esc">press esc to come back early</p>' +
         '</div>';
       document.body.appendChild(host);
@@ -2525,8 +2926,23 @@
       const anim = runSaver(host.querySelector('.saver-canvas'), cfg);
       const clockEl = host.querySelector('.saver-clock');
       const hud = host.querySelector('.saver-hud');
-      const until = Date.now() + Math.max(1, cfg.minutes) * 60000;
-      let done = false;
+      const lpEl = host.querySelector('.saver-lp');
+      const planned = Math.max(1, cfg.minutes);
+      const startedAt = Date.now();
+      const until = startedAt + planned * 60000;
+      let done = false, paid = 0;
+
+      /* Whole minutes away, credited the moment each one completes. */
+      const accrue = () => {
+        const minutes = wholeMinutes(Date.now() - startedAt);
+        if (minutes <= paid) return;
+        creditMinutes(minutes - paid);
+        paid = minutes;
+        lpEl.innerHTML = '<strong>' + (paid * POINTS_PER_MINUTE) + '</strong> life points';
+        lpEl.classList.remove('lp-tick');
+        void lpEl.offsetWidth;
+        lpEl.classList.add('lp-tick');
+      };
 
       const showLeft = () => {
         const left = Math.max(0, until - Date.now());
@@ -2543,23 +2959,35 @@
       const driftTimer = setInterval(drift, 15000);
       setTimeout(drift, 1200);
 
-      const tick = setInterval(() => { if (showLeft() <= 0) end(); }, 250);
+      const tick = setInterval(() => {
+        accrue();
+        if (showLeft() <= 0) end(true);
+      }, 250);
 
       /* while the break runs, the desktop's own shortcuts stay out of it */
       function swallow(e) {
         e.stopPropagation();
-        if (e.type === 'keydown' && e.key === 'Escape') { e.preventDefault(); end(); return; }
+        if (e.type === 'keydown' && e.key === 'Escape') { e.preventDefault(); end(false); return; }
         if (e.type === 'contextmenu') e.preventDefault();
       }
       const GUARDED = ['keydown', 'keyup', 'keypress', 'contextmenu'];
       GUARDED.forEach(t => addEventListener(t, swallow, true));
 
-      function end() {
+      function end(completed) {
         if (done) return;
         done = true;
         clearInterval(tick);
         clearInterval(driftTimer);
         GUARDED.forEach(t => removeEventListener(t, swallow, true));
+        accrue();
+        const bonus = finishBreak({
+          minutes: paid, planned, completed, style: cfg.style,
+        });
+        /* The last thing shown on the way out is what the time was worth. */
+        const total = paid * POINTS_PER_MINUTE + bonus;
+        lpEl.innerHTML = total
+          ? '<strong>+' + total + '</strong> life points' + (bonus ? ' &middot; finished' : '')
+          : 'no minutes to show for it';
         host.classList.add('done');
         setTimeout(() => { anim.stop(); host.remove(); saverOn = false; }, 1700);
       }
@@ -2925,6 +3353,7 @@
         build(el, w) {
           el.innerHTML =
             '<p class="dw-title">take a break</p>' +
+            '<p class="tb-wallet"></p>' +
             '<canvas class="tb-preview" aria-hidden="true"></canvas>' +
             '<p class="tb-cap">visual</p><div class="tb-row" data-key="style"></div>' +
             '<p class="tb-cap">colours</p><div class="tb-row" data-key="palette"></div>' +
@@ -2955,6 +3384,7 @@
                 host.querySelectorAll('.on').forEach(c => c.classList.remove('on'));
                 chip.classList.add('on');
                 preview();
+                paintLifePoints();       /* a longer break pays more — say so */
               });
               host.appendChild(chip);
             });
@@ -2971,6 +3401,9 @@
 
           el.querySelector('.tb-go').addEventListener('click', () => startSaver({ ...w.data }));
           preview();
+          /* build() runs before renderWidget inserts the element, and the
+             repaint walks the document — so it has to wait for the insert. */
+          requestAnimationFrame(paintLifePoints);
         },
         destroy(el) {
           if (el._preview) el._preview.stop();
@@ -3245,6 +3678,7 @@
       about:   document.getElementById('window'),
       pers:    document.getElementById('pwin'),
       widgets: document.getElementById('wwin'),
+      profile: document.getElementById('lpwin'),
     };
     function openWin(key) {
       closeAll('win');
@@ -3267,6 +3701,11 @@
     document.getElementById('win-close').addEventListener('click', closeWins);
     document.getElementById('p-close').addEventListener('click', closeWins);
     document.getElementById('w-close').addEventListener('click', closeWins);
+    document.getElementById('lp-close').addEventListener('click', closeWins);
+    document.getElementById('lp-chip').addEventListener('click', e => {
+      e.stopPropagation();
+      openWin('profile');
+    });
     document.getElementById('scrim').addEventListener('click', closeWins);
     document.getElementById('start-user').addEventListener('click', e => {
       e.stopPropagation(); openPers();
@@ -3307,8 +3746,10 @@
     makeWindowDraggable(WINDOWS.about,   document.getElementById('titlebar'));
     makeWindowDraggable(WINDOWS.pers,    document.getElementById('p-titlebar'));
     makeWindowDraggable(WINDOWS.widgets, document.getElementById('w-titlebar'));
+    makeWindowDraggable(WINDOWS.profile, document.getElementById('lp-titlebar'));
     WINDOWS.pers.addEventListener('click', e => e.stopPropagation());
     WINDOWS.widgets.addEventListener('click', e => e.stopPropagation());
+    WINDOWS.profile.addEventListener('click', e => e.stopPropagation());
 
     /* ── personalize controls ──────────────────────────────────────── */
     document.getElementById('p-name').addEventListener('input', e => {
@@ -3386,6 +3827,8 @@
         e.preventDefault(); setStart(true);
       }
     });
+
+    paintLifePoints();
 
     /* ── sparkles ──────────────────────────────────────────────────── */
     const SPARKS = 7;
