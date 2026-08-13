@@ -225,8 +225,10 @@
 
 	let draftsList = $state<DraftIndexItem[]>([]);
 	let currentDraftId = $state<string | null>(null);
-	// Announced once when a draft arrived here from another app.
-	let handoffNotice = $state('');
+	// A transient confirmation pill — announced once when a draft arrived here
+	// from another app, or after "save & close" tucks the current one away.
+	let notice = $state('');
+	let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 	let draftsOpen = $state(false);
 	let promptOpen = $state(false);
 	// Recomputed only when the index itself changes — both walk every draft's
@@ -475,7 +477,7 @@
 					: `opened the newest of ${boot.handoffs} things sent here — the rest are in drafts`
 			);
 		}
-		if (notices.length > 0) handoffNotice = notices.join(' · ');
+		if (notices.length > 0) notice = notices.join(' · ');
 
 		if (boot.body) {
 			try {
@@ -523,6 +525,7 @@
 			document.removeEventListener('selectionchange', onSelectionChange);
 		}
 		wrapObserver?.disconnect();
+		clearTimeout(noticeTimer);
 	});
 
 	function onResize() {
@@ -820,6 +823,26 @@
 		draftsList = [{ id, title: '', updatedAt: now }, ...draftsList];
 		writeIndex(draftsList);
 		loadDraft(id);
+	}
+
+	// The explicit "tuck this away and start fresh" gesture. loadDraft() (via
+	// newDraft() below) already flushes the current draft's body to storage
+	// before switching — but only scheduleSave's debounce keeps the drafts
+	// *index* entry (title, kind, tags) in step with what's on the page, so a
+	// close that lands inside that 700ms window needs its own flush of the
+	// index too, or the drafts list would show the title as it was a moment ago.
+	function saveAndClose() {
+		if (currentDraftId) {
+			const now = new Date().toISOString();
+			draftsList = upsertIndex(draftsList, currentDraftId, title, now, { kind, tags });
+			writeIndex(draftsList);
+		}
+		newDraft();
+		notice = 'tucked away in drafts — here’s a new page';
+		clearTimeout(noticeTimer);
+		noticeTimer = setTimeout(() => {
+			notice = '';
+		}, 3200);
 	}
 
 	// A model's answer, appended to whatever is already in the foreground —
@@ -1339,6 +1362,7 @@
 	bind:promptOpen
 	{isListKind}
 	onLayerChange={setActiveLayer}
+	onSaveAndClose={saveAndClose}
 />
 
 <DraftsModal
@@ -1375,10 +1399,10 @@
 
 <PublishOverlay status={publishStatus} errorMessage={publishErrorMessage} />
 
-{#if handoffNotice}
+{#if notice}
 	<p class="handoff-notice" aria-live="polite">
-		{handoffNotice}
-		<button type="button" onclick={() => (handoffNotice = '')} aria-label="dismiss">×</button>
+		{notice}
+		<button type="button" onclick={() => (notice = '')} aria-label="dismiss">×</button>
 	</p>
 {/if}
 
