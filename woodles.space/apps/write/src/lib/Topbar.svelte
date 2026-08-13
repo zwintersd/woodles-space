@@ -16,7 +16,8 @@
 		syncConnected,
 		promptOpen = $bindable(),
 		isListKind = false,
-		onLayerChange
+		onLayerChange,
+		onSaveAndClose
 	}: {
 		activeLayer: LayerId;
 		layerIds: readonly LayerId[];
@@ -32,6 +33,8 @@
 		/** Liquid replaces the page/spread layers wholesale — neither switch applies. */
 		isListKind?: boolean;
 		onLayerChange: (id: LayerId) => void;
+		/** Flushes the current draft to storage and opens a fresh blank page. */
+		onSaveAndClose: () => void;
 	} = $props();
 </script>
 
@@ -98,6 +101,13 @@
 		title="draft it with a prompt"
 	>
 		✦ prompt
+	</button>
+	<button
+		class="save-close-btn"
+		onclick={onSaveAndClose}
+		title="save this draft and start a new page"
+	>
+		save &amp; close
 	</button>
 	<span class="topbar-divider" aria-hidden="true"></span>
 	<button
@@ -355,4 +365,18 @@
 		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 		transform: translateY(-1px);
 	}
+	.save-close-btn {
+		font-family: var(--editor-mono, var(--font-mono));
+		font-size: 0.57rem; letter-spacing: 0.14em; text-transform: lowercase;
+		color: var(--muted); background: none; border: 1px solid var(--rule);
+		padding: 3px 9px; border-radius: 4px; cursor: pointer; opacity: 0.65;
+		position: relative; z-index: 1; margin-left: 0.6rem;
+		transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+	}
+	.save-close-btn:hover {
+		opacity: 1; color: var(--accent-strong);
+		background: color-mix(in srgb, var(--accent) 16%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+	}
+	.save-close-btn:active { transform: translateY(1px); }
 </style>
