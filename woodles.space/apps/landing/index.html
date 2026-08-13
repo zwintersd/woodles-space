@@ -442,6 +442,20 @@
       transition: background 0.16s ease;
     }
     .pc-toggle:hover { background: color-mix(in srgb, var(--accent) 34%, transparent); }
+    .pc-controls { display: flex; justify-content: center; gap: 0.4rem; }
+    .pc-restart {
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.58rem; letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.7rem;
+      cursor: pointer;
+      transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+    }
+    .pc-restart:hover { border-color: #e8859a; color: #e8859a; }
     .pc-game-trail { min-height: 1.8rem; }
     .pc-prompt {
       font-family: 'Cormorant Garamond', Georgia, serif;
@@ -3506,7 +3520,10 @@
               '<p class="pc-n"></p>' +
               '<div class="pc-trail"></div>' +
               '<p class="pc-found"></p>' +
-              '<button type="button" class="pc-toggle"></button>' +
+              '<div class="pc-controls">' +
+                '<button type="button" class="pc-toggle"></button>' +
+                '<button type="button" class="pc-restart">restart</button>' +
+              '</div>' +
             '</div>' +
             '<div class="pc-game">' +
               '<div class="pc-trail pc-game-trail"></div>' +
@@ -3522,6 +3539,7 @@
           const trail = el.querySelector('.pc-ambient .pc-trail');
           const foundEl = el.querySelector('.pc-found');
           const toggle = el.querySelector('.pc-toggle');
+          const restart = el.querySelector('.pc-restart');
           const modeBtns = el.querySelectorAll('.pc-mode-btn');
           const ambientView = el.querySelector('.pc-ambient');
           const gameView = el.querySelector('.pc-game');
@@ -3613,6 +3631,15 @@
           toggle.addEventListener('click', () => {
             w.data.running = !w.data.running;
             renderToggle();
+            saveWidgets();
+          });
+
+          restart.addEventListener('click', () => {
+            w.data.n = 1;
+            w.data.found = 0;
+            w.data.lastPrime = null;
+            w.data.recent = [];
+            renderN(false); renderTrail(); renderFound();
             saveWidgets();
           });
 
