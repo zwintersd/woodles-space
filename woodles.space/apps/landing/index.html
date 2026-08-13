@@ -373,8 +373,28 @@
       color-scheme: inherit;
       cursor: text;
     }
-    /* prime counter — a slow, steady tick through the integers */
-    .dw-primes { width: 202px; text-align: center; }
+    /* prime counter — a slow, steady tick through the integers, or a recitation game */
+    .dw-primes { width: 212px; text-align: center; }
+    .pc-modes { display: flex; justify-content: center; gap: 0.3rem; margin-bottom: 0.6rem; }
+    .pc-mode-btn {
+      border: 1px solid var(--rule);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.5rem; letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.22rem 0.6rem;
+      cursor: pointer;
+      transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+    }
+    .pc-mode-btn:hover { border-color: var(--accent-strong); color: var(--text); }
+    .pc-mode-btn.pc-mode-active {
+      background: color-mix(in srgb, var(--accent) 30%, transparent);
+      border-color: var(--accent-strong);
+      color: var(--accent-strong);
+    }
+    .pc-hidden { display: none; }
     .pc-n {
       font-family: 'DM Mono', monospace;
       font-size: 2.3rem; font-weight: 300;
@@ -422,6 +442,57 @@
       transition: background 0.16s ease;
     }
     .pc-toggle:hover { background: color-mix(in srgb, var(--accent) 34%, transparent); }
+    .pc-game-trail { min-height: 1.8rem; }
+    .pc-prompt {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-style: italic;
+      font-size: 1rem; line-height: 1.3;
+      color: var(--text);
+      margin: 0.15rem 0 0.6rem;
+      min-height: 2.5em;
+    }
+    .pc-game-form { margin-bottom: 0.5rem; }
+    .pc-input {
+      width: 100%;
+      text-align: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.85rem;
+      padding: 0.42rem 0.6rem;
+      border-radius: 8px;
+      border: 1px solid var(--rule);
+      background: color-mix(in srgb, var(--bg) 65%, transparent);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.16s ease, box-shadow 0.16s ease;
+    }
+    .pc-input::placeholder { color: var(--muted); }
+    .pc-input:focus {
+      border-color: var(--accent-strong);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 26%, transparent);
+    }
+    .pc-game-stats {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.56rem; letter-spacing: 0.03em;
+      color: var(--muted);
+    }
+    .pc-game-stats strong { color: var(--accent-strong); font-weight: 600; }
+    .pc-flash-ok .pc-input { animation: pc-flash-ok 0.5s ease; }
+    .pc-flash-bad .pc-input { animation: pc-flash-bad 0.5s ease; }
+    @keyframes pc-flash-ok {
+      0% {
+        border-color: var(--accent-strong);
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--aqua) 45%, transparent);
+      }
+      100% { border-color: var(--rule); box-shadow: none; }
+    }
+    @keyframes pc-flash-bad {
+      0%   { transform: translateX(0);    border-color: #e8859a; box-shadow: 0 0 0 4px rgba(232, 133, 154, 0.35); }
+      20%  { transform: translateX(-4px); }
+      40%  { transform: translateX(4px);  }
+      60%  { transform: translateX(-3px); }
+      80%  { transform: translateX(3px);  }
+      100% { transform: translateX(0);    border-color: var(--rule); box-shadow: none; }
+    }
     /* bookmarks — a quick web search plus a small holder of saved links */
     .dw-bookmarks { width: 226px; }
     .bm-search { margin-bottom: 0.6rem; }
@@ -3415,25 +3486,61 @@
         },
       },
       primes: {
-        title: 'prime counter', glyph: '&#8473;', desc: 'a slow, steady count through the primes', group: 'tools',
-        data: () => ({ n: 1, found: 0, lastPrime: null, recent: [], running: true }),
+        title: 'prime counter', glyph: '&#8473;', desc: 'a slow count through the primes, or a recitation game', group: 'tools',
+        data: () => ({
+          n: 1, found: 0, lastPrime: null, recent: [], running: true,
+          mode: 'ambient',
+          game: { current: 0, recited: [], streak: 0, best: 0, bestMs: null, startedAt: null },
+        }),
         build(el, w) {
+          if (!w.data.mode) w.data.mode = 'ambient';
+          if (!w.data.game) w.data.game = { current: 0, recited: [], streak: 0, best: 0, bestMs: null, startedAt: null };
+
           el.innerHTML =
             '<p class="dw-title">prime counter</p>' +
-            '<p class="pc-n"></p>' +
-            '<div class="pc-trail"></div>' +
-            '<p class="pc-found"></p>' +
-            '<button type="button" class="pc-toggle"></button>';
+            '<div class="pc-modes">' +
+              '<button type="button" class="pc-mode-btn" data-mode="ambient">ambient</button>' +
+              '<button type="button" class="pc-mode-btn" data-mode="game">recite</button>' +
+            '</div>' +
+            '<div class="pc-ambient">' +
+              '<p class="pc-n"></p>' +
+              '<div class="pc-trail"></div>' +
+              '<p class="pc-found"></p>' +
+              '<button type="button" class="pc-toggle"></button>' +
+            '</div>' +
+            '<div class="pc-game">' +
+              '<div class="pc-trail pc-game-trail"></div>' +
+              '<p class="pc-prompt"></p>' +
+              '<form class="pc-game-form" autocomplete="off">' +
+                '<input class="pc-input" type="text" inputmode="numeric" autocomplete="off" ' +
+                  'placeholder="next prime&hellip;" aria-label="Type the next prime from memory" />' +
+              '</form>' +
+              '<p class="pc-game-stats"></p>' +
+            '</div>';
+
           const nEl = el.querySelector('.pc-n');
-          const trail = el.querySelector('.pc-trail');
+          const trail = el.querySelector('.pc-ambient .pc-trail');
           const foundEl = el.querySelector('.pc-found');
           const toggle = el.querySelector('.pc-toggle');
+          const modeBtns = el.querySelectorAll('.pc-mode-btn');
+          const ambientView = el.querySelector('.pc-ambient');
+          const gameView = el.querySelector('.pc-game');
+          const gameTrail = el.querySelector('.pc-game-trail');
+          const prompt = el.querySelector('.pc-prompt');
+          const gameForm = el.querySelector('.pc-game-form');
+          const input = el.querySelector('.pc-input');
+          const gameStats = el.querySelector('.pc-game-stats');
 
           function isPrime(n) {
             if (n < 2) return false;
             if (n % 2 === 0) return n === 2;
             for (let d = 3; d * d <= n; d += 2) if (n % d === 0) return false;
             return true;
+          }
+          function nextPrimeAfter(n) {
+            let c = n + 1;
+            while (!isPrime(c)) c += 1;
+            return c;
           }
           const renderN = pulse => {
             nEl.textContent = w.data.n;
@@ -3453,7 +3560,40 @@
           };
           const renderToggle = () => { toggle.textContent = w.data.running ? 'pause' : 'resume'; };
 
+          const renderGameTrail = () => {
+            gameTrail.innerHTML = w.data.game.recited.slice(-8)
+              .map(p => '<span class="pc-bead">' + p + '</span>').join('');
+          };
+          const renderPrompt = () => {
+            prompt.textContent = w.data.game.recited.length
+              ? 'what comes after ' + w.data.game.current + '?'
+              : 'recite the primes from memory, starting with 2';
+          };
+          const renderGameStats = () => {
+            const g = w.data.game;
+            const bits = ['<strong>' + g.streak + '</strong> in a row'];
+            if (g.best) bits.push('best <strong>' + g.best + '</strong>');
+            if (g.bestMs != null) bits.push('fastest ' + (g.bestMs / 1000).toFixed(1) + 's');
+            gameStats.innerHTML = bits.join(' &middot; ');
+          };
+          const renderMode = () => {
+            const isGame = w.data.mode === 'game';
+            ambientView.classList.toggle('pc-hidden', isGame);
+            gameView.classList.toggle('pc-hidden', !isGame);
+            modeBtns.forEach(b => b.classList.toggle('pc-mode-active', b.dataset.mode === w.data.mode));
+            if (isGame) {
+              w.data.game.startedAt = Date.now();
+              input.focus();
+            }
+          };
+          function flash(cls) {
+            gameView.classList.remove('pc-flash-ok', 'pc-flash-bad');
+            void gameView.offsetWidth;
+            gameView.classList.add(cls);
+          }
+
           renderN(false); renderTrail(); renderFound(); renderToggle();
+          renderMode(); renderGameTrail(); renderPrompt(); renderGameStats();
 
           primeTimers[w.id] = setInterval(() => {
             if (!w.data.running) return;
@@ -3473,6 +3613,41 @@
           toggle.addEventListener('click', () => {
             w.data.running = !w.data.running;
             renderToggle();
+            saveWidgets();
+          });
+
+          modeBtns.forEach(b => b.addEventListener('click', () => {
+            if (w.data.mode === b.dataset.mode) return;
+            w.data.mode = b.dataset.mode;
+            renderMode();
+            saveWidgets();
+          }));
+
+          gameForm.addEventListener('submit', e => {
+            e.preventDefault();
+            const raw = input.value.trim();
+            if (!raw) return;
+            input.value = '';
+            const guess = Number(raw);
+            const g = w.data.game;
+            const expected = nextPrimeAfter(g.current);
+            if (Number.isInteger(guess) && guess === expected) {
+              const elapsed = g.startedAt ? Date.now() - g.startedAt : null;
+              g.current = guess;
+              g.recited.push(guess);
+              g.streak += 1;
+              if (g.streak > g.best) g.best = g.streak;
+              if (elapsed != null && (g.bestMs == null || elapsed < g.bestMs)) g.bestMs = elapsed;
+              g.startedAt = Date.now();
+              flash('pc-flash-ok');
+              renderGameTrail(); renderPrompt(); renderGameStats();
+            } else {
+              prompt.textContent = expected + ' was next — start again from 2';
+              g.current = 0; g.recited = []; g.streak = 0;
+              g.startedAt = Date.now();
+              flash('pc-flash-bad');
+              renderGameTrail(); renderGameStats();
+            }
             saveWidgets();
           });
         },
