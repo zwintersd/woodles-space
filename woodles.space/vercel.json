@@ -49,6 +49,8 @@
     { "source": "/marginalia/:path*",         "destination": "/apps/marginalia/dist/index.html" },
     { "source": "/planner",            "destination": "/apps/planner/dist/index.html" },
     { "source": "/planner/:path*",     "destination": "/apps/planner/dist/:path*" },
+    { "source": "/whiteboard",         "destination": "/apps/whiteboard/dist/index.html" },
+    { "source": "/whiteboard/:path*",  "destination": "/apps/whiteboard/dist/:path*" },
     { "source": "/animations",         "destination": "/apps/animations/index.html" },
     { "source": "/animations/:path*",  "destination": "/apps/animations/:path*" },
 { "source": "/bestiary",                  "destination": "/apps/bestiary/dist/index.html" },

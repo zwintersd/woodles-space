@@ -192,6 +192,19 @@ export const appManifest = Object.freeze([
 		landing: tile('thinking', 7, 'tend', 'a landing spot for what you are reading, playing, and watching', 'var(--lapis)', 'var(--aqua)', '140deg')
 	},
 	{
+		id: 'whiteboard',
+		name: 'Whiteboard',
+		publicPath: '/whiteboard',
+		aliases: [],
+		kind: 'sveltekit',
+		maturity: 'growing',
+		sourceDir: 'apps/whiteboard',
+		outputDir: 'apps/whiteboard/dist',
+		entryFile: 'index.html',
+		packageName: 'whiteboard',
+		landing: tile('whiteboard', 14, 'tend', 'when a thought wants to take up space', 'var(--peach)', 'var(--lilac)', '145deg')
+	},
+	{
 		id: 'bloomforge',
 		name: 'Bloomforge',
 		publicPath: '/bloomforge',

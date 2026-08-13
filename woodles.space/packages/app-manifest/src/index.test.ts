@@ -23,11 +23,14 @@ const VERCEL = JSON.parse(readFileSync(join(ROOT, 'vercel.json'), 'utf8')) as {
 };
 const rewrites = new Map(VERCEL.rewrites.map((rewrite) => [rewrite.source, rewrite.destination]));
 const redirects = new Map((VERCEL.redirects ?? []).map((entry) => [entry.source, entry]));
+// A retired app can leave its source directory behind while its public route
+// deliberately redirects elsewhere. It is not a deployable app inventory row.
+const RETIRED_SOURCE_DIRS = new Set(['marginalia-devlog']);
 
 describe('canonical app inventory', () => {
 	it('accounts for every deployable app directory exactly once', () => {
 		const directories = readdirSync(join(ROOT, 'apps'), { withFileTypes: true })
-			.filter((entry) => entry.isDirectory())
+			.filter((entry) => entry.isDirectory() && !RETIRED_SOURCE_DIRS.has(entry.name))
 			.map((entry) => entry.name)
 			.sort();
 		const manifested = appManifest.map((app) => app.sourceDir.replace('apps/', '')).sort();
@@ -102,9 +105,9 @@ describe('route smoke contract', () => {
 });
 
 describe('landing catalogue', () => {
-	it('derives the thirteen ordered tiles, pins, and featured fallbacks from the manifest', () => {
-		expect(landingApps).toHaveLength(13);
-		expect(landingApps.map((app) => app.order)).toEqual([...Array(13)].map((_, index) => index + 1));
+	it('derives the fourteen ordered tiles, pins, and featured fallbacks from the manifest', () => {
+		expect(landingApps).toHaveLength(14);
+		expect(landingApps.map((app) => app.order)).toEqual([...Array(14)].map((_, index) => index + 1));
 		expect(new Set(landingApps.map((app) => app.id)).size).toBe(landingApps.length);
 		expect(defaultLandingPins).toEqual(['hygge', 'write', 'marg', 'planner', 'quiet']);
 		expect(featuredLandingApps.map((app) => app.id)).toEqual(['marg', 'bestiary', 'write']);

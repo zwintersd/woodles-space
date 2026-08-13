@@ -133,6 +133,7 @@ woodles.space/
     ├── planner/             SvelteKit · carillon — self-observation, day piles, and reinforcement
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
     ├── thinking-about/      SvelteKit · a board for what's being read, played, and watched — and, per entry, a structured record cast for it
+    ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking
     ├── bloomforge/          SvelteKit · a studio for making incremental games
     └── bloomforge-player/   SvelteKit · the runtime that makes those games playable
 ```
@@ -150,13 +151,13 @@ the repository or silently promoting an experiment into a game.
 ## the app manifest
 
 `packages/app-manifest/src/index.js` is the canonical deployable-app inventory.
-It owns the 15 app ids, names, public paths and aliases, app shape, source and
+It owns the 16 app ids, names, public paths and aliases, app shape, source and
 output locations, maturity, and landing visibility. It also owns the landing
 tile order/copy, **band**, default pins, featured fallback, and Marginalia's
 Reading Room sub-surface. A band is the *moment* a tile is for rather than the
 thing it holds — `write`, `tend`, `read`, `play` — and the start
 menu's "all apps" section renders grouped under them (`landingAppsByBand`),
-so the homepage stops presenting thirteen peers to choose between. That section
+so the homepage stops presenting fourteen peers to choose between. That section
 lists every app, not just the unpinned remainder, because a band whose only
 app is pinned would otherwise never show its name. There is no `catch` band
 anymore: Notebook, the app it existed for, retired into Write (CONVERGENCE.md
@@ -207,8 +208,8 @@ and its bloom post-processing addons from a CDN through a `<script
 type="importmap">`, still with no build step.
 
 **SvelteKit apps** — `write`, `marginalia`, `planner`, `bestiary`,
-`thinking-about`, `bloomforge`, `bloomforge-player` — use Svelte 5 runes,
-Vite 7, and `@sveltejs/adapter-static`.
+`thinking-about`, `whiteboard`, `bloomforge`, `bloomforge-player` — use Svelte
+5 runes, Vite 7, and `@sveltejs/adapter-static`.
 each builds to `apps/<name>/dist/` and consumes `shared/` through the `@shared`
 Vite alias (`../../shared`). there is no SSR; every app ships as a static bundle.
 
@@ -1222,15 +1223,16 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1822 tests total: 16 in `api/` (its own
+1832 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1806 across fifteen pnpm
+instead of the recursive `pnpm -r test`), plus 1816 across sixteen pnpm
 packages — `write` 223, `marginalia` 333, `planner` 539,
 `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
 `packages/sync` 36, `packages/persistence` 6, `packages/app-manifest` 17,
 `packages/handoff` 14, `packages/text` 30, `packages/spellcraft` 15,
-`packages/emoji` 4, `packages/incremental-core` 191, and `thinking-about` 131.
+`packages/emoji` 4, `packages/incremental-core` 191, `thinking-about` 131,
+and `whiteboard` 10.
 (Counted by running each suite, not by adding to the previous figure — keep
 this inventory current when a suite changes; the root command is the release
 contract, not the prose count.)
@@ -1302,8 +1304,8 @@ pnpm test:e2e
 
 ## svelte-check
 
-All seven SvelteKit apps currently pass with zero errors and zero warnings.
-`pnpm -r check` runs all seven in turn. it stops at the first app that fails,
+All eight SvelteKit apps currently pass with zero errors and zero warnings.
+`pnpm -r check` runs all eight in turn. it stops at the first app that fails,
 so when diagnosing a new break, run the app directly to see past it.
 
 ## continuous integration
@@ -1320,9 +1322,9 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (1822 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (1832 tests)
 pnpm check              svelte-check in every app
-pnpm build              build the seven SvelteKit apps
+pnpm build              build the eight SvelteKit apps
 ```
 
 both `test` and `check` generate `.svelte-kit/` themselves on a fresh clone, so
