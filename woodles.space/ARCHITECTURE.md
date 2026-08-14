@@ -133,7 +133,7 @@ woodles.space/
     ├── planner/             SvelteKit · carillon — self-observation, day piles, and reinforcement
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
     ├── thinking-about/      SvelteKit · a board for what's being read, played, and watched — and, per entry, a structured record cast for it
-    ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking — and a camera that knows where it is in it
+    ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking — a camera that knows where it is, and cards that can say more than they show
     ├── bloomforge/          SvelteKit · a studio for making incremental games
     └── bloomforge-player/   SvelteKit · the runtime that makes those games playable
 ```
@@ -660,9 +660,44 @@ old board is adopted onto the shelf once, and its key cleared only after its
 contents are safely rewritten, so an interrupted migration retries rather than
 loses. Deleting a board only deletes the images no other board still holds.
 
-Schema 2 added the navigation to the document itself — `home`, `viewpoints`,
-`journey` — and migrates schema 1 by filling them in; a corrupt journey costs
-you the journey, never the board.
+**The optional layer.** Schema 3 gives every object a property sheet it does
+not have to use: `labels`, `status`, `kind` ("Type"), `source`, `tint`
+("Color"). `properties` is absent until something is actually said, and
+clearing the last field removes the sheet again, so an object that has been
+cleared is indistinguishable from one that was never touched — that absence is
+what keeps a card looking like a card. Created and Updated are properties too,
+but they are `createdAt`/`updatedAt` on the item already; `properties.ts` shows
+them and never stores them twice. Colour is one palette of six, and a frame
+keeps its colour in the `tint` field it has had since the app was written
+rather than growing a second one — `setProperty` dispatches on that, so callers
+see one Color property either way.
+
+A card wears its layer as a chip row rather than a property sheet: a Type
+eyebrow, a status dot, label chips, a `↗` when a source is set, and a `＋` that
+appears only while the card is chosen. A card grows by one row to hold its
+first chip and shrinks back when the last one goes, because otherwise saying
+something about a card silently eats a line of whatever it already said.
+
+**Labels** (`labels.ts`) are the first metadata system: reusable, owned by the
+board rather than by any one object, matched by name however they are typed.
+Renaming one renames it everywhere, and renaming onto an existing name folds
+the two into one rather than leaving two labels that read the same. Deleting
+one takes it off everything wearing it (`repairLabelling`, in `geometry.ts`).
+This is organization independent of spatial location: space, frames, stacks and
+labels, with no database under any of it.
+
+**Search** (`search.ts`) reads the material and the optional layer alike —
+title, body, name, label, type, status, source — weighted by how much of an
+answer each field is to "what is this", with a match at the start of a field
+beating one buried in it. A leading `#` narrows to labels alone. The board
+flies to the result: arrow keys travel through hits without filling up the
+camera history, Enter keeps the one you landed on and records a single move
+from where the search began, `⇧↵` pulls back to hold every result at once, and
+Escape puts the camera back where it started.
+
+Schemas 2 and 3 both migrate forward by filling in what they added. A corrupt
+journey costs you the journey, never the board; an unreadable property sheet
+costs that one object its properties and nothing else.
 
 ## the writing surface
 
@@ -1277,20 +1312,25 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1915 tests total: 16 in `api/` (its own
+1967 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1899 across sixteen pnpm
+instead of the recursive `pnpm -r test`), plus 1951 across sixteen pnpm
 packages — `write` 242, `marginalia` 333, `planner` 539,
 `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
 `packages/sync` 36, `packages/persistence` 6, `packages/app-manifest` 17,
 `packages/handoff` 14, `packages/text` 30, `packages/spellcraft` 15,
 `packages/emoji` 4, `packages/incremental-core` 191, `thinking-about` 131,
-and `whiteboard` 74.
+and `whiteboard` 126.
 (Counted by running each suite, not by adding to the previous figure — keep
 this inventory current when a suite changes; the root command is the release
 contract, not the prose count.)
-(Whiteboard's suite grew by 64 for navigation: `camera.ts` (16) for the van
+(Whiteboard's suite grew by a further 52 for the optional layer: `labels.ts`
+(19) for the reusable label registry, `properties.ts` (15) for the property
+sheet that disappears when it is empty, `search.ts` (18) for finding and
+ranking, and two more in `persistence.ts` for carrying an older save forward
+and for dropping a property sheet it cannot read. Before that it grew by 64
+for navigation: `camera.ts` (16) for the van
 Wijk flight and the history stack, `navigation.ts` (15) for reading order,
 breadcrumbs and framing, `journey.ts` (14) for arranging and playing a
 sequence, `library.ts` (12) for the board shelf and the one-time adoption of

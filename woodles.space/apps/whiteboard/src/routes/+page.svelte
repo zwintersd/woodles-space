@@ -37,6 +37,7 @@
 	type WhiteboardItem
 	} from '$lib/model';
 	import {
+	cameraForBounds,
 	camerasMatch,
 	canGoBack,
 	canGoForward,
@@ -73,9 +74,32 @@
 	import { cameraCentredOn, minimapExtent, minimapMarks, minimapProjection } from '$lib/minimap';
 	import { boardLibrary, boardTitleFallback, type BoardSummary } from '$lib/library';
 	import { restoreWhiteboard } from '$lib/persistence';
+	import {
+	deleteLabel,
+	labelItems,
+	labelsOn,
+	labelCount,
+	renameLabel,
+	retintLabel,
+	suggestLabels,
+	toggleLabel
+	} from '$lib/labels';
+	import {
+	colorOf,
+	formatStamp,
+	kindOf,
+	propertyCount,
+	setItemProperty,
+	sourceLabel,
+	sourceLink,
+	sourceOf,
+	statusOf
+	} from '$lib/properties';
+	import { hitsBounds, searchBoard, type SearchHit } from '$lib/search';
+	import { STATUSES, TINTS, type Label, type Tint } from '$lib/model';
 
 	type Tool = 'select' | 'frame' | 'stack' | 'line';
-	type Drawer = 'places' | 'journey';
+	type Drawer = 'places' | 'journey' | 'details';
 	const MINIMAP = { width: 186, height: 124 };
 	type SaveState = 'idle' | 'saving' | 'saved' | 'recovered' | 'error';
 	type Point = { x: number; y: number };
@@ -172,6 +196,19 @@
 	let playIndex = $state(0);
 	let playTimer: ReturnType<typeof setTimeout> | null = null;
 
+	// Labels and the optional layer.
+	let labelDraft = $state('');
+	let renamingLabelId = $state<string | null>(null);
+
+	// Search: the board flies to what you find.
+	let searchOpen = $state(false);
+	let searchText = $state('');
+	let searchIndex = $state(0);
+	let searchInput = $state<HTMLInputElement>();
+	/** Where to put the camera back if the search is abandoned. */
+	let searchReturn: Camera | null = null;
+	let searchPreviewTimer: ReturnType<typeof setTimeout> | null = null;
+
 	const objects = $derived(
 		board.items
 			.filter((item) => item.type !== 'connector')
@@ -193,6 +230,12 @@
 	const mapProjection = $derived(minimapProjection(minimapExtent(board, board.camera, viewportSize), MINIMAP));
 	const mapMarks = $derived(minimapMarks(board.items));
 	const mapView = $derived(mapProjection.project(visibleBounds(board.camera, viewportSize)));
+
+	/** The objects the Details panel is speaking about — nothing, one, or many. */
+	const chosen = $derived(board.items.filter((item) => selectedIds.includes(item.id) && item.type !== 'connector'));
+	const only = $derived(chosen.length === 1 ? chosen[0] : null);
+	const results = $derived(searchOpen && searchText.trim() ? searchBoard(board, searchText) : []);
+	const matchIds = $derived(new Set(results.map((hit) => hit.item.id)));
 
 	function viewport(): { width: number; height: number } {
 		const rect = canvasEl?.getBoundingClientRect();
@@ -388,6 +431,7 @@
 		if (cameraAnimation) cancelAnimationFrame(cameraAnimation);
 		if (pointerMoveFrame) cancelAnimationFrame(pointerMoveFrame);
 		clearPlayTimer();
+		if (searchPreviewTimer) clearTimeout(searchPreviewTimer);
 		Object.values(imageUrls).forEach((url) => URL.revokeObjectURL(url));
 	});
 
@@ -1099,6 +1143,223 @@
 		scheduleSave();
 	}
 
+	// ── Labels and the optional layer ───────────────────────────────────────
+
+	function chipsFor(item: WhiteboardItem): Label[] {
+		return labelsOn(board, item);
+	}
+
+	/**
+	 * A chip on the board is a button, not a handle. Without this the object
+	 * underneath takes the pointer, captures it, and the click never lands.
+	 */
+	function stopChipPointer(event: PointerEvent) {
+		event.stopPropagation();
+	}
+
+	const CHIP_ROW_ROOM = 28;
+
+	/** Whether an object is showing a chip row of its own, selection aside. */
+	function showsChipRow(item: WhiteboardItem): boolean {
+		return Boolean(chipsFor(item).length || statusOf(item) || sourceOf(item));
+	}
+
+	function chipRoomBefore(ids: string[]): Map<string, boolean> {
+		return new Map(ids.map((id) => {
+			const item = board.items.find((candidate) => candidate.id === id);
+			return [id, item ? showsChipRow(item) : false];
+		}));
+	}
+
+	/**
+	 * A card grows to hold its first chip row and shrinks back when the last chip
+	 * goes. Without this, saying something about a card silently eats a line of
+	 * whatever it already said.
+	 */
+	function keepChipRoom(before: Map<string, boolean>) {
+		board.items = board.items.map((item) => {
+			if (item.type !== 'card') return item;
+			const had = before.get(item.id);
+			if (had === undefined || had === showsChipRow(item)) return item;
+			const height = had ? Math.max(90, item.height - CHIP_ROW_ROOM) : item.height + CHIP_ROW_ROOM;
+			return { ...item, height };
+		});
+	}
+
+	/** Names a label onto everything selected. New labels are made by typing. */
+	function applyLabelDraft() {
+		const name = labelDraft.trim();
+		if (!name || !chosen.length) return;
+		const ids = chosen.map((item) => item.id);
+		const before = chipRoomBefore(ids);
+		board = labelItems(board, ids, name);
+		keepChipRoom(before);
+		labelDraft = '';
+		scheduleSave();
+	}
+
+	function toggleLabelOnSelection(labelId: string) {
+		if (!chosen.length) return;
+		// With several chosen, one click means "give this to all of them" unless
+		// they all already have it, in which case it means "take it away".
+		const everyone = chosen.every((item) => item.properties?.labelIds?.includes(labelId));
+		const before = chipRoomBefore(chosen.map((item) => item.id));
+		for (const item of chosen) {
+			const wears = item.properties?.labelIds?.includes(labelId);
+			if (everyone === Boolean(wears)) board = toggleLabel(board, item.id, labelId);
+		}
+		keepChipRoom(before);
+		scheduleSave();
+	}
+
+	function removeLabelFrom(itemId: string, labelId: string) {
+		const before = chipRoomBefore([itemId]);
+		board = toggleLabel(board, itemId, labelId);
+		keepChipRoom(before);
+		scheduleSave();
+	}
+
+	function writeProperty(key: 'status' | 'kind' | 'source' | 'tint', value: string | null) {
+		const before = chipRoomBefore(chosen.map((item) => item.id));
+		for (const item of chosen) board = setItemProperty(board, item.id, key, value);
+		keepChipRoom(before);
+		scheduleSave();
+	}
+
+	/** A property already shared by everything chosen, or null when they differ. */
+	function sharedProperty(read: (item: WhiteboardItem) => string | null): string | null {
+		if (!chosen.length) return null;
+		const first = read(chosen[0]);
+		return chosen.every((item) => read(item) === first) ? first : null;
+	}
+
+	function openDetails() {
+		drawer = 'details';
+		shortcutsOpen = false;
+	}
+
+	async function addLabelToItem(item: WhiteboardItem) {
+		selectOnly(item.id);
+		openDetails();
+		await tick();
+		document.getElementById('label-draft')?.focus();
+	}
+
+	function renameLabelTo(labelId: string, name: string) {
+		board = renameLabel(board, labelId, name);
+		scheduleSave();
+	}
+
+	function recolourLabel(labelId: string, tint: Tint) {
+		board = retintLabel(board, labelId, tint);
+		scheduleSave();
+	}
+
+	function dropLabel(labelId: string) {
+		board = deleteLabel(board, labelId);
+		scheduleSave();
+	}
+
+	// ── Search ──────────────────────────────────────────────────────────────
+
+	async function openSearch(seed = '') {
+		if (!searchOpen) searchReturn = { ...board.camera };
+		searchOpen = true;
+		searchText = seed;
+		searchIndex = 0;
+		drawer = null;
+		shelfOpen = false;
+		shortcutsOpen = false;
+		handHoldsTheCamera();
+		await tick();
+		searchInput?.focus();
+		searchInput?.select();
+		if (seed) previewResult(0);
+	}
+
+	/** Moving through results flies the camera, without filling up the history. */
+	function previewResult(index: number) {
+		const hit = results[index];
+		if (!hit) return;
+		searchIndex = index;
+		const camera = focusCamera(board.items, hit.item.id, viewport());
+		if (camera) flyTo(camera, hit.title, false);
+	}
+
+	function stepResult(direction: -1 | 1) {
+		if (!results.length) return;
+		previewResult((searchIndex + direction + results.length) % results.length);
+	}
+
+	/**
+	 * The board goes to the best result on its own, once typing settles. Flying
+	 * on every keystroke would be thrash, not travel.
+	 */
+	function queueSearchPreview() {
+		if (searchPreviewTimer) clearTimeout(searchPreviewTimer);
+		searchPreviewTimer = setTimeout(() => {
+			searchPreviewTimer = null;
+			if (searchOpen && results.length) previewResult(0);
+		}, 340);
+	}
+
+	/** Keeps the result you landed on, and makes it something Back can undo. */
+	function commitSearch(index = searchIndex) {
+		const hit = results[index];
+		if (!hit) return;
+		searchIndex = index;
+		const camera = focusCamera(board.items, hit.item.id, viewport());
+		if (camera && searchReturn) {
+			// Rewind to where the search started so history records one move, from
+			// there to here, rather than every result glanced at along the way.
+			board.camera = { ...searchReturn };
+			flyTo(camera, hit.title);
+		}
+		selectOnly(hit.item.id);
+		closeSearch(false);
+	}
+
+	/** Pulls back far enough to hold every result at once. */
+	function fitResults() {
+		const bounds = hitsBounds(board.items, results);
+		if (!bounds) return;
+		if (searchReturn) board.camera = { ...searchReturn };
+		flyTo(cameraForBounds(bounds, viewport(), 140, 1.2), `${results.length} results`);
+		selectedIds = results.map((hit) => hit.item.id);
+		closeSearch(false);
+	}
+
+	function closeSearch(restore = true) {
+		if (searchPreviewTimer) clearTimeout(searchPreviewTimer);
+		searchPreviewTimer = null;
+		if (restore && searchReturn) animateCamera(searchReturn);
+		searchOpen = false;
+		searchText = '';
+		searchIndex = 0;
+		searchReturn = null;
+	}
+
+	function searchForLabel(label: Label) {
+		void openSearch(`#${label.name}`);
+	}
+
+	function handleSearchKeydown(event: KeyboardEvent) {
+		if (event.key === 'ArrowDown') {
+			event.preventDefault();
+			stepResult(1);
+		} else if (event.key === 'ArrowUp') {
+			event.preventDefault();
+			stepResult(-1);
+		} else if (event.key === 'Enter') {
+			event.preventDefault();
+			if (event.shiftKey) fitResults();
+			else commitSearch();
+		} else if (event.key === 'Escape') {
+			event.preventDefault();
+			closeSearch();
+		}
+	}
+
 	// ── The shelf: boards as a set, not a single canvas ─────────────────────
 
 	function refreshBoards() {
@@ -1114,6 +1375,9 @@
 	/** Puts a board on screen, with none of the previous board left clinging on. */
 	function adoptDocument(document: WhiteboardDocument, state: SaveState, message: string) {
 		exitJourney();
+		if (searchOpen) closeSearch(false);
+		labelDraft = '';
+		renamingLabelId = null;
 		releaseImageUrls();
 		board = restoreWhiteboard(document);
 		selectedIds = [];
@@ -1213,13 +1477,29 @@
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
+		// Find is reachable from anywhere, including from inside a card.
+		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+			event.preventDefault();
+			void openSearch(searchOpen ? searchText : '');
+			return;
+		}
 		if (event.code === 'Space' && !isTextTarget(event.target)) {
 			spaceHeld = true;
 			event.preventDefault();
 		}
 		if (isTextTarget(event.target)) return;
 
+		if (event.key === '/') {
+			event.preventDefault();
+			void openSearch();
+			return;
+		}
+
 		if (event.key === 'Escape') {
+			if (searchOpen) {
+				closeSearch();
+				return;
+			}
 			if (playing) {
 				exitJourney();
 				return;
@@ -1297,6 +1577,11 @@
 		if (event.key.toLowerCase() === 'm') {
 			event.preventDefault();
 			minimapOn = !minimapOn;
+			return;
+		}
+		if (event.key.toLowerCase() === 'i' && chosen.length) {
+			event.preventDefault();
+			openDetails();
 			return;
 		}
 		if (event.key === '?') {
@@ -1442,11 +1727,8 @@
 					data-whiteboard-object
 					class:selected={isSelected(item.id)}
 					class:dragging={draggingIds.includes(item.id)}
-					class:peach={item.tint === 'peach'}
-					class:lavender={item.tint === 'lavender'}
-					class:aqua={item.tint === 'aqua'}
-					class:gold={item.tint === 'gold'}
-					class="board-item frame"
+					class:found={matchIds.has(item.id)}
+					class="board-item frame tint-{item.tint}"
 					style={itemStyle(item)}
 					role="group"
 					aria-label={`Frame: ${item.title || 'Untitled frame'}`}
@@ -1477,6 +1759,9 @@
 								ondblclick={(event) => { event.stopPropagation(); renamingFrameId = item.id; void tick().then(() => document.getElementById(`frame-title-${item.id}`)?.focus()); }}
 							>{item.title || 'Untitled frame'}</button>
 						{/if}
+						{#each chipsFor(item) as label (label.id)}
+							<button data-whiteboard-ui class="label-chip tint-{label.tint}" title={`Find everything labelled ${label.name}`} onpointerdown={stopChipPointer} onclick={() => searchForLabel(label)}>{label.name}</button>
+						{/each}
 					</div>
 					{#if isSelected(item.id)}
 						<button data-whiteboard-ui class="resize-handle" aria-label="Resize frame" onpointerdown={(event) => startResize(event, item)}></button>
@@ -1488,7 +1773,8 @@
 					class:selected={isSelected(item.id)}
 					class:dragging={draggingIds.includes(item.id)}
 					class:drop-target={dropStackId === item.id}
-					class="board-item stack"
+					class:found={matchIds.has(item.id)}
+					class="board-item stack tint-{colorOf(item) ?? 'none'}"
 					style={itemStyle(item)}
 					role="group"
 					aria-label={`Stack: ${item.title || 'Untitled stack'}`}
@@ -1507,6 +1793,13 @@
 						/>
 						<span class="stack-count">{item.cardIds.length || ''}</span>
 					</div>
+					{#if chipsFor(item).length}
+						<div class="chip-row stack-chips" data-whiteboard-ui>
+							{#each chipsFor(item) as label (label.id)}
+								<button class="label-chip tint-{label.tint}" title={`Find everything labelled ${label.name}`} onpointerdown={stopChipPointer} onclick={() => searchForLabel(label)}>{label.name}</button>
+							{/each}
+						</div>
+					{/if}
 					{#if item.cardIds.length === 0}
 						<p class="stack-empty">drag a card in</p>
 					{/if}
@@ -1515,12 +1808,14 @@
 					{/if}
 				</section>
 			{:else if item.type === 'card'}
+				{@const chips = chipsFor(item)}
 				<section
 					data-whiteboard-object
 					class:selected={isSelected(item.id)}
 					class:dragging={draggingIds.includes(item.id)}
 					class:in-stack={Boolean(item.stackId)}
-					class="board-item card"
+					class:found={matchIds.has(item.id)}
+					class="board-item card tint-{colorOf(item) ?? 'none'}"
 					style={itemStyle(item)}
 					role="group"
 					aria-label={`Card: ${item.title || 'Untitled card'}`}
@@ -1529,6 +1824,9 @@
 				>
 					<div class="card-topline" aria-hidden="true"></div>
 					<span class="card-grip" aria-hidden="true">⠿</span>
+					{#if kindOf(item)}
+						<p class="card-kind">{kindOf(item)}</p>
+					{/if}
 					<input
 						class="card-title"
 						aria-label="Card title"
@@ -1548,6 +1846,22 @@
 						oninput={(event) => updateCard(item, 'body', (event.currentTarget as HTMLTextAreaElement).value)}
 						onkeydown={handleEditableKeydown}
 					></textarea>
+					{#if chips.length || statusOf(item) || sourceOf(item) || isSelected(item.id)}
+						<div class="chip-row" data-whiteboard-ui>
+							{#if statusOf(item)}
+								<span class="status-chip {statusOf(item)}" title={`Status: ${statusOf(item)}`}><i aria-hidden="true"></i>{statusOf(item)}</span>
+							{/if}
+							{#each chips as label (label.id)}
+								<button class="label-chip tint-{label.tint}" title={`Find everything labelled ${label.name}`} onpointerdown={stopChipPointer} onclick={() => searchForLabel(label)}>{label.name}</button>
+							{/each}
+							{#if sourceOf(item)}
+								<span class="source-mark" title={`Source: ${sourceOf(item)}`} aria-label={`Source: ${sourceOf(item)}`}>↗</span>
+							{/if}
+							{#if isSelected(item.id)}
+								<button class="chip-add" title="Label this card (I)" aria-label="Add a label to this card" onpointerdown={stopChipPointer} onclick={() => addLabelToItem(item)}>＋</button>
+							{/if}
+						</div>
+					{/if}
 					{#if isSelected(item.id)}
 						<button data-whiteboard-ui class="resize-handle" aria-label="Resize card" onpointerdown={(event) => startResize(event, item)}></button>
 					{/if}
@@ -1557,6 +1871,7 @@
 					data-whiteboard-object
 					class:selected={isSelected(item.id)}
 					class:dragging={draggingIds.includes(item.id)}
+					class:found={matchIds.has(item.id)}
 					class="board-item image-card"
 					style={itemStyle(item)}
 					role="group"
@@ -1570,6 +1885,13 @@
 						<div class="missing-image">
 							<span aria-hidden="true">◇</span>
 							<p>{missingAssets.has(item.assetId) ? 'image kept its place' : 'placing image…'}</p>
+						</div>
+					{/if}
+					{#if chipsFor(item).length}
+						<div class="chip-row image-chips" data-whiteboard-ui>
+							{#each chipsFor(item) as label (label.id)}
+								<button class="label-chip tint-{label.tint}" title={`Find everything labelled ${label.name}`} onpointerdown={stopChipPointer} onclick={() => searchForLabel(label)}>{label.name}</button>
+							{/each}
 						</div>
 					{/if}
 					{#if isSelected(item.id)}
@@ -1620,7 +1942,7 @@
 		</div>
 	</header>
 
-	<nav class:hidden={playing} class="location-bar" data-whiteboard-ui aria-label="Board location">
+	<nav class:hidden={playing || searchOpen} class="location-bar" data-whiteboard-ui aria-label="Board location">
 		<div class="history-pair">
 			<button disabled={!canGoBack(history)} aria-label="Back to the previous view" title="Back (⌥←)" onclick={() => travelHistory(-1)}>‹</button>
 			<button disabled={!canGoForward(history)} aria-label="Forward to the next view" title="Forward (⌥→)" onclick={() => travelHistory(1)}>›</button>
@@ -1643,20 +1965,73 @@
 		</div>
 	</nav>
 
-	<div class:hidden={playing} class="rail" data-whiteboard-ui aria-label="Places and journeys">
+	<div class:hidden={playing || searchOpen} class="rail" data-whiteboard-ui aria-label="Places and journeys">
 		<button class="rail-button" title="Home — the view this board opens to (H)" onclick={goHome}><span aria-hidden="true">⌂</span>Home</button>
+		<button class="rail-button" title="Find anything on this board (/)" onclick={() => void openSearch()}><span aria-hidden="true">⌕</span>Find</button>
 		<button class:active={drawer === 'places'} class="rail-button" aria-pressed={drawer === 'places'} title="Saved views and frames" onclick={() => (drawer = drawer === 'places' ? null : 'places')}><span aria-hidden="true">◈</span>Places</button>
 		<button class:active={drawer === 'journey'} class="rail-button" aria-pressed={drawer === 'journey'} title="Arrange a journey through the board" onclick={() => (drawer = drawer === 'journey' ? null : 'journey')}><span aria-hidden="true">⇉</span>Journey</button>
 		<button class="rail-button play" title="Play the journey (P)" onclick={() => beginJourney()}><span aria-hidden="true">▶</span>Play</button>
 	</div>
 	</div>
 
+	{#if searchOpen}
+		<div class="finder" data-whiteboard-ui>
+			<div class="finder-field">
+				<span class="finder-mark" aria-hidden="true">⌕</span>
+				<input
+					bind:this={searchInput}
+					aria-label="Find on this board"
+					placeholder="Find a card, a label, anything…"
+					value={searchText}
+					oninput={(event) => { searchText = (event.currentTarget as HTMLInputElement).value; searchIndex = 0; queueSearchPreview(); }}
+					onkeydown={handleSearchKeydown}
+				/>
+				{#if results.length}
+					<button class="chip quiet" title="Pull back to show every result (⇧↵)" onclick={fitResults}>Show all {results.length}</button>
+				{/if}
+				<button class="finder-close" aria-label="Close find" onclick={() => closeSearch()}>×</button>
+			</div>
+			{#if searchText.trim()}
+				{#if results.length}
+					<ul class="finder-results">
+						{#each results.slice(0, 40) as hit, index (hit.item.id)}
+							<li>
+								<button
+									class:current={index === searchIndex}
+									class="finder-result"
+									onpointerenter={() => (searchIndex = index)}
+									onclick={() => commitSearch(index)}
+								>
+									<span class="finder-kind" aria-hidden="true">{hit.item.type === 'frame' ? '▢' : hit.item.type === 'stack' ? '▤' : hit.item.type === 'image' ? '▧' : '□'}</span>
+									<span class="finder-text">
+										<strong>{hit.title}</strong>
+										<small>{hit.snippet}</small>
+									</span>
+									{#each hit.labels.slice(0, 3) as label (label.id)}
+										<span class="label-chip tint-{label.tint} tiny">{label.name}</span>
+									{/each}
+									<span class="finder-where">{hit.field}</span>
+								</button>
+							</li>
+						{/each}
+					</ul>
+					<p class="finder-hint">↑↓ to travel · ↵ to stay · ⇧↵ to see them all · esc to come back</p>
+				{:else}
+					<p class="finder-empty">Nothing on this board answers to that.</p>
+				{/if}
+			{:else}
+				<p class="finder-hint">Type to search titles, text, labels, type, status and source. Start with <code>#</code> to search labels alone.</p>
+			{/if}
+		</div>
+	{/if}
+
 	{#if drawer && !playing}
-		<aside class="drawer" data-whiteboard-ui aria-label={drawer === 'places' ? 'Places on this board' : 'The journey through this board'}>
+		<aside class="drawer" data-whiteboard-ui aria-label={drawer === 'places' ? 'Places on this board' : drawer === 'details' ? 'What is known about the chosen objects' : 'The journey through this board'}>
 			<header class="drawer-head">
 				<div class="drawer-tabs">
 					<button class:active={drawer === 'places'} onclick={() => (drawer = 'places')}>Places</button>
 					<button class:active={drawer === 'journey'} onclick={() => (drawer = 'journey')}>Journey</button>
+					<button class:active={drawer === 'details'} onclick={() => (drawer = 'details')}>Details{#if chosen.length > 1}<span class="tab-count">{chosen.length}</span>{/if}</button>
 				</div>
 				<button class="drawer-close" aria-label="Close panel" onclick={() => (drawer = null)}>×</button>
 			</header>
@@ -1747,6 +2122,140 @@
 						{/if}
 					</section>
 				</div>
+			{:else if drawer === 'details'}
+				<div class="drawer-body">
+					{#if !chosen.length}
+						<p class="drawer-empty">Choose something on the board. Anything you say about it stays optional — a card with nothing said about it is still just a card.</p>
+					{:else}
+						<section>
+							<h3>{only ? itemLabel(only) : `${chosen.length} chosen`}</h3>
+							<p class="drawer-note">
+								{#if only}{only.type}{propertyCount(only) ? ` · ${propertyCount(only)} things said about it` : ''}{:else}What you say here goes to all of them.{/if}
+							</p>
+						</section>
+
+						<section>
+							<h3>Labels</h3>
+							{#if only && chipsFor(only).length}
+								<div class="chip-row inline">
+									{#each chipsFor(only) as label (label.id)}
+										<button class="label-chip tint-{label.tint} removable" title={`Take ${label.name} off`} onclick={() => removeLabelFrom(only.id, label.id)}>{label.name}<i aria-hidden="true">×</i></button>
+									{/each}
+								</div>
+							{/if}
+							<div class="row-buttons">
+								<input
+									id="label-draft"
+									class="place-input"
+									aria-label="Add a label"
+									placeholder="Type a label…"
+									bind:value={labelDraft}
+									onkeydown={(event) => { if (event.key === 'Enter') { event.preventDefault(); applyLabelDraft(); } }}
+								/>
+								<button class="chip strong" onclick={applyLabelDraft}>Add</button>
+							</div>
+							{#if suggestLabels(board, only, labelDraft).length}
+								<div class="chip-row inline suggestions">
+									{#each suggestLabels(board, only, labelDraft).slice(0, 12) as label (label.id)}
+										<button class="label-chip tint-{label.tint} ghost" onclick={() => toggleLabelOnSelection(label.id)}>{label.name}</button>
+									{/each}
+								</div>
+							{/if}
+						</section>
+
+						<section>
+							<h3>Status</h3>
+							<div class="row-buttons">
+								{#each STATUSES as status (status)}
+									<button
+										class:active={sharedProperty(statusOf) === status}
+										class="chip status-pick {status}"
+										onclick={() => writeProperty('status', sharedProperty(statusOf) === status ? null : status)}
+									><i aria-hidden="true"></i>{status}</button>
+								{/each}
+							</div>
+						</section>
+
+						<section>
+							<h3>Type</h3>
+							<input
+								class="place-input wide"
+								aria-label="Type"
+								placeholder="note, question, reference…"
+								value={sharedProperty(kindOf) ?? ''}
+								oninput={(event) => writeProperty('kind', (event.currentTarget as HTMLInputElement).value)}
+							/>
+						</section>
+
+						<section>
+							<h3>Source</h3>
+							<input
+								class="place-input wide"
+								aria-label="Source"
+								placeholder="a link, a book, a conversation…"
+								value={sharedProperty(sourceOf) ?? ''}
+								oninput={(event) => writeProperty('source', (event.currentTarget as HTMLInputElement).value)}
+							/>
+							{#if only && sourceOf(only) && sourceLink(sourceOf(only)!)}
+								<a class="source-link" href={sourceLink(sourceOf(only)!)} target="_blank" rel="noreferrer noopener">{sourceLabel(sourceOf(only)!)} ↗</a>
+							{/if}
+						</section>
+
+						<section>
+							<h3>Color</h3>
+							<div class="swatches">
+								{#each TINTS as tint (tint)}
+									<button
+										class:active={sharedProperty(colorOf) === tint}
+										class="swatch tint-{tint}"
+										aria-label={tint}
+										title={tint}
+										onclick={() => writeProperty('tint', sharedProperty(colorOf) === tint ? null : tint)}
+									></button>
+								{/each}
+							</div>
+						</section>
+
+						{#if only}
+							<section>
+								<h3>When</h3>
+								<dl class="stamps">
+									<dt>Created</dt><dd>{formatStamp(only.createdAt)}</dd>
+									<dt>Updated</dt><dd>{formatStamp(only.updatedAt)}</dd>
+								</dl>
+							</section>
+						{/if}
+					{/if}
+					{#if board.labels.length}
+						<section>
+							<h3>Labels on this board</h3>
+							<p class="drawer-note">Organization that does not depend on where a thing sits.</p>
+							<ul class="place-list">
+								{#each board.labels as label (label.id)}
+									<li>
+										{#if renamingLabelId === label.id}
+											<input
+												class="place-rename"
+												aria-label="Label name"
+												value={label.name}
+												oninput={(event) => renameLabelTo(label.id, (event.currentTarget as HTMLInputElement).value)}
+												onblur={() => (renamingLabelId = null)}
+												onkeydown={(event) => { if (event.key === 'Enter' || event.key === 'Escape') (event.currentTarget as HTMLInputElement).blur(); }}
+											/>
+										{:else}
+											<button class="place-name" onclick={() => searchForLabel(label)}>
+												<span class="label-chip tint-{label.tint}">{label.name}</span>
+												<small>{labelCount(board, label.id)}</small>
+											</button>
+										{/if}
+										<button class="place-edit" aria-label={`Rename ${label.name}`} onclick={() => { renamingLabelId = label.id; void tick().then(() => (window.document.querySelector('.place-rename') as HTMLInputElement | null)?.focus()); }}>✎</button>
+										<button class="place-drop" aria-label={`Delete ${label.name}`} onclick={() => dropLabel(label.id)}>×</button>
+									</li>
+								{/each}
+							</ul>
+						</section>
+					{/if}
+				</div>
 			{:else}
 				<div class="drawer-body">
 					<section>
@@ -1817,7 +2326,7 @@
 				{#each mapMarks as mark (mark.id)}
 					{@const box = mapProjection.project(mark.bounds)}
 					<span
-						class="map-mark {mark.kind}"
+						class="map-mark mark-{mark.kind}"
 						class:here={mark.id === here?.id}
 						style={`left: ${box.x}px; top: ${box.y}px; width: ${box.width}px; height: ${box.height}px;`}
 					></span>
@@ -1880,6 +2389,8 @@
 		<div class="shortcuts" data-whiteboard-ui aria-label="Keyboard shortcuts">
 			<h3>Moving around</h3>
 			<dl>
+				<dt>/ ⌘K</dt><dd>find anything</dd>
+				<dt>I</dt><dd>details of what's chosen</dd>
 				<dt>[ ]</dt><dd>previous / next frame</dd>
 				<dt>1–9</dt><dd>jump to a frame</dd>
 				<dt>0</dt><dd>fit the whole board</dd>
@@ -2054,9 +2565,12 @@
 		cursor: move;
 	}
 
-	.frame.lavender { background: rgba(204, 193, 232, 0.18); border-color: rgba(113, 94, 150, 0.28); }
-	.frame.aqua { background: rgba(172, 220, 216, 0.18); border-color: rgba(66, 136, 133, 0.26); }
-	.frame.gold { background: rgba(236, 215, 166, 0.2); border-color: rgba(161, 124, 51, 0.26); }
+	/* One palette, six names, shared by frames, labels and the Color property. */
+	.frame.tint-lavender { background: rgba(204, 193, 232, 0.18); border-color: rgba(113, 94, 150, 0.28); }
+	.frame.tint-aqua { background: rgba(172, 220, 216, 0.18); border-color: rgba(66, 136, 133, 0.26); }
+	.frame.tint-gold { background: rgba(236, 215, 166, 0.2); border-color: rgba(161, 124, 51, 0.26); }
+	.frame.tint-rose { background: rgba(232, 193, 199, 0.2); border-color: rgba(160, 96, 110, 0.26); }
+	.frame.tint-sage { background: rgba(196, 216, 190, 0.2); border-color: rgba(97, 133, 92, 0.26); }
 
 	.frame-label {
 		position: absolute;
@@ -2149,6 +2663,112 @@
 	}
 
 	.card.in-stack { box-shadow: 0 3px 8px rgba(73, 54, 46, 0.09); }
+
+	/* Colour is a wash over the card's own paper, never a repaint of it. */
+	.card.tint-peach { background: rgba(250, 226, 210, 0.94); }
+	.card.tint-lavender { background: rgba(230, 224, 245, 0.94); }
+	.card.tint-aqua { background: rgba(214, 238, 235, 0.94); }
+	.card.tint-gold { background: rgba(246, 233, 202, 0.94); }
+	.card.tint-rose { background: rgba(247, 224, 228, 0.94); }
+	.card.tint-sage { background: rgba(224, 237, 219, 0.94); }
+	.stack.tint-peach { background: rgba(243, 219, 203, 0.6); }
+	.stack.tint-lavender { background: rgba(222, 216, 238, 0.6); }
+	.stack.tint-aqua { background: rgba(206, 231, 228, 0.6); }
+	.stack.tint-gold { background: rgba(239, 226, 195, 0.6); }
+	.stack.tint-rose { background: rgba(240, 217, 221, 0.6); }
+	.stack.tint-sage { background: rgba(217, 230, 212, 0.6); }
+
+	/* A search result, said quietly on the board itself. */
+	.board-item.found::before {
+		content: '';
+		position: absolute;
+		inset: -7px;
+		border: 1.5px solid rgba(180, 132, 84, 0.85);
+		border-radius: inherit;
+		box-shadow: 0 0 0 4px rgba(206, 163, 106, 0.16);
+		pointer-events: none;
+		animation: found 1.6s ease-in-out infinite alternate;
+	}
+	@keyframes found { from { opacity: .55; } to { opacity: 1; } }
+
+	.card-kind {
+		margin: 3px 0 0;
+		color: #9d857c;
+		font-size: 9.5px;
+		font-weight: 700;
+		letter-spacing: .11em;
+		text-transform: uppercase;
+	}
+
+	.chip-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px;
+		margin-top: 8px;
+		pointer-events: auto;
+	}
+	.chip-row.inline { margin-top: 0; margin-bottom: 8px; }
+	.chip-row.suggestions { margin-top: 9px; margin-bottom: 0; }
+	.stack-chips { margin: 9px 13px 0; }
+	.image-chips { position: absolute; left: 5px; bottom: 5px; margin: 0; }
+
+	.label-chip {
+		max-width: 132px;
+		padding: 2px 7px;
+		border: 1px solid transparent;
+		border-radius: 999px;
+		font-size: 10.5px;
+		line-height: 1.5;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		transition: filter 130ms ease, border-color 130ms ease;
+	}
+	button.label-chip:hover { filter: brightness(0.96); border-color: rgba(90, 70, 60, 0.28); }
+	.label-chip.tiny { max-width: 88px; font-size: 9.5px; }
+	.label-chip.ghost { background: transparent !important; border-color: rgba(120, 96, 88, 0.24); color: #8b7a73 !important; }
+	.label-chip.ghost:hover { border-color: rgba(120, 96, 88, 0.5); color: #5f4f49 !important; }
+	.label-chip.removable i { margin-left: 4px; font-style: normal; opacity: .55; }
+
+	.label-chip.tint-peach { background: rgba(246, 214, 192, 0.85); color: #7d5340; }
+	.label-chip.tint-lavender { background: rgba(220, 212, 240, 0.85); color: #5d4d7d; }
+	.label-chip.tint-aqua { background: rgba(199, 230, 226, 0.85); color: #3d6d69; }
+	.label-chip.tint-gold { background: rgba(240, 224, 184, 0.85); color: #7a5f26; }
+	.label-chip.tint-rose { background: rgba(243, 210, 216, 0.85); color: #86495a; }
+	.label-chip.tint-sage { background: rgba(211, 228, 204, 0.85); color: #4d6b45; }
+
+	.status-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		padding: 2px 7px 2px 5px;
+		border-radius: 999px;
+		background: rgba(120, 96, 88, 0.08);
+		color: #7c6a63;
+		font-size: 10.5px;
+		line-height: 1.5;
+	}
+	.status-chip i, .status-pick i { width: 6px; height: 6px; border-radius: 50%; background: #b3a49c; }
+	.status-chip.idea i, .status-pick.idea i { background: #c2a25f; }
+	.status-chip.open i, .status-pick.open i { background: #8ea9c4; }
+	.status-chip.doing i, .status-pick.doing i { background: #cf8d6b; }
+	.status-chip.done i, .status-pick.done i { background: #8cb19c; }
+	.status-chip.parked i, .status-pick.parked i { background: #b0a6a1; }
+
+	.source-mark { color: #a4938b; font-size: 11px; line-height: 1.5; cursor: help; }
+
+	.chip-add {
+		width: 20px;
+		height: 18px;
+		border-radius: 999px;
+		background: rgba(120, 96, 88, 0.09);
+		color: #8b7a73;
+		font-size: 10px;
+		line-height: 1;
+		transition: background 130ms ease, color 130ms ease;
+	}
+	.chip-add:hover { background: rgba(218, 188, 181, 0.55); color: #69434a; }
 
 	.card-topline { position: absolute; left: 18px; top: 9px; width: 29px; height: 2px; background: rgba(189, 139, 119, 0.42); border-radius: 3px; }
 	.card-grip { position: absolute; right: 11px; top: 7px; color: rgba(93, 79, 71, 0.38); font-size: 14px; line-height: 1; letter-spacing: -3px; }
@@ -2558,10 +3178,12 @@
 	}
 	.minimap { position: relative; border-radius: 9px; background: rgba(120, 96, 88, 0.06); overflow: hidden; cursor: crosshair; }
 	.minimap:focus-visible { outline: 2px solid rgba(167, 102, 112, 0.7); outline-offset: 2px; }
+	/* Kind classes are prefixed: a bare `.frame` here would be the same selector
+	   as a frame on the board, and the two are not the same thing. */
 	.map-mark { position: absolute; border-radius: 2px; background: rgba(120, 96, 88, 0.34); }
-	.map-mark.frame { border: 1px solid rgba(137, 103, 89, 0.42); border-radius: 4px; background: rgba(219, 186, 163, 0.24); }
-	.map-mark.stack { background: rgba(120, 96, 88, 0.26); }
-	.map-mark.image { background: rgba(150, 118, 106, 0.44); }
+	.map-mark.mark-frame { border: 1px solid rgba(137, 103, 89, 0.42); border-radius: 4px; background: rgba(219, 186, 163, 0.24); }
+	.map-mark.mark-stack { background: rgba(120, 96, 88, 0.26); }
+	.map-mark.mark-image { background: rgba(150, 118, 106, 0.44); }
 	.map-mark.here { border-color: rgba(167, 102, 112, 0.75); background: rgba(219, 178, 178, 0.42); }
 	.map-view { position: absolute; border: 1.5px solid rgba(167, 102, 112, 0.85); border-radius: 3px; background: rgba(167, 102, 112, 0.09); pointer-events: none; }
 
@@ -2634,6 +3256,85 @@
 	.shelf-badge { flex: none; padding: 2px 7px; border-radius: 999px; background: rgba(167, 102, 112, 0.16); color: #7c4a53; font-size: 9.5px; letter-spacing: .07em; text-transform: uppercase; }
 	.shelf-foot { display: flex; flex-wrap: wrap; gap: 7px; padding: 14px 20px 18px; border-top: 1px solid rgba(98,80,70,.1); }
 
+	.tab-count { margin-left: 4px; padding: 0 4px; border-radius: 5px; background: rgba(120, 96, 88, 0.16); font-size: 9.5px; font-variant-numeric: tabular-nums; }
+	.place-input.wide { width: 100%; }
+	.source-link { display: inline-block; margin-top: 7px; color: #8a5b63; font-size: 11px; text-decoration: none; border-bottom: 1px solid rgba(138, 91, 99, .3); }
+	.source-link:hover { color: #6f454c; }
+
+	.status-pick { gap: 5px; padding: 0 9px; }
+	.status-pick.active { border-color: rgba(167, 102, 112, 0.42); background: rgba(219, 178, 178, 0.34); color: #7c4a53; }
+
+	.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+	.swatch { width: 26px; height: 26px; border: 1.5px solid rgba(98, 80, 70, 0.16); border-radius: 8px; transition: transform 130ms ease, border-color 130ms ease; }
+	.swatch:hover { transform: scale(1.08); }
+	.swatch.active { border-color: rgba(167, 102, 112, 0.85); box-shadow: 0 0 0 3px rgba(167, 102, 112, 0.14); }
+	.swatch.tint-peach { background: rgba(246, 214, 192, 0.95); }
+	.swatch.tint-lavender { background: rgba(220, 212, 240, 0.95); }
+	.swatch.tint-aqua { background: rgba(199, 230, 226, 0.95); }
+	.swatch.tint-gold { background: rgba(240, 224, 184, 0.95); }
+	.swatch.tint-rose { background: rgba(243, 210, 216, 0.95); }
+	.swatch.tint-sage { background: rgba(211, 228, 204, 0.95); }
+
+	.stamps { display: grid; grid-template-columns: 62px 1fr; gap: 4px 10px; margin: 0; }
+	.stamps dt { color: #a2948d; font-size: 10.5px; }
+	.stamps dd { margin: 0; color: #6b5b55; font-size: 11.5px; }
+
+	.finder {
+		position: absolute;
+		z-index: 88;
+		left: 50%;
+		top: 84px;
+		display: flex;
+		flex-direction: column;
+		width: min(560px, calc(100vw - 44px));
+		max-height: calc(100vh - 180px);
+		border: 1px solid rgba(98, 80, 70, 0.16);
+		border-radius: 16px;
+		background: rgba(255, 253, 248, 0.95);
+		box-shadow: 0 18px 46px rgba(70, 52, 44, 0.2), inset 0 1px rgba(255,255,255,.9);
+		backdrop-filter: blur(18px);
+		transform: translateX(-50%);
+		animation: finder-in 200ms ease both;
+	}
+	@keyframes finder-in { from { opacity: 0; transform: translate(-50%, -10px); } }
+
+	.finder-field { display: flex; align-items: center; gap: 7px; padding: 9px 9px 9px 13px; }
+	.finder-mark { color: #a4938b; font-size: 16px; line-height: 1; }
+	.finder-field input {
+		flex: 1;
+		min-width: 0;
+		border: 0;
+		background: transparent;
+		color: #4c403c;
+		font-family: var(--font-display, Georgia, serif);
+		font-size: 16px;
+		outline: none;
+	}
+	.finder-field input::placeholder { color: #b4a7a0; font-family: var(--font-body, sans-serif); font-size: 14px; }
+	.finder-close { width: 26px; height: 26px; flex: none; border-radius: 8px; background: transparent; color: #8b7a73; font-size: 18px; line-height: 1; }
+	.finder-close:hover { background: rgba(224, 210, 200, 0.55); }
+
+	.finder-results { margin: 0; padding: 4px 6px 6px; list-style: none; overflow-y: auto; border-top: 1px solid rgba(98,80,70,.1); }
+	.finder-result {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		padding: 7px 9px;
+		border-radius: 10px;
+		background: transparent;
+		text-align: left;
+	}
+	.finder-result.current { background: rgba(219, 178, 178, 0.28); }
+	.finder-kind { flex: none; color: #a4938b; font-size: 12px; }
+	.finder-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+	.finder-text strong { color: #4f403b; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.finder-text small { color: #988a82; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.finder-where { flex: none; color: #b0a29b; font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; }
+	.finder-hint { margin: 0; padding: 10px 13px 12px; border-top: 1px solid rgba(98,80,70,.08); color: #a2948d; font-size: 11px; }
+	.finder-hint code { padding: 1px 4px; border-radius: 4px; background: rgba(120,96,88,.1); font-size: 10.5px; }
+	.finder-empty { margin: 0; padding: 16px 13px 18px; border-top: 1px solid rgba(98,80,70,.1); color: #9c8e87; font-size: 12px; font-style: italic; text-align: center; }
+
 	.shortcuts {
 		position: absolute;
 		z-index: 74;
@@ -2651,6 +3352,11 @@
 	.shortcuts dl { display: grid; grid-template-columns: 58px 1fr; gap: 5px 9px; margin: 0; }
 	.shortcuts dt { color: #7c6a63; font-size: 10.5px; font-variant-numeric: tabular-nums; }
 	.shortcuts dd { margin: 0; color: #948680; font-size: 10.5px; }
+
+	@media (max-width: 1360px) {
+		/* The eyebrow is the first thing worth losing to keep the top one row. */
+		.board-name span { display: none; }
+	}
 
 	@media (max-width: 1120px) {
 		/* The breadcrumb drops to its own line before anything has to shrink. */
