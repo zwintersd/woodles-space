@@ -1,4 +1,4 @@
-export const BOARD_SCHEMA_VERSION = 3;
+export const BOARD_SCHEMA_VERSION = 4;
 const MIN_CAMERA_ZOOM = 0.1;
 const MAX_CAMERA_ZOOM = 4;
 
@@ -12,8 +12,23 @@ export type WhiteboardItemType = 'card' | 'image' | 'frame' | 'stack' | 'connect
 export const TINTS = ['peach', 'lavender', 'aqua', 'gold', 'rose', 'sage'] as const;
 export type Tint = (typeof TINTS)[number];
 
-export const STATUSES = ['idea', 'open', 'doing', 'done', 'parked'] as const;
-export type Status = (typeof STATUSES)[number];
+/**
+ * Status is a word, not a fixed vocabulary. These five are offered because
+ * most boards want something like them, but a Status stack confers its own
+ * title — so a board that thinks in IDEA / BUILDING / WORKS / POLISH gets to.
+ */
+export const SUGGESTED_STATUSES = ['idea', 'open', 'doing', 'done', 'parked'] as const;
+export type Status = string;
+export const MAX_STATUS = 32;
+/** The one status the app itself reads: a checklist ticks cards to it. */
+export const DONE = 'done';
+
+/**
+ * What a stack does beyond holding cards in order. Absent means `plain`:
+ * a stack earns behaviour, it is never born with it.
+ */
+export const STACK_BEHAVIORS = ['plain', 'status', 'checklist', 'queue', 'gallery'] as const;
+export type StackBehavior = (typeof STACK_BEHAVIORS)[number];
 
 export type Camera = {
 	x: number;
@@ -81,6 +96,8 @@ export interface StackItem extends BaseWhiteboardItem {
 	type: 'stack';
 	title: string;
 	cardIds: string[];
+	/** Absent means `plain`. See STACK_BEHAVIORS. */
+	behavior?: StackBehavior;
 }
 
 export interface ConnectorItem extends BaseWhiteboardItem {
@@ -287,7 +304,11 @@ export function isTint(value: unknown): value is Tint {
 }
 
 export function isStatus(value: unknown): value is Status {
-	return typeof value === 'string' && (STATUSES as readonly string[]).includes(value);
+	return typeof value === 'string' && value.trim().length > 0 && value.length <= MAX_STATUS;
+}
+
+export function isStackBehavior(value: unknown): value is StackBehavior {
+	return typeof value === 'string' && (STACK_BEHAVIORS as readonly string[]).includes(value);
 }
 
 function isItemProperties(value: unknown): value is ItemProperties {
@@ -329,7 +350,9 @@ export function isWhiteboardItem(value: unknown): value is WhiteboardItem {
 		case 'frame':
 			return typeof value.title === 'string' && typeof value.tint === 'string';
 		case 'stack':
-			return typeof value.title === 'string' && Array.isArray(value.cardIds) && value.cardIds.every((id) => typeof id === 'string');
+			return typeof value.title === 'string' && Array.isArray(value.cardIds) &&
+				value.cardIds.every((id) => typeof id === 'string') &&
+				(value.behavior === undefined || isStackBehavior(value.behavior));
 		case 'connector':
 			return typeof value.fromId === 'string' && typeof value.toId === 'string' && typeof value.arrow === 'boolean';
 		default:

@@ -55,9 +55,17 @@ describe('the optional layer', () => {
 		expect(card.properties).toBeUndefined();
 	});
 
-	it('refuses a status or colour it does not know', () => {
-		const card = setProperty(createCard(0, 0), 'status', 'flourishing');
-		expect(card.properties).toBeUndefined();
+	it('takes any word as a status, because a Status stack confers its own name', () => {
+		expect(statusOf(setProperty(createCard(0, 0), 'status', 'BUILDING'))).toBe('BUILDING');
+		expect(statusOf(setProperty(createCard(0, 0), 'status', 'flourishing'))).toBe('flourishing');
+	});
+
+	it('keeps a status short enough to wear on a card', () => {
+		const long = setProperty(createCard(0, 0), 'status', 'x'.repeat(80));
+		expect(statusOf(long)!.length).toBe(32);
+	});
+
+	it('still refuses a colour outside the palette', () => {
 		expect(setProperty(createCard(0, 0), 'tint', 'chartreuse').properties).toBeUndefined();
 	});
 

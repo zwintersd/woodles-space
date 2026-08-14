@@ -1,6 +1,7 @@
 import {
-	isStatus,
+	DONE,
 	isTint,
+	MAX_STATUS,
 	now,
 	type ItemProperties,
 	type Status,
@@ -43,7 +44,7 @@ function clean(key: PropertyKey, value: string | null): string | null {
 	if (value === null) return null;
 	const trimmed = value.trim();
 	if (!trimmed) return null;
-	if (key === 'status') return isStatus(trimmed) ? trimmed : null;
+	if (key === 'status') return trimmed.slice(0, MAX_STATUS);
 	if (key === 'tint') return isTint(trimmed) ? trimmed : null;
 	if (key === 'kind') return trimmed.slice(0, MAX_KIND);
 	return trimmed.slice(0, MAX_SOURCE);
@@ -60,6 +61,14 @@ export function setItemProperty(
 
 export function statusOf(item: WhiteboardItem): Status | null {
 	return item.properties?.status ?? null;
+}
+
+/**
+ * The one status the app itself acts on, so a checklist tick and a card that
+ * simply says "Done" mean the same thing.
+ */
+export function isDone(item: WhiteboardItem): boolean {
+	return (statusOf(item) ?? '').trim().toLowerCase() === DONE;
 }
 
 export function kindOf(item: WhiteboardItem): string | null {

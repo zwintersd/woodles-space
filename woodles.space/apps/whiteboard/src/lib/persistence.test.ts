@@ -67,7 +67,7 @@ describe('whiteboard persistence', () => {
 			savedAt: '2026-08-13T00:00:00.000Z',
 			data: {
 				...createEmptyBoard(),
-				items: [{ ...card, properties: { status: 'flourishing', labelIds: 'not-a-list' } }]
+				items: [{ ...card, properties: { labelIds: 'not-a-list', tint: 42 } }]
 			}
 		}));
 
