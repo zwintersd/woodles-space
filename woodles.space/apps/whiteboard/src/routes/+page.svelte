@@ -96,7 +96,21 @@
 	statusOf
 	} from '$lib/properties';
 	import { hitsBounds, searchBoard, type SearchHit } from '$lib/search';
-	import { STATUSES, TINTS, type Label, type Tint } from '$lib/model';
+	import {
+	behaviorOf,
+	BEHAVIOR_NOTES,
+	checklistProgress,
+	isStack,
+	queueHeads,
+	renameStack,
+	setStackBehavior,
+	shiftCardColumn,
+	stackBeside,
+	takeFromQueue,
+	toggleChecked
+	} from '$lib/stacks';
+	import { isDone } from '$lib/properties';
+	import { STACK_BEHAVIORS, SUGGESTED_STATUSES, TINTS, type Label, type StackBehavior, type Tint } from '$lib/model';
 
 	type Tool = 'select' | 'frame' | 'stack' | 'line';
 	type Drawer = 'places' | 'journey' | 'details';
@@ -836,8 +850,71 @@
 		updateItem(item.id, { title: value }, true);
 	}
 
+	/**
+	 * Stack titles go through `renameStack`, not `updateItem`: a Status stack's
+	 * title is the status it confers, so renaming it renames every card inside.
+	 */
 	function updateStack(item: StackItem, value: string) {
-		updateItem(item.id, { title: value }, true);
+		board = renameStack(board, item.id, value);
+		board.updatedAt = now();
+		scheduleSave();
+	}
+
+	function changeBehavior(stackId: string, behavior: StackBehavior) {
+		board = setStackBehavior(board, stackId, behavior);
+		scheduleSave();
+	}
+
+	function tickCard(card: WhiteboardItem) {
+		board = toggleChecked(board, card.id);
+		scheduleSave();
+	}
+
+	function takeTop(stackId: string) {
+		board = takeFromQueue(board, stackId);
+		scheduleSave();
+	}
+
+	function addColumnBeside(stack: StackItem) {
+		board = stackBeside(board, stack.id, 'New column');
+		scheduleSave();
+	}
+
+	function moveCardColumn(direction: -1 | 1) {
+		const card = chosen.find((item) => item.type === 'card' && item.stackId);
+		if (!card) return;
+		const before = board;
+		board = shiftCardColumn(board, card.id, direction);
+		if (board === before) notice = 'That is the last column this way.';
+		else scheduleSave();
+	}
+
+	const stacksById = $derived(new Map(board.items.filter(isStack).map((item) => [item.id, item])));
+
+	/** The stack a card is laid in, and therefore how it should be shown. */
+	function homeStack(item: WhiteboardItem): StackItem | null {
+		return item.type === 'card' && item.stackId ? stacksById.get(item.stackId) ?? null : null;
+	}
+
+	function cardMode(item: WhiteboardItem): StackBehavior | null {
+		const stack = homeStack(item);
+		return stack ? behaviorOf(stack) : null;
+	}
+
+	/** "now" for the top of a queue, "next" for the one under it. */
+	function queueRank(item: WhiteboardItem): 'now' | 'next' | null {
+		const stack = homeStack(item);
+		if (!stack || behaviorOf(stack) !== 'queue') return null;
+		const at = stack.cardIds.indexOf(item.id);
+		return at === 0 ? 'now' : at === 1 ? 'next' : null;
+	}
+
+	function stackCountLabel(stack: StackItem): string {
+		if (behaviorOf(stack) === 'checklist') {
+			const progress = checklistProgress(board.items, stack);
+			return progress.total ? `${progress.done}/${progress.total}` : '';
+		}
+		return stack.cardIds.length ? String(stack.cardIds.length) : '';
 	}
 
 	function deleteSelection() {
@@ -1584,6 +1661,12 @@
 			openDetails();
 			return;
 		}
+		// The keyboard says what the drag says: move the card one column along.
+		if (event.shiftKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+			event.preventDefault();
+			moveCardColumn(event.key === 'ArrowLeft' ? -1 : 1);
+			return;
+		}
 		if (event.key === '?') {
 			event.preventDefault();
 			shortcutsOpen = !shortcutsOpen;
@@ -1774,10 +1857,10 @@
 					class:dragging={draggingIds.includes(item.id)}
 					class:drop-target={dropStackId === item.id}
 					class:found={matchIds.has(item.id)}
-					class="board-item stack tint-{colorOf(item) ?? 'none'}"
+					class="board-item stack tint-{colorOf(item) ?? 'none'} does-{behaviorOf(item)}"
 					style={itemStyle(item)}
 					role="group"
-					aria-label={`Stack: ${item.title || 'Untitled stack'}`}
+					aria-label={`${behaviorOf(item) === 'plain' ? 'Stack' : `${behaviorOf(item)} stack`}: ${item.title || 'Untitled stack'}`}
 					onpointerdown={(event) => handleItemPointerDown(event, item)}
 					ondblclick={(event) => handleItemDoubleClick(event, item)}
 				>
@@ -1791,8 +1874,20 @@
 							oninput={(event) => updateStack(item, (event.currentTarget as HTMLInputElement).value)}
 							onkeydown={handleEditableKeydown}
 						/>
-						<span class="stack-count">{item.cardIds.length || ''}</span>
+						{#if behaviorOf(item) !== 'plain'}
+							<span class="stack-mode" title={BEHAVIOR_NOTES[behaviorOf(item)]}>{behaviorOf(item)}</span>
+						{/if}
+						<span class="stack-count">{stackCountLabel(item)}</span>
 					</div>
+					{#if behaviorOf(item) === 'queue' && item.cardIds.length}
+						<button
+							data-whiteboard-ui
+							class="queue-take"
+							title="Take the top card out and set it down beside the stack"
+							onpointerdown={stopChipPointer}
+							onclick={() => takeTop(item.id)}
+						>take “{itemLabel(queueHeads(board.items, item).now ?? item)}”</button>
+					{/if}
 					{#if chipsFor(item).length}
 						<div class="chip-row stack-chips" data-whiteboard-ui>
 							{#each chipsFor(item) as label (label.id)}
@@ -1815,14 +1910,31 @@
 					class:dragging={draggingIds.includes(item.id)}
 					class:in-stack={Boolean(item.stackId)}
 					class:found={matchIds.has(item.id)}
-					class="board-item card tint-{colorOf(item) ?? 'none'}"
+					class:tile={cardMode(item) === 'gallery'}
+					class:ticked={cardMode(item) === 'checklist' && isDone(item)}
+					class="board-item card tint-{colorOf(item) ?? 'none'} laid-{cardMode(item) ?? 'free'}"
 					style={itemStyle(item)}
 					role="group"
 					aria-label={`Card: ${item.title || 'Untitled card'}`}
 					onpointerdown={(event) => handleItemPointerDown(event, item)}
 					ondblclick={(event) => handleItemDoubleClick(event, item)}
 				>
-					<div class="card-topline" aria-hidden="true"></div>
+					{#if cardMode(item) === 'checklist'}
+						<button
+							data-whiteboard-ui
+							class:on={isDone(item)}
+							class="tick"
+							aria-label={isDone(item) ? `Untick ${itemLabel(item)}` : `Tick off ${itemLabel(item)}`}
+							aria-pressed={isDone(item)}
+							onpointerdown={stopChipPointer}
+							onclick={() => tickCard(item)}
+						><span aria-hidden="true">✓</span></button>
+					{:else}
+						<div class="card-topline" aria-hidden="true"></div>
+					{/if}
+					{#if queueRank(item)}
+						<span class="queue-badge {queueRank(item)}">{queueRank(item)}</span>
+					{/if}
 					<span class="card-grip" aria-hidden="true">⠿</span>
 					{#if kindOf(item)}
 						<p class="card-kind">{kindOf(item)}</p>
@@ -2134,6 +2246,34 @@
 							</p>
 						</section>
 
+						{#if only && isStack(only)}
+							<section>
+								<h3>What this stack does</h3>
+								<div class="row-buttons">
+									{#each STACK_BEHAVIORS as behavior (behavior)}
+										<button
+											class:active={behaviorOf(only) === behavior}
+											class="chip"
+											onclick={() => changeBehavior(only.id, behavior)}
+										>{behavior}</button>
+									{/each}
+								</div>
+								<p class="drawer-note behavior-note">{BEHAVIOR_NOTES[behaviorOf(only)]}</p>
+								{#if behaviorOf(only) === 'status'}
+									<div class="row-buttons">
+										<button class="chip strong" onclick={() => addColumnBeside(only)}>Add a column beside this</button>
+									</div>
+									<p class="drawer-note">Four of these side by side is a board. Nothing new is created — they are still stacks on the same canvas.</p>
+								{:else if behaviorOf(only) === 'queue'}
+									<div class="row-buttons">
+										<button class="chip strong" disabled={!only.cardIds.length} onclick={() => takeTop(only.id)}>Take the top card</button>
+									</div>
+								{:else if behaviorOf(only) === 'checklist'}
+									<p class="drawer-note">{checklistProgress(board.items, only).done} of {checklistProgress(board.items, only).total} ticked.</p>
+								{/if}
+							</section>
+						{/if}
+
 						<section>
 							<h3>Labels</h3>
 							{#if only && chipsFor(only).length}
@@ -2166,7 +2306,7 @@
 						<section>
 							<h3>Status</h3>
 							<div class="row-buttons">
-								{#each STATUSES as status (status)}
+								{#each SUGGESTED_STATUSES as status (status)}
 									<button
 										class:active={sharedProperty(statusOf) === status}
 										class="chip status-pick {status}"
@@ -2174,6 +2314,16 @@
 									><i aria-hidden="true"></i>{status}</button>
 								{/each}
 							</div>
+							<input
+								class="place-input wide status-free"
+								aria-label="Status"
+								placeholder="or a word of your own…"
+								value={sharedProperty(statusOf) ?? ''}
+								oninput={(event) => writeProperty('status', (event.currentTarget as HTMLInputElement).value)}
+							/>
+							{#if only?.type === 'card' && homeStack(only) && behaviorOf(homeStack(only)!) === 'status'}
+								<p class="drawer-note">Held by “{homeStack(only)!.title.trim() || 'an unnamed stack'}”, which sets this. Drag the card to another column to change it.</p>
+							{/if}
 						</section>
 
 						<section>
@@ -2391,6 +2541,7 @@
 			<dl>
 				<dt>/ ⌘K</dt><dd>find anything</dd>
 				<dt>I</dt><dd>details of what's chosen</dd>
+				<dt>⇧← →</dt><dd>move a card a column along</dd>
 				<dt>[ ]</dt><dd>previous / next frame</dd>
 				<dt>1–9</dt><dd>jump to a frame</dd>
 				<dt>0</dt><dd>fit the whole board</dd>
@@ -2645,8 +2796,93 @@
 		outline: none;
 	}
 
-	.stack-count { color: #9a8d86; font-size: 12px; min-width: 10px; text-align: right; }
+	.stack-count { color: #9a8d86; font-size: 12px; min-width: 10px; text-align: right; font-variant-numeric: tabular-nums; }
 	.stack-empty { margin: 22px 14px; color: #a69a93; font-size: 12px; font-style: italic; }
+
+	/*
+	 * A stack with a behaviour still looks like a stack in the same place. The
+	 * only outward difference is a word in the header and what its cards do.
+	 */
+	.stack-mode {
+		flex: none;
+		padding: 2px 6px;
+		border-radius: 999px;
+		background: rgba(120, 96, 88, 0.1);
+		color: #8b7a73;
+		font-size: 9px;
+		letter-spacing: .07em;
+		text-transform: uppercase;
+		cursor: help;
+	}
+	.stack.does-status { border-color: rgba(137, 103, 89, 0.3); }
+	.stack.does-status .stack-header { border-bottom-width: 2px; border-bottom-color: rgba(137, 103, 89, 0.22); }
+	.stack.does-status .stack-header input { font-size: 14px; letter-spacing: .05em; text-transform: uppercase; }
+
+	.queue-take {
+		display: block;
+		width: calc(100% - 26px);
+		margin: 9px 13px 0;
+		padding: 5px 8px;
+		border: 1px dashed rgba(120, 96, 88, 0.3);
+		border-radius: 9px;
+		background: transparent;
+		color: #7c6a63;
+		font-size: 11px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		transition: background 130ms ease, border-color 130ms ease;
+	}
+	.queue-take:hover { border-color: rgba(167, 102, 112, 0.5); background: rgba(219, 178, 178, 0.22); color: #7c4a53; }
+
+	.tick {
+		position: absolute;
+		left: 15px;
+		top: 13px;
+		width: 15px;
+		height: 15px;
+		display: grid;
+		place-items: center;
+		border: 1.5px solid rgba(120, 96, 88, 0.34);
+		border-radius: 5px;
+		background: transparent;
+		color: transparent;
+		font-size: 10px;
+		line-height: 1;
+		transition: background 130ms ease, border-color 130ms ease, color 130ms ease;
+	}
+	.tick:hover { border-color: rgba(120, 96, 88, 0.6); color: rgba(120, 96, 88, 0.35); }
+	.tick.on { border-color: rgba(122, 152, 132, 0.85); background: rgba(140, 177, 156, 0.5); color: #40624f; }
+	.card.laid-checklist .card-title,
+	.card.laid-checklist .card-body { padding-left: 24px; }
+	.card.ticked .card-title { color: #9a8d86; text-decoration: line-through; text-decoration-color: rgba(120, 96, 88, 0.4); }
+	.card.ticked .card-body { color: #a49790; }
+
+	.queue-badge {
+		position: absolute;
+		left: 16px;
+		top: 7px;
+		padding: 1px 6px;
+		border-radius: 999px;
+		font-size: 8.5px;
+		font-weight: 700;
+		letter-spacing: .09em;
+		text-transform: uppercase;
+	}
+	.queue-badge.now { background: rgba(219, 178, 178, 0.62); color: #7c4a53; }
+	.queue-badge.next { background: rgba(120, 96, 88, 0.11); color: #8b7a73; }
+	.card.laid-queue .card-topline { display: none; }
+	.card.laid-queue .card-title { margin-top: 11px; }
+
+	/* A gallery tile is the same card, read at a glance. Its box is a fixed size,
+	   so unlike a free card it clips rather than spilling over its neighbour. */
+	.card.tile { padding: 11px 12px 10px; overflow: hidden; }
+	.card.tile .card-topline,
+	.card.tile .card-grip,
+	.card.tile .card-kind,
+	.card.tile .card-body,
+	.card.tile .chip-row { display: none; }
+	.card.tile .card-title { margin-top: 0; font-size: 12.5px; line-height: 1.3; }
 
 	.card {
 		min-width: 150px;

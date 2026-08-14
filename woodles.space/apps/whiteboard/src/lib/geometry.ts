@@ -14,6 +14,17 @@ export const STACK_GAP = 10;
  */
 export const GALLERY_MIN_TILE = 104;
 export const GALLERY_TILE_HEIGHT = 96;
+/**
+ * A queue keeps a strip under its header for the "take the top card" action.
+ * Cards are laid out in world coordinates, so the room has to be made here —
+ * otherwise the first card is drawn straight over the button.
+ */
+export const QUEUE_BAR = 34;
+
+/** Where a stack's cards begin, below the header and anything under it. */
+export function stackTopInset(stack: StackItem): number {
+	return STACK_HEADER_HEIGHT + STACK_INSET + (stack.behavior === 'queue' ? QUEUE_BAR : 0);
+}
 
 export function clampZoom(value: number): number {
 	return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
@@ -73,13 +84,13 @@ export function stackContentHeight(items: WhiteboardItem[], stack: StackItem): n
 	const inner = stack.behavior === 'gallery'
 		? Math.ceil(cards.length / galleryColumns(stack)) * (GALLERY_TILE_HEIGHT + STACK_GAP) - STACK_GAP
 		: cards.reduce((total, card) => total + Math.max(72, card.height), 0) + STACK_GAP * (cards.length - 1);
-	return Math.max(stack.height, STACK_HEADER_HEIGHT + STACK_INSET + inner + STACK_INSET);
+	return Math.max(stack.height, stackTopInset(stack) + inner + STACK_INSET);
 }
 
 export function stackCardBounds(items: WhiteboardItem[], stack: StackItem, card: CardItem): Bounds {
 	const cards = stackCards(items, stack);
 	const index = Math.max(0, cards.findIndex((candidate) => candidate.id === card.id));
-	const top = stack.y + STACK_HEADER_HEIGHT + STACK_INSET;
+	const top = stack.y + stackTopInset(stack);
 
 	// A gallery lays its cards out as tiles across and then down. It is still
 	// the same stack in the same place — only the reading order is wrapped.

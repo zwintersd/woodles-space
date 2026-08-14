@@ -133,7 +133,7 @@ woodles.space/
     ├── planner/             SvelteKit · carillon — self-observation, day piles, and reinforcement
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
     ├── thinking-about/      SvelteKit · a board for what's being read, played, and watched — and, per entry, a structured record cast for it
-    ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking — a camera that knows where it is, and cards that can say more than they show
+    ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking — a camera that knows where it is, cards that say more than they show, and stacks that do more than hold them
     ├── bloomforge/          SvelteKit · a studio for making incremental games
     └── bloomforge-player/   SvelteKit · the runtime that makes those games playable
 ```
@@ -695,7 +695,45 @@ camera history, Enter keeps the one you landed on and records a single move
 from where the search began, `⇧↵` pulls back to hold every result at once, and
 Escape puts the camera back where it started.
 
-Schemas 2 and 3 both migrate forward by filling in what they added. A corrupt
+**Stack behaviours.** Schema 4 lets a stack do more than hold cards in order:
+`behavior` is `status`, `checklist`, `queue` or `gallery`, and is absent
+entirely until a stack earns one — a plain stack carries no field at all, and
+setting it back to plain removes it again.
+
+A **Status** stack's title *is* the status it confers. Every card inside wears
+it, so dragging a card from IDEA to BUILDING **is** the status change rather
+than something to remember afterwards, and renaming the stack renames the
+status of everything in it. `conferStackStatuses` runs from both
+`insertCardIntoStack` and `repairDocument`, which are the only two ways stack
+membership changes, so a card cannot sit in one column while claiming to be
+something else. Nothing is taken away on the way out: a card that leaves keeps
+what it was last told.
+
+That is why status is a word rather than a closed vocabulary — the five
+suggestions stay, but a board that thinks in IDEA / BUILDING / WORKS / POLISH
+gets to. `done` is the one status the app itself reads, so a **checklist**
+tick and a card that simply says "Done" are the same fact.
+
+**Kanban is four Status stacks beside one another and nothing else** — no board
+object, no mode, no database. `stackBeside` puts the next column down to the
+right at the same size and height, and `shiftCardColumn` lets the keyboard say
+what the drag says, reading the column order off where the stacks actually sit
+rather than off a stored sequence.
+
+A **queue** badges its top two cards `now` and `next` and keeps a strip clear
+under its header for "take the top card", which lifts that card out and sets it
+down beside the stack — picking up the current thing is a move across the board,
+not a state change in a list. That strip is `stackTopInset`, in the geometry:
+cards are laid out in world coordinates, so the room has to be made there or the
+first card is drawn straight over the button. A **gallery** wraps the same cards
+into tiles across and then down, sized so the default stack width gives two per
+row.
+
+None of it moves anything off the canvas, which is the rule the whole update is
+built around: a stack with a behaviour is still a stack, in the same place, with
+cards you can drag in and out of it.
+
+Schemas 2, 3 and 4 each migrate forward by filling in what they added. A corrupt
 journey costs you the journey, never the board; an unreadable property sheet
 costs that one object its properties and nothing else.
 
@@ -1312,20 +1350,23 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1967 tests total: 16 in `api/` (its own
+1999 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1951 across sixteen pnpm
+instead of the recursive `pnpm -r test`), plus 1983 across sixteen pnpm
 packages — `write` 242, `marginalia` 333, `planner` 539,
 `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
 `packages/sync` 36, `packages/persistence` 6, `packages/app-manifest` 17,
 `packages/handoff` 14, `packages/text` 30, `packages/spellcraft` 15,
 `packages/emoji` 4, `packages/incremental-core` 191, `thinking-about` 131,
-and `whiteboard` 126.
+and `whiteboard` 158.
 (Counted by running each suite, not by adding to the previous figure — keep
 this inventory current when a suite changes; the root command is the release
 contract, not the prose count.)
-(Whiteboard's suite grew by a further 52 for the optional layer: `labels.ts`
+(Whiteboard's suite grew by a further 32 for stack behaviours, nearly all in
+`stacks.ts` — status conferral and renaming, the column shift, ticking,
+queue heads and taking, and the gallery's wrapped layout. Before that it grew
+by 52 for the optional layer: `labels.ts`
 (19) for the reusable label registry, `properties.ts` (15) for the property
 sheet that disappears when it is empty, `search.ts` (18) for finding and
 ranking, and two more in `persistence.ts` for carrying an older save forward

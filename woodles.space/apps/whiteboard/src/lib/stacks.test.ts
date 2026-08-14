@@ -19,7 +19,8 @@ import {
 	repairDocument,
 	stackCardBounds,
 	stackContentHeight,
-	stackCards
+	stackCards,
+	stackTopInset
 } from './geometry';
 import { isDone, setItemProperty, statusOf } from './properties';
 import { createCard, createEmptyBoard, createStack, type StackItem, type WhiteboardDocument } from './model';
@@ -211,6 +212,20 @@ describe('queue stacks', () => {
 	it('has nothing to take from an empty queue', () => {
 		const document = setStackBehavior(board(), 'ideas', 'queue');
 		expect(takeFromQueue(document, 'ideas')).toBe(document);
+	});
+
+	it('keeps a strip clear under the header, so the take action is not buried', () => {
+		const plain = withCards(board(), 'ideas', ['one']);
+		const queue = setStackBehavior(plain, 'ideas', 'queue');
+		const boundsIn = (document: WhiteboardDocument) =>
+			stackCardBounds(
+				document.items,
+				document.items.find((item): item is StackItem => item.id === 'ideas')!,
+				document.items.find((item) => item.id === 'one') as never
+			);
+		expect(boundsIn(queue).y).toBeGreaterThan(boundsIn(plain).y);
+		const stack = queue.items.find((item): item is StackItem => item.id === 'ideas')!;
+		expect(stackTopInset(stack)).toBeGreaterThan(stackTopInset({ ...stack, behavior: 'plain' }));
 	});
 });
 
