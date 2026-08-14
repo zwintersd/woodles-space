@@ -133,7 +133,7 @@ woodles.space/
     ├── planner/             SvelteKit · carillon — self-observation, day piles, and reinforcement
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
     ├── thinking-about/      SvelteKit · a board for what's being read, played, and watched — and, per entry, a structured record cast for it
-    ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking
+    ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking — and a camera that knows where it is in it
     ├── bloomforge/          SvelteKit · a studio for making incremental games
     └── bloomforge-player/   SvelteKit · the runtime that makes those games playable
 ```
@@ -609,6 +609,60 @@ entry might not have. Spores' worldbuilding categories (creature, biome,
 ability, stat, minigame, lore) did not come with it: they were the retired Dev
 Log's content, and nothing in this workspace's four healthy apps is about
 marginalia's world, so there was nowhere honest to put them.
+
+## the navigable board
+
+`whiteboard` is a wide, tactile place for spatial thinking: cards, stacks,
+images, connectors, and frames on one canvas that is bigger than the screen.
+Once the canvas is genuinely large, moving around it becomes its own form of
+organization, so the navigation is the app's second subject rather than a
+convenience laid over the first.
+
+**The camera.** `src/lib/camera.ts` interpolates a move along van Wijk &
+Nuij's arc ("Smooth and Efficient Zooming and Panning", 2003) instead of
+tweening `x`, `y` and `zoom` in a straight line. A long jump lifts, travels
+while the board is small enough to read whole, then settles — the alternative
+smears the board sideways at reading scale, which is the motion that makes
+people lose their place. The arc's parameters come out of the paper: ρ = 1.42
+for curvature, constant velocity along the path, so a longer journey honestly
+takes longer (bounded to 280–1500 ms). The arc deliberately pulls wider than
+either endpoint, so the intermediate zoom is clamped; that flattens the top of
+the arc into a pan at the widest legal scale, and the centre is unaffected.
+The same file owns the camera history — Back and Forward over *deliberate*
+moves only, refreshing the entry being left with the live camera so Back
+returns to where you actually were rather than to where a jump last landed.
+Free panning and zooming are not recorded: history is a record of decisions,
+not of drifting.
+
+**Location.** `src/lib/navigation.ts` answers "where am I". `frameSequence`
+bands frames into rows and reads them top-to-bottom, left-to-right; that is
+the order `[` and `]` and the number keys walk, and it stays true as frames
+move, so the sequence never needs maintaining by hand. Containment forces
+`parent.x <= child.x`, so a nested frame always follows its parent.
+`locateCamera` reports the chain of frames the viewport centre is inside as a
+breadcrumb, dropping frames too small to fill a meaningful share of the view —
+from high above you are over the board, not in any one place.
+
+**Journeys.** `src/lib/journey.ts` is Journey Mode: an ordered sequence of
+stops that the camera walks when Play is pressed. A stop points at something
+that already exists (an item, a saved viewpoint, or the whole board) rather
+than storing a camera of its own, so moving or renaming a frame moves the stop
+with it, and deleting one shortens the journey instead of leaving a step that
+lands nowhere (`repairJourney`, in `geometry.ts`). With nothing arranged by
+hand, `suggestedStops` offers an overview followed by every frame in reading
+order, so Play means something the first time it is pressed.
+
+**The shelf.** `src/lib/library.ts` makes a whiteboard one of many. Each board
+is its own versioned save under `woodles.whiteboard.boards.<id>` with a small
+index alongside it; the prefix is deliberately not `…board.`, which would read
+the single-board era's `…board.v1` key as a board whose id is `v1`. That one
+old board is adopted onto the shelf once, and its key cleared only after its
+contents are safely rewritten, so an interrupted migration retries rather than
+loses. Deleting a board only deletes the images no other board still holds.
+
+Schema 2 added the navigation to the document itself — `home`, `viewpoints`,
+`journey` — and migrates schema 1 by filling them in; a corrupt journey costs
+you the journey, never the board.
 
 ## the writing surface
 
@@ -1223,19 +1277,27 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1832 tests total: 16 in `api/` (its own
+1915 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1816 across sixteen pnpm
-packages — `write` 223, `marginalia` 333, `planner` 539,
+instead of the recursive `pnpm -r test`), plus 1899 across sixteen pnpm
+packages — `write` 242, `marginalia` 333, `planner` 539,
 `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
 `packages/sync` 36, `packages/persistence` 6, `packages/app-manifest` 17,
 `packages/handoff` 14, `packages/text` 30, `packages/spellcraft` 15,
 `packages/emoji` 4, `packages/incremental-core` 191, `thinking-about` 131,
-and `whiteboard` 10.
+and `whiteboard` 74.
 (Counted by running each suite, not by adding to the previous figure — keep
 this inventory current when a suite changes; the root command is the release
 contract, not the prose count.)
+(Whiteboard's suite grew by 64 for navigation: `camera.ts` (16) for the van
+Wijk flight and the history stack, `navigation.ts` (15) for reading order,
+breadcrumbs and framing, `journey.ts` (14) for arranging and playing a
+sequence, `library.ts` (12) for the board shelf and the one-time adoption of
+the single-board save, and `minimap.ts` (7) for the overview projection. The
+chrome those modules drive — the breadcrumb bar, the drawer, the player, the
+shelf — is exercised by hand rather than by a unit suite, same as every other
+view-only Svelte component here.)
 (Spores' 140 retired with the app. Write's suite grew by 28 — `sporesImport.ts`
 (14), `backlinks.ts` (7), `status.ts` (7) — for the pieces of it that moved in;
 Thinking About's grew by 13 for the spell registry's assembler and parser;

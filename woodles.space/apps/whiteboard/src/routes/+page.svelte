@@ -4,14 +4,13 @@
 	import {
 	boundsForItem,
 	connectorEndpoints,
-	documentBounds,
 	extractCardFromStack,
-	fitCamera,
 	insertCardIntoStack,
 	intersects,
 	normalizeBounds,
 	reorderStackCard,
 	removeItems,
+	repairDocument,
 	screenToWorld,
 	stackCardBounds,
 	stackCards,
@@ -23,21 +22,61 @@
 	createFrame,
 	createImage,
 	createStack,
+	createViewpoint,
 	makeId,
 	nextZ,
 	now,
-	snapshotDocument,
 	type Bounds,
 	type Camera,
 	type CardItem,
 	type FrameItem,
+	type JourneyStop,
 	type StackItem,
+	type Viewpoint,
 	type WhiteboardDocument,
 	type WhiteboardItem
 	} from '$lib/model';
-	import { restoreWhiteboard, whiteboardStorage } from '$lib/persistence';
+	import {
+	camerasMatch,
+	canGoBack,
+	canGoForward,
+	createCameraHistory,
+	planCameraFlight,
+	pushCameraMark,
+	scaleName,
+	stepHistory,
+	visibleBounds,
+	type CameraHistory
+	} from '$lib/camera';
+	import {
+	fitBoardCamera,
+	focusCamera,
+	frameSequence,
+	frameTitle,
+	itemLabel,
+	locateCamera,
+	stepFrame
+	} from '$lib/navigation';
+	import {
+	addStop,
+	advanceStop,
+	hasStop,
+	moveStop,
+	removeStop,
+	resolveJourney,
+	setJourneyLoop,
+	setJourneyStops,
+	setStopHold,
+	stepStop,
+	suggestedStops
+	} from '$lib/journey';
+	import { cameraCentredOn, minimapExtent, minimapMarks, minimapProjection } from '$lib/minimap';
+	import { boardLibrary, boardTitleFallback, type BoardSummary } from '$lib/library';
+	import { restoreWhiteboard } from '$lib/persistence';
 
 	type Tool = 'select' | 'frame' | 'stack' | 'line';
+	type Drawer = 'places' | 'journey';
+	const MINIMAP = { width: 186, height: 124 };
 	type SaveState = 'idle' | 'saving' | 'saved' | 'recovered' | 'error';
 	type Point = { x: number; y: number };
 	type PointerMove = { pointerId: number; screen: Point };
@@ -83,6 +122,9 @@
 		board: { id: 'loading-board', title: 'Untitled whiteboard' },
 		items: [],
 		camera: { x: 180, y: 120, zoom: 1 },
+		home: null,
+		viewpoints: [],
+		journey: { stops: [], loop: false },
 		updatedAt: ''
 	});
 	let tool = $state<Tool>('select');
@@ -109,6 +151,26 @@
 	let dirty = false;
 	const pendingAssetDeletes = new Set<string>();
 
+	// Navigation: where the camera has been, where it can go, and what it says.
+	let history = $state<CameraHistory>(createCameraHistory({ camera: { x: 180, y: 120, zoom: 1 }, label: 'Board' }));
+	let viewportSize = $state({ width: 1200, height: 800 });
+	let drawer = $state<Drawer | null>(null);
+	let minimapOn = $state(true);
+	let shortcutsOpen = $state(false);
+	let newViewpointName = $state('');
+	let renamingViewpointId = $state<string | null>(null);
+
+	// The shelf: every board, and which one is open.
+	let shelfOpen = $state(false);
+	let boards = $state<BoardSummary[]>([]);
+	let confirmDeleteId = $state<string | null>(null);
+
+	// Journey Mode.
+	let playing = $state(false);
+	let paused = $state(false);
+	let playIndex = $state(0);
+	let playTimer: ReturnType<typeof setTimeout> | null = null;
+
 	const objects = $derived(
 		board.items
 			.filter((item) => item.type !== 'connector')
@@ -122,9 +184,22 @@
 	const connectors = $derived(board.items.filter((item) => item.type === 'connector'));
 	const hasContent = $derived(board.items.some((item) => item.type !== 'connector'));
 
+	const sequence = $derived(frameSequence(board.items));
+	/** The frames the camera is inside, outermost first — the breadcrumb. */
+	const trail = $derived(locateCamera(board.items, board.camera, viewportSize));
+	const here = $derived(trail.length ? trail[trail.length - 1] : null);
+	const stops = $derived(resolveJourney(board, viewportSize));
+	const mapProjection = $derived(minimapProjection(minimapExtent(board, board.camera, viewportSize), MINIMAP));
+	const mapMarks = $derived(minimapMarks(board.items));
+	const mapView = $derived(mapProjection.project(visibleBounds(board.camera, viewportSize)));
+
 	function viewport(): { width: number; height: number } {
 		const rect = canvasEl?.getBoundingClientRect();
 		return { width: rect?.width ?? window.innerWidth, height: rect?.height ?? window.innerHeight };
+	}
+
+	function measureViewport() {
+		viewportSize = viewport();
 	}
 
 	function localPoint(event: MouseEvent | PointerEvent | WheelEvent | DragEvent): Point {
@@ -219,7 +294,7 @@
 			saveTimer = null;
 		}
 		board.updatedAt = now();
-		const result = whiteboardStorage.save(snapshotDocument(board));
+		const result = boardLibrary.save(board);
 		if (result.ok) {
 			dirty = false;
 			saveState = 'saved';
@@ -259,31 +334,59 @@
 	}
 
 	onMount(() => {
-		const result = whiteboardStorage.load();
-		board = restoreWhiteboard(result.value);
-		if (result.source === 'backup') {
-			saveState = 'recovered';
-			saveMessage = 'restored the last saved board';
-		} else if (result.issue) {
-			saveState = 'error';
-			saveMessage = result.issue.message;
-		} else if (result.source === 'primary') {
+		measureViewport();
+		// The one board of the single-board era becomes the first board on the shelf.
+		const adopted = boardLibrary.adoptLegacyBoard();
+		const opened = adopted
+			? { document: adopted, source: 'primary' as const, issue: null }
+			: openLastBoard();
+
+		if (opened) {
+			board = restoreWhiteboard(opened.document);
+			boardLibrary.setActiveId(board.board.id);
+			if (opened.source === 'backup') {
+				saveState = 'recovered';
+				saveMessage = 'restored the last saved board';
+			} else if (opened.issue) {
+				saveState = 'error';
+				saveMessage = opened.issue;
+			} else {
+				saveState = 'saved';
+				saveMessage = 'saved here';
+			}
+		} else {
+			board = boardLibrary.create();
 			saveState = 'saved';
 			saveMessage = 'saved here';
 		}
+
+		history = createCameraHistory({ camera: { ...board.camera }, label: 'Where you were' });
 		loaded = true;
+		refreshBoards();
 		void hydrateImages();
+
 		const onBeforeUnload = () => saveNow();
 		window.addEventListener('beforeunload', onBeforeUnload);
+		window.addEventListener('resize', measureViewport);
 		return () => {
 			window.removeEventListener('beforeunload', onBeforeUnload);
+			window.removeEventListener('resize', measureViewport);
 			saveNow();
 		};
 	});
 
+	function openLastBoard() {
+		const shelf = boardLibrary.list();
+		if (!shelf.length) return null;
+		const active = boardLibrary.activeId();
+		const target = active && shelf.some((entry) => entry.id === active) ? active : shelf[0].id;
+		return boardLibrary.open(target);
+	}
+
 	onDestroy(() => {
 		if (cameraAnimation) cancelAnimationFrame(cameraAnimation);
 		if (pointerMoveFrame) cancelAnimationFrame(pointerMoveFrame);
+		clearPlayTimer();
 		Object.values(imageUrls).forEach((url) => URL.revokeObjectURL(url));
 	});
 
@@ -371,8 +474,14 @@
 		input.value = '';
 	}
 
+	/** Taking hold of the board mid-journey pauses it rather than fighting you. */
+	function handHoldsTheCamera() {
+		if (playing && !paused) pauseJourney();
+	}
+
 	function handleCanvasPointerDown(event: PointerEvent) {
 		if (targetHasUI(event.target)) return;
+		handHoldsTheCamera();
 		interruptCameraAnimation();
 		if (event.button === 1 || (event.button === 0 && spaceHeld)) {
 			beginPan(event);
@@ -423,6 +532,7 @@
 		}
 		if (event.button !== 0) return;
 		event.stopPropagation();
+		handHoldsTheCamera();
 		interruptCameraAnimation();
 		if (tool === 'line') {
 			connectTo(item);
@@ -731,6 +841,7 @@
 
 	function handleWheel(event: WheelEvent) {
 		event.preventDefault();
+		handHoldsTheCamera();
 		interruptCameraAnimation();
 		const factor = Math.exp(-event.deltaY * 0.00125);
 		board.camera = zoomAroundPoint(board.camera, localPoint(event), board.camera.zoom * factor);
@@ -742,49 +853,97 @@
 		cameraAnimation = 0;
 	}
 
-	function animateCamera(target: Camera) {
+	function prefersReducedMotion(): boolean {
+		return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+	}
+
+	/** Returns how long the move will take, so a journey can time its next step. */
+	function animateCamera(target: Camera): number {
 		interruptCameraAnimation();
-		const start = { ...board.camera };
-		const reduceMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-		if (reduceMotion) {
-			board.camera = target;
+		measureViewport();
+		if (prefersReducedMotion()) {
+			board.camera = { ...target };
 			scheduleSave();
-			return;
+			return 0;
 		}
+		const flight = planCameraFlight(board.camera, target, viewport());
 		const startAt = performance.now();
-		const duration = 460;
-		const ease = (value: number) => 1 - Math.pow(1 - value, 4);
 		const step = (time: number) => {
-			const amount = Math.min(1, (time - startAt) / duration);
-			const t = ease(amount);
-			board.camera = {
-				x: start.x + (target.x - start.x) * t,
-				y: start.y + (target.y - start.y) * t,
-				zoom: start.zoom + (target.zoom - start.zoom) * t
-			};
+			const progress = Math.min(1, (time - startAt) / flight.duration);
+			board.camera = flight.at(progress);
 			markDirty();
-			if (amount < 1) cameraAnimation = requestAnimationFrame(step);
-			else {
+			if (progress < 1) {
+				cameraAnimation = requestAnimationFrame(step);
+			} else {
 				cameraAnimation = 0;
 				scheduleSave();
 			}
 		};
 		cameraAnimation = requestAnimationFrame(step);
+		return flight.duration;
+	}
+
+	/**
+	 * Every deliberate move goes through here, so the place being left is written
+	 * into history and Back has somewhere to return to. Free panning and zooming
+	 * deliberately do not: history is a record of decisions, not of drifting.
+	 */
+	function flyTo(target: Camera, label: string, record = true): number {
+		if (record) history = pushCameraMark(history, board.camera, { camera: { ...target }, label });
+		return animateCamera(target);
+	}
+
+	function focusItem(id: string, label?: string) {
+		const camera = focusCamera(board.items, id, viewport());
+		if (!camera) return;
+		const item = board.items.find((candidate) => candidate.id === id);
+		flyTo(camera, label ?? (item ? itemLabel(item) : 'Board'));
+		selectOnly(id);
 	}
 
 	function focusFrame(item: FrameItem) {
-		const bounds = itemBounds(item);
-		animateCamera(fitCamera(bounds, viewport(), 100));
-		selectOnly(item.id);
+		focusItem(item.id, frameTitle(item));
 	}
 
 	function goHome() {
-		const bounds = documentBounds(board);
-		if (bounds) animateCamera(fitCamera(bounds, viewport(), 120));
-		else {
-			const size = viewport();
-			animateCamera({ x: size.width / 2, y: size.height / 2, zoom: 1 });
+		flyTo(board.home ?? fitBoardCamera(board, viewport()), board.home ? 'Home' : 'Whole board');
+	}
+
+	function fitBoard() {
+		flyTo(fitBoardCamera(board, viewport()), 'Whole board');
+	}
+
+	function setHome() {
+		board.home = { ...board.camera };
+		notice = 'Home is this view now.';
+		scheduleSave();
+	}
+
+	function clearHome() {
+		board.home = null;
+		notice = 'Home is the whole board again.';
+		scheduleSave();
+	}
+
+	function travelHistory(direction: -1 | 1) {
+		const stepped = stepHistory(history, board.camera, direction);
+		if (!stepped) return;
+		history = stepped.history;
+		animateCamera(stepped.mark.camera);
+	}
+
+	function stepThroughFrames(direction: -1 | 1) {
+		const next = stepFrame(sequence, here?.id ?? null, direction);
+		if (!next) {
+			notice = 'Draw a frame to give the board places to go.';
+			return;
 		}
+		focusFrame(next);
+	}
+
+	function jumpToFrame(position: number) {
+		const frame = sequence[position];
+		if (frame) focusFrame(frame);
 	}
 
 	function changeZoom(multiplier: number) {
@@ -793,26 +952,355 @@
 		scheduleSave();
 	}
 
+	function saveViewpointHere() {
+		const name = newViewpointName.trim() || `View ${board.viewpoints.length + 1}`;
+		board.viewpoints = [...board.viewpoints, createViewpoint(name, board.camera)];
+		newViewpointName = '';
+		notice = `Saved “${name}”.`;
+		scheduleSave();
+	}
+
+	function goToViewpoint(viewpoint: Viewpoint) {
+		flyTo(viewpoint.camera, viewpoint.name);
+	}
+
+	function renameViewpoint(id: string, name: string) {
+		board.viewpoints = board.viewpoints.map((viewpoint) => (viewpoint.id === id ? { ...viewpoint, name } : viewpoint));
+		scheduleSave();
+	}
+
+	function deleteViewpoint(id: string) {
+		board.viewpoints = board.viewpoints.filter((viewpoint) => viewpoint.id !== id);
+		board = repairDocument(board);
+		scheduleSave();
+	}
+
+	// ── Journey Mode ────────────────────────────────────────────────────────
+	// The board, read aloud: the camera walks an arranged sequence of places and
+	// rests at each one long enough to be taken in.
+
+	function clearPlayTimer() {
+		if (playTimer) clearTimeout(playTimer);
+		playTimer = null;
+	}
+
+	function beginJourney(from = 0) {
+		if (!board.journey.stops.length) {
+			const suggested = suggestedStops(board);
+			if (!suggested.length) {
+				notice = 'A journey visits frames — draw a frame or two first.';
+				return;
+			}
+			board = setJourneyStops(board, suggested);
+			scheduleSave();
+		}
+		playing = true;
+		paused = false;
+		drawer = null;
+		shelfOpen = false;
+		// The board is being shown, not worked on: selection rings and handles go.
+		selectedIds = [];
+		connectorSourceId = null;
+		tool = 'select';
+		notice = '';
+		playStop(from);
+	}
+
+	function playStop(index: number) {
+		clearPlayTimer();
+		const resolved = resolveJourney(board, viewport());
+		if (!resolved.length) {
+			exitJourney();
+			return;
+		}
+		const position = Math.max(0, Math.min(index, resolved.length - 1));
+		playIndex = position;
+		const stop = resolved[position];
+		// Stops are not written into history: a journey has its own way forward
+		// and back, and twenty stops would bury the places you chose yourself.
+		const travel = stop.camera ? flyTo(stop.camera, stop.label, false) : 0;
+		if (paused) return;
+		playTimer = setTimeout(() => {
+			const next = advanceStop(position, resolved.length, board.journey.loop);
+			if (next === null) finishJourney();
+			else playStop(next);
+		}, travel + stop.stop.hold * 1000);
+	}
+
+	function pauseJourney() {
+		paused = true;
+		clearPlayTimer();
+	}
+
+	function resumeJourney() {
+		paused = false;
+		playStop(playIndex);
+	}
+
+	function stepJourney(direction: -1 | 1) {
+		playStop(stepStop(playIndex, board.journey.stops.length, direction));
+	}
+
+	function finishJourney() {
+		exitJourney();
+		notice = 'Journey complete.';
+	}
+
+	/** Leaves the journey where it stands, and makes that somewhere Back can undo. */
+	function exitJourney() {
+		clearPlayTimer();
+		if (playing) {
+			const label = stops[playIndex]?.label ?? 'Journey';
+			history = pushCameraMark(history, board.camera, { camera: { ...board.camera }, label });
+		}
+		playing = false;
+		paused = false;
+	}
+
+	function toggleStop(target: JourneyStop['target']) {
+		if (hasStop(board, target)) {
+			const existing = board.journey.stops.find((stop) =>
+				stop.target.kind === target.kind &&
+				(target.kind === 'board' || (stop.target.kind !== 'board' && stop.target.id === target.id))
+			);
+			if (existing) board = removeStop(board, existing.id);
+		} else {
+			board = addStop(board, target);
+		}
+		scheduleSave();
+	}
+
+	function addSelectionToJourney() {
+		const additions = selectedIds.filter((id) => board.items.some((item) => item.id === id && item.type !== 'connector'));
+		if (!additions.length) {
+			notice = 'Choose something on the board to add to the journey.';
+			return;
+		}
+		for (const id of additions) {
+			if (!hasStop(board, { kind: 'item', id })) board = addStop(board, { kind: 'item', id });
+		}
+		drawer = 'journey';
+		scheduleSave();
+	}
+
+	function useSuggestedJourney() {
+		const suggested = suggestedStops(board);
+		if (!suggested.length) {
+			notice = 'A journey visits frames — draw a frame or two first.';
+			return;
+		}
+		board = setJourneyStops(board, suggested);
+		scheduleSave();
+	}
+
+	function clearJourney() {
+		board = setJourneyStops(board, []);
+		scheduleSave();
+	}
+
+	// ── The shelf: boards as a set, not a single canvas ─────────────────────
+
+	function refreshBoards() {
+		boards = boardLibrary.list();
+	}
+
+	function releaseImageUrls() {
+		Object.values(imageUrls).forEach((url) => URL.revokeObjectURL(url));
+		imageUrls = {};
+		missingAssets = new Set();
+	}
+
+	/** Puts a board on screen, with none of the previous board left clinging on. */
+	function adoptDocument(document: WhiteboardDocument, state: SaveState, message: string) {
+		exitJourney();
+		releaseImageUrls();
+		board = restoreWhiteboard(document);
+		selectedIds = [];
+		connectorSourceId = null;
+		renamingFrameId = null;
+		tool = 'select';
+		notice = '';
+		marquee = null;
+		frameDraft = null;
+		history = createCameraHistory({ camera: { ...board.camera }, label: 'Where you were' });
+		dirty = false;
+		saveState = state;
+		saveMessage = message;
+		void hydrateImages();
+	}
+
+	function discardPendingSave() {
+		if (saveTimer) clearTimeout(saveTimer);
+		saveTimer = null;
+		dirty = false;
+	}
+
+	function openShelf() {
+		saveNow();
+		refreshBoards();
+		shelfOpen = true;
+	}
+
+	function openBoard(id: string) {
+		if (id === board.board.id) {
+			shelfOpen = false;
+			return;
+		}
+		saveNow();
+		const opened = boardLibrary.open(id);
+		if (!opened) {
+			notice = 'That board is no longer on the shelf.';
+			refreshBoards();
+			return;
+		}
+		boardLibrary.setActiveId(id);
+		adoptDocument(
+			opened.document,
+			opened.source === 'backup' ? 'recovered' : 'saved',
+			opened.source === 'backup' ? 'restored the last saved board' : 'saved here'
+		);
+		shelfOpen = false;
+		refreshBoards();
+	}
+
+	async function startNewBoard() {
+		saveNow();
+		adoptDocument(boardLibrary.create(), 'saved', 'saved here');
+		shelfOpen = false;
+		refreshBoards();
+		await tick();
+		document.getElementById('board-title')?.focus();
+	}
+
+	function closeBoard() {
+		saveNow();
+		refreshBoards();
+		shelfOpen = true;
+	}
+
+	function duplicateBoard(id: string) {
+		if (id === board.board.id) saveNow();
+		const copy = boardLibrary.duplicate(id);
+		if (!copy) return;
+		refreshBoards();
+		notice = `Copied as “${boardTitleFallback(copy.board.title)}”.`;
+	}
+
+	function deleteBoard(id: string) {
+		const doomed = boardLibrary.open(id);
+		const spokenFor = boardLibrary.referencedAssets(id);
+		boardLibrary.remove(id);
+		for (const item of doomed?.document.items ?? []) {
+			if (item.type === 'image' && !spokenFor.has(item.assetId)) {
+				void removeImageAsset(item.assetId).catch(() => undefined);
+			}
+		}
+		confirmDeleteId = null;
+		refreshBoards();
+		if (id !== board.board.id) return;
+
+		// The board under our feet just went. Don't let a queued save write it back.
+		discardPendingSave();
+		const next = boards[0] ? boardLibrary.open(boards[0].id) : null;
+		if (next) {
+			boardLibrary.setActiveId(next.document.board.id);
+			adoptDocument(next.document, 'saved', 'saved here');
+		} else {
+			adoptDocument(boardLibrary.create(), 'saved', 'saved here');
+			refreshBoards();
+		}
+	}
+
 	function handleKeydown(event: KeyboardEvent) {
 		if (event.code === 'Space' && !isTextTarget(event.target)) {
 			spaceHeld = true;
 			event.preventDefault();
 		}
 		if (isTextTarget(event.target)) return;
-		if ((event.key === 'Delete' || event.key === 'Backspace') && selectedIds.length) {
-			event.preventDefault();
-			deleteSelection();
-		}
-		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd') {
-			event.preventDefault();
-			duplicateSelection();
-		}
+
 		if (event.key === 'Escape') {
+			if (playing) {
+				exitJourney();
+				return;
+			}
+			if (shelfOpen || drawer || shortcutsOpen) {
+				shelfOpen = false;
+				drawer = null;
+				shortcutsOpen = false;
+				confirmDeleteId = null;
+				return;
+			}
 			tool = 'select';
 			connectorSourceId = null;
 			renamingFrameId = null;
 			notice = '';
 			cancelPointerSession();
+			return;
+		}
+
+		// Camera history rides the platform's own back and forward gesture.
+		if ((event.altKey || event.metaKey) && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+			event.preventDefault();
+			travelHistory(event.key === 'ArrowLeft' ? -1 : 1);
+			return;
+		}
+		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+			event.preventDefault();
+			saveNow();
+			return;
+		}
+		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd') {
+			event.preventDefault();
+			duplicateSelection();
+			return;
+		}
+		if (event.metaKey || event.ctrlKey) return;
+
+		if (playing) {
+			if (event.key === 'ArrowRight') { event.preventDefault(); stepJourney(1); }
+			if (event.key === 'ArrowLeft') { event.preventDefault(); stepJourney(-1); }
+			if (event.key.toLowerCase() === 'p') { event.preventDefault(); paused ? resumeJourney() : pauseJourney(); }
+			return;
+		}
+
+		if ((event.key === 'Delete' || event.key === 'Backspace') && selectedIds.length) {
+			event.preventDefault();
+			deleteSelection();
+			return;
+		}
+		if (event.key === '[' || event.key === ']') {
+			event.preventDefault();
+			stepThroughFrames(event.key === '[' ? -1 : 1);
+			return;
+		}
+		if (event.key === '0') {
+			event.preventDefault();
+			fitBoard();
+			return;
+		}
+		if (/^[1-9]$/.test(event.key)) {
+			event.preventDefault();
+			jumpToFrame(Number(event.key) - 1);
+			return;
+		}
+		if (event.key.toLowerCase() === 'h') {
+			event.preventDefault();
+			goHome();
+			return;
+		}
+		if (event.key.toLowerCase() === 'p') {
+			event.preventDefault();
+			beginJourney();
+			return;
+		}
+		if (event.key.toLowerCase() === 'm') {
+			event.preventDefault();
+			minimapOn = !minimapOn;
+			return;
+		}
+		if (event.key === '?') {
+			event.preventDefault();
+			shortcutsOpen = !shortcutsOpen;
 		}
 	}
 
@@ -856,6 +1344,37 @@
 
 	function zoomLabel(): string {
 		return `${Math.round(board.camera.zoom * 100)}%`;
+	}
+
+	function handleMinimapPointer(event: PointerEvent) {
+		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+		const point = mapProjection.toWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top });
+		handHoldsTheCamera();
+		flyTo(cameraCentredOn(point, board.camera, viewport()), 'Overview');
+	}
+
+	/** The 1–9 a frame answers to, or empty once the sequence runs past nine. */
+	function frameKey(id: string): string {
+		const position = sequence.findIndex((frame) => frame.id === id);
+		return position >= 0 && position < 9 ? String(position + 1) : '';
+	}
+
+	function relativeWhen(iso: string): string {
+		const then = new Date(iso).getTime();
+		if (!Number.isFinite(then)) return '';
+		const minutes = Math.round((Date.now() - then) / 60_000);
+		if (minutes < 1) return 'just now';
+		if (minutes < 60) return `${minutes} min ago`;
+		const hours = Math.round(minutes / 60);
+		if (hours < 24) return `${hours} hr ago`;
+		const days = Math.round(hours / 24);
+		return days < 30 ? `${days} d ago` : new Date(then).toLocaleDateString();
+	}
+
+	function boardCountLabel(entry: BoardSummary): string {
+		const pieces = [`${entry.items} ${entry.items === 1 ? 'thing' : 'things'}`];
+		if (entry.frames) pieces.push(`${entry.frames} ${entry.frames === 1 ? 'frame' : 'frames'}`);
+		return pieces.join(' · ');
 	}
 </script>
 
@@ -1067,20 +1586,23 @@
 		{/if}
 	</div>
 
-	{#if !hasContent}
+	{#if !hasContent && !shelfOpen}
 		<div class="empty-whisper" aria-hidden="true">
 			<span class="empty-mark">✦</span>
 			<p>double-click anywhere to begin</p>
-			<small>drag images in · hold Space to move</small>
+			<small>drag images in · hold Space to move · frame a region to name a place</small>
 		</div>
 	{/if}
 
-	<header class="topbar" data-whiteboard-ui>
+	<div class="top-deck">
+	<header class:hidden={playing} class="topbar" data-whiteboard-ui>
 		<a class="back-link" href="/" aria-label="Back to Woodles">←</a>
 		<div class="board-name">
 			<span>Whiteboard</span>
 			<input
+				id="board-title"
 				aria-label="Whiteboard title"
+				placeholder="Untitled whiteboard"
 				value={board.board.title}
 				oninput={(event) => { board.board.title = (event.currentTarget as HTMLInputElement).value; board.updatedAt = now(); scheduleSave(); }}
 			/>
@@ -1088,9 +1610,289 @@
 		<p class:warning={saveState === 'error'} class="save-status" aria-live="polite">
 			<span class:working={saveState === 'saving'} class="save-dot"></span>{saveMessage}
 		</p>
+		<div class="board-actions">
+			<button class="chip" title="Save now (⌘S)" onclick={() => { markDirty(); saveNow(); }}>Save</button>
+			<button class="chip" title="Save and put this board back on the shelf" onclick={closeBoard}>Close</button>
+			<button class:active={shelfOpen} class="chip strong" aria-expanded={shelfOpen} onclick={() => (shelfOpen ? (shelfOpen = false) : openShelf())}>
+				Boards<span class="chip-count">{boards.length || 1}</span>
+			</button>
+		</div>
 	</header>
 
-	<div class="tool-dock" data-whiteboard-ui aria-label="Whiteboard tools">
+	<nav class:hidden={playing} class="location-bar" data-whiteboard-ui aria-label="Board location">
+		<div class="history-pair">
+			<button disabled={!canGoBack(history)} aria-label="Back to the previous view" title="Back (⌥←)" onclick={() => travelHistory(-1)}>‹</button>
+			<button disabled={!canGoForward(history)} aria-label="Forward to the next view" title="Forward (⌥→)" onclick={() => travelHistory(1)}>›</button>
+		</div>
+		<ol class="breadcrumb">
+			<li>
+				<button class="crumb root" title="Fit the whole board (0)" onclick={fitBoard}>{boardTitleFallback(board.board.title)}</button>
+			</li>
+			{#each trail as frame (frame.id)}
+				<li>
+					<span class="crumb-arrow" aria-hidden="true">›</span>
+					<button class:current={frame.id === here?.id} class="crumb" onclick={() => focusFrame(frame)}>{frameTitle(frame)}</button>
+				</li>
+			{/each}
+		</ol>
+		<span class="scale-word" title={`${zoomLabel()} — ${sequence.length} ${sequence.length === 1 ? 'frame' : 'frames'} on this board`}>{scaleName(board.camera.zoom)}</span>
+		<div class="frame-steps">
+			<button disabled={!sequence.length} aria-label="Previous frame" title="Previous frame ([)" onclick={() => stepThroughFrames(-1)}>◂</button>
+			<button disabled={!sequence.length} aria-label="Next frame" title="Next frame (])" onclick={() => stepThroughFrames(1)}>▸</button>
+		</div>
+	</nav>
+
+	<div class:hidden={playing} class="rail" data-whiteboard-ui aria-label="Places and journeys">
+		<button class="rail-button" title="Home — the view this board opens to (H)" onclick={goHome}><span aria-hidden="true">⌂</span>Home</button>
+		<button class:active={drawer === 'places'} class="rail-button" aria-pressed={drawer === 'places'} title="Saved views and frames" onclick={() => (drawer = drawer === 'places' ? null : 'places')}><span aria-hidden="true">◈</span>Places</button>
+		<button class:active={drawer === 'journey'} class="rail-button" aria-pressed={drawer === 'journey'} title="Arrange a journey through the board" onclick={() => (drawer = drawer === 'journey' ? null : 'journey')}><span aria-hidden="true">⇉</span>Journey</button>
+		<button class="rail-button play" title="Play the journey (P)" onclick={() => beginJourney()}><span aria-hidden="true">▶</span>Play</button>
+	</div>
+	</div>
+
+	{#if drawer && !playing}
+		<aside class="drawer" data-whiteboard-ui aria-label={drawer === 'places' ? 'Places on this board' : 'The journey through this board'}>
+			<header class="drawer-head">
+				<div class="drawer-tabs">
+					<button class:active={drawer === 'places'} onclick={() => (drawer = 'places')}>Places</button>
+					<button class:active={drawer === 'journey'} onclick={() => (drawer = 'journey')}>Journey</button>
+				</div>
+				<button class="drawer-close" aria-label="Close panel" onclick={() => (drawer = null)}>×</button>
+			</header>
+
+			{#if drawer === 'places'}
+				<div class="drawer-body">
+					<section>
+						<h3>Home</h3>
+						<p class="drawer-note">{board.home ? 'This board opens to a view you chose.' : 'This board opens to whatever fits.'}</p>
+						<div class="row-buttons">
+							<button class="chip" onclick={setHome}>Set home to this view</button>
+							{#if board.home}
+								<button class="chip quiet" onclick={clearHome}>Clear</button>
+							{/if}
+						</div>
+					</section>
+
+					<section>
+						<h3>Saved views</h3>
+						{#if board.viewpoints.length}
+							<ul class="place-list">
+								{#each board.viewpoints as viewpoint (viewpoint.id)}
+									<li>
+										{#if renamingViewpointId === viewpoint.id}
+											<input
+												class="place-rename"
+												aria-label="View name"
+												value={viewpoint.name}
+												oninput={(event) => renameViewpoint(viewpoint.id, (event.currentTarget as HTMLInputElement).value)}
+												onblur={() => (renamingViewpointId = null)}
+												onkeydown={(event) => { if (event.key === 'Enter' || event.key === 'Escape') (event.currentTarget as HTMLInputElement).blur(); }}
+											/>
+										{:else}
+											<button class="place-name" onclick={() => goToViewpoint(viewpoint)}>
+												<span>{viewpoint.name}</span>
+												<small>{Math.round(viewpoint.camera.zoom * 100)}%</small>
+											</button>
+										{/if}
+										<button
+											class:on={hasStop(board, { kind: 'viewpoint', id: viewpoint.id })}
+											class="place-add"
+											title="Add this view to the journey"
+											aria-label={`Add ${viewpoint.name} to the journey`}
+											onclick={() => toggleStop({ kind: 'viewpoint', id: viewpoint.id })}
+										>⇉</button>
+										<button class="place-edit" aria-label={`Rename ${viewpoint.name}`} onclick={() => { renamingViewpointId = viewpoint.id; void tick().then(() => (window.document.querySelector('.place-rename') as HTMLInputElement | null)?.focus()); }}>✎</button>
+										<button class="place-drop" aria-label={`Delete ${viewpoint.name}`} onclick={() => deleteViewpoint(viewpoint.id)}>×</button>
+									</li>
+								{/each}
+							</ul>
+						{:else}
+							<p class="drawer-note">No saved views yet. Frame something you will want to come back to.</p>
+						{/if}
+						<div class="row-buttons">
+							<input
+								class="place-input"
+								aria-label="Name for this view"
+								placeholder="Name this view"
+								bind:value={newViewpointName}
+								onkeydown={(event) => { if (event.key === 'Enter') saveViewpointHere(); }}
+							/>
+							<button class="chip strong" onclick={saveViewpointHere}>Save view</button>
+						</div>
+					</section>
+
+					<section>
+						<h3>Frames</h3>
+						{#if sequence.length}
+							<ul class="place-list">
+								{#each sequence as frame (frame.id)}
+									<li>
+										<button class:current={frame.id === here?.id} class="place-name" onclick={() => focusFrame(frame)}>
+											<span>{frameTitle(frame)}</span>
+											{#if frameKey(frame.id)}<small class="key">{frameKey(frame.id)}</small>{/if}
+										</button>
+										<button
+											class:on={hasStop(board, { kind: 'item', id: frame.id })}
+											class="place-add"
+											title="Add this frame to the journey"
+											aria-label={`Add ${frameTitle(frame)} to the journey`}
+											onclick={() => toggleStop({ kind: 'item', id: frame.id })}
+										>⇉</button>
+									</li>
+								{/each}
+							</ul>
+						{:else}
+							<p class="drawer-note">Draw a frame to give the board named places. Frames are what the keyboard walks between.</p>
+						{/if}
+					</section>
+				</div>
+			{:else}
+				<div class="drawer-body">
+					<section>
+						<p class="drawer-note">A journey is an order to see this board in. Press Play and the camera walks it.</p>
+						{#if stops.length}
+							<ol class="stop-list">
+								{#each stops as entry, index (entry.stop.id)}
+									<li class:playing={playing && index === playIndex}>
+										<span class="stop-number">{index + 1}</span>
+										<button class="stop-name" onclick={() => beginJourney(index)}>
+											<span>{entry.label}</span>
+											<small>{entry.kind === 'board' ? 'the whole board' : entry.kind === 'viewpoint' ? 'saved view' : 'on the board'}</small>
+										</button>
+										<label class="stop-hold">
+											<input
+												type="number"
+												min="1"
+												max="30"
+												aria-label={`Seconds to rest at ${entry.label}`}
+												value={entry.stop.hold}
+												oninput={(event) => { board = setStopHold(board, entry.stop.id, Number((event.currentTarget as HTMLInputElement).value)); scheduleSave(); }}
+											/>s
+										</label>
+										<div class="stop-move">
+											<button disabled={index === 0} aria-label="Move this stop earlier" onclick={() => { board = moveStop(board, entry.stop.id, -1); scheduleSave(); }}>▴</button>
+											<button disabled={index === stops.length - 1} aria-label="Move this stop later" onclick={() => { board = moveStop(board, entry.stop.id, 1); scheduleSave(); }}>▾</button>
+										</div>
+										<button class="place-drop" aria-label={`Remove ${entry.label} from the journey`} onclick={() => { board = removeStop(board, entry.stop.id); scheduleSave(); }}>×</button>
+									</li>
+								{/each}
+							</ol>
+						{:else}
+							<p class="drawer-empty">Nothing arranged yet.</p>
+						{/if}
+					</section>
+
+					<section class="journey-controls">
+						<div class="row-buttons">
+							<button class="chip strong" onclick={() => beginJourney()}>▶ Play</button>
+							<button class="chip" onclick={addSelectionToJourney}>Add selection</button>
+							<button class="chip" onclick={() => toggleStop({ kind: 'board' })}>{hasStop(board, { kind: 'board' }) ? 'Remove overview' : 'Add overview'}</button>
+						</div>
+						<div class="row-buttons">
+							<button class="chip" onclick={useSuggestedJourney}>Build from frames</button>
+							{#if stops.length}<button class="chip quiet" onclick={clearJourney}>Clear</button>{/if}
+						</div>
+						<label class="loop-toggle">
+							<input type="checkbox" checked={board.journey.loop} onchange={(event) => { board = setJourneyLoop(board, (event.currentTarget as HTMLInputElement).checked); scheduleSave(); }} />
+							loop back to the beginning
+						</label>
+					</section>
+				</div>
+			{/if}
+		</aside>
+	{/if}
+
+	{#if minimapOn && !playing}
+		<div class="minimap-shell" data-whiteboard-ui>
+			<div
+				class="minimap"
+				role="button"
+				tabindex="0"
+				aria-label="Board overview — choose a place to move the view there"
+				style={`width: ${MINIMAP.width}px; height: ${MINIMAP.height}px;`}
+				onpointerdown={handleMinimapPointer}
+				onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); fitBoard(); } }}
+			>
+				{#each mapMarks as mark (mark.id)}
+					{@const box = mapProjection.project(mark.bounds)}
+					<span
+						class="map-mark {mark.kind}"
+						class:here={mark.id === here?.id}
+						style={`left: ${box.x}px; top: ${box.y}px; width: ${box.width}px; height: ${box.height}px;`}
+					></span>
+				{/each}
+				<span class="map-view" style={`left: ${mapView.x}px; top: ${mapView.y}px; width: ${mapView.width}px; height: ${mapView.height}px;`}></span>
+			</div>
+		</div>
+	{/if}
+
+	{#if playing}
+		<div class="player" data-whiteboard-ui aria-label="Journey">
+			<button aria-label="Previous stop" title="Previous stop (←)" onclick={() => stepJourney(-1)}>‹</button>
+			<button class="player-play" aria-label={paused ? 'Resume the journey' : 'Pause the journey'} onclick={() => (paused ? resumeJourney() : pauseJourney())}>{paused ? '▶' : '❚❚'}</button>
+			<button aria-label="Next stop" title="Next stop (→)" onclick={() => stepJourney(1)}>›</button>
+			<p class="player-where">
+				<span class="player-count">{playIndex + 1} / {stops.length}</span>
+				<span class="player-label">{stops[playIndex]?.label ?? ''}</span>
+			</p>
+			<button class="player-exit" onclick={exitJourney}>Leave</button>
+		</div>
+	{/if}
+
+	{#if shelfOpen}
+		<div class="shelf-backdrop" data-whiteboard-ui>
+			<section class="shelf" aria-label="Your whiteboards">
+				<header class="shelf-head">
+					<div>
+						<h2>Whiteboards</h2>
+						<p>Each board is its own space. They are saved on this device as you work.</p>
+					</div>
+					<button class="shelf-close" aria-label="Close the shelf" onclick={() => { shelfOpen = false; confirmDeleteId = null; }}>×</button>
+				</header>
+				<ul class="shelf-list">
+					{#each boards as entry (entry.id)}
+						<li class:open={entry.id === board.board.id}>
+							<button class="shelf-open" onclick={() => openBoard(entry.id)}>
+								<strong>{boardTitleFallback(entry.title)}</strong>
+								<small>{boardCountLabel(entry)} · {relativeWhen(entry.updatedAt)}</small>
+							</button>
+							{#if entry.id === board.board.id}<span class="shelf-badge">open</span>{/if}
+							<button class="chip quiet" onclick={() => duplicateBoard(entry.id)}>Duplicate</button>
+							{#if confirmDeleteId === entry.id}
+								<button class="chip danger" onclick={() => deleteBoard(entry.id)}>Delete for good</button>
+								<button class="chip quiet" onclick={() => (confirmDeleteId = null)}>Keep</button>
+							{:else}
+								<button class="chip quiet" onclick={() => (confirmDeleteId = entry.id)}>Delete</button>
+							{/if}
+						</li>
+					{/each}
+				</ul>
+				<footer class="shelf-foot">
+					<button class="chip strong" onclick={startNewBoard}>Start a new whiteboard</button>
+					<button class="chip" onclick={() => { shelfOpen = false; confirmDeleteId = null; }}>Back to “{boardTitleFallback(board.board.title)}”</button>
+				</footer>
+			</section>
+		</div>
+	{/if}
+
+	{#if shortcutsOpen && !playing}
+		<div class="shortcuts" data-whiteboard-ui aria-label="Keyboard shortcuts">
+			<h3>Moving around</h3>
+			<dl>
+				<dt>[ ]</dt><dd>previous / next frame</dd>
+				<dt>1–9</dt><dd>jump to a frame</dd>
+				<dt>0</dt><dd>fit the whole board</dd>
+				<dt>H</dt><dd>home</dd>
+				<dt>⌥ ← →</dt><dd>back / forward</dd>
+				<dt>P</dt><dd>play the journey</dd>
+				<dt>M</dt><dd>overview map</dd>
+				<dt>Space</dt><dd>hold to drag the board</dd>
+				<dt>⌘S</dt><dd>save now</dd>
+			</dl>
+		</div>
+	{/if}
+
+	<div class:hidden={playing} class="tool-dock" data-whiteboard-ui aria-label="Whiteboard tools">
 		<button class="tool-button" aria-label="Add card" title="Card" onclick={addCardFromDock}><span aria-hidden="true">□</span>Card</button>
 		<button class="tool-button" aria-label="Add image" title="Image" onclick={() => imageInput?.click()}><span aria-hidden="true">▧</span>Image</button>
 		<button class:active={tool === 'frame'} class="tool-button" aria-pressed={tool === 'frame'} title="Draw a frame" onclick={() => { tool = tool === 'frame' ? 'select' : 'frame'; connectorSourceId = null; notice = tool === 'frame' ? 'Drag a region for a frame.' : ''; }}><span aria-hidden="true">▢</span>Frame</button>
@@ -1098,17 +1900,21 @@
 		<button class:active={tool === 'line'} class="tool-button" aria-pressed={tool === 'line'} title="Connect two ideas" onclick={() => { tool = tool === 'line' ? 'select' : 'line'; connectorSourceId = null; notice = tool === 'line' ? 'Choose the first idea.' : ''; }}><span aria-hidden="true">⟶</span>Line</button>
 	</div>
 
-	<div class="camera-controls" data-whiteboard-ui aria-label="Camera controls">
+	<div class:hidden={playing} class="camera-controls" data-whiteboard-ui aria-label="Camera controls">
 		<button aria-label="Zoom in" title="Zoom in" onclick={() => changeZoom(1.2)}>+</button>
 		<button aria-label="Zoom out" title="Zoom out" onclick={() => changeZoom(1 / 1.2)}>−</button>
-		<button class="home-button" aria-label="Fit board in view" title="Fit board" onclick={goHome}>⌾</button>
+		<button class="home-button" aria-label="Fit board in view" title="Fit the whole board (0)" onclick={fitBoard}>⌾</button>
+		<button class:active={minimapOn} class="map-button" aria-pressed={minimapOn} aria-label="Board overview" title="Overview map (M)" onclick={() => (minimapOn = !minimapOn)}>▦</button>
+		<button class:active={shortcutsOpen} class="map-button help-button" aria-pressed={shortcutsOpen} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onclick={() => (shortcutsOpen = !shortcutsOpen)}>?</button>
 		<span>{zoomLabel()}</span>
 	</div>
 
-	{#if notice}
+	{#if notice && !playing}
 		<p class="notice" data-whiteboard-ui>{notice}</p>
 	{/if}
-	{#if tool === 'frame'}
+	{#if playing}
+		<!-- nothing: the board is being presented, not edited -->
+	{:else if tool === 'frame'}
 		<p class="mode-note" data-whiteboard-ui>drag to make a frame</p>
 	{:else if tool === 'line' && connectorSourceId}
 		<p class="mode-note" data-whiteboard-ui>choose the other end</p>
@@ -1412,15 +2218,31 @@
 	.marquee { border: 1px solid rgba(167, 102, 112, 0.84); background: rgba(167, 102, 112, 0.1); border-radius: 3px; }
 	.frame-draft { border: 1.5px dashed rgba(119, 94, 149, 0.7); border-radius: 16px; background: rgba(204, 193, 232, 0.17); }
 
-	.topbar {
+	/*
+	 * One row across the top rather than three pieces pinned independently:
+	 * absolute positioning let the breadcrumb drift over the board controls at
+	 * middling widths, and a flex row cannot overlap itself at any width.
+	 */
+	.top-deck {
 		position: absolute;
 		z-index: 70;
 		top: 20px;
 		left: 22px;
+		right: 22px;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 9px;
+		pointer-events: none;
+	}
+	.top-deck > * { pointer-events: auto; }
+
+	.topbar {
 		display: flex;
 		align-items: center;
 		gap: 13px;
-		max-width: min(620px, calc(100vw - 44px));
+		min-width: 0;
 		padding: 8px 10px 8px 8px;
 		border: 1px solid rgba(98, 80, 70, 0.13);
 		border-radius: 14px;
@@ -1468,7 +2290,7 @@
 		right: 22px;
 		bottom: 25px;
 		display: grid;
-		grid-template-columns: 35px 35px 35px auto;
+		grid-template-columns: repeat(5, 35px) auto;
 		align-items: center;
 		gap: 3px;
 		padding: 5px;
@@ -1507,15 +2329,360 @@
 	.mode-note { color: #73586f; }
 	.image-input { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
+	/* Chrome steps out of the way while a journey is running. */
+	.hidden { opacity: 0; pointer-events: none; transform: translateY(-8px); }
+	.topbar, .location-bar, .rail, .tool-dock, .camera-controls { transition: opacity 260ms ease, transform 260ms ease; }
+
+	.chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		min-height: 27px;
+		padding: 0 10px;
+		border: 1px solid rgba(98, 80, 70, 0.15);
+		border-radius: 9px;
+		background: rgba(255, 253, 248, 0.7);
+		color: #6b5b55;
+		font-size: 11.5px;
+		white-space: nowrap;
+		transition: background 130ms ease, color 130ms ease, border-color 130ms ease;
+	}
+	.chip:hover { background: rgba(232, 214, 208, 0.62); color: #4f403b; }
+	.chip.strong { border-color: rgba(167, 102, 112, 0.38); background: rgba(219, 178, 178, 0.34); color: #7c4a53; }
+	.chip.strong:hover { background: rgba(219, 178, 178, 0.52); }
+	.chip.quiet { border-color: transparent; background: transparent; color: #8d7f79; }
+	.chip.quiet:hover { background: rgba(224, 210, 200, 0.5); }
+	.chip.danger { border-color: rgba(163, 84, 83, 0.4); background: rgba(196, 122, 118, 0.2); color: #8f4a48; }
+	.chip.active { background: rgba(218, 188, 181, 0.5); color: #69434a; }
+	.chip-count { padding: 0 5px; border-radius: 6px; background: rgba(120, 96, 88, 0.13); color: #7b6a63; font-size: 10px; font-variant-numeric: tabular-nums; }
+
+	.board-actions { display: flex; align-items: center; gap: 4px; padding-left: 9px; border-left: 1px solid rgba(98,80,70,.13); }
+
+	.location-bar {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-width: 0;
+		max-width: 560px;
+		padding: 5px 9px 5px 5px;
+		border: 1px solid rgba(98, 80, 70, 0.13);
+		border-radius: 13px;
+		background: rgba(255, 253, 248, 0.72);
+		box-shadow: 0 5px 19px rgba(76, 57, 48, 0.08), inset 0 1px rgba(255,255,255,.85);
+		backdrop-filter: blur(12px);
+	}
+
+	.history-pair,
+	.frame-steps { display: flex; gap: 1px; }
+	.history-pair button,
+	.frame-steps button {
+		width: 26px;
+		height: 26px;
+		border-radius: 8px;
+		background: transparent;
+		color: #77655e;
+		font-size: 16px;
+		line-height: 1;
+		transition: background 130ms ease, color 130ms ease;
+	}
+	.frame-steps button { font-size: 11px; }
+	.history-pair button:hover:not(:disabled),
+	.frame-steps button:hover:not(:disabled) { background: rgba(218, 188, 181, 0.4); color: #5a4741; }
+	.history-pair button:disabled,
+	.frame-steps button:disabled { color: #c8bcb5; cursor: default; }
+
+	.breadcrumb {
+		display: flex;
+		align-items: center;
+		min-width: 0;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		overflow: hidden;
+	}
+	.breadcrumb li { display: flex; align-items: center; min-width: 0; }
+	.crumb {
+		max-width: 190px;
+		padding: 3px 6px;
+		border-radius: 7px;
+		background: transparent;
+		color: #7d6c65;
+		font-size: 12.5px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		transition: background 130ms ease, color 130ms ease;
+	}
+	.crumb:hover { background: rgba(224, 210, 200, 0.55); color: #4f403b; }
+	.crumb.root { font-family: var(--font-display, Georgia, serif); font-weight: 600; color: #5d4c46; }
+	.crumb.current { color: #7c4a53; font-weight: 600; }
+	.crumb-arrow { color: #b8a9a2; font-size: 12px; }
+
+	.scale-word {
+		flex: none;
+		padding: 2px 7px;
+		border-radius: 999px;
+		background: rgba(120, 96, 88, 0.09);
+		color: #8b7a73;
+		font-size: 10px;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		white-space: nowrap;
+	}
+
+	.rail {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+		padding: 5px;
+		border: 1px solid rgba(98, 80, 70, 0.13);
+		border-radius: 13px;
+		background: rgba(255, 253, 248, 0.72);
+		box-shadow: 0 5px 19px rgba(76, 57, 48, 0.08), inset 0 1px rgba(255,255,255,.85);
+		backdrop-filter: blur(12px);
+	}
+	.rail-button {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		min-height: 30px;
+		padding: 0 9px;
+		border-radius: 9px;
+		background: transparent;
+		color: #695953;
+		font-size: 11.5px;
+		transition: background 130ms ease, color 130ms ease;
+	}
+	.rail-button span { color: #9a7770; font-size: 13px; line-height: 1; }
+	.rail-button:hover,
+	.rail-button.active { background: rgba(218, 188, 181, 0.4); color: #69434a; }
+	.rail-button.play span { color: #a3646e; }
+
+	.drawer {
+		position: absolute;
+		z-index: 72;
+		top: 66px;
+		right: 22px;
+		bottom: 96px;
+		display: flex;
+		flex-direction: column;
+		width: min(324px, calc(100vw - 44px));
+		border: 1px solid rgba(98, 80, 70, 0.14);
+		border-radius: 16px;
+		background: rgba(255, 253, 248, 0.93);
+		box-shadow: 0 14px 40px rgba(76, 57, 48, 0.16), inset 0 1px rgba(255,255,255,.9);
+		backdrop-filter: blur(16px);
+		animation: drawer-in 220ms ease both;
+	}
+	@keyframes drawer-in { from { opacity: 0; transform: translateY(-8px); } }
+
+	.drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 9px 9px 8px 11px; border-bottom: 1px solid rgba(98,80,70,.11); }
+	.drawer-tabs { display: flex; gap: 2px; }
+	.drawer-tabs button { padding: 5px 10px; border-radius: 8px; background: transparent; color: #877771; font-size: 12px; }
+	.drawer-tabs button.active { background: rgba(218, 188, 181, 0.42); color: #69434a; font-weight: 600; }
+	.drawer-close { width: 26px; height: 26px; border-radius: 8px; background: transparent; color: #8b7a73; font-size: 18px; line-height: 1; }
+	.drawer-close:hover { background: rgba(224, 210, 200, 0.55); }
+
+	.drawer-body { flex: 1; overflow-y: auto; padding: 12px 12px 16px; }
+	.drawer-body section + section { margin-top: 18px; padding-top: 15px; border-top: 1px solid rgba(98,80,70,.09); }
+	.drawer-body h3 { margin: 0 0 7px; color: #6d5c56; font-family: var(--font-display, Georgia, serif); font-size: 13px; font-weight: 600; }
+	.drawer-note { margin: 0 0 9px; color: #94867f; font-size: 11.5px; line-height: 1.5; }
+	.drawer-empty { margin: 0 0 10px; padding: 14px; border: 1px dashed rgba(120,96,88,.22); border-radius: 11px; color: #9c8e87; font-size: 11.5px; font-style: italic; text-align: center; }
+	.row-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 8px; }
+
+	.place-list,
+	.stop-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+	.place-list li,
+	.stop-list li { display: flex; align-items: center; gap: 3px; border-radius: 9px; }
+	.stop-list li.playing { background: rgba(219, 178, 178, 0.26); }
+
+	.place-name,
+	.stop-name {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 8px;
+		padding: 6px 8px;
+		border-radius: 8px;
+		background: transparent;
+		color: #5f4f49;
+		font-size: 12.5px;
+		text-align: left;
+	}
+	.place-name span,
+	.stop-name span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.place-name small,
+	.stop-name small { flex: none; color: #a2948d; font-size: 10px; }
+	.place-name:hover,
+	.stop-name:hover { background: rgba(224, 210, 200, 0.5); }
+	.place-name.current { color: #7c4a53; font-weight: 600; }
+	.place-name small.key { padding: 1px 5px; border-radius: 5px; background: rgba(120,96,88,.11); font-variant-numeric: tabular-nums; }
+
+	.place-add,
+	.place-edit,
+	.place-drop { width: 25px; height: 25px; flex: none; border-radius: 7px; background: transparent; color: #a1928b; font-size: 12px; line-height: 1; transition: background 130ms ease, color 130ms ease; }
+	.place-drop { font-size: 16px; }
+	.place-add:hover, .place-edit:hover, .place-drop:hover { background: rgba(224, 210, 200, 0.6); color: #6b5952; }
+	.place-add.on { background: rgba(219, 178, 178, 0.5); color: #7c4a53; }
+	.place-rename,
+	.place-input { flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid rgba(167, 102, 112, 0.35); border-radius: 8px; background: rgba(255,255,255,.7); color: #4c403c; font-size: 12px; outline: none; }
+	.place-input:focus, .place-rename:focus { border-color: rgba(167, 102, 112, 0.7); }
+
+	.stop-number { width: 18px; flex: none; color: #a89a93; font-size: 10.5px; font-variant-numeric: tabular-nums; text-align: center; }
+	.stop-hold { display: flex; align-items: center; gap: 1px; color: #a2948d; font-size: 10px; }
+	.stop-hold input { width: 32px; padding: 3px 4px; border: 1px solid rgba(98,80,70,.16); border-radius: 6px; background: rgba(255,255,255,.6); color: #6b5b55; font-size: 11px; text-align: center; outline: none; }
+	.stop-move { display: flex; flex-direction: column; gap: 1px; }
+	.stop-move button { width: 20px; height: 13px; border-radius: 4px; background: transparent; color: #a89a93; font-size: 9px; line-height: 1; }
+	.stop-move button:hover:not(:disabled) { background: rgba(224, 210, 200, 0.6); color: #6b5952; }
+	.stop-move button:disabled { color: #d2c7c1; cursor: default; }
+
+	.journey-controls .loop-toggle { display: flex; align-items: center; gap: 6px; margin-top: 11px; color: #8b7d76; font-size: 11.5px; }
+	.journey-controls .loop-toggle input { accent-color: #a76670; }
+
+	/* Bottom-left: the one corner the dock, the camera controls and the drawer
+	   all leave alone, so the overview never has to fight for it. */
+	.minimap-shell {
+		position: absolute;
+		z-index: 68;
+		left: 22px;
+		bottom: 25px;
+		padding: 5px;
+		border: 1px solid rgba(98, 80, 70, 0.13);
+		border-radius: 13px;
+		background: rgba(255, 253, 248, 0.78);
+		box-shadow: 0 8px 26px rgba(76,57,48,.11), inset 0 1px rgba(255,255,255,.9);
+		backdrop-filter: blur(15px);
+	}
+	.minimap { position: relative; border-radius: 9px; background: rgba(120, 96, 88, 0.06); overflow: hidden; cursor: crosshair; }
+	.minimap:focus-visible { outline: 2px solid rgba(167, 102, 112, 0.7); outline-offset: 2px; }
+	.map-mark { position: absolute; border-radius: 2px; background: rgba(120, 96, 88, 0.34); }
+	.map-mark.frame { border: 1px solid rgba(137, 103, 89, 0.42); border-radius: 4px; background: rgba(219, 186, 163, 0.24); }
+	.map-mark.stack { background: rgba(120, 96, 88, 0.26); }
+	.map-mark.image { background: rgba(150, 118, 106, 0.44); }
+	.map-mark.here { border-color: rgba(167, 102, 112, 0.75); background: rgba(219, 178, 178, 0.42); }
+	.map-view { position: absolute; border: 1.5px solid rgba(167, 102, 112, 0.85); border-radius: 3px; background: rgba(167, 102, 112, 0.09); pointer-events: none; }
+
+	.player {
+		position: absolute;
+		z-index: 80;
+		left: 50%;
+		bottom: 26px;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		max-width: min(520px, calc(100vw - 40px));
+		padding: 6px 8px 6px 6px;
+		border: 1px solid rgba(98, 80, 70, 0.15);
+		border-radius: 15px;
+		background: rgba(255, 253, 248, 0.86);
+		box-shadow: 0 10px 32px rgba(76,57,48,.15), inset 0 1px rgba(255,255,255,.9);
+		backdrop-filter: blur(16px);
+		transform: translateX(-50%);
+		animation: player-in 300ms ease both;
+	}
+	@keyframes player-in { from { opacity: 0; transform: translate(-50%, 14px); } }
+	.player button { width: 32px; height: 32px; border-radius: 9px; background: transparent; color: #6b5b55; font-size: 16px; line-height: 1; transition: background 130ms ease; }
+	.player button:hover { background: rgba(218, 188, 181, 0.45); }
+	.player-play { color: #7c4a53 !important; font-size: 13px !important; background: rgba(219, 178, 178, 0.34) !important; }
+	.player-where { display: flex; align-items: baseline; gap: 8px; min-width: 0; margin: 0 4px; padding-left: 9px; border-left: 1px solid rgba(98,80,70,.13); }
+	.player-count { flex: none; color: #a2948d; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+	.player-label { min-width: 0; color: #5c4b45; font-family: var(--font-display, Georgia, serif); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.player-exit { width: auto !important; padding: 0 10px; color: #8b7a73 !important; font-size: 11.5px !important; }
+
+	.shelf-backdrop {
+		position: absolute;
+		inset: 0;
+		z-index: 90;
+		display: grid;
+		place-items: center;
+		padding: 22px;
+		background: rgba(60, 47, 41, 0.24);
+		backdrop-filter: blur(4px);
+		animation: fade-in 180ms ease both;
+	}
+	@keyframes fade-in { from { opacity: 0; } }
+
+	.shelf {
+		display: flex;
+		flex-direction: column;
+		width: min(560px, 100%);
+		max-height: min(620px, 100%);
+		border: 1px solid rgba(98, 80, 70, 0.16);
+		border-radius: 20px;
+		background: rgba(255, 253, 248, 0.98);
+		box-shadow: 0 24px 60px rgba(58, 42, 35, 0.28);
+		animation: shelf-in 240ms ease both;
+	}
+	@keyframes shelf-in { from { opacity: 0; transform: translateY(12px) scale(.99); } }
+
+	.shelf-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 20px 14px; border-bottom: 1px solid rgba(98,80,70,.1); }
+	.shelf-head h2 { margin: 0; color: #4f403b; font-family: var(--font-display, Georgia, serif); font-size: 20px; font-weight: 600; }
+	.shelf-head p { margin: 5px 0 0; color: #92847c; font-size: 12px; }
+	.shelf-close { width: 30px; height: 30px; flex: none; border-radius: 9px; background: transparent; color: #8b7a73; font-size: 20px; line-height: 1; }
+	.shelf-close:hover { background: rgba(224, 210, 200, 0.55); }
+
+	.shelf-list { flex: 1; margin: 0; padding: 10px; list-style: none; overflow-y: auto; }
+	.shelf-list li { display: flex; align-items: center; gap: 4px; padding: 3px; border-radius: 12px; }
+	.shelf-list li:hover { background: rgba(238, 228, 220, 0.6); }
+	.shelf-list li.open { background: rgba(219, 178, 178, 0.18); }
+	.shelf-open { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 9px 11px; border-radius: 10px; background: transparent; text-align: left; }
+	.shelf-open strong { color: #4f403b; font-family: var(--font-display, Georgia, serif); font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.shelf-open small { color: #988a82; font-size: 11px; }
+	.shelf-badge { flex: none; padding: 2px 7px; border-radius: 999px; background: rgba(167, 102, 112, 0.16); color: #7c4a53; font-size: 9.5px; letter-spacing: .07em; text-transform: uppercase; }
+	.shelf-foot { display: flex; flex-wrap: wrap; gap: 7px; padding: 14px 20px 18px; border-top: 1px solid rgba(98,80,70,.1); }
+
+	.shortcuts {
+		position: absolute;
+		z-index: 74;
+		right: 22px;
+		bottom: 76px;
+		width: 232px;
+		padding: 13px 15px 15px;
+		border: 1px solid rgba(98, 80, 70, 0.14);
+		border-radius: 14px;
+		background: rgba(255, 253, 248, 0.95);
+		box-shadow: 0 12px 34px rgba(76,57,48,.15);
+		backdrop-filter: blur(14px);
+	}
+	.shortcuts h3 { margin: 0 0 9px; color: #6d5c56; font-family: var(--font-display, Georgia, serif); font-size: 13px; font-weight: 600; }
+	.shortcuts dl { display: grid; grid-template-columns: 58px 1fr; gap: 5px 9px; margin: 0; }
+	.shortcuts dt { color: #7c6a63; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+	.shortcuts dd { margin: 0; color: #948680; font-size: 10.5px; }
+
+	@media (max-width: 1120px) {
+		/* The breadcrumb drops to its own line before anything has to shrink. */
+		.location-bar { order: 3; }
+		.topbar { flex: 1 1 auto; }
+	}
+
 	@media (max-width: 650px) {
-		.topbar { left: 12px; top: 12px; max-width: calc(100vw - 24px); }
+		.top-deck { left: 12px; right: 12px; top: 12px; gap: 7px; }
 		.save-status { display: none; }
-		.tool-dock { bottom: 12px; max-width: calc(100vw - 120px); overflow-x: auto; }
+		/* The eyebrow is decoration; the title needs every pixel it can have. */
+		.board-name { flex: 1 1 auto; }
+		.board-name span { display: none; }
+		.board-name input { min-width: 0; width: 100%; }
+		/* Pinned between the left edge and the camera controls rather than
+		   centred, so the two can never land on top of each other. */
+		.tool-dock { left: 12px; right: 158px; bottom: 12px; max-width: none; overflow-x: auto; transform: none; }
 		.tool-button { padding: 0 8px; }
 		.tool-button span { display: none; }
-		.camera-controls { right: 12px; bottom: 12px; grid-template-columns: 31px 31px 31px; }
+		.camera-controls { right: 12px; bottom: 12px; grid-template-columns: repeat(4, 31px); }
 		.camera-controls button { width: 31px; height: 31px; }
-		.camera-controls span { display: none; }
+		.camera-controls span,
+		.camera-controls .help-button { display: none; }
+		.location-bar { max-width: 100%; }
+		.crumb { max-width: 118px; }
+		.scale-word { display: none; }
+		.rail-button { padding: 0 7px; font-size: 0; gap: 0; }
+		.rail-button span { font-size: 15px; }
+		.drawer { top: 112px; right: 12px; bottom: 66px; width: calc(100vw - 24px); }
+		.minimap-shell { display: none; }
+		.shortcuts { right: 12px; bottom: 60px; }
+		.board-actions { padding-left: 6px; gap: 3px; }
+		.shelf-list li { flex-wrap: wrap; }
 	}
 
 	@media (prefers-reduced-motion: reduce) {
