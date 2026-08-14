@@ -1,8 +1,19 @@
-export const BOARD_SCHEMA_VERSION = 2;
+export const BOARD_SCHEMA_VERSION = 3;
 const MIN_CAMERA_ZOOM = 0.1;
 const MAX_CAMERA_ZOOM = 4;
 
 export type WhiteboardItemType = 'card' | 'image' | 'frame' | 'stack' | 'connector';
+
+/**
+ * One palette for everything that carries colour — labels, the Color property,
+ * and the tint a frame has always had. Frames' existing values are the first
+ * four, so they already speak it and nothing needed migrating.
+ */
+export const TINTS = ['peach', 'lavender', 'aqua', 'gold', 'rose', 'sage'] as const;
+export type Tint = (typeof TINTS)[number];
+
+export const STATUSES = ['idea', 'open', 'doing', 'done', 'parked'] as const;
+export type Status = (typeof STATUSES)[number];
 
 export type Camera = {
 	x: number;
@@ -17,12 +28,32 @@ export type Bounds = {
 	height: number;
 };
 
+/**
+ * The optional layer. Every field is absent until something is actually said,
+ * and an object that has been told nothing carries no `properties` key at all —
+ * which is what keeps a card looking like a card.
+ *
+ * Created and Updated are properties too, but they are `createdAt`/`updatedAt`
+ * on the item already. They are shown, never stored twice.
+ */
+export type ItemProperties = {
+	labelIds?: string[];
+	status?: Status;
+	/** "Type": what kind of thing this is, in the board's own words. */
+	kind?: string;
+	/** Where this came from — a link, a book, a conversation. */
+	source?: string;
+	/** "Color". Frames keep theirs in `tint`; see `colorOf` in properties.ts. */
+	tint?: Tint;
+};
+
 export interface BaseWhiteboardItem extends Bounds {
 	id: string;
 	type: WhiteboardItemType;
 	zIndex: number;
 	createdAt: string;
 	updatedAt: string;
+	properties?: ItemProperties;
 }
 
 export interface CardItem extends BaseWhiteboardItem {
@@ -60,6 +91,18 @@ export interface ConnectorItem extends BaseWhiteboardItem {
 }
 
 export type WhiteboardItem = CardItem | ImageItem | FrameItem | StackItem | ConnectorItem;
+
+/**
+ * A reusable label, owned by the board rather than by any one object, so the
+ * same word means the same thing everywhere and renaming it renames it once.
+ * This is organization that does not depend on where a thing sits.
+ */
+export type Label = {
+	id: string;
+	name: string;
+	tint: Tint;
+	createdAt: string;
+};
 
 /** A camera the board remembers by name, so a place can be returned to exactly. */
 export type Viewpoint = {
@@ -100,6 +143,7 @@ export type WhiteboardDocument = {
 	home: Camera | null;
 	viewpoints: Viewpoint[];
 	journey: Journey;
+	labels: Label[];
 	updatedAt: string;
 };
 
@@ -138,8 +182,18 @@ export function createEmptyBoard(): WhiteboardDocument {
 		home: null,
 		viewpoints: [],
 		journey: { stops: [], loop: false },
+		labels: [],
 		updatedAt: now()
 	};
+}
+
+export function createLabel(name: string, tint: Tint): Label {
+	return { id: makeId('label'), name: normalizeLabelName(name), tint, createdAt: now() };
+}
+
+/** Labels are matched by name, so the name has to be one settled thing. */
+export function normalizeLabelName(name: string): string {
+	return name.trim().replace(/^#+/, '').replace(/\s+/g, ' ').slice(0, 32);
 }
 
 export const DEFAULT_STOP_HOLD = 4;
@@ -218,7 +272,32 @@ export function isWhiteboardDocument(value: unknown): value is WhiteboardDocumen
 	if (!Array.isArray(value.viewpoints) || !value.viewpoints.every(isViewpoint)) return false;
 	if (new Set(value.viewpoints.map((viewpoint) => viewpoint.id)).size !== value.viewpoints.length) return false;
 	if (!isJourney(value.journey)) return false;
+	if (!Array.isArray(value.labels) || !value.labels.every(isLabel)) return false;
+	if (new Set(value.labels.map((label) => label.id)).size !== value.labels.length) return false;
 	return value.items.every(isWhiteboardItem) && new Set(value.items.map((item) => item.id)).size === value.items.length;
+}
+
+export function isLabel(value: unknown): value is Label {
+	return isRecord(value) && typeof value.id === 'string' && typeof value.name === 'string' &&
+		typeof value.createdAt === 'string' && isTint(value.tint);
+}
+
+export function isTint(value: unknown): value is Tint {
+	return typeof value === 'string' && (TINTS as readonly string[]).includes(value);
+}
+
+export function isStatus(value: unknown): value is Status {
+	return typeof value === 'string' && (STATUSES as readonly string[]).includes(value);
+}
+
+function isItemProperties(value: unknown): value is ItemProperties {
+	if (!isRecord(value)) return false;
+	if (value.labelIds !== undefined && (!Array.isArray(value.labelIds) || !value.labelIds.every((id) => typeof id === 'string'))) return false;
+	if (value.status !== undefined && !isStatus(value.status)) return false;
+	if (value.kind !== undefined && typeof value.kind !== 'string') return false;
+	if (value.source !== undefined && typeof value.source !== 'string') return false;
+	if (value.tint !== undefined && !isTint(value.tint)) return false;
+	return true;
 }
 
 export function isViewpoint(value: unknown): value is Viewpoint {
@@ -261,7 +340,8 @@ export function isWhiteboardItem(value: unknown): value is WhiteboardItem {
 function isBaseItem(value: Record<string, unknown>): boolean {
 	return typeof value.id === 'string' &&
 		finite(value.x) && finite(value.y) && finite(value.width) && finite(value.height) && finite(value.zIndex) &&
-		typeof value.createdAt === 'string' && typeof value.updatedAt === 'string';
+		typeof value.createdAt === 'string' && typeof value.updatedAt === 'string' &&
+		(value.properties === undefined || isItemProperties(value.properties));
 }
 
 function isCamera(value: unknown): value is Camera {
@@ -281,15 +361,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Fills in everything schema 2 added. Anything unreadable is dropped rather
- * than guessed at: a board's material matters more than its navigation, so a
- * corrupt journey costs you the journey, never the board.
+ * Fills in everything schemas 2 and 3 added. Anything unreadable is dropped
+ * rather than guessed at: a board's material matters more than what has been
+ * said about it, so a corrupt journey costs you the journey, never the board,
+ * and an unreadable property sheet costs that object its properties alone.
  */
 export function upgradeDocument(value: unknown): unknown {
 	if (!isRecord(value)) return value;
 	const viewpoints = Array.isArray(value.viewpoints) ? value.viewpoints.filter(isViewpoint) : [];
 	const journey = isJourney(value.journey) ? value.journey : { stops: [], loop: false };
-	return { ...value, home: isCamera(value.home) ? value.home : null, viewpoints, journey };
+	const labels = Array.isArray(value.labels) ? value.labels.filter(isLabel) : [];
+	const items = Array.isArray(value.items)
+		? value.items.map((item) => {
+			if (!isRecord(item) || item.properties === undefined || isItemProperties(item.properties)) return item;
+			const { properties: _unreadable, ...rest } = item;
+			return rest;
+		})
+		: value.items;
+	return { ...value, items, home: isCamera(value.home) ? value.home : null, viewpoints, journey, labels };
 }
 
 export function snapshotDocument(document: WhiteboardDocument): WhiteboardDocument {
@@ -299,9 +388,11 @@ export function snapshotDocument(document: WhiteboardDocument): WhiteboardDocume
 		home: document.home ? { ...document.home } : null,
 		viewpoints: document.viewpoints.map((viewpoint) => ({ ...viewpoint, camera: { ...viewpoint.camera } })),
 		journey: { loop: document.journey.loop, stops: document.journey.stops.map((stop) => ({ ...stop, target: { ...stop.target } })) },
+		labels: document.labels.map((label) => ({ ...label })),
 		updatedAt: document.updatedAt,
 		items: document.items.map((item) => ({
 			...item,
+			...(item.properties ? { properties: { ...item.properties, ...(item.properties.labelIds ? { labelIds: [...item.properties.labelIds] } : {}) } } : {}),
 			...(item.type === 'stack' ? { cardIds: [...item.cardIds] } : {}),
 			...(item.type === 'card' && item.freePosition ? { freePosition: { ...item.freePosition } } : {})
 		})) as WhiteboardItem[]

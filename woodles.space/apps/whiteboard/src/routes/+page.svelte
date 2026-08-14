@@ -125,6 +125,7 @@
 		home: null,
 		viewpoints: [],
 		journey: { stops: [], loop: false },
+		labels: [],
 		updatedAt: ''
 	});
 	let tool = $state<Tool>('select');

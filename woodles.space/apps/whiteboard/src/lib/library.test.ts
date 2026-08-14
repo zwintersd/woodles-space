@@ -110,7 +110,7 @@ describe('the board that came before the shelf', () => {
 	it('moves the single saved board onto the shelf and opens it', () => {
 		const storage = memoryStorage();
 		const legacy = { ...createEmptyBoard(), board: { id: 'board-legacy', title: 'The only board' }, items: [createCard(10, 20)] };
-		const { home: _home, viewpoints: _viewpoints, journey: _journey, ...schemaOne } = legacy;
+		const { home: _home, viewpoints: _viewpoints, journey: _journey, labels: _labels, ...schemaOne } = legacy;
 		storage.setItem(LEGACY_BOARD_KEY, JSON.stringify({
 			woodles: 'woodles-persistence',
 			schemaVersion: 1,
@@ -122,9 +122,10 @@ describe('the board that came before the shelf', () => {
 		const adopted = library.adoptLegacyBoard()!;
 		expect(adopted.board.title).toBe('The only board');
 		expect(adopted.items).toHaveLength(1);
-		// Schema 2's navigation arrives filled in rather than missing.
+		// Schema 2's navigation and schema 3's labels arrive filled in, not missing.
 		expect(adopted.viewpoints).toEqual([]);
 		expect(adopted.journey).toEqual({ stops: [], loop: false });
+		expect(adopted.labels).toEqual([]);
 		expect(library.list().map((entry) => entry.title)).toEqual(['The only board']);
 		expect(library.activeId()).toBe('board-legacy');
 	});

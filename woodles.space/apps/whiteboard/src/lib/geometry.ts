@@ -164,7 +164,34 @@ export function repairDocument(document: WhiteboardDocument): WhiteboardDocument
 		}
 		return item;
 	}) as WhiteboardItem[];
-	return { ...document, items, journey: repairJourney(document, items) };
+	const labelled = repairLabelling(document, items);
+	return { ...document, items: labelled, journey: repairJourney(document, labelled) };
+}
+
+/**
+ * A label that no longer exists is not a label. Deleting one takes it off
+ * everything wearing it, and an object left with an empty property sheet drops
+ * the sheet too, so "has no properties" stays the same as never having had any.
+ */
+function repairLabelling(document: WhiteboardDocument, items: WhiteboardItem[]): WhiteboardItem[] {
+	const known = new Set(document.labels.map((label) => label.id));
+	return items.map((item) => {
+		if (!item.properties) return item;
+		const properties: typeof item.properties = { ...item.properties };
+		if (properties.labelIds) {
+			const kept = [...new Set(properties.labelIds)].filter((id) => known.has(id));
+			if (kept.length) properties.labelIds = kept;
+			else delete properties.labelIds;
+		}
+		for (const [key, value] of Object.entries(properties)) {
+			if (value === undefined || value === '') delete properties[key as keyof typeof properties];
+		}
+		if (!Object.keys(properties).length) {
+			const { properties: _empty, ...rest } = item;
+			return rest as WhiteboardItem;
+		}
+		return { ...item, properties } as WhiteboardItem;
+	});
 }
 
 /**
