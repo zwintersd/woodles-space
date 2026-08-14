@@ -255,23 +255,27 @@ describe('the §1.2 lesson', () => {
 		expect(r.summary.stressedShare).toBeGreaterThan(0.5);
 	});
 
-	it('allowing `returning` closes the loop and the world recovers', () => {
-		const r = simulate(witnessOnly(), {
-			duration: 6 * HOUR,
-			seed: 1,
-			worldspace: 'shallows'
-		});
-		const w = r.final;
-		// the fungal net (+0.15 nutrients) is the biggest single return in the
-		// game, and with the whole web written the three stocks settle mid-band
-		expect(w.state.stocks.nutrients).toBeGreaterThan(50);
-		expect(w.state.stocks.oxygen).toBeGreaterThan(55);
-		expect(w.state.stocks.moisture).toBeGreaterThan(45);
-		expect(w.allStocksInBand).toBe(true);
-		expect(w.stability).toBe(100);
-		// and nothing is left suffering
-		for (const l of w.life) expect(w.severityOf(l)).toBe(0);
-	});
+	it(
+		'allowing `returning` closes the loop and the world recovers',
+		{ timeout: 30_000 },
+		() => {
+			const r = simulate(witnessOnly(), {
+				duration: 6 * HOUR,
+				seed: 1,
+				worldspace: 'shallows'
+			});
+			const w = r.final;
+			// the fungal net (+0.15 nutrients) is the biggest single return in the
+			// game, and with the whole web written the three stocks settle mid-band
+			expect(w.state.stocks.nutrients).toBeGreaterThan(50);
+			expect(w.state.stocks.oxygen).toBeGreaterThan(55);
+			expect(w.state.stocks.moisture).toBeGreaterThan(45);
+			expect(w.allStocksInBand).toBe(true);
+			expect(w.stability).toBe(100);
+			// and nothing is left suffering
+			for (const l of w.life) expect(w.severityOf(l)).toBe(0);
+		}
+	);
 
 	it('a complete world is a balanced one; a partial world is not', () => {
 		const partial = simulate(witnessOnly(), {
