@@ -164,7 +164,25 @@ export function repairDocument(document: WhiteboardDocument): WhiteboardDocument
 		}
 		return item;
 	}) as WhiteboardItem[];
-	return { ...document, items };
+	return { ...document, items, journey: repairJourney(document, items) };
+}
+
+/**
+ * A stop whose destination is gone is not a stop. Deleting a frame therefore
+ * shortens the journey rather than leaving a step that lands nowhere.
+ */
+function repairJourney(document: WhiteboardDocument, items: WhiteboardItem[]): WhiteboardDocument['journey'] {
+	const itemIds = new Set(items.filter((item) => item.type !== 'connector').map((item) => item.id));
+	const viewpointIds = new Set(document.viewpoints.map((viewpoint) => viewpoint.id));
+	const seen = new Set<string>();
+	const stops = document.journey.stops.filter((stop) => {
+		if (seen.has(stop.id)) return false;
+		seen.add(stop.id);
+		if (stop.target.kind === 'item') return itemIds.has(stop.target.id);
+		if (stop.target.kind === 'viewpoint') return viewpointIds.has(stop.target.id);
+		return true;
+	});
+	return stops.length === document.journey.stops.length ? document.journey : { ...document.journey, stops };
 }
 
 export function removeItems(document: WhiteboardDocument, ids: Set<string>): WhiteboardDocument {

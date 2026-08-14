@@ -1,4 +1,4 @@
-export const BOARD_SCHEMA_VERSION = 1;
+export const BOARD_SCHEMA_VERSION = 2;
 const MIN_CAMERA_ZOOM = 0.1;
 const MAX_CAMERA_ZOOM = 4;
 
@@ -61,6 +61,34 @@ export interface ConnectorItem extends BaseWhiteboardItem {
 
 export type WhiteboardItem = CardItem | ImageItem | FrameItem | StackItem | ConnectorItem;
 
+/** A camera the board remembers by name, so a place can be returned to exactly. */
+export type Viewpoint = {
+	id: string;
+	name: string;
+	camera: Camera;
+	createdAt: string;
+};
+
+/**
+ * One stop on a journey. A stop points at something that already exists on the
+ * board rather than storing a camera of its own, so moving a frame moves the
+ * stop with it. Viewpoint stops are the exception: those *are* a camera.
+ */
+export type JourneyStop = {
+	id: string;
+	target:
+		| { kind: 'item'; id: string }
+		| { kind: 'viewpoint'; id: string }
+		| { kind: 'board' };
+	/** Seconds to rest here before Play moves on. */
+	hold: number;
+};
+
+export type Journey = {
+	stops: JourneyStop[];
+	loop: boolean;
+};
+
 export type WhiteboardDocument = {
 	board: {
 		id: string;
@@ -68,6 +96,10 @@ export type WhiteboardDocument = {
 	};
 	items: WhiteboardItem[];
 	camera: Camera;
+	/** Where Home lands. Null means "wherever the board currently fits". */
+	home: Camera | null;
+	viewpoints: Viewpoint[];
+	journey: Journey;
 	updatedAt: string;
 };
 
@@ -103,8 +135,26 @@ export function createEmptyBoard(): WhiteboardDocument {
 		board: { id: makeId('board'), title: 'Untitled whiteboard' },
 		items: [],
 		camera: { x: 180, y: 120, zoom: 1 },
+		home: null,
+		viewpoints: [],
+		journey: { stops: [], loop: false },
 		updatedAt: now()
 	};
+}
+
+export const DEFAULT_STOP_HOLD = 4;
+
+export function createViewpoint(name: string, camera: Camera): Viewpoint {
+	return { id: makeId('view'), name: name.trim() || 'Untitled view', camera: { ...camera }, createdAt: now() };
+}
+
+export function createStop(target: JourneyStop['target'], hold = DEFAULT_STOP_HOLD): JourneyStop {
+	return { id: makeId('stop'), target, hold: clampHold(hold) };
+}
+
+export function clampHold(seconds: number): number {
+	if (!Number.isFinite(seconds)) return DEFAULT_STOP_HOLD;
+	return Math.min(30, Math.max(1, Math.round(seconds)));
 }
 
 export function createCard(x: number, y: number, zIndex = nextZ([])): CardItem {
@@ -164,7 +214,28 @@ export function nextZ(items: WhiteboardItem[]): number {
 export function isWhiteboardDocument(value: unknown): value is WhiteboardDocument {
 	if (!isRecord(value) || !isRecord(value.board) || !Array.isArray(value.items) || !isCamera(value.camera)) return false;
 	if (typeof value.board.id !== 'string' || typeof value.board.title !== 'string' || typeof value.updatedAt !== 'string') return false;
+	if (value.home !== null && !isCamera(value.home)) return false;
+	if (!Array.isArray(value.viewpoints) || !value.viewpoints.every(isViewpoint)) return false;
+	if (new Set(value.viewpoints.map((viewpoint) => viewpoint.id)).size !== value.viewpoints.length) return false;
+	if (!isJourney(value.journey)) return false;
 	return value.items.every(isWhiteboardItem) && new Set(value.items.map((item) => item.id)).size === value.items.length;
+}
+
+export function isViewpoint(value: unknown): value is Viewpoint {
+	return isRecord(value) && typeof value.id === 'string' && typeof value.name === 'string' &&
+		typeof value.createdAt === 'string' && isCamera(value.camera);
+}
+
+function isJourney(value: unknown): value is Journey {
+	if (!isRecord(value) || typeof value.loop !== 'boolean' || !Array.isArray(value.stops)) return false;
+	return value.stops.every(isJourneyStop) && new Set(value.stops.map((stop) => (stop as JourneyStop).id)).size === value.stops.length;
+}
+
+function isJourneyStop(value: unknown): value is JourneyStop {
+	if (!isRecord(value) || typeof value.id !== 'string' || !finite(value.hold) || !isRecord(value.target)) return false;
+	const target = value.target;
+	if (target.kind === 'board') return true;
+	return (target.kind === 'item' || target.kind === 'viewpoint') && typeof target.id === 'string';
 }
 
 export function isWhiteboardItem(value: unknown): value is WhiteboardItem {
@@ -209,10 +280,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/**
+ * Fills in everything schema 2 added. Anything unreadable is dropped rather
+ * than guessed at: a board's material matters more than its navigation, so a
+ * corrupt journey costs you the journey, never the board.
+ */
+export function upgradeDocument(value: unknown): unknown {
+	if (!isRecord(value)) return value;
+	const viewpoints = Array.isArray(value.viewpoints) ? value.viewpoints.filter(isViewpoint) : [];
+	const journey = isJourney(value.journey) ? value.journey : { stops: [], loop: false };
+	return { ...value, home: isCamera(value.home) ? value.home : null, viewpoints, journey };
+}
+
 export function snapshotDocument(document: WhiteboardDocument): WhiteboardDocument {
 	return {
 		board: { ...document.board },
 		camera: { ...document.camera },
+		home: document.home ? { ...document.home } : null,
+		viewpoints: document.viewpoints.map((viewpoint) => ({ ...viewpoint, camera: { ...viewpoint.camera } })),
+		journey: { loop: document.journey.loop, stops: document.journey.stops.map((stop) => ({ ...stop, target: { ...stop.target } })) },
 		updatedAt: document.updatedAt,
 		items: document.items.map((item) => ({
 			...item,
