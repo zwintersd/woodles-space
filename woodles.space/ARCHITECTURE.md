@@ -133,7 +133,7 @@ woodles.space/
     ├── planner/             SvelteKit · carillon — self-observation, day piles, and reinforcement
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
     ├── thinking-about/      SvelteKit · a board for what's being read, played, and watched — and, per entry, a structured record cast for it
-    ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking
+    ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking — a camera that knows where it is, cards that say more than they show, and stacks that do more than hold them
     ├── bloomforge/          SvelteKit · a studio for making incremental games
     └── bloomforge-player/   SvelteKit · the runtime that makes those games playable
 ```
@@ -609,6 +609,133 @@ entry might not have. Spores' worldbuilding categories (creature, biome,
 ability, stat, minigame, lore) did not come with it: they were the retired Dev
 Log's content, and nothing in this workspace's four healthy apps is about
 marginalia's world, so there was nowhere honest to put them.
+
+## the navigable board
+
+`whiteboard` is a wide, tactile place for spatial thinking: cards, stacks,
+images, connectors, and frames on one canvas that is bigger than the screen.
+Once the canvas is genuinely large, moving around it becomes its own form of
+organization, so the navigation is the app's second subject rather than a
+convenience laid over the first.
+
+**The camera.** `src/lib/camera.ts` interpolates a move along van Wijk &
+Nuij's arc ("Smooth and Efficient Zooming and Panning", 2003) instead of
+tweening `x`, `y` and `zoom` in a straight line. A long jump lifts, travels
+while the board is small enough to read whole, then settles — the alternative
+smears the board sideways at reading scale, which is the motion that makes
+people lose their place. The arc's parameters come out of the paper: ρ = 1.42
+for curvature, constant velocity along the path, so a longer journey honestly
+takes longer (bounded to 280–1500 ms). The arc deliberately pulls wider than
+either endpoint, so the intermediate zoom is clamped; that flattens the top of
+the arc into a pan at the widest legal scale, and the centre is unaffected.
+The same file owns the camera history — Back and Forward over *deliberate*
+moves only, refreshing the entry being left with the live camera so Back
+returns to where you actually were rather than to where a jump last landed.
+Free panning and zooming are not recorded: history is a record of decisions,
+not of drifting.
+
+**Location.** `src/lib/navigation.ts` answers "where am I". `frameSequence`
+bands frames into rows and reads them top-to-bottom, left-to-right; that is
+the order `[` and `]` and the number keys walk, and it stays true as frames
+move, so the sequence never needs maintaining by hand. Containment forces
+`parent.x <= child.x`, so a nested frame always follows its parent.
+`locateCamera` reports the chain of frames the viewport centre is inside as a
+breadcrumb, dropping frames too small to fill a meaningful share of the view —
+from high above you are over the board, not in any one place.
+
+**Journeys.** `src/lib/journey.ts` is Journey Mode: an ordered sequence of
+stops that the camera walks when Play is pressed. A stop points at something
+that already exists (an item, a saved viewpoint, or the whole board) rather
+than storing a camera of its own, so moving or renaming a frame moves the stop
+with it, and deleting one shortens the journey instead of leaving a step that
+lands nowhere (`repairJourney`, in `geometry.ts`). With nothing arranged by
+hand, `suggestedStops` offers an overview followed by every frame in reading
+order, so Play means something the first time it is pressed.
+
+**The shelf.** `src/lib/library.ts` makes a whiteboard one of many. Each board
+is its own versioned save under `woodles.whiteboard.boards.<id>` with a small
+index alongside it; the prefix is deliberately not `…board.`, which would read
+the single-board era's `…board.v1` key as a board whose id is `v1`. That one
+old board is adopted onto the shelf once, and its key cleared only after its
+contents are safely rewritten, so an interrupted migration retries rather than
+loses. Deleting a board only deletes the images no other board still holds.
+
+**The optional layer.** Schema 3 gives every object a property sheet it does
+not have to use: `labels`, `status`, `kind` ("Type"), `source`, `tint`
+("Color"). `properties` is absent until something is actually said, and
+clearing the last field removes the sheet again, so an object that has been
+cleared is indistinguishable from one that was never touched — that absence is
+what keeps a card looking like a card. Created and Updated are properties too,
+but they are `createdAt`/`updatedAt` on the item already; `properties.ts` shows
+them and never stores them twice. Colour is one palette of six, and a frame
+keeps its colour in the `tint` field it has had since the app was written
+rather than growing a second one — `setProperty` dispatches on that, so callers
+see one Color property either way.
+
+A card wears its layer as a chip row rather than a property sheet: a Type
+eyebrow, a status dot, label chips, a `↗` when a source is set, and a `＋` that
+appears only while the card is chosen. A card grows by one row to hold its
+first chip and shrinks back when the last one goes, because otherwise saying
+something about a card silently eats a line of whatever it already said.
+
+**Labels** (`labels.ts`) are the first metadata system: reusable, owned by the
+board rather than by any one object, matched by name however they are typed.
+Renaming one renames it everywhere, and renaming onto an existing name folds
+the two into one rather than leaving two labels that read the same. Deleting
+one takes it off everything wearing it (`repairLabelling`, in `geometry.ts`).
+This is organization independent of spatial location: space, frames, stacks and
+labels, with no database under any of it.
+
+**Search** (`search.ts`) reads the material and the optional layer alike —
+title, body, name, label, type, status, source — weighted by how much of an
+answer each field is to "what is this", with a match at the start of a field
+beating one buried in it. A leading `#` narrows to labels alone. The board
+flies to the result: arrow keys travel through hits without filling up the
+camera history, Enter keeps the one you landed on and records a single move
+from where the search began, `⇧↵` pulls back to hold every result at once, and
+Escape puts the camera back where it started.
+
+**Stack behaviours.** Schema 4 lets a stack do more than hold cards in order:
+`behavior` is `status`, `checklist`, `queue` or `gallery`, and is absent
+entirely until a stack earns one — a plain stack carries no field at all, and
+setting it back to plain removes it again.
+
+A **Status** stack's title *is* the status it confers. Every card inside wears
+it, so dragging a card from IDEA to BUILDING **is** the status change rather
+than something to remember afterwards, and renaming the stack renames the
+status of everything in it. `conferStackStatuses` runs from both
+`insertCardIntoStack` and `repairDocument`, which are the only two ways stack
+membership changes, so a card cannot sit in one column while claiming to be
+something else. Nothing is taken away on the way out: a card that leaves keeps
+what it was last told.
+
+That is why status is a word rather than a closed vocabulary — the five
+suggestions stay, but a board that thinks in IDEA / BUILDING / WORKS / POLISH
+gets to. `done` is the one status the app itself reads, so a **checklist**
+tick and a card that simply says "Done" are the same fact.
+
+**Kanban is four Status stacks beside one another and nothing else** — no board
+object, no mode, no database. `stackBeside` puts the next column down to the
+right at the same size and height, and `shiftCardColumn` lets the keyboard say
+what the drag says, reading the column order off where the stacks actually sit
+rather than off a stored sequence.
+
+A **queue** badges its top two cards `now` and `next` and keeps a strip clear
+under its header for "take the top card", which lifts that card out and sets it
+down beside the stack — picking up the current thing is a move across the board,
+not a state change in a list. That strip is `stackTopInset`, in the geometry:
+cards are laid out in world coordinates, so the room has to be made there or the
+first card is drawn straight over the button. A **gallery** wraps the same cards
+into tiles across and then down, sized so the default stack width gives two per
+row.
+
+None of it moves anything off the canvas, which is the rule the whole update is
+built around: a stack with a behaviour is still a stack, in the same place, with
+cards you can drag in and out of it.
+
+Schemas 2, 3 and 4 each migrate forward by filling in what they added. A corrupt
+journey costs you the journey, never the board; an unreadable property sheet
+costs that one object its properties and nothing else.
 
 ## the writing surface
 
@@ -1223,19 +1350,35 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1832 tests total: 16 in `api/` (its own
+1999 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1816 across sixteen pnpm
-packages — `write` 223, `marginalia` 333, `planner` 539,
+instead of the recursive `pnpm -r test`), plus 1983 across sixteen pnpm
+packages — `write` 242, `marginalia` 333, `planner` 539,
 `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
 `packages/sync` 36, `packages/persistence` 6, `packages/app-manifest` 17,
 `packages/handoff` 14, `packages/text` 30, `packages/spellcraft` 15,
 `packages/emoji` 4, `packages/incremental-core` 191, `thinking-about` 131,
-and `whiteboard` 10.
+and `whiteboard` 158.
 (Counted by running each suite, not by adding to the previous figure — keep
 this inventory current when a suite changes; the root command is the release
 contract, not the prose count.)
+(Whiteboard's suite grew by a further 32 for stack behaviours, nearly all in
+`stacks.ts` — status conferral and renaming, the column shift, ticking,
+queue heads and taking, and the gallery's wrapped layout. Before that it grew
+by 52 for the optional layer: `labels.ts`
+(19) for the reusable label registry, `properties.ts` (15) for the property
+sheet that disappears when it is empty, `search.ts` (18) for finding and
+ranking, and two more in `persistence.ts` for carrying an older save forward
+and for dropping a property sheet it cannot read. Before that it grew by 64
+for navigation: `camera.ts` (16) for the van
+Wijk flight and the history stack, `navigation.ts` (15) for reading order,
+breadcrumbs and framing, `journey.ts` (14) for arranging and playing a
+sequence, `library.ts` (12) for the board shelf and the one-time adoption of
+the single-board save, and `minimap.ts` (7) for the overview projection. The
+chrome those modules drive — the breadcrumb bar, the drawer, the player, the
+shelf — is exercised by hand rather than by a unit suite, same as every other
+view-only Svelte component here.)
 (Spores' 140 retired with the app. Write's suite grew by 28 — `sporesImport.ts`
 (14), `backlinks.ts` (7), `status.ts` (7) — for the pieces of it that moved in;
 Thinking About's grew by 13 for the spell registry's assembler and parser;

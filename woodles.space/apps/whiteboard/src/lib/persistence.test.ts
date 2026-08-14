@@ -37,6 +37,47 @@ describe('whiteboard persistence', () => {
 		expect(loaded.value.board.title).toBe('safe board');
 	});
 
+	it('carries an older save forward, filling in what later schemas added', () => {
+		const storage = memoryStorage();
+		const store = createWhiteboardStorage(storage);
+		const current = createEmptyBoard();
+		const { home: _home, viewpoints: _viewpoints, journey: _journey, labels: _labels, ...older } = current;
+		storage.setItem(store.key, JSON.stringify({
+			woodles: 'woodles-persistence',
+			schemaVersion: 1,
+			savedAt: '2026-08-13T00:00:00.000Z',
+			data: { ...older, board: { id: 'board-old', title: 'an older board' } }
+		}));
+
+		const loaded = store.load();
+		expect(loaded.source).toBe('primary');
+		expect(loaded.migrated).toBe(true);
+		expect(loaded.value.board.title).toBe('an older board');
+		expect(loaded.value.labels).toEqual([]);
+		expect(loaded.value.journey).toEqual({ stops: [], loop: false });
+	});
+
+	it('drops a property sheet it cannot read without losing the object under it', () => {
+		const storage = memoryStorage();
+		const store = createWhiteboardStorage(storage);
+		const card = createCard(40, 60);
+		storage.setItem(store.key, JSON.stringify({
+			woodles: 'woodles-persistence',
+			schemaVersion: 2,
+			savedAt: '2026-08-13T00:00:00.000Z',
+			data: {
+				...createEmptyBoard(),
+				items: [{ ...card, properties: { labelIds: 'not-a-list', tint: 42 } }]
+			}
+		}));
+
+		const loaded = store.load();
+		expect(loaded.source).toBe('primary');
+		expect(loaded.value.items).toHaveLength(1);
+		expect(loaded.value.items[0].id).toBe(card.id);
+		expect(loaded.value.items[0].properties).toBeUndefined();
+	});
+
 	it('cleans dangling connector relationships during restoration', () => {
 		const document = createEmptyBoard();
 		document.items = [

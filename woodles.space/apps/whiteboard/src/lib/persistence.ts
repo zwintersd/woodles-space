@@ -1,5 +1,11 @@
 import { createVersionedStorage, type StorageLike } from '@woodles/persistence';
-import { createEmptyBoard, isWhiteboardDocument, type WhiteboardDocument } from './model';
+import {
+	BOARD_SCHEMA_VERSION,
+	createEmptyBoard,
+	isWhiteboardDocument,
+	upgradeDocument,
+	type WhiteboardDocument
+} from './model';
 import { repairDocument } from './geometry';
 
 export const WHITEBOARD_STORAGE_KEY = 'woodles.whiteboard.board.v1';
@@ -7,10 +13,10 @@ export const WHITEBOARD_STORAGE_KEY = 'woodles.whiteboard.board.v1';
 export function createWhiteboardStorage(storage?: StorageLike | null) {
 	return createVersionedStorage<WhiteboardDocument>({
 		key: WHITEBOARD_STORAGE_KEY,
-		version: 1,
+		version: BOARD_SCHEMA_VERSION,
 		fallback: createEmptyBoard,
 		validate: isWhiteboardDocument,
-		migrate: () => createEmptyBoard(),
+		migrate: upgradeDocument,
 		...(storage === undefined ? {} : { storage })
 	});
 }
