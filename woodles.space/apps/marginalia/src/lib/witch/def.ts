@@ -1,34 +1,23 @@
 /**
- * `MarginaliaDef` — everything about World 1 that today lives as scattered
- * module-level constants in `tuning.ts` and the `content/` files, gathered
- * into one serializable shape. The role this plays is exactly `GameDef`'s
- * role in `@woodles/incremental-core`: the editor (eventually) edits this,
- * the engine (eventually) takes it as a parameter instead of importing its
- * pieces directly, and the two can't drift apart because they're reading
- * the same object.
- *
- * Step B threaded this through `World` itself: its constructor now takes a
- * `def` parameter (defaulting to `world1Def`), and every direct tuning.ts /
- * content/ import world.ts used to hold is now a read of `this.def`. Left
- * alone on purpose: `WorldTuning` (stageSeconds/stockDriftPerSec/stockLeak)
- * stays a separate, narrower constructor parameter — see world.ts's comment
- * on it — and `vitals.ts`'s own internal rates (vitality, band falloff, the
- * stability ecosystem bonus) are captured here as data but not yet wired,
- * since threading them through means changing vitals.ts's own signatures,
- * not just what calls it.
- *
- * Grouped by primitive shape (see packages/dynamics/README.md) wherever a
- * group of constants configures one shape's instance, so the fields read as
- * "here is recall's DecayRestoreOptions" rather than an alphabetical dump.
+ * `world1Def` — everything about World 1, in the `MarginaliaDef` shape
+ * `@woodles/witch-engine` defines (see that package's def.ts for the full
+ * schema and the reasoning behind each field group). This file is the
+ * content half: it gathers this app's own `content/` data and `tuning.ts`
+ * numbers into one object; `World` (world.ts) is built entirely against the
+ * schema and knows nothing about World 1 specifically.
  */
 
-import type { DecayRestoreOptions, ComboOptions } from '@woodles/dynamics';
-import { conditions, type Condition } from './content/conditions';
-import { emergences, type Emergence } from './content/emergences';
-import { interventions, type Intervention } from './content/interventions';
-import { world1Life, type Life, type LifeCategory, type LifeDomain } from './content/life';
-import type { Worldspace } from './worldShape';
-import { STOCK_BANDS, type StockId } from './vitals';
+import type { MarginaliaDef } from '@woodles/witch-engine';
+import { conditions } from './content/conditions';
+import { emergences } from './content/emergences';
+import {
+	fieldNotesByDomain,
+	equilibriumFieldNotes,
+	quietFieldNotes,
+	categoryMasteryFieldNotes
+} from './content/fieldNoteTemplates';
+import { interventions } from './content/interventions';
+import { world1Life } from './content/life';
 import {
 	STAGE_SECONDS,
 	STAGE_INSIGHT_MULT,
@@ -78,135 +67,6 @@ import {
 	FOCUS_STREAK_MAX
 } from './tuning';
 
-/** Shape E, Threshold Ladder — study seconds climbing toward each observation stage. */
-export interface StageDef {
-	/** Study-seconds to reach each stage; index 0 unused. */
-	seconds: readonly number[];
-	/** Insight-yield multiplier by deepest stage reached. */
-	insightMult: readonly number[];
-	/** How metabolically present life is at each stage. */
-	activity: readonly number[];
-	/** A manual "look closer" click's base study-seconds. */
-	lookCloserSeconds: number;
-}
-
-/** Shape C, Banded Stock — nutrients/oxygen/moisture share one config shape, three instances. */
-export interface StockDef {
-	bands: Record<StockId, [number, number]>;
-	driftPerSec: number;
-	leak: Record<StockId, number>;
-	start: number;
-	neutral: number;
-	/** Points outside a band at which health falls to 0 — shared by stocks and per-life needs. */
-	bandFalloff: number;
-}
-
-/** Shape B, Eased Stat — vitality's target is binary (0 or 1); see `VitalityDef.floor`. */
-export interface VitalityDef {
-	drainPerSec: number;
-	recoverPerSec: number;
-	floor: number;
-}
-
-/** Shape B, Eased Stat — favor's target is a live formula, not a constant. */
-export interface FavorDef {
-	baseTarget: number;
-	perKnown: number;
-	driftPerSec: number;
-	stressPenalty: number;
-	equilibriumBonus: number;
-	/** Replaces `tuning.ts`'s `favorMultiplier` function: `base + perPoint * favor`. */
-	multiplier: { base: number; perPoint: number };
-}
-
-/** The read side of shape D — how recall and fluency turn into a yield multiplier. */
-export interface RecallYieldDef {
-	floor: number;
-	fluencyBonus: number;
-}
-
-/** Shape G, Capacity + Roster. */
-export interface AttentionDef {
-	start: number;
-	costs: readonly number[];
-}
-
-/** Shape F, Tally -> Factor -> Gated Accrual — the restraint dividend. */
-export interface RestraintDef {
-	loadWeight: Record<'temporary' | 'lasting' | 'permanent', number>;
-	loadFull: number;
-	minFactor: number;
-}
-
-/**
- * The five intervention verbs' effect magnitudes — not their own shape, but
- * four injection points into shapes that already exist (see world.ts's
- * `applyInterventionEffect`): a stock's live value, a capped tally shifting
- * a band, a capped tally inside the stability formula, and a per-instance
- * coefficient override.
- */
-export interface InterventionEffectsDef {
-	tendBump: number;
-	invokeBump: number;
-	shapeBaselineRaise: number;
-	shapeBaselineMax: number;
-	encourageStability: number;
-	encourageStabilityMax: number;
-	guideMetabolismScale: number;
-}
-
-/** Shape J, Manual Conversion — the two insight sinks that aren't an intervention. */
-export interface InsightSinksDef {
-	distillInsightCost: number;
-	distillEssenceGain: number;
-}
-
-/** Discrete grants (shape I) fired by a stage crossing, and the two remaining world-level knobs. */
-export interface ProgressDef {
-	essenceOnStudied: number;
-	essenceOnKnown: number;
-	stabilityEcosystemBonus: number;
-	quietStability: number;
-	categoryMasteryBonus: number;
-	insightTrickleAnnounceSec: number;
-}
-
-/**
- * Shape H, Emergence Gate, at the scene level: which categories a worldspace
- * shows. `'all'` is `shallows` today; `water` shows only `aquatic` — see
- * `worldShape.ts`'s `lifeVisibleInWorldspace`, which this replaces with data.
- */
-export interface WorldspaceDef {
-	id: Worldspace;
-	visibleCategories: 'all' | LifeCategory[];
-}
-
-export interface MarginaliaDef {
-	meta: { id: string; title: string };
-
-	life: Life[];
-	conditions: Condition[];
-	/** Tier 2: revealed automatically once both of the conditions it names are written. */
-	emergences: Emergence[];
-	interventions: Record<LifeDomain, Intervention>;
-	worldspaces: Record<Worldspace, WorldspaceDef>;
-
-	stage: StageDef;
-	stock: StockDef;
-	vitality: VitalityDef;
-	favor: FavorDef;
-	/** Shape D itself — already typed by @woodles/dynamics, nothing to add. */
-	recall: DecayRestoreOptions;
-	recallYield: RecallYieldDef;
-	attention: AttentionDef;
-	restraint: RestraintDef;
-	interventionEffects: InterventionEffectsDef;
-	insightSinks: InsightSinksDef;
-	progress: ProgressDef;
-	/** Shape K itself — already typed by @woodles/dynamics, nothing to add. */
-	focus: ComboOptions;
-}
-
 /**
  * Deliberately excluded: `OFFLINE_CAP_SECONDS`, `STOCK_HISTORY_SAMPLE_SEC`,
  * `STOCK_HISTORY_LENGTH`, `FIELD_NOTES_MAX`. Those govern session/UI
@@ -235,7 +95,11 @@ export const world1Def: MarginaliaDef = {
 		lookCloserSeconds: LOOK_CLOSER_SECONDS
 	},
 	stock: {
-		bands: STOCK_BANDS,
+		// The bands that define a *balanced* world — distinct from per-life
+		// needs, which say what one creature tolerates rather than what
+		// equilibrium looks like. World 1's own numbers; not reusable as a
+		// generic default, so they live here rather than in vitals.ts.
+		bands: { nutrients: [40, 80], oxygen: [45, 85], moisture: [35, 75] },
 		driftPerSec: STOCK_DRIFT_PER_SEC,
 		leak: STOCK_LEAK,
 		start: STOCK_START,
@@ -299,5 +163,11 @@ export const world1Def: MarginaliaDef = {
 		windowSeconds: FOCUS_STREAK_WINDOW_SEC,
 		stepBonus: FOCUS_STREAK_STEP,
 		maxLevel: FOCUS_STREAK_MAX
+	},
+	fieldNotes: {
+		byDomain: fieldNotesByDomain,
+		equilibrium: equilibriumFieldNotes,
+		quiet: quietFieldNotes,
+		categoryMastery: categoryMasteryFieldNotes
 	}
 };

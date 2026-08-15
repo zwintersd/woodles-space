@@ -3,10 +3,12 @@
 // touch a thing until she has witnessed it: notice, observe, study, know.
 
 import { isRevealed } from '@woodles/dynamics';
-import type { StockVector, Needs } from '../vitals';
-
-export type LifeCategory = 'aquatic' | 'terrestrial' | 'atmospheric';
-export type LifeDomain = 'plant' | 'animal' | 'ecosystem' | 'geology' | 'weather';
+// Life/LifeCategory/LifeDomain's shape now lives in @woodles/witch-engine —
+// see that package's types.ts — re-exported here so the ~40 files that
+// import them from this module keep working unchanged. This file keeps the
+// data: World 1's actual roster.
+import type { Life, LifeCategory, LifeDomain } from '@woodles/witch-engine';
+export type { Life, LifeCategory, LifeDomain };
 
 // the language of care varies by domain
 export const domainVerb: Record<LifeDomain, string> = {
@@ -16,36 +18,6 @@ export const domainVerb: Record<LifeDomain, string> = {
 	geology: 'shape',
 	weather: 'invoke'
 };
-
-export interface Life {
-	id: string;
-	name: string;
-	scientificName: string;
-	category: LifeCategory;
-	domain: LifeDomain;
-	// every required condition must be written for this to emerge
-	requires: string[];
-	// idle tuning ──────────────────────────────────────────────────────────
-	// insightWeight: how much Insight this life yields once witnessed. The
-	//   per-second yield scales with how deeply it has been observed.
-	// studyEase: how quickly attention deepens here. >1 is quick to know,
-	//   <1 is slow but usually richer — the core min/max tension.
-	insightWeight: number;
-	studyEase: number;
-	// vital signs ────────────────────────────────────────────────────────────
-	// metabolism: per-second effect on each stock at full activity (Known and
-	//   healthy), positive produces / negative consumes. Scaled by stage and
-	//   vitality at runtime. Omitted = metabolically inert.
-	// needs: healthy bands on the stocks this life depends on. Out of band, the
-	//   life is stressed: it yields less, deepens slower, and its vitality drains.
-	metabolism?: StockVector;
-	needs?: Needs;
-	// the four observation stages — the description fills in as she watches
-	notice: string; // greyed-out, before she has looked
-	observe: string; // first sustained look
-	study: string; // patterns over time
-	know: string; // enough to know what help would mean
-}
 
 export const world1Life: Life[] = [
 	// ── aquatic ──────────────────────────────────────────────────────────────

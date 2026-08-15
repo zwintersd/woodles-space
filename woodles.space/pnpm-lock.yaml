@@ -180,6 +180,9 @@ importers:
       '@woodles/text':
         specifier: workspace:*
         version: link:../../packages/text
+      '@woodles/witch-engine':
+        specifier: workspace:*
+        version: link:../../packages/witch-engine
       fflate:
         specifier: ^0.8.2
         version: 0.8.3
@@ -498,6 +501,22 @@ importers:
       happy-dom:
         specifier: ^20.0.0
         version: 20.10.6
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@22.19.17)(happy-dom@20.10.6)
+
+  packages/witch-engine:
+    dependencies:
+      '@woodles/dynamics':
+        specifier: workspace:*
+        version: link:../dynamics
+      '@woodles/incremental-core':
+        specifier: workspace:*
+        version: link:../incremental-core
+    devDependencies:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

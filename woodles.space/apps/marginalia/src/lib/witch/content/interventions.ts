@@ -9,16 +9,10 @@
 
 import type { LifeDomain } from './life';
 
-export interface Intervention {
-	domain: LifeDomain;
-	verb: string;
-	reach: 'broad' | 'targeted' | 'narrow';
-	permanence: 'temporary' | 'lasting' | 'permanent';
-	uncertain?: boolean; // invoke: asked, not commanded — the outcome varies
-	// what it costs her to act — Insight always, Essence only for the dear ones
-	cost: { insight: number; essence: number };
-	lines: string[];
-}
+// Intervention's shape now lives in @woodles/witch-engine; re-exported here
+// so existing imports keep working. This file keeps the data.
+import type { Intervention } from '@woodles/witch-engine';
+export type { Intervention };
 
 export const interventions: Record<LifeDomain, Intervention> = {
 	plant: {

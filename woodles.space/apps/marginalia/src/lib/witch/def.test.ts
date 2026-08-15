@@ -9,8 +9,14 @@ import { world1Def } from './def';
 import { world1Life } from './content/life';
 import { conditions } from './content/conditions';
 import { emergences } from './content/emergences';
+import {
+	fieldNotesByDomain,
+	equilibriumFieldNotes,
+	quietFieldNotes,
+	categoryMasteryFieldNotes
+} from './content/fieldNoteTemplates';
 import { interventions } from './content/interventions';
-import { STOCK_BANDS, STOCK_IDS } from './vitals';
+import { STOCK_IDS } from './vitals';
 import {
 	STAGE_SECONDS,
 	STAGE_INSIGHT_MULT,
@@ -74,8 +80,7 @@ describe('world1Def tuning, cross-checked against tuning.ts', () => {
 		expect(world1Def.stage.activity).toBe(STAGE_ACTIVITY);
 	});
 
-	it('stock — the same bands vitals.ts balances against', () => {
-		expect(world1Def.stock.bands).toBe(STOCK_BANDS);
+	it('stock', () => {
 		expect(world1Def.stock.driftPerSec).toBe(STOCK_DRIFT_PER_SEC);
 		expect(world1Def.stock.leak).toBe(STOCK_LEAK);
 		for (const id of STOCK_IDS) {
@@ -121,5 +126,12 @@ describe('world1Def tuning, cross-checked against tuning.ts', () => {
 
 	it('focus — already shaped as @woodles/dynamics ComboOptions', () => {
 		expect(world1Def.focus.maxLevel).toBe(FOCUS_STREAK_MAX);
+	});
+
+	it('field notes carry the exact same content', () => {
+		expect(world1Def.fieldNotes.byDomain).toBe(fieldNotesByDomain);
+		expect(world1Def.fieldNotes.equilibrium).toBe(equilibriumFieldNotes);
+		expect(world1Def.fieldNotes.quiet).toBe(quietFieldNotes);
+		expect(world1Def.fieldNotes.categoryMastery).toBe(categoryMasteryFieldNotes);
 	});
 });
