@@ -5,7 +5,15 @@
 // drains its vitality, which in turn lowers what it yields and how fast it can be
 // known. Everything here is pure and rune-free so it can be unit-tested directly —
 // the Book (book.svelte.ts) holds the $state and calls into this.
+//
+// The stocks are @woodles/dynamics's Banded Stock (shape C) and vitality is its
+// Eased Stat (shape B) — see packages/dynamics/README.md for the general shapes
+// this file instantiates with Marginalia's own constants. `severityFor`,
+// `lifeStockRate`, `focusStock` and `stabilityOf` stay here rather than moving
+// into that package: they're domain logic (what a *life* asks of a stock), not
+// the stock's own dynamics.
 
+import { bandHealth as bandedStockHealth, driftRate as bandedDriftRate, ease, leakRate } from '@woodles/dynamics';
 import {
 	STOCK_START,
 	STOCK_NEUTRAL,
@@ -49,16 +57,14 @@ export function neutralStocks(): Stocks {
 //
 // Loss acts only on what sits *above* the band floor, so it can never drive a
 // stock below the range the world is comfortable in, and an unattended world
-// settles at that floor rather than draining to nothing.
-export function leakRate(value: number, lo: number, rate: number): number {
-	return value <= lo ? 0 : -rate * (value - lo);
-}
+// settles at that floor rather than draining to nothing. Re-exported directly:
+// its signature (value, floor, rate) already matches @woodles/dynamics's shape
+// C helper of the same name exactly.
+export { leakRate };
 
 // 100 inside the band, falling linearly to 0 at BAND_FALLOFF points outside it.
 export function bandHealth(value: number, lo: number, hi: number): number {
-	if (value >= lo && value <= hi) return 100;
-	const dist = value < lo ? lo - value : value - hi;
-	return Math.max(0, 100 * (1 - dist / BAND_FALLOFF));
+	return bandedStockHealth(value, { lo, hi }, BAND_FALLOFF);
 }
 
 // 0 = content, 1 = dire. The worst-off of a life's needs decides its stress.
@@ -78,9 +84,12 @@ export function severityFor(needs: Needs | undefined, stocks: Stocks): number {
 export function nextVitality(current: number, severity: number, dt: number): number {
 	const stressed = severity > 0;
 	const target = stressed ? 0 : 1;
-	const k = stressed ? VITALITY_DRAIN_PER_SEC * severity : VITALITY_RECOVER_PER_SEC;
-	const next = current + (target - current) * (1 - Math.exp(-k * dt));
-	return Math.min(1, Math.max(VITALITY_FLOOR, next));
+	return ease(current, target, dt, {
+		up: VITALITY_RECOVER_PER_SEC,
+		down: VITALITY_DRAIN_PER_SEC * severity,
+		floor: VITALITY_FLOOR,
+		ceiling: 1
+	});
 }
 
 // One life's net per-second effect on the stocks, scaled by how present it is
@@ -122,11 +131,7 @@ export function driftRate(
 	rate: number = STOCK_DRIFT_PER_SEC
 ): number {
 	const shift = baseline - STOCK_NEUTRAL;
-	const lo = band[0] + shift;
-	const hi = band[1] + shift;
-	if (value < lo) return rate * (lo - value);
-	if (value > hi) return rate * (hi - value);
-	return 0;
+	return bandedDriftRate(value, { lo: band[0] + shift, hi: band[1] + shift }, rate);
 }
 
 // The stock an intervention should act on for a given life: the stock it most

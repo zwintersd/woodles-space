@@ -25,6 +25,7 @@
     "vitest": "^3.2.6"
   },
   "dependencies": {
+    "@woodles/dynamics": "workspace:*",
     "@woodles/incremental-core": "workspace:*",
     "@woodles/sync": "workspace:*",
     "@woodles/text": "workspace:*",
