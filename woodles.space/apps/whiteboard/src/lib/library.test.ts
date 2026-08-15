@@ -89,6 +89,57 @@ describe('the board shelf', () => {
 	});
 });
 
+describe('remembering how deep you were', () => {
+	it('gives the trail back on the next visit', () => {
+		const library = createBoardLibrary(memoryStorage());
+		const game = boardNamed('Makeup Game');
+		const brushes = boardNamed('Brushes');
+		library.save(game);
+		library.save(brushes);
+
+		const trail = [
+			{ boardId: game.board.id, title: 'Makeup Game', camera: { x: -40, y: -90, zoom: 0.6 }, portalId: 'door-1' },
+			{ boardId: brushes.board.id, title: 'Brushes', camera: { x: 10, y: 20, zoom: 1.4 }, portalId: 'door-2' }
+		];
+		library.writeTrail(trail);
+		expect(library.readTrail()).toEqual(trail);
+	});
+
+	it('cuts the trail at the first board that is gone, and everything under it', () => {
+		const library = createBoardLibrary(memoryStorage());
+		const game = boardNamed('Makeup Game');
+		const brushes = boardNamed('Brushes');
+		library.save(game);
+		library.save(brushes);
+		library.writeTrail([
+			{ boardId: game.board.id, title: 'Makeup Game', camera: { x: 0, y: 0, zoom: 1 }, portalId: null },
+			{ boardId: 'board-gone', title: 'Deleted', camera: { x: 0, y: 0, zoom: 1 }, portalId: null },
+			{ boardId: brushes.board.id, title: 'Brushes', camera: { x: 0, y: 0, zoom: 1 }, portalId: null }
+		]);
+		expect(library.readTrail().map((step) => step.title)).toEqual(['Makeup Game']);
+	});
+
+	it('forgets the trail rather than storing an empty one', () => {
+		const storage = memoryStorage();
+		const library = createBoardLibrary(storage);
+		const game = boardNamed('Makeup Game');
+		library.save(game);
+		library.writeTrail([{ boardId: game.board.id, title: 'Makeup Game', camera: { x: 0, y: 0, zoom: 1 }, portalId: null }]);
+		library.writeTrail([]);
+		expect(storage.keys().some((key) => key.includes('trail'))).toBe(false);
+		expect(library.readTrail()).toEqual([]);
+	});
+
+	it('shrugs off a trail that is not readable', () => {
+		const storage = memoryStorage();
+		const library = createBoardLibrary(storage);
+		storage.setItem('woodles.whiteboard.trail.v1', '{not json');
+		expect(library.readTrail()).toEqual([]);
+		storage.setItem('woodles.whiteboard.trail.v1', JSON.stringify([{ boardId: 5 }]));
+		expect(library.readTrail()).toEqual([]);
+	});
+});
+
 describe('images shared between boards', () => {
 	it('counts an asset as spoken for while another board still holds it', () => {
 		const library = createBoardLibrary(memoryStorage());

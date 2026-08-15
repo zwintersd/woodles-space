@@ -79,6 +79,10 @@ function bestMatch(item: WhiteboardItem, labels: Label[], query: SearchQuery): M
 		candidates.push({ field: 'title', text: item.title });
 	} else if (item.type === 'image') {
 		candidates.push({ field: 'name', text: item.name });
+	} else if (item.type === 'portal') {
+		// A doorway is findable by what it is called here. What lies beyond it
+		// belongs to that board's own search, not this one's.
+		candidates.push({ field: 'title', text: item.title });
 	}
 
 	const properties = item.properties;

@@ -1,8 +1,8 @@
-export const BOARD_SCHEMA_VERSION = 4;
+export const BOARD_SCHEMA_VERSION = 5;
 const MIN_CAMERA_ZOOM = 0.1;
 const MAX_CAMERA_ZOOM = 4;
 
-export type WhiteboardItemType = 'card' | 'image' | 'frame' | 'stack' | 'connector';
+export type WhiteboardItemType = 'card' | 'image' | 'frame' | 'stack' | 'connector' | 'portal';
 
 /**
  * One palette for everything that carries colour — labels, the Color property,
@@ -100,6 +100,22 @@ export interface StackItem extends BaseWhiteboardItem {
 	behavior?: StackBehavior;
 }
 
+/**
+ * A doorway to another whiteboard. It holds only the id of the board beyond —
+ * never a copy of it — so the two cannot drift apart, and a portal is cheap
+ * enough that a board can be full of them.
+ *
+ * The board it names lives in the library, outside this document, so a portal
+ * can end up pointing nowhere. That is shown rather than swept up: a deleted
+ * board may come back, and a portal is part of a layout somebody arranged.
+ */
+export interface PortalItem extends BaseWhiteboardItem {
+	type: 'portal';
+	boardId: string;
+	/** What this doorway is called here. Empty means "ask the board its name". */
+	title: string;
+}
+
 export interface ConnectorItem extends BaseWhiteboardItem {
 	type: 'connector';
 	fromId: string;
@@ -107,7 +123,7 @@ export interface ConnectorItem extends BaseWhiteboardItem {
 	arrow: boolean;
 }
 
-export type WhiteboardItem = CardItem | ImageItem | FrameItem | StackItem | ConnectorItem;
+export type WhiteboardItem = CardItem | ImageItem | FrameItem | StackItem | ConnectorItem | PortalItem;
 
 /**
  * A reusable label, owned by the board rather than by any one object, so the
@@ -244,6 +260,13 @@ export function createFrame(x: number, y: number, width = 500, height = 360, zIn
 	};
 }
 
+export const PORTAL_WIDTH = 230;
+export const PORTAL_HEIGHT = 168;
+
+export function createPortal(x: number, y: number, boardId: string, title = '', zIndex = nextZ([])): PortalItem {
+	return { ...base('portal', x, y, PORTAL_WIDTH, PORTAL_HEIGHT, zIndex), boardId, title };
+}
+
 export function createStack(x: number, y: number, zIndex = nextZ([])): StackItem {
 	return {
 		...base('stack', x, y, 280, 290, zIndex),
@@ -353,6 +376,8 @@ export function isWhiteboardItem(value: unknown): value is WhiteboardItem {
 			return typeof value.title === 'string' && Array.isArray(value.cardIds) &&
 				value.cardIds.every((id) => typeof id === 'string') &&
 				(value.behavior === undefined || isStackBehavior(value.behavior));
+		case 'portal':
+			return typeof value.boardId === 'string' && typeof value.title === 'string';
 		case 'connector':
 			return typeof value.fromId === 'string' && typeof value.toId === 'string' && typeof value.arrow === 'boolean';
 		default:

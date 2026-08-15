@@ -133,7 +133,7 @@ woodles.space/
     ├── planner/             SvelteKit · carillon — self-observation, day piles, and reinforcement
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
     ├── thinking-about/      SvelteKit · a board for what's being read, played, and watched — and, per entry, a structured record cast for it
-    ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking — a camera that knows where it is, cards that say more than they show, and stacks that do more than hold them
+    ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking — a camera that knows where it is, cards that say more than they show, stacks that do more than hold them, and doorways into other boards
     ├── bloomforge/          SvelteKit · a studio for making incremental games
     └── bloomforge-player/   SvelteKit · the runtime that makes those games playable
 ```
@@ -733,9 +733,80 @@ None of it moves anything off the canvas, which is the rule the whole update is
 built around: a stack with a behaviour is still a stack, in the same place, with
 cards you can drag in and out of it.
 
-Schemas 2, 3 and 4 each migrate forward by filling in what they added. A corrupt
-journey costs you the journey, never the board; an unreadable property sheet
-costs that one object its properties and nothing else.
+**Portals.** Schema 5 adds a doorway you can put on a board: an object holding
+the id of another whiteboard and nothing else about it, so a doorway and the
+room beyond it cannot drift apart. Its pane shows that board as shapes, drawn
+with the same projection the overview map uses and read from the library at
+render time — which is why a child board that changes is immediately right
+through the doorway with nothing to keep in step.
+
+The board a portal names lives in the library, outside the document, so a
+portal can end up pointing nowhere. `repairDocument` cannot know — it only sees
+one document — and that is the right outcome anyway: a deleted board may come
+back, and a portal is part of a layout somebody arranged, so a dangling one
+says it leads nowhere rather than quietly deleting itself.
+
+Going through is a camera move, not a page navigation. `enterCamera` comes
+down onto the doorway until it dominates the screen, and `arrivalCamera` lands
+the child at the framing its miniature was already showing, so the shapes you
+were flying toward are the shapes that greet you. That continuity is the whole
+illusion. Two things it cost to get right: the flight has to be **interrupted**
+before the swap or it keeps writing the camera every frame and paints over the
+arrival; and the enter camera has to be **clamped**, because filling the screen
+with a small doorway wants a zoom past `MAX_ZOOM`, and a camera out of range is
+not a legal camera — the board refuses to save it. The veil covers the last of
+the distance.
+
+**The trail** (`portals.ts`) is the other half, and it belongs to no document:
+it records the boards descended through and the camera each was left at, so
+climbing back puts you where you were standing rather than at a board's front
+door. It survives a session, and is cut at the first board that has since gone
+— you cannot climb down through a doorway that is not there. Opening a board
+from the shelf clears it, because that is arriving at a board, not climbing out
+of one.
+
+Breadcrumbs are one line for both questions at once — `Makeup Game / Brushes /
+Pickup Physics` — the boards above, this board, then the frames the camera is
+inside, because from the inside "which whiteboard am I in" and "where in it"
+are the same question.
+
+**Capture** (`capture.ts`) is the board being hungry. Two gestures with one
+rule each: dropping is placing, so it lands where you let go; pasting has no
+position, so it goes to the Inbox. What arrives is inferred rather than asked
+about — an address is a link, a page of addresses is that many links, anything
+else is a note with its first line as the title.
+
+A captured link is **not a new kind of object**. It is a card whose Source is
+the link — the property that has meant "where this came from" since schema 3 —
+so it is searchable, labellable and colourable the day it lands, with no new
+model and no new rendering rules. The Source chip on the card became the link
+itself rather than a mark meaning one exists, which cost no extra room because
+a card already grows a row for a source.
+
+"Rich preview" without a server means rich in what the address itself says, and
+this is honest about that: a page's real title cannot be fetched, so a link is
+named from its own path. A **Woodles** link is the exception and says the most.
+`resolveWoodle` matches against `@woodles/app-manifest` — which already owns
+every app's public path, its aliases, and the record kinds it answers to — so
+`/planner` resolves to Carillon by name and `/play?game=g-42` to Bloomforge
+Player and the game it addresses, with no lookup and no network. Longest route
+wins, so `/hygge/motion` is Hygge rather than the landing page.
+
+The **Inbox** is an ordinary stack titled `Inbox`, made the first time
+something needs one. Nothing about it is a special case: it can be moved,
+renamed, given a behaviour, or emptied by dragging its cards onto the board.
+That is what makes "capture first, organize when ready" cost nothing to build —
+the holding area is a stack, and organizing is the drag that already existed.
+
+`whiteboard` also joined `HANDOFF_TARGETS`, so another Woodle can hand this
+board material; the queue is drained once on open and filed in the Inbox,
+because a handoff is a capture that happened somewhere else. Each target keeps
+its own queue and a test asserts one app can never drain another's. Nothing
+sends to Whiteboard yet — this is the receiving half.
+
+Schemas 2 through 5 each migrate forward by filling in what they added. A
+corrupt journey costs you the journey, never the board; an unreadable property
+sheet costs that one object its properties and nothing else.
 
 ## the writing surface
 
@@ -1350,20 +1421,28 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1999 tests total: 16 in `api/` (its own
+2049 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1983 across sixteen pnpm
+instead of the recursive `pnpm -r test`), plus 2033 across sixteen pnpm
 packages — `write` 242, `marginalia` 333, `planner` 539,
 `bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
 `packages/sync` 36, `packages/persistence` 6, `packages/app-manifest` 17,
-`packages/handoff` 14, `packages/text` 30, `packages/spellcraft` 15,
+`packages/handoff` 15, `packages/text` 30, `packages/spellcraft` 15,
 `packages/emoji` 4, `packages/incremental-core` 191, `thinking-about` 131,
-and `whiteboard` 158.
+and `whiteboard` 207.
 (Counted by running each suite, not by adding to the previous figure — keep
 this inventory current when a suite changes; the root command is the release
 contract, not the prose count.)
-(Whiteboard's suite grew by a further 32 for stack behaviours, nearly all in
+(Whiteboard's suite grew by a further 26 for capture — `capture.ts` for what a
+pasted or dropped thing infers itself to be, resolving a Woodles link against
+the real manifest, and the Inbox; `packages/handoff` gained one for the
+isolation between two target queues, now that there are two again. Before that
+it grew by 23 for portals — `portals.ts` for the
+trail, the breadcrumbs and the cameras of going through, including the
+regression that an enter camera must stay inside the zoom range a board will
+save, plus four in `library.ts` for remembering how deep you were. Before that
+it grew by 32 for stack behaviours, nearly all in
 `stacks.ts` — status conferral and renaming, the column shift, ticking,
 queue heads and taking, and the gallery's wrapped layout. Before that it grew
 by 52 for the optional layer: `labels.ts`
