@@ -2,13 +2,10 @@
 // These are not written. They appear, on their own, once the conditions that
 // imply them are both present. The web revealing its own depth.
 
-export interface Emergence {
-	id: string;
-	name: string;
-	// both conditions must be written for this to surface
-	from: [string, string];
-	note: string;
-}
+// Emergence's shape now lives in @woodles/witch-engine; re-exported here so
+// existing imports keep working. This file keeps the data.
+import type { Emergence } from '@woodles/witch-engine';
+export type { Emergence };
 
 export const emergences: Emergence[] = [
 	{

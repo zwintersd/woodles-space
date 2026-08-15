@@ -2,16 +2,10 @@
 // Brianna writes conditions, not creatures. She writes a constraint and the
 // world figures out the rest. Each condition costs Essence to write.
 
-export interface Condition {
-	id: string;
-	// the phrase she writes into the Book
-	phrase: string;
-	// the plain name used in the web's connective tissue
-	name: string;
-	// what the world does with it
-	enables: string;
-	cost: number; // essence
-}
+// Condition's shape now lives in @woodles/witch-engine; re-exported here so
+// existing imports keep working. This file keeps the data.
+import type { Condition } from '@woodles/witch-engine';
+export type { Condition };
 
 export const conditions: Condition[] = [
 	{

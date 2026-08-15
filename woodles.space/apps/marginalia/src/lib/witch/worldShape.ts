@@ -1,6 +1,9 @@
 import type { Life, LifeCategory, LifeDomain } from './content/life';
 
-export type Worldspace = 'water' | 'shallows';
+// Worldspace's shape now lives in @woodles/witch-engine; re-exported here so
+// existing imports keep working.
+import type { Worldspace } from '@woodles/witch-engine';
+export type { Worldspace };
 export type SpawnLayer = 'water' | 'floor' | 'shore' | 'air';
 export type SpawnRarity = 'common' | 'uncommon' | 'rare';
 

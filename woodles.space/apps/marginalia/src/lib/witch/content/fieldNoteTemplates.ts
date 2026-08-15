@@ -3,18 +3,23 @@
 // register but templated so they don't need one hand-written entry per life;
 // edit freely, nothing here gates progress. See DESIGN.md's "I'll draft, you
 // edit" convention.
+//
+// Pure content: this is `world1Def.fieldNotes`' data, in the shape
+// @woodles/witch-engine's `FieldNotesDef` expects. `pickLine`/`fillTemplate`
+// — the generic, content-free half of what used to live here — moved to
+// that package; `World`'s tick calls them directly against this data.
 
 import type { LifeCategory, LifeDomain } from './life';
 
-// stage numbers duplicated here (not imported from book.svelte.ts) to keep
-// this module framework-free and importable from a plain test file.
+// stage numbers duplicated here (not imported from world.ts) to keep this
+// module framework-free and importable from a plain test file.
 const STAGE_OBSERVED = 1;
 const STAGE_STUDIED = 2;
 const STAGE_KNOWN = 3;
 
-type StageTemplates = Partial<Record<number, string[]>>;
+type StageTemplates = Partial<Record<number, readonly string[]>>;
 
-const byDomain: Record<LifeDomain, StageTemplates> = {
+export const fieldNotesByDomain: Record<LifeDomain, StageTemplates> = {
 	plant: {
 		[STAGE_OBSERVED]: [
 			'{name} — she stopped to look longer than she meant to.',
@@ -87,19 +92,19 @@ const byDomain: Record<LifeDomain, StageTemplates> = {
 	}
 };
 
-export const equilibriumFieldNotes: string[] = [
+export const equilibriumFieldNotes: readonly string[] = [
 	"it's holding itself. she is trying very hard not to help.",
 	'nothing needed her, for a while. that felt like something.',
 	'the world balanced on its own today. she watched and did not touch it.'
 ];
 
-export const quietFieldNotes: string[] = [
+export const quietFieldNotes: readonly string[] = [
 	'it has gone quiet. not gone — quiet.',
 	'the world is thinning at the edges. she is still here.',
 	'quiet, now. she is staying anyway.'
 ];
 
-export const categoryMasteryFieldNotes: Record<LifeCategory, string[]> = {
+export const categoryMasteryFieldNotes: Record<LifeCategory, readonly string[]> = {
 	aquatic: [
 		'the water, fully known. she could close her eyes and still find her way through it.',
 		'every tide she watches for now answers to a name.'
@@ -113,22 +118,3 @@ export const categoryMasteryFieldNotes: Record<LifeCategory, string[]> = {
 		'the weather no longer surprises her. it still moves her.'
 	]
 };
-
-// The template options for a domain crossing into a given stage, or an
-// empty array if there is nothing written for that combination (e.g. Noticed
-// — emergence already has its own text on the card).
-export function stageFieldNoteOptions(domain: LifeDomain, stage: number): string[] {
-	return byDomain[domain]?.[stage] ?? [];
-}
-
-export function fillTemplate(template: string, name: string): string {
-	return template.replace('{name}', name);
-}
-
-// Deterministic-friendly picker — pass Math.random() at the call site, or a
-// fixed value in tests.
-export function pickLine(options: readonly string[], r: number): string | null {
-	if (options.length === 0) return null;
-	const idx = Math.min(options.length - 1, Math.floor(r * options.length));
-	return options[idx];
-}

@@ -27,6 +27,7 @@
   "dependencies": {
     "@woodles/dynamics": "workspace:*",
     "@woodles/incremental-core": "workspace:*",
+    "@woodles/witch-engine": "workspace:*",
     "@woodles/sync": "workspace:*",
     "@woodles/text": "workspace:*",
     "fflate": "^0.8.2",
