@@ -30,12 +30,14 @@ import {
 	canAffordAll,
 	decay as decayPrimary,
 	dismiss,
+	ease,
 	factorFor,
 	freeSlots,
 	isMember,
 	nextCapacityCost,
 	restore as restorePrimary,
 	risingEdge,
+	stepStock,
 	advanceLadder,
 	type DecayRestoreOptions,
 	type EdgeLatch
@@ -106,8 +108,6 @@ import {
 	severityFor,
 	nextVitality,
 	lifeStockRate,
-	driftRate,
-	leakRate,
 	focusStock,
 	stabilityOf,
 	type StockId
@@ -690,7 +690,23 @@ export class World {
 		return into;
 	}
 
-	/** Each verb does its own thing — see DESIGN.md §2.2. */
+	/**
+	 * Each verb does its own thing — see DESIGN.md §2.2 — but none of the five
+	 * is its own mechanism. Each just writes into a primitive that already
+	 * exists elsewhere in this file, at one of four injection points:
+	 *
+	 *  - `tend`/`invoke` write straight into a stock's live *value* (shape C) —
+	 *    temporary only because the tick's ordinary drift and leak already pull
+	 *    it back once it lands outside the band; no new machinery required.
+	 *  - `shape` writes into a capped, permanent tally that shifts a stock's
+	 *    *band* instead of its value — one line, not worth its own primitive.
+	 *  - `encourage` writes into a capped, permanent tally inside the stability
+	 *    formula (shape M) — the same one-line shape as `shape`'s tally.
+	 *  - `guide` sets a per-instance coefficient override (shape I) that scales
+	 *    one life's future contribution to shape C's input sum; the one-shot
+	 *    guard already lives in `canIntervene`/`hasIntervened`, so there's
+	 *    nothing left for a `fireOnce` wrapper to add here.
+	 */
 	private applyInterventionEffect(life: Life): void {
 		const focus = focusStock(life.metabolism, life.needs);
 		switch (life.domain) {
@@ -839,20 +855,20 @@ export class World {
 
 		// 3) stocks move by metabolism, then get pulled back only if they have
 		//    left their band — inside it the world is free to settle wherever
-		//    its life holds it.
+		//    its life holds it. Shape C, Banded Stock: `stepStock` is drift, leak
+		//    (the world's own losses — evaporation, leach) and the clamp in one
+		//    call; `driftRate`/`leakRate` still exist on their own in vitals.ts
+		//    for callers (and tests) that want just one half.
 		const stocks = { ...s.stocks };
 		for (const id of STOCK_IDS) {
 			const shift = s.stockBaseline[id] - STOCK_NEUTRAL;
-			const drift = driftRate(
-				stocks[id],
-				s.stockBaseline[id],
-				STOCK_BANDS[id],
-				this.tuning.stockDriftPerSec
-			);
-			// the world's own losses — evaporation, leach. Never below the floor,
-			// so an unattended world settles there rather than draining away.
-			const leak = leakRate(stocks[id], STOCK_BANDS[id][0] + shift, this.tuning.stockLeak[id]);
-			stocks[id] = Math.max(0, Math.min(100, stocks[id] + (rate[id] + drift + leak) * dt));
+			const band = { lo: STOCK_BANDS[id][0] + shift, hi: STOCK_BANDS[id][1] + shift };
+			stocks[id] = stepStock(stocks[id], band, rate[id], dt, {
+				driftPerSec: this.tuning.stockDriftPerSec,
+				leakPerSec: this.tuning.stockLeak[id],
+				min: 0,
+				max: 100
+			});
 		}
 		s.stocks = stocks;
 
@@ -895,8 +911,9 @@ export class World {
 		}
 
 		// 7) Favor eases toward a target set by how much she has Known, pulled
-		//    down by the world's stress and lifted when it holds itself.
-		//    Exponential approach stays stable for any dt (incl. offline jumps).
+		//    down by the world's stress and lifted when it holds itself. Shape B,
+		//    Eased Stat, the same shape as vitality in vitals.ts — here with a
+		//    live formula for the target instead of a binary one.
 		const target = Math.max(
 			0,
 			FAVOR_BASE_TARGET +
@@ -904,8 +921,7 @@ export class World {
 				FAVOR_STRESS_PENALTY * stress +
 				FAVOR_EQUILIBRIUM_BONUS * eq
 		);
-		const k = 1 - Math.exp(-FAVOR_DRIFT_PER_SEC * dt);
-		s.favor = Math.max(0, Math.min(100, s.favor + (target - s.favor) * k));
+		s.favor = ease(s.favor, target, dt, { up: FAVOR_DRIFT_PER_SEC, floor: 0, ceiling: 100 });
 		return into;
 	}
 }
