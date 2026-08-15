@@ -303,6 +303,12 @@ importers:
 
   apps/whiteboard:
     dependencies:
+      '@woodles/app-manifest':
+        specifier: workspace:*
+        version: link:../../packages/app-manifest
+      '@woodles/handoff':
+        specifier: workspace:*
+        version: link:../../packages/handoff
       '@woodles/persistence':
         specifier: workspace:*
         version: link:../../packages/persistence
