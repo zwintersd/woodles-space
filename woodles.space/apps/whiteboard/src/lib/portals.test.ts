@@ -20,9 +20,11 @@ import {
 	createEmptyBoard,
 	createFrame,
 	createPortal,
+	isWhiteboardDocument,
 	type Camera,
 	type WhiteboardDocument
 } from './model';
+import { MAX_ZOOM, MIN_ZOOM } from './geometry';
 
 const viewport = { width: 1200, height: 800 };
 
@@ -138,13 +140,30 @@ describe('breadcrumbs', () => {
 });
 
 describe('going through', () => {
-	it('takes the portal past the edges of the screen, so it stops being an object', () => {
+	it('comes down onto the doorway, centred on it', () => {
 		const portal = { x: 200, y: 100, width: 230, height: 168 };
 		const camera = enterCamera(portal, viewport);
 		const view = visibleBounds(camera, viewport);
-		expect(view.width).toBeLessThan(portal.width);
 		expect(view.x + view.width / 2).toBeCloseTo(portal.x + portal.width / 2, 4);
 		expect(view.y + view.height / 2).toBeCloseTo(portal.y + portal.height / 2, 4);
+		// Much closer than a resting view: the doorway dominates what is on screen.
+		expect(portal.width / view.width).toBeGreaterThan(0.5);
+	});
+
+	it('stays a camera the board will accept, however small the doorway', () => {
+		// Filling the screen with a small doorway would want a zoom past the
+		// board's maximum, and a camera out of range fails validation on save.
+		for (const width of [40, 120, 230, 900]) {
+			const camera = enterCamera({ x: 0, y: 0, width, height: width * 0.7 }, viewport);
+			expect(camera.zoom).toBeLessThanOrEqual(MAX_ZOOM);
+			expect(camera.zoom).toBeGreaterThanOrEqual(MIN_ZOOM);
+			expect(isWhiteboardDocument({ ...createEmptyBoard(), camera })).toBe(true);
+		}
+	});
+
+	it('never leaves the board with a camera it cannot save on the way back either', () => {
+		const camera = returnCamera({ x: 0, y: 0, width: 12, height: 9 }, { x: 0, y: 0, zoom: 1 }, viewport);
+		expect(isWhiteboardDocument({ ...createEmptyBoard(), camera })).toBe(true);
 	});
 
 	it('arrives at the child framing that the doorway was showing', () => {

@@ -1,5 +1,6 @@
 import type { Viewport } from './camera';
 import { cameraForBounds } from './camera';
+import { clampZoom } from './geometry';
 import { fitBoardCamera, frameTitle, locateCamera } from './navigation';
 import type { Bounds, Camera, PortalItem, WhiteboardDocument, WhiteboardItem } from './model';
 
@@ -85,12 +86,16 @@ export function breadcrumbs(
 }
 
 /**
- * The camera that puts a portal past the edges of the screen — the last frame
- * of going in. Overshooting is what sells it: the doorway stops being an object
- * on the board and becomes the board.
+ * The camera for the last moment before going in: as close to the doorway as
+ * the board allows, centred on it.
+ *
+ * Filling the screen outright would need a zoom past the board's maximum for
+ * any doorway smaller than the viewport, and a camera outside that range is not
+ * a legal camera — it fails validation and the board refuses to save. So this
+ * clamps, and the veil covers the last of the distance.
  */
 export function enterCamera(portal: Bounds, viewport: Viewport, overshoot = 1.7): Camera {
-	const zoom = (viewport.width / Math.max(1, portal.width)) * overshoot;
+	const zoom = clampZoom((viewport.width / Math.max(1, portal.width)) * overshoot);
 	return {
 		zoom,
 		x: viewport.width / 2 - (portal.x + portal.width / 2) * zoom,

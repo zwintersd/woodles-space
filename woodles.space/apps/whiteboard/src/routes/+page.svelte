@@ -4,6 +4,7 @@
 	import {
 	boundsForItem,
 	connectorEndpoints,
+	documentBounds,
 	extractCardFromStack,
 	insertCardIntoStack,
 	intersects,
@@ -71,7 +72,7 @@
 	stepStop,
 	suggestedStops
 	} from '$lib/journey';
-	import { cameraCentredOn, minimapExtent, minimapMarks, minimapProjection } from '$lib/minimap';
+	import { cameraCentredOn, minimapExtent, minimapMarks, minimapProjection, type MinimapMark } from '$lib/minimap';
 	import { boardLibrary, boardTitleFallback, type BoardSummary } from '$lib/library';
 	import { restoreWhiteboard } from '$lib/persistence';
 	import {
@@ -110,6 +111,20 @@
 	toggleChecked
 	} from '$lib/stacks';
 	import { isDone } from '$lib/properties';
+	import {
+	arrivalCamera,
+	breadcrumbs,
+	enterCamera,
+	isPortal,
+	popTrailTo,
+	portals,
+	portalTitle,
+	pushTrail,
+	returnCamera,
+	trailHasBoard,
+	type TrailStep
+	} from '$lib/portals';
+	import { createPortal, type PortalItem } from '$lib/model';
 	import { STACK_BEHAVIORS, SUGGESTED_STATUSES, TINTS, type Label, type StackBehavior, type Tint } from '$lib/model';
 
 	type Tool = 'select' | 'frame' | 'stack' | 'line';
@@ -214,6 +229,14 @@
 	let labelDraft = $state('');
 	let renamingLabelId = $state<string | null>(null);
 
+	// Portals: the boards below this one, and how deep we are.
+	type PortalPreview = { title: string; marks: MinimapMark[]; bounds: Bounds | null; missing: boolean };
+	let previews = $state<Record<string, PortalPreview>>({});
+	let trail = $state<TrailStep[]>([]);
+	/** Rises over the board while going through a doorway, in either direction. */
+	let veil = $state(0);
+	let travelling = false;
+
 	// Search: the board flies to what you find.
 	let searchOpen = $state(false);
 	let searchText = $state('');
@@ -237,9 +260,9 @@
 	const hasContent = $derived(board.items.some((item) => item.type !== 'connector'));
 
 	const sequence = $derived(frameSequence(board.items));
-	/** The frames the camera is inside, outermost first — the breadcrumb. */
-	const trail = $derived(locateCamera(board.items, board.camera, viewportSize));
-	const here = $derived(trail.length ? trail[trail.length - 1] : null);
+	/** The frames the camera is inside, outermost first — the tail of the crumbs. */
+	const frameTrail = $derived(locateCamera(board.items, board.camera, viewportSize));
+	const here = $derived(frameTrail.length ? frameTrail[frameTrail.length - 1] : null);
 	const stops = $derived(resolveJourney(board, viewportSize));
 	const mapProjection = $derived(minimapProjection(minimapExtent(board, board.camera, viewportSize), MINIMAP));
 	const mapMarks = $derived(minimapMarks(board.items));
@@ -248,6 +271,7 @@
 	/** The objects the Details panel is speaking about — nothing, one, or many. */
 	const chosen = $derived(board.items.filter((item) => selectedIds.includes(item.id) && item.type !== 'connector'));
 	const only = $derived(chosen.length === 1 ? chosen[0] : null);
+	const crumbs = $derived(breadcrumbs(trail, board, board.camera, viewportSize));
 	const results = $derived(searchOpen && searchText.trim() ? searchBoard(board, searchText) : []);
 	const matchIds = $derived(new Set(results.map((hit) => hit.item.id)));
 
@@ -420,7 +444,11 @@
 
 		history = createCameraHistory({ camera: { ...board.camera }, label: 'Where you were' });
 		loaded = true;
+		// Resume at the depth the last session left off at, not at the top.
+		trail = boardLibrary.readTrail().filter((step) => step.boardId !== board.board.id);
+		if (trail.length !== boardLibrary.readTrail().length) boardLibrary.writeTrail(trail);
 		refreshBoards();
+		refreshPreviews();
 		void hydrateImages();
 
 		const onBeforeUnload = () => saveNow();
@@ -1337,6 +1365,160 @@
 		scheduleSave();
 	}
 
+	// ── Portals ─────────────────────────────────────────────────────────────
+
+	function wait(ms: number): Promise<void> {
+		return new Promise((resolve) => setTimeout(resolve, ms));
+	}
+
+	/**
+	 * What each doorway on this board is showing. A portal stores only an id, so
+	 * the miniature is read from the library rather than kept in the document —
+	 * which is why a child board that changes is immediately right through the
+	 * doorway, with nothing to keep in step.
+	 */
+	function refreshPreviews() {
+		const next: Record<string, PortalPreview> = {};
+		for (const boardId of new Set(portals(board.items).map((portal) => portal.boardId))) {
+			const opened = boardLibrary.open(boardId);
+			next[boardId] = opened
+				? {
+					title: opened.document.board.title,
+					marks: minimapMarks(opened.document.items),
+					bounds: documentBounds(opened.document),
+					missing: false
+				}
+				: { title: '', marks: [], bounds: null, missing: true };
+		}
+		previews = next;
+	}
+
+	function previewFor(portal: PortalItem): PortalPreview | null {
+		return previews[portal.boardId] ?? null;
+	}
+
+	function doorLabel(portal: PortalItem): string {
+		return portalTitle(portal, previewFor(portal)?.title ?? null);
+	}
+
+	/** The child board's shapes, projected into the pane of the doorway. */
+	function previewProjection(portal: PortalItem) {
+		const extent = previewFor(portal)?.bounds ?? { x: 0, y: 0, width: 1, height: 1 };
+		return minimapProjection(extent, { width: portal.width - 22, height: portal.height - 52 }, 5);
+	}
+
+	async function addPortalFromDock() {
+		saveNow();
+		const size = viewport();
+		const at = screenToWorld(board.camera, { x: size.width / 2 - 115, y: size.height / 2 - 84 });
+		const child = boardLibrary.create('New board');
+		// `create` marks the child as the board to reopen. We are not going there
+		// yet — this board is still the one being worked on.
+		boardLibrary.setActiveId(board.board.id);
+		const portal = createPortal(at.x, at.y, child.board.id, '', nextZ(board.items));
+		setItems([...board.items, portal]);
+		selectOnly(portal.id);
+		refreshBoards();
+		refreshPreviews();
+		scheduleSave();
+		await tick();
+		document.getElementById(`portal-title-${portal.id}`)?.focus();
+	}
+
+	function pointPortal(portal: PortalItem, boardId: string) {
+		updateItem(portal.id, { boardId } as Partial<WhiteboardItem>, true);
+		refreshPreviews();
+	}
+
+	/**
+	 * Through the doorway. The camera flies into the portal until it is past the
+	 * edges of the screen, and the child arrives at the framing its miniature was
+	 * showing — so the shapes you were flying toward are the shapes that greet
+	 * you. That continuity is the whole of the illusion; without it this would be
+	 * a page navigation with an animation in front of it.
+	 */
+	async function enterPortal(portal: PortalItem) {
+		if (travelling) return;
+		const opened = boardLibrary.open(portal.boardId);
+		if (!opened) {
+			refreshPreviews();
+			notice = 'That board is no longer on the shelf.';
+			return;
+		}
+
+		travelling = true;
+		handHoldsTheCamera();
+		saveNow();
+		const resting = { ...board.camera };
+		const flight = animateCamera(enterCamera(itemBounds(portal), viewport()));
+		veil = 1;
+		await wait(flight * 0.75);
+		// The flight is still running. Left going, it would keep writing the camera
+		// every frame and paint straight over the arrival.
+		interruptCameraAnimation();
+
+		const step: TrailStep = {
+			boardId: board.board.id,
+			title: board.board.title,
+			camera: resting,
+			portalId: portal.id
+		};
+		trail = pushTrail(trail, step);
+		boardLibrary.writeTrail(trail);
+		boardLibrary.setActiveId(portal.boardId);
+		adoptDocument(opened.document, 'saved', 'saved here');
+		board.camera = arrivalCamera(board, viewport());
+		refreshPreviews();
+		veil = 0;
+		travelling = false;
+	}
+
+	/**
+	 * Back up to a board on the trail. The child shrinks away, and the parent
+	 * comes back framed on the doorway that was stepped through before easing out
+	 * to where you were actually standing.
+	 */
+	async function climbTo(depth: number) {
+		if (travelling) return;
+		const climbed = popTrailTo(trail, depth);
+		if (!climbed) return;
+		const opened = boardLibrary.open(climbed.step.boardId);
+		if (!opened) {
+			trail = climbed.trail;
+			boardLibrary.writeTrail(trail);
+			notice = 'The board above is no longer on the shelf.';
+			return;
+		}
+
+		travelling = true;
+		handHoldsTheCamera();
+		saveNow();
+		const away = { ...board.camera, zoom: Math.max(0.1, board.camera.zoom * 0.4) };
+		const flight = animateCamera(away);
+		veil = 1;
+		await wait(flight * 0.6);
+		interruptCameraAnimation();
+
+		trail = climbed.trail;
+		boardLibrary.writeTrail(trail);
+		boardLibrary.setActiveId(climbed.step.boardId);
+		adoptDocument(opened.document, 'saved', 'saved here');
+		refreshPreviews();
+
+		const door = opened.document.items.find((item) => item.id === climbed.step.portalId);
+		board.camera = door
+			? returnCamera(boundsForItem(opened.document.items, door), climbed.step.camera, viewport())
+			: climbed.step.camera;
+		veil = 0;
+		// Ease from the doorway back out to the view that was left behind.
+		animateCamera(climbed.step.camera);
+		travelling = false;
+	}
+
+	function climbOne() {
+		if (trail.length) void climbTo(trail.length - 1);
+	}
+
 	// ── Search ──────────────────────────────────────────────────────────────
 
 	async function openSearch(seed = '') {
@@ -1496,6 +1678,10 @@
 			return;
 		}
 		boardLibrary.setActiveId(id);
+		// Opening a board from the shelf is not climbing out of anything, so the
+		// trail does not survive it — you arrive at that board, not under it.
+		trail = [];
+		boardLibrary.writeTrail(trail);
 		adoptDocument(
 			opened.document,
 			opened.source === 'backup' ? 'recovered' : 'saved',
@@ -1503,13 +1689,17 @@
 		);
 		shelfOpen = false;
 		refreshBoards();
+		refreshPreviews();
 	}
 
 	async function startNewBoard() {
 		saveNow();
+		trail = [];
+		boardLibrary.writeTrail(trail);
 		adoptDocument(boardLibrary.create(), 'saved', 'saved here');
 		shelfOpen = false;
 		refreshBoards();
+		refreshPreviews();
 		await tick();
 		document.getElementById('board-title')?.focus();
 	}
@@ -1539,6 +1729,11 @@
 		}
 		confirmDeleteId = null;
 		refreshBoards();
+		// Doorways to it stay where they are and say they lead nowhere — the board
+		// may come back, and the layout around them was arranged by hand.
+		refreshPreviews();
+		trail = trail.filter((step) => step.boardId !== id);
+		boardLibrary.writeTrail(trail);
 		if (id !== board.board.id) return;
 
 		// The board under our feet just went. Don't let a queued save write it back.
@@ -1978,6 +2173,61 @@
 						<button data-whiteboard-ui class="resize-handle" aria-label="Resize card" onpointerdown={(event) => startResize(event, item)}></button>
 					{/if}
 				</section>
+			{:else if item.type === 'portal'}
+				{@const preview = previewFor(item)}
+				{@const projection = previewProjection(item)}
+				<section
+					data-whiteboard-object
+					class:selected={isSelected(item.id)}
+					class:dragging={draggingIds.includes(item.id)}
+					class:found={matchIds.has(item.id)}
+					class:missing={preview?.missing}
+					class:loops={trailHasBoard(trail, item.boardId)}
+					class="board-item portal"
+					style={itemStyle(item)}
+					role="group"
+					aria-label={`Way through to ${doorLabel(item)}`}
+					onpointerdown={(event) => handleItemPointerDown(event, item)}
+					ondblclick={(event) => { event.stopPropagation(); if (tool === 'select' && !preview?.missing) void enterPortal(item); }}
+				>
+					<div class="portal-pane" aria-hidden="true">
+						{#if preview?.missing}
+							<p class="portal-gone">this board is gone</p>
+						{:else if preview?.marks.length}
+							{#each preview.marks as mark (mark.id)}
+								{@const box = projection.project(mark.bounds)}
+								<span class="door-mark mark-{mark.kind}" style={`left: ${box.x}px; top: ${box.y}px; width: ${box.width}px; height: ${box.height}px;`}></span>
+							{/each}
+						{:else}
+							<p class="portal-empty">nothing here yet</p>
+						{/if}
+					</div>
+					<div class="portal-foot">
+						<input
+							id={`portal-title-${item.id}`}
+							class="portal-title"
+							aria-label="Portal name"
+							placeholder={preview?.title || 'Name this way through'}
+							value={item.title}
+							onpointerdown={(event) => handleEditablePointerDown(event, item)}
+							oninput={(event) => updateItem(item.id, { title: (event.currentTarget as HTMLInputElement).value } as Partial<WhiteboardItem>, true)}
+							onkeydown={handleEditableKeydown}
+						/>
+						{#if !preview?.missing}
+							<button
+								data-whiteboard-ui
+								class="portal-go"
+								title={`Go into ${doorLabel(item)}`}
+								aria-label={`Go into ${doorLabel(item)}`}
+								onpointerdown={stopChipPointer}
+								onclick={() => void enterPortal(item)}
+							>→</button>
+						{/if}
+					</div>
+					{#if isSelected(item.id)}
+						<button data-whiteboard-ui class="resize-handle" aria-label="Resize portal" onpointerdown={(event) => startResize(event, item)}></button>
+					{/if}
+				</section>
 			{:else if item.type === 'image'}
 				<section
 					data-whiteboard-object
@@ -2055,18 +2305,24 @@
 	</header>
 
 	<nav class:hidden={playing || searchOpen} class="location-bar" data-whiteboard-ui aria-label="Board location">
+		{#if trail.length}
+			<button class="climb-out" title={`Back out to ${trail[trail.length - 1].title || 'the board above'}`} aria-label="Back out one board" onclick={climbOne}>↰</button>
+		{/if}
 		<div class="history-pair">
 			<button disabled={!canGoBack(history)} aria-label="Back to the previous view" title="Back (⌥←)" onclick={() => travelHistory(-1)}>‹</button>
 			<button disabled={!canGoForward(history)} aria-label="Forward to the next view" title="Forward (⌥→)" onclick={() => travelHistory(1)}>›</button>
 		</div>
 		<ol class="breadcrumb">
-			<li>
-				<button class="crumb root" title="Fit the whole board (0)" onclick={fitBoard}>{boardTitleFallback(board.board.title)}</button>
-			</li>
-			{#each trail as frame (frame.id)}
+			{#each crumbs as crumb, index (index)}
 				<li>
-					<span class="crumb-arrow" aria-hidden="true">›</span>
-					<button class:current={frame.id === here?.id} class="crumb" onclick={() => focusFrame(frame)}>{frameTitle(frame)}</button>
+					{#if index > 0}<span class="crumb-arrow" aria-hidden="true">/</span>{/if}
+					{#if crumb.kind === 'board'}
+						<button class="crumb above" title={`Back out to ${crumb.label}`} onclick={() => void climbTo(crumb.depth)}>{crumb.label}</button>
+					{:else if crumb.kind === 'here'}
+						<button class="crumb root" title="Fit the whole board (0)" onclick={fitBoard}>{crumb.label}</button>
+					{:else}
+						<button class:current={crumb.id === here?.id} class="crumb" onclick={() => { const frame = board.items.find((item) => item.id === crumb.id); if (frame?.type === 'frame') focusFrame(frame); }}>{crumb.label}</button>
+					{/if}
 				</li>
 			{/each}
 		</ol>
@@ -2246,7 +2502,33 @@
 							</p>
 						</section>
 
-						{#if only && isStack(only)}
+						{#if only && isPortal(only)}
+						<section>
+							<h3>Where this goes</h3>
+							{#if previewFor(only)?.missing}
+								<p class="drawer-note">This doorway points at a board that is no longer on the shelf. Choose another below, or delete the doorway.</p>
+							{:else}
+								<div class="row-buttons">
+									<button class="chip strong" onclick={() => void enterPortal(only)}>Go into “{doorLabel(only)}”</button>
+								</div>
+							{/if}
+							<ul class="place-list door-targets">
+								{#each boards as entry (entry.id)}
+									<li>
+										<button class:current={entry.id === only.boardId} class="place-name" onclick={() => pointPortal(only, entry.id)}>
+											<span>{boardTitleFallback(entry.title)}</span>
+											<small>{boardCountLabel(entry)}</small>
+										</button>
+									</li>
+								{/each}
+							</ul>
+							{#if trailHasBoard(trail, only.boardId)}
+								<p class="drawer-note">This leads back to a board you came through. Going in is allowed — it just goes round.</p>
+							{/if}
+						</section>
+					{/if}
+
+					{#if only && isStack(only)}
 							<section>
 								<h3>What this stack does</h3>
 								<div class="row-buttons">
@@ -2560,6 +2842,7 @@
 		<button class="tool-button" aria-label="Add image" title="Image" onclick={() => imageInput?.click()}><span aria-hidden="true">▧</span>Image</button>
 		<button class:active={tool === 'frame'} class="tool-button" aria-pressed={tool === 'frame'} title="Draw a frame" onclick={() => { tool = tool === 'frame' ? 'select' : 'frame'; connectorSourceId = null; notice = tool === 'frame' ? 'Drag a region for a frame.' : ''; }}><span aria-hidden="true">▢</span>Frame</button>
 		<button class="tool-button" aria-label="Add stack" title="Stack" onclick={addStackFromDock}><span aria-hidden="true">▤</span>Stack</button>
+		<button class="tool-button" aria-label="Add a way through to another board" title="Portal" onclick={addPortalFromDock}><span aria-hidden="true">◫</span>Portal</button>
 		<button class:active={tool === 'line'} class="tool-button" aria-pressed={tool === 'line'} title="Connect two ideas" onclick={() => { tool = tool === 'line' ? 'select' : 'line'; connectorSourceId = null; notice = tool === 'line' ? 'Choose the first idea.' : ''; }}><span aria-hidden="true">⟶</span>Line</button>
 	</div>
 
@@ -2582,6 +2865,8 @@
 	{:else if tool === 'line' && connectorSourceId}
 		<p class="mode-note" data-whiteboard-ui>choose the other end</p>
 	{/if}
+
+	<div class="veil" class:up={veil === 1} aria-hidden="true"></div>
 
 	<input bind:this={imageInput} class="image-input" type="file" accept="image/*" multiple onchange={handleImageInput} />
 </main>
@@ -3036,6 +3321,104 @@
 		font-family: var(--font-body, ui-sans-serif, sans-serif);
 	}
 	.card-body::placeholder { color: #b4aaa5; }
+
+	/*
+	 * A doorway. The pane shows the board beyond as shapes — the same projection
+	 * the overview map uses — so flying into it lands on the arrangement you were
+	 * already looking at.
+	 */
+	.portal {
+		min-width: 150px;
+		min-height: 120px;
+		display: flex;
+		flex-direction: column;
+		padding: 8px 8px 0;
+		border: 1px solid rgba(93, 79, 71, 0.18);
+		border-radius: 16px;
+		background: rgba(252, 249, 243, 0.96);
+		box-shadow: 0 5px 14px rgba(73, 54, 46, 0.12), inset 0 1px rgba(255,255,255,.9);
+		cursor: move;
+	}
+	.portal::after { border-radius: 16px; }
+	.portal.missing { border-style: dashed; border-color: rgba(163, 84, 83, 0.42); background: rgba(250, 244, 241, 0.9); }
+	.portal.loops { border-color: rgba(137, 103, 89, 0.42); }
+
+	.portal-pane {
+		position: relative;
+		flex: 1;
+		min-height: 0;
+		border-radius: 10px;
+		background:
+			radial-gradient(ellipse at 50% 120%, rgba(167, 102, 112, 0.09), transparent 62%),
+			rgba(120, 96, 88, 0.07);
+		box-shadow: inset 0 1px 3px rgba(73, 54, 46, 0.09);
+		overflow: hidden;
+	}
+	.door-mark { position: absolute; border-radius: 2px; background: rgba(120, 96, 88, 0.34); }
+	.door-mark.mark-frame { border: 1px solid rgba(137, 103, 89, 0.4); border-radius: 3px; background: rgba(219, 186, 163, 0.28); }
+	.door-mark.mark-stack { background: rgba(120, 96, 88, 0.3); }
+	.door-mark.mark-image { background: rgba(150, 118, 106, 0.44); }
+	.door-mark.mark-portal { border: 1px solid rgba(120, 96, 88, 0.4); background: rgba(252, 249, 243, 0.85); }
+
+	.portal-gone,
+	.portal-empty { margin: 0; padding: 0 10px; height: 100%; display: grid; place-content: center; text-align: center; font-size: 11px; font-style: italic; }
+	.portal-gone { color: #a45554; }
+	.portal-empty { color: #a89a93; }
+
+	.portal-foot { display: flex; align-items: center; gap: 4px; height: 36px; flex: none; }
+	.portal-title {
+		flex: 1;
+		min-width: 0;
+		padding: 3px 4px;
+		border: 0;
+		background: transparent;
+		color: #4c403c;
+		font-family: var(--font-display, Georgia, serif);
+		font-size: 14px;
+		font-weight: 600;
+		outline: none;
+	}
+	.portal-title::placeholder { color: #a89a93; font-weight: 400; }
+	.portal-go {
+		width: 26px;
+		height: 26px;
+		flex: none;
+		border-radius: 8px;
+		background: rgba(219, 178, 178, 0.34);
+		color: #7c4a53;
+		font-size: 14px;
+		line-height: 1;
+		transition: background 130ms ease, transform 130ms ease;
+	}
+	.portal-go:hover { background: rgba(219, 178, 178, 0.62); transform: translateX(1px); }
+
+	/* Rises over the board while going through, in either direction. */
+	.veil {
+		position: absolute;
+		inset: 0;
+		z-index: 85;
+		background: var(--paper);
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 260ms ease;
+	}
+	.veil.up { opacity: 1; }
+
+	.climb-out {
+		width: 26px;
+		height: 26px;
+		flex: none;
+		border-radius: 8px;
+		background: rgba(219, 178, 178, 0.3);
+		color: #7c4a53;
+		font-size: 14px;
+		line-height: 1;
+		transition: background 130ms ease;
+	}
+	.climb-out:hover { background: rgba(219, 178, 178, 0.58); }
+	.crumb.above { color: #8a5b63; }
+	.crumb.above:hover { background: rgba(219, 178, 178, 0.32); color: #6f454c; }
+	.door-targets { margin-top: 9px; max-height: 168px; overflow-y: auto; }
 
 	.image-card {
 		min-width: 120px;
