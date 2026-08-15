@@ -332,7 +332,7 @@
 	}
 	/* the tagline is the first thing to go when the bar gets tight — it is the
 	   only purely decorative item up here */
-	@media (max-width: 1000px) {
+	@media (max-width: 1080px) {
 		.topbar-label { display: none; }
 	}
 	@media (max-width: 720px) {
