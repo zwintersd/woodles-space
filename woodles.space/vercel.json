@@ -60,6 +60,8 @@
     { "source": "/bloomforge",                "destination": "/apps/bloomforge/dist/index.html" },
     { "source": "/bloomforge/:path*",         "destination": "/apps/bloomforge/dist/:path*" },
     { "source": "/play",                      "destination": "/apps/bloomforge-player/dist/index.html" },
-    { "source": "/play/:path*",               "destination": "/apps/bloomforge-player/dist/:path*" }
+    { "source": "/play/:path*",               "destination": "/apps/bloomforge-player/dist/:path*" },
+    { "source": "/grimoire",                  "destination": "/apps/grimoire/dist/index.html" },
+    { "source": "/grimoire/:path*",           "destination": "/apps/grimoire/dist/:path*" }
   ]
 }
