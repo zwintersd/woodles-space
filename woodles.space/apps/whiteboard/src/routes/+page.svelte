@@ -125,6 +125,17 @@
 	type TrailStep
 	} from '$lib/portals';
 	import { createPortal, type PortalItem } from '$lib/model';
+	import {
+	captureAt,
+	captureToInbox,
+	findInbox,
+	inferCapture,
+	INBOX_TITLE,
+	type CaptureItem
+	} from '$lib/capture';
+	import { createHandoffQueue } from '@woodles/handoff';
+
+	const whiteboardHandoffs = createHandoffQueue('whiteboard');
 	import { STACK_BEHAVIORS, SUGGESTED_STATUSES, TINTS, type Label, type StackBehavior, type Tint } from '$lib/model';
 
 	type Tool = 'select' | 'frame' | 'stack' | 'line';
@@ -235,6 +246,12 @@
 	let trail = $state<TrailStep[]>([]);
 	/** Rises over the board while going through a doorway, in either direction. */
 	let veil = $state(0);
+	/**
+	 * The exact notice that came with a "show me the Inbox" offer. Comparing the
+	 * live notice against it means any other message clears the offer on its own,
+	 * with nothing to remember at the thirty-odd other places notices are set.
+	 */
+	let inboxNotice = $state('');
 	let travelling = false;
 
 	// Search: the board flies to what you find.
@@ -450,6 +467,7 @@
 		refreshBoards();
 		refreshPreviews();
 		void hydrateImages();
+		drainHandoffs();
 
 		const onBeforeUnload = () => saveNow();
 		window.addEventListener('beforeunload', onBeforeUnload);
@@ -1876,22 +1894,101 @@
 		spaceHeld = false;
 	}
 
+	// ── Capture ─────────────────────────────────────────────────────────────
+	// Two gestures, one rule each: dropping is placing, so it lands where you
+	// let go; pasting has no position, so it goes to the Inbox.
+
+	function sameOriginHosts(): string[] {
+		return typeof location === 'undefined' ? [] : [location.host, location.hostname];
+	}
+
+	function captureCount(items: CaptureItem[]): string {
+		const links = items.filter((item) => item.kind === 'link').length;
+		if (links === items.length) return items.length === 1 ? 'a link' : `${items.length} links`;
+		return items.length === 1 ? 'a card' : `${items.length} cards`;
+	}
+
+	/** Puts captured material down where it was dropped. */
+	function placeCapture(items: CaptureItem[], at: Point) {
+		if (!items.length) return;
+		const result = captureAt(board, items, at);
+		setItems(result.document.items);
+		selectedIds = result.ids;
+		notice = `Put ${captureCount(items)} down here.`;
+		scheduleSave();
+	}
+
+	/** Files captured material in the Inbox, and says where it went. */
+	function fileCapture(items: CaptureItem[]) {
+		if (!items.length) return;
+		const size = viewport();
+		const near = screenToWorld(board.camera, { x: size.width - 340, y: 120 });
+		const result = captureToInbox(board, items, near);
+		board = result.document;
+		markDirty();
+		notice = `${captureCount(items)} in the Inbox.`;
+		inboxNotice = notice;
+		scheduleSave();
+	}
+
+	function showInbox() {
+		const inbox = findInbox(board);
+		if (!inbox) return;
+		focusItem(inbox.id, INBOX_TITLE);
+		notice = '';
+	}
+
 	function handlePaste(event: ClipboardEvent) {
 		if (isTextTarget(event.target)) return;
-		const image = [...(event.clipboardData?.files ?? [])].find((file) => file.type.startsWith('image/'));
-		if (!image) return;
+		const images = [...(event.clipboardData?.files ?? [])].filter((file) => file.type.startsWith('image/'));
+		if (images.length) {
+			event.preventDefault();
+			const size = viewport();
+			const centre = screenToWorld(board.camera, { x: size.width / 2, y: size.height / 2 });
+			void Promise.all(images.map((file, index) => addImageFile(file, { x: centre.x + index * 28, y: centre.y + index * 28 })));
+			return;
+		}
+
+		const text = event.clipboardData?.getData('text/plain') ?? '';
+		const items = inferCapture(text, sameOriginHosts());
+		if (!items.length) return;
 		event.preventDefault();
-		const size = viewport();
-		void addImageFile(image, screenToWorld(board.camera, { x: size.width / 2, y: size.height / 2 }));
+		fileCapture(items);
 	}
 
 	function handleDrop(event: DragEvent) {
 		event.preventDefault();
 		fileDragging = false;
-		const files = [...(event.dataTransfer?.files ?? [])].filter((file) => file.type.startsWith('image/'));
-		if (!files.length) return;
 		const point = pointForEvent(event);
-		void Promise.all(files.map((file, index) => addImageFile(file, { x: point.x + index * 26, y: point.y + index * 26 })));
+		const files = [...(event.dataTransfer?.files ?? [])];
+		const images = files.filter((file) => file.type.startsWith('image/'));
+		if (images.length) {
+			void Promise.all(images.map((file, index) => addImageFile(file, { x: point.x + index * 26, y: point.y + index * 26 })));
+			return;
+		}
+
+		// A link dragged out of a browser arrives as `text/uri-list`; a selection
+		// dragged out of a document arrives as plain text. Both are captures.
+		const dropped = event.dataTransfer?.getData('text/uri-list') || event.dataTransfer?.getData('text/plain') || '';
+		placeCapture(inferCapture(dropped, sameOriginHosts()), point);
+	}
+
+	/**
+	 * Anything another Woodle handed to this board while it was closed. The queue
+	 * is drained once on open and filed in the Inbox — a handoff is a capture that
+	 * happened somewhere else, so it lands in the same place as any other.
+	 */
+	function drainHandoffs() {
+		const drained = whiteboardHandoffs.drain();
+		if (!drained.items.length) return;
+		const items: CaptureItem[] = drained.items.map((handoff) => ({
+			kind: 'note' as const,
+			title: handoff.title || handoff.source.label || `From ${handoff.source.app}`,
+			body: [handoff.body, handoff.source.href].filter(Boolean).join('\n\n')
+		}));
+		fileCapture(items);
+		notice = `${drained.items.length} handed over from elsewhere, in the Inbox.`;
+		inboxNotice = notice;
 	}
 
 	function handleFrameTitleKeydown(event: KeyboardEvent) {
@@ -2147,7 +2244,7 @@
 						id={`card-body-${item.id}`}
 						class="card-body"
 						aria-label="Card text"
-						placeholder="Start anywhere…"
+						placeholder={sourceOf(item) ? '' : 'Start anywhere…'}
 						value={item.body}
 						onpointerdown={(event) => handleEditablePointerDown(event, item)}
 						oninput={(event) => updateCard(item, 'body', (event.currentTarget as HTMLTextAreaElement).value)}
@@ -2162,7 +2259,19 @@
 								<button class="label-chip tint-{label.tint}" title={`Find everything labelled ${label.name}`} onpointerdown={stopChipPointer} onclick={() => searchForLabel(label)}>{label.name}</button>
 							{/each}
 							{#if sourceOf(item)}
-								<span class="source-mark" title={`Source: ${sourceOf(item)}`} aria-label={`Source: ${sourceOf(item)}`}>↗</span>
+								{@const href = sourceLink(sourceOf(item)!)}
+								{#if href}
+									<a
+										class="source-chip"
+										{href}
+										target="_blank"
+										rel="noreferrer noopener"
+										title={sourceOf(item)!}
+										onpointerdown={stopChipPointer}
+									>{sourceLabel(sourceOf(item)!)}<span aria-hidden="true">↗</span></a>
+								{:else}
+									<span class="source-chip plain" title={`Source: ${sourceOf(item)}`}>{sourceLabel(sourceOf(item)!)}</span>
+								{/if}
 							{/if}
 							{#if isSelected(item.id)}
 								<button class="chip-add" title="Label this card (I)" aria-label="Add a label to this card" onpointerdown={stopChipPointer} onclick={() => addLabelToItem(item)}>＋</button>
@@ -2275,7 +2384,7 @@
 		<div class="empty-whisper" aria-hidden="true">
 			<span class="empty-mark">✦</span>
 			<p>double-click anywhere to begin</p>
-			<small>drag images in · hold Space to move · frame a region to name a place</small>
+			<small>paste anything · drag images or links in · hold Space to move</small>
 		</div>
 	{/if}
 
@@ -2856,7 +2965,12 @@
 	</div>
 
 	{#if notice && !playing}
-		<p class="notice" data-whiteboard-ui>{notice}</p>
+		<p class="notice" data-whiteboard-ui>
+			{notice}
+			{#if notice === inboxNotice && findInbox(board)}
+				<button class="notice-go" onclick={showInbox}>show me</button>
+			{/if}
+		</p>
 	{/if}
 	{#if playing}
 		<!-- nothing: the board is being presented, not edited -->
@@ -2915,7 +3029,7 @@
 	.whiteboard.space-panning:active * { cursor: grabbing !important; }
 
 	.whiteboard.file-dragging::before {
-		content: 'drop images into the board';
+		content: 'drop images, files or a link';
 		position: absolute;
 		inset: 18px;
 		z-index: 60;
@@ -3277,7 +3391,28 @@
 	.status-chip.done i, .status-pick.done i { background: #8cb19c; }
 	.status-chip.parked i, .status-pick.parked i { background: #b0a6a1; }
 
-	.source-mark { color: #a4938b; font-size: 11px; line-height: 1.5; cursor: help; }
+	/* A captured link reads as the link it is, not as a mark meaning "there is
+	   one". Same row, same room — nothing had to grow to hold it. */
+	.source-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		max-width: 150px;
+		padding: 2px 7px;
+		border: 1px solid rgba(120, 96, 88, 0.2);
+		border-radius: 999px;
+		color: #8a7a72;
+		font-size: 10.5px;
+		line-height: 1.5;
+		text-decoration: none;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		transition: border-color 130ms ease, color 130ms ease;
+	}
+	a.source-chip:hover { border-color: rgba(138, 91, 99, 0.5); color: #6f454c; }
+	.source-chip span { font-size: 9px; opacity: .7; }
+	.source-chip.plain { border-style: dashed; cursor: help; }
 
 	.chip-add {
 		width: 20px;
@@ -3567,6 +3702,9 @@
 	.notice,
 	.mode-note { position: absolute; z-index: 70; left: 50%; bottom: 80px; margin: 0; padding: 7px 12px; border: 1px solid rgba(98,80,70,.12); border-radius: 999px; background: rgba(255,253,248,.82); box-shadow: 0 5px 15px rgba(76,57,48,.08); color: #77665f; font-size: 12px; transform: translateX(-50%); pointer-events: none; backdrop-filter: blur(10px); }
 	.mode-note { color: #73586f; }
+	.notice { display: flex; align-items: center; gap: 8px; pointer-events: auto; }
+	.notice-go { padding: 2px 8px; border-radius: 999px; background: rgba(219, 178, 178, 0.42); color: #7c4a53; font-size: 11px; }
+	.notice-go:hover { background: rgba(219, 178, 178, 0.7); }
 	.image-input { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
 	/* Chrome steps out of the way while a journey is running. */
