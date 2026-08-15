@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { world1Def } from './def';
 import { world1Life } from './content/life';
 import { conditions } from './content/conditions';
+import { emergences } from './content/emergences';
 import { interventions } from './content/interventions';
 import { STOCK_BANDS, STOCK_IDS } from './vitals';
 import {
@@ -31,10 +32,19 @@ import {
 } from './tuning';
 
 describe('world1Def content', () => {
-	it('carries the exact same life roster, conditions, and interventions', () => {
+	it('carries the exact same life roster, conditions, emergences, and interventions', () => {
 		expect(world1Def.life).toBe(world1Life);
 		expect(world1Def.conditions).toBe(conditions);
+		expect(world1Def.emergences).toBe(emergences);
 		expect(world1Def.interventions).toBe(interventions);
+	});
+
+	it('every emergence names two conditions that exist', () => {
+		const ids = new Set(conditions.map((c) => c.id));
+		for (const e of world1Def.emergences) {
+			expect(ids.has(e.from[0])).toBe(true);
+			expect(ids.has(e.from[1])).toBe(true);
+		}
 	});
 
 	it('every life requires only conditions that exist', () => {

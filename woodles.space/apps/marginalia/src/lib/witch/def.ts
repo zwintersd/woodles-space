@@ -7,12 +7,15 @@
  * pieces directly, and the two can't drift apart because they're reading
  * the same object.
  *
- * This file is step A of that migration: the schema, and `world1Def`, the
- * def that describes exactly the game as it plays today. Nothing yet
- * *reads* `world1Def` — `world.ts` and `vitals.ts` still import `tuning.ts`
- * and `content/life.ts` directly, the same as before. Wiring that up is
- * step B, verified the same way every prior step was: the full test suite,
- * unchanged, has to still pass.
+ * Step B threaded this through `World` itself: its constructor now takes a
+ * `def` parameter (defaulting to `world1Def`), and every direct tuning.ts /
+ * content/ import world.ts used to hold is now a read of `this.def`. Left
+ * alone on purpose: `WorldTuning` (stageSeconds/stockDriftPerSec/stockLeak)
+ * stays a separate, narrower constructor parameter — see world.ts's comment
+ * on it — and `vitals.ts`'s own internal rates (vitality, band falloff, the
+ * stability ecosystem bonus) are captured here as data but not yet wired,
+ * since threading them through means changing vitals.ts's own signatures,
+ * not just what calls it.
  *
  * Grouped by primitive shape (see packages/dynamics/README.md) wherever a
  * group of constants configures one shape's instance, so the fields read as
@@ -21,6 +24,7 @@
 
 import type { DecayRestoreOptions, ComboOptions } from '@woodles/dynamics';
 import { conditions, type Condition } from './content/conditions';
+import { emergences, type Emergence } from './content/emergences';
 import { interventions, type Intervention } from './content/interventions';
 import { world1Life, type Life, type LifeCategory, type LifeDomain } from './content/life';
 import type { Worldspace } from './worldShape';
@@ -182,6 +186,8 @@ export interface MarginaliaDef {
 
 	life: Life[];
 	conditions: Condition[];
+	/** Tier 2: revealed automatically once both of the conditions it names are written. */
+	emergences: Emergence[];
 	interventions: Record<LifeDomain, Intervention>;
 	worldspaces: Record<Worldspace, WorldspaceDef>;
 
@@ -215,6 +221,7 @@ export const world1Def: MarginaliaDef = {
 
 	life: world1Life,
 	conditions,
+	emergences,
 	interventions,
 	worldspaces: {
 		water: { id: 'water', visibleCategories: ['aquatic'] },
