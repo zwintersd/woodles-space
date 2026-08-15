@@ -335,7 +335,16 @@
 	@media (max-width: 1080px) {
 		.topbar-label { display: none; }
 	}
-	@media (max-width: 720px) {
+	/* below this the page-mode layer switch pushes the row past its budget —
+	   tighten the gaps between groups before anything starts shedding content */
+	@media (max-width: 900px) {
+		.view-switch, .layer-switch, .drafts-toggle { margin-left: 0.7rem; }
+		.save-close-btn { margin-left: 0.3rem; }
+		.topbar-divider { margin: 0 0.4rem; }
+		.layer-btn { padding: 3px 5px; }
+		.drafts-toggle, .pockets-toggle, .sync-toggle, .save-close-btn { padding: 3px 6px; }
+	}
+	@media (max-width: 820px) {
 		.view-btn { font-size: 0; gap: 0; padding: 3px 6px; }
 		.view-icon { width: 16px; height: 11px; }
 	}
