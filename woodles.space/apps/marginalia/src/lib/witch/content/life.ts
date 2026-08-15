@@ -2,6 +2,7 @@
 // Each entry emerges once its required conditions are written. Brianna cannot
 // touch a thing until she has witnessed it: notice, observe, study, know.
 
+import { isRevealed } from '@woodles/dynamics';
 import type { StockVector, Needs } from '../vitals';
 
 export type LifeCategory = 'aquatic' | 'terrestrial' | 'atmospheric';
@@ -229,8 +230,10 @@ export const world1Life: Life[] = [
 	}
 ];
 
+// Shape H, Emergence Gate: a life is revealed once every condition it requires
+// has been written.
 export function revealedLife(written: ReadonlySet<string>): Life[] {
-	return world1Life.filter((l) => l.requires.every((r) => written.has(r)));
+	return world1Life.filter((l) => isRevealed(l.requires, written));
 }
 
 export function lifeById(id: string): Life | undefined {

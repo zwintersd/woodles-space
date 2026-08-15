@@ -24,6 +24,22 @@
 // makes sweeping a constant in `tuning.ts` a thing you can actually do.
 
 import { createRng, type Rng } from '@woodles/incremental-core';
+import {
+	accrue,
+	admit,
+	canAffordAll,
+	decay as decayPrimary,
+	dismiss,
+	factorFor,
+	freeSlots,
+	isMember,
+	nextCapacityCost,
+	restore as restorePrimary,
+	risingEdge,
+	advanceLadder,
+	type DecayRestoreOptions,
+	type EdgeLatch
+} from '@woodles/dynamics';
 import { conditionById } from './content/conditions';
 import { revealedEmergences } from './content/emergences';
 import {
@@ -177,6 +193,15 @@ export const defaultTuning: WorldTuning = {
 	stockLeak: STOCK_LEAK
 };
 
+// Shape D, Decay-with-Restore + Coupled Accumulator: recall is primary, fluency
+// the companion that only grows while recall is being restored.
+const RECALL_OPTS: DecayRestoreOptions = {
+	restoreRate: RECALL_RESTORE_PER_SEC,
+	baseDecayRate: RECALL_DECAY_PER_SEC,
+	companionGainRate: FLUENCY_GAIN_PER_SEC,
+	companionCap: FLUENCY_MAX
+};
+
 export function createWorldState(): WorldState {
 	return {
 		essence: 6,
@@ -245,9 +270,9 @@ export class World {
 	private cachedWrittenSet: Set<string> | null = null;
 	private lifeDirty = true;
 
-	// edge detection for the once-per-transition beats
-	private wasSelfBalancing = false;
-	private wasQuiet = false;
+	// edge detection for the once-per-transition beats — shape L, Edge Latch
+	private selfBalancingLatch: EdgeLatch = { was: false };
+	private quietLatch: EdgeLatch = { was: false };
 
 	constructor(
 		state: WorldState = createWorldState(),
@@ -278,8 +303,8 @@ export class World {
 	replace(state: WorldState): void {
 		this.state = state;
 		this.invalidate();
-		this.wasSelfBalancing = false;
-		this.wasQuiet = false;
+		this.selfBalancingLatch = { was: false };
+		this.quietLatch = { was: false };
 	}
 
 	private invalidate(): void {
@@ -394,14 +419,14 @@ export class World {
 		return this.state.attending.length;
 	}
 
+	// Shape G, Capacity + Roster: attentionCapacity + attending.
 	get attentionFree(): number {
-		return this.state.attentionCapacity - this.state.attending.length;
+		return freeSlots({ capacity: this.state.attentionCapacity, members: this.state.attending });
 	}
 
 	/** Cost to raise attention capacity by one, or null at the maximum. */
 	get attentionUpgradeCost(): number | null {
-		const tier = this.state.attentionCapacity - ATTENTION_START;
-		return tier < ATTENTION_COSTS.length ? ATTENTION_COSTS[tier] : null;
+		return nextCapacityCost(this.state.attentionCapacity, ATTENTION_START, ATTENTION_COSTS);
 	}
 
 	/**
@@ -452,8 +477,7 @@ export class World {
 	 * mechanic paid a meddler more than an ascetic. See BALANCE.md §3.
 	 */
 	get equilibriumFactor(): number {
-		if (!this.allStocksInBand) return 0;
-		return Math.max(0, 1 - Math.min(1, this.state.interventionLoad / INTERVENTION_LOAD_FULL));
+		return factorFor(this.state.interventionLoad, { cap: INTERVENTION_LOAD_FULL, gate: this.allStocksInBand });
 	}
 
 	/**
@@ -496,7 +520,7 @@ export class World {
 	// ── attention ────────────────────────────────────────────────────────────
 
 	isAttending(lifeId: string): boolean {
-		return this.state.attending.includes(lifeId);
+		return isMember({ capacity: this.state.attentionCapacity, members: this.state.attending }, lifeId);
 	}
 
 	/**
@@ -515,13 +539,16 @@ export class World {
 
 	attend(lifeId: string): boolean {
 		if (!this.canAttend(lifeId)) return false;
-		this.state.attending = [...this.state.attending, lifeId];
+		const roster = { capacity: this.state.attentionCapacity, members: [...this.state.attending] };
+		admit(roster, lifeId);
+		this.state.attending = roster.members;
 		return true;
 	}
 
 	unattend(lifeId: string): boolean {
-		if (!this.isAttending(lifeId)) return false;
-		this.state.attending = this.state.attending.filter((id) => id !== lifeId);
+		const roster = { capacity: this.state.attentionCapacity, members: [...this.state.attending] };
+		if (!dismiss(roster, lifeId)) return false;
+		this.state.attending = roster.members;
 		return true;
 	}
 
@@ -558,48 +585,47 @@ export class World {
 		this.settleStages(lifeId, into);
 	}
 
-	/** Advance as many stages as the banked study-seconds allow. */
+	/** Advance as many stages as the banked study-seconds allow. Shape E, Threshold Ladder. */
 	private settleStages(lifeId: string, into: WorldEvent[]): number {
-		let crossed = 0;
-		let stage = this.stageOf(lifeId);
-		let banked = this.state.study[lifeId] ?? 0;
 		const life = lifeById(lifeId);
-		while (stage < STAGE_KNOWN) {
-			const threshold = this.tuning.stageSeconds[stage + 1];
-			if (banked < threshold) break;
-			banked -= threshold;
-			stage += 1;
-			crossed += 1;
-			this.state.observation = { ...this.state.observation, [lifeId]: stage };
-			this.state.knowing += 1;
-			if (stage === STAGE_STUDIED) {
-				this.state.essence += ESSENCE_ON_STUDIED;
-				into.push({ kind: 'gain', resource: 'essence', amount: ESSENCE_ON_STUDIED });
+		const result = advanceLadder(
+			this.stageOf(lifeId),
+			this.state.study[lifeId] ?? 0,
+			this.tuning.stageSeconds,
+			STAGE_KNOWN,
+			(stage) => {
+				this.state.observation = { ...this.state.observation, [lifeId]: stage };
+				this.state.knowing += 1;
+				if (stage === STAGE_STUDIED) {
+					this.state.essence += ESSENCE_ON_STUDIED;
+					into.push({ kind: 'gain', resource: 'essence', amount: ESSENCE_ON_STUDIED });
+				}
+				if (stage === STAGE_KNOWN) {
+					this.state.essence += ESSENCE_ON_KNOWN;
+					into.push({ kind: 'gain', resource: 'essence', amount: ESSENCE_ON_KNOWN });
+					// freshly Known is fully in mind; it fades from here
+					this.state.recall = { ...this.state.recall, [lifeId]: 1 };
+				}
+				if (life) {
+					const line = pickLine(stageFieldNoteOptions(life.domain, stage), this.rng.next());
+					into.push({
+						kind: 'stage',
+						lifeId,
+						stage,
+						note: line ? fillTemplate(line, life.name) : null
+					});
+					if (stage === STAGE_KNOWN) this.checkCategoryMastery(life.category, into);
+				}
 			}
-			if (stage === STAGE_KNOWN) {
-				this.state.essence += ESSENCE_ON_KNOWN;
-				into.push({ kind: 'gain', resource: 'essence', amount: ESSENCE_ON_KNOWN });
-				// freshly Known is fully in mind; it fades from here
-				this.state.recall = { ...this.state.recall, [lifeId]: 1 };
-			}
-			if (life) {
-				const line = pickLine(stageFieldNoteOptions(life.domain, stage), this.rng.next());
-				into.push({
-					kind: 'stage',
-					lifeId,
-					stage,
-					note: line ? fillTemplate(line, life.name) : null
-				});
-				if (stage === STAGE_KNOWN) this.checkCategoryMastery(life.category, into);
-			}
-		}
-		if (stage >= STAGE_KNOWN) {
+		);
+		this.state.study = { ...this.state.study, [lifeId]: result.banked };
+		if (result.stage >= STAGE_KNOWN) {
 			// fully known — it no longer needs watching; free the slot
-			banked = 0;
-			this.state.attending = this.state.attending.filter((id) => id !== lifeId);
+			const roster = { capacity: this.state.attentionCapacity, members: [...this.state.attending] };
+			dismiss(roster, lifeId);
+			this.state.attending = roster.members;
 		}
-		this.state.study = { ...this.state.study, [lifeId]: banked };
-		return crossed;
+		return result.crossed;
 	}
 
 	/**
@@ -634,8 +660,8 @@ export class World {
 
 	canIntervene(lifeId: string): boolean {
 		if (this.stageOf(lifeId) < STAGE_KNOWN || this.hasIntervened(lifeId)) return false;
-		const c = this.interventionCostFor(lifeId);
-		return this.state.insight >= c.insight && this.state.essence >= c.essence;
+		// Shape J, Manual Conversion: affordability across both currencies at once.
+		return canAffordAll({ insight: this.state.insight, essence: this.state.essence }, this.interventionCostFor(lifeId));
 	}
 
 	interventionLineFor(lifeId: string): string | null {
@@ -745,25 +771,15 @@ export class World {
 	 * nothing; recovering something half-lost is worth a great deal.
 	 */
 	private restoreRecall(lifeId: string, dt: number): void {
-		const current = this.recallOf(lifeId);
-		if (current >= 1) return;
-		const gap = 1 - current;
-		const next = Math.min(1, current + gap * (1 - Math.exp(-RECALL_RESTORE_PER_SEC * dt)));
-		this.state.recall = { ...this.state.recall, [lifeId]: next };
-		const gained = Math.min(
-			FLUENCY_MAX,
-			this.fluencyOf(lifeId) + FLUENCY_GAIN_PER_SEC * gap * dt
-		);
-		this.state.fluency = { ...this.state.fluency, [lifeId]: gained };
+		const next = restorePrimary({ primary: this.recallOf(lifeId), companion: this.fluencyOf(lifeId) }, dt, RECALL_OPTS);
+		this.state.recall = { ...this.state.recall, [lifeId]: next.primary };
+		this.state.fluency = { ...this.state.fluency, [lifeId]: next.companion };
 	}
 
 	/** It slips, slower the more fluent she is with it. Exponential, dt-stable. */
 	private fadeRecall(lifeId: string, dt: number): void {
-		const current = this.recallOf(lifeId);
-		if (current <= 0) return;
-		const k = RECALL_DECAY_PER_SEC / (1 + this.fluencyOf(lifeId));
-		const next = Math.max(0, current * Math.exp(-k * dt));
-		this.state.recall = { ...this.state.recall, [lifeId]: next };
+		const next = decayPrimary({ primary: this.recallOf(lifeId), companion: this.fluencyOf(lifeId) }, dt, RECALL_OPTS);
+		this.state.recall = { ...this.state.recall, [lifeId]: next.primary };
 	}
 
 	// ── the idle tick ────────────────────────────────────────────────────────
@@ -866,21 +882,17 @@ export class World {
 		// load short of the threshold cost exactly nothing, so the lightest hand
 		// and a fairly heavy one banked identically. Now every act she makes
 		// shows up in the dividend immediately, at its own weight.
-		if (eq > EQUILIBRIUM_MIN_FACTOR) s.equilibriumSeconds += eq * dt;
+		s.equilibriumSeconds = accrue(s.equilibriumSeconds, eq, dt, EQUILIBRIUM_MIN_FACTOR);
 
 		// 6) a beat the first time this world settles into balance, or the first
-		//    time it goes quiet — not a repeating alarm.
-		const balancingNow = this.selfBalancing;
-		if (balancingNow && !this.wasSelfBalancing) {
+		//    time it goes quiet — not a repeating alarm. Shape L, Edge Latch.
+		if (risingEdge(this.selfBalancingLatch, this.selfBalancing)) {
 			into.push({ kind: 'equilibrium', note: pickLine(equilibriumFieldNotes, this.rng.next()) });
 		}
-		this.wasSelfBalancing = balancingNow;
 
-		const quietNow = this.quiet;
-		if (quietNow && !this.wasQuiet) {
+		if (risingEdge(this.quietLatch, this.quiet)) {
 			into.push({ kind: 'quiet', note: pickLine(quietFieldNotes, this.rng.next()) });
 		}
-		this.wasQuiet = quietNow;
 
 		// 7) Favor eases toward a target set by how much she has Known, pulled
 		//    down by the world's stress and lifted when it holds itself.
