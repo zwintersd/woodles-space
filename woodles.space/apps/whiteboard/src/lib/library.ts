@@ -10,6 +10,7 @@ import {
 	type WhiteboardDocument
 } from './model';
 import { repairDocument } from './geometry';
+import type { TrailStep } from './portals';
 import { createWhiteboardStorage, WHITEBOARD_STORAGE_KEY } from './persistence';
 
 export const BOARD_INDEX_KEY = 'woodles.whiteboard.index.v1';
@@ -19,6 +20,8 @@ export const BOARD_INDEX_KEY = 'woodles.whiteboard.index.v1';
  */
 export const BOARD_KEY_PREFIX = 'woodles.whiteboard.boards.';
 export const ACTIVE_BOARD_KEY = 'woodles.whiteboard.active.v1';
+/** How deep you were, not what any board holds — see portals.ts. */
+export const TRAIL_KEY = 'woodles.whiteboard.trail.v1';
 /** Where the single-board era kept its one and only board. */
 export const LEGACY_BOARD_KEY = WHITEBOARD_STORAGE_KEY;
 
@@ -45,6 +48,16 @@ function isSummary(value: unknown): value is BoardSummary {
 
 function isSummaryList(value: unknown): value is BoardSummary[] {
 	return Array.isArray(value) && value.every(isSummary);
+}
+
+function isTrailStep(value: unknown): value is TrailStep {
+	if (typeof value !== 'object' || value === null) return false;
+	const step = value as Record<string, unknown>;
+	const camera = step.camera as Record<string, unknown> | undefined;
+	return typeof step.boardId === 'string' && typeof step.title === 'string' &&
+		(step.portalId === null || typeof step.portalId === 'string') &&
+		typeof camera === 'object' && camera !== null &&
+		[camera.x, camera.y, camera.zoom].every((n) => typeof n === 'number' && Number.isFinite(n));
 }
 
 export function summarize(document: WhiteboardDocument): BoardSummary {
@@ -217,6 +230,49 @@ export function createBoardLibrary(storage?: StorageLike | null) {
 	}
 
 	/**
+	 * The way back up, remembered between sessions so reopening resumes where
+	 * you were standing rather than at the top. Steps whose board has since
+	 * gone are dropped, and with them everything below — you cannot climb down
+	 * through a doorway that is no longer there.
+	 */
+	function readTrail(): TrailStep[] {
+		const store = resolveStorage();
+		if (!store) return [];
+		let raw: string | null = null;
+		try {
+			raw = store.getItem(TRAIL_KEY);
+		} catch {
+			return [];
+		}
+		if (!raw) return [];
+		let parsed: unknown;
+		try {
+			parsed = JSON.parse(raw);
+		} catch {
+			return [];
+		}
+		if (!Array.isArray(parsed)) return [];
+		const known = new Set(list().map((entry) => entry.id));
+		const steps: TrailStep[] = [];
+		for (const value of parsed) {
+			if (!isTrailStep(value) || !known.has(value.boardId)) break;
+			steps.push(value);
+		}
+		return steps;
+	}
+
+	function writeTrail(trail: TrailStep[]): void {
+		const store = resolveStorage();
+		if (!store) return;
+		try {
+			if (trail.length) store.setItem(TRAIL_KEY, JSON.stringify(trail));
+			else store.removeItem(TRAIL_KEY);
+		} catch {
+			// A trail that cannot be remembered still works for this session.
+		}
+	}
+
+	/**
 	 * Every image asset still spoken for, so deleting one board never takes the
 	 * pictures another board is using.
 	 */
@@ -245,6 +301,8 @@ export function createBoardLibrary(storage?: StorageLike | null) {
 		setActiveId,
 		clearActiveId,
 		adoptLegacyBoard,
+		readTrail,
+		writeTrail,
 		referencedAssets
 	};
 }

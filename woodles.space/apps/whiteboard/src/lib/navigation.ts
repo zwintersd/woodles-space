@@ -130,6 +130,8 @@ export function itemLabel(item: WhiteboardItem): string {
 			return item.title.trim() || item.body.trim().split('\n')[0]?.slice(0, 40) || 'Untitled card';
 		case 'image':
 			return item.name.trim() || 'Image';
+		case 'portal':
+			return item.title.trim() || 'A way through';
 		default:
 			return 'Connector';
 	}
