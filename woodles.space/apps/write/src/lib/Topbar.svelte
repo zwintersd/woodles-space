@@ -146,6 +146,7 @@
 		backdrop-filter: blur(22px);
 		-webkit-backdrop-filter: blur(22px);
 		overflow: hidden;
+		white-space: nowrap;
 	}
 	.topbar::after {
 		content: '';
