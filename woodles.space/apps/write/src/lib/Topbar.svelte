@@ -17,7 +17,8 @@
 		promptOpen = $bindable(),
 		isListKind = false,
 		onLayerChange,
-		onSaveAndClose
+		onSaveAndClose,
+		onSendToBoard
 	}: {
 		activeLayer: LayerId;
 		layerIds: readonly LayerId[];
@@ -35,6 +36,8 @@
 		onLayerChange: (id: LayerId) => void;
 		/** Flushes the current draft to storage and opens a fresh blank page. */
 		onSaveAndClose: () => void;
+		/** Hands the current draft's prose to whiteboard's Inbox as a card. */
+		onSendToBoard: () => void;
 	} = $props();
 </script>
 
@@ -108,6 +111,13 @@
 		title="save this draft and start a new page"
 	>
 		save &amp; close
+	</button>
+	<button
+		class="save-close-btn"
+		onclick={onSendToBoard}
+		title="send this draft's prose to whiteboard's Inbox, as a card"
+	>
+		send to board
 	</button>
 	<span class="topbar-divider" aria-hidden="true"></span>
 	<button

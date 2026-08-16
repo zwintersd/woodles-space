@@ -20,6 +20,7 @@ export {
 	ANCHOR_BLOCK_SELECTOR,
 	countWords,
 	ensureAnchorsOn,
+	htmlToText,
 	isEmptyHtml,
 	previewText,
 	readReferences,

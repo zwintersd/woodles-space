@@ -51,6 +51,16 @@
 	type CameraHistory
 	} from '$lib/camera';
 	import {
+	applyRestoredDocument,
+	canRedo,
+	canUndo,
+	createEditHistory,
+	recordEdit,
+	redoEdit,
+	undoEdit,
+	type EditHistory
+	} from '$lib/history';
+	import {
 	fitBoardCamera,
 	focusCamera,
 	frameSequence,
@@ -218,6 +228,8 @@
 
 	// Navigation: where the camera has been, where it can go, and what it says.
 	let history = $state<CameraHistory>(createCameraHistory({ camera: { x: 180, y: 120, zoom: 1 }, label: 'Board' }));
+	// Undo/redo over document edits — independent of the camera history above.
+	let editHistory = $state<EditHistory>(createEditHistory());
 	let viewportSize = $state({ width: 1200, height: 800 });
 	let drawer = $state<Drawer | null>(null);
 	let minimapOn = $state(true);
@@ -285,8 +297,17 @@
 	const mapMarks = $derived(minimapMarks(board.items));
 	const mapView = $derived(mapProjection.project(visibleBounds(board.camera, viewportSize)));
 
-	/** The objects the Details panel is speaking about — nothing, one, or many. */
-	const chosen = $derived(board.items.filter((item) => selectedIds.includes(item.id) && item.type !== 'connector'));
+	/**
+	 * The objects the Details panel is speaking about — nothing, one, or many.
+	 * Connectors are included: the property sheet (Labels, Status, Type,
+	 * Source, Color) is generic across every item type, a connector already
+	 * validates and stores it the same as anything else — it just had no way
+	 * in, since this filter kept them out. `duplicateSelection` and
+	 * `addSelectionToJourney` keep their own, separate connector exclusions;
+	 * those are about what duplicating or journeying to a connector would
+	 * even mean, a different question from whether it can carry a color.
+	 */
+	const chosen = $derived(board.items.filter((item) => selectedIds.includes(item.id)));
 	const only = $derived(chosen.length === 1 ? chosen[0] : null);
 	const crumbs = $derived(breadcrumbs(trail, board, board.camera, viewportSize));
 	const results = $derived(searchOpen && searchText.trim() ? searchBoard(board, searchText) : []);
@@ -405,6 +426,47 @@
 		}
 	}
 
+	/**
+	 * Call before a mutation, with the board exactly as it stands. `coalesceKey`
+	 * merges a burst of edits to the same field — typing a sentence into a card
+	 * is one undo step — while a discrete action (a click) should pass none, so
+	 * it is always its own step. Never records camera-only moves; those live in
+	 * `history` above, not here.
+	 */
+	function beginEdit(coalesceKey: string | null = null) {
+		editHistory = recordEdit(editHistory, board, coalesceKey);
+	}
+
+	function performUndo() {
+		if (!canUndo(editHistory)) {
+			notice = 'Nothing to undo yet.';
+			return;
+		}
+		const step = undoEdit(editHistory, board)!;
+		cancelPointerSession();
+		editHistory = step.history;
+		board = applyRestoredDocument(board, step.document);
+		selectedIds = [];
+		connectorSourceId = null;
+		notice = '';
+		scheduleSave();
+	}
+
+	function performRedo() {
+		if (!canRedo(editHistory)) {
+			notice = 'Nothing to redo.';
+			return;
+		}
+		const step = redoEdit(editHistory, board)!;
+		cancelPointerSession();
+		editHistory = step.history;
+		board = applyRestoredDocument(board, step.document);
+		selectedIds = [];
+		connectorSourceId = null;
+		notice = '';
+		scheduleSave();
+	}
+
 	function removeSettledImageAssets() {
 		for (const assetId of [...pendingAssetDeletes]) {
 			if (board.items.some((item) => item.type === 'image' && item.assetId === assetId)) {
@@ -460,6 +522,7 @@
 		}
 
 		history = createCameraHistory({ camera: { ...board.camera }, label: 'Where you were' });
+		editHistory = createEditHistory();
 		loaded = true;
 		// Resume at the depth the last session left off at, not at the top.
 		trail = boardLibrary.readTrail().filter((step) => step.boardId !== board.board.id);
@@ -496,6 +559,7 @@
 	});
 
 	async function createCardAt(point: Point) {
+		beginEdit();
 		const card = createCard(point.x - 18, point.y - 18, nextZ(board.items));
 		setItems([...board.items, card]);
 		selectOnly(card.id);
@@ -505,6 +569,7 @@
 	}
 
 	async function createStackAt(point: Point) {
+		beginEdit();
 		const stack = createStack(point.x - 32, point.y - 24, nextZ(board.items));
 		setItems([...board.items, stack]);
 		selectOnly(stack.id);
@@ -514,6 +579,7 @@
 	}
 
 	async function createFrameAt(bounds: Bounds) {
+		beginEdit();
 		const frame = createFrame(bounds.x, bounds.y, bounds.width, bounds.height, 1);
 		setItems([...board.items, frame]);
 		selectOnly(frame.id);
@@ -559,6 +625,7 @@
 				nextZ(board.items)
 			);
 			imageUrls = { ...imageUrls, [assetId]: source };
+			beginEdit();
 			setItems([...board.items, image]);
 			selectOnly(image.id);
 			notice = '';
@@ -654,6 +721,7 @@
 				.filter((candidate): candidate is WhiteboardItem => Boolean(candidate))
 				.map((candidate) => [candidate.id, itemBounds(candidate)])
 		);
+		beginEdit();
 		activeSession = {
 			kind: 'drag',
 			pointerId: event.pointerId,
@@ -680,6 +748,7 @@
 			notice = 'Choose another idea for the other end.';
 			return;
 		}
+		beginEdit();
 		const line = createConnector(connectorSourceId, item.id);
 		setItems([...board.items, line]);
 		selectedIds = [line.id];
@@ -853,6 +922,7 @@
 		if (item.type === 'connector') return;
 		event.stopPropagation();
 		selectOnly(item.id);
+		beginEdit();
 		activeSession = { kind: 'resize', pointerId: event.pointerId, itemId: item.id, startWorld: pointForEvent(event), bounds: itemBounds(item) };
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
 	}
@@ -889,10 +959,12 @@
 	}
 
 	function updateCard(item: CardItem, field: 'title' | 'body', value: string) {
+		beginEdit(`card-${field}:${item.id}`);
 		updateItem(item.id, { [field]: value } as Partial<WhiteboardItem>, true);
 	}
 
 	function updateFrame(item: FrameItem, value: string) {
+		beginEdit(`frame-title:${item.id}`);
 		updateItem(item.id, { title: value }, true);
 	}
 
@@ -901,27 +973,32 @@
 	 * title is the status it confers, so renaming it renames every card inside.
 	 */
 	function updateStack(item: StackItem, value: string) {
+		beginEdit(`stack-title:${item.id}`);
 		board = renameStack(board, item.id, value);
 		board.updatedAt = now();
 		scheduleSave();
 	}
 
 	function changeBehavior(stackId: string, behavior: StackBehavior) {
+		beginEdit();
 		board = setStackBehavior(board, stackId, behavior);
 		scheduleSave();
 	}
 
 	function tickCard(card: WhiteboardItem) {
+		beginEdit();
 		board = toggleChecked(board, card.id);
 		scheduleSave();
 	}
 
 	function takeTop(stackId: string) {
+		beginEdit();
 		board = takeFromQueue(board, stackId);
 		scheduleSave();
 	}
 
 	function addColumnBeside(stack: StackItem) {
+		beginEdit();
 		board = stackBeside(board, stack.id, 'New column');
 		scheduleSave();
 	}
@@ -930,9 +1007,14 @@
 		const card = chosen.find((item) => item.type === 'card' && item.stackId);
 		if (!card) return;
 		const before = board;
-		board = shiftCardColumn(board, card.id, direction);
-		if (board === before) notice = 'That is the last column this way.';
-		else scheduleSave();
+		const next = shiftCardColumn(board, card.id, direction);
+		if (next === before) {
+			notice = 'That is the last column this way.';
+			return;
+		}
+		beginEdit();
+		board = next;
+		scheduleSave();
 	}
 
 	const stacksById = $derived(new Map(board.items.filter(isStack).map((item) => [item.id, item])));
@@ -965,6 +1047,7 @@
 
 	function deleteSelection() {
 		if (!selectedIds.length) return;
+		beginEdit();
 		const selected = new Set(selectedIds);
 		const imageAssets = board.items
 			.filter((item): item is Extract<WhiteboardItem, { type: 'image' }> => selected.has(item.id) && item.type === 'image')
@@ -986,6 +1069,7 @@
 	function duplicateSelection() {
 		const originals = board.items.filter((item) => selectedIds.includes(item.id) && item.type !== 'connector');
 		if (!originals.length) return;
+		beginEdit();
 		const clones = originals.map((item, index) => {
 			const bounds = itemBounds(item);
 			const stamp = now();
@@ -1082,12 +1166,14 @@
 	}
 
 	function setHome() {
+		beginEdit();
 		board.home = { ...board.camera };
 		notice = 'Home is this view now.';
 		scheduleSave();
 	}
 
 	function clearHome() {
+		beginEdit();
 		board.home = null;
 		notice = 'Home is the whole board again.';
 		scheduleSave();
@@ -1122,6 +1208,7 @@
 
 	function saveViewpointHere() {
 		const name = newViewpointName.trim() || `View ${board.viewpoints.length + 1}`;
+		beginEdit();
 		board.viewpoints = [...board.viewpoints, createViewpoint(name, board.camera)];
 		newViewpointName = '';
 		notice = `Saved “${name}”.`;
@@ -1133,11 +1220,13 @@
 	}
 
 	function renameViewpoint(id: string, name: string) {
+		beginEdit(`viewpoint-name:${id}`);
 		board.viewpoints = board.viewpoints.map((viewpoint) => (viewpoint.id === id ? { ...viewpoint, name } : viewpoint));
 		scheduleSave();
 	}
 
 	function deleteViewpoint(id: string) {
+		beginEdit();
 		board.viewpoints = board.viewpoints.filter((viewpoint) => viewpoint.id !== id);
 		board = repairDocument(board);
 		scheduleSave();
@@ -1159,6 +1248,7 @@
 				notice = 'A journey visits frames — draw a frame or two first.';
 				return;
 			}
+			beginEdit();
 			board = setJourneyStops(board, suggested);
 			scheduleSave();
 		}
@@ -1226,6 +1316,7 @@
 	}
 
 	function toggleStop(target: JourneyStop['target']) {
+		beginEdit();
 		if (hasStop(board, target)) {
 			const existing = board.journey.stops.find((stop) =>
 				stop.target.kind === target.kind &&
@@ -1244,6 +1335,7 @@
 			notice = 'Choose something on the board to add to the journey.';
 			return;
 		}
+		beginEdit();
 		for (const id of additions) {
 			if (!hasStop(board, { kind: 'item', id })) board = addStop(board, { kind: 'item', id });
 		}
@@ -1257,11 +1349,13 @@
 			notice = 'A journey visits frames — draw a frame or two first.';
 			return;
 		}
+		beginEdit();
 		board = setJourneyStops(board, suggested);
 		scheduleSave();
 	}
 
 	function clearJourney() {
+		beginEdit();
 		board = setJourneyStops(board, []);
 		scheduleSave();
 	}
@@ -1313,6 +1407,7 @@
 	function applyLabelDraft() {
 		const name = labelDraft.trim();
 		if (!name || !chosen.length) return;
+		beginEdit();
 		const ids = chosen.map((item) => item.id);
 		const before = chipRoomBefore(ids);
 		board = labelItems(board, ids, name);
@@ -1323,6 +1418,7 @@
 
 	function toggleLabelOnSelection(labelId: string) {
 		if (!chosen.length) return;
+		beginEdit();
 		// With several chosen, one click means "give this to all of them" unless
 		// they all already have it, in which case it means "take it away".
 		const everyone = chosen.every((item) => item.properties?.labelIds?.includes(labelId));
@@ -1336,6 +1432,7 @@
 	}
 
 	function removeLabelFrom(itemId: string, labelId: string) {
+		beginEdit();
 		const before = chipRoomBefore([itemId]);
 		board = toggleLabel(board, itemId, labelId);
 		keepChipRoom(before);
@@ -1343,6 +1440,7 @@
 	}
 
 	function writeProperty(key: 'status' | 'kind' | 'source' | 'tint', value: string | null) {
+		beginEdit(`property:${key}:${chosen.map((item) => item.id).join(',')}`);
 		const before = chipRoomBefore(chosen.map((item) => item.id));
 		for (const item of chosen) board = setItemProperty(board, item.id, key, value);
 		keepChipRoom(before);
@@ -1369,16 +1467,19 @@
 	}
 
 	function renameLabelTo(labelId: string, name: string) {
+		beginEdit(`label-name:${labelId}`);
 		board = renameLabel(board, labelId, name);
 		scheduleSave();
 	}
 
 	function recolourLabel(labelId: string, tint: Tint) {
+		beginEdit();
 		board = retintLabel(board, labelId, tint);
 		scheduleSave();
 	}
 
 	function dropLabel(labelId: string) {
+		beginEdit();
 		board = deleteLabel(board, labelId);
 		scheduleSave();
 	}
@@ -1434,6 +1535,7 @@
 		// yet — this board is still the one being worked on.
 		boardLibrary.setActiveId(board.board.id);
 		const portal = createPortal(at.x, at.y, child.board.id, '', nextZ(board.items));
+		beginEdit();
 		setItems([...board.items, portal]);
 		selectOnly(portal.id);
 		refreshBoards();
@@ -1444,6 +1546,7 @@
 	}
 
 	function pointPortal(portal: PortalItem, boardId: string) {
+		beginEdit();
 		updateItem(portal.id, { boardId } as Partial<WhiteboardItem>, true);
 		refreshPreviews();
 	}
@@ -1665,6 +1768,7 @@
 		marquee = null;
 		frameDraft = null;
 		history = createCameraHistory({ camera: { ...board.camera }, label: 'Where you were' });
+		editHistory = createEditHistory();
 		dirty = false;
 		saveState = state;
 		saveMessage = message;
@@ -1825,6 +1929,18 @@
 			duplicateSelection();
 			return;
 		}
+		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+			event.preventDefault();
+			if (event.shiftKey) performRedo();
+			else performUndo();
+			return;
+		}
+		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') {
+			event.preventDefault();
+			selectedIds = board.items.filter((item) => item.type !== 'connector').map((item) => item.id);
+			connectorSourceId = null;
+			return;
+		}
 		if (event.metaKey || event.ctrlKey) return;
 
 		if (playing) {
@@ -1911,6 +2027,7 @@
 	/** Puts captured material down where it was dropped. */
 	function placeCapture(items: CaptureItem[], at: Point) {
 		if (!items.length) return;
+		beginEdit();
 		const result = captureAt(board, items, at);
 		setItems(result.document.items);
 		selectedIds = result.ids;
@@ -1921,6 +2038,7 @@
 	/** Files captured material in the Inbox, and says where it went. */
 	function fileCapture(items: CaptureItem[]) {
 		if (!items.length) return;
+		beginEdit();
 		const size = viewport();
 		const near = screenToWorld(board.camera, { x: size.width - 340, y: 120 });
 		const result = captureToInbox(board, items, near);
@@ -2075,6 +2193,8 @@
 			</defs>
 			{#each connectors as connector (connector.id)}
 				{@const endpoints = connectorEndpoints(board.items, connector)}
+				{@const tint = colorOf(connector)}
+				{@const label = kindOf(connector)}
 				{#if endpoints}
 					<path
 						class="connector-hit-area"
@@ -2088,10 +2208,20 @@
 					<path
 						aria-hidden="true"
 						class:selected-line={isSelected(connector.id)}
-						class="connector-path"
+						class={tint ? `connector-path tint-${tint}` : 'connector-path'}
 						d={`M ${endpoints.from.x} ${endpoints.from.y} L ${endpoints.to.x} ${endpoints.to.y}`}
 						marker-end={connector.arrow ? 'url(#connector-arrow)' : undefined}
 					/>
+					{#if label}
+						<text
+							class="connector-label"
+							aria-hidden="true"
+							x={(endpoints.from.x + endpoints.to.x) / 2}
+							y={(endpoints.from.y + endpoints.to.y) / 2}
+							dy="-6"
+							text-anchor="middle"
+						>{label}</text>
+					{/if}
 				{/if}
 			{/each}
 		</svg>
@@ -2398,7 +2528,7 @@
 				aria-label="Whiteboard title"
 				placeholder="Untitled whiteboard"
 				value={board.board.title}
-				oninput={(event) => { board.board.title = (event.currentTarget as HTMLInputElement).value; board.updatedAt = now(); scheduleSave(); }}
+				oninput={(event) => { beginEdit('board-title'); board.board.title = (event.currentTarget as HTMLInputElement).value; board.updatedAt = now(); scheduleSave(); }}
 			/>
 		</div>
 		<p class:warning={saveState === 'error'} class="save-status" aria-live="polite">
@@ -2718,11 +2848,11 @@
 						</section>
 
 						<section>
-							<h3>Type</h3>
+							<h3>{only?.type === 'connector' ? 'What this line means' : 'Type'}</h3>
 							<input
 								class="place-input wide"
 								aria-label="Type"
-								placeholder="note, question, reference…"
+								placeholder={only?.type === 'connector' ? 'leads to, blocks, supports…' : 'note, question, reference…'}
 								value={sharedProperty(kindOf) ?? ''}
 								oninput={(event) => writeProperty('kind', (event.currentTarget as HTMLInputElement).value)}
 							/>
@@ -2817,14 +2947,14 @@
 												max="30"
 												aria-label={`Seconds to rest at ${entry.label}`}
 												value={entry.stop.hold}
-												oninput={(event) => { board = setStopHold(board, entry.stop.id, Number((event.currentTarget as HTMLInputElement).value)); scheduleSave(); }}
+												oninput={(event) => { beginEdit(`stop-hold:${entry.stop.id}`); board = setStopHold(board, entry.stop.id, Number((event.currentTarget as HTMLInputElement).value)); scheduleSave(); }}
 											/>s
 										</label>
 										<div class="stop-move">
-											<button disabled={index === 0} aria-label="Move this stop earlier" onclick={() => { board = moveStop(board, entry.stop.id, -1); scheduleSave(); }}>▴</button>
-											<button disabled={index === stops.length - 1} aria-label="Move this stop later" onclick={() => { board = moveStop(board, entry.stop.id, 1); scheduleSave(); }}>▾</button>
+											<button disabled={index === 0} aria-label="Move this stop earlier" onclick={() => { beginEdit(); board = moveStop(board, entry.stop.id, -1); scheduleSave(); }}>▴</button>
+											<button disabled={index === stops.length - 1} aria-label="Move this stop later" onclick={() => { beginEdit(); board = moveStop(board, entry.stop.id, 1); scheduleSave(); }}>▾</button>
 										</div>
-										<button class="place-drop" aria-label={`Remove ${entry.label} from the journey`} onclick={() => { board = removeStop(board, entry.stop.id); scheduleSave(); }}>×</button>
+										<button class="place-drop" aria-label={`Remove ${entry.label} from the journey`} onclick={() => { beginEdit(); board = removeStop(board, entry.stop.id); scheduleSave(); }}>×</button>
 									</li>
 								{/each}
 							</ol>
@@ -2844,7 +2974,7 @@
 							{#if stops.length}<button class="chip quiet" onclick={clearJourney}>Clear</button>{/if}
 						</div>
 						<label class="loop-toggle">
-							<input type="checkbox" checked={board.journey.loop} onchange={(event) => { board = setJourneyLoop(board, (event.currentTarget as HTMLInputElement).checked); scheduleSave(); }} />
+							<input type="checkbox" checked={board.journey.loop} onchange={(event) => { beginEdit(); board = setJourneyLoop(board, (event.currentTarget as HTMLInputElement).checked); scheduleSave(); }} />
 							loop back to the beginning
 						</label>
 					</section>
@@ -2942,6 +3072,14 @@
 				<dt>M</dt><dd>overview map</dd>
 				<dt>Space</dt><dd>hold to drag the board</dd>
 				<dt>⌘S</dt><dd>save now</dd>
+			</dl>
+			<h3>Editing</h3>
+			<dl>
+				<dt>⌘Z</dt><dd>undo</dd>
+				<dt>⇧⌘Z</dt><dd>redo</dd>
+				<dt>⌘D</dt><dd>duplicate what's chosen</dd>
+				<dt>⌘A</dt><dd>select everything</dd>
+				<dt>⌫</dt><dd>delete what's chosen</dd>
 			</dl>
 		</div>
 	{/if}
@@ -3075,6 +3213,16 @@
 		transition: stroke 140ms ease, stroke-width 140ms ease;
 	}
 
+	/* Same six ink tones the label chips already read their text in — a
+	   connector's line is a mark, not a fill, so it wants that weight rather
+	   than the paler tint used for a card or frame's background. */
+	.connector-path.tint-peach { stroke: #7d5340; }
+	.connector-path.tint-lavender { stroke: #5d4d7d; }
+	.connector-path.tint-aqua { stroke: #3d6d69; }
+	.connector-path.tint-gold { stroke: #7a5f26; }
+	.connector-path.tint-rose { stroke: #86495a; }
+	.connector-path.tint-sage { stroke: #4d6b45; }
+
 	.connector-hit-area {
 		fill: none;
 		stroke: transparent;
@@ -3086,6 +3234,18 @@
 
 	.connector-path:hover,
 	.connector-path.selected-line { stroke: var(--accent); stroke-width: 3.4; }
+
+	.connector-label {
+		font-family: var(--font-body, 'DM Sans', ui-sans-serif, system-ui, sans-serif);
+		font-size: 11px;
+		fill: #6d5c56;
+		paint-order: stroke;
+		stroke: var(--paper);
+		stroke-width: 3px;
+		stroke-linejoin: round;
+		pointer-events: none;
+		user-select: none;
+	}
 
 	.board-item {
 		position: absolute;
@@ -4106,6 +4266,7 @@
 		backdrop-filter: blur(14px);
 	}
 	.shortcuts h3 { margin: 0 0 9px; color: #6d5c56; font-family: var(--font-display, Georgia, serif); font-size: 13px; font-weight: 600; }
+	.shortcuts dl + h3 { margin-top: 14px; }
 	.shortcuts dl { display: grid; grid-template-columns: 58px 1fr; gap: 5px 9px; margin: 0; }
 	.shortcuts dt { color: #7c6a63; font-size: 10.5px; font-variant-numeric: tabular-nums; }
 	.shortcuts dd { margin: 0; color: #948680; font-size: 10.5px; }
