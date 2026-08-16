@@ -80,7 +80,7 @@ per-field undo instead of rewinding the whole board. picked up `⌘A`
 Delete/Backspace in the shortcuts panel — both real, both previously
 missing from `?`. 12 new tests in `history.test.ts`; 219/219 pass.
 
-### 2. connectors get their second pass
+### 2. connectors get their second pass ✅ shipped
 
 every other primitive got a follow-up commit that gave it depth after
 being born plain — cards grew the property chip row ("cards that can say
@@ -103,7 +103,40 @@ its ends instead of `connectorEndpoints`'s straight chord
 (`geometry.ts`) — is a bigger, separate call, worth making only once color
 alone proves the small fix isn't enough.
 
-### 3. close the handoff loop
+**correction, found while building this:** `chosen` was wrong above — it
+read `board.items.filter((item) => selectedIds.includes(item.id) &&
+item.type !== 'connector')`, so a selected connector never reached
+`chosen`/`only` at all, and the Details drawer showed its empty state
+for one. the "silent no-op" wasn't quite right either: it wasn't that
+setting a color did nothing, it's that there was no way to *try* — every
+consumer of `chosen` (`writeProperty`, `sharedProperty`, the drawer
+template, the `itemLabel` header, which already had a `default: return
+'Connector'` case nobody could reach) turned out to handle a connector
+fine once one could arrive. so the actual fix was smaller than planned:
+drop the connector exclusion from `chosen`, and everything else was
+already generic. `duplicateSelection` and `addSelectionToJourney` keep
+their own separate connector exclusions — different question (what
+duplicating a line even means), left alone.
+
+**what shipped:** `chosen` includes connectors now. `.connector-path`
+reads `colorOf(connector)` for its stroke — six new
+`.connector-path.tint-*` rules, reusing the exact ink tones the label
+chips already read their text in, placed before the `:hover`/
+`.selected-line` rule so selection still wins on a tie. a connector's
+`kind` (repurposing the existing Type field — a frame-style field reuse,
+not a new one) renders as a `<text class="connector-label">` at the
+line's midpoint, with a `var(--paper)` stroke-halo for legibility over
+the dotted canvas. the Type section's header and placeholder go
+connector-specific ("What this line means" / "leads to, blocks,
+supports…") when `only?.type === 'connector'`. no waypoints, no bend —
+color and a label proved to be the whole ask; routing around what's in
+the way stays deferred. one new test in `properties.test.ts` confirming
+`setProperty`/`colorOf`/`kindOf` treat a connector like anything else;
+the rest is `+page.svelte` template wiring, verified live (two cards, a
+line between them, rose + "leads to" set via Details, confirmed the
+deselected stroke computes to the exact `#86495a` the CSS names).
+
+### 3. close the handoff loop ✅ shipped
 
 `whiteboard` is a registered `HANDOFF_TARGETS` receiver
 (`packages/handoff/src/index.ts`) — its Inbox drains the queue on open,
@@ -121,6 +154,35 @@ action alongside wherever `write` currently resolves where a capture
 landed would close a loop the codebase has been carrying open since
 whiteboard's first commit — small, concrete, and it's the one item here
 that makes another app better too.
+
+**what shipped:** a "send to board" button in `write`'s topbar, next to
+"save & close" — one click, no overlay, matching the weight of the
+thing it does (unlike "echoes", which is a real publish with its own
+panel). `drafts.ts` grows `draftBodyToHandoff` — the mirror of the
+existing `handoffToDraftBody` receiver — and a thin `sendDraftToBoard`
+wrapper. only the foreground layer's prose travels; pockets, margin
+notes, the other two layers, and Liquid boards stay in `write`, the same
+as a plain-textarea card was never going to hold a whole draft's
+structure. the html → text step turned out to already exist and be
+unused for exactly this: `@woodles/text`'s `htmlToText`, whose own doc
+comment says "for moving a rich body into a plain `<textarea>`, which is
+what a handoff between the rich editor and the plain-bodied apps needs"
+— written, apparently, for this and never called. re-exported through
+`htmlTools.ts` (the seam the file's own header describes) rather than
+imported straight from the package, matching how every other write
+module reaches `@woodles/text`. falls back to the draft's own
+kind-specific untitled label (`activeKindSpec.untitled`, "untitled
+letter" etc.) when there's no title, guards against sending a genuinely
+empty draft, and reuses the existing `notice`/`noticeTimer` toast rather
+than inventing a second feedback mechanism. 5 new tests in
+`drafts.test.ts`, one of them asserting against a real
+`createHandoffQueue('whiteboard')` rather than just the shape of the
+draft object. verified live end to end: typed a title-less two-paragraph
+draft in a real contenteditable, clicked send, read the exact queued
+JSON out of `localStorage`, then — separately, since dev servers don't
+share an origin the way production's rewrites do — seeded whiteboard
+with that same payload and watched it drain into a real Inbox card with
+the paragraph break intact.
 
 ### 4. search the shelf, not just the board
 
