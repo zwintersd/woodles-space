@@ -62,6 +62,7 @@
 		removeDraftBody,
 		setActiveDraftId,
 		clearActiveDraftId,
+		sendDraftToBoard,
 		statusesFor,
 		textToHtml,
 		upsertIndex,
@@ -845,6 +846,27 @@
 		}, 3200);
 	}
 
+	/**
+	 * The other half of the handoff spine: whiteboard has taken thoughts from
+	 * here since it grew an Inbox, but nothing ever sent one. Only the
+	 * foreground's prose travels — see `draftBodyToHandoff` for why.
+	 */
+	function sendToBoard() {
+		const body = currentDraftBody(new Date().toISOString());
+		if (!body.title?.trim() && isEmptyHtml(body.layers?.foreground?.html ?? '')) {
+			notice = 'nothing to send yet';
+		} else {
+			const result = sendDraftToBoard(body, activeKindSpec.untitled);
+			notice = result.ok
+				? 'sent to the whiteboard — it’s waiting in the Inbox'
+				: 'the board didn’t get that — try again';
+		}
+		clearTimeout(noticeTimer);
+		noticeTimer = setTimeout(() => {
+			notice = '';
+		}, 3200);
+	}
+
 	// A model's answer, appended to whatever is already in the foreground —
 	// same insertion point as pasting, and never a silent replace of prose
 	// already there. See DraftPromptModal.svelte.
@@ -1363,6 +1385,7 @@
 	{isListKind}
 	onLayerChange={setActiveLayer}
 	onSaveAndClose={saveAndClose}
+	onSendToBoard={sendToBoard}
 />
 
 <DraftsModal

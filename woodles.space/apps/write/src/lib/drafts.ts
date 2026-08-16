@@ -4,8 +4,8 @@ import {
 	DRAFT_PREFIX,
 	LEGACY_DRAFT_KEY
 } from './storage';
-import { createHandoffQueue, type Handoff } from '@woodles/handoff';
-import { sanitizeHtml } from './htmlTools';
+import { createHandoffQueue, sendHandoff, type Handoff, type HandoffDraft, type SendResult } from '@woodles/handoff';
+import { htmlToText, sanitizeHtml } from './htmlTools';
 import { coerceKind, WRITING_KINDS, type WritingKind } from './kinds';
 import { importNotebookCaptures } from './notebookImport';
 import { importSporesEntries } from './sporesImport';
@@ -276,6 +276,31 @@ export function handoffToDraftBody(item: Handoff): DraftBody {
 		layers: { foreground: { html, updatedAt: stamp } },
 		savedAt: stamp
 	};
+}
+
+/**
+ * The other direction: a draft, handed to a board that wants room around a
+ * thought rather than a line in a draft (see `HANDOFF_TARGETS` in
+ * `@woodles/handoff` for why whiteboard is on the receiving list at all).
+ * Only the foreground's prose travels, flattened to text the way
+ * `htmlToText` was built for — a card's body is a plain textarea, not
+ * another rich editor, so pockets, margin notes, and the other two layers
+ * stay here the same as a card was never going to hold a whole draft's
+ * structure.
+ */
+export function draftBodyToHandoff(body: DraftBody, fallbackTitle: string): HandoffDraft {
+	return {
+		title: (body.title?.trim() || fallbackTitle).trim(),
+		body: htmlToText(body.layers?.foreground?.html ?? body.content ?? ''),
+		format: 'text',
+		...(body.tags && body.tags.length > 0 ? { tags: body.tags } : {}),
+		source: { app: 'write', ...(body.title?.trim() ? { label: body.title.trim() } : {}) }
+	};
+}
+
+/** Queues the current draft for whiteboard. Never throws; reports failure instead. */
+export function sendDraftToBoard(body: DraftBody, fallbackTitle: string): SendResult {
+	return sendHandoff('whiteboard', draftBodyToHandoff(body, fallbackTitle));
 }
 
 export interface HandoffIngestResult {
