@@ -5,12 +5,15 @@
 		ARENA_W,
 		ATTACK_ARC,
 		ATTACK_RANGE,
-		ENEMY_RADIUS,
+		ENEMY_SPECS,
 		PLAYER_MAX_HP,
 		PLAYER_RADIUS,
+		PROJECTILE_RADIUS,
+		WAVES,
 		createArenaState,
 		stepArena,
-		type ArenaInput
+		type ArenaInput,
+		type EnemyKind
 	} from './spike';
 
 	let canvasEl: HTMLCanvasElement;
@@ -28,6 +31,16 @@
 	let mouseAngle = 0;
 	let attacking = false;
 	let dashing = false;
+
+	const ENEMY_COLORS: Record<EnemyKind, { fill: string; stroke: string }> = {
+		swarmer: { fill: '#b8506c', stroke: '#5c1f30' },
+		brute: { fill: '#a2622a', stroke: '#4d2c10' },
+		caster: { fill: '#2f8ba0', stroke: '#164450' }
+	};
+
+	function isPlayable(phase: string): boolean {
+		return phase === 'running' || phase === 'intermission';
+	}
 
 	function start() {
 		state = createArenaState();
@@ -55,7 +68,7 @@
 
 	function onPointerDown(event: PointerEvent) {
 		canvasEl.setPointerCapture(event.pointerId);
-		if (state.phase !== 'running') {
+		if (!isPlayable(state.phase)) {
 			start();
 			return;
 		}
@@ -72,7 +85,7 @@
 		const key = event.key.toLowerCase();
 		if (key === ' ' || key === 'enter') {
 			event.preventDefault();
-			if (state.phase !== 'running') {
+			if (!isPlayable(state.phase)) {
 				start();
 				return;
 			}
@@ -122,11 +135,13 @@
 		}
 		drawBackground(ctx);
 		drawEnemies(ctx);
+		drawProjectiles(ctx);
 		drawPlayer(ctx);
 		ctx.restore();
 
 		drawHud(ctx);
-		if (state.phase !== 'running') drawOverlay(ctx);
+		if (state.phase === 'intermission') drawIntermissionBanner(ctx);
+		if (state.phase === 'ready' || state.phase === 'over' || state.phase === 'cleared') drawOverlay(ctx);
 	}
 
 	function drawBackground(ctx: CanvasRenderingContext2D) {
@@ -153,19 +168,44 @@
 
 	function drawEnemies(ctx: CanvasRenderingContext2D) {
 		for (const enemy of state.enemies) {
+			const spec = ENEMY_SPECS[enemy.kind];
+			const colors = ENEMY_COLORS[enemy.kind];
 			ctx.save();
 			ctx.fillStyle = 'rgba(30, 20, 10, 0.18)';
 			ctx.beginPath();
-			ctx.ellipse(enemy.pos.x, enemy.pos.y + ENEMY_RADIUS * 0.75, ENEMY_RADIUS * 0.8, ENEMY_RADIUS * 0.35, 0, 0, Math.PI * 2);
+			ctx.ellipse(enemy.pos.x, enemy.pos.y + spec.radius * 0.75, spec.radius * 0.8, spec.radius * 0.35, 0, 0, Math.PI * 2);
 			ctx.fill();
 
-			ctx.fillStyle = enemy.hurtFlash > 0 ? '#fdf6e3' : '#b8506c';
-			ctx.strokeStyle = '#5c1f30';
-			ctx.lineWidth = 2;
+			ctx.fillStyle = enemy.hurtFlash > 0 ? '#fdf6e3' : colors.fill;
+			ctx.strokeStyle = colors.stroke;
+			ctx.lineWidth = enemy.kind === 'brute' ? 3.4 : 2;
 			ctx.beginPath();
-			ctx.arc(enemy.pos.x, enemy.pos.y, ENEMY_RADIUS, 0, Math.PI * 2);
+			ctx.arc(enemy.pos.x, enemy.pos.y, spec.radius, 0, Math.PI * 2);
 			ctx.fill();
 			ctx.stroke();
+
+			if (enemy.kind === 'caster') {
+				ctx.strokeStyle = 'rgba(47, 139, 160, 0.4)';
+				ctx.lineWidth = 1.5;
+				ctx.beginPath();
+				ctx.arc(enemy.pos.x, enemy.pos.y, spec.radius + 5, 0, Math.PI * 2);
+				ctx.stroke();
+			}
+			ctx.restore();
+		}
+	}
+
+	function drawProjectiles(ctx: CanvasRenderingContext2D) {
+		for (const proj of state.projectiles) {
+			ctx.save();
+			ctx.fillStyle = 'rgba(47, 139, 160, 0.3)';
+			ctx.beginPath();
+			ctx.arc(proj.pos.x, proj.pos.y, PROJECTILE_RADIUS + 4, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.fillStyle = '#2f8ba0';
+			ctx.beginPath();
+			ctx.arc(proj.pos.x, proj.pos.y, PROJECTILE_RADIUS, 0, Math.PI * 2);
+			ctx.fill();
 			ctx.restore();
 		}
 	}
@@ -226,11 +266,28 @@
 		ctx.fillText(`${Math.ceil(state.player.hp)} / ${PLAYER_MAX_HP}`, 18, 34);
 
 		ctx.fillStyle = 'rgba(253, 246, 227, 0.9)';
-		ctx.fillRect(ARENA_W - 110, 14, 96, 34);
-		ctx.strokeRect(ARENA_W - 110, 14, 96, 34);
+		ctx.fillRect(ARENA_W - 150, 14, 136, 34);
+		ctx.strokeRect(ARENA_W - 150, 14, 136, 34);
 		ctx.fillStyle = '#3a3226';
 		ctx.textAlign = 'center';
-		ctx.fillText(`kills ${state.kills}`, ARENA_W - 62, 24);
+		ctx.fillText(`wave ${Math.min(state.wave + 1, WAVES.length)} / ${WAVES.length}`, ARENA_W - 82, 24);
+		ctx.fillText(`kills ${state.kills}`, ARENA_W - 82, 40);
+		ctx.restore();
+	}
+
+	function drawIntermissionBanner(ctx: CanvasRenderingContext2D) {
+		ctx.save();
+		ctx.fillStyle = 'rgba(253, 246, 227, 0.88)';
+		ctx.strokeStyle = 'rgba(88, 74, 55, 0.4)';
+		ctx.lineWidth = 1;
+		const width = 260;
+		ctx.fillRect(ARENA_W / 2 - width / 2, 14, width, 34);
+		ctx.strokeRect(ARENA_W / 2 - width / 2, 14, width, 34);
+		ctx.fillStyle = '#3a3226';
+		ctx.font = '13px var(--font-ui)';
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		ctx.fillText(`wave ${state.wave} cleared — wave ${state.wave + 1} in ${Math.ceil(state.intermissionTimer)}…`, ARENA_W / 2, 31);
 		ctx.restore();
 	}
 
@@ -242,16 +299,22 @@
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
 		ctx.font = '32px var(--font-display)';
-		ctx.fillText(state.phase === 'over' ? 'you fell' : 'Arena — a feel spike', ARENA_W / 2, ARENA_H / 2 - 20);
+		ctx.fillText(titleFor(state.phase), ARENA_W / 2, ARENA_H / 2 - 20);
 		ctx.font = '15px var(--font-ui)';
-		ctx.fillText(
-			state.phase === 'over'
-				? `${state.kills} kills — click or press space to try again`
-				: 'WASD move · mouse aim · click / space attack · shift dash',
-			ARENA_W / 2,
-			ARENA_H / 2 + 16
-		);
+		ctx.fillText(subtitleFor(state.phase), ARENA_W / 2, ARENA_H / 2 + 16);
 		ctx.restore();
+	}
+
+	function titleFor(phase: string): string {
+		if (phase === 'over') return 'you fell';
+		if (phase === 'cleared') return 'the arena is cleared';
+		return 'Arena — a feel spike';
+	}
+
+	function subtitleFor(phase: string): string {
+		if (phase === 'over') return `wave ${state.wave + 1} · ${state.kills} kills — click or press space to try again`;
+		if (phase === 'cleared') return `${state.kills} kills across ${WAVES.length} waves — click or press space to run it again`;
+		return 'WASD move · mouse aim · click / space attack · shift dash';
 	}
 
 	onMount(() => {
@@ -283,7 +346,7 @@
 	onpointerup={onPointerUp}
 	onpointercancel={onPointerUp}
 	oncontextmenu={(e) => e.preventDefault()}
-	>a small top-down arena with a player circle and chasing enemies</canvas
+	>a small top-down arena with a player circle, chasing enemies, and enemy projectiles</canvas
 >
 
 <style>
