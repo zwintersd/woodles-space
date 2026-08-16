@@ -34,7 +34,7 @@ shape.
 roughly ordered by how much it costs against how much it's currently
 missed — cheap-and-load-bearing first, expensive-and-speculative last.
 
-### 1. undo
+### 1. undo ✅ shipped
 
 there is no way to undo a document edit. ⌥←/⌥→ (`camera.ts`'s
 `CameraHistory`) replay *where you looked*, not *what you did* — select six
@@ -53,6 +53,32 @@ needs, and every edit already funnels through a small number of setters in
 `+page.svelte` — one choke point to hook, not a rewrite. ⌘Z / ⇧⌘Z, scoped
 to the open board; camera moves stay out of it, same as they're already
 out of save.
+
+**what actually shipped:** a new `history.ts` — deliberately not named or
+shaped like `camera.ts`'s `CameraHistory`, since the two solve different
+problems (this one has no notion of "the live position between marks").
+`recordEdit(history, board, coalesceKey?)` snapshots the board *before* a
+mutation; every one of the ~30 places `+page.svelte` commits a document
+change now calls a small `beginEdit(coalesceKey?)` wrapper first — the
+"one choke point" from above turned out to be closer to two dozen, since
+label/journey/viewpoint/property edits each go through their own setter,
+not through `setItems`. what stayed a single choke point: the *coalescing*
+rule. typing into a card, a frame title, a viewpoint name, a label name, or
+the hold-seconds field calls `beginEdit` on every keystroke, but passes a
+key (`` `card-${field}:${id}` `` and siblings) so a burst within 800ms
+merges into one step — a sentence is one undo, not one per letter. a drag
+or resize records once at the pointer-down that starts the gesture, before
+any frame of movement, so the whole drag is one step regardless of how
+many animation frames it took. board-switch and initial load reset the
+history outright (`editHistory = createEditHistory()`, next to where
+`history = createCameraHistory(...)` already did the same for camera
+moves) rather than letting undo reach across boards. `⌘Z` / `⇧⌘Z`, gated
+behind the same `isTextTarget` check `⌘S`/`⌘D` already used, so undoing
+while focused in a text field falls through to the browser's native
+per-field undo instead of rewinding the whole board. picked up `⌘A`
+(select everything but connectors) alongside it, and documented `⌘D` and
+Delete/Backspace in the shortcuts panel — both real, both previously
+missing from `?`. 12 new tests in `history.test.ts`; 219/219 pass.
 
 ### 2. connectors get their second pass
 
