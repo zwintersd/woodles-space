@@ -13,7 +13,7 @@ import {
 	timestamps
 } from './properties';
 import { labelItems } from './labels';
-import { createCard, createEmptyBoard, createFrame, type WhiteboardDocument } from './model';
+import { createCard, createConnector, createEmptyBoard, createFrame, type WhiteboardDocument } from './model';
 
 function board(): WhiteboardDocument {
 	return {
@@ -97,6 +97,16 @@ describe('colour', () => {
 		expect(frame.type === 'frame' && frame.tint).toBe('lavender');
 		expect(frame.properties).toBeUndefined();
 		expect(colorOf(frame)).toBe('lavender');
+	});
+});
+
+describe('connectors', () => {
+	it('takes a colour and a kind the same way any other item does', () => {
+		let line = setProperty(createConnector('a', 'b'), 'tint', 'rose');
+		line = setProperty(line, 'kind', 'leads to');
+		expect(colorOf(line)).toBe('rose');
+		expect(kindOf(line)).toBe('leads to');
+		expect(propertyCount(line)).toBe(2);
 	});
 });
 

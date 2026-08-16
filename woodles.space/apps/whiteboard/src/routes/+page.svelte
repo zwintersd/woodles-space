@@ -297,8 +297,17 @@
 	const mapMarks = $derived(minimapMarks(board.items));
 	const mapView = $derived(mapProjection.project(visibleBounds(board.camera, viewportSize)));
 
-	/** The objects the Details panel is speaking about — nothing, one, or many. */
-	const chosen = $derived(board.items.filter((item) => selectedIds.includes(item.id) && item.type !== 'connector'));
+	/**
+	 * The objects the Details panel is speaking about — nothing, one, or many.
+	 * Connectors are included: the property sheet (Labels, Status, Type,
+	 * Source, Color) is generic across every item type, a connector already
+	 * validates and stores it the same as anything else — it just had no way
+	 * in, since this filter kept them out. `duplicateSelection` and
+	 * `addSelectionToJourney` keep their own, separate connector exclusions;
+	 * those are about what duplicating or journeying to a connector would
+	 * even mean, a different question from whether it can carry a color.
+	 */
+	const chosen = $derived(board.items.filter((item) => selectedIds.includes(item.id)));
 	const only = $derived(chosen.length === 1 ? chosen[0] : null);
 	const crumbs = $derived(breadcrumbs(trail, board, board.camera, viewportSize));
 	const results = $derived(searchOpen && searchText.trim() ? searchBoard(board, searchText) : []);
@@ -2184,6 +2193,8 @@
 			</defs>
 			{#each connectors as connector (connector.id)}
 				{@const endpoints = connectorEndpoints(board.items, connector)}
+				{@const tint = colorOf(connector)}
+				{@const label = kindOf(connector)}
 				{#if endpoints}
 					<path
 						class="connector-hit-area"
@@ -2197,10 +2208,20 @@
 					<path
 						aria-hidden="true"
 						class:selected-line={isSelected(connector.id)}
-						class="connector-path"
+						class={tint ? `connector-path tint-${tint}` : 'connector-path'}
 						d={`M ${endpoints.from.x} ${endpoints.from.y} L ${endpoints.to.x} ${endpoints.to.y}`}
 						marker-end={connector.arrow ? 'url(#connector-arrow)' : undefined}
 					/>
+					{#if label}
+						<text
+							class="connector-label"
+							aria-hidden="true"
+							x={(endpoints.from.x + endpoints.to.x) / 2}
+							y={(endpoints.from.y + endpoints.to.y) / 2}
+							dy="-6"
+							text-anchor="middle"
+						>{label}</text>
+					{/if}
 				{/if}
 			{/each}
 		</svg>
@@ -2827,11 +2848,11 @@
 						</section>
 
 						<section>
-							<h3>Type</h3>
+							<h3>{only?.type === 'connector' ? 'What this line means' : 'Type'}</h3>
 							<input
 								class="place-input wide"
 								aria-label="Type"
-								placeholder="note, question, reference…"
+								placeholder={only?.type === 'connector' ? 'leads to, blocks, supports…' : 'note, question, reference…'}
 								value={sharedProperty(kindOf) ?? ''}
 								oninput={(event) => writeProperty('kind', (event.currentTarget as HTMLInputElement).value)}
 							/>
@@ -3192,6 +3213,16 @@
 		transition: stroke 140ms ease, stroke-width 140ms ease;
 	}
 
+	/* Same six ink tones the label chips already read their text in — a
+	   connector's line is a mark, not a fill, so it wants that weight rather
+	   than the paler tint used for a card or frame's background. */
+	.connector-path.tint-peach { stroke: #7d5340; }
+	.connector-path.tint-lavender { stroke: #5d4d7d; }
+	.connector-path.tint-aqua { stroke: #3d6d69; }
+	.connector-path.tint-gold { stroke: #7a5f26; }
+	.connector-path.tint-rose { stroke: #86495a; }
+	.connector-path.tint-sage { stroke: #4d6b45; }
+
 	.connector-hit-area {
 		fill: none;
 		stroke: transparent;
@@ -3203,6 +3234,18 @@
 
 	.connector-path:hover,
 	.connector-path.selected-line { stroke: var(--accent); stroke-width: 3.4; }
+
+	.connector-label {
+		font-family: var(--font-body, 'DM Sans', ui-sans-serif, system-ui, sans-serif);
+		font-size: 11px;
+		fill: #6d5c56;
+		paint-order: stroke;
+		stroke: var(--paper);
+		stroke-width: 3px;
+		stroke-linejoin: round;
+		pointer-events: none;
+		user-select: none;
+	}
 
 	.board-item {
 		position: absolute;
