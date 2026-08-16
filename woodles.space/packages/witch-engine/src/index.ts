@@ -9,3 +9,4 @@ export * from './def.js';
 export * from './vitals.js';
 export * from './text.js';
 export * from './world.js';
+export * from './sim.js';

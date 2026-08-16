@@ -235,6 +235,23 @@ export const appManifest = Object.freeze([
 		// URL, so a link can't go stale against an edited game.
 		addressableBy: ['game']
 		// No `landing` tile — see bloomforge's comment above; this is its player.
+	},
+	{
+		id: 'grimoire',
+		name: 'Grimoire',
+		publicPath: '/grimoire',
+		aliases: [],
+		kind: 'sveltekit',
+		maturity: 'incubator',
+		sourceDir: 'apps/grimoire',
+		outputDir: 'apps/grimoire/dist',
+		entryFile: 'index.html',
+		packageName: 'grimoire'
+		// No `landing` tile yet — this is the studio Bloomforge is pivoting
+		// toward, built on @woodles/witch-engine instead of GameDef. Not
+		// promoted, and not yet linked from Lab either: right now it's a bare
+		// proof that the engine ticks in a browser, nothing worth clicking
+		// into. That changes once it can actually tune something.
 	}
 ]);
 
