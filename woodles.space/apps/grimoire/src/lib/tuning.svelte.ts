@@ -1,0 +1,102 @@
+// The tuning instrument's working state: World 1's numbers, editable, with
+// `world1Def` always reachable underneath as the thing being compared
+// against. Nothing here touches content (life/conditions/interventions/
+// worldspaces/fieldNotes) — this is a *tuning* instrument, not an authoring
+// one, so only the twelve numeric groups `MarginaliaDef` defines are here.
+
+import { world1Def, type MarginaliaDef } from '@woodles/witch-engine';
+
+export type TuningGroupKey =
+	| 'stage'
+	| 'stock'
+	| 'vitality'
+	| 'favor'
+	| 'recall'
+	| 'recallYield'
+	| 'attention'
+	| 'restraint'
+	| 'interventionEffects'
+	| 'insightSinks'
+	| 'progress'
+	| 'focus';
+
+export type TuningGroups = Pick<MarginaliaDef, TuningGroupKey>;
+
+export const TUNING_GROUP_KEYS: readonly TuningGroupKey[] = [
+	'stage',
+	'stock',
+	'vitality',
+	'favor',
+	'recall',
+	'recallYield',
+	'attention',
+	'restraint',
+	'interventionEffects',
+	'insightSinks',
+	'progress',
+	'focus'
+];
+
+/**
+ * A deliberate, explicit clone — every leaf touched by a real property read
+ * (spread, not `structuredClone`) so that calling this from inside a
+ * `$derived`/`$effect` against a reactive `$state` source registers Svelte's
+ * fine-grained dependency on every field, not just the twelve group
+ * references. Called on plain (non-reactive) sources too, where that's just
+ * a normal deep copy.
+ */
+export function cloneTuningGroups(source: TuningGroups): TuningGroups {
+	return {
+		stage: {
+			seconds: [...source.stage.seconds],
+			insightMult: [...source.stage.insightMult],
+			activity: [...source.stage.activity],
+			lookCloserSeconds: source.stage.lookCloserSeconds
+		},
+		stock: {
+			bands: {
+				nutrients: [...source.stock.bands.nutrients],
+				oxygen: [...source.stock.bands.oxygen],
+				moisture: [...source.stock.bands.moisture]
+			},
+			driftPerSec: source.stock.driftPerSec,
+			leak: { ...source.stock.leak },
+			start: source.stock.start,
+			neutral: source.stock.neutral,
+			bandFalloff: source.stock.bandFalloff
+		},
+		vitality: { ...source.vitality },
+		favor: { ...source.favor, multiplier: { ...source.favor.multiplier } },
+		recall: { ...source.recall },
+		recallYield: { ...source.recallYield },
+		attention: { start: source.attention.start, costs: [...source.attention.costs] },
+		restraint: { loadWeight: { ...source.restraint.loadWeight }, loadFull: source.restraint.loadFull, minFactor: source.restraint.minFactor },
+		interventionEffects: { ...source.interventionEffects },
+		insightSinks: { ...source.insightSinks },
+		progress: { ...source.progress },
+		focus: { ...source.focus }
+	};
+}
+
+export class TuningState {
+	groups = $state(cloneTuningGroups(world1Def));
+
+	/** World 1's content, with these tuning numbers substituted in. */
+	get def(): MarginaliaDef {
+		return { ...world1Def, ...cloneTuningGroups(this.groups) };
+	}
+
+	resetGroup<K extends TuningGroupKey>(key: K): void {
+		// world1Def is plain, non-reactive data — an ordinary deep copy here,
+		// not the read-triggering clone `.def` needs.
+		this.groups[key] = structuredClone(world1Def[key]) as TuningGroups[K];
+	}
+
+	resetAll(): void {
+		this.groups = cloneTuningGroups(world1Def);
+	}
+
+	isGroupModified(key: TuningGroupKey): boolean {
+		return JSON.stringify(this.groups[key]) !== JSON.stringify(world1Def[key]);
+	}
+}
