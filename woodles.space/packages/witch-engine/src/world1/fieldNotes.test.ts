@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fieldNotesByDomain, equilibriumFieldNotes, quietFieldNotes, categoryMasteryFieldNotes } from './fieldNoteTemplates';
-import type { LifeDomain, LifeCategory } from './life';
+import { fieldNotesByDomain, equilibriumFieldNotes, quietFieldNotes, categoryMasteryFieldNotes } from './fieldNotes.js';
+import type { LifeDomain, LifeCategory } from '../types.js';
 
 const domains: LifeDomain[] = ['plant', 'animal', 'ecosystem', 'geology', 'weather'];
 const categories: LifeCategory[] = ['aquatic', 'terrestrial', 'atmospheric'];

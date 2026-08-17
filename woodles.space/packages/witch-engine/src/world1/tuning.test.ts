@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-	STAGE_SECONDS,
-	STAGE_INSIGHT_MULT,
-	ATTENTION_COSTS,
-	favorMultiplier
-} from './tuning';
+import { STAGE_SECONDS, STAGE_INSIGHT_MULT, ATTENTION_COSTS, favorMultiplier } from './tuning.js';
 
 describe('tuning constants', () => {
 	it('STAGE_SECONDS is strictly increasing past index 0', () => {

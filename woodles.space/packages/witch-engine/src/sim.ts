@@ -63,6 +63,39 @@ export type PolicyAction =
 
 const NOTHING: readonly PolicyAction[] = Object.freeze([]);
 
+/**
+ * Apply one decided action to a world. `simulate`'s own tick loop inlines
+ * this (it additionally counts interventions for the summary), but a live
+ * driver — an app running a policy frame by frame instead of tick by tick —
+ * needs the same mapping without the harness bookkeeping. Kept here rather
+ * than duplicated so both read one definition of what an action does.
+ */
+export function applyPolicyAction(world: World, action: PolicyAction, t: number, into: WorldEvent[] = []): void {
+	switch (action.type) {
+		case 'attend':
+			world.attend(action.lifeId);
+			break;
+		case 'unattend':
+			world.unattend(action.lifeId);
+			break;
+		case 'lookCloser':
+			world.lookCloser(action.lifeId, t * 1000, into);
+			break;
+		case 'intervene':
+			world.intervene(action.lifeId, into);
+			break;
+		case 'expandAttention':
+			world.expandAttention();
+			break;
+		case 'distill':
+			world.distillEssence(into);
+			break;
+		case 'writeCondition':
+			world.writeCondition(action.id);
+			break;
+	}
+}
+
 // ── the bounds ──────────────────────────────────────────────────────────────
 //
 // `incremental-core` brackets play between "never buys" and "always buys the
