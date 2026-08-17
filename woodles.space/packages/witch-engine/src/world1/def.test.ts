@@ -5,18 +5,13 @@
 // as an unexplained balance drift.
 
 import { describe, expect, it } from 'vitest';
-import { world1Def } from './def';
-import { world1Life } from './content/life';
-import { conditions } from './content/conditions';
-import { emergences } from './content/emergences';
-import {
-	fieldNotesByDomain,
-	equilibriumFieldNotes,
-	quietFieldNotes,
-	categoryMasteryFieldNotes
-} from './content/fieldNoteTemplates';
-import { interventions } from './content/interventions';
-import { STOCK_IDS } from './vitals';
+import { world1Def } from './def.js';
+import { world1Life } from './life.js';
+import { conditions } from './conditions.js';
+import { emergences } from './emergences.js';
+import { fieldNotesByDomain, equilibriumFieldNotes, quietFieldNotes, categoryMasteryFieldNotes } from './fieldNotes.js';
+import { interventions } from './interventions.js';
+import { STOCK_IDS } from '../vitals.js';
 import {
 	STAGE_SECONDS,
 	STAGE_INSIGHT_MULT,
@@ -35,7 +30,7 @@ import {
 	TEND_BUMP,
 	CATEGORY_MASTERY_BONUS,
 	FOCUS_STREAK_MAX
-} from './tuning';
+} from './tuning.js';
 
 describe('world1Def content', () => {
 	it('carries the exact same life roster, conditions, emergences, and interventions', () => {

@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { LiveWorld } from '$lib/liveWorld.svelte';
-	import { exampleDef } from '$lib/exampleDef';
+	import { world1Def } from '@woodles/witch-engine';
 
-	const live = new LiveWorld(exampleDef);
+	const live = new LiveWorld(world1Def);
 
 	onMount(() => {
 		live.start();
@@ -22,9 +22,10 @@
 	<p class="eyebrow">grimoire · proof of pipeline</p>
 	<h1>Grimoire → @woodles/witch-engine → World.tick()</h1>
 	<p class="lede">
-		This page runs {exampleDef.meta.title} in the browser, ten seconds of game time per real second,
-		with nothing between it and <code>@woodles/witch-engine</code>. Nothing here is tunable yet — that's
-		the next step. This step is just proving the numbers actually move.
+		This page runs {world1Def.meta.title} — Marginalia's real World 1, bundled in
+		<code>@woodles/witch-engine</code> — in the browser, ten seconds of game time per real second, with
+		nothing between it and the package. Nothing here is tunable yet — that's the next step. This step is
+		just proving the numbers actually move.
 	</p>
 
 	<div class="controls">
