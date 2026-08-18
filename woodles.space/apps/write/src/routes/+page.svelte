@@ -1113,6 +1113,24 @@
 		if (picker?.handleKey(event)) {
 			event.preventDefault();
 			if (event.key === 'Escape') closeReferencePicker(true);
+			return;
+		}
+		const mod = event.ctrlKey || event.metaKey;
+		if (mod && !event.altKey) {
+			const key = event.key.toLowerCase();
+			// Some browsers (e.g. Firefox) reserve Ctrl+B for their own
+			// bookmarks-sidebar shortcut, so it never reaches the
+			// contenteditable's default bold handling. Drive it explicitly.
+			if (key === 'b') {
+				event.preventDefault();
+				exec('bold');
+			} else if (key === 'i') {
+				event.preventDefault();
+				exec('italic');
+			} else if (key === 'u') {
+				event.preventDefault();
+				exec('underline');
+			}
 		}
 	}
 
