@@ -406,6 +406,13 @@
       0%   { color: var(--accent-strong); transform: scale(1.2); }
       100% { color: var(--text); transform: scale(1); }
     }
+    .pc-factors {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.62rem; letter-spacing: 0.03em;
+      color: var(--accent-deep);
+      min-height: 1em;
+      margin: 0.3rem 0 0;
+    }
     .pc-trail {
       display: flex; flex-wrap: wrap; justify-content: center;
       gap: 0.3rem;
@@ -3520,6 +3527,7 @@
             '</div>' +
             '<div class="pc-ambient">' +
               '<p class="pc-n"></p>' +
+              '<p class="pc-factors"></p>' +
               '<div class="pc-trail"></div>' +
               '<p class="pc-found"></p>' +
               '<div class="pc-controls">' +
@@ -3538,6 +3546,7 @@
             '</div>';
 
           const nEl = el.querySelector('.pc-n');
+          const factorsEl = el.querySelector('.pc-factors');
           const trail = el.querySelector('.pc-ambient .pc-trail');
           const foundEl = el.querySelector('.pc-found');
           const toggle = el.querySelector('.pc-toggle');
@@ -3562,6 +3571,15 @@
             while (!isPrime(c)) c += 1;
             return c;
           }
+          function primeFactors(n) {
+            const factors = [];
+            let x = n;
+            for (let d = 2; d * d <= x; d += 1) {
+              while (x % d === 0) { factors.push(d); x /= d; }
+            }
+            if (x > 1) factors.push(x);
+            return factors;
+          }
           const renderN = pulse => {
             nEl.textContent = w.data.n;
             if (pulse) {
@@ -3569,6 +3587,11 @@
               void nEl.offsetWidth;
               nEl.classList.add('pc-pulse');
             }
+          };
+          const renderFactors = () => {
+            factorsEl.textContent = (!w.data.running && w.data.n >= 4 && !isPrime(w.data.n))
+              ? primeFactors(w.data.n).join(' × ')
+              : '';
           };
           const renderTrail = () => {
             trail.innerHTML = w.data.recent.map(p => '<span class="pc-bead">' + p + '</span>').join('');
@@ -3612,7 +3635,7 @@
             gameView.classList.add(cls);
           }
 
-          renderN(false); renderTrail(); renderFound(); renderToggle();
+          renderN(false); renderFactors(); renderTrail(); renderFound(); renderToggle();
           renderMode(); renderGameTrail(); renderPrompt(); renderGameStats();
 
           primeTimers[w.id] = setInterval(() => {
@@ -3633,6 +3656,7 @@
           toggle.addEventListener('click', () => {
             w.data.running = !w.data.running;
             renderToggle();
+            renderFactors();
             saveWidgets();
           });
 
@@ -3641,7 +3665,7 @@
             w.data.found = 0;
             w.data.lastPrime = null;
             w.data.recent = [];
-            renderN(false); renderTrail(); renderFound();
+            renderN(false); renderFactors(); renderTrail(); renderFound();
             saveWidgets();
           });
 
