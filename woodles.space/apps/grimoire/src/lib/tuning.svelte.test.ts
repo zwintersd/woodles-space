@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { world1Def } from '@woodles/witch-engine';
-import { TuningState, cloneTuningGroups, TUNING_GROUP_KEYS } from './tuning.svelte';
+import { TuningState, cloneTuningGroups, TUNING_GROUP_KEYS, TUNING_STORAGE_KEY } from './tuning.svelte';
 
 describe('cloneTuningGroups', () => {
 	it('copies the values', () => {
@@ -131,5 +131,119 @@ describe('TuningState.def', () => {
 		// and the content survives the trip, which is what the run needs
 		expect(sent.life.length).toBe(world1Def.life.length);
 		expect(sent.conditions.length).toBe(world1Def.conditions.length);
+	});
+});
+
+describe('persistence', () => {
+	/** A fresh Storage per test, so one test's draft can't leak into another. */
+	function freshStorage(): Storage {
+		const items = new Map<string, string>();
+		return {
+			get length() {
+				return items.size;
+			},
+			clear: () => items.clear(),
+			getItem: (k: string) => items.get(k) ?? null,
+			key: (i: number) => [...items.keys()][i] ?? null,
+			removeItem: (k: string) => void items.delete(k),
+			setItem: (k: string, v: string) => void items.set(k, v)
+		} as Storage;
+	}
+
+	it('a fresh panel with nothing stored is World 1', () => {
+		const tuning = new TuningState(freshStorage());
+		expect(tuning.isModified).toBe(false);
+		expect(tuning.def).toEqual(world1Def);
+	});
+
+	it('an edit survives a reload', () => {
+		const storage = freshStorage();
+
+		const first = new TuningState(storage);
+		first.groups.favor.baseTarget = 12;
+		first.groups.stage.seconds[1] = 45;
+		first.save();
+
+		const second = new TuningState(storage);
+		expect(second.groups.favor.baseTarget).toBe(12);
+		expect(second.groups.stage.seconds[1]).toBe(45);
+		expect(second.isModified).toBe(true);
+	});
+
+	it('storing nothing is what an unmodified panel does', () => {
+		const storage = freshStorage();
+
+		const tuning = new TuningState(storage);
+		tuning.groups.favor.baseTarget = 12;
+		tuning.save();
+		expect(storage.getItem(TUNING_STORAGE_KEY)).not.toBeNull();
+
+		tuning.resetAll();
+		tuning.save();
+		expect(storage.getItem(TUNING_STORAGE_KEY)).toBeNull();
+	});
+
+	it('ignores a payload that is not an object', () => {
+		for (const junk of ['null', '"hello"', '[1,2,3]', 'not json at all', '42']) {
+			const storage = freshStorage();
+			storage.setItem(TUNING_STORAGE_KEY, junk);
+			const tuning = new TuningState(storage);
+			expect(tuning.def, junk).toEqual(world1Def);
+		}
+	});
+
+	it('keeps the values it recognises and falls back for the rest', () => {
+		const storage = freshStorage();
+		// one real field, one renamed away, one of the wrong type
+		storage.setItem(
+			TUNING_STORAGE_KEY,
+			JSON.stringify({
+				favor: { baseTarget: 12, someKnobThatNoLongerExists: 5 },
+				focus: { maxLevel: 'six' },
+				stage: { seconds: [0, 45] }
+			})
+		);
+
+		const tuning = new TuningState(storage);
+		expect(tuning.groups.favor.baseTarget).toBe(12);
+		expect(tuning.groups.stage.seconds[1]).toBe(45);
+		// the bad type and the untouched entries fall back to World 1
+		expect(tuning.groups.focus.maxLevel).toBe(world1Def.focus.maxLevel);
+		expect(tuning.groups.stage.seconds[2]).toBe(world1Def.stage.seconds[2]);
+		expect(tuning.groups.vitality).toEqual(world1Def.vitality);
+	});
+
+	it('rejects a non-finite value rather than loading a def that cannot run', () => {
+		const storage = freshStorage();
+		storage.setItem(TUNING_STORAGE_KEY, JSON.stringify({ favor: { baseTarget: null }, focus: { maxLevel: 1e999 } }));
+
+		const tuning = new TuningState(storage);
+		expect(tuning.def).toEqual(world1Def);
+	});
+
+	it('works with no storage at all — a blocked or private context', () => {
+		const tuning = new TuningState(null);
+		tuning.groups.favor.baseTarget = 12;
+		expect(() => tuning.save()).not.toThrow();
+		expect(tuning.groups.favor.baseTarget).toBe(12);
+	});
+
+	it('survives a storage that throws on every access', () => {
+		const hostile = {
+			getItem: () => {
+				throw new Error('blocked');
+			},
+			setItem: () => {
+				throw new Error('quota');
+			},
+			removeItem: () => {
+				throw new Error('blocked');
+			}
+		} as unknown as Storage;
+
+		const tuning = new TuningState(hostile);
+		expect(tuning.def).toEqual(world1Def);
+		tuning.groups.favor.baseTarget = 12;
+		expect(() => tuning.save()).not.toThrow();
 	});
 });

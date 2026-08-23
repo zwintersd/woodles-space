@@ -48,6 +48,13 @@
 		untrack(() => live.rebuild(def, space));
 	});
 
+	// Persist on every edit. `save()` writes a string and touches no reactive
+	// state, so unlike the rebuild above this can't feed back into itself.
+	$effect(() => {
+		tuning.signature;
+		tuning.save();
+	});
+
 	function formatSeconds(seconds: number): string {
 		const whole = Math.floor(seconds);
 		const minutes = Math.floor(whole / 60);

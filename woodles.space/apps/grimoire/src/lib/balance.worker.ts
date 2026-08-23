@@ -13,29 +13,34 @@
 // — the reason favor's multiplier is `{base, perPoint}` rather than a
 // function. A def with a closure in it could not make this trip.
 
-import { compare, witnessOnly, interventionist } from '@woodles/witch-engine';
-import type { BalanceRequest, BalanceResponse } from './balanceTypes';
+import { compare, witnessOnly, interventionist, type MarginaliaDef, type Worldspace } from '@woodles/witch-engine';
+import type { BalanceRequest, BalanceResponse, BalanceRow } from './balanceTypes';
+
+/**
+ * The same two bracketing policies BALANCE.md reads every number against:
+ * restraint against meddling, which is the axis World 1 claims to reward.
+ */
+function run(def: MarginaliaDef, duration: number, worldspace: Worldspace): BalanceRow[] {
+	return compare(def, [witnessOnly(), interventionist()], { duration, worldspace }).map((r) => ({
+		policy: r.summary.policy,
+		timeToAllKnown: r.summary.timeToAllKnown,
+		equilibriumShare: r.summary.equilibriumShare,
+		stressedShare: r.summary.stressedShare,
+		finalFavor: r.summary.finalFavor,
+		interventions: r.summary.interventions,
+		concepts: r.summary.concepts
+	}));
+}
 
 self.addEventListener('message', (event: MessageEvent<BalanceRequest>) => {
-	const { id, def, duration, worldspace } = event.data;
-
-	// The same two bracketing policies BALANCE.md reads every number against:
-	// restraint against meddling, which is the axis World 1 claims to reward.
-	const results = compare(def, [witnessOnly(), interventionist()], { duration, worldspace });
+	const { id, def, baselineDef, duration, worldspace } = event.data;
 
 	const response: BalanceResponse = {
 		id,
 		duration,
 		worldspace,
-		rows: results.map((r) => ({
-			policy: r.summary.policy,
-			timeToAllKnown: r.summary.timeToAllKnown,
-			equilibriumShare: r.summary.equilibriumShare,
-			stressedShare: r.summary.stressedShare,
-			finalFavor: r.summary.finalFavor,
-			interventions: r.summary.interventions,
-			concepts: r.summary.concepts
-		}))
+		rows: run(def, duration, worldspace),
+		baselineRows: baselineDef ? run(baselineDef, duration, worldspace) : null
 	};
 
 	self.postMessage(response);

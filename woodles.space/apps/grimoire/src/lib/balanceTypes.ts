@@ -14,6 +14,13 @@ export interface BalanceRequest {
 	/** Discards a response whose run has been superseded — see BalancePanel. */
 	id: number;
 	def: MarginaliaDef;
+	/**
+	 * World 1's shipped numbers, to run alongside for comparison. Null when
+	 * the panel already has that baseline cached for this duration and
+	 * worldspace, or when nothing has been edited and the two runs would be
+	 * the same run.
+	 */
+	baselineDef: MarginaliaDef | null;
 	duration: number;
 	worldspace: Worldspace;
 }
@@ -34,4 +41,6 @@ export interface BalanceResponse {
 	duration: number;
 	worldspace: Worldspace;
 	rows: BalanceRow[];
+	/** Present only when the request asked for a baseline run. */
+	baselineRows: BalanceRow[] | null;
 }
