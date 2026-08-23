@@ -8,7 +8,7 @@
 // invariant nothing checks for.
 
 import { world1Def } from '@woodles/witch-engine';
-import type { TuningGroupKey, TuningGroups } from './tuning.svelte';
+import type { TuningGroupKey, TuningGroups, TuningGroupsSource } from './tuning.svelte';
 
 export interface TuningField {
 	group: TuningGroupKey;
@@ -20,12 +20,20 @@ export interface TuningField {
 	max?: number;
 }
 
-export function fieldValue(groups: TuningGroups, field: TuningField): number {
+/** Reads only, so it accepts a def's own readonly groups as well as the working copy. */
+export function fieldValue(groups: TuningGroupsSource, field: TuningField): number {
 	let cur: unknown = groups[field.group];
 	for (const key of field.path) cur = (cur as Record<string | number, unknown>)[key];
 	return cur as number;
 }
 
+/**
+ * Writes, so it needs the mutable working copy. The casts here are the
+ * irreducible cost of walking a path TypeScript can't see the shape of —
+ * they no longer paper over a `readonly`, which is what `TuningGroups`
+ * being deep-mutable bought. `tuningFields.test.ts` is what actually holds
+ * these paths honest.
+ */
 export function setFieldValue(groups: TuningGroups, field: TuningField, value: number): void {
 	let cur: unknown = groups[field.group];
 	for (let i = 0; i < field.path.length - 1; i++) cur = (cur as Record<string | number, unknown>)[field.path[i]];

@@ -20,7 +20,24 @@ export type TuningGroupKey =
 	| 'progress'
 	| 'focus';
 
-export type TuningGroups = Pick<MarginaliaDef, TuningGroupKey>;
+/** The twelve groups as a def declares them — readonly, because a def is a spec. */
+export type TuningGroupsSource = Pick<MarginaliaDef, TuningGroupKey>;
+
+/**
+ * Homomorphic, so arrays stay arrays and `[number, number]` bands stay
+ * two-tuples; `-readonly` is the whole point. Sound only because the tuning
+ * groups are guaranteed plain data — no functions to mangle, which is also
+ * what lets `.def` cross a `postMessage` to the balance worker.
+ */
+type DeepMutable<T> = T extends object ? { -readonly [K in keyof T]: DeepMutable<T[K]> } : T;
+
+/**
+ * The editable working copy. A def's arrays are `readonly` because a def is a
+ * specification; this is the thing being *edited*, so it says so — rather than
+ * leaving `setFieldValue` to write through a cast into something typed as
+ * immutable.
+ */
+export type TuningGroups = DeepMutable<TuningGroupsSource>;
 
 export const TUNING_GROUP_KEYS: readonly TuningGroupKey[] = [
 	'stage',
@@ -45,7 +62,7 @@ export const TUNING_GROUP_KEYS: readonly TuningGroupKey[] = [
  * references. Called on plain (non-reactive) sources too, where that's just
  * a normal deep copy.
  */
-export function cloneTuningGroups(source: TuningGroups): TuningGroups {
+export function cloneTuningGroups(source: TuningGroupsSource): TuningGroups {
 	return {
 		stage: {
 			seconds: [...source.stage.seconds],
