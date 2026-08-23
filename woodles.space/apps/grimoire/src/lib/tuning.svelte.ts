@@ -86,6 +86,15 @@ export class TuningState {
 		return { ...world1Def, ...cloneTuningGroups(this.groups) };
 	}
 
+	/**
+	 * A value-identity for the current numbers. Reading it registers a
+	 * dependency on every field, so a `$derived` over it re-evaluates on any
+	 * edit — which is how a finished balance run knows it has been superseded.
+	 */
+	get signature(): string {
+		return JSON.stringify(this.groups);
+	}
+
 	resetGroup<K extends TuningGroupKey>(key: K): void {
 		// world1Def is plain, non-reactive data — an ordinary deep copy here,
 		// not the read-triggering clone `.def` needs.

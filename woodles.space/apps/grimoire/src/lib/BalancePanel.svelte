@@ -1,8 +1,10 @@
 <script lang="ts">
-	import { compare, witnessOnly, interventionist, type SimResult } from '@woodles/witch-engine';
+	import { onDestroy } from 'svelte';
+	import type { Worldspace } from '@woodles/witch-engine';
 	import type { TuningState } from './tuning.svelte';
+	import type { BalanceRequest, BalanceResponse } from './balanceTypes';
 
-	let { tuning }: { tuning: TuningState } = $props();
+	let { tuning, worldspace }: { tuning: TuningState; worldspace: Worldspace } = $props();
 
 	const DURATIONS = [
 		{ label: '1h', seconds: 3600 },
@@ -12,8 +14,32 @@
 
 	let durationSeconds = $state(3600);
 	let running = $state(false);
-	let results = $state<SimResult[] | null>(null);
-	let ranAt = $state<{ durationSeconds: number } | null>(null);
+	let response = $state<BalanceResponse | null>(null);
+	/** The tuning signature the shown numbers were produced from. */
+	let ranWith = $state<string | null>(null);
+
+	// The run's numbers describe the tuning as it was when it started. Say so
+	// rather than clearing them — comparing the last run against the edit you
+	// just made is most of what this panel is for.
+	const stale = $derived(ranWith !== null && ranWith !== tuning.signature);
+
+	let worker: Worker | null = null;
+	let nextId = 0;
+	/** Only the newest request's response is accepted; earlier ones are discarded. */
+	let awaitingId = -1;
+
+	function ensureWorker(): Worker {
+		if (worker) return worker;
+		worker = new Worker(new URL('./balance.worker.ts', import.meta.url), { type: 'module' });
+		worker.addEventListener('message', (event: MessageEvent<BalanceResponse>) => {
+			if (event.data.id !== awaitingId) return;
+			response = event.data;
+			running = false;
+		});
+		return worker;
+	}
+
+	onDestroy(() => worker?.terminate());
 
 	function fmtDuration(s: number): string {
 		if (s < 60) return `${s.toFixed(0)}s`;
@@ -22,16 +48,16 @@
 	}
 
 	function run(): void {
+		const request: BalanceRequest = {
+			id: ++nextId,
+			def: tuning.def,
+			duration: durationSeconds,
+			worldspace
+		};
+		awaitingId = request.id;
+		ranWith = tuning.signature;
 		running = true;
-		// Yield a frame so the "running…" state actually paints before the
-		// synchronous sim loop blocks the main thread — compare() is not
-		// chunked or worker-hosted, so a 24h run is a real, felt pause.
-		requestAnimationFrame(() => {
-			const duration = durationSeconds;
-			results = compare(tuning.def, [witnessOnly(), interventionist()], { duration });
-			ranAt = { durationSeconds: duration };
-			running = false;
-		});
+		ensureWorker().postMessage(request);
 	}
 </script>
 
@@ -39,15 +65,21 @@
 	<div class="panel-head">
 		<h2>Balance</h2>
 		<p class="blurb">
-			Runs Witness against Interventionist on the tuning above — the same two bracketing policies
-			BALANCE.md checks every number against. Not chunked, so a longer run pauses the tab while it works.
+			Runs Witness against Interventionist — the same two bracketing policies BALANCE.md checks every
+			number against — on the tuning above, in the current worldspace. Runs on a worker thread, so a long
+			comparison doesn't freeze the page.
 		</p>
 	</div>
 
 	<div class="controls">
 		<div class="durations" role="radiogroup" aria-label="run duration">
 			{#each DURATIONS as d (d.seconds)}
-				<button class:active={durationSeconds === d.seconds} onclick={() => (durationSeconds = d.seconds)}>
+				<button
+					role="radio"
+					aria-checked={durationSeconds === d.seconds}
+					class:active={durationSeconds === d.seconds}
+					onclick={() => (durationSeconds = d.seconds)}
+				>
 					{d.label}
 				</button>
 			{/each}
@@ -55,36 +87,49 @@
 		<button class="run" onclick={run} disabled={running}>
 			{running ? 'running…' : 'run comparison'}
 		</button>
+		{#if running}
+			<span class="note">{fmtDuration(durationSeconds)} of game time, on a worker</span>
+		{/if}
 	</div>
 
-	{#if results && ranAt}
-		<table>
-			<thead>
-				<tr>
-					<th>policy</th>
-					<th>all Known</th>
-					<th>eq. share</th>
-					<th>stressed</th>
-					<th>favor</th>
-					<th>interventions</th>
-					<th>concepts</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each results as r (r.summary.policy)}
-					<tr>
-						<td>{r.summary.policy}</td>
-						<td>{r.summary.timeToAllKnown !== null ? fmtDuration(r.summary.timeToAllKnown) : '—'}</td>
-						<td>{(r.summary.equilibriumShare * 100).toFixed(1)}%</td>
-						<td>{(r.summary.stressedShare * 100).toFixed(1)}%</td>
-						<td>{r.summary.finalFavor.toFixed(1)}</td>
-						<td>{r.summary.interventions}</td>
-						<td>{r.summary.concepts}</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-		<p class="ran-note">{fmtDuration(ranAt.durationSeconds)} of game time, from a world with every condition already written.</p>
+	{#if response}
+		<div class="results" class:stale>
+			<div class="table-scroll">
+				<table>
+					<thead>
+						<tr>
+							<th>policy</th>
+							<th>all Known</th>
+							<th>eq. share</th>
+							<th>stressed</th>
+							<th>favor</th>
+							<th>interventions</th>
+							<th>concepts</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each response.rows as row (row.policy)}
+							<tr>
+								<td>{row.policy}</td>
+								<td>{row.timeToAllKnown !== null ? fmtDuration(row.timeToAllKnown) : '—'}</td>
+								<td>{(row.equilibriumShare * 100).toFixed(1)}%</td>
+								<td>{(row.stressedShare * 100).toFixed(1)}%</td>
+								<td>{row.finalFavor.toFixed(1)}</td>
+								<td>{row.interventions}</td>
+								<td>{row.concepts}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+			<p class="ran-note">
+				{fmtDuration(response.duration)} of game time in <strong>{response.worldspace}</strong>, from a
+				world with every condition already written.
+				{#if stale}
+					<span class="stale-flag">Tuning has changed since this run.</span>
+				{/if}
+			</p>
+		</div>
 	{/if}
 </div>
 
@@ -151,7 +196,27 @@
 
 	.run:disabled {
 		opacity: 0.6;
-		cursor: wait;
+		cursor: progress;
+	}
+
+	.note {
+		font-family: var(--font-mono, ui-monospace, monospace);
+		font-size: 0.72rem;
+		color: var(--muted);
+	}
+
+	.results {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.results.stale table {
+		opacity: 0.55;
+	}
+
+	.table-scroll {
+		overflow-x: auto;
 	}
 
 	table {
@@ -165,6 +230,7 @@
 		text-align: left;
 		padding: 0.4rem 0.7rem;
 		border-bottom: 1px solid var(--rule);
+		white-space: nowrap;
 	}
 
 	th {
@@ -184,5 +250,9 @@
 		font-size: 0.72rem;
 		color: var(--muted);
 		margin: 0;
+	}
+
+	.stale-flag {
+		color: var(--accent-warm, var(--accent));
 	}
 </style>

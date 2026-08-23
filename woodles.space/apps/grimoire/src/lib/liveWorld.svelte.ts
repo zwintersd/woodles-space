@@ -14,16 +14,17 @@ import {
 	witnessOnly,
 	applyPolicyAction,
 	type MarginaliaDef,
-	type WorldPolicy
+	type WorldPolicy,
+	type Worldspace
 } from '@woodles/witch-engine';
 
 /** Essence enough to write every World 1 condition up front; matches sim.ts's own headroom for the same reason. */
 const STARTING_ESSENCE = 10_000;
 
-function openWorld(def: MarginaliaDef): World {
+function openWorld(def: MarginaliaDef, worldspace: Worldspace): World {
 	const state = createWorldState(def);
 	state.essence = STARTING_ESSENCE;
-	state.activeWorldspace = 'shallows';
+	state.activeWorldspace = worldspace;
 	const world = new World(def, state, 1, undefined, tuningFromDef(def));
 	for (const c of def.conditions) world.writeCondition(c.id);
 	return world;
@@ -37,6 +38,9 @@ export class LiveWorld {
 	insightPerSec = $state(0);
 	favor = $state(0);
 	stocks = $state<Record<string, number>>({});
+	/** Life visible from where the world stands — the worldspace's whole effect, in one number. */
+	visibleLife = $state(0);
+	knownLife = $state(0);
 
 	#frame: number | null = null;
 	#lastFrame = 0;
@@ -44,16 +48,21 @@ export class LiveWorld {
 	#elapsedSeconds = 0;
 	#policy: WorldPolicy = witnessOnly();
 
-	constructor(def: MarginaliaDef) {
-		this.world = openWorld(def);
+	constructor(def: MarginaliaDef, worldspace: Worldspace) {
+		this.world = openWorld(def, worldspace);
 		this.#readout();
 	}
 
-	/** Rebuild against a new def — a fresh world, not a re-tuned old one, so nothing carries over that shouldn't. */
-	rebuild(def: MarginaliaDef): void {
+	/**
+	 * Rebuild against new numbers or a new worldspace — a fresh world, not a
+	 * re-tuned old one, so nothing carries over that shouldn't. Changing a
+	 * stage length under a world that has already banked study-seconds against
+	 * the old one would report a state no real playthrough could reach.
+	 */
+	rebuild(def: MarginaliaDef, worldspace: Worldspace): void {
 		const wasRunning = this.running;
 		this.pause();
-		this.world = openWorld(def);
+		this.world = openWorld(def, worldspace);
 		this.#elapsedSeconds = 0;
 		this.#readout();
 		if (wasRunning) this.start();
@@ -95,5 +104,7 @@ export class LiveWorld {
 		this.insightPerSec = this.world.insightPerSec;
 		this.favor = this.world.state.favor;
 		this.stocks = { ...this.world.state.stocks };
+		this.visibleLife = this.world.life.length;
+		this.knownLife = this.world.knownCount;
 	}
 }
