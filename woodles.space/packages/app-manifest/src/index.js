@@ -247,11 +247,11 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/grimoire/dist',
 		entryFile: 'index.html',
 		packageName: 'grimoire'
-		// No `landing` tile yet — this is the studio Bloomforge is pivoting
-		// toward, built on @woodles/witch-engine instead of GameDef. Not
-		// promoted, and not yet linked from Lab either: right now it's a bare
-		// proof that the engine ticks in a browser, nothing worth clicking
-		// into. That changes once it can actually tune something.
+		// No `landing` tile — this is the studio Bloomforge pivoted toward,
+		// built on @woodles/witch-engine instead of GameDef. It can now tune
+		// World 1 and run a balance comparison against the shipped numbers, so
+		// it is linked from Lab, which is the right shelf for an instrument
+		// still finding its shape. Front page is a later question.
 	}
 ]);
 
