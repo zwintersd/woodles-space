@@ -15,3 +15,7 @@ export * from './edgeLatch.js';
 export * from './emergenceGate.js';
 export * from './trigger.js';
 export * from './manualConversion.js';
+
+// The taxonomy the twelve modules above belong to, as data — so a consumer can
+// name which shape a group of numbers instantiates and render what that means.
+export * from './shapes.js';

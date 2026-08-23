@@ -13,9 +13,18 @@
 // instead of quietly shipping a panel that can't reach it.
 
 import { describe, expect, it } from 'vitest';
+import { SHAPES, SHAPE_IDS } from '@woodles/dynamics';
 import { world1Def } from '@woodles/witch-engine';
 import { TUNING_GROUP_KEYS, cloneTuningGroups, type TuningGroupKey } from './tuning.svelte';
-import { TUNING_GROUPS, fieldValue, setFieldValue, defaultFieldValue, type TuningField } from './tuningFields';
+import {
+	TUNING_GROUPS,
+	TUNED_SHAPES,
+	UNTUNED_SHAPES,
+	fieldValue,
+	setFieldValue,
+	defaultFieldValue,
+	type TuningField
+} from './tuningFields';
 
 const allFields: TuningField[] = TUNING_GROUPS.flatMap((g) => g.fields);
 
@@ -139,5 +148,46 @@ describe('setFieldValue', () => {
 		for (const field of allFields) {
 			expect(defaultFieldValue(field), `${pathKey(field.group, field.path)} leaked into world1Def`).not.toBe(999);
 		}
+	});
+});
+
+describe('shape annotations', () => {
+	it('every group names at least one shape, and every named shape is real', () => {
+		for (const group of TUNING_GROUPS) {
+			expect(group.shapes.length, `${group.key} names no shape`).toBeGreaterThan(0);
+			for (const id of group.shapes) {
+				expect(SHAPE_IDS, `${group.key} names shape ${id}, which does not exist`).toContain(id);
+			}
+		}
+	});
+
+	it('no group names the same shape twice', () => {
+		for (const group of TUNING_GROUPS) {
+			expect(new Set(group.shapes).size, group.key).toBe(group.shapes.length);
+		}
+	});
+
+	it('a group naming more than one shape explains why', () => {
+		// One shape is self-evident from the badge; several is a claim that
+		// needs a sentence, or a reader just sees three letters.
+		for (const group of TUNING_GROUPS) {
+			if (group.shapes.length > 1) {
+				expect(group.shapeNote, `${group.key} names ${group.shapes.length} shapes with no note`).toBeTruthy();
+			}
+		}
+	});
+
+	it('TUNED and UNTUNED partition the taxonomy', () => {
+		expect([...TUNED_SHAPES, ...UNTUNED_SHAPES].sort()).toEqual([...SHAPE_IDS].sort());
+		for (const id of TUNED_SHAPES) expect(UNTUNED_SHAPES).not.toContain(id);
+	});
+
+	it('the untuned shapes are the structural ones — A, H and L', () => {
+		// Pool (insight/essence), Emergence Gate (conditions -> life.requires)
+		// and Edge Latch (the equilibrium/quiet beats) are all present in
+		// Marginalia but carry no number anyone can turn. If this changes, the
+		// panel's own copy about them needs to change with it.
+		expect([...UNTUNED_SHAPES]).toEqual(['A', 'H', 'L']);
+		for (const id of UNTUNED_SHAPES) expect(SHAPES[id].name.length).toBeGreaterThan(0);
 	});
 });
