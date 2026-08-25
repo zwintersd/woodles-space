@@ -1,8 +1,10 @@
 <script lang="ts">
-	import { compare, witnessOnly, interventionist, type SimResult } from '@woodles/witch-engine';
+	import { onDestroy } from 'svelte';
+	import { world1Def, type Worldspace } from '@woodles/witch-engine';
 	import type { TuningState } from './tuning.svelte';
+	import type { BalanceRequest, BalanceResponse, BalanceRow } from './balanceTypes';
 
-	let { tuning }: { tuning: TuningState } = $props();
+	let { tuning, worldspace }: { tuning: TuningState; worldspace: Worldspace } = $props();
 
 	const DURATIONS = [
 		{ label: '1h', seconds: 3600 },
@@ -10,10 +12,86 @@
 		{ label: '24h', seconds: 86400 }
 	];
 
+	type Kind = 'duration' | 'percent' | 'number';
+
+	const COLUMNS: { head: string; get: (r: BalanceRow) => number | null; kind: Kind }[] = [
+		{ head: 'all Known', get: (r) => r.timeToAllKnown, kind: 'duration' },
+		{ head: 'eq. share', get: (r) => r.equilibriumShare, kind: 'percent' },
+		{ head: 'stressed', get: (r) => r.stressedShare, kind: 'percent' },
+		{ head: 'favor', get: (r) => r.finalFavor, kind: 'number' },
+		{ head: 'interventions', get: (r) => r.interventions, kind: 'number' },
+		{ head: 'concepts', get: (r) => r.concepts, kind: 'number' }
+	];
+
 	let durationSeconds = $state(3600);
 	let running = $state(false);
-	let results = $state<SimResult[] | null>(null);
-	let ranAt = $state<{ durationSeconds: number } | null>(null);
+	let response = $state<BalanceResponse | null>(null);
+	/** The tuning signature the shown numbers were produced from. */
+	let ranWith = $state<string | null>(null);
+
+	/**
+	 * World 1's numbers for a given duration and worldspace don't change, so a
+	 * baseline is run once and kept. Without this every comparison would pay
+	 * for the same shipped run again — at 24h that is another twenty seconds
+	 * to learn something already known.
+	 */
+	const baselineCache = new Map<string, BalanceRow[]>();
+	const cacheKey = (duration: number, space: Worldspace) => `${duration}:${space}`;
+
+	/** The baseline actually in force for what is on screen, cache included. */
+	const baseline = $derived(
+		response ? (response.baselineRows ?? baselineCache.get(cacheKey(response.duration, response.worldspace)) ?? null) : null
+	);
+
+	function fmtValue(v: number | null, kind: Kind): string {
+		if (v === null) return '—';
+		if (kind === 'duration') return fmtDuration(v);
+		if (kind === 'percent') return `${(v * 100).toFixed(1)}%`;
+		return Number.isInteger(v) ? String(v) : v.toFixed(1);
+	}
+
+	/**
+	 * Deliberately unsigned by colour. The harness "does not decide whether a
+	 * number is good — it reports; the caller judges" (sim.ts), and which
+	 * direction is an improvement genuinely depends on what you were trying to
+	 * do. So: magnitude and direction, no green and no red.
+	 */
+	function fmtDelta(cur: number | null, base: number | null, kind: Kind): string | null {
+		if (cur === null || base === null) return null;
+		const d = cur - base;
+		if (Math.abs(d) < 1e-9) return null;
+		const sign = d > 0 ? '+' : '−';
+		const mag = Math.abs(d);
+		if (kind === 'duration') return sign + fmtDuration(mag);
+		if (kind === 'percent') return `${sign}${(mag * 100).toFixed(1)}pp`;
+		return sign + (Number.isInteger(d) ? String(mag) : mag.toFixed(1));
+	}
+
+	// The run's numbers describe the tuning as it was when it started. Say so
+	// rather than clearing them — comparing the last run against the edit you
+	// just made is most of what this panel is for.
+	const stale = $derived(ranWith !== null && ranWith !== tuning.signature);
+
+	let worker: Worker | null = null;
+	let nextId = 0;
+	/** Only the newest request's response is accepted; earlier ones are discarded. */
+	let awaitingId = -1;
+
+	function ensureWorker(): Worker {
+		if (worker) return worker;
+		worker = new Worker(new URL('./balance.worker.ts', import.meta.url), { type: 'module' });
+		worker.addEventListener('message', (event: MessageEvent<BalanceResponse>) => {
+			if (event.data.id !== awaitingId) return;
+			if (event.data.baselineRows) {
+				baselineCache.set(cacheKey(event.data.duration, event.data.worldspace), event.data.baselineRows);
+			}
+			response = event.data;
+			running = false;
+		});
+		return worker;
+	}
+
+	onDestroy(() => worker?.terminate());
 
 	function fmtDuration(s: number): string {
 		if (s < 60) return `${s.toFixed(0)}s`;
@@ -22,16 +100,22 @@
 	}
 
 	function run(): void {
+		const key = cacheKey(durationSeconds, worldspace);
+		// Nothing edited means the two runs would be identical, so there is no
+		// baseline to ask for — the single run *is* World 1.
+		const wantsBaseline = tuning.isModified && !baselineCache.has(key);
+
+		const request: BalanceRequest = {
+			id: ++nextId,
+			def: tuning.def,
+			baselineDef: wantsBaseline ? structuredClone(world1Def) : null,
+			duration: durationSeconds,
+			worldspace
+		};
+		awaitingId = request.id;
+		ranWith = tuning.signature;
 		running = true;
-		// Yield a frame so the "running…" state actually paints before the
-		// synchronous sim loop blocks the main thread — compare() is not
-		// chunked or worker-hosted, so a 24h run is a real, felt pause.
-		requestAnimationFrame(() => {
-			const duration = durationSeconds;
-			results = compare(tuning.def, [witnessOnly(), interventionist()], { duration });
-			ranAt = { durationSeconds: duration };
-			running = false;
-		});
+		ensureWorker().postMessage(request);
 	}
 </script>
 
@@ -39,15 +123,21 @@
 	<div class="panel-head">
 		<h2>Balance</h2>
 		<p class="blurb">
-			Runs Witness against Interventionist on the tuning above — the same two bracketing policies
-			BALANCE.md checks every number against. Not chunked, so a longer run pauses the tab while it works.
+			Runs Witness against Interventionist — the same two bracketing policies BALANCE.md checks every
+			number against — on the tuning above, in the current worldspace. Runs on a worker thread, so a long
+			comparison doesn't freeze the page.
 		</p>
 	</div>
 
 	<div class="controls">
 		<div class="durations" role="radiogroup" aria-label="run duration">
 			{#each DURATIONS as d (d.seconds)}
-				<button class:active={durationSeconds === d.seconds} onclick={() => (durationSeconds = d.seconds)}>
+				<button
+					role="radio"
+					aria-checked={durationSeconds === d.seconds}
+					class:active={durationSeconds === d.seconds}
+					onclick={() => (durationSeconds = d.seconds)}
+				>
 					{d.label}
 				</button>
 			{/each}
@@ -55,36 +145,53 @@
 		<button class="run" onclick={run} disabled={running}>
 			{running ? 'running…' : 'run comparison'}
 		</button>
+		{#if running}
+			<span class="note">{fmtDuration(durationSeconds)} of game time, on a worker</span>
+		{/if}
 	</div>
 
-	{#if results && ranAt}
-		<table>
-			<thead>
-				<tr>
-					<th>policy</th>
-					<th>all Known</th>
-					<th>eq. share</th>
-					<th>stressed</th>
-					<th>favor</th>
-					<th>interventions</th>
-					<th>concepts</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each results as r (r.summary.policy)}
-					<tr>
-						<td>{r.summary.policy}</td>
-						<td>{r.summary.timeToAllKnown !== null ? fmtDuration(r.summary.timeToAllKnown) : '—'}</td>
-						<td>{(r.summary.equilibriumShare * 100).toFixed(1)}%</td>
-						<td>{(r.summary.stressedShare * 100).toFixed(1)}%</td>
-						<td>{r.summary.finalFavor.toFixed(1)}</td>
-						<td>{r.summary.interventions}</td>
-						<td>{r.summary.concepts}</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-		<p class="ran-note">{fmtDuration(ranAt.durationSeconds)} of game time, from a world with every condition already written.</p>
+	{#if response}
+		<div class="results" class:stale>
+			<div class="table-scroll">
+				<table>
+					<thead>
+						<tr>
+							<th>policy</th>
+							{#each COLUMNS as col (col.head)}
+								<th>{col.head}</th>
+							{/each}
+						</tr>
+					</thead>
+					<tbody>
+						{#each response.rows as row, i (row.policy)}
+							<tr>
+								<td>{row.policy}</td>
+								{#each COLUMNS as col (col.head)}
+									{@const base = baseline?.[i] ? col.get(baseline[i]) : null}
+									{@const delta = fmtDelta(col.get(row), base, col.kind)}
+									<td>
+										{fmtValue(col.get(row), col.kind)}
+										{#if delta}<span class="delta">{delta}</span>{/if}
+									</td>
+								{/each}
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+			<p class="ran-note">
+				{fmtDuration(response.duration)} of game time in <strong>{response.worldspace}</strong>, from a
+				world with every condition already written.
+				{#if baseline}
+					Deltas are against World 1's shipped numbers over the same run.
+				{:else}
+					These <em>are</em> World 1's shipped numbers — edit something to get a comparison.
+				{/if}
+				{#if stale}
+					<span class="stale-flag">Tuning has changed since this run.</span>
+				{/if}
+			</p>
+		</div>
 	{/if}
 </div>
 
@@ -151,7 +258,27 @@
 
 	.run:disabled {
 		opacity: 0.6;
-		cursor: wait;
+		cursor: progress;
+	}
+
+	.note {
+		font-family: var(--font-mono, ui-monospace, monospace);
+		font-size: 0.72rem;
+		color: var(--muted);
+	}
+
+	.results {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.results.stale table {
+		opacity: 0.55;
+	}
+
+	.table-scroll {
+		overflow-x: auto;
 	}
 
 	table {
@@ -165,6 +292,7 @@
 		text-align: left;
 		padding: 0.4rem 0.7rem;
 		border-bottom: 1px solid var(--rule);
+		white-space: nowrap;
 	}
 
 	th {
@@ -184,5 +312,17 @@
 		font-size: 0.72rem;
 		color: var(--muted);
 		margin: 0;
+	}
+
+	.stale-flag {
+		color: var(--accent-warm, var(--accent));
+	}
+
+	/* No red, no green — see fmtDelta. Direction and magnitude only. */
+	.delta {
+		display: block;
+		font-size: 0.68rem;
+		color: var(--accent-strong, var(--muted));
+		opacity: 0.85;
 	}
 </style>

@@ -15,10 +15,14 @@ dozen bespoke mechanics because each was hand-written inline in `tick.ts`'s
 single seven-step pass over shared mutable state. Read against the
 implementation rather than the design prose (BALANCE.md already caught
 DESIGN.md being arithmetically wrong once), they resolve into **thirteen**
-recurring shapes, most reused three or four times over. Eleven of the
+recurring shapes, most reused three or four times over. Twelve of the
 thirteen are implemented here as small, independently testable functions.
-The other two are documented below rather than faked into modules that would
+The last one is documented below rather than faked into a module that would
 only add indirection.
+
+The table below is also available as data — `SHAPES` in `shapes.ts`, which
+`shapes.test.ts` checks against the modules actually on disk, so this table
+and the code can't drift apart the way the count above once did.
 
 | Shape | Module | Marginalia instances |
 | --- | --- | --- |

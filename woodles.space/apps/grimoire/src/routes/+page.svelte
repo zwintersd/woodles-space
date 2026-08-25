@@ -4,31 +4,55 @@
 	import { TuningState } from '$lib/tuning.svelte';
 	import TuningPanel from '$lib/TuningPanel.svelte';
 	import BalancePanel from '$lib/BalancePanel.svelte';
-	import { world1Def } from '@woodles/witch-engine';
+	import { world1Def, type Worldspace } from '@woodles/witch-engine';
 
 	const tuning = new TuningState();
-	const live = new LiveWorld(tuning.def);
+
+	// Which part of the world to stand in. Governs both docks: the Playtest
+	// world is built standing here, and the Balance comparison runs from here
+	// — BALANCE.md reports the opening water worldspace and the full shallows
+	// as genuinely different questions (Q6 against Q8), not one number.
+	const WORLDSPACES = Object.keys(world1Def.worldspaces) as Worldspace[];
+	let worldspace = $state<Worldspace>('shallows');
+
+	const visibleCategories = $derived.by(() => {
+		const shown = world1Def.worldspaces[worldspace].visibleCategories;
+		return shown === 'all' ? 'every category' : shown.join(', ') + ' only';
+	});
+
+	// Only the initial value is wanted here — the $effect below is what carries
+	// later changes into a rebuild.
+	// svelte-ignore state_referenced_locally
+	const live = new LiveWorld(tuning.def, worldspace);
 
 	onMount(() => {
 		live.start();
 		return () => live.pause();
 	});
 
-	// Reruns on every tuning change: `.def` walks every leaf of `tuning.groups`
-	// on read, so this effect tracks all of them. Skips its own first run —
-	// `live` was already built with today's tuning above. `rebuild` itself
-	// reads and writes `live`'s own $state (running, elapsed, …); left
+	// Reruns on every tuning or worldspace change: `.def` walks every leaf of
+	// `tuning.groups` on read, so this effect tracks all of them. Skips its own
+	// first run — `live` was already built with today's values above. `rebuild`
+	// itself reads and writes `live`'s own $state (running, elapsed, …); left
 	// untracked, that read would make this effect depend on `live` too, and
 	// the write inside the same run would then retrigger it — an infinite
 	// loop `untrack` exists specifically to prevent.
 	let mounted = false;
 	$effect(() => {
 		const def = tuning.def;
+		const space = worldspace;
 		if (!mounted) {
 			mounted = true;
 			return;
 		}
-		untrack(() => live.rebuild(def));
+		untrack(() => live.rebuild(def, space));
+	});
+
+	// Persist on every edit. `save()` writes a string and touches no reactive
+	// state, so unlike the rebuild above this can't feed back into itself.
+	$effect(() => {
+		tuning.signature;
+		tuning.save();
 	});
 
 	function formatSeconds(seconds: number): string {
@@ -49,13 +73,30 @@
 			rebuilds against it immediately; run the comparison at the bottom to see what it did to the numbers
 			BALANCE.md checks.
 		</p>
+
+		<div class="worldspace">
+			<span class="worldspace-label">worldspace</span>
+			<div class="switch" role="radiogroup" aria-label="worldspace">
+				{#each WORLDSPACES as space (space)}
+					<button
+						role="radio"
+						aria-checked={worldspace === space}
+						class:active={worldspace === space}
+						onclick={() => (worldspace = space)}
+					>
+						{space}
+					</button>
+				{/each}
+			</div>
+			<span class="worldspace-note">{visibleCategories}</span>
+		</div>
 	</header>
 
 	<div class="layout">
 		<aside class="playtest">
 			<div class="playtest-head">
 				<h2>Playtest</h2>
-				<span class="tag">every condition pre-written</span>
+				<span class="tag">{worldspace} · every condition pre-written</span>
 			</div>
 			<div class="controls">
 				<button onclick={() => (live.running ? live.pause() : live.start())}>
@@ -77,6 +118,10 @@
 					<dt>favor</dt>
 					<dd>{live.favor.toFixed(1)}</dd>
 				</div>
+				<div>
+					<dt>known</dt>
+					<dd>{live.knownLife}<span class="of">/{live.visibleLife}</span></dd>
+				</div>
 				{#each Object.entries(live.stocks) as [id, value] (id)}
 					<div>
 						<dt>{id}</dt>
@@ -88,7 +133,7 @@
 
 		<div class="main-column">
 			<TuningPanel {tuning} />
-			<BalancePanel {tuning} />
+			<BalancePanel {tuning} {worldspace} />
 		</div>
 	</div>
 </main>
@@ -128,6 +173,50 @@
 
 	.lede code {
 		font-family: var(--font-mono, ui-monospace, monospace);
+	}
+
+	.worldspace {
+		display: flex;
+		align-items: center;
+		gap: 0.7rem;
+		flex-wrap: wrap;
+		margin-top: 1.5rem;
+	}
+
+	.worldspace-label,
+	.worldspace-note {
+		font-family: var(--font-mono, ui-monospace, monospace);
+		font-size: 0.72rem;
+		color: var(--muted);
+	}
+
+	.worldspace-label {
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+
+	.switch {
+		display: flex;
+		border: 1px solid var(--rule);
+		border-radius: 999px;
+		overflow: hidden;
+	}
+
+	.switch button {
+		font: inherit;
+		font-family: var(--font-mono, ui-monospace, monospace);
+		font-size: 0.78rem;
+		padding: 0.3rem 0.9rem;
+		border: none;
+		border-radius: 0;
+		background: none;
+		color: var(--muted);
+		cursor: pointer;
+	}
+
+	.switch button.active {
+		background: var(--accent);
+		color: var(--lapis, var(--text));
 	}
 
 	.layout {
@@ -227,5 +316,10 @@
 		margin: 0.1rem 0 0;
 		font-size: 1.1rem;
 		font-variant-numeric: tabular-nums;
+	}
+
+	.of {
+		font-size: 0.8rem;
+		color: var(--muted);
 	}
 </style>

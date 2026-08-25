@@ -237,6 +237,43 @@
       box-shadow: 0 0 22px rgba(255, 253, 248, 0.92);
     }
 
+    .grimoire-preview {
+      display: grid;
+      place-items: center;
+    }
+
+    .grimoire-preview svg {
+      width: min(76%, 268px);
+      overflow: visible;
+    }
+
+    /* three stocks, each easing about inside its healthy band — shape C,
+       which is most of what the instrument behind this card tunes. */
+    .grimoire-preview .track {
+      stroke: rgba(255, 253, 248, 0.26);
+      stroke-width: 1.1;
+      stroke-linecap: round;
+    }
+
+    .grimoire-preview .band {
+      stroke-width: 3.6;
+      stroke-linecap: round;
+      opacity: 0.34;
+    }
+
+    .grimoire-preview .mark {
+      animation: settle 5.4s ease-in-out infinite;
+    }
+
+    .grimoire-preview .mark-b { animation-duration: 6.8s; animation-delay: 0.7s; }
+    .grimoire-preview .mark-c { animation-duration: 4.6s; animation-delay: 1.6s; }
+
+    @keyframes settle {
+      0%, 100% { transform: translateX(32px); }
+      35% { transform: translateX(74px); }
+      62% { transform: translateX(46px); }
+    }
+
     .studio-preview {
       display: grid;
       place-items: center;
@@ -413,6 +450,30 @@
         </div>
       </a>
 
+      <a class="experiment" href="/grimoire">
+        <div class="preview grimoire-preview" aria-hidden="true">
+          <svg viewBox="0 0 100 60">
+            <line class="track" x1="10" y1="14" x2="90" y2="14" />
+            <line class="band" x1="34" y1="14" x2="72" y2="14" stroke="var(--lab-violet)" />
+            <circle class="mark mark-a" cx="0" cy="14" r="3.4" fill="var(--lab-violet)" />
+
+            <line class="track" x1="10" y1="30" x2="90" y2="30" />
+            <line class="band" x1="28" y1="30" x2="66" y2="30" stroke="var(--lab-aqua)" />
+            <circle class="mark mark-b" cx="0" cy="30" r="3.4" fill="var(--lab-aqua)" />
+
+            <line class="track" x1="10" y1="46" x2="90" y2="46" />
+            <line class="band" x1="40" y1="46" x2="78" y2="46" stroke="var(--lab-rose)" />
+            <circle class="mark mark-c" cx="0" cy="46" r="3.4" fill="var(--lab-rose)" />
+          </svg>
+        </div>
+        <div class="copy">
+          <span class="label">tuning instrument</span>
+          <h2>Grimoire</h2>
+          <p>Marginalia's world with its back off: every number that shapes it, the primitive each one belongs to, and a balance run to see what moving it did.</p>
+          <span class="launch">open grimoire</span>
+        </div>
+      </a>
+
       <a class="experiment" href="/bloomforge">
         <div class="preview studio-preview" aria-hidden="true">
           <svg viewBox="0 0 100 60">
@@ -427,7 +488,7 @@
         <div class="copy">
           <span class="label">node-graph editor</span>
           <h2>Bloomforge</h2>
-          <p>A studio for wiring up currency/generator/upgrade economies and fast-forwarding ten hours of them. Held here while Studio gets rebuilt around Marginalia's own shape.</p>
+          <p>A studio for wiring up currency/generator/upgrade economies and fast-forwarding ten hours of them. Still runs; kept here now that Grimoire has taken up the Marginalia-shaped half of the job.</p>
           <span class="launch">open bloomforge</span>
         </div>
       </a>
