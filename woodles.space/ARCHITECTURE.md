@@ -1502,7 +1502,8 @@ coverage tests the paths people actually visit instead of seven unrelated Vite
 ports. The suite covers every published entry route, Write → Echoes archiving,
 Bestiary gallery/adopt/share and Marginalia consumption, an Arcade state change,
 the Thinking About → Carillon round trip, back, and the sitting that returns
-from it, legacy localStorage migration across reload,
+from it, Carillon's binder strip and the way in and out of its task composer,
+legacy localStorage migration across reload,
 keyboard operation, and serious/critical WCAG A axe findings.
 
 The cross-app specs earn their cost in a way the route checks don't. The

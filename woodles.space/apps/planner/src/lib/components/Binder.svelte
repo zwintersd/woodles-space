@@ -52,7 +52,16 @@
 		await connectAndHydrate(pass);
 	}
 
+	// New task sits in the strip with the tabs, so it toggles like one: a second
+	// press on the lit control puts it away again. Nothing is filed either way —
+	// only the composer's own "add" does that.
+	const composing = $derived(store.composing && store.editingTaskId == null);
+
 	function handleAddTask() {
+		if (composing) {
+			store.cancelCompose();
+			return;
+		}
 		store.closeBinder();
 		store.startCompose();
 	}
@@ -68,23 +77,30 @@
 {/if}
 
 <div class="binder-dock">
-	<button
-		class="binder-add-btn"
-		data-testid="binder-add-task"
-		onclick={handleAddTask}
-		title="add a task"
-		aria-label="add a task"
-	>
-		<span class="binder-tab-icon">+</span>
-	</button>
+	<!-- A group rather than a tablist: these are disclosure buttons over one
+	     panel, never tabs over tabpanels, and new task opens a sheet instead of
+	     the panel at all. Calling them tabs in the markup only promised
+	     keyboard behaviour the binder has never had. -->
+	<div class="binder-tabs" role="group" aria-label="binder">
+		<button
+			class="binder-tab binder-tab-add"
+			class:active={composing}
+			data-testid="binder-add-task"
+			onclick={handleAddTask}
+			title="new task"
+			aria-label="new task"
+			aria-haspopup="dialog"
+			aria-expanded={composing}
+		>
+			<span class="binder-tab-icon">+</span>
+		</button>
 
-	<div class="binder-tabs" role="tablist" aria-label="binder">
 		{#each TABS as tab}
 			<button
 				class="binder-tab"
 				class:active={store.binderTab === tab.id}
-				role="tab"
-				aria-selected={store.binderTab === tab.id}
+				aria-controls="binder-panel"
+				aria-expanded={store.binderTab === tab.id}
 				onclick={() => store.toggleBinder(tab.id)}
 				title={tab.label}
 				aria-label={tab.label}
@@ -96,6 +112,7 @@
 </div>
 
 <aside
+	id="binder-panel"
 	class="binder-panel"
 	class:open={store.binderTab !== null}
 	aria-hidden={store.binderTab === null}
@@ -287,31 +304,6 @@
 		gap: 8px;
 	}
 
-	.binder-add-btn {
-		width: 36px;
-		height: 36px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: var(--p-bg);
-		background: var(--p-accent);
-		border: 1px solid var(--p-accent);
-		border-right: none;
-		border-radius: var(--pl-radius-md) 0 0 var(--pl-radius-md);
-		box-shadow: -2px 0 12px var(--p-accent-soft);
-		transition: opacity var(--pl-transition-fast), var(--pl-transition-palette);
-	}
-
-	.binder-add-btn:hover {
-		opacity: 0.85;
-	}
-
-	.binder-add-btn .binder-tab-icon {
-		color: inherit;
-		font-size: 1.05rem;
-		line-height: 1;
-	}
-
 	.binder-tabs {
 		display: flex;
 		flex-direction: column;
@@ -350,6 +342,19 @@
 	.binder-tab-icon {
 		font-size: 0.85rem;
 		color: var(--p-text);
+	}
+
+	/* Same size and rhythm as its neighbours — it's one of them now. The accent
+	   stays on the glyph, and it sits a little brighter than a closed tab, so
+	   the one control that makes something is still the one found first. */
+	.binder-tab-add {
+		opacity: 0.8;
+	}
+
+	.binder-tab-add .binder-tab-icon {
+		font-size: 1.05rem;
+		line-height: 1;
+		color: var(--p-accent);
 	}
 
 	.binder-panel {
@@ -738,17 +743,11 @@
 			max-width: calc(100vw - 1.5rem);
 		}
 
-		.binder-add-btn {
-			width: 32px;
-			height: 32px;
-			border-radius: var(--pl-radius-md);
-			border-right: 1px solid var(--p-accent);
-			flex-shrink: 0;
-		}
-
 		.binder-tabs {
 			flex-direction: row;
-			max-width: calc(100vw - 5.4rem);
+			/* The strip is the whole dock now, so it gets the whole width the
+			   dock had — it used to leave room for the add button beside it. */
+			max-width: calc(100vw - 1.5rem);
 			overflow-x: auto;
 			border: 1px solid var(--p-border);
 			border-radius: var(--pl-radius-md);
