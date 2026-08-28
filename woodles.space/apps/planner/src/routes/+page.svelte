@@ -562,7 +562,10 @@
 			flex-direction: column;
 		}
 
-		:global(.binder-tabs) {
+		/* The binder's panels are a desk surface, not a phone one — but new task
+		   lives in that strip now, and it is the only way in to the composer
+		   from anywhere in the instrument. So the panel tabs go and it stays. */
+		:global(.binder-tabs .binder-tab:not(.binder-tab-add)) {
 			display: none;
 		}
 	}
