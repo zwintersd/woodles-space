@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	FLOOR_FOCAL,
+	FLOOR_HEIGHT_UNIT,
 	FLOOR_HORIZON_Y,
 	FOG_MAX,
 	SCENE_FAR_Z,
@@ -152,5 +153,38 @@ describe('depth ordering', () => {
 		const a = { z: 0.5, tag: 'a' };
 		const b = { z: 0.5, tag: 'b' };
 		expect([a, b].sort(byDepth).map((i) => i.tag)).toEqual(['a', 'b']);
+	});
+});
+
+describe('height above the plane', () => {
+	it('leaves the floor itself where the plane is', () => {
+		expect(projectFloor(0.5, 0.5, 0).y).toBeCloseTo(floorPlaneY(0.5));
+	});
+
+	it('raises silt toward the viewer, never below the floor', () => {
+		const flat = projectFloor(0.5, 0.6, 0).y;
+		const mound = projectFloor(0.5, 0.6, 1).y;
+		expect(mound).toBeLessThan(flat);
+		expect(flat - mound).toBeCloseTo(FLOOR_HEIGHT_UNIT * floorDepthScale(0.6));
+	});
+
+	it('foreshortens height, so the same mound rises less at the back', () => {
+		const near = projectFloor(0.5, 1, 1);
+		const far = projectFloor(0.5, 0, 1);
+		expect(floorPlaneY(1) - near.y).toBeGreaterThan(floorPlaneY(0) - far.y);
+	});
+
+	it('does not move a raised point sideways', () => {
+		expect(projectFloor(0.3, 0.4, 0.8).x).toBeCloseTo(projectFloor(0.3, 0.4, 0).x);
+	});
+
+	// The mound has to stay in the floor's own band; silt climbing into the open
+	// water would break the composition A was careful to preserve.
+	it('keeps a full mound inside the frame', () => {
+		for (let i = 0; i <= 10; i++) {
+			const y = projectFloor(0.5, i / 10, 1).y;
+			expect(y).toBeGreaterThan(0.5);
+			expect(y).toBeLessThanOrEqual(1);
+		}
 	});
 });

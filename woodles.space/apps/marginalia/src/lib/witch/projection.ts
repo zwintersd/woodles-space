@@ -70,16 +70,28 @@ export function floorDepthAtY(y: number): number | null {
 	return clamp01(1 - (1 / q - 1) / FLOOR_FOCAL);
 }
 
+// How far a full-density cell of silt stands proud of the plane, in canvas
+// fractions, measured at the near edge. The floor band is 0.2 of the frame, so at
+// 0.055 a full mound is about a quarter of the visible floor — enough to read as
+// relief in profile without the seabed climbing into the open water.
+export const FLOOR_HEIGHT_UNIT = 0.055;
+
 /**
- * World (x, z) on the floor plane to screen position and foreshortening. `x` and
- * the returned `x`/`y` are canvas fractions; `scale` multiplies any size drawn at
- * that spot.
+ * World (x, z, h) to screen position and foreshortening. `x` and the returned
+ * `x`/`y` are canvas fractions; `scale` multiplies any size drawn at that spot.
+ * `h` is height above the plane — 0 on the floor itself, 1 at a full mound — and
+ * foreshortens with distance like everything else, so a mound at the back rises
+ * less on screen than the same mound at the front.
  */
-export function projectFloor(x: number, z: number): { x: number; y: number; scale: number } {
+export function projectFloor(
+	x: number,
+	z: number,
+	h = 0
+): { x: number; y: number; scale: number } {
 	const scale = floorDepthScale(z);
 	return {
 		x: 0.5 + (x - 0.5) * floorXScale(z),
-		y: floorPlaneY(z),
+		y: floorPlaneY(z) - h * FLOOR_HEIGHT_UNIT * scale,
 		scale
 	};
 }
