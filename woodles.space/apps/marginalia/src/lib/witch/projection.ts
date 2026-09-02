@@ -95,3 +95,49 @@ export function unprojectFloor(x: number, y: number): { x: number; z: number } |
 	if (z === null) return null;
 	return { x: clamp01(0.5 + (x - 0.5) / floorXScale(z)), z };
 }
+
+// ── the scene beyond the floor ───────────────────────────────────────────────
+//
+// The floor carries a real depth axis; the water column above it does not. A spawn
+// point there stores only (x, y), where y is its layer's band — height, not
+// distance. Rather than invent a persisted depth field for it, a point takes a
+// *stable* depth derived from its own id: deterministic across frames and reloads,
+// distinct per point, and costing nothing in the save. The volume gets populated;
+// no data changes.
+//
+// The column occupies the near end of the same axis the floor uses, so one
+// foreshortening function serves the whole scene — a creature at the back of the
+// water reads at the same scale as the floor does at that distance, which is the
+// point of having a single camera.
+
+/** The far wall of the water column. Nothing in the column sits behind this. */
+export const SCENE_FAR_Z = 0.35;
+
+/** Depth for a point in the water column, from a stable [0, 1) seed. */
+export function sceneDepthFromSeed(seed: number): number {
+	return SCENE_FAR_Z + (1 - SCENE_FAR_Z) * Math.max(0, Math.min(1, seed));
+}
+
+// Fog. Underwater this is not a stylistic flourish — water genuinely swallows
+// contrast over distance, which is why an aquarium is the easiest subject in the
+// world to give depth to. Beer-Lambert falloff, normalized so the far wall lands
+// exactly on FOG_MAX rather than wherever the exponential happens to be.
+export const FOG_MAX = 0.42;
+export const FOG_DENSITY = 1.6;
+const FOG_NORM = 1 - Math.exp(-FOG_DENSITY);
+
+/** How much atmosphere sits between the viewer and depth z. */
+export function fogAlpha(z: number): number {
+	const d = 1 - Math.max(0, Math.min(1, z));
+	return (FOG_MAX * (1 - Math.exp(-FOG_DENSITY * d))) / FOG_NORM;
+}
+
+/**
+ * Back-to-front comparator. Painter's order on a plane means the far thing goes
+ * down first, so a nearer one can cover it — which is what the scene's passes were
+ * missing: they drew in roster order, where a creature at the back could land on
+ * top of one at the front.
+ */
+export function byDepth(a: { z: number }, b: { z: number }): number {
+	return a.z - b.z;
+}

@@ -14,7 +14,16 @@
 		type SpawnLayer,
 		type SpawnPoint
 	} from './worldShape';
-	import { floorDepthAtY, floorPlaneY, projectFloor, unprojectFloor } from './projection';
+	import {
+		byDepth,
+		floorDepthAtY,
+		floorDepthScale,
+		floorPlaneY,
+		fogAlpha,
+		projectFloor,
+		sceneDepthFromSeed,
+		unprojectFloor
+	} from './projection';
 	import type { Life } from './content/life';
 
 	const ASPECT = 960 / 480;
@@ -26,6 +35,10 @@
 	const GLINT_SPRITES = [32, 33, 34, 35, 36, 37, 38, 39];
 	const PUFF_SPRITES = [40, 41, 42, 43, 44, 45, 46, 47];
 	const DEEPWATER_SWIM = { columns: 4, rows: 3, frames: 12, fps: 12 } as const;
+
+	// something in the scene with a distance, held back until its whole pass has
+	// been collected so it can be drawn in depth order.
+	type Drawable = { z: number; render: () => void };
 
 	let wrapEl: HTMLDivElement | undefined = $state();
 	let canvasEl: HTMLCanvasElement | undefined = $state();
@@ -181,7 +194,10 @@
 			rotation: number,
 			alpha: number,
 			yScale = 1,
-			blend: GlobalCompositeOperation = 'source-over'
+			blend: GlobalCompositeOperation = 'source-over',
+			// distance haze, when the sprite is something standing in the world rather
+			// than an overlay drawn on top of it.
+			fog?: { amount: number; tint: readonly [number, number, number] }
 		): boolean {
 			if (!sheet.ok || !sheet.img.naturalWidth || !sheet.img.naturalHeight) return false;
 			const cellW = sheet.img.naturalWidth / sheet.cols;
@@ -194,7 +210,20 @@
 			ctx!.globalAlpha = clamp01(alpha);
 			ctx!.globalCompositeOperation = blend;
 			ctx!.imageSmoothingEnabled = true;
-			ctx!.drawImage(sheet.img, sx, sy, cellW, cellH, -size / 2, -(size * yScale) / 2, size, size * yScale);
+			if (fog && fog.amount > 0.01) {
+				drawFogged(
+					sheet.img,
+					-size / 2,
+					-(size * yScale) / 2,
+					size,
+					size * yScale,
+					fog.amount,
+					fog.tint,
+					{ sx, sy, sw: cellW, sh: cellH }
+				);
+			} else {
+				ctx!.drawImage(sheet.img, sx, sy, cellW, cellH, -size / 2, -(size * yScale) / 2, size, size * yScale);
+			}
 			ctx!.restore();
 			return true;
 		}
@@ -406,15 +435,13 @@
 					const cy = projected.y * H;
 					const cellW = baseCellW * projected.scale;
 					const seed = `${x}:${y}:${book.worldShape.spawnRevision}`;
-					// distance haze, not depth-of-water dimming: this used to fade the
-					// *near* rows, which was the flat-wall reading. On a plane it's the
-					// far rows that should recede. A generalizes it no further than
-					// this one term; B replaces it with real depth fog for the whole
-					// scene, water column included.
-					const depth = 1 - z;
+					// the same fog every other object in the scene answers to, rather
+					// than the row-index dimming this carried before. Baked in per row,
+					// so distance costs nothing per frame.
+					const haze = fogAlpha(z);
 
 					ctx!.save();
-					ctx!.globalAlpha = (0.06 + value * 0.22) * (1 - depth * 0.18);
+					ctx!.globalAlpha = (0.06 + value * 0.22) * (1 - haze);
 					const pearl = ctx!.createRadialGradient(cx - cellW * 0.22, cy - cellH * 0.22, 0, cx, cy, cellW * (1.2 + value));
 					pearl.addColorStop(0, 'rgba(255, 255, 255, 0.98)');
 					pearl.addColorStop(0.46, value > 0.62 ? 'rgba(249, 242, 255, 0.9)' : 'rgba(248, 248, 242, 0.78)');
@@ -630,7 +657,82 @@
 			return point;
 		}
 
-		function drawCreatureLayers(layers: SpawnLayer[], T: number) {
+		// The depth of anything in the scene. On the floor it's read off the plane;
+		// in the water column it comes from the point's own id, so it's stable across
+		// frames and reloads without a save field to carry it.
+		function depthOf(id: string, y: number): number {
+			return floorDepthAtY(y) ?? sceneDepthFromSeed(stable01(`${id}:depth`));
+		}
+
+		// The color distance fades toward: the water's own body, sampled down the
+		// column so a far creature near the surface hazes pale and one near the floor
+		// hazes blue. Above the waterline it's the pale air at the horizon. These
+		// track drawWaterBase's stops rather than introducing a second palette.
+		function fogColorAt(y: number): [number, number, number] {
+			const waterY = H * WATER_TOP;
+			if (y <= waterY) return [232, 226, 240];
+			const t = clamp01((y - waterY) / Math.max(1, H - waterY));
+			return t < 0.32
+				? [
+						lerp(243, 204, t / 0.32),
+						lerp(224, 193, t / 0.32),
+						lerp(236, 229, t / 0.32)
+					]
+				: [
+						lerp(204, 132, (t - 0.32) / 0.68),
+						lerp(193, 146, (t - 0.32) / 0.68),
+						lerp(229, 205, (t - 0.32) / 0.68)
+					];
+		}
+
+		// Tinting a sprite by distance needs the fog to land on the sprite's own
+		// pixels, not on the water behind it — so the sprite goes to a scratch canvas
+		// first, takes a `source-atop` wash there, and arrives here already hazed.
+		// One canvas, reused, grown as needed.
+		const fogCanvas = document.createElement('canvas');
+		const fogCtx = fogCanvas.getContext('2d');
+
+		function drawFogged(
+			img: CanvasImageSource,
+			dx: number,
+			dy: number,
+			dw: number,
+			dh: number,
+			fog: number,
+			tint: readonly [number, number, number],
+			source?: { sx: number; sy: number; sw: number; sh: number }
+		) {
+			// the scratch is sized to where the sprite *lands*, not to the source art:
+			// a bound Bestiary creature can be a 1024px png drawn at 90, and rasterizing
+			// the full source every frame would cost far more than the haze is worth.
+			// device pixels, so a hi-dpi screen loses no sharpness on the round trip.
+			const rw = Math.ceil(dw * dpr);
+			const rh = Math.ceil(dh * dpr);
+			if (!fogCtx || fog <= 0.01 || rw <= 0 || rh <= 0) {
+				if (source) ctx!.drawImage(img, source.sx, source.sy, source.sw, source.sh, dx, dy, dw, dh);
+				else ctx!.drawImage(img, dx, dy, dw, dh);
+				return;
+			}
+			if (fogCanvas.width < rw || fogCanvas.height < rh) {
+				fogCanvas.width = Math.max(fogCanvas.width, rw);
+				fogCanvas.height = Math.max(fogCanvas.height, rh);
+			}
+			fogCtx.setTransform(1, 0, 0, 1, 0, 0);
+			fogCtx.globalCompositeOperation = 'source-over';
+			fogCtx.clearRect(0, 0, rw, rh);
+			fogCtx.imageSmoothingEnabled = ctx!.imageSmoothingEnabled;
+			if (source) fogCtx.drawImage(img, source.sx, source.sy, source.sw, source.sh, 0, 0, rw, rh);
+			else fogCtx.drawImage(img, 0, 0, rw, rh);
+			fogCtx.globalCompositeOperation = 'source-atop';
+			fogCtx.fillStyle = `rgba(${tint[0] | 0}, ${tint[1] | 0}, ${tint[2] | 0}, ${fog})`;
+			fogCtx.fillRect(0, 0, rw, rh);
+			fogCtx.globalCompositeOperation = 'source-over';
+			ctx!.drawImage(fogCanvas, 0, 0, rw, rh, dx, dy, dw, dh);
+		}
+
+		// One creature, already placed in depth. Collected rather than drawn on sight
+		// so the whole layer can be sorted back-to-front first (see drawSceneLayers).
+		function collectLife(layers: SpawnLayer[], T: number, into: Drawable[]) {
 			for (const life of book.life) {
 				const info = spriteFor(life.id);
 				if (!info) continue;
@@ -642,19 +744,20 @@
 				const seed = point.x + point.y + life.id.length * 0.013;
 				const stage = book.stageOf(life.id);
 				// a spawn point whose y falls inside the floor band is standing on the
-				// plane, so it takes the plane's foreshortening. Points in the water
-				// column above it are untouched here — the whole scene gets depth in
-				// step B; A is the floor. Its stored x is already a world fraction
-				// (sedimentSpawnPoints derives it from the grid column), so it
-				// projects forward; only the depth has to be recovered from y.
+				// plane, so it takes the plane's foreshortening. One above it takes a
+				// stable depth of its own, so the water column is a volume rather than
+				// a pane — one foreshortening function serves both. Its stored x is
+				// already a world fraction (sedimentSpawnPoints derives it from the
+				// grid column), so it projects forward; only depth comes from y.
 				const groundZ = floorDepthAtY(point.y);
+				const z = depthOf(point.id, point.y);
 				const box =
 					H *
 					CREATURE_BOX *
 					point.scale *
 					info.sizeScale *
 					(0.58 + 0.42 * (stage / 3)) *
-					(groundZ === null ? 1 : projectFloor(point.x, groundZ).scale);
+					(groundZ === null ? floorDepthScale(z) : projectFloor(point.x, groundZ).scale);
 				const scale = box / Math.max(entry.img.naturalWidth, entry.img.naturalHeight);
 				const dw = entry.img.naturalWidth * scale;
 				const dh = entry.img.naturalHeight * scale;
@@ -685,29 +788,35 @@
 				const rawCy = point.y * H + layerBob(point.layer, T, seed);
 				const cy = Math.min(Math.max(rawCy, minCy), Math.max(minCy, maxCy));
 				const alpha = clamp01(stage === 0 ? 0.3 : 0.55 + 0.45 * book.vitalityOf(life.id));
+				const grounded = point.layer === 'floor' || point.layer === 'shore';
 
-				if (point.layer === 'floor' || point.layer === 'shore') {
-					ctx!.save();
-					ctx!.globalAlpha = alpha * 0.22;
-					ctx!.fillStyle = 'rgb(14, 14, 40)';
-					ctx!.beginPath();
-					ctx!.ellipse(cx, cy + dh * 0.35, dw * 0.32, dh * 0.06, 0, 0, Math.PI * 2);
-					ctx!.fill();
-					ctx!.restore();
-				}
+				into.push({
+					z,
+					render() {
+						if (grounded) {
+							ctx!.save();
+							ctx!.globalAlpha = alpha * 0.22;
+							ctx!.fillStyle = 'rgb(14, 14, 40)';
+							ctx!.beginPath();
+							ctx!.ellipse(cx, cy + dh * 0.35, dw * 0.32, dh * 0.06, 0, 0, Math.PI * 2);
+							ctx!.fill();
+							ctx!.restore();
+						}
 
-				ctx!.save();
-				ctx!.globalAlpha = alpha;
-				ctx!.imageSmoothingEnabled = !info.pixelated;
-				ctx!.drawImage(entry.img, cx - dw / 2, cy - dh / 2, dw, dh);
-				ctx!.restore();
+						ctx!.save();
+						ctx!.globalAlpha = alpha;
+						ctx!.imageSmoothingEnabled = !info.pixelated;
+						drawFogged(entry.img, cx - dw / 2, cy - dh / 2, dw, dh, fogAlpha(z), fogColorAt(cy));
+						ctx!.restore();
+					}
+				});
 			}
 		}
 
 		// the shared decorative creatures Brianna calls into the scene
 		// (CREATURE_SPECS / worldShape.placedCreatures) — no vitals/stage
 		// concept, just an animated sprite sheet at a fixed placed spot.
-		function drawPlacedCreatures(layers: SpawnLayer[], T: number) {
+		function collectPlacedCreatures(layers: SpawnLayer[], T: number, into: Drawable[]) {
 			for (const placed of book.worldShape.placedCreatures) {
 				const spec = creatureById(placed.creatureId);
 				if (!spec || !layers.includes(spec.layer)) continue;
@@ -719,7 +828,9 @@
 				const yScale = cellW > 0 ? cellH / cellW : 1;
 				// same rule as the life above: on the plane means projected.
 				const groundZ = floorDepthAtY(placed.y);
-				const groundScale = groundZ === null ? 1 : projectFloor(placed.x, groundZ).scale;
+				const z = depthOf(placed.id, placed.y);
+				const groundScale =
+					groundZ === null ? floorDepthScale(z) : projectFloor(placed.x, groundZ).scale;
 				const size = H * CREATURE_BOX * spec.boxScale * placed.scale * groundScale;
 				const dh = size * yScale;
 
@@ -738,19 +849,42 @@
 				const rawCy = placed.y * H + layerBob(spec.layer, T, seed);
 				const cy = Math.min(Math.max(rawCy, minCy), Math.max(minCy, maxCy));
 
-				if (spec.layer === 'floor' || spec.layer === 'shore') {
-					ctx!.save();
-					ctx!.globalAlpha = 0.22;
-					ctx!.fillStyle = 'rgb(14, 14, 40)';
-					ctx!.beginPath();
-					ctx!.ellipse(cx, cy + dh * 0.35, size * 0.32, dh * 0.06, 0, 0, Math.PI * 2);
-					ctx!.fill();
-					ctx!.restore();
-				}
+				const grounded = spec.layer === 'floor' || spec.layer === 'shore';
 
-				const frame = Math.floor(T * spec.fps) % spec.frameCount;
-				drawSheetSprite(sheet, frame, cx, cy, size, placed.rotation, 1, yScale);
+				into.push({
+					z,
+					render() {
+						if (grounded) {
+							ctx!.save();
+							ctx!.globalAlpha = 0.22;
+							ctx!.fillStyle = 'rgb(14, 14, 40)';
+							ctx!.beginPath();
+							ctx!.ellipse(cx, cy + dh * 0.35, size * 0.32, dh * 0.06, 0, 0, Math.PI * 2);
+							ctx!.fill();
+							ctx!.restore();
+						}
+
+						const frame = Math.floor(T * spec.fps) % spec.frameCount;
+						drawSheetSprite(sheet, frame, cx, cy, size, placed.rotation, 1, yScale, 'source-over', {
+							amount: fogAlpha(z),
+							tint: fogColorAt(cy)
+						});
+					}
+				});
 			}
+		}
+
+		// Back-to-front within a pass. The four hand-ordered buckets stay two passes,
+		// split at the water's surface — the glaze and ripples are a film on it, not
+		// an object in the volume, so they keep their fixed place between. Inside each
+		// pass the order was `book.life`'s roster order, which had nothing to do with
+		// distance: a creature at the back could draw over one at the front.
+		function drawSceneLayers(layers: SpawnLayer[], T: number) {
+			const items: Drawable[] = [];
+			collectLife(layers, T, items);
+			collectPlacedCreatures(layers, T, items);
+			items.sort(byDepth);
+			for (const item of items) item.render();
 		}
 
 		function drawRain(T: number) {
@@ -1099,13 +1233,11 @@
 			drawShallowsShelf();
 			drawFeatures();
 			drawFeatureAuras(T, shine(witnessed));
-			drawCreatureLayers(['water', 'floor'], T);
+			drawSceneLayers(['water', 'floor'], T);
 			drawAnimatorSwimmer(T, shine(tending));
-			drawPlacedCreatures(['water', 'floor'], T);
 			drawWaterGlaze(T);
 			drawWaterRipples(T, m, shine(tending * 0.6 + m * 0.4));
-			drawCreatureLayers(['shore', 'air'], T);
-			drawPlacedCreatures(['shore', 'air'], T);
+			drawSceneLayers(['shore', 'air'], T);
 			drawRain(T);
 			drawWitchMotes(T, shine(tending));
 			drawOverlays(T);

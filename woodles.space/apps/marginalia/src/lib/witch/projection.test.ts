@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest';
 import {
 	FLOOR_FOCAL,
 	FLOOR_HORIZON_Y,
+	FOG_MAX,
+	SCENE_FAR_Z,
 	SEDIMENT_BAND_TOP,
 	floorDepthAtY,
 	floorDepthScale,
 	floorPlaneY,
+	byDepth,
 	floorXScale,
+	fogAlpha,
 	projectFloor,
+	sceneDepthFromSeed,
 	unprojectFloor
 } from './projection';
 
@@ -99,5 +104,53 @@ describe('unprojecting', () => {
 		const corner = unprojectFloor(0, floorPlaneY(0))!;
 		expect(corner.x).toBe(0);
 		expect(unprojectFloor(1, floorPlaneY(0))!.x).toBe(1);
+	});
+});
+
+describe('scene depth and fog', () => {
+	it('keeps the water column in front of the floor plane it shares an axis with', () => {
+		expect(sceneDepthFromSeed(0)).toBeCloseTo(SCENE_FAR_Z);
+		expect(sceneDepthFromSeed(1)).toBeCloseTo(1);
+		expect(SCENE_FAR_Z).toBeGreaterThan(0);
+	});
+
+	it('spreads points through the volume rather than onto one pane', () => {
+		const seeds = [0.05, 0.3, 0.62, 0.95].map(sceneDepthFromSeed);
+		expect(new Set(seeds).size).toBe(4);
+		for (const z of seeds) {
+			expect(z).toBeGreaterThanOrEqual(SCENE_FAR_Z);
+			expect(z).toBeLessThanOrEqual(1);
+		}
+	});
+
+	it('clears the fog at the near edge and lands on FOG_MAX at the far one', () => {
+		expect(fogAlpha(1)).toBeCloseTo(0);
+		expect(fogAlpha(0)).toBeCloseTo(FOG_MAX);
+	});
+
+	it('thickens monotonically with distance', () => {
+		let previous = -Infinity;
+		for (let i = 10; i >= 0; i--) {
+			const a = fogAlpha(i / 10);
+			expect(a).toBeGreaterThan(previous);
+			previous = a;
+		}
+	});
+
+	it('never fogs anything to invisibility', () => {
+		expect(fogAlpha(0)).toBeLessThan(0.6);
+	});
+});
+
+describe('depth ordering', () => {
+	it('sorts back to front, so nearer things are painted last', () => {
+		const items = [{ z: 0.9 }, { z: 0.35 }, { z: 1 }, { z: 0.6 }];
+		expect([...items].sort(byDepth).map((i) => i.z)).toEqual([0.35, 0.6, 0.9, 1]);
+	});
+
+	it('is stable enough to leave co-located things in collection order', () => {
+		const a = { z: 0.5, tag: 'a' };
+		const b = { z: 0.5, tag: 'b' };
+		expect([a, b].sort(byDepth).map((i) => i.tag)).toEqual(['a', 'b']);
 	});
 });
