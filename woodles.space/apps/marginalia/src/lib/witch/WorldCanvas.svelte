@@ -10,12 +10,11 @@
 		featureById,
 		resolveSpawnPointForLife,
 		stable01,
-		waterGridYToWorld,
-		worldYToWaterGrid,
 		type SedimentGrid,
 		type SpawnLayer,
 		type SpawnPoint
 	} from './worldShape';
+	import { floorDepthAtY, floorPlaneY, projectFloor, unprojectFloor } from './projection';
 	import type { Life } from './content/life';
 
 	const ASPECT = 960 / 480;
@@ -43,15 +42,21 @@
 	let pourPoint: { x: number; y: number } | null = null;
 	let lastPourAt = 0;
 
+	// screen point -> world (x, z) on the floor plane. `x` is a *world* fraction,
+	// not the raw canvas one: the near edge of the frame is wider than the far edge
+	// of the world, so pointing at the same pixel column means a different column of
+	// silt depending on how far back you are. unprojectFloor does that inversion and
+	// returns null off the plane, which is the same range check this made before.
 	function pointerToWaterPoint(event: PointerEvent): { x: number; y: number } | null {
 		const canvas = canvasEl;
 		if (!canvas) return null;
 		const rect = canvas.getBoundingClientRect();
 		if (rect.width <= 0 || rect.height <= 0) return null;
-		const x = clamp01((event.clientX - rect.left) / rect.width);
-		const worldY = (event.clientY - rect.top) / rect.height;
-		const y = worldYToWaterGrid(worldY);
-		return y === null ? null : { x, y };
+		const point = unprojectFloor(
+			clamp01((event.clientX - rect.left) / rect.width),
+			(event.clientY - rect.top) / rect.height
+		);
+		return point === null ? null : { x: point.x, y: point.z };
 	}
 
 	function startPour(event: PointerEvent) {
@@ -379,21 +384,34 @@
 
 		function drawSedimentGrid() {
 			const grid = book.worldShape.sedimentGrid;
-			// confined to the bottom fraction of the canvas (FLOOR_TOP), not the
-			// whole water column, so open water stays clear for creatures to
-			// read against instead of sediment texture filling the entire depth.
-			const waterY = H * FLOOR_TOP;
-			const waterH = H - waterY;
-			const cellW = W / grid.w;
-			const cellH = waterH / grid.h;
+			// the grid's rows are the *depth* axis now — SEDIMENT_GRID_H cells
+			// front-to-back across a plane in perspective, not stacked bands of a
+			// flat wall (2_5D.md part 1). Nothing about the stored grid changed; the
+			// row a cell sits in is read as z rather than as screen y, so far rows
+			// compress toward the horizon and near rows open up. The plane still
+			// spans exactly the band it did before, FLOOR_TOP to the frame's bottom.
+			const baseCellW = W / grid.w;
 			for (let y = 0; y < grid.h; y++) {
+				// the row's near and far edges, so a cell's footprint is its true
+				// projected height rather than a constant slice of the band.
+				const zFar = y / grid.h;
+				const zNear = (y + 1) / grid.h;
+				const z = (y + 0.5) / grid.h;
+				const cellH = (floorPlaneY(zNear) - floorPlaneY(zFar)) * H;
 				for (let x = 0; x < grid.w; x++) {
 					const value = grid.cells[y * grid.w + x] ?? 0;
 					if (value <= 0.01) continue;
-					const cx = (x + 0.5) * cellW;
-					const cy = waterY + (y + 0.5) * cellH;
+					const projected = projectFloor((x + 0.5) / grid.w, z);
+					const cx = projected.x * W;
+					const cy = projected.y * H;
+					const cellW = baseCellW * projected.scale;
 					const seed = `${x}:${y}:${book.worldShape.spawnRevision}`;
-					const depth = y / Math.max(1, grid.h - 1);
+					// distance haze, not depth-of-water dimming: this used to fade the
+					// *near* rows, which was the flat-wall reading. On a plane it's the
+					// far rows that should recede. A generalizes it no further than
+					// this one term; B replaces it with real depth fog for the whole
+					// scene, water column included.
+					const depth = 1 - z;
 
 					ctx!.save();
 					ctx!.globalAlpha = (0.06 + value * 0.22) * (1 - depth * 0.18);
@@ -551,13 +569,18 @@
 			for (const placed of book.worldShape.placedFeatures) {
 				const spec = featureById(placed.featureId);
 				if (!spec) continue;
-				const x = placed.x * W;
-				const size = H * 0.13 * placed.scale;
+				// placed.y is already the grid's depth axis, so a feature projects
+				// onto the plane the same way a sediment cell does — including the
+				// foreshortening, which is what stops a feature at the back of the
+				// floor from reading as pasted on top of it.
+				const projected = projectFloor(placed.x, placed.y);
+				const x = projected.x * W;
+				const size = H * 0.13 * placed.scale * projected.scale;
 				// features are placed on the deepest sediment rows by design
 				// (placeFeatureOnBestSediment favors them), which can sit close
 				// enough to y=1 that the feature — plus its grounding shadow at
 				// y + size * 0.35 — would spill past the bottom of the canvas.
-				const y = Math.min(H * waterGridYToWorld(placed.y), H - size * 0.5 - H * 0.01);
+				const y = Math.min(projected.y * H, H - size * 0.5 - H * 0.01);
 				ctx!.save();
 				ctx!.globalAlpha = 0.2;
 				ctx!.fillStyle = 'rgb(14, 14, 40)';
@@ -618,8 +641,20 @@
 
 				const seed = point.x + point.y + life.id.length * 0.013;
 				const stage = book.stageOf(life.id);
+				// a spawn point whose y falls inside the floor band is standing on the
+				// plane, so it takes the plane's foreshortening. Points in the water
+				// column above it are untouched here — the whole scene gets depth in
+				// step B; A is the floor. Its stored x is already a world fraction
+				// (sedimentSpawnPoints derives it from the grid column), so it
+				// projects forward; only the depth has to be recovered from y.
+				const groundZ = floorDepthAtY(point.y);
 				const box =
-					H * CREATURE_BOX * point.scale * info.sizeScale * (0.58 + 0.42 * (stage / 3));
+					H *
+					CREATURE_BOX *
+					point.scale *
+					info.sizeScale *
+					(0.58 + 0.42 * (stage / 3)) *
+					(groundZ === null ? 1 : projectFloor(point.x, groundZ).scale);
 				const scale = box / Math.max(entry.img.naturalWidth, entry.img.naturalHeight);
 				const dw = entry.img.naturalWidth * scale;
 				const dh = entry.img.naturalHeight * scale;
@@ -629,8 +664,15 @@
 				// than the *life* meant co-located creatures rendered at the exact same
 				// x. key the fan-out on the (point, life) pair so it's stable across
 				// frames/reloads but distinct per creature.
-				const fan = (stable01(`${point.id}:${life.id}:fan`) - 0.5) * W * 0.09;
-				const cx = Math.min(Math.max(point.x * W + fan, dw * 0.5), W - dw * 0.5);
+				// the fan is applied in world x *before* projection, so co-located
+				// creatures spread along the plane rather than across the screen —
+				// two on a far row sit closer together than two on a near one.
+				const fan = (stable01(`${point.id}:${life.id}:fan`) - 0.5) * 0.09;
+				const spread =
+					groundZ === null
+						? point.x * W + fan * W
+						: projectFloor(point.x + fan, groundZ).x * W;
+				const cx = Math.min(Math.max(spread, dw * 0.5), W - dw * 0.5);
 				// floor spawns (dense sediment, placed features) are biased toward
 				// the deepest rows and can sit close enough to y=1 that a
 				// full-size sprite's bottom edge — plus its bob — would fall past
@@ -638,6 +680,8 @@
 				// cy + dh * 0.35 below) inside the frame.
 				const minCy = dh * 0.5 + H * 0.01;
 				const maxCy = H - dh * 0.65 - H * 0.01;
+				// the bob is a hover *above* the plane, so it stays a screen-space
+				// offset applied after the projected landing point.
 				const rawCy = point.y * H + layerBob(point.layer, T, seed);
 				const cy = Math.min(Math.max(rawCy, minCy), Math.max(minCy, maxCy));
 				const alpha = clamp01(stage === 0 ? 0.3 : 0.55 + 0.45 * book.vitalityOf(life.id));
@@ -673,12 +717,19 @@
 				const cellW = sheet.img.naturalWidth / sheet.cols;
 				const cellH = sheet.img.naturalHeight / sheet.rows;
 				const yScale = cellW > 0 ? cellH / cellW : 1;
-				const size = H * CREATURE_BOX * spec.boxScale * placed.scale;
+				// same rule as the life above: on the plane means projected.
+				const groundZ = floorDepthAtY(placed.y);
+				const groundScale = groundZ === null ? 1 : projectFloor(placed.x, groundZ).scale;
+				const size = H * CREATURE_BOX * spec.boxScale * placed.scale * groundScale;
 				const dh = size * yScale;
 
 				const seed = placed.x + placed.y + placed.id.length * 0.013;
-				const jitter = (placed.id.length % 7) * W * 0.002;
-				const cx = Math.min(Math.max(placed.x * W + jitter, size * 0.5), W - size * 0.5);
+				const jitter = (placed.id.length % 7) * 0.002;
+				const spread =
+					groundZ === null
+						? placed.x * W + jitter * W
+						: projectFloor(placed.x + jitter, groundZ).x * W;
+				const cx = Math.min(Math.max(spread, size * 0.5), W - size * 0.5);
 				// same floor/bottom-edge clamp as drawCreatureLayers, for the same
 				// reason: a floor-layer creature's band goes fairly deep, and its
 				// bob shouldn't be able to carry it past the canvas.
@@ -752,8 +803,11 @@
 				ctx!.fillRect(0, 0, W, H);
 			}
 			if (isPouring && pourPoint) {
-				const x = pourPoint.x * W;
-				const y = H * waterGridYToWorld(pourPoint.y);
+				// pourPoint is world (x, z); re-project it so the stream lands on the
+				// plane at the spot the pointer actually resolved to.
+				const landing = projectFloor(pourPoint.x, pourPoint.y);
+				const x = landing.x * W;
+				const y = landing.y * H;
 				const top = H * WATER_TOP + H * 0.012;
 				const bottom = Math.max(top + H * 0.035, y);
 				const drift = reduce ? 0 : T;
@@ -983,10 +1037,14 @@
 				const rowBase = Math.min(3, Math.floor(intensity * 3 + interventions / 5));
 				const row = Math.min(3, rowBase + (Math.sin(T * 0.7 + i) > 0.7 ? 1 : 0));
 				const placed = book.worldShape.placedFeatures[i % Math.max(1, book.worldShape.placedFeatures.length)];
-				const x = placed ? placed.x * W : W * (0.17 + i * 0.22 + (stable01(`${seed}-x`) - 0.5) * 0.05);
-				const size = H * (0.15 + stable01(`${seed}-size`) * 0.05);
-				const y = placed
-					? Math.min(H * waterGridYToWorld(placed.y), H - size * 0.5 - H * 0.01)
+				// an aura anchored to a feature has to ride the same projection the
+				// feature does, or it drifts off the thing it belongs to.
+				const anchor = placed ? projectFloor(placed.x, placed.y) : null;
+				const x = anchor ? anchor.x * W : W * (0.17 + i * 0.22 + (stable01(`${seed}-x`) - 0.5) * 0.05);
+				const size =
+					H * (0.15 + stable01(`${seed}-size`) * 0.05) * (anchor ? anchor.scale : 1);
+				const y = anchor
+					? Math.min(anchor.y * H, H - size * 0.5 - H * 0.01)
 					: H * (WATER_TOP + 0.12 + stable01(`${seed}-y`) * 0.28);
 				const pulse = 0.78 + 0.22 * Math.sin(T * (0.8 + stable01(`${seed}-pulse`)) + i);
 				drawGlow(x, y, size * 0.6, AURA_TINTS[row] ?? [200, 190, 220], (0.18 + intensity * 0.32) * pulse);
