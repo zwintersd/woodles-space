@@ -9,13 +9,22 @@
 		creatureById,
 		featureById,
 		resolveSpawnPointForLife,
+		sampleSediment,
 		stable01,
-		waterGridYToWorld,
-		worldYToWaterGrid,
 		type SedimentGrid,
 		type SpawnLayer,
 		type SpawnPoint
 	} from './worldShape';
+	import {
+		byDepth,
+		floorDepthAtY,
+		floorDepthScale,
+		floorPlaneY,
+		fogAlpha,
+		projectFloor,
+		sceneDepthFromSeed,
+		unprojectFloor
+	} from './projection';
 	import type { Life } from './content/life';
 
 	const ASPECT = 960 / 480;
@@ -27,6 +36,10 @@
 	const GLINT_SPRITES = [32, 33, 34, 35, 36, 37, 38, 39];
 	const PUFF_SPRITES = [40, 41, 42, 43, 44, 45, 46, 47];
 	const DEEPWATER_SWIM = { columns: 4, rows: 3, frames: 12, fps: 12 } as const;
+
+	// something in the scene with a distance, held back until its whole pass has
+	// been collected so it can be drawn in depth order.
+	type Drawable = { z: number; render: () => void };
 
 	let wrapEl: HTMLDivElement | undefined = $state();
 	let canvasEl: HTMLCanvasElement | undefined = $state();
@@ -43,15 +56,21 @@
 	let pourPoint: { x: number; y: number } | null = null;
 	let lastPourAt = 0;
 
+	// screen point -> world (x, z) on the floor plane. `x` is a *world* fraction,
+	// not the raw canvas one: the near edge of the frame is wider than the far edge
+	// of the world, so pointing at the same pixel column means a different column of
+	// silt depending on how far back you are. unprojectFloor does that inversion and
+	// returns null off the plane, which is the same range check this made before.
 	function pointerToWaterPoint(event: PointerEvent): { x: number; y: number } | null {
 		const canvas = canvasEl;
 		if (!canvas) return null;
 		const rect = canvas.getBoundingClientRect();
 		if (rect.width <= 0 || rect.height <= 0) return null;
-		const x = clamp01((event.clientX - rect.left) / rect.width);
-		const worldY = (event.clientY - rect.top) / rect.height;
-		const y = worldYToWaterGrid(worldY);
-		return y === null ? null : { x, y };
+		const point = unprojectFloor(
+			clamp01((event.clientX - rect.left) / rect.width),
+			(event.clientY - rect.top) / rect.height
+		);
+		return point === null ? null : { x: point.x, y: point.z };
 	}
 
 	function startPour(event: PointerEvent) {
@@ -96,6 +115,10 @@
 		// canvas once per actual change and blit the result instead.
 		const sedimentCanvas = document.createElement('canvas');
 		const sedimentCtx = sedimentCanvas.getContext('2d');
+		// while a pour is live the floor repaints at most this often; see
+		// ensureSedimentBaked.
+		const SEDIMENT_BAKE_MIN_MS = 90;
+		let sedimentBakedAt = -Infinity;
 		let sedimentBakedGrid: SedimentGrid | null = null;
 		let sedimentBakedW = 0;
 		let sedimentBakedH = 0;
@@ -176,7 +199,10 @@
 			rotation: number,
 			alpha: number,
 			yScale = 1,
-			blend: GlobalCompositeOperation = 'source-over'
+			blend: GlobalCompositeOperation = 'source-over',
+			// distance haze, when the sprite is something standing in the world rather
+			// than an overlay drawn on top of it.
+			fog?: { amount: number; tint: readonly [number, number, number] }
 		): boolean {
 			if (!sheet.ok || !sheet.img.naturalWidth || !sheet.img.naturalHeight) return false;
 			const cellW = sheet.img.naturalWidth / sheet.cols;
@@ -189,7 +215,20 @@
 			ctx!.globalAlpha = clamp01(alpha);
 			ctx!.globalCompositeOperation = blend;
 			ctx!.imageSmoothingEnabled = true;
-			ctx!.drawImage(sheet.img, sx, sy, cellW, cellH, -size / 2, -(size * yScale) / 2, size, size * yScale);
+			if (fog && fog.amount > 0.01) {
+				drawFogged(
+					sheet.img,
+					-size / 2,
+					-(size * yScale) / 2,
+					size,
+					size * yScale,
+					fog.amount,
+					fog.tint,
+					{ sx, sy, sw: cellW, sh: cellH }
+				);
+			} else {
+				ctx!.drawImage(sheet.img, sx, sy, cellW, cellH, -size / 2, -(size * yScale) / 2, size, size * yScale);
+			}
 			ctx!.restore();
 			return true;
 		}
@@ -377,26 +416,142 @@
 			ctx!.restore();
 		}
 
+		// The silt surface. Drawn back to front as depth bands whose top edge follows
+		// the interpolated height at each x, so painter's order does the occlusion: a
+		// mound in front covers the trough behind it, which is what makes a pour read
+		// as relief rather than as a change of opacity.
+		//
+		// The 48x12 grid is persisted at that size, so the surface is sampled off a
+		// finer render grid rather than migrating the save (2_5D.md part 1). This is
+		// the step where that subdivision starts earning its keep: A's soft scatter had
+		// no hard edges to look coarse, a filled band does.
+		// Subdivision is bounded by what the source actually holds: the grid is 48x12,
+		// so ~1.3x the columns and 1.5x the rows is enough to smooth the interpolation
+		// without inventing detail. 96x36 was tried and is visually indistinguishable
+		// from this — the extra samples interpolate information the 12 rows never had
+		// — while costing a third of the frame rate during a live pour, when the whole
+		// surface rebuilds every frame.
+		const SURFACE_COLS = 64;
+		const SURFACE_ROWS = 18;
+		const SURFACE_SHADE_STOPS = 24;
+
+		function drawSedimentSurface() {
+			const grid = book.worldShape.sedimentGrid;
+			// far edge first: painter's order is what does the occluding here, so a
+			// near mound has to be laid down after the trough behind it.
+			for (let row = 0; row < SURFACE_ROWS; row++) {
+				const zNear = (row + 1) / SURFACE_ROWS;
+				const v = (row + 0.5) / SURFACE_ROWS;
+				const haze = fogAlpha(v);
+				const baseY = floorPlaneY(zNear) * H;
+
+				const crest: { x: number; y: number; value: number }[] = [];
+				let peak = 0;
+				for (let col = 0; col <= SURFACE_COLS; col++) {
+					const u = col / SURFACE_COLS;
+					const value = sampleSediment(grid, u, v);
+					peak = Math.max(peak, value);
+					const p = projectFloor(u, v, value);
+					crest.push({ x: p.x * W, y: p.y * H, value });
+				}
+				if (peak <= 0.02) continue;
+
+				// Two things vary along the band, and both have to, or the floor reads
+				// wrong. Opacity follows the silt at each x rather than the band's peak
+				// — otherwise one tall mound paints its whole row at mound opacity and
+				// the seabed becomes a slab. And lightness follows the *slope*: a
+				// heightfield of smooth mounds has almost no silhouette from a camera
+				// this low, so what makes relief legible is shading, not outline. The
+				// face descending toward the viewer catches the light; the back of the
+				// same mound falls away into shadow.
+				//
+				// A horizontal gradient is the only way to vary either across a single
+				// fill, so both are built as one stop per sampled column.
+				// Gradient resolution is deliberately coarser than the path's. The
+				// silhouette needs every one of SURFACE_COLS samples to stay smooth,
+				// but shade and opacity vary gently, so stopping every few columns is
+				// visually identical and costs a fraction — and this whole surface is
+				// rebuilt on every frame of a live pour, where the cost lands on the
+				// one interaction that has to stay responsive.
+				const vAhead = Math.min(1, v + 1 / SURFACE_ROWS);
+				const body = ctx!.createLinearGradient(crest[0].x, 0, crest[crest.length - 1].x, 0);
+				const rim = ctx!.createLinearGradient(crest[0].x, 0, crest[crest.length - 1].x, 0);
+				for (let g = 0; g <= SURFACE_SHADE_STOPS; g++) {
+					const i = Math.round((g / SURFACE_SHADE_STOPS) * (crest.length - 1));
+					const value = crest[i].value;
+					// positive where the surface falls away toward the viewer — the lit
+					// face of a mound; negative on its sheltered back.
+					const slope = value - sampleSediment(grid, i / SURFACE_COLS, vAhead);
+					const lit = clamp01(0.5 + slope * 9);
+					const stop = g / SURFACE_SHADE_STOPS;
+					body.addColorStop(
+						stop,
+						`rgba(${lerp(178, 253, lit) | 0}, ${lerp(190, 252, lit) | 0}, ${
+							lerp(222, 255, lit) | 0
+						}, ${value * 0.5 * (1 - haze)})`
+					);
+					// the rim only earns its line where there's a real edge to catch it.
+					rim.addColorStop(
+						stop,
+						`rgba(255, 255, 255, ${clamp01(slope * 5) * 0.5 * (1 - haze)})`
+					);
+				}
+
+				ctx!.save();
+				ctx!.beginPath();
+				ctx!.moveTo(crest[0].x, crest[0].y);
+				for (let i = 1; i < crest.length; i++) ctx!.lineTo(crest[i].x, crest[i].y);
+				ctx!.lineTo(crest[crest.length - 1].x, baseY);
+				ctx!.lineTo(crest[0].x, baseY);
+				ctx!.closePath();
+				ctx!.fillStyle = body;
+				ctx!.fill();
+
+				// the crest line is what actually says "this has a top". Without it the
+				// bands blend into one wash and the relief disappears.
+				ctx!.beginPath();
+				ctx!.moveTo(crest[0].x, crest[0].y);
+				for (let i = 1; i < crest.length; i++) ctx!.lineTo(crest[i].x, crest[i].y);
+				ctx!.strokeStyle = rim;
+				ctx!.lineWidth = Math.max(0.7, H * 0.0026 * floorDepthScale(v));
+				ctx!.stroke();
+				ctx!.restore();
+			}
+		}
+
 		function drawSedimentGrid() {
 			const grid = book.worldShape.sedimentGrid;
-			// confined to the bottom fraction of the canvas (FLOOR_TOP), not the
-			// whole water column, so open water stays clear for creatures to
-			// read against instead of sediment texture filling the entire depth.
-			const waterY = H * FLOOR_TOP;
-			const waterH = H - waterY;
-			const cellW = W / grid.w;
-			const cellH = waterH / grid.h;
+			// the grid's rows are the *depth* axis now — SEDIMENT_GRID_H cells
+			// front-to-back across a plane in perspective, not stacked bands of a
+			// flat wall (2_5D.md part 1). Nothing about the stored grid changed; the
+			// row a cell sits in is read as z rather than as screen y, so far rows
+			// compress toward the horizon and near rows open up. The plane still
+			// spans exactly the band it did before, FLOOR_TOP to the frame's bottom.
+			const baseCellW = W / grid.w;
 			for (let y = 0; y < grid.h; y++) {
+				// the row's near and far edges, so a cell's footprint is its true
+				// projected height rather than a constant slice of the band.
+				const zFar = y / grid.h;
+				const zNear = (y + 1) / grid.h;
+				const z = (y + 0.5) / grid.h;
+				const cellH = (floorPlaneY(zNear) - floorPlaneY(zFar)) * H;
 				for (let x = 0; x < grid.w; x++) {
 					const value = grid.cells[y * grid.w + x] ?? 0;
 					if (value <= 0.01) continue;
-					const cx = (x + 0.5) * cellW;
-					const cy = waterY + (y + 0.5) * cellH;
+					// the scatter rides the height it helped build, so bits and clusters
+					// sit on the mound rather than floating at the plane beneath it.
+					const projected = projectFloor((x + 0.5) / grid.w, z, value);
+					const cx = projected.x * W;
+					const cy = projected.y * H;
+					const cellW = baseCellW * projected.scale;
 					const seed = `${x}:${y}:${book.worldShape.spawnRevision}`;
-					const depth = y / Math.max(1, grid.h - 1);
+					// the same fog every other object in the scene answers to, rather
+					// than the row-index dimming this carried before. Baked in per row,
+					// so distance costs nothing per frame.
+					const haze = fogAlpha(z);
 
 					ctx!.save();
-					ctx!.globalAlpha = (0.06 + value * 0.22) * (1 - depth * 0.18);
+					ctx!.globalAlpha = (0.06 + value * 0.22) * (1 - haze);
 					const pearl = ctx!.createRadialGradient(cx - cellW * 0.22, cy - cellH * 0.22, 0, cx, cy, cellW * (1.2 + value));
 					pearl.addColorStop(0, 'rgba(255, 255, 255, 0.98)');
 					pearl.addColorStop(0.46, value > 0.62 ? 'rgba(249, 242, 255, 0.9)' : 'rgba(248, 248, 242, 0.78)');
@@ -475,21 +630,32 @@
 		// rebakes drawSedimentGrid() into the offscreen sediment canvas by
 		// temporarily pointing the shared `ctx` at it — every draw helper below
 		// already reads `ctx` dynamically, so nothing else needs to change.
-		function ensureSedimentBaked() {
+		function ensureSedimentBaked(nowMs: number, force: boolean) {
 			if (!sedimentCtx) return;
 			const grid = book.worldShape.sedimentGrid;
 			if (grid === sedimentBakedGrid && W === sedimentBakedW && H === sedimentBakedH) return;
+			// A live pour hands us a new grid every single frame (pourSedimentAt
+			// rebuilds it), and since C the bake is a real piece of work — the whole
+			// silt surface, filled and stroked band by band. Baking it at frame rate
+			// spends the cost squarely on the one interaction that has to stay
+			// responsive. The grid itself still updates every frame, so nothing about
+			// the pour's arithmetic changes; only the painted floor trails it, by less
+			// than a tenth of a second, under a falling stream drawn live on top. The
+			// frame the pour ends is forced, so what she let go of is what she sees.
+			if (!force && nowMs - sedimentBakedAt < SEDIMENT_BAKE_MIN_MS) return;
 			sedimentCanvas.width = Math.max(1, Math.round(W * dpr));
 			sedimentCanvas.height = Math.max(1, Math.round(H * dpr));
 			const liveCtx = ctx;
 			ctx = sedimentCtx;
 			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 			ctx.clearRect(0, 0, W, H);
+			drawSedimentSurface();
 			drawSedimentGrid();
 			ctx = liveCtx;
 			sedimentBakedGrid = grid;
 			sedimentBakedW = W;
 			sedimentBakedH = H;
+			sedimentBakedAt = nowMs;
 		}
 
 		function drawShallowsShelf() {
@@ -551,13 +717,24 @@
 			for (const placed of book.worldShape.placedFeatures) {
 				const spec = featureById(placed.featureId);
 				if (!spec) continue;
-				const x = placed.x * W;
-				const size = H * 0.13 * placed.scale;
+				// placed.y is already the grid's depth axis, so a feature projects
+				// onto the plane the same way a sediment cell does — including the
+				// foreshortening, which is what stops a feature at the back of the
+				// floor from reading as pasted on top of it, and the height of the
+				// silt it was settled into, since placeFeatureOnBestSediment seeks
+				// exactly the deep cells that now stand proud of the floor.
+				const projected = projectFloor(
+					placed.x,
+					placed.y,
+					sampleSediment(book.worldShape.sedimentGrid, placed.x, placed.y)
+				);
+				const x = projected.x * W;
+				const size = H * 0.13 * placed.scale * projected.scale;
 				// features are placed on the deepest sediment rows by design
 				// (placeFeatureOnBestSediment favors them), which can sit close
 				// enough to y=1 that the feature — plus its grounding shadow at
 				// y + size * 0.35 — would spill past the bottom of the canvas.
-				const y = Math.min(H * waterGridYToWorld(placed.y), H - size * 0.5 - H * 0.01);
+				const y = Math.min(projected.y * H, H - size * 0.5 - H * 0.01);
 				ctx!.save();
 				ctx!.globalAlpha = 0.2;
 				ctx!.fillStyle = 'rgb(14, 14, 40)';
@@ -607,7 +784,82 @@
 			return point;
 		}
 
-		function drawCreatureLayers(layers: SpawnLayer[], T: number) {
+		// The depth of anything in the scene. On the floor it's read off the plane;
+		// in the water column it comes from the point's own id, so it's stable across
+		// frames and reloads without a save field to carry it.
+		function depthOf(id: string, y: number): number {
+			return floorDepthAtY(y) ?? sceneDepthFromSeed(stable01(`${id}:depth`));
+		}
+
+		// The color distance fades toward: the water's own body, sampled down the
+		// column so a far creature near the surface hazes pale and one near the floor
+		// hazes blue. Above the waterline it's the pale air at the horizon. These
+		// track drawWaterBase's stops rather than introducing a second palette.
+		function fogColorAt(y: number): [number, number, number] {
+			const waterY = H * WATER_TOP;
+			if (y <= waterY) return [232, 226, 240];
+			const t = clamp01((y - waterY) / Math.max(1, H - waterY));
+			return t < 0.32
+				? [
+						lerp(243, 204, t / 0.32),
+						lerp(224, 193, t / 0.32),
+						lerp(236, 229, t / 0.32)
+					]
+				: [
+						lerp(204, 132, (t - 0.32) / 0.68),
+						lerp(193, 146, (t - 0.32) / 0.68),
+						lerp(229, 205, (t - 0.32) / 0.68)
+					];
+		}
+
+		// Tinting a sprite by distance needs the fog to land on the sprite's own
+		// pixels, not on the water behind it — so the sprite goes to a scratch canvas
+		// first, takes a `source-atop` wash there, and arrives here already hazed.
+		// One canvas, reused, grown as needed.
+		const fogCanvas = document.createElement('canvas');
+		const fogCtx = fogCanvas.getContext('2d');
+
+		function drawFogged(
+			img: CanvasImageSource,
+			dx: number,
+			dy: number,
+			dw: number,
+			dh: number,
+			fog: number,
+			tint: readonly [number, number, number],
+			source?: { sx: number; sy: number; sw: number; sh: number }
+		) {
+			// the scratch is sized to where the sprite *lands*, not to the source art:
+			// a bound Bestiary creature can be a 1024px png drawn at 90, and rasterizing
+			// the full source every frame would cost far more than the haze is worth.
+			// device pixels, so a hi-dpi screen loses no sharpness on the round trip.
+			const rw = Math.ceil(dw * dpr);
+			const rh = Math.ceil(dh * dpr);
+			if (!fogCtx || fog <= 0.01 || rw <= 0 || rh <= 0) {
+				if (source) ctx!.drawImage(img, source.sx, source.sy, source.sw, source.sh, dx, dy, dw, dh);
+				else ctx!.drawImage(img, dx, dy, dw, dh);
+				return;
+			}
+			if (fogCanvas.width < rw || fogCanvas.height < rh) {
+				fogCanvas.width = Math.max(fogCanvas.width, rw);
+				fogCanvas.height = Math.max(fogCanvas.height, rh);
+			}
+			fogCtx.setTransform(1, 0, 0, 1, 0, 0);
+			fogCtx.globalCompositeOperation = 'source-over';
+			fogCtx.clearRect(0, 0, rw, rh);
+			fogCtx.imageSmoothingEnabled = ctx!.imageSmoothingEnabled;
+			if (source) fogCtx.drawImage(img, source.sx, source.sy, source.sw, source.sh, 0, 0, rw, rh);
+			else fogCtx.drawImage(img, 0, 0, rw, rh);
+			fogCtx.globalCompositeOperation = 'source-atop';
+			fogCtx.fillStyle = `rgba(${tint[0] | 0}, ${tint[1] | 0}, ${tint[2] | 0}, ${fog})`;
+			fogCtx.fillRect(0, 0, rw, rh);
+			fogCtx.globalCompositeOperation = 'source-over';
+			ctx!.drawImage(fogCanvas, 0, 0, rw, rh, dx, dy, dw, dh);
+		}
+
+		// One creature, already placed in depth. Collected rather than drawn on sight
+		// so the whole layer can be sorted back-to-front first (see drawSceneLayers).
+		function collectLife(layers: SpawnLayer[], T: number, into: Drawable[]) {
 			for (const life of book.life) {
 				const info = spriteFor(life.id);
 				if (!info) continue;
@@ -618,8 +870,21 @@
 
 				const seed = point.x + point.y + life.id.length * 0.013;
 				const stage = book.stageOf(life.id);
+				// a spawn point whose y falls inside the floor band is standing on the
+				// plane, so it takes the plane's foreshortening. One above it takes a
+				// stable depth of its own, so the water column is a volume rather than
+				// a pane — one foreshortening function serves both. Its stored x is
+				// already a world fraction (sedimentSpawnPoints derives it from the
+				// grid column), so it projects forward; only depth comes from y.
+				const groundZ = floorDepthAtY(point.y);
+				const z = depthOf(point.id, point.y);
 				const box =
-					H * CREATURE_BOX * point.scale * info.sizeScale * (0.58 + 0.42 * (stage / 3));
+					H *
+					CREATURE_BOX *
+					point.scale *
+					info.sizeScale *
+					(0.58 + 0.42 * (stage / 3)) *
+					(groundZ === null ? floorDepthScale(z) : projectFloor(point.x, groundZ).scale);
 				const scale = box / Math.max(entry.img.naturalWidth, entry.img.naturalHeight);
 				const dw = entry.img.naturalWidth * scale;
 				const dh = entry.img.naturalHeight * scale;
@@ -629,8 +894,15 @@
 				// than the *life* meant co-located creatures rendered at the exact same
 				// x. key the fan-out on the (point, life) pair so it's stable across
 				// frames/reloads but distinct per creature.
-				const fan = (stable01(`${point.id}:${life.id}:fan`) - 0.5) * W * 0.09;
-				const cx = Math.min(Math.max(point.x * W + fan, dw * 0.5), W - dw * 0.5);
+				// the fan is applied in world x *before* projection, so co-located
+				// creatures spread along the plane rather than across the screen —
+				// two on a far row sit closer together than two on a near one.
+				const fan = (stable01(`${point.id}:${life.id}:fan`) - 0.5) * 0.09;
+				const spread =
+					groundZ === null
+						? point.x * W + fan * W
+						: projectFloor(point.x + fan, groundZ).x * W;
+				const cx = Math.min(Math.max(spread, dw * 0.5), W - dw * 0.5);
 				// floor spawns (dense sediment, placed features) are biased toward
 				// the deepest rows and can sit close enough to y=1 that a
 				// full-size sprite's bottom edge — plus its bob — would fall past
@@ -638,32 +910,40 @@
 				// cy + dh * 0.35 below) inside the frame.
 				const minCy = dh * 0.5 + H * 0.01;
 				const maxCy = H - dh * 0.65 - H * 0.01;
+				// the bob is a hover *above* the plane, so it stays a screen-space
+				// offset applied after the projected landing point.
 				const rawCy = point.y * H + layerBob(point.layer, T, seed);
 				const cy = Math.min(Math.max(rawCy, minCy), Math.max(minCy, maxCy));
 				const alpha = clamp01(stage === 0 ? 0.3 : 0.55 + 0.45 * book.vitalityOf(life.id));
+				const grounded = point.layer === 'floor' || point.layer === 'shore';
 
-				if (point.layer === 'floor' || point.layer === 'shore') {
-					ctx!.save();
-					ctx!.globalAlpha = alpha * 0.22;
-					ctx!.fillStyle = 'rgb(14, 14, 40)';
-					ctx!.beginPath();
-					ctx!.ellipse(cx, cy + dh * 0.35, dw * 0.32, dh * 0.06, 0, 0, Math.PI * 2);
-					ctx!.fill();
-					ctx!.restore();
-				}
+				into.push({
+					z,
+					render() {
+						if (grounded) {
+							ctx!.save();
+							ctx!.globalAlpha = alpha * 0.22;
+							ctx!.fillStyle = 'rgb(14, 14, 40)';
+							ctx!.beginPath();
+							ctx!.ellipse(cx, cy + dh * 0.35, dw * 0.32, dh * 0.06, 0, 0, Math.PI * 2);
+							ctx!.fill();
+							ctx!.restore();
+						}
 
-				ctx!.save();
-				ctx!.globalAlpha = alpha;
-				ctx!.imageSmoothingEnabled = !info.pixelated;
-				ctx!.drawImage(entry.img, cx - dw / 2, cy - dh / 2, dw, dh);
-				ctx!.restore();
+						ctx!.save();
+						ctx!.globalAlpha = alpha;
+						ctx!.imageSmoothingEnabled = !info.pixelated;
+						drawFogged(entry.img, cx - dw / 2, cy - dh / 2, dw, dh, fogAlpha(z), fogColorAt(cy));
+						ctx!.restore();
+					}
+				});
 			}
 		}
 
 		// the shared decorative creatures Brianna calls into the scene
 		// (CREATURE_SPECS / worldShape.placedCreatures) — no vitals/stage
 		// concept, just an animated sprite sheet at a fixed placed spot.
-		function drawPlacedCreatures(layers: SpawnLayer[], T: number) {
+		function collectPlacedCreatures(layers: SpawnLayer[], T: number, into: Drawable[]) {
 			for (const placed of book.worldShape.placedCreatures) {
 				const spec = creatureById(placed.creatureId);
 				if (!spec || !layers.includes(spec.layer)) continue;
@@ -673,12 +953,21 @@
 				const cellW = sheet.img.naturalWidth / sheet.cols;
 				const cellH = sheet.img.naturalHeight / sheet.rows;
 				const yScale = cellW > 0 ? cellH / cellW : 1;
-				const size = H * CREATURE_BOX * spec.boxScale * placed.scale;
+				// same rule as the life above: on the plane means projected.
+				const groundZ = floorDepthAtY(placed.y);
+				const z = depthOf(placed.id, placed.y);
+				const groundScale =
+					groundZ === null ? floorDepthScale(z) : projectFloor(placed.x, groundZ).scale;
+				const size = H * CREATURE_BOX * spec.boxScale * placed.scale * groundScale;
 				const dh = size * yScale;
 
 				const seed = placed.x + placed.y + placed.id.length * 0.013;
-				const jitter = (placed.id.length % 7) * W * 0.002;
-				const cx = Math.min(Math.max(placed.x * W + jitter, size * 0.5), W - size * 0.5);
+				const jitter = (placed.id.length % 7) * 0.002;
+				const spread =
+					groundZ === null
+						? placed.x * W + jitter * W
+						: projectFloor(placed.x + jitter, groundZ).x * W;
+				const cx = Math.min(Math.max(spread, size * 0.5), W - size * 0.5);
 				// same floor/bottom-edge clamp as drawCreatureLayers, for the same
 				// reason: a floor-layer creature's band goes fairly deep, and its
 				// bob shouldn't be able to carry it past the canvas.
@@ -687,19 +976,42 @@
 				const rawCy = placed.y * H + layerBob(spec.layer, T, seed);
 				const cy = Math.min(Math.max(rawCy, minCy), Math.max(minCy, maxCy));
 
-				if (spec.layer === 'floor' || spec.layer === 'shore') {
-					ctx!.save();
-					ctx!.globalAlpha = 0.22;
-					ctx!.fillStyle = 'rgb(14, 14, 40)';
-					ctx!.beginPath();
-					ctx!.ellipse(cx, cy + dh * 0.35, size * 0.32, dh * 0.06, 0, 0, Math.PI * 2);
-					ctx!.fill();
-					ctx!.restore();
-				}
+				const grounded = spec.layer === 'floor' || spec.layer === 'shore';
 
-				const frame = Math.floor(T * spec.fps) % spec.frameCount;
-				drawSheetSprite(sheet, frame, cx, cy, size, placed.rotation, 1, yScale);
+				into.push({
+					z,
+					render() {
+						if (grounded) {
+							ctx!.save();
+							ctx!.globalAlpha = 0.22;
+							ctx!.fillStyle = 'rgb(14, 14, 40)';
+							ctx!.beginPath();
+							ctx!.ellipse(cx, cy + dh * 0.35, size * 0.32, dh * 0.06, 0, 0, Math.PI * 2);
+							ctx!.fill();
+							ctx!.restore();
+						}
+
+						const frame = Math.floor(T * spec.fps) % spec.frameCount;
+						drawSheetSprite(sheet, frame, cx, cy, size, placed.rotation, 1, yScale, 'source-over', {
+							amount: fogAlpha(z),
+							tint: fogColorAt(cy)
+						});
+					}
+				});
 			}
+		}
+
+		// Back-to-front within a pass. The four hand-ordered buckets stay two passes,
+		// split at the water's surface — the glaze and ripples are a film on it, not
+		// an object in the volume, so they keep their fixed place between. Inside each
+		// pass the order was `book.life`'s roster order, which had nothing to do with
+		// distance: a creature at the back could draw over one at the front.
+		function drawSceneLayers(layers: SpawnLayer[], T: number) {
+			const items: Drawable[] = [];
+			collectLife(layers, T, items);
+			collectPlacedCreatures(layers, T, items);
+			items.sort(byDepth);
+			for (const item of items) item.render();
 		}
 
 		function drawRain(T: number) {
@@ -752,8 +1064,16 @@
 				ctx!.fillRect(0, 0, W, H);
 			}
 			if (isPouring && pourPoint) {
-				const x = pourPoint.x * W;
-				const y = H * waterGridYToWorld(pourPoint.y);
+				// pourPoint is world (x, z); re-project it so the stream lands on the
+				// silt at the spot the pointer actually resolved to — on top of what's
+				// already been poured there, not on the plane underneath it.
+				const landing = projectFloor(
+					pourPoint.x,
+					pourPoint.y,
+					sampleSediment(book.worldShape.sedimentGrid, pourPoint.x, pourPoint.y)
+				);
+				const x = landing.x * W;
+				const y = landing.y * H;
 				const top = H * WATER_TOP + H * 0.012;
 				const bottom = Math.max(top + H * 0.035, y);
 				const drift = reduce ? 0 : T;
@@ -914,11 +1234,44 @@
 			}
 		}
 
-		function drawSedimentCast(T: number, intensity: number) {
+		// The falling silt. Its x used to be seeded off `book.worldIndex` and never
+		// consulted `pourPoint`, so during a pour the stream ran at full intensity
+		// somewhere the pointer wasn't — cause and effect with the travel between them
+		// missing. Given a landing spot it now starts at the surface above that spot,
+		// falls to it, and puffs where it arrives, foreshortened by the landing depth
+		// so a pour at the back of the floor is a smaller, shorter fall than one at the
+		// front. Without one it keeps the ambient wandering it always had.
+		function drawSedimentCast(
+			T: number,
+			intensity: number,
+			landing: { x: number; y: number } | null
+		) {
 			if (!sedimentCast.ok || !sedimentCast.img.naturalWidth || intensity <= 0.03) return;
 			const sw = sedimentCast.img.naturalWidth / 8;
 			const streamH = sedimentCast.img.naturalHeight / 2;
 			const puffY = sedimentCast.img.naturalHeight - sw;
+			const surfaceY = H * (WATER_TOP - 0.025);
+
+			if (landing) {
+				const value = sampleSediment(book.worldShape.sedimentGrid, landing.x, landing.y);
+				const spot = projectFloor(landing.x, landing.y, value);
+				const x = spot.x * W;
+				const groundY = spot.y * H;
+				const frame = Math.floor(T * 6) % 8;
+				const streamW = H * 0.14 * spot.scale;
+				const fall = Math.max(H * 0.08, groundY - surfaceY);
+				drawSheetRegion(
+					sedimentCast, frame * sw, 0, sw, streamH,
+					x, surfaceY, streamW, fall, 0.16 + intensity * 0.34, 0, 'screen'
+				);
+				drawSheetRegion(
+					sedimentCast, frame * sw, puffY, sw, sw,
+					x, groundY, streamW * 1.3, H * 0.09 * spot.scale,
+					(0.16 + intensity * 0.34) * 1.25, 0, 'screen'
+				);
+				return;
+			}
+
 			const casts = intensity > 0.55 ? 2 : 1;
 			for (let i = 0; i < casts; i++) {
 				const seed = `sediment-cast-${book.worldIndex}-${i}`;
@@ -928,32 +1281,13 @@
 				const streamW = H * (0.12 + stable01(`${seed}-w`) * 0.05);
 				const streamAlpha = 0.14 + intensity * 0.3;
 				drawSheetRegion(
-					sedimentCast,
-					frame * sw,
-					0,
-					sw,
-					streamH,
-					x,
-					H * (WATER_TOP - 0.025),
-					streamW,
-					H * 0.42,
-					streamAlpha,
-					lean,
-					'screen'
+					sedimentCast, frame * sw, 0, sw, streamH,
+					x, surfaceY, streamW, H * 0.42, streamAlpha, lean, 'screen'
 				);
 				drawSheetRegion(
-					sedimentCast,
-					frame * sw,
-					puffY,
-					sw,
-					sw,
-					x + lean * H * 0.16,
-					H * (WATER_TOP + 0.205),
-					streamW * 1.3,
-					H * 0.09,
-					streamAlpha * 1.25,
-					0,
-					'screen'
+					sedimentCast, frame * sw, puffY, sw, sw,
+					x + lean * H * 0.16, H * (WATER_TOP + 0.205), streamW * 1.3, H * 0.09,
+					streamAlpha * 1.25, 0, 'screen'
 				);
 			}
 		}
@@ -983,10 +1317,20 @@
 				const rowBase = Math.min(3, Math.floor(intensity * 3 + interventions / 5));
 				const row = Math.min(3, rowBase + (Math.sin(T * 0.7 + i) > 0.7 ? 1 : 0));
 				const placed = book.worldShape.placedFeatures[i % Math.max(1, book.worldShape.placedFeatures.length)];
-				const x = placed ? placed.x * W : W * (0.17 + i * 0.22 + (stable01(`${seed}-x`) - 0.5) * 0.05);
-				const size = H * (0.15 + stable01(`${seed}-size`) * 0.05);
-				const y = placed
-					? Math.min(H * waterGridYToWorld(placed.y), H - size * 0.5 - H * 0.01)
+				// an aura anchored to a feature has to ride the same projection the
+				// feature does, or it drifts off the thing it belongs to.
+				const anchor = placed
+					? projectFloor(
+							placed.x,
+							placed.y,
+							sampleSediment(book.worldShape.sedimentGrid, placed.x, placed.y)
+						)
+					: null;
+				const x = anchor ? anchor.x * W : W * (0.17 + i * 0.22 + (stable01(`${seed}-x`) - 0.5) * 0.05);
+				const size =
+					H * (0.15 + stable01(`${seed}-size`) * 0.05) * (anchor ? anchor.scale : 1);
+				const y = anchor
+					? Math.min(anchor.y * H, H - size * 0.5 - H * 0.01)
 					: H * (WATER_TOP + 0.12 + stable01(`${seed}-y`) * 0.28);
 				const pulse = 0.78 + 0.22 * Math.sin(T * (0.8 + stable01(`${seed}-pulse`)) + i);
 				drawGlow(x, y, size * 0.6, AURA_TINTS[row] ?? [200, 190, 220], (0.18 + intensity * 0.32) * pulse);
@@ -1035,19 +1379,17 @@
 			drawSky(T);
 			drawWeather(T);
 			drawWaterBase(T);
-			ensureSedimentBaked();
+			ensureSedimentBaked(tMs, !isPouring);
 			ctx!.drawImage(sedimentCanvas, 0, 0, W, H);
-			drawSedimentCast(T, isPouring ? 1 : shine(tending) * 0.45);
+			drawSedimentCast(T, isPouring ? 1 : shine(tending) * 0.45, isPouring ? pourPoint : null);
 			drawShallowsShelf();
 			drawFeatures();
 			drawFeatureAuras(T, shine(witnessed));
-			drawCreatureLayers(['water', 'floor'], T);
+			drawSceneLayers(['water', 'floor'], T);
 			drawAnimatorSwimmer(T, shine(tending));
-			drawPlacedCreatures(['water', 'floor'], T);
 			drawWaterGlaze(T);
 			drawWaterRipples(T, m, shine(tending * 0.6 + m * 0.4));
-			drawCreatureLayers(['shore', 'air'], T);
-			drawPlacedCreatures(['shore', 'air'], T);
+			drawSceneLayers(['shore', 'air'], T);
 			drawRain(T);
 			drawWitchMotes(T, shine(tending));
 			drawOverlays(T);

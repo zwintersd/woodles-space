@@ -118,6 +118,11 @@ looking at the diorama with fresh eyes, using the current token values (now the 
 actually documented in `ASSETS.md`) as the anchor instead of the pre-repaint ones.
 deliberately deferred — bigger and more subjective than the rest of this list.
 
+> **see [2_5D.md](./2_5D.md) before starting this.** the 2.5d proposal argues that
+> generalized depth-fog gives every gradient stop a principled reason to exist — you'd
+> pick a water color and a falloff rather than hand-tune twelve stops. if that pass
+> happens, this one wants to happen on top of it, not before it and then again.
+
 ### blocked on your voice, not on code
 
 two DESIGN.md items are specifically diorama *moments* that still have no on-canvas

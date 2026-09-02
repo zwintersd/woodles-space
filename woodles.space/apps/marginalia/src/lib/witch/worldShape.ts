@@ -3,6 +3,7 @@ import type { Life, LifeCategory, LifeDomain } from './content/life';
 // Worldspace's shape now lives in @woodles/witch-engine; re-exported here so
 // existing imports keep working.
 import type { Worldspace } from '@woodles/witch-engine';
+import { SEDIMENT_BAND_TOP, floorDepthAtY, floorPlaneY } from './projection';
 export type { Worldspace };
 export type SpawnLayer = 'water' | 'floor' | 'shore' | 'air';
 export type SpawnRarity = 'common' | 'uncommon' | 'rare';
@@ -16,11 +17,8 @@ export const SEDIMENT_POUR_RATE = 0.8;
 export const SEDIMENT_POUR_RADIUS = 2.5;
 export const SEDIMENT_POUR_STRENGTH = 0.46;
 export const WORLD_WATER_TOP = 0.34;
-// the sediment floor — and anything anchored to it (placed features, the
-// pour interaction) — is confined to this bottom fraction of the canvas,
-// not the whole water column. keeps the open water clear for creatures to
-// read against, rather than sediment texture filling the entire depth.
-export const SEDIMENT_BAND_TOP = 0.8;
+// the floor plane's screen band and the perspective over it — see projection.ts.
+export { SEDIMENT_BAND_TOP } from './projection';
 
 // waymarks — spawn points she authors directly, in full. reuses the exact
 // tag vocabulary spawnWeightForLife already reads (excludes 'rare', which is
@@ -684,13 +682,38 @@ function findFeatureAnchor(
 	return bestPoint;
 }
 
+// These two are now the forward and inverse of the floor projection rather than a
+// linear remap of the band (2_5D.md part 1). Their endpoints are unchanged — 0 maps
+// to SEDIMENT_BAND_TOP and 1 to the bottom of the frame — so every caller keeps
+// working and the grid's stored y keeps meaning exactly what it meant. What changed
+// is the distribution between those endpoints: the rows are depth now.
+// Bilinear read of the sediment grid at fractional (u, v) across its extent, where
+// u runs along the world and v into the depth. The grid is 48x12 and persisted at
+// that size — see 2_5D.md — so a renderer that wants a finer surface than 12 rows
+// interpolates one rather than migrating the save. Samples are taken against cell
+// *centers*, so the value at a cell's center is exactly that cell's value.
+export function sampleSediment(grid: SedimentGrid, u: number, v: number): number {
+	if (grid.w <= 0 || grid.h <= 0) return 0;
+	const fx = clamp01(u) * grid.w - 0.5;
+	const fy = clamp01(v) * grid.h - 0.5;
+	const x0 = Math.max(0, Math.min(grid.w - 1, Math.floor(fx)));
+	const y0 = Math.max(0, Math.min(grid.h - 1, Math.floor(fy)));
+	const x1 = Math.min(grid.w - 1, x0 + 1);
+	const y1 = Math.min(grid.h - 1, y0 + 1);
+	const tx = Math.max(0, Math.min(1, fx - x0));
+	const ty = Math.max(0, Math.min(1, fy - y0));
+	const at = (x: number, y: number) => grid.cells[y * grid.w + x] ?? 0;
+	const top = at(x0, y0) + (at(x1, y0) - at(x0, y0)) * tx;
+	const bottom = at(x0, y1) + (at(x1, y1) - at(x0, y1)) * tx;
+	return top + (bottom - top) * ty;
+}
+
 export function waterGridYToWorld(y: number): number {
-	return SEDIMENT_BAND_TOP + clamp01(y) * (1 - SEDIMENT_BAND_TOP);
+	return floorPlaneY(clamp01(y));
 }
 
 export function worldYToWaterGrid(y: number): number | null {
-	if (y < SEDIMENT_BAND_TOP || y > 1) return null;
-	return clamp01((y - SEDIMENT_BAND_TOP) / (1 - SEDIMENT_BAND_TOP));
+	return floorDepthAtY(y);
 }
 
 export function generateSpawnPoints(shape: WorldShape): SpawnPoint[] {
