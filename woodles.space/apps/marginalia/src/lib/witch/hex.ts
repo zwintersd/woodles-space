@@ -14,8 +14,17 @@
 // Screen space stays canvas fractions in [0, 1], the convention the previous
 // projection used, so the renderer's callers keep their shape.
 
-/** Circumradius of one hex, as a fraction of canvas width. */
-export const HEX_SIZE = 0.055;
+/**
+ * Circumradius of one hex, as a fraction of canvas width.
+ *
+ * Sized against the frame rather than picked: the canvas is 2:1 and the tilt
+ * squashes rows, so a field of FIELD_COLS tiles at this size spans about three
+ * quarters of the width and two thirds of the height — roughly 2.3:1 in pixels,
+ * which reads as a wide island with open water around it. hexField.test.ts holds
+ * the field inside the frame, so changing this without changing the field's shape
+ * fails there rather than overflowing silently.
+ */
+export const HEX_SIZE = 0.028;
 
 /**
  * How much the camera flattens the world vertically. 1 is straight overhead — a
