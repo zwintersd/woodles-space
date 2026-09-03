@@ -26,7 +26,15 @@
 		sceneDepthFromSeed,
 		unprojectFloor
 	} from './projection';
-	import { SEA_LEVEL, hexCorners, offsetToAxial, projectHex } from './hex';
+	import {
+		CAMERA_TILT,
+		HEX_SIZE,
+		SEA_LEVEL,
+		TILE_THICKNESS,
+		hexCorners,
+		offsetToAxial,
+		projectHex
+	} from './hex';
 	import {
 		FIELD_COLS,
 		FIELD_ROWS,
@@ -42,7 +50,16 @@
 	const ASPECT = 960 / 480;
 	const WATER_TOP = WORLD_WATER_TOP;
 	const FLOOR_TOP = SEDIMENT_BAND_TOP;
-	const CREATURE_BOX = 0.2;
+	/**
+	 * How wide a creature is, measured in tiles.
+	 *
+	 * It used to be a fraction of the frame's height, which made sense when the
+	 * scene was a water column filling the canvas. Against a hex field the only
+	 * scale that means anything is the tile: a creature is a thing standing on the
+	 * ground, and how big it is relative to that ground is the whole question. Just
+	 * under one tile leaves it clearly an inhabitant rather than a landmark.
+	 */
+	const CREATURE_TILES = 0.9;
 	const PEARL_BIT_SPRITES = [0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 14, 15, 48, 49, 50, 55, 57, 60, 61, 62, 63];
 	const PASTEL_BIT_SPRITES = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 52, 53, 56, 59];
 	const GLINT_SPRITES = [32, 33, 34, 35, 36, 37, 38, 39];
@@ -436,14 +453,56 @@
 		// Where a spawn point's (x, y) — still plain [0,1] fractions — lands on the
 		// field, and how high the tile under it stands. This is what puts creatures
 		// and features on the island rather than on a plane behind it.
-		function standOn(u: number, v: number): { x: number; y: number; elevation: number } {
+		// A spawn point's (x, y) were authored against a canvas the scene filled edge
+		// to edge. The field occupies the middle of the frame with open water around
+		// it, so read literally they put creatures out on the rim where the seabed
+		// has already faded to nothing — one of world 1's own points sits at
+		// (0.8, 0.84), which lands half off the frame. Compressing toward the middle
+		// keeps their arrangement relative to each other while putting all of them on
+		// ground that exists.
+		const SPAWN_INSET = 0.62;
+
+		function spawnToField(u: number, v: number): { u: number; v: number } {
+			return { u: 0.5 + (u - 0.5) * SPAWN_INSET, v: 0.5 + (v - 0.5) * SPAWN_INSET };
+		}
+
+		function standOn(
+			u: number,
+			v: number
+		): { x: number; y: number; elevation: number; col: number; row: number; land: boolean } {
 			const col = Math.max(0, Math.min(FIELD_COLS - 1, Math.round(clamp01(u) * (FIELD_COLS - 1))));
 			const row = Math.max(0, Math.min(FIELD_ROWS - 1, Math.round(clamp01(v) * (FIELD_ROWS - 1))));
 			const { q, r } = offsetToAxial(col, row);
 			const elevation = tileElevation(book.worldShape.sedimentGrid, col, row);
 			const standing = elevation >= SEA_LEVEL ? elevation : Math.min(elevation, SEA_LEVEL * 0.92);
 			const p = projectHex(q, r, standing, fieldOrigin());
-			return { x: p.x, y: p.y, elevation };
+			return { x: p.x, y: p.y, elevation, col, row, land: elevation >= SEA_LEVEL };
+		}
+
+		// How far above its tile a creature rides, in elevation units. A swimmer is
+		// in the water over the seabed rather than sitting on it, and something in
+		// the air is higher still; anything that walks stands on the top face.
+		const LAYER_HOVER: Record<SpawnLayer, number> = {
+			air: 0.62,
+			water: 0.3,
+			shore: 0,
+			floor: 0
+		};
+
+		// The mark that actually does the work of putting something in the world: a
+		// shadow on the tile below it, flattened to the same tilt as the tile's own
+		// top face. Without it a sprite is a picture laid over the scene; with it the
+		// eye reads a thing standing on ground.
+		function drawTileShadow(cx: number, cy: number, radius: number, alpha: number) {
+			ctx!.save();
+			ctx!.globalAlpha = alpha;
+			// the water swallows a shadow far more than sand does, so this leans blue
+			// rather than black — a hard dark ellipse on open water reads as a hole
+			ctx!.fillStyle = 'rgb(16, 46, 66)';
+			ctx!.beginPath();
+			ctx!.ellipse(cx * W, cy * H, radius * W, radius * W * CAMERA_TILT * 0.6, 0, 0, TAU);
+			ctx!.fill();
+			ctx!.restore();
 		}
 
 		function drawHexField() {
@@ -728,70 +787,52 @@
 
 				const seed = point.x + point.y + life.id.length * 0.013;
 				const stage = book.stageOf(life.id);
-				// a spawn point whose y falls inside the floor band is standing on the
-				// plane, so it takes the plane's foreshortening. One above it takes a
-				// stable depth of its own, so the water column is a volume rather than
-				// a pane — one foreshortening function serves both. Its stored x is
-				// already a world fraction (sedimentSpawnPoints derives it from the
-				// grid column), so it projects forward; only depth comes from y.
-				const groundZ = floorDepthAtY(point.y);
-				const z = depthOf(point.id, point.y);
+				// A spawn point's (x, y) are still plain fractions; read as a place in
+				// the field they name the tile this life belongs to. Everything else
+				// follows from that tile: what it stands on, how high, and — since the
+				// camera has no perspective — a size that no longer depends on where
+				// in the frame it happens to be.
+				const inset = spawnToField(point.x, point.y);
+				const spot = standOn(inset.u, inset.v);
 				const box =
-					H *
-					CREATURE_BOX *
+					HEX_SIZE *
+					2 *
+					W *
+					CREATURE_TILES *
 					point.scale *
 					info.sizeScale *
-					(0.58 + 0.42 * (stage / 3)) *
-					(groundZ === null ? floorDepthScale(z) : project(point.x, groundZ).scale);
+					(0.58 + 0.42 * (stage / 3));
 				const scale = box / Math.max(entry.img.naturalWidth, entry.img.naturalHeight);
 				const dw = entry.img.naturalWidth * scale;
 				const dh = entry.img.naturalHeight * scale;
-				// a handful of spawn points serve many lives before sediment/features
-				// expand the pool (world 1 alone has 4 aquatic life sharing 3 points,
-				// and 4 terrestrial life sharing 1) — offsetting by the *point* rather
-				// than the *life* meant co-located creatures rendered at the exact same
-				// x. key the fan-out on the (point, life) pair so it's stable across
-				// frames/reloads but distinct per creature.
-				// the fan is applied in world x *before* projection, so co-located
-				// creatures spread along the plane rather than across the screen —
-				// two on a far row sit closer together than two on a near one.
-				const fan = (stable01(`${point.id}:${life.id}:fan`) - 0.5) * 0.09;
-				const spread =
-					groundZ === null
-						? point.x * W + fan * W
-						: project(point.x + fan, groundZ).x * W;
-				const cx = Math.min(Math.max(spread, dw * 0.5), W - dw * 0.5);
-				// floor spawns (dense sediment, placed features) are biased toward
-				// the deepest rows and can sit close enough to y=1 that a
-				// full-size sprite's bottom edge — plus its bob — would fall past
-				// the canvas. Keep the whole sprite (and its grounding shadow, at
-				// cy + dh * 0.35 below) inside the frame.
-				const minCy = dh * 0.5 + H * 0.01;
-				const maxCy = H - dh * 0.65 - H * 0.01;
-				// the bob is a hover *above* the plane, so it stays a screen-space
-				// offset applied after the projected landing point.
-				const rawCy = point.y * H + layerBob(point.layer, T, seed);
-				const cy = Math.min(Math.max(rawCy, minCy), Math.max(minCy, maxCy));
+				// A handful of spawn points serve many lives — world 1 alone has four
+				// aquatic sharing three points — so co-located lives are fanned apart
+				// by a stable per-(point, life) offset rather than stacking.
+				const fan = (stable01(`${point.id}:${life.id}:fan`) - 0.5) * HEX_SIZE * 1.3;
+				const cx = clamp01(spot.x + fan);
+				// The hover is what separates a swimmer from a walker: the shadow stays
+				// on the tile while the creature rides above it.
+				const hover = LAYER_HOVER[point.layer] ?? 0;
+				const footY = spot.y;
+				const bodyY =
+					footY - hover * TILE_THICKNESS + (reduce ? 0 : layerBob(point.layer, T, seed) / H);
 				const alpha = clamp01(stage === 0 ? 0.3 : 0.55 + 0.45 * book.vitalityOf(life.id));
-				const grounded = point.layer === 'floor' || point.layer === 'shore';
 
 				into.push({
-					z,
+					// depth is the row it stands in, so creatures sort among themselves
+					// the same way the tiles they stand on do
+					z: spot.row / Math.max(1, FIELD_ROWS - 1),
 					render() {
-						if (grounded) {
-							ctx!.save();
-							ctx!.globalAlpha = alpha * 0.22;
-							ctx!.fillStyle = 'rgb(14, 14, 40)';
-							ctx!.beginPath();
-							ctx!.ellipse(cx, cy + dh * 0.35, dw * 0.32, dh * 0.06, 0, 0, Math.PI * 2);
-							ctx!.fill();
-							ctx!.restore();
-						}
-
+						drawTileShadow(
+							cx,
+							footY,
+							dw / W / 2.4,
+							alpha * 0.26 * (1 - hover * 0.5) * (spot.land ? 1 : 0.34)
+						);
 						ctx!.save();
 						ctx!.globalAlpha = alpha;
 						ctx!.imageSmoothingEnabled = !info.pixelated;
-						drawFogged(entry.img, cx - dw / 2, cy - dh / 2, dw, dh, fogAlpha(z), fogColorAt(cy));
+						ctx!.drawImage(entry.img, cx * W - dw / 2, bodyY * H - dh * 0.82, dw, dh);
 						ctx!.restore();
 					}
 				});
@@ -811,49 +852,30 @@
 				const cellW = sheet.img.naturalWidth / sheet.cols;
 				const cellH = sheet.img.naturalHeight / sheet.rows;
 				const yScale = cellW > 0 ? cellH / cellW : 1;
-				// same rule as the life above: on the plane means projected.
-				const groundZ = floorDepthAtY(placed.y);
-				const z = depthOf(placed.id, placed.y);
-				const groundScale =
-					groundZ === null ? floorDepthScale(z) : project(placed.x, groundZ).scale;
-				const size = H * CREATURE_BOX * spec.boxScale * placed.scale * groundScale;
+				// same footing as the living life: the tile its (x, y) names
+				const inset = spawnToField(placed.x, placed.y);
+				const spot = standOn(inset.u, inset.v);
+				const size = HEX_SIZE * 2 * W * CREATURE_TILES * spec.boxScale * placed.scale;
 				const dh = size * yScale;
-
 				const seed = placed.x + placed.y + placed.id.length * 0.013;
-				const jitter = (placed.id.length % 7) * 0.002;
-				const spread =
-					groundZ === null
-						? placed.x * W + jitter * W
-						: project(placed.x + jitter, groundZ).x * W;
-				const cx = Math.min(Math.max(spread, size * 0.5), W - size * 0.5);
-				// same floor/bottom-edge clamp as drawCreatureLayers, for the same
-				// reason: a floor-layer creature's band goes fairly deep, and its
-				// bob shouldn't be able to carry it past the canvas.
-				const minCy = dh * 0.5 + H * 0.01;
-				const maxCy = H - dh * 0.65 - H * 0.01;
-				const rawCy = placed.y * H + layerBob(spec.layer, T, seed);
-				const cy = Math.min(Math.max(rawCy, minCy), Math.max(minCy, maxCy));
-
-				const grounded = spec.layer === 'floor' || spec.layer === 'shore';
+				const jitter = (stable01(`${placed.id}:fan`) - 0.5) * HEX_SIZE * 1.3;
+				const cx = clamp01(spot.x + jitter);
+				const hover = LAYER_HOVER[spec.layer] ?? 0;
+				const footY = spot.y;
+				const bodyY =
+					footY - hover * TILE_THICKNESS + (reduce ? 0 : layerBob(spec.layer, T, seed) / H);
 
 				into.push({
-					z,
+					z: spot.row / Math.max(1, FIELD_ROWS - 1),
 					render() {
-						if (grounded) {
-							ctx!.save();
-							ctx!.globalAlpha = 0.22;
-							ctx!.fillStyle = 'rgb(14, 14, 40)';
-							ctx!.beginPath();
-							ctx!.ellipse(cx, cy + dh * 0.35, size * 0.32, dh * 0.06, 0, 0, Math.PI * 2);
-							ctx!.fill();
-							ctx!.restore();
-						}
-
+						drawTileShadow(
+							cx,
+							footY,
+							size / W / 2.4,
+							0.24 * (1 - hover * 0.5) * (spot.land ? 1 : 0.34)
+						);
 						const frame = Math.floor(T * spec.fps) % spec.frameCount;
-						drawSheetSprite(sheet, frame, cx, cy, size, placed.rotation, 1, yScale, 'source-over', {
-							amount: fogAlpha(z),
-							tint: fogColorAt(cy)
-						});
+						drawSheetSprite(sheet, frame, cx * W, bodyY * H - dh * 0.32, size, placed.rotation, 1, yScale);
 					}
 				});
 			}
@@ -1000,13 +1022,15 @@
 		function drawWitchMotes(T: number, intensity: number) {
 			if (!witchMotes.ok || intensity <= 0.02) return;
 			const rows = [0, 1, 2, 4, 5, 6, 7];
-			const count = Math.round(8 + intensity * 22 + book.attentionUsed * 1.5);
+			// tuned against a water column that filled the frame; the world it drifts
+			// over is a third of that now, and at the old count it read as static
+			const count = Math.round(5 + intensity * 12 + book.attentionUsed * 0.8);
 			for (let i = 0; i < count; i++) {
 				const seed = `witch-mote-${book.worldIndex}-${i}`;
 				const drift = (T * (0.018 + stable01(`${seed}-speed`) * 0.025) + stable01(`${seed}-phase`)) % 1;
 				const sway = Math.sin(T * (0.5 + stable01(`${seed}-sway`) * 0.8) + stable01(seed) * TAU);
 				const x = W * (0.06 + stable01(`${seed}-x`) * 0.88) + sway * W * 0.012;
-				const y = H * (0.32 + stable01(`${seed}-y`) * 0.58) - drift * H * 0.16;
+				const y = H * (0.24 + stable01(`${seed}-y`) * 0.5) - drift * H * 0.14;
 				const row = rows[i % rows.length];
 				const col = Math.floor(stable01(`${seed}-col`) * 8);
 				const size = H * (0.018 + stable01(`${seed}-size`) * 0.026);
@@ -1081,6 +1105,14 @@
 		// falls to it, and puffs where it arrives, foreshortened by the landing depth
 		// so a pour at the back of the floor is a smaller, shorter fall than one at the
 		// front. Without one it keeps the ambient wandering it always had.
+		// Silt arriving on a tile.
+		//
+		// It used to fall from a water surface drawn as a line near the top of the
+		// frame, down a column seen edge-on. There is no such surface under this
+		// camera and no column to fall down: the world is seen from above, so what
+		// reads is the arrival — a short plume dropping onto the tile she is pouring
+		// into, and a puff spreading across its top face in the same flattened
+		// ellipse the tile itself is drawn in.
 		function drawSedimentCast(
 			T: number,
 			intensity: number,
@@ -1090,45 +1122,26 @@
 			const sw = sedimentCast.img.naturalWidth / 8;
 			const streamH = sedimentCast.img.naturalHeight / 2;
 			const puffY = sedimentCast.img.naturalHeight - sw;
-			const surfaceY = H * (WATER_TOP - 0.025);
+			const frame = Math.floor(T * 6) % 8;
 
-			if (landing) {
-				const spot = standOn(landing.x, landing.y);
-				const x = spot.x * W;
-				const groundY = spot.y * H;
-				const frame = Math.floor(T * 6) % 8;
-				const streamW = H * 0.14;
-				const fall = Math.max(H * 0.08, groundY - surfaceY);
-				drawSheetRegion(
-					sedimentCast, frame * sw, 0, sw, streamH,
-					x, surfaceY, streamW, fall, 0.16 + intensity * 0.34, 0, 'screen'
-				);
-				drawSheetRegion(
-					sedimentCast, frame * sw, puffY, sw, sw,
-					x, groundY, streamW * 1.3, H * 0.09,
-					(0.16 + intensity * 0.34) * 1.25, 0, 'screen'
-				);
-				return;
-			}
+			// where it lands, and how far above the tile the fall starts
+			const spot = landing
+				? standOn(landing.x, landing.y)
+				: standOn(0.5, 0.5);
+			const drop = H * 0.16;
+			const width = H * 0.1;
+			const alpha = 0.14 + intensity * 0.32;
+			const x = spot.x * W;
+			const groundY = spot.y * H;
 
-			const casts = intensity > 0.55 ? 2 : 1;
-			for (let i = 0; i < casts; i++) {
-				const seed = `sediment-cast-${book.worldIndex}-${i}`;
-				const frame = Math.floor(T * 6 + stable01(`${seed}-phase`) * 8) % 8;
-				const x = W * (0.28 + stable01(`${seed}-x`) * 0.44);
-				const lean = (stable01(`${seed}-lean`) - 0.5) * 0.18;
-				const streamW = H * (0.12 + stable01(`${seed}-w`) * 0.05);
-				const streamAlpha = 0.14 + intensity * 0.3;
-				drawSheetRegion(
-					sedimentCast, frame * sw, 0, sw, streamH,
-					x, surfaceY, streamW, H * 0.42, streamAlpha, lean, 'screen'
-				);
-				drawSheetRegion(
-					sedimentCast, frame * sw, puffY, sw, sw,
-					x + lean * H * 0.16, H * (WATER_TOP + 0.205), streamW * 1.3, H * 0.09,
-					streamAlpha * 1.25, 0, 'screen'
-				);
-			}
+			drawSheetRegion(
+				sedimentCast, frame * sw, 0, sw, streamH,
+				x, groundY - drop, width, drop, alpha, 0, 'screen'
+			);
+			drawSheetRegion(
+				sedimentCast, frame * sw, puffY, sw, sw,
+				x, groundY, width * 1.5, width * 1.5 * CAMERA_TILT, alpha * 1.2, 0, 'screen'
+			);
 		}
 
 		const AURA_TINTS: Record<number, readonly [number, number, number]> = {
