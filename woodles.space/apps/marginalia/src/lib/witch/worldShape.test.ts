@@ -28,6 +28,7 @@ import {
 	worldYToWaterGrid,
 	type Worldspace
 } from './worldShape';
+import { SEA_LEVEL_Y, isAboveWater, projectFloor } from './projection';
 
 const aquaticLife: Life = {
 	id: 'soft_swimmer',
@@ -291,5 +292,27 @@ describe('sampling the sediment grid', () => {
 
 	it('survives a degenerate grid', () => {
 		expect(sampleSediment({ w: 0, h: 0, cells: [] }, 0.5, 0.5)).toBe(0);
+	});
+});
+
+// The shelf rises with coverage, which is the mechanic: the floor she fills is the
+// floor that shallows. It does not yet break the surface — 2_5D.md "the two
+// horizons" explains why that is blocked on a composition decision rather than a
+// number — so what is pinned here is the coupling, not a shoreline.
+describe('coverage and the shelf', () => {
+	it('lifts the seabed as the floor fills', () => {
+		const bare = projectFloor(1, 1, 0, 0).y;
+		const atUnlock = projectFloor(1, 1, 0, SEDIMENT_UNLOCK_COVERAGE).y;
+		expect(atUnlock).toBeLessThan(bare);
+	});
+
+	it('leaves the shore under water at every coverage, for now', () => {
+		for (const c of [0, SEDIMENT_UNLOCK_COVERAGE, 1]) {
+			expect(isAboveWater(1, 1, 1, c)).toBe(false);
+		}
+	});
+
+	it('never lifts the deep water, however full the floor gets', () => {
+		expect(projectFloor(0.1, 0.5, 0, 1).y).toBeCloseTo(projectFloor(0.1, 0.5, 0, 0).y);
 	});
 });

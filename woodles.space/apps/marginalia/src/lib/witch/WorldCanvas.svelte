@@ -16,6 +16,7 @@
 		type SpawnPoint
 	} from './worldShape';
 	import {
+		SEA_LEVEL_Y,
 		byDepth,
 		floorDepthAtY,
 		floorDepthScale,
@@ -25,6 +26,17 @@
 		sceneDepthFromSeed,
 		unprojectFloor
 	} from './projection';
+	import { SEA_LEVEL, hexCorners, offsetToAxial, projectHex } from './hex';
+	import {
+		FIELD_COLS,
+		FIELD_ROWS,
+		TILE_ELEVATION_SCALE,
+		TILE_MIN_ELEVATION,
+		fieldOrigin,
+		fieldTiles,
+		tileAtPoint,
+		tileElevation
+	} from './hexField';
 	import type { Life } from './content/life';
 
 	const ASPECT = 960 / 480;
@@ -66,11 +78,13 @@
 		if (!canvas) return null;
 		const rect = canvas.getBoundingClientRect();
 		if (rect.width <= 0 || rect.height <= 0) return null;
-		const point = unprojectFloor(
+		const tile = tileAtPoint(
 			clamp01((event.clientX - rect.left) / rect.width),
 			(event.clientY - rect.top) / rect.height
 		);
-		return point === null ? null : { x: point.x, y: point.z };
+		// Off the field is not a target — this is what stops a pour writing past the
+		// edge of the world.
+		return tile === null ? null : { x: tile.u, y: tile.v };
 	}
 
 	function startPour(event: PointerEvent) {
@@ -115,6 +129,13 @@
 		// canvas once per actual change and blit the result instead.
 		const sedimentCanvas = document.createElement('canvas');
 		const sedimentCtx = sedimentCanvas.getContext('2d');
+		// Everything drawn on the floor has to agree about the shape of the seabed,
+		// and that shape depends on how much of it she has covered. Rather than pass
+		// coverage to a dozen call sites and hope none is missed, the whole renderer
+		// goes through this one wrapper.
+		const project = (x: number, z: number, h = 0) =>
+			projectFloor(x, z, h, book.sedimentCoverage);
+
 		// while a pour is live the floor repaints at most this often; see
 		// ensureSedimentBaked.
 		const SEDIMENT_BAKE_MIN_MS = 90;
@@ -315,39 +336,6 @@
 			return src ? { src, pixelated: c!.pixelated, sizeScale: c!.sizeScale } : null;
 		}
 
-		function drawSky(T: number) {
-			const o = clamp01(book.stocks.oxygen / 100);
-			const fav = clamp01(book.favor / 100);
-			const horizon = H * WATER_TOP;
-			const sky = ctx!.createLinearGradient(0, 0, 0, horizon);
-			sky.addColorStop(0, rgb(lerp(236, 255, fav), lerp(178, 214, o), lerp(198, 226, o)));
-			sky.addColorStop(0.58, rgb(lerp(242, 255, fav), lerp(193, 221, o), lerp(211, 235, o)));
-			sky.addColorStop(1, rgb(lerp(210, 232, o), lerp(166, 194, fav), lerp(207, 228, fav)));
-			ctx!.fillStyle = sky;
-			ctx!.fillRect(0, 0, W, horizon + 1);
-
-			const drift = reduce ? 0 : T;
-			ctx!.save();
-			ctx!.globalAlpha = 0.18 + fav * 0.16;
-			ctx!.strokeStyle = 'rgba(255, 252, 252, 0.72)';
-			ctx!.lineWidth = 1;
-			for (let i = 0; i < 5; i++) {
-				const y = horizon * (0.18 + i * 0.13) + Math.sin(drift * 0.25 + i) * H * 0.006;
-				ctx!.beginPath();
-				ctx!.moveTo(-W * 0.08, y);
-				ctx!.bezierCurveTo(W * 0.22, y - H * 0.025, W * 0.48, y + H * 0.018, W * 1.08, y - H * 0.006);
-				ctx!.stroke();
-			}
-			ctx!.restore();
-
-			const horizonGlow = ctx!.createLinearGradient(0, horizon - H * 0.09, 0, horizon + H * 0.04);
-			horizonGlow.addColorStop(0, 'rgba(255, 255, 255, 0)');
-			horizonGlow.addColorStop(0.7, 'rgba(255, 245, 250, 0.28)');
-			horizonGlow.addColorStop(1, 'rgba(210, 164, 198, 0)');
-			ctx!.fillStyle = horizonGlow;
-			ctx!.fillRect(0, horizon - H * 0.09, W, H * 0.13);
-		}
-
 		function drawWeather(T: number) {
 			const m = clamp01(book.stocks.moisture / 100);
 			const drift = reduce ? 0 : T;
@@ -380,254 +368,127 @@
 			}
 		}
 
-		function drawWaterBase(T: number) {
-			const waterY = H * WATER_TOP;
-			const waterH = H - waterY;
+		// The sea the island sits in. Under the hex camera there is no waterline to
+		// draw — the water is the whole ground plane, paler with distance toward the
+		// top of the frame — so the old sky-over-water split, its glaze and its shelf
+		// wash have gone with the perspective floor they belonged to.
+		function drawSea(T: number) {
+			const sea = ctx!.createLinearGradient(0, 0, 0, H);
 			const m = clamp01(book.stocks.moisture / 100);
-			const waterGrad = ctx!.createLinearGradient(0, waterY, 0, H);
-			waterGrad.addColorStop(0, `rgba(255, 229, 239, ${0.28 + m * 0.1})`);
-			waterGrad.addColorStop(0.32, 'rgba(204, 193, 229, 0.58)');
-			waterGrad.addColorStop(1, 'rgba(132, 146, 205, 0.78)');
-			ctx!.fillStyle = waterGrad;
-			ctx!.fillRect(0, waterY, W, waterH);
+			sea.addColorStop(0, 'rgb(207, 233, 242)');
+			sea.addColorStop(0.3, `rgb(126, ${200 + m * 12}, 218)`);
+			sea.addColorStop(0.62, 'rgb(47, 131, 166)');
+			sea.addColorStop(1, 'rgb(27, 91, 125)');
+			ctx!.fillStyle = sea;
+			ctx!.fillRect(0, 0, W, H);
 
-			const wave = reduce ? 0 : Math.sin(T * 0.9) * H * 0.004;
+			// a few slow bands of open water, so the sea is not a flat wash
+			if (reduce) return;
 			ctx!.save();
-			ctx!.globalAlpha = 0.18;
-			ctx!.strokeStyle = 'rgba(255, 255, 255, 0.74)';
+			ctx!.globalAlpha = 0.05;
+			ctx!.strokeStyle = 'rgb(255, 255, 255)';
 			ctx!.lineWidth = 1;
-			for (let i = 0; i < 7; i++) {
-				const y = waterY + ((i + 1) / 8) * waterH + wave * (i + 1);
+			for (let i = 0; i < 6; i++) {
+				const y = H * (0.2 + i * 0.13) + Math.sin(T * 0.4 + i) * H * 0.004;
 				ctx!.beginPath();
-				ctx!.moveTo(-W * 0.05, y);
-				ctx!.bezierCurveTo(W * 0.22, y + H * 0.012, W * 0.48, y - H * 0.01, W * 1.05, y + H * 0.006);
+				ctx!.moveTo(0, y);
+				ctx!.bezierCurveTo(W * 0.3, y + H * 0.008, W * 0.6, y - H * 0.008, W, y);
 				ctx!.stroke();
 			}
 			ctx!.restore();
-
-			ctx!.save();
-			ctx!.globalAlpha = 0.36;
-			ctx!.strokeStyle = 'rgba(255, 250, 252, 0.82)';
-			ctx!.lineWidth = 1;
-			ctx!.beginPath();
-			ctx!.moveTo(0, waterY + 0.5);
-			ctx!.bezierCurveTo(W * 0.28, waterY - 1, W * 0.46, waterY + 2, W, waterY + 0.5);
-			ctx!.stroke();
-			ctx!.restore();
 		}
 
-		// The silt surface. Drawn back to front as depth bands whose top edge follows
-		// the interpolated height at each x, so painter's order does the occlusion: a
-		// mound in front covers the trough behind it, which is what makes a pour read
-		// as relief rather than as a change of opacity.
+		// ── the hex field ────────────────────────────────────────────────────────
 		//
-		// The 48x12 grid is persisted at that size, so the surface is sampled off a
-		// finer render grid rather than migrating the save (2_5D.md part 1). This is
-		// the step where that subdivision starts earning its keep: A's soft scatter had
-		// no hard edges to look coarse, a filled band does.
-		// Subdivision is bounded by what the source actually holds: the grid is 48x12,
-		// so ~1.3x the columns and 1.5x the rows is enough to smooth the interpolation
-		// without inventing detail. 96x36 was tried and is visually indistinguishable
-		// from this — the extra samples interpolate information the 12 rows never had
-		// — while costing a third of the frame rate during a live pour, when the whole
-		// surface rebuilds every frame.
-		const SURFACE_COLS = 64;
-		const SURFACE_ROWS = 18;
-		const SURFACE_SHADE_STOPS = 24;
+		// The island she is building, drawn back to front so a tile's raised side is
+		// covered by whatever stands in front of it. Nothing is drawn where the
+		// seabed has not gathered: open water stays open, which is the difference
+		// between an island and a tiled floor.
+		const CORNERS = hexCorners();
 
-		function drawSedimentSurface() {
-			const grid = book.worldShape.sedimentGrid;
-			// far edge first: painter's order is what does the occluding here, so a
-			// near mound has to be laid down after the trough behind it.
-			for (let row = 0; row < SURFACE_ROWS; row++) {
-				const zNear = (row + 1) / SURFACE_ROWS;
-				const v = (row + 0.5) / SURFACE_ROWS;
-				const haze = fogAlpha(v);
-				const baseY = floorPlaneY(zNear) * H;
+		function traceTop(cx: number, cy: number) {
+			ctx!.beginPath();
+			CORNERS.forEach((c, i) => {
+				const px = (cx + c.x) * W;
+				const py = (cy + c.y) * H;
+				if (i === 0) ctx!.moveTo(px, py);
+				else ctx!.lineTo(px, py);
+			});
+			ctx!.closePath();
+		}
 
-				const crest: { x: number; y: number; value: number }[] = [];
-				let peak = 0;
-				for (let col = 0; col <= SURFACE_COLS; col++) {
-					const u = col / SURFACE_COLS;
-					const value = sampleSediment(grid, u, v);
-					peak = Math.max(peak, value);
-					const p = projectFloor(u, v, value);
-					crest.push({ x: p.x * W, y: p.y * H, value });
-				}
-				if (peak <= 0.02) continue;
+		function traceSide(cx: number, cy: number, side: number) {
+			// the four lower corners, extruded straight down by the tile's thickness
+			const lower = [CORNERS[1], CORNERS[2], CORNERS[3], CORNERS[4]];
+			ctx!.beginPath();
+			lower.forEach((c, i) => {
+				const px = (cx + c.x) * W;
+				const py = (cy + c.y) * H;
+				if (i === 0) ctx!.moveTo(px, py);
+				else ctx!.lineTo(px, py);
+			});
+			for (let i = lower.length - 1; i >= 0; i--) {
+				ctx!.lineTo((cx + lower[i].x) * W, (cy + lower[i].y + side) * H);
+			}
+			ctx!.closePath();
+		}
 
-				// Two things vary along the band, and both have to, or the floor reads
-				// wrong. Opacity follows the silt at each x rather than the band's peak
-				// — otherwise one tall mound paints its whole row at mound opacity and
-				// the seabed becomes a slab. And lightness follows the *slope*: a
-				// heightfield of smooth mounds has almost no silhouette from a camera
-				// this low, so what makes relief legible is shading, not outline. The
-				// face descending toward the viewer catches the light; the back of the
-				// same mound falls away into shadow.
-				//
-				// A horizontal gradient is the only way to vary either across a single
-				// fill, so both are built as one stop per sampled column.
-				// Gradient resolution is deliberately coarser than the path's. The
-				// silhouette needs every one of SURFACE_COLS samples to stay smooth,
-				// but shade and opacity vary gently, so stopping every few columns is
-				// visually identical and costs a fraction — and this whole surface is
-				// rebuilt on every frame of a live pour, where the cost lands on the
-				// one interaction that has to stay responsive.
-				const vAhead = Math.min(1, v + 1 / SURFACE_ROWS);
-				const body = ctx!.createLinearGradient(crest[0].x, 0, crest[crest.length - 1].x, 0);
-				const rim = ctx!.createLinearGradient(crest[0].x, 0, crest[crest.length - 1].x, 0);
-				for (let g = 0; g <= SURFACE_SHADE_STOPS; g++) {
-					const i = Math.round((g / SURFACE_SHADE_STOPS) * (crest.length - 1));
-					const value = crest[i].value;
-					// positive where the surface falls away toward the viewer — the lit
-					// face of a mound; negative on its sheltered back.
-					const slope = value - sampleSediment(grid, i / SURFACE_COLS, vAhead);
-					const lit = clamp01(0.5 + slope * 9);
-					const stop = g / SURFACE_SHADE_STOPS;
-					body.addColorStop(
-						stop,
-						`rgba(${lerp(178, 253, lit) | 0}, ${lerp(190, 252, lit) | 0}, ${
-							lerp(222, 255, lit) | 0
-						}, ${value * 0.5 * (1 - haze)})`
-					);
-					// the rim only earns its line where there's a real edge to catch it.
-					rim.addColorStop(
-						stop,
-						`rgba(255, 255, 255, ${clamp01(slope * 5) * 0.5 * (1 - haze)})`
-					);
-				}
+		// Where a spawn point's (x, y) — still plain [0,1] fractions — lands on the
+		// field, and how high the tile under it stands. This is what puts creatures
+		// and features on the island rather than on a plane behind it.
+		function standOn(u: number, v: number): { x: number; y: number; elevation: number } {
+			const col = Math.max(0, Math.min(FIELD_COLS - 1, Math.round(clamp01(u) * (FIELD_COLS - 1))));
+			const row = Math.max(0, Math.min(FIELD_ROWS - 1, Math.round(clamp01(v) * (FIELD_ROWS - 1))));
+			const { q, r } = offsetToAxial(col, row);
+			const elevation = tileElevation(book.worldShape.sedimentGrid, col, row);
+			const standing = elevation >= SEA_LEVEL ? elevation : Math.min(elevation, SEA_LEVEL * 0.92);
+			const p = projectHex(q, r, standing, fieldOrigin());
+			return { x: p.x, y: p.y, elevation };
+		}
+
+		function drawHexField() {
+			const origin = fieldOrigin();
+			for (const tile of fieldTiles(book.worldShape.sedimentGrid)) {
+				if (tile.elevation < TILE_MIN_ELEVATION) continue;
+				// A submerged tile is held just under the surface however deep its silt
+				// is, so open water reads as water rather than as a stack of steps.
+				const standing = tile.land ? tile.elevation : Math.min(tile.elevation, SEA_LEVEL * 0.92);
+				const p = projectHex(tile.q, tile.r, standing, origin);
+				// how near the surface, and how far out of nothing — the second is what
+				// lets a tile arrive gradually instead of popping into being.
+				const shallow = clamp01(tile.elevation / SEA_LEVEL);
+				const arrival = clamp01((tile.elevation - TILE_MIN_ELEVATION) / 0.5);
 
 				ctx!.save();
-				ctx!.beginPath();
-				ctx!.moveTo(crest[0].x, crest[0].y);
-				for (let i = 1; i < crest.length; i++) ctx!.lineTo(crest[i].x, crest[i].y);
-				ctx!.lineTo(crest[crest.length - 1].x, baseY);
-				ctx!.lineTo(crest[0].x, baseY);
-				ctx!.closePath();
-				ctx!.fillStyle = body;
+				traceSide(p.x, p.y, p.side);
+				if (tile.land) {
+					ctx!.fillStyle = 'rgb(185, 160, 105)';
+				} else {
+					ctx!.globalAlpha = 0.5 * arrival;
+					ctx!.fillStyle = 'rgb(29, 95, 124)';
+				}
 				ctx!.fill();
+				ctx!.restore();
 
-				// the crest line is what actually says "this has a top". Without it the
-				// bands blend into one wash and the relief disappears.
-				ctx!.beginPath();
-				ctx!.moveTo(crest[0].x, crest[0].y);
-				for (let i = 1; i < crest.length; i++) ctx!.lineTo(crest[i].x, crest[i].y);
-				ctx!.strokeStyle = rim;
-				ctx!.lineWidth = Math.max(0.7, H * 0.0026 * floorDepthScale(v));
+				ctx!.save();
+				traceTop(p.x, p.y);
+				if (tile.land) {
+					const t = clamp01((tile.elevation - SEA_LEVEL) / (TILE_ELEVATION_SCALE - SEA_LEVEL));
+					// sand at the waterline, greening as it climbs away from it
+					ctx!.fillStyle = rgb(lerp(236, 147, t), lerp(220, 194, t), lerp(174, 104, t));
+				} else {
+					ctx!.globalAlpha = 0.3 + 0.6 * shallow * arrival;
+					ctx!.fillStyle = rgb(46 + 70 * shallow, 120 + 80 * shallow, 146 + 60 * shallow);
+				}
+				ctx!.fill();
+				ctx!.strokeStyle = `rgba(255, 255, 255, ${tile.land ? 0.16 : 0.06})`;
+				ctx!.lineWidth = 1;
 				ctx!.stroke();
 				ctx!.restore();
 			}
 		}
 
-		function drawSedimentGrid() {
-			const grid = book.worldShape.sedimentGrid;
-			// the grid's rows are the *depth* axis now — SEDIMENT_GRID_H cells
-			// front-to-back across a plane in perspective, not stacked bands of a
-			// flat wall (2_5D.md part 1). Nothing about the stored grid changed; the
-			// row a cell sits in is read as z rather than as screen y, so far rows
-			// compress toward the horizon and near rows open up. The plane still
-			// spans exactly the band it did before, FLOOR_TOP to the frame's bottom.
-			const baseCellW = W / grid.w;
-			for (let y = 0; y < grid.h; y++) {
-				// the row's near and far edges, so a cell's footprint is its true
-				// projected height rather than a constant slice of the band.
-				const zFar = y / grid.h;
-				const zNear = (y + 1) / grid.h;
-				const z = (y + 0.5) / grid.h;
-				const cellH = (floorPlaneY(zNear) - floorPlaneY(zFar)) * H;
-				for (let x = 0; x < grid.w; x++) {
-					const value = grid.cells[y * grid.w + x] ?? 0;
-					if (value <= 0.01) continue;
-					// the scatter rides the height it helped build, so bits and clusters
-					// sit on the mound rather than floating at the plane beneath it.
-					const projected = projectFloor((x + 0.5) / grid.w, z, value);
-					const cx = projected.x * W;
-					const cy = projected.y * H;
-					const cellW = baseCellW * projected.scale;
-					const seed = `${x}:${y}:${book.worldShape.spawnRevision}`;
-					// the same fog every other object in the scene answers to, rather
-					// than the row-index dimming this carried before. Baked in per row,
-					// so distance costs nothing per frame.
-					const haze = fogAlpha(z);
-
-					ctx!.save();
-					ctx!.globalAlpha = (0.06 + value * 0.22) * (1 - haze);
-					const pearl = ctx!.createRadialGradient(cx - cellW * 0.22, cy - cellH * 0.22, 0, cx, cy, cellW * (1.2 + value));
-					pearl.addColorStop(0, 'rgba(255, 255, 255, 0.98)');
-					pearl.addColorStop(0.46, value > 0.62 ? 'rgba(249, 242, 255, 0.9)' : 'rgba(248, 248, 242, 0.78)');
-					pearl.addColorStop(1, 'rgba(205, 218, 244, 0.18)');
-					ctx!.fillStyle = pearl;
-					ctx!.beginPath();
-					ctx!.ellipse(cx, cy, cellW * (0.75 + value), cellH * (0.5 + value * 0.3), 0, 0, Math.PI * 2);
-					ctx!.fill();
-					ctx!.restore();
-
-					if (value > 0.42 && stable01(`${seed}:puff`) < value * 0.28) {
-						const sprite = pickSprite(PUFF_SPRITES, `${seed}:puff-sprite`);
-						const size = cellW * (2.1 + stable01(`${seed}:puff-size`) * 1.3);
-						drawSheetSprite(
-							sedimentBits,
-							sprite,
-							cx + (stable01(`${seed}:puff-x`) - 0.5) * cellW * 0.8,
-							cy + (stable01(`${seed}:puff-y`) - 0.5) * cellH * 0.5,
-							size,
-							(stable01(`${seed}:puff-r`) - 0.5) * 0.7,
-							0.16 + value * 0.22,
-							0.72
-						);
-					}
-
-					if (value > 0.24 && stable01(`${seed}:cluster`) < value * 0.44) {
-						const sprite = Math.floor(stable01(`${seed}:cluster-sprite`) * 16);
-						const size = cellW * (1.8 + value * 2.4 + stable01(`${seed}:cluster-size`) * 0.8);
-						if (!drawSheetSprite(
-							sedimentClusters,
-							sprite,
-							cx + (stable01(`${seed}:cluster-x`) - 0.5) * cellW * 0.85,
-							cy + cellH * (0.1 + stable01(`${seed}:cluster-y`) * 0.28),
-							size,
-							(stable01(`${seed}:cluster-r`) - 0.5) * 0.42,
-							0.32 + value * 0.56,
-							0.72 + stable01(`${seed}:cluster-scale-y`) * 0.22
-						)) {
-							ctx!.save();
-							ctx!.globalAlpha = 0.12 + value * 0.36;
-							ctx!.fillStyle = 'rgba(255, 255, 255, 0.82)';
-							ctx!.beginPath();
-							ctx!.ellipse(cx, cy, cellW * (0.75 + value), cellH * (0.5 + value * 0.3), 0, 0, Math.PI * 2);
-							ctx!.fill();
-							ctx!.restore();
-						}
-					}
-
-					const bitCount = value > 0.62 ? 3 : value > 0.28 ? 2 : 1;
-					for (let i = 0; i < bitCount; i++) {
-						const bitSeed = `${seed}:bit:${i}`;
-						if (stable01(`${bitSeed}:skip`) > 0.35 + value * 0.56) continue;
-						const roll = stable01(`${bitSeed}:kind`);
-						const sprite =
-							roll > 0.88 && value > 0.4
-								? pickSprite(GLINT_SPRITES, `${bitSeed}:glint`)
-								: roll > 0.62
-									? pickSprite(PASTEL_BIT_SPRITES, `${bitSeed}:pastel`)
-									: pickSprite(PEARL_BIT_SPRITES, `${bitSeed}:pearl`);
-						const size = cellW * (0.72 + stable01(`${bitSeed}:size`) * 1.1) * (0.84 + value * 0.5);
-						drawSheetSprite(
-							sedimentBits,
-							sprite,
-							cx + (stable01(`${bitSeed}:x`) - 0.5) * cellW * 1.5,
-							cy + (stable01(`${bitSeed}:y`) - 0.5) * cellH * 1.1,
-							size,
-							(stable01(`${bitSeed}:r`) - 0.5) * Math.PI,
-							0.42 + value * 0.44,
-							0.72 + stable01(`${bitSeed}:ys`) * 0.46
-						);
-					}
-				}
-			}
-		}
-
-		// rebakes drawSedimentGrid() into the offscreen sediment canvas by
+		// rebakes drawHexField() into the offscreen sediment canvas by
 		// temporarily pointing the shared `ctx` at it — every draw helper below
 		// already reads `ctx` dynamically, so nothing else needs to change.
 		function ensureSedimentBaked(nowMs: number, force: boolean) {
@@ -649,34 +510,12 @@
 			ctx = sedimentCtx;
 			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 			ctx.clearRect(0, 0, W, H);
-			drawSedimentSurface();
-			drawSedimentGrid();
+			drawHexField();
 			ctx = liveCtx;
 			sedimentBakedGrid = grid;
 			sedimentBakedW = W;
 			sedimentBakedH = H;
 			sedimentBakedAt = nowMs;
-		}
-
-		function drawShallowsShelf() {
-			if (book.worldShape.activeWorldspace !== 'shallows') return;
-			// anchored to where the sediment floor actually starts now (FLOOR_TOP),
-			// so the shallow-water tinge and the visible floor read as one place
-			// instead of the wash starting well above where any floor shows.
-			const y = H * FLOOR_TOP;
-			const shelf = ctx!.createLinearGradient(0, y - 16, 0, y + 52);
-			shelf.addColorStop(0, 'rgba(255, 255, 255, 0)');
-			shelf.addColorStop(0.4, 'rgba(248, 241, 255, 0.32)');
-			shelf.addColorStop(1, 'rgba(196, 174, 223, 0.24)');
-			ctx!.fillStyle = shelf;
-			ctx!.beginPath();
-			ctx!.moveTo(0, y + 16);
-			ctx!.bezierCurveTo(W * 0.18, y - 6, W * 0.36, y + 10, W * 0.58, y);
-			ctx!.bezierCurveTo(W * 0.76, y - 8, W * 0.88, y + 8, W, y - 4);
-			ctx!.lineTo(W, H);
-			ctx!.lineTo(0, H);
-			ctx!.closePath();
-			ctx!.fill();
 		}
 
 		function drawFeatureFallback(featureId: string, x: number, y: number, size: number, rotation: number) {
@@ -723,13 +562,9 @@
 				// floor from reading as pasted on top of it, and the height of the
 				// silt it was settled into, since placeFeatureOnBestSediment seeks
 				// exactly the deep cells that now stand proud of the floor.
-				const projected = projectFloor(
-					placed.x,
-					placed.y,
-					sampleSediment(book.worldShape.sedimentGrid, placed.x, placed.y)
-				);
+				const projected = standOn(placed.x, placed.y);
 				const x = projected.x * W;
-				const size = H * 0.13 * placed.scale * projected.scale;
+				const size = H * 0.13 * placed.scale;
 				// features are placed on the deepest sediment rows by design
 				// (placeFeatureOnBestSediment favors them), which can sit close
 				// enough to y=1 that the feature — plus its grounding shadow at
@@ -884,7 +719,7 @@
 					point.scale *
 					info.sizeScale *
 					(0.58 + 0.42 * (stage / 3)) *
-					(groundZ === null ? floorDepthScale(z) : projectFloor(point.x, groundZ).scale);
+					(groundZ === null ? floorDepthScale(z) : project(point.x, groundZ).scale);
 				const scale = box / Math.max(entry.img.naturalWidth, entry.img.naturalHeight);
 				const dw = entry.img.naturalWidth * scale;
 				const dh = entry.img.naturalHeight * scale;
@@ -901,7 +736,7 @@
 				const spread =
 					groundZ === null
 						? point.x * W + fan * W
-						: projectFloor(point.x + fan, groundZ).x * W;
+						: project(point.x + fan, groundZ).x * W;
 				const cx = Math.min(Math.max(spread, dw * 0.5), W - dw * 0.5);
 				// floor spawns (dense sediment, placed features) are biased toward
 				// the deepest rows and can sit close enough to y=1 that a
@@ -957,7 +792,7 @@
 				const groundZ = floorDepthAtY(placed.y);
 				const z = depthOf(placed.id, placed.y);
 				const groundScale =
-					groundZ === null ? floorDepthScale(z) : projectFloor(placed.x, groundZ).scale;
+					groundZ === null ? floorDepthScale(z) : project(placed.x, groundZ).scale;
 				const size = H * CREATURE_BOX * spec.boxScale * placed.scale * groundScale;
 				const dh = size * yScale;
 
@@ -966,7 +801,7 @@
 				const spread =
 					groundZ === null
 						? placed.x * W + jitter * W
-						: projectFloor(placed.x + jitter, groundZ).x * W;
+						: project(placed.x + jitter, groundZ).x * W;
 				const cx = Math.min(Math.max(spread, size * 0.5), W - size * 0.5);
 				// same floor/bottom-edge clamp as drawCreatureLayers, for the same
 				// reason: a floor-layer creature's band goes fairly deep, and its
@@ -1034,19 +869,6 @@
 			ctx!.restore();
 		}
 
-		function drawWaterGlaze(T: number) {
-			const drift = reduce ? 0 : T;
-			const waterY = H * WATER_TOP;
-			ctx!.save();
-			ctx!.globalAlpha = 0.18;
-			ctx!.fillStyle = 'rgba(255, 255, 255, 0.54)';
-			for (let i = 0; i < 8; i++) {
-				const y = waterY + ((i + 1) / 9) * (H - waterY);
-				ctx!.fillRect(((drift * 8 + i * 37) % 80) - 80, y, W + 120, 1);
-			}
-			ctx!.restore();
-		}
-
 		function drawOverlays(T: number) {
 			const stab = clamp01(book.stability / 100);
 			if (stab < 0.999) {
@@ -1064,14 +886,9 @@
 				ctx!.fillRect(0, 0, W, H);
 			}
 			if (isPouring && pourPoint) {
-				// pourPoint is world (x, z); re-project it so the stream lands on the
-				// silt at the spot the pointer actually resolved to — on top of what's
-				// already been poured there, not on the plane underneath it.
-				const landing = projectFloor(
-					pourPoint.x,
-					pourPoint.y,
-					sampleSediment(book.worldShape.sedimentGrid, pourPoint.x, pourPoint.y)
-				);
+				// pourPoint is a place in the density field; stand it on the tile she is
+				// actually pouring onto, so the stream ends where the silt is landing.
+				const landing = standOn(pourPoint.x, pourPoint.y);
 				const x = landing.x * W;
 				const y = landing.y * H;
 				const top = H * WATER_TOP + H * 0.012;
@@ -1253,12 +1070,11 @@
 			const surfaceY = H * (WATER_TOP - 0.025);
 
 			if (landing) {
-				const value = sampleSediment(book.worldShape.sedimentGrid, landing.x, landing.y);
-				const spot = projectFloor(landing.x, landing.y, value);
+				const spot = standOn(landing.x, landing.y);
 				const x = spot.x * W;
 				const groundY = spot.y * H;
 				const frame = Math.floor(T * 6) % 8;
-				const streamW = H * 0.14 * spot.scale;
+				const streamW = H * 0.14;
 				const fall = Math.max(H * 0.08, groundY - surfaceY);
 				drawSheetRegion(
 					sedimentCast, frame * sw, 0, sw, streamH,
@@ -1266,7 +1082,7 @@
 				);
 				drawSheetRegion(
 					sedimentCast, frame * sw, puffY, sw, sw,
-					x, groundY, streamW * 1.3, H * 0.09 * spot.scale,
+					x, groundY, streamW * 1.3, H * 0.09,
 					(0.16 + intensity * 0.34) * 1.25, 0, 'screen'
 				);
 				return;
@@ -1320,7 +1136,7 @@
 				// an aura anchored to a feature has to ride the same projection the
 				// feature does, or it drifts off the thing it belongs to.
 				const anchor = placed
-					? projectFloor(
+					? project(
 							placed.x,
 							placed.y,
 							sampleSediment(book.worldShape.sedimentGrid, placed.x, placed.y)
@@ -1376,18 +1192,15 @@
 					(book.selfBalancing ? 0.22 : 0)
 			);
 
-			drawSky(T);
+			drawSea(T);
 			drawWeather(T);
-			drawWaterBase(T);
 			ensureSedimentBaked(tMs, !isPouring);
 			ctx!.drawImage(sedimentCanvas, 0, 0, W, H);
 			drawSedimentCast(T, isPouring ? 1 : shine(tending) * 0.45, isPouring ? pourPoint : null);
-			drawShallowsShelf();
 			drawFeatures();
 			drawFeatureAuras(T, shine(witnessed));
 			drawSceneLayers(['water', 'floor'], T);
 			drawAnimatorSwimmer(T, shine(tending));
-			drawWaterGlaze(T);
 			drawWaterRipples(T, m, shine(tending * 0.6 + m * 0.4));
 			drawSceneLayers(['shore', 'air'], T);
 			drawRain(T);

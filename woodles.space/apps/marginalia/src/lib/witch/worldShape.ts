@@ -316,14 +316,20 @@ export function applySedimentPour(
 	const cx = clamp01(x) * (grid.w - 1);
 	const cy = clamp01(y) * (grid.h - 1);
 	const cells = grid.cells.slice();
+	// The radius is given in columns, and the grid's cells are not square — it is
+	// 48 wide by 12 deep — so a circle measured in cells is a tall smear once the
+	// grid is shown at any other aspect. Scaling the vertical reach by the grid's
+	// own proportions keeps the brush round in the normalized space the field is
+	// drawn from, and leaves the horizontal reach exactly as it was.
+	const radiusY = grid.w > 1 ? (radius * (grid.h - 1)) / (grid.w - 1) : radius;
 	const minX = Math.max(0, Math.floor(cx - radius));
 	const maxX = Math.min(grid.w - 1, Math.ceil(cx + radius));
-	const minY = Math.max(0, Math.floor(cy - radius));
-	const maxY = Math.min(grid.h - 1, Math.ceil(cy + radius));
+	const minY = Math.max(0, Math.floor(cy - radiusY));
+	const maxY = Math.min(grid.h - 1, Math.ceil(cy + radiusY));
 
 	for (let gy = minY; gy <= maxY; gy++) {
 		for (let gx = minX; gx <= maxX; gx++) {
-			const dist = Math.hypot(gx - cx, gy - cy);
+			const dist = Math.hypot(gx - cx, radiusY > 0 ? ((gy - cy) * radius) / radiusY : 0);
 			if (dist > radius) continue;
 			const falloff = Math.pow(1 - dist / radius, 1.35);
 			const index = gy * grid.w + gx;
