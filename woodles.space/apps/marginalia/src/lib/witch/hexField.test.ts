@@ -3,6 +3,8 @@ import { SEA_LEVEL, projectHex } from './hex';
 import {
 	FIELD_COLS,
 	FIELD_ROWS,
+	SEABED_ALPHA,
+	edgeFalloff,
 	TILE_ELEVATION_SCALE,
 	fieldOrigin,
 	fieldTiles,
@@ -116,5 +118,48 @@ describe('pointing at a tile', () => {
 		const hit = tileAtPoint(p.x, p.y, origin)!;
 		expect(hit.u).toBe(0);
 		expect(hit.v).toBe(0);
+	});
+});
+
+// The regression that shipped in the first hex build: an untouched world drew
+// nothing at all, so a new player — before she has the insight to unlock pouring
+// — was looking at an empty rectangle. The seabed is always there.
+describe('the world before she touches it', () => {
+	it('still has a floor', () => {
+		expect(SEABED_ALPHA).toBeGreaterThan(0);
+	});
+
+	it('gives every tile a place to be drawn, silt or no silt', () => {
+		const tiles = fieldTiles(empty);
+		expect(tiles).toHaveLength(FIELD_COLS * FIELD_ROWS);
+		expect(tiles.every((t) => Number.isFinite(t.elevation))).toBe(true);
+	});
+});
+
+describe('the field dissolving into deep water', () => {
+	it('is full strength in the middle and nothing at the border', () => {
+		expect(edgeFalloff(Math.floor(FIELD_COLS / 2), Math.floor(FIELD_ROWS / 2))).toBeCloseTo(1);
+		expect(edgeFalloff(0, 0)).toBe(0);
+		expect(edgeFalloff(FIELD_COLS - 1, FIELD_ROWS - 1)).toBe(0);
+	});
+
+	it('fades on every side, so the field has no visible corner', () => {
+		for (let col = 0; col < FIELD_COLS; col++) {
+			expect(edgeFalloff(col, 0)).toBe(0);
+			expect(edgeFalloff(col, FIELD_ROWS - 1)).toBe(0);
+		}
+		for (let row = 0; row < FIELD_ROWS; row++) {
+			expect(edgeFalloff(0, row)).toBe(0);
+			expect(edgeFalloff(FIELD_COLS - 1, row)).toBe(0);
+		}
+	});
+
+	it('rises without stepping, so the edge has no seam', () => {
+		let previous = -1;
+		for (let col = 0; col <= Math.floor(FIELD_COLS / 2); col++) {
+			const e = edgeFalloff(col, Math.floor(FIELD_ROWS / 2));
+			expect(e).toBeGreaterThanOrEqual(previous);
+			previous = e;
+		}
 	});
 });

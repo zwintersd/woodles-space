@@ -35,8 +35,16 @@ export const FIELD_ROWS = 27;
  */
 export const TILE_ELEVATION_SCALE = 2.2;
 
-/** Below this a tile is bare seabed and is not drawn at all — open water. */
-export const TILE_MIN_ELEVATION = 0.16;
+/**
+ * How faintly a tile with no silt in it is drawn.
+ *
+ * Not zero, and that matters. Skipping empty tiles made an island read as an
+ * island rather than as a tiled floor, but applied to the whole field it meant an
+ * untouched world drew nothing at all — a new player, before she has the insight
+ * to unlock pouring, was looking at an empty blue rectangle. The seabed is always
+ * there; it is just quiet until she gives it something to be.
+ */
+export const SEABED_ALPHA = 0.24;
 
 export interface FieldTile {
 	col: number;
@@ -48,6 +56,23 @@ export interface FieldTile {
 	/** how much silt is in it, 0..1 */
 	density: number;
 	land: boolean;
+	/**
+	 * 1 in the body of the field, falling to 0 at its border. The field is a
+	 * rectangle of tiles and its edge is a hard comb of half-offset rows; without
+	 * this the seabed reads as a slab dropped in the sea rather than as a floor
+	 * the deep water swallows. Silt can still be poured out here — it just
+	 * arrives from somewhere the eye cannot quite find the edge of.
+	 */
+	edge: number;
+}
+
+/** How many tiles the seabed takes to dissolve into open water. */
+export const FIELD_EDGE_FADE = 2.5;
+
+export function edgeFalloff(col: number, row: number): number {
+	const fromEdge = Math.min(col, FIELD_COLS - 1 - col, row, FIELD_ROWS - 1 - row);
+	const t = Math.max(0, Math.min(1, fromEdge / FIELD_EDGE_FADE));
+	return t * t * (3 - 2 * t);
 }
 
 /** Where a tile sits in the density field, in the grid's own [0,1] coordinates. */
@@ -97,7 +122,16 @@ export function fieldTiles(grid: SedimentGrid): FieldTile[] {
 			const { u, v } = tileSample(col, row);
 			const density = sampleSediment(grid, u, v);
 			const elevation = density * TILE_ELEVATION_SCALE;
-			tiles.push({ col, row, q, r, elevation, density, land: elevation >= SEA_LEVEL });
+			tiles.push({
+				col,
+				row,
+				q,
+				r,
+				elevation,
+				density,
+				land: elevation >= SEA_LEVEL,
+				edge: edgeFalloff(col, row)
+			});
 		}
 	}
 	tiles.sort(byHexRow);
