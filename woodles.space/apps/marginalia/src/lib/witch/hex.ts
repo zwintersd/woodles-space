@@ -33,8 +33,15 @@ export const HEX_SIZE = 0.028;
  */
 export const CAMERA_TILT = 0.56;
 
-/** How tall one unit of elevation stands, before the tilt. */
-export const TILE_THICKNESS = 0.052;
+/**
+ * How tall one unit of elevation stands, before the tilt.
+ *
+ * Tuned against a tile's own drawn height rather than picked: a hex is about
+ * 0.031 of the frame tall on screen, and at this thickness the highest land
+ * stands roughly one tile-height above the water. At 0.052 it stood at two, which
+ * reads as a stack of blocks rather than as ground.
+ */
+export const TILE_THICKNESS = 0.032;
 
 /** Sea level, in elevation units. Terrain above this is land. */
 export const SEA_LEVEL = 1;
