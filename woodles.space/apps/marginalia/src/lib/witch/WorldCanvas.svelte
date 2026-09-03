@@ -31,7 +31,7 @@
 		FIELD_COLS,
 		FIELD_ROWS,
 		TILE_ELEVATION_SCALE,
-		TILE_MIN_ELEVATION,
+		SEABED_ALPHA,
 		fieldOrigin,
 		fieldTiles,
 		tileAtPoint,
@@ -449,26 +449,30 @@
 		function drawHexField() {
 			const origin = fieldOrigin();
 			for (const tile of fieldTiles(book.worldShape.sedimentGrid)) {
-				if (tile.elevation < TILE_MIN_ELEVATION) continue;
+				// Every tile draws. An empty world is a seabed lying quiet under deep
+				// water, not a void — see SEABED_ALPHA.
+				//
 				// A submerged tile is held just under the surface however deep its silt
 				// is, so open water reads as water rather than as a stack of steps.
 				const standing = tile.land ? tile.elevation : Math.min(tile.elevation, SEA_LEVEL * 0.92);
 				const p = projectHex(tile.q, tile.r, standing, origin);
-				// how near the surface, and how far out of nothing — the second is what
-				// lets a tile arrive gradually instead of popping into being.
 				const shallow = clamp01(tile.elevation / SEA_LEVEL);
-				const arrival = clamp01((tile.elevation - TILE_MIN_ELEVATION) / 0.5);
+				// bare floor at SEABED_ALPHA, gathering presence as the silt rises
+				const submerged = (SEABED_ALPHA + (0.62 - SEABED_ALPHA) * shallow) * tile.edge;
 
-				ctx!.save();
-				traceSide(p.x, p.y, p.side);
-				if (tile.land) {
-					ctx!.fillStyle = 'rgb(185, 160, 105)';
-				} else {
-					ctx!.globalAlpha = 0.5 * arrival;
-					ctx!.fillStyle = 'rgb(29, 95, 124)';
+				if (p.side > 0.0005) {
+					ctx!.save();
+					traceSide(p.x, p.y, p.side);
+					if (tile.land) {
+						ctx!.globalAlpha = tile.edge;
+						ctx!.fillStyle = 'rgb(185, 160, 105)';
+					} else {
+						ctx!.globalAlpha = submerged * 0.8;
+						ctx!.fillStyle = 'rgb(29, 95, 124)';
+					}
+					ctx!.fill();
+					ctx!.restore();
 				}
-				ctx!.fill();
-				ctx!.restore();
 
 				ctx!.save();
 				traceTop(p.x, p.y);
@@ -476,12 +480,13 @@
 					const t = clamp01((tile.elevation - SEA_LEVEL) / (TILE_ELEVATION_SCALE - SEA_LEVEL));
 					// sand at the waterline, greening as it climbs away from it
 					ctx!.fillStyle = rgb(lerp(236, 147, t), lerp(220, 194, t), lerp(174, 104, t));
+					ctx!.globalAlpha = tile.edge;
 				} else {
-					ctx!.globalAlpha = 0.3 + 0.6 * shallow * arrival;
+					ctx!.globalAlpha = submerged;
 					ctx!.fillStyle = rgb(46 + 70 * shallow, 120 + 80 * shallow, 146 + 60 * shallow);
 				}
 				ctx!.fill();
-				ctx!.strokeStyle = `rgba(255, 255, 255, ${tile.land ? 0.16 : 0.06})`;
+				ctx!.strokeStyle = `rgba(255, 255, 255, ${(tile.land ? 0.16 : 0.05) * tile.edge})`;
 				ctx!.lineWidth = 1;
 				ctx!.stroke();
 				ctx!.restore();
