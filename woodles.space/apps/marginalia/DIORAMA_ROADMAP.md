@@ -1,5 +1,13 @@
 # marginalia — the diorama's polish roadmap
 
+> **out of date as of the hex world.** This file is about `WorldCanvas.svelte` as a
+> procedural canvas painting of a side-on biome diorama. That diorama is gone —
+> see [HEX_WORLD.md](./HEX_WORLD.md) for what replaced it and
+> [2_5D.md](./2_5D.md) for how. The craft items below that still apply (the sprite
+> conventions, the offline binding, reduced-motion and a11y care) survived the
+> change; the ones about sky gradients, the water column and the sediment band do
+> not describe anything that still exists.
+
 scope note: this is about `WorldCanvas.svelte` itself — the rendering, legibility, and
 craft of the biome diorama as a piece of canvas art. it's deliberately narrower than
 [DESIGN.md](./DESIGN.md) (the game systems the diorama displays) and the root
