@@ -50,7 +50,16 @@
 	const ASPECT = 960 / 480;
 	const WATER_TOP = WORLD_WATER_TOP;
 	const FLOOR_TOP = SEDIMENT_BAND_TOP;
-	const CREATURE_BOX = 0.2;
+	/**
+	 * How wide a creature is, measured in tiles.
+	 *
+	 * It used to be a fraction of the frame's height, which made sense when the
+	 * scene was a water column filling the canvas. Against a hex field the only
+	 * scale that means anything is the tile: a creature is a thing standing on the
+	 * ground, and how big it is relative to that ground is the whole question. Just
+	 * under one tile leaves it clearly an inhabitant rather than a landmark.
+	 */
+	const CREATURE_TILES = 0.9;
 	const PEARL_BIT_SPRITES = [0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 14, 15, 48, 49, 50, 55, 57, 60, 61, 62, 63];
 	const PASTEL_BIT_SPRITES = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 52, 53, 56, 59];
 	const GLINT_SPRITES = [32, 33, 34, 35, 36, 37, 38, 39];
@@ -444,6 +453,19 @@
 		// Where a spawn point's (x, y) — still plain [0,1] fractions — lands on the
 		// field, and how high the tile under it stands. This is what puts creatures
 		// and features on the island rather than on a plane behind it.
+		// A spawn point's (x, y) were authored against a canvas the scene filled edge
+		// to edge. The field occupies the middle of the frame with open water around
+		// it, so read literally they put creatures out on the rim where the seabed
+		// has already faded to nothing — one of world 1's own points sits at
+		// (0.8, 0.84), which lands half off the frame. Compressing toward the middle
+		// keeps their arrangement relative to each other while putting all of them on
+		// ground that exists.
+		const SPAWN_INSET = 0.62;
+
+		function spawnToField(u: number, v: number): { u: number; v: number } {
+			return { u: 0.5 + (u - 0.5) * SPAWN_INSET, v: 0.5 + (v - 0.5) * SPAWN_INSET };
+		}
+
 		function standOn(
 			u: number,
 			v: number
@@ -770,9 +792,16 @@
 				// follows from that tile: what it stands on, how high, and — since the
 				// camera has no perspective — a size that no longer depends on where
 				// in the frame it happens to be.
-				const spot = standOn(point.x, point.y);
+				const inset = spawnToField(point.x, point.y);
+				const spot = standOn(inset.u, inset.v);
 				const box =
-					H * CREATURE_BOX * point.scale * info.sizeScale * (0.58 + 0.42 * (stage / 3));
+					HEX_SIZE *
+					2 *
+					W *
+					CREATURE_TILES *
+					point.scale *
+					info.sizeScale *
+					(0.58 + 0.42 * (stage / 3));
 				const scale = box / Math.max(entry.img.naturalWidth, entry.img.naturalHeight);
 				const dw = entry.img.naturalWidth * scale;
 				const dh = entry.img.naturalHeight * scale;
@@ -824,8 +853,9 @@
 				const cellH = sheet.img.naturalHeight / sheet.rows;
 				const yScale = cellW > 0 ? cellH / cellW : 1;
 				// same footing as the living life: the tile its (x, y) names
-				const spot = standOn(placed.x, placed.y);
-				const size = H * CREATURE_BOX * spec.boxScale * placed.scale;
+				const inset = spawnToField(placed.x, placed.y);
+				const spot = standOn(inset.u, inset.v);
+				const size = HEX_SIZE * 2 * W * CREATURE_TILES * spec.boxScale * placed.scale;
 				const dh = size * yScale;
 				const seed = placed.x + placed.y + placed.id.length * 0.013;
 				const jitter = (stable01(`${placed.id}:fan`) - 0.5) * HEX_SIZE * 1.3;
@@ -992,13 +1022,15 @@
 		function drawWitchMotes(T: number, intensity: number) {
 			if (!witchMotes.ok || intensity <= 0.02) return;
 			const rows = [0, 1, 2, 4, 5, 6, 7];
-			const count = Math.round(8 + intensity * 22 + book.attentionUsed * 1.5);
+			// tuned against a water column that filled the frame; the world it drifts
+			// over is a third of that now, and at the old count it read as static
+			const count = Math.round(5 + intensity * 12 + book.attentionUsed * 0.8);
 			for (let i = 0; i < count; i++) {
 				const seed = `witch-mote-${book.worldIndex}-${i}`;
 				const drift = (T * (0.018 + stable01(`${seed}-speed`) * 0.025) + stable01(`${seed}-phase`)) % 1;
 				const sway = Math.sin(T * (0.5 + stable01(`${seed}-sway`) * 0.8) + stable01(seed) * TAU);
 				const x = W * (0.06 + stable01(`${seed}-x`) * 0.88) + sway * W * 0.012;
-				const y = H * (0.32 + stable01(`${seed}-y`) * 0.58) - drift * H * 0.16;
+				const y = H * (0.24 + stable01(`${seed}-y`) * 0.5) - drift * H * 0.14;
 				const row = rows[i % rows.length];
 				const col = Math.floor(stable01(`${seed}-col`) * 8);
 				const size = H * (0.018 + stable01(`${seed}-size`) * 0.026);
