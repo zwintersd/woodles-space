@@ -476,19 +476,37 @@
 
 				ctx!.save();
 				traceTop(p.x, p.y);
+				// A little tone per tile, so neither the floor nor the land is one flat
+				// colour. Without it the field reads as a wash with a grid ruled over
+				// it rather than as ground made of separate pieces.
+				const grain = (stable01(`tone:${tile.col}:${tile.row}`) - 0.5) * 2;
 				if (tile.land) {
 					const t = clamp01((tile.elevation - SEA_LEVEL) / (TILE_ELEVATION_SCALE - SEA_LEVEL));
 					// sand at the waterline, greening as it climbs away from it
-					ctx!.fillStyle = rgb(lerp(236, 147, t), lerp(220, 194, t), lerp(174, 104, t));
+					ctx!.fillStyle = rgb(
+						lerp(236, 147, t) + grain * 7,
+						lerp(220, 194, t) + grain * 7,
+						lerp(174, 104, t) + grain * 6
+					);
 					ctx!.globalAlpha = tile.edge;
 				} else {
 					ctx!.globalAlpha = submerged;
-					ctx!.fillStyle = rgb(46 + 70 * shallow, 120 + 80 * shallow, 146 + 60 * shallow);
+					ctx!.fillStyle = rgb(
+						46 + 70 * shallow + grain * 6,
+						120 + 80 * shallow + grain * 7,
+						146 + 60 * shallow + grain * 7
+					);
 				}
 				ctx!.fill();
-				ctx!.strokeStyle = `rgba(255, 255, 255, ${(tile.land ? 0.16 : 0.05) * tile.edge})`;
-				ctx!.lineWidth = 1;
-				ctx!.stroke();
+				// Only land keeps a drawn edge. Underwater the strokes of a whole row
+				// line up and read as stripes ruled across the sea, which is the one
+				// thing a seabed should not look like; the tone difference between
+				// neighbours is enough to tell tiles apart down there.
+				if (tile.land) {
+					ctx!.strokeStyle = `rgba(255, 255, 255, ${0.16 * tile.edge})`;
+					ctx!.lineWidth = 1;
+					ctx!.stroke();
+				}
 				ctx!.restore();
 			}
 		}

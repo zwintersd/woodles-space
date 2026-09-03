@@ -4,6 +4,7 @@ import {
 	FIELD_COLS,
 	FIELD_ROWS,
 	SEABED_ALPHA,
+	SEABED_RELIEF,
 	edgeFalloff,
 	TILE_ELEVATION_SCALE,
 	fieldOrigin,
@@ -37,11 +38,13 @@ describe('the field over the grid', () => {
 		expect(fieldTiles(empty)).toHaveLength(FIELD_COLS * FIELD_ROWS);
 	});
 
-	// The whole mechanic in one assertion: an untouched world is open water.
+	// The whole mechanic in one assertion: an untouched world is all water. It is
+	// not flat — the bare floor carries SEABED_RELIEF so it reads as a place — but
+	// nothing on it stands high enough to be land until she pours.
 	it('is all water until she pours', () => {
 		for (const tile of fieldTiles(empty)) {
-			expect(tile.elevation).toBe(0);
 			expect(tile.land).toBe(false);
+			expect(tile.elevation).toBeLessThan(SEA_LEVEL);
 		}
 	});
 
@@ -49,9 +52,13 @@ describe('the field over the grid', () => {
 		expect(fieldTiles(full).every((t) => t.land)).toBe(true);
 	});
 
-	it('reads elevation straight off the silt, with nothing authored under it', () => {
-		expect(tileElevation(empty, 7, 6)).toBe(0);
-		expect(tileElevation(full, 7, 6)).toBeCloseTo(TILE_ELEVATION_SCALE);
+	it('reads elevation off the silt, over the floor that was already there', () => {
+		expect(tileElevation(empty, 7, 6)).toBeLessThan(SEABED_RELIEF);
+		expect(tileElevation(full, 7, 6)).toBeGreaterThanOrEqual(TILE_ELEVATION_SCALE);
+		// the silt is what moves it: the floor's own relief is a fraction of the swing
+		expect(tileElevation(full, 7, 6) - tileElevation(empty, 7, 6)).toBeCloseTo(
+			TILE_ELEVATION_SCALE
+		);
 	});
 
 	it('puts the shore a little past the coverage threshold, not with it', () => {
@@ -137,29 +144,59 @@ describe('the world before she touches it', () => {
 });
 
 describe('the field dissolving into deep water', () => {
-	it('is full strength in the middle and nothing at the border', () => {
+	it('is full strength in the middle and gone by the corners', () => {
 		expect(edgeFalloff(Math.floor(FIELD_COLS / 2), Math.floor(FIELD_ROWS / 2))).toBeCloseTo(1);
 		expect(edgeFalloff(0, 0)).toBe(0);
+		expect(edgeFalloff(FIELD_COLS - 1, 0)).toBe(0);
+		expect(edgeFalloff(0, FIELD_ROWS - 1)).toBe(0);
 		expect(edgeFalloff(FIELD_COLS - 1, FIELD_ROWS - 1)).toBe(0);
 	});
 
-	it('fades on every side, so the field has no visible corner', () => {
-		for (let col = 0; col < FIELD_COLS; col++) {
-			expect(edgeFalloff(col, 0)).toBe(0);
-			expect(edgeFalloff(col, FIELD_ROWS - 1)).toBe(0);
-		}
-		for (let row = 0; row < FIELD_ROWS; row++) {
-			expect(edgeFalloff(0, row)).toBe(0);
-			expect(edgeFalloff(FIELD_COLS - 1, row)).toBe(0);
-		}
+	// The shape is the point. Fading from a rectangle's border kept the rectangle:
+	// a scalloped top edge and a combed side, a slab lying in the sea.
+	it('fades from an ellipse rather than from a rectangle', () => {
+		const midCol = Math.floor(FIELD_COLS / 2);
+		const midRow = Math.floor(FIELD_ROWS / 2);
+		// A corner is further from the centre than either edge midpoint, so it has
+		// to go first — which is exactly what a rectangular falloff would not do.
+		expect(edgeFalloff(0, 0)).toBeLessThanOrEqual(edgeFalloff(0, midRow));
+		expect(edgeFalloff(0, 0)).toBeLessThanOrEqual(edgeFalloff(midCol, 0));
 	});
 
-	it('rises without stepping, so the edge has no seam', () => {
-		let previous = -1;
-		for (let col = 0; col <= Math.floor(FIELD_COLS / 2); col++) {
-			const e = edgeFalloff(col, Math.floor(FIELD_ROWS / 2));
-			expect(e).toBeGreaterThanOrEqual(previous);
-			previous = e;
+	it('has a ragged rim, so no tile row ends on the same line', () => {
+		const rim = [];
+		for (let row = 0; row < FIELD_ROWS; row++) {
+			let last = -1;
+			for (let col = 0; col < FIELD_COLS; col++) if (edgeFalloff(col, row) > 0) last = col;
+			if (last >= 0) rim.push(last);
+		}
+		expect(new Set(rim).size).toBeGreaterThan(2);
+	});
+
+	it('is the same rim every time she opens the book', () => {
+		expect(edgeFalloff(3, 9)).toBe(edgeFalloff(3, 9));
+	});
+});
+
+describe('relief on the bare floor', () => {
+	it('gives an untouched seabed some shape', () => {
+		const heights = new Set(fieldTiles(empty).map((t) => t.elevation.toFixed(4)));
+		expect(heights.size).toBeGreaterThan(10);
+	});
+
+	it('is small enough that poured silt still governs', () => {
+		expect(SEABED_RELIEF).toBeLessThan(SEA_LEVEL / 2);
+	});
+
+	it('never lifts a bare tile into being land', () => {
+		expect(fieldTiles(empty).some((t) => t.land)).toBe(false);
+	});
+
+	it('is what a tile standing on the floor agrees with', () => {
+		// standOn reads tileElevation; fieldTiles builds its own. They have to match
+		// or a creature stands at a different height than the tile it is on.
+		for (const tile of fieldTiles(empty)) {
+			expect(tileElevation(empty, tile.col, tile.row)).toBeCloseTo(tile.elevation);
 		}
 	});
 });

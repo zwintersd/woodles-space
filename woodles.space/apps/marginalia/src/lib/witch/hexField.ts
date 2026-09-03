@@ -21,7 +21,9 @@ import {
 	offsetToAxial,
 	unprojectHex
 } from './hex';
-import { sampleSediment, type SedimentGrid } from './worldShape';
+import { sampleSediment, stable01, type SedimentGrid } from './worldShape';
+
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
 /** How many tiles the field shows. Odd-r offset, so rows alternate half a tile. */
 export const FIELD_COLS = 15;
@@ -57,22 +59,49 @@ export interface FieldTile {
 	density: number;
 	land: boolean;
 	/**
-	 * 1 in the body of the field, falling to 0 at its border. The field is a
-	 * rectangle of tiles and its edge is a hard comb of half-offset rows; without
-	 * this the seabed reads as a slab dropped in the sea rather than as a floor
-	 * the deep water swallows. Silt can still be poured out here — it just
-	 * arrives from somewhere the eye cannot quite find the edge of.
+	 * 1 in the body of the field, falling to 0 around a ragged ellipse near its
+	 * rim — see edgeFalloff. Silt can still be poured out there; the eye just
+	 * cannot find where the world stops.
 	 */
 	edge: number;
 }
 
-/** How many tiles the seabed takes to dissolve into open water. */
-export const FIELD_EDGE_FADE = 2.5;
+/**
+ * How the seabed ends.
+ *
+ * The first attempt faded from the field's rectangular border inward, which
+ * removed the hard cut but kept the shape: a scalloped top edge and a combed side,
+ * a slab lying in the sea. A seabed has no rectangle in it. This fades radially
+ * instead, from an ellipse matching the field's own proportions, and roughens the
+ * boundary per tile so it dissolves unevenly the way a real one would.
+ */
+export const FIELD_CORE = 0.62;
+export const FIELD_EDGE_NOISE = 0.17;
 
 export function edgeFalloff(col: number, row: number): number {
-	const fromEdge = Math.min(col, FIELD_COLS - 1 - col, row, FIELD_ROWS - 1 - row);
-	const t = Math.max(0, Math.min(1, fromEdge / FIELD_EDGE_FADE));
+	const dx = (col - (FIELD_COLS - 1) / 2) / ((FIELD_COLS - 1) / 2);
+	const dy = (row - (FIELD_ROWS - 1) / 2) / ((FIELD_ROWS - 1) / 2);
+	const spread = Math.hypot(dx, dy);
+	// a stable per-tile wobble, so the rim is ragged rather than a clean ellipse
+	const wobble = (stable01(`seabed:${col}:${row}`) - 0.5) * FIELD_EDGE_NOISE;
+	const t = clamp01((1 - (spread + wobble)) / (1 - FIELD_CORE));
 	return t * t * (3 - 2 * t);
+}
+
+/**
+ * A little relief on the bare seabed, in elevation units.
+ *
+ * Without it the untouched floor is one flat plane of identical tiles and reads as
+ * a texture rather than a place — every tile the same height means no tile has a
+ * visible side. This is deterministic per tile, so the floor is the same every
+ * time she opens the book, and small enough that poured silt still dominates it.
+ */
+export const SEABED_RELIEF = 0.22;
+
+export function seabedRelief(col: number, row: number): number {
+	const a = stable01(`relief:${col}:${row}`);
+	const b = stable01(`relief:${row}:${col}`);
+	return ((a + b) / 2) * SEABED_RELIEF;
 }
 
 /** Where a tile sits in the density field, in the grid's own [0,1] coordinates. */
@@ -85,7 +114,8 @@ export function tileSample(col: number, row: number): { u: number; v: number } {
 
 export function tileElevation(grid: SedimentGrid, col: number, row: number): number {
 	const { u, v } = tileSample(col, row);
-	return sampleSediment(grid, u, v) * TILE_ELEVATION_SCALE;
+	// same sum fieldTiles uses, so anything standing on a tile agrees with the tile
+	return seabedRelief(col, row) + sampleSediment(grid, u, v) * TILE_ELEVATION_SCALE;
 }
 
 /**
@@ -121,7 +151,8 @@ export function fieldTiles(grid: SedimentGrid): FieldTile[] {
 			const { q, r } = offsetToAxial(col, row);
 			const { u, v } = tileSample(col, row);
 			const density = sampleSediment(grid, u, v);
-			const elevation = density * TILE_ELEVATION_SCALE;
+			// silt on top of what the floor already had, so a bare seabed has shape
+			const elevation = seabedRelief(col, row) + density * TILE_ELEVATION_SCALE;
 			tiles.push({
 				col,
 				row,
