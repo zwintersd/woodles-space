@@ -5,14 +5,22 @@ import {
 	FLOOR_HORIZON_Y,
 	FOG_MAX,
 	SCENE_FAR_Z,
+	SEA_LEVEL_Y,
+	SHELF_BASE,
+	SHELF_COVERAGE_LIFT,
+	SHELF_CREST,
+	SHELF_TOE,
 	SEDIMENT_BAND_TOP,
 	floorDepthAtY,
 	floorDepthScale,
 	floorPlaneY,
 	byDepth,
+	bathymetryRise,
 	floorXScale,
 	fogAlpha,
+	isAboveWater,
 	projectFloor,
+	shelfProfile,
 	sceneDepthFromSeed,
 	unprojectFloor
 } from './projection';
@@ -102,9 +110,28 @@ describe('unprojecting', () => {
 	});
 
 	it('clamps a click past the far edge of the world back into it', () => {
-		const corner = unprojectFloor(0, floorPlaneY(0))!;
-		expect(corner.x).toBe(0);
-		expect(unprojectFloor(1, floorPlaneY(0))!.x).toBe(1);
+		expect(unprojectFloor(0, floorPlaneY(0))!.x).toBe(0);
+	});
+
+	// The round-trip check is what decides whether a screen point is on the seabed
+	// at all, now that the floor is a shaped surface rather than a flat band: open
+	// water above the bed has no depth to report.
+	it('rejects open water above the seabed', () => {
+		expect(unprojectFloor(0.5, 0.5)).toBeNull();
+		expect(unprojectFloor(0.2, 0.62)).toBeNull();
+	});
+
+	it('finds the shelf where the shelf actually is, not where the plane is', () => {
+		// At the near edge the seabed at x=1 stands a fifth of the frame proud of the
+		// plane, so this y resolves to the front of the shelf rather than the back.
+		const onShelf = unprojectFloor(1, floorPlaneY(0))!;
+		expect(onShelf).not.toBeNull();
+		expect(onShelf.z).toBeGreaterThan(0.9);
+	});
+
+	it('accepts the shelf where it actually is', () => {
+		const onShelf = projectFloor(0.95, 0.2, 0, 0.5);
+		expect(unprojectFloor(onShelf.x, onShelf.y, 0.5)).not.toBeNull();
 	});
 });
 
@@ -157,20 +184,23 @@ describe('depth ordering', () => {
 });
 
 describe('height above the plane', () => {
-	it('leaves the floor itself where the plane is', () => {
-		expect(projectFloor(0.5, 0.5, 0).y).toBeCloseTo(floorPlaneY(0.5));
+	// The plane is the datum the seabed sits on, not the seabed itself — since D
+	// the shelf stands on it, so the two only coincide out in the deep water where
+	// the shelf has not started climbing.
+	it('leaves the deep floor where the plane is', () => {
+		expect(projectFloor(0.1, 0.5, 0).y).toBeCloseTo(floorPlaneY(0.5));
 	});
 
 	it('raises silt toward the viewer, never below the floor', () => {
-		const flat = projectFloor(0.5, 0.6, 0).y;
-		const mound = projectFloor(0.5, 0.6, 1).y;
+		const flat = projectFloor(0.1, 0.6, 0).y;
+		const mound = projectFloor(0.1, 0.6, 1).y;
 		expect(mound).toBeLessThan(flat);
 		expect(flat - mound).toBeCloseTo(FLOOR_HEIGHT_UNIT * floorDepthScale(0.6));
 	});
 
 	it('foreshortens height, so the same mound rises less at the back', () => {
-		const near = projectFloor(0.5, 1, 1);
-		const far = projectFloor(0.5, 0, 1);
+		const near = projectFloor(0.1, 1, 1);
+		const far = projectFloor(0.1, 0, 1);
 		expect(floorPlaneY(1) - near.y).toBeGreaterThan(floorPlaneY(0) - far.y);
 	});
 
@@ -178,13 +208,82 @@ describe('height above the plane', () => {
 		expect(projectFloor(0.3, 0.4, 0.8).x).toBeCloseTo(projectFloor(0.3, 0.4, 0).x);
 	});
 
-	// The mound has to stay in the floor's own band; silt climbing into the open
-	// water would break the composition A was careful to preserve.
-	it('keeps a full mound inside the frame', () => {
+	it('keeps a full mound inside the frame out in the deep water', () => {
 		for (let i = 0; i <= 10; i++) {
-			const y = projectFloor(0.5, i / 10, 1).y;
+			const y = projectFloor(0.1, i / 10, 1).y;
 			expect(y).toBeGreaterThan(0.5);
 			expect(y).toBeLessThanOrEqual(1);
 		}
+	});
+
+
+});
+
+describe('the shelf, and the shoreline it makes', () => {
+	it('is deep on the left and shelves up to the right', () => {
+		expect(shelfProfile(0)).toBe(0);
+		expect(shelfProfile(SHELF_TOE)).toBeCloseTo(0);
+		expect(shelfProfile(SHELF_CREST)).toBeCloseTo(1);
+		expect(shelfProfile(1)).toBeCloseTo(1);
+		let previous = -1;
+		for (let i = 0; i <= 20; i++) {
+			const r = shelfProfile(i / 20);
+			expect(r).toBeGreaterThanOrEqual(previous);
+			previous = r;
+		}
+	});
+
+	it('leaves the deep water flat, so the shelf reads as a shelf', () => {
+		expect(bathymetryRise(0, 1)).toBe(0);
+		expect(bathymetryRise(0.2, 1)).toBe(0);
+	});
+
+	it('rises with coverage — this is the waterline being hers', () => {
+		expect(bathymetryRise(1, 1)).toBeGreaterThan(bathymetryRise(1, 0));
+		expect(bathymetryRise(1, 0)).toBeCloseTo(SHELF_BASE);
+		expect(bathymetryRise(1, 1)).toBeCloseTo(SHELF_BASE + SHELF_COVERAGE_LIFT);
+	});
+
+	// The shelf shallows but stays under water, on purpose — see the note on
+	// SHELF_BASE and 2_5D.md's "the two horizons". These pin that it is deliberate,
+	// so that whoever reconciles the cameras finds a failing test rather than a
+	// silent behaviour change.
+	it('shallows toward the shore without breaking the surface', () => {
+		for (let i = 0; i <= 20; i++) {
+			for (const z of [0, 0.5, 1]) {
+				expect(isAboveWater(i / 20, z, 1, 1)).toBe(false);
+			}
+		}
+	});
+
+	it('still rises toward the surface as she covers the floor', () => {
+		const bare = projectFloor(1, 1, 0, 0).y;
+		const covered = projectFloor(1, 1, 0, 1).y;
+		expect(covered).toBeLessThan(bare);
+		expect(bare - covered).toBeCloseTo(SHELF_COVERAGE_LIFT);
+	});
+
+});
+
+describe('unprojecting across the shelf', () => {
+	it('round-trips with the seabed shaped under it', () => {
+		for (const coverage of [0, 0.6, 1]) {
+			for (const x of [0.15, 0.5, 0.8]) {
+				for (const z of [0.15, 0.5, 1]) {
+					const p = projectFloor(x, z, 0, coverage);
+					const back = unprojectFloor(p.x, p.y, coverage);
+					expect(back).not.toBeNull();
+					expect(back!.x).toBeCloseTo(x, 2);
+					expect(back!.z).toBeCloseTo(z, 2);
+				}
+			}
+		}
+	});
+
+	it('still round-trips on the flat deep floor, where there is no shelf', () => {
+		const p = projectFloor(0.1, 0.5, 0, 1);
+		const back = unprojectFloor(p.x, p.y, 1)!;
+		expect(back.x).toBeCloseTo(0.1, 3);
+		expect(back.z).toBeCloseTo(0.5, 3);
 	});
 });

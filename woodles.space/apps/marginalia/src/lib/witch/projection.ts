@@ -62,7 +62,11 @@ export function floorXScale(z: number): number {
 	return 1 - FLOOR_X_CONVERGENCE * (1 - floorDepthScale(z));
 }
 
-/** Depth of the floor plane at screen y, or null if that y isn't on the plane. */
+/**
+ * Depth of the *flat* floor plane at screen y, ignoring the seabed's shape. Only
+ * meaningful where nothing stands proud of the plane; `floorDepthAt` is the one to
+ * reach for once bathymetry is in play.
+ */
 export function floorDepthAtY(y: number): number | null {
 	if (y < SEDIMENT_BAND_TOP || y > 1) return null;
 	const q = (y - FLOOR_HORIZON_Y) / (1 - FLOOR_HORIZON_Y);
@@ -70,30 +74,121 @@ export function floorDepthAtY(y: number): number | null {
 	return clamp01(1 - (1 / q - 1) / FLOOR_FOCAL);
 }
 
-// How far a full-density cell of silt stands proud of the plane, in canvas
-// fractions, measured at the near edge. The floor band is 0.2 of the frame, so at
-// 0.055 a full mound is about a quarter of the visible floor — enough to read as
-// relief in profile without the seabed climbing into the open water.
+// How far a full-density cell of silt stands proud of the seabed, in canvas
+// fractions, measured at the near edge.
 export const FLOOR_HEIGHT_UNIT = 0.055;
 
+// ── the seabed's own shape ───────────────────────────────────────────────────
+//
+// Sea level. Flat, because sea level is: the water's surface is drawn edge-on as
+// a line, the way a cutaway shows it (2_5D.md part 2).
+export const SEA_LEVEL_Y = 0.34;
+
+// The shelf's shape. A smoothstep from toe to crest and flat after — a shelf
+// rather than a spike. A quadratic was tried first and back-loads everything into
+// the last few percent of the width, which makes land a sliver at the frame edge
+// instead of a beach.
+export const SHELF_TOE = 0.3;
+export const SHELF_CREST = 0.86;
+
+// How high the bare seabed sits, and how much her silt lifts it.
+//
+// These are deliberately short of what the shelf would need to break the surface,
+// and that is a blocked design decision rather than a tuning choice. See 2_5D.md
+// "the two horizons": the seabed's vanishing point sits at FLOOR_HORIZON_Y 0.667,
+// while the water is drawn as a line at SEA_LEVEL_Y 0.340 — a third of the frame
+// *above* it. Terrain can rise above a horizon, but to get there from here the
+// near edge of the shelf has to ramp across 66% of the frame height, and it reads
+// as a wall thrown across the diorama rather than as a beach. That is the two
+// cameras in this scene disagreeing, and reconciling them is a composition
+// decision, not a number.
+//
+// So the shelf shallows and does not emerge. Everything needed for it to emerge —
+// the profile, the coverage coupling, the land shading, the coupled inverse — is
+// here and works; only these two numbers hold it under water.
+export const SHELF_COVERAGE_LIFT = 0.08;
+export const SHELF_BASE = 0.2;
+
+export function shelfProfile(x: number): number {
+	const t = clamp01((clamp01(x) - SHELF_TOE) / (SHELF_CREST - SHELF_TOE));
+	return t * t * (3 - 2 * t);
+}
+
 /**
- * World (x, z, h) to screen position and foreshortening. `x` and the returned
- * `x`/`y` are canvas fractions; `scale` multiplies any size drawn at that spot.
- * `h` is height above the plane — 0 on the floor itself, 1 at a full mound — and
- * foreshortens with distance like everything else, so a mound at the back rises
- * less on screen than the same mound at the front.
+ * The seabed's elevation at world x, before the silt she has laid on top of it —
+ * deep on the left, shelving up to the right, and lifted bodily by how much of the
+ * floor she has covered. `coverage` is `book.sedimentCoverage`, 0 to 1.
+ *
+ * This is the term that makes the waterline hers. The shoreline is wherever the
+ * seabed crosses SEA_LEVEL_Y; nothing places it, and pouring moves it.
  */
+export function bathymetryRise(x: number, coverage = 0): number {
+	return (SHELF_BASE + clamp01(coverage) * SHELF_COVERAGE_LIFT) * shelfProfile(x);
+}
+
+const zFromQ = (q: number) => clamp01(1 - (1 / q - 1) / FLOOR_FOCAL);
+
+/**
+ * Depth at a screen point, accounting for the shelf.
+ *
+ * Bathymetry couples the two axes — the height of the seabed depends on x, and
+ * which x a screen column corresponds to depends on z — so this cannot be solved
+ * in one step the way the flat plane could. Given a rise it *is* closed form:
+ *
+ *   planeY(z) - rise·q = y   →   q = (y - HORIZON) / (1 - HORIZON - rise)
+ *
+ * so a few rounds of "guess the depth, read off x, take that column's rise, solve
+ * again" converge quickly, because the shelf is smooth and shallow in x. Four is
+ * comfortably past the point where the answer stops moving.
+ */
+export function floorDepthAt(screenX: number, y: number, coverage = 0): number | null {
+	if (!Number.isFinite(y) || y > 1) return null;
+	// The flat-plane answer is only a seed now, and often not even a legal one: a
+	// shelf raises its part of the seabed well above SEDIMENT_BAND_TOP, so a point
+	// genuinely on the floor can sit anywhere between sea level and the frame's
+	// bottom. Start from the flat solution where it exists and mid-depth where it
+	// does not, then let the iteration find the real one.
+	let z = floorDepthAtY(y) ?? 0.5;
+	for (let i = 0; i < 6; i++) {
+		const worldX = clamp01(0.5 + (screenX - 0.5) / floorXScale(z));
+		const denominator = 1 - FLOOR_HORIZON_Y - bathymetryRise(worldX, coverage);
+		// Degenerate where the shelf would rise to the horizon itself.
+		if (Math.abs(denominator) < 1e-6) break;
+		const q = (y - FLOOR_HORIZON_Y) / denominator;
+		if (q <= 0) break;
+		z = zFromQ(q);
+	}
+	// Whether the point was on the seabed at all is decided by whether the answer
+	// projects back to it. Solving against the bare shelf rather than the silt on
+	// top costs at most FLOOR_HEIGHT_UNIT of error, which is under a pixel and a
+	// good trade for keeping this module free of world state.
+	const worldX = clamp01(0.5 + (screenX - 0.5) / floorXScale(z));
+	return Math.abs(projectFloor(worldX, z, 0, coverage).y - y) < 0.012 ? z : null;
+}
+
 export function projectFloor(
 	x: number,
 	z: number,
-	h = 0
+	h = 0,
+	coverage = 0
 ): { x: number; y: number; scale: number } {
 	const scale = floorDepthScale(z);
+	// The bathymetry is added here rather than by callers on purpose: the shelf is
+	// a property of the world, not of whoever is drawing. Everything already
+	// anchored to the floor — the sediment surface, placed features and their
+	// auras, floor-layer life, the pour's landing point — rides the seabed's shape
+	// with no change at its call site, the same way step A moved them all onto the
+	// plane by changing one function.
 	return {
 		x: 0.5 + (x - 0.5) * floorXScale(z),
-		y: floorPlaneY(z) - h * FLOOR_HEIGHT_UNIT * scale,
+		y: floorPlaneY(z) - (bathymetryRise(x, coverage) + h * FLOOR_HEIGHT_UNIT) * scale,
 		scale
 	};
+}
+
+/** True where the seabed at (x, z, silt h) stands above the water. */
+export function isAboveWater(x: number, z: number, h = 0, coverage = 0): boolean {
+	return projectFloor(x, z, h, coverage).y <= SEA_LEVEL_Y;
 }
 
 /**
@@ -102,8 +197,12 @@ export function projectFloor(
  * against SEDIMENT_BAND_TOP. `x` is clamped, since the near-edge frame is wider
  * than the far-edge world and a click at the far corner falls outside it.
  */
-export function unprojectFloor(x: number, y: number): { x: number; z: number } | null {
-	const z = floorDepthAtY(y);
+export function unprojectFloor(
+	x: number,
+	y: number,
+	coverage = 0
+): { x: number; z: number } | null {
+	const z = floorDepthAt(x, y, coverage);
 	if (z === null) return null;
 	return { x: clamp01(0.5 + (x - 0.5) / floorXScale(z)), z };
 }
