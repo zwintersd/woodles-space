@@ -157,3 +157,37 @@ export function offsetToAxial(col: number, row: number): { q: number; r: number 
 export function axialToOffset(q: number, r: number): { col: number; row: number } {
 	return { col: q + (r - (r & 1)) / 2, row: r };
 }
+
+/**
+ * The six tiles touching this one, in odd-r offset coordinates.
+ *
+ * Offset rows alternate, so which diagonals a tile has depends on whether its row
+ * is odd — the price of storing a hex map in a rectangle, and the reason this is a
+ * table rather than arithmetic. Neighbours off the field are returned anyway;
+ * callers know their own bounds.
+ */
+const ODD_R_NEIGHBOURS = {
+	even: [
+		[1, 0],
+		[0, -1],
+		[-1, -1],
+		[-1, 0],
+		[-1, 1],
+		[0, 1]
+	],
+	odd: [
+		[1, 0],
+		[1, -1],
+		[0, -1],
+		[-1, 0],
+		[0, 1],
+		[1, 1]
+	]
+} as const;
+
+export function hexNeighbours(col: number, row: number): { col: number; row: number }[] {
+	return ODD_R_NEIGHBOURS[row & 1 ? 'odd' : 'even'].map(([dc, dr]) => ({
+		col: col + dc,
+		row: row + dr
+	}));
+}
