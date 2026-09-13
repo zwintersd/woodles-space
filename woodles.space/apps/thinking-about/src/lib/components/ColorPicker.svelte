@@ -21,6 +21,7 @@
 				onclick={() => onChange(swatch.hex)}
 			>
 				{#if selected}
+					<span class="ring" aria-hidden="true"></span>
 					<span class="check" aria-hidden="true">✓</span>
 				{/if}
 			</button>
@@ -52,6 +53,7 @@
 
 	.swatch,
 	.custom-swatch {
+		position: relative;
 		width: 1.4rem;
 		height: 1.4rem;
 		border-radius: 50%;
@@ -94,6 +96,22 @@
 		font-size: 0.72rem;
 		line-height: 1;
 		text-shadow: 0 0 2px rgba(0, 0, 0, 0.6), 0 1px 1px rgba(0, 0, 0, 0.45);
+		animation: ta-pop 0.34s var(--ta-ease-spring) both;
+	}
+
+	/* one ring thrown off the swatch as it is chosen — the check lands, the
+	   ring leaves. Both are created by the {#if}, so both replay on every
+	   change of color rather than only on the first. */
+	.ring {
+		position: absolute;
+		left: 50%;
+		top: 50%;
+		width: 1.4rem;
+		height: 1.4rem;
+		border-radius: 50%;
+		border: 2px solid var(--swatch-color, var(--ta-text-dim));
+		pointer-events: none;
+		animation: ta-ripple 0.5s var(--ta-ease-glide) both;
 	}
 
 	.custom-swatch {
