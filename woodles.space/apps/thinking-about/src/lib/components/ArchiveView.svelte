@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { thinkingAbout } from '$lib/thinkingAbout.svelte';
 	import { columnLabel, sectionLabel } from '$lib/constants';
+	import { collect } from '$lib/motion';
 </script>
 
 <div class="archive-view">
@@ -9,22 +10,28 @@
 		<button class="back-link" onclick={() => thinkingAbout.openBoard()}>← back to board</button>
 	</header>
 
+	<!-- list first, message second: reopening the last completed thing lets
+	     that row fold away above the message arriving under it, rather than
+	     being cut off by the list unmounting around it. See Section for the
+	     same reasoning one screen over. -->
+	<ul class="archive-list">
+		{#each thinkingAbout.archived as entry, i (entry.id)}
+			<!-- the color rides the row, not just its dot, so the hover tint is
+			     the entry's own — and the dot inherits it from here -->
+			<li class="archive-row" style:--chip-color={entry.color} style:--i={i} out:collect>
+				<span class="archive-dot" aria-hidden="true"></span>
+				<button class="archive-title" onclick={() => thinkingAbout.openEntry(entry.id)}>
+					{entry.title || 'untitled'}
+				</button>
+				<span class="archive-meta">{columnLabel(entry.columnKey)} · {sectionLabel(entry.sectionKey)}</span>
+				<span class="archive-date">closed {entry.dateClosed}</span>
+				<button class="reopen-btn" onclick={() => thinkingAbout.reopenEntry(entry.id)}>reopen</button>
+			</li>
+		{/each}
+	</ul>
+
 	{#if thinkingAbout.archived.length === 0}
 		<p class="archive-empty">nothing closed yet</p>
-	{:else}
-		<ul class="archive-list">
-			{#each thinkingAbout.archived as entry (entry.id)}
-				<li class="archive-row">
-					<span class="archive-dot" style:--chip-color={entry.color} aria-hidden="true"></span>
-					<button class="archive-title" onclick={() => thinkingAbout.openEntry(entry.id)}>
-						{entry.title || 'untitled'}
-					</button>
-					<span class="archive-meta">{columnLabel(entry.columnKey)} · {sectionLabel(entry.sectionKey)}</span>
-					<span class="archive-date">closed {entry.dateClosed}</span>
-					<button class="reopen-btn" onclick={() => thinkingAbout.reopenEntry(entry.id)}>reopen</button>
-				</li>
-			{/each}
-		</ul>
 	{/if}
 </div>
 
@@ -38,6 +45,7 @@
 		border-radius: var(--ta-radius-md);
 		box-shadow: var(--ta-shadow-lg);
 		padding: 1rem 1.2rem 1.4rem;
+		animation: ta-rise 0.5s var(--ta-ease-glide) both;
 	}
 
 	.archive-header {
@@ -65,7 +73,7 @@
 
 	.back-link:hover {
 		color: var(--ta-accent);
-		transform: translateX(-2px);
+		transform: translateX(-3px);
 	}
 
 	.archive-empty {
@@ -74,6 +82,7 @@
 		color: var(--ta-muted);
 		padding: 1.5rem 0;
 		text-align: center;
+		animation: ta-rise 0.4s var(--ta-ease-glide) 0.1s both;
 	}
 
 	.archive-list {
@@ -82,7 +91,12 @@
 		flex-direction: column;
 	}
 
+	.archive-list:empty {
+		display: none;
+	}
+
 	.archive-row {
+		position: relative;
 		display: flex;
 		align-items: center;
 		gap: 0.6rem;
@@ -91,6 +105,8 @@
 		border-radius: var(--ta-radius-sm);
 		border-bottom: 1px solid var(--ta-border-soft);
 		transition: background var(--ta-transition-fast);
+		animation: ta-slide-in 0.4s var(--ta-ease-glide) both;
+		animation-delay: min(calc(var(--i, 0) * 34ms), 300ms);
 	}
 
 	.archive-row:last-child {
@@ -101,6 +117,18 @@
 		background: color-mix(in srgb, var(--chip-color, var(--ta-accent)) 9%, white);
 	}
 
+	/* reopening flips the row back to its own color on the way out, the same
+	   language the board's chips use when they leave in the other direction */
+	.archive-row::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		background: var(--chip-color);
+		opacity: calc(var(--ta-collect, 0) * 0.55);
+		pointer-events: none;
+	}
+
 	.archive-dot {
 		width: 9px;
 		height: 9px;
@@ -108,11 +136,12 @@
 		background: var(--chip-color);
 		box-shadow: 0 0 0 3px color-mix(in srgb, var(--chip-color) 16%, transparent);
 		flex-shrink: 0;
-		transition: transform var(--ta-transition-spring);
+		transition: transform var(--ta-transition-spring), box-shadow var(--ta-transition-glide);
 	}
 
 	.archive-row:hover .archive-dot {
 		transform: scale(1.3);
+		box-shadow: 0 0 0 5px color-mix(in srgb, var(--chip-color) 20%, transparent);
 	}
 
 	.archive-title {
@@ -122,10 +151,13 @@
 		text-decoration: line-through;
 		text-decoration-color: var(--ta-border);
 		text-align: left;
+		transition: color var(--ta-transition-fast),
+			text-decoration-color var(--ta-transition-medium);
 	}
 
 	.archive-title:hover {
 		color: var(--ta-accent);
+		text-decoration-color: color-mix(in srgb, var(--ta-accent) 45%, transparent);
 	}
 
 	.archive-meta {

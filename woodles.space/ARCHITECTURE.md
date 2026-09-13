@@ -587,6 +587,36 @@ columns, sections, one-tap sittings, the standing-slot and ledger machinery
 documented under "cross-app ledgers" in "the sync layer" below rather than
 here, so it isn't said twice.
 
+**The board in motion.** The app's feel is a deliberate second subject, on
+the argument that a board you are meant to visit daily has to be pleasant to
+touch. Two halves, split by what each can actually do. CSS owns *entrances*:
+`src/lib/style/tokens.css` declares the easings (`--ta-ease-spring`,
+`-glide`, `-swift`) and a small vocabulary of global `ta-*` keyframes — rise,
+pop, bump, ripple, spark, sheen, breathe — which components reference by
+name, because a CSS animation runs whenever an element is created, whether
+that is a hydrated first paint or a chip added an hour later. Arrival is
+staggered by a chain of inherited custom properties rather than per-element
+delays: `Column` publishes `--column-delay`, `Section` adds its own place in
+the stack onto that as `--section-delay`, and `EntryChip` adds a third step
+onto that, so the board deals itself out left to right, top to bottom from
+one variable each. `src/lib/motion.ts` owns the other half — *exits*, which
+CSS cannot describe because the node is gone before it could. `collect` is
+the one that matters: the row being put away floods with its own color,
+stamps a check, then folds shut, publishing its progress as `--ta-collect`
+so each caller's stylesheet decides what "flooding" looks like for it, and
+reclaiming the flex `row-gap` it was holding open so the list doesn't snap
+at the end. Two structural notes that are easy to undo by accident: an exit
+transition is local, so `Section`'s chip container and `ArchiveView`'s list
+are always mounted and hidden with `:empty` instead — otherwise archiving the
+last entry in a section (the common case here) would tear the container down
+around the chip and skip the animation entirely; and `.chip` deliberately
+does not clip, which is why the hover sheen has its own inset layer — the
+burst thrown off by logging a sitting has to be able to leave the chip.
+Reduced motion is honored on both halves: tokens.css carries the
+`prefers-reduced-motion` block that silences CSS animation and transition,
+`motionDuration` collapses every Svelte transition, and `logSitting` builds
+no burst at all rather than building one and hiding it.
+
 **Casting a spell.** `apps/thinking-about/src/lib/spells/` is Spores' curated
 category system (author, musician, filmmaker, actor, person, tv-series, film,
 book, album, game, the anime relationship graph), moved here because its
