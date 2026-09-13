@@ -134,7 +134,12 @@
       left: 50%;
       bottom: calc(max(1.3rem, env(safe-area-inset-bottom)) + 64px);
       transform: translateX(-50%) translateY(10px);
-      width: 232px;
+      width: 250px;
+      /* two groups now, so on a short screen the panel scrolls rather than
+         running up over the dock below it or the way home above it */
+      max-height: calc(100vh - 9.5rem);
+      max-height: calc(100dvh - 9.5rem);
+      overflow-y: auto;
       padding: 1rem 1.1rem 1.1rem;
       border-radius: 16px;
       background: rgba(18, 16, 30, 0.5);
@@ -181,6 +186,71 @@
       box-shadow: 0 0 10px -1px rgba(180, 160, 250, 0.9);
       cursor: pointer;
     }
+
+    /* the second group sits under a hairline so the voice and the keyboard
+       read as two separate things to fiddle with */
+    .tone-group + .tone-group {
+      margin-top: 1rem;
+      padding-top: 0.95rem;
+      border-top: 1px solid rgba(180, 168, 232, 0.14);
+    }
+    /* the scale only bites in note-locked mode — dimmed, but still yours to
+       set ahead of switching back */
+    .tone-row.muted { opacity: 0.6; }
+
+    /* the play-mode switch */
+    .seg {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.2rem;
+      padding: 0.2rem;
+      border-radius: 11px;
+      background: rgba(150, 134, 226, 0.1);
+      border: 1px solid rgba(180, 168, 232, 0.16);
+    }
+    .seg-btn {
+      appearance: none; -webkit-appearance: none;
+      border: none; background: transparent;
+      font-family: var(--font-mono);
+      font-size: 0.56rem; letter-spacing: 0.08em;
+      color: rgba(226, 220, 246, 0.6);
+      padding: 0.44rem 0.2rem;
+      border-radius: 9px;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+    .seg-btn:hover { color: rgba(239, 233, 255, 0.92); }
+    .seg-btn[aria-pressed="true"] {
+      background: rgba(150, 134, 226, 0.3);
+      color: #efe9ff;
+      box-shadow: 0 0 14px -6px rgba(180, 160, 250, 0.9);
+    }
+    .seg-note {
+      margin: 0.5rem 0 0.75rem;
+      font-size: 0.55rem; line-height: 1.7; letter-spacing: 0.05em;
+      color: rgba(226, 220, 246, 0.62);
+      min-height: 1.7em;
+    }
+
+    .tone-row select {
+      appearance: none; -webkit-appearance: none;
+      width: 100%;
+      font-family: var(--font-mono);
+      font-size: 0.58rem; letter-spacing: 0.05em;
+      color: rgba(239, 233, 255, 0.9);
+      background: rgba(150, 134, 226, 0.14);
+      border: 1px solid rgba(180, 168, 232, 0.2);
+      border-radius: 9px;
+      padding: 0.34rem 1.45rem 0.34rem 0.5rem;
+      cursor: pointer;
+      touch-action: auto;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6' fill='none' stroke='%23cdc4f5' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.45rem center;
+      background-size: 8px 5px;
+    }
+    .tone-row select:hover { border-color: rgba(180, 168, 232, 0.34); }
+    /* the room's own chrome is dark glass in every mood, so the native popup
+       has to be told to match rather than inherit the page's light theme */
+    .tone-row select option { background: #14121f; color: #efe9ff; }
 
     .ctl {
       width: 42px; height: 42px;
@@ -295,25 +365,48 @@
 
   <p class="mood-name" id="mood-name"></p>
 
-  <!-- hideable tone panel -->
-  <div class="tones" id="tones" role="group" aria-label="tone controls" aria-hidden="true">
-    <p class="tones-title">the voice</p>
-    <label class="tone-row">
-      <span>linger</span>
-      <input type="range" id="t-linger" min="0" max="1" step="0.01" value="0.25" aria-label="how long each note rings out" />
-    </label>
-    <label class="tone-row">
-      <span>reverb</span>
-      <input type="range" id="t-reverb" min="0" max="1" step="0.01" value="0.5" aria-label="reverberant space" />
-    </label>
-    <label class="tone-row">
-      <span>glide</span>
-      <input type="range" id="t-glide" min="0" max="1" step="0.01" value="0.25" aria-label="how slowly the pitch bends" />
-    </label>
-    <label class="tone-row">
-      <span>tone</span>
-      <input type="range" id="t-tone" min="0" max="1" step="0.01" value="0.4" aria-label="brightness of the reed" />
-    </label>
+  <!-- hideable voice + keyboard panel -->
+  <div class="tones" id="tones" role="group" aria-label="voice and keyboard controls">
+    <section class="tone-group">
+      <p class="tones-title">the voice</p>
+      <label class="tone-row">
+        <span>linger</span>
+        <input type="range" id="t-linger" min="0" max="1" step="0.01" value="0.25" aria-label="how long each note rings out" />
+      </label>
+      <label class="tone-row">
+        <span>reverb</span>
+        <input type="range" id="t-reverb" min="0" max="1" step="0.01" value="0.5" aria-label="reverberant space" />
+      </label>
+      <label class="tone-row">
+        <span>glide</span>
+        <input type="range" id="t-glide" min="0" max="1" step="0.01" value="0.25" aria-label="how slowly the pitch bends" />
+      </label>
+      <label class="tone-row">
+        <span>tone</span>
+        <input type="range" id="t-tone" min="0" max="1" step="0.01" value="0.4" aria-label="brightness of the reed" />
+      </label>
+    </section>
+
+    <section class="tone-group">
+      <p class="tones-title">the keyboard</p>
+      <div class="seg" role="group" aria-label="play mode">
+        <button type="button" class="seg-btn" data-mode="stylophone" aria-pressed="false">stylophone</button>
+        <button type="button" class="seg-btn" data-mode="locked" aria-pressed="true">note-locked</button>
+      </div>
+      <p class="seg-note" id="mode-note" aria-live="polite"></p>
+      <label class="tone-row" id="scale-row">
+        <span>scale</span>
+        <select id="k-scale" aria-label="the scale notes lock to, in note-locked mode"></select>
+      </label>
+      <label class="tone-row">
+        <span>key</span>
+        <select id="k-key" aria-label="the key of the room, followed by the drone"></select>
+      </label>
+      <label class="tone-row">
+        <span>span</span>
+        <select id="k-span" aria-label="how many octaves the strip covers"></select>
+      </label>
+    </section>
   </div>
 
   <nav class="dock" id="dock" aria-label="quiet room controls">
@@ -325,7 +418,7 @@
         <path class="wave" d="M18 6.8a7.4 7.4 0 0 1 0 10.4"/>
       </svg>
     </button>
-    <button class="ctl" id="tune" aria-pressed="false" title="tone" aria-label="tone controls">
+    <button class="ctl" id="tune" aria-pressed="false" title="voice &amp; keyboard" aria-label="voice and keyboard controls">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
            stroke-linecap="round" aria-hidden="true">
         <path d="M6 4v6M6 14v6M12 4v3M12 11v9M18 4v9M18 17v3"/>
@@ -896,7 +989,7 @@
     let held = false;       // is the pointer currently pressed
     let lastTrail = 0;      // throttle for the ripple trail while dragging
     let playNx = 0.5;       // 0..1 across the screen — the note's place, low → high
-    const nxOf = (cx) => Math.max(0, Math.min(1, cx / window.innerWidth));
+    let heldRung = -1;      // which rung of the ladder is sounding, in note-locked
 
     function groundXZ(cx, cy) {
       ndc.x = (cx / window.innerWidth) * 2 - 1;
@@ -924,13 +1017,19 @@
       pulseBoost = 1;
       held = true;
       playTarget = 1;
-      playNx = nxOf(e.clientX);
+      const p0 = pitchAt(e.clientX);
+      playNx = p0.nx; heldRung = p0.rung;
       try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
       startVoice(e.clientX, e.clientY);
     });
     canvas.addEventListener('pointermove', (e) => {
       if (!held) return;
-      playNx = nxOf(e.clientX);
+      const p = pitchAt(e.clientX);
+      playNx = p.nx;                            // the light follows the note
+      if (p.rung !== heldRung) {                // a new key under the stylus
+        heldRung = p.rung;
+        if (prefs.mode === 'locked') retouch();
+      }
       bendVoice(e.clientX, e.clientY);          // dragging bends the pitch
       const now = performance.now();
       if (now - lastTrail > 110) {              // a sparse trail of ripples
@@ -972,66 +1071,188 @@
       const wet = ctx.createGain(); wet.gain.value = settings.reverb;
       verb.connect(wet); wet.connect(master);
 
-      // the ambient drone: a few detuned voices under a slow filter
+      // the ambient drone: a few detuned voices under a slow filter, pitched
+      // two octaves under the room's key as root-fifth-root-fifth
       const drone = ctx.createGain(); drone.gain.value = 0.05;
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass'; lp.frequency.value = 540; lp.Q.value = 0.6;
       drone.connect(lp); lp.connect(master); lp.connect(verb);
-      [55, 82.41, 110, 164.81].forEach((f, i) => {
+      const root = rootHz();
+      const droneOsc = DRONE.map((ratio, i) => {
         const o = ctx.createOscillator();
         o.type = i % 2 ? 'triangle' : 'sine';
-        o.frequency.value = f;
+        o.frequency.value = root * ratio;
         o.detune.value = (i - 1.5) * 5;
         const g = ctx.createGain(); g.gain.value = i === 0 ? 0.5 : 0.22;
         o.connect(g); g.connect(drone); o.start();
+        return o;
       });
       // a slow swell on the filter so the pad never sits still
       const lfo = ctx.createOscillator(); lfo.frequency.value = 0.05;
       const lfoG = ctx.createGain(); lfoG.gain.value = 180;
       lfo.connect(lfoG); lfoG.connect(lp.frequency); lfo.start();
 
-      audio = { ctx, master, verb, wet };
+      audio = { ctx, master, verb, wet, droneOsc };
     }
-    /* ── tone settings, driven by the hideable panel (defaults match the
-       slider values in the markup) ──────────────────────────────────────── */
+    /* root and fifth, two octaves below the key — a bare fifth, so the pad
+       sits under a minor scale and a major one alike */
+    const FIFTH = Math.pow(2, 7 / 12);
+    const DRONE = [0.25, 0.25 * FIFTH, 0.5, 0.5 * FIFTH];
+    /* changing the key slides the pad there over a breath rather than
+       snapping, so the shift reads the way a change of light does */
+    function tuneDrone() {
+      if (!audio) return;
+      const now = audio.ctx.currentTime, root = rootHz();
+      audio.droneOsc.forEach((o, i) => o.frequency.setTargetAtTime(root * DRONE[i], now, 0.9));
+    }
+    /* ── how a touch becomes a pitch ─────────────────────────────────────
+       the same strip of light, played two ways:
+
+       · stylophone  — the strip runs continuous, so the pitch follows your
+                       finger exactly and slides through everything in
+                       between, the way a stylus sweeps a ribbon. free, and
+                       free to be sour.
+       · note-locked — each position snaps to the nearest rung of the chosen
+                       scale, so nothing you land on is out of key, and
+                       crossing into a new rung is re-articulated so it reads
+                       as a struck note rather than a smear.
+
+       both share one span: `span` octaves climbing from the room's key. the
+       drone follows that key too, so the pad and the melody stay related
+       however far you move the room from A. the defaults reproduce the
+       ladder this room shipped with — A-minor pentatonic, two octaves. */
+    const MODES = {
+      stylophone: { note: 'the strip runs continuous — slide and bend between the notes.' },
+      locked:     { note: 'every touch snaps to the nearest rung of the scale.' },
+    };
+    /* scales as semitones above the root, repeating each octave */
+    const SCALES = [
+      { id: 'minor-pent', name: 'pentatonic',  steps: [0, 3, 5, 7, 10] },
+      { id: 'major-pent', name: 'major pent',  steps: [0, 2, 4, 7, 9] },
+      { id: 'aeolian',    name: 'minor',       steps: [0, 2, 3, 5, 7, 8, 10] },
+      { id: 'ionian',     name: 'major',       steps: [0, 2, 4, 5, 7, 9, 11] },
+      { id: 'dorian',     name: 'dorian',      steps: [0, 2, 3, 5, 7, 9, 10] },
+      { id: 'lydian',     name: 'lydian',      steps: [0, 2, 4, 6, 7, 9, 11] },
+      { id: 'hirajoshi',  name: 'hirajoshi',   steps: [0, 2, 3, 7, 8] },
+      { id: 'whole',      name: 'whole tone',  steps: [0, 2, 4, 6, 8, 10] },
+      { id: 'chromatic',  name: 'chromatic',   steps: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] },
+    ];
+    /* keys, as semitones from A3 — kept within a few steps of 220 Hz either
+       way so no key drags the room into a growl or a shriek */
+    const KEYS = [
+      { id: 'E',  name: 'E',  semi: -5 },
+      { id: 'F',  name: 'F',  semi: -4 },
+      { id: 'F#', name: 'F♯', semi: -3 },
+      { id: 'G',  name: 'G',  semi: -2 },
+      { id: 'G#', name: 'G♯', semi: -1 },
+      { id: 'A',  name: 'A',  semi: 0 },
+      { id: 'A#', name: 'A♯', semi: 1 },
+      { id: 'B',  name: 'B',  semi: 2 },
+      { id: 'C',  name: 'C',  semi: 3 },
+      { id: 'C#', name: 'C♯', semi: 4 },
+      { id: 'D',  name: 'D',  semi: 5 },
+      { id: 'D#', name: 'D♯', semi: 6 },
+    ];
+    const SPANS = [
+      { octaves: 1, name: 'one octave' },
+      { octaves: 2, name: 'two octaves' },
+      { octaves: 3, name: 'three octaves' },
+    ];
+
+    /* ── tone settings, driven by the hideable panel ──────────────────────
+       the slider maps stay 0…1 in, seconds/hertz out; the raw slider
+       positions are what gets remembered, so the panel and the voice can be
+       restored from the same numbers. */
     const mapRelease    = (s) => 0.09 * Math.pow(24, s);   // linger: 0.09s … ~2.2s
     const mapGlide      = (s) => 0.01 + s * 0.24;          // portamento time
     const mapBrightness = (s) => 0.5 + s * 1.3;            // lowpass multiplier
     const mapReverb     = (s) => s * 0.92;                 // reverb wet level
-    const settings = {
-      release:    mapRelease(0.25),
-      glide:      mapGlide(0.25),
-      brightness: mapBrightness(0.4),
-      reverb:     mapReverb(0.5),
-    };
-    let lastCy = window.innerHeight * 0.5;   // remembered so tone tweaks apply live
 
-    /* a fretted ladder — A-minor pentatonic across two octaves, in tune with
-       the drone. position snaps to the nearest rung, so every note you land
-       on is in key — a pentatonic scale has no wrong notes, so quantizing it
-       makes the room foolproof to play. the portamento in bendVoice still
-       slides audibly from rung to rung as you drag (faster than it can
-       settle, so a fast sweep still glissandos the way a real Stylophone's
-       metal contacts do), so the held-note slide isn't lost — only the
-       in-between mistuning is. */
-    const LADDER = [220.0, 261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25, 783.99, 880.0];
-    function freqFromX(cx) {
-      const nx = Math.max(0, Math.min(1, cx / window.innerWidth));
-      const i = Math.round(nx * (LADDER.length - 1));
-      return LADDER[i];
+    const PREFS_KEY = 'woodles.quiet-room.voice.v1';
+    const DEFAULTS = {
+      linger: 0.25, reverb: 0.5, glide: 0.25, tone: 0.4,   // match the markup
+      mode: 'locked', scale: 'minor-pent', key: 'A', span: 2,
+    };
+    /* a chosen voice should still be there next visit — but a browser with
+       storage walled off just gets the defaults, never an error. */
+    function loadPrefs() {
+      const p = Object.assign({}, DEFAULTS);
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem(PREFS_KEY) || 'null'); } catch (e) { saved = null; }
+      if (!saved || typeof saved !== 'object') return p;
+      ['linger', 'reverb', 'glide', 'tone'].forEach((k) => {
+        if (typeof saved[k] === 'number' && saved[k] >= 0 && saved[k] <= 1) p[k] = saved[k];
+      });
+      if (MODES[saved.mode]) p.mode = saved.mode;
+      if (SCALES.some((x) => x.id === saved.scale)) p.scale = saved.scale;
+      if (KEYS.some((x) => x.id === saved.key)) p.key = saved.key;
+      if (SPANS.some((x) => x.octaves === saved.span)) p.span = saved.span;
+      return p;
+    }
+    const prefs = loadPrefs();
+    let saveTimer = null;
+    function savePrefs() {
+      clearTimeout(saveTimer);   // a dragged slider shouldn't write on every frame
+      saveTimer = setTimeout(() => {
+        try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (e) {}
+      }, 400);
+    }
+
+    const settings = {
+      release:    mapRelease(prefs.linger),
+      glide:      mapGlide(prefs.glide),
+      brightness: mapBrightness(prefs.tone),
+      reverb:     mapReverb(prefs.reverb),
+    };
+    /* the last touch, remembered so panel tweaks apply to a held note live */
+    let lastCx = window.innerWidth * 0.5;
+    let lastCy = window.innerHeight * 0.5;
+
+    const clamp01 = (v) => Math.max(0, Math.min(1, v));
+    const rootHz = () => {
+      const k = KEYS.find((x) => x.id === prefs.key) || KEYS.find((x) => x.id === DEFAULTS.key);
+      return 220 * Math.pow(2, k.semi / 12);
+    };
+    /* the fretted ladder, rebuilt whenever the key, scale or span changes.
+       it closes on the octave above the top degree so the far edge of the
+       screen is always the root again. */
+    let ladder = [];
+    function buildLadder() {
+      const scale = SCALES.find((x) => x.id === prefs.scale) || SCALES[0];
+      const root = rootHz();
+      const rungs = [];
+      for (let o = 0; o < prefs.span; o++) {
+        for (const step of scale.steps) rungs.push(root * Math.pow(2, o + step / 12));
+      }
+      rungs.push(root * Math.pow(2, prefs.span));
+      ladder = rungs;
+    }
+    buildLadder();
+
+    /* a touch's place across the screen, as both a pitch and the place that
+       pitch actually sounds at — the room's colour follows the note rather
+       than the finger, so a locked note and its light land on the same rung. */
+    function pitchAt(cx) {
+      const nx = clamp01(cx / window.innerWidth);
+      if (prefs.mode === 'stylophone') {
+        return { freq: rootHz() * Math.pow(2, nx * prefs.span), nx, rung: -1 };
+      }
+      const i = Math.round(nx * (ladder.length - 1));
+      return { freq: ladder[i], nx: ladder.length > 1 ? i / (ladder.length - 1) : 0, rung: i };
     }
     function cutoffFromY(cy) {
-      const ny = Math.max(0, Math.min(1, cy / window.innerHeight));
+      const ny = clamp01(cy / window.innerHeight);
       return 680 * Math.pow(4.2, 1 - ny) * settings.brightness;  // drag up → brighter
     }
 
+    const PEAK = 0.16;    // the held voice's level, once the attack has landed
     let voice = null;     // the single held stylophone voice
     function startVoice(cx, cy) {
       if (!audio || !soundOn) return;
-      lastCy = cy;
+      lastCx = cx; lastCy = cy;
       const { ctx, master, verb } = audio;
       const now = ctx.currentTime;
-      const freq = freqFromX(cx);
+      const freq = pitchAt(cx).freq;
       const saw = ctx.createOscillator(); saw.type = 'sawtooth';
       const sqr = ctx.createOscillator(); sqr.type = 'square'; sqr.detune.value = -3;
       const sub = ctx.createOscillator(); sub.type = 'sine';
@@ -1053,20 +1274,39 @@
       sub.connect(subG); subG.connect(env);     // sub bypasses the filter, for body
       env.connect(master); env.connect(verb);
       env.gain.setValueAtTime(0.0001, now);
-      env.gain.exponentialRampToValueAtTime(0.16, now + 0.04);   // soft attack
+      env.gain.exponentialRampToValueAtTime(PEAK, now + 0.04);   // soft attack
       saw.start(now); sqr.start(now); sub.start(now); vib.start(now);
-      voice = { saw, sqr, sub, vib, lp, env };
+      voice = { saw, sqr, sub, vib, lp, env, t0: now };
     }
     function bendVoice(cx, cy) {
       if (!voice || !audio) return;
-      lastCy = cy;
+      lastCx = cx; lastCy = cy;
       const now = audio.ctx.currentTime;
-      const freq = freqFromX(cx);
+      const freq = pitchAt(cx).freq;
       const glide = settings.glide;               // portamento → the bend itself
       voice.saw.frequency.setTargetAtTime(freq, now, glide);
       voice.sqr.frequency.setTargetAtTime(freq, now, glide);
       voice.sub.frequency.setTargetAtTime(freq / 2, now, glide);
       voice.lp.frequency.setTargetAtTime(cutoffFromY(cy), now, 0.05);
+    }
+    /* note-locked plays discrete keys, so crossing into a new rung takes a
+       breath out of the envelope and puts it back — enough to read as a
+       second note struck, far too little to click. the glide is left alone,
+       so a long portamento still swoops between the rungs underneath it. */
+    let lastTouch = 0;
+    function retouch() {
+      if (!voice || !audio) return;
+      const now = audio.ctx.currentTime;
+      if (now - voice.t0 < 0.06) return;          // don't interrupt the attack
+      // sweeping a wide scale crosses rungs faster than an articulation can
+      // finish; below this floor the glide carries it as a glissando instead,
+      // which also keeps each dip from cancelling the last one's recovery
+      if (now - lastTouch < 0.06) return;
+      lastTouch = now;
+      const g = voice.env.gain;
+      g.cancelScheduledValues(now);
+      g.setTargetAtTime(PEAK * 0.42, now, 0.007);
+      g.setTargetAtTime(PEAK, now + 0.03, 0.028);
     }
     function endVoice() {
       if (!voice || !audio) return;
@@ -1134,25 +1374,80 @@
       else document.exitFullscreen?.();
     });
 
-    /* ── the tone panel ──────────────────────────────────────────────────── */
+    /* ── the voice + keyboard panel ──────────────────────────────────────── */
+    const tonePanel = document.getElementById('tones');
     const tuneBtn = document.getElementById('tune');
+    tonePanel.inert = true;          // a closed panel shouldn't catch the tab key
     tuneBtn.addEventListener('click', () => {
       const open = !body.classList.contains('tones-open');
       body.classList.toggle('tones-open', open);
       tuneBtn.setAttribute('aria-pressed', String(open));
+      tonePanel.inert = !open;
     });
-    const bindTone = (id, apply) =>
-      document.getElementById(id).addEventListener('input', (e) => apply(parseFloat(e.target.value)));
-    bindTone('t-linger', (s) => { settings.release = mapRelease(s); });
-    bindTone('t-glide',  (s) => { settings.glide = mapGlide(s); });
-    bindTone('t-tone',   (s) => {
+
+    /* sliders: the stored position sets the control, the control sets the
+       voice, and either way the same number is what gets remembered */
+    const bindTone = (id, key, apply) => {
+      const el = document.getElementById(id);
+      el.value = String(prefs[key]);
+      apply(prefs[key]);
+      el.addEventListener('input', (e) => {
+        prefs[key] = parseFloat(e.target.value);
+        apply(prefs[key]);
+        savePrefs();
+      });
+    };
+    bindTone('t-linger', 'linger', (s) => { settings.release = mapRelease(s); });
+    bindTone('t-glide',  'glide',  (s) => { settings.glide = mapGlide(s); });
+    bindTone('t-tone',   'tone',   (s) => {
       settings.brightness = mapBrightness(s);
       if (voice && audio) voice.lp.frequency.setTargetAtTime(cutoffFromY(lastCy), audio.ctx.currentTime, 0.05);
     });
-    bindTone('t-reverb', (s) => {
+    bindTone('t-reverb', 'reverb', (s) => {
       settings.reverb = mapReverb(s);
       if (audio) audio.wet.gain.setTargetAtTime(settings.reverb, audio.ctx.currentTime, 0.1);
     });
+
+    /* the keyboard: rebuild the ladder, re-pitch anything still being held,
+       and let the pad follow the key */
+    function refreshKeyboard() {
+      buildLadder();
+      tuneDrone();
+      const p = pitchAt(lastCx);
+      playNx = p.nx; heldRung = p.rung;
+      if (voice) bendVoice(lastCx, lastCy);
+    }
+
+    const scaleRow = document.getElementById('scale-row');
+    const modeNote = document.getElementById('mode-note');
+    const modeBtns = Array.from(document.querySelectorAll('.seg-btn[data-mode]'));
+    function setMode(id, remember) {
+      prefs.mode = MODES[id] ? id : DEFAULTS.mode;
+      modeBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === prefs.mode)));
+      modeNote.textContent = MODES[prefs.mode].note;
+      // a free strip has no rungs to lock to, so the scale dims out of the way
+      scaleRow.classList.toggle('muted', prefs.mode === 'stylophone');
+      refreshKeyboard();
+      if (remember) savePrefs();
+    }
+    modeBtns.forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode, true)));
+
+    /* the three lists are filled from the tables above, so the scales and
+       keys live in exactly one place */
+    const bindChoice = (id, items, valueOf, labelOf, current, pick) => {
+      const el = document.getElementById(id);
+      items.forEach((item) => el.add(new Option(labelOf(item), String(valueOf(item)))));
+      el.value = String(current);
+      el.addEventListener('change', () => { pick(el.value); refreshKeyboard(); savePrefs(); });
+    };
+    bindChoice('k-scale', SCALES, (x) => x.id, (x) => x.name, prefs.scale,
+      (v) => { prefs.scale = v; });
+    bindChoice('k-key', KEYS, (x) => x.id, (x) => x.name, prefs.key,
+      (v) => { prefs.key = v; });
+    bindChoice('k-span', SPANS, (x) => x.octaves, (x) => x.name, prefs.span,
+      (v) => { prefs.span = parseInt(v, 10); });
+
+    setMode(prefs.mode, false);
 
     /* the hint fades on its own after a while if untouched */
     let hintGone = false;
