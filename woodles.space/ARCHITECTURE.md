@@ -852,6 +852,23 @@ change of zoom redraws the tile. The canvas is `overflow: clip` rather than
 board with anything overflowing it could be dragged sideways — bars, dock and
 all — by a browser scrolling a focused field into view.
 
+**Colour blocking.** On rainbow paper the chrome stops being one cream:
+every panel takes the band of the spectrum it is standing on, so the topbar
+wears the rose the left edge is washed in, the rail the lilac the right edge
+ends on, the dock the leaf it sits over. `surfaceBlocks` hands the same seven
+bands the paper is made of to the panels as `--block-<band>` and
+`--deep-<band>` custom properties — `r, g, b` triples rather than finished
+colours, so each panel keeps the alpha it already had and the glass is tinted
+rather than replaced. Every state inside a block is that block's band drawn
+harder, never the one warm rose the whole app used to hover in, which on a
+cool panel reads as a smudge rather than as a choice; `.chip.strong` is the
+deliberate exception, because an action should look the same wherever it is.
+The quietest inks step down a shade on a block: a whisper that clears 5.4:1
+on cream falls to 4.0 on the strongest band, and the small readouts are
+exactly where that matters. The board's own material — cards, frames, stacks,
+images — is untouched. The paper and the furniture are the room, and the room
+is not what you came to read.
+
 **Chrome that rests.** Most of the app does not need to be visible all the
 time. The bars, the dock, the camera cluster and the map fade out a few
 seconds after the pointer stops and come back on the first movement anywhere;
@@ -1486,19 +1503,25 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-2049 tests total: 16 in `api/` (its own
+2358 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 2033 across sixteen pnpm
-packages — `write` 242, `marginalia` 333, `planner` 539,
-`bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
-`packages/sync` 36, `packages/persistence` 6, `packages/app-manifest` 17,
-`packages/handoff` 15, `packages/text` 30, `packages/spellcraft` 15,
-`packages/emoji` 4, `packages/incremental-core` 191, `thinking-about` 131,
-and `whiteboard` 251.
+instead of the recursive `pnpm -r test`), plus 2342 across twenty pnpm
+packages — `planner` 539, `marginalia` 376, `whiteboard` 258,
+`write` 247, `packages/incremental-core` 191, `bestiary` 162,
+`thinking-about` 148, `bloomforge` 83, `packages/dynamics` 69,
+`packages/witch-engine` 58, `packages/sync` 36, `grimoire` 36,
+`packages/life-points` 30, `packages/text` 30, `bloomforge-player` 22,
+`packages/app-manifest` 17, `packages/handoff` 15,
+`packages/spellcraft` 15, `packages/persistence` 6, and
+`packages/emoji` 4.
 (Counted by running each suite, not by adding to the previous figure — keep
 this inventory current when a suite changes; the root command is the release
-contract, not the prose count.)
+contract, not the prose count. This pass caught up four packages the
+inventory had never listed and four figures that had drifted behind their
+suites. `life-points` had been missing since the list was written; the
+`witch-engine`, `dynamics` and `grimoire` suites all arrived after it and
+were never added, so "sixteen packages" had been counting four short.)
 (Whiteboard's suite grew by a further 26 for capture — `capture.ts` for what a
 pasted or dropped thing infers itself to be, resolving a Woodles link against
 the real manifest, and the Inbox; `packages/handoff` gained one for the

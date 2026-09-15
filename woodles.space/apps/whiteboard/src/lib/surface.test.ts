@@ -5,6 +5,8 @@ import {
 	normalizeSurface,
 	paperCss,
 	patternStep,
+	surfaceBlocks,
+	surfaceStyle,
 	SURFACE_PAPERS,
 	SURFACE_PATTERNS,
 	weaveCss,
@@ -132,6 +134,65 @@ describe('the paper', () => {
 		for (const paper of SURFACE_PAPERS) {
 			expect(paperCss(surfaceWith({ paper }))).toContain('background-color: #f7f3ec;');
 		}
+	});
+});
+
+describe('the blocks the chrome wears', () => {
+	it('hands out nothing at all on ordinary paper, so ordinary boards stay ordinary', () => {
+		expect(surfaceBlocks(DEFAULT_SURFACE)).toBe('');
+		expect(surfaceStyle(DEFAULT_SURFACE)).toBe(paperCss(DEFAULT_SURFACE));
+	});
+
+	it('names all seven bands, pale for the panel and deep for what is chosen in it', () => {
+		const blocks = surfaceBlocks(surfaceWith({ paper: 'rainbow' }));
+		for (const band of ['rose', 'apricot', 'butter', 'leaf', 'sky', 'iris', 'lilac']) {
+			expect(blocks).toContain(`--block-${band}:`);
+			expect(blocks).toContain(`--deep-${band}:`);
+		}
+	});
+
+	it('hands over triples rather than colours, so every panel keeps its own alpha', () => {
+		const blocks = surfaceBlocks(surfaceWith({ paper: 'rainbow' }));
+		expect(blocks).toMatch(/--block-rose: \d+, \d+, \d+;/);
+		expect(blocks).not.toContain('rgba(');
+	});
+
+	it('draws a state harder than the panel it is in', () => {
+		const blocks = surfaceBlocks(surfaceWith({ paper: 'rainbow' }));
+		const read = (name: string) =>
+			blocks.match(new RegExp(`--${name}-leaf: (\\d+), (\\d+), (\\d+);`))!.slice(1).map(Number);
+		const [, blockGreen] = read('block');
+		const [deepRed, deepGreen] = read('deep');
+		// The leaf band is greener and darker than the cream: deeper means
+		// further from the cream on both counts.
+		expect(deepGreen).toBeGreaterThan(0);
+		expect(deepRed).toBeLessThan(255);
+		expect(255 - deepRed).toBeGreaterThan(255 - read('block')[0]);
+		expect(blockGreen).toBeGreaterThan(deepGreen);
+	});
+
+	it('takes the same dial the paper and the pattern take', () => {
+		const faint = surfaceBlocks(surfaceWith({ paper: 'rainbow', depth: 'faint' }));
+		const strong = surfaceBlocks(surfaceWith({ paper: 'rainbow', depth: 'strong' }));
+		const red = (blocks: string) => Number(blocks.match(/--block-sky: (\d+),/)![1]);
+		// The sky band is far below the cream's red, so a stronger mix is a
+		// lower number — a panel further from cream and closer to its band.
+		expect(red(strong)).toBeLessThan(red(faint));
+	});
+
+	it('never leaves a channel outside what a colour can hold', () => {
+		for (const depth of ['faint', 'normal', 'strong'] as const) {
+			for (const channel of surfaceBlocks(surfaceWith({ paper: 'rainbow', depth })).match(/\d+/g) ?? []) {
+				expect(Number(channel)).toBeLessThanOrEqual(255);
+			}
+		}
+	});
+
+	it('is carried by the canvas alongside its paper', () => {
+		const rainbow = surfaceWith({ paper: 'rainbow' });
+		const style = surfaceStyle(rainbow);
+		expect(style.startsWith(paperCss(rainbow))).toBe(true);
+		expect(style).toContain('--block-iris:');
 	});
 });
 
