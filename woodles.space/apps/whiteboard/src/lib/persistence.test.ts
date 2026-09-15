@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createCard, createEmptyBoard } from './model';
+import { DEFAULT_SURFACE } from './surface';
 import { createWhiteboardStorage, restoreWhiteboard } from './persistence';
 
 function memoryStorage() {
@@ -41,7 +42,7 @@ describe('whiteboard persistence', () => {
 		const storage = memoryStorage();
 		const store = createWhiteboardStorage(storage);
 		const current = createEmptyBoard();
-		const { home: _home, viewpoints: _viewpoints, journey: _journey, labels: _labels, ...older } = current;
+		const { home: _home, viewpoints: _viewpoints, journey: _journey, labels: _labels, surface: _surface, ...older } = current;
 		storage.setItem(store.key, JSON.stringify({
 			woodles: 'woodles-persistence',
 			schemaVersion: 1,
@@ -55,6 +56,28 @@ describe('whiteboard persistence', () => {
 		expect(loaded.value.board.title).toBe('an older board');
 		expect(loaded.value.labels).toEqual([]);
 		expect(loaded.value.journey).toEqual({ stops: [], loop: false });
+		expect(loaded.value.surface).toEqual(DEFAULT_SURFACE);
+	});
+
+	it('round-trips a surface, and keeps the board when the surface is gibberish', () => {
+		const storage = memoryStorage();
+		const store = createWhiteboardStorage(storage);
+		const document = createEmptyBoard();
+		document.surface = { pattern: 'grid', size: 'wide', depth: 'strong', paper: 'rainbow' };
+		document.items = [createCard(10, 10)];
+		expect(store.save(document).ok).toBe(true);
+		expect(store.load().value.surface).toEqual(document.surface);
+
+		storage.setItem(store.key, JSON.stringify({
+			woodles: 'woodles-persistence',
+			schemaVersion: 5,
+			savedAt: '2026-08-15T00:00:00.000Z',
+			data: { ...document, surface: { pattern: 'plaid', size: 'wide' } }
+		}));
+		const loaded = store.load();
+		expect(loaded.source).toBe('primary');
+		expect(loaded.value.items).toHaveLength(1);
+		expect(loaded.value.surface).toEqual({ ...DEFAULT_SURFACE, size: 'wide' });
 	});
 
 	it('drops a property sheet it cannot read without losing the object under it', () => {

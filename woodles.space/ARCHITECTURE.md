@@ -834,9 +834,44 @@ because a handoff is a capture that happened somewhere else. Each target keeps
 its own queue and a test asserts one app can never drain another's. Nothing
 sends to Whiteboard yet — this is the receiving half.
 
-Schemas 2 through 5 each migrate forward by filling in what they added. A
+**The surface** (`surface.ts`) is the paper and the pattern drawn on it.
+Both used to be two hardcoded lines of CSS, and the dot grid among them was
+pinned to the *screen* — the one thing on the page whose job was to say "this
+canvas is bigger than the window" sat perfectly still while the board slid
+under it. Schema 6 makes it the board's: a `surface` of `pattern` (dots, grid,
+lines, plain), `size`, `depth` and `paper` (the warm sheet, or a rainbow),
+saved with the whiteboard and carried into a duplicate. The cell is in world
+units, so `patternStep` scales it with the camera and then doubles or halves it
+until the on-screen spacing is back inside a readable band — every visible line
+stays on a multiple of the cell, so the pattern stays registered to the board
+while its density stays legible from 10% to 400%. The layer sits one tile
+outside the window on each side and pans by `transform`, so a pan is a
+composited shift of a few pixels rather than a full-screen repaint, and only a
+change of zoom redraws the tile. The canvas is `overflow: clip` rather than
+`hidden` for it: `hidden` leaves an element programmatically scrollable, and a
+board with anything overflowing it could be dragged sideways — bars, dock and
+all — by a browser scrolling a focused field into view.
+
+**Chrome that rests.** Most of the app does not need to be visible all the
+time. The bars, the dock, the camera cluster and the map fade out a few
+seconds after the pointer stops and come back on the first movement anywhere;
+pointer events go with the opacity, so nothing invisible is ever in the way of
+the board, and a pointer parked *on* the chrome holds it up rather than
+watching it fade out from under itself. Typing into a card does not count as
+movement — a card being written is a good reason for the edges to stay gone.
+Nothing that is open and being read rests: a drawer, the finder, the shelf, the
+View card. The View card in the bottom-right corner is where the surface is
+chosen, and it took in the two toggles that were spending a permanent button
+each on the camera cluster (the overview map and the shortcuts list). What this
+device wants to see — whether the edges rest, whether the map is up — is
+`view.ts`, a small versioned preference outside any document, because hiding
+the map is a statement about the window you are working in and should not
+travel to another device or into a copy of the board.
+
+Schemas 2 through 6 each migrate forward by filling in what they added. A
 corrupt journey costs you the journey, never the board; an unreadable property
-sheet costs that one object its properties and nothing else.
+sheet costs that one object its properties and nothing else; a surface nobody
+can read costs the board its wallpaper.
 
 ## the writing surface
 
@@ -1460,7 +1495,7 @@ packages — `write` 242, `marginalia` 333, `planner` 539,
 `packages/sync` 36, `packages/persistence` 6, `packages/app-manifest` 17,
 `packages/handoff` 15, `packages/text` 30, `packages/spellcraft` 15,
 `packages/emoji` 4, `packages/incremental-core` 191, `thinking-about` 131,
-and `whiteboard` 207.
+and `whiteboard` 251.
 (Counted by running each suite, not by adding to the previous figure — keep
 this inventory current when a suite changes; the root command is the release
 contract, not the prose count.)

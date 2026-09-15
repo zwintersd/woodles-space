@@ -111,6 +111,16 @@ describe('edit history', () => {
 		expect(step.document.items).toHaveLength(1);
 	});
 
+	it('takes the surface back with everything else — changing the paper is an edit', () => {
+		const document = withItems();
+		const history = recordEdit(createEditHistory(), document);
+		const painted = { ...document, surface: { ...document.surface, paper: 'rainbow' as const } };
+
+		const step = undoEdit(history, painted)!;
+		expect(step.document.surface.paper).toBe('paper');
+		expect(redoEdit(step.history, step.document)!.document.surface.paper).toBe('rainbow');
+	});
+
 	it('restores everything but the camera, which stays where the viewer is', () => {
 		const restored = { ...withItems([createCard(5, 5)]), camera: { x: -900, y: 200, zoom: 2 } };
 		const current = { ...withItems(), camera: { x: 0, y: 0, zoom: 1 } };

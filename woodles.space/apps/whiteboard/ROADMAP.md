@@ -7,10 +7,11 @@ read alongside [ARCHITECTURE.md](../../ARCHITECTURE.md)'s "the navigable
 board" section, which is the source of truth for what already exists; this
 file only proposes what doesn't.
 
-grounded in the actual code as of this write-up, not aspiration: 207 tests
-pass (`pnpm --filter whiteboard test`), schema is at version 5
-(`BOARD_SCHEMA_VERSION` in `model.ts`), the app is live at `/whiteboard`.
-every item below cites where it lives, or where it would.
+grounded in the actual code as of this write-up, not aspiration: 251 tests
+pass (`pnpm --filter whiteboard test`), schema is at version 6
+(`BOARD_SCHEMA_VERSION` in `model.ts` — 6 added the board's surface, the
+paper and the pattern on it), the app is live at `/whiteboard`. every item
+below cites where it lives, or where it would.
 
 ## what's here, briefly
 

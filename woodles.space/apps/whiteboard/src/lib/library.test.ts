@@ -61,6 +61,9 @@ describe('the board shelf', () => {
 
 		expect(copy.board.id).not.toBe(original.board.id);
 		expect(copy.board.title).toBe('Makeup Game copy');
+		// The surface is the board's, so a copy of the board is a copy of it too.
+		expect(copy.surface).toEqual(original.surface);
+		expect(copy.surface).not.toBe(original.surface);
 		library.save({ ...copy, items: [] });
 		expect(library.open(original.board.id)!.document.items).toHaveLength(1);
 	});
