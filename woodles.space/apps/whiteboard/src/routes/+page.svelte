@@ -145,7 +145,7 @@
 	} from '$lib/capture';
 	import {
 	DEFAULT_SURFACE,
-	paperCss,
+	surfaceStyle,
 	SURFACE_DEPTHS,
 	SURFACE_PAPERS,
 	SURFACE_PATTERNS,
@@ -350,8 +350,13 @@
 		view.restChrome && !chromeAwake && !drawer && !searchOpen && !shelfOpen &&
 		!shortcutsOpen && !viewOpen && !fileDragging
 	);
-	/** The paper, which is fixed to the window, and the pattern, which is not. */
-	const paperStyle = $derived(paperCss(board.surface));
+	/**
+	 * The paper, which is fixed to the window, and the pattern, which is not.
+	 * The paper also carries the seven blocks the chrome wears on a rainbow;
+	 * they arrive as custom properties on the canvas, so every panel inside it
+	 * can reach the band it is standing on.
+	 */
+	const paperStyle = $derived(surfaceStyle(board.surface));
 	const weaveStyle = $derived(weaveCss(board.surface, board.camera));
 
 	function viewport(): { width: number; height: number } {
@@ -2274,6 +2279,7 @@
 	class:space-panning={spaceHeld}
 	class:file-dragging={fileDragging}
 	class:chrome-resting={chromeResting}
+	class:on-rainbow={board.surface.paper === 'rainbow'}
 	class="whiteboard"
 	style={paperStyle}
 	aria-label="Whiteboard canvas"
@@ -4555,6 +4561,82 @@
 	.view-toggle small,
 	.view-card .chip small { padding: 1px 5px; border-radius: 5px; background: rgba(120,96,88,.11); color: #8b7a73; font-size: 9.5px; }
 	.view-toggle small { margin-left: auto; }
+
+	/*
+	 * Colour blocking. On rainbow paper the chrome stops being one cream:
+	 * every panel takes the band of the spectrum it is standing on, so the
+	 * furniture reads as part of the paper rather than as glass laid over it.
+	 * The paper runs rose → lilac across the board and the panels follow it —
+	 * the topbar in the rose the left edge is washed in, the rail in the lilac
+	 * the right edge ends on, the dock in the leaf it sits over.
+	 *
+	 * Every state inside a block is the same band drawn harder (`--deep-*`),
+	 * never the warm rose the whole app used to hover in — that rose on a cool
+	 * panel reads as a smudge rather than as a choice. `.chip.strong` is the
+	 * exception on purpose: it is the one action colour, and an action should
+	 * look the same wherever it is.
+	 *
+	 * Every rule here is behind `.on-rainbow`, which is the same condition
+	 * that puts the `--block-*` properties on the canvas, so the variables can
+	 * never be missing where they are read. The board's own material — cards,
+	 * frames, stacks, images — is deliberately untouched: the paper and the
+	 * furniture are the room, and the room is not what you came to read.
+	 */
+	.on-rainbow .topbar { background: rgba(var(--block-rose), 0.88); border-color: rgba(var(--deep-rose), 0.72); }
+	.on-rainbow .location-bar { background: rgba(var(--block-butter), 0.88); border-color: rgba(var(--deep-butter), 0.72); }
+	.on-rainbow .rail { background: rgba(var(--block-lilac), 0.88); border-color: rgba(var(--deep-lilac), 0.72); }
+	.on-rainbow .minimap-shell { background: rgba(var(--block-apricot), 0.9); border-color: rgba(var(--deep-apricot), 0.72); }
+	.on-rainbow .tool-dock { background: rgba(var(--block-leaf), 0.9); border-color: rgba(var(--deep-leaf), 0.72); }
+	.on-rainbow .camera-controls { background: rgba(var(--block-iris), 0.9); border-color: rgba(var(--deep-iris), 0.72); }
+	.on-rainbow .drawer { background: rgba(var(--block-sky), 0.96); border-color: rgba(var(--deep-sky), 0.72); }
+	.on-rainbow .finder { background: rgba(var(--block-butter), 0.96); border-color: rgba(var(--deep-butter), 0.72); }
+	.on-rainbow .view-card { background: rgba(var(--block-lilac), 0.96); border-color: rgba(var(--deep-lilac), 0.72); }
+	.on-rainbow .shortcuts { background: rgba(var(--block-iris), 0.96); border-color: rgba(var(--deep-iris), 0.72); }
+	.on-rainbow .player { background: rgba(var(--block-leaf), 0.93); border-color: rgba(var(--deep-leaf), 0.72); }
+	.on-rainbow .shelf { background: rgba(var(--block-apricot), 0.98); }
+	.on-rainbow .notice,
+	.on-rainbow .mode-note { background: rgba(var(--block-leaf), 0.9); border-color: rgba(var(--deep-leaf), 0.6); }
+	/* The minimap's own field is the board it stands for, so it keeps a paler
+	   draw of the block rather than taking the panel's. */
+	.on-rainbow .minimap { background: rgba(var(--deep-apricot), 0.34); }
+
+	.on-rainbow .back-link:hover,
+	.on-rainbow .topbar .chip:not(.strong):hover,
+	.on-rainbow .topbar .chip.active:not(.strong) { background: rgba(var(--deep-rose), 0.6); }
+	.on-rainbow .crumb:hover,
+	.on-rainbow .history-pair button:hover:not(:disabled),
+	.on-rainbow .frame-steps button:hover:not(:disabled) { background: rgba(var(--deep-butter), 0.72); }
+	.on-rainbow .scale-word { background: rgba(var(--deep-butter), 0.5); }
+	.on-rainbow .rail-button:hover,
+	.on-rainbow .rail-button.active { background: rgba(var(--deep-lilac), 0.7); }
+	.on-rainbow .tool-button:hover,
+	.on-rainbow .tool-button.active { background: rgba(var(--deep-leaf), 0.72); }
+	.on-rainbow .camera-controls button:hover,
+	.on-rainbow .camera-controls button.active { background: rgba(var(--deep-iris), 0.72); }
+	.on-rainbow .drawer .chip:not(.strong):hover,
+	.on-rainbow .drawer .chip.active:not(.strong),
+	.on-rainbow .drawer-tabs button.active,
+	.on-rainbow .place-name:hover { background: rgba(var(--deep-sky), 0.62); }
+	.on-rainbow .finder-result:hover,
+	.on-rainbow .finder-result.current { background: rgba(var(--deep-butter), 0.6); }
+	.on-rainbow .view-card .chip:not(.strong):hover,
+	.on-rainbow .view-card .chip.active:not(.strong) { background: rgba(var(--deep-lilac), 0.7); }
+	.on-rainbow .shelf-open:hover { background: rgba(var(--deep-apricot), 0.55); }
+
+	/*
+	 * The quietest inks step down a shade on a block. A whisper that clears
+	 * 5.4:1 on cream falls to 4.0 on the strongest band, and the small
+	 * readouts — the crumb, the step arrows, the zoom figure — are exactly
+	 * where that matters. `#665650` holds 5:1 against every band at every
+	 * depth. The exclusions keep the states that own their colour: a disabled
+	 * arrow stays disabled, and the crumb you are standing in keeps the
+	 * accent that says so.
+	 */
+	.on-rainbow .crumb:not(.current):not(.root),
+	.on-rainbow .scale-word,
+	.on-rainbow .history-pair button:not(:disabled),
+	.on-rainbow .frame-steps button:not(:disabled),
+	.on-rainbow .camera-controls span { color: #665650; }
 
 	.shortcuts {
 		position: absolute;

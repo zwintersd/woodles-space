@@ -46,8 +46,40 @@ const WASH_ALPHA: Record<SurfaceDepth, number> = { faint: 0.3, normal: 0.52, str
 
 const INK_RGB = '103, 86, 75';
 const PAPER_COLOR = '#f7f3ec';
-/** Seven bands, low saturation: a rainbow the board can still be read over. */
-const SPECTRUM = ['246, 184, 192', '248, 211, 168', '244, 236, 174', '191, 227, 189', '182, 220, 239', '198, 196, 239', '231, 191, 228'];
+
+type Band = { name: string; rgb: [number, number, number] };
+
+/**
+ * Seven bands, low saturation: a rainbow the board can still be read over.
+ * They are named because the chrome uses them too — `paperCss` washes them
+ * across the board, and `surfaceBlocks` hands the same seven to the panels
+ * standing on it, so the furniture is coloured by the part of the rainbow it
+ * is standing on rather than by a second palette that would have to be kept
+ * in step with this one.
+ */
+const SPECTRUM: Band[] = [
+	{ name: 'rose', rgb: [246, 184, 192] },
+	{ name: 'apricot', rgb: [248, 211, 168] },
+	{ name: 'butter', rgb: [244, 236, 174] },
+	{ name: 'leaf', rgb: [191, 227, 189] },
+	{ name: 'sky', rgb: [182, 220, 239] },
+	{ name: 'iris', rgb: [198, 196, 239] },
+	{ name: 'lilac', rgb: [231, 191, 228] }
+];
+
+/** The cream every panel is made of. A block is a band mixed into it. */
+const PANEL_CREAM: [number, number, number] = [255, 253, 248];
+/**
+ * How far a panel is taken toward its band — the same dial as everything
+ * else. These run higher than the wash's alphas on purpose: a panel sits on
+ * paper that is already carrying its band, so a timid mix reads as tinted
+ * glass rather than as a block of colour. `strong` stops well short of the
+ * band itself, which is where the warm inks the panels are written in would
+ * start losing their contrast.
+ */
+const BLOCK_MIX: Record<SurfaceDepth, number> = { faint: 0.26, normal: 0.48, strong: 0.64 };
+/** A state inside a block is the same band drawn harder, never a second colour. */
+const DEEP_EXTRA = 0.26;
 
 /**
  * How far apart the cells land on screen. The pattern is anchored to the
@@ -116,9 +148,37 @@ export function paperCss(surface: Surface): string {
 	}
 	const wash = WASH_ALPHA[surface.depth];
 	const bands = SPECTRUM
-		.map((rgb, index) => `rgba(${rgb}, ${round(wash * 1000) / 1000}) ${round((index / (SPECTRUM.length - 1)) * 100)}%`)
+		.map((band, index) => `rgba(${band.rgb.join(', ')}, ${round(wash * 1000) / 1000}) ${round((index / (SPECTRUM.length - 1)) * 100)}%`)
 		.join(', ');
 	return `background-color: ${PAPER_COLOR}; background-image: ${glow}, linear-gradient(105deg, ${bands});`;
+}
+
+function mix(rgb: [number, number, number], into: [number, number, number], amount: number): string {
+	const held = Math.min(1, Math.max(0, amount));
+	return rgb.map((channel, index) => Math.round(into[index] + (channel - into[index]) * held)).join(', ');
+}
+
+/**
+ * The seven bands as custom properties for the chrome to wear — a pale
+ * `--block-<band>` for the panel itself and a `--deep-<band>` for whatever is
+ * hovered or chosen inside it. Each is an `r, g, b` triple rather than a
+ * finished colour, so every panel keeps the alpha it already had: the glass
+ * is tinted, not replaced.
+ *
+ * Empty on any other paper, which is what keeps an ordinary board ordinary —
+ * the rules that read these are all behind a class that only rainbow sets.
+ */
+export function surfaceBlocks(surface: Surface): string {
+	if (surface.paper !== 'rainbow') return '';
+	const held = BLOCK_MIX[surface.depth];
+	return SPECTRUM
+		.map((band) => ` --block-${band.name}: ${mix(band.rgb, PANEL_CREAM, held)}; --deep-${band.name}: ${mix(band.rgb, PANEL_CREAM, held + DEEP_EXTRA)};`)
+		.join('');
+}
+
+/** Everything the canvas element itself carries: its paper, and the blocks the chrome wears. */
+export function surfaceStyle(surface: Surface): string {
+	return `${paperCss(surface)}${surfaceBlocks(surface)}`;
 }
 
 export function isSurface(value: unknown): value is Surface {
