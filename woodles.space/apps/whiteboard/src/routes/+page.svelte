@@ -143,6 +143,17 @@
 	INBOX_TITLE,
 	type CaptureItem
 	} from '$lib/capture';
+	import {
+	DEFAULT_SURFACE,
+	paperCss,
+	SURFACE_DEPTHS,
+	SURFACE_PAPERS,
+	SURFACE_PATTERNS,
+	SURFACE_SIZES,
+	weaveCss,
+	type Surface
+	} from '$lib/surface';
+	import { DEFAULT_VIEW, normalizeView, viewPreferences, type ViewPreferences } from '$lib/view';
 	import { createHandoffQueue } from '@woodles/handoff';
 
 	const whiteboardHandoffs = createHandoffQueue('whiteboard');
@@ -151,6 +162,12 @@
 	type Tool = 'select' | 'frame' | 'stack' | 'line';
 	type Drawer = 'places' | 'journey' | 'details';
 	const MINIMAP = { width: 186, height: 124 };
+	/**
+	 * How long the chrome waits, after the last thing you did, before it gets
+	 * out of the way. Long enough to read what a panel just said; short enough
+	 * that a board you are only looking at ends up being only the board.
+	 */
+	const CHROME_REST_MS = 3200;
 	type SaveState = 'idle' | 'saving' | 'saved' | 'recovered' | 'error';
 	type Point = { x: number; y: number };
 	type PointerMove = { pointerId: number; screen: Point };
@@ -200,6 +217,7 @@
 		viewpoints: [],
 		journey: { stops: [], loop: false },
 		labels: [],
+		surface: { ...DEFAULT_SURFACE },
 		updatedAt: ''
 	});
 	let tool = $state<Tool>('select');
@@ -232,7 +250,15 @@
 	let editHistory = $state<EditHistory>(createEditHistory());
 	let viewportSize = $state({ width: 1200, height: 800 });
 	let drawer = $state<Drawer | null>(null);
-	let minimapOn = $state(true);
+	/** What this device wants to see of the app — remembered across sessions. */
+	let view = $state<ViewPreferences>({ ...DEFAULT_VIEW });
+	let viewOpen = $state(false);
+	/**
+	 * Whether the chrome is currently up. It rests on a timer and wakes on the
+	 * first sign of life; `chromeResting` below is what the template reads.
+	 */
+	let chromeAwake = $state(true);
+	let restTimer: ReturnType<typeof setTimeout> | null = null;
 	let shortcutsOpen = $state(false);
 	let newViewpointName = $state('');
 	let renamingViewpointId = $state<string | null>(null);
@@ -313,6 +339,21 @@
 	const results = $derived(searchOpen && searchText.trim() ? searchBoard(board, searchText) : []);
 	const matchIds = $derived(new Set(results.map((hit) => hit.item.id)));
 
+	/**
+	 * Most of this does not need to be visible all the time. The bars, the
+	 * dock, the camera cluster and the map fade once the pointer has been
+	 * still for a moment — but never over something you have open and are in
+	 * the middle of reading, and never while a file is hovering over the
+	 * board waiting to be dropped.
+	 */
+	const chromeResting = $derived(
+		view.restChrome && !chromeAwake && !drawer && !searchOpen && !shelfOpen &&
+		!shortcutsOpen && !viewOpen && !fileDragging
+	);
+	/** The paper, which is fixed to the window, and the pattern, which is not. */
+	const paperStyle = $derived(paperCss(board.surface));
+	const weaveStyle = $derived(weaveCss(board.surface, board.camera));
+
 	function viewport(): { width: number; height: number } {
 		const rect = canvasEl?.getBoundingClientRect();
 		return { width: rect?.width ?? window.innerWidth, height: rect?.height ?? window.innerHeight };
@@ -358,6 +399,56 @@
 
 	function targetHasUI(target: EventTarget | null): boolean {
 		return target instanceof Element && Boolean(target.closest('[data-whiteboard-ui], [data-whiteboard-object]'));
+	}
+
+	/** The app's own furniture, as opposed to the board and everything on it. */
+	function targetIsChrome(target: EventTarget | null): boolean {
+		return target instanceof Element && Boolean(target.closest('[data-whiteboard-ui]'));
+	}
+
+	/**
+	 * Brings the chrome back and starts its clock again. `holding` is for a
+	 * pointer that is on the chrome itself: it wakes it and then leaves it up,
+	 * since something you are pointing at should not fade out from under you.
+	 */
+	function wakeChrome(holding = false) {
+		chromeAwake = true;
+		if (restTimer) {
+			clearTimeout(restTimer);
+			restTimer = null;
+		}
+		if (!view.restChrome || holding) return;
+		restTimer = setTimeout(() => {
+			restTimer = null;
+			chromeAwake = false;
+		}, CHROME_REST_MS);
+	}
+
+	function setView(patch: Partial<ViewPreferences>) {
+		view = { ...view, ...patch };
+		viewPreferences.save(view);
+		wakeChrome(true);
+	}
+
+	function toggleViewPanel() {
+		viewOpen = !viewOpen;
+		// The two cards share the same corner, so they take turns in it.
+		if (viewOpen) shortcutsOpen = false;
+		wakeChrome(true);
+	}
+
+	function toggleShortcuts() {
+		shortcutsOpen = !shortcutsOpen;
+		if (shortcutsOpen) viewOpen = false;
+		wakeChrome(true);
+	}
+
+	/** The surface belongs to the board, so changing it is an edit like any other. */
+	function changeSurface(patch: Partial<Surface>) {
+		beginEdit();
+		board.surface = { ...board.surface, ...patch };
+		board.updatedAt = now();
+		scheduleSave();
 	}
 
 	function selectOnly(id: string) {
@@ -496,6 +587,8 @@
 
 	onMount(() => {
 		measureViewport();
+		view = normalizeView(viewPreferences.load().value);
+		wakeChrome();
 		// The one board of the single-board era becomes the first board on the shelf.
 		const adopted = boardLibrary.adoptLegacyBoard();
 		const opened = adopted
@@ -551,6 +644,7 @@
 	}
 
 	onDestroy(() => {
+		if (restTimer) clearTimeout(restTimer);
 		if (cameraAnimation) cancelAnimationFrame(cameraAnimation);
 		if (pointerMoveFrame) cancelAnimationFrame(pointerMoveFrame);
 		clearPlayTimer();
@@ -652,6 +746,7 @@
 	}
 
 	function handleCanvasPointerDown(event: PointerEvent) {
+		wakeChrome(targetIsChrome(event.target));
 		if (targetHasUI(event.target)) return;
 		handHoldsTheCamera();
 		interruptCameraAnimation();
@@ -759,6 +854,7 @@
 	}
 
 	function handlePointerMove(event: PointerEvent) {
+		wakeChrome(targetIsChrome(event.target));
 		const session = activeSession;
 		if (!session || session.pointerId !== event.pointerId) return;
 		queuedPointerMove = { pointerId: event.pointerId, screen: localPoint(event) };
@@ -1093,6 +1189,7 @@
 
 	function handleWheel(event: WheelEvent) {
 		event.preventDefault();
+		wakeChrome();
 		handHoldsTheCamera();
 		interruptCameraAnimation();
 		const factor = Math.exp(-event.deltaY * 0.00125);
@@ -1871,6 +1968,8 @@
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
+		// Typing into a card is not a reason for the edges to come back.
+		if (!isTextTarget(event.target)) wakeChrome();
 		// Find is reachable from anywhere, including from inside a card.
 		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
 			event.preventDefault();
@@ -1898,10 +1997,11 @@
 				exitJourney();
 				return;
 			}
-			if (shelfOpen || drawer || shortcutsOpen) {
+			if (shelfOpen || drawer || shortcutsOpen || viewOpen) {
 				shelfOpen = false;
 				drawer = null;
 				shortcutsOpen = false;
+				viewOpen = false;
 				confirmDeleteId = null;
 				return;
 			}
@@ -1982,7 +2082,7 @@
 		}
 		if (event.key.toLowerCase() === 'm') {
 			event.preventDefault();
-			minimapOn = !minimapOn;
+			setView({ minimapOn: !view.minimapOn });
 			return;
 		}
 		if (event.key.toLowerCase() === 'i' && chosen.length) {
@@ -1998,7 +2098,7 @@
 		}
 		if (event.key === '?') {
 			event.preventDefault();
-			shortcutsOpen = !shortcutsOpen;
+			toggleShortcuts();
 		}
 	}
 
@@ -2173,7 +2273,9 @@
 	bind:this={canvasEl}
 	class:space-panning={spaceHeld}
 	class:file-dragging={fileDragging}
+	class:chrome-resting={chromeResting}
 	class="whiteboard"
+	style={paperStyle}
 	aria-label="Whiteboard canvas"
 	onpointerdown={handleCanvasPointerDown}
 	onpointermove={handlePointerMove}
@@ -2184,6 +2286,10 @@
 	ondragleave={() => (fileDragging = false)}
 	ondrop={handleDrop}
 >
+	{#if board.surface.pattern !== 'plain'}
+		<div class="surface-weave" style={weaveStyle} aria-hidden="true"></div>
+	{/if}
+
 	<div class="world" style={worldStyle()}>
 		<svg class="connector-layer" width="1" height="1">
 			<defs>
@@ -2531,8 +2637,14 @@
 				oninput={(event) => { beginEdit('board-title'); board.board.title = (event.currentTarget as HTMLInputElement).value; board.updatedAt = now(); scheduleSave(); }}
 			/>
 		</div>
-		<p class:warning={saveState === 'error'} class="save-status" aria-live="polite">
-			<span class:working={saveState === 'saving'} class="save-dot"></span>{saveMessage}
+		<p
+			class:warning={saveState === 'error'}
+			class:settled={saveState === 'saved'}
+			class="save-status"
+			aria-live="polite"
+			title={saveMessage}
+		>
+			<span class:working={saveState === 'saving'} class="save-dot"></span><span class="save-word">{saveMessage}</span>
 		</p>
 		<div class="board-actions">
 			<button class="chip" title="Save now (⌘S)" onclick={() => { markDirty(); saveNow(); }}>Save</button>
@@ -2983,7 +3095,7 @@
 		</aside>
 	{/if}
 
-	{#if minimapOn && !playing}
+	{#if view.minimapOn && !playing}
 		<div class="minimap-shell" data-whiteboard-ui>
 			<div
 				class="minimap"
@@ -3058,6 +3170,7 @@
 
 	{#if shortcutsOpen && !playing}
 		<div class="shortcuts" data-whiteboard-ui aria-label="Keyboard shortcuts">
+			<button class="drawer-close shortcuts-close" aria-label="Close keyboard shortcuts" onclick={toggleShortcuts}>×</button>
 			<h3>Moving around</h3>
 			<dl>
 				<dt>/ ⌘K</dt><dd>find anything</dd>
@@ -3070,6 +3183,7 @@
 				<dt>⌥ ← →</dt><dd>back / forward</dd>
 				<dt>P</dt><dd>play the journey</dd>
 				<dt>M</dt><dd>overview map</dd>
+				<dt>?</dt><dd>this list</dd>
 				<dt>Space</dt><dd>hold to drag the board</dd>
 				<dt>⌘S</dt><dd>save now</dd>
 			</dl>
@@ -3081,6 +3195,92 @@
 				<dt>⌘A</dt><dd>select everything</dd>
 				<dt>⌫</dt><dd>delete what's chosen</dd>
 			</dl>
+		</div>
+	{/if}
+
+	{#if viewOpen && !playing}
+		<div class="view-card" data-whiteboard-ui aria-label="How this board looks">
+			<header class="view-head">
+				<h3>View</h3>
+				<button class="drawer-close" aria-label="Close view options" onclick={() => (viewOpen = false)}>×</button>
+			</header>
+
+			<section>
+				<h4>Pattern</h4>
+				<div class="row-buttons">
+					{#each SURFACE_PATTERNS as pattern (pattern)}
+						<button
+							class:active={board.surface.pattern === pattern}
+							class="chip"
+							onclick={() => changeSurface({ pattern })}
+						>{pattern}</button>
+					{/each}
+				</div>
+			</section>
+
+			<section>
+				<h4>Size</h4>
+				<div class="row-buttons">
+					{#each SURFACE_SIZES as size (size)}
+						<button
+							class:active={board.surface.size === size}
+							class="chip"
+							disabled={board.surface.pattern === 'plain'}
+							onclick={() => changeSurface({ size })}
+						>{size}</button>
+					{/each}
+				</div>
+			</section>
+
+			<section>
+				<h4>Depth</h4>
+				<div class="row-buttons">
+					{#each SURFACE_DEPTHS as depth (depth)}
+						<button
+							class:active={board.surface.depth === depth}
+							class="chip"
+							onclick={() => changeSurface({ depth })}
+						>{depth}</button>
+					{/each}
+				</div>
+			</section>
+
+			<section>
+				<h4>Paper</h4>
+				<div class="row-buttons">
+					{#each SURFACE_PAPERS as paper (paper)}
+						<button
+							class:active={board.surface.paper === paper}
+							class="chip paper-chip paper-{paper}"
+							onclick={() => changeSurface({ paper })}
+						>{paper}</button>
+					{/each}
+				</div>
+				<p class="drawer-note">The pattern is part of the board — it moves and scales with it. All of this is saved with this whiteboard, not with this device.</p>
+			</section>
+
+			<section>
+				<h4>Shown</h4>
+				<label class="view-toggle">
+					<input
+						type="checkbox"
+						checked={view.restChrome}
+						onchange={(event) => setView({ restChrome: (event.currentTarget as HTMLInputElement).checked })}
+					/>
+					let the edges rest
+				</label>
+				<label class="view-toggle">
+					<input
+						type="checkbox"
+						checked={view.minimapOn}
+						onchange={(event) => setView({ minimapOn: (event.currentTarget as HTMLInputElement).checked })}
+					/>
+					overview map<small>M</small>
+				</label>
+				<div class="row-buttons">
+					<button class="chip quiet" onclick={toggleShortcuts}>Keyboard shortcuts<small>?</small></button>
+				</div>
+			</section>
 		</div>
 	{/if}
 
@@ -3097,8 +3297,14 @@
 		<button aria-label="Zoom in" title="Zoom in" onclick={() => changeZoom(1.2)}>+</button>
 		<button aria-label="Zoom out" title="Zoom out" onclick={() => changeZoom(1 / 1.2)}>−</button>
 		<button class="home-button" aria-label="Fit board in view" title="Fit the whole board (0)" onclick={fitBoard}>⌾</button>
-		<button class:active={minimapOn} class="map-button" aria-pressed={minimapOn} aria-label="Board overview" title="Overview map (M)" onclick={() => (minimapOn = !minimapOn)}>▦</button>
-		<button class:active={shortcutsOpen} class="map-button help-button" aria-pressed={shortcutsOpen} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onclick={() => (shortcutsOpen = !shortcutsOpen)}>?</button>
+		<button
+			class:active={viewOpen}
+			class="view-button"
+			aria-expanded={viewOpen}
+			aria-label="How this board looks"
+			title="The surface under the board, and what stays on screen"
+			onclick={toggleViewPanel}
+		>◍</button>
 		<span>{zoomLabel()}</span>
 	</div>
 
@@ -3139,16 +3345,35 @@
 		--accent: #a76670;
 		position: fixed;
 		inset: 0;
-		overflow: hidden;
+		/*
+		 * `clip` rather than `hidden`: the canvas must not be a scroll
+		 * container. With `hidden` it still scrolls programmatically, so
+		 * anything that puts an element in view — a browser focusing a field
+		 * in a panel — could drag the whole board and every bar on it
+		 * sideways by however far the content overflows.
+		 */
+		overflow: clip;
 		isolation: isolate;
 		user-select: none;
 		touch-action: none;
+		/* Paper and pattern are both `surface.ts`'s to write: the colour wash
+		   arrives as this element's inline style, the pattern as the layer
+		   below. Only the vignette and the drop hint are still CSS's own. */
 		background-color: var(--paper);
-		background-image:
-			radial-gradient(circle at 1px 1px, rgba(103, 86, 75, 0.14) 1px, transparent 1.1px),
-			radial-gradient(ellipse at 50% -20%, rgba(255, 255, 255, 0.82), transparent 59%);
-		background-size: 22px 22px, 100% 100%;
 		cursor: default;
+	}
+
+	/*
+	 * The pattern, one tile wider than the window on every side. Panning moves
+	 * it with a transform — a composited shift of a few pixels — rather than by
+	 * repainting a full-screen background every frame; only a change of zoom
+	 * redraws the tile itself.
+	 */
+	.surface-weave {
+		position: absolute;
+		inset: -96px;
+		z-index: 0;
+		pointer-events: none;
 	}
 
 	.whiteboard::after {
@@ -3791,8 +4016,20 @@
 	.board-name { min-width: 0; display: flex; align-items: baseline; gap: 8px; }
 	.board-name span { color: #9c8e86; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 	.board-name input { min-width: 90px; width: clamp(125px, 18vw, 220px); border: 0; background: transparent; color: #443a36; font-family: var(--font-display, Georgia, serif); font-size: 17px; font-weight: 600; outline: none; }
-	.save-status { display: flex; align-items: center; gap: 5px; margin: 0 0 0 3px; padding-left: 10px; border-left: 1px solid rgba(98,80,70,.13); color: #92847c; font-size: 11px; white-space: nowrap; }
+	.save-status { position: relative; display: flex; align-items: center; gap: 5px; margin: 0 0 0 3px; padding-left: 10px; border-left: 1px solid rgba(98,80,70,.13); color: #92847c; font-size: 11px; white-space: nowrap; }
 	.save-status.warning { color: #a45554; }
+	/* Saved is the ordinary state, and the ordinary state does not need words:
+	   the dot carries it, the title attribute says it, and anything worth
+	   reading — saving, recovered, a failure — puts them back. */
+	.save-status.settled { padding-left: 8px; }
+	.save-status.settled .save-word {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
 	.save-dot { width: 5px; height: 5px; border-radius: 50%; background: #8cb19c; }
 	.save-dot.working { background: #c49b68; animation: breathe 900ms ease-in-out infinite alternate; }
 	@keyframes breathe { to { transform: scale(1.65); opacity: .46; } }
@@ -3825,7 +4062,7 @@
 		right: 22px;
 		bottom: 25px;
 		display: grid;
-		grid-template-columns: repeat(5, 35px) auto;
+		grid-template-columns: repeat(4, 35px) auto;
 		align-items: center;
 		gap: 3px;
 		padding: 5px;
@@ -3840,6 +4077,8 @@
 	.camera-controls button:hover { background: rgba(218,188,181,.37); }
 	.camera-controls button:active { transform: scale(.94); }
 	.camera-controls .home-button { font-size: 20px; }
+	.camera-controls .view-button { font-size: 16px; }
+	.camera-controls button.active { background: rgba(218, 188, 181, 0.52); color: #69434a; }
 	.camera-controls span { min-width: 40px; padding-left: 5px; color: #978981; font-size: 11px; font-variant-numeric: tabular-nums; }
 
 	.empty-whisper {
@@ -3869,7 +4108,29 @@
 
 	/* Chrome steps out of the way while a journey is running. */
 	.hidden { opacity: 0; pointer-events: none; transform: translateY(-8px); }
-	.topbar, .location-bar, .rail, .tool-dock, .camera-controls { transition: opacity 260ms ease, transform 260ms ease; }
+	.topbar, .location-bar, .rail, .tool-dock, .camera-controls, .minimap-shell { transition: opacity 260ms ease, transform 260ms ease; }
+
+	/*
+	 * …and while nothing is happening at all. Most of this does not need to be
+	 * visible all the time: it settles a few seconds after the pointer does,
+	 * and the first movement anywhere brings it back. Pointer events go with
+	 * the opacity, so nothing invisible is ever in the way of the board.
+	 */
+	.chrome-resting .topbar,
+	.chrome-resting .location-bar,
+	.chrome-resting .rail,
+	.chrome-resting .tool-dock,
+	.chrome-resting .camera-controls,
+	.chrome-resting .minimap-shell {
+		opacity: 0;
+		pointer-events: none;
+	}
+	.chrome-resting .topbar,
+	.chrome-resting .location-bar,
+	.chrome-resting .rail { transform: translateY(-6px); }
+	.chrome-resting .camera-controls,
+	.chrome-resting .minimap-shell { transform: translateY(8px); }
+	.chrome-resting .tool-dock { transform: translate(-50%, 8px); }
 
 	.chip {
 		display: inline-flex;
@@ -3892,6 +4153,7 @@
 	.chip.quiet:hover { background: rgba(224, 210, 200, 0.5); }
 	.chip.danger { border-color: rgba(163, 84, 83, 0.4); background: rgba(196, 122, 118, 0.2); color: #8f4a48; }
 	.chip.active { background: rgba(218, 188, 181, 0.5); color: #69434a; }
+	.chip:disabled { opacity: .42; cursor: default; pointer-events: none; }
 	.chip-count { padding: 0 5px; border-radius: 6px; background: rgba(120, 96, 88, 0.13); color: #7b6a63; font-size: 10px; font-variant-numeric: tabular-nums; }
 
 	.board-actions { display: flex; align-items: center; gap: 4px; padding-left: 9px; border-left: 1px solid rgba(98,80,70,.13); }
@@ -4252,6 +4514,48 @@
 	.finder-hint code { padding: 1px 4px; border-radius: 4px; background: rgba(120,96,88,.1); font-size: 10.5px; }
 	.finder-empty { margin: 0; padding: 16px 13px 18px; border-top: 1px solid rgba(98,80,70,.1); color: #9c8e87; font-size: 12px; font-style: italic; text-align: center; }
 
+	/*
+	 * The View card and the shortcuts card share this corner and take turns in
+	 * it — two cards stacked here would be exactly the clutter this one exists
+	 * to reduce.
+	 */
+	.view-card {
+		position: absolute;
+		z-index: 74;
+		right: 22px;
+		bottom: 76px;
+		width: 248px;
+		max-height: calc(100vh - 150px);
+		overflow-y: auto;
+		padding: 11px 14px 14px;
+		border: 1px solid rgba(98, 80, 70, 0.14);
+		border-radius: 14px;
+		background: rgba(255, 253, 248, 0.95);
+		box-shadow: 0 12px 34px rgba(76,57,48,.15);
+		backdrop-filter: blur(14px);
+		animation: card-in 180ms ease both;
+	}
+	@keyframes card-in { from { opacity: 0; transform: translateY(6px); } }
+	.view-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+	.view-head h3 { margin: 0; color: #5d4c46; font-family: var(--font-display, Georgia, serif); font-size: 14px; font-weight: 600; }
+	.view-card section { padding: 9px 0 0; border-top: 1px solid rgba(98,80,70,.08); }
+	.view-card section:first-of-type { border-top: 0; }
+	.view-card h4 { margin: 0 0 6px; color: #9c8e86; font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+	.view-card .row-buttons { gap: 4px; }
+	.view-card .chip { min-height: 25px; padding: 0 9px; font-size: 11px; }
+	.view-card .drawer-note { margin-top: 8px; }
+	/* The paper choices show what they mean rather than only naming it. */
+	.paper-chip::before { content: ''; width: 11px; height: 11px; border: 1px solid rgba(98,80,70,.2); border-radius: 3px; }
+	.paper-chip.paper-paper::before { background: #f7f3ec; }
+	.paper-chip.paper-rainbow::before {
+		background: linear-gradient(105deg, #f6b8c0, #f8d3a8, #f4ecae, #bfe3bd, #b6dcef, #c6c4ef, #e7bfe4);
+	}
+	.view-toggle { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; color: #6b5b55; font-size: 11.5px; cursor: pointer; }
+	.view-toggle input { accent-color: #a76670; }
+	.view-toggle small,
+	.view-card .chip small { padding: 1px 5px; border-radius: 5px; background: rgba(120,96,88,.11); color: #8b7a73; font-size: 9.5px; }
+	.view-toggle small { margin-left: auto; }
+
 	.shortcuts {
 		position: absolute;
 		z-index: 74;
@@ -4265,6 +4569,7 @@
 		box-shadow: 0 12px 34px rgba(76,57,48,.15);
 		backdrop-filter: blur(14px);
 	}
+	.shortcuts-close { position: absolute; top: 8px; right: 9px; }
 	.shortcuts h3 { margin: 0 0 9px; color: #6d5c56; font-family: var(--font-display, Georgia, serif); font-size: 13px; font-weight: 600; }
 	.shortcuts dl + h3 { margin-top: 14px; }
 	.shortcuts dl { display: grid; grid-template-columns: 58px 1fr; gap: 5px 9px; margin: 0; }
@@ -4296,8 +4601,7 @@
 		.tool-button span { display: none; }
 		.camera-controls { right: 12px; bottom: 12px; grid-template-columns: repeat(4, 31px); }
 		.camera-controls button { width: 31px; height: 31px; }
-		.camera-controls span,
-		.camera-controls .help-button { display: none; }
+		.camera-controls span { display: none; }
 		.location-bar { max-width: 100%; }
 		.crumb { max-width: 118px; }
 		.scale-word { display: none; }
@@ -4306,6 +4610,7 @@
 		.drawer { top: 112px; right: 12px; bottom: 66px; width: calc(100vw - 24px); }
 		.minimap-shell { display: none; }
 		.shortcuts { right: 12px; bottom: 60px; }
+		.view-card { right: 12px; bottom: 60px; max-height: calc(100vh - 130px); }
 		.board-actions { padding-left: 6px; gap: 3px; }
 		.shelf-list li { flex-wrap: wrap; }
 	}

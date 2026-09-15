@@ -1,4 +1,6 @@
-export const BOARD_SCHEMA_VERSION = 5;
+import { DEFAULT_SURFACE, isSurface, normalizeSurface, type Surface } from './surface';
+
+export const BOARD_SCHEMA_VERSION = 6;
 const MIN_CAMERA_ZOOM = 0.1;
 const MAX_CAMERA_ZOOM = 4;
 
@@ -177,6 +179,8 @@ export type WhiteboardDocument = {
 	viewpoints: Viewpoint[];
 	journey: Journey;
 	labels: Label[];
+	/** The paper and the pattern on it. Decoration the board carries with it. */
+	surface: Surface;
 	updatedAt: string;
 };
 
@@ -216,6 +220,7 @@ export function createEmptyBoard(): WhiteboardDocument {
 		viewpoints: [],
 		journey: { stops: [], loop: false },
 		labels: [],
+		surface: { ...DEFAULT_SURFACE },
 		updatedAt: now()
 	};
 }
@@ -314,6 +319,7 @@ export function isWhiteboardDocument(value: unknown): value is WhiteboardDocumen
 	if (!isJourney(value.journey)) return false;
 	if (!Array.isArray(value.labels) || !value.labels.every(isLabel)) return false;
 	if (new Set(value.labels.map((label) => label.id)).size !== value.labels.length) return false;
+	if (!isSurface(value.surface)) return false;
 	return value.items.every(isWhiteboardItem) && new Set(value.items.map((item) => item.id)).size === value.items.length;
 }
 
@@ -409,10 +415,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Fills in everything schemas 2 and 3 added. Anything unreadable is dropped
- * rather than guessed at: a board's material matters more than what has been
- * said about it, so a corrupt journey costs you the journey, never the board,
- * and an unreadable property sheet costs that object its properties alone.
+ * Fills in everything schemas 2 through 6 added. Anything unreadable is
+ * dropped rather than guessed at: a board's material matters more than what
+ * has been said about it, so a corrupt journey costs you the journey, never
+ * the board, an unreadable property sheet costs that object its properties
+ * alone, and a surface nobody can read costs the board its wallpaper.
  */
 export function upgradeDocument(value: unknown): unknown {
 	if (!isRecord(value)) return value;
@@ -426,7 +433,7 @@ export function upgradeDocument(value: unknown): unknown {
 			return rest;
 		})
 		: value.items;
-	return { ...value, items, home: isCamera(value.home) ? value.home : null, viewpoints, journey, labels };
+	return { ...value, items, home: isCamera(value.home) ? value.home : null, viewpoints, journey, labels, surface: normalizeSurface(value.surface) };
 }
 
 export function snapshotDocument(document: WhiteboardDocument): WhiteboardDocument {
@@ -437,6 +444,7 @@ export function snapshotDocument(document: WhiteboardDocument): WhiteboardDocume
 		viewpoints: document.viewpoints.map((viewpoint) => ({ ...viewpoint, camera: { ...viewpoint.camera } })),
 		journey: { loop: document.journey.loop, stops: document.journey.stops.map((stop) => ({ ...stop, target: { ...stop.target } })) },
 		labels: document.labels.map((label) => ({ ...label })),
+		surface: { ...document.surface },
 		updatedAt: document.updatedAt,
 		items: document.items.map((item) => ({
 			...item,
