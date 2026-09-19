@@ -216,6 +216,7 @@
 	}
 
 	function startCustom(): void {
+		customLabel = selectedInterval?.observation?.kind === 'elsewhere' ? selectedInterval.observation.label : '';
 		customOpen = true;
 		requestAnimationFrame(() => {
 			document.querySelector<HTMLInputElement>('#carillon-custom-activity')?.focus();
@@ -230,9 +231,7 @@
 <section class="instrument" aria-labelledby="today-heading">
 	<header class="day-heading">
 		<div>
-			<p class="section-kicker">observed day · {todayKey}</p>
 			<h1 id="today-heading">{dayOfWeekLabel(store.now)}, {shortDateLabel(store.now)}</h1>
-			<p class="day-thesis">Plan the day and record what happens.</p>
 		</div>
 		<div class="day-actions">
 			<button type="button" class="pile-pill" onclick={onopenpiles}>
@@ -245,9 +244,6 @@
 			</button>
 		</div>
 	</header>
-
-	<DayPlan {onopenpiles} />
-	<details class="context-details"><summary>Sleep and context</summary><Capacity /></details>
 
 	<div class="instrument-grid">
 		<article class="sampler" data-testid="interval-sampler">
@@ -269,12 +265,30 @@
 				</span>
 			</div>
 
+			<div class="sample-mode">
+				<button type="button" aria-pressed={paperEntry} onclick={() => {
+					paperEntry = !paperEntry;
+					if (paperEntry) paperDate = todayKey;
+					customOpen = false;
+					customLabel = '';
+					feedback = '';
+				}}>{paperEntry ? 'Return to now' : 'Enter paper marks'}</button>
+				{#if paperEntry}
+					<label>Sheet date<input type="date" max={todayKey} bind:value={paperDate} onchange={() => { customOpen = false; feedback = ''; }} /></label>
+					<label>Interval<select aria-label="Interval" bind:value={selectedStart} onchange={() => { customOpen = false; customLabel = ''; feedback = ''; }}>
+						{#each ledgerIntervals.filter((row) => row.state !== 'future') as row (row.key)}
+							<option value={row.startTime}>{displayTime(row.startTime)}{row.observation ? ` · ${row.observation.label}` : ''}</option>
+						{/each}
+					</select></label>
+				{/if}
+			</div>
+
 			<p class="plan-hint">
 				<span>pile suggested</span>
 				<strong>{selectedInterval?.plannedBlock?.title ?? 'nothing in particular'}</strong>
 			</p>
 
-			<h2>{paperEntry ? 'What was marked here?' : 'What is happening right now?'}</h2>
+			<h2>{paperEntry ? 'What was marked here?' : 'What’s happening now?'}</h2>
 			<p class="sampler-sub">
 				{paperEntry
 					? 'Choose the activity marked on your paper sheet.'
@@ -313,6 +327,7 @@
 							placeholder="transition, scrolling, groceries…"
 						/>
 						<button type="submit" disabled={!customLabel.trim()}>record</button>
+						<button type="button" onclick={() => { customOpen = false; customLabel = ''; }}>cancel</button>
 					</div>
 				</form>
 			{/if}
@@ -351,7 +366,7 @@
 						observed as {selectedInterval.observation.label}
 						{#if selectedInterval.continuation} · part of a recalled stretch{:else if selectedInterval.observation.source === 'paper'} · entered from paper{:else if selectedInterval.observation.source === 'recall'} · recalled from memory{/if}
 					{:else}
-						Choose an activity above to add a record.
+						{selectedInterval ? 'Choose an activity above to add a record.' : 'No interval is available. You can enter earlier paper marks or add a recalled activity below.'}
 					{/if}
 				</p>
 				{#if selectedInterval?.observation}
@@ -359,38 +374,21 @@
 				{/if}
 			</div>
 		</article>
-
-
+		<div class="plan-dock"><DayPlan {onopenpiles} /></div>
 	</div>
 
+	<details class="context-details"><summary>Sleep and context</summary><Capacity /></details>
 	<details class="context-details"><summary>Add an earlier activity</summary><CatchUp intervals={todayIntervals} {onopenroutines} {onopensurge} /></details>
 
-	<details class="context-details"><summary>Earlier today · {ledgerObservations.length} records</summary>
+	<details class="context-details"><summary>{paperEntry ? `Sheet · ${ledgerDateKey}` : 'Earlier today'} · {ledgerObservations.length} records</summary>
 	<section class="ledger-card" aria-labelledby="ledger-heading">
 		<header class="ledger-titlebar">
 			<div>
 				<p class="section-kicker">field sheet · {ledgerDateKey}</p>
-				<h2 id="ledger-heading">Today’s record</h2>
+				<h2 id="ledger-heading">{paperEntry ? 'Sheet record' : 'Today’s record'}</h2>
 			</div>
 			<div class="ledger-controls">
 				<span>{ledgerObservations.length} sampled moment{ledgerObservations.length === 1 ? '' : 's'}</span>
-				<button
-					type="button"
-					class:active={paperEntry}
-					aria-pressed={paperEntry}
-					onclick={() => {
-						paperEntry = !paperEntry;
-						if (paperEntry) paperDate = todayKey;
-					}}
-				>
-					{paperEntry ? 'paper entry on' : 'enter paper marks'}
-				</button>
-				{#if paperEntry}
-					<label class="paper-date">
-						<span>sheet date</span>
-						<input type="date" max={todayKey} bind:value={paperDate} />
-					</label>
-				{/if}
 			</div>
 		</header>
 
@@ -465,8 +463,8 @@
 </section>
 
 <style>
-	.context-details { margin: 1rem 0; color: var(--car-cream); }
-	.context-details summary { cursor:pointer; padding:.6rem 0; }
+	.context-details { margin: 0; color: var(--car-cream); }
+	.context-details summary { cursor:pointer; padding:.15rem 0; }
 	.instrument {
 		display: grid;
 		gap: 1.2rem;
@@ -493,19 +491,12 @@
 		margin-top: 0.2rem;
 		color: var(--car-cream);
 		font-family: var(--car-display);
-		font-size: clamp(2.4rem, 5vw, 4.6rem);
+		font-size: clamp(1.3rem, 2.4vw, 1.9rem);
 		font-weight: 400;
 		letter-spacing: -0.04em;
 		line-height: 0.94;
 	}
 
-	.day-thesis {
-		margin-top: 0.55rem;
-		color: var(--car-mist);
-		font-family: var(--car-body);
-		font-size: 0.92rem;
-		font-style: italic;
-	}
 
 	.day-actions {
 		display: flex;
@@ -585,7 +576,7 @@
 		position: relative;
 		overflow: hidden;
 		border-radius: 1rem 1rem 2.8rem 1rem;
-		padding: clamp(1.15rem, 3vw, 2rem);
+		padding: 1.15rem;
 	}
 
 	.sampler::after {
@@ -642,7 +633,7 @@
 		display: flex;
 		align-items: baseline;
 		gap: 0.45rem;
-		margin-top: 1.5rem;
+		margin-top: 1rem;
 		color: var(--car-ink-soft);
 		font-family: var(--car-mono);
 		font-size: 0.62rem;
@@ -658,10 +649,10 @@
 	}
 
 	.sampler h2 {
-		max-width: 13ch;
+		max-width: none;
 		margin-top: 0.55rem;
 		font-family: var(--car-display);
-		font-size: clamp(2rem, 4.5vw, 3.7rem);
+		font-size: clamp(1.6rem, 2.5vw, 2.2rem);
 		font-weight: 500;
 		letter-spacing: -0.045em;
 		line-height: 0.95;
@@ -678,7 +669,7 @@
 		display: grid;
 		grid-template-columns: repeat(4, minmax(0, 1fr));
 		gap: 0.45rem;
-		margin-top: 1.4rem;
+		margin-top: 1rem;
 	}
 
 	.activity-chip {
@@ -862,39 +853,6 @@
 		font-size: 0.55rem;
 	}
 
-	.ledger-controls button {
-		border: 1px solid rgba(68, 54, 91, 0.2);
-		border-radius: 999px;
-		padding: 0.35rem 0.65rem;
-	}
-
-	.ledger-controls button.active {
-		border-color: var(--car-pink-dark);
-		background: var(--car-pink-wash);
-		color: var(--car-pink-dark);
-	}
-
-	.paper-date {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-	}
-
-	.paper-date span {
-		font-size: 0.48rem;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-	}
-
-	.paper-date input {
-		width: 7.8rem;
-		border-bottom: 1px solid rgba(68, 54, 91, 0.28);
-		padding: 0.2rem 0;
-		color: var(--car-ink);
-		font-family: var(--car-mono);
-		font-size: 0.58rem;
-	}
-
 	.ledger-head,
 	.ledger-row {
 		display: grid;
@@ -1020,7 +978,7 @@
 
 	@media (max-width: 600px) {
 		.activity-grid {
-			grid-template-columns: repeat(2, minmax(0, 1fr));
+			grid-template-columns: repeat(3, minmax(0, 1fr));
 		}
 
 		.activity-chip {
@@ -1060,6 +1018,45 @@
 		.activity-chip {
 			transition: none;
 		}
+	}
+
+	/* Keep the observation and the editable plan within the same working area. */
+	.sample-mode { display: flex; flex-wrap: wrap; align-items: end; gap: 0.6rem; margin-top: 0.75rem; }
+	.sample-mode button, .sample-mode input, .sample-mode select { min-height: 2rem; max-width: 100%; border: 1px solid #44365b33; border-radius: 0.45rem; padding: 0.35rem 0.5rem; background: #ffffff55; color: var(--car-ink); font: 0.65rem var(--car-mono); }
+	.sample-mode button { cursor: pointer; box-shadow: 0 2px 0 #44365b22; }
+	.sample-mode button[aria-pressed='true'] { background: var(--car-pink-wash); box-shadow: inset 0 1px 3px #44365b22; }
+	.sample-mode label { display: grid; gap: 0.25rem; min-width: 0; font: 0.6rem var(--car-mono); }
+	.sample-mode :focus-visible { outline: 2px solid var(--car-pink-dark); outline-offset: 3px; }
+	.instrument { gap: 0.8rem; }
+	.day-heading { align-items: center; }
+	.instrument-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: start; }
+	.plan-dock { min-width: 0; }
+	.plan-dock :global(.wb-card) { padding: 1rem; }
+	.plan-dock :global(.wb-heading) { gap: 0.7rem; margin-bottom: 0.7rem; }
+	.plan-dock :global(h2) { font-size: 1.4rem; }
+	.plan-dock :global(.wb-row) { padding: 0.55rem 0; }
+	.plan-dock :global(.wb-notice:empty) { display: none; }
+	.activity-chip { border-bottom-width: 3px; box-shadow: 0 3px 0 rgba(68, 54, 91, 0.18), inset 0 1px 0 #ffffff80; transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease; }
+	.activity-chip:not(:disabled):hover { transform: translateY(-2px); }
+	.activity-chip:not(:disabled):active, .activity-chip.selected { transform: translateY(2px); box-shadow: inset 0 2px 4px #44365b22; }
+	.activity-chip:focus-visible { outline: 2px solid var(--car-pink-dark); outline-offset: 4px; }
+	.sampler { animation: settle-in 280ms ease-out both; }
+	.context-details { border: 1px solid var(--car-line); border-radius: 0.7rem; padding: 0.65rem 0.85rem; }
+	.context-details summary { cursor: pointer; font-size: 0.8rem; }
+	@keyframes settle-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+	@media (max-width: 900px) {
+		.instrument-grid { grid-template-columns: minmax(0, 1fr); }
+		.day-heading { flex-wrap: wrap; gap: 0.6rem; }
+		.day-heading h1 { font-size: 1.4rem; }
+		.day-actions { flex-wrap: wrap; }
+		.sampler-meta { gap: 0.5rem; flex-wrap: wrap; }
+		.interval-clock { font-size: 1.25rem; }
+		.sample-source { letter-spacing: 0.04em; }
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.sampler { animation: none; }
+		.activity-chip { transition: none; }
+		.activity-chip:not(:disabled):hover, .activity-chip:not(:disabled):active, .activity-chip.selected { transform: none; }
 	}
 
 	@media print {
