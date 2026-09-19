@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
-	import { book } from './book.svelte';
+	import { book, STAGE_OBSERVED } from './book.svelte';
 	import {
 		CREATURE_SPECS,
 		SEDIMENT_BAND_TOP,
@@ -274,6 +274,10 @@
 			const c = book.boundCreatureFor(lifeId);
 			const src = c ? (c.isolatedSprite ?? c.sprite ?? null) : null;
 			return src ? { src, pixelated: c!.pixelated, sizeScale: c!.sizeScale } : null;
+		}
+
+		function hasObserved(lifeId: string): boolean {
+			return book.stageOf(lifeId) >= STAGE_OBSERVED;
 		}
 
 		function drawSky(T: number) {
@@ -670,15 +674,36 @@
 				const sheet = creatureSheets.get(spec.id);
 				if (!sheet || !sheet.ok || !sheet.img.naturalWidth) continue;
 
+				const seed = placed.x + placed.y + placed.id.length * 0.013;
+				// These are intentionally just two named flourishes, not a configurable
+				// creature-behavior system. The first water only needs a hovering star and
+				// a small swimmer that follows the current differently from the rest.
+				const phase = T + seed * TAU;
+				const motion = reduce
+					? { x: 0, rotation: 0, scale: 1 }
+					: spec.id === 'star_drifter'
+						? {
+							x: Math.sin(phase * 0.22) * W * 0.012,
+							rotation: Math.sin(phase * 0.72) * 0.035,
+							scale: 0.975 + Math.sin(phase * 0.72) * 0.035
+						}
+						: spec.id === 'spotted_swimmer'
+							? {
+								x: Math.sin(phase * 0.26) * W * 0.06,
+								rotation: Math.cos(phase * 0.26) * 0.075,
+								scale: 1
+							}
+							: { x: 0, rotation: 0, scale: 1 };
 				const cellW = sheet.img.naturalWidth / sheet.cols;
 				const cellH = sheet.img.naturalHeight / sheet.rows;
 				const yScale = cellW > 0 ? cellH / cellW : 1;
-				const size = H * CREATURE_BOX * spec.boxScale * placed.scale;
+				const size = H * CREATURE_BOX * spec.boxScale * placed.scale * motion.scale;
 				const dh = size * yScale;
-
-				const seed = placed.x + placed.y + placed.id.length * 0.013;
 				const jitter = (placed.id.length % 7) * W * 0.002;
-				const cx = Math.min(Math.max(placed.x * W + jitter, size * 0.5), W - size * 0.5);
+				const cx = Math.min(
+					Math.max(placed.x * W + jitter + motion.x, size * 0.5),
+					W - size * 0.5
+				);
 				// same floor/bottom-edge clamp as drawCreatureLayers, for the same
 				// reason: a floor-layer creature's band goes fairly deep, and its
 				// bob shouldn't be able to carry it past the canvas.
@@ -697,8 +722,8 @@
 					ctx!.restore();
 				}
 
-				const frame = Math.floor(T * spec.fps) % spec.frameCount;
-				drawSheetSprite(sheet, frame, cx, cy, size, placed.rotation, 1, yScale);
+				const frame = reduce ? 0 : Math.floor(T * spec.fps) % spec.frameCount;
+				drawSheetSprite(sheet, frame, cx, cy, size, placed.rotation + motion.rotation, 1, yScale);
 			}
 		}
 
@@ -867,15 +892,20 @@
 		}
 
 		function drawAnimatorSwimmer(T: number, intensity: number) {
+			if (book.worldShape.activeWorldspace !== 'water' || !hasObserved('soft_swimmer')) return;
 			if (!deepwaterSwimmer.ok || !deepwaterSwimmer.img.naturalWidth) return;
 
 			const seed = stable01(`animator-swimmer:${book.worldIndex}`);
-			const passage = reduce ? 0.48 : (seed + T * 0.024) % 1;
+			const passSeconds = 23;
+			const cycleSeconds = 86;
+			const elapsed = reduce ? passSeconds * 0.48 : (T + seed * cycleSeconds) % cycleSeconds;
+			if (!reduce && elapsed > passSeconds) return;
+			const passage = reduce ? 0.48 : elapsed / passSeconds;
 			const frame = reduce ? 0 : Math.floor(T * DEEPWATER_SWIM.fps) % DEEPWATER_SWIM.frames;
 			const bob = reduce ? 0 : Math.sin(T * 0.9 + seed * TAU) * H * 0.012;
 			const x = W * (1.12 - passage * 1.26);
-			const y = H * (WATER_TOP + 0.16 + seed * 0.15) + bob;
-			const size = H * (0.18 + seed * 0.035);
+			const y = H * (FLOOR_TOP - 0.1 + seed * 0.04) + bob;
+			const size = H * (0.15 + seed * 0.025);
 			const alpha = 0.32 + intensity * 0.2;
 
 			ctx!.save();
@@ -889,17 +919,93 @@
 			drawSheetSprite(deepwaterSwimmer, frame, x, y, size, 0, alpha, 1);
 		}
 
+		function drawSaltGlints(T: number) {
+			if (!hasObserved('salt_deposit')) return;
+			const stage = book.stageOf('salt_deposit');
+			for (let i = 0; i < 3; i++) {
+				const seed = `salt-glint:${book.worldIndex}:${i}`;
+				const shimmer = reduce
+					? 0.78
+					: 0.52 + 0.48 * Math.sin(T * (0.72 + stable01(`${seed}:speed`) * 0.45) + i);
+				const x = W * (0.16 + stable01(`${seed}:x`) * 0.68);
+				const y = H * (WATER_TOP + 0.026 + stable01(`${seed}:y`) * 0.055);
+				const size = H * (0.018 + stable01(`${seed}:size`) * 0.014);
+				drawSheetSprite(
+					sedimentBits,
+					pickSprite(GLINT_SPRITES, seed),
+					x,
+					y,
+					size,
+					0,
+					(0.12 + stage * 0.07) * shimmer,
+					1,
+					'screen'
+				);
+			}
+		}
+
+		function drawShallowsBreath(T: number) {
+			if (book.worldShape.activeWorldspace !== 'shallows' || !hasObserved('algae_bloom')) return;
+			const oxygen = clamp01(book.stocks.oxygen / 100);
+			const count = 2 + Math.round(oxygen * 3);
+			for (let i = 0; i < count; i++) {
+				const seed = `oxygen-bubble:${book.worldIndex}:${i}`;
+				const rise = reduce
+					? 0.52
+					: (T * (0.028 + stable01(`${seed}:speed`) * 0.02) + stable01(`${seed}:phase`)) % 1;
+				const x = W * (0.2 + stable01(`${seed}:x`) * 0.6) + Math.sin(rise * TAU) * W * 0.012;
+				const y = H * (FLOOR_TOP - 0.035 - rise * 0.2);
+				const radius = H * (0.006 + stable01(`${seed}:size`) * 0.007);
+				ctx!.save();
+				ctx!.globalAlpha = 0.2 + oxygen * 0.22;
+				ctx!.strokeStyle = 'rgba(239, 255, 248, 0.88)';
+				ctx!.lineWidth = 1;
+				ctx!.beginPath();
+				ctx!.arc(x, y, radius, 0, TAU);
+				ctx!.stroke();
+				ctx!.restore();
+			}
+		}
+
+		function drawNutrientSpecks(T: number) {
+			if (!book.worldShape.sedimentUnlocked || !hasObserved('tidal_pool')) return;
+			const richness = clamp01(book.stocks.nutrients / 100);
+			if (richness <= 0.04) return;
+			const count = 4 + Math.round(richness * 5);
+			for (let i = 0; i < count; i++) {
+				const seed = `nutrient-speck:${book.worldIndex}:${i}`;
+				const phase = reduce
+					? stable01(`${seed}:phase`) * TAU
+					: T * (0.42 + stable01(`${seed}:speed`) * 0.3) + stable01(`${seed}:phase`) * TAU;
+				const centerX = W * (0.18 + stable01(`${seed}:x`) * 0.64);
+				const centerY = H * (FLOOR_TOP + 0.055 + stable01(`${seed}:y`) * 0.09);
+				const x = centerX + Math.cos(phase) * W * 0.014;
+				const y = centerY + Math.sin(phase) * H * 0.009;
+				const size = Math.max(1, H * (0.0025 + stable01(`${seed}:size`) * 0.0025));
+				ctx!.save();
+				ctx!.globalAlpha = 0.16 + richness * 0.34;
+				ctx!.fillStyle = 'rgb(244, 199, 127)';
+				ctx!.beginPath();
+				ctx!.arc(x, y, size, 0, TAU);
+				ctx!.fill();
+				ctx!.restore();
+			}
+		}
+
 		function drawWaterRipples(T: number, moisture: number, intensity: number) {
 			if (!waterRipples.ok || intensity <= 0.01) return;
-			const count = 2 + Math.round(moisture * 3);
+			const count = 2 + Math.round(moisture * 3) + (hasObserved('tidal_pool') ? 1 : 0);
 			for (let i = 0; i < count; i++) {
 				const seed = `ripple-${book.worldIndex}-${i}`;
-				const frame = Math.floor(T * (5.5 + i * 0.4) + stable01(`${seed}-phase`) * 8) % 8;
+				const frame = reduce
+					? 0
+					: Math.floor(T * (5.5 + i * 0.4) + stable01(`${seed}-phase`) * 8) % 8;
 				const row = i % 2;
 				const x = W * (0.12 + stable01(`${seed}-x`) * 0.76);
 				const y = H * (WATER_TOP + 0.06 + stable01(`${seed}-y`) * 0.2);
 				const size = H * (0.12 + stable01(`${seed}-size`) * 0.15);
-				const alpha = (0.14 + 0.34 * intensity) * (0.75 + 0.25 * Math.sin(T + i));
+				const alpha =
+					(0.14 + 0.34 * intensity) * (reduce ? 0.88 : 0.75 + 0.25 * Math.sin(T + i));
 				drawSheetSprite(
 					waterRipples,
 					row * 8 + frame,
@@ -1041,6 +1147,9 @@
 			drawShallowsShelf();
 			drawFeatures();
 			drawFeatureAuras(T, shine(witnessed));
+			drawSaltGlints(T);
+			drawNutrientSpecks(T);
+			drawShallowsBreath(T);
 			drawCreatureLayers(['water', 'floor'], T);
 			drawAnimatorSwimmer(T, shine(tending));
 			drawPlacedCreatures(['water', 'floor'], T);

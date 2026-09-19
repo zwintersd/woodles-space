@@ -16,7 +16,7 @@
 	let working = $state<string[]>([...store.weekPattern.days]);
 
 	// Track which shape is selected on the palette (visual hint only).
-	let activeShapeId = $state<string | null>(store.dayShapes[0]?.id ?? null);
+	let activeShapeId = $state<string | null>(store.dayShapes.find(s => !s.deletedAt && !s.archived)?.id ?? null);
 
 	function assign(dayOfWeek: number, shapeId: string) {
 		const next = [...working];
@@ -40,7 +40,7 @@
 
 	function arcSegments(shape: DayShape): Segment[] {
 		return shape.blocks
-			.filter((b) => timeToMinutes(b.endTime) > ARC_START && timeToMinutes(b.startTime) < ARC_END)
+			.filter((b) => !b.flexible && timeToMinutes(b.endTime) > ARC_START && timeToMinutes(b.startTime) < ARC_END)
 			.map((b) => {
 				const start = Math.max(ARC_START, timeToMinutes(b.startTime));
 				const end = Math.min(ARC_END, timeToMinutes(b.endTime));
@@ -63,7 +63,7 @@
 >
 	<!-- Shape palette: cards with day-arc visualisation -->
 	<div class="shape-palette" role="radiogroup" aria-label="day shape palette">
-		{#each store.dayShapes as shape (shape.id)}
+		{#each store.dayShapes.filter(s => !s.deletedAt && !s.archived) as shape (shape.id)}
 			{@const segs = arcSegments(shape)}
 			<button
 				class="shape-card"
@@ -117,7 +117,7 @@
 	<div class="weekday-row">
 		{#each WEEKDAY_ORDER as dow, i}
 			{@const shapeId = working[dow]}
-			{@const shape = store.dayShapes.find((s) => s.id === shapeId)}
+			{@const shape = store.dayShapes.find((s) => s.id === shapeId && !s.deletedAt)}
 			<button
 				class="weekday-tile"
 				class:restful={shape?.restful}

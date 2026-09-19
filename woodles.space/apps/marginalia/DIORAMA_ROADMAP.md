@@ -19,8 +19,8 @@ pool (`CREATURE_SPECS` in `worldShape.ts`, distinct from per-user Bestiary bindi
 Brianna can call into the scene via a new panel (`CreatureCall.svelte`) — free,
 auto-placed, no vitals/insight participation, deliberately kept that simple. See
 [ASSETS.md](./ASSETS.md)'s "the menagerie" section for the sprite-sheet convention (grid,
-fps, filenames) — two entries are wired up (`star_drifter`, `spotted_swimmer`) but their
-actual PNG files still need to land in `static/diorama/`.
+fps, filenames) — its two entries (`star_drifter`, `spotted_swimmer`) now have their
+actual PNG files in `static/diorama/`.
 
 **update once real sprites landed:** the sediment/floor was filling the *entire* water
 column, competing visually with the new creature art for attention. confined it to the

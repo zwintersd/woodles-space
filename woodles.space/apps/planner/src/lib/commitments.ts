@@ -27,20 +27,23 @@ import type { Block, Task } from './types';
 export function buildCommitments(
 	tasks: Task[],
 	blocks: Block[],
-	publishedAt = new Date().toISOString()
+	publishedAt = new Date().toISOString(),
+	blocksForDate?: (date: string) => Block[]
 ): CarillonCommitmentsBlob {
 	const blockById = new Map(blocks.map((block) => [block.id, block]));
 
 	const commitments: Commitment[] = tasks
 		.filter((task) => task.thinkingAboutEntryId && task.status !== 'dropped')
 		.map((task): Commitment => {
-			const block = task.targetBlockId ? blockById.get(task.targetBlockId) : undefined;
+			const block = task.targetDate && blocksForDate
+				? blocksForDate(task.targetDate).find((item) => item.id === task.targetBlockId)
+				: task.targetBlockId ? blockById.get(task.targetBlockId) : undefined;
 			return {
 				entryId: task.thinkingAboutEntryId as string,
 				taskId: task.id,
 				title: task.title,
 				date: task.targetDate ?? null,
-				time: block?.startTime ?? null,
+				time: block && !block.flexible ? block.startTime : null,
 				blockTitle: block?.title ?? null,
 				// Carillon's third state, `dropped`, is filtered out above rather
 				// than published — a board about what you're reading has no use for
