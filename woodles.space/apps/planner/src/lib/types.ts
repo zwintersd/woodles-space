@@ -116,6 +116,7 @@ export type ToneName = 'wry' | 'gentle' | 'minimal' | 'earnest';
 export type OnboardingStep = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type PlannerSettings = {
+	sampleTags?: SampleTag[];
 	flourishEnabled: boolean;
 	quietHoursStart: string; // "HH:MM"
 	quietHoursEnd: string;
@@ -174,6 +175,8 @@ export type IntervalKind =
  * many bells it spans.
  */
 export type IntervalObservation = {
+	/** Snapshot of the optional user label; null means explicitly unlabelled. */
+	sampleTag?: SampleTag | null;
 	id: string;
 	date: string; // YYYY-MM-DD
 	intervalStart: string; // HH:MM
@@ -185,6 +188,14 @@ export type IntervalObservation = {
 	intervalMinutes?: number;
 	capturedAt: string;
 	updatedAt: string;
+};
+
+export type SampleTag = {
+	id: string;
+	name: string;
+	color: string;
+	/** Stable compatibility bucket for existing reports and exports. */
+	kind: IntervalKind;
 };
 
 export type RoutineStep = {

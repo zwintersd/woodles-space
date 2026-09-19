@@ -4,15 +4,13 @@
 	import {
 		INTERVAL_KIND_OPTIONS,
 		buildDayIntervals,
-		currentIntervalStart,
-		kindLabel,
 		timeForMinutes,
 		type DayInterval
 	} from '$lib/instrument';
 	import { thinkingAboutShelf } from '$lib/thinkingAboutShelf.svelte';
 	import { dateKey, dayOfWeekLabel, shortDateLabel, timeToMinutes } from '$lib/utils';
-	import type { IntervalKind } from '$lib/types';
 	import DayPlan from './DayPlan.svelte';
+	import MomentarySample from './MomentarySample.svelte';
 	import CatchUp from './CatchUp.svelte';
 	import Capacity from './Capacity.svelte';
 
@@ -27,14 +25,6 @@
 	} = $props();
 
 	let selectedStart = $state('');
-	let paperEntry = $state(false);
-	let paperDate = $state(dateKey(store.now));
-	let selectedLedgerDate = $state('');
-	let customOpen = $state(false);
-	let customLabel = $state('');
-	let feedback = $state('');
-	let feedbackTimer: ReturnType<typeof setTimeout> | null = null;
-
 	let todayKey = $derived(dateKey(store.now));
 	let dayShape = $derived(store.getDayShape(store.now));
 	let blocks = $derived(store.getBlocksForDate(store.now));
@@ -53,25 +43,10 @@
 	let currentInterval = $derived(
 		todayIntervals.find((row) => row.state === 'current') ?? null
 	);
-	let ledgerDateKey = $derived(paperEntry ? paperDate || todayKey : todayKey);
-	let ledgerDate = $derived(dateFromKey(ledgerDateKey));
-	let ledgerObservations = $derived(store.getObservationsForDate(ledgerDateKey));
-	let ledgerIntervals = $derived(
-		buildDayIntervals(
-			ledgerDate,
-			store.getBlocksForDate(ledgerDate),
-			ledgerObservations,
-			store.settings.wakeAnchor,
-			store.settings.sleepAnchor,
-			store.settings.samplingIntervalMinutes,
-			store.now
-		)
-	);
-	let selectedInterval = $derived(
-		paperEntry
-			? ledgerIntervals.find((row) => row.startTime === selectedStart) ?? null
-			: currentInterval
-	);
+	let ledgerDateKey = $derived(todayKey);
+	let ledgerObservations = $derived(todayObservations);
+	let ledgerIntervals = $derived(todayIntervals);
+	let selectedInterval = $derived(todayIntervals.find(row => row.startTime === selectedStart) ?? currentInterval);
 
 	let tomorrow = $derived.by(() => {
 		const next = new Date(store.now);
@@ -115,29 +90,6 @@
 		void thinkingAboutShelf.refresh();
 	});
 
-	$effect(() => {
-		const liveStart = currentIntervalStart(store.now, store.settings.samplingIntervalMinutes);
-		if (!paperEntry) {
-			selectedStart = currentInterval?.startTime ?? liveStart;
-			selectedLedgerDate = todayKey;
-			return;
-		}
-		if (selectedLedgerDate !== ledgerDateKey) {
-			selectedStart =
-				ledgerDateKey === todayKey
-					? currentInterval?.startTime ?? liveStart
-					: ledgerIntervals[0]?.startTime ?? '';
-			selectedLedgerDate = ledgerDateKey;
-		} else if (!ledgerIntervals.some((row) => row.startTime === selectedStart)) {
-			selectedStart = ledgerIntervals[0]?.startTime ?? '';
-		}
-	});
-
-	function dateFromKey(key: string): Date {
-		const [year, month, day] = key.split('-').map(Number);
-		return new Date(year, month - 1, day, 12);
-	}
-
 	function displayTime(value: string): string {
 		const minutes = timeToMinutes(value);
 		const hour24 = Math.floor(minutes / 60);
@@ -148,48 +100,12 @@
 	}
 
 	function canSelect(row: DayInterval): boolean {
-		return row.state === 'current' || (paperEntry && row.state === 'past');
+		return row.state === 'current' || Boolean(row.observation?.intervalStart === row.startTime && row.observation);
 	}
-
 	function selectRow(row: DayInterval): void {
 		if (!canSelect(row)) return;
 		selectedStart = row.startTime;
-		customOpen = false;
-		customLabel = '';
-	}
-
-	function record(kind: IntervalKind): void {
-		if (!selectedInterval || !canSelect(selectedInterval)) return;
-		// A recalled stretch that merely covers this row is not the row's own
-		// mark — recording here adds a sharper sample inside it, not a correction.
-		const existing =
-			selectedInterval.observation?.intervalStart === selectedInterval.startTime
-				? selectedInterval.observation
-				: null;
-		const label =
-			kind === 'elsewhere' && customLabel.trim()
-				? customLabel.trim()
-				: kindLabel(kind);
-
-		store.observeInterval({
-			date: selectedInterval.date,
-			intervalStart: selectedInterval.startTime,
-			kind,
-			label,
-			source:
-				existing?.source ?? (paperEntry ? 'paper' : 'live')
-		});
-		queueSync();
-
-		feedback = existing
-			? 'Observation updated.'
-			: paperEntry
-				? 'Paper record saved.'
-				: 'Observation saved.';
-		customOpen = false;
-		customLabel = '';
-		if (feedbackTimer) clearTimeout(feedbackTimer);
-		feedbackTimer = setTimeout(() => (feedback = ''), 3200);
+		document.querySelector<HTMLElement>('#moment-entry')?.focus();
 	}
 
 	// After a mark lands, the entries the plan says this block was about. An
@@ -213,14 +129,6 @@
 		if (!selectedInterval) return;
 		store.unlogThinkingAboutSession(entryId, selectedInterval.date);
 		queueSync();
-	}
-
-	function startCustom(): void {
-		customLabel = selectedInterval?.observation?.kind === 'elsewhere' ? selectedInterval.observation.label : '';
-		customOpen = true;
-		requestAnimationFrame(() => {
-			document.querySelector<HTMLInputElement>('#carillon-custom-activity')?.focus();
-		});
 	}
 
 	function printTomorrow(): void {
@@ -257,80 +165,22 @@
 						{/if}
 					</p>
 					<p class="bell-note">
-						{paperEntry ? 'paper transcription · no live bell' : bellStatus}
+						{selectedStart && selectedInterval?.state === 'past' ? 'editing a recorded moment' : bellStatus}
 					</p>
 				</div>
-				<span class="sample-source" class:paper={paperEntry}>
-					{paperEntry ? 'paper entry' : 'momentary sample'}
+				<span class="sample-source">
+					momentary sample
 				</span>
 			</div>
 
-			<div class="sample-mode">
-				<button type="button" aria-pressed={paperEntry} onclick={() => {
-					paperEntry = !paperEntry;
-					if (paperEntry) paperDate = todayKey;
-					customOpen = false;
-					customLabel = '';
-					feedback = '';
-				}}>{paperEntry ? 'Return to now' : 'Enter paper marks'}</button>
-				{#if paperEntry}
-					<label>Sheet date<input type="date" max={todayKey} bind:value={paperDate} onchange={() => { customOpen = false; feedback = ''; }} /></label>
-					<label>Interval<select aria-label="Interval" bind:value={selectedStart} onchange={() => { customOpen = false; customLabel = ''; feedback = ''; }}>
-						{#each ledgerIntervals.filter((row) => row.state !== 'future') as row (row.key)}
-							<option value={row.startTime}>{displayTime(row.startTime)}{row.observation ? ` · ${row.observation.label}` : ''}</option>
-						{/each}
-					</select></label>
-				{/if}
-			</div>
+			{#if selectedStart}<button class="return-now" onclick={() => selectedStart = ''}>Return to now</button>{/if}
 
 			<p class="plan-hint">
 				<span>pile suggested</span>
 				<strong>{selectedInterval?.plannedBlock?.title ?? 'nothing in particular'}</strong>
 			</p>
 
-			<h2>{paperEntry ? 'What was marked here?' : 'What’s happening now?'}</h2>
-			<p class="sampler-sub">
-				{paperEntry
-					? 'Choose the activity marked on your paper sheet.'
-					: 'Choose an activity to record this moment.'}
-			</p>
-
-			<div class="activity-grid" role="group" aria-label="observed activity">
-				{#each INTERVAL_KIND_OPTIONS as option (option.kind)}
-					<button
-						type="button"
-						class="activity-chip"
-						class:selected={selectedInterval?.observation?.kind === option.kind}
-						aria-pressed={selectedInterval?.observation?.kind === option.kind}
-						onclick={() => option.kind === 'elsewhere' ? startCustom() : record(option.kind)}
-						disabled={!selectedInterval || !canSelect(selectedInterval)}
-					>
-						<span class="activity-glyph" aria-hidden="true">{option.glyph}</span>
-						<span>{option.label}</span>
-					</button>
-				{/each}
-			</div>
-
-			{#if customOpen}
-				<form
-					class="custom-activity"
-					onsubmit={(event) => {
-						event.preventDefault();
-						record('elsewhere');
-					}}
-				>
-					<label for="carillon-custom-activity">what is it?</label>
-					<div>
-						<input
-							id="carillon-custom-activity"
-							bind:value={customLabel}
-							placeholder="transition, scrolling, groceries…"
-						/>
-						<button type="submit" disabled={!customLabel.trim()}>record</button>
-						<button type="button" onclick={() => { customOpen = false; customLabel = ''; }}>cancel</button>
-					</div>
-				</form>
-			{/if}
+			<MomentarySample interval={selectedInterval} />
 
 			{#if offerableEntries.length > 0}
 				<div class="sitting-offer" data-testid="sitting-offer">
@@ -358,21 +208,6 @@
 				</div>
 			{/if}
 
-			<div class="sample-footer">
-				<p class="sample-feedback" aria-live="polite">
-					{#if feedback}
-						{feedback}
-					{:else if selectedInterval?.observation}
-						observed as {selectedInterval.observation.label}
-						{#if selectedInterval.continuation} · part of a recalled stretch{:else if selectedInterval.observation.source === 'paper'} · entered from paper{:else if selectedInterval.observation.source === 'recall'} · recalled from memory{/if}
-					{:else}
-						{selectedInterval ? 'Choose an activity above to add a record.' : 'No interval is available. You can enter earlier paper marks or add a recalled activity below.'}
-					{/if}
-				</p>
-				{#if selectedInterval?.observation}
-					<span class="edit-note">tap another answer to correct it</span>
-				{/if}
-			</div>
 		</article>
 		<div class="plan-dock"><DayPlan {onopenpiles} /></div>
 	</div>
@@ -380,12 +215,12 @@
 	<details class="context-details"><summary>Sleep and context</summary><Capacity /></details>
 	<details class="context-details"><summary>Add an earlier activity</summary><CatchUp intervals={todayIntervals} {onopenroutines} {onopensurge} /></details>
 
-	<details class="context-details"><summary>{paperEntry ? `Sheet · ${ledgerDateKey}` : 'Earlier today'} · {ledgerObservations.length} records</summary>
+	<details class="context-details"><summary>Earlier today · {ledgerObservations.length} records</summary>
 	<section class="ledger-card" aria-labelledby="ledger-heading">
 		<header class="ledger-titlebar">
 			<div>
 				<p class="section-kicker">field sheet · {ledgerDateKey}</p>
-				<h2 id="ledger-heading">{paperEntry ? 'Sheet record' : 'Today’s record'}</h2>
+				<h2 id="ledger-heading">Today’s record</h2>
 			</div>
 			<div class="ledger-controls">
 				<span>{ledgerObservations.length} sampled moment{ledgerObservations.length === 1 ? '' : 's'}</span>
@@ -413,8 +248,9 @@
 					<span class="row-plan">{row.plannedBlock?.title ?? 'open'}</span>
 					<span class="row-observed" class:continuation={row.continuation}>
 						{#if row.observation}
-							<i data-kind={row.observation.kind} aria-hidden="true"></i>
+							<i data-kind={row.observation.kind} style:background={row.observation.sampleTag?.color} aria-hidden="true"></i>
 							{row.observation.label}
+							{#if row.observation.sampleTag}<sup>{row.observation.sampleTag.name}</sup>{/if}
 							{#if row.continuation}<sup>same stretch</sup>{:else if row.observation.source === 'paper'}<sup>paper</sup>{:else if row.observation.source === 'recall'}<sup>recalled</sup>{/if}
 						{:else}
 							<span class="hollow">—</span>
@@ -624,10 +460,6 @@
 		text-transform: uppercase;
 	}
 
-	.sample-source.paper {
-		border-style: dashed;
-		color: var(--car-pink-dark);
-	}
 
 	.plan-hint {
 		display: flex;
@@ -648,105 +480,17 @@
 		font-weight: 500;
 	}
 
-	.sampler h2 {
-		max-width: none;
-		margin-top: 0.55rem;
-		font-family: var(--car-display);
-		font-size: clamp(1.6rem, 2.5vw, 2.2rem);
-		font-weight: 500;
-		letter-spacing: -0.045em;
-		line-height: 0.95;
-	}
 
-	.sampler-sub {
-		margin-top: 0.6rem;
-		color: var(--car-ink-soft);
-		font-family: var(--car-body);
-		font-size: 0.78rem;
-	}
 
-	.activity-grid {
-		display: grid;
-		grid-template-columns: repeat(4, minmax(0, 1fr));
-		gap: 0.45rem;
-		margin-top: 1rem;
-	}
 
-	.activity-chip {
-		display: grid;
-		min-height: 4.4rem;
-		place-items: center;
-		gap: 0.2rem;
-		border: 1px solid rgba(68, 54, 91, 0.16);
-		border-radius: 0.75rem;
-		background: rgba(255, 255, 255, 0.45);
-		color: var(--car-ink);
-		font-family: var(--car-mono);
-		font-size: 0.58rem;
-		line-height: 1.2;
-		text-align: center;
-		transition:
-			transform 150ms ease,
-			border-color 150ms ease,
-			background 150ms ease;
-	}
 
-	.activity-chip:hover:not(:disabled),
-	.activity-chip.selected {
-		border-color: var(--car-pink-dark);
-		background: var(--car-pink-wash);
-		transform: translateY(-2px);
-	}
 
-	.activity-chip:disabled {
-		cursor: default;
-		opacity: 0.42;
-	}
 
-	.activity-glyph {
-		color: var(--car-pink-dark);
-		font-family: var(--car-display);
-		font-size: 1.05rem;
-	}
 
-	.custom-activity {
-		margin-top: 0.75rem;
-		border: 1px dashed rgba(68, 54, 91, 0.24);
-		border-radius: 0.75rem;
-		padding: 0.75rem;
-	}
 
-	.custom-activity label {
-		display: block;
-		margin-bottom: 0.35rem;
-		color: var(--car-ink-soft);
-		font-family: var(--car-mono);
-		font-size: 0.58rem;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-	}
 
-	.custom-activity div {
-		display: flex;
-		gap: 0.5rem;
-	}
 
-	.custom-activity input {
-		flex: 1;
-		min-width: 0;
-		border-bottom: 1px solid rgba(68, 54, 91, 0.28);
-		padding: 0.35rem 0.2rem;
-		font-family: var(--car-body);
-	}
 
-	.custom-activity button {
-		border-radius: 999px;
-		background: var(--car-ink);
-		padding: 0.3rem 0.75rem;
-		color: var(--car-paper);
-		font-family: var(--car-mono);
-		font-size: 0.62rem;
-	}
 
 	/* The offer to log a sitting in Thinking About. Deliberately quiet — it is
 	   an aside to the observation, not a second thing to answer. */
@@ -805,27 +549,8 @@
 		color: var(--p-text);
 	}
 
-	.sample-footer {
-		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: 1rem;
-		min-height: 1.35rem;
-		margin-top: 1rem;
-		padding-right: 3rem;
-	}
 
-	.sample-feedback {
-		color: var(--car-pink-dark);
-		font-family: var(--car-mono);
-		font-size: 0.64rem;
-	}
 
-	.edit-note {
-		color: var(--car-ink-soft);
-		font-family: var(--car-mono);
-		font-size: 0.5rem;
-	}
 
 	.ledger-card {
 		overflow: hidden;
@@ -977,13 +702,7 @@
 	}
 
 	@media (max-width: 600px) {
-		.activity-grid {
-			grid-template-columns: repeat(3, minmax(0, 1fr));
-		}
 
-		.activity-chip {
-			min-height: 3.65rem;
-		}
 
 		.ledger-titlebar {
 			align-items: flex-start;
@@ -1014,19 +733,10 @@
 
 	@media (prefers-reduced-motion: reduce) {
 		.pile-pill,
-		.print-action,
-		.activity-chip {
-			transition: none;
-		}
+		.print-action { transition: none; }
 	}
 
 	/* Keep the observation and the editable plan within the same working area. */
-	.sample-mode { display: flex; flex-wrap: wrap; align-items: end; gap: 0.6rem; margin-top: 0.75rem; }
-	.sample-mode button, .sample-mode input, .sample-mode select { min-height: 2rem; max-width: 100%; border: 1px solid #44365b33; border-radius: 0.45rem; padding: 0.35rem 0.5rem; background: #ffffff55; color: var(--car-ink); font: 0.65rem var(--car-mono); }
-	.sample-mode button { cursor: pointer; box-shadow: 0 2px 0 #44365b22; }
-	.sample-mode button[aria-pressed='true'] { background: var(--car-pink-wash); box-shadow: inset 0 1px 3px #44365b22; }
-	.sample-mode label { display: grid; gap: 0.25rem; min-width: 0; font: 0.6rem var(--car-mono); }
-	.sample-mode :focus-visible { outline: 2px solid var(--car-pink-dark); outline-offset: 3px; }
 	.instrument { gap: 0.8rem; }
 	.day-heading { align-items: center; }
 	.instrument-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: start; }
@@ -1036,10 +746,6 @@
 	.plan-dock :global(h2) { font-size: 1.4rem; }
 	.plan-dock :global(.wb-row) { padding: 0.55rem 0; }
 	.plan-dock :global(.wb-notice:empty) { display: none; }
-	.activity-chip { border-bottom-width: 3px; box-shadow: 0 3px 0 rgba(68, 54, 91, 0.18), inset 0 1px 0 #ffffff80; transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease; }
-	.activity-chip:not(:disabled):hover { transform: translateY(-2px); }
-	.activity-chip:not(:disabled):active, .activity-chip.selected { transform: translateY(2px); box-shadow: inset 0 2px 4px #44365b22; }
-	.activity-chip:focus-visible { outline: 2px solid var(--car-pink-dark); outline-offset: 4px; }
 	.sampler { animation: settle-in 280ms ease-out both; }
 	.context-details { border: 1px solid var(--car-line); border-radius: 0.7rem; padding: 0.65rem 0.85rem; }
 	.context-details summary { cursor: pointer; font-size: 0.8rem; }
@@ -1055,8 +761,6 @@
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.sampler { animation: none; }
-		.activity-chip { transition: none; }
-		.activity-chip:not(:disabled):hover, .activity-chip:not(:disabled):active, .activity-chip.selected { transform: none; }
 	}
 
 	@media print {
