@@ -7,6 +7,7 @@ import {
 	axialToOffset,
 	byHexRow,
 	hexCorners,
+	hexNeighbours,
 	hexRound,
 	hexToWorld,
 	offsetToAxial,
@@ -153,5 +154,44 @@ describe('sea level', () => {
 		const drowned = projectHex(0, 0, SEA_LEVEL - 0.4);
 		const risen = projectHex(0, 0, SEA_LEVEL + 0.4);
 		expect(risen.y).toBeLessThan(drowned.y);
+	});
+});
+
+describe('neighbours', () => {
+	it('gives every tile six', () => {
+		expect(hexNeighbours(4, 4)).toHaveLength(6);
+		expect(hexNeighbours(4, 5)).toHaveLength(6);
+	});
+
+	// The thing offset coordinates get wrong if the row parity is ignored: a tile's
+	// diagonals shift by half a tile on alternate rows, so a single table for both
+	// would make some neighbours not actually touch.
+	it('is symmetric — if A touches B, B touches A', () => {
+		for (const row of [3, 4]) {
+			for (const col of [5, 6]) {
+				for (const n of hexNeighbours(col, row)) {
+					const back = hexNeighbours(n.col, n.row);
+					expect(back.some((b) => b.col === col && b.row === row)).toBe(true);
+				}
+			}
+		}
+	});
+
+	it('returns each neighbour once', () => {
+		const keys = hexNeighbours(3, 3).map((n) => `${n.col}:${n.row}`);
+		expect(new Set(keys).size).toBe(6);
+	});
+
+	it('names tiles that are actually adjacent on screen', () => {
+		// every neighbour sits within about one tile's width of the centre
+		const origin = offsetToAxial(6, 6);
+		const here = projectHex(origin.q, origin.r, 0);
+		for (const n of hexNeighbours(6, 6)) {
+			const a = offsetToAxial(n.col, n.row);
+			const there = projectHex(a.q, a.r, 0);
+			expect(Math.hypot(there.x - here.x, (there.y - here.y) / CAMERA_TILT)).toBeLessThan(
+				HEX_SIZE * 2.1
+			);
+		}
 	});
 });
