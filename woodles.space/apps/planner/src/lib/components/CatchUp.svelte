@@ -37,7 +37,7 @@
 	let activeGap = $derived(
 		gaps.find((gap) => gapKey(gap.startTime) === activeGapKey) ?? gaps[0] ?? null
 	);
-	let hollowMinutes = $derived(gaps.reduce((sum, gap) => sum + gap.minutes, 0));
+	let unrecordedMinutes = $derived(gaps.reduce((sum, gap) => sum + gap.minutes, 0));
 
 	// Keep the sketch span inside the active gap as marks land and gaps shrink.
 	$effect(() => {
@@ -58,28 +58,9 @@
 	);
 	let sketchMinutes = $derived(fromTime && toTime ? spanMinutes(fromTime, toTime) : 0);
 
-	let recentCutoff = $derived.by(() => {
-		const cutoff = new Date(store.now);
-		cutoff.setDate(cutoff.getDate() - 14);
-		return dateKey(cutoff);
-	});
-	// Only routines the user actually logs get a nudge — a routine never
-	// practiced in the last two weeks is a choice, not a lapse.
-	let unpracticedRoutines = $derived(
-		store.routines.filter((routine) => {
-			if (routine.archived) return false;
-			const practices = store.routinePractices.filter(
-				(practice) => practice.routineId === routine.id
-			);
-			return (
-				practices.some((practice) => practice.date >= recentCutoff && practice.date < todayKey) &&
-				!practices.some((practice) => practice.date === todayKey)
-			);
-		})
-	);
 	let waitingSurge = $derived(
 		store.surgeDrafts.filter(
-			(draft) => draft.status === 'captured' && draft.createdSessionId !== store.sessionId
+			(draft) => draft.status !== 'discarded' && Boolean(draft.reviewDate && draft.reviewDate <= todayKey)
 		).length
 	);
 
@@ -116,7 +97,7 @@
 		});
 		queueSync();
 
-		say(`${minutesToDisplay(sketchMinutes)} recalled as ${label} · one spore`);
+		say(`${minutesToDisplay(sketchMinutes)} recalled as ${label}`);
 		customOpen = false;
 		customLabel = '';
 	}
@@ -132,11 +113,11 @@
 		if (!activeGap) return;
 		dismissed = [...dismissed, gapKey(activeGap.startTime)];
 		activeGapKey = '';
-		say('left hollow · unobserved is still an honest answer');
+		say('Left unrecorded.');
 	}
 </script>
 
-{#if activeGap || feedback || unpracticedRoutines.length > 0 || waitingSurge > 0}
+{#if activeGap || feedback || waitingSurge > 0}
 	<section class="catch-up" aria-label="catch up on the day">
 		{#if !activeGap && feedback}
 			<p class="caught-up" aria-live="polite">{feedback} · the sheet is caught up</p>
@@ -146,17 +127,16 @@
 				<header class="gap-heading">
 					<div>
 						<p class="gap-kicker">while you were away</p>
-						<h2>Sketch the hollow hours in broad strokes.</h2>
+						<h2>Add an earlier activity.</h2>
 						<p class="gap-sub">
-							{minutesToDisplay(hollowMinutes)} of today went by without a sample. One remembered
-							stretch is one sample — and hollow is also an honest answer.
+							{minutesToDisplay(unrecordedMinutes)} of today has no record. Add a remembered activity or leave it blank.
 						</p>
 					</div>
 					<span class="gap-source">remembered · not a live bell</span>
 				</header>
 
 				{#if gaps.length > 1}
-					<div class="gap-strip" role="group" aria-label="hollow stretches">
+					<div class="gap-strip" role="group" aria-label="unrecorded stretches">
 						{#each gaps as gap (gap.startTime)}
 							<button
 								type="button"
@@ -165,7 +145,7 @@
 								onclick={() => (activeGapKey = gapKey(gap.startTime))}
 							>
 								<strong>{displayTime(gap.startTime)}–{displayTime(gap.endTime)}</strong>
-								<small>{minutesToDisplay(gap.minutes)} hollow</small>
+								<small>{minutesToDisplay(gap.minutes)} unrecorded</small>
 							</button>
 						{/each}
 					</div>
@@ -226,28 +206,23 @@
 
 				<footer class="gap-footer">
 					<p class="gap-feedback" aria-live="polite">
-						{feedback || 'Recalled stretches are marked as memory, never dressed up as live samples.'}
+						{feedback || 'This will be saved as a recalled activity.'}
 					</p>
 					<button type="button" class="hollow-action" onclick={leaveHollow}>
-						leave this stretch hollow
+						leave this stretch unrecorded
 					</button>
 				</footer>
 			</article>
 		{/if}
 
-		{#if unpracticedRoutines.length > 0 || waitingSurge > 0}
-			<div class="nudge-strip" aria-label="waiting for a mark">
-				<span class="nudge-kicker">also waiting</span>
-				{#each unpracticedRoutines as routine (routine.id)}
-					<button type="button" class="nudge-chip" onclick={onopenroutines}>
-						<span aria-hidden="true">↻</span>
-						{routine.name} · unmarked today
-					</button>
-				{/each}
+		{#if waitingSurge > 0}
+			<div class="nudge-strip" aria-label="Ideas to review">
+				<span class="nudge-kicker">Review dates</span>
+
 				{#if waitingSurge > 0}
 					<button type="button" class="nudge-chip" onclick={onopensurge}>
 						<span aria-hidden="true">✴</span>
-						{waitingSurge} surge draft{waitingSurge === 1 ? '' : 's'} ready to review
+						{waitingSurge} idea{waitingSurge === 1 ? '' : 's'} ready to review
 					</button>
 				{/if}
 			</div>

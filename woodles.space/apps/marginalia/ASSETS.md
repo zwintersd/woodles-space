@@ -54,10 +54,9 @@ what's left to draw is **P2/P3 below** — richness on top of the procedural sce
 ## the menagerie — shared creature sprite sheets
 
 **this is live and already wired up** — `worldShape.ts`'s `CREATURE_SPECS` lists two
-entries (`star_drifter`, `spotted_swimmer`) and the in-fiction panel to call them into
-the scene exists (`CreatureCall.svelte`), but the actual sprite sheets aren't in the repo
-yet — the canvas just skips them gracefully until they land, same as any other missing
-diorama asset. this is the pipeline your animator app should target:
+entries (`star_drifter`, `spotted_swimmer`), their sprite sheets are in the repo, and the
+in-fiction panel to call them into the scene exists (`CreatureCall.svelte`). this is the
+pipeline future animator exports should target:
 
 - **grid:** a sprite sheet, cols × rows of equal-size cells, one animation frame each.
   the two references you've shown are 4 cols × 3 rows (12 frames) — that's not a hard
@@ -81,10 +80,10 @@ diorama asset. this is the pipeline your animator app should target:
   [DIORAMA_ROADMAP.md](./DIORAMA_ROADMAP.md) for why, and for the "room to grow later"
   note if that ever changes.
 
-**still needed:** `star-drifter.png` and `spotted-swimmer.png`, matching the reference
-images already shared, at whatever grid/fps you actually rendered them at (update
-`CREATURE_SPECS` in `worldShape.ts` if it doesn't match the 4×3 @ 8/10fps placeholder
-currently there).
+**landed:** `star-drifter.png` and `spotted-swimmer.png`, matching their current 4 × 3
+specifications in `worldShape.ts`. A third automatic resident atlas,
+`creatures/deepwater_fish_swim_sheet.png`, is local to the First Water canvas rather
+than a call-in Menagerie creature.
 
 ---
 

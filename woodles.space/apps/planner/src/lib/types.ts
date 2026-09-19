@@ -1,5 +1,7 @@
 export type Block = {
 	id: string;
+	flexible?: boolean;
+	routineId?: string;
 	startTime: string; // "HH:MM" 24h
 	endTime: string;
 	title: string;
@@ -24,6 +26,8 @@ export type MomentumLevel = 'easy' | 'steady' | 'stretch';
 
 export type DayShape = {
 	id: string;
+	archived?: boolean;
+	deletedAt?: string;
 	name: string;
 	blocks: Block[];
 	restful?: boolean; // hints to UI that this is "off-like" (styling, badges)
@@ -99,6 +103,9 @@ export type Domain = {
 export type DayInstance = {
 	date: string; // YYYY-MM-DD
 	dayShapeId: string;
+	blocks?: Block[];
+	name?: string;
+	note?: string;
 	updatedAt?: string;
 };
 
@@ -187,6 +194,7 @@ export type RoutineStep = {
 
 export type Routine = {
 	id: string;
+	deletedAt?: string;
 	name: string;
 	cue?: string;
 	steps: RoutineStep[];
@@ -199,6 +207,8 @@ export type RoutineStepResult = 'independent' | 'prompted' | 'missed';
 
 export type RoutinePractice = {
 	id: string;
+	routineName?: string;
+	steps?: RoutineStep[];
 	routineId: string;
 	date: string;
 	results: Record<string, RoutineStepResult>;
@@ -212,6 +222,7 @@ export type SurgeDraftStatus = 'captured' | 'promoted' | 'discarded';
 
 export type SurgeDraft = {
 	id: string;
+	reviewDate?: string;
 	title: string;
 	body: string;
 	status: SurgeDraftStatus;

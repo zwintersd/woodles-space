@@ -25,7 +25,7 @@
 	}> = [
 		{ id: 'today', label: 'Today', note: 'observe', key: '1' },
 		{ id: 'piles', label: 'Day piles', note: 'prepare', key: '2' },
-		{ id: 'routines', label: 'Routines', note: 'fade', key: '3' },
+		{ id: 'routines', label: 'Routines', note: 'use & edit', key: '3' },
 		{ id: 'surge', label: 'Surge', note: 'capture', key: '4' },
 		{ id: 'review', label: 'Editions', note: 'review', key: '5' }
 	];
@@ -90,7 +90,7 @@
 {#if !store.settings.onboardingComplete}
 	<Onboarding />
 {:else}
-	<a class="skip-link" href="#carillon-main">skip to instrument</a>
+	<a class="skip-link" href="#carillon-main">skip to content</a>
 
 	<div class="carillon-shell" data-section={section}>
 		<header class="app-header">
@@ -103,7 +103,7 @@
 					</span>
 					<span>
 						<strong>Carillon</strong>
-						<small>self-observation instrument</small>
+						<small>days, routines & ideas</small>
 					</span>
 				</button>
 			</div>
@@ -123,11 +123,6 @@
 			</nav>
 
 			<div class="instrument-status">
-				<div class="spore-readout" aria-label={`${store.sporeEvents.length} Carillon spores`}>
-					<span aria-hidden="true">✦</span>
-					<strong>{store.sporeEvents.length}</strong>
-					<small>spores</small>
-				</div>
 				<button
 					type="button"
 					class="sync-readout"
@@ -158,7 +153,7 @@
 			{:else if section === 'surge'}
 				<SurgeWorkbench />
 			{:else}
-				<EditionReview />
+				<EditionReview onopenpiles={() => setSection('piles')} onopenroutines={() => setSection('routines')} onopensurge={() => setSection('surge')} />
 			{/if}
 		</main>
 
@@ -167,10 +162,10 @@
 				<span>interval</span>
 				<strong>{store.settings.samplingIntervalMinutes} min</strong>
 				<i></i>
-				<span>reinforcement</span>
-				<strong>observation, never compliance</strong>
+				<span>records</span>
+				<strong>editable</strong>
 			</p>
-			<p>local first · passphrase sync to Neon · private by default</p>
+			<p>saved locally · optional passphrase sync</p>
 		</footer>
 
 		<Binder />
@@ -384,34 +379,6 @@
 		gap: 0.75rem;
 	}
 
-	.spore-readout {
-		display: grid;
-		grid-template-columns: auto auto;
-		gap: 0 0.25rem;
-		align-items: center;
-	}
-
-	.spore-readout > span {
-		grid-row: 1 / 3;
-		color: var(--car-pink);
-		font-size: 0.78rem;
-	}
-
-	.spore-readout strong {
-		font-family: var(--car-counter);
-		font-size: 0.98rem;
-		font-weight: 400;
-		line-height: 1;
-	}
-
-	.spore-readout small {
-		color: var(--car-mist);
-		font-family: var(--car-mono);
-		font-size: 0.4rem;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-	}
-
 	.sync-readout {
 		display: flex;
 		align-items: center;
@@ -537,10 +504,7 @@
 			width: min(100% - 1rem, 84rem);
 		}
 
-		.world-link,
-		.spore-readout {
-			display: none;
-		}
+		 .world-link { display:none; }
 
 		.brand small {
 			display: none;

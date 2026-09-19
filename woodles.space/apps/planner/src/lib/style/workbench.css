@@ -1,0 +1,201 @@
+.planner-root .workbench {
+	color: var(--car-cream);
+	font-family: var(--car-body);
+}
+.workbench .wb-heading {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 1rem;
+	margin-bottom: 1.5rem;
+	flex-wrap: wrap;
+}
+.workbench h1,
+.workbench h2,
+.workbench h3 {
+	font-family: var(--car-display);
+	font-weight: 500;
+	margin: 0 0 0.65rem;
+}
+.workbench h1 {
+	font-size: clamp(2rem, 4vw, 3.2rem);
+}
+.workbench h2 {
+	font-size: 1.6rem;
+}
+.workbench p {
+	line-height: 1.6;
+}
+.workbench .wb-kicker {
+	font: 0.7rem var(--car-mono);
+	text-transform: uppercase;
+	letter-spacing: 0.12em;
+	margin: 0 0 0.65rem;
+}
+.workbench .wb-grid {
+	display: grid;
+	grid-template-columns: minmax(180px, 0.7fr) minmax(0, 2fr);
+	gap: 1.4rem;
+	align-items: start;
+}
+.workbench .wb-card {
+	border: 1px solid var(--car-line);
+	border-radius: 18px;
+	background: var(--car-panel);
+	padding: 1.4rem;
+	margin-bottom: 1rem;
+}
+.workbench .wb-paper {
+	background: var(--car-paper);
+	color: var(--car-ink);
+	border-radius: 5px 18px 18px 5px;
+	box-shadow: 0 8px 24px var(--car-shadow);
+}
+.workbench .wb-list {
+	display: grid;
+	gap: 0.65rem;
+}
+.workbench .wb-list > button {
+	text-align: left;
+	padding: 1rem;
+}
+.workbench .wb-list small {
+	display: block;
+	margin-top: 0.4rem;
+}
+.workbench button,
+.workbench .wb-link {
+	cursor: pointer;
+	border: 1px solid var(--car-line);
+	border-radius: 8px;
+	background: var(--car-wash);
+	color: inherit;
+	padding: 0.6rem 0.85rem;
+	font: 0.8rem var(--car-mono);
+	text-decoration: none;
+}
+.workbench button:hover {
+	background: var(--car-pink-wash);
+}
+.workbench button[aria-pressed='true'],
+.workbench .primary {
+	background: var(--car-pink);
+	color: var(--car-surge-ink);
+}
+.workbench button:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+.workbench .wb-paper button {
+	border-color: rgba(64, 50, 71, 0.25);
+}
+.workbench .wb-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.6rem;
+	margin: 0.8rem 0;
+}
+.workbench label {
+	display: grid;
+	gap: 0.4rem;
+	font-size: 0.85rem;
+	margin-bottom: 0.85rem;
+}
+.workbench input:not([type='checkbox']),
+.workbench textarea,
+.workbench select {
+	width: 100%;
+	min-width: 0;
+	box-sizing: border-box;
+	border: 1px solid var(--car-line);
+	border-radius: 7px;
+	padding: 0.65rem;
+	font: inherit;
+	color: inherit;
+	background: var(--car-inset);
+}
+.workbench .wb-paper input,
+.workbench .wb-paper textarea,
+.workbench .wb-paper select {
+	background: rgba(255, 255, 255, 0.65);
+	border-color: rgba(64, 50, 71, 0.25);
+	color: var(--car-ink);
+}
+.workbench textarea {
+	resize: vertical;
+}
+.workbench .wb-row {
+	display: flex;
+	gap: 0.8rem;
+	align-items: start;
+	flex-wrap: wrap;
+	padding: 0.9rem 0;
+	border-bottom: 1px solid var(--car-line);
+}
+.workbench .wb-row > .grow {
+	flex: 1;
+	min-width: 140px;
+}
+.workbench .wb-row label {
+	flex: 1;
+	min-width: 120px;
+}
+.workbench .wb-row .time-field {
+	flex: 0 1 130px;
+}
+.workbench .wb-check {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+}
+.workbench .wb-note {
+	font-size: 0.8rem;
+	opacity: 0.85;
+}
+.workbench .wb-notice {
+	min-height: 1.5em;
+	font-size: 0.85rem;
+}
+.workbench .wb-danger {
+	color: var(--car-pink);
+}
+.workbench .wb-paper .wb-danger {
+	color: var(--car-pink-dark);
+}
+.workbench :focus-visible {
+	outline: 3px solid var(--car-pink-dark);
+	outline-offset: 3px;
+}
+.workbench .wb-strip {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin-bottom: 1rem;
+}
+.workbench table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.85rem;
+}
+.workbench th,
+.workbench td {
+	text-align: left;
+	padding: 0.8rem 0.4rem;
+	border-bottom: 1px solid rgba(64, 50, 71, 0.15);
+	vertical-align: top;
+}
+@media (max-width: 720px) {
+	.workbench .wb-grid {
+		grid-template-columns: 1fr;
+	}
+	.workbench .wb-card {
+		padding: 1rem;
+	}
+	.workbench .wb-list {
+		grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	}
+}
+
+.workbench .wb-paper .wb-card { background: rgba(64,50,71,.035); border-color: rgba(64,50,71,.2); color:var(--car-ink); }
+.workbench .wb-paper .wb-row { border-color: rgba(64,50,71,.15); }

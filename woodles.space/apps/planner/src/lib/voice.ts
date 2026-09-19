@@ -76,10 +76,10 @@ export function shouldShowFlourish(date: Date, blockId: string): boolean {
 // ── Lead-time prompts (5 minutes before block start) ───────────────
 
 const TONE_LEAD: Record<ToneName, string> = {
-	wry: 'Five minutes. The schedule is keeping its end of the bargain.',
-	gentle: 'Five minutes. No rush — just a heads-up.',
+	wry: '{block_title} in five minutes.',
+	gentle: '{block_title} starts in five minutes.',
 	minimal: 'Five minutes.',
-	earnest: 'Five minutes until {block_title}. You’ve got this.'
+	earnest: 'Five minutes until {block_title}, at {start_time}.'
 };
 
 export function getLeadPrompt(tone: ToneName, block: Block | null, date: Date): string {

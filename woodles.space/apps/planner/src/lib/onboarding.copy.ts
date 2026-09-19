@@ -1,7 +1,7 @@
 // ── Carillon onboarding copy ───────────────────────────────────────
 // All user-facing text for the onboarding flow.
 // Edit this file to revise voice without touching component code.
-// Tone reference: "the day has not yet decided what it is".
+// Voice: state the fact, explain the action, avoid interpreting the user.
 
 import type { Block, DayShape, Domain, OnboardingStep } from './types';
 
@@ -17,39 +17,39 @@ export type OnboardingStepCopy = {
 export const STEP_COPY: OnboardingStepCopy[] = [
 	{
 		eyebrow: 'ONE OF SIX',
-		heading: 'When does your day actually start?',
-		subprompt: 'Not the alarm. The moment you stop pretending you might fall back asleep.',
-		cta: 'set the edges →'
+		heading: 'When does your day start and end?',
+		subprompt: 'Set the hours you want to plan and record.',
+		cta: 'Save hours →'
 	},
 	{
 		eyebrow: 'TWO OF SIX',
-		heading: 'What claims you before you’ve decided anything?',
-		subprompt: 'The things already there, waiting — not because you chose them today, but because past you made agreements.',
-		cta: 'noted →'
+		heading: 'What commitments repeat each week?',
+		subprompt: 'Add recurring appointments, work hours, or other fixed commitments.',
+		cta: 'Save commitments →'
 	},
 	{
 		eyebrow: 'THREE OF SIX',
-		heading: 'What do you do on purpose?',
-		subprompt: 'The small repeated things that are yours — not obligations, not crises. Just yours.',
-		cta: 'these stay →'
+		heading: 'What activities repeat each day?',
+		subprompt: 'Add regular activities you want to see on your plan.',
+		cta: 'Save activities →'
 	},
 	{
 		eyebrow: 'FOUR OF SIX',
-		heading: 'What territories does your life move through?',
-		subprompt: 'Pick the ones that actually come up. You can add more whenever the week surprises you.',
-		cta: 'these are the territories →'
+		heading: 'Which categories do you use?',
+		subprompt: 'Choose categories for your tasks. You can change these later.',
+		cta: 'Save categories →'
 	},
 	{
 		eyebrow: 'FIVE OF SIX',
-		heading: 'Does the week have a shape?',
-		subprompt: 'Some days you’re a different person than other days. You can tell Carillon that.',
-		cta: 'roughly this →'
+		heading: 'Choose a default pile for each weekday.',
+		subprompt: 'Start with these templates. Edit their activities in Day piles.',
+		cta: 'Save week →'
 	},
 	{
 		eyebrow: 'SIX OF SIX',
-		heading: 'How should Carillon talk to you?',
-		subprompt: 'You can change this anytime. The planner is not attached to its own personality.',
-		cta: 'begin →'
+		heading: 'Choose a reminder style.',
+		subprompt: 'All styles use direct language. This setting changes the amount of detail.',
+		cta: 'Finish setup →'
 	}
 ];
 
@@ -65,17 +65,17 @@ export const PLACEHOLDERS = {
 // ── Welcome screen ─────────────────────────────────────────────────
 
 export const WELCOME = {
-	heading: 'The week is not yet named.',
-	subheading: 'Carillon will help with that.',
-	cta: 'let’s begin →'
+	heading: 'Set up your week.',
+	subheading: 'Choose your hours, recurring commitments, and day templates.',
+	cta: 'let’s Finish setup →'
 };
 
 // ── Completion screen ──────────────────────────────────────────────
 
 export const COMPLETION = {
-	heading: 'The structure is in place.',
-	body: 'Give the day one real thing to hold, then let the rest stay adjustable.',
-	cta: 'add the first thing →',
+	heading: 'Your week is ready.',
+	body: 'Add a task now, or open Carillon to review your plan.',
+	cta: 'Add a task →',
 	skipCta: 'open carillon'
 };
 
@@ -83,18 +83,18 @@ export const COMPLETION = {
 
 export const EMPTY_STATES = {
 	shapes: {
-		heading: 'No shapes yet.',
-		body: 'A day without a shape is still a day. But it might help to name it.',
+		heading: 'No day piles yet.',
+		body: 'Create a template with activities you want to reuse.',
 		cta: 'add a shape →'
 	},
 	weekPattern: {
 		heading: 'The week is unassigned.',
-		body: 'This is neither good nor bad. It’s just open.',
+		body: 'Choose a default pile for each weekday.',
 		cta: 'assign days →'
 	},
 	today: {
-		heading: 'The day has not yet decided what it is.',
-		body: 'Neither have you. This seems fine.',
+		heading: 'No activities planned.',
+		body: 'Add an activity or choose a day pile.',
 		cta: 'add a block →'
 	}
 };
@@ -117,8 +117,8 @@ export type RefreshSection = {
 export const REFRESH_SECTIONS: RefreshSection[] = [
 	{ step: 1, label: 'day anchors', hint: 'when the day starts and ends' },
 	{ step: 2, label: 'obligations', hint: 'fixed commitments already on the calendar' },
-	{ step: 3, label: 'rituals', hint: 'the small repeated things that are yours' },
-	{ step: 4, label: 'domains', hint: 'the territories your life moves through' },
+	{ step: 3, label: 'rituals', hint: 'activities that repeat daily' },
+	{ step: 4, label: 'domains', hint: 'categories for your tasks' },
 	{ step: 5, label: 'week rhythm', hint: 'which day pile fits which weekday' },
 	{ step: 6, label: 'voice', hint: 'how Carillon talks to you' }
 ];
@@ -135,91 +135,12 @@ export type TonePreset = {
 };
 
 export const TONES: TonePreset[] = [
-	{
-		id: 'wry',
-		name: 'wry',
-		description: 'Dry, world-weary, aware it’s a planner. Observes; doesn’t motivate.',
-		samples: [
-			'The {block_title} is happening. As scheduled. Whether or not you feel ready.',
-			'It is {weekday}. The calendar has opinions. Here they are.',
-			'{block_title} is next. You have done this before and survived, technically.',
-			'The day has, against all odds, continued.',
-			'A {day_shape_name}. You designed this. We’re not here to judge that.'
-		]
-	},
-	{
-		id: 'gentle',
-		name: 'gentle',
-		description: 'Warm, unhurried, treats you like someone doing their best.',
-		samples: [
-			'Here you are at the start of {weekday}. That’s enough for now.',
-			'{block_title} is coming — you don’t have to arrive at it perfectly.',
-			'The {domain_name} things are waiting, without urgency, for whenever you’re ready.',
-			'The day has a shape. You made it. It’s allowed to hold you.',
-			'There’s time. Or there will be. You’ve managed this kind of {weekday} before.'
-		]
-	},
-	{
-		id: 'minimal',
-		name: 'minimal',
-		description: 'No flourish. Just facts. The planner as instrument.',
-		samples: [
-			'{block_title}. {start_time}–{end_time}.',
-			'Next: {block_title}.',
-			'{weekday}. {block_count} blocks.',
-			'{domain_name}: {item_count} pending.',
-			'Updated.'
-		]
-	},
-	{
-		id: 'earnest',
-		name: 'earnest',
-		description: 'Sincere, not ironic. The friend who actually means it.',
-		samples: [
-			'Today includes {block_title}. You’ve been here before. You know how this goes.',
-			'{weekday} is a reasonable day for {domain_name} things. You put it there for a reason.',
-			'You built this schedule. It’s on your side.',
-			'The plan is in place. Now it’s just time doing what time does.',
-			'{block_title}: one of the things you decided matters. That’s why it’s here.'
-		]
-	}
+ { id:'minimal', name:'Brief', description:'Activity and time.', samples:['{block_title}. {start_time}–{end_time}.','Next: {block_title}.','{weekday}. {block_count} activities.'] },
+ { id:'gentle', name:'Standard', description:'A short reminder.', samples:['Coming up: {block_title}, at {start_time}.','Today’s pile: {day_shape_name}.'] },
+ { id:'earnest', name:'Detailed', description:'Activity, timing, and day context.', samples:['{weekday}: {block_title}, {start_time}–{end_time}.','{day_shape_name}: {block_count} activities planned.'] },
+ { id:'wry', name:'Compact', description:'Short schedule labels.', samples:['{start_time} · {block_title}','{day_shape_name} · {weekday}'] }
 ];
-
-// ── Templated flourish fragments (universal pool) ──────────────────
-// Used regardless of tone — the day-cycle's quiet weirdness layer.
-
-export const FLOURISH_FRAGMENTS: string[] = [
-	'The {block_title} is doing what {block_title}s do. This is fine.',
-	'{weekday}. The clock continues to behave as expected.',
-	'You have arrived at {block_title}. Or it has arrived at you. Hard to say.',
-	'{domain_name} is, for once, not pressing.',
-	'It is the hour of {block_title}. The schedule knew before you did.',
-	'The {day_shape_name} is in session. You are a participant.',
-	'{weekday} has committed to being {weekday}. Respect that.',
-	'This portion of the day is called {block_title}. You named it. Good name.',
-	'The {domain_name} territory is on the map. You put it there.',
-	'A {day_shape_name} awaits. It has no feelings about this. You may.',
-	'Something from {domain_name} will make itself known. It usually does.',
-	'Block incoming: {block_title}. The calendar is not nervous. Consider following its lead.',
-	'{weekday} is the shape the week makes right now.',
-	'The {block_title} window is open. What you do with it is between you and the time.',
-	'Today is a {day_shape_name}. This was your call. Carillon supports you.',
-	'You scheduled {block_title}. Past you thought this was a good idea. Future you will have opinions.',
-	'{domain_name} exists. You acknowledged it. That’s already something.',
-	'The day has a shape. Right now the shape includes {block_title}.',
-	'{weekday} again. Still counts.',
-	'The {block_title} block is not here to impress anyone. It is here to be done.',
-	'Here at the edge of {block_title}: what happens next is entirely up to the next version of you.',
-	'{day_shape_name}. The category has been assigned. Proceed accordingly.',
-	'You are somewhere inside {block_title}. This is where you are.',
-	'The {domain_name} items remain. Patient as ever.',
-	'{weekday} is underway. No notes.',
-	'From here: {block_title}. After that, a different part of the same day.',
-	'The {day_shape_name} continues, neither worse nor better than anticipated.',
-	'The clock doesn’t know what {block_title} means. You do. That’s the arrangement.',
-	'{block_count} blocks. One of them is {block_title}. That one’s now.',
-	'At {start_time} the day made a decision. The decision was {block_title}.'
-];
+export const FLOURISH_FRAGMENTS: string[] = ['Next: {block_title}.','Today’s pile: {day_shape_name}.'];
 
 // ── Starter domains (12 chips for step 4) ──────────────────────────
 
@@ -243,48 +164,48 @@ export const STARTER_DOMAINS: Domain[] = [
 // day then begins with high-probability on-ramps before asking for stretch work.
 
 const OFFICE_DAY_BLOCKS: Block[] = [
-	{ id: 'office-morning',  startTime: '07:30', endTime: '08:30', title: 'Morning',     flourishEligible: true, momentum: 'easy', sampleKind: 'care' },
-	{ id: 'office-commute',  startTime: '08:30', endTime: '09:00', title: 'Commute', momentum: 'easy', sampleKind: 'movement' },
-	{ id: 'office-focus-1',  startTime: '09:00', endTime: '12:00', title: 'Clinic', momentum: 'steady', sampleKind: 'clinic' },
-	{ id: 'office-midday',   startTime: '12:00', endTime: '13:00', title: 'Midday',      flourishEligible: true, bellId: 'meal', momentum: 'easy', sampleKind: 'rest' },
-	{ id: 'office-focus-2',  startTime: '13:00', endTime: '17:00', title: 'Clinic', momentum: 'stretch', sampleKind: 'clinic' },
-	{ id: 'office-wind',     startTime: '17:00', endTime: '17:30', title: 'Close notes', momentum: 'steady', sampleKind: 'clinic' },
-	{ id: 'office-commute-h',startTime: '17:30', endTime: '18:00', title: 'Commute home', momentum: 'easy', sampleKind: 'movement' }
+	{ id: 'office-morning',  startTime: '07:30', endTime: '08:30', title: 'Morning',     flourishEligible: true, sampleKind: 'care' },
+	{ id: 'office-commute',  startTime: '08:30', endTime: '09:00', title: 'Commute', sampleKind: 'movement' },
+	{ id: 'office-focus-1',  startTime: '09:00', endTime: '12:00', title: 'Clinic', sampleKind: 'clinic' },
+	{ id: 'office-midday',   startTime: '12:00', endTime: '13:00', title: 'Midday',      flourishEligible: true, bellId: 'meal', sampleKind: 'rest' },
+	{ id: 'office-focus-2',  startTime: '13:00', endTime: '17:00', title: 'Clinic', sampleKind: 'clinic' },
+	{ id: 'office-wind',     startTime: '17:00', endTime: '17:30', title: 'Close notes', sampleKind: 'clinic' },
+	{ id: 'office-commute-h',startTime: '17:30', endTime: '18:00', title: 'Commute home', sampleKind: 'movement' }
 ];
 
 const MAKER_DAY_BLOCKS: Block[] = [
-	{ id: 'maker-morning',   startTime: '08:00', endTime: '09:00', title: 'Open the workshop', flourishEligible: true, momentum: 'easy', sampleKind: 'care' },
-	{ id: 'maker-deep-1',    startTime: '09:00', endTime: '12:30', title: 'Build', flourishEligible: true, momentum: 'stretch', sampleKind: 'build' },
-	{ id: 'maker-break',     startTime: '12:30', endTime: '13:30', title: 'Break', bellId: 'meal', momentum: 'easy', sampleKind: 'rest' },
-	{ id: 'maker-deep-2',    startTime: '13:30', endTime: '16:30', title: 'Build', flourishEligible: true, momentum: 'steady', sampleKind: 'build' },
-	{ id: 'maker-admin',     startTime: '16:30', endTime: '17:30', title: 'Small closures', momentum: 'easy', sampleKind: 'care' },
-	{ id: 'maker-evening',   startTime: '17:30', endTime: '19:00', title: 'Evening', flourishEligible: true, momentum: 'easy', sampleKind: 'rest' }
+	{ id: 'maker-morning',   startTime: '08:00', endTime: '09:00', title: 'Open the workshop', flourishEligible: true, sampleKind: 'care' },
+	{ id: 'maker-deep-1',    startTime: '09:00', endTime: '12:30', title: 'Build', flourishEligible: true, sampleKind: 'build' },
+	{ id: 'maker-break',     startTime: '12:30', endTime: '13:30', title: 'Break', bellId: 'meal', sampleKind: 'rest' },
+	{ id: 'maker-deep-2',    startTime: '13:30', endTime: '16:30', title: 'Build', flourishEligible: true, sampleKind: 'build' },
+	{ id: 'maker-admin',     startTime: '16:30', endTime: '17:30', title: 'Small closures', sampleKind: 'care' },
+	{ id: 'maker-evening',   startTime: '17:30', endTime: '19:00', title: 'Evening', flourishEligible: true, sampleKind: 'rest' }
 ];
 
 const OUT_DAY_BLOCKS: Block[] = [
-	{ id: 'out-morning',     startTime: '08:30', endTime: '09:30', title: 'Pack and leave', flourishEligible: true, momentum: 'easy', sampleKind: 'care' },
-	{ id: 'out-appts',       startTime: '09:30', endTime: '12:00', title: 'Appointments', momentum: 'steady', sampleKind: 'clinic' },
-	{ id: 'out-midday',      startTime: '12:00', endTime: '13:00', title: 'Midday', bellId: 'meal', momentum: 'easy', sampleKind: 'rest' },
-	{ id: 'out-about',       startTime: '13:00', endTime: '16:00', title: 'Out & about', momentum: 'stretch', sampleKind: 'movement' },
-	{ id: 'out-decompress',  startTime: '16:00', endTime: '18:00', title: 'Decompression', flourishEligible: true, momentum: 'easy', sampleKind: 'rest' },
-	{ id: 'out-evening',     startTime: '18:00', endTime: '20:00', title: 'Evening', flourishEligible: true, momentum: 'easy', sampleKind: 'care' }
+	{ id: 'out-morning',     startTime: '08:30', endTime: '09:30', title: 'Pack and leave', flourishEligible: true, sampleKind: 'care' },
+	{ id: 'out-appts',       startTime: '09:30', endTime: '12:00', title: 'Appointments', sampleKind: 'clinic' },
+	{ id: 'out-midday',      startTime: '12:00', endTime: '13:00', title: 'Midday', bellId: 'meal', sampleKind: 'rest' },
+	{ id: 'out-about',       startTime: '13:00', endTime: '16:00', title: 'Out & about', sampleKind: 'movement' },
+	{ id: 'out-decompress',  startTime: '16:00', endTime: '18:00', title: 'Decompression', flourishEligible: true, sampleKind: 'rest' },
+	{ id: 'out-evening',     startTime: '18:00', endTime: '20:00', title: 'Evening', flourishEligible: true, sampleKind: 'care' }
 ];
 
 const RECOVERY_DAY_BLOCKS: Block[] = [
-	{ id: 'rec-slow',        startTime: '09:00', endTime: '10:30', title: 'Slow morning', flourishEligible: true, momentum: 'easy', sampleKind: 'care' },
-	{ id: 'rec-open-1',      startTime: '10:30', endTime: '12:30', title: 'One light thing', flourishEligible: true, momentum: 'easy', sampleKind: 'care' },
-	{ id: 'rec-midday',      startTime: '12:30', endTime: '13:30', title: 'Midday', bellId: 'meal', momentum: 'easy', sampleKind: 'rest' },
-	{ id: 'rec-open-2',      startTime: '13:30', endTime: '17:00', title: 'Open / light things', flourishEligible: true, momentum: 'steady', sampleKind: 'rest' },
-	{ id: 'rec-quiet',       startTime: '17:00', endTime: '20:00', title: 'Quiet evening', flourishEligible: true, bellId: 'wind-down', momentum: 'easy', sampleKind: 'rest' }
+	{ id: 'rec-slow',        startTime: '09:00', endTime: '10:30', title: 'Slow morning', flourishEligible: true, sampleKind: 'care' },
+	{ id: 'rec-open-1',      startTime: '10:30', endTime: '12:30', title: 'One light thing', flourishEligible: true, sampleKind: 'care' },
+	{ id: 'rec-midday',      startTime: '12:30', endTime: '13:30', title: 'Midday', bellId: 'meal', sampleKind: 'rest' },
+	{ id: 'rec-open-2',      startTime: '13:30', endTime: '17:00', title: 'Open / light things', flourishEligible: true, sampleKind: 'rest' },
+	{ id: 'rec-quiet',       startTime: '17:00', endTime: '20:00', title: 'Quiet evening', flourishEligible: true, bellId: 'wind-down', sampleKind: 'rest' }
 ];
 
 const WRITING_DAY_BLOCKS: Block[] = [
-	{ id: 'writing-tea', startTime: '08:00', endTime: '08:30', title: 'Tea + reread', momentum: 'easy', sampleKind: 'care' },
-	{ id: 'writing-notes', startTime: '08:30', endTime: '09:00', title: 'Loose notes', momentum: 'easy', sampleKind: 'writing' },
-	{ id: 'writing-draft', startTime: '09:00', endTime: '12:00', title: 'Draft', momentum: 'stretch', sampleKind: 'writing', flourishEligible: true },
-	{ id: 'writing-walk', startTime: '12:00', endTime: '13:00', title: 'Walk + lunch', momentum: 'easy', sampleKind: 'movement', bellId: 'meal' },
-	{ id: 'writing-return', startTime: '13:00', endTime: '15:00', title: 'Return to the page', momentum: 'steady', sampleKind: 'writing' },
-	{ id: 'writing-close', startTime: '15:00', endTime: '16:00', title: 'Leave a door open', momentum: 'easy', sampleKind: 'care' }
+	{ id: 'writing-tea', startTime: '08:00', endTime: '08:30', title: 'Tea + reread', sampleKind: 'care' },
+	{ id: 'writing-notes', startTime: '08:30', endTime: '09:00', title: 'Loose notes', sampleKind: 'writing' },
+	{ id: 'writing-draft', startTime: '09:00', endTime: '12:00', title: 'Draft', sampleKind: 'writing', flourishEligible: true },
+	{ id: 'writing-walk', startTime: '12:00', endTime: '13:00', title: 'Walk + lunch', sampleKind: 'movement', bellId: 'meal' },
+	{ id: 'writing-return', startTime: '13:00', endTime: '15:00', title: 'Return to the page', sampleKind: 'writing' },
+	{ id: 'writing-close', startTime: '15:00', endTime: '16:00', title: 'Leave a door open', sampleKind: 'care' }
 ];
 
 export const STARTER_OFFICE_DAY: DayShape = {

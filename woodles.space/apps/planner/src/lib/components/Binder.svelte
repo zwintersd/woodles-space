@@ -137,13 +137,13 @@
 			<span class="binder-title">{BINDER_LABELS.shapes}</span>
 		</header>
 		<div class="binder-body">
-			{#if store.dayShapes.length === 0}
+			{#if store.dayShapes.filter(s => !s.deletedAt && !s.archived).length === 0}
 				<div class="binder-empty-block">
 					<p class="binder-empty-heading">{EMPTY_STATES.shapes.heading}</p>
 					<p class="binder-empty-body">{EMPTY_STATES.shapes.body}</p>
 				</div>
 			{:else}
-				{#each store.dayShapes as shape (shape.id)}
+				{#each store.dayShapes.filter(s => !s.deletedAt && !s.archived) as shape (shape.id)}
 					<div class="shape-row">
 						<span class="shape-row-name">{shape.name}</span>
 						<span class="shape-row-meta">
@@ -161,7 +161,7 @@
 			<span class="binder-title">{BINDER_LABELS.weekPattern}</span>
 		</header>
 		<div class="binder-body">
-			{#if store.dayShapes.length === 0}
+			{#if store.dayShapes.filter(s => !s.deletedAt && !s.archived).length === 0}
 				<div class="binder-empty-block">
 					<p class="binder-empty-heading">{EMPTY_STATES.weekPattern.heading}</p>
 					<p class="binder-empty-body">{EMPTY_STATES.weekPattern.body}</p>
@@ -169,7 +169,7 @@
 			{:else}
 				{#each WEEKDAY_ORDER as dow, i}
 					{@const shapeId = store.weekPattern.days[dow]}
-					{@const shape = store.dayShapes.find((s) => s.id === shapeId)}
+					{@const shape = store.dayShapes.find((s) => s.id === shapeId && !s.deletedAt)}
 					<div class="pattern-row">
 						<span class="pattern-dow">{WEEKDAY_LABELS[i]}</span>
 						<span class="pattern-shape">{shape?.name ?? '—'}</span>

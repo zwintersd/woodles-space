@@ -12,7 +12,7 @@
 	import { thinkingAboutShelf } from '$lib/thinkingAboutShelf.svelte';
 	import { dateKey, dayOfWeekLabel, shortDateLabel, timeToMinutes } from '$lib/utils';
 	import type { IntervalKind } from '$lib/types';
-	import EchoCreature from './EchoCreature.svelte';
+	import DayPlan from './DayPlan.svelte';
 	import CatchUp from './CatchUp.svelte';
 	import Capacity from './Capacity.svelte';
 
@@ -182,10 +182,10 @@
 		queueSync();
 
 		feedback = existing
-			? 'sample corrected · same spore, clearer data'
+			? 'Observation updated.'
 			: paperEntry
-				? 'paper mark entered · one spore'
-				: 'observed · one spore';
+				? 'Paper record saved.'
+				: 'Observation saved.';
 		customOpen = false;
 		customLabel = '';
 		if (feedbackTimer) clearTimeout(feedbackTimer);
@@ -232,7 +232,7 @@
 		<div>
 			<p class="section-kicker">observed day · {todayKey}</p>
 			<h1 id="today-heading">{dayOfWeekLabel(store.now)}, {shortDateLabel(store.now)}</h1>
-			<p class="day-thesis">The plan is a hypothesis. The day is data.</p>
+			<p class="day-thesis">Plan the day and record what happens.</p>
 		</div>
 		<div class="day-actions">
 			<button type="button" class="pile-pill" onclick={onopenpiles}>
@@ -246,7 +246,8 @@
 		</div>
 	</header>
 
-	<Capacity {onopenroutines} />
+	<DayPlan {onopenpiles} />
+	<details class="context-details"><summary>Sleep and context</summary><Capacity /></details>
 
 	<div class="instrument-grid">
 		<article class="sampler" data-testid="interval-sampler">
@@ -276,8 +277,8 @@
 			<h2>{paperEntry ? 'What was marked here?' : 'What is happening right now?'}</h2>
 			<p class="sampler-sub">
 				{paperEntry
-					? 'Enter the paper mark without pretending it was sampled live.'
-					: 'Tap what is true. Matching the pile earns nothing extra.'}
+					? 'Choose the activity marked on your paper sheet.'
+					: 'Choose an activity to record this moment.'}
 			</p>
 
 			<div class="activity-grid" role="group" aria-label="observed activity">
@@ -350,7 +351,7 @@
 						observed as {selectedInterval.observation.label}
 						{#if selectedInterval.continuation} · part of a recalled stretch{:else if selectedInterval.observation.source === 'paper'} · entered from paper{:else if selectedInterval.observation.source === 'recall'} · recalled from memory{/if}
 					{:else}
-						An unplanned day is still a day. Start observing.
+						Choose an activity above to add a record.
 					{/if}
 				</p>
 				{#if selectedInterval?.observation}
@@ -359,16 +360,17 @@
 			</div>
 		</article>
 
-		<EchoCreature />
+
 	</div>
 
-	<CatchUp intervals={todayIntervals} {onopenroutines} {onopensurge} />
+	<details class="context-details"><summary>Add an earlier activity</summary><CatchUp intervals={todayIntervals} {onopenroutines} {onopensurge} /></details>
 
+	<details class="context-details"><summary>Earlier today · {ledgerObservations.length} records</summary>
 	<section class="ledger-card" aria-labelledby="ledger-heading">
 		<header class="ledger-titlebar">
 			<div>
 				<p class="section-kicker">field sheet · {ledgerDateKey}</p>
-				<h2 id="ledger-heading">Plan beside observation</h2>
+				<h2 id="ledger-heading">Today’s record</h2>
 			</div>
 			<div class="ledger-controls">
 				<span>{ledgerObservations.length} sampled moment{ledgerObservations.length === 1 ? '' : 's'}</span>
@@ -424,10 +426,10 @@
 			{/each}
 		</div>
 		<p class="ledger-footnote">
-			A hollow interval is unobserved—not failed. Paper marks and recalled stretches are labeled
-			because live samples and remembered marks are different kinds of evidence.
+			Blank intervals have no record. Paper entries and recalled stretches are labeled by source.
 		</p>
 	</section>
+	</details>
 </section>
 
 <!-- This artifact is always ready so the evening ritual is one click. -->
@@ -463,6 +465,8 @@
 </section>
 
 <style>
+	.context-details { margin: 1rem 0; color: var(--car-cream); }
+	.context-details summary { cursor:pointer; padding:.6rem 0; }
 	.instrument {
 		display: grid;
 		gap: 1.2rem;
@@ -560,7 +564,7 @@
 
 	.instrument-grid {
 		display: grid;
-		grid-template-columns: minmax(0, 1.65fr) minmax(15rem, 0.75fr);
+		grid-template-columns: minmax(0, 1fr);
 		gap: 1rem;
 		align-items: stretch;
 	}
