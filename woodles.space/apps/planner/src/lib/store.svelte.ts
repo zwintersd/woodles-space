@@ -19,7 +19,6 @@ import type {
 	RoutineStepResult,
 	SurgeDraft,
 	SporeEvent,
-	MomentumLevel,
 	SleepLog,
 	SleepQuality,
 	SignalEntry,
@@ -72,7 +71,7 @@ function save<T>(key: string, value: T): void {
 }
 
 const DEFAULT_SETTINGS: PlannerSettings = {
-	flourishEnabled: true,
+	flourishEnabled: false,
 	quietHoursStart: '22:00',
 	quietHoursEnd: '07:00',
 	leadTimeMinutes: 5,
@@ -83,7 +82,7 @@ const DEFAULT_SETTINGS: PlannerSettings = {
 	onboardingComplete: false,
 	wakeAnchor: '07:00',
 	sleepAnchor: '22:30',
-	tone: 'gentle'
+	tone: 'minimal'
 };
 
 function migrateCarillonPiles(): DayShape[] {
@@ -102,7 +101,6 @@ function migrateCarillonPiles(): DayShape[] {
 				const starterBlock = starterBlocks.get(block.id);
 				return {
 					...block,
-					momentum: block.momentum ?? starterBlock?.momentum ?? 'steady',
 					sampleKind: block.sampleKind ?? starterBlock?.sampleKind
 				};
 			})
@@ -169,12 +167,15 @@ export class PlannerStore {
 		const overrideId = this.dayOverrides[key]?.dayShapeId;
 		const patternId = this.weekPattern.days[date.getDay()];
 		const id = overrideId ?? patternId;
-		return this.dayShapes.find((s) => s.id === id) ?? this.dayShapes[0] ?? null;
+		const day = this.dayOverrides[key];
+		const shape = this.dayShapes.find((s) => s.id === id && !s.deletedAt) ?? null;
+		if (day?.blocks) return { id, name: day.name ?? shape?.name ?? 'Day plan', blocks: day.blocks };
+		return shape;
 	}
 
 	getBlocksForDate(date: Date = this.now): Block[] {
 		const shape = this.getDayShape(date);
-		const base = shape?.blocks ?? [];
+		const base = (shape?.blocks ?? []).filter((block) => !block.flexible);
 		const weekday = date.getDay();
 
 		const obligationBlocks: Block[] = this.obligations
@@ -234,7 +235,7 @@ export class PlannerStore {
 	getAllBlocks(): Block[] {
 		const seen = new Set<string>();
 		const out: Block[] = [];
-		for (const shape of this.dayShapes) {
+		for (const shape of this.dayShapes.filter((shape) => !shape.deletedAt)) {
 			for (const b of shape.blocks) {
 				if (!seen.has(b.id)) {
 					seen.add(b.id);
@@ -380,7 +381,7 @@ export class PlannerStore {
 	publishCommitmentsLocally(): void {
 		mirrorLedgerLocally(
 			CARILLON_COMMITMENTS_STORAGE_KEY,
-			buildCommitments(this.tasks, this.getAllBlocks())
+			buildCommitments(this.tasks, this.getAllBlocks(), undefined, (date) => this.getBlocksForDateKey(date))
 		);
 	}
 
@@ -517,6 +518,11 @@ export class PlannerStore {
 		intervalMinutes?: number;
 	}): IntervalObservation {
 		const date = input.date ?? dateKey(this.now);
+		if (!this.dayOverrides[date]?.blocks) {
+			const [y, m, d] = date.split('-').map(Number);
+			const shape = this.getDayShape(new Date(y, m - 1, d, 12));
+			this.saveDayPlan(date, shape?.blocks ?? [], shape?.name);
+		}
 		const id = `observation-${intervalKey(date, input.intervalStart)}`;
 		const existing = this.intervalObservations.find((observation) => observation.id === id);
 		const minute = timeToMinutes(input.intervalStart);
@@ -606,6 +612,8 @@ export class PlannerStore {
 		if (!routine) return null;
 		const id = `practice-${routineId}-${date}`;
 		const practice: RoutinePractice = {
+			routineName: routine.name,
+			steps: routine.steps.map((step) => ({ ...step })),
 			id,
 			routineId,
 			date,
@@ -712,8 +720,7 @@ export class PlannerStore {
 		const draft = this.surgeDrafts.find((item) => item.id === id);
 		return Boolean(
 			draft &&
-				draft.status === 'captured' &&
-				draft.createdSessionId !== this.sessionId
+				draft.status === 'captured'
 		);
 	}
 
@@ -775,11 +782,101 @@ export class PlannerStore {
 
 	// ── day-shape actions ───────────────────────────────────────────
 
+	savePile(input: DayShape): boolean {
+		if (!input.name.trim() || input.blocks.some((block) => !block.title.trim() ||
+			(!block.flexible && (!/^\d{2}:\d{2}$/.test(block.startTime) || !/^\d{2}:\d{2}$/.test(block.endTime) || block.endTime <= block.startTime)))) return false;
+		const shape = { ...input, name: input.name.trim(), blocks: input.blocks.map((block) => ({ ...block })), updatedAt: new Date().toISOString() };
+		this.setDayShapes(this.dayShapes.some((item) => item.id === shape.id)
+			? this.dayShapes.map((item) => item.id === shape.id ? shape : item)
+			: [...this.dayShapes, shape]);
+		this.publishCommitmentsLocally();
+		return true;
+	}
+
+	archivePile(id: string, archived = true): void {
+		const shape = this.dayShapes.find((item) => item.id === id);
+		if (shape) this.savePile({ ...shape, archived });
+	}
+
+	deletePile(id: string): void {
+		const shape = this.dayShapes.find((item) => item.id === id);
+		if (!shape) return;
+		// Retain dated plans independently of the template being removed.
+		for (const day of Object.values(this.dayOverrides)) {
+			if (day.dayShapeId === id && !day.blocks) this.saveDayPlan(day.date, shape.blocks, shape.name);
+		}
+		const timestamp = new Date().toISOString();
+		this.setDayShapes(this.dayShapes.map((item) => item.id === id
+			? { ...item, blocks: [], deletedAt: timestamp, updatedAt: timestamp } : item));
+		this.setWeekPattern({ days: this.weekPattern.days.map((value) => value === id ? '' : value) as WeekPattern['days'], updatedAt: timestamp });
+	}
+
+	saveDayPlan(date: string, blocks: Block[], name?: string): void {
+		const [y, m, d] = date.split('-').map(Number);
+		const shape = this.getDayShape(new Date(y, m - 1, d, 12));
+		this.dayOverrides = { ...this.dayOverrides, [date]: {
+			...this.dayOverrides[date], date, dayShapeId: shape?.id ?? '',
+			name: name ?? shape?.name ?? 'Day plan', blocks: blocks.map((block) => ({ ...block })), updatedAt: new Date().toISOString()
+		} };
+		save('planner.days.v2', this.dayOverrides);
+		this.publishCommitmentsLocally();
+	}
+
+	saveDayNote(date: string, note: string): void {
+		const [y, m, d] = date.split('-').map(Number);
+		this.dayOverrides = { ...this.dayOverrides, [date]: {
+			...this.dayOverrides[date], date, dayShapeId: this.dayOverrides[date]?.dayShapeId ?? this.getDayShape(new Date(y, m - 1, d, 12))?.id ?? '', note, updatedAt: new Date().toISOString()
+		} };
+		save('planner.days.v2', this.dayOverrides);
+	}
+
+	updateRoutine(id: string, patch: Partial<Routine>): void {
+		const original = this.routines.find((item) => item.id === id);
+		if (!original) return;
+		// Upgrade legacy practices before replacing labels or removing the analysis.
+		this.routinePractices = this.routinePractices.map((practice) => practice.routineId === id && !practice.steps
+			? { ...practice, routineName: original.name, steps: original.steps.map((step) => ({ ...step })) } : practice);
+		save('planner.routinePractices.v1', this.routinePractices);
+		this.routines = this.routines.map((item) => item.id === id
+			? { ...item, ...patch, id, updatedAt: new Date().toISOString() } : item);
+		save('planner.routines.v1', this.routines);
+	}
+
+	deleteRoutine(id: string): void {
+		this.updateRoutine(id, { deletedAt: new Date().toISOString(), archived: true, steps: [] });
+	}
+
+	updateSurgeDraft(id: string, patch: Pick<SurgeDraft, 'title' | 'body' | 'reviewDate'>): void {
+		if (!patch.title.trim()) return;
+		this.surgeDrafts = this.surgeDrafts.map((draft) => draft.id === id
+			? { ...draft, ...patch, title: patch.title.trim(), updatedAt: new Date().toISOString() } : draft);
+		save('planner.surgeDrafts.v1', this.surgeDrafts);
+	}
+
+	extractSurgeTasks(id: string, titles: string[], targetDate?: string): Task[] {
+		const draft = this.surgeDrafts.find((item) => item.id === id && item.status !== 'discarded');
+		if (!draft) return [];
+		const timestamp = new Date().toISOString();
+		const tasks = titles.map((title) => title.trim()).filter(Boolean).map((title): Task => ({
+			id: uid(), title, status: 'open', targetDate,
+			notes: `From idea: ${draft.title}\n\n${draft.body}`, createdAt: timestamp, updatedAt: timestamp
+		}));
+		if (!tasks.length) return [];
+		this.tasks = [...this.tasks, ...tasks];
+		this.surgeDrafts = this.surgeDrafts.map((item) => item.id === id ? {
+			...item, status: 'promoted', promotedAt: timestamp, updatedAt: timestamp,
+			promotedTaskIds: [...(item.promotedTaskIds ?? []), ...tasks.map((task) => task.id)]
+		} : item);
+		this.#saveTasks();
+		save('planner.surgeDrafts.v1', this.surgeDrafts);
+		return tasks;
+	}
+
 	setDayShape(date: Date, dayShapeId: string): void {
 		const key = dateKey(date);
 		this.dayOverrides = {
 			...this.dayOverrides,
-			[key]: { date: key, dayShapeId, updatedAt: new Date().toISOString() }
+			[key]: { ...this.dayOverrides[key], date: key, dayShapeId, blocks: undefined, name: undefined, updatedAt: new Date().toISOString() }
 		};
 		save('planner.days.v2', this.dayOverrides);
 	}
@@ -794,53 +891,11 @@ export class PlannerStore {
 	cycleDayShape(date: Date): void {
 		if (this.dayShapes.length === 0) return;
 		const current = this.getDayShape(date);
-		const idx = current ? this.dayShapes.findIndex((s) => s.id === current.id) : -1;
-		const next = this.dayShapes[(idx + 1) % this.dayShapes.length];
+		const active = this.dayShapes.filter(s => !s.archived && !s.deletedAt);
+		if (!active.length) return;
+		const idx = current ? active.findIndex((s) => s.id === current.id) : -1;
+		const next = active[(idx + 1) % active.length];
 		this.setDayShape(date, next.id);
-	}
-
-	updateBlockMomentum(
-		dayShapeId: string,
-		blockId: string,
-		momentum: MomentumLevel
-	): void {
-		this.dayShapes = this.dayShapes.map((shape) =>
-			shape.id === dayShapeId
-				? {
-						...shape,
-						updatedAt: new Date().toISOString(),
-						blocks: shape.blocks.map((block) =>
-							block.id === blockId ? { ...block, momentum } : block
-						)
-					}
-				: shape
-		);
-		save('planner.shapes.v1', this.dayShapes);
-	}
-
-	/**
-	 * Put high-probability blocks first while preserving the pile's authored
-	 * time slots. Fixed obligations are overlays, so they are never reordered.
-	 */
-	sequenceDayPile(dayShapeId: string): void {
-		const rank: Record<MomentumLevel, number> = { easy: 0, steady: 1, stretch: 2 };
-		this.dayShapes = this.dayShapes.map((shape) => {
-			if (shape.id !== dayShapeId) return shape;
-			const slots = [...shape.blocks].sort((a, b) => a.startTime.localeCompare(b.startTime));
-			const sequenced = [...shape.blocks].sort(
-				(a, b) => rank[a.momentum ?? 'steady'] - rank[b.momentum ?? 'steady']
-			);
-			return {
-				...shape,
-				updatedAt: new Date().toISOString(),
-				blocks: sequenced.map((block, index) => ({
-					...block,
-					startTime: slots[index]?.startTime ?? block.startTime,
-					endTime: slots[index]?.endTime ?? block.endTime
-				}))
-			};
-		});
-		save('planner.shapes.v1', this.dayShapes);
 	}
 
 	// ── obligation / ritual actions ────────────────────────────────

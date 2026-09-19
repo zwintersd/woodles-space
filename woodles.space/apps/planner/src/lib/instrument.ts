@@ -16,7 +16,7 @@ export const INTERVAL_KIND_OPTIONS: ReadonlyArray<{
 	shortLabel: string;
 	glyph: string;
 	stat: string;
-	/** The part of Echo's portrait this kind grows (EchoCreature.svelte). */
+	/** The part of Echo's portrait this kind grows. */
 	echoPart: string;
 }> = [
 	// prettier-ignore-start

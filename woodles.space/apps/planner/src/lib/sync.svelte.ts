@@ -49,7 +49,15 @@ function latestObservation(
 }
 
 function latestPractice(local: RoutinePractice, remote: RoutinePractice): RoutinePractice {
-	return local.recordedAt > remote.recordedAt ? local : remote;
+	const winner = local.recordedAt > remote.recordedAt ? local : remote;
+	return { ...winner, steps: winner.steps ?? local.steps ?? remote.steps, routineName: winner.routineName ?? local.routineName ?? remote.routineName };
+}
+
+// Deletion is final even if a device edits an older copy while offline.
+function latestLifecycle<T extends { updatedAt?: string; deletedAt?: string }>(local: T, remote: T): T {
+	if (local.deletedAt && !remote.deletedAt) return local;
+	if (remote.deletedAt && !local.deletedAt) return remote;
+	return latestMutable(local, remote);
 }
 
 function latestMutable<T extends { updatedAt?: string; createdAt?: string }>(
@@ -113,7 +121,7 @@ export function mergePlannerBlobs(local: PlannerBlob, remote: PlannerBlob): Plan
 	);
 
 	return {
-		shapes: mergeById(local.shapes, remote.shapes, latestMutable),
+		shapes: mergeById(local.shapes, remote.shapes, latestLifecycle),
 		weekPattern: latestMutable(local.weekPattern, remote.weekPattern),
 		days: mergeDayInstances(local.days, remote.days),
 		obligations: mergeById(local.obligations, remote.obligations),
@@ -122,7 +130,7 @@ export function mergePlannerBlobs(local: PlannerBlob, remote: PlannerBlob): Plan
 		settings: { ...local.settings, ...remote.settings },
 		domains: mergeById(local.domains, remote.domains),
 		observations,
-		routines: mergeById(local.routines ?? [], remote.routines ?? [], latestMutable),
+		routines: mergeById(local.routines ?? [], remote.routines ?? [], latestLifecycle),
 		routinePractices: mergeById(
 			local.routinePractices ?? [],
 			remote.routinePractices ?? [],
@@ -156,7 +164,7 @@ const commitmentsPublisher = createLedgerPublisher<CarillonCommitmentsBlob>({
  * depend on this succeeding.
  */
 export async function publishCommitments(): Promise<void> {
-	await commitmentsPublisher.publish(buildCommitments(store.tasks, store.getAllBlocks()));
+	await commitmentsPublisher.publish(buildCommitments(store.tasks, store.getAllBlocks(), undefined, (date) => store.getBlocksForDateKey(date)));
 }
 
 const sessionsPublisher = createLedgerPublisher<CarillonSessionsBlob>({

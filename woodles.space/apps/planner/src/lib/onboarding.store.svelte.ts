@@ -181,7 +181,7 @@ export class OnboardingStore {
 			Array.isArray(this.planner.weekPattern?.days) &&
 			this.planner.weekPattern.days.length === 7 &&
 			this.planner.weekPattern.days.every((id) =>
-				this.planner.dayShapes.some((shape) => shape.id === id)
+				id === '' || this.planner.dayShapes.some((shape) => shape.id === id && !shape.deletedAt)
 			);
 		if (!hasUsableWeekPattern) {
 			this.planner.setWeekPattern(defaultPattern);

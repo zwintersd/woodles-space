@@ -51,10 +51,10 @@ describe('PlannerStore', () => {
 		});
 
 		it('starts with default settings', () => {
-			expect(store.settings.flourishEnabled).toBe(true);
+			expect(store.settings.flourishEnabled).toBe(false);
 			expect(store.settings.bellsEnabled).toBe(true);
 			expect(store.settings.dayCycleEnabled).toBe(true);
-			expect(store.settings.tone).toBe('gentle');
+			expect(store.settings.tone).toBe('minimal');
 			expect(store.settings.onboardingComplete).toBe(false);
 		});
 
@@ -316,10 +316,10 @@ describe('PlannerStore', () => {
 			expect(shape?.id).toBe(store.dayShapes.find((s) => s.id === store.weekPattern.days[6])?.id);
 		});
 
-		it('falls back to first shape if pattern is broken', () => {
+		it('leaves the day unassigned if its template is missing', () => {
 			store.weekPattern = { days: ['nonexistent', 'nonexistent', 'nonexistent', 'nonexistent', 'nonexistent', 'nonexistent', 'nonexistent'] };
 			const shape = store.getDayShape();
-			expect(shape?.id).toBe(store.dayShapes[0]?.id);
+			expect(shape).toBeNull();
 		});
 
 		it('returns null if no shapes exist', () => {

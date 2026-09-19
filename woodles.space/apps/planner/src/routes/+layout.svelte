@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '$lib/style/tokens.css';
+	import '$lib/style/workbench.css';
 	import { store } from '$lib/store.svelte';
 	import {
 		getPaletteForTime,

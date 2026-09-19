@@ -208,12 +208,12 @@ describe('Carillon instrument persistence', () => {
 	});
 });
 
-describe('Surge draft session gate', () => {
+describe('Surge explicit review', () => {
 	beforeEach(() => {
 		localStorage.clear();
 	});
 
-	it('blocks same-session promotion and allows review in a later session', () => {
+	it('keeps capture unscheduled and permits explicit review immediately', () => {
 		const captureSession = new PlannerStore();
 		const draft = captureSession.addSurgeDraft(
 			'restructure every project',
@@ -221,8 +221,7 @@ describe('Surge draft session gate', () => {
 		);
 
 		expect(draft).not.toBeNull();
-		expect(captureSession.canPromoteSurgeDraft(draft!.id)).toBe(false);
-		expect(captureSession.promoteSurgeDraft(draft!.id)).toBeNull();
+		expect(captureSession.canPromoteSurgeDraft(draft!.id)).toBe(true);
 		expect(captureSession.tasks).toHaveLength(0);
 
 		const reviewSession = new PlannerStore();
@@ -267,7 +266,7 @@ describe('Surge draft session gate', () => {
 			status: 'captured',
 			discardedAt: undefined
 		});
-		expect(reloaded.canPromoteSurgeDraft(draft!.id)).toBe(false);
+		expect(reloaded.canPromoteSurgeDraft(draft!.id)).toBe(true);
 		expect(reloaded.tasks).toHaveLength(0);
 	});
 });

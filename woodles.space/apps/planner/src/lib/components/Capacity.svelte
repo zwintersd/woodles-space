@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { store } from '$lib/store.svelte';
 	import { queueSync } from '$lib/sync.svelte';
-	import { capacityNudges, capacityRead, type CapacityLevel } from '$lib/capacity';
 	import {
 		SIGNAL_KIND_OPTIONS,
 		activeCustomSignals,
@@ -14,21 +13,10 @@
 	import { dateKey } from '$lib/utils';
 	import type { SignalKind, SleepQuality } from '$lib/types';
 
-	let { onopenroutines }: { onopenroutines?: () => void } = $props();
 
 	let todayKey = $derived(dateKey(store.now));
 	let sleep = $derived(store.getSleepLog(todayKey));
 	let editingSleep = $state(false);
-
-	let capacity = $derived(
-		capacityRead({
-			today: todayKey,
-			routinePractices: store.routinePractices,
-			sleep,
-			signals: store.signalEntries
-		})
-	);
-	let nudges = $derived(capacityNudges(capacity.level));
 
 	let cycle = $derived(cycleRead(store.signalEntries, todayKey));
 	let payday = $derived(paydayRead(store.signalEntries, todayKey));
@@ -56,27 +44,10 @@
 		feedbackTimer = setTimeout(() => (feedback = ''), 4000);
 	}
 
-	function levelHeadline(level: CapacityLevel): string {
-		if (level === 'open') return 'There’s room to spare today.';
-		if (level === 'low') return 'Today’s looking lighter.';
-		return 'A steady, ordinary day.';
-	}
-
-	function levelCopy(level: CapacityLevel): string {
-		if (level === 'open') return 'open';
-		if (level === 'low') return 'low';
-		return 'steady';
-	}
-
 	function logSleep(quality: SleepQuality): void {
 		store.recordSleep(quality, todayKey);
 		queueSync();
 		editingSleep = false;
-	}
-
-	function runNudge(action: 'compose' | 'none'): void {
-		if (action !== 'compose') return;
-		store.startCompose({ targetDate: todayKey });
 	}
 
 	function openLogForm(kind?: SignalKind): void {
@@ -118,15 +89,8 @@
 	}
 </script>
 
-<section class="capacity" aria-label="today's capacity" data-testid="capacity-card">
-	<header class="cap-heading">
-		<div>
-			<p class="cap-kicker">reading the morning</p>
-			<h2>{levelHeadline(capacity.level)}</h2>
-		</div>
-		<span class="cap-level" data-level={capacity.level}>{levelCopy(capacity.level)}</span>
-	</header>
-
+<section class="capacity" aria-label="Sleep and context" data-testid="context-card">
+<header class="cap-heading"><h2>Sleep and context</h2></header>
 	<div class="sleep-row">
 		{#if sleep && !editingSleep}
 			<button type="button" class="sleep-said" onclick={() => (editingSleep = true)}>
@@ -145,33 +109,6 @@
 			</div>
 		{/if}
 	</div>
-
-	{#if capacity.reasons.length > 0}
-		<ul class="cap-reasons" aria-label="why">
-			{#each capacity.reasons as reason (reason.label)}
-				<li class={`reason-${reason.direction}`}>{reason.label}</li>
-			{/each}
-		</ul>
-	{/if}
-
-	{#if nudges.length > 0}
-		<div class="cap-nudges" role="group" aria-label="worth considering">
-			{#each nudges as nudge (nudge.id)}
-				{#if nudge.action === 'compose'}
-					<button type="button" class="nudge-chip" onclick={() => runNudge(nudge.action)}>
-						{nudge.message}
-					</button>
-				{:else}
-					<p class="nudge-note">{nudge.message}</p>
-				{/if}
-			{/each}
-			{#if onopenroutines && capacity.level === 'low'}
-				<button type="button" class="nudge-chip quiet" onclick={onopenroutines}>
-					see this morning’s routine steps
-				</button>
-			{/if}
-		</div>
-	{/if}
 
 	<div class="ongoing">
 		{#if hasOngoing}
@@ -281,15 +218,6 @@
 		gap: 1rem;
 	}
 
-	.cap-kicker {
-		color: var(--car-pink-dark);
-		font-family: var(--car-mono);
-		font-size: 0.61rem;
-		font-weight: 500;
-		letter-spacing: 0.18em;
-		text-transform: uppercase;
-	}
-
 	.cap-heading h2 {
 		margin-top: 0.35rem;
 		font-family: var(--car-display);
@@ -297,29 +225,6 @@
 		font-weight: 500;
 		letter-spacing: -0.03em;
 		line-height: 1.05;
-	}
-
-	.cap-level {
-		flex-shrink: 0;
-		border: 1px dashed rgba(68, 54, 91, 0.28);
-		border-radius: 999px;
-		padding: 0.3rem 0.7rem;
-		color: var(--car-pink-dark);
-		font-family: var(--car-mono);
-		font-size: 0.58rem;
-		letter-spacing: 0.12em;
-		text-transform: uppercase;
-	}
-
-	.cap-level[data-level='open'] {
-		border-style: solid;
-		border-color: var(--car-sage);
-		color: var(--car-sage);
-	}
-
-	.cap-level[data-level='low'] {
-		border-style: solid;
-		border-color: var(--car-pink-dark);
 	}
 
 	.sleep-row {
@@ -380,78 +285,6 @@
 	.sleep-chips button:hover {
 		border-color: var(--car-pink-dark);
 		background: var(--car-pink-wash);
-	}
-
-	.cap-reasons {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.4rem;
-		list-style: none;
-	}
-
-	.cap-reasons li {
-		border-radius: 999px;
-		padding: 0.28rem 0.6rem;
-		font-family: var(--car-mono);
-		font-size: 0.58rem;
-		letter-spacing: 0.02em;
-	}
-
-	.cap-reasons li.reason-up {
-		background: rgba(113, 207, 184, 0.16);
-		color: #2c6f5f;
-	}
-
-	.cap-reasons li.reason-down {
-		background: var(--car-pink-wash);
-		color: var(--car-pink-dark);
-	}
-
-	.cap-reasons li.reason-neutral {
-		border: 1px dashed rgba(68, 54, 91, 0.24);
-		color: var(--car-ink-soft);
-	}
-
-	.cap-nudges {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.nudge-chip {
-		border: 1px solid var(--car-pink-dark);
-		border-radius: 999px;
-		padding: 0.4rem 0.75rem;
-		color: var(--car-pink-dark);
-		font-family: var(--car-body);
-		font-size: 0.72rem;
-		transition:
-			background 150ms ease,
-			color 150ms ease;
-	}
-
-	.nudge-chip:hover {
-		background: var(--car-pink-dark);
-		color: var(--car-paper);
-	}
-
-	.nudge-chip.quiet {
-		border-color: rgba(68, 54, 91, 0.2);
-		color: var(--car-ink-soft);
-	}
-
-	.nudge-chip.quiet:hover {
-		background: transparent;
-		border-color: var(--car-pink-dark);
-		color: var(--car-pink-dark);
-	}
-
-	.nudge-note {
-		color: var(--car-ink-soft);
-		font-family: var(--car-body);
-		font-size: 0.75rem;
-		font-style: italic;
 	}
 
 	.ongoing {
@@ -599,9 +432,6 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.sleep-chips button,
-		.nudge-chip {
-			transition: none;
-		}
+		 .sleep-chips button { transition: none; }
 	}
 </style>
