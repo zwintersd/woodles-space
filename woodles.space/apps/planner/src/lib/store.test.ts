@@ -36,6 +36,18 @@ describe('PlannerStore', () => {
 	});
 
 	// ── initialization ────────────────────────────────────────────────
+	it('persists open sample text and label snapshots independently of editable options', () => {
+		const tag = { id: 'outdoors', name: 'Outside', color: '#338866', kind: 'elsewhere' as const };
+		store.updateSettings({ sampleTags: [tag] });
+		store.observeInterval({ date: '2026-09-19', intervalStart: '12:00', kind: 'elsewhere', label: 'Reading in the garden', sampleTag: tag });
+		store.updateSettings({ sampleTags: [{ ...tag, name: 'Garden', color: '#885533' }] });
+		const restored = new PlannerStore();
+		expect(restored.settings.sampleTags?.[0].name).toBe('Garden');
+		expect(restored.getObservation('2026-09-19', '12:00')).toMatchObject({ label: 'Reading in the garden', sampleTag: tag });
+		restored.observeInterval({ date: '2026-09-19', intervalStart: '12:00', kind: 'elsewhere', label: 'Still reading', sampleTag: null });
+		expect(new PlannerStore().getObservation('2026-09-19', '12:00')).toMatchObject({ label: 'Still reading', sampleTag: null });
+		expect(restored.getObservationsForDate('2026-09-19')).toHaveLength(1);
+	});
 
 	describe('initialization', () => {
 		it('loads default shapes from STARTER_SHAPES', () => {
