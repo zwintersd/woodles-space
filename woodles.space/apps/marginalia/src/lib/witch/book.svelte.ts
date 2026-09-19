@@ -33,6 +33,8 @@ import {
 	type WorldCreature
 } from './bestiaryDb';
 import { announceGain } from './resourceGains.svelte';
+import { achievementById } from './content/achievements';
+import { announceAchievement } from './achievementToasts.svelte';
 import {
 	World,
 	createWorldState,
@@ -249,6 +251,7 @@ export class Book {
 	}
 
 	journalShown = $state<string[]>([]);
+	achievementsUnlocked = $state<string[]>([]);
 	worldIndex = $state(0);
 	bookOpen = $state(false);
 	worldShape = $state<WorldShape>(emptyWorldShape());
@@ -499,8 +502,18 @@ export class Book {
 					if (!this.suppressGainAnnouncements) announceGain('insight', e.amount, 'trickle');
 					break;
 				case 'stage':
+					if (e.note) this.pushFieldNote(e.note);
+					if (e.stage === STAGE_OBSERVED) this.unlockAchievement('noticed');
+					if (e.stage === STAGE_KNOWN) this.unlockAchievement('known');
+					break;
 				case 'mastery':
+					if (e.note) this.pushFieldNote(e.note);
+					this.unlockAchievement(`mastery-${e.category}`);
+					break;
 				case 'equilibrium':
+					if (e.note) this.pushFieldNote(e.note);
+					this.unlockAchievement('held-itself');
+					break;
 				case 'quiet':
 					if (e.note) this.pushFieldNote(e.note);
 					break;
@@ -520,6 +533,22 @@ export class Book {
 			text
 		};
 		this.fieldNotes = [note, ...this.fieldNotes].slice(0, FIELD_NOTES_MAX);
+	}
+
+	// ── achievements: first-time-only, never revoked ─────────────────────────
+	// see content/achievements.ts for why each one exists. Self-contained
+	// (persists itself, like dismissJournal) since it's called from several
+	// unrelated places — book methods that already persist, and absorb(),
+	// which is also reached from the idle tick and offline replay, neither of
+	// which does.
+
+	private unlockAchievement(id: string) {
+		if (this.achievementsUnlocked.includes(id)) return;
+		const achievement = achievementById(id);
+		if (!achievement) return;
+		this.achievementsUnlocked = [...this.achievementsUnlocked, id];
+		announceAchievement(achievement);
+		this.persist();
 	}
 
 	// ── the Book ─────────────────────────────────────────────────────────────
@@ -542,6 +571,7 @@ export class Book {
 
 	writeCondition(id: string) {
 		if (!this.world.writeCondition(id)) return;
+		this.unlockAchievement('first-written');
 		this.touch();
 		this.persist();
 	}
@@ -558,6 +588,7 @@ export class Book {
 
 	attend(lifeId: string) {
 		if (!this.world.attend(lifeId)) return;
+		this.unlockAchievement('first-attended');
 		this.touch();
 		this.persist();
 	}
@@ -616,6 +647,7 @@ export class Book {
 		const events = this.world.intervene(lifeId);
 		if (!events.length) return;
 		this.absorb(events);
+		this.unlockAchievement('light-touch');
 		this.touch();
 		this.persist();
 	}
@@ -636,6 +668,7 @@ export class Book {
 		const events = this.world.distillEssence();
 		if (!events.length) return;
 		this.absorb(events);
+		this.unlockAchievement('distilled');
 		this.touch();
 		this.persist();
 	}
@@ -746,6 +779,7 @@ export class Book {
 		if (next === this.worldShape) return false;
 		this.insight -= cost;
 		this.worldShape = next;
+		this.unlockAchievement('marked');
 		this.persist();
 		return true;
 	}
@@ -863,6 +897,7 @@ export class Book {
 			writtenConditions: [...w.writtenConditions],
 			observation: { ...w.observation },
 			journalShown: this.journalShown,
+			achievementsUnlocked: this.achievementsUnlocked,
 			worldIndex: this.worldIndex,
 			bookOpen: this.bookOpen,
 			worldShape: normalizeWorldShape(this.worldShape),
@@ -910,6 +945,7 @@ export class Book {
 		this.world.replace(state);
 
 		this.journalShown = [...s.journalShown];
+		this.achievementsUnlocked = [...(s.achievementsUnlocked ?? [])];
 		this.worldIndex = s.worldIndex;
 		this.bookOpen = s.bookOpen;
 		this.worldShape = shape;

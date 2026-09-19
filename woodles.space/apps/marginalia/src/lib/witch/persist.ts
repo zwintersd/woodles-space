@@ -47,6 +47,9 @@ export interface BookSave {
 	writtenConditions: string[];
 	observation: Record<string, number>;
 	journalShown: string[];
+	// lifetime, first-time-only achievement ids — see content/achievements.ts.
+	// never revoked; reset alongside everything else on resetIdleProgress().
+	achievementsUnlocked: string[];
 	worldIndex: number;
 	bookOpen: boolean;
 	// world-shaping — sediment, worldspaces, and feature-card placements
@@ -100,6 +103,7 @@ export function emptySave(): BookSave {
 		writtenConditions: [],
 		observation: {},
 		journalShown: [],
+		achievementsUnlocked: [],
 		worldIndex: 0,
 		bookOpen: false,
 		worldShape: emptyWorldShape(),

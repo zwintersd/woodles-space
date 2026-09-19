@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 import type { Life } from './content/life';
 import { STAGE_SECONDS, ATTENTION_START, ATTENTION_COSTS } from './tuning';
 import { visibleLifeForWorldspace } from './worldShape';
+import { conditions } from './content/conditions';
 import {
 	Book,
 	fmt,
@@ -211,5 +212,117 @@ describe('Book — it instantiates, and it is a view over a plain world', () => 
 		b.world.tick(10);
 		// the Book sees it, because there is only one copy of the state
 		expect(b.study['salt_deposit']).toBeGreaterThan(0);
+	});
+});
+
+// Advance in fixed 100ms steps, the way a real tick loop does — same shape as
+// characterization.test.ts's own `run`, kept local rather than shared since
+// each test file's helpers are meant to be read next to what they drive.
+function run(b: Book, seconds: number) {
+	const steps = Math.round(seconds * 10);
+	for (let i = 0; i < steps; i++) b.tick(0.1);
+}
+
+describe('Book — achievements', () => {
+	// each achievement id is a first-time-only beat (content/achievements.ts).
+	// The three not covered here — held-itself and the terrestrial/atmospheric
+	// mastery ids — dispatch through the exact same absorb() switch arms as
+	// known/mastery-aquatic below, one line apiece; reaching them for real
+	// needs a multi-hour run in the shallows (self-balancing is designed to be
+	// unreachable in the opening water world — WORLDS.md §1.4), which
+	// sim.test.ts already exists to cover at the mechanic level. Re-simulating
+	// that here would test the same wiring at a much higher cost for no new
+	// coverage.
+
+	it('writing a condition for the first time unlocks first-written, and only once', () => {
+		const b = new Book();
+		b.essence = 100;
+		expect(b.achievementsUnlocked).not.toContain('first-written');
+		b.writeCondition('holding');
+		expect(b.achievementsUnlocked).toContain('first-written');
+		b.writeCondition('flow'); // a second condition — not a second unlock
+		expect(b.achievementsUnlocked.filter((id) => id === 'first-written')).toHaveLength(1);
+	});
+
+	it('attending a life for the first time unlocks first-attended', () => {
+		const b = new Book();
+		b.essence = 100;
+		b.writeCondition('holding');
+		expect(b.achievementsUnlocked).not.toContain('first-attended');
+		b.attend('salt_deposit');
+		expect(b.achievementsUnlocked).toContain('first-attended');
+	});
+
+	it('a life becoming visible unlocks noticed, and reaching Known unlocks known', () => {
+		const b = new Book();
+		b.essence = 100;
+		b.writeCondition('holding'); // salt_deposit is the only life this reveals
+		b.attend('salt_deposit');
+
+		run(b, 31); // crosses STAGE_OBSERVED (30 study-seconds at ease 1.4)
+		expect(b.stageOf('salt_deposit')).toBe(STAGE_OBSERVED);
+		expect(b.achievementsUnlocked).toContain('noticed');
+		expect(b.achievementsUnlocked).not.toContain('known');
+
+		run(b, 1000); // comfortably past 30 + 210 + 1100 study-seconds
+		expect(b.stageOf('salt_deposit')).toBe(STAGE_KNOWN);
+		expect(b.achievementsUnlocked).toContain('known');
+	});
+
+	it('a fully-known category unlocks its mastery achievement', () => {
+		const b = new Book();
+		b.essence = 100;
+		b.writeCondition('holding'); // salt_deposit is the only aquatic life revealed
+		b.attend('salt_deposit');
+		run(b, 1000);
+		expect(b.categoryMastered.aquatic).toBe(true);
+		expect(b.achievementsUnlocked).toContain('mastery-aquatic');
+	});
+
+	it('intervening for the first time unlocks light-touch', () => {
+		const b = new Book();
+		b.essence = 10_000;
+		for (const c of conditions) b.writeCondition(c.id);
+		b.attend('salt_deposit');
+		run(b, 1000);
+		b.insight = 10_000;
+		expect(b.achievementsUnlocked).not.toContain('light-touch');
+		b.intervene('salt_deposit');
+		expect(b.achievementsUnlocked).toContain('light-touch');
+	});
+
+	it('distilling for the first time unlocks distilled', () => {
+		const b = new Book();
+		b.insight = 60;
+		expect(b.achievementsUnlocked).not.toContain('distilled');
+		b.distillEssence();
+		expect(b.achievementsUnlocked).toContain('distilled');
+	});
+
+	it('placing a waymark for the first time unlocks marked', () => {
+		const b = new Book();
+		b.insight = 100;
+		expect(b.achievementsUnlocked).not.toContain('marked');
+		const placed = b.placeCustomSpawnPoint({
+			x: 0.4,
+			y: 0.5,
+			category: 'aquatic',
+			layer: 'water',
+			tags: ['mineral'],
+			weight: 1,
+			rarity: 'common'
+		});
+		expect(placed).toBe(true);
+		expect(b.achievementsUnlocked).toContain('marked');
+	});
+
+	it('survives a save round trip', () => {
+		const b = new Book();
+		b.essence = 100;
+		b.writeCondition('holding');
+		expect(b.achievementsUnlocked).toContain('first-written');
+		const back = new Book();
+		back.fromSave(b.toSave());
+		expect(back.achievementsUnlocked).toEqual(['first-written']);
 	});
 });
