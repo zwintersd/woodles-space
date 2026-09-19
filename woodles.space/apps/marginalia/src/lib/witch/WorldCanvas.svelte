@@ -4,28 +4,15 @@
 	import { book } from './book.svelte';
 	import {
 		CREATURE_SPECS,
-		SEDIMENT_BAND_TOP,
-		WORLD_WATER_TOP,
 		creatureById,
 		featureById,
 		resolveSpawnPointForLife,
-		sampleSediment,
 		stable01,
 		type SedimentGrid,
 		type SpawnLayer,
 		type SpawnPoint
 	} from './worldShape';
-	import {
-		SEA_LEVEL_Y,
-		byDepth,
-		floorDepthAtY,
-		floorDepthScale,
-		floorPlaneY,
-		fogAlpha,
-		projectFloor,
-		sceneDepthFromSeed,
-		unprojectFloor
-	} from './projection';
+	import { byDepth } from './projection';
 	import {
 		CAMERA_TILT,
 		HEX_SIZE,
@@ -49,8 +36,13 @@
 	import type { Life } from './content/life';
 
 	const ASPECT = 960 / 480;
-	const WATER_TOP = WORLD_WATER_TOP;
-	const FLOOR_TOP = SEDIMENT_BAND_TOP;
+	/**
+	 * How far above the tile it's landing on the poured stream starts falling
+	 * from, in canvas fractions. Both places that draw the fall (the ambient
+	 * sediment cast and the live pour overlay) use this so they agree; there is
+	 * no water-surface line left to hang it off instead.
+	 */
+	const POUR_FALL_HEIGHT = 0.16;
 	/**
 	 * How wide a creature is, measured in tiles.
 	 *
@@ -86,11 +78,10 @@
 	let pourPoint: { x: number; y: number } | null = null;
 	let lastPourAt = 0;
 
-	// screen point -> world (x, z) on the floor plane. `x` is a *world* fraction,
-	// not the raw canvas one: the near edge of the frame is wider than the far edge
-	// of the world, so pointing at the same pixel column means a different column of
-	// silt depending on how far back you are. unprojectFloor does that inversion and
-	// returns null off the plane, which is the same range check this made before.
+	// screen point -> a place in the density field. tileAtPoint resolves the hex
+	// tile under the pointer and hands back its (u, v) in the grid's own [0, 1]
+	// coordinates, returning null off the field — which is what stops a pour
+	// writing past the edge of the world.
 	function pointerToWaterPoint(event: PointerEvent): { x: number; y: number } | null {
 		const canvas = canvasEl;
 		if (!canvas) return null;
@@ -100,8 +91,6 @@
 			clamp01((event.clientX - rect.left) / rect.width),
 			(event.clientY - rect.top) / rect.height
 		);
-		// Off the field is not a target — this is what stops a pour writing past the
-		// edge of the world.
 		return tile === null ? null : { x: tile.u, y: tile.v };
 	}
 
@@ -147,13 +136,6 @@
 		// canvas once per actual change and blit the result instead.
 		const sedimentCanvas = document.createElement('canvas');
 		const sedimentCtx = sedimentCanvas.getContext('2d');
-		// Everything drawn on the floor has to agree about the shape of the seabed,
-		// and that shape depends on how much of it she has covered. Rather than pass
-		// coverage to a dozen call sites and hope none is missed, the whole renderer
-		// goes through this one wrapper.
-		const project = (x: number, z: number, h = 0) =>
-			projectFloor(x, z, h, book.sedimentCoverage);
-
 		// while a pour is live the floor repaints at most this often; see
 		// ensureSedimentBaked.
 		const SEDIMENT_BAKE_MIN_MS = 90;
@@ -377,12 +359,20 @@
 
 			const mo = clamp01((m - 0.4) / 0.4) * 0.42;
 			if (mo > 0.01) {
-				const mist = ctx!.createLinearGradient(0, H * WATER_TOP - H * 0.1, 0, H * WATER_TOP + H * 0.08);
+				// settles at the field's own horizon rather than a waterline this camera
+				// doesn't draw — the same far edge the cloud streaks above are already
+				// gathered around, so the two read as one bank of mist over the water.
+				const mist = ctx!.createLinearGradient(
+					0,
+					H * FIELD_HORIZON_Y - H * 0.1,
+					0,
+					H * FIELD_HORIZON_Y + H * 0.08
+				);
 				mist.addColorStop(0, 'rgba(255, 255, 255, 0)');
 				mist.addColorStop(0.45, `rgba(255, 246, 251, ${mo})`);
 				mist.addColorStop(1, 'rgba(255, 255, 255, 0)');
 				ctx!.fillStyle = mist;
-				ctx!.fillRect(0, H * WATER_TOP - H * 0.1, W, H * 0.18);
+				ctx!.fillRect(0, H * FIELD_HORIZON_Y - H * 0.1, W, H * 0.18);
 			}
 		}
 
@@ -423,6 +413,13 @@
 		// seabed has not gathered: open water stays open, which is the difference
 		// between an island and a tiled floor.
 		const CORNERS = hexCorners();
+
+		// The closest thing this camera has to a horizon: where the field's far edge
+		// sits on screen before any elevation lifts it. fieldOrigin() depends only on
+		// FIELD_COLS/FIELD_ROWS, so this is a constant, not something to recompute
+		// per frame. Weather and ambient effects that used to anchor to the vanished
+		// waterline (WATER_TOP, retired with the perspective camera) anchor here.
+		const FIELD_HORIZON_Y = fieldOrigin().y;
 
 		/** How much a side face is darkened relative to its own top. */
 		const SIDE_SHADE = 0.72;
@@ -766,34 +763,6 @@
 			return point;
 		}
 
-		// The depth of anything in the scene. On the floor it's read off the plane;
-		// in the water column it comes from the point's own id, so it's stable across
-		// frames and reloads without a save field to carry it.
-		function depthOf(id: string, y: number): number {
-			return floorDepthAtY(y) ?? sceneDepthFromSeed(stable01(`${id}:depth`));
-		}
-
-		// The color distance fades toward: the water's own body, sampled down the
-		// column so a far creature near the surface hazes pale and one near the floor
-		// hazes blue. Above the waterline it's the pale air at the horizon. These
-		// track drawWaterBase's stops rather than introducing a second palette.
-		function fogColorAt(y: number): [number, number, number] {
-			const waterY = H * WATER_TOP;
-			if (y <= waterY) return [232, 226, 240];
-			const t = clamp01((y - waterY) / Math.max(1, H - waterY));
-			return t < 0.32
-				? [
-						lerp(243, 204, t / 0.32),
-						lerp(224, 193, t / 0.32),
-						lerp(236, 229, t / 0.32)
-					]
-				: [
-						lerp(204, 132, (t - 0.32) / 0.68),
-						lerp(193, 146, (t - 0.32) / 0.68),
-						lerp(229, 205, (t - 0.32) / 0.68)
-					];
-		}
-
 		// Tinting a sprite by distance needs the fog to land on the sprite's own
 		// pixels, not on the water behind it — so the sprite goes to a scratch canvas
 		// first, takes a `source-atop` wash there, and arrives here already hazed.
@@ -1001,7 +970,9 @@
 				const landing = standOn(pourPoint.x, pourPoint.y);
 				const x = landing.x * W;
 				const y = landing.y * H;
-				const top = H * WATER_TOP + H * 0.012;
+				// falls from above the tile it's landing on, not a waterline this camera
+				// no longer draws.
+				const top = y - H * POUR_FALL_HEIGHT;
 				const bottom = Math.max(top + H * 0.035, y);
 				const drift = reduce ? 0 : T;
 
@@ -1123,7 +1094,10 @@
 			const frame = reduce ? 0 : Math.floor(T * DEEPWATER_SWIM.fps) % DEEPWATER_SWIM.frames;
 			const bob = reduce ? 0 : Math.sin(T * 0.9 + seed * TAU) * H * 0.012;
 			const x = W * (1.12 - passage * 1.26);
-			const y = H * (WATER_TOP + 0.16 + seed * 0.15) + bob;
+			// no water-surface line to hang this off any more; keep it in the open
+			// sea beyond the field's far edge so it drifts past the island rather
+			// than swims over it.
+			const y = H * (0.03 + seed * (FIELD_HORIZON_Y - 0.1)) + bob;
 			const size = H * (0.18 + seed * 0.035);
 			const alpha = 0.32 + intensity * 0.2;
 
@@ -1146,7 +1120,9 @@
 				const frame = Math.floor(T * (5.5 + i * 0.4) + stable01(`${seed}-phase`) * 8) % 8;
 				const row = i % 2;
 				const x = W * (0.12 + stable01(`${seed}-x`) * 0.76);
-				const y = H * (WATER_TOP + 0.06 + stable01(`${seed}-y`) * 0.2);
+				// no waterline to hang this off any more; ripples read best on the open
+				// water nearest the viewer, in front of the field rather than through it.
+				const y = H * (0.83 + stable01(`${seed}-y`) * 0.14);
 				const size = H * (0.12 + stable01(`${seed}-size`) * 0.15);
 				const alpha = (0.14 + 0.34 * intensity) * (0.75 + 0.25 * Math.sin(T + i));
 				drawSheetSprite(
@@ -1193,7 +1169,7 @@
 			const spot = landing
 				? standOn(landing.x, landing.y)
 				: standOn(0.5, 0.5);
-			const drop = H * 0.16;
+			const drop = H * POUR_FALL_HEIGHT;
 			const width = H * 0.1;
 			const alpha = 0.14 + intensity * 0.32;
 			const x = spot.x * W;
@@ -1234,21 +1210,17 @@
 				const rowBase = Math.min(3, Math.floor(intensity * 3 + interventions / 5));
 				const row = Math.min(3, rowBase + (Math.sin(T * 0.7 + i) > 0.7 ? 1 : 0));
 				const placed = book.worldShape.placedFeatures[i % Math.max(1, book.worldShape.placedFeatures.length)];
-				// an aura anchored to a feature has to ride the same projection the
-				// feature does, or it drifts off the thing it belongs to.
-				const anchor = placed
-					? project(
-							placed.x,
-							placed.y,
-							sampleSediment(book.worldShape.sedimentGrid, placed.x, placed.y)
-						)
-					: null;
+				// an aura anchored to a feature has to stand on the same tile the
+				// feature itself does — standOn, the way drawFeatures places the
+				// feature sprite — or it drifts off the thing it belongs to. This used
+				// to ride the old floor projection, which this camera replaced; there's
+				// also no per-distance scale to apply any more, so size is fixed.
+				const anchor = placed ? standOn(placed.x, placed.y) : null;
+				const size = H * (0.15 + stable01(`${seed}-size`) * 0.05);
 				const x = anchor ? anchor.x * W : W * (0.17 + i * 0.22 + (stable01(`${seed}-x`) - 0.5) * 0.05);
-				const size =
-					H * (0.15 + stable01(`${seed}-size`) * 0.05) * (anchor ? anchor.scale : 1);
 				const y = anchor
 					? Math.min(anchor.y * H, H - size * 0.5 - H * 0.01)
-					: H * (WATER_TOP + 0.12 + stable01(`${seed}-y`) * 0.28);
+					: H * (FIELD_HORIZON_Y + stable01(`${seed}-y`) * 0.5);
 				const pulse = 0.78 + 0.22 * Math.sin(T * (0.8 + stable01(`${seed}-pulse`)) + i);
 				drawGlow(x, y, size * 0.6, AURA_TINTS[row] ?? [200, 190, 220], (0.18 + intensity * 0.32) * pulse);
 				drawSheetSprite(
