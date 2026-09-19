@@ -32,6 +32,7 @@
 		SEA_LEVEL,
 		TILE_THICKNESS,
 		hexCorners,
+		hexNeighbours,
 		offsetToAxial,
 		projectHex
 	} from './hex';
@@ -423,6 +424,14 @@
 		// between an island and a tiled floor.
 		const CORNERS = hexCorners();
 
+		/** How much a side face is darkened relative to its own top. */
+		const SIDE_SHADE = 0.72;
+		/** How far the back of the field hazes, on land and under water. */
+		const FIELD_HAZE_LAND = 0.34;
+		const FIELD_HAZE_WATER = 0.46;
+		const SKY_HAZE = [186, 219, 231] as const;
+		const DEEP_HAZE = [60, 128, 160] as const;
+
 		function traceTop(cx: number, cy: number) {
 			ctx!.beginPath();
 			CORNERS.forEach((c, i) => {
@@ -505,26 +514,94 @@
 			ctx!.restore();
 		}
 
+		// ── how a tile is coloured ───────────────────────────────────────────────
+		//
+		// Three things act on every tile, and they are separable on purpose so each
+		// can be reasoned about alone.
+		//
+		// **Biome** is a ramp read off elevation: sand at the waterline, grass above
+		// it, a darker green higher still. Nothing places a biome — the same thing
+		// that decides land decides what kind of land.
+		//
+		// **Light** is one direction. The top face takes it full, the side faces are
+		// in shade, and a side is a darker shade of *its own tile's* colour rather
+		// than a fixed brown, so a tall tile reads as one material with a lit top.
+		//
+		// **Distance** hazes a tile toward the water it sits in. There is no
+		// perspective here to make far things small, so haze is the only thing that
+		// says a row at the back is further away than a row at the front.
+		const BIOME_STOPS: readonly (readonly [number, readonly [number, number, number]])[] = [
+			[0, [236, 220, 174]],
+			[0.34, [206, 206, 140]],
+			[0.66, [150, 190, 110]],
+			[1, [104, 156, 96]]
+		];
+
+		function biomeColour(above: number): [number, number, number] {
+			const t = clamp01(above);
+			for (let i = 1; i < BIOME_STOPS.length; i++) {
+				const [toStop, to] = BIOME_STOPS[i];
+				const [fromStop, from] = BIOME_STOPS[i - 1];
+				if (t <= toStop || i === BIOME_STOPS.length - 1) {
+					const k = toStop === fromStop ? 0 : clamp01((t - fromStop) / (toStop - fromStop));
+					return [lerp(from[0], to[0], k), lerp(from[1], to[1], k), lerp(from[2], to[2], k)];
+				}
+			}
+			return [...BIOME_STOPS[0][1]] as [number, number, number];
+		}
+
+		/** Mixes a colour toward the sea it is seen through. */
+		function hazed(
+			c: readonly [number, number, number],
+			amount: number,
+			toward: readonly [number, number, number]
+		) {
+			return rgb(
+				lerp(c[0], toward[0], amount),
+				lerp(c[1], toward[1], amount),
+				lerp(c[2], toward[2], amount)
+			);
+		}
+
 		function drawHexField() {
 			const origin = fieldOrigin();
-			for (const tile of fieldTiles(book.worldShape.sedimentGrid)) {
-				// Every tile draws. An empty world is a seabed lying quiet under deep
-				// water, not a void — see SEABED_ALPHA.
-				//
+			const tiles = fieldTiles(book.worldShape.sedimentGrid);
+			// which tiles are land, so a shore can know it is a shore
+			const land = new Set<string>();
+			for (const t of tiles) if (t.land) land.add(`${t.col}:${t.row}`);
+
+			for (const tile of tiles) {
 				// A submerged tile is held just under the surface however deep its silt
 				// is, so open water reads as water rather than as a stack of steps.
 				const standing = tile.land ? tile.elevation : Math.min(tile.elevation, SEA_LEVEL * 0.92);
 				const p = projectHex(tile.q, tile.r, standing, origin);
 				const shallow = clamp01(tile.elevation / SEA_LEVEL);
-				// bare floor at SEABED_ALPHA, gathering presence as the silt rises
 				const submerged = (SEABED_ALPHA + (0.62 - SEABED_ALPHA) * shallow) * tile.edge;
+				const grain = (stable01(`tone:${tile.col}:${tile.row}`) - 0.5) * 2;
+
+				// Rows at the back are further away. With no perspective to shrink them,
+				// haze is the only thing that says so.
+				const distance = 1 - tile.row / Math.max(1, FIELD_ROWS - 1);
+				const haze = distance * (tile.land ? FIELD_HAZE_LAND : FIELD_HAZE_WATER);
+				const hazeTo = tile.land ? SKY_HAZE : DEEP_HAZE;
+
+				const top: [number, number, number] = tile.land
+					? biomeColour((tile.elevation - SEA_LEVEL) / (TILE_ELEVATION_SCALE - SEA_LEVEL))
+					: [46 + 70 * shallow, 120 + 80 * shallow, 146 + 60 * shallow];
+				top[0] += grain * 7;
+				top[1] += grain * 7;
+				top[2] += grain * 6;
 
 				if (p.side > 0.0005) {
 					ctx!.save();
 					traceSide(p.x, p.y, p.side);
 					if (tile.land) {
-						ctx!.globalAlpha = tile.edge;
-						ctx!.fillStyle = 'rgb(185, 160, 105)';
+						// the same material, in shade — not a separate brown
+						ctx!.fillStyle = hazed(
+							[top[0] * SIDE_SHADE, top[1] * SIDE_SHADE, top[2] * SIDE_SHADE * 0.96],
+							haze,
+							hazeTo
+						);
 					} else {
 						ctx!.globalAlpha = submerged * 0.8;
 						ctx!.fillStyle = 'rgb(29, 95, 124)';
@@ -535,35 +612,23 @@
 
 				ctx!.save();
 				traceTop(p.x, p.y);
-				// A little tone per tile, so neither the floor nor the land is one flat
-				// colour. Without it the field reads as a wash with a grid ruled over
-				// it rather than as ground made of separate pieces.
-				const grain = (stable01(`tone:${tile.col}:${tile.row}`) - 0.5) * 2;
-				if (tile.land) {
-					const t = clamp01((tile.elevation - SEA_LEVEL) / (TILE_ELEVATION_SCALE - SEA_LEVEL));
-					// sand at the waterline, greening as it climbs away from it
-					ctx!.fillStyle = rgb(
-						lerp(236, 147, t) + grain * 7,
-						lerp(220, 194, t) + grain * 7,
-						lerp(174, 104, t) + grain * 6
-					);
-					ctx!.globalAlpha = tile.edge;
-				} else {
-					ctx!.globalAlpha = submerged;
-					ctx!.fillStyle = rgb(
-						46 + 70 * shallow + grain * 6,
-						120 + 80 * shallow + grain * 7,
-						146 + 60 * shallow + grain * 7
-					);
-				}
+				ctx!.globalAlpha = tile.land ? tile.edge : submerged;
+				ctx!.fillStyle = hazed(top, haze, hazeTo);
 				ctx!.fill();
 				// Only land keeps a drawn edge. Underwater the strokes of a whole row
-				// line up and read as stripes ruled across the sea, which is the one
-				// thing a seabed should not look like; the tone difference between
-				// neighbours is enough to tell tiles apart down there.
+				// line up and read as stripes ruled across the sea; the tone difference
+				// between neighbours is enough to tell tiles apart down there.
 				if (tile.land) {
-					ctx!.strokeStyle = `rgba(255, 255, 255, ${0.16 * tile.edge})`;
-					ctx!.lineWidth = 1;
+					// A shore is a land tile with water against it, and it catches a pale
+					// line where the two meet — the one place the reference art puts a
+					// hard edge, and the thing that stops an island looking stamped on.
+					const shore = hexNeighbours(tile.col, tile.row).some(
+						(n) => !land.has(`${n.col}:${n.row}`)
+					);
+					ctx!.strokeStyle = shore
+						? `rgba(238, 249, 252, ${0.5 * tile.edge * (1 - haze)})`
+						: `rgba(255, 255, 255, ${0.14 * tile.edge * (1 - haze)})`;
+					ctx!.lineWidth = shore ? 1.6 : 1;
 					ctx!.stroke();
 				}
 				ctx!.restore();
