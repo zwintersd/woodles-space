@@ -428,7 +428,7 @@
 		width: min(100% - 2rem, 84rem);
 		min-height: calc(100vh - 10rem);
 		margin: 0 auto;
-		padding: clamp(1.2rem, 3vw, 2.4rem) 0 3rem;
+		padding: 0.85rem 0 1.5rem;
 		outline: none;
 	}
 

@@ -60,6 +60,50 @@ test('edits, reorders, archives, restores, and deletes a routine',async({page})=
 	await expect(page.getByRole('button',{name:/Revised arrival.*2 steps/})).toHaveCount(0);
 });
 
+test('opens an activity directly and cancels without changing the plan', async ({ page }) => {
+	await page.clock.setFixedTime(new Date('2026-09-19T12:00:00'));
+	await open(page);
+	const plan = page.getByRole('region', { name: "Today's plan" });
+	await expect(plan.locator('.plan-row.now')).toHaveCount(1);
+	const allCount = await plan.locator('.plan-row').count();
+	await plan.getByRole('button', { name: 'From now', exact: true }).click();
+	expect(await plan.locator('.plan-row').count()).toBeLessThan(allCount);
+	await plan.getByRole('button', { name: 'From now', exact: true }).click();
+	await expect(plan.locator('.plan-row')).toHaveCount(allCount);
+	const activity = page.getByRole('button', { name: /^Edit activity:/ }).first();
+	const original = await activity.getAttribute('aria-label');
+	await activity.click();
+	await expect(page.getByLabel('Activity 1', { exact: true })).toBeFocused();
+	await page.getByLabel('Activity 1', { exact: true }).fill('Unsaved change');
+	await expect(page.getByRole('button', { name: 'Change today', exact: true })).toBeDisabled();
+	await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+	await expect(page.getByRole('button', { name: original!, exact: true })).toBeVisible();
+	await expect(page.getByText('Unsaved change', { exact: true })).toHaveCount(0);
+});
+
+test('enters and corrects a paper mark from the sample card', async ({ page }) => {
+	await open(page);
+	const sampler = page.getByTestId('interval-sampler');
+	await sampler.getByRole('button', { name: 'Enter paper marks', exact: true }).click();
+	await sampler.getByLabel('Sheet date').fill('2026-01-01');
+	await sampler.getByLabel('Interval', { exact: true }).selectOption({ index: 0 });
+	await sampler.getByRole('button', { name: 'something else', exact: true }).click();
+	await sampler.getByLabel('what is it?').fill('Reading outside');
+	await sampler.getByRole('button', { name: 'record', exact: true }).click();
+	await expect(sampler.getByRole('button', { name: 'something else', exact: true })).toHaveAttribute('aria-pressed', 'true');
+	await sampler.getByRole('button', { name: 'something else', exact: true }).click();
+	await expect(sampler.getByLabel('what is it?')).toHaveValue('Reading outside');
+	await sampler.getByRole('button', { name: 'cancel', exact: true }).click();
+	await sampler.getByRole('button', { name: 'writing', exact: true }).click();
+	await page.reload();
+	await sampler.getByRole('button', { name: 'Enter paper marks', exact: true }).click();
+	await sampler.getByLabel('Sheet date').fill('2026-01-01');
+	await sampler.getByLabel('Interval', { exact: true }).selectOption({ index: 0 });
+	await expect(sampler.getByRole('button', { name: 'writing', exact: true })).toHaveAttribute('aria-pressed', 'true');
+	await sampler.getByRole('button', { name: 'Return to now', exact: true }).click();
+	await expect(sampler.getByLabel('Sheet date')).toHaveCount(0);
+});
+
 test('extracts several idea tasks immediately and persists an edition note',async({page})=>{
 	await open(page);await section(page,'Surge');
 	await page.getByLabel('Title',{exact:true}).fill('Write a book');
