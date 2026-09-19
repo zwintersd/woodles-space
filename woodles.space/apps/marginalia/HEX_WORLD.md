@@ -165,24 +165,30 @@ better than it did; this is worth doing on purpose.
 with every test passing. It reproduces on a clean checkout, does not occur on
 GitHub's runner, and has no config knob — see PR #313.
 
-**`WATER_TOP` still anchors a few leftovers** — the weather mist band, the ripples.
-They are drawn against a water surface that no longer exists as a line. Harmless,
-but they belong to the old camera.
-
 ---
 
 ## 7. what is next
 
 In the order I would take them.
 
-1. **Atmosphere.** The base is coherent now, which is what the last few rounds were
-   for. Depth-tinting so far tiles recede, light on tile tops, and the biome
-   vocabulary from the reference art — biome colour by elevation, then mountains and
-   forests.
+1. **Mountains and forests** — atmosphere's base (biome-by-elevation, lighting,
+   distance haze, shores) shipped; the rest of the reference art's vocabulary is
+   still open.
 2. **The row-split bake**, so creatures occlude correctly against tiles.
-3. **Retire the `WATER_TOP` leftovers.**
-4. **Panning**, which is nearly free and opens a world larger than one frame — the
+3. **Panning**, which is nearly free and opens a world larger than one frame — the
    original point of D's lateral axis.
+
+`WATER_TOP` is retired. It anchored the weather mist band, the ripples, the
+ambient swimmer, the pour overlay's drop height, and a feature aura's fallback
+position — all against a water surface this camera never draws. Fixing it also
+turned up a real bug, not just a stale constant: the aura anchor for a *placed*
+feature was riding the old perspective floor's `projectFloor` while the feature
+itself had already moved onto the hex camera's `standOn`, so an aura visibly
+drifted off the thing it was supposed to glow around. Both now agree. Everything
+that used to hang off `WATER_TOP` anchors to `FIELD_HORIZON_Y` (the field's far
+edge, `fieldOrigin().y` — a constant, since it depends only on the field's
+column/row counts) or to the open water in front of or beyond the field, chosen
+so nothing draws over the island it shouldn't.
 
 Two questions the reference art raises that are design calls, not implementation:
 

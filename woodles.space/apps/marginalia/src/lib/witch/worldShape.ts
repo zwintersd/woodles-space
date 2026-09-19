@@ -16,7 +16,6 @@ export const SEDIMENT_UNLOCK_COST = 60;
 export const SEDIMENT_POUR_RATE = 0.8;
 export const SEDIMENT_POUR_RADIUS = 2.5;
 export const SEDIMENT_POUR_STRENGTH = 0.46;
-export const WORLD_WATER_TOP = 0.34;
 // the floor plane's screen band and the perspective over it — see projection.ts.
 export { SEDIMENT_BAND_TOP } from './projection';
 
