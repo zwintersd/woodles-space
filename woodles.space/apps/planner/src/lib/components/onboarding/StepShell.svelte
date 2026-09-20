@@ -69,6 +69,17 @@
 </div>
 
 <style>
+	.step-body :global(.wb-card) { padding: 1rem; border: 1px solid var(--p-border); border-radius: var(--pl-radius-md); background: var(--p-surface); }
+	.step-body :global(.wb-list) { display: grid; gap: .8rem; }
+	.step-body :global(.wb-row), .step-body :global(.wb-actions) { display: flex; flex-wrap: wrap; gap: .6rem; align-items: end; }
+	.step-body :global(.wb-card label) { display: grid; gap: .35rem; font-size: .85rem; min-width: 0; }
+	.step-body :global(.wb-card input:not([type=checkbox])), .step-body :global(.wb-card select), .step-body :global(textarea) { width: 100%; min-width: 0; box-sizing: border-box; padding: .55rem; border: 1px solid var(--p-border); border-radius: var(--pl-radius-sm); background: var(--p-bg); color: var(--p-text); font: inherit; }
+	.step-body :global(.wb-card button), .step-body :global(.wb-actions button) { padding: .5rem .7rem; border: 1px solid var(--p-border); border-radius: var(--pl-radius-sm); color: var(--p-text); }
+	.step-body :global(button:disabled) { opacity: .45; }
+	.step-body :global(.wb-note), .step-body :global(.wb-card p) { color: var(--p-muted); font-size: .85rem; line-height: 1.5; }
+	.step-body :global(summary) { cursor: pointer; padding: .6rem 0; }
+	.step-body :global(h2) { font-size: 1.2rem; }
+
 	.step-shell {
 		max-width: 640px;
 		margin: 0 auto;

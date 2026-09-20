@@ -8,6 +8,10 @@
 
 	const copy = STEP_COPY[5];
 
+	let interval = $state(store.settings.samplingIntervalMinutes);
+	let bells = $state(store.settings.bellsEnabled);
+	let quietStart = $state(store.settings.quietHoursStart);
+	let quietEnd = $state(store.settings.quietHoursEnd);
 	let selected = $state<ToneName>(store.settings.tone);
 
 	const sampleCtx = $derived({
@@ -25,7 +29,7 @@
 	}
 
 	function advance() {
-		store.updateSettings({ tone: selected });
+		store.updateSettings({ tone: selected, samplingIntervalMinutes: interval, bellsEnabled: bells, quietHoursStart: quietStart, quietHoursEnd: quietEnd });
 		onboarding.advance();
 	}
 </script>
@@ -36,8 +40,19 @@
 	subprompt={copy.subprompt}
 	cta={copy.cta}
 	stage={6}
+	canAdvance={Boolean(quietStart && quietEnd)}
 	onAdvance={advance}
 >
+	<div class="wb-card wb-list">
+		<label>Observation interval<select bind:value={interval}>
+			{#each [...new Set([5, 10, 15, 30, 60, interval])].sort((a, b) => a - b) as minutes}<option value={minutes}>{minutes} minutes</option>{/each}
+		</select></label>
+		<p class="wb-note">Sets the interval grid in Today. You can record observations later or leave intervals blank.</p>
+		<label class="bell-toggle"><input type="checkbox" bind:checked={bells} /> Enable bells</label>
+		<div class="wb-row"><label>Quiet hours start<input type="time" bind:value={quietStart} /></label><label>Quiet hours end<input type="time" bind:value={quietEnd} /></label></div>
+		<p class="wb-note">Bells are silent during quiet hours. Browser audio may require an interaction first.</p>
+	</div>
+	<h2>Reminder detail</h2>
 	<div class="tone-list" role="radiogroup" aria-label="tone selection">
 		{#each TONES as tone (tone.id)}
 			{@const active = selected === tone.id}
@@ -63,6 +78,7 @@
 </StepShell>
 
 <style>
+	.bell-toggle { display: flex !important; align-items: center; gap: .6rem; }
 	.tone-list {
 		display: flex;
 		flex-direction: column;

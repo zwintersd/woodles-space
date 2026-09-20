@@ -44,8 +44,10 @@
 
 		<ul class="completion-recap" aria-label="your setup at a glance">
 			<li><span>today</span><strong>{todayShape}</strong></li>
-			<li><span>territories</span><strong>{store.domains.length}</strong></li>
-			<li><span>recurring things</span><strong>{recurringCount}</strong></li>
+			<li><span>categories</span><strong>{store.domains.length}</strong></li>
+			<li><span>recurring activities</span><strong>{recurringCount}</strong></li>
+		<li><span>routines</span><strong>{store.routines.filter(r => !r.archived && !r.deletedAt).length}</strong></li>
+			<li><span>check-in interval</span><strong>{store.settings.samplingIntervalMinutes} minutes</strong></li>
 		</ul>
 
 		<button
@@ -59,11 +61,11 @@
 		<button class="completion-skip" onclick={() => onboarding.finish()}>{COMPLETION.skipCta}</button>
 
 		<p class="completion-foot">
-			the first thing can be small
+			Edit templates in Day piles
 			<span class="foot-sep">·</span>
-			the calendar is ready
+			Record in Today
 			<span class="foot-sep">·</span>
-			you may proceed
+			Review in Editions
 		</p>
 	</div>
 </div>

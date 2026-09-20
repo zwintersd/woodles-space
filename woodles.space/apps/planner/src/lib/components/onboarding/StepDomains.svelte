@@ -7,6 +7,8 @@
 
 	const copy = STEP_COPY[3];
 
+	const availableDomains = [...store.domains, ...STARTER_DOMAINS.filter(d => !store.domains.some(existing => existing.id === d.id))];
+
 	// Local selection state; pre-fill with any domains already in the store.
 	let selectedIds = $state(new Set(store.domains.map((d) => d.id)));
 
@@ -18,7 +20,7 @@
 	}
 
 	function advance() {
-		const picked = STARTER_DOMAINS.filter((d) => selectedIds.has(d.id));
+		const picked = availableDomains.filter((d) => selectedIds.has(d.id));
 		store.setDomains(picked);
 		onboarding.advance();
 	}
@@ -36,7 +38,7 @@
 	onAdvance={advance}
 >
 	<div class="chip-grid">
-		{#each STARTER_DOMAINS as d (d.id)}
+		{#each availableDomains as d (d.id)}
 			{@const active = selectedIds.has(d.id)}
 			<button
 				class="chip"
@@ -53,7 +55,7 @@
 
 	<p class="chip-count">
 		{selectedIds.size > 0
-			? `${selectedIds.size} ${selectedIds.size === 1 ? 'territory' : 'territories'} chosen`
+			? `${selectedIds.size} ${selectedIds.size === 1 ? 'category' : 'categories'} chosen`
 			: 'pick at least one'}
 	</p>
 </StepShell>
