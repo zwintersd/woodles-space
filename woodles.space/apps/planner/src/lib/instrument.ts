@@ -30,34 +30,6 @@ export const INTERVAL_KIND_OPTIONS: ReadonlyArray<{
 	// prettier-ignore-end
 ];
 
-export const STARTER_ROUTINES: Routine[] = [
-	{
-		id: 'routine-morning-launch',
-		name: 'morning launch',
-		cue: 'after the first bell',
-		createdAt: 'starter',
-		steps: [
-			{ id: 'morning-water', label: 'water + medication' },
-			{ id: 'morning-wash', label: 'wash up' },
-			{ id: 'morning-dress', label: 'get dressed' },
-			{ id: 'morning-bag', label: 'bag, keys, food' },
-			{ id: 'morning-door', label: 'leave through the door' }
-		]
-	},
-	{
-		id: 'routine-close-clinic',
-		name: 'close the clinic day',
-		cue: 'after the last note',
-		createdAt: 'starter',
-		steps: [
-			{ id: 'close-note', label: 'finish the live note' },
-			{ id: 'close-desk', label: 'reset the desk' },
-			{ id: 'close-tomorrow', label: 'name tomorrow’s first thing' },
-			{ id: 'close-leave', label: 'leave work at work' }
-		]
-	}
-];
-
 export type IntervalState = 'past' | 'current' | 'future';
 
 export type DayInterval = {
