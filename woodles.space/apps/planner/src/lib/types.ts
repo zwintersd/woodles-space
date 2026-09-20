@@ -116,6 +116,7 @@ export type ToneName = 'wry' | 'gentle' | 'minimal' | 'earnest';
 export type OnboardingStep = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type PlannerSettings = {
+	momentTrackers?: MomentTracker[];
 	sampleTags?: SampleTag[];
 	flourishEnabled: boolean;
 	quietHoursStart: string; // "HH:MM"
@@ -175,6 +176,7 @@ export type IntervalKind =
  * many bells it spans.
  */
 export type IntervalObservation = {
+	trackerAnswers?: TrackerAnswer[];
 	/** Optional, explicitly entered details about this moment. */
 	details?: MomentDetails;
 	/** Snapshot of the optional user label; null means explicitly unlabelled. */
@@ -209,6 +211,16 @@ export type MomentDetails = {
 	body?: string;
 	company?: string;
 };
+
+export type MomentTracker = {
+	id: string;
+	name: string;
+	type: 'rating' | 'check' | 'text';
+	cue: string;
+	low: string;
+	high: string;
+};
+export type TrackerAnswer = { tracker: MomentTracker; value: string | number | boolean };
 
 export type RoutineStep = {
 	id: string;
