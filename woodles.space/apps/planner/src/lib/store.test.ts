@@ -86,6 +86,22 @@ describe('PlannerStore', () => {
 			expect(store.tasks).toEqual([]);
 		});
 
+		it('starts with no routines and removes the retired seeded examples', () => {
+			expect(store.routines).toEqual([]);
+			localStorage.setItem(
+				'planner.routines.v1',
+				JSON.stringify([
+					{ id: 'routine-morning-launch', name: 'morning launch', createdAt: 'starter', steps: [] },
+					{ id: 'personal', name: 'personal routine', createdAt: '2026-09-20', steps: [] }
+				])
+			);
+
+			const restored = new PlannerStore();
+
+			expect(restored.routines.map((routine) => routine.id)).toEqual(['personal']);
+			expect(JSON.parse(localStorage.getItem('planner.routines.v1')!).map((routine: { id: string }) => routine.id)).toEqual(['personal']);
+		});
+
 		it('starts with default settings', () => {
 			expect(store.settings.flourishEnabled).toBe(false);
 			expect(store.settings.bellsEnabled).toBe(true);

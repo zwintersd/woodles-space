@@ -43,7 +43,6 @@ import { thinkingAboutShelf } from './thinkingAboutShelf.svelte';
 import { dateKey, nowMinutes, uid, timeToMinutes } from './utils';
 import { playBell } from './bells';
 import {
-	STARTER_ROUTINES,
 	intervalKey,
 	kindLabel,
 	routineIndependence
@@ -68,6 +67,15 @@ function save<T>(key: string, value: T): void {
 	} catch {
 		// Ignore quota / disabled storage
 	}
+}
+
+function loadRoutines(): Routine[] {
+	const routines = load<Routine[]>('planner.routines.v1', []);
+	const withoutSeededExamples = routines.filter((routine) => routine.createdAt !== 'starter');
+	if (withoutSeededExamples.length !== routines.length) {
+		save('planner.routines.v1', withoutSeededExamples);
+	}
+	return withoutSeededExamples;
 }
 
 const DEFAULT_SETTINGS: PlannerSettings = {
@@ -139,7 +147,9 @@ export class PlannerStore {
 	intervalObservations = $state<IntervalObservation[]>(
 		load('planner.observations.v1', [])
 	);
-	routines = $state<Routine[]>(load('planner.routines.v1', STARTER_ROUTINES));
+	// Routines are personal checklists. Begin empty so setup only shows the
+	// routines a person deliberately adds.
+	routines = $state<Routine[]>(loadRoutines());
 	routinePractices = $state<RoutinePractice[]>(
 		load('planner.routinePractices.v1', [])
 	);
