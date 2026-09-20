@@ -15,6 +15,15 @@ or local workflow changes.
 other docs have narrower jobs:
 
 - [README.md](./README.md) is the deployment reference.
+- [CHANGELOG.md](./CHANGELOG.md) is what shipped, session to session —
+  dated entries, newest first, hosted at
+  [woodles.space/changelog](https://woodles.space/changelog). its own
+  header states the convention: add to it before ending a session that
+  shipped something a reader of the site would notice.
+- [LORE.md](./LORE.md) is marginalia's story — Brianna, the Book, the
+  journal — curated for reading, not the mechanical design docs under
+  `apps/marginalia/`. hosted at
+  [woodles.space/lore](https://woodles.space/lore).
 - [REFACTORING.md](./REFACTORING.md) is the living consolidation log — code
   that exists in more than one place.
 - [CONVERGENCE.md](./CONVERGENCE.md) is the product-shape counterpart: why
@@ -102,12 +111,16 @@ woodles.space/
 ├── .env.example             DATABASE_URL, SYNC_PASS_HASH
 ├── ARCHITECTURE.md          you are here
 ├── README.md                deployment reference
+├── CHANGELOG.md             what shipped, session to session — hosted at /changelog
+├── LORE.md                  marginalia's story, curated — hosted at /lore
 ├── REFACTORING.md           consolidation log
 ├── shared/                  cross-app design system + data registry
 │   ├── palette.css          11 named themes, switched via [data-theme]
 │   ├── fonts.css            --font-* custom properties
 │   ├── motifs.css           ambient backdrops (class="motif-<id>")
-│   └── library.js           palettes / motifs / fontPairs / templates — untyped
+│   ├── library.js           palettes / motifs / fontPairs / templates — untyped
+│   ├── docPage.js           renders a root .md file into /changelog, /lore, /architecture
+│   └── docPage.css          typography for the rendered markdown above
 ├── api/
 │   ├── sync.ts              Neon edge function — single-user sync
 │   └── schema.sql
@@ -127,6 +140,9 @@ woodles.space/
     ├── digits/              static · an SVG pen that writes the time
     ├── quiet-room/          static · an immersive three.js room of light
     ├── letter/              static · echoes — the private archive reader
+    ├── changelog/           static · renders CHANGELOG.md at /changelog
+    ├── lore/                static · renders LORE.md at /lore
+    ├── architecture/        static · renders ARCHITECTURE.md at /architecture
     ├── animations/          Python · offline Manim scenes and curated web previews
     ├── write/               SvelteKit · the writing surface — letters, essays, stories, poems, notes, and lists that nest and move (Liquid); also the knowledge base now, in a small way (cross-draft references, backlinks, "draft it with a prompt")
     ├── marginalia/          SvelteKit · a witch writes worlds + a reading room
@@ -135,7 +151,8 @@ woodles.space/
     ├── thinking-about/      SvelteKit · a board for what's being read, played, and watched — and, per entry, a structured record cast for it
     ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking — a camera that knows where it is, cards that say more than they show, stacks that do more than hold them, and doorways into other boards
     ├── bloomforge/          SvelteKit · a studio for making incremental games
-    └── bloomforge-player/   SvelteKit · the runtime that makes those games playable
+    ├── bloomforge-player/   SvelteKit · the runtime that makes those games playable
+    └── grimoire/            SvelteKit · the studio Bloomforge pivoted toward, built on @woodles/witch-engine
 ```
 
 `animations/` is the Python/Manim authoring side of Hygge's motion workshop. it
@@ -1472,6 +1489,20 @@ in the browser.
 **motifs** apply via `class="motif-<id>"` on the surface element, with the
 blob/grain scaffold divs underneath — not a `data-motif` attribute. the five
 motifs are `blobs`, `aurora`, `mist`, `paper`, `clean`.
+
+**`shared/docPage.js`** is a dependency-free markdown-to-HTML renderer plus a
+`loadDocPage({ source, target })` helper that fetches a root `.md` file and
+renders it into the page. it's what `apps/changelog`, `apps/lore`, and
+`apps/architecture` are — each one `index.html` with no body of its own,
+just a `<script type="module">` naming which doc to load. it covers exactly
+what those three files use (headings, tables, code fences, blockquotes,
+lists, links, bold/italic) rather than the whole of GFM, and rewrites a
+doc-to-doc relative link (`./README.md`) against the site root rather than
+the page's own URL, since every root doc deploys straight from there.
+`shared/docPage.css` is its typography, reusing the same `--bg` / `--text`
+/ `--accent-*` tokens `shared/palette.css` defines. the same pattern that
+made `/marginalia/cheats` trustworthy — read the source of truth, don't
+copy it — applied one level up, to the workspace's own docs.
 
 ## cross-app duplication
 

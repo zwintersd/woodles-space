@@ -114,6 +114,41 @@ export const appManifest = Object.freeze([
 		landing: tile('echoes', 3, 'read', 'letters left here, words that stayed', 'var(--peach)', 'var(--lilac)', '120deg')
 	},
 	{
+		id: 'changelog',
+		name: 'Changelog',
+		publicPath: '/changelog',
+		aliases: [],
+		kind: 'static',
+		maturity: 'stable',
+		sourceDir: 'apps/changelog',
+		outputDir: 'apps/changelog',
+		entryFile: 'index.html'
+		// No `landing` tile — a docs page, not something to play with. See
+		// `digits` / `animations` above for the same call.
+	},
+	{
+		id: 'lore',
+		name: 'Lore',
+		publicPath: '/lore',
+		aliases: [],
+		kind: 'static',
+		maturity: 'stable',
+		sourceDir: 'apps/lore',
+		outputDir: 'apps/lore',
+		entryFile: 'index.html'
+	},
+	{
+		id: 'architecture',
+		name: 'Architecture',
+		publicPath: '/architecture',
+		aliases: [],
+		kind: 'static',
+		maturity: 'stable',
+		sourceDir: 'apps/architecture',
+		outputDir: 'apps/architecture',
+		entryFile: 'index.html'
+	},
+	{
 		id: 'marginalia',
 		name: 'Marginalia',
 		publicPath: '/marginalia',

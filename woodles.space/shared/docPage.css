@@ -1,0 +1,201 @@
+/* woodles.space · shared doc-page shell
+   used by the plain static pages that render a root markdown file at
+   runtime — /changelog, /architecture, /lore. pairs with palette.css and
+   fonts.css, already linked by each of those pages. */
+
+.doc-page {
+	min-height: 100vh;
+	padding: 1rem clamp(0.8rem, 3vw, 2rem) 4rem;
+	background: var(--bg);
+	color: var(--text);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.doc-top {
+	width: min(100%, 46rem);
+	display: flex;
+	align-items: baseline;
+	gap: 0.6rem;
+	padding: 0.4rem 0 1.4rem;
+}
+
+.doc-top .brand {
+	font-family: var(--font-sans);
+	font-size: 0.7rem;
+	letter-spacing: 0.2em;
+	text-transform: uppercase;
+	color: var(--accent-deep);
+	text-decoration: none;
+}
+
+.doc-top .brand:hover {
+	color: var(--accent);
+}
+
+.doc-title {
+	display: flex;
+	align-items: baseline;
+	gap: 0.45rem;
+}
+
+.doc-kicker {
+	font-family: var(--font-sans);
+	font-size: 0.56rem;
+	letter-spacing: 0.2em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.doc-title h1 {
+	margin: 0;
+	font-family: var(--font-display);
+	font-weight: 500;
+	font-size: clamp(1.05rem, 2.4vw, 1.4rem);
+	line-height: 1;
+	color: var(--text);
+}
+
+.doc-body {
+	width: min(100%, 46rem);
+	font-family: var(--font-body);
+	font-size: 0.98rem;
+	line-height: 1.65;
+}
+
+.doc-body[aria-busy='true'] {
+	opacity: 0.6;
+}
+
+.doc-loading,
+.doc-error {
+	color: var(--muted);
+	font-style: italic;
+}
+
+.doc-body h1 {
+	display: none; /* the page's own <h1> already carries the title */
+}
+
+.doc-body h2 {
+	margin: 2.2rem 0 0.8rem;
+	font-family: var(--font-display);
+	font-weight: 600;
+	font-size: 1.4rem;
+	color: var(--accent-deep);
+}
+
+.doc-body h3 {
+	margin: 1.6rem 0 0.6rem;
+	font-family: var(--font-display);
+	font-weight: 600;
+	font-size: 1.15rem;
+	color: var(--text);
+}
+
+.doc-body h4,
+.doc-body h5,
+.doc-body h6 {
+	margin: 1.2rem 0 0.5rem;
+	font-family: var(--font-sans);
+	font-size: 0.85rem;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--muted);
+}
+
+.doc-body p {
+	margin: 0 0 1rem;
+}
+
+.doc-body a {
+	color: var(--accent-deep);
+	text-decoration-color: var(--rule);
+	text-underline-offset: 0.15em;
+}
+
+.doc-body a:hover {
+	color: var(--accent);
+}
+
+.doc-body code {
+	font-family: var(--font-mono);
+	font-size: 0.88em;
+	background: var(--surface);
+	border: 1px solid var(--rule);
+	border-radius: 3px;
+	padding: 0.05em 0.35em;
+}
+
+.doc-body pre {
+	margin: 0 0 1.2rem;
+	padding: 0.85rem 1rem;
+	overflow-x: auto;
+	background: var(--surface);
+	border: 1px solid var(--rule);
+	border-radius: 6px;
+}
+
+.doc-body pre code {
+	background: none;
+	border: none;
+	padding: 0;
+	font-size: 0.82rem;
+	line-height: 1.5;
+}
+
+.doc-body blockquote {
+	margin: 0 0 1.2rem;
+	padding: 0.2rem 1rem;
+	border-left: 3px solid var(--accent);
+	color: var(--muted);
+	font-style: italic;
+}
+
+.doc-body blockquote p {
+	margin: 0 0 0.5rem;
+}
+
+.doc-body blockquote p:last-child {
+	margin-bottom: 0;
+}
+
+.doc-body ul,
+.doc-body ol {
+	margin: 0 0 1.2rem;
+	padding-left: 1.4rem;
+}
+
+.doc-body li {
+	margin-bottom: 0.45rem;
+}
+
+.doc-body hr {
+	margin: 2rem 0;
+	border: none;
+	border-top: 1px solid var(--rule);
+}
+
+.doc-body table {
+	width: 100%;
+	margin: 0 0 1.4rem;
+	border-collapse: collapse;
+	font-size: 0.88rem;
+}
+
+.doc-body th,
+.doc-body td {
+	text-align: left;
+	vertical-align: top;
+	padding: 0.5rem 0.7rem;
+	border-bottom: 1px solid var(--rule);
+}
+
+.doc-body th {
+	font-family: var(--font-sans);
+	font-size: 0.68rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
