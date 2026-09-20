@@ -13,7 +13,10 @@
 	let draft = $state<Block[]>([]);
 	let editor = $state<HTMLFormElement>();
 	let remainingOnly = $state(false);
+	let skipping = $state('');
+	let skipReason = $state('');
 	let today = $derived(dateKey(store.now));
+	let skipped = $derived(store.dayOverrides[today]?.skippedRecurring ?? []);
 	let pile = $derived(store.getDayShape());
 	let fixed = $derived(store.getBlocksForDate());
 	let minutes = $derived(store.now.getHours() * 60 + store.now.getMinutes());
@@ -102,7 +105,36 @@
 						>{/if}{#if block.routineId && store.routines.some((r) => r.id === block.routineId && !r.deletedAt)}<button
 							onclick={() => (activeRoutine = block.routineId!)}>Use routine</button
 						>{/if}
-				</div>{/each}
+					{#if block.overlay === 'obligation' || block.overlay === 'ritual'}
+						<button class="skip-trigger" aria-label={`Skip ${block.title} today`} aria-expanded={skipping === block.id} onclick={() => { skipping = skipping === block.id ? '' : block.id; skipReason = ''; }}>Skip today</button>
+					{/if}
+				</div>
+				{#if skipping === block.id}
+					<form class="skip-form" onsubmit={(event) => {
+						event.preventDefault(); store.skipRecurring(today, block.id, skipReason);
+						queueSync(); skipping = ''; notice = `${block.title} skipped today. Future occurrences stay scheduled.`;
+					}}>
+						<label>Reason (optional)
+							<select bind:value={skipReason}>
+								<option value="">No reason</option>
+								<option>Task was cancelled</option>
+								<option>Missing something needed</option>
+								<option>Holiday</option>
+								<option>Unwell or need rest</option>
+								<option>Plans changed</option>
+								<option>Other</option>
+							</select>
+						</label>
+						<p class="wb-note">Only today’s occurrence will be removed.</p>
+						<div class="wb-actions"><button type="submit">Skip today</button><button type="button" onclick={() => skipping = ''}>Cancel</button></div>
+					</form>
+				{/if}
+			{/each}
+			{#if skipped.length}
+				<details class="skipped-list"><summary>Skipped today ({skipped.length})</summary>
+					{#each skipped as item}<div class="wb-row"><span class="grow">{item.title}<small>{item.reason || 'No reason given'}</small></span><button aria-label={`Restore ${item.title} today`} onclick={() => { store.restoreRecurring(today, item.blockId); queueSync(); notice = `${item.title} restored for today.`; }}>Restore</button></div>{/each}
+				</details>
+			{/if}
 			{#if remainingOnly && pastCount}<p class="wb-note">{pastCount} earlier activit{pastCount === 1 ? 'y' : 'ies'} hidden. Turn off “From now” to see the whole day.</p>{/if}
 			{#if flexible.length}<h3>Flexible activities</h3>
 				{#each flexible as block}<div class="wb-row">
@@ -143,6 +175,11 @@
 </section>
 
 <style>
+	.workbench .skip-trigger { font-size: 0.7rem; background: transparent; border-color: transparent; }
+	.skip-form { padding: 0.75rem; }
+	.skip-form label { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+	.skipped-list { margin-top: 0.75rem; font-size: 0.85rem; }
+	.skipped-list small { display: block; opacity: 0.7; }
 	.plan-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.4rem; font: 0.7rem var(--car-mono); }
 	.plan-row { border-radius: 0.45rem; transition: background 200ms ease; }
 	.plan-row.now { background: var(--car-pink-wash); box-shadow: inset 3px 0 var(--car-pink-dark); padding-left: 0.65rem; }

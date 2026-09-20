@@ -177,6 +177,7 @@ export class PlannerStore {
 		const shape = this.getDayShape(date);
 		const base = (shape?.blocks ?? []).filter((block) => !block.flexible);
 		const weekday = date.getDay();
+		const skipped = new Set(this.dayOverrides[dateKey(date)]?.skippedRecurring?.map((item) => item.blockId) ?? []);
 
 		const obligationBlocks: Block[] = this.obligations
 			.filter((o) => o.weekdays.includes(weekday))
@@ -199,8 +200,8 @@ export class PlannerStore {
 		}));
 
 		return mergeBlocks(base, [
-			...obligationBlocks,
-			...ritualBlocks,
+			...obligationBlocks.filter((block) => !skipped.has(block.id)),
+			...ritualBlocks.filter((block) => !skipped.has(block.id)),
 			...this.standingBlocksForWeekday(weekday)
 		]);
 	}
@@ -823,6 +824,31 @@ export class PlannerStore {
 		this.dayOverrides = { ...this.dayOverrides, [date]: {
 			...this.dayOverrides[date], date, dayShapeId: shape?.id ?? '',
 			name: name ?? shape?.name ?? 'Day plan', blocks: blocks.map((block) => ({ ...block })), updatedAt: new Date().toISOString()
+		} };
+		save('planner.days.v2', this.dayOverrides);
+		this.publishCommitmentsLocally();
+	}
+
+	skipRecurring(date: string, blockId: string, reason = ''): void {
+		const block = this.getBlocksForDateKey(date).find((item) => item.id === blockId);
+		if (!block || (block.overlay !== 'obligation' && block.overlay !== 'ritual')) return;
+		const [y, m, d] = date.split('-').map(Number);
+		this.dayOverrides = { ...this.dayOverrides, [date]: {
+			...this.dayOverrides[date],
+			date, dayShapeId: this.dayOverrides[date]?.dayShapeId ?? this.getDayShape(new Date(y, m - 1, d, 12))?.id ?? '',
+			skippedRecurring: [...(this.dayOverrides[date]?.skippedRecurring ?? []), { blockId, title: block.title, reason: reason.trim() }],
+			updatedAt: new Date().toISOString()
+		} };
+		save('planner.days.v2', this.dayOverrides);
+		this.publishCommitmentsLocally();
+	}
+
+	restoreRecurring(date: string, blockId: string): void {
+		const day = this.dayOverrides[date];
+		if (!day?.skippedRecurring?.some((item) => item.blockId === blockId)) return;
+		this.dayOverrides = { ...this.dayOverrides, [date]: { ...day,
+			skippedRecurring: day.skippedRecurring.filter((item) => item.blockId !== blockId),
+			updatedAt: new Date().toISOString()
 		} };
 		save('planner.days.v2', this.dayOverrides);
 		this.publishCommitmentsLocally();
