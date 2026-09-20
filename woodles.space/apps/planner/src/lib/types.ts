@@ -101,6 +101,7 @@ export type Domain = {
 };
 
 export type DayInstance = {
+	skippedRecurring?: { blockId: string; title: string; reason: string }[];
 	date: string; // YYYY-MM-DD
 	dayShapeId: string;
 	blocks?: Block[];

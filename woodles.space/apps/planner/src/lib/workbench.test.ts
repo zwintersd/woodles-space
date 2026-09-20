@@ -39,6 +39,30 @@ describe('Carillon editable workspaces', () => {
 		store.setWeekPattern({ days: Array(7).fill('home') as PlannerBlob['weekPattern']['days'] });
 	});
 	afterEach(() => vi.useRealTimers());
+	it('skips only one recurring occurrence, persists its reason, and restores through sync', () => {
+		store.obligations = [{ id: 'work', name: 'Work', weekdays: [6], startTime: '13:00', endTime: '14:00' }];
+		store.skipRecurring('2026-09-19', 'obl-work', 'Holiday');
+		store.skipRecurring('2026-09-19', 'read', 'Holiday');
+		expect(store.getBlocksForDateKey('2026-09-19').map((b) => b.id)).toEqual(['read']);
+		expect(store.getBlocksForDateKey('2026-09-26').some((b) => b.id === 'obl-work')).toBe(true);
+		const loaded = new PlannerStore();
+		loaded.obligations = store.obligations;
+		expect(loaded.getBlocksForDateKey('2026-09-19').some((b) => b.id === 'obl-work')).toBe(false);
+		expect(loaded.dayOverrides['2026-09-19'].skippedRecurring).toEqual([{ blockId: 'obl-work', title: 'Work', reason: 'Holiday' }]);
+		const stale = JSON.parse(JSON.stringify(blob(loaded)));
+		vi.advanceTimersByTime(1000);
+		loaded.restoreRecurring('2026-09-19', 'obl-work');
+		expect(loaded.getBlocksForDateKey('2026-09-19').some((b) => b.id === 'obl-work')).toBe(true);
+		expect(mergePlannerBlobs(blob(loaded), stale).days['2026-09-19'].skippedRecurring).toEqual([]);
+		expect(new PlannerStore().dayOverrides['2026-09-19'].skippedRecurring).toEqual([]);
+	});
+	it('preserves a skipped ritual when editing the day plan', () => {
+		store.rituals = [{ id: 'tea', name: 'Tea', startTime: '08:00', endTime: '08:15' }];
+		store.skipRecurring('2026-09-19', 'rit-tea');
+		store.saveDayPlan('2026-09-19', pile.blocks);
+		expect(store.getBlocksForDateKey('2026-09-19').some((b) => b.id === 'rit-tea')).toBe(false);
+		expect(store.getBlocksForDateKey('2026-09-20').some((b) => b.id === 'rit-tea')).toBe(true);
+	});
 	it('isolates one-day changes, excludes flexible blocks from the clock, and persists both', () => {
 		store.saveDayPlan('2026-09-19', [
 			{ ...pile.blocks[0], startTime: '11:00', endTime: '12:00' },
