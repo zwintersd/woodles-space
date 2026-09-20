@@ -11,6 +11,7 @@
 	import { dateKey, dayOfWeekLabel, shortDateLabel, timeToMinutes } from '$lib/utils';
 	import DayPlan from './DayPlan.svelte';
 	import MomentarySample from './MomentarySample.svelte';
+	import { detailSummary } from '$lib/momentDetails';
 	import CatchUp from './CatchUp.svelte';
 	import Capacity from './Capacity.svelte';
 
@@ -250,6 +251,7 @@
 						{#if row.observation}
 							<i data-kind={row.observation.kind} style:background={row.observation.sampleTag?.color} aria-hidden="true"></i>
 							{row.observation.label}
+							{#if detailSummary(row.observation.details)}<sup title={detailSummary(row.observation.details)}>{Object.keys(row.observation.details ?? {}).length} details</sup>{/if}
 							{#if row.observation.sampleTag}<sup>{row.observation.sampleTag.name}</sup>{/if}
 							{#if row.continuation}<sup>same stretch</sup>{:else if row.observation.source === 'paper'}<sup>paper</sup>{:else if row.observation.source === 'recall'}<sup>recalled</sup>{/if}
 						{:else}
@@ -410,7 +412,7 @@
 
 	.sampler {
 		position: relative;
-		overflow: hidden;
+		overflow: clip;
 		border-radius: 1rem 1rem 2.8rem 1rem;
 		padding: 1.15rem;
 	}

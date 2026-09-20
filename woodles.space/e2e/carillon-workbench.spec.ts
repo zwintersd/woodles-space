@@ -124,6 +124,49 @@ test('saves open entries with optional editable color labels', async ({ page }) 
  await expect(sampler.getByRole('button', { name: 'No label', exact: true })).toHaveAttribute('aria-pressed', 'true');
 });
 
+test('offers contextual details without recording answers until save', async ({ page }, testInfo) => {
+	await page.emulateMedia({ reducedMotion: 'reduce' });
+	await page.clock.setFixedTime(new Date('2026-09-19T12:00:00'));
+	await page.addInitScript(() => { if (!localStorage.getItem('planner.observations.v1')) localStorage.setItem('planner.observations.v1', JSON.stringify([
+		{ id: 'earlier', date: '2026-09-19', intervalStart: '09:00', source: 'live', kind: 'elsewhere', label: 'Slow start', details: { energy: 1 }, capturedAt: '', updatedAt: '' }
+	])); });
+	await open(page);
+	const sampler = page.getByTestId('interval-sampler');
+	await expect(sampler.getByTestId('detail-offer')).toHaveCount(0);
+	await sampler.getByLabel('What’s happening now?', { exact: true }).fill('Working on notes');
+	await expect(sampler.getByTestId('detail-offer')).toHaveCount(1);
+	await expect(sampler.getByText('You recorded low energy at 09:00. Has it changed?')).toBeVisible();
+	await sampler.getByRole('button', { name: /^Add energy/ }).click();
+	const rating = sampler.getByRole('group', { name: 'How much energy do you have?' });
+	await expect(rating.locator('[aria-pressed="true"]')).toHaveCount(0);
+	await rating.getByRole('button', { name: 'Low', exact: true }).click();
+	await sampler.getByRole('button', { name: 'Done', exact: true }).click();
+	await sampler.getByRole('button', { name: /^Add body/ }).click();
+	await sampler.getByLabel('What do you notice in your body?').fill('Tense shoulders');
+	await expect(sampler.getByTestId('detail-offer')).toHaveCount(0);
+	for (const width of [1440, 390]) {
+		await page.setViewportSize({ width, height: 1000 });
+		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+		expect(await sampler.evaluate(el => [el.scrollTop, el.scrollLeft])).toEqual([0, 0]);
+		await page.screenshot({ path: testInfo.outputPath(`moment-details-${width}.png`), fullPage: true, animations: 'disabled' });
+	}
+	let saved = await page.evaluate(() => JSON.parse(localStorage.getItem('planner.observations.v1') || '[]'));
+	expect(saved).toHaveLength(1);
+	await sampler.getByRole('button', { name: 'Save moment', exact: true }).click();
+	saved = await page.evaluate(() => JSON.parse(localStorage.getItem('planner.observations.v1') || '[]'));
+	expect(saved.find((o: { intervalStart: string }) => o.intervalStart === '12:00').details).toEqual({ energy: 2, body: 'Tense shoulders' });
+	await page.reload();
+	const restored = page;
+	const restoredSample = restored.getByTestId('interval-sampler');
+	await restoredSample.getByRole('button', { name: 'Energy · Low', exact: true }).click();
+	await restoredSample.getByRole('button', { name: 'Remove detail', exact: true }).click();
+	await restoredSample.getByRole('button', { name: 'Save changes', exact: true }).click();
+	await restored.reload();
+	await expect(restoredSample.getByRole('button', { name: 'Energy · Low', exact: true })).toHaveCount(0);
+	await restoredSample.getByRole('button', { name: 'Body ✓', exact: true }).click();
+	await expect(restoredSample.getByLabel('What do you notice in your body?')).toHaveValue('Tense shoulders');
+});
+
 test('extracts several idea tasks immediately and persists an edition note',async({page})=>{
 	await open(page);await section(page,'Surge');
 	await page.getByLabel('Title',{exact:true}).fill('Write a book');

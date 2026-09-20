@@ -175,6 +175,8 @@ export type IntervalKind =
  * many bells it spans.
  */
 export type IntervalObservation = {
+	/** Optional, explicitly entered details about this moment. */
+	details?: MomentDetails;
 	/** Snapshot of the optional user label; null means explicitly unlabelled. */
 	sampleTag?: SampleTag | null;
 	id: string;
@@ -196,6 +198,16 @@ export type SampleTag = {
 	color: string;
 	/** Stable compatibility bucket for existing reports and exports. */
 	kind: IntervalKind;
+};
+
+export type MomentDetails = {
+	mood?: number;
+	energy?: number;
+	coping?: number;
+	helped?: string;
+	friction?: string;
+	body?: string;
+	company?: string;
 };
 
 export type RoutineStep = {

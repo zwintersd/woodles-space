@@ -3,13 +3,15 @@
 	import { queueSync } from '$lib/sync.svelte';
 	import { INTERVAL_KIND_OPTIONS, type DayInterval } from '$lib/instrument';
 	import { uid } from '$lib/utils';
-	import type { SampleTag } from '$lib/types';
+	import type { SampleTag, MomentDetails as Details } from '$lib/types';
+	import MomentDetails from './MomentDetails.svelte';
+	import { cleanDetails } from '$lib/momentDetails';
 
 	let { interval }: { interval: DayInterval | null } = $props();
 	const colors = ['#aa526b', '#8061a8', '#467f92', '#98702f', '#548068', '#6676a0'];
 	const defaults: SampleTag[] = INTERVAL_KIND_OPTIONS.filter(o => o.kind !== 'elsewhere').map((o, i) => ({ id: o.kind, name: o.label, color: colors[i], kind: o.kind }));
 	let tags = $derived(store.settings.sampleTags ?? defaults);
-	let drafts = $state<Record<string, { text: string; tagId: string; fallback?: SampleTag }>>({});
+	let drafts = $state<Record<string, { text: string; tagId: string; fallback?: SampleTag; details: Details }>>({});
 	let draft = $derived(interval ? drafts[interval.key] : undefined);
 	let editing = $state(false);
 	let tagDraft = $state<SampleTag[]>([]);
@@ -20,14 +22,14 @@
 		const observation = interval.observation;
 		const own = observation?.intervalStart === interval.startTime ? observation : undefined;
 		const tag = own?.sampleTag === undefined ? defaults.find(t => t.kind === own?.kind) : own.sampleTag;
-		drafts[interval.key] = { text: own?.label ?? '', tagId: tag?.id ?? '', fallback: tag ?? undefined };
+		drafts[interval.key] = { text: own?.label ?? '', tagId: tag?.id ?? '', fallback: tag ?? undefined, details: { ...own?.details } };
 		feedback = '';
 	});
 	let chosen = $derived(tags.find(t => t.id === draft?.tagId) ?? (draft?.fallback?.id === draft?.tagId ? draft?.fallback : undefined));
 	function saveSample() {
 		if (!interval || !draft?.text.trim()) return;
 		const existing = interval.observation?.intervalStart === interval.startTime ? interval.observation : undefined;
-		store.observeInterval({ date: interval.date, intervalStart: interval.startTime, label: draft.text, kind: chosen?.kind ?? 'elsewhere', sampleTag: chosen ? { ...chosen } : null, source: existing?.source ?? 'live', note: existing?.note });
+		store.observeInterval({ date: interval.date, intervalStart: interval.startTime, label: draft.text, kind: chosen?.kind ?? 'elsewhere', sampleTag: chosen ? { ...chosen } : null, details: cleanDetails(draft.details), source: existing?.source ?? 'live', note: existing?.note });
 		queueSync();
 		feedback = existing ? 'Changes saved.' : 'Moment saved.';
 	}
@@ -53,6 +55,7 @@
 			{/each}
 			{#if chosen && !tags.some(t => t.id === chosen.id)}<span class="retired">{chosen.name} · saved label</span>{/if}
 		</div>
+		{#if interval && draft}{#key interval.key}<MomentDetails bind:details={draft.details} text={draft.text} tagName={chosen?.name} date={interval.date} start={interval.startTime} previous={store.getObservationsForDate(interval.date)} onchange={() => feedback = ''} />{/key}{/if}
 		<div class="save-row"><span role="status">{feedback || (interval ? 'Your words first. Add a label if it helps.' : 'Outside sampling hours. Add an earlier activity below.')}</span><button class="save" disabled={!draft?.text.trim()}>{interval?.observation?.intervalStart === interval?.startTime && interval?.observation ? 'Save changes' : 'Save moment'}</button></div>
 	</form>
 	{#if editing}

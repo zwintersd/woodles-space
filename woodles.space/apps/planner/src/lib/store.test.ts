@@ -36,6 +36,17 @@ describe('PlannerStore', () => {
 	});
 
 	// ── initialization ────────────────────────────────────────────────
+	it('keeps moment details independent from drafts and preserves or explicitly clears them on edits', () => {
+		const details = { energy: 2, helped: 'A walk' };
+		const input = { date: '2026-09-19', intervalStart: '12:00', kind: 'elsewhere' as const, label: 'Outside' };
+		store.observeInterval({ ...input, details });
+		details.helped = 'Draft change';
+		store.observeInterval({ ...input, label: 'Still outside' });
+		expect(new PlannerStore().getObservation(input.date, input.intervalStart)?.details).toEqual({ energy: 2, helped: 'A walk' });
+		store.observeInterval({ ...input, details: {} });
+		expect(new PlannerStore().getObservation(input.date, input.intervalStart)?.details).toEqual({});
+		expect(store.getObservationsForDate(input.date)).toHaveLength(1);
+	});
 	it('persists open sample text and label snapshots independently of editable options', () => {
 		const tag = { id: 'outdoors', name: 'Outside', color: '#338866', kind: 'elsewhere' as const };
 		store.updateSettings({ sampleTags: [tag] });

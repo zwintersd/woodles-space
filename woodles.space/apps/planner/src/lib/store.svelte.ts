@@ -508,6 +508,7 @@ export class PlannerStore {
 	}
 
 	observeInterval(input: {
+		details?: IntervalObservation['details'];
 		sampleTag?: IntervalObservation['sampleTag'];
 		date?: string;
 		intervalStart: string;
@@ -538,6 +539,7 @@ export class PlannerStore {
 		const timestamp = new Date().toISOString();
 
 		const observation: IntervalObservation = {
+			details: input.details === undefined ? existing?.details : { ...input.details },
 			sampleTag: input.sampleTag === undefined ? existing?.sampleTag : input.sampleTag ? { ...input.sampleTag } : null,
 			id,
 			date,
