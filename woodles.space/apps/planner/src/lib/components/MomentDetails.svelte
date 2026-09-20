@@ -1,18 +1,24 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { DETAIL_FIELDS, hasDetail, suggestMomentDetails, type DetailKey } from '$lib/momentDetails';
-	import type { IntervalObservation, MomentDetails } from '$lib/types';
-	let { details = $bindable<MomentDetails>({}), text, tagName, date, start, previous, onchange } : {
+	import type { IntervalObservation, MomentDetails, TrackerAnswer } from '$lib/types';
+	import { store } from '$lib/store.svelte';
+	import { trackerOffer } from '$lib/momentTrackers';
+	import PersonalTrackers from './PersonalTrackers.svelte';
+	let { details = $bindable<MomentDetails>({}), answers = $bindable<TrackerAnswer[]>([]), text, tagName, date, start, previous, onchange } : {
+		answers: TrackerAnswer[];
 		details: MomentDetails; text: string; tagName?: string; date: string; start: string;
 		previous: IntervalObservation[]; onchange: () => void;
 	} = $props();
-	let active = $state<DetailKey | null>(null);
+	let active = $state<string | null>(null);
+	let dismissedTrackers = $state<string[]>([]);
 	let dismissed = $state<DetailKey[]>([]);
 	let browsing = $state(false);
 	let quiet = $state(false);
 	let field = $derived(DETAIL_FIELDS.find(f => f.key === active));
 	let answered = $derived(DETAIL_FIELDS.filter(f => hasDetail(details, f.key)));
-	let offers = $derived(suggestMomentDetails({ text, tagName, details, date, start, previous, dismissed }));
+	let customOffer = $derived(trackerOffer(store.settings.momentTrackers ?? [], answers, text, date, start, previous, dismissedTrackers));
+	let offers = $derived(suggestMomentDetails({ text, tagName, details, date, start, previous, dismissed }).slice(0, customOffer ? 1 : 2));
 	async function open(key: DetailKey) {
 		active = key; browsing = false;
 		await tick();
@@ -28,14 +34,16 @@
 	{#if answered.length}<div class="recorded" aria-label="Details added">
 		{#each answered as item (item.key)}<button type="button" onclick={() => open(item.key)}>{item.title}{item.scale ? ` · ${item.scale[Number(details[item.key]) - 1]}` : ' ✓'}</button>{/each}
 	</div>{/if}
-	{#if !active && !quiet && offers.length}
+	{#if !active && !quiet && (offers.length || customOffer)}
 		<div class="offer-heading"><span>Worth adding?</span><button type="button" onclick={() => quiet = true}>Hide suggestions</button></div>
 		<div class="offers">{#each offers as offer (offer.key)}
 			<div class="offer" data-testid="detail-offer">
 				<button type="button" class="offer-main" onclick={() => open(offer.key)}><strong>Add {DETAIL_FIELDS.find(f => f.key === offer.key)?.title.toLowerCase()}</strong><small>{offer.reason}</small></button>
 				<button type="button" class="dismiss" aria-label={`Dismiss ${offer.key} suggestion`} onclick={() => dismissed = [...dismissed, offer.key]}>×</button>
 			</div>
-		{/each}</div>
+		{/each}
+		{#if customOffer}<div class="offer" data-testid="detail-offer"><button type="button" class="offer-main" onclick={() => active = `custom:${customOffer!.tracker.id}`}><strong>Add {customOffer.tracker.name}</strong><small>{customOffer.reason}</small></button><button type="button" class="dismiss" aria-label={`Dismiss ${customOffer.tracker.name} suggestion`} onclick={() => dismissedTrackers = [...dismissedTrackers, customOffer!.tracker.id]}>×</button></div>{/if}
+		</div>
 	{/if}
 	{#if field}<div class="detail-panel" id="moment-detail-editor">
 		<p id="detail-question">{field.question}</p>
@@ -48,8 +56,9 @@
 		<summary>More details <small>optional</small></summary>
 		<p>Only log what feels useful. Blank fields stay unrecorded.</p>
 		<div class="choices">{#each DETAIL_FIELDS as item}<button type="button" onclick={() => open(item.key)}>{item.title}{hasDetail(details, item.key) ? ' ✓' : ''}</button>{/each}</div>
-		{#if quiet || dismissed.length}<button class="reset" type="button" onclick={() => { quiet = false; dismissed = []; browsing = false; }}>Show suggestions again</button>{/if}
+		{#if quiet || dismissed.length || dismissedTrackers.length}<button class="reset" type="button" onclick={() => { quiet = false; dismissed = []; dismissedTrackers = []; browsing = false; }}>Show suggestions again</button>{/if}
 	</details>
+	<PersonalTrackers bind:answers bind:active {onchange} />
 </section>
 
 <style>

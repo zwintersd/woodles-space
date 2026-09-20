@@ -36,6 +36,19 @@ describe('PlannerStore', () => {
 	});
 
 	// ── initialization ────────────────────────────────────────────────
+	it('snapshots personal tracker names, types, and answers through later customization', () => {
+		const tracker = { id: 'focus', name: 'Focus', type: 'rating' as const, cue: 'reading', low: 'Scattered', high: 'Absorbed' };
+		const input = { date: '2026-09-20', intervalStart: '12:00', kind: 'elsewhere' as const, label: 'Reading' };
+		store.updateSettings({ momentTrackers: [tracker] });
+		store.observeInterval({ ...input, trackerAnswers: [{ tracker, value: 3 }] });
+		tracker.name = 'Attention';
+		store.updateSettings({ momentTrackers: [] });
+		store.observeInterval({ ...input, label: 'Reading more' });
+		const saved = new PlannerStore().getObservation(input.date, input.intervalStart)!;
+		expect(saved.trackerAnswers?.[0]).toMatchObject({ tracker: { name: 'Focus', type: 'rating', low: 'Scattered' }, value: 3 });
+		store.observeInterval({ ...input, trackerAnswers: [] });
+		expect(new PlannerStore().getObservation(input.date, input.intervalStart)?.trackerAnswers).toEqual([]);
+	});
 	it('keeps moment details independent from drafts and preserves or explicitly clears them on edits', () => {
 		const details = { energy: 2, helped: 'A walk' };
 		const input = { date: '2026-09-19', intervalStart: '12:00', kind: 'elsewhere' as const, label: 'Outside' };

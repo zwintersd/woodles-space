@@ -167,6 +167,53 @@ test('offers contextual details without recording answers until save', async ({ 
 	await expect(restoredSample.getByLabel('What do you notice in your body?')).toHaveValue('Tense shoulders');
 });
 
+test('customizes trackers, offers relevant questions, and reopens them from the day review', async ({ page }, testInfo) => {
+	await page.clock.setFixedTime(new Date('2026-09-20T12:00:00'));
+	await page.emulateMedia({ reducedMotion: 'reduce' });
+	await open(page);
+	const sampler = page.getByTestId('interval-sampler');
+	await sampler.getByText('Your trackers', { exact: false }).click();
+	await sampler.getByRole('button', { name: 'Customize trackers', exact: true }).click();
+	await sampler.getByRole('button', { name: 'Add tracker', exact: true }).click();
+	await sampler.getByLabel('Tracker 1 name', { exact: true }).fill('Focus');
+	await sampler.getByLabel('Tracker 1 low', { exact: true }).fill('Scattered');
+	await sampler.getByLabel('Tracker 1 high', { exact: true }).fill('Absorbed');
+	await sampler.getByLabel('Tracker 1 cues', { exact: true }).fill('reading, writing');
+	await sampler.getByRole('button', { name: 'Add tracker', exact: true }).click();
+	await sampler.getByLabel('Tracker 2 name', { exact: true }).fill('Outside');
+	await sampler.getByLabel('Tracker 2 type', { exact: true }).selectOption('check');
+	await sampler.getByRole('button', { name: 'Save trackers', exact: true }).click();
+	await sampler.getByLabel('What’s happening now?', { exact: true }).fill('Reading a book');
+	await expect(sampler.getByTestId('detail-offer')).toHaveCount(2);
+	await sampler.getByRole('button', { name: /^Add Focus/ }).click();
+	await sampler.getByRole('group', { name: 'Focus', exact: true }).getByRole('button', { name: '4', exact: true }).click();
+	await sampler.getByRole('button', { name: 'Done', exact: true }).click();
+	await sampler.getByRole('button', { name: 'Outside', exact: true }).click();
+	await sampler.getByRole('group', { name: 'Outside', exact: true }).getByRole('button', { name: 'No', exact: true }).click();
+	await sampler.getByRole('button', { name: 'Save moment', exact: true }).click();
+	await page.reload();
+	await expect(sampler.getByRole('button', { name: 'Focus · 4/5', exact: true })).toBeVisible();
+	await expect(sampler.getByRole('button', { name: 'Outside · No', exact: true })).toBeVisible();
+	await page.locator('summary').filter({ hasText: 'Day so far' }).click();
+	await page.getByLabel('Find a moment', { exact: true }).fill('Focus');
+	await expect(page.getByRole('button', { name: 'Reopen 12:00: Reading a book', exact: true })).toBeVisible();
+	for (const width of [1440, 390]) {
+		await page.setViewportSize({ width, height: 1000 });
+		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+		await page.screenshot({ path: testInfo.outputPath(`personal-trackers-${width}.png`), fullPage: true, animations: 'disabled' });
+	}
+	await page.getByRole('button', { name: 'Reopen 12:00: Reading a book', exact: true }).click();
+	await sampler.getByRole('button', { name: 'Focus · 4/5', exact: true }).click();
+	await expect(sampler.getByRole('group', { name: 'Focus', exact: true }).getByRole('button', { name: '4', exact: true })).toHaveAttribute('aria-pressed', 'true');
+	await page.evaluate(() => { const settings = JSON.parse(localStorage.getItem('planner.settings.v1') || '{}'); settings.wakeAnchor = '13:00'; localStorage.setItem('planner.settings.v1', JSON.stringify(settings)); });
+	await page.reload();
+	await page.locator('summary').filter({ hasText: 'Day so far' }).click();
+	await page.getByRole('button', { name: 'Reopen 12:00: Reading a book', exact: true }).click();
+	await expect(sampler.getByLabel('What was happening?', { exact: true })).toHaveValue('Reading a book');
+	await sampler.getByRole('button', { name: 'Focus · 4/5', exact: true }).click();
+	await expect(sampler.getByRole('group', { name: 'Focus', exact: true }).getByRole('button', { name: '4', exact: true })).toHaveAttribute('aria-pressed', 'true');
+});
+
 test('extracts several idea tasks immediately and persists an edition note',async({page})=>{
 	await open(page);await section(page,'Surge');
 	await page.getByLabel('Title',{exact:true}).fill('Write a book');

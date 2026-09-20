@@ -508,6 +508,7 @@ export class PlannerStore {
 	}
 
 	observeInterval(input: {
+		trackerAnswers?: IntervalObservation['trackerAnswers'];
 		details?: IntervalObservation['details'];
 		sampleTag?: IntervalObservation['sampleTag'];
 		date?: string;
@@ -539,6 +540,7 @@ export class PlannerStore {
 		const timestamp = new Date().toISOString();
 
 		const observation: IntervalObservation = {
+			trackerAnswers: input.trackerAnswers === undefined ? existing?.trackerAnswers : input.trackerAnswers.map(a => ({ tracker: { ...a.tracker }, value: a.value })),
 			details: input.details === undefined ? existing?.details : { ...input.details },
 			sampleTag: input.sampleTag === undefined ? existing?.sampleTag : input.sampleTag ? { ...input.sampleTag } : null,
 			id,

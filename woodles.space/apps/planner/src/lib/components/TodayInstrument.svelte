@@ -11,6 +11,7 @@
 	import { dateKey, dayOfWeekLabel, shortDateLabel, timeToMinutes } from '$lib/utils';
 	import DayPlan from './DayPlan.svelte';
 	import MomentarySample from './MomentarySample.svelte';
+	import MomentDayReview from './MomentDayReview.svelte';
 	import { detailSummary } from '$lib/momentDetails';
 	import CatchUp from './CatchUp.svelte';
 	import Capacity from './Capacity.svelte';
@@ -47,7 +48,16 @@
 	let ledgerDateKey = $derived(todayKey);
 	let ledgerObservations = $derived(todayObservations);
 	let ledgerIntervals = $derived(todayIntervals);
-	let selectedInterval = $derived(todayIntervals.find(row => row.startTime === selectedStart) ?? currentInterval);
+	let selectedInterval = $derived.by((): DayInterval | null => {
+		if (!selectedStart) return currentInterval;
+		const row = todayIntervals.find(row => row.startTime === selectedStart);
+		if (row) return row;
+		// A saved moment remains editable even after sampling hours have changed.
+		const observation = todayObservations.find(o => o.intervalStart === selectedStart);
+		return observation ? { key: `${todayKey}@${selectedStart}`, date: todayKey, startTime: selectedStart,
+			endTime: timeForMinutes(timeToMinutes(selectedStart) + (observation.intervalMinutes ?? store.settings.samplingIntervalMinutes)),
+			state: 'past', plannedBlock: null, observation } : null;
+	});
 
 	let tomorrow = $derived.by(() => {
 		const next = new Date(store.now);
@@ -213,6 +223,7 @@
 		<div class="plan-dock"><DayPlan {onopenpiles} /></div>
 	</div>
 
+	<MomentDayReview observations={todayObservations} onselect={start => { selectedStart = start; document.querySelector<HTMLElement>('#moment-entry')?.focus(); }} />
 	<details class="context-details"><summary>Sleep and context</summary><Capacity /></details>
 	<details class="context-details"><summary>Add an earlier activity</summary><CatchUp intervals={todayIntervals} {onopenroutines} {onopensurge} /></details>
 
