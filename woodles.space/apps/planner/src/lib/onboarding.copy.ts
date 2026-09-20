@@ -18,20 +18,20 @@ export const STEP_COPY: OnboardingStepCopy[] = [
 	{
 		eyebrow: 'ONE OF SIX',
 		heading: 'When does your day start and end?',
-		subprompt: 'Set the hours you want to plan and record.',
+		subprompt: 'Set the hours shown in Today. You can plan activities and record what happened throughout this window.',
 		cta: 'Save hours →'
 	},
 	{
 		eyebrow: 'TWO OF SIX',
 		heading: 'What commitments repeat each week?',
-		subprompt: 'Add recurring appointments, work hours, or other fixed commitments.',
+		subprompt: 'Add fixed times on selected weekdays. These appear alongside your day pile; you can skip a commitment on an individual date.',
 		cta: 'Save commitments →'
 	},
 	{
 		eyebrow: 'THREE OF SIX',
-		heading: 'What activities repeat each day?',
-		subprompt: 'Add regular activities you want to see on your plan.',
-		cta: 'Save activities →'
+		heading: 'What routines help you get started?',
+		subprompt: 'Save reusable checklists with a cue and small steps. Link them to activities when you arrange your day piles.',
+		cta: 'Save routines →'
 	},
 	{
 		eyebrow: 'FOUR OF SIX',
@@ -42,13 +42,13 @@ export const STEP_COPY: OnboardingStepCopy[] = [
 	{
 		eyebrow: 'FIVE OF SIX',
 		heading: 'Choose a default pile for each weekday.',
-		subprompt: 'Start with these templates. Edit their activities in Day piles.',
+		subprompt: 'Edit a starter pile or create your own, then assign weekday defaults. Activities can have fixed times or stay flexible.',
 		cta: 'Save week →'
 	},
 	{
 		eyebrow: 'SIX OF SIX',
-		heading: 'Choose a reminder style.',
-		subprompt: 'All styles use direct language. This setting changes the amount of detail.',
+		heading: 'How often do you want to check in?',
+		subprompt: 'Choose an observation interval, bell settings, and reminder detail. Today lets you record activities and moments; Editions brings those records together.',
 		cta: 'Finish setup →'
 	}
 ];
@@ -66,15 +66,15 @@ export const PLACEHOLDERS = {
 
 export const WELCOME = {
 	heading: 'Set up your week.',
-	subheading: 'Choose your hours, recurring commitments, and day templates.',
-	cta: 'let’s Finish setup →'
+	subheading: 'Set your hours, commitments, routines, categories, day piles, and check-in preferences.',
+	cta: 'Start setup →'
 };
 
 // ── Completion screen ──────────────────────────────────────────────
 
 export const COMPLETION = {
 	heading: 'Your week is ready.',
-	body: 'Add a task now, or open Carillon to review your plan.',
+	body: 'Add a task now, or open Today to adjust your plan and record what happens. Save ideas in Surge and turn them into tasks when ready.',
 	cta: 'Add a task →',
 	skipCta: 'open carillon'
 };
@@ -116,11 +116,11 @@ export type RefreshSection = {
 
 export const REFRESH_SECTIONS: RefreshSection[] = [
 	{ step: 1, label: 'day anchors', hint: 'when the day starts and ends' },
-	{ step: 2, label: 'obligations', hint: 'fixed commitments already on the calendar' },
-	{ step: 3, label: 'rituals', hint: 'activities that repeat daily' },
-	{ step: 4, label: 'domains', hint: 'categories for your tasks' },
-	{ step: 5, label: 'week rhythm', hint: 'which day pile fits which weekday' },
-	{ step: 6, label: 'voice', hint: 'how Carillon talks to you' }
+	{ step: 2, label: 'commitments', hint: 'fixed commitments already on the calendar' },
+	{ step: 3, label: 'routines and daily activities', hint: 'reusable checklists and daily fixed times' },
+	{ step: 4, label: 'categories', hint: 'categories for your tasks' },
+	{ step: 5, label: 'day piles and week', hint: 'which day pile fits which weekday' },
+	{ step: 6, label: 'check-ins and reminders', hint: 'observation interval, bells, and reminder detail' }
 ];
 
 // ── Tone presets ───────────────────────────────────────────────────

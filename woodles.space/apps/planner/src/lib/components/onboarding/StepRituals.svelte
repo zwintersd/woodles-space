@@ -6,6 +6,13 @@
 
 	const copy = STEP_COPY[2];
 
+	let routineName = $state('');
+	let cue = $state('');
+	let steps = $state('');
+	function addRoutine() {
+		if (!store.addRoutine(routineName, steps.split('\n'), cue)) return;
+		routineName = ''; cue = ''; steps = '';
+	}
 	let name = $state('');
 	let startTime = $state('07:00');
 	let endTime = $state('07:30');
@@ -31,6 +38,25 @@
 	stage={3}
 	onAdvance={advance}
 >
+	<section class="wb-card">
+		<h2>Reusable routines</h2>
+		<p>A routine is a checklist, not a scheduled appointment. Run it from Routines or link it to a pile activity in step five.</p>
+		{#each store.routines.filter(r => !r.archived && !r.deletedAt) as routine (routine.id)}
+			<details><summary>{routine.name} · {routine.steps.length} steps</summary>
+				{#if routine.cue}<p>{routine.cue}</p>{/if}
+				<ol>{#each routine.steps as step}<li>{step.label}</li>{/each}</ol>
+			</details>
+		{/each}
+		<form class="wb-list" onsubmit={(e) => { e.preventDefault(); addRoutine(); }}>
+			<label>Routine name<input required bind:value={routineName} placeholder="e.g. Start work" /></label>
+			<label>Cue<input bind:value={cue} placeholder="e.g. After breakfast" /></label>
+			<label>Steps, one per line<textarea required rows="4" bind:value={steps} placeholder="Open notebook&#10;Choose one task&#10;Gather what you need"></textarea></label>
+			<button type="submit" disabled={!routineName.trim() || !steps.trim()}>+ Add routine</button>
+		</form>
+		<p class="wb-note">Edit, reorder, archive, or delete routines later in Routines. Saved practice records keep their original steps.</p>
+	</section>
+	<details><summary>Daily activities at a fixed time (optional)</summary>
+	<p>These appear every day, separately from routine checklists and day piles.</p>
 	{#if store.rituals.length > 0}
 		<ul class="rit-list">
 			{#each store.rituals as r (r.id)}
@@ -61,6 +87,7 @@
 	</form>
 
 	<p class="rit-hint">applies to every day. you can override on any single date later.</p>
+</details>
 </StepShell>
 
 <style>

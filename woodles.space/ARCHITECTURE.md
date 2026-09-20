@@ -457,14 +457,20 @@ request. Practice ids are routine-plus-date, so correcting today's data replaces
 today's record rather than pretending it was another day.
 
 **Onboarding and refresh.** First setup is a six-step wizard (`OnboardingStore`,
-`onboarding.store.svelte.ts`) — anchors, obligations, rituals, domains, week
-rhythm, voice — that mutates the planner directly as each step is answered
+`onboarding.store.svelte.ts`) — hours, commitments, routines, categories, day piles and weekday
+defaults, check-ins and reminders — that mutates the planner directly as each step is answered
 rather than staging changes to commit at the end, so "finish later" is always
 safe: `settings.onboardingStep` checkpoints exactly which question was live,
 and a reload resumes there. Once `onboardingComplete` is true, though, that
 same six-step machinery had been the *only* way back into any of those
 questions — changing one setting meant "restart the wizard," which looks and
 feels like wiping progress even though the underlying data was untouched.
+Step three creates reusable routine checklists with cues and keeps daily fixed-time
+activities in an optional section. Step five reuses the activity editor for fixed
+or flexible activities and routine links, supports new piles and unassigned weekdays,
+and saves pile edits explicitly. Step six sets observation intervals, bells, quiet
+hours, and reminder detail. Revisiting categories retains custom category definitions.
+The completion recap introduces Today, Surge, and Editions.
 **Refresh** is a second, independent entry point into the identical step
 components: `startRefresh([steps])` opens directly on whichever section(s)
 were picked from the Binder's sync tab, in that order, over the running app

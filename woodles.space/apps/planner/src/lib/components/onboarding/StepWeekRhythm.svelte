@@ -2,7 +2,8 @@
 	import { store } from '$lib/store.svelte';
 	import { onboarding } from '$lib/onboarding.store.svelte';
 	import { STEP_COPY, SHAPE_DESCRIPTIONS } from '$lib/onboarding.copy';
-	import { timeToMinutes } from '$lib/utils';
+	import BlockEditor from '../BlockEditor.svelte';
+	import { uid, timeToMinutes } from '$lib/utils';
 	import type { WeekPattern, DayShape } from '$lib/types';
 	import StepShell from './StepShell.svelte';
 
@@ -18,6 +19,18 @@
 	// Track which shape is selected on the palette (visual hint only).
 	let activeShapeId = $state<string | null>(store.dayShapes.find(s => !s.deletedAt && !s.archived)?.id ?? null);
 
+	let draft = $state<DayShape | null>(null);
+	let notice = $state('');
+	function editPile(pile: DayShape) {
+		draft = { ...pile, blocks: pile.blocks.map(b => ({ ...b, flexible: b.flexible ?? false })) };
+		notice = '';
+	}
+	function savePile() {
+		if (!draft || !store.savePile(draft)) { notice = 'Give the pile and each activity a name, and fixed activities a valid time range.'; return; }
+		activeShapeId = draft.id;
+		draft = null;
+		notice = 'Pile saved. Assign it to weekdays below.';
+	}
 	function assign(dayOfWeek: number, shapeId: string) {
 		const next = [...working];
 		next[dayOfWeek] = shapeId;
@@ -59,10 +72,11 @@
 	subprompt={copy.subprompt}
 	cta={copy.cta}
 	stage={5}
+	canAdvance={draft === null}
 	onAdvance={advance}
 >
 	<!-- Shape palette: cards with day-arc visualisation -->
-	<div class="shape-palette" role="radiogroup" aria-label="day shape palette">
+	<div class="shape-palette" role="radiogroup" aria-label="day pile palette">
 		{#each store.dayShapes.filter(s => !s.deletedAt && !s.archived) as shape (shape.id)}
 			{@const segs = arcSegments(shape)}
 			<button
@@ -71,7 +85,7 @@
 				onclick={() => (activeShapeId = shape.id)}
 				role="radio"
 				aria-checked={activeShapeId === shape.id}
-				title="pick this shape, then tap weekdays below"
+				title="pick this pile, then tap weekdays below"
 			>
 				<div class="shape-card-head">
 					<span class="shape-card-name">{shape.name}</span>
@@ -80,7 +94,7 @@
 					{/if}
 				</div>
 				<span class="shape-card-desc">
-					{SHAPE_DESCRIPTIONS[shape.id] ?? `${shape.blocks.length} blocks`}
+					{SHAPE_DESCRIPTIONS[shape.id] ?? `${shape.blocks.length} activities`}
 				</span>
 
 				<!-- 18-hour arc: 6am → midnight -->
@@ -109,10 +123,24 @@
 
 	<p class="rhythm-hint">
 		<span class="rhythm-hint-mark">✦</span>
-		pick a shape, then tap the days it belongs to.
+		Pick a pile, then choose its weekdays.
 		<span class="rhythm-hint-mark">✦</span>
 	</p>
 
+	<div class="wb-actions">
+		<button onclick={() => { const pile = store.dayShapes.find(p => p.id === activeShapeId); if (pile) editPile(pile); }} disabled={!activeShapeId}>Edit selected pile</button>
+		<button onclick={() => editPile({ id: uid(), name: '', blocks: [] })}>+ New day pile</button>
+		<button aria-pressed={activeShapeId === ''} onclick={() => activeShapeId = ''}>No pile</button>
+	</div>
+	{#if draft}
+		<form class="wb-card wb-list" onsubmit={(e) => { e.preventDefault(); savePile(); }}>
+			<label>Pile name<input required bind:value={draft.name} /></label>
+			<BlockEditor bind:blocks={draft.blocks} />
+			<div class="wb-actions"><button type="submit">Save pile</button><button type="button" onclick={() => draft = null}>Cancel edit</button></div>
+		</form>
+	{/if}
+	<p role="status">{notice}</p>
+	<p class="wb-note">Commitments and daily activities are added separately, so avoid copying them into a pile. Weekday defaults apply to days you have not customized. Today lets you change a single date without changing the template.</p>
 	<!-- Weekday tiles -->
 	<div class="weekday-row">
 		{#each WEEKDAY_ORDER as dow, i}
@@ -121,12 +149,12 @@
 			<button
 				class="weekday-tile"
 				class:restful={shape?.restful}
-				onclick={() => activeShapeId && assign(dow, activeShapeId)}
-				disabled={!activeShapeId}
+				onclick={() => activeShapeId !== null && assign(dow, activeShapeId)}
+				disabled={activeShapeId === null}
 				title={shape ? `${WEEKDAY_LABELS[i]} → ${shape.name}` : WEEKDAY_LABELS[i]}
 			>
 				<span class="weekday-dow">{WEEKDAY_LABELS[i]}</span>
-				<span class="weekday-shape">{shape?.name ?? '—'}</span>
+				<span class="weekday-shape">{shape?.name ?? 'No pile'}</span>
 				{#if shape?.restful}
 					<span class="weekday-mark" aria-hidden="true">✦</span>
 				{/if}
