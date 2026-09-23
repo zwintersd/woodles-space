@@ -782,16 +782,22 @@
 	.instrument { gap: 0.8rem; }
 	.day-heading { align-items: center; }
 	.plan-dock { min-width: 0; position: sticky; top: 1rem; border: 1px solid var(--car-line); border-radius: 0.85rem; background: var(--car-wash); color: var(--car-cream); }
-	.plan-dock summary { display: grid; gap: 0.2rem; padding: 0.9rem 1rem; cursor: pointer; list-style-position: inside; }
+	.plan-dock summary { display: grid; gap: 0.12rem; padding: 0.7rem 0.85rem; cursor: pointer; list-style-position: inside; }
 	.plan-dock summary span { font: 0.6rem var(--car-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--car-mist); }
 	.plan-dock summary strong { font: 500 1.1rem var(--car-display); }
 	.plan-dock summary small { font: 0.62rem var(--car-body); color: var(--car-mist); }
 	.plan-dock details[open] summary { border-bottom: 1px solid var(--car-line); }
-	.plan-dock :global(.wb-card) { padding: 1rem; }
-	.plan-dock :global(.workbench) { padding: 0.6rem; }
-	.plan-dock :global(.wb-heading) { gap: 0.7rem; margin-bottom: 0.7rem; }
-	.plan-dock :global(h2) { font-size: 1.4rem; }
-	.plan-dock :global(.wb-row) { padding: 0.55rem 0; }
+	.plan-dock :global(.wb-card) { padding: 0.7rem; margin-bottom: 0; }
+	.plan-dock :global(.workbench) { padding: 0.45rem; }
+	.plan-dock :global(.wb-heading) { gap: 0.5rem; margin-bottom: 0.35rem; }
+	/* The disclosure summary already names the plan, so keep its expanded actions on one compact line. */
+	.plan-dock :global(.wb-heading > div:first-child) { display: none; }
+	.plan-dock :global(.wb-heading .wb-actions) { gap: 0.35rem; margin: 0; }
+	.plan-dock :global(.wb-heading .wb-actions button) { padding: 0.42rem 0.55rem; font-size: 0.68rem; }
+	.plan-dock :global(h2) { font-size: 1.2rem; }
+	.plan-dock :global(.plan-toolbar) { margin-bottom: 0.15rem; }
+	.plan-dock :global(.wb-row) { padding: 0.3rem 0; gap: 0.45rem; }
+	.plan-dock :global(.activity-title) { font-size: 0.9rem; }
 	.plan-dock :global(.wb-notice:empty) { display: none; }
 	.sampler { animation: settle-in 280ms ease-out both; }
 	.context-details { border: 1px solid var(--car-line); border-radius: 0.7rem; padding: 0.65rem 0.85rem; }
@@ -800,6 +806,10 @@
 	@media (max-width: 900px) {
 		.instrument-grid { grid-template-columns: minmax(0, 1fr); }
 		.plan-dock { position: static; }
+		.plan-dock :global(.wb-card) { padding: 1rem; }
+		.plan-dock :global(.workbench) { padding: 0.6rem; }
+		.plan-dock :global(.wb-row) { padding: 0.55rem 0; gap: 0.8rem; }
+		.plan-dock :global(.activity-title) { font-size: 1rem; }
 		.day-heading { flex-wrap: wrap; gap: 0.6rem; }
 		.day-heading h1 { font-size: 1.4rem; }
 		.day-actions { flex-wrap: wrap; }
