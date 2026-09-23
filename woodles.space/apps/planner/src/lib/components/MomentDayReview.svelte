@@ -9,7 +9,7 @@
 	let changes = $derived(ratingChanges(observations));
 </script>
 
-<details class="review">
+<details class="review" open>
 	<summary>Day so far <small>{observations.length} recorded moment{observations.length === 1 ? '' : 's'}</small></summary>
 	{#if changes.length}<div class="changes" aria-label="Recorded changes today">{#each changes as change}
 		{@const field = DETAIL_FIELDS.find(f => f.key === change.key)!}
@@ -31,7 +31,8 @@
 </details>
 
 <style>
-	.review { border: 1px solid var(--car-line); border-radius: .7rem; padding: .65rem .85rem; color: var(--car-cream); font: .8rem var(--car-body); }
+	.review { border: 1px solid var(--car-line); border-radius: .85rem; padding: .8rem 1rem; color: var(--car-cream); background: var(--car-wash); font: .8rem var(--car-body); }
+	.review[open] { padding-bottom: 1rem; }
 	summary { cursor: pointer; padding: .15rem 0; }
 	summary small { margin-left: .5rem; }
 	small { font-size: .7rem; opacity: .8; }

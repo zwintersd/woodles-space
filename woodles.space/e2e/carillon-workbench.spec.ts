@@ -21,11 +21,13 @@ test('edits a pile, isolates today, and reloads the saved day',async({page})=>{
 	await page.getByRole('button',{name:'Save pile',exact:true}).click();
 	await page.getByRole('button',{name:'Use saved pile today',exact:true}).click();
 	await section(page,'Today');
+	await page.locator('.plan-dock > details > summary').click();
 	await expect(page.getByText('Read at home',{exact:true})).toBeVisible();
 	await page.getByRole('button',{name:'Change today',exact:true}).click();
 	await page.getByLabel('Activity 1',{exact:true}).fill('Read outside today');
 	await page.getByRole('button',{name:'Save today only',exact:true}).click();
 	await page.reload();
+	await page.locator('.plan-dock > details > summary').click();
 	await expect(page.getByText('Read outside today',{exact:true})).toBeVisible();
 	await section(page,'Day piles');
 	await page.getByRole('button',{name:/Home test day.*1 activities/}).click();
@@ -63,6 +65,7 @@ test('edits, reorders, archives, restores, and deletes a routine',async({page})=
 test('opens an activity directly and cancels without changing the plan', async ({ page }) => {
 	await page.clock.setFixedTime(new Date('2026-09-19T12:00:00'));
 	await open(page);
+	await page.locator('.plan-dock > details > summary').click();
 	const plan = page.getByRole('region', { name: "Today's plan" });
 	await expect(plan.locator('.plan-row.now')).toHaveCount(1);
 	const allCount = await plan.locator('.plan-row').count();
@@ -89,7 +92,12 @@ test('saves open entries with optional editable color labels', async ({ page }) 
  const entry = sampler.getByLabel('What’s happening now?', { exact: true });
  await entry.fill('Reading outside');
  await sampler.getByRole('button', { name: 'Save moment', exact: true }).click();
+ await expect(entry).toHaveCount(0);
+ await expect(sampler.getByText('Moment saved', { exact: true })).toBeVisible();
  await page.reload();
+ await expect(sampler.getByLabel('What’s happening now?', { exact: true })).toHaveCount(0);
+ await expect(page.getByRole('button', { name: 'Reopen 12:00: Reading outside', exact: true })).toBeVisible();
+ await page.getByRole('button', { name: 'Reopen 12:00: Reading outside', exact: true }).click();
  await expect(entry).toHaveValue('Reading outside');
  await expect(sampler.getByRole('button', { name: 'No label', exact: true })).toHaveAttribute('aria-pressed', 'true');
  await sampler.getByRole('button', { name: 'Edit labels', exact: true }).click();
@@ -103,6 +111,7 @@ test('saves open entries with optional editable color labels', async ({ page }) 
  await expect(entry).toHaveValue('Reading outside');
  await sampler.getByRole('button', { name: 'Save changes', exact: true }).click();
  await page.reload();
+ await page.getByRole('button', { name: 'Reopen 12:00: Reading outside', exact: true }).click();
  await expect(entry).toHaveValue('Reading outside');
  await expect(sampler.getByRole('button', { name: 'Outside', exact: true })).toHaveAttribute('aria-pressed', 'true');
  await expect(sampler.getByRole('button', { name: 'People', exact: true })).toBeVisible();
@@ -119,6 +128,7 @@ test('saves open entries with optional editable color labels', async ({ page }) 
  await entry.fill('Reading in the garden');
  await sampler.getByRole('button', { name: 'Save changes', exact: true }).click();
  await page.reload();
+ await page.getByRole('button', { name: 'Reopen 12:00: Reading in the garden', exact: true }).click();
  await expect(entry).toHaveValue('Reading in the garden');
  await expect(sampler.getByRole('button', { name: 'Garden', exact: true })).toHaveCount(0);
  await expect(sampler.getByRole('button', { name: 'No label', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -158,10 +168,12 @@ test('offers contextual details without recording answers until save', async ({ 
 	await page.reload();
 	const restored = page;
 	const restoredSample = restored.getByTestId('interval-sampler');
+	await restored.getByRole('button', { name: 'Reopen 12:00: Working on notes', exact: true }).click();
 	await restoredSample.getByRole('button', { name: 'Energy · Low', exact: true }).click();
 	await restoredSample.getByRole('button', { name: 'Remove detail', exact: true }).click();
 	await restoredSample.getByRole('button', { name: 'Save changes', exact: true }).click();
 	await restored.reload();
+	await restored.getByRole('button', { name: 'Reopen 12:00: Working on notes', exact: true }).click();
 	await expect(restoredSample.getByRole('button', { name: 'Energy · Low', exact: true })).toHaveCount(0);
 	await restoredSample.getByRole('button', { name: 'Body ✓', exact: true }).click();
 	await expect(restoredSample.getByLabel('What do you notice in your body?')).toHaveValue('Tense shoulders');
@@ -192,9 +204,9 @@ test('customizes trackers, offers relevant questions, and reopens them from the 
 	await sampler.getByRole('group', { name: 'Outside', exact: true }).getByRole('button', { name: 'No', exact: true }).click();
 	await sampler.getByRole('button', { name: 'Save moment', exact: true }).click();
 	await page.reload();
+	await page.getByRole('button', { name: 'Reopen 12:00: Reading a book', exact: true }).click();
 	await expect(sampler.getByRole('button', { name: 'Focus · 4/5', exact: true })).toBeVisible();
 	await expect(sampler.getByRole('button', { name: 'Outside · No', exact: true })).toBeVisible();
-	await page.locator('summary').filter({ hasText: 'Day so far' }).click();
 	await page.getByLabel('Find a moment', { exact: true }).fill('Focus');
 	await expect(page.getByRole('button', { name: 'Reopen 12:00: Reading a book', exact: true })).toBeVisible();
 	for (const width of [1440, 390]) {
@@ -207,7 +219,6 @@ test('customizes trackers, offers relevant questions, and reopens them from the 
 	await expect(sampler.getByRole('group', { name: 'Focus', exact: true }).getByRole('button', { name: '4', exact: true })).toHaveAttribute('aria-pressed', 'true');
 	await page.evaluate(() => { const settings = JSON.parse(localStorage.getItem('planner.settings.v1') || '{}'); settings.wakeAnchor = '13:00'; localStorage.setItem('planner.settings.v1', JSON.stringify(settings)); });
 	await page.reload();
-	await page.locator('summary').filter({ hasText: 'Day so far' }).click();
 	await page.getByRole('button', { name: 'Reopen 12:00: Reading a book', exact: true }).click();
 	await expect(sampler.getByLabel('What was happening?', { exact: true })).toHaveValue('Reading a book');
 	await sampler.getByRole('button', { name: 'Focus · 4/5', exact: true }).click();
