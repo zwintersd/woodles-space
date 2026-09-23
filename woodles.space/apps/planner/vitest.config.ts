@@ -6,6 +6,7 @@ export default defineConfig({
 	// so importing them under vitest doesn't throw `$state is not defined`.
 	plugins: [sveltekit()],
 	test: {
-		include: ['src/**/*.test.ts']
+		include: ['src/**/*.test.ts'],
+		setupFiles: ['../../vitest.setup.ts']
 	}
 });
