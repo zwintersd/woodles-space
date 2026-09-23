@@ -8,7 +8,7 @@
 	import MomentDetails from './MomentDetails.svelte';
 	import { cleanDetails } from '$lib/momentDetails';
 
-	let { interval }: { interval: DayInterval | null } = $props();
+	let { interval, onsaved }: { interval: DayInterval | null; onsaved?: () => void } = $props();
 	const colors = ['#aa526b', '#8061a8', '#467f92', '#98702f', '#548068', '#6676a0'];
 	const defaults: SampleTag[] = INTERVAL_KIND_OPTIONS.filter(o => o.kind !== 'elsewhere').map((o, i) => ({ id: o.kind, name: o.label, color: colors[i], kind: o.kind }));
 	let tags = $derived(store.settings.sampleTags ?? defaults);
@@ -33,6 +33,7 @@
 		store.observeInterval({ date: interval.date, intervalStart: interval.startTime, label: draft.text, kind: chosen?.kind ?? 'elsewhere', sampleTag: chosen ? { ...chosen } : null, details: cleanDetails(draft.details), trackerAnswers: cleanTrackerAnswers(draft.answers), source: existing?.source ?? 'live', note: existing?.note });
 		queueSync();
 		feedback = existing ? 'Changes saved.' : 'Moment saved.';
+		onsaved?.();
 	}
 	function saveLabels() {
 		if (tagDraft.some(t => !t.name.trim())) { labelError = 'Give every label a name, or remove it.'; return; }
