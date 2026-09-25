@@ -66,6 +66,10 @@ work it in this order:
 3. **the output dir.** does the app write to `dist/`? the rewrite points at
    `/apps/<name>/dist/`; the adapter has to agree.
 
+`/schedules` is a private, static link tree outside the homepage catalogue.
+Its dated pages have explicit rewrites too; add each new dated page to
+`vercel.json` so its friendly URL resolves to the matching `index.html`.
+
 ## a note on the recursive scripts
 
 `pnpm -r check` and `pnpm -r test` stop at the first app that fails, so a break

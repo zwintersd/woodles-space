@@ -232,6 +232,17 @@ export const appManifest = Object.freeze([
 		// URL, so a link can't go stale against an edited game.
 		addressableBy: ['game'],
 		landing: tile('player', 13, 'play', 'play the incremental games you built in the studio', 'var(--peach)', 'var(--lavender)', '160deg')
+	},
+	{
+		id: 'schedules',
+		name: 'Schedules',
+		publicPath: '/schedules',
+		aliases: [],
+		kind: 'static',
+		maturity: 'private',
+		sourceDir: 'apps/schedules',
+		outputDir: 'apps/schedules',
+		entryFile: 'index.html'
 	}
 ]);
 
