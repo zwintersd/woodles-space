@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { fade, fly } from 'svelte/transition';
-	import { quintOut } from 'svelte/easing';
+	import { expoOut } from 'svelte/easing';
 	import { thinkingAbout } from '$lib/thinkingAbout.svelte';
 	import {
 		COLUMNS,
@@ -13,7 +13,7 @@
 		showsSchedule,
 		showsSharedWith
 	} from '$lib/constants';
-	import { motionDuration } from '$lib/motion';
+	import { collect, motionDuration } from '$lib/motion';
 	import { findTimeHref } from '$lib/deepLink';
 	import { commitments } from '$lib/commitments.svelte';
 	import { mentions } from '$lib/mentions.svelte';
@@ -180,7 +180,7 @@
 		role="dialog"
 		aria-modal="true"
 		aria-labelledby="ta-detail-heading"
-		transition:fly={{ x: 48, duration: motionDuration(260), easing: quintOut }}
+		transition:fly={{ x: 64, duration: motionDuration(320), easing: expoOut }}
 	>
 		<span id="ta-detail-heading" class="sr-only">entry detail</span>
 		<header class="detail-header">
@@ -198,9 +198,14 @@
 			oninput={(e) => thinkingAbout.updateEntry(id, { title: e.currentTarget.value })}
 		/>
 
-		<ColorPicker value={entry.color} onChange={(hex) => thinkingAbout.updateEntry(id, { color: hex })} />
+		<div class="detail-field" style:--i="2">
+			<ColorPicker
+				value={entry.color}
+				onChange={(hex) => thinkingAbout.updateEntry(id, { color: hex })}
+			/>
+		</div>
 
-		<div class="detail-field">
+		<div class="detail-field" style:--i="3">
 			<label for="ta-section">section</label>
 			<select
 				id="ta-section"
@@ -217,7 +222,7 @@
 			</select>
 		</div>
 
-		<div class="detail-field">
+		<div class="detail-field" style:--i="4">
 			<label for="ta-date-started">started</label>
 			<div class="field-with-clear">
 				<input
@@ -240,7 +245,7 @@
 		</div>
 
 		{#if showsSharedWith(entry.sectionKey)}
-			<div class="detail-field">
+			<div class="detail-field" style:--i="5">
 				<label for="ta-shared-with">shared with</label>
 				<input
 					id="ta-shared-with"
@@ -253,7 +258,7 @@
 		{/if}
 
 		{#if showsSchedule(entry.columnKey)}
-			<div class="detail-field">
+			<div class="detail-field" style:--i="6">
 				<label for="ta-schedule">schedule</label>
 				<input
 					id="ta-schedule"
@@ -268,7 +273,7 @@
 			     guessing "Tuesdays after work" wrong is worse than leaving it as
 			     the note somebody wrote. Setting it puts the slot on Carillon's
 			     calendar without creating anything there. -->
-			<div class="detail-field">
+			<div class="detail-field" style:--i="7">
 				<span class="detail-field-label">most weeks</span>
 				<div class="standing-days" role="group" aria-label="days this happens">
 					{#each WEEKDAY_LABELS as label, day (day)}
@@ -307,7 +312,7 @@
 		<!-- The one way out of this app, and the one thing that comes back. A
 		     schedule field says when this *usually* happens; Carillon answers
 		     when it actually will. -->
-		<div class="detail-field">
+		<div class="detail-field" style:--i="8">
 			{#if scheduled.length > 0}
 				<ul class="commitments" data-testid="commitments">
 					{#each scheduled as item (item.taskId)}
@@ -324,7 +329,7 @@
 		</div>
 
 		{#if written.length > 0}
-			<div class="detail-field">
+			<div class="detail-field" style:--i="9">
 				<span class="detail-field-label">written about</span>
 				<ul class="mentions" data-testid="mentions">
 					{#each written as letter (letter.letterId)}
@@ -339,7 +344,7 @@
 			</div>
 		{/if}
 
-		<div class="detail-field">
+		<div class="detail-field" style:--i="10">
 			<div class="sessions-heading">
 				<span class="detail-field-label">{sessionVerb(entry.columnKey)} sessions</span>
 				<button class="btn-log-session" onclick={() => handleLogSession(id)}>
@@ -351,7 +356,7 @@
 			{:else}
 				<ul class="sessions-list">
 					{#each sessions as session (session.id)}
-						<li class="session-row" transition:fly={{ y: -6, duration: motionDuration(160) }}>
+						<li class="session-row" out:collect={{ duration: 300 }}>
 							<input
 								type="date"
 								class="session-date"
@@ -384,7 +389,7 @@
 			{/if}
 		</div>
 
-		<div class="detail-field">
+		<div class="detail-field" style:--i="11">
 			<span class="detail-field-label">structured record</span>
 			{#key id}
 				<SpellPanel
@@ -397,7 +402,7 @@
 			{/key}
 		</div>
 
-		<div class="detail-field">
+		<div class="detail-field" style:--i="12">
 			<label for="ta-notes">notes</label>
 			<textarea
 				id="ta-notes"
@@ -439,6 +444,20 @@
 		backdrop-filter: blur(2px);
 		-webkit-backdrop-filter: blur(2px);
 		z-index: var(--ta-z-detail);
+		/* the fade is Svelte's (it owns opacity); the blur pulling focus off
+		   the board behind it is this. */
+		animation: ta-scrim-blur 0.34s var(--ta-ease-glide) both;
+	}
+
+	@keyframes ta-scrim-blur {
+		from {
+			backdrop-filter: blur(0);
+			-webkit-backdrop-filter: blur(0);
+		}
+		to {
+			backdrop-filter: blur(2px);
+			-webkit-backdrop-filter: blur(2px);
+		}
 	}
 
 	.detail {
@@ -499,7 +518,7 @@
 	.detail-close:hover {
 		background: var(--ta-bg-subtle);
 		color: var(--ta-text);
-		transform: var(--ta-lift-hover) scale(1.06);
+		transform: rotate(90deg) scale(1.1);
 	}
 
 	.detail-close:active {
@@ -517,8 +536,27 @@
 	}
 
 	.detail-title:focus-visible {
-		border-color: var(--ta-border);
+		border-color: var(--chip-color);
 		outline: none;
+	}
+
+	/* the panel slides in, then fills: each field is one step behind the one
+	   above it. `--i` is the field's place in the full layout (set in the
+	   markup), not its place among the fields actually shown, so a reading
+	   entry with no schedule fields still cascades downward. */
+	.detail-field,
+	.detail-title,
+	.detail-header {
+		animation: ta-rise 0.34s var(--ta-ease-glide) both;
+		animation-delay: calc(var(--i, 0) * 26ms + 60ms);
+	}
+
+	.detail-title {
+		--i: 1;
+	}
+
+	.detail-footer {
+		animation: ta-rise 0.34s var(--ta-ease-glide) 0.4s both;
 	}
 
 	.detail-field {
@@ -612,13 +650,26 @@
 		border: 1px solid var(--ta-border);
 		border-radius: 50%;
 		background: transparent;
-		transition: all var(--ta-transition-fast);
+		transition: color var(--ta-transition-fast), background var(--ta-transition-fast),
+			border-color var(--ta-transition-fast), transform var(--ta-transition-spring);
 	}
 
+	.standing-day:hover {
+		border-color: var(--ta-accent);
+		transform: translateY(-1px);
+	}
+
+	.standing-day:active {
+		transform: scale(0.88);
+	}
+
+	/* a day switching on is the only thing in this panel that puts something
+	   on another app's calendar, so it gets to be felt */
 	.standing-day.on {
 		color: var(--ta-surface);
 		background: var(--ta-accent);
 		border-color: var(--ta-accent);
+		animation: ta-bump 0.4s var(--ta-ease-spring);
 	}
 
 	.standing-times {
@@ -700,11 +751,12 @@
 		font-family: var(--ta-font-sans);
 		font-size: 0.78rem;
 		color: var(--ta-accent);
-		transition: color var(--ta-transition-fast);
+		transition: color var(--ta-transition-fast), transform var(--ta-transition-spring);
 	}
 
 	.find-time:hover {
 		color: var(--ta-text);
+		transform: translateX(3px);
 	}
 
 	.btn-log-session {
@@ -720,10 +772,11 @@
 
 	.btn-log-session:hover {
 		background: color-mix(in srgb, var(--ta-accent-soft) 70%, var(--ta-accent) 30%);
+		transform: var(--ta-lift-hover);
 	}
 
 	.btn-log-session:active {
-		transform: var(--ta-lift-press);
+		transform: scale(0.92);
 	}
 
 	.sessions-empty {
@@ -745,6 +798,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.35rem;
+		animation: ta-slide-in 0.32s var(--ta-ease-spring) both;
 	}
 
 	.session-date {
@@ -808,6 +862,7 @@
 		font-size: 0.76rem;
 		color: var(--ta-danger);
 		margin-right: 0.1rem;
+		animation: ta-slide-in 0.26s var(--ta-ease-spring) both;
 	}
 
 	.btn-ghost,

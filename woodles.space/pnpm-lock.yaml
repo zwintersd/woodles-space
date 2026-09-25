@@ -166,8 +166,51 @@ importers:
         specifier: ^3.2.6
         version: 3.2.6(@types/node@22.19.17)(happy-dom@20.10.6)
 
+  apps/grimoire:
+    dependencies:
+      '@woodles/app-manifest':
+        specifier: workspace:*
+        version: link:../../packages/app-manifest
+      '@woodles/dynamics':
+        specifier: workspace:*
+        version: link:../../packages/dynamics
+      '@woodles/witch-engine':
+        specifier: workspace:*
+        version: link:../../packages/witch-engine
+    devDependencies:
+      '@sveltejs/adapter-static':
+        specifier: ^3.0.0
+        version: 3.0.10(@sveltejs/kit@2.66.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@7.3.5(@types/node@22.19.17)))(svelte@5.56.3)(typescript@5.9.3)(vite@7.3.5(@types/node@22.19.17)))
+      '@sveltejs/kit':
+        specifier: ^2.66.0
+        version: 2.66.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@7.3.5(@types/node@22.19.17)))(svelte@5.56.3)(typescript@5.9.3)(vite@7.3.5(@types/node@22.19.17))
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^6.2.4
+        version: 6.2.4(svelte@5.56.3)(vite@7.3.5(@types/node@22.19.17))
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.17
+      svelte:
+        specifier: ^5.56.3
+        version: 5.56.3
+      svelte-check:
+        specifier: ^4.4.2
+        version: 4.4.7(picomatch@4.0.4)(svelte@5.56.3)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^7.3.5
+        version: 7.3.5(@types/node@22.19.17)
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@22.19.17)(happy-dom@20.10.6)
+
   apps/marginalia:
     dependencies:
+      '@woodles/dynamics':
+        specifier: workspace:*
+        version: link:../../packages/dynamics
       '@woodles/incremental-core':
         specifier: workspace:*
         version: link:../../packages/incremental-core
@@ -177,6 +220,9 @@ importers:
       '@woodles/text':
         specifier: workspace:*
         version: link:../../packages/text
+      '@woodles/witch-engine':
+        specifier: workspace:*
+        version: link:../../packages/witch-engine
       fflate:
         specifier: ^0.8.2
         version: 0.8.3
@@ -303,6 +349,12 @@ importers:
 
   apps/whiteboard:
     dependencies:
+      '@woodles/app-manifest':
+        specifier: workspace:*
+        version: link:../../packages/app-manifest
+      '@woodles/handoff':
+        specifier: workspace:*
+        version: link:../../packages/handoff
       '@woodles/persistence':
         specifier: workspace:*
         version: link:../../packages/persistence
@@ -399,6 +451,15 @@ importers:
         specifier: ^3.2.6
         version: 3.2.6(@types/node@22.19.17)(happy-dom@20.10.6)
 
+  packages/dynamics:
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@22.19.17)(happy-dom@20.10.6)
+
   packages/emoji:
     devDependencies:
       typescript:
@@ -480,6 +541,22 @@ importers:
       happy-dom:
         specifier: ^20.0.0
         version: 20.10.6
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@22.19.17)(happy-dom@20.10.6)
+
+  packages/witch-engine:
+    dependencies:
+      '@woodles/dynamics':
+        specifier: workspace:*
+        version: link:../dynamics
+      '@woodles/incremental-core':
+        specifier: workspace:*
+        version: link:../incremental-core
+    devDependencies:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

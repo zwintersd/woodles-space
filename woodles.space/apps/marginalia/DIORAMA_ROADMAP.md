@@ -1,5 +1,13 @@
 # marginalia — the diorama's polish roadmap
 
+> **out of date as of the hex world.** This file is about `WorldCanvas.svelte` as a
+> procedural canvas painting of a side-on biome diorama. That diorama is gone —
+> see [HEX_WORLD.md](./HEX_WORLD.md) for what replaced it and
+> [2_5D.md](./2_5D.md) for how. The craft items below that still apply (the sprite
+> conventions, the offline binding, reduced-motion and a11y care) survived the
+> change; the ones about sky gradients, the water column and the sediment band do
+> not describe anything that still exists.
+
 scope note: this is about `WorldCanvas.svelte` itself — the rendering, legibility, and
 craft of the biome diorama as a piece of canvas art. it's deliberately narrower than
 [DESIGN.md](./DESIGN.md) (the game systems the diorama displays) and the root
@@ -117,6 +125,11 @@ plausible rather than being tuned for them. worth a dedicated pass once someone'
 looking at the diorama with fresh eyes, using the current token values (now the ones
 actually documented in `ASSETS.md`) as the anchor instead of the pre-repaint ones.
 deliberately deferred — bigger and more subjective than the rest of this list.
+
+> **see [2_5D.md](./2_5D.md) before starting this.** the 2.5d proposal argues that
+> generalized depth-fog gives every gradient stop a principled reason to exist — you'd
+> pick a water color and a falloff rather than hand-tune twelve stops. if that pass
+> happens, this one wants to happen on top of it, not before it and then again.
 
 ### blocked on your voice, not on code
 

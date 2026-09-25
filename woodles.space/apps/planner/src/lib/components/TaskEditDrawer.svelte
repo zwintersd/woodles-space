@@ -129,6 +129,15 @@
 		queueSync();
 	}
 
+	// Leaving the composer without filing anything. A task being composed has
+	// never existed, so backing out of it means it never did — the header's
+	// "add" is the one gesture that files one. Editing makes a different
+	// promise: that sheet is open over something real, and closing it has
+	// always meant saving, so this stays compose-only.
+	function discardCompose() {
+		store.cancelCompose();
+	}
+
 	function handleDrop() {
 		const id = store.editingTaskId;
 		if (!id) return;
@@ -153,7 +162,13 @@
 
 <svelte:window
 	onkeydown={(e) => {
-		if (e.key === 'Escape' && open) commitAndClose();
+		if (e.key !== 'Escape' || !open) return;
+		// Escape is the way out, and out of a new thing means out — not a
+		// half-answered form filed under its own first line. Clicking away is
+		// the softer gesture and still keeps what's there.
+		if (composing) discardCompose();
+		else commitAndClose();
+		e.preventDefault();
 	}}
 />
 
@@ -291,6 +306,9 @@
 		{#if composing}
 			<div class="ted-actions ted-actions-compose">
 				<span class="ted-hint">pick a day and a block, or leave it in the tray.</span>
+				<button class="ted-discard-btn" data-testid="ted-discard" onclick={discardCompose}>
+					discard
+				</button>
 			</div>
 		{:else}
 			<div class="ted-actions">
@@ -585,7 +603,8 @@
 		font-style: italic;
 	}
 
-	.ted-drop-btn {
+	.ted-drop-btn,
+	.ted-discard-btn {
 		font-family: var(--pl-font-mono);
 		font-size: 0.6rem;
 		letter-spacing: 0.12em;
@@ -594,9 +613,16 @@
 		transition: opacity var(--pl-transition-fast), color var(--pl-transition-fast);
 	}
 
-	.ted-drop-btn:hover {
+	.ted-drop-btn:hover,
+	.ted-discard-btn:hover {
 		opacity: 1;
 		color: var(--p-accent);
+	}
+
+	/* Kept to the far edge, away from "add": the two are opposite answers, and
+	   a phone has no Escape key to reach for. */
+	.ted-discard-btn {
+		margin-left: auto;
 	}
 
 	.ted-status-btn {

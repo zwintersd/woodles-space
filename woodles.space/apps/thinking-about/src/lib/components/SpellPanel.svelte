@@ -110,7 +110,9 @@
 				</div>
 			</div>
 		{:else}
-			<button class="btn-ghost" onclick={startCast}>✦ cast a spell</button>
+			<button class="btn-ghost cast" onclick={startCast}>
+				<span class="cast-star" aria-hidden="true">✦</span> cast a spell
+			</button>
 		{/if}
 	{:else}
 		<div class="spell-form">
@@ -139,7 +141,9 @@
 				<div class="detail-field">
 					<label for="spell-prompt">paste this into any model</label>
 					<textarea id="spell-prompt" class="spell-textarea" readonly value={prompt}></textarea>
-					<button class="btn-ghost" onclick={copyPrompt}>{copied ? 'copied' : 'copy'}</button>
+					<button class="btn-ghost" onclick={copyPrompt}>
+						{#key copied}<span class="btn-label">{copied ? 'copied' : 'copy'}</span>{/key}
+					</button>
 				</div>
 				<div class="detail-field">
 					<label for="spell-answer">paste its answer back</label>
@@ -173,6 +177,25 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
+		animation: ta-rise 0.34s var(--ta-ease-glide) both;
+	}
+
+	/* the star leans in when the button is hovered — the one flourish this
+	   panel gets, and the only place in the app that says "spell" */
+	.cast-star {
+		display: inline-block;
+		transition: transform var(--ta-transition-spring);
+	}
+
+	.cast:hover .cast-star {
+		transform: rotate(72deg) scale(1.25);
+	}
+
+	/* keyed on `copied`, so the word is rebuilt — and so pops — when it
+	   changes rather than swapping in place */
+	.btn-label {
+		display: inline-block;
+		animation: ta-pop 0.3s var(--ta-ease-spring) both;
 	}
 	.spell-data {
 		display: flex;
@@ -216,12 +239,14 @@
 		font-size: 0.76rem;
 		color: var(--ta-muted);
 		margin: 0;
+		animation: ta-slide-in 0.3s var(--ta-ease-spring) both;
 	}
 	.spell-error {
 		font-family: var(--ta-font-sans);
 		font-size: 0.76rem;
 		color: var(--ta-danger);
 		margin: 0;
+		animation: ta-slide-in 0.3s var(--ta-ease-spring) both;
 	}
 	.btn-ghost {
 		font-family: var(--ta-font-sans);
@@ -230,12 +255,17 @@
 		border-radius: var(--ta-radius-sm);
 		border: 1px solid var(--ta-border);
 		color: var(--ta-text-dim);
-		transition: border-color var(--ta-transition-fast), color var(--ta-transition-fast);
+		transition: border-color var(--ta-transition-fast), color var(--ta-transition-fast),
+			transform var(--ta-transition-spring);
 		align-self: flex-start;
 	}
 	.btn-ghost:hover {
 		border-color: var(--ta-accent);
 		color: var(--ta-accent);
+		transform: var(--ta-lift-hover);
+	}
+	.btn-ghost:active {
+		transform: var(--ta-lift-press);
 	}
 	.btn-ghost:disabled {
 		opacity: 0.5;

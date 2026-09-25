@@ -48,11 +48,15 @@
 	});
 </script>
 
-<span class="clock-date">{date}</span>
-<span class="clock-sep">·</span>
+<span class="clock-dategroup">
+	<span class="clock-date">{date}</span>
+	<span class="clock-sep">·</span>
+</span>
 <span class="clock-time {tickClass}">{time}</span>
-<span class="clock-sep">·</span>
-<span class="clock-day">day {dayOfYear}</span>
+<span class="clock-daygroup">
+	<span class="clock-sep">·</span>
+	<span class="clock-day">day {dayOfYear}</span>
+</span>
 
 <style>
 	.clock-date {
@@ -84,5 +88,13 @@
 		100% {
 			opacity: 0.8;
 		}
+	}
+	/* day-of-year is the least essential reading — shed it first when the bar
+	   gets tight, same idea as the topbar tagline dropping out earlier. */
+	@media (max-width: 1320px) {
+		.clock-daygroup { display: none; }
+	}
+	@media (max-width: 1180px) {
+		.clock-dategroup { display: none; }
 	}
 </style>

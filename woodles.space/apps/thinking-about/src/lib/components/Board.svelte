@@ -15,8 +15,8 @@
 	{/if}
 
 	<div class="board">
-		{#each COLUMNS as column (column.key)}
-			<Column {column} />
+		{#each COLUMNS as column, i (column.key)}
+			<Column {column} index={i} />
 		{/each}
 	</div>
 </div>
@@ -43,15 +43,30 @@
 		box-shadow: var(--ta-shadow-sm);
 		padding: 0.75rem 0.95rem;
 		overflow: hidden;
+		animation: ta-rise 0.5s var(--ta-ease-spring) both;
 	}
 
+	/* the one hint an empty board gives, kept alive by a bar of color that
+	   drifts slowly enough that you only notice it if you stay a while */
 	.empty-guide::before {
 		content: '';
 		width: 0.58rem;
 		align-self: stretch;
 		border-radius: var(--ta-radius-pill);
-		background: linear-gradient(180deg, #3f51b5, #33b679, #f4511e);
+		background: linear-gradient(180deg, #3f51b5, #33b679, #f4511e, #3f51b5);
+		background-size: 100% 260%;
+		animation: ta-drift-y 9s ease-in-out infinite;
 		flex-shrink: 0;
+	}
+
+	@keyframes ta-drift-y {
+		0%,
+		100% {
+			background-position: 50% 0%;
+		}
+		50% {
+			background-position: 50% 100%;
+		}
 	}
 
 	.empty-guide p {
@@ -75,6 +90,20 @@
 		border-radius: var(--ta-radius-md);
 		box-shadow: var(--ta-shadow-lg);
 		overflow: hidden;
+		animation: ta-board-in 0.55s var(--ta-ease-glide) both;
+	}
+
+	/* the card itself settles first and everything inside it arrives on top
+	   of that — see Column for the rest of the cascade */
+	@keyframes ta-board-in {
+		from {
+			opacity: 0;
+			transform: translateY(12px) scale(0.992);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
 	}
 
 	@media (max-width: 860px) {

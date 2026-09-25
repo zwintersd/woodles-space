@@ -6,12 +6,12 @@
 	connectorEndpoints,
 	documentBounds,
 	extractCardFromStack,
-	fitCamera,
 	insertCardIntoStack,
 	intersects,
 	normalizeBounds,
 	reorderStackCard,
 	removeItems,
+	repairDocument,
 	screenToWorld,
 	stackCardBounds,
 	stackCards,
@@ -23,21 +23,151 @@
 	createFrame,
 	createImage,
 	createStack,
+	createViewpoint,
 	makeId,
 	nextZ,
 	now,
-	snapshotDocument,
 	type Bounds,
 	type Camera,
 	type CardItem,
 	type FrameItem,
+	type JourneyStop,
 	type StackItem,
+	type Viewpoint,
 	type WhiteboardDocument,
 	type WhiteboardItem
 	} from '$lib/model';
-	import { restoreWhiteboard, whiteboardStorage } from '$lib/persistence';
+	import {
+	cameraForBounds,
+	camerasMatch,
+	canGoBack,
+	canGoForward,
+	createCameraHistory,
+	planCameraFlight,
+	pushCameraMark,
+	scaleName,
+	stepHistory,
+	visibleBounds,
+	type CameraHistory
+	} from '$lib/camera';
+	import {
+	applyRestoredDocument,
+	canRedo,
+	canUndo,
+	createEditHistory,
+	recordEdit,
+	redoEdit,
+	undoEdit,
+	type EditHistory
+	} from '$lib/history';
+	import {
+	fitBoardCamera,
+	focusCamera,
+	frameSequence,
+	frameTitle,
+	itemLabel,
+	locateCamera,
+	stepFrame
+	} from '$lib/navigation';
+	import {
+	addStop,
+	advanceStop,
+	hasStop,
+	moveStop,
+	removeStop,
+	resolveJourney,
+	setJourneyLoop,
+	setJourneyStops,
+	setStopHold,
+	stepStop,
+	suggestedStops
+	} from '$lib/journey';
+	import { cameraCentredOn, minimapExtent, minimapMarks, minimapProjection, type MinimapMark } from '$lib/minimap';
+	import { boardLibrary, boardTitleFallback, type BoardSummary } from '$lib/library';
+	import { restoreWhiteboard } from '$lib/persistence';
+	import {
+	deleteLabel,
+	labelItems,
+	labelsOn,
+	labelCount,
+	renameLabel,
+	retintLabel,
+	suggestLabels,
+	toggleLabel
+	} from '$lib/labels';
+	import {
+	colorOf,
+	formatStamp,
+	kindOf,
+	propertyCount,
+	setItemProperty,
+	sourceLabel,
+	sourceLink,
+	sourceOf,
+	statusOf
+	} from '$lib/properties';
+	import { hitsBounds, searchBoard, type SearchHit } from '$lib/search';
+	import {
+	behaviorOf,
+	BEHAVIOR_NOTES,
+	checklistProgress,
+	isStack,
+	queueHeads,
+	renameStack,
+	setStackBehavior,
+	shiftCardColumn,
+	stackBeside,
+	takeFromQueue,
+	toggleChecked
+	} from '$lib/stacks';
+	import { isDone } from '$lib/properties';
+	import {
+	arrivalCamera,
+	breadcrumbs,
+	enterCamera,
+	isPortal,
+	popTrailTo,
+	portals,
+	portalTitle,
+	pushTrail,
+	returnCamera,
+	trailHasBoard,
+	type TrailStep
+	} from '$lib/portals';
+	import { createPortal, type PortalItem } from '$lib/model';
+	import {
+	captureAt,
+	captureToInbox,
+	findInbox,
+	inferCapture,
+	INBOX_TITLE,
+	type CaptureItem
+	} from '$lib/capture';
+	import {
+	DEFAULT_SURFACE,
+	surfaceStyle,
+	SURFACE_DEPTHS,
+	SURFACE_PAPERS,
+	SURFACE_PATTERNS,
+	SURFACE_SIZES,
+	weaveCss,
+	type Surface
+	} from '$lib/surface';
+	import { DEFAULT_VIEW, normalizeView, viewPreferences, type ViewPreferences } from '$lib/view';
+	import { createHandoffQueue } from '@woodles/handoff';
+
+	const whiteboardHandoffs = createHandoffQueue('whiteboard');
+	import { STACK_BEHAVIORS, SUGGESTED_STATUSES, TINTS, type Label, type StackBehavior, type Tint } from '$lib/model';
 
 	type Tool = 'select' | 'frame' | 'stack' | 'line';
+	type Drawer = 'places' | 'journey' | 'details';
+	const MINIMAP = { width: 186, height: 124 };
+	/**
+	 * How long the chrome waits, after the last thing you did, before it gets
+	 * out of the way. Long enough to read what a panel just said; short enough
+	 * that a board you are only looking at ends up being only the board.
+	 */
+	const CHROME_REST_MS = 3200;
 	type SaveState = 'idle' | 'saving' | 'saved' | 'recovered' | 'error';
 	type Point = { x: number; y: number };
 	type PointerMove = { pointerId: number; screen: Point };
@@ -83,6 +213,11 @@
 		board: { id: 'loading-board', title: 'Untitled whiteboard' },
 		items: [],
 		camera: { x: 180, y: 120, zoom: 1 },
+		home: null,
+		viewpoints: [],
+		journey: { stops: [], loop: false },
+		labels: [],
+		surface: { ...DEFAULT_SURFACE },
 		updatedAt: ''
 	});
 	let tool = $state<Tool>('select');
@@ -109,6 +244,63 @@
 	let dirty = false;
 	const pendingAssetDeletes = new Set<string>();
 
+	// Navigation: where the camera has been, where it can go, and what it says.
+	let history = $state<CameraHistory>(createCameraHistory({ camera: { x: 180, y: 120, zoom: 1 }, label: 'Board' }));
+	// Undo/redo over document edits — independent of the camera history above.
+	let editHistory = $state<EditHistory>(createEditHistory());
+	let viewportSize = $state({ width: 1200, height: 800 });
+	let drawer = $state<Drawer | null>(null);
+	/** What this device wants to see of the app — remembered across sessions. */
+	let view = $state<ViewPreferences>({ ...DEFAULT_VIEW });
+	let viewOpen = $state(false);
+	/**
+	 * Whether the chrome is currently up. It rests on a timer and wakes on the
+	 * first sign of life; `chromeResting` below is what the template reads.
+	 */
+	let chromeAwake = $state(true);
+	let restTimer: ReturnType<typeof setTimeout> | null = null;
+	let shortcutsOpen = $state(false);
+	let newViewpointName = $state('');
+	let renamingViewpointId = $state<string | null>(null);
+
+	// The shelf: every board, and which one is open.
+	let shelfOpen = $state(false);
+	let boards = $state<BoardSummary[]>([]);
+	let confirmDeleteId = $state<string | null>(null);
+
+	// Journey Mode.
+	let playing = $state(false);
+	let paused = $state(false);
+	let playIndex = $state(0);
+	let playTimer: ReturnType<typeof setTimeout> | null = null;
+
+	// Labels and the optional layer.
+	let labelDraft = $state('');
+	let renamingLabelId = $state<string | null>(null);
+
+	// Portals: the boards below this one, and how deep we are.
+	type PortalPreview = { title: string; marks: MinimapMark[]; bounds: Bounds | null; missing: boolean };
+	let previews = $state<Record<string, PortalPreview>>({});
+	let trail = $state<TrailStep[]>([]);
+	/** Rises over the board while going through a doorway, in either direction. */
+	let veil = $state(0);
+	/**
+	 * The exact notice that came with a "show me the Inbox" offer. Comparing the
+	 * live notice against it means any other message clears the offer on its own,
+	 * with nothing to remember at the thirty-odd other places notices are set.
+	 */
+	let inboxNotice = $state('');
+	let travelling = false;
+
+	// Search: the board flies to what you find.
+	let searchOpen = $state(false);
+	let searchText = $state('');
+	let searchIndex = $state(0);
+	let searchInput = $state<HTMLInputElement>();
+	/** Where to put the camera back if the search is abandoned. */
+	let searchReturn: Camera | null = null;
+	let searchPreviewTimer: ReturnType<typeof setTimeout> | null = null;
+
 	const objects = $derived(
 		board.items
 			.filter((item) => item.type !== 'connector')
@@ -122,9 +314,58 @@
 	const connectors = $derived(board.items.filter((item) => item.type === 'connector'));
 	const hasContent = $derived(board.items.some((item) => item.type !== 'connector'));
 
+	const sequence = $derived(frameSequence(board.items));
+	/** The frames the camera is inside, outermost first — the tail of the crumbs. */
+	const frameTrail = $derived(locateCamera(board.items, board.camera, viewportSize));
+	const here = $derived(frameTrail.length ? frameTrail[frameTrail.length - 1] : null);
+	const stops = $derived(resolveJourney(board, viewportSize));
+	const mapProjection = $derived(minimapProjection(minimapExtent(board, board.camera, viewportSize), MINIMAP));
+	const mapMarks = $derived(minimapMarks(board.items));
+	const mapView = $derived(mapProjection.project(visibleBounds(board.camera, viewportSize)));
+
+	/**
+	 * The objects the Details panel is speaking about — nothing, one, or many.
+	 * Connectors are included: the property sheet (Labels, Status, Type,
+	 * Source, Color) is generic across every item type, a connector already
+	 * validates and stores it the same as anything else — it just had no way
+	 * in, since this filter kept them out. `duplicateSelection` and
+	 * `addSelectionToJourney` keep their own, separate connector exclusions;
+	 * those are about what duplicating or journeying to a connector would
+	 * even mean, a different question from whether it can carry a color.
+	 */
+	const chosen = $derived(board.items.filter((item) => selectedIds.includes(item.id)));
+	const only = $derived(chosen.length === 1 ? chosen[0] : null);
+	const crumbs = $derived(breadcrumbs(trail, board, board.camera, viewportSize));
+	const results = $derived(searchOpen && searchText.trim() ? searchBoard(board, searchText) : []);
+	const matchIds = $derived(new Set(results.map((hit) => hit.item.id)));
+
+	/**
+	 * Most of this does not need to be visible all the time. The bars, the
+	 * dock, the camera cluster and the map fade once the pointer has been
+	 * still for a moment — but never over something you have open and are in
+	 * the middle of reading, and never while a file is hovering over the
+	 * board waiting to be dropped.
+	 */
+	const chromeResting = $derived(
+		view.restChrome && !chromeAwake && !drawer && !searchOpen && !shelfOpen &&
+		!shortcutsOpen && !viewOpen && !fileDragging
+	);
+	/**
+	 * The paper, which is fixed to the window, and the pattern, which is not.
+	 * The paper also carries the seven blocks the chrome wears on a rainbow;
+	 * they arrive as custom properties on the canvas, so every panel inside it
+	 * can reach the band it is standing on.
+	 */
+	const paperStyle = $derived(surfaceStyle(board.surface));
+	const weaveStyle = $derived(weaveCss(board.surface, board.camera));
+
 	function viewport(): { width: number; height: number } {
 		const rect = canvasEl?.getBoundingClientRect();
 		return { width: rect?.width ?? window.innerWidth, height: rect?.height ?? window.innerHeight };
+	}
+
+	function measureViewport() {
+		viewportSize = viewport();
 	}
 
 	function localPoint(event: MouseEvent | PointerEvent | WheelEvent | DragEvent): Point {
@@ -163,6 +404,56 @@
 
 	function targetHasUI(target: EventTarget | null): boolean {
 		return target instanceof Element && Boolean(target.closest('[data-whiteboard-ui], [data-whiteboard-object]'));
+	}
+
+	/** The app's own furniture, as opposed to the board and everything on it. */
+	function targetIsChrome(target: EventTarget | null): boolean {
+		return target instanceof Element && Boolean(target.closest('[data-whiteboard-ui]'));
+	}
+
+	/**
+	 * Brings the chrome back and starts its clock again. `holding` is for a
+	 * pointer that is on the chrome itself: it wakes it and then leaves it up,
+	 * since something you are pointing at should not fade out from under you.
+	 */
+	function wakeChrome(holding = false) {
+		chromeAwake = true;
+		if (restTimer) {
+			clearTimeout(restTimer);
+			restTimer = null;
+		}
+		if (!view.restChrome || holding) return;
+		restTimer = setTimeout(() => {
+			restTimer = null;
+			chromeAwake = false;
+		}, CHROME_REST_MS);
+	}
+
+	function setView(patch: Partial<ViewPreferences>) {
+		view = { ...view, ...patch };
+		viewPreferences.save(view);
+		wakeChrome(true);
+	}
+
+	function toggleViewPanel() {
+		viewOpen = !viewOpen;
+		// The two cards share the same corner, so they take turns in it.
+		if (viewOpen) shortcutsOpen = false;
+		wakeChrome(true);
+	}
+
+	function toggleShortcuts() {
+		shortcutsOpen = !shortcutsOpen;
+		if (shortcutsOpen) viewOpen = false;
+		wakeChrome(true);
+	}
+
+	/** The surface belongs to the board, so changing it is an edit like any other. */
+	function changeSurface(patch: Partial<Surface>) {
+		beginEdit();
+		board.surface = { ...board.surface, ...patch };
+		board.updatedAt = now();
+		scheduleSave();
 	}
 
 	function selectOnly(id: string) {
@@ -219,7 +510,7 @@
 			saveTimer = null;
 		}
 		board.updatedAt = now();
-		const result = whiteboardStorage.save(snapshotDocument(board));
+		const result = boardLibrary.save(board);
 		if (result.ok) {
 			dirty = false;
 			saveState = 'saved';
@@ -229,6 +520,47 @@
 			saveState = 'error';
 			saveMessage = result.issue?.message ?? 'this board could not be saved';
 		}
+	}
+
+	/**
+	 * Call before a mutation, with the board exactly as it stands. `coalesceKey`
+	 * merges a burst of edits to the same field — typing a sentence into a card
+	 * is one undo step — while a discrete action (a click) should pass none, so
+	 * it is always its own step. Never records camera-only moves; those live in
+	 * `history` above, not here.
+	 */
+	function beginEdit(coalesceKey: string | null = null) {
+		editHistory = recordEdit(editHistory, board, coalesceKey);
+	}
+
+	function performUndo() {
+		if (!canUndo(editHistory)) {
+			notice = 'Nothing to undo yet.';
+			return;
+		}
+		const step = undoEdit(editHistory, board)!;
+		cancelPointerSession();
+		editHistory = step.history;
+		board = applyRestoredDocument(board, step.document);
+		selectedIds = [];
+		connectorSourceId = null;
+		notice = '';
+		scheduleSave();
+	}
+
+	function performRedo() {
+		if (!canRedo(editHistory)) {
+			notice = 'Nothing to redo.';
+			return;
+		}
+		const step = redoEdit(editHistory, board)!;
+		cancelPointerSession();
+		editHistory = step.history;
+		board = applyRestoredDocument(board, step.document);
+		selectedIds = [];
+		connectorSourceId = null;
+		notice = '';
+		scheduleSave();
 	}
 
 	function removeSettledImageAssets() {
@@ -259,35 +591,74 @@
 	}
 
 	onMount(() => {
-		const result = whiteboardStorage.load();
-		board = restoreWhiteboard(result.value);
-		if (result.source === 'backup') {
-			saveState = 'recovered';
-			saveMessage = 'restored the last saved board';
-		} else if (result.issue) {
-			saveState = 'error';
-			saveMessage = result.issue.message;
-		} else if (result.source === 'primary') {
+		measureViewport();
+		view = normalizeView(viewPreferences.load().value);
+		wakeChrome();
+		// The one board of the single-board era becomes the first board on the shelf.
+		const adopted = boardLibrary.adoptLegacyBoard();
+		const opened = adopted
+			? { document: adopted, source: 'primary' as const, issue: null }
+			: openLastBoard();
+
+		if (opened) {
+			board = restoreWhiteboard(opened.document);
+			boardLibrary.setActiveId(board.board.id);
+			if (opened.source === 'backup') {
+				saveState = 'recovered';
+				saveMessage = 'restored the last saved board';
+			} else if (opened.issue) {
+				saveState = 'error';
+				saveMessage = opened.issue;
+			} else {
+				saveState = 'saved';
+				saveMessage = 'saved here';
+			}
+		} else {
+			board = boardLibrary.create();
 			saveState = 'saved';
 			saveMessage = 'saved here';
 		}
+
+		history = createCameraHistory({ camera: { ...board.camera }, label: 'Where you were' });
+		editHistory = createEditHistory();
 		loaded = true;
+		// Resume at the depth the last session left off at, not at the top.
+		trail = boardLibrary.readTrail().filter((step) => step.boardId !== board.board.id);
+		if (trail.length !== boardLibrary.readTrail().length) boardLibrary.writeTrail(trail);
+		refreshBoards();
+		refreshPreviews();
 		void hydrateImages();
+		drainHandoffs();
+
 		const onBeforeUnload = () => saveNow();
 		window.addEventListener('beforeunload', onBeforeUnload);
+		window.addEventListener('resize', measureViewport);
 		return () => {
 			window.removeEventListener('beforeunload', onBeforeUnload);
+			window.removeEventListener('resize', measureViewport);
 			saveNow();
 		};
 	});
 
+	function openLastBoard() {
+		const shelf = boardLibrary.list();
+		if (!shelf.length) return null;
+		const active = boardLibrary.activeId();
+		const target = active && shelf.some((entry) => entry.id === active) ? active : shelf[0].id;
+		return boardLibrary.open(target);
+	}
+
 	onDestroy(() => {
+		if (restTimer) clearTimeout(restTimer);
 		if (cameraAnimation) cancelAnimationFrame(cameraAnimation);
 		if (pointerMoveFrame) cancelAnimationFrame(pointerMoveFrame);
+		clearPlayTimer();
+		if (searchPreviewTimer) clearTimeout(searchPreviewTimer);
 		Object.values(imageUrls).forEach((url) => URL.revokeObjectURL(url));
 	});
 
 	async function createCardAt(point: Point) {
+		beginEdit();
 		const card = createCard(point.x - 18, point.y - 18, nextZ(board.items));
 		setItems([...board.items, card]);
 		selectOnly(card.id);
@@ -297,6 +668,7 @@
 	}
 
 	async function createStackAt(point: Point) {
+		beginEdit();
 		const stack = createStack(point.x - 32, point.y - 24, nextZ(board.items));
 		setItems([...board.items, stack]);
 		selectOnly(stack.id);
@@ -306,6 +678,7 @@
 	}
 
 	async function createFrameAt(bounds: Bounds) {
+		beginEdit();
 		const frame = createFrame(bounds.x, bounds.y, bounds.width, bounds.height, 1);
 		setItems([...board.items, frame]);
 		selectOnly(frame.id);
@@ -351,6 +724,7 @@
 				nextZ(board.items)
 			);
 			imageUrls = { ...imageUrls, [assetId]: source };
+			beginEdit();
 			setItems([...board.items, image]);
 			selectOnly(image.id);
 			notice = '';
@@ -371,8 +745,15 @@
 		input.value = '';
 	}
 
+	/** Taking hold of the board mid-journey pauses it rather than fighting you. */
+	function handHoldsTheCamera() {
+		if (playing && !paused) pauseJourney();
+	}
+
 	function handleCanvasPointerDown(event: PointerEvent) {
+		wakeChrome(targetIsChrome(event.target));
 		if (targetHasUI(event.target)) return;
+		handHoldsTheCamera();
 		interruptCameraAnimation();
 		if (event.button === 1 || (event.button === 0 && spaceHeld)) {
 			beginPan(event);
@@ -423,6 +804,7 @@
 		}
 		if (event.button !== 0) return;
 		event.stopPropagation();
+		handHoldsTheCamera();
 		interruptCameraAnimation();
 		if (tool === 'line') {
 			connectTo(item);
@@ -439,6 +821,7 @@
 				.filter((candidate): candidate is WhiteboardItem => Boolean(candidate))
 				.map((candidate) => [candidate.id, itemBounds(candidate)])
 		);
+		beginEdit();
 		activeSession = {
 			kind: 'drag',
 			pointerId: event.pointerId,
@@ -465,6 +848,7 @@
 			notice = 'Choose another idea for the other end.';
 			return;
 		}
+		beginEdit();
 		const line = createConnector(connectorSourceId, item.id);
 		setItems([...board.items, line]);
 		selectedIds = [line.id];
@@ -475,6 +859,7 @@
 	}
 
 	function handlePointerMove(event: PointerEvent) {
+		wakeChrome(targetIsChrome(event.target));
 		const session = activeSession;
 		if (!session || session.pointerId !== event.pointerId) return;
 		queuedPointerMove = { pointerId: event.pointerId, screen: localPoint(event) };
@@ -638,6 +1023,7 @@
 		if (item.type === 'connector') return;
 		event.stopPropagation();
 		selectOnly(item.id);
+		beginEdit();
 		activeSession = { kind: 'resize', pointerId: event.pointerId, itemId: item.id, startWorld: pointForEvent(event), bounds: itemBounds(item) };
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
 	}
@@ -674,19 +1060,95 @@
 	}
 
 	function updateCard(item: CardItem, field: 'title' | 'body', value: string) {
+		beginEdit(`card-${field}:${item.id}`);
 		updateItem(item.id, { [field]: value } as Partial<WhiteboardItem>, true);
 	}
 
 	function updateFrame(item: FrameItem, value: string) {
+		beginEdit(`frame-title:${item.id}`);
 		updateItem(item.id, { title: value }, true);
 	}
 
+	/**
+	 * Stack titles go through `renameStack`, not `updateItem`: a Status stack's
+	 * title is the status it confers, so renaming it renames every card inside.
+	 */
 	function updateStack(item: StackItem, value: string) {
-		updateItem(item.id, { title: value }, true);
+		beginEdit(`stack-title:${item.id}`);
+		board = renameStack(board, item.id, value);
+		board.updatedAt = now();
+		scheduleSave();
+	}
+
+	function changeBehavior(stackId: string, behavior: StackBehavior) {
+		beginEdit();
+		board = setStackBehavior(board, stackId, behavior);
+		scheduleSave();
+	}
+
+	function tickCard(card: WhiteboardItem) {
+		beginEdit();
+		board = toggleChecked(board, card.id);
+		scheduleSave();
+	}
+
+	function takeTop(stackId: string) {
+		beginEdit();
+		board = takeFromQueue(board, stackId);
+		scheduleSave();
+	}
+
+	function addColumnBeside(stack: StackItem) {
+		beginEdit();
+		board = stackBeside(board, stack.id, 'New column');
+		scheduleSave();
+	}
+
+	function moveCardColumn(direction: -1 | 1) {
+		const card = chosen.find((item) => item.type === 'card' && item.stackId);
+		if (!card) return;
+		const before = board;
+		const next = shiftCardColumn(board, card.id, direction);
+		if (next === before) {
+			notice = 'That is the last column this way.';
+			return;
+		}
+		beginEdit();
+		board = next;
+		scheduleSave();
+	}
+
+	const stacksById = $derived(new Map(board.items.filter(isStack).map((item) => [item.id, item])));
+
+	/** The stack a card is laid in, and therefore how it should be shown. */
+	function homeStack(item: WhiteboardItem): StackItem | null {
+		return item.type === 'card' && item.stackId ? stacksById.get(item.stackId) ?? null : null;
+	}
+
+	function cardMode(item: WhiteboardItem): StackBehavior | null {
+		const stack = homeStack(item);
+		return stack ? behaviorOf(stack) : null;
+	}
+
+	/** "now" for the top of a queue, "next" for the one under it. */
+	function queueRank(item: WhiteboardItem): 'now' | 'next' | null {
+		const stack = homeStack(item);
+		if (!stack || behaviorOf(stack) !== 'queue') return null;
+		const at = stack.cardIds.indexOf(item.id);
+		return at === 0 ? 'now' : at === 1 ? 'next' : null;
+	}
+
+	function stackCountLabel(stack: StackItem): string {
+		if (behaviorOf(stack) === 'checklist') {
+			const progress = checklistProgress(board.items, stack);
+			return progress.total ? `${progress.done}/${progress.total}` : '';
+		}
+		return stack.cardIds.length ? String(stack.cardIds.length) : '';
 	}
 
 	function deleteSelection() {
 		if (!selectedIds.length) return;
+		beginEdit();
 		const selected = new Set(selectedIds);
 		const imageAssets = board.items
 			.filter((item): item is Extract<WhiteboardItem, { type: 'image' }> => selected.has(item.id) && item.type === 'image')
@@ -708,6 +1170,7 @@
 	function duplicateSelection() {
 		const originals = board.items.filter((item) => selectedIds.includes(item.id) && item.type !== 'connector');
 		if (!originals.length) return;
+		beginEdit();
 		const clones = originals.map((item, index) => {
 			const bounds = itemBounds(item);
 			const stamp = now();
@@ -731,6 +1194,8 @@
 
 	function handleWheel(event: WheelEvent) {
 		event.preventDefault();
+		wakeChrome();
+		handHoldsTheCamera();
 		interruptCameraAnimation();
 		const factor = Math.exp(-event.deltaY * 0.00125);
 		board.camera = zoomAroundPoint(board.camera, localPoint(event), board.camera.zoom * factor);
@@ -742,49 +1207,99 @@
 		cameraAnimation = 0;
 	}
 
-	function animateCamera(target: Camera) {
+	function prefersReducedMotion(): boolean {
+		return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+	}
+
+	/** Returns how long the move will take, so a journey can time its next step. */
+	function animateCamera(target: Camera): number {
 		interruptCameraAnimation();
-		const start = { ...board.camera };
-		const reduceMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-		if (reduceMotion) {
-			board.camera = target;
+		measureViewport();
+		if (prefersReducedMotion()) {
+			board.camera = { ...target };
 			scheduleSave();
-			return;
+			return 0;
 		}
+		const flight = planCameraFlight(board.camera, target, viewport());
 		const startAt = performance.now();
-		const duration = 460;
-		const ease = (value: number) => 1 - Math.pow(1 - value, 4);
 		const step = (time: number) => {
-			const amount = Math.min(1, (time - startAt) / duration);
-			const t = ease(amount);
-			board.camera = {
-				x: start.x + (target.x - start.x) * t,
-				y: start.y + (target.y - start.y) * t,
-				zoom: start.zoom + (target.zoom - start.zoom) * t
-			};
+			const progress = Math.min(1, (time - startAt) / flight.duration);
+			board.camera = flight.at(progress);
 			markDirty();
-			if (amount < 1) cameraAnimation = requestAnimationFrame(step);
-			else {
+			if (progress < 1) {
+				cameraAnimation = requestAnimationFrame(step);
+			} else {
 				cameraAnimation = 0;
 				scheduleSave();
 			}
 		};
 		cameraAnimation = requestAnimationFrame(step);
+		return flight.duration;
+	}
+
+	/**
+	 * Every deliberate move goes through here, so the place being left is written
+	 * into history and Back has somewhere to return to. Free panning and zooming
+	 * deliberately do not: history is a record of decisions, not of drifting.
+	 */
+	function flyTo(target: Camera, label: string, record = true): number {
+		if (record) history = pushCameraMark(history, board.camera, { camera: { ...target }, label });
+		return animateCamera(target);
+	}
+
+	function focusItem(id: string, label?: string) {
+		const camera = focusCamera(board.items, id, viewport());
+		if (!camera) return;
+		const item = board.items.find((candidate) => candidate.id === id);
+		flyTo(camera, label ?? (item ? itemLabel(item) : 'Board'));
+		selectOnly(id);
 	}
 
 	function focusFrame(item: FrameItem) {
-		const bounds = itemBounds(item);
-		animateCamera(fitCamera(bounds, viewport(), 100));
-		selectOnly(item.id);
+		focusItem(item.id, frameTitle(item));
 	}
 
 	function goHome() {
-		const bounds = documentBounds(board);
-		if (bounds) animateCamera(fitCamera(bounds, viewport(), 120));
-		else {
-			const size = viewport();
-			animateCamera({ x: size.width / 2, y: size.height / 2, zoom: 1 });
+		flyTo(board.home ?? fitBoardCamera(board, viewport()), board.home ? 'Home' : 'Whole board');
+	}
+
+	function fitBoard() {
+		flyTo(fitBoardCamera(board, viewport()), 'Whole board');
+	}
+
+	function setHome() {
+		beginEdit();
+		board.home = { ...board.camera };
+		notice = 'Home is this view now.';
+		scheduleSave();
+	}
+
+	function clearHome() {
+		beginEdit();
+		board.home = null;
+		notice = 'Home is the whole board again.';
+		scheduleSave();
+	}
+
+	function travelHistory(direction: -1 | 1) {
+		const stepped = stepHistory(history, board.camera, direction);
+		if (!stepped) return;
+		history = stepped.history;
+		animateCamera(stepped.mark.camera);
+	}
+
+	function stepThroughFrames(direction: -1 | 1) {
+		const next = stepFrame(sequence, here?.id ?? null, direction);
+		if (!next) {
+			notice = 'Draw a frame to give the board places to go.';
+			return;
 		}
+		focusFrame(next);
+	}
+
+	function jumpToFrame(position: number) {
+		const frame = sequence[position];
+		if (frame) focusFrame(frame);
 	}
 
 	function changeZoom(multiplier: number) {
@@ -793,26 +1308,802 @@
 		scheduleSave();
 	}
 
+	function saveViewpointHere() {
+		const name = newViewpointName.trim() || `View ${board.viewpoints.length + 1}`;
+		beginEdit();
+		board.viewpoints = [...board.viewpoints, createViewpoint(name, board.camera)];
+		newViewpointName = '';
+		notice = `Saved “${name}”.`;
+		scheduleSave();
+	}
+
+	function goToViewpoint(viewpoint: Viewpoint) {
+		flyTo(viewpoint.camera, viewpoint.name);
+	}
+
+	function renameViewpoint(id: string, name: string) {
+		beginEdit(`viewpoint-name:${id}`);
+		board.viewpoints = board.viewpoints.map((viewpoint) => (viewpoint.id === id ? { ...viewpoint, name } : viewpoint));
+		scheduleSave();
+	}
+
+	function deleteViewpoint(id: string) {
+		beginEdit();
+		board.viewpoints = board.viewpoints.filter((viewpoint) => viewpoint.id !== id);
+		board = repairDocument(board);
+		scheduleSave();
+	}
+
+	// ── Journey Mode ────────────────────────────────────────────────────────
+	// The board, read aloud: the camera walks an arranged sequence of places and
+	// rests at each one long enough to be taken in.
+
+	function clearPlayTimer() {
+		if (playTimer) clearTimeout(playTimer);
+		playTimer = null;
+	}
+
+	function beginJourney(from = 0) {
+		if (!board.journey.stops.length) {
+			const suggested = suggestedStops(board);
+			if (!suggested.length) {
+				notice = 'A journey visits frames — draw a frame or two first.';
+				return;
+			}
+			beginEdit();
+			board = setJourneyStops(board, suggested);
+			scheduleSave();
+		}
+		playing = true;
+		paused = false;
+		drawer = null;
+		shelfOpen = false;
+		// The board is being shown, not worked on: selection rings and handles go.
+		selectedIds = [];
+		connectorSourceId = null;
+		tool = 'select';
+		notice = '';
+		playStop(from);
+	}
+
+	function playStop(index: number) {
+		clearPlayTimer();
+		const resolved = resolveJourney(board, viewport());
+		if (!resolved.length) {
+			exitJourney();
+			return;
+		}
+		const position = Math.max(0, Math.min(index, resolved.length - 1));
+		playIndex = position;
+		const stop = resolved[position];
+		// Stops are not written into history: a journey has its own way forward
+		// and back, and twenty stops would bury the places you chose yourself.
+		const travel = stop.camera ? flyTo(stop.camera, stop.label, false) : 0;
+		if (paused) return;
+		playTimer = setTimeout(() => {
+			const next = advanceStop(position, resolved.length, board.journey.loop);
+			if (next === null) finishJourney();
+			else playStop(next);
+		}, travel + stop.stop.hold * 1000);
+	}
+
+	function pauseJourney() {
+		paused = true;
+		clearPlayTimer();
+	}
+
+	function resumeJourney() {
+		paused = false;
+		playStop(playIndex);
+	}
+
+	function stepJourney(direction: -1 | 1) {
+		playStop(stepStop(playIndex, board.journey.stops.length, direction));
+	}
+
+	function finishJourney() {
+		exitJourney();
+		notice = 'Journey complete.';
+	}
+
+	/** Leaves the journey where it stands, and makes that somewhere Back can undo. */
+	function exitJourney() {
+		clearPlayTimer();
+		if (playing) {
+			const label = stops[playIndex]?.label ?? 'Journey';
+			history = pushCameraMark(history, board.camera, { camera: { ...board.camera }, label });
+		}
+		playing = false;
+		paused = false;
+	}
+
+	function toggleStop(target: JourneyStop['target']) {
+		beginEdit();
+		if (hasStop(board, target)) {
+			const existing = board.journey.stops.find((stop) =>
+				stop.target.kind === target.kind &&
+				(target.kind === 'board' || (stop.target.kind !== 'board' && stop.target.id === target.id))
+			);
+			if (existing) board = removeStop(board, existing.id);
+		} else {
+			board = addStop(board, target);
+		}
+		scheduleSave();
+	}
+
+	function addSelectionToJourney() {
+		const additions = selectedIds.filter((id) => board.items.some((item) => item.id === id && item.type !== 'connector'));
+		if (!additions.length) {
+			notice = 'Choose something on the board to add to the journey.';
+			return;
+		}
+		beginEdit();
+		for (const id of additions) {
+			if (!hasStop(board, { kind: 'item', id })) board = addStop(board, { kind: 'item', id });
+		}
+		drawer = 'journey';
+		scheduleSave();
+	}
+
+	function useSuggestedJourney() {
+		const suggested = suggestedStops(board);
+		if (!suggested.length) {
+			notice = 'A journey visits frames — draw a frame or two first.';
+			return;
+		}
+		beginEdit();
+		board = setJourneyStops(board, suggested);
+		scheduleSave();
+	}
+
+	function clearJourney() {
+		beginEdit();
+		board = setJourneyStops(board, []);
+		scheduleSave();
+	}
+
+	// ── Labels and the optional layer ───────────────────────────────────────
+
+	function chipsFor(item: WhiteboardItem): Label[] {
+		return labelsOn(board, item);
+	}
+
+	/**
+	 * A chip on the board is a button, not a handle. Without this the object
+	 * underneath takes the pointer, captures it, and the click never lands.
+	 */
+	function stopChipPointer(event: PointerEvent) {
+		event.stopPropagation();
+	}
+
+	const CHIP_ROW_ROOM = 28;
+
+	/** Whether an object is showing a chip row of its own, selection aside. */
+	function showsChipRow(item: WhiteboardItem): boolean {
+		return Boolean(chipsFor(item).length || statusOf(item) || sourceOf(item));
+	}
+
+	function chipRoomBefore(ids: string[]): Map<string, boolean> {
+		return new Map(ids.map((id) => {
+			const item = board.items.find((candidate) => candidate.id === id);
+			return [id, item ? showsChipRow(item) : false];
+		}));
+	}
+
+	/**
+	 * A card grows to hold its first chip row and shrinks back when the last chip
+	 * goes. Without this, saying something about a card silently eats a line of
+	 * whatever it already said.
+	 */
+	function keepChipRoom(before: Map<string, boolean>) {
+		board.items = board.items.map((item) => {
+			if (item.type !== 'card') return item;
+			const had = before.get(item.id);
+			if (had === undefined || had === showsChipRow(item)) return item;
+			const height = had ? Math.max(90, item.height - CHIP_ROW_ROOM) : item.height + CHIP_ROW_ROOM;
+			return { ...item, height };
+		});
+	}
+
+	/** Names a label onto everything selected. New labels are made by typing. */
+	function applyLabelDraft() {
+		const name = labelDraft.trim();
+		if (!name || !chosen.length) return;
+		beginEdit();
+		const ids = chosen.map((item) => item.id);
+		const before = chipRoomBefore(ids);
+		board = labelItems(board, ids, name);
+		keepChipRoom(before);
+		labelDraft = '';
+		scheduleSave();
+	}
+
+	function toggleLabelOnSelection(labelId: string) {
+		if (!chosen.length) return;
+		beginEdit();
+		// With several chosen, one click means "give this to all of them" unless
+		// they all already have it, in which case it means "take it away".
+		const everyone = chosen.every((item) => item.properties?.labelIds?.includes(labelId));
+		const before = chipRoomBefore(chosen.map((item) => item.id));
+		for (const item of chosen) {
+			const wears = item.properties?.labelIds?.includes(labelId);
+			if (everyone === Boolean(wears)) board = toggleLabel(board, item.id, labelId);
+		}
+		keepChipRoom(before);
+		scheduleSave();
+	}
+
+	function removeLabelFrom(itemId: string, labelId: string) {
+		beginEdit();
+		const before = chipRoomBefore([itemId]);
+		board = toggleLabel(board, itemId, labelId);
+		keepChipRoom(before);
+		scheduleSave();
+	}
+
+	function writeProperty(key: 'status' | 'kind' | 'source' | 'tint', value: string | null) {
+		beginEdit(`property:${key}:${chosen.map((item) => item.id).join(',')}`);
+		const before = chipRoomBefore(chosen.map((item) => item.id));
+		for (const item of chosen) board = setItemProperty(board, item.id, key, value);
+		keepChipRoom(before);
+		scheduleSave();
+	}
+
+	/** A property already shared by everything chosen, or null when they differ. */
+	function sharedProperty(read: (item: WhiteboardItem) => string | null): string | null {
+		if (!chosen.length) return null;
+		const first = read(chosen[0]);
+		return chosen.every((item) => read(item) === first) ? first : null;
+	}
+
+	function openDetails() {
+		drawer = 'details';
+		shortcutsOpen = false;
+	}
+
+	async function addLabelToItem(item: WhiteboardItem) {
+		selectOnly(item.id);
+		openDetails();
+		await tick();
+		document.getElementById('label-draft')?.focus();
+	}
+
+	function renameLabelTo(labelId: string, name: string) {
+		beginEdit(`label-name:${labelId}`);
+		board = renameLabel(board, labelId, name);
+		scheduleSave();
+	}
+
+	function recolourLabel(labelId: string, tint: Tint) {
+		beginEdit();
+		board = retintLabel(board, labelId, tint);
+		scheduleSave();
+	}
+
+	function dropLabel(labelId: string) {
+		beginEdit();
+		board = deleteLabel(board, labelId);
+		scheduleSave();
+	}
+
+	// ── Portals ─────────────────────────────────────────────────────────────
+
+	function wait(ms: number): Promise<void> {
+		return new Promise((resolve) => setTimeout(resolve, ms));
+	}
+
+	/**
+	 * What each doorway on this board is showing. A portal stores only an id, so
+	 * the miniature is read from the library rather than kept in the document —
+	 * which is why a child board that changes is immediately right through the
+	 * doorway, with nothing to keep in step.
+	 */
+	function refreshPreviews() {
+		const next: Record<string, PortalPreview> = {};
+		for (const boardId of new Set(portals(board.items).map((portal) => portal.boardId))) {
+			const opened = boardLibrary.open(boardId);
+			next[boardId] = opened
+				? {
+					title: opened.document.board.title,
+					marks: minimapMarks(opened.document.items),
+					bounds: documentBounds(opened.document),
+					missing: false
+				}
+				: { title: '', marks: [], bounds: null, missing: true };
+		}
+		previews = next;
+	}
+
+	function previewFor(portal: PortalItem): PortalPreview | null {
+		return previews[portal.boardId] ?? null;
+	}
+
+	function doorLabel(portal: PortalItem): string {
+		return portalTitle(portal, previewFor(portal)?.title ?? null);
+	}
+
+	/** The child board's shapes, projected into the pane of the doorway. */
+	function previewProjection(portal: PortalItem) {
+		const extent = previewFor(portal)?.bounds ?? { x: 0, y: 0, width: 1, height: 1 };
+		return minimapProjection(extent, { width: portal.width - 22, height: portal.height - 52 }, 5);
+	}
+
+	async function addPortalFromDock() {
+		saveNow();
+		const size = viewport();
+		const at = screenToWorld(board.camera, { x: size.width / 2 - 115, y: size.height / 2 - 84 });
+		const child = boardLibrary.create('New board');
+		// `create` marks the child as the board to reopen. We are not going there
+		// yet — this board is still the one being worked on.
+		boardLibrary.setActiveId(board.board.id);
+		const portal = createPortal(at.x, at.y, child.board.id, '', nextZ(board.items));
+		beginEdit();
+		setItems([...board.items, portal]);
+		selectOnly(portal.id);
+		refreshBoards();
+		refreshPreviews();
+		scheduleSave();
+		await tick();
+		document.getElementById(`portal-title-${portal.id}`)?.focus();
+	}
+
+	function pointPortal(portal: PortalItem, boardId: string) {
+		beginEdit();
+		updateItem(portal.id, { boardId } as Partial<WhiteboardItem>, true);
+		refreshPreviews();
+	}
+
+	/**
+	 * Through the doorway. The camera flies into the portal until it is past the
+	 * edges of the screen, and the child arrives at the framing its miniature was
+	 * showing — so the shapes you were flying toward are the shapes that greet
+	 * you. That continuity is the whole of the illusion; without it this would be
+	 * a page navigation with an animation in front of it.
+	 */
+	async function enterPortal(portal: PortalItem) {
+		if (travelling) return;
+		const opened = boardLibrary.open(portal.boardId);
+		if (!opened) {
+			refreshPreviews();
+			notice = 'That board is no longer on the shelf.';
+			return;
+		}
+
+		travelling = true;
+		handHoldsTheCamera();
+		saveNow();
+		const resting = { ...board.camera };
+		const flight = animateCamera(enterCamera(itemBounds(portal), viewport()));
+		veil = 1;
+		await wait(flight * 0.75);
+		// The flight is still running. Left going, it would keep writing the camera
+		// every frame and paint straight over the arrival.
+		interruptCameraAnimation();
+
+		const step: TrailStep = {
+			boardId: board.board.id,
+			title: board.board.title,
+			camera: resting,
+			portalId: portal.id
+		};
+		trail = pushTrail(trail, step);
+		boardLibrary.writeTrail(trail);
+		boardLibrary.setActiveId(portal.boardId);
+		adoptDocument(opened.document, 'saved', 'saved here');
+		board.camera = arrivalCamera(board, viewport());
+		refreshPreviews();
+		veil = 0;
+		travelling = false;
+	}
+
+	/**
+	 * Back up to a board on the trail. The child shrinks away, and the parent
+	 * comes back framed on the doorway that was stepped through before easing out
+	 * to where you were actually standing.
+	 */
+	async function climbTo(depth: number) {
+		if (travelling) return;
+		const climbed = popTrailTo(trail, depth);
+		if (!climbed) return;
+		const opened = boardLibrary.open(climbed.step.boardId);
+		if (!opened) {
+			trail = climbed.trail;
+			boardLibrary.writeTrail(trail);
+			notice = 'The board above is no longer on the shelf.';
+			return;
+		}
+
+		travelling = true;
+		handHoldsTheCamera();
+		saveNow();
+		const away = { ...board.camera, zoom: Math.max(0.1, board.camera.zoom * 0.4) };
+		const flight = animateCamera(away);
+		veil = 1;
+		await wait(flight * 0.6);
+		interruptCameraAnimation();
+
+		trail = climbed.trail;
+		boardLibrary.writeTrail(trail);
+		boardLibrary.setActiveId(climbed.step.boardId);
+		adoptDocument(opened.document, 'saved', 'saved here');
+		refreshPreviews();
+
+		const door = opened.document.items.find((item) => item.id === climbed.step.portalId);
+		board.camera = door
+			? returnCamera(boundsForItem(opened.document.items, door), climbed.step.camera, viewport())
+			: climbed.step.camera;
+		veil = 0;
+		// Ease from the doorway back out to the view that was left behind.
+		animateCamera(climbed.step.camera);
+		travelling = false;
+	}
+
+	function climbOne() {
+		if (trail.length) void climbTo(trail.length - 1);
+	}
+
+	// ── Search ──────────────────────────────────────────────────────────────
+
+	async function openSearch(seed = '') {
+		if (!searchOpen) searchReturn = { ...board.camera };
+		searchOpen = true;
+		searchText = seed;
+		searchIndex = 0;
+		drawer = null;
+		shelfOpen = false;
+		shortcutsOpen = false;
+		handHoldsTheCamera();
+		await tick();
+		searchInput?.focus();
+		searchInput?.select();
+		if (seed) previewResult(0);
+	}
+
+	/** Moving through results flies the camera, without filling up the history. */
+	function previewResult(index: number) {
+		const hit = results[index];
+		if (!hit) return;
+		searchIndex = index;
+		const camera = focusCamera(board.items, hit.item.id, viewport());
+		if (camera) flyTo(camera, hit.title, false);
+	}
+
+	function stepResult(direction: -1 | 1) {
+		if (!results.length) return;
+		previewResult((searchIndex + direction + results.length) % results.length);
+	}
+
+	/**
+	 * The board goes to the best result on its own, once typing settles. Flying
+	 * on every keystroke would be thrash, not travel.
+	 */
+	function queueSearchPreview() {
+		if (searchPreviewTimer) clearTimeout(searchPreviewTimer);
+		searchPreviewTimer = setTimeout(() => {
+			searchPreviewTimer = null;
+			if (searchOpen && results.length) previewResult(0);
+		}, 340);
+	}
+
+	/** Keeps the result you landed on, and makes it something Back can undo. */
+	function commitSearch(index = searchIndex) {
+		const hit = results[index];
+		if (!hit) return;
+		searchIndex = index;
+		const camera = focusCamera(board.items, hit.item.id, viewport());
+		if (camera && searchReturn) {
+			// Rewind to where the search started so history records one move, from
+			// there to here, rather than every result glanced at along the way.
+			board.camera = { ...searchReturn };
+			flyTo(camera, hit.title);
+		}
+		selectOnly(hit.item.id);
+		closeSearch(false);
+	}
+
+	/** Pulls back far enough to hold every result at once. */
+	function fitResults() {
+		const bounds = hitsBounds(board.items, results);
+		if (!bounds) return;
+		if (searchReturn) board.camera = { ...searchReturn };
+		flyTo(cameraForBounds(bounds, viewport(), 140, 1.2), `${results.length} results`);
+		selectedIds = results.map((hit) => hit.item.id);
+		closeSearch(false);
+	}
+
+	function closeSearch(restore = true) {
+		if (searchPreviewTimer) clearTimeout(searchPreviewTimer);
+		searchPreviewTimer = null;
+		if (restore && searchReturn) animateCamera(searchReturn);
+		searchOpen = false;
+		searchText = '';
+		searchIndex = 0;
+		searchReturn = null;
+	}
+
+	function searchForLabel(label: Label) {
+		void openSearch(`#${label.name}`);
+	}
+
+	function handleSearchKeydown(event: KeyboardEvent) {
+		if (event.key === 'ArrowDown') {
+			event.preventDefault();
+			stepResult(1);
+		} else if (event.key === 'ArrowUp') {
+			event.preventDefault();
+			stepResult(-1);
+		} else if (event.key === 'Enter') {
+			event.preventDefault();
+			if (event.shiftKey) fitResults();
+			else commitSearch();
+		} else if (event.key === 'Escape') {
+			event.preventDefault();
+			closeSearch();
+		}
+	}
+
+	// ── The shelf: boards as a set, not a single canvas ─────────────────────
+
+	function refreshBoards() {
+		boards = boardLibrary.list();
+	}
+
+	function releaseImageUrls() {
+		Object.values(imageUrls).forEach((url) => URL.revokeObjectURL(url));
+		imageUrls = {};
+		missingAssets = new Set();
+	}
+
+	/** Puts a board on screen, with none of the previous board left clinging on. */
+	function adoptDocument(document: WhiteboardDocument, state: SaveState, message: string) {
+		exitJourney();
+		if (searchOpen) closeSearch(false);
+		labelDraft = '';
+		renamingLabelId = null;
+		releaseImageUrls();
+		board = restoreWhiteboard(document);
+		selectedIds = [];
+		connectorSourceId = null;
+		renamingFrameId = null;
+		tool = 'select';
+		notice = '';
+		marquee = null;
+		frameDraft = null;
+		history = createCameraHistory({ camera: { ...board.camera }, label: 'Where you were' });
+		editHistory = createEditHistory();
+		dirty = false;
+		saveState = state;
+		saveMessage = message;
+		void hydrateImages();
+	}
+
+	function discardPendingSave() {
+		if (saveTimer) clearTimeout(saveTimer);
+		saveTimer = null;
+		dirty = false;
+	}
+
+	function openShelf() {
+		saveNow();
+		refreshBoards();
+		shelfOpen = true;
+	}
+
+	function openBoard(id: string) {
+		if (id === board.board.id) {
+			shelfOpen = false;
+			return;
+		}
+		saveNow();
+		const opened = boardLibrary.open(id);
+		if (!opened) {
+			notice = 'That board is no longer on the shelf.';
+			refreshBoards();
+			return;
+		}
+		boardLibrary.setActiveId(id);
+		// Opening a board from the shelf is not climbing out of anything, so the
+		// trail does not survive it — you arrive at that board, not under it.
+		trail = [];
+		boardLibrary.writeTrail(trail);
+		adoptDocument(
+			opened.document,
+			opened.source === 'backup' ? 'recovered' : 'saved',
+			opened.source === 'backup' ? 'restored the last saved board' : 'saved here'
+		);
+		shelfOpen = false;
+		refreshBoards();
+		refreshPreviews();
+	}
+
+	async function startNewBoard() {
+		saveNow();
+		trail = [];
+		boardLibrary.writeTrail(trail);
+		adoptDocument(boardLibrary.create(), 'saved', 'saved here');
+		shelfOpen = false;
+		refreshBoards();
+		refreshPreviews();
+		await tick();
+		document.getElementById('board-title')?.focus();
+	}
+
+	function closeBoard() {
+		saveNow();
+		refreshBoards();
+		shelfOpen = true;
+	}
+
+	function duplicateBoard(id: string) {
+		if (id === board.board.id) saveNow();
+		const copy = boardLibrary.duplicate(id);
+		if (!copy) return;
+		refreshBoards();
+		notice = `Copied as “${boardTitleFallback(copy.board.title)}”.`;
+	}
+
+	function deleteBoard(id: string) {
+		const doomed = boardLibrary.open(id);
+		const spokenFor = boardLibrary.referencedAssets(id);
+		boardLibrary.remove(id);
+		for (const item of doomed?.document.items ?? []) {
+			if (item.type === 'image' && !spokenFor.has(item.assetId)) {
+				void removeImageAsset(item.assetId).catch(() => undefined);
+			}
+		}
+		confirmDeleteId = null;
+		refreshBoards();
+		// Doorways to it stay where they are and say they lead nowhere — the board
+		// may come back, and the layout around them was arranged by hand.
+		refreshPreviews();
+		trail = trail.filter((step) => step.boardId !== id);
+		boardLibrary.writeTrail(trail);
+		if (id !== board.board.id) return;
+
+		// The board under our feet just went. Don't let a queued save write it back.
+		discardPendingSave();
+		const next = boards[0] ? boardLibrary.open(boards[0].id) : null;
+		if (next) {
+			boardLibrary.setActiveId(next.document.board.id);
+			adoptDocument(next.document, 'saved', 'saved here');
+		} else {
+			adoptDocument(boardLibrary.create(), 'saved', 'saved here');
+			refreshBoards();
+		}
+	}
+
 	function handleKeydown(event: KeyboardEvent) {
+		// Typing into a card is not a reason for the edges to come back.
+		if (!isTextTarget(event.target)) wakeChrome();
+		// Find is reachable from anywhere, including from inside a card.
+		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+			event.preventDefault();
+			void openSearch(searchOpen ? searchText : '');
+			return;
+		}
 		if (event.code === 'Space' && !isTextTarget(event.target)) {
 			spaceHeld = true;
 			event.preventDefault();
 		}
 		if (isTextTarget(event.target)) return;
-		if ((event.key === 'Delete' || event.key === 'Backspace') && selectedIds.length) {
+
+		if (event.key === '/') {
 			event.preventDefault();
-			deleteSelection();
+			void openSearch();
+			return;
 		}
-		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd') {
-			event.preventDefault();
-			duplicateSelection();
-		}
+
 		if (event.key === 'Escape') {
+			if (searchOpen) {
+				closeSearch();
+				return;
+			}
+			if (playing) {
+				exitJourney();
+				return;
+			}
+			if (shelfOpen || drawer || shortcutsOpen || viewOpen) {
+				shelfOpen = false;
+				drawer = null;
+				shortcutsOpen = false;
+				viewOpen = false;
+				confirmDeleteId = null;
+				return;
+			}
 			tool = 'select';
 			connectorSourceId = null;
 			renamingFrameId = null;
 			notice = '';
 			cancelPointerSession();
+			return;
+		}
+
+		// Camera history rides the platform's own back and forward gesture.
+		if ((event.altKey || event.metaKey) && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+			event.preventDefault();
+			travelHistory(event.key === 'ArrowLeft' ? -1 : 1);
+			return;
+		}
+		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+			event.preventDefault();
+			saveNow();
+			return;
+		}
+		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd') {
+			event.preventDefault();
+			duplicateSelection();
+			return;
+		}
+		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+			event.preventDefault();
+			if (event.shiftKey) performRedo();
+			else performUndo();
+			return;
+		}
+		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') {
+			event.preventDefault();
+			selectedIds = board.items.filter((item) => item.type !== 'connector').map((item) => item.id);
+			connectorSourceId = null;
+			return;
+		}
+		if (event.metaKey || event.ctrlKey) return;
+
+		if (playing) {
+			if (event.key === 'ArrowRight') { event.preventDefault(); stepJourney(1); }
+			if (event.key === 'ArrowLeft') { event.preventDefault(); stepJourney(-1); }
+			if (event.key.toLowerCase() === 'p') { event.preventDefault(); paused ? resumeJourney() : pauseJourney(); }
+			return;
+		}
+
+		if ((event.key === 'Delete' || event.key === 'Backspace') && selectedIds.length) {
+			event.preventDefault();
+			deleteSelection();
+			return;
+		}
+		if (event.key === '[' || event.key === ']') {
+			event.preventDefault();
+			stepThroughFrames(event.key === '[' ? -1 : 1);
+			return;
+		}
+		if (event.key === '0') {
+			event.preventDefault();
+			fitBoard();
+			return;
+		}
+		if (/^[1-9]$/.test(event.key)) {
+			event.preventDefault();
+			jumpToFrame(Number(event.key) - 1);
+			return;
+		}
+		if (event.key.toLowerCase() === 'h') {
+			event.preventDefault();
+			goHome();
+			return;
+		}
+		if (event.key.toLowerCase() === 'p') {
+			event.preventDefault();
+			beginJourney();
+			return;
+		}
+		if (event.key.toLowerCase() === 'm') {
+			event.preventDefault();
+			setView({ minimapOn: !view.minimapOn });
+			return;
+		}
+		if (event.key.toLowerCase() === 'i' && chosen.length) {
+			event.preventDefault();
+			openDetails();
+			return;
+		}
+		// The keyboard says what the drag says: move the card one column along.
+		if (event.shiftKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+			event.preventDefault();
+			moveCardColumn(event.key === 'ArrowLeft' ? -1 : 1);
+			return;
+		}
+		if (event.key === '?') {
+			event.preventDefault();
+			toggleShortcuts();
 		}
 	}
 
@@ -824,22 +2115,103 @@
 		spaceHeld = false;
 	}
 
+	// ── Capture ─────────────────────────────────────────────────────────────
+	// Two gestures, one rule each: dropping is placing, so it lands where you
+	// let go; pasting has no position, so it goes to the Inbox.
+
+	function sameOriginHosts(): string[] {
+		return typeof location === 'undefined' ? [] : [location.host, location.hostname];
+	}
+
+	function captureCount(items: CaptureItem[]): string {
+		const links = items.filter((item) => item.kind === 'link').length;
+		if (links === items.length) return items.length === 1 ? 'a link' : `${items.length} links`;
+		return items.length === 1 ? 'a card' : `${items.length} cards`;
+	}
+
+	/** Puts captured material down where it was dropped. */
+	function placeCapture(items: CaptureItem[], at: Point) {
+		if (!items.length) return;
+		beginEdit();
+		const result = captureAt(board, items, at);
+		setItems(result.document.items);
+		selectedIds = result.ids;
+		notice = `Put ${captureCount(items)} down here.`;
+		scheduleSave();
+	}
+
+	/** Files captured material in the Inbox, and says where it went. */
+	function fileCapture(items: CaptureItem[]) {
+		if (!items.length) return;
+		beginEdit();
+		const size = viewport();
+		const near = screenToWorld(board.camera, { x: size.width - 340, y: 120 });
+		const result = captureToInbox(board, items, near);
+		board = result.document;
+		markDirty();
+		notice = `${captureCount(items)} in the Inbox.`;
+		inboxNotice = notice;
+		scheduleSave();
+	}
+
+	function showInbox() {
+		const inbox = findInbox(board);
+		if (!inbox) return;
+		focusItem(inbox.id, INBOX_TITLE);
+		notice = '';
+	}
+
 	function handlePaste(event: ClipboardEvent) {
 		if (isTextTarget(event.target)) return;
-		const image = [...(event.clipboardData?.files ?? [])].find((file) => file.type.startsWith('image/'));
-		if (!image) return;
+		const images = [...(event.clipboardData?.files ?? [])].filter((file) => file.type.startsWith('image/'));
+		if (images.length) {
+			event.preventDefault();
+			const size = viewport();
+			const centre = screenToWorld(board.camera, { x: size.width / 2, y: size.height / 2 });
+			void Promise.all(images.map((file, index) => addImageFile(file, { x: centre.x + index * 28, y: centre.y + index * 28 })));
+			return;
+		}
+
+		const text = event.clipboardData?.getData('text/plain') ?? '';
+		const items = inferCapture(text, sameOriginHosts());
+		if (!items.length) return;
 		event.preventDefault();
-		const size = viewport();
-		void addImageFile(image, screenToWorld(board.camera, { x: size.width / 2, y: size.height / 2 }));
+		fileCapture(items);
 	}
 
 	function handleDrop(event: DragEvent) {
 		event.preventDefault();
 		fileDragging = false;
-		const files = [...(event.dataTransfer?.files ?? [])].filter((file) => file.type.startsWith('image/'));
-		if (!files.length) return;
 		const point = pointForEvent(event);
-		void Promise.all(files.map((file, index) => addImageFile(file, { x: point.x + index * 26, y: point.y + index * 26 })));
+		const files = [...(event.dataTransfer?.files ?? [])];
+		const images = files.filter((file) => file.type.startsWith('image/'));
+		if (images.length) {
+			void Promise.all(images.map((file, index) => addImageFile(file, { x: point.x + index * 26, y: point.y + index * 26 })));
+			return;
+		}
+
+		// A link dragged out of a browser arrives as `text/uri-list`; a selection
+		// dragged out of a document arrives as plain text. Both are captures.
+		const dropped = event.dataTransfer?.getData('text/uri-list') || event.dataTransfer?.getData('text/plain') || '';
+		placeCapture(inferCapture(dropped, sameOriginHosts()), point);
+	}
+
+	/**
+	 * Anything another Woodle handed to this board while it was closed. The queue
+	 * is drained once on open and filed in the Inbox — a handoff is a capture that
+	 * happened somewhere else, so it lands in the same place as any other.
+	 */
+	function drainHandoffs() {
+		const drained = whiteboardHandoffs.drain();
+		if (!drained.items.length) return;
+		const items: CaptureItem[] = drained.items.map((handoff) => ({
+			kind: 'note' as const,
+			title: handoff.title || handoff.source.label || `From ${handoff.source.app}`,
+			body: [handoff.body, handoff.source.href].filter(Boolean).join('\n\n')
+		}));
+		fileCapture(items);
+		notice = `${drained.items.length} handed over from elsewhere, in the Inbox.`;
+		inboxNotice = notice;
 	}
 
 	function handleFrameTitleKeydown(event: KeyboardEvent) {
@@ -856,6 +2228,37 @@
 
 	function zoomLabel(): string {
 		return `${Math.round(board.camera.zoom * 100)}%`;
+	}
+
+	function handleMinimapPointer(event: PointerEvent) {
+		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+		const point = mapProjection.toWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top });
+		handHoldsTheCamera();
+		flyTo(cameraCentredOn(point, board.camera, viewport()), 'Overview');
+	}
+
+	/** The 1–9 a frame answers to, or empty once the sequence runs past nine. */
+	function frameKey(id: string): string {
+		const position = sequence.findIndex((frame) => frame.id === id);
+		return position >= 0 && position < 9 ? String(position + 1) : '';
+	}
+
+	function relativeWhen(iso: string): string {
+		const then = new Date(iso).getTime();
+		if (!Number.isFinite(then)) return '';
+		const minutes = Math.round((Date.now() - then) / 60_000);
+		if (minutes < 1) return 'just now';
+		if (minutes < 60) return `${minutes} min ago`;
+		const hours = Math.round(minutes / 60);
+		if (hours < 24) return `${hours} hr ago`;
+		const days = Math.round(hours / 24);
+		return days < 30 ? `${days} d ago` : new Date(then).toLocaleDateString();
+	}
+
+	function boardCountLabel(entry: BoardSummary): string {
+		const pieces = [`${entry.items} ${entry.items === 1 ? 'thing' : 'things'}`];
+		if (entry.frames) pieces.push(`${entry.frames} ${entry.frames === 1 ? 'frame' : 'frames'}`);
+		return pieces.join(' · ');
 	}
 </script>
 
@@ -875,7 +2278,10 @@
 	bind:this={canvasEl}
 	class:space-panning={spaceHeld}
 	class:file-dragging={fileDragging}
+	class:chrome-resting={chromeResting}
+	class:on-rainbow={board.surface.paper === 'rainbow'}
 	class="whiteboard"
+	style={paperStyle}
 	aria-label="Whiteboard canvas"
 	onpointerdown={handleCanvasPointerDown}
 	onpointermove={handlePointerMove}
@@ -886,6 +2292,10 @@
 	ondragleave={() => (fileDragging = false)}
 	ondrop={handleDrop}
 >
+	{#if board.surface.pattern !== 'plain'}
+		<div class="surface-weave" style={weaveStyle} aria-hidden="true"></div>
+	{/if}
+
 	<div class="world" style={worldStyle()}>
 		<svg class="connector-layer" width="1" height="1">
 			<defs>
@@ -895,6 +2305,8 @@
 			</defs>
 			{#each connectors as connector (connector.id)}
 				{@const endpoints = connectorEndpoints(board.items, connector)}
+				{@const tint = colorOf(connector)}
+				{@const label = kindOf(connector)}
 				{#if endpoints}
 					<path
 						class="connector-hit-area"
@@ -908,10 +2320,20 @@
 					<path
 						aria-hidden="true"
 						class:selected-line={isSelected(connector.id)}
-						class="connector-path"
+						class={tint ? `connector-path tint-${tint}` : 'connector-path'}
 						d={`M ${endpoints.from.x} ${endpoints.from.y} L ${endpoints.to.x} ${endpoints.to.y}`}
 						marker-end={connector.arrow ? 'url(#connector-arrow)' : undefined}
 					/>
+					{#if label}
+						<text
+							class="connector-label"
+							aria-hidden="true"
+							x={(endpoints.from.x + endpoints.to.x) / 2}
+							y={(endpoints.from.y + endpoints.to.y) / 2}
+							dy="-6"
+							text-anchor="middle"
+						>{label}</text>
+					{/if}
 				{/if}
 			{/each}
 		</svg>
@@ -922,11 +2344,8 @@
 					data-whiteboard-object
 					class:selected={isSelected(item.id)}
 					class:dragging={draggingIds.includes(item.id)}
-					class:peach={item.tint === 'peach'}
-					class:lavender={item.tint === 'lavender'}
-					class:aqua={item.tint === 'aqua'}
-					class:gold={item.tint === 'gold'}
-					class="board-item frame"
+					class:found={matchIds.has(item.id)}
+					class="board-item frame tint-{item.tint}"
 					style={itemStyle(item)}
 					role="group"
 					aria-label={`Frame: ${item.title || 'Untitled frame'}`}
@@ -957,6 +2376,9 @@
 								ondblclick={(event) => { event.stopPropagation(); renamingFrameId = item.id; void tick().then(() => document.getElementById(`frame-title-${item.id}`)?.focus()); }}
 							>{item.title || 'Untitled frame'}</button>
 						{/if}
+						{#each chipsFor(item) as label (label.id)}
+							<button data-whiteboard-ui class="label-chip tint-{label.tint}" title={`Find everything labelled ${label.name}`} onpointerdown={stopChipPointer} onclick={() => searchForLabel(label)}>{label.name}</button>
+						{/each}
 					</div>
 					{#if isSelected(item.id)}
 						<button data-whiteboard-ui class="resize-handle" aria-label="Resize frame" onpointerdown={(event) => startResize(event, item)}></button>
@@ -968,10 +2390,11 @@
 					class:selected={isSelected(item.id)}
 					class:dragging={draggingIds.includes(item.id)}
 					class:drop-target={dropStackId === item.id}
-					class="board-item stack"
+					class:found={matchIds.has(item.id)}
+					class="board-item stack tint-{colorOf(item) ?? 'none'} does-{behaviorOf(item)}"
 					style={itemStyle(item)}
 					role="group"
-					aria-label={`Stack: ${item.title || 'Untitled stack'}`}
+					aria-label={`${behaviorOf(item) === 'plain' ? 'Stack' : `${behaviorOf(item)} stack`}: ${item.title || 'Untitled stack'}`}
 					onpointerdown={(event) => handleItemPointerDown(event, item)}
 					ondblclick={(event) => handleItemDoubleClick(event, item)}
 				>
@@ -985,8 +2408,27 @@
 							oninput={(event) => updateStack(item, (event.currentTarget as HTMLInputElement).value)}
 							onkeydown={handleEditableKeydown}
 						/>
-						<span class="stack-count">{item.cardIds.length || ''}</span>
+						{#if behaviorOf(item) !== 'plain'}
+							<span class="stack-mode" title={BEHAVIOR_NOTES[behaviorOf(item)]}>{behaviorOf(item)}</span>
+						{/if}
+						<span class="stack-count">{stackCountLabel(item)}</span>
 					</div>
+					{#if behaviorOf(item) === 'queue' && item.cardIds.length}
+						<button
+							data-whiteboard-ui
+							class="queue-take"
+							title="Take the top card out and set it down beside the stack"
+							onpointerdown={stopChipPointer}
+							onclick={() => takeTop(item.id)}
+						>take “{itemLabel(queueHeads(board.items, item).now ?? item)}”</button>
+					{/if}
+					{#if chipsFor(item).length}
+						<div class="chip-row stack-chips" data-whiteboard-ui>
+							{#each chipsFor(item) as label (label.id)}
+								<button class="label-chip tint-{label.tint}" title={`Find everything labelled ${label.name}`} onpointerdown={stopChipPointer} onclick={() => searchForLabel(label)}>{label.name}</button>
+							{/each}
+						</div>
+					{/if}
 					{#if item.cardIds.length === 0}
 						<p class="stack-empty">drag a card in</p>
 					{/if}
@@ -995,20 +2437,42 @@
 					{/if}
 				</section>
 			{:else if item.type === 'card'}
+				{@const chips = chipsFor(item)}
 				<section
 					data-whiteboard-object
 					class:selected={isSelected(item.id)}
 					class:dragging={draggingIds.includes(item.id)}
 					class:in-stack={Boolean(item.stackId)}
-					class="board-item card"
+					class:found={matchIds.has(item.id)}
+					class:tile={cardMode(item) === 'gallery'}
+					class:ticked={cardMode(item) === 'checklist' && isDone(item)}
+					class="board-item card tint-{colorOf(item) ?? 'none'} laid-{cardMode(item) ?? 'free'}"
 					style={itemStyle(item)}
 					role="group"
 					aria-label={`Card: ${item.title || 'Untitled card'}`}
 					onpointerdown={(event) => handleItemPointerDown(event, item)}
 					ondblclick={(event) => handleItemDoubleClick(event, item)}
 				>
-					<div class="card-topline" aria-hidden="true"></div>
+					{#if cardMode(item) === 'checklist'}
+						<button
+							data-whiteboard-ui
+							class:on={isDone(item)}
+							class="tick"
+							aria-label={isDone(item) ? `Untick ${itemLabel(item)}` : `Tick off ${itemLabel(item)}`}
+							aria-pressed={isDone(item)}
+							onpointerdown={stopChipPointer}
+							onclick={() => tickCard(item)}
+						><span aria-hidden="true">✓</span></button>
+					{:else}
+						<div class="card-topline" aria-hidden="true"></div>
+					{/if}
+					{#if queueRank(item)}
+						<span class="queue-badge {queueRank(item)}">{queueRank(item)}</span>
+					{/if}
 					<span class="card-grip" aria-hidden="true">⠿</span>
+					{#if kindOf(item)}
+						<p class="card-kind">{kindOf(item)}</p>
+					{/if}
 					<input
 						class="card-title"
 						aria-label="Card title"
@@ -1022,14 +2486,97 @@
 						id={`card-body-${item.id}`}
 						class="card-body"
 						aria-label="Card text"
-						placeholder="Start anywhere…"
+						placeholder={sourceOf(item) ? '' : 'Start anywhere…'}
 						value={item.body}
 						onpointerdown={(event) => handleEditablePointerDown(event, item)}
 						oninput={(event) => updateCard(item, 'body', (event.currentTarget as HTMLTextAreaElement).value)}
 						onkeydown={handleEditableKeydown}
 					></textarea>
+					{#if chips.length || statusOf(item) || sourceOf(item) || isSelected(item.id)}
+						<div class="chip-row" data-whiteboard-ui>
+							{#if statusOf(item)}
+								<span class="status-chip {statusOf(item)}" title={`Status: ${statusOf(item)}`}><i aria-hidden="true"></i>{statusOf(item)}</span>
+							{/if}
+							{#each chips as label (label.id)}
+								<button class="label-chip tint-{label.tint}" title={`Find everything labelled ${label.name}`} onpointerdown={stopChipPointer} onclick={() => searchForLabel(label)}>{label.name}</button>
+							{/each}
+							{#if sourceOf(item)}
+								{@const href = sourceLink(sourceOf(item)!)}
+								{#if href}
+									<a
+										class="source-chip"
+										{href}
+										target="_blank"
+										rel="noreferrer noopener"
+										title={sourceOf(item)!}
+										onpointerdown={stopChipPointer}
+									>{sourceLabel(sourceOf(item)!)}<span aria-hidden="true">↗</span></a>
+								{:else}
+									<span class="source-chip plain" title={`Source: ${sourceOf(item)}`}>{sourceLabel(sourceOf(item)!)}</span>
+								{/if}
+							{/if}
+							{#if isSelected(item.id)}
+								<button class="chip-add" title="Label this card (I)" aria-label="Add a label to this card" onpointerdown={stopChipPointer} onclick={() => addLabelToItem(item)}>＋</button>
+							{/if}
+						</div>
+					{/if}
 					{#if isSelected(item.id)}
 						<button data-whiteboard-ui class="resize-handle" aria-label="Resize card" onpointerdown={(event) => startResize(event, item)}></button>
+					{/if}
+				</section>
+			{:else if item.type === 'portal'}
+				{@const preview = previewFor(item)}
+				{@const projection = previewProjection(item)}
+				<section
+					data-whiteboard-object
+					class:selected={isSelected(item.id)}
+					class:dragging={draggingIds.includes(item.id)}
+					class:found={matchIds.has(item.id)}
+					class:missing={preview?.missing}
+					class:loops={trailHasBoard(trail, item.boardId)}
+					class="board-item portal"
+					style={itemStyle(item)}
+					role="group"
+					aria-label={`Way through to ${doorLabel(item)}`}
+					onpointerdown={(event) => handleItemPointerDown(event, item)}
+					ondblclick={(event) => { event.stopPropagation(); if (tool === 'select' && !preview?.missing) void enterPortal(item); }}
+				>
+					<div class="portal-pane" aria-hidden="true">
+						{#if preview?.missing}
+							<p class="portal-gone">this board is gone</p>
+						{:else if preview?.marks.length}
+							{#each preview.marks as mark (mark.id)}
+								{@const box = projection.project(mark.bounds)}
+								<span class="door-mark mark-{mark.kind}" style={`left: ${box.x}px; top: ${box.y}px; width: ${box.width}px; height: ${box.height}px;`}></span>
+							{/each}
+						{:else}
+							<p class="portal-empty">nothing here yet</p>
+						{/if}
+					</div>
+					<div class="portal-foot">
+						<input
+							id={`portal-title-${item.id}`}
+							class="portal-title"
+							aria-label="Portal name"
+							placeholder={preview?.title || 'Name this way through'}
+							value={item.title}
+							onpointerdown={(event) => handleEditablePointerDown(event, item)}
+							oninput={(event) => updateItem(item.id, { title: (event.currentTarget as HTMLInputElement).value } as Partial<WhiteboardItem>, true)}
+							onkeydown={handleEditableKeydown}
+						/>
+						{#if !preview?.missing}
+							<button
+								data-whiteboard-ui
+								class="portal-go"
+								title={`Go into ${doorLabel(item)}`}
+								aria-label={`Go into ${doorLabel(item)}`}
+								onpointerdown={stopChipPointer}
+								onclick={() => void enterPortal(item)}
+							>→</button>
+						{/if}
+					</div>
+					{#if isSelected(item.id)}
+						<button data-whiteboard-ui class="resize-handle" aria-label="Resize portal" onpointerdown={(event) => startResize(event, item)}></button>
 					{/if}
 				</section>
 			{:else if item.type === 'image'}
@@ -1037,6 +2584,7 @@
 					data-whiteboard-object
 					class:selected={isSelected(item.id)}
 					class:dragging={draggingIds.includes(item.id)}
+					class:found={matchIds.has(item.id)}
 					class="board-item image-card"
 					style={itemStyle(item)}
 					role="group"
@@ -1050,6 +2598,13 @@
 						<div class="missing-image">
 							<span aria-hidden="true">◇</span>
 							<p>{missingAssets.has(item.assetId) ? 'image kept its place' : 'placing image…'}</p>
+						</div>
+					{/if}
+					{#if chipsFor(item).length}
+						<div class="chip-row image-chips" data-whiteboard-ui>
+							{#each chipsFor(item) as label (label.id)}
+								<button class="label-chip tint-{label.tint}" title={`Find everything labelled ${label.name}`} onpointerdown={stopChipPointer} onclick={() => searchForLabel(label)}>{label.name}</button>
+							{/each}
 						</div>
 					{/if}
 					{#if isSelected(item.id)}
@@ -1067,52 +2622,715 @@
 		{/if}
 	</div>
 
-	{#if !hasContent}
+	{#if !hasContent && !shelfOpen}
 		<div class="empty-whisper" aria-hidden="true">
 			<span class="empty-mark">✦</span>
 			<p>double-click anywhere to begin</p>
-			<small>drag images in · hold Space to move</small>
+			<small>paste anything · drag images or links in · hold Space to move</small>
 		</div>
 	{/if}
 
-	<header class="topbar" data-whiteboard-ui>
+	<div class="top-deck">
+	<header class:hidden={playing} class="topbar" data-whiteboard-ui>
 		<a class="back-link" href="/" aria-label="Back to Woodles">←</a>
 		<div class="board-name">
 			<span>Whiteboard</span>
 			<input
+				id="board-title"
 				aria-label="Whiteboard title"
+				placeholder="Untitled whiteboard"
 				value={board.board.title}
-				oninput={(event) => { board.board.title = (event.currentTarget as HTMLInputElement).value; board.updatedAt = now(); scheduleSave(); }}
+				oninput={(event) => { beginEdit('board-title'); board.board.title = (event.currentTarget as HTMLInputElement).value; board.updatedAt = now(); scheduleSave(); }}
 			/>
 		</div>
-		<p class:warning={saveState === 'error'} class="save-status" aria-live="polite">
-			<span class:working={saveState === 'saving'} class="save-dot"></span>{saveMessage}
+		<p
+			class:warning={saveState === 'error'}
+			class:settled={saveState === 'saved'}
+			class="save-status"
+			aria-live="polite"
+			title={saveMessage}
+		>
+			<span class:working={saveState === 'saving'} class="save-dot"></span><span class="save-word">{saveMessage}</span>
 		</p>
+		<div class="board-actions">
+			<button class="chip" title="Save now (⌘S)" onclick={() => { markDirty(); saveNow(); }}>Save</button>
+			<button class="chip" title="Save and put this board back on the shelf" onclick={closeBoard}>Close</button>
+			<button class:active={shelfOpen} class="chip strong" aria-expanded={shelfOpen} onclick={() => (shelfOpen ? (shelfOpen = false) : openShelf())}>
+				Boards<span class="chip-count">{boards.length || 1}</span>
+			</button>
+		</div>
 	</header>
 
-	<div class="tool-dock" data-whiteboard-ui aria-label="Whiteboard tools">
+	<nav class:hidden={playing || searchOpen} class="location-bar" data-whiteboard-ui aria-label="Board location">
+		{#if trail.length}
+			<button class="climb-out" title={`Back out to ${trail[trail.length - 1].title || 'the board above'}`} aria-label="Back out one board" onclick={climbOne}>↰</button>
+		{/if}
+		<div class="history-pair">
+			<button disabled={!canGoBack(history)} aria-label="Back to the previous view" title="Back (⌥←)" onclick={() => travelHistory(-1)}>‹</button>
+			<button disabled={!canGoForward(history)} aria-label="Forward to the next view" title="Forward (⌥→)" onclick={() => travelHistory(1)}>›</button>
+		</div>
+		<ol class="breadcrumb">
+			{#each crumbs as crumb, index (index)}
+				<li>
+					{#if index > 0}<span class="crumb-arrow" aria-hidden="true">/</span>{/if}
+					{#if crumb.kind === 'board'}
+						<button class="crumb above" title={`Back out to ${crumb.label}`} onclick={() => void climbTo(crumb.depth)}>{crumb.label}</button>
+					{:else if crumb.kind === 'here'}
+						<button class="crumb root" title="Fit the whole board (0)" onclick={fitBoard}>{crumb.label}</button>
+					{:else}
+						<button class:current={crumb.id === here?.id} class="crumb" onclick={() => { const frame = board.items.find((item) => item.id === crumb.id); if (frame?.type === 'frame') focusFrame(frame); }}>{crumb.label}</button>
+					{/if}
+				</li>
+			{/each}
+		</ol>
+		<span class="scale-word" title={`${zoomLabel()} — ${sequence.length} ${sequence.length === 1 ? 'frame' : 'frames'} on this board`}>{scaleName(board.camera.zoom)}</span>
+		<div class="frame-steps">
+			<button disabled={!sequence.length} aria-label="Previous frame" title="Previous frame ([)" onclick={() => stepThroughFrames(-1)}>◂</button>
+			<button disabled={!sequence.length} aria-label="Next frame" title="Next frame (])" onclick={() => stepThroughFrames(1)}>▸</button>
+		</div>
+	</nav>
+
+	<div class:hidden={playing || searchOpen} class="rail" data-whiteboard-ui aria-label="Places and journeys">
+		<button class="rail-button" title="Home — the view this board opens to (H)" onclick={goHome}><span aria-hidden="true">⌂</span>Home</button>
+		<button class="rail-button" title="Find anything on this board (/)" onclick={() => void openSearch()}><span aria-hidden="true">⌕</span>Find</button>
+		<button class:active={drawer === 'places'} class="rail-button" aria-pressed={drawer === 'places'} title="Saved views and frames" onclick={() => (drawer = drawer === 'places' ? null : 'places')}><span aria-hidden="true">◈</span>Places</button>
+		<button class:active={drawer === 'journey'} class="rail-button" aria-pressed={drawer === 'journey'} title="Arrange a journey through the board" onclick={() => (drawer = drawer === 'journey' ? null : 'journey')}><span aria-hidden="true">⇉</span>Journey</button>
+		<button class="rail-button play" title="Play the journey (P)" onclick={() => beginJourney()}><span aria-hidden="true">▶</span>Play</button>
+	</div>
+	</div>
+
+	{#if searchOpen}
+		<div class="finder" data-whiteboard-ui>
+			<div class="finder-field">
+				<span class="finder-mark" aria-hidden="true">⌕</span>
+				<input
+					bind:this={searchInput}
+					aria-label="Find on this board"
+					placeholder="Find a card, a label, anything…"
+					value={searchText}
+					oninput={(event) => { searchText = (event.currentTarget as HTMLInputElement).value; searchIndex = 0; queueSearchPreview(); }}
+					onkeydown={handleSearchKeydown}
+				/>
+				{#if results.length}
+					<button class="chip quiet" title="Pull back to show every result (⇧↵)" onclick={fitResults}>Show all {results.length}</button>
+				{/if}
+				<button class="finder-close" aria-label="Close find" onclick={() => closeSearch()}>×</button>
+			</div>
+			{#if searchText.trim()}
+				{#if results.length}
+					<ul class="finder-results">
+						{#each results.slice(0, 40) as hit, index (hit.item.id)}
+							<li>
+								<button
+									class:current={index === searchIndex}
+									class="finder-result"
+									onpointerenter={() => (searchIndex = index)}
+									onclick={() => commitSearch(index)}
+								>
+									<span class="finder-kind" aria-hidden="true">{hit.item.type === 'frame' ? '▢' : hit.item.type === 'stack' ? '▤' : hit.item.type === 'image' ? '▧' : '□'}</span>
+									<span class="finder-text">
+										<strong>{hit.title}</strong>
+										<small>{hit.snippet}</small>
+									</span>
+									{#each hit.labels.slice(0, 3) as label (label.id)}
+										<span class="label-chip tint-{label.tint} tiny">{label.name}</span>
+									{/each}
+									<span class="finder-where">{hit.field}</span>
+								</button>
+							</li>
+						{/each}
+					</ul>
+					<p class="finder-hint">↑↓ to travel · ↵ to stay · ⇧↵ to see them all · esc to come back</p>
+				{:else}
+					<p class="finder-empty">Nothing on this board answers to that.</p>
+				{/if}
+			{:else}
+				<p class="finder-hint">Type to search titles, text, labels, type, status and source. Start with <code>#</code> to search labels alone.</p>
+			{/if}
+		</div>
+	{/if}
+
+	{#if drawer && !playing}
+		<aside class="drawer" data-whiteboard-ui aria-label={drawer === 'places' ? 'Places on this board' : drawer === 'details' ? 'What is known about the chosen objects' : 'The journey through this board'}>
+			<header class="drawer-head">
+				<div class="drawer-tabs">
+					<button class:active={drawer === 'places'} onclick={() => (drawer = 'places')}>Places</button>
+					<button class:active={drawer === 'journey'} onclick={() => (drawer = 'journey')}>Journey</button>
+					<button class:active={drawer === 'details'} onclick={() => (drawer = 'details')}>Details{#if chosen.length > 1}<span class="tab-count">{chosen.length}</span>{/if}</button>
+				</div>
+				<button class="drawer-close" aria-label="Close panel" onclick={() => (drawer = null)}>×</button>
+			</header>
+
+			{#if drawer === 'places'}
+				<div class="drawer-body">
+					<section>
+						<h3>Home</h3>
+						<p class="drawer-note">{board.home ? 'This board opens to a view you chose.' : 'This board opens to whatever fits.'}</p>
+						<div class="row-buttons">
+							<button class="chip" onclick={setHome}>Set home to this view</button>
+							{#if board.home}
+								<button class="chip quiet" onclick={clearHome}>Clear</button>
+							{/if}
+						</div>
+					</section>
+
+					<section>
+						<h3>Saved views</h3>
+						{#if board.viewpoints.length}
+							<ul class="place-list">
+								{#each board.viewpoints as viewpoint (viewpoint.id)}
+									<li>
+										{#if renamingViewpointId === viewpoint.id}
+											<input
+												class="place-rename"
+												aria-label="View name"
+												value={viewpoint.name}
+												oninput={(event) => renameViewpoint(viewpoint.id, (event.currentTarget as HTMLInputElement).value)}
+												onblur={() => (renamingViewpointId = null)}
+												onkeydown={(event) => { if (event.key === 'Enter' || event.key === 'Escape') (event.currentTarget as HTMLInputElement).blur(); }}
+											/>
+										{:else}
+											<button class="place-name" onclick={() => goToViewpoint(viewpoint)}>
+												<span>{viewpoint.name}</span>
+												<small>{Math.round(viewpoint.camera.zoom * 100)}%</small>
+											</button>
+										{/if}
+										<button
+											class:on={hasStop(board, { kind: 'viewpoint', id: viewpoint.id })}
+											class="place-add"
+											title="Add this view to the journey"
+											aria-label={`Add ${viewpoint.name} to the journey`}
+											onclick={() => toggleStop({ kind: 'viewpoint', id: viewpoint.id })}
+										>⇉</button>
+										<button class="place-edit" aria-label={`Rename ${viewpoint.name}`} onclick={() => { renamingViewpointId = viewpoint.id; void tick().then(() => (window.document.querySelector('.place-rename') as HTMLInputElement | null)?.focus()); }}>✎</button>
+										<button class="place-drop" aria-label={`Delete ${viewpoint.name}`} onclick={() => deleteViewpoint(viewpoint.id)}>×</button>
+									</li>
+								{/each}
+							</ul>
+						{:else}
+							<p class="drawer-note">No saved views yet. Frame something you will want to come back to.</p>
+						{/if}
+						<div class="row-buttons">
+							<input
+								class="place-input"
+								aria-label="Name for this view"
+								placeholder="Name this view"
+								bind:value={newViewpointName}
+								onkeydown={(event) => { if (event.key === 'Enter') saveViewpointHere(); }}
+							/>
+							<button class="chip strong" onclick={saveViewpointHere}>Save view</button>
+						</div>
+					</section>
+
+					<section>
+						<h3>Frames</h3>
+						{#if sequence.length}
+							<ul class="place-list">
+								{#each sequence as frame (frame.id)}
+									<li>
+										<button class:current={frame.id === here?.id} class="place-name" onclick={() => focusFrame(frame)}>
+											<span>{frameTitle(frame)}</span>
+											{#if frameKey(frame.id)}<small class="key">{frameKey(frame.id)}</small>{/if}
+										</button>
+										<button
+											class:on={hasStop(board, { kind: 'item', id: frame.id })}
+											class="place-add"
+											title="Add this frame to the journey"
+											aria-label={`Add ${frameTitle(frame)} to the journey`}
+											onclick={() => toggleStop({ kind: 'item', id: frame.id })}
+										>⇉</button>
+									</li>
+								{/each}
+							</ul>
+						{:else}
+							<p class="drawer-note">Draw a frame to give the board named places. Frames are what the keyboard walks between.</p>
+						{/if}
+					</section>
+				</div>
+			{:else if drawer === 'details'}
+				<div class="drawer-body">
+					{#if !chosen.length}
+						<p class="drawer-empty">Choose something on the board. Anything you say about it stays optional — a card with nothing said about it is still just a card.</p>
+					{:else}
+						<section>
+							<h3>{only ? itemLabel(only) : `${chosen.length} chosen`}</h3>
+							<p class="drawer-note">
+								{#if only}{only.type}{propertyCount(only) ? ` · ${propertyCount(only)} things said about it` : ''}{:else}What you say here goes to all of them.{/if}
+							</p>
+						</section>
+
+						{#if only && isPortal(only)}
+						<section>
+							<h3>Where this goes</h3>
+							{#if previewFor(only)?.missing}
+								<p class="drawer-note">This doorway points at a board that is no longer on the shelf. Choose another below, or delete the doorway.</p>
+							{:else}
+								<div class="row-buttons">
+									<button class="chip strong" onclick={() => void enterPortal(only)}>Go into “{doorLabel(only)}”</button>
+								</div>
+							{/if}
+							<ul class="place-list door-targets">
+								{#each boards as entry (entry.id)}
+									<li>
+										<button class:current={entry.id === only.boardId} class="place-name" onclick={() => pointPortal(only, entry.id)}>
+											<span>{boardTitleFallback(entry.title)}</span>
+											<small>{boardCountLabel(entry)}</small>
+										</button>
+									</li>
+								{/each}
+							</ul>
+							{#if trailHasBoard(trail, only.boardId)}
+								<p class="drawer-note">This leads back to a board you came through. Going in is allowed — it just goes round.</p>
+							{/if}
+						</section>
+					{/if}
+
+					{#if only && isStack(only)}
+							<section>
+								<h3>What this stack does</h3>
+								<div class="row-buttons">
+									{#each STACK_BEHAVIORS as behavior (behavior)}
+										<button
+											class:active={behaviorOf(only) === behavior}
+											class="chip"
+											onclick={() => changeBehavior(only.id, behavior)}
+										>{behavior}</button>
+									{/each}
+								</div>
+								<p class="drawer-note behavior-note">{BEHAVIOR_NOTES[behaviorOf(only)]}</p>
+								{#if behaviorOf(only) === 'status'}
+									<div class="row-buttons">
+										<button class="chip strong" onclick={() => addColumnBeside(only)}>Add a column beside this</button>
+									</div>
+									<p class="drawer-note">Four of these side by side is a board. Nothing new is created — they are still stacks on the same canvas.</p>
+								{:else if behaviorOf(only) === 'queue'}
+									<div class="row-buttons">
+										<button class="chip strong" disabled={!only.cardIds.length} onclick={() => takeTop(only.id)}>Take the top card</button>
+									</div>
+								{:else if behaviorOf(only) === 'checklist'}
+									<p class="drawer-note">{checklistProgress(board.items, only).done} of {checklistProgress(board.items, only).total} ticked.</p>
+								{/if}
+							</section>
+						{/if}
+
+						<section>
+							<h3>Labels</h3>
+							{#if only && chipsFor(only).length}
+								<div class="chip-row inline">
+									{#each chipsFor(only) as label (label.id)}
+										<button class="label-chip tint-{label.tint} removable" title={`Take ${label.name} off`} onclick={() => removeLabelFrom(only.id, label.id)}>{label.name}<i aria-hidden="true">×</i></button>
+									{/each}
+								</div>
+							{/if}
+							<div class="row-buttons">
+								<input
+									id="label-draft"
+									class="place-input"
+									aria-label="Add a label"
+									placeholder="Type a label…"
+									bind:value={labelDraft}
+									onkeydown={(event) => { if (event.key === 'Enter') { event.preventDefault(); applyLabelDraft(); } }}
+								/>
+								<button class="chip strong" onclick={applyLabelDraft}>Add</button>
+							</div>
+							{#if suggestLabels(board, only, labelDraft).length}
+								<div class="chip-row inline suggestions">
+									{#each suggestLabels(board, only, labelDraft).slice(0, 12) as label (label.id)}
+										<button class="label-chip tint-{label.tint} ghost" onclick={() => toggleLabelOnSelection(label.id)}>{label.name}</button>
+									{/each}
+								</div>
+							{/if}
+						</section>
+
+						<section>
+							<h3>Status</h3>
+							<div class="row-buttons">
+								{#each SUGGESTED_STATUSES as status (status)}
+									<button
+										class:active={sharedProperty(statusOf) === status}
+										class="chip status-pick {status}"
+										onclick={() => writeProperty('status', sharedProperty(statusOf) === status ? null : status)}
+									><i aria-hidden="true"></i>{status}</button>
+								{/each}
+							</div>
+							<input
+								class="place-input wide status-free"
+								aria-label="Status"
+								placeholder="or a word of your own…"
+								value={sharedProperty(statusOf) ?? ''}
+								oninput={(event) => writeProperty('status', (event.currentTarget as HTMLInputElement).value)}
+							/>
+							{#if only?.type === 'card' && homeStack(only) && behaviorOf(homeStack(only)!) === 'status'}
+								<p class="drawer-note">Held by “{homeStack(only)!.title.trim() || 'an unnamed stack'}”, which sets this. Drag the card to another column to change it.</p>
+							{/if}
+						</section>
+
+						<section>
+							<h3>{only?.type === 'connector' ? 'What this line means' : 'Type'}</h3>
+							<input
+								class="place-input wide"
+								aria-label="Type"
+								placeholder={only?.type === 'connector' ? 'leads to, blocks, supports…' : 'note, question, reference…'}
+								value={sharedProperty(kindOf) ?? ''}
+								oninput={(event) => writeProperty('kind', (event.currentTarget as HTMLInputElement).value)}
+							/>
+						</section>
+
+						<section>
+							<h3>Source</h3>
+							<input
+								class="place-input wide"
+								aria-label="Source"
+								placeholder="a link, a book, a conversation…"
+								value={sharedProperty(sourceOf) ?? ''}
+								oninput={(event) => writeProperty('source', (event.currentTarget as HTMLInputElement).value)}
+							/>
+							{#if only && sourceOf(only) && sourceLink(sourceOf(only)!)}
+								<a class="source-link" href={sourceLink(sourceOf(only)!)} target="_blank" rel="noreferrer noopener">{sourceLabel(sourceOf(only)!)} ↗</a>
+							{/if}
+						</section>
+
+						<section>
+							<h3>Color</h3>
+							<div class="swatches">
+								{#each TINTS as tint (tint)}
+									<button
+										class:active={sharedProperty(colorOf) === tint}
+										class="swatch tint-{tint}"
+										aria-label={tint}
+										title={tint}
+										onclick={() => writeProperty('tint', sharedProperty(colorOf) === tint ? null : tint)}
+									></button>
+								{/each}
+							</div>
+						</section>
+
+						{#if only}
+							<section>
+								<h3>When</h3>
+								<dl class="stamps">
+									<dt>Created</dt><dd>{formatStamp(only.createdAt)}</dd>
+									<dt>Updated</dt><dd>{formatStamp(only.updatedAt)}</dd>
+								</dl>
+							</section>
+						{/if}
+					{/if}
+					{#if board.labels.length}
+						<section>
+							<h3>Labels on this board</h3>
+							<p class="drawer-note">Organization that does not depend on where a thing sits.</p>
+							<ul class="place-list">
+								{#each board.labels as label (label.id)}
+									<li>
+										{#if renamingLabelId === label.id}
+											<input
+												class="place-rename"
+												aria-label="Label name"
+												value={label.name}
+												oninput={(event) => renameLabelTo(label.id, (event.currentTarget as HTMLInputElement).value)}
+												onblur={() => (renamingLabelId = null)}
+												onkeydown={(event) => { if (event.key === 'Enter' || event.key === 'Escape') (event.currentTarget as HTMLInputElement).blur(); }}
+											/>
+										{:else}
+											<button class="place-name" onclick={() => searchForLabel(label)}>
+												<span class="label-chip tint-{label.tint}">{label.name}</span>
+												<small>{labelCount(board, label.id)}</small>
+											</button>
+										{/if}
+										<button class="place-edit" aria-label={`Rename ${label.name}`} onclick={() => { renamingLabelId = label.id; void tick().then(() => (window.document.querySelector('.place-rename') as HTMLInputElement | null)?.focus()); }}>✎</button>
+										<button class="place-drop" aria-label={`Delete ${label.name}`} onclick={() => dropLabel(label.id)}>×</button>
+									</li>
+								{/each}
+							</ul>
+						</section>
+					{/if}
+				</div>
+			{:else}
+				<div class="drawer-body">
+					<section>
+						<p class="drawer-note">A journey is an order to see this board in. Press Play and the camera walks it.</p>
+						{#if stops.length}
+							<ol class="stop-list">
+								{#each stops as entry, index (entry.stop.id)}
+									<li class:playing={playing && index === playIndex}>
+										<span class="stop-number">{index + 1}</span>
+										<button class="stop-name" onclick={() => beginJourney(index)}>
+											<span>{entry.label}</span>
+											<small>{entry.kind === 'board' ? 'the whole board' : entry.kind === 'viewpoint' ? 'saved view' : 'on the board'}</small>
+										</button>
+										<label class="stop-hold">
+											<input
+												type="number"
+												min="1"
+												max="30"
+												aria-label={`Seconds to rest at ${entry.label}`}
+												value={entry.stop.hold}
+												oninput={(event) => { beginEdit(`stop-hold:${entry.stop.id}`); board = setStopHold(board, entry.stop.id, Number((event.currentTarget as HTMLInputElement).value)); scheduleSave(); }}
+											/>s
+										</label>
+										<div class="stop-move">
+											<button disabled={index === 0} aria-label="Move this stop earlier" onclick={() => { beginEdit(); board = moveStop(board, entry.stop.id, -1); scheduleSave(); }}>▴</button>
+											<button disabled={index === stops.length - 1} aria-label="Move this stop later" onclick={() => { beginEdit(); board = moveStop(board, entry.stop.id, 1); scheduleSave(); }}>▾</button>
+										</div>
+										<button class="place-drop" aria-label={`Remove ${entry.label} from the journey`} onclick={() => { beginEdit(); board = removeStop(board, entry.stop.id); scheduleSave(); }}>×</button>
+									</li>
+								{/each}
+							</ol>
+						{:else}
+							<p class="drawer-empty">Nothing arranged yet.</p>
+						{/if}
+					</section>
+
+					<section class="journey-controls">
+						<div class="row-buttons">
+							<button class="chip strong" onclick={() => beginJourney()}>▶ Play</button>
+							<button class="chip" onclick={addSelectionToJourney}>Add selection</button>
+							<button class="chip" onclick={() => toggleStop({ kind: 'board' })}>{hasStop(board, { kind: 'board' }) ? 'Remove overview' : 'Add overview'}</button>
+						</div>
+						<div class="row-buttons">
+							<button class="chip" onclick={useSuggestedJourney}>Build from frames</button>
+							{#if stops.length}<button class="chip quiet" onclick={clearJourney}>Clear</button>{/if}
+						</div>
+						<label class="loop-toggle">
+							<input type="checkbox" checked={board.journey.loop} onchange={(event) => { beginEdit(); board = setJourneyLoop(board, (event.currentTarget as HTMLInputElement).checked); scheduleSave(); }} />
+							loop back to the beginning
+						</label>
+					</section>
+				</div>
+			{/if}
+		</aside>
+	{/if}
+
+	{#if view.minimapOn && !playing}
+		<div class="minimap-shell" data-whiteboard-ui>
+			<div
+				class="minimap"
+				role="button"
+				tabindex="0"
+				aria-label="Board overview — choose a place to move the view there"
+				style={`width: ${MINIMAP.width}px; height: ${MINIMAP.height}px;`}
+				onpointerdown={handleMinimapPointer}
+				onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); fitBoard(); } }}
+			>
+				{#each mapMarks as mark (mark.id)}
+					{@const box = mapProjection.project(mark.bounds)}
+					<span
+						class="map-mark mark-{mark.kind}"
+						class:here={mark.id === here?.id}
+						style={`left: ${box.x}px; top: ${box.y}px; width: ${box.width}px; height: ${box.height}px;`}
+					></span>
+				{/each}
+				<span class="map-view" style={`left: ${mapView.x}px; top: ${mapView.y}px; width: ${mapView.width}px; height: ${mapView.height}px;`}></span>
+			</div>
+		</div>
+	{/if}
+
+	{#if playing}
+		<div class="player" data-whiteboard-ui aria-label="Journey">
+			<button aria-label="Previous stop" title="Previous stop (←)" onclick={() => stepJourney(-1)}>‹</button>
+			<button class="player-play" aria-label={paused ? 'Resume the journey' : 'Pause the journey'} onclick={() => (paused ? resumeJourney() : pauseJourney())}>{paused ? '▶' : '❚❚'}</button>
+			<button aria-label="Next stop" title="Next stop (→)" onclick={() => stepJourney(1)}>›</button>
+			<p class="player-where">
+				<span class="player-count">{playIndex + 1} / {stops.length}</span>
+				<span class="player-label">{stops[playIndex]?.label ?? ''}</span>
+			</p>
+			<button class="player-exit" onclick={exitJourney}>Leave</button>
+		</div>
+	{/if}
+
+	{#if shelfOpen}
+		<div class="shelf-backdrop" data-whiteboard-ui>
+			<section class="shelf" aria-label="Your whiteboards">
+				<header class="shelf-head">
+					<div>
+						<h2>Whiteboards</h2>
+						<p>Each board is its own space. They are saved on this device as you work.</p>
+					</div>
+					<button class="shelf-close" aria-label="Close the shelf" onclick={() => { shelfOpen = false; confirmDeleteId = null; }}>×</button>
+				</header>
+				<ul class="shelf-list">
+					{#each boards as entry (entry.id)}
+						<li class:open={entry.id === board.board.id}>
+							<button class="shelf-open" onclick={() => openBoard(entry.id)}>
+								<strong>{boardTitleFallback(entry.title)}</strong>
+								<small>{boardCountLabel(entry)} · {relativeWhen(entry.updatedAt)}</small>
+							</button>
+							{#if entry.id === board.board.id}<span class="shelf-badge">open</span>{/if}
+							<button class="chip quiet" onclick={() => duplicateBoard(entry.id)}>Duplicate</button>
+							{#if confirmDeleteId === entry.id}
+								<button class="chip danger" onclick={() => deleteBoard(entry.id)}>Delete for good</button>
+								<button class="chip quiet" onclick={() => (confirmDeleteId = null)}>Keep</button>
+							{:else}
+								<button class="chip quiet" onclick={() => (confirmDeleteId = entry.id)}>Delete</button>
+							{/if}
+						</li>
+					{/each}
+				</ul>
+				<footer class="shelf-foot">
+					<button class="chip strong" onclick={startNewBoard}>Start a new whiteboard</button>
+					<button class="chip" onclick={() => { shelfOpen = false; confirmDeleteId = null; }}>Back to “{boardTitleFallback(board.board.title)}”</button>
+				</footer>
+			</section>
+		</div>
+	{/if}
+
+	{#if shortcutsOpen && !playing}
+		<div class="shortcuts" data-whiteboard-ui aria-label="Keyboard shortcuts">
+			<button class="drawer-close shortcuts-close" aria-label="Close keyboard shortcuts" onclick={toggleShortcuts}>×</button>
+			<h3>Moving around</h3>
+			<dl>
+				<dt>/ ⌘K</dt><dd>find anything</dd>
+				<dt>I</dt><dd>details of what's chosen</dd>
+				<dt>⇧← →</dt><dd>move a card a column along</dd>
+				<dt>[ ]</dt><dd>previous / next frame</dd>
+				<dt>1–9</dt><dd>jump to a frame</dd>
+				<dt>0</dt><dd>fit the whole board</dd>
+				<dt>H</dt><dd>home</dd>
+				<dt>⌥ ← →</dt><dd>back / forward</dd>
+				<dt>P</dt><dd>play the journey</dd>
+				<dt>M</dt><dd>overview map</dd>
+				<dt>?</dt><dd>this list</dd>
+				<dt>Space</dt><dd>hold to drag the board</dd>
+				<dt>⌘S</dt><dd>save now</dd>
+			</dl>
+			<h3>Editing</h3>
+			<dl>
+				<dt>⌘Z</dt><dd>undo</dd>
+				<dt>⇧⌘Z</dt><dd>redo</dd>
+				<dt>⌘D</dt><dd>duplicate what's chosen</dd>
+				<dt>⌘A</dt><dd>select everything</dd>
+				<dt>⌫</dt><dd>delete what's chosen</dd>
+			</dl>
+		</div>
+	{/if}
+
+	{#if viewOpen && !playing}
+		<div class="view-card" data-whiteboard-ui aria-label="How this board looks">
+			<header class="view-head">
+				<h3>View</h3>
+				<button class="drawer-close" aria-label="Close view options" onclick={() => (viewOpen = false)}>×</button>
+			</header>
+
+			<section>
+				<h4>Pattern</h4>
+				<div class="row-buttons">
+					{#each SURFACE_PATTERNS as pattern (pattern)}
+						<button
+							class:active={board.surface.pattern === pattern}
+							class="chip"
+							onclick={() => changeSurface({ pattern })}
+						>{pattern}</button>
+					{/each}
+				</div>
+			</section>
+
+			<section>
+				<h4>Size</h4>
+				<div class="row-buttons">
+					{#each SURFACE_SIZES as size (size)}
+						<button
+							class:active={board.surface.size === size}
+							class="chip"
+							disabled={board.surface.pattern === 'plain'}
+							onclick={() => changeSurface({ size })}
+						>{size}</button>
+					{/each}
+				</div>
+			</section>
+
+			<section>
+				<h4>Depth</h4>
+				<div class="row-buttons">
+					{#each SURFACE_DEPTHS as depth (depth)}
+						<button
+							class:active={board.surface.depth === depth}
+							class="chip"
+							onclick={() => changeSurface({ depth })}
+						>{depth}</button>
+					{/each}
+				</div>
+			</section>
+
+			<section>
+				<h4>Paper</h4>
+				<div class="row-buttons">
+					{#each SURFACE_PAPERS as paper (paper)}
+						<button
+							class:active={board.surface.paper === paper}
+							class="chip paper-chip paper-{paper}"
+							onclick={() => changeSurface({ paper })}
+						>{paper}</button>
+					{/each}
+				</div>
+				<p class="drawer-note">The pattern is part of the board — it moves and scales with it. All of this is saved with this whiteboard, not with this device.</p>
+			</section>
+
+			<section>
+				<h4>Shown</h4>
+				<label class="view-toggle">
+					<input
+						type="checkbox"
+						checked={view.restChrome}
+						onchange={(event) => setView({ restChrome: (event.currentTarget as HTMLInputElement).checked })}
+					/>
+					let the edges rest
+				</label>
+				<label class="view-toggle">
+					<input
+						type="checkbox"
+						checked={view.minimapOn}
+						onchange={(event) => setView({ minimapOn: (event.currentTarget as HTMLInputElement).checked })}
+					/>
+					overview map<small>M</small>
+				</label>
+				<div class="row-buttons">
+					<button class="chip quiet" onclick={toggleShortcuts}>Keyboard shortcuts<small>?</small></button>
+				</div>
+			</section>
+		</div>
+	{/if}
+
+	<div class:hidden={playing} class="tool-dock" data-whiteboard-ui aria-label="Whiteboard tools">
 		<button class="tool-button" aria-label="Add card" title="Card" onclick={addCardFromDock}><span aria-hidden="true">□</span>Card</button>
 		<button class="tool-button" aria-label="Add image" title="Image" onclick={() => imageInput?.click()}><span aria-hidden="true">▧</span>Image</button>
 		<button class:active={tool === 'frame'} class="tool-button" aria-pressed={tool === 'frame'} title="Draw a frame" onclick={() => { tool = tool === 'frame' ? 'select' : 'frame'; connectorSourceId = null; notice = tool === 'frame' ? 'Drag a region for a frame.' : ''; }}><span aria-hidden="true">▢</span>Frame</button>
 		<button class="tool-button" aria-label="Add stack" title="Stack" onclick={addStackFromDock}><span aria-hidden="true">▤</span>Stack</button>
+		<button class="tool-button" aria-label="Add a way through to another board" title="Portal" onclick={addPortalFromDock}><span aria-hidden="true">◫</span>Portal</button>
 		<button class:active={tool === 'line'} class="tool-button" aria-pressed={tool === 'line'} title="Connect two ideas" onclick={() => { tool = tool === 'line' ? 'select' : 'line'; connectorSourceId = null; notice = tool === 'line' ? 'Choose the first idea.' : ''; }}><span aria-hidden="true">⟶</span>Line</button>
 	</div>
 
-	<div class="camera-controls" data-whiteboard-ui aria-label="Camera controls">
+	<div class:hidden={playing} class="camera-controls" data-whiteboard-ui aria-label="Camera controls">
 		<button aria-label="Zoom in" title="Zoom in" onclick={() => changeZoom(1.2)}>+</button>
 		<button aria-label="Zoom out" title="Zoom out" onclick={() => changeZoom(1 / 1.2)}>−</button>
-		<button class="home-button" aria-label="Fit board in view" title="Fit board" onclick={goHome}>⌾</button>
+		<button class="home-button" aria-label="Fit board in view" title="Fit the whole board (0)" onclick={fitBoard}>⌾</button>
+		<button
+			class:active={viewOpen}
+			class="view-button"
+			aria-expanded={viewOpen}
+			aria-label="How this board looks"
+			title="The surface under the board, and what stays on screen"
+			onclick={toggleViewPanel}
+		>◍</button>
 		<span>{zoomLabel()}</span>
 	</div>
 
-	{#if notice}
-		<p class="notice" data-whiteboard-ui>{notice}</p>
+	{#if notice && !playing}
+		<p class="notice" data-whiteboard-ui>
+			{notice}
+			{#if notice === inboxNotice && findInbox(board)}
+				<button class="notice-go" onclick={showInbox}>show me</button>
+			{/if}
+		</p>
 	{/if}
-	{#if tool === 'frame'}
+	{#if playing}
+		<!-- nothing: the board is being presented, not edited -->
+	{:else if tool === 'frame'}
 		<p class="mode-note" data-whiteboard-ui>drag to make a frame</p>
 	{:else if tool === 'line' && connectorSourceId}
 		<p class="mode-note" data-whiteboard-ui>choose the other end</p>
 	{/if}
+
+	<div class="veil" class:up={veil === 1} aria-hidden="true"></div>
 
 	<input bind:this={imageInput} class="image-input" type="file" accept="image/*" multiple onchange={handleImageInput} />
 </main>
@@ -1133,16 +3351,35 @@
 		--accent: #a76670;
 		position: fixed;
 		inset: 0;
-		overflow: hidden;
+		/*
+		 * `clip` rather than `hidden`: the canvas must not be a scroll
+		 * container. With `hidden` it still scrolls programmatically, so
+		 * anything that puts an element in view — a browser focusing a field
+		 * in a panel — could drag the whole board and every bar on it
+		 * sideways by however far the content overflows.
+		 */
+		overflow: clip;
 		isolation: isolate;
 		user-select: none;
 		touch-action: none;
+		/* Paper and pattern are both `surface.ts`'s to write: the colour wash
+		   arrives as this element's inline style, the pattern as the layer
+		   below. Only the vignette and the drop hint are still CSS's own. */
 		background-color: var(--paper);
-		background-image:
-			radial-gradient(circle at 1px 1px, rgba(103, 86, 75, 0.14) 1px, transparent 1.1px),
-			radial-gradient(ellipse at 50% -20%, rgba(255, 255, 255, 0.82), transparent 59%);
-		background-size: 22px 22px, 100% 100%;
 		cursor: default;
+	}
+
+	/*
+	 * The pattern, one tile wider than the window on every side. Panning moves
+	 * it with a transform — a composited shift of a few pixels — rather than by
+	 * repainting a full-screen background every frame; only a change of zoom
+	 * redraws the tile itself.
+	 */
+	.surface-weave {
+		position: absolute;
+		inset: -96px;
+		z-index: 0;
+		pointer-events: none;
 	}
 
 	.whiteboard::after {
@@ -1161,7 +3398,7 @@
 	.whiteboard.space-panning:active * { cursor: grabbing !important; }
 
 	.whiteboard.file-dragging::before {
-		content: 'drop images into the board';
+		content: 'drop images, files or a link';
 		position: absolute;
 		inset: 18px;
 		z-index: 60;
@@ -1207,6 +3444,16 @@
 		transition: stroke 140ms ease, stroke-width 140ms ease;
 	}
 
+	/* Same six ink tones the label chips already read their text in — a
+	   connector's line is a mark, not a fill, so it wants that weight rather
+	   than the paler tint used for a card or frame's background. */
+	.connector-path.tint-peach { stroke: #7d5340; }
+	.connector-path.tint-lavender { stroke: #5d4d7d; }
+	.connector-path.tint-aqua { stroke: #3d6d69; }
+	.connector-path.tint-gold { stroke: #7a5f26; }
+	.connector-path.tint-rose { stroke: #86495a; }
+	.connector-path.tint-sage { stroke: #4d6b45; }
+
 	.connector-hit-area {
 		fill: none;
 		stroke: transparent;
@@ -1218,6 +3465,18 @@
 
 	.connector-path:hover,
 	.connector-path.selected-line { stroke: var(--accent); stroke-width: 3.4; }
+
+	.connector-label {
+		font-family: var(--font-body, 'DM Sans', ui-sans-serif, system-ui, sans-serif);
+		font-size: 11px;
+		fill: #6d5c56;
+		paint-order: stroke;
+		stroke: var(--paper);
+		stroke-width: 3px;
+		stroke-linejoin: round;
+		pointer-events: none;
+		user-select: none;
+	}
 
 	.board-item {
 		position: absolute;
@@ -1247,9 +3506,12 @@
 		cursor: move;
 	}
 
-	.frame.lavender { background: rgba(204, 193, 232, 0.18); border-color: rgba(113, 94, 150, 0.28); }
-	.frame.aqua { background: rgba(172, 220, 216, 0.18); border-color: rgba(66, 136, 133, 0.26); }
-	.frame.gold { background: rgba(236, 215, 166, 0.2); border-color: rgba(161, 124, 51, 0.26); }
+	/* One palette, six names, shared by frames, labels and the Color property. */
+	.frame.tint-lavender { background: rgba(204, 193, 232, 0.18); border-color: rgba(113, 94, 150, 0.28); }
+	.frame.tint-aqua { background: rgba(172, 220, 216, 0.18); border-color: rgba(66, 136, 133, 0.26); }
+	.frame.tint-gold { background: rgba(236, 215, 166, 0.2); border-color: rgba(161, 124, 51, 0.26); }
+	.frame.tint-rose { background: rgba(232, 193, 199, 0.2); border-color: rgba(160, 96, 110, 0.26); }
+	.frame.tint-sage { background: rgba(196, 216, 190, 0.2); border-color: rgba(97, 133, 92, 0.26); }
 
 	.frame-label {
 		position: absolute;
@@ -1324,8 +3586,93 @@
 		outline: none;
 	}
 
-	.stack-count { color: #9a8d86; font-size: 12px; min-width: 10px; text-align: right; }
+	.stack-count { color: #9a8d86; font-size: 12px; min-width: 10px; text-align: right; font-variant-numeric: tabular-nums; }
 	.stack-empty { margin: 22px 14px; color: #a69a93; font-size: 12px; font-style: italic; }
+
+	/*
+	 * A stack with a behaviour still looks like a stack in the same place. The
+	 * only outward difference is a word in the header and what its cards do.
+	 */
+	.stack-mode {
+		flex: none;
+		padding: 2px 6px;
+		border-radius: 999px;
+		background: rgba(120, 96, 88, 0.1);
+		color: #8b7a73;
+		font-size: 9px;
+		letter-spacing: .07em;
+		text-transform: uppercase;
+		cursor: help;
+	}
+	.stack.does-status { border-color: rgba(137, 103, 89, 0.3); }
+	.stack.does-status .stack-header { border-bottom-width: 2px; border-bottom-color: rgba(137, 103, 89, 0.22); }
+	.stack.does-status .stack-header input { font-size: 14px; letter-spacing: .05em; text-transform: uppercase; }
+
+	.queue-take {
+		display: block;
+		width: calc(100% - 26px);
+		margin: 9px 13px 0;
+		padding: 5px 8px;
+		border: 1px dashed rgba(120, 96, 88, 0.3);
+		border-radius: 9px;
+		background: transparent;
+		color: #7c6a63;
+		font-size: 11px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		transition: background 130ms ease, border-color 130ms ease;
+	}
+	.queue-take:hover { border-color: rgba(167, 102, 112, 0.5); background: rgba(219, 178, 178, 0.22); color: #7c4a53; }
+
+	.tick {
+		position: absolute;
+		left: 15px;
+		top: 13px;
+		width: 15px;
+		height: 15px;
+		display: grid;
+		place-items: center;
+		border: 1.5px solid rgba(120, 96, 88, 0.34);
+		border-radius: 5px;
+		background: transparent;
+		color: transparent;
+		font-size: 10px;
+		line-height: 1;
+		transition: background 130ms ease, border-color 130ms ease, color 130ms ease;
+	}
+	.tick:hover { border-color: rgba(120, 96, 88, 0.6); color: rgba(120, 96, 88, 0.35); }
+	.tick.on { border-color: rgba(122, 152, 132, 0.85); background: rgba(140, 177, 156, 0.5); color: #40624f; }
+	.card.laid-checklist .card-title,
+	.card.laid-checklist .card-body { padding-left: 24px; }
+	.card.ticked .card-title { color: #9a8d86; text-decoration: line-through; text-decoration-color: rgba(120, 96, 88, 0.4); }
+	.card.ticked .card-body { color: #a49790; }
+
+	.queue-badge {
+		position: absolute;
+		left: 16px;
+		top: 7px;
+		padding: 1px 6px;
+		border-radius: 999px;
+		font-size: 8.5px;
+		font-weight: 700;
+		letter-spacing: .09em;
+		text-transform: uppercase;
+	}
+	.queue-badge.now { background: rgba(219, 178, 178, 0.62); color: #7c4a53; }
+	.queue-badge.next { background: rgba(120, 96, 88, 0.11); color: #8b7a73; }
+	.card.laid-queue .card-topline { display: none; }
+	.card.laid-queue .card-title { margin-top: 11px; }
+
+	/* A gallery tile is the same card, read at a glance. Its box is a fixed size,
+	   so unlike a free card it clips rather than spilling over its neighbour. */
+	.card.tile { padding: 11px 12px 10px; overflow: hidden; }
+	.card.tile .card-topline,
+	.card.tile .card-grip,
+	.card.tile .card-kind,
+	.card.tile .card-body,
+	.card.tile .chip-row { display: none; }
+	.card.tile .card-title { margin-top: 0; font-size: 12.5px; line-height: 1.3; }
 
 	.card {
 		min-width: 150px;
@@ -1342,6 +3689,133 @@
 	}
 
 	.card.in-stack { box-shadow: 0 3px 8px rgba(73, 54, 46, 0.09); }
+
+	/* Colour is a wash over the card's own paper, never a repaint of it. */
+	.card.tint-peach { background: rgba(250, 226, 210, 0.94); }
+	.card.tint-lavender { background: rgba(230, 224, 245, 0.94); }
+	.card.tint-aqua { background: rgba(214, 238, 235, 0.94); }
+	.card.tint-gold { background: rgba(246, 233, 202, 0.94); }
+	.card.tint-rose { background: rgba(247, 224, 228, 0.94); }
+	.card.tint-sage { background: rgba(224, 237, 219, 0.94); }
+	.stack.tint-peach { background: rgba(243, 219, 203, 0.6); }
+	.stack.tint-lavender { background: rgba(222, 216, 238, 0.6); }
+	.stack.tint-aqua { background: rgba(206, 231, 228, 0.6); }
+	.stack.tint-gold { background: rgba(239, 226, 195, 0.6); }
+	.stack.tint-rose { background: rgba(240, 217, 221, 0.6); }
+	.stack.tint-sage { background: rgba(217, 230, 212, 0.6); }
+
+	/* A search result, said quietly on the board itself. */
+	.board-item.found::before {
+		content: '';
+		position: absolute;
+		inset: -7px;
+		border: 1.5px solid rgba(180, 132, 84, 0.85);
+		border-radius: inherit;
+		box-shadow: 0 0 0 4px rgba(206, 163, 106, 0.16);
+		pointer-events: none;
+		animation: found 1.6s ease-in-out infinite alternate;
+	}
+	@keyframes found { from { opacity: .55; } to { opacity: 1; } }
+
+	.card-kind {
+		margin: 3px 0 0;
+		color: #9d857c;
+		font-size: 9.5px;
+		font-weight: 700;
+		letter-spacing: .11em;
+		text-transform: uppercase;
+	}
+
+	.chip-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px;
+		margin-top: 8px;
+		pointer-events: auto;
+	}
+	.chip-row.inline { margin-top: 0; margin-bottom: 8px; }
+	.chip-row.suggestions { margin-top: 9px; margin-bottom: 0; }
+	.stack-chips { margin: 9px 13px 0; }
+	.image-chips { position: absolute; left: 5px; bottom: 5px; margin: 0; }
+
+	.label-chip {
+		max-width: 132px;
+		padding: 2px 7px;
+		border: 1px solid transparent;
+		border-radius: 999px;
+		font-size: 10.5px;
+		line-height: 1.5;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		transition: filter 130ms ease, border-color 130ms ease;
+	}
+	button.label-chip:hover { filter: brightness(0.96); border-color: rgba(90, 70, 60, 0.28); }
+	.label-chip.tiny { max-width: 88px; font-size: 9.5px; }
+	.label-chip.ghost { background: transparent !important; border-color: rgba(120, 96, 88, 0.24); color: #8b7a73 !important; }
+	.label-chip.ghost:hover { border-color: rgba(120, 96, 88, 0.5); color: #5f4f49 !important; }
+	.label-chip.removable i { margin-left: 4px; font-style: normal; opacity: .55; }
+
+	.label-chip.tint-peach { background: rgba(246, 214, 192, 0.85); color: #7d5340; }
+	.label-chip.tint-lavender { background: rgba(220, 212, 240, 0.85); color: #5d4d7d; }
+	.label-chip.tint-aqua { background: rgba(199, 230, 226, 0.85); color: #3d6d69; }
+	.label-chip.tint-gold { background: rgba(240, 224, 184, 0.85); color: #7a5f26; }
+	.label-chip.tint-rose { background: rgba(243, 210, 216, 0.85); color: #86495a; }
+	.label-chip.tint-sage { background: rgba(211, 228, 204, 0.85); color: #4d6b45; }
+
+	.status-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		padding: 2px 7px 2px 5px;
+		border-radius: 999px;
+		background: rgba(120, 96, 88, 0.08);
+		color: #7c6a63;
+		font-size: 10.5px;
+		line-height: 1.5;
+	}
+	.status-chip i, .status-pick i { width: 6px; height: 6px; border-radius: 50%; background: #b3a49c; }
+	.status-chip.idea i, .status-pick.idea i { background: #c2a25f; }
+	.status-chip.open i, .status-pick.open i { background: #8ea9c4; }
+	.status-chip.doing i, .status-pick.doing i { background: #cf8d6b; }
+	.status-chip.done i, .status-pick.done i { background: #8cb19c; }
+	.status-chip.parked i, .status-pick.parked i { background: #b0a6a1; }
+
+	/* A captured link reads as the link it is, not as a mark meaning "there is
+	   one". Same row, same room — nothing had to grow to hold it. */
+	.source-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		max-width: 150px;
+		padding: 2px 7px;
+		border: 1px solid rgba(120, 96, 88, 0.2);
+		border-radius: 999px;
+		color: #8a7a72;
+		font-size: 10.5px;
+		line-height: 1.5;
+		text-decoration: none;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		transition: border-color 130ms ease, color 130ms ease;
+	}
+	a.source-chip:hover { border-color: rgba(138, 91, 99, 0.5); color: #6f454c; }
+	.source-chip span { font-size: 9px; opacity: .7; }
+	.source-chip.plain { border-style: dashed; cursor: help; }
+
+	.chip-add {
+		width: 20px;
+		height: 18px;
+		border-radius: 999px;
+		background: rgba(120, 96, 88, 0.09);
+		color: #8b7a73;
+		font-size: 10px;
+		line-height: 1;
+		transition: background 130ms ease, color 130ms ease;
+	}
+	.chip-add:hover { background: rgba(218, 188, 181, 0.55); color: #69434a; }
 
 	.card-topline { position: absolute; left: 18px; top: 9px; width: 29px; height: 2px; background: rgba(189, 139, 119, 0.42); border-radius: 3px; }
 	.card-grip { position: absolute; right: 11px; top: 7px; color: rgba(93, 79, 71, 0.38); font-size: 14px; line-height: 1; letter-spacing: -3px; }
@@ -1373,6 +3847,104 @@
 		font-family: var(--font-body, ui-sans-serif, sans-serif);
 	}
 	.card-body::placeholder { color: #b4aaa5; }
+
+	/*
+	 * A doorway. The pane shows the board beyond as shapes — the same projection
+	 * the overview map uses — so flying into it lands on the arrangement you were
+	 * already looking at.
+	 */
+	.portal {
+		min-width: 150px;
+		min-height: 120px;
+		display: flex;
+		flex-direction: column;
+		padding: 8px 8px 0;
+		border: 1px solid rgba(93, 79, 71, 0.18);
+		border-radius: 16px;
+		background: rgba(252, 249, 243, 0.96);
+		box-shadow: 0 5px 14px rgba(73, 54, 46, 0.12), inset 0 1px rgba(255,255,255,.9);
+		cursor: move;
+	}
+	.portal::after { border-radius: 16px; }
+	.portal.missing { border-style: dashed; border-color: rgba(163, 84, 83, 0.42); background: rgba(250, 244, 241, 0.9); }
+	.portal.loops { border-color: rgba(137, 103, 89, 0.42); }
+
+	.portal-pane {
+		position: relative;
+		flex: 1;
+		min-height: 0;
+		border-radius: 10px;
+		background:
+			radial-gradient(ellipse at 50% 120%, rgba(167, 102, 112, 0.09), transparent 62%),
+			rgba(120, 96, 88, 0.07);
+		box-shadow: inset 0 1px 3px rgba(73, 54, 46, 0.09);
+		overflow: hidden;
+	}
+	.door-mark { position: absolute; border-radius: 2px; background: rgba(120, 96, 88, 0.34); }
+	.door-mark.mark-frame { border: 1px solid rgba(137, 103, 89, 0.4); border-radius: 3px; background: rgba(219, 186, 163, 0.28); }
+	.door-mark.mark-stack { background: rgba(120, 96, 88, 0.3); }
+	.door-mark.mark-image { background: rgba(150, 118, 106, 0.44); }
+	.door-mark.mark-portal { border: 1px solid rgba(120, 96, 88, 0.4); background: rgba(252, 249, 243, 0.85); }
+
+	.portal-gone,
+	.portal-empty { margin: 0; padding: 0 10px; height: 100%; display: grid; place-content: center; text-align: center; font-size: 11px; font-style: italic; }
+	.portal-gone { color: #a45554; }
+	.portal-empty { color: #a89a93; }
+
+	.portal-foot { display: flex; align-items: center; gap: 4px; height: 36px; flex: none; }
+	.portal-title {
+		flex: 1;
+		min-width: 0;
+		padding: 3px 4px;
+		border: 0;
+		background: transparent;
+		color: #4c403c;
+		font-family: var(--font-display, Georgia, serif);
+		font-size: 14px;
+		font-weight: 600;
+		outline: none;
+	}
+	.portal-title::placeholder { color: #a89a93; font-weight: 400; }
+	.portal-go {
+		width: 26px;
+		height: 26px;
+		flex: none;
+		border-radius: 8px;
+		background: rgba(219, 178, 178, 0.34);
+		color: #7c4a53;
+		font-size: 14px;
+		line-height: 1;
+		transition: background 130ms ease, transform 130ms ease;
+	}
+	.portal-go:hover { background: rgba(219, 178, 178, 0.62); transform: translateX(1px); }
+
+	/* Rises over the board while going through, in either direction. */
+	.veil {
+		position: absolute;
+		inset: 0;
+		z-index: 85;
+		background: var(--paper);
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 260ms ease;
+	}
+	.veil.up { opacity: 1; }
+
+	.climb-out {
+		width: 26px;
+		height: 26px;
+		flex: none;
+		border-radius: 8px;
+		background: rgba(219, 178, 178, 0.3);
+		color: #7c4a53;
+		font-size: 14px;
+		line-height: 1;
+		transition: background 130ms ease;
+	}
+	.climb-out:hover { background: rgba(219, 178, 178, 0.58); }
+	.crumb.above { color: #8a5b63; }
+	.crumb.above:hover { background: rgba(219, 178, 178, 0.32); color: #6f454c; }
+	.door-targets { margin-top: 9px; max-height: 168px; overflow-y: auto; }
 
 	.image-card {
 		min-width: 120px;
@@ -1412,15 +3984,31 @@
 	.marquee { border: 1px solid rgba(167, 102, 112, 0.84); background: rgba(167, 102, 112, 0.1); border-radius: 3px; }
 	.frame-draft { border: 1.5px dashed rgba(119, 94, 149, 0.7); border-radius: 16px; background: rgba(204, 193, 232, 0.17); }
 
-	.topbar {
+	/*
+	 * One row across the top rather than three pieces pinned independently:
+	 * absolute positioning let the breadcrumb drift over the board controls at
+	 * middling widths, and a flex row cannot overlap itself at any width.
+	 */
+	.top-deck {
 		position: absolute;
 		z-index: 70;
 		top: 20px;
 		left: 22px;
+		right: 22px;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 9px;
+		pointer-events: none;
+	}
+	.top-deck > * { pointer-events: auto; }
+
+	.topbar {
 		display: flex;
 		align-items: center;
 		gap: 13px;
-		max-width: min(620px, calc(100vw - 44px));
+		min-width: 0;
 		padding: 8px 10px 8px 8px;
 		border: 1px solid rgba(98, 80, 70, 0.13);
 		border-radius: 14px;
@@ -1434,8 +4022,20 @@
 	.board-name { min-width: 0; display: flex; align-items: baseline; gap: 8px; }
 	.board-name span { color: #9c8e86; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 	.board-name input { min-width: 90px; width: clamp(125px, 18vw, 220px); border: 0; background: transparent; color: #443a36; font-family: var(--font-display, Georgia, serif); font-size: 17px; font-weight: 600; outline: none; }
-	.save-status { display: flex; align-items: center; gap: 5px; margin: 0 0 0 3px; padding-left: 10px; border-left: 1px solid rgba(98,80,70,.13); color: #92847c; font-size: 11px; white-space: nowrap; }
+	.save-status { position: relative; display: flex; align-items: center; gap: 5px; margin: 0 0 0 3px; padding-left: 10px; border-left: 1px solid rgba(98,80,70,.13); color: #92847c; font-size: 11px; white-space: nowrap; }
 	.save-status.warning { color: #a45554; }
+	/* Saved is the ordinary state, and the ordinary state does not need words:
+	   the dot carries it, the title attribute says it, and anything worth
+	   reading — saving, recovered, a failure — puts them back. */
+	.save-status.settled { padding-left: 8px; }
+	.save-status.settled .save-word {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
 	.save-dot { width: 5px; height: 5px; border-radius: 50%; background: #8cb19c; }
 	.save-dot.working { background: #c49b68; animation: breathe 900ms ease-in-out infinite alternate; }
 	@keyframes breathe { to { transform: scale(1.65); opacity: .46; } }
@@ -1468,7 +4068,7 @@
 		right: 22px;
 		bottom: 25px;
 		display: grid;
-		grid-template-columns: 35px 35px 35px auto;
+		grid-template-columns: repeat(4, 35px) auto;
 		align-items: center;
 		gap: 3px;
 		padding: 5px;
@@ -1483,6 +4083,8 @@
 	.camera-controls button:hover { background: rgba(218,188,181,.37); }
 	.camera-controls button:active { transform: scale(.94); }
 	.camera-controls .home-button { font-size: 20px; }
+	.camera-controls .view-button { font-size: 16px; }
+	.camera-controls button.active { background: rgba(218, 188, 181, 0.52); color: #69434a; }
 	.camera-controls span { min-width: 40px; padding-left: 5px; color: #978981; font-size: 11px; font-variant-numeric: tabular-nums; }
 
 	.empty-whisper {
@@ -1505,17 +4107,594 @@
 	.notice,
 	.mode-note { position: absolute; z-index: 70; left: 50%; bottom: 80px; margin: 0; padding: 7px 12px; border: 1px solid rgba(98,80,70,.12); border-radius: 999px; background: rgba(255,253,248,.82); box-shadow: 0 5px 15px rgba(76,57,48,.08); color: #77665f; font-size: 12px; transform: translateX(-50%); pointer-events: none; backdrop-filter: blur(10px); }
 	.mode-note { color: #73586f; }
+	.notice { display: flex; align-items: center; gap: 8px; pointer-events: auto; }
+	.notice-go { padding: 2px 8px; border-radius: 999px; background: rgba(219, 178, 178, 0.42); color: #7c4a53; font-size: 11px; }
+	.notice-go:hover { background: rgba(219, 178, 178, 0.7); }
 	.image-input { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
+	/* Chrome steps out of the way while a journey is running. */
+	.hidden { opacity: 0; pointer-events: none; transform: translateY(-8px); }
+	.topbar, .location-bar, .rail, .tool-dock, .camera-controls, .minimap-shell { transition: opacity 260ms ease, transform 260ms ease; }
+
+	/*
+	 * …and while nothing is happening at all. Most of this does not need to be
+	 * visible all the time: it settles a few seconds after the pointer does,
+	 * and the first movement anywhere brings it back. Pointer events go with
+	 * the opacity, so nothing invisible is ever in the way of the board.
+	 */
+	.chrome-resting .topbar,
+	.chrome-resting .location-bar,
+	.chrome-resting .rail,
+	.chrome-resting .tool-dock,
+	.chrome-resting .camera-controls,
+	.chrome-resting .minimap-shell {
+		opacity: 0;
+		pointer-events: none;
+	}
+	.chrome-resting .topbar,
+	.chrome-resting .location-bar,
+	.chrome-resting .rail { transform: translateY(-6px); }
+	.chrome-resting .camera-controls,
+	.chrome-resting .minimap-shell { transform: translateY(8px); }
+	.chrome-resting .tool-dock { transform: translate(-50%, 8px); }
+
+	.chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		min-height: 27px;
+		padding: 0 10px;
+		border: 1px solid rgba(98, 80, 70, 0.15);
+		border-radius: 9px;
+		background: rgba(255, 253, 248, 0.7);
+		color: #6b5b55;
+		font-size: 11.5px;
+		white-space: nowrap;
+		transition: background 130ms ease, color 130ms ease, border-color 130ms ease;
+	}
+	.chip:hover { background: rgba(232, 214, 208, 0.62); color: #4f403b; }
+	.chip.strong { border-color: rgba(167, 102, 112, 0.38); background: rgba(219, 178, 178, 0.34); color: #7c4a53; }
+	.chip.strong:hover { background: rgba(219, 178, 178, 0.52); }
+	.chip.quiet { border-color: transparent; background: transparent; color: #8d7f79; }
+	.chip.quiet:hover { background: rgba(224, 210, 200, 0.5); }
+	.chip.danger { border-color: rgba(163, 84, 83, 0.4); background: rgba(196, 122, 118, 0.2); color: #8f4a48; }
+	.chip.active { background: rgba(218, 188, 181, 0.5); color: #69434a; }
+	.chip:disabled { opacity: .42; cursor: default; pointer-events: none; }
+	.chip-count { padding: 0 5px; border-radius: 6px; background: rgba(120, 96, 88, 0.13); color: #7b6a63; font-size: 10px; font-variant-numeric: tabular-nums; }
+
+	.board-actions { display: flex; align-items: center; gap: 4px; padding-left: 9px; border-left: 1px solid rgba(98,80,70,.13); }
+
+	.location-bar {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-width: 0;
+		max-width: 560px;
+		padding: 5px 9px 5px 5px;
+		border: 1px solid rgba(98, 80, 70, 0.13);
+		border-radius: 13px;
+		background: rgba(255, 253, 248, 0.72);
+		box-shadow: 0 5px 19px rgba(76, 57, 48, 0.08), inset 0 1px rgba(255,255,255,.85);
+		backdrop-filter: blur(12px);
+	}
+
+	.history-pair,
+	.frame-steps { display: flex; gap: 1px; }
+	.history-pair button,
+	.frame-steps button {
+		width: 26px;
+		height: 26px;
+		border-radius: 8px;
+		background: transparent;
+		color: #77655e;
+		font-size: 16px;
+		line-height: 1;
+		transition: background 130ms ease, color 130ms ease;
+	}
+	.frame-steps button { font-size: 11px; }
+	.history-pair button:hover:not(:disabled),
+	.frame-steps button:hover:not(:disabled) { background: rgba(218, 188, 181, 0.4); color: #5a4741; }
+	.history-pair button:disabled,
+	.frame-steps button:disabled { color: #c8bcb5; cursor: default; }
+
+	.breadcrumb {
+		display: flex;
+		align-items: center;
+		min-width: 0;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		overflow: hidden;
+	}
+	.breadcrumb li { display: flex; align-items: center; min-width: 0; }
+	.crumb {
+		max-width: 190px;
+		padding: 3px 6px;
+		border-radius: 7px;
+		background: transparent;
+		color: #7d6c65;
+		font-size: 12.5px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		transition: background 130ms ease, color 130ms ease;
+	}
+	.crumb:hover { background: rgba(224, 210, 200, 0.55); color: #4f403b; }
+	.crumb.root { font-family: var(--font-display, Georgia, serif); font-weight: 600; color: #5d4c46; }
+	.crumb.current { color: #7c4a53; font-weight: 600; }
+	.crumb-arrow { color: #b8a9a2; font-size: 12px; }
+
+	.scale-word {
+		flex: none;
+		padding: 2px 7px;
+		border-radius: 999px;
+		background: rgba(120, 96, 88, 0.09);
+		color: #8b7a73;
+		font-size: 10px;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		white-space: nowrap;
+	}
+
+	.rail {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+		padding: 5px;
+		border: 1px solid rgba(98, 80, 70, 0.13);
+		border-radius: 13px;
+		background: rgba(255, 253, 248, 0.72);
+		box-shadow: 0 5px 19px rgba(76, 57, 48, 0.08), inset 0 1px rgba(255,255,255,.85);
+		backdrop-filter: blur(12px);
+	}
+	.rail-button {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		min-height: 30px;
+		padding: 0 9px;
+		border-radius: 9px;
+		background: transparent;
+		color: #695953;
+		font-size: 11.5px;
+		transition: background 130ms ease, color 130ms ease;
+	}
+	.rail-button span { color: #9a7770; font-size: 13px; line-height: 1; }
+	.rail-button:hover,
+	.rail-button.active { background: rgba(218, 188, 181, 0.4); color: #69434a; }
+	.rail-button.play span { color: #a3646e; }
+
+	.drawer {
+		position: absolute;
+		z-index: 72;
+		top: 66px;
+		right: 22px;
+		bottom: 96px;
+		display: flex;
+		flex-direction: column;
+		width: min(324px, calc(100vw - 44px));
+		border: 1px solid rgba(98, 80, 70, 0.14);
+		border-radius: 16px;
+		background: rgba(255, 253, 248, 0.93);
+		box-shadow: 0 14px 40px rgba(76, 57, 48, 0.16), inset 0 1px rgba(255,255,255,.9);
+		backdrop-filter: blur(16px);
+		animation: drawer-in 220ms ease both;
+	}
+	@keyframes drawer-in { from { opacity: 0; transform: translateY(-8px); } }
+
+	.drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 9px 9px 8px 11px; border-bottom: 1px solid rgba(98,80,70,.11); }
+	.drawer-tabs { display: flex; gap: 2px; }
+	.drawer-tabs button { padding: 5px 10px; border-radius: 8px; background: transparent; color: #877771; font-size: 12px; }
+	.drawer-tabs button.active { background: rgba(218, 188, 181, 0.42); color: #69434a; font-weight: 600; }
+	.drawer-close { width: 26px; height: 26px; border-radius: 8px; background: transparent; color: #8b7a73; font-size: 18px; line-height: 1; }
+	.drawer-close:hover { background: rgba(224, 210, 200, 0.55); }
+
+	.drawer-body { flex: 1; overflow-y: auto; padding: 12px 12px 16px; }
+	.drawer-body section + section { margin-top: 18px; padding-top: 15px; border-top: 1px solid rgba(98,80,70,.09); }
+	.drawer-body h3 { margin: 0 0 7px; color: #6d5c56; font-family: var(--font-display, Georgia, serif); font-size: 13px; font-weight: 600; }
+	.drawer-note { margin: 0 0 9px; color: #94867f; font-size: 11.5px; line-height: 1.5; }
+	.drawer-empty { margin: 0 0 10px; padding: 14px; border: 1px dashed rgba(120,96,88,.22); border-radius: 11px; color: #9c8e87; font-size: 11.5px; font-style: italic; text-align: center; }
+	.row-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 8px; }
+
+	.place-list,
+	.stop-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+	.place-list li,
+	.stop-list li { display: flex; align-items: center; gap: 3px; border-radius: 9px; }
+	.stop-list li.playing { background: rgba(219, 178, 178, 0.26); }
+
+	.place-name,
+	.stop-name {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 8px;
+		padding: 6px 8px;
+		border-radius: 8px;
+		background: transparent;
+		color: #5f4f49;
+		font-size: 12.5px;
+		text-align: left;
+	}
+	.place-name span,
+	.stop-name span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.place-name small,
+	.stop-name small { flex: none; color: #a2948d; font-size: 10px; }
+	.place-name:hover,
+	.stop-name:hover { background: rgba(224, 210, 200, 0.5); }
+	.place-name.current { color: #7c4a53; font-weight: 600; }
+	.place-name small.key { padding: 1px 5px; border-radius: 5px; background: rgba(120,96,88,.11); font-variant-numeric: tabular-nums; }
+
+	.place-add,
+	.place-edit,
+	.place-drop { width: 25px; height: 25px; flex: none; border-radius: 7px; background: transparent; color: #a1928b; font-size: 12px; line-height: 1; transition: background 130ms ease, color 130ms ease; }
+	.place-drop { font-size: 16px; }
+	.place-add:hover, .place-edit:hover, .place-drop:hover { background: rgba(224, 210, 200, 0.6); color: #6b5952; }
+	.place-add.on { background: rgba(219, 178, 178, 0.5); color: #7c4a53; }
+	.place-rename,
+	.place-input { flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid rgba(167, 102, 112, 0.35); border-radius: 8px; background: rgba(255,255,255,.7); color: #4c403c; font-size: 12px; outline: none; }
+	.place-input:focus, .place-rename:focus { border-color: rgba(167, 102, 112, 0.7); }
+
+	.stop-number { width: 18px; flex: none; color: #a89a93; font-size: 10.5px; font-variant-numeric: tabular-nums; text-align: center; }
+	.stop-hold { display: flex; align-items: center; gap: 1px; color: #a2948d; font-size: 10px; }
+	.stop-hold input { width: 32px; padding: 3px 4px; border: 1px solid rgba(98,80,70,.16); border-radius: 6px; background: rgba(255,255,255,.6); color: #6b5b55; font-size: 11px; text-align: center; outline: none; }
+	.stop-move { display: flex; flex-direction: column; gap: 1px; }
+	.stop-move button { width: 20px; height: 13px; border-radius: 4px; background: transparent; color: #a89a93; font-size: 9px; line-height: 1; }
+	.stop-move button:hover:not(:disabled) { background: rgba(224, 210, 200, 0.6); color: #6b5952; }
+	.stop-move button:disabled { color: #d2c7c1; cursor: default; }
+
+	.journey-controls .loop-toggle { display: flex; align-items: center; gap: 6px; margin-top: 11px; color: #8b7d76; font-size: 11.5px; }
+	.journey-controls .loop-toggle input { accent-color: #a76670; }
+
+	/* Bottom-left: the one corner the dock, the camera controls and the drawer
+	   all leave alone, so the overview never has to fight for it. */
+	.minimap-shell {
+		position: absolute;
+		z-index: 68;
+		left: 22px;
+		bottom: 25px;
+		padding: 5px;
+		border: 1px solid rgba(98, 80, 70, 0.13);
+		border-radius: 13px;
+		background: rgba(255, 253, 248, 0.78);
+		box-shadow: 0 8px 26px rgba(76,57,48,.11), inset 0 1px rgba(255,255,255,.9);
+		backdrop-filter: blur(15px);
+	}
+	.minimap { position: relative; border-radius: 9px; background: rgba(120, 96, 88, 0.06); overflow: hidden; cursor: crosshair; }
+	.minimap:focus-visible { outline: 2px solid rgba(167, 102, 112, 0.7); outline-offset: 2px; }
+	/* Kind classes are prefixed: a bare `.frame` here would be the same selector
+	   as a frame on the board, and the two are not the same thing. */
+	.map-mark { position: absolute; border-radius: 2px; background: rgba(120, 96, 88, 0.34); }
+	.map-mark.mark-frame { border: 1px solid rgba(137, 103, 89, 0.42); border-radius: 4px; background: rgba(219, 186, 163, 0.24); }
+	.map-mark.mark-stack { background: rgba(120, 96, 88, 0.26); }
+	.map-mark.mark-image { background: rgba(150, 118, 106, 0.44); }
+	.map-mark.here { border-color: rgba(167, 102, 112, 0.75); background: rgba(219, 178, 178, 0.42); }
+	.map-view { position: absolute; border: 1.5px solid rgba(167, 102, 112, 0.85); border-radius: 3px; background: rgba(167, 102, 112, 0.09); pointer-events: none; }
+
+	.player {
+		position: absolute;
+		z-index: 80;
+		left: 50%;
+		bottom: 26px;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		max-width: min(520px, calc(100vw - 40px));
+		padding: 6px 8px 6px 6px;
+		border: 1px solid rgba(98, 80, 70, 0.15);
+		border-radius: 15px;
+		background: rgba(255, 253, 248, 0.86);
+		box-shadow: 0 10px 32px rgba(76,57,48,.15), inset 0 1px rgba(255,255,255,.9);
+		backdrop-filter: blur(16px);
+		transform: translateX(-50%);
+		animation: player-in 300ms ease both;
+	}
+	@keyframes player-in { from { opacity: 0; transform: translate(-50%, 14px); } }
+	.player button { width: 32px; height: 32px; border-radius: 9px; background: transparent; color: #6b5b55; font-size: 16px; line-height: 1; transition: background 130ms ease; }
+	.player button:hover { background: rgba(218, 188, 181, 0.45); }
+	.player-play { color: #7c4a53 !important; font-size: 13px !important; background: rgba(219, 178, 178, 0.34) !important; }
+	.player-where { display: flex; align-items: baseline; gap: 8px; min-width: 0; margin: 0 4px; padding-left: 9px; border-left: 1px solid rgba(98,80,70,.13); }
+	.player-count { flex: none; color: #a2948d; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+	.player-label { min-width: 0; color: #5c4b45; font-family: var(--font-display, Georgia, serif); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.player-exit { width: auto !important; padding: 0 10px; color: #8b7a73 !important; font-size: 11.5px !important; }
+
+	.shelf-backdrop {
+		position: absolute;
+		inset: 0;
+		z-index: 90;
+		display: grid;
+		place-items: center;
+		padding: 22px;
+		background: rgba(60, 47, 41, 0.24);
+		backdrop-filter: blur(4px);
+		animation: fade-in 180ms ease both;
+	}
+	@keyframes fade-in { from { opacity: 0; } }
+
+	.shelf {
+		display: flex;
+		flex-direction: column;
+		width: min(560px, 100%);
+		max-height: min(620px, 100%);
+		border: 1px solid rgba(98, 80, 70, 0.16);
+		border-radius: 20px;
+		background: rgba(255, 253, 248, 0.98);
+		box-shadow: 0 24px 60px rgba(58, 42, 35, 0.28);
+		animation: shelf-in 240ms ease both;
+	}
+	@keyframes shelf-in { from { opacity: 0; transform: translateY(12px) scale(.99); } }
+
+	.shelf-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 20px 14px; border-bottom: 1px solid rgba(98,80,70,.1); }
+	.shelf-head h2 { margin: 0; color: #4f403b; font-family: var(--font-display, Georgia, serif); font-size: 20px; font-weight: 600; }
+	.shelf-head p { margin: 5px 0 0; color: #92847c; font-size: 12px; }
+	.shelf-close { width: 30px; height: 30px; flex: none; border-radius: 9px; background: transparent; color: #8b7a73; font-size: 20px; line-height: 1; }
+	.shelf-close:hover { background: rgba(224, 210, 200, 0.55); }
+
+	.shelf-list { flex: 1; margin: 0; padding: 10px; list-style: none; overflow-y: auto; }
+	.shelf-list li { display: flex; align-items: center; gap: 4px; padding: 3px; border-radius: 12px; }
+	.shelf-list li:hover { background: rgba(238, 228, 220, 0.6); }
+	.shelf-list li.open { background: rgba(219, 178, 178, 0.18); }
+	.shelf-open { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 9px 11px; border-radius: 10px; background: transparent; text-align: left; }
+	.shelf-open strong { color: #4f403b; font-family: var(--font-display, Georgia, serif); font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.shelf-open small { color: #988a82; font-size: 11px; }
+	.shelf-badge { flex: none; padding: 2px 7px; border-radius: 999px; background: rgba(167, 102, 112, 0.16); color: #7c4a53; font-size: 9.5px; letter-spacing: .07em; text-transform: uppercase; }
+	.shelf-foot { display: flex; flex-wrap: wrap; gap: 7px; padding: 14px 20px 18px; border-top: 1px solid rgba(98,80,70,.1); }
+
+	.tab-count { margin-left: 4px; padding: 0 4px; border-radius: 5px; background: rgba(120, 96, 88, 0.16); font-size: 9.5px; font-variant-numeric: tabular-nums; }
+	.place-input.wide { width: 100%; }
+	.source-link { display: inline-block; margin-top: 7px; color: #8a5b63; font-size: 11px; text-decoration: none; border-bottom: 1px solid rgba(138, 91, 99, .3); }
+	.source-link:hover { color: #6f454c; }
+
+	.status-pick { gap: 5px; padding: 0 9px; }
+	.status-pick.active { border-color: rgba(167, 102, 112, 0.42); background: rgba(219, 178, 178, 0.34); color: #7c4a53; }
+
+	.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+	.swatch { width: 26px; height: 26px; border: 1.5px solid rgba(98, 80, 70, 0.16); border-radius: 8px; transition: transform 130ms ease, border-color 130ms ease; }
+	.swatch:hover { transform: scale(1.08); }
+	.swatch.active { border-color: rgba(167, 102, 112, 0.85); box-shadow: 0 0 0 3px rgba(167, 102, 112, 0.14); }
+	.swatch.tint-peach { background: rgba(246, 214, 192, 0.95); }
+	.swatch.tint-lavender { background: rgba(220, 212, 240, 0.95); }
+	.swatch.tint-aqua { background: rgba(199, 230, 226, 0.95); }
+	.swatch.tint-gold { background: rgba(240, 224, 184, 0.95); }
+	.swatch.tint-rose { background: rgba(243, 210, 216, 0.95); }
+	.swatch.tint-sage { background: rgba(211, 228, 204, 0.95); }
+
+	.stamps { display: grid; grid-template-columns: 62px 1fr; gap: 4px 10px; margin: 0; }
+	.stamps dt { color: #a2948d; font-size: 10.5px; }
+	.stamps dd { margin: 0; color: #6b5b55; font-size: 11.5px; }
+
+	.finder {
+		position: absolute;
+		z-index: 88;
+		left: 50%;
+		top: 84px;
+		display: flex;
+		flex-direction: column;
+		width: min(560px, calc(100vw - 44px));
+		max-height: calc(100vh - 180px);
+		border: 1px solid rgba(98, 80, 70, 0.16);
+		border-radius: 16px;
+		background: rgba(255, 253, 248, 0.95);
+		box-shadow: 0 18px 46px rgba(70, 52, 44, 0.2), inset 0 1px rgba(255,255,255,.9);
+		backdrop-filter: blur(18px);
+		transform: translateX(-50%);
+		animation: finder-in 200ms ease both;
+	}
+	@keyframes finder-in { from { opacity: 0; transform: translate(-50%, -10px); } }
+
+	.finder-field { display: flex; align-items: center; gap: 7px; padding: 9px 9px 9px 13px; }
+	.finder-mark { color: #a4938b; font-size: 16px; line-height: 1; }
+	.finder-field input {
+		flex: 1;
+		min-width: 0;
+		border: 0;
+		background: transparent;
+		color: #4c403c;
+		font-family: var(--font-display, Georgia, serif);
+		font-size: 16px;
+		outline: none;
+	}
+	.finder-field input::placeholder { color: #b4a7a0; font-family: var(--font-body, sans-serif); font-size: 14px; }
+	.finder-close { width: 26px; height: 26px; flex: none; border-radius: 8px; background: transparent; color: #8b7a73; font-size: 18px; line-height: 1; }
+	.finder-close:hover { background: rgba(224, 210, 200, 0.55); }
+
+	.finder-results { margin: 0; padding: 4px 6px 6px; list-style: none; overflow-y: auto; border-top: 1px solid rgba(98,80,70,.1); }
+	.finder-result {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		padding: 7px 9px;
+		border-radius: 10px;
+		background: transparent;
+		text-align: left;
+	}
+	.finder-result.current { background: rgba(219, 178, 178, 0.28); }
+	.finder-kind { flex: none; color: #a4938b; font-size: 12px; }
+	.finder-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+	.finder-text strong { color: #4f403b; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.finder-text small { color: #988a82; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.finder-where { flex: none; color: #b0a29b; font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; }
+	.finder-hint { margin: 0; padding: 10px 13px 12px; border-top: 1px solid rgba(98,80,70,.08); color: #a2948d; font-size: 11px; }
+	.finder-hint code { padding: 1px 4px; border-radius: 4px; background: rgba(120,96,88,.1); font-size: 10.5px; }
+	.finder-empty { margin: 0; padding: 16px 13px 18px; border-top: 1px solid rgba(98,80,70,.1); color: #9c8e87; font-size: 12px; font-style: italic; text-align: center; }
+
+	/*
+	 * The View card and the shortcuts card share this corner and take turns in
+	 * it — two cards stacked here would be exactly the clutter this one exists
+	 * to reduce.
+	 */
+	.view-card {
+		position: absolute;
+		z-index: 74;
+		right: 22px;
+		bottom: 76px;
+		width: 248px;
+		max-height: calc(100vh - 150px);
+		overflow-y: auto;
+		padding: 11px 14px 14px;
+		border: 1px solid rgba(98, 80, 70, 0.14);
+		border-radius: 14px;
+		background: rgba(255, 253, 248, 0.95);
+		box-shadow: 0 12px 34px rgba(76,57,48,.15);
+		backdrop-filter: blur(14px);
+		animation: card-in 180ms ease both;
+	}
+	@keyframes card-in { from { opacity: 0; transform: translateY(6px); } }
+	.view-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+	.view-head h3 { margin: 0; color: #5d4c46; font-family: var(--font-display, Georgia, serif); font-size: 14px; font-weight: 600; }
+	.view-card section { padding: 9px 0 0; border-top: 1px solid rgba(98,80,70,.08); }
+	.view-card section:first-of-type { border-top: 0; }
+	.view-card h4 { margin: 0 0 6px; color: #9c8e86; font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+	.view-card .row-buttons { gap: 4px; }
+	.view-card .chip { min-height: 25px; padding: 0 9px; font-size: 11px; }
+	.view-card .drawer-note { margin-top: 8px; }
+	/* The paper choices show what they mean rather than only naming it. */
+	.paper-chip::before { content: ''; width: 11px; height: 11px; border: 1px solid rgba(98,80,70,.2); border-radius: 3px; }
+	.paper-chip.paper-paper::before { background: #f7f3ec; }
+	.paper-chip.paper-rainbow::before {
+		background: linear-gradient(105deg, #f6b8c0, #f8d3a8, #f4ecae, #bfe3bd, #b6dcef, #c6c4ef, #e7bfe4);
+	}
+	.view-toggle { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; color: #6b5b55; font-size: 11.5px; cursor: pointer; }
+	.view-toggle input { accent-color: #a76670; }
+	.view-toggle small,
+	.view-card .chip small { padding: 1px 5px; border-radius: 5px; background: rgba(120,96,88,.11); color: #8b7a73; font-size: 9.5px; }
+	.view-toggle small { margin-left: auto; }
+
+	/*
+	 * Colour blocking. On rainbow paper the chrome stops being one cream:
+	 * every panel takes the band of the spectrum it is standing on, so the
+	 * furniture reads as part of the paper rather than as glass laid over it.
+	 * The paper runs rose → lilac across the board and the panels follow it —
+	 * the topbar in the rose the left edge is washed in, the rail in the lilac
+	 * the right edge ends on, the dock in the leaf it sits over.
+	 *
+	 * Every state inside a block is the same band drawn harder (`--deep-*`),
+	 * never the warm rose the whole app used to hover in — that rose on a cool
+	 * panel reads as a smudge rather than as a choice. `.chip.strong` is the
+	 * exception on purpose: it is the one action colour, and an action should
+	 * look the same wherever it is.
+	 *
+	 * Every rule here is behind `.on-rainbow`, which is the same condition
+	 * that puts the `--block-*` properties on the canvas, so the variables can
+	 * never be missing where they are read. The board's own material — cards,
+	 * frames, stacks, images — is deliberately untouched: the paper and the
+	 * furniture are the room, and the room is not what you came to read.
+	 */
+	.on-rainbow .topbar { background: rgba(var(--block-rose), 0.88); border-color: rgba(var(--deep-rose), 0.72); }
+	.on-rainbow .location-bar { background: rgba(var(--block-butter), 0.88); border-color: rgba(var(--deep-butter), 0.72); }
+	.on-rainbow .rail { background: rgba(var(--block-lilac), 0.88); border-color: rgba(var(--deep-lilac), 0.72); }
+	.on-rainbow .minimap-shell { background: rgba(var(--block-apricot), 0.9); border-color: rgba(var(--deep-apricot), 0.72); }
+	.on-rainbow .tool-dock { background: rgba(var(--block-leaf), 0.9); border-color: rgba(var(--deep-leaf), 0.72); }
+	.on-rainbow .camera-controls { background: rgba(var(--block-iris), 0.9); border-color: rgba(var(--deep-iris), 0.72); }
+	.on-rainbow .drawer { background: rgba(var(--block-sky), 0.96); border-color: rgba(var(--deep-sky), 0.72); }
+	.on-rainbow .finder { background: rgba(var(--block-butter), 0.96); border-color: rgba(var(--deep-butter), 0.72); }
+	.on-rainbow .view-card { background: rgba(var(--block-lilac), 0.96); border-color: rgba(var(--deep-lilac), 0.72); }
+	.on-rainbow .shortcuts { background: rgba(var(--block-iris), 0.96); border-color: rgba(var(--deep-iris), 0.72); }
+	.on-rainbow .player { background: rgba(var(--block-leaf), 0.93); border-color: rgba(var(--deep-leaf), 0.72); }
+	.on-rainbow .shelf { background: rgba(var(--block-apricot), 0.98); }
+	.on-rainbow .notice,
+	.on-rainbow .mode-note { background: rgba(var(--block-leaf), 0.9); border-color: rgba(var(--deep-leaf), 0.6); }
+	/* The minimap's own field is the board it stands for, so it keeps a paler
+	   draw of the block rather than taking the panel's. */
+	.on-rainbow .minimap { background: rgba(var(--deep-apricot), 0.34); }
+
+	.on-rainbow .back-link:hover,
+	.on-rainbow .topbar .chip:not(.strong):hover,
+	.on-rainbow .topbar .chip.active:not(.strong) { background: rgba(var(--deep-rose), 0.6); }
+	.on-rainbow .crumb:hover,
+	.on-rainbow .history-pair button:hover:not(:disabled),
+	.on-rainbow .frame-steps button:hover:not(:disabled) { background: rgba(var(--deep-butter), 0.72); }
+	.on-rainbow .scale-word { background: rgba(var(--deep-butter), 0.5); }
+	.on-rainbow .rail-button:hover,
+	.on-rainbow .rail-button.active { background: rgba(var(--deep-lilac), 0.7); }
+	.on-rainbow .tool-button:hover,
+	.on-rainbow .tool-button.active { background: rgba(var(--deep-leaf), 0.72); }
+	.on-rainbow .camera-controls button:hover,
+	.on-rainbow .camera-controls button.active { background: rgba(var(--deep-iris), 0.72); }
+	.on-rainbow .drawer .chip:not(.strong):hover,
+	.on-rainbow .drawer .chip.active:not(.strong),
+	.on-rainbow .drawer-tabs button.active,
+	.on-rainbow .place-name:hover { background: rgba(var(--deep-sky), 0.62); }
+	.on-rainbow .finder-result:hover,
+	.on-rainbow .finder-result.current { background: rgba(var(--deep-butter), 0.6); }
+	.on-rainbow .view-card .chip:not(.strong):hover,
+	.on-rainbow .view-card .chip.active:not(.strong) { background: rgba(var(--deep-lilac), 0.7); }
+	.on-rainbow .shelf-open:hover { background: rgba(var(--deep-apricot), 0.55); }
+
+	/*
+	 * The quietest inks step down a shade on a block. A whisper that clears
+	 * 5.4:1 on cream falls to 4.0 on the strongest band, and the small
+	 * readouts — the crumb, the step arrows, the zoom figure — are exactly
+	 * where that matters. `#665650` holds 5:1 against every band at every
+	 * depth. The exclusions keep the states that own their colour: a disabled
+	 * arrow stays disabled, and the crumb you are standing in keeps the
+	 * accent that says so.
+	 */
+	.on-rainbow .crumb:not(.current):not(.root),
+	.on-rainbow .scale-word,
+	.on-rainbow .history-pair button:not(:disabled),
+	.on-rainbow .frame-steps button:not(:disabled),
+	.on-rainbow .camera-controls span { color: #665650; }
+
+	.shortcuts {
+		position: absolute;
+		z-index: 74;
+		right: 22px;
+		bottom: 76px;
+		width: 232px;
+		padding: 13px 15px 15px;
+		border: 1px solid rgba(98, 80, 70, 0.14);
+		border-radius: 14px;
+		background: rgba(255, 253, 248, 0.95);
+		box-shadow: 0 12px 34px rgba(76,57,48,.15);
+		backdrop-filter: blur(14px);
+	}
+	.shortcuts-close { position: absolute; top: 8px; right: 9px; }
+	.shortcuts h3 { margin: 0 0 9px; color: #6d5c56; font-family: var(--font-display, Georgia, serif); font-size: 13px; font-weight: 600; }
+	.shortcuts dl + h3 { margin-top: 14px; }
+	.shortcuts dl { display: grid; grid-template-columns: 58px 1fr; gap: 5px 9px; margin: 0; }
+	.shortcuts dt { color: #7c6a63; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+	.shortcuts dd { margin: 0; color: #948680; font-size: 10.5px; }
+
+	@media (max-width: 1360px) {
+		/* The eyebrow is the first thing worth losing to keep the top one row. */
+		.board-name span { display: none; }
+	}
+
+	@media (max-width: 1120px) {
+		/* The breadcrumb drops to its own line before anything has to shrink. */
+		.location-bar { order: 3; }
+		.topbar { flex: 1 1 auto; }
+	}
+
 	@media (max-width: 650px) {
-		.topbar { left: 12px; top: 12px; max-width: calc(100vw - 24px); }
+		.top-deck { left: 12px; right: 12px; top: 12px; gap: 7px; }
 		.save-status { display: none; }
-		.tool-dock { bottom: 12px; max-width: calc(100vw - 120px); overflow-x: auto; }
+		/* The eyebrow is decoration; the title needs every pixel it can have. */
+		.board-name { flex: 1 1 auto; }
+		.board-name span { display: none; }
+		.board-name input { min-width: 0; width: 100%; }
+		/* Pinned between the left edge and the camera controls rather than
+		   centred, so the two can never land on top of each other. */
+		.tool-dock { left: 12px; right: 158px; bottom: 12px; max-width: none; overflow-x: auto; transform: none; }
 		.tool-button { padding: 0 8px; }
 		.tool-button span { display: none; }
-		.camera-controls { right: 12px; bottom: 12px; grid-template-columns: 31px 31px 31px; }
+		.camera-controls { right: 12px; bottom: 12px; grid-template-columns: repeat(4, 31px); }
 		.camera-controls button { width: 31px; height: 31px; }
 		.camera-controls span { display: none; }
+		.location-bar { max-width: 100%; }
+		.crumb { max-width: 118px; }
+		.scale-word { display: none; }
+		.rail-button { padding: 0 7px; font-size: 0; gap: 0; }
+		.rail-button span { font-size: 15px; }
+		.drawer { top: 112px; right: 12px; bottom: 66px; width: calc(100vw - 24px); }
+		.minimap-shell { display: none; }
+		.shortcuts { right: 12px; bottom: 60px; }
+		.view-card { right: 12px; bottom: 60px; max-height: calc(100vh - 130px); }
+		.board-actions { padding-left: 6px; gap: 3px; }
+		.shelf-list li { flex-wrap: wrap; }
 	}
 
 	@media (prefers-reduced-motion: reduce) {

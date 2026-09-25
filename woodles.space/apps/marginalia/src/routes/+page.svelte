@@ -11,6 +11,7 @@
 	import type { Life } from '$lib/witch/content/life';
 	import ReadingRoom from '$lib/components/reading/ReadingRoom.svelte';
 	import CheatConsole from '$lib/witch/CheatConsole.svelte';
+	import AchievementToast from '$lib/witch/AchievementToast.svelte';
 	import HexStage from '$lib/witch/HexStage.svelte';
 	import TutorialOverlay from '$lib/witch/TutorialOverlay.svelte';
 
@@ -197,6 +198,7 @@
 </script>
 
 <CheatConsole />
+<AchievementToast />
 
 <header class="topbar">
 	<div class="brand-group">

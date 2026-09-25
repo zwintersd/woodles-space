@@ -16,6 +16,14 @@ be afforded. `Patient(n)` is Witness but lets a thing fall to `n` recall before
 returning to it. All are deliberately naive bounds. Seed 1, fixed 100ms
 timestep.
 
+The harness and the policies now live in `@woodles/witch-engine` (`sim.ts`), and
+the numbers they read live beside them in `world1/tuning.ts`; `pnpm --filter
+marginalia balance` and the report scripts are unchanged, and every table below
+was re-confirmed identical across that move. [Grimoire](../grimoire) runs the
+same two bracketing policies in the browser against numbers you can edit, and
+shows the delta from the shipped ones — useful for asking "what would this
+change?" before committing to a re-run of the tables here.
+
 ---
 
 ## 1. pacing — fixed

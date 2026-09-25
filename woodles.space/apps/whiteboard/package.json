@@ -11,6 +11,8 @@
 		"test": "svelte-kit sync && vitest run"
 	},
 	"dependencies": {
+		"@woodles/app-manifest": "workspace:*",
+		"@woodles/handoff": "workspace:*",
 		"@woodles/persistence": "workspace:*"
 	},
 	"devDependencies": {

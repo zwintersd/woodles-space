@@ -53,7 +53,7 @@ spreadsheet would be bigger and worse.
 and then nothing happens. once a life hits `STAGE_KNOWN`, `TheWorld.svelte` shows
 *"she knows it now — enough to {verb} it kindly"* followed by *"(intervention arrives
 in a later pass.)"*, and the life drops out of attention into a passive yield.
-`domainVerb` (tend / guide / encourage / shape / invoke, `content/life.ts:9`) exists
+`domainVerb` (tend / guide / encourage / shape / invoke, `content/life.ts`) exists
 for exactly this and is used nowhere else. this is the single most-promised,
 least-built mechanic.
 
@@ -79,8 +79,8 @@ not be a pure upgrade.
 
 **the hole.** the long arc is fully storyboarded in content and entirely unbuilt.
 `worldIndex` is defined, saved, and reset but never incremented or read
-(`book.svelte.ts:75`). essence and knowing are commented *"will cross worlds, once
-prestige exists"* (`book.svelte.ts:58`). the assumptions tier is introduced as *"the
+(`worldIndex`, on the Book). essence and knowing are commented *"will cross worlds, once
+prestige exists"* (`WorldState`, in @woodles/witch-engine). the assumptions tier is introduced as *"the
 first prestige reveals they were assumptions all along"* (`content/assumptions.ts`).
 the Mother and Witness titles are gated *"not yet — not in this world."*
 
@@ -105,7 +105,7 @@ the real scope multiplier; everything else is one world's worth of polish.
 ### 3. the world's vital signs
 
 **the hole.** `complexity`, `nutrients`, `oxygen`, `stability` are all `$derived`
-on the Book (`book.svelte.ts:180–189`) and rendered in **zero** components. the
+on the Book and rendered in **zero** components. the
 numbers that would make the world feel alive are computed every tick and thrown away.
 
 **the sketch.** the cheapest high-impact change in the doc: a small "vital signs"
@@ -121,7 +121,7 @@ readout, or a minimal planet visual that breathes with them.
 ### 4. the reading room, joined to the book
 
 **the hole.** `readingCumulativeMs` / `readingCumulativeWords` are tracked, saved,
-and migrated from legacy saves (`book.svelte.ts:130–131`) — and displayed nowhere.
+and migrated from legacy saves (on the Book) — and displayed nowhere.
 stars don't feed the economy, yet the arcade's locked hints already treat reading
 stars as a currency. the room is mechanically an island.
 
@@ -213,7 +213,7 @@ a prerequisite, deepening the tree past its current two flat layers.
 
 ### 9. favor with weather
 favor is currently a silent 0.5–1.5× multiplier easing toward a target
-(`tuning.ts:44`). light events driven off the §3 metrics — a drought, a bloom — would
+(`favorMultiplier`, in `tuning.ts`). light events driven off the §3 metrics — a drought, a bloom — would
 give it stakes.
 - **need from you:** appetite for randomness at all? and may events be *losses*
   (drought), or only gains — given the theme cuts both ways?

@@ -114,6 +114,41 @@ export const appManifest = Object.freeze([
 		landing: tile('echoes', 3, 'read', 'letters left here, words that stayed', 'var(--peach)', 'var(--lilac)', '120deg')
 	},
 	{
+		id: 'changelog',
+		name: 'Changelog',
+		publicPath: '/changelog',
+		aliases: [],
+		kind: 'static',
+		maturity: 'stable',
+		sourceDir: 'apps/changelog',
+		outputDir: 'apps/changelog',
+		entryFile: 'index.html'
+		// No `landing` tile — a docs page, not something to play with. See
+		// `digits` / `animations` above for the same call.
+	},
+	{
+		id: 'lore',
+		name: 'Lore',
+		publicPath: '/lore',
+		aliases: [],
+		kind: 'static',
+		maturity: 'stable',
+		sourceDir: 'apps/lore',
+		outputDir: 'apps/lore',
+		entryFile: 'index.html'
+	},
+	{
+		id: 'architecture',
+		name: 'Architecture',
+		publicPath: '/architecture',
+		aliases: [],
+		kind: 'static',
+		maturity: 'stable',
+		sourceDir: 'apps/architecture',
+		outputDir: 'apps/architecture',
+		entryFile: 'index.html'
+	},
+	{
 		id: 'marginalia',
 		name: 'Marginalia',
 		publicPath: '/marginalia',
@@ -202,7 +237,7 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/whiteboard/dist',
 		entryFile: 'index.html',
 		packageName: 'whiteboard',
-		landing: tile('whiteboard', 14, 'tend', 'when a thought wants to take up space', 'var(--peach)', 'var(--lilac)', '145deg')
+		landing: tile('whiteboard', 12, 'tend', 'when a thought wants to take up space', 'var(--peach)', 'var(--lilac)', '145deg')
 	},
 	{
 		id: 'bloomforge',
@@ -210,12 +245,15 @@ export const appManifest = Object.freeze([
 		publicPath: '/bloomforge',
 		aliases: [],
 		kind: 'sveltekit',
-		maturity: 'growing',
+		maturity: 'incubator',
 		sourceDir: 'apps/bloomforge',
 		outputDir: 'apps/bloomforge/dist',
 		entryFile: 'index.html',
-		packageName: 'bloomforge',
-		landing: tile('bloomforge', 12, 'play', 'a studio for making incremental games: wire up an economy, then watch it run', 'var(--lavender)', 'var(--aqua)', '150deg')
+		packageName: 'bloomforge'
+		// No `landing` tile — Studio is pivoting to Marginalia's own shape
+		// (@woodles/dynamics), and this GameDef/incremental-core version is held
+		// at its route rather than promoted from the front page. Linked from
+		// Lab instead, the same way `digits` and `animations` are.
 	},
 	{
 		id: 'bloomforge-player',
@@ -223,15 +261,15 @@ export const appManifest = Object.freeze([
 		publicPath: '/play',
 		aliases: [],
 		kind: 'sveltekit',
-		maturity: 'growing',
+		maturity: 'incubator',
 		sourceDir: 'apps/bloomforge-player',
 		outputDir: 'apps/bloomforge-player/dist',
 		entryFile: 'index.html',
 		packageName: 'bloomforge-player',
 		// The studio's "Play it" hands over a project id rather than a def in the
 		// URL, so a link can't go stale against an edited game.
-		addressableBy: ['game'],
-		landing: tile('player', 13, 'play', 'play the incremental games you built in the studio', 'var(--peach)', 'var(--lavender)', '160deg')
+	addressableBy: ['game']
+		// No `landing` tile — see bloomforge's comment above; this is its player.
 	},
 	{
 		id: 'schedules',
@@ -243,6 +281,23 @@ export const appManifest = Object.freeze([
 		sourceDir: 'apps/schedules',
 		outputDir: 'apps/schedules',
 		entryFile: 'index.html'
+	},
+	{
+		id: 'grimoire',
+		name: 'Grimoire',
+		publicPath: '/grimoire',
+		aliases: [],
+		kind: 'sveltekit',
+		maturity: 'incubator',
+		sourceDir: 'apps/grimoire',
+		outputDir: 'apps/grimoire/dist',
+		entryFile: 'index.html',
+		packageName: 'grimoire'
+		// No `landing` tile — this is the studio Bloomforge pivoted toward,
+		// built on @woodles/witch-engine instead of GameDef. It can now tune
+		// World 1 and run a balance comparison against the shipped numbers, so
+		// it is linked from Lab, which is the right shelf for an instrument
+		// still finding its shape. Front page is a later question.
 	}
 ]);
 
