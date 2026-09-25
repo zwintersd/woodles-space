@@ -168,7 +168,7 @@
 			<p>saved locally · optional passphrase sync</p>
 		</footer>
 
-		<Binder />
+		<Binder onopenpiles={() => setSection('piles')} />
 		<TaskEditDrawer />
 		<ShelfArrival />
 

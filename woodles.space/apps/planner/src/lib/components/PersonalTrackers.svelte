@@ -3,12 +3,21 @@
 	import { queueSync } from '$lib/sync.svelte';
 	import { uid } from '$lib/utils';
 	import type { MomentTracker, TrackerAnswer } from '$lib/types';
+	const trackerSuggestions: Array<Omit<MomentTracker, 'id'> & { description: string }> = [
+		{ name: 'Focus', type: 'rating', cue: 'reading, writing, study, work', low: 'Scattered', high: 'Absorbed', description: 'Notice how present your attention feels.' },
+		{ name: 'Energy', type: 'rating', cue: 'tired, energy, rest, exercise', low: 'Drained', high: 'Energized', description: 'Check in with your energy through the day.' },
+		{ name: 'Stress', type: 'rating', cue: 'stress, deadline, anxious', low: 'Calm', high: 'Overwhelmed', description: 'Mark how much pressure you are feeling.' },
+		{ name: 'Moved my body', type: 'check', cue: 'walk, exercise, stretch', low: '', high: '', description: 'A quick yes or no after movement.' }
+	];
 	let { answers = $bindable<TrackerAnswer[]>([]), active = $bindable<string | null>(null), onchange } : { answers: TrackerAnswer[]; active: string | null; onchange: () => void } = $props();
 	let trackers = $derived(store.settings.momentTrackers ?? []);
 	let tracker = $derived(answers.find(a => `custom:${a.tracker.id}` === active)?.tracker ?? trackers.find(t => `custom:${t.id}` === active));
 	let answer = $derived(answers.find(a => a.tracker.id === tracker?.id));
 	let managing = $state(false), expanded = $state(false), error = $state('');
 	let draft = $state<MomentTracker[]>([]);
+	function suggestionAdded(name: string) {
+		return draft.some(t => t.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase());
+	}
 	function set(value: TrackerAnswer['value']) {
 		if (!tracker) return;
 		if (tracker.type === 'text' && typeof value === 'string' && !value.trim()) { answers = answers.filter(a => a.tracker.id !== tracker!.id); onchange(); return; }
@@ -30,11 +39,20 @@
 		{:else}<textarea aria-label={tracker.name} rows="2" value={typeof answer?.value === 'string' ? answer.value : ''} oninput={e => set(e.currentTarget.value)}></textarea>{/if}
 		<div class="actions"><small>Included when you save the moment.</small><button type="button" onclick={() => active = null}>Done</button>{#if answer}<button type="button" onclick={() => { answers = answers.filter(a => a.tracker.id !== tracker!.id); active = null; onchange(); }}>Remove answer</button>{/if}</div>
 	</div>{/if}
-	<details bind:open={expanded}><summary>Your trackers <small>{trackers.length ? `${trackers.length} available` : 'make this your own'}</small></summary>
+	<details bind:open={expanded}><summary>Your trackers <small>{trackers.length ? `${trackers.length} available` : '4 suggestions or make your own'}</small></summary>
 		<div class="chips">{#each trackers as t (t.id)}<button type="button" onclick={() => { active = `custom:${t.id}`; expanded = false; }}>{t.name}</button>{/each}</div>
-		<button type="button" onclick={() => { draft = trackers.map(t => ({ ...t })); error = ''; managing = !managing; }}>Customize trackers</button>
+		<button type="button" onclick={() => { draft = trackers.map(t => ({ ...t })); error = ''; managing = !managing; }}>{trackers.length ? 'Customize trackers' : 'Choose tracker suggestions'}</button>
 		{#if managing}<div class="manager" aria-label="Customize trackers">
-			<p>Add a rating, yes/no question, or a note. Optional cue words help choose when to offer it.</p>
+			<p>Add a starter below or make your own rating, yes/no question, or note. Optional cue words help choose when to offer it.</p>
+			<section class="suggestions" aria-label="Tracker suggestions">
+				<strong>Try a starter</strong>
+				{#each trackerSuggestions as suggestion (suggestion.name)}
+					<div class="suggestion">
+						<div><b>{suggestion.name}</b><small>{suggestion.description}</small></div>
+						<button type="button" disabled={suggestionAdded(suggestion.name)} onclick={() => { draft = [...draft, { id: uid(), name: suggestion.name, type: suggestion.type, cue: suggestion.cue, low: suggestion.low, high: suggestion.high }]; error = ''; }}>{suggestionAdded(suggestion.name) ? 'Added' : `Add ${suggestion.name}`}</button>
+					</div>
+				{/each}
+			</section>
 			{#each draft as t, index (t.id)}<div class="tracker-edit">
 				<label>Name<input aria-label={`Tracker ${index + 1} name`} bind:value={t.name} maxlength="60" /></label>
 				<label>Answer<select aria-label={`Tracker ${index + 1} type`} bind:value={t.type}><option value="rating">Rating 1–5</option><option value="check">Yes / no</option><option value="text">Note</option></select></label>
@@ -55,6 +73,11 @@
 	button[aria-pressed='true'] { background: var(--car-pink-wash); border-color: var(--car-pink-dark); box-shadow: inset 0 2px 3px #44365b22; }
 	.chips, .actions { display: flex; flex-wrap: wrap; gap: .4rem; margin: .5rem 0; align-items: center; }
 	.chips button { border-radius: 99px; }
+	.suggestions { display: grid; gap: .35rem; margin: .65rem 0; }
+	.suggestion { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .5rem .6rem; border: 1px solid #44365b20; border-radius: .55rem; background: #ffffff50; }
+	.suggestion > div { display: grid; gap: .15rem; }
+	.suggestion b { font-weight: 600; }
+	.suggestion button { flex: none; }
 	.panel, .tracker-edit { border: 1px solid #44365b25; background: #ffffff50; padding: .7rem; border-radius: .65rem; margin: .5rem 0; }
 	.rating { display: grid; grid-template-columns: repeat(5, 1fr); gap: .4rem; }
 	.rating button { min-height: 2.5rem; }

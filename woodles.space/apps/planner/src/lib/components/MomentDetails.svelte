@@ -16,9 +16,15 @@
 	let browsing = $state(false);
 	let quiet = $state(false);
 	let field = $derived(DETAIL_FIELDS.find(f => f.key === active));
-	let answered = $derived(DETAIL_FIELDS.filter(f => hasDetail(details, f.key)));
+	const scaleFields = DETAIL_FIELDS.filter(item => item.scale);
+	const noteFields = DETAIL_FIELDS.filter(item => !item.scale);
+	let answered = $derived(noteFields.filter(f => hasDetail(details, f.key)));
 	let customOffer = $derived(trackerOffer(store.settings.momentTrackers ?? [], answers, text, date, start, previous, dismissedTrackers));
-	let offers = $derived(suggestMomentDetails({ text, tagName, details, date, start, previous, dismissed }).slice(0, customOffer ? 1 : 2));
+	let offers = $derived(suggestMomentDetails({ text, tagName, details, date, start, previous, dismissed }).filter(offer => !DETAIL_FIELDS.find(item => item.key === offer.key)?.scale).slice(0, customOffer ? 1 : 2));
+	function setRating(key: DetailKey, value: number) {
+		details = { ...details, [key]: value };
+		onchange();
+	}
 	async function open(key: DetailKey) {
 		active = key; browsing = false;
 		await tick();
@@ -34,6 +40,14 @@
 	{#if answered.length}<div class="recorded" aria-label="Details added">
 		{#each answered as item (item.key)}<button type="button" onclick={() => open(item.key)}>{item.title}{item.scale ? ` · ${item.scale[Number(details[item.key]) - 1]}` : ' ✓'}</button>{/each}
 	</div>{/if}
+	<div class="quick-scales" aria-label="Moment ratings">
+		{#each scaleFields as item, index (item.key)}
+			<div class="scale-field" style:--scale-color={['#aa526b', '#8061a8', '#467f92'][index % 3]}>
+				<div class="scale-title"><span>{item.title}</span><output>{typeof details[item.key] === 'number' ? details[item.key] : '—'}</output></div>
+				<div class="scale-input"><small>{item.scale?.[0]}</small><input type="range" min="1" max="5" step="1" aria-label={item.question} aria-valuetext={typeof details[item.key] === 'number' ? item.scale?.[Number(details[item.key]) - 1] : 'Not rated'} value={typeof details[item.key] === 'number' ? details[item.key] : 3} oninput={event => setRating(item.key, Number(event.currentTarget.value))} /><small>{item.scale?.[4]}</small></div>
+			</div>
+		{/each}
+	</div>
 	{#if !active && !quiet && (offers.length || customOffer)}
 		<div class="offer-heading"><span>Worth adding?</span><button type="button" onclick={() => quiet = true}>Hide suggestions</button></div>
 		<div class="offers">{#each offers as offer (offer.key)}
@@ -53,22 +67,30 @@
 		<div class="panel-actions"><small>Included when you save this moment.</small><button type="button" onclick={() => active = null}>Done</button>{#if hasDetail(details, field.key)}<button type="button" onclick={() => clear(field!.key)}>Remove detail</button>{/if}</div>
 	</div>{/if}
 	<details bind:open={browsing} class="detail-menu">
-		<summary>More details <small>optional</small></summary>
+		<summary>More check-ins <small>optional</small></summary>
 		<p>Only log what feels useful. Blank fields stay unrecorded.</p>
-		<div class="choices">{#each DETAIL_FIELDS as item}<button type="button" onclick={() => open(item.key)}>{item.title}{hasDetail(details, item.key) ? ' ✓' : ''}</button>{/each}</div>
+		<div class="choices">{#each noteFields as item}<button type="button" onclick={() => open(item.key)}>{item.title}{hasDetail(details, item.key) ? ' ✓' : ''}</button>{/each}</div>
 		{#if quiet || dismissed.length || dismissedTrackers.length}<button class="reset" type="button" onclick={() => { quiet = false; dismissed = []; dismissedTrackers = []; browsing = false; }}>Show suggestions again</button>{/if}
 	</details>
 	<PersonalTrackers bind:answers bind:active {onchange} />
 </section>
 
 <style>
-	.moment-details { margin-top: 0.8rem; border-top: 1px solid #44365b22; padding-top: 0.65rem; }
+	.moment-details { margin-top: 0.65rem; border-top: 1px solid #44365b22; padding-top: 0.55rem; }
 	button { cursor: pointer; border: 1px solid #44365b30; background: #ffffff70; border-radius: 0.5rem; color: var(--car-ink); padding: 0.4rem 0.55rem; font: 0.75rem var(--car-body); }
 	button:active { transform: translateY(1px); }
 	button:focus-visible, summary:focus-visible, textarea:focus-visible { outline: 2px solid var(--car-pink-dark); outline-offset: 3px; }
 	.recorded, .choices { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 	.recorded { margin-bottom: 0.5rem; }
 	.recorded button { background: var(--car-pink-wash); border-radius: 99px; }
+	.quick-scales { display: grid; gap: 0.55rem; }
+	.scale-field { padding: 0.55rem 0.6rem; border: 1px solid #44365b20; border-radius: 0.55rem; background: #ffffff80; }
+	.scale-title { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font: 0.83rem var(--car-body); }
+	.scale-title output { min-width: 1.8rem; padding: 0.15rem 0.35rem; border-radius: 0.35rem; background: color-mix(in srgb, var(--scale-color) 14%, transparent); color: var(--scale-color); text-align: center; font: 600 0.76rem var(--car-mono); }
+	.scale-input { display: grid; grid-template-columns: minmax(3.7rem, auto) minmax(4rem, 1fr) minmax(3.7rem, auto); align-items: center; gap: 0.45rem; margin-top: 0.2rem; }
+	.scale-input small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.scale-input small:last-child { text-align: right; }
+	.scale-input input { width: 100%; margin: 0; accent-color: var(--scale-color); cursor: pointer; }
 	.offer-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.75rem; margin-bottom: 0.4rem; }
 	.offer-heading button { background: transparent; border: 0; font-size: 0.65rem; }
 	.offers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }

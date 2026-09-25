@@ -10,7 +10,6 @@
 	} from '$lib/instrument';
 	import { thinkingAboutShelf } from '$lib/thinkingAboutShelf.svelte';
 	import { dateKey, dayOfWeekLabel, shortDateLabel, timeToMinutes } from '$lib/utils';
-	import DayPlan from './DayPlan.svelte';
 	import MomentarySample from './MomentarySample.svelte';
 	import MomentDayReview from './MomentDayReview.svelte';
 	import { detailSummary } from '$lib/momentDetails';
@@ -175,38 +174,13 @@
 	<div class="instrument-grid">
 		<div class="moment-column">
 		<article class="sampler" data-testid="interval-sampler">
-			<div class="sampler-meta">
-				<div>
-					<p class="interval-clock">
-						{#if selectedInterval}
-							{displayTime(selectedInterval.startTime)}–{displayTime(selectedInterval.endTime)}
-						{:else}
-							outside sampling hours
-						{/if}
-					</p>
-					<p class="bell-note">
-						{selectedStart && selectedInterval?.state === 'past' ? 'editing a recorded moment' : bellStatus}
-					</p>
-				</div>
-				<span class="sample-source">
-					momentary sample
-				</span>
-			</div>
-
-			{#if selectedStart}<button class="return-now" onclick={() => selectedStart = ''}>Return to now</button>{/if}
-
-			{#if selectedInterval && (!selectedInterval.observation || selectedStart)}<p class="plan-hint">
-				<span>pile suggested</span>
-				<strong>{selectedInterval?.plannedBlock?.title ?? 'nothing in particular'}</strong>
-			</p>{/if}
-
 			{#if selectedInterval && selectedInterval.observation?.intervalStart === selectedInterval.startTime && !selectedStart}
 				<div class="sample-rest" role="status">
 					<span class="rest-mark" aria-hidden="true">✓</span>
-					<div><strong>Moment saved</strong><p>Your note is in Day so far. The next prompt will appear with the next interval.</p></div>
+					<div><small>{displayTime(selectedInterval.startTime)}–{displayTime(selectedInterval.endTime)}</small><strong>Moment saved</strong><p>Your note is in Day so far. The next prompt will appear with the next interval.</p></div>
 				</div>
 			{:else if selectedInterval}
-				<MomentarySample interval={selectedInterval} onsaved={() => selectedStart = ''} />
+				<MomentarySample interval={selectedInterval} timeLabel="{displayTime(selectedInterval.startTime)}–{displayTime(selectedInterval.endTime)}" bellNote={selectedStart ? 'editing a recorded moment' : bellStatus} editingPast={Boolean(selectedStart)} onreturnnow={() => selectedStart = ''} onsaved={() => selectedStart = ''} />
 			{:else}
 				<p class="sample-rest">Outside sampling hours. Your saved moments are below.</p>
 			{/if}
@@ -240,12 +214,6 @@
 		</article>
 		<MomentDayReview observations={todayObservations} onselect={reopenMoment} />
 		</div>
-		<aside class="plan-dock" aria-label="Daily plan">
-			<details>
-				<summary><span>Today’s plan</span><strong>{dayShape?.name ?? 'Open day'}</strong><small>{blocks.length} timed activit{blocks.length === 1 ? 'y' : 'ies'} · open plan</small></summary>
-				<DayPlan {onopenpiles} />
-			</details>
-		</aside>
 	</div>
 
 	<details class="context-details"><summary>Sleep and context</summary><Capacity /></details>
@@ -265,7 +233,7 @@
 
 		<div class="ledger-head" aria-hidden="true">
 			<span>interval</span>
-			<span>pile suggested</span>
+			<span>planned activity</span>
 			<span>observed</span>
 		</div>
 		<div class="ledger-rows">
@@ -428,7 +396,7 @@
 
 	.instrument-grid {
 		display: grid;
-		grid-template-columns: minmax(0, 1.9fr) minmax(16rem, 0.8fr);
+		grid-template-columns: minmax(0, 1fr);
 		gap: 1rem;
 		align-items: start;
 	}
@@ -467,59 +435,6 @@
 		border-radius: 50%;
 		content: '';
 		box-shadow: 0 0 0 0.7rem rgba(141, 49, 83, 0.04);
-	}
-
-	.sampler-meta {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 1rem;
-	}
-
-	.interval-clock {
-		font-family: var(--car-counter);
-		font-size: clamp(1.35rem, 3vw, 2rem);
-		letter-spacing: 0.04em;
-		line-height: 1;
-	}
-
-	.bell-note {
-		margin-top: 0.3rem;
-		color: var(--car-ink-soft);
-		font-family: var(--car-mono);
-		font-size: 0.58rem;
-		letter-spacing: 0.08em;
-	}
-
-	.sample-source {
-		border: 1px solid rgba(68, 54, 91, 0.18);
-		border-radius: 999px;
-		padding: 0.24rem 0.55rem;
-		color: var(--car-ink-soft);
-		font-family: var(--car-mono);
-		font-size: 0.52rem;
-		letter-spacing: 0.11em;
-		text-transform: uppercase;
-	}
-
-
-	.plan-hint {
-		display: flex;
-		align-items: baseline;
-		gap: 0.45rem;
-		margin-top: 1rem;
-		color: var(--car-ink-soft);
-		font-family: var(--car-mono);
-		font-size: 0.62rem;
-	}
-
-	.plan-hint span {
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-	}
-
-	.plan-hint strong {
-		font-weight: 500;
 	}
 
 
@@ -781,41 +696,15 @@
 	/* The plan stays available beside the moment, without competing for the main column. */
 	.instrument { gap: 0.8rem; }
 	.day-heading { align-items: center; }
-	.plan-dock { min-width: 0; position: sticky; top: 1rem; border: 1px solid var(--car-line); border-radius: 0.85rem; background: var(--car-wash); color: var(--car-cream); }
-	.plan-dock summary { display: grid; gap: 0.12rem; padding: 0.7rem 0.85rem; cursor: pointer; list-style-position: inside; }
-	.plan-dock summary span { font: 0.6rem var(--car-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--car-mist); }
-	.plan-dock summary strong { font: 500 1.1rem var(--car-display); }
-	.plan-dock summary small { font: 0.62rem var(--car-body); color: var(--car-mist); }
-	.plan-dock details[open] summary { border-bottom: 1px solid var(--car-line); }
-	.plan-dock :global(.wb-card) { padding: 0.7rem; margin-bottom: 0; }
-	.plan-dock :global(.workbench) { padding: 0.45rem; }
-	.plan-dock :global(.wb-heading) { gap: 0.5rem; margin-bottom: 0.35rem; }
-	/* The disclosure summary already names the plan, so keep its expanded actions on one compact line. */
-	.plan-dock :global(.wb-heading > div:first-child) { display: none; }
-	.plan-dock :global(.wb-heading .wb-actions) { gap: 0.35rem; margin: 0; }
-	.plan-dock :global(.wb-heading .wb-actions button) { padding: 0.42rem 0.55rem; font-size: 0.68rem; }
-	.plan-dock :global(h2) { font-size: 1.2rem; }
-	.plan-dock :global(.plan-toolbar) { margin-bottom: 0.15rem; }
-	.plan-dock :global(.wb-row) { padding: 0.3rem 0; gap: 0.45rem; }
-	.plan-dock :global(.activity-title) { font-size: 0.9rem; }
-	.plan-dock :global(.wb-notice:empty) { display: none; }
 	.sampler { animation: settle-in 280ms ease-out both; }
 	.context-details { border: 1px solid var(--car-line); border-radius: 0.7rem; padding: 0.65rem 0.85rem; }
 	.context-details summary { cursor: pointer; font-size: 0.8rem; }
 	@keyframes settle-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 	@media (max-width: 900px) {
 		.instrument-grid { grid-template-columns: minmax(0, 1fr); }
-		.plan-dock { position: static; }
-		.plan-dock :global(.wb-card) { padding: 1rem; }
-		.plan-dock :global(.workbench) { padding: 0.6rem; }
-		.plan-dock :global(.wb-row) { padding: 0.55rem 0; gap: 0.8rem; }
-		.plan-dock :global(.activity-title) { font-size: 1rem; }
 		.day-heading { flex-wrap: wrap; gap: 0.6rem; }
 		.day-heading h1 { font-size: 1.4rem; }
 		.day-actions { flex-wrap: wrap; }
-		.sampler-meta { gap: 0.5rem; flex-wrap: wrap; }
-		.interval-clock { font-size: 1.25rem; }
-		.sample-source { letter-spacing: 0.04em; }
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.sampler { animation: none; }

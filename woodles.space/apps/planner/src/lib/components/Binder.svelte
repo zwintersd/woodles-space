@@ -3,6 +3,7 @@
 	import { EMPTY_STATES, BINDER_LABELS, REFRESH_SECTIONS } from '$lib/onboarding.copy';
 	import { onboarding } from '$lib/onboarding.store.svelte';
 	import YearScroll from './YearScroll.svelte';
+	import DayPlan from './DayPlan.svelte';
 	import { syncState, connectAndHydrate, flushSync, disconnect } from '$lib/sync.svelte';
 	import type { OnboardingStep } from '$lib/types';
 
@@ -11,10 +12,13 @@
 		| 'holidays'
 		| 'shapes'
 		| 'week-pattern'
+		| 'schedule'
 		| 'sync';
+	let { onopenpiles }: { onopenpiles?: () => void } = $props();
 
 	const TABS: { id: BinderTabId; icon: string; label: string }[] = [
 		{ id: 'shapes',       icon: '◐', label: BINDER_LABELS.shapes },
+		{ id: 'schedule',     icon: '▤', label: 'schedule' },
 		{ id: 'week-pattern', icon: '◇', label: BINDER_LABELS.weekPattern },
 		{ id: 'year-scroll',  icon: '∞', label: 'year' },
 		{ id: 'holidays',     icon: '✦', label: 'holidays' },
@@ -97,12 +101,21 @@
 
 <aside
 	class="binder-panel"
+	class:schedule={store.binderTab === 'schedule'}
 	class:open={store.binderTab !== null}
 	aria-hidden={store.binderTab === null}
 >
 	{#if store.binderTab === 'year-scroll'}
 		<div class="binder-year-scroll">
 			<YearScroll compact />
+		</div>
+	{:else if store.binderTab === 'schedule'}
+		<header class="binder-header">
+			<span class="binder-eyebrow">today</span>
+			<span class="binder-title">schedule</span>
+		</header>
+		<div class="binder-body binder-schedule">
+			<DayPlan onopenpiles={() => { store.closeBinder(); onopenpiles?.(); }} />
 		</div>
 
 	{:else if store.binderTab === 'holidays'}
@@ -371,6 +384,22 @@
 
 	.binder-panel.open {
 		transform: translateX(0);
+	}
+
+	.binder-panel.schedule {
+		width: min(38rem, max(20rem, 34vw));
+	}
+
+	.binder-schedule {
+		padding: 0.7rem;
+	}
+
+	.binder-schedule :global(.workbench) {
+		padding: 0;
+	}
+
+	.binder-schedule :global(.wb-card) {
+		padding: 0.8rem;
 	}
 
 	.binder-header {
@@ -765,6 +794,10 @@
 		.binder-panel {
 			right: 0;
 			width: min(320px, calc(100vw - 1rem));
+		}
+
+		.binder-panel.schedule {
+			width: min(38rem, calc(100vw - 1rem));
 		}
 	}
 </style>
