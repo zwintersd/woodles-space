@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { sendHandoff } from '@woodles/handoff';
+import { createHandoffQueue, sendHandoff } from '@woodles/handoff';
 import {
 	bootstrap,
 	clearActiveDraftId,
 	createDraftId,
 	cycleDraftStatus,
+	draftBodyToHandoff,
 	filterDrafts,
 	getActiveDraftId,
 	handoffToDraftBody,
@@ -15,6 +16,7 @@ import {
 	pendingHandoffs,
 	removeDraftBody,
 	saveDraft,
+	sendDraftToBoard,
 	setActiveDraftId,
 	tagCounts,
 	textToHtml,
@@ -302,6 +304,43 @@ describe('handoffs', () => {
 		expect(boot.handoffs).toBe(0);
 		expect(boot.activeId).toBe('d-mine');
 		expect(boot.body?.title).toBe('mine');
+	});
+});
+
+describe('sending a draft to a board', () => {
+	it('flattens the foreground to text, keeping paragraph breaks a plain textarea can show', () => {
+		const draft = draftBodyToHandoff(
+			{ title: 'Brush notes', layers: { foreground: { html: '<p>one</p><p>two</p>' } } },
+			'untitled'
+		);
+		expect(draft.title).toBe('Brush notes');
+		expect(draft.body).toBe('one\n\ntwo');
+		expect(draft.format).toBe('text');
+	});
+
+	it('falls back to the kind’s untitled label when the draft has none', () => {
+		const draft = draftBodyToHandoff({ layers: { foreground: { html: '<p>x</p>' } } }, 'untitled letter');
+		expect(draft.title).toBe('untitled letter');
+		expect(draft.source.label).toBeUndefined();
+	});
+
+	it('carries tags through, the same way a handoff arriving here keeps them', () => {
+		const draft = draftBodyToHandoff({ title: 'x', tags: ['brushes', 'from:spores'] }, 'untitled');
+		expect(draft.tags).toEqual(['brushes', 'from:spores']);
+	});
+
+	it('names write as the source, labelled with the draft’s own title', () => {
+		const draft = draftBodyToHandoff({ title: 'Brush notes' }, 'untitled');
+		expect(draft.source).toEqual({ app: 'write', label: 'Brush notes' });
+	});
+
+	it('actually queues the handoff for whiteboard, not just builds one', () => {
+		sendDraftToBoard({ title: 'Brush notes', layers: { foreground: { html: '<p>hello</p>' } } }, 'untitled');
+		const waiting = createHandoffQueue('whiteboard').peek();
+		expect(waiting).toHaveLength(1);
+		expect(waiting[0].title).toBe('Brush notes');
+		expect(waiting[0].body).toBe('hello');
+		expect(waiting[0].source).toEqual({ app: 'write', label: 'Brush notes' });
 	});
 });
 

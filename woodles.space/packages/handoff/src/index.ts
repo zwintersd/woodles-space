@@ -18,10 +18,14 @@ import { createVersionedStorage, type PersistenceIssue, type StorageLike } from 
  * Apps that can receive a handoff. Read targets (echoes) can't. `notebook`
  * left this list when the app retired into Write — its stranded queue is
  * drained by Write's one-time capture import, not by a receiver. `spores`
- * left it the same way when it retired into Write in turn: Write is now the
- * only app anything gets handed off to.
+ * left it the same way when it retired into Write in turn.
+ *
+ * `whiteboard` joined when it grew an Inbox: a thought that wants room around
+ * it rather than a line in a draft is the other half of "put it anywhere, move
+ * it later", and a board with somewhere to put unsorted material can now be
+ * the anywhere. Each target keeps its own queue, so the two never mix.
  */
-export const HANDOFF_TARGETS = ['write'] as const;
+export const HANDOFF_TARGETS = ['write', 'whiteboard'] as const;
 
 export type HandoffTarget = (typeof HANDOFF_TARGETS)[number];
 

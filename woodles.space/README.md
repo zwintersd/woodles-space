@@ -12,10 +12,16 @@ the docs have one owner each:
 | --- | --- |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | current repo layout, app inventory, shared systems, tests, checks, local workflow |
 | this README | deployment and Vercel routing notes |
+| [CHANGELOG.md](./CHANGELOG.md) | what shipped, session to session — the log a reader can follow without cloning the repo |
+| [LORE.md](./LORE.md) | marginalia's story, curated for reading rather than building |
 | [REFACTORING.md](./REFACTORING.md) | living list of duplicated code and consolidation candidates |
 | [ABSTRACTION.md](./ABSTRACTION.md) | simulating marginalia fast enough to tune its feel — what's in the way, measured, and what to borrow from bloomforge |
 | `apps/*/*.md` | app-specific design briefs, proposals, assets, and known issues |
 | [`../AUDIT.md`](../AUDIT.md) | dated audit snapshot only; not the current source of truth |
+
+`CHANGELOG.md`, `LORE.md`, and `ARCHITECTURE.md` are also hosted pages —
+`/changelog`, `/lore`, and `/architecture` — rendered from the markdown
+file itself at runtime by `shared/docPage.js`; see "how it ships" below.
 
 when docs disagree, treat `ARCHITECTURE.md` and the code as current. update this
 README only for deployment details.
@@ -29,6 +35,14 @@ friendly path to the right file: `/write` → `/apps/write/dist/index.html`,
 `/lab` → `/apps/lab/index.html`, `/digits` → `/apps/digits/index.html`, and so
 on. `lab` is the homepage-facing shelf for stub experiments; the direct
 experiment paths still exist for links and bookmarks.
+
+`/changelog`, `/lore`, and `/architecture` are the same static-app shape,
+minus even a hand-written body: each app (`apps/changelog`,
+`apps/lore`, `apps/architecture`) is one `index.html` whose only job is to
+`fetch()` its root markdown file (`CHANGELOG.md`, `LORE.md`,
+`ARCHITECTURE.md`) and render it client-side with `shared/docPage.js`. no
+build step, and no copy of the doc to keep in sync — the page reads the
+same file a contributor reads in an editor.
 
 `vercel.json`'s `buildCommand` is just `pnpm build`, the root `package.json`
 script (`pnpm -r --if-present build`) — it used to be one `--filter <app>

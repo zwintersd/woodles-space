@@ -44,18 +44,32 @@
 
 	--ta-z-detail: 30;
 
+	/* easings, named once so every app surface springs the same way.
+	   `spring` overshoots and settles — the tactile one, for anything a
+	   finger did; `glide` is the calm decelerating curve for anything that
+	   simply moves; `swift` snaps out of the way. */
+	--ta-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+	--ta-ease-glide:  cubic-bezier(0.22, 0.68, 0.24, 1);
+	--ta-ease-swift:  cubic-bezier(0.4, 0, 0.2, 1);
+
 	--ta-transition-fast:   0.14s ease;
 	--ta-transition-medium: 0.22s ease;
 	/* a small, tasteful bounce for hover/press feedback — same shape as the
 	   "spring" easing planner and spores already use for their own tactile
 	   moments (task-check ticks, swatch hovers), so a click here feels like
 	   it belongs to the same family of apps even with a very different look. */
-	--ta-transition-spring: 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+	--ta-transition-spring: 0.32s var(--ta-ease-spring);
+	--ta-transition-glide:  0.42s var(--ta-ease-glide);
 
 	/* a gentle lift on hover — cards/buttons rise a hair off the page rather
 	   than just recoloring, borrowed from hygge's own hover language. */
 	--ta-lift-hover: translateY(-1px);
 	--ta-lift-press: scale(0.97);
+
+	/* How far into a `collect` exit the thing being put away is — published by
+	   motion.ts's transition, read by whatever is leaving. 0 at rest, so the
+	   same rule is harmless on an element that is merely sitting there. */
+	--ta-collect: 0;
 
 	/* shadows — sm lifts a chip on hover, md is the detail/popover elevation,
 	   lg is the board's own resting elevation off the page background. */
@@ -64,4 +78,183 @@
 	--ta-shadow-lg: 0 1px 2px rgba(60, 64, 67, 0.08), 0 8px 28px rgba(60, 64, 67, 0.12);
 
 	color-scheme: light;
+}
+
+
+/* ── the shared motion phrases ──────────────────────────────────────────
+   Declared once, globally, because half a dozen components say the same few
+   things: something arrived, something changed, something was touched. Each
+   keyframe below is `ta-` prefixed for the same reason the custom properties
+   are — this stylesheet is loaded app-wide, not scoped by the compiler. */
+
+/* something arrived: up out of the page and into place */
+@keyframes ta-rise {
+	from {
+		opacity: 0;
+		transform: translateY(10px) scale(0.985);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+/* the same arrival, sideways — for anything that belongs to a row */
+@keyframes ta-slide-in {
+	from {
+		opacity: 0;
+		transform: translateX(-8px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+/* something small appeared and wants to be seen doing it */
+@keyframes ta-pop {
+	0% {
+		opacity: 0;
+		transform: scale(0.3);
+	}
+	60% {
+		opacity: 1;
+		transform: scale(1.18);
+	}
+	100% {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+/* a number that just went up */
+@keyframes ta-bump {
+	0% {
+		transform: scale(1);
+	}
+	35% {
+		transform: scale(1.32);
+	}
+	100% {
+		transform: scale(1);
+	}
+}
+
+/* a ring thrown off by a tap, the way water answers a dropped stone */
+@keyframes ta-ripple {
+	from {
+		opacity: 0.55;
+		transform: translate(-50%, -50%) scale(0.2);
+	}
+	to {
+		opacity: 0;
+		transform: translate(-50%, -50%) scale(2.6);
+	}
+}
+
+/* one fleck of that same tap, thrown outward. `--angle` aims it and
+   `--distance` says how far it gets before it burns out. */
+@keyframes ta-spark {
+	0% {
+		opacity: 0;
+		transform: rotate(var(--angle, 0deg)) translateX(3px) scale(0.4);
+	}
+	22% {
+		opacity: 1;
+		transform: rotate(var(--angle, 0deg)) translateX(calc(var(--distance, 14px) * 0.45)) scale(1);
+	}
+	100% {
+		opacity: 0;
+		transform: rotate(var(--angle, 0deg)) translateX(var(--distance, 14px)) scale(0.2);
+	}
+}
+
+/* a whole row acknowledging the tap it just took */
+@keyframes ta-flash {
+	0% {
+		box-shadow: 0 0 0 0 var(--ta-flash-color, rgba(26, 115, 232, 0.45));
+	}
+	45% {
+		box-shadow: 0 0 0 5px transparent;
+	}
+	100% {
+		box-shadow: 0 0 0 0 transparent;
+	}
+}
+
+/* the log arrow leaving and coming back */
+@keyframes ta-nudge {
+	0% {
+		transform: translateX(0);
+	}
+	40% {
+		transform: translateX(5px) scale(1.25);
+	}
+	100% {
+		transform: translateX(0);
+	}
+}
+
+/* a live thing, breathing: the halo on a connected dot, or on something
+   sat with today */
+@keyframes ta-breathe {
+	0%,
+	100% {
+		opacity: 0.5;
+		transform: scale(1);
+	}
+	50% {
+		opacity: 0;
+		transform: scale(2.1);
+	}
+}
+
+/* a rule drawing itself left to right */
+@keyframes ta-draw {
+	from {
+		transform: scaleX(0);
+	}
+	to {
+		transform: scaleX(1);
+	}
+}
+
+/* light passing slowly over a surface */
+@keyframes ta-sheen {
+	from {
+		transform: translateX(-120%) skewX(-12deg);
+	}
+	to {
+		transform: translateX(320%) skewX(-12deg);
+	}
+}
+
+/* a wash of color drifting under a panel, too slow to watch on purpose */
+@keyframes ta-drift {
+	0% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
+	}
+}
+
+/* ── and the one setting that turns all of it off ──────────────────────
+   Everything above is decoration on top of a board that works without it.
+   Note this reaches CSS only: Svelte's transition directives are driven by
+   JS, and `$lib/motion` is what silences those. */
+@media (prefers-reduced-motion: reduce) {
+	.thinking-about-root *,
+	.thinking-about-root *::before,
+	.thinking-about-root *::after {
+		animation-duration: 0.01ms !important;
+		animation-delay: 0ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		transition-delay: 0ms !important;
+		scroll-behavior: auto !important;
+	}
 }

@@ -57,8 +57,20 @@
 		stability:
 			'resilience — how close the three stocks sit to a balanced world, steadied by the ecosystems she has come to Know.',
 		complexity:
-			'the richness of the world — its life, how deeply it is witnessed, what has emerged, and what she has fully Known.'
+			'the richness of the world — its life, how deeply it is witnessed, what has emerged, and what she has fully Known.',
+		unsettled:
+			'a world only holds itself when all three stocks sit inside their band. this one can’t yet on its own — opening the shallows is what closes the loop.',
+		balancing:
+			'all three stocks are inside their band without her holding them there. the longer that lasts, the more it lifts favor.',
+		quiet:
+			'stability has dropped low enough to call the world quiet. nothing happens to it yet — it can still recover, or stay this way until she returns to it.'
 	});
+
+	// which of the three mutually-exclusive body states is showing, so its
+	// title tooltip and tap-to-reveal hint read the same explanation.
+	const worldBodyHint = $derived(
+		book.quiet ? hints.quiet : book.selfBalancing ? hints.balancing : hints.unsettled
+	);
 
 	// Every cell's explanation lives in its title tooltip — useless on a touch
 	// screen, which has no hover. Tapping toggles the same text open inline
@@ -161,14 +173,36 @@
 		<section class="group body">
 			<h3>
 				the world's body
-				{#if book.quiet}<span class="quiet">— going quiet</span>{:else if book.selfBalancing}<span
-						class="balancing">— holding itself</span
+				{#if book.quiet}<span
+						class="quiet"
+						title={hints.quiet}
+						role="button"
+						tabindex="0"
+						aria-expanded={expandedId === 'worldBody'}
+						onclick={() => toggleHint('worldBody')}
+						onkeydown={(e) => hintKeydown(e, 'worldBody')}
+						>— going quiet</span
+					>{:else if book.selfBalancing}<span
+						class="balancing"
+						title={hints.balancing}
+						role="button"
+						tabindex="0"
+						aria-expanded={expandedId === 'worldBody'}
+						onclick={() => toggleHint('worldBody')}
+						onkeydown={(e) => hintKeydown(e, 'worldBody')}
+						>— holding itself</span
 					>{:else if book.outOfBand.length > 0}<span
 						class="unsettled"
-						title="a world only holds itself when all three sit inside their band. this one can't yet — the shallows is where the loop closes."
+						title={hints.unsettled}
+						role="button"
+						tabindex="0"
+						aria-expanded={expandedId === 'worldBody'}
+						onclick={() => toggleHint('worldBody')}
+						onkeydown={(e) => hintKeydown(e, 'worldBody')}
 						>— {book.outOfBand.join(' and ')} out of band</span
 					>{/if}
 			</h3>
+			{#if expandedId === 'worldBody'}<p class="hint">{worldBodyHint}</p>{/if}
 			<div class="cells">
 				{#each stockRows as row (row.id)}
 					{@const dir = trend(row.history)}
@@ -323,17 +357,24 @@
 		font-style: italic;
 		cursor: help;
 	}
-	.quiet {
-		font-family: var(--font-ui);
-		font-size: 0.6rem;
-		letter-spacing: 0.12em;
-		color: var(--print-pink);
-	}
+	.quiet,
 	.balancing {
 		font-family: var(--font-ui);
 		font-size: 0.6rem;
 		letter-spacing: 0.12em;
+		cursor: help;
+	}
+	.quiet {
+		color: var(--print-pink);
+	}
+	.balancing {
 		color: var(--cyan);
+	}
+	.unsettled:focus-visible,
+	.quiet:focus-visible,
+	.balancing:focus-visible {
+		outline: 1px solid var(--cyan);
+		outline-offset: 2px;
 	}
 	.value.sm {
 		font-size: 1.1rem;

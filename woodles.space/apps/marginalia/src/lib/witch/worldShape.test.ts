@@ -23,10 +23,12 @@ import {
 	sedimentCoverage,
 	unlockWorldspacesForCoverage,
 	visibleLifeForWorldspace,
+	sampleSediment,
 	waterGridYToWorld,
 	worldYToWaterGrid,
 	type Worldspace
 } from './worldShape';
+import { SEA_LEVEL_Y, isAboveWater, projectFloor } from './projection';
 
 const aquaticLife: Life = {
 	id: 'soft_swimmer',
@@ -258,5 +260,59 @@ describe('worldShape waymarks (player-authored spawn points)', () => {
 		expect(removed.customSpawnPoints).toHaveLength(0);
 		expect(removed.spawnRevision).toBe(placed.spawnRevision + 1);
 		expect(generateSpawnPoints(removed).some((point) => point.id === id)).toBe(false);
+	});
+});
+
+describe('sampling the sediment grid', () => {
+	const grid = { w: 4, h: 2, cells: [0, 1, 0, 1, 1, 0, 1, 0] };
+
+	it('returns a cell exactly at its own center', () => {
+		expect(sampleSediment(grid, 1 / 8, 1 / 4)).toBeCloseTo(0);
+		expect(sampleSediment(grid, 3 / 8, 1 / 4)).toBeCloseTo(1);
+		expect(sampleSediment(grid, 1 / 8, 3 / 4)).toBeCloseTo(1);
+	});
+
+	it('interpolates between neighbors rather than stepping', () => {
+		const mid = sampleSediment(grid, 2 / 8, 1 / 4);
+		expect(mid).toBeGreaterThan(0.4);
+		expect(mid).toBeLessThan(0.6);
+	});
+
+	it('clamps at the edges instead of reading past them', () => {
+		expect(sampleSediment(grid, 0, 0)).toBeCloseTo(0);
+		expect(sampleSediment(grid, 1, 1)).toBeCloseTo(0);
+		expect(sampleSediment(grid, -5, -5)).toBeCloseTo(0);
+		expect(sampleSediment(grid, 5, 5)).toBeCloseTo(0);
+	});
+
+	it('never invents density in an empty world', () => {
+		const empty = { w: 8, h: 4, cells: Array(32).fill(0) };
+		for (let i = 0; i <= 10; i++) expect(sampleSediment(empty, i / 10, i / 10)).toBe(0);
+	});
+
+	it('survives a degenerate grid', () => {
+		expect(sampleSediment({ w: 0, h: 0, cells: [] }, 0.5, 0.5)).toBe(0);
+	});
+});
+
+// The shelf rises with coverage, which is the mechanic: the floor she fills is the
+// floor that shallows. It does not yet break the surface — 2_5D.md "the two
+// horizons" explains why that is blocked on a composition decision rather than a
+// number — so what is pinned here is the coupling, not a shoreline.
+describe('coverage and the shelf', () => {
+	it('lifts the seabed as the floor fills', () => {
+		const bare = projectFloor(1, 1, 0, 0).y;
+		const atUnlock = projectFloor(1, 1, 0, SEDIMENT_UNLOCK_COVERAGE).y;
+		expect(atUnlock).toBeLessThan(bare);
+	});
+
+	it('leaves the shore under water at every coverage, for now', () => {
+		for (const c of [0, SEDIMENT_UNLOCK_COVERAGE, 1]) {
+			expect(isAboveWater(1, 1, 1, c)).toBe(false);
+		}
+	});
+
+	it('never lifts the deep water, however full the floor gets', () => {
+		expect(projectFloor(0.1, 0.5, 0, 1).y).toBeCloseTo(projectFloor(0.1, 0.5, 0, 0).y);
 	});
 });

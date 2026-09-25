@@ -1,10 +1,30 @@
 import type { Bounds, Camera, CardItem, StackItem, WhiteboardDocument, WhiteboardItem } from './model';
+import { setProperty, statusOf } from './properties';
 
 export const MIN_ZOOM = 0.1;
 export const MAX_ZOOM = 4;
 export const STACK_HEADER_HEIGHT = 52;
 export const STACK_INSET = 14;
 export const STACK_GAP = 10;
+/**
+ * The narrowest a gallery tile is allowed to get. It decides how many fit
+ * across; the real tile width then divides the row evenly. At the default
+ * stack width this gives two per row, which is the least that reads as a
+ * gallery rather than a column.
+ */
+export const GALLERY_MIN_TILE = 104;
+export const GALLERY_TILE_HEIGHT = 96;
+/**
+ * A queue keeps a strip under its header for the "take the top card" action.
+ * Cards are laid out in world coordinates, so the room has to be made here —
+ * otherwise the first card is drawn straight over the button.
+ */
+export const QUEUE_BAR = 34;
+
+/** Where a stack's cards begin, below the header and anything under it. */
+export function stackTopInset(stack: StackItem): number {
+	return STACK_HEADER_HEIGHT + STACK_INSET + (stack.behavior === 'queue' ? QUEUE_BAR : 0);
+}
 
 export function clampZoom(value: number): number {
 	return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
@@ -46,20 +66,49 @@ export function boundsForItem(items: WhiteboardItem[], item: WhiteboardItem): Bo
 	return { x: item.x, y: item.y, width: item.width, height: item.height };
 }
 
+/** How many tiles fit across a gallery stack of this width. */
+export function galleryColumns(stack: StackItem): number {
+	const usable = Math.max(1, stack.width - STACK_INSET * 2);
+	return Math.max(1, Math.floor((usable + STACK_GAP) / (GALLERY_MIN_TILE + STACK_GAP)));
+}
+
+function galleryTileWidth(stack: StackItem): number {
+	const usable = Math.max(1, stack.width - STACK_INSET * 2);
+	const columns = galleryColumns(stack);
+	return Math.max(80, (usable - STACK_GAP * (columns - 1)) / columns);
+}
+
 export function stackContentHeight(items: WhiteboardItem[], stack: StackItem): number {
 	const cards = stackCards(items, stack);
 	if (!cards.length) return stack.height;
-	const cardHeight = cards.reduce((total, card) => total + Math.max(72, card.height), 0);
-	return Math.max(stack.height, STACK_HEADER_HEIGHT + STACK_INSET + cardHeight + STACK_GAP * (cards.length - 1) + STACK_INSET);
+	const inner = stack.behavior === 'gallery'
+		? Math.ceil(cards.length / galleryColumns(stack)) * (GALLERY_TILE_HEIGHT + STACK_GAP) - STACK_GAP
+		: cards.reduce((total, card) => total + Math.max(72, card.height), 0) + STACK_GAP * (cards.length - 1);
+	return Math.max(stack.height, stackTopInset(stack) + inner + STACK_INSET);
 }
 
 export function stackCardBounds(items: WhiteboardItem[], stack: StackItem, card: CardItem): Bounds {
 	const cards = stackCards(items, stack);
 	const index = Math.max(0, cards.findIndex((candidate) => candidate.id === card.id));
+	const top = stack.y + stackTopInset(stack);
+
+	// A gallery lays its cards out as tiles across and then down. It is still
+	// the same stack in the same place — only the reading order is wrapped.
+	if (stack.behavior === 'gallery') {
+		const columns = galleryColumns(stack);
+		const width = galleryTileWidth(stack);
+		return {
+			x: stack.x + STACK_INSET + (index % columns) * (width + STACK_GAP),
+			y: top + Math.floor(index / columns) * (GALLERY_TILE_HEIGHT + STACK_GAP),
+			width,
+			height: GALLERY_TILE_HEIGHT
+		};
+	}
+
 	const previousHeight = cards.slice(0, index).reduce((total, candidate) => total + Math.max(72, candidate.height) + STACK_GAP, 0);
 	return {
 		x: stack.x + STACK_INSET,
-		y: stack.y + STACK_HEADER_HEIGHT + STACK_INSET + previousHeight,
+		y: top + previousHeight,
 		width: Math.max(120, stack.width - STACK_INSET * 2),
 		height: Math.max(72, card.height)
 	};
@@ -164,7 +213,78 @@ export function repairDocument(document: WhiteboardDocument): WhiteboardDocument
 		}
 		return item;
 	}) as WhiteboardItem[];
-	return { ...document, items };
+	const labelled = conferStackStatuses(repairLabelling(document, items));
+	return { ...document, items: labelled, journey: repairJourney(document, labelled) };
+}
+
+/**
+ * A Status stack's title is the status it confers, and every card inside it
+ * wears that status. This runs wherever stack membership can change, so there
+ * is no way for a card to sit in BUILDING while claiming to be something else —
+ * which is what makes dragging a card between stacks *be* the status change
+ * rather than something you have to remember to do afterwards.
+ *
+ * Nothing is taken away on the way out: a card that leaves keeps what it was
+ * last told, the same as if it had been typed in by hand.
+ */
+export function conferStackStatuses(items: WhiteboardItem[]): WhiteboardItem[] {
+	const conferred = new Map<string, string>();
+	for (const item of items) {
+		if (item.type !== 'stack' || item.behavior !== 'status') continue;
+		const status = item.title.trim();
+		if (!status) continue;
+		for (const cardId of item.cardIds) conferred.set(cardId, status);
+	}
+	if (!conferred.size) return items;
+	return items.map((item) => {
+		const status = conferred.get(item.id);
+		if (!status || item.type !== 'card') return item;
+		return statusOf(item) === status ? item : setProperty(item, 'status', status);
+	});
+}
+
+/**
+ * A label that no longer exists is not a label. Deleting one takes it off
+ * everything wearing it, and an object left with an empty property sheet drops
+ * the sheet too, so "has no properties" stays the same as never having had any.
+ */
+function repairLabelling(document: WhiteboardDocument, items: WhiteboardItem[]): WhiteboardItem[] {
+	const known = new Set(document.labels.map((label) => label.id));
+	return items.map((item) => {
+		if (!item.properties) return item;
+		const properties: typeof item.properties = { ...item.properties };
+		if (properties.labelIds) {
+			const kept = [...new Set(properties.labelIds)].filter((id) => known.has(id));
+			if (kept.length) properties.labelIds = kept;
+			else delete properties.labelIds;
+		}
+		for (const [key, value] of Object.entries(properties)) {
+			if (value === undefined || value === '') delete properties[key as keyof typeof properties];
+		}
+		if (!Object.keys(properties).length) {
+			const { properties: _empty, ...rest } = item;
+			return rest as WhiteboardItem;
+		}
+		return { ...item, properties } as WhiteboardItem;
+	});
+}
+
+/**
+ * A stop whose destination is gone is not a stop. Deleting a frame therefore
+ * shortens the journey rather than leaving a step that lands nowhere.
+ */
+function repairJourney(document: WhiteboardDocument, items: WhiteboardItem[]): WhiteboardDocument['journey'] {
+	const itemIds = new Set(items.filter((item) => item.type !== 'connector').map((item) => item.id));
+	const viewpointIds = new Set(document.viewpoints.map((viewpoint) => viewpoint.id));
+	const seen = new Set<string>();
+	const stops = document.journey.stops.filter((stop) => {
+		if (seen.has(stop.id)) return false;
+		seen.add(stop.id);
+		if (stop.target.kind === 'item') return itemIds.has(stop.target.id);
+		if (stop.target.kind === 'viewpoint') return viewpointIds.has(stop.target.id);
+		return true;
+	});
+	return stops.length === document.journey.stops.length ? document.journey : { ...document.journey, stops };
 }
 
 export function removeItems(document: WhiteboardDocument, ids: Set<string>): WhiteboardDocument {
@@ -199,7 +319,7 @@ export function insertCardIntoStack(document: WhiteboardDocument, cardId: string
 		if (item.id === cardId && item.type === 'card') return { ...item, stackId, freePosition };
 		return item;
 	}) as WhiteboardItem[];
-	return { ...document, items: nextItems };
+	return { ...document, items: conferStackStatuses(nextItems) };
 }
 
 export function extractCardFromStack(document: WhiteboardDocument, cardId: string, point?: { x: number; y: number }): WhiteboardDocument {

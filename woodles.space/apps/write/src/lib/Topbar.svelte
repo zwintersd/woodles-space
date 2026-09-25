@@ -17,7 +17,8 @@
 		promptOpen = $bindable(),
 		isListKind = false,
 		onLayerChange,
-		onSaveAndClose
+		onSaveAndClose,
+		onSendToBoard
 	}: {
 		activeLayer: LayerId;
 		layerIds: readonly LayerId[];
@@ -35,6 +36,8 @@
 		onLayerChange: (id: LayerId) => void;
 		/** Flushes the current draft to storage and opens a fresh blank page. */
 		onSaveAndClose: () => void;
+		/** Hands the current draft's prose to whiteboard's Inbox as a card. */
+		onSendToBoard: () => void;
 	} = $props();
 </script>
 
@@ -109,6 +112,13 @@
 	>
 		save &amp; close
 	</button>
+	<button
+		class="save-close-btn"
+		onclick={onSendToBoard}
+		title="send this draft's prose to whiteboard's Inbox, as a card"
+	>
+		send to board
+	</button>
 	<span class="topbar-divider" aria-hidden="true"></span>
 	<button
 		class="pockets-toggle"
@@ -146,6 +156,7 @@
 		backdrop-filter: blur(22px);
 		-webkit-backdrop-filter: blur(22px);
 		overflow: hidden;
+		white-space: nowrap;
 	}
 	.topbar::after {
 		content: '';
@@ -331,10 +342,19 @@
 	}
 	/* the tagline is the first thing to go when the bar gets tight — it is the
 	   only purely decorative item up here */
-	@media (max-width: 1000px) {
+	@media (max-width: 1080px) {
 		.topbar-label { display: none; }
 	}
-	@media (max-width: 720px) {
+	/* below this the page-mode layer switch pushes the row past its budget —
+	   tighten the gaps between groups before anything starts shedding content */
+	@media (max-width: 900px) {
+		.view-switch, .layer-switch, .drafts-toggle { margin-left: 0.7rem; }
+		.save-close-btn { margin-left: 0.3rem; }
+		.topbar-divider { margin: 0 0.4rem; }
+		.layer-btn { padding: 3px 5px; }
+		.drafts-toggle, .pockets-toggle, .sync-toggle, .save-close-btn { padding: 3px 6px; }
+	}
+	@media (max-width: 820px) {
 		.view-btn { font-size: 0; gap: 0; padding: 3px 6px; }
 		.view-icon { width: 16px; height: 11px; }
 	}

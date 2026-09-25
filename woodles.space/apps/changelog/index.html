@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="cream">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>changelog · woodles.space</title>
+  <meta name="description" content="what shipped, session to session." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="/shared/fonts.css" />
+  <link rel="stylesheet" href="/shared/palette.css" />
+  <link rel="stylesheet" href="/shared/scrollbars.css" />
+  <link rel="stylesheet" href="/shared/docPage.css" />
+</head>
+<body>
+  <div class="doc-page">
+    <header class="doc-top">
+      <a class="brand" href="/">woodles.space</a>
+      <div class="doc-title">
+        <span class="doc-kicker">what shipped</span>
+        <h1>changelog</h1>
+      </div>
+    </header>
+    <main id="doc-content" class="doc-body" aria-live="polite">
+      <p class="doc-loading">loading…</p>
+    </main>
+  </div>
+  <script type="module">
+    import { loadDocPage } from '/shared/docPage.js';
+    loadDocPage({ source: '/CHANGELOG.md', target: document.getElementById('doc-content') });
+  </script>
+</body>
+</html>

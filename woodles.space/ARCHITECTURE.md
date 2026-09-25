@@ -15,6 +15,15 @@ or local workflow changes.
 other docs have narrower jobs:
 
 - [README.md](./README.md) is the deployment reference.
+- [CHANGELOG.md](./CHANGELOG.md) is what shipped, session to session —
+  dated entries, newest first, hosted at
+  [woodles.space/changelog](https://woodles.space/changelog). its own
+  header states the convention: add to it before ending a session that
+  shipped something a reader of the site would notice.
+- [LORE.md](./LORE.md) is marginalia's story — Brianna, the Book, the
+  journal — curated for reading, not the mechanical design docs under
+  `apps/marginalia/`. hosted at
+  [woodles.space/lore](https://woodles.space/lore).
 - [REFACTORING.md](./REFACTORING.md) is the living consolidation log — code
   that exists in more than one place.
 - [CONVERGENCE.md](./CONVERGENCE.md) is the product-shape counterpart: why
@@ -102,12 +111,16 @@ woodles.space/
 ├── .env.example             DATABASE_URL, SYNC_PASS_HASH
 ├── ARCHITECTURE.md          you are here
 ├── README.md                deployment reference
+├── CHANGELOG.md             what shipped, session to session — hosted at /changelog
+├── LORE.md                  marginalia's story, curated — hosted at /lore
 ├── REFACTORING.md           consolidation log
 ├── shared/                  cross-app design system + data registry
 │   ├── palette.css          11 named themes, switched via [data-theme]
 │   ├── fonts.css            --font-* custom properties
 │   ├── motifs.css           ambient backdrops (class="motif-<id>")
-│   └── library.js           palettes / motifs / fontPairs / templates — untyped
+│   ├── library.js           palettes / motifs / fontPairs / templates — untyped
+│   ├── docPage.js           renders a root .md file into /changelog, /lore, /architecture
+│   └── docPage.css          typography for the rendered markdown above
 ├── api/
 │   ├── sync.ts              Neon edge function — single-user sync
 │   └── schema.sql
@@ -128,15 +141,19 @@ woodles.space/
     ├── quiet-room/          static · an immersive three.js room of light
     ├── schedules/           static · a private link tree and visual schedules
     ├── letter/              static · echoes — the private archive reader
+    ├── changelog/           static · renders CHANGELOG.md at /changelog
+    ├── lore/                static · renders LORE.md at /lore
+    ├── architecture/        static · renders ARCHITECTURE.md at /architecture
     ├── animations/          Python · offline Manim scenes and curated web previews
     ├── write/               SvelteKit · the writing surface — letters, essays, stories, poems, notes, and lists that nest and move (Liquid); also the knowledge base now, in a small way (cross-draft references, backlinks, "draft it with a prompt")
     ├── marginalia/          SvelteKit · a witch writes worlds + a reading room
     ├── planner/             SvelteKit · carillon — self-observation, day piles, and reinforcement
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
     ├── thinking-about/      SvelteKit · a board for what's being read, played, and watched — and, per entry, a structured record cast for it
-    ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking
+    ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking — a camera that knows where it is, cards that say more than they show, stacks that do more than hold them, and doorways into other boards
     ├── bloomforge/          SvelteKit · a studio for making incremental games
-    └── bloomforge-player/   SvelteKit · the runtime that makes those games playable
+    ├── bloomforge-player/   SvelteKit · the runtime that makes those games playable
+    └── grimoire/            SvelteKit · the studio Bloomforge pivoted toward, built on @woodles/witch-engine
 ```
 
 `animations/` is the Python/Manim authoring side of Hygge's motion workshop. it
@@ -594,6 +611,36 @@ columns, sections, one-tap sittings, the standing-slot and ledger machinery
 documented under "cross-app ledgers" in "the sync layer" below rather than
 here, so it isn't said twice.
 
+**The board in motion.** The app's feel is a deliberate second subject, on
+the argument that a board you are meant to visit daily has to be pleasant to
+touch. Two halves, split by what each can actually do. CSS owns *entrances*:
+`src/lib/style/tokens.css` declares the easings (`--ta-ease-spring`,
+`-glide`, `-swift`) and a small vocabulary of global `ta-*` keyframes — rise,
+pop, bump, ripple, spark, sheen, breathe — which components reference by
+name, because a CSS animation runs whenever an element is created, whether
+that is a hydrated first paint or a chip added an hour later. Arrival is
+staggered by a chain of inherited custom properties rather than per-element
+delays: `Column` publishes `--column-delay`, `Section` adds its own place in
+the stack onto that as `--section-delay`, and `EntryChip` adds a third step
+onto that, so the board deals itself out left to right, top to bottom from
+one variable each. `src/lib/motion.ts` owns the other half — *exits*, which
+CSS cannot describe because the node is gone before it could. `collect` is
+the one that matters: the row being put away floods with its own color,
+stamps a check, then folds shut, publishing its progress as `--ta-collect`
+so each caller's stylesheet decides what "flooding" looks like for it, and
+reclaiming the flex `row-gap` it was holding open so the list doesn't snap
+at the end. Two structural notes that are easy to undo by accident: an exit
+transition is local, so `Section`'s chip container and `ArchiveView`'s list
+are always mounted and hidden with `:empty` instead — otherwise archiving the
+last entry in a section (the common case here) would tear the container down
+around the chip and skip the animation entirely; and `.chip` deliberately
+does not clip, which is why the hover sheen has its own inset layer — the
+burst thrown off by logging a sitting has to be able to leave the chip.
+Reduced motion is honored on both halves: tokens.css carries the
+`prefers-reduced-motion` block that silences CSS animation and transition,
+`motionDuration` collapses every Svelte transition, and `logSitting` builds
+no burst at all rather than building one and hiding it.
+
 **Casting a spell.** `apps/thinking-about/src/lib/spells/` is Spores' curated
 category system (author, musician, filmmaker, actor, person, tv-series, film,
 book, album, game, the anime relationship graph), moved here because its
@@ -616,6 +663,256 @@ entry might not have. Spores' worldbuilding categories (creature, biome,
 ability, stat, minigame, lore) did not come with it: they were the retired Dev
 Log's content, and nothing in this workspace's four healthy apps is about
 marginalia's world, so there was nowhere honest to put them.
+
+## the navigable board
+
+`whiteboard` is a wide, tactile place for spatial thinking: cards, stacks,
+images, connectors, and frames on one canvas that is bigger than the screen.
+Once the canvas is genuinely large, moving around it becomes its own form of
+organization, so the navigation is the app's second subject rather than a
+convenience laid over the first.
+
+**The camera.** `src/lib/camera.ts` interpolates a move along van Wijk &
+Nuij's arc ("Smooth and Efficient Zooming and Panning", 2003) instead of
+tweening `x`, `y` and `zoom` in a straight line. A long jump lifts, travels
+while the board is small enough to read whole, then settles — the alternative
+smears the board sideways at reading scale, which is the motion that makes
+people lose their place. The arc's parameters come out of the paper: ρ = 1.42
+for curvature, constant velocity along the path, so a longer journey honestly
+takes longer (bounded to 280–1500 ms). The arc deliberately pulls wider than
+either endpoint, so the intermediate zoom is clamped; that flattens the top of
+the arc into a pan at the widest legal scale, and the centre is unaffected.
+The same file owns the camera history — Back and Forward over *deliberate*
+moves only, refreshing the entry being left with the live camera so Back
+returns to where you actually were rather than to where a jump last landed.
+Free panning and zooming are not recorded: history is a record of decisions,
+not of drifting.
+
+**Location.** `src/lib/navigation.ts` answers "where am I". `frameSequence`
+bands frames into rows and reads them top-to-bottom, left-to-right; that is
+the order `[` and `]` and the number keys walk, and it stays true as frames
+move, so the sequence never needs maintaining by hand. Containment forces
+`parent.x <= child.x`, so a nested frame always follows its parent.
+`locateCamera` reports the chain of frames the viewport centre is inside as a
+breadcrumb, dropping frames too small to fill a meaningful share of the view —
+from high above you are over the board, not in any one place.
+
+**Journeys.** `src/lib/journey.ts` is Journey Mode: an ordered sequence of
+stops that the camera walks when Play is pressed. A stop points at something
+that already exists (an item, a saved viewpoint, or the whole board) rather
+than storing a camera of its own, so moving or renaming a frame moves the stop
+with it, and deleting one shortens the journey instead of leaving a step that
+lands nowhere (`repairJourney`, in `geometry.ts`). With nothing arranged by
+hand, `suggestedStops` offers an overview followed by every frame in reading
+order, so Play means something the first time it is pressed.
+
+**The shelf.** `src/lib/library.ts` makes a whiteboard one of many. Each board
+is its own versioned save under `woodles.whiteboard.boards.<id>` with a small
+index alongside it; the prefix is deliberately not `…board.`, which would read
+the single-board era's `…board.v1` key as a board whose id is `v1`. That one
+old board is adopted onto the shelf once, and its key cleared only after its
+contents are safely rewritten, so an interrupted migration retries rather than
+loses. Deleting a board only deletes the images no other board still holds.
+
+**The optional layer.** Schema 3 gives every object a property sheet it does
+not have to use: `labels`, `status`, `kind` ("Type"), `source`, `tint`
+("Color"). `properties` is absent until something is actually said, and
+clearing the last field removes the sheet again, so an object that has been
+cleared is indistinguishable from one that was never touched — that absence is
+what keeps a card looking like a card. Created and Updated are properties too,
+but they are `createdAt`/`updatedAt` on the item already; `properties.ts` shows
+them and never stores them twice. Colour is one palette of six, and a frame
+keeps its colour in the `tint` field it has had since the app was written
+rather than growing a second one — `setProperty` dispatches on that, so callers
+see one Color property either way.
+
+A card wears its layer as a chip row rather than a property sheet: a Type
+eyebrow, a status dot, label chips, a `↗` when a source is set, and a `＋` that
+appears only while the card is chosen. A card grows by one row to hold its
+first chip and shrinks back when the last one goes, because otherwise saying
+something about a card silently eats a line of whatever it already said.
+
+**Labels** (`labels.ts`) are the first metadata system: reusable, owned by the
+board rather than by any one object, matched by name however they are typed.
+Renaming one renames it everywhere, and renaming onto an existing name folds
+the two into one rather than leaving two labels that read the same. Deleting
+one takes it off everything wearing it (`repairLabelling`, in `geometry.ts`).
+This is organization independent of spatial location: space, frames, stacks and
+labels, with no database under any of it.
+
+**Search** (`search.ts`) reads the material and the optional layer alike —
+title, body, name, label, type, status, source — weighted by how much of an
+answer each field is to "what is this", with a match at the start of a field
+beating one buried in it. A leading `#` narrows to labels alone. The board
+flies to the result: arrow keys travel through hits without filling up the
+camera history, Enter keeps the one you landed on and records a single move
+from where the search began, `⇧↵` pulls back to hold every result at once, and
+Escape puts the camera back where it started.
+
+**Stack behaviours.** Schema 4 lets a stack do more than hold cards in order:
+`behavior` is `status`, `checklist`, `queue` or `gallery`, and is absent
+entirely until a stack earns one — a plain stack carries no field at all, and
+setting it back to plain removes it again.
+
+A **Status** stack's title *is* the status it confers. Every card inside wears
+it, so dragging a card from IDEA to BUILDING **is** the status change rather
+than something to remember afterwards, and renaming the stack renames the
+status of everything in it. `conferStackStatuses` runs from both
+`insertCardIntoStack` and `repairDocument`, which are the only two ways stack
+membership changes, so a card cannot sit in one column while claiming to be
+something else. Nothing is taken away on the way out: a card that leaves keeps
+what it was last told.
+
+That is why status is a word rather than a closed vocabulary — the five
+suggestions stay, but a board that thinks in IDEA / BUILDING / WORKS / POLISH
+gets to. `done` is the one status the app itself reads, so a **checklist**
+tick and a card that simply says "Done" are the same fact.
+
+**Kanban is four Status stacks beside one another and nothing else** — no board
+object, no mode, no database. `stackBeside` puts the next column down to the
+right at the same size and height, and `shiftCardColumn` lets the keyboard say
+what the drag says, reading the column order off where the stacks actually sit
+rather than off a stored sequence.
+
+A **queue** badges its top two cards `now` and `next` and keeps a strip clear
+under its header for "take the top card", which lifts that card out and sets it
+down beside the stack — picking up the current thing is a move across the board,
+not a state change in a list. That strip is `stackTopInset`, in the geometry:
+cards are laid out in world coordinates, so the room has to be made there or the
+first card is drawn straight over the button. A **gallery** wraps the same cards
+into tiles across and then down, sized so the default stack width gives two per
+row.
+
+None of it moves anything off the canvas, which is the rule the whole update is
+built around: a stack with a behaviour is still a stack, in the same place, with
+cards you can drag in and out of it.
+
+**Portals.** Schema 5 adds a doorway you can put on a board: an object holding
+the id of another whiteboard and nothing else about it, so a doorway and the
+room beyond it cannot drift apart. Its pane shows that board as shapes, drawn
+with the same projection the overview map uses and read from the library at
+render time — which is why a child board that changes is immediately right
+through the doorway with nothing to keep in step.
+
+The board a portal names lives in the library, outside the document, so a
+portal can end up pointing nowhere. `repairDocument` cannot know — it only sees
+one document — and that is the right outcome anyway: a deleted board may come
+back, and a portal is part of a layout somebody arranged, so a dangling one
+says it leads nowhere rather than quietly deleting itself.
+
+Going through is a camera move, not a page navigation. `enterCamera` comes
+down onto the doorway until it dominates the screen, and `arrivalCamera` lands
+the child at the framing its miniature was already showing, so the shapes you
+were flying toward are the shapes that greet you. That continuity is the whole
+illusion. Two things it cost to get right: the flight has to be **interrupted**
+before the swap or it keeps writing the camera every frame and paints over the
+arrival; and the enter camera has to be **clamped**, because filling the screen
+with a small doorway wants a zoom past `MAX_ZOOM`, and a camera out of range is
+not a legal camera — the board refuses to save it. The veil covers the last of
+the distance.
+
+**The trail** (`portals.ts`) is the other half, and it belongs to no document:
+it records the boards descended through and the camera each was left at, so
+climbing back puts you where you were standing rather than at a board's front
+door. It survives a session, and is cut at the first board that has since gone
+— you cannot climb down through a doorway that is not there. Opening a board
+from the shelf clears it, because that is arriving at a board, not climbing out
+of one.
+
+Breadcrumbs are one line for both questions at once — `Makeup Game / Brushes /
+Pickup Physics` — the boards above, this board, then the frames the camera is
+inside, because from the inside "which whiteboard am I in" and "where in it"
+are the same question.
+
+**Capture** (`capture.ts`) is the board being hungry. Two gestures with one
+rule each: dropping is placing, so it lands where you let go; pasting has no
+position, so it goes to the Inbox. What arrives is inferred rather than asked
+about — an address is a link, a page of addresses is that many links, anything
+else is a note with its first line as the title.
+
+A captured link is **not a new kind of object**. It is a card whose Source is
+the link — the property that has meant "where this came from" since schema 3 —
+so it is searchable, labellable and colourable the day it lands, with no new
+model and no new rendering rules. The Source chip on the card became the link
+itself rather than a mark meaning one exists, which cost no extra room because
+a card already grows a row for a source.
+
+"Rich preview" without a server means rich in what the address itself says, and
+this is honest about that: a page's real title cannot be fetched, so a link is
+named from its own path. A **Woodles** link is the exception and says the most.
+`resolveWoodle` matches against `@woodles/app-manifest` — which already owns
+every app's public path, its aliases, and the record kinds it answers to — so
+`/planner` resolves to Carillon by name and `/play?game=g-42` to Bloomforge
+Player and the game it addresses, with no lookup and no network. Longest route
+wins, so `/hygge/motion` is Hygge rather than the landing page.
+
+The **Inbox** is an ordinary stack titled `Inbox`, made the first time
+something needs one. Nothing about it is a special case: it can be moved,
+renamed, given a behaviour, or emptied by dragging its cards onto the board.
+That is what makes "capture first, organize when ready" cost nothing to build —
+the holding area is a stack, and organizing is the drag that already existed.
+
+`whiteboard` also joined `HANDOFF_TARGETS`, so another Woodle can hand this
+board material; the queue is drained once on open and filed in the Inbox,
+because a handoff is a capture that happened somewhere else. Each target keeps
+its own queue and a test asserts one app can never drain another's. Nothing
+sends to Whiteboard yet — this is the receiving half.
+
+**The surface** (`surface.ts`) is the paper and the pattern drawn on it.
+Both used to be two hardcoded lines of CSS, and the dot grid among them was
+pinned to the *screen* — the one thing on the page whose job was to say "this
+canvas is bigger than the window" sat perfectly still while the board slid
+under it. Schema 6 makes it the board's: a `surface` of `pattern` (dots, grid,
+lines, plain), `size`, `depth` and `paper` (the warm sheet, or a rainbow),
+saved with the whiteboard and carried into a duplicate. The cell is in world
+units, so `patternStep` scales it with the camera and then doubles or halves it
+until the on-screen spacing is back inside a readable band — every visible line
+stays on a multiple of the cell, so the pattern stays registered to the board
+while its density stays legible from 10% to 400%. The layer sits one tile
+outside the window on each side and pans by `transform`, so a pan is a
+composited shift of a few pixels rather than a full-screen repaint, and only a
+change of zoom redraws the tile. The canvas is `overflow: clip` rather than
+`hidden` for it: `hidden` leaves an element programmatically scrollable, and a
+board with anything overflowing it could be dragged sideways — bars, dock and
+all — by a browser scrolling a focused field into view.
+
+**Colour blocking.** On rainbow paper the chrome stops being one cream:
+every panel takes the band of the spectrum it is standing on, so the topbar
+wears the rose the left edge is washed in, the rail the lilac the right edge
+ends on, the dock the leaf it sits over. `surfaceBlocks` hands the same seven
+bands the paper is made of to the panels as `--block-<band>` and
+`--deep-<band>` custom properties — `r, g, b` triples rather than finished
+colours, so each panel keeps the alpha it already had and the glass is tinted
+rather than replaced. Every state inside a block is that block's band drawn
+harder, never the one warm rose the whole app used to hover in, which on a
+cool panel reads as a smudge rather than as a choice; `.chip.strong` is the
+deliberate exception, because an action should look the same wherever it is.
+The quietest inks step down a shade on a block: a whisper that clears 5.4:1
+on cream falls to 4.0 on the strongest band, and the small readouts are
+exactly where that matters. The board's own material — cards, frames, stacks,
+images — is untouched. The paper and the furniture are the room, and the room
+is not what you came to read.
+
+**Chrome that rests.** Most of the app does not need to be visible all the
+time. The bars, the dock, the camera cluster and the map fade out a few
+seconds after the pointer stops and come back on the first movement anywhere;
+pointer events go with the opacity, so nothing invisible is ever in the way of
+the board, and a pointer parked *on* the chrome holds it up rather than
+watching it fade out from under itself. Typing into a card does not count as
+movement — a card being written is a good reason for the edges to stay gone.
+Nothing that is open and being read rests: a drawer, the finder, the shelf, the
+View card. The View card in the bottom-right corner is where the surface is
+chosen, and it took in the two toggles that were spending a permanent button
+each on the camera cluster (the overview map and the shortcuts list). What this
+device wants to see — whether the edges rest, whether the map is up — is
+`view.ts`, a small versioned preference outside any document, because hiding
+the map is a statement about the window you are working in and should not
+travel to another device or into a copy of the board.
+
+Schemas 2 through 6 each migrate forward by filling in what they added. A
+corrupt journey costs you the journey, never the board; an unreadable property
+sheet costs that one object its properties and nothing else; a surface nobody
+can read costs the board its wallpaper.
 
 ## the writing surface
 
@@ -1200,6 +1497,20 @@ in the browser.
 blob/grain scaffold divs underneath — not a `data-motif` attribute. the five
 motifs are `blobs`, `aurora`, `mist`, `paper`, `clean`.
 
+**`shared/docPage.js`** is a dependency-free markdown-to-HTML renderer plus a
+`loadDocPage({ source, target })` helper that fetches a root `.md` file and
+renders it into the page. it's what `apps/changelog`, `apps/lore`, and
+`apps/architecture` are — each one `index.html` with no body of its own,
+just a `<script type="module">` naming which doc to load. it covers exactly
+what those three files use (headings, tables, code fences, blockquotes,
+lists, links, bold/italic) rather than the whole of GFM, and rewrites a
+doc-to-doc relative link (`./README.md`) against the site root rather than
+the page's own URL, since every root doc deploys straight from there.
+`shared/docPage.css` is its typography, reusing the same `--bg` / `--text`
+/ `--accent-*` tokens `shared/palette.css` defines. the same pattern that
+made `/marginalia/cheats` trustworthy — read the source of truth, don't
+copy it — applied one level up, to the workspace's own docs.
+
 ## cross-app duplication
 
 the habit: duplicate until two apps have built the same thing and converged on
@@ -1230,19 +1541,49 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-1832 tests total: 16 in `api/` (its own
+2358 tests total: 16 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
 part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 1816 across sixteen pnpm
-packages — `write` 223, `marginalia` 333, `planner` 539,
-`bestiary` 162, `bloomforge` 83, `bloomforge-player` 22,
-`packages/sync` 36, `packages/persistence` 6, `packages/app-manifest` 17,
-`packages/handoff` 14, `packages/text` 30, `packages/spellcraft` 15,
-`packages/emoji` 4, `packages/incremental-core` 191, `thinking-about` 131,
-and `whiteboard` 10.
+instead of the recursive `pnpm -r test`), plus 2342 across twenty pnpm
+packages — `planner` 539, `marginalia` 376, `whiteboard` 258,
+`write` 247, `packages/incremental-core` 191, `bestiary` 162,
+`thinking-about` 148, `bloomforge` 83, `packages/dynamics` 69,
+`packages/witch-engine` 58, `packages/sync` 36, `grimoire` 36,
+`packages/life-points` 30, `packages/text` 30, `bloomforge-player` 22,
+`packages/app-manifest` 17, `packages/handoff` 15,
+`packages/spellcraft` 15, `packages/persistence` 6, and
+`packages/emoji` 4.
 (Counted by running each suite, not by adding to the previous figure — keep
 this inventory current when a suite changes; the root command is the release
-contract, not the prose count.)
+contract, not the prose count. This pass caught up four packages the
+inventory had never listed and four figures that had drifted behind their
+suites. `life-points` had been missing since the list was written; the
+`witch-engine`, `dynamics` and `grimoire` suites all arrived after it and
+were never added, so "sixteen packages" had been counting four short.)
+(Whiteboard's suite grew by a further 26 for capture — `capture.ts` for what a
+pasted or dropped thing infers itself to be, resolving a Woodles link against
+the real manifest, and the Inbox; `packages/handoff` gained one for the
+isolation between two target queues, now that there are two again. Before that
+it grew by 23 for portals — `portals.ts` for the
+trail, the breadcrumbs and the cameras of going through, including the
+regression that an enter camera must stay inside the zoom range a board will
+save, plus four in `library.ts` for remembering how deep you were. Before that
+it grew by 32 for stack behaviours, nearly all in
+`stacks.ts` — status conferral and renaming, the column shift, ticking,
+queue heads and taking, and the gallery's wrapped layout. Before that it grew
+by 52 for the optional layer: `labels.ts`
+(19) for the reusable label registry, `properties.ts` (15) for the property
+sheet that disappears when it is empty, `search.ts` (18) for finding and
+ranking, and two more in `persistence.ts` for carrying an older save forward
+and for dropping a property sheet it cannot read. Before that it grew by 64
+for navigation: `camera.ts` (16) for the van
+Wijk flight and the history stack, `navigation.ts` (15) for reading order,
+breadcrumbs and framing, `journey.ts` (14) for arranging and playing a
+sequence, `library.ts` (12) for the board shelf and the one-time adoption of
+the single-board save, and `minimap.ts` (7) for the overview projection. The
+chrome those modules drive — the breadcrumb bar, the drawer, the player, the
+shelf — is exercised by hand rather than by a unit suite, same as every other
+view-only Svelte component here.)
 (Spores' 140 retired with the app. Write's suite grew by 28 — `sporesImport.ts`
 (14), `backlinks.ts` (7), `status.ts` (7) — for the pieces of it that moved in;
 Thinking About's grew by 13 for the spell registry's assembler and parser;
@@ -1287,7 +1628,8 @@ coverage tests the paths people actually visit instead of seven unrelated Vite
 ports. The suite covers every published entry route, Write → Echoes archiving,
 Bestiary gallery/adopt/share and Marginalia consumption, an Arcade state change,
 the Thinking About → Carillon round trip, back, and the sitting that returns
-from it, legacy localStorage migration across reload,
+from it, Carillon's binder strip and the way in and out of its task composer,
+legacy localStorage migration across reload,
 keyboard operation, and serious/critical WCAG A axe findings.
 
 The cross-app specs earn their cost in a way the route checks don't. The

@@ -30,6 +30,10 @@ by inspection, the way `tuning.ts` already is.
 > **§2.3's restraint dividend is still wrong, and now inverted** — it pays a
 > meddler *more* than an ascetic. untouched deliberately: what
 > `interventionLoad` should mean is this document's call, not the harness's.
+>
+> **the code has moved out from under this document.** every mechanic described
+> here still runs, and every path named here still resolves, but most of them are
+> now re-export shims over shared packages. see "where the code lives" below.
 
 three things carry through every decision:
 
@@ -47,10 +51,39 @@ default for each so nothing blocks.
 
 ---
 
+## where the code lives
+
+this document was written when all of it sat in `apps/marginalia/src/lib/witch`.
+it doesn't any more. nothing described here changed behaviour in the move — the
+balance report's numbers are identical either side of it — but a reader looking
+for the implementation should know where to look.
+
+| what | where | note |
+| --- | --- | --- |
+| the recurring *shapes* | `@woodles/dynamics` | thirteen shapes — banded stock, eased stat, decay-with-restore, threshold ladder… — twelve of them as small pure functions, the thirteenth a discipline with no code to share. no content, no Marginalia. `SHAPES` there is the taxonomy as data; the README explains each. |
+| the engine | `@woodles/witch-engine` | `World` and its tick, `vitals.ts`, the `MarginaliaDef` schema, and the `sim.ts` balance harness. knows nothing about World 1 specifically. |
+| World 1 itself | `@woodles/witch-engine/world1` | the life roster, conditions, interventions, emergences, field notes, and every number in `tuning.ts` — assembled into `world1Def`. bundled beside the engine the way `@woodles/incremental-core` bundles its own fixtures, so a tool other than this app has something real to point at. |
+| this app | `apps/marginalia/src/lib/witch` | the Svelte-facing half: `book.svelte.ts` (runes over the engine's `World`), the components, saves, and the arcade. the files this document names — `tuning.ts`, `content/*.ts`, `def.ts`, `world.ts`, `sim.ts` — still exist at those paths as re-export shims (`world.ts` and `sim.ts` also bake `world1Def` in, so existing call sites pass no def), so nothing here is a dead reference. |
+
+two consequences worth knowing before editing:
+
+- **numbers live in the package now.** changing a stage cost or a leak rate means
+  editing `packages/witch-engine/src/world1/tuning.ts`, not this app. the shim in
+  `apps/marginalia/src/lib/witch/tuning.ts` only re-exports.
+- **`MarginaliaDef` is plain, serializable data on purpose** — favor's multiplier
+  is `{base, perPoint}` rather than a function so a def can cross a worker
+  boundary. anything added to it should stay that way.
+
+[Grimoire](../grimoire) is the tuning instrument built on all of this: it edits
+`world1Def`'s numbers live, names the shape each group of them instantiates, and
+runs Witness against Interventionist on whatever you've changed.
+
+---
+
 ## 1. vital signs — the world's metabolism
 
 today `complexity`, `nutrients`, `oxygen`, `stability` are `$derived` on the Book and
-rendered nowhere (`book.svelte.ts:180–189`). this replaces them with a live system that
+rendered nowhere (`$derived` getters on the Book). this replaces them with a live system that
 life both depends on and changes, and that **gates** what can live.
 
 ### 1.1 the five signs
@@ -226,7 +259,7 @@ first self-balances (the rewarded beat), and the line for *choosing not to* inte
 
 a standard incremental loop: finish a world, mint a meta-currency from how richly and
 how *gently* you grew it, spend it on permanent upgrades, open a new world that goes
-further. `worldIndex` (`book.svelte.ts:75`, currently inert) becomes the run counter.
+further. `worldIndex` (on the Book, currently inert) becomes the run counter.
 
 ### 3.1 the loop
 

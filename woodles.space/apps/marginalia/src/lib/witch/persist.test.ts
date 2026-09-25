@@ -15,6 +15,7 @@ describe('emptySave', () => {
 		expect(s.writtenConditions).toEqual([]);
 		expect(s.observation).toEqual({});
 		expect(s.journalShown).toEqual([]);
+		expect(s.achievementsUnlocked).toEqual([]);
 		expect(s.worldShape.activeWorldspace).toBe('water');
 		expect(s.worldShape.unlockedWorldspaces).toEqual(['water']);
 		expect(s.worldShape.sedimentGrid.cells.length).toBeGreaterThan(0);
@@ -95,6 +96,15 @@ describe('load/save/wipe', () => {
 		expect(back?.writtenConditions).toEqual(['holding']);
 		expect(back?.spriteBindings).toEqual({});
 		expect(back?.fieldNotes).toEqual([]);
+	});
+	it('fills in achievementsUnlocked for a save written before it existed', () => {
+		localStorage.setItem(
+			'witch.book.save.v1',
+			JSON.stringify({ v: 1, essence: 4, writtenConditions: ['holding'] })
+		);
+		const back = load();
+		expect(back?.essence).toBe(4);
+		expect(back?.achievementsUnlocked).toEqual([]);
 	});
 	it('wipe removes the save', () => {
 		save(emptySave());

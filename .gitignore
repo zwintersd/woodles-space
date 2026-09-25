@@ -7,3 +7,4 @@ test-results/
 .env.*
 !.env.example
 package-lock.json
+.pnpm-store/
