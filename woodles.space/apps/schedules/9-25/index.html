@@ -89,6 +89,7 @@
     .field label, .field-label { font-size: 12px; font-weight: 900; }
     .field input, .field textarea, .search-line input { width: 100%; min-width: 0; min-height: 38px; padding: 7px 9px; border: 1px solid #8fa8c4; border-radius: 8px; color: var(--ink); background: white; font: 700 14px var(--body); }
     .field textarea { min-height: 42px; resize: vertical; }
+    .field-status { min-height: 16px; color: #a22142; font-size: 12px; }
     .admin-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     .secondary-button { border-color: #aebbd0; background: #fff; }
     .primary-button { border-color: var(--sky); color: white; background: var(--sky); }
@@ -190,7 +191,7 @@
     <div><h2 id="addActivityTitle">Add new schedule activity</h2><p class="helper">Add a flexible activity to Coleman’s afternoon.</p></div>
     <form id="activityForm">
       <div class="form-grid">
-        <div class="field"><label for="activityTime">Time</label><input id="activityTime" name="time" type="time" min="15:00" max="18:29" value="15:00" required /></div>
+        <div class="field"><label for="activityTime">Time</label><input id="activityTime" name="time" type="time" min="15:00" max="18:29" required /><span class="field-status" id="activityTimeStatus" role="status" aria-live="polite"></span></div>
         <div class="field"><label for="activityTitle">Activity title</label><input id="activityTitle" name="title" maxlength="80" placeholder="e.g., Build with blocks" required /></div>
         <div class="field instructions-field"><label for="activityInstructions">Instructions</label><textarea id="activityInstructions" name="instructions" maxlength="240" placeholder="A short note about what happens"></textarea></div>
       </div>
@@ -271,6 +272,19 @@
     const [hours, minutes] = value.split(':').map(Number);
     return hours * 60 + minutes - 15 * 60;
   };
+  function suggestActivityTime() {
+    const input = document.getElementById('activityTime');
+    const occupied = new Set(state.items.map((item) => item.start));
+    const currentMinute = input.value ? minuteValue(input.value) : Number.NaN;
+    const tenMinuteSlot = Array.from({ length: 21 }, (_, index) => index * 10).find((value) => !occupied.has(value));
+    const minute = Number.isFinite(currentMinute) && !occupied.has(currentMinute)
+      ? currentMinute
+      : tenMinuteSlot ?? Array.from({ length: 210 }, (_, index) => index).find((value) => !occupied.has(value));
+    input.value = minute === undefined ? '' : timeValue(minute);
+    input.disabled = minute === undefined;
+    document.querySelector('#activityForm button[type="submit"]').disabled = minute === undefined;
+    document.getElementById('activityTimeStatus').textContent = minute === undefined ? 'No open time remains before 6:30.' : '';
+  }
   const timeLabel = (minute) => {
     const total = 15 * 60 + minute;
     const hours = Math.floor(total / 60);
@@ -309,6 +323,7 @@
   }
 
   function render() {
+    suggestActivityTime();
     const items = steps();
     document.getElementById('greeting').textContent = state.greeting;
     document.getElementById('intro').textContent = state.intro;
@@ -438,11 +453,15 @@
 
   function addActivity(event) {
     event.preventDefault();
-    const form = event.currentTarget;
+    // This listener is delegated from document, so currentTarget is the
+    // document. The submitted form itself is event.target.
+    const form = event.target;
     const data = new FormData(form);
     const start = minuteValue(String(data.get('time')));
     if (state.items.some((item) => item.start === start)) {
-      document.getElementById('iconStatus').textContent = 'There is already an activity at that time. Choose another time.';
+      const timeStatus = document.getElementById('activityTimeStatus');
+      timeStatus.textContent = 'There is already an activity at that time. Choose another time.';
+      document.getElementById('activityTime').focus();
       return;
     }
     const id = `custom-${Date.now().toString(36)}`;
@@ -454,12 +473,14 @@
     state.items.sort((a, b) => a.start - b.start || (a.type === 'finish' ? 1 : b.type === 'finish' ? -1 : 0));
     save();
     form.reset();
+    suggestActivityTime();
     selectedIcon = null;
     iconResults = [];
     document.getElementById('iconResults').replaceChildren();
     document.getElementById('iconStatus').textContent = 'Activity added. Search for another picture if you like.';
     document.getElementById('selectedIcon').innerHTML = '<span>No icon selected.</span>';
     render();
+    document.querySelector(`[data-id="${CSS.escape(id)}"]`)?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
   }
 
   function saveEdit(form) {
@@ -551,7 +572,7 @@
     } else if (button.id === 'restoreSchedule') {
       if (window.confirm('Restore the original schedule? This clears your local edits and activity checks.')) {
         state = { done: {}, picks: {}, chips: {}, items: structuredClone(ORIGINAL_STEPS), greeting: 'Hi Coleman!', intro: 'Here’s our plan for today, from 3:00 to 6:30.', editing: true };
-        save(); editingId = null; render();
+        save(); editingId = null; suggestActivityTime(); render();
       }
     } else if (button.id === 'searchIcons') {
       searchPictograms();
@@ -568,6 +589,7 @@
     if (event.key === 'Enter') { event.preventDefault(); searchPictograms(); }
   });
 
+  suggestActivityTime();
   render();
   window.setInterval(tick, 20000);
 })();
