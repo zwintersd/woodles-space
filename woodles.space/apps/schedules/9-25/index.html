@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#2f7bf5" />
+  <title>Hi Coleman! · September 25</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: light;
+      --sky: #2f7bf5; --sky-deep: #1a4fb8; --sun: #ffc83d; --grass: #23b26d;
+      --city: #ff6b2c; --harbor: #1e9bb5; --forest: #2e9e4f;
+      --ink: #15213b; --ink-soft: #4b5b7c; --paper: #f4f8ff; --card: #fff; --line: #d6e2f5;
+      --now: #ff3e6c; --display: "Bungee", "Arial Black", Impact, sans-serif;
+      --body: "Nunito", "Trebuchet MS", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--body); font-weight: 800; font-size: 18px; line-height: 1.35; }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px 48px; }
+    .hero { position: relative; overflow: hidden; margin: 0 -16px; padding: 28px 22px 25px; border-radius: 0 0 28px 28px; color: #fff; background: linear-gradient(180deg, var(--sky), #5aa0ff); }
+    .hero::after { position: absolute; right: -38px; bottom: -94px; width: 260px; height: 220px; border: 2px solid rgba(255,255,255,.2); border-radius: 50%; box-shadow: 0 0 0 22px rgba(255,255,255,.08), 0 0 0 48px rgba(255,255,255,.06); content: ""; }
+    h1 { position: relative; z-index: 1; margin: 0; font-family: var(--display); font-size: clamp(42px, 11vw, 76px); font-weight: 400; line-height: 1.03; letter-spacing: .005em; text-shadow: 3px 4px 0 var(--sky-deep); }
+    .hero p { position: relative; z-index: 1; margin: 10px 0 0; font-size: clamp(16px, 4.5vw, 20px); }
+    .clock { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 8px; margin-top: 13px; padding: 6px 14px; border-radius: 999px; background: rgba(0,0,0,.18); font-variant-numeric: tabular-nums; }
+    .back { position: absolute; z-index: 2; top: 13px; right: 16px; padding: 6px 10px; border: 1px solid rgba(255,255,255,.48); border-radius: 999px; color: #fff; background: rgba(0,0,0,.12); font-size: 13px; text-decoration: none; }
+    .back:hover { background: rgba(0,0,0,.25); }
+    .back:focus-visible, .done-btn:focus-visible, .chip:focus-visible, .pick:focus-visible, .watch:focus-visible, .reset:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; }
+    .nownext { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0 8px; }
+    .nn { min-width: 0; padding: 11px 14px; border: 3px solid var(--line); border-radius: 18px; background: var(--card); }
+    .nn.now { border-color: var(--now); }
+    .nn small { display: block; color: var(--ink-soft); font-family: var(--display); font-size: 12px; letter-spacing: .06em; }
+    .nn.now small { color: var(--now); }
+    .nn b { display: block; margin-top: 2px; font-size: 19px; font-weight: 900; overflow-wrap: anywhere; }
+    .timeline { display: grid; gap: 14px; margin: 20px 0 0; padding: 0; list-style: none; }
+    .step { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: start; gap: 12px; }
+    .time { padding-top: 14px; color: var(--ink); font-family: var(--display); font-size: 18px; text-align: right; font-variant-numeric: tabular-nums; }
+    .time.soft { padding-top: 17px; color: var(--ink-soft); font-family: var(--body); font-size: 13px; line-height: 1.12; }
+    .box { position: relative; min-width: 0; padding: 13px 15px 15px; border: 3px solid var(--line); border-radius: 20px; background: var(--card); transition: opacity .16s ease, border-color .16s ease, box-shadow .16s ease; }
+    .step.is-now .box { border-color: var(--now); box-shadow: 0 0 0 5px rgba(255,62,108,.16); }
+    .step.is-done .box { opacity: .58; }
+    .nowtag { position: absolute; top: -13px; left: 14px; display: none; padding: 2px 10px; border-radius: 999px; color: #fff; background: var(--now); font-family: var(--display); font-size: 12px; letter-spacing: .06em; }
+    .step.is-now .nowtag { display: block; }
+    .head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .head h2 { margin: 0; font-size: 21px; font-weight: 900; text-wrap: balance; }
+    .done-btn { display: grid; flex: none; width: 42px; height: 42px; place-items: center; padding: 0; border: 3px solid var(--line); border-radius: 50%; background: #fff; cursor: pointer; }
+    .done-btn svg { width: 21px; height: 21px; opacity: .2; }
+    .step.is-done .done-btn { border-color: var(--grass); background: var(--grass); }
+    .step.is-done .done-btn svg { opacity: 1; stroke: #fff; }
+    .sub { margin: 4px 0 0; color: var(--ink-soft); font-size: 15px; }
+    .chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 11px; }
+    .chip { display: grid; justify-items: center; gap: 4px; min-width: 0; padding: 8px 4px; border: 3px solid var(--line); border-radius: 15px; color: var(--ink); background: var(--paper); font: inherit; font-size: 13px; line-height: 1.15; text-align: center; cursor: pointer; }
+    .chip svg { width: 42px; height: 42px; }
+    .chip[aria-pressed="true"] { border-color: var(--sky); background: #e3eeff; }
+    .videos { display: grid; gap: 11px; margin-top: 11px; }
+    .videos.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .videos.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .vid { display: flex; min-width: 0; overflow: hidden; flex-direction: column; border: 3px solid var(--line); border-radius: 17px; background: #fff; transition: opacity .15s ease, border-color .15s ease, box-shadow .15s ease; }
+    .vid .art { display: block; width: 100%; max-width: 100%; aspect-ratio: 16 / 9; }
+    .vid .body { display: grid; flex: 1; align-content: start; gap: 7px; padding: 9px 10px 11px; }
+    .vid h3 { margin: 0; font-size: 16px; font-weight: 900; line-height: 1.15; }
+    .tag { justify-self: start; padding: 2px 8px; border-radius: 999px; color: #fff; font-family: var(--display); font-size: 10px; letter-spacing: .04em; }
+    .c-city { --c: var(--city); } .c-harbor { --c: var(--harbor); } .c-forest { --c: var(--forest); }
+    .vid .tag, .vid .watch { background: var(--c); }
+    .btns { display: flex; flex-wrap: wrap; gap: 7px; margin-top: auto; }
+    .pick, .watch { display: inline-flex; min-height: 38px; align-items: center; justify-content: center; gap: 5px; padding: 7px 10px; border-radius: 11px; font: inherit; font-size: 13px; font-weight: 900; text-decoration: none; cursor: pointer; }
+    .pick { border: 3px solid var(--ink); color: var(--ink); background: #fff; }
+    .watch { border: 3px solid transparent; color: #fff; }
+    .vid.picked { border-color: var(--now); box-shadow: 0 0 0 4px rgba(255,62,108,.14); }
+    .vid.picked .pick { border-color: var(--now); color: #fff; background: var(--now); }
+    .vid.dim { opacity: .45; }
+    .return-choice { margin: 9px 0 0; color: var(--grass); font-size: 14px; font-weight: 900; }
+    .finish .box { padding-block: 20px; border-color: #f0b400; background: linear-gradient(135deg, var(--sun), #ffe08a); text-align: center; }
+    .finish .head { justify-content: center; }
+    .finish h2 { font-family: var(--display); font-size: 25px; font-weight: 400; }
+    .finish .sub { color: var(--ink); }
+    .reset { display: block; margin: 26px auto 0; padding: 8px 14px; border: 2px dashed var(--line); border-radius: 12px; color: var(--ink-soft); background: transparent; font: inherit; font-size: 14px; cursor: pointer; }
+    .editor-tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+    .tool-button, .primary-button, .secondary-button { min-height: 40px; padding: 8px 13px; border: 2px solid #a9c6ee; border-radius: 12px; color: var(--ink); background: #e5efff; font: inherit; font-size: 13px; font-weight: 900; cursor: pointer; }
+    .tool-button:hover, .secondary-button:hover { background: #d5e6ff; }
+    .admin-panel { display: grid; gap: 10px; margin: 9px 0 14px; padding: 14px; border: 2px solid #7ea9e0; border-radius: 17px; background: #e5efff; }
+    .admin-panel[hidden] { display: none; }
+    .admin-panel h2, .activity-editor h2 { margin: 0; font-size: 17px; font-weight: 900; text-transform: uppercase; }
+    .admin-panel p, .activity-editor .helper { margin: 0; color: var(--ink-soft); font-size: 13px; }
+    .admin-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+    .field { display: grid; min-width: 0; gap: 3px; }
+    .field label, .field-label { font-size: 12px; font-weight: 900; }
+    .field input, .field textarea, .search-line input { width: 100%; min-width: 0; min-height: 38px; padding: 7px 9px; border: 1px solid #8fa8c4; border-radius: 8px; color: var(--ink); background: white; font: 700 14px var(--body); }
+    .field textarea { min-height: 42px; resize: vertical; }
+    .admin-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .secondary-button { border-color: #aebbd0; background: #fff; }
+    .primary-button { border-color: var(--sky); color: white; background: var(--sky); }
+    .primary-button:hover { background: var(--sky-deep); }
+    .step { grid-template-columns: 64px minmax(0, 1fr) 30px; }
+    .row-actions { display: grid; gap: 5px; padding-top: 2px; }
+    .row-action { display: grid; width: 28px; height: 28px; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 8px; color: var(--ink-soft); background: #fff; font: 800 15px/1 var(--body); cursor: pointer; }
+    .row-action svg { width: 15px; height: 15px; }
+    .row-action:hover { border-color: var(--sky); color: var(--sky-deep); background: #eaf2ff; }
+    .row-action:disabled { opacity: .35; cursor: default; }
+    .row-action.delete:hover { border-color: #e790a5; color: #a22142; background: #fff0f3; }
+    .edit-form { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line); }
+    .edit-form[hidden] { display: none; }
+    .edit-form .edit-actions { display: flex; grid-column: 1 / -1; gap: 7px; }
+    .activity-editor { display: grid; gap: 10px; margin: 20px 0 0 76px; padding: 13px; border: 2px solid #7ea9e0; border-radius: 17px; background: #e5efff; }
+    .activity-editor form { display: grid; gap: 10px; }
+    .admin-actions .helper { color: var(--ink-soft); font-size: 12px; }
+    .form-grid { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; }
+    .instructions-field { grid-column: 1 / -1; }
+    .icon-picker { display: grid; gap: 7px; padding-top: 2px; }
+    .search-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+    .search-line .secondary-button { min-height: 38px; padding: 6px 10px; }
+    .icon-status { min-height: 18px; color: var(--ink-soft); font-size: 12px; }
+    .icon-results { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+    .icon-result { display: grid; align-content: start; justify-items: center; gap: 4px; min-width: 0; padding: 5px; border: 2px solid var(--line); border-radius: 10px; color: var(--ink); background: #fff; font: 700 10px/1.15 var(--body); cursor: pointer; }
+    .icon-result:hover, .icon-result[aria-pressed="true"] { border-color: var(--sky); background: #f4f8ff; }
+    .icon-result img { display: block; width: 44px; height: 44px; object-fit: contain; }
+    .icon-result span { display: -webkit-box; width: 100%; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; text-align: center; }
+    .selected-icon { display: flex; min-height: 36px; align-items: center; gap: 8px; color: var(--ink-soft); font-size: 12px; }
+    .selected-icon img { width: 34px; height: 34px; object-fit: contain; }
+    .pictogram-credit { color: var(--ink-soft); font-size: 11px; line-height: 1.4; }
+    .pictogram-credit a { color: var(--sky-deep); }
+    .pictogram-credit-footer { margin: 12px 0 0 76px; }
+    .activity-editor[hidden] { display: none; }
+    body.hide-editor .row-actions, body.hide-editor .activity-editor, body.hide-editor #createActivityLink { display: none; }
+    .custom-icon { width: 42px; height: 42px; flex: none; object-fit: contain; }
+    .custom-activity { display: flex; align-items: flex-start; gap: 10px; margin-top: 8px; }
+    .custom-activity p { margin: 0; color: var(--ink-soft); font-size: 15px; }
+    @media (max-width: 620px) {
+      .videos.three, .videos.two { grid-template-columns: 1fr; }
+      .vid { flex-direction: row; }
+      .vid .art { flex: none; width: 39%; aspect-ratio: 4 / 3; object-fit: cover; }
+      .vid h3 { font-size: 17px; }
+    }
+    @media (max-width: 460px) {
+      body { font-size: 16px; }
+      .step { grid-template-columns: 42px minmax(0, 1fr) 27px; gap: 6px; }
+      .time { font-size: 15px; }
+      .chips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .head h2 { font-size: 19px; }
+      .nn b { font-size: 16px; }
+      .box { padding-inline: 11px; }
+      .row-action { width: 26px; height: 27px; font-size: 14px; }
+      .activity-editor { margin-left: 48px; padding: 10px; }
+      .pictogram-credit-footer { margin-left: 48px; }
+      .admin-fields { grid-template-columns: 1fr; }
+      .form-grid { grid-template-columns: 78px minmax(0, 1fr); }
+      .icon-results { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .edit-form { grid-template-columns: 90px minmax(0, 1fr); }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; } }
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <header class="hero">
+    <a class="back" href="/schedules">← Schedules</a>
+    <h1 id="greeting">Hi Coleman!</h1>
+    <p id="intro">Here’s our plan for today, from 3:00 to 6:30.</p>
+    <div class="clock" id="clock" aria-label="Current local time">Now: --:--</div>
+  </header>
+
+  <nav class="editor-tools" aria-label="Schedule tools">
+    <button class="tool-button" type="button" id="createActivityLink">＋ Create schedule activity</button>
+    <button class="tool-button" type="button" id="adminToggle" aria-expanded="false" aria-controls="adminPanel">⚙ Admin panel</button>
+  </nav>
+
+  <section class="admin-panel" id="adminPanel" hidden>
+    <div><h2>Admin panel</h2><p>Personalize the heading, manage edit controls, or restore the original schedule.</p></div>
+    <div class="admin-fields">
+      <div class="field"><label for="greetingInput">Greeting</label><input id="greetingInput" value="Hi Coleman!" maxlength="80" /></div>
+      <div class="field"><label for="introInput">Plan note</label><input id="introInput" value="Here’s our plan for today, from 3:00 to 6:30." maxlength="140" /></div>
+    </div>
+    <div class="admin-actions">
+      <button class="primary-button" type="button" id="saveDetails">Save details</button>
+      <button class="secondary-button" type="button" id="toggleEditing">Hide edit controls</button>
+      <button class="secondary-button" type="button" id="restoreSchedule">Restore original schedule</button>
+      <span class="helper">Edits save on this device.</span>
+    </div>
+  </section>
+
+  <section class="nownext" aria-live="polite" aria-label="Now and next">
+    <div class="nn now"><small>NOW</small><b id="nowText">…</b></div>
+    <div class="nn"><small>NEXT</small><b id="nextText">…</b></div>
+  </section>
+
+  <ol class="timeline" id="timeline" aria-label="Afternoon schedule"></ol>
+  <section class="activity-editor" id="activityEditor" aria-labelledby="addActivityTitle">
+    <div><h2 id="addActivityTitle">Add new schedule activity</h2><p class="helper">Add a flexible activity to Coleman’s afternoon.</p></div>
+    <form id="activityForm">
+      <div class="form-grid">
+        <div class="field"><label for="activityTime">Time</label><input id="activityTime" name="time" type="time" min="15:00" max="18:29" value="15:00" required /></div>
+        <div class="field"><label for="activityTitle">Activity title</label><input id="activityTitle" name="title" maxlength="80" placeholder="e.g., Build with blocks" required /></div>
+        <div class="field instructions-field"><label for="activityInstructions">Instructions</label><textarea id="activityInstructions" name="instructions" maxlength="240" placeholder="A short note about what happens"></textarea></div>
+      </div>
+      <div class="icon-picker">
+        <span class="field-label">Icon picker</span>
+        <label class="field-label" for="iconSearch">Search ARASAAC pictograms</label>
+        <div class="search-line"><input id="iconSearch" type="search" placeholder="Search for icons (e.g., drink water, play)" autocomplete="off" /><button class="secondary-button" type="button" id="searchIcons">Search</button></div>
+        <div class="icon-status" id="iconStatus" role="status" aria-live="polite">Search for a picture to add to this activity.</div>
+        <div class="icon-results" id="iconResults" aria-label="Pictogram search results"></div>
+        <div class="selected-icon" id="selectedIcon"><span>No icon selected.</span></div>
+        <small class="pictogram-credit">Pictograms: Sergio Palao · <a href="https://arasaac.org" target="_blank" rel="noopener noreferrer">ARASAAC</a> · <a href="https://aulaabierta.arasaac.org/en/terms-of-use" target="_blank" rel="noopener noreferrer">CC BY-NC-SA</a> · Government of Aragón</small>
+      </div>
+      <button class="primary-button" type="submit">＋ Add new activity</button>
+    </form>
+  </section>
+  <footer class="pictogram-credit pictogram-credit-footer">Pictograms: Sergio Palao · <a href="https://arasaac.org" target="_blank" rel="noopener noreferrer">ARASAAC</a> · <a href="https://aulaabierta.arasaac.org/en/terms-of-use" target="_blank" rel="noopener noreferrer">CC BY-NC-SA</a> · Government of Aragón</footer>
+  <button class="reset" id="reset" type="button">Clear choices and checks</button>
+</main>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-toys" viewBox="0 0 48 48"><rect x="6" y="22" width="18" height="18" rx="3" fill="#ff6b2c"/><rect x="24" y="22" width="18" height="18" rx="3" fill="#2f7bf5"/><rect x="15" y="6" width="18" height="16" rx="3" fill="#23b26d"/><circle cx="15" cy="31" r="3" fill="#fff"/><circle cx="33" cy="31" r="3" fill="#fff"/><circle cx="24" cy="14" r="3" fill="#fff"/></symbol>
+    <symbol id="i-video" viewBox="0 0 48 48"><rect x="4" y="9" width="40" height="28" rx="6" fill="#ff3e6c"/><path d="M20 16 L32 23 L20 30 Z" fill="#fff"/><rect x="16" y="39" width="16" height="4" rx="2" fill="#15213b"/></symbol>
+    <symbol id="i-water" viewBox="0 0 48 48"><path d="M12 8 H36 L33 42 H15 Z" fill="#ddf1ff" stroke="#1e9bb5" stroke-width="3" stroke-linejoin="round"/><path d="M14.2 20 H33.8 L32.8 40 H15.2 Z" fill="#57c3e6"/><circle cx="21" cy="28" r="2" fill="#fff"/><circle cx="27" cy="33" r="1.5" fill="#fff"/></symbol>
+    <symbol id="i-move" viewBox="0 0 48 48"><circle cx="24" cy="9" r="5" fill="#15213b"/><path d="M24 15 V30 M24 19 L12 12 M24 19 L36 12 M24 30 L15 43 M24 30 L33 43" stroke="#23b26d" stroke-width="5" stroke-linecap="round" fill="none"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5 L10 17.5 L19 7" fill="none" stroke="#15213b" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v7m6-7v7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="art-city" viewBox="0 0 160 90"><rect width="160" height="90" fill="#ffb36b"/><circle cx="120" cy="30" r="14" fill="#ffe08a"/><g fill="#c2431a"><rect x="6" y="30" width="18" height="45"/><rect x="28" y="18" width="16" height="57"/><rect x="48" y="38" width="20" height="37"/><rect x="72" y="24" width="14" height="51"/><rect x="90" y="44" width="22" height="31"/><rect x="138" y="34" width="18" height="41"/></g><g fill="#ffe08a"><rect x="10" y="36" width="4" height="4"/><rect x="17" y="46" width="4" height="4"/><rect x="32" y="26" width="4" height="4"/><rect x="38" y="40" width="4" height="4"/><rect x="76" y="32" width="4" height="4"/><rect x="95" y="52" width="4" height="4"/></g><path d="M0 90 L0 78 Q80 62 160 78 L160 90 Z" fill="#5a5f73"/><path d="M20 82 H40 M70 76 H92 M120 80 H140" stroke="#ffe08a" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="art-harbor" viewBox="0 0 160 90"><rect width="160" height="90" fill="#9fddeb"/><path d="M104 14 V62 M104 18 H150 M146 18 V36" stroke="#3b4a63" stroke-width="5" fill="none"/><rect x="138" y="36" width="16" height="10" fill="#ff6b2c"/><path d="M14 54 H76 L68 66 H22 Z" fill="#3b4a63"/><rect x="30" y="40" width="14" height="14" fill="#ffc83d"/><rect x="46" y="44" width="14" height="10" fill="#ff3e6c"/><rect x="0" y="62" width="160" height="28" fill="#1e9bb5"/><path d="M0 70 Q10 66 20 70 T40 70 T60 70 T80 70 T100 70 T120 70 T140 70 T160 70 M0 80 Q10 76 20 80 T40 80 T60 80 T80 80 T100 80 T120 80 T140 80 T160 80" stroke="#ddf6ff" stroke-width="2" fill="none"/></symbol>
+    <symbol id="art-forest" viewBox="0 0 160 90"><rect width="160" height="90" fill="#c9f0c2"/><g fill="#6b4a2b"><rect x="22" y="42" width="8" height="40"/><rect x="74" y="36" width="9" height="46"/><rect x="126" y="44" width="8" height="38"/></g><g fill="#2e9e4f"><circle cx="26" cy="36" r="18"/><circle cx="78" cy="28" r="22"/><circle cx="130" cy="38" r="18"/></g><g fill="#51c06e"><circle cx="18" cy="30" r="8"/><circle cx="70" cy="20" r="9"/><circle cx="124" cy="32" r="8"/></g><path d="M46 0 Q50 30 44 52 M104 0 Q100 24 106 44" stroke="#2e9e4f" stroke-width="3" fill="none"/><rect x="0" y="80" width="160" height="10" fill="#8a6a3b"/></symbol>
+  </defs>
+</svg>
+
+<script>
+(() => {
+  const VIDEOS = {
+    city: { title: 'City Escape', url: 'https://www.youtube.com/watch?v=D1jHA2Itfbw', art: 'art-city', cls: 'c-city' },
+    harbor: { title: 'Metal Harbor', url: 'https://www.youtube.com/watch?v=RL6p5w0Ll8k&list=PLJWGqbQTzVEKio_DOUe2iXYB0FHcVIBJ2&index=6', art: 'art-harbor', cls: 'c-harbor' },
+    forest: { title: 'Green Forest', url: 'https://www.youtube.com/watch?v=LAX_uBEP2w4&list=PLJWGqbQTzVEKio_DOUe2iXYB0FHcVIBJ2&index=8', art: 'art-forest', cls: 'c-forest' }
+  };
+  const CHOICES = [
+    { id: 'toys', label: 'Mario toys', icon: 'i-toys' },
+    { id: 'vids', label: 'Mario videos', icon: 'i-video' },
+    { id: 'water', label: 'Drink water', icon: 'i-water' },
+    { id: 'move', label: 'Exercises', icon: 'i-move' }
+  ];
+  // Times are minutes after 3:00 PM. Each video gets a ten-minute spot; the open parts are choice time.
+  const ORIGINAL_STEPS = [
+    { id: 's1', start: 0, end: 60, time: '3:00', type: 'choice', title: "Coleman's choice" },
+    { id: 's2', start: 60, end: 70, time: '4:00', type: 'watch', title: 'Watch a video together', videos: ['city'], sub: 'We watch this one together.' },
+    { id: 's3', start: 70, end: 120, time: 'after', type: 'choice', title: "Coleman's choice" },
+    { id: 's4', start: 120, end: 130, time: '5:00', type: 'pick', title: 'Coleman picks a video', videos: ['city', 'harbor'], sub: 'Watch City Escape again, or try a new one.' },
+    { id: 's5', start: 130, end: 180, time: 'after', type: 'choice', title: "Coleman's choice" },
+    { id: 's6', start: 180, end: 190, time: '6:00', type: 'pick', title: 'Coleman picks a video', videos: ['city', 'harbor', 'forest'], sub: 'Pick any one of these three.' },
+    { id: 's7', start: 190, end: 210, time: 'after', type: 'choice', title: "Coleman's choice" },
+    { id: 's8', start: 210, end: 240, time: '6:30', type: 'finish', title: 'All done!' }
+  ];
+  const KEY = 'coleman-schedule-v1';
+  let state = { done: {}, picks: {}, chips: {}, items: structuredClone(ORIGINAL_STEPS), greeting: 'Hi Coleman!', intro: 'Here’s our plan for today, from 3:00 to 6:30.', editing: true };
+  try {
+    const stored = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (stored) state = { ...state, ...stored, items: Array.isArray(stored.items) ? stored.items : structuredClone(ORIGINAL_STEPS) };
+  } catch {}
+  let editingId = null;
+  let selectedIcon = null;
+  let iconResults = [];
+  let searchRequest = null;
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} };
+  const esc = (text) => String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const icon = (id) => `<svg aria-hidden="true"><use href="#${id}"></use></svg>`;
+  const steps = () => [...state.items].sort((a, b) => a.start - b.start || (a.type === 'finish' ? 1 : b.type === 'finish' ? -1 : 0));
+  const timeValue = (minute) => {
+    const total = 15 * 60 + minute;
+    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  };
+  const minuteValue = (value) => {
+    const [hours, minutes] = value.split(':').map(Number);
+    return hours * 60 + minutes - 15 * 60;
+  };
+  const timeLabel = (minute) => {
+    const total = 15 * 60 + minute;
+    const hours = Math.floor(total / 60);
+    return `${hours % 12 || 12}:${String(total % 60).padStart(2, '0')}`;
+  };
+  const pictogramUrl = (id) => /^\d+$/.test(String(id)) ? `https://static.arasaac.org/pictograms/${id}/${id}_300.png` : '';
+
+  function videoCard(stepId, key, selectable) {
+    const video = VIDEOS[key];
+    const tag = stepId === 's4' ? (key === 'city' ? 'AGAIN' : 'NEW') : stepId === 's6' ? (key === 'forest' ? 'NEW' : 'AGAIN') : '';
+    return `<article class="vid ${video.cls}" data-video="${key}">
+      <svg class="art" viewBox="0 0 160 90" role="img" aria-label="${esc(video.title)} illustrated thumbnail"><use href="#${video.art}"></use></svg>
+      <div class="body">${tag ? `<span class="tag">${tag}</span>` : ''}<h3>${esc(video.title)}</h3>
+        <div class="btns">${selectable ? `<button type="button" class="pick" data-step="${stepId}" data-video="${key}">Pick</button>` : ''}<a class="watch" href="${video.url}" target="_blank" rel="noopener noreferrer">▶ Watch</a></div>
+      </div>
+    </article>`;
+  }
+
+  function editForm(step) {
+    return `<form class="edit-form" data-edit-form="${esc(step.id)}" ${editingId === step.id ? '' : 'hidden'}>
+      <div class="field"><label for="edit-time-${esc(step.id)}">Time</label><input id="edit-time-${esc(step.id)}" name="time" type="time" min="15:00" max="18:29" value="${timeValue(step.start)}" required></div>
+      <div class="field"><label for="edit-title-${esc(step.id)}">Activity title</label><input id="edit-title-${esc(step.id)}" name="title" value="${esc(step.title)}" maxlength="80" required></div>
+      <div class="field instructions-field"><label for="edit-instructions-${esc(step.id)}">Instructions</label><textarea id="edit-instructions-${esc(step.id)}" name="instructions" maxlength="240">${esc(step.sub || '')}</textarea></div>
+      <div class="edit-actions"><button class="primary-button" type="submit">Save activity</button><button class="secondary-button" type="button" data-action="cancel-edit">Cancel</button></div>
+    </form>`;
+  }
+
+  function rowActions(step, index, total) {
+    if (!state.editing || step.type === 'finish') return '';
+    return `<div class="row-actions" aria-label="Activity actions">
+      <button class="row-action" type="button" data-action="edit" data-id="${esc(step.id)}" aria-label="Edit ${esc(step.title)}" title="Edit">${icon('i-edit')}</button>
+      <button class="row-action delete" type="button" data-action="delete" data-id="${esc(step.id)}" aria-label="Delete ${esc(step.title)}" title="Delete">${icon('i-trash')}</button>
+      <button class="row-action" type="button" data-action="up" data-id="${esc(step.id)}" aria-label="Move ${esc(step.title)} up" title="Move up" ${index === 0 ? 'disabled' : ''}>↑</button>
+      <button class="row-action" type="button" data-action="down" data-id="${esc(step.id)}" aria-label="Move ${esc(step.title)} down" title="Move down" ${index >= total - 2 ? 'disabled' : ''}>↓</button>
+    </div>`;
+  }
+
+  function render() {
+    const items = steps();
+    document.getElementById('greeting').textContent = state.greeting;
+    document.getElementById('intro').textContent = state.intro;
+    document.getElementById('greetingInput').value = state.greeting;
+    document.getElementById('introInput').value = state.intro;
+    document.body.classList.toggle('hide-editor', !state.editing);
+    document.getElementById('toggleEditing').textContent = state.editing ? 'Hide edit controls' : 'Show edit controls';
+    document.getElementById('timeline').innerHTML = items.map((step, index) => {
+      const time = step.time === 'after' ? '<div class="time soft">after<br>video</div>' : `<div class="time">${step.time}</div>`;
+      const done = step.type !== 'finish' ? `<button type="button" class="done-btn" data-done="${step.id}" aria-label="Mark ${esc(step.title)} done"><svg aria-hidden="true"><use href="#i-check"></use></svg></button>` : '';
+      let content = '';
+      if (step.type === 'choice') {
+        content = `<p class="sub">Pick what to do:</p><div class="chips">${CHOICES.map((choice) => `<button type="button" class="chip" data-step="${step.id}" data-chip="${choice.id}" aria-pressed="${state.chips[step.id] === choice.id}">${icon(choice.icon)}<span>${choice.label}</span></button>`).join('')}</div>`;
+      } else if (step.type === 'watch' || step.type === 'pick') {
+        content = `<p class="sub">${esc(step.sub)}</p><div class="videos ${step.videos.length === 2 ? 'two' : step.videos.length === 3 ? 'three' : 'one'}">${step.videos.map((key) => videoCard(step.id, key, step.type === 'pick')).join('')}</div>${step.type === 'watch' ? '<p class="return-choice">↩ Then: Coleman’s choice</p>' : ''}`;
+      } else if (step.type === 'custom') {
+        const customIcon = pictogramUrl(step.iconId);
+        content = `<div class="custom-activity">${customIcon ? `<img class="custom-icon" src="${customIcon}" alt="">` : ''}<p>${esc(step.sub || 'We can do this together.')}</p></div>`;
+      } else {
+        content = '<p class="sub">Great job today, Coleman!</p>';
+      }
+      return `<li class="step${step.type === 'finish' ? ' finish' : ''}${state.done[step.id] ? ' is-done' : ''}" data-id="${esc(step.id)}">${time}<article class="box"><span class="nowtag">NOW</span><div class="head"><h2>${esc(step.title)}</h2>${done}</div>${content}${editForm(step)}</article>${rowActions(step, index, items.length)}</li>`;
+    }).join('');
+    applyPicks();
+    tick();
+  }
+
+  function applyPicks() {
+    ['s4', 's6'].forEach((stepId) => {
+      const picked = state.picks[stepId];
+      document.querySelectorAll(`#${stepId} .vid`).forEach((card) => {
+        const key = card.dataset.video;
+        card.classList.toggle('picked', picked === key);
+        card.classList.toggle('dim', !!picked && picked !== key);
+        const button = card.querySelector('.pick');
+        if (button) button.textContent = picked === key ? 'Picked!' : 'Pick';
+      });
+    });
+  }
+
+  function labelFor(step) {
+    if (!step) return '';
+    if (step.type === 'pick' && state.picks[step.id]) return `Watch ${VIDEOS[state.picks[step.id]].title}`;
+    if (step.type === 'watch') return `Watch ${VIDEOS.city.title}`;
+    if (step.type === 'choice' && state.chips[step.id]) return CHOICES.find((choice) => choice.id === state.chips[step.id])?.label || step.title;
+    return step.title;
+  }
+
+  function effectiveEnd(items, index) {
+    const step = items[index];
+    const nextStart = items[index + 1]?.start ?? 240;
+    if (step.type === 'choice' || step.type === 'custom') return nextStart;
+    return Math.min(step.end ?? step.start + 10, nextStart);
+  }
+
+  function tick() {
+    const now = new Date();
+    const hour12 = ((now.getHours() + 11) % 12) + 1;
+    const minutes = now.getMinutes();
+    document.getElementById('clock').textContent = `Now: ${hour12}:${String(minutes).padStart(2, '0')}`;
+    const minuteOfAfternoon = (now.getHours() - 15) * 60 + minutes;
+    const items = steps();
+    let index = items.findIndex((step, i) => minuteOfAfternoon >= step.start && minuteOfAfternoon < effectiveEnd(items, i));
+    if (index < 0 && minuteOfAfternoon >= 0 && minuteOfAfternoon < 210) {
+      const previous = items.reduce((found, step, i) => step.start <= minuteOfAfternoon ? i : found, -1);
+      const following = items.findIndex((step) => step.start > minuteOfAfternoon);
+      if (items[previous]?.type === 'watch' || items[previous]?.type === 'pick') index = items[following]?.type === 'choice' ? following : previous;
+      else index = previous >= 0 ? previous : following;
+    }
+    if (minuteOfAfternoon >= 240) index = items.findIndex((step) => step.type === 'finish');
+    document.querySelectorAll('.step').forEach((el, i) => el.classList.toggle('is-now', i === index));
+    const nowText = document.getElementById('nowText');
+    const nextText = document.getElementById('nextText');
+    if (minuteOfAfternoon < 0) {
+      nowText.textContent = 'Not started yet';
+      nextText.textContent = "3:00 Coleman's choice";
+    } else if (index >= 0 && items[index]?.type === 'finish') {
+      nowText.textContent = 'All done!';
+      nextText.textContent = 'Great job!';
+    } else if (index >= 0) {
+      nowText.textContent = labelFor(items[index]);
+      const next = items[index + 1];
+      nextText.textContent = next ? `${next.time !== 'after' ? `${next.time} ` : ''}${labelFor(next)}` : 'All done!';
+    }
+  }
+
+  function renderIconResults() {
+    const grid = document.getElementById('iconResults');
+    grid.innerHTML = iconResults.map((result) => {
+      const id = String(result._id ?? result.id ?? '');
+      if (!/^\d+$/.test(id)) return '';
+      const keyword = Array.isArray(result.keywords) ? result.keywords.find((entry) => entry.type === 'noun')?.keyword || result.keywords[0]?.keyword : '';
+      const label = keyword || result.name || `Pictogram ${id}`;
+      const pressed = selectedIcon?.id === id;
+      return `<button class="icon-result" type="button" data-icon-id="${id}" data-icon-label="${esc(label)}" aria-pressed="${Boolean(pressed)}"><img src="${pictogramUrl(id)}" alt=""><span>${esc(label)}</span></button>`;
+    }).join('');
+    if (selectedIcon) {
+      document.getElementById('selectedIcon').innerHTML = `<img src="${pictogramUrl(selectedIcon.id)}" alt=""><span>Selected: ${esc(selectedIcon.label)}</span>`;
+    } else {
+      document.getElementById('selectedIcon').innerHTML = '<span>No icon selected.</span>';
+    }
+  }
+
+  async function searchPictograms() {
+    const query = document.getElementById('iconSearch').value.trim();
+    const status = document.getElementById('iconStatus');
+    if (!query) { status.textContent = 'Type a word or short phrase to search.'; return; }
+    searchRequest?.abort();
+    searchRequest = new AbortController();
+    status.textContent = 'Searching ARASAAC…';
+    document.getElementById('iconResults').replaceChildren();
+    try {
+      const url = `https://api.arasaac.org/v1/pictograms/en/bestsearch/${encodeURIComponent(query)}`;
+      const response = await fetch(url, { signal: searchRequest.signal });
+      if (!response.ok) throw new Error(`Search returned ${response.status}`);
+      const results = await response.json();
+      iconResults = Array.isArray(results) ? results.slice(0, 15) : [];
+      renderIconResults();
+      status.textContent = iconResults.length ? `${iconResults.length} pictograms. Choose one to add it.` : 'No pictograms found. Try a shorter search.';
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+      iconResults = [];
+      status.textContent = 'Search is unavailable right now. You can try again or browse ARASAAC pictograms.';
+      document.getElementById('iconResults').innerHTML = `<a class="secondary-button" href="https://arasaac.org/pictograms/search/${encodeURIComponent(query)}" target="_blank" rel="noopener noreferrer">Open ARASAAC search ↗</a>`;
+    }
+  }
+
+  function addActivity(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const start = minuteValue(String(data.get('time')));
+    if (state.items.some((item) => item.start === start)) {
+      document.getElementById('iconStatus').textContent = 'There is already an activity at that time. Choose another time.';
+      return;
+    }
+    const id = `custom-${Date.now().toString(36)}`;
+    state.items.push({
+      id, start, end: start + 10, time: timeLabel(start), type: 'custom',
+      title: String(data.get('title')).trim(), sub: String(data.get('instructions')).trim(),
+      iconId: selectedIcon?.id || ''
+    });
+    state.items.sort((a, b) => a.start - b.start || (a.type === 'finish' ? 1 : b.type === 'finish' ? -1 : 0));
+    save();
+    form.reset();
+    selectedIcon = null;
+    iconResults = [];
+    document.getElementById('iconResults').replaceChildren();
+    document.getElementById('iconStatus').textContent = 'Activity added. Search for another picture if you like.';
+    document.getElementById('selectedIcon').innerHTML = '<span>No icon selected.</span>';
+    render();
+  }
+
+  function saveEdit(form) {
+    const id = form.dataset.editForm;
+    const step = state.items.find((item) => item.id === id);
+    if (!step) return;
+    const data = new FormData(form);
+    const start = minuteValue(String(data.get('time')));
+    const duration = Math.max(1, (step.end ?? step.start + 10) - step.start);
+    step.start = start;
+    step.end = start + duration;
+    step.time = timeLabel(start);
+    step.title = String(data.get('title')).trim();
+    step.sub = String(data.get('instructions')).trim();
+    state.items.sort((a, b) => a.start - b.start || (a.type === 'finish' ? 1 : b.type === 'finish' ? -1 : 0));
+    editingId = null;
+    save();
+    render();
+  }
+
+  function moveActivity(id, direction) {
+    const items = steps();
+    const index = items.findIndex((step) => step.id === id);
+    const targetIndex = index + direction;
+    if (index < 0 || targetIndex < 0 || targetIndex >= items.length || items[targetIndex].type === 'finish') return;
+    const current = items[index];
+    const target = items[targetIndex];
+    const currentTime = { start: current.start, end: current.end, time: current.time };
+    Object.assign(current, { start: target.start, end: target.end, time: target.time });
+    Object.assign(target, currentTime);
+    state.items = items.sort((a, b) => a.start - b.start || (a.type === 'finish' ? 1 : b.type === 'finish' ? -1 : 0));
+    save();
+    render();
+  }
+
+  function deleteActivity(id) {
+    const item = state.items.find((step) => step.id === id);
+    if (!item || item.type === 'finish') return;
+    if (!window.confirm(`Delete “${item.title}” from this schedule?`)) return;
+    state.items = state.items.filter((step) => step.id !== id);
+    delete state.done[id]; delete state.chips[id]; delete state.picks[id];
+    save();
+    render();
+  }
+
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    if (button.dataset.done) {
+      const id = button.dataset.done;
+      state.done[id] = !state.done[id]; save();
+      document.getElementById(id).classList.toggle('is-done', !!state.done[id]);
+    } else if (button.dataset.chip) {
+      const stepId = button.dataset.step;
+      state.chips[stepId] = state.chips[stepId] === button.dataset.chip ? null : button.dataset.chip;
+      save();
+      document.querySelectorAll(`#${stepId} .chip`).forEach((chip) => chip.setAttribute('aria-pressed', String(chip.dataset.chip === state.chips[stepId])));
+      tick();
+    } else if (button.classList.contains('pick')) {
+      const stepId = button.dataset.step;
+      state.picks[stepId] = state.picks[stepId] === button.dataset.video ? null : button.dataset.video;
+      save(); applyPicks(); tick();
+    } else if (button.dataset.action === 'edit') {
+      editingId = button.dataset.id; render();
+      document.querySelector(`[data-edit-form="${CSS.escape(editingId)}"] input[name="title"]`)?.focus();
+    } else if (button.dataset.action === 'cancel-edit') {
+      editingId = null; render();
+    } else if (button.dataset.action === 'delete') {
+      deleteActivity(button.dataset.id);
+    } else if (button.dataset.action === 'up' || button.dataset.action === 'down') {
+      moveActivity(button.dataset.id, button.dataset.action === 'up' ? -1 : 1);
+    } else if (button.dataset.iconId) {
+      selectedIcon = { id: button.dataset.iconId, label: button.dataset.iconLabel };
+      renderIconResults();
+    } else if (button.id === 'createActivityLink') {
+      document.getElementById('activityEditor').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+      document.getElementById('activityTime').focus({ preventScroll: true });
+    } else if (button.id === 'adminToggle') {
+      const panel = document.getElementById('adminPanel');
+      panel.hidden = !panel.hidden;
+      button.setAttribute('aria-expanded', String(!panel.hidden));
+      if (!panel.hidden) panel.querySelector('input')?.focus();
+    } else if (button.id === 'saveDetails') {
+      state.greeting = document.getElementById('greetingInput').value.trim() || 'Hi Coleman!';
+      state.intro = document.getElementById('introInput').value.trim() || 'Here’s our plan for today, from 3:00 to 6:30.';
+      save(); render();
+    } else if (button.id === 'toggleEditing') {
+      state.editing = !state.editing; save(); render();
+    } else if (button.id === 'restoreSchedule') {
+      if (window.confirm('Restore the original schedule? This clears your local edits and activity checks.')) {
+        state = { done: {}, picks: {}, chips: {}, items: structuredClone(ORIGINAL_STEPS), greeting: 'Hi Coleman!', intro: 'Here’s our plan for today, from 3:00 to 6:30.', editing: true };
+        save(); editingId = null; render();
+      }
+    } else if (button.id === 'searchIcons') {
+      searchPictograms();
+    } else if (button.id === 'reset') {
+      state.done = {}; state.picks = {}; state.chips = {}; save(); render();
+    }
+  });
+
+  document.addEventListener('submit', (event) => {
+    if (event.target.id === 'activityForm') addActivity(event);
+    else if (event.target.matches('[data-edit-form]')) { event.preventDefault(); saveEdit(event.target); }
+  });
+  document.getElementById('iconSearch').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') { event.preventDefault(); searchPictograms(); }
+  });
+
+  render();
+  window.setInterval(tick, 20000);
+})();
+</script>
+</body>
+</html>

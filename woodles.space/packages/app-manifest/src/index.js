@@ -268,8 +268,19 @@ export const appManifest = Object.freeze([
 		packageName: 'bloomforge-player',
 		// The studio's "Play it" hands over a project id rather than a def in the
 		// URL, so a link can't go stale against an edited game.
-		addressableBy: ['game']
+	addressableBy: ['game']
 		// No `landing` tile — see bloomforge's comment above; this is its player.
+	},
+	{
+		id: 'schedules',
+		name: 'Schedules',
+		publicPath: '/schedules',
+		aliases: [],
+		kind: 'static',
+		maturity: 'private',
+		sourceDir: 'apps/schedules',
+		outputDir: 'apps/schedules',
+		entryFile: 'index.html'
 	},
 	{
 		id: 'grimoire',

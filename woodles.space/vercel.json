@@ -31,6 +31,8 @@
     { "source": "/scaffold/:path*", "destination": "/write" },
     { "source": "/lab",             "destination": "/apps/lab/index.html" },
     { "source": "/lab/:path*",      "destination": "/apps/lab/:path*" },
+    { "source": "/schedules",       "destination": "/apps/schedules/index.html" },
+    { "source": "/schedules/9-25",  "destination": "/apps/schedules/9-25/index.html" },
     { "source": "/piano",           "destination": "/apps/piano/index.html" },
     { "source": "/piano/:path*",    "destination": "/apps/piano/:path*" },
     { "source": "/digits",          "destination": "/apps/digits/index.html" },

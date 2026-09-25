@@ -139,6 +139,7 @@ woodles.space/
     ├── hygge/               static · design playground (fonts, palette, motifs, motion)
     ├── digits/              static · an SVG pen that writes the time
     ├── quiet-room/          static · an immersive three.js room of light
+    ├── schedules/           static · a private link tree and visual schedules
     ├── letter/              static · echoes — the private archive reader
     ├── changelog/           static · renders CHANGELOG.md at /changelog
     ├── lore/                static · renders LORE.md at /lore
@@ -168,7 +169,7 @@ the repository or silently promoting an experiment into a game.
 ## the app manifest
 
 `packages/app-manifest/src/index.js` is the canonical deployable-app inventory.
-It owns the 16 app ids, names, public paths and aliases, app shape, source and
+It owns the 17 app ids, names, public paths and aliases, app shape, source and
 output locations, maturity, and landing visibility. It also owns the landing
 tile order/copy, **band**, default pins, featured fallback, and Marginalia's
 Reading Room sub-surface. A band is the *moment* a tile is for rather than the
