@@ -87,7 +87,7 @@
     .admin-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
     .field { display: grid; min-width: 0; gap: 3px; }
     .field label, .field-label { font-size: 12px; font-weight: 900; }
-    .field input, .field textarea, .search-line input { width: 100%; min-width: 0; min-height: 38px; padding: 7px 9px; border: 1px solid #8fa8c4; border-radius: 8px; color: var(--ink); background: white; font: 700 14px var(--body); }
+    .field input, .field textarea, .field select, .search-line input { width: 100%; min-width: 0; min-height: 38px; padding: 7px 9px; border: 1px solid #8fa8c4; border-radius: 8px; color: var(--ink); background: white; font: 700 14px var(--body); }
     .field textarea { min-height: 42px; resize: vertical; }
     .field-status { min-height: 16px; color: #a22142; font-size: 12px; }
     .admin-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -101,8 +101,13 @@
     .row-action:hover { border-color: var(--sky); color: var(--sky-deep); background: #eaf2ff; }
     .row-action:disabled { opacity: .35; cursor: default; }
     .row-action.delete:hover { border-color: #e790a5; color: #a22142; background: #fff0f3; }
-    .edit-form { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line); }
+    .edit-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line); }
     .edit-form[hidden] { display: none; }
+    .edit-form .full-field, .edit-form .edit-options, .edit-form .edit-error { grid-column: 1 / -1; }
+    .edit-options { display: grid; gap: 4px; }
+    .edit-options[hidden] { display: none; }
+    .edit-form .helper { color: var(--ink-soft); font-size: 12px; font-weight: 700; }
+    .edit-error { min-height: 16px; color: #a22142; font-size: 12px; }
     .edit-form .edit-actions { display: flex; grid-column: 1 / -1; gap: 7px; }
     .activity-editor { display: grid; gap: 10px; margin: 20px 0 0 76px; padding: 13px; border: 2px solid #7ea9e0; border-radius: 17px; background: #e5efff; }
     .activity-editor form { display: grid; gap: 10px; }
@@ -148,7 +153,6 @@
       .admin-fields { grid-template-columns: 1fr; }
       .form-grid { grid-template-columns: 78px minmax(0, 1fr); }
       .icon-results { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-      .edit-form { grid-template-columns: 90px minmax(0, 1fr); }
     }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; } }
   </style>
@@ -239,6 +243,7 @@
     { id: 'water', label: 'Drink water', icon: 'i-water' },
     { id: 'move', label: 'Exercises', icon: 'i-move' }
   ];
+  const CHOICE_ICONS = new Set(['i-toys', 'i-video', 'i-water', 'i-move']);
   // Times are minutes after 3:00 PM. Each video gets a ten-minute spot; the open parts are choice time.
   const ORIGINAL_STEPS = [
     { id: 's1', start: 0, end: 60, time: '3:00', type: 'choice', title: "Coleman's choice" },
@@ -272,6 +277,38 @@
     const [hours, minutes] = value.split(':').map(Number);
     return hours * 60 + minutes - 15 * 60;
   };
+  function choiceOptions(step) {
+    const choices = Array.isArray(step.choices) ? step.choices : CHOICES;
+    return choices.map((choice, index) => ({
+      id: String(choice.id || `choice-${index + 1}`),
+      label: String(choice.label || `Choice ${index + 1}`),
+      icon: CHOICE_ICONS.has(choice.icon) ? choice.icon : 'i-toys'
+    }));
+  }
+  function videoOptions(step) {
+    if (!Array.isArray(step.videos)) return [];
+    return step.videos.map((entry, index) => {
+      const data = typeof entry === 'string' ? (VIDEOS[entry] || {}) : (entry || {});
+      const base = typeof entry === 'string' ? (VIDEOS[entry] || {}) : {};
+      const art = ['art-city', 'art-harbor', 'art-forest'].includes(data.art) ? data.art : base.art || 'art-city';
+      const cls = ['c-city', 'c-harbor', 'c-forest'].includes(data.cls) ? data.cls : base.cls || 'c-city';
+      return {
+        id: String(typeof entry === 'string' ? entry : data.id || `video-${index + 1}`),
+        title: String(data.title || `Video ${index + 1}`),
+        url: String(data.url || ''),
+        art,
+        cls
+      };
+    }).filter((video) => video.url);
+  }
+  function choiceLines(step) {
+    return choiceOptions(step).map((choice) => `${choice.label} | ${choice.icon.replace(/^i-/, '')}`).join('\n');
+  }
+  function videoLines(step) {
+    const videos = videoOptions(step);
+    const defaults = videos.length ? videos : [videoOptions({ videos: ['city'] })[0]];
+    return defaults.map((video) => `${video.title} | ${video.url} | ${video.art.replace('art-', '')}`).join('\n');
+  }
   function suggestActivityTime() {
     const input = document.getElementById('activityTime');
     const occupied = new Set(state.items.map((item) => item.start));
@@ -290,30 +327,65 @@
     const hours = Math.floor(total / 60);
     return `${hours % 12 || 12}:${String(total % 60).padStart(2, '0')}`;
   };
-  const pictogramUrl = (id) => /^\d+$/.test(String(id)) ? `https://static.arasaac.org/pictograms/${id}/${id}_300.png` : '';
+  const pictogramUrl = (id) => {
+    const value = String(id || '').trim();
+    if (/^\d+$/.test(value)) return `https://static.arasaac.org/pictograms/${value}/${value}_300.png`;
+    return /^https:\/\//i.test(value) ? value : '';
+  };
 
-  function videoCard(stepId, key, selectable) {
-    const video = VIDEOS[key];
-    const tag = stepId === 's4' ? (key === 'city' ? 'AGAIN' : 'NEW') : stepId === 's6' ? (key === 'forest' ? 'NEW' : 'AGAIN') : '';
-    return `<article class="vid ${video.cls}" data-video="${key}">
+  function videoCard(stepId, video, selectable) {
+    const tag = stepId === 's4' ? (video.id === 'city' ? 'AGAIN' : video.id === 'harbor' ? 'NEW' : '') : stepId === 's6' ? (video.id === 'forest' ? 'NEW' : ['city', 'harbor'].includes(video.id) ? 'AGAIN' : '') : '';
+    return `<article class="vid ${video.cls}" data-video="${esc(video.id)}">
       <svg class="art" viewBox="0 0 160 90" role="img" aria-label="${esc(video.title)} illustrated thumbnail"><use href="#${video.art}"></use></svg>
       <div class="body">${tag ? `<span class="tag">${tag}</span>` : ''}<h3>${esc(video.title)}</h3>
-        <div class="btns">${selectable ? `<button type="button" class="pick" data-step="${stepId}" data-video="${key}">Pick</button>` : ''}<a class="watch" href="${video.url}" target="_blank" rel="noopener noreferrer">▶ Watch</a></div>
+        <div class="btns">${selectable ? `<button type="button" class="pick" data-step="${esc(stepId)}" data-video="${esc(video.id)}">Pick</button>` : ''}<a class="watch" href="${esc(video.url)}" target="_blank" rel="noopener noreferrer">▶ Watch</a></div>
       </div>
     </article>`;
   }
 
   function editForm(step) {
+    const followingStart = steps().find((item) => item.id !== step.id && item.start > step.start)?.start ?? 240;
+    const maxDuration = Math.max(1, followingStart - step.start);
+    const duration = Math.min(Math.max(1, (step.end ?? step.start + 10) - step.start), maxDuration);
     return `<form class="edit-form" data-edit-form="${esc(step.id)}" ${editingId === step.id ? '' : 'hidden'}>
-      <div class="field"><label for="edit-time-${esc(step.id)}">Time</label><input id="edit-time-${esc(step.id)}" name="time" type="time" min="15:00" max="18:29" value="${timeValue(step.start)}" required></div>
-      <div class="field"><label for="edit-title-${esc(step.id)}">Activity title</label><input id="edit-title-${esc(step.id)}" name="title" value="${esc(step.title)}" maxlength="80" required></div>
-      <div class="field instructions-field"><label for="edit-instructions-${esc(step.id)}">Instructions</label><textarea id="edit-instructions-${esc(step.id)}" name="instructions" maxlength="240">${esc(step.sub || '')}</textarea></div>
+      <div class="field"><label for="edit-time-${esc(step.id)}">Start time</label><input id="edit-time-${esc(step.id)}" name="time" type="time" min="15:00" max="18:30" value="${timeValue(step.start)}" required></div>
+      <div class="field"><label for="edit-duration-${esc(step.id)}">Duration (minutes)</label><input id="edit-duration-${esc(step.id)}" name="duration" type="number" min="1" max="${maxDuration}" value="${duration}" required><span class="helper">This activity ends before the next scheduled start.</span></div>
+      <div class="field full-field"><label for="edit-title-${esc(step.id)}">Activity title</label><input id="edit-title-${esc(step.id)}" name="title" value="${esc(step.title)}" maxlength="80" required></div>
+      <div class="field full-field"><label for="edit-type-${esc(step.id)}">Activity style</label><select id="edit-type-${esc(step.id)}" name="type">
+        <option value="choice" ${step.type === 'choice' ? 'selected' : ''}>Coleman chooses an activity</option>
+        <option value="watch" ${step.type === 'watch' ? 'selected' : ''}>Watch together</option>
+        <option value="pick" ${step.type === 'pick' ? 'selected' : ''}>Coleman picks a video</option>
+        <option value="custom" ${step.type === 'custom' ? 'selected' : ''}>Simple activity</option>
+        <option value="finish" ${step.type === 'finish' ? 'selected' : ''}>End of schedule</option>
+      </select></div>
+      <div class="edit-options" data-edit-section="choices" ${step.type === 'choice' ? '' : 'hidden'}>
+        <label for="edit-choices-${esc(step.id)}">Choice buttons</label>
+        <textarea id="edit-choices-${esc(step.id)}" name="choices" rows="4" maxlength="500">${esc(choiceLines(step))}</textarea>
+        <span class="helper">One per line. Optional icon after |: toys, video, water, or move.</span>
+      </div>
+      <div class="edit-options" data-edit-section="videos" ${step.type === 'watch' || step.type === 'pick' ? '' : 'hidden'}>
+        <label for="edit-videos-${esc(step.id)}">Video links</label>
+        <textarea id="edit-videos-${esc(step.id)}" name="videos" rows="3" maxlength="1200">${esc(videoLines(step))}</textarea>
+        <span class="helper">One per line: Video title | https://… | art (city, harbor, forest).</span>
+      </div>
+      <div class="edit-options" data-edit-section="icon" ${step.type === 'custom' ? '' : 'hidden'}>
+        <label for="edit-icon-${esc(step.id)}">Picture (optional)</label>
+        <input id="edit-icon-${esc(step.id)}" name="iconId" value="${esc(step.iconId || '')}" maxlength="300" placeholder="ARASAAC pictogram ID or https:// image URL">
+        <span class="helper">Paste an ARASAAC pictogram ID or a direct HTTPS image URL.</span>
+      </div>
+      <div class="field full-field"><label for="edit-instructions-${esc(step.id)}">Instructions</label><textarea id="edit-instructions-${esc(step.id)}" name="instructions" maxlength="240">${esc(step.sub || '')}</textarea></div>
+      <div class="edit-error" data-edit-error role="status" aria-live="polite"></div>
       <div class="edit-actions"><button class="primary-button" type="submit">Save activity</button><button class="secondary-button" type="button" data-action="cancel-edit">Cancel</button></div>
     </form>`;
   }
 
   function rowActions(step, index, total) {
-    if (!state.editing || step.type === 'finish') return '';
+    if (!state.editing) return '';
+    if (step.type === 'finish') {
+      return `<div class="row-actions" aria-label="Activity actions">
+        <button class="row-action" type="button" data-action="edit" data-id="${esc(step.id)}" aria-label="Edit ${esc(step.title)}" title="Edit">${icon('i-edit')}</button>
+      </div>`;
+    }
     return `<div class="row-actions" aria-label="Activity actions">
       <button class="row-action" type="button" data-action="edit" data-id="${esc(step.id)}" aria-label="Edit ${esc(step.title)}" title="Edit">${icon('i-edit')}</button>
       <button class="row-action delete" type="button" data-action="delete" data-id="${esc(step.id)}" aria-label="Delete ${esc(step.title)}" title="Delete">${icon('i-trash')}</button>
@@ -336,14 +408,15 @@
       const done = step.type !== 'finish' ? `<button type="button" class="done-btn" data-done="${step.id}" aria-label="Mark ${esc(step.title)} done"><svg aria-hidden="true"><use href="#i-check"></use></svg></button>` : '';
       let content = '';
       if (step.type === 'choice') {
-        content = `<p class="sub">Pick what to do:</p><div class="chips">${CHOICES.map((choice) => `<button type="button" class="chip" data-step="${step.id}" data-chip="${choice.id}" aria-pressed="${state.chips[step.id] === choice.id}">${icon(choice.icon)}<span>${choice.label}</span></button>`).join('')}</div>`;
+        content = `<p class="sub">${esc(step.sub || 'Pick what to do:')}</p><div class="chips">${choiceOptions(step).map((choice) => `<button type="button" class="chip" data-step="${esc(step.id)}" data-chip="${esc(choice.id)}" aria-pressed="${state.chips[step.id] === choice.id}">${icon(choice.icon)}<span>${esc(choice.label)}</span></button>`).join('')}</div>`;
       } else if (step.type === 'watch' || step.type === 'pick') {
-        content = `<p class="sub">${esc(step.sub)}</p><div class="videos ${step.videos.length === 2 ? 'two' : step.videos.length === 3 ? 'three' : 'one'}">${step.videos.map((key) => videoCard(step.id, key, step.type === 'pick')).join('')}</div>${step.type === 'watch' ? '<p class="return-choice">↩ Then: Coleman’s choice</p>' : ''}`;
+        const videos = videoOptions(step);
+        content = `<p class="sub">${esc(step.sub || '')}</p><div class="videos ${videos.length === 2 ? 'two' : videos.length === 3 ? 'three' : 'one'}">${videos.map((video) => videoCard(step.id, video, step.type === 'pick')).join('')}</div>${step.type === 'watch' ? '<p class="return-choice">↩ Then: Coleman’s choice</p>' : ''}`;
       } else if (step.type === 'custom') {
         const customIcon = pictogramUrl(step.iconId);
         content = `<div class="custom-activity">${customIcon ? `<img class="custom-icon" src="${customIcon}" alt="">` : ''}<p>${esc(step.sub || 'We can do this together.')}</p></div>`;
       } else {
-        content = '<p class="sub">Great job today, Coleman!</p>';
+        content = `<p class="sub">${esc(step.sub || 'Great job today, Coleman!')}</p>`;
       }
       return `<li class="step${step.type === 'finish' ? ' finish' : ''}${state.done[step.id] ? ' is-done' : ''}" data-id="${esc(step.id)}">${time}<article class="box"><span class="nowtag">NOW</span><div class="head"><h2>${esc(step.title)}</h2>${done}</div>${content}${editForm(step)}</article>${rowActions(step, index, items.length)}</li>`;
     }).join('');
@@ -352,9 +425,10 @@
   }
 
   function applyPicks() {
-    ['s4', 's6'].forEach((stepId) => {
+    steps().filter((step) => step.type === 'pick').forEach((step) => {
+      const stepId = step.id;
       const picked = state.picks[stepId];
-      document.querySelectorAll(`#${stepId} .vid`).forEach((card) => {
+      document.querySelectorAll(`[data-id="${CSS.escape(stepId)}"] .vid`).forEach((card) => {
         const key = card.dataset.video;
         card.classList.toggle('picked', picked === key);
         card.classList.toggle('dim', !!picked && picked !== key);
@@ -366,17 +440,16 @@
 
   function labelFor(step) {
     if (!step) return '';
-    if (step.type === 'pick' && state.picks[step.id]) return `Watch ${VIDEOS[state.picks[step.id]].title}`;
-    if (step.type === 'watch') return `Watch ${VIDEOS.city.title}`;
-    if (step.type === 'choice' && state.chips[step.id]) return CHOICES.find((choice) => choice.id === state.chips[step.id])?.label || step.title;
+    if (step.type === 'pick' && state.picks[step.id]) return `Watch ${videoOptions(step).find((video) => video.id === state.picks[step.id])?.title || step.title}`;
+    if (step.type === 'watch') return `Watch ${videoOptions(step)[0]?.title || step.title}`;
+    if (step.type === 'choice' && state.chips[step.id]) return choiceOptions(step).find((choice) => choice.id === state.chips[step.id])?.label || step.title;
     return step.title;
   }
 
   function effectiveEnd(items, index) {
     const step = items[index];
     const nextStart = items[index + 1]?.start ?? 240;
-    if (step.type === 'choice' || step.type === 'custom') return nextStart;
-    return Math.min(step.end ?? step.start + 10, nextStart);
+    return Math.min(step.end ?? (step.type === 'choice' ? nextStart : step.start + 10), nextStart);
   }
 
   function tick() {
@@ -483,18 +556,134 @@
     document.querySelector(`[data-id="${CSS.escape(id)}"]`)?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
   }
 
+  function editError(form, message) {
+    form.querySelector('[data-edit-error]').textContent = message;
+  }
+
+  function updateEditSections(form) {
+    const type = form.elements.type.value;
+    form.querySelector('[data-edit-section="choices"]').hidden = type !== 'choice';
+    form.querySelector('[data-edit-section="videos"]').hidden = type !== 'watch' && type !== 'pick';
+    form.querySelector('[data-edit-section="icon"]').hidden = type !== 'custom';
+  }
+
+  function updateEditDurationLimit(form) {
+    const start = minuteValue(form.elements.time.value);
+    if (!Number.isFinite(start)) return;
+    const nextStart = state.items.filter((item) => item.id !== form.dataset.editForm && item.start > start).sort((a, b) => a.start - b.start)[0]?.start ?? 240;
+    const maxDuration = Math.max(1, nextStart - start);
+    form.elements.duration.max = String(maxDuration);
+    if (Number(form.elements.duration.value) > maxDuration) form.elements.duration.value = String(maxDuration);
+  }
+
+  function parseChoiceLines(value, step) {
+    const current = choiceOptions(step);
+    const icons = ['toys', 'video', 'water', 'move'];
+    const lines = value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    return lines.map((line, index) => {
+      const separator = line.indexOf('|');
+      const label = (separator < 0 ? line : line.slice(0, separator)).trim();
+      const iconName = separator < 0 ? '' : line.slice(separator + 1).trim().toLowerCase();
+      if (!label) throw new Error(`Choice ${index + 1} needs a label.`);
+      if (iconName && !icons.includes(iconName)) throw new Error(`Use toys, video, water, or move for the icon on choice ${index + 1}.`);
+      const fallbackIcon = current[index]?.icon.replace(/^i-/, '') || 'toys';
+      return {
+        id: current[index]?.id || `choice-${index + 1}`,
+        label,
+        icon: `i-${iconName || fallbackIcon}`
+      };
+    });
+  }
+
+  function parseVideoLines(value, step) {
+    const current = videoOptions(step);
+    const defaults = Object.values(VIDEOS);
+    const themes = {
+      city: { art: 'art-city', cls: 'c-city' },
+      harbor: { art: 'art-harbor', cls: 'c-harbor' },
+      forest: { art: 'art-forest', cls: 'c-forest' }
+    };
+    const lines = value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    if (!lines.length) throw new Error('Add at least one video title and link.');
+    return lines.map((line, index) => {
+      const separator = line.indexOf('|');
+      if (separator < 1) throw new Error(`Video ${index + 1} needs a title, a |, and a link.`);
+      const title = line.slice(0, separator).trim();
+      const [rawUrl, rawTheme] = line.slice(separator + 1).split('|', 2);
+      const url = rawUrl.trim();
+      const themeName = rawTheme?.trim().toLowerCase();
+      let parsedUrl;
+      try { parsedUrl = new URL(url); } catch { throw new Error(`Video ${index + 1} needs a valid web link.`); }
+      if (!title || !['http:', 'https:'].includes(parsedUrl.protocol)) throw new Error(`Video ${index + 1} needs a title and an http or https link.`);
+      const style = current[index] || defaults[index % defaults.length];
+      if (themeName && !themes[themeName]) throw new Error(`Choose city, harbor, or forest art for video ${index + 1}.`);
+      const art = themes[themeName] || style;
+      return {
+        id: current[index]?.id || `video-${step.id}-${index + 1}`,
+        title,
+        url,
+        art: art.art,
+        cls: art.cls
+      };
+    });
+  }
+
   function saveEdit(form) {
+    editError(form, '');
     const id = form.dataset.editForm;
     const step = state.items.find((item) => item.id === id);
     if (!step) return;
     const data = new FormData(form);
     const start = minuteValue(String(data.get('time')));
-    const duration = Math.max(1, (step.end ?? step.start + 10) - step.start);
+    const duration = Number(data.get('duration'));
+    const type = String(data.get('type'));
+    const title = String(data.get('title')).trim();
+    if (!title) { editError(form, 'Add a title for this activity.'); return; }
+    if (!Number.isFinite(start) || start < 0 || start > 210) { editError(form, 'Choose a start time between 3:00 and 6:30.'); return; }
+    if (!Number.isFinite(duration) || duration < 1 || duration > 240) { editError(form, 'Duration must be between 1 and 240 minutes.'); return; }
+    if (state.items.some((item) => item.id !== id && item.start === start)) {
+      editError(form, 'Another activity already starts at that time. Choose a different time.');
+      form.elements.time.focus();
+      return;
+    }
+    const followingStart = state.items.filter((item) => item.id !== id && item.start > start).sort((a, b) => a.start - b.start)[0]?.start ?? 240;
+    if (start + duration > followingStart) {
+      editError(form, `Shorten this activity or move the next one later than ${timeLabel(followingStart)}.`);
+      form.elements.duration.focus();
+      return;
+    }
+    if (!['choice', 'watch', 'pick', 'custom', 'finish'].includes(type)) { editError(form, 'Choose an activity style.'); return; }
+
+    let choices;
+    let videos;
+    const previousType = step.type;
+    if (type === 'choice') {
+      try { choices = parseChoiceLines(String(data.get('choices') || ''), step); }
+      catch (error) { editError(form, error.message); return; }
+      if (!choices.length) { editError(form, 'Add at least one choice.'); return; }
+    } else if (type === 'watch' || type === 'pick') {
+      try { videos = parseVideoLines(String(data.get('videos') || ''), step); }
+      catch (error) { editError(form, error.message); return; }
+    }
+
+    const iconId = String(data.get('iconId') || '').trim();
+    if (type === 'custom' && iconId && !/^\d+$/.test(iconId) && !/^https:\/\//i.test(iconId)) {
+      editError(form, 'Use an ARASAAC pictogram ID or an https image link.');
+      return;
+    }
     step.start = start;
     step.end = start + duration;
     step.time = timeLabel(start);
-    step.title = String(data.get('title')).trim();
+    step.title = title;
     step.sub = String(data.get('instructions')).trim();
+    step.type = type;
+    if (choices) step.choices = choices;
+    if (videos) step.videos = videos;
+    if (type === 'custom') step.iconId = iconId;
+    if (type === 'finish') delete state.done[id];
+    if (type !== 'choice' || (state.chips[id] && !choices?.some((choice) => choice.id === state.chips[id]))) delete state.chips[id];
+    if (type !== 'pick' || (state.picks[id] && !videos?.some((video) => video.id === state.picks[id]))) delete state.picks[id];
+    if (previousType === 'finish' && type !== 'finish') state.done[id] = false;
     state.items.sort((a, b) => a.start - b.start || (a.type === 'finish' ? 1 : b.type === 'finish' ? -1 : 0));
     editingId = null;
     save();
@@ -578,6 +767,19 @@
       searchPictograms();
     } else if (button.id === 'reset') {
       state.done = {}; state.picks = {}; state.chips = {}; save(); render();
+    }
+  });
+
+  document.addEventListener('change', (event) => {
+    if (event.target.matches('select[name="type"]')) {
+      const form = event.target.closest('[data-edit-form]');
+      if (form) updateEditSections(form);
+    }
+  });
+  document.addEventListener('input', (event) => {
+    if (event.target.matches('input[name="time"]')) {
+      const form = event.target.closest('[data-edit-form]');
+      if (form) updateEditDurationLimit(form);
     }
   });
 
