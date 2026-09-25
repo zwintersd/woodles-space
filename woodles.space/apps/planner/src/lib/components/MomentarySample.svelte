@@ -8,7 +8,7 @@
 	import MomentDetails from './MomentDetails.svelte';
 	import { cleanDetails } from '$lib/momentDetails';
 
-	let { interval, onsaved }: { interval: DayInterval | null; onsaved?: () => void } = $props();
+	let { interval, timeLabel, bellNote, editingPast = false, onreturnnow, onsaved }: { interval: DayInterval | null; timeLabel: string; bellNote: string; editingPast?: boolean; onreturnnow?: () => void; onsaved?: () => void } = $props();
 	const colors = ['#aa526b', '#8061a8', '#467f92', '#98702f', '#548068', '#6676a0'];
 	const defaults: SampleTag[] = INTERVAL_KIND_OPTIONS.filter(o => o.kind !== 'elsewhere').map((o, i) => ({ id: o.kind, name: o.label, color: colors[i], kind: o.kind }));
 	let tags = $derived(store.settings.sampleTags ?? defaults);
@@ -46,21 +46,27 @@
 </script>
 
 <div class="composer" style:--sample-color={chosen?.color ?? '#8061a8'}>
-	<form onsubmit={(event) => { event.preventDefault(); saveSample(); }}>
-		<label class="entry-label" for="moment-entry">{interval?.state === 'past' ? 'What was happening?' : 'What’s happening now?'}</label>
-		<textarea id="moment-entry" placeholder="A few words about this moment…" rows="3" value={draft?.text ?? ''} disabled={!draft} oninput={(event) => { if (draft) draft.text = event.currentTarget.value; feedback = ''; }}></textarea>
-		<div class="labels-heading"><span>Color label <small>optional</small></span><button type="button" onclick={() => { tagDraft = tags.map(t => ({ ...t })); labelError = ''; editing = !editing; }}>Edit labels</button></div>
-		<div class="labels" role="group" aria-label="Sample color label">
-			<button type="button" class="tag" aria-pressed={!draft?.tagId} disabled={!draft} onclick={() => { if (draft) draft.tagId = ''; feedback = ''; }}>No label</button>
-			{#each tags as tag (tag.id)}
-				<button type="button" class="tag" style:--tag-color={tag.color} aria-pressed={draft?.tagId === tag.id} disabled={!draft} onclick={() => { if (draft) draft.tagId = tag.id; feedback = ''; }}><i aria-hidden="true"></i>{tag.name}</button>
-			{/each}
-			{#if chosen && !tags.some(t => t.id === chosen.id)}<span class="retired">{chosen.name} · saved label</span>{/if}
-		</div>
-		{#if interval && draft}{#key interval.key}<MomentDetails bind:details={draft.details} bind:answers={draft.answers} text={draft.text} tagName={chosen?.name} date={interval.date} start={interval.startTime} previous={store.getObservationsForDate(interval.date)} onchange={() => feedback = ''} />{/key}{/if}
-		<div class="save-row"><span role="status">{feedback || (interval ? 'Your words first. Add a label if it helps.' : 'Outside sampling hours. Add an earlier activity below.')}</span><button class="save" disabled={!draft?.text.trim()}>{interval?.observation?.intervalStart === interval?.startTime && interval?.observation ? 'Save changes' : 'Save moment'}</button></div>
-	</form>
-	{#if editing}
+	<div class="composer-grid">
+		<div class="sample-primary">
+			<div class="sampler-meta">
+				<div><p class="interval-clock">{timeLabel}</p><p class="bell-note">{bellNote}</p></div>
+				<span class="sample-source">momentary sample</span>
+			</div>
+			{#if editingPast}<button type="button" class="return-now" onclick={onreturnnow}>Return to now</button>{/if}
+			<form onsubmit={(event) => { event.preventDefault(); saveSample(); }}>
+				<label class="entry-label" for="moment-entry">{interval?.state === 'past' ? 'What was happening?' : 'What’s happening now?'}</label>
+				<textarea id="moment-entry" placeholder="A few words about this moment…" rows="3" value={draft?.text ?? ''} disabled={!draft} oninput={(event) => { if (draft) draft.text = event.currentTarget.value; feedback = ''; }}></textarea>
+				<div class="labels-heading"><span>Color label <small>optional</small></span><button type="button" onclick={() => { tagDraft = tags.map(t => ({ ...t })); labelError = ''; editing = !editing; }}>Edit labels</button></div>
+				<div class="labels" role="group" aria-label="Sample color label">
+					<button type="button" class="tag" aria-pressed={!draft?.tagId} disabled={!draft} onclick={() => { if (draft) draft.tagId = ''; feedback = ''; }}>No label</button>
+					{#each tags as tag (tag.id)}
+						<button type="button" class="tag" style:--tag-color={tag.color} aria-pressed={draft?.tagId === tag.id} disabled={!draft} onclick={() => { if (draft) draft.tagId = tag.id; feedback = ''; }}><i aria-hidden="true"></i>{tag.name}</button>
+					{/each}
+					{#if chosen && !tags.some(t => t.id === chosen.id)}<span class="retired">{chosen.name} · saved label</span>{/if}
+				</div>
+				<div class="save-row"><span role="status">{feedback || (interval ? 'Your words first. Add a label if it helps.' : 'Outside sampling hours. Add an earlier activity below.')}</span><button class="save" disabled={!draft?.text.trim()}>{interval?.observation?.intervalStart === interval?.startTime && interval?.observation ? 'Save changes' : 'Save moment'}</button></div>
+			</form>
+			{#if editing}
 		<form class="label-editor" aria-label="Edit sample labels" onsubmit={(event) => { event.preventDefault(); saveLabels(); }}>
 			<p>Name your labels and choose their colors.</p>
 			{#each tagDraft as tag, index (tag.id)}
@@ -70,11 +76,30 @@
 			<p role="status">{labelError}</p>
 			<small>Changes apply to future saves. Recorded moments keep their saved labels.</small>
 		</form>
-	{/if}
+			{/if}
+		</div>
+		<aside class="checkin-panel" aria-labelledby="checkin-heading">
+			<header><h2 id="checkin-heading">Check in</h2><p>Touch only what matters</p></header>
+			{#if interval && draft}{#key interval.key}<MomentDetails bind:details={draft.details} bind:answers={draft.answers} text={draft.text} tagName={chosen?.name} date={interval.date} start={interval.startTime} previous={store.getObservationsForDate(interval.date)} onchange={() => feedback = ''} />{/key}
+			{:else}<p class="checkin-empty">A check in is available while recording a moment.</p>{/if}
+		</aside>
+	</div>
 </div>
 
 <style>
-	.composer { margin-top: 1rem; }
+	.composer { margin-top: 0; }
+	.composer-grid { display: grid; grid-template-columns: minmax(0, 1.85fr) minmax(18rem, 0.95fr); gap: 1rem; align-items: start; }
+	.sample-primary { min-width: 0; }
+	.sampler-meta { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 0.75rem; }
+	.interval-clock { margin: 0; color: var(--car-ink); font: clamp(1.35rem, 3vw, 2rem)/1 var(--car-counter); letter-spacing: 0.04em; }
+	.bell-note { margin: 0.3rem 0 0; color: var(--car-ink-soft); font: 0.58rem var(--car-mono); letter-spacing: 0.08em; }
+	.sample-source { border: 1px solid rgba(68, 54, 91, 0.18); border-radius: 999px; padding: 0.24rem 0.55rem; color: var(--car-ink-soft); font: 0.52rem var(--car-mono); letter-spacing: 0.11em; text-transform: uppercase; }
+	.return-now { margin-bottom: 0.65rem; border: 1px solid #44365b2b; border-radius: 0.5rem; background: #ffffff60; padding: 0.4rem 0.6rem; color: var(--car-ink); font: 0.7rem var(--car-body); cursor: pointer; }
+	.checkin-panel { min-width: 0; padding: 0.85rem; border: 1px solid var(--car-line); border-radius: 0.85rem; background: var(--car-wash); }
+	.checkin-panel header { margin-bottom: 0.65rem; }
+	.checkin-panel h2 { margin: 0; color: var(--car-ink); font: 500 1.35rem/1.05 var(--car-display); }
+	.checkin-panel header p { margin: 0.25rem 0 0; color: var(--car-ink-soft); font: 0.72rem var(--car-body); }
+	.checkin-empty { color: var(--car-ink-soft); font-size: 0.8rem; }
 	.entry-label { display: block; font: 500 clamp(1.6rem, 2.5vw, 2.2rem)/1.1 var(--car-display); margin-bottom: 0.7rem; }
 	textarea { display: block; width: 100%; resize: vertical; min-height: 6rem; border: 1px solid #44365b33; border-left: 4px solid var(--sample-color); border-radius: 0.65rem; background: #ffffff80; box-shadow: inset 0 2px 5px #44365b12; padding: 0.8rem; color: var(--car-ink); font: 1rem/1.5 var(--car-body); transition: border-color 180ms ease; }
 	.labels-heading, .save-row { display: flex; align-items: center; justify-content: space-between; gap: 0.65rem; margin: 0.8rem 0 0.5rem; }
@@ -98,5 +123,6 @@
 	.editor-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 	.retired { font-size: 0.7rem; padding: 0.5rem; }
 	:focus-visible { outline: 2px solid var(--car-pink-dark); outline-offset: 3px; }
+	@media (max-width: 900px) { .composer-grid { grid-template-columns: minmax(0, 1fr); } }
 	@media (prefers-reduced-motion: reduce) { textarea, .tag { transition: none; } .tag, button:active:not(:disabled), .tag:hover:not(:disabled), .tag[aria-pressed='true'] { transform: none; } }
 </style>

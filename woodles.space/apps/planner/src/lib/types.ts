@@ -153,6 +153,7 @@ export type BinderTab =
 	| 'holidays'
 	| 'shapes'
 	| 'week-pattern'
+	| 'schedule'
 	| 'sync'
 	| null;
 
