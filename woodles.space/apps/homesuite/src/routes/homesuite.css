@@ -94,6 +94,10 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .inspector-actions button { border: 1px solid #ded2e2; border-radius: 7px; padding: 8px 9px; background: #fffafc; color: #604a70; text-align: left; font-size: 11px; font-weight: 600; }
 .inspector-actions button:hover:not(:disabled) { background: #f0e7f3; }
 .inspector-actions button:disabled { opacity: .45; cursor: default; }
+.inspector-controls { display: grid; gap: 12px; margin-top: 18px; }
+.inspector-controls label { display: grid; gap: 6px; color: #96889a; font: 10px var(--font-mono); text-transform: uppercase; letter-spacing: .07em; }
+.inspector-controls input { width: 100%; height: 34px; border: 1px solid #e3d9e4; border-radius: 7px; padding: 0 8px; outline-color: #9879a3; color: #4b3c53; background: #fffdfa; font: 12px var(--font-sans); text-transform: none; letter-spacing: normal; }
+.inspector-controls input:disabled { color: #8b7e8e; background: #f4f0f3; }
 .inspector-detail { width: 100%; margin-top: 23px; border: 1px solid #d8c6dd; border-radius: 8px; padding: 9px; background: #f4ebf6; color: #644673; font-size: 11px; font-weight: 650; text-align: left; }
 .inspector-detail:hover { background: #eaddf0; }
 .missing-artifact { margin: auto; text-align: center; padding: 80px 20px; }
@@ -114,6 +118,17 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .palette-results button:disabled { opacity: .45; cursor: default; }
 .palette-results small { color: #9c89a3; font: 10px var(--font-mono); }
 .palette-results p { margin: 0; padding: 24px; color: #9b8a9f; text-align: center; font-size: 13px; }
+.template-backdrop { position: fixed; z-index: 40; inset: 0; display: grid; place-items: center; padding: 20px; background: #21182b73; }
+.template-dialog { width: min(510px, 100%); border: 1px solid #e0d5e3; border-radius: 16px; background: #fffcf9; box-shadow: 0 24px 65px #20162b56; padding: 25px; }
+.template-dialog h2 { margin: 10px 0 5px; color: #402f49; font: 500 32px var(--font-optical); }
+.template-dialog > p { margin: 0 0 18px; color: #837487; font: 13px/1.5 var(--font-body); }
+.template-options { display: grid; gap: 6px; }
+.template-options button { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; align-items: center; border: 1px solid #ece4eb; border-radius: 9px; padding: 10px 12px; background: #fffefa; text-align: left; color: #513e5e; }
+.template-options button:hover { border-color: #cbb8d2; background: #f7f1f7; }
+.template-options button span { font-size: 13px; font-weight: 650; }
+.template-options button small { grid-column: 1; color: #96899a; font: 11px var(--font-body); }
+.template-options button b { grid-column: 2; grid-row: 1 / span 2; color: #9e87a8; font-weight: 400; }
+.template-cancel { border: 0; background: transparent; padding: 11px 0 0; color: #887a8d; font-size: 11px; }
 
 @media (max-width: 800px) {
   .suite-topbar { padding: 0 12px; gap: 8px; }

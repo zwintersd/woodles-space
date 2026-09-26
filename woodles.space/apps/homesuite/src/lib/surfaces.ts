@@ -10,20 +10,22 @@ import {
 } from '../../../write/src/lib/drafts';
 import { boardLibrary } from '../../../whiteboard/src/lib/library';
 import type { HomeSuiteArtifactKind, WoodlesRef } from '@shared/homesuiteBridge';
+import { createCollection, loadCollections, saveCollections, type CollectionTemplate } from '../../../data/src/lib/collections';
 
 export type HomeSuiteArtifact = {
 	ref: WoodlesRef;
 	kind: HomeSuiteArtifactKind;
 	title: string;
 	updatedAt: string;
+	recordCount?: number;
 };
 
 export type HomeSuiteSurfaceAdapter = {
-	kind: 'document' | 'board';
+	kind: HomeSuiteArtifactKind;
 	label: string;
 	plural: string;
 	list: () => HomeSuiteArtifact[];
-	create: () => HomeSuiteArtifact;
+	create: (template?: CollectionTemplate) => HomeSuiteArtifact;
 	embedHref: (id: string) => string;
 };
 
@@ -69,6 +71,21 @@ export const surfaces: readonly HomeSuiteSurfaceAdapter[] = [
 			};
 		},
 		embedHref: (id) => `${entityHref('whiteboard', 'board', id)}&homesuite=1`
+	},
+	{
+		kind: 'collection', label: 'Collection', plural: 'Collections',
+		list: () => loadCollections().value.collections.map((collection) => ({
+			ref: { app: 'data', kind: 'collection', id: collection.id }, kind: 'collection',
+			title: collection.title, updatedAt: collection.updatedAt, recordCount: collection.records.length
+		})),
+		create: (template = 'blank') => {
+			const library = loadCollections().value;
+			const collection = createCollection('Untitled collection', template);
+			const result = saveCollections({ collections: [...library.collections, collection] });
+			if (!result.ok) throw new Error(result.issue?.message ?? 'Could not create Collection.');
+			return { ref: { app: 'data', kind: 'collection', id: collection.id }, kind: 'collection', title: collection.title, updatedAt: collection.updatedAt, recordCount: 0 };
+		},
+		embedHref: (id) => `${entityHref('data', 'collection', id)}&homesuite=1`
 	}
 ];
 

@@ -24,9 +24,16 @@ so it's not easy to forget.
   and Whiteboard boards into one recent-first index, with a shared New menu,
   navigation, title, commands, Undo/Redo, and inspector around their native
   editors. The homepage now opens this room while direct `/write` and
-  `/whiteboard` links still reach the things those apps own. Collections have
-  a place in the index for the next pass; no data model or presentation mode
-  has been added yet.
+  `/whiteboard` links still reach the things those apps own.
+- **HomeSuite Data: Collections and Table** — Collections now have a versioned
+  domain store with required Primary fields, native and `WoodlesRef`-backed
+  records, local fields, templates, and independent Table widths/order.
+  `/homesuite` lists and opens them in the shared shell; the Data surface has
+  direct cell editing, keyboard movement, field creation, select options,
+  reference relations, and the shared Inspector/undo controls. Browser QA
+  exercised templates, row creation, direct cell edits, select values,
+  Inspector field editing, and undo; the Data build and check passed, with
+  eight domain/persistence tests and 17 app-manifest contract tests passing.
 - **Carillon: fixed a reactive infinite loop that could wedge the whole
   page** — opening the "new task" composer while a sync passphrase was
   connected made `ThinkingAboutShelf.refresh()`'s reference-churning

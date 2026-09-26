@@ -19,6 +19,7 @@ export type HomeSuiteSurfaceState = {
 	inspector: {
 		title: string;
 		rows: { label: string; value: string }[];
+		controls?: { id: string; label: string; value: string; kind?: 'text' | 'number'; placeholder?: string }[];
 		/** Domain commands shown in the shell's inspector slot. */
 		actions?: { commandId: string; label: string; enabled?: boolean }[];
 	} | null;
@@ -37,6 +38,7 @@ export type HomeSuiteSurfaceMessage =
 export type HomeSuiteShellMessage =
 	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'undo' | 'redo' | 'inspect' | 'focus' }
 	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'command'; commandId: string }
+	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'inspector'; controlId: string; value: string }
 	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'mode'; modeId: string };
 
 export function postHomeSuiteState(state: HomeSuiteSurfaceState): void {
