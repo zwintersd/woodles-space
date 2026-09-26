@@ -2,6 +2,7 @@
 	import { onMount, onDestroy, tick } from 'svelte';
 	import { fly, slide, fade } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
+	import { HOMESUITE_CHANNEL, isHomeSuiteShellMessage, postHomeSuitePaletteRequest, postHomeSuiteState } from '@shared/homesuiteBridge';
 	import Topbar from '$lib/Topbar.svelte';
 	import BottomBar from '$lib/BottomBar.svelte';
 	import EditorToolbar from '$lib/EditorToolbar.svelte';
@@ -223,6 +224,13 @@
 	let saveTimer: ReturnType<typeof setTimeout> | undefined;
 	let measureTimer: ReturnType<typeof setTimeout> | undefined;
 	let hydrated = $state(false);
+	let homeSuiteMode = $state(false);
+	let homeSuiteSelection = $state<{ kind: string; label: string; count?: number } | null>(null);
+	let homeSuiteCanUndo = $state(false);
+	let homeSuiteCanRedo = $state(false);
+	let homeSuiteHistoryTimer: ReturnType<typeof setTimeout> | undefined;
+	let lastEditingElement: HTMLElement | null = null;
+	let pendingHomeSuiteSave = false;
 
 	let draftsList = $state<DraftIndexItem[]>([]);
 	let currentDraftId = $state<string | null>(null);
@@ -332,6 +340,121 @@
 			: [];
 	}
 
+	// HomeSuite owns the surrounding chrome. Write continues to own its draft,
+	// selection, editing commands, and browser editing history.
+	$effect(() => {
+		if (!homeSuiteMode || !hydrated || !currentDraftId) return;
+		postHomeSuiteState({
+			artifact: { id: currentDraftId, kind: 'document', title: title.trim() || 'Untitled document' },
+			selection: homeSuiteSelection,
+			inspector: {
+				title: homeSuiteSelection ? 'Text selection' : 'Document',
+				rows: homeSuiteSelection
+					? [{ label: 'Selected', value: homeSuiteSelection.label }, { label: 'Layer', value: activeLayer }]
+					: [
+						{ label: 'Writing kind', value: activeKindSpec.label },
+						{ label: 'Layer', value: activeLayer },
+						{ label: 'Words', value: String(wordCount) },
+						{ label: 'Pockets', value: String(pockets.length) },
+						{ label: 'Margin notes', value: String(marginNotes.length) }
+					],
+				actions: [
+					{ commandId: 'write.focus-title', label: 'Edit title' },
+					{ commandId: 'write.notes', label: 'Layers & notes' }
+				]
+			},
+			modes: [{ id: 'write', label: 'Write' }],
+			activeMode: 'write',
+			commands: [
+				{ id: 'inspect', label: 'Open Write details' },
+				{ id: 'write.focus-title', label: 'Edit document title' },
+				{ id: 'write.focus-body', label: 'Continue writing' },
+				{ id: 'write.pockets', label: pocketsOpen ? 'Close pockets' : 'Open pockets' },
+				{ id: 'write.notes', label: 'Inspect layers and notes' },
+				{ id: 'write.prompt', label: 'Draft with a prompt' },
+				{ id: 'write.send-to-board', label: 'Send prose to board', enabled: !isListKind }
+			],
+			canUndo: homeSuiteCanUndo,
+			canRedo: homeSuiteCanRedo
+		});
+	});
+
+	function onHomeSuiteFocusIn(event: FocusEvent) {
+		const target = event.target;
+		if (target instanceof HTMLElement && (target.isContentEditable || target instanceof HTMLTextAreaElement)) {
+			lastEditingElement = target;
+			scheduleHomeSuiteHistoryState();
+		}
+	}
+
+	function scheduleHomeSuiteHistoryState() {
+		if (!homeSuiteMode) return;
+		clearTimeout(homeSuiteHistoryTimer);
+		homeSuiteHistoryTimer = setTimeout(() => {
+			try {
+				homeSuiteCanUndo = document.queryCommandEnabled('undo');
+				homeSuiteCanRedo = document.queryCommandEnabled('redo');
+			} catch {
+				homeSuiteCanUndo = false;
+				homeSuiteCanRedo = false;
+			}
+		}, 0);
+	}
+
+	function onHomeSuiteKeydown(event: KeyboardEvent) {
+		if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+		const key = event.key.toLowerCase();
+		if (key === 'k') {
+			event.preventDefault();
+			postHomeSuitePaletteRequest();
+		} else if (key === 'z' || key === 'y') {
+			scheduleHomeSuiteHistoryState();
+		}
+	}
+
+	function onHomeSuiteMessage(event: MessageEvent) {
+		if (event.origin !== window.location.origin || event.source !== window.parent) return;
+		if (!isHomeSuiteShellMessage(event.data)) return;
+		const message = event.data;
+		if (message.action === 'focus') {
+			(isListKind ? titleEl : elFor(activeLayer))?.focus();
+		} else if (message.action === 'inspect') {
+			binderOpen = 'layers';
+		} else if (message.action === 'undo' || message.action === 'redo') {
+			(lastEditingElement ?? elFor(activeLayer))?.focus();
+			document.execCommand(message.action);
+			updateMeta();
+			fgVersion += 1;
+			scheduleSave();
+			scheduleHomeSuiteHistoryState();
+		} else if (message.action === 'command') {
+			switch (message.commandId) {
+				case 'write.focus-title': titleEl?.focus(); break;
+				case 'write.focus-body': elFor(activeLayer)?.focus(); break;
+				case 'write.pockets': pocketsOpen = !pocketsOpen; break;
+				case 'write.notes': binderOpen = 'layers'; break;
+				case 'inspect': binderOpen = 'layers'; break;
+				case 'write.prompt': promptOpen = true; break;
+				case 'write.send-to-board': if (!isListKind) sendToBoard(); break;
+			}
+		}
+	}
+
+	function updateHomeSuiteSelection() {
+		if (!homeSuiteMode || !editorPageEl) return;
+		const selection = window.getSelection();
+		const selected = selection?.toString().trim() ?? '';
+		if (!selection?.anchorNode || !editorPageEl.contains(selection.anchorNode) || !selected) {
+			homeSuiteSelection = null;
+			return;
+		}
+		homeSuiteSelection = {
+			kind: 'text',
+			label: selected.length > 70 ? `${selected.slice(0, 67)}…` : selected,
+			count: selected.split(/\s+/).length
+		};
+	}
+
 	onMount(() => {
 		void initSync();
 		// The shelf names what `#` can reach. Local first (instant, same
@@ -356,6 +479,14 @@
 		if (view.mode === 'spread') activeLayer = view.recto;
 
 		const params = new URLSearchParams(window.location.search);
+		homeSuiteMode = params.get('homesuite') === '1' && window.parent !== window;
+		if (homeSuiteMode) {
+			window.addEventListener('message', onHomeSuiteMessage);
+			window.addEventListener('keydown', onHomeSuiteKeydown, true);
+			window.addEventListener('pagehide', flushHomeSuiteSave);
+			document.addEventListener('focusin', onHomeSuiteFocusIn);
+			document.addEventListener('input', scheduleHomeSuiteHistoryState, true);
+		}
 		const tid = params.get('template');
 		const replyId = params.get('reply');
 		const revisitId = params.get('revisit');
@@ -492,7 +623,7 @@
 		// Stripped immediately, same reasoning as revisitId above.
 		const draftParam = params.get(DRAFT_PARAM);
 		if (draftParam && draftsList.some((d) => d.id === draftParam)) {
-			history.replaceState(null, '', window.location.pathname);
+			if (!homeSuiteMode) history.replaceState(null, '', window.location.pathname);
 			loadDraft(draftParam);
 		}
 
@@ -523,10 +654,17 @@
 	onDestroy(() => {
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('resize', onResize);
+			window.removeEventListener('message', onHomeSuiteMessage);
+			window.removeEventListener('keydown', onHomeSuiteKeydown, true);
+			window.removeEventListener('pagehide', flushHomeSuiteSave);
 			document.removeEventListener('selectionchange', onSelectionChange);
+			document.removeEventListener('focusin', onHomeSuiteFocusIn);
+			document.removeEventListener('input', scheduleHomeSuiteHistoryState, true);
 		}
 		wrapObserver?.disconnect();
 		clearTimeout(noticeTimer);
+		clearTimeout(homeSuiteHistoryTimer);
+		flushHomeSuiteSave();
 	});
 
 	function onResize() {
@@ -696,20 +834,30 @@
 		if (!hydrated) return;
 		if (publishing) return;
 		saveStatus = 'saving';
+		if (homeSuiteMode) pendingHomeSuiteSave = true;
 		clearTimeout(saveTimer);
-		saveTimer = setTimeout(() => {
-			try {
-				const now = new Date().toISOString();
-				if (currentDraftId) {
-					saveDraft(currentDraftId, currentDraftBody(now));
-					draftsList = upsertIndex(draftsList, currentDraftId, title, now, { kind, tags });
-					writeIndex(draftsList);
-				}
-			} catch (e) {
-				// ignore quota / disabled storage
+		saveTimer = setTimeout(persistCurrentDraft, homeSuiteMode ? 250 : 700);
+	}
+
+	function persistCurrentDraft() {
+		try {
+			const now = new Date().toISOString();
+			if (currentDraftId) {
+				saveDraft(currentDraftId, currentDraftBody(now));
+				draftsList = upsertIndex(draftsList, currentDraftId, title, now, { kind, tags });
+				writeIndex(draftsList);
 			}
-			saveStatus = 'saved';
-		}, 700);
+		} catch (e) {
+			// ignore quota / disabled storage
+		}
+		pendingHomeSuiteSave = false;
+		saveStatus = 'saved';
+	}
+
+	function flushHomeSuiteSave() {
+		if (!homeSuiteMode || !pendingHomeSuiteSave || publishing) return;
+		clearTimeout(saveTimer);
+		persistCurrentDraft();
 	}
 
 	$effect(() => {
@@ -913,6 +1061,7 @@
 
 	async function publish() {
 		publishing = true;
+		pendingHomeSuiteSave = false;
 		publishStatus = 'local';
 		publishErrorMessage = null;
 		clearTimeout(saveTimer);
@@ -986,7 +1135,14 @@
 			// ignore
 		}
 		setTimeout(() => {
-			window.location.href = '/letter';
+			if (homeSuiteMode) {
+				window.parent.postMessage(
+					{ channel: HOMESUITE_CHANNEL, source: 'surface', type: 'navigate', target: 'index' },
+					window.location.origin
+				);
+			} else {
+				window.location.href = '/letter';
+			}
 		}, 1800);
 	}
 
@@ -1136,6 +1292,7 @@
 
 	function onSelectionChange() {
 		if (typeof window === 'undefined') return;
+		updateHomeSuiteSelection();
 		if (activeLayer !== 'foreground') {
 			selectionRect = null;
 			selectionAnchorId = null;
@@ -1388,6 +1545,8 @@
 <div class="motif-blob motif-blob-3"></div>
 <div class="motif-blob motif-blob-4"></div>
 
+
+{#if !homeSuiteMode}
 <Topbar
 	{activeLayer}
 	layerIds={LAYER_IDS}
@@ -1405,6 +1564,7 @@
 	onSaveAndClose={saveAndClose}
 	onSendToBoard={sendToBoard}
 />
+{/if}
 
 <DraftsModal
 	bind:open={draftsOpen}
@@ -1448,7 +1608,29 @@
 {/if}
 
 <div class="editor-page" data-layer={activeLayer} data-view={view.mode} bind:this={editorPageEl}>
-	<div class="editor-wrap" data-layer={activeLayer} data-view={view.mode} bind:this={editorWrapEl}>
+	<div class="editor-wrap" class:embedded={homeSuiteMode} data-layer={activeLayer} data-view={view.mode} bind:this={editorWrapEl}>
+		{#if homeSuiteMode}
+			<div class="homesuite-write-tools" aria-label="Write tools">
+				{#if !isListKind}
+					<div class="homesuite-write-tool-group" role="group" aria-label="Page layout">
+						<button class:active={view.mode === 'page'} aria-pressed={view.mode === 'page'} onclick={() => setViewMode('page')}>page</button>
+						<button class:active={view.mode === 'spread'} aria-pressed={view.mode === 'spread'} onclick={() => setViewMode('spread')}>spread</button>
+					</div>
+					{#if view.mode === 'page'}
+						<div class="homesuite-write-tool-group" role="group" aria-label="Writing layer">
+							{#each LAYER_IDS as id}
+								<button class:active={activeLayer === id} aria-pressed={activeLayer === id} title={LAYER_TITLES[id]} onclick={() => setActiveLayer(id)}>{LAYER_LABELS[id]}</button>
+							{/each}
+						</div>
+					{/if}
+				{/if}
+				<button class:active={pocketsOpen} aria-pressed={pocketsOpen} onclick={() => (pocketsOpen = !pocketsOpen)}>pockets{pockets.length ? ` · ${pockets.length}` : ''}</button>
+				<button onclick={() => (binderOpen = 'layers')}>layers &amp; notes</button>
+				<button onclick={() => (promptOpen = true)}>✦ prompt</button>
+				<button onclick={sendToBoard} disabled={isListKind}>send to board</button>
+				<button class:active={syncOpen} aria-pressed={syncOpen} onclick={() => (syncOpen = !syncOpen)}>echoes</button>
+			</div>
+		{/if}
 		{#if replyTo && replyToTitle}
 			<a class="reply-breadcrumb" href="/letter?id={replyTo}" title="back to source letter">
 				<span class="reply-breadcrumb-eyebrow">in reply to</span>
@@ -1718,6 +1900,31 @@
 		padding: 84px clamp(1.5rem, 5vw, 2.5rem) 96px;
 		transition: max-width 0.3s ease;
 	}
+	.editor-wrap.embedded { padding-top: 24px; }
+	.homesuite-write-tools {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem;
+		margin-bottom: 2.25rem;
+		font-family: var(--editor-mono, var(--font-mono));
+	}
+	.homesuite-write-tool-group { display: inline-flex; gap: 2px; margin-right: 0.35rem; }
+	.homesuite-write-tools button {
+		border: 1px solid color-mix(in srgb, var(--rule) 75%, transparent);
+		border-radius: 6px;
+		background: color-mix(in srgb, var(--surface) 80%, transparent);
+		color: var(--muted);
+		padding: 0.38rem 0.58rem;
+		font: inherit;
+		font-size: 0.59rem;
+		letter-spacing: 0.04em;
+		cursor: pointer;
+	}
+	.homesuite-write-tools button:hover,
+	.homesuite-write-tools button.active { color: var(--accent-strong); border-color: var(--accent); }
+	.homesuite-write-tools button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.homesuite-write-tools button:disabled { opacity: 0.45; cursor: not-allowed; }
 	.editor-wrap[data-view='page'][data-layer='midground'] { max-width: 960px; }
 	.editor-wrap[data-view='page'][data-layer='background'] { max-width: 840px; }
 	/* an open notebook needs room for two pages and still has to leave the

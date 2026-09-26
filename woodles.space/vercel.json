@@ -41,6 +41,8 @@
     { "source": "/quiet-room/:path*", "destination": "/apps/quiet-room/:path*" },
     { "source": "/write",           "destination": "/apps/write/dist/index.html" },
     { "source": "/write/:path*",    "destination": "/apps/write/dist/:path*" },
+    { "source": "/homesuite",             "destination": "/apps/homesuite/dist/index.html" },
+    { "source": "/homesuite/:path*",      "destination": "/apps/homesuite/dist/:path*" },
     { "source": "/letter",          "destination": "/apps/letter/index.html" },
     { "source": "/letter/:path*",   "destination": "/apps/letter/:path*" },
     { "source": "/changelog",       "destination": "/apps/changelog/index.html" },

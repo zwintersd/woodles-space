@@ -2018,7 +2018,7 @@
        unicode glyphs, which rendered flat and font-dependent. */
     const ICONS = {
       hygge:      '<path d="M5 9.5h10v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4z"/><path d="M15 10.5h1.6a2.6 2.6 0 0 1 0 5.2H15"/><path d="M8.4 6.3c0-1.1.9-1.4.9-2.6M11.8 6.3c0-1.1.9-1.4.9-2.6"/>',
-      write:      '<path d="M4.5 19.5l1.1-3.9L16.8 4.4a2 2 0 0 1 2.8 2.8L8.4 18.4z"/><path d="M14.6 6.6l2.8 2.8"/>',
+      homesuite:  '<rect x="3.8" y="4.3" width="7.2" height="7.2" rx="1.4"/><rect x="13" y="4.3" width="7.2" height="7.2" rx="1.4"/><rect x="3.8" y="13.3" width="16.4" height="6.4" rx="1.4"/><path d="M7 16.5h10"/>',
       echoes:     '<path fill="currentColor" stroke="none" d="M10.8 5.6c-3.6.7-5.8 3.1-5.8 6.9v5.9h6.2v-6.2H8.3c.1-2 1.1-3.4 2.5-4.2z"/><path fill="currentColor" stroke="none" d="M19.8 5.6c-3.6.7-5.8 3.1-5.8 6.9v5.9h6.2v-6.2h-2.9c.1-2 1.1-3.4 2.5-4.2z"/>',
       marg:       '<path d="M9.3 13.9L13.1 4.8l3.2 9.1"/><path d="M3.8 17.3c5.5-2.4 10.9-2.4 16.4 0"/><path fill="currentColor" stroke="none" d="M7.2 6.8l.5 1.3 1.3.5-1.3.5-.5 1.3-.5-1.3-1.3-.5 1.3-.5z"/>',
       reading:    '<path d="M19.5 14.2A7.6 7.6 0 0 1 9.8 4.5a7.6 7.6 0 1 0 9.7 9.7z"/><path fill="currentColor" stroke="none" d="M17.6 4.4l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/>',
@@ -2030,7 +2030,6 @@
       quiet:      '<rect x="8.8" y="11" width="6.4" height="9" rx="1.6"/><path d="M12 8.6c1.3-1.2 1.3-2.7 0-4.3-1.3 1.6-1.3 3.1 0 4.3z"/><path d="M12 8.6V11"/>',
       player:     '<path d="M6.8 5.4a1 1 0 0 1 1.5-.9l9.6 6.6a1 1 0 0 1 0 1.7l-9.6 6.7a1 1 0 0 1-1.5-.9z"/><path fill="currentColor" stroke="none" d="M19.8 4.2l.45 1.25 1.25.45-1.25.45-.45 1.25-.45-1.25-1.25-.45 1.25-.45z"/>',
       bloomforge: '<circle cx="12" cy="6.4" r="2.4"/><circle cx="6.4" cy="16.6" r="2.4"/><circle cx="17.6" cy="16.6" r="2.4"/><path d="M10.8 8.5 7.6 14.5M13.2 8.5l3.2 6M8.8 16.6h6.4"/><path fill="currentColor" stroke="none" d="M20.3 4.6l.5 1.4 1.4.5-1.4.5-.5 1.4-.5-1.4-1.4-.5 1.4-.5z"/>',
-      whiteboard: '<rect x="4.2" y="5" width="15.6" height="14" rx="2.4"/><path d="M8 9.1h8M8 12h5.2M8 14.9h7.8"/><circle cx="6.8" cy="9.1" r=".7" fill="currentColor" stroke="none"/><circle cx="6.8" cy="12" r=".7" fill="currentColor" stroke="none"/><circle cx="6.8" cy="14.9" r=".7" fill="currentColor" stroke="none"/>',
     };
     const iconSVG = a =>
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"' +
@@ -2049,9 +2048,14 @@
 
     /* pinned apps live in prefs; recents are tracked on every launch */
     if (!Array.isArray(prefs.pins)) prefs.pins = defaultLandingPins.slice();
+    else prefs.pins = [...new Set(prefs.pins.map(id =>
+      id === 'write' || id === 'whiteboard' ? 'homesuite' : id))];
     const RECENTS_KEY = 'woodles-recents';
     let recents = [];
     try { recents = JSON.parse(localStorage.getItem(RECENTS_KEY)) || []; } catch {}
+    if (Array.isArray(recents)) recents = [...new Set(recents.map(id =>
+      id === 'write' || id === 'whiteboard' ? 'homesuite' : id))];
+    else recents = [];
     const byId = id => apps.find(a => a.id === id);
     const isPinned = id => prefs.pins.includes(id);
     function togglePin(id) {
@@ -2067,6 +2071,8 @@
     const LAYOUT_KEY = 'woodles-icon-layout';
     let layout = {};
     try { layout = JSON.parse(localStorage.getItem(LAYOUT_KEY)) || {}; } catch {}
+    if (!layout || typeof layout !== 'object' || Array.isArray(layout)) layout = {};
+    if (!layout.homesuite) layout.homesuite = layout.write || layout.whiteboard;
     function saveLayout() { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); }
 
     const iconsEl = document.getElementById('icons');
@@ -2276,7 +2282,7 @@
       recLabel.style.display = '';
       rec.style.display = '';
       /* every app, banded — not just the unpinned remainder. a band whose
-         only app is pinned (write, where the words go) would otherwise never
+         only app is pinned (HomeSuite) would otherwise never
          show its name, which is the part that says what the app is for. */
       fillBands(allGrid, apps);
       renderRecents();

@@ -155,6 +155,12 @@
 	} from '$lib/surface';
 	import { DEFAULT_VIEW, normalizeView, viewPreferences, type ViewPreferences } from '$lib/view';
 	import { createHandoffQueue } from '@woodles/handoff';
+	import {
+		isHomeSuiteShellMessage,
+		postHomeSuitePaletteRequest,
+		postHomeSuiteState,
+		type HomeSuiteSurfaceState
+	} from '@shared/homesuiteBridge';
 
 	const whiteboardHandoffs = createHandoffQueue('whiteboard');
 	import { STACK_BEHAVIORS, SUGGESTED_STATUSES, TINTS, type Label, type StackBehavior, type Tint } from '$lib/model';
@@ -240,9 +246,13 @@
 	let cameraAnimation = 0;
 	let pointerMoveFrame = 0;
 	let queuedPointerMove: PointerMove | null = null;
-	let loaded = false;
+	let loaded = $state(false);
 	let dirty = false;
 	const pendingAssetDeletes = new Set<string>();
+	const homeSuiteEmbedded = typeof window !== 'undefined' &&
+		window.parent !== window && new URLSearchParams(window.location.search).get('homesuite') === '1';
+	let renamingBoard = $state(false);
+	let renameDraft = $state('');
 
 	// Navigation: where the camera has been, where it can go, and what it says.
 	let history = $state<CameraHistory>(createCameraHistory({ camera: { x: 180, y: 120, zoom: 1 }, label: 'Board' }));
@@ -338,6 +348,78 @@
 	const crumbs = $derived(breadcrumbs(trail, board, board.camera, viewportSize));
 	const results = $derived(searchOpen && searchText.trim() ? searchBoard(board, searchText) : []);
 	const matchIds = $derived(new Set(results.map((hit) => hit.item.id)));
+
+	function homeSuiteInspector(): HomeSuiteSurfaceState['inspector'] {
+		if (chosen.length === 1) {
+			const item = chosen[0];
+			const rows = [
+				{ label: 'Kind', value: item.type[0].toUpperCase() + item.type.slice(1) },
+				{ label: 'Size', value: `${Math.round(item.width)} × ${Math.round(item.height)}` }
+			];
+			const status = statusOf(item);
+			if (status) rows.push({ label: 'Status', value: status });
+			const labels = labelsOn(board, item);
+			if (labels.length) rows.push({ label: 'Labels', value: labels.map((label) => label.name).join(', ') });
+			return {
+				title: itemLabel(item),
+				rows,
+				actions: [
+					{ commandId: 'inspect', label: 'Edit details' },
+					{ commandId: 'duplicate-selection', label: 'Duplicate', enabled: item.type !== 'connector' },
+					{ commandId: 'delete-selection', label: 'Delete' }
+				]
+			};
+		}
+		if (chosen.length > 1) return {
+			title: `${chosen.length} things selected`,
+			rows: [{ label: 'Kinds', value: [...new Set(chosen.map((item) => item.type))].join(', ') }],
+			actions: [
+				{ commandId: 'inspect', label: 'Edit details' },
+				{ commandId: 'duplicate-selection', label: 'Duplicate', enabled: chosen.some((item) => item.type !== 'connector') },
+				{ commandId: 'delete-selection', label: 'Delete' }
+			]
+		};
+		return {
+			title: 'Board',
+			rows: [
+				{ label: 'Things', value: String(board.items.filter((item) => item.type !== 'connector').length) },
+				{ label: 'Frames', value: String(sequence.length) }
+			],
+			actions: [
+				{ commandId: 'rename-board', label: 'Rename board' },
+				{ commandId: 'fit-board', label: 'Fit board' }
+			]
+		};
+	}
+
+	$effect(() => {
+		if (!homeSuiteEmbedded || !loaded) return;
+		postHomeSuiteState({
+			artifact: { id: board.board.id, kind: 'board', title: boardTitleFallback(board.board.title) },
+			selection: chosen.length
+				? { kind: only?.type ?? 'multiple', label: only ? itemLabel(only) : `${chosen.length} things`, count: chosen.length }
+				: null,
+			inspector: homeSuiteInspector(),
+			modes: [{ id: 'edit', label: 'Edit' }],
+			activeMode: 'edit',
+			commands: [
+				{ id: 'rename-board', label: 'Rename board' },
+				{ id: 'save', label: 'Save board', shortcut: '⌘S' },
+				{ id: 'find', label: 'Find on board', shortcut: '/' },
+				{ id: 'add-card', label: 'Add card' },
+				{ id: 'add-frame', label: 'Draw frame' },
+				{ id: 'add-stack', label: 'Add stack' },
+				{ id: 'add-image', label: 'Add image' },
+				{ id: 'fit-board', label: 'Fit board', shortcut: '0' },
+				{ id: 'inspect', label: 'Inspect selection', shortcut: 'I', enabled: chosen.length > 0 },
+				{ id: 'duplicate-selection', label: 'Duplicate selection', shortcut: '⌘D', enabled: chosen.length > 0 },
+				{ id: 'delete-selection', label: 'Delete selection', enabled: chosen.length > 0 },
+				{ id: 'play-journey', label: 'Play journey', enabled: stops.length > 0 }
+			],
+			canUndo: canUndo(editHistory),
+			canRedo: canRedo(editHistory)
+		});
+	});
 
 	/**
 	 * Most of this does not need to be visible all the time. The bars, the
@@ -590,15 +672,72 @@
 		}
 	}
 
+	function syncBoardAddress() {
+		if (typeof window === 'undefined') return;
+		const url = new URL(window.location.href);
+		if (!url.searchParams.has('board')) return;
+		url.searchParams.set('board', board.board.id);
+		window.history.replaceState(window.history.state, '', url);
+	}
+
+	function openRenameBoard() {
+		renameDraft = board.board.title;
+		renamingBoard = true;
+		void tick().then(() => document.getElementById('embedded-board-title')?.focus());
+	}
+
+	function commitBoardRename() {
+		const title = boardTitleFallback(renameDraft);
+		if (title !== board.board.title) {
+			beginEdit('board-title');
+			board.board.title = title;
+			board.updatedAt = now();
+			scheduleSave();
+		}
+		renamingBoard = false;
+	}
+
+	function runHomeSuiteCommand(commandId: string) {
+		switch (commandId) {
+			case 'rename-board': openRenameBoard(); break;
+			case 'save': markDirty(); saveNow(); break;
+			case 'find': void openSearch(); break;
+			case 'add-card': addCardFromDock(); break;
+			case 'add-frame': tool = 'frame'; connectorSourceId = null; notice = 'Drag a region for a frame.'; break;
+			case 'add-stack': addStackFromDock(); break;
+			case 'add-image': imageInput?.click(); break;
+			case 'fit-board': fitBoard(); break;
+			case 'inspect': if (chosen.length) openDetails(); break;
+			case 'duplicate-selection': if (chosen.length) duplicateSelection(); break;
+			case 'delete-selection': if (chosen.length) deleteSelection(); break;
+			case 'play-journey': if (stops.length) beginJourney(); break;
+		}
+	}
+
+	function handleHomeSuiteMessage(event: MessageEvent) {
+		if (!homeSuiteEmbedded || event.origin !== window.location.origin || event.source !== window.parent ||
+			!isHomeSuiteShellMessage(event.data)) return;
+		const message = event.data;
+		if (message.action === 'undo') performUndo();
+		else if (message.action === 'redo') performRedo();
+		else if (message.action === 'inspect') openDetails();
+		else if (message.action === 'focus') canvasEl?.focus();
+		else if (message.action === 'command') runHomeSuiteCommand(message.commandId);
+		else if (message.action === 'mode' && message.modeId === 'edit' && playing) exitJourney();
+	}
+
 	onMount(() => {
 		measureViewport();
 		view = normalizeView(viewPreferences.load().value);
 		wakeChrome();
 		// The one board of the single-board era becomes the first board on the shelf.
 		const adopted = boardLibrary.adoptLegacyBoard();
-		const opened = adopted
-			? { document: adopted, source: 'primary' as const, issue: null }
-			: openLastBoard();
+		const requestedBoardId = new URLSearchParams(window.location.search).get('board');
+		const opened = requestedBoardId
+			? boardLibrary.open(requestedBoardId) ?? openLastBoard()
+			: adopted
+				? { document: adopted, source: 'primary' as const, issue: null }
+				: openLastBoard();
 
 		if (opened) {
 			board = restoreWhiteboard(opened.document);
@@ -622,6 +761,7 @@
 		history = createCameraHistory({ camera: { ...board.camera }, label: 'Where you were' });
 		editHistory = createEditHistory();
 		loaded = true;
+		syncBoardAddress();
 		// Resume at the depth the last session left off at, not at the top.
 		trail = boardLibrary.readTrail().filter((step) => step.boardId !== board.board.id);
 		if (trail.length !== boardLibrary.readTrail().length) boardLibrary.writeTrail(trail);
@@ -633,9 +773,11 @@
 		const onBeforeUnload = () => saveNow();
 		window.addEventListener('beforeunload', onBeforeUnload);
 		window.addEventListener('resize', measureViewport);
+		window.addEventListener('message', handleHomeSuiteMessage);
 		return () => {
 			window.removeEventListener('beforeunload', onBeforeUnload);
 			window.removeEventListener('resize', measureViewport);
+			window.removeEventListener('message', handleHomeSuiteMessage);
 			saveNow();
 		};
 	});
@@ -1862,7 +2004,9 @@
 		renamingLabelId = null;
 		releaseImageUrls();
 		board = restoreWhiteboard(document);
+		syncBoardAddress();
 		selectedIds = [];
+		renamingBoard = false;
 		connectorSourceId = null;
 		renamingFrameId = null;
 		tool = 'select';
@@ -1978,7 +2122,8 @@
 		// Find is reachable from anywhere, including from inside a card.
 		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
 			event.preventDefault();
-			void openSearch(searchOpen ? searchText : '');
+			if (homeSuiteEmbedded) postHomeSuitePaletteRequest();
+			else void openSearch(searchOpen ? searchText : '');
 			return;
 		}
 		if (event.code === 'Space' && !isTextTarget(event.target)) {
@@ -2276,6 +2421,7 @@
 
 <main
 	bind:this={canvasEl}
+	tabindex="-1"
 	class:space-panning={spaceHeld}
 	class:file-dragging={fileDragging}
 	class:chrome-resting={chromeResting}
@@ -2631,6 +2777,7 @@
 	{/if}
 
 	<div class="top-deck">
+	{#if !homeSuiteEmbedded}
 	<header class:hidden={playing} class="topbar" data-whiteboard-ui>
 		<a class="back-link" href="/" aria-label="Back to Woodles">←</a>
 		<div class="board-name">
@@ -2660,6 +2807,7 @@
 			</button>
 		</div>
 	</header>
+	{/if}
 
 	<nav class:hidden={playing || searchOpen} class="location-bar" data-whiteboard-ui aria-label="Board location">
 		{#if trail.length}
@@ -2697,7 +2845,26 @@
 		<button class:active={drawer === 'journey'} class="rail-button" aria-pressed={drawer === 'journey'} title="Arrange a journey through the board" onclick={() => (drawer = drawer === 'journey' ? null : 'journey')}><span aria-hidden="true">⇉</span>Journey</button>
 		<button class="rail-button play" title="Play the journey (P)" onclick={() => beginJourney()}><span aria-hidden="true">▶</span>Play</button>
 	</div>
+
 	</div>
+
+	{#if homeSuiteEmbedded && renamingBoard}
+		<form
+			class="embedded-rename"
+			data-whiteboard-ui
+			aria-label="Rename board"
+			onsubmit={(event) => { event.preventDefault(); commitBoardRename(); }}
+		>
+			<label for="embedded-board-title">Board name</label>
+			<input
+				id="embedded-board-title"
+				bind:value={renameDraft}
+				onkeydown={(event) => { if (event.key === 'Escape') { event.preventDefault(); renamingBoard = false; } }}
+			/>
+			<button class="chip strong" type="submit">Save name</button>
+			<button class="chip" type="button" onclick={() => (renamingBoard = false)}>Cancel</button>
+		</form>
+	{/if}
 
 	{#if searchOpen}
 		<div class="finder" data-whiteboard-ui>
@@ -4003,6 +4170,33 @@
 		pointer-events: none;
 	}
 	.top-deck > * { pointer-events: auto; }
+	.embedded-rename {
+		position: absolute;
+		z-index: 82;
+		top: 72px;
+		left: 22px;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 7px;
+		width: min(480px, calc(100vw - 44px));
+		padding: 11px;
+		border: 1px solid rgba(98, 80, 70, 0.16);
+		border-radius: 14px;
+		background: rgba(255, 253, 248, 0.96);
+		box-shadow: 0 9px 30px rgba(76, 57, 48, 0.14);
+	}
+	.embedded-rename label { width: 100%; color: #76645d; font-size: 11px; font-weight: 700; }
+	.embedded-rename input {
+		flex: 1 1 180px;
+		min-width: 0;
+		padding: 8px 10px;
+		border: 1px solid rgba(98, 80, 70, 0.22);
+		border-radius: 9px;
+		background: #fffdf9;
+		color: #443a36;
+		outline-color: #a76670;
+	}
 
 	.topbar {
 		display: flex;

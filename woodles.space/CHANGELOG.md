@@ -18,6 +18,16 @@ so it's not easy to forget.
 
 ---
 
+## 2026-09-26
+
+- **HomeSuite's first room** — `/homesuite` brings existing Write documents
+  and Whiteboard boards into one recent-first index, with a shared New menu,
+  navigation, title, commands, Undo/Redo, and inspector around their native
+  editors. The homepage now opens this room while direct `/write` and
+  `/whiteboard` links still reach the things those apps own. Collections have
+  a place in the index for the next pass; no data model or presentation mode
+  has been added yet.
+
 ## 2026-09-20
 
 - **cheat codes, hosted** —

@@ -28,9 +28,10 @@ README only for deployment details.
 
 ## how it ships
 
-the static apps go up as-is — one HTML file each, no build step. the seven
-SvelteKit apps (`write`, `marginalia`, `planner`, `bestiary`,
-`thinking-about`, `bloomforge`, `bloomforge-player`) build to `apps/<name>/dist/`. `vercel.json` rewrites each
+the static apps go up as-is — one HTML file each, no build step. the
+SvelteKit apps (`homesuite`, `write`, `marginalia`, `planner`, `bestiary`,
+`thinking-about`, `whiteboard`, `bloomforge`, `bloomforge-player`,
+`grimoire`) build to `apps/<name>/dist/`. `vercel.json` rewrites each
 friendly path to the right file: `/write` → `/apps/write/dist/index.html`,
 `/lab` → `/apps/lab/index.html`, `/digits` → `/apps/digits/index.html`, and so
 on. `lab` is the homepage-facing shelf for stub experiments; the direct

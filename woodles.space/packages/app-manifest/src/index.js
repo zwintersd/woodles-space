@@ -95,8 +95,20 @@ export const appManifest = Object.freeze([
 		packageName: 'write',
 		// A `#` reference to another draft resolves here — the knowledge-base
 		// job Spores retired from (see references.svelte.ts's draft source).
-		addressableBy: ['draft'],
-		landing: tile('write', 2, 'write', 'every kind of writing — letters, essays, stories, poems, and the thought that just arrived', 'var(--aqua)', 'var(--lavender)', '160deg', { defaultPin: 2, featured: 3 })
+		addressableBy: ['draft']
+	},
+	{
+		id: 'homesuite',
+		name: 'HomeSuite',
+		publicPath: '/homesuite',
+		aliases: [],
+		kind: 'sveltekit',
+		maturity: 'growing',
+		sourceDir: 'apps/homesuite',
+		outputDir: 'apps/homesuite/dist',
+		entryFile: 'index.html',
+		packageName: 'homesuite',
+		landing: tile('homesuite', 2, 'write', 'documents, boards, and collections in one place', 'var(--aqua)', 'var(--lilac)', '155deg', { defaultPin: 2, featured: 3 })
 	},
 	{
 		id: 'letter',
@@ -237,7 +249,7 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/whiteboard/dist',
 		entryFile: 'index.html',
 		packageName: 'whiteboard',
-		landing: tile('whiteboard', 12, 'tend', 'when a thought wants to take up space', 'var(--peach)', 'var(--lilac)', '145deg')
+		addressableBy: ['board']
 	},
 	{
 		id: 'bloomforge',
@@ -339,7 +351,7 @@ export const featuredLandingApps = Object.freeze(
  * @type {readonly import('./types').LandingBand[]}
  */
 export const landingBands = Object.freeze([
-	{ id: 'write', label: 'write', blurb: 'where the words go — from stray thought to finished piece', order: 1 },
+	{ id: 'write', label: 'write', blurb: 'documents, boards, and collections begin here', order: 1 },
 	{ id: 'tend', label: 'tend', blurb: 'the things you keep, and keep coming back to', order: 2 },
 	{ id: 'read', label: 'read', blurb: 'finished things, sitting still to be read', order: 3 },
 	{ id: 'play', label: 'play', blurb: 'no goal beyond the doing of it', order: 4 }
