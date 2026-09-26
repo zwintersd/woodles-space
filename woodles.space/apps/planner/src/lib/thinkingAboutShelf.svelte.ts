@@ -37,6 +37,17 @@ function readLocalShelf(): ShelfEntry[] | null {
 	}
 }
 
+// loadLocal() re-parses localStorage on every call, which hands back a brand
+// new array even when nothing published has changed. Assigning that straight
+// to a $state field would make `entries` look "changed" on every read, and
+// any effect that reads it while also calling refresh() (TaskEditDrawer,
+// TodayInstrument) would retrigger itself forever — effect_update_depth_exceeded,
+// and the whole page's reactivity wedges with it. Comparing by value first
+// keeps the reference stable when the shelf itself hasn't moved.
+function sameEntries(a: ShelfEntry[], b: ShelfEntry[]): boolean {
+	return a.length === b.length && JSON.stringify(a) === JSON.stringify(b);
+}
+
 export class ThinkingAboutShelf {
 	entries = $state<ShelfEntry[]>([]);
 	status = $state<ShelfStatus>('idle');
@@ -62,7 +73,7 @@ export class ThinkingAboutShelf {
 	loadLocal(): void {
 		const local = readLocalShelf();
 		if (local === null) return;
-		this.entries = local;
+		if (!sameEntries(this.entries, local)) this.entries = local;
 		this.status = local.length > 0 ? 'ready' : 'empty';
 	}
 
@@ -84,7 +95,7 @@ export class ThinkingAboutShelf {
 			const snapshot = await pull<unknown>(THINKING_ABOUT_SHELF_APP);
 			const blob = readShelfBlob(snapshot.blob);
 			if (blob) {
-				this.entries = blob.entries;
+				if (!sameEntries(this.entries, blob.entries)) this.entries = blob.entries;
 				this.status = blob.entries.length > 0 ? 'ready' : 'empty';
 			} else if (this.entries.length === 0) {
 				this.status = 'empty';

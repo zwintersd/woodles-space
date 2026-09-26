@@ -130,6 +130,37 @@ describe('refreshing from sync', () => {
 	});
 });
 
+describe('reference stability', () => {
+	// loadLocal() re-parses localStorage every call, so a naive `this.entries =
+	// local` hands back a new array reference even when nothing published has
+	// changed. Any effect that reads `entries` while also calling refresh() (as
+	// both TaskEditDrawer and TodayInstrument do) would then retrigger itself
+	// forever on that unchanged reference — Svelte's
+	// effect_update_depth_exceeded, which wedges the whole page's reactivity
+	// and makes every button on it look broken, discard included.
+	it('keeps the same array reference across repeat reads of an unchanged shelf', () => {
+		writeLocal(shelfBlob([{ id: 'e1', title: 'Piranesi' }]));
+		const shelf = new ThinkingAboutShelf();
+		shelf.loadLocal();
+		const first = shelf.entries;
+		shelf.loadLocal();
+		expect(shelf.entries).toBe(first);
+	});
+
+	it('still picks up a real change to the local shelf', () => {
+		writeLocal(shelfBlob([{ id: 'e1', title: 'Piranesi' }]));
+		const shelf = new ThinkingAboutShelf();
+		shelf.loadLocal();
+		const first = shelf.entries;
+
+		writeLocal(shelfBlob([{ id: 'e1', title: 'Piranesi' }, { id: 'e2', title: 'Solaris' }]));
+		shelf.loadLocal();
+
+		expect(shelf.entries).not.toBe(first);
+		expect(shelf.entries.map((e) => e.title)).toEqual(['Piranesi', 'Solaris']);
+	});
+});
+
 describe('grouping and lookup', () => {
 	it('groups by column so a picker reads like the board', () => {
 		writeLocal(
