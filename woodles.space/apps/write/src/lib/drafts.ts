@@ -354,6 +354,33 @@ export interface BootstrapResult {
 	sporesImports: number;
 }
 
+/**
+ * Prepare Write's existing material for a library view without creating an
+ * empty page or changing the draft a standalone Write tab has open. HomeSuite
+ * uses this before listing documents; Write still owns every migration.
+ */
+export function prepareHomeSuiteDrafts(): DraftIndexItem[] {
+	let drafts = listDrafts();
+	if (drafts.length === 0) {
+		const migrated = migrateLegacyDraft();
+		if (migrated) {
+			drafts = [migrated.entry];
+			writeIndex(drafts);
+		}
+	}
+	const notebook = importNotebookCaptures(drafts);
+	if (notebook.count > 0) {
+		drafts = notebook.drafts;
+		writeIndex(drafts);
+	}
+	const spores = importSporesEntries(drafts);
+	if (spores.count > 0) {
+		drafts = spores.drafts;
+		writeIndex(drafts);
+	}
+	return ingestHandoffs(drafts).drafts;
+}
+
 // Returns the initial draft state for the app on first paint. Performs
 // the legacy migration, seeds an empty index when needed, and loads the
 // active draft body.
@@ -362,10 +389,12 @@ export function bootstrap(): BootstrapResult {
 	let activeId = getActiveDraftId();
 
 	if (!activeId) {
-		const migrated = migrateLegacyDraft();
+		const migrated = drafts.length === 0 ? migrateLegacyDraft() : null;
 		if (migrated) {
 			activeId = migrated.id;
 			drafts = [migrated.entry];
+		} else if (drafts.length > 0) {
+			activeId = [...drafts].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0].id;
 		} else {
 			activeId = createDraftId();
 			drafts = [{ id: activeId, title: '', updatedAt: new Date().toISOString() }];

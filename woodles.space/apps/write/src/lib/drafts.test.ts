@@ -14,6 +14,7 @@ import {
 	loadDraft,
 	migrateLegacyDraft,
 	pendingHandoffs,
+	prepareHomeSuiteDrafts,
 	removeDraftBody,
 	saveDraft,
 	sendDraftToBoard,
@@ -218,6 +219,32 @@ describe('bootstrap', () => {
 		expect(boot.drafts[0].title).toBe('legacy');
 		expect(boot.body?.title).toBe('legacy');
 		expect(localStorage.getItem(KEY_LEGACY)).toBeNull();
+	});
+
+	it('opens a prepared existing draft rather than replacing its index', () => {
+		writeIndex([{ id: 'd-existing', title: 'Existing', updatedAt: '2024-01-01' }]);
+		saveDraft('d-existing', { title: 'Existing', content: '<p>kept</p>' });
+		const boot = bootstrap();
+		expect(boot.activeId).toBe('d-existing');
+		expect(boot.body?.title).toBe('Existing');
+		expect(listDrafts()).toHaveLength(1);
+	});
+});
+
+describe('prepareHomeSuiteDrafts', () => {
+	it('does not seed an empty document or change the active draft', () => {
+		expect(prepareHomeSuiteDrafts()).toEqual([]);
+		expect(listDrafts()).toEqual([]);
+		expect(getActiveDraftId()).toBeNull();
+	});
+
+	it('makes a legacy draft available in the library without opening it', () => {
+		localStorage.setItem(KEY_LEGACY, JSON.stringify({ title: 'Legacy', savedAt: '2024-01-01' }));
+		const prepared = prepareHomeSuiteDrafts();
+		expect(prepared).toHaveLength(1);
+		expect(prepared[0].title).toBe('Legacy');
+		expect(getActiveDraftId()).toBeNull();
+		expect(bootstrap().activeId).toBe(prepared[0].id);
 	});
 });
 

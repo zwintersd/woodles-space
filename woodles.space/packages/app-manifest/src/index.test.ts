@@ -25,7 +25,7 @@ const rewrites = new Map(VERCEL.rewrites.map((rewrite) => [rewrite.source, rewri
 const redirects = new Map((VERCEL.redirects ?? []).map((entry) => [entry.source, entry]));
 // A retired app can leave its source directory behind while its public route
 // deliberately redirects elsewhere. It is not a deployable app inventory row.
-const RETIRED_SOURCE_DIRS = new Set(['marginalia-devlog']);
+const RETIRED_SOURCE_DIRS = new Set(['marginalia-devlog', 'notebook', 'spores']);
 
 describe('canonical app inventory', () => {
 	it('accounts for every deployable app directory exactly once', () => {
@@ -105,12 +105,12 @@ describe('route smoke contract', () => {
 });
 
 describe('landing catalogue', () => {
-	it('derives the twelve ordered tiles, pins, and featured fallbacks from the manifest', () => {
-		expect(landingApps).toHaveLength(12);
-		expect(landingApps.map((app) => app.order)).toEqual([...Array(12)].map((_, index) => index + 1));
+	it('derives the eleven ordered tiles, pins, and featured fallbacks from the manifest', () => {
+		expect(landingApps).toHaveLength(11);
+		expect(landingApps.map((app) => app.order)).toEqual([...Array(11)].map((_, index) => index + 1));
 		expect(new Set(landingApps.map((app) => app.id)).size).toBe(landingApps.length);
-		expect(defaultLandingPins).toEqual(['hygge', 'write', 'marg', 'planner', 'quiet']);
-		expect(featuredLandingApps.map((app) => app.id)).toEqual(['marg', 'bestiary', 'write']);
+		expect(defaultLandingPins).toEqual(['hygge', 'homesuite', 'marg', 'planner', 'quiet']);
+		expect(featuredLandingApps.map((app) => app.id)).toEqual(['marg', 'bestiary', 'homesuite']);
 	});
 
 	it('sorts every tile into exactly one known band, losing none', () => {
@@ -132,14 +132,13 @@ describe('landing catalogue', () => {
 		);
 	});
 
-	it('keeps the write band the one front door for words', () => {
-		// The catch band retired with Notebook (CONVERGENCE.md §7): catching a
-		// thought is Write's job now. A resurrected catch band — or a second
-		// app in write — means the routing decision CONVERGENCE.md set out to
-		// remove has grown back.
+	it('keeps HomeSuite the front door for documents and boards', () => {
 		expect(landingBands.some((band) => band.id === 'catch')).toBe(false);
 		const writeBand = landingAppsByBand.find((group) => group.band.id === 'write');
-		expect(writeBand?.apps.map((app) => app.id)).toEqual(['write']);
+		expect(writeBand?.apps.map((app) => app.id)).toEqual(['homesuite']);
+		expect(landingApps.some((app) => app.appId === 'write' || app.appId === 'whiteboard')).toBe(false);
+		expect(appById.write.publicPath).toBe('/write');
+		expect(appById.whiteboard.publicPath).toBe('/whiteboard');
 	});
 
 	it('imports the canonical catalogue and retains artwork for every tile', () => {
@@ -161,6 +160,7 @@ describe('landing catalogue', () => {
 describe('entity addressing', () => {
 	it('builds a record URL from the public path the manifest owns', () => {
 		expect(entityHref('bloomforge-player', 'game', 'proj-1')).toBe('/play?game=proj-1');
+		expect(entityHref('whiteboard', 'board', 'board-1')).toBe('/whiteboard?board=board-1');
 	});
 
 	it('encodes ids that would otherwise break the query string', () => {

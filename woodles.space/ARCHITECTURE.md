@@ -145,6 +145,7 @@ woodles.space/
     ├── lore/                static · renders LORE.md at /lore
     ├── architecture/        static · renders ARCHITECTURE.md at /architecture
     ├── animations/          Python · offline Manim scenes and curated web previews
+    ├── homesuite/            SvelteKit · one index and shared shell for documents and boards
     ├── write/               SvelteKit · the writing surface — letters, essays, stories, poems, notes, and lists that nest and move (Liquid); also the knowledge base now, in a small way (cross-draft references, backlinks, "draft it with a prompt")
     ├── marginalia/          SvelteKit · a witch writes worlds + a reading room
     ├── planner/             SvelteKit · carillon — self-observation, day piles, and reinforcement
@@ -169,19 +170,21 @@ the repository or silently promoting an experiment into a game.
 ## the app manifest
 
 `packages/app-manifest/src/index.js` is the canonical deployable-app inventory.
-It owns the 17 app ids, names, public paths and aliases, app shape, source and
+It owns the 22 app ids, names, public paths and aliases, app shape, source and
 output locations, maturity, and landing visibility. It also owns the landing
 tile order/copy, **band**, default pins, featured fallback, and Marginalia's
 Reading Room sub-surface. A band is the *moment* a tile is for rather than the
 thing it holds — `write`, `tend`, `read`, `play` — and the start
 menu's "all apps" section renders grouped under them (`landingAppsByBand`),
-so the homepage stops presenting fourteen peers to choose between. That section
+so the homepage stops presenting every app as a peer to choose between. That section
 lists every app, not just the unpinned remainder, because a band whose only
 app is pinned would otherwise never show its name. There is no `catch` band
 anymore: Notebook, the app it existed for, retired into Write (CONVERGENCE.md
-§7), and catching a thought is the write band's job now. The suite fails if a
-tile lands in an unknown band, if grouping loses one, if a `catch` band grows
-back, or if a second app joins `write`. See [CONVERGENCE.md](./CONVERGENCE.md).
+§7), and HomeSuite is now the write band's one homepage tile for documents and
+boards. Write and Whiteboard keep their direct routes and own their material.
+The suite fails if a tile lands in an unknown band, if grouping loses one, if
+a `catch` band grows back, or if another tile joins `write`.
+See [CONVERGENCE.md](./CONVERGENCE.md).
 
 The static landing page imports that browser-ready module directly;
 its hand-drawn `ICONS` stay local because they are artwork, not deployment
@@ -190,8 +193,8 @@ metadata.
 It also owns **addressing**: `primaryDestination(app)` answers "where does this
 app live", and `entityHref(appId, kind, id)` answers "where does *this thing*
 live", returning `<publicPath>?<kind>=<id>`. An app opts in by listing the
-record kinds it answers to in `addressableBy` — only `bloomforge-player`
-(`['game']`) does today — and `entityHref` throws on an unknown app or an
+record kinds it answers to in `addressableBy` — for example Write's `draft`
+and Whiteboard's `board` — and `entityHref` throws on an unknown app or an
 undeclared kind, because the manifest is static data so neither is a runtime
 condition a caller could recover from. `canAddress(appId, kind)` is the
 non-throwing check for callers that can't know the pair at author time.
@@ -225,11 +228,32 @@ runtime — `<link href="/shared/palette.css">` and `import … from
 and its bloom post-processing addons from a CDN through a `<script
 type="importmap">`, still with no build step.
 
-**SvelteKit apps** — `write`, `marginalia`, `planner`, `bestiary`,
+**SvelteKit apps** — `homesuite`, `write`, `marginalia`, `planner`, `bestiary`,
 `thinking-about`, `whiteboard`, `bloomforge`, `bloomforge-player` — use Svelte
 5 runes, Vite 7, and `@sveltejs/adapter-static`.
 each builds to `apps/<name>/dist/` and consumes `shared/` through the `@shared`
 Vite alias (`../../shared`). there is no SSR; every app ships as a static bundle.
+
+## homesuite
+
+`/homesuite` is the homepage's entry to documents and boards. Its index reads
+Write's draft index and Whiteboard's versioned board library, orders their
+summaries by recent activity, and creates new material through the owning
+app's storage functions (`apps/homesuite/src/lib/surfaces.ts`). It has no
+second artifact database and does not copy content. Collections have a visible
+place in the index and New menu, but no collection records or editor yet.
+
+HomeSuite keeps one top bar, title area, navigation, command palette,
+Undo/Redo location, and inspector slot around the active editor. Write and
+Whiteboard remain separate static builds and keep their editing models. Their
+`?homesuite=1` views mount inside a same-origin frame and exchange only
+surface state and actions through `shared/homesuiteBridge.ts`: artifact title,
+selection summary, inspector summary, available commands/modes, and history
+availability flow outward; chosen commands and Undo/Redo flow inward. The
+shell validates message origin and frame source. Each surface decides what
+its commands do and keeps its own history and storage. `?draft=` and `?board=`
+remain normal deep links to the owning apps, with `@woodles/app-manifest`
+building those links.
 
 `hygge` is the design playground — it holds the fonts, palette, motifs, and
 motion showcases that used to be separate pages. `/hygge/motion` is the review
