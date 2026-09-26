@@ -33,7 +33,12 @@ so it's not easy to forget.
   reference relations, and the shared Inspector/undo controls. Browser QA
   exercised templates, row creation, direct cell edits, select values,
   Inspector field editing, and undo; the Data build and check passed, with
-  eight domain/persistence tests and 17 app-manifest contract tests passing.
+  eleven domain/persistence/source tests and 17 app-manifest contract tests passing.
+- **Collections can stay current with Bestiary and Marginalia** — the new
+  `Bestiary + Marginalia` template pulls local Bestiary creatures, Marginalia
+  discoveries, and field notes into synced columns on open, focus, and manual
+  refresh. Personal fields survive source updates, and source records link
+  back to their originating app.
 - **Carillon: fixed a reactive infinite loop that could wedge the whole
   page** — opening the "new task" composer while a sync passphrase was
   connected made `ThinkingAboutShelf.refresh()`'s reference-churning

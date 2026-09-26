@@ -13,7 +13,8 @@
 	"dependencies": {
 		"@woodles/app-manifest": "workspace:*",
 		"@woodles/persistence": "workspace:*",
-		"@woodles/sync": "workspace:*"
+		"@woodles/sync": "workspace:*",
+		"@woodles/witch-engine": "workspace:*"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-static": "^3.0.0",

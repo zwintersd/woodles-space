@@ -347,7 +347,7 @@
 			<div class="eyebrow">START WITH A SHAPE</div><h2>New collection</h2><p>These are suggestions. Each one is a regular Collection you can change as you work.</p>
 			{#if createIssue}<div class="create-issue" role="alert">{createIssue}</div>{/if}
 			<div class="template-options">
-				{#each [{ id: 'blank', name: 'Blank', detail: 'A Primary field, ready for records' }, { id: 'tracker', name: 'Simple tracker', detail: 'Name, status, and notes' }, { id: 'media', name: 'Media', detail: 'Title, medium, progress, rating, and more' }, { id: 'projects', name: 'Projects', detail: 'Status, priority, due date, and links' }, { id: 'research', name: 'Research / sources', detail: 'Sources, URLs, notes, and links' }] as template}
+				{#each [{ id: 'blank', name: 'Blank', detail: 'A Primary field, ready for records' }, { id: 'tracker', name: 'Simple tracker', detail: 'Name, status, and notes' }, { id: 'media', name: 'Media', detail: 'Title, medium, progress, rating, and more' }, { id: 'projects', name: 'Projects', detail: 'Status, priority, due date, and links' }, { id: 'research', name: 'Research / sources', detail: 'Sources, URLs, notes, and links' }, { id: 'living-world', name: 'Bestiary + Marginalia', detail: 'Pull creatures, discovered life, and field notes into one live table' }] as template}
 					<button onclick={() => create(surfaces.find((surface) => surface.kind === 'collection')!, template.id as CollectionTemplate)}><span>{template.name}</span><small>{template.detail}</small><b>↗</b></button>
 				{/each}
 			</div><button class="template-cancel" onclick={() => collectionCreateOpen = false}>Cancel</button>

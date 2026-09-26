@@ -9,6 +9,8 @@ button { cursor: pointer; }
 .table-intro > span, .field-dialog > span, .reference-dialog > span, .inspector-mini, .option-editor > span { font: 10px/1.2 var(--font-mono, monospace); letter-spacing: .13em; color: #897b8f; }
 .table-intro strong { font-size: 12px; font-weight: 500; color: #786d7e; }
 .table-intro i { font-style: normal; color: #b9adbd; padding: 0 4px; }
+.source-status { color: #897e90; font-size: 10px; letter-spacing: .02em; }
+.synced-field { margin-left: auto; font: 9px var(--font-mono, monospace); color: #9a8aa1; text-transform: uppercase; letter-spacing: .06em; }
 .table-tools { display: flex; gap: 7px; }
 .table-tools button { border: 1px solid #e6dce7; background: #fffdfc; border-radius: 7px; padding: 6px 10px; color: #665775; font-size: 12px; }
 .table-tools button:hover { background: #f1ebf3; }

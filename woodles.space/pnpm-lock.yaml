@@ -88,6 +88,9 @@ importers:
       '@woodles/sync':
         specifier: workspace:*
         version: link:../../packages/sync
+      '@woodles/witch-engine':
+        specifier: workspace:*
+        version: link:../../packages/witch-engine
     devDependencies:
       '@sveltejs/adapter-static':
         specifier: ^3.0.0

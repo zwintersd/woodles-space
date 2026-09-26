@@ -80,7 +80,7 @@ export const surfaces: readonly HomeSuiteSurfaceAdapter[] = [
 		})),
 		create: (template = 'blank') => {
 			const library = loadCollections().value;
-			const collection = createCollection('Untitled collection', template);
+			const collection = createCollection(template === 'living-world' ? 'Bestiary + Marginalia' : 'Untitled collection', template);
 			const result = saveCollections({ collections: [...library.collections, collection] });
 			if (!result.ok) throw new Error(result.issue?.message ?? 'Could not create Collection.');
 			return { ref: { app: 'data', kind: 'collection', id: collection.id }, kind: 'collection', title: collection.title, updatedAt: collection.updatedAt, recordCount: 0 };

@@ -259,7 +259,11 @@ building those links. Data follows the same contract with `?collection=` and
 reports its active selection, Inspector controls, commands, and history state
 through the shared bridge. Collection records may keep a `WoodlesRef`
 membership or Relation; the origin application retains ownership of the
-referenced thing.
+referenced thing. The `Bestiary + Marginalia` Collection template reads the
+Bestiary's local creature shelf and Marginalia's revealed life and field-note
+log on open, when the window regains focus, and on request. Source-owned table
+columns refresh in place while Collection-owned fields stay local; source
+records are never written back to either app.
 
 `hygge` is the design playground — it holds the fonts, palette, motifs, and
 motion showcases that used to be separate pages. `/hygge/motion` is the review

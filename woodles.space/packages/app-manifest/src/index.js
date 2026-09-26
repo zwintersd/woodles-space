@@ -184,6 +184,7 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/marginalia/dist',
 		entryFile: 'index.html',
 		packageName: 'marginalia',
+		addressableBy: ['life', 'field-note'],
 		landing: tile('marg', 4, 'play', "tend a small witch, grow her world, and meet the creatures Z's already brought into it", 'var(--plum)', 'var(--lavender)', '150deg', { defaultPin: 3, featured: 1 }),
 		landingSurfaces: [
 			tile('reading', 5, 'read', 'a quiet timer, read for stars', 'var(--peach)', 'var(--aqua)', '115deg', {
