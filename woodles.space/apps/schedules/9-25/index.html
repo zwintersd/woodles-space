@@ -129,7 +129,7 @@
     .pictogram-credit a { color: var(--sky-deep); }
     .pictogram-credit-footer { margin: 12px 0 0 76px; }
     .activity-editor[hidden] { display: none; }
-    body.hide-editor .row-actions, body.hide-editor .activity-editor, body.hide-editor #createActivityLink { display: none; }
+    body.hide-editor .row-actions { display: none; }
     .custom-icon { width: 42px; height: 42px; flex: none; object-fit: contain; }
     .custom-activity { display: flex; align-items: flex-start; gap: 10px; margin-top: 8px; }
     .custom-activity p { margin: 0; color: var(--ink-soft); font-size: 15px; }
@@ -155,64 +155,309 @@
       .icon-results { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; } }
+
+    /* Two-column visual schedule workspace */
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; clip-path: inset(50%); }
+    body { min-height: 100vh; background: linear-gradient(135deg, #f5f8ff 0%, #eef4ff 100%); }
+    .workspace { display: grid; grid-template-columns: minmax(0, 2.28fr) minmax(390px, .98fr); align-items: start; gap: 24px; width: min(1600px, calc(100% - 64px)); margin: 6px auto 36px; }
+    .schedule-column, .builder-column { min-width: 0; }
+    .builder-column { position: sticky; top: 10px; display: grid; gap: 12px; align-self: start; }
+    .wrap { max-width: none; margin: 0; padding: 0 0 30px; }
+    .hero { min-height: 146px; margin: 0; padding: 19px 26px 16px; border-radius: 20px; background: linear-gradient(115deg, #1878f9 0%, #2f8bff 56%, #2377ee 100%); box-shadow: 0 3px 10px rgba(35, 91, 174, .11); }
+    .hero::after { display: none; }
+    .hero h1 { font-size: clamp(45px, 4.3vw, 64px); }
+    .hero p { margin-top: 1px; font-size: clamp(15px, 1.45vw, 19px); }
+    .clock { margin-top: 5px; padding: 4px 12px; font-size: 14px; }
+    .hero-art { position: absolute; right: 7px; bottom: 0; width: min(31%, 300px); height: 100%; pointer-events: none; }
+    .back { top: auto; right: auto; bottom: 18px; left: 148px; padding: 0; border: 0; background: transparent; opacity: .86; font-size: 11px; }
+    .back:focus-visible { outline: 2px solid white; }
+    .admin-trigger { position: absolute; z-index: 3; top: 10px; right: 12px; display: grid; width: 34px; height: 34px; place-items: center; padding: 0; border: 1px solid rgba(255,255,255,.48); border-radius: 50%; color: #fff; background: rgba(16, 73, 158, .24); font: 800 16px var(--body); cursor: pointer; }
+    .admin-trigger:hover, .admin-trigger[aria-expanded="true"] { background: rgba(16, 73, 158, .52); }
+    .admin-panel { position: relative; z-index: 4; margin: 9px 0 0; padding: 12px; border: 2px solid var(--line); background: #fff; box-shadow: 0 8px 24px rgba(32, 74, 134, .1); }
+    .admin-panel h2 { text-transform: none; }
+    .editor-tools { display: none; }
+    .nownext { gap: 10px; margin: 10px 0 0; }
+    .nn { display: flex; min-height: 62px; flex-direction: column; justify-content: center; padding: 7px 14px; border: 2px solid var(--line); border-radius: 16px; }
+    .nn.now { border-color: var(--now); }
+    .nn small { font-size: 11px; }
+    .nn b { margin-top: 0; font-size: 17px; line-height: 1.2; }
+    .timeline { position: relative; gap: 9px; margin: 14px 0 0; }
+    .timeline::before { position: absolute; z-index: 0; top: 9px; bottom: 15px; left: 75px; width: 4px; border-radius: 99px; background: #e1eaf8; content: ""; }
+    .step { position: relative; z-index: 1; grid-template-columns: 64px minmax(0, 1fr); align-items: stretch; gap: 12px; }
+    .time { position: relative; padding: 6px 0 0; font-size: 17px; white-space: nowrap; }
+    .time::after { position: absolute; z-index: 2; top: 12px; right: -20px; width: 16px; height: 16px; border: 3px solid #fff; border-radius: 50%; background: #1684ff; box-shadow: 0 0 0 1px #c6dcfb; content: ""; }
+    .time.soft { padding: 7px 0 0; font-size: 12px; }
+    .time.soft::after { top: 11px; background: #b9cce5; box-shadow: 0 0 0 1px #d7e3f3; }
+    .box { min-height: 56px; padding: 10px 12px; border: 2px solid #d6e4f8; border-radius: 16px; box-shadow: 0 2px 8px rgba(42, 88, 153, .025); }
+    .step.is-now .box { box-shadow: 0 0 0 4px rgba(255,62,108,.12); }
+    .head { min-height: 29px; }
+    .head h2, .choice-copy h2 { font-size: 19px; line-height: 1.18; }
+    .done-btn { width: 34px; height: 34px; border-width: 2px; }
+    .done-btn svg { width: 19px; height: 19px; }
+    .sub { margin-top: 2px; font-size: 13px; line-height: 1.22; }
+    .step[data-type="choice"] .box { display: grid; grid-template-columns: minmax(150px, .85fr) minmax(0, 3.5fr) 34px; align-items: center; gap: 10px; padding-block: 9px; }
+    .choice-copy h2 { margin: 0; font-weight: 900; }
+    .choice-copy .sub { margin: 3px 0 0; }
+    .step[data-type="choice"] .done-btn { grid-column: 3; grid-row: 1; }
+    .step[data-type="choice"] .edit-form { grid-column: 1 / -1; }
+    .chips { grid-column: 2; grid-row: 1; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin: 0; }
+    .chip { min-height: 74px; gap: 2px; padding: 4px; border-width: 2px; border-radius: 13px; font-size: 12px; }
+    .chip svg { width: 38px; height: 38px; }
+    .videos { gap: 8px; margin-top: 7px; }
+    .vid { min-height: 88px; flex-direction: row; border-width: 2px; border-radius: 14px; }
+    .vid .art { flex: 0 0 39%; width: 39%; max-width: 200px; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
+    .vid .body { min-width: 0; align-content: center; gap: 5px; padding: 7px 9px; }
+    .vid h3 { font-size: 14px; }
+    .tag { font-size: 9px; }
+    .pick, .watch { min-height: 33px; padding: 5px 9px; font-size: 12px; }
+    .return-choice { margin: 5px 0 0; font-size: 12px; }
+    .finish .box { min-height: 60px; padding-block: 12px; }
+    .finish h2 { font-size: 22px; }
+    .custom-activity { align-items: center; gap: 9px; margin-top: 5px; }
+    .custom-activity > img, .custom-emoji { width: 42px; height: 42px; flex: none; object-fit: contain; }
+    .custom-emoji { display: grid; place-items: center; border-radius: 12px; background: color-mix(in srgb, var(--activity-color) 13%, white); font-size: 26px; }
+    .activity-category { display: inline-block; margin-bottom: 2px; padding: 2px 8px; border-radius: 99px; color: #314560; background: color-mix(in srgb, var(--activity-color) 18%, white); font-size: 10px; line-height: 1.2; }
+    .row-actions { position: absolute; z-index: 5; top: 8px; right: 48px; display: flex; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: #fff; box-shadow: 0 3px 10px rgba(24, 58, 101, .12); opacity: 0; pointer-events: none; transition: opacity .14s ease; }
+    .step:hover .row-actions, .step:focus-within .row-actions, body.admin-open .row-actions { opacity: 1; pointer-events: auto; }
+    body.hide-editor .row-actions { display: none; }
+    .row-action { width: 26px; height: 26px; }
+    .activity-editor { display: grid; gap: 12px; margin: 0; padding: 17px; border: 2px solid #d8e5f7; border-radius: 20px; background: #fff; box-shadow: 0 5px 20px rgba(37, 78, 131, .04); }
+    .activity-editor[hidden] { display: none; }
+    .builder-heading { display: flex; align-items: flex-start; gap: 11px; }
+    .builder-mark { display: grid; flex: none; width: 36px; height: 36px; place-items: center; border-radius: 12px; color: #fff; background: #24b761; font: 900 27px/1 var(--body); box-shadow: inset 0 -2px 0 rgba(0,0,0,.1); }
+    .activity-editor h2 { margin: 0; font-size: 23px; line-height: 1.1; text-transform: none; }
+    .activity-editor .helper { margin-top: 4px; font-size: 13px; }
+    .builder-new { margin-left: auto; padding: 4px 7px; border: 0; border-radius: 8px; color: #59708f; background: transparent; font: 800 11px var(--body); cursor: pointer; }
+    .builder-new:hover { color: var(--sky-deep); background: #edf4ff; }
+    .activity-editor form { gap: 10px; }
+    .form-grid { grid-template-columns: 124px minmax(0, 1fr); align-items: stretch; gap: 8px 10px; }
+    .field label, .field-label { font-size: 12px; }
+    .field input, .field textarea, .field select, .search-line input { min-height: 38px; padding: 7px 10px; border: 1px solid #d4e1f3; border-radius: 10px; font-size: 13px; }
+    .field input:focus, .field textarea:focus, .field select:focus, .search-line input:focus { outline: 3px solid rgba(47,123,245,.2); border-color: var(--sky); }
+    .selected-icon { display: grid; min-height: 124px; align-content: center; justify-items: center; gap: 4px; padding: 6px; border: 1px solid #d4e1f3; border-radius: 14px; background: #fff; text-align: center; }
+    .selected-icon img { width: 82px; height: 82px; }
+    .selected-icon span { font-size: 11px; }
+    .form-main { display: grid; align-content: start; gap: 8px; }
+    .form-main .field { gap: 3px; }
+    .form-main .field input, .form-main .field select { min-height: 36px; }
+    .search-line { grid-template-columns: minmax(0, 1fr) 36px 36px; gap: 6px; }
+    .search-line .secondary-button { display: grid; min-height: 38px; place-items: center; padding: 4px; border-radius: 10px; }
+    .search-line input { border-radius: 999px; padding-inline: 13px; }
+    .icon-status { min-height: 14px; font-size: 11px; }
+    .icon-results { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+    .icon-result { min-height: 70px; gap: 3px; padding: 4px 3px; border-width: 1px; border-radius: 11px; font-size: 9px; }
+    .icon-result img { width: 45px; height: 45px; }
+    .icon-result span { -webkit-line-clamp: 1; }
+    .pictogram-credit { font-size: 10px; }
+    .builder-options { display: grid; gap: 8px; }
+    .option-group { display: grid; gap: 5px; }
+    .option-title { font-size: 12px; font-weight: 900; }
+    .duration-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+    .duration-option { position: relative; }
+    .duration-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+    .duration-option span { display: grid; min-height: 34px; place-items: center; padding: 4px; border: 1px solid #d4e1f3; border-radius: 999px; color: var(--ink-soft); background: #fff; font-size: 12px; cursor: pointer; }
+    .duration-option input:checked + span { border-color: var(--sky); color: #fff; background: var(--sky); box-shadow: 0 3px 8px rgba(47,123,245,.22); }
+    .duration-option input:focus-visible + span { outline: 3px solid rgba(47,123,245,.3); outline-offset: 2px; }
+    .color-options { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .color-option { position: relative; display: grid; width: 31px; height: 31px; place-items: center; }
+    .color-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+    .color-option span { width: 25px; height: 25px; border: 2px solid rgba(21,33,59,.08); border-radius: 50%; background: var(--swatch); cursor: pointer; }
+    .color-option input:checked + span { outline: 2px solid var(--sky); outline-offset: 2px; }
+    .color-option input:focus-visible + span { outline: 3px solid var(--sky); outline-offset: 3px; }
+    .color-red { --swatch: #ff4f55; } .color-orange { --swatch: #ff841f; } .color-yellow { --swatch: #ffcf48; } .color-green { --swatch: #24b761; } .color-blue { --swatch: #3193f5; } .color-purple { --swatch: #a66ad6; } .color-pink { --swatch: #f15b9d; } .color-slate { --swatch: #8794a8; }
+    .instructions-field { grid-column: 1 / -1; }
+    .activity-details summary { color: var(--ink-soft); font-size: 12px; cursor: pointer; }
+    .activity-details textarea { min-height: 54px; margin-top: 5px; }
+    .suggested-time { color: var(--ink-soft); font-size: 11px; text-align: center; }
+    .builder-submit { width: 100%; min-height: 42px; border: 0; border-radius: 999px; background: linear-gradient(100deg, #126fff, #298bf7); box-shadow: 0 3px 8px rgba(24,112,241,.2); }
+    .builder-submit:hover { background: #155ed0; }
+    .builder-submit:disabled { opacity: .55; cursor: not-allowed; }
+    .saved-custom { padding: 13px; border: 2px solid #d8e5f7; border-radius: 20px; background: #fff; box-shadow: 0 5px 20px rgba(37, 78, 131, .04); }
+    .saved-heading { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 8px; }
+    .saved-heading .bookmark { color: #143262; font-size: 21px; line-height: 1; }
+    .saved-heading h2 { margin: 0; font-size: 19px; line-height: 1.1; }
+    .saved-heading p { margin: 3px 0 0; color: var(--ink-soft); font-size: 11px; }
+    .saved-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+    .saved-empty { grid-column: 1 / -1; padding: 13px 10px; border: 1px dashed #cfddf1; border-radius: 12px; color: var(--ink-soft); font-size: 12px; text-align: center; }
+    .saved-card { position: relative; display: flex; min-width: 0; align-items: center; gap: 4px; padding: 5px 6px; border: 1px solid #e1eaf7; border-radius: 12px; background: #fbfdff; }
+    .saved-add { display: flex; min-width: 0; flex: 1; align-items: center; gap: 7px; padding: 0; border: 0; color: var(--ink); background: transparent; font: inherit; text-align: left; cursor: pointer; }
+    .saved-add:hover strong { color: var(--sky-deep); }
+    .saved-preview { display: grid; flex: none; width: 48px; height: 43px; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--activity-color, #24b761) 12%, white); }
+    .saved-preview img { width: 39px; height: 39px; object-fit: contain; }
+    .saved-preview .emoji { font-size: 27px; }
+    .saved-copy { display: grid; min-width: 0; gap: 2px; }
+    .saved-copy strong { overflow: hidden; font-size: 11px; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
+    .saved-copy em { justify-self: start; max-width: 100%; overflow: hidden; padding: 2px 7px; border-radius: 99px; color: #47617f; background: color-mix(in srgb, var(--activity-color, #24b761) 16%, white); font-size: 9px; font-style: normal; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
+    .saved-arrow { flex: none; margin-left: auto; color: #9fb5d5; font-size: 20px; }
+    .saved-remove { display: grid; flex: none; width: 22px; height: 22px; place-items: center; padding: 0; border: 0; border-radius: 50%; color: #8192aa; background: transparent; font: 800 14px var(--body); opacity: 0; cursor: pointer; }
+    .saved-card:hover .saved-remove, .saved-remove:focus-visible { opacity: 1; }
+    .pictogram-credit-footer { margin: 12px 0 0 76px; font-size: 10px; }
+    .reset { margin: 18px 0 0 76px; padding: 6px 11px; font-size: 12px; }
+    @media (max-width: 1120px) {
+      .workspace { grid-template-columns: minmax(0, 1fr) minmax(340px, .82fr); width: calc(100% - 36px); gap: 16px; }
+      .step[data-type="choice"] .box { grid-template-columns: minmax(130px, .7fr) minmax(0, 3fr) 32px; gap: 7px; }
+      .chip { font-size: 11px; }
+      .form-grid { grid-template-columns: 105px minmax(0, 1fr); }
+      .icon-results { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    }
+    @media (max-width: 900px) {
+      .workspace { grid-template-columns: minmax(0, 1fr); width: min(760px, calc(100% - 28px)); gap: 18px; }
+      .builder-column { position: static; grid-row: 2; }
+      .hero-art { width: min(36%, 270px); }
+      .activity-editor { padding: 16px; }
+      .form-grid { grid-template-columns: 124px minmax(0, 1fr); }
+      .icon-results { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    }
+    @media (max-width: 620px) {
+      .workspace { width: calc(100% - 20px); margin-top: 5px; gap: 15px; }
+      .hero { min-height: 135px; padding: 24px 15px 13px; border-radius: 17px; }
+      .hero h1 { max-width: 80%; font-size: clamp(39px, 10vw, 54px); }
+      .hero p { max-width: 76%; font-size: 14px; }
+      .hero-art { right: -15px; width: 38%; opacity: .82; }
+      .admin-trigger { top: 8px; right: 8px; font-size: 10px; }
+      .back { top: auto; right: auto; bottom: 14px; left: 138px; font-size: 10px; }
+      .admin-trigger { width: 32px; height: 32px; font-size: 16px; }
+      .nownext { gap: 7px; margin-top: 8px; }
+      .nn { min-height: 58px; padding: 6px 9px; border-radius: 13px; }
+      .nn b { font-size: 14px; }
+      .nn small { font-size: 9px; }
+      .timeline { gap: 8px; margin-top: 11px; }
+      .timeline::before { left: 48px; }
+      .step { grid-template-columns: 39px minmax(0, 1fr); gap: 9px; }
+      .time { padding-top: 8px; font-size: 13px; }
+      .time::after { top: 11px; right: -18px; width: 14px; height: 14px; }
+      .time.soft { padding-top: 8px; font-size: 10px; }
+      .time.soft::after { top: 10px; }
+      .box { padding: 9px; border-radius: 14px; }
+      .head h2, .choice-copy h2 { font-size: 16px; }
+      .done-btn { width: 30px; height: 30px; }
+      .step[data-type="choice"] .box { grid-template-columns: minmax(0, 1fr) 30px; align-items: start; gap: 7px; }
+      .choice-copy { grid-column: 1; grid-row: 1; }
+      .step[data-type="choice"] .done-btn { grid-column: 2; grid-row: 1; }
+      .chips { grid-column: 1 / -1; grid-row: 2; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .chip { min-height: 65px; padding: 3px 2px; font-size: 10px; }
+      .chip svg { width: 31px; height: 31px; }
+      .videos.two, .videos.three { grid-template-columns: 1fr; }
+      .vid { min-height: 77px; }
+      .vid .art { width: 38%; aspect-ratio: 4 / 3; }
+      .row-actions { right: 43px; top: 6px; }
+      .row-action { width: 23px; height: 23px; }
+      .builder-heading { gap: 9px; }
+      .activity-editor h2 { font-size: 20px; }
+      .form-grid { grid-template-columns: 94px minmax(0, 1fr); }
+      .selected-icon { min-height: 112px; }
+      .selected-icon img { width: 72px; height: 72px; }
+      .icon-results { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      .duration-options { gap: 4px; }
+      .duration-option span { min-height: 32px; font-size: 11px; }
+      .saved-grid { grid-template-columns: 1fr 1fr; }
+      .saved-remove { opacity: 1; }
+      .pictogram-credit-footer, .reset { margin-left: 48px; }
+    }
+    @media (max-width: 400px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .selected-icon { min-height: 92px; grid-template-columns: 70px 1fr; justify-items: start; text-align: left; }
+      .selected-icon img { width: 66px; height: 66px; }
+      .instructions-field { grid-column: 1; }
+      .icon-results { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .color-options { gap: 5px; }
+      .saved-grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
-<main class="wrap">
-  <header class="hero">
-    <a class="back" href="/schedules">← Schedules</a>
-    <h1 id="greeting">Hi Coleman!</h1>
-    <p id="intro">Here’s our plan for today, from 3:00 to 6:30.</p>
-    <div class="clock" id="clock" aria-label="Current local time">Now: --:--</div>
-  </header>
+<main class="workspace">
+  <div class="schedule-column">
+    <header class="hero">
+      <a class="back" href="/schedules">← Schedules</a>
+      <button class="admin-trigger" type="button" id="adminToggle" aria-label="Schedule settings" aria-expanded="false" aria-controls="adminPanel">⚙</button>
+      <h1 id="greeting">Hi Coleman!</h1>
+      <p id="intro">Here’s our plan for today, from 3:00 to 6:30.</p>
+      <div class="clock" id="clock" aria-label="Current local time">Now: --:--</div>
+      <svg class="hero-art" viewBox="0 0 280 150" aria-hidden="true" focusable="false">
+        <g fill="#a9d6ff" opacity=".72"><path d="M2 132c0-10 8-18 19-18 4-16 17-27 34-27 16 0 29 10 34 25 13 1 23 10 23 21 0 12-10 21-23 21H25C12 154 2 145 2 132Z"/><path d="M182 137c0-8 7-15 16-15 3-13 14-21 27-21s24 8 27 20c11 1 19 8 19 18 0 10-8 17-19 17h-50c-11 0-20-8-20-19Z"/></g>
+        <g stroke="#ffd948" stroke-width="9" stroke-linecap="round"><path d="M157 11v11M204 27l-8 8M223 70h-11M207 111l-8-8M160 115l7-10M126 73h11M133 37l8 8M178 5l-2 12"/></g>
+        <circle cx="174" cy="65" r="38" fill="#ffdb45"/><g fill="#14254e"><ellipse cx="160" cy="61" rx="3" ry="5"/><ellipse cx="187" cy="61" rx="3" ry="5"/></g><path d="M163 76c6 8 16 8 22 0" fill="none" stroke="#14254e" stroke-width="4" stroke-linecap="round"/>
+      </svg>
+    </header>
 
-  <nav class="editor-tools" aria-label="Schedule tools">
-    <button class="tool-button" type="button" id="createActivityLink">＋ Create schedule activity</button>
-    <button class="tool-button" type="button" id="adminToggle" aria-expanded="false" aria-controls="adminPanel">⚙ Admin panel</button>
-  </nav>
-
-  <section class="admin-panel" id="adminPanel" hidden>
-    <div><h2>Admin panel</h2><p>Personalize the heading, manage edit controls, or restore the original schedule.</p></div>
-    <div class="admin-fields">
-      <div class="field"><label for="greetingInput">Greeting</label><input id="greetingInput" value="Hi Coleman!" maxlength="80" /></div>
-      <div class="field"><label for="introInput">Plan note</label><input id="introInput" value="Here’s our plan for today, from 3:00 to 6:30." maxlength="140" /></div>
-    </div>
-    <div class="admin-actions">
-      <button class="primary-button" type="button" id="saveDetails">Save details</button>
-      <button class="secondary-button" type="button" id="toggleEditing">Hide edit controls</button>
-      <button class="secondary-button" type="button" id="restoreSchedule">Restore original schedule</button>
-      <span class="helper">Edits save on this device.</span>
-    </div>
-  </section>
-
-  <section class="nownext" aria-live="polite" aria-label="Now and next">
-    <div class="nn now"><small>NOW</small><b id="nowText">…</b></div>
-    <div class="nn"><small>NEXT</small><b id="nextText">…</b></div>
-  </section>
-
-  <ol class="timeline" id="timeline" aria-label="Afternoon schedule"></ol>
-  <section class="activity-editor" id="activityEditor" aria-labelledby="addActivityTitle">
-    <div><h2 id="addActivityTitle">Add new schedule activity</h2><p class="helper">Add a flexible activity to Coleman’s afternoon.</p></div>
-    <form id="activityForm">
-      <div class="form-grid">
-        <div class="field"><label for="activityTime">Time</label><input id="activityTime" name="time" type="time" min="15:00" max="18:29" required /><span class="field-status" id="activityTimeStatus" role="status" aria-live="polite"></span></div>
-        <div class="field"><label for="activityTitle">Activity title</label><input id="activityTitle" name="title" maxlength="80" placeholder="e.g., Build with blocks" required /></div>
-        <div class="field instructions-field"><label for="activityInstructions">Instructions</label><textarea id="activityInstructions" name="instructions" maxlength="240" placeholder="A short note about what happens"></textarea></div>
+    <section class="admin-panel" id="adminPanel" hidden>
+      <div><h2>Schedule settings</h2><p>Personalize the heading, manage edit controls, or restore the original schedule.</p></div>
+      <div class="admin-fields">
+        <div class="field"><label for="greetingInput">Greeting</label><input id="greetingInput" value="Hi Coleman!" maxlength="80" /></div>
+        <div class="field"><label for="introInput">Plan note</label><input id="introInput" value="Here’s our plan for today, from 3:00 to 6:30." maxlength="140" /></div>
       </div>
-      <div class="icon-picker">
-        <span class="field-label">Icon picker</span>
-        <label class="field-label" for="iconSearch">Search ARASAAC pictograms</label>
-        <div class="search-line"><input id="iconSearch" type="search" placeholder="Search for icons (e.g., drink water, play)" autocomplete="off" /><button class="secondary-button" type="button" id="searchIcons">Search</button></div>
-        <div class="icon-status" id="iconStatus" role="status" aria-live="polite">Search for a picture to add to this activity.</div>
-        <div class="icon-results" id="iconResults" aria-label="Pictogram search results"></div>
-        <div class="selected-icon" id="selectedIcon"><span>No icon selected.</span></div>
-        <small class="pictogram-credit">Pictograms: Sergio Palao · <a href="https://arasaac.org" target="_blank" rel="noopener noreferrer">ARASAAC</a> · <a href="https://aulaabierta.arasaac.org/en/terms-of-use" target="_blank" rel="noopener noreferrer">CC BY-NC-SA</a> · Government of Aragón</small>
+      <div class="admin-actions">
+        <button class="primary-button" type="button" id="saveDetails">Save details</button>
+        <button class="secondary-button" type="button" id="toggleEditing">Hide edit controls</button>
+        <button class="secondary-button" type="button" id="restoreSchedule">Restore original schedule</button>
+        <span class="helper">Edits save on this device.</span>
       </div>
-      <button class="primary-button" type="submit">＋ Add new activity</button>
-    </form>
-  </section>
-  <footer class="pictogram-credit pictogram-credit-footer">Pictograms: Sergio Palao · <a href="https://arasaac.org" target="_blank" rel="noopener noreferrer">ARASAAC</a> · <a href="https://aulaabierta.arasaac.org/en/terms-of-use" target="_blank" rel="noopener noreferrer">CC BY-NC-SA</a> · Government of Aragón</footer>
-  <button class="reset" id="reset" type="button">Clear choices and checks</button>
+    </section>
+
+    <section class="nownext" aria-live="polite" aria-label="Now and next">
+      <div class="nn now"><small>NOW</small><b id="nowText">…</b></div>
+      <div class="nn"><small>NEXT</small><b id="nextText">…</b></div>
+    </section>
+    <ol class="timeline" id="timeline" aria-label="Afternoon schedule"></ol>
+    <footer class="pictogram-credit pictogram-credit-footer">Pictograms: Sergio Palao · <a href="https://arasaac.org" target="_blank" rel="noopener noreferrer">ARASAAC</a> · <a href="https://aulaabierta.arasaac.org/en/terms-of-use" target="_blank" rel="noopener noreferrer">CC BY-NC-SA</a> · Government of Aragón</footer>
+    <button class="reset" id="reset" type="button">Clear choices and checks</button>
+  </div>
+
+  <aside class="builder-column" aria-label="Activity builder and saved choices">
+    <section class="activity-editor" id="activityEditor" aria-labelledby="addActivityTitle">
+      <div class="builder-heading">
+        <span class="builder-mark" aria-hidden="true">+</span>
+        <div><h2 id="addActivityTitle">Activity Builder</h2><p class="helper">Create custom activities with ARASAAC icons.</p></div>
+        <button class="builder-new" type="button" id="createActivityLink">＋ New</button>
+      </div>
+      <form id="activityForm">
+        <div class="icon-picker">
+          <label class="sr-only" for="iconSearch">Search ARASAAC pictograms</label>
+          <div class="search-line"><input id="iconSearch" type="search" placeholder="Search ARASAAC icons (e.g., play, snack)" autocomplete="off" /><button class="secondary-button" type="button" id="searchIcons" aria-label="Search pictograms">⌕</button><button class="secondary-button" type="button" id="clearIconSearch" aria-label="Clear icon search">×</button></div>
+          <div class="icon-status" id="iconStatus" role="status" aria-live="polite">Popular play pictograms are loading…</div>
+          <div class="icon-results" id="iconResults" aria-label="Pictogram search results"></div>
+          <div class="form-grid">
+            <div class="selected-icon" id="selectedIcon"><span>No icon selected</span></div>
+            <div class="form-main">
+              <div class="field"><label for="activityTitle">Activity name</label><input id="activityTitle" name="title" maxlength="80" placeholder="e.g., Swing break" required /></div>
+              <div class="field"><label for="activityCategory">Category</label><select id="activityCategory" name="category"><option value="Play / Leisure">Play / Leisure</option><option value="Sensory">Sensory</option><option value="Food / Drink">Food / Drink</option><option value="Learning">Learning</option><option value="Movement">Movement</option><option value="Daily routine">Daily routine</option></select></div>
+            </div>
+          </div>
+          <small class="pictogram-credit">Pictograms: Sergio Palao · <a href="https://arasaac.org" target="_blank" rel="noopener noreferrer">ARASAAC</a> · <a href="https://aulaabierta.arasaac.org/en/terms-of-use" target="_blank" rel="noopener noreferrer">CC BY-NC-SA</a> · Government of Aragón</small>
+        </div>
+        <div class="builder-options">
+          <div class="option-group"><span class="option-title">Duration <span style="font-weight:600;color:var(--ink-soft)">(optional)</span></span><div class="duration-options" role="radiogroup" aria-label="Activity duration">
+            <label class="duration-option"><input type="radio" name="duration" value="5"><span>5 min</span></label>
+            <label class="duration-option"><input type="radio" name="duration" value="10" checked><span>10 min</span></label>
+            <label class="duration-option"><input type="radio" name="duration" value="15"><span>15 min</span></label>
+            <label class="duration-option"><input type="radio" name="duration" value="20"><span>20 min</span></label>
+            <label class="duration-option"><input type="radio" name="duration" value="30"><span>30 min</span></label>
+          </div></div>
+          <div class="option-group"><span class="option-title">Color tag</span><div class="color-options" role="radiogroup" aria-label="Activity color">
+            <label class="color-option color-red"><input type="radio" name="color" value="#ff4f55" aria-label="Red"><span></span></label>
+            <label class="color-option color-orange"><input type="radio" name="color" value="#ff841f" aria-label="Orange"><span></span></label>
+            <label class="color-option color-yellow"><input type="radio" name="color" value="#ffcf48" aria-label="Yellow"><span></span></label>
+            <label class="color-option color-green"><input type="radio" name="color" value="#24b761" aria-label="Green" checked><span></span></label>
+            <label class="color-option color-blue"><input type="radio" name="color" value="#3193f5" aria-label="Blue"><span></span></label>
+            <label class="color-option color-purple"><input type="radio" name="color" value="#a66ad6" aria-label="Purple"><span></span></label>
+            <label class="color-option color-pink"><input type="radio" name="color" value="#f15b9d" aria-label="Pink"><span></span></label>
+            <label class="color-option color-slate"><input type="radio" name="color" value="#8794a8" aria-label="Slate"><span></span></label>
+          </div></div>
+        </div>
+        <details class="activity-details"><summary>Add a short note (optional)</summary><div class="field"><label for="activityInstructions">What happens?</label><textarea id="activityInstructions" name="instructions" maxlength="240" placeholder="A short note about this activity"></textarea></div></details>
+        <input id="activityTime" name="time" type="hidden" />
+        <span class="field-status" id="activityTimeStatus" role="status" aria-live="polite"></span>
+        <div class="suggested-time" aria-live="polite">Will be added to the schedule at <strong id="suggestedTime">3:10</strong></div>
+        <button class="primary-button builder-submit" type="submit">＋ Add custom activity</button>
+      </form>
+    </section>
+
+    <section class="saved-custom" aria-labelledby="savedCustomTitle">
+      <div class="saved-heading"><span class="bookmark" aria-hidden="true">▮</span><div><h2 id="savedCustomTitle">Saved custom choices</h2><p>Quickly add your custom activities to the schedule.</p></div></div>
+      <div class="saved-grid" id="savedCustomChoices"><div class="saved-empty">Your saved activities will appear here.</div></div>
+    </section>
+  </aside>
 </main>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -256,10 +501,10 @@
     { id: 's8', start: 210, end: 240, time: '6:30', type: 'finish', title: 'All done!' }
   ];
   const KEY = 'coleman-schedule-v1';
-  let state = { done: {}, picks: {}, chips: {}, items: structuredClone(ORIGINAL_STEPS), greeting: 'Hi Coleman!', intro: 'Here’s our plan for today, from 3:00 to 6:30.', editing: true };
+  let state = { done: {}, picks: {}, chips: {}, items: structuredClone(ORIGINAL_STEPS), customActivities: [], greeting: 'Hi Coleman!', intro: 'Here’s our plan for today, from 3:00 to 6:30.', editing: true };
   try {
     const stored = JSON.parse(localStorage.getItem(KEY) || 'null');
-    if (stored) state = { ...state, ...stored, items: Array.isArray(stored.items) ? stored.items : structuredClone(ORIGINAL_STEPS) };
+    if (stored) state = { ...state, ...stored, items: Array.isArray(stored.items) ? stored.items : structuredClone(ORIGINAL_STEPS), customActivities: Array.isArray(stored.customActivities) ? stored.customActivities : [] };
   } catch {}
   let editingId = null;
   let selectedIcon = null;
@@ -309,18 +554,29 @@
     const defaults = videos.length ? videos : [videoOptions({ videos: ['city'] })[0]];
     return defaults.map((video) => `${video.title} | ${video.url} | ${video.art.replace('art-', '')}`).join('\n');
   }
+  function selectedDuration() {
+    const value = Number(document.querySelector('input[name="duration"]:checked')?.value || 10);
+    return Number.isFinite(value) && value > 0 ? value : 10;
+  }
+  function findOpenStart(duration = selectedDuration()) {
+    const items = steps();
+    const occupiedStarts = new Set(items.map((item) => item.start));
+    const blockingItems = items.filter((item) => item.type !== 'choice');
+    const fits = (start) => !occupiedStarts.has(start) && !blockingItems.some((item) => {
+      const end = item.end ?? item.start + 10;
+      return start < end && start + duration > item.start;
+    });
+    for (let start = 0; start < 210; start += 10) if (fits(start)) return start;
+    for (let start = 0; start < 210; start += 1) if (fits(start)) return start;
+    return undefined;
+  }
   function suggestActivityTime() {
     const input = document.getElementById('activityTime');
-    const occupied = new Set(state.items.map((item) => item.start));
-    const currentMinute = input.value ? minuteValue(input.value) : Number.NaN;
-    const tenMinuteSlot = Array.from({ length: 21 }, (_, index) => index * 10).find((value) => !occupied.has(value));
-    const minute = Number.isFinite(currentMinute) && !occupied.has(currentMinute)
-      ? currentMinute
-      : tenMinuteSlot ?? Array.from({ length: 210 }, (_, index) => index).find((value) => !occupied.has(value));
+    const minute = findOpenStart();
     input.value = minute === undefined ? '' : timeValue(minute);
-    input.disabled = minute === undefined;
     document.querySelector('#activityForm button[type="submit"]').disabled = minute === undefined;
     document.getElementById('activityTimeStatus').textContent = minute === undefined ? 'No open time remains before 6:30.' : '';
+    document.getElementById('suggestedTime').textContent = minute === undefined ? 'no open time' : timeLabel(minute);
   }
   const timeLabel = (minute) => {
     const total = 15 * 60 + minute;
@@ -394,6 +650,33 @@
     </div>`;
   }
 
+  function categoryEmoji(category) {
+    return ({
+      'Sensory': '🧺', 'Food / Drink': '🍎', 'Learning': '📚',
+      'Movement': '🏃', 'Daily routine': '🛏️', 'Play / Leisure': '🧩'
+    })[category] || '⭐';
+  }
+  const activityColor = (value) => ['#ff4f55', '#ff841f', '#ffcf48', '#24b761', '#3193f5', '#a66ad6', '#f15b9d', '#8794a8'].includes(value) ? value : '#24b761';
+  function renderCustomChoices() {
+    const grid = document.getElementById('savedCustomChoices');
+    const templates = Array.isArray(state.customActivities) ? state.customActivities : [];
+    if (!templates.length) {
+      grid.innerHTML = '<div class="saved-empty">Create an activity above to save a quick choice here.</div>';
+      return;
+    }
+    grid.innerHTML = templates.map((activity) => {
+      const color = activityColor(activity.color);
+      const image = pictogramUrl(activity.iconId);
+      return `<div class="saved-card" style="--activity-color:${color}">
+        <button class="saved-add" type="button" data-template-id="${esc(activity.id)}" aria-label="Add ${esc(activity.title)} to the schedule">
+          <span class="saved-preview">${image ? `<img src="${image}" alt="">` : `<span class="emoji" aria-hidden="true">${categoryEmoji(activity.category)}</span>`}</span>
+          <span class="saved-copy"><strong>${esc(activity.title)}</strong><em>${esc(activity.category || 'Play / Leisure')}</em></span><span class="saved-arrow" aria-hidden="true">›</span>
+        </button>
+        <button class="saved-remove" type="button" data-remove-template="${esc(activity.id)}" aria-label="Remove ${esc(activity.title)} from saved choices" title="Remove saved choice">×</button>
+      </div>`;
+    }).join('');
+  }
+
   function render() {
     suggestActivityTime();
     const items = steps();
@@ -407,20 +690,24 @@
       const time = step.time === 'after' ? '<div class="time soft">after<br>video</div>' : `<div class="time">${step.time}</div>`;
       const done = step.type !== 'finish' ? `<button type="button" class="done-btn" data-done="${step.id}" aria-label="Mark ${esc(step.title)} done"><svg aria-hidden="true"><use href="#i-check"></use></svg></button>` : '';
       let content = '';
+      let heading = `<div class="head"><h2>${esc(step.title)}</h2>${done}</div>`;
       if (step.type === 'choice') {
-        content = `<p class="sub">${esc(step.sub || 'Pick what to do:')}</p><div class="chips">${choiceOptions(step).map((choice) => `<button type="button" class="chip" data-step="${esc(step.id)}" data-chip="${esc(choice.id)}" aria-pressed="${state.chips[step.id] === choice.id}">${icon(choice.icon)}<span>${esc(choice.label)}</span></button>`).join('')}</div>`;
+        heading = `<div class="choice-copy"><h2>${esc(step.title)}</h2><p class="sub">${esc(step.sub || 'Pick what to do:')}</p></div>${done}`;
+        content = `<div class="chips">${choiceOptions(step).map((choice) => `<button type="button" class="chip" data-step="${esc(step.id)}" data-chip="${esc(choice.id)}" aria-pressed="${state.chips[step.id] === choice.id}">${icon(choice.icon)}<span>${esc(choice.label)}</span></button>`).join('')}</div>`;
       } else if (step.type === 'watch' || step.type === 'pick') {
         const videos = videoOptions(step);
         content = `<p class="sub">${esc(step.sub || '')}</p><div class="videos ${videos.length === 2 ? 'two' : videos.length === 3 ? 'three' : 'one'}">${videos.map((video) => videoCard(step.id, video, step.type === 'pick')).join('')}</div>${step.type === 'watch' ? '<p class="return-choice">↩ Then: Coleman’s choice</p>' : ''}`;
       } else if (step.type === 'custom') {
         const customIcon = pictogramUrl(step.iconId);
-        content = `<div class="custom-activity">${customIcon ? `<img class="custom-icon" src="${customIcon}" alt="">` : ''}<p>${esc(step.sub || 'We can do this together.')}</p></div>`;
+        const color = activityColor(step.color);
+        content = `<div class="custom-activity" style="--activity-color:${color}">${customIcon ? `<img class="custom-icon" src="${customIcon}" alt="">` : `<span class="custom-emoji" aria-hidden="true">${categoryEmoji(step.category)}</span>`}<div><span class="activity-category">${esc(step.category || 'Play / Leisure')}</span><p>${esc(step.sub || `${step.duration || ((step.end || step.start + 10) - step.start)} minute activity`)}</p></div></div>`;
       } else {
         content = `<p class="sub">${esc(step.sub || 'Great job today, Coleman!')}</p>`;
       }
-      return `<li class="step${step.type === 'finish' ? ' finish' : ''}${state.done[step.id] ? ' is-done' : ''}" data-id="${esc(step.id)}">${time}<article class="box"><span class="nowtag">NOW</span><div class="head"><h2>${esc(step.title)}</h2>${done}</div>${content}${editForm(step)}</article>${rowActions(step, index, items.length)}</li>`;
+      return `<li class="step${step.type === 'finish' ? ' finish' : ''}${state.done[step.id] ? ' is-done' : ''}" data-id="${esc(step.id)}" data-type="${esc(step.type)}">${time}<article class="box"><span class="nowtag">NOW</span>${heading}${content}${editForm(step)}</article>${rowActions(step, index, items.length)}</li>`;
     }).join('');
     applyPicks();
+    renderCustomChoices();
     tick();
   }
 
@@ -500,8 +787,10 @@
     }
   }
 
-  async function searchPictograms() {
-    const query = document.getElementById('iconSearch').value.trim();
+  async function searchPictograms(searchTerm) {
+    const input = document.getElementById('iconSearch');
+    if (typeof searchTerm === 'string') input.value = searchTerm;
+    const query = input.value.trim();
     const status = document.getElementById('iconStatus');
     if (!query) { status.textContent = 'Type a word or short phrase to search.'; return; }
     searchRequest?.abort();
@@ -526,33 +815,63 @@
 
   function addActivity(event) {
     event.preventDefault();
-    // This listener is delegated from document, so currentTarget is the
-    // document. The submitted form itself is event.target.
     const form = event.target;
     const data = new FormData(form);
-    const start = minuteValue(String(data.get('time')));
-    if (state.items.some((item) => item.start === start)) {
+    const startValue = String(data.get('time') || '');
+    const start = startValue ? minuteValue(startValue) : Number.NaN;
+    const duration = Number(data.get('duration') || 10);
+    if (!Number.isFinite(start) || findOpenStart(duration) !== start) {
       const timeStatus = document.getElementById('activityTimeStatus');
-      timeStatus.textContent = 'There is already an activity at that time. Choose another time.';
-      document.getElementById('activityTime').focus();
+      timeStatus.textContent = 'That time no longer fits. Choose a shorter duration or try again.';
+      suggestActivityTime();
+      return;
+    }
+    const title = String(data.get('title') || '').trim();
+    const instructions = String(data.get('instructions') || '').trim();
+    const category = String(data.get('category') || 'Play / Leisure');
+    const color = activityColor(String(data.get('color') || '#24b761'));
+    const iconId = selectedIcon?.id || '';
+    const templateId = `choice-${Date.now().toString(36)}`;
+    const template = { id: templateId, title, sub: instructions, iconId, category, duration, color };
+    state.customActivities = Array.isArray(state.customActivities) ? state.customActivities : [];
+    state.customActivities.push(template);
+    const id = `custom-${Date.now().toString(36)}`;
+    state.items.push({
+      id, templateId, start, end: start + duration, duration, time: timeLabel(start), type: 'custom',
+      title, sub: instructions, iconId, category, color
+    });
+    state.items.sort((a, b) => a.start - b.start || (a.type === 'finish' ? 1 : b.type === 'finish' ? -1 : 0));
+    save();
+    const searchTerm = document.getElementById('iconSearch').value;
+    form.reset();
+    selectedIcon = null;
+    document.getElementById('iconSearch').value = searchTerm;
+    renderIconResults();
+    render();
+    document.getElementById('iconStatus').textContent = `Saved “${title}” to your choices and added it at ${timeLabel(start)}.`;
+    document.querySelector(`[data-id="${CSS.escape(id)}"]`)?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+  }
+
+  function addSavedChoice(templateId) {
+    const template = state.customActivities?.find((activity) => activity.id === templateId);
+    if (!template) return;
+    const duration = Math.max(1, Number(template.duration) || 10);
+    const start = findOpenStart(duration);
+    if (start === undefined) {
+      document.getElementById('activityTimeStatus').textContent = 'No open time remains for this activity duration.';
+      document.getElementById('iconStatus').textContent = 'No open time remains. Shorten an activity or choose another day.';
       return;
     }
     const id = `custom-${Date.now().toString(36)}`;
     state.items.push({
-      id, start, end: start + 10, time: timeLabel(start), type: 'custom',
-      title: String(data.get('title')).trim(), sub: String(data.get('instructions')).trim(),
-      iconId: selectedIcon?.id || ''
+      id, templateId: template.id, start, end: start + duration, duration, time: timeLabel(start), type: 'custom',
+      title: template.title, sub: template.sub || '', iconId: template.iconId || '',
+      category: template.category || 'Play / Leisure', color: activityColor(template.color)
     });
     state.items.sort((a, b) => a.start - b.start || (a.type === 'finish' ? 1 : b.type === 'finish' ? -1 : 0));
     save();
-    form.reset();
-    suggestActivityTime();
-    selectedIcon = null;
-    iconResults = [];
-    document.getElementById('iconResults').replaceChildren();
-    document.getElementById('iconStatus').textContent = 'Activity added. Search for another picture if you like.';
-    document.getElementById('selectedIcon').innerHTML = '<span>No icon selected.</span>';
     render();
+    document.getElementById('iconStatus').textContent = `Added “${template.title}” at ${timeLabel(start)}.`;
     document.querySelector(`[data-id="${CSS.escape(id)}"]`)?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
   }
 
@@ -673,6 +992,7 @@
     }
     step.start = start;
     step.end = start + duration;
+    step.duration = duration;
     step.time = timeLabel(start);
     step.title = title;
     step.sub = String(data.get('instructions')).trim();
@@ -721,7 +1041,7 @@
     if (button.dataset.done) {
       const id = button.dataset.done;
       state.done[id] = !state.done[id]; save();
-      document.getElementById(id).classList.toggle('is-done', !!state.done[id]);
+      document.querySelector(`[data-id="${CSS.escape(id)}"]`)?.classList.toggle('is-done', !!state.done[id]);
     } else if (button.dataset.chip) {
       const stepId = button.dataset.step;
       state.chips[stepId] = state.chips[stepId] === button.dataset.chip ? null : button.dataset.chip;
@@ -743,14 +1063,22 @@
       moveActivity(button.dataset.id, button.dataset.action === 'up' ? -1 : 1);
     } else if (button.dataset.iconId) {
       selectedIcon = { id: button.dataset.iconId, label: button.dataset.iconLabel };
+      const title = document.getElementById('activityTitle');
+      if (!title.value.trim()) title.value = selectedIcon.label;
       renderIconResults();
+    } else if (button.dataset.templateId) {
+      addSavedChoice(button.dataset.templateId);
+    } else if (button.dataset.removeTemplate) {
+      state.customActivities = (state.customActivities || []).filter((activity) => activity.id !== button.dataset.removeTemplate);
+      save(); render();
     } else if (button.id === 'createActivityLink') {
       document.getElementById('activityEditor').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
-      document.getElementById('activityTime').focus({ preventScroll: true });
+      document.getElementById('activityTitle').focus({ preventScroll: true });
     } else if (button.id === 'adminToggle') {
       const panel = document.getElementById('adminPanel');
       panel.hidden = !panel.hidden;
       button.setAttribute('aria-expanded', String(!panel.hidden));
+      document.body.classList.toggle('admin-open', !panel.hidden);
       if (!panel.hidden) panel.querySelector('input')?.focus();
     } else if (button.id === 'saveDetails') {
       state.greeting = document.getElementById('greetingInput').value.trim() || 'Hi Coleman!';
@@ -759,12 +1087,18 @@
     } else if (button.id === 'toggleEditing') {
       state.editing = !state.editing; save(); render();
     } else if (button.id === 'restoreSchedule') {
-      if (window.confirm('Restore the original schedule? This clears your local edits and activity checks.')) {
-        state = { done: {}, picks: {}, chips: {}, items: structuredClone(ORIGINAL_STEPS), greeting: 'Hi Coleman!', intro: 'Here’s our plan for today, from 3:00 to 6:30.', editing: true };
+      if (window.confirm('Restore the original schedule? This clears local schedule edits, saved choices, and activity checks.')) {
+        state = { done: {}, picks: {}, chips: {}, items: structuredClone(ORIGINAL_STEPS), customActivities: [], greeting: 'Hi Coleman!', intro: 'Here’s our plan for today, from 3:00 to 6:30.', editing: true };
         save(); editingId = null; suggestActivityTime(); render();
       }
     } else if (button.id === 'searchIcons') {
       searchPictograms();
+    } else if (button.id === 'clearIconSearch') {
+      searchRequest?.abort();
+      document.getElementById('iconSearch').value = '';
+      iconResults = [];
+      document.getElementById('iconResults').replaceChildren();
+      document.getElementById('iconStatus').textContent = 'Search ARASAAC for another picture.';
     } else if (button.id === 'reset') {
       state.done = {}; state.picks = {}; state.chips = {}; save(); render();
     }
@@ -775,6 +1109,7 @@
       const form = event.target.closest('[data-edit-form]');
       if (form) updateEditSections(form);
     }
+    if (event.target.matches('input[name="duration"]')) suggestActivityTime();
   });
   document.addEventListener('input', (event) => {
     if (event.target.matches('input[name="time"]')) {
@@ -793,6 +1128,8 @@
 
   suggestActivityTime();
   render();
+  document.getElementById('iconSearch').value = 'play';
+  searchPictograms('play');
   window.setInterval(tick, 20000);
 })();
 </script>
