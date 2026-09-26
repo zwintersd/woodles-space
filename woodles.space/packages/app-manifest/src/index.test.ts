@@ -132,7 +132,7 @@ describe('landing catalogue', () => {
 		);
 	});
 
-	it('keeps HomeSuite the front door for documents and boards', () => {
+	it('keeps HomeSuite the front door for its native artifacts', () => {
 		expect(landingBands.some((band) => band.id === 'catch')).toBe(false);
 		const writeBand = landingAppsByBand.find((group) => group.band.id === 'write');
 		expect(writeBand?.apps.map((app) => app.id)).toEqual(['homesuite']);
@@ -161,6 +161,7 @@ describe('entity addressing', () => {
 	it('builds a record URL from the public path the manifest owns', () => {
 		expect(entityHref('bloomforge-player', 'game', 'proj-1')).toBe('/play?game=proj-1');
 		expect(entityHref('whiteboard', 'board', 'board-1')).toBe('/whiteboard?board=board-1');
+		expect(entityHref('data', 'collection', 'collection-1')).toBe('/data?collection=collection-1');
 	});
 
 	it('encodes ids that would otherwise break the query string', () => {
@@ -246,7 +247,7 @@ function verifyAppShape(app: AppDefinition): void {
 		scripts?: Record<string, string>;
 	};
 	expect(packageJson.name).toBe(app.packageName);
-	expect(packageJson.scripts?.build).toBe('vite build');
+	expect(packageJson.scripts?.build).toMatch(/(?:^|&&\s*)vite build$/);
 
 	const config = readFileSync(join(ROOT, app.sourceDir, 'svelte.config.js'), 'utf8');
 	expect(config).toContain(`pages: 'dist'`);

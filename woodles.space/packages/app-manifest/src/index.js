@@ -111,6 +111,19 @@ export const appManifest = Object.freeze([
 		landing: tile('homesuite', 2, 'write', 'documents, boards, and collections in one place', 'var(--aqua)', 'var(--lilac)', '155deg', { defaultPin: 2, featured: 3 })
 	},
 	{
+		id: 'data',
+		name: 'Data',
+		publicPath: '/data',
+		aliases: [],
+		kind: 'sveltekit',
+		maturity: 'growing',
+		sourceDir: 'apps/data',
+		outputDir: 'apps/data/dist',
+		entryFile: 'index.html',
+		packageName: 'data',
+		addressableBy: ['collection']
+	},
+	{
 		id: 'letter',
 		name: 'Echoes',
 		publicPath: '/letter',

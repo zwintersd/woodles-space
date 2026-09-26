@@ -16,12 +16,14 @@
 		type HomeSuiteSurfaceAdapter
 	} from '$lib/surfaces';
 	import './homesuite.css';
+	import type { CollectionTemplate } from '../../../data/src/lib/collections';
 
 	type Filter = 'all' | 'document' | 'board' | 'collection';
 	type PaletteItem = { id: string; label: string; detail: string; enabled: boolean; run: () => void };
 	type ShellAction =
 		| { action: 'undo' | 'redo' | 'inspect' | 'focus' }
 		| { action: 'command'; commandId: string }
+		| { action: 'inspector'; controlId: string; value: string }
 		| { action: 'mode'; modeId: string };
 
 	let artifacts = $state<HomeSuiteArtifact[]>([]);
@@ -29,6 +31,8 @@
 	let filter = $state<Filter>('all');
 	let search = $state('');
 	let newOpen = $state(false);
+	let collectionCreateOpen = $state(false);
+	let createIssue = $state('');
 	let paletteOpen = $state(false);
 	let paletteSearch = $state('');
 	let inspectorOpen = $state(true);
@@ -49,7 +53,8 @@
 	));
 	const counts = $derived({
 		document: artifacts.filter((item) => item.kind === 'document').length,
-		board: artifacts.filter((item) => item.kind === 'board').length
+		board: artifacts.filter((item) => item.kind === 'board').length,
+		collection: artifacts.filter((item) => item.kind === 'collection').length
 	});
 	const paletteItems = $derived.by((): PaletteItem[] => {
 		const shell: PaletteItem[] = [
@@ -102,10 +107,18 @@
 		void goto('/homesuite', { noScroll: true });
 	}
 
-	function create(surface: HomeSuiteSurfaceAdapter): void {
-		const artifact = surface.create();
-		refresh();
-		void openArtifact(artifact);
+	function create(surface: HomeSuiteSurfaceAdapter, template?: CollectionTemplate): void {
+		if (surface.kind === 'collection' && !template) { collectionCreateOpen = true; newOpen = false; return; }
+		collectionCreateOpen = false;
+		createIssue = '';
+		try {
+			const artifact = surface.create(template);
+			refresh();
+			void openArtifact(artifact);
+		} catch (error) {
+			createIssue = error instanceof Error ? error.message : 'Could not create that item.';
+			collectionCreateOpen = surface.kind === 'collection';
+		}
 	}
 
 	function sendAction(action: ShellAction): void {
@@ -228,10 +241,8 @@
 				{#if newOpen}
 					<div class="new-menu" role="menu" aria-label="Create in HomeSuite">
 						{#each surfaces as surface}
-							<button role="menuitem" onclick={() => create(surface)}><span class="menu-glyph">{surface.kind === 'document' ? '¶' : '▧'}</span><span>{surface.label}</span></button>
+							<button role="menuitem" onclick={() => create(surface)}><span class="menu-glyph">{surface.kind === 'document' ? '¶' : surface.kind === 'board' ? '▧' : '▦'}</span><span>{surface.label}</span></button>
 						{/each}
-						<div class="menu-divider"></div>
-						<div class="menu-coming"><span class="menu-glyph">▦</span><span>Collection <small>coming later</small></span></div>
 					</div>
 				{/if}
 			</div>
@@ -248,7 +259,7 @@
 					{#if activeState?.selection}
 						<span class="selection-pill"><span class="selection-dot"></span>{activeState.selection.count && activeState.selection.count > 1 ? `${activeState.selection.count} selected` : activeState.selection.label}</span>
 					{:else}
-						<span class="surface-hint">{activeArtifact.kind === 'board' ? 'Canvas' : 'Writing surface'}</span>
+						<span class="surface-hint">{activeArtifact.kind === 'board' ? 'Canvas' : activeArtifact.kind === 'collection' ? 'Table' : 'Writing surface'}</span>
 					{/if}
 				</div>
 				{#key `${activeArtifact.kind}:${activeArtifact.ref.id}`}
@@ -272,7 +283,14 @@
 							{/each}
 						</dl>
 					{:else}
-						<p class="inspector-empty">Select something on the {activeArtifact.kind === 'board' ? 'board' : 'page'} to see it here.</p>
+						<p class="inspector-empty">Select something on the {activeArtifact.kind === 'board' ? 'board' : activeArtifact.kind === 'collection' ? 'table' : 'page'} to see it here.</p>
+					{/if}
+					{#if activeState?.inspector?.controls?.length}
+						<div class="inspector-controls">
+							{#each activeState.inspector.controls as control (control.id)}
+								<label>{control.label}<input value={control.value} disabled={control.id === 'field:type'} oninput={(event) => sendAction({ action: 'inspector', controlId: control.id, value: event.currentTarget.value })} /></label>
+							{/each}
+						</div>
 					{/if}
 					{#if activeState?.inspector?.actions?.length}
 						<div class="inspector-actions">
@@ -282,7 +300,7 @@
 						</div>
 					{/if}
 					{#if !activeState?.inspector?.actions?.length && activeState?.commands.some((command) => command.id === 'inspect' && command.enabled !== false)}
-						<button class="inspector-detail" onclick={() => sendAction({ action: 'inspect' })}>Open details in {activeArtifact.kind === 'board' ? 'Whiteboard' : 'Write'} ↗</button>
+						<button class="inspector-detail" onclick={() => sendAction({ action: 'inspect' })}>Open details in {activeArtifact.kind === 'board' ? 'Whiteboard' : activeArtifact.kind === 'collection' ? 'Data' : 'Write'} ↗</button>
 					{/if}
 				</aside>
 			{/if}
@@ -292,7 +310,7 @@
 	{:else}
 		<main class="suite-index">
 			<div class="index-heading">
-				<div><div class="eyebrow">YOUR WORKSPACE</div><h1>All your things, <em>within reach.</em></h1><p>Documents and boards share one place to begin. Each opens in the surface made for it.</p></div>
+				<div><div class="eyebrow">YOUR WORKSPACE</div><h1>All your things, <em>within reach.</em></h1><p>Documents, boards, and Collections share one place to begin. Each opens in the surface made for it.</p></div>
 				<div class="index-count"><strong>{artifacts.length}</strong><span>things in HomeSuite</span></div>
 			</div>
 			<div class="index-toolbar">
@@ -300,18 +318,16 @@
 					<button class:active={filter === 'all'} onclick={() => { filter = 'all'; }}>All <span>{artifacts.length}</span></button>
 					<button class:active={filter === 'document'} onclick={() => { filter = 'document'; }}>Documents <span>{counts.document}</span></button>
 					<button class:active={filter === 'board'} onclick={() => { filter = 'board'; }}>Boards <span>{counts.board}</span></button>
-					<button class:active={filter === 'collection'} onclick={() => { filter = 'collection'; }}>Collections <span>soon</span></button>
+					<button class:active={filter === 'collection'} onclick={() => { filter = 'collection'; }}>Collections <span>{counts.collection}</span></button>
 				</div>
 				<label class="index-search"><span aria-hidden="true">⌕</span><input bind:value={search} aria-label="Find a thing" placeholder="Find a thing" /></label>
 			</div>
-			{#if filter === 'collection'}
-				<section class="collection-placeholder"><span class="placeholder-mark">▦</span><h2>Collections are coming next.</h2><p>They will live here alongside documents and boards, with table, board, and gallery views over the same records.</p></section>
-			{:else if filtered.length}
+			{#if filtered.length}
 				<div class="artifact-list" aria-label="Recent artifacts">
 					{#each filtered as artifact (artifact.ref.app + artifact.ref.id)}
 						<button class="artifact-row" onclick={() => openArtifact(artifact)}>
-							<span class="artifact-icon {artifact.kind}" aria-hidden="true">{artifact.kind === 'document' ? '¶' : '▧'}</span>
-							<span class="artifact-copy"><strong>{artifact.title}</strong><small>{artifact.kind === 'document' ? 'Write' : 'Whiteboard'}</small></span>
+							<span class="artifact-icon {artifact.kind}" aria-hidden="true">{artifact.kind === 'document' ? '¶' : artifact.kind === 'board' ? '▧' : '▦'}</span>
+							<span class="artifact-copy"><strong>{artifact.title}</strong><small>{artifact.kind === 'document' ? 'Write' : artifact.kind === 'board' ? 'Whiteboard' : `${artifact.recordCount ?? 0} records`}</small></span>
 							<span class="kind-badge {artifact.kind}">{artifact.kind}</span>
 							<time datetime={artifact.updatedAt}>{formatDate(artifact.updatedAt)}</time>
 							<span class="row-arrow" aria-hidden="true">↗</span>
@@ -319,11 +335,25 @@
 						{/each}
 				</div>
 			{:else}
-				<div class="empty-list"><span>✳</span><h2>{search ? 'Nothing by that name yet.' : 'A place for your next thing.'}</h2><p>{search ? 'Try another word or clear the search.' : 'Use New to start a document or board.'}</p></div>
+				<div class="empty-list"><span>✳</span><h2>{search ? 'Nothing by that name yet.' : 'A place for your next thing.'}</h2><p>{search ? 'Try another word or clear the search.' : 'Use New to start a document, board, or Collection.'}</p></div>
 			{/if}
 		</main>
 	{/if}
 </div>
+
+{#if collectionCreateOpen}
+	<div class="template-backdrop" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) collectionCreateOpen = false; }}>
+		<div class="template-dialog" role="dialog" aria-modal="true" aria-label="New collection">
+			<div class="eyebrow">START WITH A SHAPE</div><h2>New collection</h2><p>These are suggestions. Each one is a regular Collection you can change as you work.</p>
+			{#if createIssue}<div class="create-issue" role="alert">{createIssue}</div>{/if}
+			<div class="template-options">
+				{#each [{ id: 'blank', name: 'Blank', detail: 'A Primary field, ready for records' }, { id: 'tracker', name: 'Simple tracker', detail: 'Name, status, and notes' }, { id: 'media', name: 'Media', detail: 'Title, medium, progress, rating, and more' }, { id: 'projects', name: 'Projects', detail: 'Status, priority, due date, and links' }, { id: 'research', name: 'Research / sources', detail: 'Sources, URLs, notes, and links' }] as template}
+					<button onclick={() => create(surfaces.find((surface) => surface.kind === 'collection')!, template.id as CollectionTemplate)}><span>{template.name}</span><small>{template.detail}</small><b>↗</b></button>
+				{/each}
+			</div><button class="template-cancel" onclick={() => collectionCreateOpen = false}>Cancel</button>
+		</div>
+	</div>
+{/if}
 
 {#if paletteOpen}
 	<div class="palette-backdrop">

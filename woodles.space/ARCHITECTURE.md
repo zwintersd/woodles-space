@@ -145,7 +145,8 @@ woodles.space/
     ├── lore/                static · renders LORE.md at /lore
     ├── architecture/        static · renders ARCHITECTURE.md at /architecture
     ├── animations/          Python · offline Manim scenes and curated web previews
-    ├── homesuite/            SvelteKit · one index and shared shell for documents and boards
+    ├── homesuite/            SvelteKit · one index and shared shell for documents, boards, and Collections
+    ├── data/                 SvelteKit · structured Collections, Table view, and Woodles references
     ├── write/               SvelteKit · the writing surface — letters, essays, stories, poems, notes, and lists that nest and move (Liquid); also the knowledge base now, in a small way (cross-draft references, backlinks, "draft it with a prompt")
     ├── marginalia/          SvelteKit · a witch writes worlds + a reading room
     ├── planner/             SvelteKit · carillon — self-observation, day piles, and reinforcement
@@ -170,7 +171,7 @@ the repository or silently promoting an experiment into a game.
 ## the app manifest
 
 `packages/app-manifest/src/index.js` is the canonical deployable-app inventory.
-It owns the 22 app ids, names, public paths and aliases, app shape, source and
+It owns the 23 app ids, names, public paths and aliases, app shape, source and
 output locations, maturity, and landing visibility. It also owns the landing
 tile order/copy, **band**, default pins, featured fallback, and Marginalia's
 Reading Room sub-surface. A band is the *moment* a tile is for rather than the
@@ -236,12 +237,13 @@ Vite alias (`../../shared`). there is no SSR; every app ships as a static bundle
 
 ## homesuite
 
-`/homesuite` is the homepage's entry to documents and boards. Its index reads
-Write's draft index and Whiteboard's versioned board library, orders their
-summaries by recent activity, and creates new material through the owning
-app's storage functions (`apps/homesuite/src/lib/surfaces.ts`). It has no
-second artifact database and does not copy content. Collections have a visible
-place in the index and New menu, but no collection records or editor yet.
+`/homesuite` is the homepage's entry to documents, boards, and Collections. Its
+index reads Write's draft index, Whiteboard's versioned board library, and
+Data's versioned Collection library, orders their summaries by recent activity,
+and creates new material through the owning app's storage functions
+(`apps/homesuite/src/lib/surfaces.ts`). It does not copy content. Data owns
+Collection schemas, records, and Table view state; HomeSuite owns the shared
+artifact listing and shell.
 
 HomeSuite keeps one top bar, title area, navigation, command palette,
 Undo/Redo location, and inspector slot around the active editor. Write and
@@ -253,7 +255,11 @@ availability flow outward; chosen commands and Undo/Redo flow inward. The
 shell validates message origin and frame source. Each surface decides what
 its commands do and keeps its own history and storage. `?draft=` and `?board=`
 remain normal deep links to the owning apps, with `@woodles/app-manifest`
-building those links.
+building those links. Data follows the same contract with `?collection=` and
+reports its active selection, Inspector controls, commands, and history state
+through the shared bridge. Collection records may keep a `WoodlesRef`
+membership or Relation; the origin application retains ownership of the
+referenced thing.
 
 `hygge` is the design playground — it holds the fonts, palette, motifs, and
 motion showcases that used to be separate pages. `/hygge/motion` is the review
