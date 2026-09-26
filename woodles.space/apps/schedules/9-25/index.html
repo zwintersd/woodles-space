@@ -161,7 +161,10 @@
     body { min-height: 100vh; background: linear-gradient(135deg, #f5f8ff 0%, #eef4ff 100%); }
     .workspace { display: grid; grid-template-columns: minmax(0, 2.28fr) minmax(390px, .98fr); align-items: start; gap: 24px; width: min(1600px, calc(100% - 64px)); margin: 6px auto 36px; }
     .schedule-column, .builder-column { min-width: 0; }
-    .builder-column { position: sticky; top: 10px; display: grid; gap: 12px; align-self: start; }
+    .builder-column { position: sticky; top: 10px; display: grid; gap: 12px; align-self: start; max-height: calc(100vh - 20px); max-height: calc(100dvh - 20px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: #bfd2ec transparent; }
+    .builder-column::-webkit-scrollbar { width: 8px; }
+    .builder-column::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 99px; background: #bfd2ec; background-clip: padding-box; }
+    .builder-column::-webkit-scrollbar-track { background: transparent; }
     .wrap { max-width: none; margin: 0; padding: 0 0 30px; }
     .hero { min-height: 146px; margin: 0; padding: 19px 26px 16px; border-radius: 20px; background: linear-gradient(115deg, #1878f9 0%, #2f8bff 56%, #2377ee 100%); box-shadow: 0 3px 10px rgba(35, 91, 174, .11); }
     .hero::after { display: none; }
@@ -302,7 +305,7 @@
     }
     @media (max-width: 900px) {
       .workspace { grid-template-columns: minmax(0, 1fr); width: min(760px, calc(100% - 28px)); gap: 18px; }
-      .builder-column { position: static; grid-row: 2; }
+      .builder-column { position: static; grid-row: 2; max-height: none; overflow: visible; }
       .hero-art { width: min(36%, 270px); }
       .activity-editor { padding: 16px; }
       .form-grid { grid-template-columns: 124px minmax(0, 1fr); }
