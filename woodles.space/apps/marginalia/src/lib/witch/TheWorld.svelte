@@ -253,6 +253,7 @@
 							{@const boundSprite = creatureImageSrc(l.id)}
 							{@const boundPixelated = creatureIsPixelated(l.id)}
 							<article
+								id={`life-${l.id}`}
 								class="card"
 								class:unlooked={stage === 0}
 								class:attending

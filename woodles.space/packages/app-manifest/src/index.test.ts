@@ -162,6 +162,8 @@ describe('entity addressing', () => {
 		expect(entityHref('bloomforge-player', 'game', 'proj-1')).toBe('/play?game=proj-1');
 		expect(entityHref('whiteboard', 'board', 'board-1')).toBe('/whiteboard?board=board-1');
 		expect(entityHref('data', 'collection', 'collection-1')).toBe('/data?collection=collection-1');
+		expect(entityHref('marginalia', 'life', 'salt_deposit')).toBe('/marginalia?life=salt_deposit');
+		expect(entityHref('marginalia', 'field-note', 'note 1')).toBe('/marginalia?field-note=note%201');
 	});
 
 	it('encodes ids that would otherwise break the query string', () => {

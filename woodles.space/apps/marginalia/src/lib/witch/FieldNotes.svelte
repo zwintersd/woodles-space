@@ -19,7 +19,7 @@
 		<h3>field notes</h3>
 		<ul>
 			{#each book.fieldNotes as note (note.id)}
-				<li>
+				<li id={`field-note-${note.id}`}>
 					<span class="note-text">{note.text}</span>
 					<span class="note-time">{timeAgo(note.t)}</span>
 				</li>

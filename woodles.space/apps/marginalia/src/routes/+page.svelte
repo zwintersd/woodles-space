@@ -37,6 +37,13 @@
 		book.hydrate();
 		void book.refreshBestiaryCreatures();
 		if (window.location.hash === '#reading-room') readingOpen = true;
+		const lifeId = new URLSearchParams(window.location.search).get('life');
+		const noteId = new URLSearchParams(window.location.search).get('field-note');
+		if (lifeId || noteId) {
+			book.openBook();
+			book.mode = 'world';
+			requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(lifeId ? `life-${lifeId}` : `field-note-${noteId}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })));
+		}
 		tutorialOpen = localStorage.getItem(TUTORIAL_KEY) !== 'done';
 		startTick();
 		window.addEventListener('beforeunload', persist);

@@ -5,12 +5,15 @@ export type FieldType = 'text' | 'number' | 'checkbox' | 'date' | 'select' | 'mu
 export type SelectOption = { id: string; label: string; tint: string };
 export type FieldConfig = { options?: SelectOption[]; format?: 'plain' | 'percent' | 'currency' };
 export type FieldValue = string | number | boolean | string[] | WoodlesRef | null;
+export type CollectionSource = 'bestiary-creatures' | 'marginalia-life' | 'marginalia-field-notes';
 export type CollectionField = {
 	id: string;
 	name: string;
 	type: FieldType;
 	primary: boolean;
 	config?: FieldConfig;
+	/** Source-owned columns are refreshed from their app; ordinary fields stay local. */
+	sourceKey?: string;
 	createdAt: string;
 };
 export type CollectionRecord = {
@@ -29,6 +32,8 @@ export type Collection = {
 	views: { table: TableViewState };
 	createdAt: string;
 	updatedAt: string;
+	sources?: CollectionSource[];
+	sourceSyncedAt?: string;
 };
 export type CollectionLibrary = { collections: Collection[] };
 
@@ -45,6 +50,8 @@ export function isWoodlesRef(value: unknown): value is WoodlesRef {
 export function isCollection(value: unknown): value is Collection {
 	if (!isRecord(value) || typeof value.id !== 'string' || typeof value.title !== 'string' || !Array.isArray(value.fields) || !Array.isArray(value.records)) return false;
 	if (!isStamp(value.createdAt) || !isStamp(value.updatedAt)) return false;
+	if (value.sources !== undefined && (!Array.isArray(value.sources) || !value.sources.every((source) => ['bestiary-creatures', 'marginalia-life', 'marginalia-field-notes'].includes(source)))) return false;
+	if (value.sourceSyncedAt !== undefined && !isStamp(value.sourceSyncedAt)) return false;
 	const fields = value.fields as unknown[];
 	if (fields.filter((field) => isRecord(field) && field.primary === true).length !== 1 || !fields.every(isCollectionField)) return false;
 	if (new Set((fields as CollectionField[]).map((field) => field.id)).size !== fields.length) return false;
@@ -63,6 +70,7 @@ function isCollectionField(value: unknown): value is CollectionField {
 	if (!isRecord(value) || typeof value.id !== 'string' || !value.id || typeof value.name !== 'string' || !FIELD_TYPES.includes(value.type as FieldType) || typeof value.primary !== 'boolean' || !isStamp(value.createdAt)) return false;
 	if (value.primary && value.type !== 'text') return false;
 	if (value.config !== undefined && !isFieldConfig(value.config)) return false;
+	if (value.sourceKey !== undefined && (typeof value.sourceKey !== 'string' || !value.sourceKey)) return false;
 	return true;
 }
 
@@ -108,22 +116,27 @@ function field(id: string, name: string, type: FieldType, primary = false, optio
 	return { id, name, type, primary, createdAt, ...(options ? { config: { options: options.map((label, index) => ({ id: makeId('opt'), label, tint: TINTS[index % TINTS.length] })) } } : {}) };
 }
 
-export type CollectionTemplate = 'blank' | 'tracker' | 'media' | 'projects' | 'research';
-const TEMPLATE_FIELDS: Record<CollectionTemplate, Array<[string, FieldType, string[]?]>> = {
+export type CollectionTemplate = 'blank' | 'tracker' | 'media' | 'projects' | 'research' | 'living-world';
+const TEMPLATE_FIELDS: Record<CollectionTemplate, Array<[string, FieldType, string[]?, string?]>> = {
 	blank: [['Name', 'text']],
 	tracker: [['Name', 'text'], ['Status', 'select', ['Not started', 'In progress', 'Done']], ['Notes', 'text']],
 	media: [['Title', 'text'], ['Medium', 'select', ['Book', 'Game', 'Film', 'Music']], ['Status', 'select', ['Want to try', 'In progress', 'Finished']], ['Rating', 'number'], ['Started', 'date'], ['Finished', 'date'], ['Favorite', 'checkbox'], ['Related', 'relation'], ['Notes', 'text']],
 	projects: [['Project', 'text'], ['Status', 'select', ['Not started', 'In progress', 'Done']], ['Priority', 'select', ['Low', 'Medium', 'High']], ['Due', 'date'], ['Related', 'relation']],
-	research: [['Source', 'text'], ['URL', 'url'], ['Status', 'select', ['To read', 'Reading', 'Read']], ['Notes', 'text'], ['Related', 'relation']]
+	research: [['Source', 'text'], ['URL', 'url'], ['Status', 'select', ['To read', 'Reading', 'Read']], ['Notes', 'text'], ['Related', 'relation']],
+	'living-world': [['Name', 'text', undefined, 'name'], ['Source', 'text', undefined, 'source'], ['Kind', 'text', undefined, 'kind'], ['Category', 'text', undefined, 'category'], ['Domain', 'text', undefined, 'domain'], ['Stage', 'text', undefined, 'stage'], ['Details', 'text', undefined, 'details'], ['Updated', 'text', undefined, 'updated'], ['My notes', 'text']]
+};
+
+const TEMPLATE_SOURCES: Partial<Record<CollectionTemplate, CollectionSource[]>> = {
+	'living-world': ['bestiary-creatures', 'marginalia-life', 'marginalia-field-notes']
 };
 
 export function createCollection(title = 'Untitled collection', template: CollectionTemplate = 'blank'): Collection {
 	const stamp = now();
-	const fields = TEMPLATE_FIELDS[template].map(([name, type, options], index) => field(index === 0 ? makeId('field-primary') : makeId('field'), name, type, index === 0, options));
+	const fields = TEMPLATE_FIELDS[template].map(([name, type, options, sourceKey], index) => ({ ...field(index === 0 ? makeId('field-primary') : makeId('field'), name, type, index === 0, options), ...(sourceKey ? { sourceKey } : {}) }));
 	return {
 		id: makeId('collection'), title: title.trim() || 'Untitled collection', fields, records: [],
 		views: { table: { columnOrder: fields.map((entry) => entry.id), columnWidths: Object.fromEntries(fields.map((entry) => [entry.id, entry.primary ? 240 : 160])) } },
-		createdAt: stamp, updatedAt: stamp
+		createdAt: stamp, updatedAt: stamp, ...(TEMPLATE_SOURCES[template] ? { sources: [...TEMPLATE_SOURCES[template]!] } : {})
 	};
 }
 
