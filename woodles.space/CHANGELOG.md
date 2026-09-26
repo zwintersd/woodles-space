@@ -30,6 +30,13 @@ so it's not easy to forget.
   every button, including discard, stopped responding. `loadLocal()` and
   `refresh()` now only reassign `entries`/`status` when the shelf's contents
   actually changed.
+- **Carillon: the momentary sample can tag what it's about** — "What's
+  happening now?" gets the same shelf-chip picker as the task composer
+  (`MomentarySample.svelte`), so a moment can be linked to a Thinking About
+  entry (`IntervalObservation.thinkingAboutEntryId`) without a task ever
+  having been scheduled for the block. The sitting offer
+  (`store.offerableEntryIdsForInterval`) now unions the plan-linked entries
+  with whatever the moment itself was tagged with.
 
 ## 2026-09-20
 

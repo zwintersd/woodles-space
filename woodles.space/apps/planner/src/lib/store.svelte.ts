@@ -322,6 +322,19 @@ export class PlannerStore {
 		];
 	}
 
+	/**
+	 * `linkedEntryIdsForInterval` plus whatever the moment itself was tagged
+	 * with while writing it — the sitting offer shouldn't require a task to
+	 * have been scheduled first. This is what the offer in the instrument
+	 * actually shows.
+	 */
+	offerableEntryIdsForInterval(dateStr: string, intervalStart: string): string[] {
+		const tagged = this.getObservation(dateStr, intervalStart)?.thinkingAboutEntryId;
+		return [
+			...new Set([...this.linkedEntryIdsForInterval(dateStr, intervalStart), ...(tagged ? [tagged] : [])])
+		];
+	}
+
 	loggedSessionId(entryId: string, dateStr: string): string {
 		return `session-${entryId}-${dateStr}`;
 	}
@@ -530,6 +543,7 @@ export class PlannerStore {
 		source?: 'live' | 'paper' | 'recall';
 		/** Span of the mark. A recall stretch may cover several bells as one sample. */
 		intervalMinutes?: number;
+		thinkingAboutEntryId?: string;
 	}): IntervalObservation {
 		const date = input.date ?? dateKey(this.now);
 		if (!this.dayOverrides[date]?.blocks) {
@@ -562,6 +576,7 @@ export class PlannerStore {
 			label: input.label?.trim() || kindLabel(input.kind),
 			plannedLabel,
 			note: input.note?.trim() || undefined,
+			thinkingAboutEntryId: input.thinkingAboutEntryId,
 			intervalMinutes:
 				existing?.intervalMinutes ?? input.intervalMinutes ?? this.settings.samplingIntervalMinutes,
 			capturedAt: existing?.capturedAt ?? timestamp,
