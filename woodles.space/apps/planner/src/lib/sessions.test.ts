@@ -152,3 +152,87 @@ describe('which entries an interval is about', () => {
 		expect(store.linkedEntryIdsForInterval(date, block.startTime)).toEqual(['piranesi']);
 	});
 });
+
+describe('offering a sitting without a task', () => {
+	let store: PlannerStore;
+
+	beforeEach(() => {
+		localStorage.clear();
+		store = new PlannerStore();
+	});
+
+	it('offers the entry a moment was tagged with, with no task scheduled', () => {
+		// The whole point: writing "reading Piranesi" and tagging it from the
+		// shelf should offer a sitting on its own, the same as a scheduled task
+		// would — nobody should have to plan a block just to log what happened.
+		const date = '2026-08-09';
+		const block = store.getBlocksForDateKey(date)[0];
+		store.observeInterval({
+			date,
+			intervalStart: block.startTime,
+			kind: 'reading',
+			label: 'reading Piranesi',
+			thinkingAboutEntryId: 'piranesi'
+		});
+
+		expect(store.linkedEntryIdsForInterval(date, block.startTime)).toEqual([]);
+		expect(store.offerableEntryIdsForInterval(date, block.startTime)).toEqual(['piranesi']);
+	});
+
+	it('combines a tagged moment with a linked task rather than dropping either', () => {
+		const date = '2026-08-09';
+		const block = store.getBlocksForDateKey(date)[0];
+		store.addTask({
+			title: 'read a chapter',
+			thinkingAboutEntryId: 'piranesi',
+			targetBlockId: block.id,
+			targetDate: date
+		});
+		store.observeInterval({
+			date,
+			intervalStart: block.startTime,
+			kind: 'reading',
+			label: 'started Solaris instead',
+			thinkingAboutEntryId: 'solaris'
+		});
+
+		expect(store.offerableEntryIdsForInterval(date, block.startTime).sort()).toEqual([
+			'piranesi',
+			'solaris'
+		]);
+	});
+
+	it('does not repeat an entry both the task and the moment agree on', () => {
+		const date = '2026-08-09';
+		const block = store.getBlocksForDateKey(date)[0];
+		store.addTask({
+			title: 'read a chapter',
+			thinkingAboutEntryId: 'piranesi',
+			targetBlockId: block.id,
+			targetDate: date
+		});
+		store.observeInterval({
+			date,
+			intervalStart: block.startTime,
+			kind: 'reading',
+			label: 'read a chapter',
+			thinkingAboutEntryId: 'piranesi'
+		});
+
+		expect(store.offerableEntryIdsForInterval(date, block.startTime)).toEqual(['piranesi']);
+	});
+
+	it('carries the tag on the observation itself, round-tripping through observeInterval', () => {
+		const date = '2026-08-09';
+		const observation = store.observeInterval({
+			date,
+			intervalStart: '20:00',
+			kind: 'reading',
+			label: 'reading Piranesi',
+			thinkingAboutEntryId: 'piranesi'
+		});
+
+		expect(observation.thinkingAboutEntryId).toBe('piranesi');
+		expect(store.getObservation(date, '20:00')?.thinkingAboutEntryId).toBe('piranesi');
+	});
+});

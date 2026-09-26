@@ -133,7 +133,7 @@
 	const offerableEntries = $derived.by(() => {
 		if (!selectedInterval?.observation) return [];
 		return store
-			.linkedEntryIdsForInterval(selectedInterval.date, selectedInterval.startTime)
+			.offerableEntryIdsForInterval(selectedInterval.date, selectedInterval.startTime)
 			.map((entryId) => ({ entryId, entry: thinkingAboutShelf.find(entryId) }));
 	});
 
