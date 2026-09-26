@@ -161,7 +161,10 @@
     body { min-height: 100vh; background: linear-gradient(135deg, #f5f8ff 0%, #eef4ff 100%); }
     .workspace { display: grid; grid-template-columns: minmax(0, 2.28fr) minmax(390px, .98fr); align-items: start; gap: 24px; width: min(1600px, calc(100% - 64px)); margin: 6px auto 36px; }
     .schedule-column, .builder-column { min-width: 0; }
-    .builder-column { position: sticky; top: 10px; display: grid; gap: 12px; align-self: start; }
+    .builder-column { position: sticky; top: 10px; display: grid; gap: 12px; align-self: start; max-height: calc(100vh - 20px); max-height: calc(100dvh - 20px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: #bfd2ec transparent; }
+    .builder-column::-webkit-scrollbar { width: 8px; }
+    .builder-column::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 99px; background: #bfd2ec; background-clip: padding-box; }
+    .builder-column::-webkit-scrollbar-track { background: transparent; }
     .wrap { max-width: none; margin: 0; padding: 0 0 30px; }
     .hero { min-height: 146px; margin: 0; padding: 19px 26px 16px; border-radius: 20px; background: linear-gradient(115deg, #1878f9 0%, #2f8bff 56%, #2377ee 100%); box-shadow: 0 3px 10px rgba(35, 91, 174, .11); }
     .hero::after { display: none; }
@@ -173,6 +176,11 @@
     .back:focus-visible { outline: 2px solid white; }
     .admin-trigger { position: absolute; z-index: 3; top: 10px; right: 12px; display: grid; width: 34px; height: 34px; place-items: center; padding: 0; border: 1px solid rgba(255,255,255,.48); border-radius: 50%; color: #fff; background: rgba(16, 73, 158, .24); font: 800 16px var(--body); cursor: pointer; }
     .admin-trigger:hover, .admin-trigger[aria-expanded="true"] { background: rgba(16, 73, 158, .52); }
+    .builder-toggle { position: absolute; z-index: 3; top: 10px; right: 54px; min-height: 34px; padding: 6px 11px; border: 1px solid #d7e6fb; border-radius: 999px; color: #17427d; background: #fff; box-shadow: 0 2px 6px rgba(20, 62, 119, .14); font: 900 12px var(--body); cursor: pointer; }
+    .builder-toggle:hover { background: #eaf3ff; }
+    .builder-toggle:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+    body.builder-hidden .workspace { grid-template-columns: minmax(0, 1fr); }
+    body.builder-hidden .builder-column { display: none; }
     .admin-panel { position: relative; z-index: 4; margin: 9px 0 0; padding: 12px; border: 2px solid var(--line); background: #fff; box-shadow: 0 8px 24px rgba(32, 74, 134, .1); }
     .admin-panel h2 { text-transform: none; }
     .editor-tools { display: none; }
@@ -302,7 +310,7 @@
     }
     @media (max-width: 900px) {
       .workspace { grid-template-columns: minmax(0, 1fr); width: min(760px, calc(100% - 28px)); gap: 18px; }
-      .builder-column { position: static; grid-row: 2; }
+      .builder-column { position: static; grid-row: 2; max-height: none; overflow: visible; }
       .hero-art { width: min(36%, 270px); }
       .activity-editor { padding: 16px; }
       .form-grid { grid-template-columns: 124px minmax(0, 1fr); }
@@ -317,6 +325,7 @@
       .admin-trigger { top: 8px; right: 8px; font-size: 10px; }
       .back { top: auto; right: auto; bottom: 14px; left: 138px; font-size: 10px; }
       .admin-trigger { width: 32px; height: 32px; font-size: 16px; }
+      .builder-toggle { top: auto; right: 8px; bottom: 10px; min-height: 30px; padding: 4px 9px; font-size: 11px; }
       .nownext { gap: 7px; margin-top: 8px; }
       .nn { min-height: 58px; padding: 6px 9px; border-radius: 13px; }
       .nn b { font-size: 14px; }
@@ -365,12 +374,13 @@
     }
   </style>
 </head>
-<body>
+<body class="builder-hidden">
 <main class="workspace">
   <div class="schedule-column">
     <header class="hero">
       <a class="back" href="/schedules">← Schedules</a>
       <button class="admin-trigger" type="button" id="adminToggle" aria-label="Schedule settings" aria-expanded="false" aria-controls="adminPanel">⚙</button>
+      <button class="builder-toggle" type="button" id="builderToggle" aria-label="Show activity builder" aria-expanded="false" aria-controls="builderPanel">＋ Activity Builder</button>
       <h1 id="greeting">Hi Coleman!</h1>
       <p id="intro">Here’s our plan for today, from 3:00 to 6:30.</p>
       <div class="clock" id="clock" aria-label="Current local time">Now: --:--</div>
@@ -404,7 +414,7 @@
     <button class="reset" id="reset" type="button">Clear choices and checks</button>
   </div>
 
-  <aside class="builder-column" aria-label="Activity builder and saved choices">
+  <aside class="builder-column" id="builderPanel" aria-label="Activity builder and saved choices" hidden>
     <section class="activity-editor" id="activityEditor" aria-labelledby="addActivityTitle">
       <div class="builder-heading">
         <span class="builder-mark" aria-hidden="true">+</span>
@@ -1080,6 +1090,17 @@
       button.setAttribute('aria-expanded', String(!panel.hidden));
       document.body.classList.toggle('admin-open', !panel.hidden);
       if (!panel.hidden) panel.querySelector('input')?.focus();
+    } else if (button.id === 'builderToggle') {
+      const panel = document.getElementById('builderPanel');
+      panel.hidden = !panel.hidden;
+      const expanded = !panel.hidden;
+      document.body.classList.toggle('builder-hidden', !expanded);
+      button.setAttribute('aria-expanded', String(expanded));
+      button.setAttribute('aria-label', `${expanded ? 'Hide' : 'Show'} activity builder`);
+      button.textContent = expanded ? '× Hide Builder' : '＋ Activity Builder';
+      if (expanded && matchMedia('(max-width: 900px)').matches) {
+        panel.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+      }
     } else if (button.id === 'saveDetails') {
       state.greeting = document.getElementById('greetingInput').value.trim() || 'Hi Coleman!';
       state.intro = document.getElementById('introInput').value.trim() || 'Here’s our plan for today, from 3:00 to 6:30.';
