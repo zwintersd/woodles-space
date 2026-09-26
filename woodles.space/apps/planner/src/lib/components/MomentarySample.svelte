@@ -7,12 +7,13 @@
 	import { cleanTrackerAnswers } from '$lib/momentTrackers';
 	import MomentDetails from './MomentDetails.svelte';
 	import { cleanDetails } from '$lib/momentDetails';
+	import { thinkingAboutShelf } from '$lib/thinkingAboutShelf.svelte';
 
 	let { interval, timeLabel, bellNote, editingPast = false, onreturnnow, onsaved }: { interval: DayInterval | null; timeLabel: string; bellNote: string; editingPast?: boolean; onreturnnow?: () => void; onsaved?: () => void } = $props();
 	const colors = ['#aa526b', '#8061a8', '#467f92', '#98702f', '#548068', '#6676a0'];
 	const defaults: SampleTag[] = INTERVAL_KIND_OPTIONS.filter(o => o.kind !== 'elsewhere').map((o, i) => ({ id: o.kind, name: o.label, color: colors[i], kind: o.kind }));
 	let tags = $derived(store.settings.sampleTags ?? defaults);
-	let drafts = $state<Record<string, { text: string; tagId: string; fallback?: SampleTag; details: Details; answers: TrackerAnswer[] }>>({});
+	let drafts = $state<Record<string, { text: string; tagId: string; fallback?: SampleTag; details: Details; answers: TrackerAnswer[]; thinkingAboutEntryId: string }>>({});
 	let draft = $derived(interval ? drafts[interval.key] : undefined);
 	let editing = $state(false);
 	let tagDraft = $state<SampleTag[]>([]);
@@ -23,14 +24,24 @@
 		const observation = interval.observation;
 		const own = observation?.intervalStart === interval.startTime ? observation : undefined;
 		const tag = own?.sampleTag === undefined ? defaults.find(t => t.kind === own?.kind) : own.sampleTag;
-		drafts[interval.key] = { text: own?.label ?? '', tagId: tag?.id ?? '', fallback: tag ?? undefined, details: { ...own?.details }, answers: (own?.trackerAnswers ?? []).map(a => ({ tracker: { ...a.tracker }, value: a.value })) };
+		drafts[interval.key] = { text: own?.label ?? '', tagId: tag?.id ?? '', fallback: tag ?? undefined, details: { ...own?.details }, answers: (own?.trackerAnswers ?? []).map(a => ({ tracker: { ...a.tracker }, value: a.value })), thinkingAboutEntryId: own?.thinkingAboutEntryId ?? '' };
 		feedback = '';
 	});
 	let chosen = $derived(tags.find(t => t.id === draft?.tagId) ?? (draft?.fallback?.id === draft?.tagId ? draft?.fallback : undefined));
+	// The moment's own shelf tag, independent of any task scheduled for the
+	// block — this is what lets a sitting be offered without a task ever
+	// having existed.
+	let shelfEntry = $derived(draft?.thinkingAboutEntryId ? thinkingAboutShelf.find(draft.thinkingAboutEntryId) : null);
+	function pickShelfEntry(entryId: string): void {
+		if (draft) draft.thinkingAboutEntryId = entryId;
+	}
+	function clearShelfEntry(): void {
+		if (draft) draft.thinkingAboutEntryId = '';
+	}
 	function saveSample() {
 		if (!interval || !draft?.text.trim()) return;
 		const existing = interval.observation?.intervalStart === interval.startTime ? interval.observation : undefined;
-		store.observeInterval({ date: interval.date, intervalStart: interval.startTime, label: draft.text, kind: chosen?.kind ?? 'elsewhere', sampleTag: chosen ? { ...chosen } : null, details: cleanDetails(draft.details), trackerAnswers: cleanTrackerAnswers(draft.answers), source: existing?.source ?? 'live', note: existing?.note });
+		store.observeInterval({ date: interval.date, intervalStart: interval.startTime, label: draft.text, kind: chosen?.kind ?? 'elsewhere', sampleTag: chosen ? { ...chosen } : null, details: cleanDetails(draft.details), trackerAnswers: cleanTrackerAnswers(draft.answers), source: existing?.source ?? 'live', note: existing?.note, thinkingAboutEntryId: draft.thinkingAboutEntryId || undefined });
 		queueSync();
 		feedback = existing ? 'Changes saved.' : 'Moment saved.';
 		onsaved?.();
@@ -56,6 +67,24 @@
 			<form onsubmit={(event) => { event.preventDefault(); saveSample(); }}>
 				<label class="entry-label" for="moment-entry">{interval?.state === 'past' ? 'What was happening?' : 'What’s happening now?'}</label>
 				<textarea id="moment-entry" placeholder="A few words about this moment…" rows="3" value={draft?.text ?? ''} disabled={!draft} oninput={(event) => { if (draft) draft.text = event.currentTarget.value; feedback = ''; }}></textarea>
+				{#if shelfEntry}
+					<p class="shelf-link" data-testid="moment-shelf-link">
+						<span class="shelf-dot" style:background={shelfEntry.color}></span>
+						<span>about <strong>{shelfEntry.title}</strong></span>
+						<button type="button" class="shelf-clear" onclick={clearShelfEntry}>unlink</button>
+					</p>
+				{:else if draft && thinkingAboutShelf.entries.length > 0}
+					<div class="shelf-picker" data-testid="moment-shelf-picker">
+						<p class="shelf-kicker">or something you're in the middle of</p>
+						<div class="shelf-strip">
+							{#each thinkingAboutShelf.entries as entry (entry.id)}
+								<button type="button" class="shelf-chip" style:--chip={entry.color} onclick={() => pickShelfEntry(entry.id)}>
+									{entry.title}
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/if}
 				<div class="labels-heading"><span>Color label <small>optional</small></span><button type="button" onclick={() => { tagDraft = tags.map(t => ({ ...t })); labelError = ''; editing = !editing; }}>Edit labels</button></div>
 				<div class="labels" role="group" aria-label="Sample color label">
 					<button type="button" class="tag" aria-pressed={!draft?.tagId} disabled={!draft} onclick={() => { if (draft) draft.tagId = ''; feedback = ''; }}>No label</button>
@@ -102,6 +131,18 @@
 	.checkin-empty { color: var(--car-ink-soft); font-size: 0.8rem; }
 	.entry-label { display: block; font: 500 clamp(1.6rem, 2.5vw, 2.2rem)/1.1 var(--car-display); margin-bottom: 0.7rem; }
 	textarea { display: block; width: 100%; resize: vertical; min-height: 6rem; border: 1px solid #44365b33; border-left: 4px solid var(--sample-color); border-radius: 0.65rem; background: #ffffff80; box-shadow: inset 0 2px 5px #44365b12; padding: 0.8rem; color: var(--car-ink); font: 1rem/1.5 var(--car-body); transition: border-color 180ms ease; }
+	/* The shelf, borrowed from TaskEditDrawer's composer — same chips, same
+	   colour-from-the-board so an entry reads as the same object here. */
+	.shelf-picker { margin-top: 0.6rem; }
+	.shelf-kicker { color: var(--car-ink-soft); font-size: 0.72rem; margin-bottom: 0.35rem; }
+	.shelf-strip { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+	.shelf-chip { font-size: 0.78rem; color: var(--car-ink); padding: 0.25rem 0.6rem; border: 1px solid #44365b2b; border-left: 3px solid var(--chip, var(--car-ink)); border-radius: 0.35rem; background: #ffffff60; }
+	.shelf-chip:hover, .shelf-chip:focus-visible { border-color: var(--sample-color); }
+	.shelf-link { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.6rem; color: var(--car-ink-soft); font-size: 0.78rem; }
+	.shelf-link strong { color: var(--car-ink); font-weight: 500; }
+	.shelf-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; flex: none; }
+	.shelf-clear { border: 0; background: transparent; padding: 0; margin-left: auto; color: var(--car-ink-soft); font-size: 0.72rem; text-decoration: underline; }
+	.shelf-clear:hover { color: var(--car-ink); }
 	.labels-heading, .save-row { display: flex; align-items: center; justify-content: space-between; gap: 0.65rem; margin: 0.8rem 0 0.5rem; }
 	.labels-heading { font: 0.75rem var(--car-body); }
 	small, .save-row span { color: var(--car-ink-soft); font-size: 0.7rem; }

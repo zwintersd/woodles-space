@@ -192,6 +192,14 @@ export type IntervalObservation = {
 	plannedLabel?: string;
 	note?: string;
 	intervalMinutes?: number;
+	/**
+	 * The Thinking About entry this moment was about, if tagged from the
+	 * shelf while writing it. A reference rather than a copied title, same
+	 * reason as `Task.thinkingAboutEntryId`: a rename over there doesn't
+	 * leave this lying, and it's what lets the sitting offer appear without
+	 * a task ever having been scheduled for the block.
+	 */
+	thinkingAboutEntryId?: string;
 	capturedAt: string;
 	updatedAt: string;
 };
