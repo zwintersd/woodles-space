@@ -18,6 +18,19 @@ so it's not easy to forget.
 
 ---
 
+## 2026-09-26
+
+- **Carillon: fixed a reactive infinite loop that could wedge the whole
+  page** — opening the "new task" composer while a sync passphrase was
+  connected made `ThinkingAboutShelf.refresh()`'s reference-churning
+  reassignment of `entries` (a fresh array from every `localStorage`
+  re-parse, even when nothing changed) feed back into the effects that call
+  it (`TaskEditDrawer`, `TodayInstrument`), hitting Svelte's
+  `effect_update_depth_exceeded` guard and freezing the page's reactivity —
+  every button, including discard, stopped responding. `loadLocal()` and
+  `refresh()` now only reassign `entries`/`status` when the shelf's contents
+  actually changed.
+
 ## 2026-09-20
 
 - **cheat codes, hosted** —
