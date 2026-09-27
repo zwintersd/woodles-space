@@ -18,6 +18,25 @@ so it's not easy to forget.
 
 ---
 
+## 2026-09-27
+
+- **HomeSuite stops losing things at its seams** — a board edit or a
+  Collection cell typed in the moment before leaving is now saved; Whiteboard
+  and Data flush on `pagehide`, which fires when HomeSuite closes a frame
+  (`beforeunload` never did). A new document's page is veiled until Write has
+  loaded it, so a title typed straight after New is no longer erased. Walking
+  through a board's portal now takes HomeSuite with it — before, Move to Trash
+  trashed the board you had left, not the one on screen. A trashed thing
+  opened by its address says In Trash and offers Restore. The Bestiary +
+  Marginalia Collection no longer jumps to the top of the list just for being
+  opened.
+- **HomeSuite runs in CI** — its browser spec and the `/homesuite` axe audit
+  now run after the build, with regression cases for each of the above. The
+  first HomeSuite assessment is at `apps/homesuite/ASSESSMENT.md`.
+- **main's checks are green again** — four Carillon tests used a sample kind
+  (`reading`) that isn't one, which failed `svelte-check` on every push since
+  2026-09-26.
+
 ## 2026-09-26
 
 - **HomeSuite's first room** — `/homesuite` brings existing Write documents

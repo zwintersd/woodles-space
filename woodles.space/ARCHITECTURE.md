@@ -256,7 +256,19 @@ surface state and actions through `shared/homesuiteBridge.ts`: artifact title,
 selection summary, inspector summary, available commands/modes, and history
 availability flow outward; chosen commands and Undo/Redo flow inward. The
 shell validates message origin and frame source. Each surface decides what
-its commands do and keeps its own history and storage. `?draft=` and `?board=`
+its commands do and keeps its own history and storage.
+
+Three rules keep that seam from losing work. The shell veils the frame, and
+marks it `inert`, until the surface's first `state` message — Write is
+prerendered, so its editor takes typing before it has loaded the draft, then
+drops it. What a surface reports is authoritative: when a board's portal opens
+another board in place, the shell's address follows with `replaceState` and
+the frame is not reloaded, so Trash and a reload act on what is on screen.
+And the shell closes a surface by removing its frame, which fires `pagehide`
+but never `beforeunload`, so every surface flushes its pending save on
+`pagehide` (and on `visibilitychange` to hidden). A trashed thing opened by its
+address, or walked into through a portal, opens marked In Trash with Restore
+in place of Move to Trash. `?draft=` and `?board=`
 remain normal deep links to the owning apps, with `@woodles/app-manifest`
 building those links. Data follows the same contract with `?collection=` and
 reports its active selection, Inspector controls, commands, and history state
@@ -1667,7 +1679,10 @@ Bestiary gallery/adopt/share and Marginalia consumption, an Arcade state change,
 the Thinking About → Carillon round trip, back, and the sitting that returns
 from it, Carillon's binder strip and the way in and out of its task composer,
 legacy localStorage migration across reload,
-keyboard operation, and serious/critical WCAG A axe findings.
+keyboard operation, and serious/critical WCAG A axe findings. `homesuite.spec.ts`
+covers the shell's seams: the veil, edits made just before a frame is removed,
+a portal the shell has to follow, Trash by address, and a connected Collection
+keeping its place in the recent order.
 
 The cross-app specs earn their cost in a way the route checks don't. The
 Carillon ↔ Thinking About one caught a bug no unit test could have: the shelf
@@ -1701,6 +1716,12 @@ pushes and pull requests with Node 22 and pnpm 10.32.1. It installs from the
 lockfile, then runs `pnpm check`, `pnpm test`, and `pnpm build` from this
 workspace. Keep the local root commands and that workflow identical so a green
 checkout means the same thing locally and on GitHub.
+
+After the build it installs Chromium and runs one slice of `e2e/`: HomeSuite's
+spec and the `/homesuite` axe audit. HomeSuite's failures live between frames,
+where no unit suite reaches. The rest of `e2e/` is not in CI yet; when last
+run it had failures of its own (a `/letter` axe finding, some Carillon specs),
+so widen the slice once those are green rather than all at once.
 
 ## running things locally
 
