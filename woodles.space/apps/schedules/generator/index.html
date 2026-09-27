@@ -27,6 +27,30 @@
   </dialog>
   <dialog id="activityDialog" class="dialog activity-dialog">
     <div id="activityDialogBody"></div>
+    <dialog id="imageEditorDialog" class="dialog image-editor-dialog" aria-labelledby="imageEditorTitle">
+      <div class="image-editor">
+        <div class="dialog-heading"><div><span class="eyebrow">Image studio · on this device</span><h2 id="imageEditorTitle">Upload and crop an image</h2><p class="muted" id="cropSubtitle">Choose a crop, drag to frame it, then download it or attach a compact 512 px copy to this activity.</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close image editor">×</button></div>
+        <div class="image-editor-controls">
+          <label class="field"><span>Choose image</span><input id="cropSource" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><small class="muted">Images are processed in this browser and are not uploaded.</small></label>
+          <label class="field"><span>Crop and output size</span><select id="cropPreset">
+            <option value="square">Activity card · 1:1 · 512 × 512</option>
+            <option value="wide">Video thumbnail · 16:9 · 1280 × 720</option>
+            <option value="wide4k">YouTube video · 16:9 · 3840 × 2160</option>
+            <option value="vertical">Shorts cover · 9:16 · 2160 × 3840</option>
+            <option value="portrait">Portrait card · 4:5 · 1080 × 1350</option>
+          </select></label>
+          <label class="field"><span>File format</span><select id="cropFormat"><option value="image/jpeg">JPEG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select><small class="muted">YouTube accepts JPG or PNG thumbnails.</small></label>
+          <label class="field crop-quality-field"><span>Image quality <output id="cropQualityLabel">85%</output></span><input id="cropQuality" type="range" min="50" max="95" value="85"><small class="muted">Used for JPEG and WebP</small></label>
+        </div>
+        <div class="crop-stage" id="cropStage">
+          <canvas id="cropCanvas" width="512" height="512" tabindex="0" aria-label="Image crop preview. Drag or use arrow keys to reposition."></canvas>
+          <div class="crop-empty" id="cropEmpty"><span aria-hidden="true">▧</span><strong>Choose an image to begin</strong><span>Drag the image to frame the crop.</span></div>
+        </div>
+        <label class="field crop-zoom"><span>Zoom</span><input id="cropZoom" type="range" min="1" max="3" step="0.01" value="1" disabled></label>
+        <div class="crop-status" id="cropStatus" role="status" aria-live="polite">Your image stays on this device.</div>
+        <div class="dialog-actions image-editor-actions"><button class="button secondary" type="button" id="downloadCrop" disabled>Download image</button><button class="button primary" type="button" id="useActivityImage" disabled>Use on activity</button></div>
+      </div>
+    </dialog>
   </dialog>
   <input id="importFile" type="file" accept="application/json,.json" hidden />
   <div class="toast" id="toast" role="status" aria-live="polite"></div>

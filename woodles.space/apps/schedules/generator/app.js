@@ -13,6 +13,7 @@
   const app = document.getElementById('app');
   const planDialog = document.getElementById('planDialog');
   const activityDialog = document.getElementById('activityDialog');
+  const imageEditorDialog = document.getElementById('imageEditorDialog');
   const activityDialogBody = document.getElementById('activityDialogBody');
   const toast = document.getElementById('toast');
   const saveStatus = document.getElementById('saveStatus');
@@ -23,11 +24,12 @@
       if (value && typeof value === 'object') {
         return {
           plans: Array.isArray(value.plans) ? value.plans.map(sanitizePlan).filter(Boolean) : [],
-          activities: Array.isArray(value.activities) ? value.activities.map(sanitizeActivity).filter(Boolean) : []
+          activities: Array.isArray(value.activities) ? value.activities.map(sanitizeActivity).filter(Boolean) : [],
+          images: Array.isArray(value.images) ? value.images.map(sanitizeImage).filter(Boolean) : []
         };
       }
     } catch {}
-    return { plans: [], activities: [] };
+    return { plans: [], activities: [], images: [] };
   }
 
   let workspace = readWorkspace();
@@ -38,6 +40,14 @@
   let activityMode = 'new';
   let editingActivityId = '';
   let toastTimer;
+  let cropImage = null;
+  let cropObjectUrl = '';
+  let cropPanX = 0;
+  let cropPanY = 0;
+  let cropZoomFactor = 1;
+  let cropPointer = null;
+  let cropSourceName = 'image';
+  let cropAttachEnabled = false;
 
   function makeId(prefix) {
     const random = window.crypto && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -68,6 +78,15 @@
     return COLORS.includes(value) ? value : COLORS[0];
   }
 
+  function isLocalImageData(value) {
+    return typeof value === 'string' && value.length <= 100000 && /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/]+=*$/i.test(value);
+  }
+
+  function sanitizeImage(value) {
+    if (!value || typeof value !== 'object' || !isLocalImageData(value.data)) return null;
+    return { id: cleanText(value.id, 100, makeId('image')), data: value.data };
+  }
+
   function sanitizeActivity(value) {
     if (!value || typeof value !== 'object' || !String(value.title || '').trim()) return null;
     return {
@@ -77,6 +96,7 @@
       duration: validDuration(value.duration, 15),
       icon: cleanText(value.icon, 16, '⭐'),
       pictogram: cleanText(value.pictogram, 300, ''),
+      imageAssetId: cleanText(value.imageAssetId, 100, ''),
       credit: cleanText(value.credit, 200, ''),
       color: validColor(value.color),
       note: cleanText(value.note, 500, '')
@@ -135,6 +155,10 @@
     const now = new Date().toISOString();
     const plan = getPlan();
     if (plan) plan.updatedAt = now;
+    const usedImages = new Set(workspace.activities.map((item) => item.imageAssetId).concat(
+      workspace.plans.flatMap((entry) => entry.days.flatMap((day) => day.activities.map((item) => item.imageAssetId)))
+    ).filter(Boolean));
+    workspace.images = workspace.images.filter((image) => usedImages.has(image.id));
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace));
       saveStatus.textContent = 'Saved on this device';
@@ -170,6 +194,7 @@
       url.searchParams.delete('plan');
       url.searchParams.delete('day');
     }
+    url.searchParams.delete('tool');
     history.replaceState({}, '', url);
     render();
     if (currentPlanId) app.querySelector('.day-tab[aria-pressed="true"]')?.focus();
@@ -266,8 +291,17 @@
     return '';
   }
 
+  function imageAssetData(id) {
+    return workspace.images.find((image) => image.id === id)?.data || '';
+  }
+
+  function activityImageValue(item) {
+    return imageAssetData(item.imageAssetId) || item.pictogram || '';
+  }
+
   function visualMarkup(item) {
-    const source = pictogramSource(item.pictogram);
+    const imageValue = activityImageValue(item);
+    const source = isLocalImageData(imageValue) ? imageValue : pictogramSource(imageValue);
     const background = validColor(item.color);
     const inside = source
       ? '<img src="' + esc(source) + '" alt="" loading="lazy">'
@@ -293,7 +327,7 @@
     app.innerHTML =
       '<div class="page-heading"><div><span class="eyebrow">Schedule studio · weekly planner</span><h1>Learner plans</h1>' +
       '<p>Organize a separate schedule for each day. Plans start blank, and your activity library can be reused across the week.</p></div>' +
-      '<div class="heading-actions"><button class="button primary" type="button" data-action="new-plan">＋ New learner plan</button><button class="button secondary" type="button" data-action="import-plan">Import plan</button></div></div>' +
+      '<div class="heading-actions"><button class="button secondary" type="button" data-action="open-image-studio">Image studio</button><button class="button primary" type="button" data-action="new-plan">＋ New learner plan</button><button class="button secondary" type="button" data-action="import-plan">Import plan</button></div></div>' +
       (plans.length
         ? '<section class="library-grid" aria-label="Saved learner plans">' + cards + '</section>'
         : '<section class="empty-card"><span class="eyebrow">A blank start</span><h2>Your plans live here</h2><p>Create a learner plan, then add activities to the days that need them. Nothing is prefilled. Plans are saved in this browser and can be exported as JSON.</p><button class="button primary" type="button" data-action="new-plan">＋ Create first learner plan</button></section>') +
@@ -361,7 +395,7 @@
       '<div class="page-heading plan-heading"><div class="plan-heading-main"><span class="eyebrow">Weekly learner plan · saved locally</span>' +
         '<input id="planTitle" class="plan-title" aria-label="Plan name" maxlength="100" value="' + esc(plan.name) + '">' +
         '<input id="planLearner" class="plan-learner" aria-label="Learner label" maxlength="100" value="' + esc(plan.learner) + '">' +
-      '</div><div class="heading-actions"><button class="button secondary" type="button" data-action="print-day">Print selected day</button><button class="button secondary" type="button" data-action="export-plan">Export JSON</button>' +
+      '</div><div class="heading-actions"><button class="button secondary" type="button" data-action="open-image-studio">Image studio</button><button class="button secondary" type="button" data-action="print-day">Print selected day</button><button class="button secondary" type="button" data-action="export-plan">Export JSON</button>' +
         '<button class="button secondary" type="button" data-action="import-plan">Import plan</button></div></div>' +
       '<div class="week-heading"><h2>Week overview</h2><p>Choose a day to build or update its schedule.</p></div>' +
       '<nav class="day-tabs" aria-label="Days of the week">' + renderDayTabs(plan) + '</nav>' +
@@ -474,7 +508,8 @@
           '<label class="field"><span>Duration (minutes)</span><input name="duration" type="number" min="1" max="480" value="' + esc(activity.duration || 15) + '" required></label>' +
           '<label class="field"><span>Visual symbol (emoji)</span><input name="icon" maxlength="16" value="' + esc(activity.icon || '⭐') + '" list="symbolSuggestions" aria-describedby="symbolHelp"><datalist id="symbolSuggestions">' + ICONS.map((icon) => '<option value="' + esc(icon) + '">').join('') + '</datalist></label>' +
           '<label class="field"><span>Color</span><select name="color">' + COLORS.map((color) => '<option value="' + color + '" ' + (color === activity.color ? 'selected' : '') + '>' + COLOR_NAMES[color] + '</option>').join('') + '</select></label>' +
-          '<label class="field full"><span>ARASAAC pictogram ID or HTTPS image URL (optional)</span><input name="pictogram" maxlength="300" value="' + esc(activity.pictogram || '') + '" placeholder="e.g., 1234"><small class="muted" id="symbolHelp">An ARASAAC ID loads its pictogram. Add a credit below for other image sources.</small></label>' +
+          '<div class="field full"><span>Activity image (optional)</span><div class="image-reference-row"><input name="pictogramUrl" maxlength="300" value="' + esc(activity.pictogram || '') + '" placeholder="ARASAAC ID or HTTPS image URL" aria-describedby="symbolHelp"><input type="hidden" name="imageAssetId" value="' + esc(activity.imageAssetId || '') + '"><button class="button secondary" type="button" data-action="open-image-editor">Upload and crop</button></div>' +
+            '<div class="image-asset-preview" id="imageAssetPreview">' + renderImageAssetPreview(activity.pictogram || '', activity.imageAssetId || '') + '</div><small class="muted" id="symbolHelp">Crop an image here or use an ARASAAC ID or direct HTTPS image URL. Add a credit below for other image sources.</small></div>' +
           '<label class="field full"><span>Image source or attribution (optional)</span><input name="credit" maxlength="200" value="' + esc(activity.credit || '') + '" placeholder="Artist, library, or license"></label>' +
           '<label class="field full"><span>Support cue or short note (optional)</span><textarea name="note" maxlength="500" placeholder="A short cue, material, or transition note">' + esc(activity.note || '') + '</textarea></label>' +
           (!editing ? '<label class="check-field full"><input type="checkbox" name="saveToLibrary" checked><span>Save this activity to the reusable library</span></label>' :
@@ -552,6 +587,219 @@
     showToast(activityMode === 'slot-edit' ? 'Open slot updated.' : 'Open slot added to ' + day.label + '.');
   }
 
+  function renderImageAssetPreview(value, imageAssetId) {
+    const imageValue = activityImageValue({ pictogram: value, imageAssetId: imageAssetId || '' });
+    const source = isLocalImageData(imageValue) ? imageValue : pictogramSource(imageValue);
+    return source
+      ? '<img src="' + esc(source) + '" alt=""><span>Image ready</span><button class="button small secondary" type="button" data-action="clear-activity-image">Remove</button>'
+      : '<span class="muted">No image attached</span>';
+  }
+
+  function imageCropSize() {
+    const sizes = {
+      square: [512, 512],
+      wide: [1280, 720],
+      wide4k: [3840, 2160],
+      vertical: [2160, 3840],
+      portrait: [1080, 1350]
+    };
+    return sizes[document.getElementById('cropPreset').value] || sizes.square;
+  }
+
+  function cropCanvas() {
+    return document.getElementById('cropCanvas');
+  }
+
+  function drawCrop() {
+    const canvas = cropCanvas();
+    const context = canvas.getContext('2d');
+    const [width, height] = imageCropSize();
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+    context.clearRect(0, 0, width, height);
+    if (!cropImage) return;
+    const scale = Math.max(width / cropImage.naturalWidth, height / cropImage.naturalHeight) * cropZoomFactor;
+    const drawnWidth = cropImage.naturalWidth * scale;
+    const drawnHeight = cropImage.naturalHeight * scale;
+    const centerX = (width - drawnWidth) / 2;
+    const centerY = (height - drawnHeight) / 2;
+    const x = Math.max(width - drawnWidth, Math.min(0, centerX + cropPanX));
+    const y = Math.max(height - drawnHeight, Math.min(0, centerY + cropPanY));
+    cropPanX = x - centerX;
+    cropPanY = y - centerY;
+    context.drawImage(cropImage, x, y, drawnWidth, drawnHeight);
+  }
+
+  function updateCropControls() {
+    const hasImage = Boolean(cropImage);
+    document.getElementById('cropEmpty').hidden = hasImage;
+    document.getElementById('cropZoom').disabled = !hasImage;
+    document.getElementById('downloadCrop').disabled = !hasImage;
+    document.getElementById('useActivityImage').hidden = !cropAttachEnabled;
+    document.getElementById('useActivityImage').disabled = !hasImage || !cropAttachEnabled;
+    document.getElementById('cropCanvas').classList.toggle('has-image', hasImage);
+    drawCrop();
+  }
+
+  function setCropStatus(message) {
+    document.getElementById('cropStatus').textContent = message;
+  }
+
+  function loadCropSource(source, name, nextObjectUrl) {
+    const image = new Image();
+    image.onload = () => {
+      if (image.naturalWidth * image.naturalHeight > 40000000) {
+        if (nextObjectUrl) URL.revokeObjectURL(nextObjectUrl);
+        setCropStatus('That image is very large. Choose an image under 40 megapixels.');
+        return;
+      }
+      if (cropObjectUrl) URL.revokeObjectURL(cropObjectUrl);
+      cropObjectUrl = nextObjectUrl || '';
+      cropImage = image;
+      cropSourceName = String(name || 'image').replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]+/gi, '-').replace(/^-|-$/g, '') || 'image';
+      cropPanX = 0;
+      cropPanY = 0;
+      cropZoomFactor = 1;
+      document.getElementById('cropZoom').value = '1';
+      updateCropControls();
+      setCropStatus(image.naturalWidth + ' × ' + image.naturalHeight + ' image ready. Drag to reposition or adjust zoom.');
+    };
+    image.onerror = () => {
+      if (nextObjectUrl) URL.revokeObjectURL(nextObjectUrl);
+      setCropStatus('This file could not be opened as an image. Try JPEG, PNG, WebP, or GIF.');
+    };
+    image.src = source;
+  }
+
+  function openImageEditor(attachToActivity) {
+    const form = attachToActivity ? document.getElementById('activityForm') : null;
+    cropAttachEnabled = Boolean(form);
+    document.getElementById('cropSubtitle').textContent = cropAttachEnabled
+      ? 'Choose a crop, drag to frame it, then download it or attach a compact 512 px copy to this activity.'
+      : 'Choose a crop, drag to frame it, then download the finished image for another app.';
+    const attached = form ? imageAssetData(form.elements.imageAssetId.value) : '';
+    if (cropAttachEnabled) activityDialog.appendChild(imageEditorDialog);
+    else document.body.appendChild(imageEditorDialog);
+    if (!imageEditorDialog.open) imageEditorDialog.showModal();
+    document.getElementById('cropSource').value = '';
+    if (isLocalImageData(attached)) loadCropSource(attached, 'activity-image', '');
+    else {
+      if (cropObjectUrl) URL.revokeObjectURL(cropObjectUrl);
+      cropObjectUrl = '';
+      cropImage = null;
+      cropPanX = 0;
+      cropPanY = 0;
+      cropZoomFactor = 1;
+      updateCropControls();
+      setCropStatus('Choose an image to begin. It stays in this browser.');
+    }
+  }
+
+  function loadCropFile(file) {
+    if (!file) return;
+    if (!/^image\/(?:png|jpeg|webp|gif)$/i.test(file.type)) {
+      setCropStatus('Choose a JPEG, PNG, WebP, or GIF image.');
+      return;
+    }
+    if (file.size > 30000000) {
+      setCropStatus('Choose an image smaller than 30 MB.');
+      return;
+    }
+    if (cropObjectUrl) URL.revokeObjectURL(cropObjectUrl);
+    cropObjectUrl = '';
+    cropImage = null;
+    updateCropControls();
+    setCropStatus('Loading image…');
+    const objectUrl = URL.createObjectURL(file);
+    loadCropSource(objectUrl, file.name, objectUrl);
+  }
+
+  function cropBlob(canvas, mime, quality) {
+    return new Promise((resolve, reject) => {
+      const output = document.createElement('canvas');
+      output.width = canvas.width;
+      output.height = canvas.height;
+      const context = output.getContext('2d');
+      if (mime === 'image/jpeg') {
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, output.width, output.height);
+      }
+      context.drawImage(canvas, 0, 0);
+      output.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Could not create the image file.')), mime, quality);
+    });
+  }
+
+  function cropFormatDetails() {
+    const select = document.getElementById('cropFormat');
+    const mime = select.value;
+    const extension = mime === 'image/jpeg' ? 'jpg' : mime === 'image/png' ? 'png' : 'webp';
+    const quality = Number(document.getElementById('cropQuality').value) / 100;
+    return { mime, extension, quality };
+  }
+
+  async function downloadImageCrop() {
+    if (!cropImage) return;
+    const { mime, extension, quality } = cropFormatDetails();
+    try {
+      const blob = await cropBlob(cropCanvas(), mime, quality);
+      if (blob.type !== mime) throw new Error('This browser cannot create that format. Choose JPEG or PNG.');
+      const [width, height] = imageCropSize();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = cropSourceName + '-' + width + 'x' + height + '.' + extension;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setCropStatus('Downloaded ' + width + ' × ' + height + ' ' + extension.toUpperCase() + ' · ' + Math.ceil(blob.size / 1024) + ' KB.');
+    } catch (error) {
+      setCropStatus(error.message || 'Could not create the image file.');
+    }
+  }
+
+  async function useCropOnActivity() {
+    const form = document.getElementById('activityForm');
+    if (!cropImage || !cropAttachEnabled || !form) return;
+    const canvas = cropCanvas();
+    const factor = Math.min(1, 512 / Math.max(canvas.width, canvas.height));
+    const { mime, quality } = cropFormatDetails();
+    try {
+      const compact = document.createElement('canvas');
+      compact.width = Math.max(1, Math.round(canvas.width * factor));
+      compact.height = Math.max(1, Math.round(canvas.height * factor));
+      const context = compact.getContext('2d');
+      if (mime === 'image/jpeg') {
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, compact.width, compact.height);
+      }
+      context.drawImage(canvas, 0, 0, compact.width, compact.height);
+      const blob = await new Promise((resolve, reject) => compact.toBlob((result) => result ? resolve(result) : reject(new Error('Could not create the activity image.')), mime, quality));
+      if (blob.type !== mime) throw new Error('This browser cannot create that format. Choose JPEG or PNG.');
+      if (blob.size > 65000) throw new Error('The compact activity image is over 65 KB. Try JPEG or WebP with a simpler crop; you can still download the full-size image.');
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (!form.isConnected || !imageEditorDialog.open) return;
+        const image = sanitizeImage({ id: makeId('image'), data: String(reader.result || '') });
+        if (!image) {
+          setCropStatus('Could not attach this image. Try another format.');
+          return;
+        }
+        workspace.images.push(image);
+        form.elements.imageAssetId.value = image.id;
+        form.elements.pictogramUrl.value = '';
+        document.getElementById('imageAssetPreview').innerHTML = renderImageAssetPreview('', image.id);
+        imageEditorDialog.close();
+      };
+      reader.onerror = () => setCropStatus('Could not attach this image. Try another format.');
+      reader.readAsDataURL(blob);
+    } catch (error) {
+      setCropStatus(error.message || 'Could not attach this image.');
+    }
+  }
+
   function renderLibraryPicker() {
     if (!workspace.activities.length) return '<div class="library-empty">Your reusable activity library is empty. Create an activity first.</div>';
     return workspace.activities.map((item) =>
@@ -571,6 +819,7 @@
       duration: item.duration,
       icon: item.icon,
       pictogram: item.pictogram,
+      imageAssetId: item.imageAssetId || '',
       credit: item.credit,
       color: item.color,
       note: item.note,
@@ -595,8 +844,11 @@
 
   function formActivityData(form) {
     const data = new FormData(form);
-    const pictogram = cleanText(data.get('pictogram'), 300, '');
-    if (pictogram && !/^\d{1,10}$/.test(pictogram) && !/^https:\/\//i.test(pictogram)) {
+    const imageUrl = cleanText(data.get('pictogramUrl'), 300, '');
+    const imageAssetId = cleanText(data.get('imageAssetId'), 100, '');
+    const pictogram = imageUrl;
+    if (imageAssetId && !workspace.images.some((image) => image.id === imageAssetId)) throw new Error('The cropped image is no longer available. Upload it again.');
+    if (imageUrl && !/^\d{1,10}$/.test(imageUrl) && !/^https:\/\//i.test(imageUrl)) {
       throw new Error('Use a pictogram number or a direct HTTPS image URL.');
     }
     const activity = sanitizeActivity({
@@ -606,6 +858,7 @@
       duration: data.get('duration'),
       icon: data.get('icon'),
       pictogram,
+      imageAssetId,
       credit: data.get('credit'),
       color: data.get('color'),
       note: data.get('note')
@@ -761,7 +1014,10 @@
     if (!plan) return;
     const usedIds = new Set(plan.days.flatMap((day) => day.activities.map((item) => item.sourceId).filter(Boolean)));
     const activityLibrary = workspace.activities.filter((item) => usedIds.has(item.id));
-    const content = JSON.stringify({ format: 'woodles.schedule-week.v1', exportedAt: new Date().toISOString(), plan, activityLibrary }, null, 2);
+    const usedImageIds = new Set(plan.days.flatMap((day) => day.activities.map((item) => item.imageAssetId))
+      .concat(activityLibrary.map((item) => item.imageAssetId)).filter(Boolean));
+    const images = workspace.images.filter((image) => usedImageIds.has(image.id));
+    const content = JSON.stringify({ format: 'woodles.schedule-week.v1', exportedAt: new Date().toISOString(), plan, activityLibrary, images }, null, 2);
     const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -787,14 +1043,28 @@
         const data = JSON.parse(String(reader.result || ''));
         const rawPlan = data && data.format === 'woodles.schedule-week.v1' ? data.plan : null;
         if (!rawPlan || !rawPlan.learner || !Array.isArray(rawPlan.days)) throw new Error('This file is not a supported weekly plan.');
-        const plan = sanitizePlan({ ...rawPlan, id: makeId('plan'), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+        const imageIdMap = new Map();
+        const importedImages = (Array.isArray(data.images) ? data.images : []).map(sanitizeImage).filter(Boolean).map((image) => {
+          const id = makeId('image');
+          imageIdMap.set(image.id, id);
+          return { ...image, id };
+        });
+        const remapImage = (item) => ({ ...item, imageAssetId: imageIdMap.get(item.imageAssetId) || '' });
+        const planSource = {
+          ...rawPlan,
+          days: rawPlan.days.map((day) => ({ ...day, activities: (Array.isArray(day.activities) ? day.activities : []).map(remapImage) }))
+        };
+        const plan = sanitizePlan({ ...planSource, id: makeId('plan'), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
         if (!plan) throw new Error('The selected file does not contain a usable weekly plan.');
         for (const day of plan.days) {
           const issue = validateDay(day);
           if (issue) throw new Error(day.label + ': ' + issue);
         }
-        const importedActivities = Array.isArray(data.activityLibrary) ? data.activityLibrary.map(sanitizeActivity).filter(Boolean) : [];
+        const importedActivities = Array.isArray(data.activityLibrary)
+          ? data.activityLibrary.map(sanitizeActivity).filter(Boolean).map(remapImage)
+          : [];
         const activityIds = new Set(workspace.activities.map((item) => item.id));
+        workspace.images.push(...importedImages);
         workspace.activities.push(...importedActivities.filter((item) => !activityIds.has(item.id)));
         plan.days.forEach((day) => day.activities.forEach((item) => { item.occurrenceId = makeId('scheduled'); }));
         workspace.plans.push(plan);
@@ -836,6 +1106,16 @@
     else if (name === 'select-day') routeToPlan(currentPlanId, action.dataset.day);
     else if (name === 'add-activity') showActivityDialog('new');
     else if (name === 'add-open-slot') showOpenSlotDialog('new');
+    else if (name === 'open-image-editor') openImageEditor(true);
+    else if (name === 'open-image-studio') openImageEditor(false);
+    else if (name === 'clear-activity-image') {
+      const form = document.getElementById('activityForm');
+      if (form) {
+        form.elements.imageAssetId.value = '';
+        form.elements.pictogramUrl.value = '';
+        document.getElementById('imageAssetPreview').innerHTML = renderImageAssetPreview('');
+      }
+    }
     else if (name === 'activity-tab') showActivityDialog(action.dataset.mode);
     else if (name === 'add-library-activity') addFromLibrary(action.dataset.id);
     else if (name === 'remove-library-activity') removeLibraryActivity(action.dataset.id);
@@ -871,6 +1151,17 @@
 
   document.addEventListener('change', (event) => {
     if (event.target.matches('[data-day-time]')) changeDayWindow(event.target);
+    if (event.target.id === 'cropSource') loadCropFile(event.target.files && event.target.files[0]);
+    if (event.target.id === 'cropPreset') {
+      cropZoomFactor = 1;
+      cropPanX = 0;
+      cropPanY = 0;
+      document.getElementById('cropZoom').value = '1';
+      updateCropControls();
+      const [width, height] = imageCropSize();
+      setCropStatus('Crop output: ' + width + ' × ' + height + '. Drag to reposition or adjust zoom.');
+    }
+    if (event.target.id === 'cropFormat') document.getElementById('cropQuality').disabled = event.target.value === 'image/png';
     if (event.target.matches('[data-print-setting]')) {
       const day = getDay(getPlan(), activeDayKey);
       if (!day) return;
@@ -894,6 +1185,53 @@
     }
   });
 
+  document.addEventListener('input', (event) => {
+    if (event.target.matches('input[name="pictogramUrl"]')) {
+      const form = event.target.form;
+      form.elements.imageAssetId.value = '';
+      document.getElementById('imageAssetPreview').innerHTML = event.target.value.trim()
+        ? '<span class="muted">Image reference will load on the activity.</span>'
+        : renderImageAssetPreview('');
+    }
+    if (event.target.id === 'cropQuality') document.getElementById('cropQualityLabel').textContent = event.target.value + '%';
+    if (event.target.id === 'cropZoom') {
+      cropZoomFactor = Number(event.target.value);
+      drawCrop();
+    }
+  });
+
+  document.getElementById('cropCanvas').addEventListener('pointerdown', (event) => {
+    if (!cropImage) return;
+    const canvas = cropCanvas();
+    canvas.setPointerCapture(event.pointerId);
+    cropPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
+  });
+  document.getElementById('cropCanvas').addEventListener('pointermove', (event) => {
+    if (!cropPointer || cropPointer.id !== event.pointerId) return;
+    const canvas = cropCanvas();
+    const bounds = canvas.getBoundingClientRect();
+    cropPanX += (event.clientX - cropPointer.x) * canvas.width / bounds.width;
+    cropPanY += (event.clientY - cropPointer.y) * canvas.height / bounds.height;
+    cropPointer.x = event.clientX;
+    cropPointer.y = event.clientY;
+    drawCrop();
+  });
+  document.getElementById('cropCanvas').addEventListener('pointerup', () => { cropPointer = null; });
+  document.getElementById('cropCanvas').addEventListener('pointercancel', () => { cropPointer = null; });
+  document.getElementById('cropCanvas').addEventListener('keydown', (event) => {
+    if (!cropImage || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    event.preventDefault();
+    const [width, height] = imageCropSize();
+    const amount = Math.max(8, Math.round(Math.min(width, height) * (event.shiftKey ? 0.08 : 0.02)));
+    if (event.key === 'ArrowLeft') cropPanX -= amount;
+    else if (event.key === 'ArrowRight') cropPanX += amount;
+    else if (event.key === 'ArrowUp') cropPanY -= amount;
+    else cropPanY += amount;
+    drawCrop();
+  });
+  document.getElementById('downloadCrop').addEventListener('click', downloadImageCrop);
+  document.getElementById('useActivityImage').addEventListener('click', useCropOnActivity);
+
   window.addEventListener('popstate', () => {
     const params = new URLSearchParams(location.search);
     currentPlanId = params.get('plan') || '';
@@ -902,4 +1240,5 @@
   });
 
   render();
+  if (new URLSearchParams(location.search).get('tool') === 'image') openImageEditor(false);
 })();
