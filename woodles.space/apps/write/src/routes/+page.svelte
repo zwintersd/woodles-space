@@ -452,6 +452,10 @@
 		if (message.action === 'flush') {
 			flushHomeSuiteSave();
 			postHomeSuiteFlushed();
+		} else if (message.action === 'rename') {
+			title = message.title;
+			scheduleSave();
+			requestAnimationFrame(autosizeTitle);
 		} else if (message.action === 'focus') {
 			(isListKind ? titleEl : elFor(activeLayer))?.focus();
 		} else if (message.action === 'inspect') {

@@ -36,6 +36,8 @@ export type HomeSuiteSurfaceMessage =
 	| { channel: typeof HOMESUITE_CHANNEL; source: 'surface'; type: 'navigate'; target: 'index' }
 	/** Open another thing; the shell keeps it in the suite when it can. */
 	| { channel: typeof HOMESUITE_CHANNEL; source: 'surface'; type: 'navigate'; target: 'artifact'; ref: WoodlesRef }
+	/** Ask the shell to edit the title in its own title area. */
+	| { channel: typeof HOMESUITE_CHANNEL; source: 'surface'; type: 'request-rename' }
 	/** The answer to a `flush` action: pending saves have landed. */
 	| { channel: typeof HOMESUITE_CHANNEL; source: 'surface'; type: 'flushed' };
 
@@ -43,7 +45,9 @@ export type HomeSuiteShellMessage =
 	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'undo' | 'redo' | 'inspect' | 'focus' | 'flush' }
 	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'command'; commandId: string }
 	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'inspector'; controlId: string; value: string }
-	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'mode'; modeId: string };
+	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'mode'; modeId: string }
+	/** A new title, edited in the shell; the surface applies it as its own edit. */
+	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'rename'; title: string };
 
 export function postHomeSuiteState(state: HomeSuiteSurfaceState): void {
 	if (typeof window === 'undefined' || window.parent === window) return;
@@ -59,6 +63,13 @@ export function postHomeSuitePaletteRequest(): void {
 export function postHomeSuiteFlushed(): void {
 	if (typeof window === 'undefined' || window.parent === window) return;
 	window.parent.postMessage({ channel: HOMESUITE_CHANNEL, source: 'surface', type: 'flushed' } satisfies HomeSuiteSurfaceMessage, window.location.origin);
+}
+
+/** Ask the shell to start renaming. Returns false outside HomeSuite. */
+export function postHomeSuiteRenameRequest(): boolean {
+	if (typeof window === 'undefined' || window.parent === window) return false;
+	window.parent.postMessage({ channel: HOMESUITE_CHANNEL, source: 'surface', type: 'request-rename' } satisfies HomeSuiteSurfaceMessage, window.location.origin);
+	return true;
 }
 
 /** Ask the shell to open another thing. Returns false outside HomeSuite. */
@@ -78,5 +89,5 @@ export function isHomeSuiteSurfaceMessage(data: unknown): data is HomeSuiteSurfa
 	if (!data || typeof data !== 'object') return false;
 	const value = data as Record<string, unknown>;
 	return value.channel === HOMESUITE_CHANNEL && value.source === 'surface' &&
-		(value.type === 'state' || value.type === 'request-palette' || value.type === 'navigate' || value.type === 'flushed');
+		(value.type === 'state' || value.type === 'request-palette' || value.type === 'request-rename' || value.type === 'navigate' || value.type === 'flushed');
 }

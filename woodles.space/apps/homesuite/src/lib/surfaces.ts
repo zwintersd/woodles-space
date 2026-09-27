@@ -12,7 +12,7 @@ import {
 } from '../../../write/src/lib/drafts';
 import { boardLibrary } from '../../../whiteboard/src/lib/library';
 import { removeImageAsset } from '../../../whiteboard/src/lib/assets';
-import { isHomeSuiteTrashed, listHomeSuiteTrash, type HomeSuiteTrashEntry } from '@shared/homesuiteTrash';
+import { listHomeSuiteTrash, type HomeSuiteTrashEntry } from '@shared/homesuiteTrash';
 import type { HomeSuiteArtifactKind, WoodlesRef } from '@shared/homesuiteBridge';
 import {
 	COLLECTION_TEMPLATES,
@@ -49,7 +49,8 @@ export type HomeSuiteSurfaceAdapter = {
 	selectionPlace: string;
 	/** Shapes to start from; when present, New asks which one. */
 	templates?: readonly HomeSuiteTemplate[];
-	list: () => HomeSuiteArtifact[];
+	/** Everything of this kind not in `trashed` (keys from `trashKey`). */
+	list: (trashed: ReadonlySet<string>) => HomeSuiteArtifact[];
 	create: (template?: string) => HomeSuiteArtifact;
 	embedHref: (id: string) => string;
 	permanentlyDelete: (id: string) => Promise<void> | void;
@@ -59,6 +60,10 @@ export type HomeSuiteSurfaceAdapter = {
 
 function refFor(app: string, kind: string, id: string): WoodlesRef {
 	return { app, kind, id };
+}
+
+export function trashKey(ref: WoodlesRef): string {
+	return `${ref.app}\u0000${ref.kind}\u0000${ref.id}`;
 }
 
 /** Let each owning app continue to define storage, creation, and deep links. */
@@ -73,7 +78,7 @@ export const surfaces: readonly HomeSuiteSurfaceAdapter[] = [
 		glyph: '¶',
 		surfaceLabel: 'Writing surface',
 		selectionPlace: 'page',
-		list: () => listDrafts().filter((draft) => !isHomeSuiteTrashed(refFor('write', 'draft', draft.id))).map((draft) => ({
+		list: (trashed) => listDrafts().filter((draft) => !trashed.has(trashKey(refFor('write', 'draft', draft.id)))).map((draft) => ({
 			ref: refFor('write', 'draft', draft.id),
 			kind: 'document',
 			title: draft.title.trim() || 'Untitled document',
@@ -105,7 +110,7 @@ export const surfaces: readonly HomeSuiteSurfaceAdapter[] = [
 		glyph: '▧',
 		surfaceLabel: 'Canvas',
 		selectionPlace: 'board',
-		list: () => boardLibrary.list().filter((board) => !isHomeSuiteTrashed(refFor('whiteboard', 'board', board.id))).map((board) => ({
+		list: (trashed) => boardLibrary.list().filter((board) => !trashed.has(trashKey(refFor('whiteboard', 'board', board.id)))).map((board) => ({
 			ref: refFor('whiteboard', 'board', board.id),
 			kind: 'board',
 			title: board.title.trim() || 'Untitled board',
@@ -146,10 +151,10 @@ export const surfaces: readonly HomeSuiteSurfaceAdapter[] = [
 		surfaceLabel: 'Table',
 		selectionPlace: 'table',
 		templates: COLLECTION_TEMPLATES,
-		list: () => loadCollections().collections.map((collection) => ({
+		list: (trashed) => loadCollections().collections.map((collection) => ({
 			ref: refFor('data', 'collection', collection.id), kind: 'collection' as const,
 			title: collection.title, updatedAt: collection.updatedAt, recordCount: collection.records.length
-		})).filter((item) => !isHomeSuiteTrashed(item.ref)),
+		})).filter((item) => !trashed.has(trashKey(item.ref))),
 		create: (templateId = 'blank') => {
 			const template = COLLECTION_TEMPLATES.find((entry) => entry.id === templateId);
 			if (!template) throw new Error('That Collection template is not available.');
@@ -169,20 +174,29 @@ export const surfaces: readonly HomeSuiteSurfaceAdapter[] = [
 
 export type TrashedHomeSuiteArtifact = HomeSuiteTrashEntry;
 
-export function prepareSurfaceStorage(): void {
-	// These are the apps' own one-time migrations. HomeSuite can then show the
-	// same library each app would show after opening it directly.
-	prepareHomeSuiteDrafts();
+/**
+ * The apps' own one-time migrations and arrivals, so HomeSuite shows the same
+ * library each app would show after opening it directly. Returns what the
+ * index should announce: Write would have said so on opening, and here Write
+ * is not the one opening.
+ */
+export function prepareSurfaceStorage(): string | null {
+	const prepared = prepareHomeSuiteDrafts();
 	boardLibrary.adoptLegacyBoard();
+	const said: string[] = [];
+	if (prepared.handoffs) said.push(prepared.handoffs === 1 ? 'One thing sent from another app is now a document.' : `${prepared.handoffs} things sent from other apps are now documents.`);
+	if (prepared.notebookImports) said.push(`Notebook retired — ${prepared.notebookImports === 1 ? 'its one capture is' : `its ${prepared.notebookImports} captures are`} now ${prepared.notebookImports === 1 ? 'a document' : 'documents'}.`);
+	if (prepared.sporesImports) said.push(`Spores retired — ${prepared.sporesImports === 1 ? 'its one entry is' : `its ${prepared.sporesImports} entries are`} now ${prepared.sporesImports === 1 ? 'a document' : 'documents'}.`);
+	return said.length ? said.join(' ') : null;
 }
 
-export function listArtifacts(): HomeSuiteArtifact[] {
-	return surfaces.flatMap((surface) => surface.list())
+/** One read of Trash, then each kind's library once. */
+export function listEverything(): { artifacts: HomeSuiteArtifact[]; trashed: TrashedHomeSuiteArtifact[] } {
+	const trashed = listHomeSuiteTrash().sort((a, b) => b.trashedAt.localeCompare(a.trashedAt));
+	const keys = new Set(trashed.map((entry) => trashKey(entry.ref)));
+	const artifacts = surfaces.flatMap((surface) => surface.list(keys))
 		.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-}
-
-export function listTrashedArtifacts(): TrashedHomeSuiteArtifact[] {
-	return listHomeSuiteTrash().sort((a, b) => b.trashedAt.localeCompare(a.trashedAt));
+	return { artifacts, trashed };
 }
 
 export function surfaceFor(kind: string): HomeSuiteSurfaceAdapter | undefined {

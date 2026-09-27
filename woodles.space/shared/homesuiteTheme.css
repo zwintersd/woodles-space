@@ -1,0 +1,98 @@
+/*
+ * HomeSuite's colors, shared by the shell (apps/homesuite) and the surfaces
+ * that are HomeSuite's own (apps/data), so a Collection sits in the room
+ * around it. Write and Whiteboard keep their own looks — each opens in the
+ * surface made for it.
+ *
+ * Text tiers are chosen to clear WCAG AA (4.5:1) on every background below,
+ * hover and sunk ones included: ink for titles, ink-soft for body, muted for
+ * labels. `faint` is only for marks with no meaning of their own (separators,
+ * arrows, placeholders).
+ */
+:root {
+	color-scheme: light;
+	--hs-page: #faf7f2;
+	--hs-bar: #fbf8f4;
+	--hs-raised: #fffcf9;
+	--hs-field: #fffdfa;
+	--hs-field-alt: #fcf9fc;
+	--hs-sunk: #f5f0f4;
+	--hs-panel: #faf7f6;
+	--hs-hover: #f1eaf4;
+	--hs-line: #e3dae5;
+	--hs-line-strong: #cbb8d2;
+
+	--hs-ink: #35273f;
+	--hs-ink-soft: #544463;
+	--hs-muted: #6c5e76;
+	--hs-faint: #aa9daf;
+
+	--hs-accent: #5c4475;
+	--hs-accent-hover: #73588d;
+	--hs-on-accent: #ffffff;
+	--hs-accent-text: #6b5189;
+	--hs-accent-light: #9b77a6;
+	--hs-accent-soft: #ebe1f3;
+	--hs-focus: #6959a4;
+
+	--hs-document-ink: #684d8b;
+	--hs-document-bg: #ece4f3;
+	--hs-board-ink: #72533d;
+	--hs-board-bg: #f9e8d9;
+	--hs-collection-ink: #28695e;
+	--hs-collection-bg: #dff1eb;
+
+	--hs-danger-ink: #8a3b2e;
+	--hs-danger-bg: #f8e9e5;
+	--hs-danger-line: #e6cdc6;
+	--hs-info-ink: #4d3a66;
+	--hs-info-bg: #ece4f3;
+
+	--hs-scrim: #21182b73;
+	--hs-shadow: #2a1d3833;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		color-scheme: dark;
+		--hs-page: #1d1822;
+		--hs-bar: #221c28;
+		--hs-raised: #2a2331;
+		--hs-field: #241e2a;
+		--hs-field-alt: #272030;
+		--hs-sunk: #1a151f;
+		--hs-panel: #201a26;
+		--hs-hover: #342a3e;
+		--hs-line: #3a3143;
+		--hs-line-strong: #574a63;
+
+		--hs-ink: #f1e9f5;
+		--hs-ink-soft: #d8cbe0;
+		--hs-muted: #b3a5bd;
+		--hs-faint: #6d6177;
+
+		--hs-accent: #7a5c9e;
+		--hs-accent-hover: #8b6daf;
+		--hs-on-accent: #ffffff;
+		--hs-accent-text: #cdb0e3;
+		--hs-accent-light: #b995cf;
+		--hs-accent-soft: #3a2e48;
+		--hs-focus: #b9a2e0;
+
+		--hs-document-ink: #d9c6f0;
+		--hs-document-bg: #372c47;
+		--hs-board-ink: #f0cfae;
+		--hs-board-bg: #3f3024;
+		--hs-collection-ink: #a9e1cf;
+		--hs-collection-bg: #1f3a33;
+
+		--hs-danger-ink: #f3b9ab;
+		--hs-danger-bg: #3f2521;
+		--hs-danger-line: #6b3b33;
+		--hs-info-ink: #e5d8f4;
+		--hs-info-bg: #30283f;
+
+		--hs-scrim: #0b080e99;
+		--hs-shadow: #00000080;
+	}
+}

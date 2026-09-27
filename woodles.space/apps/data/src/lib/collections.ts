@@ -113,7 +113,7 @@ function isRecord(value: unknown): value is Record<string, any> {
 function isStamp(value: unknown): value is string { return typeof value === 'string' && !Number.isNaN(Date.parse(value)); }
 function makeId(prefix: string): string { return `${prefix}-${crypto.randomUUID()}`; }
 function now(): string { return new Date().toISOString(); }
-function cloneJson<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
+export function cloneJson<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
 
 function field(id: string, name: string, type: FieldType, primary = false, options?: string[]): CollectionField {
 	const createdAt = now();
@@ -167,7 +167,6 @@ export function addRecord(collection: Collection, sourceRef?: WoodlesRef): Colle
 }
 
 export function addField(collection: Collection, name: string, type: FieldType): Collection {
-	if (type === 'text' && collection.fields.some((entry) => entry.primary)) type = 'text';
 	const entry = field(makeId('field'), name.trim() || 'New field', type, false, type === 'select' || type === 'multi-select' ? ['Option 1', 'Option 2'] : undefined);
 	return {
 		...collection, fields: [...collection.fields, entry],

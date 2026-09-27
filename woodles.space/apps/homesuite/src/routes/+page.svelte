@@ -11,8 +11,7 @@
 		type WoodlesRef
 	} from '@shared/homesuiteBridge';
 	import {
-		listArtifacts,
-		listTrashedArtifacts,
+		listEverything,
 		prepareSurfaceStorage,
 		surfaceFor,
 		surfaceForRef,
@@ -20,8 +19,9 @@
 		type HomeSuiteArtifact,
 		type HomeSuiteSurfaceAdapter
 	} from '$lib/surfaces';
-	import { moveHomeSuiteArtifactToTrash, restoreHomeSuiteArtifact, forgetHomeSuiteArtifact } from '@shared/homesuiteTrash';
+	import { HOMESUITE_TRASH_KEY, moveHomeSuiteArtifactToTrash, restoreHomeSuiteArtifact, forgetHomeSuiteArtifact, type HomeSuiteTrashEntry } from '@shared/homesuiteTrash';
 	import { modal } from '@shared/modal';
+	import '@shared/homesuiteTheme.css';
 	import './homesuite.css';
 
 	type Filter = 'all' | 'document' | 'board' | 'collection';
@@ -30,15 +30,19 @@
 		| { action: 'undo' | 'redo' | 'inspect' | 'focus' | 'flush' }
 		| { action: 'command'; commandId: string }
 		| { action: 'inspector'; controlId: string; value: string }
-		| { action: 'mode'; modeId: string };
+		| { action: 'mode'; modeId: string }
+		| { action: 'rename'; title: string };
 
 	let artifacts = $state<HomeSuiteArtifact[]>([]);
 	let ready = $state(false);
 	let filter = $state<Filter>('all');
 	let showingTrash = $state(false);
-	let trashed = $state<ReturnType<typeof listTrashedArtifacts>>([]);
+	let trashed = $state<HomeSuiteTrashEntry[]>([]);
 	let actionIssue = $state('');
 	let storageNotices = $state<string[]>([]);
+	let arrivals = $state('');
+	let renaming = $state(false);
+	let renameDraft = $state('');
 	let permanentConfirmation = $state('');
 	let search = $state('');
 	let newOpen = $state(false);
@@ -62,8 +66,21 @@
 	let readyFallback: ReturnType<typeof setTimeout> | undefined;
 	let flushWaiter: (() => void) | null = null;
 
-	const requestedKind = $derived(page.url.searchParams.get('kind'));
-	const requestedId = $derived(page.url.searchParams.get('id'));
+	// `?document=<id>` (or board, collection) — `entityHref('homesuite', …)`.
+	// `?kind=&id=` is the shape before HomeSuite was in the manifest; it still
+	// opens, and is rewritten on arrival.
+	const requested = $derived.by((): { kind: string; id: string; legacy: boolean } | null => {
+		const params = page.url.searchParams;
+		for (const surface of surfaces) {
+			const id = params.get(surface.kind);
+			if (id) return { kind: surface.kind, id, legacy: false };
+		}
+		const kind = params.get('kind');
+		const id = params.get('id');
+		return kind && id ? { kind, id, legacy: true } : null;
+	});
+	const requestedKind = $derived(requested?.kind ?? null);
+	const requestedId = $derived(requested?.id ?? null);
 	const adapter = $derived(requestedKind ? surfaceFor(requestedKind) : undefined);
 	const activeArtifact = $derived.by((): HomeSuiteArtifact | undefined => {
 		if (!adapter || !requestedId) return undefined;
@@ -100,6 +117,7 @@
 			activeArtifact.inTrash
 				? { id: 'shell:restore', label: 'Restore from Trash', detail: 'HomeSuite artifact', enabled: true, run: restoreActive }
 				: { id: 'shell:move-trash', label: 'Move to Trash', detail: 'HomeSuite artifact', enabled: true, run: moveActiveToTrash },
+			{ id: 'shell:rename', label: `Rename ${activeArtifact.kind}`, detail: 'HomeSuite artifact', enabled: !!activeState, run: startRename },
 			{ id: 'shell:inspect', label: inspectorOpen ? 'Hide inspector' : 'Show inspector', detail: 'View', enabled: true, run: () => { inspectorOpen = !inspectorOpen; } },
 		...(activeState?.commands ?? []).map((command) => ({
 				id: `surface:${command.id}`,
@@ -116,9 +134,29 @@
 	const currentCommand = $derived(visibleCommands[Math.min(paletteIndex, visibleCommands.length - 1)]);
 
 	function refresh(): void {
-		artifacts = listArtifacts();
-		trashed = listTrashedArtifacts();
+		({ artifacts, trashed } = listEverything());
 		storageNotices = surfaces.flatMap((surface) => surface.notice?.() ?? []);
+	}
+
+	/**
+	 * Keep the listing in step with the open surface without re-reading every
+	 * library on every message: patch the title, and only look again when the
+	 * surface reports something the listing has not seen (a board a portal
+	 * just made). The index refreshes in full whenever it is shown.
+	 */
+	function noteSurface(reported: { kind: HomeSuiteArtifactKind; id: string; title: string }): void {
+		const listed = artifacts.find((item) => item.kind === reported.kind && item.ref.id === reported.id);
+		if (!listed) {
+			if (!trashed.some((entry) => entry.kind === reported.kind && entry.ref.id === reported.id)) refresh();
+			return;
+		}
+		if (listed.title !== reported.title) artifacts = artifacts.map((item) => item === listed ? { ...item, title: reported.title } : item);
+	}
+
+	// A surface's own saves reach the shell as `storage` events too (same
+	// origin, another frame). While one is open only Trash matters here.
+	function onStorage(event: StorageEvent): void {
+		if (!frame || event.key === HOMESUITE_TRASH_KEY || event.key === null) refresh();
 	}
 
 	function artifactKey(kind: string, id: string): string {
@@ -174,6 +212,29 @@
 		void showIndex();
 	}
 
+	/** Titles are edited here, in the shell; the surface applies the new one as its own edit. */
+	function startRename(): void {
+		if (!activeState || !activeArtifact) return;
+		renameDraft = activeState.artifact.title || activeArtifact.title;
+		renaming = true;
+	}
+
+	function commitRename(): void {
+		if (!renaming) return;
+		renaming = false;
+		const next = renameDraft.trim();
+		if (next && next !== (activeState?.artifact.title ?? activeArtifact?.title)) sendAction({ action: 'rename', title: next });
+	}
+
+	function onRenameKeydown(event: KeyboardEvent): void {
+		if (event.key === 'Enter') { event.preventDefault(); commitRename(); }
+		else if (event.key === 'Escape') { event.preventDefault(); renaming = false; }
+	}
+
+	function focusAndSelect(node: HTMLInputElement) {
+		queueMicrotask(() => { node.focus(); node.select(); });
+	}
+
 	function restoreActive(): void {
 		if (!activeArtifact?.inTrash) return;
 		restoreHomeSuiteArtifact(activeArtifact.ref);
@@ -202,7 +263,7 @@
 	}
 
 	function artifactPath(kind: string, id: string): string {
-		return `/homesuite?kind=${encodeURIComponent(kind)}&id=${encodeURIComponent(id)}`;
+		return entityHref('homesuite', kind, id);
 	}
 
 	/**
@@ -283,10 +344,12 @@
 			surfaceState = message.state;
 			frameReady = true;
 			clearTimeout(readyFallback);
-			refresh();
+			noteSurface(message.state.artifact);
 			followSurface(message.state.artifact);
 		} else if (message.type === 'request-palette') {
 			openPalette();
+		} else if (message.type === 'request-rename') {
+			startRename();
 		} else if (message.type === 'flushed') {
 			flushWaiter?.();
 		} else if (message.type === 'navigate' && message.target === 'index') {
@@ -377,17 +440,18 @@
 	}
 
 	onMount(() => {
-		prepareSurfaceStorage();
+		arrivals = prepareSurfaceStorage() ?? '';
 		refresh();
+		if (requested?.legacy) void goto(artifactPath(requested.kind, requested.id), { replaceState: true, noScroll: true });
 		// On a phone the inspector would cover the thing being inspected.
 		inspectorOpen = !window.matchMedia('(max-width: 600px)').matches;
 		ready = true;
 		window.addEventListener('message', handleMessage);
-		window.addEventListener('storage', refresh);
+		window.addEventListener('storage', onStorage);
 		window.addEventListener('keydown', handleKeydown);
 		return () => {
 			window.removeEventListener('message', handleMessage);
-			window.removeEventListener('storage', refresh);
+			window.removeEventListener('storage', onStorage);
 			window.removeEventListener('keydown', handleKeydown);
 			clearTimeout(readyFallback);
 		};
@@ -407,7 +471,13 @@
 			{#if activeArtifact}
 				<span class="crumb-separator" aria-hidden="true">/</span>
 				<span class="kind-badge {activeArtifact.kind}">{activeArtifact.kind}</span>
-				<strong class="artifact-title" title={activeState?.artifact.title || activeArtifact.title}>{activeState?.artifact.title || activeArtifact.title}</strong>
+				<h1 class="artifact-heading">
+					{#if renaming}
+						<input class="artifact-title-input" aria-label={`Rename ${activeArtifact.kind}`} bind:value={renameDraft} use:focusAndSelect onkeydown={onRenameKeydown} onblur={commitRename} />
+					{:else}
+						<button class="artifact-title" title="Rename" disabled={!activeState} onclick={startRename}>{activeState?.artifact.title || activeArtifact.title}</button>
+					{/if}
+				</h1>
 				{#if activeArtifact.inTrash}<span class="trash-badge">In Trash</span>{/if}
 			{/if}
 		</div>
@@ -432,7 +502,7 @@
 				{#if activeArtifact.inTrash}
 					<button class="toolbar-button trash-trigger" onclick={restoreActive}>Restore</button>
 				{:else}
-					<button class="toolbar-button trash-trigger" aria-label="Move to Trash" onclick={moveActiveToTrash}><span>Move to </span>Trash</button>
+					<button class="toolbar-button trash-trigger" aria-label="Move to Trash" onclick={moveActiveToTrash}><span>Move to</span>Trash</button>
 				{/if}
 			{/if}
 			<div class="new-wrap">
@@ -451,7 +521,7 @@
 	{#if !ready}
 		<main class="suite-loading" aria-live="polite">Opening HomeSuite…</main>
 	{:else if activeArtifact && adapter}
-		<div class="surface-layout">
+		<main class="surface-layout" aria-label={`${adapter.label}: ${activeState?.artifact.title || activeArtifact.title}`}>
 			<div class="surface-main">
 				<div class="surface-strip">
 					<button class="back-link" onclick={() => showIndex()}>← All things</button>
@@ -512,7 +582,7 @@
 					{/if}
 				</aside>
 			{/if}
-		</div>
+		</main>
 		{:else if requestedId && ready}
 		<main class="missing-artifact"><span>Nothing at that address</span><h1>This {requestedKind || 'thing'} is not in your HomeSuite yet.</h1><button onclick={() => showIndex()}>Back to HomeSuite</button></main>
 	{:else}
@@ -535,6 +605,7 @@
 			</div>
 				{#if actionIssue}<div class="trash-issue" role="alert">{actionIssue}</div>{/if}
 				{#each storageNotices as notice}<div class="trash-issue" role="status">{notice}</div>{/each}
+				{#if arrivals && !showingTrash}<div class="arrival-notice" role="status"><span>{arrivals}</span><button aria-label="Dismiss" onclick={() => { arrivals = ''; }}>×</button></div>{/if}
 				{#if showingTrash && trashed.length}
 					<div class="artifact-list" aria-label="Trashed artifacts">
 						{#each trashed as entry (entry.ref.app + entry.ref.id)}

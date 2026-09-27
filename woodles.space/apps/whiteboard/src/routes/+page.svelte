@@ -159,6 +159,7 @@
 		isHomeSuiteShellMessage,
 		postHomeSuiteFlushed,
 		postHomeSuitePaletteRequest,
+		postHomeSuiteRenameRequest,
 		postHomeSuiteState,
 		type HomeSuiteSurfaceState
 	} from '@shared/homesuiteBridge';
@@ -254,8 +255,6 @@
 	const pendingAssetDeletes = new Set<string>();
 	const homeSuiteEmbedded = typeof window !== 'undefined' &&
 		window.parent !== window && new URLSearchParams(window.location.search).get('homesuite') === '1';
-	let renamingBoard = $state(false);
-	let renameDraft = $state('');
 
 	// Navigation: where the camera has been, where it can go, and what it says.
 	let history = $state<CameraHistory>(createCameraHistory({ camera: { x: 180, y: 120, zoom: 1 }, label: 'Board' }));
@@ -701,26 +700,19 @@
 		window.history.replaceState(window.history.state, '', url);
 	}
 
-	function openRenameBoard() {
-		renameDraft = board.board.title;
-		renamingBoard = true;
-		void tick().then(() => document.getElementById('embedded-board-title')?.focus());
-	}
-
-	function commitBoardRename() {
-		const title = boardTitleFallback(renameDraft);
-		if (title !== board.board.title) {
-			beginEdit('board-title');
-			board.board.title = title;
-			board.updatedAt = now();
-			scheduleSave();
-		}
-		renamingBoard = false;
+	/** HomeSuite edits the name in its own title area, then sends it here. */
+	function renameBoard(name: string) {
+		const title = boardTitleFallback(name);
+		if (title === board.board.title) return;
+		beginEdit('board-title');
+		board.board.title = title;
+		board.updatedAt = now();
+		scheduleSave();
 	}
 
 	function runHomeSuiteCommand(commandId: string) {
 		switch (commandId) {
-			case 'rename-board': openRenameBoard(); break;
+			case 'rename-board': postHomeSuiteRenameRequest(); break;
 			case 'save': markDirty(); saveNow(); break;
 			case 'find': void openSearch(); break;
 			case 'add-card': addCardFromDock(); break;
@@ -740,6 +732,7 @@
 			!isHomeSuiteShellMessage(event.data)) return;
 		const message = event.data;
 		if (message.action === 'flush') { saveNow(); postHomeSuiteFlushed(); }
+		else if (message.action === 'rename') renameBoard(message.title);
 		else if (message.action === 'undo') performUndo();
 		else if (message.action === 'redo') performRedo();
 		else if (message.action === 'inspect') openDetails();
@@ -2042,7 +2035,6 @@
 		board = restoreWhiteboard(document);
 		syncBoardAddress();
 		selectedIds = [];
-		renamingBoard = false;
 		connectorSourceId = null;
 		renamingFrameId = null;
 		tool = 'select';
@@ -2891,24 +2883,6 @@
 	</div>
 
 	</div>
-
-	{#if homeSuiteEmbedded && renamingBoard}
-		<form
-			class="embedded-rename"
-			data-whiteboard-ui
-			aria-label="Rename board"
-			onsubmit={(event) => { event.preventDefault(); commitBoardRename(); }}
-		>
-			<label for="embedded-board-title">Board name</label>
-			<input
-				id="embedded-board-title"
-				bind:value={renameDraft}
-				onkeydown={(event) => { if (event.key === 'Escape') { event.preventDefault(); renamingBoard = false; } }}
-			/>
-			<button class="chip strong" type="submit">Save name</button>
-			<button class="chip" type="button" onclick={() => (renamingBoard = false)}>Cancel</button>
-		</form>
-	{/if}
 
 	{#if searchOpen}
 		<div class="finder" data-whiteboard-ui>
@@ -4238,34 +4212,6 @@
 		pointer-events: none;
 	}
 	.top-deck > * { pointer-events: auto; }
-	.embedded-rename {
-		position: absolute;
-		z-index: 82;
-		top: 72px;
-		left: 22px;
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 7px;
-		width: min(480px, calc(100vw - 44px));
-		padding: 11px;
-		border: 1px solid rgba(98, 80, 70, 0.16);
-		border-radius: 14px;
-		background: rgba(255, 253, 248, 0.96);
-		box-shadow: 0 9px 30px rgba(76, 57, 48, 0.14);
-	}
-	.embedded-rename label { width: 100%; color: #76645d; font-size: 11px; font-weight: 700; }
-	.embedded-rename input {
-		flex: 1 1 180px;
-		min-width: 0;
-		padding: 8px 10px;
-		border: 1px solid rgba(98, 80, 70, 0.22);
-		border-radius: 9px;
-		background: #fffdf9;
-		color: #443a36;
-		outline-color: #a76670;
-	}
-
 	.topbar {
 		display: flex;
 		align-items: center;
