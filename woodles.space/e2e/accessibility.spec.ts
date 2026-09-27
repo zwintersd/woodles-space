@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 
 const auditRoutes = [
 	'/',
+	'/homesuite',
 	'/write',
 	'/letter',
 	'/marginalia/arcade',

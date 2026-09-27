@@ -157,11 +157,13 @@
 	import { createHandoffQueue } from '@woodles/handoff';
 	import {
 		isHomeSuiteShellMessage,
+		postHomeSuiteFlushed,
 		postHomeSuitePaletteRequest,
+		postHomeSuiteRenameRequest,
 		postHomeSuiteState,
 		type HomeSuiteSurfaceState
 	} from '@shared/homesuiteBridge';
-	import { HOMESUITE_TRASH_KEY, isHomeSuiteTrashed } from '@shared/homesuiteTrash';
+	import { HOMESUITE_TRASH_KEY, isHomeSuiteTrashed, restoreHomeSuiteArtifact } from '@shared/homesuiteTrash';
 
 	const whiteboardHandoffs = createHandoffQueue('whiteboard');
 	import { STACK_BEHAVIORS, SUGGESTED_STATUSES, TINTS, type Label, type StackBehavior, type Tint } from '$lib/model';
@@ -253,8 +255,6 @@
 	const pendingAssetDeletes = new Set<string>();
 	const homeSuiteEmbedded = typeof window !== 'undefined' &&
 		window.parent !== window && new URLSearchParams(window.location.search).get('homesuite') === '1';
-	let renamingBoard = $state(false);
-	let renameDraft = $state('');
 
 	// Navigation: where the camera has been, where it can go, and what it says.
 	let history = $state<CameraHistory>(createCameraHistory({ camera: { x: 180, y: 120, zoom: 1 }, label: 'Board' }));
@@ -353,6 +353,20 @@
 	function boardIsInTrash(id: string): boolean {
 		void trashRevision;
 		return isHomeSuiteTrashed({ app: 'whiteboard', kind: 'board', id });
+	}
+	// HomeSuite's Trash is honored here too: a trashed board leaves the shelf,
+	// and one opened anyway says so and can come back.
+	const shelvedBoards = $derived(boards.filter((entry) => !boardIsInTrash(entry.id)));
+	const boardInTrash = $derived(!homeSuiteEmbedded && loaded && boardIsInTrash(board.board.id));
+
+	function restoreBoardFromTrash() {
+		restoreHomeSuiteArtifact({ app: 'whiteboard', kind: 'board', id: board.board.id });
+		trashRevision += 1;
+	}
+
+	/** Which board standalone Whiteboard reopens; a HomeSuite frame leaves that alone. */
+	function rememberActiveBoard(id: string) {
+		if (!homeSuiteEmbedded) boardLibrary.setActiveId(id);
 	}
 
 	function homeSuiteInspector(): HomeSuiteSurfaceState['inspector'] {
@@ -686,26 +700,19 @@
 		window.history.replaceState(window.history.state, '', url);
 	}
 
-	function openRenameBoard() {
-		renameDraft = board.board.title;
-		renamingBoard = true;
-		void tick().then(() => document.getElementById('embedded-board-title')?.focus());
-	}
-
-	function commitBoardRename() {
-		const title = boardTitleFallback(renameDraft);
-		if (title !== board.board.title) {
-			beginEdit('board-title');
-			board.board.title = title;
-			board.updatedAt = now();
-			scheduleSave();
-		}
-		renamingBoard = false;
+	/** HomeSuite edits the name in its own title area, then sends it here. */
+	function renameBoard(name: string) {
+		const title = boardTitleFallback(name);
+		if (title === board.board.title) return;
+		beginEdit('board-title');
+		board.board.title = title;
+		board.updatedAt = now();
+		scheduleSave();
 	}
 
 	function runHomeSuiteCommand(commandId: string) {
 		switch (commandId) {
-			case 'rename-board': openRenameBoard(); break;
+			case 'rename-board': postHomeSuiteRenameRequest(); break;
 			case 'save': markDirty(); saveNow(); break;
 			case 'find': void openSearch(); break;
 			case 'add-card': addCardFromDock(); break;
@@ -724,7 +731,9 @@
 		if (!homeSuiteEmbedded || event.origin !== window.location.origin || event.source !== window.parent ||
 			!isHomeSuiteShellMessage(event.data)) return;
 		const message = event.data;
-		if (message.action === 'undo') performUndo();
+		if (message.action === 'flush') { saveNow(); postHomeSuiteFlushed(); }
+		else if (message.action === 'rename') renameBoard(message.title);
+		else if (message.action === 'undo') performUndo();
 		else if (message.action === 'redo') performRedo();
 		else if (message.action === 'inspect') openDetails();
 		else if (message.action === 'focus') canvasEl?.focus();
@@ -747,7 +756,7 @@
 
 		if (opened) {
 			board = restoreWhiteboard(opened.document);
-			boardLibrary.setActiveId(board.board.id);
+			rememberActiveBoard(board.board.id);
 			if (opened.source === 'backup') {
 				saveState = 'recovered';
 				saveMessage = 'restored the last saved board';
@@ -776,14 +785,20 @@
 		void hydrateImages();
 		drainHandoffs();
 
-		const onBeforeUnload = () => saveNow();
-		window.addEventListener('beforeunload', onBeforeUnload);
+		// `pagehide`, not `beforeunload`: HomeSuite closes a board by removing its
+		// frame, which never fires `beforeunload`, and the pending save would go
+		// with it. A hidden tab may never come back, so that saves too.
+		const onPageHide = () => saveNow();
+		const onVisibilityChange = () => { if (document.visibilityState === 'hidden') saveNow(); };
+		window.addEventListener('pagehide', onPageHide);
+		document.addEventListener('visibilitychange', onVisibilityChange);
 		window.addEventListener('resize', measureViewport);
 		window.addEventListener('message', handleHomeSuiteMessage);
 		const onTrashChange = (event: StorageEvent) => { if (event.key === HOMESUITE_TRASH_KEY || event.key === null) trashRevision += 1; };
 		window.addEventListener('storage', onTrashChange);
 		return () => {
-			window.removeEventListener('beforeunload', onBeforeUnload);
+			window.removeEventListener('pagehide', onPageHide);
+			document.removeEventListener('visibilitychange', onVisibilityChange);
 			window.removeEventListener('resize', measureViewport);
 			window.removeEventListener('message', handleHomeSuiteMessage);
 			window.removeEventListener('storage', onTrashChange);
@@ -1785,10 +1800,13 @@
 		saveNow();
 		const size = viewport();
 		const at = screenToWorld(board.camera, { x: size.width / 2 - 115, y: size.height / 2 - 84 });
+		const reopening = boardLibrary.activeId();
 		const child = boardLibrary.create('New board');
 		// `create` marks the child as the board to reopen. We are not going there
 		// yet — this board is still the one being worked on.
-		boardLibrary.setActiveId(board.board.id);
+		if (!homeSuiteEmbedded) boardLibrary.setActiveId(board.board.id);
+		else if (reopening) boardLibrary.setActiveId(reopening);
+		else boardLibrary.clearActiveId();
 		const portal = createPortal(at.x, at.y, child.board.id, '', nextZ(board.items));
 		beginEdit();
 		setItems([...board.items, portal]);
@@ -1841,7 +1859,7 @@
 		};
 		trail = pushTrail(trail, step);
 		boardLibrary.writeTrail(trail);
-		boardLibrary.setActiveId(portal.boardId);
+		rememberActiveBoard(portal.boardId);
 		adoptDocument(opened.document, 'saved', 'saved here');
 		board.camera = arrivalCamera(board, viewport());
 		refreshPreviews();
@@ -1877,7 +1895,7 @@
 
 		trail = climbed.trail;
 		boardLibrary.writeTrail(trail);
-		boardLibrary.setActiveId(climbed.step.boardId);
+		rememberActiveBoard(climbed.step.boardId);
 		adoptDocument(opened.document, 'saved', 'saved here');
 		refreshPreviews();
 
@@ -2017,7 +2035,6 @@
 		board = restoreWhiteboard(document);
 		syncBoardAddress();
 		selectedIds = [];
-		renamingBoard = false;
 		connectorSourceId = null;
 		renamingFrameId = null;
 		tool = 'select';
@@ -2816,10 +2833,16 @@
 			<button class="chip" title="Save now (⌘S)" onclick={() => { markDirty(); saveNow(); }}>Save</button>
 			<button class="chip" title="Save and put this board back on the shelf" onclick={closeBoard}>Close</button>
 			<button class:active={shelfOpen} class="chip strong" aria-expanded={shelfOpen} onclick={() => (shelfOpen ? (shelfOpen = false) : openShelf())}>
-				Boards<span class="chip-count">{boards.length || 1}</span>
+				Boards<span class="chip-count">{shelvedBoards.length || 1}</span>
 			</button>
 		</div>
 	</header>
+	{/if}
+	{#if boardInTrash}
+		<div class="trash-bar" role="status" data-whiteboard-ui>
+			<span>This board is in HomeSuite’s Trash.</span>
+			<button onclick={restoreBoardFromTrash}>Restore</button>
+		</div>
 	{/if}
 
 	<nav class:hidden={playing || searchOpen} class="location-bar" data-whiteboard-ui aria-label="Board location">
@@ -2860,24 +2883,6 @@
 	</div>
 
 	</div>
-
-	{#if homeSuiteEmbedded && renamingBoard}
-		<form
-			class="embedded-rename"
-			data-whiteboard-ui
-			aria-label="Rename board"
-			onsubmit={(event) => { event.preventDefault(); commitBoardRename(); }}
-		>
-			<label for="embedded-board-title">Board name</label>
-			<input
-				id="embedded-board-title"
-				bind:value={renameDraft}
-				onkeydown={(event) => { if (event.key === 'Escape') { event.preventDefault(); renamingBoard = false; } }}
-			/>
-			<button class="chip strong" type="submit">Save name</button>
-			<button class="chip" type="button" onclick={() => (renamingBoard = false)}>Cancel</button>
-		</form>
-	{/if}
 
 	{#if searchOpen}
 		<div class="finder" data-whiteboard-ui>
@@ -3050,7 +3055,7 @@
 								</div>
 							{/if}
 							<ul class="place-list door-targets">
-								{#each boards as entry (entry.id)}
+								{#each shelvedBoards as entry (entry.id)}
 									<li>
 										<button class:current={entry.id === only.boardId} class="place-name" onclick={() => pointPortal(only, entry.id)}>
 											<span>{boardTitleFallback(entry.title)}</span>
@@ -3329,7 +3334,7 @@
 					<button class="shelf-close" aria-label="Close the shelf" onclick={() => { shelfOpen = false; confirmDeleteId = null; }}>×</button>
 				</header>
 				<ul class="shelf-list">
-					{#each boards as entry (entry.id)}
+					{#each shelvedBoards as entry (entry.id)}
 						<li class:open={entry.id === board.board.id}>
 							<button class="shelf-open" onclick={() => openBoard(entry.id)}>
 								<strong>{boardTitleFallback(entry.title)}</strong>
@@ -4170,6 +4175,29 @@
 	 * absolute positioning let the breadcrumb drift over the board controls at
 	 * middling widths, and a flex row cannot overlap itself at any width.
 	 */
+	.trash-bar {
+		flex-basis: 100%;
+		order: -1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 12px;
+		padding: 8px 14px;
+		border-radius: 10px;
+		background: #f7e3dc;
+		color: #6f2e24;
+		font-size: 13px;
+		pointer-events: auto;
+	}
+	.trash-bar button {
+		border: 1px solid #d9b1a4;
+		border-radius: 7px;
+		background: #fffaf7;
+		color: #6f2e24;
+		padding: 4px 10px;
+		font: inherit;
+		cursor: pointer;
+	}
 	.top-deck {
 		position: absolute;
 		z-index: 70;
@@ -4184,34 +4212,6 @@
 		pointer-events: none;
 	}
 	.top-deck > * { pointer-events: auto; }
-	.embedded-rename {
-		position: absolute;
-		z-index: 82;
-		top: 72px;
-		left: 22px;
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 7px;
-		width: min(480px, calc(100vw - 44px));
-		padding: 11px;
-		border: 1px solid rgba(98, 80, 70, 0.16);
-		border-radius: 14px;
-		background: rgba(255, 253, 248, 0.96);
-		box-shadow: 0 9px 30px rgba(76, 57, 48, 0.14);
-	}
-	.embedded-rename label { width: 100%; color: #76645d; font-size: 11px; font-weight: 700; }
-	.embedded-rename input {
-		flex: 1 1 180px;
-		min-width: 0;
-		padding: 8px 10px;
-		border: 1px solid rgba(98, 80, 70, 0.22);
-		border-radius: 9px;
-		background: #fffdf9;
-		color: #443a36;
-		outline-color: #a76670;
-	}
-
 	.topbar {
 		display: flex;
 		align-items: center;

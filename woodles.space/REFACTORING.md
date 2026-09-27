@@ -83,3 +83,36 @@ the anchoring contract hasn't converged. still moving.
 **State:** diverged
 **Notes:** the floating popover over a text selection. same idea, different name,
 different surface. still moving.
+
+## HomeSuite surface wiring
+**Status:** candidate
+**Copies:** the `?homesuite=1` branches of `write/src/routes/+page.svelte`,
+`whiteboard/src/routes/+page.svelte`, `data/src/routes/+page.svelte`
+**State:** minor variation
+**Notes:** each surface builds its own `HomeSuiteSurfaceState`, listens for
+shell messages with the same origin/source check, and answers `flush`,
+`rename`, `undo`/`redo`, and `command` in a switch of its own. the verbs have
+settled since the bridge grew `flush`, `rename`, and `navigate`; a
+`connectHomeSuite({ state, onAction })` helper beside the bridge would take
+the listener, the checks, and the `flushed` reply. the state each builds
+stays per app.
+
+## WoodlesRef equality
+**Status:** candidate
+**Copies:** `sameRef` in `shared/homesuiteTrash.ts`, `trashKey` in
+`apps/homesuite/src/lib/surfaces.ts`, `refKey` in
+`apps/data/src/lib/sourceSync.ts`, and inline app/kind/id comparisons in
+`apps/data/src/lib/collections.ts` (`addRecord`, `removeRecord`)
+**State:** identical in meaning, different in shape (predicate vs. key)
+**Notes:** one `refKey(ref)` and `sameRef(a, b)` next to the `WoodlesRef` type
+in `shared/homesuiteBridge.ts` would serve all four.
+
+## HomeSuite colors
+**Status:** done
+**Copies:** `shared/homesuiteTheme.css`
+**State:** consolidated
+**Notes:** the shell and Data had ~230 hard-coded colors between them, no
+dark mode, and failing contrast. both now read `--hs-*` tokens from the one
+file, with a dark scheme. Write and Whiteboard keep their own palettes on
+purpose.
+

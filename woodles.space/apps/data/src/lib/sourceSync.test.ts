@@ -42,6 +42,33 @@ describe('connected Collection sources', () => {
 		expect(isCollection(changed)).toBe(true);
 	});
 
+	it('returns the same Collection when a pull changes nothing', () => {
+		const collection = createCollection('Living things', 'living-world');
+		expect(mergePulledRows(collection, [], '2026-09-26T12:00:00.000Z')).toBe(collection);
+
+		const pull: PulledSourceRow[] = [{
+			ref: { app: 'marginalia', kind: 'life', id: 'salt_deposit' }, label: 'Salt deposit', hint: 'Marginalia · noticed',
+			values: { name: 'Salt deposit', source: 'Marginalia', kind: 'Life', category: 'mineral', domain: 'shore', stage: 'noticed', details: '', updated: '' }
+		}];
+		const synced = mergePulledRows(collection, pull, '2026-09-26T12:00:00.000Z');
+		const again = mergePulledRows(synced, pull, '2026-09-26T12:01:00.000Z');
+		expect(again).toBe(synced);
+		expect(again.updatedAt).toBe('2026-09-26T12:00:00.000Z');
+	});
+
+	it('stamps only the rows whose source values changed', () => {
+		const row = (id: string, stage: string): PulledSourceRow => ({
+			ref: { app: 'marginalia', kind: 'life', id }, label: id, hint: 'Marginalia',
+			values: { name: id, source: 'Marginalia', kind: 'Life', category: '', domain: '', stage, details: '', updated: '' }
+		});
+		const synced = mergePulledRows(createCollection('Living things', 'living-world'), [row('kelp', 'noticed'), row('moss', 'noticed')], '2026-09-26T12:00:00.000Z');
+		const next = mergePulledRows(synced, [row('kelp', 'noticed'), row('moss', 'observed')], '2026-09-26T12:05:00.000Z');
+		const stamp = (collection: typeof next, id: string) => collection.records.find((record) => record.sourceRef?.id === id)!.updatedAt;
+		expect(stamp(next, 'kelp')).toBe(stamp(synced, 'kelp'));
+		expect(stamp(next, 'moss')).toBe('2026-09-26T12:05:00.000Z');
+		expect(next.updatedAt).toBe('2026-09-26T12:05:00.000Z');
+	});
+
 	it('validates connected-source configuration as part of the persisted Collection', () => {
 		const collection = createCollection('Sources', 'living-world');
 		expect(collection.sources).toEqual(['bestiary-creatures', 'marginalia-life', 'marginalia-field-notes']);

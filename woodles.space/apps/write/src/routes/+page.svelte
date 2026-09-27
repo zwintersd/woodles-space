@@ -2,8 +2,8 @@
 	import { onMount, onDestroy, tick } from 'svelte';
 	import { fly, slide, fade } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
-	import { HOMESUITE_CHANNEL, isHomeSuiteShellMessage, postHomeSuitePaletteRequest, postHomeSuiteState } from '@shared/homesuiteBridge';
-	import { isHomeSuiteTrashed } from '@shared/homesuiteTrash';
+	import { HOMESUITE_CHANNEL, isHomeSuiteShellMessage, postHomeSuiteFlushed, postHomeSuiteNavigate, postHomeSuitePaletteRequest, postHomeSuiteState } from '@shared/homesuiteBridge';
+	import { isHomeSuiteTrashed, restoreHomeSuiteArtifact } from '@shared/homesuiteTrash';
 	import Topbar from '$lib/Topbar.svelte';
 	import BottomBar from '$lib/BottomBar.svelte';
 	import EditorToolbar from '$lib/EditorToolbar.svelte';
@@ -244,6 +244,17 @@
 	// Recomputed only when the index itself changes — both walk every draft's
 	// stored body, so they stay out of anything that runs per keystroke.
 	const draftBacklinkCounts = $derived(backlinkCountsFor(draftsList));
+	// HomeSuite's Trash is honored here too: a trashed draft leaves the drafts
+	// list, and one opened anyway says so and can come back.
+	let trashRevision = $state(0);
+	const shelvedDrafts = $derived.by(() => {
+		void trashRevision;
+		return draftsList.filter((draft) => !isHomeSuiteTrashed({ app: 'write', kind: 'draft', id: draft.id }));
+	});
+	const currentInTrash = $derived.by(() => {
+		void trashRevision;
+		return !homeSuiteMode && !!currentDraftId && isHomeSuiteTrashed({ app: 'write', kind: 'draft', id: currentDraftId });
+	});
 	const draftStatuses = $derived(statusesFor(draftsList));
 
 	const nextPocketLayer = $derived<PocketLayer>(
@@ -289,6 +300,17 @@
 		if (!fgEl) return;
 		ensureAnchorsOn(fgEl.querySelectorAll(ANCHOR_BLOCK_SELECTOR));
 		markTrashedReferences();
+	}
+
+	function onTrashChanged() {
+		trashRevision += 1;
+		markTrashedReferences();
+	}
+
+	function restoreCurrentDraft() {
+		if (!currentDraftId) return;
+		restoreHomeSuiteArtifact({ app: 'write', kind: 'draft', id: currentDraftId });
+		trashRevision += 1;
 	}
 
 	function markTrashedReferences() {
@@ -427,7 +449,14 @@
 		if (event.origin !== window.location.origin || event.source !== window.parent) return;
 		if (!isHomeSuiteShellMessage(event.data)) return;
 		const message = event.data;
-		if (message.action === 'focus') {
+		if (message.action === 'flush') {
+			flushHomeSuiteSave();
+			postHomeSuiteFlushed();
+		} else if (message.action === 'rename') {
+			title = message.title;
+			scheduleSave();
+			requestAnimationFrame(autosizeTitle);
+		} else if (message.action === 'focus') {
 			(isListKind ? titleEl : elFor(activeLayer))?.focus();
 		} else if (message.action === 'inspect') {
 			binderOpen = 'layers';
@@ -449,6 +478,16 @@
 				case 'write.send-to-board': if (!isListKind) sendToBoard(); break;
 			}
 		}
+	}
+
+	// A plain click in a reference places the caret — this is an editor — so
+	// ⌘/Ctrl-click follows it, and HomeSuite opens the thing in place.
+	function onHomeSuiteReferenceClick(event: MouseEvent) {
+		if (!(event.metaKey || event.ctrlKey) || !(event.target instanceof Element)) return;
+		const anchor = event.target.closest<HTMLAnchorElement>('a[data-ref-app][data-ref-kind][data-ref-id]');
+		if (!anchor || !editorPageEl?.contains(anchor)) return;
+		event.preventDefault();
+		postHomeSuiteNavigate({ app: anchor.dataset.refApp!, kind: anchor.dataset.refKind!, id: anchor.dataset.refId! });
 	}
 
 	function updateHomeSuiteSelection() {
@@ -497,6 +536,7 @@
 			window.addEventListener('pagehide', flushHomeSuiteSave);
 			document.addEventListener('focusin', onHomeSuiteFocusIn);
 			document.addEventListener('input', scheduleHomeSuiteHistoryState, true);
+			document.addEventListener('click', onHomeSuiteReferenceClick, true);
 		}
 		const tid = params.get('template');
 		const replyId = params.get('reply');
@@ -658,7 +698,7 @@
 		scheduleMeasure();
 
 		window.addEventListener('resize', onResize);
-		window.addEventListener('storage', markTrashedReferences);
+		window.addEventListener('storage', onTrashChanged);
 		document.addEventListener('selectionchange', onSelectionChange);
 		watchWrapWidth();
 	});
@@ -666,13 +706,14 @@
 	onDestroy(() => {
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('resize', onResize);
-			window.removeEventListener('storage', markTrashedReferences);
+			window.removeEventListener('storage', onTrashChanged);
 			window.removeEventListener('message', onHomeSuiteMessage);
 			window.removeEventListener('keydown', onHomeSuiteKeydown, true);
 			window.removeEventListener('pagehide', flushHomeSuiteSave);
 			document.removeEventListener('selectionchange', onSelectionChange);
 			document.removeEventListener('focusin', onHomeSuiteFocusIn);
 			document.removeEventListener('input', scheduleHomeSuiteHistoryState, true);
+			document.removeEventListener('click', onHomeSuiteReferenceClick, true);
 		}
 		wrapObserver?.disconnect();
 		clearTimeout(noticeTimer);
@@ -957,7 +998,8 @@
 		}
 
 		currentDraftId = id;
-		setActiveDraftId(id);
+		// Which draft standalone Write reopens; a HomeSuite frame leaves that alone.
+		if (!homeSuiteMode) setActiveDraftId(id);
 
 		title = '';
 		pockets = [];
@@ -1581,7 +1623,7 @@
 
 <DraftsModal
 	bind:open={draftsOpen}
-	drafts={draftsList}
+	drafts={shelvedDrafts}
 	{currentDraftId}
 	backlinkCounts={draftBacklinkCounts}
 	statuses={draftStatuses}
@@ -1617,6 +1659,13 @@
 	<p class="handoff-notice" aria-live="polite">
 		{notice}
 		<button type="button" onclick={() => (notice = '')} aria-label="dismiss">×</button>
+	</p>
+{/if}
+
+{#if currentInTrash}
+	<p class="trash-notice" role="status">
+		This draft is in HomeSuite’s Trash.
+		<button type="button" onclick={restoreCurrentDraft}>Restore</button>
 	</p>
 {/if}
 
@@ -2159,6 +2208,35 @@
 	}
 	.handoff-notice button:hover {
 		opacity: 1;
+	}
+
+	.trash-notice {
+		position: fixed;
+		top: 4.2rem;
+		left: 50%;
+		z-index: 40;
+		transform: translateX(-50%);
+		display: inline-flex;
+		align-items: center;
+		gap: 0.75rem;
+		max-width: calc(100vw - 2rem);
+		margin: 0;
+		padding: 8px 14px;
+		border-radius: 100px;
+		border: 1px solid var(--rule);
+		background: var(--surface);
+		color: var(--text);
+		font-size: 0.8rem;
+		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+	}
+	.trash-notice button {
+		border: 1px solid var(--rule);
+		border-radius: 100px;
+		background: transparent;
+		color: inherit;
+		padding: 3px 10px;
+		font: inherit;
+		cursor: pointer;
 	}
 
 	.reply-breadcrumb {

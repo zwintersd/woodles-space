@@ -46,3 +46,20 @@ jobs:
 
       - name: Build all applications
         run: pnpm build
+
+      # HomeSuite's seams — frames, saves, the bridge — only exist in a browser.
+      # The rest of e2e/ is not CI-ready yet, so this runs HomeSuite's own spec
+      # and its accessibility audit, not the whole suite.
+      - name: Install Chromium for Playwright
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run HomeSuite browser tests
+        run: pnpm exec playwright test e2e/homesuite.spec.ts e2e/accessibility.spec.ts --grep "HomeSuite|homesuite"
+
+      - name: Keep the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: woodles.space/playwright-report
+          retention-days: 7
