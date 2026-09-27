@@ -161,6 +161,7 @@
 		postHomeSuiteState,
 		type HomeSuiteSurfaceState
 	} from '@shared/homesuiteBridge';
+	import { HOMESUITE_TRASH_KEY, isHomeSuiteTrashed } from '@shared/homesuiteTrash';
 
 	const whiteboardHandoffs = createHandoffQueue('whiteboard');
 	import { STACK_BEHAVIORS, SUGGESTED_STATUSES, TINTS, type Label, type StackBehavior, type Tint } from '$lib/model';
@@ -247,6 +248,7 @@
 	let pointerMoveFrame = 0;
 	let queuedPointerMove: PointerMove | null = null;
 	let loaded = $state(false);
+	let trashRevision = $state(0);
 	let dirty = false;
 	const pendingAssetDeletes = new Set<string>();
 	const homeSuiteEmbedded = typeof window !== 'undefined' &&
@@ -348,6 +350,10 @@
 	const crumbs = $derived(breadcrumbs(trail, board, board.camera, viewportSize));
 	const results = $derived(searchOpen && searchText.trim() ? searchBoard(board, searchText) : []);
 	const matchIds = $derived(new Set(results.map((hit) => hit.item.id)));
+	function boardIsInTrash(id: string): boolean {
+		void trashRevision;
+		return isHomeSuiteTrashed({ app: 'whiteboard', kind: 'board', id });
+	}
 
 	function homeSuiteInspector(): HomeSuiteSurfaceState['inspector'] {
 		if (chosen.length === 1) {
@@ -366,7 +372,7 @@
 				actions: [
 					{ commandId: 'inspect', label: 'Edit details' },
 					{ commandId: 'duplicate-selection', label: 'Duplicate', enabled: item.type !== 'connector' },
-					{ commandId: 'delete-selection', label: 'Delete' }
+					{ commandId: 'delete-selection', label: item.type === 'portal' ? 'Remove from board' : 'Delete board item' }
 				]
 			};
 		}
@@ -376,7 +382,7 @@
 			actions: [
 				{ commandId: 'inspect', label: 'Edit details' },
 				{ commandId: 'duplicate-selection', label: 'Duplicate', enabled: chosen.some((item) => item.type !== 'connector') },
-				{ commandId: 'delete-selection', label: 'Delete' }
+				{ commandId: 'delete-selection', label: chosen.length === 1 && only?.type === 'portal' ? 'Remove from board' : chosen.length === 1 ? 'Delete board item' : 'Remove selected items from board' }
 			]
 		};
 		return {
@@ -413,7 +419,7 @@
 				{ id: 'fit-board', label: 'Fit board', shortcut: '0' },
 				{ id: 'inspect', label: 'Inspect selection', shortcut: 'I', enabled: chosen.length > 0 },
 				{ id: 'duplicate-selection', label: 'Duplicate selection', shortcut: '⌘D', enabled: chosen.length > 0 },
-				{ id: 'delete-selection', label: 'Delete selection', enabled: chosen.length > 0 },
+				{ id: 'delete-selection', label: chosen.length === 1 && only?.type === 'portal' ? 'Remove portal from board' : chosen.length === 1 ? 'Delete board item' : 'Remove selected items from board', enabled: chosen.length > 0 },
 				{ id: 'play-journey', label: 'Play journey', enabled: stops.length > 0 }
 			],
 			canUndo: canUndo(editHistory),
@@ -774,10 +780,13 @@
 		window.addEventListener('beforeunload', onBeforeUnload);
 		window.addEventListener('resize', measureViewport);
 		window.addEventListener('message', handleHomeSuiteMessage);
+		const onTrashChange = (event: StorageEvent) => { if (event.key === HOMESUITE_TRASH_KEY || event.key === null) trashRevision += 1; };
+		window.addEventListener('storage', onTrashChange);
 		return () => {
 			window.removeEventListener('beforeunload', onBeforeUnload);
 			window.removeEventListener('resize', measureViewport);
 			window.removeEventListener('message', handleHomeSuiteMessage);
+			window.removeEventListener('storage', onTrashChange);
 			saveNow();
 		};
 	});
@@ -1290,6 +1299,7 @@
 
 	function deleteSelection() {
 		if (!selectedIds.length) return;
+		const removingPortals = board.items.filter((item) => selectedIds.includes(item.id) && item.type === 'portal').length;
 		beginEdit();
 		const selected = new Set(selectedIds);
 		const imageAssets = board.items
@@ -1307,6 +1317,7 @@
 			pendingAssetDeletes.add(assetId);
 		}
 		scheduleSave();
+		notice = removingPortals === selectedIds.length ? 'Portal removed from board. Undo to restore it.' : removingPortals ? 'Selected items removed from board. Undo to restore them.' : 'Board item deleted. Undo to restore it.';
 	}
 
 	function duplicateSelection() {
@@ -2690,6 +2701,8 @@
 					<div class="portal-pane" aria-hidden="true">
 						{#if preview?.missing}
 							<p class="portal-gone">this board is gone</p>
+						{:else if boardIsInTrash(item.boardId)}
+							<p class="portal-trashed">{preview?.title || doorLabel(item)} · in Trash</p>
 						{:else if preview?.marks.length}
 							{#each preview.marks as mark (mark.id)}
 								{@const box = projection.project(mark.bounds)}
@@ -4056,6 +4069,7 @@
 	.portal-gone,
 	.portal-empty { margin: 0; padding: 0 10px; height: 100%; display: grid; place-content: center; text-align: center; font-size: 11px; font-style: italic; }
 	.portal-gone { color: #a45554; }
+	.portal-trashed { margin: 0; padding: 8px; color: #8b6d5d; text-align: center; font: 11px/1.4 var(--font-mono); }
 	.portal-empty { color: #a89a93; }
 
 	.portal-foot { display: flex; align-items: center; gap: 4px; height: 36px; flex: none; }

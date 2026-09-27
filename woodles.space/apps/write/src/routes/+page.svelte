@@ -3,6 +3,7 @@
 	import { fly, slide, fade } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
 	import { HOMESUITE_CHANNEL, isHomeSuiteShellMessage, postHomeSuitePaletteRequest, postHomeSuiteState } from '@shared/homesuiteBridge';
+	import { isHomeSuiteTrashed } from '@shared/homesuiteTrash';
 	import Topbar from '$lib/Topbar.svelte';
 	import BottomBar from '$lib/BottomBar.svelte';
 	import EditorToolbar from '$lib/EditorToolbar.svelte';
@@ -287,6 +288,16 @@
 	function stampLiveAnchors() {
 		if (!fgEl) return;
 		ensureAnchorsOn(fgEl.querySelectorAll(ANCHOR_BLOCK_SELECTOR));
+		markTrashedReferences();
+	}
+
+	function markTrashedReferences() {
+		if (!fgEl) return;
+		for (const anchor of fgEl.querySelectorAll<HTMLAnchorElement>('a[data-ref-app][data-ref-kind][data-ref-id]')) {
+			const trashed = isHomeSuiteTrashed({ app: anchor.dataset.refApp!, kind: anchor.dataset.refKind!, id: anchor.dataset.refId! });
+			if (trashed) anchor.dataset.inTrash = 'true';
+			else delete anchor.dataset.inTrash;
+		}
 	}
 
 	// ── multi-doc storage ──
@@ -647,6 +658,7 @@
 		scheduleMeasure();
 
 		window.addEventListener('resize', onResize);
+		window.addEventListener('storage', markTrashedReferences);
 		document.addEventListener('selectionchange', onSelectionChange);
 		watchWrapWidth();
 	});
@@ -654,6 +666,7 @@
 	onDestroy(() => {
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('resize', onResize);
+			window.removeEventListener('storage', markTrashedReferences);
 			window.removeEventListener('message', onHomeSuiteMessage);
 			window.removeEventListener('keydown', onHomeSuiteKeydown, true);
 			window.removeEventListener('pagehide', flushHomeSuiteSave);
@@ -2217,6 +2230,11 @@
 		text-decoration: none;
 		border-bottom: 1px dotted color-mix(in srgb, currentColor 45%, transparent);
 		cursor: pointer;
+	}
+	.doc-body :global(a[data-in-trash="true"]::after) {
+		content: " · in Trash";
+		color: #9a6a5d;
+		font-size: .82em;
 	}
 
 	.doc-body :global(a[data-ref-id]:hover) {

@@ -9,12 +9,14 @@
 	} from '@shared/homesuiteBridge';
 	import {
 		listArtifacts,
+		listTrashedArtifacts,
 		prepareSurfaceStorage,
 		surfaceFor,
 		surfaces,
 		type HomeSuiteArtifact,
 		type HomeSuiteSurfaceAdapter
 	} from '$lib/surfaces';
+	import { moveHomeSuiteArtifactToTrash, restoreHomeSuiteArtifact, forgetHomeSuiteArtifact } from '@shared/homesuiteTrash';
 	import './homesuite.css';
 	import type { CollectionTemplate } from '../../../data/src/lib/collections';
 
@@ -29,6 +31,10 @@
 	let artifacts = $state<HomeSuiteArtifact[]>([]);
 	let ready = $state(false);
 	let filter = $state<Filter>('all');
+	let showingTrash = $state(false);
+	let trashed = $state<ReturnType<typeof listTrashedArtifacts>>([]);
+	let actionIssue = $state('');
+	let permanentConfirmation = $state('');
 	let search = $state('');
 	let newOpen = $state(false);
 	let collectionCreateOpen = $state(false);
@@ -59,6 +65,7 @@
 	const paletteItems = $derived.by((): PaletteItem[] => {
 		const shell: PaletteItem[] = [
 			{ id: 'shell:index', label: 'Go to HomeSuite', detail: 'Navigation', enabled: true, run: showIndex },
+			{ id: 'shell:trash', label: 'Open Trash', detail: 'HomeSuite', enabled: true, run: showTrash },
 			...surfaces.map((surface) => ({
 				id: `shell:new:${surface.kind}`,
 				label: `New ${surface.label.toLowerCase()}`,
@@ -70,6 +77,7 @@
 		if (!activeArtifact) return shell;
 		return [
 			...shell,
+			{ id: 'shell:move-trash', label: 'Move to Trash', detail: 'HomeSuite artifact', enabled: true, run: moveActiveToTrash },
 			{ id: 'shell:inspect', label: inspectorOpen ? 'Hide inspector' : 'Show inspector', detail: 'View', enabled: true, run: () => { inspectorOpen = !inspectorOpen; } },
 		...(activeState?.commands ?? []).map((command) => ({
 				id: `surface:${command.id}`,
@@ -86,6 +94,35 @@
 
 	function refresh(): void {
 		artifacts = listArtifacts();
+		trashed = listTrashedArtifacts();
+	}
+
+	function moveActiveToTrash(): void {
+		if (!activeArtifact) return;
+		moveHomeSuiteArtifactToTrash(activeArtifact);
+		actionIssue = '';
+		showIndex();
+	}
+
+	function restoreArtifact(entry: (typeof trashed)[number]): void {
+		restoreHomeSuiteArtifact(entry.ref);
+		refresh();
+	}
+
+	async function permanentlyDelete(entry: (typeof trashed)[number]): Promise<void> {
+		const key = `${entry.ref.app}:${entry.ref.kind}:${entry.ref.id}`;
+		if (permanentConfirmation !== key) { permanentConfirmation = key; return; }
+		const owner = surfaceFor(entry.kind);
+		if (!owner) return;
+		try {
+			await owner.permanentlyDelete(entry.ref.id);
+			forgetHomeSuiteArtifact(entry.ref);
+			permanentConfirmation = '';
+			actionIssue = '';
+			refresh();
+		} catch (error) {
+			actionIssue = error instanceof Error ? error.message : 'Could not delete this artifact permanently.';
+		}
 	}
 
 	function artifactUrl(artifact: HomeSuiteArtifact): string {
@@ -103,8 +140,15 @@
 		newOpen = false;
 		paletteOpen = false;
 		surfaceState = null;
+		showingTrash = false;
 		refresh();
 		void goto('/homesuite', { noScroll: true });
+	}
+
+	function showTrash(): void {
+		showIndex();
+		showingTrash = true;
+		refresh();
 	}
 
 	function create(surface: HomeSuiteSurfaceAdapter, template?: CollectionTemplate): void {
@@ -235,6 +279,7 @@
 			<button class="toolbar-button palette-trigger" onclick={openPalette} title="Commands (Ctrl/⌘ K)">⌕ <span>Commands</span><kbd>⌘ K</kbd></button>
 			{#if activeArtifact}
 				<button class="toolbar-button inspector-trigger" class:pressed={inspectorOpen} aria-label={inspectorOpen ? 'Hide inspector' : 'Show inspector'} aria-pressed={inspectorOpen} onclick={() => { inspectorOpen = !inspectorOpen; }}>☷ <span>Inspector</span></button>
+				<button class="toolbar-button trash-trigger" onclick={moveActiveToTrash}>Move to Trash</button>
 			{/if}
 			<div class="new-wrap">
 				<button class="new-button" aria-expanded={newOpen} onclick={() => { newOpen = !newOpen; }}>＋ New <span aria-hidden="true">⌄</span></button>
@@ -305,15 +350,17 @@
 				</aside>
 			{/if}
 		</div>
-	{:else if requestedId && ready}
+		{:else if requestedId && ready}
 		<main class="missing-artifact"><span>Nothing at that address</span><h1>This {requestedKind || 'thing'} is not in your HomeSuite yet.</h1><button onclick={showIndex}>Back to HomeSuite</button></main>
 	{:else}
 		<main class="suite-index">
-			<div class="index-heading">
-				<div><div class="eyebrow">YOUR WORKSPACE</div><h1>All your things, <em>within reach.</em></h1><p>Documents, boards, and Collections share one place to begin. Each opens in the surface made for it.</p></div>
-				<div class="index-count"><strong>{artifacts.length}</strong><span>things in HomeSuite</span></div>
+				<div class="index-heading">
+					<div><div class="eyebrow">{showingTrash ? 'HOME SUITE TRASH' : 'YOUR WORKSPACE'}</div><h1>{showingTrash ? 'A little room to reconsider.' : 'All your things, <em>within reach.</em>'}</h1><p>{showingTrash ? 'Trashed items keep their identity and contents until you restore or permanently delete them.' : 'Documents, boards, and Collections share one place to begin. Each opens in the surface made for it.'}</p></div>
+					<div class="index-count"><strong>{showingTrash ? trashed.length : artifacts.length}</strong><span>{showingTrash ? 'things in Trash' : 'things in HomeSuite'}</span></div>
 			</div>
-			<div class="index-toolbar">
+				<div class="index-toolbar">
+					<nav class="index-views" aria-label="HomeSuite views"><button class:active={!showingTrash} onclick={() => { showingTrash = false; }}>Workspace</button><button class:active={showingTrash} onclick={() => { showingTrash = true; }}>Trash <span>{trashed.length}</span></button></nav>
+					{#if !showingTrash}
 				<div class="filters" aria-label="Filter artifacts">
 					<button class:active={filter === 'all'} onclick={() => { filter = 'all'; }}>All <span>{artifacts.length}</span></button>
 					<button class:active={filter === 'document'} onclick={() => { filter = 'document'; }}>Documents <span>{counts.document}</span></button>
@@ -321,8 +368,28 @@
 					<button class:active={filter === 'collection'} onclick={() => { filter = 'collection'; }}>Collections <span>{counts.collection}</span></button>
 				</div>
 				<label class="index-search"><span aria-hidden="true">⌕</span><input bind:value={search} aria-label="Find a thing" placeholder="Find a thing" /></label>
+					{/if}
 			</div>
-			{#if filtered.length}
+				{#if actionIssue}<div class="trash-issue" role="alert">{actionIssue}</div>{/if}
+				{#if showingTrash && trashed.length}
+					<div class="artifact-list" aria-label="Trashed artifacts">
+						{#each trashed as entry (entry.ref.app + entry.ref.id)}
+							<div class="artifact-row trash-row">
+								<span class="artifact-icon {entry.kind}" aria-hidden="true">{entry.kind === 'document' ? '¶' : entry.kind === 'board' ? '▧' : '▦'}</span>
+								<span class="artifact-copy"><strong>{entry.title}</strong><small>{entry.kind} · moved {formatDate(entry.trashedAt)}</small></span>
+								<button class="trash-action" onclick={() => restoreArtifact(entry)}>Restore</button>
+								{#if permanentConfirmation === `${entry.ref.app}:${entry.ref.kind}:${entry.ref.id}`}
+									<button class="trash-action permanent" onclick={() => permanentlyDelete(entry)}>Confirm permanent deletion</button>
+									<button class="trash-action" onclick={() => permanentConfirmation = ''}>Cancel</button>
+								{:else}
+									<button class="trash-action permanent" onclick={() => permanentlyDelete(entry)}>Delete permanently</button>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				{:else if showingTrash}
+					<div class="empty-list"><span>✳</span><h2>Trash is empty.</h2><p>Top-level documents, boards, and Collections you move to Trash will appear here.</p></div>
+				{:else if filtered.length}
 				<div class="artifact-list" aria-label="Recent artifacts">
 					{#each filtered as artifact (artifact.ref.app + artifact.ref.id)}
 						<button class="artifact-row" onclick={() => openArtifact(artifact)}>

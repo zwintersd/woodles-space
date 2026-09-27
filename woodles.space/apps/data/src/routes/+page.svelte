@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { entityHref } from '@woodles/app-manifest';
 	import { isHomeSuiteShellMessage, postHomeSuitePaletteRequest, postHomeSuiteState, type HomeSuiteSurfaceState, type WoodlesRef } from '@shared/homesuiteBridge';
+	import { HOMESUITE_TRASH_KEY, isHomeSuiteTrashed } from '@shared/homesuiteTrash';
 	import { candidatesFor, refreshReferenceSources, shelfSource, type ReferenceCandidate } from '../../../write/src/lib/references.svelte';
 	import { mergePulledRows, pullCollectionSources } from '$lib/sourceSync';
 	import {
@@ -34,6 +35,7 @@
 	let syncBusy = $state(false);
 	let pickerLoading = $state(false);
 	let sourceStatus = $state('');
+	let trashRevision = $state(0);
 	function cloneJson<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
 
 	const collectionId = $derived(page.url.searchParams.get('collection'));
@@ -76,6 +78,14 @@
 		publishState();
 	}
 
+	function flushPendingSave(): void {
+		if (!saveTimer) return;
+		clearTimeout(saveTimer);
+		saveTimer = null;
+		const result = saveCollections(library);
+		saveIssue = result.ok ? '' : result.issue?.message ?? 'Could not save this Collection.';
+	}
+
 	function setText(recordId: string, fieldId: string, value: string): void {
 		const key = `${recordId}:${fieldId}`;
 		if (lastTextKey !== key || !textBurstTimer) {
@@ -93,6 +103,11 @@
 		selectedCell = { recordId, fieldId: field.id };
 		selectedRecord = recordId;
 		updateLibrary(setCellValue(collection, recordId, field.id, value));
+	}
+
+	function removeRelation(recordId: string, field: CollectionField): void {
+		if (!collection) return;
+		updateLibrary(setCellValue(collection, recordId, field.id, null));
 	}
 
 	function undo(): void {
@@ -123,6 +138,12 @@
 
 	function sourceCandidate(ref: WoodlesRef): ReferenceCandidate | null {
 		return refs.find((entry) => entry.app === ref.app && entry.kind === ref.kind && entry.id === ref.id) ?? null;
+	}
+
+	function referenceLabel(ref: WoodlesRef): string {
+		void trashRevision;
+		const label = sourceCandidate(ref)?.text ?? 'Unavailable reference';
+		return isHomeSuiteTrashed(ref) ? `${label} · in Trash` : label;
 	}
 
 	function openSource(ref: WoodlesRef): void {
@@ -162,6 +183,7 @@
 		if (id === 'record:new') addNewRecord();
 		else if (id === 'field:new') { addFieldOpen = true; }
 		else if (id === 'record:delete' && collection && selectedRecord) { updateLibrary(removeRecord(collection, selectedRecord)); selectedRecord = ''; }
+		else if (id === 'relation:remove' && collection && selectedCell) { const field = collection.fields.find((entry) => entry.id === selectedCell?.fieldId); if (field?.type === 'relation') removeRelation(selectedCell.recordId, field); }
 		else if (id === 'record:duplicate' && collection && selectedRecord) { updateLibrary(duplicateRecord(collection, selectedRecord)); }
 		else if (id === 'field:delete') deleteSelectedField();
 		else if (id === 'collection:rename' && collection) { const title = window.prompt('Collection name', collection.title); if (title?.trim()) { const next = { ...collection, title: title.trim(), updatedAt: new Date().toISOString() }; updateLibrary(next); } }
@@ -258,7 +280,8 @@
 			...(collection.sources?.length ? [{ id: 'source:sync', label: 'Refresh connected sources' }] : []),
 			{ id: 'collection:rename', label: 'Rename collection' }, { id: 'collection:export', label: 'Export collection' },
 			{ id: 'record:duplicate', label: 'Duplicate record', enabled: !!selectedRecord },
-			{ id: 'record:delete', label: 'Delete record', enabled: !!selectedRecord },
+			{ id: 'record:delete', label: activeRecord?.sourceRef ? 'Remove from collection' : 'Delete record', enabled: !!selectedRecord },
+			{ id: 'relation:remove', label: 'Remove reference', enabled: !!selectedCell && collection.fields.some((field) => field.id === selectedCell?.fieldId && field.type === 'relation') && isRef(activeRecord?.values[selectedCell?.fieldId ?? ''] ?? null) },
 			{ id: 'field:delete', label: 'Delete field', enabled: !!activeField && !activeField.primary },
 			{ id: 'source:open', label: 'Open source', enabled: !!activeRecord?.sourceRef },
 			{ id: 'reference:add', label: 'Add Woodles reference' }
@@ -267,7 +290,7 @@
 			artifact: { id: collection.id, kind: 'collection', title: collection.title }, selection: selected,
 			inspector: { title: activeField?.name ?? (activeRecord ? primaryLabel(activeRecord) : collection.title), rows,
 				controls: activeField ? [{ id: 'field:name', label: 'Field name', value: activeField.name }, { id: 'field:type', label: 'Type', value: activeField.primary ? 'Primary · Text' : activeField.type }, ...(activeField.config?.options ?? []).map((option, index) => ({ id: `option:${option.id}`, label: `Option ${index + 1}`, value: option.label }))] : undefined,
-				actions: activeField && !activeField.primary ? [{ commandId: 'field:delete', label: 'Delete field' }] : activeRecord?.sourceRef ? [{ commandId: 'source:open', label: 'Open source' }, { commandId: 'record:delete', label: 'Remove from collection' }] : [] },
+				actions: activeField && !activeField.primary ? [{ commandId: 'field:delete', label: 'Delete field' }] : activeRecord?.sourceRef ? [{ commandId: 'source:open', label: 'Open source' }, { commandId: 'record:delete', label: 'Remove from collection' }] : activeRecord ? [{ commandId: 'record:delete', label: 'Delete record' }] : [] },
 			modes: [], activeMode: 'table', commands, canUndo: undoStack.length > 0, canRedo: redoStack.length > 0
 		};
 		postHomeSuiteState(state);
@@ -334,20 +357,30 @@
 		if (collection?.records.some((record) => record.sourceRef?.app === 'bestiary' || record.sourceRef?.app === 'marginalia')) void refreshPickerSources();
 		window.addEventListener('message', onShellMessage);
 		window.addEventListener('keydown', globalKeydown);
+		const onTrashChange = (event: StorageEvent) => { if (event.key === HOMESUITE_TRASH_KEY || event.key === null) trashRevision += 1; };
+		window.addEventListener('storage', onTrashChange);
 		if (collection?.sources?.length) {
 			void syncSources();
 			const interval = window.setInterval(() => { if (document.visibilityState === 'visible') void syncSources(); }, 60_000);
 			const refreshOnFocus = () => { if (document.visibilityState === 'visible') void syncSources(); };
 			window.addEventListener('focus', refreshOnFocus);
 			window.addEventListener('visibilitychange', refreshOnFocus);
-			return () => { window.removeEventListener('message', onShellMessage); window.removeEventListener('keydown', globalKeydown); window.removeEventListener('focus', refreshOnFocus); window.removeEventListener('visibilitychange', refreshOnFocus); window.clearInterval(interval); if (saveTimer) clearTimeout(saveTimer); };
+			return () => { window.removeEventListener('message', onShellMessage); window.removeEventListener('keydown', globalKeydown); window.removeEventListener('storage', onTrashChange); window.removeEventListener('focus', refreshOnFocus); window.removeEventListener('visibilitychange', refreshOnFocus); window.clearInterval(interval); flushPendingSave(); };
 		}
-		return () => { window.removeEventListener('message', onShellMessage); window.removeEventListener('keydown', globalKeydown); if (saveTimer) clearTimeout(saveTimer); };
+		return () => { window.removeEventListener('message', onShellMessage); window.removeEventListener('keydown', globalKeydown); window.removeEventListener('storage', onTrashChange); flushPendingSave(); };
 	});
 
 	function globalKeydown(event: KeyboardEvent): void {
 		if (event.key === 'Escape') { pickerFor = null; addFieldOpen = false; }
 		if (event.key === 'F2' && collection) { event.preventDefault(); addFieldOpen = true; }
+		if ((event.key === 'Delete' || event.key === 'Backspace') && collection && selectedRecord) {
+			const target = event.target as HTMLElement | null;
+			if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+			event.preventDefault();
+			const selectedRelation = selectedCell && collection.fields.find((field) => field.id === selectedCell?.fieldId);
+			if (selectedRelation?.type === 'relation' && isRef(activeRecord?.values[selectedRelation.id] ?? null)) command('relation:remove');
+			else command('record:delete');
+		}
 	}
 </script>
 
@@ -378,7 +411,7 @@
 						{@const value = fieldValue(record, field)}
 						<td class:primary-cell={field.primary} class:active-cell={selectedCell?.recordId === record.id && selectedCell.fieldId === field.id} data-cell={`${record.id}:${field.id}`} onclick={() => { selectedRecord = record.id; selectedField = ''; selectedCell = { recordId: record.id, fieldId: field.id }; publishState(); }}>
 							{#if record.sourceRef && field.primary}
-								<button class="source-value" title={sourceCandidate(record.sourceRef)?.text ?? 'Unavailable source'} onclick={(event) => { event.stopPropagation(); selectedRecord = record.id; selectedField = ''; publishState(); }}>{sourceCandidate(record.sourceRef)?.text ?? 'Unavailable source'}{#if !sourceCandidate(record.sourceRef)} <span class="cold">cold</span>{/if}</button>
+								<button class="source-value" title={referenceLabel(record.sourceRef)} onclick={(event) => { event.stopPropagation(); selectedRecord = record.id; selectedField = ''; publishState(); }}>{referenceLabel(record.sourceRef)}{#if !sourceCandidate(record.sourceRef)} <span class="cold">cold</span>{/if}</button>
 							{:else if field.type === 'text' || field.type === 'url'}
 								<input aria-label={`${field.name}, ${primaryLabel(record)}`} value={typeof value === 'string' ? value : ''} placeholder={field.primary ? 'Name this record' : '—'} readonly={!!field.sourceKey} title={field.sourceKey ? 'Synced from its source app' : undefined} onfocus={() => { selectedRecord = record.id; selectedField = ''; selectedCell = { recordId: record.id, fieldId: field.id }; publishState(); }} oninput={(event) => setText(record.id, field.id, event.currentTarget.value)} onkeydown={(event) => cellKeydown(event, rowIndex, colIndex, record.id, field.id)} />
 								{#if field.type === 'url' && typeof value === 'string' && value}<a class="url-open" href={value} target="_blank" rel="noreferrer" aria-label={`Open ${value}`} onclick={(event) => event.stopPropagation()}>↗</a>{/if}
@@ -393,7 +426,7 @@
 							{:else if field.type === 'multi-select'}
 								<select multiple aria-label={`${field.name}, ${primaryLabel(record)}`} value={Array.isArray(value) ? value : []} onchange={(event) => mutateCell(record.id, field, Array.from(event.currentTarget.selectedOptions).map((option) => option.value))}>{#each field.config?.options ?? [] as option}<option value={option.id}>{option.label}</option>{/each}</select>
 							{:else if field.type === 'relation'}
-								<button class="relation-cell" aria-label={`Set ${field.name} relation`} onclick={(event) => { event.stopPropagation(); pickerFor = { recordId: record.id, fieldId: field.id }; pickerQuery = ''; selectedRecord = record.id; selectedField = ''; publishState(); }}>{isRef(value) ? sourceCandidate(value)?.text ?? 'Unavailable reference' : '＋ Add relation'}</button>
+								<div class="relation-wrap"><button class="relation-cell" aria-label={`Set ${field.name} relation`} onclick={(event) => { event.stopPropagation(); pickerFor = { recordId: record.id, fieldId: field.id }; pickerQuery = ''; selectedRecord = record.id; selectedField = ''; selectedCell = { recordId: record.id, fieldId: field.id }; publishState(); }}>{isRef(value) ? referenceLabel(value) : '＋ Add relation'}</button>{#if isRef(value)}<button class="remove-reference" aria-label="Remove reference" title="Remove reference" onclick={(event) => { event.stopPropagation(); selectedRecord = record.id; selectedCell = { recordId: record.id, fieldId: field.id }; removeRelation(record.id, field); }}>×</button>{/if}</div>
 							{/if}
 						</td>
 					{/each}
