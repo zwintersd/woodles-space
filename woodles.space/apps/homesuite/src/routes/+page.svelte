@@ -355,7 +355,7 @@
 	{:else}
 		<main class="suite-index">
 				<div class="index-heading">
-					<div><div class="eyebrow">{showingTrash ? 'HOME SUITE TRASH' : 'YOUR WORKSPACE'}</div><h1>{showingTrash ? 'A little room to reconsider.' : 'All your things, <em>within reach.</em>'}</h1><p>{showingTrash ? 'Trashed items keep their identity and contents until you restore or permanently delete them.' : 'Documents, boards, and Collections share one place to begin. Each opens in the surface made for it.'}</p></div>
+					<div><div class="eyebrow">{showingTrash ? 'HOME SUITE TRASH' : 'YOUR WORKSPACE'}</div><h1>{#if showingTrash}A little room to reconsider.{:else}All your things, <em>within reach.</em>{/if}</h1><p>{showingTrash ? 'Trashed items keep their identity and contents until you restore or permanently delete them.' : 'Documents, boards, and Collections share one place to begin. Each opens in the surface made for it.'}</p></div>
 					<div class="index-count"><strong>{showingTrash ? trashed.length : artifacts.length}</strong><span>{showingTrash ? 'things in Trash' : 'things in HomeSuite'}</span></div>
 			</div>
 				<div class="index-toolbar">
