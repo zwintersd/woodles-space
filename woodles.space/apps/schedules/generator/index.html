@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en" data-theme="cream">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#fbf7ed" />
+  <title>Weekly planner · Schedule studio</title>
+  <link rel="stylesheet" href="/shared/fonts.css" />
+  <link rel="stylesheet" href="/shared/palette.css" />
+  <link rel="stylesheet" href="/schedules/generator/styles.css" />
+  <script src="/schedules/generator/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="wordmark" href="/schedules"><span class="wordmark-icon" aria-hidden="true">▦</span><span>Schedule studio</span></a>
+    <span class="save-status" id="saveStatus" role="status">Saved on this device</span>
+  </header>
+  <main id="app" class="app-main"></main>
+  <dialog id="planDialog" class="dialog">
+    <form id="planForm" method="dialog">
+      <div class="dialog-heading"><div><span class="eyebrow">New plan</span><h2>Start with a learner</h2></div><button class="icon-button" type="button" data-close-dialog aria-label="Close">×</button></div>
+      <p class="muted">This creates a blank seven-day plan. Add sessions and activities only where you need them.</p>
+      <label class="field"><span>Learner label</span><input name="learner" maxlength="80" placeholder="Name, initials, or your own label" required autocomplete="off" /></label>
+      <label class="field"><span>Plan name</span><input name="name" maxlength="80" value="Weekly plan" required /></label>
+      <div class="dialog-actions"><button class="button secondary" type="button" data-close-dialog>Cancel</button><button class="button primary" type="submit">Create blank plan</button></div>
+    </form>
+  </dialog>
+  <dialog id="activityDialog" class="dialog activity-dialog">
+    <div id="activityDialogBody"></div>
+  </dialog>
+  <input id="importFile" type="file" accept="application/json,.json" hidden />
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
