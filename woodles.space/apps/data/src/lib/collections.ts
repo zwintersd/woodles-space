@@ -33,6 +33,7 @@ export type Collection = {
 	createdAt: string;
 	updatedAt: string;
 	sources?: CollectionSource[];
+	/** When a source pull last changed this Collection — not every time one ran. */
 	sourceSyncedAt?: string;
 	/** Source-backed rows the user removed here; sync must not re-add them. */
 	excludedRefs?: WoodlesRef[];

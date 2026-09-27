@@ -776,14 +776,20 @@
 		void hydrateImages();
 		drainHandoffs();
 
-		const onBeforeUnload = () => saveNow();
-		window.addEventListener('beforeunload', onBeforeUnload);
+		// `pagehide`, not `beforeunload`: HomeSuite closes a board by removing its
+		// frame, which never fires `beforeunload`, and the pending save would go
+		// with it. A hidden tab may never come back, so that saves too.
+		const onPageHide = () => saveNow();
+		const onVisibilityChange = () => { if (document.visibilityState === 'hidden') saveNow(); };
+		window.addEventListener('pagehide', onPageHide);
+		document.addEventListener('visibilitychange', onVisibilityChange);
 		window.addEventListener('resize', measureViewport);
 		window.addEventListener('message', handleHomeSuiteMessage);
 		const onTrashChange = (event: StorageEvent) => { if (event.key === HOMESUITE_TRASH_KEY || event.key === null) trashRevision += 1; };
 		window.addEventListener('storage', onTrashChange);
 		return () => {
-			window.removeEventListener('beforeunload', onBeforeUnload);
+			window.removeEventListener('pagehide', onPageHide);
+			document.removeEventListener('visibilitychange', onVisibilityChange);
 			window.removeEventListener('resize', measureViewport);
 			window.removeEventListener('message', handleHomeSuiteMessage);
 			window.removeEventListener('storage', onTrashChange);

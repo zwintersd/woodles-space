@@ -199,20 +199,23 @@
 		try {
 			const rows = await pullCollectionSources(collection.sources);
 			if (!collection) return;
-			const syncedAt = new Date().toISOString();
-			const next = mergePulledRows(collection, rows, syncedAt);
-			const nextLibrary = { collections: library.collections.map((item) => item.id === next.id ? next : item) };
-			const saved = saveCollections(nextLibrary);
-			if (!saved.ok) {
-				saveIssue = saved.issue?.message ?? 'Could not refresh source data.';
-				sourceStatus = 'Refresh failed';
-				return;
+			const next = mergePulledRows(collection, rows);
+			// An unchanged pull saves nothing, so a Collection that is only being
+			// looked at keeps its place in HomeSuite's recent order.
+			if (next !== collection) {
+				const nextLibrary = { collections: library.collections.map((item) => item.id === next.id ? next : item) };
+				const saved = saveCollections(nextLibrary);
+				if (!saved.ok) {
+					saveIssue = saved.issue?.message ?? 'Could not refresh source data.';
+					sourceStatus = 'Refresh failed';
+					return;
+				}
+				collection = next;
+				library = nextLibrary;
+				saveIssue = '';
 			}
-			collection = next;
-			library = nextLibrary;
 			const pulledRefs = rows.map((row) => ({ app: row.ref.app, kind: row.ref.kind, id: row.ref.id, text: row.label, hint: row.hint }));
 			refs = [...candidatesFor('#', ''), ...pulledRefs.filter((row) => row.app !== 'thinking-about' && row.app !== 'write')];
-			saveIssue = '';
 			sourceStatus = rows.length ? `Refreshed ${rows.length} source records` : 'No source records found on this device';
 			publishState();
 		} catch {
@@ -359,15 +362,28 @@
 		window.addEventListener('keydown', globalKeydown);
 		const onTrashChange = (event: StorageEvent) => { if (event.key === HOMESUITE_TRASH_KEY || event.key === null) trashRevision += 1; };
 		window.addEventListener('storage', onTrashChange);
+		// HomeSuite closes a Collection by removing its frame, which never runs the
+		// cleanup below; `pagehide` still fires, so the pending save lands.
+		const flushWhenHidden = () => { if (document.visibilityState === 'hidden') flushPendingSave(); };
+		window.addEventListener('pagehide', flushPendingSave);
+		document.addEventListener('visibilitychange', flushWhenHidden);
+		const teardown = () => {
+			window.removeEventListener('message', onShellMessage);
+			window.removeEventListener('keydown', globalKeydown);
+			window.removeEventListener('storage', onTrashChange);
+			window.removeEventListener('pagehide', flushPendingSave);
+			document.removeEventListener('visibilitychange', flushWhenHidden);
+			flushPendingSave();
+		};
 		if (collection?.sources?.length) {
 			void syncSources();
 			const interval = window.setInterval(() => { if (document.visibilityState === 'visible') void syncSources(); }, 60_000);
 			const refreshOnFocus = () => { if (document.visibilityState === 'visible') void syncSources(); };
 			window.addEventListener('focus', refreshOnFocus);
 			window.addEventListener('visibilitychange', refreshOnFocus);
-			return () => { window.removeEventListener('message', onShellMessage); window.removeEventListener('keydown', globalKeydown); window.removeEventListener('storage', onTrashChange); window.removeEventListener('focus', refreshOnFocus); window.removeEventListener('visibilitychange', refreshOnFocus); window.clearInterval(interval); flushPendingSave(); };
+			return () => { window.removeEventListener('focus', refreshOnFocus); window.removeEventListener('visibilitychange', refreshOnFocus); window.clearInterval(interval); teardown(); };
 		}
-		return () => { window.removeEventListener('message', onShellMessage); window.removeEventListener('keydown', globalKeydown); window.removeEventListener('storage', onTrashChange); flushPendingSave(); };
+		return teardown;
 	});
 
 	function globalKeydown(event: KeyboardEvent): void {
