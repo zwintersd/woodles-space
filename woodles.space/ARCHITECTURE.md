@@ -1698,11 +1698,19 @@ SvelteKit app's `tsconfig.json` extends `./.svelte-kit/tsconfig.json`, which
 can't resolve the tsconfig. because the scripts sync first, `pnpm test` works
 straight from a clean checkout.
 
-`write` and `marginalia` load the workspace-level
-`vitest.setup.ts` to install a browser-like in-memory `localStorage` under
-Node. planner keeps its own localStorage mock in `store.test.ts`; under the
-current Node runtime that suite passes but may still print a
-`--localstorage-file` warning.
+`write`, `marginalia`, `planner`, `grimoire`, `bloomforge`, and
+`bloomforge-player` load the workspace-level `vitest.setup.ts`, which installs
+a browser-like in-memory `localStorage` under Node. planner's `store.test.ts`
+still swaps in its own mock on top; under the current Node runtime that suite
+passes but may still print a `--localstorage-file` warning.
+
+the same setup file yields one event-loop turn after every test. vitest runs a
+file's tests back to back as microtasks, and its worker gives up on any RPC
+call that goes 60s without an answer — so a file of pure synchronous work
+(marginalia's `sim.test.ts`: ~40s on a quiet core, 45–90s on CI) could pass
+every test and still fail the run on `Timeout calling "onTaskUpdate"`. with
+the yield, that 60s bounds one test instead of one file. a package with slow
+synchronous tests that doesn't load this setup file needs the same hook.
 
 `thinking-about` gained the SvelteKit plugin in its `vitest.config.ts` for the
 same reason, when its commitments reader became the app's first rune module
