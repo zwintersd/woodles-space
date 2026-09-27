@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import {
 		HOMESUITE_CHANNEL,
 		isHomeSuiteSurfaceMessage,
+		type HomeSuiteArtifactKind,
 		type HomeSuiteSurfaceState
 	} from '@shared/homesuiteBridge';
 	import {
@@ -45,13 +46,26 @@
 	let surfaceState = $state<HomeSuiteSurfaceState | null>(null);
 	let surfaceFrame = $state<HTMLIFrameElement | null>(null);
 	let paletteInput = $state<HTMLInputElement | null>(null);
+	// The mounted frame. Its key changes only when the shell points it somewhere;
+	// a surface that moves on its own keeps its frame (see followSurface).
+	let frame = $state<{ key: number; src: string } | null>(null);
+	// Veiled and inert until the surface reports — a prerendered editor accepts
+	// typing before it has loaded the thing it is showing, then discards it.
+	let frameReady = $state(false);
+	let frameCount = 0;
+	let frameShowing = '';
+	let readyFallback: ReturnType<typeof setTimeout> | undefined;
 
 	const requestedKind = $derived(page.url.searchParams.get('kind'));
 	const requestedId = $derived(page.url.searchParams.get('id'));
 	const adapter = $derived(requestedKind ? surfaceFor(requestedKind) : undefined);
-	const activeArtifact = $derived(
-		adapter && requestedId ? artifacts.find((item) => item.kind === adapter.kind && item.ref.id === requestedId) : undefined
-	);
+	const activeArtifact = $derived.by((): HomeSuiteArtifact | undefined => {
+		if (!adapter || !requestedId) return undefined;
+		const listed = artifacts.find((item) => item.kind === adapter.kind && item.ref.id === requestedId);
+		if (listed) return listed;
+		const binned = trashed.find((entry) => entry.kind === adapter.kind && entry.ref.id === requestedId);
+		return binned && { ref: binned.ref, kind: binned.kind, title: binned.title, updatedAt: binned.updatedAt, inTrash: true };
+	});
 	const activeState = $derived(surfaceState);
 	const filtered = $derived(artifacts.filter((artifact) =>
 		(filter === 'all' || artifact.kind === filter) &&
@@ -77,7 +91,9 @@
 		if (!activeArtifact) return shell;
 		return [
 			...shell,
-			{ id: 'shell:move-trash', label: 'Move to Trash', detail: 'HomeSuite artifact', enabled: true, run: moveActiveToTrash },
+			activeArtifact.inTrash
+				? { id: 'shell:restore', label: 'Restore from Trash', detail: 'HomeSuite artifact', enabled: true, run: restoreActive }
+				: { id: 'shell:move-trash', label: 'Move to Trash', detail: 'HomeSuite artifact', enabled: true, run: moveActiveToTrash },
 			{ id: 'shell:inspect', label: inspectorOpen ? 'Hide inspector' : 'Show inspector', detail: 'View', enabled: true, run: () => { inspectorOpen = !inspectorOpen; } },
 		...(activeState?.commands ?? []).map((command) => ({
 				id: `surface:${command.id}`,
@@ -97,11 +113,63 @@
 		trashed = listTrashedArtifacts();
 	}
 
+	function artifactKey(kind: string, id: string): string {
+		return `${kind}:${id}`;
+	}
+
+	$effect(() => {
+		const target = activeArtifact;
+		const owner = adapter;
+		untrack(() => {
+			if (!target || !owner) {
+				frame = null;
+				frameShowing = '';
+				return;
+			}
+			const key = artifactKey(target.kind, target.ref.id);
+			if (frame && frameShowing === key) return;
+			clearTimeout(readyFallback);
+			surfaceState = null;
+			frameReady = false;
+			frameShowing = key;
+			frame = { key: ++frameCount, src: owner.embedHref(target.ref.id) };
+		});
+	});
+
+	function onFrameLoad(): void {
+		const key = frame?.key;
+		clearTimeout(readyFallback);
+		// A surface that never reports (an older build, a record it cannot find)
+		// should not stay veiled for good.
+		readyFallback = setTimeout(() => { if (frame?.key === key) frameReady = true; }, 3000);
+	}
+
+	/**
+	 * A surface can move on its own — a board's portal opens another board in
+	 * place. What the frame reports is the truth; the address follows it
+	 * without reloading the frame, so Trash, the title, and a reload all land
+	 * on what is on screen.
+	 */
+	function followSurface(reported: { kind: HomeSuiteArtifactKind; id: string }): void {
+		const key = artifactKey(reported.kind, reported.id);
+		if (key === frameShowing) return;
+		frameShowing = key;
+		if (reported.kind === requestedKind && reported.id === requestedId) return;
+		void goto(artifactPath(reported.kind, reported.id), { replaceState: true, noScroll: true, keepFocus: true });
+	}
+
 	function moveActiveToTrash(): void {
-		if (!activeArtifact) return;
-		moveHomeSuiteArtifactToTrash(activeArtifact);
+		if (!activeArtifact || activeArtifact.inTrash) return;
+		const { ref, kind, updatedAt } = activeArtifact;
+		moveHomeSuiteArtifactToTrash({ ref, kind, updatedAt, title: activeState?.artifact.title || activeArtifact.title });
 		actionIssue = '';
 		showIndex();
+	}
+
+	function restoreActive(): void {
+		if (!activeArtifact?.inTrash) return;
+		restoreHomeSuiteArtifact(activeArtifact.ref);
+		refresh();
 	}
 
 	function restoreArtifact(entry: (typeof trashed)[number]): void {
@@ -125,15 +193,15 @@
 		}
 	}
 
-	function artifactUrl(artifact: HomeSuiteArtifact): string {
-		return `/homesuite?kind=${encodeURIComponent(artifact.kind)}&id=${encodeURIComponent(artifact.ref.id)}`;
+	function artifactPath(kind: string, id: string): string {
+		return `/homesuite?kind=${encodeURIComponent(kind)}&id=${encodeURIComponent(id)}`;
 	}
 
 	async function openArtifact(artifact: HomeSuiteArtifact): Promise<void> {
 		newOpen = false;
 		paletteOpen = false;
 		surfaceState = null;
-		await goto(artifactUrl(artifact), { noScroll: true });
+		await goto(artifactPath(artifact.kind, artifact.ref.id), { noScroll: true });
 	}
 
 	function showIndex(): void {
@@ -180,7 +248,10 @@
 		if (message.type === 'state') {
 			if (!message.state?.artifact?.id) return;
 			surfaceState = message.state;
+			frameReady = true;
+			clearTimeout(readyFallback);
 			refresh();
+			followSurface(message.state.artifact);
 		} else if (message.type === 'request-palette') {
 			openPalette();
 		} else if (message.type === 'navigate' && message.target === 'index') {
@@ -241,6 +312,7 @@
 			window.removeEventListener('message', handleMessage);
 			window.removeEventListener('storage', refresh);
 			window.removeEventListener('keydown', handleKeydown);
+			clearTimeout(readyFallback);
 		};
 	});
 </script>
@@ -259,6 +331,7 @@
 				<span class="crumb-separator" aria-hidden="true">/</span>
 				<span class="kind-badge {activeArtifact.kind}">{activeArtifact.kind}</span>
 				<strong class="artifact-title" title={activeState?.artifact.title || activeArtifact.title}>{activeState?.artifact.title || activeArtifact.title}</strong>
+				{#if activeArtifact.inTrash}<span class="trash-badge">In Trash</span>{/if}
 			{/if}
 		</div>
 
@@ -279,7 +352,11 @@
 			<button class="toolbar-button palette-trigger" onclick={openPalette} title="Commands (Ctrl/⌘ K)">⌕ <span>Commands</span><kbd>⌘ K</kbd></button>
 			{#if activeArtifact}
 				<button class="toolbar-button inspector-trigger" class:pressed={inspectorOpen} aria-label={inspectorOpen ? 'Hide inspector' : 'Show inspector'} aria-pressed={inspectorOpen} onclick={() => { inspectorOpen = !inspectorOpen; }}>☷ <span>Inspector</span></button>
-				<button class="toolbar-button trash-trigger" onclick={moveActiveToTrash}>Move to Trash</button>
+				{#if activeArtifact.inTrash}
+					<button class="toolbar-button trash-trigger" onclick={restoreActive}>Restore</button>
+				{:else}
+					<button class="toolbar-button trash-trigger" onclick={moveActiveToTrash}>Move to Trash</button>
+				{/if}
 			{/if}
 			<div class="new-wrap">
 				<button class="new-button" aria-expanded={newOpen} onclick={() => { newOpen = !newOpen; }}>＋ New <span aria-hidden="true">⌄</span></button>
@@ -307,14 +384,23 @@
 						<span class="surface-hint">{activeArtifact.kind === 'board' ? 'Canvas' : activeArtifact.kind === 'collection' ? 'Table' : 'Writing surface'}</span>
 					{/if}
 				</div>
-				{#key `${activeArtifact.kind}:${activeArtifact.ref.id}`}
-					<iframe
-						bind:this={surfaceFrame}
-						title={`${activeArtifact.title} ${activeArtifact.kind} editor`}
-						src={adapter.embedHref(activeArtifact.ref.id)}
-						class="native-surface"
-					></iframe>
-				{/key}
+				<div class="surface-frame">
+					{#if frame}
+						{#key frame.key}
+							<iframe
+								bind:this={surfaceFrame}
+								title={`${activeArtifact.title} ${activeArtifact.kind} editor`}
+								src={frame.src}
+								class="native-surface"
+								inert={!frameReady}
+								onload={onFrameLoad}
+							></iframe>
+						{/key}
+					{/if}
+					{#if !frameReady}
+						<div class="surface-veil" role="status"><span>Opening {activeArtifact.kind}…</span></div>
+					{/if}
+				</div>
 			</div>
 			{#if inspectorOpen}
 				<aside class="inspector-slot" aria-label="Inspector">

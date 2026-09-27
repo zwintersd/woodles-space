@@ -23,6 +23,8 @@ export type HomeSuiteArtifact = {
 	title: string;
 	updatedAt: string;
 	recordCount?: number;
+	/** Open, but in HomeSuite's Trash — a portal can walk into a trashed board. */
+	inTrash?: boolean;
 };
 
 export type HomeSuiteSurfaceAdapter = {
