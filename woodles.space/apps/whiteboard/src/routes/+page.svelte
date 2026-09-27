@@ -157,11 +157,12 @@
 	import { createHandoffQueue } from '@woodles/handoff';
 	import {
 		isHomeSuiteShellMessage,
+		postHomeSuiteFlushed,
 		postHomeSuitePaletteRequest,
 		postHomeSuiteState,
 		type HomeSuiteSurfaceState
 	} from '@shared/homesuiteBridge';
-	import { HOMESUITE_TRASH_KEY, isHomeSuiteTrashed } from '@shared/homesuiteTrash';
+	import { HOMESUITE_TRASH_KEY, isHomeSuiteTrashed, restoreHomeSuiteArtifact } from '@shared/homesuiteTrash';
 
 	const whiteboardHandoffs = createHandoffQueue('whiteboard');
 	import { STACK_BEHAVIORS, SUGGESTED_STATUSES, TINTS, type Label, type StackBehavior, type Tint } from '$lib/model';
@@ -353,6 +354,20 @@
 	function boardIsInTrash(id: string): boolean {
 		void trashRevision;
 		return isHomeSuiteTrashed({ app: 'whiteboard', kind: 'board', id });
+	}
+	// HomeSuite's Trash is honored here too: a trashed board leaves the shelf,
+	// and one opened anyway says so and can come back.
+	const shelvedBoards = $derived(boards.filter((entry) => !boardIsInTrash(entry.id)));
+	const boardInTrash = $derived(!homeSuiteEmbedded && loaded && boardIsInTrash(board.board.id));
+
+	function restoreBoardFromTrash() {
+		restoreHomeSuiteArtifact({ app: 'whiteboard', kind: 'board', id: board.board.id });
+		trashRevision += 1;
+	}
+
+	/** Which board standalone Whiteboard reopens; a HomeSuite frame leaves that alone. */
+	function rememberActiveBoard(id: string) {
+		if (!homeSuiteEmbedded) boardLibrary.setActiveId(id);
 	}
 
 	function homeSuiteInspector(): HomeSuiteSurfaceState['inspector'] {
@@ -724,7 +739,8 @@
 		if (!homeSuiteEmbedded || event.origin !== window.location.origin || event.source !== window.parent ||
 			!isHomeSuiteShellMessage(event.data)) return;
 		const message = event.data;
-		if (message.action === 'undo') performUndo();
+		if (message.action === 'flush') { saveNow(); postHomeSuiteFlushed(); }
+		else if (message.action === 'undo') performUndo();
 		else if (message.action === 'redo') performRedo();
 		else if (message.action === 'inspect') openDetails();
 		else if (message.action === 'focus') canvasEl?.focus();
@@ -747,7 +763,7 @@
 
 		if (opened) {
 			board = restoreWhiteboard(opened.document);
-			boardLibrary.setActiveId(board.board.id);
+			rememberActiveBoard(board.board.id);
 			if (opened.source === 'backup') {
 				saveState = 'recovered';
 				saveMessage = 'restored the last saved board';
@@ -1791,10 +1807,13 @@
 		saveNow();
 		const size = viewport();
 		const at = screenToWorld(board.camera, { x: size.width / 2 - 115, y: size.height / 2 - 84 });
+		const reopening = boardLibrary.activeId();
 		const child = boardLibrary.create('New board');
 		// `create` marks the child as the board to reopen. We are not going there
 		// yet — this board is still the one being worked on.
-		boardLibrary.setActiveId(board.board.id);
+		if (!homeSuiteEmbedded) boardLibrary.setActiveId(board.board.id);
+		else if (reopening) boardLibrary.setActiveId(reopening);
+		else boardLibrary.clearActiveId();
 		const portal = createPortal(at.x, at.y, child.board.id, '', nextZ(board.items));
 		beginEdit();
 		setItems([...board.items, portal]);
@@ -1847,7 +1866,7 @@
 		};
 		trail = pushTrail(trail, step);
 		boardLibrary.writeTrail(trail);
-		boardLibrary.setActiveId(portal.boardId);
+		rememberActiveBoard(portal.boardId);
 		adoptDocument(opened.document, 'saved', 'saved here');
 		board.camera = arrivalCamera(board, viewport());
 		refreshPreviews();
@@ -1883,7 +1902,7 @@
 
 		trail = climbed.trail;
 		boardLibrary.writeTrail(trail);
-		boardLibrary.setActiveId(climbed.step.boardId);
+		rememberActiveBoard(climbed.step.boardId);
 		adoptDocument(opened.document, 'saved', 'saved here');
 		refreshPreviews();
 
@@ -2822,10 +2841,16 @@
 			<button class="chip" title="Save now (⌘S)" onclick={() => { markDirty(); saveNow(); }}>Save</button>
 			<button class="chip" title="Save and put this board back on the shelf" onclick={closeBoard}>Close</button>
 			<button class:active={shelfOpen} class="chip strong" aria-expanded={shelfOpen} onclick={() => (shelfOpen ? (shelfOpen = false) : openShelf())}>
-				Boards<span class="chip-count">{boards.length || 1}</span>
+				Boards<span class="chip-count">{shelvedBoards.length || 1}</span>
 			</button>
 		</div>
 	</header>
+	{/if}
+	{#if boardInTrash}
+		<div class="trash-bar" role="status" data-whiteboard-ui>
+			<span>This board is in HomeSuite’s Trash.</span>
+			<button onclick={restoreBoardFromTrash}>Restore</button>
+		</div>
 	{/if}
 
 	<nav class:hidden={playing || searchOpen} class="location-bar" data-whiteboard-ui aria-label="Board location">
@@ -3056,7 +3081,7 @@
 								</div>
 							{/if}
 							<ul class="place-list door-targets">
-								{#each boards as entry (entry.id)}
+								{#each shelvedBoards as entry (entry.id)}
 									<li>
 										<button class:current={entry.id === only.boardId} class="place-name" onclick={() => pointPortal(only, entry.id)}>
 											<span>{boardTitleFallback(entry.title)}</span>
@@ -3335,7 +3360,7 @@
 					<button class="shelf-close" aria-label="Close the shelf" onclick={() => { shelfOpen = false; confirmDeleteId = null; }}>×</button>
 				</header>
 				<ul class="shelf-list">
-					{#each boards as entry (entry.id)}
+					{#each shelvedBoards as entry (entry.id)}
 						<li class:open={entry.id === board.board.id}>
 							<button class="shelf-open" onclick={() => openBoard(entry.id)}>
 								<strong>{boardTitleFallback(entry.title)}</strong>
@@ -4176,6 +4201,29 @@
 	 * absolute positioning let the breadcrumb drift over the board controls at
 	 * middling widths, and a flex row cannot overlap itself at any width.
 	 */
+	.trash-bar {
+		flex-basis: 100%;
+		order: -1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 12px;
+		padding: 8px 14px;
+		border-radius: 10px;
+		background: #f7e3dc;
+		color: #6f2e24;
+		font-size: 13px;
+		pointer-events: auto;
+	}
+	.trash-bar button {
+		border: 1px solid #d9b1a4;
+		border-radius: 7px;
+		background: #fffaf7;
+		color: #6f2e24;
+		padding: 4px 10px;
+		font: inherit;
+		cursor: pointer;
+	}
 	.top-deck {
 		position: absolute;
 		z-index: 70;

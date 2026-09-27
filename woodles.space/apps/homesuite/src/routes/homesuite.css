@@ -132,8 +132,8 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .palette-search input::placeholder { color: #a79bab; }
 .palette-results { overflow: auto; padding: 7px; }
 .palette-results button { display: flex; justify-content: space-between; gap: 12px; width: 100%; border: 0; border-radius: 7px; padding: 12px; background: transparent; color: #493854; text-align: left; font-size: 13px; }
-.palette-results button:hover:not(:disabled) { background: #f1eaf4; }
-.palette-results button:disabled { opacity: .45; cursor: default; }
+.palette-results button.current { background: #f1eaf4; }
+.palette-results button[aria-disabled="true"] { opacity: .45; cursor: default; }
 .palette-results small { color: #9c89a3; font: 10px var(--font-mono); }
 .palette-results p { margin: 0; padding: 24px; color: #9b8a9f; text-align: center; font-size: 13px; }
 .template-backdrop { position: fixed; z-index: 40; inset: 0; display: grid; place-items: center; padding: 20px; background: #21182b73; }
@@ -164,6 +164,9 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
   .woodles-link, .crumb-separator:nth-of-type(1) { display: none; }
   .suite-home { font-size: 12px; }
   .suite-navigation .kind-badge, .suite-navigation .trash-badge { display: none; }
+  .suite-navigation { flex: 1 1 auto; overflow: hidden; }
+  .artifact-open .suite-home, .artifact-open .suite-home + .crumb-separator { display: none; }
+  .artifact-open .artifact-title { flex: 1 1 auto; min-width: 0; max-width: none; }
   .artifact-title { max-width: 29vw; font-size: 11px; }
   .history-actions { padding-right: 2px; margin-right: 0; }
   .history-actions button { width: 25px; }

@@ -75,7 +75,7 @@ test('native edits and shell commands stay attached to the owning surface', asyn
 	await create(page, 'Board');
 	const board = page.frameLocator('iframe.native-surface');
 	await page.getByRole('button', { name: /Commands/ }).click();
-	await page.getByRole('dialog', { name: 'HomeSuite commands' }).getByRole('button', { name: /Add card/ }).click();
+	await page.getByRole('dialog', { name: 'HomeSuite commands' }).getByRole('option', { name: /Add card/ }).click();
 	await expect(board.getByRole('textbox', { name: 'Card title' })).toHaveCount(1);
 	await expect(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
 	await page.getByRole('button', { name: 'Undo' }).click();
@@ -107,7 +107,7 @@ test('edits made just before leaving a board or a Collection are kept', async ({
 	await create(page, 'Board');
 	const board = page.frameLocator('iframe.native-surface');
 	await page.getByRole('button', { name: /Commands/ }).click();
-	await page.getByRole('dialog', { name: 'HomeSuite commands' }).getByRole('button', { name: /Add card/ }).click();
+	await page.getByRole('dialog', { name: 'HomeSuite commands' }).getByRole('option', { name: /Add card/ }).click();
 	await expect(board.getByRole('textbox', { name: 'Card title' })).toHaveCount(1);
 	// Well inside the board's save debounce: the frame goes before its timer fires.
 	await backToIndex(page);
@@ -121,6 +121,9 @@ test('edits made just before leaving a board or a Collection are kept', async ({
 	await table.getByRole('button', { name: '＋ New record' }).click();
 	await table.locator('td.primary-cell input').first().fill('Fern');
 	await backToIndex(page);
+	// The shell asked the frame to flush before reading the index, so the new
+	// record is already counted.
+	await expect(page.locator('.artifact-row', { hasText: 'Untitled collection' })).toContainText('1 record');
 	await page.locator('.artifact-row', { hasText: 'Untitled collection' }).click();
 	await surfaceReady(page);
 	await expect(table.locator('td.primary-cell input').first()).toHaveValue('Fern');
@@ -173,4 +176,158 @@ test('looking at a connected Collection does not make it the most recent thing',
 	await expect(page.frameLocator('iframe.native-surface').locator('.source-status')).toContainText('source records');
 	await backToIndex(page);
 	await expect(page.locator('.artifact-row').first()).toContainText('Untitled document');
+});
+
+test('one unreadable Collection is set aside, and making another does not overwrite it', async ({ page }) => {
+	await page.goto('/homesuite');
+	for (let count = 1; count <= 2; count++) {
+		await createCollection(page, /Blank/);
+		await backToIndex(page);
+		await expect(page.locator('.artifact-row')).toHaveCount(count);
+	}
+	// One wrong value in one record — a string in a number field — in both the
+	// save and its backup, as an older or newer build might leave it.
+	await page.evaluate(() => {
+		for (const key of ['woodles.data.collections.v1', 'woodles.data.collections.v1.backup']) {
+			const saved = localStorage.getItem(key);
+			if (!saved) continue;
+			const envelope = JSON.parse(saved);
+			const collection = envelope.data.collections.at(-1);
+			const stamp = new Date().toISOString();
+			collection.fields.push({ id: 'field-count', name: 'Count', type: 'number', primary: false, createdAt: stamp });
+			collection.views.table.columnOrder.push('field-count');
+			collection.views.table.columnWidths['field-count'] = 160;
+			collection.records.push({ id: 'record-odd', values: { 'field-count': '3' }, createdAt: stamp, updatedAt: stamp });
+			localStorage.setItem(key, JSON.stringify(envelope));
+		}
+	});
+	await page.reload();
+	await expect(page.locator('.artifact-row')).toHaveCount(1);
+	await expect(page.getByRole('status').filter({ hasText: 'set aside unchanged' })).toBeVisible();
+
+	await createCollection(page, /Blank/);
+	await backToIndex(page);
+	await expect(page.locator('.artifact-row')).toHaveCount(2);
+	const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('woodles.data.collections.v1')!).data.collections.length);
+	expect(stored).toBe(3);
+});
+
+test('a reference in a document opens its target inside HomeSuite', async ({ page }) => {
+	await page.goto('/homesuite');
+	await create(page, 'Document');
+	await page.frameLocator('iframe.native-surface').locator('textarea.doc-title').fill('Where it points');
+	await expect(page.locator('.artifact-title')).toHaveText('Where it points');
+	const target = new URL(page.url()).searchParams.get('id')!;
+	await backToIndex(page);
+	await create(page, 'Document');
+	const source = new URL(page.url()).searchParams.get('id')!;
+	await backToIndex(page);
+	// Only once its frame is gone, or its last save would write over this.
+	await expect(page.locator('.artifact-row')).toHaveCount(2);
+	await page.evaluate(({ source, target }) => {
+		const key = `woodles_draft_${source}`;
+		const body = JSON.parse(localStorage.getItem(key)!);
+		const html = `<p data-anchor="a-001">See <a data-ref-app="write" data-ref-kind="draft" data-ref-id="${target}" href="/write?draft=${target}">where it points</a>.</p>`;
+		localStorage.setItem(key, JSON.stringify({ ...body, content: html, layers: { ...(body.layers ?? {}), foreground: { html } } }));
+	}, { source, target });
+
+	await page.goto(`/homesuite?kind=document&id=${source}`);
+	await surfaceReady(page);
+	await page.frameLocator('iframe.native-surface').locator('a[data-ref-id]').click({ modifiers: ['ControlOrMeta'] });
+	await expect.poll(() => new URL(page.url()).searchParams.get('id')).toBe(target);
+	await expect(page.locator('.artifact-title')).toHaveText('Where it points');
+});
+
+test('Write and Whiteboard honor Trash, and HomeSuite leaves what they reopen alone', async ({ page }) => {
+	await page.goto('/write');
+	await page.locator('textarea.doc-title').fill('Kept open in Write');
+	await expect.poll(() => page.evaluate(() => localStorage.getItem('woodles_active_draft_id'))).not.toBeNull();
+	const writeActive = await page.evaluate(() => localStorage.getItem('woodles_active_draft_id'));
+
+	await page.goto('/homesuite');
+	await create(page, 'Document');
+	const draft = new URL(page.url()).searchParams.get('id')!;
+	await page.getByRole('button', { name: 'Move to Trash' }).click();
+	await create(page, 'Board');
+	const board = new URL(page.url()).searchParams.get('id')!;
+	await page.getByRole('button', { name: 'Move to Trash' }).click();
+	expect(await page.evaluate(() => localStorage.getItem('woodles_active_draft_id'))).toBe(writeActive);
+	expect(await page.evaluate(() => localStorage.getItem('woodles.whiteboard.active.v1'))).toBeNull();
+
+	await page.goto(`/write?draft=${draft}`);
+	await expect(page.locator('.trash-notice')).toContainText('in HomeSuite’s Trash');
+	await page.locator('.trash-notice').getByRole('button', { name: 'Restore' }).click();
+	await expect(page.locator('.trash-notice')).toHaveCount(0);
+
+	await page.goto(`/whiteboard?board=${board}`);
+	await expect(page.locator('.trash-bar')).toContainText('in HomeSuite’s Trash');
+	await page.locator('.trash-bar').getByRole('button', { name: 'Restore' }).click();
+	await expect(page.locator('.trash-bar')).toHaveCount(0);
+
+	// Both restored, beside the draft Write had open all along.
+	await page.goto('/homesuite');
+	await expect(page.locator('.artifact-row')).toHaveCount(3);
+	await expect(page.locator('.trash-row')).toHaveCount(0);
+});
+
+test('the template picker and the palette work from the keyboard', async ({ page }) => {
+	await page.goto('/homesuite');
+	await page.getByRole('button', { name: /New/ }).click();
+	await page.getByRole('menuitem', { name: /Collection/ }).click();
+	const dialog = page.getByRole('dialog', { name: 'New collection' });
+	await expect(dialog.getByRole('button', { name: /Blank/ })).toBeFocused();
+	await page.keyboard.press('Shift+Tab');
+	await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
+	await page.keyboard.press('Escape');
+	await expect(dialog).toHaveCount(0);
+	await expect(page.getByRole('button', { name: /New/ })).toBeFocused();
+
+	await page.keyboard.press('ControlOrMeta+k');
+	await expect(page.getByRole('combobox', { name: 'Search commands' })).toBeFocused();
+	await page.keyboard.type('new board');
+	await expect(page.getByRole('option', { name: /New board/ })).toHaveAttribute('aria-selected', 'true');
+	await page.keyboard.press('Enter');
+	await surfaceReady(page);
+	await expect(page.locator('iframe.native-surface')).toHaveAttribute('src', /\/whiteboard\?board=/);
+});
+
+test('Collection edits from the inspector and number cells undo in one step', async ({ page }) => {
+	await page.goto('/homesuite');
+	await createCollection(page, /Media/);
+	const table = page.frameLocator('iframe.native-surface');
+	await table.locator('button.field-head', { hasText: 'Notes' }).click();
+	await expect(page.getByLabel('Type', { exact: true })).toHaveAttribute('readonly', '');
+	const name = page.getByLabel('Field name');
+	await name.click();
+	await name.press('End');
+	await name.pressSequentially(' and asides');
+	await expect(table.locator('button.field-head', { hasText: 'Notes and asides' })).toBeVisible();
+	await page.getByRole('button', { name: 'Undo' }).click();
+	await expect(table.locator('button.field-head', { hasText: 'Notes and asides' })).toHaveCount(0);
+	await expect(table.locator('button.field-head', { hasText: 'Notes' })).toBeVisible();
+
+	await table.getByRole('button', { name: '＋ New record' }).click();
+	const rating = table.locator('input[type=number]').first();
+	await rating.click();
+	await rating.pressSequentially('123');
+	await expect(rating).toHaveValue('123');
+	await page.getByRole('button', { name: 'Undo' }).click();
+	await expect(rating).toHaveValue('');
+
+	await table.locator('td.primary-cell input').first().click();
+	await page.keyboard.press('ControlOrMeta+k');
+	await expect(page.getByRole('dialog', { name: 'HomeSuite commands' })).toBeVisible();
+});
+
+test('on a phone the inspector starts closed and the title has room', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/homesuite');
+	await create(page, 'Document');
+	await expect(page.getByRole('complementary', { name: 'Inspector' })).toHaveCount(0);
+	const overlap = await page.evaluate(() => {
+		const navigation = document.querySelector('.suite-navigation')!.getBoundingClientRect();
+		const actions = document.querySelector('.suite-actions')!.getBoundingClientRect();
+		return navigation.right - actions.left;
+	});
+	expect(overlap).toBeLessThanOrEqual(0);
 });

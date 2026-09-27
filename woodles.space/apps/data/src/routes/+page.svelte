@@ -2,18 +2,18 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { entityHref } from '@woodles/app-manifest';
-	import { isHomeSuiteShellMessage, postHomeSuitePaletteRequest, postHomeSuiteState, type HomeSuiteSurfaceState, type WoodlesRef } from '@shared/homesuiteBridge';
+	import { isHomeSuiteShellMessage, postHomeSuiteFlushed, postHomeSuiteNavigate, postHomeSuitePaletteRequest, postHomeSuiteState, type HomeSuiteSurfaceState, type WoodlesRef } from '@shared/homesuiteBridge';
+	import { modal } from '@shared/modal';
 	import { HOMESUITE_TRASH_KEY, isHomeSuiteTrashed } from '@shared/homesuiteTrash';
 	import { candidatesFor, refreshReferenceSources, shelfSource, type ReferenceCandidate } from '../../../write/src/lib/references.svelte';
 	import { mergePulledRows, pullCollectionSources } from '$lib/sourceSync';
 	import {
-		addField, addRecord, createCollection, deleteField, duplicateRecord, exportCollections, importCollections,
-		isCollection, loadCollections, removeRecord, renameField, resizeColumn, saveCollections, setCellValue,
-		type Collection, type CollectionField, type CollectionLibrary, type FieldType, type FieldValue
+		addField, addRecord, deleteField, duplicateRecord, exportCollections, importCollections,
+		isCollection, loadCollections, removeRecord, renameField, resizeColumn, saveCollection, setCellValue,
+		type Collection, type CollectionField, type FieldType, type FieldValue
 	} from '$lib/collections';
 	import './data.css';
 
-	let library = $state<CollectionLibrary>({ collections: [] });
 	let collection = $state<Collection | null>(null);
 	let ready = $state(false);
 	let saveIssue = $state('');
@@ -60,21 +60,25 @@
 			redoStack = [];
 		}
 		collection = next;
-		library = { collections: library.collections.map((item) => item.id === next.id ? next : item) };
 		if (saveTimer) clearTimeout(saveTimer);
 		saveTimer = setTimeout(() => {
-			const result = saveCollections(library);
-			saveIssue = result.ok ? '' : result.issue?.message ?? 'Could not save this Collection.';
+			saveTimer = null;
+			persist();
 			publishState();
 		}, 120);
 		publishState();
 	}
 
+	/** Writes only this Collection; the rest of the library is re-read, never replaced. */
+	function persist(): void {
+		if (!collection) return;
+		const result = saveCollection(collection);
+		saveIssue = result.ok ? '' : result.issue?.message ?? 'Could not save this Collection.';
+	}
+
 	function replaceCollection(next: Collection): void {
 		collection = next;
-		library = { collections: library.collections.map((item) => item.id === next.id ? next : item) };
-		const result = saveCollections(library);
-		saveIssue = result.ok ? '' : result.issue?.message ?? 'Could not save this Collection.';
+		persist();
 		publishState();
 	}
 
@@ -82,12 +86,11 @@
 		if (!saveTimer) return;
 		clearTimeout(saveTimer);
 		saveTimer = null;
-		const result = saveCollections(library);
-		saveIssue = result.ok ? '' : result.issue?.message ?? 'Could not save this Collection.';
+		persist();
 	}
 
-	function setText(recordId: string, fieldId: string, value: string): void {
-		const key = `${recordId}:${fieldId}`;
+	/** A run of keystrokes into one place is one undo step, not one per key. */
+	function recordBurst(key: string): void {
 		if (lastTextKey !== key || !textBurstTimer) {
 			if (collection) undoStack = [...undoStack.slice(-49), cloneJson(collection)];
 			redoStack = [];
@@ -95,7 +98,19 @@
 		lastTextKey = key;
 		if (textBurstTimer) clearTimeout(textBurstTimer);
 		textBurstTimer = setTimeout(() => { textBurstTimer = null; lastTextKey = ''; }, 700);
+	}
+
+	function setText(recordId: string, fieldId: string, value: string): void {
+		recordBurst(`${recordId}:${fieldId}`);
 		if (collection) updateLibrary(setCellValue(collection, recordId, fieldId, value), false);
+	}
+
+	function setNumber(recordId: string, field: CollectionField, value: number | null): void {
+		if (!collection) return;
+		selectedCell = { recordId, fieldId: field.id };
+		selectedRecord = recordId;
+		recordBurst(`${recordId}:${field.id}`);
+		updateLibrary(setCellValue(collection, recordId, field.id, value), false);
 	}
 
 	function mutateCell(recordId: string, field: CollectionField, value: FieldValue): void {
@@ -147,6 +162,8 @@
 	}
 
 	function openSource(ref: WoodlesRef): void {
+		// Inside HomeSuite the shell opens it, in place when it is one of its own.
+		if (homeSuite && postHomeSuiteNavigate(ref)) return;
 		try { window.open(entityHref(ref.app, ref.kind, ref.id), '_blank', 'noopener'); } catch { /* A cold reference remains visible. */ }
 	}
 
@@ -188,7 +205,7 @@
 		else if (id === 'field:delete') deleteSelectedField();
 		else if (id === 'collection:rename' && collection) { const title = window.prompt('Collection name', collection.title); if (title?.trim()) { const next = { ...collection, title: title.trim(), updatedAt: new Date().toISOString() }; updateLibrary(next); } }
 		else if (id === 'source:open' && activeRecord?.sourceRef) openSource(activeRecord.sourceRef);
-		else if (id === 'collection:export' && collection) { const blob = new Blob([exportCollections({ collections: [collection] })], { type: 'application/json' }); const anchor = document.createElement('a'); anchor.href = URL.createObjectURL(blob); anchor.download = `${collection.title || 'collection'}.json`; anchor.click(); URL.revokeObjectURL(anchor.href); }
+		else if (id === 'collection:export' && collection) { const blob = new Blob([exportCollections([collection])], { type: 'application/json' }); const anchor = document.createElement('a'); anchor.href = URL.createObjectURL(blob); anchor.download = `${collection.title || 'collection'}.json`; anchor.click(); URL.revokeObjectURL(anchor.href); }
 		else if (id === 'reference:add') { pickerFor = { recordId: '', fieldId: '' }; pickerQuery = ''; void refreshPickerSources(); }
 		else if (id === 'source:sync') void syncSources();
 	}
@@ -203,15 +220,13 @@
 			// An unchanged pull saves nothing, so a Collection that is only being
 			// looked at keeps its place in HomeSuite's recent order.
 			if (next !== collection) {
-				const nextLibrary = { collections: library.collections.map((item) => item.id === next.id ? next : item) };
-				const saved = saveCollections(nextLibrary);
+				const saved = saveCollection(next);
 				if (!saved.ok) {
 					saveIssue = saved.issue?.message ?? 'Could not refresh source data.';
 					sourceStatus = 'Refresh failed';
 					return;
 				}
 				collection = next;
-				library = nextLibrary;
 				saveIssue = '';
 			}
 			const pulledRefs = rows.map((row) => ({ app: row.ref.app, kind: row.ref.kind, id: row.ref.id, text: row.label, hint: row.hint }));
@@ -239,24 +254,23 @@
 	async function importFile(file: File | undefined): Promise<void> {
 		if (!file) return;
 		const result = importCollections(await file.text());
-		if (!result.ok || !result.value?.collections.length) { saveIssue = result.issue?.message ?? 'This file contains no valid Collections.'; return; }
-		const source = cloneJson(result.value.collections[0]);
-		const fieldIds = new Map(source.fields.map((field) => [field.id, crypto.randomUUID()]));
-		source.id = crypto.randomUUID();
+		if (!result.collections.length) { saveIssue = result.issue?.message ?? 'This file contains no readable Collections.'; return; }
+		const source = cloneJson(result.collections[0]);
+		const fieldIds = new Map(source.fields.map((field) => [field.id, `${field.primary ? 'field-primary' : 'field'}-${crypto.randomUUID()}`]));
+		source.id = `collection-${crypto.randomUUID()}`;
 		source.fields = source.fields.map((field) => ({ ...field, id: fieldIds.get(field.id)!, config: field.config ? cloneJson(field.config) : undefined }));
-		source.records = source.records.map((record) => ({ ...record, id: crypto.randomUUID(), values: Object.fromEntries(Object.entries(record.values).map(([id, value]) => [fieldIds.get(id) ?? id, value])) }));
+		source.records = source.records.map((record) => ({ ...record, id: `record-${crypto.randomUUID()}`, values: Object.fromEntries(Object.entries(record.values).map(([id, value]) => [fieldIds.get(id) ?? id, value])) }));
 		source.views.table.columnOrder = source.views.table.columnOrder.map((id) => fieldIds.get(id) ?? id);
 		source.views.table.columnWidths = Object.fromEntries(Object.entries(source.views.table.columnWidths).map(([id, width]) => [fieldIds.get(id) ?? id, width]));
-		const next = { collections: [...library.collections, source] };
-		const saved = saveCollections(next);
+		const saved = saveCollection(source);
 		if (!saved.ok) { saveIssue = saved.issue?.message ?? 'Could not import this Collection.'; return; }
-		library = next;
 		saveIssue = `Imported “${source.title}”. It is now in the HomeSuite index.`;
 		publishState();
 	}
 
 	function inspectorChange(controlId: string, value: string): void {
 		if (!collection || !activeField) return;
+		recordBurst(`inspector:${activeField.id}:${controlId}`);
 		if (controlId === 'field:name') updateLibrary(renameField(collection, activeField.id, value), false);
 		else if (controlId.startsWith('option:')) {
 			const optionId = controlId.slice('option:'.length);
@@ -292,7 +306,7 @@
 		const state: HomeSuiteSurfaceState = {
 			artifact: { id: collection.id, kind: 'collection', title: collection.title }, selection: selected,
 			inspector: { title: activeField?.name ?? (activeRecord ? primaryLabel(activeRecord) : collection.title), rows,
-				controls: activeField ? [{ id: 'field:name', label: 'Field name', value: activeField.name }, { id: 'field:type', label: 'Type', value: activeField.primary ? 'Primary · Text' : activeField.type }, ...(activeField.config?.options ?? []).map((option, index) => ({ id: `option:${option.id}`, label: `Option ${index + 1}`, value: option.label }))] : undefined,
+				controls: activeField ? [{ id: 'field:name', label: 'Field name', value: activeField.name }, { id: 'field:type', label: 'Type', value: activeField.primary ? 'Primary · Text' : activeField.type, readonly: true }, ...(activeField.config?.options ?? []).map((option, index) => ({ id: `option:${option.id}`, label: `Option ${index + 1}`, value: option.label }))] : undefined,
 				actions: activeField && !activeField.primary ? [{ commandId: 'field:delete', label: 'Delete field' }] : activeRecord?.sourceRef ? [{ commandId: 'source:open', label: 'Open source' }, { commandId: 'record:delete', label: 'Remove from collection' }] : activeRecord ? [{ commandId: 'record:delete', label: 'Delete record' }] : [] },
 			modes: [], activeMode: 'table', commands, canUndo: undoStack.length > 0, canRedo: redoStack.length > 0
 		};
@@ -302,7 +316,8 @@
 	function onShellMessage(event: MessageEvent): void {
 		if (event.origin !== window.location.origin || event.source !== window.parent || !isHomeSuiteShellMessage(event.data)) return;
 		const message = event.data;
-		if (message.action === 'undo') undo();
+		if (message.action === 'flush') { flushPendingSave(); postHomeSuiteFlushed(); }
+		else if (message.action === 'undo') undo();
 		else if (message.action === 'redo') redo();
 		else if (message.action === 'command') command(message.commandId);
 		else if (message.action === 'inspector') inspectorChange(message.controlId, message.value);
@@ -338,7 +353,7 @@
 		const startX = event.clientX;
 		const startWidth = collection.views.table.columnWidths[field.id] ?? 160;
 		const onMove = (move: PointerEvent) => { if (collection) collection = resizeColumn(before, field.id, startWidth + move.clientX - startX); };
-		const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); if (collection) { undoStack = [...undoStack.slice(-49), before]; redoStack = []; const result = saveCollections(library = { collections: library.collections.map((item) => item.id === collection!.id ? collection! : item) }); saveIssue = result.ok ? '' : result.issue?.message ?? 'Could not save this Collection.'; publishState(); } };
+		const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); if (collection) { undoStack = [...undoStack.slice(-49), before]; redoStack = []; persist(); publishState(); } };
 		window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp);
 	}
 
@@ -347,9 +362,8 @@
 
 	onMount(() => {
 		const loaded = loadCollections();
-		library = loaded.value;
 		if (loaded.issue) saveIssue = loaded.issue.message;
-		collection = library.collections.find((entry) => entry.id === collectionId) ?? null;
+		collection = loaded.collections.find((entry) => entry.id === collectionId) ?? null;
 		ready = true;
 		void refreshReferenceSources().then(() => {
 			const synced = collection?.records.filter((record) => record.sourceRef).map((record) => ({ app: record.sourceRef!.app, kind: record.sourceRef!.kind, id: record.sourceRef!.id, text: primaryLabel(record), hint: record.sourceRef!.app })) ?? [];
@@ -387,6 +401,7 @@
 	});
 
 	function globalKeydown(event: KeyboardEvent): void {
+		if (homeSuite && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); postHomeSuitePaletteRequest(); return; }
 		if (event.key === 'Escape') { pickerFor = null; addFieldOpen = false; }
 		if (event.key === 'F2' && collection) { event.preventDefault(); addFieldOpen = true; }
 		if ((event.key === 'Delete' || event.key === 'Backspace') && collection && selectedRecord) {
@@ -432,7 +447,7 @@
 								<input aria-label={`${field.name}, ${primaryLabel(record)}`} value={typeof value === 'string' ? value : ''} placeholder={field.primary ? 'Name this record' : '—'} readonly={!!field.sourceKey} title={field.sourceKey ? 'Synced from its source app' : undefined} onfocus={() => { selectedRecord = record.id; selectedField = ''; selectedCell = { recordId: record.id, fieldId: field.id }; publishState(); }} oninput={(event) => setText(record.id, field.id, event.currentTarget.value)} onkeydown={(event) => cellKeydown(event, rowIndex, colIndex, record.id, field.id)} />
 								{#if field.type === 'url' && typeof value === 'string' && value}<a class="url-open" href={value} target="_blank" rel="noreferrer" aria-label={`Open ${value}`} onclick={(event) => event.stopPropagation()}>↗</a>{/if}
 							{:else if field.type === 'number'}
-								<input type="number" aria-label={`${field.name}, ${primaryLabel(record)}`} value={typeof value === 'number' ? value : ''} onfocus={() => { selectedRecord = record.id; selectedCell = { recordId: record.id, fieldId: field.id }; publishState(); }} oninput={(event) => { const n = event.currentTarget.valueAsNumber; mutateCell(record.id, field, Number.isFinite(n) ? n : null); }} onkeydown={(event) => cellKeydown(event, rowIndex, colIndex, record.id, field.id)} />
+								<input type="number" aria-label={`${field.name}, ${primaryLabel(record)}`} value={typeof value === 'number' ? value : ''} onfocus={() => { selectedRecord = record.id; selectedCell = { recordId: record.id, fieldId: field.id }; publishState(); }} oninput={(event) => { const n = event.currentTarget.valueAsNumber; setNumber(record.id, field, Number.isFinite(n) ? n : null); }} onkeydown={(event) => cellKeydown(event, rowIndex, colIndex, record.id, field.id)} />
 							{:else if field.type === 'checkbox'}
 								<button class:checked={value === true} class="checkbox-cell" role="checkbox" aria-checked={value === true} aria-label={`${field.name}, ${primaryLabel(record)}`} onclick={(event) => { event.stopPropagation(); mutateCell(record.id, field, value !== true); }} onkeydown={(event) => cellKeydown(event, rowIndex, colIndex, record.id, field.id)}>{value === true ? '✓' : ''}</button>
 							{:else if field.type === 'date'}
@@ -451,7 +466,7 @@
 			{/each}
 			<tr class="new-record-row"><td></td><td colspan={Math.max(1, orderedFields.length + 1)}><button onclick={addNewRecord}>＋ New record</button></td></tr>
 		</tbody></table></div>
-		{#if addFieldOpen}<div class="modal-shade" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) addFieldOpen = false; }}><form class="field-dialog" onsubmit={(event) => { event.preventDefault(); createField(); }}><span>TABLE FIELD</span><h2>Add a field</h2><label>Field name<input bind:value={fieldName} placeholder="e.g. Status" /></label><label>Type<select bind:value={fieldType}>{#each ['text','number','checkbox','date','select','multi-select','url','relation'] as type}<option value={type}>{type === 'multi-select' ? 'Multi-select' : type[0].toUpperCase() + type.slice(1)}</option>{/each}</select></label><div class="dialog-actions"><button type="button" onclick={() => { addFieldOpen = false; }}>Cancel</button><button class="primary-action" type="submit">Add field</button></div></form></div>{/if}
-		{#if pickerFor}<div class="modal-shade" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) pickerFor = null; }}><div class="reference-dialog" role="dialog" aria-modal="true" aria-label="Choose a Woodles reference"><span>WOODLES REFERENCE</span><h2>{pickerFor.recordId && pickerFor.recordId !== '$new' ? 'Choose a related thing' : 'Add a thing to this Collection'}</h2><input bind:value={pickerQuery} aria-label="Find a thing" placeholder="Search Bestiary, Marginalia, Thinking About, or Write" />{#if !pickerFor.recordId}<button class="picker-all" onclick={() => pickerFor = { recordId: '$new', fieldId: '' }}>Show available things</button>{/if}<div class="reference-list">{#each candidates as candidate (candidate.app + candidate.id)}<button onclick={() => { if (pickerFor?.recordId === '$new' || pickerFor?.recordId === '') addExternal(candidate); else if (pickerFor) { const record = collection?.records.find((entry) => entry.id === pickerFor?.recordId); const field = collection?.fields.find((entry) => entry.id === pickerFor?.fieldId); if (record && field && collection) { mutateCell(record.id, field, { app: candidate.app, kind: candidate.kind, id: candidate.id }); pickerFor = null; } } }}><strong>{candidate.text}</strong><small>{candidate.hint ?? candidate.app}</small></button>{:else}<p>{pickerLoading ? 'Looking through local Bestiary and Marginalia records…' : 'No matches. Refresh the HomeSuite window if a new source was just created.'}</p>{/each}</div></div></div>{/if}
+		{#if addFieldOpen}<div class="modal-shade" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) addFieldOpen = false; }}><div class="field-dialog" role="dialog" aria-modal="true" aria-label="Add a field" use:modal><form onsubmit={(event) => { event.preventDefault(); createField(); }}><span>TABLE FIELD</span><h2>Add a field</h2><label>Field name<input bind:value={fieldName} placeholder="e.g. Status" data-autofocus /></label><label>Type<select bind:value={fieldType}>{#each ['text','number','checkbox','date','select','multi-select','url','relation'] as type}<option value={type}>{type === 'multi-select' ? 'Multi-select' : type[0].toUpperCase() + type.slice(1)}</option>{/each}</select></label><div class="dialog-actions"><button type="button" onclick={() => { addFieldOpen = false; }}>Cancel</button><button class="primary-action" type="submit">Add field</button></div></form></div></div>{/if}
+		{#if pickerFor}<div class="modal-shade" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) pickerFor = null; }}><div class="reference-dialog" role="dialog" aria-modal="true" aria-label="Choose a Woodles reference" use:modal><span>WOODLES REFERENCE</span><h2>{pickerFor.recordId && pickerFor.recordId !== '$new' ? 'Choose a related thing' : 'Add a thing to this Collection'}</h2><input bind:value={pickerQuery} aria-label="Find a thing" placeholder="Search Bestiary, Marginalia, Thinking About, or Write" data-autofocus />{#if !pickerFor.recordId}<button class="picker-all" onclick={() => pickerFor = { recordId: '$new', fieldId: '' }}>Show available things</button>{/if}<div class="reference-list">{#each candidates as candidate (candidate.app + candidate.id)}<button onclick={() => { if (pickerFor?.recordId === '$new' || pickerFor?.recordId === '') addExternal(candidate); else if (pickerFor) { const record = collection?.records.find((entry) => entry.id === pickerFor?.recordId); const field = collection?.fields.find((entry) => entry.id === pickerFor?.fieldId); if (record && field && collection) { mutateCell(record.id, field, { app: candidate.app, kind: candidate.kind, id: candidate.id }); pickerFor = null; } } }}><strong>{candidate.text}</strong><small>{candidate.hint ?? candidate.app}</small></button>{:else}<p>{pickerLoading ? 'Looking through local Bestiary and Marginalia records…' : 'No matches. Refresh the HomeSuite window if a new source was just created.'}</p>{/each}</div></div></div>{/if}
 	</main>
 {/if}

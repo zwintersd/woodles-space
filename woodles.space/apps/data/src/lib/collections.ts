@@ -1,4 +1,4 @@
-import { createVersionedStorage, type PersistenceIssue } from '@woodles/persistence';
+import { createVersionedStorage, type PersistenceIssue, type SaveResult, type StorageLike } from '@woodles/persistence';
 import type { WoodlesRef } from '@shared/homesuiteBridge';
 
 export type FieldType = 'text' | 'number' | 'checkbox' | 'date' | 'select' | 'multi-select' | 'url' | 'relation';
@@ -121,6 +121,16 @@ function field(id: string, name: string, type: FieldType, primary = false, optio
 }
 
 export type CollectionTemplate = 'blank' | 'tracker' | 'media' | 'projects' | 'research' | 'living-world';
+
+/** How each template is offered, and what a new Collection from it is called. */
+export const COLLECTION_TEMPLATES: readonly { id: CollectionTemplate; name: string; detail: string; title: string }[] = [
+	{ id: 'blank', name: 'Blank', detail: 'A Primary field, ready for records', title: 'Untitled collection' },
+	{ id: 'tracker', name: 'Simple tracker', detail: 'Name, status, and notes', title: 'Untitled collection' },
+	{ id: 'media', name: 'Media', detail: 'Title, medium, progress, rating, and more', title: 'Untitled collection' },
+	{ id: 'projects', name: 'Projects', detail: 'Status, priority, due date, and links', title: 'Untitled collection' },
+	{ id: 'research', name: 'Research / sources', detail: 'Sources, URLs, notes, and links', title: 'Untitled collection' },
+	{ id: 'living-world', name: 'Bestiary + Marginalia', detail: 'Pull creatures, discovered life, and field notes into one live table', title: 'Bestiary + Marginalia' }
+];
 const TEMPLATE_FIELDS: Record<CollectionTemplate, Array<[string, FieldType, string[]?, string?]>> = {
 	blank: [['Name', 'text']],
 	tracker: [['Name', 'text'], ['Status', 'select', ['Not started', 'In progress', 'Done']], ['Notes', 'text']],
@@ -223,9 +233,89 @@ function migrateLibrary(value: unknown, fromVersion: number): unknown {
 	return { collections: [] };
 }
 
-export const collectionStorage = createVersionedStorage<CollectionLibrary>({
-	key: STORAGE_KEY, version: SCHEMA_VERSION, fallback: () => ({ collections: [] }), validate: isCollectionLibrary, migrate: migrateLibrary
-});
+/**
+ * What storage holds: every Collection as it was saved, readable or not.
+ * Validation happens per Collection (see `readLibrary`), so one bad value sets
+ * aside one Collection instead of hiding — and then overwriting — them all.
+ */
+type StoredLibrary = { collections: unknown[] };
+
+function isStoredLibrary(value: unknown): value is StoredLibrary {
+	return isRecord(value) && Array.isArray(value.collections);
+}
+
+function storedId(value: unknown): string | null {
+	return isRecord(value) && typeof value.id === 'string' ? value.id : null;
+}
+
+export type CollectionLoad = {
+	/** Readable Collections, first of each id. */
+	collections: Collection[];
+	/** Saved Collections that failed validation; kept in storage untouched. */
+	quarantined: number;
+	issue: PersistenceIssue | null;
+	/** False when the library itself could not be read; writes are refused. */
+	writable: boolean;
+};
+
+function readLibrary(persistence: ReturnType<typeof createVersionedStorage<StoredLibrary>>): CollectionLoad & { stored: unknown[] } {
+	const loaded = persistence.load();
+	// Primary and backup both unreadable — a newer schema, or corruption. What
+	// is there may still be someone's work, so nothing may be written over it.
+	const writable = !(loaded.source === 'fallback' && loaded.issue);
+	const stored = loaded.value.collections;
+	const seen = new Set<string>();
+	const collections: Collection[] = [];
+	for (const entry of stored) {
+		if (!isCollection(entry) || seen.has(entry.id)) continue;
+		seen.add(entry.id);
+		collections.push(entry);
+	}
+	const quarantined = stored.length - collections.length;
+	const setAside: PersistenceIssue | null = quarantined
+		? { kind: 'validation', message: `${quarantined === 1 ? 'One Collection' : `${quarantined} Collections`} could not be read on this device and ${quarantined === 1 ? 'was' : 'were'} set aside unchanged.` }
+		: null;
+	return { stored, collections, quarantined, writable, issue: loaded.issue ?? setAside };
+}
+
+function refused(issue: PersistenceIssue | null): SaveResult {
+	return {
+		ok: false, savedAt: null, bytes: 0,
+		issue: { kind: 'write', message: `${issue?.message ?? 'The Collection library could not be read.'} Nothing was saved, so it stays as it was.` }
+	};
+}
+
+/** Every write reads the library fresh and touches only its own Collection. */
+export function createCollectionStore(storage?: StorageLike | null) {
+	const persistence = createVersionedStorage<StoredLibrary>({
+		key: STORAGE_KEY, version: SCHEMA_VERSION, fallback: () => ({ collections: [] }), validate: isStoredLibrary, migrate: migrateLibrary,
+		...(storage !== undefined ? { storage } : {})
+	});
+
+	function load(): CollectionLoad {
+		const { collections, quarantined, issue, writable } = readLibrary(persistence);
+		return { collections, quarantined, issue, writable };
+	}
+
+	function save(collection: Collection): SaveResult {
+		if (!isCollection(collection)) return { ok: false, savedAt: null, bytes: 0, issue: { kind: 'validation', message: 'Refused to save a Collection that does not match the expected shape.' } };
+		const { stored, writable, issue } = readLibrary(persistence);
+		if (!writable) return refused(issue);
+		const index = stored.findIndex((entry) => storedId(entry) === collection.id);
+		const collections = index === -1 ? [...stored, collection] : stored.map((entry, at) => at === index ? collection : entry);
+		return persistence.save({ collections });
+	}
+
+	function remove(id: string): SaveResult {
+		const { stored, writable, issue } = readLibrary(persistence);
+		if (!writable) return refused(issue);
+		return persistence.save({ collections: stored.filter((entry) => storedId(entry) !== id) });
+	}
+
+	return { load, save, remove, exportText: (collections: Collection[]) => persistence.exportText({ collections }) };
+}
+
+export const collectionStore = createCollectionStore();
 
 const transientImportStorage = {
 	values: new Map<string, string>(),
@@ -233,12 +323,19 @@ const transientImportStorage = {
 	setItem(key: string, value: string) { this.values.set(key, value); },
 	removeItem(key: string) { this.values.delete(key); }
 };
-const collectionImportStorage = createVersionedStorage<CollectionLibrary>({
-	key: 'woodles.data.import.transient', version: SCHEMA_VERSION, fallback: () => ({ collections: [] }), validate: isCollectionLibrary, migrate: migrateLibrary, storage: transientImportStorage
+const collectionImportStorage = createVersionedStorage<StoredLibrary>({
+	key: 'woodles.data.import.transient', version: SCHEMA_VERSION, fallback: () => ({ collections: [] }), validate: isStoredLibrary, migrate: migrateLibrary, storage: transientImportStorage
 });
 
-export function loadCollections() { return collectionStorage.load(); }
-export function saveCollections(library: CollectionLibrary) { return collectionStorage.save(library); }
-export function exportCollections(library: CollectionLibrary): string { return collectionStorage.exportText(library); }
-export function importCollections(text: string) { return collectionImportStorage.importText(text); }
+export function loadCollections(): CollectionLoad { return collectionStore.load(); }
+export function saveCollection(collection: Collection): SaveResult { return collectionStore.save(collection); }
+export function removeCollection(id: string): SaveResult { return collectionStore.remove(id); }
+export function exportCollections(collections: Collection[]): string { return collectionStore.exportText(collections); }
+/** The readable Collections in an exported file; unreadable ones are skipped. */
+export function importCollections(text: string): { collections: Collection[]; issue: PersistenceIssue | null } {
+	const result = collectionImportStorage.importText(text);
+	if (!result.ok || !result.value) return { collections: [], issue: result.issue };
+	const collections = result.value.collections.filter(isCollection);
+	return { collections, issue: collections.length ? null : { kind: 'validation', message: 'This file contains no readable Collections.' } };
+}
 export type { PersistenceIssue };

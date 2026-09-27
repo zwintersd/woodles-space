@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createVersionedStorage, type StorageLike } from '@woodles/persistence';
 import {
-	addField, addRecord, createCollection, deleteField, duplicateRecord, isCollection, isCollectionLibrary,
-	removeRecord, renameField, resizeColumn, setCellValue, type CollectionLibrary
+	addField, addRecord, createCollection, createCollectionStore, deleteField, duplicateRecord, importCollections, isCollection,
+	isCollectionLibrary, removeRecord, renameField, resizeColumn, setCellValue, type CollectionLibrary
 } from './collections';
 
 class MemoryStorage implements StorageLike {
@@ -114,5 +114,72 @@ describe('Collection persistence', () => {
 		const recovered = persistence.load();
 		expect(recovered.source).toBe('backup');
 		expect(recovered.value).toEqual(first);
+	});
+});
+
+describe('Collection store', () => {
+	const KEY = 'woodles.data.collections.v1';
+	let storage: MemoryStorage;
+	let store: ReturnType<typeof createCollectionStore>;
+	beforeEach(() => {
+		storage = new MemoryStorage();
+		store = createCollectionStore(storage);
+	});
+
+	function storedTitles(): unknown[] {
+		return JSON.parse(storage.getItem(KEY)!).data.collections.map((entry: { title?: unknown }) => entry.title);
+	}
+
+	it('sets aside one unreadable Collection and never writes over it', () => {
+		const good = createCollection('Reading list');
+		const bad = { ...createCollection('Garden beds'), records: [{ id: 'r', values: { nope: 1 }, createdAt: 'x', updatedAt: 'x' }] };
+		storage.setItem(KEY, JSON.stringify({ woodles: 'woodles-persistence', schemaVersion: 1, savedAt: new Date().toISOString(), data: { collections: [good, bad] } }));
+
+		const loaded = store.load();
+		expect(loaded.collections.map((collection) => collection.title)).toEqual(['Reading list']);
+		expect(loaded.quarantined).toBe(1);
+		expect(loaded.issue?.message).toMatch(/set aside/);
+
+		expect(store.save(createCollection('New')).ok).toBe(true);
+		expect(storedTitles()).toEqual(['Reading list', 'Garden beds', 'New']);
+		expect(JSON.parse(storage.getItem(KEY)!).data.collections[1]).toEqual(bad);
+	});
+
+	it('writes only its own Collection, so two open copies do not undo each other', () => {
+		const first = createCollection('First');
+		store.save(first);
+		const otherTab = createCollectionStore(storage);
+		otherTab.save(createCollection('Made elsewhere'));
+		expect(store.save({ ...first, title: 'First, renamed' }).ok).toBe(true);
+		expect(storedTitles()).toEqual(['First, renamed', 'Made elsewhere']);
+
+		expect(store.remove(first.id).ok).toBe(true);
+		expect(storedTitles()).toEqual(['Made elsewhere']);
+	});
+
+	it('refuses to write over a library it cannot read', () => {
+		const text = JSON.stringify({ woodles: 'woodles-persistence', schemaVersion: 99, savedAt: new Date().toISOString(), data: { collections: [createCollection('From the future')] } });
+		storage.setItem(KEY, text);
+		const loaded = store.load();
+		expect(loaded.writable).toBe(false);
+		expect(loaded.collections).toEqual([]);
+		const saved = store.save(createCollection('Would overwrite'));
+		expect(saved.ok).toBe(false);
+		expect(saved.issue?.message).toMatch(/Nothing was saved/);
+		expect(store.remove('anything').ok).toBe(false);
+		expect(storage.getItem(KEY)).toBe(text);
+	});
+
+	it('refuses to save a Collection that does not validate', () => {
+		const collection = createCollection();
+		expect(store.save({ ...collection, fields: [] }).ok).toBe(false);
+		expect(storage.getItem(KEY)).toBeNull();
+	});
+
+	it('imports the readable Collections in a file and skips the rest', () => {
+		const good = createCollection('Keep me');
+		const text = JSON.stringify({ woodles: 'woodles-persistence', schemaVersion: 1, savedAt: new Date().toISOString(), data: { collections: [{ id: 'bad' }, good] } });
+		expect(importCollections(text).collections.map((collection) => collection.title)).toEqual(['Keep me']);
+		expect(importCollections(JSON.stringify({ collections: [{ id: 'bad' }] })).collections).toEqual([]);
 	});
 });

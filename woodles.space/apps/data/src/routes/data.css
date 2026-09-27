@@ -6,7 +6,7 @@ button { cursor: pointer; }
 .data-surface { min-height: 100vh; background: #fbf9f7; color: #342b3c; }
 .table-toolbar { height: 48px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e8e0e8; background: #f8f5f3; }
 .table-intro { display: flex; align-items: baseline; gap: 12px; }
-.table-intro > span, .field-dialog > span, .reference-dialog > span, .inspector-mini, .option-editor > span { font: 10px/1.2 var(--font-mono, monospace); letter-spacing: .13em; color: #897b8f; }
+.table-intro > span, .field-dialog > form > span, .reference-dialog > span, .inspector-mini, .option-editor > span { font: 10px/1.2 var(--font-mono, monospace); letter-spacing: .13em; color: #897b8f; }
 .table-intro strong { font-size: 12px; font-weight: 500; color: #786d7e; }
 .table-intro i { font-style: normal; color: #b9adbd; padding: 0 4px; }
 .source-status { color: #897e90; font-size: 10px; letter-spacing: .02em; }
