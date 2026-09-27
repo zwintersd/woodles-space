@@ -7,11 +7,12 @@ anything here against [ARCHITECTURE.md](../../ARCHITECTURE.md) and the code.*
 every finding marked **verified** was reproduced against a local build in
 Chromium through the real shell; the rest are read from code and say so.
 
-> **status, 2026-09-27:** step 1 of the fix plan has landed. findings 1–4
-> and 6 are fixed, each with a regression case in `e2e/homesuite.spec.ts`,
-> which CI now runs; 9 is fixed except for HomeSuite's missing unit tests. of
-> 8, only the deep link changed: a trashed thing opened by its address now
-> opens marked In Trash, with Restore. everything else below is still open.
+> **status, 2026-09-27:** steps 1 and 2 of the fix plan have landed.
+> findings 1–8, 10, 11, 13, and 16 are fixed, each with a regression case in
+> `e2e/homesuite.spec.ts` (and unit tests for the Collection store), which CI
+> runs; 9 is fixed except for HomeSuite's own missing unit tests. 14 is
+> partly fixed — references open in place on ⌘/Ctrl-click and from Open
+> source. step 3 (12, 15, 17–21) and 22 are still open.
 
 ## the short version
 

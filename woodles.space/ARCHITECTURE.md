@@ -249,35 +249,58 @@ Collection schemas, records, and Table view state; HomeSuite owns the shared
 artifact listing and shell.
 
 HomeSuite keeps one top bar, title area, navigation, command palette,
-Undo/Redo location, and inspector slot around the active editor. Write and
-Whiteboard remain separate static builds and keep their editing models. Their
-`?homesuite=1` views mount inside a same-origin frame and exchange only
-surface state and actions through `shared/homesuiteBridge.ts`: artifact title,
-selection summary, inspector summary, available commands/modes, and history
-availability flow outward; chosen commands and Undo/Redo flow inward. The
-shell validates message origin and frame source. Each surface decides what
-its commands do and keeps its own history and storage.
+Undo/Redo location, and inspector slot around the active editor. Write,
+Whiteboard, and Data remain separate static builds and keep their editing
+models. Their `?homesuite=1` views mount inside a same-origin frame and
+exchange only surface state and actions through `shared/homesuiteBridge.ts`:
+artifact title, selection summary, inspector summary, available
+commands/modes, and history availability flow outward; chosen commands and
+Undo/Redo flow inward. The shell validates message origin and frame source.
+Each surface decides what its commands do and keeps its own history and
+storage. What the shell needs to know about a kind — its owning app and
+record kind, glyph, labels, and any templates New should offer — lives on
+that kind's adapter in `surfaces.ts`, not in the shell. An inspector control
+a surface marks `readonly` is shown and not editable, and the shell never
+writes a control's value while it has focus, so a late echo cannot undo a
+later keystroke. A surface can ask to `navigate` to a `WoodlesRef` — Data's
+Open source, a ⌘/Ctrl-click on a `#` reference in Write — and the shell opens
+it in place when one of its kinds owns it, in a new tab otherwise.
 
-Three rules keep that seam from losing work. The shell veils the frame, and
-marks it `inert`, until the surface's first `state` message — Write is
-prerendered, so its editor takes typing before it has loaded the draft, then
-drops it. What a surface reports is authoritative: when a board's portal opens
-another board in place, the shell's address follows with `replaceState` and
-the frame is not reloaded, so Trash and a reload act on what is on screen.
-And the shell closes a surface by removing its frame, which fires `pagehide`
-but never `beforeunload`, so every surface flushes its pending save on
-`pagehide` (and on `visibilitychange` to hidden). A trashed thing opened by its
-address, or walked into through a portal, opens marked In Trash with Restore
-in place of Move to Trash. `?draft=` and `?board=`
-remain normal deep links to the owning apps, with `@woodles/app-manifest`
-building those links. Data follows the same contract with `?collection=` and
-reports its active selection, Inspector controls, commands, and history state
-through the shared bridge. Collection records may keep a `WoodlesRef`
-membership or Relation; the origin application retains ownership of the
-referenced thing. The `Bestiary + Marginalia` Collection template reads the
-Bestiary's local creature shelf and Marginalia's revealed life and field-note
-log on open, when the window regains focus, and on request. Source-owned table
-columns refresh in place while Collection-owned fields stay local; source
+Four rules keep that seam from losing or misplacing work. The shell veils the
+frame, and marks it `inert`, until the surface's first `state` message —
+Write is prerendered, so its editor takes typing before it has loaded the
+draft, then drops it. What a surface reports is authoritative: when a board's
+portal opens another board in place, the shell's address follows with
+`replaceState` and the frame is not reloaded, so Trash and a reload act on
+what is on screen. Before it takes a frame away the shell sends `flush` and
+waits (at most 250 ms) for `flushed`, so the index it shows next already has
+the last edit; every surface also flushes on `pagehide` and on
+`visibilitychange` to hidden, since removing a frame never fires
+`beforeunload`. And a frame leaves the standalone app's own choice of what to
+reopen alone: neither HomeSuite nor an embedded editor sets Write's active
+draft or Whiteboard's active board.
+
+Trash is HomeSuite's list (`shared/homesuiteTrash.ts`), and the owning apps
+honor it: Write's drafts list and Whiteboard's shelf and portal picker leave
+trashed things out, and one opened directly shows that it is in Trash with a
+Restore. In the shell, a trashed thing opened by its address, or walked into
+through a portal, opens marked In Trash with Restore in place of Move to
+Trash. `?draft=`, `?board=`, and `?collection=` remain normal deep links to
+the owning apps, with `@woodles/app-manifest` building those links.
+
+Data's Collection library is validated one Collection at a time. One that
+cannot be read is set aside, untouched in storage, and the index says so; it
+no longer hides the rest. Every write reads the library fresh and replaces
+only its own Collection (`createCollectionStore` in
+`apps/data/src/lib/collections.ts`), so two open copies cannot undo each
+other, and nothing is written at all when the library itself cannot be read —
+a newer schema, or corruption with no good backup. Collection records may
+keep a `WoodlesRef` membership or Relation; the origin application retains
+ownership of the referenced thing. The `Bestiary + Marginalia` Collection
+template reads the Bestiary's local creature shelf and Marginalia's revealed
+life and field-note log on open, when the window regains focus, and on
+request. Source-owned table columns refresh in place while Collection-owned
+fields stay local; a pull that changes nothing saves nothing, and source
 records are never written back to either app.
 
 `hygge` is the design playground — it holds the fonts, palette, motifs, and
@@ -1681,8 +1704,10 @@ from it, Carillon's binder strip and the way in and out of its task composer,
 legacy localStorage migration across reload,
 keyboard operation, and serious/critical WCAG A axe findings. `homesuite.spec.ts`
 covers the shell's seams: the veil, edits made just before a frame is removed,
-a portal the shell has to follow, Trash by address, and a connected Collection
-keeping its place in the recent order.
+a portal the shell has to follow, Trash by address and in the owning apps, an
+unreadable Collection set aside rather than overwritten, references opened in
+place, keyboard use of the palette and template picker, one-step undo for
+inspector and number edits, and the phone layout.
 
 The cross-app specs earn their cost in a way the route checks don't. The
 Carillon ↔ Thinking About one caught a bug no unit test could have: the shelf

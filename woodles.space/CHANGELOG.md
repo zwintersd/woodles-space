@@ -20,6 +20,24 @@ so it's not easy to forget.
 
 ## 2026-09-27
 
+- **One bad Collection no longer costs you the others** — a Collection that
+  can't be read on this device is set aside, untouched, and HomeSuite says
+  so; before, one wrong value hid every Collection, and making a new one then
+  overwrote them all. Each save now rewrites only its own Collection, so two
+  open tabs can't undo each other, and nothing is written over a library
+  that can't be read at all.
+- **Trash means the same thing everywhere** — Write's drafts list and
+  Whiteboard's shelf leave trashed things out, and one opened directly offers
+  Restore. Opening or making things in HomeSuite no longer changes which
+  draft or board Write and Whiteboard reopen on their own.
+- **HomeSuite, smoother at the edges** — ⌘/Ctrl-click a `#` reference in a
+  document, or Open source in a Collection, and it opens in place. Leaving a
+  thing waits for its last save, so the index is already up to date. The
+  palette moves with the arrow keys, dialogs take and return focus, Escape
+  closes the template picker, ⌘K works from inside a Collection, and field
+  renames and number cells undo in one step. On a phone the inspector starts
+  closed and the title keeps its room.
+
 - **HomeSuite stops losing things at its seams** — a board edit or a
   Collection cell typed in the moment before leaving is now saved; Whiteboard
   and Data flush on `pagehide`, which fires when HomeSuite closes a frame
