@@ -135,9 +135,11 @@ function refKey(ref: WoodlesRef): string { return `${ref.app}\u0000${ref.kind}\u
 export function mergePulledRows(collection: Collection, rows: PulledSourceRow[], syncedAt = new Date().toISOString()): Collection {
 	const sourceFields = collection.fields.filter((field) => field.sourceKey);
 	const bySource = new Map(collection.records.filter((record) => record.sourceRef).map((record) => [refKey(record.sourceRef!), record]));
+	const excluded = new Set((collection.excludedRefs ?? []).map(refKey));
 	let records = [...collection.records];
 	for (const row of rows) {
 		const key = refKey(row.ref);
+		if (excluded.has(key)) continue;
 		const existing = bySource.get(key);
 		if (existing) {
 			const values = { ...existing.values };

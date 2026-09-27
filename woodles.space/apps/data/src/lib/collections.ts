@@ -34,6 +34,8 @@ export type Collection = {
 	updatedAt: string;
 	sources?: CollectionSource[];
 	sourceSyncedAt?: string;
+	/** Source-backed rows the user removed here; sync must not re-add them. */
+	excludedRefs?: WoodlesRef[];
 };
 export type CollectionLibrary = { collections: Collection[] };
 
@@ -52,6 +54,7 @@ export function isCollection(value: unknown): value is Collection {
 	if (!isStamp(value.createdAt) || !isStamp(value.updatedAt)) return false;
 	if (value.sources !== undefined && (!Array.isArray(value.sources) || !value.sources.every((source) => ['bestiary-creatures', 'marginalia-life', 'marginalia-field-notes'].includes(source)))) return false;
 	if (value.sourceSyncedAt !== undefined && !isStamp(value.sourceSyncedAt)) return false;
+	if (value.excludedRefs !== undefined && (!Array.isArray(value.excludedRefs) || !value.excludedRefs.every(isWoodlesRef))) return false;
 	const fields = value.fields as unknown[];
 	if (fields.filter((field) => isRecord(field) && field.primary === true).length !== 1 || !fields.every(isCollectionField)) return false;
 	if (new Set((fields as CollectionField[]).map((field) => field.id)).size !== fields.length) return false;
@@ -148,7 +151,8 @@ export function createRecord(collection: Collection, sourceRef?: WoodlesRef): Co
 
 export function addRecord(collection: Collection, sourceRef?: WoodlesRef): Collection {
 	const record = createRecord(collection, sourceRef);
-	return { ...collection, records: [...collection.records, record], updatedAt: now() };
+	const excludedRefs = sourceRef ? (collection.excludedRefs ?? []).filter((ref) => ref.app !== sourceRef.app || ref.kind !== sourceRef.kind || ref.id !== sourceRef.id) : collection.excludedRefs;
+	return { ...collection, records: [...collection.records, record], ...(excludedRefs ? { excludedRefs } : {}), updatedAt: now() };
 }
 
 export function addField(collection: Collection, name: string, type: FieldType): Collection {
@@ -186,7 +190,11 @@ export function setCellValue(collection: Collection, recordId: string, fieldId: 
 }
 
 export function removeRecord(collection: Collection, recordId: string): Collection {
-	return { ...collection, records: collection.records.filter((record) => record.id !== recordId), updatedAt: now() };
+	const removed = collection.records.find((record) => record.id === recordId);
+	const excludedRefs = removed?.sourceRef
+		? [...(collection.excludedRefs ?? []).filter((ref) => ref.app !== removed.sourceRef?.app || ref.kind !== removed.sourceRef?.kind || ref.id !== removed.sourceRef?.id), { ...removed.sourceRef }]
+		: collection.excludedRefs;
+	return { ...collection, records: collection.records.filter((record) => record.id !== recordId), ...(excludedRefs ? { excludedRefs } : {}), updatedAt: now() };
 }
 
 export function duplicateRecord(collection: Collection, recordId: string): Collection {

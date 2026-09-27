@@ -47,6 +47,10 @@ button { cursor: pointer; }
 .checkbox-cell.checked { background: #836b90; border-color: #836b90; }
 .source-value, .relation-cell { border: 0; background: transparent; width: 100%; text-align: left; padding: 0 11px; height: 36px; color: #554265; font-weight: 550; }
 .source-value:hover, .relation-cell:hover { background: #f5eef7; }
+.relation-wrap { display: flex; align-items: center; }
+.relation-wrap .relation-cell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.remove-reference { flex: 0 0 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: #927b9a; font-size: 18px; }
+.remove-reference:hover { background: #f5e7e7; color: #9a5454; }
 .cold { margin-left: 5px; color: #a07567; font: 9px var(--font-mono, monospace); text-transform: uppercase; }
 .url-open { position: absolute; right: 8px; top: 10px; color: #8b7598; text-decoration: none; }
 .row-actions { width: 38px; min-width: 38px; text-align: center; }
