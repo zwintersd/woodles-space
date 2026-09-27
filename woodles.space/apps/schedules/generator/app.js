@@ -111,6 +111,7 @@
       return {
         key,
         label,
+        removed: source.removed === true,
         start: validTime(source.start, '09:00'),
         end: validTime(source.end, '12:00'),
         printLayout: ['timeline', 'cards'].includes(source.printLayout) ? source.printLayout : 'timeline',
@@ -179,6 +180,10 @@
     return workspace.plans.find((plan) => plan.id === currentPlanId) || null;
   }
 
+  function visibleDays(plan) {
+    return plan ? plan.days.filter((day) => !day.removed) : [];
+  }
+
   function getDay(plan, key) {
     return plan && plan.days.find((day) => day.key === key);
   }
@@ -244,7 +249,7 @@
   }
 
   function planStats(plan) {
-    return plan.days.reduce((result, day) => {
+    return visibleDays(plan).reduce((result, day) => {
       result.days += day.activities.length > 0 ? 1 : 0;
       result.activities += day.activities.filter((item) => item.kind !== 'open-slot').length;
       result.openSlots += day.activities.filter((item) => item.kind === 'open-slot').length;
@@ -335,13 +340,15 @@
   }
 
   function renderDayTabs(plan) {
-    return DAY_KEYS.map(([key, label]) => {
+    const removed = plan.days.filter((day) => day.removed);
+    return visibleDays(plan).map(({ key, label }) => {
       const day = getDay(plan, key);
       const stats = dayStats(day);
       const countText = dayItemSummary(stats);
       return '<button class="day-tab" type="button" data-action="select-day" data-day="' + key + '" aria-pressed="' + String(key === activeDayKey) + '">' +
         '<strong>' + label.slice(0, 3) + '</strong><span class="day-count">' + countText + '</span><span>' + esc(formatTime(day.start)) + '–' + esc(formatTime(day.end)) + '</span></button>';
-    }).join('');
+    }).join('') + (removed.length ? '<div class="restore-days"><span>Add back:</span>' + removed.map((day) =>
+      '<button class="button small secondary" type="button" data-action="restore-day" data-day="' + day.key + '">＋ ' + esc(day.label) + '</button>').join('') + '</div>' : '');
   }
 
   function renderActivity(day, item, index, items) {
@@ -372,7 +379,7 @@
   }
 
   function renderWeekSummary(plan) {
-    return plan.days.map((day) => {
+    return visibleDays(plan).map((day) => {
       const stats = dayStats(day);
       return '<div class="week-summary-row"><span>' + esc(day.label) + '</span><span>' + esc(dayItemSummary(stats)) + ' · ' + esc(formatTime(day.start)) + '</span></div>';
     }).join('');
@@ -381,14 +388,16 @@
   function renderPlan() {
     const plan = getPlan();
     if (!plan) return renderLibrary();
-    const day = getDay(plan, activeDayKey) || plan.days[0];
+    const shown = visibleDays(plan);
+    if (!shown.length) return renderNoDays(plan);
+    const day = shown.find((entry) => entry.key === activeDayKey) || shown[0];
     activeDayKey = day.key;
     const items = sortedActivities(day);
     const stats = dayStats(day);
     const capacity = timeMinutes(day.end) - timeMinutes(day.start);
     const hasArasaac = items.some((item) => /^\d{1,10}$/.test(String(item.pictogram || '').trim()));
-    const destinationOptions = DAY_KEYS.filter((entry) => entry[0] !== day.key).map((entry) =>
-      '<option value="' + entry[0] + '">' + entry[1] + '</option>').join('');
+    const destinationOptions = shown.filter((entry) => entry.key !== day.key).map((entry) =>
+      '<option value="' + entry.key + '">' + esc(entry.label) + '</option>').join('');
     document.title = plan.learner + ' · ' + plan.name + ' · Schedule studio';
     app.innerHTML =
       '<a class="back-link" href="/schedules" data-action="back-library">← All learner plans</a>' +
@@ -410,7 +419,7 @@
           '<label class="print-time-toggle"><input type="checkbox" data-print-setting="times" ' + (day.printTimes ? 'checked' : '') + '><span>Show times on print</span></label>' +
           '<label><span>Card spacing</span><select data-print-setting="spacing" aria-label="Printed card spacing"><option value="standard" ' + (day.printSpacing === 'standard' ? 'selected' : '') + '>Standard</option><option value="cut" ' + (day.printSpacing === 'cut' ? 'selected' : '') + '>Room to cut</option><option value="laminate" ' + (day.printSpacing === 'laminate' ? 'selected' : '') + '>Cut and laminate</option></select><small class="muted">Used with cut cards</small></label>' +
         '</div>' +
-        '<div class="copy-row"><label for="copyDestination">Reuse this day:</label><select id="copyDestination">' + destinationOptions + '</select><button class="button small secondary" type="button" data-action="copy-day">Copy day</button><button class="button small secondary danger" type="button" data-action="clear-day">Clear day</button></div>' +
+        '<div class="copy-row"><label for="copyDestination">Reuse this day:</label><select id="copyDestination">' + destinationOptions + '</select><button class="button small secondary" type="button" data-action="copy-day">Copy day</button><button class="button small secondary danger" type="button" data-action="clear-day">Clear day</button><button class="button small secondary danger" type="button" data-action="delete-day">Delete day</button></div>' +
         '<div class="activity-list" aria-label="' + esc(day.label) + ' scheduled items">' +
           (items.length ? items.map((item, index) => renderActivity(day, item, index, items)).join('') :
             '<div class="empty-day"><span class="empty-icon" aria-hidden="true">＋</span><h3>No activities planned yet</h3><p>Add a session activity or an open slot, or copy a day with a schedule you want to reuse. Times and items remain editable on every day.</p><div class="button-row"><button class="button secondary" type="button" data-action="add-open-slot">＋ Add open slot</button><button class="button secondary" type="button" data-action="add-activity">＋ Add first activity</button></div></div>') +
@@ -421,6 +430,14 @@
     document.body.dataset.printLayout = day.printLayout;
     document.body.dataset.printTimes = day.printTimes ? 'true' : 'false';
     document.body.dataset.printSpacing = day.printSpacing;
+  }
+
+  function renderNoDays(plan) {
+    document.title = plan.learner + ' · ' + plan.name + ' · Schedule studio';
+    app.innerHTML =
+      '<a class="back-link" href="/schedules" data-action="back-library">← All learner plans</a>' +
+      '<section class="empty-card"><span class="eyebrow">' + esc(plan.learner) + ' · ' + esc(plan.name) + '</span><h2>No days in this plan</h2><p>Every day has been deleted from this weekly schedule. Add a day back to keep planning.</p>' +
+      '<nav class="day-tabs" aria-label="Days of the week">' + renderDayTabs(plan) + '</nav></section>';
   }
 
   function render() {
@@ -974,6 +991,32 @@
     showToast(day.label + ' is clear.');
   }
 
+  function deleteDay() {
+    const plan = getPlan();
+    const day = getDay(plan, activeDayKey);
+    if (!day || day.removed) return;
+    const message = day.activities.length
+      ? 'Delete ' + day.label + ' and its ' + day.activities.length + ' scheduled item' + (day.activities.length === 1 ? '' : 's') + ' from this week?'
+      : 'Delete ' + day.label + ' from this week?';
+    if (!window.confirm(message)) return;
+    const next = visibleDays(plan).find((entry) => entry.key !== day.key);
+    day.removed = true;
+    day.activities = [];
+    persist();
+    routeToPlan(currentPlanId, next ? next.key : activeDayKey);
+    showToast(day.label + ' deleted.');
+  }
+
+  function restoreDay(key) {
+    const plan = getPlan();
+    const day = getDay(plan, key);
+    if (!day || !day.removed) return;
+    day.removed = false;
+    persist();
+    routeToPlan(currentPlanId, key);
+    showToast(day.label + ' added back.');
+  }
+
   function removeActivity(occurrenceId) {
     const day = getDay(getPlan(), activeDayKey);
     if (!day) return;
@@ -1131,6 +1174,8 @@
     else if (name === 'move-activity') moveActivity(action.dataset.id, action.dataset.direction);
     else if (name === 'copy-day') copyDay();
     else if (name === 'clear-day') clearDay();
+    else if (name === 'delete-day') deleteDay();
+    else if (name === 'restore-day') restoreDay(action.dataset.day);
     else if (name === 'print-day') window.print();
     else if (name === 'export-plan') exportPlan();
     else if (name === 'import-plan') importPlan();
