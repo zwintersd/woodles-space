@@ -9,7 +9,78 @@
   const CATEGORIES = ['Instruction', 'Communication', 'Play / leisure', 'Daily living', 'Movement', 'Sensory', 'Break', 'Transition', 'Other'];
   const COLORS = ['#3978c7', '#32845f', '#d27b32', '#a16ab5', '#d05c66', '#458d98', '#7c8797'];
   const COLOR_NAMES = { '#3978c7': 'Blue', '#32845f': 'Green', '#d27b32': 'Orange', '#a16ab5': 'Purple', '#d05c66': 'Rose', '#458d98': 'Teal', '#7c8797': 'Slate' };
-  const ICONS = ['⭐', '🧩', '💬', '📚', '🧸', '🎨', '🎵', '🏃', '🍎', '🪥', '🧼', '🧺', '🚶', '🧘', '🌿', '💧', '🏠', '🎯'];
+  const SYMBOL_RECENTS_KEY = 'woodles.schedule-planner.symbol-recents.v1';
+  const SYMBOL_GROUPS = ['Popular', 'Recent', 'Learning', 'Daily routines', 'Movement', 'Play', 'Nature', 'All'];
+  const SYMBOL_CATALOG = [
+    { char: '⭐', label: 'Star', groups: ['Popular', 'Play'], keywords: 'favorite reward' },
+    { char: '🧩', label: 'Puzzle', groups: ['Popular', 'Learning', 'Play'], keywords: 'problem solving' },
+    { char: '💬', label: 'Talk', groups: ['Popular', 'Learning'], keywords: 'communication speech' },
+    { char: '📚', label: 'Read', groups: ['Popular', 'Learning'], keywords: 'book story library' },
+    { char: '🧸', label: 'Comfort', groups: ['Popular', 'Play'], keywords: 'teddy toy safe' },
+    { char: '🎨', label: 'Art', groups: ['Popular', 'Play'], keywords: 'paint create craft' },
+    { char: '🎵', label: 'Music', groups: ['Popular', 'Play'], keywords: 'song listen' },
+    { char: '🪙', label: 'Token', groups: ['Play'], keywords: 'coin reward turn' },
+    { char: '💎', label: 'Gem', groups: ['Play'], keywords: 'reward treasure' },
+    { char: '🏃', label: 'Run', groups: ['Popular', 'Movement'], keywords: 'exercise race' },
+    { char: '🍎', label: 'Snack', groups: ['Popular', 'Daily routines', 'Nature'], keywords: 'food eat apple' },
+    { char: '🪥', label: 'Brush teeth', groups: ['Popular', 'Daily routines'], keywords: 'toothbrush bathroom' },
+    { char: '🧼', label: 'Wash', groups: ['Popular', 'Daily routines'], keywords: 'soap clean hands' },
+    { char: '🧺', label: 'Laundry', groups: ['Popular', 'Daily routines'], keywords: 'clothes basket' },
+    { char: '🚶', label: 'Walk', groups: ['Popular', 'Movement'], keywords: 'stroll outside' },
+    { char: '🧘', label: 'Calm', groups: ['Popular', 'Movement'], keywords: 'breathe meditation quiet' },
+    { char: '🌿', label: 'Nature', groups: ['Popular', 'Nature'], keywords: 'plant garden outside' },
+    { char: '💧', label: 'Water', groups: ['Popular', 'Daily routines'], keywords: 'drink thirsty' },
+    { char: '🏠', label: 'Home', groups: ['Popular', 'Daily routines'], keywords: 'house arrive' },
+    { char: '🎯', label: 'Goal', groups: ['Popular', 'Learning', 'Play'], keywords: 'focus target' },
+    { char: '✏️', label: 'Write', groups: ['Learning'], keywords: 'pencil draw homework' },
+    { char: '🔤', label: 'Letters', groups: ['Learning'], keywords: 'alphabet spelling' },
+    { char: '🔢', label: 'Numbers', groups: ['Learning'], keywords: 'math count' },
+    { char: '📋', label: 'Checklist', groups: ['Learning'], keywords: 'plan list' },
+    { char: '✅', label: 'Finished', groups: ['Learning', 'Daily routines'], keywords: 'done complete success' },
+    { char: '🔓', label: 'Open', groups: ['Learning', 'Play'], keywords: 'unlock ready' },
+    { char: '🔒', label: 'Wait', groups: ['Learning', 'Daily routines'], keywords: 'locked pause stop' },
+    { char: '📈', label: 'Progress', groups: ['Learning'], keywords: 'chart growing' },
+    { char: '⚖️', label: 'Balance', groups: ['Movement'], keywords: 'scales steady' },
+    { char: '⏩', label: 'Next', groups: ['Daily routines', 'Movement'], keywords: 'fast forward transition' },
+    { char: '🗑️', label: 'Clean up', groups: ['Daily routines'], keywords: 'trash tidy put away' },
+    { char: '💠', label: 'Diamond', groups: ['Play'], keywords: 'gem reward' },
+    { char: '🧠', label: 'Think', groups: ['Learning'], keywords: 'brain focus' },
+    { char: '🍽️', label: 'Meal', groups: ['Daily routines'], keywords: 'eat food lunch dinner' },
+    { char: '🚽', label: 'Bathroom', groups: ['Daily routines'], keywords: 'toilet washroom' },
+    { char: '👕', label: 'Get dressed', groups: ['Daily routines'], keywords: 'clothes shirt' },
+    { char: '🛏️', label: 'Rest', groups: ['Daily routines', 'Movement'], keywords: 'sleep bed nap' },
+    { char: '🚌', label: 'Bus', groups: ['Daily routines', 'Movement'], keywords: 'ride travel school' },
+    { char: '🎧', label: 'Listen', groups: ['Movement', 'Play'], keywords: 'headphones audio sound' },
+    { char: '🌙', label: 'Quiet time', groups: ['Movement', 'Nature'], keywords: 'moon calm rest' },
+    { char: '🫧', label: 'Sensory break', groups: ['Movement', 'Play'], keywords: 'bubbles sensory' },
+    { char: '🎲', label: 'Game', groups: ['Play'], keywords: 'dice play turn' },
+    { char: '🏆', label: 'Celebrate', groups: ['Play'], keywords: 'trophy success win' },
+    { char: '🌈', label: 'Rainbow', groups: ['Play', 'Nature'], keywords: 'color weather' },
+    { char: '🦋', label: 'Butterfly', groups: ['Nature', 'Play'], keywords: 'bug insect' },
+    { char: '🐝', label: 'Bee', groups: ['Nature'], keywords: 'insect bug' },
+    { char: '🐌', label: 'Snail', groups: ['Nature'], keywords: 'slow garden' },
+    { char: '🐚', label: 'Shell', groups: ['Nature'], keywords: 'beach ocean' },
+    { char: '🌱', label: 'Seedling', groups: ['Nature'], keywords: 'plant grow garden' },
+    { char: '🌸', label: 'Flower', groups: ['Nature', 'Play'], keywords: 'blossom' },
+    { char: '🌻', label: 'Sunflower', groups: ['Nature'], keywords: 'flower' },
+    { char: '🌼', label: 'Blossom', groups: ['Nature'], keywords: 'flower' },
+    { char: '🍄', label: 'Mushroom', groups: ['Nature', 'Play'], keywords: 'forest' },
+    { char: '🍀', label: 'Clover', groups: ['Nature'], keywords: 'leaf luck' },
+    { char: '🍯', label: 'Honey', groups: ['Nature', 'Daily routines'], keywords: 'food snack sweet' },
+    { char: '🌾', label: 'Harvest', groups: ['Nature'], keywords: 'grain field' },
+    { char: '🪵', label: 'Wood', groups: ['Nature', 'Play'], keywords: 'log forest' },
+    { char: '🌰', label: 'Acorn', groups: ['Nature'], keywords: 'nut tree' },
+    { char: '🍇', label: 'Grapes', groups: ['Nature', 'Daily routines'], keywords: 'fruit snack food' },
+    { char: '✨', label: 'Sparkle', groups: ['Play'], keywords: 'magic special' },
+    { char: '🔥', label: 'Warm up', groups: ['Movement'], keywords: 'fire heat' },
+    { char: '📜', label: 'Story', groups: ['Learning', 'Play'], keywords: 'scroll read' }
+  ];
+  const OPENMOJI_FILES = new Set([
+    '23E9', '2696', '2705', '2728', '2B50', '1F308', '1F319', '1F330', '1F331', '1F338', '1F33B',
+    '1F33C', '1F33E', '1F33F', '1F340', '1F344', '1F347', '1F34E', '1F36F', '1F3AF', '1F3C6',
+    '1F40C', '1F41A', '1F41D', '1F48E', '1F4A0', '1F4A7', '1F4C8', '1F4CB', '1F4DC', '1F512',
+    '1F513', '1F525', '1F5D1', '1F98B', '1FA99', '1FAB5', '1FAE7'
+  ]);
   const app = document.getElementById('app');
   const planDialog = document.getElementById('planDialog');
   const activityDialog = document.getElementById('activityDialog');
@@ -48,6 +119,8 @@
   let cropPointer = null;
   let cropSourceName = 'image';
   let cropAttachEnabled = false;
+  let activeSymbolGroup = 'Popular';
+  let recentSymbols = readRecentSymbols();
 
   function makeId(prefix) {
     const random = window.crypto && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -58,6 +131,58 @@
     return String(value == null ? '' : value).replace(/[&<>"']/g, (character) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     })[character]);
+  }
+
+  function readRecentSymbols() {
+    try {
+      const value = JSON.parse(localStorage.getItem(SYMBOL_RECENTS_KEY) || '[]');
+      return Array.isArray(value) ? value.filter((symbol, index) => SYMBOL_CATALOG.some((entry) => entry.char === symbol) && value.indexOf(symbol) === index).slice(0, 8) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function rememberSymbol(symbol) {
+    recentSymbols = [symbol].concat(recentSymbols.filter((entry) => entry !== symbol)).slice(0, 8);
+    try { localStorage.setItem(SYMBOL_RECENTS_KEY, JSON.stringify(recentSymbols)); } catch {}
+  }
+
+  function openMojiCodepoint(value) {
+    const points = Array.from(String(value || '').trim()).map((character) => character.codePointAt(0)).filter((point) => point !== 0xfe0f);
+    if (points.length !== 1) return '';
+    const codepoint = points[0].toString(16).toUpperCase();
+    return OPENMOJI_FILES.has(codepoint) ? codepoint : '';
+  }
+
+  function symbolMarkup(value, size) {
+    const symbol = String(value || '⭐');
+    const codepoint = openMojiCodepoint(symbol);
+    if (codepoint) return '<img class="symbol-artwork" src="/schedules/generator/assets/openmoji/' + codepoint + '.svg" alt="" width="' + size + '" height="' + size + '" loading="lazy">';
+    return '<span class="symbol-fallback" aria-hidden="true" style="font-size:' + size + 'px">' + esc(symbol) + '</span>';
+  }
+
+  function renderSymbolResults(form) {
+    const query = cleanText(form.elements.symbolSearch.value, 80, '').toLowerCase();
+    const current = form.elements.icon.value || '⭐';
+    let choices = activeSymbolGroup === 'Recent'
+      ? recentSymbols.map((symbol) => SYMBOL_CATALOG.find((entry) => entry.char === symbol)).filter(Boolean)
+      : SYMBOL_CATALOG.filter((entry) => activeSymbolGroup === 'All' || entry.groups.includes(activeSymbolGroup));
+    if (query) choices = SYMBOL_CATALOG.filter((entry) => [entry.label, entry.keywords, entry.char].join(' ').toLowerCase().includes(query));
+    const results = form.querySelector('#symbolResults');
+    const count = form.querySelector('#symbolResultCount');
+    form.querySelectorAll('[data-action="filter-symbols"]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.group === activeSymbolGroup));
+    });
+    const recentButton = form.querySelector('[data-group="Recent"]');
+    if (recentButton) recentButton.textContent = 'Recent' + (recentSymbols.length ? ' · ' + recentSymbols.length : '');
+    count.textContent = choices.length ? choices.length + (choices.length === 1 ? ' symbol' : ' symbols') : (activeSymbolGroup === 'Recent' ? 'Your picked symbols will show up here.' : 'No symbols found. Try another search.');
+    results.innerHTML = choices.map((entry) => '<button class="symbol-option' + (entry.char === current ? ' is-selected' : '') + '" type="button" data-action="select-symbol" data-symbol="' + esc(entry.char) + '" aria-label="Choose ' + esc(entry.label) + '" aria-pressed="' + String(entry.char === current) + '" title="' + esc(entry.label) + '">' +
+      '<span class="symbol-option-art" aria-hidden="true">' + symbolMarkup(entry.char, 30) + '</span><span class="symbol-option-label">' + esc(entry.label) + '</span></button>').join('');
+  }
+
+  function updateSymbolPreview(form) {
+    const preview = form.querySelector('.symbol-preview');
+    if (preview) preview.innerHTML = symbolMarkup(form.elements.icon.value || '⭐', 30);
   }
 
   function cleanText(value, max, fallback) {
@@ -305,7 +430,7 @@
     const background = validColor(item.color);
     const inside = source
       ? '<img src="' + esc(source) + '" alt="" loading="lazy">'
-      : esc(item.icon || '⭐');
+      : symbolMarkup(item.icon || '⭐', 36);
     return '<span class="activity-visual" style="--activity-bg:color-mix(in srgb,' + background + ' 14%,white)">' + inside + '</span>';
   }
 
@@ -387,6 +512,15 @@
     const stats = dayStats(day);
     const capacity = timeMinutes(day.end) - timeMinutes(day.start);
     const hasArasaac = items.some((item) => /^\d{1,10}$/.test(String(item.pictogram || '').trim()));
+    const hasOpenMoji = items.some((item) => {
+      if (item.kind === 'open-slot') return false;
+      const imageValue = activityImageValue(item);
+      return !(isLocalImageData(imageValue) || pictogramSource(imageValue)) && Boolean(openMojiCodepoint(item.icon));
+    });
+    const printCredits = [
+      hasArasaac ? 'ARASAAC pictograms by Sergio Palao · Government of Aragón · CC BY-NC-SA. <a href="https://aulaabierta.arasaac.org/en/terms-of-use">Terms of use</a>.' : '',
+      hasOpenMoji ? 'Emoji artwork by <a href="https://openmoji.org">OpenMoji</a> · <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.' : ''
+    ].filter(Boolean).join(' ');
     const destinationOptions = DAY_KEYS.filter((entry) => entry[0] !== day.key).map((entry) =>
       '<option value="' + entry[0] + '">' + entry[1] + '</option>').join('');
     document.title = plan.learner + ' · ' + plan.name + ' · Schedule studio';
@@ -414,7 +548,7 @@
         '<div class="activity-list" aria-label="' + esc(day.label) + ' scheduled items">' +
           (items.length ? items.map((item, index) => renderActivity(day, item, index, items)).join('') :
             '<div class="empty-day"><span class="empty-icon" aria-hidden="true">＋</span><h3>No activities planned yet</h3><p>Add a session activity or an open slot, or copy a day with a schedule you want to reuse. Times and items remain editable on every day.</p><div class="button-row"><button class="button secondary" type="button" data-action="add-open-slot">＋ Add open slot</button><button class="button secondary" type="button" data-action="add-activity">＋ Add first activity</button></div></div>') +
-        '</div>' + (hasArasaac ? '<p class="print-credit">ARASAAC pictograms by Sergio Palao · Government of Aragón · CC BY-NC-SA. <a href="https://aulaabierta.arasaac.org/en/terms-of-use">Terms of use</a>.</p>' : '') + '</section>' +
+        '</div>' + (printCredits ? '<p class="print-credit">' + printCredits + '</p>' : '') + '</section>' +
         '<aside class="day-side"><section class="side-card"><h3>This week</h3><p>Each day can use its own session window and activity sequence.</p><div class="week-summary">' + renderWeekSummary(plan) + '</div>' +
           '<div class="side-actions"><button class="button secondary" type="button" data-action="duplicate-plan">Duplicate this learner plan</button><button class="button secondary danger" type="button" data-action="delete-current-plan">Delete this plan</button></div></section></aside>' +
       '</div>';
@@ -487,6 +621,20 @@
     showToast('Plan deleted.');
   }
 
+  function renderSymbolPicker(icon) {
+    return '<div class="field full symbol-field"><label for="activityIcon">Visual symbol or emoji</label>' +
+      '<div class="symbol-entry"><span class="symbol-preview" aria-hidden="true">' + symbolMarkup(icon || '⭐', 30) + '</span>' +
+        '<input id="activityIcon" name="icon" maxlength="16" value="' + esc(icon || '⭐') + '" autocomplete="off" aria-describedby="activityIconHelp" placeholder="Choose or type an emoji">' +
+        '<button class="button secondary" type="button" data-action="toggle-symbol-picker" aria-expanded="false" aria-controls="symbolPicker">Browse symbols</button></div>' +
+      '<small class="muted" id="activityIconHelp">Browse by name, or type any emoji. OpenMoji artwork is used where available.</small>' +
+      '<section class="symbol-picker" id="symbolPicker" aria-label="Choose a visual symbol" hidden>' +
+        '<label class="visually-hidden" for="symbolSearch">Search symbols by name</label><input class="symbol-search" id="symbolSearch" name="symbolSearch" type="search" placeholder="Search all symbols (book, snack, break…)" autocomplete="off">' +
+        '<div class="symbol-groups" role="group" aria-label="Symbol categories">' + SYMBOL_GROUPS.map((group) => '<button class="symbol-group" type="button" data-action="filter-symbols" data-group="' + esc(group) + '" aria-pressed="' + String(group === 'Popular') + '">' + esc(group) + (group === 'Recent' && recentSymbols.length ? ' · ' + recentSymbols.length : '') + '</button>').join('') + '</div>' +
+        '<p class="symbol-result-count" id="symbolResultCount" role="status" aria-live="polite"></p><div class="symbol-results" id="symbolResults" role="group" aria-label="Available symbols"></div>' +
+        '<small class="symbol-credit">OpenMoji artwork for supported picks · <a href="https://openmoji.org" target="_blank" rel="noopener noreferrer">OpenMoji</a> · <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a></small>' +
+      '</section></div>';
+  }
+
   function showActivityDialog(mode, item) {
     activityMode = mode;
     editingActivityId = item ? item.occurrenceId : '';
@@ -506,10 +654,10 @@
           '<label class="field"><span>Activity name</span><input name="title" maxlength="100" value="' + esc(activity.title || '') + '" placeholder="e.g., Choose a book" required></label>' +
           '<label class="field"><span>Category</span><input name="category" maxlength="60" value="' + esc(activity.category || 'Instruction') + '" list="categorySuggestions"><datalist id="categorySuggestions">' + CATEGORIES.map((category) => '<option value="' + esc(category) + '">').join('') + '</datalist></label>' +
           '<label class="field"><span>Duration (minutes)</span><input name="duration" type="number" min="1" max="480" value="' + esc(activity.duration || 15) + '" required></label>' +
-          '<label class="field"><span>Visual symbol (emoji)</span><input name="icon" maxlength="16" value="' + esc(activity.icon || '⭐') + '" list="symbolSuggestions" aria-describedby="symbolHelp"><datalist id="symbolSuggestions">' + ICONS.map((icon) => '<option value="' + esc(icon) + '">').join('') + '</datalist></label>' +
+          renderSymbolPicker(activity.icon || '⭐') +
           '<label class="field"><span>Color</span><select name="color">' + COLORS.map((color) => '<option value="' + color + '" ' + (color === activity.color ? 'selected' : '') + '>' + COLOR_NAMES[color] + '</option>').join('') + '</select></label>' +
-          '<div class="field full"><span>Activity image (optional)</span><div class="image-reference-row"><input name="pictogramUrl" maxlength="300" value="' + esc(activity.pictogram || '') + '" placeholder="ARASAAC ID or HTTPS image URL" aria-describedby="symbolHelp"><input type="hidden" name="imageAssetId" value="' + esc(activity.imageAssetId || '') + '"><button class="button secondary" type="button" data-action="open-image-editor">Upload and crop</button></div>' +
-            '<div class="image-asset-preview" id="imageAssetPreview">' + renderImageAssetPreview(activity.pictogram || '', activity.imageAssetId || '') + '</div><small class="muted" id="symbolHelp">Crop an image here or use an ARASAAC ID or direct HTTPS image URL. Add a credit below for other image sources.</small></div>' +
+          '<div class="field full"><span>Activity image (optional)</span><div class="image-reference-row"><input name="pictogramUrl" maxlength="300" value="' + esc(activity.pictogram || '') + '" placeholder="ARASAAC ID or HTTPS image URL" aria-describedby="imageHelp"><input type="hidden" name="imageAssetId" value="' + esc(activity.imageAssetId || '') + '"><button class="button secondary" type="button" data-action="open-image-editor">Upload and crop</button></div>' +
+            '<div class="image-asset-preview" id="imageAssetPreview">' + renderImageAssetPreview(activity.pictogram || '', activity.imageAssetId || '') + '</div><small class="muted" id="imageHelp">Crop an image here or use an ARASAAC ID or direct HTTPS image URL. Add a credit below for other image sources.</small></div>' +
           '<label class="field full"><span>Image source or attribution (optional)</span><input name="credit" maxlength="200" value="' + esc(activity.credit || '') + '" placeholder="Artist, library, or license"></label>' +
           '<label class="field full"><span>Support cue or short note (optional)</span><textarea name="note" maxlength="500" placeholder="A short cue, material, or transition note">' + esc(activity.note || '') + '</textarea></label>' +
           (!editing ? '<label class="check-field full"><input type="checkbox" name="saveToLibrary" checked><span>Save this activity to the reusable library</span></label>' :
@@ -1108,6 +1256,36 @@
     else if (name === 'add-open-slot') showOpenSlotDialog('new');
     else if (name === 'open-image-editor') openImageEditor(true);
     else if (name === 'open-image-studio') openImageEditor(false);
+    else if (name === 'toggle-symbol-picker') {
+      const form = action.closest('#activityForm');
+      const picker = form && form.querySelector('#symbolPicker');
+      if (form && picker) {
+        picker.hidden = !picker.hidden;
+        action.setAttribute('aria-expanded', String(!picker.hidden));
+        if (!picker.hidden) {
+          activeSymbolGroup = 'Popular';
+          renderSymbolResults(form);
+          form.elements.symbolSearch.focus();
+        }
+      }
+    } else if (name === 'filter-symbols') {
+      const form = action.closest('#activityForm');
+      if (form) {
+        activeSymbolGroup = action.dataset.group;
+        form.elements.symbolSearch.value = '';
+        renderSymbolResults(form);
+      }
+    } else if (name === 'select-symbol') {
+      const form = action.closest('#activityForm');
+      if (form) {
+        form.elements.icon.value = action.dataset.symbol;
+        rememberSymbol(action.dataset.symbol);
+        updateSymbolPreview(form);
+        form.querySelector('#symbolPicker').hidden = true;
+        form.querySelector('[data-action="toggle-symbol-picker"]').setAttribute('aria-expanded', 'false');
+        form.elements.icon.focus();
+      }
+    }
     else if (name === 'clear-activity-image') {
       const form = document.getElementById('activityForm');
       if (form) {
@@ -1186,6 +1364,11 @@
   });
 
   document.addEventListener('input', (event) => {
+    if (event.target.matches('input[name="icon"]')) updateSymbolPreview(event.target.form);
+    if (event.target.id === 'symbolSearch') {
+      activeSymbolGroup = 'All';
+      renderSymbolResults(event.target.form);
+    }
     if (event.target.matches('input[name="pictogramUrl"]')) {
       const form = event.target.form;
       form.elements.imageAssetId.value = '';
@@ -1198,6 +1381,17 @@
       cropZoomFactor = Number(event.target.value);
       drawCrop();
     }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.target.id !== 'symbolSearch' || event.key !== 'Escape') return;
+    const form = event.target.form;
+    const picker = form && form.querySelector('#symbolPicker');
+    if (!picker || picker.hidden) return;
+    event.preventDefault();
+    picker.hidden = true;
+    form.querySelector('[data-action="toggle-symbol-picker"]').setAttribute('aria-expanded', 'false');
+    form.querySelector('[data-action="toggle-symbol-picker"]').focus();
   });
 
   document.getElementById('cropCanvas').addEventListener('pointerdown', (event) => {
