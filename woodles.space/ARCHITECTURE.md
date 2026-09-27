@@ -96,6 +96,9 @@ other docs have narrower jobs:
     `ARCADE_ROADMAP.md`'s own note about it).
   - `apps/planner/`: `KNOWN_ISSUES.md` (the vitest/rune-store sharp edges
     under "the test suite" below).
+  - `apps/homesuite/`: `ASSESSMENT.md` (a dated 2026-09-27 review of the
+    shell, the bridge, and Data — verified findings and a staged fix plan;
+    a snapshot, like `../AUDIT.md`, not live truth).
   - `apps/write`, `apps/letter`, `apps/bestiary`: no doc file of their own
     — their publish/passphrase behavior is documented once, centrally, in
     "the public read path" below, rather than duplicated three times.
