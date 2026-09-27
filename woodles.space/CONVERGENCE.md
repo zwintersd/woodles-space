@@ -887,3 +887,38 @@ design tokens" lost their Spores paragraphs. `packages/app-manifest`'s doc
 comments and `packages/spellcraft`'s header comment were rewritten in place
 rather than left describing a plan that no longer matches the code — the
 thing AUDIT.md flagged, twice, as this repo's most persistent failure mode.
+
+## 9. the third collapse — write and whiteboard behind one front door
+
+*added after §8. this one collapsed where things are found, not the apps
+that make them.*
+
+### the decision
+
+§7 and §8 folded apps into Write because they were the same activity under
+different names. Whiteboard is not: spatial thinking on a canvas is its own
+kind of work, and its editing model — cameras, portals, stacks, a history of
+its own — has nothing to gain from Write's. What the two did share was the
+moment before either: *where is the thing I was working on?* The homepage
+answered that twice, with two tiles, and Data's Collections were about to
+make it three.
+
+| question | answer | consequence |
+| --- | --- | --- |
+| merge Whiteboard into Write, the way §7 and §8 did? | **no** | each app keeps its build, editor, storage, and deep links; nothing is copied |
+| one place to find, start, and put away documents, boards, and Collections? | **yes — HomeSuite** | one index, one New, one Trash, one command palette, one inspector slot, around whichever editor is open |
+| how does the shell drive editors it does not own? | **same-origin frames and a small bridge** | `shared/homesuiteBridge.ts`: state flows out, actions flow in; each surface decides what its commands do |
+| does HomeSuite get its own record kinds? | **no — a mapping** | `document`, `board`, `collection` are Write's `draft`, Whiteboard's `board`, Data's `collection`; each adapter in `surfaces.ts` names its owner, and the manifest addresses `/homesuite?document=` |
+| does Trash belong to HomeSuite or the apps? | **HomeSuite's list, honored by the owners** | Write's drafts list and Whiteboard's shelf skip trashed things and offer Restore when one is opened directly |
+| does the homepage keep Write and Whiteboard tiles? | **no — one write-band tile** | `/write` and `/whiteboard` still work for links and bookmarks |
+
+### what landed
+
+HomeSuite shipped on 2026-09-26 with the index, the shell, and Data's
+Collections. `apps/homesuite/ASSESSMENT.md` reviewed it the next day and
+found the seams leaking — edits lost when a frame was removed, a portal the
+shell did not follow, a Collection library that one bad value could wipe —
+and its three-step fix plan landed the same day. ARCHITECTURE.md's
+"homesuite" section is the current description of the contract; the
+assessment keeps the history.
+

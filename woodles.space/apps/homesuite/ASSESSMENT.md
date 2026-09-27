@@ -7,12 +7,13 @@ anything here against [ARCHITECTURE.md](../../ARCHITECTURE.md) and the code.*
 every finding marked **verified** was reproduced against a local build in
 Chromium through the real shell; the rest are read from code and say so.
 
-> **status, 2026-09-27:** steps 1 and 2 of the fix plan have landed.
-> findings 1–8, 10, 11, 13, and 16 are fixed, each with a regression case in
-> `e2e/homesuite.spec.ts` (and unit tests for the Collection store), which CI
-> runs; 9 is fixed except for HomeSuite's own missing unit tests. 14 is
-> partly fixed — references open in place on ⌘/Ctrl-click and from Open
-> source. step 3 (12, 15, 17–21) and 22 are still open.
+> **status, 2026-09-27:** all three steps of the fix plan have landed.
+> findings 1–13 and 15–21 are fixed, with regression cases in
+> `e2e/homesuite.spec.ts` (which CI runs) and unit tests for the Collection
+> store and HomeSuite's surfaces, Trash, and bridge. 14 is partly fixed —
+> references open in place on ⌘/Ctrl-click and from Open source; a backlinks
+> panel is still future work. 22 (no suite-level export) is open, and the
+> duplication step 3 surfaced is logged in REFACTORING.md.
 
 ## the short version
 

@@ -20,6 +20,22 @@ so it's not easy to forget.
 
 ## 2026-09-27
 
+- **HomeSuite in the dark, and easier to read** — HomeSuite and its
+  Collections follow your system's dark mode, and every label now clears
+  WCAG AA contrast in both schemes; the open view gained a proper landmark
+  and heading. Collections got their own tile in the list.
+- **Rename from the title** — click a document's, board's, or Collection's
+  name at the top of HomeSuite to rename it (Enter to keep, Escape to
+  cancel); it's an ordinary edit, so Undo takes it back. Collections no
+  longer rename through a browser prompt.
+- **Arrivals are announced** — things sent to Write from other apps, which
+  HomeSuite quietly took in, are now named on the index.
+- **Addresses you can share** — an open thing's link is now
+  `/homesuite?document=…` (or `board=`, `collection=`), the same shape every
+  other Woodles link uses; older links still open.
+- **Quieter while you type** — HomeSuite no longer re-reads every library on
+  each word written in a document.
+
 - **One bad Collection no longer costs you the others** — a Collection that
   can't be read on this device is set aside, untouched, and HomeSuite says
   so; before, one wrong value hid every Collection, and making a new one then

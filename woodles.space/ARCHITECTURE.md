@@ -33,8 +33,10 @@ other docs have narrower jobs:
   its §7 records the amendment — notebook retired into write, so the
   writing surface and the front door became the same room; its §8 records
   the second collapse — spores and ologypedia retired into write too, so
-  the knowledge base joined them, and there is now one room. read it before
-  reshaping any of those apps.
+  the knowledge base joined them, and there is now one room; its §9 records
+  the third — Write and Whiteboard collapsed into HomeSuite as a shared
+  front door, without merging either app. read it before reshaping any of
+  those apps.
 - [ABSTRACTION.md](./ABSTRACTION.md) is about simulating marginalia fast
   enough to tune its feel, and argues explicitly *against* porting it onto
   `@woodles/incremental-core` — the model stays marginalia's own; only the
@@ -198,7 +200,9 @@ It also owns **addressing**: `primaryDestination(app)` answers "where does this
 app live", and `entityHref(appId, kind, id)` answers "where does *this thing*
 live", returning `<publicPath>?<kind>=<id>`. An app opts in by listing the
 record kinds it answers to in `addressableBy` — for example Write's `draft`
-and Whiteboard's `board` — and `entityHref` throws on an unknown app or an
+and Whiteboard's `board`, or HomeSuite's `document`, `board`, and
+`collection`, each of them another app's record opened in HomeSuite's shell —
+and `entityHref` throws on an unknown app or an
 undeclared kind, because the manifest is static data so neither is a runtime
 condition a caller could recover from. `canAddress(appId, kind)` is the
 non-throwing check for callers that can't know the pair at author time.
@@ -232,15 +236,18 @@ runtime — `<link href="/shared/palette.css">` and `import … from
 and its bloom post-processing addons from a CDN through a `<script
 type="importmap">`, still with no build step.
 
-**SvelteKit apps** — `homesuite`, `write`, `marginalia`, `planner`, `bestiary`,
-`thinking-about`, `whiteboard`, `bloomforge`, `bloomforge-player` — use Svelte
-5 runes, Vite 7, and `@sveltejs/adapter-static`.
+**SvelteKit apps** — `homesuite`, `data`, `write`, `marginalia`, `planner`,
+`bestiary`, `thinking-about`, `whiteboard`, `bloomforge`, `bloomforge-player`,
+`grimoire` — use Svelte 5 runes, Vite 7, and `@sveltejs/adapter-static`.
 each builds to `apps/<name>/dist/` and consumes `shared/` through the `@shared`
 Vite alias (`../../shared`). there is no SSR; every app ships as a static bundle.
 
 ## homesuite
 
-`/homesuite` is the homepage's entry to documents, boards, and Collections. Its
+`/homesuite` is the homepage's entry to documents, boards, and Collections.
+An open thing's address is `entityHref('homesuite', kind, id)` —
+`/homesuite?document=<id>`, `?board=`, `?collection=` — and the older
+`?kind=&id=` shape still opens and is rewritten on arrival. Its
 index reads Write's draft index, Whiteboard's versioned board library, and
 Data's versioned Collection library, orders their summaries by recent activity,
 and creates new material through the owning app's storage functions
@@ -302,6 +309,22 @@ life and field-note log on open, when the window regains focus, and on
 request. Source-owned table columns refresh in place while Collection-owned
 fields stay local; a pull that changes nothing saves nothing, and source
 records are never written back to either app.
+
+A title is edited in the shell's own title area — click it, or Rename in the
+palette; Data's Rename collection and Whiteboard's Rename board ask the shell
+to start with `request-rename` — and sent to the surface as a `rename`
+action, which applies it as its own undoable edit. The shell does not re-read
+the libraries on every `state` message: it patches the open thing's title and
+looks again only for something it has not seen, when the index is shown, or
+when another tab changes Trash; a surface's own saves reach it as `storage`
+events and are otherwise ignored while its frame is open. Whatever Write's
+migrations took in when the index loaded — handoffs from other apps, retired
+notebook or spores material — is announced there, since Write is not the one
+opening. HomeSuite's colors live in `shared/homesuiteTheme.css` as `--hs-*`
+tokens with a dark scheme under `prefers-color-scheme`, shared with Data so a
+Collection sits in the room around it; Write and Whiteboard keep their own
+looks. The text tiers clear WCAG AA on every background in both schemes, and
+`homesuite.spec.ts` checks the index and an open view against AA in each.
 
 `hygge` is the design playground — it holds the fonts, palette, motifs, and
 motion showcases that used to be separate pages. `/hygge/motion` is the review
@@ -1730,8 +1753,8 @@ pnpm test:e2e
 
 ## svelte-check
 
-All eight SvelteKit apps currently pass with zero errors and zero warnings.
-`pnpm -r check` runs all eight in turn. it stops at the first app that fails,
+All eleven SvelteKit apps currently pass with zero errors and zero warnings.
+`pnpm -r check` runs all eleven in turn. it stops at the first app that fails,
 so when diagnosing a new break, run the app directly to see past it.
 
 ## continuous integration
