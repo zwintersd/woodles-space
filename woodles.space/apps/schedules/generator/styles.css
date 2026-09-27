@@ -155,6 +155,33 @@ h3 { margin: 0; font-size: 16px; }
 .error-text { min-height: 18px; color: var(--red); font-size: 12px; }
 .image-credit { margin: 7px 0 0; color: var(--muted); font-size: 11px; }
 .print-credit { display: none; margin: 12px 0 0; color: #56677d; font-size: 10px; }
+.image-reference-row { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 8px; }
+.image-asset-preview { display: flex; min-height: 42px; align-items: center; gap: 9px; margin-top: 8px; color: var(--muted); font-size: 12px; }
+.image-asset-preview img { width: 42px; height: 42px; flex: none; object-fit: cover; border: 1px solid var(--line); border-radius: 8px; background: #f5f7fa; }
+.image-editor-dialog { width: min(900px, calc(100% - 28px)); }
+.image-editor { display: grid; gap: 14px; padding: 22px; }
+.image-editor .dialog-heading { margin: 0; }
+.image-editor .dialog-heading h2 { margin: 3px 0 6px; }
+.image-editor .dialog-heading p { max-width: 560px; margin: 0; font-size: 12px; line-height: 1.45; }
+.image-editor-controls { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.image-editor-controls .field { align-content: start; }
+.image-editor-controls input[type="file"] { min-height: 42px; padding: 6px; }
+.crop-quality-field > span { display: flex; justify-content: space-between; gap: 8px; }
+.crop-quality-field input[type="range"], .crop-zoom input[type="range"] { min-height: 20px; padding: 0; border: 0; border-radius: 0; background: transparent; accent-color: var(--blue); }
+.crop-stage { position: relative; display: grid; min-height: 260px; place-items: center; overflow: hidden; border: 1px solid #d6dee8; border-radius: 13px; background-color: #f7f9fb; background-image: linear-gradient(45deg,#e9eef3 25%,transparent 25%),linear-gradient(-45deg,#e9eef3 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e9eef3 75%),linear-gradient(-45deg,transparent 75%,#e9eef3 75%); background-position: 0 0,0 8px,8px -8px,-8px 0; background-size: 16px 16px; }
+.crop-stage canvas { display: block; width: auto; max-width: 100%; height: auto; max-height: min(44vh, 390px); touch-action: none; }
+.crop-stage canvas:focus-visible { outline: 3px solid rgba(57,120,199,.45); outline-offset: -3px; }
+.crop-stage canvas.has-image { cursor: grab; }
+.crop-stage canvas.has-image:active { cursor: grabbing; }
+.crop-empty { position: absolute; display: grid; justify-items: center; gap: 6px; color: #68788c; text-align: center; pointer-events: none; }
+.crop-empty[hidden] { display: none; }
+.crop-empty > span:first-child { font-size: 32px; }
+.crop-empty strong { color: #52647a; font-size: 13px; }
+.crop-empty span:last-child { font-size: 11px; }
+.crop-zoom { display: grid; grid-template-columns: 70px minmax(0,1fr); align-items: center; gap: 12px; color: #56677d; font-size: 12px; font-weight: 750; }
+.crop-status { min-height: 18px; color: #56677d; font-size: 12px; }
+.image-editor-actions { justify-content: flex-end; }
+.image-editor-actions [hidden] { display: none; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @media (max-width: 850px) {
   .day-panel { grid-template-columns: minmax(0,1fr); }
@@ -179,6 +206,9 @@ h3 { margin: 0; font-size: 16px; }
   .side-card { grid-template-columns: 1fr; }
   .side-card h3, .side-card > p, .week-summary { grid-column: 1; }
   .library-picker { grid-template-columns: 1fr; }
+  .image-editor-controls { grid-template-columns: 1fr; }
+  .image-editor .dialog-heading { flex-direction: row; }
+  .image-editor { padding: 17px; }
 }
 @media (max-width: 430px) {
   .day-tabs { grid-template-columns: repeat(2,minmax(0,1fr)); }
@@ -189,6 +219,8 @@ h3 { margin: 0; font-size: 16px; }
   .dialog-footer { padding-inline: 17px; }
   .edit-form { grid-template-columns: 1fr; }
   .edit-form .full { grid-column: 1; }
+  .image-reference-row { grid-template-columns: 1fr; }
+  .image-editor-actions { flex-wrap: wrap; }
 }
 @media print {
   body { background: #fff; }
