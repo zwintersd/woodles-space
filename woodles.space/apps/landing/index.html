@@ -36,6 +36,15 @@
       user-select: none;
       -webkit-tap-highlight-color: transparent;
     }
+    /* a ring for anything you can press, drawn only when the keyboard put
+       focus there. text fields keep their own :focus styles. the colour is
+       resolved here, on the root, so a theme swatch — which carries its own
+       data-theme — still rings in the page's colour rather than its own. */
+    :root { --focus-ring: var(--accent-strong); }
+    :is(a, button, [role='button'], [tabindex]):focus-visible {
+      outline: 2px solid var(--focus-ring);
+      outline-offset: 2px;
+    }
 
     /* ─────────────────────────── wallpaper ─────────────────────────── */
     .wallpaper {
@@ -283,7 +292,7 @@
       opacity: 0;
       transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
     }
-    .dwidget:hover .dw-x { opacity: 1; }
+    .dwidget:hover .dw-x, .dw-x:focus-visible { opacity: 1; }
     .dw-x:hover { background: #e8859a; color: #fff; }
     .dw-title {
       font-family: 'DM Mono', monospace;
@@ -299,6 +308,7 @@
       background: color-mix(in srgb, var(--peach) 42%, var(--surface));
       animation: none; opacity: 1;
     }
+    /* js grows the note to fit what's written, so it doesn't scroll */
     .dw-sticky textarea {
       width: 100%;
       min-height: 96px;
@@ -945,7 +955,8 @@
       pointer-events: none;
       transition: opacity 0.15s ease, transform 0.15s ease;
     }
-    .taskbar [data-label]:hover::after {
+    .taskbar [data-label]:hover::after,
+    .taskbar [data-label]:focus-visible::after {
       opacity: 1;
       transform: translateX(-50%) translateY(0);
     }
@@ -1023,12 +1034,19 @@
       transform: translate(-50%, 16px) scale(0.97);
       opacity: 0;
       pointer-events: none;
-      transition: transform 0.26s cubic-bezier(.2,.9,.3,1), opacity 0.2s ease;
+      /* hidden once faded, so a closed menu is out of the tab order and
+         out of what a screen reader hears — same for the flyout, the
+         context menu, and the windows below */
+      visibility: hidden;
+      transition: transform 0.26s cubic-bezier(.2,.9,.3,1), opacity 0.2s ease,
+        visibility 0s linear 0.26s;
     }
     body.start-open .start {
       transform: translate(-50%, 0) scale(1);
       opacity: 1;
       pointer-events: auto;
+      visibility: visible;
+      transition-delay: 0s;
     }
     .start-search {
       width: 100%;
@@ -1299,10 +1317,14 @@
       box-shadow: 0 22px 50px -18px var(--accent-deep);
       opacity: 0; transform: scale(0.95);
       pointer-events: none;
-      transition: opacity 0.13s ease, transform 0.13s ease;
+      visibility: hidden;
+      transition: opacity 0.13s ease, transform 0.13s ease, visibility 0s linear 0.13s;
       transform-origin: top left;
     }
-    .ctx.open { opacity: 1; transform: scale(1); pointer-events: auto; }
+    .ctx.open {
+      opacity: 1; transform: scale(1); pointer-events: auto;
+      visibility: visible; transition-delay: 0s;
+    }
     .ctx-item {
       display: flex; align-items: center; gap: 0.7rem;
       width: 100%;
@@ -1347,11 +1369,14 @@
       border: 1px solid var(--rule);
       box-shadow: 0 36px 80px -26px var(--accent-deep);
       opacity: 0; pointer-events: none;
-      transition: opacity 0.22s ease, transform 0.22s cubic-bezier(.2,.9,.3,1);
+      visibility: hidden;
+      transition: opacity 0.22s ease, transform 0.22s cubic-bezier(.2,.9,.3,1),
+        visibility 0s linear 0.22s;
       overflow: hidden;
     }
     .window.open {
       opacity: 1; pointer-events: auto;
+      visibility: visible; transition-delay: 0s;
       transform: translate(-50%, -50%) scale(1);
     }
     .titlebar {
@@ -1394,7 +1419,9 @@
       font-size: 0.62rem; letter-spacing: 0.1em;
       color: var(--muted); margin-bottom: 1rem;
     }
-    .win-body p {
+    /* plain paragraphs only — a classed one (.pers-hint, .lp-big, .win-tld…)
+       brings its own type, and this used to outrank it */
+    .win-body p:not([class]) {
       font-size: 1.05rem; line-height: 1.55;
       color: var(--text); margin-bottom: 0.7rem;
     }
@@ -1421,11 +1448,14 @@
       box-shadow: 0 28px 60px -22px var(--accent-deep);
       transform: translateY(16px) scale(0.97);
       opacity: 0; pointer-events: none;
-      transition: transform 0.24s cubic-bezier(.2,.9,.3,1), opacity 0.2s ease;
+      visibility: hidden;
+      transition: transform 0.24s cubic-bezier(.2,.9,.3,1), opacity 0.2s ease,
+        visibility 0s linear 0.24s;
     }
     body.flyout-open .flyout {
       transform: translateY(0) scale(1);
       opacity: 1; pointer-events: auto;
+      visibility: visible; transition-delay: 0s;
     }
     .fly-day {
       font-size: 1.5rem; color: var(--accent-strong);
@@ -1455,6 +1485,7 @@
        resolve to that theme — a live preview for free */
     .swatch {
       width: 26px; height: 26px;
+      padding: 0;
       border-radius: 8px; cursor: pointer;
       border: 2px solid transparent;
       background: linear-gradient(135deg,
@@ -1855,7 +1886,7 @@
     <span class="tb-sep"></span>
     <div class="tray" id="tray">
       <button class="tray-btn" id="tray-sparkle" data-label="sparkles" aria-label="Toggle sparkles">&#10022;</button>
-      <button class="tray-btn" id="tray-theme" data-label="next wallpaper" aria-label="Next wallpaper">&#10052;</button>
+      <button class="tray-btn" id="tray-theme" data-label="next theme" aria-label="Next theme">&#10052;</button>
       <div class="tray-clock">
         <div id="t-time">--:--</div>
         <div class="td" id="t-date"></div>
@@ -1868,7 +1899,7 @@
 
   <!-- about window -->
   <div class="scrim" id="scrim"></div>
-  <div class="window" id="window" role="dialog" aria-label="About">
+  <div class="window" id="window" role="dialog" aria-modal="true" aria-label="About">
     <div class="titlebar" id="titlebar">
       <span class="title">about &mdash; woodles.space</span>
       <button class="win-close" id="win-close" aria-label="Close">&#10005;</button>
@@ -1888,7 +1919,7 @@
   </div>
 
   <!-- personalize window -->
-  <div class="window" id="pwin" role="dialog" aria-label="Personalize">
+  <div class="window" id="pwin" role="dialog" aria-modal="true" aria-label="Personalize">
     <div class="titlebar" id="p-titlebar">
       <span class="title">personalize &mdash; woodles.space</span>
       <button class="win-close" id="p-close" aria-label="Close">&#10005;</button>
@@ -1939,7 +1970,7 @@
   </div>
 
   <!-- widget picker window -->
-  <div class="window" id="wwin" role="dialog" aria-label="Widgets">
+  <div class="window" id="wwin" role="dialog" aria-modal="true" aria-label="Widgets">
     <div class="titlebar" id="w-titlebar">
       <span class="title">widgets &mdash; woodles.space</span>
       <button class="win-close" id="w-close" aria-label="Close">&#10005;</button>
@@ -1952,7 +1983,7 @@
   </div>
 
   <!-- profile window — life points, and what they were spent being -->
-  <div class="window" id="lpwin" role="dialog" aria-label="Life Points">
+  <div class="window" id="lpwin" role="dialog" aria-modal="true" aria-label="Life Points">
     <div class="titlebar" id="lp-titlebar">
       <span class="title">life points &mdash; woodles.space</span>
       <button class="win-close" id="lp-close" aria-label="Close">&#10005;</button>
@@ -2067,6 +2098,18 @@
       renderStart(search.value);
     }
 
+    /* every app link opens through launch(), except a ⌘/ctrl/shift/alt or
+       middle click, which the browser keeps: a new tab or window, no
+       transition. both still count as opening it. */
+    function wireLaunch(el, a) {
+      el.addEventListener('click', e => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) { remember(a); return; }
+        e.preventDefault();
+        launch(a);
+      });
+      el.addEventListener('auxclick', e => { if (e.button === 1) remember(a); });
+    }
+
     /* ── desktop icons — free placement + drag ─────────────────────── */
     const LAYOUT_KEY = 'woodles-icon-layout';
     let layout = {};
@@ -2139,11 +2182,12 @@
       el.className = 'icon';
       el.href = a.href;
       el.dataset.id = a.id;
+      el.title = a.desc;
       el.style.animationDelay = (0.15 + i * 0.06) + 's';
       el.innerHTML = tileHTML(a) +
         '<span class="icon-label">' + a.name + '</span>';
       makeIconDraggable(el);
-      el.addEventListener('click', e => { e.preventDefault(); launch(a); });
+      wireLaunch(el, a);
       iconsEl.appendChild(el);
     });
     placeIcons();
@@ -2208,8 +2252,9 @@
       el.className = 'start-app';
       el.href = a.href;
       el.dataset.id = a.id;
+      el.title = a.desc;
       el.innerHTML = tileHTML(a) + '<span class="start-app-name">' + a.name + '</span>';
-      el.addEventListener('click', e => { e.preventDefault(); launch(a); });
+      wireLaunch(el, a);
       return el;
     }
     function fillGrid(target, list) {
@@ -2252,7 +2297,7 @@
         el.innerHTML = tileHTML(a) +
           '<span class="rec-text"><span class="rec-name">' + a.name +
           '</span><span class="rec-desc">' + a.desc + '</span></span>';
-        el.addEventListener('click', e => { e.preventDefault(); launch(a); });
+        wireLaunch(el, a);
         rec.appendChild(el);
       });
     }
@@ -2305,7 +2350,7 @@
         el.href = a.href;
         el.style.animationDelay = (i * 0.035) + 's';
         el.innerHTML = tileHTML(a) + '<span class="app-label">' + a.name + '</span>';
-        el.addEventListener('click', e => { e.preventDefault(); launch(a); });
+        wireLaunch(el, a);
         appGrid.appendChild(el);
       });
     }
@@ -2316,7 +2361,7 @@
 
     /* ── phone home: dock mirrors the first pinned apps ────────────── */
     const dock = document.getElementById('phone-dock');
-    (prefs.pins.length ? prefs.pins : DEFAULT_PINS).slice(0, 4).forEach(id => {
+    (prefs.pins.length ? prefs.pins : defaultLandingPins).slice(0, 4).forEach(id => {
       const a = byId(id);
       if (!a) return;
       const b = document.createElement('button');
@@ -3439,7 +3484,12 @@
           el.innerHTML = '<textarea placeholder="jot something&hellip;" maxlength="400"></textarea>';
           const ta = el.querySelector('textarea');
           ta.value = w.data.text || '';
-          ta.addEventListener('input', () => { w.data.text = ta.value; saveWidgets(); });
+          /* grow to the words rather than scroll. measured once the note is
+             on the page, and again when the handwriting face arrives */
+          const fit = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
+          requestAnimationFrame(fit);
+          document.fonts.ready.then(fit);
+          ta.addEventListener('input', () => { w.data.text = ta.value; saveWidgets(); fit(); });
         },
       },
       moon: {
@@ -4105,7 +4155,11 @@
     const search = document.getElementById('search');
     function setStart(open) {
       body.classList.toggle('start-open', open);
-      if (open) { closeAll('start'); setTimeout(() => search.focus(), 120); }
+      if (open) {
+        closeAll('start');
+        /* unless something else took over in the meantime */
+        setTimeout(() => { if (body.classList.contains('start-open')) search.focus(); }, 120);
+      }
       else { search.value = ''; renderStart(''); }
     }
     document.getElementById('start-btn').addEventListener('click', e => {
@@ -4148,17 +4202,21 @@
       const t = THEMES[themeIdx];
       document.documentElement.setAttribute('data-theme', t);
       localStorage.setItem('woodles-theme', t);
-      document.querySelectorAll('.swatch').forEach(s =>
-        s.classList.toggle('on', s.dataset.theme === t));
+      document.querySelectorAll('.swatch').forEach(s => {
+        s.classList.toggle('on', s.dataset.theme === t);
+        s.setAttribute('aria-pressed', String(s.dataset.theme === t));
+      });
     }
     function nextTheme() { themeIdx = (themeIdx + 1) % THEMES.length; applyTheme(); }
     /* theme swatches — flyout + personalize window share the same builder;
        each swatch carries data-theme so the css previews the real palette */
     function buildSwatches(container) {
       THEMES.forEach((t, i) => {
-        const s = document.createElement('div');
+        const s = document.createElement('button');
+        s.type = 'button';
         s.className = 'swatch';
         s.title = t;
+        s.setAttribute('aria-label', t + ' theme');
         s.setAttribute('data-theme', t);
         s.addEventListener('click', e => {
           e.stopPropagation(); themeIdx = i; applyTheme();
@@ -4174,7 +4232,7 @@
     const ctx = document.getElementById('ctx');
     const DESKTOP_CTX = [
       { act: 'start',       glyph: '&#9678;',  label: 'open start' },
-      { act: 'wallpaper',   glyph: '&#10052;', label: 'next wallpaper' },
+      { act: 'theme',       glyph: '&#10052;', label: 'next theme' },
       { act: 'personalize', glyph: '&#10024;', label: 'personalize' },
       { act: 'addwidget',   glyph: '&#10063;', label: 'add a widget' },
       { act: 'tidy',        glyph: '&#10070;', label: 'tidy desktop' },
@@ -4190,7 +4248,12 @@
           : { act: 'togglepin', id: a.id, glyph: '&#10010;', label: 'pin to taskbar' },
       ];
     }
+    /* the menu takes focus when it opens, so the keyboard can use it too,
+       and hands it back when it closes */
+    let ctxReturn = null;
     function showCtx(x, y, items) {
+      const active = document.activeElement;
+      ctxReturn = active instanceof HTMLElement && active !== body ? active : null;
       ctx.innerHTML = items.map(it => it === '-'
         ? '<div class="ctx-sep"></div>'
         : '<button class="ctx-item" data-act="' + it.act + '"' +
@@ -4200,6 +4263,7 @@
       ctx.style.left = Math.min(x, innerWidth - ctx.offsetWidth - 8) + 'px';
       ctx.style.top  = Math.min(y, innerHeight - ctx.offsetHeight - 8) + 'px';
       ctx.classList.add('open');
+      ctx.querySelector('.ctx-item').focus();
     }
     document.addEventListener('contextmenu', e => {
       if (innerWidth <= 720) return;  /* phone home has its own dock, no desktop menu */
@@ -4223,9 +4287,12 @@
       const item = e.target.closest('.ctx-item');
       if (!item) return;
       const act = item.dataset.act;
+      /* before the item vanishes; an action that opens something moves
+         focus on from there */
+      if (ctx.contains(document.activeElement)) returnFocus(ctxReturn);
       ctx.classList.remove('open');
       if (act === 'start')       setStart(true);
-      if (act === 'wallpaper')   nextTheme();
+      if (act === 'theme')       nextTheme();
       if (act === 'personalize') openPers();
       if (act === 'refresh')     location.reload();
       if (act === 'about')       openAbout();
@@ -4243,19 +4310,63 @@
       widgets: document.getElementById('wwin'),
       profile: document.getElementById('lpwin'),
     };
-    function openWin(key) {
-      closeAll('win');
-      closeWins();
-      WINDOWS[key].classList.add('open');
-      body.classList.add('win-open');
+    /* windows are modal, and behave the way shared/modal.ts has HomeSuite's
+       dialogs behave: focus moves in when one opens, Tab stays inside, and
+       focus goes back to whatever opened it when it closes */
+    const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), ' +
+      'textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+    const focusables = root => [...root.querySelectorAll(FOCUSABLE)]
+      .filter(el => el.tabIndex >= 0 && el.offsetParent !== null);
+    /* focus back to `target` — or, when that control has gone or can't take
+       it (a menu item, a button in the closed start menu), to the start
+       button. with nowhere to go, it just leaves the closing thing. */
+    function returnFocus(target) {
+      const from = document.activeElement;
+      if (target && target.isConnected) target.focus();
+      if (target && document.activeElement !== target)
+        document.getElementById('start-btn').focus();
+      if (document.activeElement === from && from instanceof HTMLElement) from.blur();
     }
-    function closeWins() {
+    let winReturn = null;
+    function openWin(key) {
+      /* one window can open another (personalize → widgets); focus goes
+         back to what opened the first */
+      if (!body.classList.contains('win-open')) {
+        const active = document.activeElement;
+        winReturn = active instanceof HTMLElement && active !== body ? active : null;
+      }
+      closeAll('win');
+      hideWins();
+      const win = WINDOWS[key];
+      win.classList.add('open');
+      body.classList.add('win-open');
+      focusables(win)[0]?.focus();
+    }
+    function hideWins() {
       Object.values(WINDOWS).forEach(w => {
         w.classList.remove('open');
         w.style.top = '50%'; w.style.left = '50%'; w.style.transform = '';
       });
       body.classList.remove('win-open');
     }
+    function closeWins() {
+      if (!body.classList.contains('win-open')) return;
+      const held = Object.values(WINDOWS).some(w => w.contains(document.activeElement));
+      hideWins();
+      if (held || document.activeElement === body) returnFocus(winReturn);
+      winReturn = null;
+    }
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Tab' || !body.classList.contains('win-open')) return;
+      const win = Object.values(WINDOWS).find(w => w.classList.contains('open'));
+      const within = win ? focusables(win) : [];
+      if (!within.length) return;
+      const first = within[0], last = within[within.length - 1];
+      const at = document.activeElement;
+      if (!win.contains(at)) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+      else if (e.shiftKey && at === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && at === last) { e.preventDefault(); first.focus(); }
+    });
     const openAbout = () => openWin('about');
     const openPers  = () => openWin('pers');
     document.getElementById('about-btn').addEventListener('click', e => {
@@ -4353,12 +4464,19 @@
     /* ── launch transition ─────────────────────────────────────────── */
     const launchEl = document.getElementById('launch');
     let launching = false;
+    function remember(a) {
+      recents = [a.id].concat(recents.filter(id => id !== a.id)).slice(0, 6);
+      localStorage.setItem(RECENTS_KEY, JSON.stringify(recents));
+      renderRecents();
+    }
     function launch(a) {
       if (launching) return;
       launching = true;
       closeAll();
-      recents = [a.id].concat(recents.filter(id => id !== a.id)).slice(0, 6);
-      localStorage.setItem(RECENTS_KEY, JSON.stringify(recents));
+      remember(a);
+      /* the overlay is the whole point of the wait; with motion reduced it
+         would only be a pause, so go straight there */
+      if (noMotion.matches) { window.location.href = a.href; return; }
       const tile = document.getElementById('launch-tile');
       tile.innerHTML = iconSVG(a);
       tile.style.setProperty('--g1', a.g1);
@@ -4367,6 +4485,13 @@
       launchEl.classList.add('go');
       setTimeout(() => { window.location.href = a.href; }, 620);
     }
+    /* Back can restore this page from the back/forward cache exactly as it
+       was left — mid-launch, overlay up, every launch refused */
+    addEventListener('pageshow', e => {
+      if (!e.persisted) return;
+      launching = false;
+      launchEl.classList.remove('go');
+    });
 
     /* ── global close handling ─────────────────────────────────────── */
     function closeAll(except) {
@@ -4381,6 +4506,11 @@
     });
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
+        /* a menu that closes can't keep focus; give it back to its opener */
+        const from = document.activeElement;
+        if (document.getElementById('start').contains(from))
+          document.getElementById('start-btn').focus();
+        else if (ctx.contains(from)) returnFocus(ctxReturn);
         body.classList.remove('start-open', 'flyout-open');
         closeWins();
         ctx.classList.remove('open');

@@ -18,6 +18,29 @@ so it's not easy to forget.
 
 ---
 
+## 2026-09-28
+
+- **the desktop survives having nothing pinned** — unpinning every app
+  stopped the homepage on its next load: the clock stuck at `--:--`, and
+  Start, widgets, and themes stopped answering. It starts normally now.
+- **the homepage says what things do** — ❄ and the right-click menu say
+  "next theme", which is what they always did; wallpaper is its own setting in
+  Personalize. Carillon, Quiet Room, and Thinking About's tiles describe the
+  apps they have become, and every icon's description shows on hover.
+- **the desktop from a keyboard** — a focus ring for anything you can press;
+  windows take focus when they open, keep Tab inside, and hand it back when
+  they close; the right-click menu works from the keyboard; theme swatches are
+  buttons; and closed menus and windows no longer sit in the tab order or in
+  what a screen reader hears.
+- **smaller things** — ⌘/Ctrl-click or middle-click an app to open it in a
+  new tab. With reduced motion, apps open without the pause. A desktop brought
+  back by Back resets its "opening…" card rather than staying stuck behind it.
+  Sticky notes grow with their words instead of scrolling, and the windows'
+  small type — Life Points' count, Personalize's hints, About's footer — is
+  its intended size again.
+- **the homepage runs in CI** — `e2e/landing.spec.ts` covers each of the
+  above and runs after the build, with the `/` axe audit.
+
 ## 2026-09-27
 
 - **HomeSuite in the dark, and easier to read** — HomeSuite and its

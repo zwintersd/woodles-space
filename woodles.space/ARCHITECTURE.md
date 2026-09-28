@@ -1738,7 +1738,10 @@ covers the shell's seams: the veil, edits made just before a frame is removed,
 a portal the shell has to follow, Trash by address and in the owning apps, an
 unreadable Collection set aside rather than overwritten, references opened in
 place, keyboard use of the palette and template picker, one-step undo for
-inspector and number edits, and the phone layout.
+inspector and number edits, and the phone layout. `landing.spec.ts` covers
+the homepage desktop: starting with nothing pinned, modified clicks that open a
+new tab, windows that take, keep, and return focus, the context menu from the
+keyboard, closed menus kept out of the tab order, and sticky notes that grow.
 
 The cross-app specs earn their cost in a way the route checks don't. The
 Carillon ↔ Thinking About one caught a bug no unit test could have: the shelf
@@ -1773,9 +1776,11 @@ lockfile, then runs `pnpm check`, `pnpm test`, and `pnpm build` from this
 workspace. Keep the local root commands and that workflow identical so a green
 checkout means the same thing locally and on GitHub.
 
-After the build it installs Chromium and runs one slice of `e2e/`: HomeSuite's
-spec and the `/homesuite` axe audit. HomeSuite's failures live between frames,
-where no unit suite reaches. The rest of `e2e/` is not in CI yet; when last
+After the build it installs Chromium and runs two slices of `e2e/`: HomeSuite's
+spec and the `/homesuite` axe audit, then the landing spec with the `/` axe
+audit and keyboard check. HomeSuite's failures live between frames, and the
+landing page is a static file with no unit suite at all, so neither is reached
+any other way. The rest of `e2e/` is not in CI yet; when last
 run it had failures of its own (a `/letter` axe finding, some Carillon specs),
 so widen the slice once those are green rather than all at once.
 

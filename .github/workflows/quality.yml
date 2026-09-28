@@ -56,6 +56,12 @@ jobs:
       - name: Run HomeSuite browser tests
         run: pnpm exec playwright test e2e/homesuite.spec.ts e2e/accessibility.spec.ts --grep "HomeSuite|homesuite"
 
+      # The homepage has no build, but its launcher, windows, and focus handling
+      # only exist in a browser too: its own spec, plus the `/` axe audit and
+      # keyboard check.
+      - name: Run landing browser tests
+        run: pnpm exec playwright test e2e/landing.spec.ts e2e/accessibility.spec.ts --grep 'landing|\s/ has'
+
       - name: Keep the Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
