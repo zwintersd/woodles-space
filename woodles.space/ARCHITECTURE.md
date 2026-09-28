@@ -98,6 +98,9 @@ other docs have narrower jobs:
     `ARCADE_ROADMAP.md`'s own note about it).
   - `apps/planner/`: `KNOWN_ISSUES.md` (the vitest/rune-store sharp edges
     under "the test suite" below).
+  - `apps/landing/`: `THEMES.md` (a proposal, not built: a theme as a
+    preset over palette, type, shape, material, motion, and atmosphere,
+    rather than a palette alone).
   - `apps/homesuite/`: `ASSESSMENT.md` (a dated 2026-09-27 review of the
     shell, the bridge, and Data — verified findings and a staged fix plan;
     a snapshot, like `../AUDIT.md`, not live truth).
