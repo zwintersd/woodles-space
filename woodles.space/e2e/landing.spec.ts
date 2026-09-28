@@ -103,3 +103,64 @@ test('desktop icons describe themselves on hover', async ({ page }) => {
 		'your day in piles, and a bell that asks what is happening now'
 	);
 });
+
+test('the default desktop is banded, and a moved icon takes its band label with it', async ({ page }) => {
+	await page.goto('/');
+	const labels = page.locator('.band-label');
+	await expect(labels).toHaveText(['write', 'tend', 'read', 'play']);
+
+	const left = (selector: string) => page.locator(selector).evaluate((el) => (el as HTMLElement).offsetLeft);
+	expect(await left('.icon[data-id="homesuite"]')).toBe(await left('.band-label:text-is("write")'));
+	expect(await left('.icon[data-id="planner"]')).toBe(await left('.band-label:text-is("tend")'));
+	expect(await left('.icon[data-id="hygge"]')).toBe(await left('.band-label:text-is("play")'));
+
+	const hygge = page.locator('.icon[data-id="hygge"]');
+	const box = (await hygge.boundingBox())!;
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(box.x + 500, box.y + 300, { steps: 8 });
+	await page.mouse.up();
+	await expect(page.locator('.band-label:text-is("play")')).toBeHidden();
+	await expect(page.locator('.band-label:text-is("tend")')).toBeVisible();
+});
+
+test('the homesuite widget lists what HomeSuite last showed, each a way back in', async ({ page }) => {
+	await page.addInitScript(() => {
+		localStorage.setItem('woodles-widgets', JSON.stringify([{ id: 'hs', type: 'homesuite', x: 500, y: 80, data: {} }]));
+		localStorage.setItem('homesuite.recent.v1', JSON.stringify({
+			version: 1,
+			publishedAt: new Date().toISOString(),
+			counts: { document: 2, board: 1, collection: 1 },
+			recent: [
+				{ kind: 'document', id: 'doc 1', title: 'letter to the moth', updatedAt: new Date().toISOString() },
+				{ kind: 'collection', id: 'c1', title: 'Bestiary + Marginalia', updatedAt: '2026-09-01T10:00:00Z', recordCount: 42 }
+			]
+		}));
+	});
+	await page.goto('/');
+	const widget = page.locator('.dw-homesuite');
+	await expect(widget.locator('.hs-counts')).toHaveText('2 documents · 1 board · 1 collection');
+	await expect(widget.getByRole('link', { name: /letter to the moth/ })).toHaveAttribute('href', '/homesuite?document=doc%201');
+	await expect(widget.getByRole('link', { name: /Bestiary \+ Marginalia/ })).toContainText('42 records');
+	await expect(widget.getByRole('link', { name: /open homesuite/ })).toHaveAttribute('href', '/homesuite');
+});
+
+test('the homesuite widget waits kindly for a first visit, then follows HomeSuite', async ({ page }) => {
+	await page.addInitScript(() => {
+		localStorage.setItem('woodles-widgets', JSON.stringify([{ id: 'hs', type: 'homesuite', x: 500, y: 80, data: {} }]));
+	});
+	await page.goto('/');
+	const widget = page.locator('.dw-homesuite');
+	await expect(widget).toContainText('open homesuite once');
+
+	// HomeSuite republishing from another tab reaches this one as a storage event
+	await page.evaluate(() => {
+		const value = JSON.stringify({
+			version: 1, publishedAt: new Date().toISOString(), counts: { document: 0, board: 1, collection: 0 },
+			recent: [{ kind: 'board', id: 'b1', title: 'world map', updatedAt: new Date().toISOString() }]
+		});
+		localStorage.setItem('homesuite.recent.v1', value);
+		dispatchEvent(new StorageEvent('storage', { key: 'homesuite.recent.v1', newValue: value }));
+	});
+	await expect(widget.getByRole('link', { name: /world map/ })).toHaveAttribute('href', '/homesuite?board=b1');
+});

@@ -20,6 +20,14 @@ so it's not easy to forget.
 
 ## 2026-09-28
 
+- **a HomeSuite widget** — add "homesuite" from the widget shelf for a wider
+  card on the desktop: how many documents, boards, and collections you have,
+  and the six you touched last, each opening straight into HomeSuite. It shows
+  what HomeSuite's index last showed, and says when that was.
+- **the desktop is banded** — by default, icons sit in columns under write,
+  tend, read, and play, the same bands the start menu uses. Icons you've
+  already moved stay put; "tidy icons" in Personalize brings the bands back.
+
 - **the desktop survives having nothing pinned** — unpinning every app
   stopped the homepage on its next load: the clock stuck at `--:--`, and
   Start, widgets, and themes stopped answering. It starts normally now.
