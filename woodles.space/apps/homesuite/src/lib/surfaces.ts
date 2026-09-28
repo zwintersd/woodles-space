@@ -13,6 +13,7 @@ import {
 import { boardLibrary } from '../../../whiteboard/src/lib/library';
 import { removeImageAsset } from '../../../whiteboard/src/lib/assets';
 import { listHomeSuiteTrash, type HomeSuiteTrashEntry } from '@shared/homesuiteTrash';
+import { buildHomeSuiteRecent, publishHomeSuiteRecent } from '@shared/homesuiteRecent.js';
 import type { HomeSuiteArtifactKind, WoodlesRef } from '@shared/homesuiteBridge';
 import {
 	COLLECTION_TEMPLATES,
@@ -190,12 +191,17 @@ export function prepareSurfaceStorage(): string | null {
 	return said.length ? said.join(' ') : null;
 }
 
-/** One read of Trash, then each kind's library once. */
+/**
+ * One read of Trash, then each kind's library once. Each listing also
+ * republishes the homepage widget's ledger (shared/homesuiteRecent.js), so
+ * the desktop shows what the index last showed.
+ */
 export function listEverything(): { artifacts: HomeSuiteArtifact[]; trashed: TrashedHomeSuiteArtifact[] } {
 	const trashed = listHomeSuiteTrash().sort((a, b) => b.trashedAt.localeCompare(a.trashedAt));
 	const keys = new Set(trashed.map((entry) => trashKey(entry.ref)));
 	const artifacts = surfaces.flatMap((surface) => surface.list(keys))
 		.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+	publishHomeSuiteRecent(buildHomeSuiteRecent(artifacts, new Date().toISOString()));
 	return { artifacts, trashed };
 }
 

@@ -124,6 +124,7 @@ woodles.space/
 │   ├── fonts.css            --font-* custom properties
 │   ├── motifs.css           ambient backdrops (class="motif-<id>")
 │   ├── library.js           palettes / motifs / fontPairs / templates — untyped
+│   ├── homesuiteRecent.js   HomeSuite's recent-things ledger, read by the homepage widget
 │   ├── docPage.js           renders a root .md file into /changelog, /lore, /architecture
 │   └── docPage.css          typography for the rendered markdown above
 ├── api/
@@ -182,7 +183,10 @@ tile order/copy, **band**, default pins, featured fallback, and Marginalia's
 Reading Room sub-surface. A band is the *moment* a tile is for rather than the
 thing it holds — `write`, `tend`, `read`, `play` — and the start
 menu's "all apps" section renders grouped under them (`landingAppsByBand`),
-so the homepage stops presenting every app as a peer to choose between. That section
+so the homepage stops presenting every app as a peer to choose between. The
+desktop's default layout is banded the same way — each band starts its own
+column under a quiet label — while an icon someone has dragged keeps its spot
+and takes its band's label away. That section
 lists every app, not just the unpinned remainder, because a band whose only
 app is pinned would otherwise never show its name. There is no `catch` band
 anymore: Notebook, the app it existed for, retired into Write (CONVERGENCE.md
@@ -320,7 +324,13 @@ when another tab changes Trash; a surface's own saves reach it as `storage`
 events and are otherwise ignored while its frame is open. Whatever Write's
 migrations took in when the index loaded — handoffs from other apps, retired
 notebook or spores material — is announced there, since Write is not the one
-opening. HomeSuite's colors live in `shared/homesuiteTheme.css` as `--hs-*`
+opening. Each listing also writes `shared/homesuiteRecent.js`'s ledger — counts per
+kind and the six most recent things, under localStorage
+`homesuite.recent.v1` — for the homepage's HomeSuite widget, with the
+cross-app ledgers' two rules: HomeSuite is the one writer, and the ledger is
+derived and never read back. It is local only, and it is as fresh as the last
+time HomeSuite's index was read; the widget says "as of" rather than pretending
+otherwise. HomeSuite's colors live in `shared/homesuiteTheme.css` as `--hs-*`
 tokens with a dark scheme under `prefers-color-scheme`, shared with Data so a
 Collection sits in the room around it; Write and Whiteboard keep their own
 looks. The text tiers clear WCAG AA on every background in both schemes, and
@@ -1741,7 +1751,8 @@ place, keyboard use of the palette and template picker, one-step undo for
 inspector and number edits, and the phone layout. `landing.spec.ts` covers
 the homepage desktop: starting with nothing pinned, modified clicks that open a
 new tab, windows that take, keep, and return focus, the context menu from the
-keyboard, closed menus kept out of the tab order, and sticky notes that grow.
+keyboard, closed menus kept out of the tab order, sticky notes that grow, the
+banded default layout, and the HomeSuite widget reading its ledger.
 
 The cross-app specs earn their cost in a way the route checks don't. The
 Carillon ↔ Thinking About one caught a bug no unit test could have: the shelf

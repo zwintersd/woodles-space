@@ -5,6 +5,7 @@ import { isHomeSuiteShellMessage, isHomeSuiteSurfaceMessage, HOMESUITE_CHANNEL }
 import { getActiveDraftId, setActiveDraftId } from '../../../write/src/lib/drafts';
 import { boardLibrary } from '../../../whiteboard/src/lib/library';
 import { listEverything, prepareSurfaceStorage, surfaceFor, surfaceForRef } from './surfaces';
+import { HOMESUITE_RECENT_LIMIT, loadHomeSuiteRecent, readHomeSuiteRecent } from '@shared/homesuiteRecent.js';
 
 const documents = surfaceFor('document')!;
 const boards = surfaceFor('board')!;
@@ -23,6 +24,32 @@ describe('HomeSuite surfaces', () => {
 		const { artifacts, trashed } = listEverything();
 		expect(artifacts.map((item) => item.kind).sort()).toEqual(['collection', 'document']);
 		expect(trashed.map((entry) => entry.ref.id)).toEqual([board.ref.id]);
+	});
+
+	it('republishes the homepage widget’s ledger on every listing, Trash left out', () => {
+		documents.create();
+		const board = boards.create();
+		for (let i = 0; i < HOMESUITE_RECENT_LIMIT; i++) collections.create('blank');
+		listEverything();
+		const ledger = loadHomeSuiteRecent();
+		expect(ledger?.counts).toEqual({ document: 1, board: 1, collection: HOMESUITE_RECENT_LIMIT });
+		expect(ledger?.recent).toHaveLength(HOMESUITE_RECENT_LIMIT);
+
+		moveHomeSuiteArtifactToTrash({ ref: board.ref, kind: 'board', title: board.title, updatedAt: board.updatedAt });
+		listEverything();
+		expect(loadHomeSuiteRecent()?.counts.board).toBe(0);
+		expect(loadHomeSuiteRecent()?.recent.some((item) => item.id === board.ref.id)).toBe(false);
+	});
+
+	it('reads only a ledger it recognises', () => {
+		expect(readHomeSuiteRecent(null)).toBeNull();
+		expect(readHomeSuiteRecent({ version: 2, recent: [] })).toBeNull();
+		const read = readHomeSuiteRecent({
+			version: 1, publishedAt: 'x', counts: { document: -3, board: 'many' },
+			recent: [{ kind: 'document', id: 'a', title: 'A', updatedAt: '2026-09-28' }, { kind: 'poem', id: 'b', title: 'B', updatedAt: '' }]
+		});
+		expect(read?.counts).toEqual({ document: 0, board: 0, collection: 0 });
+		expect(read?.recent.map((item) => item.id)).toEqual(['a']);
 	});
 
 	it('creates without changing what Write and Whiteboard reopen on their own', () => {
