@@ -67,6 +67,23 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--sky); outline-o
 .chip-art { display: grid; width: 42px; height: 42px; place-items: center; overflow: hidden; border-radius: 11px; background: color-mix(in srgb, var(--activity-color) 13%, white); }
 .chip-art img { display: block; width: 36px; height: 36px; object-fit: contain; }
 .chip-art .symbol-fallback { line-height: 1; }
+.video-head { display: grid; grid-template-columns: minmax(0, 1fr) 34px; align-items: start; gap: 10px; }
+.videos { display: grid; gap: 8px; margin-top: 8px; }
+.videos.count-2, .videos.count-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.videos.count-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.vid { display: flex; min-width: 0; min-height: 88px; overflow: hidden; border: 2px solid var(--line); border-radius: 14px; background: #fff; transition: border-color .15s ease, box-shadow .15s ease; }
+.vid .art { display: block; flex: 0 0 39%; width: 39%; max-width: 220px; aspect-ratio: 16 / 9; object-fit: cover; background: linear-gradient(135deg, #1e3a6e, #2f7bf5); transition: opacity .15s ease, filter .15s ease; }
+.vid .art-empty { display: grid; place-items: center; color: #fff; font-size: 24px; }
+.vid-body { display: grid; min-width: 0; flex: 1; align-content: center; gap: 6px; padding: 7px 10px; }
+.vid h3 { margin: 0; font-size: 15px; font-weight: 900; line-height: 1.15; overflow-wrap: anywhere; }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick, .watch { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 5px; padding: 5px 10px; border-radius: 10px; font: inherit; font-size: 12px; font-weight: 900; text-decoration: none; cursor: pointer; }
+.pick { border: 2px solid var(--ink); color: var(--ink); background: #fff; }
+.watch { border: 2px solid transparent; color: #fff; background: var(--sky-button); }
+.watch:hover { background: var(--sky-deep); }
+.vid.picked { border-color: var(--now); box-shadow: 0 0 0 4px rgba(255,62,108,.14); }
+.vid.picked .pick { border-color: var(--now-ink); color: #fff; background: var(--now-ink); }
+.vid.dim .art { opacity: .45; filter: grayscale(.6); }
 .step.finish .box { min-height: 60px; padding-block: 12px; border-color: #f0b400; background: linear-gradient(135deg, var(--sun), #ffe08a); text-align: center; }
 .step.finish h2 { margin: 0; font-family: var(--display); font-size: 22px; font-weight: 400; }
 .step.finish .sub { color: var(--ink); }
@@ -119,6 +136,11 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--sky); outline-o
   .copy h2 { font-size: 16px; }
   .done-btn { width: 30px; height: 30px; }
   .choice-layout { grid-template-columns: minmax(0, 1fr) 30px; align-items: start; gap: 8px; }
+  .video-head { grid-template-columns: minmax(0, 1fr) 30px; gap: 8px; }
+  .videos.count-2, .videos.count-3, .videos.count-4 { grid-template-columns: minmax(0, 1fr); }
+  .vid { min-height: 76px; }
+  .vid .art { flex-basis: 40%; width: 40%; }
+  .vid h3 { font-size: 14px; }
   .choice-layout .chips { grid-column: 1 / -1; grid-row: 2; grid-template-columns: repeat(var(--chip-columns-narrow, 2), minmax(0, 1fr)); gap: 6px; }
   .chip { min-height: 68px; font-size: 11px; }
   .chip-art { width: 36px; height: 36px; }
@@ -131,7 +153,9 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--sky); outline-o
 @media print {
   body { background: #fff; }
   .schedule { width: 100%; margin: 0; }
-  .edit-link, .clock, .nownext, .reset, .day-links, .done-btn, .nowtag { display: none !important; }
+  .edit-link, .clock, .nownext, .reset, .day-links, .done-btn, .nowtag, .btns { display: none !important; }
+  .vid .art { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .vid.dim .art { opacity: 1; filter: none; }
   .hero, .box, .nn, .visual, .category, .chip, .chip-art, .time::after { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .choice-layout { grid-template-columns: minmax(140px, .8fr) minmax(0, 3.2fr); }
   .activity { grid-template-columns: 64px minmax(0, 1fr); }

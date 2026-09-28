@@ -20,6 +20,13 @@ so it's not easy to forget.
 
 ## 2026-09-28
 
+- **videos in the weekly planner** — "＋ Video" adds the September 25
+  example's video cards to any day: one video to watch together, or two to
+  four for the learner to pick from, each with a ▶ Watch link. Thumbnails come
+  from the image studio, which now opens at the 16:9 video-thumbnail crop and
+  attaches straight to the video; YouTube links show their own still until
+  you upload one. The pick is saved with the day's choices and checks.
+
 - **choices in the weekly planner** — "＋ Choice" adds a choice to a day: two to
   six options, each typed with a symbol or taken from the activity library with
   its picture. On the visual schedule it's the learner's choice row from the
