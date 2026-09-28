@@ -6,7 +6,7 @@
     makeId, esc, cleanText, validTime, validDuration, validColor, timeMinutes,
     isLocalImageData, pictogramSource, openMojiCodepoint, symbolMarkup,
     sanitizeImage, sanitizeActivity, sanitizePlan, readWorkspace,
-    validVideoUrl, youTubeThumbnail, validFamiliarity, familiarityMarkup, choiceTitle, videoTitle, videoPrompt, itemLabel,
+    validVideoUrl, youTubeThumbnail, videoKey, validFamiliarity, familiarityMarkup, choiceTitle, videoTitle, videoPrompt, itemLabel,
     itemVisuals, itemImageIds, visualScheduleUrl
   } = window.ScheduleStudio;
   const CATEGORIES = ['Instruction', 'Communication', 'Play / leisure', 'Daily living', 'Movement', 'Sensory', 'Break', 'Transition', 'Other'];
@@ -829,6 +829,19 @@
     activityDialogBody.querySelector(editing ? 'input[name="start"]' : '#videoTitle')?.focus();
   }
 
+  // The earliest other video item on this day, before the one being drafted,
+  // that offers the same video: the reason to suggest "Again".
+  function earlierShowing(url) {
+    const day = getDay(getPlan(), activeDayKey);
+    const form = document.getElementById('videoForm');
+    if (!day || !form) return null;
+    const start = validTime(form.elements.start.value, '');
+    const key = videoKey(url);
+    return sortedActivities(day).find((item) => item.kind === 'video' && item.occurrenceId !== editingActivityId &&
+      (!start || timeMinutes(item.start) < timeMinutes(start)) &&
+      item.videos.some((video) => videoKey(video.url) === key)) || null;
+  }
+
   function renderVideoDraft() {
     const list = document.getElementById('videoDraft');
     const form = document.getElementById('videoForm');
@@ -839,8 +852,10 @@
     list.innerHTML = videoDraft.length
       ? videoDraft.map((video) => {
         const source = imageAssetData(video.imageAssetId) ? 'Uploaded thumbnail' : youTubeThumbnail(video.url) ? 'YouTube thumbnail' : 'No thumbnail yet';
+        const earlier = earlierShowing(video.url);
         return '<li class="video-draft-item"><span class="video-thumb-art">' + videoThumbnailMarkup(video) + '</span>' +
-          '<span class="video-draft-copy"><strong>' + esc(video.title) + '</strong><small>' + esc(new URL(video.url).hostname.replace(/^www\./, '')) + ' · ' + source + '</small></span>' +
+          '<span class="video-draft-copy"><strong>' + esc(video.title) + '</strong><small>' + esc(new URL(video.url).hostname.replace(/^www\./, '')) + ' · ' + source + '</small>' +
+            (earlier ? '<small class="video-repeat"><span aria-hidden="true">↻</span> Also offered at ' + esc(formatTime(earlier.start)) + '</small>' : '') + '</span>' +
           '<span class="video-draft-actions">' + familiaritySelect('video', video) + '<button class="button small secondary" type="button" data-action="video-thumbnail" data-id="' + esc(video.id) + '" aria-label="Upload and crop a thumbnail for ' + esc(video.title) + '">Thumbnail</button>' +
           '<button class="icon-button" type="button" data-action="remove-video-item" data-id="' + esc(video.id) + '" aria-label="Remove video ' + esc(video.title) + '" title="Remove video">×</button></span></li>';
       }).join('')
@@ -865,7 +880,7 @@
       errorNode.textContent = 'A video pick can have up to ' + MAX_VIDEOS + ' videos.';
       return false;
     }
-    videoDraft.push({ id: makeId('video'), title, url, imageAssetId: '', familiarity: '' });
+    videoDraft.push({ id: makeId('video'), title, url, imageAssetId: '', familiarity: earlierShowing(url) ? 'again' : '' });
     errorNode.textContent = '';
     form.elements.videoTitle.value = '';
     form.elements.videoUrl.value = '';
@@ -1654,6 +1669,7 @@
   });
 
   document.addEventListener('input', (event) => {
+    if (event.target.form?.id === 'videoForm' && event.target.name === 'start') renderVideoDraft();
     if (event.target.matches('input[name="icon"]')) updateSymbolPreview(event.target.form);
     if (event.target.id === 'symbolSearch') {
       activeSymbolGroup = 'All';

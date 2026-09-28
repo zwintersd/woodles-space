@@ -127,15 +127,32 @@ window.ScheduleStudio = (() => {
     try { return Boolean(new URL(value)); } catch { return false; }
   }
 
-  // YouTube serves a 16:9 still for every video, used until a thumbnail is uploaded.
-  function youTubeThumbnail(value) {
+  function youTubeId(value) {
     let url;
     try { url = new URL(value); } catch { return ''; }
     const host = url.hostname.replace(/^(?:www|m|music)\./, '');
     let id = '';
     if (host === 'youtu.be') id = url.pathname.split('/')[1] || '';
     else if (host === 'youtube.com' || host === 'youtube-nocookie.com') id = url.searchParams.get('v') || (url.pathname.match(/^\/(?:shorts|embed|live)\/([^/]+)/) || [])[1] || '';
-    return /^[\w-]{11}$/.test(id) ? 'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg' : '';
+    return /^[\w-]{11}$/.test(id) ? id : '';
+  }
+
+  // YouTube serves a 16:9 still for every video, used until a thumbnail is uploaded.
+  function youTubeThumbnail(value) {
+    const id = youTubeId(value);
+    return id ? 'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg' : '';
+  }
+
+  // Two links to one video (youtu.be/ID and youtube.com/watch?v=ID&list=…) share a key.
+  function videoKey(value) {
+    const id = youTubeId(value);
+    if (id) return 'youtube:' + id;
+    try {
+      const url = new URL(value);
+      return url.hostname.replace(/^www\./, '') + url.pathname.replace(/\/+$/, '') + url.search;
+    } catch {
+      return String(value || '');
+    }
   }
 
   function sanitizeVideo(value) {
@@ -280,7 +297,7 @@ window.ScheduleStudio = (() => {
     makeId, esc, cleanText, validTime, validDuration, validColor, timeMinutes,
     isLocalImageData, pictogramSource, openMojiCodepoint, symbolMarkup,
     sanitizeImage, sanitizeActivity, sanitizeChoiceOption, sanitizeVideo, sanitizePlan, readWorkspace,
-    validVideoUrl, youTubeThumbnail, validFamiliarity, familiarityMarkup, choiceTitle, videoTitle, videoPrompt, itemLabel,
+    validVideoUrl, youTubeThumbnail, videoKey, validFamiliarity, familiarityMarkup, choiceTitle, videoTitle, videoPrompt, itemLabel,
     itemVisuals, itemImageIds, visualScheduleUrl
   };
 })();
