@@ -2,11 +2,11 @@
   'use strict';
 
   const {
-    STORAGE_KEY, DAY_KEYS, COLORS, MAX_CHOICE_OPTIONS, MAX_VIDEOS,
+    STORAGE_KEY, DAY_KEYS, COLORS, MAX_CHOICE_OPTIONS, MAX_VIDEOS, FAMILIARITY,
     makeId, esc, cleanText, validTime, validDuration, validColor, timeMinutes,
     isLocalImageData, pictogramSource, openMojiCodepoint, symbolMarkup,
     sanitizeImage, sanitizeActivity, sanitizePlan, readWorkspace,
-    validVideoUrl, youTubeThumbnail, choiceTitle, videoTitle, videoPrompt, itemLabel,
+    validVideoUrl, youTubeThumbnail, validFamiliarity, familiarityMarkup, choiceTitle, videoTitle, videoPrompt, itemLabel,
     itemVisuals, itemImageIds, visualScheduleUrl
   } = window.ScheduleStudio;
   const CATEGORIES = ['Instruction', 'Communication', 'Play / leisure', 'Daily living', 'Movement', 'Sensory', 'Break', 'Transition', 'Other'];
@@ -356,6 +356,14 @@
     return source ? '<img src="' + esc(source) + '" alt="" loading="lazy">' : '<span aria-hidden="true">▶</span>';
   }
 
+  // Marks a drafted video or option as familiar to the learner or novel.
+  function familiaritySelect(draft, entry) {
+    return '<select class="familiarity-select" data-familiarity="' + draft + '" data-id="' + esc(entry.id) + '" aria-label="Familiarity of ' + esc(entry.title) + '">' +
+      '<option value="">No tag</option>' +
+      Object.entries(FAMILIARITY).map(([value, tag]) => '<option value="' + value + '"' + (entry.familiarity === value ? ' selected' : '') + '>' + tag.label + ' · ' + (value === 'new' ? 'novel' : 'familiar') + '</option>').join('') +
+    '</select>';
+  }
+
   function itemActions(item, index, items, name, editAction) {
     return '<div class="activity-actions">' +
       '<button class="icon-button" type="button" data-action="move-activity" data-id="' + esc(item.occurrenceId) + '" data-direction="-1" aria-label="Move ' + esc(name) + ' earlier" title="Move earlier" ' + (index === 0 ? 'disabled' : '') + '>↑</button>' +
@@ -373,7 +381,7 @@
         '<div class="activity-time">' + esc(formatTime(item.start)) + '<small>' + item.duration + ' min</small></div>' +
         '<div class="video-symbol" aria-hidden="true">▶</div>' +
         '<div class="activity-copy"><h3>' + esc(title) + '</h3><div class="activity-tags"><span class="activity-tag">' + (count > 1 ? 'Video pick · ' + count + ' videos' : 'Video · watch together') + '</span></div>' +
-          '<ul class="video-thumbs" aria-label="Videos">' + item.videos.map((video) => '<li class="video-thumb"><span class="video-thumb-art">' + videoThumbnailMarkup(video) + '</span><span>' + esc(video.title) + '</span></li>').join('') + '</ul>' +
+          '<ul class="video-thumbs" aria-label="Videos">' + item.videos.map((video) => '<li class="video-thumb"><span class="video-thumb-art">' + videoThumbnailMarkup(video) + familiarityMarkup(video.familiarity) + '</span><span>' + esc(video.title) + '</span></li>').join('') + '</ul>' +
           (item.prompt ? '<p class="activity-note">' + esc(item.prompt) + '</p>' : '') + '</div>' +
         itemActions(item, index, items, title, 'edit-video') + '</article>';
     }
@@ -383,7 +391,7 @@
         '<div class="activity-time">' + esc(formatTime(item.start)) + '<small>' + item.duration + ' min</small></div>' +
         '<div class="choice-symbol" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' +
         '<div class="activity-copy"><h3>' + esc(title) + '</h3><div class="activity-tags"><span class="activity-tag">Choice · ' + item.options.length + ' option' + (item.options.length === 1 ? '' : 's') + '</span></div>' +
-          '<ul class="choice-options" aria-label="Options">' + item.options.map((option) => '<li class="choice-option" style="--activity-bg:color-mix(in srgb,' + validColor(option.color) + ' 14%,white)"><span class="choice-option-art" aria-hidden="true">' + optionVisual(option, 22) + '</span>' + esc(option.title) + '</li>').join('') + '</ul>' +
+          '<ul class="choice-options" aria-label="Options">' + item.options.map((option) => '<li class="choice-option" style="--activity-bg:color-mix(in srgb,' + validColor(option.color) + ' 14%,white)"><span class="choice-option-art" aria-hidden="true">' + optionVisual(option, 22) + '</span>' + esc(option.title) + familiarityMarkup(option.familiarity) + '</li>').join('') + '</ul>' +
           (item.prompt ? '<p class="activity-note">' + esc(item.prompt) + '</p>' : '') + '</div>' +
         itemActions(item, index, items, title, 'edit-choice') + '</article>';
     }
@@ -705,7 +713,7 @@
     const list = document.getElementById('choiceOptions');
     if (!list) return;
     list.innerHTML = choiceDraft.length
-      ? choiceDraft.map((option) => '<li class="choice-draft-item" style="--activity-bg:color-mix(in srgb,' + validColor(option.color) + ' 14%,white)"><span class="choice-option-art" aria-hidden="true">' + optionVisual(option, 26) + '</span><span class="choice-draft-title">' + esc(option.title) + '</span>' +
+      ? choiceDraft.map((option) => '<li class="choice-draft-item" style="--activity-bg:color-mix(in srgb,' + validColor(option.color) + ' 14%,white)"><span class="choice-option-art" aria-hidden="true">' + optionVisual(option, 26) + '</span><span class="choice-draft-title">' + esc(option.title) + '</span>' + familiaritySelect('choice', option) +
         '<button class="icon-button" type="button" data-action="remove-choice-option" data-id="' + esc(option.id) + '" aria-label="Remove option ' + esc(option.title) + '" title="Remove option">×</button></li>').join('')
       : '<li class="choice-draft-empty">No options yet. Add at least two below.</li>';
   }
@@ -716,7 +724,7 @@
       errorNode.textContent = 'A choice can have up to ' + MAX_CHOICE_OPTIONS + ' options.';
       return false;
     }
-    choiceDraft.push({ id: makeId('option'), title: option.title, icon: option.icon || '⭐', pictogram: option.pictogram || '', imageAssetId: option.imageAssetId || '', color: option.color || COLORS[choiceDraft.length % COLORS.length] });
+    choiceDraft.push({ id: makeId('option'), title: option.title, icon: option.icon || '⭐', pictogram: option.pictogram || '', imageAssetId: option.imageAssetId || '', color: option.color || COLORS[choiceDraft.length % COLORS.length], familiarity: '' });
     errorNode.textContent = '';
     renderChoiceDraft();
     return true;
@@ -833,7 +841,7 @@
         const source = imageAssetData(video.imageAssetId) ? 'Uploaded thumbnail' : youTubeThumbnail(video.url) ? 'YouTube thumbnail' : 'No thumbnail yet';
         return '<li class="video-draft-item"><span class="video-thumb-art">' + videoThumbnailMarkup(video) + '</span>' +
           '<span class="video-draft-copy"><strong>' + esc(video.title) + '</strong><small>' + esc(new URL(video.url).hostname.replace(/^www\./, '')) + ' · ' + source + '</small></span>' +
-          '<span class="video-draft-actions"><button class="button small secondary" type="button" data-action="video-thumbnail" data-id="' + esc(video.id) + '" aria-label="Upload and crop a thumbnail for ' + esc(video.title) + '">Thumbnail</button>' +
+          '<span class="video-draft-actions">' + familiaritySelect('video', video) + '<button class="button small secondary" type="button" data-action="video-thumbnail" data-id="' + esc(video.id) + '" aria-label="Upload and crop a thumbnail for ' + esc(video.title) + '">Thumbnail</button>' +
           '<button class="icon-button" type="button" data-action="remove-video-item" data-id="' + esc(video.id) + '" aria-label="Remove video ' + esc(video.title) + '" title="Remove video">×</button></span></li>';
       }).join('')
       : '<li class="choice-draft-empty">No videos yet. Add one to watch together, or several to pick from.</li>';
@@ -857,7 +865,7 @@
       errorNode.textContent = 'A video pick can have up to ' + MAX_VIDEOS + ' videos.';
       return false;
     }
-    videoDraft.push({ id: makeId('video'), title, url, imageAssetId: '' });
+    videoDraft.push({ id: makeId('video'), title, url, imageAssetId: '', familiarity: '' });
     errorNode.textContent = '';
     form.elements.videoTitle.value = '';
     form.elements.videoUrl.value = '';
@@ -1617,6 +1625,11 @@
       setCropStatus('Crop output: ' + width + ' × ' + height + '. Drag to reposition or adjust zoom.');
     }
     if (event.target.id === 'cropFormat') document.getElementById('cropQuality').disabled = event.target.value === 'image/png';
+    if (event.target.matches('[data-familiarity]')) {
+      const draft = event.target.dataset.familiarity === 'video' ? videoDraft : choiceDraft;
+      const entry = draft.find((item) => item.id === event.target.dataset.id);
+      if (entry) entry.familiarity = validFamiliarity(event.target.value);
+    }
     if (event.target.matches('[data-print-setting]')) {
       const day = getDay(getPlan(), activeDayKey);
       if (!day) return;

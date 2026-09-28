@@ -4,7 +4,7 @@
   const {
     DAY_KEYS, STORAGE_KEY, esc, timeMinutes, validColor, isLocalImageData, pictogramSource,
     openMojiCodepoint, symbolMarkup, readWorkspace, choiceTitle, videoTitle, videoPrompt, itemLabel,
-    youTubeThumbnail, itemVisuals, visualScheduleUrl
+    youTubeThumbnail, FAMILIARITY, familiarityMarkup, itemVisuals, visualScheduleUrl
   } = window.ScheduleStudio;
   // Checks and picks belong to one calendar day, so a weekly plan starts fresh each time it comes round.
   const PROGRESS_KEY = 'woodles.schedule-planner.progress.v1';
@@ -118,7 +118,7 @@
     const done = progress.done.has(step.occurrenceId);
     const chips = step.options.map((option) =>
       '<button class="chip" type="button" data-choice="' + esc(step.occurrenceId) + '" data-option="' + esc(option.id) + '" aria-pressed="' + (progress.picks[step.occurrenceId] === option.id) + '" style="--activity-color:' + validColor(option.color) + '">' +
-        '<span class="chip-art" aria-hidden="true">' + visualMarkup(option, 34) + '</span><span>' + esc(option.title) + '</span></button>').join('');
+        '<span class="chip-art" aria-hidden="true">' + visualMarkup(option, 34) + '</span><span>' + esc(option.title) + '</span>' + familiarityMarkup(option.familiarity) + '</button>').join('');
     return '<li class="step choice' + (done ? ' is-done' : '') + '" data-id="' + esc(step.occurrenceId) + '">' +
       '<div class="time">' + clockLabel(step.from) + '<small>' + step.duration + ' min</small></div>' +
       '<article class="box"><span class="nowtag">NOW</span><div class="choice-layout">' +
@@ -146,8 +146,8 @@
       const source = isLocalImageData(uploaded) ? uploaded : youTubeThumbnail(video.url);
       return '<article class="vid" data-video="' + esc(video.id) + '">' +
         (source ? '<img class="art" src="' + esc(source) + '" alt="">' : '<span class="art art-empty" aria-hidden="true">▶</span>') +
-        '<div class="vid-body"><h3>' + esc(video.title) + '</h3><div class="btns">' +
-          (picking ? '<button class="pick" type="button" data-video-step="' + esc(step.occurrenceId) + '" data-video="' + esc(video.id) + '" aria-pressed="false" aria-label="Pick ' + esc(video.title) + '">Pick</button>' : '') +
+        '<div class="vid-body">' + familiarityMarkup(video.familiarity) + '<h3>' + esc(video.title) + '</h3><div class="btns">' +
+          (picking ? '<button class="pick" type="button" data-video-step="' + esc(step.occurrenceId) + '" data-video="' + esc(video.id) + '" aria-pressed="false" aria-label="Pick ' + esc(video.title) + (FAMILIARITY[video.familiarity] ? ', ' + FAMILIARITY[video.familiarity].label.toLowerCase() : '') + '">Pick</button>' : '') +
           '<a class="watch" href="' + esc(video.url) + '" target="_blank" rel="noopener noreferrer" aria-label="Watch ' + esc(video.title) + ' (opens in a new tab)">▶ Watch</a>' +
         '</div></div></article>';
     }).join('');

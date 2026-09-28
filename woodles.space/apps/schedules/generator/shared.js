@@ -11,6 +11,8 @@ window.ScheduleStudio = (() => {
   const COLORS = ['#3978c7', '#32845f', '#d27b32', '#a16ab5', '#d05c66', '#458d98', '#7c8797'];
   const MAX_CHOICE_OPTIONS = 6;
   const MAX_VIDEOS = 4;
+  // Whether an offered video or option is familiar to the learner or novel.
+  const FAMILIARITY = { again: { label: 'Again', symbol: '↻' }, new: { label: 'New', symbol: '✦' } };
   const OPENMOJI_FILES = new Set([
     '23E9', '2696', '2705', '2728', '2B50', '1F308', '1F319', '1F330', '1F331', '1F338', '1F33B',
     '1F33C', '1F33E', '1F33F', '1F340', '1F344', '1F347', '1F34E', '1F36F', '1F3AF', '1F3C6',
@@ -98,6 +100,15 @@ window.ScheduleStudio = (() => {
     };
   }
 
+  function validFamiliarity(value) {
+    return Object.prototype.hasOwnProperty.call(FAMILIARITY, value) ? value : '';
+  }
+
+  function familiarityMarkup(value) {
+    const tag = FAMILIARITY[validFamiliarity(value)];
+    return tag ? '<span class="familiarity is-' + value + '"><span aria-hidden="true">' + tag.symbol + '</span> ' + tag.label + '</span>' : '';
+  }
+
   function sanitizeChoiceOption(value) {
     if (!value || typeof value !== 'object' || !String(value.title || '').trim()) return null;
     return {
@@ -106,7 +117,8 @@ window.ScheduleStudio = (() => {
       icon: cleanText(value.icon, 16, '⭐'),
       pictogram: cleanText(value.pictogram, 300, ''),
       imageAssetId: cleanText(value.imageAssetId, 100, ''),
-      color: validColor(value.color)
+      color: validColor(value.color),
+      familiarity: validFamiliarity(value.familiarity)
     };
   }
 
@@ -134,7 +146,8 @@ window.ScheduleStudio = (() => {
       id: cleanText(value.id, 100, makeId('video')),
       title: cleanText(value.title, 80, 'Video'),
       url,
-      imageAssetId: cleanText(value.imageAssetId, 100, '')
+      imageAssetId: cleanText(value.imageAssetId, 100, ''),
+      familiarity: validFamiliarity(value.familiarity)
     };
   }
 
@@ -263,11 +276,11 @@ window.ScheduleStudio = (() => {
   }
 
   return {
-    STORAGE_KEY, DAY_KEYS, COLORS, MAX_CHOICE_OPTIONS, MAX_VIDEOS,
+    STORAGE_KEY, DAY_KEYS, COLORS, MAX_CHOICE_OPTIONS, MAX_VIDEOS, FAMILIARITY,
     makeId, esc, cleanText, validTime, validDuration, validColor, timeMinutes,
     isLocalImageData, pictogramSource, openMojiCodepoint, symbolMarkup,
     sanitizeImage, sanitizeActivity, sanitizeChoiceOption, sanitizeVideo, sanitizePlan, readWorkspace,
-    validVideoUrl, youTubeThumbnail, choiceTitle, videoTitle, videoPrompt, itemLabel,
+    validVideoUrl, youTubeThumbnail, validFamiliarity, familiarityMarkup, choiceTitle, videoTitle, videoPrompt, itemLabel,
     itemVisuals, itemImageIds, visualScheduleUrl
   };
 })();

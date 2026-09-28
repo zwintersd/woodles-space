@@ -67,6 +67,10 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--sky); outline-o
 .chip-art { display: grid; width: 42px; height: 42px; place-items: center; overflow: hidden; border-radius: 11px; background: color-mix(in srgb, var(--activity-color) 13%, white); }
 .chip-art img { display: block; width: 36px; height: 36px; object-fit: contain; }
 .chip-art .symbol-fallback { line-height: 1; }
+.familiarity { display: inline-flex; justify-self: start; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; color: #fff; font-family: var(--display); font-size: 10px; font-weight: 400; letter-spacing: .04em; line-height: 1.4; text-transform: uppercase; }
+.familiarity.is-again { background: #0f766e; }
+.familiarity.is-new { background: #7a3fd1; }
+.chip .familiarity { justify-self: center; padding: 1px 7px; font-size: 9px; }
 .video-head { display: grid; grid-template-columns: minmax(0, 1fr) 34px; align-items: start; gap: 10px; }
 .videos { display: grid; gap: 8px; margin-top: 8px; }
 .videos.count-2, .videos.count-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -156,7 +160,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--sky); outline-o
   .edit-link, .clock, .nownext, .reset, .day-links, .done-btn, .nowtag, .btns { display: none !important; }
   .vid .art { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .vid.dim .art { opacity: 1; filter: none; }
-  .hero, .box, .nn, .visual, .category, .chip, .chip-art, .time::after { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .hero, .box, .nn, .visual, .category, .chip, .chip-art, .familiarity, .time::after { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .choice-layout { grid-template-columns: minmax(140px, .8fr) minmax(0, 3.2fr); }
   .activity { grid-template-columns: 64px minmax(0, 1fr); }
   .step { break-inside: avoid; }

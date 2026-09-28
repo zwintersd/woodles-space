@@ -20,6 +20,11 @@ so it's not easy to forget.
 
 ## 2026-09-28
 
+- **again and new** — videos and choice options can be marked familiar
+  (↻ Again) or novel (✦ New) in the planner, and the visual schedule shows the
+  mark on the card, like the September 25 example, so it's clear which of the
+  things on offer the learner has seen before.
+
 - **videos in the weekly planner** — "＋ Video" adds the September 25
   example's video cards to any day: one video to watch together, or two to
   four for the learner to pick from, each with a ▶ Watch link. Thumbnails come
