@@ -80,7 +80,7 @@ export const appManifest = Object.freeze([
 		sourceDir: 'apps/quiet-room',
 		outputDir: 'apps/quiet-room',
 		entryFile: 'index.html',
-		landing: tile('quiet', 11, 'play', 'an immersive room of light, drawn in three.js', 'var(--lapis)', 'var(--lilac)', '195deg', { defaultPin: 5 })
+		landing: tile('quiet', 11, 'play', 'a room of light to sit in, or to play like a stylophone', 'var(--lapis)', 'var(--lilac)', '195deg', { defaultPin: 5 })
 	},
 	{
 		id: 'write',
@@ -211,7 +211,7 @@ export const appManifest = Object.freeze([
 		// with a Thinking About entry means "what does the day say about this
 		// thing", and Carillon answers with what it already has scheduled.
 		addressableBy: ['thinking-about-entry'],
-		landing: tile('planner', 6, 'tend', 'interval data, fading routines, and day piles', 'var(--peach)', 'var(--lavender)', '170deg', { defaultPin: 4 })
+		landing: tile('planner', 6, 'tend', 'your day in piles, and a bell that asks what is happening now', 'var(--peach)', 'var(--lavender)', '170deg', { defaultPin: 4 })
 	},
 	{
 		id: 'animations',
@@ -253,7 +253,7 @@ export const appManifest = Object.freeze([
 		entryFile: 'index.html',
 		packageName: 'thinking-about',
 		addressableBy: ['entry'],
-		landing: tile('thinking', 7, 'tend', 'a landing spot for what you are reading, playing, and watching', 'var(--lapis)', 'var(--aqua)', '140deg')
+		landing: tile('thinking', 7, 'tend', 'a forest of what you are reading, playing, and watching', 'var(--lapis)', 'var(--aqua)', '140deg')
 	},
 	{
 		id: 'whiteboard',
