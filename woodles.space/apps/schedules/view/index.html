@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#2f7bf5" />
+  <title>Visual schedule · Schedule studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/schedules/view/styles.css" />
+  <script src="/schedules/generator/shared.js" defer></script>
+  <script src="/schedules/view/app.js" defer></script>
+</head>
+<body>
+<main class="schedule">
+  <header class="hero">
+    <a class="edit-link" id="editLink" href="/schedules/generator">✎ Weekly planner</a>
+    <h1 id="greeting">Visual schedule</h1>
+    <p id="intro">Loading the plan saved on this device…</p>
+    <div class="clock" id="clock" aria-label="Current local time">Now: --:--</div>
+    <svg class="hero-art" viewBox="0 0 280 150" aria-hidden="true" focusable="false">
+      <g fill="#a9d6ff" opacity=".72"><path d="M2 132c0-10 8-18 19-18 4-16 17-27 34-27 16 0 29 10 34 25 13 1 23 10 23 21 0 12-10 21-23 21H25C12 154 2 145 2 132Z"/><path d="M182 137c0-8 7-15 16-15 3-13 14-21 27-21s24 8 27 20c11 1 19 8 19 18 0 10-8 17-19 17h-50c-11 0-20-8-20-19Z"/></g>
+      <g stroke="#ffd948" stroke-width="9" stroke-linecap="round"><path d="M157 11v11M204 27l-8 8M223 70h-11M207 111l-8-8M160 115l7-10M126 73h11M133 37l8 8M178 5l-2 12"/></g>
+      <circle cx="174" cy="65" r="38" fill="#ffdb45"/><g fill="#14254e"><ellipse cx="160" cy="61" rx="3" ry="5"/><ellipse cx="187" cy="61" rx="3" ry="5"/></g><path d="M163 76c6 8 16 8 22 0" fill="none" stroke="#14254e" stroke-width="4" stroke-linecap="round"/>
+    </svg>
+  </header>
+
+  <section class="nownext" id="nowNext" aria-live="polite" aria-label="Now and next" hidden>
+    <div class="nn now"><small id="nowLabel">NOW</small><b id="nowText">…</b></div>
+    <div class="nn"><small id="nextLabel">NEXT</small><b id="nextText">…</b></div>
+  </section>
+  <ol class="timeline" id="timeline" aria-label="Schedule" hidden></ol>
+  <section class="notice" id="notice" hidden></section>
+
+  <footer class="view-footer" id="footer" hidden>
+    <p class="credits" id="credits"></p>
+    <div class="footer-actions">
+      <button class="reset" id="reset" type="button">Clear checks</button>
+      <nav class="day-links" id="dayLinks" aria-label="Days in this plan"></nav>
+    </div>
+  </footer>
+</main>
+</body>
+</html>

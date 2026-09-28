@@ -84,6 +84,9 @@ work it in this order:
 `/schedules` is a private, static link tree outside the homepage catalogue.
 Its dated pages have explicit rewrites too; add each new dated page to
 `vercel.json` so its friendly URL resolves to the matching `index.html`.
+`/schedules/view` draws any weekly-planner day in the dated pages' style. It
+reads the planner's localStorage through `generator/shared.js`, so it only
+knows plans saved in that browser.
 
 ## a note on the recursive scripts
 
