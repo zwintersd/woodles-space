@@ -35,6 +35,8 @@
     { "source": "/schedules/9-25",  "destination": "/apps/schedules/9-25/index.html" },
     { "source": "/schedules/generator", "destination": "/apps/schedules/generator/index.html" },
     { "source": "/schedules/generator/:path*", "destination": "/apps/schedules/generator/:path*" },
+    { "source": "/schedules/view",  "destination": "/apps/schedules/view/index.html" },
+    { "source": "/schedules/view/:path*", "destination": "/apps/schedules/view/:path*" },
     { "source": "/piano",           "destination": "/apps/piano/index.html" },
     { "source": "/piano/:path*",    "destination": "/apps/piano/:path*" },
     { "source": "/digits",          "destination": "/apps/digits/index.html" },

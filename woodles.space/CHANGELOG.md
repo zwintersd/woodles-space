@@ -20,6 +20,19 @@ so it's not easy to forget.
 
 ## 2026-09-28
 
+- **choices in the weekly planner** — "＋ Choice" adds a choice to a day: two to
+  six options, each typed with a symbol or taken from the activity library with
+  its picture. On the visual schedule it's the learner's choice row from the
+  September 25 example: they tap an option, Now / Next names what they picked,
+  and the pick clears the next day along with the checks.
+
+- **weekly plans open as visual schedules** — the schedule planner has a
+  ▶ Visual schedule button (and a preview card beside each day) that opens the
+  selected day in the September 25 example’s style: a greeting with their name,
+  big pictures, a live Now / Next, check-offs that reset each day, and an
+  "All done!" at the end. Open slots become the learner's choice. On any other
+  weekday it reads First / Then instead of Now / Next.
+
 - **one clock, not four** — the tray's flyout is a calendar now: the month,
   today marked, and tonight's moon, above the themes. The greeting widget keeps
   the time, the date, and the note, so nothing is said twice.
