@@ -10,6 +10,9 @@ window.ScheduleStudio = (() => {
   ];
   const COLORS = ['#3978c7', '#32845f', '#d27b32', '#a16ab5', '#d05c66', '#458d98', '#7c8797'];
   const MAX_CHOICE_OPTIONS = 6;
+  const MAX_VIDEOS = 4;
+  // Whether an offered video or option is familiar to the learner or novel.
+  const FAMILIARITY = { again: { label: 'Again', symbol: '↻' }, new: { label: 'New', symbol: '✦' } };
   const OPENMOJI_FILES = new Set([
     '23E9', '2696', '2705', '2728', '2B50', '1F308', '1F319', '1F330', '1F331', '1F338', '1F33B',
     '1F33C', '1F33E', '1F33F', '1F340', '1F344', '1F347', '1F34E', '1F36F', '1F3AF', '1F3C6',
@@ -97,6 +100,15 @@ window.ScheduleStudio = (() => {
     };
   }
 
+  function validFamiliarity(value) {
+    return Object.prototype.hasOwnProperty.call(FAMILIARITY, value) ? value : '';
+  }
+
+  function familiarityMarkup(value) {
+    const tag = FAMILIARITY[validFamiliarity(value)];
+    return tag ? '<span class="familiarity is-' + value + '"><span aria-hidden="true">' + tag.symbol + '</span> ' + tag.label + '</span>' : '';
+  }
+
   function sanitizeChoiceOption(value) {
     if (!value || typeof value !== 'object' || !String(value.title || '').trim()) return null;
     return {
@@ -105,7 +117,54 @@ window.ScheduleStudio = (() => {
       icon: cleanText(value.icon, 16, '⭐'),
       pictogram: cleanText(value.pictogram, 300, ''),
       imageAssetId: cleanText(value.imageAssetId, 100, ''),
-      color: validColor(value.color)
+      color: validColor(value.color),
+      familiarity: validFamiliarity(value.familiarity)
+    };
+  }
+
+  function validVideoUrl(value) {
+    if (!/^https?:\/\/\S+$/i.test(String(value || ''))) return false;
+    try { return Boolean(new URL(value)); } catch { return false; }
+  }
+
+  function youTubeId(value) {
+    let url;
+    try { url = new URL(value); } catch { return ''; }
+    const host = url.hostname.replace(/^(?:www|m|music)\./, '');
+    let id = '';
+    if (host === 'youtu.be') id = url.pathname.split('/')[1] || '';
+    else if (host === 'youtube.com' || host === 'youtube-nocookie.com') id = url.searchParams.get('v') || (url.pathname.match(/^\/(?:shorts|embed|live)\/([^/]+)/) || [])[1] || '';
+    return /^[\w-]{11}$/.test(id) ? id : '';
+  }
+
+  // YouTube serves a 16:9 still for every video, used until a thumbnail is uploaded.
+  function youTubeThumbnail(value) {
+    const id = youTubeId(value);
+    return id ? 'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg' : '';
+  }
+
+  // Two links to one video (youtu.be/ID and youtube.com/watch?v=ID&list=…) share a key.
+  function videoKey(value) {
+    const id = youTubeId(value);
+    if (id) return 'youtube:' + id;
+    try {
+      const url = new URL(value);
+      return url.hostname.replace(/^www\./, '') + url.pathname.replace(/\/+$/, '') + url.search;
+    } catch {
+      return String(value || '');
+    }
+  }
+
+  function sanitizeVideo(value) {
+    if (!value || typeof value !== 'object' || !String(value.title || '').trim()) return null;
+    const url = cleanText(value.url, 500, '');
+    if (!validVideoUrl(url)) return null;
+    return {
+      id: cleanText(value.id, 100, makeId('video')),
+      title: cleanText(value.title, 80, 'Video'),
+      url,
+      imageAssetId: cleanText(value.imageAssetId, 100, ''),
+      familiarity: validFamiliarity(value.familiarity)
     };
   }
 
@@ -135,6 +194,19 @@ window.ScheduleStudio = (() => {
               duration: validDuration(entry.duration, 15),
               color: validColor(entry.color),
               options: (Array.isArray(entry.options) ? entry.options : []).map(sanitizeChoiceOption).filter(Boolean).slice(0, MAX_CHOICE_OPTIONS)
+            };
+          }
+          if (entry && entry.kind === 'video') {
+            return {
+              kind: 'video',
+              occurrenceId: cleanText(entry.occurrenceId, 100, makeId('scheduled')),
+              sourceId: '',
+              title: cleanText(entry.title, 100, ''),
+              prompt: cleanText(entry.prompt, 200, ''),
+              start: validTime(entry.start, '09:00'),
+              duration: validDuration(entry.duration, 10),
+              color: validColor(entry.color),
+              videos: (Array.isArray(entry.videos) ? entry.videos : []).map(sanitizeVideo).filter(Boolean).slice(0, MAX_VIDEOS)
             };
           }
           if (entry && entry.kind === 'open-slot') {
@@ -190,10 +262,25 @@ window.ScheduleStudio = (() => {
     return (item && item.title) || learner + '’s choice';
   }
 
+  // One video is watched together; two or more are the learner's pick.
+  function videoTitle(item, learner) {
+    return item.title || (item.videos.length > 1 ? learner + ' picks a video' : 'Watch a video together');
+  }
+
+  function videoPrompt(item) {
+    return item.prompt || (item.videos.length > 1 ? 'Pick one to watch.' : 'We watch this one together.');
+  }
+
+  function itemLabel(item, learner) {
+    if (item.kind === 'activity') return item.title;
+    return item.kind === 'video' ? videoTitle(item, learner) : choiceTitle(item, learner);
+  }
+
   // The things on a scheduled item that carry a picture: an activity itself,
-  // or each option of a choice. Open slots have none.
+  // each option of a choice, or each video's thumbnail. Open slots have none.
   function itemVisuals(item) {
     if (item.kind === 'choice') return item.options;
+    if (item.kind === 'video') return item.videos;
     return item.kind === 'open-slot' ? [] : [item];
   }
 
@@ -206,10 +293,11 @@ window.ScheduleStudio = (() => {
   }
 
   return {
-    STORAGE_KEY, DAY_KEYS, COLORS, MAX_CHOICE_OPTIONS,
+    STORAGE_KEY, DAY_KEYS, COLORS, MAX_CHOICE_OPTIONS, MAX_VIDEOS, FAMILIARITY,
     makeId, esc, cleanText, validTime, validDuration, validColor, timeMinutes,
     isLocalImageData, pictogramSource, openMojiCodepoint, symbolMarkup,
-    sanitizeImage, sanitizeActivity, sanitizeChoiceOption, sanitizePlan, readWorkspace,
-    choiceTitle, itemVisuals, itemImageIds, visualScheduleUrl
+    sanitizeImage, sanitizeActivity, sanitizeChoiceOption, sanitizeVideo, sanitizePlan, readWorkspace,
+    validVideoUrl, youTubeThumbnail, videoKey, validFamiliarity, familiarityMarkup, choiceTitle, videoTitle, videoPrompt, itemLabel,
+    itemVisuals, itemImageIds, visualScheduleUrl
   };
 })();

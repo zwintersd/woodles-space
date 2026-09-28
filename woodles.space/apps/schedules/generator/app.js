@@ -2,11 +2,12 @@
   'use strict';
 
   const {
-    STORAGE_KEY, DAY_KEYS, COLORS, MAX_CHOICE_OPTIONS,
+    STORAGE_KEY, DAY_KEYS, COLORS, MAX_CHOICE_OPTIONS, MAX_VIDEOS, FAMILIARITY,
     makeId, esc, cleanText, validTime, validDuration, validColor, timeMinutes,
     isLocalImageData, pictogramSource, openMojiCodepoint, symbolMarkup,
     sanitizeImage, sanitizeActivity, sanitizePlan, readWorkspace,
-    choiceTitle, itemVisuals, itemImageIds, visualScheduleUrl
+    validVideoUrl, youTubeThumbnail, videoKey, validFamiliarity, familiarityMarkup, choiceTitle, videoTitle, videoPrompt, itemLabel,
+    itemVisuals, itemImageIds, visualScheduleUrl
   } = window.ScheduleStudio;
   const CATEGORIES = ['Instruction', 'Communication', 'Play / leisure', 'Daily living', 'Movement', 'Sensory', 'Break', 'Transition', 'Other'];
   const COLOR_NAMES = { '#3978c7': 'Blue', '#32845f': 'Green', '#d27b32': 'Orange', '#a16ab5': 'Purple', '#d05c66': 'Rose', '#458d98': 'Teal', '#7c8797': 'Slate' };
@@ -99,9 +100,12 @@
   let cropZoomFactor = 1;
   let cropPointer = null;
   let cropSourceName = 'image';
-  let cropAttachEnabled = false;
+  // Where "Use on …" in the image studio puts the crop: an activity form or a
+  // video being drafted. Null when the studio is only for downloads.
+  let cropTarget = null;
   let activeSymbolGroup = 'Popular';
   let choiceDraft = [];
+  let videoDraft = [];
   let recentSymbols = readRecentSymbols();
 
   function readRecentSymbols() {
@@ -221,6 +225,7 @@
     return {
       count: kinds('activity'),
       choices: kinds('choice'),
+      videos: kinds('video'),
       openSlots: kinds('open-slot'),
       minutes: day.activities.reduce((total, item) => total + item.duration, 0)
     };
@@ -230,6 +235,7 @@
     const parts = [];
     if (stats.count) parts.push(stats.count + ' activit' + (stats.count === 1 ? 'y' : 'ies'));
     if (stats.choices) parts.push(stats.choices + ' choice' + (stats.choices === 1 ? '' : 's'));
+    if (stats.videos) parts.push(stats.videos + ' video' + (stats.videos === 1 ? '' : 's'));
     if (stats.openSlots) parts.push(stats.openSlots + ' open slot' + (stats.openSlots === 1 ? '' : 's'));
     return parts.join(' · ') || 'No items';
   }
@@ -240,9 +246,10 @@
       result.days += day.activities.length > 0 ? 1 : 0;
       result.activities += stats.count;
       result.choices += stats.choices;
+      result.videos += stats.videos;
       result.openSlots += stats.openSlots;
       return result;
-    }, { days: 0, activities: 0, choices: 0, openSlots: 0 });
+    }, { days: 0, activities: 0, choices: 0, videos: 0, openSlots: 0 });
   }
 
   function nextFreeStart(day, duration, ignoreId) {
@@ -304,7 +311,7 @@
       return '<article class="plan-card">' +
         '<button class="plan-open" type="button" data-action="open-plan" data-plan="' + esc(plan.id) + '">' +
           '<strong>' + esc(plan.learner) + '</strong><span>' + esc(plan.name) + '</span>' +
-          '<span class="plan-meta">' + stats.days + ' day' + (stats.days === 1 ? '' : 's') + ' planned · ' + stats.activities + ' activities' + (stats.choices ? ' · ' + stats.choices + ' choice' + (stats.choices === 1 ? '' : 's') : '') + (stats.openSlots ? ' · ' + stats.openSlots + ' open slot' + (stats.openSlots === 1 ? '' : 's') : '') + ' · ' + esc(formatDate(plan.updatedAt)) + '</span>' +
+          '<span class="plan-meta">' + stats.days + ' day' + (stats.days === 1 ? '' : 's') + ' planned · ' + stats.activities + ' activities' + (stats.choices ? ' · ' + stats.choices + ' choice' + (stats.choices === 1 ? '' : 's') : '') + (stats.videos ? ' · ' + stats.videos + ' video' + (stats.videos === 1 ? '' : 's') : '') + (stats.openSlots ? ' · ' + stats.openSlots + ' open slot' + (stats.openSlots === 1 ? '' : 's') : '') + ' · ' + esc(formatDate(plan.updatedAt)) + '</span>' +
         '</button><div class="plan-actions">' +
           '<a class="icon-button visual-link" href="' + esc(visualScheduleUrl(plan.id)) + '" aria-label="Open ' + esc(plan.learner) + '’s visual schedule" title="Visual schedule">▶</a>' +
           '<button class="icon-button" type="button" data-action="duplicate-plan" data-plan="' + esc(plan.id) + '" aria-label="Duplicate ' + esc(plan.learner) + ' plan" title="Duplicate plan">⧉</button>' +
@@ -339,6 +346,24 @@
     return source ? '<img src="' + esc(source) + '" alt="" width="' + size + '" height="' + size + '" loading="lazy">' : symbolMarkup(option.icon || '⭐', size);
   }
 
+  function videoThumbnail(video) {
+    const uploaded = imageAssetData(video.imageAssetId);
+    return isLocalImageData(uploaded) ? uploaded : youTubeThumbnail(video.url);
+  }
+
+  function videoThumbnailMarkup(video) {
+    const source = videoThumbnail(video);
+    return source ? '<img src="' + esc(source) + '" alt="" loading="lazy">' : '<span aria-hidden="true">▶</span>';
+  }
+
+  // Marks a drafted video or option as familiar to the learner or novel.
+  function familiaritySelect(draft, entry) {
+    return '<select class="familiarity-select" data-familiarity="' + draft + '" data-id="' + esc(entry.id) + '" aria-label="Familiarity of ' + esc(entry.title) + '">' +
+      '<option value="">No tag</option>' +
+      Object.entries(FAMILIARITY).map(([value, tag]) => '<option value="' + value + '"' + (entry.familiarity === value ? ' selected' : '') + '>' + tag.label + ' · ' + (value === 'new' ? 'novel' : 'familiar') + '</option>').join('') +
+    '</select>';
+  }
+
   function itemActions(item, index, items, name, editAction) {
     return '<div class="activity-actions">' +
       '<button class="icon-button" type="button" data-action="move-activity" data-id="' + esc(item.occurrenceId) + '" data-direction="-1" aria-label="Move ' + esc(name) + ' earlier" title="Move earlier" ' + (index === 0 ? 'disabled' : '') + '>↑</button>' +
@@ -349,13 +374,24 @@
   }
 
   function renderActivity(day, item, index, items) {
+    if (item.kind === 'video') {
+      const title = videoTitle(item, getPlan().learner);
+      const count = item.videos.length;
+      return '<article class="activity-card video-card">' +
+        '<div class="activity-time">' + esc(formatTime(item.start)) + '<small>' + item.duration + ' min</small></div>' +
+        '<div class="video-symbol" aria-hidden="true">▶</div>' +
+        '<div class="activity-copy"><h3>' + esc(title) + '</h3><div class="activity-tags"><span class="activity-tag">' + (count > 1 ? 'Video pick · ' + count + ' videos' : 'Video · watch together') + '</span></div>' +
+          '<ul class="video-thumbs" aria-label="Videos">' + item.videos.map((video) => '<li class="video-thumb"><span class="video-thumb-art">' + videoThumbnailMarkup(video) + familiarityMarkup(video.familiarity) + '</span><span>' + esc(video.title) + '</span></li>').join('') + '</ul>' +
+          (item.prompt ? '<p class="activity-note">' + esc(item.prompt) + '</p>' : '') + '</div>' +
+        itemActions(item, index, items, title, 'edit-video') + '</article>';
+    }
     if (item.kind === 'choice') {
       const title = choiceTitle(item, getPlan().learner);
       return '<article class="activity-card choice-card">' +
         '<div class="activity-time">' + esc(formatTime(item.start)) + '<small>' + item.duration + ' min</small></div>' +
         '<div class="choice-symbol" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' +
         '<div class="activity-copy"><h3>' + esc(title) + '</h3><div class="activity-tags"><span class="activity-tag">Choice · ' + item.options.length + ' option' + (item.options.length === 1 ? '' : 's') + '</span></div>' +
-          '<ul class="choice-options" aria-label="Options">' + item.options.map((option) => '<li class="choice-option" style="--activity-bg:color-mix(in srgb,' + validColor(option.color) + ' 14%,white)"><span class="choice-option-art" aria-hidden="true">' + optionVisual(option, 22) + '</span>' + esc(option.title) + '</li>').join('') + '</ul>' +
+          '<ul class="choice-options" aria-label="Options">' + item.options.map((option) => '<li class="choice-option" style="--activity-bg:color-mix(in srgb,' + validColor(option.color) + ' 14%,white)"><span class="choice-option-art" aria-hidden="true">' + optionVisual(option, 22) + '</span>' + esc(option.title) + familiarityMarkup(option.familiarity) + '</li>').join('') + '</ul>' +
           (item.prompt ? '<p class="activity-note">' + esc(item.prompt) + '</p>' : '') + '</div>' +
         itemActions(item, index, items, title, 'edit-choice') + '</article>';
     }
@@ -384,7 +420,7 @@
 
   function renderVisualCard(plan, day) {
     const rows = sortedActivities(day).slice(0, 3).map((item) =>
-      '<span class="visual-preview-row"><b>' + esc(formatTime(item.start)) + '</b><span>' + esc(item.kind === 'activity' ? item.title : choiceTitle(item, plan.learner)) + '</span></span>').join('');
+      '<span class="visual-preview-row"><b>' + esc(formatTime(item.start)) + '</b><span>' + esc(itemLabel(item, plan.learner)) + '</span></span>').join('');
     return '<section class="visual-card" aria-labelledby="visualCardTitle">' +
       '<div class="visual-preview" aria-hidden="true"><span class="visual-preview-hero"><strong>Hi ' + esc(plan.learner) + '!</strong><small>' + esc(day.label) + ' · ' + esc(formatTime(day.start)) + '–' + esc(formatTime(day.end)) + '</small></span>' +
         (rows || '<span class="visual-preview-empty">Activities you add show up here</span>') + '</div>' +
@@ -426,7 +462,7 @@
       '<nav class="day-tabs" aria-label="Days of the week">' + renderDayTabs(plan) + '</nav>' +
       '<div class="day-panel"><section class="day-main" aria-labelledby="dayTitle">' +
         '<div class="day-main-header"><div><span class="eyebrow">' + esc(plan.learner) + ' · weekly schedule</span><h2 id="dayTitle">' + esc(day.label) + '</h2><p>Plan this day’s session, then copy it to another day when the pattern fits.</p></div>' +
-          '<div class="button-row"><button class="button secondary" type="button" data-action="add-open-slot">＋ Open slot</button><button class="button secondary" type="button" data-action="add-choice">＋ Choice</button><button class="button primary" type="button" data-action="add-activity">＋ Add activity</button></div></div>' +
+          '<div class="button-row"><button class="button secondary" type="button" data-action="add-open-slot">＋ Open slot</button><button class="button secondary" type="button" data-action="add-choice">＋ Choice</button><button class="button secondary" type="button" data-action="add-video">＋ Video</button><button class="button primary" type="button" data-action="add-activity">＋ Add activity</button></div></div>' +
         '<div class="time-window"><span class="time-window-label">Session time</span><label class="field"><span>Starts</span><input type="time" data-day-time="start" value="' + esc(day.start) + '" aria-label="' + esc(day.label) + ' session start"></label>' +
           '<label class="field"><span>Ends</span><input type="time" data-day-time="end" value="' + esc(day.end) + '" aria-label="' + esc(day.label) + ' session end"></label>' +
           '<span class="time-summary">' + stats.minutes + ' scheduled minutes · ' + Math.max(0, capacity - stats.minutes) + ' unassigned minutes</span></div>' +
@@ -438,7 +474,7 @@
         '<div class="copy-row"><label for="copyDestination">Reuse this day:</label><select id="copyDestination">' + destinationOptions + '</select><button class="button small secondary" type="button" data-action="copy-day">Copy day</button><button class="button small secondary danger" type="button" data-action="clear-day">Clear day</button><button class="button small secondary danger" type="button" data-action="delete-day">Delete day</button></div>' +
         '<div class="activity-list" aria-label="' + esc(day.label) + ' scheduled items">' +
           (items.length ? items.map((item, index) => renderActivity(day, item, index, items)).join('') :
-            '<div class="empty-day"><span class="empty-icon" aria-hidden="true">＋</span><h3>No activities planned yet</h3><p>Add a session activity, a choice between a few options, or an open slot, or copy a day with a schedule you want to reuse. Times and items remain editable on every day.</p><div class="button-row"><button class="button secondary" type="button" data-action="add-open-slot">＋ Add open slot</button><button class="button secondary" type="button" data-action="add-choice">＋ Add choice</button><button class="button secondary" type="button" data-action="add-activity">＋ Add first activity</button></div></div>') +
+            '<div class="empty-day"><span class="empty-icon" aria-hidden="true">＋</span><h3>No activities planned yet</h3><p>Add a session activity, a choice between a few options, a video, or an open slot, or copy a day with a schedule you want to reuse. Times and items remain editable on every day.</p><div class="button-row"><button class="button secondary" type="button" data-action="add-open-slot">＋ Add open slot</button><button class="button secondary" type="button" data-action="add-choice">＋ Add choice</button><button class="button secondary" type="button" data-action="add-video">＋ Add video</button><button class="button secondary" type="button" data-action="add-activity">＋ Add first activity</button></div></div>') +
         '</div>' + (printCredits ? '<p class="print-credit">' + printCredits + '</p>' : '') + '</section>' +
         '<aside class="day-side">' + renderVisualCard(plan, day) + '<section class="side-card"><h3>This week</h3><p>Each day can use its own session window and activity sequence.</p><div class="week-summary">' + renderWeekSummary(plan) + '</div>' +
           '<div class="side-actions"><button class="button secondary" type="button" data-action="duplicate-plan">Duplicate this learner plan</button><button class="button secondary danger" type="button" data-action="delete-current-plan">Delete this plan</button></div></section></aside>' +
@@ -677,7 +713,7 @@
     const list = document.getElementById('choiceOptions');
     if (!list) return;
     list.innerHTML = choiceDraft.length
-      ? choiceDraft.map((option) => '<li class="choice-draft-item" style="--activity-bg:color-mix(in srgb,' + validColor(option.color) + ' 14%,white)"><span class="choice-option-art" aria-hidden="true">' + optionVisual(option, 26) + '</span><span class="choice-draft-title">' + esc(option.title) + '</span>' +
+      ? choiceDraft.map((option) => '<li class="choice-draft-item" style="--activity-bg:color-mix(in srgb,' + validColor(option.color) + ' 14%,white)"><span class="choice-option-art" aria-hidden="true">' + optionVisual(option, 26) + '</span><span class="choice-draft-title">' + esc(option.title) + '</span>' + familiaritySelect('choice', option) +
         '<button class="icon-button" type="button" data-action="remove-choice-option" data-id="' + esc(option.id) + '" aria-label="Remove option ' + esc(option.title) + '" title="Remove option">×</button></li>').join('')
       : '<li class="choice-draft-empty">No options yet. Add at least two below.</li>';
   }
@@ -688,7 +724,7 @@
       errorNode.textContent = 'A choice can have up to ' + MAX_CHOICE_OPTIONS + ' options.';
       return false;
     }
-    choiceDraft.push({ id: makeId('option'), title: option.title, icon: option.icon || '⭐', pictogram: option.pictogram || '', imageAssetId: option.imageAssetId || '', color: option.color || COLORS[choiceDraft.length % COLORS.length] });
+    choiceDraft.push({ id: makeId('option'), title: option.title, icon: option.icon || '⭐', pictogram: option.pictogram || '', imageAssetId: option.imageAssetId || '', color: option.color || COLORS[choiceDraft.length % COLORS.length], familiarity: '' });
     errorNode.textContent = '';
     renderChoiceDraft();
     return true;
@@ -757,6 +793,150 @@
     showToast(activityMode === 'choice-edit' ? 'Choice updated.' : 'Choice added to ' + day.label + '.');
   }
 
+  function showVideoDialog(mode, item) {
+    const plan = getPlan();
+    const day = getDay(plan, activeDayKey);
+    if (!day) return;
+    activityMode = mode === 'edit' ? 'video-edit' : 'video-new';
+    editingActivityId = item ? item.occurrenceId : '';
+    const editing = activityMode === 'video-edit';
+    let defaultDuration = item ? item.duration : 10;
+    let defaultStart = item ? item.start : nextFreeStart(day, defaultDuration);
+    if (!editing && defaultStart === null) {
+      defaultDuration = 5;
+      defaultStart = nextFreeStart(day, defaultDuration);
+    }
+    if (defaultStart === null) return showToast('There is no open session time for another video.');
+    const startValue = typeof defaultStart === 'number' ? timeString(defaultStart) : defaultStart;
+    videoDraft = item ? item.videos.map((video) => ({ ...video })) : [];
+    activityDialogBody.innerHTML = '<div class="dialog-heading dialog-content"><div><span class="eyebrow">' + (editing ? 'Edit this day' : 'Add to this day') + '</span><h2>' + (editing ? 'Edit video' : 'Add a video') + '</h2><p class="muted">One video is watched together. Add 2 to ' + MAX_VIDEOS + ' and ' + esc(plan.learner) + ' picks one on the visual schedule.</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close">×</button></div>' +
+      '<form class="edit-form" id="videoForm">' +
+        '<label class="field"><span>Start time</span><input name="start" type="time" value="' + esc(startValue) + '" required></label>' +
+        '<label class="field"><span>Length (minutes)</span><input name="duration" type="number" min="1" max="480" value="' + esc(defaultDuration) + '" required></label>' +
+        '<label class="field"><span>Heading (optional)</span><input name="title" maxlength="100" value="' + esc(item ? item.title : '') + '"></label>' +
+        '<label class="field"><span>Prompt (optional)</span><input name="prompt" maxlength="200" value="' + esc(item ? item.prompt : '') + '"></label>' +
+        '<div class="field full"><span id="videoListLabel">Videos · up to ' + MAX_VIDEOS + '</span><ul class="video-draft" id="videoDraft" aria-labelledby="videoListLabel"></ul></div>' +
+        '<fieldset class="choice-composer full"><legend>Add a video</legend>' +
+          '<label class="field"><span>Video title</span><input id="videoTitle" name="videoTitle" maxlength="80" placeholder="e.g., City Escape" autocomplete="off"></label>' +
+          '<label class="field"><span>Video link</span><span class="choice-composer-row"><input id="videoUrl" name="videoUrl" type="url" maxlength="500" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off"><button class="button secondary" type="button" data-action="add-video-item">＋ Add video</button></span></label>' +
+          '<small class="muted">YouTube links get their thumbnail automatically. Use “Thumbnail” on a video to upload and crop your own at 16:9.</small>' +
+        '</fieldset>' +
+        '<div class="error-text full" id="videoError" role="status" aria-live="polite"></div>' +
+        '<div class="dialog-footer full"><button class="button secondary" type="button" data-close-dialog>Cancel</button><button class="button primary" type="submit">' + (editing ? 'Save video' : 'Add video') + '</button></div>' +
+      '</form>';
+    renderVideoDraft();
+    if (!activityDialog.open) activityDialog.showModal();
+    activityDialogBody.querySelector(editing ? 'input[name="start"]' : '#videoTitle')?.focus();
+  }
+
+  // The earliest other video item on this day, before the one being drafted,
+  // that offers the same video: the reason to suggest "Again".
+  function earlierShowing(url) {
+    const day = getDay(getPlan(), activeDayKey);
+    const form = document.getElementById('videoForm');
+    if (!day || !form) return null;
+    const start = validTime(form.elements.start.value, '');
+    const key = videoKey(url);
+    return sortedActivities(day).find((item) => item.kind === 'video' && item.occurrenceId !== editingActivityId &&
+      (!start || timeMinutes(item.start) < timeMinutes(start)) &&
+      item.videos.some((video) => videoKey(video.url) === key)) || null;
+  }
+
+  function renderVideoDraft() {
+    const list = document.getElementById('videoDraft');
+    const form = document.getElementById('videoForm');
+    if (!list || !form) return;
+    const preview = { title: '', prompt: '', videos: videoDraft };
+    form.elements.title.placeholder = videoTitle(preview, getPlan().learner);
+    form.elements.prompt.placeholder = videoPrompt(preview);
+    list.innerHTML = videoDraft.length
+      ? videoDraft.map((video) => {
+        const source = imageAssetData(video.imageAssetId) ? 'Uploaded thumbnail' : youTubeThumbnail(video.url) ? 'YouTube thumbnail' : 'No thumbnail yet';
+        const earlier = earlierShowing(video.url);
+        return '<li class="video-draft-item"><span class="video-thumb-art">' + videoThumbnailMarkup(video) + '</span>' +
+          '<span class="video-draft-copy"><strong>' + esc(video.title) + '</strong><small>' + esc(new URL(video.url).hostname.replace(/^www\./, '')) + ' · ' + source + '</small>' +
+            (earlier ? '<small class="video-repeat"><span aria-hidden="true">↻</span> Also offered at ' + esc(formatTime(earlier.start)) + '</small>' : '') + '</span>' +
+          '<span class="video-draft-actions">' + familiaritySelect('video', video) + '<button class="button small secondary" type="button" data-action="video-thumbnail" data-id="' + esc(video.id) + '" aria-label="Upload and crop a thumbnail for ' + esc(video.title) + '">Thumbnail</button>' +
+          '<button class="icon-button" type="button" data-action="remove-video-item" data-id="' + esc(video.id) + '" aria-label="Remove video ' + esc(video.title) + '" title="Remove video">×</button></span></li>';
+      }).join('')
+      : '<li class="choice-draft-empty">No videos yet. Add one to watch together, or several to pick from.</li>';
+  }
+
+  function addComposedVideo(form) {
+    const errorNode = document.getElementById('videoError');
+    const title = cleanText(form.elements.videoTitle.value, 80, '');
+    const url = cleanText(form.elements.videoUrl.value, 500, '');
+    if (!title) {
+      errorNode.textContent = 'Name the video first.';
+      form.elements.videoTitle.focus();
+      return false;
+    }
+    if (!validVideoUrl(url)) {
+      errorNode.textContent = 'Paste the video’s web link, starting with https://.';
+      form.elements.videoUrl.focus();
+      return false;
+    }
+    if (videoDraft.length >= MAX_VIDEOS) {
+      errorNode.textContent = 'A video pick can have up to ' + MAX_VIDEOS + ' videos.';
+      return false;
+    }
+    videoDraft.push({ id: makeId('video'), title, url, imageAssetId: '', familiarity: earlierShowing(url) ? 'again' : '' });
+    errorNode.textContent = '';
+    form.elements.videoTitle.value = '';
+    form.elements.videoUrl.value = '';
+    renderVideoDraft();
+    form.elements.videoTitle.focus();
+    return true;
+  }
+
+  function submitVideo(form) {
+    const day = getDay(getPlan(), activeDayKey);
+    if (!day) return;
+    const errorNode = form.querySelector('#videoError');
+    if ((form.elements.videoTitle.value.trim() || form.elements.videoUrl.value.trim()) && !addComposedVideo(form)) return;
+    const data = new FormData(form);
+    const start = validTime(data.get('start'), '');
+    const duration = validDuration(data.get('duration'), 0);
+    if (!start || !duration) {
+      errorNode.textContent = 'Enter a valid start time and a length from 1 to 480 minutes.';
+      return;
+    }
+    if (!videoDraft.length) {
+      errorNode.textContent = 'Add a video with its title and link.';
+      form.elements.videoTitle.focus();
+      return;
+    }
+    const values = { start, duration, title: cleanText(data.get('title'), 100, ''), prompt: cleanText(data.get('prompt'), 200, ''), videos: videoDraft.map((video) => ({ ...video })) };
+    let entry;
+    if (activityMode === 'video-edit') {
+      entry = day.activities.find((item) => item.occurrenceId === editingActivityId && item.kind === 'video');
+      if (!entry) return activityDialog.close();
+      const prior = { ...entry };
+      Object.assign(entry, values);
+      const message = validateDay(day);
+      if (message) {
+        Object.assign(entry, prior);
+        errorNode.textContent = message;
+        return;
+      }
+    } else {
+      entry = { kind: 'video', occurrenceId: makeId('scheduled'), sourceId: '', color: COLORS[0], ...values };
+      day.activities.push(entry);
+      const message = validateDay(day);
+      if (message) {
+        day.activities = day.activities.filter((item) => item.occurrenceId !== entry.occurrenceId);
+        errorNode.textContent = message;
+        return;
+      }
+    }
+    persist();
+    activityDialog.close();
+    render();
+    if (activityMode === 'video-edit') focusActivityAction('edit-video', entry.occurrenceId);
+    else focusAddActivity();
+    showToast(activityMode === 'video-edit' ? 'Video updated.' : 'Video added to ' + day.label + '.');
+  }
+
   function renderImageAssetPreview(value, imageAssetId) {
     const imageValue = activityImageValue({ pictogram: value, imageAssetId: imageAssetId || '' });
     const source = isLocalImageData(imageValue) ? imageValue : pictogramSource(imageValue);
@@ -807,8 +987,8 @@
     document.getElementById('cropEmpty').hidden = hasImage;
     document.getElementById('cropZoom').disabled = !hasImage;
     document.getElementById('downloadCrop').disabled = !hasImage;
-    document.getElementById('useActivityImage').hidden = !cropAttachEnabled;
-    document.getElementById('useActivityImage').disabled = !hasImage || !cropAttachEnabled;
+    document.getElementById('useActivityImage').hidden = !cropTarget;
+    document.getElementById('useActivityImage').disabled = !hasImage || !cropTarget;
     document.getElementById('cropCanvas').classList.toggle('has-image', hasImage);
     drawCrop();
   }
@@ -843,18 +1023,51 @@
     image.src = source;
   }
 
-  function openImageEditor(attachToActivity) {
-    const form = attachToActivity ? document.getElementById('activityForm') : null;
-    cropAttachEnabled = Boolean(form);
-    document.getElementById('cropSubtitle').textContent = cropAttachEnabled
-      ? 'Choose a crop, drag to frame it, then download it or attach a compact 512 px copy to this activity.'
+  function activityImageTarget() {
+    const form = document.getElementById('activityForm');
+    return form && {
+      form,
+      label: 'activity',
+      preset: 'square',
+      imageId: form.elements.imageAssetId.value,
+      attach(image) {
+        form.elements.imageAssetId.value = image.id;
+        form.elements.pictogramUrl.value = '';
+        document.getElementById('imageAssetPreview').innerHTML = renderImageAssetPreview('', image.id);
+      }
+    };
+  }
+
+  function videoImageTarget(videoId) {
+    const form = document.getElementById('videoForm');
+    const video = videoDraft.find((entry) => entry.id === videoId);
+    return form && video && {
+      form,
+      label: 'video',
+      preset: 'wide',
+      imageId: video.imageAssetId,
+      attach(image) {
+        video.imageAssetId = image.id;
+        renderVideoDraft();
+      }
+    };
+  }
+
+  function openImageEditor(target) {
+    cropTarget = target || null;
+    document.getElementById('cropSubtitle').textContent = cropTarget
+      ? 'Choose a crop, drag to frame it, then download it or attach a compact 512 px copy to this ' + cropTarget.label + '.'
       : 'Choose a crop, drag to frame it, then download the finished image for another app.';
-    const attached = form ? imageAssetData(form.elements.imageAssetId.value) : '';
-    if (cropAttachEnabled) activityDialog.appendChild(imageEditorDialog);
+    if (cropTarget) {
+      document.getElementById('cropPreset').value = cropTarget.preset;
+      document.getElementById('useActivityImage').textContent = 'Use on ' + cropTarget.label;
+    }
+    const attached = cropTarget ? imageAssetData(cropTarget.imageId) : '';
+    if (cropTarget) activityDialog.appendChild(imageEditorDialog);
     else document.body.appendChild(imageEditorDialog);
     if (!imageEditorDialog.open) imageEditorDialog.showModal();
     document.getElementById('cropSource').value = '';
-    if (isLocalImageData(attached)) loadCropSource(attached, 'activity-image', '');
+    if (isLocalImageData(attached)) loadCropSource(attached, cropTarget.label + '-image', '');
     else {
       if (cropObjectUrl) URL.revokeObjectURL(cropObjectUrl);
       cropObjectUrl = '';
@@ -930,9 +1143,9 @@
     }
   }
 
-  async function useCropOnActivity() {
-    const form = document.getElementById('activityForm');
-    if (!cropImage || !cropAttachEnabled || !form) return;
+  async function useCropOnTarget() {
+    const target = cropTarget;
+    if (!cropImage || !target) return;
     const canvas = cropCanvas();
     const factor = Math.min(1, 512 / Math.max(canvas.width, canvas.height));
     const { mime, quality } = cropFormatDetails();
@@ -946,21 +1159,19 @@
         context.fillRect(0, 0, compact.width, compact.height);
       }
       context.drawImage(canvas, 0, 0, compact.width, compact.height);
-      const blob = await new Promise((resolve, reject) => compact.toBlob((result) => result ? resolve(result) : reject(new Error('Could not create the activity image.')), mime, quality));
+      const blob = await new Promise((resolve, reject) => compact.toBlob((result) => result ? resolve(result) : reject(new Error('Could not create the ' + target.label + ' image.')), mime, quality));
       if (blob.type !== mime) throw new Error('This browser cannot create that format. Choose JPEG or PNG.');
-      if (blob.size > 65000) throw new Error('The compact activity image is over 65 KB. Try JPEG or WebP with a simpler crop; you can still download the full-size image.');
+      if (blob.size > 65000) throw new Error('The compact ' + target.label + ' image is over 65 KB. Try JPEG or WebP with a simpler crop; you can still download the full-size image.');
       const reader = new FileReader();
       reader.onload = () => {
-        if (!form.isConnected || !imageEditorDialog.open) return;
+        if (!target.form.isConnected || !imageEditorDialog.open) return;
         const image = sanitizeImage({ id: makeId('image'), data: String(reader.result || '') });
         if (!image) {
           setCropStatus('Could not attach this image. Try another format.');
           return;
         }
         workspace.images.push(image);
-        form.elements.imageAssetId.value = image.id;
-        form.elements.pictogramUrl.value = '';
-        document.getElementById('imageAssetPreview').innerHTML = renderImageAssetPreview('', image.id);
+        target.attach(image);
         imageEditorDialog.close();
       };
       reader.onerror = () => setCropStatus('Could not attach this image. Try another format.');
@@ -1138,7 +1349,7 @@
     const plan = getPlan();
     const day = getDay(plan, activeDayKey);
     if (!day || !day.activities.length) return;
-    if (!window.confirm('Clear all activities, choices, and open slots from ' + day.label + '?')) return;
+    if (!window.confirm('Clear everything scheduled on ' + day.label + '?')) return;
     day.activities = [];
     persist();
     render();
@@ -1176,7 +1387,7 @@
     const day = getDay(getPlan(), activeDayKey);
     if (!day) return;
     const item = day.activities.find((entry) => entry.occurrenceId === occurrenceId);
-    const label = item && (item.kind === 'open-slot' ? 'this open slot' : item.kind === 'choice' ? 'this choice' : '“' + item.title + '”');
+    const label = item && (item.kind === 'open-slot' ? 'this open slot' : item.kind === 'choice' ? 'this choice' : item.kind === 'video' ? 'this video' : '“' + item.title + '”');
     if (!item || !window.confirm('Remove ' + label + ' from ' + day.label + '?')) return;
     day.activities = day.activities.filter((entry) => entry.occurrenceId !== occurrenceId);
     persist();
@@ -1250,7 +1461,8 @@
         const remapImage = (item) => ({
           ...item,
           imageAssetId: imageIdMap.get(item && item.imageAssetId) || '',
-          ...(item && Array.isArray(item.options) ? { options: item.options.map(remapImage) } : {})
+          ...(item && Array.isArray(item.options) ? { options: item.options.map(remapImage) } : {}),
+          ...(item && Array.isArray(item.videos) ? { videos: item.videos.map(remapImage) } : {})
         });
         const planSource = {
           ...rawPlan,
@@ -1318,8 +1530,16 @@
       renderChoiceDraft();
       document.getElementById('optionTitle')?.focus();
     }
-    else if (name === 'open-image-editor') openImageEditor(true);
-    else if (name === 'open-image-studio') openImageEditor(false);
+    else if (name === 'open-image-editor') openImageEditor(activityImageTarget());
+    else if (name === 'open-image-studio') openImageEditor(null);
+    else if (name === 'add-video') showVideoDialog('new');
+    else if (name === 'add-video-item') addComposedVideo(action.form);
+    else if (name === 'video-thumbnail') openImageEditor(videoImageTarget(action.dataset.id));
+    else if (name === 'remove-video-item') {
+      videoDraft = videoDraft.filter((video) => video.id !== action.dataset.id);
+      renderVideoDraft();
+      document.getElementById('videoTitle')?.focus();
+    }
     else if (name === 'toggle-symbol-picker') {
       const form = action.closest('form');
       const picker = form && form.querySelector('#symbolPicker');
@@ -1373,6 +1593,10 @@
       const day = getDay(getPlan(), activeDayKey);
       const item = day && day.activities.find((entry) => entry.occurrenceId === action.dataset.id && entry.kind === 'choice');
       if (item) showChoiceDialog('edit', item);
+    } else if (name === 'edit-video') {
+      const day = getDay(getPlan(), activeDayKey);
+      const item = day && day.activities.find((entry) => entry.occurrenceId === action.dataset.id && entry.kind === 'video');
+      if (item) showVideoDialog('edit', item);
     } else if (name === 'remove-activity') removeActivity(action.dataset.id);
     else if (name === 'move-activity') moveActivity(action.dataset.id, action.dataset.direction);
     else if (name === 'copy-day') copyDay();
@@ -1397,6 +1621,9 @@
     } else if (event.target.id === 'choiceForm') {
       event.preventDefault();
       submitChoice(event.target);
+    } else if (event.target.id === 'videoForm') {
+      event.preventDefault();
+      submitVideo(event.target);
     }
   });
 
@@ -1413,6 +1640,11 @@
       setCropStatus('Crop output: ' + width + ' × ' + height + '. Drag to reposition or adjust zoom.');
     }
     if (event.target.id === 'cropFormat') document.getElementById('cropQuality').disabled = event.target.value === 'image/png';
+    if (event.target.matches('[data-familiarity]')) {
+      const draft = event.target.dataset.familiarity === 'video' ? videoDraft : choiceDraft;
+      const entry = draft.find((item) => item.id === event.target.dataset.id);
+      if (entry) entry.familiarity = validFamiliarity(event.target.value);
+    }
     if (event.target.matches('[data-print-setting]')) {
       const day = getDay(getPlan(), activeDayKey);
       if (!day) return;
@@ -1437,6 +1669,7 @@
   });
 
   document.addEventListener('input', (event) => {
+    if (event.target.form?.id === 'videoForm' && event.target.name === 'start') renderVideoDraft();
     if (event.target.matches('input[name="icon"]')) updateSymbolPreview(event.target.form);
     if (event.target.id === 'symbolSearch') {
       activeSymbolGroup = 'All';
@@ -1462,6 +1695,11 @@
       addComposedOption(event.target.form);
       return;
     }
+    if ((event.target.id === 'videoTitle' || event.target.id === 'videoUrl') && event.key === 'Enter') {
+      event.preventDefault();
+      addComposedVideo(event.target.form);
+      return;
+    }
     if (event.target.id !== 'symbolSearch' || event.key !== 'Escape') return;
     const form = event.target.form;
     const picker = form && form.querySelector('#symbolPicker');
@@ -1471,6 +1709,12 @@
     form.querySelector('[data-action="toggle-symbol-picker"]').setAttribute('aria-expanded', 'false');
     form.querySelector('[data-action="toggle-symbol-picker"]').focus();
   });
+
+  // A YouTube still that fails to load (offline, a removed video) falls back to the play tile.
+  document.addEventListener('error', (event) => {
+    const image = event.target;
+    if (image instanceof HTMLImageElement && image.parentElement?.classList.contains('video-thumb-art')) image.outerHTML = '<span aria-hidden="true">▶</span>';
+  }, true);
 
   document.getElementById('cropCanvas').addEventListener('pointerdown', (event) => {
     if (!cropImage) return;
@@ -1502,7 +1746,7 @@
     drawCrop();
   });
   document.getElementById('downloadCrop').addEventListener('click', downloadImageCrop);
-  document.getElementById('useActivityImage').addEventListener('click', useCropOnActivity);
+  document.getElementById('useActivityImage').addEventListener('click', useCropOnTarget);
 
   window.addEventListener('popstate', () => {
     const params = new URLSearchParams(location.search);
@@ -1512,5 +1756,5 @@
   });
 
   render();
-  if (new URLSearchParams(location.search).get('tool') === 'image') openImageEditor(false);
+  if (new URLSearchParams(location.search).get('tool') === 'image') openImageEditor(null);
 })();

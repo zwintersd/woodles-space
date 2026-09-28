@@ -3,7 +3,8 @@
 
   const {
     DAY_KEYS, STORAGE_KEY, esc, timeMinutes, validColor, isLocalImageData, pictogramSource,
-    openMojiCodepoint, symbolMarkup, readWorkspace, choiceTitle, itemVisuals, visualScheduleUrl
+    openMojiCodepoint, symbolMarkup, readWorkspace, choiceTitle, videoTitle, videoPrompt, itemLabel,
+    youTubeThumbnail, FAMILIARITY, familiarityMarkup, itemVisuals, visualScheduleUrl
   } = window.ScheduleStudio;
   // Checks and picks belong to one calendar day, so a weekly plan starts fresh each time it comes round.
   const PROGRESS_KEY = 'woodles.schedule-planner.progress.v1';
@@ -52,9 +53,12 @@
 
   function stepLabel(step, picks) {
     if (step.kind === 'finish') return 'All done!';
-    if (step.kind === 'activity') return step.title;
+    if (step.kind === 'video') {
+      const video = step.videos.find((entry) => entry.id === picks[step.occurrenceId]) || (step.videos.length === 1 ? step.videos[0] : null);
+      return video ? 'Watch ' + video.title : itemLabel(step, plan.learner);
+    }
     const picked = step.kind === 'choice' && step.options.find((option) => option.id === picks[step.occurrenceId]);
-    return picked ? picked.title : choiceTitle(step, plan.learner);
+    return picked ? picked.title : itemLabel(step, plan.learner);
   }
 
   function imageValue(item) {
@@ -114,7 +118,7 @@
     const done = progress.done.has(step.occurrenceId);
     const chips = step.options.map((option) =>
       '<button class="chip" type="button" data-choice="' + esc(step.occurrenceId) + '" data-option="' + esc(option.id) + '" aria-pressed="' + (progress.picks[step.occurrenceId] === option.id) + '" style="--activity-color:' + validColor(option.color) + '">' +
-        '<span class="chip-art" aria-hidden="true">' + visualMarkup(option, 34) + '</span><span>' + esc(option.title) + '</span></button>').join('');
+        '<span class="chip-art" aria-hidden="true">' + visualMarkup(option, 34) + '</span><span>' + esc(option.title) + '</span>' + familiarityMarkup(option.familiarity) + '</button>').join('');
     return '<li class="step choice' + (done ? ' is-done' : '') + '" data-id="' + esc(step.occurrenceId) + '">' +
       '<div class="time">' + clockLabel(step.from) + '<small>' + step.duration + ' min</small></div>' +
       '<article class="box"><span class="nowtag">NOW</span><div class="choice-layout">' +
@@ -124,7 +128,39 @@
       '</div></article></li>';
   }
 
+  function videoCardState(card, picked) {
+    const pick = card.querySelector('.pick');
+    card.classList.toggle('picked', picked === card.dataset.video);
+    card.classList.toggle('dim', Boolean(picked) && picked !== card.dataset.video);
+    if (!pick) return;
+    pick.setAttribute('aria-pressed', String(picked === card.dataset.video));
+    pick.textContent = picked === card.dataset.video ? 'Picked!' : 'Pick';
+  }
+
+  function videoMarkup(step, progress) {
+    const title = videoTitle(step, plan.learner);
+    const done = progress.done.has(step.occurrenceId);
+    const picking = step.videos.length > 1;
+    const cards = step.videos.map((video) => {
+      const uploaded = imageValue(video);
+      const source = isLocalImageData(uploaded) ? uploaded : youTubeThumbnail(video.url);
+      return '<article class="vid" data-video="' + esc(video.id) + '">' +
+        (source ? '<img class="art" src="' + esc(source) + '" alt="">' : '<span class="art art-empty" aria-hidden="true">▶</span>') +
+        '<div class="vid-body">' + familiarityMarkup(video.familiarity) + '<h3>' + esc(video.title) + '</h3><div class="btns">' +
+          (picking ? '<button class="pick" type="button" data-video-step="' + esc(step.occurrenceId) + '" data-video="' + esc(video.id) + '" aria-pressed="false" aria-label="Pick ' + esc(video.title) + (FAMILIARITY[video.familiarity] ? ', ' + FAMILIARITY[video.familiarity].label.toLowerCase() : '') + '">Pick</button>' : '') +
+          '<a class="watch" href="' + esc(video.url) + '" target="_blank" rel="noopener noreferrer" aria-label="Watch ' + esc(video.title) + ' (opens in a new tab)">▶ Watch</a>' +
+        '</div></div></article>';
+    }).join('');
+    return '<li class="step video' + (done ? ' is-done' : '') + '" data-id="' + esc(step.occurrenceId) + '">' +
+      '<div class="time">' + clockLabel(step.from) + '<small>' + step.duration + ' min</small></div>' +
+      '<article class="box"><span class="nowtag">NOW</span>' +
+        '<div class="video-head"><div class="copy"><h2>' + esc(title) + '</h2><p class="sub">' + esc(videoPrompt(step)) + '</p></div>' + doneButton(step, title, done) + '</div>' +
+        (step.videos.length ? '<div class="videos count-' + step.videos.length + '">' + cards + '</div>' : '') +
+      '</article></li>';
+  }
+
   function stepMarkup(step, progress) {
+    if (step.kind === 'video') return videoMarkup(step, progress);
     if (step.kind === 'choice') return choiceMarkup(step, progress);
     const done = progress.done.has(step.occurrenceId);
     if (step.kind === 'finish') {
@@ -211,7 +247,7 @@
     if (!day.activities.length) {
       el('reset').hidden = true;
       el('credits').innerHTML = '';
-      el('notice').innerHTML = '<h2>Nothing planned for ' + esc(day.label) + ' yet</h2><p>Add activities, choices, or open slots to this day in the weekly planner, and they will show up here.</p>' +
+      el('notice').innerHTML = '<h2>Nothing planned for ' + esc(day.label) + ' yet</h2><p>Add activities, choices, videos, or open slots to this day in the weekly planner, and they will show up here.</p>' +
         '<a class="notice-button" href="' + esc(el('editLink').href) + '">Plan ' + esc(day.label) + '</a>';
       el('notice').hidden = false;
       tick();
@@ -220,10 +256,14 @@
 
     const progress = readDayProgress();
     el('reset').hidden = false;
-    el('reset').textContent = day.activities.some((item) => item.kind === 'choice') ? 'Clear choices and checks' : 'Clear checks';
+    el('reset').textContent = day.activities.some((item) => item.kind === 'choice' || (item.kind === 'video' && item.videos.length > 1)) ? 'Clear choices and checks' : 'Clear checks';
     el('credits').innerHTML = creditsMarkup();
     el('timeline').setAttribute('aria-label', day.label + ' schedule');
     el('timeline').innerHTML = steps().map((step) => stepMarkup(step, progress)).join('');
+    el('timeline').querySelectorAll('.videos').forEach((list) => {
+      const picked = progress.picks[list.closest('.step').dataset.id];
+      list.querySelectorAll('.vid').forEach((card) => videoCardState(card, picked));
+    });
     el('timeline').hidden = false;
     el('nowNext').hidden = false;
     tick();
@@ -285,6 +325,14 @@
       writeDayProgress(progress);
       button.closest('.chips').querySelectorAll('.chip').forEach((chip) => chip.setAttribute('aria-pressed', String(chip.dataset.option === progress.picks[id])));
       tick();
+    } else if (button.dataset.videoStep) {
+      const progress = readDayProgress();
+      const id = button.dataset.videoStep;
+      if (progress.picks[id] === button.dataset.video) delete progress.picks[id];
+      else progress.picks[id] = button.dataset.video;
+      writeDayProgress(progress);
+      button.closest('.videos').querySelectorAll('.vid').forEach((card) => videoCardState(card, progress.picks[id]));
+      tick();
     } else if (button.id === 'reset') {
       writeDayProgress({ done: new Set(), picks: {} });
       render();
@@ -298,6 +346,11 @@
     render();
   });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+  // A YouTube still that fails to load (offline, a removed video) falls back to the play tile.
+  document.addEventListener('error', (event) => {
+    const image = event.target;
+    if (image instanceof HTMLImageElement && image.matches('.vid .art')) image.outerHTML = '<span class="art art-empty" aria-hidden="true">▶</span>';
+  }, true);
 
   render();
   window.setInterval(tick, 20000);
