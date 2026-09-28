@@ -530,8 +530,6 @@
       hasArasaac ? 'ARASAAC pictograms by Sergio Palao · Government of Aragón · CC BY-NC-SA. <a href="https://aulaabierta.arasaac.org/en/terms-of-use">Terms of use</a>.' : '',
       hasOpenMoji ? 'Emoji artwork by <a href="https://openmoji.org">OpenMoji</a> · <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.' : ''
     ].filter(Boolean).join(' ');
-    const destinationOptions = DAY_KEYS.filter((entry) => entry[0] !== day.key).map((entry) =>
-      '<option value="' + entry[0] + '">' + entry[1] + '</option>').join('');
     const destinationOptions = shown.filter((entry) => entry.key !== day.key).map((entry) =>
       '<option value="' + entry.key + '">' + esc(entry.label) + '</option>').join('');
     document.title = plan.learner + ' · ' + plan.name + ' · Schedule studio';
