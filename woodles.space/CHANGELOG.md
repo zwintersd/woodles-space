@@ -20,6 +20,21 @@ so it's not easy to forget.
 
 ## 2026-09-28
 
+- **one clock, not four** — the tray's flyout is a calendar now: the month,
+  today marked, and tonight's moon, above the themes. The greeting widget keeps
+  the time, the date, and the note, so nothing is said twice.
+- **the desktop follows dark mode** — until you pick a theme, it's cream by
+  day and dusk when your system is dark, like HomeSuite. Picking one sticks.
+- **what's new** — a ✉ in the tray opens the changelog, with a dot when
+  there's an entry since you last looked. About links to it, to Lore, and to
+  how the site is built.
+- **a today widget** — what Carillon has planned for today (standing slots
+  included) and the last few things on your Thinking About shelf, each a link
+  back into its app.
+- **quieter taskbar, steadier widgets** — the dots under taskbar icons, which
+  read as "running" but meant "opened lately", are gone. Widgets pulled back on
+  screen by a smaller window return to their place when it grows again.
+
 - **a HomeSuite widget** — add "homesuite" from the widget shelf for a wider
   card on the desktop: how many documents, boards, and collections you have,
   and the six you touched last, each opening straight into HomeSuite. It shows

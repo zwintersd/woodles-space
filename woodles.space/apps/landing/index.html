@@ -21,6 +21,15 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/shared/palette.css" />
   <link rel="stylesheet" href="/shared/scrollbars.css" />
+  <script>
+    /* before first paint, so a dark system doesn't flash cream: a chosen
+       theme wins, otherwise follow the system (the module below agrees) */
+    try {
+      var t = localStorage.getItem('woodles-theme');
+      if (!t && matchMedia('(prefers-color-scheme: dark)').matches) t = 'dusk';
+      if (t) document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  </script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -394,6 +403,30 @@
     .hs-open { color: var(--accent-strong); text-decoration: none; }
     .hs-open:hover { text-decoration: underline; }
     .hs-asof { color: var(--muted); }
+    /* today — what Carillon has planned and what's on the shelf, read from
+       the ledgers those apps already publish for each other */
+    .dw-today { width: 248px; }
+    .td-section {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.5rem; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--muted); margin: 0.55rem 0 0.25rem;
+    }
+    .td-section:first-of-type { margin-top: 0; }
+    .td-list { list-style: none; display: flex; flex-direction: column; gap: 0.05rem; }
+    .td-item {
+      display: flex; align-items: baseline; gap: 0.55rem;
+      padding: 0.22rem 0.35rem; border-radius: 8px;
+      color: var(--text); text-decoration: none;
+    }
+    .td-item:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+    .td-time {
+      flex: none; width: 2.6rem;
+      font-family: 'DM Mono', monospace; font-size: 0.56rem; color: var(--muted);
+    }
+    .td-name { font-size: 0.98rem; line-height: 1.25; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .td-done .td-name { text-decoration: line-through; color: var(--muted); }
+    .td-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; align-self: center; background: var(--lavender); }
+    .td-empty { font-style: italic; font-size: 0.92rem; color: var(--muted); padding: 0.1rem 0.35rem; }
     .dw-month { width: 196px; }
     .mo-grid {
       display: grid;
@@ -983,17 +1016,6 @@
       transition: transform 0.18s cubic-bezier(.2,.9,.3,1);
       will-change: transform;
     }
-    /* recently-opened indicator */
-    .tb-app::before {
-      content: '';
-      position: absolute; bottom: 3px; left: 50%;
-      transform: translateX(-50%);
-      width: 5px; height: 5px; border-radius: 50%;
-      background: var(--accent-strong);
-      opacity: 0; transition: opacity 0.18s ease, width 0.18s ease;
-    }
-    .tb-app.recent::before { opacity: 0.9; }
-    .tb-app:hover::before { width: 14px; border-radius: 3px; }
     /* label bubbles above the bar */
     .taskbar [data-label]::after {
       content: attr(data-label);
@@ -1065,6 +1087,15 @@
     .tray-btn:hover { background: color-mix(in srgb, var(--accent) 32%, transparent); }
     .tray-btn:active { transform: scale(0.86); }
     .tray-btn.off { opacity: 0.35; }
+    a.tray-btn { text-decoration: none; }
+    /* a dot for changelog entries newer than the last one you opened */
+    .tray-new.unseen::before {
+      content: '';
+      position: absolute; top: 3px; right: 3px;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #e8859a;
+      box-shadow: 0 0 0 2px var(--surface);
+    }
     .tray-clock {
       font-family: 'DM Mono', monospace;
       font-size: 0.62rem;
@@ -1485,6 +1516,12 @@
       font-size: 1.05rem; line-height: 1.55;
       color: var(--text); margin-bottom: 0.7rem;
     }
+    .win-links {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem; letter-spacing: 0.06em;
+      color: var(--muted); margin-top: 0.9rem;
+    }
+    .win-links a { color: var(--accent-strong); }
     .win-meta {
       font-family: 'DM Mono', monospace;
       font-size: 0.58rem; letter-spacing: 0.06em;
@@ -1517,25 +1554,12 @@
       opacity: 1; pointer-events: auto;
       visibility: visible; transition-delay: 0s;
     }
-    .fly-day {
-      font-size: 1.5rem; color: var(--accent-strong);
-      line-height: 1.1;
-    }
-    .fly-big {
-      font-family: 'DM Mono', monospace;
-      font-size: 3.4rem; font-weight: 300;
-      color: var(--text); line-height: 1;
-      margin: 0.2rem 0;
-    }
-    .fly-month {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.6rem; letter-spacing: 0.14em;
-      text-transform: uppercase; color: var(--muted);
-    }
-    .fly-note {
-      margin-top: 1rem; padding-top: 0.85rem;
+    /* the flyout is the calendar: the greeting widget already has the time,
+       the date, and the note, so this doesn't say them again */
+    .fly-moon {
+      margin-top: 0.8rem; padding-top: 0.7rem;
       border-top: 1px solid var(--rule);
-      font-style: italic; font-size: 1rem;
+      font-style: italic; font-size: 0.98rem;
       color: var(--accent-deep);
     }
     .fly-themes {
@@ -1928,10 +1952,9 @@
 
   <!-- tray flyout -->
   <section class="flyout" id="flyout">
-    <p class="fly-day" id="fly-day">day</p>
-    <p class="fly-big" id="fly-big">00</p>
-    <p class="fly-month" id="fly-month">month</p>
-    <p class="fly-note" id="fly-note">a good day to make something &#10084;</p>
+    <p class="dw-title" id="fly-month">month</p>
+    <div class="mo-grid" id="fly-cal"></div>
+    <p class="fly-moon" id="fly-moon"></p>
     <div class="fly-themes" id="themes"></div>
     <button class="fly-pers" id="fly-pers">personalize this desktop &#10024;</button>
   </section>
@@ -1945,6 +1968,7 @@
     <div id="tb-apps" style="display:flex;gap:0.25rem"></div>
     <span class="tb-sep"></span>
     <div class="tray" id="tray">
+      <a class="tray-btn tray-new" id="tray-new" href="/changelog" data-label="what's new" aria-label="What's new">&#9993;</a>
       <button class="tray-btn" id="tray-sparkle" data-label="sparkles" aria-label="Toggle sparkles">&#10022;</button>
       <button class="tray-btn" id="tray-theme" data-label="next theme" aria-label="Next theme">&#10052;</button>
       <div class="tray-clock">
@@ -1974,6 +1998,8 @@
          shared world, letters marked to be read. that's the exhibit &mdash; what
          i've chosen to put on show. everything you make here is yours alone,
          saved in your own browser, unless you publish it the same way.</p>
+      <p class="win-links"><a href="/changelog">what's new</a> &middot;
+        <a href="/lore">lore</a> &middot; <a href="/architecture">how it's built</a></p>
       <p class="win-meta" id="win-meta">z winters &middot; open monorepo</p>
     </div>
   </div>
@@ -2306,7 +2332,6 @@
         b.dataset.id = a.id;
         b.dataset.label = a.name.toLowerCase();
         b.setAttribute('aria-label', a.name);
-        if (recents.includes(a.id)) b.classList.add('recent');
         b.innerHTML = tileHTML(a);
         b.addEventListener('click', () => launch(a));
         tbApps.appendChild(b);
@@ -2525,10 +2550,6 @@
       document.getElementById('m-greet-word').textContent = greeting(now.getHours());
       document.getElementById('m-clock').innerHTML = time;
       document.getElementById('m-date').textContent = DAYS[now.getDay()] + ' · ' + dShort;
-      document.getElementById('fly-day').textContent = DAYS[now.getDay()];
-      document.getElementById('fly-big').textContent = pad(now.getDate());
-      document.getElementById('fly-month').textContent =
-        MONTHS[now.getMonth()] + ' ' + now.getFullYear();
     }
     tick();
     setInterval(tick, 1000 * 20);
@@ -2545,7 +2566,6 @@
       const note = (prefs.note || '').trim() ||
         NOTES[new Date().getDate() % NOTES.length];
       document.getElementById('w-note').textContent = note;
-      document.getElementById('fly-note').textContent = note;
       document.body.classList.toggle('no-sparkles', !prefs.sparkles);
       const pName = document.getElementById('p-name');
       if (document.activeElement !== pName)
@@ -3589,7 +3609,95 @@
       collection: { glyph: '▦', one: 'collection', many: 'collections' },
     };
 
+    /* the two ledgers the today widget reads. keys and shapes are
+       packages/sync/src/crossAppBlobs.ts's; this static page can't import
+       it, so packages/sync/src/landing.test.ts asserts the two agree */
+    const CARILLON_COMMITMENTS_KEY = 'planner.commitments.v1';
+    const THINKING_ABOUT_SHELF_KEY = 'thinking-about.shelf.v1';
+    function readLedger(key, field) {
+      try {
+        const blob = JSON.parse(localStorage.getItem(key) || 'null');
+        return blob && blob.version === 1 && Array.isArray(blob[field]) ? blob[field] : null;
+      } catch { return null; }
+    }
+    const isText = v => typeof v === 'string';
+    function tdRow(href, time, name, extra) {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.className = 'td-item' + (extra.done ? ' td-done' : '');
+      a.href = href;
+      if (extra.color) {
+        const dot = document.createElement('span');
+        dot.className = 'td-dot';
+        dot.setAttribute('aria-hidden', 'true');
+        dot.style.background = extra.color;
+        a.appendChild(dot);
+      } else {
+        const t = document.createElement('span');
+        t.className = 'td-time';
+        t.textContent = time;
+        a.appendChild(t);
+      }
+      const n = document.createElement('span');
+      n.className = 'td-name';
+      n.textContent = name;
+      a.appendChild(n);
+      li.appendChild(a);
+      return li;
+    }
+    function tdEmpty(text) {
+      const li = document.createElement('li');
+      li.className = 'td-empty';
+      li.textContent = text;
+      return li;
+    }
+
     const WTYPES = {
+      today: {
+        title: 'today', glyph: '&#9788;', desc: "what carillon has planned, and what's on your shelf", group: 'today',
+        data: () => ({}),
+        build(el) {
+          el.innerHTML =
+            '<p class="td-section">carillon, today</p><ul class="td-list td-plan"></ul>' +
+            '<p class="td-section">on the shelf</p><ul class="td-list td-shelf"></ul>';
+          this.refresh(el);
+        },
+        refresh(el) {
+          const today = ymd(new Date()), weekday = new Date().getDay();
+          const commitments = readLedger(CARILLON_COMMITMENTS_KEY, 'commitments');
+          const shelf = readLedger(THINKING_ABOUT_SHELF_KEY, 'entries');
+          const plan = el.querySelector('.td-plan'), kept = el.querySelector('.td-shelf');
+          plan.innerHTML = ''; kept.innerHTML = '';
+
+          const rows = (commitments || [])
+            .filter(c => c && isText(c.entryId) && isText(c.title) && c.date === today)
+            .map(c => ({ time: isText(c.time) ? c.time : '', title: c.title, done: c.status === 'done',
+                         href: entityHref('planner', 'thinking-about-entry', c.entryId) }));
+          /* a standing slot is a plan too, even on a day nothing was scheduled into it */
+          (shelf || []).forEach(e => {
+            const st = e && e.standing;
+            if (!st || !Array.isArray(st.weekdays) || !st.weekdays.includes(weekday) || !isText(e.title)) return;
+            if (rows.some(r => r.title === e.title)) return;
+            rows.push({ time: isText(st.startTime) ? st.startTime : '', title: e.title, done: false,
+                        href: entityHref('thinking-about', 'entry', e.id) });
+          });
+          rows.sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
+          if (!rows.length) plan.appendChild(tdEmpty(commitments || shelf
+            ? 'nothing planned — an open day.'
+            : "carillon hasn't planned anything on this device yet."));
+          rows.forEach(r => plan.appendChild(tdRow(r.href, r.time || '—', r.title, { done: r.done })));
+
+          const entries = (shelf || [])
+            .filter(e => e && isText(e.id) && isText(e.title) && e.title.trim())
+            .sort((a, b) => (b.lastSessionDate || '').localeCompare(a.lastSessionDate || ''))
+            .slice(0, 4);
+          if (!entries.length) kept.appendChild(tdEmpty(shelf
+            ? 'the shelf is empty.'
+            : 'thinking about keeps its shelf here once it has one.'));
+          entries.forEach(e => kept.appendChild(tdRow(entityHref('thinking-about', 'entry', e.id), '', e.title,
+            { color: isText(e.color) && CSS.supports('color', e.color) ? e.color : 'var(--lavender)' })));
+        },
+      },
       homesuite: {
         title: 'homesuite', glyph: '&#9638;', desc: 'your recent documents, boards, and collections', group: 'keeping',
         data: () => ({}),
@@ -4245,14 +4353,16 @@
       }
     }
 
+    function placeWidget(el, w) {
+      el.style.left = Math.min(Math.max(w.x, 8), Math.max(innerWidth - el.offsetWidth - 8, 8)) + 'px';
+      el.style.top  = Math.min(Math.max(w.y, 8), Math.max(innerHeight - el.offsetHeight - 8, 8)) + 'px';
+    }
     function renderWidget(w) {
       const t = WTYPES[w.type];
       if (!t) return;
       const el = document.createElement('div');
       el.className = 'dwidget dw-' + w.type;
       el.dataset.wid = w.id;
-      el.style.left = Math.min(Math.max(w.x, 8), Math.max(innerWidth - 200, 8)) + 'px';
-      el.style.top  = Math.min(Math.max(w.y, 8), Math.max(innerHeight - 160, 8)) + 'px';
       el.style.zIndex = String(++topZ);
       t.build(el, w);
       const x = document.createElement('button');
@@ -4264,6 +4374,7 @@
       el.appendChild(x);
       makeWidgetElDraggable(el, w);
       document.body.appendChild(el);
+      placeWidget(el, w);
       widgetEls[w.id] = el;
     }
     widgets.forEach(renderWidget);
@@ -4295,17 +4406,63 @@
 
     /* HomeSuite republishes as its index changes, often from another tab;
        coming back to this one is the other moment the relative times drift */
-    function refreshHomeSuiteWidgets() {
-      widgets.filter(w => w.type === 'homesuite').forEach(w => {
+    /* the same holds for the today widget's two ledgers */
+    const LEDGER_WIDGETS = {
+      [HOMESUITE_RECENT_STORAGE_KEY]: 'homesuite',
+      [CARILLON_COMMITMENTS_KEY]: 'today',
+      [THINKING_ABOUT_SHELF_KEY]: 'today',
+    };
+    function refreshLedgerWidgets(types) {
+      widgets.filter(w => types.includes(w.type)).forEach(w => {
         const el = widgetEls[w.id];
-        if (el) WTYPES.homesuite.refresh(el, w);
+        if (el) WTYPES[w.type].refresh(el, w);
       });
     }
     addEventListener('storage', e => {
-      if (e.key === HOMESUITE_RECENT_STORAGE_KEY || e.key === null) refreshHomeSuiteWidgets();
+      if (e.key === null) refreshLedgerWidgets(['homesuite', 'today']);
+      else if (LEDGER_WIDGETS[e.key]) refreshLedgerWidgets([LEDGER_WIDGETS[e.key]]);
     });
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') refreshHomeSuiteWidgets();
+      if (document.visibilityState === 'visible') refreshLedgerWidgets(['homesuite', 'today']);
+    });
+
+    /* widgets keep their saved spot, pulled back on screen when the window
+       is smaller than it was — and returned to it when it grows again */
+    addEventListener('resize', () => widgets.forEach(w => {
+      if (widgetEls[w.id]) placeWidget(widgetEls[w.id], w);
+    }));
+
+    /* ── tray flyout: the calendar, and tonight's moon ─────────────── */
+    function paintFlyout() {
+      WTYPES.month.refresh(document.getElementById('flyout'));
+      const m = moonInfo(Date.now());
+      document.getElementById('fly-moon').textContent =
+        'tonight: ' + m.name + ', ' + Math.round(m.illum * 100) + '% lit';
+    }
+
+    /* ── what's new ────────────────────────────────────────────────── */
+    /* the newest dated heading in CHANGELOG.md against the one you last
+       opened. a first visit starts caught up — the dot is for returning. */
+    const SEEN_KEY = 'woodles-changelog-seen';
+    const trayNew = document.getElementById('tray-new');
+    let latestEntry = '';
+    fetch('/CHANGELOG.md').then(r => (r.ok ? r.text() : '')).then(md => {
+      const m = /^## (\d{4}-\d{2}-\d{2})/m.exec(md);
+      if (!m) return;
+      latestEntry = m[1];
+      let seen = null;
+      try { seen = localStorage.getItem(SEEN_KEY); } catch {}
+      if (!seen) { try { localStorage.setItem(SEEN_KEY, latestEntry); } catch {} return; }
+      if (latestEntry > seen) {
+        trayNew.classList.add('unseen');
+        const [, mo, d] = latestEntry.split('-');
+        trayNew.dataset.label = "what's new · " + Number(d) + ' ' + MONTHS[Number(mo) - 1];
+        trayNew.setAttribute('aria-label', "What's new, since your last visit");
+      }
+    }).catch(() => {});
+    trayNew.addEventListener('click', e => {
+      e.stopPropagation();
+      if (latestEntry) try { localStorage.setItem(SEEN_KEY, latestEntry); } catch {}
     });
 
     /* keep date-driven widgets honest across midnight */
@@ -4373,7 +4530,7 @@
     document.getElementById('tray').addEventListener('click', e => {
       e.stopPropagation();
       const open = !body.classList.contains('flyout-open');
-      if (open) closeAll('flyout');
+      if (open) { closeAll('flyout'); paintFlyout(); }
       body.classList.toggle('flyout-open', open);
     });
     document.getElementById('flyout').addEventListener('click', e => e.stopPropagation());
@@ -4390,13 +4547,27 @@
     /* ── theme / wallpaper ─────────────────────────────────────────── */
     /* every theme the shared palette knows about */
     const THEMES = ['cream','dawn','dusk','terracotta','midnight','forest','paper','inkwell','typewriter','blossom','sugar','fog','glacier','signal','amber'];
-    let themeIdx = 0;
-    const stored = localStorage.getItem('woodles-theme');
-    if (stored && THEMES.includes(stored)) themeIdx = THEMES.indexOf(stored);
-    function applyTheme() {
+    /* until someone picks a theme, the desktop follows the system: cream by
+       day, dusk in dark mode — the way HomeSuite and Data follow it. picking
+       one (swatch, ❄, menu) is remembered and wins from then on. */
+    const darkScheme = matchMedia('(prefers-color-scheme: dark)');
+    const systemTheme = () => THEMES.indexOf(darkScheme.matches ? 'dusk' : 'cream');
+    let themeChosen = false;
+    let themeIdx = systemTheme();
+    try {
+      const stored = localStorage.getItem('woodles-theme');
+      if (stored && THEMES.includes(stored)) { themeIdx = THEMES.indexOf(stored); themeChosen = true; }
+    } catch {}
+    darkScheme.addEventListener('change', () => {
+      if (!themeChosen) { themeIdx = systemTheme(); applyTheme(false); }
+    });
+    function applyTheme(chosen = true) {
       const t = THEMES[themeIdx];
       document.documentElement.setAttribute('data-theme', t);
-      localStorage.setItem('woodles-theme', t);
+      if (chosen) {
+        themeChosen = true;
+        try { localStorage.setItem('woodles-theme', t); } catch {}
+      }
       document.querySelectorAll('.swatch').forEach(s => {
         s.classList.toggle('on', s.dataset.theme === t);
         s.setAttribute('aria-pressed', String(s.dataset.theme === t));
@@ -4421,7 +4592,7 @@
     }
     buildSwatches(document.getElementById('themes'));
     buildSwatches(document.getElementById('p-themes'));
-    applyTheme();
+    applyTheme(themeChosen);
 
     /* ── context menu — built per-target ───────────────────────────── */
     const ctx = document.getElementById('ctx');

@@ -164,3 +164,98 @@ test('the homesuite widget waits kindly for a first visit, then follows HomeSuit
 	});
 	await expect(widget.getByRole('link', { name: /world map/ })).toHaveAttribute('href', '/homesuite?board=b1');
 });
+
+test('the tray flyout is a calendar, not a fourth clock', async ({ page }) => {
+	await page.goto('/');
+	await page.locator('.tray-clock').click();
+	const flyout = page.locator('#flyout');
+	await expect(flyout.locator('.mo-today')).toHaveText(String(new Date().getDate()));
+	await expect(flyout.locator('#fly-moon')).toContainText('% lit');
+	await expect(flyout).not.toContainText(await page.locator('#w-note').innerText());
+});
+
+test('with no theme chosen, the desktop follows a dark system; a choice then sticks', async ({ page }) => {
+	await page.emulateMedia({ colorScheme: 'dark' });
+	await page.goto('/');
+	await expect(page.locator('html')).toHaveAttribute('data-theme', 'dusk');
+	expect(await page.evaluate(() => localStorage.getItem('woodles-theme'))).toBeNull();
+
+	await page.getByRole('button', { name: 'Next theme' }).click();
+	await page.emulateMedia({ colorScheme: 'light' });
+	await page.reload();
+	await expect(page.locator('html')).not.toHaveAttribute('data-theme', 'cream');
+});
+
+test('what’s new: a dot for a returning visitor, gone once the changelog is opened', async ({ page }) => {
+	await page.addInitScript(() => {
+		if (!sessionStorage.getItem('seeded')) {
+			localStorage.setItem('woodles-changelog-seen', '2000-01-01');
+			sessionStorage.setItem('seeded', '1');
+		}
+	});
+	await page.goto('/');
+	const tray = page.getByRole('link', { name: /What's new/ });
+	await expect(tray).toHaveClass(/unseen/);
+	await tray.click();
+	await expect(page).toHaveURL(/\/changelog$/);
+	await page.goto('/');
+	await expect(page.getByRole('link', { name: /What's new/ })).not.toHaveClass(/unseen/);
+});
+
+test('a first visit starts caught up on what’s new', async ({ page }) => {
+	await page.goto('/');
+	await expect.poll(() => page.evaluate(() => localStorage.getItem('woodles-changelog-seen'))).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+	await expect(page.getByRole('link', { name: /What's new/ })).not.toHaveClass(/unseen/);
+});
+
+test('the today widget reads Carillon’s plan and the Thinking About shelf', async ({ page }) => {
+	await page.addInitScript(() => {
+		const d = new Date();
+		const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+		localStorage.setItem('woodles-widgets', JSON.stringify([{ id: 't', type: 'today', x: 500, y: 80, data: {} }]));
+		localStorage.setItem('planner.commitments.v1', JSON.stringify({ version: 1, publishedAt: '', commitments: [
+			{ entryId: 'e1', taskId: 't1', title: 'read two chapters', date: today, time: '19:00', blockTitle: null, status: 'open' },
+			{ entryId: 'e2', taskId: 't2', title: 'finish the level', date: today, time: '08:30', blockTitle: null, status: 'done' },
+			{ entryId: 'e3', taskId: 't3', title: 'another day', date: '1999-01-01', time: null, blockTitle: null, status: 'open' }
+		] }));
+		localStorage.setItem('thinking-about.shelf.v1', JSON.stringify({ version: 1, publishedAt: '', entries: [
+			{ id: 'e1', title: 'The Left Hand of Darkness', columnKey: 'read', sectionKey: 'now', color: '#9b77a6', lastSessionDate: '2026-09-27' },
+			{ id: 'e4', title: 'Outer Wilds', columnKey: 'play', sectionKey: 'now', color: 'not a colour', lastSessionDate: null,
+				standing: { weekdays: [0, 1, 2, 3, 4, 5, 6], startTime: '21:00', endTime: '22:00' } }
+		] }));
+	});
+	await page.goto('/');
+	const plan = page.locator('.dw-today .td-plan .td-item');
+	await expect(plan).toHaveCount(3);
+	await expect(plan.nth(0)).toContainText('finish the level');
+	await expect(plan.nth(0)).toHaveClass(/td-done/);
+	await expect(plan.nth(1)).toHaveAttribute('href', '/planner?thinking-about-entry=e1');
+	await expect(plan.nth(2)).toContainText('21:00Outer Wilds');
+	const shelf = page.locator('.dw-today .td-shelf .td-item');
+	await expect(shelf.first()).toHaveAttribute('href', '/thinking-about?entry=e1');
+	await expect(shelf).toHaveCount(2);
+});
+
+test('the today widget is honest on a device that has neither', async ({ page }) => {
+	await page.addInitScript(() => localStorage.setItem('woodles-widgets', JSON.stringify([{ id: 't', type: 'today', x: 500, y: 80, data: {} }])));
+	await page.goto('/');
+	await expect(page.locator('.dw-today')).toContainText("carillon hasn't planned anything");
+});
+
+test('taskbar icons carry no “running” dot', async ({ page }) => {
+	await page.addInitScript(() => localStorage.setItem('woodles-recents', JSON.stringify(['hygge'])));
+	await page.goto('/');
+	await expect(page.locator('.tb-app.recent')).toHaveCount(0);
+});
+
+test('a widget comes back on screen when the window shrinks, and home when it grows', async ({ page }) => {
+	await page.addInitScript(() => localStorage.setItem('woodles-widgets', JSON.stringify([{ id: 's', type: 'sticky', x: 1100, y: 500, data: { text: 'hi' } }])));
+	await page.setViewportSize({ width: 1280, height: 720 });
+	await page.goto('/');
+	const note = page.locator('.dw-sticky');
+	const home = await note.evaluate((el) => el.style.left);
+	await page.setViewportSize({ width: 800, height: 600 });
+	await expect.poll(async () => (await note.boundingBox())!.x + (await note.boundingBox())!.width).toBeLessThanOrEqual(800);
+	await page.setViewportSize({ width: 1280, height: 720 });
+	await expect.poll(() => note.evaluate((el) => el.style.left)).toBe(home);
+});
