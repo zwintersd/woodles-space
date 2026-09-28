@@ -1296,6 +1296,10 @@ everywhere, same origin, same localStorage key.
 
 ### cross-app ledgers
 
+The static landing page's today widget reads two of these locally — the
+commitments and the shelf — and, like `apps/letter`, hand-rolls the read;
+`packages/sync/src/landing.test.ts` pins its keys against the constants.
+
 A third use of the sync spine, alongside each app's own blob and the public
 read path below. A **ledger** is the narrow surface one app publishes for
 *another app* to read — private data following one person between their own
@@ -1752,7 +1756,9 @@ inspector and number edits, and the phone layout. `landing.spec.ts` covers
 the homepage desktop: starting with nothing pinned, modified clicks that open a
 new tab, windows that take, keep, and return focus, the context menu from the
 keyboard, closed menus kept out of the tab order, sticky notes that grow, the
-banded default layout, and the HomeSuite widget reading its ledger.
+banded default layout, the HomeSuite and today widgets reading their ledgers,
+the calendar flyout, following a dark system until a theme is chosen, and the
+what's-new dot.
 
 The cross-app specs earn their cost in a way the route checks don't. The
 Carillon ↔ Thinking About one caught a bug no unit test could have: the shelf
