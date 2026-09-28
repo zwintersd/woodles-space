@@ -354,12 +354,21 @@ export interface BootstrapResult {
 	sporesImports: number;
 }
 
+/** What `prepareHomeSuiteDrafts` found waiting, so the library can say so. */
+export interface PreparedDrafts {
+	drafts: DraftIndexItem[];
+	/** Sent here from another app; each is now its own draft. */
+	handoffs: number;
+	notebookImports: number;
+	sporesImports: number;
+}
+
 /**
  * Prepare Write's existing material for a library view without creating an
  * empty page or changing the draft a standalone Write tab has open. HomeSuite
  * uses this before listing documents; Write still owns every migration.
  */
-export function prepareHomeSuiteDrafts(): DraftIndexItem[] {
+export function prepareHomeSuiteDrafts(): PreparedDrafts {
 	let drafts = listDrafts();
 	if (drafts.length === 0) {
 		const migrated = migrateLegacyDraft();
@@ -378,7 +387,8 @@ export function prepareHomeSuiteDrafts(): DraftIndexItem[] {
 		drafts = spores.drafts;
 		writeIndex(drafts);
 	}
-	return ingestHandoffs(drafts).drafts;
+	const caught = ingestHandoffs(drafts);
+	return { drafts: caught.drafts, handoffs: caught.count, notebookImports: notebook.count, sporesImports: spores.count };
 }
 
 // Returns the initial draft state for the app on first paint. Performs

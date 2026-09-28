@@ -33,8 +33,10 @@ other docs have narrower jobs:
   its §7 records the amendment — notebook retired into write, so the
   writing surface and the front door became the same room; its §8 records
   the second collapse — spores and ologypedia retired into write too, so
-  the knowledge base joined them, and there is now one room. read it before
-  reshaping any of those apps.
+  the knowledge base joined them, and there is now one room; its §9 records
+  the third — Write and Whiteboard collapsed into HomeSuite as a shared
+  front door, without merging either app. read it before reshaping any of
+  those apps.
 - [ABSTRACTION.md](./ABSTRACTION.md) is about simulating marginalia fast
   enough to tune its feel, and argues explicitly *against* porting it onto
   `@woodles/incremental-core` — the model stays marginalia's own; only the
@@ -96,6 +98,9 @@ other docs have narrower jobs:
     `ARCADE_ROADMAP.md`'s own note about it).
   - `apps/planner/`: `KNOWN_ISSUES.md` (the vitest/rune-store sharp edges
     under "the test suite" below).
+  - `apps/homesuite/`: `ASSESSMENT.md` (a dated 2026-09-27 review of the
+    shell, the bridge, and Data — verified findings and a staged fix plan;
+    a snapshot, like `../AUDIT.md`, not live truth).
   - `apps/write`, `apps/letter`, `apps/bestiary`: no doc file of their own
     — their publish/passphrase behavior is documented once, centrally, in
     "the public read path" below, rather than duplicated three times.
@@ -195,7 +200,9 @@ It also owns **addressing**: `primaryDestination(app)` answers "where does this
 app live", and `entityHref(appId, kind, id)` answers "where does *this thing*
 live", returning `<publicPath>?<kind>=<id>`. An app opts in by listing the
 record kinds it answers to in `addressableBy` — for example Write's `draft`
-and Whiteboard's `board` — and `entityHref` throws on an unknown app or an
+and Whiteboard's `board`, or HomeSuite's `document`, `board`, and
+`collection`, each of them another app's record opened in HomeSuite's shell —
+and `entityHref` throws on an unknown app or an
 undeclared kind, because the manifest is static data so neither is a runtime
 condition a caller could recover from. `canAddress(appId, kind)` is the
 non-throwing check for callers that can't know the pair at author time.
@@ -229,15 +236,18 @@ runtime — `<link href="/shared/palette.css">` and `import … from
 and its bloom post-processing addons from a CDN through a `<script
 type="importmap">`, still with no build step.
 
-**SvelteKit apps** — `homesuite`, `write`, `marginalia`, `planner`, `bestiary`,
-`thinking-about`, `whiteboard`, `bloomforge`, `bloomforge-player` — use Svelte
-5 runes, Vite 7, and `@sveltejs/adapter-static`.
+**SvelteKit apps** — `homesuite`, `data`, `write`, `marginalia`, `planner`,
+`bestiary`, `thinking-about`, `whiteboard`, `bloomforge`, `bloomforge-player`,
+`grimoire` — use Svelte 5 runes, Vite 7, and `@sveltejs/adapter-static`.
 each builds to `apps/<name>/dist/` and consumes `shared/` through the `@shared`
 Vite alias (`../../shared`). there is no SSR; every app ships as a static bundle.
 
 ## homesuite
 
-`/homesuite` is the homepage's entry to documents, boards, and Collections. Its
+`/homesuite` is the homepage's entry to documents, boards, and Collections.
+An open thing's address is `entityHref('homesuite', kind, id)` —
+`/homesuite?document=<id>`, `?board=`, `?collection=` — and the older
+`?kind=&id=` shape still opens and is rewritten on arrival. Its
 index reads Write's draft index, Whiteboard's versioned board library, and
 Data's versioned Collection library, orders their summaries by recent activity,
 and creates new material through the owning app's storage functions
@@ -246,24 +256,75 @@ Collection schemas, records, and Table view state; HomeSuite owns the shared
 artifact listing and shell.
 
 HomeSuite keeps one top bar, title area, navigation, command palette,
-Undo/Redo location, and inspector slot around the active editor. Write and
-Whiteboard remain separate static builds and keep their editing models. Their
-`?homesuite=1` views mount inside a same-origin frame and exchange only
-surface state and actions through `shared/homesuiteBridge.ts`: artifact title,
-selection summary, inspector summary, available commands/modes, and history
-availability flow outward; chosen commands and Undo/Redo flow inward. The
-shell validates message origin and frame source. Each surface decides what
-its commands do and keeps its own history and storage. `?draft=` and `?board=`
-remain normal deep links to the owning apps, with `@woodles/app-manifest`
-building those links. Data follows the same contract with `?collection=` and
-reports its active selection, Inspector controls, commands, and history state
-through the shared bridge. Collection records may keep a `WoodlesRef`
-membership or Relation; the origin application retains ownership of the
-referenced thing. The `Bestiary + Marginalia` Collection template reads the
-Bestiary's local creature shelf and Marginalia's revealed life and field-note
-log on open, when the window regains focus, and on request. Source-owned table
-columns refresh in place while Collection-owned fields stay local; source
+Undo/Redo location, and inspector slot around the active editor. Write,
+Whiteboard, and Data remain separate static builds and keep their editing
+models. Their `?homesuite=1` views mount inside a same-origin frame and
+exchange only surface state and actions through `shared/homesuiteBridge.ts`:
+artifact title, selection summary, inspector summary, available
+commands/modes, and history availability flow outward; chosen commands and
+Undo/Redo flow inward. The shell validates message origin and frame source.
+Each surface decides what its commands do and keeps its own history and
+storage. What the shell needs to know about a kind — its owning app and
+record kind, glyph, labels, and any templates New should offer — lives on
+that kind's adapter in `surfaces.ts`, not in the shell. An inspector control
+a surface marks `readonly` is shown and not editable, and the shell never
+writes a control's value while it has focus, so a late echo cannot undo a
+later keystroke. A surface can ask to `navigate` to a `WoodlesRef` — Data's
+Open source, a ⌘/Ctrl-click on a `#` reference in Write — and the shell opens
+it in place when one of its kinds owns it, in a new tab otherwise.
+
+Four rules keep that seam from losing or misplacing work. The shell veils the
+frame, and marks it `inert`, until the surface's first `state` message —
+Write is prerendered, so its editor takes typing before it has loaded the
+draft, then drops it. What a surface reports is authoritative: when a board's
+portal opens another board in place, the shell's address follows with
+`replaceState` and the frame is not reloaded, so Trash and a reload act on
+what is on screen. Before it takes a frame away the shell sends `flush` and
+waits (at most 250 ms) for `flushed`, so the index it shows next already has
+the last edit; every surface also flushes on `pagehide` and on
+`visibilitychange` to hidden, since removing a frame never fires
+`beforeunload`. And a frame leaves the standalone app's own choice of what to
+reopen alone: neither HomeSuite nor an embedded editor sets Write's active
+draft or Whiteboard's active board.
+
+Trash is HomeSuite's list (`shared/homesuiteTrash.ts`), and the owning apps
+honor it: Write's drafts list and Whiteboard's shelf and portal picker leave
+trashed things out, and one opened directly shows that it is in Trash with a
+Restore. In the shell, a trashed thing opened by its address, or walked into
+through a portal, opens marked In Trash with Restore in place of Move to
+Trash. `?draft=`, `?board=`, and `?collection=` remain normal deep links to
+the owning apps, with `@woodles/app-manifest` building those links.
+
+Data's Collection library is validated one Collection at a time. One that
+cannot be read is set aside, untouched in storage, and the index says so; it
+no longer hides the rest. Every write reads the library fresh and replaces
+only its own Collection (`createCollectionStore` in
+`apps/data/src/lib/collections.ts`), so two open copies cannot undo each
+other, and nothing is written at all when the library itself cannot be read —
+a newer schema, or corruption with no good backup. Collection records may
+keep a `WoodlesRef` membership or Relation; the origin application retains
+ownership of the referenced thing. The `Bestiary + Marginalia` Collection
+template reads the Bestiary's local creature shelf and Marginalia's revealed
+life and field-note log on open, when the window regains focus, and on
+request. Source-owned table columns refresh in place while Collection-owned
+fields stay local; a pull that changes nothing saves nothing, and source
 records are never written back to either app.
+
+A title is edited in the shell's own title area — click it, or Rename in the
+palette; Data's Rename collection and Whiteboard's Rename board ask the shell
+to start with `request-rename` — and sent to the surface as a `rename`
+action, which applies it as its own undoable edit. The shell does not re-read
+the libraries on every `state` message: it patches the open thing's title and
+looks again only for something it has not seen, when the index is shown, or
+when another tab changes Trash; a surface's own saves reach it as `storage`
+events and are otherwise ignored while its frame is open. Whatever Write's
+migrations took in when the index loaded — handoffs from other apps, retired
+notebook or spores material — is announced there, since Write is not the one
+opening. HomeSuite's colors live in `shared/homesuiteTheme.css` as `--hs-*`
+tokens with a dark scheme under `prefers-color-scheme`, shared with Data so a
+Collection sits in the room around it; Write and Whiteboard keep their own
+looks. The text tiers clear WCAG AA on every background in both schemes, and
+`homesuite.spec.ts` checks the index and an open view against AA in each.
 
 `hygge` is the design playground — it holds the fonts, palette, motifs, and
 motion showcases that used to be separate pages. `/hygge/motion` is the review
@@ -1637,11 +1698,19 @@ SvelteKit app's `tsconfig.json` extends `./.svelte-kit/tsconfig.json`, which
 can't resolve the tsconfig. because the scripts sync first, `pnpm test` works
 straight from a clean checkout.
 
-`write` and `marginalia` load the workspace-level
-`vitest.setup.ts` to install a browser-like in-memory `localStorage` under
-Node. planner keeps its own localStorage mock in `store.test.ts`; under the
-current Node runtime that suite passes but may still print a
-`--localstorage-file` warning.
+`write`, `marginalia`, `planner`, `grimoire`, `bloomforge`, and
+`bloomforge-player` load the workspace-level `vitest.setup.ts`, which installs
+a browser-like in-memory `localStorage` under Node. planner's `store.test.ts`
+still swaps in its own mock on top; under the current Node runtime that suite
+passes but may still print a `--localstorage-file` warning.
+
+the same setup file yields one event-loop turn after every test. vitest runs a
+file's tests back to back as microtasks, and its worker gives up on any RPC
+call that goes 60s without an answer — so a file of pure synchronous work
+(marginalia's `sim.test.ts`: ~40s on a quiet core, 45–90s on CI) could pass
+every test and still fail the run on `Timeout calling "onTaskUpdate"`. with
+the yield, that 60s bounds one test instead of one file. a package with slow
+synchronous tests that doesn't load this setup file needs the same hook.
 
 `thinking-about` gained the SvelteKit plugin in its `vitest.config.ts` for the
 same reason, when its commitments reader became the app's first rune module
@@ -1664,7 +1733,12 @@ Bestiary gallery/adopt/share and Marginalia consumption, an Arcade state change,
 the Thinking About → Carillon round trip, back, and the sitting that returns
 from it, Carillon's binder strip and the way in and out of its task composer,
 legacy localStorage migration across reload,
-keyboard operation, and serious/critical WCAG A axe findings.
+keyboard operation, and serious/critical WCAG A axe findings. `homesuite.spec.ts`
+covers the shell's seams: the veil, edits made just before a frame is removed,
+a portal the shell has to follow, Trash by address and in the owning apps, an
+unreadable Collection set aside rather than overwritten, references opened in
+place, keyboard use of the palette and template picker, one-step undo for
+inspector and number edits, and the phone layout.
 
 The cross-app specs earn their cost in a way the route checks don't. The
 Carillon ↔ Thinking About one caught a bug no unit test could have: the shelf
@@ -1687,8 +1761,8 @@ pnpm test:e2e
 
 ## svelte-check
 
-All eight SvelteKit apps currently pass with zero errors and zero warnings.
-`pnpm -r check` runs all eight in turn. it stops at the first app that fails,
+All eleven SvelteKit apps currently pass with zero errors and zero warnings.
+`pnpm -r check` runs all eleven in turn. it stops at the first app that fails,
 so when diagnosing a new break, run the app directly to see past it.
 
 ## continuous integration
@@ -1698,6 +1772,12 @@ pushes and pull requests with Node 22 and pnpm 10.32.1. It installs from the
 lockfile, then runs `pnpm check`, `pnpm test`, and `pnpm build` from this
 workspace. Keep the local root commands and that workflow identical so a green
 checkout means the same thing locally and on GitHub.
+
+After the build it installs Chromium and runs one slice of `e2e/`: HomeSuite's
+spec and the `/homesuite` axe audit. HomeSuite's failures live between frames,
+where no unit suite reaches. The rest of `e2e/` is not in CI yet; when last
+run it had failures of its own (a `/letter` axe finding, some Carillon specs),
+so widen the slice once those are green rather than all at once.
 
 ## running things locally
 

@@ -131,25 +131,36 @@ export async function pullCollectionSources(sources: CollectionSource[]): Promis
 
 function refKey(ref: WoodlesRef): string { return `${ref.app}\u0000${ref.kind}\u0000${ref.id}`; }
 
-/** Update only source-owned columns; collection-owned fields remain untouched. */
+/**
+ * Update only source-owned columns; collection-owned fields remain untouched.
+ * A pull that changes nothing returns the same Collection, so looking at a
+ * connected Collection never makes it the most recent thing in HomeSuite.
+ */
 export function mergePulledRows(collection: Collection, rows: PulledSourceRow[], syncedAt = new Date().toISOString()): Collection {
 	const sourceFields = collection.fields.filter((field) => field.sourceKey);
 	const bySource = new Map(collection.records.filter((record) => record.sourceRef).map((record) => [refKey(record.sourceRef!), record]));
 	const excluded = new Set((collection.excludedRefs ?? []).map(refKey));
-	let records = [...collection.records];
+	let records = collection.records;
 	for (const row of rows) {
 		const key = refKey(row.ref);
 		if (excluded.has(key)) continue;
 		const existing = bySource.get(key);
 		if (existing) {
 			const values = { ...existing.values };
-			for (const field of sourceFields) values[field.id] = row.values[field.sourceKey!] ?? '';
-			records = records.map((record) => record.id === existing.id ? { ...record, values, updatedAt: syncedAt } : record);
+			let changed = false;
+			for (const field of sourceFields) {
+				const value = row.values[field.sourceKey!] ?? '';
+				if (values[field.id] === value) continue;
+				values[field.id] = value;
+				changed = true;
+			}
+			if (changed) records = records.map((record) => record.id === existing.id ? { ...record, values, updatedAt: syncedAt } : record);
 		} else {
 			const record = createRecord(collection, row.ref);
 			for (const field of sourceFields) record.values[field.id] = row.values[field.sourceKey!] ?? '';
-			records.push(record);
+			records = [...records, record];
 		}
 	}
+	if (records === collection.records) return collection;
 	return { ...collection, records, sourceSyncedAt: syncedAt, updatedAt: syncedAt };
 }

@@ -2,26 +2,27 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { entityHref } from '@woodles/app-manifest';
-	import { isHomeSuiteShellMessage, postHomeSuitePaletteRequest, postHomeSuiteState, type HomeSuiteSurfaceState, type WoodlesRef } from '@shared/homesuiteBridge';
+	import { isHomeSuiteShellMessage, postHomeSuiteFlushed, postHomeSuiteNavigate, postHomeSuitePaletteRequest, postHomeSuiteRenameRequest, postHomeSuiteState, type HomeSuiteSurfaceState, type WoodlesRef } from '@shared/homesuiteBridge';
+	import FieldDialog from '$lib/FieldDialog.svelte';
+	import ReferenceDialog from '$lib/ReferenceDialog.svelte';
+	import TableToolbar from '$lib/TableToolbar.svelte';
 	import { HOMESUITE_TRASH_KEY, isHomeSuiteTrashed } from '@shared/homesuiteTrash';
 	import { candidatesFor, refreshReferenceSources, shelfSource, type ReferenceCandidate } from '../../../write/src/lib/references.svelte';
 	import { mergePulledRows, pullCollectionSources } from '$lib/sourceSync';
 	import {
-		addField, addRecord, createCollection, deleteField, duplicateRecord, exportCollections, importCollections,
-		isCollection, loadCollections, removeRecord, renameField, resizeColumn, saveCollections, setCellValue,
-		type Collection, type CollectionField, type CollectionLibrary, type FieldType, type FieldValue
+		addField, addRecord, cloneJson, deleteField, duplicateRecord, exportCollections, importCollections,
+		isCollection, loadCollections, removeRecord, renameField, resizeColumn, saveCollection, setCellValue,
+		type Collection, type CollectionField, type FieldType, type FieldValue
 	} from '$lib/collections';
+	import '@shared/homesuiteTheme.css';
 	import './data.css';
 
-	let library = $state<CollectionLibrary>({ collections: [] });
 	let collection = $state<Collection | null>(null);
 	let ready = $state(false);
 	let saveIssue = $state('');
 	let selectedField = $state('');
 	let selectedRecord = $state('');
 	let selectedCell = $state<{ recordId: string; fieldId: string } | null>(null);
-	let fieldName = $state('');
-	let fieldType = $state<FieldType>('text');
 	let addFieldOpen = $state(false);
 	let pickerFor = $state<{ recordId: string; fieldId: string } | null>(null);
 	let pickerQuery = $state('');
@@ -36,7 +37,6 @@
 	let pickerLoading = $state(false);
 	let sourceStatus = $state('');
 	let trashRevision = $state(0);
-	function cloneJson<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
 
 	const collectionId = $derived(page.url.searchParams.get('collection'));
 	const homeSuite = $derived(page.url.searchParams.has('homesuite'));
@@ -60,21 +60,25 @@
 			redoStack = [];
 		}
 		collection = next;
-		library = { collections: library.collections.map((item) => item.id === next.id ? next : item) };
 		if (saveTimer) clearTimeout(saveTimer);
 		saveTimer = setTimeout(() => {
-			const result = saveCollections(library);
-			saveIssue = result.ok ? '' : result.issue?.message ?? 'Could not save this Collection.';
+			saveTimer = null;
+			persist();
 			publishState();
 		}, 120);
 		publishState();
 	}
 
+	/** Writes only this Collection; the rest of the library is re-read, never replaced. */
+	function persist(): void {
+		if (!collection) return;
+		const result = saveCollection(collection);
+		saveIssue = result.ok ? '' : result.issue?.message ?? 'Could not save this Collection.';
+	}
+
 	function replaceCollection(next: Collection): void {
 		collection = next;
-		library = { collections: library.collections.map((item) => item.id === next.id ? next : item) };
-		const result = saveCollections(library);
-		saveIssue = result.ok ? '' : result.issue?.message ?? 'Could not save this Collection.';
+		persist();
 		publishState();
 	}
 
@@ -82,12 +86,11 @@
 		if (!saveTimer) return;
 		clearTimeout(saveTimer);
 		saveTimer = null;
-		const result = saveCollections(library);
-		saveIssue = result.ok ? '' : result.issue?.message ?? 'Could not save this Collection.';
+		persist();
 	}
 
-	function setText(recordId: string, fieldId: string, value: string): void {
-		const key = `${recordId}:${fieldId}`;
+	/** A run of keystrokes into one place is one undo step, not one per key. */
+	function recordBurst(key: string): void {
 		if (lastTextKey !== key || !textBurstTimer) {
 			if (collection) undoStack = [...undoStack.slice(-49), cloneJson(collection)];
 			redoStack = [];
@@ -95,7 +98,19 @@
 		lastTextKey = key;
 		if (textBurstTimer) clearTimeout(textBurstTimer);
 		textBurstTimer = setTimeout(() => { textBurstTimer = null; lastTextKey = ''; }, 700);
+	}
+
+	function setText(recordId: string, fieldId: string, value: string): void {
+		recordBurst(`${recordId}:${fieldId}`);
 		if (collection) updateLibrary(setCellValue(collection, recordId, fieldId, value), false);
+	}
+
+	function setNumber(recordId: string, field: CollectionField, value: number | null): void {
+		if (!collection) return;
+		selectedCell = { recordId, fieldId: field.id };
+		selectedRecord = recordId;
+		recordBurst(`${recordId}:${field.id}`);
+		updateLibrary(setCellValue(collection, recordId, field.id, value), false);
 	}
 
 	function mutateCell(recordId: string, field: CollectionField, value: FieldValue): void {
@@ -147,6 +162,8 @@
 	}
 
 	function openSource(ref: WoodlesRef): void {
+		// Inside HomeSuite the shell opens it, in place when it is one of its own.
+		if (homeSuite && postHomeSuiteNavigate(ref)) return;
 		try { window.open(entityHref(ref.app, ref.kind, ref.id), '_blank', 'noopener'); } catch { /* A cold reference remains visible. */ }
 	}
 
@@ -166,11 +183,74 @@
 		pickerFor = null;
 	}
 
-	function createField(): void {
+	function createField(name: string, type: FieldType): void {
 		if (!collection) return;
-		updateLibrary(addField(collection, fieldName, fieldType));
-		fieldName = '';
+		updateLibrary(addField(collection, name, type));
 		addFieldOpen = false;
+	}
+
+	// ── table interaction, named so the markup below stays readable ──
+
+	function selectField(fieldId: string): void {
+		selectedField = fieldId;
+		selectedRecord = '';
+		selectedCell = null;
+		publishState();
+	}
+
+	function selectRecord(recordId: string): void {
+		selectedRecord = recordId;
+		selectedField = '';
+		selectedCell = null;
+		publishState();
+	}
+
+	function selectCell(recordId: string, fieldId: string): void {
+		selectedRecord = recordId;
+		selectedField = '';
+		selectedCell = { recordId, fieldId };
+		publishState();
+	}
+
+	function dropField(targetId: string): void {
+		if (!collection || !dragField || dragField === targetId) return;
+		const ids = orderedFields.map((item) => item.id);
+		ids.splice(ids.indexOf(dragField), 1);
+		ids.splice(ids.indexOf(targetId), 0, dragField);
+		updateLibrary({ ...collection, views: { table: { ...collection.views.table, columnOrder: ids } } });
+		dragField = '';
+	}
+
+	function openRelationPicker(recordId: string, fieldId: string): void {
+		pickerFor = { recordId, fieldId };
+		pickerQuery = '';
+		selectCell(recordId, fieldId);
+	}
+
+	/** A pick either adds a referenced record or sets the Relation it was opened from. */
+	function pickCandidate(candidate: ReferenceCandidate): void {
+		if (!pickerFor || !collection) return;
+		if (pickerFor.recordId === '$new' || pickerFor.recordId === '') { addExternal(candidate); return; }
+		const { recordId, fieldId } = pickerFor;
+		const field = collection.fields.find((entry) => entry.id === fieldId);
+		if (!field || !collection.records.some((entry) => entry.id === recordId)) return;
+		mutateCell(recordId, field, { app: candidate.app, kind: candidate.kind, id: candidate.id });
+		pickerFor = null;
+	}
+
+	function relationSelected(): boolean {
+		if (!collection || !selectedCell) return false;
+		const field = collection.fields.find((entry) => entry.id === selectedCell?.fieldId);
+		return field?.type === 'relation' && isRef(activeRecord?.values[field.id] ?? null);
+	}
+
+	function fieldGlyph(field: CollectionField): string {
+		if (field.primary) return '◆';
+		return field.type === 'checkbox' ? '□' : field.type === 'relation' ? '↗' : field.type === 'date' ? '◷' : '·';
+	}
+
+	function cellLabel(field: CollectionField, record: Collection['records'][number]): string {
+		return `${field.name}, ${primaryLabel(record)}`;
 	}
 
 	function deleteSelectedField(): void {
@@ -186,11 +266,30 @@
 		else if (id === 'relation:remove' && collection && selectedCell) { const field = collection.fields.find((entry) => entry.id === selectedCell?.fieldId); if (field?.type === 'relation') removeRelation(selectedCell.recordId, field); }
 		else if (id === 'record:duplicate' && collection && selectedRecord) { updateLibrary(duplicateRecord(collection, selectedRecord)); }
 		else if (id === 'field:delete') deleteSelectedField();
-		else if (id === 'collection:rename' && collection) { const title = window.prompt('Collection name', collection.title); if (title?.trim()) { const next = { ...collection, title: title.trim(), updatedAt: new Date().toISOString() }; updateLibrary(next); } }
+		else if (id === 'collection:rename' && collection) {
+			// In HomeSuite the name is edited where it is shown, in the shell's title.
+			if (homeSuite && postHomeSuiteRenameRequest()) return;
+			const title = window.prompt('Collection name', collection.title);
+			if (title?.trim()) renameCollection(title);
+		}
 		else if (id === 'source:open' && activeRecord?.sourceRef) openSource(activeRecord.sourceRef);
-		else if (id === 'collection:export' && collection) { const blob = new Blob([exportCollections({ collections: [collection] })], { type: 'application/json' }); const anchor = document.createElement('a'); anchor.href = URL.createObjectURL(blob); anchor.download = `${collection.title || 'collection'}.json`; anchor.click(); URL.revokeObjectURL(anchor.href); }
+		else if (id === 'collection:export' && collection) exportCollection(collection);
 		else if (id === 'reference:add') { pickerFor = { recordId: '', fieldId: '' }; pickerQuery = ''; void refreshPickerSources(); }
 		else if (id === 'source:sync') void syncSources();
+	}
+
+	function exportCollection(target: Collection): void {
+		const blob = new Blob([exportCollections([target])], { type: 'application/json' });
+		const anchor = document.createElement('a');
+		anchor.href = URL.createObjectURL(blob);
+		anchor.download = `${target.title || 'collection'}.json`;
+		anchor.click();
+		URL.revokeObjectURL(anchor.href);
+	}
+
+	function renameCollection(title: string): void {
+		if (!collection || !title.trim() || title.trim() === collection.title) return;
+		updateLibrary({ ...collection, title: title.trim(), updatedAt: new Date().toISOString() });
 	}
 
 	async function syncSources(): Promise<void> {
@@ -199,20 +298,21 @@
 		try {
 			const rows = await pullCollectionSources(collection.sources);
 			if (!collection) return;
-			const syncedAt = new Date().toISOString();
-			const next = mergePulledRows(collection, rows, syncedAt);
-			const nextLibrary = { collections: library.collections.map((item) => item.id === next.id ? next : item) };
-			const saved = saveCollections(nextLibrary);
-			if (!saved.ok) {
-				saveIssue = saved.issue?.message ?? 'Could not refresh source data.';
-				sourceStatus = 'Refresh failed';
-				return;
+			const next = mergePulledRows(collection, rows);
+			// An unchanged pull saves nothing, so a Collection that is only being
+			// looked at keeps its place in HomeSuite's recent order.
+			if (next !== collection) {
+				const saved = saveCollection(next);
+				if (!saved.ok) {
+					saveIssue = saved.issue?.message ?? 'Could not refresh source data.';
+					sourceStatus = 'Refresh failed';
+					return;
+				}
+				collection = next;
+				saveIssue = '';
 			}
-			collection = next;
-			library = nextLibrary;
 			const pulledRefs = rows.map((row) => ({ app: row.ref.app, kind: row.ref.kind, id: row.ref.id, text: row.label, hint: row.hint }));
 			refs = [...candidatesFor('#', ''), ...pulledRefs.filter((row) => row.app !== 'thinking-about' && row.app !== 'write')];
-			saveIssue = '';
 			sourceStatus = rows.length ? `Refreshed ${rows.length} source records` : 'No source records found on this device';
 			publishState();
 		} catch {
@@ -236,24 +336,23 @@
 	async function importFile(file: File | undefined): Promise<void> {
 		if (!file) return;
 		const result = importCollections(await file.text());
-		if (!result.ok || !result.value?.collections.length) { saveIssue = result.issue?.message ?? 'This file contains no valid Collections.'; return; }
-		const source = cloneJson(result.value.collections[0]);
-		const fieldIds = new Map(source.fields.map((field) => [field.id, crypto.randomUUID()]));
-		source.id = crypto.randomUUID();
+		if (!result.collections.length) { saveIssue = result.issue?.message ?? 'This file contains no readable Collections.'; return; }
+		const source = cloneJson(result.collections[0]);
+		const fieldIds = new Map(source.fields.map((field) => [field.id, `${field.primary ? 'field-primary' : 'field'}-${crypto.randomUUID()}`]));
+		source.id = `collection-${crypto.randomUUID()}`;
 		source.fields = source.fields.map((field) => ({ ...field, id: fieldIds.get(field.id)!, config: field.config ? cloneJson(field.config) : undefined }));
-		source.records = source.records.map((record) => ({ ...record, id: crypto.randomUUID(), values: Object.fromEntries(Object.entries(record.values).map(([id, value]) => [fieldIds.get(id) ?? id, value])) }));
+		source.records = source.records.map((record) => ({ ...record, id: `record-${crypto.randomUUID()}`, values: Object.fromEntries(Object.entries(record.values).map(([id, value]) => [fieldIds.get(id) ?? id, value])) }));
 		source.views.table.columnOrder = source.views.table.columnOrder.map((id) => fieldIds.get(id) ?? id);
 		source.views.table.columnWidths = Object.fromEntries(Object.entries(source.views.table.columnWidths).map(([id, width]) => [fieldIds.get(id) ?? id, width]));
-		const next = { collections: [...library.collections, source] };
-		const saved = saveCollections(next);
+		const saved = saveCollection(source);
 		if (!saved.ok) { saveIssue = saved.issue?.message ?? 'Could not import this Collection.'; return; }
-		library = next;
 		saveIssue = `Imported “${source.title}”. It is now in the HomeSuite index.`;
 		publishState();
 	}
 
 	function inspectorChange(controlId: string, value: string): void {
 		if (!collection || !activeField) return;
+		recordBurst(`inspector:${activeField.id}:${controlId}`);
 		if (controlId === 'field:name') updateLibrary(renameField(collection, activeField.id, value), false);
 		else if (controlId.startsWith('option:')) {
 			const optionId = controlId.slice('option:'.length);
@@ -273,24 +372,42 @@
 		const rows = activeField
 			? [{ label: 'Type', value: activeField.type }, { label: 'Primary', value: activeField.primary ? 'Yes' : 'No' }, { label: 'Field id', value: activeField.id }]
 			: activeRecord
-				? [{ label: 'Identity', value: activeRecord.sourceRef ? `${activeRecord.sourceRef.app} · ${activeRecord.sourceRef.kind}` : 'Native record' }, { label: 'Created', value: new Date(activeRecord.createdAt).toLocaleDateString() }, ...(activeRecord.sourceRef ? [{ label: 'Source', value: sourceCandidate(activeRecord.sourceRef)?.text ?? 'Unavailable' }] : [])]
-				: [{ label: 'Records', value: String(collection.records.length) }, { label: 'Fields', value: String(collection.fields.length) }, { label: 'Created', value: new Date(collection.createdAt).toLocaleDateString() }];
+				? [
+					{ label: 'Identity', value: activeRecord.sourceRef ? `${activeRecord.sourceRef.app} · ${activeRecord.sourceRef.kind}` : 'Native record' },
+					{ label: 'Created', value: new Date(activeRecord.createdAt).toLocaleDateString() },
+					...(activeRecord.sourceRef ? [{ label: 'Source', value: sourceCandidate(activeRecord.sourceRef)?.text ?? 'Unavailable' }] : [])
+				]
+				: [
+					{ label: 'Records', value: String(collection.records.length) },
+					{ label: 'Fields', value: String(collection.fields.length) },
+					{ label: 'Created', value: new Date(collection.createdAt).toLocaleDateString() }
+				];
+		const controls = activeField
+			? [
+				{ id: 'field:name', label: 'Field name', value: activeField.name },
+				{ id: 'field:type', label: 'Type', value: activeField.primary ? 'Primary · Text' : activeField.type, readonly: true },
+				...(activeField.config?.options ?? []).map((option, index) => ({ id: `option:${option.id}`, label: `Option ${index + 1}`, value: option.label }))
+			]
+			: undefined;
+		const actions = activeField && !activeField.primary
+			? [{ commandId: 'field:delete', label: 'Delete field' }]
+			: activeRecord?.sourceRef
+				? [{ commandId: 'source:open', label: 'Open source' }, { commandId: 'record:delete', label: 'Remove from collection' }]
+				: activeRecord ? [{ commandId: 'record:delete', label: 'Delete record' }] : [];
 		const commands = [
 			{ id: 'record:new', label: 'New record', shortcut: '⌘ ↵' }, { id: 'field:new', label: 'New field' },
 			...(collection.sources?.length ? [{ id: 'source:sync', label: 'Refresh connected sources' }] : []),
 			{ id: 'collection:rename', label: 'Rename collection' }, { id: 'collection:export', label: 'Export collection' },
 			{ id: 'record:duplicate', label: 'Duplicate record', enabled: !!selectedRecord },
 			{ id: 'record:delete', label: activeRecord?.sourceRef ? 'Remove from collection' : 'Delete record', enabled: !!selectedRecord },
-			{ id: 'relation:remove', label: 'Remove reference', enabled: !!selectedCell && collection.fields.some((field) => field.id === selectedCell?.fieldId && field.type === 'relation') && isRef(activeRecord?.values[selectedCell?.fieldId ?? ''] ?? null) },
+			{ id: 'relation:remove', label: 'Remove reference', enabled: relationSelected() },
 			{ id: 'field:delete', label: 'Delete field', enabled: !!activeField && !activeField.primary },
 			{ id: 'source:open', label: 'Open source', enabled: !!activeRecord?.sourceRef },
 			{ id: 'reference:add', label: 'Add Woodles reference' }
 		];
 		const state: HomeSuiteSurfaceState = {
 			artifact: { id: collection.id, kind: 'collection', title: collection.title }, selection: selected,
-			inspector: { title: activeField?.name ?? (activeRecord ? primaryLabel(activeRecord) : collection.title), rows,
-				controls: activeField ? [{ id: 'field:name', label: 'Field name', value: activeField.name }, { id: 'field:type', label: 'Type', value: activeField.primary ? 'Primary · Text' : activeField.type }, ...(activeField.config?.options ?? []).map((option, index) => ({ id: `option:${option.id}`, label: `Option ${index + 1}`, value: option.label }))] : undefined,
-				actions: activeField && !activeField.primary ? [{ commandId: 'field:delete', label: 'Delete field' }] : activeRecord?.sourceRef ? [{ commandId: 'source:open', label: 'Open source' }, { commandId: 'record:delete', label: 'Remove from collection' }] : activeRecord ? [{ commandId: 'record:delete', label: 'Delete record' }] : [] },
+			inspector: { title: activeField?.name ?? (activeRecord ? primaryLabel(activeRecord) : collection.title), rows, controls, actions },
 			modes: [], activeMode: 'table', commands, canUndo: undoStack.length > 0, canRedo: redoStack.length > 0
 		};
 		postHomeSuiteState(state);
@@ -299,7 +416,9 @@
 	function onShellMessage(event: MessageEvent): void {
 		if (event.origin !== window.location.origin || event.source !== window.parent || !isHomeSuiteShellMessage(event.data)) return;
 		const message = event.data;
-		if (message.action === 'undo') undo();
+		if (message.action === 'flush') { flushPendingSave(); postHomeSuiteFlushed(); }
+		else if (message.action === 'rename') renameCollection(message.title);
+		else if (message.action === 'undo') undo();
 		else if (message.action === 'redo') redo();
 		else if (message.action === 'command') command(message.commandId);
 		else if (message.action === 'inspector') inspectorChange(message.controlId, message.value);
@@ -335,7 +454,7 @@
 		const startX = event.clientX;
 		const startWidth = collection.views.table.columnWidths[field.id] ?? 160;
 		const onMove = (move: PointerEvent) => { if (collection) collection = resizeColumn(before, field.id, startWidth + move.clientX - startX); };
-		const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); if (collection) { undoStack = [...undoStack.slice(-49), before]; redoStack = []; const result = saveCollections(library = { collections: library.collections.map((item) => item.id === collection!.id ? collection! : item) }); saveIssue = result.ok ? '' : result.issue?.message ?? 'Could not save this Collection.'; publishState(); } };
+		const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); if (collection) { undoStack = [...undoStack.slice(-49), before]; redoStack = []; persist(); publishState(); } };
 		window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp);
 	}
 
@@ -344,9 +463,8 @@
 
 	onMount(() => {
 		const loaded = loadCollections();
-		library = loaded.value;
 		if (loaded.issue) saveIssue = loaded.issue.message;
-		collection = library.collections.find((entry) => entry.id === collectionId) ?? null;
+		collection = loaded.collections.find((entry) => entry.id === collectionId) ?? null;
 		ready = true;
 		void refreshReferenceSources().then(() => {
 			const synced = collection?.records.filter((record) => record.sourceRef).map((record) => ({ app: record.sourceRef!.app, kind: record.sourceRef!.kind, id: record.sourceRef!.id, text: primaryLabel(record), hint: record.sourceRef!.app })) ?? [];
@@ -359,18 +477,32 @@
 		window.addEventListener('keydown', globalKeydown);
 		const onTrashChange = (event: StorageEvent) => { if (event.key === HOMESUITE_TRASH_KEY || event.key === null) trashRevision += 1; };
 		window.addEventListener('storage', onTrashChange);
+		// HomeSuite closes a Collection by removing its frame, which never runs the
+		// cleanup below; `pagehide` still fires, so the pending save lands.
+		const flushWhenHidden = () => { if (document.visibilityState === 'hidden') flushPendingSave(); };
+		window.addEventListener('pagehide', flushPendingSave);
+		document.addEventListener('visibilitychange', flushWhenHidden);
+		const teardown = () => {
+			window.removeEventListener('message', onShellMessage);
+			window.removeEventListener('keydown', globalKeydown);
+			window.removeEventListener('storage', onTrashChange);
+			window.removeEventListener('pagehide', flushPendingSave);
+			document.removeEventListener('visibilitychange', flushWhenHidden);
+			flushPendingSave();
+		};
 		if (collection?.sources?.length) {
 			void syncSources();
 			const interval = window.setInterval(() => { if (document.visibilityState === 'visible') void syncSources(); }, 60_000);
 			const refreshOnFocus = () => { if (document.visibilityState === 'visible') void syncSources(); };
 			window.addEventListener('focus', refreshOnFocus);
 			window.addEventListener('visibilitychange', refreshOnFocus);
-			return () => { window.removeEventListener('message', onShellMessage); window.removeEventListener('keydown', globalKeydown); window.removeEventListener('storage', onTrashChange); window.removeEventListener('focus', refreshOnFocus); window.removeEventListener('visibilitychange', refreshOnFocus); window.clearInterval(interval); flushPendingSave(); };
+			return () => { window.removeEventListener('focus', refreshOnFocus); window.removeEventListener('visibilitychange', refreshOnFocus); window.clearInterval(interval); teardown(); };
 		}
-		return () => { window.removeEventListener('message', onShellMessage); window.removeEventListener('keydown', globalKeydown); window.removeEventListener('storage', onTrashChange); flushPendingSave(); };
+		return teardown;
 	});
 
 	function globalKeydown(event: KeyboardEvent): void {
+		if (homeSuite && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); postHomeSuitePaletteRequest(); return; }
 		if (event.key === 'Escape') { pickerFor = null; addFieldOpen = false; }
 		if (event.key === 'F2' && collection) { event.preventDefault(); addFieldOpen = true; }
 		if ((event.key === 'Delete' || event.key === 'Backspace') && collection && selectedRecord) {
@@ -392,50 +524,153 @@
 	<main class="missing"><span>Collection unavailable</span><h1>This Collection is not on this device.</h1><a href="/homesuite">Back to HomeSuite</a></main>
 {:else}
 	<main class="data-surface">
-		<div class="table-toolbar"><div class="table-intro"><span>COLLECTION</span><strong>{collection.records.length} records <i>·</i> {collection.fields.length} fields</strong>{#if collection.sources?.length}<small class="source-status" role="status">{sourceStatus || (collection.sourceSyncedAt ? `Updated ${new Date(collection.sourceSyncedAt).toLocaleTimeString()}` : 'Pulling source data…')}</small>{/if}</div><div class="table-tools">{#if collection.sources?.length}<button onclick={() => command('source:sync')} disabled={syncBusy} title="Refresh Bestiary and Marginalia records">{syncBusy ? '↻ Refreshing' : '↻ Refresh sources'}</button>{/if}<button onclick={() => command('reference:add')} title="Add an existing Woodles thing">↗ Add existing</button><label class="import-button" title="Import a Collection JSON backup">⇧ Import<input type="file" accept="application/json,.json" onchange={(event) => importFile(event.currentTarget.files?.[0])} /></label><button onclick={() => command('collection:export')} title="Export this Collection">⇩ Export</button></div></div>
+		<TableToolbar {collection} {sourceStatus} {syncBusy} onCommand={command} onImport={importFile} />
 		{#if saveIssue}<div class="save-issue" role="status">{saveIssue}</div>{/if}
-		<div class="table-scroll"><table class="data-table" aria-label={`${collection.title} table`}><thead><tr><th class="row-head">#</th>
-			{#each orderedFields as field, columnIndex (field.id)}
-				<th class:primary={field.primary} style={`width:${collection.views.table.columnWidths[field.id] ?? 160}px;min-width:${collection.views.table.columnWidths[field.id] ?? 160}px`}>
-					<button class="field-head" onclick={() => { selectedField = field.id; selectedRecord = ''; selectedCell = null; publishState(); }} draggable="true" ondragstart={() => { dragField = field.id; }} ondragover={(event) => event.preventDefault()} ondrop={(event) => { event.preventDefault(); if (!collection || !dragField || dragField === field.id) return; const ids = orderedFields.map((item) => item.id); const from = ids.indexOf(dragField); const to = ids.indexOf(field.id); ids.splice(from, 1); ids.splice(to, 0, dragField); updateLibrary({ ...collection, views: { table: { ...collection.views.table, columnOrder: ids } } }); dragField = ''; }}>
-						<span class="field-type">{field.primary ? '◆' : field.type === 'checkbox' ? '□' : field.type === 'relation' ? '↗' : field.type === 'date' ? '◷' : '·'}</span><span>{field.name}</span>{#if field.sourceKey}<small class="synced-field" title="Refreshed from its source app">sync</small>{/if}
-					</button><span class="resize-grip" onpointerdown={(event) => beginResize(event, field)} aria-hidden="true"></span>
-				</th>
-			{/each}
-			<th class="add-field-head"><button aria-label="Add field" title="Add field" onclick={() => { addFieldOpen = true; }}>＋</button></th>
-		</tr></thead><tbody>
-			{#each collection.records as record, rowIndex (record.id)}
-				<tr class:selected-row={selectedRecord === record.id}>
-					<td class="row-number"><button aria-label={`Select ${primaryLabel(record)}`} onclick={() => { selectedRecord = record.id; selectedField = ''; selectedCell = null; publishState(); }}>{rowIndex + 1}</button></td>
-					{#each orderedFields as field, colIndex (field.id)}
-						{@const value = fieldValue(record, field)}
-						<td class:primary-cell={field.primary} class:active-cell={selectedCell?.recordId === record.id && selectedCell.fieldId === field.id} data-cell={`${record.id}:${field.id}`} onclick={() => { selectedRecord = record.id; selectedField = ''; selectedCell = { recordId: record.id, fieldId: field.id }; publishState(); }}>
-							{#if record.sourceRef && field.primary}
-								<button class="source-value" title={referenceLabel(record.sourceRef)} onclick={(event) => { event.stopPropagation(); selectedRecord = record.id; selectedField = ''; publishState(); }}>{referenceLabel(record.sourceRef)}{#if !sourceCandidate(record.sourceRef)} <span class="cold">cold</span>{/if}</button>
-							{:else if field.type === 'text' || field.type === 'url'}
-								<input aria-label={`${field.name}, ${primaryLabel(record)}`} value={typeof value === 'string' ? value : ''} placeholder={field.primary ? 'Name this record' : '—'} readonly={!!field.sourceKey} title={field.sourceKey ? 'Synced from its source app' : undefined} onfocus={() => { selectedRecord = record.id; selectedField = ''; selectedCell = { recordId: record.id, fieldId: field.id }; publishState(); }} oninput={(event) => setText(record.id, field.id, event.currentTarget.value)} onkeydown={(event) => cellKeydown(event, rowIndex, colIndex, record.id, field.id)} />
-								{#if field.type === 'url' && typeof value === 'string' && value}<a class="url-open" href={value} target="_blank" rel="noreferrer" aria-label={`Open ${value}`} onclick={(event) => event.stopPropagation()}>↗</a>{/if}
-							{:else if field.type === 'number'}
-								<input type="number" aria-label={`${field.name}, ${primaryLabel(record)}`} value={typeof value === 'number' ? value : ''} onfocus={() => { selectedRecord = record.id; selectedCell = { recordId: record.id, fieldId: field.id }; publishState(); }} oninput={(event) => { const n = event.currentTarget.valueAsNumber; mutateCell(record.id, field, Number.isFinite(n) ? n : null); }} onkeydown={(event) => cellKeydown(event, rowIndex, colIndex, record.id, field.id)} />
-							{:else if field.type === 'checkbox'}
-								<button class:checked={value === true} class="checkbox-cell" role="checkbox" aria-checked={value === true} aria-label={`${field.name}, ${primaryLabel(record)}`} onclick={(event) => { event.stopPropagation(); mutateCell(record.id, field, value !== true); }} onkeydown={(event) => cellKeydown(event, rowIndex, colIndex, record.id, field.id)}>{value === true ? '✓' : ''}</button>
-							{:else if field.type === 'date'}
-								<input type="date" aria-label={`${field.name}, ${primaryLabel(record)}`} value={typeof value === 'string' ? value : ''} onfocus={() => { selectedRecord = record.id; selectedCell = { recordId: record.id, fieldId: field.id }; publishState(); }} onchange={(event) => mutateCell(record.id, field, event.currentTarget.value || null)} onkeydown={(event) => cellKeydown(event, rowIndex, colIndex, record.id, field.id)} />
-							{:else if field.type === 'select'}
-								<select aria-label={`${field.name}, ${primaryLabel(record)}`} value={typeof value === 'string' ? value : ''} onfocus={() => { selectedRecord = record.id; selectedCell = { recordId: record.id, fieldId: field.id }; publishState(); }} onchange={(event) => mutateCell(record.id, field, event.currentTarget.value || null)} onkeydown={(event) => cellKeydown(event, rowIndex, colIndex, record.id, field.id)}><option value="">—</option>{#each field.config?.options ?? [] as option}<option value={option.id}>{option.label}</option>{/each}</select>
-							{:else if field.type === 'multi-select'}
-								<select multiple aria-label={`${field.name}, ${primaryLabel(record)}`} value={Array.isArray(value) ? value : []} onchange={(event) => mutateCell(record.id, field, Array.from(event.currentTarget.selectedOptions).map((option) => option.value))}>{#each field.config?.options ?? [] as option}<option value={option.id}>{option.label}</option>{/each}</select>
-							{:else if field.type === 'relation'}
-								<div class="relation-wrap"><button class="relation-cell" aria-label={`Set ${field.name} relation`} onclick={(event) => { event.stopPropagation(); pickerFor = { recordId: record.id, fieldId: field.id }; pickerQuery = ''; selectedRecord = record.id; selectedField = ''; selectedCell = { recordId: record.id, fieldId: field.id }; publishState(); }}>{isRef(value) ? referenceLabel(value) : '＋ Add relation'}</button>{#if isRef(value)}<button class="remove-reference" aria-label="Remove reference" title="Remove reference" onclick={(event) => { event.stopPropagation(); selectedRecord = record.id; selectedCell = { recordId: record.id, fieldId: field.id }; removeRelation(record.id, field); }}>×</button>{/if}</div>
-							{/if}
-						</td>
+		<div class="table-scroll">
+			<table class="data-table" aria-label={`${collection.title} table`}>
+				<thead>
+					<tr>
+						<th class="row-head">#</th>
+						{#each orderedFields as field (field.id)}
+							{@const width = collection.views.table.columnWidths[field.id] ?? 160}
+							<th class:primary={field.primary} style={`width:${width}px;min-width:${width}px`}>
+								<button
+									class="field-head"
+									draggable="true"
+									onclick={() => selectField(field.id)}
+									ondragstart={() => { dragField = field.id; }}
+									ondragover={(event) => event.preventDefault()}
+									ondrop={(event) => { event.preventDefault(); dropField(field.id); }}
+								>
+									<span class="field-type">{fieldGlyph(field)}</span>
+									<span>{field.name}</span>
+									{#if field.sourceKey}<small class="synced-field" title="Refreshed from its source app">sync</small>{/if}
+								</button>
+								<span class="resize-grip" onpointerdown={(event) => beginResize(event, field)} aria-hidden="true"></span>
+							</th>
+						{/each}
+						<th class="add-field-head"><button aria-label="Add field" title="Add field" onclick={() => { addFieldOpen = true; }}>＋</button></th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each collection.records as record, rowIndex (record.id)}
+						<tr class:selected-row={selectedRecord === record.id}>
+							<td class="row-number">
+								<button aria-label={`Select ${primaryLabel(record)}`} onclick={() => selectRecord(record.id)}>{rowIndex + 1}</button>
+							</td>
+							{#each orderedFields as field, colIndex (field.id)}
+								{@const value = fieldValue(record, field)}
+								{@const onkeydown = (event: KeyboardEvent) => cellKeydown(event, rowIndex, colIndex, record.id, field.id)}
+								<td
+									class:primary-cell={field.primary}
+									class:active-cell={selectedCell?.recordId === record.id && selectedCell.fieldId === field.id}
+									data-cell={`${record.id}:${field.id}`}
+									onclick={() => selectCell(record.id, field.id)}
+								>
+									{#if record.sourceRef && field.primary}
+										<button class="source-value" title={referenceLabel(record.sourceRef)} onclick={(event) => { event.stopPropagation(); selectRecord(record.id); }}>
+											{referenceLabel(record.sourceRef)}{#if !sourceCandidate(record.sourceRef)} <span class="cold">cold</span>{/if}
+										</button>
+									{:else if field.type === 'text' || field.type === 'url'}
+										<input
+											aria-label={cellLabel(field, record)}
+											value={typeof value === 'string' ? value : ''}
+											placeholder={field.primary ? 'Name this record' : '—'}
+											readonly={!!field.sourceKey}
+											title={field.sourceKey ? 'Synced from its source app' : undefined}
+											onfocus={() => selectCell(record.id, field.id)}
+											oninput={(event) => setText(record.id, field.id, event.currentTarget.value)}
+											{onkeydown}
+										/>
+										{#if field.type === 'url' && typeof value === 'string' && value}
+											<a class="url-open" href={value} target="_blank" rel="noreferrer" aria-label={`Open ${value}`} onclick={(event) => event.stopPropagation()}>↗</a>
+										{/if}
+									{:else if field.type === 'number'}
+										<input
+											type="number"
+											aria-label={cellLabel(field, record)}
+											value={typeof value === 'number' ? value : ''}
+											onfocus={() => selectCell(record.id, field.id)}
+											oninput={(event) => { const n = event.currentTarget.valueAsNumber; setNumber(record.id, field, Number.isFinite(n) ? n : null); }}
+											{onkeydown}
+										/>
+									{:else if field.type === 'checkbox'}
+										<button
+											class="checkbox-cell"
+											class:checked={value === true}
+											role="checkbox"
+											aria-checked={value === true}
+											aria-label={cellLabel(field, record)}
+											onclick={(event) => { event.stopPropagation(); mutateCell(record.id, field, value !== true); }}
+											{onkeydown}
+										>{value === true ? '✓' : ''}</button>
+									{:else if field.type === 'date'}
+										<input
+											type="date"
+											aria-label={cellLabel(field, record)}
+											value={typeof value === 'string' ? value : ''}
+											onfocus={() => selectCell(record.id, field.id)}
+											onchange={(event) => mutateCell(record.id, field, event.currentTarget.value || null)}
+											{onkeydown}
+										/>
+									{:else if field.type === 'select'}
+										<select
+											aria-label={cellLabel(field, record)}
+											value={typeof value === 'string' ? value : ''}
+											onfocus={() => selectCell(record.id, field.id)}
+											onchange={(event) => mutateCell(record.id, field, event.currentTarget.value || null)}
+											{onkeydown}
+										>
+											<option value="">—</option>
+											{#each field.config?.options ?? [] as option}<option value={option.id}>{option.label}</option>{/each}
+										</select>
+									{:else if field.type === 'multi-select'}
+										<select
+											multiple
+											aria-label={cellLabel(field, record)}
+											value={Array.isArray(value) ? value : []}
+											onchange={(event) => mutateCell(record.id, field, Array.from(event.currentTarget.selectedOptions).map((option) => option.value))}
+										>
+											{#each field.config?.options ?? [] as option}<option value={option.id}>{option.label}</option>{/each}
+										</select>
+									{:else if field.type === 'relation'}
+										<div class="relation-wrap">
+											<button class="relation-cell" aria-label={`Set ${field.name} relation`} onclick={(event) => { event.stopPropagation(); openRelationPicker(record.id, field.id); }}>
+												{isRef(value) ? referenceLabel(value) : '＋ Add relation'}
+											</button>
+											{#if isRef(value)}
+												<button class="remove-reference" aria-label="Remove reference" title="Remove reference" onclick={(event) => { event.stopPropagation(); selectCell(record.id, field.id); removeRelation(record.id, field); }}>×</button>
+											{/if}
+										</div>
+									{/if}
+								</td>
+							{/each}
+							<td class="row-actions">
+								<button aria-label={`Actions for ${primaryLabel(record)}`} title="Record actions" onclick={() => selectRecord(record.id)}>⋯</button>
+							</td>
+						</tr>
 					{/each}
-					<td class="row-actions"><button aria-label={`Actions for ${primaryLabel(record)}`} title="Record actions" onclick={() => { selectedRecord = record.id; selectedField = ''; publishState(); }}>⋯</button></td>
-				</tr>
-			{/each}
-			<tr class="new-record-row"><td></td><td colspan={Math.max(1, orderedFields.length + 1)}><button onclick={addNewRecord}>＋ New record</button></td></tr>
-		</tbody></table></div>
-		{#if addFieldOpen}<div class="modal-shade" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) addFieldOpen = false; }}><form class="field-dialog" onsubmit={(event) => { event.preventDefault(); createField(); }}><span>TABLE FIELD</span><h2>Add a field</h2><label>Field name<input bind:value={fieldName} placeholder="e.g. Status" /></label><label>Type<select bind:value={fieldType}>{#each ['text','number','checkbox','date','select','multi-select','url','relation'] as type}<option value={type}>{type === 'multi-select' ? 'Multi-select' : type[0].toUpperCase() + type.slice(1)}</option>{/each}</select></label><div class="dialog-actions"><button type="button" onclick={() => { addFieldOpen = false; }}>Cancel</button><button class="primary-action" type="submit">Add field</button></div></form></div>{/if}
-		{#if pickerFor}<div class="modal-shade" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) pickerFor = null; }}><div class="reference-dialog" role="dialog" aria-modal="true" aria-label="Choose a Woodles reference"><span>WOODLES REFERENCE</span><h2>{pickerFor.recordId && pickerFor.recordId !== '$new' ? 'Choose a related thing' : 'Add a thing to this Collection'}</h2><input bind:value={pickerQuery} aria-label="Find a thing" placeholder="Search Bestiary, Marginalia, Thinking About, or Write" />{#if !pickerFor.recordId}<button class="picker-all" onclick={() => pickerFor = { recordId: '$new', fieldId: '' }}>Show available things</button>{/if}<div class="reference-list">{#each candidates as candidate (candidate.app + candidate.id)}<button onclick={() => { if (pickerFor?.recordId === '$new' || pickerFor?.recordId === '') addExternal(candidate); else if (pickerFor) { const record = collection?.records.find((entry) => entry.id === pickerFor?.recordId); const field = collection?.fields.find((entry) => entry.id === pickerFor?.fieldId); if (record && field && collection) { mutateCell(record.id, field, { app: candidate.app, kind: candidate.kind, id: candidate.id }); pickerFor = null; } } }}><strong>{candidate.text}</strong><small>{candidate.hint ?? candidate.app}</small></button>{:else}<p>{pickerLoading ? 'Looking through local Bestiary and Marginalia records…' : 'No matches. Refresh the HomeSuite window if a new source was just created.'}</p>{/each}</div></div></div>{/if}
+					<tr class="new-record-row">
+						<td></td>
+						<td colspan={Math.max(1, orderedFields.length + 1)}><button onclick={addNewRecord}>＋ New record</button></td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		{#if addFieldOpen}
+			<FieldDialog onCreate={createField} onClose={() => { addFieldOpen = false; }} />
+		{/if}
+		{#if pickerFor}
+			<ReferenceDialog
+				bind:query={pickerQuery}
+				relating={!!pickerFor.recordId && pickerFor.recordId !== '$new'}
+				browsing={pickerFor.recordId === '$new'}
+				{candidates}
+				loading={pickerLoading}
+				onBrowse={() => { pickerFor = { recordId: '$new', fieldId: '' }; }}
+				onPick={pickCandidate}
+				onClose={() => { pickerFor = null; }}
+			/>
+		{/if}
 	</main>
 {/if}

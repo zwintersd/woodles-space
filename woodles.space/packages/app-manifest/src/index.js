@@ -108,6 +108,9 @@ export const appManifest = Object.freeze([
 		outputDir: 'apps/homesuite/dist',
 		entryFile: 'index.html',
 		packageName: 'homesuite',
+		// HomeSuite's own kinds, each owned by another app (see its surfaces.ts):
+		// a document is Write's draft, a board Whiteboard's, a collection Data's.
+		addressableBy: ['document', 'board', 'collection'],
 		landing: tile('homesuite', 2, 'write', 'documents, boards, and collections in one place', 'var(--aqua)', 'var(--lilac)', '155deg', { defaultPin: 2, featured: 3 })
 	},
 	{

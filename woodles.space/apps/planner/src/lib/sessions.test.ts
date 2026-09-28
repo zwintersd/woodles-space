@@ -170,7 +170,7 @@ describe('offering a sitting without a task', () => {
 		store.observeInterval({
 			date,
 			intervalStart: block.startTime,
-			kind: 'reading',
+			kind: 'rest',
 			label: 'reading Piranesi',
 			thinkingAboutEntryId: 'piranesi'
 		});
@@ -191,7 +191,7 @@ describe('offering a sitting without a task', () => {
 		store.observeInterval({
 			date,
 			intervalStart: block.startTime,
-			kind: 'reading',
+			kind: 'rest',
 			label: 'started Solaris instead',
 			thinkingAboutEntryId: 'solaris'
 		});
@@ -214,7 +214,7 @@ describe('offering a sitting without a task', () => {
 		store.observeInterval({
 			date,
 			intervalStart: block.startTime,
-			kind: 'reading',
+			kind: 'rest',
 			label: 'read a chapter',
 			thinkingAboutEntryId: 'piranesi'
 		});
@@ -227,7 +227,7 @@ describe('offering a sitting without a task', () => {
 		const observation = store.observeInterval({
 			date,
 			intervalStart: '20:00',
-			kind: 'reading',
+			kind: 'rest',
 			label: 'reading Piranesi',
 			thinkingAboutEntryId: 'piranesi'
 		});

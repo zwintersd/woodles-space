@@ -233,18 +233,27 @@ describe('bootstrap', () => {
 
 describe('prepareHomeSuiteDrafts', () => {
 	it('does not seed an empty document or change the active draft', () => {
-		expect(prepareHomeSuiteDrafts()).toEqual([]);
+		expect(prepareHomeSuiteDrafts()).toEqual({ drafts: [], handoffs: 0, notebookImports: 0, sporesImports: 0 });
 		expect(listDrafts()).toEqual([]);
 		expect(getActiveDraftId()).toBeNull();
 	});
 
 	it('makes a legacy draft available in the library without opening it', () => {
 		localStorage.setItem(KEY_LEGACY, JSON.stringify({ title: 'Legacy', savedAt: '2024-01-01' }));
-		const prepared = prepareHomeSuiteDrafts();
+		const prepared = prepareHomeSuiteDrafts().drafts;
 		expect(prepared).toHaveLength(1);
 		expect(prepared[0].title).toBe('Legacy');
 		expect(getActiveDraftId()).toBeNull();
 		expect(bootstrap().activeId).toBe(prepared[0].id);
+	});
+
+	it('counts what arrived from another app, without opening it', () => {
+		sendHandoff('write', { title: 'from afar', body: 'a thought', source: { app: 'notebook' } });
+		const prepared = prepareHomeSuiteDrafts();
+		expect(prepared.handoffs).toBe(1);
+		expect(prepared.drafts.map((draft) => draft.title)).toEqual(['from afar']);
+		expect(getActiveDraftId()).toBeNull();
+		expect(prepareHomeSuiteDrafts().handoffs).toBe(0);
 	});
 });
 
