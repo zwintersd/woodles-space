@@ -107,6 +107,29 @@ h3 { margin: 0; font-size: 16px; }
 .open-slot-card { border-style: dashed; border-color: #8c9aad; background: #fafbfd; }
 .open-slot-symbol { display: grid; width: 42px; height: 42px; place-items: center; border: 1px dashed #9aa9bb; border-radius: 12px; color: #63758b; background: #f1f4f8; font-size: 22px; }
 .open-slot-hint { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.choice-card { border-color: #c8d8ee; }
+.choice-symbol { display: grid; width: 42px; height: 42px; grid-template-columns: 1fr 1fr; gap: 3px; padding: 7px; border-radius: 12px; background: #eaf3ff; }
+.choice-symbol i { border-radius: 4px; background: #7ea9e0; }
+.choice-symbol i:nth-child(2), .choice-symbol i:nth-child(3) { background: #b7d0f0; }
+.choice-options { display: flex; flex-wrap: wrap; gap: 5px; margin: 7px 0 0; padding: 0; list-style: none; }
+.choice-option { display: inline-flex; min-width: 0; align-items: center; gap: 5px; padding: 3px 8px 3px 3px; border: 1px solid #e1e8f1; border-radius: 99px; background: #fff; font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
+.choice-option-art { display: grid; width: 26px; height: 26px; flex: none; place-items: center; overflow: hidden; border-radius: 99px; background: var(--activity-bg, #edf5ff); }
+.choice-option-art img { width: 22px; height: 22px; object-fit: contain; }
+.choice-option-art .symbol-fallback { font-size: 17px !important; line-height: 1; }
+.choice-draft { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.choice-draft-item { display: grid; grid-template-columns: 34px minmax(0, 1fr) 30px; align-items: center; gap: 7px; padding: 5px; border: 1px solid #dfe7f0; border-radius: 11px; background: #fff; }
+.choice-draft-item .choice-option-art { width: 34px; height: 34px; border-radius: 9px; }
+.choice-draft-item .choice-option-art img { width: 28px; height: 28px; }
+.choice-draft-title { overflow-wrap: anywhere; font-size: 13px; font-weight: 750; }
+.choice-draft-item .icon-button { width: 28px; height: 28px; font-size: 15px; }
+.choice-draft-empty { grid-column: 1 / -1; padding: 12px; border: 1px dashed #cbd8e7; border-radius: 11px; color: var(--muted); font-size: 12px; text-align: center; }
+.choice-composer { display: grid; gap: 10px; min-width: 0; margin: 0; padding: 12px; border: 1px solid #dfe7f0; border-radius: 13px; background: #f9fbfe; }
+.choice-composer legend { padding: 0 5px; color: #56677d; font-size: 12px; font-weight: 800; }
+.choice-composer-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.choice-library { display: flex; flex-wrap: wrap; gap: 6px; max-height: 150px; overflow: auto; }
+.choice-library-item { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border: 1px solid var(--line); border-radius: 99px; background: #fff; font-size: 12px; font-weight: 700; cursor: pointer; }
+.choice-library-item:hover { border-color: #a9c1dd; background: #f7faff; }
+.choice-library-item:focus-visible { outline: 3px solid rgba(57,120,199,.34); outline-offset: 2px; }
 .activity-time { align-self: stretch; display: grid; align-content: center; gap: 3px; border-right: 1px solid #e7edf4; color: var(--blue-dark); font-size: 13px; font-weight: 800; }
 .activity-time small { color: var(--muted); font-size: 10px; font-weight: 650; }
 .activity-visual { display: grid; width: 42px; height: 42px; place-items: center; overflow: hidden; border-radius: 12px; background: var(--activity-bg, #edf5ff); font-size: 26px; }
@@ -126,7 +149,7 @@ h3 { margin: 0; font-size: 16px; }
 .side-card { display: grid; gap: 12px; padding: 17px; }
 .visual-card { display: grid; gap: 10px; padding: 14px; border: 1px solid #bcd3f3; border-radius: 17px; background: #f3f8ff; }
 .visual-card h3 { font-size: 15px; }
-.visual-card p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.visual-card p { margin: 0; color: #5b6a7e; font-size: 12px; line-height: 1.5; }
 .visual-card .button { justify-self: start; }
 .visual-preview { display: grid; gap: 5px; padding: 7px; border: 1px solid #d6e4f8; border-radius: 13px; background: #fff; }
 .visual-preview-hero { display: grid; gap: 1px; padding: 9px 11px; border-radius: 9px; color: #fff; background: linear-gradient(115deg, #1878f9, #2f8bff 56%, #2377ee); }
@@ -263,6 +286,8 @@ h3 { margin: 0; font-size: 16px; }
   .symbol-entry { grid-template-columns: 42px minmax(0,1fr); }
   .symbol-entry > button { grid-column: 1 / -1; }
   .symbol-results { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .choice-draft { grid-template-columns: 1fr; }
+  .choice-composer-row { grid-template-columns: 1fr; }
   .image-reference-row { grid-template-columns: 1fr; }
   .image-editor-actions { flex-wrap: wrap; }
 }
@@ -286,6 +311,8 @@ h3 { margin: 0; font-size: 16px; }
   body[data-print-layout="cards"] .activity-visual img { width: 54px; height: 54px; }
   body[data-print-layout="cards"] .activity-copy h3 { font-size: 18px; }
   body[data-print-layout="cards"] .open-slot-card { border: 1px dashed #63758b; background: #fff; }
+  body[data-print-layout="cards"] .activity-tags, body[data-print-layout="cards"] .choice-options { justify-content: center; }
+  .choice-option, .choice-option-art, .choice-symbol, .choice-symbol i { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   body[data-print-spacing="cut"][data-print-layout="cards"] .activity-list { gap: .28in; }
   body[data-print-spacing="cut"][data-print-layout="cards"] .activity-card { min-height: 1.7in; padding: .2in; }
   body[data-print-spacing="laminate"][data-print-layout="cards"] .activity-list { gap: .42in; }

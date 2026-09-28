@@ -2,10 +2,11 @@
   'use strict';
 
   const {
-    STORAGE_KEY, DAY_KEYS, COLORS,
+    STORAGE_KEY, DAY_KEYS, COLORS, MAX_CHOICE_OPTIONS,
     makeId, esc, cleanText, validTime, validDuration, validColor, timeMinutes,
     isLocalImageData, pictogramSource, openMojiCodepoint, symbolMarkup,
-    sanitizeImage, sanitizeActivity, sanitizePlan, readWorkspace, visualScheduleUrl
+    sanitizeImage, sanitizeActivity, sanitizePlan, readWorkspace,
+    choiceTitle, itemVisuals, itemImageIds, visualScheduleUrl
   } = window.ScheduleStudio;
   const CATEGORIES = ['Instruction', 'Communication', 'Play / leisure', 'Daily living', 'Movement', 'Sensory', 'Break', 'Transition', 'Other'];
   const COLOR_NAMES = { '#3978c7': 'Blue', '#32845f': 'Green', '#d27b32': 'Orange', '#a16ab5': 'Purple', '#d05c66': 'Rose', '#458d98': 'Teal', '#7c8797': 'Slate' };
@@ -100,6 +101,7 @@
   let cropSourceName = 'image';
   let cropAttachEnabled = false;
   let activeSymbolGroup = 'Popular';
+  let choiceDraft = [];
   let recentSymbols = readRecentSymbols();
 
   function readRecentSymbols() {
@@ -145,7 +147,7 @@
     const plan = getPlan();
     if (plan) plan.updatedAt = now;
     const usedImages = new Set(workspace.activities.map((item) => item.imageAssetId).concat(
-      workspace.plans.flatMap((entry) => entry.days.flatMap((day) => day.activities.map((item) => item.imageAssetId)))
+      workspace.plans.flatMap((entry) => entry.days.flatMap((day) => day.activities.flatMap(itemImageIds)))
     ).filter(Boolean));
     workspace.images = workspace.images.filter((image) => usedImages.has(image.id));
     try {
@@ -215,11 +217,11 @@
   }
 
   function dayStats(day) {
-    const activities = day.activities.filter((item) => item.kind !== 'open-slot').length;
-    const openSlots = day.activities.length - activities;
+    const kinds = (kind) => day.activities.filter((item) => item.kind === kind).length;
     return {
-      count: activities,
-      openSlots,
+      count: kinds('activity'),
+      choices: kinds('choice'),
+      openSlots: kinds('open-slot'),
       minutes: day.activities.reduce((total, item) => total + item.duration, 0)
     };
   }
@@ -227,17 +229,20 @@
   function dayItemSummary(stats) {
     const parts = [];
     if (stats.count) parts.push(stats.count + ' activit' + (stats.count === 1 ? 'y' : 'ies'));
+    if (stats.choices) parts.push(stats.choices + ' choice' + (stats.choices === 1 ? '' : 's'));
     if (stats.openSlots) parts.push(stats.openSlots + ' open slot' + (stats.openSlots === 1 ? '' : 's'));
     return parts.join(' · ') || 'No items';
   }
 
   function planStats(plan) {
     return visibleDays(plan).reduce((result, day) => {
+      const stats = dayStats(day);
       result.days += day.activities.length > 0 ? 1 : 0;
-      result.activities += day.activities.filter((item) => item.kind !== 'open-slot').length;
-      result.openSlots += day.activities.filter((item) => item.kind === 'open-slot').length;
+      result.activities += stats.count;
+      result.choices += stats.choices;
+      result.openSlots += stats.openSlots;
       return result;
-    }, { days: 0, activities: 0, openSlots: 0 });
+    }, { days: 0, activities: 0, choices: 0, openSlots: 0 });
   }
 
   function nextFreeStart(day, duration, ignoreId) {
@@ -299,7 +304,7 @@
       return '<article class="plan-card">' +
         '<button class="plan-open" type="button" data-action="open-plan" data-plan="' + esc(plan.id) + '">' +
           '<strong>' + esc(plan.learner) + '</strong><span>' + esc(plan.name) + '</span>' +
-          '<span class="plan-meta">' + stats.days + ' day' + (stats.days === 1 ? '' : 's') + ' planned · ' + stats.activities + ' activities' + (stats.openSlots ? ' · ' + stats.openSlots + ' open slot' + (stats.openSlots === 1 ? '' : 's') : '') + ' · ' + esc(formatDate(plan.updatedAt)) + '</span>' +
+          '<span class="plan-meta">' + stats.days + ' day' + (stats.days === 1 ? '' : 's') + ' planned · ' + stats.activities + ' activities' + (stats.choices ? ' · ' + stats.choices + ' choice' + (stats.choices === 1 ? '' : 's') : '') + (stats.openSlots ? ' · ' + stats.openSlots + ' open slot' + (stats.openSlots === 1 ? '' : 's') : '') + ' · ' + esc(formatDate(plan.updatedAt)) + '</span>' +
         '</button><div class="plan-actions">' +
           '<a class="icon-button visual-link" href="' + esc(visualScheduleUrl(plan.id)) + '" aria-label="Open ' + esc(plan.learner) + '’s visual schedule" title="Visual schedule">▶</a>' +
           '<button class="icon-button" type="button" data-action="duplicate-plan" data-plan="' + esc(plan.id) + '" aria-label="Duplicate ' + esc(plan.learner) + ' plan" title="Duplicate plan">⧉</button>' +
@@ -328,18 +333,38 @@
       '<button class="button small secondary" type="button" data-action="restore-day" data-day="' + day.key + '">＋ ' + esc(day.label) + '</button>').join('') + '</div>' : '');
   }
 
+  function optionVisual(option, size) {
+    const imageValue = activityImageValue(option);
+    const source = isLocalImageData(imageValue) ? imageValue : pictogramSource(imageValue);
+    return source ? '<img src="' + esc(source) + '" alt="" width="' + size + '" height="' + size + '" loading="lazy">' : symbolMarkup(option.icon || '⭐', size);
+  }
+
+  function itemActions(item, index, items, name, editAction) {
+    return '<div class="activity-actions">' +
+      '<button class="icon-button" type="button" data-action="move-activity" data-id="' + esc(item.occurrenceId) + '" data-direction="-1" aria-label="Move ' + esc(name) + ' earlier" title="Move earlier" ' + (index === 0 ? 'disabled' : '') + '>↑</button>' +
+      '<button class="icon-button" type="button" data-action="move-activity" data-id="' + esc(item.occurrenceId) + '" data-direction="1" aria-label="Move ' + esc(name) + ' later" title="Move later" ' + (index === items.length - 1 ? 'disabled' : '') + '>↓</button>' +
+      '<button class="icon-button" type="button" data-action="' + editAction + '" data-id="' + esc(item.occurrenceId) + '" aria-label="Edit ' + esc(name) + '" title="Edit">✎</button>' +
+      '<button class="icon-button delete" type="button" data-action="remove-activity" data-id="' + esc(item.occurrenceId) + '" aria-label="Remove ' + esc(name) + '" title="Remove">×</button>' +
+    '</div>';
+  }
+
   function renderActivity(day, item, index, items) {
+    if (item.kind === 'choice') {
+      const title = choiceTitle(item, getPlan().learner);
+      return '<article class="activity-card choice-card">' +
+        '<div class="activity-time">' + esc(formatTime(item.start)) + '<small>' + item.duration + ' min</small></div>' +
+        '<div class="choice-symbol" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' +
+        '<div class="activity-copy"><h3>' + esc(title) + '</h3><div class="activity-tags"><span class="activity-tag">Choice · ' + item.options.length + ' option' + (item.options.length === 1 ? '' : 's') + '</span></div>' +
+          '<ul class="choice-options" aria-label="Options">' + item.options.map((option) => '<li class="choice-option" style="--activity-bg:color-mix(in srgb,' + validColor(option.color) + ' 14%,white)"><span class="choice-option-art" aria-hidden="true">' + optionVisual(option, 22) + '</span>' + esc(option.title) + '</li>').join('') + '</ul>' +
+          (item.prompt ? '<p class="activity-note">' + esc(item.prompt) + '</p>' : '') + '</div>' +
+        itemActions(item, index, items, title, 'edit-choice') + '</article>';
+    }
     if (item.kind === 'open-slot') {
       return '<article class="activity-card open-slot-card" aria-label="Open slot, ' + esc(formatTime(item.start)) + ', ' + item.duration + ' minutes">' +
         '<div class="activity-time">' + esc(formatTime(item.start)) + '<small>' + item.duration + ' min</small></div>' +
         '<div class="open-slot-symbol" aria-hidden="true">＋</div>' +
-        '<div class="activity-copy"><h3>Open slot</h3><p class="open-slot-hint">Flexible time for a choice, transition, or break</p></div>' +
-        '<div class="activity-actions">' +
-          '<button class="icon-button" type="button" data-action="move-activity" data-id="' + esc(item.occurrenceId) + '" data-direction="-1" aria-label="Move open slot earlier" title="Move earlier" ' + (index === 0 ? 'disabled' : '') + '>↑</button>' +
-          '<button class="icon-button" type="button" data-action="move-activity" data-id="' + esc(item.occurrenceId) + '" data-direction="1" aria-label="Move open slot later" title="Move later" ' + (index === items.length - 1 ? 'disabled' : '') + '>↓</button>' +
-          '<button class="icon-button" type="button" data-action="edit-open-slot" data-id="' + esc(item.occurrenceId) + '" aria-label="Edit open slot" title="Edit">✎</button>' +
-          '<button class="icon-button delete" type="button" data-action="remove-activity" data-id="' + esc(item.occurrenceId) + '" aria-label="Remove open slot" title="Remove">×</button>' +
-        '</div></article>';
+        '<div class="activity-copy"><h3>Open slot</h3><p class="open-slot-hint">Flexible time for a free choice, transition, or break</p></div>' +
+        itemActions(item, index, items, 'open slot', 'edit-open-slot') + '</article>';
     }
     return '<article class="activity-card" style="--activity-bg:color-mix(in srgb,' + validColor(item.color) + ' 14%,white)">' +
       '<div class="activity-time">' + esc(formatTime(item.start)) + '<small>' + item.duration + ' min</small></div>' +
@@ -347,12 +372,7 @@
       '<div class="activity-copy"><h3>' + esc(item.title) + '</h3><div class="activity-tags"><span class="activity-tag">' + esc(item.category) + '</span></div>' +
       (item.note ? '<p class="activity-note">' + esc(item.note) + '</p>' : '') +
       (item.credit ? '<p class="image-credit">' + esc(item.credit) + '</p>' : '') + '</div>' +
-      '<div class="activity-actions">' +
-        '<button class="icon-button" type="button" data-action="move-activity" data-id="' + esc(item.occurrenceId) + '" data-direction="-1" aria-label="Move ' + esc(item.title) + ' earlier" title="Move earlier" ' + (index === 0 ? 'disabled' : '') + '>↑</button>' +
-        '<button class="icon-button" type="button" data-action="move-activity" data-id="' + esc(item.occurrenceId) + '" data-direction="1" aria-label="Move ' + esc(item.title) + ' later" title="Move later" ' + (index === items.length - 1 ? 'disabled' : '') + '>↓</button>' +
-        '<button class="icon-button" type="button" data-action="edit-activity" data-id="' + esc(item.occurrenceId) + '" aria-label="Edit ' + esc(item.title) + '" title="Edit">✎</button>' +
-        '<button class="icon-button delete" type="button" data-action="remove-activity" data-id="' + esc(item.occurrenceId) + '" aria-label="Remove ' + esc(item.title) + '" title="Remove">×</button>' +
-      '</div></article>';
+      itemActions(item, index, items, item.title, 'edit-activity') + '</article>';
   }
 
   function renderWeekSummary(plan) {
@@ -364,7 +384,7 @@
 
   function renderVisualCard(plan, day) {
     const rows = sortedActivities(day).slice(0, 3).map((item) =>
-      '<span class="visual-preview-row"><b>' + esc(formatTime(item.start)) + '</b><span>' + esc(item.kind === 'open-slot' ? plan.learner + '’s choice' : item.title) + '</span></span>').join('');
+      '<span class="visual-preview-row"><b>' + esc(formatTime(item.start)) + '</b><span>' + esc(item.kind === 'activity' ? item.title : choiceTitle(item, plan.learner)) + '</span></span>').join('');
     return '<section class="visual-card" aria-labelledby="visualCardTitle">' +
       '<div class="visual-preview" aria-hidden="true"><span class="visual-preview-hero"><strong>Hi ' + esc(plan.learner) + '!</strong><small>' + esc(day.label) + ' · ' + esc(formatTime(day.start)) + '–' + esc(formatTime(day.end)) + '</small></span>' +
         (rows || '<span class="visual-preview-empty">Activities you add show up here</span>') + '</div>' +
@@ -382,9 +402,9 @@
     const items = sortedActivities(day);
     const stats = dayStats(day);
     const capacity = timeMinutes(day.end) - timeMinutes(day.start);
-    const hasArasaac = items.some((item) => /^\d{1,10}$/.test(String(item.pictogram || '').trim()));
-    const hasOpenMoji = items.some((item) => {
-      if (item.kind === 'open-slot') return false;
+    const visuals = items.flatMap(itemVisuals);
+    const hasArasaac = visuals.some((item) => /^\d{1,10}$/.test(String(item.pictogram || '').trim()));
+    const hasOpenMoji = visuals.some((item) => {
       const imageValue = activityImageValue(item);
       return !(isLocalImageData(imageValue) || pictogramSource(imageValue)) && Boolean(openMojiCodepoint(item.icon));
     });
@@ -406,7 +426,7 @@
       '<nav class="day-tabs" aria-label="Days of the week">' + renderDayTabs(plan) + '</nav>' +
       '<div class="day-panel"><section class="day-main" aria-labelledby="dayTitle">' +
         '<div class="day-main-header"><div><span class="eyebrow">' + esc(plan.learner) + ' · weekly schedule</span><h2 id="dayTitle">' + esc(day.label) + '</h2><p>Plan this day’s session, then copy it to another day when the pattern fits.</p></div>' +
-          '<div class="button-row"><button class="button secondary" type="button" data-action="add-open-slot">＋ Open slot</button><button class="button primary" type="button" data-action="add-activity">＋ Add activity</button></div></div>' +
+          '<div class="button-row"><button class="button secondary" type="button" data-action="add-open-slot">＋ Open slot</button><button class="button secondary" type="button" data-action="add-choice">＋ Choice</button><button class="button primary" type="button" data-action="add-activity">＋ Add activity</button></div></div>' +
         '<div class="time-window"><span class="time-window-label">Session time</span><label class="field"><span>Starts</span><input type="time" data-day-time="start" value="' + esc(day.start) + '" aria-label="' + esc(day.label) + ' session start"></label>' +
           '<label class="field"><span>Ends</span><input type="time" data-day-time="end" value="' + esc(day.end) + '" aria-label="' + esc(day.label) + ' session end"></label>' +
           '<span class="time-summary">' + stats.minutes + ' scheduled minutes · ' + Math.max(0, capacity - stats.minutes) + ' unassigned minutes</span></div>' +
@@ -418,7 +438,7 @@
         '<div class="copy-row"><label for="copyDestination">Reuse this day:</label><select id="copyDestination">' + destinationOptions + '</select><button class="button small secondary" type="button" data-action="copy-day">Copy day</button><button class="button small secondary danger" type="button" data-action="clear-day">Clear day</button><button class="button small secondary danger" type="button" data-action="delete-day">Delete day</button></div>' +
         '<div class="activity-list" aria-label="' + esc(day.label) + ' scheduled items">' +
           (items.length ? items.map((item, index) => renderActivity(day, item, index, items)).join('') :
-            '<div class="empty-day"><span class="empty-icon" aria-hidden="true">＋</span><h3>No activities planned yet</h3><p>Add a session activity or an open slot, or copy a day with a schedule you want to reuse. Times and items remain editable on every day.</p><div class="button-row"><button class="button secondary" type="button" data-action="add-open-slot">＋ Add open slot</button><button class="button secondary" type="button" data-action="add-activity">＋ Add first activity</button></div></div>') +
+            '<div class="empty-day"><span class="empty-icon" aria-hidden="true">＋</span><h3>No activities planned yet</h3><p>Add a session activity, a choice between a few options, or an open slot, or copy a day with a schedule you want to reuse. Times and items remain editable on every day.</p><div class="button-row"><button class="button secondary" type="button" data-action="add-open-slot">＋ Add open slot</button><button class="button secondary" type="button" data-action="add-choice">＋ Add choice</button><button class="button secondary" type="button" data-action="add-activity">＋ Add first activity</button></div></div>') +
         '</div>' + (printCredits ? '<p class="print-credit">' + printCredits + '</p>' : '') + '</section>' +
         '<aside class="day-side">' + renderVisualCard(plan, day) + '<section class="side-card"><h3>This week</h3><p>Each day can use its own session window and activity sequence.</p><div class="week-summary">' + renderWeekSummary(plan) + '</div>' +
           '<div class="side-actions"><button class="button secondary" type="button" data-action="duplicate-plan">Duplicate this learner plan</button><button class="button secondary danger" type="button" data-action="delete-current-plan">Delete this plan</button></div></section></aside>' +
@@ -612,6 +632,129 @@
     activityDialog.close();
     render();
     showToast(activityMode === 'slot-edit' ? 'Open slot updated.' : 'Open slot added to ' + day.label + '.');
+  }
+
+  function showChoiceDialog(mode, item) {
+    const plan = getPlan();
+    const day = getDay(plan, activeDayKey);
+    if (!day) return;
+    activityMode = mode === 'edit' ? 'choice-edit' : 'choice-new';
+    editingActivityId = item ? item.occurrenceId : '';
+    const editing = activityMode === 'choice-edit';
+    let defaultDuration = item ? item.duration : 15;
+    let defaultStart = item ? item.start : nextFreeStart(day, defaultDuration);
+    if (!editing && defaultStart === null) {
+      defaultDuration = 5;
+      defaultStart = nextFreeStart(day, defaultDuration);
+    }
+    if (defaultStart === null) return showToast('There is no open session time for another choice.');
+    const startValue = typeof defaultStart === 'number' ? timeString(defaultStart) : defaultStart;
+    choiceDraft = item ? item.options.map((option) => ({ ...option })) : [];
+    const library = workspace.activities.map((activity) =>
+      '<button class="choice-library-item" type="button" data-action="add-library-option" data-id="' + esc(activity.id) + '" aria-label="Add ' + esc(activity.title) + ' as an option">' +
+        '<span class="choice-option-art" style="--activity-bg:color-mix(in srgb,' + validColor(activity.color) + ' 14%,white)" aria-hidden="true">' + optionVisual(activity, 22) + '</span>' + esc(activity.title) + '</button>').join('');
+    activityDialogBody.innerHTML = '<div class="dialog-heading dialog-content"><div><span class="eyebrow">' + (editing ? 'Edit this day' : 'Add to this day') + '</span><h2>' + (editing ? 'Edit choice' : 'Add a choice') + '</h2><p class="muted">Give ' + esc(plan.learner) + ' a few options. On the visual schedule they tap the one they want.</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close">×</button></div>' +
+      '<form class="edit-form" id="choiceForm">' +
+        '<label class="field"><span>Start time</span><input name="start" type="time" value="' + esc(startValue) + '" required></label>' +
+        '<label class="field"><span>Length (minutes)</span><input name="duration" type="number" min="1" max="480" value="' + esc(defaultDuration) + '" required></label>' +
+        '<label class="field"><span>Heading (optional)</span><input name="title" maxlength="100" value="' + esc(item ? item.title : '') + '" placeholder="' + esc(choiceTitle(null, plan.learner)) + '"></label>' +
+        '<label class="field"><span>Prompt (optional)</span><input name="prompt" maxlength="200" value="' + esc(item ? item.prompt : '') + '" placeholder="Pick what to do."></label>' +
+        '<div class="field full"><span id="choiceOptionsLabel">Options · 2 to ' + MAX_CHOICE_OPTIONS + '</span><ul class="choice-draft" id="choiceOptions" aria-labelledby="choiceOptionsLabel"></ul></div>' +
+        '<fieldset class="choice-composer full"><legend>Add an option</legend>' +
+          '<label class="field"><span>Option name</span><span class="choice-composer-row"><input id="optionTitle" name="optionTitle" maxlength="60" placeholder="e.g., Blocks" autocomplete="off"><button class="button secondary" type="button" data-action="add-choice-option">＋ Add option</button></span></label>' +
+          renderSymbolPicker('⭐') +
+        '</fieldset>' +
+        (library ? '<div class="field full"><span id="choiceLibraryLabel">Or add from your activity library (keeps its picture)</span><div class="choice-library" role="group" aria-labelledby="choiceLibraryLabel">' + library + '</div></div>' : '') +
+        '<div class="error-text full" id="choiceError" role="status" aria-live="polite"></div>' +
+        '<div class="dialog-footer full"><button class="button secondary" type="button" data-close-dialog>Cancel</button><button class="button primary" type="submit">' + (editing ? 'Save choice' : 'Add choice') + '</button></div>' +
+      '</form>';
+    renderChoiceDraft();
+    if (!activityDialog.open) activityDialog.showModal();
+    activityDialogBody.querySelector(editing ? 'input[name="start"]' : '#optionTitle')?.focus();
+  }
+
+  function renderChoiceDraft() {
+    const list = document.getElementById('choiceOptions');
+    if (!list) return;
+    list.innerHTML = choiceDraft.length
+      ? choiceDraft.map((option) => '<li class="choice-draft-item" style="--activity-bg:color-mix(in srgb,' + validColor(option.color) + ' 14%,white)"><span class="choice-option-art" aria-hidden="true">' + optionVisual(option, 26) + '</span><span class="choice-draft-title">' + esc(option.title) + '</span>' +
+        '<button class="icon-button" type="button" data-action="remove-choice-option" data-id="' + esc(option.id) + '" aria-label="Remove option ' + esc(option.title) + '" title="Remove option">×</button></li>').join('')
+      : '<li class="choice-draft-empty">No options yet. Add at least two below.</li>';
+  }
+
+  function addChoiceOption(option) {
+    const errorNode = document.getElementById('choiceError');
+    if (choiceDraft.length >= MAX_CHOICE_OPTIONS) {
+      errorNode.textContent = 'A choice can have up to ' + MAX_CHOICE_OPTIONS + ' options.';
+      return false;
+    }
+    choiceDraft.push({ id: makeId('option'), title: option.title, icon: option.icon || '⭐', pictogram: option.pictogram || '', imageAssetId: option.imageAssetId || '', color: option.color || COLORS[choiceDraft.length % COLORS.length] });
+    errorNode.textContent = '';
+    renderChoiceDraft();
+    return true;
+  }
+
+  function addComposedOption(form) {
+    const title = cleanText(form.elements.optionTitle.value, 60, '');
+    if (!title) {
+      document.getElementById('choiceError').textContent = 'Name the option first.';
+      form.elements.optionTitle.focus();
+      return false;
+    }
+    if (!addChoiceOption({ title, icon: cleanText(form.elements.icon.value, 16, '⭐') })) return false;
+    form.elements.optionTitle.value = '';
+    form.elements.icon.value = '⭐';
+    updateSymbolPreview(form);
+    form.elements.optionTitle.focus();
+    return true;
+  }
+
+  function submitChoice(form) {
+    const day = getDay(getPlan(), activeDayKey);
+    if (!day) return;
+    const errorNode = form.querySelector('#choiceError');
+    if (form.elements.optionTitle.value.trim() && !addComposedOption(form)) return;
+    const data = new FormData(form);
+    const start = validTime(data.get('start'), '');
+    const duration = validDuration(data.get('duration'), 0);
+    if (!start || !duration) {
+      errorNode.textContent = 'Enter a valid start time and a length from 1 to 480 minutes.';
+      return;
+    }
+    if (choiceDraft.length < 2) {
+      errorNode.textContent = 'Add at least two options so there is something to choose.';
+      form.elements.optionTitle.focus();
+      return;
+    }
+    const values = { start, duration, title: cleanText(data.get('title'), 100, ''), prompt: cleanText(data.get('prompt'), 200, ''), options: choiceDraft.map((option) => ({ ...option })) };
+    let choice;
+    if (activityMode === 'choice-edit') {
+      choice = day.activities.find((item) => item.occurrenceId === editingActivityId && item.kind === 'choice');
+      if (!choice) return activityDialog.close();
+      const prior = { ...choice };
+      Object.assign(choice, values);
+      const message = validateDay(day);
+      if (message) {
+        Object.assign(choice, prior);
+        errorNode.textContent = message;
+        return;
+      }
+    } else {
+      choice = { kind: 'choice', occurrenceId: makeId('scheduled'), sourceId: '', color: COLORS[0], ...values };
+      day.activities.push(choice);
+      const message = validateDay(day);
+      if (message) {
+        day.activities = day.activities.filter((item) => item.occurrenceId !== choice.occurrenceId);
+        errorNode.textContent = message;
+        return;
+      }
+    }
+    persist();
+    activityDialog.close();
+    render();
+    if (activityMode === 'choice-edit') focusActivityAction('edit-choice', choice.occurrenceId);
+    else focusAddActivity();
+    showToast(activityMode === 'choice-edit' ? 'Choice updated.' : 'Choice added to ' + day.label + '.');
   }
 
   function renderImageAssetPreview(value, imageAssetId) {
@@ -984,7 +1127,7 @@
     destination.printLayout = source.printLayout;
     destination.printTimes = source.printTimes;
     destination.printSpacing = source.printSpacing;
-    destination.activities = source.activities.map((item) => ({ ...item, occurrenceId: makeId('scheduled') }));
+    destination.activities = source.activities.map((item) => ({ ...JSON.parse(JSON.stringify(item)), occurrenceId: makeId('scheduled') }));
     persist();
     render();
     app.querySelector('.day-tab[aria-pressed="true"]')?.focus();
@@ -995,7 +1138,7 @@
     const plan = getPlan();
     const day = getDay(plan, activeDayKey);
     if (!day || !day.activities.length) return;
-    if (!window.confirm('Clear all activities and open slots from ' + day.label + '?')) return;
+    if (!window.confirm('Clear all activities, choices, and open slots from ' + day.label + '?')) return;
     day.activities = [];
     persist();
     render();
@@ -1033,7 +1176,7 @@
     const day = getDay(getPlan(), activeDayKey);
     if (!day) return;
     const item = day.activities.find((entry) => entry.occurrenceId === occurrenceId);
-    const label = item && item.kind === 'open-slot' ? 'this open slot' : item && '“' + item.title + '”';
+    const label = item && (item.kind === 'open-slot' ? 'this open slot' : item.kind === 'choice' ? 'this choice' : '“' + item.title + '”');
     if (!item || !window.confirm('Remove ' + label + ' from ' + day.label + '?')) return;
     day.activities = day.activities.filter((entry) => entry.occurrenceId !== occurrenceId);
     persist();
@@ -1069,7 +1212,7 @@
     if (!plan) return;
     const usedIds = new Set(plan.days.flatMap((day) => day.activities.map((item) => item.sourceId).filter(Boolean)));
     const activityLibrary = workspace.activities.filter((item) => usedIds.has(item.id));
-    const usedImageIds = new Set(plan.days.flatMap((day) => day.activities.map((item) => item.imageAssetId))
+    const usedImageIds = new Set(plan.days.flatMap((day) => day.activities.flatMap(itemImageIds))
       .concat(activityLibrary.map((item) => item.imageAssetId)).filter(Boolean));
     const images = workspace.images.filter((image) => usedImageIds.has(image.id));
     const content = JSON.stringify({ format: 'woodles.schedule-week.v1', exportedAt: new Date().toISOString(), plan, activityLibrary, images }, null, 2);
@@ -1104,7 +1247,11 @@
           imageIdMap.set(image.id, id);
           return { ...image, id };
         });
-        const remapImage = (item) => ({ ...item, imageAssetId: imageIdMap.get(item.imageAssetId) || '' });
+        const remapImage = (item) => ({
+          ...item,
+          imageAssetId: imageIdMap.get(item && item.imageAssetId) || '',
+          ...(item && Array.isArray(item.options) ? { options: item.options.map(remapImage) } : {})
+        });
         const planSource = {
           ...rawPlan,
           days: rawPlan.days.map((day) => ({ ...day, activities: (Array.isArray(day.activities) ? day.activities : []).map(remapImage) }))
@@ -1161,10 +1308,20 @@
     else if (name === 'select-day') routeToPlan(currentPlanId, action.dataset.day);
     else if (name === 'add-activity') showActivityDialog('new');
     else if (name === 'add-open-slot') showOpenSlotDialog('new');
+    else if (name === 'add-choice') showChoiceDialog('new');
+    else if (name === 'add-choice-option') addComposedOption(action.form);
+    else if (name === 'add-library-option') {
+      const activity = workspace.activities.find((entry) => entry.id === action.dataset.id);
+      if (activity) addChoiceOption(activity);
+    } else if (name === 'remove-choice-option') {
+      choiceDraft = choiceDraft.filter((option) => option.id !== action.dataset.id);
+      renderChoiceDraft();
+      document.getElementById('optionTitle')?.focus();
+    }
     else if (name === 'open-image-editor') openImageEditor(true);
     else if (name === 'open-image-studio') openImageEditor(false);
     else if (name === 'toggle-symbol-picker') {
-      const form = action.closest('#activityForm');
+      const form = action.closest('form');
       const picker = form && form.querySelector('#symbolPicker');
       if (form && picker) {
         picker.hidden = !picker.hidden;
@@ -1176,14 +1333,14 @@
         }
       }
     } else if (name === 'filter-symbols') {
-      const form = action.closest('#activityForm');
+      const form = action.closest('form');
       if (form) {
         activeSymbolGroup = action.dataset.group;
         form.elements.symbolSearch.value = '';
         renderSymbolResults(form);
       }
     } else if (name === 'select-symbol') {
-      const form = action.closest('#activityForm');
+      const form = action.closest('form');
       if (form) {
         form.elements.icon.value = action.dataset.symbol;
         rememberSymbol(action.dataset.symbol);
@@ -1212,6 +1369,10 @@
       const day = getDay(getPlan(), activeDayKey);
       const item = day && day.activities.find((entry) => entry.occurrenceId === action.dataset.id && entry.kind === 'open-slot');
       if (item) showOpenSlotDialog('edit', item);
+    } else if (name === 'edit-choice') {
+      const day = getDay(getPlan(), activeDayKey);
+      const item = day && day.activities.find((entry) => entry.occurrenceId === action.dataset.id && entry.kind === 'choice');
+      if (item) showChoiceDialog('edit', item);
     } else if (name === 'remove-activity') removeActivity(action.dataset.id);
     else if (name === 'move-activity') moveActivity(action.dataset.id, action.dataset.direction);
     else if (name === 'copy-day') copyDay();
@@ -1233,6 +1394,9 @@
     } else if (event.target.id === 'slotForm') {
       event.preventDefault();
       submitOpenSlot(event.target);
+    } else if (event.target.id === 'choiceForm') {
+      event.preventDefault();
+      submitChoice(event.target);
     }
   });
 
@@ -1293,6 +1457,11 @@
   });
 
   document.addEventListener('keydown', (event) => {
+    if (event.target.id === 'optionTitle' && event.key === 'Enter') {
+      event.preventDefault();
+      addComposedOption(event.target.form);
+      return;
+    }
     if (event.target.id !== 'symbolSearch' || event.key !== 'Escape') return;
     const form = event.target.form;
     const picker = form && form.querySelector('#symbolPicker');

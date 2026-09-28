@@ -58,6 +58,15 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--sky); outline-o
 .done-btn svg { width: 19px; height: 19px; opacity: .2; }
 .step.is-done .done-btn { border-color: var(--grass); color: #fff; background: var(--grass); }
 .step.is-done .done-btn svg { opacity: 1; }
+.choice-layout { display: grid; grid-template-columns: minmax(140px, .8fr) minmax(0, 3.2fr) 34px; align-items: center; gap: 10px; }
+.choice-layout .done-btn { grid-column: -2; grid-row: 1; }
+.chips { display: grid; grid-template-columns: repeat(var(--chip-columns, 4), minmax(0, 1fr)); gap: 7px; }
+.chip { display: grid; min-width: 0; min-height: 76px; justify-items: center; align-content: center; gap: 3px; padding: 5px 4px; border: 2px solid var(--line); border-radius: 13px; color: var(--ink); background: #f4f8ff; font: inherit; font-size: 12px; line-height: 1.15; text-align: center; overflow-wrap: anywhere; cursor: pointer; transition: border-color .15s ease, background .15s ease, box-shadow .15s ease; }
+.chip:hover { border-color: #a9c6ee; }
+.chip[aria-pressed="true"] { border-color: var(--sky); background: #e3eeff; box-shadow: 0 0 0 3px rgba(47,123,245,.18); }
+.chip-art { display: grid; width: 42px; height: 42px; place-items: center; overflow: hidden; border-radius: 11px; background: color-mix(in srgb, var(--activity-color) 13%, white); }
+.chip-art img { display: block; width: 36px; height: 36px; object-fit: contain; }
+.chip-art .symbol-fallback { line-height: 1; }
 .step.finish .box { min-height: 60px; padding-block: 12px; border-color: #f0b400; background: linear-gradient(135deg, var(--sun), #ffe08a); text-align: center; }
 .step.finish h2 { margin: 0; font-family: var(--display); font-size: 22px; font-weight: 400; }
 .step.finish .sub { color: var(--ink); }
@@ -109,6 +118,12 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--sky); outline-o
   .visual .symbol-fallback { font-size: 32px !important; }
   .copy h2 { font-size: 16px; }
   .done-btn { width: 30px; height: 30px; }
+  .choice-layout { grid-template-columns: minmax(0, 1fr) 30px; align-items: start; gap: 8px; }
+  .choice-layout .chips { grid-column: 1 / -1; grid-row: 2; grid-template-columns: repeat(var(--chip-columns-narrow, 2), minmax(0, 1fr)); gap: 6px; }
+  .chip { min-height: 68px; font-size: 11px; }
+  .chip-art { width: 36px; height: 36px; }
+  .chip-art img { width: 30px; height: 30px; }
+  .chip-art .symbol-fallback { font-size: 26px !important; }
   .step.finish h2 { font-size: 19px; }
   .view-footer { margin-left: 55px; }
 }
@@ -117,7 +132,8 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--sky); outline-o
   body { background: #fff; }
   .schedule { width: 100%; margin: 0; }
   .edit-link, .clock, .nownext, .reset, .day-links, .done-btn, .nowtag { display: none !important; }
-  .hero, .box, .nn, .visual, .category, .time::after { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .hero, .box, .nn, .visual, .category, .chip, .chip-art, .time::after { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .choice-layout { grid-template-columns: minmax(140px, .8fr) minmax(0, 3.2fr); }
   .activity { grid-template-columns: 64px minmax(0, 1fr); }
   .step { break-inside: avoid; }
   .step.is-now .box { border-color: #d6e4f8; box-shadow: none; }

@@ -3,9 +3,9 @@
 
   const {
     DAY_KEYS, STORAGE_KEY, esc, timeMinutes, validColor, isLocalImageData, pictogramSource,
-    openMojiCodepoint, symbolMarkup, readWorkspace, visualScheduleUrl
+    openMojiCodepoint, symbolMarkup, readWorkspace, choiceTitle, itemVisuals, visualScheduleUrl
   } = window.ScheduleStudio;
-  // Checks belong to one calendar day, so a weekly plan starts fresh each time it comes round.
+  // Checks and picks belong to one calendar day, so a weekly plan starts fresh each time it comes round.
   const PROGRESS_KEY = 'woodles.schedule-planner.progress.v1';
   const OPEN_SLOT_SYMBOL = '✨';
   const CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5 L10 17.5 L19 7" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -31,10 +31,6 @@
     return (hour % 12 || 12) + ':' + String(minutes % 60).padStart(2, '0');
   }
 
-  function choiceTitle() {
-    return plan.learner + '’s choice';
-  }
-
   function chooseDay() {
     const shown = plan.days.filter((entry) => !entry.removed);
     const today = todayKey(new Date());
@@ -54,9 +50,11 @@
     return items;
   }
 
-  function stepLabel(step) {
+  function stepLabel(step, picks) {
     if (step.kind === 'finish') return 'All done!';
-    return step.kind === 'open-slot' ? choiceTitle() : step.title;
+    if (step.kind === 'activity') return step.title;
+    const picked = step.kind === 'choice' && step.options.find((option) => option.id === picks[step.occurrenceId]);
+    return picked ? picked.title : choiceTitle(step, plan.learner);
   }
 
   function imageValue(item) {
@@ -66,6 +64,11 @@
   function imageSource(item) {
     const value = imageValue(item);
     return isLocalImageData(value) ? value : pictogramSource(value);
+  }
+
+  function visualMarkup(item, size) {
+    const source = imageSource(item);
+    return source ? '<img src="' + esc(source) + '" alt="">' : symbolMarkup(item.icon, size);
   }
 
   function readProgress() {
@@ -81,30 +84,56 @@
     return plan.id + ':' + day.key;
   }
 
-  function readDone() {
+  function readDayProgress() {
     const entry = readProgress()[progressKey()];
-    return new Set(entry && entry.date === localDate(new Date()) && Array.isArray(entry.done) ? entry.done.map(String) : []);
+    const current = entry && entry.date === localDate(new Date()) ? entry : {};
+    const picks = {};
+    if (current.picks && typeof current.picks === 'object') {
+      for (const [id, option] of Object.entries(current.picks)) if (typeof option === 'string') picks[id] = option;
+    }
+    return { done: new Set(Array.isArray(current.done) ? current.done.map(String) : []), picks };
   }
 
-  function writeDone(done) {
+  function writeDayProgress(progress) {
     const today = localDate(new Date());
     const kept = {};
     for (const [key, entry] of Object.entries(readProgress())) {
       if (entry && entry.date === today && key !== progressKey()) kept[key] = entry;
     }
-    if (done.size) kept[progressKey()] = { date: today, done: [...done] };
+    if (progress.done.size || Object.keys(progress.picks).length) kept[progressKey()] = { date: today, done: [...progress.done], picks: progress.picks };
     try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(kept)); } catch {}
   }
 
-  function stepMarkup(step, done) {
+  function doneButton(step, title, done) {
+    return '<button class="done-btn" type="button" data-done="' + esc(step.occurrenceId) + '" aria-pressed="' + done + '" aria-label="Mark ' + esc(title) + ' done">' + CHECK + '</button>';
+  }
+
+  function choiceMarkup(step, progress) {
+    const title = choiceTitle(step, plan.learner);
+    const count = step.options.length;
+    const done = progress.done.has(step.occurrenceId);
+    const chips = step.options.map((option) =>
+      '<button class="chip" type="button" data-choice="' + esc(step.occurrenceId) + '" data-option="' + esc(option.id) + '" aria-pressed="' + (progress.picks[step.occurrenceId] === option.id) + '" style="--activity-color:' + validColor(option.color) + '">' +
+        '<span class="chip-art" aria-hidden="true">' + visualMarkup(option, 34) + '</span><span>' + esc(option.title) + '</span></button>').join('');
+    return '<li class="step choice' + (done ? ' is-done' : '') + '" data-id="' + esc(step.occurrenceId) + '">' +
+      '<div class="time">' + clockLabel(step.from) + '<small>' + step.duration + ' min</small></div>' +
+      '<article class="box"><span class="nowtag">NOW</span><div class="choice-layout">' +
+        '<div class="copy"><h2>' + esc(title) + '</h2><p class="sub">' + esc(step.prompt || 'Pick what to do.') + '</p></div>' +
+        (count ? '<div class="chips" role="group" aria-label="Options for ' + esc(title) + '" style="--chip-columns:' + (count <= 4 ? count : 3) + ';--chip-columns-narrow:' + (count === 4 ? 2 : Math.min(count, 3)) + '">' + chips + '</div>' : '') +
+        doneButton(step, title, done) +
+      '</div></article></li>';
+  }
+
+  function stepMarkup(step, progress) {
+    if (step.kind === 'choice') return choiceMarkup(step, progress);
+    const done = progress.done.has(step.occurrenceId);
     if (step.kind === 'finish') {
       return '<li class="step finish" data-id="finish"><div class="time">' + clockLabel(step.from) + '</div>' +
         '<article class="box"><span class="nowtag">NOW</span><h2>All done!</h2><p class="sub">Great job today, ' + esc(plan.learner) + '!</p></article></li>';
     }
     const open = step.kind === 'open-slot';
-    const title = stepLabel(step);
-    const source = open ? '' : imageSource(step);
-    const visual = source ? '<img src="' + esc(source) + '" alt="">' : symbolMarkup(open ? OPEN_SLOT_SYMBOL : step.icon, 46);
+    const title = stepLabel(step, progress.picks);
+    const visual = open ? symbolMarkup(OPEN_SLOT_SYMBOL, 46) : visualMarkup(step, 46);
     return '<li class="step' + (open ? ' open' : '') + (done ? ' is-done' : '') + '" data-id="' + esc(step.occurrenceId) + '">' +
       '<div class="time">' + clockLabel(step.from) + '<small>' + step.duration + ' min</small></div>' +
       '<article class="box" style="--activity-color:' + validColor(step.color) + '"><span class="nowtag">NOW</span><div class="activity">' +
@@ -113,13 +142,14 @@
           (open ? '<p class="sub">Pick what to do.</p>' : step.note ? '<p class="sub">' + esc(step.note) + '</p>' : '') +
           (!open && step.credit ? '<p class="image-credit">' + esc(step.credit) + '</p>' : '') +
         '</div>' +
-        '<button class="done-btn" type="button" data-done="' + esc(step.occurrenceId) + '" aria-pressed="' + done + '" aria-label="Mark ' + esc(title) + ' done">' + CHECK + '</button>' +
+        doneButton(step, title, done) +
       '</div></article></li>';
   }
 
   function creditsMarkup() {
-    const hasArasaac = day.activities.some((item) => item.kind !== 'open-slot' && /^\d{1,10}$/.test(imageValue(item)));
-    const hasOpenMoji = day.activities.some((item) => item.kind === 'open-slot' || (!imageSource(item) && Boolean(openMojiCodepoint(item.icon))));
+    const visuals = day.activities.flatMap(itemVisuals);
+    const hasArasaac = visuals.some((item) => /^\d{1,10}$/.test(imageValue(item)));
+    const hasOpenMoji = day.activities.some((item) => item.kind === 'open-slot') || visuals.some((item) => !imageSource(item) && Boolean(openMojiCodepoint(item.icon)));
     return [
       hasArasaac ? 'Pictograms: Sergio Palao · <a href="https://arasaac.org" target="_blank" rel="noopener noreferrer">ARASAAC</a> · <a href="https://aulaabierta.arasaac.org/en/terms-of-use" target="_blank" rel="noopener noreferrer">CC BY-NC-SA</a> · Government of Aragón' : '',
       hasOpenMoji ? 'Emoji artwork: <a href="https://openmoji.org" target="_blank" rel="noopener noreferrer">OpenMoji</a> · <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a>' : ''
@@ -181,18 +211,19 @@
     if (!day.activities.length) {
       el('reset').hidden = true;
       el('credits').innerHTML = '';
-      el('notice').innerHTML = '<h2>Nothing planned for ' + esc(day.label) + ' yet</h2><p>Add activities or open slots to this day in the weekly planner, and they will show up here.</p>' +
+      el('notice').innerHTML = '<h2>Nothing planned for ' + esc(day.label) + ' yet</h2><p>Add activities, choices, or open slots to this day in the weekly planner, and they will show up here.</p>' +
         '<a class="notice-button" href="' + esc(el('editLink').href) + '">Plan ' + esc(day.label) + '</a>';
       el('notice').hidden = false;
       tick();
       return;
     }
 
-    const done = readDone();
+    const progress = readDayProgress();
     el('reset').hidden = false;
+    el('reset').textContent = day.activities.some((item) => item.kind === 'choice') ? 'Clear choices and checks' : 'Clear checks';
     el('credits').innerHTML = creditsMarkup();
     el('timeline').setAttribute('aria-label', day.label + ' schedule');
-    el('timeline').innerHTML = steps().map((step) => stepMarkup(step, done.has(step.occurrenceId))).join('');
+    el('timeline').innerHTML = steps().map((step) => stepMarkup(step, progress)).join('');
     el('timeline').hidden = false;
     el('nowNext').hidden = false;
     tick();
@@ -206,7 +237,8 @@
     const list = steps();
     const finish = list.length - 1;
     const live = day.key === todayKey(now);
-    const at = (step) => clockLabel(step.from) + ' ' + stepLabel(step);
+    const { picks } = readDayProgress();
+    const at = (step) => clockLabel(step.from) + ' ' + stepLabel(step, picks);
     let current = -1;
     let nowText;
     let nextText;
@@ -223,7 +255,7 @@
     } else {
       current = list.findIndex((step) => minute >= step.from && minute < step.to);
       const next = current >= 0 ? list[current + 1] : list.find((step) => step.from > minute);
-      nowText = current >= 0 ? stepLabel(list[current]) : 'Free time';
+      nowText = current >= 0 ? stepLabel(list[current], picks) : 'Free time';
       nextText = at(next);
     }
     el('nowNext').classList.toggle('is-preview', !live);
@@ -238,15 +270,23 @@
     const button = event.target.closest('button');
     if (!button || !day) return;
     if (button.dataset.done) {
-      const done = readDone();
+      const progress = readDayProgress();
       const id = button.dataset.done;
-      if (done.has(id)) done.delete(id);
-      else done.add(id);
-      writeDone(done);
-      button.setAttribute('aria-pressed', String(done.has(id)));
-      button.closest('.step').classList.toggle('is-done', done.has(id));
+      if (progress.done.has(id)) progress.done.delete(id);
+      else progress.done.add(id);
+      writeDayProgress(progress);
+      button.setAttribute('aria-pressed', String(progress.done.has(id)));
+      button.closest('.step').classList.toggle('is-done', progress.done.has(id));
+    } else if (button.dataset.choice) {
+      const progress = readDayProgress();
+      const id = button.dataset.choice;
+      if (progress.picks[id] === button.dataset.option) delete progress.picks[id];
+      else progress.picks[id] = button.dataset.option;
+      writeDayProgress(progress);
+      button.closest('.chips').querySelectorAll('.chip').forEach((chip) => chip.setAttribute('aria-pressed', String(chip.dataset.option === progress.picks[id])));
+      tick();
     } else if (button.id === 'reset') {
-      writeDone(new Set());
+      writeDayProgress({ done: new Set(), picks: {} });
       render();
     }
   });

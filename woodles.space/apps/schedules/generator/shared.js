@@ -9,6 +9,7 @@ window.ScheduleStudio = (() => {
     ['thursday', 'Thursday'], ['friday', 'Friday'], ['saturday', 'Saturday'], ['sunday', 'Sunday']
   ];
   const COLORS = ['#3978c7', '#32845f', '#d27b32', '#a16ab5', '#d05c66', '#458d98', '#7c8797'];
+  const MAX_CHOICE_OPTIONS = 6;
   const OPENMOJI_FILES = new Set([
     '23E9', '2696', '2705', '2728', '2B50', '1F308', '1F319', '1F330', '1F331', '1F338', '1F33B',
     '1F33C', '1F33E', '1F33F', '1F340', '1F344', '1F347', '1F34E', '1F36F', '1F3AF', '1F3C6',
@@ -96,6 +97,18 @@ window.ScheduleStudio = (() => {
     };
   }
 
+  function sanitizeChoiceOption(value) {
+    if (!value || typeof value !== 'object' || !String(value.title || '').trim()) return null;
+    return {
+      id: cleanText(value.id, 100, makeId('option')),
+      title: cleanText(value.title, 60, 'Option'),
+      icon: cleanText(value.icon, 16, '⭐'),
+      pictogram: cleanText(value.pictogram, 300, ''),
+      imageAssetId: cleanText(value.imageAssetId, 100, ''),
+      color: validColor(value.color)
+    };
+  }
+
   function sanitizePlan(value) {
     if (!value || typeof value !== 'object' || !String(value.id || '').trim()) return null;
     const sourceDays = Array.isArray(value.days) ? value.days : [];
@@ -111,6 +124,19 @@ window.ScheduleStudio = (() => {
         printTimes: source.printTimes !== false,
         printSpacing: ['standard', 'cut', 'laminate'].includes(source.printSpacing) ? source.printSpacing : 'standard',
         activities: (Array.isArray(source.activities) ? source.activities : []).map((entry) => {
+          if (entry && entry.kind === 'choice') {
+            return {
+              kind: 'choice',
+              occurrenceId: cleanText(entry.occurrenceId, 100, makeId('scheduled')),
+              sourceId: '',
+              title: cleanText(entry.title, 100, ''),
+              prompt: cleanText(entry.prompt, 200, ''),
+              start: validTime(entry.start, '09:00'),
+              duration: validDuration(entry.duration, 15),
+              color: validColor(entry.color),
+              options: (Array.isArray(entry.options) ? entry.options : []).map(sanitizeChoiceOption).filter(Boolean).slice(0, MAX_CHOICE_OPTIONS)
+            };
+          }
           if (entry && entry.kind === 'open-slot') {
             return {
               kind: 'open-slot',
@@ -159,14 +185,31 @@ window.ScheduleStudio = (() => {
     return { plans: [], activities: [], images: [] };
   }
 
+  // A choice without its own heading, and every open slot, is the learner's.
+  function choiceTitle(item, learner) {
+    return (item && item.title) || learner + '’s choice';
+  }
+
+  // The things on a scheduled item that carry a picture: an activity itself,
+  // or each option of a choice. Open slots have none.
+  function itemVisuals(item) {
+    if (item.kind === 'choice') return item.options;
+    return item.kind === 'open-slot' ? [] : [item];
+  }
+
+  function itemImageIds(item) {
+    return itemVisuals(item).map((visual) => visual.imageAssetId).filter(Boolean);
+  }
+
   function visualScheduleUrl(planId, dayKey) {
     return '/schedules/view?plan=' + encodeURIComponent(planId) + (dayKey ? '&day=' + encodeURIComponent(dayKey) : '');
   }
 
   return {
-    STORAGE_KEY, DAY_KEYS, COLORS,
+    STORAGE_KEY, DAY_KEYS, COLORS, MAX_CHOICE_OPTIONS,
     makeId, esc, cleanText, validTime, validDuration, validColor, timeMinutes,
     isLocalImageData, pictogramSource, openMojiCodepoint, symbolMarkup,
-    sanitizeImage, sanitizeActivity, sanitizePlan, readWorkspace, visualScheduleUrl
+    sanitizeImage, sanitizeActivity, sanitizeChoiceOption, sanitizePlan, readWorkspace,
+    choiceTitle, itemVisuals, itemImageIds, visualScheduleUrl
   };
 })();
