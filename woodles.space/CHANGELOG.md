@@ -20,6 +20,13 @@ so it's not easy to forget.
 
 ## 2026-09-29
 
+- **two ways into the same rooms** — Personalize now offers Soft Desktop and
+  Field Notes with live page previews, Apply, and Cancel. Field Notes turns
+  the app list into a paper catalog grouped by write, tend, read, and play,
+  with search and Pin controls, a clock and widgets in the margin, pinned rooms below, and a
+  single-column phone layout. Your palette carries across scenes, and
+  switching back restores Desktop icons and widgets to their saved places.
+
 - **themes that change more than color** — on the homepage, a theme can now
   bring its own typeface, corners, material and motion. **signal** is flat and
   opaque, crisp-cornered, in a plain sans, with no drifting wash — the

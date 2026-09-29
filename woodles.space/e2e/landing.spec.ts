@@ -25,8 +25,7 @@ test('a modified click opens an app in a new tab and leaves the desktop be', asy
 	const opened = context.waitForEvent('page');
 	await page.locator('.icon[data-id="piano"]').click({ modifiers: ['ControlOrMeta'] });
 	const tab = await opened;
-	await tab.waitForLoadState();
-	expect(new URL(tab.url()).pathname).toBe('/piano');
+	await expect(tab).toHaveURL(/\/piano$/);
 
 	await expect(page).toHaveURL(/\/$/);
 	await expect(page.locator('#launch')).not.toHaveClass(/go/);
@@ -320,4 +319,157 @@ test('an old wallpaper and sparkles-off carry over as the look’s ground and we
 
 	await page.getByRole('button', { name: 'Toggle sparkles' }).click();
 	await expect(html).toHaveAttribute('data-weather', 'sparkles');
+});
+
+test('a scene preview can be cancelled without disturbing saved Desktop icon positions', async ({ page }) => {
+	const savedLayout = { planner: { x: 402, y: 146 }, hygge: { x: 650, y: 280 } };
+	await page.addInitScript((positions) => {
+		if (!sessionStorage.getItem('scene-layout-seeded')) {
+			localStorage.setItem('woodles-icon-layout', JSON.stringify(positions));
+			sessionStorage.setItem('scene-layout-seeded', '1');
+		}
+	}, savedLayout);
+	await page.goto('/');
+
+	const html = page.locator('html');
+	await expect(html).toHaveAttribute('data-scene', 'desktop');
+	const iconPositions = () => page.locator('#icons .icon[data-id="planner"], #icons .icon[data-id="hygge"]')
+		.evaluateAll((icons) => icons.map((icon) => ({
+			id: (icon as HTMLElement).dataset.id,
+			left: (icon as HTMLElement).style.left,
+			top: (icon as HTMLElement).style.top
+		})));
+	const before = await iconPositions();
+	expect(before).toEqual([
+		{ id: 'planner', left: '402px', top: '146px' },
+		{ id: 'hygge', left: '650px', top: '280px' }
+	]);
+
+	await page.getByRole('button', { name: 'Start', exact: true }).click();
+	await page.locator('#pers-btn').click();
+	const personalize = page.getByRole('dialog', { name: 'Personalize' });
+	await expect(personalize.locator('#p-wallpaper')).toBeVisible();
+	await personalize.locator('[data-scene-choice="field-notes"]').click();
+	await expect(html).toHaveAttribute('data-scene', 'field-notes');
+	await expect(page.locator('#field-notes-home')).toBeVisible();
+	await expect(personalize.locator('#p-wallpaper')).toBeHidden();
+	await expect(personalize.locator('#p-sparkles')).toBeHidden();
+	expect(await page.evaluate(() => localStorage.getItem('woodles-landing-scene-v1'))).toBeNull();
+
+	await personalize.getByRole('button', { name: 'Cancel preview' }).click();
+	await expect(html).toHaveAttribute('data-scene', 'desktop');
+	await expect(page.locator('#icons .icon[data-id="planner"]')).toBeVisible();
+	expect(await iconPositions()).toEqual(before);
+	expect(await page.evaluate(() => localStorage.getItem('woodles-icon-layout'))).toBe(JSON.stringify(savedLayout));
+
+	await expect(personalize).toBeHidden();
+	await page.getByRole('button', { name: 'Start', exact: true }).click();
+	await page.locator('#pers-btn').click();
+	await personalize.locator('[data-scene-choice="field-notes"]').click();
+	await personalize.getByRole('button', { name: 'Apply scene' }).click();
+	await page.reload();
+	await expect(html).toHaveAttribute('data-scene', 'field-notes');
+	expect(await page.evaluate(() => localStorage.getItem('woodles-landing-scene-v1'))).not.toBeNull();
+	expect(await page.evaluate(() => localStorage.getItem('woodles-icon-layout'))).toBe(JSON.stringify(savedLayout));
+});
+
+test('Field Notes offers every Desktop app and its search opens the selected route', async ({ page }) => {
+	await page.emulateMedia({ reducedMotion: 'reduce' });
+	await page.goto('/');
+	const desktopRoutes = await page.locator('#icons .icon').evaluateAll((icons) =>
+		icons.map((icon) => icon.getAttribute('href')).sort());
+
+	await page.getByRole('button', { name: 'Start', exact: true }).click();
+	await page.locator('#pers-btn').click();
+	await page.getByRole('dialog', { name: 'Personalize' })
+		.locator('[data-scene-choice="field-notes"]').click();
+	const fieldNotes = page.locator('#field-notes-home');
+	await expect(fieldNotes).toBeVisible();
+	const fieldNotesRoutes = await fieldNotes.locator('a.fn-app').evaluateAll((cards) =>
+		cards.map((card) => card.getAttribute('href')).sort());
+	expect(fieldNotesRoutes).toEqual(desktopRoutes);
+
+	await page.getByRole('dialog', { name: 'Personalize' }).getByRole('button', { name: 'Apply scene' }).click();
+	await page.locator('#fn-search').fill('hygge');
+	await expect(fieldNotes.locator('a.fn-app[href="/hygge"]')).toBeVisible();
+	await expect(fieldNotes.locator('a.fn-app[href="/homesuite"]')).toBeHidden();
+	await fieldNotes.locator('a.fn-app[href="/hygge"]').click();
+	await expect(page).toHaveURL(/\/hygge$/);
+});
+
+test('a phone can keep Field Notes across a reload and switch back to Desktop', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/');
+	const html = page.locator('html');
+	await expect(html).toHaveAttribute('data-scene', 'desktop');
+	await expect(page.locator('#phone')).toBeVisible();
+
+	await page.getByRole('button', { name: 'Personalize', exact: true }).click();
+	const personalize = page.getByRole('dialog', { name: 'Personalize' });
+	await personalize.locator('[data-scene-choice="field-notes"]').click();
+	await expect(html).toHaveAttribute('data-scene', 'field-notes');
+	await expect(page.locator('#field-notes-home')).toBeVisible();
+	await personalize.getByRole('button', { name: 'Apply scene' }).click();
+	await page.reload();
+	await expect(html).toHaveAttribute('data-scene', 'field-notes');
+	await expect(page.locator('#field-notes-home .fn-app').first()).toBeVisible();
+
+	await page.getByRole('button', { name: 'Personalize', exact: true }).click();
+	await personalize.locator('[data-scene-choice="desktop"]').click();
+	await expect(html).toHaveAttribute('data-scene', 'desktop');
+	await personalize.getByRole('button', { name: 'Apply scene' }).click();
+	await page.reload();
+	await expect(html).toHaveAttribute('data-scene', 'desktop');
+	await expect(page.locator('#phone #app-grid .app-cell').first()).toBeVisible();
+});
+
+test('Field Notes can pin and unpin rooms from its own catalog', async ({ page }) => {
+	await page.addInitScript(() => {
+		localStorage.setItem('woodles-landing-scene-v1', 'field-notes');
+		if (!sessionStorage.getItem('field-pin-seeded')) {
+			localStorage.setItem('woodles-desk', JSON.stringify({ pins: [] }));
+			sessionStorage.setItem('field-pin-seeded', '1');
+		}
+	});
+	await page.goto('/');
+	const pin = page.locator('.fn-pin-toggle[data-id="hygge"]');
+	const pinnedRoom = page.locator('#fn-pins a[href="/hygge"]');
+	await expect(pin).toHaveAttribute('aria-pressed', 'false');
+	await pin.click();
+	await expect(pin).toHaveAttribute('aria-pressed', 'true');
+	await expect(pinnedRoom).toBeVisible();
+	await page.reload();
+	await expect(pin).toHaveAttribute('aria-pressed', 'true');
+	await expect(pinnedRoom).toBeVisible();
+	await pin.click();
+	await expect(pin).toHaveAttribute('aria-pressed', 'false');
+	await expect(pinnedRoom).toHaveCount(0);
+});
+
+test('Field Notes keeps an editable widget and its Desktop position', async ({ page }) => {
+	await page.addInitScript(() => {
+		localStorage.setItem('woodles-widgets', JSON.stringify([
+			{ id: 'kept-note', type: 'sticky', x: 440, y: 120, data: { text: 'a thought to keep' } }
+		]));
+	});
+	await page.goto('/');
+	await page.getByRole('button', { name: 'Start', exact: true }).click();
+	await page.locator('#pers-btn').click();
+	const personalize = page.getByRole('dialog', { name: 'Personalize' });
+	await personalize.locator('[data-scene-choice="field-notes"]').click();
+	await personalize.getByRole('button', { name: 'Apply scene' }).click();
+	const note = page.locator('#fn-widget-host .dw-sticky textarea');
+	await expect(note).toHaveValue('a thought to keep');
+	await note.fill('a thought revised');
+
+	await page.locator('#fn-personalize').click();
+	await personalize.locator('[data-scene-choice="desktop"]').click();
+	await personalize.getByRole('button', { name: 'Apply scene' }).click();
+	const desktopNote = page.locator('body > .dw-sticky');
+	await expect(desktopNote).toBeVisible();
+	await expect(desktopNote.locator('textarea')).toHaveValue('a thought revised');
+	expect(await desktopNote.evaluate((el) => ({ left: (el as HTMLElement).style.left, top: (el as HTMLElement).style.top })))
+		.toEqual({ left: '440px', top: '120px' });
+	const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('woodles-widgets') ?? '[]'));
+	expect(stored[0]).toMatchObject({ id: 'kept-note', x: 440, y: 120, data: { text: 'a thought revised' } });
 });

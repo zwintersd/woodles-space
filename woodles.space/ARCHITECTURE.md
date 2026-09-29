@@ -98,9 +98,9 @@ other docs have narrower jobs:
     `ARCADE_ROADMAP.md`'s own note about it).
   - `apps/planner/`: `KNOWN_ISSUES.md` (the vitest/rune-store sharp edges
     under "the test suite" below).
-  - `apps/landing/`: `THEMES.md` (a theme as a preset over palette, type,
-    shape, material, motion, and atmosphere, rather than a palette alone —
-    steps 1–3 built, the rest still a proposal; see "shared design tokens").
+  - `apps/landing/`: `THEMES.md` (the earlier six-axis look proposal and a
+    superseding note on the built Soft Desktop and Field Notes scenes; see
+    "shared design tokens").
   - `apps/homesuite/`: `ASSESSMENT.md` (a dated 2026-09-27 review of the
     shell, the bridge, and Data — verified findings and a staged fix plan;
     a snapshot, like `../AUDIT.md`, not live truth).
@@ -1591,6 +1591,18 @@ attributes — `data-type`, `-shape`, `-material`, `-motion`, `-ground`,
 `woodles-look` holds what was set by hand (`over`) and the form ❄ holds
 while it steps the colors (`held`). see
 [`apps/landing/THEMES.md`](./apps/landing/THEMES.md).
+
+The landing also has a separate scene choice. A small head script reads
+`woodles-landing-scene-v1` before first paint and sets `data-scene` to either
+`desktop` (the original draggable Desktop and phone home) or `field-notes`.
+Field Notes is an authored paper index in `apps/landing/field-notes.css`: the
+same manifest apps appear as descriptive cards under the same four bands, with
+search and Pin controls, a clock and widgets in a margin, and pinned rooms in a footer. Its
+phone layout turns the catalog into a single column. Personalize previews a
+scene immediately, then Apply stores it or Cancel returns to the saved scene.
+Personalize hides Desktop-only controls while Field Notes is showing.
+The scene choice does not rewrite `woodles-theme`, `woodles-look`, or saved
+Desktop icon and widget positions; palettes supply color to both scenes.
 
 `thinking-about`'s look is a deliberate departure even from its SvelteKit
 siblings' own house style: marginalia and bestiary still lean into the dark,

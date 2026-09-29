@@ -1,13 +1,29 @@
-# landing themes — a proposal
+# landing themes — the earlier look proposal
 
-how a theme on the homepage could change the whole room instead of only its
-colors. this is read against `apps/landing/index.html` as it stands. **steps 1–3 of
-"order" are built** (2026-09-29): the `--desk-*` tokens, `looks.js`, and
-signal's and typewriter's looks. the rest of the table and the personalize
-section are not yet. what's built departs from this proposal in the places
-noted under "as built".
+this records the six-axis look proposal. steps 1–3 of "order" were built on
+2026-09-29: the `--desk-*` tokens, `looks.js`, and signal's and typewriter's
+looks. the rest of that table remains a proposal. descriptions of the page
+"today" below describe the earlier baseline, before scenes were added.
 
-## what a theme is today
+## current direction: home scenes (2026-09-29)
+
+**Soft Desktop** keeps the draggable icons, windows, widgets, taskbar, and
+existing phone home. **Field Notes** changes the composition: a paper catalog
+of the same manifest apps under write, tend, read, and play, with descriptive
+cards, search, Pin controls and pinned rooms, and a margin for the clock, note, and widgets. on
+phones the catalog becomes a single column. `field-notes.css` owns this scene's
+layout and visual language.
+
+`data-scene` on `<html>` selects the composition. a head script reads
+`woodles-landing-scene-v1` before first paint; Personalize previews a choice
+without saving it, then Apply keeps it or Cancel restores the saved scene.
+the panel hides Desktop-only controls when Field Notes is in view.
+Desktop icon coordinates and widget coordinates remain saved when Field Notes
+is shown. the scene is independent of `woodles-theme` (the fifteen palettes)
+and `woodles-look` (Desktop's type, shape, material, motion, and atmosphere):
+the chosen palette colors either scene without deciding its layout.
+
+## the earlier baseline
 
 a theme is one attribute. `data-theme` on `<html>` picks one of the fifteen
 blocks in `shared/palette.css`, each about seventeen color tokens and a

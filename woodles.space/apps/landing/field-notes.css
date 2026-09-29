@@ -1,0 +1,847 @@
+/* Field Notes is an authored Landing scene. The classic desktop keeps its
+   existing styles and saved positions; these rules activate only on this page. */
+html[data-scene='field-notes'] {
+  --fn-page: color-mix(in srgb, var(--bg) 96%, var(--text));
+  --fn-sheet: color-mix(in srgb, var(--bg) 91%, var(--text));
+  --fn-card: color-mix(in srgb, var(--bg) 98%, var(--text));
+  --fn-rule: color-mix(in srgb, var(--text) 28%, var(--bg));
+  --fn-faint-rule: color-mix(in srgb, var(--text) 13%, var(--bg));
+  --fn-stamp: var(--accent-strong);
+  --fn-secondary: color-mix(in srgb, var(--text) 78%, var(--fn-page));
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* Sugar's bright pink accent is decorative on its aqua ground; a darker ink
+   keeps the Field Notes labels, borders, and active controls readable. */
+html[data-scene='field-notes'][data-theme='sugar'] {
+  --fn-stamp: color-mix(in srgb, var(--text) 60%, var(--accent-strong));
+}
+
+html[data-scene='field-notes'] body {
+  height: auto;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 81px,
+      color-mix(in srgb, var(--text) 3%, transparent) 81px 82px),
+    var(--fn-sheet);
+  font-family: var(--font-body, 'Lora', Georgia, serif);
+  font-weight: 400;
+  user-select: text;
+}
+
+html[data-scene='field-notes'] :is(.wallpaper, .grain, .sparkle, .desktop, .phone,
+  .widget, .taskbar) {
+  display: none !important;
+}
+
+/* A widget is visible only when the scene controller moves it into the margin.
+   The original phone rule hides every .dwidget with !important. */
+html[data-scene='field-notes'] body > .dwidget { display: none !important; }
+
+html:not([data-scene='field-notes']) .field-notes-home { display: none; }
+
+html[data-scene='field-notes'] .field-notes-home {
+  position: relative;
+  isolation: isolate;
+  z-index: 2;
+  display: block;
+  width: min(100%, 1340px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: clamp(1.4rem, 3.4vw, 3rem) clamp(2rem, 5vw, 5.5rem) 2rem;
+  background: var(--fn-page);
+  border-inline: 1px solid var(--fn-faint-rule);
+  box-shadow: 0 18px 70px color-mix(in srgb, var(--text) 8%, transparent);
+  counter-reset: fn-section;
+}
+
+html[data-scene='field-notes'] .fn-paper { min-width: 0; }
+
+html[data-scene='field-notes'] .fn-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(224px, 270px);
+  column-gap: clamp(2.5rem, 5vw, 5rem);
+  align-items: start;
+}
+
+html[data-scene='field-notes'] .fn-catalog,
+html[data-scene='field-notes'] #fn-sections { min-width: 0; }
+
+/* The hairline and punched margin make the page recognizable without color. */
+html[data-scene='field-notes'] .field-notes-home::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 clamp(0.75rem, 1.8vw, 1.5rem);
+  width: 1px;
+  background: var(--fn-faint-rule);
+  pointer-events: none;
+}
+
+html[data-scene='field-notes'] .fn-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 1rem;
+  min-width: 0;
+  padding-bottom: 1.15rem;
+  border-top: 2px solid var(--text);
+  border-bottom: 1px solid var(--fn-rule);
+}
+
+html[data-scene='field-notes'] .fn-kicker {
+  padding-top: 0.65rem;
+  font-family: var(--font-mono, var(--desk-ui));
+  font-size: 0.66rem;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  line-height: 1.5;
+  color: var(--fn-secondary);
+}
+
+html[data-scene='field-notes'] .fn-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.2rem 0.95rem;
+  padding-bottom: 0.18rem;
+}
+
+html[data-scene='field-notes'] .fn-header-actions :is(a, button) {
+  min-height: 36px;
+  padding: 0.25rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--fn-rule);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: 400 0.67rem/1.4 var(--font-mono, var(--desk-ui));
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+html[data-scene='field-notes'] .fn-header-actions :is(a, button):hover {
+  border-bottom-color: var(--fn-stamp);
+  color: var(--fn-stamp);
+}
+
+html[data-scene='field-notes'] .fn-title {
+  margin-top: 0.8rem;
+  font-family: var(--font-fell, 'IM Fell DW Pica', Georgia, serif);
+  font-size: clamp(3.4rem, 7vw, 6.8rem);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+  color: var(--text);
+}
+
+html[data-scene='field-notes'] .fn-intro {
+  max-width: 55ch;
+  margin-top: 0.85rem;
+  font-family: var(--font-body, 'Lora', Georgia, serif);
+  font-size: clamp(0.91rem, 1.1vw, 1.03rem);
+  line-height: 1.6;
+  color: var(--fn-secondary);
+}
+
+html[data-scene='field-notes'] #fn-search {
+  display: block;
+  width: min(100%, 410px);
+  margin-top: 0.2rem;
+  padding: 0.55rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--fn-rule);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: 400 0.79rem/1.5 var(--font-mono, var(--desk-ui));
+  letter-spacing: 0.02em;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+html[data-scene='field-notes'] #fn-search::placeholder { color: var(--fn-secondary); opacity: 1; }
+html[data-scene='field-notes'] #fn-search:focus {
+  border-bottom-color: var(--fn-stamp);
+  box-shadow: 0 2px 0 var(--fn-stamp);
+}
+
+html[data-scene='field-notes'] .fn-search-label {
+  display: block;
+  margin-top: 1.55rem;
+  font: 400 0.63rem/1.5 var(--font-mono, var(--desk-ui));
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--fn-secondary);
+}
+
+html[data-scene='field-notes'] .fn-empty {
+  padding-block: 2rem;
+  color: var(--fn-secondary);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+html[data-scene='field-notes'] .fn-empty[hidden] { display: none; }
+
+html[data-scene='field-notes'] .fn-section {
+  min-width: 0;
+  padding-block: clamp(1.55rem, 3.1vw, 2.45rem) 0.2rem;
+  counter-increment: fn-section;
+}
+
+html[data-scene='field-notes'] .fn-section-title {
+  display: flex;
+  gap: 0.8rem;
+  align-items: baseline;
+  min-width: 0;
+  padding-bottom: 0.32rem;
+  border-bottom: 1px solid var(--fn-rule);
+  font-family: var(--font-fell, 'IM Fell DW Pica', Georgia, serif);
+  font-size: clamp(1.8rem, 3vw, 2.45rem);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  line-height: 1.12;
+  color: var(--text);
+}
+
+html[data-scene='field-notes'] .fn-section-title::before {
+  content: counter(fn-section, decimal-leading-zero) ' /';
+  flex: none;
+  align-self: center;
+  font: 400 0.66rem/1.3 var(--font-mono, var(--desk-ui));
+  letter-spacing: 0.09em;
+  color: var(--fn-stamp);
+}
+
+html[data-scene='field-notes'] .fn-section-description {
+  margin: 0.55rem 0 1.05rem;
+  color: var(--fn-secondary);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+html[data-scene='field-notes'] .fn-apps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.72rem;
+  min-width: 0;
+}
+
+html[data-scene='field-notes'] .fn-app-entry {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+
+html[data-scene='field-notes'] .fn-app {
+  position: relative;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  grid-template-rows: auto;
+  column-gap: 0.75rem;
+  align-content: start;
+  min-width: 0;
+  min-height: 101px;
+  width: 100%;
+  padding: 0.85rem 0.85rem 3.15rem 0.75rem;
+  border: 1px solid var(--fn-faint-rule);
+  border-left: 3px solid var(--fn-stamp);
+  border-radius: 1px;
+  background: var(--fn-card);
+  color: var(--text);
+  text-decoration: none;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+html[data-scene='field-notes'] .fn-pin-toggle {
+  position: absolute;
+  z-index: 1;
+  right: 0.75rem;
+  bottom: 0.55rem;
+  min-height: 34px;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--text);
+  border-radius: 2px;
+  background: var(--fn-card);
+  color: var(--text);
+  font: 400 0.75rem/1.2 var(--font-mono, var(--desk-ui));
+  cursor: pointer;
+}
+
+html[data-scene='field-notes'] .fn-pin-toggle[aria-pressed='true'] {
+  background: var(--text);
+  color: var(--bg);
+}
+
+html[data-scene='field-notes'] .fn-pin-toggle:hover { text-decoration: underline; }
+html[data-scene='field-notes'] .fn-pin-toggle:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+
+html[data-scene='field-notes'] .fn-app:hover,
+html[data-scene='field-notes'] .fn-app:focus-visible {
+  transform: translate(-2px, -2px);
+  border-color: var(--fn-rule);
+  box-shadow: 3px 3px 0 var(--fn-faint-rule);
+}
+
+html[data-scene='field-notes'] .fn-app:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+
+html[data-scene='field-notes'] .fn-app-mark {
+  display: grid;
+  place-items: center;
+  align-self: start;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--fn-rule);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 12%, var(--fn-card));
+  color: var(--text);
+  font: 400 1.3rem/1 var(--font-fell, Georgia, serif);
+  text-align: center;
+}
+
+html[data-scene='field-notes'] .fn-app-mark svg {
+  display: block;
+  width: 24px;
+  height: 24px;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+html[data-scene='field-notes'] .fn-app-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+html[data-scene='field-notes'] .fn-app-name {
+  display: block;
+  min-width: 0;
+  font-family: var(--font-fell, 'IM Fell DW Pica', Georgia, serif);
+  font-size: 1.33rem;
+  font-weight: 400;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+html[data-scene='field-notes'] .fn-app-description {
+  display: block;
+  min-width: 0;
+  margin-top: 0.18rem;
+  color: var(--fn-secondary);
+  font-family: var(--font-body, 'Lora', Georgia, serif);
+  font-size: 0.82rem;
+  line-height: 1.42;
+  overflow-wrap: anywhere;
+}
+
+html[data-scene='field-notes'] .fn-app-arrow {
+  align-self: start;
+  padding-top: 0.15rem;
+  color: var(--fn-secondary);
+  font: 400 0.9rem/1 var(--font-mono, var(--desk-ui));
+}
+
+html[data-scene='field-notes'] .fn-margin {
+  position: sticky;
+  top: 1.5rem;
+  align-self: start;
+  min-width: 0;
+  max-height: calc(100vh - 3rem);
+  overflow-y: auto;
+  padding: 0.65rem 0 1rem clamp(1.15rem, 2vw, 1.7rem);
+  border-left: 1px solid var(--fn-rule);
+  scrollbar-width: thin;
+}
+
+html[data-scene='field-notes'] .fn-margin-label {
+  margin-bottom: 0.75rem;
+  font: 400 0.64rem/1.4 var(--font-mono, var(--desk-ui));
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--fn-secondary);
+}
+
+html[data-scene='field-notes'] .fn-clock {
+  font: 400 clamp(2.5rem, 4vw, 3.6rem)/1 var(--font-fell, Georgia, serif);
+  letter-spacing: -0.045em;
+  color: var(--text);
+}
+
+html[data-scene='field-notes'] .fn-date {
+  margin-top: 0.4rem;
+  font: 400 0.68rem/1.5 var(--font-mono, var(--desk-ui));
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--fn-secondary);
+}
+
+html[data-scene='field-notes'] .fn-note {
+  margin-block: 1.4rem 1.55rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--fn-faint-rule);
+  color: var(--text);
+  font-family: var(--font-body, 'Lora', Georgia, serif);
+  font-size: 0.82rem;
+  font-style: italic;
+  line-height: 1.6;
+}
+
+html[data-scene='field-notes'] #fn-widget-host {
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+html[data-scene='field-notes'] #fn-widget-host:empty { display: none; }
+
+html[data-scene='field-notes'] .fn-widgets-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.3rem 0.5rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--fn-faint-rule);
+}
+
+html[data-scene='field-notes'] .fn-widgets-heading .fn-margin-label { margin-bottom: 0.4rem; }
+
+html[data-scene='field-notes'] #fn-add-widget {
+  padding: 0 0 0.15rem;
+  border: 0;
+  border-bottom: 1px solid var(--fn-rule);
+  border-radius: 0;
+  background: transparent;
+  color: var(--fn-stamp);
+  font: 400 0.63rem/1.5 var(--font-mono, var(--desk-ui));
+  cursor: pointer;
+}
+
+html[data-scene='field-notes'] #fn-add-widget:hover { border-bottom-color: var(--fn-stamp); }
+
+html[data-scene='field-notes'] .fn-widgets-empty {
+  margin-top: 0.25rem;
+  color: var(--fn-secondary);
+  font-size: 0.76rem;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+html[data-scene='field-notes'] .fn-widgets-empty[hidden] { display: none; }
+
+html[data-scene='field-notes'] #fn-widget-host .dwidget {
+  display: block !important;
+  position: relative !important;
+  inset: auto !important;
+  left: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: auto;
+  width: 100% !important;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.85rem;
+  transform: none !important;
+  opacity: 1 !important;
+  animation: none !important;
+  border: 1px solid var(--fn-faint-rule);
+  border-radius: 1px;
+  background: var(--fn-card);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  cursor: default;
+  touch-action: auto;
+  overflow-x: auto;
+  overflow-wrap: anywhere;
+}
+
+html[data-scene='field-notes'] #fn-widget-host .dw-x { opacity: 1; }
+
+html[data-scene='field-notes'] .fn-dock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 1.2rem;
+  margin-top: 2.7rem;
+  padding: 0.95rem 0 0.2rem;
+  border-top: 2px solid var(--text);
+  font-family: var(--font-mono, var(--desk-ui));
+  font-size: 0.69rem;
+  letter-spacing: 0.06em;
+}
+
+html[data-scene='field-notes'] .fn-dock-label {
+  color: var(--fn-secondary);
+  font-size: 0.62rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+html[data-scene='field-notes'] #fn-pins {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 1rem;
+}
+
+html[data-scene='field-notes'] .fn-pin-empty {
+  color: var(--fn-secondary);
+  font-size: 0.64rem;
+  font-style: italic;
+}
+
+html[data-scene='field-notes'] .fn-dock :is(a, button) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0.45rem 0.15rem;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+html[data-scene='field-notes'] .fn-dock :is(a, button):hover {
+  border-bottom-color: var(--text);
+  color: var(--fn-stamp);
+}
+
+html[data-scene='field-notes'] :is(.fn-header-actions a, .fn-header-actions button,
+  #fn-add-widget, .fn-dock a, .fn-dock button):focus-visible {
+  outline-color: var(--text);
+}
+
+/* Scene controls live in Personalize in either scene. Their thumbnails show the
+   change in composition before a selection is applied. */
+#pwin:has(.scene-grid) {
+  --scene-ink: var(--text);
+  --scene-secondary: color-mix(in srgb, var(--text) 78%, var(--bg));
+  --scene-control-rule: color-mix(in srgb, var(--text) 65%, var(--bg));
+  width: min(560px, calc(100vw - 24px));
+}
+
+html[data-scene='field-notes'] #pwin .desktop-only { display: none; }
+
+.scene-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+button.scene-choice[data-scene-choice] {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+  padding: 0.45rem;
+  border: 1px solid var(--scene-control-rule, var(--text));
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--bg) 94%, var(--text));
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+button.scene-choice[data-scene-choice]:hover {
+  transform: translateY(-2px);
+  border-color: var(--scene-ink, var(--text));
+}
+
+button.scene-choice[data-scene-choice][aria-pressed='true'] {
+  border: 2px solid var(--scene-ink, var(--text));
+  padding: calc(0.45rem - 1px);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--text) 20%, transparent);
+}
+
+button.scene-choice[data-scene-choice]:focus-visible,
+.scene-actions :is(#scene-apply, #scene-cancel):focus-visible {
+  outline: 3px solid var(--scene-ink, var(--text));
+  outline-offset: 3px;
+}
+
+button.scene-choice[data-scene-choice][aria-pressed='true']::after {
+  content: '✓';
+  position: absolute;
+  top: 0.66rem;
+  right: 0.66rem;
+  display: grid;
+  place-items: center;
+  width: 23px;
+  height: 23px;
+  border-radius: 50%;
+  background: var(--scene-ink, var(--text));
+  color: var(--bg);
+  font: 600 0.8rem/1 system-ui, sans-serif;
+}
+
+.scene-thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 92px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--text) 20%, var(--bg));
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--bg) 88%, var(--accent));
+}
+
+button.scene-choice[data-scene-choice='desktop'] .scene-thumb {
+  background:
+    radial-gradient(circle at 20% 35%, var(--lavender), transparent 43%),
+    radial-gradient(circle at 78% 75%, var(--peach), transparent 42%),
+    var(--bg);
+}
+
+button.scene-choice[data-scene-choice='desktop'] .scene-thumb i {
+  position: absolute;
+  display: block;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--accent-strong);
+}
+
+button.scene-choice[data-scene-choice='desktop'] .scene-thumb i:nth-child(1) { top: 18px; left: 18px; }
+button.scene-choice[data-scene-choice='desktop'] .scene-thumb i:nth-child(2) { top: 27px; left: 58px; background: var(--accent-soft); }
+button.scene-choice[data-scene-choice='desktop'] .scene-thumb i:nth-child(3) { top: 18px; left: 105px; background: var(--accent-warm); }
+button.scene-choice[data-scene-choice='desktop'] .scene-thumb i:nth-child(4) { top: 52px; left: 30px; background: var(--lilac); }
+
+button.scene-choice[data-scene-choice='desktop'] .scene-thumb b {
+  position: absolute;
+  display: block;
+  bottom: 8px;
+  left: 31%;
+  width: 38%;
+  height: 9px;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+}
+
+button.scene-choice[data-scene-choice='field-notes'] .scene-thumb {
+  background:
+    linear-gradient(90deg, transparent 0 71%, color-mix(in srgb, var(--text) 18%, transparent) 71% 71.5%, transparent 71.5%),
+    color-mix(in srgb, var(--bg) 94%, var(--text));
+}
+
+button.scene-choice[data-scene-choice='field-notes'] .scene-thumb::before {
+  content: 'Field Notes';
+  position: absolute;
+  top: 7px;
+  left: 12px;
+  right: 32%;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--text);
+  color: var(--text);
+  font: 400 16px/1.05 var(--font-fell, Georgia, serif);
+}
+
+button.scene-choice[data-scene-choice='field-notes'] .scene-thumb i {
+  position: absolute;
+  display: block;
+  width: 23%;
+  height: 18px;
+  border: 1px solid var(--fn-rule, var(--text));
+  border-left: 3px solid var(--accent-strong);
+  background: color-mix(in srgb, var(--bg) 98%, var(--text));
+}
+
+button.scene-choice[data-scene-choice='field-notes'] .scene-thumb i:nth-child(1) { top: 39px; left: 12px; }
+button.scene-choice[data-scene-choice='field-notes'] .scene-thumb i:nth-child(2) { top: 39px; left: 38%; }
+button.scene-choice[data-scene-choice='field-notes'] .scene-thumb i:nth-child(3) { top: 64px; left: 12px; }
+button.scene-choice[data-scene-choice='field-notes'] .scene-thumb i:nth-child(4) { top: 64px; left: 38%; }
+
+button.scene-choice[data-scene-choice='field-notes'] .scene-thumb b {
+  position: absolute;
+  display: block;
+  top: 18px;
+  right: 9px;
+  width: 20%;
+  height: 12px;
+  border-top: 2px solid var(--text);
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 45%, transparent);
+}
+
+.scene-choice-name {
+  display: block;
+  margin: 0.5rem 0.28rem 0.1rem;
+  color: var(--text);
+  font: 400 1.18rem/1.15 var(--font-fell, Georgia, serif);
+}
+
+.scene-choice-desc {
+  display: block;
+  flex: 1;
+  margin: 0 0.28rem 0.35rem;
+  color: var(--scene-secondary, var(--text));
+  font: 400 0.77rem/1.45 var(--font-sans, system-ui, sans-serif);
+}
+
+.scene-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.scene-actions :is(#scene-apply, #scene-cancel) {
+  min-height: 44px;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--scene-ink, var(--text));
+  border-radius: 3px;
+  font: 400 0.77rem/1.2 var(--font-mono, var(--desk-ui));
+  cursor: pointer;
+}
+
+.scene-actions #scene-apply {
+  background: var(--scene-ink, var(--text));
+  color: var(--bg);
+}
+
+.scene-actions #scene-cancel {
+  background: transparent;
+  color: var(--scene-ink, var(--text));
+}
+
+.scene-actions :is(#scene-apply, #scene-cancel):hover { filter: brightness(1.12); }
+.scene-actions :is(#scene-apply, #scene-cancel):disabled {
+  background: transparent;
+  border-color: var(--scene-control-rule, var(--text));
+  color: var(--scene-secondary, var(--text));
+  cursor: default;
+  filter: none;
+}
+
+.scene-status {
+  min-height: 1.25em;
+  color: var(--scene-secondary, var(--text));
+  font: 400 0.75rem/1.5 var(--font-mono, var(--desk-ui));
+}
+
+/* Windows are sheets clipped over the folio, rather than glass desk panels. */
+html[data-scene='field-notes'] :is(.window, .start, .flyout, .ctx) {
+  border-radius: 2px;
+  border-color: var(--fn-rule);
+  background: var(--fn-page);
+  box-shadow: 5px 6px 0 color-mix(in srgb, var(--text) 18%, transparent);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-scene='field-notes'] .titlebar {
+  border-bottom-color: var(--fn-rule);
+  font-family: var(--font-mono, var(--desk-ui));
+}
+
+html[data-scene='field-notes'] .launch {
+  background: color-mix(in srgb, var(--fn-page) 88%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+html[data-scene='field-notes'] .launch-card {
+  min-width: min(230px, calc(100vw - 48px));
+  padding: 1.8rem 2rem;
+  border: 1px solid var(--fn-rule);
+  border-radius: 1px;
+  background: var(--fn-page);
+  box-shadow: 5px 6px 0 color-mix(in srgb, var(--text) 19%, transparent);
+}
+
+html[data-scene='field-notes'] .launch-card .tile { border-radius: 50%; }
+html[data-scene='field-notes'] .launch-name {
+  color: var(--text);
+  font: 400 1.7rem/1 var(--font-fell, Georgia, serif);
+}
+
+@media (max-width: 1000px) {
+  html[data-scene='field-notes'] .field-notes-home {
+    width: min(100%, 760px);
+    padding-inline: clamp(1.6rem, 5vw, 3rem);
+  }
+
+  html[data-scene='field-notes'] .fn-body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  html[data-scene='field-notes'] .fn-catalog,
+  html[data-scene='field-notes'] .fn-margin { width: 100%; }
+
+  html[data-scene='field-notes'] .fn-margin {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    margin-top: 2.3rem;
+    padding: 1rem 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--fn-rule);
+  }
+  html[data-scene='field-notes'] #fn-widget-host {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  html[data-scene='field-notes'] .fn-dock { margin-top: 1.6rem; }
+}
+
+@media (max-width: 720px) {
+  html[data-scene='field-notes'] .field-notes-home {
+    min-height: 100dvh;
+    padding:
+      calc(env(safe-area-inset-top, 0px) + 1.1rem)
+      calc(env(safe-area-inset-right, 0px) + 1.2rem)
+      calc(env(safe-area-inset-bottom, 0px) + 1.5rem)
+      calc(env(safe-area-inset-left, 0px) + 1.2rem);
+    border-inline: 0;
+    box-shadow: none;
+  }
+
+  html[data-scene='field-notes'] .field-notes-home::before { display: none; }
+  html[data-scene='field-notes'] .fn-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.55rem;
+    padding-bottom: 1rem;
+  }
+  html[data-scene='field-notes'] .fn-header-actions { justify-content: flex-start; }
+  html[data-scene='field-notes'] .fn-title { font-size: clamp(3.25rem, 13vw, 5rem); }
+  html[data-scene='field-notes'] .fn-intro { font-size: 0.89rem; }
+  html[data-scene='field-notes'] #fn-search { width: 100%; }
+  html[data-scene='field-notes'] .fn-section { padding-top: 1.7rem; }
+  html[data-scene='field-notes'] .fn-apps { grid-template-columns: minmax(0, 1fr); gap: 0.55rem; }
+  html[data-scene='field-notes'] .fn-app { min-height: 83px; }
+  html[data-scene='field-notes'] .fn-app-entry .fn-app { padding-bottom: 3.6rem; }
+  html[data-scene='field-notes'] .fn-pin-toggle { min-height: 44px; }
+  html[data-scene='field-notes'] #fn-widget-host { grid-template-columns: minmax(0, 1fr); }
+  html[data-scene='field-notes'] .fn-dock { gap: 0.25rem 1rem; }
+}
+
+@media (max-width: 380px) {
+  .scene-grid { grid-template-columns: minmax(0, 1fr); }
+  html[data-scene='field-notes'] .fn-app { grid-template-columns: 36px minmax(0, 1fr) auto; column-gap: 0.65rem; }
+  html[data-scene='field-notes'] .fn-app-mark { width: 36px; height: 36px; font-size: 1.1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-scene='field-notes'] .fn-app,
+  html[data-scene='field-notes'] #fn-search,
+  button.scene-choice[data-scene-choice] { transition: none; }
+}
