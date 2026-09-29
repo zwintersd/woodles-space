@@ -245,8 +245,6 @@ each step ships on its own and leaves the desk working.
      `woodles-theme = 'custom'` as cream.
    - letting people choose the light/dark pair for "follow the system",
      instead of the hardcoded cream/dusk.
-   - a "follow the day" mode that changes theme at the greeting's own time
-     bands (`greeting()`, `index.html:2526`), the way Carillon's chrome does.
 
 ## deliberately not
 
@@ -258,19 +256,19 @@ each step ships on its own and leaves the desk working.
   app wants it, following ARCHITECTURE.md's rule to "duplicate until two apps
   have built the same thing". `shared/palette.css` is untouched throughout.
 
-## what i need from you
+## decided (2026-09-29)
 
-- **should existing themes change?** the table above means anyone who chose
-  typewriter comes back to a new typeface. the alternative is to keep the
-  fifteen themes palette-only and add looks as new ids. that's safer, but it
-  leaves thirty things called a theme. i'd change the existing themes and add
-  a changelog entry.
-- **how far should type reach?** display only (the greeting, names, and
-  notes) is the gentle version. including ui (every label) is what makes
-  signal and typewriter feel like themselves.
-- **should ❄ cycle whole looks or only palettes?** whole looks is honest to
-  the button's name, but it means one click changes the font.
-- **is the table right?** in particular, which themes should get weather,
-  since it's the loudest axis.
-- **"follow the day"**: do you want it, or is that too much change for a
-  homepage?
+- **existing themes change.** the fifteen ids become full looks per the table
+  above; ship it with a changelog entry, since a chosen theme will look
+  different on the next visit.
+- **type reaches everywhere.** both roles, display and ui. the ui-legibility
+  rule under "type" still holds: ui only ever gets DM Mono, Space Grotesk or
+  Plus Jakarta Sans.
+- **❄ cycles colors only.** it steps to the next palette and leaves type,
+  shape, material, motion and atmosphere where they are. mechanically: before
+  stepping, the current resolved non-palette axes are written into
+  `woodles-look`, so the form is held rather than handed to the next theme.
+  picking a theme card in personalize is still how you take a whole look.
+- **no "follow the day".** dropped from step 6.
+
+still open: whether the table is right, particularly which themes get weather.
