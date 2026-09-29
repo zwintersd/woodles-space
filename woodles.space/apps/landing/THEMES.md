@@ -1,9 +1,11 @@
 # landing themes — a proposal
 
 how a theme on the homepage could change the whole room instead of only its
-colors. this is read against `apps/landing/index.html` as it stands. **nothing
-here is built.** the decisions that block building it are listed in the last
-section.
+colors. this is read against `apps/landing/index.html` as it stands. **steps 1–3 of
+"order" are built** (2026-09-29): the `--desk-*` tokens, `looks.js`, and
+signal's and typewriter's looks. the rest of the table and the personalize
+section are not yet. what's built departs from this proposal in the places
+noted under "as built".
 
 ## what a theme is today
 
@@ -219,6 +221,24 @@ getting their own settings:
   can't see through `backdrop-filter`, so under `glass` it measures text
   against `--surface` and the wash makes the result approximate. `paper` and
   `flat` are opaque, so their results are exact.
+
+## as built
+
+- **corners scale, not step.** `border-radius: calc(Npx * var(--desk-round))`
+  keeps all fifteen of today's sizes exactly; `crisp` is `--desk-round: 0.25`.
+  folding into five steps would have moved pixels in step 1.
+- **glass is a fallback.** each pane reads `var(--desk-glass, <its own
+  blur>)`, so glass keeps its per-pane values and paper/flat set `none`.
+- **bloom** is a ground value — blossom's heavier wash — alongside
+  `sprinkles`, sugar's dots. neither theme's look changed.
+- **paper and flat redefine `--surface`** on `<html>` (opaque) rather than
+  touching each pane's mix; their shadows are one rule over the panes.
+- **wallpaper keeps its row** in personalize, with a "theme's" button for
+  following the theme; sparkles on/off means the theme's own weather, or
+  sparkles when the theme has none.
+- only the axis values the built looks use exist yet: type `classic`
+  `fell` `modern`, shape `soft` `crisp`, material `glass` `paper` `flat`,
+  motion `float` `snappy` `still`, weather `sparkles` `none`.
 
 ## order
 

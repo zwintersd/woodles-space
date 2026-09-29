@@ -21,15 +21,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/shared/palette.css" />
   <link rel="stylesheet" href="/shared/scrollbars.css" />
-  <script>
-    /* before first paint, so a dark system doesn't flash cream: a chosen
-       theme wins, otherwise follow the system (the module below agrees) */
-    try {
-      var t = localStorage.getItem('woodles-theme');
-      if (!t && matchMedia('(prefers-color-scheme: dark)').matches) t = 'dusk';
-      if (t) document.documentElement.setAttribute('data-theme', t);
-    } catch (e) {}
-  </script>
+  <!-- before first paint: the theme, and every axis of its look, so a dark
+       system doesn't flash cream and a paper desk doesn't flash glass -->
+  <script src="/apps/landing/looks.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -45,10 +39,6 @@
       user-select: none;
       -webkit-tap-highlight-color: transparent;
     }
-    /* a ring for anything you can press, drawn only when the keyboard put
-       focus there. text fields keep their own :focus styles. the colour is
-       resolved here, on the root, so a theme swatch — which carries its own
-       data-theme — still rings in the page's colour rather than its own. */
     /* desk tokens — the landing's own form, separate from the shared
        palette. THEMES.md's axes set these; today's values are the defaults. */
     :root {
@@ -60,6 +50,10 @@
       --desk-alert: #e8859a;
       --desk-tile-ink: #fff;
     }
+    /* a ring for anything you can press, drawn only when the keyboard put
+       focus there. text fields keep their own :focus styles. the colour is
+       resolved here, on the root, so a theme swatch — which carries its own
+       data-theme — still rings in the page's colour rather than its own. */
     :root { --focus-ring: var(--accent-strong); }
     :is(a, button, [role='button'], [tabindex]):focus-visible {
       outline: 2px solid var(--focus-ring);
@@ -90,35 +84,80 @@
       50%  { transform: translate(2%,-3%) scale(1.06) rotate(3deg); }
       100% { transform: translate(-3%,2%) scale(1.03) rotate(-3deg); }
     }
-    /* wallpaper styles — chosen in personalize, independent of theme */
+    /* ground — the theme's, unless one was chosen in personalize */
     .pattern { position: absolute; inset: 0; pointer-events: none; }
-    [data-wallpaper='still'] .wash {
+    [data-ground='still'] .wash {
       opacity: 0.28;
       animation-play-state: paused;
     }
-    [data-wallpaper='confetti'] .pattern {
+    [data-ground='confetti'] .pattern {
       background-image: radial-gradient(
         color-mix(in srgb, var(--accent-strong) 55%, transparent) 1.4px, transparent 2px);
       background-size: 34px 34px;
       opacity: 0.25;
     }
-    [data-wallpaper='ruled'] .pattern {
+    [data-ground='ruled'] .pattern {
       background-image: repeating-linear-gradient(to bottom,
         transparent 0 27px,
         color-mix(in srgb, var(--accent-strong) 40%, transparent) 27px 28px);
       opacity: 0.22;
     }
-
-    /* theme flourishes — some themes bring their own weather */
-    [data-theme='blossom'] .wash { opacity: 0.8; filter: blur(55px); }
-    [data-theme='sugar'] .wash { opacity: 0.7; }
-    [data-theme='sugar'] .wallpaper::after {
-      content: '';
-      position: absolute; inset: 0;
+    /* bloom and sprinkles began as blossom's and sugar's own flourishes */
+    [data-ground='bloom'] .wash { opacity: 0.8; filter: blur(55px); }
+    [data-ground='sprinkles'] .wash { opacity: 0.7; }
+    [data-ground='sprinkles'] .pattern {
       background-image: radial-gradient(rgba(255,255,255,0.55) 1.3px, transparent 2px);
       background-size: 30px 30px;
       opacity: 0.4;
     }
+    [data-ground='plain'] :is(.wash, .pattern) { display: none; }
+
+    /* ─────────────────────────── looks ─────────────────────────────── */
+    /* one block per axis value (looks.js sets the attributes). html[…] so
+       a block outranks the palette's own [data-theme] rules. */
+    html[data-type='fell'] {
+      --desk-display: 'IM Fell DW Pica', Georgia, serif;
+    }
+    html[data-type='modern'] {
+      --desk-display: 'Plus Jakarta Sans', system-ui, sans-serif;
+      --desk-ui: 'Space Grotesk', system-ui, sans-serif;
+    }
+    html[data-shape='crisp'] { --desk-round: 0.25; }
+
+    /* paper: opaque sheets on a desk — no glass, a hard offset shadow,
+       more grain, and tiles tinted into the room */
+    html[data-material='paper'] {
+      --desk-glass: none;
+      --surface: color-mix(in srgb, var(--bg) 88%, var(--text));
+      --desk-tile-mix: 45%;
+    }
+    html[data-material='paper'] .grain { opacity: 0.09; }
+    /* flat: opaque, a hairline, no shadow — legibility over mood */
+    html[data-material='flat'] {
+      --desk-glass: none;
+      --surface: var(--bg);
+      --desk-tile-mix: 70%;
+    }
+    html[data-material='flat'] .grain { display: none; }
+    html[data-material='paper'] :is(.widget, .dwidget, .taskbar, .start, .flyout, .ctx, .window) {
+      box-shadow: 3px 4px 0 color-mix(in srgb, var(--text) 16%, transparent);
+    }
+    html[data-material='flat'] :is(.widget, .dwidget, .taskbar, .start, .flyout, .ctx, .window) {
+      box-shadow: none;
+      border-color: color-mix(in srgb, var(--text) 30%, transparent);
+    }
+
+    html[data-material='flat'] .tile { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 25%, transparent); }
+
+    /* snappy: no overshoot, no hover tilt; still: nothing ambient moves */
+    html[data-motion='snappy'] {
+      --desk-spring: cubic-bezier(.3,.7,.4,1);
+      --desk-tilt: 0deg;
+    }
+    html[data-motion='still'] { --desk-tilt: 0deg; }
+    html[data-motion='still'] .wash { animation-play-state: paused; }
+
+    html[data-weather='none'] .sparkle { display: none; }
     .grain {
       position: fixed; inset: 0; z-index: 1; pointer-events: none;
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
@@ -192,15 +231,19 @@
       background:
         radial-gradient(130% 95% at 22% 12%, rgba(255,255,255,0.38), transparent 58%),
         linear-gradient(var(--ga, 140deg),
-          var(--g1),
-          color-mix(in srgb, var(--g1) 45%, var(--g2)) 55%,
-          var(--g2));
+          var(--t1, var(--g1)),
+          color-mix(in srgb, var(--t1, var(--g1)) 45%, var(--t2, var(--g2))) 55%,
+          var(--t2, var(--g2)));
       box-shadow:
         0 10px 22px -9px color-mix(in srgb, var(--g2) 60%, var(--desk-shadow-ink)),
         inset 0 1px 0 rgba(255,255,255,0.5),
         inset 0 -10px 16px -12px color-mix(in srgb, var(--desk-shadow-ink) 45%, transparent);
       position: relative;
       transition: transform 0.25s var(--desk-spring), box-shadow 0.25s ease;
+    }
+    html:is([data-material='paper'], [data-material='flat']) .tile {
+      --t1: color-mix(in oklab, var(--accent-strong) var(--desk-tile-mix), var(--g1));
+      --t2: color-mix(in oklab, var(--accent-strong) var(--desk-tile-mix), var(--g2));
     }
     .tile::after {
       content: '';
@@ -214,7 +257,7 @@
     }
     .icon:hover .tile,
     .start-app:hover .tile {
-      transform: translateY(-3px) rotate(-2deg);
+      transform: translateY(-3px) rotate(var(--desk-tilt, -2deg));
       box-shadow:
         0 16px 28px -10px color-mix(in srgb, var(--g2) 70%, var(--desk-shadow-ink)),
         inset 0 1px 0 rgba(255,255,255,0.55),
@@ -1705,7 +1748,6 @@
       color: var(--accent-strong);
     }
 
-    body.no-sparkles .sparkle { display: none; }
     .ampm { font-size: 0.45em; letter-spacing: 0.1em; color: var(--muted); margin-left: 0.15em; }
 
     /* ─────────────────────────── open transition ───────────────────── */
@@ -2034,6 +2076,7 @@
       <div class="pers-row">
         <span class="pers-label">wallpaper</span>
         <div class="seg" id="p-wallpaper">
+          <button type="button" data-v="">theme's</button>
           <button type="button" data-v="aura">aura</button>
           <button type="button" data-v="still">still</button>
           <button type="button" data-v="confetti">confetti</button>
@@ -2175,9 +2218,28 @@
     /* ── desktop preferences ───────────────────────────────────────── */
     /* everything personal lives in the browser, like the rest of the site */
     const PREFS_KEY = 'woodles-desk';
-    const prefs = { name: 'user', clock: '24', sparkles: true, note: '', wallpaper: 'aura' };
+    const prefs = { name: 'user', clock: '24', note: '' };
     try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS_KEY)) || {}); } catch {}
     function savePrefs() { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }
+
+    /* the look — looks.js resolved and applied it before first paint; this
+       is how the page changes it. wallpaper and sparkles live there now, as
+       the ground and weather axes, set by hand over the theme's own. */
+    const looks = window.woodlesLooks;
+    const lookState = looks.read();
+    const root = document.documentElement;
+    function setOver(axis, value) {
+      if (value) lookState.over[axis] = value; else delete lookState.over[axis];
+      looks.write(lookState);
+      looks.apply(root.getAttribute('data-theme'));
+      renderPrefs();
+    }
+    const weatherOn = () => root.getAttribute('data-weather') !== 'none';
+    /* on means the theme's own weather when it has one, sparkles when not */
+    function setWeather(on) {
+      const own = looks.resolve(root.getAttribute('data-theme'), { over: {}, held: lookState.held }).weather;
+      setOver('weather', on ? (own === 'none' ? 'sparkles' : null) : (own === 'none' ? null : 'none'));
+    }
 
     /* pinned apps live in prefs; recents are tracked on every launch */
     if (!Array.isArray(prefs.pins)) prefs.pins = defaultLandingPins.slice();
@@ -2577,7 +2639,6 @@
       const note = (prefs.note || '').trim() ||
         NOTES[new Date().getDate() % NOTES.length];
       document.getElementById('w-note').textContent = note;
-      document.body.classList.toggle('no-sparkles', !prefs.sparkles);
       const pName = document.getElementById('p-name');
       if (document.activeElement !== pName)
         pName.value = prefs.name === 'user' ? '' : prefs.name;
@@ -2587,12 +2648,11 @@
       document.querySelectorAll('#p-clock button').forEach(b =>
         b.classList.toggle('on', b.dataset.v === prefs.clock));
       document.querySelectorAll('#p-sparkles button').forEach(b =>
-        b.classList.toggle('on', b.dataset.v === (prefs.sparkles ? '1' : '0')));
-      document.getElementById('tray-sparkle').classList.toggle('off', !prefs.sparkles);
-      const wp = prefs.wallpaper || 'aura';
-      document.documentElement.setAttribute('data-wallpaper', wp);
+        b.classList.toggle('on', b.dataset.v === (weatherOn() ? '1' : '0')));
+      document.getElementById('tray-sparkle').classList.toggle('off', !weatherOn());
+      const ground = lookState.over.ground || '';
       document.querySelectorAll('#p-wallpaper button').forEach(b =>
-        b.classList.toggle('on', b.dataset.v === wp));
+        b.classList.toggle('on', b.dataset.v === ground));
       tick();
     }
 
@@ -4547,17 +4607,15 @@
     document.getElementById('flyout').addEventListener('click', e => e.stopPropagation());
     document.getElementById('tray-sparkle').addEventListener('click', e => {
       e.stopPropagation();
-      prefs.sparkles = !prefs.sparkles;
-      savePrefs(); renderPrefs();
+      setWeather(!weatherOn());
     });
     document.getElementById('tray-theme').addEventListener('click', e => {
       e.stopPropagation();
       nextTheme();
     });
 
-    /* ── theme / wallpaper ─────────────────────────────────────────── */
-    /* every theme the shared palette knows about */
-    const THEMES = ['cream','dawn','dusk','terracotta','midnight','forest','paper','inkwell','typewriter','blossom','sugar','fog','glacier','signal','amber'];
+    /* ── theme ─────────────────────────────────────────────────────── */
+    const THEMES = looks.THEMES;
     /* until someone picks a theme, the desktop follows the system: cream by
        day, dusk in dark mode — the way HomeSuite and Data follow it. picking
        one (swatch, ❄, menu) is remembered and wins from then on. */
@@ -4574,17 +4632,31 @@
     });
     function applyTheme(chosen = true) {
       const t = THEMES[themeIdx];
-      document.documentElement.setAttribute('data-theme', t);
       if (chosen) {
         themeChosen = true;
         try { localStorage.setItem('woodles-theme', t); } catch {}
       }
+      looks.apply(t);
       document.querySelectorAll('.swatch').forEach(s => {
         s.classList.toggle('on', s.dataset.theme === t);
         s.setAttribute('aria-pressed', String(s.dataset.theme === t));
       });
+      renderPrefs();
     }
-    function nextTheme() { themeIdx = (themeIdx + 1) % THEMES.length; applyTheme(); }
+    /* ❄ changes the colors and nothing else: the form on screen is held,
+       so the next palette arrives in it. a swatch takes a whole look. */
+    function nextTheme() {
+      Object.assign(lookState.held, { ...looks.lookOf(THEMES[themeIdx]), ...lookState.held });
+      looks.write(lookState);
+      themeIdx = (themeIdx + 1) % THEMES.length;
+      applyTheme();
+    }
+    function takeTheme(i) {
+      for (const k in lookState.held) delete lookState.held[k];
+      looks.write(lookState);
+      themeIdx = i;
+      applyTheme();
+    }
     /* theme swatches — flyout + personalize window share the same builder;
        each swatch carries data-theme so the css previews the real palette */
     function buildSwatches(container) {
@@ -4596,7 +4668,7 @@
         s.setAttribute('aria-label', t + ' theme');
         s.setAttribute('data-theme', t);
         s.addEventListener('click', e => {
-          e.stopPropagation(); themeIdx = i; applyTheme();
+          e.stopPropagation(); takeTheme(i);
         });
         container.appendChild(s);
       });
@@ -4813,8 +4885,7 @@
     });
     document.getElementById('p-wallpaper').addEventListener('click', e => {
       const b = e.target.closest('button'); if (!b) return;
-      prefs.wallpaper = b.dataset.v;
-      savePrefs(); renderPrefs();
+      setOver('ground', b.dataset.v);
     });
     document.getElementById('p-clock').addEventListener('click', e => {
       const b = e.target.closest('button'); if (!b) return;
@@ -4823,8 +4894,7 @@
     });
     document.getElementById('p-sparkles').addEventListener('click', e => {
       const b = e.target.closest('button'); if (!b) return;
-      prefs.sparkles = b.dataset.v === '1';
-      savePrefs(); renderPrefs();
+      setWeather(b.dataset.v === '1');
     });
     document.getElementById('p-tidy').addEventListener('click', tidyIcons);
     document.getElementById('p-widgets').addEventListener('click', () => openWin('widgets'));
@@ -4834,6 +4904,7 @@
       localStorage.removeItem(RECENTS_KEY);
       localStorage.removeItem(WIDGETS_KEY);
       localStorage.removeItem('woodles-theme');
+      localStorage.removeItem('woodles-look');
       location.reload();
     });
     renderPrefs();
