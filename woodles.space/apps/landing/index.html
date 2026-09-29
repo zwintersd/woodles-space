@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="cream">
+<html lang="en" data-theme="cream" data-scene="desktop">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -20,10 +20,17 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/shared/palette.css" />
+  <link rel="stylesheet" href="/shared/fonts.css" />
   <link rel="stylesheet" href="/shared/scrollbars.css" />
   <!-- before first paint: the theme, and every axis of its look, so a dark
        system doesn't flash cream and a paper desk doesn't flash glass -->
   <script src="/apps/landing/looks.js"></script>
+  <script>
+    try {
+      if (localStorage.getItem('woodles-landing-scene-v1') === 'field-notes')
+        document.documentElement.setAttribute('data-scene', 'field-notes');
+    } catch (e) {}
+  </script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1757,9 +1764,10 @@
       background: color-mix(in srgb, var(--bg) 70%, transparent);
       backdrop-filter: blur(8px);
       opacity: 0; pointer-events: none;
-      transition: opacity 0.25s ease;
+      visibility: hidden;
+      transition: opacity 0.25s ease, visibility 0s linear 0.25s;
     }
-    .launch.go { opacity: 1; pointer-events: auto; }
+    .launch.go { opacity: 1; pointer-events: auto; visibility: visible; transition-delay: 0s; }
     .launch-card {
       display: flex; flex-direction: column; align-items: center;
       gap: 1rem;
@@ -1943,7 +1951,9 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
     }
+    .field-notes-home { display: none; }
   </style>
+  <link rel="stylesheet" href="/apps/landing/field-notes.css" />
 </head>
 <body>
 
@@ -1965,6 +1975,51 @@
     <input class="phone-search" id="m-search" type="text" placeholder="search woodles.space…" autocomplete="off" />
     <div class="app-grid" id="app-grid"></div>
     <nav class="phone-dock" id="phone-dock"></nav>
+  </main>
+
+  <!-- field notes: a second, authored home for the same app catalogue -->
+  <main class="field-notes-home" id="field-notes-home" aria-label="Field Notes home">
+    <div class="fn-paper">
+      <header class="fn-header">
+        <div>
+          <p class="fn-kicker">woodles.space / a place to begin</p>
+          <h1 class="fn-title">field notes<span aria-hidden="true"> ✳</span></h1>
+          <p class="fn-intro">Small rooms for making, keeping, reading, and playing.</p>
+        </div>
+        <div class="fn-header-actions">
+          <a href="/changelog">what's new</a>
+          <button type="button" id="fn-personalize" aria-label="Personalize">change scene</button>
+        </div>
+      </header>
+      <div class="fn-body">
+        <div class="fn-catalog">
+          <label class="fn-search-label" for="fn-search">find a room</label>
+          <input id="fn-search" type="search" placeholder="a name or a thing to do…" autocomplete="off" />
+          <div id="fn-sections"></div>
+          <p class="fn-empty" id="fn-empty" hidden>nothing here by that name — yet.</p>
+        </div>
+        <aside class="fn-margin" aria-label="Your notes and widgets">
+          <div class="fn-today">
+            <p class="fn-margin-label">today, on the desk</p>
+            <p class="fn-clock" id="fn-clock">--:--</p>
+            <p class="fn-date" id="fn-date"></p>
+          </div>
+          <p class="fn-note" id="fn-note"></p>
+          <div class="fn-widgets-heading">
+            <h2 class="fn-margin-label">things kept close</h2>
+            <button type="button" id="fn-add-widget">add a widget</button>
+          </div>
+          <div id="fn-widget-host"></div>
+          <p class="fn-widgets-empty" id="fn-widgets-empty">Your widgets will sit here.</p>
+        </aside>
+      </div>
+      <footer class="fn-dock">
+        <span class="fn-dock-label">pinned rooms</span>
+        <nav id="fn-pins" aria-label="Pinned rooms"></nav>
+        <button type="button" id="fn-profile">life points</button>
+        <button type="button" id="fn-about">about</button>
+      </footer>
+    </div>
   </main>
 
   <!-- greeting widget -->
@@ -2065,15 +2120,36 @@
     </div>
     <div class="win-body pers-body">
       <div class="pers-row">
+        <span class="pers-label">home scene</span>
+        <p class="pers-hint">Choose how this front door is arranged. Preview it before keeping it.</p>
+        <div class="scene-grid" id="scene-grid">
+          <button type="button" class="scene-choice" data-scene-choice="desktop" aria-pressed="true">
+            <span class="scene-thumb scene-thumb-desktop" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></span>
+            <span class="scene-choice-name">soft desktop</span>
+            <span class="scene-choice-desc">free icons and little windows</span>
+          </button>
+          <button type="button" class="scene-choice" data-scene-choice="field-notes" aria-pressed="false">
+            <span class="scene-thumb scene-thumb-field-notes" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></span>
+            <span class="scene-choice-name">field notes</span>
+            <span class="scene-choice-desc">a paper index of every room</span>
+          </button>
+        </div>
+        <p class="scene-status" id="scene-status" role="status"></p>
+        <div class="scene-actions">
+          <button type="button" id="scene-cancel">Cancel preview</button>
+          <button type="button" id="scene-apply">Apply scene</button>
+        </div>
+      </div>
+      <div class="pers-row desktop-only">
         <label class="pers-label" for="p-name">your name</label>
         <input class="pers-input" id="p-name" type="text" maxlength="24" placeholder="user" autocomplete="off" />
         <p class="pers-hint">how the desktop greets you. you can also click the name itself.</p>
       </div>
       <div class="pers-row">
-        <span class="pers-label">theme</span>
+        <span class="pers-label">palette</span>
         <div class="theme-grid" id="p-themes"></div>
       </div>
-      <div class="pers-row">
+      <div class="pers-row desktop-only">
         <span class="pers-label">wallpaper</span>
         <div class="seg" id="p-wallpaper">
           <button type="button" data-v="">theme's</button>
@@ -2090,7 +2166,7 @@
           <button type="button" data-v="12">12h</button>
         </div>
       </div>
-      <div class="pers-row">
+      <div class="pers-row desktop-only">
         <span class="pers-label">sparkles</span>
         <div class="seg" id="p-sparkles">
           <button type="button" data-v="1">on</button>
@@ -2098,13 +2174,13 @@
         </div>
       </div>
       <div class="pers-row">
-        <label class="pers-label" for="p-note">widget note</label>
+        <label class="pers-label" for="p-note">desk note</label>
         <input class="pers-input" id="p-note" type="text" maxlength="64" placeholder="leave blank for the daily note" autocomplete="off" />
       </div>
       <div class="pers-foot">
-        <button type="button" id="p-tidy">tidy icons</button>
+        <button type="button" id="p-tidy" class="desktop-only">tidy icons</button>
         <button type="button" id="p-widgets">add widgets</button>
-        <button type="button" id="p-reset">reset desktop</button>
+        <button type="button" id="p-reset" class="desktop-only">reset desktop</button>
       </div>
     </div>
   </div>
@@ -2228,6 +2304,46 @@
     const looks = window.woodlesLooks;
     const lookState = looks.read();
     const root = document.documentElement;
+    const SCENE_KEY = 'woodles-landing-scene-v1';
+    let savedScene = root.getAttribute('data-scene') === 'field-notes' ? 'field-notes' : 'desktop';
+    let previewSceneId = savedScene;
+    const sceneName = id => id === 'field-notes' ? 'field notes' : 'soft desktop';
+    function paintSceneChoices() {
+      document.querySelectorAll('[data-scene-choice]').forEach(button => {
+        button.setAttribute('aria-pressed', String(button.dataset.sceneChoice === previewSceneId));
+      });
+      const changed = previewSceneId !== savedScene;
+      document.getElementById('scene-status').textContent = changed
+        ? 'Previewing ' + sceneName(previewSceneId) + '. Your icons and widgets are kept.'
+        : sceneName(savedScene) + ' is in use.';
+      document.getElementById('scene-apply').disabled = !changed;
+      document.getElementById('scene-cancel').disabled = !changed;
+    }
+    function previewScene(id) {
+      if (id !== 'desktop' && id !== 'field-notes') return;
+      previewSceneId = id;
+      root.setAttribute('data-scene', id);
+      syncSceneWidgets();
+      paintSceneChoices();
+    }
+    function cancelScenePreview() {
+      if (previewSceneId !== savedScene) previewScene(savedScene);
+    }
+    document.getElementById('scene-grid').addEventListener('click', e => {
+      const choice = e.target.closest('[data-scene-choice]');
+      if (choice) previewScene(choice.dataset.sceneChoice);
+    });
+    document.getElementById('scene-cancel').addEventListener('click', () => {
+      cancelScenePreview();
+      closeWins();
+    });
+    document.getElementById('scene-apply').addEventListener('click', () => {
+      savedScene = previewSceneId;
+      try { localStorage.setItem(SCENE_KEY, savedScene); } catch {}
+      paintSceneChoices();
+      closeWins();
+    });
+    paintSceneChoices();
     function setOver(axis, value) {
       if (value) lookState.over[axis] = value; else delete lookState.over[axis];
       looks.write(lookState);
@@ -2260,6 +2376,8 @@
       savePrefs();
       renderTaskbar();
       renderStart(search.value);
+      renderFieldPins();
+      renderFieldPinButtons();
     }
 
     /* every app link opens through launch(), except a ⌘/ctrl/shift/alt or
@@ -2273,6 +2391,110 @@
       });
       el.addEventListener('auxclick', e => { if (e.button === 1) remember(a); });
     }
+
+    /* ── field notes: one app catalogue, a different front door ────── */
+    const fnSections = document.getElementById('fn-sections');
+    const fnSearch = document.getElementById('fn-search');
+    function renderFieldNotes(filter = '') {
+      const query = filter.trim().toLowerCase();
+      fnSections.replaceChildren();
+      let shown = 0;
+      landingAppsByBand.forEach(({ band, apps: bandApps }) => {
+        const matches = bandApps.filter(a =>
+          !query || (a.name + ' ' + a.desc + ' ' + band.label + ' ' + band.blurb).toLowerCase().includes(query));
+        if (!matches.length) return;
+        const section = document.createElement('section');
+        section.className = 'fn-section';
+        section.id = 'fn-' + band.id;
+        const heading = document.createElement('h2');
+        heading.className = 'fn-section-title';
+        heading.textContent = band.label;
+        const description = document.createElement('p');
+        description.className = 'fn-section-description';
+        description.textContent = band.blurb;
+        const list = document.createElement('div');
+        list.className = 'fn-apps';
+        matches.forEach(a => {
+          const entry = document.createElement('div');
+          entry.className = 'fn-app-entry';
+          const card = document.createElement('a');
+          card.className = 'fn-app';
+          card.href = a.href;
+          card.dataset.id = a.id;
+          const mark = document.createElement('span');
+          mark.className = 'fn-app-mark';
+          mark.innerHTML = iconSVG(a);
+          const copy = document.createElement('span');
+          copy.className = 'fn-app-copy';
+          const name = document.createElement('span');
+          name.className = 'fn-app-name';
+          name.textContent = a.name;
+          const desc = document.createElement('span');
+          desc.className = 'fn-app-description';
+          desc.textContent = a.desc;
+          copy.append(name, desc);
+          const arrow = document.createElement('span');
+          arrow.className = 'fn-app-arrow';
+          arrow.setAttribute('aria-hidden', 'true');
+          arrow.textContent = '↗';
+          card.append(mark, copy, arrow);
+          wireLaunch(card, a);
+          const pin = document.createElement('button');
+          pin.type = 'button';
+          pin.className = 'fn-pin-toggle';
+          pin.dataset.id = a.id;
+          pin.setAttribute('aria-label', 'Pin ' + a.name);
+          pin.addEventListener('click', () => togglePin(a.id));
+          entry.append(card, pin);
+          list.appendChild(entry);
+          shown++;
+        });
+        section.append(heading, description, list);
+        fnSections.appendChild(section);
+      });
+      document.getElementById('fn-empty').hidden = shown !== 0;
+      renderFieldPinButtons();
+    }
+    function renderFieldPinButtons() {
+      fnSections.querySelectorAll('.fn-pin-toggle').forEach(button => {
+        const pinned = isPinned(button.dataset.id);
+        button.setAttribute('aria-pressed', String(pinned));
+        button.textContent = pinned ? 'pinned' : '+ pin';
+      });
+    }
+    function renderFieldPins() {
+      const target = document.getElementById('fn-pins');
+      target.replaceChildren();
+      prefs.pins.map(byId).filter(Boolean).forEach(a => {
+        const link = document.createElement('a');
+        link.className = 'fn-pin';
+        link.href = a.href;
+        link.textContent = a.name;
+        wireLaunch(link, a);
+        target.appendChild(link);
+      });
+      if (!target.children.length) {
+        const empty = document.createElement('span');
+        empty.className = 'fn-pin-empty';
+        empty.textContent = 'pin a room from the desktop to keep it here';
+        target.appendChild(empty);
+      }
+    }
+    renderFieldNotes();
+    renderFieldPins();
+    fnSearch.addEventListener('input', () => renderFieldNotes(fnSearch.value));
+    document.getElementById('fn-personalize').addEventListener('click', e => {
+      e.stopPropagation(); openPers();
+    });
+    document.getElementById('fn-add-widget').addEventListener('click', e => {
+      e.stopPropagation(); openWin('widgets');
+    });
+    document.getElementById('fn-profile').addEventListener('click', e => {
+      e.stopPropagation(); openWin('profile');
+    });
+    document.getElementById('fn-about').addEventListener('click', e => {
+      e.stopPropagation(); openAbout();
+    });
 
     /* ── desktop icons — free placement + drag ─────────────────────── */
     const LAYOUT_KEY = 'woodles-icon-layout';
@@ -2623,6 +2845,8 @@
       document.getElementById('m-greet-word').textContent = greeting(now.getHours());
       document.getElementById('m-clock').innerHTML = time;
       document.getElementById('m-date').textContent = DAYS[now.getDay()] + ' · ' + dShort;
+      document.getElementById('fn-clock').innerHTML = time;
+      document.getElementById('fn-date').textContent = DAYS[now.getDay()] + ' · ' + dShort;
     }
     tick();
     setInterval(tick, 1000 * 20);
@@ -2639,6 +2863,7 @@
       const note = (prefs.note || '').trim() ||
         NOTES[new Date().getDate() % NOTES.length];
       document.getElementById('w-note').textContent = note;
+      document.getElementById('fn-note').textContent = note;
       const pName = document.getElementById('p-name');
       if (document.activeElement !== pName)
         pName.value = prefs.name === 'user' ? '' : prefs.name;
@@ -4387,6 +4612,7 @@
       let sx, sy, ox, oy, active = false, moved = false;
       el.addEventListener('pointerdown', () => raiseWidget(el));
       el.addEventListener('pointerdown', e => {
+        if (root.getAttribute('data-scene') === 'field-notes') return;
         if (e.button !== 0) return;
         if (e.target.closest('textarea, input, a, button')) return;
         active = true; moved = false;
@@ -4422,11 +4648,28 @@
         el.remove();
         delete widgetEls[id];
       }
+      syncSceneWidgets();
     }
 
     function placeWidget(el, w) {
       el.style.left = Math.min(Math.max(w.x, 8), Math.max(innerWidth - el.offsetWidth - 8, 8)) + 'px';
       el.style.top  = Math.min(Math.max(w.y, 8), Math.max(innerHeight - el.offsetHeight - 8, 8)) + 'px';
+    }
+    function syncSceneWidgets() {
+      const inNotes = root.getAttribute('data-scene') === 'field-notes';
+      const host = document.getElementById('fn-widget-host');
+      widgets.forEach(w => {
+        const el = widgetEls[w.id];
+        if (!el) return;
+        (inNotes ? host : document.body).appendChild(el);
+        if (!inNotes) placeWidget(el, w);
+        const note = el.querySelector('textarea');
+        if (note) requestAnimationFrame(() => {
+          note.style.height = 'auto';
+          note.style.height = note.scrollHeight + 'px';
+        });
+      });
+      document.getElementById('fn-widgets-empty').hidden = widgets.length !== 0;
     }
     function renderWidget(w) {
       const t = WTYPES[w.type];
@@ -4444,11 +4687,16 @@
       x.addEventListener('click', () => removeWidget(w.id));
       el.appendChild(x);
       makeWidgetElDraggable(el, w);
-      document.body.appendChild(el);
-      placeWidget(el, w);
+      if (root.getAttribute('data-scene') === 'field-notes')
+        document.getElementById('fn-widget-host').appendChild(el);
+      else {
+        document.body.appendChild(el);
+        placeWidget(el, w);
+      }
       widgetEls[w.id] = el;
     }
     widgets.forEach(renderWidget);
+    syncSceneWidgets();
 
     /* every widget type's own refresh() keeps it honest as days turn over;
        no type-specific special-casing needed here */
@@ -4472,6 +4720,7 @@
       widgets.push(w);
       saveWidgets();
       renderWidget(w);
+      syncSceneWidgets();
       closeWins();
     }
 
@@ -4500,7 +4749,8 @@
     /* widgets keep their saved spot, pulled back on screen when the window
        is smaller than it was — and returned to it when it grows again */
     addEventListener('resize', () => widgets.forEach(w => {
-      if (widgetEls[w.id]) placeWidget(widgetEls[w.id], w);
+      if (root.getAttribute('data-scene') === 'desktop' && widgetEls[w.id])
+        placeWidget(widgetEls[w.id], w);
     }));
 
     /* ── tray flyout: the calendar, and tonight's moon ─────────────── */
@@ -4715,6 +4965,7 @@
       ctx.querySelector('.ctx-item').focus();
     }
     document.addEventListener('contextmenu', e => {
+      if (root.getAttribute('data-scene') === 'field-notes') return;
       if (innerWidth <= 720) return;  /* phone home has its own dock, no desktop menu */
       if (e.target.closest('.window, .flyout, input, textarea')) return;
       const wEl = e.target.closest('.dwidget');
@@ -4771,9 +5022,14 @@
        button. with nowhere to go, it just leaves the closing thing. */
     function returnFocus(target) {
       const from = document.activeElement;
-      if (target && target.isConnected) target.focus();
-      if (target && document.activeElement !== target)
-        document.getElementById('start-btn').focus();
+      if (target && target.isConnected && target.offsetParent !== null) target.focus();
+      if (!target || document.activeElement !== target) {
+        const fallbacks = root.getAttribute('data-scene') === 'field-notes'
+          ? [document.getElementById('fn-personalize')]
+          : [document.getElementById('start-btn'),
+             document.querySelector('#phone-dock [aria-label="Personalize"]')];
+        fallbacks.find(el => el && el.offsetParent !== null)?.focus();
+      }
       if (document.activeElement === from && from instanceof HTMLElement) from.blur();
     }
     let winReturn = null;
@@ -4792,6 +5048,7 @@
       focusables(win)[0]?.focus();
     }
     function hideWins() {
+      if (WINDOWS.pers.classList.contains('open')) cancelScenePreview();
       Object.values(WINDOWS).forEach(w => {
         w.classList.remove('open');
         w.style.top = '50%'; w.style.left = '50%'; w.style.transform = '';
@@ -4905,6 +5162,7 @@
       localStorage.removeItem(WIDGETS_KEY);
       localStorage.removeItem('woodles-theme');
       localStorage.removeItem('woodles-look');
+      localStorage.removeItem(SCENE_KEY);
       location.reload();
     });
     renderPrefs();
@@ -4965,7 +5223,9 @@
       }
       if (e.key === '/' && !body.classList.contains('start-open')
           && !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) {
-        e.preventDefault(); setStart(true);
+        e.preventDefault();
+        if (root.getAttribute('data-scene') === 'field-notes') fnSearch.focus();
+        else setStart(true);
       }
     });
 
