@@ -259,3 +259,65 @@ test('a widget comes back on screen when the window shrinks, and home when it gr
 	await page.setViewportSize({ width: 1280, height: 720 });
 	await expect.poll(() => note.evaluate((el) => el.style.left)).toBe(home);
 });
+
+test('a theme brings its whole look; cream keeps the one the desk always had', async ({ page }) => {
+	const html = page.locator('html');
+	await page.goto('/');
+	await expect(html).toHaveAttribute('data-theme', 'cream');
+	await expect(html).toHaveAttribute('data-material', 'glass');
+	await expect(html).toHaveAttribute('data-type', 'classic');
+
+	await page.getByRole('button', { name: 'Start', exact: true }).click();
+	await page.locator('#pers-btn').click();
+	await page.getByRole('dialog', { name: 'Personalize' }).getByRole('button', { name: 'signal theme' }).click();
+	await expect(html).toHaveAttribute('data-theme', 'signal');
+	await expect(html).toHaveAttribute('data-material', 'flat');
+	await expect(html).toHaveAttribute('data-shape', 'crisp');
+	await expect(html).toHaveAttribute('data-type', 'modern');
+	await expect(html).toHaveAttribute('data-ground', 'plain');
+	await expect(page.locator('.widget')).toHaveCSS('backdrop-filter', 'none');
+});
+
+test('the snowflake changes the colors and holds the form; a swatch takes a whole look', async ({ page }) => {
+	await page.addInitScript(() => {
+		if (!sessionStorage.getItem('seeded')) {
+			localStorage.setItem('woodles-theme', 'typewriter');
+			sessionStorage.setItem('seeded', '1');
+		}
+	});
+	const html = page.locator('html');
+	await page.goto('/');
+	await expect(html).toHaveAttribute('data-material', 'paper');
+
+	await page.getByRole('button', { name: 'Next theme' }).click();
+	await expect(html).toHaveAttribute('data-theme', 'blossom');
+	await expect(html).toHaveAttribute('data-material', 'paper');
+	await expect(html).toHaveAttribute('data-type', 'fell');
+	// held across a reload, before first paint
+	await page.reload();
+	await expect(html).toHaveAttribute('data-material', 'paper');
+
+	await page.locator('.tray-clock').click();
+	await page.locator('#themes').getByRole('button', { name: 'blossom theme' }).click();
+	await expect(html).toHaveAttribute('data-material', 'glass');
+	await expect(html).toHaveAttribute('data-ground', 'bloom');
+});
+
+test('an old wallpaper and sparkles-off carry over as the look’s ground and weather', async ({ page }) => {
+	await page.addInitScript(() => {
+		if (!sessionStorage.getItem('seeded')) {
+			localStorage.setItem('woodles-desk', JSON.stringify({ name: 'z', wallpaper: 'ruled', sparkles: false }));
+			sessionStorage.setItem('seeded', '1');
+		}
+	});
+	const html = page.locator('html');
+	await page.goto('/');
+	await expect(html).toHaveAttribute('data-ground', 'ruled');
+	await expect(html).toHaveAttribute('data-weather', 'none');
+	const desk = JSON.parse((await page.evaluate(() => localStorage.getItem('woodles-desk'))) ?? '{}');
+	expect(desk).toEqual({ name: 'z' });
+	await expect(page.locator('#greet-name')).toHaveText('z');
+
+	await page.getByRole('button', { name: 'Toggle sparkles' }).click();
+	await expect(html).toHaveAttribute('data-weather', 'sparkles');
+});

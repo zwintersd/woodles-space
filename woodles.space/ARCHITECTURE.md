@@ -98,6 +98,9 @@ other docs have narrower jobs:
     `ARCADE_ROADMAP.md`'s own note about it).
   - `apps/planner/`: `KNOWN_ISSUES.md` (the vitest/rune-store sharp edges
     under "the test suite" below).
+  - `apps/landing/`: `THEMES.md` (a theme as a preset over palette, type,
+    shape, material, motion, and atmosphere, rather than a palette alone —
+    steps 1–3 built, the rest still a proposal; see "shared design tokens").
   - `apps/homesuite/`: `ASSESSMENT.md` (a dated 2026-09-27 review of the
     shell, the bridge, and Data — verified findings and a staged fix plan;
     a snapshot, like `../AUDIT.md`, not live truth).
@@ -1579,6 +1582,15 @@ for its inner surfaces and `--car-*` for the Carillon shell, `bestiary` uses
 `--b-*`, and `thinking-about` uses `--ta-*` under
 `.thinking-about-root`. `data-theme` and the eleven shared themes don't reach
 any of them; they own their own look.
+
+the landing page goes one step past the palette. `apps/landing/looks.js`, a
+blocking classic script in its `<head>`, resolves a theme into five more
+attributes — `data-type`, `-shape`, `-material`, `-motion`, `-ground`,
+`-weather` — each selecting a block of the page's own `--desk-*` tokens.
+`woodles-theme` stays a palette id (the animations gallery shares it);
+`woodles-look` holds what was set by hand (`over`) and the form ❄ holds
+while it steps the colors (`held`). see
+[`apps/landing/THEMES.md`](./apps/landing/THEMES.md).
 
 `thinking-about`'s look is a deliberate departure even from its SvelteKit
 siblings' own house style: marginalia and bestiary still lean into the dark,

@@ -18,6 +18,17 @@ so it's not easy to forget.
 
 ---
 
+## 2026-09-29
+
+- **themes that change more than color** — on the homepage, a theme can now
+  bring its own typeface, corners, material and motion. **signal** is flat and
+  opaque, crisp-cornered, in a plain sans, with no drifting wash — the
+  legible theme finally reads that way. **typewriter** is paper sheets with
+  hard shadows on a ruled desk, in IM Fell. ❄ still changes only the colors
+  and keeps the rest as it is; picking a swatch takes the theme's whole look.
+  Every other theme looks as it did, and a chosen wallpaper or sparkles-off
+  carries over. The plan for the rest is in `apps/landing/THEMES.md`.
+
 ## 2026-09-28
 
 - **again and new** — videos and choice options can be marked familiar
