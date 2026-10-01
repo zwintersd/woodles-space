@@ -255,6 +255,9 @@ getting their own settings:
 - **wallpaper keeps its row** in personalize, with a "theme's" button for
   following the theme; sparkles on/off means the theme's own weather, or
   sparkles when the theme has none.
+- the palette-cycle button changes colors and typeface together. It holds the
+  current shape, material, motion, ground, and weather; choosing a theme swatch
+  applies that theme's full default look.
 - the resolver supports type `classic` `optical` `modern` `fell` `gothic`
   `glaze` `pixel`; shape `soft` `round` `crisp` `square`; material `glass`
   `paper` `flat` `glow`; motion `float` `snappy` `bouncy` `still`; grounds
@@ -308,10 +311,9 @@ each step ships on its own and leaves the desk working.
   rule under "type" still holds: ui only ever gets DM Mono, Space Grotesk or
   Plus Jakarta Sans.
 - **❄ cycles colors only.** it steps to the next palette and leaves type,
-  shape, material, motion and atmosphere where they are. mechanically: before
-  stepping, the current resolved non-palette axes are written into
-  `woodles-look`, so the form is held rather than handed to the next theme.
-  choosing a theme swatch in Personalize still applies the whole default look.
+  shape, material, motion and atmosphere where they are. The typeface follows
+  each palette. choosing a theme swatch in Personalize applies the whole
+  default look.
 - **no "follow the day".** dropped from step 6.
 
 still open: the per-axis override editor and making the screensaver follow the
