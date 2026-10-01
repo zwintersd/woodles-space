@@ -17,184 +17,38 @@
 	import TypeWitch from './TypeWitch.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
 	import { book } from '$lib/witch/book.svelte';
+	import { ARCADE_GAME_CATALOG, type ArcadeGameCatalogEntry } from './arcadeDevCatalog';
 
-	type GameStatus = 'play' | 'soon' | 'roadmap';
-
-	interface MiniGame {
-		id: string;
-		icon: string;
-		title: string;
-		tagline: string;
-		tags: string[];
-		status: GameStatus;
-		roadmapNote?: string;
-	}
+	type MiniGame = ArcadeGameCatalogEntry & { roadmapNote?: string };
 
 	interface Props {
 		activePet?: BestiaryCreature | null;
 		bestiaryCreatures?: BestiaryCreature[];
+		initialGameId?: string | null;
 		onactivechange?: (gameId: string | null) => void;
 		ontheaterchange?: (enabled: boolean) => void;
 	}
 
-	let { activePet = null, bestiaryCreatures = [], onactivechange, ontheaterchange }: Props = $props();
+	let { activePet = null, bestiaryCreatures = [], initialGameId = null, onactivechange, ontheaterchange }: Props = $props();
 
-	let activeGame = $state<string | null>(null);
+	let activeGame = $state<string | null>(ARCADE_GAME_CATALOG.some((game) => game.id === initialGameId) ? initialGameId : null);
 	let theaterMode = $state(false);
 	let rootEl: HTMLDivElement;
 
 	const WORD_WEAVE_TARGET = 8;
 	const STAR_CATCHER_TARGET = 3;
 
-	const games = $derived<MiniGame[]>([
-		{
-			id: 'inkblot',
-			icon: '⬤',
-			title: 'Inkblot',
-			tagline: 'An image blooms slowly from ink. Press space to pause and name the creature before it fully resolves.',
-			tags: ['recognition', 'observation'],
-			status: 'play'
-		},
-		{
-			id: 'stack-2048',
-			icon: '▦',
-			title: '2048',
-			tagline: 'Slide the tiles. Merge the numbers. Reach 2048 before the board fills.',
-			tags: ['puzzle', 'numbers'],
-			status: 'play'
-		},
-		{
-			id: 'color-pop',
-			icon: '●',
-			title: 'Color POP!',
-			tagline: 'Drop bright circles, merge matching tiers, and keep the pile below the line.',
-			tags: ['physics', 'merge'],
-			status: 'play'
-		},
-		{
-			id: 'margin-miner',
-			icon: '$',
-			title: 'Margin Miner',
-			tagline: 'Swing the skyhook, gather cloud treasures, and beat the target before time runs out.',
-			tags: ['claw', 'timed'],
-			status: 'play'
-		},
-		{
-			id: 'type-witch',
-			icon: '⌨',
-			title: 'Type Witch',
-			tagline: 'Race against the clock to transcribe Brianna\'s conditions before they dissolve.',
-			tags: ['typing', 'timed'],
-			status: 'play'
-		},
-		{
-			id: 'get-big',
-			icon: '●',
-			title: 'Get Big!',
-			tagline: 'Eat smaller jelly, dodge bigger jelly, and grow until yellow finally fits.',
-			tags: ['arcade', 'growth'],
-			status: 'play'
-		},
-		{
-			id: 'margin-hollow',
-			icon: '▣',
-			title: 'Margin Hollow',
-			tagline: 'A tiny metroidvania-like: jump, open wing and key routes, and chart the archive.',
-			tags: ['platform', 'gates'],
-			status: 'play'
-		},
-		{
-			id: 'condition-match',
-			icon: '🜁',
-			title: 'Condition Match',
-			tagline: 'Flip tiles to pair conditions with their emergences. Memory as magic.',
-			tags: ['memory', 'puzzle'],
-			status: 'play'
-		},
-		{
-			id: 'insight-rush',
-			icon: '✦',
-			title: 'Insight Rush',
-			tagline: 'Tap fast, tap true. Harvest a burst of insight before the moment closes.',
-			tags: ['clicker', 'speed'],
-			status: 'play'
-		},
-		{
-			id: 'bullet-dot',
-			icon: '•',
-			title: 'Bullet Dot',
-			tagline: 'The simplest bullet heaven possible: one dot, one swarm, automatic shots.',
-			tags: ['action', 'survival'],
-			status: 'play'
-		},
-		{
-			id: 'margin-defense',
-			icon: '⌂',
-			title: 'Margin Defense',
-			tagline: 'Place tiny towers along one route. Hold five waves before the margin breaks.',
-			tags: ['tower', 'strategy'],
-			status: 'play'
-		},
-		{
-			id: 'margin-snake',
-			icon: '∿',
-			title: 'Margin Snake',
-			tagline: 'Classic snake in a notebook grid. Eat marks, grow longer, avoid yourself.',
-			tags: ['arcade', 'grid'],
-			status: 'play'
-		},
-		{
-			id: 'paddle-break',
-			icon: '▭',
-			title: 'Paddle Break',
-			tagline: 'Pong hands, Breakout wall: keep the ball alive while the bricks come loose.',
-			tags: ['arcade', 'reflex'],
-			status: 'play'
-		},
-		{
-			id: 'bubble-spinner',
-			icon: 'o',
-			title: 'Bubble Spinner',
-			tagline: 'Shoot into a hex cluster, kick it into spin, match colors, and drop orphaned rings.',
-			tags: ['shooter', 'physics'],
-			status: 'play'
-		},
-		{
-			id: 'margin-bubbles',
-			icon: '◌',
-			title: 'Margin Bubbles',
-			tagline: 'Bank shots into the canopy, match colors in threes, and keep the ceiling from pressing down.',
-			tags: ['shooter', 'aim'],
-			status: 'play'
-		},
-		{
-			id: 'word-weave',
-			icon: '🝩',
-			title: 'Word Weave',
-			tagline: 'Arrange scattered words into valid conditions. The Book will know if you\'re wrong.',
-			tags: ['word', 'puzzle'],
-			status: 'roadmap',
-			roadmapNote: `roadmap idea · ${Math.min(book.writtenConditions.length, WORD_WEAVE_TARGET)}/${WORD_WEAVE_TARGET} conditions written so far`
-		},
-		{
-			id: 'star-catcher',
-			icon: '★',
-			title: 'Star Catcher',
-			tagline: 'Guide falling stars into the margin before they blink out. Don\'t miss.',
-			tags: ['action', 'reflex'],
-			status: 'roadmap',
-			roadmapNote: `roadmap idea · ${Math.min(book.readingCompletedStars, STAR_CATCHER_TARGET)}/${STAR_CATCHER_TARGET} reading stars earned so far`
-		},
-		{
-			id: 'the-long-game',
-			icon: '∞',
-			title: 'The Long Game',
-			tagline: 'A prestige loop within the loop. It watches you back.',
-			tags: ['idle', 'meta'],
-			status: 'roadmap',
-			roadmapNote: 'roadmap idea · waiting on a real lifecycle marker, not yet tracked'
+	function roadmapNote(game: ArcadeGameCatalogEntry): string | undefined {
+		if (game.roadmapMetric === 'written-conditions') {
+			return `roadmap idea · ${Math.min(book.writtenConditions.length, WORD_WEAVE_TARGET)}/${WORD_WEAVE_TARGET} conditions written so far`;
 		}
-	]);
+		if (game.roadmapMetric === 'reading-stars') {
+			return `roadmap idea · ${Math.min(book.readingCompletedStars, STAR_CATCHER_TARGET)}/${STAR_CATCHER_TARGET} reading stars earned so far`;
+		}
+		return game.status === 'roadmap' ? game.roadmapNote : undefined;
+	}
+
+	const games = $derived<MiniGame[]>(ARCADE_GAME_CATALOG.map((game) => ({ ...game, roadmapNote: roadmapNote(game) })));
 
 	const activeGameData = $derived(games.find((game) => game.id === activeGame) ?? null);
 
@@ -236,7 +90,7 @@
 		void showCabinetTop();
 	}
 
-	const statusLabel: Record<GameStatus, string> = {
+	const statusLabel: Record<ArcadeGameCatalogEntry['status'], string> = {
 		play: 'play',
 		soon: 'coming soon',
 		roadmap: 'roadmap'

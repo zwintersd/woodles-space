@@ -325,7 +325,10 @@
 	async function refreshPickerSources(): Promise<void> {
 		pickerLoading = true;
 		try {
-			const rows = await pullCollectionSources(['bestiary-creatures', 'marginalia-life', 'marginalia-field-notes']);
+			const rows = await pullCollectionSources([
+				'bestiary-creatures', 'marginalia-life', 'marginalia-field-notes',
+				'marginalia-arcade-games', 'marginalia-arcade-primitives', 'marginalia-arcade-copy'
+			]);
 			const synced = rows.map((row) => ({ app: row.ref.app, kind: row.ref.kind, id: row.ref.id, text: row.label, hint: row.hint }));
 			refs = [...candidatesFor('#', ''), ...synced];
 		} finally {

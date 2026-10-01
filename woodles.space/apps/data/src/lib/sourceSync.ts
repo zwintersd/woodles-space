@@ -1,5 +1,6 @@
 import { world1Life } from '@woodles/witch-engine';
 import type { WoodlesRef } from '@shared/homesuiteBridge';
+import { ARCADE_COPY_CATALOG, ARCADE_GAME_CATALOG, ARCADE_PRIMITIVE_CATALOG } from '../../../marginalia/src/lib/arcade/arcadeDevCatalog';
 import { createRecord, type Collection, type CollectionSource } from './collections';
 
 export type PulledSourceRow = {
@@ -119,6 +120,63 @@ export function readMarginaliaRows(): PulledSourceRow[] {
 	}
 }
 
+function arcadeGameRows(): PulledSourceRow[] {
+	return ARCADE_GAME_CATALOG.map((game) => ({
+		ref: { app: 'marginalia', kind: 'arcade-game', id: game.id },
+		label: game.title,
+		hint: `Arcade · ${game.status}`,
+		values: {
+			name: game.title,
+			status: game.status,
+			pitch: game.tagline,
+			tags: game.tags.join(' · '),
+			coreLoop: game.coreLoop,
+			mastery: game.mastery,
+			roadmapNote: game.roadmapNote ?? '',
+			sourcePath: game.sourcePath
+		}
+	}));
+}
+
+function arcadePrimitiveRows(): PulledSourceRow[] {
+	return ARCADE_PRIMITIVE_CATALOG.map((primitive) => {
+		const exampleGame = ARCADE_GAME_CATALOG.find((game) => game.id === primitive.exampleGameId);
+		return {
+			ref: { app: 'marginalia', kind: 'arcade-primitive', id: primitive.id },
+			label: primitive.name,
+			hint: `Arcade primitive · ${primitive.status}`,
+			values: {
+				name: primitive.name,
+				category: primitive.category,
+				status: primitive.status,
+				summary: primitive.summary,
+				api: primitive.api,
+				consumers: primitive.consumers,
+				sourcePath: primitive.sourcePath,
+				boundary: primitive.boundary,
+				exampleGame: exampleGame?.title ?? ''
+			}
+		};
+	});
+}
+
+function arcadeCopyRows(): PulledSourceRow[] {
+	return ARCADE_COPY_CATALOG.map((copy) => ({
+		ref: { app: 'marginalia', kind: 'arcade-copy', id: copy.id },
+		label: copy.name,
+		hint: `Arcade copy · ${copy.status}`,
+		values: {
+			name: copy.name,
+			game: copy.title,
+			placement: copy.placement,
+			status: copy.status,
+			title: copy.title,
+			text: copy.text,
+			sourcePath: copy.sourcePath
+		}
+	}));
+}
+
 export async function pullCollectionSources(sources: CollectionSource[]): Promise<PulledSourceRow[]> {
 	const rows: PulledSourceRow[] = [];
 	if (sources.includes('bestiary-creatures')) rows.push(...await readBestiaryRows());
@@ -126,6 +184,9 @@ export async function pullCollectionSources(sources: CollectionSource[]): Promis
 		const marginalia = readMarginaliaRows();
 		rows.push(...marginalia.filter((row) => row.ref.kind === 'life' ? sources.includes('marginalia-life') : sources.includes('marginalia-field-notes')));
 	}
+	if (sources.includes('marginalia-arcade-games')) rows.push(...arcadeGameRows());
+	if (sources.includes('marginalia-arcade-primitives')) rows.push(...arcadePrimitiveRows());
+	if (sources.includes('marginalia-arcade-copy')) rows.push(...arcadeCopyRows());
 	return rows;
 }
 

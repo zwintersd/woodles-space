@@ -5,7 +5,13 @@ export type FieldType = 'text' | 'number' | 'checkbox' | 'date' | 'select' | 'mu
 export type SelectOption = { id: string; label: string; tint: string };
 export type FieldConfig = { options?: SelectOption[]; format?: 'plain' | 'percent' | 'currency' };
 export type FieldValue = string | number | boolean | string[] | WoodlesRef | null;
-export type CollectionSource = 'bestiary-creatures' | 'marginalia-life' | 'marginalia-field-notes';
+export type CollectionSource =
+	| 'bestiary-creatures'
+	| 'marginalia-life'
+	| 'marginalia-field-notes'
+	| 'marginalia-arcade-games'
+	| 'marginalia-arcade-primitives'
+	| 'marginalia-arcade-copy';
 export type CollectionField = {
 	id: string;
 	name: string;
@@ -43,6 +49,10 @@ export type CollectionLibrary = { collections: Collection[] };
 const SCHEMA_VERSION = 1;
 const STORAGE_KEY = 'woodles.data.collections.v1';
 const FIELD_TYPES: FieldType[] = ['text', 'number', 'checkbox', 'date', 'select', 'multi-select', 'url', 'relation'];
+const COLLECTION_SOURCES: readonly CollectionSource[] = [
+	'bestiary-creatures', 'marginalia-life', 'marginalia-field-notes',
+	'marginalia-arcade-games', 'marginalia-arcade-primitives', 'marginalia-arcade-copy'
+];
 const TINTS = ['#e8dff0', '#f5e5d9', '#e0ece5', '#e5eafa', '#f4ebc9'];
 
 export function isWoodlesRef(value: unknown): value is WoodlesRef {
@@ -53,7 +63,7 @@ export function isWoodlesRef(value: unknown): value is WoodlesRef {
 export function isCollection(value: unknown): value is Collection {
 	if (!isRecord(value) || typeof value.id !== 'string' || typeof value.title !== 'string' || !Array.isArray(value.fields) || !Array.isArray(value.records)) return false;
 	if (!isStamp(value.createdAt) || !isStamp(value.updatedAt)) return false;
-	if (value.sources !== undefined && (!Array.isArray(value.sources) || !value.sources.every((source) => ['bestiary-creatures', 'marginalia-life', 'marginalia-field-notes'].includes(source)))) return false;
+	if (value.sources !== undefined && (!Array.isArray(value.sources) || !value.sources.every((source) => COLLECTION_SOURCES.includes(source)))) return false;
 	if (value.sourceSyncedAt !== undefined && !isStamp(value.sourceSyncedAt)) return false;
 	if (value.excludedRefs !== undefined && (!Array.isArray(value.excludedRefs) || !value.excludedRefs.every(isWoodlesRef))) return false;
 	const fields = value.fields as unknown[];
@@ -120,7 +130,9 @@ function field(id: string, name: string, type: FieldType, primary = false, optio
 	return { id, name, type, primary, createdAt, ...(options ? { config: { options: options.map((label, index) => ({ id: makeId('opt'), label, tint: TINTS[index % TINTS.length] })) } } : {}) };
 }
 
-export type CollectionTemplate = 'blank' | 'tracker' | 'media' | 'projects' | 'research' | 'living-world';
+export type CollectionTemplate =
+	| 'blank' | 'tracker' | 'media' | 'projects' | 'research' | 'living-world'
+	| 'arcade-games' | 'arcade-primitives' | 'arcade-copy';
 
 /** How each template is offered, and what a new Collection from it is called. */
 export const COLLECTION_TEMPLATES: readonly { id: CollectionTemplate; name: string; detail: string; title: string }[] = [
@@ -129,7 +141,10 @@ export const COLLECTION_TEMPLATES: readonly { id: CollectionTemplate; name: stri
 	{ id: 'media', name: 'Media', detail: 'Title, medium, progress, rating, and more', title: 'Untitled collection' },
 	{ id: 'projects', name: 'Projects', detail: 'Status, priority, due date, and links', title: 'Untitled collection' },
 	{ id: 'research', name: 'Research / sources', detail: 'Sources, URLs, notes, and links', title: 'Untitled collection' },
-	{ id: 'living-world', name: 'Bestiary + Marginalia', detail: 'Pull creatures, discovered life, and field notes into one live table', title: 'Bestiary + Marginalia' }
+	{ id: 'living-world', name: 'Bestiary + Marginalia', detail: 'Pull creatures, discovered life, and field notes into one live table', title: 'Bestiary + Marginalia' },
+	{ id: 'arcade-games', name: 'Arcade games', detail: 'Track game concepts, loops, mastery, and implementation links', title: 'Marginalia Arcade games' },
+	{ id: 'arcade-primitives', name: 'Arcade primitives', detail: 'Map shared code, game-local patterns, and reuse boundaries', title: 'Marginalia Arcade primitives' },
+	{ id: 'arcade-copy', name: 'Arcade copy desk', detail: 'Review current card copy and keep proposed wording beside its source', title: 'Marginalia Arcade copy' }
 ];
 const TEMPLATE_FIELDS: Record<CollectionTemplate, Array<[string, FieldType, string[]?, string?]>> = {
 	blank: [['Name', 'text']],
@@ -137,11 +152,31 @@ const TEMPLATE_FIELDS: Record<CollectionTemplate, Array<[string, FieldType, stri
 	media: [['Title', 'text'], ['Medium', 'select', ['Book', 'Game', 'Film', 'Music']], ['Status', 'select', ['Want to try', 'In progress', 'Finished']], ['Rating', 'number'], ['Started', 'date'], ['Finished', 'date'], ['Favorite', 'checkbox'], ['Related', 'relation'], ['Notes', 'text']],
 	projects: [['Project', 'text'], ['Status', 'select', ['Not started', 'In progress', 'Done']], ['Priority', 'select', ['Low', 'Medium', 'High']], ['Due', 'date'], ['Related', 'relation']],
 	research: [['Source', 'text'], ['URL', 'url'], ['Status', 'select', ['To read', 'Reading', 'Read']], ['Notes', 'text'], ['Related', 'relation']],
-	'living-world': [['Name', 'text', undefined, 'name'], ['Source', 'text', undefined, 'source'], ['Kind', 'text', undefined, 'kind'], ['Category', 'text', undefined, 'category'], ['Domain', 'text', undefined, 'domain'], ['Stage', 'text', undefined, 'stage'], ['Details', 'text', undefined, 'details'], ['Updated', 'text', undefined, 'updated'], ['My notes', 'text']]
+	'living-world': [['Name', 'text', undefined, 'name'], ['Source', 'text', undefined, 'source'], ['Kind', 'text', undefined, 'kind'], ['Category', 'text', undefined, 'category'], ['Domain', 'text', undefined, 'domain'], ['Stage', 'text', undefined, 'stage'], ['Details', 'text', undefined, 'details'], ['Updated', 'text', undefined, 'updated'], ['My notes', 'text']],
+	'arcade-games': [
+		['Name', 'text', undefined, 'name'], ['Status', 'text', undefined, 'status'], ['Pitch', 'text', undefined, 'pitch'],
+		['Tags', 'text', undefined, 'tags'], ['Core loop', 'text', undefined, 'coreLoop'], ['Mastery', 'text', undefined, 'mastery'],
+		['Roadmap note', 'text', undefined, 'roadmapNote'], ['Implementation path', 'text', undefined, 'sourcePath'],
+		['Design notes', 'text'], ['Next experiment', 'text'], ['My notes', 'text']
+	],
+	'arcade-primitives': [
+		['Name', 'text', undefined, 'name'], ['Category', 'text', undefined, 'category'], ['Reuse status', 'text', undefined, 'status'],
+		['Summary', 'text', undefined, 'summary'], ['API / exports', 'text', undefined, 'api'], ['Used by', 'text', undefined, 'consumers'],
+		['Source path', 'text', undefined, 'sourcePath'], ['Reuse boundary', 'text', undefined, 'boundary'],
+		['Example game', 'text', undefined, 'exampleGame'], ['Next extraction', 'text'], ['My notes', 'text']
+	],
+	'arcade-copy': [
+		['Name', 'text', undefined, 'name'], ['Game', 'text', undefined, 'game'], ['Placement', 'text', undefined, 'placement'],
+		['Status', 'text', undefined, 'status'], ['Current title', 'text', undefined, 'title'], ['Current tagline', 'text', undefined, 'text'],
+		['Source path', 'text', undefined, 'sourcePath'], ['Proposed title', 'text'], ['Proposed tagline', 'text'], ['Review notes', 'text']
+	]
 };
 
 const TEMPLATE_SOURCES: Partial<Record<CollectionTemplate, CollectionSource[]>> = {
-	'living-world': ['bestiary-creatures', 'marginalia-life', 'marginalia-field-notes']
+	'living-world': ['bestiary-creatures', 'marginalia-life', 'marginalia-field-notes'],
+	'arcade-games': ['marginalia-arcade-games'],
+	'arcade-primitives': ['marginalia-arcade-primitives'],
+	'arcade-copy': ['marginalia-arcade-copy']
 };
 
 export function createCollection(title = 'Untitled collection', template: CollectionTemplate = 'blank'): Collection {
