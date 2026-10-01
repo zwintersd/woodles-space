@@ -6,7 +6,7 @@
 	import { resourceGains, type ResourceGain } from '$lib/witch/resourceGains.svelte';
 	import { arcadeNotices, type ArcadeNotice } from '$lib/arcade/arcadeNotices.svelte';
 	import Arcade from '$lib/arcade/Arcade.svelte';
-	import { ARCADE_GAME_CATALOG } from '$lib/arcade/arcadeDevCatalog';
+	import { ARCADE_GAME_CATALOG } from '@woodles/marginalia-arcade-catalog';
 	import ActivePetPanel from '$lib/arcade/ActivePetPanel.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
 

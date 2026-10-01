@@ -27,6 +27,7 @@
   "dependencies": {
     "@woodles/dynamics": "workspace:*",
     "@woodles/incremental-core": "workspace:*",
+    "@woodles/marginalia-arcade-catalog": "workspace:*",
     "@woodles/witch-engine": "workspace:*",
     "@woodles/sync": "workspace:*",
     "@woodles/text": "workspace:*",

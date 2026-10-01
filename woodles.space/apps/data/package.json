@@ -12,6 +12,7 @@
 	},
 	"dependencies": {
 		"@woodles/app-manifest": "workspace:*",
+		"@woodles/marginalia-arcade-catalog": "workspace:*",
 		"@woodles/persistence": "workspace:*",
 		"@woodles/sync": "workspace:*",
 		"@woodles/witch-engine": "workspace:*"

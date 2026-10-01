@@ -1,6 +1,6 @@
 import { world1Life } from '@woodles/witch-engine';
 import type { WoodlesRef } from '@shared/homesuiteBridge';
-import { ARCADE_COPY_CATALOG, ARCADE_GAME_CATALOG, ARCADE_PRIMITIVE_CATALOG } from '../../../marginalia/src/lib/arcade/arcadeDevCatalog';
+import { ARCADE_COPY_CATALOG, ARCADE_GAME_CATALOG, ARCADE_PRIMITIVE_CATALOG } from '@woodles/marginalia-arcade-catalog';
 import { createRecord, type Collection, type CollectionSource } from './collections';
 
 export type PulledSourceRow = {

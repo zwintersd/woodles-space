@@ -17,7 +17,7 @@
 	import TypeWitch from './TypeWitch.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
 	import { book } from '$lib/witch/book.svelte';
-	import { ARCADE_GAME_CATALOG, type ArcadeGameCatalogEntry } from './arcadeDevCatalog';
+	import { ARCADE_GAME_CATALOG, type ArcadeGameCatalogEntry } from '@woodles/marginalia-arcade-catalog';
 
 	type MiniGame = ArcadeGameCatalogEntry & { roadmapNote?: string };
 
