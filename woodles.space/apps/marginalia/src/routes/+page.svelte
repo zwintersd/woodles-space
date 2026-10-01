@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { base } from '$app/paths';
 	import { onMount, onDestroy } from 'svelte';
 	import { book, fmt } from '$lib/witch/book.svelte';
 	import { startTick, stopTick } from '$lib/witch/tick';
@@ -14,6 +16,7 @@
 	import AchievementToast from '$lib/witch/AchievementToast.svelte';
 	import HexStage from '$lib/witch/HexStage.svelte';
 	import TutorialOverlay from '$lib/witch/TutorialOverlay.svelte';
+	import { arcadeGameForSource } from '$lib/arcade/arcadeDevCatalog';
 
 	const TUTORIAL_KEY = 'witch.idle.tutorial.v1';
 
@@ -33,9 +36,22 @@
 		void book.refreshBestiaryCreatures();
 	}
 
+	function routeArcadeSourceRef(): boolean {
+		const params = new URLSearchParams(window.location.search);
+		const sourceKind = ['arcade-game', 'arcade-primitive', 'arcade-copy'].find((kind) => params.has(kind));
+		if (!sourceKind) return false;
+		const id = params.get(sourceKind);
+		if (!id) return false;
+		const gameId = arcadeGameForSource(sourceKind, id);
+		const target = `${base}/arcade${gameId ? `?game=${encodeURIComponent(gameId)}` : ''}`;
+		void goto(target, { replaceState: true });
+		return true;
+	}
+
 	onMount(() => {
 		book.hydrate();
 		void book.refreshBestiaryCreatures();
+		if (routeArcadeSourceRef()) return;
 		if (window.location.hash === '#reading-room') readingOpen = true;
 		const lifeId = new URLSearchParams(window.location.search).get('life');
 		const noteId = new URLSearchParams(window.location.search).get('field-note');

@@ -1,10 +1,12 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { onDestroy, onMount } from 'svelte';
 	import { book, fmt } from '$lib/witch/book.svelte';
 	import { startTick, stopTick } from '$lib/witch/tick';
 	import { resourceGains, type ResourceGain } from '$lib/witch/resourceGains.svelte';
 	import { arcadeNotices, type ArcadeNotice } from '$lib/arcade/arcadeNotices.svelte';
 	import Arcade from '$lib/arcade/Arcade.svelte';
+	import { ARCADE_GAME_CATALOG } from '$lib/arcade/arcadeDevCatalog';
 	import ActivePetPanel from '$lib/arcade/ActivePetPanel.svelte';
 	import type { BestiaryCreature } from '$lib/witch/bestiaryDb';
 
@@ -81,7 +83,9 @@
 	onMount(() => {
 		book.hydrate();
 		void book.refreshBestiaryCreatures();
-		startTick();
+		const initialGameId = new URLSearchParams(window.location.search).get('game');
+		if (initialGameId && ARCADE_GAME_CATALOG.some((game) => game.id === initialGameId)) setActiveGame(initialGameId);
+		else startTick();
 		window.addEventListener('beforeunload', persist);
 		window.addEventListener('focus', onFocus);
 	});
@@ -141,6 +145,7 @@
 			<Arcade
 				{activePet}
 				bestiaryCreatures={book.bestiaryCreatures}
+				initialGameId={page.url.searchParams.get('game')}
 				onactivechange={setActiveGame}
 				ontheaterchange={setTheaterMode}
 			/>
