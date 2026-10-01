@@ -16,7 +16,7 @@
 	import AchievementToast from '$lib/witch/AchievementToast.svelte';
 	import HexStage from '$lib/witch/HexStage.svelte';
 	import TutorialOverlay from '$lib/witch/TutorialOverlay.svelte';
-	import { arcadeGameForSource } from '$lib/arcade/arcadeDevCatalog';
+	import { arcadeGameForSource } from '@woodles/marginalia-arcade-catalog';
 
 	const TUTORIAL_KEY = 'witch.idle.tutorial.v1';
 

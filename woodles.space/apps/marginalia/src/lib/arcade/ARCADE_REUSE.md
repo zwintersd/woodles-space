@@ -6,12 +6,13 @@ This arcade works best when each game is small, readable, and self-contained, wh
 
 Each playable game is a Svelte component mounted by `Arcade.svelte`.
 
-`arcadeDevCatalog.ts` holds the small, typed development index shared with
-HomeSuite Data: game-card metadata and concepts, a curated primitive inventory,
-and the current title/tagline copy for each cabinet card. `Arcade.svelte` reads
-its cards from that catalog; Data reads the same entries as read-only source
-fields, with local fields for design notes and copy proposals. This is an index
-for development, not a place to move game rules out of their owning components.
+`@woodles/marginalia-arcade-catalog` holds the small, typed development index
+shared with HomeSuite Data: game-card metadata and concepts, a curated
+primitive inventory, and the current title/tagline copy for each cabinet card.
+`Arcade.svelte` reads its cards from that catalog; Data reads the same entries as
+read-only source fields, with local fields for design notes and copy proposals.
+This is an index for development, not a place to move game rules out of their
+owning components.
 
 A good arcade game component usually contains:
 
@@ -167,11 +168,11 @@ When adding a new game:
    when they fit naturally.
 4. Use `ArcadeHud` and `ArcadeProgress` when the game's shell matches the
    existing arcade shape.
-5. Add the card metadata to `arcadeDevCatalog.ts` and register active component routing in `Arcade.svelte`.
+5. Add the card metadata to `packages/marginalia-arcade-catalog/src/index.ts` and register active component routing in `Arcade.svelte`.
 6. Smoke test the game from the cabinet, not only from the active screen.
 7. Factor only after the third clear repetition.
 
-For the card metadata, add the game to `arcadeDevCatalog.ts`; `Arcade.svelte`
+For the card metadata, add the game to `packages/marginalia-arcade-catalog/src/index.ts`; `Arcade.svelte`
 continues to own active-component routing.
 
 The arcade should feel like a cabinet of tiny handmade machines: same room, same materials, different little mechanisms.

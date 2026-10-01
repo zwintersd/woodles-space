@@ -270,7 +270,7 @@ export const ARCADE_COPY_CATALOG: readonly ArcadeCopyCatalogEntry[] = ARCADE_GAM
 	status: game.status,
 	title: game.title,
 	text: game.tagline,
-	sourcePath: 'apps/marginalia/src/lib/arcade/arcadeDevCatalog.ts'
+	sourcePath: 'packages/marginalia-arcade-catalog/src/index.ts'
 }));
 
 /** Resolve a source row back to the game whose screen gives it useful context. */
