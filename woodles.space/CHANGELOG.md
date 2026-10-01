@@ -18,6 +18,14 @@ so it's not easy to forget.
 
 ---
 
+## 2026-09-30
+
+- **every palette gets a landing look** — all fifteen themes now choose their
+  own type, shape, material, motion, wallpaper treatment, and ambient weather.
+  Midnight and Amber gain accent-lit glass; Blossom has drifting petals;
+  Glacier has snow; Amber has scanlines and rising embers. The setting adapts
+  to high-contrast and reduced-transparency preferences.
+
 ## 2026-09-29
 
 - **two ways into the same rooms** — Personalize now offers Soft Desktop and

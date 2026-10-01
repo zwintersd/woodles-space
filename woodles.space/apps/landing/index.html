@@ -18,9 +18,8 @@
   <meta name="twitter:image" content="https://woodles.space/apps/landing/og.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Mono:wght@300;400&family=Lora:ital,wght@0,400;0,500;1,400;1,500&family=IM+Fell+DW+Pica:ital@0;1&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/shared/palette.css" />
-  <link rel="stylesheet" href="/shared/fonts.css" />
   <link rel="stylesheet" href="/shared/scrollbars.css" />
   <!-- before first paint: the theme, and every axis of its look, so a dark
        system doesn't flash cream and a paper desk doesn't flash glass -->
@@ -51,8 +50,13 @@
     :root {
       --desk-display: 'Cormorant Garamond', Georgia, serif;
       --desk-ui: 'DM Mono', monospace;
+      --font-body: 'Lora', Georgia, serif;
+      --font-fell: 'IM Fell DW Pica', Georgia, serif;
+      --font-mono: 'DM Mono', 'Courier New', monospace;
+      --font-sans: system-ui, sans-serif;
       --desk-round: 1;
       --desk-spring: cubic-bezier(.2,.9,.3,1);
+      --desk-tilt: -2deg;
       --desk-shadow-ink: var(--accent-deep);
       --desk-alert: #e8859a;
       --desk-tile-ink: #fff;
@@ -109,6 +113,12 @@
         color-mix(in srgb, var(--accent-strong) 40%, transparent) 27px 28px);
       opacity: 0.22;
     }
+    [data-ground='scanlines'] .pattern {
+      background-image: repeating-linear-gradient(to bottom,
+        color-mix(in srgb, var(--accent-strong) 20%, transparent) 0 1px,
+        transparent 1px 4px);
+      opacity: 0.34;
+    }
     /* bloom and sprinkles began as blossom's and sugar's own flourishes */
     [data-ground='bloom'] .wash { opacity: 0.8; filter: blur(55px); }
     [data-ground='sprinkles'] .wash { opacity: 0.7; }
@@ -122,14 +132,37 @@
     /* ─────────────────────────── looks ─────────────────────────────── */
     /* one block per axis value (looks.js sets the attributes). html[…] so
        a block outranks the palette's own [data-theme] rules. */
+    html[data-type='classic'] {
+      --desk-display: 'Cormorant Garamond', Georgia, serif;
+      --desk-ui: 'DM Mono', monospace;
+    }
+    html[data-type='optical'] {
+      --desk-display: 'Fraunces', Georgia, serif;
+      --desk-ui: 'DM Mono', monospace;
+    }
     html[data-type='fell'] {
       --desk-display: 'IM Fell DW Pica', Georgia, serif;
+      --desk-ui: 'DM Mono', monospace;
     }
     html[data-type='modern'] {
       --desk-display: 'Plus Jakarta Sans', system-ui, sans-serif;
       --desk-ui: 'Space Grotesk', system-ui, sans-serif;
     }
+    html[data-type='gothic'] {
+      --desk-display: 'Special Gothic Condensed One', Impact, sans-serif;
+      --desk-ui: 'DM Mono', monospace;
+    }
+    html[data-type='glaze'] {
+      --desk-display: 'Kalnia Glaze', Georgia, serif;
+      --desk-ui: 'DM Mono', monospace;
+    }
+    html[data-type='pixel'] {
+      --desk-display: 'Coral Pixels', monospace;
+      --desk-ui: 'DM Mono', monospace;
+    }
     html[data-shape='crisp'] { --desk-round: 0.25; }
+    html[data-shape='round'] { --desk-round: 1.45; }
+    html[data-shape='square'] { --desk-round: 0; }
 
     /* paper: opaque sheets on a desk — no glass, a hard offset shadow,
        more grain, and tiles tinted into the room */
@@ -155,16 +188,72 @@
     }
 
     html[data-material='flat'] .tile { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 25%, transparent); }
+    /* glow keeps the dark palette visible through the glass and lets its
+       accent light collect around panes and tiles. */
+    html[data-material='glow'] {
+      --desk-glass: blur(22px) saturate(1.65);
+      --surface: color-mix(in srgb, var(--bg) 88%, var(--text));
+      --desk-shadow-ink: var(--accent-strong);
+      --desk-tile-mix: 24%;
+    }
+    html[data-material='glow'] :is(.widget, .dwidget, .taskbar, .start, .flyout, .ctx, .window, .phone) {
+      border-color: color-mix(in srgb, var(--accent-strong) 50%, var(--rule));
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--accent-strong) 18%, transparent),
+        0 0 30px -9px color-mix(in srgb, var(--accent-strong) 58%, transparent);
+    }
+    html[data-material='glow'] .tile {
+      box-shadow:
+        0 0 24px -8px color-mix(in srgb, var(--accent-strong) 70%, transparent),
+        inset 0 1px 0 rgba(255,255,255,0.5);
+    }
 
-    /* snappy: no overshoot, no hover tilt; still: nothing ambient moves */
+    /* motion presets share the spring and hover tilt. Snappy shortens the
+       desktop's transitions and entrances; still settles the whole scene. */
     html[data-motion='snappy'] {
       --desk-spring: cubic-bezier(.3,.7,.4,1);
       --desk-tilt: 0deg;
     }
+    html[data-motion='snappy']:not([data-scene='field-notes']) *:not(.sparkle) {
+      transition-duration: 0.12s !important;
+      animation-duration: 0.3s !important;
+    }
+    html[data-motion='bouncy'] {
+      --desk-spring: cubic-bezier(.28,1.65,.55,1);
+      --desk-tilt: -4deg;
+    }
     html[data-motion='still'] { --desk-tilt: 0deg; }
-    html[data-motion='still'] .wash { animation-play-state: paused; }
+    html[data-motion='still']:not([data-scene='field-notes']) .wash { animation: none; }
+    html[data-motion='still']:not([data-scene='field-notes']) *:not(.sparkle) {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      transition-delay: 0s !important;
+    }
+    html[data-motion='still']:not([data-scene='field-notes']) .sparkle {
+      animation: none !important;
+      opacity: 0.42;
+    }
 
     html[data-weather='none'] .sparkle { display: none; }
+    html[data-weather='stars'] .sparkle { color: var(--accent-strong); animation-name: twinkle; }
+    html[data-weather='petals'] .sparkle {
+      color: var(--accent-warm);
+      animation-name: weather-fall;
+      font-size: 1.15rem;
+    }
+    html[data-weather='snow'] .sparkle {
+      color: var(--accent-strong);
+      animation-name: weather-snow;
+    }
+    html[data-weather='embers'] .sparkle {
+      color: var(--accent-warm);
+      animation-name: weather-rise;
+    }
+    html[data-weather='stars'] .sparkle { animation-duration: 9s; }
+    html[data-weather='petals'] .sparkle { animation-duration: 18s; }
+    html[data-weather='snow'] .sparkle { animation-duration: 14s; }
+    html[data-weather='embers'] .sparkle { animation-duration: 9s; }
     .grain {
       position: fixed; inset: 0; z-index: 1; pointer-events: none;
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
@@ -180,6 +269,21 @@
     @keyframes twinkle {
       0%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); }
       45%, 55% { opacity: 0.7; transform: scale(1) rotate(40deg); }
+    }
+    @keyframes weather-fall {
+      0% { opacity: 0; transform: translate3d(0, -6vh, 0) rotate(-18deg); }
+      14% { opacity: 0.72; }
+      100% { opacity: 0; transform: translate3d(var(--weather-drift, 4vw), 110vh, 0) rotate(150deg); }
+    }
+    @keyframes weather-snow {
+      0% { opacity: 0; transform: translate3d(0, -8vh, 0) rotate(0deg); }
+      12% { opacity: 0.7; }
+      100% { opacity: 0; transform: translate3d(var(--weather-drift, -3vw), 110vh, 0) rotate(240deg); }
+    }
+    @keyframes weather-rise {
+      0% { opacity: 0; transform: translateY(8vh) scale(0.7); }
+      18% { opacity: 0.8; }
+      100% { opacity: 0; transform: translateY(-86vh) scale(0.2); }
     }
 
     /* ─────────────────────────── desktop ───────────────────────────── */
@@ -248,7 +352,7 @@
       position: relative;
       transition: transform 0.25s var(--desk-spring), box-shadow 0.25s ease;
     }
-    html:is([data-material='paper'], [data-material='flat']) .tile {
+    html:is([data-material='paper'], [data-material='flat'], [data-material='glow']) .tile {
       --t1: color-mix(in oklab, var(--accent-strong) var(--desk-tile-mix), var(--g1));
       --t2: color-mix(in oklab, var(--accent-strong) var(--desk-tile-mix), var(--g2));
     }
@@ -2146,7 +2250,8 @@
         <p class="pers-hint">how the desktop greets you. you can also click the name itself.</p>
       </div>
       <div class="pers-row">
-        <span class="pers-label">palette</span>
+        <span class="pers-label">theme</span>
+        <p class="pers-hint">Sets this theme’s colors and default Desktop look. Field Notes keeps its paper style.</p>
         <div class="theme-grid" id="p-themes"></div>
       </div>
       <div class="pers-row desktop-only">
@@ -5231,18 +5336,34 @@
 
     paintLifePoints();
 
-    /* ── sparkles ──────────────────────────────────────────────────── */
-    const SPARKS = 7;
-    for (let i = 0; i < SPARKS; i++) {
-      const s = document.createElement('span');
-      s.className = 'sparkle';
-      s.textContent = '✧';
-      s.style.left = (8 + Math.random() * 84) + 'vw';
-      s.style.top  = (8 + Math.random() * 78) + 'vh';
-      s.style.animationDelay = (Math.random() * 7) + 's';
-      s.style.fontSize = (0.6 + Math.random() * 0.9) + 'rem';
-      document.body.appendChild(s);
-    }
+    /* ── theme weather ─────────────────────────────────────────────── */
+    const WEATHER = {
+      sparkles: { glyph: '✧', count: 7, size: [0.6, 1.5], duration: 7 },
+      stars:    { glyph: '✦', count: 9, size: [0.65, 1.3], duration: 9 },
+      petals:   { glyph: '✿', count: 8, size: [0.8, 1.25], duration: 18 },
+      snow:     { glyph: '❄', count: 11, size: [0.65, 1.2], duration: 14 },
+      embers:   { glyph: '·', count: 9, size: [0.75, 1.4], duration: 9 }
+    };
+    window.woodlesRenderWeather = weather => {
+      document.querySelectorAll('.sparkle').forEach(el => el.remove());
+      const look = WEATHER[weather];
+      if (!look) return;
+      const fragment = document.createDocumentFragment();
+      for (let i = 0; i < look.count; i++) {
+        const s = document.createElement('span');
+        s.className = 'sparkle';
+        s.setAttribute('aria-hidden', 'true');
+        s.textContent = look.glyph;
+        s.style.left = (8 + Math.random() * 84) + 'vw';
+        s.style.top = (8 + Math.random() * 78) + 'vh';
+        s.style.animationDelay = (-Math.random() * look.duration) + 's';
+        s.style.fontSize = (look.size[0] + Math.random() * (look.size[1] - look.size[0])) + 'rem';
+        s.style.setProperty('--weather-drift', (Math.random() * 10 - 5) + 'vw');
+        fragment.appendChild(s);
+      }
+      document.body.appendChild(fragment);
+    };
+    window.woodlesRenderWeather(document.documentElement.getAttribute('data-weather'));
   </script>
 
 </body>
