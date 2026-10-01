@@ -1,9 +1,10 @@
-# landing themes — the earlier look proposal
+# landing themes — current look map
 
-this records the six-axis look proposal. steps 1–3 of "order" were built on
-2026-09-29: the `--desk-*` tokens, `looks.js`, and signal's and typewriter's
-looks. the rest of that table remains a proposal. descriptions of the page
-"today" below describe the earlier baseline, before scenes were added.
+the six-axis look system and the full fifteen-theme map are built (2026-09-30):
+the `--desk-*` tokens, `looks.js`, and each palette's type, shape, material,
+motion, ground, and weather. the remaining proposal work is the per-axis
+override editor and screensaver integration. the historical baseline below
+describes the page before looks and scenes were added.
 
 ## current direction: home scenes (2026-09-29)
 
@@ -98,9 +99,11 @@ else, the ui role falls back to DM Mono. `--desk-ui-scale` lets a sans pair
 nudge those tiny sizes up, because a sans at 0.54rem reads smaller than the
 mono did.
 
-fonts load one pair at a time: the pre-paint script adds a Google Fonts link
-for the chosen pair. it does not use `shared/fonts.css`, which imports all
-twelve families in a single request.
+the base request loads the classic Desktop faces and the Lora/IM Fell faces
+used by Field Notes. other theme families are added on first use by
+`looks.js`; Landing does not import `shared/fonts.css`, which fetches the full
+workspace font set. The expressive display faces remain separate from the
+DM Mono or Space Grotesk UI faces.
 
 **shape.** the fifteen radii used today fold into five steps: 6–7px → xs,
 8–9px → s, 10–13px → m, 14–18px → l, 20–22px → xl. `50%` and `999px` stay as
@@ -144,16 +147,16 @@ ids. sugar's dots become the `sprinkles` value, and blossom's heavier wash
 becomes a `--desk-wash` strength, so the stylesheet never names a theme
 again.
 
-*weather* generalizes the sparkles. the seven spans already exist
-(`index.html:4892`). a weather value gives them a glyph (`✧` `✦` `✿` `❄`
-`·`), a count, and one of three keyframes: twinkle (today's), fall (petals,
-snow), or rise (embers). the ✦ tray button keeps its meaning of weather on or
-off.
+*weather* generalizes the sparkles. a weather value gives its decorative marks
+a glyph (`✧` `✦` `✿` `❄` `·`), a count, and one of three motions: twinkle,
+fall (petals and snow), or rise (embers). the tray control switches the theme's
+weather on or off; when a theme has none, switching on uses sparkles.
 
-## what the themes become
+## finalized default looks
 
-`cream` stays exactly as it is today, because the default must not change.
-the rest of this table is a first pass, meant to be argued with:
+`cream` keeps the original desk as the default. Every other palette now has a
+complete landing look. These defaults are local to Landing; the shared palette
+ids and colors stay unchanged.
 
 | theme | type | shape | material | motion | ground | weather |
 |---|---|---|---|---|---|---|
@@ -166,9 +169,9 @@ the rest of this table is a first pass, meant to be argued with:
 | inkwell | fell | crisp | paper | float | ruled | stars |
 | typewriter | fell | crisp | paper | snappy | ruled | none |
 | paper | classic | crisp | flat | snappy | plain | none |
-| blossom | glaze | round | glass | float | aura, strong | petals |
+| blossom | glaze | round | glass | float | bloom | petals |
 | sugar | modern | round | glass | bouncy | sprinkles | sparkles |
-| fog | modern | soft | glass | float | still | none |
+| fog | modern | soft | glass | still | still | none |
 | glacier | modern | crisp | glass | float | aura | snow |
 | signal | modern | crisp | flat | snappy | plain | none |
 | amber | pixel | crisp | glow | snappy | scanlines | embers |
@@ -226,17 +229,15 @@ getting their own settings:
 - `prefers-reduced-motion` forces motion to `still` and weather to `none`
   before first paint. the particles are then never built, rather than built
   and frozen, which is the same stance as Thinking About's `logSitting`.
-- `prefers-reduced-transparency` forces material to `flat`, in browsers that
-  support it. `prefers-contrast: more` does the same. either way, any palette
-  gets signal's form.
-- `/` is audited today at `wcag2a` / `wcag21a` only
-  (`e2e/accessibility.spec.ts`), and color contrast is a `wcag2aa` rule, so
-  the landing page's contrast has never been checked. `landing.spec.ts` should
-  gain a loop over every theme, with the desk and personalize open, running
-  axe at `wcag2aa`, the way `homesuite.spec.ts` already does. one caveat: axe
-  can't see through `backdrop-filter`, so under `glass` it measures text
-  against `--surface` and the wash makes the result approximate. `paper` and
-  `flat` are opaque, so their results are exact.
+- `prefers-reduced-transparency` resolves `glass` and `glow` to `flat`, in
+  browsers that support it; paper is already opaque. `prefers-contrast: more`
+  forces every material to flat.
+- the accessibility suite audits Field Notes at two widths and the scene
+  chooser with Amber, but it does not yet cover every Desktop look. Add a loop
+  over all themes with widgets and Personalize open at `wcag2aa`, as
+  `homesuite.spec.ts` does. axe can't see through `backdrop-filter`, so under
+  glass it measures text against `--surface` and the wash makes results
+  approximate. paper and flat are opaque, so their results are exact.
 
 ## as built
 
@@ -244,17 +245,23 @@ getting their own settings:
   keeps all fifteen of today's sizes exactly; `crisp` is `--desk-round: 0.25`.
   folding into five steps would have moved pixels in step 1.
 - **glass is a fallback.** each pane reads `var(--desk-glass, <its own
-  blur>)`, so glass keeps its per-pane values and paper/flat set `none`.
+  blur>)`, so glass keeps its per-pane values and paper/flat set `none`. glow
+  keeps a dark translucent surface and adds an accent halo.
 - **bloom** is a ground value — blossom's heavier wash — alongside
-  `sprinkles`, sugar's dots. neither theme's look changed.
+  `sprinkles`, sugar's dots. Blossom now uses a stronger wash with drifting
+  petals; Sugar keeps its candy ground and twinkling marks.
 - **paper and flat redefine `--surface`** on `<html>` (opaque) rather than
   touching each pane's mix; their shadows are one rule over the panes.
 - **wallpaper keeps its row** in personalize, with a "theme's" button for
   following the theme; sparkles on/off means the theme's own weather, or
   sparkles when the theme has none.
-- only the axis values the built looks use exist yet: type `classic`
-  `fell` `modern`, shape `soft` `crisp`, material `glass` `paper` `flat`,
-  motion `float` `snappy` `still`, weather `sparkles` `none`.
+- the resolver supports type `classic` `optical` `modern` `fell` `gothic`
+  `glaze` `pixel`; shape `soft` `round` `crisp` `square`; material `glass`
+  `paper` `flat` `glow`; motion `float` `snappy` `bouncy` `still`; grounds
+  `aura` `still` `confetti` `ruled` `sprinkles` `bloom` `scanlines` `plain`;
+  and weather `sparkles` `stars` `petals` `snow` `embers` `none`.
+- `prefers-contrast: more` resolves every palette to flat. Reduced transparency
+  resolves glass and glow to flat; opaque paper stays paper.
 
 ## order
 
@@ -268,12 +275,12 @@ each step ships on its own and leaves the desk working.
 2. **add the axes and the resolver, still with no visible change.** this is
    `looks.js`, the per-value token blocks, every theme mapped to today's
    values, and the `woodles-desk` migration.
-3. **give signal and typewriter their looks.** these are the two themes where
-   the gap between the name and the look is widest, and signal's change is
-   arguably a fix. the rest of the table follows.
+3. **give every theme its own look.** the complete table above is built; the
+   next work is previewing and editing individual axes in Personalize.
 4. **add a "this theme" section to personalize**, with one row per axis,
    overrides, and theme cards that preview the whole look.
-5. **make the screensaver follow the theme, and tint the tiles.**
+5. **make the screensaver follow the theme.** Tile tint now follows paper,
+   flat, and glow materials.
 6. **later, not proposed in detail:**
    - a "use on desktop" button beside "use in write" in Hygge's palette mixer.
      `library.js` already has `decodeCustomPalette` and
@@ -304,7 +311,8 @@ each step ships on its own and leaves the desk working.
   shape, material, motion and atmosphere where they are. mechanically: before
   stepping, the current resolved non-palette axes are written into
   `woodles-look`, so the form is held rather than handed to the next theme.
-  picking a theme card in personalize is still how you take a whole look.
+  choosing a theme swatch in Personalize still applies the whole default look.
 - **no "follow the day".** dropped from step 6.
 
-still open: whether the table is right, particularly which themes get weather.
+still open: the per-axis override editor and making the screensaver follow the
+resolved theme.

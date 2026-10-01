@@ -15,26 +15,41 @@
   var THEMES = ['cream','dawn','dusk','terracotta','midnight','forest','paper','inkwell','typewriter','blossom','sugar','fog','glacier','signal','amber'];
   var AXES = ['type', 'shape', 'material', 'motion', 'ground', 'weather'];
   var VALUES = {
-    type: ['classic', 'fell', 'modern'],
-    shape: ['soft', 'crisp'],
-    material: ['glass', 'paper', 'flat'],
-    motion: ['float', 'snappy', 'still'],
-    ground: ['aura', 'still', 'confetti', 'ruled', 'sprinkles', 'bloom', 'plain'],
-    weather: ['sparkles', 'none']
+    type: ['classic', 'optical', 'modern', 'fell', 'gothic', 'glaze', 'pixel'],
+    shape: ['soft', 'round', 'crisp', 'square'],
+    material: ['glass', 'paper', 'flat', 'glow'],
+    motion: ['float', 'snappy', 'bouncy', 'still'],
+    ground: ['aura', 'still', 'confetti', 'ruled', 'sprinkles', 'bloom', 'scanlines', 'plain'],
+    weather: ['sparkles', 'stars', 'petals', 'snow', 'embers', 'none']
   };
   var BASE = { type: 'classic', shape: 'soft', material: 'glass', motion: 'float', ground: 'aura', weather: 'sparkles' };
-  /* only what differs from BASE. the rest of THEMES.md's table lands as
-     its values do; until then a theme looks the way it always has. */
+  /* Each palette has a complete landing look. Keep this map local to the
+     homepage; woodles-theme remains the shared palette id. */
   var LOOKS = {
-    blossom:    { ground: 'bloom' },
-    sugar:      { ground: 'sprinkles' },
-    typewriter: { type: 'fell', shape: 'crisp', material: 'paper', motion: 'snappy', ground: 'ruled', weather: 'none' },
-    signal:     { type: 'modern', shape: 'crisp', material: 'flat', motion: 'snappy', ground: 'plain', weather: 'none' }
+    cream:      { type: 'classic', shape: 'soft', material: 'glass', motion: 'float',  ground: 'aura',      weather: 'sparkles' },
+    dawn:       { type: 'optical', shape: 'soft', material: 'glass', motion: 'float',  ground: 'aura',      weather: 'sparkles' },
+    dusk:       { type: 'classic', shape: 'soft', material: 'glass', motion: 'float',  ground: 'aura',      weather: 'stars' },
+    terracotta: { type: 'gothic',  shape: 'round', material: 'paper', motion: 'float',  ground: 'aura',      weather: 'none' },
+    midnight:   { type: 'modern',  shape: 'soft', material: 'glow',  motion: 'float',  ground: 'aura',      weather: 'stars' },
+    forest:     { type: 'optical', shape: 'soft', material: 'paper', motion: 'float',  ground: 'aura',      weather: 'none' },
+    paper:      { type: 'classic', shape: 'crisp', material: 'flat',  motion: 'snappy', ground: 'plain',     weather: 'none' },
+    inkwell:    { type: 'fell',    shape: 'crisp', material: 'paper', motion: 'float',  ground: 'ruled',     weather: 'stars' },
+    typewriter: { type: 'fell',    shape: 'crisp', material: 'paper', motion: 'snappy', ground: 'ruled',     weather: 'none' },
+    blossom:    { type: 'glaze',   shape: 'round',material: 'glass', motion: 'float',  ground: 'bloom',     weather: 'petals' },
+    sugar:      { type: 'modern',  shape: 'round',material: 'glass', motion: 'bouncy', ground: 'sprinkles', weather: 'sparkles' },
+    fog:        { type: 'modern',  shape: 'soft', material: 'glass', motion: 'still',  ground: 'still',     weather: 'none' },
+    glacier:    { type: 'modern',  shape: 'crisp',material: 'glass', motion: 'float',  ground: 'aura',      weather: 'snow' },
+    signal:     { type: 'modern',  shape: 'crisp',material: 'flat',  motion: 'snappy', ground: 'plain',     weather: 'none' },
+    amber:      { type: 'pixel',   shape: 'crisp',material: 'glow',  motion: 'snappy', ground: 'scanlines', weather: 'embers' }
   };
-  /* classic's faces come with the page; the others load when first used */
+  /* classic and Field Notes' faces come with the page; other look families
+     load when first used. */
   var FONTS = {
-    fell: 'family=IM+Fell+DW+Pica:ital@0;1',
-    modern: 'family=Plus+Jakarta+Sans:wght@300;400;500&family=Space+Grotesk:wght@300;400;500'
+    optical: 'family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;1,9..144,300;1,9..144,400',
+    modern: 'family=Plus+Jakarta+Sans:wght@300;400;500&family=Space+Grotesk:wght@300;400;500',
+    gothic: 'family=Special+Gothic+Condensed+One',
+    glaze: 'family=Kalnia+Glaze:wght@100;200;300;400;500;600;700',
+    pixel: 'family=Coral+Pixels'
   };
   var KEY = 'woodles-look';
 
@@ -85,7 +100,8 @@
     for (var o in state.over) out[o] = state.over[o];
     /* the system's word beats anyone's choice */
     if (mq('(prefers-reduced-motion: reduce)')) { out.motion = 'still'; out.weather = 'none'; }
-    if (out.material === 'glass' && (mq('(prefers-reduced-transparency: reduce)') || mq('(prefers-contrast: more)')))
+    if (mq('(prefers-contrast: more)') ||
+        ((out.material === 'glass' || out.material === 'glow') && mq('(prefers-reduced-transparency: reduce)')))
       out.material = 'flat';
     return out;
   }
@@ -112,6 +128,7 @@
     root.setAttribute('data-theme', theme);
     AXES.forEach(function (a) { root.setAttribute('data-' + a, look[a]); });
     loadFonts(look.type);
+    if (typeof window.woodlesRenderWeather === 'function') window.woodlesRenderWeather(look.weather);
     return look;
   }
 
