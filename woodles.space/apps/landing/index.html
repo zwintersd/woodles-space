@@ -4998,16 +4998,19 @@
       });
       renderPrefs();
     }
-    /* ❄ changes the colors and nothing else: the form on screen is held,
-       so the next palette arrives in it. a swatch takes a whole look. */
+    /* ❄ steps the colors and the typeface together, while holding the rest
+       of the current look. a swatch takes the selected theme's whole look. */
     function nextTheme() {
       Object.assign(lookState.held, { ...looks.lookOf(THEMES[themeIdx]), ...lookState.held });
+      delete lookState.held.type;
+      delete lookState.over.type;
       looks.write(lookState);
       themeIdx = (themeIdx + 1) % THEMES.length;
       applyTheme();
     }
     function takeTheme(i) {
       for (const k in lookState.held) delete lookState.held[k];
+      delete lookState.over.type;
       looks.write(lookState);
       themeIdx = i;
       applyTheme();

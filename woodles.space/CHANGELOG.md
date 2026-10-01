@@ -24,7 +24,9 @@ so it's not easy to forget.
   own type, shape, material, motion, wallpaper treatment, and ambient weather.
   Midnight and Amber gain accent-lit glass; Blossom has drifting petals;
   Glacier has snow; Amber has scanlines and rising embers. The setting adapts
-  to high-contrast and reduced-transparency preferences.
+  to high-contrast and reduced-transparency preferences. The palette-cycle
+  button now changes the typeface with the theme while holding its other look
+  settings.
 
 ## 2026-09-29
 
