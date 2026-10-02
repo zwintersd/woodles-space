@@ -342,3 +342,17 @@ h3 { margin: 0; font-size: 16px; }
   .print-credit { display: block; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+
+.activity-steps { margin: 12px 0 0; padding-left: 24px; text-align: left; }
+.activity-steps > li { padding: 6px 0; break-inside: avoid; }
+.step-heading, .step-options, .step-options > span { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.step-heading img, .step-options img { width: 24px; height: 24px; object-fit: contain; }
+.step-options { margin-top: 5px; font-size: 13px; }
+.step-composer { border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
+.step-editor { display: grid; gap: 10px; margin: 12px 0; padding: 12px; border: 1px solid #dfe7f0; border-radius: 12px; background: #f9fbfe; }
+.step-fields, .step-option-row { display: grid; grid-template-columns: 2fr 1fr 2fr; align-items: end; gap: 8px; }
+.step-option-row { margin-bottom: 10px; }
+.step-option-row button { grid-column: 1 / -1; justify-self: end; }
+.step-editor .button { padding: 6px 10px; font-size: 12px; }
+.step-editor .field { min-width: 0; }
+@media (max-width: 600px) { .step-fields, .step-option-row { grid-template-columns: 1fr; } }
