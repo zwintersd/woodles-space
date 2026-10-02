@@ -105,6 +105,7 @@
   let cropTarget = null;
   let activeSymbolGroup = 'Popular';
   let choiceDraft = [];
+  let activityStepsDraft = [];
   let videoDraft = [];
   let recentSymbols = readRecentSymbols();
 
@@ -150,7 +151,7 @@
     const now = new Date().toISOString();
     const plan = getPlan();
     if (plan) plan.updatedAt = now;
-    const usedImages = new Set(workspace.activities.map((item) => item.imageAssetId).concat(
+    const usedImages = new Set(workspace.activities.flatMap(itemImageIds).concat(
       workspace.plans.flatMap((entry) => entry.days.flatMap((day) => day.activities.flatMap(itemImageIds)))
     ).filter(Boolean));
     workspace.images = workspace.images.filter((image) => usedImages.has(image.id));
@@ -406,6 +407,7 @@
       '<div class="activity-time">' + esc(formatTime(item.start)) + '<small>' + item.duration + ' min</small></div>' +
       visualMarkup(item) +
       '<div class="activity-copy"><h3>' + esc(item.title) + '</h3><div class="activity-tags"><span class="activity-tag">' + esc(item.category) + '</span></div>' +
+      window.ScheduleStudio.activityStepsMarkup(item, optionVisual) +
       (item.note ? '<p class="activity-note">' + esc(item.note) + '</p>' : '') +
       (item.credit ? '<p class="image-credit">' + esc(item.credit) + '</p>' : '') + '</div>' +
       itemActions(item, index, items, item.title, 'edit-activity') + '</article>';
@@ -571,6 +573,7 @@
   }
 
   function showActivityDialog(mode, item) {
+    activityStepsDraft = JSON.parse(JSON.stringify(item?.steps || []));
     activityMode = mode;
     editingActivityId = item ? item.occurrenceId : '';
     activityDialogBody.innerHTML = '';
@@ -595,6 +598,7 @@
             '<div class="image-asset-preview" id="imageAssetPreview">' + renderImageAssetPreview(activity.pictogram || '', activity.imageAssetId || '') + '</div><small class="muted" id="imageHelp">Crop an image here or use an ARASAAC ID or direct HTTPS image URL. Add a credit below for other image sources.</small></div>' +
           '<label class="field full"><span>Image source or attribution (optional)</span><input name="credit" maxlength="200" value="' + esc(activity.credit || '') + '" placeholder="Artist, library, or license"></label>' +
           '<label class="field full"><span>Support cue or short note (optional)</span><textarea name="note" maxlength="500" placeholder="A short cue, material, or transition note">' + esc(activity.note || '') + '</textarea></label>' +
+          '<fieldset class="step-composer full"><legend>Steps inside this activity (optional)</legend><p class="muted">Add steps in order. A step can offer a choice. All steps share the activity’s total time.</p><div id="activityStepsDraft"></div><button class="button secondary" type="button" data-action="add-activity-step">＋ Add step</button></fieldset>' +
           (!editing ? '<label class="check-field full"><input type="checkbox" name="saveToLibrary" checked><span>Save this activity to the reusable library</span></label>' :
             (activity.sourceId ? '<label class="check-field full"><input type="checkbox" name="updateLibrary"><span>Also update the library card for future use</span></label>' : '')) +
           '<div class="error-text full" id="activityError" role="status" aria-live="polite"></div>' +
@@ -602,8 +606,51 @@
         '</form>';
     }
     if (!activityDialog.open) activityDialog.showModal();
+    renderActivityStepsDraft();
     activityDialogBody.querySelector('input[name="title"]')?.focus();
   }
+
+
+  function renderActivityStepsDraft() {
+    const host = document.getElementById('activityStepsDraft');
+    if (!host) return;
+    const field = (value, key, index, option, label, max) => '<label class="field"><span>' + label + '</span><input data-step-field="' + key + '" data-step-index="' + index + '"' + (option === undefined ? '' : ' data-option-index="' + option + '"') + ' maxlength="' + max + '" value="' + esc(value || '') + '"></label>';
+    const button = (action, index, label, disabled, option) => '<button class="button secondary" type="button" data-action="' + action + '" data-step-index="' + index + '"' + (option === undefined ? '' : ' data-option-index="' + option + '"') + (disabled ? ' disabled' : '') + '>' + label + '</button>';
+    host.innerHTML = activityStepsDraft.map((step, index) => '<section class="step-editor" aria-label="Step ' + (index + 1) + '"><div class="button-row"><strong>Step ' + (index + 1) + '</strong>' + button('step-up', index, 'Move up', index === 0) + button('step-down', index, 'Move down', index === activityStepsDraft.length - 1) + button('remove-activity-step', index, 'Remove step') + '</div><div class="step-fields">' + field(step.title, 'title', index, undefined, 'Step name', 60) + field(step.icon, 'icon', index, undefined, 'Symbol or emoji', 16) + field(step.pictogram, 'pictogram', index, undefined, 'ARASAAC ID or HTTPS image', 300) + '</div><label class="field"><span>Step type</span><select data-step-kind="' + index + '"><option value="task"' + (step.kind === 'task' ? ' selected' : '') + '>Do this step</option><option value="choice"' + (step.kind === 'choice' ? ' selected' : '') + '>Pick one option</option></select></label>' +
+      (step.kind === 'choice' ? '<div class="step-option-editor">' + step.options.map((option, oi) => '<div class="step-option-row">' + field(option.title, 'title', index, oi, 'Option ' + (oi + 1) + ' name', 60) + field(option.icon, 'icon', index, oi, 'Symbol or emoji', 16) + field(option.pictogram, 'pictogram', index, oi, 'ARASAAC ID or HTTPS image', 300) + button('remove-step-option', index, 'Remove option', false, oi) + '</div>').join('') + button('add-step-option', index, '＋ Add option', step.options.length >= 6) + '</div>' : '') + '</section>').join('');
+    host.parentElement.querySelector('[data-action="add-activity-step"]').disabled = activityStepsDraft.length >= 20;
+  }
+
+  function changeActivityStep(action) {
+    const index = Number(action.dataset.stepIndex);
+    const step = activityStepsDraft[index];
+    const name = action.dataset.action;
+    if (name === 'add-activity-step' && activityStepsDraft.length < 20) activityStepsDraft.push({ id: makeId('step'), kind: 'task', title: '', icon: '⭐', options: [] });
+    else if (name === 'remove-activity-step') activityStepsDraft.splice(index, 1);
+    else if (name === 'step-up' || name === 'step-down') {
+      const next = index + (name === 'step-up' ? -1 : 1);
+      if (next >= 0 && next < activityStepsDraft.length) [activityStepsDraft[index], activityStepsDraft[next]] = [activityStepsDraft[next], step];
+    } else if (name === 'add-step-option' && step.options.length < 6) step.options.push({ id: makeId('option'), title: '', icon: '⭐' });
+    else if (name === 'remove-step-option') step.options.splice(Number(action.dataset.optionIndex), 1);
+    renderActivityStepsDraft();
+    const host = document.getElementById('activityStepsDraft');
+    if (name === 'add-activity-step') host.lastElementChild?.querySelector('input')?.focus();
+    else if (name === 'add-step-option') host.children[index]?.querySelector('.step-option-row:last-of-type input')?.focus();
+  }
+
+  document.addEventListener('input', (event) => {
+    const input = event.target;
+    if (!input.matches('[data-step-field]')) return;
+    const step = activityStepsDraft[Number(input.dataset.stepIndex)];
+    const target = input.dataset.optionIndex === undefined ? step : step.options[Number(input.dataset.optionIndex)];
+    target[input.dataset.stepField] = input.value;
+    if (input.dataset.stepField === 'pictogram') target.imageAssetId = '';
+  });
+  document.addEventListener('change', (event) => {
+    if (!event.target.matches('[data-step-kind]')) return;
+    activityStepsDraft[Number(event.target.dataset.stepKind)].kind = event.target.value;
+    renderActivityStepsDraft();
+  });
 
   function showOpenSlotDialog(mode, item) {
     const plan = getPlan();
@@ -1204,6 +1251,7 @@
       credit: item.credit,
       color: item.color,
       note: item.note,
+      steps: JSON.parse(JSON.stringify(item.steps || [])),
       start: timeString(start)
     };
   }
@@ -1232,6 +1280,8 @@
     if (imageUrl && !/^\d{1,10}$/.test(imageUrl) && !/^https:\/\//i.test(imageUrl)) {
       throw new Error('Use a pictogram number or a direct HTTPS image URL.');
     }
+    if (activityStepsDraft.some((step) => !step.title.trim() || (step.kind === 'choice' && (step.options.length < 2 || step.options.some((option) => !option.title.trim()))))) throw new Error('Name each step and add at least two named options to every choice step.');
+    if (activityStepsDraft.flatMap((step) => [step, ...(step.kind === 'choice' ? step.options : [])]).some((entry) => entry.pictogram && !/^\d{1,10}$/.test(entry.pictogram) && !/^https:\/\//i.test(entry.pictogram))) throw new Error('Step pictures need an ARASAAC number or a direct HTTPS image URL.');
     const activity = sanitizeActivity({
       id: makeId('activity'),
       title: data.get('title'),
@@ -1242,7 +1292,8 @@
       imageAssetId,
       credit: data.get('credit'),
       color: data.get('color'),
-      note: data.get('note')
+      note: data.get('note'),
+      steps: activityStepsDraft
     });
     if (!activity) throw new Error('Add an activity name first.');
     const start = data.get('start') ? validTime(data.get('start'), '') : '';
@@ -1424,7 +1475,7 @@
     const usedIds = new Set(plan.days.flatMap((day) => day.activities.map((item) => item.sourceId).filter(Boolean)));
     const activityLibrary = workspace.activities.filter((item) => usedIds.has(item.id));
     const usedImageIds = new Set(plan.days.flatMap((day) => day.activities.flatMap(itemImageIds))
-      .concat(activityLibrary.map((item) => item.imageAssetId)).filter(Boolean));
+      .concat(activityLibrary.flatMap(itemImageIds)).filter(Boolean));
     const images = workspace.images.filter((image) => usedImageIds.has(image.id));
     const content = JSON.stringify({ format: 'woodles.schedule-week.v1', exportedAt: new Date().toISOString(), plan, activityLibrary, images }, null, 2);
     const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
@@ -1461,6 +1512,7 @@
         const remapImage = (item) => ({
           ...item,
           imageAssetId: imageIdMap.get(item && item.imageAssetId) || '',
+          ...(item && Array.isArray(item.steps) ? { steps: item.steps.map(remapImage) } : {}),
           ...(item && Array.isArray(item.options) ? { options: item.options.map(remapImage) } : {}),
           ...(item && Array.isArray(item.videos) ? { videos: item.videos.map(remapImage) } : {})
         });
@@ -1512,7 +1564,8 @@
     const action = event.target.closest('[data-action]');
     if (!action) return;
     const name = action.dataset.action;
-    if (name === 'new-plan') startNewPlan();
+    if (['add-activity-step', 'remove-activity-step', 'step-up', 'step-down', 'add-step-option', 'remove-step-option'].includes(name)) changeActivityStep(action);
+    else if (name === 'new-plan') startNewPlan();
     else if (name === 'open-plan') routeToPlan(action.dataset.plan, 'monday');
     else if (name === 'back-library') { event.preventDefault(); routeToPlan('', 'monday'); }
     else if (name === 'duplicate-plan') duplicatePlan(action.dataset.plan);

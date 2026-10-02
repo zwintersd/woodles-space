@@ -1,0 +1,73 @@
+import { expect, test } from '@playwright/test';
+
+test('activity steps persist, reuse, print and offer a nested choice', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/schedules/generator');
+  await page.evaluate(() => {
+    const S = (window as any).ScheduleStudio;
+    localStorage.setItem(S.STORAGE_KEY, JSON.stringify({ plans: [S.sanitizePlan({ id: 'steps-test', learner: 'Sam', name: 'Steps', days: [] })], activities: [], images: [] }));
+  });
+  await page.goto('/schedules/generator?plan=steps-test&day=monday');
+  await page.locator('[data-action="add-activity"]').first().click();
+  await page.locator('#activityForm input[name="title"]').fill('Make a snack');
+  await page.locator('[data-action="add-activity-step"]').click();
+  await page.locator('[data-step-field="title"]').fill('Wash hands');
+  await page.locator('[data-action="add-activity-step"]').click();
+  await page.locator('[data-step-field="title"][data-step-index="1"]').fill('Choose fruit');
+  await page.locator('[data-step-kind="1"]').selectOption('choice');
+  await page.locator('#activityForm button[type="submit"]').click();
+  await expect(page.locator('#activityError')).toContainText('at least two');
+  for (const [i, title] of ['Apple', 'Banana'].entries()) {
+    await page.locator('[data-action="add-step-option"]').click();
+    await page.locator(`[data-step-field="title"][data-option-index="${i}"]`).fill(title);
+  }
+  await page.locator('[data-action="step-up"][data-step-index="1"]').click();
+  await expect(page.locator('[data-step-field="title"][data-step-index="0"]').first()).toHaveValue('Choose fruit');
+  await page.locator('[data-action="step-down"][data-step-index="0"]').click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.locator('#activityDialog').evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth)).toBe(true);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.locator('#activityForm button[type="submit"]').click();
+  await expect(page.locator('.activity-card .activity-steps')).toContainText('Wash hands');
+  await page.reload();
+  await expect(page.locator('.activity-card .activity-steps')).toContainText('Banana');
+  await page.locator('[data-action="edit-activity"]').click();
+  await expect(page.locator('[data-step-field="title"][data-step-index="0"]')).toHaveValue('Wash hands');
+  await page.locator('#activityForm button[type="submit"]').click();
+  await page.locator('[data-action="add-activity"]').first().click();
+  await page.locator('[data-action="activity-tab"][data-mode="library"]').click();
+  await page.locator('[data-action="add-library-activity"]').click();
+  await expect(page.locator('.activity-card .activity-steps')).toHaveCount(2);
+  await page.emulateMedia({ media: 'print' });
+  await expect(page.locator('.activity-card .activity-steps').first()).toBeVisible();
+  await page.emulateMedia({ media: 'screen' });
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('woodles.schedule-planner.v1')!));
+  expect(saved.activities[0].steps).toHaveLength(2);
+  expect(saved.plans[0].days[0].activities[0].steps[1].options).toHaveLength(2);
+  await page.locator('#copyDestination').selectOption('tuesday');
+  await page.locator('[data-action="copy-day"]').click();
+  const exported = page.waitForEvent('download');
+  await page.locator('[data-action="export-plan"]').click();
+  const download = await exported;
+  await page.locator('#importFile').setInputFiles((await download.path())!);
+  await expect(page.locator('.activity-card .activity-steps')).toHaveCount(2);
+  const imported = await page.evaluate(() => JSON.parse(localStorage.getItem('woodles.schedule-planner.v1')!));
+  expect(imported.plans).toHaveLength(2);
+  expect(imported.plans[1].days[1].activities[0].steps[1].options[0].title).toBe('Apple');
+  await page.goto('/schedules/view?plan=steps-test&day=monday');
+  await expect(page.locator('.activity-steps')).toHaveCount(2);
+  const apple = page.locator('.activity-steps .chip').filter({ hasText: 'Apple' }).first();
+  await apple.click();
+  await expect(apple).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.activity-steps .chip').filter({ hasText: 'Apple' }).nth(1)).toHaveAttribute('aria-pressed', 'false');
+  await page.reload();
+  await expect(page.locator('.activity-steps .chip').filter({ hasText: 'Apple' }).first()).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Clear choices and checks' }).click();
+  await expect(page.locator('.activity-steps .chip').filter({ hasText: 'Apple' }).first()).toHaveAttribute('aria-pressed', 'false');
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath('schedule-steps-mobile.png'), fullPage: true });
+  expect(errors).toEqual([]);
+});
+

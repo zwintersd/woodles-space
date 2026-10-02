@@ -96,12 +96,26 @@ window.ScheduleStudio = (() => {
       imageAssetId: cleanText(value.imageAssetId, 100, ''),
       credit: cleanText(value.credit, 200, ''),
       color: validColor(value.color),
-      note: cleanText(value.note, 500, '')
+      note: cleanText(value.note, 500, ''),
+      steps: (Array.isArray(value.steps) ? value.steps : []).slice(0, 20).map(sanitizeActivityStep).filter(Boolean)
     };
   }
 
   function validFamiliarity(value) {
     return Object.prototype.hasOwnProperty.call(FAMILIARITY, value) ? value : '';
+  }
+
+  function sanitizeActivityStep(value) {
+    const step = sanitizeChoiceOption(value);
+    if (!step) return null;
+    return { ...step, kind: value.kind === 'choice' ? 'choice' : 'task',
+      options: (Array.isArray(value.options) ? value.options : []).map(sanitizeChoiceOption).filter(Boolean).slice(0, MAX_CHOICE_OPTIONS) };
+  }
+
+  function activityStepsMarkup(item, visual) {
+    if (!item.steps || !item.steps.length) return '';
+    return '<ol class="activity-steps">' + item.steps.map((step) => '<li><span class="step-heading">' + visual(step, 24) + '<strong>' + esc(step.title) + '</strong></span>' +
+      (step.kind === 'choice' ? '<span class="step-options">Pick one: ' + step.options.map((option) => '<span>' + visual(option, 24) + esc(option.title) + '</span>').join('<b aria-hidden="true">or</b>') + '</span>' : '') + '</li>').join('') + '</ol>';
   }
 
   function familiarityMarkup(value) {
@@ -281,7 +295,7 @@ window.ScheduleStudio = (() => {
   function itemVisuals(item) {
     if (item.kind === 'choice') return item.options;
     if (item.kind === 'video') return item.videos;
-    return item.kind === 'open-slot' ? [] : [item];
+    return item.kind === 'open-slot' ? [] : [item, ...(item.steps || []).flatMap((step) => [step, ...step.options])];
   }
 
   function itemImageIds(item) {
@@ -296,7 +310,7 @@ window.ScheduleStudio = (() => {
     STORAGE_KEY, DAY_KEYS, COLORS, MAX_CHOICE_OPTIONS, MAX_VIDEOS, FAMILIARITY,
     makeId, esc, cleanText, validTime, validDuration, validColor, timeMinutes,
     isLocalImageData, pictogramSource, openMojiCodepoint, symbolMarkup,
-    sanitizeImage, sanitizeActivity, sanitizeChoiceOption, sanitizeVideo, sanitizePlan, readWorkspace,
+    sanitizeImage, sanitizeActivity, sanitizeActivityStep, activityStepsMarkup, sanitizeChoiceOption, sanitizeVideo, sanitizePlan, readWorkspace,
     validVideoUrl, youTubeThumbnail, videoKey, validFamiliarity, familiarityMarkup, choiceTitle, videoTitle, videoPrompt, itemLabel,
     itemVisuals, itemImageIds, visualScheduleUrl
   };

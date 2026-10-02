@@ -159,6 +159,15 @@
       '</article></li>';
   }
 
+
+  function nestedStepsMarkup(item, progress) {
+    if (!item.steps?.length) return '';
+    return '<ol class="activity-steps">' + item.steps.map((step) => {
+      const key = item.occurrenceId + ':' + step.id;
+      return '<li><span class="step-heading">' + visualMarkup(step, 28) + '<strong>' + esc(step.title) + '</strong></span>' + (step.kind === 'choice' ? '<div class="chips" role="group" aria-label="Options for ' + esc(step.title) + '">' + step.options.map((option) => '<button class="chip" type="button" data-choice="' + esc(key) + '" data-option="' + esc(option.id) + '" aria-pressed="' + (progress.picks[key] === option.id) + '"><span class="chip-art">' + visualMarkup(option, 28) + '</span>' + esc(option.title) + '</button>').join('') + '</div>' : '') + '</li>';
+    }).join('') + '</ol>';
+  }
+
   function stepMarkup(step, progress) {
     if (step.kind === 'video') return videoMarkup(step, progress);
     if (step.kind === 'choice') return choiceMarkup(step, progress);
@@ -176,6 +185,7 @@
         '<span class="visual" aria-hidden="true">' + visual + '</span>' +
         '<div class="copy">' + (open ? '' : '<span class="category">' + esc(step.category) + '</span>') + '<h2>' + esc(title) + '</h2>' +
           (open ? '<p class="sub">Pick what to do.</p>' : step.note ? '<p class="sub">' + esc(step.note) + '</p>' : '') +
+          nestedStepsMarkup(step, progress) +
           (!open && step.credit ? '<p class="image-credit">' + esc(step.credit) + '</p>' : '') +
         '</div>' +
         doneButton(step, title, done) +
@@ -256,7 +266,7 @@
 
     const progress = readDayProgress();
     el('reset').hidden = false;
-    el('reset').textContent = day.activities.some((item) => item.kind === 'choice' || (item.kind === 'video' && item.videos.length > 1)) ? 'Clear choices and checks' : 'Clear checks';
+    el('reset').textContent = day.activities.some((item) => item.kind === 'choice' || item.steps?.some((step) => step.kind === 'choice') || (item.kind === 'video' && item.videos.length > 1)) ? 'Clear choices and checks' : 'Clear checks';
     el('credits').innerHTML = creditsMarkup();
     el('timeline').setAttribute('aria-label', day.label + ' schedule');
     el('timeline').innerHTML = steps().map((step) => stepMarkup(step, progress)).join('');

@@ -169,3 +169,11 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--sky); outline-o
 }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; } }
+
+.activity-steps { margin: 12px 0 0; padding-left: 24px; text-align: left; }
+.activity-steps > li { padding: 6px 0; break-inside: avoid; }
+.step-heading, .step-options, .step-options > span { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.step-heading img, .step-options img { width: 24px; height: 24px; object-fit: contain; }
+.step-options { margin-top: 5px; font-size: 13px; }
+
+.activity-steps .chips { display: flex; flex-wrap: wrap; margin-top: 8px; }
