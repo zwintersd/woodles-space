@@ -84,7 +84,7 @@ window.ScheduleStudio = (() => {
     return { id: cleanText(value.id, 100, makeId('image')), data: value.data };
   }
 
-  function sanitizeActivity(value) {
+  function sanitizeActivity(value, depth = 0) {
     if (!value || typeof value !== 'object' || !String(value.title || '').trim()) return null;
     return {
       id: cleanText(value.id, 100, makeId('activity')),
@@ -97,7 +97,7 @@ window.ScheduleStudio = (() => {
       credit: cleanText(value.credit, 200, ''),
       color: validColor(value.color),
       note: cleanText(value.note, 500, ''),
-      steps: (Array.isArray(value.steps) ? value.steps : []).slice(0, 20).map(sanitizeActivityStep).filter(Boolean)
+      steps: (Array.isArray(value.steps) ? value.steps : []).slice(0, 20).map((step) => sanitizeActivityStep(step, depth)).filter(Boolean)
     };
   }
 
@@ -105,9 +105,10 @@ window.ScheduleStudio = (() => {
     return Object.prototype.hasOwnProperty.call(FAMILIARITY, value) ? value : '';
   }
 
-  function sanitizeActivityStep(value) {
+  function sanitizeActivityStep(value, depth = 0) {
     const step = sanitizeChoiceOption(value);
     if (!step) return null;
+    if (value.kind === 'suggestion' && depth < 3) return { ...step, ...sanitizeSuggestion(value, depth + 1), kind: 'suggestion', poolId: cleanText(value.poolId, 100, '') };
     return { ...step, kind: value.kind === 'choice' ? 'choice' : 'task',
       options: (Array.isArray(value.options) ? value.options : []).map(sanitizeChoiceOption).filter(Boolean).slice(0, MAX_CHOICE_OPTIONS) };
   }
@@ -115,7 +116,7 @@ window.ScheduleStudio = (() => {
   function activityStepsMarkup(item, visual) {
     if (!item.steps || !item.steps.length) return '';
     return '<ol class="activity-steps">' + item.steps.map((step) => '<li><span class="step-heading">' + visual(step, 24) + '<strong>' + esc(step.title) + '</strong></span>' +
-      (step.kind === 'choice' ? '<span class="step-options">Pick one: ' + step.options.map((option) => '<span>' + visual(option, 24) + esc(option.title) + '</span>').join('<b aria-hidden="true">or</b>') + '</span>' : '') + '</li>').join('') + '</ol>';
+      (step.kind === 'choice' ? '<span class="step-options">Pick one: ' + step.options.map((option) => '<span>' + visual(option, 24) + esc(option.title) + '</span>').join('<b aria-hidden="true">or</b>') + '</span>' : step.kind === 'suggestion' ? '<span class="step-options">Suggestion pool: ' + step.candidates.filter((candidate) => candidate.enabled && candidate.duration <= Math.min(step.duration, item.duration)).map((candidate) => esc(candidate.title)).join(' · ') + '</span>' : '') + '</li>').join('') + '</ol>';
   }
 
   function familiarityMarkup(value) {
@@ -187,18 +188,18 @@ window.ScheduleStudio = (() => {
     return Number.isInteger(number) && number >= min && number <= max ? number : fallback;
   }
 
-  function sanitizeSuggestionCandidate(value) {
-    const activity = sanitizeActivity(value);
+  function sanitizeSuggestionCandidate(value, depth = 0) {
+    const activity = sanitizeActivity(value, depth);
     if (!activity) return null;
     return { ...activity, enabled: value.enabled !== false,
       weight: boundedInteger(value.weight, 1, 10, 1),
       url: validVideoUrl(value.url) ? cleanText(value.url, 500, '') : '' };
   }
 
-  function sanitizeSuggestion(value) {
+  function sanitizeSuggestion(value, depth = 0) {
     const ids = new Set();
     const candidates = (Array.isArray(value.candidates) ? value.candidates : [])
-      .slice(0, 60).map(sanitizeSuggestionCandidate).filter((candidate) => {
+      .slice(0, 60).map((candidate) => sanitizeSuggestionCandidate(candidate, depth)).filter((candidate) => {
         if (!candidate || ids.has(candidate.id)) return false;
         ids.add(candidate.id);
         return true;
@@ -350,7 +351,7 @@ window.ScheduleStudio = (() => {
       if (value && typeof value === 'object') {
         return {
           plans: Array.isArray(value.plans) ? value.plans.map(sanitizePlan).filter(Boolean) : [],
-          activities: Array.isArray(value.activities) ? value.activities.map(sanitizeActivity).filter(Boolean) : [],
+          activities: Array.isArray(value.activities) ? value.activities.map((activity) => sanitizeActivity(activity)).filter(Boolean) : [],
           suggestionPools: Array.isArray(value.suggestionPools) ? value.suggestionPools.map(sanitizeSuggestionPool).filter(Boolean) : [],
           images: Array.isArray(value.images) ? value.images.map(sanitizeImage).filter(Boolean) : []
         };
@@ -382,9 +383,18 @@ window.ScheduleStudio = (() => {
   // each option of a choice, or each video's thumbnail. Open slots have none.
   function itemVisuals(item) {
     if (Array.isArray(item.candidates)) return item.candidates.flatMap((candidate) => itemVisuals(candidate));
-    if (item.kind === 'choice') return item.options;
+    if (item.kind === 'choice') return [item, ...item.options];
     if (item.kind === 'video') return item.videos;
-    return item.kind === 'open-slot' ? [] : [item, ...(item.steps || []).flatMap((step) => [step, ...step.options])];
+    return item.kind === 'open-slot' ? [] : [item, ...(item.steps || []).flatMap(itemVisuals), ...(item.options || [])];
+  }
+
+  // Stable paths distinguish suggestion steps in each activity occurrence,
+  // including steps inside an accepted candidate. All fit their parent budget.
+  function suggestionItems(item, key = item.occurrenceId, duration = item.duration) {
+    const budget = Math.min(item.duration || duration, duration);
+    const own = item.kind === 'suggestion' ? [{ ...item, occurrenceId: key, duration: budget, nested: item.occurrenceId !== key }] : [];
+    return [...own, ...(item.steps || []).flatMap((step) => suggestionItems(step, key + ':' + step.id, budget)),
+      ...(item.candidates || []).flatMap((candidate) => suggestionItems(candidate, key + ':' + candidate.id, budget))];
   }
 
   function itemImageIds(item) {
@@ -402,6 +412,6 @@ window.ScheduleStudio = (() => {
     sanitizeImage, sanitizeActivity, sanitizeActivityStep, activityStepsMarkup, sanitizeChoiceOption, sanitizeVideo, sanitizePlan, readWorkspace,
     sanitizeSuggestion, sanitizeSuggestionCandidate, sanitizeSuggestionPool, sanitizeSuggestionState, suggestionStatus, drawSuggestion,
     validVideoUrl, youTubeThumbnail, videoKey, validFamiliarity, familiarityMarkup, choiceTitle, videoTitle, videoPrompt, itemLabel,
-    itemVisuals, itemImageIds, visualScheduleUrl
+    itemVisuals, itemImageIds, suggestionItems, visualScheduleUrl
   };
 })();

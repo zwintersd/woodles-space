@@ -102,7 +102,7 @@
     }
     const suggestions = {};
     if (current.suggestions && typeof current.suggestions === 'object') {
-      for (const item of day.activities.filter((entry) => entry.kind === 'suggestion')) {
+      for (const item of allSuggestionItems()) {
         if (!Object.prototype.hasOwnProperty.call(current.suggestions, item.occurrenceId)) continue;
         const state = window.ScheduleStudio.sanitizeSuggestionState(current.suggestions[item.occurrenceId]);
         suggestions[item.occurrenceId] = state;
@@ -180,6 +180,7 @@
     if (!item.steps?.length) return '';
     return '<ol class="activity-steps">' + item.steps.map((step) => {
       const key = item.occurrenceId + ':' + step.id;
+      if (step.kind === 'suggestion') return '<li>' + suggestionMarkup({ ...step, occurrenceId: key, duration: Math.min(step.duration, item.duration), nested: true }, progress) + '</li>';
       return '<li><span class="step-heading">' + visualMarkup(step, 28) + '<strong>' + esc(step.title) + '</strong></span>' + (step.kind === 'choice' ? '<div class="chips" role="group" aria-label="Options for ' + esc(step.title) + '">' + step.options.map((option) => '<button class="chip" type="button" data-choice="' + esc(key) + '" data-option="' + esc(option.id) + '" aria-pressed="' + (progress.picks[key] === option.id) + '"><span class="chip-art">' + visualMarkup(option, 28) + '</span>' + esc(option.title) + '</button>').join('') + '</div>' : '') + '</li>';
     }).join('') + '</ol>';
   }
@@ -202,9 +203,9 @@
         (choice.credit ? '<p class="image-credit">' + esc(choice.credit) + '</p>' : '') +
         (accepted && choice.url ? '<a class="watch" href="' + esc(choice.url) + '" target="_blank" rel="noopener noreferrer">▶ Open ' + esc(choice.title) + '</a>' : '') + '</div>' : '';
     const done = progress.done.has(step.occurrenceId);
-    return '<li class="step suggestion' + (done ? ' is-done' : '') + '" data-id="' + esc(step.occurrenceId) + '"><div class="time">' + clockLabel(step.from) + '<small>' + step.duration + ' min</small></div>' +
+    return (step.nested ? '<section class="nested-suggestion suggestion" data-suggestion-id="' + esc(step.occurrenceId) + '" aria-label="Suggestions for ' + esc(step.title) + '">' : '<li class="step suggestion' + (done ? ' is-done' : '') + '" data-suggestion-id="' + esc(step.occurrenceId) + '" data-id="' + esc(step.occurrenceId) + '"><div class="time">' + clockLabel(step.from) + '<small>' + step.duration + ' min</small></div>') +
       '<article class="box"><span class="nowtag">NOW</span><div class="video-head"><div class="copy"><span class="category">ACTIVITY SURPRISE</span><h2>' + esc(step.title) + '</h2><p class="sub">' + esc(step.prompt) + '</p></div>' +
-      (accepted ? doneButton(step, choice.title, done) : '') + '</div>' +
+      (accepted && !step.nested ? doneButton(step, choice.title, done) : '') + '</div>' +
       '<div class="suggestion-stage" aria-busy="' + spinning + '"><div class="suggestion-window" aria-hidden="true"><div class="suggestion-reel">' +
       (reel ? reel.map(reelCard).join('') : choice && !state.skipped ? reelCard(choice) : '<div class="suggestion-reel-card"><span class="suggestion-spark">✦</span><strong>Your next idea?</strong></div>') + '</div></div>' + result + '</div>' +
       (step.allowCategoryChoice && categories.length ? '<label class="suggestion-category"><span>Choose a category</span><select data-suggestion-category="' + esc(step.occurrenceId) + '"' + (controlsDisabled ? ' disabled' : '') + '><option value="">All categories</option>' + categories.map((name) => '<option value="' + esc(name) + '"' + (name === category ? ' selected' : '') + '>' + esc(name) + '</option>').join('') + '</select></label>' : '') +
@@ -212,12 +213,20 @@
       (choice && !controlsDisabled ? '<button class="suggestion-accept" type="button" data-suggestion-accept="' + esc(step.occurrenceId) + '">Use this</button>' : '') +
       (step.allowSkip && !controlsDisabled ? '<button class="suggestion-skip" type="button" data-suggestion-skip="' + esc(step.occurrenceId) + '">Skip this</button>' : '') + '</div>' +
       '<p class="suggestion-status" role="status" aria-live="polite">' + esc(spinning ? 'Finding an idea…' : status.reason || (choice ? 'Suggested: ' + choice.title + '. Use this, or spin again if you want.' : 'Ready when you are.')) + '</p>' +
-      '<p class="suggestion-budget">' + esc(rerolls) + (step.avoidRepeats ? ' · no repeats today' : '') + '</p></article></li>';
+      '<p class="suggestion-budget">' + esc(rerolls) + (step.avoidRepeats ? ' · no repeats today' : '') + '</p></article>' + (step.nested ? '</section>' : '</li>');
+  }
+
+  function allSuggestionItems() {
+    return day ? day.activities.flatMap((item) => window.ScheduleStudio.suggestionItems(item)) : [];
+  }
+
+  function suggestionNode(id) {
+    return [...el('timeline').querySelectorAll('[data-suggestion-id]')].find((entry) => entry.dataset.suggestionId === id);
   }
 
   function refreshSuggestion(id, focusAttribute) {
-    const item = day?.activities.find((entry) => entry.occurrenceId === id && entry.kind === 'suggestion');
-    const node = [...el('timeline').querySelectorAll('.step')].find((entry) => entry.dataset.id === id);
+    const item = allSuggestionItems().find((entry) => entry.occurrenceId === id);
+    const node = suggestionNode(id);
     if (!item || !node) return;
     const template = document.createElement('template');
     template.innerHTML = suggestionMarkup({ ...item, from: timeMinutes(item.start) }, readDayProgress());
@@ -245,7 +254,7 @@
 
   async function revealSuggestion(id) {
     if (spinningSuggestions.has(id)) return;
-    const item = day.activities.find((entry) => entry.occurrenceId === id && entry.kind === 'suggestion');
+    const item = allSuggestionItems().find((entry) => entry.occurrenceId === id);
     if (!item) return;
     const progress = readDayProgress();
     const current = window.ScheduleStudio.sanitizeSuggestionState(progress.suggestions[id]);
@@ -255,7 +264,7 @@
     progress.suggestions[id] = next;
     // Save the draw before animating: closing or refreshing cannot buy another spin.
     if (!writeDayProgress(progress)) {
-      const node = [...el('timeline').querySelectorAll('.step')].find((entry) => entry.dataset.id === id);
+      const node = suggestionNode(id);
       if (node) node.querySelector('.suggestion-status').textContent = 'Could not save the draw. Ask your helper before trying again.';
       return;
     }
@@ -266,7 +275,7 @@
       reel.push(result);
       spinningSuggestions.set(id, reel);
       refreshSuggestion(id);
-      const node = [...el('timeline').querySelectorAll('.step')].find((entry) => entry.dataset.id === id);
+      const node = suggestionNode(id);
       const rail = node?.querySelector('.suggestion-reel');
       try {
         if (rail) await rail.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-' + ((reel.length - 1) * 116) + 'px)' }], { duration: 1600, easing: 'cubic-bezier(.12,.6,.12,1)', fill: 'forwards' }).finished;
@@ -278,13 +287,13 @@
 
   function settleSuggestion(id, skip) {
     if (spinningSuggestions.has(id) || pendingDraws.has(id)) return;
-    const item = day.activities.find((entry) => entry.kind === 'suggestion' && entry.occurrenceId === id);
+    const item = allSuggestionItems().find((entry) => entry.occurrenceId === id);
     if (!item) return;
     const progress = readDayProgress();
     const status = window.ScheduleStudio.suggestionStatus(item, progress.suggestions[id]);
     if (status.locked || (skip ? !item.allowSkip : !status.selected)) return;
     progress.suggestions[id] = { ...status.state, accepted: !skip, skipped: skip };
-    if (skip) progress.done.add(id);
+    if (skip && !item.nested) progress.done.add(id);
     if (writeDayProgress(progress)) refreshSuggestion(id, skip ? 'data-suggestion-draw' : 'data-done');
   }
 
@@ -306,10 +315,9 @@
         '<span class="visual" aria-hidden="true">' + visual + '</span>' +
         '<div class="copy">' + (open ? '' : '<span class="category">' + esc(step.category) + '</span>') + '<h2>' + esc(title) + '</h2>' +
           (open ? '<p class="sub">Pick what to do.</p>' : step.note ? '<p class="sub">' + esc(step.note) + '</p>' : '') +
-          nestedStepsMarkup(step, progress) +
           (!open && step.credit ? '<p class="image-credit">' + esc(step.credit) + '</p>' : '') +
         '</div>' +
-        doneButton(step, title, done) +
+        doneButton(step, title, done) + nestedStepsMarkup(step, progress) +
       '</div></article></li>';
   }
 
@@ -481,7 +489,7 @@
   document.addEventListener('change', (event) => {
     const id = event.target.dataset.suggestionCategory;
     if (!id || !day || spinningSuggestions.has(id) || pendingDraws.has(id)) return;
-    const item = day.activities.find((entry) => entry.kind === 'suggestion' && entry.occurrenceId === id);
+    const item = allSuggestionItems().find((entry) => entry.occurrenceId === id);
     if (!item || !item.allowCategoryChoice) return;
     const progress = readDayProgress();
     const status = window.ScheduleStudio.suggestionStatus(item, progress.suggestions[id]);

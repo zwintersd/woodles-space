@@ -178,6 +178,15 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--sky); outline-o
 
 .activity-steps .chips { display: flex; flex-wrap: wrap; margin-top: 8px; }
 .suggestion .box { border-color: #ecc567; background: linear-gradient(145deg, #fff, #fffaf0); }
+.nested-suggestion { margin: 4px 0; }
+.nested-suggestion .box { padding: 10px; }
+.nested-suggestion .video-head { grid-template-columns: minmax(0, 1fr); }
+.nested-suggestion .copy h2 { font-size: 16px; }
+.nested-suggestion .suggestion-stage { grid-template-columns: minmax(0, 1fr); }
+.activity > .activity-steps { grid-column: 1 / -1; }
+.activity:has(> .activity-steps) { align-items: start; }
+.nested-suggestion .suggestion-reel-card { flex-direction: column; gap: 4px; font-size: 14px; }
+.nested-suggestion .suggestion-reel-card strong { display: -webkit-box; width: 100%; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.2; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .suggestion-stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 14px; margin: 12px 0; padding: 12px; border: 2px solid #ffe0a1; border-radius: 15px; background: #fff2d4; }
 .suggestion-window { height: 116px; overflow: hidden; border: 2px solid #e8bd61; border-radius: 12px; background: #fff; box-shadow: inset 0 6px 10px #f2e8d6, inset 0 -6px 10px #f2e8d6; }
