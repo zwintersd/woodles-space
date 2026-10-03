@@ -110,8 +110,46 @@
   let suggestionPoolId = '';
   let suggestionStepId = '';
   let pendingSuggestionPools = new Map();
+  let candidateSymbolDraft = {};
   let videoDraft = [];
   let recentSymbols = readRecentSymbols();
+  const customSymbols = window.ScheduleSymbolLibrary.create({ workspace: () => workspace, save: persist });
+
+  function formSymbolFields(form) {
+    return window.ScheduleStudio.symbolFields(Object.fromEntries(['symbolAssetId', 'symbolStillAssetId', 'symbolName', 'symbolCredit'].map((key) => [key, form.elements[key]?.value || '']).concat([['symbolPixelated', form.elements.symbolPixelated?.value === 'true']])));
+  }
+
+  function setFormSymbol(form, value) {
+    const fields = window.ScheduleStudio.symbolFields(value);
+    Object.entries(fields).forEach(([key, entry]) => { if (form.elements[key]) form.elements[key].value = String(entry); });
+    updateSymbolPreview(form);
+    const host = form.querySelector('[data-form-sprite-control]');
+    if (host) host.innerHTML = customSymbolControl(fields, 'form');
+  }
+
+  function customSymbolControl(value, target, attributes = '') {
+    const preview = window.ScheduleStudio.customSymbolMarkup(value, workspace.images, 26);
+    return '<div class="custom-symbol-control"><span class="custom-symbol-selection">' + (preview ? preview + '<span>:' + esc(value.symbolName || 'symbol') + ':</span>' : '<span>No custom symbol selected</span>') + '</span><button class="button secondary" type="button" data-action="pick-custom-symbol" data-sprite-target="' + target + '" ' + attributes + '>Custom symbols</button>' + (preview ? '<button class="button secondary" type="button" data-action="clear-custom-symbol" data-sprite-target="' + target + '" ' + attributes + '>Clear custom symbol</button>' : '') + '</div>';
+  }
+
+  function customSymbolTarget(action) {
+    const type = action.dataset.spriteTarget;
+    if (type === 'form') {
+      const form = action.closest('form');
+      return form ? { choose: (value) => setFormSymbol(form, value) } : null;
+    }
+    if (type === 'step' || type === 'step-option') {
+      const step = activityStepsDraft[Number(action.dataset.stepIndex)];
+      const item = type === 'step' ? step : step?.options[Number(action.dataset.optionIndex)];
+      return item ? { choose: (value) => { Object.assign(item, window.ScheduleStudio.symbolFields(value)); renderActivityStepsDraft(); } } : null;
+    }
+    if (type === 'candidate-new') return { choose: (value) => {
+      candidateSymbolDraft = window.ScheduleStudio.symbolFields(value);
+      document.getElementById('candidateSymbolControl').innerHTML = customSymbolControl(candidateSymbolDraft, 'candidate-new');
+    } };
+    const item = type === 'candidate' ? suggestionDraft.find((entry) => entry.id === action.dataset.id) : type === 'choice-option' ? choiceDraft.find((entry) => entry.id === action.dataset.id) : null;
+    return item ? { choose: (value) => { Object.assign(item, window.ScheduleStudio.symbolFields(value)); if (type === 'candidate') renderSuggestionDraft(); else renderChoiceDraft(); } } : null;
+  }
 
   function readRecentSymbols() {
     try {
@@ -148,23 +186,28 @@
 
   function updateSymbolPreview(form) {
     const preview = form.querySelector('.symbol-preview');
-    if (preview) preview.innerHTML = symbolMarkup(form.elements.icon.value || '⭐', 30);
+    if (preview) preview.innerHTML = window.ScheduleStudio.customSymbolMarkup(formSymbolFields(form), workspace.images, 30) || symbolMarkup(form.elements.icon.value || '⭐', 30);
   }
 
   function persist() {
     const now = new Date().toISOString();
     const plan = getPlan();
     if (plan) plan.updatedAt = now;
-    const usedImages = new Set([...workspace.activities, ...workspace.suggestionPools].flatMap(itemImageIds).concat(
+    const activeDrafts = activityDialog.open ? activityStepsDraft : [];
+    const usedImages = new Set([...workspace.activities, ...workspace.suggestionPools, ...workspace.customSymbols, ...activeDrafts, ...suggestionDraft, ...choiceDraft].flatMap(itemImageIds).concat(
       workspace.plans.flatMap((entry) => entry.days.flatMap((day) => day.activities.flatMap(itemImageIds)))
     ).filter(Boolean));
+    document.querySelectorAll('form [name="imageAssetId"], form [name="symbolAssetId"], form [name="symbolStillAssetId"]').forEach((input) => { if (input.value) usedImages.add(input.value); });
+    [candidateSymbolDraft.symbolAssetId, candidateSymbolDraft.symbolStillAssetId].filter(Boolean).forEach((id) => usedImages.add(id));
     workspace.images = workspace.images.filter((image) => usedImages.has(image.id));
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace));
       saveStatus.textContent = 'Saved on this device';
+      return true;
     } catch {
       saveStatus.textContent = 'Could not save';
       showToast('This browser could not save the plan. Export a copy before leaving this page.');
+      return false;
     }
   }
 
@@ -304,9 +347,9 @@
     const imageValue = activityImageValue(item);
     const source = isLocalImageData(imageValue) ? imageValue : pictogramSource(imageValue);
     const background = validColor(item.color);
-    const inside = source
+    const inside = window.ScheduleStudio.customSymbolMarkup(item, workspace.images, 36) || (source
       ? '<img src="' + esc(source) + '" alt="" loading="lazy">'
-      : symbolMarkup(item.icon || '⭐', 36);
+      : symbolMarkup(item.icon || '⭐', 36));
     return '<span class="activity-visual" style="--activity-bg:color-mix(in srgb,' + background + ' 14%,white)">' + inside + '</span>';
   }
 
@@ -351,7 +394,7 @@
   function optionVisual(option, size) {
     const imageValue = activityImageValue(option);
     const source = isLocalImageData(imageValue) ? imageValue : pictogramSource(imageValue);
-    return source ? '<img src="' + esc(source) + '" alt="" width="' + size + '" height="' + size + '" loading="lazy">' : symbolMarkup(option.icon || '⭐', size);
+    return window.ScheduleStudio.customSymbolMarkup(option, workspace.images, size) || (source ? '<img src="' + esc(source) + '" alt="" width="' + size + '" height="' + size + '" loading="lazy">' : symbolMarkup(option.icon || '⭐', size));
   }
 
   function videoThumbnail(video) {
@@ -456,9 +499,10 @@
     const hasArasaac = visuals.some((item) => /^\d{1,10}$/.test(String(item.pictogram || '').trim()));
     const hasOpenMoji = visuals.some((item) => {
       const imageValue = activityImageValue(item);
-      return !(isLocalImageData(imageValue) || pictogramSource(imageValue)) && Boolean(openMojiCodepoint(item.icon));
+      return !item.symbolAssetId && !(isLocalImageData(imageValue) || pictogramSource(imageValue)) && Boolean(openMojiCodepoint(item.icon));
     });
     const printCredits = [
+      window.ScheduleStudio.customSymbolCredits(visuals),
       hasArasaac ? 'ARASAAC pictograms by Sergio Palao · Government of Aragón · CC BY-NC-SA. <a href="https://aulaabierta.arasaac.org/en/terms-of-use">Terms of use</a>.' : '',
       hasOpenMoji ? 'Emoji artwork by <a href="https://openmoji.org">OpenMoji</a> · <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.' : ''
     ].filter(Boolean).join(' ');
@@ -570,12 +614,14 @@
     showToast('Plan deleted.');
   }
 
-  function renderSymbolPicker(icon) {
+  function renderSymbolPicker(icon, item = {}) {
     return '<div class="field full symbol-field"><label for="activityIcon">Visual symbol or emoji</label>' +
-      '<div class="symbol-entry"><span class="symbol-preview" aria-hidden="true">' + symbolMarkup(icon || '⭐', 30) + '</span>' +
+      Object.entries(window.ScheduleStudio.symbolFields(item)).map(([key, value]) => '<input type="hidden" name="' + key + '" value="' + esc(value) + '">').join('') +
+      '<div class="symbol-entry"><span class="symbol-preview" aria-hidden="true">' + (window.ScheduleStudio.customSymbolMarkup(item, workspace.images, 30) || symbolMarkup(icon || '⭐', 30)) + '</span>' +
         '<input id="activityIcon" name="icon" maxlength="16" value="' + esc(icon || '⭐') + '" autocomplete="off" aria-describedby="activityIconHelp" placeholder="Choose or type an emoji">' +
         '<button class="button secondary" type="button" data-action="toggle-symbol-picker" aria-expanded="false" aria-controls="symbolPicker">Browse symbols</button></div>' +
-      '<small class="muted" id="activityIconHelp">Browse by name, or type any emoji. OpenMoji artwork is used where available.</small>' +
+      '<div data-form-sprite-control>' + customSymbolControl(item, 'form') + '</div>' +
+      '<small class="muted" id="activityIconHelp">Browse or type an emoji, or pick your own sprite. A custom symbol takes priority over the optional picture until cleared.</small>' +
       '<section class="symbol-picker" id="symbolPicker" aria-label="Choose a visual symbol" hidden>' +
         '<label class="visually-hidden" for="symbolSearch">Search symbols by name</label><input class="symbol-search" id="symbolSearch" name="symbolSearch" type="search" placeholder="Search all symbols (book, snack, break…)" autocomplete="off">' +
         '<div class="symbol-groups" role="group" aria-label="Symbol categories">' + SYMBOL_GROUPS.map((group) => '<button class="symbol-group" type="button" data-action="filter-symbols" data-group="' + esc(group) + '" aria-pressed="' + String(group === 'Popular') + '">' + esc(group) + (group === 'Recent' && recentSymbols.length ? ' · ' + recentSymbols.length : '') + '</button>').join('') + '</div>' +
@@ -605,7 +651,7 @@
           '<label class="field"><span>Activity name</span><input name="title" maxlength="100" value="' + esc(activity.title || '') + '" placeholder="e.g., Choose a book" required></label>' +
           '<label class="field"><span>Category</span><input name="category" maxlength="60" value="' + esc(activity.category || 'Instruction') + '" list="categorySuggestions"><datalist id="categorySuggestions">' + CATEGORIES.map((category) => '<option value="' + esc(category) + '">').join('') + '</datalist></label>' +
           '<label class="field"><span>Duration (minutes)</span><input name="duration" type="number" min="1" max="480" value="' + esc(activity.duration || 15) + '" required></label>' +
-          renderSymbolPicker(activity.icon || '⭐') +
+          renderSymbolPicker(activity.icon || '⭐', activity) +
           '<label class="field"><span>Color</span><select name="color">' + COLORS.map((color) => '<option value="' + color + '" ' + (color === activity.color ? 'selected' : '') + '>' + COLOR_NAMES[color] + '</option>').join('') + '</select></label>' +
           '<div class="field full"><span>Activity image (optional)</span><div class="image-reference-row"><input name="pictogramUrl" maxlength="300" value="' + esc(activity.pictogram || '') + '" placeholder="ARASAAC ID or HTTPS image URL" aria-describedby="imageHelp"><input type="hidden" name="imageAssetId" value="' + esc(activity.imageAssetId || '') + '"><button class="button secondary" type="button" data-action="open-image-editor">Upload and crop</button></div>' +
             '<div class="image-asset-preview" id="imageAssetPreview">' + renderImageAssetPreview(activity.pictogram || '', activity.imageAssetId || '') + '</div><small class="muted" id="imageHelp">Crop an image here or use an ARASAAC ID or direct HTTPS image URL. Add a credit below for other image sources.</small></div>' +
@@ -629,8 +675,8 @@
     if (!host) return;
     const field = (value, key, index, option, label, max) => '<label class="field"><span>' + label + '</span><input data-step-field="' + key + '" data-step-index="' + index + '"' + (option === undefined ? '' : ' data-option-index="' + option + '"') + ' maxlength="' + max + '" value="' + esc(value || '') + '"></label>';
     const button = (action, index, label, disabled, option) => '<button class="button secondary" type="button" data-action="' + action + '" data-step-index="' + index + '"' + (option === undefined ? '' : ' data-option-index="' + option + '"') + (disabled ? ' disabled' : '') + '>' + label + '</button>';
-    host.innerHTML = activityStepsDraft.map((step, index) => '<section class="step-editor" aria-label="Step ' + (index + 1) + '"><div class="button-row"><strong>Step ' + (index + 1) + '</strong>' + button('step-up', index, 'Move up', index === 0) + button('step-down', index, 'Move down', index === activityStepsDraft.length - 1) + button('remove-activity-step', index, 'Remove step') + '</div><div class="step-fields">' + field(step.title, 'title', index, undefined, 'Step name', 60) + field(step.icon, 'icon', index, undefined, 'Symbol or emoji', 16) + field(step.pictogram, 'pictogram', index, undefined, 'ARASAAC ID or HTTPS image', 300) + '</div><label class="field"><span>Step type</span><select data-step-kind="' + index + '"><option value="task"' + (step.kind === 'task' ? ' selected' : '') + '>Do this step</option><option value="choice"' + (step.kind === 'choice' ? ' selected' : '') + '>Pick one option</option><option value="suggestion"' + (step.kind === 'suggestion' ? ' selected' : '') + '>Suggest an activity</option></select></label>' +
-      (step.kind === 'choice' ? '<div class="step-option-editor">' + step.options.map((option, oi) => '<div class="step-option-row">' + field(option.title, 'title', index, oi, 'Option ' + (oi + 1) + ' name', 60) + field(option.icon, 'icon', index, oi, 'Symbol or emoji', 16) + field(option.pictogram, 'pictogram', index, oi, 'ARASAAC ID or HTTPS image', 300) + button('remove-step-option', index, 'Remove option', false, oi) + '</div>').join('') + button('add-step-option', index, '＋ Add option', step.options.length >= 6) + '</div>' : step.kind === 'suggestion' ? '<div class="step-suggestion-summary"><p class="muted">' + (step.candidates || []).filter((candidate) => candidate.enabled).length + ' optional activities · ' + (step.rerollMode === 'limited' ? step.maxRerolls + ' rerolls' : step.rerollMode === 'unlimited' ? 'Unlimited rerolls' : 'No rerolls') + '</p>' + button('configure-step-suggestion', index, 'Configure suggestions') + '</div>' : '') + '</section>').join('');
+    host.innerHTML = activityStepsDraft.map((step, index) => '<section class="step-editor" aria-label="Step ' + (index + 1) + '"><div class="button-row"><strong>Step ' + (index + 1) + '</strong>' + button('step-up', index, 'Move up', index === 0) + button('step-down', index, 'Move down', index === activityStepsDraft.length - 1) + button('remove-activity-step', index, 'Remove step') + '</div><div class="step-fields">' + field(step.title, 'title', index, undefined, 'Step name', 60) + field(step.icon, 'icon', index, undefined, 'Symbol or emoji', 16) + field(step.pictogram, 'pictogram', index, undefined, 'ARASAAC ID or HTTPS image', 300) + '</div>' + customSymbolControl(step, 'step', 'data-step-index="' + index + '"') + '<label class="field"><span>Step type</span><select data-step-kind="' + index + '"><option value="task"' + (step.kind === 'task' ? ' selected' : '') + '>Do this step</option><option value="choice"' + (step.kind === 'choice' ? ' selected' : '') + '>Pick one option</option><option value="suggestion"' + (step.kind === 'suggestion' ? ' selected' : '') + '>Suggest an activity</option></select></label>' +
+      (step.kind === 'choice' ? '<div class="step-option-editor">' + step.options.map((option, oi) => '<div class="step-option-row">' + field(option.title, 'title', index, oi, 'Option ' + (oi + 1) + ' name', 60) + field(option.icon, 'icon', index, oi, 'Symbol or emoji', 16) + field(option.pictogram, 'pictogram', index, oi, 'ARASAAC ID or HTTPS image', 300) + customSymbolControl(option, 'step-option', 'data-step-index="' + index + '" data-option-index="' + oi + '"') + button('remove-step-option', index, 'Remove option', false, oi) + '</div>').join('') + button('add-step-option', index, '＋ Add option', step.options.length >= 6) + '</div>' : step.kind === 'suggestion' ? '<div class="step-suggestion-summary"><p class="muted">' + (step.candidates || []).filter((candidate) => candidate.enabled).length + ' optional activities · ' + (step.rerollMode === 'limited' ? step.maxRerolls + ' rerolls' : step.rerollMode === 'unlimited' ? 'Unlimited rerolls' : 'No rerolls') + '</p>' + button('configure-step-suggestion', index, 'Configure suggestions') + '</div>' : '') + '</section>').join('');
     host.parentElement.querySelector('[data-action="add-activity-step"]').disabled = activityStepsDraft.length >= 20;
   }
 
@@ -733,6 +779,7 @@
   }
 
   function showSuggestionDialog(item, stepId = '') {
+    candidateSymbolDraft = {};
     const day = getDay(getPlan(), activeDayKey);
     if (!day) return;
     suggestionStepId = stepId;
@@ -779,7 +826,7 @@
             '<label class="field"><span>Activity name</span><input id="candidateTitle" maxlength="100" placeholder="Fold towels, watch a video…"></label>' +
             '<label class="field"><span>Category</span><input id="candidateCategory" maxlength="60" list="suggestionCategoryNames" value="Other"></label>' +
             '<label class="field"><span>Minutes needed</span><input id="candidateDuration" type="number" min="1" max="480" value="10"></label>' +
-            '<label class="field"><span>Symbol or emoji</span><input id="candidateIcon" maxlength="16" value="⭐"></label>' +
+            '<label class="field"><span>Symbol or emoji</span><input id="candidateIcon" maxlength="16" value="⭐"></label><div class="full" id="candidateSymbolControl">' + customSymbolControl({}, 'candidate-new') + '</div>' +
             '<label class="field"><span>Video or activity link (optional)</span><input id="candidateUrl" maxlength="500" placeholder="https://…"></label>' +
             '<label class="field"><span>ARASAAC ID or HTTPS picture (optional)</span><input id="candidatePictogram" maxlength="300"></label>' +
           '</div><button class="button secondary" type="button" data-action="suggestion-add-candidate">＋ Add to pool</button></details>' +
@@ -814,7 +861,7 @@
     const host = document.getElementById('suggestionCandidates');
     if (!host) return;
     const field = (candidate, key, label, type, max) => '<label class="field"><span>' + label + '</span><input data-candidate-id="' + esc(candidate.id) + '" data-candidate-field="' + key + '" type="' + type + '"' + (type === 'number' ? ' min="1" max="' + max + '"' : ' maxlength="' + max + '"') + ' value="' + esc(candidate[key] || '') + '"' + (key === 'category' ? ' list="suggestionCategoryNames"' : '') + '></label>';
-    host.innerHTML = suggestionDraft.length ? suggestionDraft.map((candidate) => '<section class="suggestion-candidate"><div class="button-row"><span class="choice-option-art">' + optionVisual(candidate, 26) + '</span><label class="check-field"><input type="checkbox" data-candidate-id="' + esc(candidate.id) + '" data-candidate-field="enabled"' + (candidate.enabled ? ' checked' : '') + '><span>Available</span></label><button class="icon-button" type="button" data-action="suggestion-remove-candidate" data-id="' + esc(candidate.id) + '" aria-label="Remove ' + esc(candidate.title) + ' from pool">×</button></div><div class="suggestion-settings">' + field(candidate, 'title', 'Name', 'text', 100) + field(candidate, 'category', 'Category', 'text', 60) + field(candidate, 'duration', 'Minutes needed', 'number', 480) + field(candidate, 'weight', 'Chance weight (1–10)', 'number', 10) + '</div><details><summary>Picture, link, and support note' + (candidate.steps.length ? ' · ' + candidate.steps.length + ' saved steps' : '') + '</summary><div class="suggestion-settings">' + field(candidate, 'icon', 'Symbol or emoji', 'text', 16) + field(candidate, 'pictogram', 'ARASAAC ID or HTTPS picture', 'text', 300) + field(candidate, 'url', 'Video or activity link', 'text', 500) + field(candidate, 'credit', 'Image credit', 'text', 200) + field(candidate, 'note', 'Support note', 'text', 500) + '</div></details></section>').join('') : '<p class="choice-draft-empty">Add optional activities below, or load a saved pool.</p>';
+    host.innerHTML = suggestionDraft.length ? suggestionDraft.map((candidate) => '<section class="suggestion-candidate"><div class="button-row"><span class="choice-option-art">' + optionVisual(candidate, 26) + '</span><label class="check-field"><input type="checkbox" data-candidate-id="' + esc(candidate.id) + '" data-candidate-field="enabled"' + (candidate.enabled ? ' checked' : '') + '><span>Available</span></label><button class="icon-button" type="button" data-action="suggestion-remove-candidate" data-id="' + esc(candidate.id) + '" aria-label="Remove ' + esc(candidate.title) + ' from pool">×</button></div><div class="suggestion-settings">' + field(candidate, 'title', 'Name', 'text', 100) + field(candidate, 'category', 'Category', 'text', 60) + field(candidate, 'duration', 'Minutes needed', 'number', 480) + field(candidate, 'weight', 'Chance weight (1–10)', 'number', 10) + '</div>' + customSymbolControl(candidate, 'candidate', 'data-id="' + esc(candidate.id) + '"') + '<details><summary>Picture, link, and support note' + (candidate.steps.length ? ' · ' + candidate.steps.length + ' saved steps' : '') + '</summary><div class="suggestion-settings">' + field(candidate, 'icon', 'Symbol or emoji', 'text', 16) + field(candidate, 'pictogram', 'ARASAAC ID or HTTPS picture', 'text', 300) + field(candidate, 'url', 'Video or activity link', 'text', 500) + field(candidate, 'credit', 'Image credit', 'text', 200) + field(candidate, 'note', 'Support note', 'text', 500) + '</div></details></section>').join('') : '<p class="choice-draft-empty">Add optional activities below, or load a saved pool.</p>';
     suggestionReadiness();
   }
 
@@ -840,8 +887,8 @@
     if (url && !validVideoUrl(url)) { errorNode.textContent = 'Use a complete HTTP or HTTPS activity link.'; return; }
     if (pictogram && !pictogramSource(pictogram)) { errorNode.textContent = 'Use an ARASAAC number or HTTPS picture URL.'; return; }
     const before = suggestionDraft.length;
-    appendSuggestionCandidate({ id: makeId('candidate'), title, url, duration, category: value('candidateCategory'), icon: value('candidateIcon'), pictogram: pictogram || youTubeThumbnail(url) });
-    if (suggestionDraft.length > before) { document.getElementById('candidateTitle').value = ''; document.getElementById('candidateUrl').value = ''; document.getElementById('candidatePictogram').value = ''; }
+    appendSuggestionCandidate({ ...candidateSymbolDraft, id: makeId('candidate'), title, url, duration, category: value('candidateCategory'), icon: value('candidateIcon'), pictogram: pictogram || youTubeThumbnail(url) });
+    if (suggestionDraft.length > before) { document.getElementById('candidateTitle').value = ''; document.getElementById('candidateUrl').value = ''; document.getElementById('candidatePictogram').value = ''; candidateSymbolDraft = {}; document.getElementById('candidateSymbolControl').innerHTML = customSymbolControl({}, 'candidate-new'); }
     document.getElementById('candidateTitle').focus();
   }
 
@@ -994,7 +1041,7 @@
     if (!list) return;
     list.innerHTML = choiceDraft.length
       ? choiceDraft.map((option) => '<li class="choice-draft-item" style="--activity-bg:color-mix(in srgb,' + validColor(option.color) + ' 14%,white)"><span class="choice-option-art" aria-hidden="true">' + optionVisual(option, 26) + '</span><span class="choice-draft-title">' + esc(option.title) + '</span>' + familiaritySelect('choice', option) +
-        '<button class="icon-button" type="button" data-action="remove-choice-option" data-id="' + esc(option.id) + '" aria-label="Remove option ' + esc(option.title) + '" title="Remove option">×</button></li>').join('')
+        '<button class="icon-button" type="button" data-action="remove-choice-option" data-id="' + esc(option.id) + '" aria-label="Remove option ' + esc(option.title) + '" title="Remove option">×</button>' + customSymbolControl(option, 'choice-option', 'data-id="' + esc(option.id) + '"') + '</li>').join('')
       : '<li class="choice-draft-empty">No options yet. Add at least two below.</li>';
   }
 
@@ -1004,7 +1051,7 @@
       errorNode.textContent = 'A choice can have up to ' + MAX_CHOICE_OPTIONS + ' options.';
       return false;
     }
-    choiceDraft.push({ id: makeId('option'), title: option.title, icon: option.icon || '⭐', pictogram: option.pictogram || '', imageAssetId: option.imageAssetId || '', color: option.color || COLORS[choiceDraft.length % COLORS.length], familiarity: '' });
+    choiceDraft.push({ ...window.ScheduleStudio.symbolFields(option), id: makeId('option'), title: option.title, icon: option.icon || '⭐', pictogram: option.pictogram || '', imageAssetId: option.imageAssetId || '', color: option.color || COLORS[choiceDraft.length % COLORS.length], familiarity: '' });
     errorNode.textContent = '';
     renderChoiceDraft();
     return true;
@@ -1017,10 +1064,10 @@
       form.elements.optionTitle.focus();
       return false;
     }
-    if (!addChoiceOption({ title, icon: cleanText(form.elements.icon.value, 16, '⭐') })) return false;
+    if (!addChoiceOption({ ...formSymbolFields(form), title, icon: cleanText(form.elements.icon.value, 16, '⭐') })) return false;
     form.elements.optionTitle.value = '';
     form.elements.icon.value = '⭐';
-    updateSymbolPreview(form);
+    setFormSymbol(form, {});
     form.elements.optionTitle.focus();
     return true;
   }
@@ -1472,6 +1519,7 @@
 
   function createOccurrence(item, start) {
     return {
+      ...window.ScheduleStudio.symbolFields(item),
       kind: 'activity',
       occurrenceId: makeId('scheduled'),
       sourceId: item.id || '',
@@ -1518,6 +1566,7 @@
     if (nestedSuggestions.some((step) => !(step.candidates || []).some((candidate) => candidate.enabled && candidate.duration <= step.duration))) throw new Error('Configure each suggestion step with at least one available activity that fits the containing activity’s time.');
     if (activityStepsDraft.flatMap((step) => [step, ...(step.kind === 'choice' ? step.options : [])]).some((entry) => entry.pictogram && !/^\d{1,10}$/.test(entry.pictogram) && !/^https:\/\//i.test(entry.pictogram))) throw new Error('Step pictures need an ARASAAC number or a direct HTTPS image URL.');
     const activity = sanitizeActivity({
+      ...formSymbolFields(form),
       id: makeId('activity'),
       title: data.get('title'),
       category: data.get('category'),
@@ -1721,7 +1770,8 @@
     const usedPools = new Set(plan.days.flatMap((day) => day.activities.flatMap((item) => window.ScheduleStudio.suggestionItems(item))).map((item) => item.poolId));
     const suggestionPools = workspace.suggestionPools.filter((pool) => usedPools.has(pool.id));
     suggestionPools.flatMap(itemImageIds).forEach((id) => { const image = workspace.images.find((entry) => entry.id === id); if (image && !images.some((entry) => entry.id === id)) images.push(image); });
-    const content = JSON.stringify({ format: 'woodles.schedule-week.v1', exportedAt: new Date().toISOString(), plan, activityLibrary, suggestionPools, images }, null, 2);
+    const customSymbols = workspace.customSymbols.filter((symbol) => images.some((image) => image.id === symbol.symbolAssetId));
+    const content = JSON.stringify({ format: 'woodles.schedule-week.v1', exportedAt: new Date().toISOString(), plan, activityLibrary, suggestionPools, customSymbols, images }, null, 2);
     const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -1756,6 +1806,8 @@
         const remapImage = (item) => ({
           ...item,
           imageAssetId: imageIdMap.get(item && item.imageAssetId) || '',
+          symbolAssetId: imageIdMap.get(item && item.symbolAssetId) || '',
+          symbolStillAssetId: imageIdMap.get(item && item.symbolStillAssetId) || '',
           ...(item && Array.isArray(item.candidates) ? { candidates: item.candidates.map(remapImage) } : {}),
           ...(item && Array.isArray(item.steps) ? { steps: item.steps.map(remapImage) } : {}),
           ...(item && Array.isArray(item.options) ? { options: item.options.map(remapImage) } : {}),
@@ -1782,6 +1834,13 @@
         plan.days.forEach((day) => day.activities.forEach(remapPool));
         importedActivities.forEach(remapPool);
         importedPools.forEach(remapPool);
+        const importedSymbols = (Array.isArray(data.customSymbols) ? data.customSymbols : []).map(window.ScheduleStudio.sanitizeCustomSymbol).filter(Boolean).map(remapImage);
+        for (const symbol of importedSymbols) {
+          if (!symbol.symbolAssetId || workspace.customSymbols.length >= 256) continue;
+          const base = symbol.symbolName.slice(0, 34); let name = base; let suffix = 2;
+          while (workspace.customSymbols.some((entry) => entry.symbolName === name)) name = base + '_' + suffix++;
+          workspace.customSymbols.push({ ...symbol, id: makeId('symbol'), symbolName: name });
+        }
         workspace.suggestionPools.push(...importedPools);
         workspace.images.push(...importedImages);
         workspace.activities.push(...importedActivities.filter((item) => !activityIds.has(item.id)));
@@ -1817,6 +1876,15 @@
     const action = event.target.closest('[data-action]');
     if (!action) return;
     const name = action.dataset.action;
+    if (name === 'manage-custom-symbols') { customSymbols.open(); return; }
+    if (name === 'pick-custom-symbol' || name === 'clear-custom-symbol') {
+      const target = customSymbolTarget(action);
+      if (target) {
+        const choose = (value) => { target.choose(value); requestAnimationFrame(() => [...document.querySelectorAll('[data-action="pick-custom-symbol"]')].find((button) => button.dataset.spriteTarget === action.dataset.spriteTarget && button.dataset.stepIndex === action.dataset.stepIndex && button.dataset.optionIndex === action.dataset.optionIndex && button.dataset.id === action.dataset.id)?.focus()); };
+        if (name === 'pick-custom-symbol') customSymbols.open({ choose }); else choose({});
+      }
+      return;
+    }
     if (['add-activity-step', 'remove-activity-step', 'step-up', 'step-down', 'add-step-option', 'remove-step-option'].includes(name)) changeActivityStep(action);
     else if (name === 'new-plan') startNewPlan();
     else if (name === 'open-plan') routeToPlan(action.dataset.plan, 'monday');
@@ -1887,6 +1955,7 @@
       const form = action.closest('form');
       if (form) {
         form.elements.icon.value = action.dataset.symbol;
+        setFormSymbol(form, {});
         rememberSymbol(action.dataset.symbol);
         updateSymbolPreview(form);
         form.querySelector('#symbolPicker').hidden = true;

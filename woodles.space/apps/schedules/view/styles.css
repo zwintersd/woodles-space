@@ -179,6 +179,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--sky); outline-o
 .activity-steps .chips { display: flex; flex-wrap: wrap; margin-top: 8px; }
 .suggestion .box { border-color: #ecc567; background: linear-gradient(145deg, #fff, #fffaf0); }
 .nested-suggestion { margin: 4px 0; }
+.custom-symbol-art { display: inline-flex; align-items: center; justify-content: center; }
 .nested-suggestion .box { padding: 10px; }
 .nested-suggestion .video-head { grid-template-columns: minmax(0, 1fr); }
 .nested-suggestion .copy h2 { font-size: 16px; }
