@@ -182,6 +182,87 @@ window.ScheduleStudio = (() => {
     };
   }
 
+  function boundedInteger(value, min, max, fallback) {
+    const number = Number(value);
+    return Number.isInteger(number) && number >= min && number <= max ? number : fallback;
+  }
+
+  function sanitizeSuggestionCandidate(value) {
+    const activity = sanitizeActivity(value);
+    if (!activity) return null;
+    return { ...activity, enabled: value.enabled !== false,
+      weight: boundedInteger(value.weight, 1, 10, 1),
+      url: validVideoUrl(value.url) ? cleanText(value.url, 500, '') : '' };
+  }
+
+  function sanitizeSuggestion(value) {
+    const ids = new Set();
+    const candidates = (Array.isArray(value.candidates) ? value.candidates : [])
+      .slice(0, 60).map(sanitizeSuggestionCandidate).filter((candidate) => {
+        if (!candidate || ids.has(candidate.id)) return false;
+        ids.add(candidate.id);
+        return true;
+      });
+    return {
+      title: cleanText(value.title, 100, 'Activity surprise'),
+      prompt: cleanText(value.prompt, 200, 'Let’s find something to do!'),
+      duration: validDuration(value.duration, 15),
+      rerollMode: ['none', 'limited', 'unlimited'].includes(value.rerollMode) ? value.rerollMode : 'none',
+      maxRerolls: boundedInteger(value.maxRerolls, 0, 1000, 2),
+      avoidRepeats: value.avoidRepeats !== false,
+      allowCategoryChoice: value.allowCategoryChoice === true,
+      allowSkip: value.allowSkip === true,
+      animation: value.animation === 'instant' ? 'instant' : 'spin',
+      candidates
+    };
+  }
+
+  function sanitizeSuggestionPool(value) {
+    if (!value || typeof value !== 'object' || !value.title) return null;
+    return { id: cleanText(value.id, 100, makeId('pool')), ...sanitizeSuggestion(value) };
+  }
+
+  function sanitizeSuggestionState(value = {}) {
+    if (!value || typeof value !== 'object') value = {};
+    return { spins: boundedInteger(value.spins, 0, 1000000, 0),
+      selected: cleanText(value.selected, 100, ''),
+      seen: [...new Set((Array.isArray(value.seen) ? value.seen : []).filter((id) => typeof id === 'string').slice(0, 60))],
+      accepted: value.accepted === true, skipped: value.skipped === true,
+      category: cleanText(value.category, 60, '') };
+  }
+
+  // One first draw, then the maker's reroll allowance. Changing categories does
+  // not create another first draw. Only available candidates that fit may win.
+  function suggestionStatus(item, rawState, category = '') {
+    const state = sanitizeSuggestionState(rawState);
+    const pool = item.candidates.filter((candidate) => candidate.enabled && candidate.duration <= item.duration);
+    const selected = pool.find((candidate) => candidate.id === state.selected) || null;
+    const eligible = pool.filter((candidate) => (!item.allowCategoryChoice || !category || candidate.category === category)
+      && (!item.avoidRepeats || !state.seen.includes(candidate.id)));
+    const candidates = !item.avoidRepeats && eligible.length > 1
+      ? eligible.filter((candidate) => candidate.id !== state.selected) : eligible;
+    const remaining = item.rerollMode === 'unlimited' ? Infinity
+      : Math.max(0, (item.rerollMode === 'limited' ? item.maxRerolls : 0) + 1 - state.spins);
+    const locked = (state.accepted && Boolean(selected)) || state.skipped;
+    let reason = '';
+    if (locked) reason = state.skipped ? 'Skipped. Choose a plan with your helper.' : 'You chose this. Let’s do it!';
+    else if (!pool.length) reason = 'No activities are available for this time slot. Ask your helper.';
+    else if (!remaining) reason = 'No rerolls left. Use this suggestion or ask your helper.';
+    else if (!candidates.length) reason = 'No more suggestions in this category. Try another category or ask your helper.';
+    return { state, pool, selected, candidates, remaining, locked, canDraw: !locked && remaining > 0 && candidates.length > 0, reason };
+  }
+
+  function drawSuggestion(item, rawState, category = '', random = Math.random) {
+    const status = suggestionStatus(item, rawState, category);
+    if (!status.canDraw) return null;
+    const total = status.candidates.reduce((sum, candidate) => sum + candidate.weight, 0);
+    let target = random() * total;
+    const selected = status.candidates.find((candidate) => { target -= candidate.weight; return target < 0; }) || status.candidates[status.candidates.length - 1];
+    return { ...status.state, selected: selected.id, spins: status.state.spins + 1,
+      seen: [...new Set([...status.state.seen, selected.id])], accepted: false,
+      category: item.allowCategoryChoice ? category : '' };
+  }
+
   function sanitizePlan(value) {
     if (!value || typeof value !== 'object' || !String(value.id || '').trim()) return null;
     const sourceDays = Array.isArray(value.days) ? value.days : [];
@@ -197,6 +278,12 @@ window.ScheduleStudio = (() => {
         printTimes: source.printTimes !== false,
         printSpacing: ['standard', 'cut', 'laminate'].includes(source.printSpacing) ? source.printSpacing : 'standard',
         activities: (Array.isArray(source.activities) ? source.activities : []).map((entry) => {
+          if (entry && entry.kind === 'suggestion') {
+            return { ...sanitizeSuggestion(entry), kind: 'suggestion',
+              occurrenceId: cleanText(entry.occurrenceId, 100, makeId('scheduled')),
+              sourceId: '', poolId: cleanText(entry.poolId, 100, ''),
+              start: validTime(entry.start, '09:00'), color: validColor(entry.color) };
+          }
           if (entry && entry.kind === 'choice') {
             return {
               kind: 'choice',
@@ -264,11 +351,12 @@ window.ScheduleStudio = (() => {
         return {
           plans: Array.isArray(value.plans) ? value.plans.map(sanitizePlan).filter(Boolean) : [],
           activities: Array.isArray(value.activities) ? value.activities.map(sanitizeActivity).filter(Boolean) : [],
+          suggestionPools: Array.isArray(value.suggestionPools) ? value.suggestionPools.map(sanitizeSuggestionPool).filter(Boolean) : [],
           images: Array.isArray(value.images) ? value.images.map(sanitizeImage).filter(Boolean) : []
         };
       }
     } catch {}
-    return { plans: [], activities: [], images: [] };
+    return { plans: [], activities: [], images: [], suggestionPools: [] };
   }
 
   // A choice without its own heading, and every open slot, is the learner's.
@@ -286,13 +374,14 @@ window.ScheduleStudio = (() => {
   }
 
   function itemLabel(item, learner) {
-    if (item.kind === 'activity') return item.title;
+    if (item.kind === 'activity' || item.kind === 'suggestion') return item.title;
     return item.kind === 'video' ? videoTitle(item, learner) : choiceTitle(item, learner);
   }
 
   // The things on a scheduled item that carry a picture: an activity itself,
   // each option of a choice, or each video's thumbnail. Open slots have none.
   function itemVisuals(item) {
+    if (Array.isArray(item.candidates)) return item.candidates.flatMap((candidate) => itemVisuals(candidate));
     if (item.kind === 'choice') return item.options;
     if (item.kind === 'video') return item.videos;
     return item.kind === 'open-slot' ? [] : [item, ...(item.steps || []).flatMap((step) => [step, ...step.options])];
@@ -311,6 +400,7 @@ window.ScheduleStudio = (() => {
     makeId, esc, cleanText, validTime, validDuration, validColor, timeMinutes,
     isLocalImageData, pictogramSource, openMojiCodepoint, symbolMarkup,
     sanitizeImage, sanitizeActivity, sanitizeActivityStep, activityStepsMarkup, sanitizeChoiceOption, sanitizeVideo, sanitizePlan, readWorkspace,
+    sanitizeSuggestion, sanitizeSuggestionCandidate, sanitizeSuggestionPool, sanitizeSuggestionState, suggestionStatus, drawSuggestion,
     validVideoUrl, youTubeThumbnail, videoKey, validFamiliarity, familiarityMarkup, choiceTitle, videoTitle, videoPrompt, itemLabel,
     itemVisuals, itemImageIds, visualScheduleUrl
   };
