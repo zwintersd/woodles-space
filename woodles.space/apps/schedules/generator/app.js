@@ -114,6 +114,7 @@
   let videoDraft = [];
   let recentSymbols = readRecentSymbols();
   const customSymbols = window.ScheduleSymbolLibrary.create({ workspace: () => workspace, save: persist });
+  const arasaacPicker = window.ScheduleArasaacPicker.create();
 
   function formSymbolFields(form) {
     return window.ScheduleStudio.symbolFields(Object.fromEntries(['symbolAssetId', 'symbolStillAssetId', 'symbolName', 'symbolCredit'].map((key) => [key, form.elements[key]?.value || '']).concat([['symbolPixelated', form.elements.symbolPixelated?.value === 'true']])));
@@ -124,12 +125,45 @@
     Object.entries(fields).forEach(([key, entry]) => { if (form.elements[key]) form.elements[key].value = String(entry); });
     updateSymbolPreview(form);
     const host = form.querySelector('[data-form-sprite-control]');
-    if (host) host.innerHTML = customSymbolControl(fields, 'form');
+    if (host) host.innerHTML = customSymbolControl({ ...fields, pictogram: form.elements.pictogramUrl?.value || form.elements.optionPictogram?.value || '', imageAssetId: form.elements.imageAssetId?.value || '' }, 'form');
   }
 
   function customSymbolControl(value, target, attributes = '') {
-    const preview = window.ScheduleStudio.customSymbolMarkup(value, workspace.images, 26);
-    return '<div class="custom-symbol-control"><span class="custom-symbol-selection">' + (preview ? preview + '<span>:' + esc(value.symbolName || 'symbol') + ':</span>' : '<span>No custom symbol selected</span>') + '</span><button class="button secondary" type="button" data-action="pick-custom-symbol" data-sprite-target="' + target + '" ' + attributes + '>Custom symbols</button>' + (preview ? '<button class="button secondary" type="button" data-action="clear-custom-symbol" data-sprite-target="' + target + '" ' + attributes + '>Clear custom symbol</button>' : '') + '</div>';
+    const customPreview = window.ScheduleStudio.customSymbolMarkup(value, workspace.images, 26);
+    const image = activityImageValue(value);
+    const source = isLocalImageData(image) ? image : pictogramSource(image);
+    const selection = customPreview ? customPreview + '<span>:' + esc(value.symbolName || 'symbol') + ':</span>' : source ? '<img src="' + esc(source) + '" width="26" height="26" alt=""><span>' + (/^\d+$/.test(value.pictogram || '') ? 'ARASAAC ' + esc(value.pictogram) : 'Picture selected') + '</span>' : '<span>Choose a picture or custom symbol</span>';
+    return '<div class="custom-symbol-control"><span class="custom-symbol-selection">' + selection + '</span><button class="button secondary" type="button" data-action="search-arasaac" data-sprite-target="' + target + '" ' + attributes + '>Search ARASAAC</button><button class="button secondary" type="button" data-action="pick-custom-symbol" data-sprite-target="' + target + '" ' + attributes + '>Custom symbols</button>' + (customPreview ? '<button class="button secondary" type="button" data-action="clear-custom-symbol" data-sprite-target="' + target + '" ' + attributes + '>Clear custom symbol</button>' : source ? '<button class="button secondary" type="button" data-action="clear-picture" data-sprite-target="' + target + '" ' + attributes + '>Clear picture</button>' : '') + '</div>';
+  }
+
+  function arasaacTarget(action) {
+    const type = action.dataset.spriteTarget;
+    if (type === 'form') {
+      const form = action.closest('form');
+      if (!form) return null;
+      return { query: form.elements.optionTitle?.value || form.elements.title?.value || '', choose: (id) => {
+        const field = form.elements.pictogramUrl || form.elements.optionPictogram;
+        field.value = id;
+        if (form.elements.imageAssetId) form.elements.imageAssetId.value = '';
+        if (form.elements.credit) form.elements.credit.value = '';
+        setFormSymbol(form, {});
+        const preview = form.querySelector('#imageAssetPreview');
+        if (preview) preview.innerHTML = renderImageAssetPreview(id);
+      } };
+    }
+    if (type === 'candidate-new') return { query: document.getElementById('candidateTitle').value, choose: (id) => {
+      candidateSymbolDraft = {};
+      document.getElementById('candidatePictogram').value = id;
+      document.getElementById('candidateSymbolControl').innerHTML = customSymbolControl({ pictogram: id }, 'candidate-new');
+    } };
+    const step = activityStepsDraft[Number(action.dataset.stepIndex)];
+    const item = type === 'step' ? step : type === 'step-option' ? step?.options[Number(action.dataset.optionIndex)] : type === 'candidate' ? suggestionDraft.find((entry) => entry.id === action.dataset.id) : type === 'choice-option' ? choiceDraft.find((entry) => entry.id === action.dataset.id) : null;
+    return item ? { query: item.title, choose: (id) => {
+      Object.assign(item, window.ScheduleStudio.symbolFields({}), { pictogram: id, imageAssetId: '', credit: '' });
+      if (type === 'candidate') renderSuggestionDraft();
+      else if (type === 'choice-option') renderChoiceDraft();
+      else renderActivityStepsDraft();
+    } } : null;
   }
 
   function customSymbolTarget(action) {
@@ -145,7 +179,7 @@
     }
     if (type === 'candidate-new') return { choose: (value) => {
       candidateSymbolDraft = window.ScheduleStudio.symbolFields(value);
-      document.getElementById('candidateSymbolControl').innerHTML = customSymbolControl(candidateSymbolDraft, 'candidate-new');
+      document.getElementById('candidateSymbolControl').innerHTML = customSymbolControl({ ...candidateSymbolDraft, pictogram: document.getElementById('candidatePictogram').value }, 'candidate-new');
     } };
     const item = type === 'candidate' ? suggestionDraft.find((entry) => entry.id === action.dataset.id) : type === 'choice-option' ? choiceDraft.find((entry) => entry.id === action.dataset.id) : null;
     return item ? { choose: (value) => { Object.assign(item, window.ScheduleStudio.symbolFields(value)); if (type === 'candidate') renderSuggestionDraft(); else renderChoiceDraft(); } } : null;
@@ -186,7 +220,9 @@
 
   function updateSymbolPreview(form) {
     const preview = form.querySelector('.symbol-preview');
-    if (preview) preview.innerHTML = window.ScheduleStudio.customSymbolMarkup(formSymbolFields(form), workspace.images, 30) || symbolMarkup(form.elements.icon.value || '⭐', 30);
+    const image = activityImageValue({ pictogram: form.elements.pictogramUrl?.value || form.elements.optionPictogram?.value || '', imageAssetId: form.elements.imageAssetId?.value || '' });
+    const source = isLocalImageData(image) ? image : pictogramSource(image);
+    if (preview) preview.innerHTML = window.ScheduleStudio.customSymbolMarkup(formSymbolFields(form), workspace.images, 30) || (source ? '<img src="' + esc(source) + '" width="30" height="30" alt="">' : symbolMarkup(form.elements.icon.value || '⭐', 30));
   }
 
   function persist() {
@@ -666,6 +702,8 @@
     }
     if (!activityDialog.open) activityDialog.showModal();
     renderActivityStepsDraft();
+    const form = document.getElementById('activityForm');
+    if (form) updateSymbolPreview(form);
     activityDialogBody.querySelector('input[name="title"]')?.focus();
   }
 
@@ -1026,6 +1064,7 @@
         '<fieldset class="choice-composer full"><legend>Add an option</legend>' +
           '<label class="field"><span>Option name</span><span class="choice-composer-row"><input id="optionTitle" name="optionTitle" maxlength="60" placeholder="e.g., Blocks" autocomplete="off"><button class="button secondary" type="button" data-action="add-choice-option">＋ Add option</button></span></label>' +
           renderSymbolPicker('⭐') +
+          '<input type="hidden" name="optionPictogram">' +
         '</fieldset>' +
         (library ? '<div class="field full"><span id="choiceLibraryLabel">Or add from your activity library (keeps its picture)</span><div class="choice-library" role="group" aria-labelledby="choiceLibraryLabel">' + library + '</div></div>' : '') +
         '<div class="error-text full" id="choiceError" role="status" aria-live="polite"></div>' +
@@ -1064,8 +1103,9 @@
       form.elements.optionTitle.focus();
       return false;
     }
-    if (!addChoiceOption({ ...formSymbolFields(form), title, icon: cleanText(form.elements.icon.value, 16, '⭐') })) return false;
+    if (!addChoiceOption({ ...formSymbolFields(form), title, pictogram: form.elements.optionPictogram.value, icon: cleanText(form.elements.icon.value, 16, '⭐') })) return false;
     form.elements.optionTitle.value = '';
+    form.elements.optionPictogram.value = '';
     form.elements.icon.value = '⭐';
     setFormSymbol(form, {});
     form.elements.optionTitle.focus();
@@ -1876,6 +1916,18 @@
     const action = event.target.closest('[data-action]');
     if (!action) return;
     const name = action.dataset.action;
+    if (name === 'search-arasaac' || name === 'clear-picture') {
+      const target = arasaacTarget(action);
+      if (target) {
+        const choose = (id) => {
+          target.choose(id);
+          requestAnimationFrame(() => [...document.querySelectorAll('[data-action="search-arasaac"]')].find((button) => button.dataset.spriteTarget === action.dataset.spriteTarget && button.dataset.stepIndex === action.dataset.stepIndex && button.dataset.optionIndex === action.dataset.optionIndex && button.dataset.id === action.dataset.id)?.focus());
+        };
+        if (name === 'clear-picture') choose('');
+        else arasaacPicker.open({ ...target, choose });
+      }
+      return;
+    }
     if (name === 'manage-custom-symbols') { customSymbols.open(); return; }
     if (name === 'pick-custom-symbol' || name === 'clear-custom-symbol') {
       const target = customSymbolTarget(action);
@@ -1955,6 +2007,11 @@
       const form = action.closest('form');
       if (form) {
         form.elements.icon.value = action.dataset.symbol;
+        const picture = form.elements.pictogramUrl || form.elements.optionPictogram;
+        if (picture) picture.value = '';
+        if (form.elements.imageAssetId) form.elements.imageAssetId.value = '';
+        const imagePreview = form.querySelector('#imageAssetPreview');
+        if (imagePreview) imagePreview.innerHTML = renderImageAssetPreview('');
         setFormSymbol(form, {});
         rememberSymbol(action.dataset.symbol);
         updateSymbolPreview(form);
@@ -2077,6 +2134,7 @@
       document.getElementById('imageAssetPreview').innerHTML = event.target.value.trim()
         ? '<span class="muted">Image reference will load on the activity.</span>'
         : renderImageAssetPreview('');
+      setFormSymbol(form, formSymbolFields(form));
     }
     if (event.target.id === 'cropQuality') document.getElementById('cropQualityLabel').textContent = event.target.value + '%';
     if (event.target.id === 'cropZoom') {
