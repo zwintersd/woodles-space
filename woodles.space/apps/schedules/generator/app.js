@@ -108,6 +108,8 @@
   let activityStepsDraft = [];
   let suggestionDraft = [];
   let suggestionPoolId = '';
+  let suggestionStepId = '';
+  let pendingSuggestionPools = new Map();
   let videoDraft = [];
   let recentSymbols = readRecentSymbols();
 
@@ -583,6 +585,7 @@
   }
 
   function showActivityDialog(mode, item) {
+    pendingSuggestionPools = new Map();
     activityStepsDraft = JSON.parse(JSON.stringify(item?.steps || []));
     activityMode = mode;
     editingActivityId = item ? item.occurrenceId : '';
@@ -608,7 +611,7 @@
             '<div class="image-asset-preview" id="imageAssetPreview">' + renderImageAssetPreview(activity.pictogram || '', activity.imageAssetId || '') + '</div><small class="muted" id="imageHelp">Crop an image here or use an ARASAAC ID or direct HTTPS image URL. Add a credit below for other image sources.</small></div>' +
           '<label class="field full"><span>Image source or attribution (optional)</span><input name="credit" maxlength="200" value="' + esc(activity.credit || '') + '" placeholder="Artist, library, or license"></label>' +
           '<label class="field full"><span>Support cue or short note (optional)</span><textarea name="note" maxlength="500" placeholder="A short cue, material, or transition note">' + esc(activity.note || '') + '</textarea></label>' +
-          '<fieldset class="step-composer full"><legend>Steps inside this activity (optional)</legend><p class="muted">Add steps in order. A step can offer a choice. All steps share the activity’s total time.</p><div id="activityStepsDraft"></div><button class="button secondary" type="button" data-action="add-activity-step">＋ Add step</button></fieldset>' +
+          '<fieldset class="step-composer full"><legend>Steps inside this activity (optional)</legend><p class="muted">Add steps in order. A step can offer a choice or an animated suggestion. All steps share the activity’s total time.</p><div id="activityStepsDraft"></div><button class="button secondary" type="button" data-action="add-activity-step">＋ Add step</button></fieldset>' +
           (!editing ? '<label class="check-field full"><input type="checkbox" name="saveToLibrary" checked><span>Save this activity to the reusable library</span></label>' :
             (activity.sourceId ? '<label class="check-field full"><input type="checkbox" name="updateLibrary"><span>Also update the library card for future use</span></label>' : '')) +
           '<div class="error-text full" id="activityError" role="status" aria-live="polite"></div>' +
@@ -626,8 +629,8 @@
     if (!host) return;
     const field = (value, key, index, option, label, max) => '<label class="field"><span>' + label + '</span><input data-step-field="' + key + '" data-step-index="' + index + '"' + (option === undefined ? '' : ' data-option-index="' + option + '"') + ' maxlength="' + max + '" value="' + esc(value || '') + '"></label>';
     const button = (action, index, label, disabled, option) => '<button class="button secondary" type="button" data-action="' + action + '" data-step-index="' + index + '"' + (option === undefined ? '' : ' data-option-index="' + option + '"') + (disabled ? ' disabled' : '') + '>' + label + '</button>';
-    host.innerHTML = activityStepsDraft.map((step, index) => '<section class="step-editor" aria-label="Step ' + (index + 1) + '"><div class="button-row"><strong>Step ' + (index + 1) + '</strong>' + button('step-up', index, 'Move up', index === 0) + button('step-down', index, 'Move down', index === activityStepsDraft.length - 1) + button('remove-activity-step', index, 'Remove step') + '</div><div class="step-fields">' + field(step.title, 'title', index, undefined, 'Step name', 60) + field(step.icon, 'icon', index, undefined, 'Symbol or emoji', 16) + field(step.pictogram, 'pictogram', index, undefined, 'ARASAAC ID or HTTPS image', 300) + '</div><label class="field"><span>Step type</span><select data-step-kind="' + index + '"><option value="task"' + (step.kind === 'task' ? ' selected' : '') + '>Do this step</option><option value="choice"' + (step.kind === 'choice' ? ' selected' : '') + '>Pick one option</option></select></label>' +
-      (step.kind === 'choice' ? '<div class="step-option-editor">' + step.options.map((option, oi) => '<div class="step-option-row">' + field(option.title, 'title', index, oi, 'Option ' + (oi + 1) + ' name', 60) + field(option.icon, 'icon', index, oi, 'Symbol or emoji', 16) + field(option.pictogram, 'pictogram', index, oi, 'ARASAAC ID or HTTPS image', 300) + button('remove-step-option', index, 'Remove option', false, oi) + '</div>').join('') + button('add-step-option', index, '＋ Add option', step.options.length >= 6) + '</div>' : '') + '</section>').join('');
+    host.innerHTML = activityStepsDraft.map((step, index) => '<section class="step-editor" aria-label="Step ' + (index + 1) + '"><div class="button-row"><strong>Step ' + (index + 1) + '</strong>' + button('step-up', index, 'Move up', index === 0) + button('step-down', index, 'Move down', index === activityStepsDraft.length - 1) + button('remove-activity-step', index, 'Remove step') + '</div><div class="step-fields">' + field(step.title, 'title', index, undefined, 'Step name', 60) + field(step.icon, 'icon', index, undefined, 'Symbol or emoji', 16) + field(step.pictogram, 'pictogram', index, undefined, 'ARASAAC ID or HTTPS image', 300) + '</div><label class="field"><span>Step type</span><select data-step-kind="' + index + '"><option value="task"' + (step.kind === 'task' ? ' selected' : '') + '>Do this step</option><option value="choice"' + (step.kind === 'choice' ? ' selected' : '') + '>Pick one option</option><option value="suggestion"' + (step.kind === 'suggestion' ? ' selected' : '') + '>Suggest an activity</option></select></label>' +
+      (step.kind === 'choice' ? '<div class="step-option-editor">' + step.options.map((option, oi) => '<div class="step-option-row">' + field(option.title, 'title', index, oi, 'Option ' + (oi + 1) + ' name', 60) + field(option.icon, 'icon', index, oi, 'Symbol or emoji', 16) + field(option.pictogram, 'pictogram', index, oi, 'ARASAAC ID or HTTPS image', 300) + button('remove-step-option', index, 'Remove option', false, oi) + '</div>').join('') + button('add-step-option', index, '＋ Add option', step.options.length >= 6) + '</div>' : step.kind === 'suggestion' ? '<div class="step-suggestion-summary"><p class="muted">' + (step.candidates || []).filter((candidate) => candidate.enabled).length + ' optional activities · ' + (step.rerollMode === 'limited' ? step.maxRerolls + ' rerolls' : step.rerollMode === 'unlimited' ? 'Unlimited rerolls' : 'No rerolls') + '</p>' + button('configure-step-suggestion', index, 'Configure suggestions') + '</div>' : '') + '</section>').join('');
     host.parentElement.querySelector('[data-action="add-activity-step"]').disabled = activityStepsDraft.length >= 20;
   }
 
@@ -658,7 +661,9 @@
   });
   document.addEventListener('change', (event) => {
     if (!event.target.matches('[data-step-kind]')) return;
-    activityStepsDraft[Number(event.target.dataset.stepKind)].kind = event.target.value;
+    const step = activityStepsDraft[Number(event.target.dataset.stepKind)];
+    step.kind = event.target.value;
+    if (step.kind === 'choice') step.options ||= [];
     renderActivityStepsDraft();
   });
 
@@ -727,26 +732,37 @@
     showToast(activityMode === 'slot-edit' ? 'Open slot updated.' : 'Open slot added to ' + day.label + '.');
   }
 
-  function showSuggestionDialog(item) {
+  function showSuggestionDialog(item, stepId = '') {
     const day = getDay(getPlan(), activeDayKey);
     if (!day) return;
+    suggestionStepId = stepId;
+    const nested = Boolean(stepId);
+    if (!nested) pendingSuggestionPools.clear();
+    const dialog = nested ? document.getElementById('stepSuggestionDialog') : activityDialog;
+    const body = nested ? document.getElementById('stepSuggestionDialogBody') : activityDialogBody;
+    const parentForm = document.getElementById('activityForm');
+    const parentDuration = parentForm ? validDuration(parentForm.elements.duration.value, 15) : 15;
     const config = window.ScheduleStudio.sanitizeSuggestion(item || {});
-    const start = item ? item.start : nextFreeStart(day, config.duration);
+    if (nested) config.duration = Math.min(item?.duration || parentDuration, parentDuration);
+    const start = nested ? (parentForm.elements.start?.value || day.start) : item ? item.start : nextFreeStart(day, config.duration);
     if (start === null) return showToast('Make space in the session for a suggestion first.');
-    activityMode = item ? 'suggestion-edit' : 'suggestion-new';
-    editingActivityId = item?.occurrenceId || '';
+    if (!nested) {
+      activityMode = item ? 'suggestion-edit' : 'suggestion-new';
+      editingActivityId = item?.occurrenceId || '';
+    }
     suggestionPoolId = item?.poolId || '';
     suggestionDraft = JSON.parse(JSON.stringify(config.candidates));
     const videos = [...new Map(getPlan().days.flatMap((entry) => entry.activities)
       .filter((entry) => entry.kind === 'video').flatMap((entry) => entry.videos).map((video) => [video.id, video])).values()];
     const options = (entries) => entries.map((entry) => '<option value="' + esc(entry.id) + '">' + esc(entry.title) + '</option>').join('');
-    activityDialogBody.innerHTML = '<div class="dialog-heading dialog-content"><div><span class="eyebrow">Maker controls</span><h2>' + (item ? 'Edit suggestion' : 'Add a suggestion') + '</h2><p class="muted">Supply optional activities. The learner spins for one, then chooses whether to use it.</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close">×</button></div>' +
+    const pools = [...workspace.suggestionPools, ...pendingSuggestionPools.values()].filter((pool, index, all) => all.findLastIndex((entry) => entry.id === pool.id) === index);
+    body.innerHTML = '<div class="dialog-heading dialog-content"><div><span class="eyebrow">Maker controls' + (nested ? ' · inside this activity' : '') + '</span><h2>' + (nested ? 'Configure this suggestion step' : item ? 'Edit suggestion' : 'Add a suggestion') + '</h2><p class="muted">Supply optional activities. The learner spins for one, then chooses whether to use it.' + (nested ? ' Save this step, then save the containing activity.' : '') + '</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close">×</button></div>' +
       '<form class="edit-form" id="suggestionForm">' +
-        '<label class="field"><span>Start time</span><input name="start" type="time" required value="' + esc(typeof start === 'number' ? timeString(start) : start) + '"></label>' +
-        '<label class="field"><span>Time slot (minutes)</span><input name="duration" type="number" min="1" max="480" required value="' + config.duration + '"></label>' +
+        (nested ? '<input name="start" type="hidden" value="' + esc(start) + '">' : '<label class="field"><span>Start time</span><input name="start" type="time" required value="' + esc(typeof start === 'number' ? timeString(start) : start) + '"></label>') +
+        '<label class="field"><span>' + (nested ? 'Suggestion budget (minutes)' : 'Time slot (minutes)') + '</span><input name="duration" type="number" min="1" max="' + (nested ? parentDuration : 480) + '" required value="' + config.duration + '">' + (nested ? '<small class="muted">Shares the containing activity’s time; this adds no separate schedule block.</small>' : '') + '</label>' +
         '<label class="field"><span>Heading</span><input name="title" maxlength="100" required value="' + esc(config.title) + '"></label>' +
         '<label class="field"><span>Learner prompt</span><input name="prompt" maxlength="200" value="' + esc(config.prompt) + '"></label>' +
-        (workspace.suggestionPools.length ? '<label class="field full"><span>Load a reusable suggestion pool</span><select id="suggestionPool"><option value="">Choose a saved pool…</option>' + options(workspace.suggestionPools) + '</select><small class="muted">Loads its activities and rules. Scheduled copies remain independent.</small></label>' : '') +
+        (pools.length ? '<label class="field full"><span>Load a reusable suggestion pool</span><select id="suggestionPool"><option value="">Choose a saved pool…</option>' + options(pools) + '</select><small class="muted">Loads its activities and rules. Scheduled copies remain independent.</small></label>' : '') +
         '<fieldset class="choice-composer full"><legend>Rerolls and learner controls</legend>' +
           '<div class="suggestion-settings"><label class="field"><span>Rerolls</span><select name="rerollMode"><option value="none">No rerolls</option><option value="limited">Limited rerolls</option><option value="unlimited">Unlimited rerolls</option></select></label>' +
           '<label class="field" id="suggestionRerollLimit"><span>Rerolls after the first spin</span><input name="maxRerolls" type="number" min="0" max="1000" value="' + config.maxRerolls + '"></label>' +
@@ -770,12 +786,12 @@
           '<datalist id="suggestionCategoryNames"><option value="Videos"><option value="Chores"><option value="Movement"><option value="Break"><option value="Play"><option value="Other"></datalist></fieldset>' +
         '<label class="check-field full"><input type="checkbox" name="savePool" checked><span>' + (suggestionPoolId ? 'Update this reusable pool for future use' : 'Save these activities and rules as a reusable pool') + '</span></label>' +
         '<small class="muted full">Optional activities stay in this pool; they are not added as separate scheduled tasks.</small>' +
-        (item ? '<details class="full"><summary>Maker override</summary><p class="muted">Explicitly reset this slot’s suggestions, acceptance, and reroll count for today on this device.</p><button class="button secondary" type="button" data-action="suggestion-reset-progress">Reset today’s draws for this slot</button></details>' : '') +
-        '<div class="error-text full" id="suggestionError" role="status" aria-live="polite"></div><div class="dialog-footer full"><button class="button secondary" type="button" data-close-dialog>Cancel</button><button class="button primary" type="submit">' + (item ? 'Save suggestion' : 'Add suggestion') + '</button></div></form>';
+        (item && (!nested || editingActivityId) ? '<details class="full"><summary>Maker override</summary><p class="muted">Explicitly reset this slot’s suggestions, acceptance, and reroll count for today on this device.</p><button class="button secondary" type="button" data-action="suggestion-reset-progress">Reset today’s draws for this slot</button></details>' : '') +
+        '<div class="error-text full" id="suggestionError" role="status" aria-live="polite"></div><div class="dialog-footer full"><button class="button secondary" type="button" data-close-dialog>Cancel</button><button class="button primary" type="submit">' + (nested ? 'Save suggestion step' : item ? 'Save suggestion' : 'Add suggestion') + '</button></div></form>';
     const form = document.getElementById('suggestionForm');
     applySuggestionRules(form, config);
     renderSuggestionDraft();
-    if (!activityDialog.open) activityDialog.showModal();
+    if (!dialog.open) dialog.showModal();
     form.elements.title.focus();
   }
 
@@ -846,6 +862,22 @@
     const values = window.ScheduleStudio.sanitizeSuggestion({ title: data.get('title'), prompt: data.get('prompt'), duration, candidates: suggestionDraft,
       rerollMode: data.get('rerollMode'), maxRerolls: data.get('maxRerolls'), avoidRepeats: data.has('avoidRepeats'),
       allowCategoryChoice: data.has('allowCategoryChoice'), allowSkip: data.has('allowSkip'), animation: data.get('animation') });
+    if (suggestionStepId) {
+      const index = activityStepsDraft.findIndex((step) => step.id === suggestionStepId);
+      if (index < 0) return;
+      const step = activityStepsDraft[index];
+      if (data.has('savePool')) {
+        suggestionPoolId ||= makeId('pool');
+        pendingSuggestionPools.set(suggestionPoolId, { id: suggestionPoolId, ...JSON.parse(JSON.stringify(values)) });
+      }
+      Object.assign(step, values, { kind: 'suggestion', poolId: suggestionPoolId });
+      document.getElementById('stepSuggestionDialog').close();
+      document.getElementById('stepSuggestionDialogBody').replaceChildren();
+      suggestionStepId = '';
+      renderActivityStepsDraft();
+      document.getElementById('activityStepsDraft').children[index]?.querySelector('[data-action="configure-step-suggestion"]')?.focus();
+      return;
+    }
     const existing = day.activities.find((entry) => entry.occurrenceId === editingActivityId);
     const suggestion = { ...values, kind: 'suggestion', start, color: COLORS[0], sourceId: '', poolId: suggestionPoolId,
       occurrenceId: existing?.occurrenceId || makeId('scheduled') };
@@ -869,13 +901,14 @@
 
   function resetSuggestionProgress() {
     try {
+      const occurrenceId = editingActivityId + (suggestionStepId ? ':' + suggestionStepId : '');
       const key = getPlan().id + ':' + activeDayKey;
       const all = JSON.parse(localStorage.getItem('woodles.schedule-planner.progress.v1') || '{}');
       const entry = all[key];
       if (entry) {
-        if (entry.suggestions) delete entry.suggestions[editingActivityId];
-        if (Array.isArray(entry.done)) entry.done = entry.done.filter((id) => id !== editingActivityId);
-        if (entry.picks) Object.keys(entry.picks).filter((id) => id.startsWith(editingActivityId + ':')).forEach((id) => delete entry.picks[id]);
+        if (entry.suggestions) Object.keys(entry.suggestions).filter((id) => id === occurrenceId || id.startsWith(occurrenceId + ':')).forEach((id) => delete entry.suggestions[id]);
+        if (Array.isArray(entry.done)) entry.done = entry.done.filter((id) => id !== occurrenceId);
+        if (entry.picks) Object.keys(entry.picks).filter((id) => id.startsWith(occurrenceId + ':')).forEach((id) => delete entry.picks[id]);
         localStorage.setItem('woodles.schedule-planner.progress.v1', JSON.stringify(all));
       }
       document.getElementById('suggestionError').textContent = 'Today’s draws were reset for this slot.';
@@ -899,16 +932,22 @@
     const input = event.target;
     if (input.matches('#suggestionForm [name="rerollMode"]')) document.getElementById('suggestionRerollLimit').hidden = input.value !== 'limited';
     if (input.id === 'suggestionPool') {
-      const pool = workspace.suggestionPools.find((entry) => entry.id === input.value);
+      const pool = pendingSuggestionPools.get(input.value) || workspace.suggestionPools.find((entry) => entry.id === input.value);
       if (!pool) return;
       suggestionPoolId = pool.id;
       suggestionDraft = JSON.parse(JSON.stringify(pool.candidates));
       const form = document.getElementById('suggestionForm');
       ['title', 'prompt', 'duration'].forEach((key) => { form.elements[key].value = pool[key]; });
+      if (suggestionStepId) form.elements.duration.value = Math.min(pool.duration, Number(form.elements.duration.max));
       form.elements.savePool.closest('label').querySelector('span').textContent = 'Update reusable pool “' + pool.title + '” for future use';
       applySuggestionRules(form, pool);
       renderSuggestionDraft();
     }
+  });
+
+  document.getElementById('stepSuggestionDialog').addEventListener('close', () => {
+    document.getElementById('stepSuggestionDialogBody').replaceChildren();
+    suggestionStepId = '';
   });
 
   function showChoiceDialog(mode, item) {
@@ -1475,6 +1514,8 @@
       throw new Error('Use a pictogram number or a direct HTTPS image URL.');
     }
     if (activityStepsDraft.some((step) => !step.title.trim() || (step.kind === 'choice' && (step.options.length < 2 || step.options.some((option) => !option.title.trim()))))) throw new Error('Name each step and add at least two named options to every choice step.');
+    const nestedSuggestions = window.ScheduleStudio.suggestionItems({ steps: activityStepsDraft, occurrenceId: 'draft', duration: Number(data.get('duration')) });
+    if (nestedSuggestions.some((step) => !(step.candidates || []).some((candidate) => candidate.enabled && candidate.duration <= step.duration))) throw new Error('Configure each suggestion step with at least one available activity that fits the containing activity’s time.');
     if (activityStepsDraft.flatMap((step) => [step, ...(step.kind === 'choice' ? step.options : [])]).some((entry) => entry.pictogram && !/^\d{1,10}$/.test(entry.pictogram) && !/^https:\/\//i.test(entry.pictogram))) throw new Error('Step pictures need an ARASAAC number or a direct HTTPS image URL.');
     const activity = sanitizeActivity({
       id: makeId('activity'),
@@ -1533,6 +1574,12 @@
           throw new Error(validation);
         }
       }
+      for (const [id, pool] of pendingSuggestionPools) {
+        const existingPool = workspace.suggestionPools.find((entry) => entry.id === id);
+        if (existingPool) Object.assign(existingPool, pool);
+        else workspace.suggestionPools.push(pool);
+      }
+      pendingSuggestionPools.clear();
       persist();
       activityDialog.close();
       render();
@@ -1671,7 +1718,8 @@
     const usedImageIds = new Set(plan.days.flatMap((day) => day.activities.flatMap(itemImageIds))
       .concat(activityLibrary.flatMap(itemImageIds)).filter(Boolean));
     const images = workspace.images.filter((image) => usedImageIds.has(image.id));
-    const suggestionPools = workspace.suggestionPools.filter((pool) => plan.days.some((day) => day.activities.some((item) => item.poolId === pool.id)));
+    const usedPools = new Set(plan.days.flatMap((day) => day.activities.flatMap((item) => window.ScheduleStudio.suggestionItems(item))).map((item) => item.poolId));
+    const suggestionPools = workspace.suggestionPools.filter((pool) => usedPools.has(pool.id));
     suggestionPools.flatMap(itemImageIds).forEach((id) => { const image = workspace.images.find((entry) => entry.id === id); if (image && !images.some((entry) => entry.id === id)) images.push(image); });
     const content = JSON.stringify({ format: 'woodles.schedule-week.v1', exportedAt: new Date().toISOString(), plan, activityLibrary, suggestionPools, images }, null, 2);
     const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
@@ -1724,13 +1772,16 @@
           if (issue) throw new Error(day.label + ': ' + issue);
         }
         const importedActivities = Array.isArray(data.activityLibrary)
-          ? data.activityLibrary.map(sanitizeActivity).filter(Boolean).map(remapImage)
+          ? data.activityLibrary.map((activity) => sanitizeActivity(activity)).filter(Boolean).map(remapImage)
           : [];
         const activityIds = new Set(workspace.activities.map((item) => item.id));
         const importedPools = (Array.isArray(data.suggestionPools) ? data.suggestionPools : []).map(window.ScheduleStudio.sanitizeSuggestionPool).filter(Boolean).map(remapImage);
         const poolIds = new Map();
         importedPools.forEach((pool) => { const old = pool.id; pool.id = makeId('pool'); poolIds.set(old, pool.id); });
-        plan.days.forEach((day) => day.activities.forEach((item) => { if (item.kind === 'suggestion') item.poolId = poolIds.get(item.poolId) || ''; }));
+        const remapPool = (item) => { if (item.kind === 'suggestion') item.poolId = poolIds.get(item.poolId) || ''; (item.steps || []).forEach(remapPool); (item.candidates || []).forEach(remapPool); };
+        plan.days.forEach((day) => day.activities.forEach(remapPool));
+        importedActivities.forEach(remapPool);
+        importedPools.forEach(remapPool);
         workspace.suggestionPools.push(...importedPools);
         workspace.images.push(...importedImages);
         workspace.activities.push(...importedActivities.filter((item) => !activityIds.has(item.id)));
@@ -1775,7 +1826,10 @@
     else if (name === 'select-day') routeToPlan(currentPlanId, action.dataset.day);
     else if (name === 'add-activity') showActivityDialog('new');
     else if (name === 'add-open-slot') showOpenSlotDialog('new');
-    else if (name === 'add-suggestion') showSuggestionDialog();
+    else if (name === 'configure-step-suggestion') {
+      const step = activityStepsDraft[Number(action.dataset.stepIndex)];
+      if (step) showSuggestionDialog(step, step.id);
+    } else if (name === 'add-suggestion') showSuggestionDialog();
     else if (name === 'edit-suggestion') {
       const item = getDay(getPlan(), activeDayKey)?.activities.find((entry) => entry.occurrenceId === action.dataset.id);
       if (item) showSuggestionDialog(item);
