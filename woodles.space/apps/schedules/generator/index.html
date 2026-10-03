@@ -9,12 +9,13 @@
   <link rel="stylesheet" href="/shared/palette.css" />
   <link rel="stylesheet" href="/schedules/generator/styles.css" />
   <script src="/schedules/generator/shared.js" defer></script>
+  <script src="/schedules/generator/custom-symbols.js" defer></script>
   <script src="/schedules/generator/app.js" defer></script>
 </head>
 <body>
   <header class="topbar">
     <a class="wordmark" href="/schedules"><span class="wordmark-icon" aria-hidden="true">▦</span><span>Schedule studio</span></a>
-    <span class="save-status" id="saveStatus" role="status">Saved on this device</span>
+    <div class="heading-actions"><button class="button secondary" type="button" data-action="manage-custom-symbols">Custom symbols</button><span class="save-status" id="saveStatus" role="status">Saved on this device</span></div>
   </header>
   <main id="app" class="app-main"></main>
   <dialog id="planDialog" class="dialog">

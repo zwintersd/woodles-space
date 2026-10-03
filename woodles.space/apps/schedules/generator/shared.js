@@ -55,7 +55,7 @@ window.ScheduleStudio = (() => {
   }
 
   function isLocalImageData(value) {
-    return typeof value === 'string' && value.length <= 100000 && /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/]+=*$/i.test(value);
+    return typeof value === 'string' && value.length <= 100000 && /^data:image\/(?:png|jpeg|webp|gif);base64,[a-z0-9+/]+=*$/i.test(value);
   }
 
   function pictogramSource(value) {
@@ -84,9 +84,34 @@ window.ScheduleStudio = (() => {
     return { id: cleanText(value.id, 100, makeId('image')), data: value.data };
   }
 
+  function symbolFields(value = {}) {
+    return { symbolAssetId: cleanText(value.symbolAssetId, 100, ''), symbolStillAssetId: cleanText(value.symbolStillAssetId, 100, ''),
+      symbolName: cleanText(value.symbolName, 40, ''), symbolPixelated: value.symbolPixelated === true,
+      symbolCredit: cleanText(value.symbolCredit, 200, '') };
+  }
+
+  function sanitizeCustomSymbol(value) {
+    if (!value || typeof value !== 'object' || !value.symbolAssetId || !/^[a-z0-9_]{1,40}$/.test(value.symbolName || '')) return null;
+    return { id: cleanText(value.id, 100, makeId('symbol')), ...symbolFields(value), group: cleanText(value.group, 60, 'My symbols') };
+  }
+
+  function customSymbolMarkup(item, images, size) {
+    const source = images.find((image) => image.id === item.symbolAssetId)?.data;
+    if (!isLocalImageData(source)) return '';
+    const still = images.find((image) => image.id === item.symbolStillAssetId)?.data;
+    return '<picture class="custom-symbol-art">' + (isLocalImageData(still) ? '<source media="print, (prefers-reduced-motion: reduce)" srcset="' + esc(still) + '">' : '') +
+      '<img src="' + esc(source) + '" alt="" width="' + size + '" height="' + size + '" style="object-fit:contain;' + (item.symbolPixelated ? 'image-rendering:pixelated;' : '') + '"></picture>';
+  }
+
+  function customSymbolCredits(visuals) {
+    const credits = [...new Set(visuals.filter((item) => item.symbolAssetId && item.symbolCredit).map((item) => item.symbolCredit))];
+    return credits.length ? 'Custom symbols: ' + credits.map(esc).join(' · ') : '';
+  }
+
   function sanitizeActivity(value, depth = 0) {
     if (!value || typeof value !== 'object' || !String(value.title || '').trim()) return null;
     return {
+      ...symbolFields(value),
       id: cleanText(value.id, 100, makeId('activity')),
       title: cleanText(value.title, 100, 'Activity'),
       category: cleanText(value.category, 60, 'Other'),
@@ -127,6 +152,7 @@ window.ScheduleStudio = (() => {
   function sanitizeChoiceOption(value) {
     if (!value || typeof value !== 'object' || !String(value.title || '').trim()) return null;
     return {
+      ...symbolFields(value),
       id: cleanText(value.id, 100, makeId('option')),
       title: cleanText(value.title, 60, 'Option'),
       icon: cleanText(value.icon, 16, '⭐'),
@@ -353,11 +379,12 @@ window.ScheduleStudio = (() => {
           plans: Array.isArray(value.plans) ? value.plans.map(sanitizePlan).filter(Boolean) : [],
           activities: Array.isArray(value.activities) ? value.activities.map((activity) => sanitizeActivity(activity)).filter(Boolean) : [],
           suggestionPools: Array.isArray(value.suggestionPools) ? value.suggestionPools.map(sanitizeSuggestionPool).filter(Boolean) : [],
+          customSymbols: Array.isArray(value.customSymbols) ? value.customSymbols.map(sanitizeCustomSymbol).filter(Boolean).slice(0, 256) : [],
           images: Array.isArray(value.images) ? value.images.map(sanitizeImage).filter(Boolean) : []
         };
       }
     } catch {}
-    return { plans: [], activities: [], images: [], suggestionPools: [] };
+    return { plans: [], activities: [], images: [], suggestionPools: [], customSymbols: [] };
   }
 
   // A choice without its own heading, and every open slot, is the learner's.
@@ -382,7 +409,7 @@ window.ScheduleStudio = (() => {
   // The things on a scheduled item that carry a picture: an activity itself,
   // each option of a choice, or each video's thumbnail. Open slots have none.
   function itemVisuals(item) {
-    if (Array.isArray(item.candidates)) return item.candidates.flatMap((candidate) => itemVisuals(candidate));
+    if (Array.isArray(item.candidates)) return [item, ...item.candidates.flatMap((candidate) => itemVisuals(candidate))];
     if (item.kind === 'choice') return [item, ...item.options];
     if (item.kind === 'video') return item.videos;
     return item.kind === 'open-slot' ? [] : [item, ...(item.steps || []).flatMap(itemVisuals), ...(item.options || [])];
@@ -398,7 +425,7 @@ window.ScheduleStudio = (() => {
   }
 
   function itemImageIds(item) {
-    return itemVisuals(item).map((visual) => visual.imageAssetId).filter(Boolean);
+    return itemVisuals(item).flatMap((visual) => [visual.imageAssetId, visual.symbolAssetId, visual.symbolStillAssetId]).filter(Boolean);
   }
 
   function visualScheduleUrl(planId, dayKey) {
@@ -410,6 +437,7 @@ window.ScheduleStudio = (() => {
     makeId, esc, cleanText, validTime, validDuration, validColor, timeMinutes,
     isLocalImageData, pictogramSource, openMojiCodepoint, symbolMarkup,
     sanitizeImage, sanitizeActivity, sanitizeActivityStep, activityStepsMarkup, sanitizeChoiceOption, sanitizeVideo, sanitizePlan, readWorkspace,
+    symbolFields, sanitizeCustomSymbol, customSymbolMarkup, customSymbolCredits,
     sanitizeSuggestion, sanitizeSuggestionCandidate, sanitizeSuggestionPool, sanitizeSuggestionState, suggestionStatus, drawSuggestion,
     validVideoUrl, youTubeThumbnail, videoKey, validFamiliarity, familiarityMarkup, choiceTitle, videoTitle, videoPrompt, itemLabel,
     itemVisuals, itemImageIds, suggestionItems, visualScheduleUrl
