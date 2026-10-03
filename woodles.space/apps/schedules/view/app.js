@@ -18,6 +18,8 @@
   let workspace = readWorkspace();
   let plan = null;
   let day = null;
+  const spinningSuggestions = new Map();
+  const pendingDraws = new Set();
 
   function todayKey(date) {
     return DAY_KEYS[(date.getDay() + 6) % 7][0];
@@ -53,6 +55,9 @@
 
   function stepLabel(step, picks) {
     if (step.kind === 'finish') return 'All done!';
+    if (step.kind === 'suggestion') {
+      return step.candidates.find((candidate) => candidate.id === picks[step.occurrenceId])?.title || step.title;
+    }
     if (step.kind === 'video') {
       const video = step.videos.find((entry) => entry.id === picks[step.occurrenceId]) || (step.videos.length === 1 ? step.videos[0] : null);
       return video ? 'Watch ' + video.title : itemLabel(step, plan.learner);
@@ -95,7 +100,18 @@
     if (current.picks && typeof current.picks === 'object') {
       for (const [id, option] of Object.entries(current.picks)) if (typeof option === 'string') picks[id] = option;
     }
-    return { done: new Set(Array.isArray(current.done) ? current.done.map(String) : []), picks };
+    const suggestions = {};
+    if (current.suggestions && typeof current.suggestions === 'object') {
+      for (const item of day.activities.filter((entry) => entry.kind === 'suggestion')) {
+        if (!Object.prototype.hasOwnProperty.call(current.suggestions, item.occurrenceId)) continue;
+        const state = window.ScheduleStudio.sanitizeSuggestionState(current.suggestions[item.occurrenceId]);
+        suggestions[item.occurrenceId] = state;
+        const status = window.ScheduleStudio.suggestionStatus(item, state, state.category);
+        if (status.selected && !state.skipped) picks[item.occurrenceId] = status.selected.id;
+        else delete picks[item.occurrenceId];
+      }
+    }
+    return { done: new Set(Array.isArray(current.done) ? current.done.map(String) : []), picks, suggestions };
   }
 
   function writeDayProgress(progress) {
@@ -104,8 +120,8 @@
     for (const [key, entry] of Object.entries(readProgress())) {
       if (entry && entry.date === today && key !== progressKey()) kept[key] = entry;
     }
-    if (progress.done.size || Object.keys(progress.picks).length) kept[progressKey()] = { date: today, done: [...progress.done], picks: progress.picks };
-    try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(kept)); } catch {}
+    if (progress.done.size || Object.keys(progress.picks).length || Object.keys(progress.suggestions || {}).length) kept[progressKey()] = { date: today, done: [...progress.done], picks: progress.picks, suggestions: progress.suggestions || {} };
+    try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(kept)); return true; } catch { return false; }
   }
 
   function doneButton(step, title, done) {
@@ -168,7 +184,112 @@
     }).join('') + '</ol>';
   }
 
+  function suggestionMarkup(step, progress) {
+    const state = window.ScheduleStudio.sanitizeSuggestionState(progress.suggestions[step.occurrenceId]);
+    const category = step.candidates.some((candidate) => candidate.enabled && candidate.category === state.category) ? state.category : '';
+    const status = window.ScheduleStudio.suggestionStatus(step, state, category);
+    const spinning = spinningSuggestions.has(step.occurrenceId);
+    const accepted = state.accepted && Boolean(status.selected);
+    const categories = [...new Set(status.pool.map((candidate) => candidate.category))].sort();
+    const rerolls = step.rerollMode === 'unlimited' ? 'Unlimited rerolls' : step.rerollMode === 'none' ? 'One spin · no rerolls' : (state.spins ? status.remaining : step.maxRerolls) + ' rerolls left';
+    const controlsDisabled = status.locked || spinning;
+    const choice = status.selected;
+    const reelCard = (candidate) => '<div class="suggestion-reel-card"><span class="suggestion-art">' + visualMarkup(candidate, 48) + '</span><strong>' + esc(candidate.title) + '</strong></div>';
+    const reel = spinningSuggestions.get(step.occurrenceId);
+    const result = choice && !state.skipped && !spinning
+      ? '<div class="suggestion-result"><span class="category">' + esc(choice.category) + ' · ' + choice.duration + ' min</span><h3>' + esc(choice.title) + '</h3>' + (choice.note ? '<p class="sub">' + esc(choice.note) + '</p>' : '') +
+        (accepted ? nestedStepsMarkup({ ...choice, occurrenceId: step.occurrenceId + ':' + choice.id }, progress) : '') +
+        (choice.credit ? '<p class="image-credit">' + esc(choice.credit) + '</p>' : '') +
+        (accepted && choice.url ? '<a class="watch" href="' + esc(choice.url) + '" target="_blank" rel="noopener noreferrer">▶ Open ' + esc(choice.title) + '</a>' : '') + '</div>' : '';
+    const done = progress.done.has(step.occurrenceId);
+    return '<li class="step suggestion' + (done ? ' is-done' : '') + '" data-id="' + esc(step.occurrenceId) + '"><div class="time">' + clockLabel(step.from) + '<small>' + step.duration + ' min</small></div>' +
+      '<article class="box"><span class="nowtag">NOW</span><div class="video-head"><div class="copy"><span class="category">ACTIVITY SURPRISE</span><h2>' + esc(step.title) + '</h2><p class="sub">' + esc(step.prompt) + '</p></div>' +
+      (accepted ? doneButton(step, choice.title, done) : '') + '</div>' +
+      '<div class="suggestion-stage" aria-busy="' + spinning + '"><div class="suggestion-window" aria-hidden="true"><div class="suggestion-reel">' +
+      (reel ? reel.map(reelCard).join('') : choice && !state.skipped ? reelCard(choice) : '<div class="suggestion-reel-card"><span class="suggestion-spark">✦</span><strong>Your next idea?</strong></div>') + '</div></div>' + result + '</div>' +
+      (step.allowCategoryChoice && categories.length ? '<label class="suggestion-category"><span>Choose a category</span><select data-suggestion-category="' + esc(step.occurrenceId) + '"' + (controlsDisabled ? ' disabled' : '') + '><option value="">All categories</option>' + categories.map((name) => '<option value="' + esc(name) + '"' + (name === category ? ' selected' : '') + '>' + esc(name) + '</option>').join('') + '</select></label>' : '') +
+      '<div class="suggestion-actions"><button class="suggestion-spin" type="button" data-suggestion-draw="' + esc(step.occurrenceId) + '"' + (!status.canDraw || spinning ? ' disabled' : '') + '>' + (spinning ? 'Finding an idea…' : state.spins ? '↻ Spin again' : '✦ Find an activity') + '</button>' +
+      (choice && !controlsDisabled ? '<button class="suggestion-accept" type="button" data-suggestion-accept="' + esc(step.occurrenceId) + '">Use this</button>' : '') +
+      (step.allowSkip && !controlsDisabled ? '<button class="suggestion-skip" type="button" data-suggestion-skip="' + esc(step.occurrenceId) + '">Skip this</button>' : '') + '</div>' +
+      '<p class="suggestion-status" role="status" aria-live="polite">' + esc(spinning ? 'Finding an idea…' : status.reason || (choice ? 'Suggested: ' + choice.title + '. Use this, or spin again if you want.' : 'Ready when you are.')) + '</p>' +
+      '<p class="suggestion-budget">' + esc(rerolls) + (step.avoidRepeats ? ' · no repeats today' : '') + '</p></article></li>';
+  }
+
+  function refreshSuggestion(id, focusAttribute) {
+    const item = day?.activities.find((entry) => entry.occurrenceId === id && entry.kind === 'suggestion');
+    const node = [...el('timeline').querySelectorAll('.step')].find((entry) => entry.dataset.id === id);
+    if (!item || !node) return;
+    const template = document.createElement('template');
+    template.innerHTML = suggestionMarkup({ ...item, from: timeMinutes(item.start) }, readDayProgress());
+    const replacement = template.content.firstElementChild;
+    node.replaceWith(replacement);
+    if (focusAttribute) {
+      const result = replacement.querySelector('.suggestion-result h3')?.textContent;
+      el('suggestionAnnouncement').textContent = (result ? result + '. ' : '') + replacement.querySelector('.suggestion-status').textContent;
+      const target = replacement.querySelector('[' + focusAttribute + ']:not(:disabled)') || replacement.querySelector('button:not(:disabled)') || replacement.querySelector('h2');
+      if (target) { if (target.tagName === 'H2') target.tabIndex = -1; target.focus({ preventScroll: true }); }
+    }
+    tick();
+  }
+
+  async function spinSuggestion(id) {
+    if (pendingDraws.has(id) || spinningSuggestions.has(id)) return;
+    pendingDraws.add(id);
+    try {
+      // Tabs share the daily budget. Serialize the read-and-save operation so
+      // two open learner views cannot both spend the same remaining draw.
+      if (navigator.locks) await navigator.locks.request('woodles.schedule-draw:' + progressKey() + ':' + id, () => revealSuggestion(id));
+      else await revealSuggestion(id);
+    } finally { pendingDraws.delete(id); }
+  }
+
+  async function revealSuggestion(id) {
+    if (spinningSuggestions.has(id)) return;
+    const item = day.activities.find((entry) => entry.occurrenceId === id && entry.kind === 'suggestion');
+    if (!item) return;
+    const progress = readDayProgress();
+    const current = window.ScheduleStudio.sanitizeSuggestionState(progress.suggestions[id]);
+    const next = window.ScheduleStudio.drawSuggestion(item, current, current.category);
+    if (!next) { refreshSuggestion(id); return; }
+    const result = item.candidates.find((candidate) => candidate.id === next.selected);
+    progress.suggestions[id] = next;
+    // Save the draw before animating: closing or refreshing cannot buy another spin.
+    if (!writeDayProgress(progress)) {
+      const node = [...el('timeline').querySelectorAll('.step')].find((entry) => entry.dataset.id === id);
+      if (node) node.querySelector('.suggestion-status').textContent = 'Could not save the draw. Ask your helper before trying again.';
+      return;
+    }
+    const calm = item.animation === 'instant' || matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!calm) {
+      const available = window.ScheduleStudio.suggestionStatus(item, current, current.category).candidates;
+      const reel = Array.from({ length: 12 }, (_, index) => available[index % available.length]);
+      reel.push(result);
+      spinningSuggestions.set(id, reel);
+      refreshSuggestion(id);
+      const node = [...el('timeline').querySelectorAll('.step')].find((entry) => entry.dataset.id === id);
+      const rail = node?.querySelector('.suggestion-reel');
+      try {
+        if (rail) await rail.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-' + ((reel.length - 1) * 116) + 'px)' }], { duration: 1600, easing: 'cubic-bezier(.12,.6,.12,1)', fill: 'forwards' }).finished;
+      } catch { /* A maker edit or navigation can interrupt the visual reveal. */ }
+      finally { spinningSuggestions.delete(id); }
+    }
+    refreshSuggestion(id, 'data-suggestion-accept');
+  }
+
+  function settleSuggestion(id, skip) {
+    if (spinningSuggestions.has(id) || pendingDraws.has(id)) return;
+    const item = day.activities.find((entry) => entry.kind === 'suggestion' && entry.occurrenceId === id);
+    if (!item) return;
+    const progress = readDayProgress();
+    const status = window.ScheduleStudio.suggestionStatus(item, progress.suggestions[id]);
+    if (status.locked || (skip ? !item.allowSkip : !status.selected)) return;
+    progress.suggestions[id] = { ...status.state, accepted: !skip, skipped: skip };
+    if (skip) progress.done.add(id);
+    if (writeDayProgress(progress)) refreshSuggestion(id, skip ? 'data-suggestion-draw' : 'data-done');
+  }
+
   function stepMarkup(step, progress) {
+    if (step.kind === 'suggestion') return suggestionMarkup(step, progress);
     if (step.kind === 'video') return videoMarkup(step, progress);
     if (step.kind === 'choice') return choiceMarkup(step, progress);
     const done = progress.done.has(step.occurrenceId);
@@ -319,9 +440,17 @@
   document.addEventListener('click', (event) => {
     const button = event.target.closest('button');
     if (!button || !day) return;
-    if (button.dataset.done) {
+    if (button.dataset.suggestionDraw) {
+      spinSuggestion(button.dataset.suggestionDraw);
+    } else if (button.dataset.suggestionAccept) {
+      settleSuggestion(button.dataset.suggestionAccept, false);
+    } else if (button.dataset.suggestionSkip) {
+      settleSuggestion(button.dataset.suggestionSkip, true);
+    } else if (button.dataset.done) {
       const progress = readDayProgress();
       const id = button.dataset.done;
+      const item = day.activities.find((entry) => entry.occurrenceId === id);
+      if (item?.kind === 'suggestion' && !window.ScheduleStudio.suggestionStatus(item, progress.suggestions[id]).state.accepted) return;
       if (progress.done.has(id)) progress.done.delete(id);
       else progress.done.add(id);
       writeDayProgress(progress);
@@ -344,9 +473,23 @@
       button.closest('.videos').querySelectorAll('.vid').forEach((card) => videoCardState(card, progress.picks[id]));
       tick();
     } else if (button.id === 'reset') {
-      writeDayProgress({ done: new Set(), picks: {} });
+      writeDayProgress({ done: new Set(), picks: {}, suggestions: readDayProgress().suggestions });
       render();
     }
+  });
+
+  document.addEventListener('change', (event) => {
+    const id = event.target.dataset.suggestionCategory;
+    if (!id || !day || spinningSuggestions.has(id) || pendingDraws.has(id)) return;
+    const item = day.activities.find((entry) => entry.kind === 'suggestion' && entry.occurrenceId === id);
+    if (!item || !item.allowCategoryChoice) return;
+    const progress = readDayProgress();
+    const status = window.ScheduleStudio.suggestionStatus(item, progress.suggestions[id]);
+    if (status.locked) return;
+    const category = event.target.value;
+    if (category && !status.pool.some((candidate) => candidate.category === category)) return;
+    progress.suggestions[id] = { ...status.state, category };
+    if (writeDayProgress(progress)) refreshSuggestion(id, 'data-suggestion-category');
   });
 
   // The planner may be open in another tab; show its edits as they save.

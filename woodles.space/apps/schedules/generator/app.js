@@ -106,6 +106,8 @@
   let activeSymbolGroup = 'Popular';
   let choiceDraft = [];
   let activityStepsDraft = [];
+  let suggestionDraft = [];
+  let suggestionPoolId = '';
   let videoDraft = [];
   let recentSymbols = readRecentSymbols();
 
@@ -151,7 +153,7 @@
     const now = new Date().toISOString();
     const plan = getPlan();
     if (plan) plan.updatedAt = now;
-    const usedImages = new Set(workspace.activities.flatMap(itemImageIds).concat(
+    const usedImages = new Set([...workspace.activities, ...workspace.suggestionPools].flatMap(itemImageIds).concat(
       workspace.plans.flatMap((entry) => entry.days.flatMap((day) => day.activities.flatMap(itemImageIds)))
     ).filter(Boolean));
     workspace.images = workspace.images.filter((image) => usedImages.has(image.id));
@@ -227,6 +229,7 @@
       count: kinds('activity'),
       choices: kinds('choice'),
       videos: kinds('video'),
+      suggestions: kinds('suggestion'),
       openSlots: kinds('open-slot'),
       minutes: day.activities.reduce((total, item) => total + item.duration, 0)
     };
@@ -237,6 +240,7 @@
     if (stats.count) parts.push(stats.count + ' activit' + (stats.count === 1 ? 'y' : 'ies'));
     if (stats.choices) parts.push(stats.choices + ' choice' + (stats.choices === 1 ? '' : 's'));
     if (stats.videos) parts.push(stats.videos + ' video' + (stats.videos === 1 ? '' : 's'));
+    if (stats.suggestions) parts.push(stats.suggestions + ' suggestion' + (stats.suggestions === 1 ? '' : 's'));
     if (stats.openSlots) parts.push(stats.openSlots + ' open slot' + (stats.openSlots === 1 ? '' : 's'));
     return parts.join(' · ') || 'No items';
   }
@@ -248,9 +252,10 @@
       result.activities += stats.count;
       result.choices += stats.choices;
       result.videos += stats.videos;
+      result.suggestions += stats.suggestions;
       result.openSlots += stats.openSlots;
       return result;
-    }, { days: 0, activities: 0, choices: 0, videos: 0, openSlots: 0 });
+    }, { days: 0, activities: 0, choices: 0, videos: 0, suggestions: 0, openSlots: 0 });
   }
 
   function nextFreeStart(day, duration, ignoreId) {
@@ -312,7 +317,7 @@
       return '<article class="plan-card">' +
         '<button class="plan-open" type="button" data-action="open-plan" data-plan="' + esc(plan.id) + '">' +
           '<strong>' + esc(plan.learner) + '</strong><span>' + esc(plan.name) + '</span>' +
-          '<span class="plan-meta">' + stats.days + ' day' + (stats.days === 1 ? '' : 's') + ' planned · ' + stats.activities + ' activities' + (stats.choices ? ' · ' + stats.choices + ' choice' + (stats.choices === 1 ? '' : 's') : '') + (stats.videos ? ' · ' + stats.videos + ' video' + (stats.videos === 1 ? '' : 's') : '') + (stats.openSlots ? ' · ' + stats.openSlots + ' open slot' + (stats.openSlots === 1 ? '' : 's') : '') + ' · ' + esc(formatDate(plan.updatedAt)) + '</span>' +
+          '<span class="plan-meta">' + stats.days + ' day' + (stats.days === 1 ? '' : 's') + ' planned · ' + stats.activities + ' activities' + (stats.choices ? ' · ' + stats.choices + ' choice' + (stats.choices === 1 ? '' : 's') : '') + (stats.videos ? ' · ' + stats.videos + ' video' + (stats.videos === 1 ? '' : 's') : '') + (stats.suggestions ? ' · ' + stats.suggestions + ' suggestion' + (stats.suggestions === 1 ? '' : 's') : '') + (stats.openSlots ? ' · ' + stats.openSlots + ' open slot' + (stats.openSlots === 1 ? '' : 's') : '') + ' · ' + esc(formatDate(plan.updatedAt)) + '</span>' +
         '</button><div class="plan-actions">' +
           '<a class="icon-button visual-link" href="' + esc(visualScheduleUrl(plan.id)) + '" aria-label="Open ' + esc(plan.learner) + '’s visual schedule" title="Visual schedule">▶</a>' +
           '<button class="icon-button" type="button" data-action="duplicate-plan" data-plan="' + esc(plan.id) + '" aria-label="Duplicate ' + esc(plan.learner) + ' plan" title="Duplicate plan">⧉</button>' +
@@ -375,6 +380,11 @@
   }
 
   function renderActivity(day, item, index, items) {
+    if (item.kind === 'suggestion') {
+      const available = item.candidates.filter((candidate) => candidate.enabled && candidate.duration <= item.duration);
+      const policy = item.rerollMode === 'none' ? 'No rerolls' : item.rerollMode === 'unlimited' ? 'Unlimited rerolls' : item.maxRerolls + ' rerolls';
+      return '<article class="activity-card suggestion-card"><div class="activity-time">' + esc(formatTime(item.start)) + '<small>' + item.duration + ' min</small></div><div class="video-symbol" aria-hidden="true">✦</div><div class="activity-copy"><h3>' + esc(item.title) + '</h3><div class="activity-tags"><span class="activity-tag">Suggestion · ' + available.length + ' available</span><span class="activity-tag">' + policy + '</span></div><p class="activity-note">' + esc(item.prompt) + '</p><ul class="choice-options">' + available.map((candidate) => '<li class="choice-option"><span class="choice-option-art">' + optionVisual(candidate, 22) + '</span>' + esc(candidate.title) + '</li>').join('') + '</ul></div>' + itemActions(item, index, items, item.title, 'edit-suggestion') + '</article>';
+    }
     if (item.kind === 'video') {
       const title = videoTitle(item, getPlan().learner);
       const count = item.videos.length;
@@ -464,7 +474,7 @@
       '<nav class="day-tabs" aria-label="Days of the week">' + renderDayTabs(plan) + '</nav>' +
       '<div class="day-panel"><section class="day-main" aria-labelledby="dayTitle">' +
         '<div class="day-main-header"><div><span class="eyebrow">' + esc(plan.learner) + ' · weekly schedule</span><h2 id="dayTitle">' + esc(day.label) + '</h2><p>Plan this day’s session, then copy it to another day when the pattern fits.</p></div>' +
-          '<div class="button-row"><button class="button secondary" type="button" data-action="add-open-slot">＋ Open slot</button><button class="button secondary" type="button" data-action="add-choice">＋ Choice</button><button class="button secondary" type="button" data-action="add-video">＋ Video</button><button class="button primary" type="button" data-action="add-activity">＋ Add activity</button></div></div>' +
+          '<div class="button-row"><button class="button secondary" type="button" data-action="add-suggestion">✦ Suggestion</button><button class="button secondary" type="button" data-action="add-open-slot">＋ Open slot</button><button class="button secondary" type="button" data-action="add-choice">＋ Choice</button><button class="button secondary" type="button" data-action="add-video">＋ Video</button><button class="button primary" type="button" data-action="add-activity">＋ Add activity</button></div></div>' +
         '<div class="time-window"><span class="time-window-label">Session time</span><label class="field"><span>Starts</span><input type="time" data-day-time="start" value="' + esc(day.start) + '" aria-label="' + esc(day.label) + ' session start"></label>' +
           '<label class="field"><span>Ends</span><input type="time" data-day-time="end" value="' + esc(day.end) + '" aria-label="' + esc(day.label) + ' session end"></label>' +
           '<span class="time-summary">' + stats.minutes + ' scheduled minutes · ' + Math.max(0, capacity - stats.minutes) + ' unassigned minutes</span></div>' +
@@ -476,7 +486,7 @@
         '<div class="copy-row"><label for="copyDestination">Reuse this day:</label><select id="copyDestination">' + destinationOptions + '</select><button class="button small secondary" type="button" data-action="copy-day">Copy day</button><button class="button small secondary danger" type="button" data-action="clear-day">Clear day</button><button class="button small secondary danger" type="button" data-action="delete-day">Delete day</button></div>' +
         '<div class="activity-list" aria-label="' + esc(day.label) + ' scheduled items">' +
           (items.length ? items.map((item, index) => renderActivity(day, item, index, items)).join('') :
-            '<div class="empty-day"><span class="empty-icon" aria-hidden="true">＋</span><h3>No activities planned yet</h3><p>Add a session activity, a choice between a few options, a video, or an open slot, or copy a day with a schedule you want to reuse. Times and items remain editable on every day.</p><div class="button-row"><button class="button secondary" type="button" data-action="add-open-slot">＋ Add open slot</button><button class="button secondary" type="button" data-action="add-choice">＋ Add choice</button><button class="button secondary" type="button" data-action="add-video">＋ Add video</button><button class="button secondary" type="button" data-action="add-activity">＋ Add first activity</button></div></div>') +
+            '<div class="empty-day"><span class="empty-icon" aria-hidden="true">＋</span><h3>No activities planned yet</h3><p>Add an activity, a suggestion pool, a choice, a video, or an open slot, or copy a day with a schedule you want to reuse. Times and items remain editable on every day.</p><div class="button-row"><button class="button secondary" type="button" data-action="add-open-slot">＋ Add open slot</button><button class="button secondary" type="button" data-action="add-choice">＋ Add choice</button><button class="button secondary" type="button" data-action="add-video">＋ Add video</button><button class="button secondary" type="button" data-action="add-activity">＋ Add first activity</button></div></div>') +
         '</div>' + (printCredits ? '<p class="print-credit">' + printCredits + '</p>' : '') + '</section>' +
         '<aside class="day-side">' + renderVisualCard(plan, day) + '<section class="side-card"><h3>This week</h3><p>Each day can use its own session window and activity sequence.</p><div class="week-summary">' + renderWeekSummary(plan) + '</div>' +
           '<div class="side-actions"><button class="button secondary" type="button" data-action="duplicate-plan">Duplicate this learner plan</button><button class="button secondary danger" type="button" data-action="delete-current-plan">Delete this plan</button></div></section></aside>' +
@@ -716,6 +726,190 @@
     render();
     showToast(activityMode === 'slot-edit' ? 'Open slot updated.' : 'Open slot added to ' + day.label + '.');
   }
+
+  function showSuggestionDialog(item) {
+    const day = getDay(getPlan(), activeDayKey);
+    if (!day) return;
+    const config = window.ScheduleStudio.sanitizeSuggestion(item || {});
+    const start = item ? item.start : nextFreeStart(day, config.duration);
+    if (start === null) return showToast('Make space in the session for a suggestion first.');
+    activityMode = item ? 'suggestion-edit' : 'suggestion-new';
+    editingActivityId = item?.occurrenceId || '';
+    suggestionPoolId = item?.poolId || '';
+    suggestionDraft = JSON.parse(JSON.stringify(config.candidates));
+    const videos = [...new Map(getPlan().days.flatMap((entry) => entry.activities)
+      .filter((entry) => entry.kind === 'video').flatMap((entry) => entry.videos).map((video) => [video.id, video])).values()];
+    const options = (entries) => entries.map((entry) => '<option value="' + esc(entry.id) + '">' + esc(entry.title) + '</option>').join('');
+    activityDialogBody.innerHTML = '<div class="dialog-heading dialog-content"><div><span class="eyebrow">Maker controls</span><h2>' + (item ? 'Edit suggestion' : 'Add a suggestion') + '</h2><p class="muted">Supply optional activities. The learner spins for one, then chooses whether to use it.</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close">×</button></div>' +
+      '<form class="edit-form" id="suggestionForm">' +
+        '<label class="field"><span>Start time</span><input name="start" type="time" required value="' + esc(typeof start === 'number' ? timeString(start) : start) + '"></label>' +
+        '<label class="field"><span>Time slot (minutes)</span><input name="duration" type="number" min="1" max="480" required value="' + config.duration + '"></label>' +
+        '<label class="field"><span>Heading</span><input name="title" maxlength="100" required value="' + esc(config.title) + '"></label>' +
+        '<label class="field"><span>Learner prompt</span><input name="prompt" maxlength="200" value="' + esc(config.prompt) + '"></label>' +
+        (workspace.suggestionPools.length ? '<label class="field full"><span>Load a reusable suggestion pool</span><select id="suggestionPool"><option value="">Choose a saved pool…</option>' + options(workspace.suggestionPools) + '</select><small class="muted">Loads its activities and rules. Scheduled copies remain independent.</small></label>' : '') +
+        '<fieldset class="choice-composer full"><legend>Rerolls and learner controls</legend>' +
+          '<div class="suggestion-settings"><label class="field"><span>Rerolls</span><select name="rerollMode"><option value="none">No rerolls</option><option value="limited">Limited rerolls</option><option value="unlimited">Unlimited rerolls</option></select></label>' +
+          '<label class="field" id="suggestionRerollLimit"><span>Rerolls after the first spin</span><input name="maxRerolls" type="number" min="0" max="1000" value="' + config.maxRerolls + '"></label>' +
+          '<label class="field"><span>Reveal style</span><select name="animation"><option value="spin">Spinning activity reel</option><option value="instant">Instant, calm reveal</option></select></label></div>' +
+          '<label class="check-field"><input type="checkbox" name="avoidRepeats"><span>Do not repeat a suggestion in this slot today</span></label>' +
+          '<label class="check-field"><input type="checkbox" name="allowCategoryChoice"><span>Let the learner choose a category before spinning</span></label>' +
+          '<label class="check-field"><input type="checkbox" name="allowSkip"><span>Allow “Skip this” without accepting an activity</span></label>' +
+          '<p class="muted">The first spin is free. A category change uses the same reroll budget. “Use this” locks the result. Refreshing and clearing checks preserve the budget; a new calendar day starts fresh. Reduced-motion preferences always get a calm reveal.</p></fieldset>' +
+        '<fieldset class="choice-composer full"><legend>Optional activity pool</legend><p class="muted">Only enabled activities that fit this time slot can be suggested. Bigger weights make an activity more likely; equal weights give equal chances. When repeats are allowed, consecutive repeats are avoided while another activity is available.</p>' +
+          '<div id="suggestionCandidates"></div><p id="suggestionReadiness" class="muted" role="status" aria-live="polite"></p>' +
+          (workspace.activities.length ? '<label class="field"><span>Add a saved activity, including its steps and picture</span><span class="choice-composer-row"><select id="suggestionActivityLibrary">' + options(workspace.activities) + '</select><button class="button secondary" type="button" data-action="suggestion-library-candidate">＋ Add saved activity</button></span></label>' : '') +
+          (videos.length ? '<label class="field"><span>Add a video already used in this plan</span><span class="choice-composer-row"><select id="suggestionVideoLibrary">' + options(videos) + '</select><button class="button secondary" type="button" data-action="suggestion-video-candidate">＋ Add saved video</button></span></label>' : '') +
+          '<details class="suggestion-new" open><summary>Create an optional activity or video</summary><div class="suggestion-settings">' +
+            '<label class="field"><span>Activity name</span><input id="candidateTitle" maxlength="100" placeholder="Fold towels, watch a video…"></label>' +
+            '<label class="field"><span>Category</span><input id="candidateCategory" maxlength="60" list="suggestionCategoryNames" value="Other"></label>' +
+            '<label class="field"><span>Minutes needed</span><input id="candidateDuration" type="number" min="1" max="480" value="10"></label>' +
+            '<label class="field"><span>Symbol or emoji</span><input id="candidateIcon" maxlength="16" value="⭐"></label>' +
+            '<label class="field"><span>Video or activity link (optional)</span><input id="candidateUrl" maxlength="500" placeholder="https://…"></label>' +
+            '<label class="field"><span>ARASAAC ID or HTTPS picture (optional)</span><input id="candidatePictogram" maxlength="300"></label>' +
+          '</div><button class="button secondary" type="button" data-action="suggestion-add-candidate">＋ Add to pool</button></details>' +
+          '<datalist id="suggestionCategoryNames"><option value="Videos"><option value="Chores"><option value="Movement"><option value="Break"><option value="Play"><option value="Other"></datalist></fieldset>' +
+        '<label class="check-field full"><input type="checkbox" name="savePool" checked><span>' + (suggestionPoolId ? 'Update this reusable pool for future use' : 'Save these activities and rules as a reusable pool') + '</span></label>' +
+        '<small class="muted full">Optional activities stay in this pool; they are not added as separate scheduled tasks.</small>' +
+        (item ? '<details class="full"><summary>Maker override</summary><p class="muted">Explicitly reset this slot’s suggestions, acceptance, and reroll count for today on this device.</p><button class="button secondary" type="button" data-action="suggestion-reset-progress">Reset today’s draws for this slot</button></details>' : '') +
+        '<div class="error-text full" id="suggestionError" role="status" aria-live="polite"></div><div class="dialog-footer full"><button class="button secondary" type="button" data-close-dialog>Cancel</button><button class="button primary" type="submit">' + (item ? 'Save suggestion' : 'Add suggestion') + '</button></div></form>';
+    const form = document.getElementById('suggestionForm');
+    applySuggestionRules(form, config);
+    renderSuggestionDraft();
+    if (!activityDialog.open) activityDialog.showModal();
+    form.elements.title.focus();
+  }
+
+  function applySuggestionRules(form, config) {
+    ['rerollMode', 'maxRerolls', 'animation'].forEach((key) => { form.elements[key].value = config[key]; });
+    ['avoidRepeats', 'allowCategoryChoice', 'allowSkip'].forEach((key) => { form.elements[key].checked = config[key]; });
+    document.getElementById('suggestionRerollLimit').hidden = config.rerollMode !== 'limited';
+  }
+
+  function suggestionReadiness() {
+    const form = document.getElementById('suggestionForm');
+    if (!form) return;
+    const duration = Number(form.elements.duration.value);
+    const enabled = suggestionDraft.filter((candidate) => candidate.enabled);
+    const fit = enabled.filter((candidate) => candidate.duration <= duration);
+    document.getElementById('suggestionReadiness').textContent = fit.length + ' of ' + enabled.length + ' enabled activities fit in ' + duration + ' minutes.' + (fit.length === 1 ? ' One activity gives one result when repeats are prevented.' : '') + ' Up to 60 activities per pool.';
+  }
+
+  function renderSuggestionDraft() {
+    const host = document.getElementById('suggestionCandidates');
+    if (!host) return;
+    const field = (candidate, key, label, type, max) => '<label class="field"><span>' + label + '</span><input data-candidate-id="' + esc(candidate.id) + '" data-candidate-field="' + key + '" type="' + type + '"' + (type === 'number' ? ' min="1" max="' + max + '"' : ' maxlength="' + max + '"') + ' value="' + esc(candidate[key] || '') + '"' + (key === 'category' ? ' list="suggestionCategoryNames"' : '') + '></label>';
+    host.innerHTML = suggestionDraft.length ? suggestionDraft.map((candidate) => '<section class="suggestion-candidate"><div class="button-row"><span class="choice-option-art">' + optionVisual(candidate, 26) + '</span><label class="check-field"><input type="checkbox" data-candidate-id="' + esc(candidate.id) + '" data-candidate-field="enabled"' + (candidate.enabled ? ' checked' : '') + '><span>Available</span></label><button class="icon-button" type="button" data-action="suggestion-remove-candidate" data-id="' + esc(candidate.id) + '" aria-label="Remove ' + esc(candidate.title) + ' from pool">×</button></div><div class="suggestion-settings">' + field(candidate, 'title', 'Name', 'text', 100) + field(candidate, 'category', 'Category', 'text', 60) + field(candidate, 'duration', 'Minutes needed', 'number', 480) + field(candidate, 'weight', 'Chance weight (1–10)', 'number', 10) + '</div><details><summary>Picture, link, and support note' + (candidate.steps.length ? ' · ' + candidate.steps.length + ' saved steps' : '') + '</summary><div class="suggestion-settings">' + field(candidate, 'icon', 'Symbol or emoji', 'text', 16) + field(candidate, 'pictogram', 'ARASAAC ID or HTTPS picture', 'text', 300) + field(candidate, 'url', 'Video or activity link', 'text', 500) + field(candidate, 'credit', 'Image credit', 'text', 200) + field(candidate, 'note', 'Support note', 'text', 500) + '</div></details></section>').join('') : '<p class="choice-draft-empty">Add optional activities below, or load a saved pool.</p>';
+    suggestionReadiness();
+  }
+
+  function appendSuggestionCandidate(value) {
+    const errorNode = document.getElementById('suggestionError');
+    if (suggestionDraft.length >= 60) { errorNode.textContent = 'A pool can contain up to 60 activities.'; return; }
+    const candidate = window.ScheduleStudio.sanitizeSuggestionCandidate(value);
+    if (!candidate) { errorNode.textContent = 'Name the activity first.'; return; }
+    if (suggestionDraft.some((entry) => entry.id === candidate.id)) { errorNode.textContent = 'That saved activity is already in this pool.'; return; }
+    suggestionDraft.push(candidate);
+    errorNode.textContent = '';
+    renderSuggestionDraft();
+  }
+
+  function addSuggestionCandidate() {
+    const value = (id) => document.getElementById(id).value.trim();
+    const title = value('candidateTitle');
+    const url = value('candidateUrl');
+    const pictogram = value('candidatePictogram');
+    const duration = validDuration(value('candidateDuration'), 0);
+    const errorNode = document.getElementById('suggestionError');
+    if (!title || !duration) { errorNode.textContent = 'Name the optional activity and give it a length from 1 to 480 minutes.'; return; }
+    if (url && !validVideoUrl(url)) { errorNode.textContent = 'Use a complete HTTP or HTTPS activity link.'; return; }
+    if (pictogram && !pictogramSource(pictogram)) { errorNode.textContent = 'Use an ARASAAC number or HTTPS picture URL.'; return; }
+    const before = suggestionDraft.length;
+    appendSuggestionCandidate({ id: makeId('candidate'), title, url, duration, category: value('candidateCategory'), icon: value('candidateIcon'), pictogram: pictogram || youTubeThumbnail(url) });
+    if (suggestionDraft.length > before) { document.getElementById('candidateTitle').value = ''; document.getElementById('candidateUrl').value = ''; document.getElementById('candidatePictogram').value = ''; }
+    document.getElementById('candidateTitle').focus();
+  }
+
+  function submitSuggestion(form) {
+    const day = getDay(getPlan(), activeDayKey);
+    if (!day) return;
+    const errorNode = document.getElementById('suggestionError');
+    const data = new FormData(form);
+    const duration = validDuration(data.get('duration'), 0);
+    const start = validTime(data.get('start'), '');
+    if (!duration || !start) { errorNode.textContent = 'Enter a valid start time and length.'; return; }
+    if (suggestionDraft.some((candidate) => !candidate.title.trim() || !candidate.category.trim() || !validDuration(candidate.duration, 0) || !Number.isInteger(Number(candidate.weight)) || candidate.weight < 1 || candidate.weight > 10 || (candidate.url && !validVideoUrl(candidate.url)) || (candidate.pictogram && !pictogramSource(candidate.pictogram)))) {
+      errorNode.textContent = 'Check pool names, categories, lengths, weights (1–10), and picture or activity links.'; return;
+    }
+    if (!suggestionDraft.some((candidate) => candidate.enabled && candidate.duration <= duration)) {
+      errorNode.textContent = 'Enable at least one activity that fits this time slot.'; return;
+    }
+    const values = window.ScheduleStudio.sanitizeSuggestion({ title: data.get('title'), prompt: data.get('prompt'), duration, candidates: suggestionDraft,
+      rerollMode: data.get('rerollMode'), maxRerolls: data.get('maxRerolls'), avoidRepeats: data.has('avoidRepeats'),
+      allowCategoryChoice: data.has('allowCategoryChoice'), allowSkip: data.has('allowSkip'), animation: data.get('animation') });
+    const existing = day.activities.find((entry) => entry.occurrenceId === editingActivityId);
+    const suggestion = { ...values, kind: 'suggestion', start, color: COLORS[0], sourceId: '', poolId: suggestionPoolId,
+      occurrenceId: existing?.occurrenceId || makeId('scheduled') };
+    const proposed = { ...day, activities: existing ? day.activities.map((entry) => entry === existing ? suggestion : entry) : [...day.activities, suggestion] };
+    const issue = validateDay(proposed);
+    if (issue) { errorNode.textContent = issue; return; }
+    if (data.has('savePool')) {
+      const pool = workspace.suggestionPools.find((entry) => entry.id === suggestionPoolId);
+      suggestion.poolId = pool?.id || makeId('pool');
+      const saved = { id: suggestion.poolId, ...JSON.parse(JSON.stringify(values)) };
+      if (pool) Object.assign(pool, saved);
+      else workspace.suggestionPools.push(saved);
+    }
+    day.activities = proposed.activities;
+    persist();
+    activityDialog.close();
+    render();
+    focusActivityAction('edit-suggestion', suggestion.occurrenceId);
+    showToast(existing ? 'Suggestion updated. Other scheduled copies keep their settings.' : 'Suggestion added.');
+  }
+
+  function resetSuggestionProgress() {
+    try {
+      const key = getPlan().id + ':' + activeDayKey;
+      const all = JSON.parse(localStorage.getItem('woodles.schedule-planner.progress.v1') || '{}');
+      const entry = all[key];
+      if (entry) {
+        if (entry.suggestions) delete entry.suggestions[editingActivityId];
+        if (Array.isArray(entry.done)) entry.done = entry.done.filter((id) => id !== editingActivityId);
+        if (entry.picks) Object.keys(entry.picks).filter((id) => id.startsWith(editingActivityId + ':')).forEach((id) => delete entry.picks[id]);
+        localStorage.setItem('woodles.schedule-planner.progress.v1', JSON.stringify(all));
+      }
+      document.getElementById('suggestionError').textContent = 'Today’s draws were reset for this slot.';
+    } catch { document.getElementById('suggestionError').textContent = 'Could not reset the draws on this device.'; }
+  }
+
+  document.addEventListener('input', (event) => {
+    const input = event.target;
+    if (input.matches('[data-candidate-field]')) {
+      const candidate = suggestionDraft.find((entry) => entry.id === input.dataset.candidateId);
+      if (!candidate) return;
+      const key = input.dataset.candidateField;
+      candidate[key] = input.type === 'checkbox' ? input.checked : input.type === 'number' ? Number(input.value) : input.value;
+      if (key === 'pictogram') candidate.imageAssetId = '';
+      suggestionReadiness();
+    }
+    if (input.matches('#suggestionForm [name="duration"]')) suggestionReadiness();
+  });
+
+  document.addEventListener('change', (event) => {
+    const input = event.target;
+    if (input.matches('#suggestionForm [name="rerollMode"]')) document.getElementById('suggestionRerollLimit').hidden = input.value !== 'limited';
+    if (input.id === 'suggestionPool') {
+      const pool = workspace.suggestionPools.find((entry) => entry.id === input.value);
+      if (!pool) return;
+      suggestionPoolId = pool.id;
+      suggestionDraft = JSON.parse(JSON.stringify(pool.candidates));
+      const form = document.getElementById('suggestionForm');
+      ['title', 'prompt', 'duration'].forEach((key) => { form.elements[key].value = pool[key]; });
+      form.elements.savePool.closest('label').querySelector('span').textContent = 'Update reusable pool “' + pool.title + '” for future use';
+      applySuggestionRules(form, pool);
+      renderSuggestionDraft();
+    }
+  });
 
   function showChoiceDialog(mode, item) {
     const plan = getPlan();
@@ -1477,7 +1671,9 @@
     const usedImageIds = new Set(plan.days.flatMap((day) => day.activities.flatMap(itemImageIds))
       .concat(activityLibrary.flatMap(itemImageIds)).filter(Boolean));
     const images = workspace.images.filter((image) => usedImageIds.has(image.id));
-    const content = JSON.stringify({ format: 'woodles.schedule-week.v1', exportedAt: new Date().toISOString(), plan, activityLibrary, images }, null, 2);
+    const suggestionPools = workspace.suggestionPools.filter((pool) => plan.days.some((day) => day.activities.some((item) => item.poolId === pool.id)));
+    suggestionPools.flatMap(itemImageIds).forEach((id) => { const image = workspace.images.find((entry) => entry.id === id); if (image && !images.some((entry) => entry.id === id)) images.push(image); });
+    const content = JSON.stringify({ format: 'woodles.schedule-week.v1', exportedAt: new Date().toISOString(), plan, activityLibrary, suggestionPools, images }, null, 2);
     const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -1512,6 +1708,7 @@
         const remapImage = (item) => ({
           ...item,
           imageAssetId: imageIdMap.get(item && item.imageAssetId) || '',
+          ...(item && Array.isArray(item.candidates) ? { candidates: item.candidates.map(remapImage) } : {}),
           ...(item && Array.isArray(item.steps) ? { steps: item.steps.map(remapImage) } : {}),
           ...(item && Array.isArray(item.options) ? { options: item.options.map(remapImage) } : {}),
           ...(item && Array.isArray(item.videos) ? { videos: item.videos.map(remapImage) } : {})
@@ -1530,6 +1727,11 @@
           ? data.activityLibrary.map(sanitizeActivity).filter(Boolean).map(remapImage)
           : [];
         const activityIds = new Set(workspace.activities.map((item) => item.id));
+        const importedPools = (Array.isArray(data.suggestionPools) ? data.suggestionPools : []).map(window.ScheduleStudio.sanitizeSuggestionPool).filter(Boolean).map(remapImage);
+        const poolIds = new Map();
+        importedPools.forEach((pool) => { const old = pool.id; pool.id = makeId('pool'); poolIds.set(old, pool.id); });
+        plan.days.forEach((day) => day.activities.forEach((item) => { if (item.kind === 'suggestion') item.poolId = poolIds.get(item.poolId) || ''; }));
+        workspace.suggestionPools.push(...importedPools);
         workspace.images.push(...importedImages);
         workspace.activities.push(...importedActivities.filter((item) => !activityIds.has(item.id)));
         plan.days.forEach((day) => day.activities.forEach((item) => { item.occurrenceId = makeId('scheduled'); }));
@@ -1573,6 +1775,21 @@
     else if (name === 'select-day') routeToPlan(currentPlanId, action.dataset.day);
     else if (name === 'add-activity') showActivityDialog('new');
     else if (name === 'add-open-slot') showOpenSlotDialog('new');
+    else if (name === 'add-suggestion') showSuggestionDialog();
+    else if (name === 'edit-suggestion') {
+      const item = getDay(getPlan(), activeDayKey)?.activities.find((entry) => entry.occurrenceId === action.dataset.id);
+      if (item) showSuggestionDialog(item);
+    } else if (name === 'suggestion-add-candidate') addSuggestionCandidate();
+    else if (name === 'suggestion-library-candidate') {
+      const item = workspace.activities.find((entry) => entry.id === document.getElementById('suggestionActivityLibrary').value);
+      if (item) appendSuggestionCandidate(item);
+    } else if (name === 'suggestion-video-candidate') {
+      const video = getPlan().days.flatMap((day) => day.activities).filter((item) => item.kind === 'video').flatMap((item) => item.videos).find((entry) => entry.id === document.getElementById('suggestionVideoLibrary').value);
+      if (video) appendSuggestionCandidate({ ...video, category: 'Videos', duration: 10, icon: '▶', pictogram: youTubeThumbnail(video.url) });
+    } else if (name === 'suggestion-remove-candidate') {
+      suggestionDraft = suggestionDraft.filter((entry) => entry.id !== action.dataset.id);
+      renderSuggestionDraft();
+    } else if (name === 'suggestion-reset-progress') resetSuggestionProgress();
     else if (name === 'add-choice') showChoiceDialog('new');
     else if (name === 'add-choice-option') addComposedOption(action.form);
     else if (name === 'add-library-option') {
@@ -1674,6 +1891,9 @@
     } else if (event.target.id === 'choiceForm') {
       event.preventDefault();
       submitChoice(event.target);
+    } else if (event.target.id === 'suggestionForm') {
+      event.preventDefault();
+      submitSuggestion(event.target);
     } else if (event.target.id === 'videoForm') {
       event.preventDefault();
       submitVideo(event.target);
