@@ -191,8 +191,10 @@ export function targetForMenu(menuItemId) {
 /**
  * Build a capture from a page-menu click. The most specific thing that was
  * right-clicked wins: a selection over the link it sits in, a link over the
- * image inside it, any of those over the page. Null when there is nothing
- * worth keeping (a menu click on a page the protocol won't name).
+ * image inside it, any of those over the page — skipping any kind the target's
+ * menu item leaves out, which Chrome can still hand over (an image inside a
+ * link shows every item that takes links). Null when there is nothing worth
+ * keeping (a menu click on a page the protocol won't name).
  *
  * @param {{ selectionText?: string, linkUrl?: string, srcUrl?: string, mediaType?: string, pageUrl?: string }} info
  * @param {{ title?: string, url?: string } | undefined | null} tab
@@ -202,11 +204,13 @@ export function targetForMenu(menuItemId) {
  */
 export function captureFromMenu(info, tab, target, stamp) {
 	const page = pageFromTab(tab) ?? readPage({ title: '', url: info.pageUrl });
+	/** @type {readonly CaptureKind[]} */
+	const allowed = MENU.find((item) => item.target === target)?.contexts ?? CAPTURE_KINDS;
 	/** @type {Pick<Capture, 'kind' | 'text' | 'url'>} */
 	let what;
-	if (clean(info.selectionText, MAX_TEXT)) what = { kind: 'selection', text: info.selectionText ?? '', url: '' };
-	else if (safeUrl(info.linkUrl)) what = { kind: 'link', text: '', url: info.linkUrl ?? '' };
-	else if (info.mediaType === 'image' && safeUrl(info.srcUrl)) what = { kind: 'image', text: '', url: info.srcUrl ?? '' };
+	if (allowed.includes('selection') && clean(info.selectionText, MAX_TEXT)) what = { kind: 'selection', text: info.selectionText ?? '', url: '' };
+	else if (allowed.includes('link') && safeUrl(info.linkUrl)) what = { kind: 'link', text: '', url: info.linkUrl ?? '' };
+	else if (allowed.includes('image') && info.mediaType === 'image' && safeUrl(info.srcUrl)) what = { kind: 'image', text: '', url: info.srcUrl ?? '' };
 	else what = { kind: 'page', text: '', url: page?.url ?? '' };
 	return readCapture({ id: stamp.id, target, ...what, page, createdAt: stamp.now });
 }

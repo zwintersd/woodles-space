@@ -14,6 +14,7 @@ import {
 	readCapture,
 	readMessage,
 	safeUrl,
+	newCaptureId,
 	targetForMenu,
 	type CompanionMessage
 } from '@extension/protocol.js';
@@ -127,6 +128,18 @@ describe('captures from the page menu', () => {
 		}
 		// A picture on its own isn't something being read.
 		expect(MENU.find((item) => item.target === 'thinking-about')?.contexts).not.toContain('image');
+	});
+
+	it('never builds a kind the target’s item leaves out, even when Chrome offers it', () => {
+		// An image inside a link shows every item that takes links; when the link
+		// itself won't do, the image is next in line — but not for Thinking About.
+		const linkedImage = { linkUrl: 'javascript:void(0)', srcUrl: 'https://i.example/a.png', mediaType: 'image' };
+		expect(captureFromMenu(linkedImage, tab, 'write', stamp)).toMatchObject({ kind: 'image' });
+		expect(captureFromMenu(linkedImage, tab, 'thinking-about', stamp)).toMatchObject({ kind: 'page', url: tab.url });
+	});
+
+	it('gives every capture an id with a dash, which no Thinking About entry has', () => {
+		for (let i = 0; i < 20; i += 1) expect(newCaptureId()).toMatch(/^c-[a-z0-9]+-[a-z0-9]+$/);
 	});
 
 	it('carries a capture for Thinking About like any other', () => {

@@ -131,15 +131,16 @@ export type SyncGate = {
 /**
  * Drain and ingest, unless sync says the board might be stale: a hydrate that
  * failed (`error`) or one still running. Then the queue is left alone, the
- * companion keeps counting it as waiting, and a later take picks it up.
+ * companion keeps counting it as waiting, a later take picks it up, and this
+ * returns null — held back, as opposed to a take that ran and found nothing.
  * `cleared: false` is ignored — the ledger is what stops a second landing.
  */
 export function takeHandoffs(
 	sync: SyncGate,
 	ingest: (items: Handoff[]) => number,
 	options: HandoffOptions = {}
-): number {
-	if (sync.status === 'error' || sync.syncing) return 0;
+): number | null {
+	if (sync.status === 'error' || sync.syncing) return null;
 	const { items } = createHandoffQueue('thinking-about', options).drain();
 	return items.length > 0 ? ingest(items) : 0;
 }
@@ -149,25 +150,42 @@ export function takeHandoffs(
  * when the queue changes in another tab, or the board regains focus. A live
  * take catches up with the server first, so it is exactly a reload's
  * hydrate-then-take and never lands on a copy that went stale while open.
+ *
+ * `onFirstTake` runs once, after the first take that wasn't held back — the
+ * moment a held `?entry=` link can be settled. A load whose sync failed
+ * doesn't count, so the link waits for the live take that lands the arrival.
  */
 export function createArrivals({
 	sync,
 	catchUp,
 	ingest,
+	onFirstTake,
 	options = {}
 }: {
 	sync: SyncGate;
 	catchUp: () => Promise<void>;
 	ingest: (items: Handoff[]) => number;
+	onFirstTake?: () => void;
 	options?: HandoffOptions;
 }) {
 	let settled = false;
 	let busy = false;
+	let taken = false;
+
+	function take(): number {
+		const landed = takeHandoffs(sync, ingest, options);
+		if (landed === null) return 0;
+		if (!taken) {
+			taken = true;
+			onFirstTake?.();
+		}
+		return landed;
+	}
 
 	return {
 		takeAfterLoadSync(): number {
 			settled = true;
-			return takeHandoffs(sync, ingest, options);
+			return take();
 		},
 
 		async live(): Promise<number> {
@@ -177,7 +195,7 @@ export function createArrivals({
 			busy = true;
 			try {
 				if (sync.connected) await catchUp();
-				return takeHandoffs(sync, ingest, options);
+				return take();
 			} catch {
 				return 0;
 			} finally {

@@ -110,7 +110,12 @@ describe('what an arrival becomes', () => {
 	});
 
 	it('can never collide with an entry made here', () => {
-		for (let i = 0; i < 50; i += 1) expect(uid()).not.toContain('-');
+		// Entry ids never hold a dash; handoff ids always do — the spine's own
+		// `h-…` here, and the companion's `c-…` (tested with its protocol).
+		for (let i = 0; i < 50; i += 1) {
+			expect(uid()).not.toContain('-');
+			expect(sendHandoff('thinking-about', { source: { app: 'test' } }).handoff.id).toMatch(/^[a-z]+-/);
+		}
 	});
 });
 
@@ -161,7 +166,7 @@ describe('when a take is allowed', () => {
 		send();
 		for (const sync of [gate({ status: 'error' }), gate({ status: 'ok', syncing: true })]) {
 			const { ingest } = board();
-			expect(takeHandoffs(sync, ingest)).toBe(0);
+			expect(takeHandoffs(sync, ingest)).toBeNull();
 			expect(ingest).not.toHaveBeenCalled();
 			expect(createHandoffQueue('thinking-about').count()).toBe(1);
 		}
@@ -269,6 +274,31 @@ describe('arriving while the board is open', () => {
 		const [a, b] = await Promise.all([live.live(), live.live()]);
 		expect(live.catchUp).toHaveBeenCalledTimes(1);
 		expect(a + b).toBe(1);
+	});
+});
+
+describe('settling a held link', () => {
+	it('waits past a load whose sync failed, for the take that lands the arrival', async () => {
+		const sync = { status: 'error' as SyncGate['status'], syncing: false, connected: true };
+		const onFirstTake = vi.fn();
+		const { ingest } = board();
+		const arrivals = createArrivals({ sync, catchUp: async () => void (sync.status = 'ok'), ingest, onFirstTake });
+		send();
+		arrivals.takeAfterLoadSync();
+		expect(onFirstTake).not.toHaveBeenCalled();
+		expect(await arrivals.live()).toBe(1);
+		expect(onFirstTake).toHaveBeenCalledTimes(1);
+	});
+
+	it('settles on the load’s take when it ran, even with nothing to take — and only once', async () => {
+		const onFirstTake = vi.fn();
+		const { ingest } = board();
+		const arrivals = createArrivals({ sync: gate(), catchUp: async () => {}, ingest, onFirstTake });
+		arrivals.takeAfterLoadSync();
+		expect(onFirstTake).toHaveBeenCalledTimes(1);
+		send();
+		await arrivals.live();
+		expect(onFirstTake).toHaveBeenCalledTimes(1);
 	});
 });
 

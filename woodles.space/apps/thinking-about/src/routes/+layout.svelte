@@ -23,11 +23,13 @@
 		const arrivals = createArrivals({
 			sync: syncState,
 			catchUp: initSync,
-			ingest: (items) => thinkingAbout.ingestHandoffs(items)
+			ingest: (items) => thinkingAbout.ingestHandoffs(items),
+			// A held ?entry= link is settled by the first take that runs — not
+			// by a load whose sync failed, when the arrival is still queued.
+			onFirstTake: () => thinkingAbout.openPendingEntry()
 		});
 		void initSync().then(() => {
 			arrivals.takeAfterLoadSync();
-			thinkingAbout.openPendingEntry();
 			return takeOfferedSittings((sittings) => thinkingAbout.ingestSittings(sittings));
 		});
 

@@ -115,9 +115,12 @@ in, a link over the image inside it, any of those over the page.
 - Thinking About files an entry in Reading · Articles under the handoff's id
   and appends `source.href` to its notes itself, so it takes the same
   plain-text body as a board. *open it* goes straight to that entry: the
-  board holds a `?entry=` link until its first sync has settled and the
-  arrival has landed. its menu item leaves images out — a picture on its own
-  isn't something being read.
+  board holds a `?entry=` link until the first take that runs — a load whose
+  sync failed doesn't count, so the link waits for the take that lands the
+  arrival. its menu item leaves images out — a picture on its own isn't
+  something being read — and `captureFromMenu` never builds a kind a target's
+  item leaves out, so an image inside a link Chrome offers it for becomes the
+  page instead.
 
 **when Thinking About takes it.** not on arrival in the queue — Thinking About
 syncs its whole board, and hydrate keeps whichever board is newer with no

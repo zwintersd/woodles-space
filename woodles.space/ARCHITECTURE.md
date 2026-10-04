@@ -1274,9 +1274,13 @@ browser (`thinking-about.ingestedHandoffs.v1`, the last `QUEUE_LIMIT`, never in
 the blob), so a deleted arrival stays deleted through `cleared: false`, a
 redelivered capture, or a queue restored from its persistence backup. A take
 that finds nothing new writes nothing, so a stuck queue can't make the board
-win every hydrate. A `?entry=` link to an arrival is held until the take, which
-is how the companion's *open it* lands on the entry itself. What it doesn't
-close: two open Thinking About tabs can still overwrite each other, and an
+win every hydrate. A `?entry=` link to an arrival is held until the first take
+that runs — a load whose sync failed doesn't count — which is how the
+companion's *open it* lands on the entry itself. What it doesn't close: like
+Write and Whiteboard, the queue is emptied before the board saves, so a browser
+whose storage is full loses the arrival (an acknowledge-after-save on the spine
+would fix all three); two open Thinking About tabs can still overwrite each
+other; and an
 arrival travels to other devices only with the board's next push.
 
 **the first sender from outside the site** is the companion
@@ -1712,14 +1716,14 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-2525 tests total: 35 in `api/` (its own
+2529 tests total: 35 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts`, `schedules.ts` and
 `sync.ts` — the one part of the workspace that isn't a pnpm package, so it
-needs its own runner instead of the recursive `pnpm -r test`), plus 2490
+needs its own runner instead of the recursive `pnpm -r test`), plus 2494
 across twenty-three pnpm packages — `planner` 558, `marginalia` 396,
 `whiteboard` 258, `write` 251, `packages/incremental-core` 191,
-`thinking-about` 182, `bestiary` 162, `bloomforge` 83,
-`packages/dynamics` 69, `packages/witch-engine` 58, `companion` 40,
+`thinking-about` 184, `bestiary` 162, `bloomforge` 83,
+`packages/dynamics` 69, `packages/witch-engine` 58, `companion` 42,
 `packages/sync` 38, `grimoire` 36, `packages/life-points` 30,
 `packages/text` 30, `bloomforge-player` 22, `data` 18,
 `packages/app-manifest` 17, `packages/handoff` 15, `packages/spellcraft` 15,
@@ -1727,7 +1731,7 @@ across twenty-three pnpm packages — `planner` 558, `marginalia` 396,
 (Counted by running each suite, not by adding to the previous figure — keep
 this inventory current when a suite changes; the root command is the release
 contract, not the prose count. The latest pass, for Thinking About becoming a
-handoff receiver — 34 of its tests, in `handoffs.test.ts` and the store's new
+handoff receiver — 36 of its tests, in `handoffs.test.ts` and the store's new
 `thinkingAbout.test.ts` — caught up `companion`, `homesuite` and `data`, which
 had never been listed, and five figures that had drifted: `api/`, `planner`,
 `marginalia`, `write` and `packages/sync`. The pass before it caught up
@@ -1812,8 +1816,8 @@ ports. The suite covers every published entry route, Write → Echoes archiving,
 Bestiary gallery/adopt/share and Marginalia consumption, an Arcade state change,
 the Thinking About → Carillon round trip, back, and the sitting that returns
 from it, the companion's handoffs arriving on Thinking About (the held
-*open it* link, a live take from another tab, a deleted arrival staying
-deleted), Carillon's binder strip and the way in and out of its task composer,
+*open it* link, the same link waiting out a failed sync, a live take from
+another tab, a deleted arrival staying deleted), Carillon's binder strip and the way in and out of its task composer,
 legacy localStorage migration across reload,
 keyboard operation, and serious/critical WCAG A axe findings. `homesuite.spec.ts`
 covers the shell's seams: the veil, edits made just before a frame is removed,

@@ -97,6 +97,34 @@ test.describe('companion → Thinking About', () => {
 		});
 	});
 
+	test('a held “open it” waits out a failed sync, then opens what lands', async ({ page }) => {
+		// Not wrapped in expectNoPageErrors: the failed sync below is the point,
+		// and the browser logs each 500 it gets as a console error.
+		await quietFonts(page);
+		await seedQueueOnce(page);
+		await page.addInitScript(() => localStorage.setItem('woodles_sync_passphrase', 'e2e'));
+		let serverUp = false;
+		await page.route('**/api/sync**', (route) => {
+			if (!serverUp) return route.fulfill({ status: 500, body: 'down' });
+			return route.request().method() === 'GET'
+				? route.fulfill({ contentType: 'application/json', body: JSON.stringify({ blob: null, version: 0 }) })
+				: route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, version: 1 }) });
+		});
+
+		await page.goto(`/thinking-about?entry=${ENTRY_ID}`);
+		await expect(page.getByRole('button', { name: /sync/ })).toBeVisible();
+		// The load's sync failed, so nothing was taken and nothing opened.
+		await expect.poll(() => waiting(page)).toBe(1);
+		await expect(chips(page)).toHaveCount(0);
+		await expect(page.getByRole('dialog')).toHaveCount(0);
+
+		// Back online: coming back to the tab catches up, takes, and opens it.
+		serverUp = true;
+		await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+		await expect(page.getByRole('dialog').getByLabel('title')).toHaveValue('A good essay');
+		expect(await waiting(page)).toBe(0);
+	});
+
 	test('a deleted arrival stays deleted when the same thing comes back', async ({ page }) => {
 		await expectNoPageErrors(page, async () => {
 			await quietFonts(page);
