@@ -8,7 +8,7 @@
 import type { MarginaliaDef } from '../def.js';
 import { conditions } from './conditions.js';
 import { emergences } from './emergences.js';
-import { fieldNotesByDomain, equilibriumFieldNotes, quietFieldNotes, categoryMasteryFieldNotes } from './fieldNotes.js';
+import { fieldNotesByDomain, equilibriumFieldNotes, quietFieldNotes, deathFieldNotes, returnFieldNotes, categoryMasteryFieldNotes } from './fieldNotes.js';
 import { interventions } from './interventions.js';
 import { world1Life } from './life.js';
 import {
@@ -24,6 +24,11 @@ import {
 	VITALITY_DRAIN_PER_SEC,
 	VITALITY_RECOVER_PER_SEC,
 	VITALITY_FLOOR,
+	DEATH_STRESS_SECONDS,
+	DEATH_STABILITY_BELOW,
+	DEATH_NUTRIENT_PULSE,
+	DEATH_RETURN_AFTER_SEC,
+	DEATH_RETURN_VITALITY,
 	FAVOR_BASE_TARGET,
 	FAVOR_PER_KNOWN,
 	FAVOR_DRIFT_PER_SEC,
@@ -102,6 +107,13 @@ export const world1Def: MarginaliaDef = {
 		recoverPerSec: VITALITY_RECOVER_PER_SEC,
 		floor: VITALITY_FLOOR
 	},
+	death: {
+		stressSeconds: DEATH_STRESS_SECONDS,
+		stabilityBelow: DEATH_STABILITY_BELOW,
+		nutrientPulse: DEATH_NUTRIENT_PULSE,
+		returnAfterSec: DEATH_RETURN_AFTER_SEC,
+		returnVitality: DEATH_RETURN_VITALITY
+	},
 	favor: {
 		baseTarget: FAVOR_BASE_TARGET,
 		perKnown: FAVOR_PER_KNOWN,
@@ -159,6 +171,8 @@ export const world1Def: MarginaliaDef = {
 		byDomain: fieldNotesByDomain,
 		equilibrium: equilibriumFieldNotes,
 		quiet: quietFieldNotes,
+		death: deathFieldNotes,
+		return: returnFieldNotes,
 		categoryMastery: categoryMasteryFieldNotes
 	}
 };

@@ -48,6 +48,13 @@ export const ATTENTION_COSTS = [45, 130, 320, 750];
  */
 export const PRESTIGE_COMPLEXITY_THRESHOLD = 50;
 
+/** DESIGN §1.4: a life dies after ~a minute of dire stress in a world below stability 40. */
+export const DEATH_STRESS_SECONDS = 60;
+export const DEATH_STABILITY_BELOW = 40;
+export const DEATH_NUTRIENT_PULSE = 12;
+export const DEATH_RETURN_AFTER_SEC = 180;
+export const DEATH_RETURN_VITALITY = 0.5;
+
 export const DISTILL_INSIGHT_COST = 60;
 export const DISTILL_ESSENCE_GAIN = 1;
 

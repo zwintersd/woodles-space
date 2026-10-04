@@ -166,6 +166,14 @@ on decline below Noticed:  the life dies → nutrients += 12 (a pulse), attentio
                            a journal beat fires
 ```
 
+**as built:** a life that has been Observed and is stressed accrues `stressTimer`; past 60
+severity-seconds, while stability is under 40, it dies — it leaves the scene, nutrients get
++12, its attention slot frees, and a field note fires. What is *known* about it never
+regresses (storage doesn't decay, §recall), so there is no stage decline. After at least
+180s, once its needs are met again, it returns at 0.5 vitality. The harness's normal
+policies never reach stability 40, so BALANCE.md's tables don't move.
+Tuning: `DEATH_*` in `world1/tuning.ts`; field-note copy in `world1/fieldNotes.ts` is placeholder.
+
 a death is a nutrient pulse that often relieves the very stress that caused it — the
 world oscillates back toward balance on its own. **this is the system working.** ✍️ you:
 the death/decline micro-copy (see §4).
@@ -405,7 +413,7 @@ each phase is shippable on its own and unblocks the next.
 | phase | what | depends on | status |
 | --- | --- | --- | --- |
 | **A** | vital-signs math — stocks, bands, stress, vitality, gating; the `quiet` placeholder; surfaced as numbers in the Ledger | — | ✅ shipped |
-| **B** | the canvas diorama (environment + creatures), **+ visible decline/death** (loss made legible alongside the art) | A | ✅ scaffold shipped (decline/death still pending) |
+| **B** | the canvas diorama (environment + creatures), **+ visible decline/death** (loss made legible alongside the art) | A | ✅ shipped: wilting is drawn, death and return are in the sim (a dying-animation is still pending — a dead life just leaves) |
 | **C** | interventions — the five verbs, intervention load, equilibrium dividend | A | ✅ shipped |
 | **D** | prestige — close the Book, Concepts, the Study meta-tree, Essence/attention reset | A, C | — |
 | **E** | procedural worlds — generator, name-gen, creature-cap scaling, worlds 2+ | D | — |

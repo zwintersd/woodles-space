@@ -105,6 +105,18 @@ export const quietFieldNotes: readonly string[] = [
 	'quiet, now. she is staying anyway.'
 ];
 
+// placeholder copy — Z's to rewrite (DESIGN §4, the death/decline micro-copy)
+export const deathFieldNotes: readonly string[] = [
+	'something let go, and the water took it in. she did not look away.',
+	'it stopped. the soil is richer for it, and that is not a comfort.',
+	'one of the quiet ones is gone. the world fed on it, gently.'
+];
+
+export const returnFieldNotes: readonly string[] = [
+	'something has come back to the place it left.',
+	'it returned, smaller, and began again.'
+];
+
 export const categoryMasteryFieldNotes: Record<LifeCategory, readonly string[]> = {
 	aquatic: [
 		'the water, fully known. she could close her eyes and still find her way through it.',

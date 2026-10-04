@@ -46,7 +46,7 @@ import {
 	advanceLadder,
 	type EdgeLatch
 } from '@woodles/dynamics';
-import type { MarginaliaDef } from './def.js';
+import type { DeathDef, MarginaliaDef } from './def.js';
 import type { Condition, Life, LifeCategory, StockId, Stocks, Worldspace } from './types.js';
 import { fillTemplate, pickLine } from './text.js';
 import {
@@ -91,6 +91,8 @@ export interface WorldState {
 	equilibriumSeconds: number;
 	/** Highest `complexity` this world has ever reached; the prestige mint reads it. Never decays. */
 	complexityPeak: number;
+	/** Life that has died and not yet returned, by seconds since. Knowledge of it is untouched. */
+	deaths: Record<string, number>;
 	/** How readily a Known life comes to mind, 0..1. Decays; attention restores it. */
 	recall: Record<string, number>;
 	/** Permanent durability, built by returning to something that had faded. */
@@ -157,6 +159,7 @@ export function createWorldState(def: MarginaliaDef): WorldState {
 		interventionLoad: 0,
 		equilibriumSeconds: 0,
 		complexityPeak: 0,
+		deaths: {},
 		recall: {},
 		fluency: {},
 		attentionCapacity: def.attention.start,
@@ -184,6 +187,8 @@ export type WorldEvent =
 	| { kind: 'intervention'; lifeId: string; line: string; note: string }
 	| { kind: 'equilibrium'; note: string | null }
 	| { kind: 'quiet'; note: string | null }
+	| { kind: 'death'; lifeId: string; note: string | null }
+	| { kind: 'return'; lifeId: string; note: string | null }
 	/** A discrete, attention-worthy grant. */
 	| { kind: 'gain'; resource: 'insight' | 'essence'; amount: number }
 	/** The ambient per-second insight drip, batched into whole numbers. */
@@ -216,6 +221,8 @@ export class World {
 	private cachedAllLife: Life[] | null = null;
 	private cachedWrittenSet: Set<string> | null = null;
 	private lifeDirty = true;
+	/** Accumulated stress per life, in severity-seconds. Transient: a reload starts the clock over. */
+	private stressTimer: Record<string, number> = {};
 
 	// edge detection for the once-per-transition beats — shape L, Edge Latch
 	private selfBalancingLatch: EdgeLatch = { was: false };
@@ -283,6 +290,8 @@ export class World {
 		const categories = worldspace.visibleCategories;
 		this.cachedLife =
 			categories === 'all' ? this.cachedAllLife : this.cachedAllLife.filter((l) => categories.includes(l.category));
+		// the dead are not part of the scene until they return
+		if (Object.keys(this.state.deaths).length) this.cachedLife = this.cachedLife.filter((l) => !(l.id in this.state.deaths));
 		this.lifeDirty = false;
 	}
 
@@ -599,6 +608,44 @@ export class World {
 		return result.crossed;
 	}
 
+	private stepDeaths(present: Life[], dt: number, into: WorldEvent[]): void {
+		const death = this.def.death;
+		if (!death) return;
+		const s = this.state;
+		const fragile = this.stability < death.stabilityBelow;
+		for (const l of present) {
+			if (this.stageOf(l.id) < 1) continue;
+			const severity = this.severityOf(l);
+			const t = this.stressTimer[l.id] ?? 0;
+			const next = severity > 0 ? t + severity * dt : Math.max(0, t - dt);
+			this.stressTimer[l.id] = next;
+			if (next > death.stressSeconds && fragile) this.kill(l, death, into);
+		}
+		for (const id of Object.keys(s.deaths)) {
+			s.deaths[id] += dt;
+			const life = this.lifeById(id);
+			if (!life || s.deaths[id] < death.returnAfterSec) continue;
+			if (severityFor(life.needs, s.stocks, this.def.stock.bandFalloff) > 0) continue;
+			const { [id]: _gone, ...rest } = s.deaths;
+			s.deaths = rest;
+			s.vitality = { ...s.vitality, [id]: death.returnVitality };
+			this.invalidate();
+			const lines = this.def.fieldNotes.return ?? [];
+			into.push({ kind: 'return', lifeId: id, note: lines.length ? pickLine(lines, this.rng.next()) : null });
+		}
+	}
+
+	private kill(life: Life, death: DeathDef, into: WorldEvent[]): void {
+		const s = this.state;
+		delete this.stressTimer[life.id];
+		s.deaths = { ...s.deaths, [life.id]: 0 };
+		s.attending = s.attending.filter((id) => id !== life.id);
+		s.stocks = { ...s.stocks, nutrients: Math.min(100, s.stocks.nutrients + death.nutrientPulse) };
+		this.invalidate();
+		const lines = this.def.fieldNotes.death ?? [];
+		into.push({ kind: 'death', lifeId: life.id, note: lines.length ? pickLine(lines, this.rng.next()) : null });
+	}
+
 	/**
 	 * A category is mastered the moment its last un-Known life reaches Known, so
 	 * this only ever needs checking right after a Known crossing. Sticky: once
@@ -800,6 +847,10 @@ export class World {
 			for (const id of STOCK_IDS) rate[id] += r[id] ?? 0;
 		}
 		s.vitality = nextVit;
+
+		// 1b) loss. Sustained dire stress in a fragile world kills a life; the
+		//     death feeds the soil, and the dead return once what killed them clears.
+		this.stepDeaths(present, dt, into);
 
 		// 2) attended life either deepens or is returned to. Study is slowed when
 		//    a life is suffering; recall is not — attention can always be brought
