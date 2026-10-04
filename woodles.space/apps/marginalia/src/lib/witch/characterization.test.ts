@@ -183,18 +183,15 @@ describe('characterization — insight and favor', () => {
 		run(b, 1000); // salt_deposit reaches Known
 
 		// insightWeight 0.5 x STAGE_INSIGHT_MULT[3] 1.0 x vitality 1 (no needs),
-		// x 1.12 because category mastery has fired: only 'holding' was written,
-		// so salt_deposit is the *only* aquatic life revealed, and a category
-		// where every revealed member is Known counts as mastered. Sticky, so
-		// later aquatic life can't revoke it. Pinned as-is — see sim.test.ts for
-		// whether that's a balance problem.
+		// no category bonus: mastery means every member the world authors, and
+		// only 'holding' was written, so one Known life is not a mastered category.
 		expect(b.stageOf('salt_deposit')).toBe(STAGE_KNOWN);
-		expect(b.categoryMastered.aquatic).toBe(true);
+		expect(b.categoryMastered.aquatic).toBeUndefined();
 		// ...and by recall: reaching Known releases the slot, so it has begun to
 		// slip since. A forgotten thing is still known — the multiplier floors
 		// well above zero — but it is worth less than one freshly in mind.
 		expect(b.recallOf('salt_deposit')).toBeLessThan(1);
-		const expected = 0.5 * 1.12 * b.recallMultiplier('salt_deposit') * b.favorMult;
+		const expected = 0.5 * b.recallMultiplier('salt_deposit') * b.favorMult;
 		expect(b.insightPerSec).toBeCloseTo(expected, 6);
 	});
 

@@ -22,6 +22,10 @@ so it's not easy to forget.
 
 - **a mark for woodles** — a soft, hand-drawn w in lapis on lavender now
   identifies every room in browser tabs and saved home-screen shortcuts.
+- **marginalia's journal italicises instead of printing asterisks** — the first
+  journal page now shows *flow* in italics rather than literal `*flow*`. the
+  dev cheat console's `freerealestate` and `worldparty` also work again; they
+  were throwing because the Book had no setters for the fields they write.
 
 ## 2026-09-30
 

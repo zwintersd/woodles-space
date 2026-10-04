@@ -53,6 +53,10 @@
 	 * under one tile leaves it clearly an inhabitant rather than a landmark.
 	 */
 	const CREATURE_TILES = 0.9;
+	/** Vitality below this starts to read as wilting; at the floor the life is fully drained. */
+	const WILT_ONSET = 0.85;
+	/** How far (as a fraction of canvas height) a fully wilted life sags toward its tile. */
+	const WILT_SAG = 0.012;
 	const PEARL_BIT_SPRITES = [0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 14, 15, 48, 49, 50, 55, 57, 60, 61, 62, 63];
 	const PASTEL_BIT_SPRITES = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 52, 53, 56, 59];
 	const GLINT_SPRITES = [32, 33, 34, 35, 36, 37, 38, 39];
@@ -848,9 +852,18 @@
 				// on the tile while the creature rides above it.
 				const hover = LAYER_HOVER[point.layer] ?? 0;
 				const footY = spot.y;
+				// Wilting makes stress legible: a life under it drains of colour, sags
+				// toward the tile it stands on, and stops bobbing. Vitality floors rather
+				// than hitting zero (dormant, recoverable), so this is the whole range
+				// short of death. Unobserved life (stage 0) has no vitality worth showing.
+				const vitality = book.vitalityOf(life.id);
+				const wilt = stage === 0 ? 0 : clamp01((WILT_ONSET - vitality) / WILT_ONSET);
 				const bodyY =
-					footY - hover * TILE_THICKNESS + (reduce ? 0 : layerBob(point.layer, T, seed) / H);
-				const alpha = clamp01(stage === 0 ? 0.3 : 0.55 + 0.45 * book.vitalityOf(life.id));
+					footY -
+					hover * TILE_THICKNESS * (1 - 0.5 * wilt) +
+					(reduce ? 0 : (layerBob(point.layer, T, seed) / H) * (1 - wilt)) +
+					wilt * WILT_SAG;
+				const alpha = clamp01(stage === 0 ? 0.3 : 0.55 + 0.45 * vitality);
 
 				into.push({
 					// depth is the row it stands in, so creatures sort among themselves
@@ -866,7 +879,10 @@
 						ctx!.save();
 						ctx!.globalAlpha = alpha;
 						ctx!.imageSmoothingEnabled = !info.pixelated;
-						ctx!.drawImage(entry.img, cx * W - dw / 2, bodyY * H - dh * 0.82, dw, dh);
+						// ctx.filter is ignored where unsupported; alpha still carries the fade
+						if (wilt > 0) ctx!.filter = `saturate(${1 - 0.85 * wilt}) brightness(${1 - 0.25 * wilt})`;
+						const wdh = dh * (1 - 0.1 * wilt);
+						ctx!.drawImage(entry.img, cx * W - dw / 2, bodyY * H - wdh * 0.82, dw, wdh);
 						ctx!.restore();
 					}
 				});
