@@ -8,7 +8,8 @@ const auditRoutes = [
 	'/letter',
 	'/marginalia/arcade',
 	'/hygge/motion',
-	'/hygge/motion/svg'
+	'/hygge/motion/svg',
+	'/companion'
 ];
 
 for (const route of auditRoutes) {
