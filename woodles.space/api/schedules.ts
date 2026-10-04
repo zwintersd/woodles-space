@@ -27,13 +27,20 @@ export default async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const action = url.searchParams.get('action') || '';
   const id = url.searchParams.get('id') || '';
+  let operation = req.method === 'GET' ? (action || 'view') : 'request';
   if (!['GET', 'POST'].includes(req.method)) return json({ error: 'Method not allowed.' }, 405, { allow: 'GET, POST' });
   if (req.method === 'GET' && action === 'status' && !configured()) return json({ configured: false, authenticated: false });
   if (!configured()) return json({ error: 'Publishing is not configured yet. Ask the site owner to finish database setup.' }, 503);
   try {
     const sql = db();
     if (req.method === 'GET') {
-      if (action === 'status') return json({ configured: true, authenticated: await session(req, 'publisher') });
+      if (action === 'status') {
+        // Environment variables alone do not establish that the publishing
+        // migration has been applied. Resolve every required table without
+        // reading learner data or changing the database.
+        await sql`SELECT 1 FROM schedule_publications, schedule_revisions, schedule_sessions, schedule_attempts LIMIT 0`;
+        return json({ configured: true, authenticated: await session(req, 'publisher') });
+      }
       if (action) {
         if (!['list', 'detail', 'history'].includes(action)) return json({ error: 'Unknown action.' }, 400);
         if (!await session(req, 'publisher')) return json({ error: 'Unlock publishing first.' }, 401);
@@ -79,7 +86,7 @@ export default async function handler(req: Request): Promise<Response> {
     let body: Row;
     try { body = JSON.parse(bodyText); if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error(); }
     catch { return json({ error: 'Invalid request.' }, 400); }
-    const operation = body.action;
+    operation = body.action;
     if (operation === 'login') {
       if (!await allowAttempt(req, 'publisher')) return json({ error: 'Too many attempts. Try again in 15 minutes.' }, 429, { 'retry-after': '900' });
       if (typeof body.password !== 'string' || body.password.length > 256 || !equal(await digest(body.password), publisherHash().toLowerCase())) return json({ error: 'The publisher passphrase did not match.' }, 401);
@@ -147,7 +154,19 @@ export default async function handler(req: Request): Promise<Response> {
         (SELECT version FROM schedule_revisions WHERE publication_id = ${publicationId} ORDER BY version DESC LIMIT 10)`;
     } catch { /* Publication and history are already committed. Retry pruning on the next publish. */ }
     return json({ publication: metadata(changed[0]) }, current ? 200 : 201);
-  } catch {
+  } catch (error) {
+    // Log only a validated SQLSTATE and a known operation. Error messages,
+    // stacks and query parameters can contain credentials or learner data.
+    const rawCode = (error as { code?: unknown } | null)?.code;
+    const code = typeof rawCode === 'string' && /^[A-Z0-9]{5}$/.test(rawCode) ? rawCode : 'unknown';
+    const knownOperations = ['status', 'view', 'list', 'detail', 'history', 'login', 'logout', 'viewer-logout', 'unlock', 'publish', 'access', 'unpublish', 'restore'];
+    console.error('[schedules] request failed', { operation: knownOperations.includes(operation) ? operation : 'request', code });
+    if (code === '42P01') return json({
+      error: 'Schedule publishing database setup is incomplete. Ask the site owner to apply api/schema.sql to the production Neon database, then try again.'
+    }, 503);
+    if (code === '42703') return json({
+      error: 'Schedule publishing database setup is incomplete. Ask the site owner to check the production Neon table columns against api/schema.sql.'
+    }, 503);
     // Never expose database URLs, SQL, password hashes or schedule data in an error.
     return json({ error: 'Publishing is temporarily unavailable. Check site setup or try again shortly.' }, 503);
   }

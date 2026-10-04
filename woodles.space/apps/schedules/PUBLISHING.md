@@ -39,6 +39,12 @@ The publisher gate is the site's existing single-owner passphrase model, with an
 - Snapshot size is capped at 3.5 million UTF-8 bytes, with a 3.75 million byte request cap. Reduce uploaded pictures if a plan exceeds that allowance. Catalogue and history queries fetch summaries rather than all stored pictures.
 - External pictogram and video URLs continue to work as external resources. Password protection applies to the schedule payload and uploaded images, not to independently hosted external resources.
 
+## Troubleshooting a 503
+
+If publishing asks the owner to **apply api/schema.sql**, run that file in the SQL Editor for the production Neon database connected to Vercel's `DATABASE_URL`. Deploying the source does not apply this schema. The setup check resolves all four schedule tables before offering publisher login, without reading schedule content. If the error instead asks to check table columns, compare the existing tables with that file; `CREATE TABLE IF NOT EXISTS` does not update columns in an existing table.
+
+For **Publishing is temporarily unavailable**, check Vercel runtime logs for `[schedules] request failed`. The diagnostic includes the operation and a PostgreSQL SQLSTATE when available; it deliberately excludes raw database errors, credentials and learner content. `42P01` indicates a missing table and `42703` a missing column. Other failures require checking database connectivity or the reported SQLSTATE.
+
 ## Verification
 
 `pnpm exec vitest run` covers the API gates, password hashing, session isolation, CSRF rejection, conflict protection, access rotation, expiry, withdrawal, conditional reads, private-content filtering and revision retention. `pnpm exec playwright test schedule-` covers the existing schedule features plus publishing, separate learner browsers, editable copies, version restore, mobile rendering and accessibility. API and E2E TypeScript projects have separate checks.

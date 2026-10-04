@@ -57,9 +57,9 @@ CREATE TABLE IF NOT EXISTS schedule_sessions (
 );
 CREATE TABLE IF NOT EXISTS schedule_attempts (
   key text NOT NULL,
-  window bigint NOT NULL,
+  "window" bigint NOT NULL,
   attempts integer NOT NULL,
-  PRIMARY KEY (key, window)
+  PRIMARY KEY (key, "window")
 );
 CREATE INDEX IF NOT EXISTS schedule_publications_updated ON schedule_publications(updated_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS schedule_publications_source ON schedule_publications(source_id);

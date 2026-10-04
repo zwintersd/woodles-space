@@ -7,6 +7,7 @@ export function scheduleStore() {
   const now = () => new Date().toISOString();
   async function sql(strings, ...v) {
     const q = strings.join('?').replace(/\s+/g, ' ').trim(); calls.push({ q, values: copy(v) });
+    if (q === 'SELECT 1 FROM schedule_publications, schedule_revisions, schedule_sessions, schedule_attempts LIMIT 0') return [];
     if (q.startsWith('DELETE FROM schedule_attempts')) { for (const [key, row] of attempts) if (row.window < v[0]) attempts.delete(key); return []; }
     if (q.startsWith('DELETE FROM schedule_sessions WHERE expires_at')) { for (const [key, row] of sessions) if (row.expires_at <= Date.now()) sessions.delete(key); return []; }
     if (q.startsWith('INSERT INTO schedule_attempts')) { const key = v[0] + ':' + v[1]; const row = { attempts: (attempts.get(key)?.attempts || 0) + 1, window: v[1] }; attempts.set(key, row); return [row]; }
