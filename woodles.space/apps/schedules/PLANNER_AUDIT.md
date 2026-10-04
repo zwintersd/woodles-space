@@ -1,6 +1,6 @@
 # Schedule planner: feature catalogue and workflow proposal
 
-Audited October 3, 2026. Scope: `/schedules/generator`, its shared data and visual tools, and `/schedules/view`. The separate `/schedules/9-25` example is an adjacent entry point, not the weekly planner's storage or editing system. This report proposes changes; it does not implement them.
+Audited October 3, 2026. Scope: `/schedules/generator`, its shared data and visual tools, and `/schedules/view`. This report proposes changes; it does not implement them.
 
 The planner already supports a substantial visual-schedule workflow. Its main weakness is that planning time, creating reusable content, configuring learner interactions, preparing pictures, and printing compete within the same screen and nested dialogs.
 
@@ -8,7 +8,7 @@ The planner already supports a substantial visual-schedule workflow. Its main we
 
 | Area | Implemented features | Boundaries and details |
 | --- | --- | --- |
-| Entry points | Schedule studio hub; weekly planner; standalone Image Studio; finished September 25 example; visual schedule route | The hub adds a navigation step before the saved-plan library. |
+| Entry points | Schedule studio hub; weekly planner; standalone Image Studio; visual schedule route | The hub adds a navigation step before the saved-plan library. |
 | Learner plans | Create a blank plan; learner label; plan name; editable names; saved-plan cards; updated date; populated-day/item summaries; open, duplicate, delete, import, export | New plans have seven weekdays with default 9 AM–noon windows but no activities. Plans are weekly patterns, without a dated-week field or date-specific overrides. |
 | Days | Seven day selectors; per-day session start/end; scheduled/unassigned-minute totals; week summary; copy to another visible day; clear day; delete day; restore removed day | Copy replaces the destination's items, session window, and print settings. Deleting a day clears its items. Restoring it restores visibility, not its former content. |
 | Timing | Start time and duration; chronological ordering; automatic placement in the first fitting gap; overlap and session-boundary validation; earlier/later buttons | Durations are 1–480 minutes. New ordinary activities use automatic placement; their start becomes explicitly editable afterward. Other item types expose start time immediately. Reordering repacks all items contiguously from session start. Changing the window rejects incompatible items rather than shifting them. |
@@ -44,7 +44,7 @@ The planner already supports a substantial visual-schedule workflow. Its main we
 
 ### 1. Open a learner plan
 
-Make the saved-plan library the main Schedule studio destination. Keep New plan and Import there; keep the finished example separately available. Ask for a learner label and plan name, then let the maker choose active weekdays and session windows without populating activities. Default times should be easy to review and change.
+Make the saved-plan library the main Schedule studio destination. Keep New plan and Import there. Ask for a learner label and plan name, then let the maker choose active weekdays and session windows without populating activities. Default times should be easy to review and change.
 
 Provide three main actions within a plan: **Plan**, **Use**, **Print**. Keep **Library** available as a supporting workspace for reusable content. Put backup, duplication, renaming, and deletion under a clearly labeled plan menu.
 
@@ -192,7 +192,7 @@ Verification: all 32 schedule Chromium tests passed in 51.5 seconds. Six new tes
 
 Replaced the sun/cloud illustration in the generated learner schedule header with a dotted route and tilted paper activity tickets. The blue header retains its display type and greeting, with a quieter dot texture, One thing at a time caption, smaller time badge, and an Edit plan control in its own top row. Desktop art occupies a separate grid column; mobile art sits beside the time badge so greetings and plan text can use the full width. Long learner names wrap without colliding with controls or decoration.
 
-Paper cards and sparks have a brief staggered settling animation on page load. Reduced-motion settings disable it; no repeating decorative animation runs while the learner uses the schedule. The illustration is decorative and hidden from assistive technology. Print retains the greeting and plan note while omitting the decoration and editing controls. The private `/schedules/9-25` reference is unchanged.
+Paper cards and sparks have a brief staggered settling animation on page load. Reduced-motion settings disable it; no repeating decorative animation runs while the learner uses the schedule. The illustration is decorative and hidden from assistive technology. Print retains the greeting and plan note while omitting the decoration and editing controls.
 
 Verification: 11 affected schedule Chromium tests passed in 21.2 seconds. A temporary browser review separately checked header accessibility, text/control/art geometry at wide and mobile widths, a long learner name, reduced motion, print visibility, and page errors; all passed. Desktop/mobile/long-name screenshots were visually inspected. Diff whitespace checks passed. Changes remain local and uncommitted.
 

@@ -1,4 +1,4 @@
-// Uses the same public word-search endpoint as the existing /schedules/9-25 builder.
+// Uses the public ARASAAC word-search endpoint.
 window.ScheduleArasaacPicker = {
   create() {
     const S = window.ScheduleStudio;

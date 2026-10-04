@@ -498,8 +498,7 @@
         : workspace.deletedPlans.length
           ? '<section class="empty-card"><h2>No active learner plans</h2><p>Restore a saved plan from Plan Trash below, or create a new learner plan.</p></section>'
           : '<section class="empty-card"><span class="eyebrow">A blank start</span><h2>Your plans live here</h2><p>Create a learner plan, then add activities to the days that need them. Nothing is prefilled. Plans are saved in this browser and can be exported as JSON.</p><button class="button primary" type="button" data-action="new-plan">＋ Create first learner plan</button></section>') +
-      renderPlanTrash() +
-      '<a class="reference-card" href="/schedules/9-25"><span><strong>Finished example · September 25</strong><span>A polished afternoon visual schedule with choices, activities, and a live Now / Next view. Every day you plan opens in this style: choose ▶ Visual schedule.</span></span><span class="reference-arrow" aria-hidden="true">→</span></a>';
+      renderPlanTrash();
   }
 
   function renderPlanTrash() {
@@ -621,7 +620,7 @@
     return '<section class="visual-card" aria-labelledby="visualCardTitle">' +
       '<div class="visual-preview" aria-hidden="true"><span class="visual-preview-hero"><strong>Hi ' + esc(plan.learner) + '!</strong><small>' + esc(day.label) + ' · ' + esc(formatTime(day.start)) + '–' + esc(formatTime(day.end)) + '</small></span>' +
         (rows || '<span class="visual-preview-empty">Activities you add show up here</span>') + '</div>' +
-      '<h3 id="visualCardTitle">Visual schedule</h3><p>' + esc(day.label) + ' as the learner sees it: big pictures, a live Now / Next, and check-offs, like the September 25 example.</p>' +
+      '<h3 id="visualCardTitle">Visual schedule</h3><p>' + esc(day.label) + ' as the learner sees it: big pictures, a live Now / Next, and check-offs.</p>' +
       '<a class="button visual" href="' + esc(visualScheduleUrl(plan.id, day.key)) + '">▶ Open ' + esc(day.label) + '’s schedule</a></section>';
   }
 
