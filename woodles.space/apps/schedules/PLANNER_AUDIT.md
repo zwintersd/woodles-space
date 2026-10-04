@@ -159,3 +159,11 @@ Save scope is explicit. Editing a scheduled activity or suggestion defaults to t
 Verification: all 23 schedule Chromium tests passed in 38.6 seconds. Three new library tests cover creation without a plan, filtering, repeated reuse, snapshot independence, explicit source updates, duplicate/remove behavior, picture and step persistence, nested cancellation, and simulated save failure/retry. Automated accessibility checks cover the new activity editor and pool library; mobile screenshots were visually inspected. E2E TypeScript, JavaScript syntax, and diff whitespace checks passed. Existing ARASAAC tests use mocked service responses, and physical print output remains outside this verification.
 
 Remaining stages: dedicated video/choice libraries, further simplification of nested visual editing, dedicated print preview, and optional completion-driven learner progression. These changes are local and uncommitted.
+
+## Suggestion categories as choices — October 3, 2026
+
+The choice builder now offers enabled categories from saved suggestion pools alongside individual activity options. Each category option snapshots its candidates and pool rules. Selecting it in the learner view opens the existing suggestion draw/accept controls for that category, with independent persisted draw budgets per choice option. Switching options or reloading retains draws and acceptance. Source-pool removal or editing leaves scheduled options intact. Categories with no enabled candidates fitting the choice length are rejected, including after the length is shortened.
+
+Category options survive workspace sanitization and plan transfer; recursive image retention and suggestion addressing include choice options. Existing ordinary options remain compatible. The category-choice browser test covers duration rejection, creation, reload, transfer sanitization, source removal, category switching, acceptance, and accessibility.
+
+Verification: all 24 schedule Chromium tests passed in 39.1 seconds. Category-choice and ordinary nested-choice tests passed again after the final learner-rendering adjustment. E2E TypeScript, JavaScript syntax, and diff whitespace checks passed.
