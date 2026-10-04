@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "woodles",
   "short_name": "woodles",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "woodles.space in Chrome's side panel: keep what you find, see what's waiting, step away.",
   "minimum_chrome_version": "116",
   "incognito": "not_allowed",

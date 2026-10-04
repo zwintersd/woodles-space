@@ -14,7 +14,7 @@ chrome.runtime.onInstalled.addListener(() => {
 			chrome.contextMenus.create({
 				id: item.id,
 				title: item.title,
-				contexts: ['selection', 'link', 'image', 'page']
+				contexts: item.contexts
 			});
 		}
 	});

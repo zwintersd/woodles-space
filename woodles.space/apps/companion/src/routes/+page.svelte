@@ -1,15 +1,27 @@
 <script lang="ts">
 	import '@shared/homesuiteTheme.css';
 	import { onMount } from 'svelte';
-	import type { HandoffTarget } from '@woodles/handoff';
+	import { entityHref } from '@woodles/app-manifest';
+	import { HANDOFF_TARGETS, type HandoffTarget } from '@woodles/handoff';
 	import type { Capture } from '@extension/protocol.js';
 	import { PanelBridge } from '$lib/bridge.svelte';
 	import { GLANCE_KEYS, ago, greeting, readGlance, type Glance } from '$lib/glance';
 	import { keep, keepableFromCapture, keepableFromCard, prettyUrl, titleFor, type Keepable } from '$lib/keep';
 
-	const TARGETS: Record<HandoffTarget, { verb: string; place: string; href: string }> = {
+	/**
+	 * `open` names the one thing that was kept, where the receiver can be
+	 * opened on it — Thinking About's entry takes the handoff's id, and holds
+	 * a link to it until the arrival has landed.
+	 */
+	const TARGETS: Record<HandoffTarget, { verb: string; place: string; href: string; open?: (id: string) => string }> = {
 		write: { verb: 'keep in write', place: 'write', href: '/write' },
-		whiteboard: { verb: 'pin to a board', place: 'a board', href: '/whiteboard' }
+		whiteboard: { verb: 'pin to a board', place: 'a board', href: '/whiteboard' },
+		'thinking-about': {
+			verb: 'add to thinking about',
+			place: 'thinking about',
+			href: '/thinking-about',
+			open: (id) => entityHref('thinking-about', 'entry', id)
+		}
 	};
 
 	const bridge = new PanelBridge(receive);
@@ -25,7 +37,7 @@
 	let attached = $derived(withPage && bridge.inPanel ? bridge.page : null);
 	let ready = $derived(keepableFromCard(note, attached) !== null);
 	let newTab = $derived(bridge.inPanel ? '_blank' : undefined);
-	let waitingTotal = $derived(glance ? glance.waiting.write + glance.waiting.whiteboard : 0);
+	let waitingTotal = $derived(glance ? Object.values(glance.waiting).reduce((sum, n) => sum + n, 0) : 0);
 
 	// A new page beside the panel is offered fresh, even if the last one was set aside.
 	$effect(() => {
@@ -37,10 +49,14 @@
 		glance = readGlance();
 	}
 
-	function announce(item: Keepable, target: HandoffTarget, ok: boolean) {
-		const { place, href } = TARGETS[target];
+	function announce(item: Keepable, target: HandoffTarget, ok: boolean, id?: string) {
+		const { place, href, open } = TARGETS[target];
 		notice = ok
-			? { text: `kept “${shorten(titleFor(item))}” for ${place}. it’ll be waiting when you open it.`, href, tone: 'kept' }
+			? {
+					text: `kept “${shorten(titleFor(item))}” for ${place}. it’ll be waiting when you open it.`,
+					href: open && id ? open(id) : href,
+					tone: 'kept'
+				}
 			: { text: 'couldn’t keep that — this browser’s storage refused it. nothing was lost from the page.', tone: 'trouble' };
 	}
 
@@ -50,7 +66,7 @@
 		const item = keepableFromCapture(capture);
 		const result = keep(item, capture.target, { id: capture.id });
 		if (result.ok) handled.add(capture.id);
-		if (!result.duplicate) announce(item, capture.target, result.ok);
+		if (!result.duplicate) announce(item, capture.target, result.ok, capture.id);
 		refresh();
 		return result.ok;
 	}
@@ -59,7 +75,7 @@
 		const item = keepableFromCard(note, attached);
 		if (!item) return;
 		const result = keep(item, target);
-		announce(item, target, result.ok);
+		announce(item, target, result.ok, result.duplicate ? undefined : result.handoff.id);
 		if (result.ok) note = '';
 		refresh();
 	}
@@ -141,8 +157,9 @@
 		></textarea>
 
 		<div class="actions">
-			<button type="button" class="primary" disabled={!ready} onclick={() => keepCard('write')}>{TARGETS.write.verb}</button>
-			<button type="button" disabled={!ready} onclick={() => keepCard('whiteboard')}>{TARGETS.whiteboard.verb}</button>
+			{#each HANDOFF_TARGETS as target, i (target)}
+				<button type="button" class:primary={i === 0} disabled={!ready} onclick={() => keepCard(target)}>{TARGETS[target].verb}</button>
+			{/each}
 		</div>
 
 		{#if notice}

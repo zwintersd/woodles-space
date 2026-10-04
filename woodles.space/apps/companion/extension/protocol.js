@@ -23,16 +23,23 @@ export const COMPANION_PATH = '/companion';
 /** `?panel=1` lets the page lay out for the side panel before `hello` arrives. */
 export const COMPANION_URL = `${COMPANION_ORIGIN}${COMPANION_PATH}?panel=1`;
 
-/** The two handoff receivers the page menu can send to — `HANDOFF_TARGETS` in `@woodles/handoff`. */
-export const CAPTURE_TARGETS = /** @type {const} */ (['write', 'whiteboard']);
+/** The handoff receivers the page menu can send to — `HANDOFF_TARGETS` in `@woodles/handoff`. */
+export const CAPTURE_TARGETS = /** @type {const} */ (['write', 'whiteboard', 'thinking-about']);
 
 /** What was right-clicked. `page` means nothing more specific was. */
 export const CAPTURE_KINDS = /** @type {const} */ (['selection', 'link', 'image', 'page']);
 
-/** Page-menu items, one per target. Chrome groups them under the extension's name. */
+/**
+ * Page-menu items, one per target. Chrome groups them under the extension's
+ * name. `contexts` are Chrome's own names, all of them capture kinds.
+ *
+ * @type {readonly { id: string, target: CaptureTarget, title: string, contexts: [CaptureKind, ...CaptureKind[]] }[]}
+ */
 export const MENU = Object.freeze([
-	{ id: 'woodles-keep-write', target: 'write', title: 'keep in write' },
-	{ id: 'woodles-keep-whiteboard', target: 'whiteboard', title: 'pin to a board' }
+	{ id: 'woodles-keep-write', target: 'write', title: 'keep in write', contexts: ['selection', 'link', 'image', 'page'] },
+	{ id: 'woodles-keep-whiteboard', target: 'whiteboard', title: 'pin to a board', contexts: ['selection', 'link', 'image', 'page'] },
+	// A picture on its own isn't something being read — right-click the page around it.
+	{ id: 'woodles-keep-thinking-about', target: 'thinking-about', title: 'add to thinking about', contexts: ['selection', 'link', 'page'] }
 ]);
 
 /** A selection longer than this is cut, not refused — the start is what someone chose. */
@@ -178,15 +185,16 @@ export function readCapture(value) {
  * @returns {CaptureTarget | null}
  */
 export function targetForMenu(menuItemId) {
-	const item = MENU.find((entry) => entry.id === menuItemId);
-	return item ? /** @type {CaptureTarget} */ (item.target) : null;
+	return MENU.find((entry) => entry.id === menuItemId)?.target ?? null;
 }
 
 /**
  * Build a capture from a page-menu click. The most specific thing that was
  * right-clicked wins: a selection over the link it sits in, a link over the
- * image inside it, any of those over the page. Null when there is nothing
- * worth keeping (a menu click on a page the protocol won't name).
+ * image inside it, any of those over the page — skipping any kind the target's
+ * menu item leaves out, which Chrome can still hand over (an image inside a
+ * link shows every item that takes links). Null when there is nothing worth
+ * keeping (a menu click on a page the protocol won't name).
  *
  * @param {{ selectionText?: string, linkUrl?: string, srcUrl?: string, mediaType?: string, pageUrl?: string }} info
  * @param {{ title?: string, url?: string } | undefined | null} tab
@@ -196,11 +204,13 @@ export function targetForMenu(menuItemId) {
  */
 export function captureFromMenu(info, tab, target, stamp) {
 	const page = pageFromTab(tab) ?? readPage({ title: '', url: info.pageUrl });
+	/** @type {readonly CaptureKind[]} */
+	const allowed = MENU.find((item) => item.target === target)?.contexts ?? CAPTURE_KINDS;
 	/** @type {Pick<Capture, 'kind' | 'text' | 'url'>} */
 	let what;
-	if (clean(info.selectionText, MAX_TEXT)) what = { kind: 'selection', text: info.selectionText ?? '', url: '' };
-	else if (safeUrl(info.linkUrl)) what = { kind: 'link', text: '', url: info.linkUrl ?? '' };
-	else if (info.mediaType === 'image' && safeUrl(info.srcUrl)) what = { kind: 'image', text: '', url: info.srcUrl ?? '' };
+	if (allowed.includes('selection') && clean(info.selectionText, MAX_TEXT)) what = { kind: 'selection', text: info.selectionText ?? '', url: '' };
+	else if (allowed.includes('link') && safeUrl(info.linkUrl)) what = { kind: 'link', text: '', url: info.linkUrl ?? '' };
+	else if (allowed.includes('image') && info.mediaType === 'image' && safeUrl(info.srcUrl)) what = { kind: 'image', text: '', url: info.srcUrl ?? '' };
 	else what = { kind: 'page', text: '', url: page?.url ?? '' };
 	return readCapture({ id: stamp.id, target, ...what, page, createdAt: stamp.now });
 }
