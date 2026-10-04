@@ -359,7 +359,7 @@ window.ScheduleStudio = (() => {
             sourceId: cleanText(entry.sourceId, 100, ''),
             start: validTime(entry.start, '09:00')
           };
-        }).filter(Boolean)
+        }).map((item, index) => item ? { ...item, ghost: source.activities[index]?.ghost === true } : null).filter(Boolean)
       };
     });
     return {

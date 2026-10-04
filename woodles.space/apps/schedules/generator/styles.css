@@ -35,6 +35,14 @@ h3 { margin: 0; font-size: 16px; }
 .button:disabled { opacity: .45; cursor: default; }
 .button.primary { border-color: #3674c2; color: #fff; background: #3674c2; }
 .button.primary:hover { border-color: var(--blue-dark); background: var(--blue-dark); }
+.activity-card.is-ghost { border: 2px dashed #758298; background: #f3f5f8; }
+.is-ghost .activity-time small, .is-ghost .open-slot-hint, .is-ghost .activity-note { color: #536176; }
+.open-slot-card .activity-time small, .open-slot-card .open-slot-hint { color: #536176; }
+.ghost-label { margin: 0 0 5px; color: #49566a; font-size: 12px; font-weight: 750; }
+.ghost-control { display: grid; gap: 6px; padding: 12px; border: 1px dashed #758298; border-radius: 10px; color: #49566a; }
+.ghost-control span { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.ghost-control input { width: 18px; height: 18px; }
+@media print { .activity-card.is-ghost { display: none !important; } }
 .button.secondary { background: #fff; }
 .button.small { min-height: 34px; padding: 6px 10px; font-size: 12px; }
 .button.danger { color: var(--red); }
@@ -200,7 +208,16 @@ h3 { margin: 0; font-size: 16px; }
 .activity-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
 .activity-tag { padding: 3px 7px; border-radius: 99px; color: #51647d; background: #eff3f8; font-size: 10px; font-weight: 700; }
 .activity-note { margin: 6px 0 0; color: #596c83; font-size: 12px; line-height: 1.4; white-space: pre-wrap; }
-.activity-actions { display: flex; gap: 4px; }
+.activity-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; max-width: 165px; gap: 4px; }
+.drag-handle { cursor: grab; touch-action: none; }
+.drag-placeholder { opacity: .35; outline: 2px dashed #3674c2; outline-offset: 2px; }
+.drag-floating { position: fixed; z-index: 100; margin: 0; pointer-events: none; box-sizing: border-box; box-shadow: 0 18px 40px #20457630; border-color: #3674c2; will-change: transform; }
+.drag-floating.drag-invalid { border-color: #b43e53; }
+.schedule-dragging { user-select: none; cursor: grabbing; }
+.drag-status { position: fixed; z-index: 101; left: 50%; bottom: 16px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px); padding: 10px 14px; border-radius: 12px; background: #183e73; color: white; font-size: 13px; box-shadow: var(--shadow); pointer-events: none; }
+.reorder-help { margin: 0 0 10px; color: #536176; font-size: 12px; }
+@media print { .drag-floating, .drag-status, .reorder-help { display: none !important; } }
+@media (prefers-reduced-motion: reduce) { .activity-card { animation: none !important; transition: none !important; } }
 .activity-actions .icon-button { width: 29px; height: 29px; font-size: 15px; }
 .activity-actions .delete:hover { border-color: #e0aeb7; color: var(--red); background: #fff6f7; }
 .empty-day { display: grid; justify-items: center; gap: 9px; padding: 34px 18px; border: 1px dashed #cbd8e7; border-radius: 14px; background: #fbfcfe; text-align: center; }

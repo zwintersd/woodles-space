@@ -58,29 +58,27 @@ test('compact planner puts editing first and all item editors remain reachable',
   expect(errors).toEqual([]);
 });
 
-test('moves preserve neighboring gaps and hidden days retain their schedule across reloads', async ({ page }) => {
+test('moves use gaps before pushing and hidden days retain their schedule across reloads', async ({ page }) => {
   await openPlan(page);
   const original = await monday(page);
   await page.locator('[data-action="move-activity"][data-id="snack"][data-direction="-1"]').click();
   await expect(page.locator('[data-action="move-activity"][data-id="snack"][data-direction="1"]')).toBeFocused();
   const moved = await monday(page);
   expect(moved.activities.map((item: any) => [item.occurrenceId, item.start])).toEqual([
-    ['book', '09:55'], ['snack', '09:10'], ['open', '10:30']
+    ['book', '09:35'], ['snack', '09:10'], ['open', '10:30']
   ]);
   await page.reload();
   await expect(page.locator('.activity-card').first()).toContainText('Make a snack');
-  await page.locator('[data-action="move-activity"][data-id="snack"][data-direction="1"]').click();
-  expect((await monday(page)).activities).toEqual(original.activities);
   await openScheduleTools(page, 'day');
   await page.locator('[data-action="hide-day"]').click();
   expect((await monday(page)).removed).toBe(true);
-  expect((await monday(page)).activities).toEqual(original.activities);
+  expect((await monday(page)).activities).toEqual(moved.activities);
   await page.reload();
   await page.goto('/schedules/view?plan=workflow&day=monday');
   await expect(page.locator('#intro')).not.toContainText('Monday');
   await page.goto('/schedules/generator?plan=workflow&day=tuesday');
   await page.locator('[data-action="restore-day"][data-day="monday"]').click();
-  expect(await monday(page)).toEqual(original);
+  expect(await monday(page)).toEqual(moved);
   // Hiding every day must leave a reachable restoration path, including on mobile.
   for (let i = 0; i < 7; i++) {
     await openScheduleTools(page, 'day');
@@ -96,7 +94,7 @@ test('moves preserve neighboring gaps and hidden days retain their schedule acro
   const exportPath = await (await backup).path();
   expect(exportPath).toBeTruthy();
   await page.locator('[data-action="restore-day"][data-day="monday"]').click();
-  expect(await monday(page)).toEqual(original);
+  expect(await monday(page)).toEqual(moved);
 });
 
 test('print settings stay per day and planning controls are excluded from output', async ({ page }) => {

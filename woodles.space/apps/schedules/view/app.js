@@ -11,15 +11,32 @@
   const OPEN_SLOT_SYMBOL = '✨';
   const CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5 L10 17.5 L19 7" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const params = new URLSearchParams(location.search);
-  const planId = params.get('plan') || '';
+  const published = location.pathname.startsWith('/schedules/p/');
+  const publicationId = (location.pathname.match(/^\/schedules\/p\/([a-f0-9]{32})\/?$/) || [])[1] || '';
+  const planId = published ? publicationId : params.get('plan') || '';
   const requestedDay = params.get('day') || '';
   const el = (id) => document.getElementById(id);
 
-  let workspace = readWorkspace();
+  let workspace = published ? { plans: [], images: [] } : readLearnerWorkspace();
+  let publicationState = 'loading';
+  let publicationError = '';
+  let publicationVersion = 0;
+  let publicationEtag = '';
+  let loadingPublication = false;
+  let accessGeneration = 0;
+  let manuallyLocked = false;
   let plan = null;
   let day = null;
   const spinningSuggestions = new Map();
   const pendingDraws = new Set();
+
+  function readLearnerWorkspace() {
+    const value = readWorkspace();
+    value.plans.forEach((entry) => entry.days.forEach((scheduledDay) => {
+      scheduledDay.activities = scheduledDay.activities.filter((item) => !item.ghost);
+    }));
+    return value;
+  }
 
   function todayKey(date) {
     return DAY_KEYS[(date.getDay() + 6) % 7][0];
@@ -340,7 +357,7 @@
 
   function dayLinksMarkup(target, current) {
     return target.days.filter((entry) => !entry.removed && (entry.activities.length || entry === current)).map((entry) =>
-      '<a href="' + esc(visualScheduleUrl(target.id, entry.key)) + '"' + (entry === current ? ' aria-current="page"' : '') + '>' + esc(entry.label.slice(0, 3)) + '</a>').join('');
+      '<a href="' + esc(published ? '/schedules/p/' + publicationId + '?day=' + entry.key : visualScheduleUrl(target.id, entry.key)) + '"' + (entry === current ? ' aria-current="page"' : '') + '>' + esc(entry.label.slice(0, 3)) + '</a>').join('');
   }
 
   function showNotice(title, message, withPicker) {
@@ -359,6 +376,19 @@
     plan = workspace.plans.find((entry) => entry.id === planId) || null;
     day = plan ? chooseDay() : null;
     ['nowNext', 'timeline', 'notice', 'footer'].forEach((id) => { el(id).hidden = true; });
+    el('editLink').hidden = published;
+    el('lockSchedule').hidden = !published || !plan;
+
+    if (published && !plan) {
+      document.title = 'Protected schedule · Schedule studio';
+      el('greeting').textContent = 'Your schedule';
+      el('intro').textContent = 'A little plan, ready when you are.';
+      ['timeline', 'nowText', 'nextText', 'credits', 'dayLinks'].forEach(id => { el(id).innerHTML = ''; });
+      const unavailable = publicationState === 'unavailable';
+      el('notice').innerHTML = publicationState === 'loading' ? '<h2>Opening your schedule…</h2>' : unavailable ? '<h2>This schedule is unavailable</h2><p>The link may have expired or been withdrawn. Ask the person who shared it for help.</p>' :
+        '<h2>' + (publicationState === 'offline' ? 'Could not connect' : 'Ready for your plan?') + '</h2><p>' + esc(publicationError || 'Enter the learner password shared with this link.') + '</p><form id="learnerUnlock" class="learner-unlock"><label for="learnerPassword">Learner password</label><input id="learnerPassword" name="password" type="password" required minlength="8" maxlength="128" autocomplete="current-password"><button class="notice-button" type="submit">Open my schedule</button></form>';
+      el('notice').hidden = false; tick(); return;
+    }
 
     if (!plan) {
       document.title = 'Visual schedule · Schedule studio';
@@ -394,7 +424,7 @@
       el('reset').hidden = true;
       el('credits').innerHTML = '';
       el('notice').innerHTML = '<h2>Nothing planned for ' + esc(day.label) + ' yet</h2><p>Add activities, choices, videos, or open slots to this day in the weekly planner, and they will show up here.</p>' +
-        '<a class="notice-button" href="' + esc(el('editLink').href) + '">Plan ' + esc(day.label) + '</a>';
+        (published ? '' : '<a class="notice-button" href="' + esc(el('editLink').href) + '">Plan ' + esc(day.label) + '</a>');
       el('notice').hidden = false;
       tick();
       return;
@@ -511,16 +541,59 @@
   // The planner may be open in another tab; show its edits as they save.
   window.addEventListener('storage', (event) => {
     if (event.key !== STORAGE_KEY && event.key !== PROGRESS_KEY) return;
-    workspace = readWorkspace();
+    if (published) { if (event.key === PROGRESS_KEY && plan) render(); return; }
+    workspace = readLearnerWorkspace();
     render();
   });
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { tick(); if (published) loadPublication(); } else if (published) { accessGeneration++; clearPublished('locked'); } });
   // A YouTube still that fails to load (offline, a removed video) falls back to the play tile.
   document.addEventListener('error', (event) => {
     const image = event.target;
     if (image instanceof HTMLImageElement && image.matches('.vid .art')) image.outerHTML = '<span class="art art-empty" aria-hidden="true">▶</span>';
   }, true);
 
+  function clearPublished(state, error = '') {
+    workspace = { plans: [], images: [] }; plan = null; day = null; publicationVersion = 0; publicationEtag = '';
+    el('timeline').getAnimations({ subtree: true }).forEach(animation => animation.cancel()); spinningSuggestions.clear(); pendingDraws.clear();
+    el('suggestionAnnouncement').textContent = '';
+    publicationState = state; publicationError = error; render();
+  }
+  async function loadPublication() {
+    if (!published || loadingPublication || manuallyLocked || document.hidden) return;
+    if (!publicationId) { clearPublished('unavailable'); return; }
+    loadingPublication = true; const generation = accessGeneration;
+    try {
+      const response = await fetch('/api/schedules?id=' + publicationId, { credentials: 'same-origin', cache: 'no-store', headers: publicationEtag ? { 'if-none-match': publicationEtag } : {} });
+      if (generation !== accessGeneration) return;
+      if (response.status === 304) return;
+      const result = await response.json();
+      if (generation !== accessGeneration) return;
+      if (!response.ok) { clearPublished(response.status === 401 ? 'locked' : response.status === 404 ? 'unavailable' : 'offline', response.status === 401 ? '' : result.error); return; }
+      if (plan && publicationVersion === result.version) return;
+      const source = result.payload.plan;
+      const included = new Set(source.days.map(day => day.key));
+      const days = [...source.days, ...DAY_KEYS.filter(([key]) => !included.has(key)).map(([key]) => ({ key, removed: true, activities: [] }))];
+      const next = window.ScheduleStudio.sanitizePlan({ ...source, id: publicationId, days });
+      if (!next) throw new Error('Invalid published schedule.');
+      el('timeline').getAnimations({ subtree: true }).forEach(animation => animation.cancel()); spinningSuggestions.clear(); pendingDraws.clear();
+      workspace = { plans: [next], images: result.payload.images.map(window.ScheduleStudio.sanitizeImage).filter(Boolean) };
+      publicationVersion = result.version; publicationEtag = response.headers.get('etag') || ''; publicationState = 'open'; publicationError = ''; render();
+    } catch { if (generation === accessGeneration) clearPublished('offline', 'Check your connection and try opening the schedule again.'); }
+    finally { loadingPublication = false; }
+  }
+  document.addEventListener('submit', async event => {
+    if (event.target.id !== 'learnerUnlock') return;
+    event.preventDefault(); const form = event.target; const password = form.elements.password.value; form.elements.password.value = '';
+    const generation = accessGeneration; form.querySelector('button').disabled = true;
+    try { await window.SchedulePublishing.request(null, { action: 'unlock', id: publicationId, password }); if (generation === accessGeneration) { manuallyLocked = false; await loadPublication(); } }
+    catch (error) { if (generation === accessGeneration) { clearPublished(error.status === 404 ? 'unavailable' : 'locked', error.message); el('learnerPassword')?.focus(); } }
+  });
+  el('lockSchedule').addEventListener('click', async () => {
+    accessGeneration++; manuallyLocked = true; clearPublished('locked');
+    try { await window.SchedulePublishing.request(null, { action: 'viewer-logout', id: publicationId }); }
+    catch { publicationError = 'This page is locked. Reconnect, reopen the schedule, and choose Lock schedule again to end access on this browser.'; render(); }
+  });
   render();
+  if (published) { loadPublication(); window.setInterval(() => { if (!document.hidden) loadPublication(); }, 30000); }
   window.setInterval(tick, 20000);
 })();

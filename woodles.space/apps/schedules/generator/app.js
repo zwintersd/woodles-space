@@ -387,14 +387,15 @@
   }
 
   function dayStats(day) {
-    const kinds = (kind) => day.activities.filter((item) => item.kind === kind).length;
+    const active = day.activities.filter((item) => !item.ghost);
+    const kinds = (kind) => active.filter((item) => item.kind === kind).length;
     return {
       count: kinds('activity'),
       choices: kinds('choice'),
       videos: kinds('video'),
       suggestions: kinds('suggestion'),
       openSlots: kinds('open-slot'),
-      minutes: day.activities.reduce((total, item) => total + item.duration, 0)
+      minutes: active.reduce((total, item) => total + item.duration, 0)
     };
   }
 
@@ -411,7 +412,7 @@
   function planStats(plan) {
     return visibleDays(plan).reduce((result, day) => {
       const stats = dayStats(day);
-      result.days += day.activities.length > 0 ? 1 : 0;
+      result.days += day.activities.some((item) => !item.ghost) ? 1 : 0;
       result.activities += stats.count;
       result.choices += stats.choices;
       result.videos += stats.videos;
@@ -424,7 +425,7 @@
   function nextFreeStart(day, duration, ignoreId) {
     const start = timeMinutes(day.start);
     const end = timeMinutes(day.end);
-    const items = sortedActivities(day).filter((item) => item.occurrenceId !== ignoreId);
+    const items = sortedActivities(day).filter((item) => !item.ghost && item.occurrenceId !== ignoreId);
     let candidate = start;
     for (const item of items) {
       const itemStart = timeMinutes(item.start);
@@ -436,10 +437,11 @@
   }
 
   function validateDay(day) {
+    if (day._placementIssue) return day._placementIssue;
     const start = timeMinutes(day.start);
     const end = timeMinutes(day.end);
     if (start >= end) return 'The session must end after it starts.';
-    const items = sortedActivities(day);
+    const items = sortedActivities(day).filter((item) => !item.ghost);
     for (let index = 0; index < items.length; index += 1) {
       const item = items[index];
       const itemStart = timeMinutes(item.start);
@@ -490,7 +492,7 @@
     app.innerHTML =
       '<div class="page-heading"><div><span class="eyebrow">Schedule studio · weekly planner</span><h1>Learner plans</h1>' +
       '<p>Organize a separate schedule for each day. Plans start blank, and your activity library can be reused across the week.</p></div>' +
-      '<div class="heading-actions"><button class="button secondary" type="button" data-action="open-content-library">Library</button><button class="button secondary" type="button" data-action="open-image-studio">Image studio</button><button class="button primary" type="button" data-action="new-plan">＋ New learner plan</button><button class="button secondary" type="button" data-action="import-plan">Import plan</button></div></div>' +
+      '<div class="heading-actions"><button class="button secondary" type="button" data-action="open-content-library">Library</button><button class="button secondary" type="button" data-action="published-plans">Published plans</button><button class="button secondary" type="button" data-action="open-image-studio">Image studio</button><button class="button primary" type="button" data-action="new-plan">＋ New learner plan</button><button class="button secondary" type="button" data-action="import-plan">Import plan</button></div></div>' +
       (plans.length
         ? '<section class="library-grid" aria-label="Saved learner plans">' + cards + '</section>'
         : workspace.deletedPlans.length
@@ -543,15 +545,26 @@
   }
 
   function itemActions(item, index, items, name, editAction) {
+    const active = items.filter((entry) => !entry.ghost);
+    index = active.findIndex((entry) => entry.occurrenceId === item.occurrenceId);
+    items = active;
     return '<div class="activity-actions">' +
-      '<button class="icon-button" type="button" data-action="move-activity" data-id="' + esc(item.occurrenceId) + '" data-direction="-1" aria-label="Move ' + esc(name) + ' earlier" title="Move earlier" ' + (index === 0 ? 'disabled' : '') + '>↑</button>' +
-      '<button class="icon-button" type="button" data-action="move-activity" data-id="' + esc(item.occurrenceId) + '" data-direction="1" aria-label="Move ' + esc(name) + ' later" title="Move later" ' + (index === items.length - 1 ? 'disabled' : '') + '>↓</button>' +
+      '<button class="icon-button drag-handle" type="button" data-action="drag-activity" data-id="' + esc(item.occurrenceId) + '" aria-label="Drag ' + esc(name) + ' to rearrange, or use arrow keys" title="Drag to rearrange · arrow keys also work"' + (item.ghost ? ' disabled' : '') + '>⠿</button>' +
+      '<button class="icon-button" type="button" data-action="move-activity" data-id="' + esc(item.occurrenceId) + '" data-direction="-1" aria-label="Move ' + esc(name) + ' earlier" title="Move earlier" ' + (index <= 0 ? 'disabled' : '') + '>↑</button>' +
+      '<button class="icon-button" type="button" data-action="move-activity" data-id="' + esc(item.occurrenceId) + '" data-direction="1" aria-label="Move ' + esc(name) + ' later" title="Move later" ' + (index < 0 || index === items.length - 1 ? 'disabled' : '') + '>↓</button>' +
+      '<button class="button small secondary" type="button" data-action="toggle-ghost" data-id="' + esc(item.occurrenceId) + '" aria-label="' + (item.ghost ? 'Restore ' : 'Suspend ') + esc(name) + '" aria-pressed="' + Boolean(item.ghost) + '">' + (item.ghost ? 'Restore' : 'Ghost') + '</button>' +
       '<button class="icon-button" type="button" data-action="' + editAction + '" data-id="' + esc(item.occurrenceId) + '" aria-label="Edit ' + esc(name) + '" title="Edit">✎</button>' +
+      '<button class="icon-button" type="button" data-action="duplicate-activity" data-id="' + esc(item.occurrenceId) + '" aria-label="Duplicate ' + esc(name) + '" title="Duplicate">⧉</button>' +
       '<button class="icon-button delete" type="button" data-action="remove-activity" data-id="' + esc(item.occurrenceId) + '" aria-label="Remove ' + esc(name) + ' from day" title="Remove from day">×</button>' +
     '</div>';
   }
 
   function renderActivity(day, item, index, items) {
+    const markup = renderActivityCard(day, item, index, items).replace('<article ', '<article data-item-id="' + esc(item.occurrenceId) + '" ');
+    return item.ghost ? markup.replace('class="activity-card', 'class="activity-card is-ghost').replace('<h3>', '<p class="ghost-label">Ghost · not counted or shown to learner</p><h3>') : markup;
+  }
+
+  function renderActivityCard(day, item, index, items) {
     if (item.kind === 'suggestion') {
       const available = item.candidates.filter((candidate) => candidate.enabled && candidate.duration <= item.duration);
       const policy = item.rerollMode === 'none' ? 'No rerolls' : item.rerollMode === 'unlimited' ? 'Unlimited rerolls' : item.maxRerolls + ' rerolls';
@@ -603,7 +616,7 @@
   }
 
   function renderVisualCard(plan, day) {
-    const rows = sortedActivities(day).slice(0, 3).map((item) =>
+    const rows = sortedActivities(day).filter((item) => !item.ghost).slice(0, 3).map((item) =>
       '<span class="visual-preview-row"><b>' + esc(formatTime(item.start)) + '</b><span>' + esc(itemLabel(item, plan.learner)) + '</span></span>').join('');
     return '<section class="visual-card" aria-labelledby="visualCardTitle">' +
       '<div class="visual-preview" aria-hidden="true"><span class="visual-preview-hero"><strong>Hi ' + esc(plan.learner) + '!</strong><small>' + esc(day.label) + ' · ' + esc(formatTime(day.start)) + '–' + esc(formatTime(day.end)) + '</small></span>' +
@@ -617,7 +630,7 @@
       '<div class="page-heading plan-heading"><div class="plan-heading-main"><span class="eyebrow">Weekly learner plan · saved locally</span>' +
         '<input id="planTitle" class="plan-title" aria-label="Plan name" maxlength="100" value="' + esc(plan.name) + '">' +
         '<input id="planLearner" class="plan-learner" aria-label="Learner label" maxlength="100" value="' + esc(plan.learner) + '">' +
-      '</div><div class="heading-actions">' + (day ? '<a class="button visual" href="' + esc(visualScheduleUrl(plan.id, day.key)) + '">▶ Use schedule</a><button class="button secondary" type="button" data-action="open-print-setup">Print</button>' : '') + '<button class="button secondary" type="button" data-action="open-content-library">Library</button>' +
+      '</div><div class="heading-actions">' + (day ? '<a class="button visual" href="' + esc(visualScheduleUrl(plan.id, day.key)) + '">▶ Use schedule</a><button class="button secondary" type="button" data-action="open-print-setup">Print</button>' : '') + '<button class="button primary" type="button" data-action="publish-plan">Publish</button><button class="button secondary" type="button" data-action="open-content-library">Library</button>' +
         '<details class="plan-tools disclosure"><summary>Plan tools</summary><div class="tool-options"><button class="button secondary" type="button" data-action="open-image-studio">Image studio</button><button class="button secondary" type="button" data-action="export-plan">Export JSON</button><button class="button secondary" type="button" data-action="import-plan">Import plan</button><button class="button secondary" type="button" data-action="duplicate-plan">Duplicate plan</button><button class="button secondary danger" type="button" data-action="delete-current-plan">Move plan to Trash</button><p class="muted">Saved in this browser. Export and import to transfer a plan to another device.</p></div></details></div></div>';
   }
 
@@ -631,7 +644,7 @@
     const items = sortedActivities(day);
     const stats = dayStats(day);
     const capacity = timeMinutes(day.end) - timeMinutes(day.start);
-    const visuals = items.flatMap(itemVisuals);
+    const visuals = items.filter((item) => !item.ghost).flatMap(itemVisuals);
     const hasArasaac = visuals.some((item) => /^\d{1,10}$/.test(String(item.pictogram || '').trim()));
     const hasOpenMoji = visuals.some((item) => {
       const imageValue = activityImageValue(item);
@@ -653,7 +666,7 @@
         '<div class="time-window"><span class="time-window-label">Session time</span><label class="field"><span>Starts</span><input type="time" data-day-time="start" value="' + esc(day.start) + '" aria-label="' + esc(day.label) + ' session start"></label>' +
           '<label class="field"><span>Ends</span><input type="time" data-day-time="end" value="' + esc(day.end) + '" aria-label="' + esc(day.label) + ' session end"></label>' +
           '<span class="time-summary">' + stats.minutes + ' scheduled minutes · ' + Math.max(0, capacity - stats.minutes) + ' unassigned minutes</span></div>' +
-        '<div class="activity-list" aria-label="' + esc(day.label) + ' scheduled items">' +
+        '<p class="reorder-help">Drag the dotted handle or use arrows. Overlapping items move forward into free time.</p><div class="activity-list" aria-label="' + esc(day.label) + ' scheduled items">' +
           (items.length ? items.map((item, index) => renderActivity(day, item, index, items)).join('') :
             '<div class="empty-day"><h3>Start with one item</h3><p>Use Add item to choose an activity, choice, video, suggestion, or open time.</p></div>') +
         '</div>' + (printCredits ? '<p class="print-credit">' + printCredits + '</p>' : '') +
@@ -824,6 +837,7 @@
           '<div class="dialog-footer full"><button class="button secondary" type="button" data-close-dialog>Cancel</button><button class="button primary" type="submit">' + (libraryEditing ? 'Save to library' : editing ? 'Save this item' : 'Add to ' + esc(DAY_KEYS.find((day) => day[0] === activeDayKey)[1])) + '</button></div>' +
         '</form>';
     }
+    installGhostControl(item);
     if (!activityDialog.open) activityDialog.showModal();
     renderActivityStepsDraft();
     const form = document.getElementById('activityForm');
@@ -898,6 +912,7 @@
         '<div class="error-text full" id="slotError" role="status" aria-live="polite"></div>' +
         '<div class="dialog-footer full"><button class="button secondary" type="button" data-close-dialog>Cancel</button><button class="button primary" type="submit">' + (editing ? 'Save slot' : 'Add slot') + '</button></div>' +
       '</form>';
+    installGhostControl(item);
     if (!activityDialog.open) activityDialog.showModal();
     activityDialogBody.querySelector('input[name="start"]')?.focus();
   }
@@ -905,6 +920,7 @@
   function submitOpenSlot(form) {
     const day = getDay(getPlan(), activeDayKey);
     if (!day) return;
+    const before = snapshot(day);
     const errorNode = form.querySelector('#slotError');
     const data = new FormData(form);
     const start = validTime(data.get('start'), '');
@@ -918,8 +934,8 @@
       slot = day.activities.find((item) => item.occurrenceId === editingActivityId && item.kind === 'open-slot');
       if (!slot) return activityDialog.close();
       const prior = { ...slot };
-      Object.assign(slot, { start, duration });
-      const message = validateDay(day);
+      Object.assign(slot, { start, duration, ghost: data.has('ghost') });
+      const message = arrangeEditedItem(day, slot.occurrenceId, prior.ghost && !slot.ghost);
       if (message) {
         Object.assign(slot, prior);
         errorNode.textContent = message;
@@ -928,14 +944,14 @@
     } else {
       slot = { kind: 'open-slot', occurrenceId: makeId('scheduled'), sourceId: '', start, duration, color: COLORS[0] };
       day.activities.push(slot);
-      const message = validateDay(day);
+      const message = arrangeEditedItem(day, slot.occurrenceId);
       if (message) {
         day.activities = day.activities.filter((item) => item.occurrenceId !== slot.occurrenceId);
         errorNode.textContent = message;
         return;
       }
     }
-    persist();
+    if (!saveEditedDay(day, before, slot.occurrenceId)) { errorNode.textContent = "Could not save. Your draft is still here."; return; }
     activityDialog.close();
     render();
     showToast(activityMode === 'slot-edit' ? 'Open slot updated.' : 'Open slot added to ' + day.label + '.');
@@ -1002,6 +1018,7 @@
     const form = document.getElementById('suggestionForm');
     applySuggestionRules(form, config);
     renderSuggestionDraft();
+    if (!poolMode && !nested) installGhostControl(item);
     if (!dialog.open) dialog.showModal();
     form.elements.title.focus();
   }
@@ -1102,20 +1119,24 @@
       return;
     }
     const existing = day.activities.find((entry) => entry.occurrenceId === editingActivityId);
-    const suggestion = { ...values, kind: 'suggestion', start, color: COLORS[0], sourceId: '', poolId: suggestionPoolId,
+    const before = snapshot(day);
+    const suggestion = { ...values, ghost: data.has('ghost'), kind: 'suggestion', start, color: COLORS[0], sourceId: '', poolId: suggestionPoolId,
       occurrenceId: existing?.occurrenceId || makeId('scheduled') };
     const proposed = { ...day, activities: existing ? day.activities.map((entry) => entry === existing ? suggestion : entry) : [...day.activities, suggestion] };
-    const issue = validateDay(proposed);
+    const issue = arrangeEditedItem(proposed, suggestion.occurrenceId, existing?.ghost && !suggestion.ghost);
     if (issue) { errorNode.textContent = issue; return; }
-    if (data.has('savePool')) {
-      const pool = workspace.suggestionPools.find((entry) => entry.id === suggestionPoolId);
-      suggestion.poolId = pool?.id || makeId('pool');
-      const saved = { id: suggestion.poolId, ...JSON.parse(JSON.stringify(values)) };
-      if (pool) Object.assign(pool, saved);
-      else workspace.suggestionPools.push(saved);
-    }
-    day.activities = proposed.activities;
-    persist();
+    if (!commitRecoveryChange(() => {
+      if (data.has('savePool')) {
+        const pool = workspace.suggestionPools.find((entry) => entry.id === suggestionPoolId);
+        suggestion.poolId = pool?.id || makeId('pool');
+        proposed.activities.find((entry) => entry.occurrenceId === suggestion.occurrenceId).poolId = suggestion.poolId;
+        const saved = { id: suggestion.poolId, ...snapshot(values) };
+        if (pool) Object.assign(pool, saved);
+        else workspace.suggestionPools.push(saved);
+      }
+      day.activities = proposed.activities;
+      rememberPushedItems(day, before, suggestion.occurrenceId);
+    })) { errorNode.textContent = 'Could not save. Your draft is still here.'; return; }
     activityDialog.close();
     render();
     focusActivityAction('edit-suggestion', suggestion.occurrenceId);
@@ -1214,6 +1235,7 @@
         '<div class="dialog-footer full"><button class="button secondary" type="button" data-close-dialog>Cancel</button><button class="button primary" type="submit">' + (editing ? 'Save choice' : 'Add choice') + '</button></div>' +
       '</form>';
     renderChoiceDraft();
+    installGhostControl(item);
     if (!activityDialog.open) activityDialog.showModal();
     activityDialogBody.querySelector(editing ? 'input[name="start"]' : '#optionTitle')?.focus();
   }
@@ -1258,6 +1280,7 @@
   function submitChoice(form) {
     const day = getDay(getPlan(), activeDayKey);
     if (!day) return;
+    const before = snapshot(day);
     const errorNode = form.querySelector('#choiceError');
     if (form.elements.optionTitle.value.trim() && !addComposedOption(form)) return;
     const data = new FormData(form);
@@ -1276,14 +1299,14 @@
       errorNode.textContent = 'Each suggestion category needs at least one idea that fits the choice length.';
       return;
     }
-    const values = { start, duration, title: cleanText(data.get('title'), 100, ''), prompt: cleanText(data.get('prompt'), 200, ''), options: choiceDraft.map((option) => ({ ...option })) };
+    const values = { start, duration, ghost: data.has('ghost'), title: cleanText(data.get('title'), 100, ''), prompt: cleanText(data.get('prompt'), 200, ''), options: choiceDraft.map((option) => ({ ...option })) };
     let choice;
     if (activityMode === 'choice-edit') {
       choice = day.activities.find((item) => item.occurrenceId === editingActivityId && item.kind === 'choice');
       if (!choice) return activityDialog.close();
       const prior = { ...choice };
       Object.assign(choice, values);
-      const message = validateDay(day);
+      const message = arrangeEditedItem(day, choice.occurrenceId, prior.ghost && !choice.ghost);
       if (message) {
         Object.assign(choice, prior);
         errorNode.textContent = message;
@@ -1292,14 +1315,14 @@
     } else {
       choice = { kind: 'choice', occurrenceId: makeId('scheduled'), sourceId: '', color: COLORS[0], ...values };
       day.activities.push(choice);
-      const message = validateDay(day);
+      const message = arrangeEditedItem(day, choice.occurrenceId);
       if (message) {
         day.activities = day.activities.filter((item) => item.occurrenceId !== choice.occurrenceId);
         errorNode.textContent = message;
         return;
       }
     }
-    persist();
+    if (!saveEditedDay(day, before, choice.occurrenceId)) { errorNode.textContent = "Could not save. Your draft is still here."; return; }
     activityDialog.close();
     render();
     if (activityMode === 'choice-edit') focusActivityAction('edit-choice', choice.occurrenceId);
@@ -1340,6 +1363,7 @@
         '<div class="dialog-footer full"><button class="button secondary" type="button" data-close-dialog>Cancel</button><button class="button primary" type="submit">' + (editing ? 'Save video' : 'Add video') + '</button></div>' +
       '</form>';
     renderVideoDraft();
+    installGhostControl(item);
     if (!activityDialog.open) activityDialog.showModal();
     activityDialogBody.querySelector(editing ? 'input[name="start"]' : '#videoTitle')?.focus();
   }
@@ -1407,6 +1431,7 @@
   function submitVideo(form) {
     const day = getDay(getPlan(), activeDayKey);
     if (!day) return;
+    const before = snapshot(day);
     const errorNode = form.querySelector('#videoError');
     if ((form.elements.videoTitle.value.trim() || form.elements.videoUrl.value.trim()) && !addComposedVideo(form)) return;
     const data = new FormData(form);
@@ -1421,14 +1446,14 @@
       form.elements.videoTitle.focus();
       return;
     }
-    const values = { start, duration, title: cleanText(data.get('title'), 100, ''), prompt: cleanText(data.get('prompt'), 200, ''), videos: videoDraft.map((video) => ({ ...video })) };
+    const values = { start, duration, ghost: data.has('ghost'), title: cleanText(data.get('title'), 100, ''), prompt: cleanText(data.get('prompt'), 200, ''), videos: videoDraft.map((video) => ({ ...video })) };
     let entry;
     if (activityMode === 'video-edit') {
       entry = day.activities.find((item) => item.occurrenceId === editingActivityId && item.kind === 'video');
       if (!entry) return activityDialog.close();
       const prior = { ...entry };
       Object.assign(entry, values);
-      const message = validateDay(day);
+      const message = arrangeEditedItem(day, entry.occurrenceId, prior.ghost && !entry.ghost);
       if (message) {
         Object.assign(entry, prior);
         errorNode.textContent = message;
@@ -1437,14 +1462,14 @@
     } else {
       entry = { kind: 'video', occurrenceId: makeId('scheduled'), sourceId: '', color: COLORS[0], ...values };
       day.activities.push(entry);
-      const message = validateDay(day);
+      const message = arrangeEditedItem(day, entry.occurrenceId);
       if (message) {
         day.activities = day.activities.filter((item) => item.occurrenceId !== entry.occurrenceId);
         errorNode.textContent = message;
         return;
       }
     }
-    persist();
+    if (!saveEditedDay(day, before, entry.occurrenceId)) { errorNode.textContent = "Could not save. Your draft is still here."; return; }
     activityDialog.close();
     render();
     if (activityMode === 'video-edit') focusActivityAction('edit-video', entry.occurrenceId);
@@ -1858,12 +1883,15 @@
         : null;
       if (activityMode === 'edit' && !occurrence) return activityDialog.close();
       const added = createOccurrence(result.saveToLibrary ? activity : { ...activity, id: '' }, start);
+      added.ghost = Boolean(form.elements.ghost?.checked);
       if (occurrence) Object.assign(added, { occurrenceId: occurrence.occurrenceId, sourceId: result.saveToLibrary ? activity.id : occurrence.sourceId });
       const proposed = { ...day, activities: occurrence ? day.activities.map((entry) => entry === occurrence ? added : entry) : [...day.activities, added] };
-      const validation = validateDay(proposed);
+      const before = snapshot(day);
+      const validation = arrangeEditedItem(proposed, added.occurrenceId, occurrence?.ghost && !added.ghost);
       if (validation) throw new Error(validation);
       if (!commitRecoveryChange(() => {
         day.activities = proposed.activities;
+        rememberPushedItems(day, before, added.occurrenceId);
         if (result.saveToLibrary) workspace.activities.push(activity);
         if (result.updateLibrary && occurrence?.sourceId) {
           const libraryItem = workspace.activities.find((entry) => entry.id === occurrence.sourceId);
@@ -1990,29 +2018,260 @@
     const plan = getPlan();
     const day = getDay(plan, activeDayKey);
     if (!day) return;
-    const items = sortedActivities(day);
+    const items = sortedActivities(day).filter((item) => !item.ghost);
     const index = items.findIndex((entry) => entry.occurrenceId === occurrenceId);
     const target = index + Number(direction);
     if (index < 0 || target < 0 || target >= items.length) return;
-    const before = snapshot(day);
-    const earlier = items[Math.min(index, target)];
-    const later = items[Math.max(index, target)];
-    const earlierStart = earlier.start;
-    const laterStart = later.start;
-    const gap = timeMinutes(laterStart) - timeMinutes(earlierStart) - earlier.duration;
-    // Swap within the same span, retaining the gap and every other item's time.
-    later.start = earlierStart;
-    earlier.start = timeString(timeMinutes(earlierStart) + later.duration + gap);
-    const validation = validateDay(day);
-    if (validation) {
-      earlier.start = earlierStart;
-      later.start = laterStart;
-      return showToast(validation);
-    }
-    if (!saveDayChange(plan, day, before, 'moving items on ' + day.label)) return;
-    render();
+    const proposed = reorderDay(day, occurrenceId, target);
+    if (!commitArrangement(day, proposed, occurrenceId, 'moving items on ' + day.label)) return;
     focusActivityAction('move-activity', occurrenceId, direction);
-    showToast('Neighboring items swapped. Other times and the gap are kept.');
+    showToast('Item moved. Overlapping items shifted forward; other times are kept.');
+  }
+
+  // Existing starts act as anchors. Only blocks hit by the inserted item ripple
+  // forward; a gap absorbs the ripple instead of compressing the whole day.
+  function placeItem(day, occurrenceId, start) {
+    const proposed = snapshot(day);
+    const moved = proposed.activities.find((item) => item.occurrenceId === occurrenceId);
+    if (!moved) return proposed;
+    if (!moved.ghost && (start < timeMinutes(day.start) || start + moved.duration > timeMinutes(day.end))) return { ...proposed, _placementIssue: 'The moved item would fall outside the session.' };
+    moved.start = timeString(start);
+    if (moved.ghost) return proposed;
+    const others = sortedActivities(proposed).filter((item) => !item.ghost && item !== moved);
+    const following = others.filter((item) => timeMinutes(item.start) + item.duration > start);
+    let cursor = start + moved.duration;
+    for (const item of following) {
+      const next = Math.max(timeMinutes(item.start), cursor);
+      item.start = timeString(next);
+      cursor = next + item.duration;
+      if (cursor > timeMinutes(day.end)) return { ...proposed, _placementIssue: 'Pushing these items would run past the session end.' };
+    }
+    return proposed;
+  }
+
+  function reorderDay(day, occurrenceId, destination) {
+    const active = sortedActivities(day).filter((item) => !item.ghost);
+    const original = active.findIndex((item) => item.occurrenceId === occurrenceId);
+    if (original < 0 || original === destination) return snapshot(day);
+    const remaining = active.filter((item) => item.occurrenceId !== occurrenceId);
+    const start = remaining[destination] ? timeMinutes(remaining[destination].start) : timeMinutes(remaining.at(-1).start) + remaining.at(-1).duration;
+    return placeItem(day, occurrenceId, start);
+  }
+
+  function arrangeEditedItem(day, occurrenceId, restoring = false) {
+    const item = day.activities.find((entry) => entry.occurrenceId === occurrenceId);
+    const arranged = !item || restoring ? snapshot(day) : placeItem(day, occurrenceId, timeMinutes(item.start));
+    const issue = validateDay(arranged);
+    if (!issue) day.activities = arranged.activities;
+    return issue;
+  }
+
+  function rememberPushedItems(day, before, changedId) {
+    const shifted = before.activities.some((previous) => previous.occurrenceId !== changedId && day.activities.find((item) => item.occurrenceId === previous.occurrenceId)?.start !== previous.start);
+    if (shifted) {
+      undoHistory.push({ kind: 'day', planId: getPlan().id, dayKey: day.key, before, after: snapshot(day), label: 'adjusting time blocks on ' + day.label });
+      undoHistory = undoHistory.slice(-20);
+    }
+  }
+
+  function saveEditedDay(day, before, changedId) {
+    const after = snapshot(day);
+    Object.assign(day, before);
+    return commitRecoveryChange(() => {
+      Object.assign(day, after);
+      rememberPushedItems(day, before, changedId);
+    });
+  }
+
+  function cardPositions() {
+    return new Map([...app.querySelectorAll('.activity-list [data-item-id]')].map((card) => [card.dataset.itemId, card.getBoundingClientRect()]));
+  }
+
+  function animateArrangement(before, landedId) {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    app.querySelectorAll('.activity-list [data-item-id]').forEach((card) => {
+      const previous = before.get(card.dataset.itemId);
+      const current = card.getBoundingClientRect();
+      const x = previous ? previous.left - current.left : 0;
+      const y = previous ? previous.top - current.top : 0;
+      if (card.dataset.itemId === landedId) {
+        card.animate([
+          { transform: 'translate(' + x + 'px,' + y + 'px) scale(.97) rotate(-1.5deg)' },
+          { transform: 'translate(0,-5px) scale(1.025) rotate(1.1deg)', offset: .62 },
+          { transform: 'translate(0,2px) scale(.992) rotate(-.55deg)', offset: .82 },
+          { transform: 'none' }
+        ], { duration: 460, easing: 'cubic-bezier(.2,.8,.25,1)' });
+      } else if (x || y) card.animate([{ transform: 'translate(' + x + 'px,' + y + 'px)' }, { transform: 'none' }], { duration: 250, easing: 'cubic-bezier(.2,.8,.25,1)' });
+    });
+  }
+
+  function commitArrangement(day, proposed, landedId, label, positions = cardPositions()) {
+    const issue = validateDay(proposed);
+    if (issue) {
+      showToast('No room for that move. ' + issue + ' Extend the session or put an item in Ghost mode.');
+      return false;
+    }
+    const before = snapshot(day);
+    Object.assign(day, proposed);
+    if (!saveDayChange(getPlan(), day, before, label)) return false;
+    render();
+    animateArrangement(positions, landedId);
+    return true;
+  }
+
+  function duplicateActivity(occurrenceId) {
+    const day = getDay(getPlan(), activeDayKey);
+    const source = day?.activities.find((item) => item.occurrenceId === occurrenceId);
+    if (!source) return;
+    const copy = { ...snapshot(source), occurrenceId: makeId('scheduled') };
+    const proposed = snapshot(day);
+    proposed.activities.push(copy);
+    let arranged = source.ghost ? proposed : placeItem(proposed, copy.occurrenceId, timeMinutes(source.start) + source.duration);
+    if (validateDay(arranged)) {
+      copy.ghost = true;
+      copy.start = source.start;
+      arranged = proposed;
+    }
+    if (!commitArrangement(day, arranged, copy.occurrenceId, 'duplicating an item on ' + day.label)) return;
+    focusActivityAction('duplicate-activity', copy.occurrenceId);
+    showToast(copy.ghost ? 'Duplicated in Ghost mode. Set its time and restore when ready.' : 'Item duplicated after the original. Later items shifted only where needed.');
+  }
+
+  let scheduleDrag = null;
+
+  function previewDrag() {
+    const drag = scheduleDrag;
+    if (!drag?.active) return;
+    const others = [...app.querySelectorAll('.activity-list [data-item-id]:not(.is-ghost)')].filter((card) => card.dataset.itemId !== drag.id);
+    let destination = others.findIndex((card) => {
+      const bounds = card.getBoundingClientRect();
+      return drag.y < bounds.top + bounds.height / 2;
+    });
+    if (destination < 0) destination = others.length;
+    if (destination === drag.destination) return;
+    drag.destination = destination;
+    drag.proposed = reorderDay(drag.before, drag.id, destination);
+    const issue = validateDay(drag.proposed);
+    const positions = cardPositions();
+    const host = app.querySelector('.activity-list');
+    const list = sortedActivities(issue ? drag.before : drag.proposed);
+    host.innerHTML = list.map((item, index) => renderActivity(drag.before, item, index, list)).join('');
+    host.querySelector('[data-item-id="' + CSS.escape(drag.id) + '"]')?.classList.add('drag-placeholder');
+    animateArrangement(positions, '');
+    drag.floating.classList.toggle('drag-invalid', Boolean(issue));
+    drag.status.textContent = issue ? 'Not enough room. Release to keep the original times.' : 'Drop to place here. Overlapping blocks move forward. Escape cancels.';
+  }
+
+  function startScheduleDrag(event) {
+    const handle = event.target.closest('[data-action="drag-activity"]');
+    if (!handle || handle.disabled || event.button !== 0 || scheduleDrag) return;
+    const day = getDay(getPlan(), activeDayKey);
+    const card = handle.closest('[data-item-id]');
+    if (!day || !card) return;
+    event.preventDefault();
+    handle.focus();
+    scheduleDrag = { id: handle.dataset.id, pointer: event.pointerId, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, before: snapshot(day), day, card, bounds: card.getBoundingClientRect(), destination: -1, active: false, proposed: snapshot(day) };
+    app.setPointerCapture(event.pointerId);
+  }
+
+  function moveScheduleDrag(event) {
+    const drag = scheduleDrag;
+    if (!drag || drag.pointer !== event.pointerId) return;
+    event.preventDefault();
+    drag.x = event.clientX;
+    drag.y = event.clientY;
+    if (!drag.active && Math.hypot(drag.x - drag.startX, drag.y - drag.startY) < 6) return;
+    if (!drag.active) {
+      drag.active = true;
+      drag.floating = drag.card.cloneNode(true);
+      drag.floating.removeAttribute('data-item-id');
+      drag.floating.classList.add('drag-floating');
+      drag.floating.setAttribute('aria-hidden', 'true');
+      drag.floating.inert = true;
+      Object.assign(drag.floating.style, { left: drag.bounds.left + 'px', top: drag.bounds.top + 'px', width: drag.bounds.width + 'px', height: drag.bounds.height + 'px' });
+      document.body.append(drag.floating);
+      drag.status = document.createElement('p');
+      drag.status.className = 'drag-status';
+      drag.status.setAttribute('role', 'status');
+      drag.status.setAttribute('aria-live', 'polite');
+      document.body.append(drag.status);
+      document.body.classList.add('schedule-dragging');
+      const scroll = () => {
+        if (scheduleDrag !== drag) return;
+        const amount = drag.y < 70 ? -12 : drag.y > innerHeight - 70 ? 12 : 0;
+        if (amount) { window.scrollBy(0, amount); previewDrag(); }
+        drag.frame = requestAnimationFrame(scroll);
+      };
+      drag.frame = requestAnimationFrame(scroll);
+    }
+    const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    drag.floating.style.transform = 'translate(' + (drag.x - drag.startX) + 'px,' + (drag.y - drag.startY) + 'px)' + (calm ? '' : ' scale(1.035) rotate(' + Math.max(-3, Math.min(3, (drag.x - drag.startX) / 30)) + 'deg)');
+    previewDrag();
+  }
+
+  function finishScheduleDrag(cancelled = false) {
+    const drag = scheduleDrag;
+    if (!drag) return;
+    scheduleDrag = null;
+    if (app.hasPointerCapture(drag.pointer)) app.releasePointerCapture(drag.pointer);
+    cancelAnimationFrame(drag.frame);
+    document.body.classList.remove('schedule-dragging');
+    const positions = cardPositions();
+    if (drag.floating) positions.set(drag.id, drag.floating.getBoundingClientRect());
+    drag.floating?.remove();
+    drag.status?.remove();
+    if (!drag.active) return;
+    const unchanged = JSON.stringify(drag.before.activities) === JSON.stringify(drag.proposed.activities);
+    if (cancelled || unchanged) {
+      render();
+      animateArrangement(positions, drag.id);
+      showToast(cancelled ? 'Drag cancelled. Original times kept.' : 'Item snapped back into place.');
+    } else if (!commitArrangement(drag.day, drag.proposed, drag.id, 'dragging items on ' + drag.day.label, positions)) {
+      render();
+      animateArrangement(positions, drag.id);
+    } else showToast('Placed! Overlapping items moved forward into free time. Undo is available.');
+    focusActivityAction('drag-activity', drag.id);
+  }
+
+  document.addEventListener('pointerdown', startScheduleDrag);
+  document.addEventListener('pointermove', moveScheduleDrag, { passive: false });
+  document.addEventListener('pointerup', (event) => { if (scheduleDrag?.pointer === event.pointerId) finishScheduleDrag(); });
+  document.addEventListener('pointercancel', (event) => { if (scheduleDrag?.pointer === event.pointerId) finishScheduleDrag(true); });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && scheduleDrag) { event.preventDefault(); finishScheduleDrag(true); return; }
+    if (scheduleDrag && (event.key === 'Tab' || event.ctrlKey || event.metaKey)) finishScheduleDrag(true);
+    const handle = event.target.closest('[data-action="drag-activity"]');
+    if (!handle || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    event.preventDefault();
+    moveActivity(handle.dataset.id, event.key === 'ArrowUp' ? -1 : 1);
+    focusActivityAction('drag-activity', handle.dataset.id);
+  });
+  window.addEventListener('blur', () => finishScheduleDrag(true));
+
+  function installGhostControl(item) {
+    if (!item?.occurrenceId) return;
+    const form = activityDialogBody.querySelector('form');
+    if (!form || form.elements.ghost) return;
+    form.querySelector('.dialog-footer').insertAdjacentHTML('beforebegin', '<label class="ghost-control full"><span><input type="checkbox" name="ghost"' + (item.ghost ? ' checked' : '') + '> Ghost mode · temporarily suspend this item</span><small>Keep it for editing without reserving time. Hidden from learner and print. Uncheck when its time slot is ready.</small></label>');
+  }
+
+  function toggleGhost(occurrenceId) {
+    const plan = getPlan();
+    const day = getDay(plan, activeDayKey);
+    const item = day?.activities.find((entry) => entry.occurrenceId === occurrenceId);
+    if (!item) return;
+    const before = snapshot(day);
+    item.ghost = !item.ghost;
+    const issue = validateDay(day);
+    if (issue) {
+      Object.assign(day, before);
+      return showToast('Cannot restore yet. ' + issue + ' Edit the ghost item’s time or suspend the conflicting item.');
+    }
+    const suspended = item.ghost;
+    if (!saveDayChange(plan, day, before, (suspended ? 'suspending' : 'restoring') + ' an item on ' + day.label)) return;
+    render();
+    focusActivityAction('toggle-ghost', occurrenceId);
+    showToast(suspended ? 'Ghost mode: item kept, time freed. Hidden from learner and print.' : 'Item restored to the schedule.');
   }
 
   function exportPlan() {
@@ -2124,6 +2383,8 @@
   }
 
   document.addEventListener('click', (event) => {
+    const publishing = event.target.closest('[data-action="publish-plan"], [data-action="published-plans"]');
+    if (publishing) { window.SchedulePublishing.open(publishing.dataset.action === 'publish-plan' ? getPlan() : null); return; }
     const closeButton = event.target.closest('[data-close-dialog]');
     if (closeButton) {
       closeButton.closest('dialog')?.close();
@@ -2294,6 +2555,8 @@
       if (item) showVideoDialog('edit', item);
     } else if (name === 'remove-activity') removeActivity(action.dataset.id);
     else if (name === 'move-activity') moveActivity(action.dataset.id, action.dataset.direction);
+    else if (name === 'duplicate-activity') duplicateActivity(action.dataset.id);
+    else if (name === 'toggle-ghost') toggleGhost(action.dataset.id);
     else if (name === 'copy-day') copyDay();
     else if (name === 'clear-day') clearDay();
     else if (name === 'hide-day') hideDay();
@@ -2485,6 +2748,28 @@
     render();
   });
 
+  window.SchedulePublishing.setup({ getWorkspace: () => workspace, importDraft: (payload) => {
+    const imageIds = new Map();
+    const images = payload.images.map(sanitizeImage).filter(Boolean).map(image => { const id = makeId('image'); imageIds.set(image.id, id); return { ...image, id }; });
+    const remap = (item) => {
+      const value = snapshot(item);
+      for (const key of ['imageAssetId', 'symbolAssetId', 'symbolStillAssetId']) value[key] = imageIds.get(value[key]) || '';
+      for (const key of ['steps', 'options', 'videos', 'candidates']) if (value[key]) value[key] = value[key].map(remap);
+      return value;
+    };
+    const included = new Set(payload.plan.days.map(day => day.key));
+    const source = { ...payload.plan, days: payload.plan.days.map(day => ({ ...day, activities: day.activities.map(remap) })) };
+    for (const [key] of DAY_KEYS) if (!included.has(key)) source.days.push({ key, removed: true, activities: [] });
+    const plan = sanitizePlan({ ...source, id: makeId('plan'), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    if (!plan) throw new Error('This published plan could not be copied.');
+    plan.days.forEach(day => day.activities.forEach(item => { item.occurrenceId = makeId('scheduled'); }));
+    const before = snapshot(workspace);
+    workspace.images.push(...images); workspace.plans.push(plan);
+    if (!persist()) { workspace = before; throw new Error('This browser could not save the editable copy. Free some browser space and try again.'); }
+    routeToPlan(plan.id, included.values().next().value || 'monday');
+    showToast('Published plan copied to an editable local draft.');
+    return plan;
+  } });
   render();
   if (new URLSearchParams(location.search).get('tool') === 'image') openImageEditor(null);
 })();
