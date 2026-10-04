@@ -33,6 +33,16 @@
 		tileAtPoint,
 		tileElevation
 	} from './hexField';
+	import {
+		heightAboveSea,
+		landscapeFor,
+		type Landscape,
+		type LandscapeState,
+		type PeakSpec,
+		type TreeSpec
+	} from './landscape';
+	import { bandHealth } from './vitals';
+	import { world1Def } from './def';
 	import type { Life } from './content/life';
 
 	const ASPECT = 960 / 480;
@@ -700,7 +710,13 @@
 			ctx!.restore();
 		}
 
-		function drawFeatures() {
+		// Placed features stand on a tile like anything else, so they are collected
+		// and depth-sorted with the land and the creatures rather than painted first:
+		// a mountain or a tree behind one must not cover it, and one in front must.
+		// A feature outranks the land on its own tile, and a creature outranks both.
+		const FEATURE_Z_LIFT = 0.0004;
+
+		function collectFeatures(into: Drawable[]) {
 			for (const placed of book.worldShape.placedFeatures) {
 				const spec = featureById(placed.featureId);
 				if (!spec) continue;
@@ -718,23 +734,28 @@
 				// enough to y=1 that the feature — plus its grounding shadow at
 				// y + size * 0.35 — would spill past the bottom of the canvas.
 				const y = Math.min(projected.y * H, H - size * 0.5 - H * 0.01);
-				ctx!.save();
-				ctx!.globalAlpha = 0.2;
-				ctx!.fillStyle = 'rgb(14, 14, 40)';
-				ctx!.beginPath();
-				ctx!.ellipse(x, y + size * 0.28, size * 0.35, size * 0.07, 0, 0, Math.PI * 2);
-				ctx!.fill();
-				ctx!.restore();
-				const img = spec.sprite ? getFeatureSprite(spec.sprite) : null;
-				if (img) {
-					ctx!.save();
-					ctx!.translate(x, y);
-					ctx!.rotate(placed.rotation);
-					ctx!.drawImage(img, -size / 2, -size / 2, size, size);
-					ctx!.restore();
-				} else {
-					drawFeatureFallback(placed.featureId, x, y, size, placed.rotation);
-				}
+				into.push({
+					z: projected.row / Math.max(1, FIELD_ROWS - 1) + FEATURE_Z_LIFT,
+					render() {
+						ctx!.save();
+						ctx!.globalAlpha = 0.2;
+						ctx!.fillStyle = 'rgb(14, 14, 40)';
+						ctx!.beginPath();
+						ctx!.ellipse(x, y + size * 0.28, size * 0.35, size * 0.07, 0, 0, Math.PI * 2);
+						ctx!.fill();
+						ctx!.restore();
+						const img = spec!.sprite ? getFeatureSprite(spec!.sprite) : null;
+						if (img) {
+							ctx!.save();
+							ctx!.translate(x, y);
+							ctx!.rotate(placed.rotation);
+							ctx!.drawImage(img, -size / 2, -size / 2, size, size);
+							ctx!.restore();
+						} else {
+							drawFeatureFallback(placed.featureId, x, y, size, placed.rotation);
+						}
+					}
+				});
 			}
 		}
 
@@ -931,6 +952,208 @@
 			}
 		}
 
+		// ── the land's answer to the world ───────────────────────────────────────
+		//
+		// Forests and mountains are read from state (see landscape.ts), not placed.
+		// They cannot live in the sediment bake: that is rebuilt only when the silt
+		// changes, and the plants' health, the world's complexity and its deaths all
+		// move without it. They are also drawn as depth-sorted objects alongside the
+		// creatures rather than painted under them, so a tree in front of a creature
+		// stands in front of it.
+		const TILE_W = HEX_SIZE * Math.sqrt(3);
+		const LANDSCAPE_REBUILD_MS = 120;
+		let landscape: Landscape | null = null;
+		let landscapeGrid: SedimentGrid | null = null;
+		let landscapeKey = '';
+		let landscapeAt = -Infinity;
+
+		function landscapeState(): LandscapeState {
+			const { bands, bandFalloff } = world1Def.stock;
+			const stocks = book.stocks;
+			return {
+				moistureHealth: bandHealth(stocks.moisture, bands.moisture[0], bands.moisture[1], bandFalloff) / 100,
+				nutrientHealth: bandHealth(stocks.nutrients, bands.nutrients[0], bands.nutrients[1], bandFalloff) / 100,
+				stability: book.stability,
+				complexity: book.complexity,
+				deaths: book.deadCount
+			};
+		}
+
+		function currentLandscape(nowMs: number): Landscape {
+			const grid = book.worldShape.sedimentGrid;
+			const state = landscapeState();
+			// Quantised, so the land does not rebuild for a change nobody could see.
+			const key = [
+				Math.round(state.moistureHealth * 40),
+				Math.round(state.nutrientHealth * 40),
+				Math.round(state.stability / 4),
+				Math.round(state.complexity),
+				state.deaths
+			].join(':');
+			const stale = !landscape || grid !== landscapeGrid || key !== landscapeKey;
+			// A live pour hands over a new grid every frame, like the sediment bake it
+			// sits beside; trail it by a beat rather than rebuild at frame rate.
+			if (stale && (!landscape || !isPouring || nowMs - landscapeAt >= LANDSCAPE_REBUILD_MS)) {
+				landscape = landscapeFor(fieldTiles(grid), state);
+				landscapeGrid = grid;
+				landscapeKey = key;
+				landscapeAt = nowMs;
+			}
+			return landscape!;
+		}
+
+		/** Green when the plants' needs are met, going to straw as they are not. */
+		function leafColour(vigor: number, conifer: boolean, shade: number): [number, number, number] {
+			const healthy = conifer ? [52, 112, 82] : [78, 146, 88];
+			const parched = conifer ? [112, 122, 74] : [176, 154, 86];
+			return [
+				lerp(parched[0], healthy[0], vigor) * shade,
+				lerp(parched[1], healthy[1], vigor) * shade,
+				lerp(parched[2], healthy[2], vigor) * shade
+			];
+		}
+
+		function drawTree(
+			tree: TreeSpec,
+			tileX: number,
+			tileY: number,
+			vigor: number,
+			haze: number,
+			T: number
+		) {
+			const unit = HEX_SIZE * W;
+			// a stressed forest is stunted as well as pale
+			const h = unit * 1.7 * tree.size * (0.55 + 0.45 * vigor);
+			const sway = reduce ? 0 : Math.sin(T * 0.9 + tree.phase) * h * 0.035;
+			const bx = (tileX + tree.dx * TILE_W) * W;
+			const by = (tileY + tree.dy * TILE_W * CAMERA_TILT) * H;
+
+			ctx!.save();
+			ctx!.globalAlpha *= 0.2 * (1 - haze);
+			ctx!.fillStyle = 'rgb(16, 46, 66)';
+			ctx!.beginPath();
+			ctx!.ellipse(bx + h * 0.12, by, h * 0.3, h * 0.3 * CAMERA_TILT, 0, 0, TAU);
+			ctx!.fill();
+			ctx!.restore();
+
+			if (tree.conifer) {
+				ctx!.fillStyle = hazed([84, 62, 48], haze, SKY_HAZE);
+				ctx!.fillRect(bx - h * 0.04, by - h * 0.16, h * 0.08, h * 0.16);
+				for (let tier = 0; tier < 3; tier++) {
+					const top = by - h * (1 - tier * 0.24);
+					const spread = h * (0.2 + tier * 0.1);
+					const lit = leafColour(vigor, true, 1 + (2 - tier) * 0.06);
+					ctx!.fillStyle = hazed(lit, haze, SKY_HAZE);
+					ctx!.beginPath();
+					ctx!.moveTo(bx + sway * (1 - tier * 0.3), top);
+					ctx!.lineTo(bx - spread, top + h * 0.36);
+					ctx!.lineTo(bx + spread, top + h * 0.36);
+					ctx!.closePath();
+					ctx!.fill();
+				}
+			} else {
+				ctx!.fillStyle = hazed([96, 72, 52], haze, SKY_HAZE);
+				ctx!.fillRect(bx - h * 0.04, by - h * 0.42, h * 0.08, h * 0.42);
+				const cx = bx + sway;
+				const cy = by - h * 0.66;
+				ctx!.fillStyle = hazed(leafColour(vigor, false, 0.86), haze, SKY_HAZE);
+				ctx!.beginPath();
+				ctx!.ellipse(cx + h * 0.06, cy + h * 0.05, h * 0.34, h * 0.3, 0, 0, TAU);
+				ctx!.fill();
+				ctx!.fillStyle = hazed(leafColour(vigor, false, 1.04), haze, SKY_HAZE);
+				ctx!.beginPath();
+				ctx!.ellipse(cx - h * 0.04, cy - h * 0.03, h * 0.3, h * 0.27, 0, 0, TAU);
+				ctx!.fill();
+			}
+		}
+
+		const ROCK_LIT = [154, 148, 142] as const;
+		const ROCK_SHADE = [108, 104, 106] as const;
+		const SNOW_LIT = [246, 249, 252] as const;
+		const SNOW_SHADE = [208, 218, 230] as const;
+
+		function drawPeak(peak: PeakSpec, tileX: number, tileY: number, haze: number) {
+			const unit = HEX_SIZE * W;
+			const cx = tileX * W;
+			const cy = tileY * H;
+			const halfBase = unit * 1.15;
+			const rise = unit * (1.0 + 2.3 * peak.height);
+			const flat = halfBase * CAMERA_TILT * 0.4;
+			const apex = { x: cx + peak.lean * halfBase * 0.3, y: cy - rise };
+			const left = { x: cx - halfBase, y: cy + flat * 0.4 };
+			const right = { x: cx + halfBase, y: cy + flat * 0.4 };
+			const foot = { x: cx + peak.lean * halfBase * 0.1, y: cy + flat * 1.6 };
+			const along = (a: { x: number; y: number }, b: { x: number; y: number }, t: number) => ({
+				x: lerp(a.x, b.x, t),
+				y: lerp(a.y, b.y, t)
+			});
+			const face = (pts: { x: number; y: number }[], colour: readonly [number, number, number]) => {
+				ctx!.fillStyle = hazed(colour, haze, SKY_HAZE);
+				ctx!.beginPath();
+				pts.forEach((p, i) => (i === 0 ? ctx!.moveTo(p.x, p.y) : ctx!.lineTo(p.x, p.y)));
+				ctx!.closePath();
+				ctx!.fill();
+			};
+
+			ctx!.save();
+			ctx!.globalAlpha *= 0.22 * (1 - haze);
+			ctx!.fillStyle = 'rgb(16, 46, 66)';
+			ctx!.beginPath();
+			ctx!.ellipse(cx + halfBase * 0.35, cy + flat * 1.2, halfBase * 1.1, halfBase * 0.34, 0, 0, TAU);
+			ctx!.fill();
+			ctx!.restore();
+
+			face([apex, left, foot], ROCK_LIT);
+			face([apex, foot, right], ROCK_SHADE);
+			if (peak.snow > 0) {
+				const f = 0.2 + 0.5 * peak.snow;
+				// a ragged lower edge, so the cap is weather and not a triangle laid on a triangle
+				const lowL = along(apex, left, f);
+				const lowM = along(apex, foot, f * 1.15);
+				const lowR = along(apex, right, f);
+				face([apex, lowL, along(lowL, lowM, 0.5), lowM], SNOW_LIT);
+				face([apex, lowM, along(lowM, lowR, 0.5), lowR], SNOW_SHADE);
+			}
+		}
+
+		/** What stands on a faded rim tile fades with it, so the island dissolves instead of keeping a hard edge of trees. */
+		function withEdge(edge: number, draw: () => void) {
+			ctx!.save();
+			ctx!.globalAlpha *= edge;
+			draw();
+			ctx!.restore();
+		}
+
+		function collectLandscape(T: number, into: Drawable[]) {
+			const { vigor, tiles } = currentLandscape(T * 1000);
+			const origin = fieldOrigin();
+			const grid = book.worldShape.sedimentGrid;
+			for (const tile of tiles) {
+				const elevation = tileElevation(grid, tile.col, tile.row);
+				const { q, r } = offsetToAxial(tile.col, tile.row);
+				const p = projectHex(q, r, elevation, origin);
+				const distance = 1 - tile.row / Math.max(1, FIELD_ROWS - 1);
+				const haze = distance * FIELD_HAZE_LAND;
+				// the same row-based depth the creatures use, so they sort together
+				const z = tile.row / Math.max(1, FIELD_ROWS - 1);
+				// only tall enough to matter if it is actually high ground
+				if (tile.peak && heightAboveSea(elevation) > 0) {
+					const peak = tile.peak;
+					into.push({ z, render: () => withEdge(tile.edge, () => drawPeak(peak, p.x, p.y, haze)) });
+				}
+				if (tile.trees.length) {
+					const trees = [...tile.trees].sort((a, b) => a.dy - b.dy);
+					into.push({
+						z,
+						render: () =>
+							withEdge(tile.edge, () => {
+								for (const tree of trees) drawTree(tree, p.x, p.y, vigor, haze, T);
+							})
+					});
+				}
+			}
+		}
+
 		// Back-to-front within a pass. The four hand-ordered buckets stay two passes,
 		// split at the water's surface — the glaze and ripples are a film on it, not
 		// an object in the volume, so they keep their fixed place between. Inside each
@@ -938,6 +1161,11 @@
 		// distance: a creature at the back could draw over one at the front.
 		function drawSceneLayers(layers: SpawnLayer[], T: number) {
 			const items: Drawable[] = [];
+			// the land goes in first, so on a tie a creature stands in front of it
+			if (layers.includes('floor')) {
+				collectLandscape(T, items);
+				collectFeatures(items);
+			}
 			collectLife(layers, T, items);
 			collectPlacedCreatures(layers, T, items);
 			items.sort(byDepth);
@@ -1227,7 +1455,7 @@
 				const row = Math.min(3, rowBase + (Math.sin(T * 0.7 + i) > 0.7 ? 1 : 0));
 				const placed = book.worldShape.placedFeatures[i % Math.max(1, book.worldShape.placedFeatures.length)];
 				// an aura anchored to a feature has to stand on the same tile the
-				// feature itself does — standOn, the way drawFeatures places the
+				// feature itself does — standOn, the way collectFeatures places the
 				// feature sprite — or it drifts off the thing it belongs to. This used
 				// to ride the old floor projection, which this camera replaced; there's
 				// also no per-distance scale to apply any more, so size is fixed.
@@ -1286,12 +1514,14 @@
 			ensureSedimentBaked(tMs, !isPouring);
 			ctx!.drawImage(sedimentCanvas, 0, 0, W, H);
 			drawSedimentCast(T, isPouring ? 1 : shine(tending) * 0.45, isPouring ? pourPoint : null);
-			drawFeatures();
+			// Everything that stands on a tile is one depth-sorted list — land, features,
+			// swimmers and walkers — so nothing in front is covered by something behind.
+			// Only what flies is left for after the ripples, which are a film on the water.
+			drawSceneLayers(['water', 'floor', 'shore'], T);
 			drawFeatureAuras(T, shine(witnessed));
-			drawSceneLayers(['water', 'floor'], T);
 			drawAnimatorSwimmer(T, shine(tending));
 			drawWaterRipples(T, m, shine(tending * 0.6 + m * 0.4));
-			drawSceneLayers(['shore', 'air'], T);
+			drawSceneLayers(['air'], T);
 			drawRain(T);
 			drawWitchMotes(T, shine(tending));
 			drawOverlays(T);

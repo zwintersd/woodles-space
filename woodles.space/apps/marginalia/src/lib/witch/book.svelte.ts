@@ -472,6 +472,10 @@ export class Book {
 	get stability(): number {
 		return this.v, this.world.stability;
 	}
+	/** How many life are dead right now and have not yet returned. */
+	get deadCount(): number {
+		return this.v, Object.keys(this.world.state.deaths).length;
+	}
 	get quiet(): boolean {
 		return this.v, this.world.quiet;
 	}
