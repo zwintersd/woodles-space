@@ -1209,6 +1209,7 @@
           '<input type="hidden" name="optionPictogram">' +
         '</fieldset>' +
         (library ? '<div class="field full"><span id="choiceLibraryLabel">Or add from your activity library (keeps its picture)</span><div class="choice-library" role="group" aria-labelledby="choiceLibraryLabel">' + library + '</div></div>' : '') +
+        '<div class="field full"><span id="choiceCategoriesLabel">Or offer a suggestion category</span><p class="muted">Pick a category to offer its suggestions when the learner chooses it. Saved schedules keep their own copy of the pool.</p><div class="choice-library" role="group" aria-labelledby="choiceCategoriesLabel">' + workspace.suggestionPools.map((pool) => [...new Set(pool.candidates.filter((candidate) => candidate.enabled).map((candidate) => candidate.category))].map((category) => '<button class="choice-library-item" type="button" data-action="add-category-option" data-pool="' + esc(pool.id) + '" data-category="' + esc(category) + '">✦ ' + esc(category) + ' · ' + esc(pool.title) + '</button>').join('')).join('') + (workspace.suggestionPools.length ? '' : '<p class="muted">Create a suggestion pool in Library to make its categories available here.</p>') + '</div></div>' +
         '<div class="error-text full" id="choiceError" role="status" aria-live="polite"></div>' +
         '<div class="dialog-footer full"><button class="button secondary" type="button" data-close-dialog>Cancel</button><button class="button primary" type="submit">' + (editing ? 'Save choice' : 'Add choice') + '</button></div>' +
       '</form>';
@@ -1232,7 +1233,7 @@
       errorNode.textContent = 'A choice can have up to ' + MAX_CHOICE_OPTIONS + ' options.';
       return false;
     }
-    choiceDraft.push({ ...window.ScheduleStudio.symbolFields(option), id: makeId('option'), title: option.title, icon: option.icon || '⭐', pictogram: option.pictogram || '', imageAssetId: option.imageAssetId || '', color: option.color || COLORS[choiceDraft.length % COLORS.length], familiarity: '' });
+    choiceDraft.push({ ...window.ScheduleStudio.symbolFields(option), id: makeId('option'), title: option.title, icon: option.icon || '⭐', pictogram: option.pictogram || '', imageAssetId: option.imageAssetId || '', color: option.color || COLORS[choiceDraft.length % COLORS.length], familiarity: '', ...(option.kind === 'suggestion' ? { ...snapshot(option), id: makeId('option') } : {}) });
     errorNode.textContent = '';
     renderChoiceDraft();
     return true;
@@ -1269,6 +1270,10 @@
     if (choiceDraft.length < 2) {
       errorNode.textContent = 'Add at least two options so there is something to choose.';
       form.elements.optionTitle.focus();
+      return;
+    }
+    if (choiceDraft.some((option) => option.kind === 'suggestion' && !option.candidates.some((candidate) => candidate.enabled && candidate.duration <= Math.min(option.duration, duration)))) {
+      errorNode.textContent = 'Each suggestion category needs at least one idea that fits the choice length.';
       return;
     }
     const values = { start, duration, title: cleanText(data.get('title'), 100, ''), prompt: cleanText(data.get('prompt'), 200, ''), options: choiceDraft.map((option) => ({ ...option })) };
@@ -2194,6 +2199,18 @@
     } else if (name === 'suggestion-reset-progress') resetSuggestionProgress();
     else if (name === 'add-choice') showChoiceDialog('new');
     else if (name === 'add-choice-option') addComposedOption(action.form);
+    else if (name === 'add-category-option') {
+      const pool = workspace.suggestionPools.find((entry) => entry.id === action.dataset.pool);
+      if (pool) {
+        const duration = validDuration(action.form.elements.duration.value, 15);
+        const candidates = pool.candidates.filter((candidate) => candidate.enabled && candidate.category === action.dataset.category);
+        if (!candidates.some((candidate) => candidate.duration <= duration)) {
+          document.getElementById('choiceError').textContent = 'No suggestions in this category fit the choice length. Increase the length or edit the pool.';
+          return;
+        }
+        addChoiceOption({ ...pool, kind: 'suggestion', poolId: pool.id, title: action.dataset.category, prompt: 'Find an idea in ' + action.dataset.category + '.', icon: '✦', duration, candidates, allowCategoryChoice: false });
+      }
+    }
     else if (name === 'add-library-option') {
       const activity = workspace.activities.find((entry) => entry.id === action.dataset.id);
       if (activity) addChoiceOption(activity);

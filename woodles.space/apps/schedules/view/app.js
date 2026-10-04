@@ -141,7 +141,13 @@
         '<div class="copy"><h2>' + esc(title) + '</h2><p class="sub">' + esc(step.prompt || 'Pick what to do.') + '</p></div>' +
         (count ? '<div class="chips" role="group" aria-label="Options for ' + esc(title) + '" style="--chip-columns:' + (count <= 4 ? count : 3) + ';--chip-columns-narrow:' + (count === 4 ? 2 : Math.min(count, 3)) + '">' + chips + '</div>' : '') +
         doneButton(step, title, done) +
-      '</div></article></li>';
+      '</div>' + selectedCategoryMarkup(step, step.occurrenceId, progress) + '</article></li>';
+  }
+
+  function selectedCategoryMarkup(item, key, progress) {
+    const selected = item.options?.find((option) => option.id === progress.picks[key] && option.kind === 'suggestion');
+    if (!selected) return '';
+    return '<div class="category-suggestion">' + suggestionMarkup({ ...selected, occurrenceId: key + ':' + selected.id, duration: Math.min(selected.duration, item.duration || selected.duration), from: item.from || 0, nested: true }, progress) + '</div>';
   }
 
   function videoCardState(card, picked) {
@@ -181,7 +187,7 @@
     return '<ol class="activity-steps">' + item.steps.map((step) => {
       const key = item.occurrenceId + ':' + step.id;
       if (step.kind === 'suggestion') return '<li>' + suggestionMarkup({ ...step, occurrenceId: key, duration: Math.min(step.duration, item.duration), nested: true }, progress) + '</li>';
-      return '<li><span class="step-heading">' + visualMarkup(step, 28) + '<strong>' + esc(step.title) + '</strong></span>' + (step.kind === 'choice' ? '<div class="chips" role="group" aria-label="Options for ' + esc(step.title) + '">' + step.options.map((option) => '<button class="chip" type="button" data-choice="' + esc(key) + '" data-option="' + esc(option.id) + '" aria-pressed="' + (progress.picks[key] === option.id) + '"><span class="chip-art">' + visualMarkup(option, 28) + '</span>' + esc(option.title) + '</button>').join('') + '</div>' : '') + '</li>';
+      return '<li><span class="step-heading">' + visualMarkup(step, 28) + '<strong>' + esc(step.title) + '</strong></span>' + (step.kind === 'choice' ? '<div class="chips" role="group" aria-label="Options for ' + esc(step.title) + '">' + step.options.map((option) => '<button class="chip" type="button" data-choice="' + esc(key) + '" data-option="' + esc(option.id) + '" aria-pressed="' + (progress.picks[key] === option.id) + '"><span class="chip-art">' + visualMarkup(option, 28) + '</span>' + esc(option.title) + '</button>').join('') + '</div>' + selectedCategoryMarkup({ ...step, duration: item.duration }, key, progress) : '') + '</li>';
     }).join('') + '</ol>';
   }
 
@@ -470,9 +476,10 @@
       const id = button.dataset.choice;
       if (progress.picks[id] === button.dataset.option) delete progress.picks[id];
       else progress.picks[id] = button.dataset.option;
-      writeDayProgress(progress);
-      button.closest('.chips').querySelectorAll('.chip').forEach((chip) => chip.setAttribute('aria-pressed', String(chip.dataset.option === progress.picks[id])));
-      tick();
+      if (writeDayProgress(progress)) {
+        render();
+        [...el('timeline').querySelectorAll('[data-choice]')].find((chip) => chip.dataset.choice === id && chip.dataset.option === button.dataset.option)?.focus({ preventScroll: true });
+      }
     } else if (button.dataset.videoStep) {
       const progress = readDayProgress();
       const id = button.dataset.videoStep;

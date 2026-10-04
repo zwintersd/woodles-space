@@ -131,11 +131,11 @@ window.ScheduleStudio = (() => {
   }
 
   function sanitizeActivityStep(value, depth = 0) {
-    const step = sanitizeChoiceOption(value);
+    const step = sanitizeChoiceOption(value, depth);
     if (!step) return null;
     if (value.kind === 'suggestion' && depth < 3) return { ...step, ...sanitizeSuggestion(value, depth + 1), kind: 'suggestion', poolId: cleanText(value.poolId, 100, '') };
     return { ...step, kind: value.kind === 'choice' ? 'choice' : 'task',
-      options: (Array.isArray(value.options) ? value.options : []).map(sanitizeChoiceOption).filter(Boolean).slice(0, MAX_CHOICE_OPTIONS) };
+      options: (Array.isArray(value.options) ? value.options : []).map((option) => sanitizeChoiceOption(option, depth)).filter(Boolean).slice(0, MAX_CHOICE_OPTIONS) };
   }
 
   function activityStepsMarkup(item, visual) {
@@ -149,7 +149,7 @@ window.ScheduleStudio = (() => {
     return tag ? '<span class="familiarity is-' + value + '"><span aria-hidden="true">' + tag.symbol + '</span> ' + tag.label + '</span>' : '';
   }
 
-  function sanitizeChoiceOption(value) {
+  function sanitizeChoiceOption(value, depth = 0) {
     if (!value || typeof value !== 'object' || !String(value.title || '').trim()) return null;
     return {
       ...symbolFields(value),
@@ -159,7 +159,8 @@ window.ScheduleStudio = (() => {
       pictogram: cleanText(value.pictogram, 300, ''),
       imageAssetId: cleanText(value.imageAssetId, 100, ''),
       color: validColor(value.color),
-      familiarity: validFamiliarity(value.familiarity)
+      familiarity: validFamiliarity(value.familiarity),
+      ...(value.kind === 'suggestion' && depth < 3 ? { ...sanitizeSuggestion(value, depth + 1), kind: 'suggestion', title: cleanText(value.title, 60, 'Category'), poolId: cleanText(value.poolId, 100, ''), allowCategoryChoice: false } : {})
     };
   }
 
@@ -321,7 +322,7 @@ window.ScheduleStudio = (() => {
               start: validTime(entry.start, '09:00'),
               duration: validDuration(entry.duration, 15),
               color: validColor(entry.color),
-              options: (Array.isArray(entry.options) ? entry.options : []).map(sanitizeChoiceOption).filter(Boolean).slice(0, MAX_CHOICE_OPTIONS)
+              options: (Array.isArray(entry.options) ? entry.options : []).map((option) => sanitizeChoiceOption(option)).filter(Boolean).slice(0, MAX_CHOICE_OPTIONS)
             };
           }
           if (entry && entry.kind === 'video') {
@@ -411,9 +412,9 @@ window.ScheduleStudio = (() => {
   // each option of a choice, or each video's thumbnail. Open slots have none.
   function itemVisuals(item) {
     if (Array.isArray(item.candidates)) return [item, ...item.candidates.flatMap((candidate) => itemVisuals(candidate))];
-    if (item.kind === 'choice') return [item, ...item.options];
+    if (item.kind === 'choice') return [item, ...item.options.flatMap(itemVisuals)];
     if (item.kind === 'video') return item.videos;
-    return item.kind === 'open-slot' ? [] : [item, ...(item.steps || []).flatMap(itemVisuals), ...(item.options || [])];
+    return item.kind === 'open-slot' ? [] : [item, ...(item.steps || []).flatMap(itemVisuals), ...(item.options || []).flatMap(itemVisuals)];
   }
 
   // Stable paths distinguish suggestion steps in each activity occurrence,
@@ -422,7 +423,8 @@ window.ScheduleStudio = (() => {
     const budget = Math.min(item.duration || duration, duration);
     const own = item.kind === 'suggestion' ? [{ ...item, occurrenceId: key, duration: budget, nested: item.occurrenceId !== key }] : [];
     return [...own, ...(item.steps || []).flatMap((step) => suggestionItems(step, key + ':' + step.id, budget)),
-      ...(item.candidates || []).flatMap((candidate) => suggestionItems(candidate, key + ':' + candidate.id, budget))];
+      ...(item.candidates || []).flatMap((candidate) => suggestionItems(candidate, key + ':' + candidate.id, budget)),
+      ...(item.options || []).flatMap((option) => suggestionItems(option, key + ':' + option.id, budget))];
   }
 
   function itemImageIds(item) {
