@@ -1,3 +1,4 @@
+import { addScheduleItem, openScheduleTools, openActivitySection, openVisualPicker } from './support/schedule-planner';
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -24,6 +25,7 @@ async function upload(page: Page) {
   await expect(page.locator('#customSymbolStatus')).toContainText('3 symbols added');
 }
 async function pick(page: Page, selector: string, name = 'happy_cat') {
+  if (selector.includes('data-sprite-target="form"')) await openVisualPicker(page, selector.startsWith('#choiceForm') ? '#choiceForm' : '#activityForm');
   await page.locator(selector).click();
   await page.getByRole('button', { name: `Use :${name}:`, exact: true }).click();
   await expect(page.locator('#customSymbolDialog')).not.toBeVisible();
@@ -85,9 +87,10 @@ test('custom symbols survive nested activity use, removal and week transfers; GI
   await page.locator('[data-action="manage-custom-symbols"]').click();
   await upload(page);
   await page.locator('[data-library-action="close"]').click();
-  await page.locator('[data-action="add-activity"]').first().click();
+  await addScheduleItem(page, 'activity');
   await page.locator('#activityForm [name="title"]').fill('Sprite routine');
   await pick(page, '#activityForm [data-sprite-target="form"][data-action="pick-custom-symbol"]', 'sparkle');
+  await openActivitySection(page, 'steps');
   await page.locator('[data-action="add-activity-step"]').click();
   await page.locator('[data-step-field="title"]').fill('Choose a sprite');
   await pick(page, '[data-sprite-target="step"][data-action="pick-custom-symbol"]');
@@ -97,6 +100,7 @@ test('custom symbols survive nested activity use, removal and week transfers; GI
     await page.locator(`[data-step-field="title"][data-option-index="${i}"]`).fill(title);
     await pick(page, `[data-sprite-target="step-option"][data-option-index="${i}"][data-action="pick-custom-symbol"]`);
   }
+  await openActivitySection(page, 'steps');
   await page.locator('[data-action="add-activity-step"]').click();
   await page.locator('[data-step-field="title"][data-step-index="1"]').fill('Recommended sprite');
   await page.locator('[data-step-kind="1"]').selectOption('suggestion');
@@ -110,7 +114,7 @@ test('custom symbols survive nested activity use, removal and week transfers; GI
   await page.locator('#suggestionForm [name="animation"]').selectOption('instant');
   await page.locator('#suggestionForm button[type="submit"]').click();
   await page.locator('#activityForm button[type="submit"]').click();
-  await page.locator('[data-action="add-choice"]').first().click();
+  await addScheduleItem(page, 'choice');
   await page.locator('#optionTitle').fill('Sprite option');
   await pick(page, '#choiceForm [data-sprite-target="form"][data-action="pick-custom-symbol"]');
   await page.locator('[data-action="add-choice-option"]').click();
@@ -132,6 +136,7 @@ test('custom symbols survive nested activity use, removal and week transfers; GI
   await page.getByRole('button', { name: 'Remove :happy_cat: from library', exact: true }).click();
   await page.locator('[data-library-action="close"]').click();
   const exporting = page.waitForEvent('download');
+  await openScheduleTools(page, 'plan');
   await page.locator('[data-action="export-plan"]').click();
   const download = await exporting;
   await page.locator('#importFile').setInputFiles((await download.path())!);

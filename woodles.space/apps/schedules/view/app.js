@@ -204,7 +204,7 @@
         (accepted && choice.url ? '<a class="watch" href="' + esc(choice.url) + '" target="_blank" rel="noopener noreferrer">▶ Open ' + esc(choice.title) + '</a>' : '') + '</div>' : '';
     const done = progress.done.has(step.occurrenceId);
     return (step.nested ? '<section class="nested-suggestion suggestion" data-suggestion-id="' + esc(step.occurrenceId) + '" aria-label="Suggestions for ' + esc(step.title) + '">' : '<li class="step suggestion' + (done ? ' is-done' : '') + '" data-suggestion-id="' + esc(step.occurrenceId) + '" data-id="' + esc(step.occurrenceId) + '"><div class="time">' + clockLabel(step.from) + '<small>' + step.duration + ' min</small></div>') +
-      '<article class="box"><span class="nowtag">NOW</span><div class="video-head">' + (step.symbolAssetId ? '<span aria-hidden="true">' + visualMarkup(step, 28) + '</span>' : '') + '<div class="copy"><span class="category">ACTIVITY SURPRISE</span><h2>' + esc(step.title) + '</h2><p class="sub">' + esc(step.prompt) + '</p></div>' +
+      '<article class="box"><span class="nowtag">NOW</span><div class="video-head">' + (step.symbolAssetId || imageSource(step) ? '<span aria-hidden="true">' + visualMarkup(step, 28) + '</span>' : '') + '<div class="copy"><span class="category">ACTIVITY SURPRISE</span><h2>' + esc(step.title) + '</h2><p class="sub">' + esc(step.prompt) + '</p></div>' +
       (accepted && !step.nested ? doneButton(step, choice.title, done) : '') + '</div>' +
       '<div class="suggestion-stage" aria-busy="' + spinning + '"><div class="suggestion-window" aria-hidden="true"><div class="suggestion-reel">' +
       (reel ? reel.map(reelCard).join('') : choice && !state.skipped ? reelCard(choice) : '<div class="suggestion-reel-card"><span class="suggestion-spark">✦</span><strong>Your next idea?</strong></div>') + '</div></div>' + result + '</div>' +
@@ -373,7 +373,7 @@
     if (!day) {
       document.title = plan.learner + ' · Visual schedule';
       el('intro').textContent = plan.name;
-      showNotice('No days in this plan', 'Every day was deleted from this weekly plan. Add a day back in the planner.', false);
+      showNotice('All days are hidden', 'Add a day back in the planner to use its saved schedule.', false);
       tick();
       return;
     }
