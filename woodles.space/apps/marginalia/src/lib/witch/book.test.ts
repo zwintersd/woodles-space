@@ -14,6 +14,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { Life } from './content/life';
+import { world1Life } from './content/life';
 import { STAGE_SECONDS, ATTENTION_START, ATTENTION_COSTS } from './tuning';
 import { visibleLifeForWorldspace } from './worldShape';
 import { conditions } from './content/conditions';
@@ -269,10 +270,23 @@ describe('Book — achievements', () => {
 		expect(b.achievementsUnlocked).toContain('known');
 	});
 
-	it('a fully-known category unlocks its mastery achievement', () => {
+	it('one Known life does not master a category the world has more of', () => {
 		const b = new Book();
 		b.essence = 100;
 		b.writeCondition('holding'); // salt_deposit is the only aquatic life revealed
+		b.attend('salt_deposit');
+		run(b, 1000);
+		expect(b.categoryMastered.aquatic).toBeUndefined();
+		expect(b.achievementsUnlocked).not.toContain('mastery-aquatic');
+	});
+
+	it('a category is mastered when every authored member is Known', () => {
+		const b = new Book();
+		b.essence = 100;
+		for (const l of world1Life) {
+			if (l.category === 'aquatic' && l.id !== 'salt_deposit') b.world.state.observation[l.id] = STAGE_KNOWN;
+		}
+		b.writeCondition('holding');
 		b.attend('salt_deposit');
 		run(b, 1000);
 		expect(b.categoryMastered.aquatic).toBe(true);

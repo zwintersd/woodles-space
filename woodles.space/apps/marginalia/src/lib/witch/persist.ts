@@ -37,6 +37,7 @@ export interface BookSave {
 	interventionsDone: Record<string, number>; // lifeId -> spoken line index
 	interventionLoad: number;
 	equilibriumSeconds: number;
+	complexityPeak: number;
 	// recall/fluency — the Known endgame. Both are additive fields, so an older
 	// save missing them rides the merge onto emptySave() (see the header rule).
 	recall: Record<string, number>;
@@ -95,6 +96,7 @@ export function emptySave(): BookSave {
 		interventionsDone: {},
 		interventionLoad: 0,
 		equilibriumSeconds: 0,
+		complexityPeak: 0,
 		recall: {},
 		fluency: {},
 		attentionCapacity: ATTENTION_START,
