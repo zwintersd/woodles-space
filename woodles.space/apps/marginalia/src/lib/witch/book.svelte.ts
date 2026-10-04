@@ -515,6 +515,8 @@ export class Book {
 					this.unlockAchievement('held-itself');
 					break;
 				case 'quiet':
+				case 'death':
+				case 'return':
 					if (e.note) this.pushFieldNote(e.note);
 					break;
 				case 'intervention':
@@ -890,6 +892,7 @@ export class Book {
 			interventionLoad: w.interventionLoad,
 			equilibriumSeconds: w.equilibriumSeconds,
 			complexityPeak: w.complexityPeak,
+			deaths: { ...w.deaths },
 			recall: { ...w.recall },
 			fluency: { ...w.fluency },
 			attentionCapacity: w.attentionCapacity,
@@ -931,6 +934,7 @@ export class Book {
 			interventionLoad: s.interventionLoad ?? 0,
 			equilibriumSeconds: s.equilibriumSeconds ?? 0,
 			complexityPeak: s.complexityPeak ?? 0,
+			deaths: { ...(s.deaths ?? {}) },
 			recall: { ...(s.recall ?? {}) },
 			fluency: { ...(s.fluency ?? {}) },
 			attentionCapacity: s.attentionCapacity,

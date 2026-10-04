@@ -48,6 +48,25 @@ export interface VitalityDef {
 	floor: number;
 }
 
+/**
+ * Loss, and what it feeds (DESIGN §1.4). A life stressed for long enough in a
+ * fragile world dies: it leaves the scene, pulses nutrients back into the
+ * soil, and — once the stress that killed it has cleared — returns. What is
+ * *known* about it is never lost; only the living thing comes and goes.
+ */
+export interface DeathDef {
+	/** Severity-seconds of accumulated stress before a life dies. Decays when unstressed. */
+	stressSeconds: number;
+	/** Death only happens while stability is below this — a healthy world holds its dying. */
+	stabilityBelow: number;
+	/** Added to the nutrients stock when a life dies. */
+	nutrientPulse: number;
+	/** Seconds a life stays gone, at minimum, before it can return. */
+	returnAfterSec: number;
+	/** Vitality a returning life starts at. */
+	returnVitality: number;
+}
+
 /** Shape B, Eased Stat — favor's target is a live formula, not a constant. */
 export interface FavorDef {
 	baseTarget: number;
@@ -126,6 +145,9 @@ export interface FieldNotesDef {
 	byDomain: Record<LifeDomain, Partial<Record<number, readonly string[]>>>;
 	equilibrium: readonly string[];
 	quiet: readonly string[];
+	/** Absent means a death or return is silent. */
+	death?: readonly string[];
+	return?: readonly string[];
 	categoryMastery: Record<LifeCategory, readonly string[]>;
 }
 
@@ -142,6 +164,8 @@ export interface MarginaliaDef {
 	stage: StageDef;
 	stock: StockDef;
 	vitality: VitalityDef;
+	/** Absent means nothing ever dies. */
+	death?: DeathDef;
 	favor: FavorDef;
 	/** Shape D itself — already typed by @woodles/dynamics, nothing to add. */
 	recall: DecayRestoreOptions;
