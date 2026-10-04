@@ -56,12 +56,12 @@ export async function allowAttempt(req: Request, scope: string) {
   const key = await digest(scope + ':' + ip.split(',')[0].trim());
   const window = Math.floor(Date.now() / 900_000);
   const sql = db();
-  await sql`DELETE FROM schedule_attempts WHERE window < ${window - 2}`;
+  await sql`DELETE FROM schedule_attempts WHERE "window" < ${window - 2}`;
   await sql`DELETE FROM schedule_sessions WHERE expires_at <= now()`;
-  const rows = await sql`INSERT INTO schedule_attempts (key, window, attempts) VALUES (${key}, ${window}, 1)
-    ON CONFLICT (key, window) DO UPDATE SET attempts = schedule_attempts.attempts + 1 RETURNING attempts`;
+  const rows = await sql`INSERT INTO schedule_attempts (key, "window", attempts) VALUES (${key}, ${window}, 1)
+    ON CONFLICT (key, "window") DO UPDATE SET attempts = schedule_attempts.attempts + 1 RETURNING attempts`;
   if (Number(rows[0]?.attempts) > 10) return false;
-  const total = await sql`INSERT INTO schedule_attempts (key, window, attempts) VALUES (${scope}, ${window}, 1)
-    ON CONFLICT (key, window) DO UPDATE SET attempts = schedule_attempts.attempts + 1 RETURNING attempts`;
+  const total = await sql`INSERT INTO schedule_attempts (key, "window", attempts) VALUES (${scope}, ${window}, 1)
+    ON CONFLICT (key, "window") DO UPDATE SET attempts = schedule_attempts.attempts + 1 RETURNING attempts`;
   return Number(total[0]?.attempts) <= 300;
 }

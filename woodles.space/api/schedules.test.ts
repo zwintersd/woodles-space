@@ -37,6 +37,31 @@ describe('protected publishing', () => {
     for (const action of ['publish', 'restore', 'unpublish', 'access']) expect((await request('', { action })).status).toBe(401);
     expect(store.publications.size).toBe(0); expect(store.calls).toHaveLength(0);
   });
+  it('checks database readiness before offering publisher login', async () => {
+    expect(await (await request('?action=status')).json()).toEqual({ configured: true, authenticated: false });
+    expect(store.calls[0].q).toContain('schedule_publications, schedule_revisions, schedule_sessions, schedule_attempts LIMIT 0');
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      for (const code of ['42P01', '42703']) {
+        sqlMock.mockRejectedValueOnce(Object.assign(new Error('PRIVATE database details'), { code }));
+        const response = await request('?action=status');
+        expect(response.status).toBe(503);
+        expect(await response.text()).toContain(code === '42P01' ? 'apply api/schema.sql' : 'table columns against api/schema.sql');
+        expect(log).toHaveBeenLastCalledWith('[schedules] request failed', { operation: 'status', code });
+      }
+    } finally { log.mockRestore(); }
+  });
+  it('never logs raw errors, SQL, credentials, payloads or user-supplied actions', async () => {
+    const auth = await publisher();
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      sqlMock.mockRejectedValueOnce(Object.assign(new Error('postgres://SECRET@host PRIVATE payload'), { code: 'SECRET' }));
+      const response = await request('', { action: 'PRIVATE ACTION' }, auth);
+      expect(response.status).toBe(503);
+      expect(await response.text()).not.toMatch(/SECRET|PRIVATE|postgres/);
+      expect(log).toHaveBeenCalledExactlyOnceWith('[schedules] request failed', { operation: 'request', code: 'unknown' });
+    } finally { log.mockRestore(); }
+  });
   it('rejects cross-site writes and non-JSON requests', async () => {
     const cases: Record<string, string>[] = [{ origin: 'https://attacker.test' }, { 'content-type': 'text/plain' }, { origin: '' }];
     for (const headers of cases) expect((await request('', { action: 'login', password: 'publisher-passphrase' }, '', headers)).status).toBe(403);
