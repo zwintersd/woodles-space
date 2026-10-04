@@ -2,11 +2,13 @@ import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scheduleApi } from './schedule-api.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..', '..');
 const port = Number(process.env.E2E_PORT || 4173);
 const vercel = JSON.parse(await readFile(path.join(root, 'vercel.json'), 'utf8'));
+const schedules = scheduleApi(root);
 
 const contentTypes = new Map([
 	['.css', 'text/css; charset=utf-8'],
@@ -79,6 +81,15 @@ async function sendFile(res, pathname, method) {
 
 const server = createServer(async (req, res) => {
 	const url = new URL(req.url || '/', `http://${req.headers.host || '127.0.0.1'}`);
+
+	if (url.pathname === '/api/schedules') {
+		const chunks = [];
+		for await (const chunk of req) chunks.push(chunk);
+		const response = await schedules(new Request(url, { method: req.method, headers: req.headers, ...(req.method === 'POST' ? { body: Buffer.concat(chunks) } : {}) }));
+		res.writeHead(response.status, Object.fromEntries(response.headers));
+		res.end(Buffer.from(await response.arrayBuffer()));
+		return;
+	}
 
 	if (url.pathname === '/api/public' && req.method === 'GET') {
 		res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });

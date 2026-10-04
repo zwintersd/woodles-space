@@ -27,3 +27,40 @@ CREATE TABLE IF NOT EXISTS published (
   published_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (app, slug)
 );
+
+-- Password-protected schedules are deliberately separate from /api/public.
+CREATE TABLE IF NOT EXISTS schedule_publications (
+  id text PRIMARY KEY,
+  source_id text NOT NULL,
+  payload jsonb NOT NULL,
+  password_hash text NOT NULL,
+  version bigint NOT NULL DEFAULT 1,
+  access_version bigint NOT NULL DEFAULT 1,
+  active boolean NOT NULL DEFAULT true,
+  expires_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS schedule_revisions (
+  publication_id text NOT NULL REFERENCES schedule_publications(id) ON DELETE CASCADE,
+  version bigint NOT NULL,
+  payload jsonb NOT NULL,
+  published_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (publication_id, version)
+);
+CREATE TABLE IF NOT EXISTS schedule_sessions (
+  token_hash text PRIMARY KEY,
+  scope text NOT NULL,
+  access_version bigint NOT NULL,
+  publisher_hash text NOT NULL,
+  expires_at timestamptz NOT NULL
+);
+CREATE TABLE IF NOT EXISTS schedule_attempts (
+  key text NOT NULL,
+  window bigint NOT NULL,
+  attempts integer NOT NULL,
+  PRIMARY KEY (key, window)
+);
+CREATE INDEX IF NOT EXISTS schedule_publications_updated ON schedule_publications(updated_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS schedule_publications_source ON schedule_publications(source_id);
+CREATE INDEX IF NOT EXISTS schedule_sessions_expiry ON schedule_sessions(expires_at);
