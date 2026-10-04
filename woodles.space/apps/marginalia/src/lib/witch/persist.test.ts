@@ -83,6 +83,14 @@ describe('load/save/wipe', () => {
 		localStorage.setItem('witch.book.save.v1', JSON.stringify({ v: 2, essence: 5 }));
 		expect(load()).toBeNull();
 	});
+	it('defaults complexityPeak for a save written before it existed', () => {
+		localStorage.setItem(
+			'witch.book.save.v1',
+			JSON.stringify({ v: 1, essence: 9, writtenConditions: ['holding'] })
+		);
+		expect(load()?.complexityPeak).toBe(0);
+	});
+
 	it('fills in fields an older v1 save predates, from localStorage', () => {
 		// simulates a save written before a field existed — the save-discipline
 		// rule (see this file's header) says an additive shape change must not

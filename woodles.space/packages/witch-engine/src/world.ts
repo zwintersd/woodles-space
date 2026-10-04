@@ -89,6 +89,8 @@ export interface WorldState {
 	/** Lifetime weight of every act made here. Never decays. */
 	interventionLoad: number;
 	equilibriumSeconds: number;
+	/** Highest `complexity` this world has ever reached; the prestige mint reads it. Never decays. */
+	complexityPeak: number;
 	/** How readily a Known life comes to mind, 0..1. Decays; attention restores it. */
 	recall: Record<string, number>;
 	/** Permanent durability, built by returning to something that had faded. */
@@ -154,6 +156,7 @@ export function createWorldState(def: MarginaliaDef): WorldState {
 		interventionsDone: {},
 		interventionLoad: 0,
 		equilibriumSeconds: 0,
+		complexityPeak: 0,
 		recall: {},
 		fluency: {},
 		attentionCapacity: def.attention.start,
@@ -603,8 +606,10 @@ export class World {
 	 */
 	private checkCategoryMastery(category: LifeCategory, into: WorldEvent[]): void {
 		if (this.state.categoryMastered[category]) return;
-		const inCategory = this.life.filter((l) => l.category === category);
-		if (inCategory.length === 0 || !inCategory.every((l) => this.stageOf(l.id) >= STAGE_KNOWN)) {
+		// the authored world, not what is visible: mastery means Knowing every
+		// member the world has, and needs at least two to mean anything
+		const inCategory = this.def.life.filter((l) => l.category === category);
+		if (inCategory.length < 2 || !inCategory.every((l) => this.stageOf(l.id) >= STAGE_KNOWN)) {
 			return;
 		}
 		this.state.categoryMastered = { ...this.state.categoryMastered, [category]: true };
@@ -867,6 +872,9 @@ export class World {
 		if (risingEdge(this.selfBalancingLatch, this.selfBalancing)) {
 			into.push({ kind: 'equilibrium', note: pickLine(this.def.fieldNotes.equilibrium, this.rng.next()) });
 		}
+
+		const complexityNow = this.complexity;
+		if (complexityNow > s.complexityPeak) s.complexityPeak = complexityNow;
 
 		if (risingEdge(this.quietLatch, this.quiet)) {
 			into.push({ kind: 'quiet', note: pickLine(this.def.fieldNotes.quiet, this.rng.next()) });
