@@ -91,6 +91,12 @@
 
 	const currentTitle = $derived(titleById(book.title));
 	const journal = $derived(book.pendingJournal);
+	// journal beats mark emphasis as *word*; render it rather than printing the asterisks
+	const journalParts = $derived(
+		(journal?.text ?? '')
+			.split(/\*([^*]+)\*/)
+			.map((text, i) => ({ text, em: i % 2 === 1 }))
+	);
 	const portalLabel = $derived(
 		book.quiet
 			? 'going quiet'
@@ -363,7 +369,7 @@
 					{#if journal}
 						<aside class="journal">
 							<p class="journal-label">from her journal</p>
-							<p class="journal-text">{journal.text}</p>
+							<p class="journal-text">{#each journalParts as part}{#if part.em}<em>{part.text}</em>{:else}{part.text}{/if}{/each}</p>
 							<button class="ghost tiny" onclick={() => book.dismissJournal(journal.id)}>
 								close the page
 							</button>

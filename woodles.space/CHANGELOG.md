@@ -18,6 +18,13 @@ so it's not easy to forget.
 
 ---
 
+## 2026-10-04
+
+- **marginalia's journal italicises instead of printing asterisks** — the first
+  journal page now shows *flow* in italics rather than literal `*flow*`. the
+  dev cheat console's `freerealestate` and `worldparty` also work again; they
+  were throwing because the Book had no setters for the fields they write.
+
 ## 2026-09-30
 
 - **every palette gets a landing look** — all fifteen themes now choose their
