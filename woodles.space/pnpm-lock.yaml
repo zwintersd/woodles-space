@@ -459,9 +459,15 @@ importers:
       '@woodles/app-manifest':
         specifier: workspace:*
         version: link:../../packages/app-manifest
+      '@woodles/handoff':
+        specifier: workspace:*
+        version: link:../../packages/handoff
       '@woodles/sync':
         specifier: workspace:*
         version: link:../../packages/sync
+      '@woodles/text':
+        specifier: workspace:*
+        version: link:../../packages/text
     devDependencies:
       '@sveltejs/adapter-static':
         specifier: ^3.0.0

@@ -8,14 +8,15 @@ beforeEach(() => localStorage.clear());
 
 describe('the glance', () => {
 	it('is empty, not broken, on a browser that has never been here', () => {
-		expect(readGlance()).toEqual({ waiting: { write: 0, whiteboard: 0 }, recent: null, life: null });
+		expect(readGlance()).toEqual({ waiting: { write: 0, whiteboard: 0, 'thinking-about': 0 }, recent: null, life: null });
 	});
 
 	it('counts what is waiting in each queue without draining it', () => {
 		sendHandoff('write', { title: 'a', source: { app: 'companion' } });
 		sendHandoff('write', { title: 'b', source: { app: 'companion' } });
-		expect(readGlance().waiting).toEqual({ write: 2, whiteboard: 0 });
-		expect(readGlance().waiting).toEqual({ write: 2, whiteboard: 0 });
+		sendHandoff('thinking-about', { title: 'c', source: { app: 'companion' } });
+		expect(readGlance().waiting).toEqual({ write: 2, whiteboard: 0, 'thinking-about': 1 });
+		expect(readGlance().waiting).toEqual({ write: 2, whiteboard: 0, 'thinking-about': 1 });
 	});
 
 	it('links each recent thing to where HomeSuite opens it', () => {
@@ -48,7 +49,13 @@ describe('the glance', () => {
 	});
 
 	it('watches every key it reads', () => {
-		expect(GLANCE_KEYS).toEqual(['woodles.handoff.write.v1', 'woodles.handoff.whiteboard.v1', HOMESUITE_RECENT_STORAGE_KEY, LIFE_POINTS_STORAGE_KEY]);
+		expect(GLANCE_KEYS).toEqual([
+			'woodles.handoff.write.v1',
+			'woodles.handoff.whiteboard.v1',
+			'woodles.handoff.thinking-about.v1',
+			HOMESUITE_RECENT_STORAGE_KEY,
+			LIFE_POINTS_STORAGE_KEY
+		]);
 	});
 });
 

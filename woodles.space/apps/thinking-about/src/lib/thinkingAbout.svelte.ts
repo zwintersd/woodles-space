@@ -14,8 +14,10 @@ import {
 	updateEntry,
 	updateSession
 } from './entries';
+import { ingestHandoffs } from './handoffs';
 import { buildShelf, saveShelfLocally } from './shelf';
 import { ingestSittings } from './sittings';
+import type { Handoff } from '@woodles/handoff';
 import type { LoggedSitting } from '@woodles/sync';
 import type {
 	BoardView,
@@ -48,6 +50,7 @@ function save<T>(key: string, value: T): void {
 const ENTRIES_KEY = 'thinking-about.entries.v1';
 const UPDATED_KEY = 'thinking-about.updatedAt.v1';
 const INGESTED_KEY = 'thinking-about.ingestedSittings.v1';
+const HANDOFFS_KEY = 'thinking-about.ingestedHandoffs.v1';
 
 export class ThinkingAbout {
 	entries = $state<ThinkingAboutEntry[]>(
@@ -59,9 +62,17 @@ export class ThinkingAbout {
 
 	ingestedSittings = $state<string[]>(load<string[]>(INGESTED_KEY, []));
 
+	// Handoff ids taken in this browser. Never in the synced blob and never
+	// touched by rehydrate: the queues they come from don't sync either.
+	ingestedHandoffs = $state<string[]>(load<string[]>(HANDOFFS_KEY, []));
+
 	// Transient navigation — never persisted, always starts on the board.
 	view = $state<BoardView>('board');
 	activeEntryId = $state<string | null>(null);
+	/** Arrivals since the notice was last dismissed. Never saved. */
+	handedOver = $state(0);
+	/** A linked entry not on the board yet — see openEntryWhenReady. */
+	#pendingEntryId: string | null = null;
 
 	get activeEntry(): ThinkingAboutEntry | null {
 		if (!this.activeEntryId) return null;
@@ -97,6 +108,28 @@ export class ThinkingAbout {
 
 	openEntry(id: string): void {
 		this.activeEntryId = id;
+	}
+
+	/**
+	 * Open a linked entry — now if it's here, otherwise once the first sync's
+	 * take has run. Something handed over from the companion only exists after
+	 * that, and so does an entry another device added; an id that still isn't
+	 * here then (deleted, or a stale link) leaves you on the board.
+	 */
+	openEntryWhenReady(id: string): void {
+		if (this.entries.some((e) => e.id === id)) this.openEntry(id);
+		else this.#pendingEntryId = id;
+	}
+
+	/** The held link, once. It never takes over an entry someone opened meanwhile. */
+	openPendingEntry(): void {
+		const id = this.#pendingEntryId;
+		this.#pendingEntryId = null;
+		if (id && this.activeEntryId === null && this.entries.some((e) => e.id === id)) this.openEntry(id);
+	}
+
+	dismissHandedOver(): void {
+		this.handedOver = 0;
 	}
 
 	// Sweep an abandoned blank before leaving the detail view, so tapping
@@ -184,6 +217,27 @@ export class ThinkingAbout {
 	}
 
 	/**
+	 * Take what was handed over (see handoffs.ts for when that is safe).
+	 * Shaped like ingestSittings: nothing new writes nothing, a ledger-only
+	 * change saves without moving `updatedAt`, and only a real arrival does —
+	 * so a stuck queue can't make this board win every hydrate.
+	 *
+	 * Returns how many landed, and counts them for the page to say so once.
+	 */
+	ingestHandoffs(items: Handoff[]): number {
+		const result = ingestHandoffs(this.entries, items, this.ingestedHandoffs, nowIso);
+		if (result.accounted === 0) return 0;
+
+		this.entries = result.entries;
+		this.ingestedHandoffs = result.ingested;
+		if (result.added > 0) {
+			this.#touch();
+			this.handedOver += result.added;
+		} else this.#persist();
+		return result.added;
+	}
+
+	/**
 	 * Rebuild and mirror the shelf from what's on the board right now.
 	 *
 	 * Called on load as well as on every save. The shelf is derived, so a board
@@ -200,6 +254,7 @@ export class ThinkingAbout {
 		save(ENTRIES_KEY, this.entries);
 		save(UPDATED_KEY, this.updatedAt);
 		save(INGESTED_KEY, this.ingestedSittings);
+		save(HANDOFFS_KEY, this.ingestedHandoffs);
 		// The shelf is derived, so it is rebuilt here rather than maintained
 		// alongside the entries — there is no path that edits one without the
 		// other, and no stale shelf can outlive the board it came from.
@@ -221,6 +276,7 @@ export class ThinkingAbout {
 		this.ingestedSittings = [
 			...new Set([...this.ingestedSittings, ...(blob.ingestedSittings ?? [])])
 		];
+		// ingestedHandoffs stays as it is — it never travels in the blob.
 		this.#persist();
 	}
 }

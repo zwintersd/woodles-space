@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	CAPTURE_KINDS,
 	CAPTURE_TARGETS,
 	COMPANION_ORIGIN,
 	COMPANION_PATH,
@@ -115,7 +116,22 @@ describe('captures from the page menu', () => {
 	it('knows its own menu items and no one else’s', () => {
 		expect(targetForMenu('woodles-keep-write')).toBe('write');
 		expect(targetForMenu('woodles-keep-whiteboard')).toBe('whiteboard');
+		expect(targetForMenu('woodles-keep-thinking-about')).toBe('thinking-about');
 		expect(targetForMenu('someone-else')).toBeNull();
+	});
+
+	it('offers each menu item only where it means something', () => {
+		for (const item of MENU) {
+			expect(item.contexts.length).toBeGreaterThan(0);
+			for (const context of item.contexts) expect(CAPTURE_KINDS).toContain(context);
+		}
+		// A picture on its own isn't something being read.
+		expect(MENU.find((item) => item.target === 'thinking-about')?.contexts).not.toContain('image');
+	});
+
+	it('carries a capture for Thinking About like any other', () => {
+		const capture = captureFromMenu({ selectionText: 'a line' }, tab, 'thinking-about', stamp)!;
+		expect(readMessage(JSON.parse(JSON.stringify(envelope({ kind: 'capture', capture }))))).toEqual({ kind: 'capture', capture });
 	});
 
 	it('reads pending captures out of session storage, oldest first', () => {

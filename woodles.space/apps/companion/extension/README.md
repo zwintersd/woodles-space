@@ -2,7 +2,7 @@
 
 the shell half of the companion: a side panel that frames
 [woodles.space/companion](https://woodles.space/companion), and a page menu
-that keeps things into Write or a board. the why is in
+that keeps things into Write, a board, or Thinking About. the why is in
 [`../DESIGN.md`](../DESIGN.md).
 
 ## install
@@ -13,7 +13,10 @@ that keeps things into Write or a board. the why is in
 
 Chrome 116 or newer. after pulling a change to anything in this directory,
 press the reload arrow on its card in `chrome://extensions`; changes to the
-page (`../src`) arrive with the site and need nothing.
+page (`../src`) arrive with the site and need nothing. the page menu is
+registered when the extension installs or reloads, so a new menu item (0.2.0
+added *add to thinking about*) appears only after that reload — the panel's
+footer shows which version is running.
 
 ## what's here
 

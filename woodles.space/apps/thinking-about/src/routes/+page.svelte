@@ -3,6 +3,7 @@
 	import { fade, fly } from 'svelte/transition';
 	import { thinkingAbout } from '$lib/thinkingAbout.svelte';
 	import { clearEntryLinkFromAddressBar, parseEntryLink } from '$lib/deepLink';
+	import { arrivalNotice } from '$lib/handoffs';
 	import { syncState } from '$lib/sync.svelte';
 	import { motionDuration } from '$lib/motion';
 	import Board from '$lib/components/Board.svelte';
@@ -35,14 +36,16 @@
 	});
 
 	onMount(() => {
-		// Arriving from Carillon's "about <title>" link. Read once, then taken
-		// out of the address bar so a reload lands on the board as usual.
+		// Arriving from Carillon's "about <title>" link, or the companion's
+		// "open it". Read once, then taken out of the address bar so a reload
+		// lands on the board as usual. Something just handed over only exists
+		// once the first sync has settled, so a link to it is held until then;
+		// an id still missing (deleted elsewhere, a stale link) leaves you on
+		// the board — the id is not worth an error.
 		const entryId = parseEntryLink(window.location.href);
 		if (!entryId) return;
 		clearEntryLinkFromAddressBar();
-		// An entry that no longer exists (deleted on another device, or a stale
-		// link) simply leaves you on the board — the id is not worth an error.
-		if (thinkingAbout.entries.some((e) => e.id === entryId)) thinkingAbout.openEntry(entryId);
+		thinkingAbout.openEntryWhenReady(entryId);
 	});
 
 	onMount(() => {
@@ -125,6 +128,18 @@
 		<div class="sync-popover" transition:fly={{ y: -8, duration: motionDuration(180) }}>
 			<SyncPanel />
 		</div>
+	{/if}
+
+	{#if thinkingAbout.handedOver > 0}
+		<p class="handed-over" role="status" transition:fly={{ y: -6, duration: motionDuration(160) }}>
+			{arrivalNotice(thinkingAbout.handedOver)}
+			<button
+				type="button"
+				class="handed-over-dismiss"
+				aria-label="dismiss"
+				onclick={() => thinkingAbout.dismissHandedOver()}>×</button
+			>
+		</p>
 	{/if}
 
 	<!-- Both views share one grid cell, so the one leaving fades out from
@@ -336,6 +351,45 @@
 		border-radius: var(--ta-radius-pill);
 		padding: 0.05rem 0.4rem;
 		animation: ta-pop 0.4s var(--ta-ease-spring) both;
+	}
+
+	/* said once after something handed over lands — the same pill as the
+	   sync toggle, so it reads as part of the chrome rather than an alert */
+	.handed-over {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		width: fit-content;
+		max-width: 100%;
+		margin-bottom: 0.9rem;
+		padding: 0.35rem 0.4rem 0.35rem 0.85rem;
+		font-size: 0.78rem;
+		color: var(--ta-text-dim);
+		background: rgba(255, 255, 255, 0.72);
+		border: 1px solid rgba(255, 255, 255, 0.85);
+		border-radius: var(--ta-radius-pill);
+		box-shadow: var(--ta-shadow-sm);
+	}
+
+	.handed-over-dismiss {
+		display: grid;
+		place-items: center;
+		width: 1.4rem;
+		height: 1.4rem;
+		border-radius: 50%;
+		color: var(--ta-muted);
+		transition: background var(--ta-transition-fast), color var(--ta-transition-fast);
+	}
+
+	.handed-over-dismiss:hover,
+	.handed-over-dismiss:focus-visible {
+		background: var(--ta-accent-soft);
+		color: var(--ta-accent);
+	}
+
+	.handed-over-dismiss:focus-visible {
+		outline: 2px solid var(--ta-accent);
+		outline-offset: 1px;
 	}
 
 	.sync-toggle {

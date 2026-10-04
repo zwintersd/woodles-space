@@ -51,7 +51,7 @@ export function titleFor(item: Keepable): string {
 }
 
 /**
- * The handoff each receiver reads best. They differ because the two ingests do:
+ * The handoff each receiver reads best. They differ because the ingests do:
  *
  * - **Write** drops `source` when it makes a draft (`handoffToDraftBody` in
  *   apps/write/src/lib/drafts.ts), so the link back has to be in the body.
@@ -59,6 +59,9 @@ export function titleFor(item: Keepable): string {
  * - **Whiteboard** files a plain-text card and appends `source.href` to its
  *   body itself (`drainHandoffs` in apps/whiteboard/src/routes/+page.svelte),
  *   so the page's url stays out of the body here or the card says it twice.
+ * - **Thinking About** files an entry and appends `source.href` to its notes
+ *   itself (`entryFromHandoff` in apps/thinking-about/src/lib/handoffs.ts),
+ *   so it takes the same plain-text body as a board.
  */
 export function toHandoff(item: Keepable, target: HandoffTarget): HandoffDraft {
 	const source = {
@@ -68,7 +71,7 @@ export function toHandoff(item: Keepable, target: HandoffTarget): HandoffDraft {
 	const title = titleFor(item);
 	return target === 'write'
 		? { title, body: writeBody(item), format: 'html', source }
-		: { title, body: boardBody(item), format: 'text', source };
+		: { title, body: textBody(item), format: 'text', source };
 }
 
 function writeBody(item: Keepable): string {
@@ -84,7 +87,7 @@ function writeBody(item: Keepable): string {
 	return parts.join('');
 }
 
-function boardBody(item: Keepable): string {
+function textBody(item: Keepable): string {
 	const parts: string[] = [];
 	if (item.note) parts.push(item.note);
 	if (item.kind === 'selection') parts.push(`“${item.text}”`);

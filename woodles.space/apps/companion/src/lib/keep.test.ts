@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createHandoffQueue } from '@woodles/handoff';
 import { sanitizeHtml } from '@woodles/text';
-import { captureFromMenu, type Capture } from '@extension/protocol.js';
+import { captureFromMenu, type Capture, type CaptureTarget } from '@extension/protocol.js';
 import { keep, keepableFromCapture, keepableFromCard, prettyUrl, toHandoff } from './keep';
 
 const page = { title: 'A good essay', url: 'https://example.com/essay' };
 const stamp = { id: 'c-1', now: '2026-10-04T12:00:00.000Z' };
 
-function capture(info: Parameters<typeof captureFromMenu>[0], target: 'write' | 'whiteboard' = 'write'): Capture {
+function capture(info: Parameters<typeof captureFromMenu>[0], target: CaptureTarget = 'write'): Capture {
 	const made = captureFromMenu(info, page, target, stamp);
 	if (!made) throw new Error('expected a capture');
 	return made;
@@ -61,6 +61,27 @@ describe('the keep card', () => {
 		expect(handoff).toMatchObject({ title: 'buy string', source: { app: 'companion' } });
 		expect(handoff.source).not.toHaveProperty('href');
 		expect(handoff.body).toBe('<p>buy string<br>for the kite</p>');
+	});
+});
+
+describe('what goes to Thinking About', () => {
+	it('is a board’s plain text — Thinking About appends `source.href` to the notes itself', () => {
+		const handoff = toHandoff(keepableFromCapture(capture({ selectionText: 'a line' }, 'thinking-about')), 'thinking-about');
+		expect(handoff).toMatchObject({ title: 'A good essay', format: 'text', body: '“a line”', source: { app: 'companion', href: page.url } });
+		expect(handoff.body).not.toContain(page.url);
+	});
+
+	it('keeps a link’s own url in the body', () => {
+		const handoff = toHandoff(keepableFromCapture(capture({ linkUrl: 'https://l.example/x' }, 'thinking-about')), 'thinking-about');
+		expect(handoff.body).toBe('https://l.example/x');
+	});
+
+	it('queues for Thinking About alone, and notices a redelivery', () => {
+		const item = keepableFromCapture(capture({}, 'thinking-about'));
+		expect(keep(item, 'thinking-about', { id: 'c-1' })).toMatchObject({ ok: true, duplicate: false });
+		expect(keep(item, 'thinking-about', { id: 'c-1' })).toEqual({ ok: true, duplicate: true });
+		expect(createHandoffQueue('thinking-about').peek().map((handoff) => handoff.id)).toEqual(['c-1']);
+		expect(createHandoffQueue('write').count() + createHandoffQueue('whiteboard').count()).toBe(0);
 	});
 });
 

@@ -20,6 +20,12 @@ so it's not easy to forget.
 
 ## 2026-10-04
 
+- **keep a page for Thinking About** — the companion's page menu and keep card
+  gain *add to thinking about*. what you keep lands in Reading · Articles —
+  straight away if the board is open, otherwise the next time you open it —
+  with your line, the quote, and the link in its notes; move it from there.
+  *open it* in the side panel goes straight to that entry. reload the
+  extension in `chrome://extensions` for the new menu item.
 - **woodles in Chrome's side panel** — a small extension
   (`apps/companion/extension`, loaded unpacked) opens
   [/companion](https://woodles.space/companion) beside whatever you're

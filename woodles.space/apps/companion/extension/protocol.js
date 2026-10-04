@@ -23,16 +23,23 @@ export const COMPANION_PATH = '/companion';
 /** `?panel=1` lets the page lay out for the side panel before `hello` arrives. */
 export const COMPANION_URL = `${COMPANION_ORIGIN}${COMPANION_PATH}?panel=1`;
 
-/** The two handoff receivers the page menu can send to — `HANDOFF_TARGETS` in `@woodles/handoff`. */
-export const CAPTURE_TARGETS = /** @type {const} */ (['write', 'whiteboard']);
+/** The handoff receivers the page menu can send to — `HANDOFF_TARGETS` in `@woodles/handoff`. */
+export const CAPTURE_TARGETS = /** @type {const} */ (['write', 'whiteboard', 'thinking-about']);
 
 /** What was right-clicked. `page` means nothing more specific was. */
 export const CAPTURE_KINDS = /** @type {const} */ (['selection', 'link', 'image', 'page']);
 
-/** Page-menu items, one per target. Chrome groups them under the extension's name. */
+/**
+ * Page-menu items, one per target. Chrome groups them under the extension's
+ * name. `contexts` are Chrome's own names, all of them capture kinds.
+ *
+ * @type {readonly { id: string, target: CaptureTarget, title: string, contexts: [CaptureKind, ...CaptureKind[]] }[]}
+ */
 export const MENU = Object.freeze([
-	{ id: 'woodles-keep-write', target: 'write', title: 'keep in write' },
-	{ id: 'woodles-keep-whiteboard', target: 'whiteboard', title: 'pin to a board' }
+	{ id: 'woodles-keep-write', target: 'write', title: 'keep in write', contexts: ['selection', 'link', 'image', 'page'] },
+	{ id: 'woodles-keep-whiteboard', target: 'whiteboard', title: 'pin to a board', contexts: ['selection', 'link', 'image', 'page'] },
+	// A picture on its own isn't something being read — right-click the page around it.
+	{ id: 'woodles-keep-thinking-about', target: 'thinking-about', title: 'add to thinking about', contexts: ['selection', 'link', 'page'] }
 ]);
 
 /** A selection longer than this is cut, not refused — the start is what someone chose. */
@@ -178,8 +185,7 @@ export function readCapture(value) {
  * @returns {CaptureTarget | null}
  */
 export function targetForMenu(menuItemId) {
-	const item = MENU.find((entry) => entry.id === menuItemId);
-	return item ? /** @type {CaptureTarget} */ (item.target) : null;
+	return MENU.find((entry) => entry.id === menuItemId)?.target ?? null;
 }
 
 /**

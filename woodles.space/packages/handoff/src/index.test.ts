@@ -139,10 +139,10 @@ describe('queues', () => {
 
 		// Every target is reported, so a caller can render "nothing waiting"
 		// without knowing which apps exist.
-		expect(pendingCounts(shared)).toEqual({ write: 2, whiteboard: 0 });
+		expect(pendingCounts(shared)).toEqual({ write: 2, whiteboard: 0, 'thinking-about': 0 });
 
 		createHandoffQueue('whiteboard', shared).send({ source: SOURCE });
-		expect(pendingCounts(shared)).toEqual({ write: 2, whiteboard: 1 });
+		expect(pendingCounts(shared)).toEqual({ write: 2, whiteboard: 1, 'thinking-about': 0 });
 	});
 });
 
@@ -200,23 +200,26 @@ describe('failure is never silent loss', () => {
 });
 
 describe('the target list', () => {
-	it('covers the apps that can receive — Write, and Whiteboard now it has an Inbox', () => {
-		expect([...HANDOFF_TARGETS]).toEqual(['write', 'whiteboard']);
+	it('covers the apps that can receive — Write, Whiteboard now it has an Inbox, and Thinking About', () => {
+		expect([...HANDOFF_TARGETS]).toEqual(['write', 'whiteboard', 'thinking-about']);
 		const keys = HANDOFF_TARGETS.map(handoffKey);
 		expect(new Set(keys).size).toBe(keys.length);
-		for (const key of keys) expect(key).toMatch(/^woodles\.handoff\.[a-z]+\.v1$/);
+		for (const key of keys) expect(key).toMatch(/^woodles\.handoff\.[a-z][a-z-]*\.v1$/);
 	});
 
 	it('keeps each target queue to itself, so one app never drains another', () => {
 		const shared = options();
 		sendHandoff('write', { title: 'for the draft', source: SOURCE }, shared);
 		sendHandoff('whiteboard', { title: 'for the board', source: SOURCE }, shared);
+		sendHandoff('thinking-about', { title: 'to read later', source: SOURCE }, shared);
 
 		expect(createHandoffQueue('write', shared).peek().map((h) => h.title)).toEqual(['for the draft']);
 		expect(createHandoffQueue('whiteboard', shared).peek().map((h) => h.title)).toEqual(['for the board']);
+		expect(createHandoffQueue('thinking-about', shared).peek().map((h) => h.title)).toEqual(['to read later']);
 
 		expect(createHandoffQueue('whiteboard', shared).drain().items.map((h) => h.title)).toEqual(['for the board']);
 		expect(createHandoffQueue('write', shared).peek().map((h) => h.title)).toEqual(['for the draft']);
+		expect(createHandoffQueue('thinking-about', shared).peek().map((h) => h.title)).toEqual(['to read later']);
 	});
 
 	it('exposes a one-shot send for wiring a single button', () => {

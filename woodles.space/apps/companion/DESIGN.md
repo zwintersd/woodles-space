@@ -12,14 +12,16 @@ the web:
 - **keeping.** a line, a link, an image, a whole page. the handoff spine
   (`@woodles/handoff`) was built for this — *put it anywhere, move it later*
   (CONVERGENCE.md §3) — and the companion is its first sender from outside
-  the site. right-click → *keep in write* or *pin to a board*, or the keep
-  card in the panel, with a line of your own.
-- **noticing what's waiting.** handoffs sitting in Write's and Whiteboard's
-  queues, and the six things HomeSuite last listed.
+  the site. right-click → *keep in write*, *pin to a board*, or *add to
+  thinking about*, or the keep card in the panel, with a line of your own.
+- **noticing what's waiting.** handoffs sitting in Write's, Whiteboard's and
+  Thinking About's queues, and the six things HomeSuite last listed.
 - **stepping away.** the Life Points balance and rank, and a door to the
   homepage's break widget.
 
-what it deliberately isn't: a reading tracker, a bookmark manager, a feed.
+what it deliberately isn't: a reading tracker, a bookmark manager, a feed —
+Thinking About is the board for what's being read; the companion only hands
+things to it.
 it sees the tab you're on only while the panel is open, keeps nothing you
 don't hand it, sends nothing to a server, and never mints Life Points —
 landing is that ledger's one writer.
@@ -103,13 +105,31 @@ drops it too; checking twice is cheap.
 the most specific thing right-clicked wins: a selection over the link it sits
 in, a link over the image inside it, any of those over the page.
 
-**per receiver.** the two ingests differ, so the handoffs do:
+**per receiver.** the ingests differ, so the handoffs do:
 
 - Write drops `source` when it makes a draft, so the body carries the link
   back itself — HTML, a quote as `<blockquote>`, a link as `<a>`, through
   Write's own sanitizer.
 - Whiteboard files a plain-text card and appends `source.href` itself, so the
   page's url stays out of the body or the card says it twice.
+- Thinking About files an entry in Reading · Articles under the handoff's id
+  and appends `source.href` to its notes itself, so it takes the same
+  plain-text body as a board. *open it* goes straight to that entry: the
+  board holds a `?entry=` link until its first sync has settled and the
+  arrival has landed. its menu item leaves images out — a picture on its own
+  isn't something being read.
+
+**when Thinking About takes it.** not on arrival in the queue — Thinking About
+syncs its whole board, and hydrate keeps whichever board is newer with no
+merge. an arrival moves the board's clock, so it lands only right after a
+hydrate that went through, or on a board with no sync; a failed or running
+sync leaves it waiting, and the panel keeps counting it. an open board takes
+it live (the queue's `storage` event, or focus) by catching up with the server
+first. the ids it has taken stay in that browser, so a deleted arrival stays
+deleted when a capture is redelivered. two open Thinking About tabs can still
+overwrite each other — the board has no cross-tab coordination — so a tab
+still in its first sync, or one that missed the event, can save over an
+arrival another tab took.
 
 ## the panel
 
@@ -117,8 +137,9 @@ narrow-first — Chrome's side panel runs about 320–500 px. top to bottom:
 
 - **greeting** — the homepage widget's words for the hour.
 - **keep** — the page beside the panel as a chip (× sets it aside), a line of
-  your own, *keep in write* / *pin to a board*. with no page, a thought on
-  its own.
+  your own, *keep in write* / *pin to a board* / *add to thinking about* —
+  one button per receiver, the third wrapping to its own row at the panel's
+  narrowest. with no page, a thought on its own.
 - **waiting** — per-receiver counts, linking to each; opening one files them.
 - **lately** — HomeSuite's recent six, "as HomeSuite last saw it", because the
   ledger is only as fresh as its writer.
@@ -136,7 +157,7 @@ another tab, HomeSuite republishes, landing mints.
 | permission | why |
 | --- | --- |
 | `sidePanel` | the panel |
-| `contextMenus` | keep / pin from the page menu |
+| `contextMenus` | keep, pin, or add from the page menu |
 | `tabs` | the active tab's title and url, for the chip. read only while the panel is open, never stored |
 | `storage` | captures waiting for the page, in session storage |
 | `https://woodles.space/*` | the unpartitioned frame (see "the shape"). nothing scripts the site |
@@ -150,13 +171,17 @@ job is remembering.
 - **a nudge to step away** after a long stretch. it needs time-on-screen,
   which is the tracking this design refuses; better asked by Carillon's bell
   than counted by the browser.
-- **Thinking About as a receiver.** "reading" is the obvious column for a web
-  page, but Thinking About isn't on `HANDOFF_TARGETS`. that's a handoff-spine
-  change and an ingest in Thinking About, not a companion change.
+- **choosing where it lands in Thinking About.** everything arrives in
+  Reading · Articles and is moved from the entry; a choice at capture time is
+  the decision the spine exists to postpone.
+- **a link field on Thinking About entries.** the url rides at the end of the
+  notes, which aren't clickable.
 - **spending Life Points.** nothing spends yet. when something does, it
   publishes its own spend ledger (`@woodles/life-points`), and `readGlance`
   passes that ledger to `lifePointsBalance` alongside landing's.
 - **the Chrome Web Store.** unpacked until the shape settles. the store
   wants a privacy policy and a pinned extension key.
 - **other devices.** everything here is this browser's localStorage, the same
-  promise the handoff spine makes.
+  promise the handoff spine makes. Thinking About syncs its board when
+  connected, so something kept there travels once it's on the board — the
+  companion itself still sends nothing.
