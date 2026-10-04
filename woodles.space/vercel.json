@@ -32,7 +32,6 @@
     { "source": "/lab",             "destination": "/apps/lab/index.html" },
     { "source": "/lab/:path*",      "destination": "/apps/lab/:path*" },
     { "source": "/schedules",       "destination": "/apps/schedules/index.html" },
-    { "source": "/schedules/9-25",  "destination": "/apps/schedules/9-25/index.html" },
     { "source": "/schedules/generator", "destination": "/apps/schedules/generator/index.html" },
     { "source": "/schedules/generator/:path*", "destination": "/apps/schedules/generator/:path*" },
     { "source": "/schedules/view",  "destination": "/apps/schedules/view/index.html" },
