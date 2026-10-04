@@ -18,6 +18,7 @@ import { world1Life } from './content/life';
 import { STAGE_SECONDS, ATTENTION_START, ATTENTION_COSTS } from './tuning';
 import { visibleLifeForWorldspace } from './worldShape';
 import { conditions } from './content/conditions';
+import { applyMarginaliaCheat } from './cheats';
 import {
 	Book,
 	fmt,
@@ -338,5 +339,16 @@ describe('Book — achievements', () => {
 		const back = new Book();
 		back.fromSave(b.toSave());
 		expect(back.achievementsUnlocked).toEqual(['first-written']);
+	});
+});
+
+describe('Book — cheats run against the real Book', () => {
+	it('freerealestate and worldparty write through to the world', () => {
+		const b = new Book();
+		applyMarginaliaCheat('freerealestate', b);
+		expect(b.world.state.writtenConditions).toEqual(conditions.map((c) => c.id));
+		applyMarginaliaCheat('worldparty', b);
+		expect(b.mode).toBe('world');
+		expect(b.attentionCapacity).toBeGreaterThanOrEqual(12);
 	});
 });

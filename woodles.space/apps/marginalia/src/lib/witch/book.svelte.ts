@@ -169,6 +169,10 @@ export class Book {
 	get vitality(): Record<string, number> {
 		return this.v, this.world.state.vitality;
 	}
+	set vitality(v: Record<string, number>) {
+		this.world.state.vitality = v;
+		this.touch();
+	}
 
 	vitalityOf(lifeId: string): number {
 		return this.v, this.world.vitalityOf(lifeId);
@@ -231,8 +235,16 @@ export class Book {
 	get attending(): string[] {
 		return this.v, this.world.state.attending;
 	}
+	set attending(v: string[]) {
+		this.world.state.attending = v;
+		this.touch();
+	}
 	get study(): Record<string, number> {
 		return this.v, this.world.state.study;
+	}
+	set study(v: Record<string, number>) {
+		this.world.state.study = v;
+		this.touch();
 	}
 	get focusStreak(): number {
 		return this.v, this.world.state.focusStreak;
@@ -243,11 +255,23 @@ export class Book {
 	get writtenConditions(): string[] {
 		return this.v, this.world.state.writtenConditions;
 	}
+	set writtenConditions(v: string[]) {
+		this.world.state.writtenConditions = v;
+		this.touch();
+	}
 	get observation(): Record<string, number> {
 		return this.v, this.world.state.observation;
 	}
+	set observation(v: Record<string, number>) {
+		this.world.state.observation = v;
+		this.touch();
+	}
 	get categoryMastered(): Record<string, boolean> {
 		return this.v, this.world.state.categoryMastered;
+	}
+	set categoryMastered(v: Record<string, boolean>) {
+		this.world.state.categoryMastered = v;
+		this.touch();
 	}
 
 	journalShown = $state<string[]>([]);
