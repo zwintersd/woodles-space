@@ -1,3 +1,4 @@
+import { addScheduleItem, openScheduleTools, openActivitySection } from './support/schedule-planner';
 import { expect, test } from '@playwright/test';
 
 test('activity steps persist, reuse, print and offer a nested choice', async ({ page }) => {
@@ -9,10 +10,12 @@ test('activity steps persist, reuse, print and offer a nested choice', async ({ 
     localStorage.setItem(S.STORAGE_KEY, JSON.stringify({ plans: [S.sanitizePlan({ id: 'steps-test', learner: 'Sam', name: 'Steps', days: [] })], activities: [], images: [] }));
   });
   await page.goto('/schedules/generator?plan=steps-test&day=monday');
-  await page.locator('[data-action="add-activity"]').first().click();
+  await addScheduleItem(page, 'activity');
   await page.locator('#activityForm input[name="title"]').fill('Make a snack');
+  await openActivitySection(page, 'steps');
   await page.locator('[data-action="add-activity-step"]').click();
   await page.locator('[data-step-field="title"]').fill('Wash hands');
+  await openActivitySection(page, 'steps');
   await page.locator('[data-action="add-activity-step"]').click();
   await page.locator('[data-step-field="title"][data-step-index="1"]').fill('Choose fruit');
   await page.locator('[data-step-kind="1"]').selectOption('choice');
@@ -35,7 +38,7 @@ test('activity steps persist, reuse, print and offer a nested choice', async ({ 
   await page.locator('[data-action="edit-activity"]').click();
   await expect(page.locator('[data-step-field="title"][data-step-index="0"]')).toHaveValue('Wash hands');
   await page.locator('#activityForm button[type="submit"]').click();
-  await page.locator('[data-action="add-activity"]').first().click();
+  await addScheduleItem(page, 'activity');
   await page.locator('[data-action="activity-tab"][data-mode="library"]').click();
   await page.locator('[data-action="add-library-activity"]').click();
   await expect(page.locator('.activity-card .activity-steps')).toHaveCount(2);
@@ -45,9 +48,11 @@ test('activity steps persist, reuse, print and offer a nested choice', async ({ 
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('woodles.schedule-planner.v1')!));
   expect(saved.activities[0].steps).toHaveLength(2);
   expect(saved.plans[0].days[0].activities[0].steps[1].options).toHaveLength(2);
+  await openScheduleTools(page, 'day');
   await page.locator('#copyDestination').selectOption('tuesday');
   await page.locator('[data-action="copy-day"]').click();
   const exported = page.waitForEvent('download');
+  await openScheduleTools(page, 'plan');
   await page.locator('[data-action="export-plan"]').click();
   const download = await exported;
   await page.locator('#importFile').setInputFiles((await download.path())!);

@@ -377,6 +377,7 @@ window.ScheduleStudio = (() => {
       if (value && typeof value === 'object') {
         return {
           plans: Array.isArray(value.plans) ? value.plans.map(sanitizePlan).filter(Boolean) : [],
+          deletedPlans: Array.isArray(value.deletedPlans) ? value.deletedPlans.map(sanitizePlan).filter(Boolean) : [],
           activities: Array.isArray(value.activities) ? value.activities.map((activity) => sanitizeActivity(activity)).filter(Boolean) : [],
           suggestionPools: Array.isArray(value.suggestionPools) ? value.suggestionPools.map(sanitizeSuggestionPool).filter(Boolean) : [],
           customSymbols: Array.isArray(value.customSymbols) ? value.customSymbols.map(sanitizeCustomSymbol).filter(Boolean).slice(0, 256) : [],
@@ -384,7 +385,7 @@ window.ScheduleStudio = (() => {
         };
       }
     } catch {}
-    return { plans: [], activities: [], images: [], suggestionPools: [], customSymbols: [] };
+    return { plans: [], deletedPlans: [], activities: [], images: [], suggestionPools: [], customSymbols: [] };
   }
 
   // A choice without its own heading, and every open slot, is the learner's.

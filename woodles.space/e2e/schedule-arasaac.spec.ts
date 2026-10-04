@@ -1,3 +1,4 @@
+import { addScheduleItem, openScheduleTools, openActivitySection, openVisualPicker } from './support/schedule-planner';
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -21,6 +22,7 @@ async function setup(page: Page) {
   await page.route('https://static.arasaac.org/**', route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect x="10" y="10" width="80" height="80" rx="10" fill="#3978c7"/></svg>' }));
 }
 async function choose(page: Page, selector: string, id: number) {
+  if (selector.includes('data-sprite-target="form"')) await openVisualPicker(page, selector.startsWith('#choiceForm') ? '#choiceForm' : '#activityForm');
   await page.locator(selector).click();
   await expect(page.locator('#arasaacResults [data-arasaac-id]')).toHaveCount(3);
   await page.locator(`[data-arasaac-id="${id}"]`).click();
@@ -35,7 +37,7 @@ test('ARASAAC search works in activities, steps, choices and suggestion options 
     searches.push(decodeURIComponent(route.request().url().slice(api.length)));
     return route.fulfill({ json: results });
   });
-  await page.locator('[data-action="add-activity"]').first().click();
+  await addScheduleItem(page, 'activity');
   await page.locator('#activityForm [name="title"]').fill('Morning routine');
   await choose(page, '#activityForm [data-action="search-arasaac"][data-sprite-target="form"]', 2501);
   await expect(page.locator('#activityForm [name="pictogramUrl"]')).toHaveValue('2501');
@@ -50,6 +52,7 @@ test('ARASAAC search works in activities, steps, choices and suggestion options 
   await page.locator('[data-action="select-symbol"][data-symbol="⭐"]').click();
   await expect(page.locator('#activityForm [name="pictogramUrl"]')).toHaveValue('');
   await choose(page, '#activityForm [data-action="search-arasaac"][data-sprite-target="form"]', 2501);
+  await openActivitySection(page, 'steps');
   await page.locator('[data-action="add-activity-step"]').click();
   await page.locator('[data-step-field="title"]').fill('Choose Activity');
   await choose(page, '[data-action="search-arasaac"][data-sprite-target="step"]', 7171);
@@ -60,6 +63,7 @@ test('ARASAAC search works in activities, steps, choices and suggestion options 
     await page.locator(`[data-step-field="title"][data-option-index="${index}"]`).fill(title);
     await choose(page, `[data-action="search-arasaac"][data-sprite-target="step-option"][data-option-index="${index}"]`, index ? 2501 : 9813);
   }
+  await openActivitySection(page, 'steps');
   await page.locator('[data-action="add-activity-step"]').click();
   await page.locator('[data-step-field="title"][data-step-index="1"]').fill('Find a short activity');
   await page.locator('[data-step-kind="1"]').selectOption('suggestion');
@@ -80,7 +84,7 @@ test('ARASAAC search works in activities, steps, choices and suggestion options 
   await page.screenshot({ path: test.info().outputPath('arasaac-step-editor-mobile.png') });
   await page.locator('#activityForm button[type="submit"]').click();
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.locator('[data-action="add-choice"]').first().click();
+  await addScheduleItem(page, 'choice');
   await page.locator('#optionTitle').fill('Toys');
   await choose(page, '#choiceForm [data-action="search-arasaac"][data-sprite-target="form"]', 9813);
   await page.locator('[data-action="add-choice-option"]').click();
@@ -101,6 +105,7 @@ test('ARASAAC search works in activities, steps, choices and suggestion options 
   await expect(page.locator('#activityForm .symbol-preview img')).toHaveAttribute('src', /2501_300.png$/);
   await page.locator('#activityForm [data-close-dialog]').click();
   const exporting = page.waitForEvent('download');
+  await openScheduleTools(page, 'plan');
   await page.locator('[data-action="export-plan"]').click();
   const download = await exporting;
   await page.locator('#importFile').setInputFiles((await download.path())!);
@@ -132,8 +137,9 @@ test('search handles empty, failed and stale requests; supports keyboard selecti
     if (query === 'nothing') return route.fulfill({ status: 404, json: [] });
     return route.fulfill({ json: results });
   });
-  await page.locator('[data-action="add-activity"]').first().click();
+  await addScheduleItem(page, 'activity');
   const trigger = page.locator('#activityForm [data-action="search-arasaac"]');
+  await openVisualPicker(page);
   await trigger.click();
   await page.locator('#arasaacSearch').fill('x');
   await page.locator('#arasaacSearch').press('Enter');

@@ -86,6 +86,7 @@
   const saveStatus = document.getElementById('saveStatus');
 
   let workspace = readWorkspace();
+  let undoHistory = [];
   let currentPlanId = new URLSearchParams(location.search).get('plan') || '';
   let activeDayKey = DAY_KEYS.some((day) => day[0] === new URLSearchParams(location.search).get('day'))
     ? new URLSearchParams(location.search).get('day')
@@ -112,6 +113,9 @@
   let pendingSuggestionPools = new Map();
   let candidateSymbolDraft = {};
   let videoDraft = [];
+  let libraryTab = 'activities';
+  let librarySearch = '';
+  let libraryCategory = '';
   let recentSymbols = readRecentSymbols();
   const customSymbols = window.ScheduleSymbolLibrary.create({ workspace: () => workspace, save: persist });
   const arasaacPicker = window.ScheduleArasaacPicker.create();
@@ -223,15 +227,19 @@
     const image = activityImageValue({ pictogram: form.elements.pictogramUrl?.value || form.elements.optionPictogram?.value || '', imageAssetId: form.elements.imageAssetId?.value || '' });
     const source = isLocalImageData(image) ? image : pictogramSource(image);
     if (preview) preview.innerHTML = window.ScheduleStudio.customSymbolMarkup(formSymbolFields(form), workspace.images, 30) || (source ? '<img src="' + esc(source) + '" width="30" height="30" alt="">' : symbolMarkup(form.elements.icon.value || '⭐', 30));
+    const label = form.querySelector('.visual-source');
+    if (label) label.textContent = form.elements.symbolAssetId?.value ? 'My symbol · ' + (form.elements.symbolName.value || 'custom') : form.elements.imageAssetId?.value ? 'Uploaded picture' : /^\d+$/.test(form.elements.pictogramUrl?.value || form.elements.optionPictogram?.value || '') ? 'ARASAAC picture' : source ? 'Linked picture' : 'Emoji';
   }
 
   function persist() {
     const now = new Date().toISOString();
     const plan = getPlan();
     if (plan) plan.updatedAt = now;
+    pruneUndoHistory();
     const activeDrafts = activityDialog.open ? activityStepsDraft : [];
     const usedImages = new Set([...workspace.activities, ...workspace.suggestionPools, ...workspace.customSymbols, ...activeDrafts, ...suggestionDraft, ...choiceDraft].flatMap(itemImageIds).concat(
-      workspace.plans.flatMap((entry) => entry.days.flatMap((day) => day.activities.flatMap(itemImageIds)))
+      [...workspace.plans, ...workspace.deletedPlans].flatMap((entry) => entry.days.flatMap((day) => day.activities.flatMap(itemImageIds))),
+      undoHistory.filter((entry) => entry.kind === 'day').flatMap((entry) => entry.before.activities.flatMap(itemImageIds))
     ).filter(Boolean));
     document.querySelectorAll('form [name="imageAssetId"], form [name="symbolAssetId"], form [name="symbolStillAssetId"]').forEach((input) => { if (input.value) usedImages.add(input.value); });
     [candidateSymbolDraft.symbolAssetId, candidateSymbolDraft.symbolStillAssetId].filter(Boolean).forEach((id) => usedImages.add(id));
@@ -256,6 +264,80 @@
 
   function getPlan() {
     return workspace.plans.find((plan) => plan.id === currentPlanId) || null;
+  }
+
+  function snapshot(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function pruneUndoHistory() {
+    const checked = new Set();
+    const invalid = new Set();
+    for (const entry of [...undoHistory].reverse()) {
+      if (entry.kind !== 'day') continue;
+      const key = entry.planId + ':' + entry.dayKey;
+      if (checked.has(key)) continue;
+      checked.add(key);
+      const plan = [...workspace.plans, ...workspace.deletedPlans].find((plan) => plan.id === entry.planId);
+      // A later edit to this day must not be overwritten by an older undo snapshot.
+      if (JSON.stringify(getDay(plan, entry.dayKey)) !== JSON.stringify(entry.after)) invalid.add(key);
+    }
+    undoHistory = undoHistory.filter((entry) => entry.kind === 'day'
+      ? !invalid.has(entry.planId + ':' + entry.dayKey)
+      : workspace.deletedPlans.some((plan) => plan.id === entry.planId));
+    updateUndoButton();
+  }
+
+  function updateUndoButton() {
+    const button = document.getElementById('undoButton');
+    const last = undoHistory.at(-1);
+    button.disabled = !last;
+    button.title = last ? 'Undo ' + last.label + ' · this session' : 'Undo moves, removal, copying, and clearing during this session';
+    button.setAttribute('aria-label', last ? 'Undo ' + last.label : 'Undo');
+  }
+
+  function commitRecoveryChange(change) {
+    const before = snapshot(workspace);
+    const historyBefore = [...undoHistory];
+    change();
+    if (persist()) return true;
+    workspace = before;
+    undoHistory = historyBefore;
+    updateUndoButton();
+    render();
+    return false;
+  }
+
+  function saveDayChange(plan, day, before, label) {
+    const after = snapshot(day);
+    // Start the transaction from the old day so a failed save can roll back fully.
+    Object.assign(day, before);
+    return commitRecoveryChange(() => {
+      Object.assign(day, snapshot(after));
+      undoHistory.push({ kind: 'day', planId: plan.id, dayKey: day.key, before, after, label });
+      undoHistory = undoHistory.slice(-20);
+    });
+  }
+
+  function undoLastChange() {
+    pruneUndoHistory();
+    const entry = undoHistory.at(-1);
+    if (!entry) return;
+    if (!commitRecoveryChange(() => {
+      undoHistory.pop();
+      if (entry.kind === 'day') {
+        const plan = workspace.plans.find((plan) => plan.id === entry.planId);
+        Object.assign(getDay(plan, entry.dayKey), snapshot(entry.before));
+      } else {
+        const plan = workspace.deletedPlans.find((plan) => plan.id === entry.planId);
+        workspace.deletedPlans = workspace.deletedPlans.filter((plan) => plan.id !== entry.planId);
+        workspace.plans.push(plan);
+      }
+    })) return;
+    routeToPlan(entry.planId, entry.dayKey || 'monday');
+    showToast('Undid ' + entry.label + '.');
+    if (document.getElementById('undoButton').disabled) focusAddActivity();
+    else document.getElementById('undoButton').focus();
   }
 
   function visibleDays(plan) {
@@ -402,17 +484,26 @@
         '</button><div class="plan-actions">' +
           '<a class="icon-button visual-link" href="' + esc(visualScheduleUrl(plan.id)) + '" aria-label="Open ' + esc(plan.learner) + '’s visual schedule" title="Visual schedule">▶</a>' +
           '<button class="icon-button" type="button" data-action="duplicate-plan" data-plan="' + esc(plan.id) + '" aria-label="Duplicate ' + esc(plan.learner) + ' plan" title="Duplicate plan">⧉</button>' +
-          '<button class="icon-button" type="button" data-action="delete-plan" data-plan="' + esc(plan.id) + '" aria-label="Delete ' + esc(plan.learner) + ' plan" title="Delete plan">×</button>' +
+          '<button class="icon-button" type="button" data-action="delete-plan" data-plan="' + esc(plan.id) + '" aria-label="Move ' + esc(plan.learner) + ' plan to Trash" title="Move plan to Trash">×</button>' +
         '</div></article>';
     }).join('');
     app.innerHTML =
       '<div class="page-heading"><div><span class="eyebrow">Schedule studio · weekly planner</span><h1>Learner plans</h1>' +
       '<p>Organize a separate schedule for each day. Plans start blank, and your activity library can be reused across the week.</p></div>' +
-      '<div class="heading-actions"><button class="button secondary" type="button" data-action="open-image-studio">Image studio</button><button class="button primary" type="button" data-action="new-plan">＋ New learner plan</button><button class="button secondary" type="button" data-action="import-plan">Import plan</button></div></div>' +
+      '<div class="heading-actions"><button class="button secondary" type="button" data-action="open-content-library">Library</button><button class="button secondary" type="button" data-action="open-image-studio">Image studio</button><button class="button primary" type="button" data-action="new-plan">＋ New learner plan</button><button class="button secondary" type="button" data-action="import-plan">Import plan</button></div></div>' +
       (plans.length
         ? '<section class="library-grid" aria-label="Saved learner plans">' + cards + '</section>'
-        : '<section class="empty-card"><span class="eyebrow">A blank start</span><h2>Your plans live here</h2><p>Create a learner plan, then add activities to the days that need them. Nothing is prefilled. Plans are saved in this browser and can be exported as JSON.</p><button class="button primary" type="button" data-action="new-plan">＋ Create first learner plan</button></section>') +
+        : workspace.deletedPlans.length
+          ? '<section class="empty-card"><h2>No active learner plans</h2><p>Restore a saved plan from Plan Trash below, or create a new learner plan.</p></section>'
+          : '<section class="empty-card"><span class="eyebrow">A blank start</span><h2>Your plans live here</h2><p>Create a learner plan, then add activities to the days that need them. Nothing is prefilled. Plans are saved in this browser and can be exported as JSON.</p><button class="button primary" type="button" data-action="new-plan">＋ Create first learner plan</button></section>') +
+      renderPlanTrash() +
       '<a class="reference-card" href="/schedules/9-25"><span><strong>Finished example · September 25</strong><span>A polished afternoon visual schedule with choices, activities, and a live Now / Next view. Every day you plan opens in this style: choose ▶ Visual schedule.</span></span><span class="reference-arrow" aria-hidden="true">→</span></a>';
+  }
+
+  function renderPlanTrash() {
+    if (!workspace.deletedPlans.length) return '';
+    return '<details class="plan-trash disclosure"><summary>Plan Trash (' + workspace.deletedPlans.length + ')</summary><div class="tool-options"><p class="muted">These plans and their pictures are saved in this browser. Restore a plan to use it again.</p>' +
+      workspace.deletedPlans.map((plan) => '<article class="trash-plan"><div><strong>' + esc(plan.learner) + '</strong><span>' + esc(plan.name) + '</span></div><button class="button secondary" type="button" data-action="restore-plan" data-plan="' + esc(plan.id) + '" aria-label="Restore ' + esc(plan.learner) + ' plan">Restore plan</button></article>').join('') + '</div></details>';
   }
 
   function renderDayTabs(plan) {
@@ -423,7 +514,7 @@
       const countText = dayItemSummary(stats);
       return '<button class="day-tab" type="button" data-action="select-day" data-day="' + key + '" aria-pressed="' + String(key === activeDayKey) + '">' +
         '<strong>' + label.slice(0, 3) + '</strong><span class="day-count">' + countText + '</span><span>' + esc(formatTime(day.start)) + '–' + esc(formatTime(day.end)) + '</span></button>';
-    }).join('') + (removed.length ? '<div class="restore-days"><span>Add back:</span>' + removed.map((day) =>
+    }).join('') + (removed.length ? '<div class="restore-days"><span>Hidden days:</span>' + removed.map((day) =>
       '<button class="button small secondary" type="button" data-action="restore-day" data-day="' + day.key + '">＋ ' + esc(day.label) + '</button>').join('') + '</div>' : '');
   }
 
@@ -456,7 +547,7 @@
       '<button class="icon-button" type="button" data-action="move-activity" data-id="' + esc(item.occurrenceId) + '" data-direction="-1" aria-label="Move ' + esc(name) + ' earlier" title="Move earlier" ' + (index === 0 ? 'disabled' : '') + '>↑</button>' +
       '<button class="icon-button" type="button" data-action="move-activity" data-id="' + esc(item.occurrenceId) + '" data-direction="1" aria-label="Move ' + esc(name) + ' later" title="Move later" ' + (index === items.length - 1 ? 'disabled' : '') + '>↓</button>' +
       '<button class="icon-button" type="button" data-action="' + editAction + '" data-id="' + esc(item.occurrenceId) + '" aria-label="Edit ' + esc(name) + '" title="Edit">✎</button>' +
-      '<button class="icon-button delete" type="button" data-action="remove-activity" data-id="' + esc(item.occurrenceId) + '" aria-label="Remove ' + esc(name) + '" title="Remove">×</button>' +
+      '<button class="icon-button delete" type="button" data-action="remove-activity" data-id="' + esc(item.occurrenceId) + '" aria-label="Remove ' + esc(name) + ' from day" title="Remove from day">×</button>' +
     '</div>';
   }
 
@@ -521,6 +612,15 @@
       '<a class="button visual" href="' + esc(visualScheduleUrl(plan.id, day.key)) + '">▶ Open ' + esc(day.label) + '’s schedule</a></section>';
   }
 
+  function renderPlanHeading(plan, day) {
+    return '<a class="back-link" href="/schedules" data-action="back-library">← All learner plans</a>' +
+      '<div class="page-heading plan-heading"><div class="plan-heading-main"><span class="eyebrow">Weekly learner plan · saved locally</span>' +
+        '<input id="planTitle" class="plan-title" aria-label="Plan name" maxlength="100" value="' + esc(plan.name) + '">' +
+        '<input id="planLearner" class="plan-learner" aria-label="Learner label" maxlength="100" value="' + esc(plan.learner) + '">' +
+      '</div><div class="heading-actions">' + (day ? '<a class="button visual" href="' + esc(visualScheduleUrl(plan.id, day.key)) + '">▶ Use schedule</a><button class="button secondary" type="button" data-action="open-print-setup">Print</button>' : '') + '<button class="button secondary" type="button" data-action="open-content-library">Library</button>' +
+        '<details class="plan-tools disclosure"><summary>Plan tools</summary><div class="tool-options"><button class="button secondary" type="button" data-action="open-image-studio">Image studio</button><button class="button secondary" type="button" data-action="export-plan">Export JSON</button><button class="button secondary" type="button" data-action="import-plan">Import plan</button><button class="button secondary" type="button" data-action="duplicate-plan">Duplicate plan</button><button class="button secondary danger" type="button" data-action="delete-current-plan">Move plan to Trash</button><p class="muted">Saved in this browser. Export and import to transfer a plan to another device.</p></div></details></div></div>';
+  }
+
   function renderPlan() {
     const plan = getPlan();
     if (!plan) return renderLibrary();
@@ -546,32 +646,19 @@
       '<option value="' + entry.key + '">' + esc(entry.label) + '</option>').join('');
     document.title = plan.learner + ' · ' + plan.name + ' · Schedule studio';
     app.innerHTML =
-      '<a class="back-link" href="/schedules" data-action="back-library">← All learner plans</a>' +
-      '<div class="page-heading plan-heading"><div class="plan-heading-main"><span class="eyebrow">Weekly learner plan · saved locally</span>' +
-        '<input id="planTitle" class="plan-title" aria-label="Plan name" maxlength="100" value="' + esc(plan.name) + '">' +
-        '<input id="planLearner" class="plan-learner" aria-label="Learner label" maxlength="100" value="' + esc(plan.learner) + '">' +
-      '</div><div class="heading-actions"><a class="button visual" href="' + esc(visualScheduleUrl(plan.id, day.key)) + '">▶ Visual schedule</a><button class="button secondary" type="button" data-action="open-image-studio">Image studio</button><button class="button secondary" type="button" data-action="print-day">Print selected day</button><button class="button secondary" type="button" data-action="export-plan">Export JSON</button>' +
-        '<button class="button secondary" type="button" data-action="import-plan">Import plan</button></div></div>' +
-      '<div class="week-heading"><h2>Week overview</h2><p>Choose a day to build or update its schedule.</p></div>' +
+      renderPlanHeading(plan, day) +
       '<nav class="day-tabs" aria-label="Days of the week">' + renderDayTabs(plan) + '</nav>' +
       '<div class="day-panel"><section class="day-main" aria-labelledby="dayTitle">' +
-        '<div class="day-main-header"><div><span class="eyebrow">' + esc(plan.learner) + ' · weekly schedule</span><h2 id="dayTitle">' + esc(day.label) + '</h2><p>Plan this day’s session, then copy it to another day when the pattern fits.</p></div>' +
-          '<div class="button-row"><button class="button secondary" type="button" data-action="add-suggestion">✦ Suggestion</button><button class="button secondary" type="button" data-action="add-open-slot">＋ Open slot</button><button class="button secondary" type="button" data-action="add-choice">＋ Choice</button><button class="button secondary" type="button" data-action="add-video">＋ Video</button><button class="button primary" type="button" data-action="add-activity">＋ Add activity</button></div></div>' +
+        '<div class="day-main-header"><h2 id="dayTitle">' + esc(day.label) + '</h2><button class="button primary" type="button" data-action="add-item">＋ Add item</button></div>' +
         '<div class="time-window"><span class="time-window-label">Session time</span><label class="field"><span>Starts</span><input type="time" data-day-time="start" value="' + esc(day.start) + '" aria-label="' + esc(day.label) + ' session start"></label>' +
           '<label class="field"><span>Ends</span><input type="time" data-day-time="end" value="' + esc(day.end) + '" aria-label="' + esc(day.label) + ' session end"></label>' +
           '<span class="time-summary">' + stats.minutes + ' scheduled minutes · ' + Math.max(0, capacity - stats.minutes) + ' unassigned minutes</span></div>' +
-        '<div class="print-options" aria-label="Print settings"><span class="print-options-title">Print setup</span>' +
-          '<label><span>Layout</span><select data-print-setting="layout" aria-label="Print layout"><option value="timeline" ' + (day.printLayout === 'timeline' ? 'selected' : '') + '>Schedule list</option><option value="cards" ' + (day.printLayout === 'cards' ? 'selected' : '') + '>Cut cards</option></select></label>' +
-          '<label class="print-time-toggle"><input type="checkbox" data-print-setting="times" ' + (day.printTimes ? 'checked' : '') + '><span>Show times on print</span></label>' +
-          '<label><span>Card spacing</span><select data-print-setting="spacing" aria-label="Printed card spacing"><option value="standard" ' + (day.printSpacing === 'standard' ? 'selected' : '') + '>Standard</option><option value="cut" ' + (day.printSpacing === 'cut' ? 'selected' : '') + '>Room to cut</option><option value="laminate" ' + (day.printSpacing === 'laminate' ? 'selected' : '') + '>Cut and laminate</option></select><small class="muted">Used with cut cards</small></label>' +
-        '</div>' +
-        '<div class="copy-row"><label for="copyDestination">Reuse this day:</label><select id="copyDestination">' + destinationOptions + '</select><button class="button small secondary" type="button" data-action="copy-day">Copy day</button><button class="button small secondary danger" type="button" data-action="clear-day">Clear day</button><button class="button small secondary danger" type="button" data-action="delete-day">Delete day</button></div>' +
         '<div class="activity-list" aria-label="' + esc(day.label) + ' scheduled items">' +
           (items.length ? items.map((item, index) => renderActivity(day, item, index, items)).join('') :
-            '<div class="empty-day"><span class="empty-icon" aria-hidden="true">＋</span><h3>No activities planned yet</h3><p>Add an activity, a suggestion pool, a choice, a video, or an open slot, or copy a day with a schedule you want to reuse. Times and items remain editable on every day.</p><div class="button-row"><button class="button secondary" type="button" data-action="add-open-slot">＋ Add open slot</button><button class="button secondary" type="button" data-action="add-choice">＋ Add choice</button><button class="button secondary" type="button" data-action="add-video">＋ Add video</button><button class="button secondary" type="button" data-action="add-activity">＋ Add first activity</button></div></div>') +
-        '</div>' + (printCredits ? '<p class="print-credit">' + printCredits + '</p>' : '') + '</section>' +
-        '<aside class="day-side">' + renderVisualCard(plan, day) + '<section class="side-card"><h3>This week</h3><p>Each day can use its own session window and activity sequence.</p><div class="week-summary">' + renderWeekSummary(plan) + '</div>' +
-          '<div class="side-actions"><button class="button secondary" type="button" data-action="duplicate-plan">Duplicate this learner plan</button><button class="button secondary danger" type="button" data-action="delete-current-plan">Delete this plan</button></div></section></aside>' +
+            '<div class="empty-day"><h3>Start with one item</h3><p>Use Add item to choose an activity, choice, video, suggestion, or open time.</p></div>') +
+        '</div>' + (printCredits ? '<p class="print-credit">' + printCredits + '</p>' : '') +
+        '<details class="day-tools disclosure"><summary>Day tools</summary><div class="tool-options"><div class="copy-row"><label for="copyDestination">Copy to:</label><select id="copyDestination"' + (destinationOptions ? '' : ' disabled') + '>' + destinationOptions + '</select><button class="button small secondary" type="button" data-action="copy-day"' + (destinationOptions ? '' : ' disabled') + '>Copy day</button></div><p class="muted">Copying replaces the destination’s schedule and print settings.</p><div class="button-row"><button class="button small secondary" type="button" data-action="hide-day">Hide ' + esc(day.label) + '</button><button class="button small secondary danger" type="button" data-action="clear-day">Clear ' + esc(day.label) + '</button></div><p class="muted">Hiding keeps this day’s items. Clearing removes them.</p></div></details></section>' +
+        '<aside class="day-side"><details class="preview-disclosure disclosure"><summary>Learner preview</summary>' + renderVisualCard(plan, day) + '</details></aside>' +
       '</div>';
     document.body.dataset.printLayout = day.printLayout;
     document.body.dataset.printTimes = day.printTimes ? 'true' : 'false';
@@ -581,8 +668,8 @@
   function renderNoDays(plan) {
     document.title = plan.learner + ' · ' + plan.name + ' · Schedule studio';
     app.innerHTML =
-      '<a class="back-link" href="/schedules" data-action="back-library">← All learner plans</a>' +
-      '<section class="empty-card"><span class="eyebrow">' + esc(plan.learner) + ' · ' + esc(plan.name) + '</span><h2>No days in this plan</h2><p>Every day has been deleted from this weekly schedule. Add a day back to keep planning.</p>' +
+      renderPlanHeading(plan, null) +
+      '<section class="empty-card"><span class="eyebrow">' + esc(plan.learner) + ' · ' + esc(plan.name) + '</span><h2>All days are hidden</h2><p>Add a day back to keep planning. Its saved items and settings are kept.</p>' +
       '<nav class="day-tabs" aria-label="Days of the week">' + renderDayTabs(plan) + '</nav></section>';
   }
 
@@ -592,12 +679,30 @@
   }
 
   function focusAddActivity() {
-    app.querySelector('.day-main-header [data-action="add-activity"]')?.focus();
+    (app.querySelector('.day-main-header [data-action="add-item"]') || app.querySelector('#planTitle'))?.focus();
+  }
+
+  function showAddItemDialog() {
+    const dialog = document.getElementById('addItemDialog');
+    dialog.showModal();
+    dialog.querySelector('[data-action="add-activity"]').focus();
+  }
+
+  function showPrintSetup() {
+    const day = getDay(getPlan(), activeDayKey);
+    if (!day) return;
+    document.getElementById('printDialogBody').innerHTML =
+      '<div class="dialog-heading"><div><h2 id="printTitle">Print ' + esc(day.label) + '</h2><p class="muted">Print this day as a schedule or cards to cut out.</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close print setup">×</button></div>' +
+      '<div class="print-options" aria-label="Print settings"><label><span>Layout</span><select data-print-setting="layout" aria-label="Print layout"><option value="timeline"' + (day.printLayout === 'timeline' ? ' selected' : '') + '>Schedule list</option><option value="cards"' + (day.printLayout === 'cards' ? ' selected' : '') + '>Cut cards</option></select></label>' +
+      '<label class="print-time-toggle"><input type="checkbox" data-print-setting="times"' + (day.printTimes ? ' checked' : '') + '><span>Show times on print</span></label>' +
+      '<label id="printSpacingField"' + (day.printLayout === 'cards' ? '' : ' hidden') + '><span>Card spacing</span><select data-print-setting="spacing" aria-label="Printed card spacing"><option value="standard"' + (day.printSpacing === 'standard' ? ' selected' : '') + '>Standard</option><option value="cut"' + (day.printSpacing === 'cut' ? ' selected' : '') + '>Room to cut</option><option value="laminate"' + (day.printSpacing === 'laminate' ? ' selected' : '') + '>Cut and laminate</option></select></label></div>' +
+      '<p class="muted">Your browser’s print preview shows the final pages. Settings are saved for this day.</p><div class="dialog-actions"><button class="button secondary" type="button" data-close-dialog>Cancel</button><button class="button primary" type="button" data-action="print-day">Open print preview</button></div>';
+    document.getElementById('printDialog').showModal();
   }
 
   function focusActivityAction(action, occurrenceId, direction) {
-    const button = [...app.querySelectorAll('[data-action="' + action + '"]')].find((entry) =>
-      entry.dataset.id === occurrenceId && (direction === undefined || entry.dataset.direction === String(direction)));
+    const buttons = [...app.querySelectorAll('[data-action="' + action + '"]')].filter((entry) => entry.dataset.id === occurrenceId && !entry.disabled);
+    const button = buttons.find((entry) => direction === undefined || entry.dataset.direction === String(direction)) || buttons[0];
     button?.focus();
   }
 
@@ -643,30 +748,49 @@
 
   function deletePlan(planId) {
     const plan = workspace.plans.find((entry) => entry.id === planId) || getPlan();
-    if (!plan || !window.confirm('Delete the weekly plan for ' + plan.learner + '? This cannot be undone unless you exported a copy.')) return;
-    workspace.plans = workspace.plans.filter((entry) => entry.id !== plan.id);
-    persist();
+    if (!plan) return;
+    if (!commitRecoveryChange(() => {
+      workspace.plans = workspace.plans.filter((entry) => entry.id !== plan.id);
+      workspace.deletedPlans.push(plan);
+      undoHistory.push({ kind: 'delete-plan', planId: plan.id, label: 'moving ' + plan.learner + '’s plan to Trash' });
+      undoHistory = undoHistory.slice(-20);
+    })) return;
     routeToPlan('', 'monday');
-    showToast('Plan deleted.');
+    showToast('Plan moved to Trash. Undo now or restore it from Plan Trash later.');
+    document.getElementById('undoButton').focus();
   }
 
-  function renderSymbolPicker(icon, item = {}) {
+  function restorePlan(planId) {
+    const plan = workspace.deletedPlans.find((entry) => entry.id === planId);
+    if (!plan) return;
+    if (!commitRecoveryChange(() => {
+      workspace.deletedPlans = workspace.deletedPlans.filter((entry) => entry.id !== plan.id);
+      workspace.plans.push(plan);
+    })) return;
+    routeToPlan(plan.id, 'monday');
+    showToast(plan.learner + '’s plan restored.');
+  }
+
+  function renderSymbolPicker(icon, item = {}, withImage = false) {
     return '<div class="field full symbol-field"><label for="activityIcon">Visual symbol or emoji</label>' +
       Object.entries(window.ScheduleStudio.symbolFields(item)).map(([key, value]) => '<input type="hidden" name="' + key + '" value="' + esc(value) + '">').join('') +
-      '<div class="symbol-entry"><span class="symbol-preview" aria-hidden="true">' + (window.ScheduleStudio.customSymbolMarkup(item, workspace.images, 30) || symbolMarkup(icon || '⭐', 30)) + '</span>' +
+      '<div class="visual-selection"><span class="symbol-preview" aria-hidden="true">' + (window.ScheduleStudio.customSymbolMarkup(item, workspace.images, 30) || symbolMarkup(icon || '⭐', 30)) + '</span><span class="visual-source" role="status"></span><button class="button secondary" type="button" data-action="toggle-visual-picker" aria-expanded="false" aria-controls="visualPicker">Choose visual</button></div>' +
+      '<div id="visualPicker" class="visual-picker" hidden><div class="symbol-entry">' +
         '<input id="activityIcon" name="icon" maxlength="16" value="' + esc(icon || '⭐') + '" autocomplete="off" aria-describedby="activityIconHelp" placeholder="Choose or type an emoji">' +
         '<button class="button secondary" type="button" data-action="toggle-symbol-picker" aria-expanded="false" aria-controls="symbolPicker">Browse symbols</button></div>' +
       '<div data-form-sprite-control>' + customSymbolControl(item, 'form') + '</div>' +
-      '<small class="muted" id="activityIconHelp">Browse or type an emoji, or pick your own sprite. A custom symbol takes priority over the optional picture until cleared.</small>' +
+      (withImage ? '<button class="button secondary" type="button" data-action="open-image-editor">Upload and crop</button><input type="hidden" name="imageAssetId" value="' + esc(item.imageAssetId || '') + '"><div class="image-asset-preview" id="imageAssetPreview">' + renderImageAssetPreview(item.pictogram || '', item.imageAssetId || '') + '</div><details class="manual-visual disclosure"><summary>Enter picture ID or URL</summary><label class="field"><span>ARASAAC ID or HTTPS image URL</span><input name="pictogramUrl" maxlength="300" value="' + esc(item.pictogram || '') + '" placeholder="ARASAAC ID or HTTPS image URL"></label></details>' : '') +
+      '<small class="muted" id="activityIconHelp">Choose an emoji, an ARASAAC picture, or one of your symbols. The selected source is shown above.</small>' +
       '<section class="symbol-picker" id="symbolPicker" aria-label="Choose a visual symbol" hidden>' +
         '<label class="visually-hidden" for="symbolSearch">Search symbols by name</label><input class="symbol-search" id="symbolSearch" name="symbolSearch" type="search" placeholder="Search all symbols (book, snack, break…)" autocomplete="off">' +
         '<div class="symbol-groups" role="group" aria-label="Symbol categories">' + SYMBOL_GROUPS.map((group) => '<button class="symbol-group" type="button" data-action="filter-symbols" data-group="' + esc(group) + '" aria-pressed="' + String(group === 'Popular') + '">' + esc(group) + (group === 'Recent' && recentSymbols.length ? ' · ' + recentSymbols.length : '') + '</button>').join('') + '</div>' +
         '<p class="symbol-result-count" id="symbolResultCount" role="status" aria-live="polite"></p><div class="symbol-results" id="symbolResults" role="group" aria-label="Available symbols"></div>' +
         '<small class="symbol-credit">OpenMoji artwork for supported picks · <a href="https://openmoji.org" target="_blank" rel="noopener noreferrer">OpenMoji</a> · <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a></small>' +
-      '</section></div>';
+      '</section></div></div>';
   }
 
   function showActivityDialog(mode, item) {
+    activityDialog.classList.toggle('item-editor', mode !== 'library');
     pendingSuggestionPools = new Map();
     activityStepsDraft = JSON.parse(JSON.stringify(item?.steps || []));
     activityMode = mode;
@@ -676,28 +800,28 @@
       activityDialogBody.innerHTML = '<div class="dialog-heading dialog-content"><div><span class="eyebrow">Reusable activities</span><h2>Add from your library</h2><p class="muted">Choose an activity to place it in ' + esc(DAY_KEYS.find((day) => day[0] === activeDayKey)[1]) + '.</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close">×</button></div>' +
         '<div class="library-picker">' + renderLibraryPicker() + '</div>';
     } else {
-      const editing = mode === 'edit';
+      const libraryEditing = mode === 'library-edit' || mode === 'library-new';
+      const editing = mode === 'edit' || mode === 'library-edit';
+      if (libraryEditing) editingActivityId = item?.id || '';
       const activity = item || {};
-      activityDialogBody.innerHTML = '<div class="dialog-heading dialog-content"><div><span class="eyebrow">' + (editing ? 'Edit this day' : 'Add to this day') + '</span><h2>' + (editing ? 'Edit activity' : 'Create an activity') + '</h2></div><button class="icon-button" type="button" data-close-dialog aria-label="Close">×</button></div>' +
-        (workspace.activities.length && !editing
+      activityDialogBody.innerHTML = '<div class="dialog-heading dialog-content"><div><span class="eyebrow">' + (libraryEditing ? 'Reusable library · future use' : editing ? 'This scheduled item' : 'Add to this day') + '</span><h2>' + (editing ? 'Edit activity' : 'Create an activity') + '</h2><p class="muted">' + (libraryEditing ? 'Saved schedules keep their current copies.' : editing ? 'Changes apply only to this item unless you choose to update the library below.' : 'Name it, set its duration, and choose a visual. Add details or steps when needed.') + '</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close">×</button></div>' +
+        (workspace.activities.length && !editing && !libraryEditing
           ? '<div class="dialog-tabs" role="tablist"><button class="dialog-tab" type="button" data-action="activity-tab" data-mode="new" aria-selected="true">New activity</button><button class="dialog-tab" type="button" data-action="activity-tab" data-mode="library" aria-selected="false">From library (' + workspace.activities.length + ')</button></div>'
           : '') +
         '<form class="edit-form" id="activityForm">' +
-          (editing ? '<label class="field"><span>Start time</span><input name="start" type="time" value="' + esc(activity.start) + '" required></label>' : '') +
+          (editing && !libraryEditing ? '<label class="field"><span>Start time</span><input name="start" type="time" value="' + esc(activity.start) + '" required></label>' : '') +
           '<label class="field"><span>Activity name</span><input name="title" maxlength="100" value="' + esc(activity.title || '') + '" placeholder="e.g., Choose a book" required></label>' +
-          '<label class="field"><span>Category</span><input name="category" maxlength="60" value="' + esc(activity.category || 'Instruction') + '" list="categorySuggestions"><datalist id="categorySuggestions">' + CATEGORIES.map((category) => '<option value="' + esc(category) + '">').join('') + '</datalist></label>' +
           '<label class="field"><span>Duration (minutes)</span><input name="duration" type="number" min="1" max="480" value="' + esc(activity.duration || 15) + '" required></label>' +
-          renderSymbolPicker(activity.icon || '⭐', activity) +
+          renderSymbolPicker(activity.icon || '⭐', activity, true) +
+          '<details class="activity-details disclosure full"><summary>Details</summary><div class="editor-fields"><label class="field"><span>Category</span><input name="category" maxlength="60" value="' + esc(activity.category || 'Instruction') + '" list="categorySuggestions"><datalist id="categorySuggestions">' + CATEGORIES.map((category) => '<option value="' + esc(category) + '">').join('') + '</datalist></label>' +
           '<label class="field"><span>Color</span><select name="color">' + COLORS.map((color) => '<option value="' + color + '" ' + (color === activity.color ? 'selected' : '') + '>' + COLOR_NAMES[color] + '</option>').join('') + '</select></label>' +
-          '<div class="field full"><span>Activity image (optional)</span><div class="image-reference-row"><input name="pictogramUrl" maxlength="300" value="' + esc(activity.pictogram || '') + '" placeholder="ARASAAC ID or HTTPS image URL" aria-describedby="imageHelp"><input type="hidden" name="imageAssetId" value="' + esc(activity.imageAssetId || '') + '"><button class="button secondary" type="button" data-action="open-image-editor">Upload and crop</button></div>' +
-            '<div class="image-asset-preview" id="imageAssetPreview">' + renderImageAssetPreview(activity.pictogram || '', activity.imageAssetId || '') + '</div><small class="muted" id="imageHelp">Crop an image here or use an ARASAAC ID or direct HTTPS image URL. Add a credit below for other image sources.</small></div>' +
           '<label class="field full"><span>Image source or attribution (optional)</span><input name="credit" maxlength="200" value="' + esc(activity.credit || '') + '" placeholder="Artist, library, or license"></label>' +
           '<label class="field full"><span>Support cue or short note (optional)</span><textarea name="note" maxlength="500" placeholder="A short cue, material, or transition note">' + esc(activity.note || '') + '</textarea></label>' +
-          '<fieldset class="step-composer full"><legend>Steps inside this activity (optional)</legend><p class="muted">Add steps in order. A step can offer a choice or an animated suggestion. All steps share the activity’s total time.</p><div id="activityStepsDraft"></div><button class="button secondary" type="button" data-action="add-activity-step">＋ Add step</button></fieldset>' +
-          (!editing ? '<label class="check-field full"><input type="checkbox" name="saveToLibrary" checked><span>Save this activity to the reusable library</span></label>' :
-            (activity.sourceId ? '<label class="check-field full"><input type="checkbox" name="updateLibrary"><span>Also update the library card for future use</span></label>' : '')) +
+          '</div></details><details class="activity-steps-disclosure disclosure full"' + (activity.steps?.length ? ' open' : '') + '><summary>Steps' + (activity.steps?.length ? ' · ' + activity.steps.length : ' (optional)') + '</summary><fieldset class="step-composer"><legend>Steps inside this activity</legend><p class="muted">Add steps in order. A step can offer a choice or an animated suggestion. All steps share the activity’s total time.</p><div id="activityStepsDraft"></div><button class="button secondary" type="button" data-action="add-activity-step">＋ Add step</button></fieldset></details>' +
+          (libraryEditing ? '' : !editing ? '<label class="check-field full"><input type="checkbox" name="saveToLibrary" checked><span>Save this activity to the reusable library</span></label>' :
+            (workspace.activities.some((entry) => entry.id === activity.sourceId) ? '<label class="check-field full"><input type="checkbox" name="updateLibrary"><span>Update the library card for future use too</span></label>' : '<label class="check-field full"><input type="checkbox" name="saveToLibrary"><span>Save as a new library activity</span></label>')) +
           '<div class="error-text full" id="activityError" role="status" aria-live="polite"></div>' +
-          '<div class="dialog-footer full"><button class="button secondary" type="button" data-close-dialog>Cancel</button><button class="button primary" type="submit">' + (editing ? 'Save activity' : 'Add to ' + esc(DAY_KEYS.find((day) => day[0] === activeDayKey)[1])) + '</button></div>' +
+          '<div class="dialog-footer full"><button class="button secondary" type="button" data-close-dialog>Cancel</button><button class="button primary" type="submit">' + (libraryEditing ? 'Save to library' : editing ? 'Save this item' : 'Add to ' + esc(DAY_KEYS.find((day) => day[0] === activeDayKey)[1])) + '</button></div>' +
         '</form>';
     }
     if (!activityDialog.open) activityDialog.showModal();
@@ -752,6 +876,7 @@
   });
 
   function showOpenSlotDialog(mode, item) {
+    activityDialog.classList.add('item-editor');
     const plan = getPlan();
     const day = getDay(plan, activeDayKey);
     if (!day) return;
@@ -816,9 +941,10 @@
     showToast(activityMode === 'slot-edit' ? 'Open slot updated.' : 'Open slot added to ' + day.label + '.');
   }
 
-  function showSuggestionDialog(item, stepId = '') {
+  function showSuggestionDialog(item, stepId = '', poolMode = false) {
+    if (!stepId) activityDialog.classList.add('item-editor');
     candidateSymbolDraft = {};
-    const day = getDay(getPlan(), activeDayKey);
+    const day = getDay(getPlan(), activeDayKey) || ((poolMode || activityMode.startsWith('library-')) ? { start: '09:00', end: '23:59', activities: [] } : null);
     if (!day) return;
     suggestionStepId = stepId;
     const nested = Boolean(stepId);
@@ -829,21 +955,21 @@
     const parentDuration = parentForm ? validDuration(parentForm.elements.duration.value, 15) : 15;
     const config = window.ScheduleStudio.sanitizeSuggestion(item || {});
     if (nested) config.duration = Math.min(item?.duration || parentDuration, parentDuration);
-    const start = nested ? (parentForm.elements.start?.value || day.start) : item ? item.start : nextFreeStart(day, config.duration);
+    const start = poolMode ? '09:00' : nested ? (parentForm.elements.start?.value || day.start) : item ? item.start : nextFreeStart(day, config.duration);
     if (start === null) return showToast('Make space in the session for a suggestion first.');
     if (!nested) {
-      activityMode = item ? 'suggestion-edit' : 'suggestion-new';
+      activityMode = poolMode ? (item ? 'pool-edit' : 'pool-new') : item ? 'suggestion-edit' : 'suggestion-new';
       editingActivityId = item?.occurrenceId || '';
     }
-    suggestionPoolId = item?.poolId || '';
+    suggestionPoolId = poolMode ? item?.id || '' : item?.poolId || '';
     suggestionDraft = JSON.parse(JSON.stringify(config.candidates));
-    const videos = [...new Map(getPlan().days.flatMap((entry) => entry.activities)
+    const videos = [...new Map((getPlan()?.days || []).flatMap((entry) => entry.activities)
       .filter((entry) => entry.kind === 'video').flatMap((entry) => entry.videos).map((video) => [video.id, video])).values()];
     const options = (entries) => entries.map((entry) => '<option value="' + esc(entry.id) + '">' + esc(entry.title) + '</option>').join('');
     const pools = [...workspace.suggestionPools, ...pendingSuggestionPools.values()].filter((pool, index, all) => all.findLastIndex((entry) => entry.id === pool.id) === index);
-    body.innerHTML = '<div class="dialog-heading dialog-content"><div><span class="eyebrow">Maker controls' + (nested ? ' · inside this activity' : '') + '</span><h2>' + (nested ? 'Configure this suggestion step' : item ? 'Edit suggestion' : 'Add a suggestion') + '</h2><p class="muted">Supply optional activities. The learner spins for one, then chooses whether to use it.' + (nested ? ' Save this step, then save the containing activity.' : '') + '</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close">×</button></div>' +
+    body.innerHTML = '<div class="dialog-heading dialog-content"><div><span class="eyebrow">' + (poolMode ? 'Reusable library · future use' : 'This suggestion' + (nested ? ' · inside this activity' : '')) + '</span><h2>' + (poolMode ? (item ? 'Edit suggestion pool' : 'Create a suggestion pool') : nested ? 'Configure this suggestion step' : item ? 'Edit suggestion' : 'Add a suggestion') + '</h2><p class="muted">' + (poolMode ? 'Save candidates and rules for future use. Scheduled copies keep their settings.' : 'Supply optional activities. The learner spins for one, then chooses whether to use it.') + (nested ? ' Save this step, then save the containing activity.' : '') + '</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close">×</button></div>' +
       '<form class="edit-form" id="suggestionForm">' +
-        (nested ? '<input name="start" type="hidden" value="' + esc(start) + '">' : '<label class="field"><span>Start time</span><input name="start" type="time" required value="' + esc(typeof start === 'number' ? timeString(start) : start) + '"></label>') +
+        (nested || poolMode ? '<input name="start" type="hidden" value="' + esc(start) + '">' : '<label class="field"><span>Start time</span><input name="start" type="time" required value="' + esc(typeof start === 'number' ? timeString(start) : start) + '"></label>') +
         '<label class="field"><span>' + (nested ? 'Suggestion budget (minutes)' : 'Time slot (minutes)') + '</span><input name="duration" type="number" min="1" max="' + (nested ? parentDuration : 480) + '" required value="' + config.duration + '">' + (nested ? '<small class="muted">Shares the containing activity’s time; this adds no separate schedule block.</small>' : '') + '</label>' +
         '<label class="field"><span>Heading</span><input name="title" maxlength="100" required value="' + esc(config.title) + '"></label>' +
         '<label class="field"><span>Learner prompt</span><input name="prompt" maxlength="200" value="' + esc(config.prompt) + '"></label>' +
@@ -869,10 +995,10 @@
             '<label class="field"><span>ARASAAC ID or HTTPS picture (optional)</span><input id="candidatePictogram" maxlength="300"></label>' +
           '</div><button class="button secondary" type="button" data-action="suggestion-add-candidate">＋ Add to pool</button></details>' +
           '<datalist id="suggestionCategoryNames"><option value="Videos"><option value="Chores"><option value="Movement"><option value="Break"><option value="Play"><option value="Other"></datalist></fieldset>' +
-        '<label class="check-field full"><input type="checkbox" name="savePool" checked><span>' + (suggestionPoolId ? 'Update this reusable pool for future use' : 'Save these activities and rules as a reusable pool') + '</span></label>' +
+        (poolMode ? '' : '<label class="check-field full"><input type="checkbox" name="savePool"' + (item?.poolId || item?.occurrenceId ? '' : ' checked') + '><span>' + (suggestionPoolId ? 'Update this reusable pool for future use too' : 'Save these activities and rules as a reusable pool') + '</span></label>') +
         '<small class="muted full">Optional activities stay in this pool; they are not added as separate scheduled tasks.</small>' +
-        (item && (!nested || editingActivityId) ? '<details class="full"><summary>Maker override</summary><p class="muted">Explicitly reset this slot’s suggestions, acceptance, and reroll count for today on this device.</p><button class="button secondary" type="button" data-action="suggestion-reset-progress">Reset today’s draws for this slot</button></details>' : '') +
-        '<div class="error-text full" id="suggestionError" role="status" aria-live="polite"></div><div class="dialog-footer full"><button class="button secondary" type="button" data-close-dialog>Cancel</button><button class="button primary" type="submit">' + (nested ? 'Save suggestion step' : item ? 'Save suggestion' : 'Add suggestion') + '</button></div></form>';
+        (!poolMode && item && (!nested || editingActivityId) && !activityMode.startsWith('library-') ? '<details class="full"><summary>Maker override</summary><p class="muted">Explicitly reset this slot’s suggestions, acceptance, and reroll count for today on this device.</p><button class="button secondary" type="button" data-action="suggestion-reset-progress">Reset today’s draws for this slot</button></details>' : '') +
+        '<div class="error-text full" id="suggestionError" role="status" aria-live="polite"></div><div class="dialog-footer full"><button class="button secondary" type="button" data-close-dialog>Cancel</button><button class="button primary" type="submit">' + (poolMode ? 'Save pool to library' : nested ? 'Save suggestion step' : item ? 'Save suggestion' : 'Add suggestion') + '</button></div></form>';
     const form = document.getElementById('suggestionForm');
     applySuggestionRules(form, config);
     renderSuggestionDraft();
@@ -932,7 +1058,8 @@
 
   function submitSuggestion(form) {
     const day = getDay(getPlan(), activeDayKey);
-    if (!day) return;
+    const poolMode = activityMode === 'pool-edit' || activityMode === 'pool-new';
+    if (!day && !poolMode && !suggestionStepId) return;
     const errorNode = document.getElementById('suggestionError');
     const data = new FormData(form);
     const duration = validDuration(data.get('duration'), 0);
@@ -947,6 +1074,17 @@
     const values = window.ScheduleStudio.sanitizeSuggestion({ title: data.get('title'), prompt: data.get('prompt'), duration, candidates: suggestionDraft,
       rerollMode: data.get('rerollMode'), maxRerolls: data.get('maxRerolls'), avoidRepeats: data.has('avoidRepeats'),
       allowCategoryChoice: data.has('allowCategoryChoice'), allowSkip: data.has('allowSkip'), animation: data.get('animation') });
+    if (poolMode) {
+      const id = suggestionPoolId || makeId('pool');
+      if (!commitRecoveryChange(() => {
+        const pool = workspace.suggestionPools.find((entry) => entry.id === id);
+        if (pool) Object.assign(pool, { id, ...snapshot(values) });
+        else workspace.suggestionPools.push({ id, ...snapshot(values) });
+      })) { errorNode.textContent = 'Could not save this pool. Your draft is still here.'; return; }
+      activityDialog.close();
+      showToast('Pool saved for future use. Scheduled copies keep their settings.');
+      return;
+    }
     if (suggestionStepId) {
       const index = activityStepsDraft.findIndex((step) => step.id === suggestionStepId);
       if (index < 0) return;
@@ -1024,7 +1162,10 @@
       const form = document.getElementById('suggestionForm');
       ['title', 'prompt', 'duration'].forEach((key) => { form.elements[key].value = pool[key]; });
       if (suggestionStepId) form.elements.duration.value = Math.min(pool.duration, Number(form.elements.duration.max));
-      form.elements.savePool.closest('label').querySelector('span').textContent = 'Update reusable pool “' + pool.title + '” for future use';
+      if (form.elements.savePool) {
+        form.elements.savePool.checked = false;
+        form.elements.savePool.closest('label').querySelector('span').textContent = 'Update reusable pool “' + pool.title + '” for future use too';
+      }
       applySuggestionRules(form, pool);
       renderSuggestionDraft();
     }
@@ -1036,6 +1177,7 @@
   });
 
   function showChoiceDialog(mode, item) {
+    activityDialog.classList.add('item-editor');
     const plan = getPlan();
     const day = getDay(plan, activeDayKey);
     if (!day) return;
@@ -1161,6 +1303,7 @@
   }
 
   function showVideoDialog(mode, item) {
+    activityDialog.classList.add('item-editor');
     const plan = getPlan();
     const day = getDay(plan, activeDayKey);
     if (!day) return;
@@ -1401,6 +1544,7 @@
         form.elements.imageAssetId.value = image.id;
         form.elements.pictogramUrl.value = '';
         document.getElementById('imageAssetPreview').innerHTML = renderImageAssetPreview('', image.id);
+        setFormSymbol(form, {});
       }
     };
   }
@@ -1557,6 +1701,62 @@
     ).join('');
   }
 
+  function showContentLibrary(reset = true) {
+    if (reset) { librarySearch = ''; libraryCategory = ''; }
+    const day = getDay(getPlan(), activeDayKey);
+    const entries = workspace[libraryTab];
+    const categories = [...new Set(entries.flatMap((item) => libraryTab === 'activities' ? [item.category] : item.candidates.map((candidate) => candidate.category)))].sort();
+    document.getElementById('contentLibraryBody').innerHTML =
+      '<div class="dialog-heading dialog-content"><div><h2 id="contentLibraryTitle">Reusable library</h2><p class="muted">Create once, reuse when needed. Editing library cards keeps saved schedules unchanged.</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close library">×</button></div>' +
+      '<div class="dialog-tabs" role="tablist" aria-label="Library sections"><button class="dialog-tab" type="button" role="tab" data-action="library-section" data-section="activities" aria-selected="' + (libraryTab === 'activities') + '" aria-controls="libraryResults" id="libraryActivitiesTab">Activities</button><button class="dialog-tab" type="button" role="tab" data-action="library-section" data-section="suggestionPools" aria-selected="' + (libraryTab === 'suggestionPools') + '" aria-controls="libraryResults" id="libraryPoolsTab">Suggestion pools</button></div>' +
+      '<div class="library-browser"><div class="library-filters"><label class="field"><span>Search library</span><input id="librarySearch" type="search" value="' + esc(librarySearch) + '" placeholder="Name, category, or note…"></label><label class="field"><span>Category</span><select id="libraryCategory" aria-label="Library category"><option value="">All categories</option>' + categories.map((category) => '<option value="' + esc(category) + '"' + (category === libraryCategory ? ' selected' : '') + '>' + esc(category) + '</option>').join('') + '</select></label></div>' +
+      '<div class="button-row"><button class="button primary" type="button" data-action="library-create">＋ New ' + (libraryTab === 'activities' ? 'activity' : 'suggestion pool') + '</button><span class="muted library-context">' + (day && !day.removed ? 'Add to ' + esc(day.label) : 'Open a plan to add cards to a day.') + '</span></div><p id="libraryCount" role="status" class="muted"></p><div id="libraryResults" role="tabpanel" aria-labelledby="' + (libraryTab === 'activities' ? 'libraryActivitiesTab' : 'libraryPoolsTab') + '"></div></div>';
+    renderContentLibraryResults();
+    const dialog = document.getElementById('contentLibraryDialog');
+    if (!dialog.open) dialog.showModal();
+  }
+
+  function renderContentLibraryResults() {
+    const day = getDay(getPlan(), activeDayKey);
+    const query = librarySearch.toLowerCase().trim();
+    const entries = workspace[libraryTab].filter((item) => {
+      const categories = libraryTab === 'activities' ? [item.category] : item.candidates.map((candidate) => candidate.category);
+      return (!libraryCategory || categories.includes(libraryCategory)) && (!query || [item.title, item.note, ...categories].join(' ').toLowerCase().includes(query));
+    });
+    document.getElementById('libraryCount').textContent = entries.length + ' of ' + workspace[libraryTab].length + ' saved ' + (libraryTab === 'activities' ? 'activities' : 'pools');
+    document.getElementById('libraryResults').innerHTML = entries.length ? entries.map((item) => '<article class="library-entry"><div class="library-entry-heading">' + (libraryTab === 'activities' ? visualMarkup(item) : '<span class="activity-visual" aria-hidden="true">✦</span>') + '<div><h3>' + esc(item.title) + '</h3><p>' + (libraryTab === 'activities' ? esc(item.category) + ' · ' + item.duration + ' min' + (item.steps.length ? ' · ' + item.steps.length + ' steps' : '') : item.candidates.length + ' candidates · ' + item.duration + ' min · ' + esc(item.rerollMode) + ' rerolls') + '</p></div></div><div class="button-row">' +
+      '<button class="button small primary" type="button" data-action="library-add" data-id="' + esc(item.id) + '"' + (day && !day.removed ? '' : ' disabled') + '>Add to ' + (day && !day.removed ? esc(day.label) : 'day') + '</button>' +
+      ['edit', 'duplicate', 'remove'].map((action) => '<button class="button small secondary' + (action === 'remove' ? ' danger' : '') + '" type="button" data-action="library-' + action + '" data-id="' + esc(item.id) + '" aria-label="' + (action === 'remove' ? 'Remove ' + esc(item.title) + ' from library' : action[0].toUpperCase() + action.slice(1) + ' ' + esc(item.title)) + '">' + (action === 'remove' ? 'Remove from library' : action[0].toUpperCase() + action.slice(1)) + '</button>').join('') + '</div></article>').join('') : '<p class="library-empty">' + (workspace[libraryTab].length ? 'No matches. Try another search or category.' : 'No saved cards yet. Create one here without scheduling it.') + '</p>';
+  }
+
+  function libraryAction(action) {
+    const item = workspace[libraryTab].find((entry) => entry.id === action.dataset.id);
+    const name = action.dataset.action;
+    if (name === 'library-create' || (name === 'library-edit' && item)) {
+      document.getElementById('contentLibraryDialog').close();
+      if (libraryTab === 'activities') showActivityDialog(item ? 'library-edit' : 'library-new', item);
+      else showSuggestionDialog(item, '', true);
+    } else if (name === 'library-add' && item) {
+      const day = getDay(getPlan(), activeDayKey);
+      if (!day || day.removed) return;
+      const start = nextFreeStart(day, item.duration);
+      if (start === null) return showToast('There is not enough open time for this card on ' + day.label + '.');
+      const occurrence = libraryTab === 'activities' ? createOccurrence(item, start) : { ...snapshot(item), kind: 'suggestion', occurrenceId: makeId('scheduled'), poolId: item.id, sourceId: '', start: timeString(start), color: COLORS[0] };
+      if (!commitRecoveryChange(() => day.activities.push(occurrence))) return;
+      render();
+      showToast(item.title + ' added to ' + day.label + '.');
+    } else if (name === 'library-duplicate' && item) {
+      const copy = { ...snapshot(item), id: makeId(libraryTab === 'activities' ? 'activity' : 'pool'), title: cleanText(item.title, 94, '') + ' copy' };
+      if (!commitRecoveryChange(() => workspace[libraryTab].push(copy))) return;
+      showContentLibrary(false);
+    } else if (name === 'library-remove' && item) {
+      if (!window.confirm('Remove “' + item.title + '” from the library? Saved schedules keep their copies.')) return;
+      if (!commitRecoveryChange(() => { workspace[libraryTab] = workspace[libraryTab].filter((entry) => entry.id !== item.id); })) return;
+      showContentLibrary(false);
+      showToast('Removed from library. Saved schedules keep their copies.');
+    }
+  }
+
   function createOccurrence(item, start) {
     return {
       ...window.ScheduleStudio.symbolFields(item),
@@ -1627,11 +1827,24 @@
   function submitActivity(form) {
     const plan = getPlan();
     const day = getDay(plan, activeDayKey);
-    if (!day) return;
+    const libraryEditing = activityMode === 'library-edit' || activityMode === 'library-new';
+    if (!day && !libraryEditing) return;
     const errorNode = form.querySelector('#activityError');
     try {
       const result = formActivityData(form);
       const activity = result.activity;
+      if (libraryEditing) {
+        if (!commitRecoveryChange(() => {
+          const existing = workspace.activities.find((entry) => entry.id === editingActivityId);
+          if (existing) Object.assign(existing, activity, { id: existing.id });
+          else workspace.activities.push(activity);
+          savePendingPools();
+        })) throw new Error('Could not save this activity. Your draft is still here.');
+        pendingSuggestionPools.clear();
+        activityDialog.close();
+        showToast('Activity saved for future use. Scheduled copies keep their content.');
+        return;
+      }
       let start = result.start ? timeMinutes(result.start) : nextFreeStart(day, activity.duration);
       if (start === null || start === undefined) throw new Error('No open time remains for an activity of this duration.');
       const startValue = timeString(start);
@@ -1639,37 +1852,21 @@
         ? day.activities.find((entry) => entry.occurrenceId === editingActivityId)
         : null;
       if (activityMode === 'edit' && !occurrence) return activityDialog.close();
-      if (activityMode === 'edit') {
-        const prior = { ...occurrence };
-        Object.assign(occurrence, activity, { occurrenceId: prior.occurrenceId, sourceId: prior.sourceId, start: startValue });
-        const validation = validateDay(day);
-        if (validation) {
-          Object.assign(occurrence, prior);
-          throw new Error(validation);
-        }
-        if (result.updateLibrary && prior.sourceId) {
-          const libraryItem = workspace.activities.find((entry) => entry.id === prior.sourceId);
-          if (libraryItem) Object.assign(libraryItem, activity, { id: prior.sourceId });
-        }
-      } else {
+      const added = createOccurrence(result.saveToLibrary ? activity : { ...activity, id: '' }, start);
+      if (occurrence) Object.assign(added, { occurrenceId: occurrence.occurrenceId, sourceId: result.saveToLibrary ? activity.id : occurrence.sourceId });
+      const proposed = { ...day, activities: occurrence ? day.activities.map((entry) => entry === occurrence ? added : entry) : [...day.activities, added] };
+      const validation = validateDay(proposed);
+      if (validation) throw new Error(validation);
+      if (!commitRecoveryChange(() => {
+        day.activities = proposed.activities;
         if (result.saveToLibrary) workspace.activities.push(activity);
-        const added = createOccurrence(result.saveToLibrary ? activity : { ...activity, id: '' }, start);
-        if (!result.saveToLibrary) added.sourceId = '';
-        day.activities.push(added);
-        const validation = validateDay(day);
-        if (validation) {
-          day.activities = day.activities.filter((entry) => entry.occurrenceId !== added.occurrenceId);
-          if (result.saveToLibrary) workspace.activities = workspace.activities.filter((entry) => entry.id !== activity.id);
-          throw new Error(validation);
+        if (result.updateLibrary && occurrence?.sourceId) {
+          const libraryItem = workspace.activities.find((entry) => entry.id === occurrence.sourceId);
+          if (libraryItem) Object.assign(libraryItem, activity, { id: libraryItem.id });
         }
-      }
-      for (const [id, pool] of pendingSuggestionPools) {
-        const existingPool = workspace.suggestionPools.find((entry) => entry.id === id);
-        if (existingPool) Object.assign(existingPool, pool);
-        else workspace.suggestionPools.push(pool);
-      }
+        savePendingPools();
+      })) throw new Error('Could not save this activity. Your draft is still here.');
       pendingSuggestionPools.clear();
-      persist();
       activityDialog.close();
       render();
       if (activityMode === 'edit') focusActivityAction('edit-activity', editingActivityId);
@@ -1677,6 +1874,14 @@
       showToast(activityMode === 'edit' ? 'Activity updated.' : 'Activity added to ' + day.label + '.');
     } catch (error) {
       if (errorNode) errorNode.textContent = error.message || 'Could not save this activity.';
+    }
+  }
+
+  function savePendingPools() {
+    for (const [id, pool] of pendingSuggestionPools) {
+      const existing = workspace.suggestionPools.find((entry) => entry.id === id);
+      if (existing) Object.assign(existing, snapshot(pool));
+      else workspace.suggestionPools.push(snapshot(pool));
     }
   }
 
@@ -1714,13 +1919,14 @@
     const destination = getDay(plan, destinationKey);
     if (!source || !destination || destination.key === source.key) return;
     if (destination.activities.length && !window.confirm(destination.label + ' already has scheduled items. Replace its schedule with a copy of ' + source.label + '?')) return;
+    const before = snapshot(destination);
     destination.start = source.start;
     destination.end = source.end;
     destination.printLayout = source.printLayout;
     destination.printTimes = source.printTimes;
     destination.printSpacing = source.printSpacing;
     destination.activities = source.activities.map((item) => ({ ...JSON.parse(JSON.stringify(item)), occurrenceId: makeId('scheduled') }));
-    persist();
+    if (!saveDayChange(plan, destination, before, 'copying to ' + destination.label)) return;
     render();
     app.querySelector('.day-tab[aria-pressed="true"]')?.focus();
     showToast(source.label + ' copied to ' + destination.label + '.');
@@ -1731,27 +1937,23 @@
     const day = getDay(plan, activeDayKey);
     if (!day || !day.activities.length) return;
     if (!window.confirm('Clear everything scheduled on ' + day.label + '?')) return;
+    const before = snapshot(day);
     day.activities = [];
-    persist();
+    if (!saveDayChange(plan, day, before, 'clearing ' + day.label)) return;
     render();
     focusAddActivity();
     showToast(day.label + ' is clear.');
   }
 
-  function deleteDay() {
+  function hideDay() {
     const plan = getPlan();
     const day = getDay(plan, activeDayKey);
     if (!day || day.removed) return;
-    const message = day.activities.length
-      ? 'Delete ' + day.label + ' and its ' + day.activities.length + ' scheduled item' + (day.activities.length === 1 ? '' : 's') + ' from this week?'
-      : 'Delete ' + day.label + ' from this week?';
-    if (!window.confirm(message)) return;
     const next = visibleDays(plan).find((entry) => entry.key !== day.key);
     day.removed = true;
-    day.activities = [];
     persist();
     routeToPlan(currentPlanId, next ? next.key : activeDayKey);
-    showToast(day.label + ' deleted.');
+    showToast(day.label + ' hidden. Its items are kept; add it back from Hidden days.');
   }
 
   function restoreDay(key) {
@@ -1765,38 +1967,47 @@
   }
 
   function removeActivity(occurrenceId) {
-    const day = getDay(getPlan(), activeDayKey);
+    const plan = getPlan();
+    const day = getDay(plan, activeDayKey);
     if (!day) return;
     const item = day.activities.find((entry) => entry.occurrenceId === occurrenceId);
     const label = item && (item.kind === 'open-slot' ? 'this open slot' : item.kind === 'choice' ? 'this choice' : item.kind === 'video' ? 'this video' : '“' + item.title + '”');
-    if (!item || !window.confirm('Remove ' + label + ' from ' + day.label + '?')) return;
+    if (!item) return;
+    const before = snapshot(day);
     day.activities = day.activities.filter((entry) => entry.occurrenceId !== occurrenceId);
-    persist();
+    if (!saveDayChange(plan, day, before, 'removing ' + label + ' from ' + day.label)) return;
     render();
     focusAddActivity();
+    showToast('Removed from ' + day.label + '. Undo is available during this session.');
   }
 
   function moveActivity(occurrenceId, direction) {
-    const day = getDay(getPlan(), activeDayKey);
+    const plan = getPlan();
+    const day = getDay(plan, activeDayKey);
     if (!day) return;
     const items = sortedActivities(day);
     const index = items.findIndex((entry) => entry.occurrenceId === occurrenceId);
     const target = index + Number(direction);
     if (index < 0 || target < 0 || target >= items.length) return;
-    [items[index], items[target]] = [items[target], items[index]];
-    const totalMinutes = items.reduce((total, item) => total + item.duration, 0);
-    if (timeMinutes(day.start) + totalMinutes > timeMinutes(day.end)) {
-      return showToast('There is not enough session time to move items into this order.');
+    const before = snapshot(day);
+    const earlier = items[Math.min(index, target)];
+    const later = items[Math.max(index, target)];
+    const earlierStart = earlier.start;
+    const laterStart = later.start;
+    const gap = timeMinutes(laterStart) - timeMinutes(earlierStart) - earlier.duration;
+    // Swap within the same span, retaining the gap and every other item's time.
+    later.start = earlierStart;
+    earlier.start = timeString(timeMinutes(earlierStart) + later.duration + gap);
+    const validation = validateDay(day);
+    if (validation) {
+      earlier.start = earlierStart;
+      later.start = laterStart;
+      return showToast(validation);
     }
-    let cursor = timeMinutes(day.start);
-    for (const item of items) {
-      item.start = timeString(cursor);
-      cursor += item.duration;
-    }
-    day.activities = items;
-    persist();
+    if (!saveDayChange(plan, day, before, 'moving items on ' + day.label)) return;
     render();
     focusActivityAction('move-activity', occurrenceId, direction);
+    showToast('Neighboring items swapped. Other times and the gap are kept.');
   }
 
   function exportPlan() {
@@ -1916,6 +2127,21 @@
     const action = event.target.closest('[data-action]');
     if (!action) return;
     const name = action.dataset.action;
+    if (action.closest('#addItemDialog')) document.getElementById('addItemDialog').close();
+    const planTools = action.closest('.plan-tools');
+    if (planTools) planTools.open = false;
+    if (name === 'undo-change') { undoLastChange(); return; }
+    if (name === 'restore-plan') { restorePlan(action.dataset.plan); return; }
+    if (name === 'open-content-library') { showContentLibrary(); return; }
+    if (name === 'library-section') { libraryTab = action.dataset.section; showContentLibrary(); document.getElementById(libraryTab === 'activities' ? 'libraryActivitiesTab' : 'libraryPoolsTab').focus(); return; }
+    if (['library-create', 'library-edit', 'library-add', 'library-duplicate', 'library-remove'].includes(name)) { libraryAction(action); return; }
+    if (name === 'toggle-visual-picker') {
+      const picker = action.closest('form').querySelector('#visualPicker');
+      picker.hidden = !picker.hidden;
+      action.setAttribute('aria-expanded', String(!picker.hidden));
+      if (!picker.hidden) picker.querySelector('input').focus();
+      return;
+    }
     if (name === 'search-arasaac' || name === 'clear-picture') {
       const target = arasaacTarget(action);
       if (target) {
@@ -1944,6 +2170,8 @@
     else if (name === 'duplicate-plan') duplicatePlan(action.dataset.plan);
     else if (name === 'delete-plan' || name === 'delete-current-plan') deletePlan(action.dataset.plan);
     else if (name === 'select-day') routeToPlan(currentPlanId, action.dataset.day);
+    else if (name === 'add-item') showAddItemDialog();
+    else if (name === 'add-library') { libraryTab = 'activities'; showContentLibrary(); }
     else if (name === 'add-activity') showActivityDialog('new');
     else if (name === 'add-open-slot') showOpenSlotDialog('new');
     else if (name === 'configure-step-suggestion') {
@@ -2051,9 +2279,10 @@
     else if (name === 'move-activity') moveActivity(action.dataset.id, action.dataset.direction);
     else if (name === 'copy-day') copyDay();
     else if (name === 'clear-day') clearDay();
-    else if (name === 'delete-day') deleteDay();
+    else if (name === 'hide-day') hideDay();
     else if (name === 'restore-day') restoreDay(action.dataset.day);
-    else if (name === 'print-day') window.print();
+    else if (name === 'open-print-setup') showPrintSetup();
+    else if (name === 'print-day') { document.getElementById('printDialog').close(); window.print(); }
     else if (name === 'export-plan') exportPlan();
     else if (name === 'import-plan') importPlan();
   });
@@ -2081,6 +2310,7 @@
   });
 
   document.addEventListener('change', (event) => {
+    if (event.target.id === 'libraryCategory') { libraryCategory = event.target.value; renderContentLibraryResults(); }
     if (event.target.matches('[data-day-time]')) changeDayWindow(event.target);
     if (event.target.id === 'cropSource') loadCropFile(event.target.files && event.target.files[0]);
     if (event.target.id === 'cropPreset') {
@@ -2108,6 +2338,7 @@
       document.body.dataset.printLayout = day.printLayout;
       document.body.dataset.printTimes = day.printTimes ? 'true' : 'false';
       document.body.dataset.printSpacing = day.printSpacing;
+      document.getElementById('printSpacingField').hidden = day.printLayout !== 'cards';
       persist();
     }
     if (event.target.id === 'importFile') importFile(event.target.files && event.target.files[0]);
@@ -2122,8 +2353,17 @@
   });
 
   document.addEventListener('input', (event) => {
+    if (event.target.id === 'librarySearch') { librarySearch = event.target.value; renderContentLibraryResults(); }
     if (event.target.form?.id === 'videoForm' && event.target.name === 'start') renderVideoDraft();
-    if (event.target.matches('input[name="icon"]')) updateSymbolPreview(event.target.form);
+    if (event.target.matches('input[name="icon"]')) {
+      const form = event.target.form;
+      const picture = form.elements.pictogramUrl || form.elements.optionPictogram;
+      if (picture) picture.value = '';
+      if (form.elements.imageAssetId) form.elements.imageAssetId.value = '';
+      const preview = form.querySelector('#imageAssetPreview');
+      if (preview) preview.innerHTML = renderImageAssetPreview('');
+      setFormSymbol(form, {});
+    }
     if (event.target.id === 'symbolSearch') {
       activeSymbolGroup = 'All';
       renderSymbolResults(event.target.form);
@@ -2134,7 +2374,7 @@
       document.getElementById('imageAssetPreview').innerHTML = event.target.value.trim()
         ? '<span class="muted">Image reference will load on the activity.</span>'
         : renderImageAssetPreview('');
-      setFormSymbol(form, formSymbolFields(form));
+      setFormSymbol(form, {});
     }
     if (event.target.id === 'cropQuality') document.getElementById('cropQualityLabel').textContent = event.target.value + '%';
     if (event.target.id === 'cropZoom') {
@@ -2144,6 +2384,17 @@
   });
 
   document.addEventListener('keydown', (event) => {
+    if (event.target.dataset.action === 'library-section' && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+      event.preventDefault();
+      document.getElementById(libraryTab === 'activities' ? 'libraryPoolsTab' : 'libraryActivitiesTab').click();
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'z' &&
+        !document.querySelector('dialog[open]') && !event.target.closest('input, textarea, select, [contenteditable]') && undoHistory.length) {
+      event.preventDefault();
+      undoLastChange();
+      return;
+    }
     if (event.target.id === 'optionTitle' && event.key === 'Enter') {
       event.preventDefault();
       addComposedOption(event.target.form);
@@ -2162,6 +2413,14 @@
     picker.hidden = true;
     form.querySelector('[data-action="toggle-symbol-picker"]').setAttribute('aria-expanded', 'false');
     form.querySelector('[data-action="toggle-symbol-picker"]').focus();
+  });
+
+  activityDialog.addEventListener('close', (event) => {
+    if (event.target === activityDialog && ['library-edit', 'library-new', 'pool-edit', 'pool-new'].includes(activityMode)) {
+      activityMode = '';
+      pendingSuggestionPools.clear();
+      showContentLibrary(false);
+    }
   });
 
   // A YouTube still that fails to load (offline, a removed video) falls back to the play tile.

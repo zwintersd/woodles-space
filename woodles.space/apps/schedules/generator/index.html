@@ -16,9 +16,24 @@
 <body>
   <header class="topbar">
     <a class="wordmark" href="/schedules"><span class="wordmark-icon" aria-hidden="true">▦</span><span>Schedule studio</span></a>
-    <div class="heading-actions"><button class="button secondary" type="button" data-action="manage-custom-symbols">Custom symbols</button><span class="save-status" id="saveStatus" role="status">Saved on this device</span></div>
+    <div class="heading-actions"><button class="button secondary" type="button" id="undoButton" data-action="undo-change" disabled title="Undo moves, removal, copying, and clearing during this session">Undo</button><button class="button secondary" type="button" data-action="manage-custom-symbols">Custom symbols</button><span class="save-status" id="saveStatus" role="status">Saved on this device</span></div>
   </header>
   <main id="app" class="app-main"></main>
+  <dialog id="contentLibraryDialog" class="dialog activity-dialog" aria-labelledby="contentLibraryTitle"><div id="contentLibraryBody"></div></dialog>
+  <dialog id="addItemDialog" class="dialog" aria-labelledby="addItemTitle">
+    <div class="dialog-content">
+      <div class="dialog-heading"><div><h2 id="addItemTitle">Add an item</h2><p class="muted">Choose what belongs in this part of the day.</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close add item">×</button></div>
+      <div class="item-chooser">
+        <button type="button" data-action="add-activity"><strong>Activity</strong><span>Do something, with optional steps</span></button>
+        <button type="button" data-action="add-library"><strong>From activity library</strong><span>Reuse an activity you have saved</span></button>
+        <button type="button" data-action="add-choice"><strong>Choice</strong><span>Let the learner pick from options</span></button>
+        <button type="button" data-action="add-video"><strong>Video</strong><span>Watch one or choose a video</span></button>
+        <button type="button" data-action="add-suggestion"><strong>Suggestion</strong><span>Offer a random idea from a pool</span></button>
+        <button type="button" data-action="add-open-slot"><strong>Open time</strong><span>Reserve time for a break or transition</span></button>
+      </div>
+    </div>
+  </dialog>
+  <dialog id="printDialog" class="dialog" aria-labelledby="printTitle"><div id="printDialogBody" class="dialog-content"></div></dialog>
   <dialog id="planDialog" class="dialog">
     <form id="planForm" method="dialog">
       <div class="dialog-heading"><div><span class="eyebrow">New plan</span><h2>Start with a learner</h2></div><button class="icon-button" type="button" data-close-dialog aria-label="Close">×</button></div>

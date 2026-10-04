@@ -1,3 +1,4 @@
+import { addScheduleItem, openScheduleTools, openActivitySection } from './support/schedule-planner';
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -10,9 +11,11 @@ test('suggestions can be configured, saved and used inside an activity step', as
     localStorage.setItem(studio.STORAGE_KEY, JSON.stringify({ plans: [studio.sanitizePlan({ id: 'nested', learner: 'Sam', name: 'Nested suggestions', days: [] })], activities: [], images: [] }));
   });
   await page.goto('/schedules/generator?plan=nested&day=monday');
-  await page.locator('[data-action="add-activity"]').first().click();
+  await addScheduleItem(page, 'activity');
   await page.locator('#activityForm [name="title"]').fill('Afternoon routine');
+  await openActivitySection(page, 'details');
   await page.locator('#activityForm [name="note"]').fill('Keep this parent draft');
+  await openActivitySection(page, 'steps');
   await page.locator('[data-action="add-activity-step"]').click();
   await page.locator('[data-step-field="title"]').fill('Pick a short activity');
   await page.locator('[data-step-kind="0"]').selectOption('suggestion');
@@ -65,6 +68,7 @@ test('suggestions can be configured, saved and used inside an activity step', as
   const occurrence = workspace.plans[0].days[0].activities[0].occurrenceId;
   const stepId = workspace.plans[0].days[0].activities[0].steps[0].id;
   const exporting = page.waitForEvent('download');
+  await openScheduleTools(page, 'plan');
   await page.locator('[data-action="export-plan"]').click();
   const download = await exporting;
   await page.locator('#importFile').setInputFiles((await download.path())!);

@@ -1,3 +1,4 @@
+import { addScheduleItem, openScheduleTools } from './support/schedule-planner';
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -32,7 +33,7 @@ test('maker pools, rules, saved steps and pictures survive copies and export/imp
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await blankPlan(page);
-  await page.locator('[data-action="add-suggestion"]').click();
+  await addScheduleItem(page, 'suggestion');
   await page.locator('#suggestionForm button[type="submit"]').click();
   await expect(page.locator('#suggestionError')).toContainText('Enable at least one');
   await page.locator('[data-action="suggestion-library-candidate"]').click();
@@ -53,16 +54,18 @@ test('maker pools, rules, saved steps and pictures survive copies and export/imp
   expect(saved.plans[0].days[0].activities).toHaveLength(1);
   expect(saved.suggestionPools).toHaveLength(1);
   expect(saved.suggestionPools[0].candidates[0].steps).toHaveLength(2);
+  await openScheduleTools(page, 'day');
   await page.locator('#copyDestination').selectOption('tuesday');
   await page.locator('[data-action="copy-day"]').click();
   await page.locator('[data-action="edit-suggestion"]').click();
   await expect(page.getByRole('combobox', { name: 'Rerolls', exact: true })).toHaveValue('limited');
   await page.getByLabel('Rerolls after the first spin').fill('2');
+  await page.locator('#suggestionForm [name="savePool"]').check();
   await page.locator('#suggestionForm button[type="submit"]').click();
   saved = await savedState(page);
   expect(saved.plans[0].days[0].activities[0].maxRerolls).toBe(2);
   expect(saved.plans[0].days[1].activities[0].maxRerolls).toBe(1);
-  await page.locator('[data-action="add-suggestion"]').click();
+  await addScheduleItem(page, 'suggestion');
   await page.locator('#suggestionPool').selectOption(saved.suggestionPools[0].id);
   await expect(page.locator('.suggestion-candidate')).toHaveCount(3);
   await expect(page.getByLabel('Rerolls after the first spin')).toHaveValue('2');
@@ -71,6 +74,7 @@ test('maker pools, rules, saved steps and pictures survive copies and export/imp
   await expect(page.locator('.suggestion-card').first()).toBeVisible();
   await page.emulateMedia({ media: 'screen' });
   const exporting = page.waitForEvent('download');
+  await openScheduleTools(page, 'plan');
   await page.locator('[data-action="export-plan"]').click();
   const download = await exporting;
   await page.locator('#importFile').setInputFiles((await download.path())!);
@@ -224,7 +228,7 @@ test('weighted policy handles limits, unavailable items, exhaustion and configur
 
 test('suggestion setup and learner controls meet automated accessibility checks', async ({ page }) => {
   await blankPlan(page);
-  await page.locator('[data-action="add-suggestion"]').click();
+  await addScheduleItem(page, 'suggestion');
   await page.locator('[data-action="suggestion-library-candidate"]').click();
   const maker = await new AxeBuilder({ page }).include('#suggestionForm').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
   expect(maker.violations, JSON.stringify(maker.violations, null, 2)).toEqual([]);

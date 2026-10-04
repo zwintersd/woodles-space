@@ -373,7 +373,7 @@
     if (!day) {
       document.title = plan.learner + ' · Visual schedule';
       el('intro').textContent = plan.name;
-      showNotice('No days in this plan', 'Every day was deleted from this weekly plan. Add a day back in the planner.', false);
+      showNotice('All days are hidden', 'Add a day back in the planner to use its saved schedule.', false);
       tick();
       return;
     }
