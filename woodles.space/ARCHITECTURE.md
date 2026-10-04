@@ -104,6 +104,10 @@ other docs have narrower jobs:
   - `apps/homesuite/`: `ASSESSMENT.md` (a dated 2026-09-27 review of the
     shell, the bridge, and Data — verified findings and a staged fix plan;
     a snapshot, like `../AUDIT.md`, not live truth).
+  - `apps/companion/`: `DESIGN.md` (why the Chrome extension is a thin
+    shell around a page the site serves, the message protocol, capture,
+    permissions, and what was deliberately left out), and
+    `extension/README.md` (installing it unpacked).
   - `apps/write`, `apps/letter`, `apps/bestiary`: no doc file of their own
     — their publish/passphrase behavior is documented once, centrally, in
     "the public read path" below, rather than duplicated three times.
@@ -164,7 +168,8 @@ woodles.space/
     ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking — a camera that knows where it is, cards that say more than they show, stacks that do more than hold them, and doorways into other boards
     ├── bloomforge/          SvelteKit · a studio for making incremental games
     ├── bloomforge-player/   SvelteKit · the runtime that makes those games playable
-    └── grimoire/            SvelteKit · the studio Bloomforge pivoted toward, built on @woodles/witch-engine
+    ├── grimoire/            SvelteKit · the studio Bloomforge pivoted toward, built on @woodles/witch-engine
+    └── companion/           SvelteKit · woodles.space in Chrome's side panel — the page, plus extension/, the shell that frames it
 ```
 
 `animations/` is the Python/Manim authoring side of Hygge's motion workshop. it
@@ -180,7 +185,7 @@ the repository or silently promoting an experiment into a game.
 ## the app manifest
 
 `packages/app-manifest/src/index.js` is the canonical deployable-app inventory.
-It owns the 23 app ids, names, public paths and aliases, app shape, source and
+It owns the 24 app ids, names, public paths and aliases, app shape, source and
 output locations, maturity, and landing visibility. It also owns the landing
 tile order/copy, **band**, default pins, featured fallback, and Marginalia's
 Reading Room sub-surface. A band is the *moment* a tile is for rather than the
@@ -245,7 +250,7 @@ type="importmap">`, still with no build step.
 
 **SvelteKit apps** — `homesuite`, `data`, `write`, `marginalia`, `planner`,
 `bestiary`, `thinking-about`, `whiteboard`, `bloomforge`, `bloomforge-player`,
-`grimoire` — use Svelte 5 runes, Vite 7, and `@sveltejs/adapter-static`.
+`grimoire`, `companion` — use Svelte 5 runes, Vite 7, and `@sveltejs/adapter-static`.
 each builds to `apps/<name>/dist/` and consumes `shared/` through the `@shared`
 Vite alias (`../../shared`). there is no SSR; every app ships as a static bundle.
 
@@ -1228,10 +1233,9 @@ the app it stays in forever.
 
 **`packages/handoff` (`@woodles/handoff`)** — `createHandoffQueue(target)` over
 one versioned localStorage document per target (`woodles.handoff.<target>.v1`).
-`write` is now the only app that can receive: `notebook` left the target list
+`write` and `whiteboard` are the receivers: `notebook` left the target list
 when it retired into Write, and `spores` left it the same way when it retired
-into Write in turn, so there is nothing left to route *between* — the handoff
-spine still exists for whatever catches a thought next. Read-only surfaces
+into Write in turn; `whiteboard` joined later (below). Read-only surfaces
 (echoes) are not targets. `send()`
 appends, `drain()` empties, `peek()`/`count()` don't consume. The envelope is
 `{ id, target, title, body, format, tags, source, createdAt }`, where `format`
@@ -1252,6 +1256,20 @@ Three deliberate choices, each tested:
 arrival its own draft (tags carried onto the index) and opens the newest.
 HTML bodies run through `sanitizeHtml` — a body may be model output from
 another app entirely, and write's drafts can reach the public publish path.
+`whiteboard` joined the target list when it grew an Inbox, and files each
+arrival there as a plain-text card.
+
+**the first sender from outside the site** is the companion
+(`apps/companion`): a Chrome extension whose side panel frames `/companion`,
+so a line, link, image, or page right-clicked anywhere on the web becomes a
+handoff to Write or a board. The frame is what lets it write these queues at
+all — Chrome leaves an extension-hosted frame of a site the extension has
+host permission for unpartitioned, so it shares a woodles.space tab's
+localStorage. A capture's id becomes its handoff's id, so redelivery from the
+extension is caught by `peek()` rather than filed twice. The page also reads
+`pendingCounts`, HomeSuite's recent ledger, and the Life Points ledger, and
+writes nothing but handoffs. See
+[`apps/companion/DESIGN.md`](./apps/companion/DESIGN.md).
 
 ## the sync layer
 

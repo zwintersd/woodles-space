@@ -1,0 +1,100 @@
+/* The panel's own chrome is only ever seen while the page loads or can't.
+   Colours are HomeSuite's page tokens (shared/homesuiteTheme.css), copied
+   because an extension can't link the site's stylesheet before it can
+   reach the site — the same reason this file exists at all. */
+
+:root {
+	color-scheme: light dark;
+	--page: #faf7f2;
+	--ink-soft: #544463;
+	--muted: #6c5e76;
+	--line: #e3dae5;
+	--accent: #5c4475;
+	--on-accent: #ffffff;
+	--focus: #6959a4;
+	--g1: #c9bfee;
+	--g2: #f5c8a8;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--page: #1d1822;
+		--ink-soft: #d8cbe0;
+		--muted: #b3a5bd;
+		--line: #3a3143;
+		--accent: #7a5c9e;
+		--focus: #b9a2e0;
+		--g1: #8b7fbe;
+		--g2: #c8866a;
+	}
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+	margin: 0;
+	height: 100%;
+	background: var(--page);
+}
+
+iframe {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border: 0;
+}
+
+iframe[hidden], [hidden] { display: none !important; }
+
+.waiting {
+	display: grid;
+	place-content: center;
+	justify-items: center;
+	gap: 10px;
+	min-height: 100%;
+	padding: 24px 16px;
+	text-align: center;
+	font: 15px/1.5 Georgia, serif;
+	color: var(--ink-soft);
+}
+
+.mark {
+	width: 40px;
+	height: 40px;
+	border-radius: 12px;
+	background: linear-gradient(140deg, var(--g1), var(--g2));
+	animation: breathe 2.4s ease-in-out infinite;
+}
+
+.status { margin: 0; font-style: italic; }
+
+.pending {
+	margin: 0;
+	max-width: 30ch;
+	font: 13px/1.5 system-ui, sans-serif;
+	color: var(--muted);
+}
+
+button {
+	margin-top: 6px;
+	padding: 7px 16px;
+	border: 0;
+	border-radius: 999px;
+	background: var(--accent);
+	color: var(--on-accent);
+	font: 500 13px/1 system-ui, sans-serif;
+	cursor: pointer;
+}
+
+button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+@keyframes breathe {
+	50% { transform: scale(0.92); opacity: 0.7; }
+}
+
+/* it has stopped trying, so the mark stops breathing */
+.stalled .mark { animation: none; opacity: 0.6; }
+
+@media (prefers-reduced-motion: reduce) {
+	.mark { animation: none; }
+}

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>woodles</title>
+	<link rel="stylesheet" href="panel.css" />
+	<script type="module" src="panel.js"></script>
+</head>
+<body>
+	<!-- the companion itself: woodles.space/companion, drawn by the site -->
+	<iframe id="companion" title="woodles" hidden></iframe>
+
+	<!-- shown until the page says it is listening, and again if it never does -->
+	<main class="waiting" id="waiting">
+		<span class="mark" aria-hidden="true"></span>
+		<p class="status" id="status" role="status">opening woodles…</p>
+		<p class="pending" id="pending" hidden></p>
+		<button type="button" id="retry" hidden>try again</button>
+	</main>
+</body>
+</html>
