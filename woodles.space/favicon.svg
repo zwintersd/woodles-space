@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Woodles</title>
+  <rect x="2" y="2" width="60" height="60" rx="18" fill="#c9bfee"/>
+  <path d="M14 21c1 16 4 23 10 23 5 0 7-8 8-16 1 8 3 16 8 16 6 0 10-10 11-23"
+    fill="none" stroke="#3a2d72" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

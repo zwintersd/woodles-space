@@ -18,6 +18,11 @@ so it's not easy to forget.
 
 ---
 
+## 2026-10-04
+
+- **a mark for woodles** — a soft, hand-drawn w in lapis on lavender now
+  identifies every room in browser tabs and saved home-screen shortcuts.
+
 ## 2026-09-30
 
 - **every palette gets a landing look** — all fifteen themes now choose their
