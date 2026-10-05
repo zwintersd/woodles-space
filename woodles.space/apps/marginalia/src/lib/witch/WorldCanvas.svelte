@@ -27,11 +27,16 @@
 		FIELD_COLS,
 		FIELD_ROWS,
 		TILE_ELEVATION_SCALE,
+		TILE_SCREEN_WIDTH,
 		SEABED_ALPHA,
+		fieldBounds,
 		fieldOrigin,
 		fieldTiles,
+		gridExtent,
+		panLimit,
 		tileAtPoint,
-		tileElevation
+		tileElevation,
+		tileNearest
 	} from './hexField';
 	import {
 		heightAboveSea,
@@ -90,30 +95,121 @@
 
 	let activePointerId: number | null = null;
 	let pourPoint: { x: number; y: number } | null = null;
+	/** Where the pointer is, in client pixels, so a pour can follow the tile under it as the view moves. */
+	let pourClient: { x: number; y: number } | null = null;
 	let lastPourAt = 0;
+
+	// ── the camera ───────────────────────────────────────────────────────────────
+	//
+	// The frame holds FIELD_COLS columns; a world that has grown is wider, and the
+	// camera is a translation along it — axonometry has no perspective to recompute,
+	// so panning moves the origin and nothing else. Measured in tile columns from
+	// the centred view, positive looking east, and not saved: she always comes back
+	// to the home island, which is where the pan starts.
+	const worldExtent = $derived(gridExtent(book.worldShape.sedimentGrid));
+	const reach = $derived(panLimit(worldExtent));
+	let panTarget = $state(0);
+	/** The eased position the frame is actually drawn at, chasing panTarget. */
+	let panNow = 0;
+	/** How far a tap on an arrow carries the view, in columns — a third of the frame. */
+	const PAN_STEP = 5;
+	const PAN_EASE = 9;
+
+	const clampPan = (cols: number) => Math.max(-reach, Math.min(reach, cols));
+
+	function cameraOrigin(extent = worldExtent): { x: number; y: number } {
+		const origin = fieldOrigin(extent);
+		return { x: origin.x - panNow * TILE_SCREEN_WIDTH, y: origin.y };
+	}
+
+	function panBy(cols: number) {
+		panTarget = clampPan(panTarget + cols);
+	}
+
+	function panKey(event: KeyboardEvent) {
+		if (event.key === 'ArrowLeft') panBy(-PAN_STEP);
+		else if (event.key === 'ArrowRight') panBy(PAN_STEP);
+		else return;
+		event.preventDefault();
+	}
+
+	let panPointerId: number | null = null;
+	let panDragX = 0;
+
+	function startPan(event: PointerEvent) {
+		panPointerId = event.pointerId;
+		panDragX = event.clientX;
+		canvasEl?.setPointerCapture(event.pointerId);
+		event.preventDefault();
+	}
+
+	function movePan(event: PointerEvent) {
+		if (event.pointerId !== panPointerId || !canvasEl) return;
+		// a missed pointerup (a hidden tab, a lost capture) must not leave hovering as a drag
+		if (event.pointerType === 'mouse' && event.buttons === 0) {
+			stopPan(event);
+			return;
+		}
+		const rect = canvasEl.getBoundingClientRect();
+		if (rect.width <= 0) return;
+		// dragging the world one way moves the camera the other, and the view follows
+		// the hand rather than easing after it
+		const cols = -((event.clientX - panDragX) / rect.width) / TILE_SCREEN_WIDTH;
+		panDragX = event.clientX;
+		// from where the view is, not where an arrow tap sent it, so a drag does not jump
+		panTarget = clampPan(panNow + cols);
+		panNow = panTarget;
+	}
+
+	function stopPan(event?: PointerEvent) {
+		if (event && event.pointerId !== panPointerId) return;
+		if (panPointerId !== null && canvasEl?.hasPointerCapture(panPointerId)) {
+			canvasEl.releasePointerCapture(panPointerId);
+		}
+		panPointerId = null;
+	}
+
+	// Shift, the middle button, or any drag when there is nothing to pour with. A
+	// plain drag is the pour — that is the one gesture the world already has.
+	function startPointer(event: PointerEvent) {
+		const pannable = reach > 0;
+		if (pannable && (event.button === 1 || event.shiftKey || !book.canPourSediment())) {
+			startPan(event);
+			return;
+		}
+		startPour(event);
+	}
+
+	function stopPointer(event?: PointerEvent) {
+		stopPan(event);
+		stopPour(event);
+	}
 
 	// screen point -> a place in the density field. tileAtPoint resolves the hex
 	// tile under the pointer and hands back its (u, v) in the grid's own [0, 1]
 	// coordinates, returning null off the field — which is what stops a pour
 	// writing past the edge of the world.
-	function pointerToWaterPoint(event: PointerEvent): { x: number; y: number } | null {
+	function clientToWaterPoint(clientX: number, clientY: number): { x: number; y: number } | null {
 		const canvas = canvasEl;
 		if (!canvas) return null;
 		const rect = canvas.getBoundingClientRect();
 		if (rect.width <= 0 || rect.height <= 0) return null;
 		const tile = tileAtPoint(
-			clamp01((event.clientX - rect.left) / rect.width),
-			(event.clientY - rect.top) / rect.height
+			(clientX - rect.left) / rect.width,
+			(clientY - rect.top) / rect.height,
+			cameraOrigin(),
+			worldExtent
 		);
 		return tile === null ? null : { x: tile.u, y: tile.v };
 	}
 
 	function startPour(event: PointerEvent) {
 		if (!book.canPourSediment()) return;
-		const point = pointerToWaterPoint(event);
+		const point = clientToWaterPoint(event.clientX, event.clientY);
 		if (!point) return;
 		activePointerId = event.pointerId;
 		pourPoint = point;
+		pourClient = { x: event.clientX, y: event.clientY };
 		lastPourAt = performance.now();
 		isPouring = true;
 		canvasEl?.setPointerCapture(event.pointerId);
@@ -122,7 +218,8 @@
 
 	function movePour(event: PointerEvent) {
 		if (event.pointerId !== activePointerId) return;
-		const point = pointerToWaterPoint(event);
+		pourClient = { x: event.clientX, y: event.clientY };
+		const point = clientToWaterPoint(event.clientX, event.clientY);
 		if (point) pourPoint = point;
 	}
 
@@ -134,6 +231,7 @@
 		if (isPouring) book.finishPourSediment();
 		activePointerId = null;
 		pourPoint = null;
+		pourClient = null;
 		isPouring = false;
 	}
 
@@ -157,6 +255,9 @@
 		let sedimentBakedGrid: SedimentGrid | null = null;
 		let sedimentBakedW = 0;
 		let sedimentBakedH = 0;
+		// where the baked canvas sits, in canvas fractions with the camera centred
+		let sedimentBakedLeft = 0;
+		let sedimentBakedSpan = 1;
 
 		const motionQuery =
 			typeof matchMedia !== 'undefined' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
@@ -429,8 +530,8 @@
 		const CORNERS = hexCorners();
 
 		// The closest thing this camera has to a horizon: where the field's far edge
-		// sits on screen before any elevation lifts it. fieldOrigin() depends only on
-		// FIELD_COLS/FIELD_ROWS, so this is a constant, not something to recompute
+		// sits on screen before any elevation lifts it. fieldOrigin().y depends only on
+		// FIELD_ROWS (the world grows sideways), so this is a constant, not something to recompute
 		// per frame. Weather and ambient effects that used to anchor to the vanished
 		// waterline (WATER_TOP, retired with the perspective camera) anchor here.
 		const FIELD_HORIZON_Y = fieldOrigin().y;
@@ -490,12 +591,11 @@
 			u: number,
 			v: number
 		): { x: number; y: number; elevation: number; col: number; row: number; land: boolean } {
-			const col = Math.max(0, Math.min(FIELD_COLS - 1, Math.round(clamp01(u) * (FIELD_COLS - 1))));
-			const row = Math.max(0, Math.min(FIELD_ROWS - 1, Math.round(clamp01(v) * (FIELD_ROWS - 1))));
+			const { col, row } = tileNearest(u, v, worldExtent);
 			const { q, r } = offsetToAxial(col, row);
 			const elevation = tileElevation(book.worldShape.sedimentGrid, col, row);
 			const standing = elevation >= SEA_LEVEL ? elevation : Math.min(elevation, SEA_LEVEL * 0.92);
-			const p = projectHex(q, r, standing, fieldOrigin());
+			const p = projectHex(q, r, standing, cameraOrigin());
 			return { x: p.x, y: p.y, elevation, col, row, land: elevation >= SEA_LEVEL };
 		}
 
@@ -575,7 +675,9 @@
 		}
 
 		function drawHexField() {
-			const origin = fieldOrigin();
+			// baked with the camera centred: panning moves the finished picture, so
+			// it never costs a rebake
+			const origin = fieldOrigin(worldExtent);
 			const tiles = fieldTiles(book.worldShape.sedimentGrid);
 			// which tiles are land, so a shore can know it is a shore
 			const land = new Set<string>();
@@ -588,7 +690,7 @@
 				const p = projectHex(tile.q, tile.r, standing, origin);
 				const shallow = clamp01(tile.elevation / SEA_LEVEL);
 				const submerged = (SEABED_ALPHA + (0.62 - SEABED_ALPHA) * shallow) * tile.edge;
-				const grain = (stable01(`tone:${tile.col}:${tile.row}`) - 0.5) * 2;
+				const grain = (stable01(`tone:${tile.homeCol}:${tile.row}`) - 0.5) * 2;
 
 				// Rows at the back are further away. With no perspective to shrink them,
 				// haze is the only thing that says so.
@@ -662,12 +764,17 @@
 			// than a tenth of a second, under a falling stream drawn live on top. The
 			// frame the pour ends is forced, so what she let go of is what she sees.
 			if (!force && nowMs - sedimentBakedAt < SEDIMENT_BAKE_MIN_MS) return;
-			sedimentCanvas.width = Math.max(1, Math.round(W * dpr));
+			// The frame, widened to take in the whole world. The home world fits inside
+			// the frame, so for it this is exactly the canvas it has always baked.
+			const bounds = fieldBounds(worldExtent);
+			sedimentBakedLeft = Math.min(0, bounds.left);
+			sedimentBakedSpan = Math.max(1, bounds.right) - sedimentBakedLeft;
+			sedimentCanvas.width = Math.max(1, Math.round(W * sedimentBakedSpan * dpr));
 			sedimentCanvas.height = Math.max(1, Math.round(H * dpr));
 			const liveCtx = ctx;
 			ctx = sedimentCtx;
-			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-			ctx.clearRect(0, 0, W, H);
+			ctx.setTransform(dpr, 0, 0, dpr, -sedimentBakedLeft * W * dpr, 0);
+			ctx.clearRect(sedimentBakedLeft * W, 0, sedimentBakedSpan * W, H);
 			drawHexField();
 			ctx = liveCtx;
 			sedimentBakedGrid = grid;
@@ -868,7 +975,10 @@
 				// aquatic sharing three points — so co-located lives are fanned apart
 				// by a stable per-(point, life) offset rather than stacking.
 				const fan = (stable01(`${point.id}:${life.id}:fan`) - 0.5) * HEX_SIZE * 1.3;
-				const cx = clamp01(spot.x + fan);
+				// not clamped to the frame: in a grown world its tile can be off to one side,
+				// and it goes with it rather than piling up at the edge
+				const cx = spot.x + fan;
+				if (cx < -0.1 || cx > 1.1) continue;
 				// The hover is what separates a swimmer from a walker: the shadow stays
 				// on the tile while the creature rides above it.
 				const hover = LAYER_HOVER[point.layer] ?? 0;
@@ -930,7 +1040,8 @@
 				const dh = size * yScale;
 				const seed = placed.x + placed.y + placed.id.length * 0.013;
 				const jitter = (stable01(`${placed.id}:fan`) - 0.5) * HEX_SIZE * 1.3;
-				const cx = clamp01(spot.x + jitter);
+				const cx = spot.x + jitter;
+				if (cx < -0.1 || cx > 1.1) continue;
 				const hover = LAYER_HOVER[spec.layer] ?? 0;
 				const footY = spot.y;
 				const bodyY =
@@ -1126,12 +1237,14 @@
 
 		function collectLandscape(T: number, into: Drawable[]) {
 			const { vigor, tiles } = currentLandscape(T * 1000);
-			const origin = fieldOrigin();
+			const origin = cameraOrigin();
 			const grid = book.worldShape.sedimentGrid;
 			for (const tile of tiles) {
 				const elevation = tileElevation(grid, tile.col, tile.row);
 				const { q, r } = offsetToAxial(tile.col, tile.row);
 				const p = projectHex(q, r, elevation, origin);
+				// a grown world runs well past the frame; keep to what can be seen
+				if (p.x < -0.1 || p.x > 1.1) continue;
 				const distance = 1 - tile.row / Math.max(1, FIELD_ROWS - 1);
 				const haze = distance * FIELD_HAZE_LAND;
 				// the same row-based depth the creatures use, so they sort together
@@ -1512,7 +1625,13 @@
 			drawSea(T);
 			drawWeather(T);
 			ensureSedimentBaked(tMs, !isPouring);
-			ctx!.drawImage(sedimentCanvas, 0, 0, W, H);
+			ctx!.drawImage(
+				sedimentCanvas,
+				(sedimentBakedLeft - panNow * TILE_SCREEN_WIDTH) * W,
+				0,
+				sedimentBakedSpan * W,
+				H
+			);
 			drawSedimentCast(T, isPouring ? 1 : shine(tending) * 0.45, isPouring ? pourPoint : null);
 			// Everything that stands on a tile is one depth-sorted list — land, features,
 			// swimmers and walkers — so nothing in front is covered by something behind.
@@ -1529,8 +1648,26 @@
 
 		let raf = 0;
 		let running = true;
+		let lastFrameAt = 0;
+		function stepPan(t: number) {
+			const dt = Math.min(0.1, Math.max(0, (t - lastFrameAt) / 1000));
+			lastFrameAt = t;
+			// the world can shrink under the camera (a cheat, a reset), so hold the target in range
+			const held = clampPan(panTarget);
+			if (held !== panTarget) panTarget = held;
+			if (reduce || Math.abs(panTarget - panNow) < 0.002) panNow = panTarget;
+			else panNow += (panTarget - panNow) * (1 - Math.exp(-dt * PAN_EASE));
+		}
+
 		function frame(t: number) {
 			if (!running) return;
+			stepPan(t);
+			// the view can move under a pointer that has not, so the pour is re-aimed at
+			// whatever tile is under it now rather than where it was last moved
+			if (isPouring && pourClient) {
+				const aimed = clientToWaterPoint(pourClient.x, pourClient.y);
+				if (aimed) pourPoint = aimed;
+			}
 			if (isPouring && pourPoint) {
 				const dt = Math.min(0.08, Math.max(0, (t - lastPourAt) / 1000));
 				if (dt > 0) {
@@ -1547,6 +1684,7 @@
 		function onVisibility() {
 			if (document.hidden) {
 				stopPour();
+				stopPan();
 				running = false;
 				if (raf) cancelAnimationFrame(raf);
 			} else if (!running) {
@@ -1558,7 +1696,27 @@
 
 		document.addEventListener('visibilitychange', onVisibility);
 
+		// A trackpad's sideways scroll, or shift and the wheel, pans a world that has
+		// grown. Registered by hand because Svelte's own wheel listener is passive, and
+		// this has to be able to keep the page from scrolling under the gesture. Plain
+		// vertical scrolling is left alone, so the page still scrolls past the canvas.
+		function onWheel(event: WheelEvent) {
+			if (reach <= 0) return;
+			const sideways = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.shiftKey ? event.deltaY : 0;
+			if (sideways === 0) return;
+			event.preventDefault();
+			const rect = canvas.getBoundingClientRect();
+			if (rect.width <= 0) return;
+			// a wheel reports pixels, lines or pages depending on the device
+			const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? rect.width : 1;
+			const cols = (sideways * unit) / rect.width / TILE_SCREEN_WIDTH;
+			panTarget = clampPan(panNow + cols);
+			panNow = panTarget;
+		}
+		canvas.addEventListener('wheel', onWheel, { passive: false });
+
 		return () => {
+			canvas.removeEventListener('wheel', onWheel);
 			stopPour();
 			running = false;
 			if (raf) cancelAnimationFrame(raf);
@@ -1569,18 +1727,56 @@
 	});
 </script>
 
-<div class="diorama" bind:this={wrapEl} class:pourable={book.canPourSediment()} class:pouring={isPouring}>
+<div
+	class="diorama"
+	bind:this={wrapEl}
+	class:pourable={book.canPourSediment()}
+	class:pannable={reach > 0}
+	class:pouring={isPouring}
+>
 	<canvas
 		bind:this={canvasEl}
 		aria-label={book.canPourSediment()
 			? 'a living water world — tap and drag on the water to sift sediment into shallows'
 			: 'a living water world where sediment can gather into shallows'}
-		onpointerdown={startPour}
-		onpointermove={movePour}
-		onpointerup={stopPour}
-		onpointercancel={stopPour}
-		onlostpointercapture={stopPour}
+		onpointerdown={startPointer}
+		onpointermove={(event) => {
+			movePan(event);
+			movePour(event);
+		}}
+		onpointerup={stopPointer}
+		onpointercancel={stopPointer}
+		onlostpointercapture={stopPointer}
 	></canvas>
+	{#if reach > 0}
+		<button
+			type="button"
+			class="pan pan-left"
+			aria-label="look west along the world"
+			aria-disabled={panTarget <= -reach}
+			onclick={() => panBy(-PAN_STEP)}
+			onkeydown={panKey}
+		>
+			‹
+		</button>
+		<button
+			type="button"
+			class="pan pan-right"
+			aria-label="look east along the world"
+			aria-disabled={panTarget >= reach}
+			onclick={() => panBy(PAN_STEP)}
+			onkeydown={panKey}
+		>
+			›
+		</button>
+		<div class="pan-track" aria-hidden="true">
+			<div
+				class="pan-thumb"
+				style:left="{(1 - FIELD_COLS / worldExtent) * (0.5 + panTarget / (2 * reach)) * 100}%"
+				style:width="{(FIELD_COLS / worldExtent) * 100}%"
+			></div>
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -1597,6 +1793,13 @@
 		cursor: crosshair;
 		touch-action: none;
 	}
+	/* a drag pans when there is nothing to pour with, and a touch has to be ours to do it */
+	.diorama.pannable canvas {
+		touch-action: none;
+	}
+	.diorama.pannable:not(.pourable) canvas {
+		cursor: grab;
+	}
 	.diorama.pouring {
 		border-color: rgba(255, 255, 255, 0.74);
 		box-shadow: 0 0 18px rgba(255, 236, 248, 0.2);
@@ -1604,5 +1807,56 @@
 	canvas {
 		display: block;
 		width: 100%;
+	}
+	.pan {
+		position: absolute;
+		top: 50%;
+		transform: translateY(-50%);
+		width: 2rem;
+		height: 3rem;
+		border: 1px solid var(--rule);
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.5);
+		color: inherit;
+		font-size: 1.4rem;
+		line-height: 1;
+		cursor: pointer;
+		opacity: 0.7;
+	}
+	.pan:hover:not([aria-disabled='true']),
+	.pan:focus-visible {
+		opacity: 1;
+		background: rgba(255, 255, 255, 0.8);
+	}
+	/* aria-disabled rather than disabled, so a button that has reached the end of the
+	   world keeps focus and the arrow keys still reach the other direction */
+	.pan[aria-disabled='true'] {
+		opacity: 0.18;
+		cursor: default;
+	}
+	.pan-left {
+		left: 0.5rem;
+	}
+	.pan-right {
+		right: 0.5rem;
+	}
+	/* where the frame sits along the whole world */
+	.pan-track {
+		position: absolute;
+		left: 50%;
+		bottom: 0.45rem;
+		width: 5rem;
+		height: 3px;
+		transform: translateX(-50%);
+		border-radius: 2px;
+		background: rgba(255, 255, 255, 0.35);
+		pointer-events: none;
+	}
+	.pan-thumb {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		border-radius: 2px;
+		background: rgba(255, 255, 255, 0.85);
 	}
 </style>

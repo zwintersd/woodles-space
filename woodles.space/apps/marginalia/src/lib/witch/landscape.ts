@@ -143,7 +143,7 @@ export function landscapeFor(tiles: readonly FieldTile[], state: LandscapeState)
 		let peak: PeakSpec | null = null;
 
 		if (above >= PEAK_MIN_HEIGHT) {
-			if (stable01(`peak:${tile.col}:${tile.row}`) >= peakChance(above)) continue;
+			if (stable01(`peak:${tile.homeCol}:${tile.row}`) >= peakChance(above)) continue;
 			// The high ground is always there; what the world's complexity decides is
 			// how much of it stands up. A flat world keeps a low rise, never nothing,
 			// so there is something for complexity to grow.
@@ -151,13 +151,13 @@ export function landscapeFor(tiles: readonly FieldTile[], state: LandscapeState)
 			peak = {
 				height: clamp01((0.22 + 0.78 * share) * rise),
 				snow: above > 0.75 ? clamp01((share - SNOWLINE) / (1 - SNOWLINE)) : 0,
-				lean: (stable01(`lean:${tile.col}:${tile.row}`) - 0.5) * 2
+				lean: (stable01(`lean:${tile.homeCol}:${tile.row}`) - 0.5) * 2
 			};
-		} else if (above >= FOREST_MIN_HEIGHT && above <= FOREST_MAX_HEIGHT && groveHash(tile.col, tile.row) < coverage) {
+		} else if (above >= FOREST_MIN_HEIGHT && above <= FOREST_MAX_HEIGHT && groveHash(tile.homeCol, tile.row) < coverage) {
 			// 1..3, more of them in a healthy forest
-			const count = 1 + Math.round(vigor * 2 * stable01(`count:${tile.col}:${tile.row}`));
+			const count = 1 + Math.round(vigor * 2 * stable01(`count:${tile.homeCol}:${tile.row}`));
 			for (let i = 0; i < count; i++) {
-				const key = `${tile.col}:${tile.row}:${i}`;
+				const key = `${tile.homeCol}:${tile.row}:${i}`;
 				trees.push({
 					dx: (stable01(`tx:${key}`) - 0.5) * 0.56,
 					dy: (stable01(`ty:${key}`) - 0.5) * 0.4,
