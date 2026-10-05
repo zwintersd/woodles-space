@@ -346,7 +346,12 @@ export function applySedimentPour(
 	// grid is shown at any other aspect. Scaling the vertical reach by the grid's
 	// own proportions keeps the brush round in the normalized space the field is
 	// drawn from, and leaves the horizontal reach exactly as it was.
-	const radiusY = grid.w > 1 ? (radius * (grid.h - 1)) / (grid.w - 1) : radius;
+	//
+	// A grown world is wider than 48 cells but is read at the same cells per tile
+	// column, so a round brush keeps the home grid's proportions at any width; read
+	// from the grown width its vertical reach would shrink to nothing.
+	const aspectW = extentForGridWidth(grid.w) === HOME_COLS ? grid.w : SEDIMENT_GRID_W;
+	const radiusY = aspectW > 1 ? (radius * (grid.h - 1)) / (aspectW - 1) : radius;
 	const minX = Math.max(0, Math.floor(cx - radius));
 	const maxX = Math.min(grid.w - 1, Math.ceil(cx + radius));
 	const minY = Math.max(0, Math.floor(cy - radiusY));
@@ -382,7 +387,8 @@ export function nextWorldExtent(extent: number): WorldExtent | null {
 }
 
 /**
- * One step wider: the grid gains open water on both sides, and everything placed
+ * One step wider: the grid gains open water on both sides (bar one cell of its
+ * own edge, carried outward — see below), and everything placed
  * on it is carried to the same silt it stood on. Returns the shape unchanged at
  * the widest world, and for a grid this module did not size.
  *
@@ -400,6 +406,12 @@ export function growWorld(shape: WorldShape): WorldShape {
 	const cells = new Array<number>(w * grid.h).fill(0);
 	for (let y = 0; y < grid.h; y++) {
 		for (let x = 0; x < grid.w; x++) cells[y * w + x + pad] = grid.cells[y * grid.w + x] ?? 0;
+		// The home world's outermost columns sample half a cell past the grid, which
+		// the read clamps to the edge cell. Beside a pad of zeros that same position
+		// would read half the silt, so the edge cell is carried one cell outward and
+		// those tiles keep the ground they had.
+		cells[y * w + pad - 1] = grid.cells[y * grid.w] ?? 0;
+		cells[y * w + pad + grid.w] = grid.cells[y * grid.w + grid.w - 1] ?? 0;
 	}
 	const shrink = grid.w / w;
 	const carry = <T extends { x: number }>(item: T): T => ({

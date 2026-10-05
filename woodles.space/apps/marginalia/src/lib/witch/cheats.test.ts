@@ -64,6 +64,15 @@ describe('Marginalia cheat codes', () => {
 		expect(book.worldShape.worldExtent).toBe(45);
 	});
 
+	it('fills a grown world at the width it has, rather than shrinking it back', () => {
+		const book = target();
+		applyMarginaliaCheat('growworld', book);
+		applyMarginaliaCheat('growworld', book);
+		applyMarginaliaCheat('pearlrush', book);
+		expect(book.worldShape.worldExtent).toBe(45);
+		expect(sedimentCoverage(book.worldShape.sedimentGrid)).toBe(1);
+	});
+
 	it('can trigger the shallows ceremony without marking it seen', () => {
 		const book = target();
 		applyMarginaliaCheat('unlockshallows', book);

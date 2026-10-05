@@ -85,8 +85,8 @@ function knownVisibleLife(target: CheatTarget): number {
 	return changed;
 }
 
-function sedimentCells(fill: 'threshold' | 'full') {
-	const grid = emptySedimentGrid();
+function sedimentCells(fill: 'threshold' | 'full', width?: number) {
+	const grid = emptySedimentGrid(width);
 	const cells = grid.cells.map((_, index) => {
 		const x = index % grid.w;
 		const y = Math.floor(index / grid.w);
@@ -103,7 +103,8 @@ function unlockShallows(target: CheatTarget, fill: 'threshold' | 'full', seen: b
 		normalizeWorldShape({
 			...target.worldShape,
 			sedimentUnlocked: true,
-			sedimentGrid: sedimentCells(fill),
+			// at the width the world already has, so a grown world is not shrunk back
+			sedimentGrid: sedimentCells(fill, target.worldShape.sedimentGrid.w),
 			seenUnlocks: seen ? ['shallows'] : target.worldShape.seenUnlocks,
 			spawnRevision: target.worldShape.spawnRevision + 1
 		})

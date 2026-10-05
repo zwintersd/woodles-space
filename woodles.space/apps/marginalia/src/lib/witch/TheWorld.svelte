@@ -156,7 +156,13 @@
 	const sedimentUnlockPct = Math.floor(SEDIMENT_UNLOCK_COVERAGE * 100);
 	const sedimentPct = $derived(Math.floor(book.sedimentCoverage * 100));
 	const sedimentPhrase = $derived.by(() => {
-		if (book.sedimentCoverage >= SEDIMENT_UNLOCK_COVERAGE) return 'the floor has learned shallows.';
+		// a world that has grown is a larger floor to fill, so coverage can fall back
+		// below the line after the shallows were learned; they stay learned
+		if (
+			book.sedimentCoverage >= SEDIMENT_UNLOCK_COVERAGE ||
+			book.worldShape.unlockedWorldspaces.includes('shallows')
+		)
+			return 'the floor has learned shallows.';
 		if (book.sedimentCoverage >= 0.4) return 'the floor is gathering into shelves.';
 		if (book.sedimentCoverage >= 0.18) return 'the water is keeping a little ground.';
 		if (book.worldShape.sedimentUnlocked) return 'sediment is beginning to remember where it fell.';

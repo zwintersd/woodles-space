@@ -19,6 +19,7 @@ import {
 	SEDIMENT_GRID_H,
 	SEDIMENT_GRID_W,
 	WORLD_EXTENTS,
+	applySedimentPour,
 	emptyWorldShape,
 	extentForGridWidth,
 	generateSpawnPoints,
@@ -31,6 +32,18 @@ import {
 	stable01,
 	type WorldShape
 } from './worldShape';
+
+/** A home world silted edge to edge, lumpy, so the outermost columns have ground to keep. */
+function silted(): WorldShape {
+	const shape = emptyWorldShape();
+	const cells: number[] = [];
+	for (let y = 0; y < SEDIMENT_GRID_H; y++) {
+		for (let x = 0; x < SEDIMENT_GRID_W; x++) {
+			cells.push(0.35 + 0.6 * stable01(`silt:${x}:${y}`));
+		}
+	}
+	return { ...shape, sedimentGrid: { w: SEDIMENT_GRID_W, h: SEDIMENT_GRID_H, cells } };
+}
 
 /** A home world with an island in it: a blob of deep silt, lumpy so no two tiles agree. */
 function island(): WorldShape {
@@ -94,10 +107,20 @@ describe('the sizes a world can be', () => {
 });
 
 describe('growing the world', () => {
-	it('pads the grid with open water on both sides and nothing else', () => {
+	it('pads the grid with open water on both sides, bar one cell of its own edge carried out', () => {
 		const home = island();
 		const grown = growWorld(home);
 		const pad = (gridWidthForExtent(31) - SEDIMENT_GRID_W) / 2;
+		const edge = silted();
+		const carried = growWorld(edge).sedimentGrid;
+		for (let y = 0; y < SEDIMENT_GRID_H; y++) {
+			expect(carried.cells[y * carried.w + pad - 1]).toBe(edge.sedimentGrid.cells[y * SEDIMENT_GRID_W]);
+			expect(carried.cells[y * carried.w + pad + SEDIMENT_GRID_W]).toBe(
+				edge.sedimentGrid.cells[y * SEDIMENT_GRID_W + SEDIMENT_GRID_W - 1]
+			);
+			expect(carried.cells[y * carried.w + pad - 2]).toBe(0);
+			expect(carried.cells[y * carried.w + pad + SEDIMENT_GRID_W + 1]).toBe(0);
+		}
 		expect(grown.worldExtent).toBe(31);
 		expect(grown.sedimentGrid.w).toBe(gridWidthForExtent(31));
 		expect(grown.sedimentGrid.h).toBe(SEDIMENT_GRID_H);
@@ -149,6 +172,23 @@ describe('growing the world', () => {
 			expect(same.density).toBeCloseTo(tile.density, 9);
 			expect(same.elevation).toBeCloseTo(tile.elevation, 9);
 			expect(same.land).toBe(tile.land);
+		}
+	});
+
+	it('keeps the outermost columns reading the ground they had, where the silt reaches the edge', () => {
+		// at home the first and last columns sample half a cell past the grid, which the
+		// read clamps to the edge cell; padding with zeros alone would halve them
+		const home = silted();
+		for (const grown of [growWorld(home), growWorld(growWorld(home))]) {
+			const shift = (grown.worldExtent - HOME_COLS) / 2;
+			for (let row = 0; row < FIELD_ROWS; row++) {
+				for (const col of [0, 1, FIELD_COLS - 2, FIELD_COLS - 1]) {
+					expect(tileElevation(grown.sedimentGrid, col + shift, row)).toBeCloseTo(
+						tileElevation(home.sedimentGrid, col, row),
+						9
+					);
+				}
+			}
 		}
 	});
 
@@ -218,6 +258,34 @@ describe('growing the world', () => {
 		const grownIds = new Set(generateSpawnPoints(grown).map((p) => p.id));
 		expect(homeIds.length).toBeGreaterThan(0);
 		for (const id of homeIds) expect(grownIds.has(id)).toBe(true);
+	});
+});
+
+describe('pouring in a grown world', () => {
+	// the brush has to cover the same ground on screen at any width: a pour that
+	// spends insight and lands nothing is the failure to catch
+	const silt = (shape: WorldShape, col: number, row: number) => {
+		const extent = shape.worldExtent;
+		const { u, v } = tileSample(col, row, extent);
+		const poured = applySedimentPour(shape.sedimentGrid, u, v, 1);
+		return poured.cells.reduce((sum, c, i) => sum + (c - shape.sedimentGrid.cells[i]), 0);
+	};
+
+	it('lands silt from every row of the field, at every width', () => {
+		const home = emptyWorldShape();
+		const worlds = [home, growWorld(home), growWorld(growWorld(home))];
+		for (let row = 0; row < FIELD_ROWS; row++) {
+			const atHome = silt(home, 7, row);
+			expect(atHome).toBeGreaterThan(0);
+			for (const world of worlds.slice(1)) {
+				const col = (world.worldExtent - 1) / 2;
+				const grown = silt(world, col, row);
+				expect(grown).toBeGreaterThan(0);
+				// the same brush on the same ground, give or take where it falls between cells
+				expect(grown / atHome).toBeGreaterThan(0.6);
+				expect(grown / atHome).toBeLessThan(1.6);
+			}
+		}
 	});
 });
 
