@@ -18,6 +18,16 @@ so it's not easy to forget.
 
 ---
 
+## 2026-10-05
+
+- **marginalia's world can grow** — once the shallows are learned, the world panel
+  shows "the water's reach": silt against 40% and steadiness against 60. when both
+  are met, *widen the world* takes the world from 15 to 31 to 45 columns, free, and
+  the view pans along it (arrows, shift-drag, sideways scroll, or a plain drag when
+  nothing can be poured). the island you built stays exactly where it was, and the
+  next step is earned from the new width. the floor also grows forests and mountains
+  from what you have poured, mountains following how complex the world is right now.
+
 ## 2026-10-04
 
 - **keep a page for Thinking About** — the companion's page menu and keep card
