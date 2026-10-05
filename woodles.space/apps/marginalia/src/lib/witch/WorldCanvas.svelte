@@ -95,6 +95,8 @@
 
 	let activePointerId: number | null = null;
 	let pourPoint: { x: number; y: number } | null = null;
+	/** Where the pointer is, in client pixels, so a pour can follow the tile under it as the view moves. */
+	let pourClient: { x: number; y: number } | null = null;
 	let lastPourAt = 0;
 
 	// ── the camera ───────────────────────────────────────────────────────────────
@@ -143,13 +145,19 @@
 
 	function movePan(event: PointerEvent) {
 		if (event.pointerId !== panPointerId || !canvasEl) return;
+		// a missed pointerup (a hidden tab, a lost capture) must not leave hovering as a drag
+		if (event.pointerType === 'mouse' && event.buttons === 0) {
+			stopPan(event);
+			return;
+		}
 		const rect = canvasEl.getBoundingClientRect();
 		if (rect.width <= 0) return;
 		// dragging the world one way moves the camera the other, and the view follows
 		// the hand rather than easing after it
 		const cols = -((event.clientX - panDragX) / rect.width) / TILE_SCREEN_WIDTH;
 		panDragX = event.clientX;
-		panTarget = clampPan(panTarget + cols);
+		// from where the view is, not where an arrow tap sent it, so a drag does not jump
+		panTarget = clampPan(panNow + cols);
 		panNow = panTarget;
 	}
 
@@ -181,14 +189,14 @@
 	// tile under the pointer and hands back its (u, v) in the grid's own [0, 1]
 	// coordinates, returning null off the field — which is what stops a pour
 	// writing past the edge of the world.
-	function pointerToWaterPoint(event: PointerEvent): { x: number; y: number } | null {
+	function clientToWaterPoint(clientX: number, clientY: number): { x: number; y: number } | null {
 		const canvas = canvasEl;
 		if (!canvas) return null;
 		const rect = canvas.getBoundingClientRect();
 		if (rect.width <= 0 || rect.height <= 0) return null;
 		const tile = tileAtPoint(
-			(event.clientX - rect.left) / rect.width,
-			(event.clientY - rect.top) / rect.height,
+			(clientX - rect.left) / rect.width,
+			(clientY - rect.top) / rect.height,
 			cameraOrigin(),
 			worldExtent
 		);
@@ -197,10 +205,11 @@
 
 	function startPour(event: PointerEvent) {
 		if (!book.canPourSediment()) return;
-		const point = pointerToWaterPoint(event);
+		const point = clientToWaterPoint(event.clientX, event.clientY);
 		if (!point) return;
 		activePointerId = event.pointerId;
 		pourPoint = point;
+		pourClient = { x: event.clientX, y: event.clientY };
 		lastPourAt = performance.now();
 		isPouring = true;
 		canvasEl?.setPointerCapture(event.pointerId);
@@ -209,7 +218,8 @@
 
 	function movePour(event: PointerEvent) {
 		if (event.pointerId !== activePointerId) return;
-		const point = pointerToWaterPoint(event);
+		pourClient = { x: event.clientX, y: event.clientY };
+		const point = clientToWaterPoint(event.clientX, event.clientY);
 		if (point) pourPoint = point;
 	}
 
@@ -221,6 +231,7 @@
 		if (isPouring) book.finishPourSediment();
 		activePointerId = null;
 		pourPoint = null;
+		pourClient = null;
 		isPouring = false;
 	}
 
@@ -964,7 +975,10 @@
 				// aquatic sharing three points — so co-located lives are fanned apart
 				// by a stable per-(point, life) offset rather than stacking.
 				const fan = (stable01(`${point.id}:${life.id}:fan`) - 0.5) * HEX_SIZE * 1.3;
-				const cx = clamp01(spot.x + fan);
+				// not clamped to the frame: in a grown world its tile can be off to one side,
+				// and it goes with it rather than piling up at the edge
+				const cx = spot.x + fan;
+				if (cx < -0.1 || cx > 1.1) continue;
 				// The hover is what separates a swimmer from a walker: the shadow stays
 				// on the tile while the creature rides above it.
 				const hover = LAYER_HOVER[point.layer] ?? 0;
@@ -1026,7 +1040,8 @@
 				const dh = size * yScale;
 				const seed = placed.x + placed.y + placed.id.length * 0.013;
 				const jitter = (stable01(`${placed.id}:fan`) - 0.5) * HEX_SIZE * 1.3;
-				const cx = clamp01(spot.x + jitter);
+				const cx = spot.x + jitter;
+				if (cx < -0.1 || cx > 1.1) continue;
 				const hover = LAYER_HOVER[spec.layer] ?? 0;
 				const footY = spot.y;
 				const bodyY =
@@ -1647,6 +1662,12 @@
 		function frame(t: number) {
 			if (!running) return;
 			stepPan(t);
+			// the view can move under a pointer that has not, so the pour is re-aimed at
+			// whatever tile is under it now rather than where it was last moved
+			if (isPouring && pourClient) {
+				const aimed = clientToWaterPoint(pourClient.x, pourClient.y);
+				if (aimed) pourPoint = aimed;
+			}
 			if (isPouring && pourPoint) {
 				const dt = Math.min(0.08, Math.max(0, (t - lastPourAt) / 1000));
 				if (dt > 0) {
@@ -1663,6 +1684,7 @@
 		function onVisibility() {
 			if (document.hidden) {
 				stopPour();
+				stopPan();
 				running = false;
 				if (raf) cancelAnimationFrame(raf);
 			} else if (!running) {
@@ -1685,8 +1707,10 @@
 			event.preventDefault();
 			const rect = canvas.getBoundingClientRect();
 			if (rect.width <= 0) return;
-			const cols = sideways / rect.width / TILE_SCREEN_WIDTH;
-			panTarget = clampPan(panTarget + cols);
+			// a wheel reports pixels, lines or pages depending on the device
+			const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? rect.width : 1;
+			const cols = (sideways * unit) / rect.width / TILE_SCREEN_WIDTH;
+			panTarget = clampPan(panNow + cols);
 			panNow = panTarget;
 		}
 		canvas.addEventListener('wheel', onWheel, { passive: false });
@@ -1703,7 +1727,13 @@
 	});
 </script>
 
-<div class="diorama" bind:this={wrapEl} class:pourable={book.canPourSediment()} class:pouring={isPouring}>
+<div
+	class="diorama"
+	bind:this={wrapEl}
+	class:pourable={book.canPourSediment()}
+	class:pannable={reach > 0}
+	class:pouring={isPouring}
+>
 	<canvas
 		bind:this={canvasEl}
 		aria-label={book.canPourSediment()
@@ -1723,7 +1753,7 @@
 			type="button"
 			class="pan pan-left"
 			aria-label="look west along the world"
-			disabled={panTarget <= -reach}
+			aria-disabled={panTarget <= -reach}
 			onclick={() => panBy(-PAN_STEP)}
 			onkeydown={panKey}
 		>
@@ -1733,7 +1763,7 @@
 			type="button"
 			class="pan pan-right"
 			aria-label="look east along the world"
-			disabled={panTarget >= reach}
+			aria-disabled={panTarget >= reach}
 			onclick={() => panBy(PAN_STEP)}
 			onkeydown={panKey}
 		>
@@ -1763,6 +1793,13 @@
 		cursor: crosshair;
 		touch-action: none;
 	}
+	/* a drag pans when there is nothing to pour with, and a touch has to be ours to do it */
+	.diorama.pannable canvas {
+		touch-action: none;
+	}
+	.diorama.pannable:not(.pourable) canvas {
+		cursor: grab;
+	}
 	.diorama.pouring {
 		border-color: rgba(255, 255, 255, 0.74);
 		box-shadow: 0 0 18px rgba(255, 236, 248, 0.2);
@@ -1786,12 +1823,14 @@
 		cursor: pointer;
 		opacity: 0.7;
 	}
-	.pan:hover:not(:disabled),
+	.pan:hover:not([aria-disabled='true']),
 	.pan:focus-visible {
 		opacity: 1;
 		background: rgba(255, 255, 255, 0.8);
 	}
-	.pan:disabled {
+	/* aria-disabled rather than disabled, so a button that has reached the end of the
+	   world keeps focus and the arrow keys still reach the other direction */
+	.pan[aria-disabled='true'] {
 		opacity: 0.18;
 		cursor: default;
 	}
