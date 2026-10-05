@@ -16,6 +16,27 @@ export const SEDIMENT_UNLOCK_COST = 60;
 export const SEDIMENT_POUR_RATE = 0.8;
 export const SEDIMENT_POUR_RADIUS = 2.5;
 export const SEDIMENT_POUR_STRENGTH = 0.46;
+
+// ── how far the world reaches ────────────────────────────────────────────────
+//
+// Every world began as 15 columns of hexes across a 48-cell grid, and that is
+// still the world a save is when it says nothing else. Growing pads the grid with
+// open water on both sides and widens the field to match; nothing already in the
+// silt moves, because the field reads the grid at a fixed number of cells per
+// column, anchored on its middle.
+//
+// The widths are odd so the original island stays exactly where it was: padding a
+// whole number of columns each side keeps every row's half-tile offset intact.
+// The grid pads in steps of six cells so the spawn blocks of `sedimentSpawnPoints`
+// keep their alignment.
+/** The world every save began as: hexes across, at the start. */
+export const HOME_COLS = 15;
+/** Grid cells one tile column spans: the 48-cell grid read across the 15-column field. */
+export const TILE_CELL_SPACING = SEDIMENT_GRID_W / (HOME_COLS - 1);
+/** The widths the world can have, in tile columns. */
+export const WORLD_EXTENTS = [15, 31, 45] as const;
+export type WorldExtent = (typeof WORLD_EXTENTS)[number];
+const GRID_PAD_STEP = 6;
 // the floor plane's screen band and the perspective over it — see projection.ts.
 export { SEDIMENT_BAND_TOP } from './projection';
 
@@ -68,6 +89,11 @@ export interface PlacedSpawnPoint {
 }
 
 export interface WorldShape {
+	/**
+	 * How many tile columns the world is across, one of WORLD_EXTENTS. The grid's
+	 * own width says the same thing; this is it written down, and what a save keeps.
+	 */
+	worldExtent: WorldExtent;
 	activeWorldspace: Worldspace;
 	unlockedWorldspaces: Worldspace[];
 	sedimentUnlocked: boolean;
@@ -339,8 +365,61 @@ export function applySedimentPour(
 	return { ...grid, cells };
 }
 
+/** The grid width a world of this many columns is stored at. */
+export function gridWidthForExtent(extent: number): number {
+	const wide = Math.max(0, (extent - HOME_COLS) / 2);
+	const pad = Math.ceil((wide * TILE_CELL_SPACING) / GRID_PAD_STEP) * GRID_PAD_STEP;
+	return SEDIMENT_GRID_W + 2 * pad;
+}
+
+/** Which world a grid of this width holds. A width nothing here made is the home world. */
+export function extentForGridWidth(w: number): WorldExtent {
+	return WORLD_EXTENTS.find((extent) => gridWidthForExtent(extent) === w) ?? HOME_COLS;
+}
+
+export function nextWorldExtent(extent: number): WorldExtent | null {
+	return WORLD_EXTENTS.find((step) => step > extent) ?? null;
+}
+
+/**
+ * One step wider: the grid gains open water on both sides, and everything placed
+ * on it is carried to the same silt it stood on. Returns the shape unchanged at
+ * the widest world, and for a grid this module did not size.
+ *
+ * Placed things are stored as fractions of the grid, so padding shrinks them
+ * toward the middle by the old width over the new — the middle is the only point
+ * the padding leaves where it was.
+ */
+export function growWorld(shape: WorldShape): WorldShape {
+	const grid = shape.sedimentGrid;
+	const from = extentForGridWidth(grid.w);
+	const to = nextWorldExtent(from);
+	if (to === null || grid.w !== gridWidthForExtent(from)) return shape;
+	const w = gridWidthForExtent(to);
+	const pad = (w - grid.w) / 2;
+	const cells = new Array<number>(w * grid.h).fill(0);
+	for (let y = 0; y < grid.h; y++) {
+		for (let x = 0; x < grid.w; x++) cells[y * w + x + pad] = grid.cells[y * grid.w + x] ?? 0;
+	}
+	const shrink = grid.w / w;
+	const carry = <T extends { x: number }>(item: T): T => ({
+		...item,
+		x: clamp01(0.5 + (item.x - 0.5) * shrink)
+	});
+	return {
+		...shape,
+		worldExtent: to,
+		sedimentGrid: { w, h: grid.h, cells },
+		placedFeatures: shape.placedFeatures.map(carry),
+		placedCreatures: shape.placedCreatures.map(carry),
+		customSpawnPoints: shape.customSpawnPoints.map(carry),
+		spawnRevision: shape.spawnRevision + 1
+	};
+}
+
 export function emptyWorldShape(): WorldShape {
 	return {
+		worldExtent: HOME_COLS,
 		activeWorldspace: 'water',
 		unlockedWorldspaces: ['water'],
 		sedimentUnlocked: false,
@@ -375,6 +454,7 @@ export function normalizeWorldShape(input: unknown): WorldShape {
 	const active =
 		maybe.activeWorldspace === 'shallows' && unlocked.includes('shallows') ? 'shallows' : 'water';
 	return {
+		worldExtent: extentForGridWidth(sedimentGrid.w),
 		activeWorldspace: active,
 		unlockedWorldspaces: unlocked,
 		sedimentUnlocked: Boolean(maybe.sedimentUnlocked),
@@ -721,10 +801,19 @@ export function worldYToWaterGrid(y: number): number | null {
 	return floorDepthAtY(y);
 }
 
+// The world's own spawn points are authored as fractions of the home world. Once
+// the world has grown they keep to it, so existing life does not wander out onto
+// new land; the new land is populated by its own silt, and by what she places.
+function homeSpawn(point: SpawnPoint, shape: WorldShape): SpawnPoint {
+	const w = shape.sedimentGrid.w;
+	if (extentForGridWidth(w) === HOME_COLS) return { ...point };
+	return { ...point, x: 0.5 + (point.x - 0.5) * (SEDIMENT_GRID_W / w) };
+}
+
 export function generateSpawnPoints(shape: WorldShape): SpawnPoint[] {
-	const points = DEFAULT_WATER_SPAWNS.map((point) => ({ ...point }));
+	const points = DEFAULT_WATER_SPAWNS.map((point) => homeSpawn(point, shape));
 	points.push(...sedimentSpawnPoints(shape.sedimentGrid));
-	if (shape.activeWorldspace === 'shallows') points.push(...SHALLOWS_SPAWNS.map((point) => ({ ...point })));
+	if (shape.activeWorldspace === 'shallows') points.push(...SHALLOWS_SPAWNS.map((point) => homeSpawn(point, shape)));
 	for (const placed of shape.placedFeatures) {
 		const feature = featureById(placed.featureId);
 		if (!feature) continue;
@@ -778,6 +867,9 @@ function sedimentSpawnPoints(grid: SedimentGrid): SpawnPoint[] {
 	const points: SpawnPoint[] = [];
 	const blockW = 6;
 	const blockH = 3;
+	// a block is named for where it sits in the home world, so growing leaves the
+	// ones that were already there with the names — and the surfaces — they had
+	const shift = extentForGridWidth(grid.w) === HOME_COLS ? 0 : (grid.w - SEDIMENT_GRID_W) / 2;
 	for (let by = 0; by < grid.h; by += blockH) {
 		for (let bx = 0; bx < grid.w; bx += blockW) {
 			let sum = 0;
@@ -793,11 +885,11 @@ function sedimentSpawnPoints(grid: SedimentGrid): SpawnPoint[] {
 			const x = (bx + Math.min(blockW, grid.w - bx) / 2) / grid.w;
 			const waterY = (by + Math.min(blockH, grid.h - by) / 2) / grid.h;
 			points.push({
-				id: `sediment-${bx}-${by}`,
+				id: `sediment-${bx - shift}-${by}`,
 				x,
 				y: waterGridYToWorld(waterY),
 				category: 'aquatic',
-				tags: ['sediment', waterY > 0.55 ? 'bottom' : 'shallow', sedimentSurfaceTag(bx, by)],
+				tags: ['sediment', waterY > 0.55 ? 'bottom' : 'shallow', sedimentSurfaceTag(bx - shift, by)],
 				weight: 0.45 + avg,
 				rarity: avg > 0.62 ? 'uncommon' : 'common',
 				layer: 'floor',

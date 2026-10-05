@@ -5,6 +5,7 @@ import {
 	FEATURE_SPECS,
 	SEDIMENT_UNLOCK_COVERAGE,
 	emptySedimentGrid,
+	growWorld,
 	normalizeWorldShape,
 	placeFeatureOnBestSediment,
 	unlockWorldspacesForCoverage,
@@ -189,6 +190,19 @@ export const CHEAT_CODES: CheatSpec[] = [
 			target.insight = Math.max(target.insight, 5000);
 			unlockShallows(target, 'threshold', false);
 			return `unlockshallows: sediment passes ${Math.floor(SEDIMENT_UNLOCK_COVERAGE * 100)}%.`;
+		}
+	},
+	{
+		code: 'growworld',
+		aliases: ['grow world'],
+		summary: 'widen the world one step, so there is land to pan across',
+		run: (target) => {
+			const next = growWorld(target.worldShape);
+			if (next === target.worldShape) return 'growworld: the world is as wide as it goes.';
+			target.worldShape = next;
+			target.bookOpen = true;
+			target.mode = 'world';
+			return `growworld: the world reaches ${next.worldExtent} columns.`;
 		}
 	},
 	{

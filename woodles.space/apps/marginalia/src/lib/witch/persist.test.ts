@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { emptySave, exportSave, importSave, load, save, wipe } from './persist';
+import { gridWidthForExtent, growWorld } from './worldShape';
 
 // jsdom provides localStorage; reset between tests so cases stay isolated.
 beforeEach(() => {
@@ -147,6 +148,31 @@ describe('load/save/wipe', () => {
 		const back = load();
 		expect(back?.essence).toBe(5);
 		expect(back?.worldShape.customSpawnPoints).toEqual([]);
+	});
+});
+
+describe('the world\u2019s width', () => {
+	it('loads a save that never knew about growth as the home world', () => {
+		localStorage.setItem(
+			'witch.book.save.v1',
+			JSON.stringify({
+				v: 1,
+				essence: 2,
+				worldShape: { activeWorldspace: 'water', sedimentUnlocked: true, placedFeatures: [] }
+			})
+		);
+		const back = load();
+		expect(back?.worldShape.worldExtent).toBe(15);
+		expect(back?.worldShape.sedimentGrid.w).toBe(48);
+	});
+	it('keeps a grown world across a reload', () => {
+		const s = emptySave();
+		s.worldShape = growWorld(s.worldShape);
+		save(s);
+		const back = load();
+		expect(back?.worldShape.worldExtent).toBe(31);
+		expect(back?.worldShape.sedimentGrid.w).toBe(gridWidthForExtent(31));
+		expect(back?.worldShape).toEqual(s.worldShape);
 	});
 });
 

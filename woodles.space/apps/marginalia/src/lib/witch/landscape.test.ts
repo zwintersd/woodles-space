@@ -27,7 +27,7 @@ function flatLand(above: number): FieldTile[] {
 	const tiles: FieldTile[] = [];
 	for (let row = 0; row < FIELD_ROWS; row++) {
 		for (let col = 0; col < FIELD_COLS; col++) {
-			tiles.push({ col, row, q: col, r: row, elevation, density: 1, land: true, edge: 1 });
+			tiles.push({ col, row, q: col, r: row, homeCol: col, elevation, density: 1, land: true, edge: 1 });
 		}
 	}
 	return tiles;
