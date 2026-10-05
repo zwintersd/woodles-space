@@ -15,7 +15,13 @@
 	import WorldShapingDetails from './WorldShapingDetails.svelte';
 	import CreatureCall from './CreatureCall.svelte';
 	import Waymarks from './Waymarks.svelte';
-	import { FEATURE_SPECS, SEDIMENT_UNLOCK_COVERAGE, type WorldFeatureId } from './worldShape';
+	import {
+		FEATURE_SPECS,
+		GROWTH_MIN_COVERAGE,
+		GROWTH_MIN_STABILITY,
+		SEDIMENT_UNLOCK_COVERAGE,
+		type WorldFeatureId
+	} from './worldShape';
 
 	const categories: { id: LifeCategory; label: string }[] = [
 		{ id: 'aquatic', label: 'in the water' },
@@ -155,19 +161,24 @@
 	);
 	const sedimentUnlockPct = Math.floor(SEDIMENT_UNLOCK_COVERAGE * 100);
 	const sedimentPct = $derived(Math.floor(book.sedimentCoverage * 100));
+	// a world that has grown is a larger floor to fill, so coverage can fall back
+	// below the line after the shallows were learned; they stay learned, and the
+	// readout stops measuring against a line that has already been crossed
+	const shallowsLearned = $derived(book.worldShape.unlockedWorldspaces.includes('shallows'));
 	const sedimentPhrase = $derived.by(() => {
-		// a world that has grown is a larger floor to fill, so coverage can fall back
-		// below the line after the shallows were learned; they stay learned
-		if (
-			book.sedimentCoverage >= SEDIMENT_UNLOCK_COVERAGE ||
-			book.worldShape.unlockedWorldspaces.includes('shallows')
-		)
+		if (book.sedimentCoverage >= SEDIMENT_UNLOCK_COVERAGE || shallowsLearned)
 			return 'the floor has learned shallows.';
 		if (book.sedimentCoverage >= 0.4) return 'the floor is gathering into shelves.';
 		if (book.sedimentCoverage >= 0.18) return 'the water is keeping a little ground.';
 		if (book.worldShape.sedimentUnlocked) return 'sediment is beginning to remember where it fell.';
 		return 'the water is not ready to hold ground yet.';
 	});
+
+	// ── the water's reach ─────────────────────────────────────────────────────
+
+	const growth = $derived(book.worldGrowth);
+	const growthSiltPct = Math.round(GROWTH_MIN_COVERAGE * 100);
+	const stabilityNow = $derived(Math.floor(book.stability));
 
 	function featurePlaced(featureId: WorldFeatureId): boolean {
 		return book.worldShape.placedFeatures.some((feature) => feature.featureId === featureId);
@@ -484,10 +495,15 @@
 				<div class="sediment-readout">
 					<div class="sediment-line">
 						<span>{sedimentPhrase}</span>
-						<strong>{sedimentPct}/{sedimentUnlockPct}%</strong>
+						<strong>{shallowsLearned ? `${sedimentPct}%` : `${sedimentPct}/${sedimentUnlockPct}%`}</strong>
 					</div>
 					<div class="sediment-meter" aria-hidden="true">
-						<div style:width="{Math.min(100, (book.sedimentCoverage / SEDIMENT_UNLOCK_COVERAGE) * 100)}%"></div>
+						<div
+							style:width="{Math.min(
+								100,
+								(book.sedimentCoverage / (shallowsLearned ? 1 : SEDIMENT_UNLOCK_COVERAGE)) * 100
+							)}%"
+						></div>
 					</div>
 					<p class="shape-note">
 						sift sediment where her hand rests · {fmt(book.sedimentPourRate)} insight/s
@@ -496,6 +512,41 @@
 			{/if}
 
 			{#if book.worldShape.unlockedWorldspaces.includes('shallows')}
+				<section class="reach-panel" aria-label="the water's reach">
+					<div class="feature-head">
+						<span>the water's reach</span>
+						<small>{book.worldShape.worldExtent} columns</small>
+					</div>
+					{#if growth.state === 'ready'}
+						<div class="shape-buy-row">
+							<p>the water offers more ground, {growth.next} columns of it.</p>
+							<button class="shape-buy" onclick={() => book.growWorld()}>widen the world</button>
+						</div>
+					{:else if growth.state === 'needs-growth'}
+						<p class="shape-note">
+							it will widen once the floor is silted and the world holds steady.
+						</p>
+						<div class="reach-meters">
+							<div class="reach-meter" class:met={!growth.needsSilt}>
+								<span>silt</span>
+								<div class="sediment-meter" aria-hidden="true">
+									<div style:width="{Math.min(100, (book.sedimentCoverage / GROWTH_MIN_COVERAGE) * 100)}%"></div>
+								</div>
+								<strong>{sedimentPct}/{growthSiltPct}%</strong>
+							</div>
+							<div class="reach-meter" class:met={!growth.needsStability}>
+								<span>steadiness</span>
+								<div class="sediment-meter" aria-hidden="true">
+									<div style:width="{Math.min(100, (book.stability / GROWTH_MIN_STABILITY) * 100)}%"></div>
+								</div>
+								<strong>{stabilityNow}/{GROWTH_MIN_STABILITY}</strong>
+							</div>
+						</div>
+					{:else if growth.state === 'max'}
+						<p class="shape-note">the water has given all the ground it has.</p>
+					{/if}
+				</section>
+
 				<div class="worldspace-switch" aria-label="worldspace">
 					<button
 						class:active={book.worldShape.activeWorldspace === 'water'}
@@ -748,6 +799,39 @@
 		height: 100%;
 		background: linear-gradient(90deg, var(--leafeon-pink), var(--cyan));
 		transition: width 160ms linear;
+	}
+	.reach-panel {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+	}
+	.reach-meters {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+	}
+	.reach-meter {
+		display: grid;
+		grid-template-columns: 6.5rem minmax(0, 1fr) 4.2rem;
+		align-items: center;
+		gap: 0.6rem;
+	}
+	.reach-meter span {
+		font-family: var(--font-body);
+		font-style: italic;
+		font-size: 0.84rem;
+		color: var(--muted);
+	}
+	.reach-meter strong {
+		font-family: var(--font-counter);
+		font-weight: 400;
+		font-size: 0.95rem;
+		color: var(--muted);
+		text-align: right;
+		white-space: nowrap;
+	}
+	.reach-meter.met strong {
+		color: var(--cyan);
 	}
 	.worldspace-switch {
 		display: flex;

@@ -62,10 +62,13 @@ import {
 	removeCustomSpawnPoint as removeCustomSpawnPointFromShape,
 	sedimentCoverage as sedimentCoverageOf,
 	unlockWorldspacesForCoverage,
+	worldGrowthStatus,
+	growWorldIfReady,
 	type CustomSpawnPointInput,
 	type SpawnLayer,
 	type SpawnRarity,
 	type WorldFeatureId,
+	type WorldGrowthStatus,
 	type WorldShape,
 	type Worldspace
 } from './worldShape';
@@ -437,6 +440,10 @@ export class Book {
 	// ── derived: world shaping ───────────────────────────────────────────────
 
 	sedimentCoverage = $derived(sedimentCoverageOf(this.worldShape.sedimentGrid));
+	/** Whether the water is offering the next step of ground — see worldGrowthStatus. */
+	get worldGrowth(): WorldGrowthStatus {
+		return worldGrowthStatus(this.worldShape, this.stability);
+	}
 	sedimentUnlockCost = SEDIMENT_UNLOCK_COST;
 	sedimentPourRate = SEDIMENT_POUR_RATE;
 
@@ -767,6 +774,18 @@ export class Book {
 
 	placeFeature(featureId: WorldFeatureId) {
 		const next = placeFeatureOnBestSediment(this.worldShape, featureId);
+		if (next === this.worldShape) return;
+		this.worldShape = next;
+		this.persist();
+	}
+
+	/**
+	 * Takes the next step of ground, once silt and stability have earned it. Free —
+	 * growth is a reward for a world already doing well, not another thing to buy,
+	 * so nothing here touches insight or the pacing the balance harness measures.
+	 */
+	growWorld() {
+		const next = growWorldIfReady(this.worldShape, this.stability);
 		if (next === this.worldShape) return;
 		this.worldShape = next;
 		this.persist();

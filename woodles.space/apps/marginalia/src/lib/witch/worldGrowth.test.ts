@@ -15,6 +15,8 @@ import {
 } from './hexField';
 import { landscapeFor, type LandscapeState } from './landscape';
 import {
+	GROWTH_MIN_COVERAGE,
+	GROWTH_MIN_STABILITY,
 	HOME_COLS,
 	SEDIMENT_GRID_H,
 	SEDIMENT_GRID_W,
@@ -25,11 +27,13 @@ import {
 	generateSpawnPoints,
 	gridWidthForExtent,
 	growWorld,
+	growWorldIfReady,
 	nextWorldExtent,
 	normalizeWorldShape,
 	placeFeatureOnBestSediment,
 	sedimentCoverage,
 	stable01,
+	worldGrowthStatus,
 	type WorldShape
 } from './worldShape';
 
@@ -374,5 +378,85 @@ describe('saving a grown world', () => {
 		expect(normalizeWorldShape({ ...grown, worldExtent: 45 }).worldExtent).toBe(31);
 		expect(normalizeWorldShape({ ...island(), worldExtent: 45 }).worldExtent).toBe(HOME_COLS);
 		expect(normalizeWorldShape(JSON.parse(JSON.stringify(grown)))).toEqual(grown);
+	});
+});
+
+/** A world whose grid has this share of cells silted, in whole columns from the left. */
+function coveredTo(shape: WorldShape, share: number): WorldShape {
+	const grid = shape.sedimentGrid;
+	const filled = Math.ceil(grid.cells.length * share);
+	const cells = grid.cells.map((_, i) => (i < filled ? 0.8 : 0));
+	return { ...shape, sedimentGrid: { ...grid, cells } };
+}
+
+const learned = (shape: WorldShape): WorldShape => ({
+	...shape,
+	unlockedWorldspaces: ['water', 'shallows']
+});
+
+describe('when the world may grow', () => {
+	const STEADY = GROWTH_MIN_STABILITY;
+	const enough = () => coveredTo(learned(emptyWorldShape()), GROWTH_MIN_COVERAGE);
+
+	it('takes the numbers from the sketch', () => {
+		expect(GROWTH_MIN_COVERAGE).toBe(0.4);
+		expect(GROWTH_MIN_STABILITY).toBe(60);
+	});
+
+	it('is ready at exactly the thresholds, and not a hair under either', () => {
+		expect(worldGrowthStatus(enough(), STEADY)).toEqual({ state: 'ready', next: 31 });
+		expect(worldGrowthStatus(enough(), STEADY - 1)).toMatchObject({
+			state: 'needs-growth',
+			needsSilt: false,
+			needsStability: true
+		});
+		const thin = coveredTo(learned(emptyWorldShape()), GROWTH_MIN_COVERAGE - 0.05);
+		expect(worldGrowthStatus(thin, STEADY)).toMatchObject({
+			state: 'needs-growth',
+			needsSilt: true,
+			needsStability: false
+		});
+		expect(worldGrowthStatus(thin, 0)).toMatchObject({ needsSilt: true, needsStability: true });
+	});
+
+	it('waits for the shallows however much silt there is', () => {
+		const full = coveredTo(emptyWorldShape(), 1);
+		expect(worldGrowthStatus(full, 100)).toEqual({ state: 'needs-shallows' });
+		expect(growWorldIfReady(full, 100)).toBe(full);
+	});
+
+	it('grows only when ready, and is the same growth the cheat takes', () => {
+		const shape = enough();
+		expect(growWorldIfReady(shape, STEADY - 1)).toBe(shape);
+		expect(growWorldIfReady(shape, STEADY)).toEqual(growWorld(shape));
+	});
+
+	it('reads coverage against the world as it stands, so the next step is earned again', () => {
+		// the shallows open at 60% of the home world, which clears 40% at once...
+		const opened = coveredTo(learned(emptyWorldShape()), 0.6);
+		expect(worldGrowthStatus(opened, 100).state).toBe('ready');
+		// ...but the same silt is a smaller share of the wider floor
+		const wider = growWorldIfReady(opened, 100);
+		expect(wider.worldExtent).toBe(31);
+		expect(sedimentCoverage(wider.sedimentGrid)).toBeLessThan(GROWTH_MIN_COVERAGE);
+		expect(worldGrowthStatus(wider, 100)).toMatchObject({ state: 'needs-growth', next: 45, needsSilt: true });
+		// shallows stay learned across growth
+		expect(wider.unlockedWorldspaces).toContain('shallows');
+	});
+
+	it('stops at the widest world', () => {
+		let shape = coveredTo(learned(emptyWorldShape()), 1);
+		for (let i = 0; i < WORLD_EXTENTS.length; i++) {
+			shape = coveredTo(growWorldIfReady(shape, 100), 1);
+		}
+		expect(shape.worldExtent).toBe(45);
+		expect(worldGrowthStatus(shape, 100)).toEqual({ state: 'max' });
+		expect(growWorldIfReady(shape, 100)).toBe(shape);
+	});
+
+	it('reports max even without the shallows, since there is nothing left to want', () => {
+		const wide = growWorld(growWorld(emptyWorldShape()));
+		expect(wide.worldExtent).toBe(45);
+		expect(worldGrowthStatus(wide, 0)).toEqual({ state: 'max' });
 	});
 });
