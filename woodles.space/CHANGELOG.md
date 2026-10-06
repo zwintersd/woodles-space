@@ -20,6 +20,11 @@ so it's not easy to forget.
 
 ## 2026-10-04
 
+- **meet Faerie** — a glowing, winged companion with a standalone playground
+  for attention cues, gentle hints, pointer following, and small celebrations.
+  It is ready for future rooms to use, with reduced motion and keyboard
+  controls, and is not attached to a particular Woodle.
+
 - **a mark for woodles** — a soft, hand-drawn w in lapis on lavender now
   identifies every room in browser tabs and saved home-screen shortcuts.
 

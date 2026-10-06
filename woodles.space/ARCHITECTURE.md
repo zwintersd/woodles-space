@@ -135,6 +135,7 @@ woodles.space/
 │   └── schema.sql
 ├── packages/
 │   ├── app-manifest/        @woodles/app-manifest — canonical app and route inventory
+│   ├── faerie/              @woodles/faerie — a reusable glowing attention companion + standalone playground
 │   ├── handoff/             @woodles/handoff — passing a thought between apps
 │   ├── incremental-core/    @woodles/incremental-core — GameDef schema, validator, sim engine
 │   ├── life-points/         @woodles/life-points — the cross-app currency, earned by being away
@@ -1558,6 +1559,20 @@ no `@woodles/sync` import possible in the browser) and `bestiaryDb.ts`'s
 IndexedDB-backed fallback chain land in the same place by different means.
 
 ## shared design tokens
+
+**`packages/faerie` (`@woodles/faerie`)** is a framework-independent browser
+companion, currently used only in its standalone
+[`playground`](./packages/faerie/playground/index.html). `createFaerie()` mounts
+an orb with translucent wings, gentle motion, plain-text hints, and an
+optional target outline. A host can point it at an element, selector,
+resolver callback, or viewport point; speak, follow the pointer, celebrate,
+rest, hide, and change its glow. The host chooses what matters and when.
+Faerie owns no app data or persistence. Shadow styles keep its appearance
+independent; hints respect keyboard focus and reduced motion. Hidden,
+removed, clipped, and offscreen targets release the cue, with scrolling
+available only when requested. Imports work during SSR; create the instance
+after mounting and call `destroy()` when the view is removed. See its
+[`README`](./packages/faerie/README.md) for the API and local preview command.
 
 the design system is shared at the lowest level only, and not by every app.
 

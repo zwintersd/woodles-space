@@ -327,6 +327,10 @@
 		}
 	}
 
+	function templatesInGroup(templates: readonly { id: string; name: string; detail: string; group?: string }[], group: string) {
+		return templates.filter((template) => (template.group ?? 'connected') === group);
+	}
+
 	function sendAction(action: ShellAction): void {
 		if (!surfaceFrame?.contentWindow) return;
 		surfaceFrame.contentWindow.postMessage(
@@ -647,13 +651,26 @@
 	{@const picker = templatePicker}
 	<div class="template-backdrop" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) templatePicker = null; }}>
 		<div class="template-dialog" role="dialog" aria-modal="true" aria-label={`New ${picker.label.toLowerCase()}`} use:modal={{ returnFocus: '.new-button' }}>
-			<div class="eyebrow">START WITH A SHAPE</div><h2>New {picker.label.toLowerCase()}</h2><p>These are suggestions. Each one is a regular {picker.label} you can change as you work.</p>
+			<header class="template-header">
+				<div class="eyebrow">START WITH A SHAPE</div><h2>New {picker.label.toLowerCase()}</h2><p>Choose a starting point. Every {picker.label.toLowerCase()} stays editable.</p>
+			</header>
 			{#if createIssue}<div class="create-issue" role="alert">{createIssue}</div>{/if}
-			<div class="template-options">
-				{#each picker.templates ?? [] as template (template.id)}
-					<button onclick={() => create(picker, template.id)}><span>{template.name}</span><small>{template.detail}</small><b>↗</b></button>
+			<div class="template-scroll">
+				{#each [{ id: 'quick', label: 'Quick starts' }, { id: 'lists', label: 'Personal lists' }, { id: 'connected', label: 'Connected app data' }] as group (group.id)}
+					{@const groupTemplates = templatesInGroup(picker.templates ?? [], group.id)}
+					{#if groupTemplates.length}
+						<details class="template-group" open={group.id === 'quick'}>
+							<summary><span>{group.label}</span><small>{groupTemplates.length} {groupTemplates.length === 1 ? 'option' : 'options'}</small></summary>
+							<div class="template-options">
+								{#each groupTemplates as template (template.id)}
+									<button onclick={() => create(picker, template.id)}><span>{template.name}</span><small>{template.detail}</small><b aria-hidden="true">↗</b></button>
+								{/each}
+							</div>
+						</details>
+					{/if}
 				{/each}
-			</div><button class="template-cancel" onclick={() => templatePicker = null}>Cancel</button>
+			</div>
+			<footer class="template-footer"><button class="template-cancel" onclick={() => templatePicker = null}>Cancel</button></footer>
 		</div>
 	</div>
 {/if}

@@ -1,4 +1,5 @@
 import { world1Life } from '@woodles/witch-engine';
+import { appManifest } from '@woodles/app-manifest';
 import type { WoodlesRef } from '@shared/homesuiteBridge';
 import { ARCADE_COPY_CATALOG, ARCADE_GAME_CATALOG, ARCADE_PRIMITIVE_CATALOG } from '@woodles/marginalia-arcade-catalog';
 import { createRecord, type Collection, type CollectionSource } from './collections';
@@ -177,8 +178,27 @@ function arcadeCopyRows(): PulledSourceRow[] {
 	}));
 }
 
+function woodlesAppRows(): PulledSourceRow[] {
+	return appManifest.map((app) => ({
+		ref: { app: app.id, kind: 'app', id: app.id },
+		label: app.name,
+		hint: `Woodles app · ${app.maturity}`,
+		values: {
+			name: app.name,
+			status: app.maturity,
+			route: app.publicPath,
+			kind: app.kind,
+			sourceDir: app.sourceDir,
+			outputDir: app.outputDir,
+			packageName: app.packageName ?? '',
+			addressableBy: app.addressableBy?.join(' · ') ?? ''
+		}
+	}));
+}
+
 export async function pullCollectionSources(sources: CollectionSource[]): Promise<PulledSourceRow[]> {
 	const rows: PulledSourceRow[] = [];
+	if (sources.includes('woodles-apps')) rows.push(...woodlesAppRows());
 	if (sources.includes('bestiary-creatures')) rows.push(...await readBestiaryRows());
 	if (sources.includes('marginalia-life') || sources.includes('marginalia-field-notes')) {
 		const marginalia = readMarginaliaRows();
