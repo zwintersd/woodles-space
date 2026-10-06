@@ -16,7 +16,12 @@ import { describe, expect, it } from 'vitest';
 import type { Life } from './content/life';
 import { world1Life } from './content/life';
 import { STAGE_SECONDS, ATTENTION_START, ATTENTION_COSTS } from './tuning';
-import { visibleLifeForWorldspace } from './worldShape';
+import {
+	GROWTH_MIN_COVERAGE,
+	emptyWorldShape,
+	visibleLifeForWorldspace,
+	type WorldShape
+} from './worldShape';
 import { conditions } from './content/conditions';
 import { applyMarginaliaCheat } from './cheats';
 import {
@@ -350,5 +355,67 @@ describe('Book — cheats run against the real Book', () => {
 		applyMarginaliaCheat('worldparty', b);
 		expect(b.mode).toBe('world');
 		expect(b.attentionCapacity).toBeGreaterThanOrEqual(12);
+	});
+});
+
+describe('Book — widening the world', () => {
+	/** A book whose floor has learned the shallows and holds this share of silt. */
+	function silted(share: number): Book {
+		const b = new Book();
+		const shape: WorldShape = emptyWorldShape();
+		const filled = Math.ceil(shape.sedimentGrid.cells.length * share);
+		b.worldShape = {
+			...shape,
+			sedimentUnlocked: true,
+			unlockedWorldspaces: ['water', 'shallows'],
+			sedimentGrid: {
+				...shape.sedimentGrid,
+				cells: shape.sedimentGrid.cells.map((_, i) => (i < filled ? 0.8 : 0))
+			}
+		};
+		return b;
+	}
+
+	it('widens once silt and stability allow, and costs nothing', () => {
+		const b = silted(GROWTH_MIN_COVERAGE);
+		b.insight = 40;
+		b.essence = 7;
+		expect(b.worldGrowth).toEqual({ state: 'ready', next: 31 });
+		b.growWorld();
+		expect(b.worldShape.worldExtent).toBe(31);
+		expect(b.insight).toBe(40);
+		expect(b.essence).toBe(7);
+		expect(b.worldGrowth.state).toBe('needs-growth');
+	});
+
+	it('does nothing before the floor has earned it', () => {
+		const thin = silted(GROWTH_MIN_COVERAGE - 0.1);
+		const before = thin.worldShape;
+		thin.growWorld();
+		expect(thin.worldShape).toBe(before);
+
+		const fresh = new Book();
+		fresh.growWorld();
+		expect(fresh.worldShape.worldExtent).toBe(15);
+	});
+
+	it('does nothing while the world is unsteady', () => {
+		const b = silted(0.6);
+		b.stocks = { nutrients: 100, oxygen: 0, moisture: 100 };
+		expect(b.stability).toBeLessThan(60);
+		const before = b.worldShape;
+		b.growWorld();
+		expect(b.worldShape).toBe(before);
+		expect(b.worldGrowth).toMatchObject({ state: 'needs-growth', needsStability: true });
+	});
+
+	it('survives a save round trip at its new width', () => {
+		const b = silted(0.6);
+		b.growWorld();
+		const back = new Book();
+		back.fromSave(b.toSave());
+		expect(back.worldShape.worldExtent).toBe(31);
+		expect(back.worldShape.sedimentGrid.w).toBe(b.worldShape.sedimentGrid.w);
+		expect(back.worldGrowth).toEqual(b.worldGrowth);
 	});
 });

@@ -144,7 +144,18 @@ Panning is a translation: `cameraOrigin()` is `fieldOrigin(extent)` shifted by t
 eased pan, and `standOn`, the pour's hit-test and the landscape all take their
 origin from it. The sediment bake covers the whole world once and is blitted at an
 offset, so a pan never rebakes. The pan is not saved; she always opens on the home
-island. Growth is not triggered by anything yet apart from the `growworld` cheat.
+island.
+
+**When it grows.** `worldGrowthStatus(shape, stability)` decides, and the player takes
+the step with "widen the world" in the world panel once it says `ready`. The shallows
+have to be learned first, then the current world needs at least 40% of its cells silted
+(`GROWTH_MIN_COVERAGE`) and stability at 60 or more (`GROWTH_MIN_STABILITY`), up to
+45 columns. Coverage is read against the world as it stands, so the same silt is a
+smaller share after a step and the next one is earned from the new width: a home world
+silted to the 60% that opens the shallows clears the first step at once, then sits near
+30% of 31 columns and has to reach 40% again. The step costs nothing, and it is not in
+the engine, so the dividend and pacing tables cannot move; `pnpm balance` is unchanged.
+The `growworld` cheat skips the rule.
 
 ---
 
@@ -197,17 +208,15 @@ GitHub's runner, and has no config knob — see PR #313.
 
 In the order I would take them.
 
-1. **The growth rule** — a step unlocks when the current world is at least 40%
-   covered in silt and stability is at least 60, to a cap of 45 columns (Z's call). It
-   needs a harness check that it does not move the dividend or pacing tables.
-2. **The row-split bake**, so creatures occlude correctly against tiles. (Landscape,
+1. **The row-split bake**, so creatures occlude correctly against tiles. (Landscape,
    placed features and creatures are now one depth-sorted list; only the baked tiles
    are not.)
-3. **A dying animation, and real death and return copy.**
+2. **A dying animation, and real death and return copy.**
+3. **A prestige world resets to 15 columns** (Z's call), once prestige exists.
 
 Done since the first version of this list: forests and mountains (#384, drawn from
-world state in `landscape.ts`, mountains following live complexity) and panning
-across a grown world.
+world state in `landscape.ts`, mountains following live complexity), panning across a
+grown world, and the growth rule above.
 
 `WATER_TOP` is retired. It anchored the weather mist band, the ripples, the
 ambient swimmer, the pour overlay's drop height, and a feature aura's fallback

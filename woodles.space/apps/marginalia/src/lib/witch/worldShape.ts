@@ -429,6 +429,43 @@ export function growWorld(shape: WorldShape): WorldShape {
 	};
 }
 
+/**
+ * What the floor has to be before the water offers more of itself: a share of the
+ * current world already silted, and a world steady enough to be trusted with a
+ * bigger one. Both are Z's numbers from the growth sketch; coverage is read
+ * against the world as it stands, so the same silt is a smaller share once the
+ * world has grown and the next step has to be earned from the new width.
+ */
+export const GROWTH_MIN_COVERAGE = 0.4;
+export const GROWTH_MIN_STABILITY = 60;
+
+export type WorldGrowthStatus =
+	| { state: 'ready'; next: WorldExtent }
+	| { state: 'max' }
+	| { state: 'needs-shallows' }
+	| { state: 'needs-growth'; next: WorldExtent; needsSilt: boolean; needsStability: boolean };
+
+/**
+ * Whether the world may take its next step. The shallows come first — the home
+ * world has to have been filled the way the whole game asks before it is allowed
+ * to want more — then silt and stability together. `stability` is the live
+ * number from the engine, so this reads it rather than owning it.
+ */
+export function worldGrowthStatus(shape: WorldShape, stability: number): WorldGrowthStatus {
+	const next = nextWorldExtent(extentForGridWidth(shape.sedimentGrid.w));
+	if (next === null) return { state: 'max' };
+	if (!isShallowsUnlocked(shape)) return { state: 'needs-shallows' };
+	const needsSilt = sedimentCoverage(shape.sedimentGrid) < GROWTH_MIN_COVERAGE;
+	const needsStability = stability < GROWTH_MIN_STABILITY;
+	if (needsSilt || needsStability) return { state: 'needs-growth', next, needsSilt, needsStability };
+	return { state: 'ready', next };
+}
+
+/** `growWorld`, but only when the rule above allows it — the one a player's button calls. */
+export function growWorldIfReady(shape: WorldShape, stability: number): WorldShape {
+	return worldGrowthStatus(shape, stability).state === 'ready' ? growWorld(shape) : shape;
+}
+
 export function emptyWorldShape(): WorldShape {
 	return {
 		worldExtent: HOME_COLS,
