@@ -6,6 +6,7 @@ export type SelectOption = { id: string; label: string; tint: string };
 export type FieldConfig = { options?: SelectOption[]; format?: 'plain' | 'percent' | 'currency' };
 export type FieldValue = string | number | boolean | string[] | WoodlesRef | null;
 export type CollectionSource =
+	| 'woodles-apps'
 	| 'bestiary-creatures'
 	| 'marginalia-life'
 	| 'marginalia-field-notes'
@@ -50,6 +51,7 @@ const SCHEMA_VERSION = 1;
 const STORAGE_KEY = 'woodles.data.collections.v1';
 const FIELD_TYPES: FieldType[] = ['text', 'number', 'checkbox', 'date', 'select', 'multi-select', 'url', 'relation'];
 const COLLECTION_SOURCES: readonly CollectionSource[] = [
+	'woodles-apps',
 	'bestiary-creatures', 'marginalia-life', 'marginalia-field-notes',
 	'marginalia-arcade-games', 'marginalia-arcade-primitives', 'marginalia-arcade-copy'
 ];
@@ -132,19 +134,20 @@ function field(id: string, name: string, type: FieldType, primary = false, optio
 
 export type CollectionTemplate =
 	| 'blank' | 'tracker' | 'media' | 'projects' | 'research' | 'living-world'
-	| 'arcade-games' | 'arcade-primitives' | 'arcade-copy';
+	| 'arcade-games' | 'arcade-primitives' | 'arcade-copy' | 'woodles-apps';
 
 /** How each template is offered, and what a new Collection from it is called. */
-export const COLLECTION_TEMPLATES: readonly { id: CollectionTemplate; name: string; detail: string; title: string }[] = [
-	{ id: 'blank', name: 'Blank', detail: 'A Primary field, ready for records', title: 'Untitled collection' },
-	{ id: 'tracker', name: 'Simple tracker', detail: 'Name, status, and notes', title: 'Untitled collection' },
-	{ id: 'media', name: 'Media', detail: 'Title, medium, progress, rating, and more', title: 'Untitled collection' },
-	{ id: 'projects', name: 'Projects', detail: 'Status, priority, due date, and links', title: 'Untitled collection' },
-	{ id: 'research', name: 'Research / sources', detail: 'Sources, URLs, notes, and links', title: 'Untitled collection' },
-	{ id: 'living-world', name: 'Bestiary + Marginalia', detail: 'Pull creatures, discovered life, and field notes into one live table', title: 'Bestiary + Marginalia' },
-	{ id: 'arcade-games', name: 'Arcade games', detail: 'Track game concepts, loops, mastery, and implementation links', title: 'Marginalia Arcade games' },
-	{ id: 'arcade-primitives', name: 'Arcade primitives', detail: 'Map shared code, game-local patterns, and reuse boundaries', title: 'Marginalia Arcade primitives' },
-	{ id: 'arcade-copy', name: 'Arcade copy desk', detail: 'Review current card copy and keep proposed wording beside its source', title: 'Marginalia Arcade copy' }
+export const COLLECTION_TEMPLATES: readonly { id: CollectionTemplate; name: string; detail: string; title: string; group: 'quick' | 'lists' | 'connected' }[] = [
+	{ id: 'blank', name: 'Blank', detail: 'A Primary field, ready for records', title: 'Untitled collection', group: 'quick' },
+	{ id: 'tracker', name: 'Simple tracker', detail: 'Name, status, and notes', title: 'Untitled collection', group: 'quick' },
+	{ id: 'media', name: 'Media', detail: 'Title, medium, progress, rating, and more', title: 'Untitled collection', group: 'lists' },
+	{ id: 'projects', name: 'Projects', detail: 'Status, priority, due date, and links', title: 'Untitled collection', group: 'lists' },
+	{ id: 'research', name: 'Research / sources', detail: 'Sources, URLs, notes, and links', title: 'Untitled collection', group: 'lists' },
+	{ id: 'living-world', name: 'Bestiary + Marginalia', detail: 'Pull creatures, discovered life, and field notes into one live table', title: 'Bestiary + Marginalia', group: 'connected' },
+	{ id: 'arcade-games', name: 'Arcade games', detail: 'Track game concepts, loops, mastery, and implementation links', title: 'Marginalia Arcade games', group: 'connected' },
+	{ id: 'arcade-primitives', name: 'Arcade primitives', detail: 'Map shared code, game-local patterns, and reuse boundaries', title: 'Marginalia Arcade primitives', group: 'connected' },
+	{ id: 'arcade-copy', name: 'Arcade copy desk', detail: 'Review current card copy and keep proposed wording beside its source', title: 'Marginalia Arcade copy', group: 'connected' },
+	{ id: 'woodles-apps', name: 'Woodles app inventory', detail: 'Current app status, routes, build details, and addressable data from the repo manifest', title: 'Woodles app inventory', group: 'connected' }
 ];
 const TEMPLATE_FIELDS: Record<CollectionTemplate, Array<[string, FieldType, string[]?, string?]>> = {
 	blank: [['Name', 'text']],
@@ -169,6 +172,11 @@ const TEMPLATE_FIELDS: Record<CollectionTemplate, Array<[string, FieldType, stri
 		['Name', 'text', undefined, 'name'], ['Game', 'text', undefined, 'game'], ['Placement', 'text', undefined, 'placement'],
 		['Status', 'text', undefined, 'status'], ['Current title', 'text', undefined, 'title'], ['Current tagline', 'text', undefined, 'text'],
 		['Source path', 'text', undefined, 'sourcePath'], ['Proposed title', 'text'], ['Proposed tagline', 'text'], ['Review notes', 'text']
+	],
+	'woodles-apps': [
+		['App', 'text', undefined, 'name'], ['Status', 'text', undefined, 'status'], ['Route', 'text', undefined, 'route'],
+		['Build type', 'text', undefined, 'kind'], ['Source directory', 'text', undefined, 'sourceDir'], ['Output directory', 'text', undefined, 'outputDir'],
+		['Package', 'text', undefined, 'packageName'], ['Addressable data', 'text', undefined, 'addressableBy'], ['My notes', 'text']
 	]
 };
 
@@ -176,7 +184,8 @@ const TEMPLATE_SOURCES: Partial<Record<CollectionTemplate, CollectionSource[]>> 
 	'living-world': ['bestiary-creatures', 'marginalia-life', 'marginalia-field-notes'],
 	'arcade-games': ['marginalia-arcade-games'],
 	'arcade-primitives': ['marginalia-arcade-primitives'],
-	'arcade-copy': ['marginalia-arcade-copy']
+	'arcade-copy': ['marginalia-arcade-copy'],
+	'woodles-apps': ['woodles-apps']
 };
 
 export function createCollection(title = 'Untitled collection', template: CollectionTemplate = 'blank'): Collection {

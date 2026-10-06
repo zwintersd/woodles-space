@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#131923" />
+    <title>Faerie · A little light for your next step</title>
+    <link rel="stylesheet" href="./playground.css" />
+  </head>
+  <body>
+    <div class="sky" aria-hidden="true"></div>
+    <div class="page-shell">
+      <header class="page-header">
+        <a class="wordmark" href="#" aria-label="Faerie playground home">
+          <span class="brand-light" aria-hidden="true"><i></i></span>
+          <span>A small companion</span>
+        </a>
+        <span class="state-pill"><span class="state-dot" aria-hidden="true"></span><span id="faerie-state">Resting nearby</span></span>
+      </header>
+
+      <main>
+        <section class="intro" aria-labelledby="page-title">
+          <div class="intro-copy">
+            <p class="eyebrow">A little light for your next step</p>
+            <h1 id="page-title">Meet <em>Faerie.</em></h1>
+            <p class="intro-description">She drifts beside you, lights up what matters, and offers a gentle nudge when you need one.</p>
+          </div>
+          <div class="intro-note"><span class="small-star" aria-hidden="true">✧</span><p>Give her somewhere to go.<br />Let the rest fall quiet.</p></div>
+        </section>
+
+        <div class="playground-grid">
+          <aside class="companion-panel" aria-labelledby="controls-title">
+            <div class="panel-heading"><span class="eyebrow">Try her out</span><h2 id="controls-title">A helpful little presence</h2></div>
+
+            <div class="hint-controls">
+              <label for="hint-message">What should she say?</label>
+              <textarea id="hint-message" rows="3" maxlength="240">Your next small step is right here.</textarea>
+              <label for="attention-target">Where should she go?</label>
+              <select id="attention-target">
+                <option value="next-step">The next small step</option>
+                <option value="save-draft">The save button</option>
+                <option value="collection-target">The inspiration collection</option>
+                <option value="lower-target">Something further down</option>
+                <option value="open-space">A quiet patch of space</option>
+              </select>
+              <button class="button button-primary" id="guide-attention"><span aria-hidden="true">✧</span> Guide my attention</button>
+              <button class="button button-secondary" id="say-hint">Say it nearby</button>
+            </div>
+
+            <div class="control-divider"></div>
+
+            <div class="behavior-controls">
+              <div class="section-heading"><h3>A few little tricks</h3><span id="tour-progress" hidden></span></div>
+              <button class="behavior-button" id="start-tour"><span class="behavior-icon" aria-hidden="true">↗</span><span><strong>Take a little tour</strong><small>Three stops, at your pace</small></span><span class="button-arrow" aria-hidden="true">→</span></button>
+              <button class="text-button stop-tour" id="stop-tour" hidden>Finish the tour</button>
+              <button class="behavior-button" id="follow-pointer" aria-pressed="false"><span class="behavior-icon" aria-hidden="true">⌁</span><span><strong>Follow my pointer</strong><small>A curious companion</small></span><span class="toggle-indicator" aria-hidden="true"></span></button>
+              <button class="behavior-button" id="celebrate"><span class="behavior-icon" aria-hidden="true">✺</span><span><strong>Celebrate a small win</strong><small>A little extra sparkle</small></span><span class="button-arrow" aria-hidden="true">→</span></button>
+            </div>
+
+            <div class="control-divider"></div>
+
+            <fieldset class="tone-controls">
+              <legend>Her glow</legend>
+              <div class="tone-options">
+                <button class="tone-button" data-tone="moonlight" aria-pressed="true" aria-label="Moonlight glow"><span class="tone-swatch moonlight"></span><span>Moonlight</span></button>
+                <button class="tone-button" data-tone="lilac" aria-pressed="false" aria-label="Lilac glow"><span class="tone-swatch lilac"></span><span>Lilac</span></button>
+                <button class="tone-button" data-tone="rose" aria-pressed="false" aria-label="Rose glow"><span class="tone-swatch rose"></span><span>Rose</span></button>
+                <button class="tone-button" data-tone="leaf" aria-pressed="false" aria-label="Leaf glow"><span class="tone-swatch leaf"></span><span>Leaf</span></button>
+              </div>
+            </fieldset>
+            <label class="motion-control" for="gentle-motion"><input type="checkbox" id="gentle-motion" /><span><strong>Keep movement gentle</strong><small>She also follows your device’s preference.</small></span></label>
+            <div class="quiet-controls"><button class="button button-quiet" id="rest">Let her rest</button><button class="button button-quiet" id="visibility">Hide Faerie</button></div>
+            <p class="keyboard-note"><kbd>Esc</kbd> lets Faerie rest.</p>
+          </aside>
+
+          <section class="workspace-panel" aria-labelledby="workspace-title">
+            <div class="workspace-topline"><div><span class="eyebrow">A place to explore</span><h2 id="workspace-title">The evening studio</h2></div><span class="workspace-badge"><span aria-hidden="true">☾</span> A quiet corner</span></div>
+            <div class="workspace-content">
+              <div class="workspace-toolbar"><div class="workspace-breadcrumb"><span class="folder-mark" aria-hidden="true"></span>My little projects <span aria-hidden="true">/</span> A new idea</div><button class="save-button" id="save-draft"><span aria-hidden="true">↥</span> Save draft</button></div>
+              <article class="draft-card">
+                <div class="draft-meta"><span class="draft-tag">A work in progress</span><span id="save-status" role="status">Room to begin</span></div>
+                <h3>Something worth making</h3>
+                <p class="draft-intro">Every good thing starts with a small, slightly unfinished idea.</p>
+                <label class="visually-hidden" for="studio-note">Your idea</label>
+                <textarea id="studio-note" rows="4" placeholder="Leave a thought here. It doesn’t have to be perfect.">A place to collect the small things that catch my eye — colors, little discoveries, and ideas for another day.</textarea>
+                <div class="note-bottom"><span class="note-dot" aria-hidden="true"></span>Just a sample workspace. Make yourself at home.</div>
+              </article>
+              <div class="workspace-cards">
+                <button class="next-step-card" id="next-step" aria-pressed="false"><span class="check-circle" aria-hidden="true"></span><span><small>Next small step</small><strong>Give this idea a name</strong><span class="target-description">A beginning is enough.</span></span><span class="card-arrow" aria-hidden="true">↗</span></button>
+                <button class="collection-card" id="collection-target" aria-expanded="false" aria-controls="collection-peek"><span class="paper-stack" aria-hidden="true"><i></i><i></i><i></i></span><span><small>Keep what catches your eye</small><strong>Inspiration</strong><span class="target-description">Three little sparks</span></span><span class="card-arrow" aria-hidden="true">↗</span></button>
+              </div>
+              <div class="collection-peek" id="collection-peek" hidden><div><span class="inspiration-color moss"></span><strong>Moss after rain</strong></div><div><span class="inspiration-color dusk"></span><strong>The last of the light</strong></div><div><span class="inspiration-color paper"></span><strong>A page waiting for you</strong></div></div>
+              <div class="workspace-end" id="open-space"><span class="small-star" aria-hidden="true">✧</span><p>Important things don’t have to shout.</p></div>
+            </div>
+            <div class="workspace-footnote"><span class="footnote-orb" aria-hidden="true"></span><p>Ask Faerie to point out a place in this workspace, or follow her through the tour.</p></div>
+          </section>
+        </div>
+
+        <section class="lower-discovery" aria-labelledby="lower-title">
+          <div class="discovery-path" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div class="lower-target" id="lower-target" tabindex="-1"><span class="eyebrow">A little further down</span><h2 id="lower-title">She can find you here, too.</h2><p>When something is out of view, Faerie can bring it into reach and settle beside it.</p><span class="discovery-stamp" aria-hidden="true">✧</span></div>
+        </section>
+
+        <details class="integration-details">
+          <summary>Bring Faerie into a workspace <span aria-hidden="true">+</span></summary>
+          <div class="integration-content"><p>Faerie can guide attention to any element, visit a point on the screen, speak, follow, or quietly rest. The workspace decides when she helps.</p><pre><code>import { createFaerie } from '../src/index.js';
+
+const faerie = createFaerie({ tone: 'moonlight' });
+
+faerie.attend(document.querySelector('#next-step'), {
+  message: 'Your next small step is right here.',
+  action: { label: 'Got it', onSelect: () =&gt; faerie.rest() }
+});</code></pre><p class="integration-caption">This playground stands on its own. Faerie isn’t attached to an app.</p></div>
+        </details>
+      </main>
+      <footer class="page-footer"><span>Faerie</span><p>A companion, ready to meet any workspace.</p><span class="footer-star" aria-hidden="true">✧</span></footer>
+    </div>
+    <div class="visually-hidden" id="playground-status" role="status" aria-live="polite"></div>
+    <script type="module" src="./playground.js"></script>
+  </body>
+</html>

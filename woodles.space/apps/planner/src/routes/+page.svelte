@@ -32,6 +32,68 @@
 
 	let section = $state<CarillonSection>('today');
 	let mainElement = $state<HTMLElement>();
+	let refreshReturnFocus: HTMLElement | null = null;
+
+	// Capture the opener before the binder closes and removes its contents.
+	$effect.pre(() => {
+		if (!onboarding.isRefreshing) return;
+		const active = document.activeElement;
+		refreshReturnFocus = active instanceof HTMLElement ? active : null;
+		if (refreshReturnFocus?.closest('#binder-panel')) {
+			refreshReturnFocus = document.querySelector<HTMLElement>(
+				'.binder-tab[aria-controls="binder-panel"][aria-expanded="true"]'
+			);
+		}
+	});
+
+	function manageRefreshDialog(node: HTMLElement) {
+		const bodyOverflow = document.body.style.overflow;
+		const rootOverflow = document.documentElement.style.overflow;
+		document.body.style.overflow = 'hidden';
+		document.documentElement.style.overflow = 'hidden';
+
+		$effect(() => {
+			onboarding.stage;
+			node.scrollTop = 0;
+			node.focus({ preventScroll: true });
+		});
+
+		function trapTab(event: KeyboardEvent) {
+			if (event.key !== 'Tab') return;
+			const controls = Array.from(node.querySelectorAll<HTMLElement>(
+				'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), ' +
+				'select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'
+			)).filter((element) => element.checkVisibility() && !element.closest('[inert]'));
+			const current = controls.indexOf(document.activeElement as HTMLElement);
+			if (controls.length === 0) {
+				event.preventDefault();
+				node.focus();
+			} else if (event.shiftKey && current <= 0) {
+				event.preventDefault();
+				controls[controls.length - 1].focus();
+			} else if (!event.shiftKey && (current === -1 || current === controls.length - 1)) {
+				event.preventDefault();
+				controls[0].focus();
+			}
+		}
+
+		node.addEventListener('keydown', trapTab);
+		return {
+			destroy() {
+				node.removeEventListener('keydown', trapTab);
+				document.body.style.overflow = bodyOverflow;
+				document.documentElement.style.overflow = rootOverflow;
+				queueMicrotask(() => {
+					if (onboarding.isRefreshing) return;
+					const target = refreshReturnFocus?.isConnected &&
+						refreshReturnFocus.checkVisibility() && !refreshReturnFocus.closest('[inert]')
+						? refreshReturnFocus
+						: document.querySelector<HTMLElement>('.sync-readout');
+					target?.focus({ preventScroll: true });
+				});
+			}
+		};
+	}
 
 	onMount(() => {
 		// Arriving with a reference from Thinking About. The shelf is refreshed
@@ -52,6 +114,14 @@
 	}
 
 	function handleKeydown(event: KeyboardEvent): void {
+		if (onboarding.isRefreshing) {
+			if (event.key === 'Escape') {
+				onboarding.closeRefresh();
+				event.preventDefault();
+			}
+			return;
+		}
+
 		const target = event.target as HTMLElement | null;
 		if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
 
@@ -70,11 +140,6 @@
 			store.closeBinder();
 			event.preventDefault();
 		}
-
-		if (event.key === 'Escape' && onboarding.isRefreshing) {
-			onboarding.closeRefresh();
-			event.preventDefault();
-		}
 	}
 
 	let syncLabel = $derived.by(() => {
@@ -90,9 +155,9 @@
 {#if !store.settings.onboardingComplete}
 	<Onboarding />
 {:else}
-	<a class="skip-link" href="#carillon-main">skip to content</a>
+	<a class="skip-link" href="#carillon-main" inert={onboarding.isRefreshing}>skip to content</a>
 
-	<div class="carillon-shell" data-section={section}>
+	<div class="carillon-shell" data-section={section} inert={onboarding.isRefreshing}>
 		<header class="app-header">
 			<div class="brand-lockup">
 				<a href="/" class="world-link" aria-label="Back to woodles.space">·space</a>
@@ -172,12 +237,19 @@
 		<TaskEditDrawer />
 		<ShelfArrival />
 
-		{#if onboarding.isRefreshing}
-			<div class="refresh-overlay" role="dialog" aria-modal="true" aria-label="refresh setup">
-				<Onboarding />
-			</div>
-		{/if}
 	</div>
+	{#if onboarding.isRefreshing}
+		<div
+			class="refresh-overlay"
+			role="dialog"
+			aria-modal="true"
+			aria-label="refresh setup"
+			tabindex="-1"
+			use:manageRefreshDialog
+		>
+			<Onboarding />
+		</div>
+	{/if}
 {/if}
 
 <style>
@@ -475,7 +547,9 @@
 		inset: 0;
 		z-index: var(--pl-z-modal);
 		overflow-y: auto;
+		overscroll-behavior: contain;
 		background: var(--p-bg);
+		outline: none;
 	}
 
 	@media (max-width: 1050px) {

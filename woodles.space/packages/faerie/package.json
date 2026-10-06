@@ -1,0 +1,18 @@
+{
+  "name": "@woodles/faerie",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    }
+  },
+  "scripts": {
+    "check": "node --check src/index.js && node --check src/styles.js && node --check src/placement.js && node --check playground/playground.js",
+    "test": "node --test src/*.test.js"
+  }
+}

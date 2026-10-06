@@ -63,6 +63,8 @@
 		min-height: 100vh;
 		position: relative;
 		overflow: hidden;
+		background: var(--p-bg);
+		color: var(--p-text);
 	}
 
 	.onboarding-fade {
@@ -131,5 +133,9 @@
 		50%  { transform: rotate(-8deg);  }
 		75%  { transform: rotate(5deg);   }
 		100% { transform: rotate(0);      }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.onboarding-fade, .bell-ring, .bell-swing { animation: none; }
 	}
 </style>

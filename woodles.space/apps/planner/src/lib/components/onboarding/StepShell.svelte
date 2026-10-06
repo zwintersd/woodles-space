@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { onboarding } from '$lib/onboarding.store.svelte';
+	import { REFRESH_SECTIONS } from '$lib/onboarding.copy';
 
 	type Props = {
 		eyebrow: string;
@@ -25,26 +26,30 @@
 	}: Props = $props();
 
 	const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI'];
+	const progressSteps = $derived(onboarding.isRefreshing ? onboarding.refreshSteps : [1, 2, 3, 4, 5, 6]);
+	const refreshLabel = $derived(REFRESH_SECTIONS.find(section => section.step === stage)?.label ?? 'setup');
 </script>
 
-<div class="step-shell">
+<div class="step-shell" class:refresh={onboarding.isRefreshing}>
 	<!-- Roman-numeral progress with dot dividers between -->
+	{#if progressSteps.length > 1}
 	<div class="step-progress" aria-hidden="true">
-		{#each [1, 2, 3, 4, 5, 6] as n, idx}
+		{#each progressSteps as n, idx}
 			<div class="prog-cell" class:done={n < stage} class:current={n === stage}>
 				<span class="prog-numeral">{ROMAN[n]}</span>
 				<span class="prog-underline"></span>
 			</div>
-			{#if idx < 5}
+			{#if idx < progressSteps.length - 1}
 				<span class="prog-sep" class:done={n < stage}>·</span>
 			{/if}
 		{/each}
 	</div>
+	{/if}
 
 	<header class="step-header">
 		<div class="step-eyebrow-row">
 			<span class="eyebrow-mark" aria-hidden="true">✦</span>
-			<span class="step-eyebrow">{eyebrow}</span>
+			<span class="step-eyebrow">{onboarding.isRefreshing ? `Refresh setup · ${refreshLabel}` : eyebrow}</span>
 			<span class="eyebrow-mark" aria-hidden="true">✦</span>
 		</div>
 		<h1 class="step-heading">{heading}</h1>
@@ -69,7 +74,7 @@
 </div>
 
 <style>
-	.step-body :global(.wb-card) { padding: 1rem; border: 1px solid var(--p-border); border-radius: var(--pl-radius-md); background: var(--p-surface); }
+	.step-body :global(.wb-card) { padding: 1rem; border: 1px solid var(--p-border); border-radius: var(--pl-radius-md); background: var(--p-surface); color: var(--p-text); }
 	.step-body :global(.wb-list) { display: grid; gap: .8rem; }
 	.step-body :global(.wb-row), .step-body :global(.wb-actions) { display: flex; flex-wrap: wrap; gap: .6rem; align-items: end; }
 	.step-body :global(.wb-card label) { display: grid; gap: .35rem; font-size: .85rem; min-width: 0; }
@@ -77,8 +82,14 @@
 	.step-body :global(.wb-card button), .step-body :global(.wb-actions button) { padding: .5rem .7rem; border: 1px solid var(--p-border); border-radius: var(--pl-radius-sm); color: var(--p-text); }
 	.step-body :global(button:disabled) { opacity: .45; }
 	.step-body :global(.wb-note), .step-body :global(.wb-card p) { color: var(--p-muted); font-size: .85rem; line-height: 1.5; }
-	.step-body :global(summary) { cursor: pointer; padding: .6rem 0; }
-	.step-body :global(h2) { font-size: 1.2rem; }
+	.step-body :global(summary) { cursor: pointer; padding: .6rem 0; color: var(--p-text); overflow-wrap: anywhere; }
+	.step-body :global(h2) { font-size: 1.2rem; margin-bottom: .4rem; }
+	.step-body :global(h3) { font-size: 1rem; }
+	.step-body :global(ol) { padding-inline-start: 1.6rem; margin: .6rem 0; }
+	.step-body :global(li) { overflow-wrap: anywhere; }
+	.step-body :global(li + li) { margin-top: .25rem; }
+	.step-body :global(button:focus-visible), .step-body :global(summary:focus-visible) { outline: 2px solid var(--p-text); outline-offset: 3px; }
+	.step-body :global(input:focus-visible), .step-body :global(textarea:focus-visible), .step-body :global(select:focus-visible) { outline: 2px solid var(--p-text) !important; outline-offset: 3px; }
 
 	.step-shell {
 		max-width: 640px;
@@ -90,6 +101,9 @@
 		gap: clamp(1.25rem, 3vw, 2rem);
 		position: relative;
 	}
+
+	.step-shell.refresh { min-height: 100vh; gap: 1.25rem; }
+	.refresh .step-header { margin-top: .5rem; }
 
 	/* ── progress: roman numerals + dot dividers ─────────────────────── */
 	.step-progress {
@@ -126,7 +140,7 @@
 		line-height: 1;
 	}
 
-	.prog-cell.current .prog-numeral { color: var(--p-accent); }
+	.prog-cell.current .prog-numeral { color: var(--p-text); font-weight: 700; }
 
 	.prog-underline {
 		width: 100%;
@@ -162,7 +176,6 @@
 		display: flex;
 		align-items: center;
 		gap: 0.7rem;
-		opacity: 0.85;
 	}
 
 	.eyebrow-mark {
@@ -199,7 +212,6 @@
 		line-height: 1.55;
 		color: var(--p-muted);
 		font-style: italic;
-		opacity: 0.85;
 		max-width: 36rem;
 	}
 
@@ -248,7 +260,6 @@
 		font-size: 0.65rem;
 		letter-spacing: 0.14em;
 		color: var(--p-muted);
-		opacity: 0.55;
 		padding: 6px 10px;
 		border-radius: var(--pl-radius-pill);
 		transition: opacity var(--pl-transition-fast), color var(--pl-transition-fast);
@@ -258,12 +269,11 @@
 
 	.step-later {
 		font-family: var(--pl-font-mono);
-		font-size: 0.58rem;
+		font-size: 0.65rem;
 		letter-spacing: 0.1em;
 		color: var(--p-muted);
 		padding: 6px 8px;
 		border-radius: var(--pl-radius-pill);
-		opacity: 0.5;
 		white-space: nowrap;
 		transition: opacity var(--pl-transition-fast), color var(--pl-transition-fast);
 	}
@@ -284,12 +294,17 @@
 	}
 
 	.step-cta:hover:not(:disabled) {
-		background: var(--p-accent);
-		color: var(--p-bg);
+		background: var(--p-accent-soft);
+		border-color: var(--p-text);
 	}
 
 	.step-cta:disabled {
 		opacity: 0.35;
 		cursor: not-allowed;
+	}
+
+	@media (max-width: 480px) {
+		.step-footer { flex-wrap: wrap; }
+		.step-cta { margin-left: auto; }
 	}
 </style>

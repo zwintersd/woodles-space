@@ -33,7 +33,7 @@ export type HomeSuiteArtifact = {
 	inTrash?: boolean;
 };
 
-export type HomeSuiteTemplate = { id: string; name: string; detail: string };
+export type HomeSuiteTemplate = { id: string; name: string; detail: string; group?: 'quick' | 'lists' | 'connected' };
 
 export type HomeSuiteSurfaceAdapter = {
 	kind: HomeSuiteArtifactKind;

@@ -143,17 +143,28 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .palette-results button[aria-disabled="true"] { opacity: .45; cursor: default; }
 .palette-results small { color: var(--hs-muted); font: 10px var(--font-mono); }
 .palette-results p { margin: 0; padding: 24px; color: var(--hs-muted); text-align: center; font-size: 13px; }
-.template-backdrop { position: fixed; z-index: 40; inset: 0; display: grid; place-items: center; padding: 20px; background: var(--hs-scrim); }
-.template-dialog { width: min(510px, 100%); border: 1px solid var(--hs-line); border-radius: 16px; background: var(--hs-raised); box-shadow: 0 24px 65px var(--hs-shadow); padding: 25px; }
-.template-dialog h2 { margin: 10px 0 5px; color: var(--hs-ink); font: 500 32px var(--font-optical); }
-.template-dialog > p { margin: 0 0 18px; color: var(--hs-muted); font: 13px/1.5 var(--font-body); }
-.template-options { display: grid; gap: 6px; }
-.template-options button { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; align-items: center; border: 1px solid var(--hs-line); border-radius: 9px; padding: 10px 12px; background: var(--hs-field); text-align: left; color: var(--hs-ink-soft); }
+.template-backdrop { position: fixed; z-index: 40; inset: 0; display: flex; align-items: center; justify-content: center; overflow-y: auto; padding: 16px; background: var(--hs-scrim); }
+.template-dialog { width: min(540px, 100%); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--hs-line); border-radius: 16px; background: var(--hs-raised); box-shadow: 0 24px 65px var(--hs-shadow); }
+.template-header { flex: 0 0 auto; padding: 22px 24px 12px; }
+.template-dialog h2 { margin: 8px 0 4px; color: var(--hs-ink); font: 500 30px var(--font-optical); }
+.template-header p { margin: 0; color: var(--hs-muted); font: 13px/1.5 var(--font-body); }
+.template-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 0 18px; }
+.template-group { border-top: 1px solid var(--hs-line); }
+.template-group summary { display: flex; align-items: center; gap: 9px; min-height: 40px; padding: 0 6px; color: var(--hs-ink-soft); font-size: 11px; font-weight: 700; cursor: pointer; list-style: none; }
+.template-group summary::-webkit-details-marker { display: none; }
+.template-group summary::before { content: '›'; display: inline-block; color: var(--hs-accent-text); font-size: 17px; transform: rotate(0); transition: transform .15s ease; }
+.template-group[open] summary::before { transform: rotate(90deg); }
+.template-group summary small { margin-left: auto; color: var(--hs-muted); font: 10px var(--font-mono); }
+.template-options { display: grid; gap: 5px; padding: 0 0 10px 17px; }
+.template-options button { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center; border: 1px solid var(--hs-line); border-radius: 8px; padding: 8px 11px; background: var(--hs-field); text-align: left; color: var(--hs-ink-soft); }
 .template-options button:hover { border-color: var(--hs-line-strong); background: var(--hs-hover); }
-.template-options button span { font-size: 13px; font-weight: 650; }
-.template-options button small { grid-column: 1; color: var(--hs-muted); font: 11px var(--font-body); }
+.template-options button span { font-size: 12px; font-weight: 650; }
+.template-options button small { grid-column: 1; color: var(--hs-muted); font: 10px/1.35 var(--font-body); }
 .template-options button b { grid-column: 2; grid-row: 1 / span 2; color: var(--hs-accent-text); font-weight: 400; }
-.template-cancel { border: 0; background: transparent; padding: 11px 0 0; color: var(--hs-muted); font-size: 11px; }
+.template-footer { flex: 0 0 auto; border-top: 1px solid var(--hs-line); padding: 10px 24px 12px; background: var(--hs-raised); }
+.template-cancel { border: 0; background: transparent; padding: 4px 0; color: var(--hs-muted); font-size: 11px; }
+.create-issue { flex: 0 0 auto; margin: 0 24px 10px; }
+@media (max-height: 600px) { .template-header { padding-top: 14px; } .template-header h2 { font-size: 25px; } .template-dialog { max-height: calc(100dvh - 20px); } .template-backdrop { padding: 10px; } }
 
 @media (max-width: 800px) {
   .suite-topbar { padding: 0 12px; gap: 8px; }

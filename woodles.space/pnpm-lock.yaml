@@ -622,6 +622,8 @@ importers:
         specifier: ^3.2.6
         version: 3.2.6(@types/node@22.19.17)(happy-dom@20.10.6)
 
+  packages/faerie: {}
+
   packages/handoff:
     dependencies:
       '@woodles/persistence':

@@ -2,6 +2,8 @@
 	import { store } from '$lib/store.svelte';
 	import { onboarding } from '$lib/onboarding.store.svelte';
 	import { STEP_COPY, PLACEHOLDERS } from '$lib/onboarding.copy';
+	import { queueSync } from '$lib/sync.svelte';
+	import { timeToMinutes } from '$lib/utils';
 	import StepShell from './StepShell.svelte';
 
 	const copy = STEP_COPY[2];
@@ -9,23 +11,52 @@
 	let routineName = $state('');
 	let cue = $state('');
 	let steps = $state('');
+	let routineNameInput: HTMLInputElement;
+	let stepsInput: HTMLTextAreaElement;
+	let notice = $state('');
+	const routines = $derived(store.routines.filter(r => !r.archived && !r.deletedAt));
 	function addRoutine() {
-		if (!store.addRoutine(routineName, steps.split('\n'), cue)) return;
+		if (!store.addRoutine(routineName, steps.split('\n'), cue)) {
+			notice = 'Add a routine name and at least one step.';
+			if (!routineName.trim()) routineNameInput.focus();
+			else stepsInput.focus();
+			return false;
+		}
 		routineName = ''; cue = ''; steps = '';
+		queueSync();
+		notice = 'Routine added.';
+		return true;
 	}
 	let name = $state('');
 	let startTime = $state('07:00');
 	let endTime = $state('07:30');
+	let activityForm: HTMLFormElement;
+	let dailyActivities: HTMLDetailsElement;
+	let activityNameInput: HTMLInputElement;
+	let activityEndInput: HTMLInputElement;
 
 	function addRitual() {
-		if (!name.trim()) return;
+		dailyActivities.open = true;
+		activityNameInput.setCustomValidity(name.trim() ? '' : 'Enter an activity name.');
+		activityEndInput.setCustomValidity(startTime && endTime && timeToMinutes(endTime) <= timeToMinutes(startTime)
+			? 'Choose an end time after the start time.' : '');
+		if (!activityForm.reportValidity()) return false;
 		store.addRitual({ name: name.trim(), startTime, endTime });
 		name = '';
 		startTime = '07:00';
 		endTime = '07:30';
+		queueSync();
+		return true;
 	}
 
 	function advance() {
+		if ((routineName.trim() || cue.trim() || steps.trim()) && !addRoutine()) return;
+		if (name.trim() || startTime !== '07:00' || endTime !== '07:30') {
+			dailyActivities.open = true;
+			if (!addRitual()) {
+				return;
+			}
+		}
 		onboarding.advance();
 	}
 </script>
@@ -38,24 +69,33 @@
 	stage={3}
 	onAdvance={advance}
 >
-	<section class="wb-card">
+	<section class="wb-card routines-card" aria-label="Reusable routines">
 		<h2>Reusable routines</h2>
-		<p>A routine is a checklist, not a scheduled appointment. Run it from Routines or link it to a pile activity in step five.</p>
-		{#each store.routines.filter(r => !r.archived && !r.deletedAt) as routine (routine.id)}
-			<details><summary>{routine.name} · {routine.steps.length} steps</summary>
-				{#if routine.cue}<p>{routine.cue}</p>{/if}
-				<ol>{#each routine.steps as step}<li>{step.label}</li>{/each}</ol>
-			</details>
-		{/each}
-		<form class="wb-list" onsubmit={(e) => { e.preventDefault(); addRoutine(); }}>
-			<label>Routine name<input required bind:value={routineName} placeholder="e.g. Start work" /></label>
-			<label>Cue<input bind:value={cue} placeholder="e.g. After breakfast" /></label>
-			<label>Steps, one per line<textarea required rows="4" bind:value={steps} placeholder="Open notebook&#10;Choose one task&#10;Gather what you need"></textarea></label>
+		<p>Run these checklists from Routines or link them to a day pile activity.</p>
+		<div class="routine-list">
+			{#each routines as routine (routine.id)}
+				<details class="routine-item"><summary>{routine.name} · {routine.steps.length} {routine.steps.length === 1 ? 'step' : 'steps'}</summary>
+					<div class="routine-preview">
+						{#if routine.cue}<p><strong>Cue:</strong> {routine.cue}</p>{/if}
+						<ol>{#each routine.steps as step (step.id)}<li>{step.label}</li>{/each}</ol>
+					</div>
+				</details>
+			{:else}
+				<p>No routines yet. Add one below, or continue and create one later.</p>
+			{/each}
+		</div>
+		<form class="wb-list routine-form" aria-label="Add a routine" onsubmit={(e) => { e.preventDefault(); addRoutine(); }}>
+			<h3>Add a routine</h3>
+			<label>Routine name<input required bind:this={routineNameInput} bind:value={routineName} placeholder="e.g. Start work" /></label>
+			<label>Cue<input bind:value={cue} aria-describedby="routine-cue-hint" placeholder="e.g. After breakfast" /></label>
+			<p id="routine-cue-hint" class="field-hint">Optional: what reminds you to begin?</p>
+			<label>Steps, one per line<textarea required rows="4" bind:this={stepsInput} bind:value={steps} placeholder={'Open notebook\nChoose one task\nGather what you need'}></textarea></label>
 			<button type="submit" disabled={!routineName.trim() || !steps.trim()}>+ Add routine</button>
 		</form>
+		<p class="routine-notice" role="status">{notice}</p>
 		<p class="wb-note">Edit, reorder, archive, or delete routines later in Routines. Saved practice records keep their original steps.</p>
 	</section>
-	<details><summary>Daily activities at a fixed time (optional)</summary>
+	<details class="wb-card daily-activities" bind:this={dailyActivities}><summary>Daily activities at a fixed time (optional)</summary>
 	<p>These appear every day, separately from routine checklists and day piles.</p>
 	{#if store.rituals.length > 0}
 		<ul class="rit-list">
@@ -63,26 +103,30 @@
 				<li class="rit-row">
 					<span class="rit-name">{r.name}</span>
 					<span class="rit-time">{r.startTime}–{r.endTime}</span>
-					<button class="rit-rm" onclick={() => store.removeRitual(r.id)} title="remove">×</button>
+					<button class="rit-rm" onclick={() => { store.removeRitual(r.id); queueSync(); }} aria-label={`Remove daily activity ${r.name}`}>×</button>
 				</li>
 			{/each}
 		</ul>
 	{/if}
 
-	<form class="rit-form" onsubmit={(e) => { e.preventDefault(); addRitual(); }}>
+	<form class="rit-form" bind:this={activityForm} aria-label="Add a daily activity" onsubmit={(e) => { e.preventDefault(); addRitual(); }}>
+		<label>Activity name
 		<input
 			class="rit-input"
+			bind:this={activityNameInput}
 			bind:value={name}
+			oninput={() => activityNameInput.setCustomValidity('')}
 			placeholder={PLACEHOLDERS.ritualName}
 			autocomplete="off"
 			spellcheck="false"
+			required
 		/>
+		</label>
 
 		<div class="rit-times">
-			<input type="time" class="rit-time-input" bind:value={startTime} />
-			<span class="rit-time-sep">→</span>
-			<input type="time" class="rit-time-input" bind:value={endTime} />
-			<button type="submit" class="rit-add" disabled={!name.trim()}>+ add</button>
+			<label>Starts at<input type="time" class="rit-time-input" required bind:value={startTime} oninput={() => activityEndInput.setCustomValidity('')} /></label>
+			<label>Ends at<input type="time" class="rit-time-input" required bind:this={activityEndInput} bind:value={endTime} oninput={() => activityEndInput.setCustomValidity('')} /></label>
+			<button type="submit" class="rit-add" disabled={!name.trim() || !startTime || !endTime}>+ Add daily activity</button>
 		</div>
 	</form>
 
@@ -91,6 +135,16 @@
 </StepShell>
 
 <style>
+	.routines-card { display: grid; gap: .8rem; }
+	.routine-list { display: grid; gap: .5rem; }
+	.routine-item { border: 1px solid var(--p-border); border-radius: var(--pl-radius-sm); padding: 0 .75rem; }
+	.routine-preview { padding-bottom: .5rem; }
+	.routine-form { border-top: 1px solid var(--p-border); padding-top: 1rem; }
+	.routine-form button { justify-self: start; }
+	.routine-form .field-hint { margin-top: -.55rem; }
+	.routine-notice:empty { display: none; }
+	.daily-activities { display: grid; gap: .8rem; }
+	.daily-activities:not([open]) { display: block; }
 	.rit-list {
 		list-style: none;
 		padding: 0;
@@ -116,6 +170,8 @@
 		font-family: var(--pl-font-body);
 		font-size: 0.95rem;
 		color: var(--p-text);
+		overflow-wrap: anywhere;
+		min-width: 0;
 	}
 
 	.rit-time {
@@ -130,7 +186,6 @@
 		font-size: 0.95rem;
 		line-height: 1;
 		color: var(--p-muted);
-		opacity: 0.4;
 		padding: 2px 6px;
 	}
 
@@ -160,7 +215,7 @@
 		font-family: var(--pl-font-body);
 		font-style: italic;
 		color: var(--p-muted);
-		opacity: 0.5;
+		opacity: 1;
 	}
 
 	.rit-input:focus {
@@ -170,9 +225,9 @@
 
 	.rit-times {
 		display: flex;
-		align-items: center;
 		gap: 0.6rem;
 		flex-wrap: wrap;
+		align-items: end;
 	}
 
 	.rit-time-input {
@@ -188,12 +243,6 @@
 	.rit-time-input:focus {
 		border-color: var(--p-accent);
 		outline: none;
-	}
-
-	.rit-time-sep {
-		font-family: var(--pl-font-mono);
-		color: var(--p-muted);
-		opacity: 0.5;
 	}
 
 	.rit-add {
@@ -222,7 +271,6 @@
 		font-size: 0.62rem;
 		letter-spacing: 0.05em;
 		color: var(--p-muted);
-		opacity: 0.55;
 		font-style: italic;
 	}
 </style>

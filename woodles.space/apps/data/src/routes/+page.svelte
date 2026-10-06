@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import { entityHref } from '@woodles/app-manifest';
+	import { appById, entityHref, primaryDestination } from '@woodles/app-manifest';
 	import { isHomeSuiteShellMessage, postHomeSuiteFlushed, postHomeSuiteNavigate, postHomeSuitePaletteRequest, postHomeSuiteRenameRequest, postHomeSuiteState, type HomeSuiteSurfaceState, type WoodlesRef } from '@shared/homesuiteBridge';
 	import FieldDialog from '$lib/FieldDialog.svelte';
 	import ReferenceDialog from '$lib/ReferenceDialog.svelte';
@@ -163,8 +163,13 @@
 
 	function openSource(ref: WoodlesRef): void {
 		// Inside HomeSuite the shell opens it, in place when it is one of its own.
-		if (homeSuite && postHomeSuiteNavigate(ref)) return;
-		try { window.open(entityHref(ref.app, ref.kind, ref.id), '_blank', 'noopener'); } catch { /* A cold reference remains visible. */ }
+		if (ref.kind !== 'app' && homeSuite && postHomeSuiteNavigate(ref)) return;
+		try {
+			const href = ref.kind === 'app'
+				? primaryDestination(appById[ref.app])
+				: entityHref(ref.app, ref.kind, ref.id);
+			window.open(href, '_blank', 'noopener');
+		} catch { /* A cold reference remains visible. */ }
 	}
 
 	function addNewRecord(): void {
@@ -326,6 +331,7 @@
 		pickerLoading = true;
 		try {
 			const rows = await pullCollectionSources([
+				'woodles-apps',
 				'bestiary-creatures', 'marginalia-life', 'marginalia-field-notes',
 				'marginalia-arcade-games', 'marginalia-arcade-primitives', 'marginalia-arcade-copy'
 			]);
