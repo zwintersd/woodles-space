@@ -291,7 +291,8 @@ test('the snowflake changes the colors and holds the form; a swatch takes a whol
 	await page.getByRole('button', { name: 'Next theme' }).click();
 	await expect(html).toHaveAttribute('data-theme', 'blossom');
 	await expect(html).toHaveAttribute('data-material', 'paper');
-	await expect(html).toHaveAttribute('data-type', 'fell');
+	// the cycle follows the theme's typeface (blossom: glaze) and holds the rest of the look
+	await expect(html).toHaveAttribute('data-type', 'glaze');
 	// held across a reload, before first paint
 	await page.reload();
 	await expect(html).toHaveAttribute('data-material', 'paper');

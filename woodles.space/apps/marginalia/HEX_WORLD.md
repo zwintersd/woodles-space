@@ -95,6 +95,8 @@ drifts.
 | `SEABED_RELIEF` | 0.22 | enough that tiles have sides; a fraction of what a pour adds |
 | `CREATURE_TILES` | 0.9 | **measured in tiles, not frame heights** — see §5 |
 | `SPAWN_INSET` | 0.62 | spawn points were authored full-bleed; the field is the middle of the frame |
+| `WORLD_EXTENTS` | 15 · 31 · 45 | the widths a world can grow to. Odd, so padding a whole number of columns each side leaves the original island where it was; 45 is the cap Z chose |
+| `TILE_CELL_SPACING` | 48 ÷ 14 | grid cells per tile column — the home world's own ratio, held fixed so a wider world reads each old tile at the same silt |
 
 ---
 
@@ -119,6 +121,30 @@ a hole in it.
 `LAYER_HOVER` then gives the spawn layers meaning they never had: a swimmer rides
 above its tile while its shadow stays on it, air rides higher, anything that walks
 stands on the top face.
+
+**How the world grows.** The frame is 15 columns wide and a world can be 15, 31 or 45.
+The silt grid says which: 48, 108 or 156 cells wide (`extentForGridWidth`), so the
+saved `worldExtent` is a copy of what the grid already knows and is re-derived on
+load. `growWorld` pads the grid with open water on both sides and moves nothing:
+`tileSample` reads the grid at a fixed `TILE_CELL_SPACING`, anchored on its middle,
+so the tile that stood on a given cell before still does. Three things have to hold
+for that to be true, and each has a test in `worldGrowth.test.ts`:
+
+- Anything hashed per tile (seabed relief, grain, which trees grow, where peaks
+  stand) keys on `homeCol`, the column the tile had in the home world. Keying on
+  `col` would renumber every tile on the first growth and reshuffle the island.
+- Placed things are fractions of the grid, so `growWorld` shrinks their `x` toward
+  the middle by old width over new. The world's own spawn points do the same
+  (`homeSpawn`), so existing life stays on the island; new land is populated by its
+  own silt and by what she places.
+- A grid width nothing here produced reads as the home world with the old
+  `u = col / 14` mapping, so odd test grids and odd saves behave exactly as before.
+
+Panning is a translation: `cameraOrigin()` is `fieldOrigin(extent)` shifted by the
+eased pan, and `standOn`, the pour's hit-test and the landscape all take their
+origin from it. The sediment bake covers the whole world once and is blitted at an
+offset, so a pan never rebakes. The pan is not saved; she always opens on the home
+island. Growth is not triggered by anything yet apart from the `growworld` cheat.
 
 ---
 
@@ -171,12 +197,17 @@ GitHub's runner, and has no config knob — see PR #313.
 
 In the order I would take them.
 
-1. **Mountains and forests** — atmosphere's base (biome-by-elevation, lighting,
-   distance haze, shores) shipped; the rest of the reference art's vocabulary is
-   still open.
-2. **The row-split bake**, so creatures occlude correctly against tiles.
-3. **Panning**, which is nearly free and opens a world larger than one frame — the
-   original point of D's lateral axis.
+1. **The growth rule** — a step unlocks when the current world is at least 40%
+   covered in silt and stability is at least 60, to a cap of 45 columns (Z's call). It
+   needs a harness check that it does not move the dividend or pacing tables.
+2. **The row-split bake**, so creatures occlude correctly against tiles. (Landscape,
+   placed features and creatures are now one depth-sorted list; only the baked tiles
+   are not.)
+3. **A dying animation, and real death and return copy.**
+
+Done since the first version of this list: forests and mountains (#384, drawn from
+world state in `landscape.ts`, mountains following live complexity) and panning
+across a grown world.
 
 `WATER_TOP` is retired. It anchored the weather mist band, the ripples, the
 ambient swimmer, the pour overlay's drop height, and a feature aura's fallback
@@ -190,14 +221,10 @@ edge, `fieldOrigin().y` — a constant, since it depends only on the field's
 column/row counts) or to the open water in front of or beyond the field, chosen
 so nothing draws over the island it shouldn't.
 
-Two questions the reference art raises that are design calls, not implementation:
-
-- **Does the world grow past one screen?** Panning makes it cheap. The mechanic
-  currently fills a fixed field.
-- **What do the later panels mean mechanically?** Mountains, forests and the sunset
-  view are a vocabulary; which of them are *states of the world* (tied to
-  complexity, stability, the Known endgame) rather than decoration is a DESIGN.md
-  question.
+Both design calls the reference art raised are answered: the world grows past one
+screen, and mountains and forests are states of the world (forests follow the
+plants' own needs, stability and deaths; mountains follow live complexity). The
+sunset view is still only a vocabulary.
 
 ---
 

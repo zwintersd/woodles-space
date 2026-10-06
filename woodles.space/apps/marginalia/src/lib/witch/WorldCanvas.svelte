@@ -27,12 +27,27 @@
 		FIELD_COLS,
 		FIELD_ROWS,
 		TILE_ELEVATION_SCALE,
+		TILE_SCREEN_WIDTH,
 		SEABED_ALPHA,
+		fieldBounds,
 		fieldOrigin,
 		fieldTiles,
+		gridExtent,
+		panLimit,
 		tileAtPoint,
-		tileElevation
+		tileElevation,
+		tileNearest
 	} from './hexField';
+	import {
+		heightAboveSea,
+		landscapeFor,
+		type Landscape,
+		type LandscapeState,
+		type PeakSpec,
+		type TreeSpec
+	} from './landscape';
+	import { bandHealth } from './vitals';
+	import { world1Def } from './def';
 	import type { Life } from './content/life';
 
 	const ASPECT = 960 / 480;
@@ -53,6 +68,10 @@
 	 * under one tile leaves it clearly an inhabitant rather than a landmark.
 	 */
 	const CREATURE_TILES = 0.9;
+	/** Vitality below this starts to read as wilting; at the floor the life is fully drained. */
+	const WILT_ONSET = 0.85;
+	/** How far (as a fraction of canvas height) a fully wilted life sags toward its tile. */
+	const WILT_SAG = 0.012;
 	const PEARL_BIT_SPRITES = [0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 14, 15, 48, 49, 50, 55, 57, 60, 61, 62, 63];
 	const PASTEL_BIT_SPRITES = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 52, 53, 56, 59];
 	const GLINT_SPRITES = [32, 33, 34, 35, 36, 37, 38, 39];
@@ -76,30 +95,121 @@
 
 	let activePointerId: number | null = null;
 	let pourPoint: { x: number; y: number } | null = null;
+	/** Where the pointer is, in client pixels, so a pour can follow the tile under it as the view moves. */
+	let pourClient: { x: number; y: number } | null = null;
 	let lastPourAt = 0;
+
+	// ── the camera ───────────────────────────────────────────────────────────────
+	//
+	// The frame holds FIELD_COLS columns; a world that has grown is wider, and the
+	// camera is a translation along it — axonometry has no perspective to recompute,
+	// so panning moves the origin and nothing else. Measured in tile columns from
+	// the centred view, positive looking east, and not saved: she always comes back
+	// to the home island, which is where the pan starts.
+	const worldExtent = $derived(gridExtent(book.worldShape.sedimentGrid));
+	const reach = $derived(panLimit(worldExtent));
+	let panTarget = $state(0);
+	/** The eased position the frame is actually drawn at, chasing panTarget. */
+	let panNow = 0;
+	/** How far a tap on an arrow carries the view, in columns — a third of the frame. */
+	const PAN_STEP = 5;
+	const PAN_EASE = 9;
+
+	const clampPan = (cols: number) => Math.max(-reach, Math.min(reach, cols));
+
+	function cameraOrigin(extent = worldExtent): { x: number; y: number } {
+		const origin = fieldOrigin(extent);
+		return { x: origin.x - panNow * TILE_SCREEN_WIDTH, y: origin.y };
+	}
+
+	function panBy(cols: number) {
+		panTarget = clampPan(panTarget + cols);
+	}
+
+	function panKey(event: KeyboardEvent) {
+		if (event.key === 'ArrowLeft') panBy(-PAN_STEP);
+		else if (event.key === 'ArrowRight') panBy(PAN_STEP);
+		else return;
+		event.preventDefault();
+	}
+
+	let panPointerId: number | null = null;
+	let panDragX = 0;
+
+	function startPan(event: PointerEvent) {
+		panPointerId = event.pointerId;
+		panDragX = event.clientX;
+		canvasEl?.setPointerCapture(event.pointerId);
+		event.preventDefault();
+	}
+
+	function movePan(event: PointerEvent) {
+		if (event.pointerId !== panPointerId || !canvasEl) return;
+		// a missed pointerup (a hidden tab, a lost capture) must not leave hovering as a drag
+		if (event.pointerType === 'mouse' && event.buttons === 0) {
+			stopPan(event);
+			return;
+		}
+		const rect = canvasEl.getBoundingClientRect();
+		if (rect.width <= 0) return;
+		// dragging the world one way moves the camera the other, and the view follows
+		// the hand rather than easing after it
+		const cols = -((event.clientX - panDragX) / rect.width) / TILE_SCREEN_WIDTH;
+		panDragX = event.clientX;
+		// from where the view is, not where an arrow tap sent it, so a drag does not jump
+		panTarget = clampPan(panNow + cols);
+		panNow = panTarget;
+	}
+
+	function stopPan(event?: PointerEvent) {
+		if (event && event.pointerId !== panPointerId) return;
+		if (panPointerId !== null && canvasEl?.hasPointerCapture(panPointerId)) {
+			canvasEl.releasePointerCapture(panPointerId);
+		}
+		panPointerId = null;
+	}
+
+	// Shift, the middle button, or any drag when there is nothing to pour with. A
+	// plain drag is the pour — that is the one gesture the world already has.
+	function startPointer(event: PointerEvent) {
+		const pannable = reach > 0;
+		if (pannable && (event.button === 1 || event.shiftKey || !book.canPourSediment())) {
+			startPan(event);
+			return;
+		}
+		startPour(event);
+	}
+
+	function stopPointer(event?: PointerEvent) {
+		stopPan(event);
+		stopPour(event);
+	}
 
 	// screen point -> a place in the density field. tileAtPoint resolves the hex
 	// tile under the pointer and hands back its (u, v) in the grid's own [0, 1]
 	// coordinates, returning null off the field — which is what stops a pour
 	// writing past the edge of the world.
-	function pointerToWaterPoint(event: PointerEvent): { x: number; y: number } | null {
+	function clientToWaterPoint(clientX: number, clientY: number): { x: number; y: number } | null {
 		const canvas = canvasEl;
 		if (!canvas) return null;
 		const rect = canvas.getBoundingClientRect();
 		if (rect.width <= 0 || rect.height <= 0) return null;
 		const tile = tileAtPoint(
-			clamp01((event.clientX - rect.left) / rect.width),
-			(event.clientY - rect.top) / rect.height
+			(clientX - rect.left) / rect.width,
+			(clientY - rect.top) / rect.height,
+			cameraOrigin(),
+			worldExtent
 		);
 		return tile === null ? null : { x: tile.u, y: tile.v };
 	}
 
 	function startPour(event: PointerEvent) {
 		if (!book.canPourSediment()) return;
-		const point = pointerToWaterPoint(event);
+		const point = clientToWaterPoint(event.clientX, event.clientY);
 		if (!point) return;
 		activePointerId = event.pointerId;
 		pourPoint = point;
+		pourClient = { x: event.clientX, y: event.clientY };
 		lastPourAt = performance.now();
 		isPouring = true;
 		canvasEl?.setPointerCapture(event.pointerId);
@@ -108,7 +218,8 @@
 
 	function movePour(event: PointerEvent) {
 		if (event.pointerId !== activePointerId) return;
-		const point = pointerToWaterPoint(event);
+		pourClient = { x: event.clientX, y: event.clientY };
+		const point = clientToWaterPoint(event.clientX, event.clientY);
 		if (point) pourPoint = point;
 	}
 
@@ -120,6 +231,7 @@
 		if (isPouring) book.finishPourSediment();
 		activePointerId = null;
 		pourPoint = null;
+		pourClient = null;
 		isPouring = false;
 	}
 
@@ -143,6 +255,9 @@
 		let sedimentBakedGrid: SedimentGrid | null = null;
 		let sedimentBakedW = 0;
 		let sedimentBakedH = 0;
+		// where the baked canvas sits, in canvas fractions with the camera centred
+		let sedimentBakedLeft = 0;
+		let sedimentBakedSpan = 1;
 
 		const motionQuery =
 			typeof matchMedia !== 'undefined' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
@@ -415,8 +530,8 @@
 		const CORNERS = hexCorners();
 
 		// The closest thing this camera has to a horizon: where the field's far edge
-		// sits on screen before any elevation lifts it. fieldOrigin() depends only on
-		// FIELD_COLS/FIELD_ROWS, so this is a constant, not something to recompute
+		// sits on screen before any elevation lifts it. fieldOrigin().y depends only on
+		// FIELD_ROWS (the world grows sideways), so this is a constant, not something to recompute
 		// per frame. Weather and ambient effects that used to anchor to the vanished
 		// waterline (WATER_TOP, retired with the perspective camera) anchor here.
 		const FIELD_HORIZON_Y = fieldOrigin().y;
@@ -476,12 +591,11 @@
 			u: number,
 			v: number
 		): { x: number; y: number; elevation: number; col: number; row: number; land: boolean } {
-			const col = Math.max(0, Math.min(FIELD_COLS - 1, Math.round(clamp01(u) * (FIELD_COLS - 1))));
-			const row = Math.max(0, Math.min(FIELD_ROWS - 1, Math.round(clamp01(v) * (FIELD_ROWS - 1))));
+			const { col, row } = tileNearest(u, v, worldExtent);
 			const { q, r } = offsetToAxial(col, row);
 			const elevation = tileElevation(book.worldShape.sedimentGrid, col, row);
 			const standing = elevation >= SEA_LEVEL ? elevation : Math.min(elevation, SEA_LEVEL * 0.92);
-			const p = projectHex(q, r, standing, fieldOrigin());
+			const p = projectHex(q, r, standing, cameraOrigin());
 			return { x: p.x, y: p.y, elevation, col, row, land: elevation >= SEA_LEVEL };
 		}
 
@@ -561,7 +675,9 @@
 		}
 
 		function drawHexField() {
-			const origin = fieldOrigin();
+			// baked with the camera centred: panning moves the finished picture, so
+			// it never costs a rebake
+			const origin = fieldOrigin(worldExtent);
 			const tiles = fieldTiles(book.worldShape.sedimentGrid);
 			// which tiles are land, so a shore can know it is a shore
 			const land = new Set<string>();
@@ -574,7 +690,7 @@
 				const p = projectHex(tile.q, tile.r, standing, origin);
 				const shallow = clamp01(tile.elevation / SEA_LEVEL);
 				const submerged = (SEABED_ALPHA + (0.62 - SEABED_ALPHA) * shallow) * tile.edge;
-				const grain = (stable01(`tone:${tile.col}:${tile.row}`) - 0.5) * 2;
+				const grain = (stable01(`tone:${tile.homeCol}:${tile.row}`) - 0.5) * 2;
 
 				// Rows at the back are further away. With no perspective to shrink them,
 				// haze is the only thing that says so.
@@ -648,12 +764,17 @@
 			// than a tenth of a second, under a falling stream drawn live on top. The
 			// frame the pour ends is forced, so what she let go of is what she sees.
 			if (!force && nowMs - sedimentBakedAt < SEDIMENT_BAKE_MIN_MS) return;
-			sedimentCanvas.width = Math.max(1, Math.round(W * dpr));
+			// The frame, widened to take in the whole world. The home world fits inside
+			// the frame, so for it this is exactly the canvas it has always baked.
+			const bounds = fieldBounds(worldExtent);
+			sedimentBakedLeft = Math.min(0, bounds.left);
+			sedimentBakedSpan = Math.max(1, bounds.right) - sedimentBakedLeft;
+			sedimentCanvas.width = Math.max(1, Math.round(W * sedimentBakedSpan * dpr));
 			sedimentCanvas.height = Math.max(1, Math.round(H * dpr));
 			const liveCtx = ctx;
 			ctx = sedimentCtx;
-			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-			ctx.clearRect(0, 0, W, H);
+			ctx.setTransform(dpr, 0, 0, dpr, -sedimentBakedLeft * W * dpr, 0);
+			ctx.clearRect(sedimentBakedLeft * W, 0, sedimentBakedSpan * W, H);
 			drawHexField();
 			ctx = liveCtx;
 			sedimentBakedGrid = grid;
@@ -696,7 +817,13 @@
 			ctx!.restore();
 		}
 
-		function drawFeatures() {
+		// Placed features stand on a tile like anything else, so they are collected
+		// and depth-sorted with the land and the creatures rather than painted first:
+		// a mountain or a tree behind one must not cover it, and one in front must.
+		// A feature outranks the land on its own tile, and a creature outranks both.
+		const FEATURE_Z_LIFT = 0.0004;
+
+		function collectFeatures(into: Drawable[]) {
 			for (const placed of book.worldShape.placedFeatures) {
 				const spec = featureById(placed.featureId);
 				if (!spec) continue;
@@ -714,23 +841,28 @@
 				// enough to y=1 that the feature — plus its grounding shadow at
 				// y + size * 0.35 — would spill past the bottom of the canvas.
 				const y = Math.min(projected.y * H, H - size * 0.5 - H * 0.01);
-				ctx!.save();
-				ctx!.globalAlpha = 0.2;
-				ctx!.fillStyle = 'rgb(14, 14, 40)';
-				ctx!.beginPath();
-				ctx!.ellipse(x, y + size * 0.28, size * 0.35, size * 0.07, 0, 0, Math.PI * 2);
-				ctx!.fill();
-				ctx!.restore();
-				const img = spec.sprite ? getFeatureSprite(spec.sprite) : null;
-				if (img) {
-					ctx!.save();
-					ctx!.translate(x, y);
-					ctx!.rotate(placed.rotation);
-					ctx!.drawImage(img, -size / 2, -size / 2, size, size);
-					ctx!.restore();
-				} else {
-					drawFeatureFallback(placed.featureId, x, y, size, placed.rotation);
-				}
+				into.push({
+					z: projected.row / Math.max(1, FIELD_ROWS - 1) + FEATURE_Z_LIFT,
+					render() {
+						ctx!.save();
+						ctx!.globalAlpha = 0.2;
+						ctx!.fillStyle = 'rgb(14, 14, 40)';
+						ctx!.beginPath();
+						ctx!.ellipse(x, y + size * 0.28, size * 0.35, size * 0.07, 0, 0, Math.PI * 2);
+						ctx!.fill();
+						ctx!.restore();
+						const img = spec!.sprite ? getFeatureSprite(spec!.sprite) : null;
+						if (img) {
+							ctx!.save();
+							ctx!.translate(x, y);
+							ctx!.rotate(placed.rotation);
+							ctx!.drawImage(img, -size / 2, -size / 2, size, size);
+							ctx!.restore();
+						} else {
+							drawFeatureFallback(placed.featureId, x, y, size, placed.rotation);
+						}
+					}
+				});
 			}
 		}
 
@@ -843,14 +975,26 @@
 				// aquatic sharing three points — so co-located lives are fanned apart
 				// by a stable per-(point, life) offset rather than stacking.
 				const fan = (stable01(`${point.id}:${life.id}:fan`) - 0.5) * HEX_SIZE * 1.3;
-				const cx = clamp01(spot.x + fan);
+				// not clamped to the frame: in a grown world its tile can be off to one side,
+				// and it goes with it rather than piling up at the edge
+				const cx = spot.x + fan;
+				if (cx < -0.1 || cx > 1.1) continue;
 				// The hover is what separates a swimmer from a walker: the shadow stays
 				// on the tile while the creature rides above it.
 				const hover = LAYER_HOVER[point.layer] ?? 0;
 				const footY = spot.y;
+				// Wilting makes stress legible: a life under it drains of colour, sags
+				// toward the tile it stands on, and stops bobbing. Vitality floors rather
+				// than hitting zero (dormant, recoverable), so this is the whole range
+				// short of death. Unobserved life (stage 0) has no vitality worth showing.
+				const vitality = book.vitalityOf(life.id);
+				const wilt = stage === 0 ? 0 : clamp01((WILT_ONSET - vitality) / WILT_ONSET);
 				const bodyY =
-					footY - hover * TILE_THICKNESS + (reduce ? 0 : layerBob(point.layer, T, seed) / H);
-				const alpha = clamp01(stage === 0 ? 0.3 : 0.55 + 0.45 * book.vitalityOf(life.id));
+					footY -
+					hover * TILE_THICKNESS * (1 - 0.5 * wilt) +
+					(reduce ? 0 : (layerBob(point.layer, T, seed) / H) * (1 - wilt)) +
+					wilt * WILT_SAG;
+				const alpha = clamp01(stage === 0 ? 0.3 : 0.55 + 0.45 * vitality);
 
 				into.push({
 					// depth is the row it stands in, so creatures sort among themselves
@@ -866,7 +1010,10 @@
 						ctx!.save();
 						ctx!.globalAlpha = alpha;
 						ctx!.imageSmoothingEnabled = !info.pixelated;
-						ctx!.drawImage(entry.img, cx * W - dw / 2, bodyY * H - dh * 0.82, dw, dh);
+						// ctx.filter is ignored where unsupported; alpha still carries the fade
+						if (wilt > 0) ctx!.filter = `saturate(${1 - 0.85 * wilt}) brightness(${1 - 0.25 * wilt})`;
+						const wdh = dh * (1 - 0.1 * wilt);
+						ctx!.drawImage(entry.img, cx * W - dw / 2, bodyY * H - wdh * 0.82, dw, wdh);
 						ctx!.restore();
 					}
 				});
@@ -893,7 +1040,8 @@
 				const dh = size * yScale;
 				const seed = placed.x + placed.y + placed.id.length * 0.013;
 				const jitter = (stable01(`${placed.id}:fan`) - 0.5) * HEX_SIZE * 1.3;
-				const cx = clamp01(spot.x + jitter);
+				const cx = spot.x + jitter;
+				if (cx < -0.1 || cx > 1.1) continue;
 				const hover = LAYER_HOVER[spec.layer] ?? 0;
 				const footY = spot.y;
 				const bodyY =
@@ -915,6 +1063,210 @@
 			}
 		}
 
+		// ── the land's answer to the world ───────────────────────────────────────
+		//
+		// Forests and mountains are read from state (see landscape.ts), not placed.
+		// They cannot live in the sediment bake: that is rebuilt only when the silt
+		// changes, and the plants' health, the world's complexity and its deaths all
+		// move without it. They are also drawn as depth-sorted objects alongside the
+		// creatures rather than painted under them, so a tree in front of a creature
+		// stands in front of it.
+		const TILE_W = HEX_SIZE * Math.sqrt(3);
+		const LANDSCAPE_REBUILD_MS = 120;
+		let landscape: Landscape | null = null;
+		let landscapeGrid: SedimentGrid | null = null;
+		let landscapeKey = '';
+		let landscapeAt = -Infinity;
+
+		function landscapeState(): LandscapeState {
+			const { bands, bandFalloff } = world1Def.stock;
+			const stocks = book.stocks;
+			return {
+				moistureHealth: bandHealth(stocks.moisture, bands.moisture[0], bands.moisture[1], bandFalloff) / 100,
+				nutrientHealth: bandHealth(stocks.nutrients, bands.nutrients[0], bands.nutrients[1], bandFalloff) / 100,
+				stability: book.stability,
+				complexity: book.complexity,
+				deaths: book.deadCount
+			};
+		}
+
+		function currentLandscape(nowMs: number): Landscape {
+			const grid = book.worldShape.sedimentGrid;
+			const state = landscapeState();
+			// Quantised, so the land does not rebuild for a change nobody could see.
+			const key = [
+				Math.round(state.moistureHealth * 40),
+				Math.round(state.nutrientHealth * 40),
+				Math.round(state.stability / 4),
+				Math.round(state.complexity),
+				state.deaths
+			].join(':');
+			const stale = !landscape || grid !== landscapeGrid || key !== landscapeKey;
+			// A live pour hands over a new grid every frame, like the sediment bake it
+			// sits beside; trail it by a beat rather than rebuild at frame rate.
+			if (stale && (!landscape || !isPouring || nowMs - landscapeAt >= LANDSCAPE_REBUILD_MS)) {
+				landscape = landscapeFor(fieldTiles(grid), state);
+				landscapeGrid = grid;
+				landscapeKey = key;
+				landscapeAt = nowMs;
+			}
+			return landscape!;
+		}
+
+		/** Green when the plants' needs are met, going to straw as they are not. */
+		function leafColour(vigor: number, conifer: boolean, shade: number): [number, number, number] {
+			const healthy = conifer ? [52, 112, 82] : [78, 146, 88];
+			const parched = conifer ? [112, 122, 74] : [176, 154, 86];
+			return [
+				lerp(parched[0], healthy[0], vigor) * shade,
+				lerp(parched[1], healthy[1], vigor) * shade,
+				lerp(parched[2], healthy[2], vigor) * shade
+			];
+		}
+
+		function drawTree(
+			tree: TreeSpec,
+			tileX: number,
+			tileY: number,
+			vigor: number,
+			haze: number,
+			T: number
+		) {
+			const unit = HEX_SIZE * W;
+			// a stressed forest is stunted as well as pale
+			const h = unit * 1.7 * tree.size * (0.55 + 0.45 * vigor);
+			const sway = reduce ? 0 : Math.sin(T * 0.9 + tree.phase) * h * 0.035;
+			const bx = (tileX + tree.dx * TILE_W) * W;
+			const by = (tileY + tree.dy * TILE_W * CAMERA_TILT) * H;
+
+			ctx!.save();
+			ctx!.globalAlpha *= 0.2 * (1 - haze);
+			ctx!.fillStyle = 'rgb(16, 46, 66)';
+			ctx!.beginPath();
+			ctx!.ellipse(bx + h * 0.12, by, h * 0.3, h * 0.3 * CAMERA_TILT, 0, 0, TAU);
+			ctx!.fill();
+			ctx!.restore();
+
+			if (tree.conifer) {
+				ctx!.fillStyle = hazed([84, 62, 48], haze, SKY_HAZE);
+				ctx!.fillRect(bx - h * 0.04, by - h * 0.16, h * 0.08, h * 0.16);
+				for (let tier = 0; tier < 3; tier++) {
+					const top = by - h * (1 - tier * 0.24);
+					const spread = h * (0.2 + tier * 0.1);
+					const lit = leafColour(vigor, true, 1 + (2 - tier) * 0.06);
+					ctx!.fillStyle = hazed(lit, haze, SKY_HAZE);
+					ctx!.beginPath();
+					ctx!.moveTo(bx + sway * (1 - tier * 0.3), top);
+					ctx!.lineTo(bx - spread, top + h * 0.36);
+					ctx!.lineTo(bx + spread, top + h * 0.36);
+					ctx!.closePath();
+					ctx!.fill();
+				}
+			} else {
+				ctx!.fillStyle = hazed([96, 72, 52], haze, SKY_HAZE);
+				ctx!.fillRect(bx - h * 0.04, by - h * 0.42, h * 0.08, h * 0.42);
+				const cx = bx + sway;
+				const cy = by - h * 0.66;
+				ctx!.fillStyle = hazed(leafColour(vigor, false, 0.86), haze, SKY_HAZE);
+				ctx!.beginPath();
+				ctx!.ellipse(cx + h * 0.06, cy + h * 0.05, h * 0.34, h * 0.3, 0, 0, TAU);
+				ctx!.fill();
+				ctx!.fillStyle = hazed(leafColour(vigor, false, 1.04), haze, SKY_HAZE);
+				ctx!.beginPath();
+				ctx!.ellipse(cx - h * 0.04, cy - h * 0.03, h * 0.3, h * 0.27, 0, 0, TAU);
+				ctx!.fill();
+			}
+		}
+
+		const ROCK_LIT = [154, 148, 142] as const;
+		const ROCK_SHADE = [108, 104, 106] as const;
+		const SNOW_LIT = [246, 249, 252] as const;
+		const SNOW_SHADE = [208, 218, 230] as const;
+
+		function drawPeak(peak: PeakSpec, tileX: number, tileY: number, haze: number) {
+			const unit = HEX_SIZE * W;
+			const cx = tileX * W;
+			const cy = tileY * H;
+			const halfBase = unit * 1.15;
+			const rise = unit * (1.0 + 2.3 * peak.height);
+			const flat = halfBase * CAMERA_TILT * 0.4;
+			const apex = { x: cx + peak.lean * halfBase * 0.3, y: cy - rise };
+			const left = { x: cx - halfBase, y: cy + flat * 0.4 };
+			const right = { x: cx + halfBase, y: cy + flat * 0.4 };
+			const foot = { x: cx + peak.lean * halfBase * 0.1, y: cy + flat * 1.6 };
+			const along = (a: { x: number; y: number }, b: { x: number; y: number }, t: number) => ({
+				x: lerp(a.x, b.x, t),
+				y: lerp(a.y, b.y, t)
+			});
+			const face = (pts: { x: number; y: number }[], colour: readonly [number, number, number]) => {
+				ctx!.fillStyle = hazed(colour, haze, SKY_HAZE);
+				ctx!.beginPath();
+				pts.forEach((p, i) => (i === 0 ? ctx!.moveTo(p.x, p.y) : ctx!.lineTo(p.x, p.y)));
+				ctx!.closePath();
+				ctx!.fill();
+			};
+
+			ctx!.save();
+			ctx!.globalAlpha *= 0.22 * (1 - haze);
+			ctx!.fillStyle = 'rgb(16, 46, 66)';
+			ctx!.beginPath();
+			ctx!.ellipse(cx + halfBase * 0.35, cy + flat * 1.2, halfBase * 1.1, halfBase * 0.34, 0, 0, TAU);
+			ctx!.fill();
+			ctx!.restore();
+
+			face([apex, left, foot], ROCK_LIT);
+			face([apex, foot, right], ROCK_SHADE);
+			if (peak.snow > 0) {
+				const f = 0.2 + 0.5 * peak.snow;
+				// a ragged lower edge, so the cap is weather and not a triangle laid on a triangle
+				const lowL = along(apex, left, f);
+				const lowM = along(apex, foot, f * 1.15);
+				const lowR = along(apex, right, f);
+				face([apex, lowL, along(lowL, lowM, 0.5), lowM], SNOW_LIT);
+				face([apex, lowM, along(lowM, lowR, 0.5), lowR], SNOW_SHADE);
+			}
+		}
+
+		/** What stands on a faded rim tile fades with it, so the island dissolves instead of keeping a hard edge of trees. */
+		function withEdge(edge: number, draw: () => void) {
+			ctx!.save();
+			ctx!.globalAlpha *= edge;
+			draw();
+			ctx!.restore();
+		}
+
+		function collectLandscape(T: number, into: Drawable[]) {
+			const { vigor, tiles } = currentLandscape(T * 1000);
+			const origin = cameraOrigin();
+			const grid = book.worldShape.sedimentGrid;
+			for (const tile of tiles) {
+				const elevation = tileElevation(grid, tile.col, tile.row);
+				const { q, r } = offsetToAxial(tile.col, tile.row);
+				const p = projectHex(q, r, elevation, origin);
+				// a grown world runs well past the frame; keep to what can be seen
+				if (p.x < -0.1 || p.x > 1.1) continue;
+				const distance = 1 - tile.row / Math.max(1, FIELD_ROWS - 1);
+				const haze = distance * FIELD_HAZE_LAND;
+				// the same row-based depth the creatures use, so they sort together
+				const z = tile.row / Math.max(1, FIELD_ROWS - 1);
+				// only tall enough to matter if it is actually high ground
+				if (tile.peak && heightAboveSea(elevation) > 0) {
+					const peak = tile.peak;
+					into.push({ z, render: () => withEdge(tile.edge, () => drawPeak(peak, p.x, p.y, haze)) });
+				}
+				if (tile.trees.length) {
+					const trees = [...tile.trees].sort((a, b) => a.dy - b.dy);
+					into.push({
+						z,
+						render: () =>
+							withEdge(tile.edge, () => {
+								for (const tree of trees) drawTree(tree, p.x, p.y, vigor, haze, T);
+							})
+					});
+				}
+			}
+		}
+
 		// Back-to-front within a pass. The four hand-ordered buckets stay two passes,
 		// split at the water's surface — the glaze and ripples are a film on it, not
 		// an object in the volume, so they keep their fixed place between. Inside each
@@ -922,6 +1274,11 @@
 		// distance: a creature at the back could draw over one at the front.
 		function drawSceneLayers(layers: SpawnLayer[], T: number) {
 			const items: Drawable[] = [];
+			// the land goes in first, so on a tie a creature stands in front of it
+			if (layers.includes('floor')) {
+				collectLandscape(T, items);
+				collectFeatures(items);
+			}
 			collectLife(layers, T, items);
 			collectPlacedCreatures(layers, T, items);
 			items.sort(byDepth);
@@ -1211,7 +1568,7 @@
 				const row = Math.min(3, rowBase + (Math.sin(T * 0.7 + i) > 0.7 ? 1 : 0));
 				const placed = book.worldShape.placedFeatures[i % Math.max(1, book.worldShape.placedFeatures.length)];
 				// an aura anchored to a feature has to stand on the same tile the
-				// feature itself does — standOn, the way drawFeatures places the
+				// feature itself does — standOn, the way collectFeatures places the
 				// feature sprite — or it drifts off the thing it belongs to. This used
 				// to ride the old floor projection, which this camera replaced; there's
 				// also no per-distance scale to apply any more, so size is fixed.
@@ -1268,14 +1625,22 @@
 			drawSea(T);
 			drawWeather(T);
 			ensureSedimentBaked(tMs, !isPouring);
-			ctx!.drawImage(sedimentCanvas, 0, 0, W, H);
+			ctx!.drawImage(
+				sedimentCanvas,
+				(sedimentBakedLeft - panNow * TILE_SCREEN_WIDTH) * W,
+				0,
+				sedimentBakedSpan * W,
+				H
+			);
 			drawSedimentCast(T, isPouring ? 1 : shine(tending) * 0.45, isPouring ? pourPoint : null);
-			drawFeatures();
+			// Everything that stands on a tile is one depth-sorted list — land, features,
+			// swimmers and walkers — so nothing in front is covered by something behind.
+			// Only what flies is left for after the ripples, which are a film on the water.
+			drawSceneLayers(['water', 'floor', 'shore'], T);
 			drawFeatureAuras(T, shine(witnessed));
-			drawSceneLayers(['water', 'floor'], T);
 			drawAnimatorSwimmer(T, shine(tending));
 			drawWaterRipples(T, m, shine(tending * 0.6 + m * 0.4));
-			drawSceneLayers(['shore', 'air'], T);
+			drawSceneLayers(['air'], T);
 			drawRain(T);
 			drawWitchMotes(T, shine(tending));
 			drawOverlays(T);
@@ -1283,8 +1648,26 @@
 
 		let raf = 0;
 		let running = true;
+		let lastFrameAt = 0;
+		function stepPan(t: number) {
+			const dt = Math.min(0.1, Math.max(0, (t - lastFrameAt) / 1000));
+			lastFrameAt = t;
+			// the world can shrink under the camera (a cheat, a reset), so hold the target in range
+			const held = clampPan(panTarget);
+			if (held !== panTarget) panTarget = held;
+			if (reduce || Math.abs(panTarget - panNow) < 0.002) panNow = panTarget;
+			else panNow += (panTarget - panNow) * (1 - Math.exp(-dt * PAN_EASE));
+		}
+
 		function frame(t: number) {
 			if (!running) return;
+			stepPan(t);
+			// the view can move under a pointer that has not, so the pour is re-aimed at
+			// whatever tile is under it now rather than where it was last moved
+			if (isPouring && pourClient) {
+				const aimed = clientToWaterPoint(pourClient.x, pourClient.y);
+				if (aimed) pourPoint = aimed;
+			}
 			if (isPouring && pourPoint) {
 				const dt = Math.min(0.08, Math.max(0, (t - lastPourAt) / 1000));
 				if (dt > 0) {
@@ -1301,6 +1684,7 @@
 		function onVisibility() {
 			if (document.hidden) {
 				stopPour();
+				stopPan();
 				running = false;
 				if (raf) cancelAnimationFrame(raf);
 			} else if (!running) {
@@ -1312,7 +1696,27 @@
 
 		document.addEventListener('visibilitychange', onVisibility);
 
+		// A trackpad's sideways scroll, or shift and the wheel, pans a world that has
+		// grown. Registered by hand because Svelte's own wheel listener is passive, and
+		// this has to be able to keep the page from scrolling under the gesture. Plain
+		// vertical scrolling is left alone, so the page still scrolls past the canvas.
+		function onWheel(event: WheelEvent) {
+			if (reach <= 0) return;
+			const sideways = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.shiftKey ? event.deltaY : 0;
+			if (sideways === 0) return;
+			event.preventDefault();
+			const rect = canvas.getBoundingClientRect();
+			if (rect.width <= 0) return;
+			// a wheel reports pixels, lines or pages depending on the device
+			const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? rect.width : 1;
+			const cols = (sideways * unit) / rect.width / TILE_SCREEN_WIDTH;
+			panTarget = clampPan(panNow + cols);
+			panNow = panTarget;
+		}
+		canvas.addEventListener('wheel', onWheel, { passive: false });
+
 		return () => {
+			canvas.removeEventListener('wheel', onWheel);
 			stopPour();
 			running = false;
 			if (raf) cancelAnimationFrame(raf);
@@ -1323,18 +1727,56 @@
 	});
 </script>
 
-<div class="diorama" bind:this={wrapEl} class:pourable={book.canPourSediment()} class:pouring={isPouring}>
+<div
+	class="diorama"
+	bind:this={wrapEl}
+	class:pourable={book.canPourSediment()}
+	class:pannable={reach > 0}
+	class:pouring={isPouring}
+>
 	<canvas
 		bind:this={canvasEl}
 		aria-label={book.canPourSediment()
 			? 'a living water world — tap and drag on the water to sift sediment into shallows'
 			: 'a living water world where sediment can gather into shallows'}
-		onpointerdown={startPour}
-		onpointermove={movePour}
-		onpointerup={stopPour}
-		onpointercancel={stopPour}
-		onlostpointercapture={stopPour}
+		onpointerdown={startPointer}
+		onpointermove={(event) => {
+			movePan(event);
+			movePour(event);
+		}}
+		onpointerup={stopPointer}
+		onpointercancel={stopPointer}
+		onlostpointercapture={stopPointer}
 	></canvas>
+	{#if reach > 0}
+		<button
+			type="button"
+			class="pan pan-left"
+			aria-label="look west along the world"
+			aria-disabled={panTarget <= -reach}
+			onclick={() => panBy(-PAN_STEP)}
+			onkeydown={panKey}
+		>
+			‹
+		</button>
+		<button
+			type="button"
+			class="pan pan-right"
+			aria-label="look east along the world"
+			aria-disabled={panTarget >= reach}
+			onclick={() => panBy(PAN_STEP)}
+			onkeydown={panKey}
+		>
+			›
+		</button>
+		<div class="pan-track" aria-hidden="true">
+			<div
+				class="pan-thumb"
+				style:left="{(1 - FIELD_COLS / worldExtent) * (0.5 + panTarget / (2 * reach)) * 100}%"
+				style:width="{(FIELD_COLS / worldExtent) * 100}%"
+			></div>
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -1351,6 +1793,13 @@
 		cursor: crosshair;
 		touch-action: none;
 	}
+	/* a drag pans when there is nothing to pour with, and a touch has to be ours to do it */
+	.diorama.pannable canvas {
+		touch-action: none;
+	}
+	.diorama.pannable:not(.pourable) canvas {
+		cursor: grab;
+	}
 	.diorama.pouring {
 		border-color: rgba(255, 255, 255, 0.74);
 		box-shadow: 0 0 18px rgba(255, 236, 248, 0.2);
@@ -1358,5 +1807,56 @@
 	canvas {
 		display: block;
 		width: 100%;
+	}
+	.pan {
+		position: absolute;
+		top: 50%;
+		transform: translateY(-50%);
+		width: 2rem;
+		height: 3rem;
+		border: 1px solid var(--rule);
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.5);
+		color: inherit;
+		font-size: 1.4rem;
+		line-height: 1;
+		cursor: pointer;
+		opacity: 0.7;
+	}
+	.pan:hover:not([aria-disabled='true']),
+	.pan:focus-visible {
+		opacity: 1;
+		background: rgba(255, 255, 255, 0.8);
+	}
+	/* aria-disabled rather than disabled, so a button that has reached the end of the
+	   world keeps focus and the arrow keys still reach the other direction */
+	.pan[aria-disabled='true'] {
+		opacity: 0.18;
+		cursor: default;
+	}
+	.pan-left {
+		left: 0.5rem;
+	}
+	.pan-right {
+		right: 0.5rem;
+	}
+	/* where the frame sits along the whole world */
+	.pan-track {
+		position: absolute;
+		left: 50%;
+		bottom: 0.45rem;
+		width: 5rem;
+		height: 3px;
+		transform: translateX(-50%);
+		border-radius: 2px;
+		background: rgba(255, 255, 255, 0.35);
+		pointer-events: none;
+	}
+	.pan-thumb {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		border-radius: 2px;
+		background: rgba(255, 255, 255, 0.85);
 	}
 </style>

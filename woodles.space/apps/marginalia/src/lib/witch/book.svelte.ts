@@ -169,6 +169,10 @@ export class Book {
 	get vitality(): Record<string, number> {
 		return this.v, this.world.state.vitality;
 	}
+	set vitality(v: Record<string, number>) {
+		this.world.state.vitality = v;
+		this.touch();
+	}
 
 	vitalityOf(lifeId: string): number {
 		return this.v, this.world.vitalityOf(lifeId);
@@ -231,8 +235,16 @@ export class Book {
 	get attending(): string[] {
 		return this.v, this.world.state.attending;
 	}
+	set attending(v: string[]) {
+		this.world.state.attending = v;
+		this.touch();
+	}
 	get study(): Record<string, number> {
 		return this.v, this.world.state.study;
+	}
+	set study(v: Record<string, number>) {
+		this.world.state.study = v;
+		this.touch();
 	}
 	get focusStreak(): number {
 		return this.v, this.world.state.focusStreak;
@@ -243,11 +255,23 @@ export class Book {
 	get writtenConditions(): string[] {
 		return this.v, this.world.state.writtenConditions;
 	}
+	set writtenConditions(v: string[]) {
+		this.world.state.writtenConditions = v;
+		this.touch();
+	}
 	get observation(): Record<string, number> {
 		return this.v, this.world.state.observation;
 	}
+	set observation(v: Record<string, number>) {
+		this.world.state.observation = v;
+		this.touch();
+	}
 	get categoryMastered(): Record<string, boolean> {
 		return this.v, this.world.state.categoryMastered;
+	}
+	set categoryMastered(v: Record<string, boolean>) {
+		this.world.state.categoryMastered = v;
+		this.touch();
 	}
 
 	journalShown = $state<string[]>([]);
@@ -448,6 +472,10 @@ export class Book {
 	get stability(): number {
 		return this.v, this.world.stability;
 	}
+	/** How many life are dead right now and have not yet returned. */
+	get deadCount(): number {
+		return this.v, Object.keys(this.world.state.deaths).length;
+	}
 	get quiet(): boolean {
 		return this.v, this.world.quiet;
 	}
@@ -515,6 +543,8 @@ export class Book {
 					this.unlockAchievement('held-itself');
 					break;
 				case 'quiet':
+				case 'death':
+				case 'return':
 					if (e.note) this.pushFieldNote(e.note);
 					break;
 				case 'intervention':
@@ -889,6 +919,8 @@ export class Book {
 			interventionsDone: { ...w.interventionsDone },
 			interventionLoad: w.interventionLoad,
 			equilibriumSeconds: w.equilibriumSeconds,
+			complexityPeak: w.complexityPeak,
+			deaths: { ...w.deaths },
 			recall: { ...w.recall },
 			fluency: { ...w.fluency },
 			attentionCapacity: w.attentionCapacity,
@@ -929,6 +961,8 @@ export class Book {
 			interventionsDone: { ...(s.interventionsDone ?? {}) },
 			interventionLoad: s.interventionLoad ?? 0,
 			equilibriumSeconds: s.equilibriumSeconds ?? 0,
+			complexityPeak: s.complexityPeak ?? 0,
+			deaths: { ...(s.deaths ?? {}) },
 			recall: { ...(s.recall ?? {}) },
 			fluency: { ...(s.fluency ?? {}) },
 			attentionCapacity: s.attentionCapacity,
