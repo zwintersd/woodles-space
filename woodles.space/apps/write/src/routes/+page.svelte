@@ -3,6 +3,7 @@
 	import { fly, slide, fade } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
 	import { HOMESUITE_CHANNEL, isHomeSuiteShellMessage, postHomeSuiteFlushed, postHomeSuiteNavigate, postHomeSuitePaletteRequest, postHomeSuiteState } from '@shared/homesuiteBridge';
+	import { createHomeSuiteContext, type ContextAction } from '@shared/homesuiteContext';
 	import { isHomeSuiteTrashed, restoreHomeSuiteArtifact } from '@shared/homesuiteTrash';
 	import Topbar from '$lib/Topbar.svelte';
 	import BottomBar from '$lib/BottomBar.svelte';
@@ -231,6 +232,7 @@
 	let homeSuiteCanRedo = $state(false);
 	let homeSuiteHistoryTimer: ReturnType<typeof setTimeout> | undefined;
 	let lastEditingElement: HTMLElement | null = null;
+	const context = createHomeSuiteContext();
 	let pendingHomeSuiteSave = false;
 
 	let draftsList = $state<DraftIndexItem[]>([]);
@@ -405,7 +407,7 @@
 				{ id: 'write.pockets', label: pocketsOpen ? 'Close pockets' : 'Open pockets' },
 				{ id: 'write.notes', label: 'Inspect layers and notes' },
 				{ id: 'write.prompt', label: 'Draft with a prompt' },
-				{ id: 'write.send-to-board', label: 'Send prose to board', enabled: !isListKind }
+				{ id: 'write.send-to-board', label: 'Send prose to board Inbox', enabled: !isListKind, context: 'artifact', group: 'connect', detail: 'Sends a snapshot of the foreground prose' }
 			],
 			canUndo: homeSuiteCanUndo,
 			canRedo: homeSuiteCanRedo
@@ -435,6 +437,10 @@
 	}
 
 	function onHomeSuiteKeydown(event: KeyboardEvent) {
+		if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+			if (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+			event.preventDefault(); openWriteContext({ x: 16, y: 16 }); return;
+		}
 		if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
 		const key = event.key.toLowerCase();
 		if (key === 'k') {
@@ -449,6 +455,8 @@
 		if (event.origin !== window.location.origin || event.source !== window.parent) return;
 		if (!isHomeSuiteShellMessage(event.data)) return;
 		const message = event.data;
+		if (context.handle(message)) return;
+		if (message.action === 'context-open') { openWriteContext({ x: 16, y: 16 }); return; }
 		if (message.action === 'flush') {
 			flushHomeSuiteSave();
 			postHomeSuiteFlushed();
@@ -482,6 +490,38 @@
 
 	// A plain click in a reference places the caret — this is an editor — so
 	// ⌘/Ctrl-click follows it, and HomeSuite opens the thing in place.
+	function openWriteContext(point: { x: number; y: number }, anchor?: HTMLAnchorElement) {
+		if (!homeSuiteMode || !hydrated || !currentDraftId) return;
+		const draftId = currentDraftId;
+		const valid = () => currentDraftId === draftId;
+		const actions: ContextAction[] = anchor ? [
+			{ id: 'reference:remove', label: 'Remove reference', detail: 'Keeps the words and source item', group: 'danger', run: () => {
+				if (!valid() || !anchor.isConnected) return;
+				const range = document.createRange(); range.selectNodeContents(anchor);
+				const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range);
+				anchor.closest<HTMLElement>('[contenteditable="true"]')?.focus();
+				document.execCommand('unlink'); updateMeta(); fgVersion += 1; scheduleSave(); scheduleHomeSuiteHistoryState();
+			} }
+		] : [
+			{ id: 'write:continue', label: 'Continue writing', group: 'edit', run: () => { if (valid()) (isListKind ? titleEl : elFor(activeLayer))?.focus(); } },
+			{ id: 'write:notes', label: 'Layers & notes', group: 'view', run: () => { if (valid()) binderOpen = 'layers'; } },
+			{ id: 'write:send', label: 'Send prose to board Inbox', detail: 'Sends a snapshot of the foreground prose', group: 'connect', enabled: !isListKind, run: () => { if (valid() && !isListKind) sendToBoard(); } }
+		];
+		context.open(point, {
+			label: anchor?.textContent?.trim() || title.trim() || 'Untitled document',
+			detail: anchor ? 'Reference in this document' : 'Document · Write',
+			ref: anchor ? { app: anchor.dataset.refApp!, kind: anchor.dataset.refKind!, id: anchor.dataset.refId! } : { app: 'write', kind: 'draft', id: draftId }
+		}, actions);
+	}
+
+	function writeContextEvent(event: MouseEvent) {
+		if (!(event.target instanceof Element) || !editorPageEl?.contains(event.target)) return;
+		const anchor = event.target.closest<HTMLAnchorElement>('a[data-ref-app][data-ref-kind][data-ref-id]');
+		if (!anchor && event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+		event.preventDefault();
+		openWriteContext({ x: event.clientX, y: event.clientY }, anchor ?? undefined);
+	}
+
 	function onHomeSuiteReferenceClick(event: MouseEvent) {
 		if (!(event.metaKey || event.ctrlKey) || !(event.target instanceof Element)) return;
 		const anchor = event.target.closest<HTMLAnchorElement>('a[data-ref-app][data-ref-kind][data-ref-id]');
@@ -537,6 +577,7 @@
 			document.addEventListener('focusin', onHomeSuiteFocusIn);
 			document.addEventListener('input', scheduleHomeSuiteHistoryState, true);
 			document.addEventListener('click', onHomeSuiteReferenceClick, true);
+			document.addEventListener('contextmenu', writeContextEvent);
 		}
 		const tid = params.get('template');
 		const replyId = params.get('reply');
@@ -714,6 +755,7 @@
 			document.removeEventListener('focusin', onHomeSuiteFocusIn);
 			document.removeEventListener('input', scheduleHomeSuiteHistoryState, true);
 			document.removeEventListener('click', onHomeSuiteReferenceClick, true);
+			document.removeEventListener('contextmenu', writeContextEvent);
 		}
 		wrapObserver?.disconnect();
 		clearTimeout(noticeTimer);

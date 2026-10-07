@@ -3,6 +3,8 @@
 	import { page } from '$app/state';
 	import { appById, entityHref, primaryDestination } from '@woodles/app-manifest';
 	import { isHomeSuiteShellMessage, postHomeSuiteFlushed, postHomeSuiteNavigate, postHomeSuitePaletteRequest, postHomeSuiteRenameRequest, postHomeSuiteState, type HomeSuiteSurfaceState, type WoodlesRef } from '@shared/homesuiteBridge';
+	import { createHomeSuiteContext, type ContextAction } from '@shared/homesuiteContext';
+	import { boardLibrary } from '../../../whiteboard/src/lib/library';
 	import FieldDialog from '$lib/FieldDialog.svelte';
 	import ReferenceDialog from '$lib/ReferenceDialog.svelte';
 	import TableToolbar from '$lib/TableToolbar.svelte';
@@ -37,6 +39,70 @@
 	let pickerLoading = $state(false);
 	let sourceStatus = $state('');
 	let trashRevision = $state(0);
+	const context = createHomeSuiteContext();
+
+	function suiteCandidates(): ReferenceCandidate[] {
+		return [
+			...boardLibrary.list().map((board) => ({ app: 'whiteboard', kind: 'board', id: board.id, text: board.title.trim() || 'Untitled board', hint: 'Whiteboard' })),
+			...loadCollections().collections.map((entry) => ({ app: 'data', kind: 'collection', id: entry.id, text: entry.title, hint: 'Data' }))
+		];
+	}
+
+	function openDataContext(point: { x: number; y: number }, recordId = selectedRecord, fieldId = selectedField || selectedCell?.fieldId || ''): void {
+		if (!homeSuite || !collection) return;
+		const ownerId = collection.id;
+		const record = collection.records.find((entry) => entry.id === recordId);
+		const field = collection.fields.find((entry) => entry.id === fieldId);
+		if (record) selectCell(record.id, field?.id ?? '');
+		else if (field) selectField(field.id);
+		const run = (id: string) => {
+			if (collection?.id !== ownerId) return;
+			if (record && !collection.records.some((entry) => entry.id === record.id)) return;
+			if (field && !collection.fields.some((entry) => entry.id === field.id)) return;
+			if (record) selectCell(record.id, field?.id ?? ''); else if (field) selectField(field.id);
+			command(id);
+		};
+		const actions: ContextAction[] = [];
+		let ref = record?.sourceRef;
+		let detail = record ? (record.sourceRef ? 'Reference in this collection · local notes stay here' : 'Record in this collection · undoable edits') : field ? `${field.primary ? 'Primary · ' : ''}${field.sourceKey ? 'Synced · ' : ''}${field.type} field` : 'Collection';
+		if (record) {
+			if (field?.type === 'relation' && !field.sourceKey) {
+				const value = record.values[field.id];
+				if (isRef(value)) ref = value;
+				actions.push({ id: 'relation:choose', label: isRef(value) ? 'Change reference…' : 'Choose reference…', group: 'edit', run: () => {
+					if (collection?.id === ownerId && collection.records.some((entry) => entry.id === record.id)) openRelationPicker(record.id, field.id);
+				} });
+				if (isRef(value)) {
+					detail = `Reference in ${field.name} · ${primaryLabel(record)}`;
+					actions.push({ id: 'relation:remove', label: 'Remove reference', group: 'danger', run: () => run('relation:remove') });
+				}
+			}
+			if (!record.sourceRef) actions.push({ id: 'record:duplicate', label: 'Duplicate record', group: 'edit', run: () => run('record:duplicate') });
+			actions.push({ id: 'record:delete', label: record.sourceRef ? 'Remove from collection' : 'Delete record', detail: record.sourceRef ? 'Keeps the source item' : 'Undo to restore', group: 'danger', run: () => run('record:delete') });
+		} else if (field) {
+			actions.push({ id: 'field:new', label: 'Add field…', group: 'edit', run: () => run('field:new') });
+			actions.push({ id: 'field:delete', label: 'Delete field', enabled: !field.primary, detail: field.primary ? 'The Primary field is required' : 'Removes this column and its values · undoable', group: 'danger', run: () => run('field:delete') });
+		} else {
+			for (const [id, label] of [['record:new', 'New record'], ['field:new', 'New field…'], ['reference:add', 'Add Woodles reference…'], ['collection:export', 'Export collection']]) actions.push({ id, label, group: 'edit', run: () => run(id) });
+		}
+		context.open(point, { label: record ? primaryLabel(record) : field?.name ?? collection.title, detail, ref }, actions);
+	}
+
+	function dataContextEvent(event: MouseEvent): void {
+		if (!homeSuite || !(event.target instanceof Element) || !event.target.closest('.data-table')) return;
+		if (event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+		const row = event.target.closest<HTMLElement>('[data-record]');
+		const cell = event.target.closest<HTMLElement>('[data-cell]');
+		const head = event.target.closest<HTMLElement>('[data-field]');
+		event.preventDefault();
+		openDataContext({ x: event.clientX, y: event.clientY }, row?.dataset.record ?? '', head?.dataset.field ?? cell?.dataset.cell?.split(':')[1] ?? '');
+	}
+
+	function recordContext(event: MouseEvent, recordId: string): void {
+		if (!homeSuite) { selectRecord(recordId); return; }
+		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+		openDataContext({ x: rect.left, y: rect.bottom }, recordId, '');
+	}
 
 	const collectionId = $derived(page.url.searchParams.get('collection'));
 	const homeSuite = $derived(page.url.searchParams.has('homesuite'));
@@ -49,7 +115,8 @@
 	const candidates = $derived.by(() => {
 		const query = pickerQuery.trim().toLowerCase();
 		const synced = refs.filter((entry) => (entry.app === 'bestiary' || entry.app === 'marginalia') && (!query || `${entry.text} ${entry.hint ?? ''}`.toLowerCase().includes(query)));
-		return [...candidatesFor('#', pickerQuery), ...synced].slice(0, 8);
+		const suite = suiteCandidates().filter((entry) => !isHomeSuiteTrashed(entry) && (!query || `${entry.text} ${entry.hint}`.toLowerCase().includes(query)));
+		return [...candidatesFor('#', pickerQuery), ...suite, ...synced].slice(0, 8);
 	});
 
 	function updateLibrary(next: Collection, recordHistory = true): void {
@@ -143,7 +210,7 @@
 	function primaryLabel(record: Collection['records'][number]): string {
 		if (!collection) return '';
 		if (record.sourceRef) {
-			const candidate = refs.find((entry) => entry.app === record.sourceRef?.app && entry.kind === record.sourceRef?.kind && entry.id === record.sourceRef?.id);
+			const candidate = sourceCandidate(record.sourceRef);
 			return candidate?.text ?? 'Unavailable source';
 		}
 		const primary = collection.fields.find((entry) => entry.primary);
@@ -152,6 +219,7 @@
 	}
 
 	function sourceCandidate(ref: WoodlesRef): ReferenceCandidate | null {
+		if (ref.app === 'whiteboard' || ref.app === 'data') return suiteCandidates().find((entry) => entry.app === ref.app && entry.kind === ref.kind && entry.id === ref.id) ?? null;
 		return refs.find((entry) => entry.app === ref.app && entry.kind === ref.kind && entry.id === ref.id) ?? null;
 	}
 
@@ -403,10 +471,10 @@
 			: activeRecord?.sourceRef
 				? [{ commandId: 'source:open', label: 'Open source' }, { commandId: 'record:delete', label: 'Remove from collection' }]
 				: activeRecord ? [{ commandId: 'record:delete', label: 'Delete record' }] : [];
-		const commands = [
+		const commands: HomeSuiteSurfaceState['commands'] = [
 			{ id: 'record:new', label: 'New record', shortcut: '⌘ ↵' }, { id: 'field:new', label: 'New field' },
-			...(collection.sources?.length ? [{ id: 'source:sync', label: 'Refresh connected sources' }] : []),
-			{ id: 'collection:rename', label: 'Rename collection' }, { id: 'collection:export', label: 'Export collection' },
+			...(collection.sources?.length ? [{ id: 'source:sync', label: 'Refresh connected sources', context: 'artifact' as const, group: 'connect' as const }] : []),
+			{ id: 'collection:rename', label: 'Rename collection' }, { id: 'collection:export', label: 'Export collection', context: 'artifact', group: 'connect' },
 			{ id: 'record:duplicate', label: 'Duplicate record', enabled: !!selectedRecord },
 			{ id: 'record:delete', label: activeRecord?.sourceRef ? 'Remove from collection' : 'Delete record', enabled: !!selectedRecord },
 			{ id: 'relation:remove', label: 'Remove reference', enabled: relationSelected() },
@@ -425,6 +493,13 @@
 	function onShellMessage(event: MessageEvent): void {
 		if (event.origin !== window.location.origin || event.source !== window.parent || !isHomeSuiteShellMessage(event.data)) return;
 		const message = event.data;
+		if (context.handle(message)) return;
+		if (message.action === 'context-open') { openDataContext({ x: 16, y: 16 }); return; }
+		if (message.action === 'add-reference' && collection) {
+			const ref = message.ref;
+			if (!collection.records.some((entry) => entry.sourceRef?.app === ref.app && entry.sourceRef.kind === ref.kind && entry.sourceRef.id === ref.id)) updateLibrary(addRecord(collection, ref));
+			return;
+		}
 		if (message.action === 'flush') { flushPendingSave(); postHomeSuiteFlushed(); }
 		else if (message.action === 'rename') renameCollection(message.title);
 		else if (message.action === 'undo') undo();
@@ -483,6 +558,7 @@
 		if (collection) { shelfSource.loadLocal(); refs = candidatesFor('#', ''); publishState(); }
 		if (collection?.records.some((record) => record.sourceRef?.app === 'bestiary' || record.sourceRef?.app === 'marginalia')) void refreshPickerSources();
 		window.addEventListener('message', onShellMessage);
+		window.addEventListener('contextmenu', dataContextEvent);
 		window.addEventListener('keydown', globalKeydown);
 		const onTrashChange = (event: StorageEvent) => { if (event.key === HOMESUITE_TRASH_KEY || event.key === null) trashRevision += 1; };
 		window.addEventListener('storage', onTrashChange);
@@ -493,6 +569,7 @@
 		document.addEventListener('visibilitychange', flushWhenHidden);
 		const teardown = () => {
 			window.removeEventListener('message', onShellMessage);
+			window.removeEventListener('contextmenu', dataContextEvent);
 			window.removeEventListener('keydown', globalKeydown);
 			window.removeEventListener('storage', onTrashChange);
 			window.removeEventListener('pagehide', flushPendingSave);
@@ -511,6 +588,10 @@
 	});
 
 	function globalKeydown(event: KeyboardEvent): void {
+		if (homeSuite && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) {
+			if (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+			event.preventDefault(); openDataContext({ x: 16, y: 16 }); return;
+		}
 		if (homeSuite && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); postHomeSuitePaletteRequest(); return; }
 		if (event.key === 'Escape') { pickerFor = null; addFieldOpen = false; }
 		if (event.key === 'F2' && collection) { event.preventDefault(); addFieldOpen = true; }
@@ -542,7 +623,7 @@
 						<th class="row-head">#</th>
 						{#each orderedFields as field (field.id)}
 							{@const width = collection.views.table.columnWidths[field.id] ?? 160}
-							<th class:primary={field.primary} style={`width:${width}px;min-width:${width}px`}>
+							<th data-field={field.id} class:primary={field.primary} style={`width:${width}px;min-width:${width}px`}>
 								<button
 									class="field-head"
 									draggable="true"
@@ -563,7 +644,7 @@
 				</thead>
 				<tbody>
 					{#each collection.records as record, rowIndex (record.id)}
-						<tr class:selected-row={selectedRecord === record.id}>
+						<tr class:selected-row={selectedRecord === record.id} data-record={record.id}>
 							<td class="row-number">
 								<button aria-label={`Select ${primaryLabel(record)}`} onclick={() => selectRecord(record.id)}>{rowIndex + 1}</button>
 							</td>
@@ -655,7 +736,7 @@
 								</td>
 							{/each}
 							<td class="row-actions">
-								<button aria-label={`Actions for ${primaryLabel(record)}`} title="Record actions" onclick={() => selectRecord(record.id)}>⋯</button>
+								<button aria-label={`Actions for ${primaryLabel(record)}`} title="Record actions" aria-haspopup={homeSuite ? 'menu' : undefined} onclick={(event) => recordContext(event, record.id)}>⋯</button>
 							</td>
 						</tr>
 					{/each}

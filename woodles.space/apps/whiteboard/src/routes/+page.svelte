@@ -155,6 +155,7 @@
 	} from '$lib/surface';
 	import { DEFAULT_VIEW, normalizeView, viewPreferences, type ViewPreferences } from '$lib/view';
 	import { createHandoffQueue } from '@woodles/handoff';
+	import { createHomeSuiteContext, type ContextAction } from '@shared/homesuiteContext';
 	import {
 		isHomeSuiteShellMessage,
 		postHomeSuiteFlushed,
@@ -166,6 +167,7 @@
 	import { HOMESUITE_TRASH_KEY, isHomeSuiteTrashed, restoreHomeSuiteArtifact } from '@shared/homesuiteTrash';
 
 	const whiteboardHandoffs = createHandoffQueue('whiteboard');
+	const context = createHomeSuiteContext();
 	import { STACK_BEHAVIORS, SUGGESTED_STATUSES, TINTS, type Label, type StackBehavior, type Tint } from '$lib/model';
 
 	type Tool = 'select' | 'frame' | 'stack' | 'line';
@@ -425,16 +427,16 @@
 			commands: [
 				{ id: 'rename-board', label: 'Rename board' },
 				{ id: 'save', label: 'Save board', shortcut: '⌘S' },
-				{ id: 'find', label: 'Find on board', shortcut: '/' },
+				{ id: 'find', label: 'Find on board', shortcut: '/', context: 'artifact', group: 'view' },
 				{ id: 'add-card', label: 'Add card' },
 				{ id: 'add-frame', label: 'Draw frame' },
 				{ id: 'add-stack', label: 'Add stack' },
 				{ id: 'add-image', label: 'Add image' },
-				{ id: 'fit-board', label: 'Fit board', shortcut: '0' },
+				{ id: 'fit-board', label: 'Fit board', shortcut: '0', context: 'artifact', group: 'view' },
 				{ id: 'inspect', label: 'Inspect selection', shortcut: 'I', enabled: chosen.length > 0 },
 				{ id: 'duplicate-selection', label: 'Duplicate selection', shortcut: '⌘D', enabled: chosen.length > 0 },
 				{ id: 'delete-selection', label: chosen.length === 1 && only?.type === 'portal' ? 'Remove portal from board' : chosen.length === 1 ? 'Delete board item' : 'Remove selected items from board', enabled: chosen.length > 0 },
-				{ id: 'play-journey', label: 'Play journey', enabled: stops.length > 0 }
+				{ id: 'play-journey', label: 'Play journey', enabled: stops.length > 0, context: 'artifact', group: 'view' }
 			],
 			canUndo: canUndo(editHistory),
 			canRedo: canRedo(editHistory)
@@ -727,10 +729,57 @@
 		}
 	}
 
+	function openBoardContext(point: { x: number; y: number }, itemId?: string) {
+		if (!homeSuiteEmbedded || !loaded) return;
+		if (itemId && !selectedIds.includes(itemId)) selectOnly(itemId);
+		const boardId = board.board.id;
+		const ids = [...selectedIds];
+		const items = board.items.filter((item) => ids.includes(item.id));
+		const item = items.length === 1 ? items[0] : null;
+		const run = (id: string) => {
+			if (board.board.id !== boardId || ids.some((selected) => !board.items.some((entry) => entry.id === selected))) return;
+			selectedIds = ids;
+			runHomeSuiteCommand(id);
+		};
+		const actions: ContextAction[] = items.length ? [
+			{ id: 'inspect', label: 'Edit details', group: 'edit', run: () => run('inspect') },
+			{ id: 'duplicate-selection', label: items.length === 1 ? 'Duplicate item' : 'Duplicate selected items', group: 'edit', enabled: items.some((entry) => entry.type !== 'connector'), run: () => run('duplicate-selection') },
+			{ id: 'delete-selection', label: item?.type === 'portal' ? 'Remove portal from board' : items.length === 1 ? 'Delete board item' : 'Remove selected items from board', group: 'danger', detail: item?.type === 'portal' ? 'Keeps the destination board' : 'Undo to restore', run: () => run('delete-selection') }
+		] : [
+			{ id: 'add-card', label: 'Add card', group: 'edit', run: () => run('add-card') },
+			{ id: 'add-frame', label: 'Draw frame', group: 'edit', run: () => run('add-frame') },
+			{ id: 'add-stack', label: 'Add stack', group: 'edit', run: () => run('add-stack') },
+			{ id: 'fit-board', label: 'Fit board', group: 'view', run: () => run('fit-board') }
+		];
+		context.open(point, {
+			label: item ? itemLabel(item) : items.length ? `${items.length} selected items` : boardTitleFallback(board.board.title),
+			detail: item ? `${item.type} on this board` : items.length ? 'Selection on this board' : 'Board canvas',
+			ref: item?.type === 'portal' ? { app: 'whiteboard', kind: 'board', id: item.boardId } : !items.length ? { app: 'whiteboard', kind: 'board', id: boardId } : undefined
+		}, actions);
+	}
+
+	function boardContextEvent(event: MouseEvent) {
+		if (!homeSuiteEmbedded || !(event.target instanceof Element) || !canvasEl?.contains(event.target)) return;
+		if (event.target.closest('input, textarea, select, [contenteditable="true"], [data-whiteboard-ui]')) return;
+		event.preventDefault();
+		const object = event.target.closest<HTMLElement>('[data-context-item]');
+		if (!object) selectedIds = [];
+		openBoardContext({ x: event.clientX, y: event.clientY }, object?.dataset.contextItem);
+	}
+
+	function boardContextKey(event: KeyboardEvent) {
+		if (homeSuiteEmbedded && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) {
+			if (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+			event.preventDefault(); openBoardContext({ x: 16, y: 16 });
+		}
+	}
+
 	function handleHomeSuiteMessage(event: MessageEvent) {
 		if (!homeSuiteEmbedded || event.origin !== window.location.origin || event.source !== window.parent ||
 			!isHomeSuiteShellMessage(event.data)) return;
 		const message = event.data;
+		if (context.handle(message)) return;
+		if (message.action === 'context-open') { openBoardContext({ x: 16, y: 16 }); return; }
 		if (message.action === 'flush') { saveNow(); postHomeSuiteFlushed(); }
 		else if (message.action === 'rename') renameBoard(message.title);
 		else if (message.action === 'undo') performUndo();
@@ -794,6 +843,8 @@
 		document.addEventListener('visibilitychange', onVisibilityChange);
 		window.addEventListener('resize', measureViewport);
 		window.addEventListener('message', handleHomeSuiteMessage);
+		window.addEventListener('contextmenu', boardContextEvent);
+		window.addEventListener('keydown', boardContextKey);
 		const onTrashChange = (event: StorageEvent) => { if (event.key === HOMESUITE_TRASH_KEY || event.key === null) trashRevision += 1; };
 		window.addEventListener('storage', onTrashChange);
 		return () => {
@@ -801,6 +852,8 @@
 			document.removeEventListener('visibilitychange', onVisibilityChange);
 			window.removeEventListener('resize', measureViewport);
 			window.removeEventListener('message', handleHomeSuiteMessage);
+			window.removeEventListener('contextmenu', boardContextEvent);
+			window.removeEventListener('keydown', boardContextKey);
 			window.removeEventListener('storage', onTrashChange);
 			saveNow();
 		};
@@ -2484,6 +2537,7 @@
 				{#if endpoints}
 					<path
 						class="connector-hit-area"
+						data-context-item={connector.id}
 						d={`M ${endpoints.from.x} ${endpoints.from.y} L ${endpoints.to.x} ${endpoints.to.y}`}
 						role="button"
 						tabindex="0"
@@ -2520,6 +2574,7 @@
 					class:dragging={draggingIds.includes(item.id)}
 					class:found={matchIds.has(item.id)}
 					class="board-item frame tint-{item.tint}"
+					data-context-item={item.id}
 					style={itemStyle(item)}
 					role="group"
 					aria-label={`Frame: ${item.title || 'Untitled frame'}`}
@@ -2566,6 +2621,7 @@
 					class:drop-target={dropStackId === item.id}
 					class:found={matchIds.has(item.id)}
 					class="board-item stack tint-{colorOf(item) ?? 'none'} does-{behaviorOf(item)}"
+					data-context-item={item.id}
 					style={itemStyle(item)}
 					role="group"
 					aria-label={`${behaviorOf(item) === 'plain' ? 'Stack' : `${behaviorOf(item)} stack`}: ${item.title || 'Untitled stack'}`}
@@ -2621,6 +2677,7 @@
 					class:tile={cardMode(item) === 'gallery'}
 					class:ticked={cardMode(item) === 'checklist' && isDone(item)}
 					class="board-item card tint-{colorOf(item) ?? 'none'} laid-{cardMode(item) ?? 'free'}"
+					data-context-item={item.id}
 					style={itemStyle(item)}
 					role="group"
 					aria-label={`Card: ${item.title || 'Untitled card'}`}
@@ -2709,6 +2766,7 @@
 					class:missing={preview?.missing}
 					class:loops={trailHasBoard(trail, item.boardId)}
 					class="board-item portal"
+					data-context-item={item.id}
 					style={itemStyle(item)}
 					role="group"
 					aria-label={`Way through to ${doorLabel(item)}`}
@@ -2762,6 +2820,7 @@
 					class:dragging={draggingIds.includes(item.id)}
 					class:found={matchIds.has(item.id)}
 					class="board-item image-card"
+					data-context-item={item.id}
 					style={itemStyle(item)}
 					role="group"
 					aria-label={`Image: ${item.name || 'Board image'}`}

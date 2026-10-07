@@ -5,9 +5,9 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"build": "cd ../write && svelte-kit sync && cd ../data && vite build",
+		"build": "cd ../write && svelte-kit sync && cd ../whiteboard && svelte-kit sync && cd ../data && vite build",
 		"preview": "vite preview",
-		"check": "cd ../write && svelte-kit sync && cd ../data && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check": "cd ../write && svelte-kit sync && cd ../whiteboard && svelte-kit sync && cd ../data && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"test": "svelte-kit sync && vitest run"
 	},
 	"dependencies": {

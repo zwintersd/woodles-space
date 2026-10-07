@@ -3,19 +3,28 @@ import { expect, test, type Page } from '@playwright/test';
 
 /** The shell veils a surface until the surface reports what it has loaded. */
 async function surfaceReady(page: Page): Promise<void> {
+	await expect(page.locator('iframe.native-surface')).toBeVisible();
 	await expect(page.locator('.surface-veil')).toHaveCount(0);
+	await expect(page.locator('iframe.native-surface')).not.toHaveAttribute('inert');
 }
 
 async function create(page: Page, kind: 'Document' | 'Board'): Promise<void> {
+	const previous = page.url();
 	await page.getByRole('button', { name: /New/ }).click();
 	await page.getByRole('menuitem', { name: new RegExp(kind) }).click();
+	await expect.poll(() => page.url()).not.toBe(previous);
 	await surfaceReady(page);
 }
 
 async function createCollection(page: Page, template: RegExp): Promise<void> {
+	const previous = page.url();
 	await page.getByRole('button', { name: /New/ }).click();
 	await page.getByRole('menuitem', { name: /Collection/ }).click();
-	await page.getByRole('dialog', { name: 'New collection' }).getByRole('button', { name: template }).click();
+	const dialog = page.getByRole('dialog', { name: 'New collection' });
+	const group = dialog.locator('details').filter({ has: page.getByRole('button', { name: template, includeHidden: true }) });
+	if (await group.getAttribute('open') === null) await group.locator('summary').click();
+	await dialog.getByRole('button', { name: template }).click();
+	await expect.poll(() => page.url()).not.toBe(previous);
 	await surfaceReady(page);
 }
 
@@ -27,6 +36,8 @@ function openId(page: Page): string {
 
 async function backToIndex(page: Page): Promise<void> {
 	await page.getByRole('button', { name: '← All things' }).click();
+	await expect(page).toHaveURL(/\/homesuite\/?$/);
+	await expect(page.locator('iframe.native-surface')).toHaveCount(0);
 }
 
 test('HomeSuite creates and reopens native documents and boards from one index', async ({ page }) => {
@@ -390,11 +401,189 @@ test('typing in a document does not make the shell re-read every library', async
 	expect(await page.evaluate(() => (window as unknown as { shellReads: number }).shellReads)).toBeLessThan(5);
 });
 
+test('context menu keyboard navigation, focus return, and viewport fitting', async ({ page }) => {
+	await page.goto('/homesuite');
+	await create(page, 'Document');
+	await backToIndex(page);
+	const trigger = page.getByRole('button', { name: 'Actions for Untitled document' });
+	await trigger.click();
+	const menu = page.getByRole('menu', { name: 'Actions for Untitled document' });
+	await expect(menu.getByRole('menuitem', { name: 'Open in HomeSuite' })).toBeFocused();
+	await page.keyboard.press('End');
+	await expect(menu.getByRole('menuitem', { name: 'Move to Trash' })).toBeFocused();
+	await page.keyboard.press('Home');
+	await page.keyboard.press('ArrowDown');
+	await expect(menu.getByRole('menuitem', { name: 'Rename document' })).toBeFocused();
+	await page.keyboard.press('Escape');
+	await expect(menu).toHaveCount(0);
+	await expect(trigger).toBeFocused();
+	await trigger.click();
+	await menu.getByRole('menuitem', { name: 'Rename document' }).click();
+	await expect(page.getByRole('textbox', { name: 'Rename document' })).toBeFocused();
+	await page.keyboard.press('Escape');
+	await page.setViewportSize({ width: 390, height: 600 });
+	await page.getByRole('button', { name: 'Actions for document', exact: true }).click();
+	const box = await page.locator('.context-menu').boundingBox();
+	expect(box!.x).toBeGreaterThanOrEqual(0);
+	expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+	expect(box!.y + box!.height).toBeLessThanOrEqual(600);
+});
+
+test('context menu adds a board reference to a Collection, then removes only its membership', async ({ page }) => {
+	await page.goto('/homesuite');
+	await createCollection(page, /Blank/);
+	const collectionId = openId(page);
+	await backToIndex(page);
+	await create(page, 'Board');
+	const boardId = openId(page);
+	await backToIndex(page);
+	await page.locator('.artifact-row-open', { hasText: 'Untitled board' }).click({ button: 'right' });
+	await page.getByRole('menuitem', { name: 'Add reference to collection…' }).click();
+	await page.getByRole('dialog', { name: 'Add reference to collection' }).getByRole('button', { name: 'Untitled collection Add reference' }).click();
+	await page.goto(`/homesuite?collection=${collectionId}`);
+	await surfaceReady(page);
+	const table = page.frameLocator('iframe.native-surface');
+	await expect(table.getByRole('button', { name: 'Untitled board', exact: true })).toBeVisible();
+	await table.getByRole('button', { name: 'Actions for Untitled board' }).click();
+	const menu = page.getByRole('menu', { name: 'Actions for Untitled board' });
+	await expect(menu.getByRole('menuitem', { name: 'Delete record', exact: true })).toHaveCount(0);
+	await menu.getByRole('menuitem', { name: 'Remove from collection' }).click();
+	await expect(table.locator('.source-value')).toHaveCount(0);
+	await page.getByRole('button', { name: 'Undo' }).click();
+	await expect(table.locator('.source-value')).toContainText('Untitled board');
+	await table.getByRole('button', { name: 'Actions for Untitled board' }).click();
+	await page.getByRole('menuitem', { name: 'Open referenced item in HomeSuite' }).click();
+	await expect.poll(() => openId(page)).toBe(boardId);
+});
+
+test('Trash context always leaves permanent deletion at its explicit confirmation', async ({ page }) => {
+	await page.goto('/homesuite');
+	await create(page, 'Board');
+	await backToIndex(page);
+	await page.getByRole('button', { name: 'Actions for Untitled board' }).click();
+	await page.getByRole('menuitem', { name: 'Move to Trash' }).click();
+	await page.getByRole('navigation', { name: 'HomeSuite views' }).getByRole('button', { name: /Trash/ }).click();
+	await page.getByRole('button', { name: 'Delete permanently', exact: true }).click();
+	await page.getByRole('button', { name: 'Actions for Untitled board' }).click();
+	await page.getByRole('menuitem', { name: /Delete permanently/ }).click();
+	await expect(page.locator('.trash-row')).toHaveCount(1);
+	await expect(page.getByRole('button', { name: 'Confirm permanent deletion' })).toBeVisible();
+	await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+	await page.getByRole('button', { name: 'Restore', exact: true }).click();
+	await page.getByRole('navigation', { name: 'HomeSuite views' }).getByRole('button', { name: 'Workspace' }).click();
+	await expect(page.locator('.artifact-row')).toHaveCount(1);
+});
+
+test('native context targets are correct without replacing editable text menus', async ({ page }) => {
+	await page.goto('/homesuite');
+	await createCollection(page, /Blank/);
+	const table = page.frameLocator('iframe.native-surface');
+	await table.getByRole('button', { name: '＋ New record' }).click();
+	await table.locator('td.primary-cell input').fill('First row');
+	await table.getByRole('button', { name: '＋ New record' }).click();
+	await table.locator('td.primary-cell input').last().fill('Second row');
+	await table.locator('td.primary-cell input').first().click({ button: 'right' });
+	await expect(page.locator('.context-menu')).toHaveCount(0);
+	await table.getByRole('button', { name: 'Actions for First row' }).click();
+	await expect(page.getByRole('menu', { name: 'Actions for First row' })).toBeVisible();
+	await page.getByRole('menuitem', { name: 'Delete record' }).click();
+	await expect(table.locator('td.primary-cell input')).toHaveCount(1);
+	await expect(table.locator('td.primary-cell input')).toHaveValue('Second row');
+	await table.locator('.field-head').click({ button: 'right' });
+	await expect(page.getByRole('menuitem', { name: /Delete field/ })).toBeDisabled();
+	await page.keyboard.press('Escape');
+	await page.getByRole('button', { name: 'Undo' }).click();
+	await expect(table.locator('td.primary-cell input')).toHaveCount(2);
+});
+
+test('board right click and selection actions duplicate and remove the exact board item', async ({ page }) => {
+	await page.goto('/homesuite');
+	await create(page, 'Board');
+	await page.getByRole('button', { name: /Commands/ }).click();
+	await page.getByRole('option', { name: /Add card/ }).click();
+	const board = page.frameLocator('iframe.native-surface');
+	await board.locator('.board-item.card').click({ button: 'right', position: { x: 10, y: 10 } });
+	await expect(page.getByRole('menuitem', { name: 'Duplicate item' })).toBeVisible();
+	await page.getByRole('menuitem', { name: 'Duplicate item' }).click();
+	await expect(board.locator('.board-item.card')).toHaveCount(2);
+	await page.getByRole('button', { name: 'Actions for selection' }).click();
+	await page.getByRole('menuitem', { name: /Delete board item/ }).click();
+	await expect(board.locator('.board-item.card')).toHaveCount(1);
+	await page.getByRole('button', { name: 'Undo' }).click();
+	await expect(board.locator('.board-item.card')).toHaveCount(2);
+});
+
+test('Write reference context unlinks without deleting prose or the source document', async ({ page }) => {
+	await page.goto('/homesuite');
+	await create(page, 'Document');
+	const target = openId(page);
+	await create(page, 'Document');
+	const source = openId(page);
+	await backToIndex(page);
+	await page.evaluate(({ source, target }) => {
+		const key = `woodles_draft_${source}`;
+		const body = JSON.parse(localStorage.getItem(key)!);
+		const html = `<p data-anchor="a-001">See <a data-ref-app="write" data-ref-kind="draft" data-ref-id="${target}" href="/write?draft=${target}">the other document</a>.</p>`;
+		localStorage.setItem(key, JSON.stringify({ ...body, content: html, layers: { ...(body.layers ?? {}), foreground: { html } } }));
+	}, { source, target });
+	await page.goto(`/homesuite?document=${source}`);
+	await surfaceReady(page);
+	const draft = page.frameLocator('iframe.native-surface');
+	await draft.locator('a[data-ref-id]').click({ button: 'right' });
+	await page.getByRole('menuitem', { name: /Remove reference/ }).click();
+	await expect(draft.locator('a[data-ref-id]')).toHaveCount(0);
+	await expect(draft.getByRole('textbox', { name: 'foreground content' })).toContainText('See the other document.');
+	await backToIndex(page);
+	await expect(page.locator('.artifact-row')).toHaveCount(2);
+});
+
+test('artifact context exposes Write’s existing prose snapshot handoff', async ({ page }) => {
+	await page.goto('/homesuite');
+	await create(page, 'Document');
+	const draft = page.frameLocator('iframe.native-surface');
+	await draft.getByRole('textbox', { name: 'foreground content' }).fill('A thought for the canvas.');
+	await page.getByRole('button', { name: 'Actions for document', exact: true }).click();
+	await page.getByRole('menuitem', { name: /Send prose to board Inbox/ }).click();
+	await expect(draft.locator('.handoff-notice')).toContainText('waiting in the Inbox');
+	const queue = await page.evaluate(() => JSON.parse(localStorage.getItem('woodles.handoff.whiteboard.v1')!));
+	expect(JSON.stringify(queue)).toContain('A thought for the canvas.');
+});
+
+test('a relation menu adds to the open Collection through its owner and keeps local edits undoable', async ({ page }) => {
+	await page.goto('/homesuite');
+	await create(page, 'Document');
+	await page.frameLocator('iframe.native-surface').locator('textarea.doc-title').fill('Source note');
+	await backToIndex(page);
+	await createCollection(page, /Media/);
+	const table = page.frameLocator('iframe.native-surface');
+	await table.getByRole('button', { name: '＋ New record' }).click();
+	await table.locator('td.primary-cell input').fill('Local row');
+	await table.getByRole('button', { name: 'Set Related relation' }).click();
+	await table.getByRole('dialog', { name: 'Choose a Woodles reference' }).getByRole('button', { name: /Source note/ }).click();
+	await table.locator('.relation-cell').click({ button: 'right' });
+	await page.getByRole('menuitem', { name: 'Add reference to collection…' }).click();
+	await page.getByRole('dialog', { name: 'Add reference to collection' }).getByRole('button', { name: /Untitled collection Add reference/ }).click();
+	await expect(table.locator('.source-value')).toContainText('Source note');
+	await expect(table.locator('td.primary-cell input')).toHaveValue('Local row');
+	await page.getByRole('button', { name: 'Undo' }).click();
+	await expect(table.locator('.source-value')).toHaveCount(0);
+	await expect(table.locator('.relation-cell')).toContainText('Source note');
+	await table.locator('.relation-cell').click({ button: 'right' });
+	await page.getByRole('menuitem', { name: 'Remove reference', exact: true }).click();
+	await expect(table.locator('.relation-cell')).toContainText('Add relation');
+	await backToIndex(page);
+	await expect(page.locator('.artifact-row')).toHaveCount(2);
+});
+
 for (const colorScheme of ['light', 'dark'] as const) {
 	test(`HomeSuite meets WCAG AA in the ${colorScheme} scheme, index and open`, async ({ page }) => {
 		await page.emulateMedia({ colorScheme });
 		await page.goto('/homesuite');
 		await createCollection(page, /Media/);
+		await page.getByRole('button', { name: 'Actions for collection', exact: true }).click();
+		const context = await new AxeBuilder({ page }).exclude('iframe').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+		expect(context.violations, JSON.stringify(context.violations, null, 2)).toEqual([]);
+		await page.keyboard.press('Escape');
 		const table = page.frameLocator('iframe.native-surface');
 		await table.getByRole('button', { name: '＋ New record' }).click();
 		await table.locator('td.primary-cell input').first().click();
