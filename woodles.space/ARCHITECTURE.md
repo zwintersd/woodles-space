@@ -318,6 +318,13 @@ request. Source-owned table columns refresh in place while Collection-owned
 fields stay local; a pull that changes nothing saves nothing, and source
 records are never written back to either app.
 
+Context menus use the same owner boundary: the surface snapshots its target and
+keeps action callbacks locally; the shell renders serializable action descriptors
+above the iframe and adds reference navigation, copying, and Collection membership.
+Request IDs keep dismissed or superseded actions from touching a new selection.
+Native text keeps its browser menu. The data relationships, action matrix, and
+extension contract are in [HomeSuite's context menu design](./apps/homesuite/CONTEXT_MENU.md).
+
 A title is edited in the shell's own title area — click it, or Rename in the
 palette; Data's Rename collection and Whiteboard's Rename board ask the shell
 to start with `request-rename` — and sent to the surface as a `rename`

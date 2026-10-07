@@ -8,5 +8,5 @@ export default defineConfig({
 			'@shared': fileURLToPath(new URL('../../shared', import.meta.url))
 		}
 	},
-	test: { environment: 'happy-dom', include: ['src/**/*.test.ts'] }
+	test: { environment: 'happy-dom', include: ['src/**/*.test.ts'], setupFiles: ['../../vitest.setup.ts'] }
 });

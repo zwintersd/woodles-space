@@ -13,6 +13,20 @@ export type HomeSuiteArtifactKind = 'document' | 'board' | 'collection';
 /** A handle for an entity in its owning app; resolution stays with that app. */
 export type WoodlesRef = { app: string; kind: string; id: string };
 
+export type HomeSuiteContextAction = {
+	id: string;
+	label: string;
+	group?: 'edit' | 'connect' | 'view' | 'danger';
+	enabled?: boolean;
+	detail?: string;
+};
+export type HomeSuiteContextTarget = {
+	label: string;
+	detail: string;
+	ref?: WoodlesRef;
+	actions: HomeSuiteContextAction[];
+};
+
 export type HomeSuiteSurfaceState = {
 	artifact: { id: string; kind: HomeSuiteArtifactKind; title: string };
 	selection: { kind: string; label: string; count?: number } | null;
@@ -25,7 +39,7 @@ export type HomeSuiteSurfaceState = {
 	} | null;
 	modes: { id: string; label: string }[];
 	activeMode: string;
-	commands: { id: string; label: string; shortcut?: string; enabled?: boolean }[];
+	commands: { id: string; label: string; shortcut?: string; enabled?: boolean; context?: 'artifact' | 'selection'; group?: HomeSuiteContextAction['group']; detail?: string }[];
 	canUndo: boolean;
 	canRedo: boolean;
 };
@@ -38,11 +52,16 @@ export type HomeSuiteSurfaceMessage =
 	| { channel: typeof HOMESUITE_CHANNEL; source: 'surface'; type: 'navigate'; target: 'artifact'; ref: WoodlesRef }
 	/** Ask the shell to edit the title in its own title area. */
 	| { channel: typeof HOMESUITE_CHANNEL; source: 'surface'; type: 'request-rename' }
+	/** Coordinates are in the surface viewport; actions belong to this request. */
+	| { channel: typeof HOMESUITE_CHANNEL; source: 'surface'; type: 'context-menu'; requestId: string; x: number; y: number; target: HomeSuiteContextTarget }
 	/** The answer to a `flush` action: pending saves have landed. */
 	| { channel: typeof HOMESUITE_CHANNEL; source: 'surface'; type: 'flushed' };
 
 export type HomeSuiteShellMessage =
-	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'undo' | 'redo' | 'inspect' | 'focus' | 'flush' }
+	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'undo' | 'redo' | 'inspect' | 'focus' | 'flush' | 'context-open' }
+	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'context-command'; requestId: string; commandId: string }
+	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'context-dismiss'; requestId: string }
+	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'add-reference'; ref: WoodlesRef }
 	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'command'; commandId: string }
 	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'inspector'; controlId: string; value: string }
 	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'mode'; modeId: string }
@@ -89,5 +108,5 @@ export function isHomeSuiteSurfaceMessage(data: unknown): data is HomeSuiteSurfa
 	if (!data || typeof data !== 'object') return false;
 	const value = data as Record<string, unknown>;
 	return value.channel === HOMESUITE_CHANNEL && value.source === 'surface' &&
-		(value.type === 'state' || value.type === 'request-palette' || value.type === 'request-rename' || value.type === 'navigate' || value.type === 'flushed');
+		(value.type === 'state' || value.type === 'request-palette' || value.type === 'request-rename' || value.type === 'navigate' || value.type === 'flushed' || value.type === 'context-menu');
 }

@@ -4,7 +4,8 @@ import { moveHomeSuiteArtifactToTrash, listHomeSuiteTrash, restoreHomeSuiteArtif
 import { isHomeSuiteShellMessage, isHomeSuiteSurfaceMessage, HOMESUITE_CHANNEL } from '@shared/homesuiteBridge';
 import { getActiveDraftId, setActiveDraftId } from '../../../write/src/lib/drafts';
 import { boardLibrary } from '../../../whiteboard/src/lib/library';
-import { listEverything, prepareSurfaceStorage, surfaceFor, surfaceForRef } from './surfaces';
+import { addCollectionReference, collectionReferenceTargets, listEverything, prepareSurfaceStorage, surfaceFor, surfaceForRef } from './surfaces';
+import { loadCollections, removeRecord, saveCollection } from '../../../data/src/lib/collections';
 import { HOMESUITE_RECENT_LIMIT, loadHomeSuiteRecent, readHomeSuiteRecent } from '@shared/homesuiteRecent.js';
 
 const documents = surfaceFor('document')!;
@@ -127,5 +128,33 @@ describe('HomeSuite bridge', () => {
 		expect(isHomeSuiteShellMessage({ channel: HOMESUITE_CHANNEL, source: 'shell', type: 'action', action: 'flush' })).toBe(true);
 		expect(isHomeSuiteShellMessage({ channel: HOMESUITE_CHANNEL, source: 'surface', type: 'action' })).toBe(false);
 		expect(isHomeSuiteShellMessage(null)).toBe(false);
+	});
+});
+
+describe('collection reference destinations', () => {
+	it('adds only a full reference, deduplicates it, and leaves source and sibling content intact', () => {
+		const source = documents.create();
+		const target = collections.create();
+		const sibling = collections.create();
+		addCollectionReference(source.ref, target.ref.id);
+		addCollectionReference(source.ref, target.ref.id);
+		const saved = loadCollections().collections;
+		expect(saved.find((entry) => entry.id === target.ref.id)?.records.map((record) => record.sourceRef)).toEqual([source.ref]);
+		expect(saved.find((entry) => entry.id === sibling.ref.id)?.records).toEqual([]);
+		expect(listEverything().artifacts.some((entry) => entry.ref.id === source.ref.id)).toBe(true);
+		expect(collectionReferenceTargets(source.ref).find((entry) => entry.id === target.ref.id)?.contains).toBe(true);
+	});
+
+	it('re-adds a removed source reference explicitly, but refuses a trashed or self destination', () => {
+		const source = documents.create();
+		const target = collections.create();
+		addCollectionReference(source.ref, target.ref.id);
+		const saved = loadCollections().collections.find((entry) => entry.id === target.ref.id)!;
+		saveCollection(removeRecord(saved, saved.records[0].id));
+		addCollectionReference(source.ref, target.ref.id);
+		expect(loadCollections().collections.find((entry) => entry.id === target.ref.id)?.excludedRefs).toEqual([]);
+		expect(collectionReferenceTargets(target.ref).some((entry) => entry.id === target.ref.id)).toBe(false);
+		moveHomeSuiteArtifactToTrash({ ...target });
+		expect(() => addCollectionReference(source.ref, target.ref.id)).toThrow(/no longer available/);
 	});
 });

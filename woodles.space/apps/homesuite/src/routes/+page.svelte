@@ -1,16 +1,19 @@
 <script lang="ts">
-	import { onMount, untrack } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { entityHref } from '@woodles/app-manifest';
+	import { appById, entityHref, primaryDestination } from '@woodles/app-manifest';
 	import {
 		HOMESUITE_CHANNEL,
 		isHomeSuiteSurfaceMessage,
 		type HomeSuiteArtifactKind,
+		type HomeSuiteContextAction,
 		type HomeSuiteSurfaceState,
 		type WoodlesRef
 	} from '@shared/homesuiteBridge';
 	import {
+		addCollectionReference,
+		collectionReferenceTargets,
 		listEverything,
 		prepareSurfaceStorage,
 		surfaceFor,
@@ -21,13 +24,17 @@
 	} from '$lib/surfaces';
 	import { HOMESUITE_TRASH_KEY, moveHomeSuiteArtifactToTrash, restoreHomeSuiteArtifact, forgetHomeSuiteArtifact, type HomeSuiteTrashEntry } from '@shared/homesuiteTrash';
 	import { modal } from '@shared/modal';
+	import ContextMenu from '$lib/ContextMenu.svelte';
 	import '@shared/homesuiteTheme.css';
 	import './homesuite.css';
 
 	type Filter = 'all' | 'document' | 'board' | 'collection';
 	type PaletteItem = { id: string; label: string; detail: string; enabled: boolean; run: () => void };
 	type ShellAction =
-		| { action: 'undo' | 'redo' | 'inspect' | 'focus' | 'flush' }
+		| { action: 'undo' | 'redo' | 'inspect' | 'focus' | 'flush' | 'context-open' }
+		| { action: 'context-command'; requestId: string; commandId: string }
+		| { action: 'context-dismiss'; requestId: string }
+		| { action: 'add-reference'; ref: WoodlesRef }
 		| { action: 'command'; commandId: string }
 		| { action: 'inspector'; controlId: string; value: string }
 		| { action: 'mode'; modeId: string }
@@ -63,8 +70,119 @@
 	let frameReady = $state(false);
 	let frameCount = 0;
 	let frameShowing = '';
+	let navigating = false;
 	let readyFallback: ReturnType<typeof setTimeout> | undefined;
 	let flushWaiter: (() => void) | null = null;
+	type MenuAction = HomeSuiteContextAction & { run: () => void };
+	let contextMenu = $state<{ label: string; detail: string; x: number; y: number; items: MenuAction[]; requestId?: string; returnTo?: HTMLElement } | null>(null);
+	let referencePicker = $state<{ ref: WoodlesRef; title: string } | null>(null);
+	let referenceTargets = $state<ReturnType<typeof collectionReferenceTargets>>([]);
+	let referenceQuery = $state('');
+	let referenceIssue = $state('');
+	let actionNotice = $state('');
+	let renameOnArrival = '';
+	const visibleReferenceTargets = $derived(referenceTargets.filter((target) => target.title.toLowerCase().includes(referenceQuery.trim().toLowerCase())));
+
+	function closeContext(restoreFocus = true, dismiss = true): void {
+		const menu = contextMenu;
+		contextMenu = null;
+		if (menu?.requestId && dismiss) sendAction({ action: 'context-dismiss', requestId: menu.requestId });
+		if (restoreFocus && menu?.returnTo?.isConnected) menu.returnTo.focus({ preventScroll: true });
+	}
+
+	function showContext(label: string, detail: string, point: { x: number; y: number }, items: MenuAction[], returnTo?: HTMLElement): void {
+		closeContext(false);
+		newOpen = false;
+		contextMenu = { label, detail, ...point, items, returnTo };
+	}
+
+	function runContext(id: string): void {
+		const item = contextMenu?.items.find((entry) => entry.id === id);
+		if (!item || item.enabled === false) return;
+		closeContext(true, false);
+		item.run();
+	}
+
+	async function copyRef(ref: WoodlesRef): Promise<void> {
+		try {
+			const path = refHref(ref);
+			await navigator.clipboard.writeText(new URL(path, window.location.origin).href);
+			actionNotice = 'Link copied.';
+		} catch { actionNotice = 'Could not copy the link. Clipboard access may be unavailable.'; }
+	}
+
+	function connectionActions(ref: WoodlesRef, title: string): MenuAction[] {
+		let addressable = true;
+		try { refHref(ref); } catch { addressable = false; }
+		return [
+			{ id: 'ref:copy', label: 'Copy link', group: 'connect', enabled: addressable, run: () => void copyRef(ref) },
+			{ id: 'ref:collect', label: 'Add reference to collection…', group: 'connect', run: () => void pickReferenceDestination(ref, title) }
+		];
+	}
+
+	async function pickReferenceDestination(ref: WoodlesRef, title: string): Promise<void> {
+		await releaseFrame();
+		referenceTargets = collectionReferenceTargets(ref);
+		referenceQuery = ''; referenceIssue = '';
+		referencePicker = { ref, title };
+	}
+
+	async function addReferenceTo(id: string): Promise<void> {
+		if (!referencePicker) return;
+		try {
+			const mounted = activeArtifact?.kind === 'collection' && activeArtifact.ref.id === id;
+			if (mounted) {
+				// The mounted owner applies this as an undoable edit to its current model.
+				sendAction({ action: 'add-reference', ref: referencePicker.ref });
+				await releaseFrame();
+			} else addCollectionReference(referencePicker.ref, id);
+			referencePicker = null;
+			actionNotice = mounted ? 'Reference sent to the open collection.' : 'Reference added to collection.';
+			refresh();
+		} catch (error) { referenceIssue = error instanceof Error ? error.message : 'Could not add the reference.'; }
+	}
+
+	function artifactContext(artifact: HomeSuiteArtifact, event: MouseEvent): void {
+		event.preventDefault(); event.stopPropagation();
+		const trigger = event.currentTarget as HTMLElement;
+		const rect = trigger.getBoundingClientRect();
+		const point = event.type === 'contextmenu' && (event.clientX || event.clientY) ? { x: event.clientX, y: event.clientY } : { x: rect.left, y: rect.bottom };
+		const active = activeArtifact?.kind === artifact.kind && activeArtifact.ref.id === artifact.ref.id;
+		const title = active ? activeState?.artifact.title || artifact.title : artifact.title;
+		const items: MenuAction[] = [
+			{ id: 'artifact:open', label: 'Open in HomeSuite', group: 'edit', run: () => void openArtifact(artifact) },
+			{ id: 'artifact:rename', label: `Rename ${artifact.kind}`, group: 'edit', enabled: !active || !!activeState, run: () => {
+				if (active) startRename();
+				else { renameOnArrival = artifactKey(artifact.kind, artifact.ref.id); void openArtifact(artifact); }
+			} },
+			...connectionActions(artifact.ref, title),
+			...(active ? (activeState?.commands ?? []).filter((command) => command.context === 'artifact').map((command): MenuAction => ({
+				id: `surface:${command.id}`, label: command.label, enabled: command.enabled, group: command.group ?? 'edit', detail: command.detail,
+				run: () => sendAction({ action: 'command', commandId: command.id })
+			})) : []),
+			{ id: 'artifact:owner', label: `Open in ${surfaceFor(artifact.kind)?.appName}`, group: 'view', run: () => {
+				void releaseFrame().then(() => window.open(entityHref(artifact.ref.app, artifact.ref.kind, artifact.ref.id), '_blank', 'noopener'));
+			} },
+			{ id: 'artifact:trash', label: artifact.inTrash ? 'Restore from Trash' : 'Move to Trash', group: 'danger', run: () => {
+				if (artifact.inTrash) { restoreHomeSuiteArtifact(artifact.ref); refresh(); }
+				else if (active) moveActiveToTrash();
+				else { moveHomeSuiteArtifactToTrash({ ...artifact, title }); refresh(); }
+			} }
+		];
+		items.sort((a, b) => ['edit', 'connect', 'view', 'danger'].indexOf(a.group ?? 'edit') - ['edit', 'connect', 'view', 'danger'].indexOf(b.group ?? 'edit'));
+		showContext(title, `${artifact.kind} · ${surfaceFor(artifact.kind)?.appName}${artifact.inTrash ? ' · in Trash' : ''}`, point, items, trigger);
+	}
+
+	function trashContext(entry: HomeSuiteTrashEntry, event: MouseEvent): void {
+		event.preventDefault(); event.stopPropagation();
+		const trigger = event.currentTarget as HTMLElement;
+		const rect = trigger.getBoundingClientRect();
+		showContext(entry.title, `${entry.kind} · in Trash`, { x: event.clientX || rect.left, y: event.clientY || rect.bottom }, [
+			{ id: 'trash:restore', label: 'Restore from Trash', group: 'edit', run: () => restoreArtifact(entry) },
+			{ id: 'trash:copy', label: 'Copy link', group: 'connect', run: () => void copyRef(entry.ref) },
+			{ id: 'trash:delete', label: 'Delete permanently…', detail: 'Confirm in the Trash row', group: 'danger', run: () => { permanentConfirmation = `${entry.ref.app}:${entry.ref.kind}:${entry.ref.id}`; } }
+		], trigger);
+	}
 
 	// `?document=<id>` (or board, collection) — `entityHref('homesuite', …)`.
 	// `?kind=&id=` is the shape before HomeSuite was in the manifest; it still
@@ -197,6 +315,7 @@
 	 * on what is on screen.
 	 */
 	function followSurface(reported: { kind: HomeSuiteArtifactKind; id: string }): void {
+		if (navigating) return;
 		const key = artifactKey(reported.kind, reported.id);
 		if (key === frameShowing) return;
 		frameShowing = key;
@@ -243,6 +362,7 @@
 
 	function restoreArtifact(entry: (typeof trashed)[number]): void {
 		restoreHomeSuiteArtifact(entry.ref);
+		permanentConfirmation = '';
 		refresh();
 	}
 
@@ -266,6 +386,11 @@
 		return entityHref('homesuite', kind, id);
 	}
 
+	function refHref(ref: WoodlesRef): string {
+		const owner = surfaceForRef(ref);
+		return owner ? artifactPath(owner.kind, ref.id) : ref.kind === 'app' ? primaryDestination(appById[ref.app]) : entityHref(ref.app, ref.kind, ref.id);
+	}
+
 	/**
 	 * Ask the open surface to write what it has pending before the shell takes
 	 * its frame away. `pagehide` covers the same ground; this answers first, so
@@ -282,10 +407,12 @@
 	}
 
 	async function openAddress(kind: string, id: string): Promise<void> {
+		closeContext(false);
 		newOpen = false;
 		paletteOpen = false;
-		await releaseFrame();
-		await goto(artifactPath(kind, id), { noScroll: true });
+		navigating = true;
+		try { await releaseFrame(); await goto(artifactPath(kind, id), { noScroll: true }); await tick(); }
+		finally { navigating = false; }
 	}
 
 	function openArtifact(artifact: HomeSuiteArtifact): Promise<void> {
@@ -296,16 +423,20 @@
 	function openRef(ref: WoodlesRef): void {
 		const owner = surfaceForRef(ref);
 		if (owner) { void openAddress(owner.kind, ref.id); return; }
-		try { window.open(entityHref(ref.app, ref.kind, ref.id), '_blank', 'noopener'); } catch { /* not addressable */ }
+		try { window.open(refHref(ref), '_blank', 'noopener'); } catch { /* not addressable */ }
 	}
 
 	async function showIndex(trash = false): Promise<void> {
+		closeContext(false);
 		newOpen = false;
 		paletteOpen = false;
-		await releaseFrame();
-		showingTrash = trash;
-		refresh();
-		await goto('/homesuite', { noScroll: true });
+		navigating = true;
+		try {
+			await releaseFrame();
+			showingTrash = trash;
+			refresh();
+			await goto('/homesuite', { noScroll: true }); await tick();
+		} finally { navigating = false; }
 	}
 
 	function showTrash(): void {
@@ -334,7 +465,7 @@
 	function sendAction(action: ShellAction): void {
 		if (!surfaceFrame?.contentWindow) return;
 		surfaceFrame.contentWindow.postMessage(
-			{ channel: HOMESUITE_CHANNEL, source: 'shell', type: 'action', ...action },
+			{ channel: HOMESUITE_CHANNEL, source: 'shell', type: 'action', ...action, ...('ref' in action ? { ref: { app: action.ref.app, kind: action.ref.kind, id: action.ref.id } } : {}) },
 			window.location.origin
 		);
 	}
@@ -345,11 +476,32 @@
 		const message = event.data;
 		if (message.type === 'state') {
 			if (!message.state?.artifact?.id) return;
+			if (surfaceState && artifactKey(surfaceState.artifact.kind, surfaceState.artifact.id) !== artifactKey(message.state.artifact.kind, message.state.artifact.id)) closeContext(false);
 			surfaceState = message.state;
 			frameReady = true;
 			clearTimeout(readyFallback);
 			noteSurface(message.state.artifact);
 			followSurface(message.state.artifact);
+			if (renameOnArrival === artifactKey(message.state.artifact.kind, message.state.artifact.id)) { renameOnArrival = ''; startRename(); }
+		} else if (message.type === 'context-menu') {
+			if (!frameReady || !Number.isFinite(message.x) || !Number.isFinite(message.y) || !message.target?.actions?.length) return;
+			const rect = surfaceFrame!.getBoundingClientRect();
+			const { target, requestId } = message;
+			const items: MenuAction[] = target.actions.map((action) => ({ ...action, run: () => sendAction({ action: 'context-command', requestId, commandId: action.id }) }));
+			items.push({ id: 'context:inspector', label: 'Show inspector', group: 'view', run: () => { sendAction({ action: 'context-dismiss', requestId }); inspectorOpen = true; } });
+			if (target.ref) {
+				const ref = target.ref;
+				let addressable = true;
+				try { refHref(ref); } catch { addressable = false; }
+				items.push({ id: 'ref:open', label: surfaceForRef(ref) ? 'Open referenced item in HomeSuite' : 'Open source', group: 'connect', enabled: addressable,
+					run: () => { sendAction({ action: 'context-dismiss', requestId }); openRef(ref); } });
+			}
+			if (target.ref) items.push(...connectionActions(target.ref, target.label).map((action) => ({ ...action, run: () => {
+				sendAction({ action: 'context-dismiss', requestId }); action.run();
+			} })));
+			items.sort((a, b) => ['edit', 'connect', 'view', 'danger'].indexOf(a.group ?? 'edit') - ['edit', 'connect', 'view', 'danger'].indexOf(b.group ?? 'edit'));
+			showContext(target.label, target.detail, { x: rect.left + message.x, y: rect.top + message.y }, items);
+			contextMenu!.requestId = requestId;
 		} else if (message.type === 'request-palette') {
 			openPalette();
 		} else if (message.type === 'request-rename') {
@@ -364,6 +516,7 @@
 	}
 
 	function openPalette(): void {
+		closeContext(false);
 		newOpen = false;
 		paletteSearch = '';
 		paletteIndex = 0;
@@ -396,7 +549,9 @@
 		}
 		if (event.key === 'Escape') {
 			// One layer at a time: the palette, then a template picker, then menus.
-			if (paletteOpen) paletteOpen = false;
+			if (referencePicker) referencePicker = null;
+			else if (contextMenu) closeContext();
+			else if (paletteOpen) paletteOpen = false;
 			else if (templatePicker) templatePicker = null;
 			newOpen = false;
 			return;
@@ -479,7 +634,7 @@
 					{#if renaming}
 						<input class="artifact-title-input" aria-label={`Rename ${activeArtifact.kind}`} bind:value={renameDraft} use:focusAndSelect onkeydown={onRenameKeydown} onblur={commitRename} />
 					{:else}
-						<button class="artifact-title" title="Rename" disabled={!activeState} onclick={startRename}>{activeState?.artifact.title || activeArtifact.title}</button>
+						<button class="artifact-title" title="Rename" disabled={!activeState} onclick={startRename} oncontextmenu={(event) => artifactContext(activeArtifact, event)}>{activeState?.artifact.title || activeArtifact.title}</button>
 					{/if}
 				</h1>
 				{#if activeArtifact.inTrash}<span class="trash-badge">In Trash</span>{/if}
@@ -488,6 +643,7 @@
 
 		<div class="suite-actions">
 			{#if activeArtifact}
+				<button class="toolbar-button artifact-context-trigger" aria-label={`Actions for ${activeArtifact.kind}`} aria-haspopup="menu" onclick={(event) => artifactContext(activeArtifact, event)}>⋯</button>
 				<div class="mode-slot" aria-label="Mode">
 					{#if (activeState?.modes.length ?? 0) > 1}
 						{#each activeState?.modes ?? [] as mode}
@@ -530,7 +686,7 @@
 				<div class="surface-strip">
 					<button class="back-link" onclick={() => showIndex()}>← All things</button>
 					{#if activeState?.selection}
-						<span class="selection-pill"><span class="selection-dot"></span>{activeState.selection.count && activeState.selection.count > 1 ? `${activeState.selection.count} selected` : activeState.selection.label}</span>
+						<button class="selection-pill" aria-label="Actions for selection" aria-haspopup="menu" onclick={() => sendAction({ action: 'context-open' })}><span class="selection-dot"></span>{activeState.selection.count && activeState.selection.count > 1 ? `${activeState.selection.count} selected` : activeState.selection.label}<span aria-hidden="true">⋯</span></button>
 					{:else}
 						<span class="surface-hint">{adapter.surfaceLabel}</span>
 					{/if}
@@ -623,6 +779,7 @@
 								{:else}
 									<button class="trash-action permanent" onclick={() => permanentlyDelete(entry)}>Delete permanently</button>
 								{/if}
+								<button class="row-context-trigger" aria-label={`Actions for ${entry.title}`} aria-haspopup="menu" onclick={(event) => trashContext(entry, event)}>⋯</button>
 							</div>
 						{/each}
 					</div>
@@ -631,13 +788,16 @@
 				{:else if filtered.length}
 				<div class="artifact-list" aria-label="Recent artifacts">
 					{#each filtered as artifact (artifact.ref.app + artifact.ref.id)}
-						<button class="artifact-row" onclick={() => openArtifact(artifact)}>
+						<div class="artifact-row">
+						<button class="artifact-row-open" onclick={() => openArtifact(artifact)} oncontextmenu={(event) => artifactContext(artifact, event)}>
 							<span class="artifact-icon {artifact.kind}" aria-hidden="true">{surfaceFor(artifact.kind)?.glyph}</span>
 							<span class="artifact-copy"><strong>{artifact.title}</strong><small>{artifact.recordCount === undefined ? surfaceFor(artifact.kind)?.appName : `${artifact.recordCount} ${artifact.recordCount === 1 ? 'record' : 'records'}`}</small></span>
 							<span class="kind-badge {artifact.kind}">{artifact.kind}</span>
 							<time datetime={artifact.updatedAt}>{formatDate(artifact.updatedAt)}</time>
 							<span class="row-arrow" aria-hidden="true">↗</span>
 						</button>
+						<button class="row-context-trigger" aria-label={`Actions for ${artifact.title}`} aria-haspopup="menu" onclick={(event) => artifactContext(artifact, event)}>⋯</button>
+						</div>
 						{/each}
 				</div>
 			{:else}
@@ -646,6 +806,34 @@
 		</main>
 	{/if}
 </div>
+
+{#if actionNotice}<div class="context-notice" role="status"><span>{actionNotice}</span><button aria-label="Dismiss action notice" onclick={() => actionNotice = ''}>×</button></div>{/if}
+
+{#if contextMenu}
+	{#key contextMenu}
+		<ContextMenu label={contextMenu.label} detail={contextMenu.detail} items={contextMenu.items} x={contextMenu.x} y={contextMenu.y} onRun={runContext} onClose={closeContext} />
+	{/key}
+{/if}
+
+{#if referencePicker}
+	<div class="template-backdrop" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) referencePicker = null; }}>
+		<div class="reference-destination-dialog" role="dialog" aria-modal="true" aria-label="Add reference to collection" use:modal={{ returnFocus: '.artifact-context-trigger, .row-context-trigger' }}>
+			<div class="eyebrow">CONNECT YOUR THINGS</div>
+			<h2>Add to a collection</h2>
+			<p><strong>{referencePicker.title}</strong> will appear as a reference. Its content stays in its owning app; the collection holds your local notes.</p>
+			<input bind:value={referenceQuery} aria-label="Find a collection" placeholder="Find a collection" data-autofocus />
+			{#if referenceIssue}<p role="alert">{referenceIssue}</p>{/if}
+			<div class="reference-destinations">
+				{#each visibleReferenceTargets as target (target.id)}
+					<button disabled={target.contains} onclick={() => addReferenceTo(target.id)}><strong>{target.title}</strong><small>{target.contains ? 'Already contains this reference' : 'Add reference'}</small></button>
+				{:else}
+					<p>{referenceTargets.length ? 'No matching collections.' : 'Create a collection from New, then add a reference here.'}</p>
+				{/each}
+			</div>
+			<button class="destination-cancel" onclick={() => referencePicker = null}>Cancel</button>
+		</div>
+	</div>
+{/if}
 
 {#if templatePicker}
 	{@const picker = templatePicker}

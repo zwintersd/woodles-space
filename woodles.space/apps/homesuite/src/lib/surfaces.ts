@@ -17,6 +17,7 @@ import { buildHomeSuiteRecent, publishHomeSuiteRecent } from '@shared/homesuiteR
 import type { HomeSuiteArtifactKind, WoodlesRef } from '@shared/homesuiteBridge';
 import {
 	COLLECTION_TEMPLATES,
+	addRecord,
 	createCollection,
 	loadCollections,
 	removeCollection,
@@ -212,4 +213,26 @@ export function surfaceFor(kind: string): HomeSuiteSurfaceAdapter | undefined {
 /** The surface that shows a ref, if HomeSuite has one for it. */
 export function surfaceForRef(ref: WoodlesRef): HomeSuiteSurfaceAdapter | undefined {
 	return surfaces.find((surface) => surface.app === ref.app && surface.refKind === ref.kind);
+}
+
+/** Destinations are live Collections, never copies of the source content. */
+export function collectionReferenceTargets(ref: WoodlesRef): { id: string; title: string; contains: boolean }[] {
+	const trashed = new Set(listHomeSuiteTrash().map((entry) => trashKey(entry.ref)));
+	return loadCollections().collections
+		.filter((collection) => !trashed.has(trashKey({ app: 'data', kind: 'collection', id: collection.id })) &&
+			!(ref.app === 'data' && ref.kind === 'collection' && ref.id === collection.id))
+		.map((collection) => ({ id: collection.id, title: collection.title,
+			contains: collection.records.some((record) => record.sourceRef && trashKey(record.sourceRef) === trashKey(ref)) }));
+}
+
+/** Re-read the destination after the picker opens, preserving other Collections. */
+export function addCollectionReference(ref: WoodlesRef, collectionId: string): void {
+	if (!collectionReferenceTargets(ref).some((target) => target.id === collectionId)) throw new Error('That Collection is no longer available.');
+	const collection = loadCollections().collections.find((entry) => entry.id === collectionId);
+	if (!collection) throw new Error('That Collection is no longer available.');
+	if (collection.records.some((record) => record.sourceRef && trashKey(record.sourceRef) === trashKey(ref))) return;
+	const next = addRecord(collection, ref);
+	next.excludedRefs = next.excludedRefs?.filter((entry) => trashKey(entry) !== trashKey(ref));
+	const result = saveCollection(next);
+	if (!result.ok) throw new Error(result.issue?.message ?? 'Could not add this reference.');
 }
