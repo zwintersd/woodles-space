@@ -41,6 +41,20 @@ export const ATTENTION_COSTS = [45, 130, 320, 750];
 
 // ── distilling: the World → Web bridge ────────────────────────────────────
 // The impatient path to Essence: convert a block of Insight directly.
+/**
+ * Peak complexity the Book must reach before it can close. Above the water
+ * worldspace's measured 37.5 and below the shallows' 79.5, so opening the
+ * shallows is structurally required (WORLDS.md 1.5).
+ */
+export const PRESTIGE_COMPLEXITY_THRESHOLD = 50;
+
+/** DESIGN §1.4: a life dies after ~a minute of dire stress in a world below stability 40. */
+export const DEATH_STRESS_SECONDS = 60;
+export const DEATH_STABILITY_BELOW = 40;
+export const DEATH_NUTRIENT_PULSE = 12;
+export const DEATH_RETURN_AFTER_SEC = 180;
+export const DEATH_RETURN_VITALITY = 0.5;
+
 export const DISTILL_INSIGHT_COST = 60;
 export const DISTILL_ESSENCE_GAIN = 1;
 

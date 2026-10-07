@@ -1,8 +1,9 @@
 <script lang="ts">
 	import '$lib/style/tokens.css';
-	import { initSync } from '$lib/sync.svelte';
+	import { initSync, syncState } from '$lib/sync.svelte';
 	import { thinkingAbout } from '$lib/thinkingAbout.svelte';
 	import { takeOfferedSittings } from '$lib/commitments.svelte';
+	import { ARRIVALS_KEY, createArrivals } from '$lib/handoffs';
 	import { onMount } from 'svelte';
 
 	let { children } = $props();
@@ -14,9 +15,36 @@
 		// sync so a same-origin accept shows immediately, and again is safe:
 		// ingesting is idempotent by the ledger's own ids.
 		void takeOfferedSittings((sittings) => thinkingAbout.ingestSittings(sittings));
-		void initSync().then(() =>
-			takeOfferedSittings((sittings) => thinkingAbout.ingestSittings(sittings))
-		);
+
+		// Things handed over (the companion's "add to thinking about") land
+		// only right after a hydrate that went through, or on a board with no
+		// sync — never in the pre-sync slot above, because an arrival moves
+		// `updatedAt` and hydrate keeps the newer board. See handoffs.ts.
+		const arrivals = createArrivals({
+			sync: syncState,
+			catchUp: initSync,
+			ingest: (items) => thinkingAbout.ingestHandoffs(items),
+			// A held ?entry= link is settled by the first take that runs — not
+			// by a load whose sync failed, when the arrival is still queued.
+			onFirstTake: () => thinkingAbout.openPendingEntry()
+		});
+		void initSync().then(() => {
+			arrivals.takeAfterLoadSync();
+			return takeOfferedSittings((sittings) => thinkingAbout.ingestSittings(sittings));
+		});
+
+		// While open: kept in another tab (the companion's frame included), or
+		// back from somewhere else. Each catches up with the server first.
+		const onStorage = (event: StorageEvent) => {
+			if (event.key === ARRIVALS_KEY) void arrivals.live();
+		};
+		const onFocus = () => void arrivals.live();
+		window.addEventListener('storage', onStorage);
+		window.addEventListener('focus', onFocus);
+		return () => {
+			window.removeEventListener('storage', onStorage);
+			window.removeEventListener('focus', onFocus);
+		};
 	});
 </script>
 

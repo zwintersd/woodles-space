@@ -23,9 +23,14 @@ import { createVersionedStorage, type PersistenceIssue, type StorageLike } from 
  * `whiteboard` joined when it grew an Inbox: a thought that wants room around
  * it rather than a line in a draft is the other half of "put it anywhere, move
  * it later", and a board with somewhere to put unsorted material can now be
- * the anywhere. Each target keeps its own queue, so the two never mix.
+ * the anywhere. Each target keeps its own queue, so none of them mix.
+ *
+ * `thinking-about` joined when the companion started sending pages from the
+ * web: something kept to read later belongs on the board of what's being
+ * read. It lands in Reading · Articles under the handoff's own id, and is
+ * moved from there.
  */
-export const HANDOFF_TARGETS = ['write', 'whiteboard'] as const;
+export const HANDOFF_TARGETS = ['write', 'whiteboard', 'thinking-about'] as const;
 
 export type HandoffTarget = (typeof HANDOFF_TARGETS)[number];
 

@@ -104,6 +104,10 @@ other docs have narrower jobs:
   - `apps/homesuite/`: `ASSESSMENT.md` (a dated 2026-09-27 review of the
     shell, the bridge, and Data — verified findings and a staged fix plan;
     a snapshot, like `../AUDIT.md`, not live truth).
+  - `apps/companion/`: `DESIGN.md` (why the Chrome extension is a thin
+    shell around a page the site serves, the message protocol, capture,
+    permissions, and what was deliberately left out), and
+    `extension/README.md` (installing it unpacked).
   - `apps/write`, `apps/letter`, `apps/bestiary`: no doc file of their own
     — their publish/passphrase behavior is documented once, centrally, in
     "the public read path" below, rather than duplicated three times.
@@ -165,7 +169,8 @@ woodles.space/
     ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking — a camera that knows where it is, cards that say more than they show, stacks that do more than hold them, and doorways into other boards
     ├── bloomforge/          SvelteKit · a studio for making incremental games
     ├── bloomforge-player/   SvelteKit · the runtime that makes those games playable
-    └── grimoire/            SvelteKit · the studio Bloomforge pivoted toward, built on @woodles/witch-engine
+    ├── grimoire/            SvelteKit · the studio Bloomforge pivoted toward, built on @woodles/witch-engine
+    └── companion/           SvelteKit · woodles.space in Chrome's side panel — the page, plus extension/, the shell that frames it
 ```
 
 `animations/` is the Python/Manim authoring side of Hygge's motion workshop. it
@@ -181,7 +186,7 @@ the repository or silently promoting an experiment into a game.
 ## the app manifest
 
 `packages/app-manifest/src/index.js` is the canonical deployable-app inventory.
-It owns the 23 app ids, names, public paths and aliases, app shape, source and
+It owns the 24 app ids, names, public paths and aliases, app shape, source and
 output locations, maturity, and landing visibility. It also owns the landing
 tile order/copy, **band**, default pins, featured fallback, and Marginalia's
 Reading Room sub-surface. A band is the *moment* a tile is for rather than the
@@ -246,7 +251,7 @@ type="importmap">`, still with no build step.
 
 **SvelteKit apps** — `homesuite`, `data`, `write`, `marginalia`, `planner`,
 `bestiary`, `thinking-about`, `whiteboard`, `bloomforge`, `bloomforge-player`,
-`grimoire` — use Svelte 5 runes, Vite 7, and `@sveltejs/adapter-static`.
+`grimoire`, `companion` — use Svelte 5 runes, Vite 7, and `@sveltejs/adapter-static`.
 each builds to `apps/<name>/dist/` and consumes `shared/` through the `@shared`
 Vite alias (`../../shared`). there is no SSR; every app ships as a static bundle.
 
@@ -725,7 +730,8 @@ false success. See "the sync layer" below for the transport contract.
 `thinking-about` is a board for what's being read, played, and watched —
 columns, sections, one-tap sittings, the standing-slot and ledger machinery
 documented under "cross-app ledgers" in "the sync layer" below rather than
-here, so it isn't said twice.
+here, so it isn't said twice — and the handoffs it takes, under "the handoff
+spine".
 
 **The board in motion.** The app's feel is a deliberate second subject, on
 the argument that a board you are meant to visit daily has to be pleasant to
@@ -1236,10 +1242,9 @@ the app it stays in forever.
 
 **`packages/handoff` (`@woodles/handoff`)** — `createHandoffQueue(target)` over
 one versioned localStorage document per target (`woodles.handoff.<target>.v1`).
-`write` is now the only app that can receive: `notebook` left the target list
-when it retired into Write, and `spores` left it the same way when it retired
-into Write in turn, so there is nothing left to route *between* — the handoff
-spine still exists for whatever catches a thought next. Read-only surfaces
+`write`, `whiteboard` and `thinking-about` are the receivers: `notebook` left
+the target list when it retired into Write, and `spores` left it the same way
+when it retired into Write in turn; the other two joined later (below). Read-only surfaces
 (echoes) are not targets. `send()`
 appends, `drain()` empties, `peek()`/`count()` don't consume. The envelope is
 `{ id, target, title, body, format, tags, source, createdAt }`, where `format`
@@ -1260,6 +1265,43 @@ Three deliberate choices, each tested:
 arrival its own draft (tags carried onto the index) and opens the newest.
 HTML bodies run through `sanitizeHtml` — a body may be model output from
 another app entirely, and write's drafts can reach the public publish path.
+`whiteboard` joined the target list when it grew an Inbox, and files each
+arrival there as a plain-text card.
+
+`thinking-about` joined when the companion gave it something to read later:
+each arrival becomes an entry in Reading · Articles under the handoff's own
+id, its notes the body (HTML flattened through `htmlToText`) then
+`source.href`, its title never blank — an untitled entry is swept on close.
+An arrival moves the board's `updatedAt`, and hydrate keeps the newer whole
+board with no merge, so an arrival lands only right after a hydrate that went
+through, or on a board with no sync: on load once `initSync` settles without
+error, and live — the queue's `storage` event, or focus — by running
+`initSync` first. Taking it any earlier would make a possibly stale board look
+newest and push it over another device's. The ids it has taken stay in this
+browser (`thinking-about.ingestedHandoffs.v1`, the last `QUEUE_LIMIT`, never in
+the blob), so a deleted arrival stays deleted through `cleared: false`, a
+redelivered capture, or a queue restored from its persistence backup. A take
+that finds nothing new writes nothing, so a stuck queue can't make the board
+win every hydrate. A `?entry=` link to an arrival is held until the first take
+that runs — a load whose sync failed doesn't count — which is how the
+companion's *open it* lands on the entry itself. What it doesn't close: like
+Write and Whiteboard, the queue is emptied before the board saves, so a browser
+whose storage is full loses the arrival (an acknowledge-after-save on the spine
+would fix all three); two open Thinking About tabs can still overwrite each
+other; and an
+arrival travels to other devices only with the board's next push.
+
+**the first sender from outside the site** is the companion
+(`apps/companion`): a Chrome extension whose side panel frames `/companion`,
+so a line, link, image, or page right-clicked anywhere on the web becomes a
+handoff to Write, a board, or Thinking About. The frame is what lets it write these queues at
+all — Chrome leaves an extension-hosted frame of a site the extension has
+host permission for unpartitioned, so it shares a woodles.space tab's
+localStorage. A capture's id becomes its handoff's id, so redelivery from the
+extension is caught by `peek()` rather than filed twice. The page also reads
+`pendingCounts`, HomeSuite's recent ledger, and the Life Points ledger, and
+writes nothing but handoffs. See
+[`apps/companion/DESIGN.md`](./apps/companion/DESIGN.md).
 
 ## the sync layer
 
@@ -1696,23 +1738,27 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-2358 tests total: 16 in `api/` (its own
-root-level `vitest.config.ts`, covering `public.ts` and `sync.ts` — the one
-part of the workspace that isn't a pnpm package, so it needs its own runner
-instead of the recursive `pnpm -r test`), plus 2342 across twenty pnpm
-packages — `planner` 539, `marginalia` 376, `whiteboard` 258,
-`write` 247, `packages/incremental-core` 191, `bestiary` 162,
-`thinking-about` 148, `bloomforge` 83, `packages/dynamics` 69,
-`packages/witch-engine` 58, `packages/sync` 36, `grimoire` 36,
-`packages/life-points` 30, `packages/text` 30, `bloomforge-player` 22,
-`packages/app-manifest` 17, `packages/handoff` 15,
-`packages/spellcraft` 15, `packages/persistence` 6, and
-`packages/emoji` 4.
+2529 tests total: 35 in `api/` (its own
+root-level `vitest.config.ts`, covering `public.ts`, `schedules.ts` and
+`sync.ts` — the one part of the workspace that isn't a pnpm package, so it
+needs its own runner instead of the recursive `pnpm -r test`), plus 2494
+across twenty-three pnpm packages — `planner` 558, `marginalia` 396,
+`whiteboard` 258, `write` 251, `packages/incremental-core` 191,
+`thinking-about` 184, `bestiary` 162, `bloomforge` 83,
+`packages/dynamics` 69, `packages/witch-engine` 58, `companion` 42,
+`packages/sync` 38, `grimoire` 36, `packages/life-points` 30,
+`packages/text` 30, `bloomforge-player` 22, `data` 18,
+`packages/app-manifest` 17, `packages/handoff` 15, `packages/spellcraft` 15,
+`homesuite` 11, `packages/persistence` 6, and `packages/emoji` 4.
 (Counted by running each suite, not by adding to the previous figure — keep
 this inventory current when a suite changes; the root command is the release
-contract, not the prose count. This pass caught up four packages the
-inventory had never listed and four figures that had drifted behind their
-suites. `life-points` had been missing since the list was written; the
+contract, not the prose count. The latest pass, for Thinking About becoming a
+handoff receiver — 36 of its tests, in `handoffs.test.ts` and the store's new
+`thinkingAbout.test.ts` — caught up `companion`, `homesuite` and `data`, which
+had never been listed, and five figures that had drifted: `api/`, `planner`,
+`marginalia`, `write` and `packages/sync`. The pass before it caught up
+four packages the inventory had never listed and four figures that had
+drifted behind their suites. `life-points` had been missing since the list was written; the
 `witch-engine`, `dynamics` and `grimoire` suites all arrived after it and
 were never added, so "sixteen packages" had been counting four short.)
 (Whiteboard's suite grew by a further 26 for capture — `capture.ts` for what a
@@ -1791,7 +1837,9 @@ coverage tests the paths people actually visit instead of seven unrelated Vite
 ports. The suite covers every published entry route, Write → Echoes archiving,
 Bestiary gallery/adopt/share and Marginalia consumption, an Arcade state change,
 the Thinking About → Carillon round trip, back, and the sitting that returns
-from it, Carillon's binder strip and the way in and out of its task composer,
+from it, the companion's handoffs arriving on Thinking About (the held
+*open it* link, the same link waiting out a failed sync, a live take from
+another tab, a deleted arrival staying deleted), Carillon's binder strip and the way in and out of its task composer,
 legacy localStorage migration across reload,
 keyboard operation, and serious/critical WCAG A axe findings. `homesuite.spec.ts`
 covers the shell's seams: the veil, edits made just before a frame is removed,

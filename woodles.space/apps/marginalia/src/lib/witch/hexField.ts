@@ -21,13 +21,43 @@ import {
 	offsetToAxial,
 	unprojectHex
 } from './hex';
-import { sampleSediment, stable01, type SedimentGrid } from './worldShape';
+import {
+	HOME_COLS,
+	TILE_CELL_SPACING,
+	extentForGridWidth,
+	gridWidthForExtent,
+	sampleSediment,
+	stable01,
+	type SedimentGrid
+} from './worldShape';
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
-/** How many tiles the field shows. Odd-r offset, so rows alternate half a tile. */
-export const FIELD_COLS = 15;
+/**
+ * How many tiles the field shows. Odd-r offset, so rows alternate half a tile.
+ *
+ * FIELD_COLS is what the frame holds, and the width of the world a save starts as.
+ * A world that has grown is wider than the frame — `extent` below — and the camera
+ * pans across it.
+ */
+export const FIELD_COLS = HOME_COLS;
 export const FIELD_ROWS = 27;
+
+/** How many columns the world a grid holds is across. */
+export function gridExtent(grid: Pick<SedimentGrid, 'w'>): number {
+	return extentForGridWidth(grid.w);
+}
+
+/**
+ * How far a column sits from where it stood in the home world, in columns. Zero
+ * for the home world and for any tile of it, so a tile's hashed character —
+ * relief, grain, which trees it grows — is the same after the world grows as
+ * before. Growing adds tiles at negative and past-the-end columns rather than
+ * renumbering the ones she has already built on.
+ */
+export function homeShift(extent: number): number {
+	return (extent - FIELD_COLS) / 2;
+}
 
 /**
  * Silt density to elevation. At this scale a cell needs a density of about 0.45
@@ -55,6 +85,8 @@ export interface FieldTile {
 	r: number;
 	/** 0..TILE_ELEVATION_SCALE */
 	elevation: number;
+	/** the column this tile had in the home world, so hashes keyed on it survive growth */
+	homeCol: number;
 	/** how much silt is in it, 0..1 */
 	density: number;
 	land: boolean;
@@ -78,12 +110,12 @@ export interface FieldTile {
 export const FIELD_CORE = 0.62;
 export const FIELD_EDGE_NOISE = 0.17;
 
-export function edgeFalloff(col: number, row: number): number {
-	const dx = (col - (FIELD_COLS - 1) / 2) / ((FIELD_COLS - 1) / 2);
+export function edgeFalloff(col: number, row: number, extent = FIELD_COLS): number {
+	const dx = (col - (extent - 1) / 2) / ((extent - 1) / 2);
 	const dy = (row - (FIELD_ROWS - 1) / 2) / ((FIELD_ROWS - 1) / 2);
 	const spread = Math.hypot(dx, dy);
 	// a stable per-tile wobble, so the rim is ragged rather than a clean ellipse
-	const wobble = (stable01(`seabed:${col}:${row}`) - 0.5) * FIELD_EDGE_NOISE;
+	const wobble = (stable01(`seabed:${col - homeShift(extent)}:${row}`) - 0.5) * FIELD_EDGE_NOISE;
 	const t = clamp01((1 - (spread + wobble)) / (1 - FIELD_CORE));
 	return t * t * (3 - 2 * t);
 }
@@ -98,24 +130,52 @@ export function edgeFalloff(col: number, row: number): number {
  */
 export const SEABED_RELIEF = 0.22;
 
-export function seabedRelief(col: number, row: number): number {
-	const a = stable01(`relief:${col}:${row}`);
-	const b = stable01(`relief:${row}:${col}`);
+export function seabedRelief(col: number, row: number, extent = FIELD_COLS): number {
+	const home = col - homeShift(extent);
+	const a = stable01(`relief:${home}:${row}`);
+	const b = stable01(`relief:${row}:${home}`);
 	return ((a + b) / 2) * SEABED_RELIEF;
 }
 
-/** Where a tile sits in the density field, in the grid's own [0,1] coordinates. */
-export function tileSample(col: number, row: number): { u: number; v: number } {
+/**
+ * Where a tile sits in the density field, in the grid's own [0,1] coordinates.
+ *
+ * The home world reads the grid straight across, column 0 to the left edge and the
+ * last column to the right. A grown world reads it at the same number of cells per
+ * column, anchored on the middle — which is the same thing at home, and is what
+ * leaves every tile she had already built on reading the same silt after it grows.
+ */
+export function tileSample(col: number, row: number, extent = FIELD_COLS): { u: number; v: number } {
+	const v = FIELD_ROWS > 1 ? row / (FIELD_ROWS - 1) : 0.5;
+	if (extent === FIELD_COLS) return { u: FIELD_COLS > 1 ? col / (FIELD_COLS - 1) : 0.5, v };
+	return { u: 0.5 + ((col - (extent - 1) / 2) * TILE_CELL_SPACING) / gridWidthForExtent(extent), v };
+}
+
+/**
+ * The tile a grid position belongs to — tileSample run backwards, and rounded. It
+ * is what puts a placed thing, stored as a fraction of the grid, on the hex under
+ * it however wide the world is.
+ */
+export function tileNearest(
+	u: number,
+	v: number,
+	extent = FIELD_COLS
+): { col: number; row: number } {
+	const colFloat =
+		extent === FIELD_COLS
+			? clamp01(u) * (FIELD_COLS - 1)
+			: ((clamp01(u) - 0.5) * gridWidthForExtent(extent)) / TILE_CELL_SPACING + (extent - 1) / 2;
 	return {
-		u: FIELD_COLS > 1 ? col / (FIELD_COLS - 1) : 0.5,
-		v: FIELD_ROWS > 1 ? row / (FIELD_ROWS - 1) : 0.5
+		col: Math.max(0, Math.min(extent - 1, Math.round(colFloat))),
+		row: Math.max(0, Math.min(FIELD_ROWS - 1, Math.round(clamp01(v) * (FIELD_ROWS - 1))))
 	};
 }
 
 export function tileElevation(grid: SedimentGrid, col: number, row: number): number {
-	const { u, v } = tileSample(col, row);
+	const extent = gridExtent(grid);
+	const { u, v } = tileSample(col, row, extent);
 	// same sum fieldTiles uses, so anything standing on a tile agrees with the tile
-	return seabedRelief(col, row) + sampleSediment(grid, u, v) * TILE_ELEVATION_SCALE;
+	return seabedRelief(col, row, extent) + sampleSediment(grid, u, v) * TILE_ELEVATION_SCALE;
 }
 
 /**
@@ -125,13 +185,13 @@ export function tileElevation(grid: SedimentGrid, col: number, row: number): num
  * changing FIELD_COLS or FIELD_ROWS keeps the world centred without anyone
  * remembering to re-tune an offset.
  */
-export function fieldOrigin(): { x: number; y: number } {
+export function fieldOrigin(extent = FIELD_COLS): { x: number; y: number } {
 	let minX = Infinity;
 	let maxX = -Infinity;
 	let minY = Infinity;
 	let maxY = -Infinity;
 	for (let row = 0; row < FIELD_ROWS; row++) {
-		for (let col = 0; col < FIELD_COLS; col++) {
+		for (let col = 0; col < extent; col++) {
 			const { q, r } = offsetToAxial(col, row);
 			const w = hexToWorld(q, r);
 			minX = Math.min(minX, w.x);
@@ -143,25 +203,63 @@ export function fieldOrigin(): { x: number; y: number } {
 	return { x: 0.5 - (minX + maxX) / 2, y: 0.5 - ((minY + maxY) / 2) * CAMERA_TILT };
 }
 
+/**
+ * How wide one column is on screen, in canvas fractions — the distance a pan of one
+ * tile covers.
+ */
+export const TILE_SCREEN_WIDTH = hexToWorld(1, 0).x;
+
+/**
+ * Where the world's far left and right edges sit on screen with the camera
+ * centred, in canvas fractions. For the home world this is inside the frame; a
+ * grown world runs well past it, and this is how far.
+ */
+export function fieldBounds(extent = FIELD_COLS): { left: number; right: number } {
+	const origin = fieldOrigin(extent);
+	let left = Infinity;
+	let right = -Infinity;
+	for (let row = 0; row < FIELD_ROWS; row++) {
+		for (const col of [0, extent - 1]) {
+			const { q, r } = offsetToAxial(col, row);
+			const x = origin.x + hexToWorld(q, r).x;
+			left = Math.min(left, x);
+			right = Math.max(right, x);
+		}
+	}
+	const half = TILE_SCREEN_WIDTH / 2;
+	return { left: left - half, right: right + half };
+}
+
+/**
+ * How far the camera can travel either way, in tile columns. Zero for the home
+ * world, so a save that has never grown has nothing to pan.
+ */
+export function panLimit(extent = FIELD_COLS): number {
+	return Math.max(0, (extent - FIELD_COLS) / 2);
+}
+
 /** Every tile in the field, in painter's order, with its elevation resolved. */
 export function fieldTiles(grid: SedimentGrid): FieldTile[] {
+	const extent = gridExtent(grid);
+	const shift = homeShift(extent);
 	const tiles: FieldTile[] = [];
 	for (let row = 0; row < FIELD_ROWS; row++) {
-		for (let col = 0; col < FIELD_COLS; col++) {
+		for (let col = 0; col < extent; col++) {
 			const { q, r } = offsetToAxial(col, row);
-			const { u, v } = tileSample(col, row);
+			const { u, v } = tileSample(col, row, extent);
 			const density = sampleSediment(grid, u, v);
 			// silt on top of what the floor already had, so a bare seabed has shape
-			const elevation = seabedRelief(col, row) + density * TILE_ELEVATION_SCALE;
+			const elevation = seabedRelief(col, row, extent) + density * TILE_ELEVATION_SCALE;
 			tiles.push({
 				col,
 				row,
 				q,
 				r,
+				homeCol: col - shift,
 				elevation,
 				density,
 				land: elevation >= SEA_LEVEL,
-				edge: edgeFalloff(col, row)
+				edge: edgeFalloff(col, row, extent)
 			});
 		}
 	}
@@ -180,12 +278,13 @@ export function fieldTiles(grid: SedimentGrid): FieldTile[] {
 export function tileAtPoint(
 	screenX: number,
 	screenY: number,
-	origin = fieldOrigin()
+	origin = fieldOrigin(),
+	extent = FIELD_COLS
 ): { col: number; row: number; u: number; v: number } | null {
 	const fractional = unprojectHex(screenX, screenY, SEA_LEVEL, origin);
 	const { q, r } = hexRound(fractional.q, fractional.r);
 	const row = r;
 	const col = q + (r - (r & 1)) / 2;
-	if (col < 0 || col >= FIELD_COLS || row < 0 || row >= FIELD_ROWS) return null;
-	return { col, row, ...tileSample(col, row) };
+	if (col < 0 || col >= extent || row < 0 || row >= FIELD_ROWS) return null;
+	return { col, row, ...tileSample(col, row, extent) };
 }

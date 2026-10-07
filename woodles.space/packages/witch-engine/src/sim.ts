@@ -470,7 +470,7 @@ export function simulate(def: MarginaliaDef, policy: WorldPolicy, opts: SimOptio
 			finalRecall: series[series.length - 1].recall,
 			finalFluency: series[series.length - 1].fluency,
 			interventions,
-			concepts: conceptsFor(peakComplexity, world.knownCount, world.state.equilibriumSeconds)
+			concepts: conceptsFor(Math.max(peakComplexity, world.state.complexityPeak), world.knownCount, world.state.equilibriumSeconds)
 		},
 		series,
 		events,

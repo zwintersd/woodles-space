@@ -53,6 +53,26 @@ describe('Marginalia cheat codes', () => {
 		expect(book.mode).toBe('web');
 	});
 
+	it('widens the world one step at a time through growworld, and stops at the widest', () => {
+		const book = target();
+		expect(applyMarginaliaCheat('growworld', book).message).toContain('31 columns');
+		expect(book.worldShape.worldExtent).toBe(31);
+		expect(book.mode).toBe('world');
+		expect(applyMarginaliaCheat('grow world', book).message).toContain('45 columns');
+		const widest = applyMarginaliaCheat('growworld', book);
+		expect(widest.message).toContain('as wide as it goes');
+		expect(book.worldShape.worldExtent).toBe(45);
+	});
+
+	it('fills a grown world at the width it has, rather than shrinking it back', () => {
+		const book = target();
+		applyMarginaliaCheat('growworld', book);
+		applyMarginaliaCheat('growworld', book);
+		applyMarginaliaCheat('pearlrush', book);
+		expect(book.worldShape.worldExtent).toBe(45);
+		expect(sedimentCoverage(book.worldShape.sedimentGrid)).toBe(1);
+	});
+
 	it('can trigger the shallows ceremony without marking it seen', () => {
 		const book = target();
 		applyMarginaliaCheat('unlockshallows', book);

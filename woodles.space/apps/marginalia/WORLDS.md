@@ -82,7 +82,7 @@ aquatic category is mastered forever. Conversely, terrestrial and atmospheric
 are *unmasterable* from the water worldspace — `inCategory.length === 0` returns
 early.
 
-✅ **Compute over the authored world, require at least two members.** Three
+✅ **— shipped.** Compute over the authored world, require at least two members. Three
 lines, no design tension, ungameable: mastery means "you came to Know every
 $category thing this world has", which is what the copy already claims.
 
@@ -108,7 +108,7 @@ the shallows banks nearly none, so either the shallows must precede prestige
 
 ## 1.5 what phase D has to decide before it can start
 
-- **Peak complexity isn't tracked.** `complexity` is derived and never
+- **Peak complexity — tracked (shipped); threshold constant `PRESTIGE_COMPLEXITY_THRESHOLD = 50` added, not yet enforced.** `complexity` is derived and never
   remembered; the mint needs `complexityPeak`. One `WorldState` field, one save
   field, updated in `tick`. Additive, so the merge-onto-`emptySave()` pattern
   covers it for free (DESIGN.md §7).

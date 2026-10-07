@@ -27,6 +27,24 @@ so it's not easy to forget.
 
 - **a mark for woodles** — a soft, hand-drawn w in lapis on lavender now
   identifies every room in browser tabs and saved home-screen shortcuts.
+- **keep a page for Thinking About** — the companion's page menu and keep card
+  gain *add to thinking about*. what you keep lands in Reading · Articles —
+  straight away if the board is open, otherwise the next time you open it —
+  with your line, the quote, and the link in its notes; move it from there.
+  *open it* in the side panel goes straight to that entry. reload the
+  extension in `chrome://extensions` for the new menu item.
+- **woodles in Chrome's side panel** — a small extension
+  (`apps/companion/extension`, loaded unpacked) opens
+  [/companion](https://woodles.space/companion) beside whatever you're
+  reading. right-click a line, a link, an image, or the page to keep it in
+  Write or pin it to a board; it's waiting there the next time you open
+  either. the panel also shows what's waiting to be filed, the last few things
+  HomeSuite touched, and your Life Points. it only sees the tab you're on
+  while it's open, and everything stays in this browser.
+- **marginalia's journal italicises instead of printing asterisks** — the first
+  journal page now shows *flow* in italics rather than literal `*flow*`. the
+  dev cheat console's `freerealestate` and `worldparty` also work again; they
+  were throwing because the Book had no setters for the fields they write.
 
 ## 2026-09-30
 

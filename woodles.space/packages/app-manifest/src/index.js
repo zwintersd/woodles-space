@@ -312,6 +312,21 @@ export const appManifest = Object.freeze([
 		entryFile: 'index.html'
 	},
 	{
+		id: 'companion',
+		name: 'Companion',
+		publicPath: '/companion',
+		aliases: [],
+		kind: 'sveltekit',
+		maturity: 'incubator',
+		sourceDir: 'apps/companion',
+		outputDir: 'apps/companion/dist',
+		entryFile: 'index.html',
+		packageName: 'companion'
+		// No `landing` tile — this is the page Chrome's side panel frames, via
+		// the extension in apps/companion/extension. Opened directly it says so
+		// and still works; it is not a room to walk into from the front door.
+	},
+	{
 		id: 'grimoire',
 		name: 'Grimoire',
 		publicPath: '/grimoire',
