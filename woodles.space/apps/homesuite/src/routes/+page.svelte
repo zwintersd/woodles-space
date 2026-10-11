@@ -25,6 +25,13 @@
 	import { HOMESUITE_TRASH_KEY, moveHomeSuiteArtifactToTrash, restoreHomeSuiteArtifact, forgetHomeSuiteArtifact, type HomeSuiteTrashEntry } from '@shared/homesuiteTrash';
 	import { modal } from '@shared/modal';
 	import ContextMenu from '$lib/ContextMenu.svelte';
+	import FolderNavigation from '$lib/FolderNavigation.svelte';
+	import FolderIcon from '$lib/FolderIcon.svelte';
+	import {
+		HOMESUITE_FOLDERS_KEY, createFolder, loadFolders, folderForRef, folderPath, folderTree,
+		moveFilesToFolder, moveFolder, removeFolder, renameFolder, refKey,
+		type FolderLibrary, type HomeSuiteFolder
+	} from '$lib/folders';
 	import '@shared/homesuiteTheme.css';
 	import './homesuite.css';
 
@@ -81,7 +88,123 @@
 	let referenceIssue = $state('');
 	let actionNotice = $state('');
 	let renameOnArrival = '';
+	let folderLibrary = $state<FolderLibrary>({ folders: [], placements: [] });
+	let folderNotice = $state('');
+	let selectedFiles = $state<string[]>([]);
+	let folderEditor = $state<{ id?: string; parentId: string | null } | null>(null);
+	let folderName = $state('');
+	let folderIssue = $state('');
+	let folderRemoval = $state<HomeSuiteFolder | null>(null);
+	let movePicker = $state<{ refs?: WoodlesRef[]; folderId?: string; title: string } | null>(null);
+	let moveDestination = $state<string | null>(null);
+	let folderQuery = $state('');
+	const location = $derived(page.url.searchParams.get('folder'));
+	const currentFolder = $derived(folderLibrary.folders.find((folder) => folder.id === location));
+	const breadcrumbs = $derived(folderPath(folderLibrary, currentFolder?.id ?? null));
+	const scopedArtifacts = $derived(artifacts.filter((artifact) => location === null ||
+		folderForRef(folderLibrary, artifact.ref) === (location === 'root' ? null : location)));
+	const childFolders = $derived(folderLibrary.folders.filter((folder) => folder.parentId === (currentFolder?.id ?? null) &&
+		location !== 'root' && folder.name.toLowerCase().includes(search.trim().toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)));
+	const unfiledCount = $derived(artifacts.filter((artifact) => folderForRef(folderLibrary, artifact.ref) === null).length);
+	const moveTargets = $derived(folderTree(folderLibrary).filter((row) =>
+		(!movePicker?.folderId || !folderPath(folderLibrary, row.folder.id).some((folder) => folder.id === movePicker?.folderId)) &&
+		row.path.toLowerCase().includes(folderQuery.trim().toLowerCase())));
+	const pickedFiles = $derived(artifacts.filter((artifact) => selectedFiles.includes(refKey(artifact.ref))));
 	const visibleReferenceTargets = $derived(referenceTargets.filter((target) => target.title.toLowerCase().includes(referenceQuery.trim().toLowerCase())));
+	$effect(() => {
+		// Browser Back and Forward change the folder without calling openFolder.
+		void location;
+		untrack(() => { selectedFiles = []; });
+	});
+
+	function refreshFolders(): void {
+		const loaded = loadFolders();
+		folderLibrary = loaded.value;
+		folderNotice = loaded.issue ? `Folder organization: ${loaded.issue.message}` : '';
+	}
+
+	function indexPath(id: string | null = location): string {
+		return id === null ? '/homesuite' : `/homesuite?folder=${encodeURIComponent(id)}`;
+	}
+
+	async function openFolder(id: string | null): Promise<void> {
+		selectedFiles = []; search = ''; filter = 'all'; showingTrash = false;
+		closeContext(false); newOpen = false; paletteOpen = false;
+		navigating = true;
+		try { await releaseFrame(); refresh(); await goto(indexPath(id), { noScroll: true }); await tick(); }
+		finally { navigating = false; }
+	}
+
+	function editFolder(folder?: HomeSuiteFolder): void {
+		newOpen = false; folderIssue = '';
+		folderName = folder?.name ?? '';
+		folderEditor = folder ? { id: folder.id, parentId: folder.parentId } : { parentId: currentFolder?.id ?? null };
+	}
+
+	async function saveFolder(): Promise<void> {
+		if (!folderEditor) return;
+		try {
+			if (folderEditor.id) {
+				renameFolder(folderEditor.id, folderName);
+				folderEditor = null; refreshFolders(); actionNotice = 'Folder renamed.';
+			} else {
+				const folder = createFolder(folderName, folderEditor.parentId);
+				folderEditor = null; refreshFolders();
+				await openFolder(folder.id);
+			}
+		} catch (error) { folderIssue = error instanceof Error ? error.message : 'Could not save this folder.'; }
+	}
+
+	function folderContext(id: string, event: MouseEvent): void {
+		event.preventDefault(); event.stopPropagation();
+		const folder = folderLibrary.folders.find((entry) => entry.id === id);
+		if (!folder) return;
+		const trigger = event.currentTarget as HTMLElement;
+		const rect = trigger.getBoundingClientRect();
+		showContext(folder.name, 'HomeSuite folder', { x: rect.left, y: rect.bottom }, [
+			{ id: 'folder:open', label: 'Open folder', group: 'edit', run: () => void openFolder(id) },
+			{ id: 'folder:rename', label: 'Rename folder…', group: 'edit', run: () => editFolder(folder) },
+			{ id: 'folder:move', label: 'Move folder…', group: 'edit', run: () => pickMove({ folderId: id, title: folder.name }) },
+			{ id: 'folder:remove', label: 'Remove folder…', detail: 'Contents move up one level', group: 'danger', run: () => { folderIssue = ''; folderRemoval = folder; } }
+		], trigger);
+	}
+
+	function pickMove(target: NonNullable<typeof movePicker>): void {
+		refreshFolders(); folderIssue = ''; folderQuery = '';
+		moveDestination = target.folderId ? folderLibrary.folders.find((folder) => folder.id === target.folderId)?.parentId ?? null :
+			target.refs?.length === 1 ? folderForRef(folderLibrary, target.refs[0]) : null;
+		movePicker = target;
+	}
+
+	async function commitMove(): Promise<void> {
+		if (!movePicker) return;
+		try {
+			if (movePicker.folderId) moveFolder(movePicker.folderId, moveDestination);
+			else moveFilesToFolder(movePicker.refs ?? [], moveDestination);
+			actionNotice = `${movePicker.title} moved to ${moveDestination === null ? (movePicker.folderId ? 'HomeSuite' : 'Unfiled') : folderPath(folderLibrary, moveDestination).map((folder) => folder.name).join(' / ')}.`;
+			movePicker = null; selectedFiles = []; refreshFolders();
+		} catch (error) { folderIssue = error instanceof Error ? error.message : 'Could not move these things.'; }
+	}
+
+	async function confirmFolderRemoval(): Promise<void> {
+		if (!folderRemoval) return;
+		try {
+			const removed = folderRemoval;
+			removeFolder(removed.id); folderRemoval = null; refreshFolders();
+			if (location === removed.id) await openFolder(removed.parentId);
+			actionNotice = 'Folder removed. Its files and subfolders moved up one level.';
+		} catch (error) { folderIssue = error instanceof Error ? error.message : 'Could not remove this folder.'; }
+	}
+
+	function toggleFile(ref: WoodlesRef): void {
+		const key = refKey(ref);
+		selectedFiles = selectedFiles.includes(key) ? selectedFiles.filter((entry) => entry !== key) : [...selectedFiles, key];
+	}
+
+	function toggleVisibleFiles(): void {
+		const visible = new Set(filtered.map((artifact) => refKey(artifact.ref)));
+		selectedFiles = allVisibleSelected ? selectedFiles.filter((key) => !visible.has(key)) : [...new Set([...selectedFiles, ...visible])];
+	}
 
 	function closeContext(restoreFocus = true, dismiss = true): void {
 		const menu = contextMenu;
@@ -155,6 +278,7 @@
 				if (active) startRename();
 				else { renameOnArrival = artifactKey(artifact.kind, artifact.ref.id); void openArtifact(artifact); }
 			} },
+			{ id: 'artifact:folder', label: 'Move to folder…', group: 'edit', enabled: !artifact.inTrash, run: () => pickMove({ refs: [artifact.ref], title }) },
 			...connectionActions(artifact.ref, title),
 			...(active ? (activeState?.commands ?? []).filter((command) => command.context === 'artifact').map((command): MenuAction => ({
 				id: `surface:${command.id}`, label: command.label, enabled: command.enabled, group: command.group ?? 'edit', detail: command.detail,
@@ -208,19 +332,22 @@
 		return binned && { ref: binned.ref, kind: binned.kind, title: binned.title, updatedAt: binned.updatedAt, inTrash: true };
 	});
 	const activeState = $derived(surfaceState);
-	const filtered = $derived(artifacts.filter((artifact) =>
+	const filtered = $derived(scopedArtifacts.filter((artifact) =>
 		(filter === 'all' || artifact.kind === filter) &&
 		artifact.title.toLowerCase().includes(search.trim().toLowerCase())
 	));
+	const allVisibleSelected = $derived(filtered.length > 0 && filtered.every((artifact) => selectedFiles.includes(refKey(artifact.ref))));
 	const counts = $derived({
-		document: artifacts.filter((item) => item.kind === 'document').length,
-		board: artifacts.filter((item) => item.kind === 'board').length,
-		collection: artifacts.filter((item) => item.kind === 'collection').length
+		document: scopedArtifacts.filter((item) => item.kind === 'document').length,
+		board: scopedArtifacts.filter((item) => item.kind === 'board').length,
+		collection: scopedArtifacts.filter((item) => item.kind === 'collection').length
 	});
 	const paletteItems = $derived.by((): PaletteItem[] => {
 		const shell: PaletteItem[] = [
 			{ id: 'shell:index', label: 'Go to HomeSuite', detail: 'Navigation', enabled: true, run: () => void showIndex() },
 			{ id: 'shell:trash', label: 'Open Trash', detail: 'HomeSuite', enabled: true, run: showTrash },
+			{ id: 'shell:new-folder', label: 'New folder', detail: 'Organize', enabled: true, run: () => editFolder() },
+			{ id: 'shell:all-files', label: 'Show all files', detail: 'Organize', enabled: true, run: () => void openFolder(null) },
 			...surfaces.map((surface) => ({
 				id: `shell:new:${surface.kind}`,
 				label: `New ${surface.label.toLowerCase()}`,
@@ -236,6 +363,7 @@
 				? { id: 'shell:restore', label: 'Restore from Trash', detail: 'HomeSuite artifact', enabled: true, run: restoreActive }
 				: { id: 'shell:move-trash', label: 'Move to Trash', detail: 'HomeSuite artifact', enabled: true, run: moveActiveToTrash },
 			{ id: 'shell:rename', label: `Rename ${activeArtifact.kind}`, detail: 'HomeSuite artifact', enabled: !!activeState, run: startRename },
+			{ id: 'shell:folder', label: 'Move to folder…', detail: 'Organize', enabled: !activeArtifact.inTrash, run: () => pickMove({ refs: [activeArtifact.ref], title: activeState?.artifact.title || activeArtifact.title }) },
 			{ id: 'shell:inspect', label: inspectorOpen ? 'Hide inspector' : 'Show inspector', detail: 'View', enabled: true, run: () => { inspectorOpen = !inspectorOpen; } },
 		...(activeState?.commands ?? []).map((command) => ({
 				id: `surface:${command.id}`,
@@ -253,6 +381,8 @@
 
 	function refresh(): void {
 		({ artifacts, trashed } = listEverything());
+		refreshFolders();
+		selectedFiles = selectedFiles.filter((key) => artifacts.some((artifact) => refKey(artifact.ref) === key));
 		storageNotices = surfaces.flatMap((surface) => surface.notice?.() ?? []);
 	}
 
@@ -274,6 +404,7 @@
 	// A surface's own saves reach the shell as `storage` events too (same
 	// origin, another frame). While one is open only Trash matters here.
 	function onStorage(event: StorageEvent): void {
+		if (event.key === HOMESUITE_FOLDERS_KEY) refreshFolders();
 		if (!frame || event.key === HOMESUITE_TRASH_KEY || event.key === null) refresh();
 	}
 
@@ -383,7 +514,8 @@
 	}
 
 	function artifactPath(kind: string, id: string): string {
-		return entityHref('homesuite', kind, id);
+		const path = entityHref('homesuite', kind, id);
+		return location === null ? path : `${path}&folder=${encodeURIComponent(location)}`;
 	}
 
 	function refHref(ref: WoodlesRef): string {
@@ -434,8 +566,9 @@
 		try {
 			await releaseFrame();
 			showingTrash = trash;
+			selectedFiles = [];
 			refresh();
-			await goto('/homesuite', { noScroll: true }); await tick();
+			await goto(indexPath(), { noScroll: true }); await tick();
 		} finally { navigating = false; }
 	}
 
@@ -449,6 +582,10 @@
 		createIssue = '';
 		try {
 			const artifact = surface.create(template);
+			if (currentFolder) {
+				try { moveFilesToFolder([artifact.ref], currentFolder.id); }
+				catch (error) { actionIssue = error instanceof Error ? `File created, but could not place it in the folder: ${error.message}` : 'File created in Unfiled. Folder placement could not be saved.'; }
+			}
 			templatePicker = null;
 			refresh();
 			void openArtifact(artifact);
@@ -549,7 +686,10 @@
 		}
 		if (event.key === 'Escape') {
 			// One layer at a time: the palette, then a template picker, then menus.
-			if (referencePicker) referencePicker = null;
+			if (folderEditor) folderEditor = null;
+			else if (folderRemoval) folderRemoval = null;
+			else if (movePicker) movePicker = null;
+			else if (referencePicker) referencePicker = null;
 			else if (contextMenu) closeContext();
 			else if (paletteOpen) paletteOpen = false;
 			else if (templatePicker) templatePicker = null;
@@ -670,8 +810,10 @@
 				{#if newOpen}
 					<div class="new-menu" role="menu" aria-label="Create in HomeSuite">
 						{#each surfaces as surface}
-							<button role="menuitem" onclick={() => create(surface)}><span class="menu-glyph">{surface.glyph}</span><span>{surface.label}</span></button>
+							<button role="menuitem" onclick={() => create(surface)}><span class="menu-glyph" aria-hidden="true">{surface.glyph}</span><span>{surface.label}</span></button>
 						{/each}
+						<div class="menu-divider"></div>
+						<button role="menuitem" onclick={() => editFolder()}><span class="menu-glyph" aria-hidden="true"><FolderIcon /></span><span>Folder</span></button>
 					</div>
 				{/if}
 			</div>
@@ -684,7 +826,7 @@
 		<main class="surface-layout" aria-label={`${adapter.label}: ${activeState?.artifact.title || activeArtifact.title}`}>
 			<div class="surface-main">
 				<div class="surface-strip">
-					<button class="back-link" onclick={() => showIndex()}>← All things</button>
+					<button class="back-link" onclick={() => showIndex()}>← {currentFolder?.name ?? (location === 'root' ? 'Unfiled' : 'All things')}</button>
 					{#if activeState?.selection}
 						<button class="selection-pill" aria-label="Actions for selection" aria-haspopup="menu" onclick={() => sendAction({ action: 'context-open' })}><span class="selection-dot"></span>{activeState.selection.count && activeState.selection.count > 1 ? `${activeState.selection.count} selected` : activeState.selection.label}<span aria-hidden="true">⋯</span></button>
 					{:else}
@@ -748,14 +890,14 @@
 	{:else}
 		<main class="suite-index">
 				<div class="index-heading">
-					<div><div class="eyebrow">{showingTrash ? 'HOME SUITE TRASH' : 'YOUR WORKSPACE'}</div><h1>{#if showingTrash}A little room to reconsider.{:else}All your things, <em>within reach.</em>{/if}</h1><p>{showingTrash ? 'Trashed items keep their identity and contents until you restore or permanently delete them.' : 'Documents, boards, and Collections share one place to begin. Each opens in the surface made for it.'}</p></div>
-					<div class="index-count"><strong>{showingTrash ? trashed.length : artifacts.length}</strong><span>{showingTrash ? 'things in Trash' : 'things in HomeSuite'}</span></div>
+					<div><div class="eyebrow">{showingTrash ? 'HOME SUITE TRASH' : currentFolder ? 'YOUR FOLDER' : 'YOUR WORKSPACE'}</div><h1>{#if showingTrash}A little room to reconsider.{:else if currentFolder}{currentFolder.name}{:else if location === 'root'}Unfiled things.{:else}All your things, <em>within reach.</em>{/if}</h1><p>{showingTrash ? 'Trashed items keep their identity and contents until you restore or permanently delete them.' : currentFolder ? 'A place for related documents, boards, and Collections. Use New to add something here.' : location === 'root' ? 'Things you haven’t placed in a folder yet.' : 'Documents, boards, and Collections share one place to begin. Group related things into folders.'}</p></div>
+					<div class="index-count"><strong>{showingTrash ? trashed.length : scopedArtifacts.length}</strong><span>{showingTrash ? 'things in Trash' : currentFolder ? 'things in this folder' : 'things in HomeSuite'}</span></div>
 			</div>
 				<div class="index-toolbar">
 					<nav class="index-views" aria-label="HomeSuite views"><button class:active={!showingTrash} onclick={() => { showingTrash = false; }}>Workspace</button><button class:active={showingTrash} onclick={() => { showingTrash = true; }}>Trash <span>{trashed.length}</span></button></nav>
 					{#if !showingTrash}
 				<div class="filters" aria-label="Filter artifacts">
-					<button class:active={filter === 'all'} onclick={() => { filter = 'all'; }}>All <span>{artifacts.length}</span></button>
+					<button class:active={filter === 'all'} onclick={() => { filter = 'all'; }}>All <span>{scopedArtifacts.length}</span></button>
 					<button class:active={filter === 'document'} onclick={() => { filter = 'document'; }}>Documents <span>{counts.document}</span></button>
 					<button class:active={filter === 'board'} onclick={() => { filter = 'board'; }}>Boards <span>{counts.board}</span></button>
 					<button class:active={filter === 'collection'} onclick={() => { filter = 'collection'; }}>Collections <span>{counts.collection}</span></button>
@@ -765,6 +907,7 @@
 			</div>
 				{#if actionIssue}<div class="trash-issue" role="alert">{actionIssue}</div>{/if}
 				{#each storageNotices as notice}<div class="trash-issue" role="status">{notice}</div>{/each}
+				{#if folderNotice}<div class="trash-issue" role="status">{folderNotice}</div>{/if}
 				{#if arrivals && !showingTrash}<div class="arrival-notice" role="status"><span>{arrivals}</span><button aria-label="Dismiss" onclick={() => { arrivals = ''; }}>×</button></div>{/if}
 				{#if showingTrash && trashed.length}
 					<div class="artifact-list" aria-label="Trashed artifacts">
@@ -785,13 +928,47 @@
 					</div>
 				{:else if showingTrash}
 					<div class="empty-list"><span>✳</span><h2>Trash is empty.</h2><p>Top-level documents, boards, and Collections you move to Trash will appear here.</p></div>
-				{:else if filtered.length}
+				{:else}
+				<div class="organized-workspace">
+					<FolderNavigation library={folderLibrary} {location} {unfiledCount} onOpen={(id) => void openFolder(id)} onCreate={() => editFolder()} onActions={folderContext} />
+					<section class="folder-contents" aria-label="Folder contents">
+						<div class="folder-location-bar">
+							<nav class="folder-breadcrumbs" aria-label="Folder breadcrumbs">
+								<button onclick={() => openFolder(null)}>All files</button>
+								{#if location === 'root'}<span aria-hidden="true">/</span><span aria-current="page">Unfiled</span>{/if}
+								{#each breadcrumbs as crumb, index (crumb.id)}
+									<span aria-hidden="true">/</span><button aria-current={index === breadcrumbs.length - 1 ? 'page' : undefined} onclick={() => openFolder(crumb.id)}>{crumb.name}</button>
+								{/each}
+							</nav>
+							{#if currentFolder}<button class="row-context-trigger" aria-label={`Folder actions for current folder ${currentFolder.name}`} aria-haspopup="menu" onclick={(event) => folderContext(currentFolder.id, event)}>⋯</button>{/if}
+						</div>
+						{#if location && location !== 'root' && !currentFolder}
+							<div class="empty-list"><span>▱</span><h2>This folder is no longer here.</h2><p>Your files are still available in All files.</p><button class="destination-cancel" onclick={() => openFolder(null)}>Show all files</button></div>
+						{:else}
+						{#if childFolders.length}
+							<div class="child-folders" aria-label="Subfolders">
+								{#each childFolders as folder (folder.id)}
+									<div class="folder-card">
+										<button class="folder-card-open" onclick={() => openFolder(folder.id)} oncontextmenu={(event) => folderContext(folder.id, event)}><FolderIcon /><span><strong>{folder.name}</strong><small>{artifacts.filter((artifact) => folderForRef(folderLibrary, artifact.ref) === folder.id).length} files · {folderLibrary.folders.filter((entry) => entry.parentId === folder.id).length} folders</small></span></button>
+										<button class="row-context-trigger" aria-label={`Actions for folder ${folder.name}`} aria-haspopup="menu" onclick={(event) => folderContext(folder.id, event)}>⋯</button>
+									</div>
+								{/each}
+								</div>
+						{/if}
+						{#if filtered.length || pickedFiles.length}
+						<div class="file-selection-bar">
+							<label><input type="checkbox" aria-label="Select all visible files" checked={allVisibleSelected} onchange={toggleVisibleFiles} />{pickedFiles.length ? `${pickedFiles.length} selected` : `${filtered.length} ${filtered.length === 1 ? 'file' : 'files'}`}</label>
+							{#if pickedFiles.length}<div><button class="destination-cancel" onclick={() => pickMove({ refs: pickedFiles.map((artifact) => artifact.ref), title: `${pickedFiles.length} ${pickedFiles.length === 1 ? 'file' : 'files'}` })}>Move to folder…</button><button class="toolbar-button" onclick={() => selectedFiles = []}>Clear selection</button></div>{/if}
+						</div>
+						{/if}
+						{#if filtered.length}
 				<div class="artifact-list" aria-label="Recent artifacts">
 					{#each filtered as artifact (artifact.ref.app + artifact.ref.id)}
-						<div class="artifact-row">
+						<div class="artifact-row" class:selected={selectedFiles.includes(refKey(artifact.ref))}>
+						<input class="file-checkbox" type="checkbox" aria-label={`Select ${artifact.title}`} checked={selectedFiles.includes(refKey(artifact.ref))} onchange={() => toggleFile(artifact.ref)} />
 						<button class="artifact-row-open" onclick={() => openArtifact(artifact)} oncontextmenu={(event) => artifactContext(artifact, event)}>
 							<span class="artifact-icon {artifact.kind}" aria-hidden="true">{surfaceFor(artifact.kind)?.glyph}</span>
-							<span class="artifact-copy"><strong>{artifact.title}</strong><small>{artifact.recordCount === undefined ? surfaceFor(artifact.kind)?.appName : `${artifact.recordCount} ${artifact.recordCount === 1 ? 'record' : 'records'}`}</small></span>
+							<span class="artifact-copy"><strong>{artifact.title}</strong><small>{artifact.recordCount === undefined ? surfaceFor(artifact.kind)?.appName : `${artifact.recordCount} ${artifact.recordCount === 1 ? 'record' : 'records'}`}{#if location === null}<span class="file-folder-path"> · {folderPath(folderLibrary, folderForRef(folderLibrary, artifact.ref)).map((folder) => folder.name).join(' / ') || 'Unfiled'}</span>{/if}</small></span>
 							<span class="kind-badge {artifact.kind}">{artifact.kind}</span>
 							<time datetime={artifact.updatedAt}>{formatDate(artifact.updatedAt)}</time>
 							<span class="row-arrow" aria-hidden="true">↗</span>
@@ -801,11 +978,51 @@
 						{/each}
 				</div>
 			{:else}
-				<div class="empty-list"><span>✳</span><h2>{search ? 'Nothing by that name yet.' : 'A place for your next thing.'}</h2><p>{search ? 'Try another word or clear the search.' : 'Use New to start a document, board, or Collection.'}</p></div>
+				<div class="empty-list"><span>{currentFolder ? '▱' : '✳'}</span><h2>{search ? 'Nothing by that name yet.' : currentFolder ? 'Room for your next thing.' : 'A place for your next thing.'}</h2><p>{search ? 'Try another word or clear the search.' : currentFolder ? 'Use New to create something here, or move files into this folder from All files.' : 'Use New to start a document, board, or Collection.'}</p></div>
+						{/if}
+						{/if}
+					</section>
+				</div>
 			{/if}
 		</main>
 	{/if}
 </div>
+
+{#if folderEditor}
+	<div class="template-backdrop" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) folderEditor = null; }}>
+		<div class="folder-dialog" role="dialog" aria-modal="true" aria-label={folderEditor.id ? 'Rename folder' : 'New folder'} use:modal={{ returnFocus: '.folder-new-link, .new-button' }}>
+		<form class="folder-dialog-form" onsubmit={(event) => { event.preventDefault(); void saveFolder(); }}>
+			<header class="folder-dialog-header"><div class="eyebrow">ORGANIZE YOUR THINGS</div><h2>{folderEditor.id ? 'Rename folder' : 'New folder'}</h2><p>{folderEditor.id ? 'Choose a name that’s easy to find.' : `Create inside ${folderPath(folderLibrary, folderEditor.parentId).map((folder) => folder.name).join(' / ') || 'HomeSuite'}.`}</p></header>
+			<div class="folder-dialog-body"><label class="folder-name-label">Folder name<input bind:value={folderName} maxlength="120" data-autofocus /></label>{#if folderIssue}<p class="trash-issue" role="alert">{folderIssue}</p>{/if}</div>
+			<footer class="folder-dialog-footer"><button type="button" class="destination-cancel" onclick={() => folderEditor = null}>Cancel</button><button type="submit" class="new-button">{folderEditor.id ? 'Save name' : 'Create folder'}</button></footer>
+		</form>
+		</div>
+	</div>
+{/if}
+
+{#if movePicker}
+	<div class="template-backdrop" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) movePicker = null; }}>
+		<div class="folder-dialog" role="dialog" aria-modal="true" aria-label={movePicker.folderId ? 'Move folder' : 'Move to folder'} use:modal={{ returnFocus: '.artifact-context-trigger, .file-checkbox, .row-context-trigger' }}>
+			<header class="folder-dialog-header"><div class="eyebrow">CHOOSE A PLACE</div><h2>{movePicker.folderId ? 'Move folder' : 'Move to folder'}</h2><p>{movePicker.title}</p><input class="folder-search" aria-label="Find a folder" placeholder="Find a folder" bind:value={folderQuery} data-autofocus /></header>
+			<div class="folder-dialog-body folder-destinations" role="group" aria-label="Destination folder">
+				<button class:chosen={moveDestination === null} aria-pressed={moveDestination === null} onclick={() => moveDestination = null}><span aria-hidden="true">✳</span><span>{movePicker.folderId ? 'HomeSuite' : 'Unfiled'}</span><span class="destination-check" aria-hidden="true">{moveDestination === null ? '✓' : ''}</span></button>
+				{#each moveTargets as row (row.folder.id)}<button class:chosen={moveDestination === row.folder.id} aria-pressed={moveDestination === row.folder.id} onclick={() => moveDestination = row.folder.id}><FolderIcon /><span>{row.path}</span><span class="destination-check" aria-hidden="true">{moveDestination === row.folder.id ? '✓' : ''}</span></button>{:else}<p>{folderQuery ? 'No matching folders.' : 'Create a folder from New to give your things a place.'}</p>{/each}
+				{#if folderIssue}<p class="trash-issue" role="alert">{folderIssue}</p>{/if}
+			</div>
+			<footer class="folder-dialog-footer"><button class="destination-cancel" onclick={() => movePicker = null}>Cancel</button><button class="new-button" onclick={commitMove}>Move here</button></footer>
+		</div>
+	</div>
+{/if}
+
+{#if folderRemoval}
+	<div class="template-backdrop" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) folderRemoval = null; }}>
+		<div class="folder-dialog" role="dialog" aria-modal="true" aria-label="Remove folder" use:modal={{ returnFocus: '.folder-new-link' }}>
+			<header class="folder-dialog-header"><div class="eyebrow">KEEP YOUR THINGS</div><h2>Remove {folderRemoval.name}?</h2><p>Files and subfolders inside will move to {folderPath(folderLibrary, folderRemoval.parentId).map((folder) => folder.name).join(' / ') || 'HomeSuite (files become Unfiled)'}. All file contents are kept.</p></header>
+			{#if folderIssue}<div class="folder-dialog-body"><p class="trash-issue" role="alert">{folderIssue}</p></div>{/if}
+			<footer class="folder-dialog-footer"><button class="destination-cancel" data-autofocus onclick={() => folderRemoval = null}>Cancel</button><button class="trash-action permanent" onclick={confirmFolderRemoval}>Remove folder</button></footer>
+		</div>
+	</div>
+{/if}
 
 {#if actionNotice}<div class="context-notice" role="status"><span>{actionNotice}</span><button aria-label="Dismiss action notice" onclick={() => actionNotice = ''}>×</button></div>{/if}
 
