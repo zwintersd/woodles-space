@@ -8,6 +8,7 @@
 	import FieldDialog from '$lib/FieldDialog.svelte';
 	import ReferenceDialog from '$lib/ReferenceDialog.svelte';
 	import TableToolbar from '$lib/TableToolbar.svelte';
+	import ScrollFrame from '$lib/ScrollFrame.svelte';
 	import { HOMESUITE_TRASH_KEY, isHomeSuiteTrashed } from '@shared/homesuiteTrash';
 	import { candidatesFor, refreshReferenceSources, shelfSource, type ReferenceCandidate } from '../../../write/src/lib/references.svelte';
 	import { mergePulledRows, pullCollectionSources } from '$lib/sourceSync';
@@ -616,7 +617,7 @@
 	<main class="data-surface">
 		<TableToolbar {collection} {sourceStatus} {syncBusy} onCommand={command} onImport={importFile} />
 		{#if saveIssue}<div class="save-issue" role="status">{saveIssue}</div>{/if}
-		<div class="table-scroll">
+		<ScrollFrame label={`${collection.title} scrollable table`}>
 			<table class="data-table" aria-label={`${collection.title} table`}>
 				<thead>
 					<tr>
@@ -746,7 +747,7 @@
 					</tr>
 				</tbody>
 			</table>
-		</div>
+		</ScrollFrame>
 		{#if addFieldOpen}
 			<FieldDialog onCreate={createField} onClose={() => { addFieldOpen = false; }} />
 		{/if}

@@ -1,10 +1,10 @@
 :root { font-family: var(--font-sans, 'Aptos', sans-serif); color: var(--hs-ink); background: var(--hs-page); font-synthesis: none; }
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 620px; background: var(--hs-page); }
+body { margin: 0; background: var(--hs-page); }
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
-.data-surface { min-height: 100vh; background: var(--hs-page); color: var(--hs-ink); }
-.table-toolbar { height: 48px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--hs-line); background: var(--hs-bar); }
+.data-surface { height: 100dvh; display: flex; flex-direction: column; min-width: 0; background: var(--hs-page); color: var(--hs-ink); }
+.table-toolbar { min-height: 48px; flex: 0 0 auto; padding: 8px 18px; gap: 8px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--hs-line); background: var(--hs-bar); }
 .table-intro { display: flex; align-items: baseline; gap: 12px; }
 .table-intro > span, .field-dialog > form > span, .reference-dialog > span, .inspector-mini, .option-editor > span { font: 10px/1.2 var(--font-mono, monospace); letter-spacing: .13em; color: var(--hs-muted); }
 .table-intro strong { font-size: 12px; font-weight: 500; color: var(--hs-muted); }
@@ -18,11 +18,11 @@ button { cursor: pointer; }
 .import-button:hover { background: var(--hs-hover); }
 .import-button input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .save-issue { margin: 8px 16px 0; padding: 8px 10px; background: var(--hs-danger-bg); border: 1px solid var(--hs-danger-line); color: var(--hs-danger-ink); border-radius: 7px; font-size: 12px; }
-.table-scroll { overflow: auto; height: calc(100vh - 48px); }
 .data-table { border-collapse: separate; border-spacing: 0; table-layout: fixed; width: max-content; min-width: 100%; font-size: 13px; }
-.data-table th { position: sticky; top: 0; z-index: 2; height: 38px; text-align: left; background: var(--hs-sunk); border-bottom: 1px solid var(--hs-line); border-right: 1px solid var(--hs-line); color: var(--hs-ink-soft); font-weight: 600; padding: 0; }
+.data-table th { position: sticky; top: 0; z-index: 3; height: 38px; text-align: left; background: var(--hs-sunk); border-bottom: 1px solid var(--hs-line); border-right: 1px solid var(--hs-line); color: var(--hs-ink-soft); font-weight: 600; padding: 0; }
 .data-table th.primary { background: var(--hs-hover); }
 .row-head, .row-number { position: sticky; left: 0; z-index: 3; width: 42px; min-width: 42px; text-align: center !important; color: var(--hs-muted) !important; background: var(--hs-sunk) !important; border-right: 1px solid var(--hs-line); }
+.data-table th.row-head { z-index: 4; }
 .field-head { border: 0; background: transparent; width: 100%; height: 38px; display: flex; align-items: center; gap: 8px; text-align: left; padding: 0 13px; color: inherit; font-size: 12px; }
 .field-head:hover { background: var(--hs-hover); }
 .field-type { color: var(--hs-muted); font-size: 12px; }
@@ -31,6 +31,7 @@ button { cursor: pointer; }
 .add-field-head { min-width: 38px; width: 38px; }
 .add-field-head button { width: 100%; height: 100%; border: 0; background: transparent; color: var(--hs-muted); font-size: 17px; }
 .data-table td { position: relative; height: 37px; padding: 0; background: var(--hs-field); border-bottom: 1px solid var(--hs-line); border-right: 1px solid var(--hs-line); }
+.data-table td.row-number { position: sticky; left: 0; z-index: 2; }
 .data-table tbody tr:hover td { background: var(--hs-field-alt); }
 .data-table td.primary-cell { background: var(--hs-field-alt); }
 .data-table td.active-cell { z-index: 1; box-shadow: inset 0 0 0 2px var(--hs-focus); }
