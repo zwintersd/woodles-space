@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createHomeSuiteContext } from '@shared/homesuiteContext';
-import { HOMESUITE_CHANNEL, type HomeSuiteShellMessage } from '@shared/homesuiteBridge';
+import { HOMESUITE_CHANNEL, type HomeSuiteShellMessage, type HomeSuiteSurfaceMessage } from '@shared/homesuiteBridge';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -40,7 +40,7 @@ it('discards dismissed actions', () => {
 });
 
 it('sends a reactive reference as cloneable plain data', () => {
-	const postMessage = vi.fn((message) => structuredClone(message));
+	const postMessage = vi.fn((message: Extract<HomeSuiteSurfaceMessage, { type: 'context-menu' }>) => structuredClone(message));
 	vi.stubGlobal('window', { parent: { postMessage }, location: { origin: 'https://woodles.test' } });
 	const ref = new Proxy({ app: 'whiteboard', kind: 'board', id: 'board-1' }, {});
 	expect(() => createHomeSuiteContext().open({ x: 0, y: 0 }, { label: 'A board', detail: 'Reference', ref }, [])).not.toThrow();

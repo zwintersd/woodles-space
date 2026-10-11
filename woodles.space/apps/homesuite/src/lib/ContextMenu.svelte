@@ -28,7 +28,7 @@
 			left = Math.max(8, Math.min(x, window.innerWidth - rect.width - 8));
 			top = Math.max(8, Math.min(y, window.innerHeight - rect.height - 8));
 		};
-		fit(); buttons()[0]?.focus();
+		fit(); buttons()[0]?.focus({ preventScroll: true });
 		const outside = (event: PointerEvent) => { if (!menu.contains(event.target as Node)) onClose(false); };
 		const blur = () => { if (document.activeElement?.tagName === 'IFRAME') onClose(false); };
 		const dismiss = () => onClose(false);

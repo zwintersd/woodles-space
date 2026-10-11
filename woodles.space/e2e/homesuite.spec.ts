@@ -10,7 +10,7 @@ async function surfaceReady(page: Page): Promise<void> {
 
 async function create(page: Page, kind: 'Document' | 'Board'): Promise<void> {
 	const previous = page.url();
-	await page.getByRole('button', { name: /New/ }).click();
+	await page.getByRole('button', { name: '＋ New', exact: true }).click();
 	await page.getByRole('menuitem', { name: new RegExp(kind) }).click();
 	await expect.poll(() => page.url()).not.toBe(previous);
 	await surfaceReady(page);
@@ -18,7 +18,7 @@ async function create(page: Page, kind: 'Document' | 'Board'): Promise<void> {
 
 async function createCollection(page: Page, template: RegExp): Promise<void> {
 	const previous = page.url();
-	await page.getByRole('button', { name: /New/ }).click();
+	await page.getByRole('button', { name: '＋ New', exact: true }).click();
 	await page.getByRole('menuitem', { name: /Collection/ }).click();
 	const dialog = page.getByRole('dialog', { name: 'New collection' });
 	const group = dialog.locator('details').filter({ has: page.getByRole('button', { name: template, includeHidden: true }) });
@@ -108,7 +108,7 @@ test('a surface stays veiled and inert until it has loaded what it shows', async
 		await new Promise((resolve) => setTimeout(resolve, 800));
 		await route.continue().catch(() => undefined);
 	});
-	await page.getByRole('button', { name: /New/ }).click();
+	await page.getByRole('button', { name: '＋ New', exact: true }).click();
 	await page.getByRole('menuitem', { name: /Document/ }).click();
 	await expect(page.locator('.surface-veil')).toBeVisible();
 	await expect(page.locator('iframe.native-surface')).toHaveAttribute('inert', '');
@@ -293,7 +293,7 @@ test('Write and Whiteboard honor Trash, and HomeSuite leaves what they reopen al
 
 test('the template picker and the palette work from the keyboard', async ({ page }) => {
 	await page.goto('/homesuite');
-	await page.getByRole('button', { name: /New/ }).click();
+	await page.getByRole('button', { name: '＋ New', exact: true }).click();
 	await page.getByRole('menuitem', { name: /Collection/ }).click();
 	const dialog = page.getByRole('dialog', { name: 'New collection' });
 	await expect(dialog.getByRole('button', { name: /Blank/ })).toBeFocused();
@@ -301,7 +301,7 @@ test('the template picker and the palette work from the keyboard', async ({ page
 	await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
 	await page.keyboard.press('Escape');
 	await expect(dialog).toHaveCount(0);
-	await expect(page.getByRole('button', { name: /New/ })).toBeFocused();
+	await expect(page.getByRole('button', { name: '＋ New', exact: true })).toBeFocused();
 
 	await page.keyboard.press('ControlOrMeta+k');
 	await expect(page.getByRole('combobox', { name: 'Search commands' })).toBeFocused();
