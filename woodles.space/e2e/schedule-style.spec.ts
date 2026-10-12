@@ -59,7 +59,8 @@ test('style studio themes a plan and the learner view wears it', async ({ page }
   await expect(page.locator('#greeting')).toHaveText('Choo choo, Sam!');
   await expect(page.locator('#kicker')).toHaveText('Next stop: today');
   await expect(page.locator('#nowLabel')).toHaveText('THIS STOP');
-  await expect(page.locator('#heroMascots .mascot')).toHaveCount(3);
+  await expect(page.locator('#heroArt svg.scene-trains')).toBeVisible();
+  await expect(page.locator('#heroMascots')).toBeHidden();
   await expect(page.locator('#heroScene')).toBeHidden();
   const root = await page.evaluate(() => {
     const style = getComputedStyle(document.documentElement);
@@ -98,6 +99,8 @@ test('every theme renders the learner view without overflow and with readable ca
     await page.goto('/schedules/view?plan=styled');
     await expect(page.locator('#timeline')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe(theme);
+    const illustrated = ['trains', 'dinosaurs', 'unicorns', 'space', 'construction', 'ocean'].includes(theme);
+    await expect(page.locator('#heroArt svg.scene-art')).toHaveCount(illustrated ? 1 : 0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
     await page.setViewportSize({ width: 1100, height: 800 });
     await page.screenshot({ path: test.info().outputPath(`theme-${theme}.png`) });

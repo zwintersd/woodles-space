@@ -36,6 +36,13 @@ so it's not easy to forget.
   pictures, corners, bold outlines, background patterns, high contrast, and
   whether anything moves. the look is saved per plan and carried by
   published learner links.
+- **illustrated banners** — six themes now draw their own banner instead of
+  emoji stickers: a steam train pulling a carriage along a railway, a
+  brontosaurus beside a smoking volcano, a unicorn under a rainbow, a rocket
+  passing a ringed planet, a digger at work beside traffic cones, and a
+  whale spouting among fish. with motion on, wheels turn, smoke puffs,
+  heads nod, stars twinkle and waves roll. the style studio's banner choice
+  can swap any of them for the theme's stickers, your own, or nothing.
 
 ## 2026-10-05
 

@@ -146,7 +146,7 @@ window.ScheduleThemes = (() => {
     track: [['', 'Theme default'], ['line', 'Simple line'], ['rainbow', 'Rainbow'], ['rails', 'Railway track'], ['road', 'Road'], ['prints', 'Paw prints'], ['dotted', 'Dots'], ['dashed', 'Dashes'], ['hazard', 'Hazard stripes']],
     celebrate: [['', 'Theme default'], ['off', 'Off'], ['gentle', 'A small burst'], ['party', 'Party']],
     motion: [['', 'Theme default'], ['on', 'Gently moving'], ['off', 'Still']],
-    scene: [['theme', 'Theme stickers'], ['custom', 'My stickers'], ['none', 'No stickers']]
+    scene: [['theme', 'Theme banner'], ['stickers', 'Theme stickers'], ['custom', 'My stickers'], ['none', 'Nothing']]
   };
   const WORDS = [
     ['kicker', 'Banner line', 60], ['greeting', 'Greeting', 60], ['now', 'Now label', 16], ['next', 'Next label', 16],
@@ -279,12 +279,14 @@ window.ScheduleThemes = (() => {
     const body = style.bodyFont || base.body;
     const stickers = [...base.stickers];
     const mascots = style.scene === 'none' ? [] : style.scene === 'custom' ? style.mascots : base.mascots;
+    const art = style.scene === 'theme' && window.ScheduleScenes?.[base.id] ? base.id : '';
     const wordsOut = Object.fromEntries(WORDS.map(([key]) => [key, style.words[key] || base.words[key]]));
     const resolvedStamp = style.stamp === 'theme' ? base.stamp : style.stamp;
     const resolvedMarker = style.marker === 'theme' ? base.marker : style.marker;
     return {
       style, theme: base, tokens, heading, body, stickers, mascots,
-      scene: style.scene === 'theme' && base.scene === 'tickets' ? 'tickets' : mascots.length ? 'mascots' : 'none',
+      scene: art ? 'art' : style.scene === 'theme' && base.scene === 'tickets' ? 'tickets' : mascots.length ? 'mascots' : 'none',
+      art,
       pattern: style.highContrast ? 'none' : style.pattern || base.pattern,
       track: style.track || base.track,
       shape: style.shape || base.shape,
@@ -403,6 +405,11 @@ window.ScheduleThemes = (() => {
     node.dataset.contrast = look.style.highContrast ? 'high' : 'standard';
   }
 
+  // The banner's picture: an illustration, the theme's stickers, or nothing.
+  function sceneMarkup(look) {
+    return look.scene === 'art' ? window.ScheduleScenes[look.art] : mascotMarkup(look);
+  }
+
   function mascotMarkup(look) {
     return look.mascots.map((mascot, index) => '<span class="mascot mascot-' + (index + 1) + '">' + esc(mascot) + '</span>').join('');
   }
@@ -436,6 +443,6 @@ window.ScheduleThemes = (() => {
 
   return {
     FONTS, READING_FONTS, THEMES, GROUPS, COLOR_ROLES, OPTIONS, WORDS, EXTRA_STICKERS,
-    sanitizeStyle, theme, resolve, fill, warnings, variables, paint, fontsHref, loadFonts, mascotMarkup, celebrate, contrast
+    sanitizeStyle, theme, resolve, fill, warnings, variables, paint, fontsHref, loadFonts, mascotMarkup, sceneMarkup, celebrate, contrast
   };
 })();

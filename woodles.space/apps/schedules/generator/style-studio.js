@@ -116,7 +116,7 @@ window.ScheduleStyleStudio = (() => {
       '<span class="lp-box" style="--activity-color:' + color + '">' + (state === 'now' ? '<span class="lp-nowtag">' + esc(w.now) + '</span>' : '') +
       '<span class="lp-visual">' + icon + '</span><span class="lp-title">' + title + '</span><span class="lp-done">' + (state === 'done' ? (look.stamp ? esc(look.stamp) : '✓') : '') + '</span></span></li>';
     return '<div class="lp-hero"><div class="lp-hero-copy"><small>' + esc(w.kicker) + '</small><strong>' + esc(Themes.fill(w.greeting, name)) + '</strong><span class="lp-clock">Now: 9:20</span></div>' +
-      '<div class="lp-scene" aria-hidden="true">' + (look.scene === 'tickets' ? '<span class="mascot mascot-1">🎟️</span><span class="mascot mascot-2">⭐</span>' : Themes.mascotMarkup(look)) + '</div></div>' +
+      '<div class="lp-scene' + (look.scene === 'art' ? ' is-art' : '') + '" aria-hidden="true">' + (look.scene === 'tickets' ? '<span class="mascot mascot-1">🎟️</span><span class="mascot mascot-2">⭐</span>' : Themes.sceneMarkup(look)) + '</div></div>' +
       '<div class="lp-nownext"><span class="lp-nn now"><small>' + esc(w.now) + '</small><b>Read a book</b></span><span class="lp-nn"><small>' + esc(w.next) + '</small><b>9:40 Snack</b></span></div>' +
       '<ol class="lp-timeline">' + step('9:00', '🧩', 'Puzzle', '#32845f', 'done') + step('9:15', '📖', 'Read a book', '#3978c7', 'now') + step('9:40', '🍎', 'Snack', '#d27b32', '') +
       '<li class="lp-step lp-finish"><span class="lp-time">10:00<i class="lp-dot"></i></span><span class="lp-box"><strong>' + esc(w.finishTitle) + '</strong><small>' + esc(Themes.fill(w.finishMessage, name)) + '</small></span></li></ol>';

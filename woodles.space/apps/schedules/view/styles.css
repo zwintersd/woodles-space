@@ -193,7 +193,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--sky); outline-o
 @media print {
   body { background: var(--page-a); }
   .schedule { width: 100%; margin: 0; }
-  .edit-link, .clock, .nownext, .reset, .day-links, .done-btn, .nowtag, .btns, .time .marker, .hero-mascots { display: none !important; }
+  .edit-link, .clock, .nownext, .reset, .day-links, .done-btn, .nowtag, .btns, .time .marker, .hero-mascots, .hero-art { display: none !important; }
   .vid .art { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .vid.dim .art { opacity: 1; filter: none; }
   .hero, .box, .nn, .visual, .category, .chip, .chip-art, .familiarity, .time::after { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
@@ -275,7 +275,10 @@ button.edit-link { font: inherit; cursor: pointer; }
 :root[data-contrast="high"] .box, :root[data-contrast="high"] .nn, :root[data-contrast="high"] .chip, :root[data-contrast="high"] .vid { border-color: #000; }
 :root[data-contrast="high"] .step.is-done .box { opacity: .75; }
 .hero-content.no-scene { grid-template-columns: minmax(0, 1fr); }
+.hero-art { height: 160px; margin-block: -6px -10px; pointer-events: none; }
+.hero-content:has(> .hero-art:not([hidden])) { grid-template-columns: minmax(0, 1fr) 300px; }
 @media (max-width: 620px) {
   .hero-mascots { position: absolute; right: 8px; bottom: 6px; width: 104px; height: 64px; }
   .mascot-1 { font-size: 36px; } .mascot-2 { font-size: 28px; } .mascot-3 { font-size: 24px; }
+  .hero-art { position: absolute; right: 8px; bottom: 8px; width: 108px; height: 58px; margin: 0; }
 }

@@ -45,6 +45,8 @@
     el('heroScene').toggleAttribute('hidden', look.scene !== 'tickets');
     el('heroMascots').hidden = look.scene !== 'mascots';
     el('heroMascots').innerHTML = look.scene === 'mascots' ? Themes.mascotMarkup(look) : '';
+    el('heroArt').hidden = look.scene !== 'art';
+    el('heroArt').innerHTML = look.scene === 'art' ? Themes.sceneMarkup(look) : '';
     el('heroContent').classList.toggle('no-scene', look.scene === 'none');
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', look.tokens.heroA);
   }

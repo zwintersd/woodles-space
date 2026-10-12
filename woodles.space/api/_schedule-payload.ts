@@ -86,7 +86,7 @@ const STYLE_ENUMS: Record<string, string[]> = {
   textSize: ['standard', 'large', 'xl'], pictureSize: ['standard', 'large'], shape: ['', 'square', 'soft', 'round'],
   borders: ['standard', 'bold'], pattern: ['', 'none', 'stickers', 'dots', 'stars', 'stripes', 'grid'], patternStrength: ['subtle', 'playful'],
   track: ['', 'line', 'rainbow', 'rails', 'road', 'prints', 'dotted', 'dashed', 'hazard'], celebrate: ['', 'off', 'gentle', 'party'],
-  motion: ['', 'on', 'off'], scene: ['theme', 'custom', 'none']
+  motion: ['', 'on', 'off'], scene: ['theme', 'stickers', 'custom', 'none']
 };
 const STYLE_COLORS = ['accent', 'hero', 'page', 'card', 'ink', 'now', 'done', 'track'];
 const STYLE_WORDS: [string, number][] = [['kicker', 60], ['greeting', 60], ['now', 16], ['next', 16], ['finishTitle', 40], ['finishMessage', 80]];

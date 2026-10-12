@@ -73,6 +73,8 @@
 .lp-hero strong { overflow-wrap: anywhere; font-family: var(--display); font-size: calc(23px * var(--display-scale) * var(--text)); font-weight: 400; line-height: 1.15; text-shadow: 1px 2px 0 var(--hero-shadow); }
 .lp-clock { justify-self: start; margin-top: 4px; padding: 2px 7px; border-radius: calc(7px * var(--round)); background: var(--hero-chip); font-size: 9px; }
 .lp-scene { position: relative; height: 62px; }
+.lp-scene.is-art { height: 72px; margin-right: -6px; }
+.lp-hero:has(> .lp-scene.is-art) { grid-template-columns: minmax(0, 1fr) 136px; }
 .lp-scene .mascot { position: absolute; line-height: 1; }
 .lp-scene .mascot-1 { left: 0; top: 14px; font-size: 32px; transform: rotate(-8deg); }
 .lp-scene .mascot-2 { left: 38px; top: 0; font-size: 26px; transform: rotate(9deg); }
