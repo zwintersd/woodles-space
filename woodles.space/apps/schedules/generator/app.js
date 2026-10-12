@@ -616,11 +616,16 @@
     }).join('');
   }
 
+  function themedPreviewHero(plan) {
+    const tokens = window.ScheduleThemes.resolve(plan.style).tokens;
+    return 'color:' + tokens.heroInk + ';background:linear-gradient(115deg,' + tokens.heroA + ',' + tokens.heroB + ')';
+  }
+
   function renderVisualCard(plan, day) {
     const rows = sortedActivities(day).filter((item) => !item.ghost).slice(0, 3).map((item) =>
       '<span class="visual-preview-row"><b>' + esc(formatTime(item.start)) + '</b><span>' + esc(itemLabel(item, plan.learner)) + '</span></span>').join('');
     return '<section class="visual-card" aria-labelledby="visualCardTitle">' +
-      '<div class="visual-preview" aria-hidden="true"><span class="visual-preview-hero"><strong>Hi ' + esc(plan.learner) + '!</strong><small>' + esc(day.label) + ' · ' + esc(formatTime(day.start)) + '–' + esc(formatTime(day.end)) + '</small></span>' +
+      '<div class="visual-preview" aria-hidden="true"><span class="visual-preview-hero" style="' + esc(themedPreviewHero(plan)) + '"><strong>' + esc(window.ScheduleThemes.fill(window.ScheduleThemes.resolve(plan.style).words.greeting, plan.learner)) + '</strong><small>' + esc(day.label) + ' · ' + esc(formatTime(day.start)) + '–' + esc(formatTime(day.end)) + '</small></span>' +
         (rows || '<span class="visual-preview-empty">Activities you add show up here</span>') + '</div>' +
       '<h3 id="visualCardTitle">Visual schedule</h3><p>' + esc(day.label) + ' as the learner sees it: big pictures, a live Now / Next, and check-offs.</p>' +
       '<a class="button visual" href="' + esc(visualScheduleUrl(plan.id, day.key)) + '">▶ Open ' + esc(day.label) + '’s schedule</a></section>';
@@ -631,7 +636,7 @@
       '<div class="page-heading plan-heading"><div class="plan-heading-main"><span class="eyebrow">Weekly learner plan · saved locally</span>' +
         '<input id="planTitle" class="plan-title" aria-label="Plan name" maxlength="100" value="' + esc(plan.name) + '">' +
         '<input id="planLearner" class="plan-learner" aria-label="Learner label" maxlength="100" value="' + esc(plan.learner) + '">' +
-      '</div><div class="heading-actions">' + (day ? '<a class="button visual" href="' + esc(visualScheduleUrl(plan.id, day.key)) + '">▶ Use schedule</a><button class="button secondary" type="button" data-action="open-print-setup">Print</button>' : '') + '<button class="button primary" type="button" data-action="publish-plan">Publish</button><button class="button secondary" type="button" data-action="open-content-library">Library</button>' +
+      '</div><div class="heading-actions">' + (day ? '<a class="button visual" href="' + esc(visualScheduleUrl(plan.id, day.key)) + '">▶ Use schedule</a><button class="button secondary" type="button" data-action="open-print-setup">Print</button>' : '') + '<button class="button secondary style-button" type="button" data-action="open-style-studio" title="Colours, fonts and theme for the visual schedule"><span aria-hidden="true">' + esc(window.ScheduleThemes.theme(plan.style?.theme).emoji) + '</span> Style</button><button class="button primary" type="button" data-action="publish-plan">Publish</button><button class="button secondary" type="button" data-action="open-content-library">Library</button>' +
         '<details class="plan-tools disclosure"><summary>Plan tools</summary><div class="tool-options"><label class="field progression-field"><span>Learner view moves on</span><select id="planProgression"><option value="clock"' + (plan.progression === 'done' ? '' : ' selected') + '>By the clock</option><option value="done"' + (plan.progression === 'done' ? ' selected' : '') + '>When each item is done</option></select></label><p class="muted">By the clock follows planned times. When each item is done, Now moves to the first unfinished item as the learner checks things off.</p><button class="button secondary" type="button" data-action="open-image-studio">Image studio</button><button class="button secondary" type="button" data-action="export-plan">Export JSON</button><button class="button secondary" type="button" data-action="import-plan">Import plan</button><button class="button secondary" type="button" data-action="duplicate-plan">Duplicate plan</button><button class="button secondary danger" type="button" data-action="delete-current-plan">Move plan to Trash</button><p class="muted">Saved in this browser. Export and import to transfer a plan to another device.</p></div></details></div></div>';
   }
 
@@ -2600,6 +2605,7 @@
     else if (name === 'hide-day') hideDay();
     else if (name === 'restore-day') restoreDay(action.dataset.day);
     else if (name === 'open-print-setup') showPrintSetup();
+    else if (name === 'open-style-studio') window.ScheduleStyleStudio.open(currentPlanId);
     else if (name === 'print-day') { document.getElementById('printDialog').close(); window.print(); }
     else if (name === 'export-plan') exportPlan();
     else if (name === 'import-plan') importPlan();
@@ -2793,7 +2799,17 @@
     render();
   });
 
-  window.SchedulePublishing.setup({ getWorkspace: () => workspace, importDraft: (payload) => {
+  window.ScheduleStyleStudio.setup({ plans: () => workspace.plans, save: (planId, style) => {
+    const plan = workspace.plans.find((entry) => entry.id === planId);
+    if (!plan) return false;
+    const before = plan.style;
+    plan.style = style;
+    if (!persist()) { plan.style = before; return false; }
+    render();
+    showToast('Look saved. ' + (window.SchedulePublishing.isPublished(planId) ? 'Publish again to update the learner link.' : 'Use schedule shows it now.'));
+    return true;
+  } });
+  window.SchedulePublishing.setup({ getWorkspace: () => workspace, openStyle: (planId, done) => window.ScheduleStyleStudio.open(planId, done), importDraft: (payload) => {
     const imageIds = new Map();
     const images = payload.images.map(sanitizeImage).filter(Boolean).map(image => { const id = makeId('image'); imageIds.set(image.id, id); return { ...image, id }; });
     const remap = (item) => {

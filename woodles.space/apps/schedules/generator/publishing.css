@@ -30,4 +30,5 @@
 .publish-catalogue { display: grid; gap: 10px; }
 .publish-catalogue button { padding: 16px; border: 1px solid #cbd9ea; border-radius: 12px; display: grid; text-align: left; gap: 6px; color: #23344c; background: white; font: inherit; cursor: pointer; }
 @media (max-width: 560px) { .publish-fields { grid-template-columns: 1fr; } .publish-actions .button { width: 100%; text-align: center; } .publish-version { align-items: flex-start; flex-direction: column; } }
+.publish-look { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border: 1px solid #cbd9ea; border-radius: 12px; background: #fff; }
 @media print { .publishing-dialog { display: none; } }

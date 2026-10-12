@@ -20,6 +20,35 @@ so it's not easy to forget.
 
 ## 2026-10-12
 
+- **visual schedules can wear a learner's favourite thing** — the weekly
+  planner's new **Style** button opens a style studio with 22 themes built
+  around popular special interests: unicorns, dinosaurs, trains, outer space,
+  diggers, cars and trucks, dragons, robots, pixel games, superheroes,
+  pirates, building bricks, sweets, weather, under the sea, horses, bugs,
+  jungle animals, puppies and kittens, plus the original Bright sky and a
+  low-stimulation Quiet and calm. each theme brings its own colours, fonts,
+  banner stickers, timeline track (railway sleepers, a road, a rainbow, paw
+  prints, hazard stripes), a marker that rides beside the current activity,
+  a done stamp, a celebration burst, and words — trains say *All aboard* and
+  label the now/next row *This stop* / *Next stop*. everything can then be
+  tuned: eight colour roles with readability warnings, 26 heading fonts and
+  easy-reading fonts (Atkinson Hyperlegible, Lexend, Andika), larger text and
+  pictures, corners, bold outlines, background patterns, high contrast, and
+  whether anything moves. the look is saved per plan and carried by
+  published learner links.
+- **illustrated banners** — six themes now draw their own banner instead of
+  emoji stickers: a steam train pulling a carriage along a railway, a
+  brontosaurus beside a smoking volcano, a unicorn under a rainbow, a rocket
+  passing a ringed planet, a digger at work beside traffic cones, and a
+  whale spouting among fish. with motion on, wheels turn, smoke puffs,
+  heads nod, stars twinkle and waves roll. the style studio's banner choice
+  can swap any of them for the theme's stickers, your own, or nothing.
+- **four more banners, and princesses** — pirates get a ship with a
+  skull-and-crossbones sail off a treasure island, superheroes a caped hero
+  flying over a night city in front of a comic burst, robots a waving robot
+  with blinking chest lights, turning gears and a hovering drone. a new
+  *Princesses and castles* theme brings a pink castle with flags and a
+  jewelled crown, in a bubbly Cherry Bomb heading font.
 - **first/then rewards in the schedule planner** — an activity can list what
   the learner earns: a reward (M&M, sticker, token) and up to six results worth
   0–99 each, such as sat on toilet 1, voided liquid 3, voided solid 5. the
