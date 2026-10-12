@@ -1,0 +1,61 @@
+/* Illustrated banners from scenes.js. Shared by the learner view and the style
+   studio preview; parts only move inside a look painted with motion on. */
+.scene-art { display: block; width: 100%; height: 100%; overflow: visible; }
+.scene-art [class^="sc-"] { transform-box: fill-box; transform-origin: center; }
+.scene-art .sc-nod { transform-origin: 30% 100%; }
+.scene-art .sc-sway { transform-origin: 100% 50%; }
+.scene-art .sc-dig { transform-origin: 100% 100%; }
+.scene-art .sc-spout { transform-origin: 50% 100%; }
+.scene-art .sc-rock { transform-origin: 50% 100%; }
+.scene-art .sc-flag, .scene-art .sc-cape, .scene-art .sc-billow { transform-origin: 0% 50%; }
+.scene-art .sc-cape { transform-origin: 100% 30%; }
+.scene-art .sc-wave-arm { transform-origin: 50% 100%; }
+
+[data-motion="on"] .scene-art .sc-spin { animation: sc-spin 1.6s linear infinite; }
+[data-motion="on"] .scene-art .sc-roll { animation: sc-roll .5s steps(2) infinite; }
+[data-motion="on"] .scene-art .sc-bob { animation: sc-bob 2.4s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-puff { animation: sc-puff 3s ease-out infinite; }
+[data-motion="on"] .scene-art .sc-twinkle { animation: sc-twinkle 2.8s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-nod { animation: sc-nod 4s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-sway { animation: sc-sway 3s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-dig { animation: sc-dig 3.6s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-flicker { animation: sc-flicker .35s ease-in-out infinite alternate; }
+[data-motion="on"] .scene-art .sc-spout { animation: sc-spout 2.4s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-swim { animation: sc-swim 5s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-rise { animation: sc-rise 4s ease-in infinite; }
+[data-motion="on"] .scene-art .sc-wave-front { animation: sc-wave 6s ease-in-out infinite alternate; }
+[data-motion="on"] .scene-art .sc-spin-rev { animation: sc-spin 2.2s linear infinite reverse; }
+[data-motion="on"] .scene-art .sc-rock { animation: sc-rock 3.2s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-flag { animation: sc-flag 1.2s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-billow { animation: sc-billow 3.2s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-pulse { animation: sc-pulse 1.6s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-zoom { animation: sc-zoom .9s linear infinite; }
+[data-motion="on"] .scene-art .sc-cape { animation: sc-cape .6s ease-in-out infinite alternate; }
+[data-motion="on"] .scene-art .sc-blink { animation: sc-blink 1.2s steps(2) infinite; }
+[data-motion="on"] .scene-art .sc-wave-arm { animation: sc-wave-arm 1.4s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-wave-back { animation: sc-wave 8s ease-in-out infinite alternate-reverse; }
+
+@keyframes sc-spin { to { rotate: 360deg; } }
+@keyframes sc-roll { 50% { translate: 0 .8px; } }
+@keyframes sc-bob { 50% { translate: 0 -2.5px; } }
+@keyframes sc-puff { 0% { opacity: 0; scale: .5; translate: 6px 10px; } 25% { opacity: .9; } 100% { opacity: 0; scale: 1.25; translate: -10px -10px; } }
+@keyframes sc-twinkle { 0%, 100% { opacity: 1; scale: 1; } 50% { opacity: .35; scale: .7; } }
+@keyframes sc-nod { 0%, 100% { rotate: 0deg; } 50% { rotate: -4deg; } }
+@keyframes sc-sway { 0%, 100% { rotate: 0deg; } 50% { rotate: 6deg; } }
+@keyframes sc-dig { 0%, 100% { rotate: 0deg; } 45%, 55% { rotate: -7deg; } }
+@keyframes sc-flicker { to { scale: 1 .82; opacity: .85; } }
+@keyframes sc-spout { 0%, 100% { scale: 1 1; } 50% { scale: 1.08 .82; } }
+@keyframes sc-swim { 0%, 100% { translate: 0 0; } 50% { translate: -14px -4px; } }
+@keyframes sc-rise { 0% { opacity: 0; translate: 0 18px; } 30% { opacity: 1; } 100% { opacity: 0; translate: 0 -26px; } }
+@keyframes sc-wave { to { translate: 20px 0; } }
+@keyframes sc-rock { 0%, 100% { rotate: -2deg; } 50% { rotate: 2deg; translate: 0 -2px; } }
+@keyframes sc-flag { 50% { transform: scaleX(.82) skewY(8deg); } }
+@keyframes sc-billow { 50% { scale: 1.05 1; } }
+@keyframes sc-pulse { 50% { scale: 1.05; rotate: 4deg; } }
+@keyframes sc-zoom { from { translate: 12px 0; opacity: 0; } 40% { opacity: 1; } to { translate: -12px 0; opacity: 0; } }
+@keyframes sc-cape { to { scale: 1 .88; } }
+@keyframes sc-blink { 50% { opacity: .3; } }
+@keyframes sc-wave-arm { 0%, 100% { rotate: -12deg; } 50% { rotate: 14deg; } }
+
+@media (prefers-reduced-motion: reduce) { .scene-art * { animation: none !important; } }
+@media print { .scene-art * { animation: none !important; } }

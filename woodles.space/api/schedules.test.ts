@@ -177,6 +177,18 @@ describe('snapshot validation and passwords', () => {
     expect(clean.plan.days[0].activities[0].options[1]).toMatchObject({ kind: 'suggestion', maxRerolls: 2, candidates: [{ title: 'Draw', symbolCredit: 'Artist', symbolPixelated: true }] });
     expect(clean.plan.days[0].activities[1].videos[0].url).toBe('https://example.com/video');
   });
+  it('keeps a plan’s look and strips anything that is not a look', () => {
+    const payload: any = draft(); payload.plan.style = { theme: 'trains', colors: { accent: '#AA0000', hero: 'red', card: 'url(x)' }, headingFont: 'alfa', bodyFont: 'Bad Font!',
+      textSize: 'xl', track: 'rails', pattern: 'javascript', scene: 'custom', mascots: ['🚂', '<img src=x>', '🚃', '🚉', '🎫'], stamp: '"🎫"', marker: 'dot',
+      highContrast: 'yes', words: { greeting: 'All aboard, {name}!\n', now: 'THIS STOP IS A VERY LONG LABEL' }, extra: 'dropped' };
+    const style: any = schedulePayload(payload, 'c'.repeat(32)).plan.style;
+    expect(style).toMatchObject({ theme: 'trains', headingFont: 'alfa', bodyFont: '', textSize: 'xl', track: 'rails', pattern: '', scene: 'custom', stamp: '🎫', marker: 'dot', highContrast: false });
+    expect(style.colors).toMatchObject({ accent: '#aa0000', hero: '', card: '' });
+    expect(style.mascots).toEqual(['🚂', 'img src=x', '🚃']);
+    expect(style.words).toMatchObject({ greeting: 'All aboard, {name}!', now: 'THIS STOP IS A V' });
+    expect(style.extra).toBeUndefined();
+    expect(schedulePayload(draft(), 'c'.repeat(32)).plan).not.toHaveProperty('style');
+  });
   it('uses unique salts and verifies only the right learner password', async () => {
     const a = await hashPassword('learner-pass'), b = await hashPassword('learner-pass'); expect(a).not.toBe(b);
     expect(await verifyPassword('learner-pass', a)).toBe(true); expect(await verifyPassword('wrong', a)).toBe(false); expect(await verifyPassword('learner-pass', 'malformed')).toBe(false);

@@ -14,6 +14,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/schedules/view/styles.css" />
+  <link rel="stylesheet" href="/schedules/generator/scenes.css" />
+  <script src="/schedules/generator/scenes.js" defer></script>
+  <script src="/schedules/generator/themes.js" defer></script>
   <script src="/schedules/generator/shared.js" defer></script>
   <script src="/schedules/generator/publishing.js" defer></script>
   <script src="/schedules/view/app.js" defer></script>
@@ -21,10 +24,10 @@
 <body>
 <main class="schedule">
   <header class="hero">
-    <div class="hero-topline"><span class="hero-kicker">One thing at a time</span><a class="edit-link" id="editLink" href="/schedules/generator">✎ Weekly planner</a><button class="edit-link" id="lockSchedule" type="button" hidden>Lock schedule</button></div>
-    <div class="hero-content">
+    <div class="hero-topline"><span class="hero-kicker" id="kicker">One thing at a time</span><a class="edit-link" id="editLink" href="/schedules/generator">✎ Weekly planner</a><button class="edit-link" id="lockSchedule" type="button" hidden>Lock schedule</button></div>
+    <div class="hero-content" id="heroContent">
       <div class="hero-copy"><h1 id="greeting">Visual schedule</h1><p id="intro">Loading the plan saved on this device…</p><div class="hero-meta"><div class="clock" id="clock" aria-label="Current local time">Now: --:--</div><span class="hero-trail" aria-hidden="true"><i></i><i></i><i></i><b>✦</b></span></div></div>
-      <svg class="hero-scene" viewBox="0 0 320 170" aria-hidden="true" focusable="false">
+      <svg class="hero-scene" id="heroScene" viewBox="0 0 320 170" aria-hidden="true" focusable="false">
         <path d="M14 122C36 164 97 156 111 120S123 51 167 52S238 20 292 44" fill="none" stroke="#b5d5ff" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 9"/>
         <g transform="translate(30 51) rotate(-13 34 43)"><g class="hero-ticket-float ticket-one">
           <rect x="3" y="6" width="68" height="86" rx="11" fill="#123c86" opacity=".3"/><rect width="68" height="86" rx="11" fill="#effff6" stroke="#cff6e1" stroke-width="2"/>
@@ -46,6 +49,8 @@
         <g class="hero-spark" fill="#ffdb75"><path d="m286 20 4 13 13 4-13 4-4 13-4-13-13-4 13-4Z"/><path d="m105 13 2 7 7 2-7 2-2 7-2-7-7-2 7-2Z"/></g>
         <path d="m16 64-6-6m290 69 7 3M207 146l-3 8" stroke="#cee5ff" stroke-width="4" stroke-linecap="round"/>
       </svg>
+      <div class="hero-mascots" id="heroMascots" aria-hidden="true" hidden></div>
+      <div class="hero-art" id="heroArt" aria-hidden="true" hidden></div>
     </div>
   </header>
 
