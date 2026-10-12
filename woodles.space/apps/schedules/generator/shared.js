@@ -368,8 +368,15 @@ window.ScheduleStudio = (() => {
       name: cleanText(value.name, 100, 'Weekly plan'),
       createdAt: cleanText(value.createdAt, 40, new Date().toISOString()),
       updatedAt: cleanText(value.updatedAt, 40, new Date().toISOString()),
-      days
+      days,
+      ...planStyle(value.style)
     };
+  }
+
+  // themes.js owns the shape; without it, keep whatever was saved rather than lose it.
+  function planStyle(value) {
+    if (!value || typeof value !== 'object') return {};
+    return { style: window.ScheduleThemes ? window.ScheduleThemes.sanitizeStyle(value) : JSON.parse(JSON.stringify(value)) };
   }
 
   function readWorkspace() {

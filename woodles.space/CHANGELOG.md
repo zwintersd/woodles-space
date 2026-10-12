@@ -18,6 +18,25 @@ so it's not easy to forget.
 
 ---
 
+## 2026-10-12
+
+- **visual schedules can wear a learner's favourite thing** — the weekly
+  planner's new **Style** button opens a style studio with 21 themes built
+  around popular special interests: unicorns, dinosaurs, trains, outer space,
+  diggers, cars and trucks, dragons, robots, pixel games, superheroes,
+  pirates, building bricks, sweets, weather, under the sea, horses, bugs,
+  jungle animals, puppies and kittens, plus the original Bright sky and a
+  low-stimulation Quiet and calm. each theme brings its own colours, fonts,
+  banner stickers, timeline track (railway sleepers, a road, a rainbow, paw
+  prints, hazard stripes), a marker that rides beside the current activity,
+  a done stamp, a celebration burst, and words — trains say *All aboard* and
+  label the now/next row *This stop* / *Next stop*. everything can then be
+  tuned: eight colour roles with readability warnings, 26 heading fonts and
+  easy-reading fonts (Atkinson Hyperlegible, Lexend, Andika), larger text and
+  pictures, corners, bold outlines, background patterns, high contrast, and
+  whether anything moves. the look is saved per plan and carried by
+  published learner links.
+
 ## 2026-10-05
 
 - **marginalia's world can grow** — once the shallows are learned, the world panel

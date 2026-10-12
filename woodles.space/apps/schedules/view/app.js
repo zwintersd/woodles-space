@@ -29,6 +29,30 @@
   let day = null;
   const spinningSuggestions = new Map();
   const pendingDraws = new Set();
+  const Themes = window.ScheduleThemes;
+  let look = Themes.resolve({});
+  let lookKey = '';
+
+  // The plan's chosen look, or Bright sky when no plan is open.
+  function applyLook(style) {
+    const key = JSON.stringify(style || {});
+    if (key === lookKey) return;
+    lookKey = key;
+    look = Themes.resolve(style || {});
+    Themes.paint(document.documentElement, look);
+    Themes.loadFonts([look.heading, look.body], 'themeFonts');
+    el('kicker').textContent = look.words.kicker;
+    el('heroScene').toggleAttribute('hidden', look.scene !== 'tickets');
+    el('heroMascots').hidden = look.scene !== 'mascots';
+    el('heroMascots').innerHTML = look.scene === 'mascots' ? Themes.mascotMarkup(look) : '';
+    el('heroContent').classList.toggle('no-scene', look.scene === 'none');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', look.tokens.heroA);
+  }
+
+  function timeMarkup(step, withDuration) {
+    return '<div class="time">' + clockLabel(step.from) + (withDuration ? '<small>' + step.duration + ' min</small>' : '') +
+      (look.marker ? '<span class="marker" aria-hidden="true">' + esc(look.marker) + '</span>' : '') + '</div>';
+  }
 
   function readLearnerWorkspace() {
     const value = readWorkspace();
@@ -142,7 +166,7 @@
   }
 
   function doneButton(step, title, done) {
-    return '<button class="done-btn" type="button" data-done="' + esc(step.occurrenceId) + '" aria-pressed="' + done + '" aria-label="Mark ' + esc(title) + ' done">' + CHECK + '</button>';
+    return '<button class="done-btn" type="button" data-done="' + esc(step.occurrenceId) + '" aria-pressed="' + done + '" aria-label="Mark ' + esc(title) + ' done">' + CHECK + (look.stamp ? '<span class="stamp" aria-hidden="true">' + esc(look.stamp) + '</span>' : '') + '</button>';
   }
 
   function choiceMarkup(step, progress) {
@@ -153,8 +177,8 @@
       '<button class="chip" type="button" data-choice="' + esc(step.occurrenceId) + '" data-option="' + esc(option.id) + '" aria-pressed="' + (progress.picks[step.occurrenceId] === option.id) + '" style="--activity-color:' + validColor(option.color) + '">' +
         '<span class="chip-art" aria-hidden="true">' + visualMarkup(option, 34) + '</span><span>' + esc(option.title) + '</span>' + familiarityMarkup(option.familiarity) + '</button>').join('');
     return '<li class="step choice' + (done ? ' is-done' : '') + '" data-id="' + esc(step.occurrenceId) + '">' +
-      '<div class="time">' + clockLabel(step.from) + '<small>' + step.duration + ' min</small></div>' +
-      '<article class="box"><span class="nowtag">NOW</span><div class="choice-layout">' +
+      timeMarkup(step, true) +
+      '<article class="box"><span class="nowtag">' + esc(look.words.now) + '</span><div class="choice-layout">' +
         '<div class="copy"><h2>' + esc(title) + '</h2><p class="sub">' + esc(step.prompt || 'Pick what to do.') + '</p></div>' +
         (count ? '<div class="chips" role="group" aria-label="Options for ' + esc(title) + '" style="--chip-columns:' + (count <= 4 ? count : 3) + ';--chip-columns-narrow:' + (count === 4 ? 2 : Math.min(count, 3)) + '">' + chips + '</div>' : '') +
         doneButton(step, title, done) +
@@ -191,8 +215,8 @@
         '</div></div></article>';
     }).join('');
     return '<li class="step video' + (done ? ' is-done' : '') + '" data-id="' + esc(step.occurrenceId) + '">' +
-      '<div class="time">' + clockLabel(step.from) + '<small>' + step.duration + ' min</small></div>' +
-      '<article class="box"><span class="nowtag">NOW</span>' +
+      timeMarkup(step, true) +
+      '<article class="box"><span class="nowtag">' + esc(look.words.now) + '</span>' +
         '<div class="video-head"><div class="copy"><h2>' + esc(title) + '</h2><p class="sub">' + esc(videoPrompt(step)) + '</p></div>' + doneButton(step, title, done) + '</div>' +
         (step.videos.length ? '<div class="videos count-' + step.videos.length + '">' + cards + '</div>' : '') +
       '</article></li>';
@@ -227,7 +251,7 @@
         (accepted && choice.url ? '<a class="watch" href="' + esc(choice.url) + '" target="_blank" rel="noopener noreferrer">▶ Open ' + esc(choice.title) + '</a>' : '') + '</div>' : '';
     const done = progress.done.has(step.occurrenceId);
     return (step.nested ? '<section class="nested-suggestion suggestion" data-suggestion-id="' + esc(step.occurrenceId) + '" aria-label="Suggestions for ' + esc(step.title) + '">' : '<li class="step suggestion' + (done ? ' is-done' : '') + '" data-suggestion-id="' + esc(step.occurrenceId) + '" data-id="' + esc(step.occurrenceId) + '"><div class="time">' + clockLabel(step.from) + '<small>' + step.duration + ' min</small></div>') +
-      '<article class="box"><span class="nowtag">NOW</span><div class="video-head">' + (step.symbolAssetId || imageSource(step) ? '<span aria-hidden="true">' + visualMarkup(step, 28) + '</span>' : '') + '<div class="copy"><span class="category">ACTIVITY SURPRISE</span><h2>' + esc(step.title) + '</h2><p class="sub">' + esc(step.prompt) + '</p></div>' +
+      '<article class="box"><span class="nowtag">' + esc(look.words.now) + '</span><div class="video-head">' + (step.symbolAssetId || imageSource(step) ? '<span aria-hidden="true">' + visualMarkup(step, 28) + '</span>' : '') + '<div class="copy"><span class="category">ACTIVITY SURPRISE</span><h2>' + esc(step.title) + '</h2><p class="sub">' + esc(step.prompt) + '</p></div>' +
       (accepted && !step.nested ? doneButton(step, choice.title, done) : '') + '</div>' +
       '<div class="suggestion-stage" aria-busy="' + spinning + '"><div class="suggestion-window" aria-hidden="true"><div class="suggestion-reel">' +
       (reel ? reel.map(reelCard).join('') : choice && !state.skipped ? reelCard(choice) : '<div class="suggestion-reel-card"><span class="suggestion-spark">✦</span><strong>Your next idea?</strong></div>') + '</div></div>' + result + '</div>' +
@@ -326,15 +350,15 @@
     if (step.kind === 'choice') return choiceMarkup(step, progress);
     const done = progress.done.has(step.occurrenceId);
     if (step.kind === 'finish') {
-      return '<li class="step finish" data-id="finish"><div class="time">' + clockLabel(step.from) + '</div>' +
-        '<article class="box"><span class="nowtag">NOW</span><h2>All done!</h2><p class="sub">Great job today, ' + esc(plan.learner) + '!</p></article></li>';
+      return '<li class="step finish" data-id="finish">' + timeMarkup(step, false) +
+        '<article class="box"><span class="nowtag">' + esc(look.words.now) + '</span><h2>' + esc(look.words.finishTitle) + '</h2><p class="sub">' + esc(Themes.fill(look.words.finishMessage, plan.learner)) + '</p></article></li>';
     }
     const open = step.kind === 'open-slot';
     const title = stepLabel(step, progress.picks);
     const visual = open ? symbolMarkup(OPEN_SLOT_SYMBOL, 46) : visualMarkup(step, 46);
     return '<li class="step' + (open ? ' open' : '') + (done ? ' is-done' : '') + '" data-id="' + esc(step.occurrenceId) + '">' +
-      '<div class="time">' + clockLabel(step.from) + '<small>' + step.duration + ' min</small></div>' +
-      '<article class="box" style="--activity-color:' + validColor(step.color) + '"><span class="nowtag">NOW</span><div class="activity">' +
+      timeMarkup(step, true) +
+      '<article class="box" style="--activity-color:' + validColor(step.color) + '"><span class="nowtag">' + esc(look.words.now) + '</span><div class="activity">' +
         '<span class="visual" aria-hidden="true">' + visual + '</span>' +
         '<div class="copy">' + (open ? '' : '<span class="category">' + esc(step.category) + '</span>') + '<h2>' + esc(title) + '</h2>' +
           (open ? '<p class="sub">Pick what to do.</p>' : step.note ? '<p class="sub">' + esc(step.note) + '</p>' : '') +
@@ -378,6 +402,7 @@
     ['nowNext', 'timeline', 'notice', 'footer'].forEach((id) => { el(id).hidden = true; });
     el('editLink').hidden = published;
     el('lockSchedule').hidden = !published || !plan;
+    applyLook(plan && plan.style);
 
     if (published && !plan) {
       document.title = 'Protected schedule · Schedule studio';
@@ -405,7 +430,7 @@
 
     el('editLink').href = '/schedules/generator?plan=' + encodeURIComponent(plan.id) + (day ? '&day=' + day.key : '');
     el('editLink').textContent = '✎ Edit plan';
-    el('greeting').textContent = 'Hi ' + plan.learner + '!';
+    el('greeting').textContent = Themes.fill(look.words.greeting, plan.learner);
     if (!day) {
       document.title = plan.learner + ' · Visual schedule';
       el('intro').textContent = plan.name;
@@ -415,7 +440,7 @@
     }
 
     const isToday = day.key === todayKey(new Date());
-    document.title = 'Hi ' + plan.learner + '! · ' + day.label;
+    document.title = Themes.fill(look.words.greeting, plan.learner) + ' · ' + day.label;
     el('intro').textContent = 'Here’s our plan for ' + (isToday ? 'today' : day.label) + ', from ' + clockLabel(timeMinutes(day.start)) + ' to ' + clockLabel(timeMinutes(day.end)) + '.';
     el('dayLinks').innerHTML = dayLinksMarkup(plan, day);
     el('footer').hidden = false;
@@ -466,7 +491,7 @@
       nextText = at(list[0]);
     } else if (minute >= list[finish].from) {
       current = finish;
-      nowText = 'All done!';
+      nowText = look.words.finishTitle;
       nextText = 'Great job!';
     } else {
       current = list.findIndex((step) => minute >= step.from && minute < step.to);
@@ -475,8 +500,8 @@
       nextText = at(next);
     }
     el('nowNext').classList.toggle('is-preview', !live);
-    el('nowLabel').textContent = live ? 'NOW' : 'FIRST';
-    el('nextLabel').textContent = live ? 'NEXT' : 'THEN';
+    el('nowLabel').textContent = live ? look.words.now : 'FIRST';
+    el('nextLabel').textContent = live ? look.words.next : 'THEN';
     el('nowText').textContent = nowText;
     el('nextText').textContent = nextText;
     el('timeline').querySelectorAll('.step').forEach((node, index) => node.classList.toggle('is-now', index === current));
@@ -501,6 +526,7 @@
       writeDayProgress(progress);
       button.setAttribute('aria-pressed', String(progress.done.has(id)));
       button.closest('.step').classList.toggle('is-done', progress.done.has(id));
+      if (progress.done.has(id)) Themes.celebrate(button, look);
     } else if (button.dataset.choice) {
       const progress = readDayProgress();
       const id = button.dataset.choice;

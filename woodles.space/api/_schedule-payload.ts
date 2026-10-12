@@ -80,6 +80,32 @@ function checkBudget(value: RecordValue, budget: number) {
   for (const field of ['steps', 'options']) for (const child of (value[field] || []) as RecordValue[]) checkBudget(child, available);
   for (const candidate of (value.candidates || []) as RecordValue[]) checkBudget(candidate, Number(candidate.duration));
 }
+// Mirrors ScheduleThemes.sanitizeStyle; the theme and font catalogues stay client-side,
+// so keys are checked for shape here and unknown ones fall back to defaults in the viewer.
+const STYLE_ENUMS: Record<string, string[]> = {
+  textSize: ['standard', 'large', 'xl'], pictureSize: ['standard', 'large'], shape: ['', 'square', 'soft', 'round'],
+  borders: ['standard', 'bold'], pattern: ['', 'none', 'stickers', 'dots', 'stars', 'stripes', 'grid'], patternStrength: ['subtle', 'playful'],
+  track: ['', 'line', 'rainbow', 'rails', 'road', 'prints', 'dotted', 'dashed', 'hazard'], celebrate: ['', 'off', 'gentle', 'party'],
+  motion: ['', 'on', 'off'], scene: ['theme', 'custom', 'none']
+};
+const STYLE_COLORS = ['accent', 'hero', 'page', 'card', 'ink', 'now', 'done', 'track'];
+const STYLE_WORDS: [string, number][] = [['kicker', 60], ['greeting', 60], ['now', 16], ['next', 16], ['finishTitle', 40], ['finishMessage', 80]];
+const sticker = (value: unknown) => typeof value === 'string' ? value.replace(/[<>&"'\\\u0000-\u001f]/g, '').trim().slice(0, 16) : '';
+const styleKey = (value: unknown) => typeof value === 'string' && /^[a-z0-9-]{1,32}$/.test(value) ? value : '';
+export function scheduleStyle(raw: unknown): RecordValue {
+  const value = record(raw); const colors = record(value.colors); const words = record(value.words);
+  const choice = (input: unknown, plain: string) => input === plain ? plain : sticker(input) || 'theme';
+  return {
+    theme: styleKey(value.theme) || 'classic',
+    colors: Object.fromEntries(STYLE_COLORS.map(role => [role, /^#[0-9a-f]{6}$/i.test(String(colors[role])) ? String(colors[role]).toLowerCase() : ''])),
+    headingFont: styleKey(value.headingFont), bodyFont: styleKey(value.bodyFont),
+    ...Object.fromEntries(Object.entries(STYLE_ENUMS).map(([key, allowed]) => [key, allowed.includes(String(value[key])) ? value[key] : allowed[0]])),
+    mascots: array(value.mascots).map(sticker).filter(Boolean).slice(0, 3),
+    stamp: choice(value.stamp, 'check'), marker: choice(value.marker, 'dot'),
+    highContrast: value.highContrast === true,
+    words: Object.fromEntries(STYLE_WORDS.map(([key, max]) => [key, typeof words[key] === 'string' ? (words[key] as string).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max) : '']))
+  };
+}
 export function schedulePayload(raw: unknown, id: string) {
   const input = record(raw); const source = record(input.plan);
   if (!text(source.learner)) throw new Error('Add a learner label before publishing.');
@@ -120,7 +146,7 @@ export function schedulePayload(raw: unknown, id: string) {
   });
   const imageIds = new Set(images.map(image => image.id));
   if (imageIds.size !== images.length || [...referenced].some(id => !imageIds.has(id))) throw new Error('An uploaded picture is missing or duplicated. Attach it again before publishing.');
-  const payload = { schemaVersion: 1, plan: { id, learner: text(source.learner), name: text(source.name) || 'Weekly plan', days }, images };
+  const payload = { schemaVersion: 1, plan: { id, learner: text(source.learner), name: text(source.name) || 'Weekly plan', days, ...(source.style ? { style: scheduleStyle(source.style) } : {}) }, images };
   if (new TextEncoder().encode(JSON.stringify(payload)).length > 3_500_000) throw new Error('This plan is too large to publish. Use smaller uploaded pictures.');
   return payload;
 }

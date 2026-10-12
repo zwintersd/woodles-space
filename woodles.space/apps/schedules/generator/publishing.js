@@ -28,7 +28,7 @@ window.SchedulePublishing = (() => {
     const shown = plan.days.filter(day => !day.removed && chosen.has(day.key)).map(day => ({ key: day.key, start: day.start, end: day.end,
       activities: day.activities.filter(item => !item.ghost).map(clean) }));
     const ids = new Set(shown.flatMap(day => day.activities.flatMap(itemImageIds)));
-    return { schemaVersion: 1, plan: { id: plan.id, learner: plan.learner, name: plan.name, days: shown },
+    return { schemaVersion: 1, plan: { id: plan.id, learner: plan.learner, name: plan.name, days: shown, ...(plan.style ? { style: plan.style } : {}) },
       images: workspace.images.filter(image => ids.has(image.id)).map(image => ({ id: image.id, data: image.data })) };
   }
   function savedLinks() {
@@ -51,6 +51,10 @@ window.SchedulePublishing = (() => {
   function summary(payload) {
     return '<div class="publish-preview">' + payload.plan.days.map(day => '<details><summary>' + esc(DAY_KEYS.find(entry => entry[0] === day.key)?.[1] || day.key) + ' · ' + esc(day.start) + '–' + esc(day.end) + ' · ' + day.activities.length + ' item' + (day.activities.length === 1 ? '' : 's') + '</summary><ol>' + day.activities.map(item => '<li><span>' + esc(item.start) + ' · ' + item.duration + ' min</span> ' + esc(item.title || ({ choice: 'Choice', video: 'Video', 'open-slot': 'Open time' }[item.kind]) || 'Activity') + '</li>').join('') + '</ol></details>').join('') + '</div>';
   }
+  function lookSummary() {
+    const theme = window.ScheduleThemes.theme(draft.style?.theme);
+    return '<div class="publish-look"><span><span aria-hidden="true">' + esc(theme.emoji) + '</span> Look: <strong>' + esc(theme.name) + '</strong>' + (draft.style && JSON.stringify(window.ScheduleThemes.sanitizeStyle({ theme: draft.style.theme })) !== JSON.stringify(draft.style) ? ' · customised' : '') + '</span><button class="button secondary" type="button" data-pub="style">Change look</button></div>';
+  }
   function localExpiry(value) { return value ? new Date(Date.parse(value) - new Date(value).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''; }
   function accessFields() {
     return '<div class="publish-fields"><label>Learner password<input name="learnerPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" ' + (!selected ? 'required' : '') + ' placeholder="' + (selected ? 'Leave blank to keep the current password' : 'At least 8 characters') + '"></label><label>Link expires (optional)<input name="expiresAt" type="datetime-local" value="' + esc(localExpiry(selected?.expiresAt)) + '"></label></div><p class="publish-hint">Every learner link needs a password. Share the password separately. Changing it locks existing learner sessions.</p>';
@@ -69,7 +73,7 @@ window.SchedulePublishing = (() => {
       if (draft) payload = snapshot(draft, hooks.getWorkspace(), days);
       body = '<p class="publish-status">' + esc(status) + (selected ? ' · Version ' + selected.version : '') + '</p>' +
         (selected ? '<label>Learner link<input class="publish-link" readonly value="' + esc(link(selected.id)) + '"></label><div class="publish-actions"><button class="button secondary" data-pub="copy">Copy learner link</button><a class="button secondary" href="' + esc(link(selected.id)) + '" target="_blank" rel="noopener">Open learner view</a></div>' : '') +
-        (draft ? '<form data-publish-form="publish"><fieldset class="publish-days"><legend>Days to publish</legend>' + draft.days.filter(day => !day.removed).map(day => '<label><input type="checkbox" name="day" value="' + day.key + '" ' + (days.includes(day.key) ? 'checked' : '') + '>' + esc(day.label) + '</label>').join('') + '</fieldset><p class="publish-hint">Only these days and their active items are shared. Ghosts, hidden days, other plans and library content are excluded.</p><div id="publishPreview">' + summary(payload) + '</div><p id="publishDifference" class="publish-hint"></p>' + accessFields() + '<div class="publish-actions"><button class="button primary" type="submit">' + (selected ? 'Publish updated plan' : 'Publish learner link') + '</button></div><p class="publish-hint">Local edits stay on this device until you publish again.</p></form>' : '<h3>' + esc(selected.learner) + ' · ' + esc(selected.name) + '</h3><p>' + selected.days + ' days · ' + selected.items + ' items</p><button class="button secondary" data-pub="import">Make an editable local copy</button>') +
+        (draft ? '<form data-publish-form="publish"><fieldset class="publish-days"><legend>Days to publish</legend>' + draft.days.filter(day => !day.removed).map(day => '<label><input type="checkbox" name="day" value="' + day.key + '" ' + (days.includes(day.key) ? 'checked' : '') + '>' + esc(day.label) + '</label>').join('') + '</fieldset><p class="publish-hint">Only these days and their active items are shared. Ghosts, hidden days, other plans and library content are excluded.</p>' + lookSummary() + '<div id="publishPreview">' + summary(payload) + '</div><p id="publishDifference" class="publish-hint"></p>' + accessFields() + '<div class="publish-actions"><button class="button primary" type="submit">' + (selected ? 'Publish updated plan' : 'Publish learner link') + '</button></div><p class="publish-hint">Local edits stay on this device until you publish again.</p></form>' : '<h3>' + esc(selected.learner) + ' · ' + esc(selected.name) + '</h3><p>' + selected.days + ' days · ' + selected.items + ' items</p><button class="button secondary" data-pub="import">Make an editable local copy</button>') +
         (selected ? '<details class="publish-access"><summary>Password and expiry</summary><form data-publish-form="access">' + accessFields() + '<button class="button secondary" type="submit">Save access settings</button></form></details><details class="publish-history"><summary>Published versions</summary><button class="button secondary" data-pub="history">Load version history</button><div>' + history.map(entry => '<div class="publish-version"><span>Version ' + entry.version + ' · ' + esc(new Date(entry.publishedAt).toLocaleString()) + '</span><button class="button secondary" data-pub="preview-version" data-version="' + entry.version + '">Preview version ' + entry.version + '</button></div>').join('') + '</div>' + (preview ? '<h4>Version ' + preview.version + '</h4>' + summary(preview.payload) + '<button class="button primary" data-pub="restore" data-version="' + preview.version + '">Publish version ' + preview.version + ' again</button><p class="publish-hint">This restores the published content on the same link. Your local draft stays as it is.</p>' : '') + '</details>' +
           (selected.active ? '<div class="publish-withdraw">' + (withdrawal ? '<p>Withdraw this link? Learners will lose access, and the saved versions will remain here.</p><button class="button danger" data-pub="confirm-withdraw">Yes, withdraw learner link</button><button class="button secondary" data-pub="cancel-withdraw">Keep link live</button>' : '<button class="button secondary danger" data-pub="withdraw">Withdraw learner link</button>') + '</div>' : '') : '') +
       '<div class="publish-actions"><button class="button secondary" data-pub="catalogue">All published plans</button></div>';
@@ -128,6 +132,7 @@ window.SchedulePublishing = (() => {
       if (busy) return;
       if (action === 'close') { dialog.close(); return; }
       if (action === 'withdraw' || action === 'cancel-withdraw') { withdrawal = action === 'withdraw'; render(); return; }
+      if (action === 'style') { hooks.openStyle?.(draft.id, (style) => { draft.style = style; render(); }); return; }
       run(async () => {
         if (action === 'copy') { await navigator.clipboard.writeText(link(selected.id)); return; }
         if (action === 'logout') { await request(null, { action: 'logout' }); authenticated = false; publications = []; selected = null; preview = null; history = []; return; }
@@ -155,5 +160,6 @@ window.SchedulePublishing = (() => {
     await run(async () => { const status = await request({ action: 'status' }); ready = status.configured; authenticated = status.authenticated; if (authenticated) await refresh(); });
     dialog.querySelector('input')?.focus();
   }
-  return { request, snapshot, setup, open, link };
+  const isPublished = (planId) => Boolean(savedLinks()[planId]);
+  return { request, snapshot, setup, open, link, isPublished };
 })();
