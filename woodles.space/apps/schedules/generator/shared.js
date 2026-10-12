@@ -11,6 +11,7 @@ window.ScheduleStudio = (() => {
   const COLORS = ['#3978c7', '#32845f', '#d27b32', '#a16ab5', '#d05c66', '#458d98', '#7c8797'];
   const MAX_CHOICE_OPTIONS = 6;
   const MAX_VIDEOS = 4;
+  const MAX_OUTCOME_TIERS = 6;
   // Whether an offered video or option is familiar to the learner or novel.
   const FAMILIARITY = { again: { label: 'Again', symbol: '↻' }, new: { label: 'New', symbol: '✦' } };
   const OPENMOJI_FILES = new Set([
@@ -110,6 +111,7 @@ window.ScheduleStudio = (() => {
 
   function sanitizeActivity(value, depth = 0) {
     if (!value || typeof value !== 'object' || !String(value.title || '').trim()) return null;
+    const outcomes = sanitizeOutcomes(value.outcomes);
     return {
       ...symbolFields(value),
       id: cleanText(value.id, 100, makeId('activity')),
@@ -122,8 +124,48 @@ window.ScheduleStudio = (() => {
       credit: cleanText(value.credit, 200, ''),
       color: validColor(value.color),
       note: cleanText(value.note, 500, ''),
-      steps: (Array.isArray(value.steps) ? value.steps : []).slice(0, 20).map((step) => sanitizeActivityStep(step, depth)).filter(Boolean)
+      steps: (Array.isArray(value.steps) ? value.steps : []).slice(0, 20).map((step) => sanitizeActivityStep(step, depth)).filter(Boolean),
+      ...(outcomes ? { outcomes } : {})
     };
+  }
+
+  // First/then rewards: the learner picks the best result that happened, so
+  // tiers are kept lowest to highest and only one counts.
+  function sanitizeOutcomes(value) {
+    if (!value || typeof value !== 'object') return null;
+    const tiers = (Array.isArray(value.tiers) ? value.tiers : []).filter((tier) => tier && typeof tier === 'object' && String(tier.title || '').trim())
+      .slice(0, MAX_OUTCOME_TIERS).map((tier) => ({
+        id: cleanText(tier.id, 100, makeId('tier')),
+        title: cleanText(tier.title, 60, 'Result'),
+        icon: cleanText(tier.icon, 16, ''),
+        pictogram: cleanText(tier.pictogram, 300, ''),
+        amount: boundedInteger(tier.amount, 0, 99, 1)
+      }));
+    if (!tiers.length) return null;
+    return { unit: cleanText(value.unit, 40, 'reward'), unitIcon: cleanText(value.unitIcon, 16, '⭐'), tiers: tiers.sort((a, b) => a.amount - b.amount) };
+  }
+
+  function outcomeTier(item, tierId) {
+    return item.outcomes?.tiers.find((tier) => tier.id === tierId) || null;
+  }
+
+  function outcomeTierVisual(outcomes, tier, visual, size) {
+    return visual({ ...tier, icon: tier.icon || outcomes.unitIcon }, size);
+  }
+
+  function outcomeAmountMarkup(outcomes, amount) {
+    return '<b class="outcome-amount">' + amount + ' ' + symbolMarkup(outcomes.unitIcon, 18) + '<span class="visually-hidden"> ' + esc(outcomes.unit) + '</span></b>';
+  }
+
+  // The printable and planner form: the activity is the "first", the ladder is the "then".
+  function outcomesMarkup(item, visual) {
+    if (!item.outcomes) return '';
+    return '<div class="first-then"><span class="first-then-tag">Then</span><ul class="outcome-ladder" aria-label="Rewards">' + item.outcomes.tiers.map((tier) =>
+      '<li><span class="outcome-art" aria-hidden="true">' + outcomeTierVisual(item.outcomes, tier, visual, 24) + '</span><span class="outcome-title">' + esc(tier.title) + '</span>' + outcomeAmountMarkup(item.outcomes, tier.amount) + '</li>').join('') + '</ul></div>';
+  }
+
+  function outcomeLadder(outcomes) {
+    return outcomes.tiers.map((tier) => tier.amount).join(' · ') + ' ' + outcomes.unit;
   }
 
   function validFamiliarity(value) {
@@ -218,6 +260,7 @@ window.ScheduleStudio = (() => {
   function sanitizeSuggestionCandidate(value, depth = 0) {
     const activity = sanitizeActivity(value, depth);
     if (!activity) return null;
+    delete activity.outcomes;
     return { ...activity, enabled: value.enabled !== false,
       weight: boundedInteger(value.weight, 1, 10, 1),
       url: validVideoUrl(value.url) ? cleanText(value.url, 500, '') : '' };
@@ -414,7 +457,8 @@ window.ScheduleStudio = (() => {
     if (Array.isArray(item.candidates)) return [item, ...item.candidates.flatMap((candidate) => itemVisuals(candidate))];
     if (item.kind === 'choice') return [item, ...item.options.flatMap(itemVisuals)];
     if (item.kind === 'video') return item.videos;
-    return item.kind === 'open-slot' ? [] : [item, ...(item.steps || []).flatMap(itemVisuals), ...(item.options || []).flatMap(itemVisuals)];
+    const outcomes = item.outcomes ? [{ icon: item.outcomes.unitIcon }, ...item.outcomes.tiers] : [];
+    return item.kind === 'open-slot' ? [] : [item, ...(item.steps || []).flatMap(itemVisuals), ...(item.options || []).flatMap(itemVisuals), ...outcomes];
   }
 
   // Stable paths distinguish suggestion steps in each activity occurrence,
@@ -436,7 +480,8 @@ window.ScheduleStudio = (() => {
   }
 
   return {
-    STORAGE_KEY, DAY_KEYS, COLORS, MAX_CHOICE_OPTIONS, MAX_VIDEOS, FAMILIARITY,
+    STORAGE_KEY, DAY_KEYS, COLORS, MAX_CHOICE_OPTIONS, MAX_VIDEOS, MAX_OUTCOME_TIERS, FAMILIARITY,
+    sanitizeOutcomes, outcomeTier, outcomeLadder, outcomeTierVisual, outcomeAmountMarkup, outcomesMarkup,
     makeId, esc, cleanText, validTime, validDuration, validColor, timeMinutes,
     isLocalImageData, pictogramSource, openMojiCodepoint, symbolMarkup,
     sanitizeImage, sanitizeActivity, sanitizeActivityStep, activityStepsMarkup, sanitizeChoiceOption, sanitizeVideo, sanitizePlan, readWorkspace,

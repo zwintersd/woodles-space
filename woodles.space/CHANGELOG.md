@@ -18,6 +18,16 @@ so it's not easy to forget.
 
 ---
 
+## 2026-10-12
+
+- **first/then rewards in the schedule planner** — an activity can list what
+  the learner earns: a reward (M&M, sticker, token) and up to six results worth
+  0–99 each, such as sat on toilet 1, voided liquid 3, voided solid 5. the
+  learner taps the best thing that happened, and only that counts. *not this
+  time* moves them on with nothing. a daily total sits in the schedule header.
+  results reset each day like checks, and the ladder prints on the card and
+  survives publishing.
+
 ## 2026-10-05
 
 - **marginalia's world can grow** — once the shallows are learned, the world panel

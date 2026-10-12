@@ -4,7 +4,8 @@
   const {
     DAY_KEYS, STORAGE_KEY, esc, timeMinutes, validColor, isLocalImageData, pictogramSource,
     openMojiCodepoint, symbolMarkup, readWorkspace, choiceTitle, videoTitle, videoPrompt, itemLabel,
-    youTubeThumbnail, FAMILIARITY, familiarityMarkup, itemVisuals, visualScheduleUrl
+    youTubeThumbnail, FAMILIARITY, familiarityMarkup, itemVisuals, visualScheduleUrl,
+    outcomeTier, outcomeTierVisual, outcomeAmountMarkup
   } = window.ScheduleStudio;
   // Checks and picks belong to one calendar day, so a weekly plan starts fresh each time it comes round.
   const PROGRESS_KEY = 'woodles.schedule-planner.progress.v1';
@@ -128,7 +129,15 @@
         else delete picks[item.occurrenceId];
       }
     }
-    return { done: new Set(Array.isArray(current.done) ? current.done.map(String) : []), picks, suggestions };
+    // A result counts only while its tier still exists in the plan.
+    const outcomes = {};
+    if (current.outcomes && typeof current.outcomes === 'object') {
+      for (const item of day.activities) {
+        const result = current.outcomes[item.occurrenceId];
+        if (item.outcomes && (result === 'none' || outcomeTier(item, result))) outcomes[item.occurrenceId] = result;
+      }
+    }
+    return { done: new Set(Array.isArray(current.done) ? current.done.map(String) : []), picks, suggestions, outcomes };
   }
 
   function writeDayProgress(progress) {
@@ -137,7 +146,7 @@
     for (const [key, entry] of Object.entries(readProgress())) {
       if (entry && entry.date === today && key !== progressKey()) kept[key] = entry;
     }
-    if (progress.done.size || Object.keys(progress.picks).length || Object.keys(progress.suggestions || {}).length) kept[progressKey()] = { date: today, done: [...progress.done], picks: progress.picks, suggestions: progress.suggestions || {} };
+    if (progress.done.size || Object.keys(progress.picks).length || Object.keys(progress.suggestions || {}).length || Object.keys(progress.outcomes || {}).length) kept[progressKey()] = { date: today, done: [...progress.done], picks: progress.picks, suggestions: progress.suggestions || {}, outcomes: progress.outcomes || {} };
     try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(kept)); return true; } catch { return false; }
   }
 
@@ -320,6 +329,18 @@
     if (writeDayProgress(progress)) refreshSuggestion(id, skip ? 'data-suggestion-draw' : 'data-done');
   }
 
+  // First/then: the learner taps the best thing that happened, or moves on.
+  function outcomesPanelMarkup(step, title, progress) {
+    const result = progress.outcomes[step.occurrenceId];
+    const earned = outcomeTier(step, result);
+    const button = (tierId, label, inner) => '<button class="outcome-btn' + (tierId === 'none' ? ' outcome-none' : '') + '" type="button" data-outcome="' + esc(step.occurrenceId) + '" data-tier="' + esc(tierId) + '" aria-pressed="' + (result === tierId) + '" aria-label="' + esc(label) + '">' + inner + '</button>';
+    return '<div class="first-then-panel"><span class="first-then-tag">Then</span><div class="outcome-choices" role="group" aria-label="' + esc(title) + ': pick the best thing that happened">' +
+      step.outcomes.tiers.map((tier) => button(tier.id, tier.title + ', ' + tier.amount + ' ' + step.outcomes.unit,
+        '<span class="outcome-art" aria-hidden="true">' + outcomeTierVisual(step.outcomes, tier, visualMarkup, 36) + '</span><span class="outcome-title">' + esc(tier.title) + '</span>' + outcomeAmountMarkup(step.outcomes, tier.amount))).join('') +
+      button('none', 'Not this time, move on', '<span class="outcome-art" aria-hidden="true">→</span><span class="outcome-title">Not this time</span>') + '</div>' +
+      (earned ? '<p class="outcome-earned">You earned ' + outcomeAmountMarkup(step.outcomes, earned.amount) + '</p>' : '') + '</div>';
+  }
+
   function stepMarkup(step, progress) {
     if (step.kind === 'suggestion') return suggestionMarkup(step, progress);
     if (step.kind === 'video') return videoMarkup(step, progress);
@@ -340,7 +361,8 @@
           (open ? '<p class="sub">Pick what to do.</p>' : step.note ? '<p class="sub">' + esc(step.note) + '</p>' : '') +
           (!open && step.credit ? '<p class="image-credit">' + esc(step.credit) + '</p>' : '') +
         '</div>' +
-        doneButton(step, title, done) + nestedStepsMarkup(step, progress) +
+        (step.outcomes ? '<span class="done-btn outcome-status" aria-hidden="true">' + CHECK + '</span>' : doneButton(step, title, done)) + nestedStepsMarkup(step, progress) +
+        (step.outcomes ? outcomesPanelMarkup(step, title, progress) : '') +
       '</div></article></li>';
   }
 
@@ -375,7 +397,7 @@
   function render() {
     plan = workspace.plans.find((entry) => entry.id === planId) || null;
     day = plan ? chooseDay() : null;
-    ['nowNext', 'timeline', 'notice', 'footer'].forEach((id) => { el(id).hidden = true; });
+    ['nowNext', 'timeline', 'notice', 'footer', 'rewardTotal'].forEach((id) => { el(id).hidden = true; });
     el('editLink').hidden = published;
     el('lockSchedule').hidden = !published || !plan;
 
@@ -434,6 +456,7 @@
     el('reset').hidden = false;
     el('reset').textContent = day.activities.some((item) => item.kind === 'choice' || item.steps?.some((step) => step.kind === 'choice') || (item.kind === 'video' && item.videos.length > 1)) ? 'Clear choices and checks' : 'Clear checks';
     el('credits').innerHTML = creditsMarkup();
+    renderRewardTotal(progress);
     el('timeline').setAttribute('aria-label', day.label + ' schedule');
     el('timeline').innerHTML = steps().map((step) => stepMarkup(step, progress)).join('');
     el('timeline').querySelectorAll('.videos').forEach((list) => {
@@ -443,6 +466,20 @@
     el('timeline').hidden = false;
     el('nowNext').hidden = false;
     tick();
+  }
+
+  // Totals group by reward, so a plan mixing M&Ms and stickers counts each.
+  function renderRewardTotal(progress) {
+    const totals = new Map();
+    for (const item of day.activities) {
+      if (!item.outcomes) continue;
+      const key = item.outcomes.unit + '\u0000' + item.outcomes.unitIcon;
+      const entry = totals.get(key) || { outcomes: item.outcomes, amount: 0 };
+      entry.amount += outcomeTier(item, progress.outcomes[item.occurrenceId])?.amount || 0;
+      totals.set(key, entry);
+    }
+    el('rewardTotal').hidden = !totals.size;
+    el('rewardTotal').innerHTML = [...totals.values()].map((entry) => outcomeAmountMarkup(entry.outcomes, entry.amount)).join('') + '<span class="reward-today"> today</span>';
   }
 
   function tick() {
@@ -501,6 +538,18 @@
       writeDayProgress(progress);
       button.setAttribute('aria-pressed', String(progress.done.has(id)));
       button.closest('.step').classList.toggle('is-done', progress.done.has(id));
+    } else if (button.dataset.outcome) {
+      const progress = readDayProgress();
+      const id = button.dataset.outcome;
+      const item = day.activities.find((entry) => entry.occurrenceId === id);
+      const tier = button.dataset.tier;
+      if (!item?.outcomes || (tier !== 'none' && !outcomeTier(item, tier))) return;
+      if (progress.outcomes[id] === tier) { delete progress.outcomes[id]; progress.done.delete(id); }
+      else { progress.outcomes[id] = tier; progress.done.add(id); }
+      if (writeDayProgress(progress)) {
+        render();
+        [...el('timeline').querySelectorAll('[data-outcome]')].find((entry) => entry.dataset.outcome === id && entry.dataset.tier === tier)?.focus({ preventScroll: true });
+      }
     } else if (button.dataset.choice) {
       const progress = readDayProgress();
       const id = button.dataset.choice;
@@ -519,7 +568,7 @@
       button.closest('.videos').querySelectorAll('.vid').forEach((card) => videoCardState(card, progress.picks[id]));
       tick();
     } else if (button.id === 'reset') {
-      writeDayProgress({ done: new Set(), picks: {}, suggestions: readDayProgress().suggestions });
+      writeDayProgress({ done: new Set(), picks: {}, suggestions: readDayProgress().suggestions, outcomes: {} });
       render();
     }
   });

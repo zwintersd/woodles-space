@@ -210,6 +210,38 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--sky); outline-o
 .nested-suggestion .copy h2 { font-size: 16px; }
 .nested-suggestion .suggestion-stage { grid-template-columns: minmax(0, 1fr); }
 .activity > .activity-steps { grid-column: 1 / -1; }
+.activity > .first-then-panel { grid-column: 1 / -1; }
+.first-then-panel { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 8px 10px; margin-top: 4px; padding-top: 10px; border-top: 2px dashed var(--line); }
+.first-then-tag { padding: 3px 10px; border-radius: 999px; color: #fff; background: #13834e; font-family: var(--display); font-size: 12px; letter-spacing: .06em; }
+.outcome-choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 7px; }
+.outcome-btn { display: grid; min-width: 0; min-height: 84px; justify-items: center; align-content: center; gap: 3px; padding: 6px 5px; border: 2px solid var(--line); border-radius: 13px; color: var(--ink); background: #f2fbf6; font: inherit; font-size: 13px; line-height: 1.15; text-align: center; overflow-wrap: anywhere; cursor: pointer; transition: border-color .15s ease, background .15s ease, box-shadow .15s ease; }
+.outcome-btn:hover { border-color: #8fd3b1; }
+.outcome-btn[aria-pressed="true"] { border-color: var(--grass); background: #dcf6e8; box-shadow: 0 0 0 3px rgba(35,178,109,.2); }
+.outcome-none { background: #f6f8fc; color: var(--ink-soft); }
+.outcome-none[aria-pressed="true"] { border-color: var(--ink-soft); background: #eceff5; box-shadow: 0 0 0 3px rgba(75,91,124,.16); }
+.outcome-art { display: grid; width: 40px; height: 40px; place-items: center; font-size: 26px; }
+.outcome-art img { display: block; width: 36px; height: 36px; object-fit: contain; }
+.outcome-amount { display: inline-flex; align-items: center; gap: 3px; font-variant-numeric: tabular-nums; }
+.outcome-amount img { width: 18px; height: 18px; }
+.outcome-amount .symbol-fallback { font-size: 16px !important; }
+.outcome-earned { grid-column: 2; margin: 0; color: #0f6b3f; font-size: 15px; }
+.step.is-done .box:has(.first-then-panel) { opacity: .8; }
+.reward-total { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border: 1px solid #ffffff40; border-radius: 10px; color: #103c88; background: #ffe7a3; font-size: 13px; white-space: nowrap; }
+.reward-total .outcome-amount img { width: 16px; height: 16px; }
+@media (max-width: 620px) {
+  .first-then-panel { grid-template-columns: minmax(0, 1fr); }
+  .first-then-tag { justify-self: start; }
+  .outcome-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .outcome-btn { min-height: 74px; font-size: 12px; }
+  .outcome-earned { grid-column: 1; }
+  .hero-meta { flex-wrap: wrap; }
+  .reward-total { font-size: 12px; padding: 5px 9px; }
+}
+@media print {
+  .outcome-none, .outcome-earned { display: none !important; }
+  .outcome-btn[aria-pressed="true"] { border-color: var(--line); background: #f2fbf6; box-shadow: none; }
+  .first-then-tag, .outcome-btn { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
 .activity:has(> .activity-steps) { align-items: start; }
 .nested-suggestion .suggestion-reel-card { flex-direction: column; gap: 4px; font-size: 14px; }
 .nested-suggestion .suggestion-reel-card strong { display: -webkit-box; width: 100%; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.2; }
