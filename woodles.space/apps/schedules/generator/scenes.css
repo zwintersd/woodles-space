@@ -6,6 +6,10 @@
 .scene-art .sc-sway { transform-origin: 100% 50%; }
 .scene-art .sc-dig { transform-origin: 100% 100%; }
 .scene-art .sc-spout { transform-origin: 50% 100%; }
+.scene-art .sc-rock { transform-origin: 50% 100%; }
+.scene-art .sc-flag, .scene-art .sc-cape, .scene-art .sc-billow { transform-origin: 0% 50%; }
+.scene-art .sc-cape { transform-origin: 100% 30%; }
+.scene-art .sc-wave-arm { transform-origin: 50% 100%; }
 
 [data-motion="on"] .scene-art .sc-spin { animation: sc-spin 1.6s linear infinite; }
 [data-motion="on"] .scene-art .sc-roll { animation: sc-roll .5s steps(2) infinite; }
@@ -20,6 +24,15 @@
 [data-motion="on"] .scene-art .sc-swim { animation: sc-swim 5s ease-in-out infinite; }
 [data-motion="on"] .scene-art .sc-rise { animation: sc-rise 4s ease-in infinite; }
 [data-motion="on"] .scene-art .sc-wave-front { animation: sc-wave 6s ease-in-out infinite alternate; }
+[data-motion="on"] .scene-art .sc-spin-rev { animation: sc-spin 2.2s linear infinite reverse; }
+[data-motion="on"] .scene-art .sc-rock { animation: sc-rock 3.2s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-flag { animation: sc-flag 1.2s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-billow { animation: sc-billow 3.2s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-pulse { animation: sc-pulse 1.6s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-zoom { animation: sc-zoom .9s linear infinite; }
+[data-motion="on"] .scene-art .sc-cape { animation: sc-cape .6s ease-in-out infinite alternate; }
+[data-motion="on"] .scene-art .sc-blink { animation: sc-blink 1.2s steps(2) infinite; }
+[data-motion="on"] .scene-art .sc-wave-arm { animation: sc-wave-arm 1.4s ease-in-out infinite; }
 [data-motion="on"] .scene-art .sc-wave-back { animation: sc-wave 8s ease-in-out infinite alternate-reverse; }
 
 @keyframes sc-spin { to { rotate: 360deg; } }
@@ -35,6 +48,14 @@
 @keyframes sc-swim { 0%, 100% { translate: 0 0; } 50% { translate: -14px -4px; } }
 @keyframes sc-rise { 0% { opacity: 0; translate: 0 18px; } 30% { opacity: 1; } 100% { opacity: 0; translate: 0 -26px; } }
 @keyframes sc-wave { to { translate: 20px 0; } }
+@keyframes sc-rock { 0%, 100% { rotate: -2deg; } 50% { rotate: 2deg; translate: 0 -2px; } }
+@keyframes sc-flag { 50% { transform: scaleX(.82) skewY(8deg); } }
+@keyframes sc-billow { 50% { scale: 1.05 1; } }
+@keyframes sc-pulse { 50% { scale: 1.05; rotate: 4deg; } }
+@keyframes sc-zoom { from { translate: 12px 0; opacity: 0; } 40% { opacity: 1; } to { translate: -12px 0; opacity: 0; } }
+@keyframes sc-cape { to { scale: 1 .88; } }
+@keyframes sc-blink { 50% { opacity: .3; } }
+@keyframes sc-wave-arm { 0%, 100% { rotate: -12deg; } 50% { rotate: 14deg; } }
 
 @media (prefers-reduced-motion: reduce) { .scene-art * { animation: none !important; } }
 @media print { .scene-art * { animation: none !important; } }

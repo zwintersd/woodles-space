@@ -150,5 +150,117 @@ window.ScheduleScenes = (() => {
     '</g>' +
     faded('front-wave', wave(148, '#0b4f6c', 'class="sc-wave-front"')));
 
-  return { trains, dinosaurs, unicorns, space, construction, ocean };
+  const ink = (color) => ' stroke="' + color + '" stroke-width="3" stroke-linejoin="round"';
+  const flag = (x, y, fill, stroke) => '<path d="M' + x + ' ' + (y + 16) + 'V' + y + '" stroke="' + stroke + '" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path class="sc-flag" d="M' + (x + 1) + ' ' + y + 'h20l-5 6 5 6h-20z" fill="' + fill + '"' + ink(stroke) + '/>';
+
+  const pirates = svg('pirates',
+    '<circle cx="40" cy="34" r="15" fill="#fff3c4"/><circle cx="35" cy="30" r="3" fill="#f2dc9a"/><circle cx="45" cy="40" r="2.5" fill="#f2dc9a"/>' +
+    [[86, 22], [130, 40], [160, 14], [306, 30], [100, 60]].map(([x, y], index) => '<circle class="sc-twinkle" style="animation-delay:' + index * .5 + 's" cx="' + x + '" cy="' + y + '" r="1.8" fill="#fff"/>').join('') +
+    faded('pirate-back-wave', wave(134, '#3d7ea6', 'class="sc-wave-back" opacity=".5"')) +
+    // treasure island
+    '<path d="M2 152q56-58 116 0z" fill="#f2d38b"' + ink('#5a3a1a') + '/>' +
+    '<path d="M68 126q-2-24 6-44" fill="none" stroke="#5a3a1a" stroke-width="8" stroke-linecap="round"/><path d="M68 126q-2-24 6-44" fill="none" stroke="#a0662f" stroke-width="4" stroke-linecap="round"/>' +
+    '<g fill="#3fa34d"' + ink('#1f5a28') + '><path d="M74 82q-24-6-34 8q16-10 34-8z"/><path d="M74 82q-12-22-30-20q20 4 30 20z"/><path d="M74 82q10-22 30-18q-20 2-30 18z"/><path d="M74 82q26-4 34 12q-14-12-34-12z"/></g>' +
+    '<g transform="translate(26 116)"><rect width="24" height="16" rx="2" fill="#a0522d"' + ink('#5a3a1a') + '/><path d="M0 6h24" stroke="#ffd43b" stroke-width="3"/><path d="M-1 1q13-11 26 0z" fill="#8b4513"' + ink('#5a3a1a') + '/><rect x="9" y="4" width="6" height="7" rx="1" fill="#ffd43b"' + ink('#5a3a1a') + '/></g>' +
+    '<g fill="#ffd43b"' + ink('#8a5a00') + '><circle cx="56" cy="130" r="4"/><circle cx="63" cy="133" r="3.5"/></g>' +
+    // ship
+    '<g class="sc-rock">' +
+      '<path d="M296 104l18-14" stroke="#5a3a1a" stroke-width="4" stroke-linecap="round"/>' +
+      '<rect x="218" y="30" width="6" height="84" rx="2" fill="#5a3a1a"/>' +
+      flag(222, 18, '#1c1c1c', '#1c1c1c') + '<circle cx="233" cy="24" r="2.6" fill="#fff"/>' +
+      '<path d="M226 46l68 56h-62z" fill="#f4ead2"' + ink('#3a2410') + '/>' +
+      '<path class="sc-billow" d="M184 40h70q12 26 0 54h-70q10-27 0-54z" fill="#fff8e6"' + ink('#3a2410') + '/>' +
+      '<g fill="#3a2410"><circle cx="219" cy="62" r="9"/><rect x="213" y="68" width="12" height="7" rx="2"/></g><g fill="#fff8e6"><circle cx="215.5" cy="61" r="2.6"/><circle cx="222.5" cy="61" r="2.6"/></g>' +
+      '<path d="M206 82l26 6M232 82l-26 6" stroke="#3a2410" stroke-width="3.5" stroke-linecap="round"/>' +
+      '<path d="M144 104l32 8h96l30-14-14 40q-64 14-126 0z" fill="#8b5a2b"' + ink('#3a2410') + '/>' +
+      '<path d="M156 124h132M160 134h120" stroke="#6b4423" stroke-width="2.5"/>' +
+      [192, 214, 236, 258].map((x) => '<circle cx="' + x + '" cy="118" r="4" fill="#ffe08a"' + ink('#3a2410') + '/>').join('') +
+    '</g>' +
+    faded('pirate-front-wave', wave(146, '#1d5f86', 'class="sc-wave-front"')));
+
+  const burst = (cx, cy, outer, inner, points) => range(points * 2).map((index) => {
+    const angle = Math.PI * index / points - Math.PI / 2;
+    const radius = index % 2 ? inner : outer;
+    return (index ? 'L' : 'M') + (cx + Math.cos(angle) * radius).toFixed(1) + ' ' + (cy + Math.sin(angle) * radius).toFixed(1);
+  }).join('') + 'Z';
+  const heroes = svg('heroes',
+    '<path class="sc-pulse" d="' + burst(222, 80, 74, 52, 12) + '" fill="#ffd43b"' + ink('#1c1c1c') + '/>' +
+    '<path d="' + burst(222, 80, 50, 36, 12) + '" fill="#fff3a6"/>' +
+    faded('city', '<g fill="#14214d">' + [[0, 120, 26], [28, 104, 22], [52, 128, 30], [84, 96, 24], [110, 116, 20], [132, 108, 28], [162, 126, 22], [186, 112, 26], [214, 132, 30], [246, 106, 24], [272, 122, 22], [296, 110, 24]].map(([x, y, w]) => '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + (170 - y) + '"/>').join('') + '</g>' +
+      '<g fill="#ffe066">' + [[6, 128], [34, 112], [40, 124], [60, 136], [90, 104], [96, 118], [138, 116], [146, 130], [192, 120], [252, 114], [258, 128], [302, 118]].map(([x, y]) => '<rect x="' + x + '" y="' + y + '" width="5" height="6" rx="1"/>').join('') + '</g>') +
+    '<path d="M62 22l-14 26h12l-8 24 24-32h-13l9-18z" fill="#ffd43b"' + ink('#1c1c1c') + '/>' +
+    '<g stroke="#fff" stroke-width="3.5" stroke-linecap="round" class="sc-zoom"><path d="M110 64h34M100 82h40M114 100h30"/></g>' +
+    '<g class="sc-bob">' +
+      '<path class="sc-cape" d="M228 70c-26-8-48 0-70-10 12 18 4 32 16 40 18-4 34-8 54-14z" fill="#e03131"' + ink('#1c1c1c') + '/>' +
+      '<rect x="176" y="71" width="14" height="16" rx="6" fill="#e03131"' + ink('#1c1c1c') + '/>' +
+      '<rect x="186" y="72" width="30" height="14" rx="7" fill="#1c7ed6"' + ink('#1c1c1c') + '/>' +
+      '<rect x="208" y="67" width="48" height="24" rx="12" fill="#1c7ed6"' + ink('#1c1c1c') + '/>' +
+      '<path d="M213 67v24" stroke="#ffd43b" stroke-width="5"/>' +
+      '<path d="' + burst(236, 79, 7, 3, 5) + '" fill="#ffd43b" stroke="#1c1c1c" stroke-width="1.5" stroke-linejoin="round"/>' +
+      '<rect x="250" y="84" width="34" height="11" rx="5.5" fill="#1c7ed6"' + ink('#1c1c1c') + '/>' +
+      '<circle cx="290" cy="89" r="7.5" fill="#f4c49c"' + ink('#1c1c1c') + '/>' +
+      '<circle cx="266" cy="68" r="15" fill="#f4c49c"' + ink('#1c1c1c') + '/>' +
+      '<path d="M251 66a15 15 0 0 1 29-5q-8-5-15-1-7-4-14 6z" fill="#3b2a20"' + ink('#1c1c1c') + '/>' +
+      '<rect x="253" y="64" width="27" height="8" rx="4" fill="#e03131" stroke="#1c1c1c" stroke-width="2"/>' +
+      '<circle cx="262" cy="68" r="2" fill="#fff"/><circle cx="274" cy="68" r="2" fill="#fff"/>' +
+      '<path d="M264 76q4 3 8 0" fill="none" stroke="#1c1c1c" stroke-width="2" stroke-linecap="round"/>' +
+    '</g>');
+
+  const gear = (cx, cy, radius, teeth, fill, spin) => {
+    const d = range(teeth * 4).map((index) => {
+      const angle = (Math.PI * 2 * (index - .5)) / (teeth * 4);
+      const r = index % 4 < 2 ? radius : radius * .78;
+      return (index ? 'L' : 'M') + (cx + Math.cos(angle) * r).toFixed(1) + ' ' + (cy + Math.sin(angle) * r).toFixed(1);
+    }).join('') + 'Z';
+    return '<g class="' + spin + '"><path d="' + d + '" fill="' + fill + '"' + ink('#1e293b') + '/><circle cx="' + cx + '" cy="' + cy + '" r="' + radius * .3 + '" fill="#334155"' + ink('#1e293b') + '/></g>';
+  };
+  const robots = svg('robots',
+    faded('robot-floor', '<rect x="0" y="152" width="320" height="18" fill="#1e293b" opacity=".45"/><path d="M0 152H320" stroke="#94a3b8" stroke-width="2"/>') +
+    gear(64, 108, 30, 10, '#94a3b8', 'sc-spin') + gear(112, 76, 19, 8, '#fbbf24', 'sc-spin-rev') + gear(40, 56, 13, 7, '#5eead4', 'sc-spin-rev') +
+    // drone
+    '<g class="sc-bob"><ellipse cx="150" cy="30" rx="16" ry="9" fill="#e2e8f0"' + ink('#1e293b') + '/><circle cx="150" cy="30" r="4" fill="#22d3ee"/>' +
+      '<path d="M136 24l-6-6M164 24l6-6" stroke="#1e293b" stroke-width="2.5"/><ellipse class="sc-flicker" cx="128" cy="17" rx="9" ry="2.5" fill="#94a3b8"/><ellipse class="sc-flicker" cx="172" cy="17" rx="9" ry="2.5" fill="#94a3b8"/></g>' +
+    // robot
+    '<path d="M230 36V22" stroke="#1e293b" stroke-width="3"/><circle class="sc-blink" cx="230" cy="18" r="5.5" fill="#ff6b6b"' + ink('#1e293b') + '/>' +
+    '<rect x="193" y="48" width="9" height="18" rx="3" fill="#94a3b8"' + ink('#1e293b') + '/><rect x="258" y="48" width="9" height="18" rx="3" fill="#94a3b8"' + ink('#1e293b') + '/>' +
+    '<rect x="200" y="34" width="60" height="46" rx="11" fill="#e2e8f0"' + ink('#1e293b') + '/>' +
+    '<circle cx="218" cy="54" r="8" fill="#22d3ee"' + ink('#1e293b') + '/><circle cx="242" cy="54" r="8" fill="#22d3ee"' + ink('#1e293b') + '/>' +
+    '<circle cx="215" cy="51" r="2.5" fill="#fff"/><circle cx="239" cy="51" r="2.5" fill="#fff"/>' +
+    '<path d="M219 68q11 8 22 0" fill="none" stroke="#1e293b" stroke-width="3" stroke-linecap="round"/>' +
+    '<circle cx="208" cy="66" r="4" fill="#fda4af" opacity=".8"/><circle cx="252" cy="66" r="4" fill="#fda4af" opacity=".8"/>' +
+    '<rect x="222" y="80" width="16" height="6" fill="#94a3b8"' + ink('#1e293b') + '/>' +
+    '<rect x="182" y="90" width="12" height="34" rx="6" fill="#94a3b8"' + ink('#1e293b') + '/><circle cx="188" cy="128" r="7" fill="#cbd5e1"' + ink('#1e293b') + '/>' +
+    '<g class="sc-wave-arm"><rect x="266" y="58" width="12" height="36" rx="6" fill="#94a3b8"' + ink('#1e293b') + '/><circle cx="272" cy="54" r="8" fill="#cbd5e1"' + ink('#1e293b') + '/></g>' +
+    '<rect x="208" y="132" width="14" height="16" fill="#94a3b8"' + ink('#1e293b') + '/><rect x="238" y="132" width="14" height="16" fill="#94a3b8"' + ink('#1e293b') + '/>' +
+    '<rect x="201" y="145" width="26" height="8" rx="4" fill="#334155"' + ink('#1e293b') + '/><rect x="233" y="145" width="26" height="8" rx="4" fill="#334155"' + ink('#1e293b') + '/>' +
+    '<rect x="194" y="84" width="72" height="50" rx="11" fill="#fb923c"' + ink('#1e293b') + '/>' +
+    '<rect x="210" y="94" width="40" height="28" rx="6" fill="#1e293b"/>' +
+    [['#ff6b6b', 0], ['#4ade80', .4], ['#fde047', .8]].map(([fill, delay], index) => '<circle class="sc-blink" style="animation-delay:' + delay + 's" cx="' + (220 + index * 10) + '" cy="102" r="3.2" fill="' + fill + '"/>').join('') +
+    '<path d="M217 114h26" stroke="#22d3ee" stroke-width="3" stroke-linecap="round" stroke-dasharray="4 4"/>');
+
+  const tower = (x, y, width, wall, roof, flagFill) => '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + (150 - y) + '" fill="' + wall + '"' + ink('#6b2150') + '/>' +
+    '<path d="M' + (x - 5) + ' ' + y + 'L' + (x + width / 2) + ' ' + (y - 40) + 'L' + (x + width + 5) + ' ' + y + 'z" fill="' + roof + '"' + ink('#6b2150') + '/>' +
+    flag(x + width / 2, y - 56, flagFill, '#6b2150') +
+    '<path d="M' + (x + width / 2 - 5) + ' ' + (y + 24) + 'v-6a5 5 0 0 1 10 0v6z" fill="#ffd43b"' + ink('#6b2150') + '/>';
+  const princesses = svg('princesses',
+    faded('meadow', '<path d="M0 156Q80 138 160 150T320 146V170H0Z" fill="#f9a8d4" opacity=".55"/>') +
+    sparkle(30, 30, 8, '#fff6b0', 0) + sparkle(150, 22, 6, '#fff', .8) + sparkle(312, 64, 7, '#fff6b0', 1.6) + sparkle(24, 120, 5, '#fff', 2.2) +
+    '<g fill="#ff8fc8"' + ink('#6b2150') + '><path class="sc-twinkle" d="M150 60c-4-6-12-2-9 4l9 8 9-8c3-6-5-10-9-4z"/><path class="sc-twinkle" style="animation-delay:1.2s" d="M128 120c-3-5-10-2-8 3l8 7 8-7c2-5-5-8-8-3z"/></g>' +
+    // castle
+    tower(222, 66, 30, '#fde2f0', '#8a4fc4', '#ffd43b') +
+    '<rect x="190" y="88" width="94" height="62" fill="#fde2f0"' + ink('#6b2150') + '/>' +
+    '<path d="' + range(7).map((index) => 'M' + (192 + index * 14) + ' 88v-8h8v8').join('') + '" fill="#fde2f0"' + ink('#6b2150') + '/>' +
+    '<path d="M224 150v-24a13 13 0 0 1 26 0v24z" fill="#8a4fc4"' + ink('#6b2150') + '/><path d="M237 113v37" stroke="#6b2150" stroke-width="2"/>' +
+    '<path d="M202 112v-8a6 6 0 0 1 12 0v8zM260 112v-8a6 6 0 0 1 12 0v8z" fill="#ffd43b"' + ink('#6b2150') + '/>' +
+    tower(168, 74, 28, '#f8c8e0', '#b0307a', '#7fd1ff') + tower(278, 74, 28, '#f8c8e0', '#b0307a', '#7fd1ff') +
+    // crown
+    '<g class="sc-bob">' +
+      '<path d="M54 98l4-34 16 16 14-26 14 26 16-16 4 34z" fill="#ffd43b"' + ink('#8a5a00') + '/>' +
+      '<rect x="52" y="94" width="72" height="12" rx="4" fill="#ffc21a"' + ink('#8a5a00') + '/>' +
+      '<g' + ink('#8a5a00').replace('stroke-width="3"', 'stroke-width="2"') + '><circle cx="58" cy="62" r="4.5" fill="#ff8fc8"/><circle cx="88" cy="52" r="5" fill="#7fd1ff"/><circle cx="118" cy="62" r="4.5" fill="#ff8fc8"/>' +
+        '<circle cx="70" cy="100" r="3.5" fill="#4dabf7"/><circle cx="88" cy="100" r="4" fill="#e64980"/><circle cx="106" cy="100" r="3.5" fill="#51cf66"/></g>' +
+    '</g>');
+
+  return { trains, dinosaurs, unicorns, space, construction, ocean, pirates, heroes, robots, princesses };
 })();

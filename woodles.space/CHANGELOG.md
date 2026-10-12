@@ -21,7 +21,7 @@ so it's not easy to forget.
 ## 2026-10-12
 
 - **visual schedules can wear a learner's favourite thing** — the weekly
-  planner's new **Style** button opens a style studio with 21 themes built
+  planner's new **Style** button opens a style studio with 22 themes built
   around popular special interests: unicorns, dinosaurs, trains, outer space,
   diggers, cars and trucks, dragons, robots, pixel games, superheroes,
   pirates, building bricks, sweets, weather, under the sea, horses, bugs,
@@ -43,6 +43,12 @@ so it's not easy to forget.
   whale spouting among fish. with motion on, wheels turn, smoke puffs,
   heads nod, stars twinkle and waves roll. the style studio's banner choice
   can swap any of them for the theme's stickers, your own, or nothing.
+- **four more banners, and princesses** — pirates get a ship with a
+  skull-and-crossbones sail off a treasure island, superheroes a caped hero
+  flying over a night city in front of a comic burst, robots a waving robot
+  with blinking chest lights, turning gears and a hovering drone. a new
+  *Princesses and castles* theme brings a pink castle with flags and a
+  jewelled crown, in a bubbly Cherry Bomb heading font.
 
 ## 2026-10-05
 

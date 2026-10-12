@@ -26,7 +26,7 @@ test('style studio themes a plan and the learner view wears it', async ({ page }
   await page.getByRole('button', { name: 'Style', exact: false }).click();
   const studio = page.locator('.style-studio-dialog');
   await expect(studio.getByRole('heading', { name: 'Style Sam’s schedule' })).toBeVisible();
-  await expect(studio.locator('.theme-card')).toHaveCount(21);
+  await expect(studio.locator('.theme-card')).toHaveCount(22);
   await expect(studio.getByRole('button', { name: 'Save look' })).toBeDisabled();
 
   await studio.locator('.theme-card[data-theme="trains"]').click();
@@ -99,7 +99,7 @@ test('every theme renders the learner view without overflow and with readable ca
     await page.goto('/schedules/view?plan=styled');
     await expect(page.locator('#timeline')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe(theme);
-    const illustrated = ['trains', 'dinosaurs', 'unicorns', 'space', 'construction', 'ocean'].includes(theme);
+    const illustrated = ['trains', 'dinosaurs', 'unicorns', 'space', 'construction', 'ocean', 'pirates', 'heroes', 'robots', 'princesses'].includes(theme);
     await expect(page.locator('#heroArt svg.scene-art')).toHaveCount(illustrated ? 1 : 0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
     await page.setViewportSize({ width: 1100, height: 800 });
