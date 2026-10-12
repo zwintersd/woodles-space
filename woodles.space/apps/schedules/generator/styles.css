@@ -119,6 +119,8 @@ h3 { margin: 0; font-size: 16px; }
 .plan-tools { position: relative; }
 .plan-tools > summary { min-height: 40px; }
 .plan-tools .tool-options { position: absolute; z-index: 5; top: calc(100% + 6px); right: 0; width: min(280px, calc(100vw - 40px)); box-shadow: var(--shadow); }
+/* On a phone the actions wrap, so a right-anchored popover can run off the left edge; open it in flow instead. */
+@media (max-width: 600px) { .plan-tools[open] { flex-basis: 100%; } .plan-tools .tool-options { position: static; width: auto; margin-top: 6px; } }
 .day-tools { margin-top: 12px; }
 .plan-trash { margin-top: 18px; }
 .trash-plan { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }

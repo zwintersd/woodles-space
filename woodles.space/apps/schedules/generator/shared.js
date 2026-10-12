@@ -409,6 +409,8 @@ window.ScheduleStudio = (() => {
       id: cleanText(value.id, 100, makeId('plan')),
       learner: cleanText(value.learner, 100, 'Learner'),
       name: cleanText(value.name, 100, 'Weekly plan'),
+      // 'clock' follows planned times; 'done' moves Now/Next as items are finished.
+      progression: value.progression === 'done' ? 'done' : 'clock',
       createdAt: cleanText(value.createdAt, 40, new Date().toISOString()),
       updatedAt: cleanText(value.updatedAt, 40, new Date().toISOString()),
       days

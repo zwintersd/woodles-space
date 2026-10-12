@@ -17,6 +17,7 @@
   const planId = published ? publicationId : params.get('plan') || '';
   const requestedDay = params.get('day') || '';
   const el = (id) => document.getElementById(id);
+  let shownCurrent = null;
 
   let workspace = published ? { plans: [], images: [] } : readLearnerWorkspace();
   let publicationState = 'loading';
@@ -490,14 +491,22 @@
     const list = steps();
     const finish = list.length - 1;
     const live = day.key === todayKey(now);
-    const { picks } = readDayProgress();
+    const { picks, done } = readDayProgress();
     const at = (step) => clockLabel(step.from) + ' ' + stepLabel(step, picks);
+    const doneMode = plan.progression === 'done';
     let current = -1;
     let nowText;
     let nextText;
     if (!live) {
       nowText = at(list[0]);
       nextText = at(list[1]);
+    } else if (doneMode) {
+      // Finishing, not the clock, moves the learner along: Now is the first unfinished item.
+      const unfinished = (step, index) => index === finish || !done.has(step.occurrenceId);
+      current = list.findIndex(unfinished);
+      const next = list.findIndex((step, index) => index > current && unfinished(step, index));
+      nowText = current === finish ? 'All done!' : stepLabel(list[current], picks);
+      nextText = current === finish ? 'Great job!' : stepLabel(list[next], picks);
     } else if (minute < list[0].from) {
       nowText = 'Not started yet';
       nextText = at(list[0]);
@@ -517,6 +526,10 @@
     el('nowText').textContent = nowText;
     el('nextText').textContent = nextText;
     el('timeline').querySelectorAll('.step').forEach((node, index) => node.classList.toggle('is-now', index === current));
+    if (doneMode && live && current !== shownCurrent) {
+      el('timeline').querySelectorAll('.step')[current]?.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    }
+    shownCurrent = current;
   }
 
   document.addEventListener('click', (event) => {
@@ -538,6 +551,7 @@
       writeDayProgress(progress);
       button.setAttribute('aria-pressed', String(progress.done.has(id)));
       button.closest('.step').classList.toggle('is-done', progress.done.has(id));
+      tick();
     } else if (button.dataset.outcome) {
       const progress = readDayProgress();
       const id = button.dataset.outcome;

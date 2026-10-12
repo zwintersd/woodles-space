@@ -632,7 +632,7 @@
         '<input id="planTitle" class="plan-title" aria-label="Plan name" maxlength="100" value="' + esc(plan.name) + '">' +
         '<input id="planLearner" class="plan-learner" aria-label="Learner label" maxlength="100" value="' + esc(plan.learner) + '">' +
       '</div><div class="heading-actions">' + (day ? '<a class="button visual" href="' + esc(visualScheduleUrl(plan.id, day.key)) + '">▶ Use schedule</a><button class="button secondary" type="button" data-action="open-print-setup">Print</button>' : '') + '<button class="button primary" type="button" data-action="publish-plan">Publish</button><button class="button secondary" type="button" data-action="open-content-library">Library</button>' +
-        '<details class="plan-tools disclosure"><summary>Plan tools</summary><div class="tool-options"><button class="button secondary" type="button" data-action="open-image-studio">Image studio</button><button class="button secondary" type="button" data-action="export-plan">Export JSON</button><button class="button secondary" type="button" data-action="import-plan">Import plan</button><button class="button secondary" type="button" data-action="duplicate-plan">Duplicate plan</button><button class="button secondary danger" type="button" data-action="delete-current-plan">Move plan to Trash</button><p class="muted">Saved in this browser. Export and import to transfer a plan to another device.</p></div></details></div></div>';
+        '<details class="plan-tools disclosure"><summary>Plan tools</summary><div class="tool-options"><label class="field progression-field"><span>Learner view moves on</span><select id="planProgression"><option value="clock"' + (plan.progression === 'done' ? '' : ' selected') + '>By the clock</option><option value="done"' + (plan.progression === 'done' ? ' selected' : '') + '>When each item is done</option></select></label><p class="muted">By the clock follows planned times. When each item is done, Now moves to the first unfinished item as the learner checks things off.</p><button class="button secondary" type="button" data-action="open-image-studio">Image studio</button><button class="button secondary" type="button" data-action="export-plan">Export JSON</button><button class="button secondary" type="button" data-action="import-plan">Import plan</button><button class="button secondary" type="button" data-action="duplicate-plan">Duplicate plan</button><button class="button secondary danger" type="button" data-action="delete-current-plan">Move plan to Trash</button><p class="muted">Saved in this browser. Export and import to transfer a plan to another device.</p></div></details></div></div>';
   }
 
   function renderPlan() {
@@ -2660,6 +2660,13 @@
       persist();
     }
     if (event.target.id === 'importFile') importFile(event.target.files && event.target.files[0]);
+    if (event.target.id === 'planProgression') {
+      const plan = getPlan();
+      if (!plan) return;
+      plan.progression = event.target.value === 'done' ? 'done' : 'clock';
+      persist();
+      showToast(plan.progression === 'done' ? 'The learner view now moves on when each item is done.' : 'The learner view now follows the clock.');
+    }
     if (event.target.id === 'planTitle' || event.target.id === 'planLearner') {
       const plan = getPlan();
       if (!plan) return;

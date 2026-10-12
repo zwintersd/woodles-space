@@ -185,6 +185,9 @@ describe('snapshot validation and passwords', () => {
     expect(item.outcomes).toEqual({ unit: 'M&M', unitIcon: '🍬', tiers: [
       { id: 'sat', title: 'Sat on toilet', icon: '', pictogram: '1234', amount: 1 }, { id: 'liquid', title: 'Voided liquid', icon: '', pictogram: '', amount: 3 }, { id: 'solid', title: 'Voided solid', icon: '', pictogram: '', amount: 5 }] });
     expect(item.steps[0].outcomes).toBeUndefined();
+    expect(clean.plan.progression).toBe('clock');
+    expect(schedulePayload({ ...draft(), plan: { ...draft().plan, progression: 'done' } }, 'c'.repeat(32)).plan.progression).toBe('done');
+    expect(schedulePayload({ ...draft(), plan: { ...draft().plan, progression: 'sideways' } }, 'c'.repeat(32)).plan.progression).toBe('clock');
     const bad = (change: (rewards: any) => void, error: RegExp) => { const next: any = draft(); const rewards = { unit: 'M&M', tiers: tiers.map(tier => ({ ...tier })) }; change(rewards); next.plan.days[0].activities[0].outcomes = rewards; expect(() => schedulePayload(next, 'c'.repeat(32))).toThrow(error); };
     bad(rewards => { rewards.tiers[0].amount = 1.5; }, /whole numbers/);
     bad(rewards => { rewards.tiers[0].amount = 100; }, /whole numbers/);

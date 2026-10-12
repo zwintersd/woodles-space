@@ -135,7 +135,7 @@ export function schedulePayload(raw: unknown, id: string) {
   });
   const imageIds = new Set(images.map(image => image.id));
   if (imageIds.size !== images.length || [...referenced].some(id => !imageIds.has(id))) throw new Error('An uploaded picture is missing or duplicated. Attach it again before publishing.');
-  const payload = { schemaVersion: 1, plan: { id, learner: text(source.learner), name: text(source.name) || 'Weekly plan', days }, images };
+  const payload = { schemaVersion: 1, plan: { id, learner: text(source.learner), name: text(source.name) || 'Weekly plan', progression: source.progression === 'done' ? 'done' : 'clock', days }, images };
   if (new TextEncoder().encode(JSON.stringify(payload)).length > 3_500_000) throw new Error('This plan is too large to publish. Use smaller uploaded pictures.');
   return payload;
 }
