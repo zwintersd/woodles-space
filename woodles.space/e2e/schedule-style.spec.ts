@@ -26,7 +26,7 @@ test('style studio themes a plan and the learner view wears it', async ({ page }
   await page.getByRole('button', { name: 'Style', exact: false }).click();
   const studio = page.locator('.style-studio-dialog');
   await expect(studio.getByRole('heading', { name: 'Style Sam’s schedule' })).toBeVisible();
-  await expect(studio.locator('.theme-card')).toHaveCount(26);
+  await expect(studio.locator('.theme-card')).toHaveCount(30);
   await expect(studio.getByRole('button', { name: 'Save look' })).toBeDisabled();
 
   await studio.locator('.theme-card[data-theme="trains"]').click();
