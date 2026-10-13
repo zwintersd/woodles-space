@@ -20,6 +20,16 @@ so it's not easy to forget.
 
 ## 2026-10-13
 
+- **four seasonal themes for visual schedules** — a new Seasons group in the
+  style studio adds Springtime, Summer days, Autumn leaves and Winter snow,
+  each with its own colours, fonts, stickers, words and an illustrated
+  banner: a lamb among tulips beside a cherry tree in blossom, a sandcastle
+  under a striped beach umbrella while the sun wears sunglasses, a squirrel
+  hugging an acorn on a log by a heap of leaves, and a snowman in a knitted
+  hat and scarf waving beside snowy pines and a sled. with motion on, petals
+  and leaves drift down, snow falls, the scarf flutters, the tail flicks and
+  the boat rocks. they draw the time of year, never a holiday — no eggs,
+  pumpkins or decorated trees.
 - **every special-interest theme now has its own banner** — the last ten
   themes swap their emoji stickers for illustrations in the same flat,
   sticker-like style: a puppy and a kitten sharing a bed beside a ball of

@@ -563,5 +563,180 @@ window.ScheduleScenes = (() => {
     '<path d="M250 76q4-4 8 0M270 76q4-4 8 0M256 86q8 6 16 0" fill="none" stroke="#1c2a63" stroke-width="2.6" stroke-linecap="round"/>' + blush([[248, 86], [280, 86]], 4) +
     '<g class="sc-drift">' + cloud(220, 132, '#1c2a63', 1.7) + '</g>');
 
-  return { trains, dinosaurs, unicorns, space, construction, ocean, pirates, heroes, robots, princesses, pets, horses, bugs, jungle, dragons, cars, games, bricks, sweets, weather };
+  // The seasons draw the time of year (its plants, weather and animals), never a holiday.
+  const tulip = (x, y, fill, delay) => '<g class="sc-tilt" style="animation-delay:' + delay + 's">' + tube('M' + x + ' 156V' + (y + 8), '#1e3a28', '#5cb85c', 8) +
+    '<g stroke="#1e3a28" stroke-width="2" stroke-linejoin="round"><path d="M' + x + ' ' + (y + 32) + 'q-12-4-14-18q10 2 14 12z" fill="#5cb85c"/>' +
+    '<path d="M' + (x - 8) + ' ' + (y - 6) + 'l4 5 4-7 4 7 4-5v8q0 9-8 9t-8-9z" fill="' + fill + '" stroke-width="2.5"/></g></g>';
+  // A lens 10 long, turned to `angle` in its own coordinates so it can carry sc-flutter.
+  const petal = (x, y, angle, delay) => {
+    const along = [Math.cos(angle * Math.PI / 180) * 5, Math.sin(angle * Math.PI / 180) * 5];
+    const n = (value) => +value.toFixed(1);
+    const [ax, ay] = along; const [px, py] = [-ay * 1.2, ax * 1.2];
+    return '<path class="sc-flutter" style="animation-delay:' + delay + 's" d="M' + n(x - ax) + ' ' + n(y - ay) + 'Q' + n(x + px) + ' ' + n(y + py) + ' ' + n(x + ax) + ' ' + n(y + ay) + 'Q' + n(x - px) + ' ' + n(y - py) + ' ' + n(x - ax) + ' ' + n(y - ay) + 'z" fill="#ffe0ec"/>';
+  };
+  const blossomTree = '<circle cx="44" cy="84" r="20"/><circle cx="68" cy="64" r="24"/><circle cx="98" cy="70" r="21"/><circle cx="116" cy="92" r="15"/><circle cx="34" cy="104" r="13"/><circle cx="74" cy="96" r="22"/><circle cx="100" cy="102" r="14"/>';
+  const lambWool = '<circle cx="214" cy="110" r="14"/><circle cx="226" cy="96" r="15"/><circle cx="246" cy="90" r="16"/><circle cx="266" cy="92" r="15"/><circle cx="282" cy="104" r="13"/><circle cx="292" cy="106" r="8"/>' +
+    '<circle cx="284" cy="120" r="12"/><circle cx="268" cy="130" r="13"/><circle cx="246" cy="132" r="13"/><circle cx="224" cy="128" r="13"/><ellipse cx="248" cy="112" rx="34" ry="20"/>';
+  const lambTuft = '<circle cx="186" cy="83" r="6"/><circle cx="194" cy="79" r="7"/><circle cx="203" cy="82" r="6"/>';
+  const spring = svg('spring',
+    '<g class="sc-drift">' + cloud(178, 40, '#1e3a28', .7) + '</g>' +
+    faded('spring-meadow', '<path d="M0 150Q70 136 150 146T320 140V170H0Z" fill="#7ccf6e" opacity=".55"/>') +
+    // cherry tree in blossom
+    tube('M72 154C74 138 70 124 74 108', '#1e3a28', '#8a5a3c', 16) +
+    '<g fill="#1e3a28" stroke="#1e3a28" stroke-width="6">' + blossomTree + '</g><g fill="#ffc2dc">' + blossomTree + '</g>' +
+    '<g fill="#fff6b0" stroke="#ff8fbf" stroke-width="2.6">' + [[46, 78], [64, 56], [90, 62], [112, 88], [78, 90], [38, 102], [98, 104], [58, 82], [84, 74], [62, 104]].map(([x, y]) => '<circle cx="' + x + '" cy="' + y + '" r="2.3"/>').join('') + '</g>' +
+    tulip(124, 126, '#ff8fc8', 1.8) +
+    // lamb, legs then wool then head
+    [214, 230, 258, 274].map((x) => '<rect x="' + x + '" y="126" width="9" height="24" rx="4" fill="#5b4740"' + ink('#1e3a28') + '/>').join('') +
+    '<g fill="#1e3a28" stroke="#1e3a28" stroke-width="6">' + lambWool + '</g><g fill="#fff">' + lambWool + '</g>' +
+    '<g class="sc-nuzzle">' +
+      '<ellipse cx="176" cy="92" rx="10" ry="5" transform="rotate(-24 176 92)" fill="#fde4d4"' + ink('#1e3a28') + '/><ellipse cx="176" cy="92" rx="5" ry="2.2" transform="rotate(-24 176 92)" fill="#ffb3c6"/>' +
+      '<ellipse cx="212" cy="88" rx="9" ry="4.5" transform="rotate(28 212 88)" fill="#fde4d4"' + ink('#1e3a28') + '/>' +
+      '<ellipse cx="194" cy="97" rx="17" ry="15" fill="#fde4d4"' + ink('#1e3a28') + '/>' +
+      '<g fill="#1e3a28" stroke="#1e3a28" stroke-width="6">' + lambTuft + '</g><g fill="#fff">' + lambTuft + '</g>' +
+      '<circle cx="188" cy="97" r="2.4" fill="#1e3a28"/><circle cx="200" cy="97" r="2.4" fill="#1e3a28"/>' +
+      '<path d="M190 105q4 3 8 0" fill="none" stroke="#1e3a28" stroke-width="2.2" stroke-linecap="round"/>' + blush([[183, 103], [206, 103]], 3) +
+    '</g>' +
+    tulip(148, 116, '#ff6b6b', 0) + tulip(166, 108, '#ffd43b', 1.1) + tulip(248, 134, '#ffa94d', 2.4) +
+    faded('spring-grass', '<path d="M0 154Q80 146 160 152T320 150V170H0Z" fill="#57b552"/>') +
+    '<g fill="#fff">' + [[40, 160], [104, 158], [196, 162], [244, 158], [286, 161]].map(([x, y]) => '<circle cx="' + x + '" cy="' + y + '" r="2.5"/>').join('') + '</g>' +
+    [[138, 40, 20, 0], [150, 76, -30, 1.5], [196, 58, 40, 3], [128, 116, 10, 4.5], [212, 30, -15, 2.2]].map(([x, y, angle, delay]) => petal(x, y, angle, delay)).join(''));
+
+  // The castle is bucket-built: its towers taper out to the sand.
+  const sandTower = (x) => '<path d="M' + (x - 13) + ' 150L' + (x - 10) + ' 104h20l3 46zM' + (x - 10) + ' 104v-6h6v6zM' + (x + 4) + ' 104v-6h6v6z" fill="#f4c76b"' + ink('#123b5c') + '/>' +
+    '<path d="M' + (x - 3) + ' 124v-5a3 3 0 0 1 6 0v5z" fill="#d9a441"/>';
+  const summer = svg('summer',
+    sunRays(48, 40, 26, 33, 10, '#ffe066') +
+    '<circle cx="48" cy="40" r="20" fill="#ffd43b"' + ink('#123b5c') + '/>' +
+    '<path d="M33 35h12v4a6 6 0 0 1-12 0zM51 35h12v4a6 6 0 0 1-12 0z" fill="#123b5c"/>' +
+    '<path d="M45 36h6M33 35l-4-3M63 35l4-3" stroke="#123b5c" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path d="M36 38l3-2M54 38l3-2" stroke="#fff" stroke-width="2" stroke-linecap="round"/>' +
+    '<path d="M41 51q7 5 14 0" fill="none" stroke="#123b5c" stroke-width="2.6" stroke-linecap="round"/>' + blush([[34, 49], [62, 49]], 3.5) +
+    '<g class="sc-drift" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M132 30q6-6 12 0q6-6 12 0"/><path d="M164 50q4-4 8 0q4-4 8 0"/></g>' +
+    faded('summer-back-wave', wave(126, '#7fe0f0', 'class="sc-wave-back" opacity=".75"')) +
+    // sailboat on the horizon
+    '<g class="sc-rock">' +
+      '<path d="M96 124V88" stroke="#123b5c" stroke-width="3" stroke-linecap="round"/>' +
+      '<path d="M99 90v30h22z" fill="#fff"' + ink('#123b5c') + '/><path d="M93 96v24h-16z" fill="#ffd43b"' + ink('#123b5c') + '/>' +
+      '<path d="M74 124h44l-7 10h-30z" fill="#ff6b4a"' + ink('#123b5c') + '/>' +
+    '</g>' +
+    faded('summer-front-wave', wave(138, '#38bfd9', 'class="sc-wave-front"')) +
+    faded('sand', '<path d="M0 148Q80 138 170 146T320 142V170H0Z" fill="#f7dc8f"/>' +
+      '<g fill="#e8c46a">' + [[30, 158], [62, 152], [118, 160], [204, 160], [262, 156], [300, 162]].map(([x, y]) => '<circle cx="' + x + '" cy="' + y + '" r="2"/>').join('') + '</g>') +
+    '<path d="' + burst(142, 155, 9, 4, 5) + '" fill="#ff8a5b" stroke="#123b5c" stroke-width="2.5" stroke-linejoin="round"/>' +
+    // beach umbrella, leaning into the breeze
+    '<ellipse cx="248" cy="152" rx="44" ry="4" fill="#e2bf6a"/>' +
+    '<g transform="rotate(6 252 150)">' +
+      tube('M252 152V80', '#123b5c', '#fff', 9) +
+      '<path d="M196 80C196 58 222 46 252 46C282 46 308 58 308 80q-14 8-28 0q-14 8-28 0q-14 8-28 0q-14 8-28 0z" fill="#fff"/>' +
+      '<path d="M252 46C222 46 196 58 196 80q14 8 28 0C226 62 238 50 252 46zM252 46V80q14 8 28 0C278 62 266 50 252 46z" fill="#ff6b4a"/>' +
+      '<path d="M196 80C196 58 222 46 252 46C282 46 308 58 308 80q-14 8-28 0q-14 8-28 0q-14 8-28 0q-14 8-28 0z" fill="none"' + ink('#123b5c') + '/>' +
+      '<path d="M224 80C226 62 238 50 252 46M252 46V80M280 80C278 62 266 50 252 46" fill="none" stroke="#123b5c" stroke-width="2.5"/>' +
+      '<circle cx="252" cy="43" r="4" fill="#ff6b4a" stroke="#123b5c" stroke-width="2.5"/>' +
+    '</g>' +
+    // sandcastle
+    '<rect x="192" y="118" width="26" height="32" fill="#f4c76b"' + ink('#123b5c') + '/>' +
+    '<path d="M194 118v-6h6v6zM210 118v-6h6v6z" fill="#f4c76b"' + ink('#123b5c') + '/>' +
+    sandTower(183) + sandTower(227) +
+    '<path d="M199 150v-12a6 6 0 0 1 12 0v12z" fill="#d9a441"' + ink('#123b5c') + '/>' +
+    '<g fill="#e0ad4f"><circle cx="178" cy="138" r="2"/><circle cx="232" cy="134" r="2"/><circle cx="214" cy="128" r="1.8"/></g>' +
+    flag(183, 82, '#ff6b4a', '#123b5c') +
+    // bucket
+    '<path d="M285 130h24l-3 20h-18z" fill="#4dabf7"' + ink('#123b5c') + '/>' +
+    '<path d="M288 129q9-16 18 0" fill="none" stroke="#123b5c" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<rect x="283" y="126" width="28" height="6" rx="3" fill="#a5d8ff"' + ink('#123b5c') + '/>');
+
+  // `extra` carries the motion class on a wrapper, so the turn stays on its own group.
+  const leaf = (x, y, angle, fill, extra) => {
+    const body = '<g transform="rotate(' + angle + ' ' + x + ' ' + y + ')" stroke="#3f1a0c" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">' +
+      '<path d="M' + x + ' ' + (y - 10) + 'c8 5 8 14 0 19c-8-5-8-14 0-19z" fill="' + fill + '"/><path d="M' + x + ' ' + (y - 6) + 'v19"/></g>';
+    return extra ? '<g ' + extra + '>' + body + '</g>' : body;
+  };
+  const autumn = svg('autumn',
+    '<path d="M14 58c18-14 38-14 54 0s36 10 50-4" fill="none" stroke="#fff" stroke-width="2.5" stroke-dasharray="2 8" stroke-linecap="round" opacity=".5"/>' +
+    [[38, 30, 20, '#ffc93c', 0], [104, 46, -30, '#ff8c2e', 1.4], [150, 22, 50, '#ff6a4d', 2.8], [172, 74, -15, '#ffc93c', 4.2], [126, 92, 35, '#c8d44e', .7], [60, 90, -40, '#ff8c2e', 3.5]]
+      .map(([x, y, angle, fill, delay]) => leaf(x, y, angle, fill, 'class="sc-flutter" style="animation-delay:' + delay + 's"')).join('') +
+    faded('autumn-hills', '<path d="M0 150Q70 134 150 146T320 140V170H0Z" fill="#5a1d28" opacity=".55"/>') +
+    // a heap of raked leaves and two toadstools
+    '<path d="M12 152C16 128 44 118 64 124C86 118 108 132 112 152Z" fill="#ff8c2e"' + ink('#3f1a0c') + '/>' +
+    [[32, 134, -40, '#ffc93c'], [56, 126, 10, '#ff6a4d'], [82, 130, 55, '#ffc93c'], [100, 142, 80, '#c8d44e'], [24, 146, -75, '#ff6a4d'], [66, 142, -20, '#ffc93c']].map(([x, y, angle, fill]) => leaf(x, y, angle, fill)).join('') +
+    '<rect x="128" y="126" width="10" height="26" rx="4" fill="#fbe9d0"' + ink('#3f1a0c') + '/><path d="M118 130q15-24 30 0z" fill="#e8a25a"' + ink('#3f1a0c') + '/>' +
+    '<g fill="#fff3dc"><circle cx="127" cy="123" r="2.6"/><circle cx="138" cy="121" r="2.2"/></g>' +
+    '<rect x="146" y="138" width="7" height="14" rx="3" fill="#fbe9d0"' + ink('#3f1a0c') + '/><path d="M140 140q9-14 19 0z" fill="#e8a25a"' + ink('#3f1a0c') + '/>' +
+    // log
+    '<rect x="176" y="126" width="122" height="24" rx="12" fill="#8a4b2a"' + ink('#3f1a0c') + '/>' +
+    '<path d="M190 134h22M226 142h26M262 134h16" stroke="#6a361c" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<ellipse cx="296" cy="138" rx="9" ry="12" fill="#e9b37a"' + ink('#3f1a0c') + '/><ellipse cx="296" cy="138" rx="4.5" ry="6.5" fill="none" stroke="#c98a4b" stroke-width="2"/>' +
+    // squirrel, tail first
+    '<g class="sc-wag"><path d="M256 124C292 128 308 100 298 76C290 58 268 52 260 66C272 64 282 74 280 88C278 102 264 108 250 110Z" fill="#e8863a"' + ink('#3f1a0c') + '/>' +
+      '<path d="M264 116C284 112 294 96 290 80" fill="none" stroke="#fde3c0" stroke-width="5" stroke-linecap="round"/></g>' +
+    '<ellipse cx="236" cy="106" rx="22" ry="22" fill="#e8863a"' + ink('#3f1a0c') + '/>' +
+    '<ellipse cx="229" cy="110" rx="12" ry="15" fill="#fde3c0"/>' +
+    '<ellipse cx="250" cy="116" rx="13" ry="11" fill="#e8863a"' + ink('#3f1a0c') + '/>' +
+    '<ellipse cx="236" cy="127" rx="13" ry="4.5" fill="#e8863a"' + ink('#3f1a0c') + '/>' +
+    tube('M228 94Q226 104 220 108', '#3f1a0c', '#e8863a', 10) +
+    '<ellipse cx="212" cy="107" rx="7" ry="8" fill="#c98a4b" stroke="#3f1a0c" stroke-width="2.5"/><path d="M204 102q8-10 16 0z" fill="#7a4a26" stroke="#3f1a0c" stroke-width="2.5" stroke-linejoin="round"/>' +
+    '<path d="M212 96v-4" stroke="#3f1a0c" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<g fill="#e8863a" stroke="#3f1a0c" stroke-width="2.5"><circle cx="205" cy="108" r="4.5"/><circle cx="219" cy="110" r="4.5"/></g>' +
+    '<g class="sc-nuzzle">' +
+      '<path d="M208 62C203 54 205 46 211 44C216 47 218 54 216 60ZM226 58C226 50 230 45 236 44C239 50 237 56 233 62Z" fill="#e8863a"' + ink('#3f1a0c') + '/>' +
+      '<path d="M211 44l-2-5M236 44l2-5" stroke="#3f1a0c" stroke-width="2.5" stroke-linecap="round"/><path d="M210 57q-2-6 1-9q3 3 2 8zM230 56q1-6 5-8q1 4-2 8z" fill="#ffb39b"/>' +
+      '<circle cx="222" cy="74" r="18" fill="#e8863a"' + ink('#3f1a0c') + '/>' +
+      '<ellipse cx="210" cy="81" rx="9" ry="7" fill="#fde3c0"/>' +
+      '<circle cx="202" cy="78" r="2.6" fill="#3f1a0c"/><circle cx="215" cy="70" r="2.6" fill="#3f1a0c"/><circle cx="228" cy="70" r="2.4" fill="#3f1a0c"/>' +
+      '<path d="M204 86q4 3 8 0" fill="none" stroke="#3f1a0c" stroke-width="2.2" stroke-linecap="round"/>' + blush([[226, 82]], 3.5) +
+    '</g>' +
+    faded('autumn-ground', '<path d="M0 154Q80 146 160 152T320 150V170H0Z" fill="#5c2a1c"/>') +
+    leaf(184, 158, 80, '#ffc93c') + leaf(272, 160, -70, '#ff6a4d') + leaf(60, 160, 100, '#c8d44e'));
+
+  const flake = (x, y, size, delay) => {
+    const half = size / 2; const rise = +(size * .87).toFixed(1);
+    return '<path class="sc-snow" style="animation-delay:' + delay + 's" d="M' + (x - size) + ' ' + y + 'H' + (x + size) + 'M' + (x - half) + ' ' + (y - rise) + 'L' + (x + half) + ' ' + (y + rise) + 'M' + (x + half) + ' ' + (y - rise) + 'L' + (x - half) + ' ' + (y + rise) + '" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>';
+  };
+  // A pine in three tiers, each wearing a scalloped cap of snow. It stands at y 150.
+  const pine = (x, top, width) => {
+    const n = (value) => +value.toFixed(1);
+    const height = 150 - top;
+    const tier = (apex, base, half) => '<path d="M' + n(x - half) + ' ' + n(base) + 'Q' + x + ' ' + n(base + 6) + ' ' + n(x + half) + ' ' + n(base) + 'L' + x + ' ' + n(apex) + 'Z" fill="#2b8a7e"' + ink('#17324a') + '/>' +
+      '<path d="M' + x + ' ' + n(apex) + 'L' + n(x + half / 2) + ' ' + n((apex + base) / 2) + 'q' + n(-half / 4) + ' 5 ' + n(-half / 2) + ' 0q' + n(-half / 4) + ' 5 ' + n(-half / 2) + ' 0Z" fill="#fff" stroke="#17324a" stroke-width="2.5" stroke-linejoin="round"/>';
+    return '<rect x="' + (x - 4) + '" y="' + n(top + height * .8) + '" width="8" height="' + n(height * .2 + 4) + '" fill="#7a4a2a"' + ink('#17324a') + '/>' +
+      tier(top + height * .38, top + height * .86, width) + tier(top + height * .18, top + height * .62, width * .76) + tier(top, top + height * .36, width * .52);
+  };
+  // Pale blue on the shadow side, so each snowball reads round.
+  const shade = (cx, cy, r) => {
+    const at = (degrees) => (cx + Math.cos(degrees * Math.PI / 180) * (r - 1.5)).toFixed(1) + ' ' + (cy + Math.sin(degrees * Math.PI / 180) * (r - 1.5)).toFixed(1);
+    return '<path d="M' + at(-30) + 'A' + (r - 1.5) + ' ' + (r - 1.5) + ' 0 0 1 ' + at(120) + 'A' + r * 1.25 + ' ' + r * 1.25 + ' 0 0 0 ' + at(-30) + 'Z" fill="#d6e4f5"/>';
+  };
+  const snowball = (cx, cy, r) => '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="#fff"' + ink('#17324a') + '/>' + shade(cx, cy, r);
+  const winter = svg('winter',
+    [[24, 24, 6, 0], [92, 40, 5, 1.2], [146, 18, 6, 2.6], [156, 124, 5, .6], [124, 96, 4, 3.4], [290, 96, 5, 1.8]].map(([x, y, size, delay]) => flake(x, y, size, delay)).join('') +
+    '<g fill="#fff">' + [[52, 58, 0], [130, 58, 1.6], [182, 34, 3], [270, 62, .8], [16, 96, 2.2], [254, 112, 3.8], [104, 18, 4.4]].map(([x, y, delay]) => '<circle class="sc-snow" style="animation-delay:' + delay + 's" cx="' + x + '" cy="' + y + '" r="2.5"/>').join('') + '</g>' +
+    faded('winter-hills', '<path d="M0 150Q70 128 150 142T320 134V170H0Z" fill="#cfe0f2" opacity=".5"/>') +
+    pine(56, 50, 34) + pine(108, 88, 22) +
+    // sled, nose to the right
+    '<path d="M254 148H302q10 0 10-10" fill="none" stroke="#17324a" stroke-width="3.5" stroke-linecap="round"/>' +
+    '<path d="M264 134v13M294 134v13" stroke="#17324a" stroke-width="3" stroke-linecap="round"/>' +
+    '<rect x="252" y="126" width="52" height="9" rx="4" fill="#d9824b"' + ink('#17324a') + '/>' +
+    '<path d="M304 130q10-2 8-12" fill="none" stroke="#ffb02e" stroke-width="2.5" stroke-linecap="round"/>' +
+    // snowman: twig arms behind, then the snowballs
+    '<path d="M189 94L166 106M174 102l-3-8M170 104l-8-2" fill="none" stroke="#7a4a2a" stroke-width="3.5" stroke-linecap="round"/>' +
+    '<g class="sc-tilt"><path d="M222 90L242 62M236 70l8-3M234 73l-2-9" fill="none" stroke="#7a4a2a" stroke-width="3.5" stroke-linecap="round"/>' +
+      '<ellipse cx="245" cy="57" rx="6" ry="7" fill="#ff7a45" stroke="#17324a" stroke-width="2.5"/><ellipse cx="239" cy="59" rx="3" ry="4" fill="#ff7a45" stroke="#17324a" stroke-width="2.5"/></g>' +
+    snowball(206, 125, 26) + snowball(206, 87, 19) +
+    '<g fill="#2b3440"><circle cx="206" cy="84" r="3"/><circle cx="206" cy="96" r="3"/></g>' +
+    snowball(206, 55, 15) +
+    '<circle cx="200" cy="53" r="2.4" fill="#2b3440"/><circle cx="212" cy="53" r="2.4" fill="#2b3440"/>' +
+    '<path d="M206 56l13 3-13 3z" fill="#ff8a3d" stroke="#17324a" stroke-width="2" stroke-linejoin="round"/>' +
+    '<path d="M200 63q6 3 12 0" fill="none" stroke="#2b3440" stroke-width="2.4" stroke-linecap="round"/>' + blush([[195, 60], [217, 60]], 3) +
+    // knitted hat and scarf
+    '<path d="M192 46a14 12 0 0 1 28 0z" fill="#ff7a45"' + ink('#17324a') + '/>' +
+    '<rect x="189" y="43" width="34" height="8" rx="4" fill="#ffb02e" stroke="#17324a" stroke-width="2.5"/>' +
+    '<circle cx="206" cy="32" r="5" fill="#fff" stroke="#17324a" stroke-width="2.5"/>' +
+    '<g class="sc-cape"><path d="M196 69L172 71L170 81L196 79Z" fill="#ffb02e" stroke="#17324a" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<path d="M188 70v9.5M180 70.5v9.8" stroke="#ff7a45" stroke-width="3"/><path d="M170 73h-5M170 77h-5M170 81h-4" stroke="#17324a" stroke-width="2" stroke-linecap="round"/></g>' +
+    '<rect x="190" y="68" width="32" height="10" rx="5" fill="#ffb02e" stroke="#17324a" stroke-width="2.5"/>' +
+    '<path d="M200 68v10M212 68v10" stroke="#ff7a45" stroke-width="3"/>' +
+    faded('winter-snow', '<path d="M0 152Q80 144 160 150T320 148V170H0Z" fill="#f4f8ff"/>'));
+
+  return { trains, dinosaurs, unicorns, space, construction, ocean, pirates, heroes, robots, princesses, pets, horses, bugs, jungle, dragons, cars, games, bricks, sweets, weather, spring, summer, autumn, winter };
 })();
