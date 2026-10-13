@@ -10,8 +10,8 @@ export async function openScheduleTools(page: Page, scope: 'plan' | 'day') {
   if (await tools.getAttribute('open') === null) await tools.locator('summary').click();
 }
 
-export async function openActivitySection(page: Page, section: 'details' | 'steps') {
-  const disclosure = page.locator(section === 'details' ? '.activity-details' : '.activity-steps-disclosure');
+export async function openActivitySection(page: Page, section: 'details' | 'steps' | 'rewards') {
+  const disclosure = page.locator({ details: '.activity-details', steps: '.activity-steps-disclosure', rewards: '.activity-outcomes-disclosure' }[section]);
   if (await disclosure.getAttribute('open') === null) await disclosure.locator(':scope > summary').click();
 }
 

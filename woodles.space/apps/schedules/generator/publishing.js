@@ -28,7 +28,7 @@ window.SchedulePublishing = (() => {
     const shown = plan.days.filter(day => !day.removed && chosen.has(day.key)).map(day => ({ key: day.key, start: day.start, end: day.end,
       activities: day.activities.filter(item => !item.ghost).map(clean) }));
     const ids = new Set(shown.flatMap(day => day.activities.flatMap(itemImageIds)));
-    return { schemaVersion: 1, plan: { id: plan.id, learner: plan.learner, name: plan.name, days: shown, ...(plan.style ? { style: plan.style } : {}) },
+    return { schemaVersion: 1, plan: { id: plan.id, learner: plan.learner, name: plan.name, progression: plan.progression, days: shown, ...(plan.style ? { style: plan.style } : {}) },
       images: workspace.images.filter(image => ids.has(image.id)).map(image => ({ id: image.id, data: image.data })) };
   }
   function savedLinks() {

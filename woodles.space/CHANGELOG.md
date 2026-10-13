@@ -49,6 +49,20 @@ so it's not easy to forget.
   with blinking chest lights, turning gears and a hovering drone. a new
   *Princesses and castles* theme brings a pink castle with flags and a
   jewelled crown, in a bubbly Cherry Bomb heading font.
+- **first/then rewards in the schedule planner** — an activity can list what
+  the learner earns: a reward (M&M, sticker, token) and up to six results worth
+  0–99 each, such as sat on toilet 1, voided liquid 3, voided solid 5. the
+  learner taps the best thing that happened, and only that counts. *not this
+  time* moves them on with nothing. a daily total sits in the schedule header.
+  results reset each day like checks, and the ladder prints on the card and
+  survives publishing.
+- **advance when done** — a plan can now move the learner along by finishing
+  rather than by the clock. pick it under plan tools: *learner view moves on
+  — when each item is done*. now is the first unfinished item and next is the
+  one after, whatever the time, so finishing early or running late both work.
+  checking an item (or tapping a reward result, or *not this time*) moves on.
+  existing plans keep following the clock. plan tools also no longer run off
+  the side of a phone screen.
 
 ## 2026-10-05
 

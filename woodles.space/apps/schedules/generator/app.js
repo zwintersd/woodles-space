@@ -107,6 +107,7 @@
   let activeSymbolGroup = 'Popular';
   let choiceDraft = [];
   let activityStepsDraft = [];
+  let outcomesDraft = [];
   let suggestionDraft = [];
   let suggestionPoolId = '';
   let suggestionStepId = '';
@@ -602,6 +603,7 @@
       visualMarkup(item) +
       '<div class="activity-copy"><h3>' + esc(item.title) + '</h3><div class="activity-tags"><span class="activity-tag">' + esc(item.category) + '</span></div>' +
       window.ScheduleStudio.activityStepsMarkup(item, optionVisual) +
+      window.ScheduleStudio.outcomesMarkup(item, optionVisual) +
       (item.note ? '<p class="activity-note">' + esc(item.note) + '</p>' : '') +
       (item.credit ? '<p class="image-credit">' + esc(item.credit) + '</p>' : '') + '</div>' +
       itemActions(item, index, items, item.title, 'edit-activity') + '</article>';
@@ -635,7 +637,7 @@
         '<input id="planTitle" class="plan-title" aria-label="Plan name" maxlength="100" value="' + esc(plan.name) + '">' +
         '<input id="planLearner" class="plan-learner" aria-label="Learner label" maxlength="100" value="' + esc(plan.learner) + '">' +
       '</div><div class="heading-actions">' + (day ? '<a class="button visual" href="' + esc(visualScheduleUrl(plan.id, day.key)) + '">▶ Use schedule</a><button class="button secondary" type="button" data-action="open-print-setup">Print</button>' : '') + '<button class="button secondary style-button" type="button" data-action="open-style-studio" title="Colours, fonts and theme for the visual schedule"><span aria-hidden="true">' + esc(window.ScheduleThemes.theme(plan.style?.theme).emoji) + '</span> Style</button><button class="button primary" type="button" data-action="publish-plan">Publish</button><button class="button secondary" type="button" data-action="open-content-library">Library</button>' +
-        '<details class="plan-tools disclosure"><summary>Plan tools</summary><div class="tool-options"><button class="button secondary" type="button" data-action="open-image-studio">Image studio</button><button class="button secondary" type="button" data-action="export-plan">Export JSON</button><button class="button secondary" type="button" data-action="import-plan">Import plan</button><button class="button secondary" type="button" data-action="duplicate-plan">Duplicate plan</button><button class="button secondary danger" type="button" data-action="delete-current-plan">Move plan to Trash</button><p class="muted">Saved in this browser. Export and import to transfer a plan to another device.</p></div></details></div></div>';
+        '<details class="plan-tools disclosure"><summary>Plan tools</summary><div class="tool-options"><label class="field progression-field"><span>Learner view moves on</span><select id="planProgression"><option value="clock"' + (plan.progression === 'done' ? '' : ' selected') + '>By the clock</option><option value="done"' + (plan.progression === 'done' ? ' selected' : '') + '>When each item is done</option></select></label><p class="muted">By the clock follows planned times. When each item is done, Now moves to the first unfinished item as the learner checks things off.</p><button class="button secondary" type="button" data-action="open-image-studio">Image studio</button><button class="button secondary" type="button" data-action="export-plan">Export JSON</button><button class="button secondary" type="button" data-action="import-plan">Import plan</button><button class="button secondary" type="button" data-action="duplicate-plan">Duplicate plan</button><button class="button secondary danger" type="button" data-action="delete-current-plan">Move plan to Trash</button><p class="muted">Saved in this browser. Export and import to transfer a plan to another device.</p></div></details></div></div>';
   }
 
   function renderPlan() {
@@ -810,6 +812,7 @@
     activityDialog.classList.toggle('item-editor', mode !== 'library');
     pendingSuggestionPools = new Map();
     activityStepsDraft = JSON.parse(JSON.stringify(item?.steps || []));
+    outcomesDraft = JSON.parse(JSON.stringify(item?.outcomes?.tiers || []));
     activityMode = mode;
     editingActivityId = item ? item.occurrenceId : '';
     activityDialogBody.innerHTML = '';
@@ -835,6 +838,9 @@
           '<label class="field full"><span>Image source or attribution (optional)</span><input name="credit" maxlength="200" value="' + esc(activity.credit || '') + '" placeholder="Artist, library, or license"></label>' +
           '<label class="field full"><span>Support cue or short note (optional)</span><textarea name="note" maxlength="500" placeholder="A short cue, material, or transition note">' + esc(activity.note || '') + '</textarea></label>' +
           '</div></details><details class="activity-steps-disclosure disclosure full"' + (activity.steps?.length ? ' open' : '') + '><summary>Steps' + (activity.steps?.length ? ' · ' + activity.steps.length : ' (optional)') + '</summary><fieldset class="step-composer"><legend>Steps inside this activity</legend><p class="muted">Add steps in order. A step can offer a choice or an animated suggestion. All steps share the activity’s total time.</p><div id="activityStepsDraft"></div><button class="button secondary" type="button" data-action="add-activity-step">＋ Add step</button></fieldset></details>' +
+          '<details class="activity-outcomes-disclosure disclosure full"' + (activity.outcomes ? ' open' : '') + '><summary>First/then rewards' + (activity.outcomes ? ' · ' + esc(window.ScheduleStudio.outcomeLadder(activity.outcomes)) : ' (optional)') + '</summary><fieldset class="step-composer"><legend>What the learner can earn</legend><p class="muted">List the results that can happen. The learner taps the best one, and only that one counts. If nothing happened, they tap Not this time and move on.</p>' +
+            '<div class="step-fields outcome-unit"><label class="field"><span>Reward name</span><input name="outcomeUnit" maxlength="40" value="' + esc(activity.outcomes?.unit || '') + '" placeholder="e.g., M&amp;M"></label><label class="field"><span>Reward symbol or emoji</span><input name="outcomeUnitIcon" maxlength="16" value="' + esc(activity.outcomes?.unitIcon || '🍬') + '"></label></div>' +
+            '<div id="activityOutcomesDraft"></div><button class="button secondary" type="button" data-action="add-outcome-tier">＋ Add result</button></fieldset></details>' +
           (libraryEditing ? '' : !editing ? '<label class="check-field full"><input type="checkbox" name="saveToLibrary" checked><span>Save this activity to the reusable library</span></label>' :
             (workspace.activities.some((entry) => entry.id === activity.sourceId) ? '<label class="check-field full"><input type="checkbox" name="updateLibrary"><span>Update the library card for future use too</span></label>' : '<label class="check-field full"><input type="checkbox" name="saveToLibrary"><span>Save as a new library activity</span></label>')) +
           '<div class="error-text full" id="activityError" role="status" aria-live="polite"></div>' +
@@ -844,6 +850,7 @@
     installGhostControl(item);
     if (!activityDialog.open) activityDialog.showModal();
     renderActivityStepsDraft();
+    renderOutcomesDraft();
     const form = document.getElementById('activityForm');
     if (form) updateSymbolPreview(form);
     activityDialogBody.querySelector('input[name="title"]')?.focus();
@@ -858,6 +865,26 @@
     host.innerHTML = activityStepsDraft.map((step, index) => '<section class="step-editor" aria-label="Step ' + (index + 1) + '"><div class="button-row"><strong>Step ' + (index + 1) + '</strong>' + button('step-up', index, 'Move up', index === 0) + button('step-down', index, 'Move down', index === activityStepsDraft.length - 1) + button('remove-activity-step', index, 'Remove step') + '</div><div class="step-fields">' + field(step.title, 'title', index, undefined, 'Step name', 60) + field(step.icon, 'icon', index, undefined, 'Symbol or emoji', 16) + field(step.pictogram, 'pictogram', index, undefined, 'ARASAAC ID or HTTPS image', 300) + '</div>' + customSymbolControl(step, 'step', 'data-step-index="' + index + '"') + '<label class="field"><span>Step type</span><select data-step-kind="' + index + '"><option value="task"' + (step.kind === 'task' ? ' selected' : '') + '>Do this step</option><option value="choice"' + (step.kind === 'choice' ? ' selected' : '') + '>Pick one option</option><option value="suggestion"' + (step.kind === 'suggestion' ? ' selected' : '') + '>Suggest an activity</option></select></label>' +
       (step.kind === 'choice' ? '<div class="step-option-editor">' + step.options.map((option, oi) => '<div class="step-option-row">' + field(option.title, 'title', index, oi, 'Option ' + (oi + 1) + ' name', 60) + field(option.icon, 'icon', index, oi, 'Symbol or emoji', 16) + field(option.pictogram, 'pictogram', index, oi, 'ARASAAC ID or HTTPS image', 300) + customSymbolControl(option, 'step-option', 'data-step-index="' + index + '" data-option-index="' + oi + '"') + button('remove-step-option', index, 'Remove option', false, oi) + '</div>').join('') + button('add-step-option', index, '＋ Add option', step.options.length >= 6) + '</div>' : step.kind === 'suggestion' ? '<div class="step-suggestion-summary"><p class="muted">' + (step.candidates || []).filter((candidate) => candidate.enabled).length + ' optional activities · ' + (step.rerollMode === 'limited' ? step.maxRerolls + ' rerolls' : step.rerollMode === 'unlimited' ? 'Unlimited rerolls' : 'No rerolls') + '</p>' + button('configure-step-suggestion', index, 'Configure suggestions') + '</div>' : '') + '</section>').join('');
     host.parentElement.querySelector('[data-action="add-activity-step"]').disabled = activityStepsDraft.length >= 20;
+  }
+
+  function renderOutcomesDraft() {
+    const host = document.getElementById('activityOutcomesDraft');
+    if (!host) return;
+    const field = (tier, key, index, label, max, type = 'text') => '<label class="field"><span>' + label + '</span><input data-outcome-field="' + key + '" data-outcome-index="' + index + '" type="' + type + '"' + (type === 'number' ? ' min="0" max="99"' : ' maxlength="' + max + '"') + ' value="' + esc(tier[key] ?? '') + '"></label>';
+    host.innerHTML = outcomesDraft.map((tier, index) => '<section class="step-editor outcome-editor" aria-label="Result ' + (index + 1) + '"><div class="button-row"><strong>Result ' + (index + 1) + '</strong><button class="button secondary" type="button" data-action="remove-outcome-tier" data-outcome-index="' + index + '">Remove result</button></div><div class="step-fields outcome-fields">' +
+      field(tier, 'title', index, 'Result name', 60) + field(tier, 'amount', index, 'Earns', 2, 'number') + field(tier, 'icon', index, 'Symbol or emoji', 16) + field(tier, 'pictogram', index, 'ARASAAC ID or HTTPS image', 300) + '</div></section>').join('');
+    host.parentElement.querySelector('[data-action="add-outcome-tier"]').disabled = outcomesDraft.length >= window.ScheduleStudio.MAX_OUTCOME_TIERS;
+  }
+
+  function changeOutcomeTier(action) {
+    if (action.dataset.action === 'add-outcome-tier' && outcomesDraft.length < window.ScheduleStudio.MAX_OUTCOME_TIERS) {
+      const highest = outcomesDraft.reduce((most, tier) => Math.max(most, Number(tier.amount) || 0), 0);
+      outcomesDraft.push({ id: makeId('tier'), title: '', icon: '', pictogram: '', amount: outcomesDraft.length ? highest + 1 : 1 });
+    } else if (action.dataset.action === 'remove-outcome-tier') outcomesDraft.splice(Number(action.dataset.outcomeIndex), 1);
+    renderOutcomesDraft();
+    const host = document.getElementById('activityOutcomesDraft');
+    if (action.dataset.action === 'add-outcome-tier') host.lastElementChild?.querySelector('input')?.focus();
+    else (host.querySelector('[data-action="remove-outcome-tier"]') || host.parentElement.querySelector('[data-action="add-outcome-tier"]')).focus();
   }
 
   function changeActivityStep(action) {
@@ -879,6 +906,11 @@
 
   document.addEventListener('input', (event) => {
     const input = event.target;
+    if (input.matches('[data-outcome-field]')) {
+      const tier = outcomesDraft[Number(input.dataset.outcomeIndex)];
+      if (tier) tier[input.dataset.outcomeField] = input.dataset.outcomeField === 'amount' ? Number(input.value) : input.value;
+      return;
+    }
     if (!input.matches('[data-step-field]')) return;
     const step = activityStepsDraft[Number(input.dataset.stepIndex)];
     const target = input.dataset.optionIndex === undefined ? step : step.options[Number(input.dataset.optionIndex)];
@@ -1807,6 +1839,7 @@
       color: item.color,
       note: item.note,
       steps: JSON.parse(JSON.stringify(item.steps || [])),
+      ...(item.outcomes ? { outcomes: JSON.parse(JSON.stringify(item.outcomes)) } : {}),
       start: timeString(start)
     };
   }
@@ -1839,6 +1872,10 @@
     const nestedSuggestions = window.ScheduleStudio.suggestionItems({ steps: activityStepsDraft, occurrenceId: 'draft', duration: Number(data.get('duration')) });
     if (nestedSuggestions.some((step) => !(step.candidates || []).some((candidate) => candidate.enabled && candidate.duration <= step.duration))) throw new Error('Configure each suggestion step with at least one available activity that fits the containing activity’s time.');
     if (activityStepsDraft.flatMap((step) => [step, ...(step.kind === 'choice' ? step.options : [])]).some((entry) => entry.pictogram && !/^\d{1,10}$/.test(entry.pictogram) && !/^https:\/\//i.test(entry.pictogram))) throw new Error('Step pictures need an ARASAAC number or a direct HTTPS image URL.');
+    if (outcomesDraft.some((tier) => !String(tier.title || '').trim())) throw new Error('Name each reward result, or remove the empty ones.');
+    if (outcomesDraft.some((tier) => !Number.isInteger(Number(tier.amount)) || Number(tier.amount) < 0 || Number(tier.amount) > 99)) throw new Error('Each reward result earns a whole number from 0 to 99.');
+    if (outcomesDraft.some((tier) => tier.pictogram && !/^\d{1,10}$/.test(tier.pictogram) && !/^https:\/\//i.test(tier.pictogram))) throw new Error('Reward pictures need an ARASAAC number or a direct HTTPS image URL.');
+    if (outcomesDraft.length && !cleanText(data.get('outcomeUnit'), 40, '')) throw new Error('Name the reward, such as M&M or sticker.');
     const activity = sanitizeActivity({
       ...formSymbolFields(form),
       id: makeId('activity'),
@@ -1851,7 +1888,8 @@
       credit: data.get('credit'),
       color: data.get('color'),
       note: data.get('note'),
-      steps: activityStepsDraft
+      steps: activityStepsDraft,
+      outcomes: { unit: data.get('outcomeUnit'), unitIcon: data.get('outcomeUnitIcon'), tiers: outcomesDraft }
     });
     if (!activity) throw new Error('Add an activity name first.');
     const start = data.get('start') ? validTime(data.get('start'), '') : '';
@@ -1870,7 +1908,7 @@
       if (libraryEditing) {
         if (!commitRecoveryChange(() => {
           const existing = workspace.activities.find((entry) => entry.id === editingActivityId);
-          if (existing) Object.assign(existing, activity, { id: existing.id });
+          if (existing) { Object.assign(existing, activity, { id: existing.id }); if (!activity.outcomes) delete existing.outcomes; }
           else workspace.activities.push(activity);
           savePendingPools();
         })) throw new Error('Could not save this activity. Your draft is still here.');
@@ -1899,7 +1937,7 @@
         if (result.saveToLibrary) workspace.activities.push(activity);
         if (result.updateLibrary && occurrence?.sourceId) {
           const libraryItem = workspace.activities.find((entry) => entry.id === occurrence.sourceId);
-          if (libraryItem) Object.assign(libraryItem, activity, { id: libraryItem.id });
+          if (libraryItem) { Object.assign(libraryItem, activity, { id: libraryItem.id }); if (!activity.outcomes) delete libraryItem.outcomes; }
         }
         savePendingPools();
       })) throw new Error('Could not save this activity. Your draft is still here.');
@@ -2434,6 +2472,7 @@
       return;
     }
     if (['add-activity-step', 'remove-activity-step', 'step-up', 'step-down', 'add-step-option', 'remove-step-option'].includes(name)) changeActivityStep(action);
+    if (name === 'add-outcome-tier' || name === 'remove-outcome-tier') changeOutcomeTier(action);
     else if (name === 'new-plan') startNewPlan();
     else if (name === 'open-plan') routeToPlan(action.dataset.plan, 'monday');
     else if (name === 'back-library') { event.preventDefault(); routeToPlan('', 'monday'); }
@@ -2627,6 +2666,13 @@
       persist();
     }
     if (event.target.id === 'importFile') importFile(event.target.files && event.target.files[0]);
+    if (event.target.id === 'planProgression') {
+      const plan = getPlan();
+      if (!plan) return;
+      plan.progression = event.target.value === 'done' ? 'done' : 'clock';
+      persist();
+      showToast(plan.progression === 'done' ? 'The learner view now moves on when each item is done.' : 'The learner view now follows the clock.');
+    }
     if (event.target.id === 'planTitle' || event.target.id === 'planLearner') {
       const plan = getPlan();
       if (!plan) return;

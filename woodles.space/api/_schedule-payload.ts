@@ -34,6 +34,19 @@ function visual(value: RecordValue): RecordValue {
     familiarity: ['new', 'again'].includes(String(value.familiarity)) ? value.familiarity : ''
   };
 }
+function outcomes(raw: unknown) {
+  const value = record(raw); const tiers = array(value.tiers);
+  if (!tiers.length) return undefined;
+  if (tiers.length > 6) throw new Error('An activity can have up to six reward results.');
+  uniqueIds(tiers);
+  return { unit: text(value.unit, 40) || 'reward', unitIcon: text(value.unitIcon, 16) || '⭐', tiers: tiers.map(rawTier => {
+    const tier = record(rawTier);
+    if (!text(tier.title)) throw new Error('Name each reward result before publishing.');
+    if (!Number.isInteger(tier.amount) || Number(tier.amount) < 0 || Number(tier.amount) > 99) throw new Error('Reward amounts must be whole numbers from 0 to 99.');
+    const { icon, pictogram } = visual(tier);
+    return { id: text(tier.id), title: text(tier.title, 60), icon, pictogram, amount: Number(tier.amount) };
+  }).sort((a, b) => a.amount - b.amount) };
+}
 function content(raw: unknown, depth = 0): RecordValue {
   if (depth > 8) throw new Error('Nested activities are too deep to publish.');
   const value = record(raw);
@@ -72,6 +85,8 @@ function content(raw: unknown, depth = 0): RecordValue {
   uniqueIds(steps);
   result.steps = steps.map(step => { const input = record(step); return { ...content(input, depth + 1), kind: input.kind === 'choice' || input.kind === 'suggestion' ? input.kind : 'task' }; });
   if (value.url) result.url = url(value.url);
+  const rewards = kind === 'activity' && depth === 0 ? outcomes(value.outcomes) : undefined;
+  if (rewards) result.outcomes = rewards;
   return result;
 }
 function checkBudget(value: RecordValue, budget: number) {
@@ -146,7 +161,7 @@ export function schedulePayload(raw: unknown, id: string) {
   });
   const imageIds = new Set(images.map(image => image.id));
   if (imageIds.size !== images.length || [...referenced].some(id => !imageIds.has(id))) throw new Error('An uploaded picture is missing or duplicated. Attach it again before publishing.');
-  const payload = { schemaVersion: 1, plan: { id, learner: text(source.learner), name: text(source.name) || 'Weekly plan', days, ...(source.style ? { style: scheduleStyle(source.style) } : {}) }, images };
+  const payload = { schemaVersion: 1, plan: { id, learner: text(source.learner), name: text(source.name) || 'Weekly plan', progression: source.progression === 'done' ? 'done' : 'clock', days, ...(source.style ? { style: scheduleStyle(source.style) } : {}) }, images };
   if (new TextEncoder().encode(JSON.stringify(payload)).length > 3_500_000) throw new Error('This plan is too large to publish. Use smaller uploaded pictures.');
   return payload;
 }

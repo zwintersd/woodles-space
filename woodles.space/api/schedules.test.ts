@@ -177,6 +177,25 @@ describe('snapshot validation and passwords', () => {
     expect(clean.plan.days[0].activities[0].options[1]).toMatchObject({ kind: 'suggestion', maxRerolls: 2, candidates: [{ title: 'Draw', symbolCredit: 'Artist', symbolPixelated: true }] });
     expect(clean.plan.days[0].activities[1].videos[0].url).toBe('https://example.com/video');
   });
+  it('keeps first/then rewards on top-level activities only, sorted and bounded', () => {
+    const tiers = [{ id: 'solid', title: 'Voided solid', amount: 5 }, { id: 'sat', title: 'Sat on toilet', amount: 1, pictogram: '1234' }, { id: 'liquid', title: 'Voided liquid', amount: 3 }];
+    const payload: any = draft(); payload.plan.days[0].activities[0].outcomes = { unit: 'M&M', unitIcon: '🍬', tiers };
+    payload.plan.days[0].activities[0].steps = [{ id: 'step', title: 'Wash hands', outcomes: { unit: 'x', tiers } }];
+    const clean: any = schedulePayload(payload, 'c'.repeat(32)); const item = clean.plan.days[0].activities[0];
+    expect(item.outcomes).toEqual({ unit: 'M&M', unitIcon: '🍬', tiers: [
+      { id: 'sat', title: 'Sat on toilet', icon: '', pictogram: '1234', amount: 1 }, { id: 'liquid', title: 'Voided liquid', icon: '', pictogram: '', amount: 3 }, { id: 'solid', title: 'Voided solid', icon: '', pictogram: '', amount: 5 }] });
+    expect(item.steps[0].outcomes).toBeUndefined();
+    expect(clean.plan.progression).toBe('clock');
+    expect(schedulePayload({ ...draft(), plan: { ...draft().plan, progression: 'done' } }, 'c'.repeat(32)).plan.progression).toBe('done');
+    expect(schedulePayload({ ...draft(), plan: { ...draft().plan, progression: 'sideways' } }, 'c'.repeat(32)).plan.progression).toBe('clock');
+    const bad = (change: (rewards: any) => void, error: RegExp) => { const next: any = draft(); const rewards = { unit: 'M&M', tiers: tiers.map(tier => ({ ...tier })) }; change(rewards); next.plan.days[0].activities[0].outcomes = rewards; expect(() => schedulePayload(next, 'c'.repeat(32))).toThrow(error); };
+    bad(rewards => { rewards.tiers[0].amount = 1.5; }, /whole numbers/);
+    bad(rewards => { rewards.tiers[0].amount = 100; }, /whole numbers/);
+    bad(rewards => { rewards.tiers[0].title = ' '; }, /Name each reward/);
+    bad(rewards => { rewards.tiers[1].id = 'solid'; }, /unique IDs/);
+    bad(rewards => { rewards.tiers = Array.from({ length: 7 }, (_, index) => ({ id: 't' + index, title: 'R', amount: index })); }, /six reward/);
+    bad(rewards => { rewards.tiers[0].pictogram = 'javascript:alert(1)'; }, /picture link/);
+  });
   it('keeps a plan’s look and strips anything that is not a look', () => {
     const payload: any = draft(); payload.plan.style = { theme: 'trains', colors: { accent: '#AA0000', hero: 'red', card: 'url(x)' }, headingFont: 'alfa', bodyFont: 'Bad Font!',
       textSize: 'xl', track: 'rails', pattern: 'javascript', scene: 'custom', mascots: ['🚂', '<img src=x>', '🚃', '🚉', '🎫'], stamp: '"🎫"', marker: 'dot',
