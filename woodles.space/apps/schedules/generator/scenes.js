@@ -1,6 +1,7 @@
 // Illustrated banners for some themes, drawn for a 320×170 box like the
 // original ticket scene. Constant markup only: nothing here comes from a plan.
 // Moving parts carry sc-* classes; scenes.css animates them when motion is on.
+// apps/schedules/SCENES.md is the style reference and process for adding one.
 window.ScheduleScenes = (() => {
   'use strict';
   const range = (count) => Array.from({ length: count }, (_, index) => index);

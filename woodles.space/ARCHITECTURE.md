@@ -153,7 +153,7 @@ woodles.space/
     ├── hygge/               static · design playground (fonts, palette, motifs, motion)
     ├── digits/              static · an SVG pen that writes the time
     ├── quiet-room/          static · an immersive three.js room of light
-    ├── schedules/           static · a private link tree and visual schedules
+    ├── schedules/           static · a private link tree and visual schedules (banner art: apps/schedules/SCENES.md)
     ├── letter/              static · echoes — the private archive reader
     ├── changelog/           static · renders CHANGELOG.md at /changelog
     ├── lore/                static · renders LORE.md at /lore
