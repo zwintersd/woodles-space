@@ -39,7 +39,7 @@ window.ScheduleThemes = (() => {
   const READING_FONTS = ['atkinson', 'lexend', 'andika'];
 
   const GROUPS = [
-    ['creatures', 'Creatures'], ['go', 'Things that go'], ['play', 'Make-believe and play'], ['calm', 'Classic and calm']
+    ['creatures', 'Creatures'], ['go', 'Things that go'], ['play', 'Make-believe and play'], ['seasons', 'Seasons'], ['calm', 'Classic and calm']
   ];
 
   // Colour roles a theme sets and the studio can override; everything else is derived.
@@ -130,6 +130,23 @@ window.ScheduleThemes = (() => {
       { accent: '#be185d', heroA: '#c0266d', heroB: '#c2410c', pageA: '#fff6f8', pageB: '#fff0e4', card: '#ffffff', ink: '#3b1d2a', now: '#7c3aed', done: '#16a34a', sun: '#fcd34d', track: '#f5c6d6' },
       { heading: 'pacifico', body: 'quicksand', stickers: ['🧁', '🍩', '🍪', '🍓', '🎂', '🍭'], mascots: ['🧁', '🍩', '🍭'], pattern: 'stickers', track: 'rainbow', shape: 'round', stamp: '🍪', marker: '🧁', celebrate: 'party', motion: 'on',
         words: { kicker: 'Sweet and simple', greeting: 'Hi {name}!', finishTitle: 'Sweet success!', finishMessage: 'Delicious work today, {name}!', now: 'NOW', next: 'NEXT' } }),
+    // Seasons draw the weather, plants and animals of the time of year, never a holiday.
+    T('spring', 'seasons', 'Springtime', '🌷', 'Blossom, tulips and new green shoots.',
+      { accent: '#2e8540', heroA: '#2a72b5', heroB: '#2f8544', pageA: '#f4fbef', pageB: '#fff3f7', card: '#ffffff', ink: '#1f2d22', now: '#e8559a', done: '#1f9d74', sun: '#ffd84a', track: '#cfe6c4' },
+      { heading: 'cherry', body: 'quicksand', stickers: ['🌷', '🌸', '🌱', '🐑', '☔', '🌼'], mascots: ['🌷', '🐑', '🌸'], pattern: 'stickers', track: 'dashed', shape: 'round', stamp: '🌸', marker: '🌷', celebrate: 'gentle', motion: 'on',
+        words: { kicker: 'Bloom by bloom', greeting: 'Hi {name}!', finishTitle: 'All in bloom!', finishMessage: 'You blossomed today, {name}!', now: 'NOW', next: 'NEXT' } }),
+    T('summer', 'seasons', 'Summer days', '⛱️', 'Sunshine, sandcastles and the seaside.',
+      { accent: '#0e7fb8', heroA: '#0b6fbf', heroB: '#118bc9', pageA: '#fffaf0', pageB: '#e9f7fc', card: '#ffffff', ink: '#132a3a', now: '#ff6b4a', done: '#14a37f', sun: '#ffd43b', track: '#f6dfa4' },
+      { heading: 'pacifico', body: 'nunito', stickers: ['☀️', '🏖️', '🍉', '🍦', '🐚', '🕶️'], mascots: ['☀️', '🏖️', '🍦'], pattern: 'stripes', track: 'dotted', shape: 'round', stamp: '🍉', marker: '⛱️', celebrate: 'party', motion: 'on',
+        words: { kicker: 'Sunny side up', greeting: 'Hi {name}!', finishTitle: 'Sun-sational!', finishMessage: 'What a sunny day, {name}!', now: 'NOW', next: 'NEXT' } }),
+    T('autumn', 'seasons', 'Autumn leaves', '🍂', 'Falling leaves, acorns and cosy colours.',
+      { accent: '#a8481a', heroA: '#c0541c', heroB: '#8a2f3c', pageA: '#fdf6ee', pageB: '#f8eadb', card: '#fffdf9', ink: '#2f1d14', now: '#d97706', done: '#5a8a2a', sun: '#fbbf24', track: '#ecd2b0' },
+      { heading: 'chewy', body: 'nunito', stickers: ['🍂', '🍁', '🐿️', '🍎', '🌰', '🍄'], mascots: ['🍂', '🐿️', '🍁'], pattern: 'stickers', track: 'prints', shape: 'soft', stamp: '🍁', marker: '🐿️', celebrate: 'gentle', motion: 'on',
+        words: { kicker: 'Leaf by leaf', greeting: 'Hi {name}!', finishTitle: 'All gathered in!', finishMessage: 'Cosy work today, {name}!', now: 'NOW', next: 'NEXT' } }),
+    T('winter', 'seasons', 'Winter snow', '⛄', 'Snowflakes, snowmen and warm woolly scarves.',
+      { accent: '#2d6ea8', heroA: '#2b6c94', heroB: '#3a4f8f', pageA: '#f2f8fd', pageB: '#eef1fb', card: '#ffffff', ink: '#15253a', now: '#e8590c', done: '#0f9b8e', sun: '#ffe08a', track: '#d3e3f2' },
+      { heading: 'sniglet', body: 'nunito', stickers: ['❄️', '⛄', '🧣', '🧤', '🛷', '🐧'], mascots: ['⛄', '❄️', '🧣'], pattern: 'dots', track: 'line', shape: 'round', stamp: '❄️', marker: '⛄', celebrate: 'gentle', motion: 'on',
+        words: { kicker: 'Flake by flake', greeting: 'Hi {name}!', finishTitle: 'Snow-tastic!', finishMessage: 'Time to warm up, {name}!', now: 'NOW', next: 'NEXT' } }),
     T('weather', 'calm', 'Weather watch', '🌦️', 'Sunshine, rainbows and today’s forecast.',
       { accent: '#2563eb', heroA: '#2f6fe0', heroB: '#7349d6', pageA: '#eef6ff', pageB: '#f6f3ff', card: '#ffffff', ink: '#172036', now: '#f59e0b', done: '#059669', sun: '#fcd34d', track: '#d3e0f5' },
       { heading: 'fredoka', body: 'nunito', stickers: ['☀️', '🌈', '🌦️', '❄️', '⚡', '🌪️'], mascots: ['☀️', '🌈', '🌦️'], pattern: 'stickers', track: 'rainbow', shape: 'round', stamp: '☀️', marker: '⛅', celebrate: 'gentle', motion: 'on',

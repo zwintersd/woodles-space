@@ -6,8 +6,9 @@ read this before touching `generator/scenes.js` or `generator/scenes.css`.
 
 every theme but two has one: trains, dinosaurs, unicorns, space,
 construction, ocean, pirates, heroes, robots, princesses, pets, horses, bugs,
-jungle, dragons, cars, games, bricks, sweets, weather. Bright sky keeps its
-ticket scene and Quiet and calm shows nothing — both on purpose.
+jungle, dragons, cars, games, bricks, sweets, weather, and the four seasons —
+spring, summer, autumn, winter. Bright sky keeps its ticket scene and Quiet
+and calm shows nothing — both on purpose.
 
 ## where they live
 
@@ -94,6 +95,8 @@ convention. current inks:
 | bugs | `#1d3a12` leaf green | | games | `#1e0b3a` arcade purple (as pixels) |
 | jungle | `#2d2410` earth brown | | bricks | `#1b1b2f` ink navy |
 | sweets | `#3b1622` berry brown | | weather | `#1c2a63` storm blue |
+| spring | `#1e3a28` moss green | | autumn | `#3f1a0c` chestnut |
+| summer | `#123b5c` deep sea | | winter | `#17324a` frost navy |
 
 **tubes** (necks, arms, booms) are two stacked strokes of the same path: the
 ink colour wide, then the fill colour 5–6 units narrower. that gives an
@@ -132,6 +135,10 @@ outlined limb without building a closed shape:
   | red→orange (bricks) | blue, yellow, green and white bricks — never red |
   | magenta→orange (sweets) | white frosting on a sky-blue wrapper |
   | blue→violet (weather) | yellow sun, white cloud, four-band rainbow |
+  | blue→green (spring) | white lamb, pink blossom, red, yellow and orange tulips |
+  | azure (summer) | sand-gold castle, coral-and-white umbrella, yellow sun |
+  | rust→wine (autumn) | ginger squirrel with a cream belly, gold and orange leaves |
+  | steel→dusk blue (winter) | white snowman, orange hat, golden scarf, teal pines |
 
 - give each subject **one lighter tone** for form: a belly, a sail, a wall.
   keep it to one; two starts to read as shading.
@@ -162,6 +169,13 @@ outlined limb without building a closed shape:
 - **don't gender the learner.** the princess scene is a castle and a crown,
   not a princess, and the theme's greeting is "Hi {name}!". draw the
   interest, not a person the learner is meant to be.
+- **seasons, not holidays.** the season scenes draw what the time of year
+  looks like outdoors — blossom and lambs, a beach, falling leaves and
+  acorns, snow — and never a holiday: no eggs or bunnies, carved pumpkins or
+  turkeys, decorated trees, presents, stockings, hearts or fireworks. keep
+  holiday colour pairs away too: the snowman wears orange and gold, not red
+  and green, and the pines carry snow, not baubles. the themes' stickers
+  follow the same rule.
 - objects get a little life where it's cheap: a dome on the boiler, a blush on
   the whale, a chest light on the robot, a face on the cupcake and the sun.
   vehicles and buildings stay faceless.
@@ -192,10 +206,14 @@ drawing tool in the loop and none is needed.
 | `heart(x, y, size, fill, stroke, extra)` | a rounded heart; `extra` carries a class or style |
 | `sunRays(cx, cy, inner, outer, count, color)` | glowing rays around a sun |
 | `pixels(x, y, size, rows, palette)` | pixel art from rows of palette keys, merged into runs |
-| `trainWheel`, `carWheel`, `fish`, `paw`, `daisy`, `brick`, `sprinkle`, `raindrop` | scene-local repeats |
+| `leaf(x, y, angle, fill, extra)` | an outlined leaf with a midrib; `extra` puts a motion class on a wrapper so the turn stays on its own group |
+| `pine(x, top, width)` | a three-tier pine standing on y 150, each tier wearing a scalloped cap of snow |
+| `snowball(cx, cy, r)` | a white ball with a pale blue crescent (`shade`) on its shadow side |
+| `trainWheel`, `carWheel`, `fish`, `paw`, `daisy`, `brick`, `sprinkle`, `raindrop`, `tulip`, `petal`, `sandTower`, `flake` | scene-local repeats |
 
 add a helper as soon as a shape repeats. most scenes are 3–5 KB of markup;
-the busiest (pets, jungle, bugs) are about 6. past that, look for a helper.
+the busiest (pets, jungle, bugs) are about 6, and the seasons, with their
+falling petals, leaves and snow, run 6–8. past that, look for a helper.
 
 ### recurring constructions
 
@@ -267,12 +285,15 @@ it's printing).
 | `sc-flip` | pixel coin turns edge-on, stepped | 1.2s | centre |
 | `sc-place` | brick lowers 7px toward its slot | 2.6s | — |
 | `sc-fall` | raindrop falls and fades | 1.4s | — |
+| `sc-flutter` | petal or leaf drifts down, turning 45°, and fades | 6s | centre |
+| `sc-snow` | snowflake or snow dot drifts down and fades | 5s | — |
 
 rules:
 
 - **small and slow.** rotations ≤ 4° for living things, bobs ≤ 3px, cycles
   2–5s. only machines (wheels, gears, flames, blinking lights) go faster or
-  spin fully.
+  spin fully, and only falling petals and leaves turn further, slowly, as
+  they drift.
 - **stagger repeats** with an inline `style="animation-delay:…s"` so three
   puffs or five stars don't pulse in unison.
 - **one class per element.** `[class^="sc-"]` sets `transform-box: fill-box`
