@@ -99,7 +99,8 @@ test('every theme renders the learner view without overflow and with readable ca
     await page.goto('/schedules/view?plan=styled');
     await expect(page.locator('#timeline')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe(theme);
-    const illustrated = ['trains', 'dinosaurs', 'unicorns', 'space', 'construction', 'ocean', 'pirates', 'heroes', 'robots', 'princesses'].includes(theme);
+    // Bright sky keeps its ticket scene and Quiet and calm stays empty; every other theme draws a banner.
+    const illustrated = !['classic', 'calm'].includes(theme);
     await expect(page.locator('#heroArt svg.scene-art')).toHaveCount(illustrated ? 1 : 0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
     await page.setViewportSize({ width: 1100, height: 800 });
