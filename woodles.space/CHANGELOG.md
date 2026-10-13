@@ -20,6 +20,18 @@ so it's not easy to forget.
 
 ## 2026-10-13
 
+- **four quiet-hobby themes for older learners and adults** — a new Quiet
+  hobbies group in the style studio adds Houseplants, Tea and books,
+  Stargazing and Birdwatching: muted colours, grown-up type (Young Serif,
+  Fraunces, Josefin Sans and Quicksand over easy-reading body fonts), gentle
+  words without the exclamation marks, and illustrated banners that keep
+  their whimsy without shouting — a monstera on a sunny sill beside a
+  trailing pothos and a cactus in flower, a ginger cat asleep on a stack of
+  books by a teapot and a steaming cup, a fox watching the Plough beside a
+  brass telescope, and a robin on a fence post with binoculars set down in
+  the grass. faces stay on the animals, without cheeks, and only a few parts
+  move, slowly: the pothos swings, steam rises, the cat breathes, the fox's
+  tail sweeps and the robin leans in. Stargazing is a dark theme.
 - **four seasonal themes for visual schedules** — a new Seasons group in the
   style studio adds Springtime, Summer days, Autumn leaves and Winter snow,
   each with its own colours, fonts, stickers, words and an illustrated

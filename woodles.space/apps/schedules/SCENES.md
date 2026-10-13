@@ -6,9 +6,10 @@ read this before touching `generator/scenes.js` or `generator/scenes.css`.
 
 every theme but two has one: trains, dinosaurs, unicorns, space,
 construction, ocean, pirates, heroes, robots, princesses, pets, horses, bugs,
-jungle, dragons, cars, games, bricks, sweets, weather, and the four seasons —
-spring, summer, autumn, winter. Bright sky keeps its ticket scene and Quiet
-and calm shows nothing — both on purpose.
+jungle, dragons, cars, games, bricks, sweets, weather, the four seasons —
+spring, summer, autumn, winter — and the four quiet hobbies — houseplants,
+books, stargazing, birds. Bright sky keeps its ticket scene and Quiet and
+calm shows nothing — both on purpose.
 
 ## where they live
 
@@ -97,6 +98,8 @@ convention. current inks:
 | sweets | `#3b1622` berry brown | | weather | `#1c2a63` storm blue |
 | spring | `#1e3a28` moss green | | autumn | `#3f1a0c` chestnut |
 | summer | `#123b5c` deep sea | | winter | `#17324a` frost navy |
+| houseplants | `#1f3322` deep leaf | | stargazing | `#121a33` night navy |
+| books | `#2d1a2a` aubergine | | birds | `#163033` deep teal |
 
 **tubes** (necks, arms, booms) are two stacked strokes of the same path: the
 ink colour wide, then the fill colour 5–6 units narrower. that gives an
@@ -139,6 +142,10 @@ outlined limb without building a closed shape:
   | azure (summer) | sand-gold castle, coral-and-white umbrella, yellow sun |
   | rust→wine (autumn) | ginger squirrel with a cream belly, gold and orange leaves |
   | steel→dusk blue (winter) | white snowman, orange hat, golden scarf, teal pines |
+  | terracotta (houseplants) | sage-green monstera in a cream pot, eucalyptus hanger, mustard cactus pot |
+  | dusky plum (books) | duck-egg teapot, mustard, rust and sage spines, ginger cat |
+  | night navy (stargazing) | brass telescope, rust fox, cream stars |
+  | muted teal (birds) | orange-breasted robin, cream birdhouse, leather-brown binoculars |
 
 - give each subject **one lighter tone** for form: a belly, a sail, a wall.
   keep it to one; two starts to read as shading.
@@ -176,6 +183,17 @@ outlined limb without building a closed shape:
   holiday colour pairs away too: the snowman wears orange and gold, not red
   and green, and the pines carry snow, not baubles. the themes' stickers
   follow the same rule.
+- **quiet hobbies are for grown-ups.** houseplants, books, stargazing and
+  birds are built for older learners and adults, so they turn the volume
+  down without losing the whimsy: dusty, lower-saturation fills (sage, not
+  lime; rust, not red), faces only on the animals — dot eyes or sleeping
+  arcs, never cheeks or a grin — and no faces on objects, not even the moon.
+  their charm is in the situation instead: a cat asleep on the books, a fox
+  seen from behind watching the Plough, a blue tit peeking out of a
+  birdhouse, a cutting rooting in a jar. only a handful of parts move, all
+  slowly, and stars twinkle a few at a time, never the whole sky. outlines,
+  ink and composition follow every other rule here, so the set still sits
+  beside the rest.
 - objects get a little life where it's cheap: a dome on the boiler, a blush on
   the whale, a chest light on the robot, a face on the cupcake and the sun.
   vehicles and buildings stay faceless.
@@ -209,11 +227,15 @@ drawing tool in the loop and none is needed.
 | `leaf(x, y, angle, fill, extra)` | an outlined leaf with a midrib; `extra` puts a motion class on a wrapper so the turn stays on its own group |
 | `pine(x, top, width)` | a three-tier pine standing on y 150, each tier wearing a scalloped cap of snow |
 | `snowball(cx, cy, r)` | a white ball with a pale blue crescent (`shade`) on its shadow side |
-| `trainWheel`, `carWheel`, `fish`, `paw`, `daisy`, `brick`, `sprinkle`, `raindrop`, `tulip`, `petal`, `sandTower`, `flake` | scene-local repeats |
+| `turned(x, y, angle, size, path)` | places a path drawn in local units (joint at `0 0`, tip toward −y) by rewriting its coordinates, so outlines keep their width and the result can still carry an `sc-*` class |
+| `monstera(leaves)` · `pothos(leaves, size)` | split and heart-shaped leaves from `turned`, sharing one fill and outline; pothos hearts are drawn long so they never read as the ♥ symbol |
+| `book(x, y, w, h, fill)` | a book lying flat, spine out, with a label and two bands |
+| `trainWheel`, `carWheel`, `fish`, `paw`, `daisy`, `brick`, `sprinkle`, `raindrop`, `tulip`, `petal`, `sandTower`, `flake`, `steam`, `flyer` | scene-local repeats |
 
 add a helper as soon as a shape repeats. most scenes are 3–5 KB of markup;
 the busiest (pets, jungle, bugs) are about 6, and the seasons, with their
-falling petals, leaves and snow, run 6–8. past that, look for a helper.
+falling petals, leaves and snow, run 6–8, as does houseplants with its
+leaves. past that, look for a helper.
 
 ### recurring constructions
 
@@ -287,6 +309,7 @@ it's printing).
 | `sc-fall` | raindrop falls and fades | 1.4s | — |
 | `sc-flutter` | petal or leaf drifts down, turning 45°, and fades | 6s | centre |
 | `sc-snow` | snowflake or snow dot drifts down and fades | 5s | — |
+| `sc-steam` | steam curl rises 16px and fades | 5s | — |
 
 rules:
 

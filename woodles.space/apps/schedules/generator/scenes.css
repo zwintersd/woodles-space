@@ -52,6 +52,7 @@
 [data-motion="on"] .scene-art .sc-fall { animation: sc-fall 1.4s linear infinite; }
 [data-motion="on"] .scene-art .sc-flutter { animation: sc-flutter 6s ease-in-out infinite; }
 [data-motion="on"] .scene-art .sc-snow { animation: sc-snow 5s linear infinite; }
+[data-motion="on"] .scene-art .sc-steam { animation: sc-steam 5s ease-out infinite; }
 
 @keyframes sc-spin { to { rotate: 360deg; } }
 @keyframes sc-roll { 50% { translate: 0 .8px; } }
@@ -87,6 +88,7 @@
 @keyframes sc-fall { 0% { opacity: 0; translate: 0 -6px; } 20% { opacity: 1; } 100% { opacity: 0; translate: 0 18px; } }
 @keyframes sc-flutter { 0% { opacity: 0; translate: -6px -10px; rotate: -20deg; } 20%, 80% { opacity: 1; } 100% { opacity: 0; translate: 10px 22px; rotate: 25deg; } }
 @keyframes sc-snow { 0% { opacity: 0; translate: 0 -8px; } 20%, 80% { opacity: 1; } 100% { opacity: 0; translate: 4px 24px; } }
+@keyframes sc-steam { 0% { opacity: 0; translate: 0 6px; } 35% { opacity: .8; } 100% { opacity: 0; translate: 0 -10px; } }
 
 @media (prefers-reduced-motion: reduce) { .scene-art * { animation: none !important; } }
 @media print { .scene-art * { animation: none !important; } }

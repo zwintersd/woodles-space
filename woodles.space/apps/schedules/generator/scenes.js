@@ -738,5 +738,171 @@ window.ScheduleScenes = (() => {
     '<path d="M200 68v10M212 68v10" stroke="#ff7a45" stroke-width="3"/>' +
     faded('winter-snow', '<path d="M0 152Q80 144 160 150T320 148V170H0Z" fill="#f4f8ff"/>'));
 
-  return { trains, dinosaurs, unicorns, space, construction, ocean, pirates, heroes, robots, princesses, pets, horses, bugs, jungle, dragons, cars, games, bricks, sweets, weather, spring, summer, autumn, winter };
+  // Quiet hobbies, for older learners and adults: muted fills, faces only on animals and
+  // no cheeks, and few parts moving slowly.
+  // `turned` places a path drawn in local units (stem joint at 0 0, tip toward −y) at x y,
+  // turned `angle` degrees and scaled by `size`, so outlines keep their width.
+  const turned = (x, y, angle, size, path) => {
+    const turn = angle * Math.PI / 180; const cos = Math.cos(turn); const sin = Math.sin(turn);
+    return path.replace(/(-?[\d.]+) (-?[\d.]+)/g, (_, px, py) => {
+      const sx = px * size; const sy = py * size;
+      return +(x + sx * cos - sy * sin).toFixed(1) + ' ' + +(y + sx * sin + sy * cos).toFixed(1);
+    });
+  };
+  const monsteraPath = 'M0 -5C8 3 24 1 27 -13L13 -20L28 -24C30 -30 29 -34 25 -37L11 -35L20 -45C14 -50 6 -52 0 -52' +
+    'C-6 -52 -14 -50 -20 -45L-11 -35L-25 -37C-29 -34 -30 -30 -28 -24L-13 -20L-27 -13C-24 1 -8 3 0 -5Z';
+  // Leaves overlap, so each keeps its own outline and midrib, back to front.
+  const monstera = (leaves) => '<g fill="#76a46c"' + ink('#1f3322') + '>' + leaves.map(([x, y, angle, size]) => '<path d="' + turned(x, y, angle, size, monsteraPath) + '"/>' +
+    '<path d="' + turned(x, y, angle, size, 'M0 -6L0 -44') + '" stroke="#b0d19c" stroke-width="2.5" stroke-linecap="round"/>').join('') + '</g>';
+  // Pothos leaves are hearts drawn long, so they read as leaves and never as the symbol.
+  const pothosPath = 'M0 0C-6 2 -11 -4 -10 -10C-9 -16 -4 -20 0 -27C4 -20 9 -16 10 -10C11 -4 6 2 0 0Z';
+  const pothos = (leaves, size) => '<g fill="#76a46c" stroke="#1f3322" stroke-width="2.5" stroke-linejoin="round">' + leaves.map(([x, y, angle]) => '<path d="' + turned(x, y, angle, size, pothosPath) + '"/>').join('') + '</g>' +
+    '<path d="' + leaves.map(([x, y, angle]) => turned(x, y, angle, size, 'M0 -3L0 -19')).join('') + '" stroke="#b0d19c" stroke-width="2" stroke-linecap="round"/>';
+  const monsteraLeaves = [[206, 92, -58, .9], [226, 74, -18, 1], [262, 84, 30, .95], [274, 104, 72, .8], [234, 100, 6, .6]];
+  const houseplants = svg('houseplants',
+    faded('sill', '<rect x="0" y="148" width="320" height="8" fill="#d9bd8f"/><rect x="0" y="156" width="320" height="14" fill="#b38b62"/>' +
+      '<path d="M0 148H320" stroke="#1f3322" stroke-width="3"/><path d="M0 156H320" stroke="#1f3322" stroke-width="2" opacity=".5"/>') +
+    // pothos in a macramé hanger
+    '<g class="sc-swing">' +
+      '<path d="M64 0V4" stroke="#1f3322" stroke-width="2.5" stroke-linecap="round"/><circle cx="64" cy="8" r="4" fill="none" stroke="#1f3322" stroke-width="2.5"/>' +
+      '<path d="M62 12L44 46M64 12V46M66 12L84 46" stroke="#e9dcc3" stroke-width="2.5" stroke-linecap="round"/>' +
+      '<path d="M54 28h20" stroke="#e9dcc3" stroke-width="5" stroke-linecap="round"/>' +
+      '<path d="M42 48h44q0 22-22 22q-22 0-22-22z" fill="#b2c5c2"' + ink('#1f3322') + '/>' +
+      '<rect x="39" y="43" width="50" height="8" rx="4" fill="#d6e2df"' + ink('#1f3322') + '/>' +
+      '<path d="M64 70v12M60 70l-3 11M68 70l3 11" stroke="#e9dcc3" stroke-width="2.5" stroke-linecap="round"/>' +
+      '<g fill="none" stroke="#5d8a55" stroke-width="3" stroke-linecap="round"><path d="M44 50C30 62 36 88 22 112"/><path d="M86 50C100 66 92 90 104 106"/></g>' +
+      pothos([[37, 61, 215], [33, 77, 145], [31, 93, 215], [22, 111, 180], [93, 61, 145], [96, 77, 215], [98, 93, 150], [104, 106, 180], [50, 44, -35], [78, 44, 35], [64, 44, 0]], .62) +
+    '</g>' +
+    // cactus in flower
+    tube('M124 114h5q5 0 5-6v-8', '#1f3322', '#7fa874', 12) + tube('M106 120h-4q-5 0-5-6v-5', '#1f3322', '#7fa874', 12) +
+    '<rect x="105" y="90" width="20" height="44" rx="10" fill="#7fa874"' + ink('#1f3322') + '/>' +
+    '<path d="M112 98v28M118 98v28" stroke="#acd09a" stroke-width="2" stroke-linecap="round"/>' +
+    '<path d="' + burst(115, 86, 8, 4.5, 5) + '" fill="#e3a1ab"' + ink('#1f3322') + '/><circle cx="115" cy="86" r="2.6" fill="#f2d27e"/>' +
+    '<path d="M100 132L104 150H126L130 132Z" fill="#d3a24f"' + ink('#1f3322') + '/><rect x="97" y="126" width="36" height="8" rx="3" fill="#e6c27e"' + ink('#1f3322') + '/>' +
+    // a cutting rooting in a jar of water
+    tube('M164 130C164 118 160 112 162 104', '#1f3322', '#5d8a55', 8) +
+    pothos([[162, 106, -50], [162, 104, 40]], .55) +
+    '<rect x="150" y="114" width="28" height="36" rx="5" fill="#d8e6e2"' + ink('#1f3322') + '/>' +
+    '<path d="M153 126h22v18q0 3-3 3h-16q-3 0-3-3z" fill="#b9d2cd"/>' +
+    '<path d="M164 126v10M164 132q-4 4-5 10M164 132q4 3 4 9" fill="none" stroke="#f3ead6" stroke-width="2" stroke-linecap="round"/>' +
+    // monstera, leaves swaying together over the pot
+    '<g class="sc-tilt">' +
+      tube(monsteraLeaves.map(([x, y, angle]) => 'M' + (236 + angle / 12).toFixed(1) + ' 112Q' + ((236 + x) / 2) + ' ' + (y + 10) + ' ' + x + ' ' + y).join(''), '#1f3322', '#5d8a55', 10) +
+      monstera(monsteraLeaves) +
+    '</g>' +
+    '<path d="M212 116L218 150H262L268 116Z" fill="#ebe1cf"' + ink('#1f3322') + '/>' +
+    '<g fill="#b8a487">' + [[222, 126], [236, 140], [250, 124], [258, 138], [228, 144], [244, 130]].map(([x, y]) => '<circle cx="' + x + '" cy="' + y + '" r="1.6"/>').join('') + '</g>' +
+    '<rect x="206" y="106" width="68" height="12" rx="5" fill="#f6efe2"' + ink('#1f3322') + '/>');
+
+  const steam = (x, y, delay) => '<path class="sc-steam" style="animation-delay:' + delay + 's" d="M' + x + ' ' + y + 'q-6-7 0-13t0-13" fill="none" stroke="#f3e6c8" stroke-width="3" stroke-linecap="round" opacity=".8"/>';
+  // A book lying flat, spine out: a label in the middle and a band near each end.
+  const book = (x, y, width, height, fill) => '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="3" fill="' + fill + '"' + ink('#2d1a2a') + '/>' +
+    '<path d="M' + (x + 9) + ' ' + (y + 2) + 'v' + (height - 4) + 'M' + (x + width - 9) + ' ' + (y + 2) + 'v' + (height - 4) + '" stroke="#efe2c8" stroke-width="2.5"/>' +
+    '<rect x="' + (x + width / 2 - 13) + '" y="' + (y + height / 2 - 3) + '" width="26" height="6" rx="1.5" fill="#efe2c8"/>';
+  const books = svg('books',
+    '<path d="M30 26a14 14 0 1 0 14 22a11 11 0 1 1-14-22z" fill="#f3e6c8"/>' +
+    '<g fill="#f3e6c8">' + [[76, 22, 0], [150, 18, 2.2]].map(([x, y, delay]) => '<circle class="sc-twinkle" style="animation-delay:' + delay + 's" cx="' + x + '" cy="' + y + '" r="1.8"/>').join('') +
+      '<circle cx="110" cy="44" r="1.8"/><circle cx="182" cy="54" r="1.8"/></g>' +
+    faded('table', '<rect x="0" y="148" width="320" height="7" fill="#a8775a"/><rect x="0" y="155" width="320" height="15" fill="#7c5143"/>' +
+      '<path d="M0 148H320" stroke="#2d1a2a" stroke-width="3"/>') +
+    // teapot: spout and handle behind the body
+    tube('M110 134C126 130 126 112 138 104', '#2d1a2a', '#9cc4bd', 13) +
+    '<path d="M134 101l9-3" stroke="#2d1a2a" stroke-width="5" stroke-linecap="round"/>' +
+    tube('M58 112C34 106 32 142 56 140', '#2d1a2a', '#9cc4bd', 11) +
+    '<ellipse cx="84" cy="126" rx="34" ry="24" fill="#9cc4bd"' + ink('#2d1a2a') + '/>' +
+    '<path d="M52 122q32 12 64 0" fill="none" stroke="#cfe3dc" stroke-width="6" stroke-linecap="round"/>' +
+    '<path d="M66 104a18 13 0 0 1 36 0z" fill="#cfe3dc"' + ink('#2d1a2a') + '/><circle cx="84" cy="89" r="4.5" fill="#cfe3dc"' + ink('#2d1a2a') + '/>' +
+    // a cup of tea, steaming
+    steam(156, 114, 0) + steam(168, 110, 2.5) +
+    '<ellipse cx="162" cy="148" rx="25" ry="4.5" fill="#e9dfcf"' + ink('#2d1a2a') + '/>' +
+    tube('M176 128q10 0 10 7t-10 7', '#2d1a2a', '#f3ead9', 9) +
+    '<path d="M146 122h32v10q0 14-16 14q-16 0-16-14z" fill="#f3ead9"' + ink('#2d1a2a') + '/>' +
+    '<path d="M147 130h30" stroke="#9cc4bd" stroke-width="4"/>' +
+    '<ellipse cx="162" cy="122" rx="14.5" ry="2.6" fill="#b5764a"/>' +
+    // the stack, a ribbon marking a place
+    book(188, 132, 116, 18, '#cf9f4a') + book(198, 116, 98, 16, '#b0634a') +
+    '<path d="M268 130v14l3-3 3 3v-14" fill="#d9c27a" stroke="#2d1a2a" stroke-width="2" stroke-linejoin="round"/>' +
+    book(192, 102, 98, 14, '#8aa97f') +
+    // a ginger cat asleep on top
+    '<g class="sc-breathe">' +
+      '<path d="M206 102C204 80 226 70 250 70C274 70 290 82 288 102Z" fill="#d79c63"' + ink('#2d1a2a') + '/>' +
+      '<path d="M244 76q4 6 2 12M258 74q4 6 2 12M272 80q3 5 1 10" fill="none" stroke="#b5743f" stroke-width="3" stroke-linecap="round"/>' +
+      tube('M286 96C290 108 252 108 232 101', '#2d1a2a', '#d79c63', 12) +
+      '<path d="M210 80L207 64L220 75ZM226 75L234 63L236 80Z" fill="#d79c63"' + ink('#2d1a2a') + '/>' +
+      '<circle cx="222" cy="88" r="14" fill="#d79c63"' + ink('#2d1a2a') + '/>' +
+      '<ellipse cx="222" cy="95" rx="7.5" ry="5" fill="#f2d9b8"/>' +
+      '<path d="M211 87q3 3 6 0M227 87q3 3 6 0" fill="none" stroke="#2d1a2a" stroke-width="2.2" stroke-linecap="round"/>' +
+      '<path d="M220 92h4l-2 2.5z" fill="#2d1a2a" stroke="#2d1a2a" stroke-width="1.5" stroke-linejoin="round"/>' +
+    '</g>');
+
+  // The Plough, handle to bowl, then the bowl closed back to its first star.
+  const plough = [[24, 46], [44, 30], [66, 24], [88, 30], [126, 18], [130, 50], [94, 56]];
+  const stargazing = svg('stargazing',
+    '<g fill="#e9e2cf" opacity=".7">' + [[150, 12], [200, 24], [16, 84], [150, 74], [300, 70], [252, 56], [118, 96], [8, 22]].map(([x, y]) => '<circle cx="' + x + '" cy="' + y + '" r="1.3"/>').join('') + '</g>' +
+    '<path d="M' + plough.map((point) => point.join(' ')).join('L') + 'L88 30" fill="none" stroke="#e9e2cf" stroke-width="1.5" stroke-linejoin="round" opacity=".4"/>' +
+    plough.map(([x, y], index) => index % 3 ? '<circle cx="' + x + '" cy="' + y + '" r="2.4" fill="#fff3d6"/>' : sparkle(x, y, 5.5, '#fff3d6', index * .9)).join('') +
+    '<path d="M160 32l22-12" stroke="#e9e2cf" stroke-width="2" stroke-linecap="round" opacity=".5"/>' + sparkle(184, 19, 4, '#fff', 1.6) +
+    '<path d="M38 88a14 14 0 1 0 14 22a11 11 0 1 1-14-22z" fill="#f3e6c4"/>' +
+    faded('stargazing-back-hill', '<path d="M0 134Q60 112 120 128T230 146V170H0Z" fill="#33426f" opacity=".75"/>') +
+    // a cabin on the far hill, one window lit
+    '<path d="M68 126V112l10-8 10 8v14z" fill="#24305a" stroke="#121a33" stroke-width="2.5" stroke-linejoin="round"/><rect x="75" y="114" width="6" height="6" rx="1" fill="#ffe08a"/>' +
+    faded('stargazing-hill', '<path d="M0 156Q90 140 190 147T320 142V170H0Z" fill="#141c36"/>') +
+    // fox, from behind, watching the sky; the tail sweeps round
+    '<g class="sc-sway"><path d="M160 148C140 154 116 152 110 141C106 132 118 126 128 132C136 138 146 140 162 138Z" fill="#c97a4a"' + ink('#121a33') + '/>' +
+      '<path d="M110 141C106 132 118 126 128 132C122 136 118 142 120 148C114 147 111 144 110 141Z" fill="#f1e2cc"' + ink('#121a33') + '/></g>' +
+    '<path d="M150 149C142 130 148 110 166 106C184 110 192 130 184 149Z" fill="#c97a4a"' + ink('#121a33') + '/>' +
+    '<path d="M155 84L151 63L166 79ZM168 79L175 61L180 85Z" fill="#c97a4a"' + ink('#121a33') + '/>' +
+    '<path d="M152.6 71.5L151 63L157 69.5ZM172.3 68L175 61L176.4 70Z" fill="#3b2a2c"/>' +
+    '<path d="M155 86L139 75Q136 74 137 77L156 97Z" fill="#c97a4a"' + ink('#121a33') + '/><circle cx="138" cy="76" r="2.6" fill="#121a33"/>' +
+    '<circle cx="166" cy="94" r="15" fill="#c97a4a"' + ink('#121a33') + '/>' +
+    // tripod and telescope
+    tube('M232 98L208 149M232 98L236 149M232 98L264 149', '#121a33', '#9a7550', 10) +
+    '<path d="M220 124h28" stroke="#121a33" stroke-width="3" stroke-linecap="round"/>' +
+    '<rect x="225" y="84" width="14" height="14" rx="3" fill="#5a4632"' + ink('#121a33') + '/>' +
+    '<g transform="rotate(28 274 96)">' +
+      '<path d="M224 80v7M244 80v7" stroke="#121a33" stroke-width="2.5"/><rect x="220" y="75" width="30" height="7" rx="3" fill="#d1a95f"' + ink('#121a33') + '/>' +
+      '<rect x="190" y="87" width="80" height="18" rx="4" fill="#d1a95f"' + ink('#121a33') + '/>' +
+      '<path d="M212 89v14M250 89v14" stroke="#ecd29a" stroke-width="5"/>' +
+      '<rect x="270" y="91" width="10" height="10" rx="2" fill="#5a4632"' + ink('#121a33') + '/><rect x="279" y="93" width="8" height="6" rx="2" fill="#5a4632" stroke="#121a33" stroke-width="2.5"/>' +
+      '<rect x="168" y="84" width="26" height="24" rx="4" fill="#d1a95f"' + ink('#121a33') + '/>' +
+      '<rect x="164" y="86" width="7" height="20" rx="3" fill="#9fb4dc"' + ink('#121a33') + '/>' +
+    '</g>');
+
+  const flyer = (x, y) => '<path d="M' + x + ' ' + y + 'q5-6 10 0q5-6 10 0" fill="none" stroke="#e8efe9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+  const robinBody = '<ellipse cx="232" cy="82" rx="27" ry="22"/><circle cx="212" cy="66" r="15"/>';
+  const birds = svg('birds',
+    '<g class="sc-drift">' + flyer(30, 34) + flyer(56, 24) + flyer(80, 40) + '</g>' +
+    '<g class="sc-drift" style="animation-direction:alternate-reverse">' + cloud(160, 42, '#163033', .8, '#e8efe9') + '</g>' +
+    faded('birds-meadow', '<path d="M0 150Q80 140 160 148T320 144V170H0Z" fill="#8fa66b"/>' +
+      '<g fill="none" stroke="#6f8a52" stroke-width="2.5" stroke-linecap="round">' + [18, 132, 196, 300].map((x) => '<path d="M' + x + ' 156l-3-9M' + (x + 4) + ' 156l1-11M' + (x + 8) + ' 156l4-8"/>').join('') + '</g>') +
+    // a birdhouse on a pole, someone peeking out
+    '<rect x="66" y="104" width="8" height="46" fill="#9c7a58"' + ink('#163033') + '/>' +
+    '<path d="M48 108V74L70 56L92 74V108Z" fill="#e7dcc6"' + ink('#163033') + '/>' +
+    '<path d="M40 78L70 50L100 78" fill="none" stroke="#163033" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 78L70 50L100 78" fill="none" stroke="#6f9a8a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<circle cx="70" cy="84" r="9" fill="#2a3b3a"' + ink('#163033') + '/>' +
+    '<circle cx="70" cy="86" r="6.5" fill="#f4f1e8"/><path d="M63.5 84a6.5 6.5 0 0 1 13 0z" fill="#6f95bd"/><path d="M64 86.5h12" stroke="#2a3b3a" stroke-width="1.6"/>' +
+    '<circle cx="68" cy="87" r="1.4" fill="#163033"/><path d="M65 89l-3 1 3 1z" fill="#2a3b3a"/>' +
+    '<path d="M70 98v6" stroke="#163033" stroke-width="3" stroke-linecap="round"/>' +
+    // a feather drifting down
+    '<g class="sc-flutter" style="animation-delay:1s"><path d="M138 66c8 6 10 16 6 24c-8-6-10-16-6-24z" fill="#f1ece0" stroke="#163033" stroke-width="2" stroke-linejoin="round"/><path d="M139 70q3 10 3 24" fill="none" stroke="#163033" stroke-width="2" stroke-linecap="round"/></g>' +
+    // binoculars set down in the grass, strap looped beside them
+    '<path d="M264 146q-16 10 4 12q30 4 38-10" fill="none" stroke="#6b4a3a" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<g' + ink('#163033') + '><rect x="265" y="111" width="12" height="12" rx="3" fill="#3b3734"/><rect x="293" y="111" width="12" height="12" rx="3" fill="#3b3734"/>' +
+      '<rect x="262" y="120" width="18" height="30" rx="5" fill="#7d5a43"/><rect x="290" y="120" width="18" height="30" rx="5" fill="#7d5a43"/>' +
+      '<rect x="279" y="126" width="12" height="12" rx="2" fill="#3b3734"/><rect x="281" y="115" width="8" height="10" rx="2" fill="#a98366"/></g>' +
+    '<path d="M265 141h12M293 141h12" stroke="#a98366" stroke-width="3.5"/>' +
+    // fence post, and the robin on it facing into the banner
+    '<rect x="218" y="112" width="26" height="38" rx="2" fill="#9c7a58"' + ink('#163033') + '/><rect x="215" y="106" width="32" height="8" rx="3" fill="#bf9c76"' + ink('#163033') + '/>' +
+    '<path d="M228 122v14" stroke="#bf9c76" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path d="M224 101l-2 5M236 101l-1 5" stroke="#163033" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<g class="sc-nod">' +
+      '<path d="M254 88L276 100L270 106L248 96Z" fill="#7a6248"' + ink('#163033') + '/>' +
+      '<g fill="#163033" stroke="#163033" stroke-width="6">' + robinBody + '</g><g fill="#8f7556">' + robinBody + '</g>' +
+      '<path d="M200 58Q207 53 216 60Q222 70 226 82Q232 94 240 98Q226 102 214 96Q206 90 206 82Q203 76 199 68Z" fill="#d9824e"/>' +
+      '<path d="M234 74Q252 72 260 88Q248 94 236 86Z" fill="#7a6248"/>' +
+      '<circle cx="207" cy="62" r="2.6" fill="#163033"/>' +
+      '<path d="M198 63L189 66L198 69Z" fill="#4a3b2e" stroke="#163033" stroke-width="2" stroke-linejoin="round"/>' +
+    '</g>');
+
+  return { trains, dinosaurs, unicorns, space, construction, ocean, pirates, heroes, robots, princesses, pets, horses, bugs, jungle, dragons, cars, games, bricks, sweets, weather, spring, summer, autumn, winter, houseplants, books, stargazing, birds };
 })();
