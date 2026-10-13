@@ -18,6 +18,23 @@ so it's not easy to forget.
 
 ---
 
+## 2026-10-13
+
+- **every special-interest theme now has its own banner** — the last ten
+  themes swap their emoji stickers for illustrations in the same flat,
+  sticker-like style: a puppy and a kitten sharing a bed beside a ball of
+  yarn, a horse resting its chin on a paddock fence by a hay bale, a ladybird
+  on a big leaf with a butterfly, a bee and daisies, a giraffe rising from
+  the palms while a monkey swings on a vine, a round green dragon asleep
+  beside a little castle puffing smoke rings, a fire engine speeding past a
+  green light, a pixel-art slime under a gold block and its coin, a stack of
+  studded bricks with one being lowered on top, a smiling cupcake beside a
+  plate of warm cookies, and a sun peeking out from behind a cloud over a
+  rainbow and a rain shower. with motion on, tails wag, wings flap, the
+  monkey swings, the dragon breathes, the siren blinks, the coin spins, steam
+  rises and rain falls. Bright sky keeps its tickets and Quiet and calm stays
+  plain.
+
 ## 2026-10-12
 
 - **visual schedules can wear a learner's favourite thing** — the weekly

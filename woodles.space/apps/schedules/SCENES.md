@@ -4,9 +4,10 @@ the illustrated banners on the learner's visual schedule: how they're drawn,
 why they look the way they do, and how to add one that belongs with the rest.
 read this before touching `generator/scenes.js` or `generator/scenes.css`.
 
-ten exist: trains, dinosaurs, unicorns, space, construction, ocean, pirates,
-heroes, robots, princesses. the other themes fall back to emoji stickers (and
-Bright sky to its ticket scene, Quiet and calm to nothing — both on purpose).
+every theme but two has one: trains, dinosaurs, unicorns, space,
+construction, ocean, pirates, heroes, robots, princesses, pets, horses, bugs,
+jungle, dragons, cars, games, bricks, sweets, weather. Bright sky keeps its
+ticket scene and Quiet and calm shows nothing — both on purpose.
 
 ## where they live
 
@@ -88,6 +89,11 @@ convention. current inks:
 | unicorns | `#6b3fa0` violet | | heroes | `#1c1c1c` comic black |
 | space | `#2a3170` indigo | | robots | `#1e293b` slate |
 | construction | `#1c1f24` charcoal | | princesses | `#6b2150` plum |
+| pets | `#4a2614` warm brown | | dragons | `#2b1747` night purple |
+| horses | `#3b2414` saddle brown | | cars | `#1b1e25` tyre black |
+| bugs | `#1d3a12` leaf green | | games | `#1e0b3a` arcade purple (as pixels) |
+| jungle | `#2d2410` earth brown | | bricks | `#1b1b2f` ink navy |
+| sweets | `#3b1622` berry brown | | weather | `#1c2a63` storm blue |
 
 **tubes** (necks, arms, booms) are two stacked strokes of the same path: the
 ink colour wide, then the fill colour 5–6 units narrower. that gives an
@@ -116,6 +122,16 @@ outlined limb without building a closed shape:
   | teal (ocean, robots) | mid-blue whale; orange-bodied robot |
   | red→blue (heroes) | yellow burst behind a blue-and-red hero |
   | pink→purple (princesses) | pale pink castle, gold crown |
+  | orange→rose (pets) | cream puppy, grey kitten, blue bed |
+  | brown (horses) | cream horse with a dark mane, white fence |
+  | green (bugs) | red ladybird on a pale leaf |
+  | dark green (jungle) | yellow giraffe, brown monkey with a tan face |
+  | purple→green (dragons) | lime dragon, lilac stone keep |
+  | slate (cars) | red fire engine |
+  | violet→magenta (games) | green pixel slime, gold block |
+  | red→orange (bricks) | blue, yellow, green and white bricks — never red |
+  | magenta→orange (sweets) | white frosting on a sky-blue wrapper |
+  | blue→violet (weather) | yellow sun, white cloud, four-band rainbow |
 
 - give each subject **one lighter tone** for form: a belly, a sail, a wall.
   keep it to one; two starts to read as shading.
@@ -140,12 +156,15 @@ outlined limb without building a closed shape:
 - **mouth:** a short upward curve, `stroke-width` 2–3, round caps.
 - **generic, not branded.** the hero has no logo or recognisable costume; the
   star on the chest is the burst helper. avoid any likeness to a licensed
-  character, toy or vehicle.
+  character, toy or vehicle: the pixel block carries a sparkle rather than a
+  question mark, the player is a slime of our own, and the bricks have no
+  minifigure and no lettering on the studs.
 - **don't gender the learner.** the princess scene is a castle and a crown,
   not a princess, and the theme's greeting is "Hi {name}!". draw the
   interest, not a person the learner is meant to be.
 - objects get a little life where it's cheap: a dome on the boiler, a blush on
-  the whale, a chest light on the robot.
+  the whale, a chest light on the robot, a face on the cupcake and the sun.
+  vehicles and buildings stay faceless.
 
 ## building shapes
 
@@ -167,10 +186,16 @@ drawing tool in the loop and none is needed.
 | `wave(y, fill, extra)` | a scalloped water band from x −40 to 360 |
 | `flag(x, y, fill, ink)` | a pole and a swallow-tail pennant that waves |
 | `tower(x, y, w, wall, roof, flagFill)` | a castle tower: wall, cone roof, flag, arched window |
-| `trainWheel`, `fish`, `cloud` | scene-local repeats |
+| `cloud(x, y, stroke, scale, fill)` | the flat-bottomed cloud, any ink, any size |
+| `tube(d, outline, fill, width)` | an outlined limb or tail: the ink stroke, then the fill 6 narrower |
+| `blush(points, r, fill)` | pink cheeks at `opacity=".8"` |
+| `heart(x, y, size, fill, stroke, extra)` | a rounded heart; `extra` carries a class or style |
+| `sunRays(cx, cy, inner, outer, count, color)` | glowing rays around a sun |
+| `pixels(x, y, size, rows, palette)` | pixel art from rows of palette keys, merged into runs |
+| `trainWheel`, `carWheel`, `fish`, `paw`, `daisy`, `brick`, `sprinkle`, `raindrop` | scene-local repeats |
 
-add a helper as soon as a shape repeats; a scene should stay around
-2.5–4 KB of markup.
+add a helper as soon as a shape repeats. most scenes are 3–5 KB of markup;
+the busiest (pets, jungle, bugs) are about 6. past that, look for a helper.
 
 ### recurring constructions
 
@@ -184,6 +209,13 @@ add a helper as soon as a shape repeats; a scene should stay around
   radiating from one point (`q-24-6-34 8 q16-10 34-8 z`).
 - **ground strip:** a rect or gently rolling path (`Q … T …`) wrapped in
   `faded()`.
+- **union outline:** to outline several overlapping primitives as one shape
+  (the bone, the horse's head, the jungle bush), draw them once filled and
+  stroked in ink at `stroke-width="6"`, then again in the fill colour with no
+  stroke. the inner seams disappear and the outside keeps a 3-unit line.
+- **hiding a root:** a neck or stem that rises from off-canvas ends behind
+  something — a fence, a bush, the front of a bed — never at the box edge,
+  where its round cap pokes out below the banner.
 
 ### layering, back to front
 
@@ -223,6 +255,18 @@ it's printing).
 | `sc-spout` | water spout squashes | 2.4s | bottom centre |
 | `sc-swim` | fish drifts 14px and back | 5s | — |
 | `sc-wave` (front/back) | water slides 20px | 6s / 8s alternate | — |
+| `sc-wag` | tail wags −5°…6° | 1.6s | bottom left (the tail's root) |
+| `sc-nuzzle` | head dips 4° (`sc-nod` keyframes) | 4.4s | right 30% (where a left-facing head meets its neck) |
+| `sc-tilt` | flower or frond sways ±2.5° | 3.4s | bottom centre (the stem) |
+| `sc-swing` | hangs and swings ±4° | 3.6s | top centre (the vine's anchor) |
+| `sc-breathe` | sleeping body swells 3% | 4s | bottom centre |
+| `sc-flap` | wings close to 55% | .9s | centre (the body) |
+| `sc-glow` | sun rays grow 8% and dim | 4s | centre |
+| `sc-drift` | cloud slides 10px | 7s alternate | — |
+| `sc-hop` | pixel player jumps 8px, stepped | 1.6s | — |
+| `sc-flip` | pixel coin turns edge-on, stepped | 1.2s | centre |
+| `sc-place` | brick lowers 7px toward its slot | 2.6s | — |
+| `sc-fall` | raindrop falls and fades | 1.4s | — |
 
 rules:
 
@@ -266,6 +310,24 @@ rules:
 - `node --check generator/scenes.js` catches the commonest mistake, a broken
   string concatenation.
 
+## the pixel scene
+
+Pixel games is the one scene that breaks the rounded-line rule. it's drawn
+with `pixels()` from string maps — one character per pixel, `.` for empty,
+each other character a key into a palette — so the art is legible in the
+source:
+
+```js
+const pixelHeart = ['.kk.kk.', 'kwrkrrk', 'krrrrrk', '.krrrk.', '..krk..', '...k...'];
+pixels(10, 10, 4, pixelHeart, arcade)
+```
+
+- pixels are **5 units** for the player, block and coin, 4 for the hearts and
+  sparkles. outlines are ink-coloured pixels, not strokes.
+- the whole scene sits in `<g shape-rendering="crispEdges">`.
+- its motion is stepped (`steps(3)` on the hop, `steps(2)` on the coin flip)
+  so it moves like a sprite, not a tween.
+
 ## process
 
 how the existing ten were made, and how to make the next one.
@@ -286,9 +348,19 @@ how the existing ten were made, and how to make the next one.
    its peak about 13 units); the castle's middle flag touched the Edit plan pill
    (lowered 10); every ground strip ended in a hard rectangle (added
    `faded`); the studio preview drew the art at 96px (gave it a 136px
-   column).
+   column); the horse's head read as a beak until it was rebuilt as a jowl,
+   a face and a muzzle under one union outline; the giraffe's neck poked out
+   below the canvas (now ends behind a bush); the pixel coin sat in line with
+   the hearts and read as part of the score bar (moved down with its block).
 6. **turn motion on** and watch it in a real browser for a few cycles. check
    pivots, then check that nothing is distracting next to the schedule.
+   without a screen to watch, freeze it instead: render the scene a few times
+   inside `data-motion="on"`, pause every animation and step it, then look
+   for parts that come loose at the extremes.
+
+   ```js
+   for (const anim of document.getAnimations()) { anim.pause(); anim.currentTime = ms; }
+   ```
 7. **wire and test** (below).
 
 ### screenshot script
@@ -342,8 +414,9 @@ back to a system font, which is fine for judging the art.
 2. add the scene to `generator/scenes.js` and to its `return { … }`.
 3. new motion goes in `generator/scenes.css`: origin in the top block, the
    gated `animation` line, the `@keyframes`.
-4. add the id to the `illustrated` list in `e2e/schedule-style.spec.ts` (and
-   bump the theme-card count if you added a theme).
+4. `e2e/schedule-style.spec.ts` expects art on every theme except `classic`
+   and `calm`. a new theme shipping on stickers first goes in that exception
+   list until its scene lands; bump the theme-card count when you add a theme.
 5. run `node --check apps/schedules/generator/scenes.js`, then
    `pnpm exec playwright test schedule-`.
 6. add a CHANGELOG line — a new banner is something a reader would notice.
@@ -351,27 +424,9 @@ back to a system font, which is fine for judging the art.
 the API needs no change for a new scene; it only validates the
 `style.scene` enum, not the art.
 
-## not yet drawn
+## new themes
 
-ideas for the themes still on stickers, in the same voice:
-
-- **dragons and castles** — a round, sleepy green dragon curled on a hill
-  beside a small castle, puffing a smoke ring rather than fire.
-- **puppies and kittens** — a dog and a cat in a basket with a ball of yarn;
-  tails wag (`sc-sway`).
-- **horses** — a horse's head over a fence rail, a hay bale and a sun.
-- **bugs and butterflies** — a ladybird on a big leaf, a butterfly that bobs,
-  daisies.
-- **jungle safari** — a giraffe's neck rising from palms, a monkey hanging
-  from a vine (`sc-sway`).
-- **cars and trucks** — a fire engine on a road with a dashed centre line;
-  wheels spin, a light blinks.
-- **pixel games** — a joystick and a coin block; draw it on a 10-unit grid
-  with `shape-rendering="crispEdges"` and square joins, the one scene allowed
-  to break the rounded-line rule.
-- **building bricks** — a stack of studded bricks with one being placed.
-- **sweets and baking** — a cupcake with a cherry and sprinkles, a cookie,
-  rising steam.
-- **weather** — a sun half behind a cloud with a rainbow and a few raindrops.
-
-Bright sky keeps its tickets and Quiet and calm stays empty on purpose.
+a theme added to `THEMES` falls back to its stickers until it gets a scene.
+pick the subject the learner loves, write the one-sentence brief, and follow
+the process above. Bright sky keeps its tickets and Quiet and calm stays
+empty on purpose.

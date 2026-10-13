@@ -75,7 +75,11 @@ window.ScheduleScenes = (() => {
       '<circle cx="286" cy="45" r="3.5" fill="#ff9f7a" opacity=".8"/></g>');
 
   const rainbow = ['#ff6b8b', '#ffa94d', '#ffe066', '#69db7c', '#74c0fc', '#b197fc'];
-  const cloud = (x, y) => '<path d="M' + (x - 26) + ' ' + y + 'a12 12 0 0 1 8-20a15 15 0 0 1 28-4a12 12 0 0 1 16 12a10 10 0 0 1 0 12z" fill="#fff" stroke="#8a5cc2" stroke-width="2.5" stroke-linejoin="round"/>';
+  const cloud = (x, y, stroke = '#8a5cc2', scale = 1, fill = '#fff') => {
+    const n = (value) => +(value * scale).toFixed(1);
+    return '<path d="M' + (x - n(26)) + ' ' + y + 'a' + n(12) + ' ' + n(12) + ' 0 0 1 ' + n(8) + ' ' + n(-20) + 'a' + n(15) + ' ' + n(15) + ' 0 0 1 ' + n(28) + ' ' + n(-4) +
+      'a' + n(12) + ' ' + n(12) + ' 0 0 1 ' + n(16) + ' ' + n(12) + 'a' + n(10) + ' ' + n(10) + ' 0 0 1 0 ' + n(12) + 'z" fill="' + fill + '" stroke="' + stroke + '" stroke-width="2.5" stroke-linejoin="round"/>';
+  };
   const unicorns = svg('unicorns',
     rainbow.map((color, index) => '<path d="M' + (24 + index * 11) + ' 150a' + (86 - index * 11) + ' ' + (86 - index * 11) + ' 0 0 1 ' + (172 - index * 22) + ' 0" fill="none" stroke="' + color + '" stroke-width="11"/>').join('') +
     cloud(34, 154) + cloud(196, 154) +
@@ -263,5 +267,301 @@ window.ScheduleScenes = (() => {
         '<circle cx="70" cy="100" r="3.5" fill="#4dabf7"/><circle cx="88" cy="100" r="4" fill="#e64980"/><circle cx="106" cy="100" r="3.5" fill="#51cf66"/></g>' +
     '</g>');
 
-  return { trains, dinosaurs, unicorns, space, construction, ocean, pirates, heroes, robots, princesses };
+  // An outlined limb or tail: the ink stroke, then the fill 6 units narrower.
+  const tube = (d, outline, fill, width) => '<path d="' + d + '" fill="none" stroke="' + outline + '" stroke-width="' + width + '" stroke-linecap="round"/>' +
+    '<path d="' + d + '" fill="none" stroke="' + fill + '" stroke-width="' + (width - 6) + '" stroke-linecap="round"/>';
+  const blush = (points, r, fill = '#ff9fb6') => points.map(([x, y]) => '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="' + fill + '" opacity=".8"/>').join('');
+  const heart = (x, y, size, fill, stroke, extra = '') => {
+    const s = size / 14;
+    const n = (value) => +(value * s).toFixed(1);
+    return '<path ' + extra + ' d="M' + x + ' ' + (y + n(8)) + 'c' + n(-8) + ' ' + n(-6) + ' ' + n(-14) + ' ' + n(-10) + ' ' + n(-14) + ' ' + n(-16) + 'c0 ' + n(-4) + ' ' + n(3) + ' ' + n(-7) + ' ' + n(7) + ' ' + n(-7) +
+      'c' + n(3) + ' 0 ' + n(5) + ' ' + n(2) + ' ' + n(7) + ' ' + n(4) + 'c' + n(2) + ' ' + n(-2) + ' ' + n(4) + ' ' + n(-4) + ' ' + n(7) + ' ' + n(-4) + 'c' + n(4) + ' 0 ' + n(7) + ' ' + n(3) + ' ' + n(7) + ' ' + n(7) +
+      'c0 ' + n(6) + ' ' + n(-6) + ' ' + n(10) + ' ' + n(-14) + ' ' + n(16) + 'z" fill="' + fill + '" stroke="' + stroke + '" stroke-width="2.5" stroke-linejoin="round"/>';
+  };
+
+  const paw = (x, y, angle) => '<g transform="rotate(' + angle + ' ' + x + ' ' + y + ')"><ellipse cx="' + x + '" cy="' + (y + 4) + '" rx="6.5" ry="5.5"/>' +
+    [[-7, -3], [-3, -8], [3, -8], [7, -3]].map(([dx, dy]) => '<circle cx="' + (x + dx) + '" cy="' + (y + dy) + '" r="2.6"/>').join('') + '</g>';
+  const bone = '<circle cx="46" cy="138" r="5"/><circle cx="46" cy="146" r="5"/><circle cx="72" cy="138" r="5"/><circle cx="72" cy="146" r="5"/><rect x="46" y="137" width="26" height="10"/>';
+  const pets = svg('pets',
+    faded('rug', '<rect x="0" y="150" width="320" height="20" fill="#7a2420" opacity=".4"/>') +
+    '<g fill="#fff" opacity=".4">' + paw(22, 96, 30) + paw(44, 72, 40) + paw(76, 62, 50) + paw(94, 34, 50) + '</g>' +
+    // bone and yarn
+    '<g transform="rotate(-8 59 142)"><g fill="#4a2614" stroke="#4a2614" stroke-width="6" stroke-linejoin="round">' + bone + '</g><g fill="#fff6e5">' + bone + '</g></g>' +
+    '<path d="M126 142q10 8 22 2t20-4" fill="none" stroke="#7c83fd" stroke-width="3" stroke-linecap="round"/>' +
+    '<circle cx="112" cy="134" r="16" fill="#7c83fd"' + ink('#4a2614') + '/>' +
+    '<path d="M99 126q12 4 16 22M103 121q16 0 24 16M97 138q14-4 28 4" fill="none" stroke="#c3c7ff" stroke-width="2.5" stroke-linecap="round"/>' +
+    // bed, back half
+    '<ellipse cx="236" cy="118" rx="78" ry="24" fill="#3d7cc9"' + ink('#4a2614') + '/>' +
+    '<ellipse cx="236" cy="118" rx="64" ry="15" fill="#a5d0f5" stroke="#4a2614" stroke-width="2.5"/>' +
+    '<g class="sc-wag">' + tube('M292 104q16-4 18-22', '#4a2614', '#fff3e0', 12) + '</g>' +
+    '<ellipse cx="206" cy="120" rx="26" ry="15" fill="#9aa6b8"' + ink('#4a2614') + '/>' +
+    '<ellipse cx="270" cy="114" rx="27" ry="24" fill="#fff3e0"' + ink('#4a2614') + '/>' +
+    // kitten
+    '<path d="M184 90L183 70L198 79ZM203 78L217 70L218 90Z" fill="#9aa6b8"' + ink('#4a2614') + '/><path d="M187 84v-8l6 4zM209 80l5-4 1 8z" fill="#ffb3cf"/>' +
+    '<circle cx="200" cy="96" r="19" fill="#9aa6b8"' + ink('#4a2614') + '/>' +
+    '<path d="M196 79v6M201 78v7M206 79v6" stroke="#6c788c" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path d="M188 96q4-4 8 0M204 96q4-4 8 0M196 105q2 2 4 0q2 2 4 0M182 101h-8M183 105l-7 2M218 101h8M217 105l7 2" fill="none" stroke="#2a160b" stroke-width="2.2" stroke-linecap="round"/>' +
+    '<path d="M197.5 101h5l-2.5 2.5z" fill="#ff8fa3" stroke="#ff8fa3" stroke-width="1.5" stroke-linejoin="round"/>' + blush([[189, 103], [211, 103]], 3.5) +
+    // puppy
+    '<path d="M252 56C238 58 234 80 240 94C244 100 252 98 252 90C252 80 256 68 258 60ZM284 56C298 58 302 80 296 94C292 100 284 98 284 90C284 80 280 68 278 60Z" fill="#b8692f"' + ink('#4a2614') + '/>' +
+    '<circle cx="268" cy="72" r="24" fill="#fff3e0"' + ink('#4a2614') + '/><circle cx="277" cy="68" r="8" fill="#e0a46a"/>' +
+    '<circle cx="259" cy="70" r="3" fill="#2a160b"/><circle cx="277" cy="70" r="3" fill="#2a160b"/>' +
+    '<ellipse cx="268" cy="84" rx="11" ry="8" fill="#fffaf2" stroke="#4a2614" stroke-width="2.5"/>' +
+    '<path d="M266 89h4v3a2 2 0 0 1-4 0z" fill="#ff8fa3"/><path d="M263 79h10q0 5-5 7q-5-2-5-7z" fill="#2a160b"/>' +
+    '<path d="M262 88q3 3 6 0q3 3 6 0" fill="none" stroke="#2a160b" stroke-width="2" stroke-linecap="round"/>' + blush([[252, 82], [284, 82]], 4) +
+    // bed, front rim, and paws over it
+    '<path d="M158 118C158 140 190 152 236 152C282 152 314 140 314 118C304 132 276 138 236 138C196 138 168 132 158 118Z" fill="#3d7cc9"' + ink('#4a2614') + '/>' +
+    '<path d="M174 138Q236 156 298 138" fill="none" stroke="#a5d0f5" stroke-width="2.5" stroke-dasharray="4 5" stroke-linecap="round"/>' +
+    '<g' + ink('#4a2614') + '><ellipse cx="194" cy="137" rx="7" ry="5" fill="#9aa6b8"/><ellipse cx="214" cy="138" rx="7" ry="5" fill="#9aa6b8"/><ellipse cx="257" cy="137" rx="8" ry="6" fill="#fff3e0"/><ellipse cx="283" cy="137" rx="8" ry="6" fill="#fff3e0"/></g>' +
+    '<g class="sc-sway">' + tube('M182 124q-18 0-20-16', '#4a2614', '#9aa6b8', 10) + '</g>' +
+    heart(232, 46, 14, '#ff8fb1', '#4a2614', 'class="sc-rise"') + heart(208, 34, 9, '#ffc2d4', '#4a2614', 'class="sc-rise" style="animation-delay:1.6s"'));
+
+  const sunRays = (cx, cy, inner, outer, count, color) => '<g class="sc-glow" stroke="' + color + '" stroke-width="5" stroke-linecap="round">' + range(count).map((index) => {
+    const angle = Math.PI * 2 * index / count;
+    return '<path d="M' + (cx + Math.cos(angle) * inner).toFixed(1) + ' ' + (cy + Math.sin(angle) * inner).toFixed(1) + 'L' + (cx + Math.cos(angle) * outer).toFixed(1) + ' ' + (cy + Math.sin(angle) * outer).toFixed(1) + '"/>';
+  }).join('') + '</g>';
+  const horseHead = '<circle cx="246" cy="76" r="21"/><path d="M234 58L192 98L212 118L250 96Z"/><ellipse cx="204" cy="106" rx="17" ry="14"/>';
+  const horses = svg('horses',
+    sunRays(42, 38, 21, 28, 8, '#ffe066') + '<circle cx="42" cy="38" r="15" fill="#ffd43b"/>' +
+    '<g class="sc-drift">' + cloud(134, 46, '#3b2414', .9) + '</g>' +
+    faded('pasture', '<path d="M0 150Q80 138 160 146T320 142V170H0Z" fill="#6b8e23" opacity=".85"/>') +
+    // hay bale
+    '<path d="M36 110l-4-9M46 110l2-10M70 110l-2-9M98 110l4-9" stroke="#f4c95d" stroke-width="3" stroke-linecap="round"/>' +
+    '<rect x="24" y="108" width="86" height="42" rx="10" fill="#f4c95d"' + ink('#3b2414') + '/>' +
+    '<path d="M32 120h10M58 118h12M88 122h12M34 136h8M62 134h12M90 138h10M66 126h8" stroke="#d49a2a" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path d="M50 109v40M84 109v40" stroke="#a0522d" stroke-width="3"/>' +
+    // horse neck and mane, behind the fence
+    '<g transform="translate(0 6)">' +
+      '<path d="M232 84L262 50C284 66 298 100 302 150H244C246 120 240 100 232 84Z" fill="#f6e3c0"' + ink('#3b2414') + '/>' +
+      '<g fill="#6b3f1d"' + ink('#3b2414') + '>' + [[266, 52], [280, 68], [290, 88], [297, 110], [301, 132]].map(([x, y]) => '<circle cx="' + x + '" cy="' + y + '" r="9"/>').join('') + '</g>' +
+      '<path d="M264 52C280 66 293 92 299 140" fill="none" stroke="#6b3f1d" stroke-width="12" stroke-linecap="round"/>' +
+    '</g>' +
+    // fence, then grass over the foot of the neck
+    '<g fill="#fdf6ea"' + ink('#3b2414') + '><rect x="124" y="104" width="194" height="10" rx="3"/><rect x="124" y="122" width="194" height="10" rx="3"/><rect x="124" y="140" width="194" height="9" rx="3"/><rect x="134" y="96" width="12" height="56" rx="2"/><rect x="298" y="96" width="12" height="56" rx="2"/></g>' +
+    faded('pasture-front', '<path d="M0 156Q80 146 160 152T320 150V170H0Z" fill="#6b8e23"/>') +
+    // horse head, chin on the top rail
+    '<g transform="translate(0 6)"><g class="sc-nuzzle">' +
+      '<path d="M238 58L241 38L254 54ZM253 60L263 41L266 62Z" fill="#f6e3c0"' + ink('#3b2414') + '/><path d="M243 52l1-8 5 6zM258 56l4-8 1 9z" fill="#e8b8a0"/>' +
+      '<g fill="#3b2414" stroke="#3b2414" stroke-width="6" stroke-linejoin="round">' + horseHead + '</g><g fill="#f6e3c0">' + horseHead + '</g>' +
+      '<path d="M234 58C226 70 212 84 202 96C204 99 209 100 211 97C220 86 232 72 241 62Z" fill="#fffaf2"/>' +
+      '<ellipse cx="204" cy="106" rx="15" ry="11" fill="#f2c9a8"/>' +
+      '<path d="M248 52q-10 3-13 13q8-1 13-7q1 6-1 10q9-5 8-15z" fill="#6b3f1d" stroke="#3b2414" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<circle cx="238" cy="72" r="3.2" fill="#2b1a0e"/><path d="M234 67l-3-3" stroke="#2b1a0e" stroke-width="2" stroke-linecap="round"/>' +
+      '<ellipse cx="197" cy="103" rx="2.4" ry="3" fill="#2b1a0e"/>' +
+      '<path d="M200 113q6 3 12-1" fill="none" stroke="#2b1a0e" stroke-width="2.5" stroke-linecap="round"/>' + blush([[234, 90]], 5) +
+    '</g></g>');
+
+  const daisy = (x, y, delay) => '<g class="sc-tilt" style="animation-delay:' + delay + 's">' + tube('M' + x + ' 152V' + y, '#1d3a12', '#7cc35a', 8) +
+    '<path d="M' + x + ' ' + (y + 22) + 'q10-10 18-4q-8 8-18 4z" fill="#7cc35a" stroke="#1d3a12" stroke-width="2" stroke-linejoin="round"/>' +
+    '<g fill="#fff" stroke="#1d3a12" stroke-width="2">' + range(8).map((index) => '<circle cx="' + (x + Math.cos(index * Math.PI / 4) * 8).toFixed(1) + '" cy="' + (y + Math.sin(index * Math.PI / 4) * 8).toFixed(1) + '" r="5.5"/>').join('') +
+    '<circle cx="' + x + '" cy="' + y + '" r="5.5" fill="#ffd43b"/></g></g>';
+  const bugs = svg('bugs',
+    faded('garden', '<path d="M0 152Q80 142 160 150T320 146V170H0Z" fill="#174d1a" opacity=".55"/>') +
+    // bee and its loop
+    '<path d="M96 30q26 26 46 4" fill="none" stroke="#fff" stroke-width="2.5" stroke-dasharray="2 7" stroke-linecap="round" opacity=".6"/>' +
+    '<g class="sc-bob" style="animation-delay:.6s"><ellipse cx="150" cy="28" rx="6" ry="4" fill="#fff" opacity=".9" stroke="#1d3a12" stroke-width="2"/><ellipse cx="160" cy="27" rx="6" ry="4" fill="#fff" opacity=".9" stroke="#1d3a12" stroke-width="2"/>' +
+      '<ellipse cx="154" cy="38" rx="11" ry="8" fill="#ffd43b" stroke="#1d3a12" stroke-width="2.5"/><path d="M152 31v14M158 31v14" stroke="#1d3a12" stroke-width="3"/><circle cx="147" cy="36" r="1.8" fill="#1d3a12"/></g>' +
+    // butterfly
+    '<g class="sc-bob"><g class="sc-flap" stroke="#1d3a12" stroke-width="2.5" stroke-linejoin="round">' +
+      '<path d="M84 62C70 40 52 42 54 58C56 70 72 70 84 64ZM84 62C98 40 116 42 114 58C112 70 96 70 84 64Z" fill="#ff8fc8"/>' +
+      '<path d="M84 66C70 70 60 82 68 88C76 92 82 80 84 68ZM84 66C98 70 108 82 100 88C92 92 86 80 84 68Z" fill="#ffd84a"/>' +
+      '<g fill="#fff" stroke="none"><circle cx="66" cy="56" r="3.5"/><circle cx="102" cy="56" r="3.5"/></g></g>' +
+      '<rect x="81" y="50" width="6" height="30" rx="3" fill="#3b2a4d"/><path d="M83 51q-4-8-10-9M85 51q4-8 10-9" fill="none" stroke="#3b2a4d" stroke-width="2" stroke-linecap="round"/></g>' +
+    daisy(26, 112, 0) + daisy(52, 124, .8) + daisy(124, 120, 1.6) +
+    // leaf and ladybird
+    '<path d="M314 150C302 108 248 84 158 90C186 132 244 154 314 150Z" fill="#a3e06a"' + ink('#1d3a12') + '/>' +
+    '<path d="M306 144C268 118 214 100 168 92M282 128l8-18M270 122l-6 16M182 98l8-10" fill="none" stroke="#62a83a" stroke-width="3" stroke-linecap="round"/>' +
+    '<path d="M224 120l-3 7M240 121v7M256 120l3 7" stroke="#1d3a12" stroke-width="3" stroke-linecap="round"/>' +
+    '<path d="M214 120a30 32 0 0 1 60 0z" fill="#ef3b3b"' + ink('#1d3a12') + '/><path d="M244 88v32" stroke="#1d3a12" stroke-width="2.5"/>' +
+    '<g fill="#2a1f2e">' + [[229, 106, 5.5], [259, 106, 5.5], [237, 96, 3.5], [251, 96, 3.5], [234, 115, 3], [254, 115, 3]].map(([x, y, r]) => '<circle cx="' + x + '" cy="' + y + '" r="' + r + '"/>').join('') + '</g>' +
+    '<path d="M207 102q-4-10-12-12M215 100q2-10 10-14" fill="none" stroke="#1d3a12" stroke-width="2.5" stroke-linecap="round"/><circle cx="195" cy="90" r="3" fill="#2a1f2e"/><circle cx="225" cy="86" r="3" fill="#2a1f2e"/>' +
+    '<circle cx="212" cy="112" r="13" fill="#2a1f2e"' + ink('#1d3a12') + '/>' +
+    '<circle cx="206" cy="109" r="3.6" fill="#fff"/><circle cx="217" cy="109" r="3.6" fill="#fff"/><circle cx="206" cy="110" r="1.8" fill="#2a1f2e"/><circle cx="217" cy="110" r="1.8" fill="#2a1f2e"/>' + blush([[203, 116], [221, 116]], 2.4) +
+    '<path d="M205 117q5 4 10 0" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>');
+
+  const jungleBush = '<circle cx="262" cy="146" r="11"/><circle cx="280" cy="138" r="15"/><circle cx="301" cy="140" r="14"/><circle cx="313" cy="148" r="8"/><rect x="254" y="144" width="64" height="10" rx="4"/>';
+  const jungle = svg('jungle',
+    faded('bush', '<path d="M0 156Q16 136 38 146Q58 128 82 144Q104 132 124 148Q150 134 170 150Q196 136 220 148Q248 132 272 146Q296 134 320 150V170H0Z" fill="#0c3a1b" opacity=".6"/>') +
+    // leaves hanging from the canopy
+    '<g' + ink('#2d2410') + '><path d="M10 0C30 14 34 36 26 52C12 40 6 20 10 0Z" fill="#4caf50"/><path d="M34 0C52 10 60 28 56 44C42 34 34 18 34 0Z" fill="#66bb6a"/><path d="M0 16C14 26 18 44 12 60C2 50 0 36 0 16Z" fill="#66bb6a"/></g>' +
+    '<path d="M11 4Q24 24 25 46M36 4Q48 20 54 38" fill="none" stroke="#2e7d32" stroke-width="2" stroke-linecap="round"/>' +
+    // monkey on a vine
+    '<g class="sc-swing">' + tube('M104 0C98 18 110 34 104 58', '#2d2410', '#7cb342', 8) +
+      '<path d="M104 16q12-8 18 0q-10 6-18 0zM105 36q-12-8-18 0q10 6 18 0z" fill="#7cb342" stroke="#2d2410" stroke-width="2" stroke-linejoin="round"/>' +
+      tube('M114 98C118 84 112 68 106 60', '#2d2410', '#8b5a2b', 12) +
+      tube('M114 120C134 124 140 108 132 98C128 94 122 98 126 102', '#2d2410', '#8b5a2b', 10) +
+      tube('M98 120C94 128 94 134 96 140', '#2d2410', '#8b5a2b', 12) + tube('M110 120C114 128 116 134 112 140', '#2d2410', '#8b5a2b', 12) +
+      '<ellipse cx="104" cy="108" rx="14" ry="17" fill="#8b5a2b"' + ink('#2d2410') + '/><ellipse cx="104" cy="112" rx="8" ry="10" fill="#f3c99b"/>' +
+      tube('M94 100C86 106 84 114 86 120', '#2d2410', '#8b5a2b', 12) +
+      '<g fill="#f3c99b" stroke="#2d2410" stroke-width="2.5"><circle cx="105" cy="58" r="5"/><circle cx="86" cy="121" r="5"/><circle cx="96" cy="141" r="5"/><circle cx="112" cy="141" r="5"/></g>' +
+      '<g fill="#8b5a2b"' + ink('#2d2410') + '><circle cx="86" cy="82" r="7"/><circle cx="118" cy="82" r="7"/></g><g fill="#f3c99b"><circle cx="86" cy="82" r="3.5"/><circle cx="118" cy="82" r="3.5"/></g>' +
+      '<circle cx="102" cy="84" r="16" fill="#8b5a2b"' + ink('#2d2410') + '/>' +
+      '<path d="M90 87C90 79 96 77 102 81C108 77 114 79 114 87C114 96 108 100 102 100C96 100 90 96 90 87Z" fill="#f3c99b" stroke="#2d2410" stroke-width="2"/>' +
+      '<circle cx="97" cy="86" r="2.4" fill="#2d2410"/><circle cx="107" cy="86" r="2.4" fill="#2d2410"/><path d="M98 93q4 3 8 0" fill="none" stroke="#2d2410" stroke-width="2.2" stroke-linecap="round"/>' + blush([[93, 93], [111, 93]], 2.6) +
+    '</g>' +
+    // giraffe
+    tube('M288 140C286 120 266 102 238 86', '#2d2410', '#f7c948', 30) +
+    '<g fill="#c8742c">' + [[284, 150, 6], [295, 138, 4.5], [279, 128, 5.5], [272, 112, 4], [262, 106, 5], [250, 94, 4]].map(([x, y, r]) => '<circle cx="' + x + '" cy="' + y + '" r="' + r + '"/>').join('') + '</g>' +
+    '<g class="sc-nuzzle">' +
+      tube('M222 66l-3-14M232 68l3-14', '#2d2410', '#f7c948', 9) + '<g fill="#a0522d" stroke="#2d2410" stroke-width="2.5"><circle cx="219" cy="51" r="4.5"/><circle cx="235" cy="53" r="4.5"/></g>' +
+      '<path d="M238 72q14-8 22-2q-10 8-22 2z" fill="#f7c948" stroke="#2d2410" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<ellipse cx="220" cy="76" rx="24" ry="17" transform="rotate(-15 220 76)" fill="#f7c948"' + ink('#2d2410') + '/>' +
+      '<circle cx="232" cy="82" r="4" fill="#c8742c"/>' +
+      '<ellipse cx="198" cy="86" rx="14" ry="12" fill="#ffe3a3"' + ink('#2d2410') + '/>' +
+      '<circle cx="192" cy="82" r="1.8" fill="#2d2410"/><circle cx="199" cy="80" r="1.8" fill="#2d2410"/><circle cx="220" cy="72" r="3" fill="#2d2410"/>' +
+      '<path d="M190 92q5 4 10 1" fill="none" stroke="#2d2410" stroke-width="2.2" stroke-linecap="round"/>' + blush([[211, 85]], 4) +
+    '</g>' +
+    // a bush and palm fronds hide where the neck comes up
+    '<g class="sc-tilt"' + ink('#2d2410') + '><path d="M290 146C266 116 232 112 206 122C236 120 262 130 290 146Z" fill="#5cb85c"/><path d="M292 146C300 114 310 100 318 94C318 118 308 134 292 146Z" fill="#7cc35a"/></g>' +
+    '<g fill="#2d2410" stroke="#2d2410" stroke-width="6" stroke-linejoin="round">' + jungleBush + '</g><g fill="#3f8f3a">' + jungleBush + '</g>' +
+    '<path d="M266 140q6-6 12-4M290 132q8-6 14-2" fill="none" stroke="#5cb85c" stroke-width="2.5" stroke-linecap="round"/>');
+
+  const dragonSpikes = range(6).map((index) => {
+    const at = (angle, grow) => (246 + Math.cos(angle) * 52 * grow).toFixed(1) + ' ' + (116 + Math.sin(angle) * 32 * grow).toFixed(1);
+    const angle = (-150 + index * 22) * Math.PI / 180;
+    return 'M' + at(angle - .12, 1) + 'L' + at(angle, 1.28) + 'L' + at(angle + .12, 1) + 'Z';
+  }).join('');
+  const dragons = svg('dragons',
+    '<path d="M140 14a13 13 0 1 0 13 20a10 10 0 1 1-13-20z" fill="#fff3c4"/>' +
+    [[20, 30], [60, 18], [104, 26], [196, 34], [304, 58], [176, 66], [14, 86]].map(([x, y], index) => '<circle class="sc-twinkle" style="animation-delay:' + index * .4 + 's" cx="' + x + '" cy="' + y + '" r="' + (index % 3 ? 1.8 : 2.4) + '" fill="#fff"/>').join('') +
+    faded('dragon-hills', '<path d="M0 152Q60 140 120 148T320 140V170H0Z" fill="#0b3f2c" opacity=".6"/><path d="M150 152C170 124 210 116 250 118C290 120 312 132 320 142V152Z" fill="#2a8a58"/>') +
+    // castle
+    '<g fill="#c9c2e0"' + ink('#2b1747') + '><rect x="38" y="74" width="50" height="76"/><path d="' + range(4).map((index) => 'M' + (38 + index * 14) + ' 74v-9h8v9').join('') + '"/>' +
+      '<rect x="88" y="100" width="26" height="50"/><path d="M90 100v-8h8v8M104 100v-8h8v8"/></g>' +
+    '<path d="M44 90h10M70 86h10M46 118h8M76 122h8M94 138h8" stroke="#a59bc7" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path d="M53 150v-20a10 10 0 0 1 20 0v20z" fill="#6d28d9"' + ink('#2b1747') + '/>' +
+    '<path d="M58 104v-8a5 5 0 0 1 10 0v8zM97 126v-7a4 4 0 0 1 8 0v7z" fill="#ffd43b"' + ink('#2b1747') + '/>' +
+    flag(63, 49, '#ffd43b', '#2b1747') +
+    // smoke rings
+    '<g fill="none" stroke="#efe9ff" stroke-width="3.5">' + [[146, 100, 5, 0], [132, 78, 7, 1], [116, 54, 9, 2]].map(([x, y, r, delay]) => '<circle class="sc-puff" style="animation-delay:' + delay + 's" cx="' + x + '" cy="' + y + '" r="' + r + '"/>').join('') + '</g>' +
+    // dragon, curled up asleep
+    '<g class="sc-breathe">' +
+      '<path d="M236 92C240 70 262 60 286 64C280 72 280 80 284 88C274 86 268 92 268 100Z" fill="#5cc27a"' + ink('#2b1747') + '/>' +
+      '<path d="' + dragonSpikes + '" fill="#ffb347" stroke="#2b1747" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<ellipse cx="246" cy="116" rx="52" ry="32" fill="#9be38a"' + ink('#2b1747') + '/>' +
+      '<path d="M204 128C220 146 270 150 294 128" fill="none" stroke="#fff3b8" stroke-width="7" stroke-linecap="round"/>' +
+      '<ellipse cx="274" cy="124" rx="18" ry="14" fill="#9be38a" stroke="#2b1747" stroke-width="2.5"/>' +
+      tube('M290 128C306 148 274 156 240 151', '#2b1747', '#9be38a', 18) +
+      '<path d="M242 151L229 143L222 151L229 159Z" fill="#ffb347" stroke="#2b1747" stroke-width="2.5" stroke-linejoin="round"/>' +
+    '</g>' +
+    '<path d="M186 102l2-14 9 11zM200 101l7-12 4 13z" fill="#fff3b8" stroke="#2b1747" stroke-width="2.5" stroke-linejoin="round"/>' +
+    '<ellipse cx="190" cy="120" rx="27" ry="21" fill="#9be38a"' + ink('#2b1747') + '/>' +
+    '<ellipse cx="166" cy="126" rx="15" ry="12" fill="#9be38a"' + ink('#2b1747') + '/>' +
+    '<circle cx="158" cy="121" r="1.8" fill="#2b1747"/><circle cx="164" cy="120" r="1.8" fill="#2b1747"/>' +
+    '<path d="M180 112q6 5 12 0M156 132q6 4 12 1" fill="none" stroke="#2b1747" stroke-width="2.6" stroke-linecap="round"/>' + blush([[196, 126]], 5) +
+    '<g fill="#9be38a"' + ink('#2b1747') + '><ellipse cx="184" cy="143" rx="9" ry="6"/><ellipse cx="204" cy="144" rx="9" ry="6"/></g>');
+
+  function carWheel(cx, cy, r) {
+    return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="#2b2e33"' + ink('#1b1e25') + '/><circle cx="' + cx + '" cy="' + cy + '" r="' + r * .55 + '" fill="#ced4da" stroke="#1b1e25" stroke-width="2.5"/>' +
+      '<g class="sc-spin"><path d="M' + (cx - r * .4) + ' ' + cy + 'H' + (cx + r * .4) + 'M' + cx + ' ' + (cy - r * .4) + 'V' + (cy + r * .4) + '" stroke="#1b1e25" stroke-width="2.5" stroke-linecap="round"/></g>';
+  }
+  const cars = svg('cars',
+    '<g class="sc-drift">' + cloud(78, 48, '#1b1e25', .8) + cloud(178, 32, '#1b1e25', .6) + '</g>' +
+    faded('road', '<rect x="0" y="146" width="320" height="24" fill="#1f242d"/><path d="M0 146H320" stroke="#8a94a6" stroke-width="2"/><path d="M4 159H320" stroke="#ffd43b" stroke-width="3" stroke-dasharray="14 10"/>') +
+    // traffic light
+    '<rect x="36" y="94" width="6" height="54" fill="#495057"' + ink('#1b1e25') + '/>' +
+    '<rect x="25" y="42" width="28" height="56" rx="7" fill="#343a40"' + ink('#1b1e25') + '/>' +
+    '<circle cx="39" cy="54" r="6" fill="#7a3434"/><circle cx="39" cy="70" r="6" fill="#7a6a2a"/><circle cx="39" cy="86" r="6.5" fill="#51cf66" stroke="#b2f2bb" stroke-width="2"/>' +
+    '<g stroke="#fff" stroke-width="3.5" stroke-linecap="round" class="sc-zoom"><path d="M96 104h26M86 120h34M100 136h22"/></g>' +
+    // fire engine
+    '<g class="sc-roll">' +
+      '<path d="M146 96v-6M226 96v-6" stroke="#1b1e25" stroke-width="4"/>' +
+      '<g fill="#dee2e6" stroke="#1b1e25" stroke-width="2.5"><rect x="134" y="80" width="108" height="5" rx="2"/><rect x="134" y="89" width="108" height="5" rx="2"/></g>' +
+      '<path d="' + range(8).map((index) => 'M' + (142 + index * 13) + ' 84v6').join('') + '" stroke="#1b1e25" stroke-width="2.5"/>' +
+      '<rect x="132" y="96" width="110" height="42" rx="5" fill="#e03131"' + ink('#1b1e25') + '/>' +
+      '<path d="M240 138V84h40q16 0 22 20l6 22v12z" fill="#e03131"' + ink('#1b1e25') + '/>' +
+      '<path d="M258 90h20q10 0 14 14l2 8h-36z" fill="#bfe3ff" stroke="#1b1e25" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<g fill="none" stroke="#1b1e25" stroke-width="2.5"><rect x="140" y="102" width="30" height="20" rx="3"/><rect x="204" y="102" width="30" height="20" rx="3"/><path d="M250 92v32"/></g>' +
+      '<circle cx="187" cy="112" r="10" fill="#ffd43b" stroke="#1b1e25" stroke-width="2.5"/><circle cx="187" cy="112" r="3.5" fill="#1b1e25"/>' +
+      '<rect x="132" y="126" width="176" height="5" fill="#f8f9fa"/>' +
+      '<rect class="sc-blink" x="248" y="75" width="15" height="9" rx="3" fill="#ff6b6b"' + ink('#1b1e25') + '/><rect class="sc-blink" style="animation-delay:.6s" x="263" y="75" width="15" height="9" rx="3" fill="#4dabf7"' + ink('#1b1e25') + '/>' +
+      '<circle cx="302" cy="118" r="4.5" fill="#ffe08a" stroke="#1b1e25" stroke-width="2.5"/>' +
+      '<rect x="292" y="132" width="20" height="8" rx="3" fill="#adb5bd"' + ink('#1b1e25') + '/>' +
+    '</g>' +
+    carWheel(168, 136, 14) + carWheel(276, 136, 14));
+
+  // Pixel art from rows of palette keys ('.' is empty), merged into horizontal runs.
+  const pixels = (x, y, size, rows, palette) => {
+    const runs = {};
+    rows.forEach((row, line) => {
+      for (let start = 0, end; start < row.length; start = end) {
+        for (end = start; end < row.length && row[end] === row[start]; end += 1);
+        if (row[start] !== '.') (runs[row[start]] = runs[row[start]] || []).push('M' + (x + start * size) + ' ' + (y + line * size) + 'h' + (end - start) * size + 'v' + size + 'h-' + (end - start) * size + 'z');
+      }
+    });
+    return Object.keys(runs).map((key) => '<path d="' + runs[key].join('') + '" fill="' + palette[key] + '"/>').join('');
+  };
+  const arcade = { k: '#1e0b3a', g: '#4ade80', l: '#bbf7d0', w: '#fff', p: '#f9a8d4', y: '#facc15', o: '#f59e0b', r: '#ff4d6d' };
+  const pixelHeart = ['.kk.kk.', 'kwrkrrk', 'krrrrrk', '.krrrk.', '..krk..', '...k...'];
+  const pixelSpark = ['.w.', 'www', '.w.'];
+  const games = svg('games',
+    '<g shape-rendering="crispEdges">' +
+      [10, 42, 74].map((x) => pixels(x, 10, 4, pixelHeart, arcade)).join('') +
+      '<g opacity=".9">' + pixels(150, 30, 5, ['...ww....', '.wwwwww..', 'wwwwwwwww'], arcade) + pixels(196, 64, 5, ['..www.', 'wwwwww'], arcade) + '</g>' +
+      [[180, 108, 0], [300, 52, .9], [62, 76, 1.8]].map(([x, y, delay]) => '<g class="sc-twinkle" style="animation-delay:' + delay + 's">' + pixels(x, y, 4, pixelSpark, arcade) + '</g>').join('') +
+      faded('pixel-ground', '<rect x="0" y="150" width="320" height="5" fill="#22c55e"/><rect x="0" y="155" width="320" height="15" fill="#92400e"/>' +
+        '<path d="' + range(16).map((index) => 'M' + (index * 20 + (index % 2) * 10) + ' 160h5v5h-5z').join('') + '" fill="#6b2f0a"/>') +
+      // block and the coin it gave
+      pixels(110, 82, 5, ['kkkkkkkkk', 'koyyyyyok', 'kyyyyyyyk', 'kyyywyyyk', 'kyywwwyyk', 'kyyywyyyk', 'kyyyyyyyk', 'koyyyyyok', 'kkkkkkkkk'], arcade) +
+      '<g class="sc-bob"><g class="sc-flip">' + pixels(120, 44, 5, ['.kkk.', 'kyyyk', 'kyoyk', 'kyoyk', 'kyyyk', '.kkk.'], arcade) + '</g></g>' +
+      // the player, looking at the block
+      '<g class="sc-hop">' + pixels(222, 90, 5, ['......kkkk......', '....kkggggkk....', '...kggggggggk...', '..kggggggggggk..', '.kggwwggggwwggk.', '.kggkwggggkwggk.',
+        'kgggkwggggkwgggk', 'kgppggggggggppgk', 'kggggkggggkggggk', 'kgggggkkkkgggggk', 'kgllllllllllllgk', '.kkkkkkkkkkkkkk.'], arcade) + '</g>' +
+    '</g>');
+
+  const brick = (x, y, studs, fill) => '<g fill="' + fill + '"' + ink('#1b1b2f') + '>' + range(studs).map((index) => '<rect x="' + (x + 3 + index * 16) + '" y="' + (y - 6) + '" width="10" height="8" rx="2"/>').join('') +
+    '<rect x="' + x + '" y="' + y + '" width="' + studs * 16 + '" height="20" rx="3"/></g>';
+  const bricks = svg('bricks',
+    sparkle(30, 34, 8, '#fff6b0', 0) + sparkle(140, 26, 6, '#fff', .8) + sparkle(304, 62, 7, '#fff6b0', 1.6) + sparkle(118, 92, 5, '#fff', 2.2) +
+    faded('baseplate', '<path d="' + range(20).map((index) => 'M' + (index * 16 + 3) + ' 150v-4h10v4z').join('') + '" fill="#2f9e44" stroke="#1b1b2f" stroke-width="2"/><rect x="0" y="150" width="320" height="20" fill="#2f9e44"/><path d="M0 150H320" stroke="#1b1b2f" stroke-width="2.5"/>') +
+    // loose bricks
+    brick(36, 130, 2, '#f8f9fa') + brick(74, 130, 1, '#ffd43b') +
+    // the stack
+    brick(172, 130, 4, '#2563eb') + brick(236, 130, 4, '#ffd43b') +
+    brick(188, 110, 4, '#2fb35a') + brick(252, 110, 2, '#74c0fc') +
+    brick(204, 90, 2, '#ffd43b') +
+    // and the one going on top
+    '<g class="sc-place">' + brick(236, 56, 2, '#2563eb') + '<path d="M226 58v14M278 58v14" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".7"/></g>');
+
+  const sprinkles = [['#ffd43b', 30], ['#74c0fc', -20], ['#69db7c', 60], ['#b197fc', -40], ['#ff922b', 20], ['#ff8fc8', -60]];
+  const sprinkle = ([x, y], index, extra = '') => {
+    const [color, angle] = sprinkles[index % sprinkles.length];
+    const dx = (Math.cos(angle * Math.PI / 180) * 3).toFixed(1);
+    const dy = (Math.sin(angle * Math.PI / 180) * 3).toFixed(1);
+    return '<path ' + extra + 'd="M' + (x - dx) + ' ' + (y - dy) + 'L' + (x + +dx) + ' ' + (y + +dy) + '" stroke="' + color + '" stroke-width="3.5" stroke-linecap="round"/>';
+  };
+  const sweets = svg('sweets',
+    [[28, 30], [140, 24], [170, 62], [300, 74], [16, 92], [124, 74], [196, 30]].map((point, index) => sprinkle(point, index, 'class="sc-twinkle" style="animation-delay:' + index * .4 + 's" ')).join('') +
+    sparkle(100, 40, 7, '#fff6b0', .4) + sparkle(296, 112, 6, '#fff', 1.4) +
+    faded('table', '<rect x="0" y="150" width="320" height="20" fill="#fff0f5" opacity=".3"/>') +
+    // steam over warm cookies
+    '<g fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" opacity=".85">' + [[66, 0], [86, 1.3], [108, .6]].map(([x, delay]) => '<path class="sc-rise" style="animation-delay:' + delay + 's" d="M' + x + ' 96q-6-7 0-14t0-14"/>').join('') + '</g>' +
+    '<ellipse cx="92" cy="146" rx="54" ry="8" fill="#fff"' + ink('#3b1622') + '/>' +
+    '<circle cx="78" cy="124" r="22" fill="#e9a85a"' + ink('#3b1622') + '/><circle cx="114" cy="130" r="18" fill="#f0b86e"' + ink('#3b1622') + '/>' +
+    '<g fill="#5a2e1a">' + [[70, 114, 3.2], [86, 118, 2.6], [66, 130, 3], [80, 136, 2.4], [108, 124, 3], [121, 132, 2.6], [110, 139, 2.4]].map(([x, y, r]) => '<circle cx="' + x + '" cy="' + y + '" r="' + r + '"/>').join('') + '</g>' +
+    // cupcake
+    '<g class="sc-rock">' +
+      '<path d="M206 112h68l-8 38h-52z" fill="#7dd3fc"' + ink('#3b1622') + '/><path d="M217 116l3 30M263 116l-3 30" stroke="#38a3d1" stroke-width="2.5" stroke-linecap="round"/>' +
+      '<g fill="#fff4f7"' + ink('#3b1622') + '><ellipse cx="240" cy="108" rx="40" ry="13"/><ellipse cx="240" cy="94" rx="30" ry="11"/><ellipse cx="240" cy="80" rx="18" ry="9"/></g>' +
+      [[220, 106], [236, 113], [256, 108], [228, 94], [250, 90], [262, 100], [240, 80]].map((point, index) => sprinkle(point, index)).join('') +
+      '<path d="M241 54q2-8 10-12" fill="none" stroke="#3b1622" stroke-width="2.5" stroke-linecap="round"/>' +
+      '<circle cx="240" cy="62" r="9" fill="#e5383b"' + ink('#3b1622') + '/><circle cx="236.5" cy="58.5" r="2.2" fill="#fff"/>' +
+      '<circle cx="229" cy="130" r="2.8" fill="#3b1622"/><circle cx="251" cy="130" r="2.8" fill="#3b1622"/>' +
+      '<path d="M234 136q6 5 12 0" fill="none" stroke="#3b1622" stroke-width="2.5" stroke-linecap="round"/>' + blush([[222, 136], [258, 136]], 3.5) +
+    '</g>');
+
+  const raindrop = (x, y, delay) => '<path class="sc-fall" style="animation-delay:' + delay + 's" d="M' + x + ' ' + y + 'q-5 7-5 10a5 5 0 0 0 10 0q0-3-5-10z" fill="#a5d8ff" stroke="#1c2a63" stroke-width="2" stroke-linejoin="round"/>';
+  const weather = svg('weather',
+    faded('weather-hills', '<path d="M0 152Q60 136 130 148T320 142V170H0Z" fill="#3a9d5d"/>') +
+    [['#ff6b6b', 82], ['#ffd43b', 74], ['#69db7c', 66], ['#74c0fc', 58]].map(([color, r]) => '<path d="M' + (140 - r) + ' 152a' + r + ' ' + r + ' 0 0 1 ' + r * 2 + ' 0" fill="none" stroke="' + color + '" stroke-width="8"/>').join('') +
+    '<ellipse cx="40" cy="150" rx="18" ry="3.5" fill="#a5d8ff" opacity=".8"/>' +
+    raindrop(24, 72, 0) + raindrop(40, 84, .5) + raindrop(56, 70, 1) + raindrop(30, 104, .8) + raindrop(50, 110, .3) +
+    '<g class="sc-drift" style="animation-direction:alternate-reverse">' + cloud(42, 60, '#1c2a63', 1.1, '#dbe4ff') + '</g>' +
+    // sun behind a cloud
+    sunRays(264, 80, 33, 40, 10, '#ffd43b') +
+    '<circle cx="264" cy="80" r="26" fill="#ffd43b"' + ink('#1c2a63') + '/>' +
+    '<path d="M250 76q4-4 8 0M270 76q4-4 8 0M256 86q8 6 16 0" fill="none" stroke="#1c2a63" stroke-width="2.6" stroke-linecap="round"/>' + blush([[248, 86], [280, 86]], 4) +
+    '<g class="sc-drift">' + cloud(220, 132, '#1c2a63', 1.7) + '</g>');
+
+  return { trains, dinosaurs, unicorns, space, construction, ocean, pirates, heroes, robots, princesses, pets, horses, bugs, jungle, dragons, cars, games, bricks, sweets, weather };
 })();
