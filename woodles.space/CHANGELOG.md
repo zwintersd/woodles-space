@@ -29,6 +29,9 @@ so it's not easy to forget.
   see where something is hidden. the Primary field can't be hidden. every
   change is undoable, saves with the Collection, and is also in the command
   palette.
+- **slimmer Data scrollbars** — the table's lilac rails drop from 34px to
+  20px, keeping their sparkle grip and corner flower; touch screens keep the
+  larger buttons.
 
 ## 2026-10-13
 
