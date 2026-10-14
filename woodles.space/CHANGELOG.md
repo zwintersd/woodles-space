@@ -18,6 +18,21 @@ so it's not easy to forget.
 
 ---
 
+## 2026-10-14
+
+- **freeze and hide rows and fields in HomeSuite Data** — right-click a
+  record or a field header (or open a record's ⋯ menu) to freeze everything
+  up to it, so leading rows stay under the header and leading fields stay
+  beside the row numbers while the rest scrolls. the same menu hides a record
+  or a field. hidden things keep their values; the toolbar counts them and
+  brings them back in one click, and row numbers keep their gaps so you can
+  see where something is hidden. the Primary field can't be hidden. every
+  change is undoable, saves with the Collection, and is also in the command
+  palette.
+- **slimmer Data scrollbars** — the table's lilac rails drop from 34px to
+  20px, keeping their sparkle grip and corner flower; touch screens keep the
+  larger buttons.
+
 ## 2026-10-13
 
 - **four quiet-hobby themes for older learners and adults** — a new Quiet

@@ -48,7 +48,7 @@
 </div>
 
 <style>
-	.scroll-frame { --rail-size: 34px; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
+	.scroll-frame { --rail-size: 20px; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 	.scroll-frame.enhanced.horizontal { grid-template-rows: minmax(0, 1fr) var(--rail-size); }
 	.scroll-frame.enhanced.vertical { grid-template-columns: minmax(0, 1fr) var(--rail-size); }
 	.table-scroll { grid-area: 1 / 1; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; outline: none; }
@@ -57,7 +57,7 @@
 	.enhanced .table-scroll::-webkit-scrollbar { display: none; }
 	.scroll-content { width: max-content; min-width: 100%; }
 	.scroll-corner { grid-area: 2 / 2; display: grid; place-items: center; border-top: 1px solid var(--hs-line); border-left: 1px solid var(--hs-line); background: var(--hs-sunk); }
-	.scroll-corner svg { width: 20px; height: 20px; fill: var(--hs-accent-soft); stroke: var(--hs-accent-light); stroke-width: 1; }
+	.scroll-corner svg { width: 13px; height: 13px; fill: var(--hs-accent-soft); stroke: var(--hs-accent-light); stroke-width: 1; }
 	.scroll-corner circle { fill: var(--hs-accent-light); stroke: none; }
 	@media (pointer: coarse) { .scroll-frame { --rail-size: 44px; } }
 	@media (forced-colors: active) {

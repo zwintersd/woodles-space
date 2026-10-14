@@ -14,15 +14,21 @@ button { cursor: pointer; }
 .table-tools { display: flex; gap: 7px; }
 .table-tools button { border: 1px solid var(--hs-line); background: var(--hs-field); border-radius: 7px; padding: 6px 10px; color: var(--hs-ink-soft); font-size: 12px; }
 .table-tools button:hover { background: var(--hs-hover); }
+.table-tools button.show-hidden { border-style: dashed; color: var(--hs-muted); }
 .import-button { position: relative; overflow: hidden; border: 1px solid var(--hs-line); background: var(--hs-field); border-radius: 7px; padding: 6px 10px; color: var(--hs-ink-soft); font-size: 12px; cursor: pointer; }
 .import-button:hover { background: var(--hs-hover); }
 .import-button input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .save-issue { margin: 8px 16px 0; padding: 8px 10px; background: var(--hs-danger-bg); border: 1px solid var(--hs-danger-line); color: var(--hs-danger-ink); border-radius: 7px; font-size: 12px; }
 .data-table { border-collapse: separate; border-spacing: 0; table-layout: fixed; width: max-content; min-width: 100%; font-size: 13px; }
-.data-table th { position: sticky; top: 0; z-index: 3; height: 38px; text-align: left; background: var(--hs-sunk); border-bottom: 1px solid var(--hs-line); border-right: 1px solid var(--hs-line); color: var(--hs-ink-soft); font-weight: 600; padding: 0; }
+.data-table thead { position: sticky; top: 0; z-index: 5; }
+.data-table th { position: relative; height: 38px; text-align: left; background: var(--hs-sunk); border-bottom: 1px solid var(--hs-line); border-right: 1px solid var(--hs-line); color: var(--hs-ink-soft); font-weight: 600; padding: 0; }
 .data-table th.primary { background: var(--hs-hover); }
 .row-head, .row-number { position: sticky; left: 0; z-index: 3; width: 42px; min-width: 42px; text-align: center !important; color: var(--hs-muted) !important; background: var(--hs-sunk) !important; border-right: 1px solid var(--hs-line); }
-.data-table th.row-head { z-index: 4; }
+.data-table th.row-head { position: sticky; z-index: 4; }
+.data-table .frozen-col { position: sticky; z-index: 2; }
+.data-table th.frozen-col { z-index: 3; }
+.data-table .frozen-col-edge { border-right: 2px solid var(--hs-line-strong); }
+.data-table .frozen-edge td { border-bottom: 2px solid var(--hs-line-strong); }
 .field-head { border: 0; background: transparent; width: 100%; height: 38px; display: flex; align-items: center; gap: 8px; text-align: left; padding: 0 13px; color: inherit; font-size: 12px; }
 .field-head:hover { background: var(--hs-hover); }
 .field-type { color: var(--hs-muted); font-size: 12px; }
@@ -32,7 +38,7 @@ button { cursor: pointer; }
 .add-field-head button { width: 100%; height: 100%; border: 0; background: transparent; color: var(--hs-muted); font-size: 17px; }
 .data-table td { position: relative; height: 37px; padding: 0; background: var(--hs-field); border-bottom: 1px solid var(--hs-line); border-right: 1px solid var(--hs-line); }
 .data-table td.row-number { position: sticky; left: 0; z-index: 2; }
-.data-table tbody tr:hover td { background: var(--hs-field-alt); }
+.data-table tr[data-record]:hover td { background: var(--hs-field-alt); }
 .data-table td.primary-cell { background: var(--hs-field-alt); }
 .data-table td.active-cell { z-index: 1; box-shadow: inset 0 0 0 2px var(--hs-focus); }
 .data-table td.active-cell input, .data-table td.active-cell select { background: var(--hs-field); }
