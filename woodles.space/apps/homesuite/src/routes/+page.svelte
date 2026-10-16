@@ -32,6 +32,7 @@
 		moveFilesToFolder, moveFolder, removeFolder, renameFolder, refKey,
 		type FolderLibrary, type HomeSuiteFolder
 	} from '$lib/folders';
+	import { syncState, connect as connectSync, disconnect as disconnectSync, pushIfChanged, syncNow } from '$lib/sync.svelte';
 	import '@shared/homesuiteTheme.css';
 	import './homesuite.css';
 
@@ -98,6 +99,11 @@
 	let movePicker = $state<{ refs?: WoodlesRef[]; folderId?: string; title: string } | null>(null);
 	let moveDestination = $state<string | null>(null);
 	let folderQuery = $state('');
+	let syncOpen = $state(false);
+	let syncPass = $state('');
+	let lastIndexSync = 0;
+	let pushSoon: ReturnType<typeof setTimeout> | undefined;
+	const syncLabel = $derived(syncState.syncing ? 'Syncing…' : !syncState.connected ? 'Sync off' : syncState.status === 'error' ? 'Sync issue' : 'Synced');
 	const location = $derived(page.url.searchParams.get('folder'));
 	const currentFolder = $derived(folderLibrary.folders.find((folder) => folder.id === location));
 	const breadcrumbs = $derived(folderPath(folderLibrary, currentFolder?.id ?? null));
@@ -133,6 +139,37 @@
 		navigating = true;
 		try { await releaseFrame(); refresh(); await goto(indexPath(id), { noScroll: true }); await tick(); }
 		finally { navigating = false; }
+	}
+
+	/**
+	 * Sync writes into the owning apps' storage, so it runs only while no
+	 * editor is mounted over that storage: on opening, on coming back to the
+	 * index, on returning to the tab. With a frame open it only pushes.
+	 */
+	async function syncIndex(): Promise<void> {
+		if (frame) return;
+		lastIndexSync = Date.now();
+		await syncNow();
+		if (!frame) refresh();
+	}
+
+	async function connectSuite(): Promise<void> {
+		const pass = syncPass.trim();
+		if (!pass) return;
+		await releaseFrame();
+		await connectSync(pass);
+		syncPass = '';
+		refresh();
+	}
+
+	function openSync(): void {
+		closeContext(false); newOpen = false; paletteOpen = false;
+		syncOpen = true;
+	}
+
+	function onVisibility(): void {
+		if (document.visibilityState === 'hidden') void pushIfChanged();
+		else if (Date.now() - lastIndexSync > 20_000) void syncIndex();
 	}
 
 	function editFolder(folder?: HomeSuiteFolder): void {
@@ -348,6 +385,9 @@
 			{ id: 'shell:trash', label: 'Open Trash', detail: 'HomeSuite', enabled: true, run: showTrash },
 			{ id: 'shell:new-folder', label: 'New folder', detail: 'Organize', enabled: true, run: () => editFolder() },
 			{ id: 'shell:all-files', label: 'Show all files', detail: 'Organize', enabled: true, run: () => void openFolder(null) },
+			{ id: 'shell:sync', label: syncState.connected ? 'Sync now' : 'Set up sync', detail: 'Devices', enabled: true, run: () => {
+				if (syncState.connected && !frame) void syncIndex(); else openSync();
+			} },
 			...surfaces.map((surface) => ({
 				id: `shell:new:${surface.kind}`,
 				label: `New ${surface.label.toLowerCase()}`,
@@ -384,6 +424,9 @@
 		refreshFolders();
 		selectedFiles = selectedFiles.filter((key) => artifacts.some((artifact) => refKey(artifact.ref) === key));
 		storageNotices = surfaces.flatMap((surface) => surface.notice?.() ?? []);
+		// Every change made from the index ends here; send it on once things settle.
+		clearTimeout(pushSoon);
+		if (syncState.connected) pushSoon = setTimeout(() => void pushIfChanged(), 1500);
 	}
 
 	/**
@@ -570,6 +613,7 @@
 			refresh();
 			await goto(indexPath(), { noScroll: true }); await tick();
 		} finally { navigating = false; }
+		void syncIndex();
 	}
 
 	function showTrash(): void {
@@ -692,6 +736,7 @@
 			else if (referencePicker) referencePicker = null;
 			else if (contextMenu) closeContext();
 			else if (paletteOpen) paletteOpen = false;
+			else if (syncOpen) syncOpen = false;
 			else if (templatePicker) templatePicker = null;
 			newOpen = false;
 			return;
@@ -745,13 +790,23 @@
 		// On a phone the inspector would cover the thing being inspected.
 		inspectorOpen = !window.matchMedia('(max-width: 600px)').matches;
 		ready = true;
+		void syncIndex();
+		// A phone tab is often closed from the app switcher, never coming back to the index.
+		const pushing = setInterval(() => { if (frame) void pushIfChanged(); else void syncIndex(); }, 120_000);
+		const onPageHide = () => void pushIfChanged();
 		window.addEventListener('message', handleMessage);
 		window.addEventListener('storage', onStorage);
 		window.addEventListener('keydown', handleKeydown);
+		window.addEventListener('pagehide', onPageHide);
+		document.addEventListener('visibilitychange', onVisibility);
 		return () => {
 			window.removeEventListener('message', handleMessage);
 			window.removeEventListener('storage', onStorage);
 			window.removeEventListener('keydown', handleKeydown);
+			window.removeEventListener('pagehide', onPageHide);
+			document.removeEventListener('visibilitychange', onVisibility);
+			clearInterval(pushing);
+			clearTimeout(pushSoon);
 			clearTimeout(readyFallback);
 		};
 	});
@@ -796,6 +851,7 @@
 					<button title="Redo" aria-label="Redo" disabled={!activeState?.canRedo} onclick={() => sendAction({ action: 'redo' })}>↷</button>
 				</div>
 			{/if}
+			<button class="toolbar-button sync-trigger" aria-label={`${syncLabel}. Sync settings`} aria-haspopup="dialog" onclick={openSync}><span class="sync-dot {syncState.syncing ? 'busy' : !syncState.connected ? 'off' : syncState.status}" aria-hidden="true"></span><span class="sync-label">{syncLabel}</span></button>
 			<button class="toolbar-button palette-trigger" onclick={openPalette} title="Commands (Ctrl/⌘ K)">⌕ <span>Commands</span><kbd>⌘ K</kbd></button>
 			{#if activeArtifact}
 				<button class="toolbar-button inspector-trigger" class:pressed={inspectorOpen} aria-label={inspectorOpen ? 'Hide inspector' : 'Show inspector'} aria-pressed={inspectorOpen} onclick={() => { inspectorOpen = !inspectorOpen; }}>☷ <span>Inspector</span></button>
@@ -1020,6 +1076,40 @@
 			<header class="folder-dialog-header"><div class="eyebrow">KEEP YOUR THINGS</div><h2>Remove {folderRemoval.name}?</h2><p>Files and subfolders inside will move to {folderPath(folderLibrary, folderRemoval.parentId).map((folder) => folder.name).join(' / ') || 'HomeSuite (files become Unfiled)'}. All file contents are kept.</p></header>
 			{#if folderIssue}<div class="folder-dialog-body"><p class="trash-issue" role="alert">{folderIssue}</p></div>{/if}
 			<footer class="folder-dialog-footer"><button class="destination-cancel" data-autofocus onclick={() => folderRemoval = null}>Cancel</button><button class="trash-action permanent" onclick={confirmFolderRemoval}>Remove folder</button></footer>
+		</div>
+	</div>
+{/if}
+
+{#if syncOpen}
+	<div class="template-backdrop" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) syncOpen = false; }}>
+		<div class="folder-dialog sync-dialog" role="dialog" aria-modal="true" aria-label="Sync HomeSuite" use:modal={{ returnFocus: '.sync-trigger' }}>
+			<header class="folder-dialog-header">
+				<div class="eyebrow">YOUR DEVICES</div>
+				<h2>Sync HomeSuite</h2>
+				<p>Documents, boards, Collections, folders, and Trash follow you between your computer and your phone. Connect each one with the same passphrase.</p>
+			</header>
+			<div class="folder-dialog-body">
+				{#if syncState.connected}
+					<p class="sync-status" role="status"><span class="sync-dot {syncState.syncing ? 'busy' : syncState.status}" aria-hidden="true"></span>{syncState.syncing ? 'Syncing…' : syncState.lastSyncedAt ? `Synced at ${syncState.lastSyncedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Connected'}</p>
+					<p>HomeSuite syncs when it opens, when you come back to the index, every couple of minutes, and as you leave. A thing changed on both devices keeps the later edit; a delete on one removes it on the other.</p>
+				{:else}
+					<form class="sync-connect" onsubmit={(event) => { event.preventDefault(); void connectSuite(); }}>
+						<label class="folder-name-label">Sync passphrase<input type="password" autocomplete="current-password" bind:value={syncPass} data-autofocus /></label>
+						<button type="submit" class="new-button" disabled={syncState.syncing || !syncPass.trim()}>{syncState.syncing ? 'Connecting…' : 'Connect'}</button>
+					</form>
+					<p>The first sync puts both devices’ things together; nothing on either is removed.</p>
+				{/if}
+				{#if syncState.errorMessage}<p class="trash-issue" role="alert">{syncState.errorMessage}</p>{/if}
+				<p class="sync-footnote">Pictures placed on boards stay on the device they were added from. Connecting here connects every woodles app on this device.</p>
+			</div>
+			<footer class="folder-dialog-footer">
+				{#if syncState.connected}
+					<button class="destination-cancel" onclick={() => { disconnectSync(); }}>Disconnect</button>
+					<button class="new-button" disabled={syncState.syncing || !!frame} title={frame ? 'Close the open thing to sync' : undefined} onclick={() => void syncIndex()}>Sync now</button>
+				{:else}
+					<button class="destination-cancel" onclick={() => syncOpen = false}>Close</button>
+				{/if}
+			</footer>
 		</div>
 	</div>
 {/if}

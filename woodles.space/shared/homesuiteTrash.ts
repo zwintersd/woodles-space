@@ -39,6 +39,11 @@ function save(entries: HomeSuiteTrashEntry[]): void {
 	storage()?.setItem(HOMESUITE_TRASH_KEY, JSON.stringify(entries));
 }
 
+/** Sync's whole-list write, after its own merge. */
+export function replaceHomeSuiteTrash(entries: HomeSuiteTrashEntry[]): void {
+	save(entries.map((entry) => ({ ...entry, ref: { ...entry.ref } })));
+}
+
 export function isHomeSuiteTrashed(ref: WoodlesRef): boolean {
 	return listHomeSuiteTrash().some((entry) => sameRef(entry.ref, ref));
 }

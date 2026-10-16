@@ -18,6 +18,17 @@ so it's not easy to forget.
 
 ---
 
+## 2026-10-16
+
+- **HomeSuite syncs between your computer and your phone** — a Sync button
+  in HomeSuite's top bar connects with the same passphrase the other apps
+  use. documents, boards, Collections, folders, and Trash then follow you
+  between devices: HomeSuite syncs on opening, on coming back to the index,
+  every couple of minutes, and as you leave. each thing merges on its own —
+  a thing changed on both devices keeps the later edit, a delete on one
+  removes it on the other, and the very first sync only adds. pictures on
+  boards stay on the device they were added from.
+
 ## 2026-10-14
 
 - **freeze and hide rows and fields in HomeSuite Data** — right-click a
