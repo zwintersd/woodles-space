@@ -31,6 +31,9 @@ window.ScheduleThemes = (() => {
     quicksand: { label: 'Quicksand', family: 'Quicksand', spec: 'Quicksand:wght@600;700', fallback: 'system-ui, sans-serif', scale: 1.05, body: 700 },
     comic: { label: 'Comic Neue', family: 'Comic Neue', spec: 'Comic+Neue:wght@700', fallback: '"Comic Sans MS", sans-serif', scale: 1.05, body: 700 },
     patrick: { label: 'Patrick Hand', family: 'Patrick Hand', spec: 'Patrick+Hand', fallback: '"Comic Sans MS", sans-serif', scale: 1.1, body: 400 },
+    fraunces: { label: 'Fraunces', family: 'Fraunces', spec: 'Fraunces:opsz,wght@9..144,600', fallback: 'Georgia, serif', scale: 1 },
+    youngserif: { label: 'Young Serif', family: 'Young Serif', spec: 'Young+Serif', fallback: 'Georgia, serif', scale: .96 },
+    josefin: { label: 'Josefin Sans', family: 'Josefin Sans', spec: 'Josefin+Sans:wght@600;700', fallback: 'system-ui, sans-serif', scale: 1.04 },
     atkinson: { label: 'Atkinson Hyperlegible', family: 'Atkinson Hyperlegible', spec: 'Atkinson+Hyperlegible:wght@400;700', fallback: 'Verdana, system-ui, sans-serif', scale: 1, body: 700 },
     lexend: { label: 'Lexend', family: 'Lexend', spec: 'Lexend:wght@500;700;800', fallback: 'Verdana, system-ui, sans-serif', scale: .96, body: 700 },
     andika: { label: 'Andika', family: 'Andika', spec: 'Andika:wght@400;700', fallback: 'Verdana, system-ui, sans-serif', scale: 1, body: 700 },
@@ -39,7 +42,7 @@ window.ScheduleThemes = (() => {
   const READING_FONTS = ['atkinson', 'lexend', 'andika'];
 
   const GROUPS = [
-    ['creatures', 'Creatures'], ['go', 'Things that go'], ['play', 'Make-believe and play'], ['calm', 'Classic and calm']
+    ['creatures', 'Creatures'], ['go', 'Things that go'], ['play', 'Make-believe and play'], ['seasons', 'Seasons'], ['hobbies', 'Quiet hobbies'], ['calm', 'Classic and calm']
   ];
 
   // Colour roles a theme sets and the studio can override; everything else is derived.
@@ -130,6 +133,40 @@ window.ScheduleThemes = (() => {
       { accent: '#be185d', heroA: '#c0266d', heroB: '#c2410c', pageA: '#fff6f8', pageB: '#fff0e4', card: '#ffffff', ink: '#3b1d2a', now: '#7c3aed', done: '#16a34a', sun: '#fcd34d', track: '#f5c6d6' },
       { heading: 'pacifico', body: 'quicksand', stickers: ['🧁', '🍩', '🍪', '🍓', '🎂', '🍭'], mascots: ['🧁', '🍩', '🍭'], pattern: 'stickers', track: 'rainbow', shape: 'round', stamp: '🍪', marker: '🧁', celebrate: 'party', motion: 'on',
         words: { kicker: 'Sweet and simple', greeting: 'Hi {name}!', finishTitle: 'Sweet success!', finishMessage: 'Delicious work today, {name}!', now: 'NOW', next: 'NEXT' } }),
+    // Seasons draw the weather, plants and animals of the time of year, never a holiday.
+    T('spring', 'seasons', 'Springtime', '🌷', 'Blossom, tulips and new green shoots.',
+      { accent: '#2e8540', heroA: '#2a72b5', heroB: '#2f8544', pageA: '#f4fbef', pageB: '#fff3f7', card: '#ffffff', ink: '#1f2d22', now: '#e8559a', done: '#1f9d74', sun: '#ffd84a', track: '#cfe6c4' },
+      { heading: 'cherry', body: 'quicksand', stickers: ['🌷', '🌸', '🌱', '🐑', '☔', '🌼'], mascots: ['🌷', '🐑', '🌸'], pattern: 'stickers', track: 'dashed', shape: 'round', stamp: '🌸', marker: '🌷', celebrate: 'gentle', motion: 'on',
+        words: { kicker: 'Bloom by bloom', greeting: 'Hi {name}!', finishTitle: 'All in bloom!', finishMessage: 'You blossomed today, {name}!', now: 'NOW', next: 'NEXT' } }),
+    T('summer', 'seasons', 'Summer days', '⛱️', 'Sunshine, sandcastles and the seaside.',
+      { accent: '#0e7fb8', heroA: '#0b6fbf', heroB: '#118bc9', pageA: '#fffaf0', pageB: '#e9f7fc', card: '#ffffff', ink: '#132a3a', now: '#ff6b4a', done: '#14a37f', sun: '#ffd43b', track: '#f6dfa4' },
+      { heading: 'pacifico', body: 'nunito', stickers: ['☀️', '🏖️', '🍉', '🍦', '🐚', '🕶️'], mascots: ['☀️', '🏖️', '🍦'], pattern: 'stripes', track: 'dotted', shape: 'round', stamp: '🍉', marker: '⛱️', celebrate: 'party', motion: 'on',
+        words: { kicker: 'Sunny side up', greeting: 'Hi {name}!', finishTitle: 'Sun-sational!', finishMessage: 'What a sunny day, {name}!', now: 'NOW', next: 'NEXT' } }),
+    T('autumn', 'seasons', 'Autumn leaves', '🍂', 'Falling leaves, acorns and cosy colours.',
+      { accent: '#a8481a', heroA: '#c0541c', heroB: '#8a2f3c', pageA: '#fdf6ee', pageB: '#f8eadb', card: '#fffdf9', ink: '#2f1d14', now: '#d97706', done: '#5a8a2a', sun: '#fbbf24', track: '#ecd2b0' },
+      { heading: 'chewy', body: 'nunito', stickers: ['🍂', '🍁', '🐿️', '🍎', '🌰', '🍄'], mascots: ['🍂', '🐿️', '🍁'], pattern: 'stickers', track: 'prints', shape: 'soft', stamp: '🍁', marker: '🐿️', celebrate: 'gentle', motion: 'on',
+        words: { kicker: 'Leaf by leaf', greeting: 'Hi {name}!', finishTitle: 'All gathered in!', finishMessage: 'Cosy work today, {name}!', now: 'NOW', next: 'NEXT' } }),
+    T('winter', 'seasons', 'Winter snow', '⛄', 'Snowflakes, snowmen and warm woolly scarves.',
+      { accent: '#2d6ea8', heroA: '#2b6c94', heroB: '#3a4f8f', pageA: '#f2f8fd', pageB: '#eef1fb', card: '#ffffff', ink: '#15253a', now: '#e8590c', done: '#0f9b8e', sun: '#ffe08a', track: '#d3e3f2' },
+      { heading: 'sniglet', body: 'nunito', stickers: ['❄️', '⛄', '🧣', '🧤', '🛷', '🐧'], mascots: ['⛄', '❄️', '🧣'], pattern: 'dots', track: 'line', shape: 'round', stamp: '❄️', marker: '⛄', celebrate: 'gentle', motion: 'on',
+        words: { kicker: 'Flake by flake', greeting: 'Hi {name}!', finishTitle: 'Snow-tastic!', finishMessage: 'Time to warm up, {name}!', now: 'NOW', next: 'NEXT' } }),
+    // Quiet hobbies are for older learners and adults: muted colours, grown-up type, gentle words.
+    T('houseplants', 'hobbies', 'Houseplants', '🪴', 'Leafy greens, trailing vines and a sunny sill.',
+      { accent: '#3f7652', heroA: '#a65d43', heroB: '#8a4b3c', pageA: '#f7f3ec', pageB: '#eef2e9', card: '#fffdf9', ink: '#24302a', now: '#b45c3a', done: '#3f8a5f', sun: '#e6c27a', track: '#ddd5c4' },
+      { heading: 'youngserif', body: 'lexend', stickers: ['🪴', '🌿', '🌱', '🌵', '🍃', '💧'], mascots: ['🪴', '🌵', '🌿'], pattern: 'dots', track: 'line', shape: 'soft', stamp: '🌱', marker: '🪴', celebrate: 'gentle', motion: 'on',
+        words: { kicker: 'Grow at your own pace', greeting: 'Rooting for you, {name}', finishTitle: 'All watered in', finishMessage: 'A well-tended day, {name}.', now: 'NOW', next: 'NEXT' } }),
+    T('books', 'hobbies', 'Tea and books', '📚', 'A pot of tea, a good book and a sleepy cat.',
+      { accent: '#7a4f6e', heroA: '#6e4866', heroB: '#523b57', pageA: '#f8f4ee', pageB: '#f2ece6', card: '#fffdf8', ink: '#2d2330', now: '#a8622f', done: '#4f8a68', sun: '#e8c88a', track: '#e3d7d0' },
+      { heading: 'fraunces', body: 'atkinson', stickers: ['📚', '🫖', '☕', '📖', '🐈', '🍪'], mascots: ['📚', '🫖', '🐈'], pattern: 'none', track: 'dashed', shape: 'soft', stamp: '🔖', marker: '📖', celebrate: 'gentle', motion: 'on',
+        words: { kicker: 'One chapter at a time', greeting: 'Settle in, {name}', finishTitle: 'Chapter complete', finishMessage: 'Put the kettle on, {name}.', now: 'NOW', next: 'NEXT' } }),
+    T('stargazing', 'hobbies', 'Stargazing', '🔭', 'Constellations, a brass telescope and a dark sky.',
+      { accent: '#8796d0', heroA: '#1d2746', heroB: '#2b3962', pageA: '#131a2c', pageB: '#1a2238', card: '#1f2840', ink: '#ede8da', now: '#e2b862', done: '#5fb39a', sun: '#f0d58c', track: '#38426a' },
+      { heading: 'josefin', body: 'lexend', stickers: ['🔭', '🌙', '⭐', '🌌', '🦊', '☄️'], mascots: ['🔭', '🌙', '🦊'], pattern: 'dots', track: 'dotted', shape: 'soft', stamp: '⭐', marker: '🌙', celebrate: 'gentle', motion: 'on',
+        words: { kicker: 'Chart the day', greeting: 'Clear skies, {name}', finishTitle: 'Every star in place', finishMessage: 'A well-charted day, {name}.', now: 'NOW', next: 'NEXT' } }),
+    T('birds', 'hobbies', 'Birdwatching', '🐦', 'Robins, birdhouses and a good pair of binoculars.',
+      { accent: '#3d6f72', heroA: '#4a7073', heroB: '#3a5a66', pageA: '#f4f5ef', pageB: '#ecf1ed', card: '#fffffb', ink: '#1f2b2b', now: '#b85c36', done: '#5a8a4c', sun: '#e9c46a', track: '#d4dfda' },
+      { heading: 'quicksand', body: 'atkinson', stickers: ['🐦', '🪶', '🪺', '🌳', '🦉', '🍃'], mascots: ['🐦', '🪶', '🦉'], pattern: 'none', track: 'dashed', shape: 'soft', stamp: '🪶', marker: '🐦', celebrate: 'gentle', motion: 'on',
+        words: { kicker: 'One sighting at a time', greeting: 'Hello, {name}', finishTitle: 'Checklist complete', finishMessage: 'Good birding today, {name}.', now: 'NOW', next: 'NEXT' } }),
     T('weather', 'calm', 'Weather watch', '🌦️', 'Sunshine, rainbows and today’s forecast.',
       { accent: '#2563eb', heroA: '#2f6fe0', heroB: '#7349d6', pageA: '#eef6ff', pageB: '#f6f3ff', card: '#ffffff', ink: '#172036', now: '#f59e0b', done: '#059669', sun: '#fcd34d', track: '#d3e0f5' },
       { heading: 'fredoka', body: 'nunito', stickers: ['☀️', '🌈', '🌦️', '❄️', '⚡', '🌪️'], mascots: ['☀️', '🌈', '🌦️'], pattern: 'stickers', track: 'rainbow', shape: 'round', stamp: '☀️', marker: '⛅', celebrate: 'gentle', motion: 'on',

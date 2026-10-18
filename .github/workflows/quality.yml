@@ -54,7 +54,7 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Run HomeSuite browser tests
-        run: pnpm exec playwright test e2e/homesuite.spec.ts e2e/accessibility.spec.ts --grep "HomeSuite|homesuite"
+        run: pnpm exec playwright test e2e/homesuite.spec.ts e2e/homesuite-sync.spec.ts e2e/accessibility.spec.ts --grep "HomeSuite|homesuite"
 
       # The homepage has no build, but its launcher, windows, and focus handling
       # only exist in a browser too: its own spec, plus the `/` axe audit and

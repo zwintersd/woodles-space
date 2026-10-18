@@ -496,6 +496,48 @@ test('native context targets are correct without replacing editable text menus',
 	await expect(table.locator('td.primary-cell input')).toHaveCount(2);
 });
 
+test('Collection rows and fields freeze and hide from the context menu', async ({ page }) => {
+	await page.setViewportSize({ width: 900, height: 700 });
+	await page.goto('/homesuite');
+	await createCollection(page, /Projects/);
+	const table = page.frameLocator('iframe.native-surface');
+	for (const name of ['Alpha', 'Beta', 'Gamma']) {
+		await table.getByRole('button', { name: '＋ New record' }).click();
+		await table.locator('td.primary-cell input').last().fill(name);
+	}
+	await table.getByRole('button', { name: 'Actions for Beta' }).click();
+	await page.getByRole('menuitem', { name: 'Freeze up to this row' }).click();
+	await expect(table.locator('thead tr[data-record]')).toHaveCount(2);
+	await table.locator('.field-head', { hasText: 'Status' }).click({ button: 'right' });
+	await page.getByRole('menuitem', { name: 'Freeze up to this field' }).click();
+	await expect(table.locator('th.frozen-col')).toHaveCount(2);
+	const status = table.locator('th.frozen-col', { hasText: 'Status' });
+	const before = (await status.boundingBox())!;
+	await table.locator('.table-scroll').evaluate((element) => { element.scrollLeft = 300; });
+	await expect.poll(async () => (await status.boundingBox())!.x).toBe(before.x);
+	await expect.poll(async () => (await table.locator('th', { hasText: 'Priority' }).boundingBox())!.x).toBeLessThan(before.x + 200);
+
+	await table.locator('.field-head', { hasText: 'Priority' }).click({ button: 'right' });
+	await page.getByRole('menuitem', { name: 'Hide field' }).click();
+	await expect(table.locator('.field-head', { hasText: 'Priority' })).toHaveCount(0);
+	await table.getByRole('button', { name: 'Actions for Gamma' }).click();
+	await page.getByRole('menuitem', { name: 'Hide record' }).click();
+	await expect(table.locator('tr[data-record]')).toHaveCount(2);
+	await table.locator('.field-head', { hasText: 'Project' }).click({ button: 'right' });
+	await expect(page.getByRole('menuitem', { name: 'Hide field' })).toBeDisabled();
+	await page.getByRole('menuitem', { name: 'Show hidden records (1)' }).click();
+	await expect(table.locator('tr[data-record]')).toHaveCount(3);
+	await table.getByRole('button', { name: '1 hidden field' }).click();
+	await expect(table.locator('.field-head', { hasText: 'Priority' })).toHaveCount(1);
+	await page.getByRole('button', { name: 'Undo' }).click();
+	await expect(table.locator('.field-head', { hasText: 'Priority' })).toHaveCount(0);
+	await page.reload();
+	await surfaceReady(page);
+	await expect(table.locator('thead tr[data-record]')).toHaveCount(2);
+	await expect(table.locator('th.frozen-col')).toHaveCount(2);
+	await expect(table.getByRole('button', { name: '1 hidden field' })).toBeVisible();
+});
+
 test('board right click and selection actions duplicate and remove the exact board item', async ({ page }) => {
 	await page.goto('/homesuite');
 	await create(page, 'Board');

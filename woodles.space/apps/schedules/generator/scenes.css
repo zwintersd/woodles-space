@@ -11,6 +11,10 @@
 .scene-art .sc-flag, .scene-art .sc-cape, .scene-art .sc-billow { transform-origin: 0% 50%; }
 .scene-art .sc-cape { transform-origin: 100% 30%; }
 .scene-art .sc-wave-arm { transform-origin: 50% 100%; }
+.scene-art .sc-wag { transform-origin: 0% 100%; }
+.scene-art .sc-nuzzle { transform-origin: 100% 30%; }
+.scene-art .sc-tilt, .scene-art .sc-breathe { transform-origin: 50% 100%; }
+.scene-art .sc-swing { transform-origin: 50% 0%; }
 
 [data-motion="on"] .scene-art .sc-spin { animation: sc-spin 1.6s linear infinite; }
 [data-motion="on"] .scene-art .sc-roll { animation: sc-roll .5s steps(2) infinite; }
@@ -35,6 +39,21 @@
 [data-motion="on"] .scene-art .sc-blink { animation: sc-blink 1.2s steps(2) infinite; }
 [data-motion="on"] .scene-art .sc-wave-arm { animation: sc-wave-arm 1.4s ease-in-out infinite; }
 [data-motion="on"] .scene-art .sc-wave-back { animation: sc-wave 8s ease-in-out infinite alternate-reverse; }
+[data-motion="on"] .scene-art .sc-wag { animation: sc-wag 1.6s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-nuzzle { animation: sc-nod 4.4s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-tilt { animation: sc-tilt 3.4s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-swing { animation: sc-swing 3.6s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-breathe { animation: sc-breathe 4s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-flap { animation: sc-flap .9s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-glow { animation: sc-glow 4s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-drift { animation: sc-drift 7s ease-in-out infinite alternate; }
+[data-motion="on"] .scene-art .sc-hop { animation: sc-hop 1.6s steps(3) infinite; }
+[data-motion="on"] .scene-art .sc-flip { animation: sc-flip 1.2s steps(2) infinite; }
+[data-motion="on"] .scene-art .sc-place { animation: sc-place 2.6s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-fall { animation: sc-fall 1.4s linear infinite; }
+[data-motion="on"] .scene-art .sc-flutter { animation: sc-flutter 6s ease-in-out infinite; }
+[data-motion="on"] .scene-art .sc-snow { animation: sc-snow 5s linear infinite; }
+[data-motion="on"] .scene-art .sc-steam { animation: sc-steam 5s ease-out infinite; }
 
 @keyframes sc-spin { to { rotate: 360deg; } }
 @keyframes sc-roll { 50% { translate: 0 .8px; } }
@@ -57,6 +76,20 @@
 @keyframes sc-cape { to { scale: 1 .88; } }
 @keyframes sc-blink { 50% { opacity: .3; } }
 @keyframes sc-wave-arm { 0%, 100% { rotate: -12deg; } 50% { rotate: 14deg; } }
+@keyframes sc-wag { 0%, 100% { rotate: -5deg; } 50% { rotate: 6deg; } }
+@keyframes sc-tilt { 0%, 100% { rotate: -2.5deg; } 50% { rotate: 2.5deg; } }
+@keyframes sc-swing { 0%, 100% { rotate: -4deg; } 50% { rotate: 4deg; } }
+@keyframes sc-breathe { 50% { scale: 1.025 1.04; } }
+@keyframes sc-flap { 50% { scale: .55 1; } }
+@keyframes sc-glow { 50% { scale: 1.08; opacity: .75; } }
+@keyframes sc-drift { to { translate: 10px 0; } }
+@keyframes sc-hop { 0%, 50%, 100% { translate: 0 0; } 25% { translate: 0 -8px; } }
+@keyframes sc-flip { 50% { scale: .2 1; } }
+@keyframes sc-place { 50% { translate: 0 7px; } }
+@keyframes sc-fall { 0% { opacity: 0; translate: 0 -6px; } 20% { opacity: 1; } 100% { opacity: 0; translate: 0 18px; } }
+@keyframes sc-flutter { 0% { opacity: 0; translate: -6px -10px; rotate: -20deg; } 20%, 80% { opacity: 1; } 100% { opacity: 0; translate: 10px 22px; rotate: 25deg; } }
+@keyframes sc-snow { 0% { opacity: 0; translate: 0 -8px; } 20%, 80% { opacity: 1; } 100% { opacity: 0; translate: 4px 24px; } }
+@keyframes sc-steam { 0% { opacity: 0; translate: 0 6px; } 35% { opacity: .8; } 100% { opacity: 0; translate: 0 -10px; } }
 
 @media (prefers-reduced-motion: reduce) { .scene-art * { animation: none !important; } }
 @media print { .scene-art * { animation: none !important; } }

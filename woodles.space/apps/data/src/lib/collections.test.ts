@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createVersionedStorage, type StorageLike } from '@woodles/persistence';
 import {
 	addField, addRecord, createCollection, createCollectionStore, deleteField, duplicateRecord, importCollections, isCollection,
-	isCollectionLibrary, removeRecord, renameField, resizeColumn, setCellValue, type CollectionLibrary
+	isCollectionLibrary, removeRecord, renameField, resizeColumn, setCellValue, setFrozen, setHidden, showAllHidden, type CollectionLibrary
 } from './collections';
 
 class MemoryStorage implements StorageLike {
@@ -35,6 +35,30 @@ describe('Collection model', () => {
 		const corrupted = structuredClone(resized) as any;
 		corrupted.fields.push({ ...primary, id: 'second-primary' });
 		expect(isCollection(corrupted)).toBe(false);
+	});
+
+	it('freezes and hides rows and fields as view state, and keeps the Primary field visible', () => {
+		let next = addRecord(addRecord(addRecord(createCollection('Projects', 'projects'))));
+		const [first, second, third] = next.records;
+		const [primary, status] = next.fields;
+		next = setFrozen(setFrozen(next, 'rows', 2), 'columns', 99);
+		expect(next.views.table.frozenRows).toBe(2);
+		expect(next.views.table.frozenColumns).toBe(next.fields.length);
+		next = setHidden(setHidden(next, 'rows', second.id, true), 'columns', status.id, true);
+		expect(setHidden(next, 'columns', primary.id, true)).toBe(next);
+		expect(next.views.table.hiddenRecords).toEqual([second.id]);
+		expect(next.views.table.hiddenFields).toEqual([status.id]);
+		expect(isCollection(next)).toBe(true);
+		// Removing inside the frozen block keeps the edge on the same row and field.
+		const trimmed = deleteField(removeRecord(next, first.id), status.id);
+		expect(trimmed.views.table.frozenRows).toBe(1);
+		expect(trimmed.views.table.frozenColumns).toBe(trimmed.fields.length);
+		expect(trimmed.views.table.hiddenFields).toBeUndefined();
+		expect(removeRecord(next, third.id).views.table.frozenRows).toBe(2);
+		const shown = showAllHidden(setFrozen(next, 'rows', 0), 'rows');
+		expect(shown.views.table.hiddenRecords).toBeUndefined();
+		expect('frozenRows' in shown.views.table).toBe(false);
+		expect(isCollection({ ...next, views: { table: { ...next.views.table, frozenRows: -1 } } })).toBe(false);
 	});
 
 	it('keeps referenced membership and local values independent of its source', () => {

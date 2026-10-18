@@ -28,7 +28,7 @@ test('style studio themes a plan and the learner view wears it', async ({ page }
   await page.getByRole('button', { name: 'Style', exact: false }).click();
   const studio = page.locator('.style-studio-dialog');
   await expect(studio.getByRole('heading', { name: 'Style Sam’s schedule' })).toBeVisible();
-  await expect(studio.locator('.theme-card')).toHaveCount(28);
+  await expect(studio.locator('.theme-card')).toHaveCount(30);
   await expect(studio.getByRole('button', { name: 'Save look' })).toBeDisabled();
 
   await studio.locator('.theme-card[data-theme="trains"]').click();
@@ -118,6 +118,7 @@ test('every theme renders the learner view without overflow and with readable ca
     await page.goto('/schedules/view?plan=styled');
     await expect(page.locator('#timeline')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe(theme);
+    // Bright sky keeps its ticket scene and Quiet and calm stays empty; every other theme draws a banner.
     const illustrated = !['classic', 'calm'].includes(theme);
     await expect(page.locator('#heroArt svg.scene-art')).toHaveCount(illustrated ? 1 : 0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
