@@ -28,7 +28,8 @@ import type {
 	LoopEvent,
 	LoopEventType,
 	ClosureReflection,
-	FiveContactsRound
+	FiveContactsRound,
+	LoopReminder
 } from './types';
 import {
 	STARTER_SHAPES,
@@ -47,7 +48,8 @@ import { buildSessions } from './sessions';
 import { thinkingAboutShelf } from './thinkingAboutShelf.svelte';
 import { dateKey, nowMinutes, uid, timeToMinutes } from './utils';
 import { playBell } from './bells';
-import { activeContacts, projectLoopLifecycle, retainContactBoundary } from './openLoops';
+import { activeContacts, isLifecycleEvent, latestLifecycleEvent, projectLoopLifecycle, retainContactBoundary } from './openLoops';
+import { cleanRhythmDays, dueReminders, isQuietMinute, liveReminders, rhythmDueAt } from './reminders';
 import {
 	intervalKey,
 	kindLabel,
@@ -168,6 +170,7 @@ export class PlannerStore {
 	loopEvents = $state<LoopEvent[]>(load('planner.loopEvents.v1', []));
 	closureReflections = $state<ClosureReflection[]>(load('planner.closureReflections.v1', []));
 	fiveContactsRounds = $state<FiveContactsRound[]>(load('planner.fiveContactsRounds.v1', []));
+	loopReminders = $state<LoopReminder[]>(load('planner.loopReminders.v1', []));
 
 	// Transient
 	readonly sessionId = uid();
@@ -578,7 +581,10 @@ export class PlannerStore {
 
 		const observation: IntervalObservation = {
 			trackerAnswers: input.trackerAnswers === undefined ? existing?.trackerAnswers : input.trackerAnswers.map(a => ({ tracker: { ...a.tracker }, value: a.value })),
-			noticings: input.noticings === undefined ? existing?.noticings : input.noticings.map(noticing => ({ ...noticing, note: noticing.note.trim() })),
+			noticings: input.noticings === undefined ? existing?.noticings : input.noticings.map(noticing => {
+				const links = [...new Set(noticing.linkedLoopIds ?? [])];
+				return { channel: noticing.channel, note: noticing.note.trim(), ...(links.length ? { linkedLoopIds: links } : {}) };
+			}),
 			linkedLoopIds: input.linkedLoopIds === undefined ? existing?.linkedLoopIds : [...new Set(input.linkedLoopIds)],
 			details: input.details === undefined ? existing?.details : { ...input.details },
 			sampleTag: input.sampleTag === undefined ? existing?.sampleTag : input.sampleTag ? { ...input.sampleTag } : null,
@@ -656,7 +662,165 @@ export class PlannerStore {
 		this.openLoops = projectLoopLifecycle(this.openLoops, this.loopEvents);
 		save('planner.loopEvents.v1', this.loopEvents);
 		save('planner.openLoops.v1', this.openLoops);
+		if (event.type === 'closed' && loop) this.#ensureRhythmReminder(loop.id);
 		return event;
+	}
+
+	/**
+	 * Rename a loop or change whether it recurs. Lifecycle is untouched: it
+	 * stays a projection of the event ledger.
+	 */
+	updateOpenLoop(id: string, patch: { title?: string; recurring?: boolean; rhythmDays?: number | string | null; remindAfterClosure?: boolean }): OpenLoop | null {
+		const loop = this.openLoops.find(item => item.id === id);
+		if (!loop) return null;
+		const title = patch.title === undefined ? loop.title : patch.title.trim();
+		if (!title) return null;
+		const recurring = patch.recurring ?? Boolean(loop.recurring);
+		const rhythmDays = !recurring ? undefined : patch.rhythmDays === undefined ? loop.rhythmDays : cleanRhythmDays(patch.rhythmDays ?? undefined);
+		const remindAfterClosure = Boolean(recurring && rhythmDays && (patch.remindAfterClosure ?? loop.remindAfterClosure));
+		const timestamp = new Date().toISOString();
+		const updated: OpenLoop = {
+			...loop, title, recurring: recurring || undefined, rhythmDays,
+			remindAfterClosure: remindAfterClosure || undefined, editedAt: timestamp, updatedAt: timestamp
+		};
+		this.openLoops = projectLoopLifecycle(this.openLoops.map(item => item.id === id ? updated : item), this.loopEvents);
+		save('planner.openLoops.v1', this.openLoops);
+		if (remindAfterClosure) this.#ensureRhythmReminder(id);
+		else this.#cancelRhythmReminders(id);
+		return this.openLoops.find(item => item.id === id) ?? null;
+	}
+
+	/**
+	 * Correct a saved event: when it happened, its note, or — for observations
+	 * that are not lifecycle changes — which loop it belongs to. The entry time
+	 * and the first occurrence time are kept, so a correction stays visible.
+	 */
+	updateLoopEvent(id: string, patch: { occurredAt?: string; note?: string | null; loopId?: string | null }): LoopEvent | null {
+		const event = this.loopEvents.find(item => item.id === id);
+		if (!event) return null;
+		let occurredAt = event.occurredAt;
+		if (patch.occurredAt !== undefined) {
+			const time = new Date(patch.occurredAt);
+			// An occurrence can be corrected into the past, not into the future.
+			if (!Number.isFinite(time.getTime()) || time.getTime() > Date.now() + 60_000) return null;
+			occurredAt = time.toISOString();
+		}
+		let loopId = event.loopId;
+		if (patch.loopId !== undefined && (patch.loopId || undefined) !== event.loopId) {
+			if (isLifecycleEvent(event.type)) return null;
+			if (patch.loopId && !this.openLoops.some(loop => loop.id === patch.loopId)) return null;
+			loopId = patch.loopId || undefined;
+		}
+		const note = patch.note === undefined ? event.note : patch.note?.trim() || undefined;
+		if (occurredAt === event.occurredAt && loopId === event.loopId && note === event.note) return event;
+		const timestamp = new Date().toISOString();
+		const updated: LoopEvent = {
+			...event, occurredAt, loopId, note, updatedAt: timestamp,
+			originalOccurredAt: occurredAt !== event.occurredAt ? event.originalOccurredAt ?? event.occurredAt : event.originalOccurredAt
+		};
+		this.loopEvents = this.loopEvents.map(item => item.id === id ? updated : item);
+		this.openLoops = projectLoopLifecycle(this.openLoops, this.loopEvents);
+		save('planner.loopEvents.v1', this.loopEvents);
+		save('planner.openLoops.v1', this.openLoops);
+		if (occurredAt !== event.occurredAt) {
+			// A between-cycles reminder follows its closure's corrected time.
+			const shift = new Date(occurredAt).getTime() - new Date(event.occurredAt).getTime();
+			this.#writeReminders(this.loopReminders.map(reminder => reminder.afterEventId === id && !reminder.endedAt
+				? { ...reminder, dueAt: new Date(new Date(reminder.dueAt).getTime() + shift).toISOString(), updatedAt: timestamp } : reminder));
+		}
+		return updated;
+	}
+
+	// ── reminders: only ever the ones the person asked for ─────────────
+
+	createLoopReminder(loopId: string, dueAt: string, note?: string): LoopReminder | null {
+		const loop = this.openLoops.find(item => item.id === loopId);
+		const due = new Date(dueAt);
+		if (!loop || loop.status === 'resolved' || !Number.isFinite(due.getTime()) || due.getTime() < Date.now() - 60_000) return null;
+		const timestamp = new Date().toISOString();
+		const reminder: LoopReminder = { id: `reminder-${uid()}`, loopId, dueAt: due.toISOString(), note: note?.trim() || undefined, createdAt: timestamp, updatedAt: timestamp };
+		this.#writeReminders([...this.loopReminders, reminder]);
+		return reminder;
+	}
+
+	/** Thanks or cancel: either way the reminder is finished and never repeats. */
+	endLoopReminder(id: string, ending: 'acknowledged' | 'cancelled'): void {
+		const timestamp = new Date().toISOString();
+		this.#writeReminders(this.loopReminders.map(reminder => reminder.id === id && !reminder.endedAt
+			? { ...reminder, endedAt: timestamp, ending, updatedAt: timestamp } : reminder));
+	}
+
+	/** Move a reminder to a specific later time. */
+	moveLoopReminder(id: string, dueAt: Date): void {
+		if (!Number.isFinite(dueAt.getTime())) return;
+		const timestamp = new Date().toISOString();
+		this.#writeReminders(this.loopReminders.map(reminder => reminder.id === id && !reminder.endedAt
+			? { ...reminder, dueAt: dueAt.toISOString(), updatedAt: timestamp } : reminder));
+	}
+
+	getLiveReminders(loopId?: string): LoopReminder[] {
+		return liveReminders(this.loopReminders, this.openLoops, this.loopEvents).filter(reminder => !loopId || reminder.loopId === loopId);
+	}
+
+	getDueReminders(now: Date = this.now): LoopReminder[] {
+		return dueReminders(this.loopReminders, this.openLoops, this.loopEvents, now);
+	}
+
+	#writeReminders(reminders: LoopReminder[]): void {
+		this.loopReminders = reminders;
+		save('planner.loopReminders.v1', this.loopReminders);
+	}
+
+	/** Deterministic id, so a retry or a second device cannot double it. */
+	#ensureRhythmReminder(loopId: string): void {
+		const loop = this.openLoops.find(item => item.id === loopId);
+		const closure = latestLifecycleEvent(loopId, this.loopEvents);
+		if (!loop?.recurring || !loop.remindAfterClosure || !loop.rhythmDays || loop.status !== 'resolved' || closure?.type !== 'closed') return;
+		const id = `reminder-after-${closure.id}`;
+		const dueAt = rhythmDueAt(closure.occurredAt, loop.rhythmDays);
+		const existing = this.loopReminders.find(reminder => reminder.id === id);
+		const timestamp = new Date().toISOString();
+		if (existing && (existing.endedAt || existing.dueAt === dueAt)) return;
+		const reminder: LoopReminder = existing
+			? { ...existing, dueAt, updatedAt: timestamp }
+			: { id, loopId, dueAt, afterEventId: closure.id, createdAt: timestamp, updatedAt: timestamp };
+		this.#writeReminders(existing ? this.loopReminders.map(item => item.id === id ? reminder : item) : [...this.loopReminders, reminder]);
+	}
+
+	#cancelRhythmReminders(loopId: string): void {
+		if (!this.loopReminders.some(reminder => reminder.loopId === loopId && reminder.afterEventId && !reminder.endedAt)) return;
+		const timestamp = new Date().toISOString();
+		this.#writeReminders(this.loopReminders.map(reminder => reminder.loopId === loopId && reminder.afterEventId && !reminder.endedAt
+			? { ...reminder, endedAt: timestamp, ending: 'cancelled', updatedAt: timestamp } : reminder));
+	}
+
+	/**
+	 * Browser notifications are opt-in, respect quiet hours, and fire once per
+	 * due time. The in-app card shows due reminders either way.
+	 */
+	#deliverReminders(): void {
+		if (!this.settings.reminderNotifications || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+		if (isQuietMinute(nowMinutes(this.now), this.settings.quietHoursStart, this.settings.quietHoursEnd)) return;
+		const pending = this.getDueReminders().filter(reminder => reminder.notifiedFor !== reminder.dueAt);
+		if (!pending.length) return;
+		for (const reminder of pending) {
+			const title = this.openLoops.find(loop => loop.id === reminder.loopId)?.title ?? 'An open loop';
+			try {
+				new Notification('Carillon', { body: `A reminder you asked for: ${title}${reminder.note ? ` — ${reminder.note}` : ''}`, tag: reminder.id });
+			} catch {
+				// Some mobile browsers only notify through a service worker; the in-app card still shows it.
+			}
+		}
+		const ids = new Set(pending.map(reminder => reminder.id));
+		// Not an edit: updatedAt stays put so this never outranks a snooze from another device.
+		this.#writeReminders(this.loopReminders.map(reminder => ids.has(reminder.id) ? { ...reminder, notifiedFor: reminder.dueAt } : reminder));
+	}
+
+	/** An offer or idea waved away stays away. */
+	dismissOffer(key: string): void {
+		const dismissed = this.settings.dismissedOffers ?? [];
+		if (dismissed.includes(key)) return;
+		this.updateSettings({ dismissedOffers: [...dismissed, key].slice(-300) });
 	}
 
 	saveClosureReflection(eventId: string, input: { descriptors: string[]; note?: string; nextFeelsPossible?: 'something' | 'rest' | 'nothing' }): ClosureReflection | null {
@@ -1159,6 +1323,7 @@ export class PlannerStore {
 		this.openLoops = projectLoopLifecycle(blob.openLoops ?? this.openLoops, this.loopEvents);
 		this.closureReflections = blob.closureReflections ?? this.closureReflections;
 		this.fiveContactsRounds = blob.fiveContactsRounds ?? this.fiveContactsRounds;
+		this.loopReminders = blob.loopReminders ?? this.loopReminders;
 		save('planner.shapes.v1', this.dayShapes);
 		save('planner.weekPattern.v1', this.weekPattern);
 		save('planner.days.v2', this.dayOverrides);
@@ -1179,6 +1344,7 @@ export class PlannerStore {
 		save('planner.loopEvents.v1', this.loopEvents);
 		save('planner.closureReflections.v1', this.closureReflections);
 		save('planner.fiveContactsRounds.v1', this.fiveContactsRounds);
+		save('planner.loopReminders.v1', this.loopReminders);
 		this.publishSessionsLocally();
 	}
 
@@ -1214,6 +1380,7 @@ export class PlannerStore {
 
 	tick(): void {
 		this.now = new Date();
+		this.#deliverReminders();
 
 		if (!this.settings.bellsEnabled) return;
 
@@ -1221,13 +1388,7 @@ export class PlannerStore {
 		const minuteKey = `${dateKey(this.now)}-${mins}`;
 		if (minuteKey === this.#lastBellMinuteKey) return;
 
-		const quietStart = timeToMinutes(this.settings.quietHoursStart);
-		const quietEnd = timeToMinutes(this.settings.quietHoursEnd);
-		const inQuietHours =
-			quietStart <= quietEnd
-				? mins >= quietStart && mins < quietEnd
-				: mins >= quietStart || mins < quietEnd;
-		if (inQuietHours) return;
+		if (isQuietMinute(mins, this.settings.quietHoursStart, this.settings.quietHoursEnd)) return;
 
 		const samplingInterval = Math.max(1, this.settings.samplingIntervalMinutes || 15);
 		if (mins % samplingInterval === 0) {

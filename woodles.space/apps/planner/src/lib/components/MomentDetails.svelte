@@ -5,6 +5,7 @@
 	import { store } from '$lib/store.svelte';
 	import { queueSync } from '$lib/sync.svelte';
 	import { trackerOffer } from '$lib/momentTrackers';
+	import { loopCandidate, suggestLoopLinks } from '$lib/loopInference';
 	import PersonalTrackers from './PersonalTrackers.svelte';
 	let { details = $bindable<MomentDetails>({}), answers = $bindable<TrackerAnswer[]>([]), noticings = $bindable<MomentNoticing[]>([]), linkedLoopIds = $bindable<string[]>([]), text, date, start, previous, onchange } : {
 		answers: TrackerAnswer[]; noticings: MomentNoticing[]; linkedLoopIds: string[];
@@ -22,6 +23,13 @@
 	let linking = $state(false);
 	let loopTitle = $state('');
 	let loopError = $state('');
+	let loopTitleInput: HTMLInputElement | undefined = $state();
+	let notLinks = $state<string[]>([]);
+	let candidateWaved = $state('');
+	// Offers read the moment's words; nothing is linked or created until a click.
+	let linkOffer = $derived(suggestLoopLinks([text, ...noticings.map(n => n.note)].join(' '), store.openLoops, [...linkedLoopIds, ...noticings.flatMap(n => n.linkedLoopIds ?? []), ...notLinks])[0]);
+	let candidate = $derived(linking ? null : loopCandidate(text, store.openLoops));
+	const loopName = (id: string) => store.openLoops.find(loop => loop.id === id)?.title ?? 'Saved loop';
 	let field = $derived(DETAIL_FIELDS.find(f => f.key === active));
 	let answered = $derived(DETAIL_FIELDS.filter(f => hasDetail(details, f.key)));
 	let customOffer = $derived(trackerOffer(store.settings.momentTrackers ?? [], answers, text, date, start, previous, dismissedTrackers));
@@ -32,6 +40,18 @@
 	function noteChannel(channel: MomentNoticing['channel'], note: string) {
 		noticings = noticings.map(n => n.channel === channel ? { ...n, note } : n);
 		onchange();
+	}
+	/** A link on one noticing, separate from the moment as a whole. */
+	function linkNoticing(channel: MomentNoticing['channel'], loopId: string, linked: boolean) {
+		if (!loopId) return;
+		noticings = noticings.map(n => n.channel !== channel ? n : {
+			...n, linkedLoopIds: linked ? [...new Set([...(n.linkedLoopIds ?? []), loopId])] : (n.linkedLoopIds ?? []).filter(id => id !== loopId)
+		});
+		onchange();
+	}
+	async function nameCandidate(title: string) {
+		linking = true; loopTitle = title; loopError = '';
+		await tick(); loopTitleInput?.focus();
 	}
 	async function open(key: DetailKey) {
 		active = key;
@@ -61,13 +81,22 @@
 	{#each noticings as noticing (noticing.channel)}
 		{@const item = channels.find(c => c.channel === noticing.channel)!}
 		<label class="noticing-note">{item.question}<textarea rows="2" placeholder={item.placeholder} value={noticing.note} oninput={event => noteChannel(noticing.channel, event.currentTarget.value)}></textarea></label>
+		{#if store.openLoops.length || noticing.linkedLoopIds?.length}<div class="noticing-links">
+			{#each noticing.linkedLoopIds ?? [] as id (id)}<button type="button" class="linked-chip" aria-label={`Unlink ${loopName(id)} from this ${item.title.toLowerCase()} note`} onclick={() => linkNoticing(noticing.channel, id, false)}>{loopName(id)} ×</button>{/each}
+			{#if store.openLoops.some(loop => !noticing.linkedLoopIds?.includes(loop.id))}<select aria-label={`Connect this ${item.title.toLowerCase()} note to a loop`} value="" onchange={event => { linkNoticing(noticing.channel, event.currentTarget.value, true); event.currentTarget.value = ''; }}>
+				<option value="">Connect this note to a loop…</option>
+				{#each store.openLoops.filter(loop => !noticing.linkedLoopIds?.includes(loop.id)) as loop (loop.id)}<option value={loop.id}>{loop.title}{loop.status === 'resolved' ? ' · resolved' : ''}</option>{/each}
+			</select>{/if}
+		</div>{/if}
 	{/each}
 	<div class="loop-actions"><button type="button" aria-expanded={linking} onclick={() => linking = !linking}>+ Link an open loop</button><a href="#open-loop-notebook">Close a loop</a></div>
+	{#if linkOffer}<div class="offer loop-offer" data-testid="loop-link-offer"><p>Possibly about <strong>{linkOffer.title}</strong>?</p><div><button type="button" onclick={() => toggleLoop(linkOffer!.id)}>Link it</button><button type="button" onclick={() => notLinks = [...notLinks, linkOffer!.id]}>Not this</button></div></div>
+	{:else if candidate && candidate !== candidateWaved}<div class="offer loop-offer" data-testid="loop-candidate-offer"><p>Keep “{candidate}” as an open loop?</p><div><button type="button" onclick={() => nameCandidate(candidate!)}>Name it as a loop</button><button type="button" onclick={() => candidateWaved = candidate!}>Not now</button></div></div>{/if}
 	{#if linkedLoopIds.length}<div class="chips linked-loops" aria-label="Linked open loops">{#each linkedLoopIds as id (id)}<button type="button" aria-label={`Unlink ${store.openLoops.find(loop => loop.id === id)?.title ?? 'saved loop'}`} onclick={() => toggleLoop(id)}>{store.openLoops.find(loop => loop.id === id)?.title ?? 'Saved loop'} ×</button>{/each}</div>{/if}
 	{#if linking}<div class="loop-picker">
 		<p>Connect only if it seems useful. Sensations can stay unlinked.</p>
 		{#if store.openLoops.length}<div class="loop-list" role="group" aria-label="Choose loops to link">{#each store.openLoops as loop (loop.id)}<label><input type="checkbox" checked={linkedLoopIds.includes(loop.id)} onchange={() => toggleLoop(loop.id)} /><span>{loop.title}{loop.status === 'resolved' ? ' · resolved' : ''}</span></label>{/each}</div>{/if}
-		<form onsubmit={event => { event.preventDefault(); createLoop(); }}><label>New loop name <small>optional</small><input bind:value={loopTitle} maxlength="160" placeholder="Reply to Mom" /></label><button type="submit" disabled={!loopTitle.trim()}>Create and link</button></form>
+		<form onsubmit={event => { event.preventDefault(); createLoop(); }}><label>New loop name <small>optional</small><input bind:this={loopTitleInput} bind:value={loopTitle} maxlength="160" placeholder="Reply to Mom" /></label><button type="submit" disabled={!loopTitle.trim()}>Create and link</button></form>
 		<p role="status">{loopError}</p><small>Creating keeps the loop now. The link is included when you save the moment.</small>
 	</div>{/if}
 	<details bind:open={browsing} class="detail-menu">
@@ -115,6 +144,12 @@
 	.loop-picker form button { justify-self: start; }
 	.loop-picker input:not([type='checkbox']) { width: 100%; min-width: 0; }
 	.linked-loops button { max-width: 100%; overflow-wrap: anywhere; }
+	.noticing-links { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; margin: -.3rem 0 .7rem; }
+	.noticing-links select { max-width: 100%; min-width: 0; color: var(--car-ink); border: 1px solid #44365b30; background: #ffffff70; border-radius: .5rem; padding: .35rem .5rem; font: .72rem var(--car-body); }
+	.linked-chip { border-radius: 99px; font-size: .7rem; padding: .3rem .55rem; overflow-wrap: anywhere; max-width: 100%; }
+	.loop-offer { display: grid; gap: .35rem; padding: .55rem .65rem; }
+	.loop-offer p { margin: 0; }
+	.loop-offer div { display: flex; flex-wrap: wrap; gap: .35rem; }
 	.rating { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.3rem; }
 	.rating button { min-width: 0; min-height: 2.8rem; padding: 0.4rem 0.15rem; font-size: 0.7rem; box-shadow: 0 2px 0 #44365b20; }
 	.panel-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }

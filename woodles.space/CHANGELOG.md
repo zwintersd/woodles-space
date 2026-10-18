@@ -18,6 +18,20 @@ so it's not easy to forget.
 
 ---
 
+## 2026-10-18
+
+- **Carillon's open loops can recur, remind, and look back** — a loop can be a
+  recurring need: closing ends one cycle and *need is back* starts the next,
+  with an optional rhythm. reminders are only the ones you set — a time on a
+  loop, or a while after each closed cycle — and appear below the sampler,
+  with browser notifications as a separate opt-in that stays quiet overnight.
+  a *Patterns in your loops* disclosure counts what sat near your closures
+  (reflections, labels, noticings, Five Contacts rounds) without calling any
+  of it a cause, offers loop names and rhythms it spots in your notes, and
+  shows ideas only when you ask. a single body, attention, or actions note can
+  now link to its own loop, and saved loop events can be corrected — the time
+  you first entered stays on the record.
+
 ## 2026-10-16
 
 - **HomeSuite syncs between your computer and your phone** — a Sync button

@@ -17,6 +17,8 @@
 	import Capacity from './Capacity.svelte';
 	import LoopNotebook from './LoopNotebook.svelte';
 	import FiveContacts from './FiveContacts.svelte';
+	import LoopReminders from './LoopReminders.svelte';
+	import LoopPatterns from './LoopPatterns.svelte';
 
 	let {
 		onopenpiles,
@@ -29,6 +31,7 @@
 	} = $props();
 
 	let selectedStart = $state('');
+	let patternsOpen = $state(false);
 	let todayKey = $derived(dateKey(store.now));
 	let dayShape = $derived(store.getDayShape(store.now));
 	let blocks = $derived(store.getBlocksForDate(store.now));
@@ -214,11 +217,13 @@
 			{/if}
 
 		</article>
+		<LoopReminders />
 		<div class="optional-tools"><LoopNotebook /><FiveContacts /></div>
 		<MomentDayReview observations={todayObservations} onselect={reopenMoment} />
 		</div>
 	</div>
 
+	<details class="context-details" bind:open={patternsOpen}><summary>Patterns in your loops</summary>{#if patternsOpen}<LoopPatterns />{/if}</details>
 	<details class="context-details"><summary>Sleep and context</summary><Capacity /></details>
 	<details class="context-details"><summary>Add an earlier activity</summary><CatchUp intervals={todayIntervals} {onopenroutines} {onopensurge} /></details>
 

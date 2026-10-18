@@ -9,7 +9,8 @@ import {
 import { store } from './store.svelte';
 import { buildCommitments, commitmentsMatch } from './commitments';
 import { buildSessions, sessionsMatch } from './sessions';
-import { mergeFiveContactsRound, projectLoopLifecycle } from './openLoops';
+import { mergeFiveContactsRound, mergeLoopEvent, mergeOpenLoop, projectLoopLifecycle } from './openLoops';
+import { mergeLoopReminder } from './reminders';
 import type {
 	IntervalObservation,
 	PlannerBlob,
@@ -106,10 +107,12 @@ function mergeDayInstances(
  * desktop tap survive the same CAS conflict instead of choosing one device.
  */
 export function mergePlannerBlobs(local: PlannerBlob, remote: PlannerBlob): PlannerBlob {
-	const loopEvents = mergeById(local.loopEvents ?? [], remote.loopEvents ?? []);
+	const loopEvents = mergeById(local.loopEvents ?? [], remote.loopEvents ?? [], mergeLoopEvent);
 	const openLoops = projectLoopLifecycle(
-		mergeById(local.openLoops ?? [], remote.openLoops ?? [], latestMutable), loopEvents
+		mergeById(local.openLoops ?? [], remote.openLoops ?? [], mergeOpenLoop), loopEvents
 	);
+	// Dismissals only accumulate; a stale device must not bring an offer back.
+	const dismissedOffers = [...new Set([...(local.settings.dismissedOffers ?? []), ...(remote.settings.dismissedOffers ?? [])])];
 	const observations = mergeById(
 		local.observations ?? [],
 		remote.observations ?? [],
@@ -132,7 +135,11 @@ export function mergePlannerBlobs(local: PlannerBlob, remote: PlannerBlob): Plan
 		obligations: mergeById(local.obligations, remote.obligations),
 		rituals: mergeById(local.rituals, remote.rituals),
 		tasks: mergeById(local.tasks, remote.tasks, latestMutable),
-		settings: { ...local.settings, ...remote.settings },
+		settings: {
+			...local.settings,
+			...remote.settings,
+			...(dismissedOffers.length ? { dismissedOffers } : {})
+		},
 		domains: mergeById(local.domains, remote.domains),
 		observations,
 		routines: mergeById(local.routines ?? [], remote.routines ?? [], latestLifecycle),
@@ -156,7 +163,8 @@ export function mergePlannerBlobs(local: PlannerBlob, remote: PlannerBlob): Plan
 		openLoops,
 		loopEvents,
 		closureReflections: mergeById(local.closureReflections ?? [], remote.closureReflections ?? [], (a, b) => (a.updatedAt ?? a.recordedAt) > (b.updatedAt ?? b.recordedAt) ? a : b),
-		fiveContactsRounds: mergeById(local.fiveContactsRounds ?? [], remote.fiveContactsRounds ?? [], mergeFiveContactsRound)
+		fiveContactsRounds: mergeById(local.fiveContactsRounds ?? [], remote.fiveContactsRounds ?? [], mergeFiveContactsRound),
+		loopReminders: mergeById(local.loopReminders ?? [], remote.loopReminders ?? [], mergeLoopReminder)
 	};
 }
 
@@ -216,7 +224,8 @@ const appSync = createAppSync<PlannerBlob>({
 					openLoops: store.openLoops,
 					loopEvents: store.loopEvents,
 					closureReflections: store.closureReflections,
-					fiveContactsRounds: store.fiveContactsRounds
+					fiveContactsRounds: store.fiveContactsRounds,
+					loopReminders: store.loopReminders
 				};
 			},
 			write(blob: PlannerBlob): void {

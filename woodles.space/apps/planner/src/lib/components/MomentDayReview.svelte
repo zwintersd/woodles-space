@@ -8,7 +8,7 @@
 	let sorted = $derived([...observations].sort((a,b) => b.intervalStart.localeCompare(a.intervalStart)));
 	const noticingNames = { body: 'Body', attention: 'Attention', behavior: 'Actions' };
 	function loopName(id: string) { return store.openLoops.find(loop => loop.id === id)?.title ?? 'Saved loop'; }
-	let visible = $derived(sorted.filter(o => `${o.label} ${o.sampleTag?.name ?? ''} ${detailSummary(o.details)} ${(o.trackerAnswers ?? []).map(a => `${a.tracker.name} ${a.value}`).join(' ')} ${Object.values(o.details ?? {}).join(' ')} ${(o.noticings ?? []).map(n => `${noticingNames[n.channel]} ${n.note}`).join(' ')} ${(o.linkedLoopIds ?? []).map(loopName).join(' ')}`.toLowerCase().includes(filter.toLowerCase())));
+	let visible = $derived(sorted.filter(o => `${o.label} ${o.sampleTag?.name ?? ''} ${detailSummary(o.details)} ${(o.trackerAnswers ?? []).map(a => `${a.tracker.name} ${a.value}`).join(' ')} ${Object.values(o.details ?? {}).join(' ')} ${(o.noticings ?? []).map(n => `${noticingNames[n.channel]} ${n.note} ${(n.linkedLoopIds ?? []).map(loopName).join(' ')}`).join(' ')} ${(o.linkedLoopIds ?? []).map(loopName).join(' ')}`.toLowerCase().includes(filter.toLowerCase())));
 	let changes = $derived(ratingChanges(observations));
 </script>
 
@@ -26,7 +26,7 @@
 			{#if detailSummary(moment.details)}<small>{detailSummary(moment.details)}</small>{/if}
 			{#each moment.trackerAnswers ?? [] as a}<small>{a.tracker.name}: {typeof a.value === 'boolean' ? a.value ? 'Yes' : 'No' : a.value}{a.tracker.type === 'rating' ? '/5' : ''}</small>{/each}
 			{#each DETAIL_FIELDS.filter(field => !field.scale && moment.details?.[field.key]) as field}<small>{field.title}: {moment.details?.[field.key]}</small>{/each}
-			{#each moment.noticings ?? [] as noticing}<small>{noticingNames[noticing.channel]}{noticing.note ? `: ${noticing.note}` : ' · noted'}</small>{/each}
+			{#each moment.noticings ?? [] as noticing}<small>{noticingNames[noticing.channel]}{noticing.note ? `: ${noticing.note}` : ' · noted'}{noticing.linkedLoopIds?.length ? ` → ${noticing.linkedLoopIds.map(loopName).join(' · ')}` : ''}</small>{/each}
 			{#if moment.linkedLoopIds?.length}<small>Linked: {moment.linkedLoopIds.map(loopName).join(' · ')}</small>{/if}
 			</div><span aria-hidden="true">↗</span>
 		</button>

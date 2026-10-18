@@ -8,7 +8,8 @@ import type {
 	SporeEvent,
 	OpenLoop,
 	LoopEvent,
-	FiveContactsRound
+	FiveContactsRound,
+	LoopReminder
 } from './types';
 import { activeContacts } from './openLoops';
 
@@ -391,5 +392,37 @@ describe('mergePlannerBlobs', () => {
 
 		expect(merged.signals?.map((entry) => entry.id).sort()).toEqual(['signal-1', 'signal-2']);
 		expect(merged.signals?.find((entry) => entry.id === 'signal-1')?.endDate).toBe('2026-07-30');
+	});
+
+	it('keeps a rename made on one device when another device closes the loop from a stale copy', () => {
+		const loop: OpenLoop = { id: 'loop-1', title: 'Shower', status: 'open', createdAt: '2026-10-18T09:00:00.000Z', updatedAt: '2026-10-18T09:00:00.000Z' };
+		const renamed = { ...loop, title: 'Showering', recurring: true, rhythmDays: 2, editedAt: '2026-10-18T10:00:00.000Z', updatedAt: '2026-10-18T10:00:00.000Z' };
+		const closed: LoopEvent = { id: 'closed', loopId: loop.id, type: 'closed', occurredAt: '2026-10-18T11:00:00.000Z', recordedAt: '2026-10-18T11:00:00.000Z' };
+		const staleCloser = blob({ openLoops: [{ ...loop, status: 'resolved', updatedAt: '2026-10-18T11:00:00.000Z' }], loopEvents: [closed] });
+		for (const merged of [mergePlannerBlobs(blob({ openLoops: [renamed] }), staleCloser), mergePlannerBlobs(staleCloser, blob({ openLoops: [renamed] }))]) {
+			expect(merged.openLoops?.[0]).toMatchObject({ title: 'Showering', recurring: true, rhythmDays: 2, status: 'resolved' });
+		}
+	});
+
+	it('takes a corrected event over its stale original in either direction', () => {
+		const original: LoopEvent = { id: 'event-1', type: 'noticed', occurredAt: '2026-10-18T13:00:00.000Z', recordedAt: '2026-10-18T13:00:00.000Z' };
+		const corrected: LoopEvent = { ...original, loopId: 'loop-1', occurredAt: '2026-10-18T11:30:00.000Z', originalOccurredAt: original.occurredAt, updatedAt: '2026-10-18T14:00:00.000Z' };
+		expect(mergePlannerBlobs(blob({ loopEvents: [corrected] }), blob({ loopEvents: [original] })).loopEvents?.[0]).toEqual(corrected);
+		expect(mergePlannerBlobs(blob({ loopEvents: [original] }), blob({ loopEvents: [corrected] })).loopEvents?.[0]).toEqual(corrected);
+	});
+
+	it('merges reminders by id, keeps finished ones finished, and unions dismissed offers', () => {
+		const base: LoopReminder = { id: 'reminder-1', loopId: 'loop-1', dueAt: '2026-10-18T18:00:00.000Z', createdAt: '2026-10-18T10:00:00.000Z', updatedAt: '2026-10-18T10:00:00.000Z' };
+		const finished = { ...base, endedAt: '2026-10-18T18:01:00.000Z', ending: 'acknowledged' as const, updatedAt: '2026-10-18T18:01:00.000Z' };
+		const staleMove = { ...base, dueAt: '2026-10-19T08:00:00.000Z', updatedAt: '2026-10-18T18:05:00.000Z' };
+		const other: LoopReminder = { ...base, id: 'reminder-2' };
+		const local = blob({ loopReminders: [finished], settings: { ...blob().settings, dismissedOffers: ['theme:laundry'] } });
+		const remote = blob({ loopReminders: [staleMove, other], settings: { ...blob().settings, dismissedOffers: ['idea:many:9'] } });
+		const merged = mergePlannerBlobs(local, remote);
+		expect(merged.loopReminders?.map(reminder => reminder.id).sort()).toEqual(['reminder-1', 'reminder-2']);
+		expect(merged.loopReminders?.find(reminder => reminder.id === 'reminder-1')?.ending).toBe('acknowledged');
+		expect(merged.settings.dismissedOffers?.sort()).toEqual(['idea:many:9', 'theme:laundry']);
+		expect(mergePlannerBlobs(blob(), blob()).settings.dismissedOffers).toBeUndefined();
+		expect(mergePlannerBlobs(blob(), blob()).loopReminders).toEqual([]);
 	});
 });
