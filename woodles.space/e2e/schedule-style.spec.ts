@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+const nextThemes = ['mushroom', 'library', 'farm', 'music', 'arctic', 'potions'];
+
 async function openPlan(page: Page) {
   await page.goto('/schedules/generator');
   await page.evaluate(() => {
@@ -26,7 +28,7 @@ test('style studio themes a plan and the learner view wears it', async ({ page }
   await page.getByRole('button', { name: 'Style', exact: false }).click();
   const studio = page.locator('.style-studio-dialog');
   await expect(studio.getByRole('heading', { name: 'Style Sam’s schedule' })).toBeVisible();
-  await expect(studio.locator('.theme-card')).toHaveCount(22);
+  await expect(studio.locator('.theme-card')).toHaveCount(28);
   await expect(studio.getByRole('button', { name: 'Save look' })).toBeDisabled();
 
   await studio.locator('.theme-card[data-theme="trains"]').click();
@@ -86,22 +88,46 @@ test('every theme renders the learner view without overflow and with readable ca
   await openPlan(page);
   const themes: string[] = await page.evaluate(() => (window as any).ScheduleThemes.THEMES.map((theme: any) => theme.id));
   for (const theme of themes) {
+    const fromPicker = nextThemes.includes(theme);
     await page.goto('/schedules/generator');
-    await page.evaluate((id) => {
+    await page.evaluate(({ id, fromPicker }) => {
       const S = (window as any).ScheduleStudio;
       const workspace = JSON.parse(localStorage.getItem(S.STORAGE_KEY)!);
-      workspace.plans[0].style = { theme: id };
+      workspace.plans[0].style = fromPicker ? {} : { theme: id };
       localStorage.setItem(S.STORAGE_KEY, JSON.stringify(workspace));
       const look = (window as any).ScheduleThemes.resolve({ theme: id });
       if ((window as any).ScheduleThemes.warnings(look).length) throw new Error(id + ': ' + (window as any).ScheduleThemes.warnings(look).join(' '));
-    }, theme);
+    }, { id: theme, fromPicker });
+    if (fromPicker) {
+      await page.goto('/schedules/generator?plan=styled');
+      await page.getByRole('button', { name: 'Style', exact: false }).click();
+      const studio = page.locator('.style-studio-dialog');
+      await studio.locator('.theme-card[data-theme="' + theme + '"]').click();
+      await expect(studio.locator('.lp-scene svg.scene-' + theme)).toBeVisible();
+      await studio.getByRole('button', { name: 'Save look' }).click();
+      await page.reload();
+      expect((await savedStyle(page)).theme).toBe(theme);
+      const snapshotTheme = await page.evaluate(() => {
+        const workspace = (window as any).ScheduleStudio.readWorkspace();
+        const plan = workspace.plans[0];
+        return (window as any).SchedulePublishing.snapshot(plan, workspace, plan.days.map((day: any) => day.key)).plan.style.theme;
+      });
+      expect(snapshotTheme).toBe(theme);
+    }
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/schedules/view?plan=styled');
     await expect(page.locator('#timeline')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe(theme);
-    const illustrated = ['trains', 'dinosaurs', 'unicorns', 'space', 'construction', 'ocean', 'pirates', 'heroes', 'robots', 'princesses'].includes(theme);
+    const illustrated = !['classic', 'calm'].includes(theme);
     await expect(page.locator('#heroArt svg.scene-art')).toHaveCount(illustrated ? 1 : 0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    if (fromPicker) {
+      await expect(page.locator('html')).toHaveAttribute('data-motion', theme === 'library' ? 'off' : 'on');
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      expect(await page.locator('#heroArt [class^="sc-"]').evaluateAll(elements => elements.every(element => getComputedStyle(element).animationName === 'none'))).toBe(true);
+      await page.screenshot({ path: test.info().outputPath(`theme-${theme}-mobile.png`), fullPage: true });
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+    }
     await page.setViewportSize({ width: 1100, height: 800 });
     await page.screenshot({ path: test.info().outputPath(`theme-${theme}.png`) });
   }

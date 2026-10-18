@@ -21,14 +21,15 @@ test('edits a pile, isolates today, and reloads the saved day',async({page})=>{
 	await page.getByRole('button',{name:'Save pile',exact:true}).click();
 	await page.getByRole('button',{name:'Use saved pile today',exact:true}).click();
 	await section(page,'Today');
-	await page.locator('.plan-dock > details > summary').click();
+	await page.getByRole('button', { name: 'schedule', exact: true }).click();
 	await expect(page.getByText('Read at home',{exact:true})).toBeVisible();
 	await page.getByRole('button',{name:'Change today',exact:true}).click();
 	await page.getByLabel('Activity 1',{exact:true}).fill('Read outside today');
 	await page.getByRole('button',{name:'Save today only',exact:true}).click();
 	await page.reload();
-	await page.locator('.plan-dock > details > summary').click();
+	await page.getByRole('button', { name: 'schedule', exact: true }).click();
 	await expect(page.getByText('Read outside today',{exact:true})).toBeVisible();
+	await page.keyboard.press('Escape');
 	await section(page,'Day piles');
 	await page.getByRole('button',{name:/Home test day.*1 activities/}).click();
 	await expect(page.getByLabel('Activity 1',{exact:true})).toHaveValue('Read at home');
@@ -65,7 +66,7 @@ test('edits, reorders, archives, restores, and deletes a routine',async({page})=
 test('opens an activity directly and cancels without changing the plan', async ({ page }) => {
 	await page.clock.setFixedTime(new Date('2026-09-19T12:00:00'));
 	await open(page);
-	await page.locator('.plan-dock > details > summary').click();
+	await page.getByRole('button', { name: 'schedule', exact: true }).click();
 	const plan = page.getByRole('region', { name: "Today's plan" });
 	await expect(plan.locator('.plan-row.now')).toHaveCount(1);
 	const allCount = await plan.locator('.plan-row').count();
@@ -134,7 +135,7 @@ test('saves open entries with optional editable color labels', async ({ page }) 
  await expect(sampler.getByRole('button', { name: 'No label', exact: true })).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('offers contextual details without recording answers until save', async ({ page }, testInfo) => {
+test('offers optional legacy details without recording answers until save', async ({ page }, testInfo) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.clock.setFixedTime(new Date('2026-09-19T12:00:00'));
 	await page.addInitScript(() => { if (!localStorage.getItem('planner.observations.v1')) localStorage.setItem('planner.observations.v1', JSON.stringify([
@@ -144,14 +145,14 @@ test('offers contextual details without recording answers until save', async ({ 
 	const sampler = page.getByTestId('interval-sampler');
 	await expect(sampler.getByTestId('detail-offer')).toHaveCount(0);
 	await sampler.getByLabel('What’s happening now?', { exact: true }).fill('Working on notes');
-	await expect(sampler.getByTestId('detail-offer')).toHaveCount(1);
-	await expect(sampler.getByText('You recorded low energy at 09:00. Has it changed?')).toBeVisible();
-	await sampler.getByRole('button', { name: /^Add energy/ }).click();
+	await expect(sampler.getByTestId('detail-offer')).toHaveCount(0);
+	await sampler.getByText('Additional trackers', { exact: false }).click();
+	await sampler.getByRole('button', { name: 'Energy', exact: true }).click();
 	const rating = sampler.getByRole('group', { name: 'How much energy do you have?' });
 	await expect(rating.locator('[aria-pressed="true"]')).toHaveCount(0);
 	await rating.getByRole('button', { name: 'Low', exact: true }).click();
 	await sampler.getByRole('button', { name: 'Done', exact: true }).click();
-	await sampler.getByRole('button', { name: /^Add body/ }).click();
+	await sampler.getByRole('button', { name: 'Body', exact: true }).click();
 	await sampler.getByLabel('What do you notice in your body?').fill('Tense shoulders');
 	await expect(sampler.getByTestId('detail-offer')).toHaveCount(0);
 	for (const width of [1440, 390]) {
@@ -169,13 +170,15 @@ test('offers contextual details without recording answers until save', async ({ 
 	const restored = page;
 	const restoredSample = restored.getByTestId('interval-sampler');
 	await restored.getByRole('button', { name: 'Reopen 12:00: Working on notes', exact: true }).click();
+	await restoredSample.getByText('Additional trackers', { exact: false }).click();
 	await restoredSample.getByRole('button', { name: 'Energy · Low', exact: true }).click();
 	await restoredSample.getByRole('button', { name: 'Remove detail', exact: true }).click();
 	await restoredSample.getByRole('button', { name: 'Save changes', exact: true }).click();
 	await restored.reload();
 	await restored.getByRole('button', { name: 'Reopen 12:00: Working on notes', exact: true }).click();
+	await restoredSample.getByText('Additional trackers', { exact: false }).click();
 	await expect(restoredSample.getByRole('button', { name: 'Energy · Low', exact: true })).toHaveCount(0);
-	await restoredSample.getByRole('button', { name: 'Body ✓', exact: true }).click();
+	await restoredSample.getByLabel('Details added').getByRole('button', { name: 'Body ✓', exact: true }).click();
 	await expect(restoredSample.getByLabel('What do you notice in your body?')).toHaveValue('Tense shoulders');
 });
 
@@ -184,8 +187,9 @@ test('customizes trackers, offers relevant questions, and reopens them from the 
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await open(page);
 	const sampler = page.getByTestId('interval-sampler');
+	await sampler.getByText('Additional trackers', { exact: false }).click();
 	await sampler.getByText('Your trackers', { exact: false }).click();
-	await sampler.getByRole('button', { name: 'Customize trackers', exact: true }).click();
+	await sampler.getByRole('button', { name: 'Choose tracker suggestions', exact: true }).click();
 	await sampler.getByRole('button', { name: 'Add tracker', exact: true }).click();
 	await sampler.getByLabel('Tracker 1 name', { exact: true }).fill('Focus');
 	await sampler.getByLabel('Tracker 1 low', { exact: true }).fill('Scattered');
@@ -196,7 +200,7 @@ test('customizes trackers, offers relevant questions, and reopens them from the 
 	await sampler.getByLabel('Tracker 2 type', { exact: true }).selectOption('check');
 	await sampler.getByRole('button', { name: 'Save trackers', exact: true }).click();
 	await sampler.getByLabel('What’s happening now?', { exact: true }).fill('Reading a book');
-	await expect(sampler.getByTestId('detail-offer')).toHaveCount(2);
+	await expect(sampler.getByTestId('detail-offer')).toHaveCount(1);
 	await sampler.getByRole('button', { name: /^Add Focus/ }).click();
 	await sampler.getByRole('group', { name: 'Focus', exact: true }).getByRole('button', { name: '4', exact: true }).click();
 	await sampler.getByRole('button', { name: 'Done', exact: true }).click();
@@ -205,6 +209,7 @@ test('customizes trackers, offers relevant questions, and reopens them from the 
 	await sampler.getByRole('button', { name: 'Save moment', exact: true }).click();
 	await page.reload();
 	await page.getByRole('button', { name: 'Reopen 12:00: Reading a book', exact: true }).click();
+	await sampler.getByText('Additional trackers', { exact: false }).click();
 	await expect(sampler.getByRole('button', { name: 'Focus · 4/5', exact: true })).toBeVisible();
 	await expect(sampler.getByRole('button', { name: 'Outside · No', exact: true })).toBeVisible();
 	await page.getByLabel('Find a moment', { exact: true }).fill('Focus');
@@ -220,6 +225,7 @@ test('customizes trackers, offers relevant questions, and reopens them from the 
 	await page.evaluate(() => { const settings = JSON.parse(localStorage.getItem('planner.settings.v1') || '{}'); settings.wakeAnchor = '13:00'; localStorage.setItem('planner.settings.v1', JSON.stringify(settings)); });
 	await page.reload();
 	await page.getByRole('button', { name: 'Reopen 12:00: Reading a book', exact: true }).click();
+	await sampler.getByText('Additional trackers', { exact: false }).click();
 	await expect(sampler.getByLabel('What was happening?', { exact: true })).toHaveValue('Reading a book');
 	await sampler.getByRole('button', { name: 'Focus · 4/5', exact: true }).click();
 	await expect(sampler.getByRole('group', { name: 'Focus', exact: true }).getByRole('button', { name: '4', exact: true })).toHaveAttribute('aria-pressed', 'true');

@@ -179,6 +179,9 @@ export type IntervalKind =
  */
 export type IntervalObservation = {
 	trackerAnswers?: TrackerAnswer[];
+	/** Optional observations chosen by the person, with no inferred cause. */
+	noticings?: MomentNoticing[];
+	linkedLoopIds?: string[];
 	/** Optional, explicitly entered details about this moment. */
 	details?: MomentDetails;
 	/** Snapshot of the optional user label; null means explicitly unlabelled. */
@@ -231,6 +234,72 @@ export type MomentTracker = {
 	high: string;
 };
 export type TrackerAnswer = { tracker: MomentTracker; value: string | number | boolean };
+
+export type MomentNoticing = {
+	channel: 'body' | 'attention' | 'behavior';
+	note: string;
+};
+
+export type OpenLoop = {
+	id: string;
+	title: string;
+	status: 'open' | 'paused' | 'resolved';
+	createdAt: string;
+	updatedAt: string;
+	resolvedAt?: string;
+	resolution?: 'completed' | 'released';
+};
+
+export type LoopEventType =
+	| 'noticed' | 'approached' | 'related_action' | 'progress'
+	| 'paused' | 'closed' | 'released' | 'reopened';
+
+export type LoopEvent = {
+	id: string;
+	loopId?: string;
+	type: LoopEventType;
+	occurredAt: string;
+	recordedAt: string;
+	/** Breaks ties when several local actions happen in one millisecond. */
+	sequence?: number;
+	sourceMomentId?: string;
+	note?: string;
+};
+
+export type ClosureReflection = {
+	id: string;
+	loopEventId: string;
+	descriptors: string[];
+	note?: string;
+	nextFeelsPossible?: 'something' | 'rest' | 'nothing';
+	recordedAt: string;
+	updatedAt?: string;
+};
+
+export type Contact = {
+	id: string;
+	at: string;
+	sequence?: number;
+	note?: string;
+	linkedLoopId?: string;
+	/** Undo is retained so an offline copy cannot resurrect this contact. */
+	removedAt?: string;
+	/** Preserved offline evidence outside the five admitted contacts; never auto-promoted. */
+	overflow?: boolean;
+};
+
+export type FiveContactsRound = {
+	id: string;
+	startedAt: string;
+	endedAt?: string;
+	updatedAt: string;
+	status: 'active' | 'completed' | 'stopped';
+	/** Contact ledger, including undone entries. Use activeContacts for the counter. */
+	contacts: Contact[];
+	reflectionNote?: string;
+	/** Independent clock, including deliberate clearing of a reflection. */
+	reflectionUpdatedAt?: string;
+};
 
 export type RoutineStep = {
 	id: string;
@@ -371,4 +440,8 @@ export type PlannerBlob = {
 	sleepLogs?: SleepLog[];
 	signals?: SignalEntry[];
 	loggedSessions?: LoggedSession[];
+	openLoops?: OpenLoop[];
+	loopEvents?: LoopEvent[];
+	closureReflections?: ClosureReflection[];
+	fiveContactsRounds?: FiveContactsRound[];
 };

@@ -5,8 +5,12 @@ import type {
 	IntervalKind,
 	IntervalObservation,
 	PlannerBlob,
-	SporeEvent
+	SporeEvent,
+	OpenLoop,
+	LoopEvent,
+	FiveContactsRound
 } from './types';
+import { activeContacts } from './openLoops';
 
 function observation(
 	intervalStart: string,
@@ -65,6 +69,88 @@ function blob(overrides: Partial<PlannerBlob> = {}): PlannerBlob {
 }
 
 describe('mergePlannerBlobs', () => {
+	it('unions loop history and derives resolution from events instead of a stale loop snapshot', () => {
+		const loop: OpenLoop = { id: 'loop-1', title: 'Reply to Mom', status: 'open', createdAt: '2026-10-18T13:00:00.000Z', updatedAt: '2026-10-18T13:00:00.000Z' };
+		const closed: LoopEvent = { id: 'closed', loopId: loop.id, type: 'closed', occurredAt: '2026-10-18T13:03:01.000Z', recordedAt: '2026-10-18T13:03:02.000Z', sequence: 2 };
+		const unrelated: LoopEvent = { id: 'body-note', type: 'noticed', note: 'Tight shoulders', occurredAt: '2026-10-18T13:04:00.000Z', recordedAt: '2026-10-18T13:04:00.000Z', sequence: 3 };
+		const local = blob({ openLoops: [loop], loopEvents: [closed] });
+		const stale = blob({ openLoops: [{ ...loop, updatedAt: '2026-10-18T14:00:00.000Z' }], loopEvents: [unrelated] });
+		const merged = mergePlannerBlobs(local, stale);
+		expect(merged.loopEvents).toHaveLength(2);
+		expect(merged.openLoops?.[0]).toMatchObject({ status: 'resolved', resolution: 'completed', resolvedAt: closed.occurredAt });
+		expect(mergePlannerBlobs(stale, local).openLoops).toEqual(merged.openLoops);
+		const reopened: LoopEvent = { ...closed, id: 'reopened', type: 'reopened', sequence: 4 };
+		expect(mergePlannerBlobs(merged, blob({ openLoops: [loop], loopEvents: [reopened] })).openLoops?.[0]).toMatchObject({ status: 'open', resolvedAt: undefined, resolution: undefined });
+	});
+
+	it('preserves optional notebook collections when a device still has an older blob shape', () => {
+		const old = observation('09:00', 'rest', '2026-07-30T13:00:00.000Z');
+		old.details = { mood: 3, energy: 2, coping: 4 };
+		const local = blob({
+			observations: [old],
+			openLoops: [{ id: 'loop-1', title: 'A wanted feature', status: 'open', createdAt: '2026-10-18T13:00:00.000Z', updatedAt: '2026-10-18T13:00:00.000Z' }],
+			closureReflections: [{ id: 'reflection-1', loopEventId: 'closed-1', descriptors: ['No noticeable change'], recordedAt: '2026-10-18T14:00:00.000Z' }],
+			fiveContactsRounds: [{ id: 'round-1', startedAt: '2026-10-18T14:00:00.000Z', updatedAt: '2026-10-18T14:00:00.000Z', status: 'active', contacts: [] }]
+		});
+		const merged = mergePlannerBlobs(local, blob());
+		expect(merged.observations).toEqual([old]);
+		expect(merged.openLoops).toEqual(local.openLoops);
+		expect(merged.closureReflections).toEqual(local.closureReflections);
+		expect(merged.fiveContactsRounds).toEqual(local.fiveContactsRounds);
+	});
+
+	it('unions contacts inside a shared round and retains Undo against a newer stale snapshot', () => {
+		const round: FiveContactsRound = { id: 'round-1', startedAt: '2026-10-18T13:00:00.000Z', updatedAt: '2026-10-18T13:01:00.000Z', status: 'active', contacts: [{ id: 'contact-1', at: '2026-10-18T13:01:00.000Z' }] };
+		const remote = { ...round, updatedAt: '2026-10-18T13:02:00.000Z', contacts: [{ id: 'contact-2', at: '2026-10-18T13:02:00.000Z' }] };
+		const merged = mergePlannerBlobs(blob({ fiveContactsRounds: [round] }), blob({ fiveContactsRounds: [remote] }));
+		expect(activeContacts(merged.fiveContactsRounds![0]).map(contact => contact.id)).toEqual(['contact-1', 'contact-2']);
+		const undone = { ...round, contacts: [{ ...round.contacts[0], removedAt: '2026-10-18T13:03:00.000Z' }] };
+		const stale = { ...round, updatedAt: '2026-10-18T14:00:00.000Z' };
+		const withUndo = mergePlannerBlobs(blob({ fiveContactsRounds: [undone] }), blob({ fiveContactsRounds: [stale] }));
+		expect(activeContacts(withUndo.fiveContactsRounds![0])).toHaveLength(0);
+		expect(withUndo.fiveContactsRounds![0].contacts[0].removedAt).toBe('2026-10-18T13:03:00.000Z');
+	});
+
+	it('retains concurrent offline overflow as evidence while admitting five and respecting early exit', () => {
+		const round: FiveContactsRound = { id: 'round-1', startedAt: '2026-10-18T13:00:00.000Z', updatedAt: '2026-10-18T13:03:00.000Z', status: 'active', contacts: [] };
+		const first = { ...round, contacts: [1, 2, 3].map(index => ({ id: `contact-${index}`, at: `2026-10-18T13:0${index}:00.000Z` })) };
+		const second = { ...round, contacts: [4, 5, 6].map(index => ({ id: `contact-${index}`, at: `2026-10-18T13:0${index}:00.000Z` })) };
+		const merged = mergePlannerBlobs(blob({ fiveContactsRounds: [first] }), blob({ fiveContactsRounds: [second] }));
+		expect(merged.fiveContactsRounds![0].contacts).toHaveLength(6);
+		expect(activeContacts(merged.fiveContactsRounds![0])).toHaveLength(5);
+		expect(merged.fiveContactsRounds![0].status).toBe('completed');
+		expect(merged.fiveContactsRounds![0].contacts.find(contact => contact.id === 'contact-6')?.overflow).toBe(true);
+		const undone: FiveContactsRound = {
+			...merged.fiveContactsRounds![0], status: 'active', updatedAt: '2026-10-18T13:07:00.000Z',
+			contacts: merged.fiveContactsRounds![0].contacts.map(contact => contact.id === 'contact-5' ? { ...contact, removedAt: '2026-10-18T13:07:00.000Z' } : contact)
+		};
+		for (const result of [mergePlannerBlobs(blob({ fiveContactsRounds: [undone] }), blob({ fiveContactsRounds: [second] })), mergePlannerBlobs(blob({ fiveContactsRounds: [second] }), blob({ fiveContactsRounds: [undone] }))]) {
+			expect(activeContacts(result.fiveContactsRounds![0])).toHaveLength(4);
+			expect(result.fiveContactsRounds![0].status).toBe('active');
+			expect(result.fiveContactsRounds![0].contacts.find(contact => contact.id === 'contact-6')?.overflow).toBe(true);
+		}
+		const stopped: FiveContactsRound = { ...round, status: 'stopped', endedAt: '2026-10-18T13:02:00.000Z' };
+		expect(mergePlannerBlobs(merged, blob({ fiveContactsRounds: [stopped] })).fiveContactsRounds![0].status).toBe('stopped');
+	});
+
+	it('merges reflection changes and explicit clearing independently from later round activity in either direction', () => {
+		const round: FiveContactsRound = { id: 'round-1', startedAt: '2026-10-18T13:00:00.000Z', updatedAt: '2026-10-18T13:01:00.000Z', status: 'active', contacts: [] };
+		const reflection: FiveContactsRound = { ...round, reflectionNote: 'A little lighter', reflectionUpdatedAt: '2026-10-18T13:01:00.000Z' };
+		const staleActivity: FiveContactsRound = { ...round, updatedAt: '2026-10-18T13:03:00.000Z', status: 'stopped', endedAt: '2026-10-18T13:03:00.000Z' };
+		for (const [first, second] of [[reflection, staleActivity], [staleActivity, reflection]]) {
+			const result = mergePlannerBlobs(blob({ fiveContactsRounds: [first] }), blob({ fiveContactsRounds: [second] })).fiveContactsRounds![0];
+			expect(result.reflectionNote).toBe('A little lighter');
+			expect(result.reflectionUpdatedAt).toBe('2026-10-18T13:01:00.000Z');
+			expect(result.status).toBe('stopped');
+		}
+		const cleared: FiveContactsRound = { ...reflection, reflectionNote: undefined, reflectionUpdatedAt: '2026-10-18T13:02:00.000Z', updatedAt: '2026-10-18T13:02:00.000Z' };
+		const staleReflection = { ...reflection, updatedAt: '2026-10-18T14:00:00.000Z' };
+		for (const [first, second] of [[cleared, staleReflection], [staleReflection, cleared]]) {
+			const result = mergePlannerBlobs(blob({ fiveContactsRounds: [first] }), blob({ fiveContactsRounds: [second] })).fiveContactsRounds![0];
+			expect(result.reflectionNote).toBeUndefined();
+			expect(result.reflectionUpdatedAt).toBe('2026-10-18T13:02:00.000Z');
+		}
+	});
 	it('preserves observations captured concurrently on two devices', () => {
 		const phoneMark = observation('09:00', 'clinic', '2026-07-30T13:00:00.000Z');
 		const desktopMark = observation('09:15', 'writing', '2026-07-30T13:15:00.000Z');

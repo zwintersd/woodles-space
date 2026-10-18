@@ -15,6 +15,8 @@
 	import { detailSummary } from '$lib/momentDetails';
 	import CatchUp from './CatchUp.svelte';
 	import Capacity from './Capacity.svelte';
+	import LoopNotebook from './LoopNotebook.svelte';
+	import FiveContacts from './FiveContacts.svelte';
 
 	let {
 		onopenpiles,
@@ -212,6 +214,7 @@
 			{/if}
 
 		</article>
+		<div class="optional-tools"><LoopNotebook /><FiveContacts /></div>
 		<MomentDayReview observations={todayObservations} onselect={reopenMoment} />
 		</div>
 	</div>
@@ -401,6 +404,8 @@
 		align-items: start;
 	}
 	.moment-column { display: grid; min-width: 0; gap: 1rem; }
+	.optional-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: start; }
+	@media (max-width: 900px) { .optional-tools { grid-template-columns: minmax(0, 1fr); } }
 	.sample-rest { display: flex; align-items: center; gap: 0.8rem; margin-top: 1.5rem; padding: 1rem; border-radius: 0.7rem; background: var(--car-pink-wash); color: var(--car-ink-soft); font: 0.8rem/1.45 var(--car-body); }
 	.sample-rest strong { display: block; color: var(--car-ink); font: 500 1.2rem var(--car-display); }
 	.sample-rest p { margin-top: 0.2rem; }

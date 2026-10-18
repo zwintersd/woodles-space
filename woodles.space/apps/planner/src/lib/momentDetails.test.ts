@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanDetails, suggestMomentDetails } from './momentDetails';
+import { cleanDetails, cleanNoticings, suggestMomentDetails } from './momentDetails';
 import type { IntervalObservation, MomentDetails } from './types';
 
 const prior = (time: string, details: MomentDetails, date = '2026-09-19'): IntervalObservation => ({ id: time, date, intervalStart: time, source: 'live', kind: 'elsewhere', label: 'An earlier moment', details, capturedAt: '', updatedAt: '' });
@@ -37,5 +37,16 @@ describe('moment detail offers', () => {
 	});
 	it('omits blank and invalid answers without treating them as zero', () => {
 		expect(cleanDetails({ mood: 0, energy: 2, coping: 6, helped: '  A walk  ', body: '  ' })).toEqual({ energy: 2, helped: 'A walk' });
+	});
+	it('keeps untouched ratings absent and preserves explicitly saved midpoint ratings', () => {
+		expect(cleanDetails({})).toEqual({});
+		const legacy = { mood: 3, energy: 3, coping: 3, body: 'Tense shoulders' };
+		expect(cleanDetails(legacy)).toEqual(legacy);
+	});
+	it('keeps explicit note-category selections without inventing a measurement or loop link', () => {
+		expect(cleanNoticings([])).toEqual([]);
+		const notes = [{ channel: 'body' as const, note: '  Tight shoulders  ' }, { channel: 'attention' as const, note: '' }];
+		expect(cleanNoticings(notes)).toEqual([{ channel: 'body', note: 'Tight shoulders' }, { channel: 'attention', note: '' }]);
+		expect(notes[0].note).toBe('  Tight shoulders  ');
 	});
 });
