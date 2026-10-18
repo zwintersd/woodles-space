@@ -25,14 +25,17 @@ export function cleanDetails(details: MomentDetails): MomentDetails {
 	}));
 }
 
-/** A selected category is explicit; its note may intentionally be empty. */
+/** A selected category is explicit; its note may intentionally be empty. Links are only ever chosen. */
 export function cleanNoticings(noticings: MomentNoticing[]): MomentNoticing[] {
 	const channels = new Set<string>();
 	return noticings.filter(noticing => {
 		if (!['body', 'attention', 'behavior'].includes(noticing.channel) || channels.has(noticing.channel)) return false;
 		channels.add(noticing.channel);
 		return true;
-	}).map(noticing => ({ ...noticing, note: noticing.note.trim() }));
+	}).map(noticing => {
+		const links = [...new Set((noticing.linkedLoopIds ?? []).filter(Boolean))];
+		return { channel: noticing.channel, note: noticing.note.trim(), ...(links.length ? { linkedLoopIds: links } : {}) };
+	});
 }
 
 export function detailSummary(details: MomentDetails = {}): string {

@@ -51,3 +51,10 @@ export function formatHHMM(totalMinutes: number): string {
 	const m = totalMinutes % 60;
 	return `${padTwo(h)}:${padTwo(m)}`;
 }
+
+/** An ISO instant as the local "YYYY-MM-DDTHH:MM" a datetime-local input expects. */
+export function toLocalInputValue(iso: string): string {
+	const date = new Date(iso);
+	if (Number.isNaN(date.getTime())) return '';
+	return `${dateKey(date)}T${formatTime(date)}`;
+}

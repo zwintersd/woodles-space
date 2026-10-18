@@ -49,4 +49,13 @@ describe('moment detail offers', () => {
 		expect(cleanNoticings(notes)).toEqual([{ channel: 'body', note: 'Tight shoulders' }, { channel: 'attention', note: '' }]);
 		expect(notes[0].note).toBe('  Tight shoulders  ');
 	});
+	it('keeps per-noticing loop links only when chosen, without duplicates', () => {
+		const notes = [
+			{ channel: 'body' as const, note: ' pit in stomach ', linkedLoopIds: ['loop-a', 'loop-a', ''] },
+			{ channel: 'attention' as const, note: 'drifting', linkedLoopIds: [] },
+			{ channel: 'body' as const, note: 'duplicate channel', linkedLoopIds: ['loop-b'] }
+		];
+		expect(cleanNoticings(notes)).toEqual([{ channel: 'body', note: 'pit in stomach', linkedLoopIds: ['loop-a'] }, { channel: 'attention', note: 'drifting' }]);
+		expect('linkedLoopIds' in cleanNoticings(notes)[1]).toBe(false);
+	});
 });
