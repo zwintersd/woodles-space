@@ -43,7 +43,7 @@
 	}
 
 	// Stop shows only while something is sounding; a finished preview resets its button.
-	$effect(() => { if (!store.bellSounding) previewing = null; });
+	$effect(() => { if (store.bellSounding !== 'preview') previewing = null; });
 
 	onMount(() => {
 		// Start from fresh settings, so an edit here isn't made on a stale copy.
@@ -63,7 +63,7 @@
 	function setLevel(mark: BellMark, value: number) { store.setMarkSound(mark, { volume: value / 100 }); }
 
 	async function togglePreview(mark: BellMark) {
-		if (previewing === mark && store.bellSounding) { stopBells(); previewing = null; await say('stopped'); return; }
+		if (previewing === mark && store.bellSounding === 'preview') { stopBells(); previewing = null; await say('stopped'); return; }
 		const unlocked = await unlockAudio();
 		if (unlocked === 'unavailable') { await say('this browser can’t play bell sounds'); return; }
 		const result = await store.previewMark(mark);
@@ -89,6 +89,8 @@
 		await say(state === 'running' ? 'sound allowed for this page' : 'the browser is still holding sound');
 	}
 	async function setEnabled(enabled: boolean) {
+		// This click is the gesture browsers need; the page-wide unlock skipped it because bells were still off.
+		if (enabled) void unlockAudio();
 		store.updateSettings({ bellsEnabled: enabled }); save();
 		await say(enabled ? 'bells on' : 'bells off');
 	}

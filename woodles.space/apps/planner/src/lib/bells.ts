@@ -57,7 +57,8 @@ export function registryNotes(id: string): BellNote[] {
 // ── one shared audio graph ─────────────────────────────────────────
 
 type Graph = { context: AudioContext; input: GainNode };
-type Sequence = { gain: GainNode; oscillators: Set<OscillatorNode>; kind: 'auto' | 'preview' };
+export type SoundKind = 'auto' | 'preview';
+type Sequence = { gain: GainNode; oscillators: Set<OscillatorNode>; kind: SoundKind; endsAt: number };
 
 let graph: Graph | null = null;
 /** Set once making a context has failed — the browser has Web Audio in name only. */
@@ -79,16 +80,26 @@ export function resetAudioForTests(): void {
 	notifySounding();
 }
 
-const soundingListeners = new Set<(sounding: boolean) => void>();
+const soundingListeners = new Set<(sounding: SoundKind | null) => void>();
 
-function notifySounding(): void {
-	for (const listener of soundingListeners) listener(sequences.size > 0);
+/** What is sounding now: the latest sequence's kind, or null. */
+function soundingKind(): SoundKind | null {
+	return [...sequences].at(-1)?.kind ?? null;
 }
 
-/** Follow whether a bell is sounding, so a stop control can appear only while one is. */
-export function watchSounding(listener: (sounding: boolean) => void): () => void {
+function notifySounding(): void {
+	const kind = soundingKind();
+	for (const listener of soundingListeners) listener(kind);
+}
+
+/**
+ * Follow what is sounding — a preview, an automatic bell, or nothing — so a
+ * stop control can appear only while something plays, and a preview's own
+ * stop button can clear when an automatic bell takes over.
+ */
+export function watchSounding(listener: (sounding: SoundKind | null) => void): () => void {
 	soundingListeners.add(listener);
-	listener(sequences.size > 0);
+	listener(soundingKind());
 	return () => soundingListeners.delete(listener);
 }
 
@@ -114,8 +125,10 @@ function notifyReadiness(): void {
 
 /**
  * One context for the life of the page — a context per bell would hit
- * browser limits and start locked each time. A near-transparent limiter on
- * the way out only acts if something unexpected stacks.
+ * browser limits and start locked each time. No compressor on the way out:
+ * every voice's summed envelope stays well under full scale (bellVoices
+ * tests check it), and a compressor's automatic makeup gain would raise
+ * every bell above the original level.
  */
 function audioGraph(): Graph | null {
 	if (graph && graph.context.state !== 'closed') return graph;
@@ -123,14 +136,7 @@ function audioGraph(): Graph | null {
 	if (!context) { notifyReadiness(); return null; }
 	try {
 		const input = context.createGain();
-		const limiter = context.createDynamicsCompressor();
-		limiter.threshold.value = -3;
-		limiter.knee.value = 0;
-		limiter.ratio.value = 20;
-		limiter.attack.value = 0.002;
-		limiter.release.value = 0.1;
-		input.connect(limiter);
-		limiter.connect(context.destination);
+		input.connect(context.destination);
 		context.addEventListener?.('statechange', () => {
 			// A context that stops running mid-sequence would play the rest late; let it go instead.
 			if (context.state !== 'running') stopBells(0);
@@ -230,10 +236,10 @@ async function ensureRunning(context: AudioContext): Promise<boolean> {
 
 export type PlayResult = 'scheduled' | 'silent' | 'locked' | 'muted' | 'unavailable';
 
-function schedule(current: Graph, notes: BellNote[], level: number, kind: Sequence['kind']): Sequence {
+function schedule(current: Graph, notes: BellNote[], level: number, kind: SoundKind, delay = 0): Sequence {
 	const { context, input } = current;
-	const now = context.currentTime + 0.03;
-	const sequence: Sequence = { gain: context.createGain(), oscillators: new Set(), kind };
+	const now = context.currentTime + 0.03 + delay;
+	const sequence: Sequence = { gain: context.createGain(), oscillators: new Set(), kind, endsAt: now + notesEnd(notes) };
 	sequence.gain.connect(input);
 	sequences.add(sequence);
 	notifySounding();
@@ -281,10 +287,12 @@ function fadeOut(sequence: Sequence, seconds: number, notify = true): void {
 /**
  * Play notes as one sequence. Only a running context gets notes: a locked
  * one's clock stands still, and anything queued on it would all sound at
- * once on the first tap. One sequence plays at a time; a new one fades the
- * last, so bells never stack.
+ * once on the first tap. Bells never stack: a preview (an explicit request)
+ * fades whatever is sounding, and an automatic bell fades a preview but
+ * waits for another automatic bell to finish — a counted hour is never cut
+ * off by a reminder that came due during it.
  */
-export async function playNotes(notes: BellNote[], volume: number, kind: Sequence['kind'] = 'auto'): Promise<PlayResult> {
+export async function playNotes(notes: BellNote[], volume: number, kind: SoundKind = 'auto'): Promise<PlayResult> {
 	if (masterMuted) return 'muted';
 	const level = levelFor(volume) * HEADROOM;
 	if (level <= 0 || !notes.length) return 'silent';
@@ -292,9 +300,14 @@ export async function playNotes(notes: BellNote[], volume: number, kind: Sequenc
 		const current = audioGraph();
 		if (!current) return 'unavailable';
 		if (!(await ensureRunning(current.context))) { notifyReadiness(); return 'locked'; }
+		const now = current.context.currentTime;
+		let delay = 0;
 		// The next sequence takes over without a moment of "nothing sounding".
-		for (const sequence of [...sequences]) fadeOut(sequence, 0.08, false);
-		schedule(current, notes, level, kind);
+		for (const sequence of [...sequences]) {
+			if (kind === 'auto' && sequence.kind === 'auto' && sequence.endsAt > now) delay = Math.max(delay, sequence.endsAt - now + 0.3);
+			else fadeOut(sequence, 0.08, false);
+		}
+		schedule(current, notes, level, kind, delay);
 		return 'scheduled';
 	} catch {
 		return 'unavailable';
@@ -322,7 +335,7 @@ export function voiceWithStrikes(voice: BellVoiceId, options: { minute?: number;
 	return [...notes, ...strikes];
 }
 
-export function playVoice(voice: BellVoiceId, options: { volume: number; minute?: number; strikeHour?: number; kind?: Sequence['kind'] }): Promise<PlayResult> {
+export function playVoice(voice: BellVoiceId, options: { volume: number; minute?: number; strikeHour?: number; kind?: SoundKind }): Promise<PlayResult> {
 	return playNotes(voiceWithStrikes(voice, options), options.volume, options.kind);
 }
 

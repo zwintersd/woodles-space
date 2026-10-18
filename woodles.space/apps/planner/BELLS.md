@@ -40,7 +40,10 @@ status line opens it (the binder tabs are hidden on phones).
 - one ring per minute per device: `planner.bellRungMinute.v1` holds the last
   minute rung (as an instant, so a fall-back hour is still two minutes). it is
   written only after the sound was scheduled, so a tab the browser is holding
-  never takes a bell from one that can play.
+  never takes a bell from one that can play. deciding, playing and claiming run
+  under a Web Lock (`carillon-bell`), so two tabs ticking in the same instant
+  ring once; within a tab, bell runs are queued, so a focus tick and a
+  visibility tick never double a reminder.
 
 ## how it sounds
 
@@ -52,10 +55,15 @@ status line opens it (the binder tabs are hidden on phones).
   a locked one's clock stands still and would release everything at once on
   the first tap. a context that wakes within half a second plays; otherwise the
   bell is let go and Today says "tap to let it sound".
-- one sequence at a time: a new bell or preview fades the last over ~80 ms.
-  Escape (or "stop sound") fades whatever is sounding.
+- one sequence at a time. a preview fades whatever is sounding; an automatic
+  bell fades a preview but waits for another automatic bell to finish, so a
+  reminder never cuts a counted hour short. Escape (or "stop sound") fades
+  whatever is sounding. there is no compressor on the output — every voice
+  stays well under full scale, and a compressor's makeup gain would make every
+  bell louder than the original.
 - gesture listeners stay for the life of the page, because iOS suspends the
-  context after calls and backgrounding. on iPhone bells follow the silent
+  context after calls and backgrounding. turning bells on unlocks audio from
+  that same click. on iPhone bells follow the silent
   switch and only ring while Carillon is open.
 
 ## what syncs

@@ -57,20 +57,42 @@ describe('the bell engine on Web Audio', () => {
 
 	it('plays one sequence at a time, fading the last instead of cutting it', async () => {
 		const context = use(new FakeAudioContext({ running: true }))!;
-		const sounding: boolean[] = [];
-		const stop = watchSounding(value => sounding.push(value));
-		await playVoice('bowl', { volume: 1 });
+		const sounding: (string | null)[] = [];
+		const stop = watchSounding(kind => sounding.push(kind));
+		await playVoice('bowl', { volume: 1, kind: 'preview' });
 		const bowl = [...context.oscillators];
 		context.currentTime = 1;
-		await playVoice('chime', { volume: 1 });
+		await playVoice('chime', { volume: 1, kind: 'preview' });
 		const fade = context.gains.find(gain => gain.gain.events.some(event => event.kind === 'target'));
 		expect(fade?.gain.events.find(event => event.kind === 'target')).toMatchObject({ value: 0, time: 1 });
 		for (const oscillator of bowl) expect(oscillator.stoppedAt!).toBeLessThanOrEqual(1.11);
 		expect(isSounding()).toBe(true);
 		stopBells();
 		expect(isSounding()).toBe(false);
-		expect(sounding).toEqual([false, true, true, false]);
 		// Fading the bowl for the chime never reported a gap.
+		expect(sounding).toEqual([null, 'preview', 'preview', null]);
+		stop();
+	});
+
+	it('lets an automatic bell wait for another rather than cut it off, and replace a preview', async () => {
+		const context = use(new FakeAudioContext({ running: true }))!;
+		const sounding: (string | null)[] = [];
+		const stop = watchSounding(kind => sounding.push(kind));
+		await playVoice('bell', { volume: 1, minute: 0, strikeHour: 12 });
+		const hour = [...context.oscillators];
+		const lastStrike = Math.max(...hour.map(oscillator => oscillator.startedAt!));
+		context.currentTime = 10;
+		await playVoice('pip', { volume: 1 });
+		// The counted hour keeps every strike — nothing still ringing at 10 s is cut — and the pip follows it.
+		expect(hour.filter(oscillator => oscillator.startedAt! > 10).every(oscillator => oscillator.stoppedAt! > oscillator.startedAt! + 0.5)).toBe(true);
+		expect(hour.filter(oscillator => oscillator.startedAt! > 10).length).toBeGreaterThan(0);
+		expect(context.oscillators.at(-1)!.startedAt!).toBeGreaterThan(lastStrike);
+		// A preview takes over at once, and an automatic bell then replaces the preview.
+		await playVoice('chime', { volume: 1, kind: 'preview' });
+		expect(hour.every(oscillator => oscillator.stoppedAt! <= 10.11)).toBe(true);
+		expect(sounding.at(-1)).toBe('preview');
+		await playVoice('bell', { volume: 1 });
+		expect(sounding.at(-1)).toBe('auto');
 		stop();
 	});
 
