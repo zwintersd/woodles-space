@@ -184,6 +184,11 @@
 		</div>
 	</header>
 
+	<!-- The same bell line MomentarySample shows, for the states without a prompt — it's how phones reach the bells panel. -->
+	{#snippet bellLine()}
+		<button type="button" class="bell-line" aria-label={`bell settings — ${bellStatus}`} data-testid="bell-status" onclick={openBells}>{bellStatus}</button>
+	{/snippet}
+
 	<div class="instrument-grid">
 		<div class="moment-column">
 		<article class="sampler" data-testid="interval-sampler">
@@ -192,10 +197,12 @@
 					<span class="rest-mark" aria-hidden="true">✓</span>
 					<div><small>{displayTime(selectedInterval.startTime)}–{displayTime(selectedInterval.endTime)}</small><strong>Moment saved</strong><p>Your note is in Day so far. The next prompt will appear with the next interval.</p></div>
 				</div>
+				<!-- Outside the status region, so the minute-by-minute bell line isn't announced. -->
+				{@render bellLine()}
 			{:else if selectedInterval}
 				<MomentarySample interval={selectedInterval} timeLabel="{displayTime(selectedInterval.startTime)}–{displayTime(selectedInterval.endTime)}" bellNote={selectedStart ? 'editing a recorded moment' : bellStatus} onbellclick={selectedStart ? undefined : openBells} editingPast={Boolean(selectedStart)} onreturnnow={() => selectedStart = ''} onsaved={() => selectedStart = ''} />
 			{:else}
-				<p class="sample-rest">Outside sampling hours. Your saved moments are below.</p>
+				<div class="sample-rest"><div><p>Outside sampling hours. Your saved moments are below.</p>{@render bellLine()}</div></div>
 			{/if}
 
 			{#if selectedStart && offerableEntries.length > 0}
@@ -422,6 +429,8 @@
 	.sample-rest { display: flex; align-items: center; gap: 0.8rem; margin-top: 1.5rem; padding: 1rem; border-radius: 0.7rem; background: var(--car-pink-wash); color: var(--car-ink-soft); font: 0.8rem/1.45 var(--car-body); }
 	.sample-rest strong { display: block; color: var(--car-ink); font: 500 1.2rem var(--car-display); }
 	.sample-rest p { margin-top: 0.2rem; }
+	.bell-line { display: block; margin-top: 0.45rem; padding: 0.2rem 0.25rem; margin-left: -0.25rem; border: 0; border-radius: 0.3rem; background: transparent; color: var(--car-ink-soft); font: 0.58rem var(--car-mono); letter-spacing: 0.08em; text-align: left; text-decoration: underline dotted; text-underline-offset: 0.25em; min-height: 1.6rem; cursor: pointer; }
+	.bell-line:hover { color: var(--car-ink); background: #ffffff60; }
 	.rest-mark { display: grid; place-items: center; width: 2rem; height: 2rem; flex: none; border: 1px solid var(--car-pink-dark); border-radius: 50%; color: var(--car-pink-dark); }
 
 	.sampler,

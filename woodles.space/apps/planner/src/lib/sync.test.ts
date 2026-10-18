@@ -444,12 +444,20 @@ describe('mergePlannerBlobs', () => {
 		const same = '2026-10-18T10:00:00.000Z';
 		expect(mergeSettings({ ...settings, tone: 'wry', settingsStamps: { tone: same } }, { ...settings, tone: 'earnest', settingsStamps: { tone: same } }, now).tone).toBe('earnest');
 		expect(mergeSettings({ ...settings, tone: 'wry', settingsStamps: { tone: 'garbage' } }, { ...settings, tone: 'earnest' }, now).tone).toBe('earnest');
-		// A stamp from a clock years ahead counts as now, so it can't win forever.
-		const future = mergeSettings({ ...settings, tone: 'wry', settingsStamps: { tone: '2099-01-01T00:00:00.000Z' } }, { ...settings, tone: 'earnest', settingsStamps: { tone: '2026-10-18T12:00:00.000Z' } }, now);
+		// A stamp from a clock years ahead never wins, even against an older real edit.
+		const future = mergeSettings({ ...settings, tone: 'wry', settingsStamps: { tone: '2099-01-01T00:00:00.000Z' } }, { ...settings, tone: 'earnest', settingsStamps: { tone: '2026-10-18T10:00:00.000Z' } }, now);
 		expect(future.tone).toBe('earnest');
-		// A deliberate clear on the newer side sticks.
+		expect(future.settingsStamps?.tone).toBe('2026-10-18T10:00:00.000Z');
+		const futureRemote = mergeSettings({ ...settings, tone: 'wry', settingsStamps: { tone: '2026-10-18T09:00:00.000Z' } }, { ...settings, tone: 'earnest', settingsStamps: { tone: '2099-01-01T00:00:00.000Z' } }, now);
+		expect(futureRemote.tone).toBe('wry');
+		// A deliberate clear on the newer side sticks, whichever side it is on.
 		const cleared = mergeSettings({ ...settings, onboardingStep: undefined, settingsStamps: { onboardingStep: '2026-10-18T11:00:00.000Z' } }, { ...settings, onboardingStep: 3 }, now);
 		expect(cleared.onboardingStep).toBeUndefined();
+		const phone = { ...settings, onboardingStep: 3 as const, settingsStamps: { onboardingStep: '2026-10-18T09:00:00.000Z' } };
+		const laptop = JSON.parse(JSON.stringify({ ...settings, onboardingStep: undefined, settingsStamps: { onboardingStep: '2026-10-18T10:00:00.000Z' } }));
+		const onPhone = mergeSettings(phone, laptop, now);
+		expect('onboardingStep' in onPhone).toBe(false);
+		expect(mergeSettings(laptop, JSON.parse(JSON.stringify(onPhone)), now).onboardingStep).toBeUndefined();
 	});
 
 	it('carries the bell mix as one stamped setting', () => {

@@ -73,11 +73,17 @@ status line opens it (the binder tabs are hidden on phones).
   garbled times fall back to defaults when read and are never rewritten.
 - master volume (`planner.bellVolume.v1`) and pause (`planner.bellPause.v1`) stay
   on the device; tabs on the device follow each other through `storage` events.
-- settings now merge per key: `updateSettings` stamps every key it changes in
-  `settings.settingsStamps`, and `mergeSettings` keeps the newer stamp. ties and
-  unstamped keys (older clients) keep the old rule, remote wins. this is what
-  stops a stale laptop from switching bells back on after the phone turned them
-  off.
+- settings now merge per key: `updateSettings` stamps a key in
+  `settings.settingsStamps` only when its value changed (a setup step re-sending
+  every field claims nothing), and `mergeSettings` keeps the newer stamp. a
+  newer remote stamp on a missing key is a clear, and clears locally. ties and
+  unstamped keys (older clients) keep the old rule, remote wins. a stamp more
+  than a day ahead of this device's clock counts as never stamped, so one
+  device with a wrong clock can't win every key forever. this is what stops a
+  stale laptop from switching bells back on after the phone turned them off.
+- a push that loses the compare-and-swap merges the device's *current* state,
+  re-read, with the server's — so a voice picked while the push was in flight
+  survives (`packages/sync`, every app with a `merge`).
 
 ## defaults
 

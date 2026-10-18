@@ -51,7 +51,7 @@
 		<p class="wb-note">Sets the interval grid in Today. You can record observations later or leave intervals blank.</p>
 		<label class="bell-toggle"><input type="checkbox" bind:checked={bells} /> Enable bells</label>
 		<div class="wb-row"><label>Quiet hours start<input type="time" bind:value={quietStart} /></label><label>Quiet hours end<input type="time" bind:value={quietEnd} /></label></div>
-		<p class="wb-note">Bells are silent during quiet hours. Browser audio may require an interaction first. You can choose how each bell sounds later, in the binder under bells.</p>
+		<p class="wb-note">Bells are silent during quiet hours. Browser audio may require an interaction first. You can choose how each bell sounds later: tap the bell line on Today, or ♪ in the binder.</p>
 	</div>
 	<h2>Reminder detail</h2>
 	<div class="tone-list" role="radiogroup" aria-label="tone selection">

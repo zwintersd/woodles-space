@@ -39,8 +39,11 @@
 		if (tab === 'bells' && lastTab !== 'bells') {
 			opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 			void tick().then(() => bellsTitle?.focus());
-		} else if (tab !== 'bells' && lastTab === 'bells') {
+		} else if (tab === null && lastTab === 'bells') {
+			// Closing hands focus back; switching to another tab leaves it on that tab.
 			if (opener?.isConnected) opener.focus({ preventScroll: true });
+			opener = null;
+		} else if (tab !== 'bells') {
 			opener = null;
 		}
 		lastTab = tab;
@@ -142,6 +145,10 @@
 	class:open={store.binderTab !== null}
 	aria-hidden={store.binderTab === null}
 >
+	{#if store.binderTab !== null}
+		<!-- Phones have no Escape key and no tab strip; this is their way out. -->
+		<button type="button" class="binder-close" aria-label={`close ${TABS.find(tab => tab.id === store.binderTab)?.label ?? 'binder'}`} onclick={() => store.closeBinder()}>×</button>
+	{/if}
 	{#if store.binderTab === 'year-scroll'}
 		<div class="binder-year-scroll">
 			<YearScroll compact />
@@ -418,6 +425,25 @@
 
 	.binder-panel.open {
 		transform: translateX(0);
+	}
+
+	.binder-close {
+		position: absolute;
+		top: 0.55rem;
+		right: 0.55rem;
+		z-index: 1;
+		width: 2.25rem;
+		height: 2.25rem;
+		border-radius: var(--pl-radius-pill);
+		font-size: 1.1rem;
+		line-height: 1;
+		color: var(--p-muted);
+	}
+
+	.binder-close:hover,
+	.binder-close:focus-visible {
+		color: var(--p-text);
+		background: var(--p-accent-soft);
 	}
 
 	.binder-panel.schedule {

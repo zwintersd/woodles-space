@@ -380,7 +380,9 @@ export function createSyncedStore<T>(adapter: StoreAdapter<T>) {
       latestConflict = result;
       if (!adapter.merge || result.server.blob === null) return result;
 
-      candidate = adapter.merge(candidate, result.server.blob);
+      // Merge into what is local *now*, not the copy read before the push:
+      // an edit made while the request was in flight must survive the retry.
+      candidate = adapter.merge(adapter.read() ?? candidate, result.server.blob);
       adapter.write(candidate);
       base = result.server.version;
       writeVersion(app, base);

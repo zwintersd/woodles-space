@@ -1301,11 +1301,18 @@ export class PlannerStore {
 
 	// ── settings + persistence ─────────────────────────────────────
 
-	/** Every deliberate change stamps its keys, so sync keeps the newer edit per setting. */
+	/**
+	 * Every change stamps the keys whose value actually changed, so sync keeps
+	 * the newer edit per setting. A form that re-saves values it read earlier
+	 * (onboarding's steps) must not stamp them as new.
+	 */
 	updateSettings(patch: Partial<PlannerSettings>): void {
 		const stampedAt = new Date().toISOString();
 		const stamps = { ...(this.settings.settingsStamps ?? {}) };
-		for (const key of Object.keys(patch)) if (key !== 'settingsStamps') stamps[key] = stampedAt;
+		const current = this.settings as Record<string, unknown>;
+		for (const [key, value] of Object.entries(patch)) {
+			if (key !== 'settingsStamps' && JSON.stringify(current[key]) !== JSON.stringify(value)) stamps[key] = stampedAt;
+		}
 		this.settings = { ...this.settings, ...patch, settingsStamps: stamps };
 		save('planner.settings.v1', this.settings);
 	}

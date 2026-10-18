@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
+	import { tick } from 'svelte';
 	import { store } from '$lib/store.svelte';
-	import { flushSync, queueSync, syncState } from '$lib/sync.svelte';
+	import { queueSync } from '$lib/sync.svelte';
 	import { BELL_VOICES, type BellVoiceId } from '$lib/bellVoices';
 	import {
 		BELL_MARKS, BELL_PRESETS, CLOCK_MARKS, INTERVAL_OPTIONS, audible, bellsResting, chimesBetweenSamples, countsHours,
@@ -45,11 +45,6 @@
 	// Stop shows only while something is sounding; a finished preview resets its button.
 	$effect(() => { if (store.bellSounding !== 'preview') previewing = null; });
 
-	onMount(() => {
-		// Start from fresh settings, so an edit here isn't made on a stale copy.
-		if (syncState.connected) void flushSync();
-	});
-
 	/** One quiet live region; clear first so a repeated message is still announced. */
 	async function say(text: string) {
 		message = '';
@@ -67,12 +62,23 @@
 		const unlocked = await unlockAudio();
 		if (unlocked === 'unavailable') { await say('this browser can’t play bell sounds'); return; }
 		const result = await store.previewMark(mark);
-		if (result === 'scheduled') { previewing = mark; await say(`playing ${voiceName(markSound(sounds, mark).voice).toLowerCase()}`); }
+		const voice = markSound(sounds, mark).voice;
+		if (result === 'scheduled') { previewing = mark; await say(voice === 'silent' ? 'playing the hour count' : `playing ${voiceName(voice).toLowerCase()}`); }
 		else if (result === 'locked') await say('the browser is still holding sound — tap the page once, then try again');
 		else if (result === 'silent') await say(`${markInfo(mark).name} is silent`);
 	}
 
-	async function stop() { stopBells(); previewing = null; await say('stopped'); }
+	/** A control that disappears takes focus with it; land on one that stays. */
+	async function keepFocus() {
+		await tick();
+		(firstPauseButton ?? resumeButton)?.focus();
+	}
+
+	async function stop() {
+		if (!store.bellSounding) return;
+		stopBells(); previewing = null;
+		await say('stopped');
+	}
 
 	async function pause(until: Date) {
 		store.pauseBells(until);
@@ -87,6 +93,7 @@
 	async function allowSound() {
 		const state = await unlockAudio();
 		await say(state === 'running' ? 'sound allowed for this page' : 'the browser is still holding sound');
+		if (state === 'running') await keepFocus();
 	}
 	async function setEnabled(enabled: boolean) {
 		// This click is the gesture browsers need; the page-wide unlock skipped it because bells were still off.
@@ -95,9 +102,10 @@
 		await say(enabled ? 'bells on' : 'bells off');
 	}
 	function applyPreset(id: string) { store.applyBellPreset(id); save(); void say(`${BELL_PRESETS.find(item => item.id === id)?.name} bells`); }
-	function setTime(key: 'quietHoursStart' | 'quietHoursEnd', value: string) {
-		// An emptied time field must not become "never quiet".
-		if (/^\d{2}:\d{2}$/.test(value)) { store.updateSettings({ [key]: value }); save(); }
+	function setTime(key: 'quietHoursStart' | 'quietHoursEnd', input: HTMLInputElement) {
+		// An emptied time field must not become "never quiet" — put the hour that still applies back.
+		if (/^\d{2}:\d{2}$/.test(input.value)) { store.updateSettings({ [key]: input.value }); save(); }
+		else input.value = store.settings[key];
 	}
 </script>
 
@@ -108,7 +116,8 @@
 		<label class="slider">volume on this device
 			<span class="slider-row"><input type="range" min="0" max="100" step="5" value={Math.round(store.bellVolume * 100)} oninput={event => store.setBellVolume(Number(event.currentTarget.value) / 100)} aria-valuetext={percent(store.bellVolume)} /><span aria-hidden="true" class="value">{percent(store.bellVolume)}</span></span>
 		</label>
-		{#if store.bellSounding}<div class="actions"><button type="button" onclick={stop}>stop sound</button></div>{/if}
+		<!-- Always present, so pressing it never drops keyboard focus; it only acts while something sounds. -->
+		<div class="actions"><button type="button" class="stop" class:idle={!store.bellSounding} aria-disabled={!store.bellSounding} onclick={stop}>stop sound</button></div>
 		{#if resting === 'paused' && paused}
 			<p class="status">paused on this device until {timeFor(paused)}. <button type="button" class="link" bind:this={resumeButton} onclick={resume}>resume now</button></p>
 		{:else}
@@ -156,7 +165,7 @@
 					<select aria-label={`sound: ${info.name}`} value={sound.voice} onchange={event => setVoice(mark, event.currentTarget.value)}>
 						{#each voicesFor(mark) as voice (voice.id)}<option value={voice.id}>{voice.name.toLowerCase()}</option>{/each}
 					</select>
-					<button type="button" class="play" onclick={() => togglePreview(mark)} disabled={!audible(sound) && !(mark === 'hour' && countsHours(sounds))} aria-label={previewing === mark ? `stop ${info.name}` : `play ${info.name}`}>{previewing === mark ? '■' : '▶'}</button>
+					<button type="button" class="play" onclick={() => togglePreview(mark)} disabled={!audible(sound) && !(mark === 'hour' && countsHours(sounds) && sound.volume > 0)} aria-label={previewing === mark ? `stop ${info.name}` : `play ${info.name}`}>{previewing === mark ? '■' : '▶'}</button>
 				</div>
 				<small class="note">{voiceHint(sound.voice)}</small>
 				{#if mark === 'hour'}<label class="check"><input type="checkbox" checked={countsHours(sounds)} onchange={event => { store.updateBellSounds({ countHours: event.currentTarget.checked }); save(); }} /> count the hour on a low bell</label>{/if}
@@ -208,8 +217,8 @@
 			</select>
 		</label>
 		<div class="pair">
-			<label>quiet from<input type="time" value={store.settings.quietHoursStart} onchange={event => setTime('quietHoursStart', event.currentTarget.value)} /></label>
-			<label>until<input type="time" value={store.settings.quietHoursEnd} onchange={event => setTime('quietHoursEnd', event.currentTarget.value)} /></label>
+			<label>quiet from<input type="time" value={store.settings.quietHoursStart} onchange={event => setTime('quietHoursStart', event.currentTarget)} /></label>
+			<label>until<input type="time" value={store.settings.quietHoursEnd} onchange={event => setTime('quietHoursEnd', event.currentTarget)} /></label>
 		</div>
 	</section>
 
@@ -231,6 +240,8 @@
 	.actions button, .play, .presets button { font-family: var(--pl-font-mono); font-size: 0.62rem; letter-spacing: 0.04em; color: var(--p-text); border: 1px solid var(--p-border); border-radius: var(--pl-radius-pill); padding: 0.4rem 0.75rem; min-height: 2.2rem; }
 	.actions button:hover:not(:disabled), .play:hover:not(:disabled), .presets button:hover { border-color: var(--p-accent); color: var(--p-accent); }
 	.play { min-width: 2.4rem; }
+	.stop.idle { opacity: 0.45; cursor: default; }
+	.stop.idle:hover { border-color: var(--p-border); color: var(--p-text); }
 	.presets { display: grid; gap: 0.4rem; }
 	.presets button { display: grid; gap: 0.1rem; text-align: left; border-radius: var(--pl-radius-md); }
 	.presets button small { font-family: var(--pl-font-body); letter-spacing: 0; }

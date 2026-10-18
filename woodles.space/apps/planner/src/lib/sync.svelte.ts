@@ -104,11 +104,13 @@ function mergeDayInstances(
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** A stamp's time; unreadable stamps lose, and one from a clock far ahead counts as now. */
+/**
+ * A stamp's time. Unreadable stamps lose, and so does one more than a day
+ * ahead of this clock — a skewed device must not win every merge from now on.
+ */
 function stampTime(stamp: string | undefined, now: number): number {
 	const time = stamp ? Date.parse(stamp) : NaN;
-	if (!Number.isFinite(time)) return -Infinity;
-	return time > now + DAY_MS ? now : time;
+	return Number.isFinite(time) && time <= now + DAY_MS ? time : -Infinity;
 }
 
 /**
@@ -125,8 +127,12 @@ export function mergeSettings(local: PlannerSettings, remote: PlannerSettings, n
 	const keys = new Set([...Object.keys(local), ...Object.keys(remote), ...Object.keys(localStamps), ...Object.keys(remoteStamps)]);
 	keys.delete('settingsStamps');
 	for (const key of keys) {
-		const localWins = stampTime(localStamps[key], now) > stampTime(remoteStamps[key], now);
+		const localTime = stampTime(localStamps[key], now);
+		const remoteTime = stampTime(remoteStamps[key], now);
+		const localWins = localTime > remoteTime;
 		if (localWins) merged[key] = (local as Record<string, unknown>)[key];
+		// A newer deliberate clear on the other device sticks too: JSON drops undefined keys.
+		else if (remoteTime > localTime && !(key in remote)) delete merged[key];
 		const stamp = localWins ? localStamps[key] : remoteStamps[key] ?? localStamps[key];
 		if (stamp) stamps[key] = stamp;
 	}

@@ -33,12 +33,19 @@ describe('the clock rings bells', () => {
 		vi.useRealTimers();
 	});
 
-	it('stamps every deliberate settings change for sync', () => {
+	it('stamps only settings whose value changed, so re-saving a stale form claims nothing', () => {
 		const store = fresh();
 		vi.setSystemTime(at(15, 0));
-		store.updateSettings({ tone: 'wry' });
+		const before = store.settings.settingsStamps?.bellsEnabled;
+		// A setup step re-sends every field it shows; only the tone actually changed.
+		store.updateSettings({ tone: 'wry', bellsEnabled: true, samplingIntervalMinutes: 15, quietHoursStart: '22:00', quietHoursEnd: '07:00' });
 		expect(store.settings.settingsStamps?.tone).toBe(at(15, 0).toISOString());
+		expect(store.settings.settingsStamps?.bellsEnabled).toBe(before);
 		expect(new PlannerStore().settings.settingsStamps?.tone).toBe(at(15, 0).toISOString());
+		store.updateSettings({ bellSounds: { marks: { hour: { voice: 'bowl' } } } });
+		vi.setSystemTime(at(15, 5));
+		store.updateSettings({ bellSounds: { marks: { hour: { voice: 'bowl' } } } });
+		expect(store.settings.settingsStamps?.bellSounds).toBe(at(15, 0).toISOString());
 	});
 
 	it('rings the classic bell by default, and a preset’s voices once chosen', async () => {

@@ -34,7 +34,12 @@ so it's not easy to forget.
   under the hood the bell no longer rings late or twice: it ticks on the
   minute, catches up after a throttled background tab, never queues sound on a
   locked page, and settings changed on one device are no longer undone by
-  another that synced later.
+  another that synced later. Escape stops a ringing bell without closing
+  whatever you were typing in, every binder panel has a close button, and the
+  bell line stays on Today after a moment is saved.
+- **sync keeps an edit made mid-push** — when two devices push at once, the
+  one that loses now merges what's on it *now*, not what it had when the push
+  started, across every app on the shared sync client.
 - **Carillon's open loops can recur, remind, and look back** — a loop can be a
   recurring need: closing ends one cycle and *need is back* starts the next,
   with an optional rhythm. reminders are only the ones you set — a time on a
