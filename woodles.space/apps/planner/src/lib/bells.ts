@@ -1,13 +1,20 @@
 import type { Bell } from './types';
+import { hourStrikes, notesEnd, voiceNotes, type BellNote, type BellVoiceId } from './bellVoices';
 
-// The registry also supplies names and relative levels for the Web Audio chimes.
-// filePath remains as a compatibility fallback for browsers without Web Audio.
+/**
+ * Carillon's bells are synthesized: every sound is a list of notes
+ * (bellVoices.ts) played on one shared Web Audio graph. There are no audio
+ * files; where Web Audio is missing, bells are simply unavailable and the
+ * panel says so.
+ */
+
+// Block bells a planned block can name (`Block.bellId`), at their original pitches.
 export const BELLS: Bell[] = [
-	{ id: 'block-start', name: 'block start',  filePath: '/planner/bells/block-start.mp3',  defaultVolume: 0.7 },
-	{ id: 'lead-time',   name: 'lead time',    filePath: '/planner/bells/lead-time.mp3',    defaultVolume: 0.5 },
-	{ id: 'meal',        name: 'meal',         filePath: '/planner/bells/meal.mp3',         defaultVolume: 0.75 },
-	{ id: 'wind-down',   name: 'wind-down',    filePath: '/planner/bells/wind-down.mp3',    defaultVolume: 0.8 },
-	{ id: 'holiday',     name: 'holiday',      filePath: '/planner/bells/holiday.mp3',      defaultVolume: 0.65 }
+	{ id: 'block-start', name: 'block start', defaultVolume: 0.7 },
+	{ id: 'lead-time',   name: 'lead time',   defaultVolume: 0.5 },
+	{ id: 'meal',        name: 'meal',        defaultVolume: 0.75 },
+	{ id: 'wind-down',   name: 'wind-down',   defaultVolume: 0.8 },
+	{ id: 'holiday',     name: 'holiday',     defaultVolume: 0.65 }
 ];
 
 let masterVolume = 1.0;
@@ -18,7 +25,7 @@ export function getBell(id: string): Bell | undefined {
 }
 
 export function setMasterVolume(v: number): void {
-	masterVolume = Math.max(0, Math.min(1, v));
+	if (Number.isFinite(v)) masterVolume = Math.max(0, Math.min(1, v));
 }
 
 export function setMasterMuted(m: boolean): void {
@@ -37,59 +44,292 @@ const BELL_FREQUENCIES: Record<string, [number, number]> = {
 	holiday: [987.77, 1318.51]
 };
 
-function playSynthBell(id: string, volume: number): boolean {
-	const AudioContextClass =
-		window.AudioContext ??
-		(window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-	if (!AudioContextClass) return false;
+/** A registry bell as notes: the original two-tone synth at its own pitches. */
+export function registryNotes(id: string): BellNote[] {
+	const [low, high] = BELL_FREQUENCIES[id] ?? BELL_FREQUENCIES['block-start'];
+	const decay = id === 'wind-down' ? 1.15 : 0.85;
+	return [
+		{ at: 0, freq: low, type: 'sine', gain: 0.5, decay, attack: 0.004 },
+		{ at: 0.035, freq: high, type: 'triangle', gain: 0.5, decay, attack: 0.004 }
+	];
+}
 
+// ── one shared audio graph ─────────────────────────────────────────
+
+type Graph = { context: AudioContext; input: GainNode };
+type Sequence = { gain: GainNode; oscillators: Set<OscillatorNode>; kind: 'auto' | 'preview' };
+
+let graph: Graph | null = null;
+/** Set once making a context has failed — the browser has Web Audio in name only. */
+let contextFailed = false;
+const sequences = new Set<Sequence>();
+let contextFactory: (() => AudioContext | null) | null = null;
+
+/** Test seam: supply a context (or null for "no Web Audio"); pass undefined to restore. */
+export function setAudioContextFactory(factory: (() => AudioContext | null) | undefined): void {
+	contextFactory = factory ?? null;
+	resetAudioForTests();
+}
+
+/** Forget the shared graph and anything sounding, so tests don't leak into each other. */
+export function resetAudioForTests(): void {
+	graph = null;
+	contextFailed = false;
+	sequences.clear();
+	notifySounding();
+}
+
+const soundingListeners = new Set<(sounding: boolean) => void>();
+
+function notifySounding(): void {
+	for (const listener of soundingListeners) listener(sequences.size > 0);
+}
+
+/** Follow whether a bell is sounding, so a stop control can appear only while one is. */
+export function watchSounding(listener: (sounding: boolean) => void): () => void {
+	soundingListeners.add(listener);
+	listener(sequences.size > 0);
+	return () => soundingListeners.delete(listener);
+}
+
+function createContext(): AudioContext | null {
+	if (!contextFactory && typeof window === 'undefined') return null;
+	const AudioContextClass = contextFactory ? null : window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+	if (!contextFactory && !AudioContextClass) return null;
 	try {
-		const context = new AudioContextClass();
-		const gain = context.createGain();
-		const [low, high] = BELL_FREQUENCIES[id] ?? BELL_FREQUENCIES['block-start'];
-		const now = context.currentTime;
-		const duration = id === 'wind-down' ? 1.15 : 0.85;
-
-		gain.gain.setValueAtTime(Math.max(0.0001, volume * 0.16), now);
-		gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-		gain.connect(context.destination);
-
-		[low, high].forEach((frequency, index) => {
-			const oscillator = context.createOscillator();
-			oscillator.type = index === 0 ? 'sine' : 'triangle';
-			oscillator.frequency.setValueAtTime(frequency, now);
-			oscillator.detune.setValueAtTime(index === 0 ? 0 : 3, now);
-			oscillator.connect(gain);
-			oscillator.start(now + index * 0.035);
-			oscillator.stop(now + duration);
-			if (index === 1) {
-				oscillator.onended = () => {
-					void context.close();
-				};
-			}
-		});
-
-		if (context.state === 'suspended') void context.resume();
-		return true;
+		return contextFactory ? contextFactory() : new AudioContextClass!({ latencyHint: 'playback' });
 	} catch {
-		return false;
+		contextFailed = true;
+		return null;
 	}
 }
 
-export function playBell(id: string): void {
-	if (masterMuted || typeof window === 'undefined') return;
-	const bell = getBell(id);
-	if (!bell) return;
-	const volume = Math.max(0, Math.min(1, bell.defaultVolume * masterVolume));
-	if (playSynthBell(id, volume)) return;
+export type AudioReadiness = 'running' | 'suspended' | 'unavailable';
+const readinessListeners = new Set<(state: AudioReadiness) => void>();
 
+function notifyReadiness(): void {
+	const state = audioReadiness();
+	for (const listener of readinessListeners) listener(state);
+}
+
+/**
+ * One context for the life of the page — a context per bell would hit
+ * browser limits and start locked each time. A near-transparent limiter on
+ * the way out only acts if something unexpected stacks.
+ */
+function audioGraph(): Graph | null {
+	if (graph && graph.context.state !== 'closed') return graph;
+	const context = createContext();
+	if (!context) { notifyReadiness(); return null; }
 	try {
-		const audio = new Audio(bell.filePath);
-		audio.volume = volume;
-		audio.play().catch(() => {
-			// Audio autoplay may be blocked — silently skip
+		const input = context.createGain();
+		const limiter = context.createDynamicsCompressor();
+		limiter.threshold.value = -3;
+		limiter.knee.value = 0;
+		limiter.ratio.value = 20;
+		limiter.attack.value = 0.002;
+		limiter.release.value = 0.1;
+		input.connect(limiter);
+		limiter.connect(context.destination);
+		context.addEventListener?.('statechange', () => {
+			// A context that stops running mid-sequence would play the rest late; let it go instead.
+			if (context.state !== 'running') stopBells(0);
+			notifyReadiness();
 		});
+		graph = { context, input };
+		notifyReadiness();
+		return graph;
 	} catch {
-		// Silently skip on any audio error
+		contextFailed = true;
+		notifyReadiness();
+		return null;
 	}
+}
+
+/** "suspended" covers Safari's "interrupted" and a context not made yet. */
+export function audioReadiness(): AudioReadiness {
+	if (graph) return graph.context.state === 'running' ? 'running' : graph.context.state === 'closed' ? 'unavailable' : 'suspended';
+	if (contextFailed) return 'unavailable';
+	if (contextFactory) return 'suspended';
+	if (typeof window === 'undefined') return 'unavailable';
+	return window.AudioContext || (window as Window & { webkitAudioContext?: unknown }).webkitAudioContext ? 'suspended' : 'unavailable';
+}
+
+export function watchAudioReadiness(listener: (state: AudioReadiness) => void): () => void {
+	readinessListeners.add(listener);
+	listener(audioReadiness());
+	return () => readinessListeners.delete(listener);
+}
+
+/**
+ * Browsers only let a page make sound after a gesture. Called from one, this
+ * resumes the context synchronously (before any await, which iOS requires)
+ * and plays one silent frame for older iOS.
+ */
+export function unlockAudio(): Promise<AudioReadiness> {
+	const current = audioGraph();
+	if (!current) return Promise.resolve('unavailable');
+	let resumed: Promise<unknown> = Promise.resolve();
+	try {
+		if (current.context.state !== 'running') resumed = current.context.resume();
+		const source = current.context.createBufferSource();
+		source.buffer = current.context.createBuffer(1, 1, 22050);
+		source.connect(current.context.destination);
+		source.start(0);
+	} catch {
+		// Still locked; the next gesture tries again.
+	}
+	return resumed.catch(() => {}).then(() => { notifyReadiness(); return audioReadiness(); });
+}
+
+/**
+ * Listen to gestures for the life of the page: iOS and Safari suspend or
+ * interrupt the context after a call or a trip to the background, and the
+ * next tap must wake it again. Skips work while running or while bells are
+ * off, so a page with bells off never opens the audio device.
+ */
+export function installAudioUnlock(wanted: () => boolean = () => true, target: Pick<Window, 'addEventListener' | 'removeEventListener'> = window): () => void {
+	// The events that count as user activation, including pen and touch.
+	const events = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'] as const;
+	const handler = () => {
+		if (graph?.context.state === 'running' || !wanted()) return;
+		void unlockAudio();
+	};
+	events.forEach(event => target.addEventListener(event, handler, { capture: true, passive: true }));
+	const visibility = () => notifyReadiness();
+	if (typeof document !== 'undefined') document.addEventListener('visibilitychange', visibility);
+	return () => {
+		events.forEach(event => target.removeEventListener(event, handler, { capture: true } as EventListenerOptions));
+		if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', visibility);
+	};
+}
+
+/** Perceived loudness is roughly logarithmic; a squared curve makes the low end of a slider usable. */
+export function levelFor(volume: number): number {
+	const clamped = Math.max(0, Math.min(1, Number.isFinite(volume) ? volume : 0));
+	return clamped * clamped;
+}
+
+// Matches the original bell: two oscillators at 0.5 peaked at 0.16 each at full volume.
+const HEADROOM = 0.32;
+
+/** How long a locked context may take to wake before a bell is let go rather than played late. */
+const RESUME_WINDOW_MS = 500;
+
+/** Resolve true only once the context is running; never wait long. */
+async function ensureRunning(context: AudioContext): Promise<boolean> {
+	if (context.state === 'running') return true;
+	try {
+		await Promise.race([context.resume(), new Promise(resolve => setTimeout(resolve, RESUME_WINDOW_MS))]);
+	} catch {
+		// Refused without a gesture.
+	}
+	// Read again: resume() may have changed it while we waited.
+	return (context.state as AudioContextState) === 'running';
+}
+
+export type PlayResult = 'scheduled' | 'silent' | 'locked' | 'muted' | 'unavailable';
+
+function schedule(current: Graph, notes: BellNote[], level: number, kind: Sequence['kind']): Sequence {
+	const { context, input } = current;
+	const now = context.currentTime + 0.03;
+	const sequence: Sequence = { gain: context.createGain(), oscillators: new Set(), kind };
+	sequence.gain.connect(input);
+	sequences.add(sequence);
+	notifySounding();
+	for (const note of notes) {
+		const start = now + note.at;
+		const attack = Math.max(0.001, note.attack ?? 0.004);
+		const peak = Math.max(0.0002, note.gain * level);
+		const gain = context.createGain();
+		gain.gain.setValueAtTime(0.0001, start);
+		gain.gain.linearRampToValueAtTime(peak, start + attack);
+		gain.gain.exponentialRampToValueAtTime(0.0001, start + attack + note.decay);
+		gain.connect(sequence.gain);
+		const oscillator = context.createOscillator();
+		oscillator.type = note.type;
+		oscillator.frequency.setValueAtTime(note.freq, start);
+		oscillator.connect(gain);
+		oscillator.onended = () => {
+			sequence.oscillators.delete(oscillator);
+			oscillator.disconnect();
+			gain.disconnect();
+			if (!sequence.oscillators.size) { sequence.gain.disconnect(); sequences.delete(sequence); notifySounding(); }
+		};
+		sequence.oscillators.add(oscillator);
+		oscillator.start(start);
+		oscillator.stop(start + attack + note.decay + 0.05);
+	}
+	return sequence;
+}
+
+/** Fade a sequence out over a few milliseconds — stopping mid-note would click. */
+function fadeOut(sequence: Sequence, seconds: number, notify = true): void {
+	const context = graph?.context;
+	sequences.delete(sequence);
+	if (notify) notifySounding();
+	if (!context) return;
+	const at = context.currentTime;
+	try {
+		sequence.gain.gain.setTargetAtTime(0, at, Math.max(0.001, seconds / 4));
+		for (const oscillator of sequence.oscillators) oscillator.stop(at + seconds + 0.02);
+	} catch {
+		// Already stopped.
+	}
+}
+
+/**
+ * Play notes as one sequence. Only a running context gets notes: a locked
+ * one's clock stands still, and anything queued on it would all sound at
+ * once on the first tap. One sequence plays at a time; a new one fades the
+ * last, so bells never stack.
+ */
+export async function playNotes(notes: BellNote[], volume: number, kind: Sequence['kind'] = 'auto'): Promise<PlayResult> {
+	if (masterMuted) return 'muted';
+	const level = levelFor(volume) * HEADROOM;
+	if (level <= 0 || !notes.length) return 'silent';
+	try {
+		const current = audioGraph();
+		if (!current) return 'unavailable';
+		if (!(await ensureRunning(current.context))) { notifyReadiness(); return 'locked'; }
+		// The next sequence takes over without a moment of "nothing sounding".
+		for (const sequence of [...sequences]) fadeOut(sequence, 0.08, false);
+		schedule(current, notes, level, kind);
+		return 'scheduled';
+	} catch {
+		return 'unavailable';
+	}
+}
+
+/** Silence everything already scheduled — a long hour can be cut short. */
+export function stopBells(seconds = 0.08): void {
+	for (const sequence of [...sequences]) fadeOut(sequence, seconds);
+}
+
+export function isSounding(): boolean {
+	return sequences.size > 0;
+}
+
+/** Shift notes later, to follow another sound. */
+export function after(notes: BellNote[], seconds: number): BellNote[] {
+	return seconds > 0 ? notes.map(note => ({ ...note, at: note.at + seconds })) : notes;
+}
+
+/** The notes for a voice, followed by the hour counted on the hour bell. */
+export function voiceWithStrikes(voice: BellVoiceId, options: { minute?: number; strikeHour?: number }): BellNote[] {
+	const notes = voiceNotes(voice, { minute: options.minute });
+	const strikes = options.strikeHour === undefined ? [] : hourStrikes(options.strikeHour, notesEnd(notes));
+	return [...notes, ...strikes];
+}
+
+export function playVoice(voice: BellVoiceId, options: { volume: number; minute?: number; strikeHour?: number; kind?: Sequence['kind'] }): Promise<PlayResult> {
+	return playNotes(voiceWithStrikes(voice, options), options.volume, options.kind);
+}
+
+/** A registry bell at its own level. Never rejects. */
+export function playBell(id: string): Promise<PlayResult> {
+	const bell = getBell(id);
+	if (!bell || typeof window === 'undefined' && !contextFactory) return Promise.resolve('silent');
+	// Registry bells keep their original linear level under the squared curve.
+	return playNotes(registryNotes(id), Math.sqrt(Math.max(0, Math.min(1, bell.defaultVolume * masterVolume)))).catch(() => 'unavailable' as const);
 }

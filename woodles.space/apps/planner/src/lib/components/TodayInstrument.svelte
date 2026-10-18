@@ -9,7 +9,9 @@
 		type DayInterval
 	} from '$lib/instrument';
 	import { thinkingAboutShelf } from '$lib/thinkingAboutShelf.svelte';
-	import { dateKey, dayOfWeekLabel, shortDateLabel, timeToMinutes } from '$lib/utils';
+	import { dateKey, dayOfWeekLabel, formatTime, shortDateLabel, timeToMinutes } from '$lib/utils';
+	import { bellsResting, upcomingChimes } from '$lib/chimes';
+	import type { BellMark } from '$lib/types';
 	import MomentarySample from './MomentarySample.svelte';
 	import MomentDayReview from './MomentDayReview.svelte';
 	import { detailSummary } from '$lib/momentDetails';
@@ -83,21 +85,23 @@
 	);
 	let printRowsPerColumn = $derived(Math.ceil(tomorrowIntervals.length / 2));
 
-	let nextBell = $derived.by(() => {
-		const minutes = store.now.getHours() * 60 + store.now.getMinutes();
-		const interval = Math.max(1, store.settings.samplingIntervalMinutes);
-		return timeForMinutes((Math.floor(minutes / interval) + 1) * interval);
-	});
+	const MARK_WORDS: Record<BellMark, string> = { hour: 'hour', half: 'half hour', quarter: 'quarter', sample: 'sample', blockStart: 'block', leadTime: 'before a block', reminder: 'reminder' };
+	// The same rules the clock rings by, read forward, so the status names the bell that will actually sound.
+	let nextChime = $derived(upcomingChimes({ now: store.now, settings: store.settings, blocksFor: date => store.getBlocksForDate(date), pausedUntil: store.pausedUntil(), count: 1, horizonMinutes: 24 * 60 })[0] ?? null);
 	let bellStatus = $derived.by(() => {
-		if (!store.settings.bellsEnabled) return 'bells off';
-		const minutes = store.now.getHours() * 60 + store.now.getMinutes();
-		const quietStart = timeToMinutes(store.settings.quietHoursStart);
-		const quietEnd = timeToMinutes(store.settings.quietHoursEnd);
-		const quiet =
-			quietStart <= quietEnd
-				? minutes >= quietStart && minutes < quietEnd
-				: minutes >= quietStart || minutes < quietEnd;
-		return quiet ? 'quiet hours · bell resting' : `next bell · ${displayTime(nextBell)}`;
+		const resting = bellsResting(store.settings, store.now, store.pausedUntil());
+		if (resting === 'off') return 'bells off';
+		const recent = store.lastChime && store.now.getTime() - new Date(store.lastChime.at).getTime() < 2 * 60_000 ? store.lastChime : null;
+		if (recent) return `rang ${displayTime(formatTime(new Date(recent.at)))} · ${MARK_WORDS[recent.mark]}`;
+		const pause = store.pausedUntil();
+		if (resting === 'paused' && pause) return `bells paused until ${displayTime(formatTime(pause))}`;
+		const next = nextChime ? `${displayTime(formatTime(nextChime.at))} · ${MARK_WORDS[nextChime.mark]}` : '';
+		if (resting === 'quiet') return next ? `quiet hours · next bell ${next}` : 'quiet hours · bell resting';
+		if (!next) return 'no bell soon';
+		if (store.bellVolume <= 0) return `bells silent · ${next} shown here`;
+		if (store.audioReadiness === 'unavailable') return `next bell ${next} · shown here only`;
+		if (store.audioReadiness === 'suspended') return `next bell ${next} · tap to let it sound`;
+		return `next bell · ${next}`;
 	});
 
 	// The shelf names the entries an offer is about. Loaded once here rather
@@ -105,6 +109,10 @@
 	$effect(() => {
 		void thinkingAboutShelf.refresh();
 	});
+
+	function openBells(): void {
+		store.binderTab = 'bells';
+	}
 
 	function displayTime(value: string): string {
 		const minutes = timeToMinutes(value);
@@ -185,7 +193,7 @@
 					<div><small>{displayTime(selectedInterval.startTime)}–{displayTime(selectedInterval.endTime)}</small><strong>Moment saved</strong><p>Your note is in Day so far. The next prompt will appear with the next interval.</p></div>
 				</div>
 			{:else if selectedInterval}
-				<MomentarySample interval={selectedInterval} timeLabel="{displayTime(selectedInterval.startTime)}–{displayTime(selectedInterval.endTime)}" bellNote={selectedStart ? 'editing a recorded moment' : bellStatus} editingPast={Boolean(selectedStart)} onreturnnow={() => selectedStart = ''} onsaved={() => selectedStart = ''} />
+				<MomentarySample interval={selectedInterval} timeLabel="{displayTime(selectedInterval.startTime)}–{displayTime(selectedInterval.endTime)}" bellNote={selectedStart ? 'editing a recorded moment' : bellStatus} onbellclick={selectedStart ? undefined : openBells} editingPast={Boolean(selectedStart)} onreturnnow={() => selectedStart = ''} onsaved={() => selectedStart = ''} />
 			{:else}
 				<p class="sample-rest">Outside sampling hours. Your saved moments are below.</p>
 			{/if}

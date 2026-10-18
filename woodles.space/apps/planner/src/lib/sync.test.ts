@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
-import { mergePlannerBlobs } from './sync.svelte';
+import { mergePlannerBlobs, mergeSettings } from './sync.svelte';
 import type {
 	IntervalKind,
 	IntervalObservation,
@@ -424,5 +424,39 @@ describe('mergePlannerBlobs', () => {
 		expect(merged.settings.dismissedOffers?.sort()).toEqual(['idea:many:9', 'theme:laundry']);
 		expect(mergePlannerBlobs(blob(), blob()).settings.dismissedOffers).toBeUndefined();
 		expect(mergePlannerBlobs(blob(), blob()).loopReminders).toEqual([]);
+	});
+
+	it('merges settings per key by edit stamp, so a newer change on a stale device survives', () => {
+		const settings = blob().settings;
+		const laptop = { ...settings, bellsEnabled: true, quietHoursEnd: '06:30', settingsStamps: { quietHoursEnd: '2026-10-18T09:00:00.000Z', bellsEnabled: '2026-10-18T08:00:00.000Z' } };
+		const phone = { ...settings, bellsEnabled: false, quietHoursEnd: '07:00', settingsStamps: { bellsEnabled: '2026-10-18T10:00:00.000Z' } };
+		for (const merged of [mergeSettings(phone, laptop), mergeSettings(laptop, phone)]) {
+			expect(merged.bellsEnabled).toBe(false);
+			expect(merged.quietHoursEnd).toBe('06:30');
+			expect(merged.settingsStamps).toEqual({ bellsEnabled: '2026-10-18T10:00:00.000Z', quietHoursEnd: '2026-10-18T09:00:00.000Z' });
+		}
+	});
+
+	it('keeps remote-wins for ties and unstamped keys, and distrusts odd stamps', () => {
+		const settings = blob().settings;
+		const now = Date.parse('2026-10-18T12:00:00.000Z');
+		expect(mergeSettings({ ...settings, tone: 'wry' }, { ...settings, tone: 'earnest' }, now).tone).toBe('earnest');
+		const same = '2026-10-18T10:00:00.000Z';
+		expect(mergeSettings({ ...settings, tone: 'wry', settingsStamps: { tone: same } }, { ...settings, tone: 'earnest', settingsStamps: { tone: same } }, now).tone).toBe('earnest');
+		expect(mergeSettings({ ...settings, tone: 'wry', settingsStamps: { tone: 'garbage' } }, { ...settings, tone: 'earnest' }, now).tone).toBe('earnest');
+		// A stamp from a clock years ahead counts as now, so it can't win forever.
+		const future = mergeSettings({ ...settings, tone: 'wry', settingsStamps: { tone: '2099-01-01T00:00:00.000Z' } }, { ...settings, tone: 'earnest', settingsStamps: { tone: '2026-10-18T12:00:00.000Z' } }, now);
+		expect(future.tone).toBe('earnest');
+		// A deliberate clear on the newer side sticks.
+		const cleared = mergeSettings({ ...settings, onboardingStep: undefined, settingsStamps: { onboardingStep: '2026-10-18T11:00:00.000Z' } }, { ...settings, onboardingStep: 3 }, now);
+		expect(cleared.onboardingStep).toBeUndefined();
+	});
+
+	it('carries the bell mix as one stamped setting', () => {
+		const settings = blob().settings;
+		const local = { ...settings, bellSounds: { marks: { hour: { voice: 'bowl' } } }, settingsStamps: { bellSounds: '2026-10-18T11:00:00.000Z' } };
+		const remote = { ...settings, bellSounds: { marks: { hour: { voice: 'westminster' } } }, settingsStamps: { bellSounds: '2026-10-18T10:00:00.000Z' } };
+		expect(mergePlannerBlobs(blob({ settings: local }), blob({ settings: remote })).settings.bellSounds?.marks?.hour?.voice).toBe('bowl');
+		expect(mergePlannerBlobs(blob({ settings: remote }), blob({ settings: local })).settings.bellSounds?.marks?.hour?.voice).toBe('bowl');
 	});
 });

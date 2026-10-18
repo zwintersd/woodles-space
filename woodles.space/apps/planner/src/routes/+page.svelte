@@ -14,6 +14,7 @@
 	import { Arrival, arrival } from '$lib/arrival.svelte';
 	import { thinkingAboutShelf } from '$lib/thinkingAboutShelf.svelte';
 	import { onMount } from 'svelte';
+	import { stopBells } from '$lib/bells';
 
 	type CarillonSection = 'today' | 'piles' | 'routines' | 'surge' | 'review';
 
@@ -123,9 +124,20 @@
 		}
 
 		const target = event.target as HTMLElement | null;
+		// Escape stops a sounding bell first, then closes the binder — even from a field inside it.
+		if (event.key === 'Escape' && store.bellSounding) {
+			stopBells();
+			event.preventDefault();
+			return;
+		}
+		if (event.key === 'Escape' && store.binderTab !== null && target?.closest('#binder-panel')) {
+			store.closeBinder();
+			event.preventDefault();
+			return;
+		}
 		if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
 
-		const match = SECTIONS.find((item) => item.key === event.key);
+		const match = store.binderTab === null ? SECTIONS.find((item) => item.key === event.key) : undefined;
 		if (match) {
 			setSection(match.id);
 			event.preventDefault();

@@ -14,6 +14,7 @@ import { mergeLoopReminder } from './reminders';
 import type {
 	IntervalObservation,
 	PlannerBlob,
+	PlannerSettings,
 	RoutinePractice,
 	SporeEvent,
 	SurgeDraft
@@ -101,6 +102,40 @@ function mergeDayInstances(
 	return merged;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** A stamp's time; unreadable stamps lose, and one from a clock far ahead counts as now. */
+function stampTime(stamp: string | undefined, now: number): number {
+	const time = stamp ? Date.parse(stamp) : NaN;
+	if (!Number.isFinite(time)) return -Infinity;
+	return time > now + DAY_MS ? now : time;
+}
+
+/**
+ * Settings merge per key: the newer deliberate edit wins, so turning bells
+ * off on a phone isn't undone by a laptop that synced later. A tie, or a key
+ * nobody stamped (older clients), keeps the old rule: remote wins.
+ * Dismissed offers only accumulate.
+ */
+export function mergeSettings(local: PlannerSettings, remote: PlannerSettings, now = Date.now()): PlannerSettings {
+	const localStamps = local.settingsStamps ?? {};
+	const remoteStamps = remote.settingsStamps ?? {};
+	const merged: Record<string, unknown> = { ...local, ...remote };
+	const stamps: Record<string, string> = {};
+	const keys = new Set([...Object.keys(local), ...Object.keys(remote), ...Object.keys(localStamps), ...Object.keys(remoteStamps)]);
+	keys.delete('settingsStamps');
+	for (const key of keys) {
+		const localWins = stampTime(localStamps[key], now) > stampTime(remoteStamps[key], now);
+		if (localWins) merged[key] = (local as Record<string, unknown>)[key];
+		const stamp = localWins ? localStamps[key] : remoteStamps[key] ?? localStamps[key];
+		if (stamp) stamps[key] = stamp;
+	}
+	const dismissedOffers = [...new Set([...(local.dismissedOffers ?? []), ...(remote.dismissedOffers ?? [])])];
+	if (dismissedOffers.length) merged.dismissedOffers = dismissedOffers;
+	if (Object.keys(stamps).length) merged.settingsStamps = stamps;
+	return merged as PlannerSettings;
+}
+
 /**
  * Planner sync is a whole JSONB snapshot in Neon, but observations are
  * append-like. Deterministic IDs + last-write timestamps let a phone tap and a
@@ -111,8 +146,6 @@ export function mergePlannerBlobs(local: PlannerBlob, remote: PlannerBlob): Plan
 	const openLoops = projectLoopLifecycle(
 		mergeById(local.openLoops ?? [], remote.openLoops ?? [], mergeOpenLoop), loopEvents
 	);
-	// Dismissals only accumulate; a stale device must not bring an offer back.
-	const dismissedOffers = [...new Set([...(local.settings.dismissedOffers ?? []), ...(remote.settings.dismissedOffers ?? [])])];
 	const observations = mergeById(
 		local.observations ?? [],
 		remote.observations ?? [],
@@ -135,11 +168,7 @@ export function mergePlannerBlobs(local: PlannerBlob, remote: PlannerBlob): Plan
 		obligations: mergeById(local.obligations, remote.obligations),
 		rituals: mergeById(local.rituals, remote.rituals),
 		tasks: mergeById(local.tasks, remote.tasks, latestMutable),
-		settings: {
-			...local.settings,
-			...remote.settings,
-			...(dismissedOffers.length ? { dismissedOffers } : {})
-		},
+		settings: mergeSettings(local.settings, remote.settings),
 		domains: mergeById(local.domains, remote.domains),
 		observations,
 		routines: mergeById(local.routines ?? [], remote.routines ?? [], latestLifecycle),
