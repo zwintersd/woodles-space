@@ -3,6 +3,7 @@
 .scene-art { display: block; width: 100%; height: 100%; overflow: visible; }
 .scene-art [class^="sc-"] { transform-box: fill-box; transform-origin: center; }
 .scene-art .sc-nod { transform-origin: 30% 100%; }
+.scene-library .sc-nod, .scene-dragons .sc-nod { transform-origin: 65% 95%; }
 .scene-art .sc-sway { transform-origin: 100% 50%; }
 .scene-art .sc-dig { transform-origin: 100% 100%; }
 .scene-art .sc-spout { transform-origin: 50% 100%; }

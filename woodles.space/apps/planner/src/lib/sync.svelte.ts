@@ -9,6 +9,7 @@ import {
 import { store } from './store.svelte';
 import { buildCommitments, commitmentsMatch } from './commitments';
 import { buildSessions, sessionsMatch } from './sessions';
+import { mergeFiveContactsRound, projectLoopLifecycle } from './openLoops';
 import type {
 	IntervalObservation,
 	PlannerBlob,
@@ -105,6 +106,10 @@ function mergeDayInstances(
  * desktop tap survive the same CAS conflict instead of choosing one device.
  */
 export function mergePlannerBlobs(local: PlannerBlob, remote: PlannerBlob): PlannerBlob {
+	const loopEvents = mergeById(local.loopEvents ?? [], remote.loopEvents ?? []);
+	const openLoops = projectLoopLifecycle(
+		mergeById(local.openLoops ?? [], remote.openLoops ?? [], latestMutable), loopEvents
+	);
 	const observations = mergeById(
 		local.observations ?? [],
 		remote.observations ?? [],
@@ -147,7 +152,11 @@ export function mergePlannerBlobs(local: PlannerBlob, remote: PlannerBlob): Plan
 		// Union, no resolver: a sitting is identified by entry-and-date, so two
 		// devices logging the same one produce the same record, and there is
 		// nothing to pick between.
-		loggedSessions: mergeById(local.loggedSessions ?? [], remote.loggedSessions ?? [])
+		loggedSessions: mergeById(local.loggedSessions ?? [], remote.loggedSessions ?? []),
+		openLoops,
+		loopEvents,
+		closureReflections: mergeById(local.closureReflections ?? [], remote.closureReflections ?? [], (a, b) => (a.updatedAt ?? a.recordedAt) > (b.updatedAt ?? b.recordedAt) ? a : b),
+		fiveContactsRounds: mergeById(local.fiveContactsRounds ?? [], remote.fiveContactsRounds ?? [], mergeFiveContactsRound)
 	};
 }
 
@@ -203,7 +212,11 @@ const appSync = createAppSync<PlannerBlob>({
 					spores: store.sporeEvents,
 					sleepLogs: store.sleepLogs,
 					signals: store.signalEntries,
-					loggedSessions: store.loggedSessions
+					loggedSessions: store.loggedSessions,
+					openLoops: store.openLoops,
+					loopEvents: store.loopEvents,
+					closureReflections: store.closureReflections,
+					fiveContactsRounds: store.fiveContactsRounds
 				};
 			},
 			write(blob: PlannerBlob): void {

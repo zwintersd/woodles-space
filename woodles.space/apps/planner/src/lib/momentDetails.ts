@@ -1,4 +1,4 @@
-import type { IntervalObservation, MomentDetails } from './types';
+import type { IntervalObservation, MomentDetails, MomentNoticing } from './types';
 import { timeToMinutes } from './utils';
 
 export type DetailKey = keyof MomentDetails;
@@ -23,6 +23,16 @@ export function cleanDetails(details: MomentDetails): MomentDetails {
 		if (field.scale) return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 5 ? [[field.key, value]] : [];
 		return typeof value === 'string' && value.trim() ? [[field.key, value.trim()]] : [];
 	}));
+}
+
+/** A selected category is explicit; its note may intentionally be empty. */
+export function cleanNoticings(noticings: MomentNoticing[]): MomentNoticing[] {
+	const channels = new Set<string>();
+	return noticings.filter(noticing => {
+		if (!['body', 'attention', 'behavior'].includes(noticing.channel) || channels.has(noticing.channel)) return false;
+		channels.add(noticing.channel);
+		return true;
+	}).map(noticing => ({ ...noticing, note: noticing.note.trim() }));
 }
 
 export function detailSummary(details: MomentDetails = {}): string {

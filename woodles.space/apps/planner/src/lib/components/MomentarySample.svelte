@@ -3,17 +3,17 @@
 	import { queueSync } from '$lib/sync.svelte';
 	import { INTERVAL_KIND_OPTIONS, type DayInterval } from '$lib/instrument';
 	import { uid } from '$lib/utils';
-	import type { SampleTag, MomentDetails as Details, TrackerAnswer } from '$lib/types';
+	import type { SampleTag, MomentDetails as Details, MomentNoticing, TrackerAnswer } from '$lib/types';
 	import { cleanTrackerAnswers } from '$lib/momentTrackers';
 	import MomentDetails from './MomentDetails.svelte';
-	import { cleanDetails } from '$lib/momentDetails';
+	import { cleanDetails, cleanNoticings } from '$lib/momentDetails';
 	import { thinkingAboutShelf } from '$lib/thinkingAboutShelf.svelte';
 
 	let { interval, timeLabel, bellNote, editingPast = false, onreturnnow, onsaved }: { interval: DayInterval | null; timeLabel: string; bellNote: string; editingPast?: boolean; onreturnnow?: () => void; onsaved?: () => void } = $props();
 	const colors = ['#aa526b', '#8061a8', '#467f92', '#98702f', '#548068', '#6676a0'];
 	const defaults: SampleTag[] = INTERVAL_KIND_OPTIONS.filter(o => o.kind !== 'elsewhere').map((o, i) => ({ id: o.kind, name: o.label, color: colors[i], kind: o.kind }));
 	let tags = $derived(store.settings.sampleTags ?? defaults);
-	let drafts = $state<Record<string, { text: string; tagId: string; fallback?: SampleTag; details: Details; answers: TrackerAnswer[]; thinkingAboutEntryId: string }>>({});
+	let drafts = $state<Record<string, { text: string; tagId: string; fallback?: SampleTag; details: Details; answers: TrackerAnswer[]; noticings: MomentNoticing[]; linkedLoopIds: string[]; thinkingAboutEntryId: string }>>({});
 	let draft = $derived(interval ? drafts[interval.key] : undefined);
 	let editing = $state(false);
 	let tagDraft = $state<SampleTag[]>([]);
@@ -24,7 +24,7 @@
 		const observation = interval.observation;
 		const own = observation?.intervalStart === interval.startTime ? observation : undefined;
 		const tag = own?.sampleTag === undefined ? defaults.find(t => t.kind === own?.kind) : own.sampleTag;
-		drafts[interval.key] = { text: own?.label ?? '', tagId: tag?.id ?? '', fallback: tag ?? undefined, details: { ...own?.details }, answers: (own?.trackerAnswers ?? []).map(a => ({ tracker: { ...a.tracker }, value: a.value })), thinkingAboutEntryId: own?.thinkingAboutEntryId ?? '' };
+		drafts[interval.key] = { text: own?.label ?? '', tagId: tag?.id ?? '', fallback: tag ?? undefined, details: { ...own?.details }, answers: (own?.trackerAnswers ?? []).map(a => ({ tracker: { ...a.tracker }, value: a.value })), noticings: (own?.noticings ?? []).map(n => ({ ...n })), linkedLoopIds: [...(own?.linkedLoopIds ?? [])], thinkingAboutEntryId: own?.thinkingAboutEntryId ?? '' };
 		feedback = '';
 	});
 	let chosen = $derived(tags.find(t => t.id === draft?.tagId) ?? (draft?.fallback?.id === draft?.tagId ? draft?.fallback : undefined));
@@ -41,7 +41,7 @@
 	function saveSample() {
 		if (!interval || !draft?.text.trim()) return;
 		const existing = interval.observation?.intervalStart === interval.startTime ? interval.observation : undefined;
-		store.observeInterval({ date: interval.date, intervalStart: interval.startTime, label: draft.text, kind: chosen?.kind ?? 'elsewhere', sampleTag: chosen ? { ...chosen } : null, details: cleanDetails(draft.details), trackerAnswers: cleanTrackerAnswers(draft.answers), source: existing?.source ?? 'live', note: existing?.note, thinkingAboutEntryId: draft.thinkingAboutEntryId || undefined });
+		store.observeInterval({ date: interval.date, intervalStart: interval.startTime, label: draft.text, kind: chosen?.kind ?? 'elsewhere', sampleTag: chosen ? { ...chosen } : null, details: cleanDetails(draft.details), trackerAnswers: cleanTrackerAnswers(draft.answers), noticings: cleanNoticings(draft.noticings), linkedLoopIds: [...draft.linkedLoopIds], source: existing?.source ?? 'live', note: existing?.note, thinkingAboutEntryId: draft.thinkingAboutEntryId || undefined });
 		queueSync();
 		feedback = existing ? 'Changes saved.' : 'Moment saved.';
 		onsaved?.();
@@ -108,9 +108,9 @@
 			{/if}
 		</div>
 		<aside class="checkin-panel" aria-labelledby="checkin-heading">
-			<header><h2 id="checkin-heading">Check in</h2><p>Touch only what matters</p></header>
-			{#if interval && draft}{#key interval.key}<MomentDetails bind:details={draft.details} bind:answers={draft.answers} text={draft.text} tagName={chosen?.name} date={interval.date} start={interval.startTime} previous={store.getObservationsForDate(interval.date)} onchange={() => feedback = ''} />{/key}
-			{:else}<p class="checkin-empty">A check in is available while recording a moment.</p>{/if}
+			<header><h2 id="checkin-heading">Anything else you notice?</h2><p>Optional · touch only what matters</p></header>
+			{#if interval && draft}{#key interval.key}<MomentDetails bind:details={draft.details} bind:answers={draft.answers} bind:noticings={draft.noticings} bind:linkedLoopIds={draft.linkedLoopIds} text={draft.text} tagName={chosen?.name} date={interval.date} start={interval.startTime} previous={store.getObservationsForDate(interval.date)} onchange={() => feedback = ''} />{/key}
+			{:else}<p class="checkin-empty">Optional notes are available while recording a moment.</p>{/if}
 		</aside>
 	</div>
 </div>

@@ -85,6 +85,16 @@ so it's not easy to forget.
 
 ## 2026-10-12
 
+- **clearer schedule illustrations** — the music banner has a symmetric guitar
+  with aligned strings and a smaller keyboard; the library and castle dragons
+  have rounded silhouettes, wings on their backs and heads that nod at the
+  neck. faces move with their subjects, and houses and potion bottles meet
+  their ground or tabletop. reviewed still at desktop and phone sizes.
+- **six more illustrated schedule themes** — Mushroom village, Cozy library,
+  Farm friends, Music studio, Arctic explorers and Potion workshop each bring
+  custom banner art, colours, fonts, stickers and words. the library starts
+  still; the others follow the existing gentle-motion controls. the ten
+  remaining emoji-only interest banners now have their own illustrations too.
 - **visual schedules can wear a learner's favourite thing** — the weekly
   planner's new **Style** button opens a style studio with 22 themes built
   around popular special interests: unicorns, dinosaurs, trains, outer space,

@@ -23,7 +23,12 @@ import type {
 	SleepQuality,
 	SignalEntry,
 	SignalKind,
-	LoggedSession
+	LoggedSession,
+	OpenLoop,
+	LoopEvent,
+	LoopEventType,
+	ClosureReflection,
+	FiveContactsRound
 } from './types';
 import {
 	STARTER_SHAPES,
@@ -42,6 +47,7 @@ import { buildSessions } from './sessions';
 import { thinkingAboutShelf } from './thinkingAboutShelf.svelte';
 import { dateKey, nowMinutes, uid, timeToMinutes } from './utils';
 import { playBell } from './bells';
+import { activeContacts, projectLoopLifecycle, retainContactBoundary } from './openLoops';
 import {
 	intervalKey,
 	kindLabel,
@@ -158,6 +164,10 @@ export class PlannerStore {
 	sleepLogs = $state<SleepLog[]>(load('planner.sleepLogs.v1', []));
 	signalEntries = $state<SignalEntry[]>(load('planner.signals.v1', []));
 	loggedSessions = $state<LoggedSession[]>(load('planner.loggedSessions.v1', []));
+	openLoops = $state<OpenLoop[]>(load('planner.openLoops.v1', []));
+	loopEvents = $state<LoopEvent[]>(load('planner.loopEvents.v1', []));
+	closureReflections = $state<ClosureReflection[]>(load('planner.closureReflections.v1', []));
+	fiveContactsRounds = $state<FiveContactsRound[]>(load('planner.fiveContactsRounds.v1', []));
 
 	// Transient
 	readonly sessionId = uid();
@@ -533,6 +543,8 @@ export class PlannerStore {
 
 	observeInterval(input: {
 		trackerAnswers?: IntervalObservation['trackerAnswers'];
+		noticings?: IntervalObservation['noticings'];
+		linkedLoopIds?: IntervalObservation['linkedLoopIds'];
 		details?: IntervalObservation['details'];
 		sampleTag?: IntervalObservation['sampleTag'];
 		date?: string;
@@ -566,6 +578,8 @@ export class PlannerStore {
 
 		const observation: IntervalObservation = {
 			trackerAnswers: input.trackerAnswers === undefined ? existing?.trackerAnswers : input.trackerAnswers.map(a => ({ tracker: { ...a.tracker }, value: a.value })),
+			noticings: input.noticings === undefined ? existing?.noticings : input.noticings.map(noticing => ({ ...noticing, note: noticing.note.trim() })),
+			linkedLoopIds: input.linkedLoopIds === undefined ? existing?.linkedLoopIds : [...new Set(input.linkedLoopIds)],
 			details: input.details === undefined ? existing?.details : { ...input.details },
 			sampleTag: input.sampleTag === undefined ? existing?.sampleTag : input.sampleTag ? { ...input.sampleTag } : null,
 			id,
@@ -604,6 +618,121 @@ export class PlannerStore {
 		save('planner.observations.v1', this.intervalObservations);
 		save('planner.carillonSpores.v1', this.sporeEvents);
 		return observation;
+	}
+
+	// ── optional open-loop notebook ──────────────────────────────────
+
+	createOpenLoop(title: string): OpenLoop | null {
+		const cleanTitle = title.trim();
+		if (!cleanTitle) return null;
+		const timestamp = new Date().toISOString();
+		const loop: OpenLoop = { id: `loop-${uid()}`, title: cleanTitle, status: 'open', createdAt: timestamp, updatedAt: timestamp };
+		this.openLoops = [...this.openLoops, loop];
+		this.recordLoopEvent({ loopId: loop.id, type: 'noticed' });
+		return loop;
+	}
+
+	recordLoopEvent(input: { loopId?: string; type: LoopEventType; note?: string; occurredAt?: string; sourceMomentId?: string }): LoopEvent | null {
+		const loop = input.loopId ? this.openLoops.find(item => item.id === input.loopId) : undefined;
+		if (input.loopId && !loop) return null;
+		const lifecycle = ['paused', 'closed', 'released', 'reopened'].includes(input.type);
+		if (lifecycle && !loop) return null;
+		// Repeated resolution taps are retries, not a second resolution.
+		if (loop?.status === 'resolved' && ['closed', 'released', 'paused'].includes(input.type)) return null;
+		if (input.type === 'paused' && loop?.status === 'paused') return null;
+		if (input.type === 'reopened' && loop?.status === 'open') return null;
+		const timestamp = new Date().toISOString();
+		const occurrence = input.occurredAt === undefined ? timestamp : new Date(input.occurredAt);
+		if (occurrence instanceof Date && !Number.isFinite(occurrence.getTime())) return null;
+		const event: LoopEvent = {
+			id: `loop-event-${uid()}`, loopId: input.loopId, type: input.type,
+			occurredAt: occurrence instanceof Date ? occurrence.toISOString() : occurrence,
+			recordedAt: timestamp,
+			sequence: this.loopEvents.reduce((max, item) => Math.max(max, item.sequence ?? 0), 0) + 1,
+			note: input.note?.trim() || undefined,
+			sourceMomentId: input.sourceMomentId
+		};
+		this.loopEvents = [...this.loopEvents, event];
+		this.openLoops = projectLoopLifecycle(this.openLoops, this.loopEvents);
+		save('planner.loopEvents.v1', this.loopEvents);
+		save('planner.openLoops.v1', this.openLoops);
+		return event;
+	}
+
+	saveClosureReflection(eventId: string, input: { descriptors: string[]; note?: string; nextFeelsPossible?: 'something' | 'rest' | 'nothing' }): ClosureReflection | null {
+		const event = this.loopEvents.find(item => item.id === eventId);
+		if (!event || !['closed', 'released'].includes(event.type)) return null;
+		const descriptors = [...new Set(input.descriptors.map(item => item.trim()).filter(Boolean))];
+		const note = input.note?.trim() || undefined;
+		if (!descriptors.length && !note && !input.nextFeelsPossible) return null;
+		const existing = this.closureReflections.find(item => item.loopEventId === eventId);
+		const timestamp = new Date().toISOString();
+		const reflection: ClosureReflection = {
+			id: `closure-reflection-${eventId}`, loopEventId: eventId,
+			descriptors, note, nextFeelsPossible: input.nextFeelsPossible,
+			recordedAt: existing?.recordedAt ?? timestamp, updatedAt: timestamp
+		};
+		this.closureReflections = existing
+			? this.closureReflections.map(item => item.id === existing.id ? reflection : item)
+			: [...this.closureReflections, reflection];
+		save('planner.closureReflections.v1', this.closureReflections);
+		return reflection;
+	}
+
+	// ── Five Contacts: a bounded commitment, independent of loop status ──
+
+	startFiveContactsRound(): FiveContactsRound {
+		const active = this.fiveContactsRounds.find(item => item.status === 'active');
+		if (active) return active;
+		const timestamp = new Date().toISOString();
+		const round: FiveContactsRound = { id: `contacts-${uid()}`, startedAt: timestamp, updatedAt: timestamp, status: 'active', contacts: [] };
+		this.fiveContactsRounds = [...this.fiveContactsRounds, round];
+		save('planner.fiveContactsRounds.v1', this.fiveContactsRounds);
+		return round;
+	}
+
+	countContact(roundId: string, input: { note?: string; linkedLoopId?: string } = {}): boolean {
+		const round = this.fiveContactsRounds.find(item => item.id === roundId);
+		if (!round || round.status !== 'active' || activeContacts(round).length >= 5) return false;
+		if (input.linkedLoopId && !this.openLoops.some(loop => loop.id === input.linkedLoopId)) return false;
+		const timestamp = new Date().toISOString();
+		const contact = { id: `contact-${uid()}`, at: timestamp, sequence: round.contacts.reduce((max, item) => Math.max(max, item.sequence ?? 0), 0) + 1, note: input.note?.trim() || undefined, linkedLoopId: input.linkedLoopId };
+		const contacts = [...round.contacts, contact];
+		const completed = activeContacts({ ...round, contacts }).length === 5;
+		this.fiveContactsRounds = this.fiveContactsRounds.map(item => item.id === roundId
+			? { ...item, contacts, status: completed ? 'completed' : 'active', endedAt: completed ? timestamp : undefined, updatedAt: timestamp }
+			: item);
+		save('planner.fiveContactsRounds.v1', this.fiveContactsRounds);
+		return true;
+	}
+
+	undoContact(roundId: string): void {
+		const round = this.fiveContactsRounds.find(item => item.id === roundId);
+		if (!round || round.status === 'stopped') return;
+		const contact = activeContacts(round).at(-1);
+		if (!contact) return;
+		const timestamp = new Date().toISOString();
+		const contacts = retainContactBoundary(round.contacts).map(entry => entry.id === contact.id ? { ...entry, removedAt: timestamp } : entry);
+		const counted = activeContacts({ ...round, contacts });
+		this.fiveContactsRounds = this.fiveContactsRounds.map(item => item.id === roundId ? {
+			...item, contacts, status: counted.length === 5 ? 'completed' : 'active',
+			endedAt: counted.length === 5 ? counted[4].at : undefined, updatedAt: timestamp
+		} : item);
+		save('planner.fiveContactsRounds.v1', this.fiveContactsRounds);
+	}
+
+	stopFiveContactsRound(roundId: string): void {
+		const timestamp = new Date().toISOString();
+		this.fiveContactsRounds = this.fiveContactsRounds.map(item => item.id === roundId && item.status === 'active'
+			? { ...item, status: 'stopped', endedAt: timestamp, updatedAt: timestamp } : item);
+		save('planner.fiveContactsRounds.v1', this.fiveContactsRounds);
+	}
+
+	reflectFiveContactsRound(roundId: string, note: string): void {
+		const timestamp = new Date().toISOString();
+		this.fiveContactsRounds = this.fiveContactsRounds.map(item => item.id === roundId
+			? { ...item, reflectionNote: note.trim() || undefined, reflectionUpdatedAt: timestamp, updatedAt: timestamp } : item);
+		save('planner.fiveContactsRounds.v1', this.fiveContactsRounds);
 	}
 
 	// ── prompt-fading routines ──────────────────────────────────────
@@ -1026,6 +1155,10 @@ export class PlannerStore {
 		this.sleepLogs = blob.sleepLogs ?? this.sleepLogs;
 		this.signalEntries = blob.signals ?? this.signalEntries;
 		this.loggedSessions = blob.loggedSessions ?? this.loggedSessions;
+		this.loopEvents = blob.loopEvents ?? this.loopEvents;
+		this.openLoops = projectLoopLifecycle(blob.openLoops ?? this.openLoops, this.loopEvents);
+		this.closureReflections = blob.closureReflections ?? this.closureReflections;
+		this.fiveContactsRounds = blob.fiveContactsRounds ?? this.fiveContactsRounds;
 		save('planner.shapes.v1', this.dayShapes);
 		save('planner.weekPattern.v1', this.weekPattern);
 		save('planner.days.v2', this.dayOverrides);
@@ -1042,6 +1175,10 @@ export class PlannerStore {
 		save('planner.sleepLogs.v1', this.sleepLogs);
 		save('planner.signals.v1', this.signalEntries);
 		save('planner.loggedSessions.v1', this.loggedSessions);
+		save('planner.openLoops.v1', this.openLoops);
+		save('planner.loopEvents.v1', this.loopEvents);
+		save('planner.closureReflections.v1', this.closureReflections);
+		save('planner.fiveContactsRounds.v1', this.fiveContactsRounds);
 		this.publishSessionsLocally();
 	}
 
