@@ -29,7 +29,9 @@ import type {
 	LoopEventType,
 	ClosureReflection,
 	FiveContactsRound,
-	LoopReminder
+	LoopReminder,
+	BellMark,
+	BellSoundSettings
 } from './types';
 import {
 	STARTER_SHAPES,
@@ -47,7 +49,12 @@ import { buildCommitments } from './commitments';
 import { buildSessions } from './sessions';
 import { thinkingAboutShelf } from './thinkingAboutShelf.svelte';
 import { dateKey, nowMinutes, uid, timeToMinutes } from './utils';
-import { playBell } from './bells';
+import { after, getBell, installAudioUnlock, levelFor, playNotes, registryNotes, voiceWithStrikes, watchAudioReadiness, watchSounding, type AudioReadiness, type PlayResult } from './bells';
+import {
+	BELL_PRESETS, CHIME_GRACE_MINUTES, CLOCK_MARKS, DEFAULT_BELL_VOLUME, audible, bellMinuteClaimed, bellsResting, claimBellMinute,
+	cleanVolume, countsHours, dueChime, markReminderRung, markSound, reminderRung, startOfMinute, type ChimeEvent
+} from './chimes';
+import { notesEnd, type BellNote, type BellVoiceId } from './bellVoices';
 import { activeContacts, isLifecycleEvent, latestLifecycleEvent, projectLoopLifecycle, retainContactBoundary } from './openLoops';
 import { cleanRhythmDays, dueReminders, isQuietMinute, liveReminders, rhythmDueAt } from './reminders';
 import {
@@ -75,6 +82,14 @@ function save<T>(key: string, value: T): void {
 	} catch {
 		// Ignore quota / disabled storage
 	}
+}
+
+const BELL_VOLUME_KEY = 'planner.bellVolume.v1';
+const BELL_PAUSE_KEY = 'planner.bellPause.v1';
+
+function loadPause(): string | null {
+	const value = load<unknown>(BELL_PAUSE_KEY, null);
+	return typeof value === 'string' && Number.isFinite(new Date(value).getTime()) ? value : null;
 }
 
 function loadRoutines(): Routine[] {
@@ -1276,8 +1291,12 @@ export class PlannerStore {
 
 	// ── settings + persistence ─────────────────────────────────────
 
+	/** Every deliberate change stamps its keys, so sync keeps the newer edit per setting. */
 	updateSettings(patch: Partial<PlannerSettings>): void {
-		this.settings = { ...this.settings, ...patch };
+		const stampedAt = new Date().toISOString();
+		const stamps = { ...(this.settings.settingsStamps ?? {}) };
+		for (const key of Object.keys(patch)) if (key !== 'settingsStamps') stamps[key] = stampedAt;
+		this.settings = { ...this.settings, ...patch, settingsStamps: stamps };
 		save('planner.settings.v1', this.settings);
 	}
 
@@ -1376,42 +1395,175 @@ export class PlannerStore {
 
 	// ── clock + bell ────────────────────────────────────────────────
 
-	#lastBellMinuteKey = '';
+	#lastChimeCheck: Date | null = null;
+	/** The last bell this tab actually sounded, for the Today status line. */
+	lastChime = $state<{ mark: BellMark; at: string } | null>(null);
+	/** Master bell volume on this device — speakers differ, so it never syncs. */
+	bellVolume = $state<number>(cleanVolume(load<unknown>(BELL_VOLUME_KEY, DEFAULT_BELL_VOLUME), DEFAULT_BELL_VOLUME));
+	/** A pause on this device; every tab here follows it. */
+	bellPausedUntil = $state<string | null>(loadPause());
+	/** Whether the browser is letting this page make sound yet. */
+	audioReadiness = $state<AudioReadiness>('suspended');
+	bellSounding = $state(false);
 
-	tick(): void {
-		this.now = new Date();
+	tick(now: Date = new Date()): void {
+		this.now = now;
 		this.#deliverReminders();
+		void this.#ringDueBells();
+	}
 
-		if (!this.settings.bellsEnabled) return;
+	pausedUntil(): Date | null {
+		const until = this.bellPausedUntil ? new Date(this.bellPausedUntil) : null;
+		return until && Number.isFinite(until.getTime()) ? until : null;
+	}
 
-		const mins = nowMinutes(this.now);
-		const minuteKey = `${dateKey(this.now)}-${mins}`;
-		if (minuteKey === this.#lastBellMinuteKey) return;
-
-		if (isQuietMinute(mins, this.settings.quietHoursStart, this.settings.quietHoursEnd)) return;
-
-		const samplingInterval = Math.max(1, this.settings.samplingIntervalMinutes || 15);
-		if (mins % samplingInterval === 0) {
-			playBell('block-start');
-			this.#lastBellMinuteKey = minuteKey;
-			return;
+	/**
+	 * One sequence per tick: this minute's chime (unless another tab or a
+	 * reload already rang it), then a reminder sound if one came due. Claims
+	 * are written only once the sound was actually scheduled, so a tab the
+	 * browser is still holding never takes a bell from one that can play.
+	 */
+	async #ringDueBells(): Promise<void> {
+		const now = this.now;
+		const event = dueChime({ lastChecked: this.#lastChimeCheck, now, settings: this.settings, blocksFor: date => this.getBlocksForDate(date), pausedUntil: this.pausedUntil() });
+		this.#lastChimeCheck = now;
+		const chime = event && !bellMinuteClaimed(event.at) ? this.chimeNotes(event) : [];
+		const reminders = this.#freshReminderSound(now);
+		const notes = [...chime, ...after(reminders.notes, chime.length ? notesEnd(chime) + 0.3 : 0)];
+		if (!notes.length) return;
+		const result = await playNotes(notes, this.bellVolume);
+		if (result !== 'scheduled') return;
+		if (event && chime.length) {
+			claimBellMinute(event.at);
+			this.#announce(event.mark, event.at, event.parts[0].sound.voice);
 		}
-
-		const blocks = this.getBlocksForDate(this.now);
-		for (const block of blocks) {
-			const startMins = timeToMinutes(block.startTime);
-			const diff = startMins - mins;
-			if (diff === this.settings.leadTimeMinutes) {
-				playBell('lead-time');
-				this.#lastBellMinuteKey = minuteKey;
-				break;
-			}
-			if (diff === 0) {
-				playBell(block.bellId ?? 'block-start');
-				this.#lastBellMinuteKey = minuteKey;
-				break;
-			}
+		if (reminders.keys.length) {
+			markReminderRung(reminders.keys);
+			if (!chime.length) this.#announce('reminder', now, markSound(this.settings.bellSounds, 'reminder').voice);
 		}
+	}
+
+	/** Note a bell that sounded — for Today's "rang" line and anything listening on the page. */
+	#announce(mark: BellMark, at: Date, voice: BellVoiceId): void {
+		this.lastChime = { mark, at: at.toISOString() };
+		if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('carillon:bell', { detail: { mark, voice, at: at.toISOString() } }));
+	}
+
+	/**
+	 * The notes for one resolved minute at the person's mix: the clock chime,
+	 * then a block's bell once it has faded. Each part's level is baked into
+	 * its notes so the whole minute plays as one sequence.
+	 */
+	chimeNotes(event: ChimeEvent): BellNote[] {
+		const notes: BellNote[] = [];
+		let offset = 0;
+		for (const part of event.parts) {
+			const own = part.blockBellId && getBell(part.blockBellId)
+				? registryNotes(part.blockBellId)
+				: voiceWithStrikes(part.sound.voice, { minute: event.at.getMinutes(), strikeHour: part.strikeHour });
+			if (!own.length) continue;
+			const scale = levelFor(part.sound.volume);
+			notes.push(...after(own, offset).map(note => ({ ...note, gain: note.gain * scale })));
+			offset += notesEnd(own) + 0.3;
+		}
+		return notes;
+	}
+
+	/**
+	 * A due loop reminder may also make a sound, if one was chosen for it —
+	 * only while Carillon is open when it comes due, once per device.
+	 */
+	#freshReminderSound(now: Date): { notes: BellNote[]; keys: string[] } {
+		const sound = markSound(this.settings.bellSounds, 'reminder');
+		if (!audible(sound) || bellsResting(this.settings, now, this.pausedUntil())) return { notes: [], keys: [] };
+		const keys = this.getDueReminders(now)
+			.filter(reminder => now.getTime() - new Date(reminder.dueAt).getTime() <= CHIME_GRACE_MINUTES * 60_000)
+			.map(reminder => `${reminder.id}@${reminder.dueAt}`)
+			.filter(key => !reminderRung(key));
+		if (!keys.length) return { notes: [], keys: [] };
+		const notes = voiceWithStrikes(sound.voice, { minute: now.getMinutes() }).map(note => ({ ...note, gain: note.gain * levelFor(sound.volume) }));
+		return { notes, keys };
+	}
+
+	/** Hear one mark as it would ring now, ignoring quiet hours and pauses — an explicit request. */
+	previewMark(mark: BellMark): Promise<PlayResult> {
+		const sound = markSound(this.settings.bellSounds, mark);
+		const minute = mark === 'hour' ? 0 : mark === 'half' ? 30 : mark === 'quarter' ? 15 : this.now.getMinutes();
+		const strikeHour = mark === 'hour' && countsHours(this.settings.bellSounds) ? 3 : undefined;
+		const notes = voiceWithStrikes(sound.voice, { minute, strikeHour }).map(note => ({ ...note, gain: note.gain * levelFor(sound.volume) }));
+		return playNotes(notes, this.bellVolume, 'preview');
+	}
+
+	/** Change the synced bell mix. Unknown values from newer versions are kept as they are. */
+	updateBellSounds(patch: Partial<BellSoundSettings>): void {
+		this.updateSettings({ bellSounds: { ...(this.settings.bellSounds ?? {}), ...patch } });
+	}
+
+	setMarkSound(mark: BellMark, sound: { voice?: BellVoiceId; volume?: number }): void {
+		const marks = this.settings.bellSounds?.marks;
+		const current = marks && typeof marks === 'object' && !Array.isArray(marks) ? marks : {};
+		const entry = current[mark] && typeof current[mark] === 'object' ? current[mark] : {};
+		this.updateBellSounds({ marks: { ...current, [mark]: { ...entry, ...sound } } });
+	}
+
+	/** Set hour, half, quarter and sample voices together. Levels stay as they are. */
+	applyBellPreset(id: string): void {
+		const preset = BELL_PRESETS.find(item => item.id === id);
+		if (!preset) return;
+		const marks = this.settings.bellSounds?.marks;
+		const current = marks && typeof marks === 'object' && !Array.isArray(marks) ? { ...marks } : {};
+		for (const mark of CLOCK_MARKS) current[mark] = { ...(current[mark] ?? {}), voice: preset.voices[mark] };
+		this.updateBellSounds({ marks: current });
+	}
+
+	setBellVolume(volume: number): void {
+		this.bellVolume = cleanVolume(volume, this.bellVolume);
+		save(BELL_VOLUME_KEY, this.bellVolume);
+	}
+
+	/** Rest the bells on this device until a minute (rounded down, so that minute's bell rings), or resume with null. */
+	pauseBells(until: Date | null): void {
+		this.bellPausedUntil = until ? startOfMinute(until).toISOString() : null;
+		save(BELL_PAUSE_KEY, this.bellPausedUntil);
+	}
+
+	#clockStarted = false;
+
+	/**
+	 * Start the clock once, from the app root. Ticks land just after each
+	 * wall-clock minute (the delay is recomputed every time, so clock jumps
+	 * correct themselves), a tab coming back into view checks at once, and
+	 * other tabs' volume and pause changes are followed.
+	 */
+	startClock(): () => void {
+		if (this.#clockStarted || typeof window === 'undefined') return () => {};
+		this.#clockStarted = true;
+		let timer: ReturnType<typeof setTimeout>;
+		const schedule = () => {
+			timer = setTimeout(() => { this.tick(); schedule(); }, 60_000 - (Date.now() % 60_000) + 150);
+		};
+		schedule();
+		const wake = () => { if (document.visibilityState !== 'hidden') this.tick(); };
+		const storage = (event: StorageEvent) => {
+			if (event.key === BELL_PAUSE_KEY) this.bellPausedUntil = loadPause();
+			if (event.key === BELL_VOLUME_KEY) this.bellVolume = cleanVolume(load<unknown>(BELL_VOLUME_KEY, DEFAULT_BELL_VOLUME), DEFAULT_BELL_VOLUME);
+		};
+		document.addEventListener('visibilitychange', wake);
+		window.addEventListener('pageshow', wake);
+		window.addEventListener('focus', wake);
+		window.addEventListener('storage', storage);
+		const stopReadiness = watchAudioReadiness(state => { this.audioReadiness = state; });
+		const stopSounding = watchSounding(sounding => { this.bellSounding = sounding; });
+		const stopUnlock = installAudioUnlock(() => this.settings.bellsEnabled === true);
+		return () => {
+			clearTimeout(timer);
+			document.removeEventListener('visibilitychange', wake);
+			window.removeEventListener('pageshow', wake);
+			window.removeEventListener('focus', wake);
+			window.removeEventListener('storage', storage);
+			stopReadiness(); stopSounding(); stopUnlock();
+			this.#clockStarted = false;
+		};
 	}
 
 	// ── shape-relative wrappers (convenience for views) ─────────────
@@ -1424,11 +1576,6 @@ export class PlannerStore {
 		return getNextBlock(this.getBlocksForDate(date), date);
 	}
 
-	constructor() {
-		if (typeof window !== 'undefined') {
-			setInterval(() => this.tick(), 30_000);
-		}
-	}
 }
 
 export const store = new PlannerStore();

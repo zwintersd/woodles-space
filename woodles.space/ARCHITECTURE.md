@@ -571,6 +571,14 @@ any earlier sheet, and those marks keep `source: "paper"` so a later clipboard
 transcription never poses as a live sample. Correcting an existing live sample
 preserves its original provenance. A blank interval is unobserved, not failed.
 
+The bell follows the same rows: a sampling bell rings where a row turns over,
+and the clock face names it (hour, half, quarter, or another sample), each with
+its own synthesized voice. A planned block's bell follows the chime it shares a
+minute with. Voices and the mix sync in `settings.bellSounds`; master volume
+and pause stay on the device. Planner settings merge per key by edit stamp
+(`settings.settingsStamps`, newer wins, remote wins ties), so a stale device
+can't undo a deliberate change. See `apps/planner/BELLS.md`.
+
 Carillon's surface runs on two clocks' worth of color. `dayCycle.ts` has
 always interpolated the `--p-*` daydream palette across the day; it now also
 produces the `--car-*` **chrome** — the ground the instrument sits on, the text

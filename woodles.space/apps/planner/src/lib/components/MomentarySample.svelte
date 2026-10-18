@@ -9,7 +9,7 @@
 	import { cleanDetails, cleanNoticings } from '$lib/momentDetails';
 	import { thinkingAboutShelf } from '$lib/thinkingAboutShelf.svelte';
 
-	let { interval, timeLabel, bellNote, editingPast = false, onreturnnow, onsaved }: { interval: DayInterval | null; timeLabel: string; bellNote: string; editingPast?: boolean; onreturnnow?: () => void; onsaved?: () => void } = $props();
+	let { interval, timeLabel, bellNote, onbellclick, editingPast = false, onreturnnow, onsaved }: { interval: DayInterval | null; timeLabel: string; bellNote: string; onbellclick?: () => void; editingPast?: boolean; onreturnnow?: () => void; onsaved?: () => void } = $props();
 	const colors = ['#aa526b', '#8061a8', '#467f92', '#98702f', '#548068', '#6676a0'];
 	const defaults: SampleTag[] = INTERVAL_KIND_OPTIONS.filter(o => o.kind !== 'elsewhere').map((o, i) => ({ id: o.kind, name: o.label, color: colors[i], kind: o.kind }));
 	let tags = $derived(store.settings.sampleTags ?? defaults);
@@ -60,7 +60,7 @@
 	<div class="composer-grid">
 		<div class="sample-primary">
 			<div class="sampler-meta">
-				<div><p class="interval-clock">{timeLabel}</p><p class="bell-note">{bellNote}</p></div>
+				<div><p class="interval-clock">{timeLabel}</p>{#if onbellclick}<button type="button" class="bell-note bell-button" aria-label={`bell settings — ${bellNote}`} data-testid="bell-status" onclick={onbellclick}>{bellNote}</button>{:else}<p class="bell-note">{bellNote}</p>{/if}</div>
 				<span class="sample-source">momentary sample</span>
 			</div>
 			{#if editingPast}<button type="button" class="return-now" onclick={onreturnnow}>Return to now</button>{/if}
@@ -122,6 +122,8 @@
 	.sampler-meta { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 0.75rem; }
 	.interval-clock { margin: 0; color: var(--car-ink); font: clamp(1.35rem, 3vw, 2rem)/1 var(--car-counter); letter-spacing: 0.04em; }
 	.bell-note { margin: 0.3rem 0 0; color: var(--car-ink-soft); font: 0.58rem var(--car-mono); letter-spacing: 0.08em; }
+	.bell-button { display: block; border: 0; border-radius: 0.3rem; background: transparent; padding: 0.2rem 0.25rem; margin-left: -0.25rem; text-align: left; text-decoration: underline dotted; text-underline-offset: 0.25em; min-height: 1.6rem; }
+	.bell-button:hover { color: var(--car-ink); background: #ffffff60; }
 	.sample-source { border: 1px solid rgba(68, 54, 91, 0.18); border-radius: 999px; padding: 0.24rem 0.55rem; color: var(--car-ink-soft); font: 0.52rem var(--car-mono); letter-spacing: 0.11em; text-transform: uppercase; }
 	.return-now { margin-bottom: 0.65rem; border: 1px solid #44365b2b; border-radius: 0.5rem; background: #ffffff60; padding: 0.4rem 0.6rem; color: var(--car-ink); font: 0.7rem var(--car-body); cursor: pointer; }
 	.checkin-panel { min-width: 0; padding: 0.85rem; border: 1px solid var(--car-line); border-radius: 0.85rem; background: var(--car-wash); }

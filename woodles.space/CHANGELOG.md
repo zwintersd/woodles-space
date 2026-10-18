@@ -20,6 +20,21 @@ so it's not easy to forget.
 
 ## 2026-10-18
 
+- **Carillon's bell can sound different for the hour, half hour and quarters**
+  — a new ♪ bells panel in the binder (or tap the bell line on Today, which is
+  how phones get there) gives each mark its own voice: bell, lower bell, low
+  bell, glass chime, singing bowl, wood block, soft pip, the Westminster
+  quarters, or silent. one tap picks a set — classic (as before), clock face,
+  or westminster — and the hour can be counted on a low bell. bells between
+  samples, block starts, lead time and reminder sounds have their own rows; a
+  block's bell now follows the chime it shares a minute with instead of being
+  drowned out. volume and pause live on each device, a preview button turns
+  into stop while it plays, and Today names the next bell, says when the
+  browser is holding sound, and shows "rang 12:30 · half hour" afterwards.
+  under the hood the bell no longer rings late or twice: it ticks on the
+  minute, catches up after a throttled background tab, never queues sound on a
+  locked page, and settings changed on one device are no longer undone by
+  another that synced later.
 - **Carillon's open loops can recur, remind, and look back** — a loop can be a
   recurring need: closing ends one cycle and *need is back* starts the next,
   with an optional rhythm. reminders are only the ones you set — a time on a

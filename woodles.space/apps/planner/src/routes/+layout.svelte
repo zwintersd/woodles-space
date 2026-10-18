@@ -19,6 +19,8 @@
 
 	onMount(() => {
 		initSync();
+		// The clock rings bells; it also follows audio readiness and frees sound on a tap.
+		const stopClock = store.startClock();
 		// Notebook's tasks move here — a task with a date belongs where time
 		// lives. Runs once; see CONVERGENCE.md step 5.
 		const moved = importNotebookTasksOnce(store);
@@ -28,6 +30,7 @@
 				`took over ${total} ${total === 1 ? 'task' : 'tasks'} from notebook` +
 				(moved.done > 0 ? ` (${moved.done} already done)` : '');
 		}
+		return stopClock;
 	});
 
 	$effect(() => {

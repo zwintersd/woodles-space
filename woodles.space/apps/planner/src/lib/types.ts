@@ -1,3 +1,5 @@
+import type { BellVoiceId } from './bellVoices';
+
 export type Block = {
 	id: string;
 	flexible?: boolean;
@@ -139,12 +141,33 @@ export type PlannerSettings = {
 	reminderNotifications?: boolean;
 	/** Offers and ideas the person waved away. Never re-offered on any device. */
 	dismissedOffers?: string[];
+	/** Which sound rings at each kind of mark. Absent means the defaults in chimes.ts. */
+	bellSounds?: BellSoundSettings;
+	/**
+	 * When each setting was last changed on purpose, so a sync merge keeps the
+	 * newer edit per key instead of whichever device synced last.
+	 */
+	settingsStamps?: Partial<Record<string, string>>;
+};
+
+export type BellMark = 'hour' | 'half' | 'quarter' | 'sample' | 'blockStart' | 'leadTime' | 'reminder';
+
+/**
+ * Which voice rings at each mark, and how loud relative to the others —
+ * the person's mix, synced. Stored leniently: it arrives from other devices
+ * and other versions, so chimes.ts validates every field when reading.
+ */
+export type BellSoundSettings = {
+	marks?: Partial<Record<BellMark, { voice?: string; volume?: number }>>;
+	/** After the hour's sound, strike the hour on a low bell. */
+	countHours?: boolean;
+	/** Ring :00, :15, :30 and :45 even when the sampling grid doesn't land there. */
+	chimeBetweenSamples?: boolean;
 };
 
 export type Bell = {
 	id: string;
 	name: string;
-	filePath: string;
 	defaultVolume: number;
 };
 
@@ -159,6 +182,7 @@ export type BinderTab =
 	| 'week-pattern'
 	| 'schedule'
 	| 'sync'
+	| 'bells'
 	| null;
 
 // ── Carillon instrument data ─────────────────────────────────────

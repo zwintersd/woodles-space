@@ -58,3 +58,9 @@ export function toLocalInputValue(iso: string): string {
 	if (Number.isNaN(date.getTime())) return '';
 	return `${dateKey(date)}T${formatTime(date)}`;
 }
+
+/** "1:29 pm" — Carillon's clock wording, the same on every device. */
+export function clockLabel(date: Date): string {
+	const hour = date.getHours();
+	return `${hour % 12 || 12}:${padTwo(date.getMinutes())} ${hour >= 12 ? 'pm' : 'am'}`;
+}

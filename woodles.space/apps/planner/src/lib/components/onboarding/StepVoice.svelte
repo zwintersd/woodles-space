@@ -5,6 +5,7 @@
 	import { fillSlots } from '$lib/voice';
 	import type { ToneName } from '$lib/types';
 	import StepShell from './StepShell.svelte';
+	import { INTERVAL_OPTIONS } from '$lib/chimes';
 
 	const copy = STEP_COPY[5];
 
@@ -45,12 +46,12 @@
 >
 	<div class="wb-card wb-list">
 		<label>Observation interval<select bind:value={interval}>
-			{#each [...new Set([5, 10, 15, 30, 60, interval])].sort((a, b) => a - b) as minutes}<option value={minutes}>{minutes} minutes</option>{/each}
+			{#each [...new Set([...INTERVAL_OPTIONS, interval])].sort((a, b) => a - b) as minutes}<option value={minutes}>{minutes} minutes</option>{/each}
 		</select></label>
 		<p class="wb-note">Sets the interval grid in Today. You can record observations later or leave intervals blank.</p>
 		<label class="bell-toggle"><input type="checkbox" bind:checked={bells} /> Enable bells</label>
 		<div class="wb-row"><label>Quiet hours start<input type="time" bind:value={quietStart} /></label><label>Quiet hours end<input type="time" bind:value={quietEnd} /></label></div>
-		<p class="wb-note">Bells are silent during quiet hours. Browser audio may require an interaction first.</p>
+		<p class="wb-note">Bells are silent during quiet hours. Browser audio may require an interaction first. You can choose how each bell sounds later, in the binder under bells.</p>
 	</div>
 	<h2>Reminder detail</h2>
 	<div class="tone-list" role="radiogroup" aria-label="tone selection">

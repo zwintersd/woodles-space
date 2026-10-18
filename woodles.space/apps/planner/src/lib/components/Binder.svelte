@@ -1,9 +1,11 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { store } from '$lib/store.svelte';
 	import { EMPTY_STATES, BINDER_LABELS, REFRESH_SECTIONS } from '$lib/onboarding.copy';
 	import { onboarding } from '$lib/onboarding.store.svelte';
 	import YearScroll from './YearScroll.svelte';
 	import DayPlan from './DayPlan.svelte';
+	import BellSettings from './BellSettings.svelte';
 	import { syncState, connectAndHydrate, flushSync, disconnect } from '$lib/sync.svelte';
 	import type { OnboardingStep } from '$lib/types';
 
@@ -13,6 +15,7 @@
 		| 'shapes'
 		| 'week-pattern'
 		| 'schedule'
+		| 'bells'
 		| 'sync';
 	let { onopenpiles }: { onopenpiles?: () => void } = $props();
 
@@ -22,10 +25,26 @@
 		{ id: 'week-pattern', icon: '◇', label: BINDER_LABELS.weekPattern },
 		{ id: 'year-scroll',  icon: '∞', label: 'year' },
 		{ id: 'holidays',     icon: '✦', label: 'holidays' },
+		{ id: 'bells',        icon: '♪', label: 'bells' },
 		{ id: 'sync',         icon: '◎', label: 'sync' }
 	];
 
 	let passphraseInput = $state('');
+	// The bells panel can be opened from Today; focus its heading, and give focus back when it closes.
+	let bellsTitle: HTMLElement | undefined = $state();
+	let opener: HTMLElement | null = null;
+	let lastTab: string | null = null;
+	$effect(() => {
+		const tab = store.binderTab;
+		if (tab === 'bells' && lastTab !== 'bells') {
+			opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+			void tick().then(() => bellsTitle?.focus());
+		} else if (tab !== 'bells' && lastTab === 'bells') {
+			if (opener?.isConnected) opener.focus({ preventScroll: true });
+			opener = null;
+		}
+		lastTab = tab;
+	});
 	let confirmReset = $state(false);
 	let selectedRefreshSteps = $state<OnboardingStep[]>([]);
 
@@ -119,6 +138,7 @@
 	id="binder-panel"
 	class="binder-panel"
 	class:schedule={store.binderTab === 'schedule'}
+	class:bells={store.binderTab === 'bells'}
 	class:open={store.binderTab !== null}
 	aria-hidden={store.binderTab === null}
 >
@@ -190,6 +210,15 @@
 					</div>
 				{/each}
 			{/if}
+		</div>
+
+	{:else if store.binderTab === 'bells'}
+		<header class="binder-header">
+			<span class="binder-eyebrow">binder</span>
+			<span class="binder-title" tabindex="-1" bind:this={bellsTitle}>bells</span>
+		</header>
+		<div class="binder-body">
+			<BellSettings />
 		</div>
 
 	{:else if store.binderTab === 'sync'}
@@ -393,6 +422,10 @@
 
 	.binder-panel.schedule {
 		width: min(38rem, max(20rem, 34vw));
+	}
+
+	.binder-panel.bells {
+		width: min(24rem, calc(100vw - 4rem));
 	}
 
 	.binder-schedule {
@@ -761,6 +794,12 @@
 		gap: 0.75rem;
 	}
 
+	@media (prefers-reduced-motion: reduce) {
+		.binder-panel {
+			transition: none;
+		}
+	}
+
 	@media (max-width: 620px) {
 		.binder-dock {
 			top: auto;
@@ -795,7 +834,8 @@
 			width: min(320px, calc(100vw - 1rem));
 		}
 
-		.binder-panel.schedule {
+		.binder-panel.schedule,
+		.binder-panel.bells {
 			width: min(38rem, calc(100vw - 1rem));
 		}
 	}
