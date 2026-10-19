@@ -348,10 +348,23 @@
 		margin-top: 0.2rem;
 		color: var(--car-cream);
 		font-family: var(--car-display);
-		font-size: clamp(1.3rem, 2.4vw, 1.9rem);
+		font-size: clamp(1.5rem, 2.8vw, 2.2rem);
 		font-weight: 400;
-		letter-spacing: -0.04em;
+		letter-spacing: -0.01em;
 		line-height: 0.94;
+	}
+
+	/* a short leaded strip under the date, echoing the transom */
+	.day-heading h1::after {
+		display: block;
+		width: 7.5rem;
+		height: 0.32rem;
+		margin-top: 0.5rem;
+		border: 1px solid var(--car-lead);
+		background:
+			linear-gradient(180deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 60%),
+			var(--car-glass-strip);
+		content: '';
 	}
 
 
@@ -365,6 +378,7 @@
 	.print-action {
 		border: 1px solid var(--car-line);
 		border-radius: 0.8rem;
+		background: color-mix(in srgb, var(--car-panel) 60%, transparent);
 		color: var(--car-cream);
 		transition:
 			border-color 160ms ease,
@@ -406,7 +420,8 @@
 	.pile-pill:hover,
 	.print-action:hover {
 		border-color: var(--car-pink);
-		background: var(--car-wash);
+		background: color-mix(in srgb, var(--car-panel) 85%, transparent);
+		box-shadow: 0 0.35rem 1.1rem var(--car-glow-warm);
 		transform: translateY(-1px);
 	}
 
@@ -420,39 +435,55 @@
 	.optional-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: start; }
 	@media (max-width: 900px) { .optional-tools { grid-template-columns: minmax(0, 1fr); } }
 	.sample-rest { display: flex; align-items: center; gap: 0.8rem; margin-top: 1.5rem; padding: 1rem; border-radius: 0.7rem; background: var(--car-pink-wash); color: var(--car-ink-soft); font: 0.8rem/1.45 var(--car-body); }
-	.sample-rest strong { display: block; color: var(--car-ink); font: 500 1.2rem var(--car-display); }
+	.sample-rest strong { display: block; color: var(--car-ink); font: 400 1.35rem var(--car-fell); }
 	.sample-rest p { margin-top: 0.2rem; }
 	.rest-mark { display: grid; place-items: center; width: 2rem; height: 2rem; flex: none; border: 1px solid var(--car-pink-dark); border-radius: 50%; color: var(--car-pink-dark); }
 
 	.sampler,
 	.ledger-card {
-		border: 1px solid var(--car-line);
-		background:
-			linear-gradient(rgba(81, 44, 71, 0.025) 1px, transparent 1px),
-			linear-gradient(90deg, rgba(81, 44, 71, 0.025) 1px, transparent 1px),
-			var(--car-paper);
-		background-size: 18px 18px;
+		border: 1px solid var(--car-vellum-edge);
+		background: var(--car-vellum);
 		box-shadow: 0 1.25rem 3.5rem var(--car-shadow);
 		color: var(--car-ink);
+		outline: 1px solid var(--car-gilt-rule);
+		outline-offset: -6px;
 	}
 
+	/* the sampler is the page the bell opens to: a jewelled edge along
+	   its top, and a crescent moon with a star in the rounded corner */
 	.sampler {
 		position: relative;
 		overflow: clip;
 		border-radius: 1rem 1rem 2.8rem 1rem;
-		padding: 1.15rem;
+		padding: 1.4rem 1.25rem 1.25rem;
+		background:
+			linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 70%) top / 100% 0.42rem no-repeat,
+			var(--car-glass-strip) top / 100% 0.42rem no-repeat,
+			var(--car-vellum);
+		border-top: 0;
+	}
+
+	.sampler::before {
+		position: absolute;
+		top: 0.42rem;
+		right: 0;
+		left: 0;
+		height: 1px;
+		background: var(--car-lead);
+		content: '';
 	}
 
 	.sampler::after {
 		position: absolute;
-		right: -2.4rem;
-		bottom: -2.4rem;
-		width: 5.5rem;
-		height: 5.5rem;
-		border: 1px solid rgba(141, 49, 83, 0.25);
+		right: 0.95rem;
+		bottom: 0.7rem;
+		width: 1.2rem;
+		height: 1.2rem;
 		border-radius: 50%;
+		box-shadow: inset 0.32rem -0.08rem 0 0 var(--car-gilt);
 		content: '';
-		box-shadow: 0 0 0 0.7rem rgba(141, 49, 83, 0.04);
+		opacity: 0.75;
+		pointer-events: none;
 	}
 
 
@@ -539,8 +570,8 @@
 
 	.ledger-titlebar h2 {
 		margin-top: 0.2rem;
-		font-family: var(--car-display);
-		font-size: 1.55rem;
+		font-family: var(--car-fell);
+		font-size: 1.65rem;
 		font-weight: 500;
 	}
 
@@ -715,8 +746,41 @@
 	.instrument { gap: 0.8rem; }
 	.day-heading { align-items: center; }
 	.sampler { animation: settle-in 280ms ease-out both; }
-	.context-details { border: 1px solid var(--car-line); border-radius: 0.7rem; padding: 0.65rem 0.85rem; }
-	.context-details summary { cursor: pointer; font-size: 0.8rem; }
+	/* each further page is a strip of vellum with a jewel quarry for its
+	   marker, which turns as the page opens */
+	.context-details {
+		--jewel: var(--car-glass-emerald);
+		border: 1px solid var(--car-line);
+		border-radius: 0.7rem;
+		padding: 0.65rem 0.85rem;
+		background: color-mix(in srgb, var(--car-panel) 55%, transparent);
+	}
+	.context-details:nth-of-type(2) { --jewel: var(--car-glass-sapphire); }
+	.context-details:nth-of-type(3) { --jewel: var(--car-glass-amber); }
+	.context-details:nth-of-type(4) { --jewel: var(--car-glass-amethyst); }
+	.context-details summary {
+		display: flex;
+		align-items: center;
+		gap: 0.65rem;
+		cursor: pointer;
+		font-size: 0.8rem;
+		list-style: none;
+	}
+	.context-details summary::-webkit-details-marker { display: none; }
+	.context-details summary::before {
+		flex: none;
+		width: 0.58rem;
+		height: 0.58rem;
+		border: 1.5px solid var(--car-lead);
+		background:
+			linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 60%),
+			var(--jewel);
+		content: '';
+		transform: rotate(45deg);
+		transition: transform 240ms ease;
+	}
+	.context-details[open] summary::before { transform: rotate(225deg) scale(1.15); }
+	.context-details[open] { border-color: color-mix(in srgb, var(--jewel) 40%, var(--car-line)); }
 	@keyframes settle-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 	@media (max-width: 900px) {
 		.instrument-grid { grid-template-columns: minmax(0, 1fr); }
@@ -726,6 +790,7 @@
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.sampler { animation: none; }
+		.context-details summary::before { transition: none; }
 	}
 
 	@media print {

@@ -579,19 +579,30 @@ and pause stay on the device. Planner settings merge per key by edit stamp
 (`settings.settingsStamps`, newer wins, remote wins ties), so a stale device
 can't undo a deliberate change. See `apps/planner/BELLS.md`.
 
-Carillon's surface runs on two clocks' worth of color. `dayCycle.ts` has
-always interpolated the `--p-*` daydream palette across the day; it now also
-produces the `--car-*` **chrome** — the ground the instrument sits on, the text
-and hairlines drawn straight onto it, the graph rule, the corner washes — via
-`getChromeForTime()`, applied alongside the palette in `+layout.svelte`. The
-chrome has two families, paper by day and the night instrument after ~21:15,
-and the crossing between them is a switch rather than a blend: interpolating a
-light ground toward a dark one passes through a mid-tone that reads as mud
-under either text color. Hues still move freely *within* a family. The paper
-tokens (`--car-paper`, `--car-ink`, `--car-ink-soft`, `--car-pink-dark`) stay
-outside the cycle — a field sheet is paper at every hour, only the desk beneath
-it changes. `dayCycle.test.ts` samples every 15 minutes and holds the chrome to
-AA body text, AA-Large accents, and never landing on a mid-tone ground.
+Carillon's surface runs on two clocks' worth of color, dressed as parchment
+and stained glass. `dayCycle.ts` interpolates the `--p-*` palette across the
+day — vellum at every stop, with the accent moving from jewel to jewel (garnet
+dawn, emerald morning, sapphire noon, teal afternoon, amethyst evening, lapis
+dusk) — and also produces the `--car-*` **chrome**: the ground the instrument
+sits on, the text and hairlines drawn straight onto it, the star scatter, and
+two glows that are the hour's light thrown through the windows. Both come
+from `getChromeForTime()`, applied alongside the palette in `+layout.svelte`,
+which also sets `data-chrome` (`paper` or `night`, via `chromeFamily()`) for
+the few things that can't be a color token — the wordmark's font palette and
+how much parchment grain lies on the ground. The chrome has two families,
+parchment by day and midnight velvet after ~21:15, and the crossing between
+them is a switch rather than a blend: interpolating a light ground toward a
+dark one passes through a mid-tone that reads as mud under either text color.
+Hues and the window light still drift freely *within* a family. The paper
+tokens (`--car-paper`, `--car-ink`, `--car-ink-soft`, `--car-pink-dark`) and
+the glass tokens (`--car-glass-*`, `--car-lead`, `--car-gilt`) stay outside the
+cycle — a field sheet is paper and glass is glass at every hour; only the desk
+and the light change. Each jewel is deep enough to carry `--car-glass-cream`
+text, so a pane can be a label's ground (the open section tab is one). The
+wordmark is Kalnia Glaze, a color font, recolored into ruby, sapphire and
+amethyst glass with `@font-palette-values` in `tokens.css`. `dayCycle.test.ts`
+samples every 15 minutes and holds the chrome to AA body text, AA-Large
+accents, and never landing on a mid-tone ground.
 
 Each observation has the deterministic identity
 `observation-<date>@<startTime>`, stores both its observed kind/label and the

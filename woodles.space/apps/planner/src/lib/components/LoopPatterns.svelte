@@ -158,7 +158,7 @@
 <style>
 	.patterns { color: var(--car-ink); font: .8rem/1.5 var(--car-body); padding: .2rem 0 .4rem; }
 	.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-	h3 { font: 500 1.05rem/1.2 var(--car-display); margin: 1.1rem 0 .4rem; }
+	h3 { font: 400 1.15rem/1.2 var(--car-fell); margin: 1.1rem 0 .4rem; }
 	p { margin: .35rem 0; }
 	.caveat, .small, small { color: var(--car-ink-soft); }
 	.small, small { font-size: .72rem; }

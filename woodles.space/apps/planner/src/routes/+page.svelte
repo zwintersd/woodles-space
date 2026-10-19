@@ -23,12 +23,14 @@
 		label: string;
 		note: string;
 		key: string;
+		/** the pane of glass this section is set in */
+		jewel: string;
 	}> = [
-		{ id: 'today', label: 'Today', note: 'observe', key: '1' },
-		{ id: 'piles', label: 'Day piles', note: 'prepare', key: '2' },
-		{ id: 'routines', label: 'Routines', note: 'use & edit', key: '3' },
-		{ id: 'surge', label: 'Surge', note: 'capture', key: '4' },
-		{ id: 'review', label: 'Editions', note: 'review', key: '5' }
+		{ id: 'today', label: 'Today', note: 'observe', key: '1', jewel: 'ruby' },
+		{ id: 'piles', label: 'Day piles', note: 'prepare', key: '2', jewel: 'amber' },
+		{ id: 'routines', label: 'Routines', note: 'use & edit', key: '3', jewel: 'emerald' },
+		{ id: 'surge', label: 'Surge', note: 'capture', key: '4', jewel: 'sapphire' },
+		{ id: 'review', label: 'Editions', note: 'review', key: '5', jewel: 'amethyst' }
 	];
 
 	let section = $state<CarillonSection>('today');
@@ -170,6 +172,8 @@
 	<a class="skip-link" href="#carillon-main" inert={onboarding.isRefreshing}>skip to content</a>
 
 	<div class="carillon-shell" data-section={section} inert={onboarding.isRefreshing}>
+		<div class="glass-transom" aria-hidden="true"></div>
+		<div class="window-light" aria-hidden="true"><i></i><b></b></div>
 		<header class="app-header">
 			<div class="brand-lockup">
 				<a href="/" class="world-link" aria-label="Back to woodles.space">·space</a>
@@ -191,6 +195,7 @@
 						type="button"
 						class:active={section === item.id}
 						aria-current={section === item.id ? 'page' : undefined}
+						style:--jewel="var(--car-glass-{item.jewel})"
 						onclick={() => setSection(item.id)}
 					>
 						<span>{item.label}</span>
@@ -242,6 +247,7 @@
 				<span>records</span>
 				<strong>editable</strong>
 			</p>
+			<span class="footer-ornament" aria-hidden="true">✦ ☾ ✦</span>
 			<p>saved locally · optional passphrase sync</p>
 		</footer>
 
@@ -284,13 +290,19 @@
 		transform: translateY(0);
 	}
 
+	/* The desk: parchment (or, after dark, midnight velvet) with the
+	   hour's light falling on it through stained glass. The two glows are
+	   day-cycled jewels; the pools are placed like light from tall
+	   windows to the upper left and right, and a reflection lower down. */
 	.carillon-shell {
 		position: relative;
 		min-height: 100vh;
 		overflow: hidden;
 		background:
-			radial-gradient(circle at 8% 4%, var(--car-glow-warm), transparent 27rem),
-			radial-gradient(circle at 92% 22%, var(--car-glow-cool), transparent 24rem),
+			radial-gradient(ellipse 52rem 36rem at 2% -6%, var(--car-glow-warm), transparent 70%),
+			radial-gradient(ellipse 44rem 40rem at 100% 10%, var(--car-glow-cool), transparent 70%),
+			radial-gradient(ellipse 38rem 30rem at 78% 70%, var(--car-glow-warm), transparent 72%),
+			radial-gradient(ellipse 34rem 34rem at 8% 62%, var(--car-glow-cool), transparent 72%),
 			linear-gradient(
 				180deg,
 				var(--car-ground-top) 0%,
@@ -303,16 +315,102 @@
 			color 900ms linear;
 	}
 
+	/* stars and crescent moons scattered over the ground, inked in the
+	   cycle's --car-grid so they're gilt by day and candle-gold at night */
 	.carillon-shell::before {
 		position: fixed;
 		inset: 0;
-		background-image:
-			linear-gradient(var(--car-grid) 1px, transparent 1px),
-			linear-gradient(90deg, var(--car-grid) 1px, transparent 1px);
-		background-size: 2rem 2rem;
+		background-color: var(--car-grid);
 		content: '';
-		mask-image: linear-gradient(to bottom, black, transparent 75%);
+		-webkit-mask-image: var(--car-star-scatter);
+		mask-image: var(--car-star-scatter);
+		-webkit-mask-size: 220px 220px;
+		mask-size: 220px 220px;
 		pointer-events: none;
+	}
+
+	/* the grain and tea-stain mottling of old parchment */
+	.carillon-shell::after {
+		position: fixed;
+		inset: 0;
+		background-image: var(--car-parchment-grain), var(--car-parchment-mottle);
+		background-size: 240px 240px, 720px 720px;
+		content: '';
+		opacity: var(--car-grain-strength, 1);
+		pointer-events: none;
+	}
+
+	/* Light through the windows, falling on the desk: a rose window's
+	   pool of every jewel to the upper right, and three lancet beams
+	   slanting in from the upper left. Static glass; the hour's own tint
+	   is in the glows above. */
+	.window-light {
+		position: absolute;
+		top: 0;
+		right: 0;
+		left: 0;
+		height: min(150vh, 100%);
+		overflow: hidden;
+		mix-blend-mode: var(--car-window-blend);
+		opacity: var(--car-window-strength);
+		pointer-events: none;
+	}
+
+	.window-light i {
+		position: absolute;
+		top: -16rem;
+		right: -12rem;
+		width: 46rem;
+		height: 46rem;
+		border-radius: 50%;
+		background:
+			radial-gradient(circle closest-side, rgba(255, 244, 220, 0.9) 0 16%, transparent 52%),
+			conic-gradient(
+				var(--car-glass-ruby),
+				var(--car-glass-amber),
+				var(--car-glass-emerald),
+				var(--car-glass-teal),
+				var(--car-glass-sapphire),
+				var(--car-glass-amethyst),
+				var(--car-glass-rose),
+				var(--car-glass-ruby)
+			);
+		filter: blur(44px);
+	}
+
+	.window-light b {
+		position: absolute;
+		top: -10rem;
+		left: -4rem;
+		width: 30rem;
+		height: 64rem;
+		background: repeating-linear-gradient(
+			90deg,
+			var(--car-glass-ruby) 0 4.5rem,
+			transparent 4.5rem 6rem,
+			var(--car-glass-amber) 6rem 10.5rem,
+			transparent 10.5rem 12rem,
+			var(--car-glass-sapphire) 12rem 16.5rem,
+			transparent 16.5rem 30rem
+		);
+		filter: blur(30px);
+		-webkit-mask-image: linear-gradient(180deg, black 10%, transparent 80%);
+		mask-image: linear-gradient(180deg, black 10%, transparent 80%);
+		opacity: 0.7;
+		transform: rotate(-28deg);
+		transform-origin: top left;
+	}
+
+	/* a leaded transom of jewel panes across the top of the instrument */
+	.glass-transom {
+		position: relative;
+		z-index: 5;
+		height: 0.7rem;
+		border-bottom: 2px solid var(--car-lead);
+		background:
+			linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.16)),
+			var(--car-glass-strip);
+		box-shadow: 0 0.35rem 1.4rem var(--car-glow-warm);
 	}
 
 	.app-header {
@@ -325,7 +423,7 @@
 		width: min(100% - 2rem, 88rem);
 		margin: 0 auto;
 		padding: 0.85rem 0;
-		border-bottom: 1px solid var(--car-line);
+		border-bottom: 3px double color-mix(in srgb, var(--car-gilt) 60%, transparent);
 	}
 
 	.brand-lockup {
@@ -350,55 +448,94 @@
 		text-align: left;
 	}
 
+	/* a rose window: eight jewel panes held in lead, a vellum medallion,
+	   and the bell set in the middle of it in garnet */
 	.brand-bell {
 		position: relative;
 		display: block;
-		width: 1.85rem;
-		height: 1.85rem;
-		border: 1px solid var(--car-pink);
+		flex: none;
+		width: 2.4rem;
+		height: 2.4rem;
 		border-radius: 50%;
+		background:
+			radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 42%),
+			radial-gradient(
+				circle closest-side,
+				var(--car-glass-cream) 0 52%,
+				var(--car-lead) 52% 59%,
+				transparent 59%
+			),
+			repeating-conic-gradient(from 22.5deg, var(--car-lead) 0 4deg, transparent 4deg 45deg),
+			conic-gradient(
+				from 22.5deg,
+				var(--car-glass-ruby) 0 45deg,
+				var(--car-glass-amber) 45deg 90deg,
+				var(--car-glass-emerald) 90deg 135deg,
+				var(--car-glass-sapphire) 135deg 180deg,
+				var(--car-glass-amethyst) 180deg 225deg,
+				var(--car-glass-rose) 225deg 270deg,
+				var(--car-glass-teal) 270deg 315deg,
+				var(--car-glass-amber) 315deg 360deg
+			);
+		box-shadow:
+			0 0 0 2px var(--car-lead),
+			0 0 0 3.5px var(--car-gilt),
+			0 0 1.1rem var(--car-glow-warm);
+		transition: transform 600ms cubic-bezier(0.34, 1.56, 0.64, 1);
+	}
+
+	.brand:hover .brand-bell {
+		transform: rotate(45deg);
 	}
 
 	.brand-bell i {
 		position: absolute;
-		top: 0.38rem;
-		left: 0.52rem;
-		width: 0.78rem;
-		height: 0.72rem;
-		border: 1px solid var(--car-pink);
+		top: 0.66rem;
+		left: 0.92rem;
+		width: 0.56rem;
+		height: 0.56rem;
+		border: 1.5px solid var(--car-lead);
 		border-top-left-radius: 50%;
 		border-top-right-radius: 50%;
 		border-bottom: 0;
+		background: var(--car-glass-ruby);
+		transition: transform 600ms cubic-bezier(0.34, 1.56, 0.64, 1);
+	}
+
+	.brand:hover .brand-bell i {
+		transform: rotate(-45deg);
 	}
 
 	.brand-bell i::after {
 		position: absolute;
-		bottom: -0.15rem;
-		left: -0.13rem;
-		width: 1rem;
-		border-top: 1px solid var(--car-pink);
+		bottom: -0.14rem;
+		left: -0.2rem;
+		width: 0.86rem;
+		border-top: 1.5px solid var(--car-lead);
 		content: '';
 	}
 
 	.brand-bell b {
 		position: absolute;
-		bottom: 0.3rem;
-		left: 0.82rem;
+		top: 1.3rem;
+		left: 1.11rem;
 		width: 0.18rem;
 		height: 0.18rem;
 		border-radius: 50%;
-		background: var(--car-pink);
+		background: var(--car-gilt);
 	}
 
 	.brand > span:last-child {
 		display: grid;
 	}
 
+	/* the wordmark is set in glazed glass — see --carillon-glass in tokens.css */
 	.brand strong {
-		font-family: var(--car-display);
-		font-size: 1.4rem;
-		font-weight: 500;
-		letter-spacing: -0.02em;
+		font-family: var(--car-wordmark);
+		font-palette: var(--car-wordmark-palette);
+		font-size: 1.55rem;
+		font-weight: 600;
+		letter-spacing: 0.01em;
 		line-height: 1;
 	}
 
@@ -422,32 +559,69 @@
 		display: none;
 	}
 
+	/* each section is a pane of its own jewel: a quarry of it marks the
+	   tab, and the open section is set entirely in that glass, arched like
+	   a lancet and held in lead */
 	.section-nav button {
+		position: relative;
 		display: grid;
-		min-width: 5.2rem;
-		gap: 0.05rem;
-		border-radius: 0.65rem;
-		padding: 0.38rem 0.58rem;
+		grid-template-columns: auto 1fr;
+		column-gap: 0.4rem;
+		min-width: 5.4rem;
+		row-gap: 0.05rem;
+		border: 1.5px solid transparent;
+		border-radius: 1.1rem 1.1rem 0.4rem 0.4rem;
+		padding: 0.4rem 0.62rem 0.36rem;
 		color: var(--car-mist);
 		text-align: left;
 		transition:
 			background 150ms ease,
-			color 150ms ease;
+			color 150ms ease,
+			border-color 150ms ease;
 	}
 
-	.section-nav button:hover,
-	.section-nav button.active {
-		background: var(--car-wash);
+	.section-nav button::before {
+		grid-row: 1 / span 2;
+		align-self: center;
+		width: 0.48rem;
+		height: 0.48rem;
+		border: 1.5px solid var(--car-lead);
+		background:
+			linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 60%),
+			var(--jewel);
+		content: '';
+		transform: rotate(45deg);
+	}
+
+	.section-nav button:hover {
+		border-color: color-mix(in srgb, var(--jewel) 45%, transparent);
+		background: color-mix(in srgb, var(--jewel) 9%, transparent);
 		color: var(--car-cream);
 	}
 
 	.section-nav button.active {
-		box-shadow: inset 0 -1px var(--car-pink);
+		border-color: var(--car-lead);
+		background:
+			linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 48%, rgba(0, 0, 0, 0.14)),
+			var(--jewel);
+		color: var(--car-glass-cream);
+		box-shadow:
+			inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+			0 0.4rem 1.2rem color-mix(in srgb, var(--jewel) 38%, transparent);
+	}
+
+	.section-nav button.active::before {
+		border-color: var(--car-glass-cream);
+		background: var(--car-glass-cream);
 	}
 
 	.section-nav span {
 		font-family: var(--car-body);
 		font-size: 0.67rem;
+	}
+
+	.section-nav button.active span {
+		font-weight: 600;
 	}
 
 	.section-nav small {
@@ -469,6 +643,7 @@
 		gap: 0.45rem;
 		border: 1px solid var(--car-line);
 		border-radius: 999px;
+		background: color-mix(in srgb, var(--car-panel) 55%, transparent);
 		padding: 0.35rem 0.6rem;
 		color: var(--car-cream);
 		text-align: left;
@@ -477,14 +652,14 @@
 	.sync-readout > i {
 		width: 0.42rem;
 		height: 0.42rem;
-		border: 1px solid var(--car-mist);
-		border-radius: 50%;
+		border: 1.5px solid var(--car-mist);
+		transform: rotate(45deg);
 	}
 
 	.sync-readout.connected > i {
-		border-color: var(--car-sage);
-		background: var(--car-sage);
-		box-shadow: 0 0 0 0.2rem rgba(113, 207, 184, 0.1);
+		border-color: var(--car-lead);
+		background: var(--car-glass-emerald);
+		box-shadow: 0 0 0.45rem color-mix(in srgb, var(--car-glass-emerald) 55%, transparent);
 	}
 
 	.sync-readout > span {
@@ -526,7 +701,7 @@
 		width: min(100% - 2rem, 84rem);
 		margin: 0 auto;
 		padding: 0.8rem 0 1.2rem;
-		border-top: 1px solid var(--car-line);
+		border-top: 3px double color-mix(in srgb, var(--car-gilt) 55%, transparent);
 		color: var(--car-mist);
 		font-family: var(--car-mono);
 		font-size: 0.45rem;
@@ -545,13 +720,24 @@
 	}
 
 	.app-footer i {
-		width: 1.5rem;
-		height: 1px;
-		background: var(--car-line);
+		width: 0.36rem;
+		height: 0.36rem;
+		margin: 0 0.3rem;
+		border: 1px solid var(--car-lead);
+		background: var(--car-glass-amber);
+		transform: rotate(45deg);
 	}
 
-	:global(.binder-tabs) {
-		filter: saturate(0.72) brightness(0.92);
+	/* a small celestial clasp between the footer's two lines */
+	.footer-ornament {
+		color: var(--car-gilt);
+		font-family: var(--car-body);
+		font-size: 0.7rem;
+		letter-spacing: 0.3em;
+	}
+
+	.carillon-main :global(summary::marker) {
+		color: var(--car-glass-rose);
 	}
 
 	.refresh-overlay {
@@ -603,13 +789,18 @@
 		}
 
 		.section-nav button {
-			min-width: 4.55rem;
-			padding: 0.34rem 0.42rem;
+			min-width: 4.8rem;
+			padding: 0.34rem 0.46rem;
+			column-gap: 0.32rem;
 		}
 
 		.app-footer {
 			align-items: flex-start;
 			flex-direction: column;
+		}
+
+		.footer-ornament {
+			display: none;
 		}
 
 		/* The binder's panels are a desk surface, not a phone one — but new task
@@ -621,7 +812,9 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.section-nav button {
+		.section-nav button,
+		.brand-bell,
+		.brand-bell i {
 			transition: none;
 		}
 
@@ -650,7 +843,10 @@
 			background: #fff8e8;
 		}
 
-		.carillon-shell::before {
+		.carillon-shell::before,
+		.carillon-shell::after,
+		.glass-transom,
+		.window-light {
 			display: none;
 		}
 	}

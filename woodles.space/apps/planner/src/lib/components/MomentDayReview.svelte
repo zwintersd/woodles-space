@@ -35,9 +35,10 @@
 </details>
 
 <style>
-	.review { border: 1px solid var(--car-line); border-radius: .85rem; padding: .8rem 1rem; color: var(--car-cream); background: var(--car-wash); font: .8rem var(--car-body); }
+	.review { border: 1px solid var(--car-line); border-radius: .85rem; padding: .8rem 1rem; color: var(--car-cream); background: color-mix(in srgb, var(--car-panel) 55%, transparent); font: .8rem var(--car-body); }
 	.review[open] { padding-bottom: 1rem; }
 	summary { cursor: pointer; padding: .15rem 0; }
+	summary::marker { color: var(--car-glass-ruby); }
 	summary small { margin-left: .5rem; }
 	small { font-size: .7rem; opacity: .8; }
 	.changes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .5rem; margin-top: .75rem; }

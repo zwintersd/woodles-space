@@ -18,6 +18,23 @@ so it's not easy to forget.
 
 ---
 
+## 2026-10-19
+
+- **Carillon is parchment and stained glass now** — the instrument sits on
+  warm, grained parchment scattered with gilt stars and crescent moons, and
+  the hour's light falls across it through stained glass: rose and amber at
+  dawn, gilt and emerald in the morning, ruby and sapphire at noon, marigold
+  and teal in the afternoon, rose and amethyst at evening, violet and lapis at
+  dusk, drifting between them rather than jumping. a leaded transom of jewel
+  panes runs across the top; the bell sits in a little rose window; each
+  section is its own pane of glass (Today ruby, Day piles amber, Routines
+  emerald, Surge sapphire, Editions amethyst) and the open one is set in it
+  like a lancet. cards are vellum with a gilt rule inside the edge, the
+  sampler gets a jewelled top and a crescent moon, headings that are only
+  words are set in IM Fell, and the wordmark is glazed glass. still light all
+  day; after dark it turns to midnight velvet with the glass lit from behind.
+  the binder's panel has a leaded spine, and no longer peeks out when closed.
+
 ## 2026-10-18
 
 - **Carillon's bell can sound different for the hour, half hour and quarters**

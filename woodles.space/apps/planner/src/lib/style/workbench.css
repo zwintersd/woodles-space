@@ -18,7 +18,10 @@
 	margin: 0 0 0.65rem;
 }
 .workbench h1 {
-	font-size: clamp(2rem, 4vw, 3.2rem);
+	/* each section's h1 is a sentence, never a date — the almanac face */
+	font-family: var(--car-fell);
+	font-weight: 400;
+	font-size: clamp(2.1rem, 4.2vw, 3.4rem);
 }
 .workbench h2 {
 	font-size: 1.6rem;
@@ -31,6 +34,10 @@
 	text-transform: uppercase;
 	letter-spacing: 0.12em;
 	margin: 0 0 0.65rem;
+	color: var(--car-pink);
+}
+.workbench .wb-paper .wb-kicker {
+	color: var(--car-pink-dark);
 }
 .workbench .wb-grid {
 	display: grid;
@@ -41,15 +48,18 @@
 .workbench .wb-card {
 	border: 1px solid var(--car-line);
 	border-radius: 18px;
-	background: var(--car-panel);
+	background: color-mix(in srgb, var(--car-panel) 72%, transparent);
 	padding: 1.4rem;
 	margin-bottom: 1rem;
 }
 .workbench .wb-paper {
-	background: var(--car-paper);
+	border-color: var(--car-vellum-edge);
+	background: var(--car-vellum);
 	color: var(--car-ink);
 	border-radius: 5px 18px 18px 5px;
 	box-shadow: 0 8px 24px var(--car-shadow);
+	outline: 1px solid var(--car-gilt-rule);
+	outline-offset: -6px;
 }
 .workbench .wb-list {
 	display: grid;
@@ -68,7 +78,7 @@
 	cursor: pointer;
 	border: 1px solid var(--car-line);
 	border-radius: 8px;
-	background: var(--car-wash);
+	background: color-mix(in srgb, var(--car-panel) 62%, transparent);
 	color: inherit;
 	padding: 0.6rem 0.85rem;
 	font: 0.8rem var(--car-mono);

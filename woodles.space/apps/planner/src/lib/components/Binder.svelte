@@ -405,13 +405,20 @@
 		right: 44px;
 		bottom: 0;
 		width: 300px;
-		background: var(--p-surface);
-		border-left: 1px solid var(--p-border);
+		/* a leaded glass spine down the open edge, then vellum */
+		background:
+			linear-gradient(var(--car-lead), var(--car-lead)) 0.45rem 0 / 1.5px 100% no-repeat,
+			linear-gradient(90deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0)) 0 0 / 0.45rem 100% no-repeat,
+			repeating-linear-gradient(180deg, var(--car-glass-stops)) 0 0 / 0.45rem 100% no-repeat,
+			radial-gradient(ellipse 140% 100% at 60% 30%, rgba(140, 90, 30, 0) 60%, rgba(140, 90, 30, 0.08) 100%),
+			var(--p-surface);
+		border-left: 1.5px solid var(--car-lead);
 		z-index: var(--pl-z-binder);
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
-		transform: translateX(110%);
+		/* fully past the dock, so the glass spine never peeks out */
+		transform: translateX(calc(100% + 3.5rem));
 		transition: transform var(--pl-transition-medium), var(--pl-transition-palette);
 		box-shadow: -4px 0 24px var(--p-accent-soft);
 	}
@@ -441,8 +448,8 @@
 	}
 
 	.binder-header {
-		padding: 1.25rem 1.25rem 0.75rem;
-		border-bottom: 1px solid var(--p-border);
+		padding: 1.25rem 1.25rem 0.75rem 1.6rem;
+		border-bottom: 3px double var(--car-gilt-rule);
 		flex-shrink: 0;
 	}
 
@@ -468,7 +475,7 @@
 	.binder-body {
 		flex: 1;
 		overflow-y: auto;
-		padding: 0.75rem 1.25rem;
+		padding: 0.75rem 1.25rem 0.75rem 1.6rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.25rem;
