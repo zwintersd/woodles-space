@@ -6,7 +6,8 @@
 		getPaletteForTime,
 		getNamedPalette,
 		getChromeForTime,
-		getNamedChrome
+		getNamedChrome,
+		chromeFamily
 	} from '$lib/dayCycle';
 	import type { PaletteModeName } from '$lib/dayCycle';
 	import { initSync } from '$lib/sync.svelte';
@@ -41,6 +42,7 @@
 		for (const [k, v] of Object.entries({ ...palette, ...chrome })) {
 			root.style.setProperty(k, v);
 		}
+		root.dataset.chrome = chromeFamily(chrome);
 		// The document element carries the chrome too, so the page behind
 		// the app (overscroll, the area below a short view) matches the
 		// hour instead of staying stuck at midnight.
@@ -110,8 +112,12 @@
 	}
 
 	:global(body) {
-		background: var(--car-ground-bottom, #17101f);
+		background: var(--car-ground-bottom, #130d1f);
 		overflow-x: hidden;
+	}
+
+	.planner-root :global(::selection) {
+		background: color-mix(in srgb, var(--car-glass-amber) 30%, transparent);
 	}
 
 	:global(button) {

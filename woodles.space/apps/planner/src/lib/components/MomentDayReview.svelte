@@ -30,14 +30,15 @@
 			{#if moment.linkedLoopIds?.length}<small>Linked: {moment.linkedLoopIds.map(loopName).join(' · ')}</small>{/if}
 			</div><span aria-hidden="true">↗</span>
 		</button>
-	{:else}<p>{observations.length ? 'No matching moments.' : 'Saved moments will appear here.'}</p>{/each}</div>
+	{:else}<p class="empty">{observations.length ? 'No matching moments.' : 'Saved moments will appear here.'}</p>{/each}</div>
 	<small class="footnote">Only recorded answers are shown. Missing ratings are not filled in.</small>
 </details>
 
 <style>
-	.review { border: 1px solid var(--car-line); border-radius: .85rem; padding: .8rem 1rem; color: var(--car-cream); background: var(--car-wash); font: .8rem var(--car-body); }
+	.review { border: 1px solid var(--car-line); border-radius: .85rem; padding: .8rem 1rem; color: var(--car-cream); background: color-mix(in srgb, var(--car-panel) 55%, transparent); font: .8rem var(--car-body); }
 	.review[open] { padding-bottom: 1rem; }
 	summary { cursor: pointer; padding: .15rem 0; }
+	summary::marker { color: var(--car-glass-ruby); }
 	summary small { margin-left: .5rem; }
 	small { font-size: .7rem; opacity: .8; }
 	.changes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .5rem; margin-top: .75rem; }
@@ -45,6 +46,9 @@
 	.search { display: grid; gap: .35rem; margin: .8rem 0; }
 	input { min-width: 0; width: 100%; border: 1px solid var(--car-line); background: var(--car-wash); border-radius: .5rem; padding: .55rem; color: inherit; }
 	.moments { max-height: 25rem; overflow: auto; margin-top: .5rem; }
+	/* nothing yet: a moon and its stars keep the space */
+	.empty { display: flex; align-items: center; gap: .7rem; }
+	.empty::before { content: ''; flex: none; width: 2.2rem; height: 2.2rem; background: var(--car-orn-sprig) center / contain no-repeat; }
 	.moment { width: 100%; display: flex; gap: .65rem; align-items: start; padding: .65rem; border: 0; border-bottom: 1px solid var(--car-line); background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; }
 	.moment:hover { background: var(--car-wash); }
 	.moment > div { flex: 1; min-width: 0; display: grid; gap: .25rem; overflow-wrap: anywhere; }

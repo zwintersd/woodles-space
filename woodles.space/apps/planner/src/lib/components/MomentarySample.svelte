@@ -128,10 +128,10 @@
 	.return-now { margin-bottom: 0.65rem; border: 1px solid #44365b2b; border-radius: 0.5rem; background: #ffffff60; padding: 0.4rem 0.6rem; color: var(--car-ink); font: 0.7rem var(--car-body); cursor: pointer; }
 	.checkin-panel { min-width: 0; padding: 0.85rem; border: 1px solid var(--car-line); border-radius: 0.85rem; background: var(--car-wash); }
 	.checkin-panel header { margin-bottom: 0.65rem; }
-	.checkin-panel h2 { margin: 0; color: var(--car-ink); font: 500 1.35rem/1.05 var(--car-display); }
+	.checkin-panel h2 { margin: 0; color: var(--car-ink); font: 400 1.4rem/1.05 var(--car-fell); }
 	.checkin-panel header p { margin: 0.25rem 0 0; color: var(--car-ink-soft); font: 0.72rem var(--car-body); }
 	.checkin-empty { color: var(--car-ink-soft); font-size: 0.8rem; }
-	.entry-label { display: block; font: 500 clamp(1.6rem, 2.5vw, 2.2rem)/1.1 var(--car-display); margin-bottom: 0.7rem; }
+	.entry-label { display: block; font: 400 clamp(1.7rem, 2.6vw, 2.3rem)/1.1 var(--car-fell); margin-bottom: 0.7rem; }
 	textarea { display: block; width: 100%; resize: vertical; min-height: 6rem; border: 1px solid #44365b33; border-left: 4px solid var(--sample-color); border-radius: 0.65rem; background: #ffffff80; box-shadow: inset 0 2px 5px #44365b12; padding: 0.8rem; color: var(--car-ink); font: 1rem/1.5 var(--car-body); transition: border-color 180ms ease; }
 	/* The shelf, borrowed from TaskEditDrawer's composer — same chips, same
 	   colour-from-the-board so an entry reads as the same object here. */
