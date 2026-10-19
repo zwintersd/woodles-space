@@ -108,9 +108,12 @@
 			{/if}
 		</div>
 		<aside class="checkin-panel" aria-labelledby="checkin-heading">
+			<div class="glass-portrait" aria-hidden="true"><span></span></div>
+			<div class="checkin-content">
 			<header><h2 id="checkin-heading">Anything else you notice?</h2><p>Optional · touch only what matters</p></header>
 			{#if interval && draft}{#key interval.key}<MomentDetails bind:details={draft.details} bind:answers={draft.answers} bind:noticings={draft.noticings} bind:linkedLoopIds={draft.linkedLoopIds} text={draft.text} tagName={chosen?.name} date={interval.date} start={interval.startTime} previous={store.getObservationsForDate(interval.date)} onchange={() => feedback = ''} />{/key}
 			{:else}<p class="checkin-empty">Optional notes are available while recording a moment.</p>{/if}
+			</div>
 		</aside>
 	</div>
 </div>
@@ -120,19 +123,22 @@
 	.composer-grid { display: grid; grid-template-columns: minmax(0, 1.85fr) minmax(18rem, 0.95fr); gap: 1rem; align-items: start; }
 	.sample-primary { min-width: 0; }
 	.sampler-meta { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 0.75rem; }
-	.interval-clock { margin: 0; color: var(--car-ink); font: clamp(1.35rem, 3vw, 2rem)/1 var(--car-counter); letter-spacing: 0.04em; }
+	.interval-clock { margin: 0; color: var(--car-ink); font: 400 clamp(1.25rem, 2.3vw, 1.75rem)/1.15 var(--car-counter); font-variant-numeric: lining-nums tabular-nums; letter-spacing: -0.025em; }
 	.bell-note { margin: 0.3rem 0 0; color: var(--car-ink-soft); font: 0.58rem var(--car-mono); letter-spacing: 0.08em; }
 	.bell-button { display: block; border: 0; border-radius: 0.3rem; background: transparent; padding: 0.2rem 0.25rem; margin-left: -0.25rem; text-align: left; text-decoration: underline dotted; text-underline-offset: 0.25em; min-height: 1.6rem; }
 	.bell-button:hover { color: var(--car-ink); background: #ffffff60; }
-	.sample-source { border: 1px solid rgba(68, 54, 91, 0.18); border-radius: 999px; padding: 0.24rem 0.55rem; color: var(--car-ink-soft); font: 0.52rem var(--car-mono); letter-spacing: 0.11em; text-transform: uppercase; }
+	.sample-source { border-top: 1px solid var(--car-gilt-rule); border-bottom: 3px double var(--car-gilt-rule); padding: 0.35rem 0.45rem; color: var(--car-ink-soft); font: 0.56rem var(--car-mono); letter-spacing: 0.1em; text-transform: uppercase; }
 	.return-now { margin-bottom: 0.65rem; border: 1px solid #44365b2b; border-radius: 0.5rem; background: #ffffff60; padding: 0.4rem 0.6rem; color: var(--car-ink); font: 0.7rem var(--car-body); cursor: pointer; }
-	.checkin-panel { min-width: 0; padding: 0.85rem; border: 1px solid var(--car-line); border-radius: 0.85rem; background: var(--car-wash); }
+	.checkin-panel { min-width: 0; overflow: hidden; border: 1px solid #136f7c45; border-radius: 5rem 5rem 0.6rem 0.6rem; background: linear-gradient(145deg, #e6eadb, #f2eddb 75%); box-shadow: 0 4px 0 #c6c7af, inset 0 0 1.4rem #8d814315; }
+	.glass-portrait { position: relative; height: 10rem; overflow: hidden; border-bottom: 3px double #c6a86c; background: var(--car-orn-chart) right -4rem center / 20rem no-repeat, radial-gradient(ellipse at 50% 100%, #205154, #281b36 75%); }
+	.glass-portrait span { position: absolute; inset: 0.25rem 0 0; background: var(--car-orn-window) center / auto 100% no-repeat; filter: drop-shadow(0 0 0.6rem #be946f45); }
+	.checkin-content { padding: 1.1rem; }
 	.checkin-panel header { margin-bottom: 0.65rem; }
 	.checkin-panel h2 { margin: 0; color: var(--car-ink); font: 400 1.4rem/1.05 var(--car-fell); }
 	.checkin-panel header p { margin: 0.25rem 0 0; color: var(--car-ink-soft); font: 0.72rem var(--car-body); }
 	.checkin-empty { color: var(--car-ink-soft); font-size: 0.8rem; }
 	.entry-label { display: block; font: 400 clamp(1.7rem, 2.6vw, 2.3rem)/1.1 var(--car-fell); margin-bottom: 0.7rem; }
-	textarea { display: block; width: 100%; resize: vertical; min-height: 6rem; border: 1px solid #44365b33; border-left: 4px solid var(--sample-color); border-radius: 0.65rem; background: #ffffff80; box-shadow: inset 0 2px 5px #44365b12; padding: 0.8rem; color: var(--car-ink); font: 1rem/1.5 var(--car-body); transition: border-color 180ms ease; }
+	textarea { display: block; width: 100%; resize: vertical; min-height: 7.4rem; border: 1px solid #44365b33; border-left: 3px solid var(--sample-color); border-radius: 0.3rem 0.3rem 0.9rem 0.3rem; background: repeating-linear-gradient(180deg, transparent 0 calc(1.7rem - 1px), #b8862b16 calc(1.7rem - 1px) 1.7rem) left 0.75rem top 0.8rem / calc(100% - 1.5rem) 100% no-repeat, #fffaf0; box-shadow: inset 0 2px 5px #44365b0c; padding: 0.8rem; color: var(--car-ink); font: 1rem/1.7rem var(--car-body); transition: border-color 180ms ease; }
 	/* The shelf, borrowed from TaskEditDrawer's composer — same chips, same
 	   colour-from-the-board so an entry reads as the same object here. */
 	.shelf-picker { margin-top: 0.6rem; }
@@ -151,12 +157,12 @@
 	.labels-heading small { margin-left: 0.3rem; }
 	button { cursor: pointer; color: var(--car-ink); border: 1px solid #44365b2b; border-radius: 0.5rem; background: #ffffff60; padding: 0.45rem 0.6rem; font: 0.7rem var(--car-body); }
 	.labels { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-	.tag { display: inline-flex; gap: 0.4rem; align-items: center; min-height: 2.25rem; border-radius: 99px; box-shadow: 0 2px 0 #44365b22; transition: transform 140ms ease, box-shadow 140ms ease; }
-	.tag i { width: 0.7rem; height: 0.7rem; border-radius: 50%; background: var(--tag-color); flex-shrink: 0; }
+	.tag { display: inline-flex; gap: 0.5rem; align-items: center; min-height: 2.25rem; border-radius: 0.35rem 0.75rem 0.35rem 0.75rem; box-shadow: 0 2px 0 #44365b18; transition: transform 140ms ease, box-shadow 140ms ease; }
+	.tag i { width: 0.55rem; height: 0.55rem; border-radius: 1px; background: var(--tag-color); box-shadow: inset 1px 1px 0 #ffffff80, 0 0 0 1px #2a1d2e80; transform: rotate(45deg); flex-shrink: 0; }
 	.tag[aria-pressed='true'] { border-color: var(--tag-color, var(--car-ink)); box-shadow: inset 0 1px 3px #44365b33; background: #ffffffb0; transform: translateY(2px); }
 	.tag:hover:not(:disabled) { transform: translateY(-1px); }
 	button:active:not(:disabled) { transform: translateY(2px); }
-	.save { background: var(--car-ink); color: var(--car-paper); padding: 0.65rem 0.9rem; white-space: nowrap; }
+	.save { border: 1px solid #6a1831; border-radius: 0.4rem 0.4rem 0.9rem 0.4rem; background: linear-gradient(145deg, #8e2849, #65213d); box-shadow: inset 0 0 0 2px #e7ba6950, 0 3px 0 #4a1931; color: var(--car-paper); padding: 0.7rem 1.1rem; white-space: nowrap; }
 	button:disabled { opacity: 0.45; cursor: default; }
 	.label-editor { border-top: 1px dashed #44365b55; padding-top: 0.8rem; margin-top: 1rem; }
 	.label-editor p { font-size: 0.8rem; margin-bottom: 0.6rem; }
@@ -166,6 +172,6 @@
 	.editor-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 	.retired { font-size: 0.7rem; padding: 0.5rem; }
 	:focus-visible { outline: 2px solid var(--car-pink-dark); outline-offset: 3px; }
-	@media (max-width: 900px) { .composer-grid { grid-template-columns: minmax(0, 1fr); } }
+	@media (max-width: 900px) { .composer-grid { grid-template-columns: minmax(0, 1fr); } .checkin-panel { border-radius: 2.5rem 2.5rem 0.6rem 0.6rem; } .checkin-content { padding: 0.85rem; } .glass-portrait { height: 7.5rem; } .sampler-meta { gap: 0.6rem; } .sample-source { max-width: 7rem; font-size: 0.52rem; } }
 	@media (prefers-reduced-motion: reduce) { textarea, .tag { transition: none; } .tag, button:active:not(:disabled), .tag:hover:not(:disabled), .tag[aria-pressed='true'] { transform: none; } }
 </style>

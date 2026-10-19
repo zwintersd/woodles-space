@@ -169,7 +169,8 @@
 
 <section class="instrument" aria-labelledby="today-heading">
 	<header class="day-heading">
-		<div>
+		<div class="date-lockup">
+			<span class="day-seal" aria-hidden="true"></span>
 			<h1 id="today-heading">{dayOfWeekLabel(store.now)}, {shortDateLabel(store.now)}</h1>
 		</div>
 		<div class="day-actions">
@@ -187,6 +188,7 @@
 	<div class="instrument-grid">
 		<div class="moment-column">
 		<article class="sampler" data-testid="interval-sampler">
+			<div class="folio-crown" aria-hidden="true"><span></span><i></i><span></span></div>
 			{#if selectedInterval && selectedInterval.observation?.intervalStart === selectedInterval.startTime && !selectedStart}
 				<div class="sample-rest" role="status">
 					<div><small>{displayTime(selectedInterval.startTime)}–{displayTime(selectedInterval.endTime)}</small><strong>Moment saved</strong><p>Your note is in Day so far. The next prompt will appear with the next interval.</p></div>
@@ -353,16 +355,16 @@
 		line-height: 0.94;
 	}
 
-	/* a short leaded strip under the date, echoing the transom */
+	.date-lockup { display: flex; align-items: center; gap: 0.8rem; }
+	.day-seal { flex: none; width: 4.1rem; height: 3.5rem; background: var(--car-orn-moth) center / contain no-repeat; }
+	/* A quiet gilt rule lets the date breathe above the open folio. */
 	.day-heading h1::after {
 		display: block;
-		width: 7.5rem;
-		height: 0.32rem;
+		width: min(100%, 11rem);
+		height: 0.2rem;
 		margin-top: 0.5rem;
-		border: 1px solid var(--car-lead);
-		background:
-			linear-gradient(180deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 60%),
-			var(--car-glass-strip);
+		border-top: 1px solid var(--car-gilt);
+		border-bottom: 1px solid color-mix(in srgb, var(--car-gilt) 40%, transparent);
 		content: '';
 	}
 
@@ -449,45 +451,34 @@
 		outline-offset: -6px;
 	}
 
-	/* the sampler is the page the bell opens to: a jewelled edge along
-	   its top, filigree in the lower left, and a moon with its stars in
-	   the wide rounded corner */
+	/* The instrument opens like a bound folio. The glass belongs to the
+	   room; the writing surface is clear vellum with a small lunar crown. */
 	.sampler {
 		position: relative;
 		overflow: clip;
-		border-radius: 1rem 1rem 2.8rem 1rem;
-		padding: 1.4rem 1.25rem 1.25rem;
+		border-radius: 1.8rem 0.65rem 1.8rem 0.65rem;
+		padding: 0.9rem 1.6rem 1.4rem 1.9rem;
 		background:
-			linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 70%) top / 100% 0.42rem no-repeat,
-			var(--car-glass-strip) top / 100% 0.42rem no-repeat,
 			var(--car-orn-corner-bl) left bottom / 56px 56px no-repeat,
-			var(--car-orn-sprig) right 0.55rem bottom 0.4rem / 2.9rem 2.9rem no-repeat,
+			var(--car-orn-sprig) right 0.7rem bottom 0.5rem / 2.6rem 2.6rem no-repeat,
 			var(--car-vellum);
-		border-top: 0;
+		border-left: 0.5rem solid var(--car-furniture, #281b36);
+		box-shadow: 0 3px 0 #d7c6a5, 0 6px 0 #eee0c4, 0 7px 0 #baa682, 0 1.3rem 2.8rem var(--car-shadow);
 	}
 
 	.sampler::before {
 		position: absolute;
-		top: 0.42rem;
-		right: 0;
-		left: 0;
-		height: 1px;
-		background: var(--car-lead);
+		top: 1.3rem;
+		bottom: 1.3rem;
+		left: 0.35rem;
+		width: 1px;
+		background: color-mix(in srgb, var(--car-gilt) 65%, transparent);
 		content: '';
+		pointer-events: none;
 	}
-
-
-
-
-
-
-
-
-
-
-
-
-
+	.folio-crown { display: flex; align-items: center; justify-content: center; gap: 0.7rem; width: min(100%, 22rem); margin: 0 auto 0.7rem; pointer-events: none; }
+	.folio-crown span { flex: 1; height: 0.2rem; border-top: 1px solid var(--car-gilt-rule); border-bottom: 1px solid color-mix(in srgb, var(--car-gilt) 18%, transparent); }
+	.folio-crown i { width: 2.8rem; height: 2.7rem; background: var(--car-orn-bellmoon) center / contain no-repeat; }
 	/* The offer to log a sitting in Thinking About. Deliberately quiet — it is
 	   an aside to the observation, not a second thing to answer. */
 	.sitting-offer {
@@ -786,6 +777,10 @@
 		.day-heading { flex-wrap: wrap; gap: 0.6rem; }
 		.day-heading h1 { font-size: 1.4rem; }
 		.day-actions { flex-wrap: wrap; }
+		.sampler { padding: 0.75rem 1rem 1.15rem 1.15rem; border-left-width: 0.35rem; border-radius: 1.25rem 0.5rem 1.25rem 0.5rem; }
+		.day-seal { width: 3rem; height: 2.6rem; }
+		.folio-crown { width: 13rem; margin-bottom: 0.5rem; }
+		.folio-crown i { width: 2.3rem; height: 2.1rem; }
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.sampler { animation: none; }
