@@ -125,10 +125,10 @@
 </section>
 
 <style>
-	.notebook { min-width: 0; border: 1px solid var(--car-vellum-edge); border-radius: .9rem; padding: 1.1rem; background: var(--car-corners), var(--car-vellum); outline: 1px solid var(--car-gilt-rule); outline-offset: -6px; box-shadow: 0 .8rem 2.4rem var(--car-shadow); color: var(--car-ink); font: .8rem/1.45 var(--car-body); scroll-margin-top: 1rem; }
+	.notebook { min-width: 0; border: 1px solid var(--car-vellum-edge); border-top: 3px double #136f7c80; border-radius: .4rem .4rem 1rem .4rem; padding: 1.1rem; background: var(--car-vellum); box-shadow: 0 3px 0 #d7c6a5, 0 .7rem 1.8rem var(--car-shadow); color: var(--car-ink); font: .8rem/1.45 var(--car-body); scroll-margin-top: 1rem; }
 	header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 	h2 { font: 400 1.6rem/1.1 var(--car-fell); margin: .2rem 0; }
-	h2::after { content: ''; display: block; width: 8.5rem; height: .85rem; margin-top: .3rem; background: var(--car-orn-divider) left center / contain no-repeat; }
+	h2::after { content: ''; display: block; width: 3.5rem; border-bottom: 1px solid var(--car-gilt-rule); margin-top: .5rem; }
 	h3 { font: 400 1.4rem/1.2 var(--car-fell); margin: .4rem 0 .7rem; }
 	.kicker { color: var(--car-ink-soft); font: .58rem var(--car-mono); letter-spacing: .08em; }
 	.kicker::before { content: ''; display: inline-block; width: .8rem; height: .8rem; margin-right: .4rem; background: var(--car-orn-quatrefoil) center / contain no-repeat; vertical-align: -.18rem; }

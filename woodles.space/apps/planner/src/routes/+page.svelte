@@ -26,10 +26,10 @@
 		/** the pane of glass this section is set in */
 		jewel: string;
 	}> = [
-		{ id: 'today', label: 'Today', note: 'observe', key: '1', jewel: 'ruby' },
-		{ id: 'piles', label: 'Day piles', note: 'prepare', key: '2', jewel: 'amber' },
-		{ id: 'routines', label: 'Routines', note: 'use & edit', key: '3', jewel: 'emerald' },
-		{ id: 'surge', label: 'Surge', note: 'capture', key: '4', jewel: 'sapphire' },
+		{ id: 'today', label: 'Today', note: 'observe', key: '1', jewel: 'amethyst' },
+		{ id: 'piles', label: 'Day piles', note: 'prepare', key: '2', jewel: 'teal' },
+		{ id: 'routines', label: 'Routines', note: 'use & edit', key: '3', jewel: 'teal' },
+		{ id: 'surge', label: 'Surge', note: 'capture', key: '4', jewel: 'ruby' },
 		{ id: 'review', label: 'Editions', note: 'review', key: '5', jewel: 'amethyst' }
 	];
 
@@ -174,6 +174,7 @@
 	<div class="carillon-shell" data-section={section} inert={onboarding.isRefreshing}>
 		<div class="glass-transom" aria-hidden="true"></div>
 		<div class="window-light" aria-hidden="true"><i></i><b></b></div>
+		<div class="study-window" aria-hidden="true"></div>
 		<header class="app-header">
 			<div class="brand-lockup">
 				<a href="/" class="world-link" aria-label="Back to woodles.space">·space</a>
@@ -290,19 +291,15 @@
 		transform: translateY(0);
 	}
 
-	/* The desk: parchment (or, after dark, midnight velvet) with the
-	   hour's light falling on it through stained glass. The two glows are
-	   day-cycled jewels; the pools are placed like light from tall
-	   windows to the upper left and right, and a reflection lower down. */
+	/* An aubergine cabinet above the hour's writing desk. The glass casts
+	   shaped, still light, leaving the parchment sheets clear to write on. */
 	.carillon-shell {
 		position: relative;
 		min-height: 100vh;
 		overflow: hidden;
 		background:
-			radial-gradient(ellipse 52rem 36rem at 2% -6%, var(--car-glow-warm), transparent 70%),
-			radial-gradient(ellipse 44rem 40rem at 100% 10%, var(--car-glow-cool), transparent 70%),
-			radial-gradient(ellipse 38rem 30rem at 78% 70%, var(--car-glow-warm), transparent 72%),
-			radial-gradient(ellipse 34rem 34rem at 8% 62%, var(--car-glow-cool), transparent 72%),
+			radial-gradient(ellipse 30rem 42rem at 103% 13%, color-mix(in srgb, var(--car-glass-teal) 14%, transparent), transparent 75%),
+			radial-gradient(ellipse 32rem 30rem at -10% 65%, color-mix(in srgb, var(--car-glass-amethyst) 12%, transparent), transparent 75%),
 			linear-gradient(
 				180deg,
 				var(--car-ground-top) 0%,
@@ -315,17 +312,16 @@
 			color 900ms linear;
 	}
 
-	/* stars and crescent moons scattered over the ground, inked in the
-	   cycle's --car-grid so they're gilt by day and candle-gold at night */
+	/* One oversized engraved chart, cropped at the desk's edge. */
 	.carillon-shell::before {
-		position: fixed;
-		inset: 0;
-		background-color: var(--car-grid);
+		position: absolute;
+		top: 23rem;
+		left: -19rem;
+		width: 48rem;
+		height: 48rem;
+		background: var(--car-orn-chart) center / contain no-repeat;
 		content: '';
-		-webkit-mask-image: var(--car-star-scatter);
-		mask-image: var(--car-star-scatter);
-		-webkit-mask-size: 220px 220px;
-		mask-size: 220px 220px;
+		opacity: 0.2;
 		pointer-events: none;
 	}
 
@@ -340,10 +336,7 @@
 		pointer-events: none;
 	}
 
-	/* Light through the windows, falling on the desk: a rose window's
-	   pool of every jewel to the upper right, and three lancet beams
-	   slanting in from the upper left. Static glass; the hour's own tint
-	   is in the glows above. */
+	/* Recognizable mullions stay in the light, instead of a rainbow haze. */
 	.window-light {
 		position: absolute;
 		top: 0;
@@ -358,59 +351,53 @@
 
 	.window-light i {
 		position: absolute;
-		top: -16rem;
-		right: -12rem;
-		width: 46rem;
-		height: 46rem;
-		border-radius: 50%;
+		top: 5rem;
+		right: -6rem;
+		width: 30rem;
+		height: 50rem;
+		border-radius: 70% 70% 0 0;
 		background:
-			radial-gradient(circle closest-side, rgba(255, 244, 220, 0.9) 0 16%, transparent 52%),
-			conic-gradient(
-				var(--car-glass-ruby),
-				var(--car-glass-amber),
-				var(--car-glass-emerald),
-				var(--car-glass-teal),
-				var(--car-glass-sapphire),
-				var(--car-glass-amethyst),
-				var(--car-glass-rose),
-				var(--car-glass-ruby)
-			);
-		filter: blur(44px);
+			repeating-linear-gradient(0deg, transparent 0 7rem, rgba(50, 29, 55, 0.4) 7rem 7.22rem),
+			linear-gradient(90deg, var(--car-glass-teal) 0 29%, transparent 29% 31%, var(--car-glass-amethyst) 31% 68%, transparent 68% 70%, var(--car-glass-teal) 70%);
+		filter: blur(3px);
+		-webkit-mask-image: linear-gradient(180deg, black, transparent 80%);
+		mask-image: linear-gradient(180deg, black, transparent 80%);
+		opacity: 0.5;
+		transform: rotate(32deg) skewY(-12deg);
+		transform-origin: top center;
 	}
 
 	.window-light b {
 		position: absolute;
-		top: -10rem;
-		left: -4rem;
-		width: 30rem;
-		height: 64rem;
-		background: repeating-linear-gradient(
-			90deg,
-			var(--car-glass-ruby) 0 4.5rem,
-			transparent 4.5rem 6rem,
-			var(--car-glass-amber) 6rem 10.5rem,
-			transparent 10.5rem 12rem,
-			var(--car-glass-sapphire) 12rem 16.5rem,
-			transparent 16.5rem 30rem
-		);
-		filter: blur(30px);
-		-webkit-mask-image: linear-gradient(180deg, black 10%, transparent 80%);
-		mask-image: linear-gradient(180deg, black 10%, transparent 80%);
-		opacity: 0.7;
-		transform: rotate(-28deg);
-		transform-origin: top left;
+		top: 10rem;
+		left: -8rem;
+		width: 32rem;
+		height: 24rem;
+		background: radial-gradient(ellipse, color-mix(in srgb, var(--car-glass-amber) 30%, transparent), transparent 68%);
+		opacity: 0.3;
+	}
+
+	.study-window {
+		position: absolute;
+		top: 11rem;
+		right: -7rem;
+		width: 24rem;
+		height: 34rem;
+		background: var(--car-orn-window) center top / contain no-repeat;
+		opacity: 0.17;
+		pointer-events: none;
 	}
 
 	/* a leaded transom of jewel panes across the top of the instrument */
 	.glass-transom {
 		position: relative;
 		z-index: 5;
-		height: 0.7rem;
+		height: 0.45rem;
 		border-bottom: 2px solid var(--car-lead);
 		background:
 			linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.16)),
 			var(--car-glass-strip);
-		box-shadow: 0 0.35rem 1.4rem var(--car-glow-warm);
+		box-shadow: 0 1px 0 var(--car-furniture-line);
 	}
 
 	.app-header {
@@ -422,8 +409,24 @@
 		gap: clamp(1rem, 3vw, 2.4rem);
 		width: min(100% - 2rem, 88rem);
 		margin: 0 auto;
-		padding: 0.85rem 0;
-		border-bottom: 3px double color-mix(in srgb, var(--car-gilt) 60%, transparent);
+		padding: 1rem 0 0.85rem;
+		border-bottom: 3px double var(--car-furniture-line);
+		color: var(--car-furniture-ink);
+	}
+
+	.app-header::before {
+		position: absolute;
+		z-index: -1;
+		top: -0.45rem;
+		bottom: -3px;
+		left: 50%;
+		width: 100vw;
+		background:
+			radial-gradient(ellipse 25rem 20rem at 10% 0%, rgba(137, 61, 94, 0.28), transparent 75%),
+			linear-gradient(105deg, var(--car-furniture-deep), var(--car-furniture) 45%, #2e172b);
+		box-shadow: 0 0.65rem 1.75rem rgba(34, 17, 36, 0.17);
+		content: '';
+		transform: translateX(-50%);
 	}
 
 	.brand-lockup {
@@ -433,7 +436,7 @@
 	}
 
 	.world-link {
-		color: var(--car-mist);
+		color: var(--car-furniture-muted);
 		font-family: var(--car-mono);
 		font-size: 0.6rem;
 		letter-spacing: 0.13em;
@@ -444,7 +447,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.6rem;
-		color: var(--car-cream);
+		color: var(--car-furniture-ink);
 		text-align: left;
 	}
 
@@ -454,8 +457,8 @@
 		position: relative;
 		display: block;
 		flex: none;
-		width: 2.4rem;
-		height: 2.4rem;
+		width: 2.7rem;
+		height: 2.7rem;
 		border-radius: 50%;
 		background:
 			radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 42%),
@@ -490,8 +493,8 @@
 
 	.brand-bell i {
 		position: absolute;
-		top: 0.66rem;
-		left: 0.92rem;
+		top: 0.81rem;
+		left: 1.07rem;
 		width: 0.56rem;
 		height: 0.56rem;
 		border: 1.5px solid var(--car-lead);
@@ -517,8 +520,8 @@
 
 	.brand-bell b {
 		position: absolute;
-		top: 1.3rem;
-		left: 1.11rem;
+		top: 1.45rem;
+		left: 1.26rem;
 		width: 0.18rem;
 		height: 0.18rem;
 		border-radius: 50%;
@@ -532,8 +535,8 @@
 	/* the wordmark is set in glazed glass — see --carillon-glass in tokens.css */
 	.brand strong {
 		font-family: var(--car-wordmark);
-		font-palette: var(--car-wordmark-palette);
-		font-size: 1.55rem;
+		font-palette: --carillon-glass-lit;
+		font-size: 1.75rem;
 		font-weight: 600;
 		letter-spacing: 0.01em;
 		line-height: 1;
@@ -541,9 +544,9 @@
 
 	.brand small {
 		margin-top: 0.15rem;
-		color: var(--car-mist);
+		color: var(--car-furniture-muted);
 		font-family: var(--car-mono);
-		font-size: 0.43rem;
+		font-size: 0.49rem;
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
 	}
@@ -551,7 +554,7 @@
 	.section-nav {
 		display: flex;
 		justify-content: center;
-		gap: 0.2rem;
+		gap: 0.35rem;
 		scrollbar-width: none;
 	}
 
@@ -567,17 +570,30 @@
 		display: grid;
 		grid-template-columns: auto 1fr;
 		column-gap: 0.4rem;
-		min-width: 5.4rem;
+		min-width: 5.9rem;
+		min-height: 4.15rem;
 		row-gap: 0.05rem;
-		border: 1.5px solid transparent;
-		border-radius: 1.1rem 1.1rem 0.4rem 0.4rem;
-		padding: 0.4rem 0.62rem 0.36rem;
-		color: var(--car-mist);
+		align-content: end;
+		border: 1px solid var(--car-furniture-line);
+		border-radius: 3.2rem 3.2rem 0.3rem 0.3rem;
+		background: linear-gradient(180deg, color-mix(in srgb, var(--jewel) 36%, transparent), rgba(15, 8, 24, 0.35));
+		padding: 1.1rem 0.7rem 0.6rem;
+		color: var(--car-furniture-ink);
 		text-align: left;
+		box-shadow: inset 0 0 0 3px rgba(13, 9, 20, 0.45);
 		transition:
 			background 150ms ease,
 			color 150ms ease,
 			border-color 150ms ease;
+	}
+
+	.section-nav button::after {
+		position: absolute;
+		inset: 0.3rem;
+		border: 1px solid color-mix(in srgb, var(--car-furniture-line) 60%, transparent);
+		border-radius: inherit;
+		content: '';
+		pointer-events: none;
 	}
 
 	.section-nav button::before {
@@ -594,20 +610,28 @@
 	}
 
 	.section-nav button:hover {
-		border-color: color-mix(in srgb, var(--jewel) 45%, transparent);
-		background: color-mix(in srgb, var(--jewel) 9%, transparent);
-		color: var(--car-cream);
+		border-color: #dbbb7d;
+		background: color-mix(in srgb, var(--jewel) 65%, var(--car-furniture));
+		color: var(--car-furniture-ink);
+	}
+
+	.section-nav button:focus-visible,
+	.brand:focus-visible,
+	.world-link:focus-visible,
+	.sync-readout:focus-visible {
+		outline: 2px solid var(--car-furniture-ink);
+		outline-offset: 3px;
 	}
 
 	.section-nav button.active {
-		border-color: var(--car-lead);
+		border-color: #dbbb7d;
 		background:
 			linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 48%, rgba(0, 0, 0, 0.14)),
 			var(--jewel);
 		color: var(--car-glass-cream);
 		box-shadow:
-			inset 0 0 0 1px rgba(255, 255, 255, 0.22),
-			0 0.4rem 1.2rem color-mix(in srgb, var(--jewel) 38%, transparent);
+			inset 0 0 0 3px rgba(24, 11, 32, 0.45),
+			0 0.3rem 1rem color-mix(in srgb, var(--jewel) 35%, transparent);
 	}
 
 	.section-nav button.active::before {
@@ -617,7 +641,7 @@
 
 	.section-nav span {
 		font-family: var(--car-body);
-		font-size: 0.67rem;
+		font-size: 0.75rem;
 	}
 
 	.section-nav button.active span {
@@ -626,9 +650,10 @@
 
 	.section-nav small {
 		font-family: var(--car-mono);
-		font-size: 0.42rem;
+		font-size: 0.47rem;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
+		color: var(--car-furniture-muted);
 	}
 
 	.instrument-status {
@@ -641,18 +666,18 @@
 		display: flex;
 		align-items: center;
 		gap: 0.45rem;
-		border: 1px solid var(--car-line);
-		border-radius: 999px;
-		background: color-mix(in srgb, var(--car-panel) 55%, transparent);
-		padding: 0.35rem 0.6rem;
-		color: var(--car-cream);
+		border: 1px solid var(--car-furniture-line);
+		border-radius: 0.2rem;
+		background: rgba(11, 7, 19, 0.3);
+		padding: 0.45rem 0.65rem;
+		color: var(--car-furniture-ink);
 		text-align: left;
 	}
 
 	.sync-readout > i {
 		width: 0.42rem;
 		height: 0.42rem;
-		border: 1.5px solid var(--car-mist);
+		border: 1.5px solid var(--car-furniture-muted);
 		transform: rotate(45deg);
 	}
 
@@ -667,16 +692,16 @@
 	}
 
 	.sync-readout small {
-		color: var(--car-mist);
+		color: var(--car-furniture-muted);
 		font-family: var(--car-mono);
-		font-size: 0.38rem;
+		font-size: 0.45rem;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
 	}
 
 	.sync-readout strong {
 		font-family: var(--car-body);
-		font-size: 0.56rem;
+		font-size: 0.63rem;
 		font-weight: 500;
 		white-space: nowrap;
 	}
@@ -687,7 +712,7 @@
 		width: min(100% - 2rem, 84rem);
 		min-height: calc(100vh - 10rem);
 		margin: 0 auto;
-		padding: 0.85rem 0 1.5rem;
+		padding: 1.55rem 0 1.5rem;
 		outline: none;
 	}
 
@@ -706,6 +731,16 @@
 		font-family: var(--car-mono);
 		font-size: 0.45rem;
 		letter-spacing: 0.06em;
+	}
+
+	/* The ribbon spine has its own margin, clear of every field and action. */
+	@media (min-width: 641px) {
+		.carillon-main,
+		.app-footer {
+			width: min(calc(100% - 7rem), 84rem);
+			margin-left: max(1rem, calc((100% - 89rem) / 2));
+			margin-right: 6rem;
+		}
 	}
 
 	.app-footer p:first-child {
@@ -761,7 +796,7 @@
 			justify-content: flex-start;
 			overflow-x: auto;
 			padding-top: 0.45rem;
-			border-top: 1px solid var(--car-line);
+			border-top: 1px solid var(--car-furniture-line);
 		}
 
 		.instrument-status {
@@ -785,18 +820,33 @@
 		.section-nav {
 			position: sticky;
 			left: 0;
-			gap: 0.1rem;
+			gap: 0.35rem;
+			padding-bottom: 0.2rem;
 		}
 
 		.section-nav button {
-			min-width: 4.8rem;
-			padding: 0.34rem 0.46rem;
+			flex: none;
+			min-width: 6rem;
+			min-height: 3.6rem;
+			padding: 0.75rem 0.6rem 0.55rem;
 			column-gap: 0.32rem;
+		}
+
+		.study-window {
+			top: 15rem;
+			right: -11rem;
+			opacity: 0.12;
+		}
+
+		.carillon-shell::before {
+			left: -23rem;
+			opacity: 0.12;
 		}
 
 		.app-footer {
 			align-items: flex-start;
 			flex-direction: column;
+			padding-bottom: 6rem;
 		}
 
 		.footer-ornament {
@@ -846,7 +896,8 @@
 		.carillon-shell::before,
 		.carillon-shell::after,
 		.glass-transom,
-		.window-light {
+		.window-light,
+		.study-window {
 			display: none;
 		}
 	}

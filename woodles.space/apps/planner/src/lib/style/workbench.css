@@ -3,12 +3,27 @@
 	font-family: var(--car-body);
 }
 .workbench .wb-heading {
+	position: relative;
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
 	gap: 1rem;
 	margin-bottom: 1.5rem;
 	flex-wrap: wrap;
+}
+.workbench > .wb-heading {
+	padding-bottom: 1.25rem;
+	border-bottom: 1px solid var(--car-gilt-rule);
+}
+.workbench > .wb-heading::after {
+	position: absolute;
+	right: 0;
+	bottom: -0.65rem;
+	width: 3.75rem;
+	height: 1.3rem;
+	background: var(--car-orn-moth) center / contain no-repeat;
+	content: '';
+	pointer-events: none;
 }
 .workbench h1,
 .workbench h2,
@@ -25,8 +40,8 @@
 }
 .workbench h1::after {
 	display: block;
-	width: min(13rem, 100%);
-	height: 1.3rem;
+	width: min(8rem, 100%);
+	height: 0.85rem;
 	margin-top: 0.35rem;
 	background: var(--car-orn-divider) left center / contain no-repeat;
 	content: '';
@@ -62,21 +77,39 @@
 	gap: 1.4rem;
 	align-items: start;
 }
+.workbench .wb-grid > aside {
+	padding: 1.2rem;
+	border: 1px solid var(--car-furniture-line);
+	border-radius: 2rem 2rem 0.5rem 0.5rem;
+	background:
+		linear-gradient(90deg, transparent 7px, var(--car-furniture-line) 7px 8px, transparent 8px),
+		radial-gradient(ellipse at 50% 0, #3b294b, transparent 70%),
+		var(--car-furniture);
+	color: var(--car-furniture-ink);
+	box-shadow: 0 8px 24px var(--car-shadow), inset 0 0 0 4px rgba(15, 8, 24, 0.16);
+}
 .workbench .wb-card {
-	border: 1px solid var(--car-line);
-	border-radius: 18px;
-	background: color-mix(in srgb, var(--car-panel) 72%, transparent);
+	border: 1px solid var(--car-furniture-line);
+	border-radius: 8px 16px 16px 8px;
+	background: var(--car-furniture);
+	color: var(--car-furniture-ink);
 	padding: 1.4rem;
 	margin-bottom: 1rem;
 }
 .workbench .wb-paper {
 	border-color: var(--car-vellum-edge);
-	background: var(--car-corners), var(--car-vellum);
+	background:
+		linear-gradient(90deg, rgba(111, 77, 48, 0.12), transparent 1.2rem),
+		var(--car-vellum);
 	color: var(--car-ink);
-	border-radius: 5px 18px 18px 5px;
-	box-shadow: 0 8px 24px var(--car-shadow);
-	outline: 1px solid var(--car-gilt-rule);
-	outline-offset: -6px;
+	border-radius: 3px 11px 14px 3px;
+	box-shadow:
+		3px 3px 0 -1px #decda9,
+		5px 5px 0 -2px rgba(89, 62, 59, 0.7),
+		7px 7px 0 -3px #e8d8b6,
+		0 12px 28px var(--car-shadow);
+	outline: 1px solid color-mix(in srgb, var(--car-gilt) 28%, transparent);
+	outline-offset: -7px;
 }
 .workbench .wb-list {
 	display: grid;
@@ -93,21 +126,23 @@
 .workbench button,
 .workbench .wb-link {
 	cursor: pointer;
-	border: 1px solid var(--car-line);
-	border-radius: 8px;
-	background: color-mix(in srgb, var(--car-panel) 62%, transparent);
-	color: inherit;
+	border: 1px solid var(--car-furniture-line);
+	border-radius: 4px 9px 9px 4px;
+	background: var(--car-furniture);
+	color: var(--car-furniture-ink);
 	padding: 0.6rem 0.85rem;
 	font: 0.8rem var(--car-mono);
 	text-decoration: none;
 }
 .workbench button:hover {
-	background: var(--car-pink-wash);
+	background: color-mix(in srgb, var(--car-glass-amethyst) 24%, var(--car-furniture));
+	border-color: var(--car-brass);
 }
 .workbench button[aria-pressed='true'],
 .workbench .primary {
-	background: var(--car-pink);
-	color: var(--car-surge-ink);
+	background: var(--car-glass-teal);
+	color: var(--car-glass-cream);
+	border-color: var(--car-glass-teal);
 }
 .workbench button:disabled {
 	opacity: 0.4;
@@ -115,6 +150,17 @@
 }
 .workbench .wb-paper button {
 	border-color: rgba(64, 50, 71, 0.25);
+	background: rgba(64, 50, 71, 0.055);
+	color: var(--car-ink);
+}
+.workbench .wb-paper button:hover {
+	background: var(--car-pink-wash);
+}
+.workbench .wb-paper button[aria-pressed='true'],
+.workbench .wb-paper .primary {
+	background: var(--car-glass-teal);
+	color: var(--car-glass-cream);
+	border-color: var(--car-glass-teal);
 }
 .workbench .wb-actions {
 	display: flex;
@@ -135,13 +181,15 @@
 	width: 100%;
 	min-width: 0;
 	box-sizing: border-box;
-	border: 1px solid var(--car-line);
+	border: 1px solid var(--car-vellum-edge);
 	border-radius: 7px;
 	padding: 0.65rem;
 	font: inherit;
-	color: inherit;
-	background: var(--car-inset);
+	color: var(--car-ink);
+	background: var(--car-paper);
 }
+.workbench input::placeholder,
+.workbench textarea::placeholder { color: var(--car-ink-soft); opacity: 1; }
 .workbench .wb-paper input,
 .workbench .wb-paper textarea,
 .workbench .wb-paper select {
@@ -191,8 +239,11 @@
 	color: var(--car-pink-dark);
 }
 .workbench :focus-visible {
-	outline: 3px solid var(--car-pink-dark);
+	outline: 3px solid var(--car-brass);
 	outline-offset: 3px;
+}
+.workbench .wb-paper :focus-visible {
+	outline-color: var(--car-pink-dark);
 }
 .workbench .wb-strip {
 	display: flex;
@@ -219,10 +270,30 @@
 	.workbench .wb-card {
 		padding: 1rem;
 	}
+	.workbench .wb-grid > aside {
+		padding: 0.85rem 1rem;
+		border-radius: 1rem 1rem 0.4rem 0.4rem;
+	}
 	.workbench .wb-list {
 		grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 	}
 }
 
-.workbench .wb-paper .wb-card { background: rgba(64,50,71,.035); border-color: rgba(64,50,71,.2); color:var(--car-ink); }
+.workbench .wb-paper .wb-card {
+	background: rgba(64, 50, 71, 0.035);
+	border-color: rgba(64, 50, 71, 0.2);
+	color: var(--car-ink);
+	box-shadow: none;
+	outline: none;
+}
 .workbench .wb-paper .wb-row { border-color: rgba(64,50,71,.15); }
+
+@media print {
+	.workbench > .wb-heading::after { display: none; }
+	.workbench .wb-card,
+	.workbench .wb-grid > aside {
+		background: white;
+		color: #241b29;
+		box-shadow: none;
+	}
+}

@@ -40,6 +40,16 @@
 	--car-glow-warm:     rgba(150, 60, 170, 0.20);   /* window light   */
 	--car-glow-cool:     rgba(50, 80, 180, 0.18);    /* window light   */
 
+	/* The cabinet stays mulberry-dark while the hour moves across the desk.
+	   Cream labels and brass fittings have their own stable contrast. */
+	--car-furniture:       #281b36;
+	--car-furniture-deep:  #190f25;
+	--car-furniture-ink:   #f4e5c7;
+	--car-furniture-muted: #cfbdd3;
+	--car-furniture-line:  rgba(218, 179, 105, 0.48);
+	--car-peacock:         #185b60;
+	--car-mulberry:        #713b59;
+
 	/* ── Carillon paper ──────────────────────────────────────────────
 	   Field sheets, editions, ledgers. Deliberately outside the cycle:
 	   paper is paper at every hour, only the desk beneath it changes.
@@ -59,30 +69,30 @@
 	   carry cream text at AA, so a pane can be a label's ground. */
 	--car-lead:          #2a1d2e;
 	--car-gilt:          #b8862b;
-	--car-glass-ruby:     #a51f3c;
-	--car-glass-rose:     #b23a6a;
-	--car-glass-amber:    #a85d0e;
-	--car-glass-emerald:  #17704f;
-	--car-glass-teal:     #136f7c;
-	--car-glass-sapphire: #2a4c9e;
-	--car-glass-amethyst: #67389d;
+	--car-glass-ruby:     #87314a;
+	--car-glass-rose:     #914568;
+	--car-glass-amber:    #98621d;
+	--car-glass-emerald:  #276557;
+	--car-glass-teal:     #185b60;
+	--car-glass-sapphire: #344f78;
+	--car-glass-amethyst: #633e81;
 	--car-glass-cream:    #fff4dc;  /* text on a pane */
 	/* a leaded strip of panes: hard stops, a lead came between each. The
 	   stops are their own token so a strip can run either way:
 	   repeating-linear-gradient(180deg, var(--car-glass-stops)) */
 	--car-glass-stops:
 		var(--car-lead) 0 2px,
-		var(--car-glass-ruby) 2px 2.6rem,
+		var(--car-glass-amethyst) 2px 2.6rem,
 		var(--car-lead) 2.6rem calc(2.6rem + 2px),
-		var(--car-glass-amber) calc(2.6rem + 2px) 4.4rem,
+		var(--car-glass-teal) calc(2.6rem + 2px) 4.4rem,
 		var(--car-lead) 4.4rem calc(4.4rem + 2px),
-		var(--car-glass-emerald) calc(4.4rem + 2px) 7.4rem,
+		var(--car-glass-amethyst) calc(4.4rem + 2px) 7.4rem,
 		var(--car-lead) 7.4rem calc(7.4rem + 2px),
-		var(--car-glass-sapphire) calc(7.4rem + 2px) 9.6rem,
+		var(--car-glass-ruby) calc(7.4rem + 2px) 9.6rem,
 		var(--car-lead) 9.6rem calc(9.6rem + 2px),
 		var(--car-glass-amethyst) calc(9.6rem + 2px) 12.2rem,
 		var(--car-lead) 12.2rem calc(12.2rem + 2px),
-		var(--car-glass-rose) calc(12.2rem + 2px) 13.8rem,
+		var(--car-glass-amber) calc(12.2rem + 2px) 13.8rem,
 		var(--car-lead) 13.8rem calc(13.8rem + 2px),
 		var(--car-glass-teal) calc(13.8rem + 2px) 16rem;
 	--car-glass-strip: repeating-linear-gradient(90deg, var(--car-glass-stops));
@@ -94,7 +104,7 @@
 	--car-star-scatter: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cg fill='black'%3E%3Cpath d='M30 25l2.2 6.8 6.8 2.2-6.8 2.2L30 43l-2.2-6.8L21 34l6.8-2.2z'/%3E%3Cpath d='M176 145l1.2 3.8 3.8 1.2-3.8 1.2L176 155l-1.2-3.8L171 150l3.8-1.2z'/%3E%3Cpath d='M98 120l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z'/%3E%3Cpath d='M150 54a10 10 0 1 0 0 20a12.5 12.5 0 0 1 0-20z'/%3E%3Cpath d='M60 184a6 6 0 1 0 0 12a7.5 7.5 0 0 1 0-12z'/%3E%3Ccircle cx='92' cy='58' r='1.6'/%3E%3Ccircle cx='190' cy='26' r='1.2'/%3E%3Ccircle cx='40' cy='150' r='1.1'/%3E%3Ccircle cx='126' cy='196' r='1.8'/%3E%3Ccircle cx='206' cy='96' r='1.2'/%3E%3Ccircle cx='66' cy='98' r='1'/%3E%3C/g%3E%3C/svg%3E");
 	--car-parchment-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.36 0 0 0 0 0.24 0 0 0 0 0.1 0.9 0 0 0 -0.34'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
 	--car-parchment-mottle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='720' height='720'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.006' numOctaves='3' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.33 0 0 0 0 0.12 0.6 0 0 0 -0.28'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)'/%3E%3C/svg%3E");
-	--car-grain-strength: 1;
+	--car-grain-strength: 0.28;
 	/* how the window light meets the ground: by day it stains the
 	   parchment (multiply); at night it glows on the velvet (screen) */
 	--car-window-blend: multiply;
@@ -119,6 +129,9 @@
 	--car-orn-bellmoon:   url('../ornaments/bellmoon.svg');
 	--car-orn-sprig:      url('../ornaments/sprig.svg');
 	--car-orn-quatrefoil: url('../ornaments/quatrefoil.svg');
+	--car-orn-window:     url('../ornaments/celestial-window.svg');
+	--car-orn-moth:       url('../ornaments/lunar-moth.svg');
+	--car-orn-chart:      url('../ornaments/celestial-chart.svg');
 	/* corner filigree is drawn at 1 unit = 1px against the -6px gilt
 	   rule, so it's sized in px. A card wears a diagonal pair — top left
 	   always, since the binder's tabs can cover a card's right edge. */
@@ -146,7 +159,7 @@
 	--car-fell:        var(--font-fell, 'IM Fell DW Pica'), Georgia, serif;
 	--car-body:        var(--font-body, 'Lora', Georgia, serif);
 	--car-mono:        var(--font-mono, 'DM Mono', 'Courier New', monospace);
-	--car-counter:     'VT323', var(--font-mono, 'DM Mono', monospace);
+	--car-counter:     var(--font-optical, 'Fraunces'), Georgia, serif;
 
 	/* ── spacing scale ────────────────────────────────────────────── */
 	--pl-space-xs:  0.25rem;
@@ -188,7 +201,7 @@
    data-chrome from the same clock as the --car-* tokens. */
 .planner-root[data-chrome='night'] {
 	--car-wordmark-palette: --carillon-glass-lit;
-	--car-grain-strength: 0.4;
+	--car-grain-strength: 0.12;
 	--car-window-blend: screen;
 	--car-window-strength: 0.2;
 }
