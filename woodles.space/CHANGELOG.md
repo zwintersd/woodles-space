@@ -34,6 +34,13 @@ so it's not easy to forget.
   words are set in IM Fell, and the wordmark is glazed glass. still light all
   day; after dark it turns to midnight velvet with the glass lit from behind.
   the binder's panel has a leaded spine, and no longer peeks out when closed.
+- **Carillon's cards have their own drawn ornaments** — hand-drawn SVG art in
+  gilt, lead and the same jewels: filigree corners with a ruby quarry on every
+  vellum card, a crescent cradling a ruby star as the divider under card and
+  page headings (and in the footer and binder), a little stained-glass bell
+  hanging from a moon when the sampler is at rest, a moon and its stars in
+  the sampler's wide corner and wherever there's nothing yet, and a
+  four-jewel quatrefoil before the small labels.
 
 ## 2026-10-18
 

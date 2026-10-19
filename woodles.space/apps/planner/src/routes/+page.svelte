@@ -247,7 +247,7 @@
 				<span>records</span>
 				<strong>editable</strong>
 			</p>
-			<span class="footer-ornament" aria-hidden="true">✦ ☾ ✦</span>
+			<span class="footer-ornament" aria-hidden="true"></span>
 			<p>saved locally · optional passphrase sync</p>
 		</footer>
 
@@ -730,10 +730,10 @@
 
 	/* a small celestial clasp between the footer's two lines */
 	.footer-ornament {
-		color: var(--car-gilt);
-		font-family: var(--car-body);
-		font-size: 0.7rem;
-		letter-spacing: 0.3em;
+		flex: none;
+		width: 8rem;
+		height: 0.8rem;
+		background: var(--car-orn-divider) center / contain no-repeat;
 	}
 
 	.carillon-main :global(summary::marker) {

@@ -600,7 +600,15 @@ cycle — a field sheet is paper and glass is glass at every hour; only the desk
 and the light change. Each jewel is deep enough to carry `--car-glass-cream`
 text, so a pane can be a label's ground (the open section tab is one). The
 wordmark is Kalnia Glaze, a color font, recolored into ruby, sapphire and
-amethyst glass with `@font-palette-values` in `tokens.css`. `dayCycle.test.ts`
+amethyst glass with `@font-palette-values` in `tokens.css`. The card
+ornaments are SVG files in `apps/planner/src/lib/ornaments/` (corner filigree,
+a crescent-and-star divider, a stained-glass bell hung from a moon, a moon
+sprig, a quatrefoil), exposed as `--car-orn-*` tokens and laid in as
+backgrounds or pseudo-elements, so they sit under text and stay invisible to
+assistive tech. They're drawn only in gilt, lead and the glass jewels — none
+of which change with the hour — so they're plain images rather than inline SVG;
+the corner filigree is drawn 1 unit = 1px to land on the vellum's -6px gilt
+rule. `dayCycle.test.ts`
 samples every 15 minutes and holds the chrome to AA body text, AA-Large
 accents, and never landing on a mid-tone ground.
 

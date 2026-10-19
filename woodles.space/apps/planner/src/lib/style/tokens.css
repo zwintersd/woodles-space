@@ -108,6 +108,24 @@
 	--car-gilt-rule: color-mix(in srgb, var(--car-gilt) 48%, transparent);
 	--car-vellum-edge: rgba(74, 46, 30, 0.22);
 
+	/* ── Carillon ornaments ──────────────────────────────────────────
+	   SVG art in lib/ornaments, drawn in gilt, lead and the glass
+	   jewels. They only ever sit on vellum or as gilt on the ground, and
+	   neither changes colour with the hour, so they're plain images. */
+	--car-orn-corner-tl:  url('../ornaments/corner-tl.svg');
+	--car-orn-corner-bl:  url('../ornaments/corner-bl.svg');
+	--car-orn-corner-br:  url('../ornaments/corner-br.svg');
+	--car-orn-divider:    url('../ornaments/divider.svg');
+	--car-orn-bellmoon:   url('../ornaments/bellmoon.svg');
+	--car-orn-sprig:      url('../ornaments/sprig.svg');
+	--car-orn-quatrefoil: url('../ornaments/quatrefoil.svg');
+	/* corner filigree is drawn at 1 unit = 1px against the -6px gilt
+	   rule, so it's sized in px. A card wears a diagonal pair — top left
+	   always, since the binder's tabs can cover a card's right edge. */
+	--car-corners:
+		var(--car-orn-corner-tl) left top / 56px 56px no-repeat,
+		var(--car-orn-corner-br) right bottom / 56px 56px no-repeat;
+
 	/* the wordmark: Kalnia Glaze is a colour font — glazed letterforms —
 	   recoloured below into ruby, sapphire and amethyst glass in lead */
 	--car-wordmark: var(--font-glaze, 'Kalnia Glaze'), var(--font-optical, 'Fraunces'), Georgia, serif;

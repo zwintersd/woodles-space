@@ -55,9 +55,11 @@
 {/if}
 
 <style>
-	.reminders { border: 1px solid var(--car-vellum-edge); border-radius: .9rem; padding: 1rem 1.1rem; background: var(--car-vellum); outline: 1px solid var(--car-gilt-rule); outline-offset: -6px; box-shadow: 0 .8rem 2.4rem var(--car-shadow); color: var(--car-ink); font: .8rem/1.45 var(--car-body); }
+	.reminders { border: 1px solid var(--car-vellum-edge); border-radius: .9rem; padding: 1rem 1.1rem; background: var(--car-corners), var(--car-vellum); outline: 1px solid var(--car-gilt-rule); outline-offset: -6px; box-shadow: 0 .8rem 2.4rem var(--car-shadow); color: var(--car-ink); font: .8rem/1.45 var(--car-body); }
 	.kicker { margin: 0; color: var(--car-ink-soft); font: .58rem var(--car-mono); letter-spacing: .08em; }
+	.kicker::before { content: ''; display: inline-block; width: .8rem; height: .8rem; margin-right: .4rem; background: var(--car-orn-quatrefoil) center / contain no-repeat; vertical-align: -.18rem; }
 	h2 { font: 400 1.3rem/1.15 var(--car-fell); margin: .2rem 0 .4rem; }
+	h2::after { content: ''; display: block; width: 7.5rem; height: .75rem; margin-top: .3rem; background: var(--car-orn-divider) left center / contain no-repeat; }
 	article { display: grid; gap: .25rem; padding: .6rem 0; border-top: 1px solid var(--car-line); overflow-wrap: anywhere; }
 	p { margin: 0; }
 	.note { white-space: pre-wrap; }

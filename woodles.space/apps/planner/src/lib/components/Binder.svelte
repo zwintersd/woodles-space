@@ -472,6 +472,15 @@
 		letter-spacing: -0.01em;
 	}
 
+	.binder-title::after {
+		display: block;
+		width: 7rem;
+		height: 0.7rem;
+		margin-top: 0.3rem;
+		background: var(--car-orn-divider) left center / contain no-repeat;
+		content: '';
+	}
+
 	.binder-body {
 		flex: 1;
 		overflow-y: auto;

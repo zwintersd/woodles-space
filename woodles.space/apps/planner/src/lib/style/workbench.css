@@ -23,6 +23,14 @@
 	font-weight: 400;
 	font-size: clamp(2.1rem, 4.2vw, 3.4rem);
 }
+.workbench h1::after {
+	display: block;
+	width: min(13rem, 100%);
+	height: 1.3rem;
+	margin-top: 0.35rem;
+	background: var(--car-orn-divider) left center / contain no-repeat;
+	content: '';
+}
 .workbench h2 {
 	font-size: 1.6rem;
 }
@@ -35,6 +43,15 @@
 	letter-spacing: 0.12em;
 	margin: 0 0 0.65rem;
 	color: var(--car-pink);
+}
+.workbench .wb-kicker::before {
+	display: inline-block;
+	width: 0.95rem;
+	height: 0.95rem;
+	margin-right: 0.5rem;
+	background: var(--car-orn-quatrefoil) center / contain no-repeat;
+	content: '';
+	vertical-align: -0.2rem;
 }
 .workbench .wb-paper .wb-kicker {
 	color: var(--car-pink-dark);
@@ -54,7 +71,7 @@
 }
 .workbench .wb-paper {
 	border-color: var(--car-vellum-edge);
-	background: var(--car-vellum);
+	background: var(--car-corners), var(--car-vellum);
 	color: var(--car-ink);
 	border-radius: 5px 18px 18px 5px;
 	box-shadow: 0 8px 24px var(--car-shadow);

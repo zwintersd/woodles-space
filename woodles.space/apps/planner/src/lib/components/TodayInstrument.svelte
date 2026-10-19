@@ -189,7 +189,6 @@
 		<article class="sampler" data-testid="interval-sampler">
 			{#if selectedInterval && selectedInterval.observation?.intervalStart === selectedInterval.startTime && !selectedStart}
 				<div class="sample-rest" role="status">
-					<span class="rest-mark" aria-hidden="true">✓</span>
 					<div><small>{displayTime(selectedInterval.startTime)}–{displayTime(selectedInterval.endTime)}</small><strong>Moment saved</strong><p>Your note is in Day so far. The next prompt will appear with the next interval.</p></div>
 				</div>
 			{:else if selectedInterval}
@@ -437,12 +436,13 @@
 	.sample-rest { display: flex; align-items: center; gap: 0.8rem; margin-top: 1.5rem; padding: 1rem; border-radius: 0.7rem; background: var(--car-pink-wash); color: var(--car-ink-soft); font: 0.8rem/1.45 var(--car-body); }
 	.sample-rest strong { display: block; color: var(--car-ink); font: 400 1.35rem var(--car-fell); }
 	.sample-rest p { margin-top: 0.2rem; }
-	.rest-mark { display: grid; place-items: center; width: 2rem; height: 2rem; flex: none; border: 1px solid var(--car-pink-dark); border-radius: 50%; color: var(--car-pink-dark); }
+	/* at rest — between intervals or outside sampling hours — the bell hangs from its moon */
+	.sample-rest::before { content: ''; flex: none; width: 3.6rem; height: 3.6rem; background: var(--car-orn-bellmoon) center / contain no-repeat; }
 
 	.sampler,
 	.ledger-card {
 		border: 1px solid var(--car-vellum-edge);
-		background: var(--car-vellum);
+		background: var(--car-corners), var(--car-vellum);
 		box-shadow: 0 1.25rem 3.5rem var(--car-shadow);
 		color: var(--car-ink);
 		outline: 1px solid var(--car-gilt-rule);
@@ -450,7 +450,8 @@
 	}
 
 	/* the sampler is the page the bell opens to: a jewelled edge along
-	   its top, and a crescent moon with a star in the rounded corner */
+	   its top, filigree in the lower left, and a moon with its stars in
+	   the wide rounded corner */
 	.sampler {
 		position: relative;
 		overflow: clip;
@@ -459,6 +460,8 @@
 		background:
 			linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 70%) top / 100% 0.42rem no-repeat,
 			var(--car-glass-strip) top / 100% 0.42rem no-repeat,
+			var(--car-orn-corner-bl) left bottom / 56px 56px no-repeat,
+			var(--car-orn-sprig) right 0.55rem bottom 0.4rem / 2.9rem 2.9rem no-repeat,
 			var(--car-vellum);
 		border-top: 0;
 	}
@@ -471,19 +474,6 @@
 		height: 1px;
 		background: var(--car-lead);
 		content: '';
-	}
-
-	.sampler::after {
-		position: absolute;
-		right: 0.95rem;
-		bottom: 0.7rem;
-		width: 1.2rem;
-		height: 1.2rem;
-		border-radius: 50%;
-		box-shadow: inset 0.32rem -0.08rem 0 0 var(--car-gilt);
-		content: '';
-		opacity: 0.75;
-		pointer-events: none;
 	}
 
 
@@ -566,6 +556,15 @@
 	.ledger-titlebar {
 		padding: 1rem 1.1rem;
 		border-bottom: 1px solid rgba(68, 54, 91, 0.14);
+	}
+
+	.ledger-titlebar h2::after {
+		display: block;
+		width: 8.5rem;
+		height: 0.85rem;
+		margin-top: 0.3rem;
+		background: var(--car-orn-divider) left center / contain no-repeat;
+		content: '';
 	}
 
 	.ledger-titlebar h2 {
