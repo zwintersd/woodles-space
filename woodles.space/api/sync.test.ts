@@ -87,3 +87,32 @@ describe('sync — every request is password-gated (unlike public)', () => {
     });
   });
 });
+
+describe('sync — writes only what JSONB can hold', () => {
+  it('drops NULs and replaces a lone surrogate instead of failing the cast', async () => {
+    sqlMock.mockResolvedValueOnce([{ version: 1 }]);
+    const halfEmoji = '🌿'.slice(0, 1);
+    const res = await handler(
+      req({
+        method: 'POST',
+        url: 'https://x/api/sync',
+        auth: PASSPHRASE,
+        body: { app: 'homesuite', blob: { title: `fern ${halfEmoji}`, [`a\u0000b`]: 'x\u0000y', ok: '🌿' }, baseVersion: 0 }
+      })
+    );
+
+    expect(res.status).toBe(200);
+    const payload = sqlMock.mock.calls[0][2] as string;
+    expect(payload).not.toMatch(/\\u(0000|d[89a-f])/i);
+    expect(JSON.parse(payload)).toEqual({ title: 'fern \uFFFD', ab: 'xy', ok: '🌿' });
+  });
+
+  it('leaves a clean blob exactly as sent', async () => {
+    sqlMock.mockResolvedValueOnce([{ version: 1 }]);
+    const blob = { title: 'fern 🌿', note: 'a literal \\u0000 stays' };
+    await handler(req({ method: 'POST', url: 'https://x/api/sync', auth: PASSPHRASE, body: { app: 'homesuite', blob, baseVersion: 0 } }));
+
+    expect(sqlMock.mock.calls[0][2]).toBe(JSON.stringify(blob));
+  });
+});
+

@@ -1403,7 +1403,10 @@ if the version still matches what you read, and answers
 `409 { conflict, server }` when the server moved first. auth is one passphrase,
 sent as `Authorization: Bearer …`. the server never stores it — only its
 SHA-256, compared in constant time against the `SYNC_PASS_HASH` env var.
-`DATABASE_URL` comes from the Neon integration.
+`DATABASE_URL` comes from the Neon integration. both write paths go through
+`jsonbText` in `api/_lib.ts`, which drops NULs and replaces lone surrogates —
+the two things `JSON.stringify` emits that the `::jsonb` cast rejects. a 500
+answers `{ message }`, and the client's error carries it.
 
 **`packages/sync` (`@woodles/sync`)** — the client half. `pull(app)` and
 `push(app, blob, baseVersion)` wrap the endpoint; `createSyncedStore(adapter)`
