@@ -49,7 +49,7 @@ import { buildCommitments } from './commitments';
 import { buildSessions } from './sessions';
 import { thinkingAboutShelf } from './thinkingAboutShelf.svelte';
 import { dateKey, nowMinutes, uid, timeToMinutes } from './utils';
-import { after, getBell, installAudioUnlock, levelFor, playNotes, registryNotes, voiceWithStrikes, watchAudioReadiness, watchSounding, type AudioReadiness, type PlayResult } from './bells';
+import { after, getBell, installAudioUnlock, levelFor, playNotes, registryNotes, voiceWithStrikes, watchAudioReadiness, watchSounding, type AudioReadiness, type PlayResult, type SoundKind } from './bells';
 import {
 	BELL_PRESETS, CHIME_GRACE_MINUTES, CLOCK_MARKS, DEFAULT_BELL_VOLUME, audible, bellMinuteClaimed, bellsResting, claimBellMinute,
 	cleanVolume, countsHours, dueChime, markReminderRung, markSound, reminderRung, startOfMinute, type ChimeEvent
@@ -86,6 +86,16 @@ function save<T>(key: string, value: T): void {
 
 const BELL_VOLUME_KEY = 'planner.bellVolume.v1';
 const BELL_PAUSE_KEY = 'planner.bellPause.v1';
+
+/**
+ * Deciding, playing and claiming a bell is one step across every tab on the
+ * device: two tabs whose clocks tick in the same instant must not both ring.
+ * Where Web Locks are missing the step simply runs (a rare double ring).
+ */
+function withBellLock(run: () => Promise<void>): Promise<void> {
+	const locks = typeof navigator !== 'undefined' ? (navigator as Navigator & { locks?: LockManager }).locks : undefined;
+	return locks?.request ? locks.request('carillon-bell', run).then(() => undefined) : run();
+}
 
 function loadPause(): string | null {
 	const value = load<unknown>(BELL_PAUSE_KEY, null);
@@ -1291,11 +1301,18 @@ export class PlannerStore {
 
 	// ── settings + persistence ─────────────────────────────────────
 
-	/** Every deliberate change stamps its keys, so sync keeps the newer edit per setting. */
+	/**
+	 * Every change stamps the keys whose value actually changed, so sync keeps
+	 * the newer edit per setting. A form that re-saves values it read earlier
+	 * (onboarding's steps) must not stamp them as new.
+	 */
 	updateSettings(patch: Partial<PlannerSettings>): void {
 		const stampedAt = new Date().toISOString();
 		const stamps = { ...(this.settings.settingsStamps ?? {}) };
-		for (const key of Object.keys(patch)) if (key !== 'settingsStamps') stamps[key] = stampedAt;
+		const current = this.settings as Record<string, unknown>;
+		for (const [key, value] of Object.entries(patch)) {
+			if (key !== 'settingsStamps' && JSON.stringify(current[key]) !== JSON.stringify(value)) stamps[key] = stampedAt;
+		}
 		this.settings = { ...this.settings, ...patch, settingsStamps: stamps };
 		save('planner.settings.v1', this.settings);
 	}
@@ -1404,12 +1421,21 @@ export class PlannerStore {
 	bellPausedUntil = $state<string | null>(loadPause());
 	/** Whether the browser is letting this page make sound yet. */
 	audioReadiness = $state<AudioReadiness>('suspended');
-	bellSounding = $state(false);
+	/** What is sounding now — a preview, an automatic bell — or null. */
+	bellSounding = $state<SoundKind | null>(null);
+	/** Bell runs in this tab happen one after another, never interleaved. */
+	#ringing: Promise<void> = Promise.resolve();
 
 	tick(now: Date = new Date()): void {
 		this.now = now;
 		this.#deliverReminders();
-		void this.#ringDueBells();
+		// A focus and a visibility tick can land together; the second waits for the first.
+		this.#ringing = this.#ringing.then(() => withBellLock(() => this.#ringDueBells(now))).catch(() => {});
+	}
+
+	/** Resolves once every bell this tab has started deciding on is decided. */
+	bellsSettled(): Promise<void> {
+		return this.#ringing;
 	}
 
 	pausedUntil(): Date | null {
@@ -1423,8 +1449,7 @@ export class PlannerStore {
 	 * are written only once the sound was actually scheduled, so a tab the
 	 * browser is still holding never takes a bell from one that can play.
 	 */
-	async #ringDueBells(): Promise<void> {
-		const now = this.now;
+	async #ringDueBells(now: Date): Promise<void> {
 		const event = dueChime({ lastChecked: this.#lastChimeCheck, now, settings: this.settings, blocksFor: date => this.getBlocksForDate(date), pausedUntil: this.pausedUntil() });
 		this.#lastChimeCheck = now;
 		const chime = event && !bellMinuteClaimed(event.at) ? this.chimeNotes(event) : [];
@@ -1553,7 +1578,7 @@ export class PlannerStore {
 		window.addEventListener('focus', wake);
 		window.addEventListener('storage', storage);
 		const stopReadiness = watchAudioReadiness(state => { this.audioReadiness = state; });
-		const stopSounding = watchSounding(sounding => { this.bellSounding = sounding; });
+		const stopSounding = watchSounding(kind => { this.bellSounding = kind; });
 		const stopUnlock = installAudioUnlock(() => this.settings.bellsEnabled === true);
 		return () => {
 			clearTimeout(timer);

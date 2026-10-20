@@ -89,11 +89,14 @@ test('pause and stop on this device; previews follow the sound', async ({ page }
 	await panel.getByRole('button', { name: 'westminster' }).click();
 	await panel.getByRole('button', { name: 'play on the hour' }).click();
 	await expect(panel.getByRole('button', { name: 'stop on the hour' })).toBeVisible();
-	await expect(panel.getByRole('button', { name: 'stop sound' })).toBeVisible();
+	await expect(panel.getByRole('button', { name: 'stop sound' })).toHaveAttribute('aria-disabled', 'false');
 	expect((await bellLog(page)).oscillators.length).toBe(4 * 4 * 6);
 	await page.keyboard.press('Escape');
 	await expect(panel.getByRole('button', { name: 'play on the hour' })).toBeVisible();
-	await expect(panel.getByRole('button', { name: 'stop sound' })).toHaveCount(0);
+	// Escape stopped the bell and nothing else: the panel is still open.
+	await expect(panel.getByRole('button', { name: 'stop sound' })).toHaveAttribute('aria-disabled', 'true');
+	await page.keyboard.press('Escape');
+	await expect(panel).toHaveCount(0);
 });
 
 test('the panel is reachable, readable and accessible on a phone', async ({ page }, testInfo) => {
@@ -115,4 +118,57 @@ test('the panel is reachable, readable and accessible on a phone', async ({ page
 	const serious = results.violations.filter(violation => violation.impact === 'serious' || violation.impact === 'critical');
 	expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
 	await page.screenshot({ path: testInfo.outputPath('bells-panel-phone-open.png'), fullPage: false });
+});
+
+test('Escape while a bell sounds stops only the bell, and other panels keep their fields’ Escape', async ({ page }) => {
+	await open(page, { settings: { bellSounds: { marks: { hour: { voice: 'westminster' } } } } });
+	// Make it 12:59:30 so the next minute is an hour.
+	await page.clock.runFor(30 * 60_000);
+	await page.locator('body').click({ position: { x: 5, y: 5 } });
+	await page.getByTestId('binder-add-task').click();
+	await page.getByLabel('Task title').fill('call the dentist');
+	await minutes(page, 1);
+	await expect.poll(async () => (await bellLog(page)).bells.map(bell => bell.mark).at(-1)).toBe('hour');
+	await page.keyboard.press('Escape');
+	// The composer and its draft are still there.
+	await expect(page.locator('.ted-sheet')).toHaveClass(/open/);
+	await expect(page.getByLabel('Task title')).toHaveValue('call the dentist');
+	await page.keyboard.press('Escape');
+	await expect(page.locator('.ted-sheet')).not.toHaveClass(/open/);
+	// A field in another panel keeps its own Escape; the binder stays open.
+	await page.getByRole('button', { name: 'sync', exact: true }).click();
+	await page.locator('#sync-pass').focus();
+	await page.keyboard.press('Escape');
+	await expect(page.locator('#binder-panel')).toHaveClass(/open/);
+});
+
+test('switching from bells to another tab keeps focus there; closing hands it back', async ({ page }) => {
+	await open(page);
+	await bellStatus(page).click();
+	await expect(page.locator('#binder-panel .binder-title')).toBeFocused();
+	const syncTab = page.getByRole('button', { name: 'sync', exact: true });
+	await syncTab.focus();
+	await page.keyboard.press('Enter');
+	await expect(page.locator('#binder-panel')).toContainText('passphrase');
+	await expect(syncTab).toBeFocused();
+	await page.getByRole('button', { name: 'bells', exact: true }).click();
+	await page.getByRole('button', { name: 'close bells' }).click();
+	await expect(page.locator('#binder-panel')).not.toHaveClass(/open/);
+});
+
+test('on a phone, the bell line stays after saving a moment and the panel closes with a tap', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await open(page);
+	const sampler = page.getByTestId('interval-sampler');
+	await sampler.getByLabel('What’s happening now?', { exact: true }).fill('Making tea');
+	await sampler.getByRole('button', { name: 'Save moment', exact: true }).click();
+	await expect(sampler.getByText('Moment saved')).toBeVisible();
+	await bellStatus(page).click();
+	await expect(page.getByTestId('bell-settings')).toBeVisible();
+	const close = page.getByRole('button', { name: 'close bells' });
+	const box = await close.boundingBox();
+	expect(box!.width).toBeGreaterThanOrEqual(24);
+	await close.click();
+	await expect(page.locator('#binder-panel')).not.toHaveClass(/open/);
+	await expect(bellStatus(page)).toBeFocused();
 });

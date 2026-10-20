@@ -576,8 +576,9 @@ and the clock face names it (hour, half, quarter, or another sample), each with
 its own synthesized voice. A planned block's bell follows the chime it shares a
 minute with. Voices and the mix sync in `settings.bellSounds`; master volume
 and pause stay on the device. Planner settings merge per key by edit stamp
-(`settings.settingsStamps`, newer wins, remote wins ties), so a stale device
-can't undo a deliberate change. See `apps/planner/BELLS.md`.
+(`settings.settingsStamps`, stamped only on a real change, newer wins — a newer
+clear included — remote wins ties, far-future stamps ignored), so a stale
+device can't undo a deliberate change. See `apps/planner/BELLS.md`.
 
 Carillon's surface runs on two clocks' worth of color, dressed as parchment
 and stained glass. `dayCycle.ts` interpolates the `--p-*` palette across the
@@ -1375,8 +1376,9 @@ owns the version bookkeeping. Ordinary adapters keep the "ask before clobber"
 decision — `onConflict` returns `mine`, `theirs`, or `cancel`. An append-like
 adapter may instead provide a deterministic `merge(local, remote)`: hydration
 applies and, when needed, flushes the merged blob; a compare-and-swap conflict
-merges against the server snapshot, adopts that returned version, and retries
-the push once. The active passphrase lives in module memory, while
+re-reads local state (so an edit made while the push was in flight isn't
+dropped), merges it against the server snapshot, adopts that returned version,
+and retries the push once. The active passphrase lives in module memory, while
 `createAppSync` also caches it under the shared `woodles_sync_passphrase`
 localStorage key so apps can reconnect after a reload; disconnect removes that
 bearer credential. the last-seen version is cached in localStorage too.

@@ -126,13 +126,9 @@
 		}
 
 		const target = event.target as HTMLElement | null;
-		// Escape stops a sounding bell first, then closes the binder — even from a field inside it.
-		if (event.key === 'Escape' && store.bellSounding) {
-			stopBells();
-			event.preventDefault();
-			return;
-		}
-		if (event.key === 'Escape' && store.binderTab !== null && target?.closest('#binder-panel')) {
+		// The bells panel is all selects and sliders; Escape from one of them still closes it.
+		// Other panels keep their fields' Escape (DayPlan's draft would be lost).
+		if (event.key === 'Escape' && store.binderTab === 'bells' && target?.closest('[data-testid="bell-settings"]')) {
 			store.closeBinder();
 			event.preventDefault();
 			return;
@@ -156,6 +152,18 @@
 		}
 	}
 
+	/**
+	 * While a bell sounds, Escape only stops it. Caught on the way down, so no
+	 * other Escape handler (the new-task composer's discard, a panel close)
+	 * also acts on the same key press.
+	 */
+	function stopBellOnEscape(event: KeyboardEvent): void {
+		if (event.key !== 'Escape' || !store.bellSounding) return;
+		stopBells();
+		event.preventDefault();
+		event.stopImmediatePropagation();
+	}
+
 	let syncLabel = $derived.by(() => {
 		if (!syncState.connected) return 'local only';
 		if (syncState.syncing) return 'syncing';
@@ -164,7 +172,7 @@
 	});
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} onkeydowncapture={stopBellOnEscape} />
 
 {#if !store.settings.onboardingComplete}
 	<Onboarding />

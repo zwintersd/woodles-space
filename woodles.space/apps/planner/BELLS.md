@@ -40,7 +40,10 @@ status line opens it (the binder tabs are hidden on phones).
 - one ring per minute per device: `planner.bellRungMinute.v1` holds the last
   minute rung (as an instant, so a fall-back hour is still two minutes). it is
   written only after the sound was scheduled, so a tab the browser is holding
-  never takes a bell from one that can play.
+  never takes a bell from one that can play. deciding, playing and claiming run
+  under a Web Lock (`carillon-bell`), so two tabs ticking in the same instant
+  ring once; within a tab, bell runs are queued, so a focus tick and a
+  visibility tick never double a reminder.
 
 ## how it sounds
 
@@ -52,10 +55,15 @@ status line opens it (the binder tabs are hidden on phones).
   a locked one's clock stands still and would release everything at once on
   the first tap. a context that wakes within half a second plays; otherwise the
   bell is let go and Today says "tap to let it sound".
-- one sequence at a time: a new bell or preview fades the last over ~80 ms.
-  Escape (or "stop sound") fades whatever is sounding.
+- one sequence at a time. a preview fades whatever is sounding; an automatic
+  bell fades a preview but waits for another automatic bell to finish, so a
+  reminder never cuts a counted hour short. Escape (or "stop sound") fades
+  whatever is sounding. there is no compressor on the output — every voice
+  stays well under full scale, and a compressor's makeup gain would make every
+  bell louder than the original.
 - gesture listeners stay for the life of the page, because iOS suspends the
-  context after calls and backgrounding. on iPhone bells follow the silent
+  context after calls and backgrounding. turning bells on unlocks audio from
+  that same click. on iPhone bells follow the silent
   switch and only ring while Carillon is open.
 
 ## what syncs
@@ -65,11 +73,17 @@ status line opens it (the binder tabs are hidden on phones).
   garbled times fall back to defaults when read and are never rewritten.
 - master volume (`planner.bellVolume.v1`) and pause (`planner.bellPause.v1`) stay
   on the device; tabs on the device follow each other through `storage` events.
-- settings now merge per key: `updateSettings` stamps every key it changes in
-  `settings.settingsStamps`, and `mergeSettings` keeps the newer stamp. ties and
-  unstamped keys (older clients) keep the old rule, remote wins. this is what
-  stops a stale laptop from switching bells back on after the phone turned them
-  off.
+- settings now merge per key: `updateSettings` stamps a key in
+  `settings.settingsStamps` only when its value changed (a setup step re-sending
+  every field claims nothing), and `mergeSettings` keeps the newer stamp. a
+  newer remote stamp on a missing key is a clear, and clears locally. ties and
+  unstamped keys (older clients) keep the old rule, remote wins. a stamp more
+  than a day ahead of this device's clock counts as never stamped, so one
+  device with a wrong clock can't win every key forever. this is what stops a
+  stale laptop from switching bells back on after the phone turned them off.
+- a push that loses the compare-and-swap merges the device's *current* state,
+  re-read, with the server's — so a voice picked while the push was in flight
+  survives (`packages/sync`, every app with a `merge`).
 
 ## defaults
 

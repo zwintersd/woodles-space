@@ -33,12 +33,19 @@ describe('the clock rings bells', () => {
 		vi.useRealTimers();
 	});
 
-	it('stamps every deliberate settings change for sync', () => {
+	it('stamps only settings whose value changed, so re-saving a stale form claims nothing', () => {
 		const store = fresh();
 		vi.setSystemTime(at(15, 0));
-		store.updateSettings({ tone: 'wry' });
+		const before = store.settings.settingsStamps?.bellsEnabled;
+		// A setup step re-sends every field it shows; only the tone actually changed.
+		store.updateSettings({ tone: 'wry', bellsEnabled: true, samplingIntervalMinutes: 15, quietHoursStart: '22:00', quietHoursEnd: '07:00' });
 		expect(store.settings.settingsStamps?.tone).toBe(at(15, 0).toISOString());
+		expect(store.settings.settingsStamps?.bellsEnabled).toBe(before);
 		expect(new PlannerStore().settings.settingsStamps?.tone).toBe(at(15, 0).toISOString());
+		store.updateSettings({ bellSounds: { marks: { hour: { voice: 'bowl' } } } });
+		vi.setSystemTime(at(15, 5));
+		store.updateSettings({ bellSounds: { marks: { hour: { voice: 'bowl' } } } });
+		expect(store.settings.settingsStamps?.bellSounds).toBe(at(15, 0).toISOString());
 	});
 
 	it('rings the classic bell by default, and a preset’s voices once chosen', async () => {
@@ -145,5 +152,36 @@ describe('the clock rings bells', () => {
 		expect(context.oscillators).toHaveLength(2 * 4 * 6);
 		store.setMarkSound('sample', { voice: 'silent' });
 		await expect(store.previewMark('sample')).resolves.toBe('silent');
+	});
+
+	it('lets only one of two tabs ticking in the same instant ring, under the device lock', async () => {
+		// A minimal Web Locks: one holder per name at a time, the rest wait their turn.
+		const queues = new Map<string, Promise<unknown>>();
+		vi.stubGlobal('navigator', { ...navigator, locks: { request: (name: string, run: () => Promise<unknown>) => {
+			const next = (queues.get(name) ?? Promise.resolve()).then(run);
+			queues.set(name, next.catch(() => {}));
+			return next;
+		} } });
+		const first = fresh();
+		const second = new PlannerStore();
+		first.tick(at(15, 0, 0));
+		second.tick(at(15, 0, 0));
+		await first.bellsSettled(); await second.bellsSettled(); await settle();
+		expect(heard).toHaveLength(1);
+		expect(context.oscillators).toHaveLength(2);
+		vi.unstubAllGlobals();
+	});
+
+	it('decides one bell at a time in a tab, so a focus and a visibility tick never double a reminder', async () => {
+		const store = fresh();
+		store.setMarkSound('reminder', { voice: 'pip' });
+		const loop = store.createOpenLoop('Reply to Mom')!;
+		store.createLoopReminder(loop.id, at(14, 59, 45).toISOString());
+		store.tick(at(15, 0, 10));
+		store.tick(at(15, 0, 10));
+		await store.bellsSettled(); await settle();
+		expect(heard.map(bell => bell.mark)).toEqual(['hour']);
+		// The hour (2 notes) and the reminder pip after it, once.
+		expect(context.oscillators.map(oscillator => oscillator.frequency.events[0].value)).toEqual([783.99, 987.77, 1046.5]);
 	});
 });
