@@ -31,6 +31,30 @@ defaults to `'woodles_sync_passphrase'`. the `SyncState` class itself stays in e
 app's `.svelte.ts` so `$state` compiles under the app's Svelte plugin rather than
 in the package.
 
+## three-way sync merge
+**Status:** done
+**Copies:** `packages/sync/src/threeWay.ts` (`@woodles/sync`)
+**State:** consolidated
+**Notes:** HomeSuite built `canonical`, `fingerprint` and the per-item
+three-way merge for its suite sync; Carillon needed the same to make deletes
+stick, so the pure half moved into `@woodles/sync` as `mergeKeyed` /
+`mergeRecords` and HomeSuite imports it unchanged. each app passes its own
+resolver for an item both sides changed — HomeSuite the later `updatedAt`,
+Carillon its per-record rules.
+
+## sync base keeping
+**Status:** candidate
+**Copies:** `apps/{homesuite,planner}/src/lib/sync.svelte.ts`
+**State:** minor variation
+**Notes:** the glue around a three-way merge: remember the last blob read or
+written in an operation, save its fingerprints as the base only when the
+server took it, clear the base on disconnect, `pushIfChanged` on the way out.
+Carillon's adds what an in-memory store needs and HomeSuite's doesn't — it
+reads its owning apps' storage fresh on every sync: a follow-up push queued
+behind a running operation, a Web Lock across tabs, catching up with other
+tabs before a read, and holding the base back over a failed save. extract when
+a third app keeps a base, or when HomeSuite's grows the same guards.
+
 ## text / HTML utilities
 **Status:** done
 **Copies:** `packages/text` (`@woodles/text`)

@@ -15,6 +15,7 @@
 export * from './publicBlobs';
 export * from './crossAppBlobs';
 export * from './ledger';
+export * from './threeWay';
 
 const ENDPOINT = '/api/sync';
 const PUBLIC_ENDPOINT = '/api/public';

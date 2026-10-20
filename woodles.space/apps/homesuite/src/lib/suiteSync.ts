@@ -8,7 +8,8 @@
 // one side can be told apart: never seen here (keep it) or deleted here since
 // (drop it). Both sides changed → the later `updatedAt` wins; an edit beats a
 // delete. Fingerprints are of canonical JSON, because the server stores the
-// blob as JSONB and hands it back with its keys reordered.
+// blob as JSONB and hands it back with its keys reordered. The merge itself is
+// `mergeRecords` in `@woodles/sync`, shared with Carillon.
 
 import {
 	clearActiveDraftId,
@@ -25,8 +26,11 @@ import { boardLibrary } from '../../../whiteboard/src/lib/library';
 import type { WhiteboardDocument } from '../../../whiteboard/src/lib/model';
 import { loadCollections, removeCollection, saveCollection, type Collection } from '../../../data/src/lib/collections';
 import { listHomeSuiteTrash, replaceHomeSuiteTrash, type HomeSuiteTrashEntry } from '@shared/homesuiteTrash';
+import { canonical, fingerprint, fingerprintRecord, mergeRecords } from '@woodles/sync';
 import { loadFolders, refKey, replaceFolders, type FolderLibrary, type HomeSuiteFolder } from './folders';
 import { trashKey } from './surfaces';
+
+export { fingerprint };
 
 export const HOMESUITE_SYNC_APP = 'homesuite';
 export const HOMESUITE_SYNC_BASE_KEY = 'woodles.homesuite.sync.base.v1';
@@ -61,31 +65,10 @@ export function emptyBlob(): HomeSuiteSyncBlob {
 	return { format: 1, documents: {}, boards: {}, collections: {}, trash: {}, folders: {}, placements: {} };
 }
 
-function canonical(value: unknown): string {
-	if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-	if (value && typeof value === 'object') {
-		const record = value as Record<string, unknown>;
-		return `{${Object.keys(record).filter((key) => record[key] !== undefined).sort()
-			.map((key) => `${JSON.stringify(key)}:${canonical(record[key])}`).join(',')}}`;
-	}
-	return JSON.stringify(value) ?? 'null';
-}
-
-/** FNV-1a over canonical JSON, with the length to make collisions duller still. */
-export function fingerprint(value: unknown): string {
-	const text = canonical(value);
-	let hash = 0x811c9dc5;
-	for (let i = 0; i < text.length; i++) {
-		hash ^= text.charCodeAt(i);
-		hash = Math.imul(hash, 0x01000193);
-	}
-	return `${(hash >>> 0).toString(36)}.${text.length.toString(36)}`;
-}
-
 export function fingerprints(blob: HomeSuiteSyncBlob): SyncBase {
 	const base: SyncBase = {};
 	for (const section of SECTIONS) {
-		base[section] = Object.fromEntries(Object.entries(blob[section] ?? {}).map(([key, value]) => [key, fingerprint(value)]));
+		base[section] = fingerprintRecord(blob[section] ?? {});
 	}
 	return base;
 }
@@ -94,33 +77,6 @@ export function fingerprints(blob: HomeSuiteSyncBlob): SyncBase {
 export function differsFromBase(blob: HomeSuiteSyncBlob, base: SyncBase): boolean {
 	const now = fingerprints(blob);
 	return SECTIONS.some((section) => canonical(now[section] ?? {}) !== canonical(base[section] ?? {}));
-}
-
-function mergeSection<T>(
-	local: Record<string, T>,
-	remote: Record<string, T>,
-	base: Record<string, string>,
-	when: (value: T) => string
-): Record<string, T> {
-	const merged: Record<string, T> = {};
-	for (const key of new Set([...Object.keys(local), ...Object.keys(remote)])) {
-		const mine = local[key];
-		const theirs = remote[key];
-		const was = base[key];
-		if (mine !== undefined && theirs !== undefined) {
-			const mineFp = fingerprint(mine);
-			const theirsFp = fingerprint(theirs);
-			if (mineFp === theirsFp || was === theirsFp) merged[key] = mine;
-			else if (was === mineFp) merged[key] = theirs;
-			else merged[key] = when(theirs) > when(mine) ? theirs : mine;
-		} else if (mine !== undefined) {
-			// Gone over there. Deleted, unless this side changed it since.
-			if (was === undefined || was !== fingerprint(mine)) merged[key] = mine;
-		} else if (theirs !== undefined) {
-			if (was === undefined || was !== fingerprint(theirs)) merged[key] = theirs;
-		}
-	}
-	return merged;
 }
 
 /** Placements that point nowhere are dropped, and a parent loop is cut. */
@@ -151,11 +107,12 @@ export function mergeSuite(local: HomeSuiteSyncBlob, remote: HomeSuiteSyncBlob, 
 	const theirs = { ...emptyBlob(), ...remote };
 	const merged = emptyBlob();
 	for (const section of SECTIONS) {
-		(merged as Record<Section, unknown>)[section] = mergeSection(
+		const when = WHEN[section] as (value: unknown) => string;
+		(merged as Record<Section, unknown>)[section] = mergeRecords(
 			local[section] as Record<string, unknown>,
 			theirs[section] as Record<string, unknown>,
-			base[section] ?? {},
-			WHEN[section] as (value: unknown) => string
+			base[section],
+			(mine, theirs) => (when(theirs) > when(mine) ? theirs : mine)
 		);
 	}
 	repairFolders(merged);

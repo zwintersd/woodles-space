@@ -10,7 +10,7 @@
 		chromeFamily
 	} from '$lib/dayCycle';
 	import type { PaletteModeName } from '$lib/dayCycle';
-	import { initSync } from '$lib/sync.svelte';
+	import { startAutoSync } from '$lib/sync.svelte';
 	import { importNotebookTasksOnce } from '$lib/notebookTasks';
 	import { onMount } from 'svelte';
 
@@ -19,7 +19,9 @@
 	let taskNotice = $state('');
 
 	onMount(() => {
-		initSync();
+		// Another tab's saves come in as they happen, so this one never saves over them.
+		const stopFollowing = store.followOtherTabs();
+		const stopSync = startAutoSync();
 		// The clock rings bells; it also follows audio readiness and frees sound on a tap.
 		const stopClock = store.startClock();
 		// Notebook's tasks move here — a task with a date belongs where time
@@ -31,7 +33,11 @@
 				`took over ${total} ${total === 1 ? 'task' : 'tasks'} from notebook` +
 				(moved.done > 0 ? ` (${moved.done} already done)` : '');
 		}
-		return stopClock;
+		return () => {
+			stopClock();
+			stopSync();
+			stopFollowing();
+		};
 	});
 
 	$effect(() => {

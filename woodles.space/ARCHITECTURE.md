@@ -394,7 +394,8 @@ them — one blob under sync key `homesuite`, behind the shared passphrase
 (`apps/homesuite/src/lib/suiteSync.ts`, glue in `sync.svelte.ts`). It reads
 each owning app's storage into the blob and writes a merged one back through
 the same functions the shell uses, saving only what changed. The merge is
-three-way and per item: `woodles.homesuite.sync.base.v1` holds each item's
+three-way and per item (`mergeRecords` in `@woodles/sync`, which Carillon
+shares): `woodles.homesuite.sync.base.v1` holds each item's
 fingerprint as of the last time this device and the server agreed, so a
 thing missing on one side reads as never seen (kept) or deleted since
 (dropped). Both sides changed → the later `updatedAt` wins; an edit beats a
@@ -799,18 +800,47 @@ not an audit, and the same view exports the Spores JSON.
 Carillon remains local-first: its domain records live in app-owned localStorage
 keys and `PlannerBlob` treats the instrument fields as optional so older synced
 blobs still hydrate. When passphrase sync is connected, `@woodles/sync` mirrors
-one whole `PlannerBlob` into Neon's `sync.blob` JSONB column. Carillon opts into
-the deterministic merge path: id-keyed collections are unioned; an observation
-collision takes the later `updatedAt`, a routine-practice collision the later
-`recordedAt`, mutable piles/tasks/routines/day choices — and sleep logs and
-signal entries alongside them — take the later `updatedAt`, and a Surge
-collision takes its later update with status precedence as a tie-break. The
+one whole `PlannerBlob` into Neon's `sync.blob` JSONB column, and it merges the
+way HomeSuite's does: three-way and per record, against `planner.sync.base.v1`
+— each record's fingerprint as of the last time this device and the server
+agreed (`mergeKeyed` in `@woodles/sync`). A record only one side changed takes
+that side. One missing on a side is new there (kept) or deleted there since
+(dropped), and an edit beats a delete — so a signal, obligation, ritual,
+domain or sitting removed on one device is removed on the others, where the
+old union brought it back. With no base — a first sync, or after
+disconnecting — the merge is a union. Only a record both devices changed
+reaches the domain rules: an observation takes the later `updatedAt`, a
+routine practice the later `recordedAt`, piles/tasks/routines/day
+choices/sleep logs/signal entries the later `updatedAt` (a pile or routine's
+`deletedAt` is final), a Surge collision its later update with status
+precedence as a tie-break, and loops, loop events, Five Contacts rounds and
+reminders their own resolvers in `openLoops.ts` and `reminders.ts`.
+Obligations, rituals and domains carry no time, so there the server's copy
+wins; settings merge per key by edit stamp (`apps/planner/BELLS.md`). The
 Spore ledger is then reconciled against the merged observations so kind,
-date, and amount stay canonical. Legacy settings and
-overlay collections remain remote-winning. A compare-and-swap conflict merges
-against each returned server version for up to three total pushes; persistent
-contention remains safe locally and surfaces as not-yet-synced instead of a
-false success. See "the sync layer" below for the transport contract.
+date, and amount stay canonical. A merge that adds nothing hands back the
+server's own blob — fingerprints are over canonical JSON, since JSONB reorders
+keys — so a sync with nothing new pushes nothing and leaves the page alone.
+
+The base is only safe while the store holds what this device agreed on, so
+three things guard it. **Tabs follow each other:** the store remembers the raw
+value it last read or wrote per key and takes another tab's save, on `storage`
+and again before every sync read (`catchUp`), so a tab open since morning
+neither saves over a newer tab's records nor reads their absence as
+deletions. **A failed save holds the base back:** a key whose last write threw
+— a full origin quota — means memory and storage disagree, and the base does
+not move until it saves. **An unreadable key starts over:** its section is
+dropped from the base on load, before anything is saved over the fallback, so
+the next sync is a union there. Sync runs one operation at a time per tab — a
+push asked for mid-sync goes out after it — and one tab at a time per device,
+under a Web Lock. It keeps HomeSuite's rhythm: on opening, on coming back to
+the tab after twenty seconds away, every two minutes while in view, a
+coalesced push after each edit, and on `pagehide` or hidden a push only if
+something changed since the base; the binder's *sync now* pulls as well. A
+compare-and-swap conflict merges against each returned server version for up
+to three total pushes; persistent contention remains safe locally and
+surfaces as not-yet-synced instead of a false success. See "the sync layer"
+below for the transport contract.
 
 ## the board
 
@@ -1416,7 +1446,13 @@ adapter may instead provide a deterministic `merge(local, remote)`: hydration
 applies and, when needed, flushes the merged blob; a compare-and-swap conflict
 re-reads local state (so an edit made while the push was in flight isn't
 dropped), merges it against the server snapshot, adopts that returned version,
-and retries the push once. The active passphrase lives in module memory, while
+and retries the push once. A merge that should let deletes stick builds on
+`packages/sync/src/threeWay.ts`: `canonical` and `fingerprint`, blind to key
+order as JSONB requires, and `mergeKeyed`/`mergeRecords`, which take a *base*
+— each item's fingerprint as of the last agreement — and tell a thing deleted
+on one side from a thing that side never saw. The app keeps the base itself,
+since only it knows whether its storage really holds what the server took.
+The active passphrase lives in module memory, while
 `createAppSync` also caches it under the shared `woodles_sync_passphrase`
 localStorage key so apps can reconnect after a reload; disconnect removes that
 bearer credential. the last-seen version is cached in localStorage too.
@@ -1427,10 +1463,11 @@ a `SyncState` class with `$state` fields, its instantiation, and a call to
 the adapter's `read()` maps the store into the blob type (`PlannerBlob`,
 `BestiaryBlob`, `DevlogBlob`, `ThinkingAboutBlob`); `write()` calls
 the store's `rehydrate()`; `isNewer` is optionally provided (`bestiary` and
-`thinking-about` use it). Carillon's file is deliberately larger because it
-owns the merge described above and coalesces queued instrument writes before
-flushing. HomeSuite's is the other larger one — a three-way, per-item merge
-across Write, Whiteboard, and Data's storage, under "homesuite" above.
+`thinking-about` use it). Carillon's and HomeSuite's are the larger ones:
+each keeps a base for a three-way merge and decides when it may move, and
+each syncs on its own rhythm — Carillon's record rules, tab guards and timing
+under "carillon" above, HomeSuite's merge across Write, Whiteboard, and Data's
+storage under "homesuite".
 `marginalia` still has none of this — it never syncs privately.
 `write`'s adapter used to be a pair of no-ops that existed only to borrow the
 passphrase handling for a public publish. Echoes is private now, so it syncs
@@ -1831,25 +1868,30 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-2529 tests total: 35 in `api/` (its own
+2845 tests total: 39 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts`, `schedules.ts` and
 `sync.ts` — the one part of the workspace that isn't a pnpm package, so it
-needs its own runner instead of the recursive `pnpm -r test`), plus 2494
-across twenty-three pnpm packages — `planner` 558, `marginalia` 396,
+needs its own runner instead of the recursive `pnpm -r test`), plus 2806
+across twenty-four pnpm packages — `planner` 756, `marginalia` 458,
 `whiteboard` 258, `write` 251, `packages/incremental-core` 191,
 `thinking-about` 184, `bestiary` 162, `bloomforge` 83,
-`packages/dynamics` 69, `packages/witch-engine` 58, `companion` 42,
-`packages/sync` 38, `grimoire` 36, `packages/life-points` 30,
-`packages/text` 30, `bloomforge-player` 22, `data` 18,
+`packages/dynamics` 69, `packages/witch-engine` 58, `packages/sync` 48,
+`companion` 42, `grimoire` 36, `homesuite` 36, `packages/life-points` 30,
+`packages/text` 30, `bloomforge-player` 22, `data` 22,
 `packages/app-manifest` 17, `packages/handoff` 15, `packages/spellcraft` 15,
-`homesuite` 11, `packages/persistence` 6, and `packages/emoji` 4.
+`packages/mycelium` 13, `packages/persistence` 6, and `packages/emoji` 4.
 (Counted by running each suite, not by adding to the previous figure — keep
 this inventory current when a suite changes; the root command is the release
-contract, not the prose count. The latest pass, for Thinking About becoming a
-handoff receiver — 36 of its tests, in `handoffs.test.ts` and the store's new
-`thinkingAbout.test.ts` — caught up `companion`, `homesuite` and `data`, which
-had never been listed, and five figures that had drifted: `api/`, `planner`,
-`marginalia`, `write` and `packages/sync`. The pass before it caught up
+contract, not the prose count. The latest pass, for Carillon's sync — 16
+tests in `sync.test.ts` and the new `syncDevices.test.ts`, 7 in
+`packages/sync`'s `threeWay.test.ts` — caught up `packages/mycelium`, which
+had never been listed, and the figures that had drifted since the pass
+before: `api/`, `planner`, `marginalia`, `data` and `homesuite`. That one,
+for Thinking About becoming a handoff receiver — 36 of its tests, in
+`handoffs.test.ts` and the store's new `thinkingAbout.test.ts` — caught up
+`companion`, `homesuite` and `data`, which had never been listed, and five
+figures that had drifted: `api/`, `planner`, `marginalia`, `write` and
+`packages/sync`. The pass before it caught up
 four packages the inventory had never listed and four figures that had
 drifted behind their suites. `life-points` had been missing since the list was written; the
 `witch-engine`, `dynamics` and `grimoire` suites all arrived after it and
@@ -1933,6 +1975,7 @@ the Thinking About → Carillon round trip, back, and the sitting that returns
 from it, the companion's handoffs arriving on Thinking About (the held
 *open it* link, the same link waiting out a failed sync, a live take from
 another tab, a deleted arrival staying deleted), Carillon's binder strip and the way in and out of its task composer,
+Carillon's sync (a removal on one device staying removed on another, two tabs keeping each other's changes),
 legacy localStorage migration across reload,
 keyboard operation, and serious/critical WCAG A axe findings. `homesuite.spec.ts`
 covers the shell's seams: the veil, edits made just before a frame is removed,
@@ -1980,13 +2023,15 @@ lockfile, then runs `pnpm check`, `pnpm test`, and `pnpm build` from this
 workspace. Keep the local root commands and that workflow identical so a green
 checkout means the same thing locally and on GitHub.
 
-After the build it installs Chromium and runs two slices of `e2e/`: HomeSuite's
-spec and the `/homesuite` axe audit, then the landing spec with the `/` axe
-audit and keyboard check. HomeSuite's failures live between frames, and the
-landing page is a static file with no unit suite at all, so neither is reached
-any other way. The rest of `e2e/` is not in CI yet; when last
-run it had failures of its own (a `/letter` axe finding, some Carillon specs),
-so widen the slice once those are green rather than all at once.
+After the build it installs Chromium and runs three slices of `e2e/`:
+HomeSuite's spec and the `/homesuite` axe audit, then the landing spec with
+the `/` axe audit and keyboard check, then Carillon's sync spec. HomeSuite's
+failures live between frames, the landing page is a static file with no unit
+suite at all, and Carillon's sync across tabs leans on `storage` events and
+Web Locks that only a browser has, so none is reached any other way. The rest
+of `e2e/` is not in CI yet; when last run it had failures of its own (a
+`/letter` axe finding; Carillon's specs, which failed then, all passed on
+2026-10-20), so widen the slice once those are green rather than all at once.
 
 ## running things locally
 
@@ -1994,7 +2039,7 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (1832 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (2845 tests)
 pnpm check              svelte-check in every app
 pnpm build              build the eight SvelteKit apps
 ```
