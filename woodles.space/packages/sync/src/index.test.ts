@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { publish, pullPublic, setPassphrase, SyncError } from './index';
+import { publish, pullPublic, push, setPassphrase, SyncError } from './index';
 
 describe('publish / pullPublic — the public read path client pair', () => {
   const fetchMock = vi.fn();
@@ -73,5 +73,39 @@ describe('publish / pullPublic — the public read path client pair', () => {
     await expect(publish('bestiary', 'gallery', { creatures: [] })).rejects.toMatchObject({
       kind: 'unauthorized'
     });
+  });
+});
+
+describe('push — a server failure says why', () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', fetchMock);
+    setPassphrase('correct horse');
+  });
+
+  afterEach(() => {
+    fetchMock.mockReset();
+    setPassphrase('');
+    vi.unstubAllGlobals();
+  });
+
+  it("carries the endpoint's message into the error", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: false, error: 'server', message: 'unsupported Unicode escape sequence' }), {
+        status: 500
+      })
+    );
+
+    await expect(push('homesuite', {}, 3)).rejects.toMatchObject({
+      kind: 'server',
+      message: 'push failed (500): unsupported Unicode escape sequence'
+    });
+  });
+
+  it('falls back to the status alone when the body is not JSON', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('<html>gateway</html>', { status: 502 }));
+
+    await expect(push('homesuite', {}, 3)).rejects.toMatchObject({ kind: 'server', message: 'push failed (502)' });
   });
 });

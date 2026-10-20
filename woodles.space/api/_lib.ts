@@ -24,6 +24,37 @@ export function db(): NeonQueryFunction<false, false> {
 
 export const APP_PATTERN = /^[a-z0-9-]{1,40}$/;
 
+// Postgres JSONB refuses two things JSON.stringify happily emits: a NUL
+// character, and a lone UTF-16 surrogate (half an emoji, usually from a
+// .slice() through one). Either fails the `::jsonb` cast on every retry, so one
+// stray character would stall an app's sync for good. Drop NULs, turn lone
+// surrogates into U+FFFD — which is how the browser already draws them.
+const NUL = /\u0000/g;
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+// What those two look like once stringified. A false positive (a literal
+// backslash-u in someone's text) only costs the slower path below.
+const UNSTORABLE = /\\u(?:0000|d[89a-f])/i;
+
+function storable(text: string): string {
+  return text.replace(NUL, '').replace(LONE_SURROGATE, '\uFFFD');
+}
+
+function clean(value: unknown): unknown {
+  if (typeof value === 'string') return storable(value);
+  if (Array.isArray(value)) return value.map(clean);
+  if (value && typeof value === 'object') {
+    // fromEntries, not assignment, so a `__proto__` key stays an ordinary key.
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [storable(key), clean(item)]));
+  }
+  return value;
+}
+
+/** JSON text the `::jsonb` cast will accept. */
+export function jsonbText(value: unknown): string {
+  const text = JSON.stringify(value);
+  return UNSTORABLE.test(text) ? JSON.stringify(clean(value)) : text;
+}
+
 // Web Crypto API — works in both Edge and Node runtimes, so we don't have to
 // fight Vercel's autodetection. Plain JS replacements for node:crypto helpers.
 function hexToBytes(hex: string): Uint8Array {

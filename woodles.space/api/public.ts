@@ -17,7 +17,7 @@
 // concurrent editor racing the publish action, so the "ask before clobber"
 // dance that `sync` needs doesn't apply here.
 
-import { authed, db, json, APP_PATTERN } from './_lib';
+import { authed, db, json, jsonbText, APP_PATTERN } from './_lib';
 
 const SLUG_PATTERN = /^[a-z0-9-]{1,80}$/;
 
@@ -80,7 +80,7 @@ async function route(req: Request): Promise<Response> {
     if (!slug || !SLUG_PATTERN.test(slug)) return json({ ok: false, error: 'bad slug' }, 400);
     if (blob === undefined) return json({ ok: false, error: 'missing blob' }, 400);
 
-    const payload = JSON.stringify(blob);
+    const payload = jsonbText(blob);
     const byteLength = new TextEncoder().encode(payload).length;
     if (byteLength > MAX_BLOB_BYTES) {
       return json(

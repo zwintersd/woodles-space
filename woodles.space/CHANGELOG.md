@@ -20,6 +20,12 @@ so it's not easy to forget.
 
 ## 2026-10-20
 
+- **sync stops stalling on a stray character** — Postgres refuses a NUL or
+  half an emoji inside JSONB, and the sync endpoint answered every retry with
+  the same 500, so one bad character in any document could block HomeSuite's
+  sync for good. `/api/sync` and `/api/public` now drop NULs and turn a lone
+  surrogate into `�` before saving. a sync that still fails now says why in
+  its status, carrying the server's message instead of just `push failed (500)`.
 - **Mycelium moves into Carillon's room** — the sidebar is gone; people now
   live under Carillon's mulberry cabinet, with a leaded transom, a rose
   window holding Mycelium's crescent, and a glazed wordmark in rose and
