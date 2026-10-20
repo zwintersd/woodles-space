@@ -116,3 +116,17 @@ dark mode, and failing contrast. both now read `--hs-*` tokens from the one
 file, with a dark scheme. Write and Whiteboard keep their own palettes on
 purpose.
 
+## Carillon ornaments and shell tokens
+**Status:** candidate
+**Copies:** `apps/planner/src/lib/ornaments/` and `apps/mycelium/src/lib/ornaments/`
+(corner filigree, divider, quatrefoil, lunar moth, celestial chart and
+window); the stable `--car-*` furniture, paper, glass and vellum tokens in
+both apps' `src/lib/style/tokens.css`; the cabinet header, lancet tabs and
+ribbon CSS in planner's `+page.svelte` / `Binder.svelte` and mycelium's
+`mycelium.css`
+**State:** identical SVGs; tokens identical except mycelium's glass strip and
+wordmark palette
+**Notes:** a second app is wearing Carillon's room. if a third does, move the
+SVGs and the stable tokens into `shared/` (a `carillon-shell.css` beside
+`fonts.css`), leaving each app its own ground — planner's cycles, mycelium's
+holds still.

@@ -18,6 +18,18 @@ so it's not easy to forget.
 
 ---
 
+## 2026-10-20
+
+- **Mycelium moves into Carillon's room** — the sidebar is gone; people now
+  live under Carillon's mulberry cabinet, with a leaded transom, a rose
+  window holding Mycelium's crescent, and a glazed wordmark in rose and
+  sage. all people, favorites and new person are lancet tabs of glass. the
+  shelf sits on parchment in stained-glass light, with IM Fell headings and
+  gilt rules; contacts and the workshop are vellum sheets with filigree
+  corners, the card waits in an arched stage, and the backup and comfort
+  tools hang in a ribbon down the right edge. circles became a filter strip
+  on the shelf. the cards themselves are unchanged.
+
 ## 2026-10-19
 
 - **Mycelium keeps people on cards** — a contact book with Bestiary's visual
