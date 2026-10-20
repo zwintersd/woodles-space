@@ -143,6 +143,7 @@ woodles.space/
 │   ├── handoff/             @woodles/handoff — passing a thought between apps
 │   ├── incremental-core/    @woodles/incremental-core — GameDef schema, validator, sim engine
 │   ├── life-points/         @woodles/life-points — the cross-app currency, earned by being away
+│   ├── mycelium/            @woodles/mycelium — canonical people, contact storage, references, and card styles
 │   ├── persistence/         @woodles/persistence — versioned local storage mechanics
 │   ├── sync/                @woodles/sync — the sync client
 │   ├── spellcraft/          @woodles/spellcraft — the authoring brief + output contracts
@@ -165,6 +166,7 @@ woodles.space/
     ├── marginalia/          SvelteKit · a witch writes worlds + a reading room
     ├── planner/             SvelteKit · carillon — self-observation, day piles, and reinforcement
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
+    ├── mycelium/            SvelteKit · people and contact details, on 3:4 cards styled like Bestiary
     ├── thinking-about/      SvelteKit · a board for what's being read, played, and watched — and, per entry, a structured record cast for it
     ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking — a camera that knows where it is, cards that say more than they show, stacks that do more than hold them, and doorways into other boards
     ├── bloomforge/          SvelteKit · a studio for making incremental games
@@ -186,7 +188,7 @@ the repository or silently promoting an experiment into a game.
 ## the app manifest
 
 `packages/app-manifest/src/index.js` is the canonical deployable-app inventory.
-It owns the 24 app ids, names, public paths and aliases, app shape, source and
+It owns the app ids, names, public paths and aliases, app shape, source and
 output locations, maturity, and landing visibility. It also owns the landing
 tile order/copy, **band**, default pins, featured fallback, and Marginalia's
 Reading Room sub-surface. A band is the *moment* a tile is for rather than the
@@ -250,7 +252,7 @@ and its bloom post-processing addons from a CDN through a `<script
 type="importmap">`, still with no build step.
 
 **SvelteKit apps** — `homesuite`, `data`, `write`, `marginalia`, `planner`,
-`bestiary`, `thinking-about`, `whiteboard`, `bloomforge`, `bloomforge-player`,
+`bestiary`, `mycelium`, `thinking-about`, `whiteboard`, `bloomforge`, `bloomforge-player`,
 `grimoire`, `companion` — use Svelte 5 runes, Vite 7, and `@sveltejs/adapter-static`.
 each builds to `apps/<name>/dist/` and consumes `shared/` through the `@shared`
 Vite alias (`../../shared`). there is no SSR; every app ships as a static bundle.
@@ -322,6 +324,27 @@ life and field-note log on open, when the window regains focus, and on
 request. Source-owned table columns refresh in place while Collection-owned
 fields stay local; a pull that changes nothing saves nothing, and source
 records are never written back to either app.
+
+Mycelium owns people through the UI-free `@woodles/mycelium` package. The
+versioned localStorage key is `woodles.mycelium.people.v1`; a person has a stable
+id, name, pronouns, role, organization, labelled email/phone/link entries,
+location, birthday, tags, contact notes, optional portrait, favorite, full card
+style, and creation/update timestamps. `loadPeople()` reports read failures;
+`listPeople()`, `getPerson(id)`, and `resolvePerson(ref)` provide current owner
+data. Writes validate and reread the store, touch only the requested person,
+and notify same-origin consumers through `subscribePeople()`.
+
+The shared identity is `{ app: 'mycelium', kind: 'person', id }`, made by
+`personRef(id)`, and the manifest resolves it to `/mycelium?person=<id>`.
+Write's `#` picker reads people through the package. Data's **Mycelium people**
+template reads the same store into source-owned columns, with editable **My
+notes** alongside the contact's own notes. Refresh updates those owner columns
+without changing local notes or deleting missing rows; removing membership
+stores the full reference in `excludedRefs` so the next refresh respects it.
+Relations and prose links keep only the complete identity and display text.
+Removing a reference never edits or deletes the person. HomeSuite opens person
+references in their owning app. Contacts remain local to this browser origin;
+adding a reference does not publish contact details to sync or a public API.
 
 Context menus use the same owner boundary: the surface snapshots its target and
 keeps action callbacks locally; the shell renders serializable action descriptors

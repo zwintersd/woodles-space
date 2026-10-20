@@ -223,6 +223,9 @@ importers:
       '@woodles/marginalia-arcade-catalog':
         specifier: workspace:*
         version: link:../../packages/marginalia-arcade-catalog
+      '@woodles/mycelium':
+        specifier: workspace:*
+        version: link:../../packages/mycelium
       '@woodles/persistence':
         specifier: workspace:*
         version: link:../../packages/persistence
@@ -312,6 +315,9 @@ importers:
       '@woodles/handoff':
         specifier: workspace:*
         version: link:../../packages/handoff
+      '@woodles/mycelium':
+        specifier: workspace:*
+        version: link:../../packages/mycelium
       '@woodles/persistence':
         specifier: workspace:*
         version: link:../../packages/persistence
@@ -413,6 +419,40 @@ importers:
       vitest:
         specifier: ^3.2.6
         version: 3.2.6(@types/node@22.19.17)(happy-dom@20.10.6)
+
+  apps/mycelium:
+    dependencies:
+      '@woodles/app-manifest':
+        specifier: workspace:*
+        version: link:../../packages/app-manifest
+      '@woodles/mycelium':
+        specifier: workspace:*
+        version: link:../../packages/mycelium
+    devDependencies:
+      '@sveltejs/adapter-static':
+        specifier: ^3.0.0
+        version: 3.0.10(@sveltejs/kit@2.66.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@7.3.5(@types/node@22.19.17)))(svelte@5.56.3)(typescript@5.9.3)(vite@7.3.5(@types/node@22.19.17)))
+      '@sveltejs/kit':
+        specifier: ^2.66.0
+        version: 2.66.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@7.3.5(@types/node@22.19.17)))(svelte@5.56.3)(typescript@5.9.3)(vite@7.3.5(@types/node@22.19.17))
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^6.2.4
+        version: 6.2.4(svelte@5.56.3)(vite@7.3.5(@types/node@22.19.17))
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.17
+      svelte:
+        specifier: ^5.56.3
+        version: 5.56.3
+      svelte-check:
+        specifier: ^4.4.2
+        version: 4.4.7(picomatch@4.0.4)(svelte@5.56.3)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^7.3.5
+        version: 7.3.5(@types/node@22.19.17)
 
   apps/planner:
     dependencies:
@@ -551,6 +591,9 @@ importers:
       '@woodles/handoff':
         specifier: workspace:*
         version: link:../../packages/handoff
+      '@woodles/mycelium':
+        specifier: workspace:*
+        version: link:../../packages/mycelium
       '@woodles/spellcraft':
         specifier: workspace:*
         version: link:../../packages/spellcraft
@@ -659,6 +702,15 @@ importers:
         version: 3.2.6(@types/node@22.19.17)(happy-dom@20.10.6)
 
   packages/marginalia-arcade-catalog: {}
+
+  packages/mycelium:
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@22.19.17)(happy-dom@20.10.6)
 
   packages/persistence:
     devDependencies:
@@ -1134,11 +1186,6 @@ packages:
 
   '@sveltejs/acorn-typescript@1.0.10':
     resolution: {integrity: sha512-4WfKk68eTih+MiJD4fSbxN7E8kVBmTMPWHUPYjvl2N0rMs53YLTT8/YjKU5Dtnz5LqDjl7LEw4U7lXR2W3J5WA==}
-    peerDependencies:
-      acorn: ^8.9.0
-
-  '@sveltejs/acorn-typescript@1.0.9':
-    resolution: {integrity: sha512-lVJX6qEgs/4DOcRTpo56tmKzVPtoWAaVbL4hfO7t7NVwl9AAXzQR6cihesW1BmNMPl+bK6dreu2sOKBP2Q9CIA==}
     peerDependencies:
       acorn: ^8.9.0
 
@@ -1973,10 +2020,6 @@ snapshots:
     dependencies:
       acorn: 8.16.0
 
-  '@sveltejs/acorn-typescript@1.0.9(acorn@8.16.0)':
-    dependencies:
-      acorn: 8.16.0
-
   '@sveltejs/adapter-static@3.0.10(@sveltejs/kit@2.66.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@7.3.5(@types/node@22.19.17)))(svelte@5.56.3)(typescript@5.9.3)(vite@7.3.5(@types/node@22.19.17)))':
     dependencies:
       '@sveltejs/kit': 2.66.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@7.3.5(@types/node@22.19.17)))(svelte@5.56.3)(typescript@5.9.3)(vite@7.3.5(@types/node@22.19.17))
@@ -1984,7 +2027,7 @@ snapshots:
   '@sveltejs/kit@2.66.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@7.3.5(@types/node@22.19.17)))(svelte@5.56.3)(typescript@5.9.3)(vite@7.3.5(@types/node@22.19.17))':
     dependencies:
       '@standard-schema/spec': 1.1.0
-      '@sveltejs/acorn-typescript': 1.0.9(acorn@8.16.0)
+      '@sveltejs/acorn-typescript': 1.0.10(acorn@8.16.0)
       '@sveltejs/vite-plugin-svelte': 6.2.4(svelte@5.56.3)(vite@7.3.5(@types/node@22.19.17))
       '@types/cookie': 0.6.0
       acorn: 8.16.0

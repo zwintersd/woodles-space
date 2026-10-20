@@ -18,6 +18,14 @@ so it's not easy to forget.
 
 ---
 
+## 2026-10-19
+
+- **Mycelium keeps people on cards** — a contact book with Bestiary's visual
+  styling on 3:4 cards. Each person has one stable Woodles reference: link to
+  them from Write or bring current contact details into a Data Collection,
+  keeping your own notes alongside. Removing a link or Collection membership
+  leaves the person's card in Mycelium.
+
 ## 2026-10-12
 
 - **clearer schedule illustrations** — the music banner has a symmetric guitar

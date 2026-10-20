@@ -105,9 +105,9 @@ describe('route smoke contract', () => {
 });
 
 describe('landing catalogue', () => {
-	it('derives the eleven ordered tiles, pins, and featured fallbacks from the manifest', () => {
-		expect(landingApps).toHaveLength(11);
-		expect(landingApps.map((app) => app.order)).toEqual([...Array(11)].map((_, index) => index + 1));
+	it('derives the twelve ordered tiles, pins, and featured fallbacks from the manifest', () => {
+		expect(landingApps).toHaveLength(12);
+		expect(landingApps.map((app) => app.order)).toEqual([...Array(12)].map((_, index) => index + 1));
 		expect(new Set(landingApps.map((app) => app.id)).size).toBe(landingApps.length);
 		expect(defaultLandingPins).toEqual(['hygge', 'homesuite', 'marg', 'planner', 'quiet']);
 		expect(featuredLandingApps.map((app) => app.id)).toEqual(['marg', 'bestiary', 'homesuite']);
@@ -162,6 +162,7 @@ describe('entity addressing', () => {
 		expect(entityHref('bloomforge-player', 'game', 'proj-1')).toBe('/play?game=proj-1');
 		expect(entityHref('whiteboard', 'board', 'board-1')).toBe('/whiteboard?board=board-1');
 		expect(entityHref('data', 'collection', 'collection-1')).toBe('/data?collection=collection-1');
+		expect(entityHref('mycelium', 'person', 'person 1')).toBe('/mycelium?person=person%201');
 		expect(entityHref('marginalia', 'life', 'salt_deposit')).toBe('/marginalia?life=salt_deposit');
 		expect(entityHref('marginalia', 'field-note', 'note 1')).toBe('/marginalia?field-note=note%201');
 	});

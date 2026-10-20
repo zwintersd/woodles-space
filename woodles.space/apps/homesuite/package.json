@@ -13,6 +13,7 @@
 	"dependencies": {
 		"@woodles/app-manifest": "workspace:*",
 		"@woodles/handoff": "workspace:*",
+		"@woodles/mycelium": "workspace:*",
 		"@woodles/persistence": "workspace:*",
 		"@woodles/text": "workspace:*"
 	},

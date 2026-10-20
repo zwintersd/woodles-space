@@ -242,6 +242,20 @@ export const appManifest = Object.freeze([
 		landing: tile('bestiary', 10, 'tend', 'bring a png of anything, leave with a card that belongs', 'var(--peach)', 'var(--plum)', '110deg', { featured: 2 })
 	},
 	{
+		id: 'mycelium',
+		name: 'Mycelium',
+		publicPath: '/mycelium',
+		aliases: [],
+		kind: 'sveltekit',
+		maturity: 'growing',
+		sourceDir: 'apps/mycelium',
+		outputDir: 'apps/mycelium/dist',
+		entryFile: 'index.html',
+		packageName: 'mycelium',
+		addressableBy: ['person'],
+		landing: tile('mycelium', 12, 'tend', 'people you know, in cards that feel like them', 'var(--aqua)', 'var(--plum)', '135deg')
+	},
+	{
 		id: 'thinking-about',
 		name: 'Thinking About',
 		publicPath: '/thinking-about',

@@ -1,5 +1,6 @@
 import { world1Life } from '@woodles/witch-engine';
 import { appManifest } from '@woodles/app-manifest';
+import { loadPeople, personRef, type Person } from '@woodles/mycelium';
 import type { WoodlesRef } from '@shared/homesuiteBridge';
 import { ARCADE_COPY_CATALOG, ARCADE_GAME_CATALOG, ARCADE_PRIMITIVE_CATALOG } from '@woodles/marginalia-arcade-catalog';
 import { createRecord, type Collection, type CollectionSource } from './collections';
@@ -38,6 +39,28 @@ const STAGES: readonly ('noticed' | 'observed' | 'studied' | 'known')[] = ['noti
 
 function values(source: string, kind: string, category: string, domain: string, stage: string, details: string, updated: string): Record<string, string> {
 	return { name: '', source, kind, category, domain, stage, details, updated };
+}
+
+/** A read-only view of canonical people; Collection annotations stay local. */
+export function personRows(people: Person[]): PulledSourceRow[] {
+	const details = (entries: Person['emails']) => entries.map((entry) => entry.label ? `${entry.label}: ${entry.value}` : entry.value).join(' · ');
+	return people.map((person) => ({
+		ref: personRef(person.id),
+		label: person.name,
+		hint: ['Mycelium', person.role, person.organization].filter(Boolean).join(' · '),
+		values: {
+			name: person.name, pronouns: person.pronouns, role: person.role, organization: person.organization,
+			emails: details(person.emails), phones: details(person.phones), links: details(person.links),
+			location: person.location, birthday: person.birthday, tags: person.tags.join(' · '), notes: person.notes,
+			favorite: person.favorite ? 'Yes' : '', updated: person.updatedAt
+		}
+	}));
+}
+
+export function readMyceliumRows(): PulledSourceRow[] {
+	const loaded = loadPeople();
+	if (loaded.issue) throw new Error(loaded.issue.message);
+	return personRows(loaded.people);
 }
 
 export async function readBestiaryRows(): Promise<PulledSourceRow[]> {
@@ -200,6 +223,7 @@ export async function pullCollectionSources(sources: CollectionSource[]): Promis
 	const rows: PulledSourceRow[] = [];
 	if (sources.includes('woodles-apps')) rows.push(...woodlesAppRows());
 	if (sources.includes('bestiary-creatures')) rows.push(...await readBestiaryRows());
+	if (sources.includes('mycelium-people')) rows.push(...readMyceliumRows());
 	if (sources.includes('marginalia-life') || sources.includes('marginalia-field-notes')) {
 		const marginalia = readMarginaliaRows();
 		rows.push(...marginalia.filter((row) => row.ref.kind === 'life' ? sources.includes('marginalia-life') : sources.includes('marginalia-field-notes')));
