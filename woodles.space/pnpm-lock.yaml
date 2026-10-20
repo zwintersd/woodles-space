@@ -321,6 +321,9 @@ importers:
       '@woodles/persistence':
         specifier: workspace:*
         version: link:../../packages/persistence
+      '@woodles/sync':
+        specifier: workspace:*
+        version: link:../../packages/sync
       '@woodles/text':
         specifier: workspace:*
         version: link:../../packages/text

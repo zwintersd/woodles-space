@@ -15,6 +15,7 @@
 		"@woodles/handoff": "workspace:*",
 		"@woodles/mycelium": "workspace:*",
 		"@woodles/persistence": "workspace:*",
+		"@woodles/sync": "workspace:*",
 		"@woodles/text": "workspace:*"
 	},
 	"devDependencies": {

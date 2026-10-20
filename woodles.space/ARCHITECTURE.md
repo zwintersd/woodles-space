@@ -154,7 +154,7 @@ woodles.space/
     ├── hygge/               static · design playground (fonts, palette, motifs, motion)
     ├── digits/              static · an SVG pen that writes the time
     ├── quiet-room/          static · an immersive three.js room of light
-    ├── schedules/           static · a private link tree and visual schedules
+    ├── schedules/           static · a private link tree and visual schedules (banner art: apps/schedules/SCENES.md)
     ├── letter/              static · echoes — the private archive reader
     ├── changelog/           static · renders CHANGELOG.md at /changelog
     ├── lore/                static · renders LORE.md at /lore
@@ -374,6 +374,30 @@ tokens with a dark scheme under `prefers-color-scheme`, shared with Data so a
 Collection sits in the room around it; Write and Whiteboard keep their own
 looks. The text tiers clear WCAG AA on every background in both schemes, and
 `homesuite.spec.ts` checks the index and an open view against AA in each.
+
+**HomeSuite syncs the suite.** Write's own sync carries letters, not drafts,
+and Whiteboard and Data have none; HomeSuite is where drafts, boards,
+Collections, folders, and Trash sit together, so it is the one that syncs
+them — one blob under sync key `homesuite`, behind the shared passphrase
+(`apps/homesuite/src/lib/suiteSync.ts`, glue in `sync.svelte.ts`). It reads
+each owning app's storage into the blob and writes a merged one back through
+the same functions the shell uses, saving only what changed. The merge is
+three-way and per item: `woodles.homesuite.sync.base.v1` holds each item's
+fingerprint as of the last time this device and the server agreed, so a
+thing missing on one side reads as never seen (kept) or deleted since
+(dropped). Both sides changed → the later `updatedAt` wins; an edit beats a
+delete; folders and placements, which carry no time, keep this device's.
+Fingerprints are over canonical JSON, since JSONB returns keys reordered, and
+a merge that adds nothing returns the server's own blob so nothing is pushed.
+A library that cannot be read — an unreadable board, a quarantined or
+unwritable Collection library, unreadable folders — refuses the sync instead
+of reporting itself empty, which would otherwise read as deletions. Sync writes
+only while no editor frame is mounted (on opening, on returning to the index,
+on refocusing the tab, every two minutes); with a frame open, and on
+`pagehide` and hidden, it only pushes, and only when something changed since
+the base. Disconnecting clears the base, so a later connect starts from a
+union. Whiteboard's images live in IndexedDB and stay per-device; the
+standalone apps' edits reach the server the next time HomeSuite opens.
 
 `hygge` is the design playground — it holds the fonts, palette, motifs, and
 motion showcases that used to be separate pages. `/hygge/motion` is the review
@@ -1361,13 +1385,15 @@ the adapter's `read()` maps the store into the blob type (`PlannerBlob`,
 the store's `rehydrate()`; `isNewer` is optionally provided (`bestiary` and
 `thinking-about` use it). Carillon's file is deliberately larger because it
 owns the merge described above and coalesces queued instrument writes before
-flushing. `marginalia` still has none of this — it never syncs privately.
+flushing. HomeSuite's is the other larger one — a three-way, per-item merge
+across Write, Whiteboard, and Data's storage, under "homesuite" above.
+`marginalia` still has none of this — it never syncs privately.
 `write`'s adapter used to be a pair of no-ops that existed only to borrow the
 passphrase handling for a public publish. Echoes is private now, so it syncs
 something real: **the archive** of finished letters, under app key `write`,
 newest-archive-wins by the most recent `publishedAt`. Drafts stay out — they
-are working state, already per-device, and an archive is a different thing
-from a desk. Connecting the passphrase once, in any app, still connects it
+are working state, and an archive is a different thing from a desk; they
+follow you between devices through HomeSuite's sync instead. Connecting the passphrase once, in any app, still connects it
 everywhere, same origin, same localStorage key.
 
 ### cross-app ledgers

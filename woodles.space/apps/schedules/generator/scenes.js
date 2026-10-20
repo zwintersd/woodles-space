@@ -1,6 +1,7 @@
 // Illustrated banners for some themes, drawn for a 320×170 box like the
 // original ticket scene. Constant markup only: nothing here comes from a plan.
 // Moving parts carry sc-* classes; scenes.css animates them when motion is on.
+// apps/schedules/SCENES.md is the style reference and process for adding one.
 window.ScheduleScenes = (() => {
   'use strict';
   const range = (count) => Array.from({ length: count }, (_, index) => index);
@@ -74,7 +75,11 @@ window.ScheduleScenes = (() => {
       '<circle cx="286" cy="45" r="3.5" fill="#ff9f7a" opacity=".8"/></g>');
 
   const rainbow = ['#ff6b8b', '#ffa94d', '#ffe066', '#69db7c', '#74c0fc', '#b197fc'];
-  const cloud = (x, y) => '<path d="M' + (x - 26) + ' ' + y + 'a12 12 0 0 1 8-20a15 15 0 0 1 28-4a12 12 0 0 1 16 12a10 10 0 0 1 0 12z" fill="#fff" stroke="#8a5cc2" stroke-width="2.5" stroke-linejoin="round"/>';
+  const cloud = (x, y, stroke = '#8a5cc2', scale = 1, fill = '#fff') => {
+    const n = (value) => +(value * scale).toFixed(1);
+    return '<path d="M' + (x - n(26)) + ' ' + y + 'a' + n(12) + ' ' + n(12) + ' 0 0 1 ' + n(8) + ' ' + n(-20) + 'a' + n(15) + ' ' + n(15) + ' 0 0 1 ' + n(28) + ' ' + n(-4) +
+      'a' + n(12) + ' ' + n(12) + ' 0 0 1 ' + n(16) + ' ' + n(12) + 'a' + n(10) + ' ' + n(10) + ' 0 0 1 0 ' + n(12) + 'z" fill="' + fill + '" stroke="' + stroke + '" stroke-width="2.5" stroke-linejoin="round"/>';
+  };
   const unicorns = svg('unicorns',
     rainbow.map((color, index) => '<path d="M' + (24 + index * 11) + ' 150a' + (86 - index * 11) + ' ' + (86 - index * 11) + ' 0 0 1 ' + (172 - index * 22) + ' 0" fill="none" stroke="' + color + '" stroke-width="11"/>').join('') +
     cloud(34, 154) + cloud(196, 154) +
@@ -262,140 +267,642 @@ window.ScheduleScenes = (() => {
         '<circle cx="70" cy="100" r="3.5" fill="#4dabf7"/><circle cx="88" cy="100" r="4" fill="#e64980"/><circle cx="106" cy="100" r="3.5" fill="#51cf66"/></g>' +
     '</g>');
 
-  // The remaining interest banners use the same outlined, gently moving art.
-  const eyes = (x, y, gap = 18, color = '#302b38') => '<g fill="' + color + '" stroke="none"><circle cx="' + x + '" cy="' + y + '" r="3"/><circle cx="' + (x + gap) + '" cy="' + y + '" r="3"/></g>';
-  const meadow = (id) => faded(id, '<path d="M0 152Q80 126 166 148T320 140V170H0Z" fill="#a7cf72" opacity=".65"/>');
-  const pets = svg('pets', meadow('pet-ground') +
-    '<g class="sc-bob"' + ink('#623b30') + '><path d="M40 96Q28 45 62 60L78 83M114 83Q139 45 148 76L138 106" fill="#925a37"/><rect x="53" y="70" width="84" height="76" rx="34" fill="#f6c88c"/><ellipse cx="94" cy="122" rx="26" ry="18" fill="#fff2db"/><path d="M85 112h18l-9 9z" fill="#623b30"/><path d="M94 122v7q-8 9-15 0m15 0q8 9 15 0" fill="none"/>' + eyes(77, 100, 34, '#623b30') + '</g>' +
-    '<g class="sc-nod"' + ink('#623b30') + '><path d="M191 90l-3-41 32 24h31l30-24-3 48" fill="#e7e5f5"/><rect x="184" y="73" width="98" height="72" rx="33" fill="#e7e5f5"/><path d="M200 68l-3-10 15 12m48 0 12-12-2 13" stroke="#d4879f"/><path d="M229 113h9l-5 6z" fill="#d4879f"/><path d="M192 116l-19-5m20 15-20 2m100-12 19-5m-20 15 20 2" fill="none"/>' + eyes(213, 103, 38, '#623b30') + '</g>' +
-    '<g class="sc-rock"' + ink('#803560') + '><circle cx="157" cy="141" r="16" fill="#f49bb8"/><path d="M144 133q22 0 24 17m-26-8q20-17 25-3m-15-13q-9 19 5 28" fill="none"/></g>');
+  // An outlined limb or tail: the ink stroke, then the fill 6 units narrower.
+  const tube = (d, outline, fill, width) => '<path d="' + d + '" fill="none" stroke="' + outline + '" stroke-width="' + width + '" stroke-linecap="round"/>' +
+    '<path d="' + d + '" fill="none" stroke="' + fill + '" stroke-width="' + (width - 6) + '" stroke-linecap="round"/>';
+  const blush = (points, r, fill = '#ff9fb6') => points.map(([x, y]) => '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="' + fill + '" opacity=".8"/>').join('');
+  const heart = (x, y, size, fill, stroke, extra = '') => {
+    const s = size / 14;
+    const n = (value) => +(value * s).toFixed(1);
+    return '<path ' + extra + ' d="M' + x + ' ' + (y + n(8)) + 'c' + n(-8) + ' ' + n(-6) + ' ' + n(-14) + ' ' + n(-10) + ' ' + n(-14) + ' ' + n(-16) + 'c0 ' + n(-4) + ' ' + n(3) + ' ' + n(-7) + ' ' + n(7) + ' ' + n(-7) +
+      'c' + n(3) + ' 0 ' + n(5) + ' ' + n(2) + ' ' + n(7) + ' ' + n(4) + 'c' + n(2) + ' ' + n(-2) + ' ' + n(4) + ' ' + n(-4) + ' ' + n(7) + ' ' + n(-4) + 'c' + n(4) + ' 0 ' + n(7) + ' ' + n(3) + ' ' + n(7) + ' ' + n(7) +
+      'c0 ' + n(6) + ' ' + n(-6) + ' ' + n(10) + ' ' + n(-14) + ' ' + n(16) + 'z" fill="' + fill + '" stroke="' + stroke + '" stroke-width="2.5" stroke-linejoin="round"/>';
+  };
 
-  const horses = svg('horses', meadow('paddock') +
-    '<g' + ink('#dfbb80') + '><path d="M18 104h284m-284 23h284M36 87v65m68-65v65m108-65v65m70-65v65" fill="none" stroke-width="6"/></g>' +
-    '<g' + ink('#482d23') + '><path d="M97 103Q73 75 59 97q-8 20-17 24 28 9 43-9" fill="#513c32"/><path d="M100 133v17h15v-17M158 133v17h15v-20" fill="#c88a50"/><path d="M86 109q5-24 44-21h35l13-46 29-3 21 41-18 14-18-23-13 56q-4 17-39 17h-27q-29 0-27-35z" fill="#c88a50"/><path d="M178 48l8-25 12 17m5-2 11-17 4 29" fill="#c88a50"/><path d="M176 45q-17 7-17 46l17 7 10-48" fill="#513c32"/><path d="M206 55l13 25-9 8-16-26" fill="#fff1dc"/><circle cx="202" cy="53" r="3" fill="#482d23"/><path d="M121 88h39v29h-39z" fill="#af3e44"/></g>' +
-    '<rect x="239" y="117" width="57" height="36" rx="7" fill="#efca64"' + ink('#9b732d') + '/><path d="M250 118v35m16-35v35m16-35v35" stroke="#bf963d" stroke-width="3"/>');
+  const paw = (x, y, angle) => '<g transform="rotate(' + angle + ' ' + x + ' ' + y + ')"><ellipse cx="' + x + '" cy="' + (y + 4) + '" rx="6.5" ry="5.5"/>' +
+    [[-7, -3], [-3, -8], [3, -8], [7, -3]].map(([dx, dy]) => '<circle cx="' + (x + dx) + '" cy="' + (y + dy) + '" r="2.6"/>').join('') + '</g>';
+  const bone = '<circle cx="46" cy="138" r="5"/><circle cx="46" cy="146" r="5"/><circle cx="72" cy="138" r="5"/><circle cx="72" cy="146" r="5"/><rect x="46" y="137" width="26" height="10"/>';
+  const pets = svg('pets',
+    faded('rug', '<rect x="0" y="150" width="320" height="20" fill="#7a2420" opacity=".4"/>') +
+    '<g fill="#fff" opacity=".4">' + paw(22, 96, 30) + paw(44, 72, 40) + paw(76, 62, 50) + paw(94, 34, 50) + '</g>' +
+    // bone and yarn
+    '<g transform="rotate(-8 59 142)"><g fill="#4a2614" stroke="#4a2614" stroke-width="6" stroke-linejoin="round">' + bone + '</g><g fill="#fff6e5">' + bone + '</g></g>' +
+    '<path d="M126 142q10 8 22 2t20-4" fill="none" stroke="#7c83fd" stroke-width="3" stroke-linecap="round"/>' +
+    '<circle cx="112" cy="134" r="16" fill="#7c83fd"' + ink('#4a2614') + '/>' +
+    '<path d="M99 126q12 4 16 22M103 121q16 0 24 16M97 138q14-4 28 4" fill="none" stroke="#c3c7ff" stroke-width="2.5" stroke-linecap="round"/>' +
+    // bed, back half
+    '<ellipse cx="236" cy="118" rx="78" ry="24" fill="#3d7cc9"' + ink('#4a2614') + '/>' +
+    '<ellipse cx="236" cy="118" rx="64" ry="15" fill="#a5d0f5" stroke="#4a2614" stroke-width="2.5"/>' +
+    '<g class="sc-wag">' + tube('M292 104q16-4 18-22', '#4a2614', '#fff3e0', 12) + '</g>' +
+    '<ellipse cx="206" cy="120" rx="26" ry="15" fill="#9aa6b8"' + ink('#4a2614') + '/>' +
+    '<ellipse cx="270" cy="114" rx="27" ry="24" fill="#fff3e0"' + ink('#4a2614') + '/>' +
+    // kitten
+    '<path d="M184 90L183 70L198 79ZM203 78L217 70L218 90Z" fill="#9aa6b8"' + ink('#4a2614') + '/><path d="M187 84v-8l6 4zM209 80l5-4 1 8z" fill="#ffb3cf"/>' +
+    '<circle cx="200" cy="96" r="19" fill="#9aa6b8"' + ink('#4a2614') + '/>' +
+    '<path d="M196 79v6M201 78v7M206 79v6" stroke="#6c788c" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path d="M188 96q4-4 8 0M204 96q4-4 8 0M196 105q2 2 4 0q2 2 4 0M182 101h-8M183 105l-7 2M218 101h8M217 105l7 2" fill="none" stroke="#2a160b" stroke-width="2.2" stroke-linecap="round"/>' +
+    '<path d="M197.5 101h5l-2.5 2.5z" fill="#ff8fa3" stroke="#ff8fa3" stroke-width="1.5" stroke-linejoin="round"/>' + blush([[189, 103], [211, 103]], 3.5) +
+    // puppy
+    '<path d="M252 56C238 58 234 80 240 94C244 100 252 98 252 90C252 80 256 68 258 60ZM284 56C298 58 302 80 296 94C292 100 284 98 284 90C284 80 280 68 278 60Z" fill="#b8692f"' + ink('#4a2614') + '/>' +
+    '<circle cx="268" cy="72" r="24" fill="#fff3e0"' + ink('#4a2614') + '/><circle cx="277" cy="68" r="8" fill="#e0a46a"/>' +
+    '<circle cx="259" cy="70" r="3" fill="#2a160b"/><circle cx="277" cy="70" r="3" fill="#2a160b"/>' +
+    '<ellipse cx="268" cy="84" rx="11" ry="8" fill="#fffaf2" stroke="#4a2614" stroke-width="2.5"/>' +
+    '<path d="M266 89h4v3a2 2 0 0 1-4 0z" fill="#ff8fa3"/><path d="M263 79h10q0 5-5 7q-5-2-5-7z" fill="#2a160b"/>' +
+    '<path d="M262 88q3 3 6 0q3 3 6 0" fill="none" stroke="#2a160b" stroke-width="2" stroke-linecap="round"/>' + blush([[252, 82], [284, 82]], 4) +
+    // bed, front rim, and paws over it
+    '<path d="M158 118C158 140 190 152 236 152C282 152 314 140 314 118C304 132 276 138 236 138C196 138 168 132 158 118Z" fill="#3d7cc9"' + ink('#4a2614') + '/>' +
+    '<path d="M174 138Q236 156 298 138" fill="none" stroke="#a5d0f5" stroke-width="2.5" stroke-dasharray="4 5" stroke-linecap="round"/>' +
+    '<g' + ink('#4a2614') + '><ellipse cx="194" cy="137" rx="7" ry="5" fill="#9aa6b8"/><ellipse cx="214" cy="138" rx="7" ry="5" fill="#9aa6b8"/><ellipse cx="257" cy="137" rx="8" ry="6" fill="#fff3e0"/><ellipse cx="283" cy="137" rx="8" ry="6" fill="#fff3e0"/></g>' +
+    '<g class="sc-sway">' + tube('M182 124q-18 0-20-16', '#4a2614', '#9aa6b8', 10) + '</g>' +
+    heart(232, 46, 14, '#ff8fb1', '#4a2614', 'class="sc-rise"') + heart(208, 34, 9, '#ffc2d4', '#4a2614', 'class="sc-rise" style="animation-delay:1.6s"'));
 
-  const bugs = svg('bugs', meadow('garden') +
-    '<path d="M68 155V97m172 58V97" fill="none" stroke="#c3e58e" stroke-width="5"/>' +
-    [68, 240].map(x => '<g fill="#ffe58b">' + range(6).map(i => '<ellipse cx="' + x + '" cy="83" rx="9" ry="18" transform="rotate(' + (i * 60) + ' ' + x + ' 97)"/>').join('') + '<circle cx="' + x + '" cy="97" r="12" fill="#e6a43d"/></g>').join('') +
-    '<g class="sc-bob"' + ink('#3c355c') + '><path d="M151 61C90 7 88 100 145 94c-45 30-5 69 18 23 22 46 62 7 18-23 57 6 55-87-6-33z" fill="#c3a0f4"/><path d="M151 70q-34-30-38-2t38 15m24-13q34-30 38-2t-38 15" fill="#ffb4d7"/><rect x="151" y="55" width="24" height="65" rx="12" fill="#ffe58b"/><path d="M158 56l-9-17m19 17 9-17" fill="none"/>' + eyes(158, 67, 10, '#3c355c') + '</g>' +
-    '<g class="sc-rock"' + ink('#28342b') + '><circle cx="87" cy="140" r="16" fill="#f76c66"/><path d="M87 124v32"/><circle cx="87" cy="123" r="7" fill="#28342b"/><circle cx="79" cy="137" r="3"/><circle cx="95" cy="145" r="3"/></g>');
+  const sunRays = (cx, cy, inner, outer, count, color) => '<g class="sc-glow" stroke="' + color + '" stroke-width="5" stroke-linecap="round">' + range(count).map((index) => {
+    const angle = Math.PI * 2 * index / count;
+    return '<path d="M' + (cx + Math.cos(angle) * inner).toFixed(1) + ' ' + (cy + Math.sin(angle) * inner).toFixed(1) + 'L' + (cx + Math.cos(angle) * outer).toFixed(1) + ' ' + (cy + Math.sin(angle) * outer).toFixed(1) + '"/>';
+  }).join('') + '</g>';
+  const horseHead = '<circle cx="246" cy="76" r="21"/><path d="M234 58L192 98L212 118L250 96Z"/><ellipse cx="204" cy="106" rx="17" ry="14"/>';
+  const horses = svg('horses',
+    sunRays(42, 38, 21, 28, 8, '#ffe066') + '<circle cx="42" cy="38" r="15" fill="#ffd43b"/>' +
+    '<g class="sc-drift">' + cloud(134, 46, '#3b2414', .9) + '</g>' +
+    faded('pasture', '<path d="M0 150Q80 138 160 146T320 142V170H0Z" fill="#6b8e23" opacity=".85"/>') +
+    // hay bale
+    '<path d="M36 110l-4-9M46 110l2-10M70 110l-2-9M98 110l4-9" stroke="#f4c95d" stroke-width="3" stroke-linecap="round"/>' +
+    '<rect x="24" y="108" width="86" height="42" rx="10" fill="#f4c95d"' + ink('#3b2414') + '/>' +
+    '<path d="M32 120h10M58 118h12M88 122h12M34 136h8M62 134h12M90 138h10M66 126h8" stroke="#d49a2a" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path d="M50 109v40M84 109v40" stroke="#a0522d" stroke-width="3"/>' +
+    // horse neck and mane, behind the fence
+    '<g transform="translate(0 6)">' +
+      '<path d="M232 84L262 50C284 66 298 100 302 150H244C246 120 240 100 232 84Z" fill="#f6e3c0"' + ink('#3b2414') + '/>' +
+      '<g fill="#6b3f1d"' + ink('#3b2414') + '>' + [[266, 52], [280, 68], [290, 88], [297, 110], [301, 132]].map(([x, y]) => '<circle cx="' + x + '" cy="' + y + '" r="9"/>').join('') + '</g>' +
+      '<path d="M264 52C280 66 293 92 299 140" fill="none" stroke="#6b3f1d" stroke-width="12" stroke-linecap="round"/>' +
+    '</g>' +
+    // fence, then grass over the foot of the neck
+    '<g fill="#fdf6ea"' + ink('#3b2414') + '><rect x="124" y="104" width="194" height="10" rx="3"/><rect x="124" y="122" width="194" height="10" rx="3"/><rect x="124" y="140" width="194" height="9" rx="3"/><rect x="134" y="96" width="12" height="56" rx="2"/><rect x="298" y="96" width="12" height="56" rx="2"/></g>' +
+    faded('pasture-front', '<path d="M0 156Q80 146 160 152T320 150V170H0Z" fill="#6b8e23"/>') +
+    // horse head, chin on the top rail
+    '<g transform="translate(0 6)"><g class="sc-nuzzle">' +
+      '<path d="M238 58L241 38L254 54ZM253 60L263 41L266 62Z" fill="#f6e3c0"' + ink('#3b2414') + '/><path d="M243 52l1-8 5 6zM258 56l4-8 1 9z" fill="#e8b8a0"/>' +
+      '<g fill="#3b2414" stroke="#3b2414" stroke-width="6" stroke-linejoin="round">' + horseHead + '</g><g fill="#f6e3c0">' + horseHead + '</g>' +
+      '<path d="M234 58C226 70 212 84 202 96C204 99 209 100 211 97C220 86 232 72 241 62Z" fill="#fffaf2"/>' +
+      '<ellipse cx="204" cy="106" rx="15" ry="11" fill="#f2c9a8"/>' +
+      '<path d="M248 52q-10 3-13 13q8-1 13-7q1 6-1 10q9-5 8-15z" fill="#6b3f1d" stroke="#3b2414" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<circle cx="238" cy="72" r="3.2" fill="#2b1a0e"/><path d="M234 67l-3-3" stroke="#2b1a0e" stroke-width="2" stroke-linecap="round"/>' +
+      '<ellipse cx="197" cy="103" rx="2.4" ry="3" fill="#2b1a0e"/>' +
+      '<path d="M200 113q6 3 12-1" fill="none" stroke="#2b1a0e" stroke-width="2.5" stroke-linecap="round"/>' + blush([[234, 90]], 5) +
+    '</g></g>');
 
-  const jungle = svg('jungle', meadow('safari') +
-    '<g' + ink('#194b37') + '><path d="M38 150l6-90m242 90-9-98" fill="none" stroke="#b78a55" stroke-width="9"/><path d="M44 60Q6 28 5 76q20-16 39-16Q22 9 74 21L44 60q41-35 48 5-26-10-48-5m233-8q-36-32-44 11 21-14 44-11-18-41 18-39l-18 39q30-26 41 9-25-10-41-9" fill="#72b86e"/></g>' +
-    '<g class="sc-bob"' + ink('#633a24') + '><circle cx="122" cy="99" r="50" fill="#ba683b"/><circle cx="122" cy="100" r="34" fill="#ffd075"/><circle cx="98" cy="77" r="9" fill="#ffd075"/><circle cx="146" cy="77" r="9" fill="#ffd075"/><ellipse cx="122" cy="119" rx="19" ry="14" fill="#fff0c7"/><path d="M115 112h14l-7 8z" fill="#633a24"/><path d="M122 120v8"/>' + eyes(108, 98, 28, '#633a24') + '</g>' +
-    '<g class="sc-nod"' + ink('#633a24') + '><circle cx="215" cy="96" r="33" fill="#ab784f"/><circle cx="184" cy="91" r="12" fill="#eaca92"/><circle cx="246" cy="91" r="12" fill="#eaca92"/><path d="M191 89q8-14 24-2 17-12 25 2v21q-25 31-49 0z" fill="#eaca92"/><path d="M207 114q8 7 16 0" fill="none"/>' + eyes(205, 96, 20, '#633a24') + '</g>');
+  const daisy = (x, y, delay) => '<g class="sc-tilt" style="animation-delay:' + delay + 's">' + tube('M' + x + ' 152V' + y, '#1d3a12', '#7cc35a', 8) +
+    '<path d="M' + x + ' ' + (y + 22) + 'q10-10 18-4q-8 8-18 4z" fill="#7cc35a" stroke="#1d3a12" stroke-width="2" stroke-linejoin="round"/>' +
+    '<g fill="#fff" stroke="#1d3a12" stroke-width="2">' + range(8).map((index) => '<circle cx="' + (x + Math.cos(index * Math.PI / 4) * 8).toFixed(1) + '" cy="' + (y + Math.sin(index * Math.PI / 4) * 8).toFixed(1) + '" r="5.5"/>').join('') +
+    '<circle cx="' + x + '" cy="' + y + '" r="5.5" fill="#ffd43b"/></g></g>';
+  const bugs = svg('bugs',
+    faded('garden', '<path d="M0 152Q80 142 160 150T320 146V170H0Z" fill="#174d1a" opacity=".55"/>') +
+    // bee and its loop
+    '<path d="M96 30q26 26 46 4" fill="none" stroke="#fff" stroke-width="2.5" stroke-dasharray="2 7" stroke-linecap="round" opacity=".6"/>' +
+    '<g class="sc-bob" style="animation-delay:.6s"><ellipse cx="150" cy="28" rx="6" ry="4" fill="#fff" opacity=".9" stroke="#1d3a12" stroke-width="2"/><ellipse cx="160" cy="27" rx="6" ry="4" fill="#fff" opacity=".9" stroke="#1d3a12" stroke-width="2"/>' +
+      '<ellipse cx="154" cy="38" rx="11" ry="8" fill="#ffd43b" stroke="#1d3a12" stroke-width="2.5"/><path d="M152 31v14M158 31v14" stroke="#1d3a12" stroke-width="3"/><circle cx="147" cy="36" r="1.8" fill="#1d3a12"/></g>' +
+    // butterfly
+    '<g class="sc-bob"><g class="sc-flap" stroke="#1d3a12" stroke-width="2.5" stroke-linejoin="round">' +
+      '<path d="M84 62C70 40 52 42 54 58C56 70 72 70 84 64ZM84 62C98 40 116 42 114 58C112 70 96 70 84 64Z" fill="#ff8fc8"/>' +
+      '<path d="M84 66C70 70 60 82 68 88C76 92 82 80 84 68ZM84 66C98 70 108 82 100 88C92 92 86 80 84 68Z" fill="#ffd84a"/>' +
+      '<g fill="#fff" stroke="none"><circle cx="66" cy="56" r="3.5"/><circle cx="102" cy="56" r="3.5"/></g></g>' +
+      '<rect x="81" y="50" width="6" height="30" rx="3" fill="#3b2a4d"/><path d="M83 51q-4-8-10-9M85 51q4-8 10-9" fill="none" stroke="#3b2a4d" stroke-width="2" stroke-linecap="round"/></g>' +
+    daisy(26, 112, 0) + daisy(52, 124, .8) + daisy(124, 120, 1.6) +
+    // leaf and ladybird
+    '<path d="M314 150C302 108 248 84 158 90C186 132 244 154 314 150Z" fill="#a3e06a"' + ink('#1d3a12') + '/>' +
+    '<path d="M306 144C268 118 214 100 168 92M282 128l8-18M270 122l-6 16M182 98l8-10" fill="none" stroke="#62a83a" stroke-width="3" stroke-linecap="round"/>' +
+    '<path d="M224 120l-3 7M240 121v7M256 120l3 7" stroke="#1d3a12" stroke-width="3" stroke-linecap="round"/>' +
+    '<path d="M214 120a30 32 0 0 1 60 0z" fill="#ef3b3b"' + ink('#1d3a12') + '/><path d="M244 88v32" stroke="#1d3a12" stroke-width="2.5"/>' +
+    '<g fill="#2a1f2e">' + [[229, 106, 5.5], [259, 106, 5.5], [237, 96, 3.5], [251, 96, 3.5], [234, 115, 3], [254, 115, 3]].map(([x, y, r]) => '<circle cx="' + x + '" cy="' + y + '" r="' + r + '"/>').join('') + '</g>' +
+    '<path d="M207 102q-4-10-12-12M215 100q2-10 10-14" fill="none" stroke="#1d3a12" stroke-width="2.5" stroke-linecap="round"/><circle cx="195" cy="90" r="3" fill="#2a1f2e"/><circle cx="225" cy="86" r="3" fill="#2a1f2e"/>' +
+    '<circle cx="212" cy="112" r="13" fill="#2a1f2e"' + ink('#1d3a12') + '/>' +
+    '<circle cx="206" cy="109" r="3.6" fill="#fff"/><circle cx="217" cy="109" r="3.6" fill="#fff"/><circle cx="206" cy="110" r="1.8" fill="#2a1f2e"/><circle cx="217" cy="110" r="1.8" fill="#2a1f2e"/>' + blush([[203, 116], [221, 116]], 2.4) +
+    '<path d="M205 117q5 4 10 0" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>');
 
-  // Rounded resting dragon: rear wing on the torso; tube neck under the head.
-  // All callers use fixed colours. Its head alone nods from the neck joint.
-  const sleepyDragon = (fill, belly, wing, stroke) =>
-    '<path d="M220 134C201 154 178 150 181 133q3-14 15-8" fill="none" stroke="' + stroke + '" stroke-width="17" stroke-linecap="round"/><path d="M220 134C201 154 178 150 181 133q3-14 15-8" fill="none" stroke="' + fill + '" stroke-width="11" stroke-linecap="round"/>' +
-    '<path d="M266 124Q287 127 304 111q-12-2-9-18-23 4-33 28z" fill="' + wing + '"' + ink(stroke) + '/>' +
-    '<path d="M257 116C257 103 249 96 241 90" fill="none" stroke="' + stroke + '" stroke-width="32" stroke-linecap="round"/><path d="M257 116C257 103 249 96 241 90" fill="none" stroke="' + fill + '" stroke-width="26" stroke-linecap="round"/>' +
-    '<g' + ink(stroke) + '><rect x="217" y="135" width="23" height="15" rx="7" fill="' + fill + '"/><rect x="267" y="135" width="23" height="15" rx="7" fill="' + fill + '"/><ellipse cx="249" cy="124" rx="44" ry="23" fill="' + fill + '"/><ellipse cx="241" cy="130" rx="22" ry="13" fill="' + belly + '" stroke="none"/></g>' +
-    '<g class="sc-nod"' + ink(stroke) + '><path d="M232 60l4-17 12 16m8 4 13-15 2 22" fill="#ffd43b"/><path d="M267 80C266 62 253 56 237 58q-22 0-24 17-20-1-21 14-1 16 22 18h28q32-4 25-27z" fill="' + fill + '"/><path d="M231 79q7 7 14 0M204 97q9 5 17 0" fill="none" stroke-width="2.5" stroke-linecap="round"/><circle cx="202" cy="87" r="2.2" fill="' + stroke + '" stroke="none"/><circle cx="227" cy="91" r="5" fill="#ffb3cf" opacity=".8" stroke="none"/></g>';
+  const jungleBush = '<circle cx="262" cy="146" r="11"/><circle cx="280" cy="138" r="15"/><circle cx="301" cy="140" r="14"/><circle cx="313" cy="148" r="8"/><rect x="254" y="144" width="64" height="10" rx="4"/>';
+  const jungle = svg('jungle',
+    faded('bush', '<path d="M0 156Q16 136 38 146Q58 128 82 144Q104 132 124 148Q150 134 170 150Q196 136 220 148Q248 132 272 146Q296 134 320 150V170H0Z" fill="#0c3a1b" opacity=".6"/>') +
+    // leaves hanging from the canopy
+    '<g' + ink('#2d2410') + '><path d="M10 0C30 14 34 36 26 52C12 40 6 20 10 0Z" fill="#4caf50"/><path d="M34 0C52 10 60 28 56 44C42 34 34 18 34 0Z" fill="#66bb6a"/><path d="M0 16C14 26 18 44 12 60C2 50 0 36 0 16Z" fill="#66bb6a"/></g>' +
+    '<path d="M11 4Q24 24 25 46M36 4Q48 20 54 38" fill="none" stroke="#2e7d32" stroke-width="2" stroke-linecap="round"/>' +
+    // monkey on a vine
+    '<g class="sc-swing">' + tube('M104 0C98 18 110 34 104 58', '#2d2410', '#7cb342', 8) +
+      '<path d="M104 16q12-8 18 0q-10 6-18 0zM105 36q-12-8-18 0q10 6 18 0z" fill="#7cb342" stroke="#2d2410" stroke-width="2" stroke-linejoin="round"/>' +
+      tube('M114 98C118 84 112 68 106 60', '#2d2410', '#8b5a2b', 12) +
+      tube('M114 120C134 124 140 108 132 98C128 94 122 98 126 102', '#2d2410', '#8b5a2b', 10) +
+      tube('M98 120C94 128 94 134 96 140', '#2d2410', '#8b5a2b', 12) + tube('M110 120C114 128 116 134 112 140', '#2d2410', '#8b5a2b', 12) +
+      '<ellipse cx="104" cy="108" rx="14" ry="17" fill="#8b5a2b"' + ink('#2d2410') + '/><ellipse cx="104" cy="112" rx="8" ry="10" fill="#f3c99b"/>' +
+      tube('M94 100C86 106 84 114 86 120', '#2d2410', '#8b5a2b', 12) +
+      '<g fill="#f3c99b" stroke="#2d2410" stroke-width="2.5"><circle cx="105" cy="58" r="5"/><circle cx="86" cy="121" r="5"/><circle cx="96" cy="141" r="5"/><circle cx="112" cy="141" r="5"/></g>' +
+      '<g fill="#8b5a2b"' + ink('#2d2410') + '><circle cx="86" cy="82" r="7"/><circle cx="118" cy="82" r="7"/></g><g fill="#f3c99b"><circle cx="86" cy="82" r="3.5"/><circle cx="118" cy="82" r="3.5"/></g>' +
+      '<circle cx="102" cy="84" r="16" fill="#8b5a2b"' + ink('#2d2410') + '/>' +
+      '<path d="M90 87C90 79 96 77 102 81C108 77 114 79 114 87C114 96 108 100 102 100C96 100 90 96 90 87Z" fill="#f3c99b" stroke="#2d2410" stroke-width="2"/>' +
+      '<circle cx="97" cy="86" r="2.4" fill="#2d2410"/><circle cx="107" cy="86" r="2.4" fill="#2d2410"/><path d="M98 93q4 3 8 0" fill="none" stroke="#2d2410" stroke-width="2.2" stroke-linecap="round"/>' + blush([[93, 93], [111, 93]], 2.6) +
+    '</g>' +
+    // giraffe
+    tube('M288 140C286 120 266 102 238 86', '#2d2410', '#f7c948', 30) +
+    '<g fill="#c8742c">' + [[284, 150, 6], [295, 138, 4.5], [279, 128, 5.5], [272, 112, 4], [262, 106, 5], [250, 94, 4]].map(([x, y, r]) => '<circle cx="' + x + '" cy="' + y + '" r="' + r + '"/>').join('') + '</g>' +
+    '<g class="sc-nuzzle">' +
+      tube('M222 66l-3-14M232 68l3-14', '#2d2410', '#f7c948', 9) + '<g fill="#a0522d" stroke="#2d2410" stroke-width="2.5"><circle cx="219" cy="51" r="4.5"/><circle cx="235" cy="53" r="4.5"/></g>' +
+      '<path d="M238 72q14-8 22-2q-10 8-22 2z" fill="#f7c948" stroke="#2d2410" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<ellipse cx="220" cy="76" rx="24" ry="17" transform="rotate(-15 220 76)" fill="#f7c948"' + ink('#2d2410') + '/>' +
+      '<circle cx="232" cy="82" r="4" fill="#c8742c"/>' +
+      '<ellipse cx="198" cy="86" rx="14" ry="12" fill="#ffe3a3"' + ink('#2d2410') + '/>' +
+      '<circle cx="192" cy="82" r="1.8" fill="#2d2410"/><circle cx="199" cy="80" r="1.8" fill="#2d2410"/><circle cx="220" cy="72" r="3" fill="#2d2410"/>' +
+      '<path d="M190 92q5 4 10 1" fill="none" stroke="#2d2410" stroke-width="2.2" stroke-linecap="round"/>' + blush([[211, 85]], 4) +
+    '</g>' +
+    // a bush and palm fronds hide where the neck comes up
+    '<g class="sc-tilt"' + ink('#2d2410') + '><path d="M290 146C266 116 232 112 206 122C236 120 262 130 290 146Z" fill="#5cb85c"/><path d="M292 146C300 114 310 100 318 94C318 118 308 134 292 146Z" fill="#7cc35a"/></g>' +
+    '<g fill="#2d2410" stroke="#2d2410" stroke-width="6" stroke-linejoin="round">' + jungleBush + '</g><g fill="#3f8f3a">' + jungleBush + '</g>' +
+    '<path d="M266 140q6-6 12-4M290 132q8-6 14-2" fill="none" stroke="#5cb85c" stroke-width="2.5" stroke-linecap="round"/>');
 
+  const dragonSpikes = range(6).map((index) => {
+    const at = (angle, grow) => (246 + Math.cos(angle) * 52 * grow).toFixed(1) + ' ' + (116 + Math.sin(angle) * 32 * grow).toFixed(1);
+    const angle = (-150 + index * 22) * Math.PI / 180;
+    return 'M' + at(angle - .12, 1) + 'L' + at(angle, 1.28) + 'L' + at(angle + .12, 1) + 'Z';
+  }).join('');
   const dragons = svg('dragons',
-    sparkle(145, 39, 8, '#fff6b0', .4) + meadow('quest') +
-    '<g' + ink('#35305c') + '><rect x="28" y="88" width="92" height="62" fill="#cdc5e7"/><path d="M22 89V67h14v10h14V67h14v10h14V67h14v10h14V67h20v22z" fill="#cdc5e7"/><path d="M60 150v-28a13 13 0 0 1 26 0v28z" fill="#635192"/><path d="M43 107v-8m63 8v-8" stroke="#ffd43b" stroke-width="7" stroke-linecap="round"/></g>' +
-    flag(73, 38, '#ffd43b', '#35305c') +
-    sleepyDragon('#f2c570', '#fff1cd', '#ce95e2', '#63432d'));
+    '<path d="M140 14a13 13 0 1 0 13 20a10 10 0 1 1-13-20z" fill="#fff3c4"/>' +
+    [[20, 30], [60, 18], [104, 26], [196, 34], [304, 58], [176, 66], [14, 86]].map(([x, y], index) => '<circle class="sc-twinkle" style="animation-delay:' + index * .4 + 's" cx="' + x + '" cy="' + y + '" r="' + (index % 3 ? 1.8 : 2.4) + '" fill="#fff"/>').join('') +
+    faded('dragon-hills', '<path d="M0 152Q60 140 120 148T320 140V170H0Z" fill="#0b3f2c" opacity=".6"/><path d="M150 152C170 124 210 116 250 118C290 120 312 132 320 142V152Z" fill="#2a8a58"/>') +
+    // castle
+    '<g fill="#c9c2e0"' + ink('#2b1747') + '><rect x="38" y="74" width="50" height="76"/><path d="' + range(4).map((index) => 'M' + (38 + index * 14) + ' 74v-9h8v9').join('') + '"/>' +
+      '<rect x="88" y="100" width="26" height="50"/><path d="M90 100v-8h8v8M104 100v-8h8v8"/></g>' +
+    '<path d="M44 90h10M70 86h10M46 118h8M76 122h8M94 138h8" stroke="#a59bc7" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path d="M53 150v-20a10 10 0 0 1 20 0v20z" fill="#6d28d9"' + ink('#2b1747') + '/>' +
+    '<path d="M58 104v-8a5 5 0 0 1 10 0v8zM97 126v-7a4 4 0 0 1 8 0v7z" fill="#ffd43b"' + ink('#2b1747') + '/>' +
+    flag(63, 49, '#ffd43b', '#2b1747') +
+    // smoke rings
+    '<g fill="none" stroke="#efe9ff" stroke-width="3.5">' + [[146, 100, 5, 0], [132, 78, 7, 1], [116, 54, 9, 2]].map(([x, y, r, delay]) => '<circle class="sc-puff" style="animation-delay:' + delay + 's" cx="' + x + '" cy="' + y + '" r="' + r + '"/>').join('') + '</g>' +
+    // dragon, curled up asleep
+    '<g class="sc-breathe">' +
+      '<path d="M236 92C240 70 262 60 286 64C280 72 280 80 284 88C274 86 268 92 268 100Z" fill="#5cc27a"' + ink('#2b1747') + '/>' +
+      '<path d="' + dragonSpikes + '" fill="#ffb347" stroke="#2b1747" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<ellipse cx="246" cy="116" rx="52" ry="32" fill="#9be38a"' + ink('#2b1747') + '/>' +
+      '<path d="M204 128C220 146 270 150 294 128" fill="none" stroke="#fff3b8" stroke-width="7" stroke-linecap="round"/>' +
+      '<ellipse cx="274" cy="124" rx="18" ry="14" fill="#9be38a" stroke="#2b1747" stroke-width="2.5"/>' +
+      tube('M290 128C306 148 274 156 240 151', '#2b1747', '#9be38a', 18) +
+      '<path d="M242 151L229 143L222 151L229 159Z" fill="#ffb347" stroke="#2b1747" stroke-width="2.5" stroke-linejoin="round"/>' +
+    '</g>' +
+    '<path d="M186 102l2-14 9 11zM200 101l7-12 4 13z" fill="#fff3b8" stroke="#2b1747" stroke-width="2.5" stroke-linejoin="round"/>' +
+    '<ellipse cx="190" cy="120" rx="27" ry="21" fill="#9be38a"' + ink('#2b1747') + '/>' +
+    '<ellipse cx="166" cy="126" rx="15" ry="12" fill="#9be38a"' + ink('#2b1747') + '/>' +
+    '<circle cx="158" cy="121" r="1.8" fill="#2b1747"/><circle cx="164" cy="120" r="1.8" fill="#2b1747"/>' +
+    '<path d="M180 112q6 5 12 0M156 132q6 4 12 1" fill="none" stroke="#2b1747" stroke-width="2.6" stroke-linecap="round"/>' + blush([[196, 126]], 5) +
+    '<g fill="#9be38a"' + ink('#2b1747') + '><ellipse cx="184" cy="143" rx="9" ry="6"/><ellipse cx="204" cy="144" rx="9" ry="6"/></g>');
 
-  const cars = svg('cars', faded('street', '<rect x="0" y="139" width="320" height="25" rx="12" fill="#1a2433"/><path d="M8 154h30m20 0h30m20 0h30m20 0h30m20 0h30m20 0h30" stroke="#ffda6b" stroke-width="3"/>') +
-    '<g' + ink('#192b43') + '><path d="M24 113l17-32h48l25 32 8 1v24H19v-20z" fill="#ffcf58"/><path d="M46 88h16v23H35zm22 0h17l18 23H68z" fill="#bdeafb"/><path d="M24 126h12m71 0h12" stroke="#fff4cf" stroke-width="5"/></g>' +
-    '<g' + ink('#192b43') + '><rect x="147" y="73" width="102" height="63" rx="6" fill="#f67465"/><path d="M249 93h34l19 25v18h-53z" fill="#d84d48"/><path d="M257 100h22l13 18h-35z" fill="#bdeafb"/><path d="M154 84h85m-85 12h85m-85 12h85" stroke="#ffcf58" stroke-width="4"/><path d="M175 63h66" stroke="#dce4ed" stroke-width="7"/></g>' +
-    [41, 101, 170, 233, 282].map(x => '<circle cx="' + x + '" cy="137" r="11" fill="#192b43"/><circle cx="' + x + '" cy="137" r="5" fill="#dce4ed"/>').join(''));
+  function carWheel(cx, cy, r) {
+    return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="#2b2e33"' + ink('#1b1e25') + '/><circle cx="' + cx + '" cy="' + cy + '" r="' + r * .55 + '" fill="#ced4da" stroke="#1b1e25" stroke-width="2.5"/>' +
+      '<g class="sc-spin"><path d="M' + (cx - r * .4) + ' ' + cy + 'H' + (cx + r * .4) + 'M' + cx + ' ' + (cy - r * .4) + 'V' + (cy + r * .4) + '" stroke="#1b1e25" stroke-width="2.5" stroke-linecap="round"/></g>';
+  }
+  const cars = svg('cars',
+    '<g class="sc-drift">' + cloud(78, 48, '#1b1e25', .8) + cloud(178, 32, '#1b1e25', .6) + '</g>' +
+    faded('road', '<rect x="0" y="146" width="320" height="24" fill="#1f242d"/><path d="M0 146H320" stroke="#8a94a6" stroke-width="2"/><path d="M4 159H320" stroke="#ffd43b" stroke-width="3" stroke-dasharray="14 10"/>') +
+    // traffic light
+    '<rect x="36" y="94" width="6" height="54" fill="#495057"' + ink('#1b1e25') + '/>' +
+    '<rect x="25" y="42" width="28" height="56" rx="7" fill="#343a40"' + ink('#1b1e25') + '/>' +
+    '<circle cx="39" cy="54" r="6" fill="#7a3434"/><circle cx="39" cy="70" r="6" fill="#7a6a2a"/><circle cx="39" cy="86" r="6.5" fill="#51cf66" stroke="#b2f2bb" stroke-width="2"/>' +
+    '<g stroke="#fff" stroke-width="3.5" stroke-linecap="round" class="sc-zoom"><path d="M96 104h26M86 120h34M100 136h22"/></g>' +
+    // fire engine
+    '<g class="sc-roll">' +
+      '<path d="M146 96v-6M226 96v-6" stroke="#1b1e25" stroke-width="4"/>' +
+      '<g fill="#dee2e6" stroke="#1b1e25" stroke-width="2.5"><rect x="134" y="80" width="108" height="5" rx="2"/><rect x="134" y="89" width="108" height="5" rx="2"/></g>' +
+      '<path d="' + range(8).map((index) => 'M' + (142 + index * 13) + ' 84v6').join('') + '" stroke="#1b1e25" stroke-width="2.5"/>' +
+      '<rect x="132" y="96" width="110" height="42" rx="5" fill="#e03131"' + ink('#1b1e25') + '/>' +
+      '<path d="M240 138V84h40q16 0 22 20l6 22v12z" fill="#e03131"' + ink('#1b1e25') + '/>' +
+      '<path d="M258 90h20q10 0 14 14l2 8h-36z" fill="#bfe3ff" stroke="#1b1e25" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<g fill="none" stroke="#1b1e25" stroke-width="2.5"><rect x="140" y="102" width="30" height="20" rx="3"/><rect x="204" y="102" width="30" height="20" rx="3"/><path d="M250 92v32"/></g>' +
+      '<circle cx="187" cy="112" r="10" fill="#ffd43b" stroke="#1b1e25" stroke-width="2.5"/><circle cx="187" cy="112" r="3.5" fill="#1b1e25"/>' +
+      '<rect x="132" y="126" width="176" height="5" fill="#f8f9fa"/>' +
+      '<rect class="sc-blink" x="248" y="75" width="15" height="9" rx="3" fill="#ff6b6b"' + ink('#1b1e25') + '/><rect class="sc-blink" style="animation-delay:.6s" x="263" y="75" width="15" height="9" rx="3" fill="#4dabf7"' + ink('#1b1e25') + '/>' +
+      '<circle cx="302" cy="118" r="4.5" fill="#ffe08a" stroke="#1b1e25" stroke-width="2.5"/>' +
+      '<rect x="292" y="132" width="20" height="8" rx="3" fill="#adb5bd"' + ink('#1b1e25') + '/>' +
+    '</g>' +
+    carWheel(168, 136, 14) + carWheel(276, 136, 14));
 
+  // Pixel art from rows of palette keys ('.' is empty), merged into horizontal runs.
+  const pixels = (x, y, size, rows, palette) => {
+    const runs = {};
+    rows.forEach((row, line) => {
+      for (let start = 0, end; start < row.length; start = end) {
+        for (end = start; end < row.length && row[end] === row[start]; end += 1);
+        if (row[start] !== '.') (runs[row[start]] = runs[row[start]] || []).push('M' + (x + start * size) + ' ' + (y + line * size) + 'h' + (end - start) * size + 'v' + size + 'h-' + (end - start) * size + 'z');
+      }
+    });
+    return Object.keys(runs).map((key) => '<path d="' + runs[key].join('') + '" fill="' + palette[key] + '"/>').join('');
+  };
+  const arcade = { k: '#1e0b3a', g: '#4ade80', l: '#bbf7d0', w: '#fff', p: '#f9a8d4', y: '#facc15', o: '#f59e0b', r: '#ff4d6d' };
+  const pixelHeart = ['.kk.kk.', 'kwrkrrk', 'krrrrrk', '.krrrk.', '..krk..', '...k...'];
+  const pixelSpark = ['.w.', 'www', '.w.'];
   const games = svg('games',
-    '<g fill="#7b5fce" opacity=".6">' + range(8).map(i => '<rect x="' + (24 + i * 38) + '" y="154" width="30" height="10"/>').join('') + '</g>' +
-    '<g class="sc-bob" fill="#9af78e"><path d="M68 43h12v12h12V43h12v12h12v12h12v48h-12v12h-12v-24H80v24H68v-12H56V67h12V55h12z"/><path d="M74 78h12v12H74zm30 0h12v12h-12z" fill="#30234e"/></g>' +
-    '<g class="sc-pulse" fill="#ffdb64"><path d="M156 68h12V56h36v12h12v48h-12v12h-36v-12h-12z"/><path d="M180 72h12v40h-12z" fill="#c78d35"/></g>' +
-    '<g fill="#ec9ed8"><path d="M243 110h12V98h36v12h12v36h-60z"/><path d="M255 98V86h24v12zm-12 48v12h24v-12m24 0v12h12v-12"/><path d="M255 119h12v12h-12zm24 0h12v12h-12z" fill="#30234e"/></g>' +
-    sparkle(254, 39, 11, '#e8e0ff', .5) + sparkle(36, 129, 7, '#ffdb64', 1));
+    '<g shape-rendering="crispEdges">' +
+      [10, 42, 74].map((x) => pixels(x, 10, 4, pixelHeart, arcade)).join('') +
+      '<g opacity=".9">' + pixels(150, 30, 5, ['...ww....', '.wwwwww..', 'wwwwwwwww'], arcade) + pixels(196, 64, 5, ['..www.', 'wwwwww'], arcade) + '</g>' +
+      [[180, 108, 0], [300, 52, .9], [62, 76, 1.8]].map(([x, y, delay]) => '<g class="sc-twinkle" style="animation-delay:' + delay + 's">' + pixels(x, y, 4, pixelSpark, arcade) + '</g>').join('') +
+      faded('pixel-ground', '<rect x="0" y="150" width="320" height="5" fill="#22c55e"/><rect x="0" y="155" width="320" height="15" fill="#92400e"/>' +
+        '<path d="' + range(16).map((index) => 'M' + (index * 20 + (index % 2) * 10) + ' 160h5v5h-5z').join('') + '" fill="#6b2f0a"/>') +
+      // block and the coin it gave
+      pixels(110, 82, 5, ['kkkkkkkkk', 'koyyyyyok', 'kyyyyyyyk', 'kyyywyyyk', 'kyywwwyyk', 'kyyywyyyk', 'kyyyyyyyk', 'koyyyyyok', 'kkkkkkkkk'], arcade) +
+      '<g class="sc-bob"><g class="sc-flip">' + pixels(120, 44, 5, ['.kkk.', 'kyyyk', 'kyoyk', 'kyoyk', 'kyyyk', '.kkk.'], arcade) + '</g></g>' +
+      // the player, looking at the block
+      '<g class="sc-hop">' + pixels(222, 90, 5, ['......kkkk......', '....kkggggkk....', '...kggggggggk...', '..kggggggggggk..', '.kggwwggggwwggk.', '.kggkwggggkwggk.',
+        'kgggkwggggkwgggk', 'kgppggggggggppgk', 'kggggkggggkggggk', 'kgggggkkkkgggggk', 'kgllllllllllllgk', '.kkkkkkkkkkkkkk.'], arcade) + '</g>' +
+    '</g>');
 
-  const brick = (x, y, w, color) => '<g' + ink('#38304a') + '><path d="M' + x + ' ' + y + 'l12-10h' + w + 'l-12 10z" fill="' + color + '"/><rect x="' + x + '" y="' + y + '" width="' + w + '" height="28" rx="3" fill="' + color + '"/>' + range(Math.floor(w / 24)).map(i => '<ellipse cx="' + (x + 16 + i * 24) + '" cy="' + (y - 8) + '" rx="8" ry="4" fill="' + color + '"/>').join('') + '</g>';
+  const brick = (x, y, studs, fill) => '<g fill="' + fill + '"' + ink('#1b1b2f') + '>' + range(studs).map((index) => '<rect x="' + (x + 3 + index * 16) + '" y="' + (y - 6) + '" width="10" height="8" rx="2"/>').join('') +
+    '<rect x="' + x + '" y="' + y + '" width="' + studs * 16 + '" height="20" rx="3"/></g>';
   const bricks = svg('bricks',
-    brick(26, 125, 96, '#f26c65') + brick(126, 125, 72, '#77c4f2') + brick(202, 125, 72, '#ffcf5c') +
-    brick(62, 87, 72, '#ffcf5c') + brick(140, 87, 96, '#84d69b') +
-    '<g class="sc-bob">' + brick(102, 49, 96, '#77c4f2') + '</g>' + sparkle(259, 57, 12, '#fff4bf', .6));
+    sparkle(30, 34, 8, '#fff6b0', 0) + sparkle(140, 26, 6, '#fff', .8) + sparkle(304, 62, 7, '#fff6b0', 1.6) + sparkle(118, 92, 5, '#fff', 2.2) +
+    faded('baseplate', '<path d="' + range(20).map((index) => 'M' + (index * 16 + 3) + ' 150v-4h10v4z').join('') + '" fill="#2f9e44" stroke="#1b1b2f" stroke-width="2"/><rect x="0" y="150" width="320" height="20" fill="#2f9e44"/><path d="M0 150H320" stroke="#1b1b2f" stroke-width="2.5"/>') +
+    // loose bricks
+    brick(36, 130, 2, '#f8f9fa') + brick(74, 130, 1, '#ffd43b') +
+    // the stack
+    brick(172, 130, 4, '#2563eb') + brick(236, 130, 4, '#ffd43b') +
+    brick(188, 110, 4, '#2fb35a') + brick(252, 110, 2, '#74c0fc') +
+    brick(204, 90, 2, '#ffd43b') +
+    // and the one going on top
+    '<g class="sc-place">' + brick(236, 56, 2, '#2563eb') + '<path d="M226 58v14M278 58v14" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".7"/></g>');
 
+  const sprinkles = [['#ffd43b', 30], ['#74c0fc', -20], ['#69db7c', 60], ['#b197fc', -40], ['#ff922b', 20], ['#ff8fc8', -60]];
+  const sprinkle = ([x, y], index, extra = '') => {
+    const [color, angle] = sprinkles[index % sprinkles.length];
+    const dx = (Math.cos(angle * Math.PI / 180) * 3).toFixed(1);
+    const dy = (Math.sin(angle * Math.PI / 180) * 3).toFixed(1);
+    return '<path ' + extra + 'd="M' + (x - dx) + ' ' + (y - dy) + 'L' + (x + +dx) + ' ' + (y + +dy) + '" stroke="' + color + '" stroke-width="3.5" stroke-linecap="round"/>';
+  };
   const sweets = svg('sweets',
-    '<ellipse cx="157" cy="153" rx="137" ry="11" fill="#ffdfc6" opacity=".55"/>' +
-    '<g class="sc-bob"' + ink('#74394a') + '><path d="M45 101l10 47h62l10-47z" fill="#f8ca74"/><path d="M68 111l4 28m17-28v28m17-28-4 28" fill="none" stroke="#cb964f"/><path d="M38 99q-4-18 16-22-4-19 18-23 0-19 17-26 0 18 18 22 19 5 17 24 20 7 10 25z" fill="#ffbdd6"/><circle cx="89" cy="30" r="8" fill="#e65067"/></g>' +
-    '<g class="sc-rock"' + ink('#74394a') + '><circle cx="193" cy="113" r="37" fill="#e7b073"/><circle cx="193" cy="113" r="24" fill="#f7d297"/><path d="M175 96l7 4m20-4 6 4m-32 20 5 5m25-12 6 4m-17 17 6 1" stroke="#74394a" stroke-width="6" stroke-linecap="round"/></g>' +
-    '<path d="M273 80v70" stroke="#fff3d7" stroke-width="7"/>' +
-    '<g class="sc-sway"' + ink('#74394a') + '><circle cx="273" cy="60" r="30" fill="#ffdc82"/><path d="M273 60q-16-16 0-20 21 1 20 21-1 27-31 26-32-6-25-35" fill="none" stroke="#f078a1" stroke-width="9"/></g>');
+    [[28, 30], [140, 24], [170, 62], [300, 74], [16, 92], [124, 74], [196, 30]].map((point, index) => sprinkle(point, index, 'class="sc-twinkle" style="animation-delay:' + index * .4 + 's" ')).join('') +
+    sparkle(100, 40, 7, '#fff6b0', .4) + sparkle(296, 112, 6, '#fff', 1.4) +
+    faded('table', '<rect x="0" y="150" width="320" height="20" fill="#fff0f5" opacity=".3"/>') +
+    // steam over warm cookies
+    '<g fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" opacity=".85">' + [[66, 0], [86, 1.3], [108, .6]].map(([x, delay]) => '<path class="sc-rise" style="animation-delay:' + delay + 's" d="M' + x + ' 96q-6-7 0-14t0-14"/>').join('') + '</g>' +
+    '<ellipse cx="92" cy="146" rx="54" ry="8" fill="#fff"' + ink('#3b1622') + '/>' +
+    '<circle cx="78" cy="124" r="22" fill="#e9a85a"' + ink('#3b1622') + '/><circle cx="114" cy="130" r="18" fill="#f0b86e"' + ink('#3b1622') + '/>' +
+    '<g fill="#5a2e1a">' + [[70, 114, 3.2], [86, 118, 2.6], [66, 130, 3], [80, 136, 2.4], [108, 124, 3], [121, 132, 2.6], [110, 139, 2.4]].map(([x, y, r]) => '<circle cx="' + x + '" cy="' + y + '" r="' + r + '"/>').join('') + '</g>' +
+    // cupcake
+    '<g class="sc-rock">' +
+      '<path d="M206 112h68l-8 38h-52z" fill="#7dd3fc"' + ink('#3b1622') + '/><path d="M217 116l3 30M263 116l-3 30" stroke="#38a3d1" stroke-width="2.5" stroke-linecap="round"/>' +
+      '<g fill="#fff4f7"' + ink('#3b1622') + '><ellipse cx="240" cy="108" rx="40" ry="13"/><ellipse cx="240" cy="94" rx="30" ry="11"/><ellipse cx="240" cy="80" rx="18" ry="9"/></g>' +
+      [[220, 106], [236, 113], [256, 108], [228, 94], [250, 90], [262, 100], [240, 80]].map((point, index) => sprinkle(point, index)).join('') +
+      '<path d="M241 54q2-8 10-12" fill="none" stroke="#3b1622" stroke-width="2.5" stroke-linecap="round"/>' +
+      '<circle cx="240" cy="62" r="9" fill="#e5383b"' + ink('#3b1622') + '/><circle cx="236.5" cy="58.5" r="2.2" fill="#fff"/>' +
+      '<circle cx="229" cy="130" r="2.8" fill="#3b1622"/><circle cx="251" cy="130" r="2.8" fill="#3b1622"/>' +
+      '<path d="M234 136q6 5 12 0" fill="none" stroke="#3b1622" stroke-width="2.5" stroke-linecap="round"/>' + blush([[222, 136], [258, 136]], 3.5) +
+    '</g>');
 
+  const raindrop = (x, y, delay) => '<path class="sc-fall" style="animation-delay:' + delay + 's" d="M' + x + ' ' + y + 'q-5 7-5 10a5 5 0 0 0 10 0q0-3-5-10z" fill="#a5d8ff" stroke="#1c2a63" stroke-width="2" stroke-linejoin="round"/>';
   const weather = svg('weather',
-    '<g fill="none" stroke-width="13"><path d="M94 145a91 91 0 0 1 182 0" stroke="#ff929a"/><path d="M107 145a78 78 0 0 1 156 0" stroke="#ffdc7d"/><path d="M120 145a65 65 0 0 1 130 0" stroke="#96e2bb"/><path d="M133 145a52 52 0 0 1 104 0" stroke="#a7cdff"/></g>' +
-    '<g class="sc-rock" stroke="#ffdc7d" stroke-width="5" stroke-linecap="round">' + range(8).map(i => '<path d="M63 14v10" transform="rotate(' + (i * 45) + ' 63 56)"/>').join('') + '<circle cx="63" cy="56" r="26" fill="#ffdc7d"' + ink('#d69832') + '/>' + eyes(55, 53, 16, '#d69832') + '</g>' +
-    '<g class="sc-bob"><path d="M219 95q-22 0-21-18t22-19q4-25 26-22 19 1 22 22 26-4 29 18 2 19-22 19z" fill="#f3f7ff"' + ink('#a9bddd') + '/></g>' +
-    '<path d="M224 108l-4 9m26-9-4 9m26-9-4 9" stroke="#a7cdff" stroke-width="5" stroke-linecap="round"/>');
+    faded('weather-hills', '<path d="M0 152Q60 136 130 148T320 142V170H0Z" fill="#3a9d5d"/>') +
+    [['#ff6b6b', 82], ['#ffd43b', 74], ['#69db7c', 66], ['#74c0fc', 58]].map(([color, r]) => '<path d="M' + (140 - r) + ' 152a' + r + ' ' + r + ' 0 0 1 ' + r * 2 + ' 0" fill="none" stroke="' + color + '" stroke-width="8"/>').join('') +
+    '<ellipse cx="40" cy="150" rx="18" ry="3.5" fill="#a5d8ff" opacity=".8"/>' +
+    raindrop(24, 72, 0) + raindrop(40, 84, .5) + raindrop(56, 70, 1) + raindrop(30, 104, .8) + raindrop(50, 110, .3) +
+    '<g class="sc-drift" style="animation-direction:alternate-reverse">' + cloud(42, 60, '#1c2a63', 1.1, '#dbe4ff') + '</g>' +
+    // sun behind a cloud
+    sunRays(264, 80, 33, 40, 10, '#ffd43b') +
+    '<circle cx="264" cy="80" r="26" fill="#ffd43b"' + ink('#1c2a63') + '/>' +
+    '<path d="M250 76q4-4 8 0M270 76q4-4 8 0M256 86q8 6 16 0" fill="none" stroke="#1c2a63" stroke-width="2.6" stroke-linecap="round"/>' + blush([[248, 86], [280, 86]], 4) +
+    '<g class="sc-drift">' + cloud(220, 132, '#1c2a63', 1.7) + '</g>');
 
-  const mushroomHouse = (x, y, size, cap) => '<g transform="translate(' + x + ' ' + y + ') scale(' + size + ')"' + ink('#533c35') + '>' +
-    '<path d="M-28 0l4 56q24 8 48 0l4-56z" fill="#fff0d1"/><path d="M-46 0q3-48 46-48T46 0q-46 13-92 0z" fill="' + cap + '"/>' +
-    '<g fill="#fff0d1" stroke="none"><ellipse cx="-24" cy="-14" rx="9" ry="7"/><ellipse cx="7" cy="-31" rx="10" ry="8"/><ellipse cx="28" cy="-10" rx="7" ry="6"/></g>' +
-    '<path d="M-12 59V36a12 12 0 0 1 24 0v23z" fill="#986741"/><circle cx="6" cy="43" r="2" fill="#ffe28c" stroke="none"/>' +
-    '<circle cx="-17" cy="16" r="6" fill="#ffd675"/><path d="M-23 16h12m-6-6v12" fill="none" stroke-width="2"/></g>';
-  const mushroom = svg('mushroom', meadow('mushroom-moss') +
-    '<path d="M135 147q-12 5-20 11h64q-10-6-18-11z" fill="#dbc49b" opacity=".9"/>' +
-    mushroomHouse(55, 112, .64, '#e9a358') + mushroomHouse(246, 109, .7, '#a68bd2') + mushroomHouse(145, 91, 1, '#e36d68') +
-    '<g class="sc-sway"' + ink('#533c35') + '><path d="M210 148V82q0-12-14-12" fill="none" stroke-width="4"/><path d="M189 76h17l3 25h-23z" fill="#ffe18d"/><path d="M188 76l9-8 10 8M197 80v17" fill="none"/><circle class="sc-twinkle" cx="197" cy="87" r="4" fill="#fff9ce" stroke="none"/></g>' +
-    '<g class="sc-swim"' + ink('#533c35') + '><path d="M237 149q4-12 22-12h26l8-12q8-7 13 1v23z" fill="#e4c389"/><circle cx="260" cy="135" r="18" fill="#c593bf"/><path d="M260 135q-9-12-13 0t12 11q15-4 9-15" fill="none" stroke-width="2.5"/><path d="M297 128l-3-10m9 11 6-10" fill="none"/><circle cx="294" cy="116" r="2.5" fill="#533c35"/><circle cx="309" cy="117" r="2.5" fill="#533c35"/></g>' +
-    '<g fill="#fff1bc"><circle class="sc-twinkle" cx="24" cy="62" r="2.5"/><circle class="sc-twinkle" style="animation-delay:1s" cx="217" cy="32" r="3"/><circle class="sc-twinkle" style="animation-delay:1.8s" cx="294" cy="70" r="2.5"/></g>');
+  // The seasons draw the time of year (its plants, weather and animals), never a holiday.
+  const tulip = (x, y, fill, delay) => '<g class="sc-tilt" style="animation-delay:' + delay + 's">' + tube('M' + x + ' 156V' + (y + 8), '#1e3a28', '#5cb85c', 8) +
+    '<g stroke="#1e3a28" stroke-width="2" stroke-linejoin="round"><path d="M' + x + ' ' + (y + 32) + 'q-12-4-14-18q10 2 14 12z" fill="#5cb85c"/>' +
+    '<path d="M' + (x - 8) + ' ' + (y - 6) + 'l4 5 4-7 4 7 4-5v8q0 9-8 9t-8-9z" fill="' + fill + '" stroke-width="2.5"/></g></g>';
+  // A lens 10 long, turned to `angle` in its own coordinates so it can carry sc-flutter.
+  const petal = (x, y, angle, delay) => {
+    const along = [Math.cos(angle * Math.PI / 180) * 5, Math.sin(angle * Math.PI / 180) * 5];
+    const n = (value) => +value.toFixed(1);
+    const [ax, ay] = along; const [px, py] = [-ay * 1.2, ax * 1.2];
+    return '<path class="sc-flutter" style="animation-delay:' + delay + 's" d="M' + n(x - ax) + ' ' + n(y - ay) + 'Q' + n(x + px) + ' ' + n(y + py) + ' ' + n(x + ax) + ' ' + n(y + ay) + 'Q' + n(x - px) + ' ' + n(y - py) + ' ' + n(x - ax) + ' ' + n(y - ay) + 'z" fill="#ffe0ec"/>';
+  };
+  const blossomTree = '<circle cx="44" cy="84" r="20"/><circle cx="68" cy="64" r="24"/><circle cx="98" cy="70" r="21"/><circle cx="116" cy="92" r="15"/><circle cx="34" cy="104" r="13"/><circle cx="74" cy="96" r="22"/><circle cx="100" cy="102" r="14"/>';
+  const lambWool = '<circle cx="214" cy="110" r="14"/><circle cx="226" cy="96" r="15"/><circle cx="246" cy="90" r="16"/><circle cx="266" cy="92" r="15"/><circle cx="282" cy="104" r="13"/><circle cx="292" cy="106" r="8"/>' +
+    '<circle cx="284" cy="120" r="12"/><circle cx="268" cy="130" r="13"/><circle cx="246" cy="132" r="13"/><circle cx="224" cy="128" r="13"/><ellipse cx="248" cy="112" rx="34" ry="20"/>';
+  const lambTuft = '<circle cx="186" cy="83" r="6"/><circle cx="194" cy="79" r="7"/><circle cx="203" cy="82" r="6"/>';
+  const spring = svg('spring',
+    '<g class="sc-drift">' + cloud(178, 40, '#1e3a28', .7) + '</g>' +
+    faded('spring-meadow', '<path d="M0 150Q70 136 150 146T320 140V170H0Z" fill="#7ccf6e" opacity=".55"/>') +
+    // cherry tree in blossom
+    tube('M72 154C74 138 70 124 74 108', '#1e3a28', '#8a5a3c', 16) +
+    '<g fill="#1e3a28" stroke="#1e3a28" stroke-width="6">' + blossomTree + '</g><g fill="#ffc2dc">' + blossomTree + '</g>' +
+    '<g fill="#fff6b0" stroke="#ff8fbf" stroke-width="2.6">' + [[46, 78], [64, 56], [90, 62], [112, 88], [78, 90], [38, 102], [98, 104], [58, 82], [84, 74], [62, 104]].map(([x, y]) => '<circle cx="' + x + '" cy="' + y + '" r="2.3"/>').join('') + '</g>' +
+    tulip(124, 126, '#ff8fc8', 1.8) +
+    // lamb, legs then wool then head
+    [214, 230, 258, 274].map((x) => '<rect x="' + x + '" y="126" width="9" height="24" rx="4" fill="#5b4740"' + ink('#1e3a28') + '/>').join('') +
+    '<g fill="#1e3a28" stroke="#1e3a28" stroke-width="6">' + lambWool + '</g><g fill="#fff">' + lambWool + '</g>' +
+    '<g class="sc-nuzzle">' +
+      '<ellipse cx="176" cy="92" rx="10" ry="5" transform="rotate(-24 176 92)" fill="#fde4d4"' + ink('#1e3a28') + '/><ellipse cx="176" cy="92" rx="5" ry="2.2" transform="rotate(-24 176 92)" fill="#ffb3c6"/>' +
+      '<ellipse cx="212" cy="88" rx="9" ry="4.5" transform="rotate(28 212 88)" fill="#fde4d4"' + ink('#1e3a28') + '/>' +
+      '<ellipse cx="194" cy="97" rx="17" ry="15" fill="#fde4d4"' + ink('#1e3a28') + '/>' +
+      '<g fill="#1e3a28" stroke="#1e3a28" stroke-width="6">' + lambTuft + '</g><g fill="#fff">' + lambTuft + '</g>' +
+      '<circle cx="188" cy="97" r="2.4" fill="#1e3a28"/><circle cx="200" cy="97" r="2.4" fill="#1e3a28"/>' +
+      '<path d="M190 105q4 3 8 0" fill="none" stroke="#1e3a28" stroke-width="2.2" stroke-linecap="round"/>' + blush([[183, 103], [206, 103]], 3) +
+    '</g>' +
+    tulip(148, 116, '#ff6b6b', 0) + tulip(166, 108, '#ffd43b', 1.1) + tulip(248, 134, '#ffa94d', 2.4) +
+    faded('spring-grass', '<path d="M0 154Q80 146 160 152T320 150V170H0Z" fill="#57b552"/>') +
+    '<g fill="#fff">' + [[40, 160], [104, 158], [196, 162], [244, 158], [286, 161]].map(([x, y]) => '<circle cx="' + x + '" cy="' + y + '" r="2.5"/>').join('') + '</g>' +
+    [[138, 40, 20, 0], [150, 76, -30, 1.5], [196, 58, 40, 3], [128, 116, 10, 4.5], [212, 30, -15, 2.2]].map(([x, y, angle, delay]) => petal(x, y, angle, delay)).join(''));
 
-  // A sleepy dragon reading by lamplight. Dragon: 169–304 × 43–150;
-  // books and lamp: 18–195 × 38–152. Feet and books meet the rug at 150.
-  const library = svg('library',
-    sparkle(134, 45, 7, '#fff6b0', .4) + sparkle(186, 27, 5, '#fff6b0', 1.1) +
-    faded('library-rug', '<ellipse cx="166" cy="154" rx="148" ry="10" fill="#c88b71" opacity=".45"/>') +
-    '<g' + ink('#493846') + '><path d="M50 146V68l25-23" fill="none" stroke-width="5" stroke-linecap="round"/><path d="M59 45q9-16 23-5l17 16-25 19z" fill="#ffd43b"/><ellipse cx="50" cy="146" rx="20" ry="4" fill="#9390c4"/></g>' +
-    '<g' + ink('#493846') + '><rect x="21" y="130" width="88" height="18" rx="4" fill="#8bb6a0"/><rect x="28" y="111" width="76" height="18" rx="4" fill="#d98b91"/><rect x="18" y="93" width="86" height="17" rx="4" fill="#9390c4"/><path d="M29 139h70m-63-19h60m-70-19h68" fill="none" stroke="#fff3d9" stroke-width="3" stroke-linecap="round"/></g>' +
-    sleepyDragon('#a8d4b0', '#d7e9c2', '#d0aacd', '#325b45') +
-    '<g' + ink('#493846') + '><path d="M109 135q21-9 43 0 21-9 43 0v17q-21-9-43-1-22-8-43 1z" fill="#fff3d9"/><path d="M152 135v16m-35-9q13-3 25 0m20 0q12-3 25 0" fill="none" stroke-width="2" stroke-linecap="round"/><path d="M142 135v12l5-3 5 3v-12" fill="#d98b91" stroke="none"/></g>');
+  // The castle is bucket-built: its towers taper out to the sand.
+  const sandTower = (x) => '<path d="M' + (x - 13) + ' 150L' + (x - 10) + ' 104h20l3 46zM' + (x - 10) + ' 104v-6h6v6zM' + (x + 4) + ' 104v-6h6v6z" fill="#f4c76b"' + ink('#123b5c') + '/>' +
+    '<path d="M' + (x - 3) + ' 124v-5a3 3 0 0 1 6 0v5z" fill="#d9a441"/>';
+  const summer = svg('summer',
+    sunRays(48, 40, 26, 33, 10, '#ffe066') +
+    '<circle cx="48" cy="40" r="20" fill="#ffd43b"' + ink('#123b5c') + '/>' +
+    '<path d="M33 35h12v4a6 6 0 0 1-12 0zM51 35h12v4a6 6 0 0 1-12 0z" fill="#123b5c"/>' +
+    '<path d="M45 36h6M33 35l-4-3M63 35l4-3" stroke="#123b5c" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path d="M36 38l3-2M54 38l3-2" stroke="#fff" stroke-width="2" stroke-linecap="round"/>' +
+    '<path d="M41 51q7 5 14 0" fill="none" stroke="#123b5c" stroke-width="2.6" stroke-linecap="round"/>' + blush([[34, 49], [62, 49]], 3.5) +
+    '<g class="sc-drift" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M132 30q6-6 12 0q6-6 12 0"/><path d="M164 50q4-4 8 0q4-4 8 0"/></g>' +
+    faded('summer-back-wave', wave(126, '#7fe0f0', 'class="sc-wave-back" opacity=".75"')) +
+    // sailboat on the horizon
+    '<g class="sc-rock">' +
+      '<path d="M96 124V88" stroke="#123b5c" stroke-width="3" stroke-linecap="round"/>' +
+      '<path d="M99 90v30h22z" fill="#fff"' + ink('#123b5c') + '/><path d="M93 96v24h-16z" fill="#ffd43b"' + ink('#123b5c') + '/>' +
+      '<path d="M74 124h44l-7 10h-30z" fill="#ff6b4a"' + ink('#123b5c') + '/>' +
+    '</g>' +
+    faded('summer-front-wave', wave(138, '#38bfd9', 'class="sc-wave-front"')) +
+    faded('sand', '<path d="M0 148Q80 138 170 146T320 142V170H0Z" fill="#f7dc8f"/>' +
+      '<g fill="#e8c46a">' + [[30, 158], [62, 152], [118, 160], [204, 160], [262, 156], [300, 162]].map(([x, y]) => '<circle cx="' + x + '" cy="' + y + '" r="2"/>').join('') + '</g>') +
+    '<path d="' + burst(142, 155, 9, 4, 5) + '" fill="#ff8a5b" stroke="#123b5c" stroke-width="2.5" stroke-linejoin="round"/>' +
+    // beach umbrella, leaning into the breeze
+    '<ellipse cx="248" cy="152" rx="44" ry="4" fill="#e2bf6a"/>' +
+    '<g transform="rotate(6 252 150)">' +
+      tube('M252 152V80', '#123b5c', '#fff', 9) +
+      '<path d="M196 80C196 58 222 46 252 46C282 46 308 58 308 80q-14 8-28 0q-14 8-28 0q-14 8-28 0q-14 8-28 0z" fill="#fff"/>' +
+      '<path d="M252 46C222 46 196 58 196 80q14 8 28 0C226 62 238 50 252 46zM252 46V80q14 8 28 0C278 62 266 50 252 46z" fill="#ff6b4a"/>' +
+      '<path d="M196 80C196 58 222 46 252 46C282 46 308 58 308 80q-14 8-28 0q-14 8-28 0q-14 8-28 0q-14 8-28 0z" fill="none"' + ink('#123b5c') + '/>' +
+      '<path d="M224 80C226 62 238 50 252 46M252 46V80M280 80C278 62 266 50 252 46" fill="none" stroke="#123b5c" stroke-width="2.5"/>' +
+      '<circle cx="252" cy="43" r="4" fill="#ff6b4a" stroke="#123b5c" stroke-width="2.5"/>' +
+    '</g>' +
+    // sandcastle
+    '<rect x="192" y="118" width="26" height="32" fill="#f4c76b"' + ink('#123b5c') + '/>' +
+    '<path d="M194 118v-6h6v6zM210 118v-6h6v6z" fill="#f4c76b"' + ink('#123b5c') + '/>' +
+    sandTower(183) + sandTower(227) +
+    '<path d="M199 150v-12a6 6 0 0 1 12 0v12z" fill="#d9a441"' + ink('#123b5c') + '/>' +
+    '<g fill="#e0ad4f"><circle cx="178" cy="138" r="2"/><circle cx="232" cy="134" r="2"/><circle cx="214" cy="128" r="1.8"/></g>' +
+    flag(183, 82, '#ff6b4a', '#123b5c') +
+    // bucket
+    '<path d="M285 130h24l-3 20h-18z" fill="#4dabf7"' + ink('#123b5c') + '/>' +
+    '<path d="M288 129q9-16 18 0" fill="none" stroke="#123b5c" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<rect x="283" y="126" width="28" height="6" rx="3" fill="#a5d8ff"' + ink('#123b5c') + '/>');
 
-  const duckling = (x, y, size) => '<g class="sc-bob" transform="translate(' + x + ' ' + y + ') scale(' + size + ')"' + ink('#79542b') + '><ellipse cx="0" cy="0" rx="14" ry="10" fill="#ffde70"/><circle cx="9" cy="-12" r="9" fill="#ffde70"/><path d="M17-13l9 4-9 3z" fill="#e99a48"/><path d="M-4-3q-4 6 4 7" fill="none" stroke-width="2"/><circle cx="11" cy="-14" r="2" fill="#79542b" stroke="none"/><path d="M-4 10l-3 5m9-5 3 5" fill="none" stroke-width="2"/></g>';
-  const farm = svg('farm', meadow('farm-field') +
-    '<circle cx="278" cy="29" r="18" fill="#ffe18b"/>' +
-    '<g' + ink('#733e36') + '><path d="M24 72l57-39 57 39v75H24z" fill="#d87669"/><path d="M15 76l66-46 66 46" fill="none" stroke-width="7"/><path d="M60 146v-51h43v51z" fill="#a54f49"/><path d="M62 96l39 49m0-49-39 49" fill="none" stroke="#ffe9c9"/><path d="M67 73V58h27v15z" fill="#ffe9c9"/><path d="M80 58v15" fill="none" stroke-width="2"/></g>' +
-    // A spotted cow with a soft pink muzzle.
-    '<g' + ink('#4c4342') + '><path d="M214 137v20h14v-22m38 0v22h14v-27" fill="#fff5df"/><path d="M201 108q-22-20-29-3" fill="none" stroke-width="5"/><ellipse cx="241" cy="117" rx="45" ry="29" fill="#fff5df"/><path d="M223 94q23-16 27 8-5 18-22 15-14-6-5-23m40 32q12-18 21-8-2 19-18 21z" fill="#77717c" stroke="none"/><path d="M258 67l-13-10q-9 10 8 18m34-8 13-10q9 10-8 18" fill="#fff5df"/><path d="M261 60l-3-14q9 2 11 13m11 1 6-14q5 11 2 16" fill="#efc47e"/><rect x="253" y="61" width="40" height="58" rx="17" fill="#fff5df"/><ellipse cx="273" cy="108" rx="23" ry="15" fill="#eeb5b0"/><circle cx="263" cy="107" r="2.5" fill="#4c4342" stroke="none"/><circle cx="283" cy="107" r="2.5" fill="#4c4342" stroke="none"/><path d="M265 115q8 5 16 0" fill="none" stroke-width="2"/>' + eyes(264, 80, 18, '#4c4342') + '</g>' +
-    duckling(146, 145, .75) + duckling(177, 150, .55) +
-    '<g' + ink('#876445') + '><path d="M33 153h67" fill="none"/><path d="M47 149l-4-16m18 16 1-20m19 20 8-14" fill="none" stroke="#6a9856" stroke-width="4"/><path d="M41 143l13 10H43zm20-2 8 12H56zm22 2 9 10H77z" fill="#e99950" stroke-width="2"/></g>');
+  // `extra` carries the motion class on a wrapper, so the turn stays on its own group.
+  const leaf = (x, y, angle, fill, extra) => {
+    const body = '<g transform="rotate(' + angle + ' ' + x + ' ' + y + ')" stroke="#3f1a0c" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">' +
+      '<path d="M' + x + ' ' + (y - 10) + 'c8 5 8 14 0 19c-8-5-8-14 0-19z" fill="' + fill + '"/><path d="M' + x + ' ' + (y - 6) + 'v19"/></g>';
+    return extra ? '<g ' + extra + '>' + body + '</g>' : body;
+  };
+  const autumn = svg('autumn',
+    '<path d="M14 58c18-14 38-14 54 0s36 10 50-4" fill="none" stroke="#fff" stroke-width="2.5" stroke-dasharray="2 8" stroke-linecap="round" opacity=".5"/>' +
+    [[38, 30, 20, '#ffc93c', 0], [104, 46, -30, '#ff8c2e', 1.4], [150, 22, 50, '#ff6a4d', 2.8], [172, 74, -15, '#ffc93c', 4.2], [126, 92, 35, '#c8d44e', .7], [60, 90, -40, '#ff8c2e', 3.5]]
+      .map(([x, y, angle, fill, delay]) => leaf(x, y, angle, fill, 'class="sc-flutter" style="animation-delay:' + delay + 's"')).join('') +
+    faded('autumn-hills', '<path d="M0 150Q70 134 150 146T320 140V170H0Z" fill="#5a1d28" opacity=".55"/>') +
+    // a heap of raked leaves and two toadstools
+    '<path d="M12 152C16 128 44 118 64 124C86 118 108 132 112 152Z" fill="#ff8c2e"' + ink('#3f1a0c') + '/>' +
+    [[32, 134, -40, '#ffc93c'], [56, 126, 10, '#ff6a4d'], [82, 130, 55, '#ffc93c'], [100, 142, 80, '#c8d44e'], [24, 146, -75, '#ff6a4d'], [66, 142, -20, '#ffc93c']].map(([x, y, angle, fill]) => leaf(x, y, angle, fill)).join('') +
+    '<rect x="128" y="126" width="10" height="26" rx="4" fill="#fbe9d0"' + ink('#3f1a0c') + '/><path d="M118 130q15-24 30 0z" fill="#e8a25a"' + ink('#3f1a0c') + '/>' +
+    '<g fill="#fff3dc"><circle cx="127" cy="123" r="2.6"/><circle cx="138" cy="121" r="2.2"/></g>' +
+    '<rect x="146" y="138" width="7" height="14" rx="3" fill="#fbe9d0"' + ink('#3f1a0c') + '/><path d="M140 140q9-14 19 0z" fill="#e8a25a"' + ink('#3f1a0c') + '/>' +
+    // log
+    '<rect x="176" y="126" width="122" height="24" rx="12" fill="#8a4b2a"' + ink('#3f1a0c') + '/>' +
+    '<path d="M190 134h22M226 142h26M262 134h16" stroke="#6a361c" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<ellipse cx="296" cy="138" rx="9" ry="12" fill="#e9b37a"' + ink('#3f1a0c') + '/><ellipse cx="296" cy="138" rx="4.5" ry="6.5" fill="none" stroke="#c98a4b" stroke-width="2"/>' +
+    // squirrel, tail first
+    '<g class="sc-wag"><path d="M256 124C292 128 308 100 298 76C290 58 268 52 260 66C272 64 282 74 280 88C278 102 264 108 250 110Z" fill="#e8863a"' + ink('#3f1a0c') + '/>' +
+      '<path d="M264 116C284 112 294 96 290 80" fill="none" stroke="#fde3c0" stroke-width="5" stroke-linecap="round"/></g>' +
+    '<ellipse cx="236" cy="106" rx="22" ry="22" fill="#e8863a"' + ink('#3f1a0c') + '/>' +
+    '<ellipse cx="229" cy="110" rx="12" ry="15" fill="#fde3c0"/>' +
+    '<ellipse cx="250" cy="116" rx="13" ry="11" fill="#e8863a"' + ink('#3f1a0c') + '/>' +
+    '<ellipse cx="236" cy="127" rx="13" ry="4.5" fill="#e8863a"' + ink('#3f1a0c') + '/>' +
+    tube('M228 94Q226 104 220 108', '#3f1a0c', '#e8863a', 10) +
+    '<ellipse cx="212" cy="107" rx="7" ry="8" fill="#c98a4b" stroke="#3f1a0c" stroke-width="2.5"/><path d="M204 102q8-10 16 0z" fill="#7a4a26" stroke="#3f1a0c" stroke-width="2.5" stroke-linejoin="round"/>' +
+    '<path d="M212 96v-4" stroke="#3f1a0c" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<g fill="#e8863a" stroke="#3f1a0c" stroke-width="2.5"><circle cx="205" cy="108" r="4.5"/><circle cx="219" cy="110" r="4.5"/></g>' +
+    '<g class="sc-nuzzle">' +
+      '<path d="M208 62C203 54 205 46 211 44C216 47 218 54 216 60ZM226 58C226 50 230 45 236 44C239 50 237 56 233 62Z" fill="#e8863a"' + ink('#3f1a0c') + '/>' +
+      '<path d="M211 44l-2-5M236 44l2-5" stroke="#3f1a0c" stroke-width="2.5" stroke-linecap="round"/><path d="M210 57q-2-6 1-9q3 3 2 8zM230 56q1-6 5-8q1 4-2 8z" fill="#ffb39b"/>' +
+      '<circle cx="222" cy="74" r="18" fill="#e8863a"' + ink('#3f1a0c') + '/>' +
+      '<ellipse cx="210" cy="81" rx="9" ry="7" fill="#fde3c0"/>' +
+      '<circle cx="202" cy="78" r="2.6" fill="#3f1a0c"/><circle cx="215" cy="70" r="2.6" fill="#3f1a0c"/><circle cx="228" cy="70" r="2.4" fill="#3f1a0c"/>' +
+      '<path d="M204 86q4 3 8 0" fill="none" stroke="#3f1a0c" stroke-width="2.2" stroke-linecap="round"/>' + blush([[226, 82]], 3.5) +
+    '</g>' +
+    faded('autumn-ground', '<path d="M0 154Q80 146 160 152T320 150V170H0Z" fill="#5c2a1c"/>') +
+    leaf(184, 158, 80, '#ffc93c') + leaf(272, 160, -70, '#ff6a4d') + leaf(60, 160, 100, '#c8d44e'));
 
-  const note = (x, y, color, delay) => '<g class="sc-bob" style="animation-delay:' + delay + 's" fill="' + color + '"><path d="M' + x + ' ' + y + 'v-28l19-5v27h-4v-19l-11 3v22z"/><ellipse cx="' + (x - 3) + '" cy="' + y + '" rx="7" ry="5" transform="rotate(-20 ' + (x - 3) + ' ' + y + ')"/><ellipse cx="' + (x + 12) + '" cy="' + (y - 6) + '" rx="7" ry="5" transform="rotate(-20 ' + (x + 12) + ' ' + (y - 6) + ')"/></g>';
-  const music = svg('music',
-    // An upright acoustic guitar, a small keyboard and a record on a faded stage.
-    faded('music-stage', '<path d="M0 150H320v20H0z" fill="#b09ab7" opacity=".28"/><path d="M0 150H320" stroke="#433747" stroke-width="3" opacity=".45"/>') +
-    note(29, 42, '#efb2ba', 0) + note(161, 57, '#d7c2ec', .8) + sparkle(201, 28, 6, '#f9e5a1', .5) +
-    // The complete disc fixes the rotating group's bounding box on its centre.
-    '<g class="sc-spin"' + ink('#433747') + '><circle cx="68" cy="74" r="26" fill="#9186ad"/><circle cx="68" cy="74" r="19" fill="none" stroke="#c4b9d5" stroke-width="2"/><circle cx="68" cy="74" r="11" fill="#f3c67b"/><circle cx="68" cy="74" r="3" fill="#433747" stroke="none"/><path d="M48 67q3-9 12-12" fill="none" stroke="#ede5f7" stroke-width="3" stroke-linecap="round"/></g>' +
-    // A keyboard on an X stand; its whole face moves with its casing.
-    '<g class="sc-rock"' + ink('#433747') + '><path d="M40 136l65 14m11-14-65 14" fill="none" stroke-width="5" stroke-linecap="round"/><rect x="20" y="98" width="118" height="42" rx="9" fill="#91cec3"/><circle cx="68" cy="107" r="3" fill="#433747" stroke="none"/><circle cx="90" cy="107" r="3" fill="#433747" stroke="none"/><path d="M73 112q6 5 12 0" fill="none" stroke-width="2.5" stroke-linecap="round"/><rect x="26" y="119" width="106" height="16" rx="3" fill="#fff2d9"/><path d="M43 120v14m18-14v14m18-14v14m18-14v14m18-14v14" fill="none" stroke-width="2"/><path d="M40 120v8m18-8v8m36-8v8m18-8v8" fill="none" stroke-width="6"/></g>' +
-    // All guitar parts share x = 247: neck, soundhole, bridge and strings.
-    '<g class="sc-rock"' + ink('#694332') + '><path d="M240 90C228 81 216 86 216 100C216 109 225 112 221 119C216 125 210 129 210 137C210 148 228 150 247 150C266 150 284 148 284 137C284 129 278 125 273 119C269 112 278 109 278 100C278 86 266 81 254 90Z" fill="#f3c67b"/><rect x="240" y="62" width="14" height="36" rx="2" fill="#b98055"/><path d="M239 48h-7m7 8h-7m7 8h-7m23-16h7m-7 8h7m-7 8h7" fill="none" stroke-width="3" stroke-linecap="round"/><rect x="236" y="43" width="22" height="23" rx="4" fill="#f3c67b"/><path d="M241 74h12m-12 9h12m-12 9h12" fill="none" stroke-width="2"/><circle cx="247" cy="111" r="14" fill="#fff0cd"/><circle cx="247" cy="111" r="10" fill="#694332" stroke="none"/><rect x="232" y="132" width="30" height="7" rx="3" fill="#694332" stroke="none"/><path d="M243 65v71m4-71v71m4-71v71" fill="none" stroke="#fff4d8" stroke-width="1.5" stroke-linecap="round"/></g>');
+  const flake = (x, y, size, delay) => {
+    const half = size / 2; const rise = +(size * .87).toFixed(1);
+    return '<path class="sc-snow" style="animation-delay:' + delay + 's" d="M' + (x - size) + ' ' + y + 'H' + (x + size) + 'M' + (x - half) + ' ' + (y - rise) + 'L' + (x + half) + ' ' + (y + rise) + 'M' + (x + half) + ' ' + (y - rise) + 'L' + (x - half) + ' ' + (y + rise) + '" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>';
+  };
+  // A pine in three tiers, each wearing a scalloped cap of snow. It stands at y 150.
+  const pine = (x, top, width) => {
+    const n = (value) => +value.toFixed(1);
+    const height = 150 - top;
+    const tier = (apex, base, half) => '<path d="M' + n(x - half) + ' ' + n(base) + 'Q' + x + ' ' + n(base + 6) + ' ' + n(x + half) + ' ' + n(base) + 'L' + x + ' ' + n(apex) + 'Z" fill="#2b8a7e"' + ink('#17324a') + '/>' +
+      '<path d="M' + x + ' ' + n(apex) + 'L' + n(x + half / 2) + ' ' + n((apex + base) / 2) + 'q' + n(-half / 4) + ' 5 ' + n(-half / 2) + ' 0q' + n(-half / 4) + ' 5 ' + n(-half / 2) + ' 0Z" fill="#fff" stroke="#17324a" stroke-width="2.5" stroke-linejoin="round"/>';
+    return '<rect x="' + (x - 4) + '" y="' + n(top + height * .8) + '" width="8" height="' + n(height * .2 + 4) + '" fill="#7a4a2a"' + ink('#17324a') + '/>' +
+      tier(top + height * .38, top + height * .86, width) + tier(top + height * .18, top + height * .62, width * .76) + tier(top, top + height * .36, width * .52);
+  };
+  // Pale blue on the shadow side, so each snowball reads round.
+  const shade = (cx, cy, r) => {
+    const at = (degrees) => (cx + Math.cos(degrees * Math.PI / 180) * (r - 1.5)).toFixed(1) + ' ' + (cy + Math.sin(degrees * Math.PI / 180) * (r - 1.5)).toFixed(1);
+    return '<path d="M' + at(-30) + 'A' + (r - 1.5) + ' ' + (r - 1.5) + ' 0 0 1 ' + at(120) + 'A' + r * 1.25 + ' ' + r * 1.25 + ' 0 0 0 ' + at(-30) + 'Z" fill="#d6e4f5"/>';
+  };
+  const snowball = (cx, cy, r) => '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="#fff"' + ink('#17324a') + '/>' + shade(cx, cy, r);
+  const winter = svg('winter',
+    [[24, 24, 6, 0], [92, 40, 5, 1.2], [146, 18, 6, 2.6], [156, 124, 5, .6], [124, 96, 4, 3.4], [290, 96, 5, 1.8]].map(([x, y, size, delay]) => flake(x, y, size, delay)).join('') +
+    '<g fill="#fff">' + [[52, 58, 0], [130, 58, 1.6], [182, 34, 3], [270, 62, .8], [16, 96, 2.2], [254, 112, 3.8], [104, 18, 4.4]].map(([x, y, delay]) => '<circle class="sc-snow" style="animation-delay:' + delay + 's" cx="' + x + '" cy="' + y + '" r="2.5"/>').join('') + '</g>' +
+    faded('winter-hills', '<path d="M0 150Q70 128 150 142T320 134V170H0Z" fill="#cfe0f2" opacity=".5"/>') +
+    pine(56, 50, 34) + pine(108, 88, 22) +
+    // sled, nose to the right
+    '<path d="M254 148H302q10 0 10-10" fill="none" stroke="#17324a" stroke-width="3.5" stroke-linecap="round"/>' +
+    '<path d="M264 134v13M294 134v13" stroke="#17324a" stroke-width="3" stroke-linecap="round"/>' +
+    '<rect x="252" y="126" width="52" height="9" rx="4" fill="#d9824b"' + ink('#17324a') + '/>' +
+    '<path d="M304 130q10-2 8-12" fill="none" stroke="#ffb02e" stroke-width="2.5" stroke-linecap="round"/>' +
+    // snowman: twig arms behind, then the snowballs
+    '<path d="M189 94L166 106M174 102l-3-8M170 104l-8-2" fill="none" stroke="#7a4a2a" stroke-width="3.5" stroke-linecap="round"/>' +
+    '<g class="sc-tilt"><path d="M222 90L242 62M236 70l8-3M234 73l-2-9" fill="none" stroke="#7a4a2a" stroke-width="3.5" stroke-linecap="round"/>' +
+      '<ellipse cx="245" cy="57" rx="6" ry="7" fill="#ff7a45" stroke="#17324a" stroke-width="2.5"/><ellipse cx="239" cy="59" rx="3" ry="4" fill="#ff7a45" stroke="#17324a" stroke-width="2.5"/></g>' +
+    snowball(206, 125, 26) + snowball(206, 87, 19) +
+    '<g fill="#2b3440"><circle cx="206" cy="84" r="3"/><circle cx="206" cy="96" r="3"/></g>' +
+    snowball(206, 55, 15) +
+    '<circle cx="200" cy="53" r="2.4" fill="#2b3440"/><circle cx="212" cy="53" r="2.4" fill="#2b3440"/>' +
+    '<path d="M206 56l13 3-13 3z" fill="#ff8a3d" stroke="#17324a" stroke-width="2" stroke-linejoin="round"/>' +
+    '<path d="M200 63q6 3 12 0" fill="none" stroke="#2b3440" stroke-width="2.4" stroke-linecap="round"/>' + blush([[195, 60], [217, 60]], 3) +
+    // knitted hat and scarf
+    '<path d="M192 46a14 12 0 0 1 28 0z" fill="#ff7a45"' + ink('#17324a') + '/>' +
+    '<rect x="189" y="43" width="34" height="8" rx="4" fill="#ffb02e" stroke="#17324a" stroke-width="2.5"/>' +
+    '<circle cx="206" cy="32" r="5" fill="#fff" stroke="#17324a" stroke-width="2.5"/>' +
+    '<g class="sc-cape"><path d="M196 69L172 71L170 81L196 79Z" fill="#ffb02e" stroke="#17324a" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<path d="M188 70v9.5M180 70.5v9.8" stroke="#ff7a45" stroke-width="3"/><path d="M170 73h-5M170 77h-5M170 81h-4" stroke="#17324a" stroke-width="2" stroke-linecap="round"/></g>' +
+    '<rect x="190" y="68" width="32" height="10" rx="5" fill="#ffb02e" stroke="#17324a" stroke-width="2.5"/>' +
+    '<path d="M200 68v10M212 68v10" stroke="#ff7a45" stroke-width="3"/>' +
+    faded('winter-snow', '<path d="M0 152Q80 144 160 150T320 148V170H0Z" fill="#f4f8ff"/>'));
 
-  const penguin = (x, y, size, scarf) => '<g class="sc-rock" transform="translate(' + x + ' ' + y + ') scale(' + size + ')"' + ink('#253b54') + '><path d="M-17-9q-17 7-20 23 15-1 22-12m30-11q17 7 20 23-15-1-22-12" fill="#36546a"/><path d="M-10 27l-12 8h19l6-8m8 0 11 8H3l-5-8" fill="#efb464"/><ellipse cx="0" cy="0" rx="25" ry="32" fill="#36546a"/><ellipse cx="0" cy="8" rx="17" ry="22" fill="#f1f5f3"/><path d="M-18-13q8-16 18-3 10-13 18 3l-5 16H-13z" fill="#f1f5f3" stroke="none"/><circle cx="-8" cy="-10" r="2.5" fill="#253b54" stroke="none"/><circle cx="8" cy="-10" r="2.5" fill="#253b54" stroke="none"/><path d="M-6-3H6L0 4z" fill="#efb464" stroke-width="2"/><path d="M-23 7q23 9 46 0l-1 7q-23 8-44 0zM13 14l-3 16h10l2-17" fill="' + scarf + '" stroke-width="2"/></g>';
-  const arctic = svg('arctic',
-    '<g class="sc-billow" fill="none" stroke-linecap="round" opacity=".75"><path d="M20 52Q73-2 127 31t96-2 82-3" stroke="#82dab9" stroke-width="14"/><path d="M25 65Q78 13 130 43t98-2 74-4" stroke="#aaa8e0" stroke-width="9"/></g>' +
-    sparkle(44, 23, 4, '#f5fbff', .2) + sparkle(190, 20, 5, '#f5fbff', 1) + sparkle(300, 74, 4, '#f5fbff', 1.7) +
-    faded('arctic-snow', '<path d="M0 151Q75 132 155 144T320 139v31H0z" fill="#d6ecf0"/><path d="M6 157q90-8 136 0m79-4q43-5 86-1" fill="none" stroke="#abcfdc" stroke-width="2"/>') +
-    '<g' + ink('#6489a2') + '><path d="M19 142l6-49 21-30 35-8 35 19 17 68z" fill="#b7dce8"/><path d="M50 142V112a27 27 0 0 1 54 0v30z" fill="#48758b"/><path d="M28 97l26-7-8-26m10 24 25-32 13 30 27-9m-11 19 17 16" fill="none" stroke="#e9f7fa" stroke-width="5"/><path d="M53 114l9-10m27 2 11 10" fill="none" stroke="#8eb4c7" stroke-width="3"/></g>' +
-    penguin(154, 117, .9, '#d6869b') + penguin(204, 136, .58, '#e8b76f') +
-    '<g class="sc-bob"' + ink('#566175') + '><path d="M229 146h70q13 0 12-11m-72 11v9h50m-45-19v10m36-10v10" fill="none" stroke-width="3.5"/><path d="M234 135h63l-5-7h-54z" fill="#c98b70"/><rect x="242" y="105" width="41" height="23" rx="5" fill="#e4b178"/><path d="M254 106v22m17-22v22" fill="none" stroke="#a36d55" stroke-width="2.5"/><path d="M291 132q-6-39 14-44" fill="none" stroke-width="2.5"/><path d="M245 104l7-11h21l6 11z" fill="#edf6f2"/></g>');
+  // Quiet hobbies, for older learners and adults: muted fills, faces only on animals and
+  // no cheeks, and few parts moving slowly.
+  // `turned` places a path drawn in local units (stem joint at 0 0, tip toward −y) at x y,
+  // turned `angle` degrees and scaled by `size`, so outlines keep their width.
+  const turned = (x, y, angle, size, path) => {
+    const turn = angle * Math.PI / 180; const cos = Math.cos(turn); const sin = Math.sin(turn);
+    return path.replace(/(-?[\d.]+) (-?[\d.]+)/g, (_, px, py) => {
+      const sx = px * size; const sy = py * size;
+      return +(x + sx * cos - sy * sin).toFixed(1) + ' ' + +(y + sx * sin + sy * cos).toFixed(1);
+    });
+  };
+  const monsteraPath = 'M0 -5C8 3 24 1 27 -13L13 -20L28 -24C30 -30 29 -34 25 -37L11 -35L20 -45C14 -50 6 -52 0 -52' +
+    'C-6 -52 -14 -50 -20 -45L-11 -35L-25 -37C-29 -34 -30 -30 -28 -24L-13 -20L-27 -13C-24 1 -8 3 0 -5Z';
+  // Leaves overlap, so each keeps its own outline and midrib, back to front.
+  const monstera = (leaves) => '<g fill="#76a46c"' + ink('#1f3322') + '>' + leaves.map(([x, y, angle, size]) => '<path d="' + turned(x, y, angle, size, monsteraPath) + '"/>' +
+    '<path d="' + turned(x, y, angle, size, 'M0 -6L0 -44') + '" stroke="#b0d19c" stroke-width="2.5" stroke-linecap="round"/>').join('') + '</g>';
+  // Pothos leaves are hearts drawn long, so they read as leaves and never as the symbol.
+  const pothosPath = 'M0 0C-6 2 -11 -4 -10 -10C-9 -16 -4 -20 0 -27C4 -20 9 -16 10 -10C11 -4 6 2 0 0Z';
+  const pothos = (leaves, size) => '<g fill="#76a46c" stroke="#1f3322" stroke-width="2.5" stroke-linejoin="round">' + leaves.map(([x, y, angle]) => '<path d="' + turned(x, y, angle, size, pothosPath) + '"/>').join('') + '</g>' +
+    '<path d="' + leaves.map(([x, y, angle]) => turned(x, y, angle, size, 'M0 -3L0 -19')).join('') + '" stroke="#b0d19c" stroke-width="2" stroke-linecap="round"/>';
+  const monsteraLeaves = [[206, 92, -58, .9], [226, 74, -18, 1], [262, 84, 30, .95], [274, 104, 72, .8], [234, 100, 6, .6]];
+  const houseplants = svg('houseplants',
+    faded('sill', '<rect x="0" y="148" width="320" height="8" fill="#d9bd8f"/><rect x="0" y="156" width="320" height="14" fill="#b38b62"/>' +
+      '<path d="M0 148H320" stroke="#1f3322" stroke-width="3"/><path d="M0 156H320" stroke="#1f3322" stroke-width="2" opacity=".5"/>') +
+    // pothos in a macramé hanger
+    '<g class="sc-swing">' +
+      '<path d="M64 0V4" stroke="#1f3322" stroke-width="2.5" stroke-linecap="round"/><circle cx="64" cy="8" r="4" fill="none" stroke="#1f3322" stroke-width="2.5"/>' +
+      '<path d="M62 12L44 46M64 12V46M66 12L84 46" stroke="#e9dcc3" stroke-width="2.5" stroke-linecap="round"/>' +
+      '<path d="M54 28h20" stroke="#e9dcc3" stroke-width="5" stroke-linecap="round"/>' +
+      '<path d="M42 48h44q0 22-22 22q-22 0-22-22z" fill="#b2c5c2"' + ink('#1f3322') + '/>' +
+      '<rect x="39" y="43" width="50" height="8" rx="4" fill="#d6e2df"' + ink('#1f3322') + '/>' +
+      '<path d="M64 70v12M60 70l-3 11M68 70l3 11" stroke="#e9dcc3" stroke-width="2.5" stroke-linecap="round"/>' +
+      '<g fill="none" stroke="#5d8a55" stroke-width="3" stroke-linecap="round"><path d="M44 50C30 62 36 88 22 112"/><path d="M86 50C100 66 92 90 104 106"/></g>' +
+      pothos([[37, 61, 215], [33, 77, 145], [31, 93, 215], [22, 111, 180], [93, 61, 145], [96, 77, 215], [98, 93, 150], [104, 106, 180], [50, 44, -35], [78, 44, 35], [64, 44, 0]], .62) +
+    '</g>' +
+    // cactus in flower
+    tube('M124 114h5q5 0 5-6v-8', '#1f3322', '#7fa874', 12) + tube('M106 120h-4q-5 0-5-6v-5', '#1f3322', '#7fa874', 12) +
+    '<rect x="105" y="90" width="20" height="44" rx="10" fill="#7fa874"' + ink('#1f3322') + '/>' +
+    '<path d="M112 98v28M118 98v28" stroke="#acd09a" stroke-width="2" stroke-linecap="round"/>' +
+    '<path d="' + burst(115, 86, 8, 4.5, 5) + '" fill="#e3a1ab"' + ink('#1f3322') + '/><circle cx="115" cy="86" r="2.6" fill="#f2d27e"/>' +
+    '<path d="M100 132L104 150H126L130 132Z" fill="#d3a24f"' + ink('#1f3322') + '/><rect x="97" y="126" width="36" height="8" rx="3" fill="#e6c27e"' + ink('#1f3322') + '/>' +
+    // a cutting rooting in a jar of water
+    tube('M164 130C164 118 160 112 162 104', '#1f3322', '#5d8a55', 8) +
+    pothos([[162, 106, -50], [162, 104, 40]], .55) +
+    '<rect x="150" y="114" width="28" height="36" rx="5" fill="#d8e6e2"' + ink('#1f3322') + '/>' +
+    '<path d="M153 126h22v18q0 3-3 3h-16q-3 0-3-3z" fill="#b9d2cd"/>' +
+    '<path d="M164 126v10M164 132q-4 4-5 10M164 132q4 3 4 9" fill="none" stroke="#f3ead6" stroke-width="2" stroke-linecap="round"/>' +
+    // monstera, leaves swaying together over the pot
+    '<g class="sc-tilt">' +
+      tube(monsteraLeaves.map(([x, y, angle]) => 'M' + (236 + angle / 12).toFixed(1) + ' 112Q' + ((236 + x) / 2) + ' ' + (y + 10) + ' ' + x + ' ' + y).join(''), '#1f3322', '#5d8a55', 10) +
+      monstera(monsteraLeaves) +
+    '</g>' +
+    '<path d="M212 116L218 150H262L268 116Z" fill="#ebe1cf"' + ink('#1f3322') + '/>' +
+    '<g fill="#b8a487">' + [[222, 126], [236, 140], [250, 124], [258, 138], [228, 144], [244, 130]].map(([x, y]) => '<circle cx="' + x + '" cy="' + y + '" r="1.6"/>').join('') + '</g>' +
+    '<rect x="206" y="106" width="68" height="12" rx="5" fill="#f6efe2"' + ink('#1f3322') + '/>');
 
-  const potionBottle = (x, y, size, color, shape) => '<g transform="translate(' + x + ' ' + y + ') scale(' + size + ')"' + ink('#584468') + '><path d="M-7-38h14v17' + (shape === 'round' ? 'q20 7 18 26-2 19-25 19S-23 5-25 5q-2-19 18-26' : 'l13 12v27q-20 7-40 0V-9l13-12') + 'z" fill="#f0eafa" fill-opacity=".7"/><path d="' + (shape === 'round' ? 'M-21-2q21 9 42 0v7q-1 15-21 15T-21 5z' : 'M-16-4q16 5 32 0v18q-16 5-32 0z') + '" fill="' + color + '" stroke="none"/><rect x="-9" y="-44" width="18" height="8" rx="2" fill="#c5936a"/><path d="M-14-11v10" stroke="#fff" stroke-width="3" stroke-linecap="round"/><circle cx="5" cy="5" r="3" fill="#fff" opacity=".7" stroke="none"/></g>';
-  const potions = svg('potions', faded('potion-table', '<path d="M6 151h308v12H6z" fill="#b28776" opacity=".5"/><path d="M12 151h296" stroke="#584468" stroke-width="3"/>') +
-    // Three jewel colored bottles with simple readable silhouettes.
-    potionBottle(46, 131, .84, '#61c5ba', 'round') + potionBottle(98, 132, .88, '#ba8bdb', 'square') + potionBottle(144, 134, .7, '#e7ae61', 'round') +
-    '<g fill="none" stroke="#d3bbe7" stroke-width="5" stroke-linecap="round"><path class="sc-puff" d="M43 86q-12-13 0-24t-2-19"/><path class="sc-puff" style="animation-delay:.8s" d="M96 83q13-11 0-23t3-20"/></g>' +
-    sparkle(28, 30, 6, '#f7da89', .1) + sparkle(155, 40, 7, '#d7bdeb', .9) + sparkle(305, 22, 5, '#f7da89', 1.6) +
-    // A helpful frog rests its hands on the mixing bowl.
-    '<g' + ink('#36594f') + '><ellipse cx="251" cy="125" rx="34" ry="26" fill="#88b88a"/><ellipse cx="251" cy="130" rx="20" ry="17" fill="#d2ddb0"/><path d="M226 134q-26 10-20 19h28m37-19q26 10 20 19h-28" fill="#88b88a"/><ellipse cx="251" cy="87" rx="39" ry="27" fill="#88b88a"/><circle cx="229" cy="67" r="14" fill="#88b88a"/><circle cx="273" cy="67" r="14" fill="#88b88a"/><circle cx="229" cy="65" r="8" fill="#f8f2d4" stroke="none"/><circle cx="273" cy="65" r="8" fill="#f8f2d4" stroke="none"/><circle cx="230" cy="66" r="3.5" fill="#36594f" stroke="none"/><circle cx="272" cy="66" r="3.5" fill="#36594f" stroke="none"/><path d="M233 91q18 14 36 0" fill="none" stroke-linecap="round"/><circle cx="225" cy="89" r="5" fill="#df9c9c" stroke="none"/><circle cx="277" cy="89" r="5" fill="#df9c9c" stroke="none"/></g>' +
-    '<g' + ink('#584468') + '><path d="M167 118q35 12 70 0l-7 28h-56z" fill="#8a6d9c"/><ellipse cx="202" cy="117" rx="35" ry="8" fill="#d5a3d2"/><path d="M192 117l-9-37" fill="none" stroke="#c5936a" stroke-width="6"/><path d="M229 113q-9-13-15-6l-3 12q9 7 18-6m10 16q-4-14-12-7l-4 12q10 8 16-5" fill="#88b88a" stroke="#36594f"/></g>' +
-    '<g class="sc-rise" fill="none" stroke="#f0d9f5" stroke-width="2.5"><circle cx="183" cy="100" r="4"/><circle cx="207" cy="88" r="5"/><circle cx="223" cy="101" r="3"/></g>');
+  const steam = (x, y, delay) => '<path class="sc-steam" style="animation-delay:' + delay + 's" d="M' + x + ' ' + y + 'q-6-7 0-13t0-13" fill="none" stroke="#f3e6c8" stroke-width="3" stroke-linecap="round" opacity=".8"/>';
+  // A book lying flat, spine out: a label in the middle and a band near each end.
+  const book = (x, y, width, height, fill) => '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="3" fill="' + fill + '"' + ink('#2d1a2a') + '/>' +
+    '<path d="M' + (x + 9) + ' ' + (y + 2) + 'v' + (height - 4) + 'M' + (x + width - 9) + ' ' + (y + 2) + 'v' + (height - 4) + '" stroke="#efe2c8" stroke-width="2.5"/>' +
+    '<rect x="' + (x + width / 2 - 13) + '" y="' + (y + height / 2 - 3) + '" width="26" height="6" rx="1.5" fill="#efe2c8"/>';
+  const books = svg('books',
+    '<path d="M30 26a14 14 0 1 0 14 22a11 11 0 1 1-14-22z" fill="#f3e6c8"/>' +
+    '<g fill="#f3e6c8">' + [[76, 22, 0], [150, 18, 2.2]].map(([x, y, delay]) => '<circle class="sc-twinkle" style="animation-delay:' + delay + 's" cx="' + x + '" cy="' + y + '" r="1.8"/>').join('') +
+      '<circle cx="110" cy="44" r="1.8"/><circle cx="182" cy="54" r="1.8"/></g>' +
+    faded('table', '<rect x="0" y="148" width="320" height="7" fill="#a8775a"/><rect x="0" y="155" width="320" height="15" fill="#7c5143"/>' +
+      '<path d="M0 148H320" stroke="#2d1a2a" stroke-width="3"/>') +
+    // teapot: spout and handle behind the body
+    tube('M110 134C126 130 126 112 138 104', '#2d1a2a', '#9cc4bd', 13) +
+    '<path d="M134 101l9-3" stroke="#2d1a2a" stroke-width="5" stroke-linecap="round"/>' +
+    tube('M58 112C34 106 32 142 56 140', '#2d1a2a', '#9cc4bd', 11) +
+    '<ellipse cx="84" cy="126" rx="34" ry="24" fill="#9cc4bd"' + ink('#2d1a2a') + '/>' +
+    '<path d="M52 122q32 12 64 0" fill="none" stroke="#cfe3dc" stroke-width="6" stroke-linecap="round"/>' +
+    '<path d="M66 104a18 13 0 0 1 36 0z" fill="#cfe3dc"' + ink('#2d1a2a') + '/><circle cx="84" cy="89" r="4.5" fill="#cfe3dc"' + ink('#2d1a2a') + '/>' +
+    // a cup of tea, steaming
+    steam(156, 114, 0) + steam(168, 110, 2.5) +
+    '<ellipse cx="162" cy="148" rx="25" ry="4.5" fill="#e9dfcf"' + ink('#2d1a2a') + '/>' +
+    tube('M176 128q10 0 10 7t-10 7', '#2d1a2a', '#f3ead9', 9) +
+    '<path d="M146 122h32v10q0 14-16 14q-16 0-16-14z" fill="#f3ead9"' + ink('#2d1a2a') + '/>' +
+    '<path d="M147 130h30" stroke="#9cc4bd" stroke-width="4"/>' +
+    '<ellipse cx="162" cy="122" rx="14.5" ry="2.6" fill="#b5764a"/>' +
+    // the stack, a ribbon marking a place
+    book(188, 132, 116, 18, '#cf9f4a') + book(198, 116, 98, 16, '#b0634a') +
+    '<path d="M268 130v14l3-3 3 3v-14" fill="#d9c27a" stroke="#2d1a2a" stroke-width="2" stroke-linejoin="round"/>' +
+    book(192, 102, 98, 14, '#8aa97f') +
+    // a ginger cat asleep on top
+    '<g class="sc-breathe">' +
+      '<path d="M206 102C204 80 226 70 250 70C274 70 290 82 288 102Z" fill="#d79c63"' + ink('#2d1a2a') + '/>' +
+      '<path d="M244 76q4 6 2 12M258 74q4 6 2 12M272 80q3 5 1 10" fill="none" stroke="#b5743f" stroke-width="3" stroke-linecap="round"/>' +
+      tube('M286 96C290 108 252 108 232 101', '#2d1a2a', '#d79c63', 12) +
+      '<path d="M210 80L207 64L220 75ZM226 75L234 63L236 80Z" fill="#d79c63"' + ink('#2d1a2a') + '/>' +
+      '<circle cx="222" cy="88" r="14" fill="#d79c63"' + ink('#2d1a2a') + '/>' +
+      '<ellipse cx="222" cy="95" rx="7.5" ry="5" fill="#f2d9b8"/>' +
+      '<path d="M211 87q3 3 6 0M227 87q3 3 6 0" fill="none" stroke="#2d1a2a" stroke-width="2.2" stroke-linecap="round"/>' +
+      '<path d="M220 92h4l-2 2.5z" fill="#2d1a2a" stroke="#2d1a2a" stroke-width="1.5" stroke-linejoin="round"/>' +
+    '</g>');
 
-  return { trains, dinosaurs, unicorns, space, construction, ocean, pirates, heroes, robots, princesses,
-    pets, horses, bugs, jungle, dragons, cars, games, bricks, sweets, weather,
-    mushroom, library, farm, music, arctic, potions };
+  // The Plough, handle to bowl, then the bowl closed back to its first star.
+  const plough = [[24, 46], [44, 30], [66, 24], [88, 30], [126, 18], [130, 50], [94, 56]];
+  const stargazing = svg('stargazing',
+    '<g fill="#e9e2cf" opacity=".7">' + [[150, 12], [200, 24], [16, 84], [150, 74], [300, 70], [252, 56], [118, 96], [8, 22]].map(([x, y]) => '<circle cx="' + x + '" cy="' + y + '" r="1.3"/>').join('') + '</g>' +
+    '<path d="M' + plough.map((point) => point.join(' ')).join('L') + 'L88 30" fill="none" stroke="#e9e2cf" stroke-width="1.5" stroke-linejoin="round" opacity=".4"/>' +
+    plough.map(([x, y], index) => index % 3 ? '<circle cx="' + x + '" cy="' + y + '" r="2.4" fill="#fff3d6"/>' : sparkle(x, y, 5.5, '#fff3d6', index * .9)).join('') +
+    '<path d="M160 32l22-12" stroke="#e9e2cf" stroke-width="2" stroke-linecap="round" opacity=".5"/>' + sparkle(184, 19, 4, '#fff', 1.6) +
+    '<path d="M38 88a14 14 0 1 0 14 22a11 11 0 1 1-14-22z" fill="#f3e6c4"/>' +
+    faded('stargazing-back-hill', '<path d="M0 134Q60 112 120 128T230 146V170H0Z" fill="#33426f" opacity=".75"/>') +
+    // a cabin on the far hill, one window lit
+    '<path d="M68 126V112l10-8 10 8v14z" fill="#24305a" stroke="#121a33" stroke-width="2.5" stroke-linejoin="round"/><rect x="75" y="114" width="6" height="6" rx="1" fill="#ffe08a"/>' +
+    faded('stargazing-hill', '<path d="M0 156Q90 140 190 147T320 142V170H0Z" fill="#141c36"/>') +
+    // fox, from behind, watching the sky; the tail sweeps round
+    '<g class="sc-sway"><path d="M160 148C140 154 116 152 110 141C106 132 118 126 128 132C136 138 146 140 162 138Z" fill="#c97a4a"' + ink('#121a33') + '/>' +
+      '<path d="M110 141C106 132 118 126 128 132C122 136 118 142 120 148C114 147 111 144 110 141Z" fill="#f1e2cc"' + ink('#121a33') + '/></g>' +
+    '<path d="M150 149C142 130 148 110 166 106C184 110 192 130 184 149Z" fill="#c97a4a"' + ink('#121a33') + '/>' +
+    '<path d="M155 84L151 63L166 79ZM168 79L175 61L180 85Z" fill="#c97a4a"' + ink('#121a33') + '/>' +
+    '<path d="M152.6 71.5L151 63L157 69.5ZM172.3 68L175 61L176.4 70Z" fill="#3b2a2c"/>' +
+    '<path d="M155 86L139 75Q136 74 137 77L156 97Z" fill="#c97a4a"' + ink('#121a33') + '/><circle cx="138" cy="76" r="2.6" fill="#121a33"/>' +
+    '<circle cx="166" cy="94" r="15" fill="#c97a4a"' + ink('#121a33') + '/>' +
+    // tripod and telescope
+    tube('M232 98L208 149M232 98L236 149M232 98L264 149', '#121a33', '#9a7550', 10) +
+    '<path d="M220 124h28" stroke="#121a33" stroke-width="3" stroke-linecap="round"/>' +
+    '<rect x="225" y="84" width="14" height="14" rx="3" fill="#5a4632"' + ink('#121a33') + '/>' +
+    '<g transform="rotate(28 274 96)">' +
+      '<path d="M224 80v7M244 80v7" stroke="#121a33" stroke-width="2.5"/><rect x="220" y="75" width="30" height="7" rx="3" fill="#d1a95f"' + ink('#121a33') + '/>' +
+      '<rect x="190" y="87" width="80" height="18" rx="4" fill="#d1a95f"' + ink('#121a33') + '/>' +
+      '<path d="M212 89v14M250 89v14" stroke="#ecd29a" stroke-width="5"/>' +
+      '<rect x="270" y="91" width="10" height="10" rx="2" fill="#5a4632"' + ink('#121a33') + '/><rect x="279" y="93" width="8" height="6" rx="2" fill="#5a4632" stroke="#121a33" stroke-width="2.5"/>' +
+      '<rect x="168" y="84" width="26" height="24" rx="4" fill="#d1a95f"' + ink('#121a33') + '/>' +
+      '<rect x="164" y="86" width="7" height="20" rx="3" fill="#9fb4dc"' + ink('#121a33') + '/>' +
+    '</g>');
+
+  const flyer = (x, y) => '<path d="M' + x + ' ' + y + 'q5-6 10 0q5-6 10 0" fill="none" stroke="#e8efe9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+  const robinBody = '<ellipse cx="232" cy="82" rx="27" ry="22"/><circle cx="212" cy="66" r="15"/>';
+  const birds = svg('birds',
+    '<g class="sc-drift">' + flyer(30, 34) + flyer(56, 24) + flyer(80, 40) + '</g>' +
+    '<g class="sc-drift" style="animation-direction:alternate-reverse">' + cloud(160, 42, '#163033', .8, '#e8efe9') + '</g>' +
+    faded('birds-meadow', '<path d="M0 150Q80 140 160 148T320 144V170H0Z" fill="#8fa66b"/>' +
+      '<g fill="none" stroke="#6f8a52" stroke-width="2.5" stroke-linecap="round">' + [18, 132, 196, 300].map((x) => '<path d="M' + x + ' 156l-3-9M' + (x + 4) + ' 156l1-11M' + (x + 8) + ' 156l4-8"/>').join('') + '</g>') +
+    // a birdhouse on a pole, someone peeking out
+    '<rect x="66" y="104" width="8" height="46" fill="#9c7a58"' + ink('#163033') + '/>' +
+    '<path d="M48 108V74L70 56L92 74V108Z" fill="#e7dcc6"' + ink('#163033') + '/>' +
+    '<path d="M40 78L70 50L100 78" fill="none" stroke="#163033" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 78L70 50L100 78" fill="none" stroke="#6f9a8a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<circle cx="70" cy="84" r="9" fill="#2a3b3a"' + ink('#163033') + '/>' +
+    '<circle cx="70" cy="86" r="6.5" fill="#f4f1e8"/><path d="M63.5 84a6.5 6.5 0 0 1 13 0z" fill="#6f95bd"/><path d="M64 86.5h12" stroke="#2a3b3a" stroke-width="1.6"/>' +
+    '<circle cx="68" cy="87" r="1.4" fill="#163033"/><path d="M65 89l-3 1 3 1z" fill="#2a3b3a"/>' +
+    '<path d="M70 98v6" stroke="#163033" stroke-width="3" stroke-linecap="round"/>' +
+    // a feather drifting down
+    '<g class="sc-flutter" style="animation-delay:1s"><path d="M138 66c8 6 10 16 6 24c-8-6-10-16-6-24z" fill="#f1ece0" stroke="#163033" stroke-width="2" stroke-linejoin="round"/><path d="M139 70q3 10 3 24" fill="none" stroke="#163033" stroke-width="2" stroke-linecap="round"/></g>' +
+    // binoculars set down in the grass, strap looped beside them
+    '<path d="M264 146q-16 10 4 12q30 4 38-10" fill="none" stroke="#6b4a3a" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<g' + ink('#163033') + '><rect x="265" y="111" width="12" height="12" rx="3" fill="#3b3734"/><rect x="293" y="111" width="12" height="12" rx="3" fill="#3b3734"/>' +
+      '<rect x="262" y="120" width="18" height="30" rx="5" fill="#7d5a43"/><rect x="290" y="120" width="18" height="30" rx="5" fill="#7d5a43"/>' +
+      '<rect x="279" y="126" width="12" height="12" rx="2" fill="#3b3734"/><rect x="281" y="115" width="8" height="10" rx="2" fill="#a98366"/></g>' +
+    '<path d="M265 141h12M293 141h12" stroke="#a98366" stroke-width="3.5"/>' +
+    // fence post, and the robin on it facing into the banner
+    '<rect x="218" y="112" width="26" height="38" rx="2" fill="#9c7a58"' + ink('#163033') + '/><rect x="215" y="106" width="32" height="8" rx="3" fill="#bf9c76"' + ink('#163033') + '/>' +
+    '<path d="M228 122v14" stroke="#bf9c76" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path d="M224 101l-2 5M236 101l-1 5" stroke="#163033" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<g class="sc-nod">' +
+      '<path d="M254 88L276 100L270 106L248 96Z" fill="#7a6248"' + ink('#163033') + '/>' +
+      '<g fill="#163033" stroke="#163033" stroke-width="6">' + robinBody + '</g><g fill="#8f7556">' + robinBody + '</g>' +
+      '<path d="M200 58Q207 53 216 60Q222 70 226 82Q232 94 240 98Q226 102 214 96Q206 90 206 82Q203 76 199 68Z" fill="#d9824e"/>' +
+      '<path d="M234 74Q252 72 260 88Q248 94 236 86Z" fill="#7a6248"/>' +
+      '<circle cx="207" cy="62" r="2.6" fill="#163033"/>' +
+      '<path d="M198 63L189 66L198 69Z" fill="#4a3b2e" stroke="#163033" stroke-width="2" stroke-linejoin="round"/>' +
+    '</g>');
+
+  return { trains, dinosaurs, unicorns, space, construction, ocean, pirates, heroes, robots, princesses, pets, horses, bugs, jungle, dragons, cars, games, bricks, sweets, weather, spring, summer, autumn, winter, houseplants, books, stargazing, birds };
 })();

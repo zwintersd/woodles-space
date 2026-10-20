@@ -31,7 +31,17 @@ export type CollectionRecord = {
 	createdAt: string;
 	updatedAt: string;
 };
-export type TableViewState = { columnOrder: string[]; columnWidths: Record<string, number> };
+export type TableViewState = {
+	columnOrder: string[];
+	columnWidths: Record<string, number>;
+	/** Leading entries of `columnOrder` pinned beside the row numbers. */
+	frozenColumns?: number;
+	/** Leading records pinned under the header. */
+	frozenRows?: number;
+	/** Ids may outlive their field or record; readers skip the missing ones. */
+	hiddenFields?: string[];
+	hiddenRecords?: string[];
+};
 export type Collection = {
 	id: string;
 	title: string;
@@ -77,6 +87,7 @@ export function isCollection(value: unknown): value is Collection {
 	if (!value.records.every((record) => isCollectionRecord(record, fieldMap)) || new Set((value.records as CollectionRecord[]).map((record) => record.id)).size !== value.records.length) return false;
 	if (!isRecord(value.views) || !isRecord(value.views.table)) return false;
 	const table = value.views.table;
+	if (!isCount(table.frozenColumns) || !isCount(table.frozenRows) || !isIdList(table.hiddenFields) || !isIdList(table.hiddenRecords)) return false;
 	return Array.isArray(table.columnOrder) && table.columnOrder.every((id) => fieldMap.has(id)) && isRecord(table.columnWidths) && Object.entries(table.columnWidths).every(([id, width]) => fieldMap.has(id) && typeof width === 'number' && width >= 72 && width <= 640);
 }
 
@@ -124,6 +135,8 @@ function isFieldValue(field: CollectionField, value: unknown): boolean {
 function isRecord(value: unknown): value is Record<string, any> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
+function isCount(value: unknown): boolean { return value === undefined || (Number.isInteger(value) && (value as number) >= 0); }
+function isIdList(value: unknown): boolean { return value === undefined || (Array.isArray(value) && value.every((id) => typeof id === 'string')); }
 function isStamp(value: unknown): value is string { return typeof value === 'string' && !Number.isNaN(Date.parse(value)); }
 function makeId(prefix: string): string { return `${prefix}-${crypto.randomUUID()}`; }
 function now(): string { return new Date().toISOString(); }
@@ -242,7 +255,13 @@ export function deleteField(collection: Collection, fieldId: string): Collection
 	return {
 		...collection, fields,
 		records: collection.records.map((record) => { const values = { ...record.values }; delete values[fieldId]; return { ...record, values }; }),
-		views: { table: { columnOrder: collection.views.table.columnOrder.filter((id) => id !== fieldId), columnWidths: Object.fromEntries(Object.entries(collection.views.table.columnWidths).filter(([id]) => id !== fieldId)) } },
+		views: { table: withoutView({
+			...collection.views.table,
+			columnOrder: collection.views.table.columnOrder.filter((id) => id !== fieldId),
+			columnWidths: Object.fromEntries(Object.entries(collection.views.table.columnWidths).filter(([id]) => id !== fieldId)),
+			frozenColumns: frozenAfterRemoval(collection.views.table.frozenColumns, collection.views.table.columnOrder.indexOf(fieldId)),
+			hiddenFields: collection.views.table.hiddenFields?.filter((id) => id !== fieldId)
+		}) },
 		updatedAt: now()
 	};
 }
@@ -260,7 +279,56 @@ export function removeRecord(collection: Collection, recordId: string): Collecti
 	const excludedRefs = removed?.sourceRef
 		? [...(collection.excludedRefs ?? []).filter((ref) => ref.app !== removed.sourceRef?.app || ref.kind !== removed.sourceRef?.kind || ref.id !== removed.sourceRef?.id), { ...removed.sourceRef }]
 		: collection.excludedRefs;
-	return { ...collection, records: collection.records.filter((record) => record.id !== recordId), ...(excludedRefs ? { excludedRefs } : {}), updatedAt: now() };
+	const table = collection.views.table;
+	const views = { table: withoutView({
+		...table,
+		frozenRows: frozenAfterRemoval(table.frozenRows, collection.records.findIndex((record) => record.id === recordId)),
+		hiddenRecords: table.hiddenRecords?.filter((id) => id !== recordId)
+	}) };
+	return { ...collection, records: collection.records.filter((record) => record.id !== recordId), views, ...(excludedRefs ? { excludedRefs } : {}), updatedAt: now() };
+}
+
+/** Removing something inside the frozen block shrinks it, so the edge stays put. */
+function frozenAfterRemoval(count: number | undefined, index: number): number | undefined {
+	return count && index !== -1 && index < count ? count - 1 : count;
+}
+
+/** Drops empty view settings, so an untouched view saves as it always has. */
+function withoutView(table: TableViewState): TableViewState {
+	const next = { ...table };
+	if (!next.frozenColumns) delete next.frozenColumns;
+	if (!next.frozenRows) delete next.frozenRows;
+	if (!next.hiddenFields?.length) delete next.hiddenFields;
+	if (!next.hiddenRecords?.length) delete next.hiddenRecords;
+	return next;
+}
+
+export type TableAxis = 'rows' | 'columns';
+
+/** Freezes everything up to and including `count` leading rows or columns; 0 unfreezes. */
+export function setFrozen(collection: Collection, axis: TableAxis, count: number): Collection {
+	const limit = axis === 'rows' ? collection.records.length : collection.views.table.columnOrder.length;
+	const next = Math.max(0, Math.min(limit, Math.floor(count)));
+	const key = axis === 'rows' ? 'frozenRows' : 'frozenColumns';
+	if ((collection.views.table[key] ?? 0) === next) return collection;
+	return { ...collection, views: { table: withoutView({ ...collection.views.table, [key]: next }) }, updatedAt: now() };
+}
+
+/** The Primary field names each record, so it is never hidden. */
+export function setHidden(collection: Collection, axis: TableAxis, id: string, hidden: boolean): Collection {
+	const exists = axis === 'rows' ? collection.records.some((record) => record.id === id) : collection.fields.some((entry) => entry.id === id && !entry.primary);
+	if (!exists) return collection;
+	const key = axis === 'rows' ? 'hiddenRecords' : 'hiddenFields';
+	const current = collection.views.table[key] ?? [];
+	if (current.includes(id) === hidden) return collection;
+	const ids = hidden ? [...current, id] : current.filter((entry) => entry !== id);
+	return { ...collection, views: { table: withoutView({ ...collection.views.table, [key]: ids }) }, updatedAt: now() };
+}
+
+export function showAllHidden(collection: Collection, axis: TableAxis): Collection {
+	const key = axis === 'rows' ? 'hiddenRecords' : 'hiddenFields';
+	if (!collection.views.table[key]?.length) return collection;
+	return { ...collection, views: { table: withoutView({ ...collection.views.table, [key]: [] }) }, updatedAt: now() };
 }
 
 export function duplicateRecord(collection: Collection, recordId: string): Collection {

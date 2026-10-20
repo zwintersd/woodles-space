@@ -6,8 +6,8 @@
 // a real job: Write's blob is the archive, and Echoes and Marginalia's reading
 // room read it back under the same passphrase.
 //
-// Drafts deliberately stay out. They are working state, they are already
-// per-device, and an archive is a different thing from a desk.
+// Drafts deliberately stay out. They are working state, and an archive is a
+// different thing from a desk; HomeSuite's sync carries them instead.
 
 import {
 	createAppSync,

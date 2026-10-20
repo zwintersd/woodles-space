@@ -297,3 +297,20 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
   .surface-layout { height: calc(100dvh - 54px); }
   .inspector-slot { position: absolute; z-index: 10; right: 0; top: 88px; bottom: 0; width: min(270px, 84vw); box-shadow: -8px 0 25px var(--hs-shadow); }
 }
+
+.sync-dot { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: var(--hs-faint); }
+.sync-dot.ok { background: var(--hs-accent-text); }
+.sync-dot.error { background: var(--hs-danger-ink); }
+.sync-dot.busy { background: var(--hs-accent-text); animation: sync-pulse 1.1s ease-in-out infinite alternate; }
+@keyframes sync-pulse { from { opacity: 1; } to { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .sync-dot.busy { animation: none; } }
+/* The topbar drops button labels under 800px; sync keeps its own, so a phone can find it. */
+.toolbar-button span.sync-dot { display: block; }
+.toolbar-button span.sync-label { display: inline; }
+@media (max-width: 800px) { .sync-trigger { min-height: 34px; padding: 7px 6px; } }
+.sync-status { display: flex; align-items: center; gap: 9px; color: var(--hs-ink) !important; font-weight: 600; }
+.sync-connect { display: flex; align-items: end; gap: 8px; }
+.sync-connect .folder-name-label { flex: 1; }
+.sync-connect .new-button { padding: 10px 14px; }
+.sync-connect .new-button:disabled, .sync-dialog .new-button:disabled { opacity: .55; cursor: default; }
+.sync-footnote { font-size: 12px !important; }

@@ -15,7 +15,7 @@
 	import { mergePulledRows, pullCollectionSources } from '$lib/sourceSync';
 	import {
 		addField, addRecord, cloneJson, deleteField, duplicateRecord, exportCollections, importCollections,
-		isCollection, loadCollections, removeRecord, renameField, resizeColumn, saveCollection, setCellValue,
+		isCollection, loadCollections, removeRecord, renameField, resizeColumn, saveCollection, setCellValue, setFrozen, setHidden, showAllHidden,
 		type Collection, type CollectionField, type FieldType, type FieldValue
 	} from '$lib/collections';
 	import '@shared/homesuiteTheme.css';
@@ -42,6 +42,7 @@
 	let sourceStatus = $state('');
 	let trashRevision = $state(0);
 	const context = createHomeSuiteContext();
+	const ROW_HEAD_WIDTH = 42;
 
 	function suiteCandidates(): ReferenceCandidate[] {
 		return [
@@ -87,15 +88,41 @@
 					actions.push({ id: 'relation:remove', label: 'Remove reference', group: 'danger', run: () => run('relation:remove') });
 				}
 			}
+			actions.push(...viewActions(record, field));
 			if (!record.sourceRef) actions.push({ id: 'record:duplicate', label: 'Duplicate record', group: 'edit', run: () => run('record:duplicate') });
 			actions.push({ id: 'record:delete', label: record.sourceRef ? 'Remove from collection' : 'Delete record', detail: record.sourceRef ? 'Keeps the source item' : 'Undo to restore', group: 'danger', run: () => run('record:delete') });
 		} else if (field) {
 			actions.push({ id: 'field:new', label: 'Add field…', group: 'edit', run: () => run('field:new') });
+			actions.push(...viewActions(undefined, field));
 			actions.push({ id: 'field:delete', label: 'Delete field', enabled: !field.primary, detail: field.primary ? 'The Primary field is required' : 'Removes this column and its values · undoable', group: 'danger', run: () => run('field:delete') });
 		} else {
 			for (const [id, label] of [['record:new', 'New record'], ['field:new', 'New field…'], ['reference:add', 'Add Woodles reference…'], ['collection:export', 'Export collection']]) actions.push({ id, label, group: 'edit', run: () => run(id) });
+			actions.push(...viewActions());
 		}
 		context.open(point, { label: record ? primaryLabel(record) : field?.name ?? collection.title, detail, ref }, actions);
+
+		/** Freeze and hide verbs for whatever was right-clicked, plus the way back from each. */
+		function viewActions(record?: Collection['records'][number], field?: CollectionField): ContextAction[] {
+			if (!collection) return [];
+			const table = collection.views.table;
+			const view: ContextAction[] = [];
+			const add = (id: string, label: string, detail?: string, enabled = true) => view.push({ id, label, detail, enabled, group: 'view', run: () => run(id) });
+			if (record) {
+				const through = collection.records.findIndex((entry) => entry.id === record.id) + 1;
+				if ((table.frozenRows ?? 0) !== through) add('view:freeze-rows', 'Freeze up to this row', through === 1 ? 'Keeps it under the header' : `Keeps rows 1–${through} under the header`);
+			}
+			if (field) {
+				const through = table.columnOrder.indexOf(field.id) + 1;
+				if ((table.frozenColumns ?? 0) !== through) add('view:freeze-columns', 'Freeze up to this field', through === 1 ? 'Keeps it in view while scrolling' : `Keeps the first ${through} fields in view`);
+			}
+			if (table.frozenRows) add('view:unfreeze-rows', 'Unfreeze rows');
+			if (table.frozenColumns) add('view:unfreeze-columns', 'Unfreeze fields');
+			if (record) add('view:hide-record', 'Hide record', 'Show it again from the toolbar or this menu');
+			if (field) add('view:hide-field', 'Hide field', field.primary ? 'The Primary field stays visible' : 'Values are kept', !field.primary);
+			if (hiddenRecordCount) add('view:show-records', `Show hidden records (${hiddenRecordCount})`);
+			if (hiddenFieldCount) add('view:show-fields', `Show hidden fields (${hiddenFieldCount})`);
+			return view;
+		}
 	}
 
 	function dataContextEvent(event: MouseEvent): void {
@@ -120,6 +147,29 @@
 		if (!collection) return [];
 		return collection.views.table.columnOrder.map((id) => collection!.fields.find((entry) => entry.id === id)).filter((entry): entry is CollectionField => !!entry);
 	});
+	const hiddenFieldIds = $derived(new Set(collection?.views.table.hiddenFields ?? []));
+	const hiddenRecordIds = $derived(new Set(collection?.views.table.hiddenRecords ?? []));
+	const visibleFields = $derived(orderedFields.filter((field) => field.primary || !hiddenFieldIds.has(field.id)));
+	const hiddenFieldCount = $derived(orderedFields.length - visibleFields.length);
+	/** Each visible record with its place in the whole Collection, which its row number shows. */
+	const visibleRecords = $derived(collection?.records.map((record, index) => ({ record, number: index + 1 })).filter(({ record }) => !hiddenRecordIds.has(record.id)) ?? []);
+	const hiddenRecordCount = $derived((collection?.records.length ?? 0) - visibleRecords.length);
+	const frozenRecords = $derived(visibleRecords.filter(({ number }) => number <= (collection?.views.table.frozenRows ?? 0)));
+	const scrollingRecords = $derived(visibleRecords.slice(frozenRecords.length));
+	/** Sticky `left` for each frozen field, after the row numbers and the frozen fields before it. */
+	const frozenOffsets = $derived.by(() => {
+		const offsets = new Map<string, number>();
+		if (!collection) return offsets;
+		const frozen = new Set(collection.views.table.columnOrder.slice(0, collection.views.table.frozenColumns ?? 0));
+		let left = ROW_HEAD_WIDTH;
+		for (const field of visibleFields) {
+			if (!frozen.has(field.id)) break;
+			offsets.set(field.id, left);
+			left += collection.views.table.columnWidths[field.id] ?? 160;
+		}
+		return offsets;
+	});
+	const lastFrozenField = $derived([...frozenOffsets.keys()].at(-1) ?? '');
 	const activeField = $derived(collection?.fields.find((entry) => entry.id === selectedField) ?? null);
 	const activeRecord = $derived(collection?.records.find((entry) => entry.id === selectedRecord) ?? null);
 	const candidates = $derived.by(() => {
@@ -359,6 +409,27 @@
 		else if (id === 'collection:export' && collection) exportCollection(collection);
 		else if (id === 'reference:add') { pickerFor = { recordId: '', fieldId: '' }; pickerQuery = ''; void refreshPickerSources(); }
 		else if (id === 'source:sync') void syncSources();
+		else if (id.startsWith('view:')) viewCommand(id);
+	}
+
+	function viewCommand(id: string): void {
+		if (!collection) return;
+		const fieldId = selectedField || selectedCell?.fieldId || '';
+		const recordIndex = collection.records.findIndex((entry) => entry.id === selectedRecord);
+		const fieldIndex = collection.views.table.columnOrder.indexOf(fieldId);
+		let next = collection;
+		if (id === 'view:freeze-rows' && recordIndex !== -1) next = setFrozen(collection, 'rows', recordIndex + 1);
+		else if (id === 'view:freeze-columns' && fieldIndex !== -1) next = setFrozen(collection, 'columns', fieldIndex + 1);
+		else if (id === 'view:unfreeze-rows') next = setFrozen(collection, 'rows', 0);
+		else if (id === 'view:unfreeze-columns') next = setFrozen(collection, 'columns', 0);
+		else if (id === 'view:hide-record' && selectedRecord) next = setHidden(collection, 'rows', selectedRecord, true);
+		else if (id === 'view:hide-field' && fieldId) next = setHidden(collection, 'columns', fieldId, true);
+		else if (id === 'view:show-records') next = showAllHidden(collection, 'rows');
+		else if (id === 'view:show-fields') next = showAllHidden(collection, 'columns');
+		if (next === collection) return;
+		if (id === 'view:hide-record') { selectedRecord = ''; selectedCell = null; }
+		if (id === 'view:hide-field') { selectedField = ''; selectedCell = null; }
+		updateLibrary(next);
 	}
 
 	function exportCollection(target: Collection): void {
@@ -428,9 +499,12 @@
 		const fieldIds = new Map(source.fields.map((field) => [field.id, `${field.primary ? 'field-primary' : 'field'}-${crypto.randomUUID()}`]));
 		source.id = `collection-${crypto.randomUUID()}`;
 		source.fields = source.fields.map((field) => ({ ...field, id: fieldIds.get(field.id)!, config: field.config ? cloneJson(field.config) : undefined }));
-		source.records = source.records.map((record) => ({ ...record, id: `record-${crypto.randomUUID()}`, values: Object.fromEntries(Object.entries(record.values).map(([id, value]) => [fieldIds.get(id) ?? id, value])) }));
+		const recordIds = new Map(source.records.map((record) => [record.id, `record-${crypto.randomUUID()}`]));
+		source.records = source.records.map((record) => ({ ...record, id: recordIds.get(record.id)!, values: Object.fromEntries(Object.entries(record.values).map(([id, value]) => [fieldIds.get(id) ?? id, value])) }));
 		source.views.table.columnOrder = source.views.table.columnOrder.map((id) => fieldIds.get(id) ?? id);
 		source.views.table.columnWidths = Object.fromEntries(Object.entries(source.views.table.columnWidths).map(([id, width]) => [fieldIds.get(id) ?? id, width]));
+		if (source.views.table.hiddenFields) source.views.table.hiddenFields = source.views.table.hiddenFields.map((id) => fieldIds.get(id) ?? id);
+		if (source.views.table.hiddenRecords) source.views.table.hiddenRecords = source.views.table.hiddenRecords.map((id) => recordIds.get(id) ?? id);
 		const saved = saveCollection(source);
 		if (!saved.ok) { saveIssue = saved.issue?.message ?? 'Could not import this Collection.'; return; }
 		saveIssue = `Imported “${source.title}”. It is now in the HomeSuite index.`;
@@ -449,6 +523,11 @@
 		publishState();
 	}
 
+	function selectedFieldForView(): CollectionField | null {
+		const fieldId = selectedField || selectedCell?.fieldId;
+		return collection?.fields.find((entry) => entry.id === fieldId) ?? null;
+	}
+
 	function publishState(): void {
 		if (!collection || !homeSuite) return;
 		const selected = activeField
@@ -465,8 +544,8 @@
 					...(activeRecord.sourceRef ? [{ label: 'Source', value: sourceCandidate(activeRecord.sourceRef)?.text ?? 'Unavailable' }] : [])
 				]
 				: [
-					{ label: 'Records', value: String(collection.records.length) },
-					{ label: 'Fields', value: String(collection.fields.length) },
+					{ label: 'Records', value: hiddenRecordCount ? `${collection.records.length} · ${hiddenRecordCount} hidden` : String(collection.records.length) },
+					{ label: 'Fields', value: hiddenFieldCount ? `${collection.fields.length} · ${hiddenFieldCount} hidden` : String(collection.fields.length) },
 					{ label: 'Created', value: new Date(collection.createdAt).toLocaleDateString() }
 				];
 		const controls = activeField
@@ -477,7 +556,7 @@
 			]
 			: undefined;
 		const actions = activeField && !activeField.primary
-			? [{ commandId: 'field:delete', label: 'Delete field' }]
+			? [{ commandId: 'view:hide-field', label: 'Hide field' }, { commandId: 'field:delete', label: 'Delete field' }]
 			: activeRecord?.sourceRef
 				? [{ commandId: 'source:open', label: 'Open source' }, { commandId: 'record:delete', label: 'Remove from collection' }]
 				: activeRecord ? [{ commandId: 'record:delete', label: 'Delete record' }] : [];
@@ -490,7 +569,15 @@
 			{ id: 'relation:remove', label: 'Remove reference', enabled: relationSelected() },
 			{ id: 'field:delete', label: 'Delete field', enabled: !!activeField && !activeField.primary },
 			{ id: 'source:open', label: 'Open source', enabled: !!activeRecord?.sourceRef },
-			{ id: 'reference:add', label: 'Add Woodles reference' }
+			{ id: 'reference:add', label: 'Add Woodles reference' },
+			{ id: 'view:freeze-rows', label: 'Freeze up to this row', enabled: !!activeRecord, group: 'view' },
+			{ id: 'view:freeze-columns', label: 'Freeze up to this field', enabled: !!(activeField ?? selectedCell), group: 'view' },
+			{ id: 'view:unfreeze-rows', label: 'Unfreeze rows', enabled: !!collection.views.table.frozenRows, group: 'view' },
+			{ id: 'view:unfreeze-columns', label: 'Unfreeze fields', enabled: !!collection.views.table.frozenColumns, group: 'view' },
+			{ id: 'view:hide-record', label: 'Hide record', enabled: !!activeRecord, group: 'view' },
+			{ id: 'view:hide-field', label: 'Hide field', enabled: !!selectedFieldForView() && !selectedFieldForView()?.primary, group: 'view' },
+			{ id: 'view:show-records', label: `Show hidden records${hiddenRecordCount ? ` (${hiddenRecordCount})` : ''}`, enabled: hiddenRecordCount > 0, group: 'view' },
+			{ id: 'view:show-fields', label: `Show hidden fields${hiddenFieldCount ? ` (${hiddenFieldCount})` : ''}`, enabled: hiddenFieldCount > 0, group: 'view' }
 		];
 		const state: HomeSuiteSurfaceState = {
 			artifact: { id: collection.id, kind: 'collection', title: collection.title }, selection: selected,
@@ -524,17 +611,18 @@
 		if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? redo() : undo(); return; }
 		if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); addNewRecord(); return; }
 		let nextRow = rowIndex, nextCol = colIndex;
-		if (event.key === 'ArrowDown') nextRow = Math.min(collection.records.length - 1, rowIndex + 1);
+		const rows = visibleRecords.map(({ record }) => record);
+		if (event.key === 'ArrowDown') nextRow = Math.min(rows.length - 1, rowIndex + 1);
 		else if (event.key === 'ArrowUp') nextRow = Math.max(0, rowIndex - 1);
-		else if (event.key === 'ArrowRight' && (event.target as HTMLInputElement).selectionStart === (event.target as HTMLInputElement).value?.length) nextCol = Math.min(orderedFields.length - 1, colIndex + 1);
+		else if (event.key === 'ArrowRight' && (event.target as HTMLInputElement).selectionStart === (event.target as HTMLInputElement).value?.length) nextCol = Math.min(visibleFields.length - 1, colIndex + 1);
 		else if (event.key === 'ArrowLeft' && (event.target as HTMLInputElement).selectionStart === 0) nextCol = Math.max(0, colIndex - 1);
-		else if (event.key === 'Tab') { nextCol = colIndex + (event.shiftKey ? -1 : 1); if (nextCol < 0) { nextCol = orderedFields.length - 1; nextRow = Math.max(0, rowIndex - 1); } if (nextCol >= orderedFields.length) { nextCol = 0; nextRow++; if (nextRow >= collection.records.length) { addNewRecord(); return; } } }
-		else if (event.key === 'Enter') { nextRow = Math.min(collection.records.length, rowIndex + 1); if (nextRow === collection.records.length) { addNewRecord(); return; } }
+		else if (event.key === 'Tab') { nextCol = colIndex + (event.shiftKey ? -1 : 1); if (nextCol < 0) { nextCol = visibleFields.length - 1; nextRow = Math.max(0, rowIndex - 1); } if (nextCol >= visibleFields.length) { nextCol = 0; nextRow++; if (nextRow >= rows.length) { addNewRecord(); return; } } }
+		else if (event.key === 'Enter') { nextRow = Math.min(rows.length, rowIndex + 1); if (nextRow === rows.length) { addNewRecord(); return; } }
 		else return;
 		event.preventDefault();
 		if (event.key === 'Tab' || event.key === 'Enter' || event.key.startsWith('Arrow')) {
-			const record = collection.records[nextRow];
-			const field = orderedFields[nextCol];
+			const record = rows[nextRow];
+			const field = visibleFields[nextCol];
 			if (!record || !field) return;
 			selectedRecord = record.id; selectedCell = { recordId: record.id, fieldId: field.id }; selectedField = '';
 			requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-cell="${record.id}:${field.id}"] input, [data-cell="${record.id}:${field.id}"] button`)?.focus());
@@ -621,6 +709,107 @@
 	}
 </script>
 
+{#snippet recordRow(record: Collection['records'][number], rowIndex: number, number: number)}
+	<tr class:selected-row={selectedRecord === record.id} class:frozen-edge={frozenRecords.at(-1)?.record.id === record.id} data-record={record.id}>
+		<td class="row-number">
+			<button aria-label={`Select ${primaryLabel(record)}`} onclick={() => selectRecord(record.id)}>{number}</button>
+		</td>
+		{#each visibleFields as field, colIndex (field.id)}
+			{@const value = fieldValue(record, field)}
+			{@const onkeydown = (event: KeyboardEvent) => cellKeydown(event, rowIndex, colIndex, record.id, field.id)}
+			<td
+				class:primary-cell={field.primary}
+				class:active-cell={selectedCell?.recordId === record.id && selectedCell.fieldId === field.id}
+				class:frozen-col={frozenOffsets.has(field.id)}
+				class:frozen-col-edge={lastFrozenField === field.id}
+				style={frozenOffsets.has(field.id) ? `left:${frozenOffsets.get(field.id)}px` : undefined}
+				data-cell={`${record.id}:${field.id}`}
+				onclick={() => selectCell(record.id, field.id)}
+			>
+				{#if record.sourceRef && field.primary}
+					<button class="source-value" title={referenceLabel(record.sourceRef)} onclick={(event) => { event.stopPropagation(); selectRecord(record.id); }}>
+						{referenceLabel(record.sourceRef)}{#if !sourceCandidate(record.sourceRef)} <span class="cold">cold</span>{/if}
+					</button>
+				{:else if field.type === 'text' || field.type === 'url'}
+					<input
+						aria-label={cellLabel(field, record)}
+						value={typeof value === 'string' ? value : ''}
+						placeholder={field.primary ? 'Name this record' : '—'}
+						readonly={!!field.sourceKey}
+						title={field.sourceKey ? 'Synced from its source app' : undefined}
+						onfocus={() => selectCell(record.id, field.id)}
+						oninput={(event) => setText(record.id, field.id, event.currentTarget.value)}
+						{onkeydown}
+					/>
+					{#if field.type === 'url' && typeof value === 'string' && value}
+						<a class="url-open" href={value} target="_blank" rel="noreferrer" aria-label={`Open ${value}`} onclick={(event) => event.stopPropagation()}>↗</a>
+					{/if}
+				{:else if field.type === 'number'}
+					<input
+						type="number"
+						aria-label={cellLabel(field, record)}
+						value={typeof value === 'number' ? value : ''}
+						onfocus={() => selectCell(record.id, field.id)}
+						oninput={(event) => { const n = event.currentTarget.valueAsNumber; setNumber(record.id, field, Number.isFinite(n) ? n : null); }}
+						{onkeydown}
+					/>
+				{:else if field.type === 'checkbox'}
+					<button
+						class="checkbox-cell"
+						class:checked={value === true}
+						role="checkbox"
+						aria-checked={value === true}
+						aria-label={cellLabel(field, record)}
+						onclick={(event) => { event.stopPropagation(); mutateCell(record.id, field, value !== true); }}
+						{onkeydown}
+					>{value === true ? '✓' : ''}</button>
+				{:else if field.type === 'date'}
+					<input
+						type="date"
+						aria-label={cellLabel(field, record)}
+						value={typeof value === 'string' ? value : ''}
+						onfocus={() => selectCell(record.id, field.id)}
+						onchange={(event) => mutateCell(record.id, field, event.currentTarget.value || null)}
+						{onkeydown}
+					/>
+				{:else if field.type === 'select'}
+					<select
+						aria-label={cellLabel(field, record)}
+						value={typeof value === 'string' ? value : ''}
+						onfocus={() => selectCell(record.id, field.id)}
+						onchange={(event) => mutateCell(record.id, field, event.currentTarget.value || null)}
+						{onkeydown}
+					>
+						<option value="">—</option>
+						{#each field.config?.options ?? [] as option}<option value={option.id}>{option.label}</option>{/each}
+					</select>
+				{:else if field.type === 'multi-select'}
+					<select
+						multiple
+						aria-label={cellLabel(field, record)}
+						value={Array.isArray(value) ? value : []}
+						onchange={(event) => mutateCell(record.id, field, Array.from(event.currentTarget.selectedOptions).map((option) => option.value))}
+					>
+						{#each field.config?.options ?? [] as option}<option value={option.id}>{option.label}</option>{/each}
+					</select>
+				{:else if field.type === 'relation'}
+					<div class="relation-wrap">
+						<button class="relation-cell" aria-label={`Set ${field.name} relation`} onclick={(event) => { event.stopPropagation(); openRelationPicker(record.id, field.id); }}>
+							{isRef(value) ? referenceLabel(value) : '＋ Add relation'}
+						</button>
+						{#if isRef(value)}
+							<button class="remove-reference" aria-label="Remove reference" title="Remove reference" onclick={(event) => { event.stopPropagation(); selectCell(record.id, field.id); removeRelation(record.id, field); }}>×</button>
+						{/if}
+					</div>
+				{/if}
+			</td>
+		{/each}
+		<td class="row-actions">
+			<button aria-label={`Actions for ${primaryLabel(record)}`} title="Record actions" aria-haspopup={homeSuite ? 'menu' : undefined} onclick={(event) => recordContext(event, record.id)}>⋯</button>
+		</td>
+	</tr>
+{/snippet}
+
 <svelte:head><title>{collection?.title ?? 'Data'} · HomeSuite</title></svelte:head>
 
 {#if !ready}
@@ -629,16 +818,17 @@
 	<main class="missing"><span>Collection unavailable</span><h1>This Collection is not on this device.</h1><a href="/homesuite">Back to HomeSuite</a></main>
 {:else}
 	<main class="data-surface">
-		<TableToolbar {collection} {sourceStatus} {syncBusy} onCommand={command} onImport={importFile} />
+		<TableToolbar {collection} {sourceStatus} {syncBusy} hiddenFields={hiddenFieldCount} hiddenRecords={hiddenRecordCount} onCommand={command} onImport={importFile} />
 		{#if saveIssue}<div class="save-issue" role="status">{saveIssue}</div>{/if}
 		<ScrollFrame label={`${collection.title} scrollable table`}>
 			<table class="data-table" aria-label={`${collection.title} table`}>
 				<thead>
 					<tr>
 						<th class="row-head">#</th>
-						{#each orderedFields as field (field.id)}
+						{#each visibleFields as field (field.id)}
 							{@const width = collection.views.table.columnWidths[field.id] ?? 160}
-							<th data-field={field.id} class:primary={field.primary} style={`width:${width}px;min-width:${width}px`}>
+							{@const left = frozenOffsets.get(field.id)}
+							<th data-field={field.id} class:primary={field.primary} class:frozen-col={left !== undefined} class:frozen-col-edge={lastFrozenField === field.id} style={`width:${width}px;min-width:${width}px${left !== undefined ? `;left:${left}px` : ''}`}>
 								<button
 									class="field-head"
 									draggable="true"
@@ -656,108 +846,17 @@
 						{/each}
 						<th class="add-field-head"><button aria-label="Add field" title="Add field" onclick={() => { addFieldOpen = true; }}>＋</button></th>
 					</tr>
+					{#each frozenRecords as { record, number }, index (record.id)}
+						{@render recordRow(record, index, number)}
+					{/each}
 				</thead>
 				<tbody>
-					{#each collection.records as record, rowIndex (record.id)}
-						<tr class:selected-row={selectedRecord === record.id} data-record={record.id}>
-							<td class="row-number">
-								<button aria-label={`Select ${primaryLabel(record)}`} onclick={() => selectRecord(record.id)}>{rowIndex + 1}</button>
-							</td>
-							{#each orderedFields as field, colIndex (field.id)}
-								{@const value = fieldValue(record, field)}
-								{@const onkeydown = (event: KeyboardEvent) => cellKeydown(event, rowIndex, colIndex, record.id, field.id)}
-								<td
-									class:primary-cell={field.primary}
-									class:active-cell={selectedCell?.recordId === record.id && selectedCell.fieldId === field.id}
-									data-cell={`${record.id}:${field.id}`}
-									onclick={() => selectCell(record.id, field.id)}
-								>
-									{#if record.sourceRef && field.primary}
-										<button class="source-value" title={referenceLabel(record.sourceRef)} onclick={(event) => { event.stopPropagation(); selectRecord(record.id); }}>
-											{referenceLabel(record.sourceRef)}{#if !sourceCandidate(record.sourceRef)} <span class="cold">cold</span>{/if}
-										</button>
-									{:else if field.type === 'text' || field.type === 'url'}
-										<input
-											aria-label={cellLabel(field, record)}
-											value={typeof value === 'string' ? value : ''}
-											placeholder={field.primary ? 'Name this record' : '—'}
-											readonly={!!field.sourceKey}
-											title={field.sourceKey ? 'Synced from its source app' : undefined}
-											onfocus={() => selectCell(record.id, field.id)}
-											oninput={(event) => setText(record.id, field.id, event.currentTarget.value)}
-											{onkeydown}
-										/>
-										{#if field.type === 'url' && typeof value === 'string' && value}
-											<a class="url-open" href={value} target="_blank" rel="noreferrer" aria-label={`Open ${value}`} onclick={(event) => event.stopPropagation()}>↗</a>
-										{/if}
-									{:else if field.type === 'number'}
-										<input
-											type="number"
-											aria-label={cellLabel(field, record)}
-											value={typeof value === 'number' ? value : ''}
-											onfocus={() => selectCell(record.id, field.id)}
-											oninput={(event) => { const n = event.currentTarget.valueAsNumber; setNumber(record.id, field, Number.isFinite(n) ? n : null); }}
-											{onkeydown}
-										/>
-									{:else if field.type === 'checkbox'}
-										<button
-											class="checkbox-cell"
-											class:checked={value === true}
-											role="checkbox"
-											aria-checked={value === true}
-											aria-label={cellLabel(field, record)}
-											onclick={(event) => { event.stopPropagation(); mutateCell(record.id, field, value !== true); }}
-											{onkeydown}
-										>{value === true ? '✓' : ''}</button>
-									{:else if field.type === 'date'}
-										<input
-											type="date"
-											aria-label={cellLabel(field, record)}
-											value={typeof value === 'string' ? value : ''}
-											onfocus={() => selectCell(record.id, field.id)}
-											onchange={(event) => mutateCell(record.id, field, event.currentTarget.value || null)}
-											{onkeydown}
-										/>
-									{:else if field.type === 'select'}
-										<select
-											aria-label={cellLabel(field, record)}
-											value={typeof value === 'string' ? value : ''}
-											onfocus={() => selectCell(record.id, field.id)}
-											onchange={(event) => mutateCell(record.id, field, event.currentTarget.value || null)}
-											{onkeydown}
-										>
-											<option value="">—</option>
-											{#each field.config?.options ?? [] as option}<option value={option.id}>{option.label}</option>{/each}
-										</select>
-									{:else if field.type === 'multi-select'}
-										<select
-											multiple
-											aria-label={cellLabel(field, record)}
-											value={Array.isArray(value) ? value : []}
-											onchange={(event) => mutateCell(record.id, field, Array.from(event.currentTarget.selectedOptions).map((option) => option.value))}
-										>
-											{#each field.config?.options ?? [] as option}<option value={option.id}>{option.label}</option>{/each}
-										</select>
-									{:else if field.type === 'relation'}
-										<div class="relation-wrap">
-											<button class="relation-cell" aria-label={`Set ${field.name} relation`} onclick={(event) => { event.stopPropagation(); openRelationPicker(record.id, field.id); }}>
-												{isRef(value) ? referenceLabel(value) : '＋ Add relation'}
-											</button>
-											{#if isRef(value)}
-												<button class="remove-reference" aria-label="Remove reference" title="Remove reference" onclick={(event) => { event.stopPropagation(); selectCell(record.id, field.id); removeRelation(record.id, field); }}>×</button>
-											{/if}
-										</div>
-									{/if}
-								</td>
-							{/each}
-							<td class="row-actions">
-								<button aria-label={`Actions for ${primaryLabel(record)}`} title="Record actions" aria-haspopup={homeSuite ? 'menu' : undefined} onclick={(event) => recordContext(event, record.id)}>⋯</button>
-							</td>
-						</tr>
+					{#each scrollingRecords as { record, number }, index (record.id)}
+						{@render recordRow(record, frozenRecords.length + index, number)}
 					{/each}
 					<tr class="new-record-row">
 						<td></td>
-						<td colspan={Math.max(1, orderedFields.length + 1)}><button onclick={addNewRecord}>＋ New record</button></td>
+						<td colspan={Math.max(1, visibleFields.length + 1)}><button onclick={addNewRecord}>＋ New record</button></td>
 					</tr>
 				</tbody>
 			</table>

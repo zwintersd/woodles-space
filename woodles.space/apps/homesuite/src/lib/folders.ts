@@ -54,6 +54,12 @@ export function loadFolders() {
 	return store.load();
 }
 
+/** Sync's whole-library write, after its own merge; refuses an invalid one. */
+export function replaceFolders(library: FolderLibrary): void {
+	const saved = store.save(library);
+	if (!saved.ok) throw new Error(saved.issue?.message ?? 'Could not save folder organization.');
+}
+
 /** Read again for every edit so another tab's organization is preserved. */
 function edit(change: (library: FolderLibrary) => void): FolderLibrary {
 	const loaded = store.load();

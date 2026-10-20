@@ -112,8 +112,8 @@
 		--rail-plum: color-mix(in srgb, var(--hs-accent) 58%, var(--hs-raised));
 		display: flex;
 		align-items: center;
-		gap: 4px;
-		padding: 4px;
+		gap: 3px;
+		padding: 2px;
 		background: linear-gradient(135deg, var(--hs-raised), var(--hs-sunk));
 		user-select: none;
 	}
@@ -122,19 +122,19 @@
 	.scroll-step {
 		display: grid;
 		place-items: center;
-		flex: 0 0 24px;
-		width: 24px;
-		height: 24px;
+		flex: 0 0 16px;
+		width: 16px;
+		height: 16px;
 		padding: 0;
 		border: 1px solid var(--hs-line-strong);
-		border-radius: 10px 12px 10px 12px;
+		border-radius: 6px 7px 6px 7px;
 		background: linear-gradient(145deg, var(--hs-raised), var(--hs-accent-soft));
 		color: var(--hs-accent-text);
 		box-shadow: inset 0 1px 0 var(--hs-raised), 0 1px 2px color-mix(in srgb, var(--hs-shadow) 40%, transparent);
 		cursor: pointer;
 		transition: border-color 120ms, box-shadow 120ms, transform 120ms;
 	}
-	.scroll-step svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+	.scroll-step svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 	.horizontal .forward svg { transform: rotate(180deg); }
 	.vertical .backward svg { transform: rotate(90deg); }
 	.vertical .forward svg { transform: rotate(-90deg); }
@@ -150,8 +150,8 @@
 		background: var(--hs-page);
 		box-shadow: inset 0 1px 3px color-mix(in srgb, var(--hs-shadow) 35%, transparent);
 	}
-	.horizontal .scroll-track::before { inset: 7px 0; background-image: radial-gradient(circle, var(--hs-line-strong) .7px, transparent 1px); background-size: 14px 100%; }
-	.vertical .scroll-track::before { inset: 0 7px; background-image: radial-gradient(circle, var(--hs-line-strong) .7px, transparent 1px); background-size: 100% 14px; }
+	.horizontal .scroll-track::before { inset: 5px 0; background-image: radial-gradient(circle, var(--hs-line-strong) .7px, transparent 1px); background-size: 14px 100%; }
+	.vertical .scroll-track::before { inset: 0 5px; background-image: radial-gradient(circle, var(--hs-line-strong) .7px, transparent 1px); background-size: 100% 14px; }
 	.scroll-thumb { position: absolute; display: grid; place-items: center; border-radius: 999px; outline: none; cursor: grab; touch-action: none; }
 	.horizontal .scroll-thumb { top: 0; height: 100%; }
 	.vertical .scroll-thumb { left: 0; width: 100%; }
@@ -164,18 +164,24 @@
 		box-shadow: inset 0 1px 1px var(--hs-raised), inset 0 -2px 3px color-mix(in srgb, var(--hs-accent) 18%, transparent), 0 2px 3px color-mix(in srgb, var(--hs-shadow) 65%, transparent);
 		transition: inset 140ms, box-shadow 140ms, border-color 140ms;
 	}
-	.horizontal .scroll-thumb::before { inset: 3px 0; }
-	.vertical .scroll-thumb::before { inset: 0 3px; background-image: linear-gradient(90deg, var(--hs-raised) -35%, var(--rail-lilac) 35%, color-mix(in srgb, var(--hs-accent-light) 65%, var(--hs-raised))); }
-	.horizontal .scroll-thumb:hover::before, .horizontal.dragging .scroll-thumb::before { inset-block: 1px; }
-	.vertical .scroll-thumb:hover::before, .vertical.dragging .scroll-thumb::before { inset-inline: 1px; }
+	.horizontal .scroll-thumb::before { inset: 2px 0; }
+	.vertical .scroll-thumb::before { inset: 0 2px; background-image: linear-gradient(90deg, var(--hs-raised) -35%, var(--rail-lilac) 35%, color-mix(in srgb, var(--hs-accent-light) 65%, var(--hs-raised))); }
+	.horizontal .scroll-thumb:hover::before, .horizontal.dragging .scroll-thumb::before { inset-block: 0; }
+	.vertical .scroll-thumb:hover::before, .vertical.dragging .scroll-thumb::before { inset-inline: 0; }
 	.scroll-thumb:hover::before { border-color: var(--hs-accent); }
 	.dragging .scroll-thumb { cursor: grabbing; }
 	.dragging .scroll-thumb::before { box-shadow: inset 0 2px 4px color-mix(in srgb, var(--hs-shadow) 65%, transparent), 0 1px 1px var(--hs-raised); }
 	.scroll-thumb:focus-visible::before, .scroll-step:focus-visible { outline: 2px solid var(--hs-focus); outline-offset: 2px; }
-	.thumb-grip { position: relative; display: flex; align-items: center; gap: 3px; color: var(--hs-accent); pointer-events: none; }
-	.thumb-grip svg { width: 12px; height: 12px; fill: currentColor; filter: drop-shadow(0 1px 0 var(--hs-raised)); }
-	.thumb-grip i { height: 7px; width: 1px; background: var(--rail-plum); box-shadow: 1px 0 0 var(--hs-raised); }
+	.thumb-grip { position: relative; display: flex; align-items: center; gap: 2px; color: var(--hs-accent); pointer-events: none; }
+	.thumb-grip svg { width: 8px; height: 8px; fill: currentColor; filter: drop-shadow(0 1px 0 var(--hs-raised)); }
+	.thumb-grip i { height: 5px; width: 1px; background: var(--rail-plum); box-shadow: 1px 0 0 var(--hs-raised); }
 	.vertical .thumb-grip { transform: rotate(90deg); }
-	@media (pointer: coarse) { .scroll-step { flex-basis: 34px; width: 34px; height: 34px; border-radius: 13px 15px 13px 15px; } }
+	@media (pointer: coarse) {
+		.scroll-rail { gap: 4px; padding: 4px; }
+		.scroll-step { flex-basis: 34px; width: 34px; height: 34px; border-radius: 13px 15px 13px 15px; }
+		.scroll-step svg { width: 14px; height: 14px; }
+		.horizontal .scroll-track::before { inset-block: 12px; }
+		.vertical .scroll-track::before { inset-inline: 12px; }
+	}
 	@media (prefers-reduced-motion: reduce) { .scroll-step, .scroll-thumb::before { transition: none; } }
 </style>

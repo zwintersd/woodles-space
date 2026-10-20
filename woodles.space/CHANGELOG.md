@@ -26,6 +26,71 @@ so it's not easy to forget.
   keeping your own notes alongside. Removing a link or Collection membership
   leaves the person's card in Mycelium.
 
+## 2026-10-16
+
+- **HomeSuite syncs between your computer and your phone** — a Sync button
+  in HomeSuite's top bar connects with the same passphrase the other apps
+  use. documents, boards, Collections, folders, and Trash then follow you
+  between devices: HomeSuite syncs on opening, on coming back to the index,
+  every couple of minutes, and as you leave. each thing merges on its own —
+  a thing changed on both devices keeps the later edit, a delete on one
+  removes it on the other, and the very first sync only adds. pictures on
+  boards stay on the device they were added from.
+
+## 2026-10-14
+
+- **freeze and hide rows and fields in HomeSuite Data** — right-click a
+  record or a field header (or open a record's ⋯ menu) to freeze everything
+  up to it, so leading rows stay under the header and leading fields stay
+  beside the row numbers while the rest scrolls. the same menu hides a record
+  or a field. hidden things keep their values; the toolbar counts them and
+  brings them back in one click, and row numbers keep their gaps so you can
+  see where something is hidden. the Primary field can't be hidden. every
+  change is undoable, saves with the Collection, and is also in the command
+  palette.
+- **slimmer Data scrollbars** — the table's lilac rails drop from 34px to
+  20px, keeping their sparkle grip and corner flower; touch screens keep the
+  larger buttons.
+
+## 2026-10-13
+
+- **four quiet-hobby themes for older learners and adults** — a new Quiet
+  hobbies group in the style studio adds Houseplants, Tea and books,
+  Stargazing and Birdwatching: muted colours, grown-up type (Young Serif,
+  Fraunces, Josefin Sans and Quicksand over easy-reading body fonts), gentle
+  words without the exclamation marks, and illustrated banners that keep
+  their whimsy without shouting — a monstera on a sunny sill beside a
+  trailing pothos and a cactus in flower, a ginger cat asleep on a stack of
+  books by a teapot and a steaming cup, a fox watching the Plough beside a
+  brass telescope, and a robin on a fence post with binoculars set down in
+  the grass. faces stay on the animals, without cheeks, and only a few parts
+  move, slowly: the pothos swings, steam rises, the cat breathes, the fox's
+  tail sweeps and the robin leans in. Stargazing is a dark theme.
+- **four seasonal themes for visual schedules** — a new Seasons group in the
+  style studio adds Springtime, Summer days, Autumn leaves and Winter snow,
+  each with its own colours, fonts, stickers, words and an illustrated
+  banner: a lamb among tulips beside a cherry tree in blossom, a sandcastle
+  under a striped beach umbrella while the sun wears sunglasses, a squirrel
+  hugging an acorn on a log by a heap of leaves, and a snowman in a knitted
+  hat and scarf waving beside snowy pines and a sled. with motion on, petals
+  and leaves drift down, snow falls, the scarf flutters, the tail flicks and
+  the boat rocks. they draw the time of year, never a holiday — no eggs,
+  pumpkins or decorated trees.
+- **every special-interest theme now has its own banner** — the last ten
+  themes swap their emoji stickers for illustrations in the same flat,
+  sticker-like style: a puppy and a kitten sharing a bed beside a ball of
+  yarn, a horse resting its chin on a paddock fence by a hay bale, a ladybird
+  on a big leaf with a butterfly, a bee and daisies, a giraffe rising from
+  the palms while a monkey swings on a vine, a round green dragon asleep
+  beside a little castle puffing smoke rings, a fire engine speeding past a
+  green light, a pixel-art slime under a gold block and its coin, a stack of
+  studded bricks with one being lowered on top, a smiling cupcake beside a
+  plate of warm cookies, and a sun peeking out from behind a cloud over a
+  rainbow and a rain shower. with motion on, tails wag, wings flap, the
+  monkey swings, the dragon breathes, the siren blinks, the coin spins, steam
+  rises and rain falls. Bright sky keeps its tickets and Quiet and calm stays
+  plain.
+
 ## 2026-10-12
 
 - **clearer schedule illustrations** — the music banner has a symmetric guitar
