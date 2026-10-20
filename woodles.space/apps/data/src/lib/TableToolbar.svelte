@@ -40,7 +40,7 @@
 			<button class="show-hidden" onclick={() => onCommand('view:show-fields')} title="Show every hidden field">{hiddenFields} hidden {hiddenFields === 1 ? 'field' : 'fields'}</button>
 		{/if}
 		{#if connected}
-			<button onclick={() => onCommand('source:sync')} disabled={syncBusy} title="Refresh Bestiary and Marginalia records">
+			<button onclick={() => onCommand('source:sync')} disabled={syncBusy} title="Refresh records from their source apps">
 				{syncBusy ? '↻ Refreshing' : '↻ Refresh sources'}
 			</button>
 		{/if}

@@ -8,6 +8,7 @@ export type FieldValue = string | number | boolean | string[] | WoodlesRef | nul
 export type CollectionSource =
 	| 'woodles-apps'
 	| 'bestiary-creatures'
+	| 'mycelium-people'
 	| 'marginalia-life'
 	| 'marginalia-field-notes'
 	| 'marginalia-arcade-games'
@@ -63,6 +64,7 @@ const FIELD_TYPES: FieldType[] = ['text', 'number', 'checkbox', 'date', 'select'
 const COLLECTION_SOURCES: readonly CollectionSource[] = [
 	'woodles-apps',
 	'bestiary-creatures', 'marginalia-life', 'marginalia-field-notes',
+	'mycelium-people',
 	'marginalia-arcade-games', 'marginalia-arcade-primitives', 'marginalia-arcade-copy'
 ];
 const TINTS = ['#e8dff0', '#f5e5d9', '#e0ece5', '#e5eafa', '#f4ebc9'];
@@ -147,7 +149,7 @@ function field(id: string, name: string, type: FieldType, primary = false, optio
 
 export type CollectionTemplate =
 	| 'blank' | 'tracker' | 'media' | 'projects' | 'research' | 'living-world'
-	| 'arcade-games' | 'arcade-primitives' | 'arcade-copy' | 'woodles-apps';
+	| 'arcade-games' | 'arcade-primitives' | 'arcade-copy' | 'woodles-apps' | 'mycelium-people';
 
 /** How each template is offered, and what a new Collection from it is called. */
 export const COLLECTION_TEMPLATES: readonly { id: CollectionTemplate; name: string; detail: string; title: string; group: 'quick' | 'lists' | 'connected' }[] = [
@@ -157,6 +159,7 @@ export const COLLECTION_TEMPLATES: readonly { id: CollectionTemplate; name: stri
 	{ id: 'projects', name: 'Projects', detail: 'Status, priority, due date, and links', title: 'Untitled collection', group: 'lists' },
 	{ id: 'research', name: 'Research / sources', detail: 'Sources, URLs, notes, and links', title: 'Untitled collection', group: 'lists' },
 	{ id: 'living-world', name: 'Bestiary + Marginalia', detail: 'Pull creatures, discovered life, and field notes into one live table', title: 'Bestiary + Marginalia', group: 'connected' },
+	{ id: 'mycelium-people', name: 'Mycelium people', detail: 'Contact details from Mycelium, with room for your own notes', title: 'Mycelium people', group: 'connected' },
 	{ id: 'arcade-games', name: 'Arcade games', detail: 'Track game concepts, loops, mastery, and implementation links', title: 'Marginalia Arcade games', group: 'connected' },
 	{ id: 'arcade-primitives', name: 'Arcade primitives', detail: 'Map shared code, game-local patterns, and reuse boundaries', title: 'Marginalia Arcade primitives', group: 'connected' },
 	{ id: 'arcade-copy', name: 'Arcade copy desk', detail: 'Review current card copy and keep proposed wording beside its source', title: 'Marginalia Arcade copy', group: 'connected' },
@@ -169,6 +172,14 @@ const TEMPLATE_FIELDS: Record<CollectionTemplate, Array<[string, FieldType, stri
 	projects: [['Project', 'text'], ['Status', 'select', ['Not started', 'In progress', 'Done']], ['Priority', 'select', ['Low', 'Medium', 'High']], ['Due', 'date'], ['Related', 'relation']],
 	research: [['Source', 'text'], ['URL', 'url'], ['Status', 'select', ['To read', 'Reading', 'Read']], ['Notes', 'text'], ['Related', 'relation']],
 	'living-world': [['Name', 'text', undefined, 'name'], ['Source', 'text', undefined, 'source'], ['Kind', 'text', undefined, 'kind'], ['Category', 'text', undefined, 'category'], ['Domain', 'text', undefined, 'domain'], ['Stage', 'text', undefined, 'stage'], ['Details', 'text', undefined, 'details'], ['Updated', 'text', undefined, 'updated'], ['My notes', 'text']],
+	'mycelium-people': [
+		['Name', 'text', undefined, 'name'], ['Pronouns', 'text', undefined, 'pronouns'],
+		['Role', 'text', undefined, 'role'], ['Organization', 'text', undefined, 'organization'],
+		['Email', 'text', undefined, 'emails'], ['Phone', 'text', undefined, 'phones'], ['Links', 'text', undefined, 'links'],
+		['Location', 'text', undefined, 'location'], ['Birthday', 'text', undefined, 'birthday'], ['Tags', 'text', undefined, 'tags'],
+		['Contact notes', 'text', undefined, 'notes'], ['Favorite', 'text', undefined, 'favorite'],
+		['Updated', 'text', undefined, 'updated'], ['My notes', 'text']
+	],
 	'arcade-games': [
 		['Name', 'text', undefined, 'name'], ['Status', 'text', undefined, 'status'], ['Pitch', 'text', undefined, 'pitch'],
 		['Tags', 'text', undefined, 'tags'], ['Core loop', 'text', undefined, 'coreLoop'], ['Mastery', 'text', undefined, 'mastery'],
@@ -195,6 +206,7 @@ const TEMPLATE_FIELDS: Record<CollectionTemplate, Array<[string, FieldType, stri
 
 const TEMPLATE_SOURCES: Partial<Record<CollectionTemplate, CollectionSource[]>> = {
 	'living-world': ['bestiary-creatures', 'marginalia-life', 'marginalia-field-notes'],
+	'mycelium-people': ['mycelium-people'],
 	'arcade-games': ['marginalia-arcade-games'],
 	'arcade-primitives': ['marginalia-arcade-primitives'],
 	'arcade-copy': ['marginalia-arcade-copy'],
@@ -256,7 +268,7 @@ export function deleteField(collection: Collection, fieldId: string): Collection
 
 export function setCellValue(collection: Collection, recordId: string, fieldId: string, value: FieldValue): Collection {
 	const target = collection.fields.find((entry) => entry.id === fieldId);
-	if (!target || !isFieldValue(target, value)) return collection;
+	if (!target || target.sourceKey || !isFieldValue(target, value)) return collection;
 	return {
 		...collection, records: collection.records.map((record) => record.id === recordId ? { ...record, values: { ...record.values, [fieldId]: value }, updatedAt: now() } : record), updatedAt: now()
 	};

@@ -11,6 +11,8 @@
 // `entityHref` turns an id into a link that resolves through the manifest.
 
 import { entityHref } from '@woodles/app-manifest';
+import { loadPeople, personRef, type Person } from '@woodles/mycelium';
+import type { WoodlesRef } from '@shared/homesuiteBridge';
 import {
 	hasPassphrase,
 	pullLedger,
@@ -151,6 +153,34 @@ class DraftSource implements ReferenceSource {
 
 export const draftSource = new DraftSource();
 
+// People remain in Mycelium's owner store. A reference carries their identity
+// and display text; adding or removing it never copies or edits the contact.
+class PersonSource implements ReferenceSource {
+	sigil: Sigil = '#';
+
+	list(query: string): ReferenceCandidate[] {
+		return loadPeople().people
+			.filter((person) => matches([person.name, person.pronouns, person.role, person.organization, person.location, ...person.tags, ...person.emails.map((entry) => entry.value), ...person.phones.map((entry) => entry.value)].join(' '), query))
+			.map((person) => this.#toCandidate(person));
+	}
+
+	resolve(kind: string, id: string): ReferenceCandidate | null {
+		if (kind !== 'person') return null;
+		const person = loadPeople().people.find((entry) => entry.id === id);
+		return person ? this.#toCandidate(person) : null;
+	}
+
+	#toCandidate(person: Person): ReferenceCandidate {
+		return {
+			...personRef(person.id),
+			text: person.name,
+			hint: ['Mycelium', person.role, person.organization].filter(Boolean).join(' · ')
+		};
+	}
+}
+
+export const personSource = new PersonSource();
+
 // ── @ : days ────────────────────────────────────────────────────────────
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -226,7 +256,7 @@ function offsetOf(key: string, from: Date): number {
 export const shelfSource = new ShelfSource();
 export const daySource = new DaySource();
 
-const SOURCES: ReferenceSource[] = [shelfSource, draftSource, daySource];
+const SOURCES: ReferenceSource[] = [shelfSource, draftSource, personSource, daySource];
 
 export function sourcesFor(sigil: Sigil): ReferenceSource[] {
 	return SOURCES.filter((source) => source.sigil === sigil);
@@ -237,12 +267,16 @@ export function candidatesFor(sigil: Sigil, query: string): ReferenceCandidate[]
 }
 
 /** The current state of a stored reference, or null once it has gone cold. */
-export function resolveReference(kind: string, id: string): ReferenceCandidate | null {
-	for (const source of SOURCES) {
-		const found = source.resolve(kind, id);
-		if (found) return found;
-	}
-	return null;
+export function resolveReference(kind: string, id: string, app?: string): ReferenceCandidate | null {
+	const found = SOURCES.map((source) => source.resolve(kind, id))
+		.filter((candidate): candidate is ReferenceCandidate => !!candidate && (!app || candidate.app === app));
+	// Legacy callers without an app must not resolve an ambiguous identity.
+	return found.length === 1 ? found[0] : null;
+}
+
+/** Resolve all three identity parts, including the app that owns the record. */
+export function resolveWoodlesReference(ref: WoodlesRef): ReferenceCandidate | null {
+	return resolveReference(ref.kind, ref.id, ref.app);
 }
 
 export async function refreshReferenceSources(): Promise<void> {

@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { appById, entityHref, primaryDestination } from '@woodles/app-manifest';
+	import { subscribePeople } from '@woodles/mycelium';
 	import { isHomeSuiteShellMessage, postHomeSuiteFlushed, postHomeSuiteNavigate, postHomeSuitePaletteRequest, postHomeSuiteRenameRequest, postHomeSuiteState, type HomeSuiteSurfaceState, type WoodlesRef } from '@shared/homesuiteBridge';
 	import { createHomeSuiteContext, type ContextAction } from '@shared/homesuiteContext';
 	import { boardLibrary } from '../../../whiteboard/src/lib/library';
@@ -47,6 +48,14 @@
 		return [
 			...boardLibrary.list().map((board) => ({ app: 'whiteboard', kind: 'board', id: board.id, text: board.title.trim() || 'Untitled board', hint: 'Whiteboard' })),
 			...loadCollections().collections.map((entry) => ({ app: 'data', kind: 'collection', id: entry.id, text: entry.title, hint: 'Data' }))
+		];
+	}
+
+	/** Owner-backed candidates always come from their current stores. */
+	function refreshCandidates(snapshots: ReferenceCandidate[]): void {
+		refs = [
+			...candidatesFor('#', ''),
+			...snapshots.filter((entry) => entry.app !== 'mycelium' && entry.app !== 'thinking-about' && entry.app !== 'write')
 		];
 	}
 
@@ -457,7 +466,7 @@
 				saveIssue = '';
 			}
 			const pulledRefs = rows.map((row) => ({ app: row.ref.app, kind: row.ref.kind, id: row.ref.id, text: row.label, hint: row.hint }));
-			refs = [...candidatesFor('#', ''), ...pulledRefs.filter((row) => row.app !== 'thinking-about' && row.app !== 'write')];
+			refreshCandidates(pulledRefs);
 			sourceStatus = rows.length ? `Refreshed ${rows.length} source records` : 'No source records found on this device';
 			publishState();
 		} catch {
@@ -476,7 +485,7 @@
 				'marginalia-arcade-games', 'marginalia-arcade-primitives', 'marginalia-arcade-copy'
 			]);
 			const synced = rows.map((row) => ({ app: row.ref.app, kind: row.ref.kind, id: row.ref.id, text: row.label, hint: row.hint }));
-			refs = [...candidatesFor('#', ''), ...synced];
+			refreshCandidates(synced);
 		} finally {
 			pickerLoading = false;
 		}
@@ -641,7 +650,7 @@
 		ready = true;
 		void refreshReferenceSources().then(() => {
 			const synced = collection?.records.filter((record) => record.sourceRef).map((record) => ({ app: record.sourceRef!.app, kind: record.sourceRef!.kind, id: record.sourceRef!.id, text: primaryLabel(record), hint: record.sourceRef!.app })) ?? [];
-			refs = [...candidatesFor('#', ''), ...synced.filter((row) => row.app !== 'thinking-about' && row.app !== 'write')];
+			refreshCandidates(synced);
 			publishState();
 		});
 		if (collection) { shelfSource.loadLocal(); refs = candidatesFor('#', ''); publishState(); }
@@ -651,12 +660,17 @@
 		window.addEventListener('keydown', globalKeydown);
 		const onTrashChange = (event: StorageEvent) => { if (event.key === HOMESUITE_TRASH_KEY || event.key === null) trashRevision += 1; };
 		window.addEventListener('storage', onTrashChange);
+		const stopPeople = subscribePeople(() => {
+			refreshCandidates(refs);
+			if (collection?.sources?.includes('mycelium-people')) void syncSources();
+		});
 		// HomeSuite closes a Collection by removing its frame, which never runs the
 		// cleanup below; `pagehide` still fires, so the pending save lands.
 		const flushWhenHidden = () => { if (document.visibilityState === 'hidden') flushPendingSave(); };
 		window.addEventListener('pagehide', flushPendingSave);
 		document.addEventListener('visibilitychange', flushWhenHidden);
 		const teardown = () => {
+			stopPeople();
 			window.removeEventListener('message', onShellMessage);
 			window.removeEventListener('contextmenu', dataContextEvent);
 			window.removeEventListener('keydown', globalKeydown);

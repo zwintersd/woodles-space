@@ -68,6 +68,8 @@
     { "source": "/animations/:path*",  "destination": "/apps/animations/:path*" },
 { "source": "/bestiary",                  "destination": "/apps/bestiary/dist/index.html" },
     { "source": "/bestiary/:path*",           "destination": "/apps/bestiary/dist/:path*" },
+    { "source": "/mycelium",                  "destination": "/apps/mycelium/dist/index.html" },
+    { "source": "/mycelium/:path*",           "destination": "/apps/mycelium/dist/:path*" },
     { "source": "/thinking-about",            "destination": "/apps/thinking-about/dist/index.html" },
     { "source": "/thinking-about/:path*",     "destination": "/apps/thinking-about/dist/:path*" },
     { "source": "/bloomforge",                "destination": "/apps/bloomforge/dist/index.html" },

@@ -1,6 +1,17 @@
-import { describe, expect, it } from 'vitest';
-import { addRecord, createCollection, isCollection, setCellValue } from './collections';
-import { marginaliaRows, mergePulledRows, type PulledSourceRow } from './sourceSync';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createPerson, getPerson, MYCELIUM_STORAGE_KEY, updatePerson } from '@woodles/mycelium';
+import { addRecord, createCollection, isCollection, removeRecord, setCellValue } from './collections';
+import { marginaliaRows, mergePulledRows, pullCollectionSources, readMyceliumRows, type PulledSourceRow } from './sourceSync';
+
+beforeEach(() => {
+	const items = new Map<string, string>();
+	vi.stubGlobal('localStorage', {
+		getItem: (key: string) => items.get(key) ?? null,
+		setItem: (key: string, value: string) => { items.set(key, value); },
+		removeItem: (key: string) => { items.delete(key); }
+	});
+});
+afterEach(() => vi.unstubAllGlobals());
 
 describe('connected Collection sources', () => {
 	it('reveals only Marginalia life whose conditions are written and includes its field notes', () => {
@@ -73,5 +84,47 @@ describe('connected Collection sources', () => {
 		const collection = createCollection('Sources', 'living-world');
 		expect(collection.sources).toEqual(['bestiary-creatures', 'marginalia-life', 'marginalia-field-notes']);
 		expect(collection.fields.filter((field) => field.sourceKey)).toHaveLength(8);
+	});
+
+	it('reads canonical people, refreshes owner fields, and keeps Collection notes local', async () => {
+		const person = createPerson({ name: 'Juniper Lane', role: 'Illustrator', emails: [{ id: 'email-1', label: 'Work', value: 'juniper@example.com' }], notes: 'Prefers email.' });
+		let collection = mergePulledRows(createCollection('People', 'mycelium-people'), await pullCollectionSources(['mycelium-people']));
+		const record = collection.records[0];
+		const name = collection.fields.find((field) => field.sourceKey === 'name')!;
+		const email = collection.fields.find((field) => field.sourceKey === 'emails')!;
+		const notes = collection.fields.find((field) => field.name === 'My notes')!;
+		expect(record.sourceRef).toEqual({ app: 'mycelium', kind: 'person', id: person.id });
+		expect(record.values[email.id]).toBe('Work: juniper@example.com');
+		collection = setCellValue(collection, record.id, notes.id, 'Ask about the mural.');
+		expect(setCellValue(collection, record.id, name.id, 'A local rename')).toBe(collection);
+		updatePerson(person.id, { name: 'Juniper Rivers', notes: 'Prefers text now.' });
+		const refreshed = mergePulledRows(collection, readMyceliumRows());
+		expect(refreshed.records[0].values[name.id]).toBe('Juniper Rivers');
+		expect(refreshed.records[0].values[notes.id]).toBe('Ask about the mural.');
+		expect(getPerson(person.id)?.notes).toBe('Prefers text now.');
+		expect(isCollection(refreshed)).toBe(true);
+	});
+
+	it('removes only Collection membership and excludes the complete reference from later pulls', () => {
+		const person = createPerson({ name: 'Robin' });
+		const rows = readMyceliumRows();
+		let collection = mergePulledRows(createCollection('People', 'mycelium-people'), rows);
+		collection = removeRecord(collection, collection.records[0].id);
+		const ownerSave = localStorage.getItem(MYCELIUM_STORAGE_KEY);
+		expect(mergePulledRows(collection, rows).records).toHaveLength(0);
+		expect(getPerson(person.id)?.name).toBe('Robin');
+		expect(localStorage.getItem(MYCELIUM_STORAGE_KEY)).toBe(ownerSave);
+		const differentOwner = { ...rows[0], ref: { ...rows[0].ref, app: 'another-app' } };
+		const differentKind = { ...rows[0], ref: { ...rows[0].ref, kind: 'another-kind' } };
+		expect(mergePulledRows(collection, [differentOwner, differentKind]).records).toHaveLength(2);
+	});
+
+	it('refuses a failed source read without writing or replacing Collection rows', () => {
+		createPerson({ name: 'Robin' });
+		const collection = mergePulledRows(createCollection('People', 'mycelium-people'), readMyceliumRows());
+		localStorage.setItem(MYCELIUM_STORAGE_KEY, '{broken');
+		expect(() => readMyceliumRows()).toThrow();
+		expect(collection.records).toHaveLength(1);
+		expect(localStorage.getItem(MYCELIUM_STORAGE_KEY)).toBe('{broken');
 	});
 });
