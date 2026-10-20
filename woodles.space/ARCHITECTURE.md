@@ -166,7 +166,7 @@ woodles.space/
     ├── marginalia/          SvelteKit · a witch writes worlds + a reading room
     ├── planner/             SvelteKit · carillon — self-observation, day piles, and reinforcement
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
-    ├── mycelium/            SvelteKit · people and contact details, on 3:4 cards styled like Bestiary
+    ├── mycelium/            SvelteKit · people and contact details, on 3:4 cards styled like Bestiary, in Carillon's shell
     ├── thinking-about/      SvelteKit · a board for what's being read, played, and watched — and, per entry, a structured record cast for it
     ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking — a camera that knows where it is, cards that say more than they show, stacks that do more than hold them, and doorways into other boards
     ├── bloomforge/          SvelteKit · a studio for making incremental games
@@ -333,6 +333,18 @@ style, and creation/update timestamps. `loadPeople()` reports read failures;
 `listPeople()`, `getPerson(id)`, and `resolvePerson(ref)` provide current owner
 data. Writes validate and reread the store, touch only the requested person,
 and notify same-origin consumers through `subscribePeople()`.
+
+The app's room is Carillon's layout; only the cards are Bestiary's. A mulberry
+cabinet header carries a leaded transom, a rose-window mark and a Kalnia Glaze
+wordmark (its own `--mycelium-glass` palette), and the shelves are lancet tabs
+in jewel glass. Below it the parchment desk, window light, engraved chart and
+study window, vellum sheets with gilt rules and filigree corners, IM Fell
+headings over the crescent divider, and the tools in a ribbon down the right
+edge (a strip above the footer on phones). The ground is held at Carillon's
+evening stop rather than cycled, and `calm` takes the light and ornaments
+away. `tokens.css` keeps the cards' `--b-*` tokens and adds Carillon's stable
+`--car-*` names (furniture, paper, glass, ornaments) plus `--my-*` for the
+fixed ground; the ornament SVGs are copies of Carillon's (see REFACTORING.md).
 
 The shared identity is `{ app: 'mycelium', kind: 'person', id }`, made by
 `personRef(id)`, and the manifest resolves it to `/mycelium?person=<id>`.

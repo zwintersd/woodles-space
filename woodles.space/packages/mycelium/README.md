@@ -22,7 +22,7 @@ People have a stable ID, name, pronouns, role, organization, labeled emails/phon
 
 Records, nested items, dates, style values, duplicate IDs, format, and version are validated. Persisted/imported objects must contain exactly the supported keys: unknown fields fail closed so this version cannot silently erase a future version's information. A malformed or unsupported save produces `loadPeople().issue`, and all mutations/export refuse to proceed. Reads never repair, reset, migrate, or write a corrupt save. The original serialized data remains available for recovery.
 
-The app combines Bestiary's complete card workshop with Carillon's plum instrument, warm paper, blush, sage, and bell-brass. The added `moon garden` and `bell & paper` presets are presentation only. They do not change identity or contact fields; the app never reads or changes Carillon's saved settings.
+The app puts Bestiary's complete card workshop inside Carillon's layout: the mulberry cabinet header with lancet tabs, the parchment desk, vellum sheets, and the tool ribbon. The added `moon garden` and `bell & paper` presets are presentation only. They do not change identity or contact fields; the app never reads or changes Carillon's saved settings.
 
 Portraits accept raster PNG/JPEG/WebP/GIF data URLs up to `MAX_PORTRAIT_LENGTH` (500,000 characters). Resize/compress photos in the editor before calling the store. Browser quota is shared with other Woodles data. Quota or denied-storage errors are exposed, and a failed write never reports success. This package deliberately avoids duplicating large portraits into another localStorage backup. Use the explicit JSON export for backups.
 

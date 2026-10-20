@@ -1,0 +1,10 @@
+<!-- carillon: quatrefoil: four jewel panes (ruby, amber, emerald, sapphire)
+     in lead around a gilt boss. a small mark before a kicker. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+<defs><linearGradient id="gilt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4d98a"/><stop offset=".45" stop-color="#c39338"/><stop offset="1" stop-color="#8a5c16"/></linearGradient></defs>
+<g stroke="#2a1d2e" stroke-width="2.2"><circle cx="12" cy="6.9" r="4.7"/><circle cx="17.1" cy="12" r="4.7"/><circle cx="12" cy="17.1" r="4.7"/><circle cx="6.9" cy="12" r="4.7"/></g>
+<circle cx="12" cy="6.9" r="4.7" fill="#a51f3c"/><circle cx="17.1" cy="12" r="4.7" fill="#c47a16"/><circle cx="12" cy="17.1" r="4.7" fill="#17704f"/><circle cx="6.9" cy="12" r="4.7" fill="#2a4c9e"/>
+<path d="M12 12 L7.45 7.45 M12 12 L16.55 7.45 M12 12 L16.55 16.55 M12 12 L7.45 16.55" stroke="#2a1d2e" stroke-width="1.1" stroke-linecap="round"/>
+<g fill="none" stroke="#fff" stroke-opacity=".5" stroke-width=".8" stroke-linecap="round"><path d="M9.6 5.4 Q10.4 3.6 12.2 3.4"/><path d="M15.4 9.6 Q16.2 8.4 17.6 8.4"/></g>
+<circle cx="12" cy="12" r="2.6" fill="url(#gilt)" stroke="#2a1d2e" stroke-width="1"/>
+</svg>

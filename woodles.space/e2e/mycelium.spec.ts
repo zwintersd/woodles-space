@@ -79,7 +79,8 @@ test('portrait, 3:4 frames, filtering, phone layout and printed cards', async ({
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'artifacts/mycelium/shelf-phone.png', fullPage: true });
   await page.emulateMedia({ media: 'print' });
-  await expect(page.locator('.sidebar')).toBeHidden();
+  await expect(page.locator('.app-header')).toBeHidden();
+  await expect(page.locator('.ribbon')).toBeHidden();
   await expect(page.locator('.person-card')).toBeVisible();
 });
 

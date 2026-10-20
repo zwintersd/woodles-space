@@ -33,6 +33,8 @@
   let importInput: HTMLInputElement;
   let selected = $derived(people.find((person) => person.id === activeId) ?? null);
   let missing = $derived(!storageBlocked && !!activeId && !selected && !creating);
+  let onShelf = $derived(!activeId && !editing);
+  let favorites = $derived(people.filter((person) => person.favorite).length);
   let dirty = $derived(editing && !!draft && JSON.stringify(draft) !== baseline);
   let tags = $derived([...new Set(people.flatMap((person) => person.tags))].sort((a, b) => a.localeCompare(b)));
   let visible = $derived(people.filter((person) => {
@@ -175,32 +177,33 @@
 
 <svelte:window onpopstate={historyChanged} onbeforeunload={beforeUnload} onkeydown={keydown} />
 
-<div class="page-layout" class:calm class:still>
-  <nav class="sidebar" aria-label="Mycelium">
-    <div class="nav-top">
-      <button class="brand" onclick={shelf}><span class="brand-mark"><CelestialMark /></span> mycelium</button>
-      <button class="nav-link" class:active={!activeId && !creating && filter === 'all'} onclick={() => { if (shelf()) filter = 'all'; }}>▧ all people <span>{people.length}</span></button>
-      <button class="nav-link" class:active={filter === 'favorites'} onclick={() => { if (shelf()) filter = 'favorites'; }}>☆ favorites <span>{people.filter((person) => person.favorite).length}</span></button>
-      <button class="new-button" disabled={storageBlocked} onclick={newPerson}>＋ new person</button>
-      {#if tags.length}
-        <div class="tag-nav"><p class="eyebrow">little circles</p>
-          {#each tags as tag}<button class="nav-link" class:active={filter === `tag:${tag}`} onclick={() => { if (shelf()) filter = `tag:${tag}`; }}>· {tag}</button>{/each}
-        </div>
-      {/if}
+<a class="skip-link" href="#mycelium-main">skip to content</a>
+
+<div class="mycelium-shell" class:calm class:still>
+  <div class="glass-transom" aria-hidden="true"></div>
+  <div class="window-light" aria-hidden="true"><i></i><b></b></div>
+  <div class="study-window" aria-hidden="true"></div>
+  <header class="app-header">
+    <div class="brand-lockup">
+      <a href="/" class="world-link" aria-label="Back to woodles.space">·space</a>
+      <button type="button" class="brand" onclick={() => { if (shelf()) filter = 'all'; }}>
+        <span class="brand-rose" aria-hidden="true"><svg viewBox="34 28.5 80 80" focusable="false"><path d="M94 35a37 37 0 1 0 13 57 32 32 0 0 1-13-57Z" fill="#87314a" stroke="#2a1d2e" stroke-width="5" stroke-linejoin="round" /><path d="m99 52 3.6 9.4 9.4 3.6-9.4 3.6-3.6 9.4-3.6-9.4-9.4-3.6 9.4-3.6Z" fill="#d4a347" stroke="#2a1d2e" stroke-width="2.5" stroke-linejoin="round" /></svg></span>
+        <span><strong>Mycelium</strong><small>people & the threads between</small></span>
+      </button>
     </div>
-    <div class="nav-bottom">
-      <p class="shelf-note">a little card for every<br />person in your world.</p>
-      <button class="nav-link" onclick={backup}>↓ export backup</button>
-      <button class="nav-link" onclick={() => importInput.click()}>↑ import backup</button>
-      <button class="nav-link" onclick={() => comfort = true}>☾ comfort</button>
-      <a class="nav-link" href="/homesuite">↩ homesuite</a>
-      <a class="site-home" href="/">·space</a>
-      <span class="local-state"><i></i> {issue ? 'check the storage message' : 'local browser storage'}</span>
-    </div>
-  </nav>
+    <nav class="section-nav" aria-label="Mycelium shelves">
+      <button type="button" style:--jewel="var(--car-glass-amethyst)" class:active={onShelf && filter === 'all'} aria-current={onShelf && filter === 'all' ? 'page' : undefined} onclick={() => { if (shelf()) filter = 'all'; }}><span>All people</span><small>the shelf · {people.length}</small></button>
+      <button type="button" style:--jewel="var(--car-glass-rose)" class:active={onShelf && filter === 'favorites'} aria-current={onShelf && filter === 'favorites' ? 'page' : undefined} onclick={() => { if (shelf()) filter = 'favorites'; }}><span>Favorites</span><small>kept close · {favorites}</small></button>
+      <button type="button" style:--jewel="var(--car-glass-teal)" class:active={creating} aria-current={creating ? 'page' : undefined} disabled={storageBlocked} onclick={newPerson}><span>New person</span><small>make a card</small></button>
+    </nav>
+    <p class="storage-readout" class:trouble={!!issue}>
+      <i aria-hidden="true"></i>
+      <span><small>contacts</small><strong>{issue ? 'check the message' : 'this browser'}</strong></span>
+    </p>
+  </header>
   <input hidden tabindex="-1" type="file" accept="application/json,.json" aria-label="Import Mycelium backup" bind:this={importInput} onchange={importBackup} />
 
-  <main class="main-content">
+  <main id="mycelium-main" class="main-content" tabindex="-1">
     {#if issue}<div class="issue" role="alert">{issue}<button aria-label="Dismiss message" onclick={() => issue = ''}>×</button></div>{/if}
     <div class="notice" aria-live="polite" role="status">{notice}</div>
     {#if editing && draft}
@@ -211,7 +214,7 @@
         </header>
         <div class="workshop-body">
           <div class="preview-stage"><div class="preview-card"><PersonCard person={draft} preview={!still} /></div><p class="preview-caption">3 : 4 · a person, in a little frame</p></div>
-          <section class="editor-panel" aria-label="Contact editor">
+          <section class="editor-panel sheet" aria-label="Contact editor">
             <div class="tabs" role="tablist" aria-label="Contact workshop">
               <button id="details-tab" type="button" role="tab" tabindex={tab === 'details' ? 0 : -1} aria-selected={tab === 'details'} aria-controls="details-panel" onkeydown={tabKey} onclick={() => tab = 'details'}>the person</button>
               <button id="appearance-tab" type="button" role="tab" tabindex={tab === 'appearance' ? 0 : -1} aria-selected={tab === 'appearance'} aria-controls="appearance-panel" onkeydown={tabKey} onclick={() => tab = 'appearance'}>the card</button>
@@ -241,7 +244,7 @@
         <header class="detail-header"><button class="text-button" onclick={shelf}>← the people shelf</button><div class="actions"><button class="chip" onclick={() => toggleFavorite(selected!)}>{selected.favorite ? '★ favorite' : '☆ favorite'}</button><button class="primary" onclick={() => edit(selected!)}>edit contact</button></div></header>
         <div class="detail-body">
           <div class="preview-stage"><div class="preview-card"><PersonCard person={selected} preview={!still} /></div></div>
-          <section class="contact-info" aria-label="Contact details">
+          <section class="contact-info sheet" aria-label="Contact details">
             <p class="eyebrow">one of your people</p><h1>{selected.name}</h1>
             {#if selected.pronouns}<p class="pronouns">{selected.pronouns}</p>{/if}
             {#if selected.role || selected.organization}<p class="role-line">{[selected.role, selected.organization].filter(Boolean).join(' · ')}</p>{/if}
@@ -261,17 +264,20 @@
         </div>
       </div>
     {:else if missing}
-      <div class="empty"><span class="empty-glyph">♧</span><h1>This card isn’t on this shelf.</h1><p>The person may have been deleted, or saved in another browser.<br />A contact link opens a local record.</p><button class="primary" onclick={shelf}>back to people</button></div>
+      <div class="empty"><span class="empty-glyph" aria-hidden="true"></span><h1>This card isn’t on this shelf.</h1><p>The person may have been deleted, or saved in another browser.<br />A contact link opens a local record.</p><button class="primary" onclick={shelf}>back to people</button></div>
     {:else}
       <section class="collection">
-        <header class="shelf-head"><div class="title-row"><div><p class="eyebrow">the threads between us</p><h1>the people shelf</h1></div><button class="primary" disabled={storageBlocked} onclick={newPerson}>＋ new person</button></div>{#if !storageBlocked}<p class="census">{people.length} {people.length === 1 ? 'person' : 'people'} <span>·</span> {people.filter((person) => person.favorite).length} favorites <span>·</span> a small, growing world</p>{/if}</header>
+        <header class="shelf-head"><div class="title-row"><div><p class="eyebrow">the threads between us</p><h1>the people shelf</h1><p class="lede">A little card for every person in your world.</p></div><button class="primary" disabled={storageBlocked} onclick={newPerson}>＋ new person</button></div>{#if !storageBlocked}<p class="census"><span>people</span> <strong>{people.length}</strong><i></i><span>favorites</span> <strong>{favorites}</strong><i></i><span>circles</span> <strong>{tags.length}</strong></p>{/if}</header>
         {#if storageBlocked}
-          <div class="empty"><span class="empty-glyph" aria-hidden="true">♧</span><h2>The shelf couldn’t be opened.</h2><p>Your saved contacts have been kept.<br />Mycelium won’t write over unreadable data.</p><button class="chip" onclick={refresh}>try reading the shelf again</button></div>
+          <div class="empty"><span class="empty-glyph" aria-hidden="true"></span><h2>The shelf couldn’t be opened.</h2><p>Your saved contacts have been kept.<br />Mycelium won’t write over unreadable data.</p><button class="chip" onclick={refresh}>try reading the shelf again</button></div>
         {:else if people.length}
           <div class="controls">
             <input type="search" class="search" aria-label="Search people" bind:value={query} placeholder="search the people, find a thread…" />
-            <div class="control-group" role="group" aria-label="Sort people"><button class="chip" class:active={sort === 'name'} onclick={() => sort = 'name'}>name</button><button class="chip" class:active={sort === 'recent'} onclick={() => sort = 'recent'}>recent</button></div>
-            <div class="control-group" role="group" aria-label="Shelf view"><button class="chip" class:active={layout === 'grid'} onclick={() => { layout = 'grid'; preferences(); }}>⊞ grid</button><button class="chip" class:active={layout === 'list'} onclick={() => { layout = 'list'; preferences(); }}>☰ list</button><button class="chip" onclick={printCards}>⊟ print cards</button></div>
+            <div class="control-group" role="group" aria-label="Sort people"><button class="chip" class:active={sort === 'name'} aria-pressed={sort === 'name'} onclick={() => sort = 'name'}>name</button><button class="chip" class:active={sort === 'recent'} aria-pressed={sort === 'recent'} onclick={() => sort = 'recent'}>recent</button></div>
+            <div class="control-group" role="group" aria-label="Shelf view"><button class="chip" class:active={layout === 'grid'} aria-pressed={layout === 'grid'} onclick={() => { layout = 'grid'; preferences(); }}>⊞ grid</button><button class="chip" class:active={layout === 'list'} aria-pressed={layout === 'list'} onclick={() => { layout = 'list'; preferences(); }}>☰ list</button><button class="chip" onclick={printCards}>⊟ print cards</button></div>
+            {#if tags.length}
+              <div class="circle-strip" role="group" aria-label="Little circles"><span class="strip-label" aria-hidden="true">little circles</span>{#each tags as tag}<button class="chip circle" class:active={filter === `tag:${tag}`} aria-pressed={filter === `tag:${tag}`} onclick={() => filter = filter === `tag:${tag}` ? 'all' : `tag:${tag}`}>{tag}</button>{/each}</div>
+            {/if}
           </div>
           {#if filter !== 'all'}<p class="filter-note">showing {filter.startsWith('tag:') ? filter.slice(4) : filter} <button class="text-button" onclick={() => filter = 'all'}>show everyone ×</button></p>{/if}
           {#if visible.length}
@@ -289,6 +295,19 @@
       </section>
     {/if}
   </main>
+
+  <aside class="ribbon" aria-label="Shelf tools">
+    <button type="button" class="ribbon-tab" onclick={backup}><span aria-hidden="true">↓</span>export backup</button>
+    <button type="button" class="ribbon-tab" onclick={() => importInput.click()}><span aria-hidden="true">↑</span>import backup</button>
+    <button type="button" class="ribbon-tab" onclick={() => comfort = true}><span aria-hidden="true">☾</span>comfort</button>
+    <a class="ribbon-tab" href="/homesuite"><span aria-hidden="true">↩</span>homesuite</a>
+  </aside>
+
+  <footer class="app-footer">
+    <p><span>cards</span> <strong>3 : 4</strong><i></i><span>found in</span> <strong>Write · Data</strong></p>
+    <span class="footer-ornament" aria-hidden="true"></span>
+    <p>saved in this browser · export a backup to keep a copy</p>
+  </footer>
 </div>
 
 {#if comfort}
