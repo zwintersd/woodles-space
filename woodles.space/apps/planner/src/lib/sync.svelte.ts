@@ -9,10 +9,12 @@ import {
 import { store } from './store.svelte';
 import { buildCommitments, commitmentsMatch } from './commitments';
 import { buildSessions, sessionsMatch } from './sessions';
-import { mergeFiveContactsRound, projectLoopLifecycle } from './openLoops';
+import { mergeFiveContactsRound, mergeLoopEvent, mergeOpenLoop, projectLoopLifecycle } from './openLoops';
+import { mergeLoopReminder } from './reminders';
 import type {
 	IntervalObservation,
 	PlannerBlob,
+	PlannerSettings,
 	RoutinePractice,
 	SporeEvent,
 	SurgeDraft
@@ -100,15 +102,55 @@ function mergeDayInstances(
 	return merged;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * A stamp's time. Unreadable stamps lose, and so does one more than a day
+ * ahead of this clock — a skewed device must not win every merge from now on.
+ */
+function stampTime(stamp: string | undefined, now: number): number {
+	const time = stamp ? Date.parse(stamp) : NaN;
+	return Number.isFinite(time) && time <= now + DAY_MS ? time : -Infinity;
+}
+
+/**
+ * Settings merge per key: the newer deliberate edit wins, so turning bells
+ * off on a phone isn't undone by a laptop that synced later. A tie, or a key
+ * nobody stamped (older clients), keeps the old rule: remote wins.
+ * Dismissed offers only accumulate.
+ */
+export function mergeSettings(local: PlannerSettings, remote: PlannerSettings, now = Date.now()): PlannerSettings {
+	const localStamps = local.settingsStamps ?? {};
+	const remoteStamps = remote.settingsStamps ?? {};
+	const merged: Record<string, unknown> = { ...local, ...remote };
+	const stamps: Record<string, string> = {};
+	const keys = new Set([...Object.keys(local), ...Object.keys(remote), ...Object.keys(localStamps), ...Object.keys(remoteStamps)]);
+	keys.delete('settingsStamps');
+	for (const key of keys) {
+		const localTime = stampTime(localStamps[key], now);
+		const remoteTime = stampTime(remoteStamps[key], now);
+		const localWins = localTime > remoteTime;
+		if (localWins) merged[key] = (local as Record<string, unknown>)[key];
+		// A newer deliberate clear on the other device sticks too: JSON drops undefined keys.
+		else if (remoteTime > localTime && !(key in remote)) delete merged[key];
+		const stamp = localWins ? localStamps[key] : remoteStamps[key] ?? localStamps[key];
+		if (stamp) stamps[key] = stamp;
+	}
+	const dismissedOffers = [...new Set([...(local.dismissedOffers ?? []), ...(remote.dismissedOffers ?? [])])];
+	if (dismissedOffers.length) merged.dismissedOffers = dismissedOffers;
+	if (Object.keys(stamps).length) merged.settingsStamps = stamps;
+	return merged as PlannerSettings;
+}
+
 /**
  * Planner sync is a whole JSONB snapshot in Neon, but observations are
  * append-like. Deterministic IDs + last-write timestamps let a phone tap and a
  * desktop tap survive the same CAS conflict instead of choosing one device.
  */
 export function mergePlannerBlobs(local: PlannerBlob, remote: PlannerBlob): PlannerBlob {
-	const loopEvents = mergeById(local.loopEvents ?? [], remote.loopEvents ?? []);
+	const loopEvents = mergeById(local.loopEvents ?? [], remote.loopEvents ?? [], mergeLoopEvent);
 	const openLoops = projectLoopLifecycle(
-		mergeById(local.openLoops ?? [], remote.openLoops ?? [], latestMutable), loopEvents
+		mergeById(local.openLoops ?? [], remote.openLoops ?? [], mergeOpenLoop), loopEvents
 	);
 	const observations = mergeById(
 		local.observations ?? [],
@@ -132,7 +174,7 @@ export function mergePlannerBlobs(local: PlannerBlob, remote: PlannerBlob): Plan
 		obligations: mergeById(local.obligations, remote.obligations),
 		rituals: mergeById(local.rituals, remote.rituals),
 		tasks: mergeById(local.tasks, remote.tasks, latestMutable),
-		settings: { ...local.settings, ...remote.settings },
+		settings: mergeSettings(local.settings, remote.settings),
 		domains: mergeById(local.domains, remote.domains),
 		observations,
 		routines: mergeById(local.routines ?? [], remote.routines ?? [], latestLifecycle),
@@ -156,7 +198,8 @@ export function mergePlannerBlobs(local: PlannerBlob, remote: PlannerBlob): Plan
 		openLoops,
 		loopEvents,
 		closureReflections: mergeById(local.closureReflections ?? [], remote.closureReflections ?? [], (a, b) => (a.updatedAt ?? a.recordedAt) > (b.updatedAt ?? b.recordedAt) ? a : b),
-		fiveContactsRounds: mergeById(local.fiveContactsRounds ?? [], remote.fiveContactsRounds ?? [], mergeFiveContactsRound)
+		fiveContactsRounds: mergeById(local.fiveContactsRounds ?? [], remote.fiveContactsRounds ?? [], mergeFiveContactsRound),
+		loopReminders: mergeById(local.loopReminders ?? [], remote.loopReminders ?? [], mergeLoopReminder)
 	};
 }
 
@@ -216,7 +259,8 @@ const appSync = createAppSync<PlannerBlob>({
 					openLoops: store.openLoops,
 					loopEvents: store.loopEvents,
 					closureReflections: store.closureReflections,
-					fiveContactsRounds: store.fiveContactsRounds
+					fiveContactsRounds: store.fiveContactsRounds,
+					loopReminders: store.loopReminders
 				};
 			},
 			write(blob: PlannerBlob): void {

@@ -3,6 +3,8 @@
 	import { store } from '$lib/store.svelte';
 	import { queueSync } from '$lib/sync.svelte';
 	import type { LoopEvent, LoopEventType } from '$lib/types';
+	import LoopRow from './LoopRow.svelte';
+	import LoopRecord from './LoopRecord.svelte';
 
 	const verbs: { value: LoopEventType; label: string }[] = [
 		{ value: 'noticed', label: 'Noticed' }, { value: 'approached', label: 'Approached' },
@@ -24,7 +26,13 @@
 	let reflecting = $derived(store.loopEvents.find(event => event.id === reflectingId));
 	let history = $derived([...store.loopEvents].sort((a, b) => b.recordedAt.localeCompare(a.recordedAt) || (b.sequence ?? 0) - (a.sequence ?? 0) || b.id.localeCompare(a.id)));
 	const titleFor = (id?: string) => store.openLoops.find(loop => loop.id === id)?.title ?? 'Unattributed observation';
-	const timeFor = (iso: string) => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+	// A recurring loop's closure ends a cycle, and its reopening is the need returning.
+	function labelFor(event: LoopEvent): string {
+		const recurring = store.openLoops.find(loop => loop.id === event.loopId)?.recurring;
+		if (recurring && event.type === 'closed') return 'Cycle closed';
+		if (recurring && event.type === 'reopened') return 'Need returned';
+		return verbs.find(verb => verb.value === event.type)?.label ?? event.type;
+	}
 	async function returnToNotebook() { await tick(); notebookHeading?.focus({ preventScroll: true }); }
 	function dismissReflection() { reflectingId = ''; void returnToNotebook(); }
 
@@ -53,7 +61,7 @@
 		const event = store.recordLoopEvent({ type: value, loopId: id || undefined, note: eventNote, occurredAt: at });
 		if (!event) { message = 'Choose a loop for this event, or check its current state.'; return; }
 		queueSync(); recording = false;
-		message = `${verbs.find(verb => verb.value === value)?.label} recorded.`;
+		message = `${labelFor(event)} recorded.`;
 		if (value === 'closed' || value === 'released') void beginReflection(event);
 	}
 	function submitEvent() {
@@ -93,7 +101,7 @@
 		<div class="actions"><button class="primary" disabled={!loopId && ['closed', 'released', 'reopened', 'paused'].includes(type)}>Save event</button><button type="button" onclick={() => recording = false}>Cancel</button></div>
 	</form>{/if}
 	{#if reflecting}<section class="panel reflection" aria-labelledby="closure-heading" data-testid="closure-reflection">
-		<p class="kicker">{titleFor(reflecting.loopId)} · {reflecting.type === 'released' ? 'released' : 'closed'}</p>
+		<p class="kicker">{titleFor(reflecting.loopId)} · {reflecting.type === 'released' ? 'released' : labelFor(reflecting) === 'Cycle closed' ? 'cycle closed' : 'closed'}</p>
 		<h3 id="closure-heading" tabindex="-1" bind:this={reflectionHeading}>What changed, if anything?</h3>
 		<div class="chips" role="group" aria-label="Observed changes">{#each descriptors as descriptor}<button type="button" aria-pressed={selected.includes(descriptor)} onclick={() => toggleDescriptor(descriptor)}>{descriptor}</button>{/each}</div>
 		<label>Reflection note <small>optional</small><textarea bind:value={reflectionNote} rows="2" placeholder="Where did you notice it—in your body, attention, or willingness to act?"></textarea></label>
@@ -106,31 +114,24 @@
 		<p class="intro">You can stop here.</p>
 	</section>{/if}
 	<details class="loop-list"><summary>Your loops <small>{unresolved.length} open or paused</small></summary>
-		{#each store.openLoops as loop (loop.id)}<article class="loop-row" aria-label={loop.title}>
-			<div><strong>{loop.title}</strong><small>{loop.status === 'resolved' ? loop.resolution === 'released' ? 'Released' : 'Closed' : loop.status === 'paused' ? 'Paused' : 'Open'}</small></div>
-			<div class="actions">{#if loop.status !== 'resolved'}<button type="button" onclick={() => log('closed', loop.id)}>Close loop</button><button type="button" onclick={() => log('released', loop.id)}>Let go</button>{:else}<button type="button" onclick={() => log('reopened', loop.id)}>Reopen loop</button>{/if}</div>
-		</article>{:else}<p class="intro">No loops recorded. A moment needs no loop.</p>{/each}
+		{#each store.openLoops as loop (loop.id)}<LoopRow {loop} onlog={(value, id) => log(value, id)} />{:else}<p class="intro">No loops recorded. A moment needs no loop.</p>{/each}
 	</details>
 	{#if history.length}<details class="history"><summary>Loop record <small>{history.length} events</small></summary>
 		<div class="records">{#each history as event (event.id)}
-			{@const reflection = store.closureReflections.find(item => item.loopEventId === event.id)}
-			<article class="record"><strong>{titleFor(event.loopId)}</strong><p>{verbs.find(verb => verb.value === event.type)?.label} · <time datetime={event.occurredAt}>{timeFor(event.occurredAt)}</time></p>
-				{#if event.occurredAt !== event.recordedAt}<small>Entered {timeFor(event.recordedAt)}</small>{/if}
-				{#if event.note}<p class="note">{event.note}</p>{/if}
-				{#if reflection}<p>{reflection.descriptors.join(' · ')}</p>{#if reflection.note}<p class="note">{reflection.note}</p>{/if}{#if reflection.nextFeelsPossible}<small>Felt possible: {reflection.nextFeelsPossible === 'something' ? 'something else was approachable' : reflection.nextFeelsPossible === 'rest' ? 'rest' : 'nothing in particular'}</small>{/if}{/if}
-				{#if event.type === 'closed' || event.type === 'released'}<button type="button" onclick={() => beginReflection(event)}>{reflection ? 'Edit reflection' : 'Add reflection'}</button>{/if}
-			</article>
+			<LoopRecord {event} label={labelFor(event)} {titleFor} onreflect={beginReflection} />
 		{/each}</div>
 	</details>{/if}
 	<p class="feedback" role="status">{message}</p>
 </section>
 
 <style>
-	.notebook { min-width: 0; border: 1px solid var(--car-line); border-radius: .9rem; padding: 1rem; background: var(--car-paper); color: var(--car-ink); font: .8rem/1.45 var(--car-body); scroll-margin-top: 1rem; }
+	.notebook { min-width: 0; border: 1px solid var(--car-vellum-edge); border-top: 3px double #136f7c80; border-radius: .4rem .4rem 1rem .4rem; padding: 1.1rem; background: var(--car-vellum); box-shadow: 0 3px 0 #d7c6a5, 0 .7rem 1.8rem var(--car-shadow); color: var(--car-ink); font: .8rem/1.45 var(--car-body); scroll-margin-top: 1rem; }
 	header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
-	h2 { font: 500 1.5rem/1.1 var(--car-display); margin: .2rem 0; }
-	h3 { font: 500 1.35rem/1.2 var(--car-display); margin: .4rem 0 .7rem; }
+	h2 { font: 400 1.6rem/1.1 var(--car-fell); margin: .2rem 0; }
+	h2::after { content: ''; display: block; width: 3.5rem; border-bottom: 1px solid var(--car-gilt-rule); margin-top: .5rem; }
+	h3 { font: 400 1.4rem/1.2 var(--car-fell); margin: .4rem 0 .7rem; }
 	.kicker { color: var(--car-ink-soft); font: .58rem var(--car-mono); letter-spacing: .08em; }
+	.kicker::before { content: ''; display: inline-block; width: .8rem; height: .8rem; margin-right: .4rem; background: var(--car-orn-quatrefoil) center / contain no-repeat; vertical-align: -.18rem; }
 	.intro, small { color: var(--car-ink-soft); }
 	.intro { margin: .5rem 0; }
 	small { font-size: .7rem; }
@@ -149,12 +150,7 @@
 	summary { padding: .3rem 0; }
 	summary small { margin-left: .4rem; }
 	.loop-list, .history { border-top: 1px solid var(--car-line); margin-top: .65rem; padding-top: .4rem; }
-	.loop-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; border-bottom: 1px solid var(--car-line); padding: .6rem 0; }
-	.loop-row > div:first-child { display: grid; gap: .2rem; min-width: 0; overflow-wrap: anywhere; }
 	.records { max-height: 22rem; overflow: auto; }
-	.record { display: grid; gap: .3rem; border-bottom: 1px solid var(--car-line); padding: .75rem 0; overflow-wrap: anywhere; }
-	.record button { justify-self: start; }
-	.note { white-space: pre-wrap; }
 	.feedback:empty { display: none; }
 	.feedback { margin-top: .6rem; color: var(--car-ink-soft); }
 	:focus-visible { outline: 2px solid var(--car-pink-dark); outline-offset: 3px; }

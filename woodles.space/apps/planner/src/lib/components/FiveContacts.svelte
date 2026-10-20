@@ -164,10 +164,11 @@
 </section>
 
 <style>
-	.five-contacts { border: 1px solid #44365b25; border-radius: 1rem; background: var(--car-paper); box-shadow: 0 2px 0 #44365b08; padding: 1rem 1.1rem; color: var(--car-ink); font: .78rem var(--car-body); }
+	.five-contacts { border: 1px solid var(--car-vellum-edge); border-top: 3px double #67389d70; border-radius: .4rem .4rem 1rem .4rem; background: var(--car-vellum); box-shadow: 0 3px 0 #d7c6a5, 0 .7rem 1.8rem var(--car-shadow); padding: 1.1rem 1.2rem; color: var(--car-ink); font: .78rem var(--car-body); }
 	header { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
-	h2 { margin: 0; font: 1.25rem var(--car-display); }
-	h3 { margin: .9rem 0 .3rem; font: 1.2rem var(--car-display); }
+	h2 { margin: 0; font: 1.4rem var(--car-fell); }
+	h2::after { content: ''; display: block; width: 3.5rem; border-bottom: 1px solid var(--car-gilt-rule); margin-top: .5rem; }
+	h3 { margin: .9rem 0 .3rem; font: 1.3rem var(--car-fell); }
 	.optional, summary span, .hint, small { color: var(--car-ink-soft); }
 	.optional { font-size: .68rem; font-weight: normal; }
 	.hint { line-height: 1.6; margin: .5rem 0 .8rem; }

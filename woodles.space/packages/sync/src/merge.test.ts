@@ -16,6 +16,33 @@ describe('sync merge conflicts', () => {
 		vi.unstubAllGlobals();
 	});
 
+	it('keeps an edit made while a conflicting push was in flight', async () => {
+		type Ledger = { observations: string[] };
+		let local: Ledger = { observations: ['phone-mark'] };
+		let releaseConflict: (response: Response) => void = () => {};
+
+		fetchMock
+			.mockImplementationOnce(() => new Promise<Response>(resolve => { releaseConflict = resolve; }))
+			.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, version: 5 }), { status: 200 }));
+
+		const synced = createSyncedStore<Ledger>({
+			app: 'planner-carillon-inflight-test',
+			read: () => local,
+			write: (next) => { local = next; },
+			merge: (mine, theirs) => ({ observations: [...new Set([...mine.observations, ...theirs.observations])] })
+		});
+
+		const flushing = synced.flush();
+		await Promise.resolve();
+		// The person keeps working while the push is out.
+		local = { observations: [...local.observations, 'typed-during-push'] };
+		releaseConflict(new Response(JSON.stringify({ server: { blob: { observations: ['desktop-mark'] }, version: 4 } }), { status: 409 }));
+		await expect(flushing).resolves.toEqual({ ok: true, version: 5 });
+		expect(local.observations).toEqual(['phone-mark', 'typed-during-push', 'desktop-mark']);
+		const [, retryInit] = fetchMock.mock.calls[1] as [string, RequestInit];
+		expect(JSON.parse(retryInit.body as string).blob.observations).toContain('typed-during-push');
+	});
+
 	it('merges a CAS conflict and retries against the observed server version', async () => {
 		type Ledger = { observations: string[] };
 		let local: Ledger = { observations: ['phone-mark'] };

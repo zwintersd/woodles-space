@@ -25,6 +25,61 @@ so it's not easy to forget.
   them from Write or bring current contact details into a Data Collection,
   keeping your own notes alongside. Removing a link or Collection membership
   leaves the person's card in Mycelium.
+- **Carillon is parchment and stained glass now** — the instrument sits on
+  warm, grained parchment scattered with gilt stars and crescent moons, and
+  the hour's light falls across it through stained glass: rose and amber at
+  dawn, gilt and emerald in the morning, ruby and sapphire at noon, marigold
+  and teal in the afternoon, rose and amethyst at evening, violet and lapis at
+  dusk, drifting between them rather than jumping. a leaded transom of jewel
+  panes runs across the top; the bell sits in a little rose window; each
+  section is its own pane of glass (Today ruby, Day piles amber, Routines
+  emerald, Surge sapphire, Editions amethyst) and the open one is set in it
+  like a lancet. cards are vellum with a gilt rule inside the edge, the
+  sampler gets a jewelled top and a crescent moon, headings that are only
+  words are set in IM Fell, and the wordmark is glazed glass. still light all
+  day; after dark it turns to midnight velvet with the glass lit from behind.
+  the binder's panel has a leaded spine, and no longer peeks out when closed.
+- **Carillon's cards have their own drawn ornaments** — hand-drawn SVG art in
+  gilt, lead and the same jewels: filigree corners with a ruby quarry on every
+  vellum card, a crescent cradling a ruby star as the divider under card and
+  page headings (and in the footer and binder), a little stained-glass bell
+  hanging from a moon when the sampler is at rest, a moon and its stars in
+  the sampler's wide corner and wherever there's nothing yet, and a
+  four-jewel quatrefoil before the small labels.
+
+## 2026-10-18
+
+- **Carillon's bell can sound different for the hour, half hour and quarters**
+  — a new ♪ bells panel in the binder (or tap the bell line on Today, which is
+  how phones get there) gives each mark its own voice: bell, lower bell, low
+  bell, glass chime, singing bowl, wood block, soft pip, the Westminster
+  quarters, or silent. one tap picks a set — classic (as before), clock face,
+  or westminster — and the hour can be counted on a low bell. bells between
+  samples, block starts, lead time and reminder sounds have their own rows; a
+  block's bell now follows the chime it shares a minute with instead of being
+  drowned out. volume and pause live on each device, a preview button turns
+  into stop while it plays, and Today names the next bell, says when the
+  browser is holding sound, and shows "rang 12:30 · half hour" afterwards.
+  under the hood the bell no longer rings late or twice: it ticks on the
+  minute, catches up after a throttled background tab, never queues sound on a
+  locked page, and settings changed on one device are no longer undone by
+  another that synced later. Escape stops a ringing bell without closing
+  whatever you were typing in, every binder panel has a close button, and the
+  bell line stays on Today after a moment is saved.
+- **sync keeps an edit made mid-push** — when two devices push at once, the
+  one that loses now merges what's on it *now*, not what it had when the push
+  started, across every app on the shared sync client.
+- **Carillon's open loops can recur, remind, and look back** — a loop can be a
+  recurring need: closing ends one cycle and *need is back* starts the next,
+  with an optional rhythm. reminders are only the ones you set — a time on a
+  loop, or a while after each closed cycle — and appear below the sampler,
+  with browser notifications as a separate opt-in that stays quiet overnight.
+  a *Patterns in your loops* disclosure counts what sat near your closures
+  (reflections, labels, noticings, Five Contacts rounds) without calling any
+  of it a cause, offers loop names and rhythms it spots in your notes, and
+  shows ideas only when you ask. a single body, attention, or actions note can
+  now link to its own loop, and saved loop events can be corrected — the time
+  you first entered stays on the record.
 
 ## 2026-10-16
 

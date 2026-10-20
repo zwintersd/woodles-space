@@ -1,0 +1,16 @@
+<!-- carillon: divider: a crescent cradling a ruby star, with scrolling gilt
+     arms either side tapering to dots. sits under a heading. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 16" width="160" height="16">
+<defs><linearGradient id="gilt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4d98a"/><stop offset=".45" stop-color="#c39338"/><stop offset="1" stop-color="#8a5c16"/></linearGradient>
+<g id="arm" fill="none" stroke="url(#gilt)" stroke-linecap="round" stroke-linejoin="round">
+<path d="M88.5 8 C95.5 8 98.5 5.2 103.5 5.2 C107.6 5.2 109.4 8.4 107.4 10 C105.7 11.3 103.5 9.9 104.5 8.3" stroke-width="1.1"/>
+<path d="M91 9.6 C99 12.2 111 12.4 119 9.4 C125.5 7 132 7.4 140 8" stroke-width=".9"/>
+<path d="M112.6 9.9 C113.4 7.4 116 6 118.6 6.2 C117.6 8.6 115.2 10 112.6 9.9 Z" fill="url(#gilt)" stroke-width=".5"/>
+<circle cx="143.4" cy="8" r="1.15" fill="url(#gilt)" stroke="none"/>
+<circle cx="148" cy="8" r=".7" fill="url(#gilt)" stroke="none"/>
+</g></defs>
+<use href="#arm"/>
+<use href="#arm" transform="matrix(-1 0 0 1 160 0)"/>
+<path d="M73.5 7.2 A6.5 6.5 0 0 0 86.5 7.2 A7.2 7.2 0 0 1 73.5 7.2 Z" fill="url(#gilt)" stroke="#2a1d2e" stroke-width=".5" stroke-linejoin="round"/>
+<path d="M80 .9 L81.05 4.35 L84.5 5.4 L81.05 6.45 L80 9.9 L78.95 6.45 L75.5 5.4 L78.95 4.35 Z" fill="#a51f3c" stroke="#2a1d2e" stroke-width=".5" stroke-linejoin="round"/>
+</svg>

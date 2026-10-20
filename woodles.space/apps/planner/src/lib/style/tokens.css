@@ -5,50 +5,144 @@
 
 .planner-root {
 	/* ── day-cycle palette (overridden by JS) ─────────────────────── */
-	--p-bg:          #e8fbff;
-	--p-surface:     #fbffff;
-	--p-text:        #25354a;
-	--p-muted:       #5f7387;
-	--p-accent:      #31c7e8;
-	--p-accent-soft: rgba(49,199,232,0.20);
-	--p-border:      rgba(37,53,74,0.12);
-	--p-highlight:   #ffd84f;
+	--p-bg:          #f2e5c9;
+	--p-surface:     #fcf5e3;
+	--p-text:        #2e2630;
+	--p-muted:       #6c5e60;
+	--p-accent:      #16798a;
+	--p-accent-soft: rgba(22,121,138,0.16);
+	--p-border:      rgba(46,38,48,0.14);
+	--p-highlight:   #e58b2e;
 
 	/* ── Carillon chrome ─────────────────────────────────────────────
 	   The instrument's own surface: the ground it sits on, whatever is
-	   drawn straight onto that ground, and the washes behind it. These
-	   are day-cycled by dayCycle.ts (getChromeForTime) on every clock
-	   tick — paper by day, the night instrument after ~21:30. The names
-	   below describe the night anchor; the *role* is what matters, so
-	   --car-cream is "primary text on the ground" and is plum ink at
-	   9am. Fallback values here match that night anchor. */
-	--car-night:         #17101f;  /* the ground                       */
-	--car-ground-top:    #1d1428;  /* shell gradient, first stop       */
-	--car-ground-bottom: #140d1d;  /* shell gradient, last stop        */
-	--car-panel:         #24182f;  /* elevated block on the ground     */
-	--car-cream:         #fff6da;  /* primary text on the ground       */
-	--car-mist:          #b9adc0;  /* secondary text on the ground     */
-	--car-pink:          #f09ab8;  /* accent on the ground             */
-	--car-surge:         #ff895a;  /* surge accent on the ground       */
-	--car-surge-ink:     #20111c;  /* text on a surge-filled control   */
-	--car-line:          rgba(255, 246, 218, 0.14);  /* hairline       */
-	--car-wash:          rgba(255, 246, 218, 0.065); /* hover fill     */
-	--car-inset:         rgba(8, 4, 14, 0.22);       /* recessed field */
-	--car-grid:          rgba(255, 246, 218, 0.025); /* graph rule     */
-	--car-shadow:        rgba(17, 7, 27, 0.24);      /* card shadow    */
-	--car-glow-warm:     rgba(240, 154, 184, 0.13);  /* corner wash    */
-	--car-glow-cool:     rgba(113, 207, 184, 0.08);  /* corner wash    */
+	   drawn straight onto that ground, and the window light thrown over
+	   it. These are day-cycled by dayCycle.ts (getChromeForTime) on
+	   every clock tick — parchment by day, midnight velvet after
+	   ~21:30. The names below describe the night anchor; the *role* is
+	   what matters, so --car-cream is "primary text on the ground" and
+	   is oak-gall ink at 9am. Fallback values here match that night
+	   anchor. */
+	--car-night:         #1a1229;  /* the ground                       */
+	--car-ground-top:    #22173a;  /* shell gradient, first stop       */
+	--car-ground-bottom: #130d1f;  /* shell gradient, last stop        */
+	--car-panel:         #261b3a;  /* elevated block on the ground     */
+	--car-cream:         #f8ecd0;  /* primary text on the ground       */
+	--car-mist:          #bfb0c6;  /* secondary text on the ground     */
+	--car-pink:          #e8bf6a;  /* accent on the ground             */
+	--car-surge:         #ff8f5e;  /* surge accent on the ground       */
+	--car-surge-ink:     #1d1020;  /* text on a surge-filled control   */
+	--car-line:          rgba(248, 236, 208, 0.15);  /* hairline       */
+	--car-wash:          rgba(248, 236, 208, 0.07);  /* hover fill     */
+	--car-inset:         rgba(6, 3, 14, 0.25);       /* recessed field */
+	--car-grid:          rgba(232, 191, 106, 0.12);  /* star scatter   */
+	--car-shadow:        rgba(8, 4, 16, 0.35);       /* card shadow    */
+	--car-glow-warm:     rgba(150, 60, 170, 0.20);   /* window light   */
+	--car-glow-cool:     rgba(50, 80, 180, 0.18);    /* window light   */
+
+	/* The cabinet stays mulberry-dark while the hour moves across the desk.
+	   Cream labels and brass fittings have their own stable contrast. */
+	--car-furniture:       #281b36;
+	--car-furniture-deep:  #190f25;
+	--car-furniture-ink:   #f4e5c7;
+	--car-furniture-muted: #cfbdd3;
+	--car-furniture-line:  rgba(218, 179, 105, 0.48);
+	--car-peacock:         #185b60;
+	--car-mulberry:        #713b59;
 
 	/* ── Carillon paper ──────────────────────────────────────────────
 	   Field sheets, editions, ledgers. Deliberately outside the cycle:
-	   paper is paper at every hour, only the desk beneath it changes. */
-	--car-paper:      #fff9e9;
-	--car-ink:        #403247;
-	--car-ink-soft:   #746878;
-	--car-pink-dark:  #8d3153;
-	--car-pink-wash:  rgba(240, 154, 184, 0.18);
-	--car-sage:       #71cfb8;
-	--car-brass:      #eaa15a;  /* Echo's bell */
+	   paper is paper at every hour, only the desk beneath it changes.
+	   Vellum and oak-gall ink; garnet for the rubrics. */
+	--car-paper:      #fcf5e3;
+	--car-ink:        #2f1d33;
+	--car-ink-soft:   #6b5568;
+	--car-pink-dark:  #8e1d40;
+	--car-pink-wash:  rgba(163, 33, 74, 0.12);
+	--car-sage:       #2e8b6c;
+	--car-brass:      #c0892b;  /* Echo's bell */
+
+	/* ── Carillon glass ──────────────────────────────────────────────
+	   The stained-glass jewels, the lead that holds them, and the gilt
+	   that edges a page. Also outside the cycle — glass is glass, the
+	   light behind it is what changes. Each jewel is deep enough to
+	   carry cream text at AA, so a pane can be a label's ground. */
+	--car-lead:          #2a1d2e;
+	--car-gilt:          #b8862b;
+	--car-glass-ruby:     #87314a;
+	--car-glass-rose:     #914568;
+	--car-glass-amber:    #98621d;
+	--car-glass-emerald:  #276557;
+	--car-glass-teal:     #185b60;
+	--car-glass-sapphire: #344f78;
+	--car-glass-amethyst: #633e81;
+	--car-glass-cream:    #fff4dc;  /* text on a pane */
+	/* a leaded strip of panes: hard stops, a lead came between each. The
+	   stops are their own token so a strip can run either way:
+	   repeating-linear-gradient(180deg, var(--car-glass-stops)) */
+	--car-glass-stops:
+		var(--car-lead) 0 2px,
+		var(--car-glass-amethyst) 2px 2.6rem,
+		var(--car-lead) 2.6rem calc(2.6rem + 2px),
+		var(--car-glass-teal) calc(2.6rem + 2px) 4.4rem,
+		var(--car-lead) 4.4rem calc(4.4rem + 2px),
+		var(--car-glass-amethyst) calc(4.4rem + 2px) 7.4rem,
+		var(--car-lead) 7.4rem calc(7.4rem + 2px),
+		var(--car-glass-ruby) calc(7.4rem + 2px) 9.6rem,
+		var(--car-lead) 9.6rem calc(9.6rem + 2px),
+		var(--car-glass-amethyst) calc(9.6rem + 2px) 12.2rem,
+		var(--car-lead) 12.2rem calc(12.2rem + 2px),
+		var(--car-glass-amber) calc(12.2rem + 2px) 13.8rem,
+		var(--car-lead) 13.8rem calc(13.8rem + 2px),
+		var(--car-glass-teal) calc(13.8rem + 2px) 16rem;
+	--car-glass-strip: repeating-linear-gradient(90deg, var(--car-glass-stops));
+
+	/* ── Carillon ground ornament ────────────────────────────────────
+	   Masks and textures for the shell. The scatter is a mask so it can
+	   take its colour from --car-grid (gilt by day, candle-gold at
+	   night); the grain and mottle are tea-brown speckle for parchment. */
+	--car-star-scatter: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cg fill='black'%3E%3Cpath d='M30 25l2.2 6.8 6.8 2.2-6.8 2.2L30 43l-2.2-6.8L21 34l6.8-2.2z'/%3E%3Cpath d='M176 145l1.2 3.8 3.8 1.2-3.8 1.2L176 155l-1.2-3.8L171 150l3.8-1.2z'/%3E%3Cpath d='M98 120l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z'/%3E%3Cpath d='M150 54a10 10 0 1 0 0 20a12.5 12.5 0 0 1 0-20z'/%3E%3Cpath d='M60 184a6 6 0 1 0 0 12a7.5 7.5 0 0 1 0-12z'/%3E%3Ccircle cx='92' cy='58' r='1.6'/%3E%3Ccircle cx='190' cy='26' r='1.2'/%3E%3Ccircle cx='40' cy='150' r='1.1'/%3E%3Ccircle cx='126' cy='196' r='1.8'/%3E%3Ccircle cx='206' cy='96' r='1.2'/%3E%3Ccircle cx='66' cy='98' r='1'/%3E%3C/g%3E%3C/svg%3E");
+	--car-parchment-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.36 0 0 0 0 0.24 0 0 0 0 0.1 0.9 0 0 0 -0.34'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+	--car-parchment-mottle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='720' height='720'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.006' numOctaves='3' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.33 0 0 0 0 0.12 0.6 0 0 0 -0.28'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)'/%3E%3C/svg%3E");
+	--car-grain-strength: 0.28;
+	/* how the window light meets the ground: by day it stains the
+	   parchment (multiply); at night it glows on the velvet (screen) */
+	--car-window-blend: multiply;
+	--car-window-strength: 0.42;
+
+	/* vellum for the cards that sit on the ground: aged at the edges, a
+	   gilt rule set just inside the border like an illuminated page */
+	--car-vellum:
+		radial-gradient(ellipse 120% 95% at 50% 30%, rgba(140, 90, 30, 0) 58%, rgba(140, 90, 30, 0.09) 100%),
+		var(--car-paper);
+	--car-gilt-rule: color-mix(in srgb, var(--car-gilt) 48%, transparent);
+	--car-vellum-edge: rgba(74, 46, 30, 0.22);
+
+	/* ── Carillon ornaments ──────────────────────────────────────────
+	   SVG art in lib/ornaments, drawn in gilt, lead and the glass
+	   jewels. They only ever sit on vellum or as gilt on the ground, and
+	   neither changes colour with the hour, so they're plain images. */
+	--car-orn-corner-tl:  url('../ornaments/corner-tl.svg');
+	--car-orn-corner-bl:  url('../ornaments/corner-bl.svg');
+	--car-orn-corner-br:  url('../ornaments/corner-br.svg');
+	--car-orn-divider:    url('../ornaments/divider.svg');
+	--car-orn-bellmoon:   url('../ornaments/bellmoon.svg');
+	--car-orn-sprig:      url('../ornaments/sprig.svg');
+	--car-orn-quatrefoil: url('../ornaments/quatrefoil.svg');
+	--car-orn-window:     url('../ornaments/celestial-window.svg');
+	--car-orn-moth:       url('../ornaments/lunar-moth.svg');
+	--car-orn-chart:      url('../ornaments/celestial-chart.svg');
+	/* corner filigree is drawn at 1 unit = 1px against the -6px gilt
+	   rule, so it's sized in px. A card wears a diagonal pair — top left
+	   always, since the binder's tabs can cover a card's right edge. */
+	--car-corners:
+		var(--car-orn-corner-tl) left top / 56px 56px no-repeat,
+		var(--car-orn-corner-br) right bottom / 56px 56px no-repeat;
+
+	/* the wordmark: Kalnia Glaze is a colour font — glazed letterforms —
+	   recoloured below into ruby, sapphire and amethyst glass in lead */
+	--car-wordmark: var(--font-glaze, 'Kalnia Glaze'), var(--font-optical, 'Fraunces'), Georgia, serif;
+	--car-wordmark-palette: --carillon-glass;
 
 	/* ── typography (inherits from shared/fonts.css) ──────────────── */
 	--pl-font-display: var(--font-display, 'Cormorant Garamond', Georgia, serif);
@@ -59,9 +153,13 @@
 	--pl-font-optical: var(--font-optical, 'Fraunces', Georgia, serif);
 	--pl-font-fell:    var(--font-fell, 'IM Fell DW Pica', Georgia, serif);
 	--car-display:     var(--font-optical, 'Fraunces', Georgia, serif);
+	/* IM Fell: the hand-set face of an old almanac, for headings that are
+	   only words — its figures are all old-style, so dates and counts stay
+	   in --car-display */
+	--car-fell:        var(--font-fell, 'IM Fell DW Pica'), Georgia, serif;
 	--car-body:        var(--font-body, 'Lora', Georgia, serif);
 	--car-mono:        var(--font-mono, 'DM Mono', 'Courier New', monospace);
-	--car-counter:     'VT323', var(--font-mono, 'DM Mono', monospace);
+	--car-counter:     var(--font-optical, 'Fraunces'), Georgia, serif;
 
 	/* ── spacing scale ────────────────────────────────────────────── */
 	--pl-space-xs:  0.25rem;
@@ -96,4 +194,27 @@
 	/* ── shadows ──────────────────────────────────────────────────── */
 	--pl-shadow-card:  0 2px 16px var(--p-accent-soft);
 	--pl-shadow-hover: 0 4px 24px var(--p-accent-soft);
+}
+
+/* After dark the lamp is lit behind the glass: lighter jewels, gilt
+   leading, and less parchment grain on the velvet. layout sets
+   data-chrome from the same clock as the --car-* tokens. */
+.planner-root[data-chrome='night'] {
+	--car-wordmark-palette: --carillon-glass-lit;
+	--car-grain-strength: 0.12;
+	--car-window-blend: screen;
+	--car-window-strength: 0.2;
+}
+
+/* Kalnia Glaze's palette: entries 0–3 paint the outline layer, 4–8 the
+   glazed fill (5 and 8 are the translucent stops that let the ground
+   through, which is what makes it read as glass). */
+@font-palette-values --carillon-glass {
+	font-family: 'Kalnia Glaze';
+	override-colors: 0 #2a1d2e, 1 #5a1a2e, 2 #2a1d2e, 3 #3a2350, 4 #a51f3c, 5 #f2b441, 6 #2a4c9e, 7 #67389d, 8 #f2b441;
+}
+
+@font-palette-values --carillon-glass-lit {
+	font-family: 'Kalnia Glaze';
+	override-colors: 0 #e8bf6a, 1 #b8862b, 2 #e8bf6a, 3 #b8862b, 4 #ff7d98, 5 #ffe3a0, 6 #8fb0ff, 7 #c89bff, 8 #ffe3a0;
 }

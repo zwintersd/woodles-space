@@ -39,6 +39,13 @@ the rest of planner's tests run in node — some check behavior with no `window`
 at all (the bells code, for one) — so the DOM environment is set on the one file
 that needs it rather than globally.
 
+constructing the store does **not** start the clock: the minute timer, the
+visibility listeners and the audio unlock start in `store.startClock()`, called
+from `+layout.svelte`. tests drive `store.tick(now)` directly, so sixty stores
+don't leave sixty timers behind. Web Audio is replaced in tests through
+`setAudioContextFactory()` with the strict fake in `src/lib/test-support/fakeAudio.ts`,
+and in Playwright with `e2e/support/fake-audio.ts`.
+
 ## $state arrays hold proxies, not your objects
 
 when you push an object into a `$state` array, Svelte wraps it in a reactive

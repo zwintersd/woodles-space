@@ -594,19 +594,47 @@ any earlier sheet, and those marks keep `source: "paper"` so a later clipboard
 transcription never poses as a live sample. Correcting an existing live sample
 preserves its original provenance. A blank interval is unobserved, not failed.
 
-Carillon's surface runs on two clocks' worth of color. `dayCycle.ts` has
-always interpolated the `--p-*` daydream palette across the day; it now also
-produces the `--car-*` **chrome** — the ground the instrument sits on, the text
-and hairlines drawn straight onto it, the graph rule, the corner washes — via
-`getChromeForTime()`, applied alongside the palette in `+layout.svelte`. The
-chrome has two families, paper by day and the night instrument after ~21:15,
-and the crossing between them is a switch rather than a blend: interpolating a
-light ground toward a dark one passes through a mid-tone that reads as mud
-under either text color. Hues still move freely *within* a family. The paper
-tokens (`--car-paper`, `--car-ink`, `--car-ink-soft`, `--car-pink-dark`) stay
-outside the cycle — a field sheet is paper at every hour, only the desk beneath
-it changes. `dayCycle.test.ts` samples every 15 minutes and holds the chrome to
-AA body text, AA-Large accents, and never landing on a mid-tone ground.
+The bell follows the same rows: a sampling bell rings where a row turns over,
+and the clock face names it (hour, half, quarter, or another sample), each with
+its own synthesized voice. A planned block's bell follows the chime it shares a
+minute with. Voices and the mix sync in `settings.bellSounds`; master volume
+and pause stay on the device. Planner settings merge per key by edit stamp
+(`settings.settingsStamps`, stamped only on a real change, newer wins — a newer
+clear included — remote wins ties, far-future stamps ignored), so a stale
+device can't undo a deliberate change. See `apps/planner/BELLS.md`.
+
+Carillon's surface runs on two clocks' worth of color, dressed as parchment
+and stained glass. `dayCycle.ts` interpolates the `--p-*` palette across the
+day — vellum at every stop, with the accent moving from jewel to jewel (garnet
+dawn, emerald morning, sapphire noon, teal afternoon, amethyst evening, lapis
+dusk) — and also produces the `--car-*` **chrome**: the ground the instrument
+sits on, the text and hairlines drawn straight onto it, the star scatter, and
+two glows that are the hour's light thrown through the windows. Both come
+from `getChromeForTime()`, applied alongside the palette in `+layout.svelte`,
+which also sets `data-chrome` (`paper` or `night`, via `chromeFamily()`) for
+the few things that can't be a color token — the wordmark's font palette and
+how much parchment grain lies on the ground. The chrome has two families,
+parchment by day and midnight velvet after ~21:15, and the crossing between
+them is a switch rather than a blend: interpolating a light ground toward a
+dark one passes through a mid-tone that reads as mud under either text color.
+Hues and the window light still drift freely *within* a family. The paper
+tokens (`--car-paper`, `--car-ink`, `--car-ink-soft`, `--car-pink-dark`) and
+the glass tokens (`--car-glass-*`, `--car-lead`, `--car-gilt`) stay outside the
+cycle — a field sheet is paper and glass is glass at every hour; only the desk
+and the light change. Each jewel is deep enough to carry `--car-glass-cream`
+text, so a pane can be a label's ground (the open section tab is one). The
+wordmark is Kalnia Glaze, a color font, recolored into ruby, sapphire and
+amethyst glass with `@font-palette-values` in `tokens.css`. The card
+ornaments are SVG files in `apps/planner/src/lib/ornaments/` (corner filigree,
+a crescent-and-star divider, a stained-glass bell hung from a moon, a moon
+sprig, a quatrefoil), exposed as `--car-orn-*` tokens and laid in as
+backgrounds or pseudo-elements, so they sit under text and stay invisible to
+assistive tech. They're drawn only in gilt, lead and the glass jewels — none
+of which change with the hour — so they're plain images rather than inline SVG;
+the corner filigree is drawn 1 unit = 1px to land on the vellum's -6px gilt
+rule. `dayCycle.test.ts`
+samples every 15 minutes and holds the chrome to AA body text, AA-Large
+accents, and never landing on a mid-tone ground.
 
 Each observation has the deterministic identity
 `observation-<date>@<startTime>`, stores both its observed kind/label and the
@@ -1371,8 +1399,9 @@ owns the version bookkeeping. Ordinary adapters keep the "ask before clobber"
 decision — `onConflict` returns `mine`, `theirs`, or `cancel`. An append-like
 adapter may instead provide a deterministic `merge(local, remote)`: hydration
 applies and, when needed, flushes the merged blob; a compare-and-swap conflict
-merges against the server snapshot, adopts that returned version, and retries
-the push once. The active passphrase lives in module memory, while
+re-reads local state (so an edit made while the push was in flight isn't
+dropped), merges it against the server snapshot, adopts that returned version,
+and retries the push once. The active passphrase lives in module memory, while
 `createAppSync` also caches it under the shared `woodles_sync_passphrase`
 localStorage key so apps can reconnect after a reload; disconnect removes that
 bearer credential. the last-seen version is cached in localStorage too.
