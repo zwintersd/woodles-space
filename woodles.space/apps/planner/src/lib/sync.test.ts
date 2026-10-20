@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
-import { mergePlannerBlobs, mergeSettings } from './sync.svelte';
+import { differsFromBase, mergePlannerBlobs, mergeSettings, plannerFingerprints } from './sync.svelte';
 import type {
 	IntervalKind,
 	IntervalObservation,
 	PlannerBlob,
+	Ritual,
+	SignalEntry,
 	SporeEvent,
 	OpenLoop,
 	LoopEvent,
@@ -466,5 +468,83 @@ describe('mergePlannerBlobs', () => {
 		const remote = { ...settings, bellSounds: { marks: { hour: { voice: 'westminster' } } }, settingsStamps: { bellSounds: '2026-10-18T10:00:00.000Z' } };
 		expect(mergePlannerBlobs(blob({ settings: local }), blob({ settings: remote })).settings.bellSounds?.marks?.hour?.voice).toBe('bowl');
 		expect(mergePlannerBlobs(blob({ settings: remote }), blob({ settings: local })).settings.bellSounds?.marks?.hour?.voice).toBe('bowl');
+	});
+});
+
+describe('mergePlannerBlobs with a base', () => {
+	const signal = (id: string, updatedAt = '2026-10-20T08:00:00.000Z'): SignalEntry => ({
+		id, kind: 'custom', label: id, date: '2026-10-20', createdAt: '2026-10-20T08:00:00.000Z', updatedAt
+	});
+	const ritual = (id: string, name = id): Ritual => ({ id, name, startTime: '08:00', endTime: '08:15' });
+	/** JSONB hands keys back in another order. */
+	const reordered = <T>(value: T): T => JSON.parse(JSON.stringify(value, (_key, inner) =>
+		inner && typeof inner === 'object' && !Array.isArray(inner) ? Object.fromEntries(Object.entries(inner).reverse()) : inner));
+
+	it('keeps a record deleted on either device deleted, instead of bringing it back', () => {
+		const agreed = blob({ signals: [signal('kept'), signal('gone')], rituals: [ritual('walk'), ritual('stretch')] });
+		const base = plannerFingerprints(agreed);
+		const removedHere = blob({ signals: [signal('kept')], rituals: [ritual('walk')] });
+
+		const pushed = mergePlannerBlobs(removedHere, agreed, base);
+		expect(pushed.signals?.map((entry) => entry.id)).toEqual(['kept']);
+		expect(pushed.rituals.map((entry) => entry.id)).toEqual(['walk']);
+
+		const pulled = mergePlannerBlobs(agreed, removedHere, base);
+		expect(pulled.signals?.map((entry) => entry.id)).toEqual(['kept']);
+		expect(pulled.rituals.map((entry) => entry.id)).toEqual(['walk']);
+	});
+
+	it('is still a union for a first sync, and keeps what is new on either side', () => {
+		const here = blob({ signals: [signal('mine')] });
+		const there = blob({ signals: [signal('theirs')] });
+		expect(mergePlannerBlobs(here, there).signals?.map((entry) => entry.id)).toEqual(['mine', 'theirs']);
+		const base = plannerFingerprints(blob());
+		expect(mergePlannerBlobs(here, there, base).signals?.map((entry) => entry.id)).toEqual(['mine', 'theirs']);
+	});
+
+	it('lets an edit beat a delete', () => {
+		const agreed = blob({ signals: [signal('cold')] });
+		const base = plannerFingerprints(agreed);
+		const ended = blob({ signals: [{ ...signal('cold', '2026-10-21T08:00:00.000Z'), endDate: '2026-10-21' }] });
+		expect(mergePlannerBlobs(ended, blob(), base).signals?.[0]?.endDate).toBe('2026-10-21');
+		expect(mergePlannerBlobs(blob(), ended, base).signals?.[0]?.endDate).toBe('2026-10-21');
+	});
+
+	it('keeps a change made on one device even where nothing carries a time', () => {
+		const agreed = blob({ rituals: [ritual('walk', 'Walk')] });
+		const base = plannerFingerprints(agreed);
+		const renamed = blob({ rituals: [ritual('walk', 'Long walk')] });
+		// Without a base the remote copy wins a tie; with one, only this side moved.
+		expect(mergePlannerBlobs(renamed, agreed).rituals[0].name).toBe('Walk');
+		expect(mergePlannerBlobs(renamed, agreed, base).rituals[0].name).toBe('Long walk');
+		expect(mergePlannerBlobs(agreed, renamed, base).rituals[0].name).toBe('Long walk');
+	});
+
+	it('drops a day plan cleared on one device, and follows the week pattern the other device changed', () => {
+		const day = { date: '2026-10-20', dayShapeId: 'deep', updatedAt: '2026-10-19T08:00:00.000Z' };
+		const agreed = blob({ days: { '2026-10-20': day }, weekPattern: { days: ['a', 'a', 'a', 'a', 'a', 'a', 'a'], updatedAt: '2026-10-19T09:00:00.000Z' } });
+		const base = plannerFingerprints(agreed);
+		// The other device's clock is behind, but only it changed the pattern.
+		const there = blob({ days: {}, weekPattern: { days: ['b', 'a', 'a', 'a', 'a', 'a', 'a'], updatedAt: '2026-10-19T07:00:00.000Z' } });
+		const merged = mergePlannerBlobs(agreed, there, base);
+		expect(merged.days).toEqual({});
+		expect(merged.weekPattern.days[0]).toBe('b');
+	});
+
+	it('hands back the server copy itself when it adds nothing, keys reordered or not', () => {
+		const agreed = blob({ signals: [signal('kept')], loopEvents: [], openLoops: [] });
+		const full = mergePlannerBlobs(agreed, agreed);
+		const server = reordered(full);
+		expect(mergePlannerBlobs(full, server, plannerFingerprints(server))).toBe(server);
+		expect(mergePlannerBlobs(full, server)).toBe(server);
+	});
+
+	it('notices a local change since the base, not a reordering', () => {
+		const agreed = blob({ signals: [signal('kept')] });
+		const base = plannerFingerprints(reordered(agreed));
+		expect(differsFromBase(agreed, base)).toBe(false);
+		expect(differsFromBase(blob({ signals: [] }), base)).toBe(true);
+		expect(differsFromBase(blob({ signals: [signal('kept')], settings: { ...agreed.settings, tone: 'wry' } }), base)).toBe(true);
+		expect(differsFromBase(agreed, {})).toBe(true);
 	});
 });

@@ -65,12 +65,32 @@ import {
 
 // ── persistence helpers ───────────────────────────────────────────
 
-function load<T>(key: string, fallback: T): T {
-	if (typeof localStorage === 'undefined') return fallback;
+// The raw value this tab last read from or wrote to each key, so a different
+// one there now is another tab's save. Keys whose last save failed, and keys
+// that could not be read when the page loaded, matter to sync: memory and
+// storage disagree there, and recording what was agreed over them would let a
+// later sync read the gap as deletions.
+const seenRaw = new Map<string, string>();
+const unsavedKeys = new Set<string>();
+const unreadableKeys = new Set<string>();
+
+function readRaw(key: string): string | null {
+	if (typeof localStorage === 'undefined') return null;
 	try {
-		const raw = localStorage.getItem(key);
-		return raw !== null ? (JSON.parse(raw) as T) : fallback;
+		return localStorage.getItem(key);
 	} catch {
+		return null;
+	}
+}
+
+function load<T>(key: string, fallback: T): T {
+	const raw = readRaw(key);
+	if (raw === null) return fallback;
+	seenRaw.set(key, raw);
+	try {
+		return JSON.parse(raw) as T;
+	} catch {
+		unreadableKeys.add(key);
 		return fallback;
 	}
 }
@@ -78,11 +98,40 @@ function load<T>(key: string, fallback: T): T {
 function save<T>(key: string, value: T): void {
 	if (typeof localStorage === 'undefined') return;
 	try {
-		localStorage.setItem(key, JSON.stringify(value));
+		const raw = JSON.stringify(value);
+		localStorage.setItem(key, raw);
+		seenRaw.set(key, raw);
+		unsavedKeys.delete(key);
 	} catch {
-		// Ignore quota / disabled storage
+		// Quota or disabled storage: memory keeps the change, sync is told.
+		unsavedKeys.add(key);
 	}
 }
+
+/** Every key the planner blob is made of, the store field holding it, and its section. */
+const SYNCED_KEYS = [
+	['planner.shapes.v1', 'dayShapes', 'shapes'],
+	['planner.weekPattern.v1', 'weekPattern', 'weekPattern'],
+	['planner.days.v2', 'dayOverrides', 'days'],
+	['planner.obligations.v1', 'obligations', 'obligations'],
+	['planner.rituals.v1', 'rituals', 'rituals'],
+	['planner.tasks.v1', 'tasks', 'tasks'],
+	['planner.settings.v1', 'settings', 'settings'],
+	['planner.domains.v1', 'domains', 'domains'],
+	['planner.observations.v1', 'intervalObservations', 'observations'],
+	['planner.routines.v1', 'routines', 'routines'],
+	['planner.routinePractices.v1', 'routinePractices', 'routinePractices'],
+	['planner.surgeDrafts.v1', 'surgeDrafts', 'surgeDrafts'],
+	['planner.carillonSpores.v1', 'sporeEvents', 'spores'],
+	['planner.sleepLogs.v1', 'sleepLogs', 'sleepLogs'],
+	['planner.signals.v1', 'signalEntries', 'signals'],
+	['planner.loggedSessions.v1', 'loggedSessions', 'loggedSessions'],
+	['planner.openLoops.v1', 'openLoops', 'openLoops'],
+	['planner.loopEvents.v1', 'loopEvents', 'loopEvents'],
+	['planner.closureReflections.v1', 'closureReflections', 'closureReflections'],
+	['planner.fiveContactsRounds.v1', 'fiveContactsRounds', 'fiveContactsRounds'],
+	['planner.loopReminders.v1', 'loopReminders', 'loopReminders']
+] as const satisfies readonly (readonly [string, keyof PlannerStore, keyof PlannerBlob])[];
 
 const BELL_VOLUME_KEY = 'planner.bellVolume.v1';
 const BELL_PAUSE_KEY = 'planner.bellPause.v1';
@@ -1382,6 +1431,56 @@ export class PlannerStore {
 		save('planner.fiveContactsRounds.v1', this.fiveContactsRounds);
 		save('planner.loopReminders.v1', this.loopReminders);
 		this.publishSessionsLocally();
+	}
+
+	// ── other tabs + sync bookkeeping ──────────────────────────────
+
+	/**
+	 * Take whatever another tab on this device saved since this one last read
+	 * or wrote it. Every change saves at once, so without this a second tab's
+	 * next save would put back its older copy — and sync, which remembers what
+	 * this device last agreed on, would read the difference as deletions.
+	 * Returns whether anything came in.
+	 */
+	catchUp(): boolean {
+		let changed = false;
+		for (const [key, field] of SYNCED_KEYS) {
+			const raw = readRaw(key);
+			if (raw === null || raw === seenRaw.get(key)) continue;
+			let value: unknown;
+			try {
+				value = JSON.parse(raw);
+			} catch {
+				continue;
+			}
+			seenRaw.set(key, raw);
+			// Memory and storage agree again, whatever this tab failed to save there.
+			unsavedKeys.delete(key);
+			(this as unknown as Record<string, unknown>)[field] =
+				field === 'settings' ? { ...DEFAULT_SETTINGS, ...(value as Partial<PlannerSettings>) } : value;
+			changed = true;
+		}
+		return changed;
+	}
+
+	/** Catch up whenever another tab saves. Returns the cleanup. */
+	followOtherTabs(): () => void {
+		if (typeof window === 'undefined') return () => {};
+		const onStorage = (event: StorageEvent) => {
+			if (event.key === null || SYNCED_KEYS.some(([key]) => key === event.key)) this.catchUp();
+		};
+		window.addEventListener('storage', onStorage);
+		return () => window.removeEventListener('storage', onStorage);
+	}
+
+	/** Whether every synced key's last save went through. */
+	allSaved(): boolean {
+		return SYNCED_KEYS.every(([key]) => !unsavedKeys.has(key));
+	}
+
+	/** Sections whose stored value could not be read when the page loaded. */
+	unreadableSections(): (keyof PlannerBlob)[] {
+		return SYNCED_KEYS.filter(([key]) => unreadableKeys.has(key)).map(([, , section]) => section);
 	}
 
 	// ── view + binder ───────────────────────────────────────────────

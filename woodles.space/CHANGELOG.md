@@ -20,6 +20,16 @@ so it's not easy to forget.
 
 ## 2026-10-20
 
+- **Carillon syncs the way HomeSuite does** — something removed on one device
+  now stays removed on the others: a signal, a sitting, an obligation, a daily
+  activity or a domain used to come back from whichever device still had it.
+  each record merges on its own against what this device and the server last
+  agreed on, so a change made on one side wins even when the other device's
+  clock runs ahead, and the very first sync still only adds. Carillon also
+  syncs when you come back to it, every couple of minutes while it's open, and
+  as you leave — it used to pull only on opening — and *sync now* pulls as
+  well as pushes. two Carillon tabs on one device keep each other's changes
+  instead of saving over them, and a sync with nothing new sends nothing.
 - **sync stops stalling on a stray character** — Postgres refuses a NUL or
   half an emoji inside JSONB, and the sync endpoint answered every retry with
   the same 500, so one bad character in any document could block HomeSuite's

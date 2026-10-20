@@ -6,7 +6,7 @@
 	import YearScroll from './YearScroll.svelte';
 	import DayPlan from './DayPlan.svelte';
 	import BellSettings from './BellSettings.svelte';
-	import { syncState, connectAndHydrate, flushSync, disconnect } from '$lib/sync.svelte';
+	import { syncState, connectAndHydrate, syncNow, disconnect } from '$lib/sync.svelte';
 	import type { OnboardingStep } from '$lib/types';
 
 	type BinderTabId =
@@ -274,7 +274,7 @@
 					<p class="sync-last">last synced {syncState.lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
 				{/if}
 				<div class="sync-actions">
-					<button class="sync-btn-primary" onclick={() => flushSync()} disabled={syncState.syncing}>
+					<button class="sync-btn-primary" onclick={() => syncNow()} disabled={syncState.syncing}>
 						sync now
 					</button>
 					<button class="sync-btn-ghost" onclick={() => disconnect()}>disconnect</button>
