@@ -118,7 +118,8 @@
 			aria-haspopup="dialog"
 			aria-expanded={composing}
 		>
-			<span class="binder-tab-icon">+</span>
+			<span class="binder-tab-icon" aria-hidden="true">+</span>
+			<span class="binder-tab-label" aria-hidden="true">new task</span>
 		</button>
 
 		{#each TABS as tab}
@@ -131,7 +132,8 @@
 				title={tab.label}
 				aria-label={tab.label}
 			>
-				<span class="binder-tab-icon">{tab.icon}</span>
+				<span class="binder-tab-icon" aria-hidden="true">{tab.icon}</span>
+				<span class="binder-tab-label" aria-hidden="true">{tab.label}</span>
 			</button>
 		{/each}
 	</div>
@@ -339,6 +341,8 @@
 		position: fixed;
 		inset: 0;
 		z-index: calc(var(--pl-z-binder) - 1);
+		background: rgba(22, 12, 31, 0.22);
+		backdrop-filter: blur(2px);
 	}
 
 	.binder-dock {
@@ -346,7 +350,7 @@
 		right: 0;
 		top: 50%;
 		transform: translateY(-50%);
-		z-index: var(--pl-z-binder);
+		z-index: calc(var(--pl-z-binder) + 1);
 		display: flex;
 		flex-direction: column;
 		align-items: flex-end;
@@ -356,71 +360,110 @@
 	.binder-tabs {
 		display: flex;
 		flex-direction: column;
-		gap: 2px;
-		background: var(--p-surface);
-		border: 1px solid var(--p-border);
+		gap: 4px;
+		background:
+			linear-gradient(90deg, transparent, rgba(226, 183, 102, 0.07) 45%, transparent),
+			var(--car-furniture);
+		border: 1px solid var(--car-furniture-line);
 		border-right: none;
-		border-radius: var(--pl-radius-md) 0 0 var(--pl-radius-md);
-		padding: 6px 0;
-		box-shadow: -2px 0 12px var(--p-accent-soft);
+		border-radius: 1.75rem 0 0 1.75rem;
+		padding: 1.1rem 0;
+		box-shadow: -5px 3px 22px rgba(21, 10, 30, 0.24), inset 4px 0 0 rgba(12, 6, 21, 0.3);
 		transition: var(--pl-transition-palette);
 	}
 
 	.binder-tab {
-		width: 36px;
-		height: 36px;
+		width: 64px;
+		min-height: 48px;
 		display: flex;
+		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		border-radius: var(--pl-radius-sm);
+		gap: 0.15rem;
+		padding: 0.4rem 0.25rem;
+		border: 1px solid transparent;
+		border-radius: 3px 0 0 3px;
 		margin: 0 4px;
 		transition: background var(--pl-transition-fast), color var(--pl-transition-fast);
-		opacity: 0.5;
+		color: var(--car-furniture-muted);
+		box-sizing: border-box;
 	}
 
 	.binder-tab:hover {
-		opacity: 0.9;
-		background: var(--p-accent-soft);
+		color: var(--car-furniture-ink);
+		background: rgba(232, 191, 106, 0.1);
+		border-color: var(--car-furniture-line);
 	}
 
 	.binder-tab.active {
-		opacity: 1;
-		background: var(--p-accent-soft);
+		color: var(--car-glass-cream);
+		background: linear-gradient(110deg, var(--car-glass-teal), #184c5b);
+		border-color: var(--car-gilt);
+		box-shadow: -3px 0 0 var(--car-gilt), 0 2px 6px rgba(0, 0, 0, 0.22);
+	}
+
+	.binder-tab:focus-visible {
+		outline: 2px solid var(--car-furniture-ink);
+		outline-offset: -3px;
 	}
 
 	.binder-tab-icon {
-		font-size: 0.85rem;
-		color: var(--p-text);
+		font-size: 1rem;
+		line-height: 1;
+		color: var(--car-furniture-ink);
+	}
+
+	.binder-tab-label {
+		font-family: var(--pl-font-mono);
+		font-size: 0.59rem;
+		line-height: 1.2;
+		text-align: center;
 	}
 
 	/* Same size and rhythm as its neighbours — it's one of them now. The accent
 	   stays on the glyph, and it sits a little brighter than a closed tab, so
 	   the one control that makes something is still the one found first. */
 	.binder-tab-add {
-		opacity: 0.8;
+		color: var(--car-furniture-ink);
 	}
 
 	.binder-tab-add .binder-tab-icon {
 		font-size: 1.05rem;
 		line-height: 1;
-		color: var(--p-accent);
+		color: #e9c683;
 	}
 
 	.binder-panel {
+		/* The contents stay on vellum while their bound cover stays velvet. */
+		--p-surface: var(--car-paper);
+		--p-bg: #f1e5cd;
+		--p-text: var(--car-ink);
+		--p-muted: var(--car-ink-soft);
+		--p-border: rgba(64, 50, 71, 0.2);
+		--p-accent: var(--car-glass-teal);
+		--p-accent-soft: rgba(19, 111, 124, 0.12);
 		position: fixed;
 		top: 0;
-		right: 44px;
+		right: 72px;
 		bottom: 0;
 		width: 300px;
-		background: var(--p-surface);
-		border-left: 1px solid var(--p-border);
+		max-width: calc(100vw - 72px);
+		/* a leaded glass spine down the open edge, then vellum */
+		background:
+			linear-gradient(var(--car-lead), var(--car-lead)) 0.45rem 0 / 1.5px 100% no-repeat,
+			linear-gradient(90deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0)) 0 0 / 0.45rem 100% no-repeat,
+			repeating-linear-gradient(180deg, var(--car-glass-stops)) 0 0 / 0.45rem 100% no-repeat,
+			radial-gradient(ellipse 140% 100% at 60% 30%, rgba(140, 90, 30, 0) 60%, rgba(140, 90, 30, 0.08) 100%),
+			var(--car-vellum);
+		border-left: 1.5px solid var(--car-lead);
 		z-index: var(--pl-z-binder);
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
-		transform: translateX(110%);
+		/* fully past the dock, so the glass spine never peeks out */
+		transform: translateX(calc(100% + 5rem));
 		transition: transform var(--pl-transition-medium), var(--pl-transition-palette);
-		box-shadow: -4px 0 24px var(--p-accent-soft);
+		box-shadow: -8px 0 32px rgba(21, 10, 30, 0.3), 4px 0 0 #e0d0ae;
 	}
 
 	.binder-panel.open {
@@ -467,37 +510,52 @@
 	}
 
 	.binder-header {
-		padding: 1.25rem 1.25rem 0.75rem;
-		border-bottom: 1px solid var(--p-border);
+		padding: 1.5rem 1.25rem 1rem 1.6rem;
+		border-bottom: 3px double var(--car-brass);
+		background:
+			var(--car-orn-chart) right -2rem top -5rem / 15rem auto no-repeat,
+			var(--car-furniture);
 		flex-shrink: 0;
 	}
 
 	.binder-eyebrow {
 		display: block;
 		font-family: var(--pl-font-mono);
-		font-size: 0.52rem;
+		font-size: 0.62rem;
 		letter-spacing: 0.22em;
 		text-transform: uppercase;
-		color: var(--p-muted);
-		opacity: 0.5;
+		color: var(--car-furniture-muted);
 		margin-bottom: 0.2rem;
 	}
 
 	.binder-title {
-		font-family: var(--pl-font-display);
-		font-size: 1.4rem;
+		font-family: var(--car-fell);
+		font-size: 1.8rem;
 		font-weight: 400;
-		color: var(--p-text);
+		color: var(--car-furniture-ink);
 		letter-spacing: -0.01em;
+	}
+
+	.binder-title::after {
+		display: block;
+		width: 7rem;
+		height: 0.7rem;
+		margin-top: 0.3rem;
+		background: var(--car-orn-divider) left center / contain no-repeat;
+		content: '';
 	}
 
 	.binder-body {
 		flex: 1;
+		min-height: 0;
 		overflow-y: auto;
-		padding: 0.75rem 1.25rem;
+		overscroll-behavior: contain;
+		padding: 0.75rem 1.25rem 0.75rem 1.6rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.25rem;
+		color: var(--car-ink);
+		scrollbar-color: #968371 #ebdfc8;
 	}
 
 	.binder-empty {
@@ -505,22 +563,31 @@
 		font-size: 0.72rem;
 		letter-spacing: 0.06em;
 		color: var(--p-muted);
-		opacity: 0.5;
 		padding: 1rem 0;
 	}
 
 	.binder-year-scroll {
 		flex: 1;
+		min-height: 0;
 		overflow-y: auto;
+		overscroll-behavior: contain;
 		padding: 0 0.75rem;
 	}
 
 	/* ── empty states ─────────────────────────────────────────────── */
 	.binder-empty-block {
-		padding: 1.2rem 0.25rem;
+		padding: 1.8rem 0.25rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.4rem;
+	}
+
+	.binder-empty-block::before {
+		width: 6rem;
+		height: 4.5rem;
+		margin: 0 auto 0.7rem;
+		background: var(--car-orn-moth) center / contain no-repeat;
+		content: '';
 	}
 
 	.binder-empty-heading {
@@ -561,10 +628,10 @@
 
 	.shape-row-meta {
 		font-family: var(--pl-font-mono);
-		font-size: 0.6rem;
+		font-size: 0.66rem;
 		letter-spacing: 0.08em;
 		color: var(--p-muted);
-		opacity: 0.7;
+		opacity: 0.9;
 	}
 
 	.shape-restful {
@@ -598,11 +665,11 @@
 
 	.pattern-restful {
 		font-family: var(--pl-font-mono);
-		font-size: 0.55rem;
+		font-size: 0.62rem;
 		letter-spacing: 0.14em;
 		text-transform: uppercase;
 		color: var(--p-muted);
-		opacity: 0.55;
+		opacity: 0.9;
 	}
 
 	/* ── sync tab ─────────────────────────────────────────────────── */
@@ -615,11 +682,10 @@
 
 	.sync-label {
 		font-family: var(--pl-font-mono);
-		font-size: 0.48rem;
+		font-size: 0.64rem;
 		letter-spacing: 0.18em;
 		text-transform: uppercase;
 		color: var(--p-muted);
-		opacity: 0.55;
 	}
 
 	.sync-row {
@@ -630,13 +696,14 @@
 
 	.sync-input {
 		flex: 1;
+		min-width: 0;
 		font-family: var(--pl-font-mono);
 		font-size: 0.7rem;
 		color: var(--p-text);
 		background: var(--p-bg);
 		border: 1px solid var(--p-border);
 		border-radius: var(--pl-radius-sm);
-		padding: 5px 8px;
+		padding: 9px 8px;
 		transition: border-color var(--pl-transition-fast);
 	}
 
@@ -647,11 +714,12 @@
 
 	.sync-btn-primary {
 		font-family: var(--pl-font-mono);
-		font-size: 0.6rem;
+		font-size: 0.65rem;
 		letter-spacing: 0.1em;
-		color: var(--p-muted);
+		color: var(--p-text);
 		border: 1px solid var(--p-border);
-		padding: 5px 12px;
+		min-height: 36px;
+		padding: 7px 12px;
 		border-radius: var(--pl-radius-pill);
 		white-space: nowrap;
 		transition: opacity var(--pl-transition-fast), color var(--pl-transition-fast), border-color var(--pl-transition-fast);
@@ -705,9 +773,9 @@
 
 	.sync-last {
 		font-family: var(--pl-font-mono);
-		font-size: 0.58rem;
+		font-size: 0.64rem;
 		color: var(--p-muted);
-		opacity: 0.55;
+		opacity: 0.9;
 		padding-bottom: 0.75rem;
 	}
 
@@ -720,10 +788,11 @@
 
 	.sync-btn-ghost {
 		font-family: var(--pl-font-mono);
-		font-size: 0.58rem;
+		font-size: 0.65rem;
 		letter-spacing: 0.1em;
 		color: var(--p-muted);
-		opacity: 0.45;
+		opacity: 0.9;
+		min-height: 32px;
 		transition: opacity var(--pl-transition-fast);
 	}
 
@@ -763,12 +832,12 @@
 
 	.refresh-chip {
 		font-family: var(--pl-font-mono);
-		font-size: 0.6rem;
+		font-size: 0.65rem;
 		letter-spacing: 0.04em;
 		color: var(--p-muted);
 		border: 1px solid var(--p-border);
 		border-radius: var(--pl-radius-pill);
-		padding: 5px 10px;
+		padding: 8px 10px;
 		transition: border-color var(--pl-transition-fast), color var(--pl-transition-fast), background var(--pl-transition-fast);
 	}
 
@@ -798,8 +867,8 @@
 	}
 
 	.reset-btn {
-		font-size: 0.55rem;
-		opacity: 0.3;
+		font-size: 0.62rem;
+		opacity: 0.85;
 	}
 
 	.reset-btn:hover {
@@ -816,21 +885,29 @@
 
 	.reset-confirm-actions {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: 0.75rem;
 	}
 
+	.binder-body :is(button, input):focus-visible {
+		outline: 2px solid var(--car-pink-dark);
+		outline-offset: 3px;
+	}
+
 	@media (prefers-reduced-motion: reduce) {
-		.binder-panel {
+		.binder-panel,
+		.binder-tabs,
+		.binder-tab {
 			transition: none;
 		}
 	}
 
-	@media (max-width: 620px) {
+	@media (max-width: 640px) {
 		.binder-dock {
 			top: auto;
 			right: 0.75rem;
-			bottom: 4.15rem;
+			bottom: 0.75rem;
 			transform: none;
 			flex-direction: row;
 			align-items: center;
@@ -843,26 +920,48 @@
 			   dock had — it used to leave room for the add button beside it. */
 			max-width: calc(100vw - 1.5rem);
 			overflow-x: auto;
-			border: 1px solid var(--p-border);
-			border-radius: var(--pl-radius-md);
+			border: 1px solid var(--car-furniture-line);
+			border-radius: 10px;
 			padding: 4px;
+			scrollbar-width: thin;
+			scrollbar-color: var(--car-brass) var(--car-furniture);
+			overscroll-behavior-x: contain;
 		}
 
 		.binder-tab {
-			width: 32px;
-			height: 32px;
+			width: 49px;
+			min-height: 48px;
 			margin: 0;
 			flex: 0 0 auto;
+			border-radius: 4px;
+		}
+
+		.binder-tab-label {
+			font-size: 0.55rem;
 		}
 
 		.binder-panel {
 			right: 0;
 			width: min(320px, calc(100vw - 1rem));
+			max-width: calc(100vw - 1rem);
 		}
 
 		.binder-panel.schedule,
 		.binder-panel.bells {
 			width: min(38rem, calc(100vw - 1rem));
+		}
+
+		.binder-body,
+		.binder-year-scroll {
+			padding-bottom: 9rem;
+		}
+	}
+
+	@media print {
+		.binder-dock,
+		.binder-panel,
+		.binder-backdrop {
+			display: none;
 		}
 	}
 </style>

@@ -169,7 +169,8 @@
 
 <section class="instrument" aria-labelledby="today-heading">
 	<header class="day-heading">
-		<div>
+		<div class="date-lockup">
+			<span class="day-seal" aria-hidden="true"></span>
 			<h1 id="today-heading">{dayOfWeekLabel(store.now)}, {shortDateLabel(store.now)}</h1>
 		</div>
 		<div class="day-actions">
@@ -192,9 +193,9 @@
 	<div class="instrument-grid">
 		<div class="moment-column">
 		<article class="sampler" data-testid="interval-sampler">
+			<div class="folio-crown" aria-hidden="true"><span></span><i></i><span></span></div>
 			{#if selectedInterval && selectedInterval.observation?.intervalStart === selectedInterval.startTime && !selectedStart}
 				<div class="sample-rest" role="status">
-					<span class="rest-mark" aria-hidden="true">✓</span>
 					<div><small>{displayTime(selectedInterval.startTime)}–{displayTime(selectedInterval.endTime)}</small><strong>Moment saved</strong><p>Your note is in Day so far. The next prompt will appear with the next interval.</p></div>
 				</div>
 				<!-- Outside the status region, so the minute-by-minute bell line isn't announced. -->
@@ -355,10 +356,23 @@
 		margin-top: 0.2rem;
 		color: var(--car-cream);
 		font-family: var(--car-display);
-		font-size: clamp(1.3rem, 2.4vw, 1.9rem);
+		font-size: clamp(1.5rem, 2.8vw, 2.2rem);
 		font-weight: 400;
-		letter-spacing: -0.04em;
+		letter-spacing: -0.01em;
 		line-height: 0.94;
+	}
+
+	.date-lockup { display: flex; align-items: center; gap: 0.8rem; }
+	.day-seal { flex: none; width: 4.1rem; height: 3.5rem; background: var(--car-orn-moth) center / contain no-repeat; }
+	/* A quiet gilt rule lets the date breathe above the open folio. */
+	.day-heading h1::after {
+		display: block;
+		width: min(100%, 11rem);
+		height: 0.2rem;
+		margin-top: 0.5rem;
+		border-top: 1px solid var(--car-gilt);
+		border-bottom: 1px solid color-mix(in srgb, var(--car-gilt) 40%, transparent);
+		content: '';
 	}
 
 
@@ -372,6 +386,7 @@
 	.print-action {
 		border: 1px solid var(--car-line);
 		border-radius: 0.8rem;
+		background: color-mix(in srgb, var(--car-panel) 60%, transparent);
 		color: var(--car-cream);
 		transition:
 			border-color 160ms ease,
@@ -413,7 +428,8 @@
 	.pile-pill:hover,
 	.print-action:hover {
 		border-color: var(--car-pink);
-		background: var(--car-wash);
+		background: color-mix(in srgb, var(--car-panel) 85%, transparent);
+		box-shadow: 0 0.35rem 1.1rem var(--car-glow-warm);
 		transform: translateY(-1px);
 	}
 
@@ -427,55 +443,52 @@
 	.optional-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: start; }
 	@media (max-width: 900px) { .optional-tools { grid-template-columns: minmax(0, 1fr); } }
 	.sample-rest { display: flex; align-items: center; gap: 0.8rem; margin-top: 1.5rem; padding: 1rem; border-radius: 0.7rem; background: var(--car-pink-wash); color: var(--car-ink-soft); font: 0.8rem/1.45 var(--car-body); }
-	.sample-rest strong { display: block; color: var(--car-ink); font: 500 1.2rem var(--car-display); }
+	.sample-rest strong { display: block; color: var(--car-ink); font: 400 1.35rem var(--car-fell); }
 	.sample-rest p { margin-top: 0.2rem; }
 	.bell-line { display: block; margin-top: 0.45rem; padding: 0.2rem 0.25rem; margin-left: -0.25rem; border: 0; border-radius: 0.3rem; background: transparent; color: var(--car-ink-soft); font: 0.58rem var(--car-mono); letter-spacing: 0.08em; text-align: left; text-decoration: underline dotted; text-underline-offset: 0.25em; min-height: 1.6rem; cursor: pointer; }
 	.bell-line:hover { color: var(--car-ink); background: #ffffff60; }
 	.rest-mark { display: grid; place-items: center; width: 2rem; height: 2rem; flex: none; border: 1px solid var(--car-pink-dark); border-radius: 50%; color: var(--car-pink-dark); }
+	/* at rest — between intervals or outside sampling hours — the bell hangs from its moon */
+	.sample-rest::before { content: ''; flex: none; width: 3.6rem; height: 3.6rem; background: var(--car-orn-bellmoon) center / contain no-repeat; }
 
 	.sampler,
 	.ledger-card {
-		border: 1px solid var(--car-line);
-		background:
-			linear-gradient(rgba(81, 44, 71, 0.025) 1px, transparent 1px),
-			linear-gradient(90deg, rgba(81, 44, 71, 0.025) 1px, transparent 1px),
-			var(--car-paper);
-		background-size: 18px 18px;
+		border: 1px solid var(--car-vellum-edge);
+		background: var(--car-corners), var(--car-vellum);
 		box-shadow: 0 1.25rem 3.5rem var(--car-shadow);
 		color: var(--car-ink);
+		outline: 1px solid var(--car-gilt-rule);
+		outline-offset: -6px;
 	}
 
+	/* The instrument opens like a bound folio. The glass belongs to the
+	   room; the writing surface is clear vellum with a small lunar crown. */
 	.sampler {
 		position: relative;
 		overflow: clip;
-		border-radius: 1rem 1rem 2.8rem 1rem;
-		padding: 1.15rem;
+		border-radius: 1.8rem 0.65rem 1.8rem 0.65rem;
+		padding: 0.9rem 1.6rem 1.4rem 1.9rem;
+		background:
+			var(--car-orn-corner-bl) left bottom / 56px 56px no-repeat,
+			var(--car-orn-sprig) right 0.7rem bottom 0.5rem / 2.6rem 2.6rem no-repeat,
+			var(--car-vellum);
+		border-left: 0.5rem solid var(--car-furniture, #281b36);
+		box-shadow: 0 3px 0 #d7c6a5, 0 6px 0 #eee0c4, 0 7px 0 #baa682, 0 1.3rem 2.8rem var(--car-shadow);
 	}
 
-	.sampler::after {
+	.sampler::before {
 		position: absolute;
-		right: -2.4rem;
-		bottom: -2.4rem;
-		width: 5.5rem;
-		height: 5.5rem;
-		border: 1px solid rgba(141, 49, 83, 0.25);
-		border-radius: 50%;
+		top: 1.3rem;
+		bottom: 1.3rem;
+		left: 0.35rem;
+		width: 1px;
+		background: color-mix(in srgb, var(--car-gilt) 65%, transparent);
 		content: '';
-		box-shadow: 0 0 0 0.7rem rgba(141, 49, 83, 0.04);
+		pointer-events: none;
 	}
-
-
-
-
-
-
-
-
-
-
-
-
-
+	.folio-crown { display: flex; align-items: center; justify-content: center; gap: 0.7rem; width: min(100%, 22rem); margin: 0 auto 0.7rem; pointer-events: none; }
+	.folio-crown span { flex: 1; height: 0.2rem; border-top: 1px solid var(--car-gilt-rule); border-bottom: 1px solid color-mix(in srgb, var(--car-gilt) 18%, transparent); }
+	.folio-crown i { width: 2.8rem; height: 2.7rem; background: var(--car-orn-bellmoon) center / contain no-repeat; }
 	/* The offer to log a sitting in Thinking About. Deliberately quiet — it is
 	   an aside to the observation, not a second thing to answer. */
 	.sitting-offer {
@@ -546,10 +559,19 @@
 		border-bottom: 1px solid rgba(68, 54, 91, 0.14);
 	}
 
+	.ledger-titlebar h2::after {
+		display: block;
+		width: 8.5rem;
+		height: 0.85rem;
+		margin-top: 0.3rem;
+		background: var(--car-orn-divider) left center / contain no-repeat;
+		content: '';
+	}
+
 	.ledger-titlebar h2 {
 		margin-top: 0.2rem;
-		font-family: var(--car-display);
-		font-size: 1.55rem;
+		font-family: var(--car-fell);
+		font-size: 1.65rem;
 		font-weight: 500;
 	}
 
@@ -724,17 +746,55 @@
 	.instrument { gap: 0.8rem; }
 	.day-heading { align-items: center; }
 	.sampler { animation: settle-in 280ms ease-out both; }
-	.context-details { border: 1px solid var(--car-line); border-radius: 0.7rem; padding: 0.65rem 0.85rem; }
-	.context-details summary { cursor: pointer; font-size: 0.8rem; }
+	/* each further page is a strip of vellum with a jewel quarry for its
+	   marker, which turns as the page opens */
+	.context-details {
+		--jewel: var(--car-glass-emerald);
+		border: 1px solid var(--car-line);
+		border-radius: 0.7rem;
+		padding: 0.65rem 0.85rem;
+		background: color-mix(in srgb, var(--car-panel) 55%, transparent);
+	}
+	.context-details:nth-of-type(2) { --jewel: var(--car-glass-sapphire); }
+	.context-details:nth-of-type(3) { --jewel: var(--car-glass-amber); }
+	.context-details:nth-of-type(4) { --jewel: var(--car-glass-amethyst); }
+	.context-details summary {
+		display: flex;
+		align-items: center;
+		gap: 0.65rem;
+		cursor: pointer;
+		font-size: 0.8rem;
+		list-style: none;
+	}
+	.context-details summary::-webkit-details-marker { display: none; }
+	.context-details summary::before {
+		flex: none;
+		width: 0.58rem;
+		height: 0.58rem;
+		border: 1.5px solid var(--car-lead);
+		background:
+			linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 60%),
+			var(--jewel);
+		content: '';
+		transform: rotate(45deg);
+		transition: transform 240ms ease;
+	}
+	.context-details[open] summary::before { transform: rotate(225deg) scale(1.15); }
+	.context-details[open] { border-color: color-mix(in srgb, var(--jewel) 40%, var(--car-line)); }
 	@keyframes settle-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 	@media (max-width: 900px) {
 		.instrument-grid { grid-template-columns: minmax(0, 1fr); }
 		.day-heading { flex-wrap: wrap; gap: 0.6rem; }
 		.day-heading h1 { font-size: 1.4rem; }
 		.day-actions { flex-wrap: wrap; }
+		.sampler { padding: 0.75rem 1rem 1.15rem 1.15rem; border-left-width: 0.35rem; border-radius: 1.25rem 0.5rem 1.25rem 0.5rem; }
+		.day-seal { width: 3rem; height: 2.6rem; }
+		.folio-crown { width: 13rem; margin-bottom: 0.5rem; }
+		.folio-crown i { width: 2.3rem; height: 2.1rem; }
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.sampler { animation: none; }
+		.context-details summary::before { transition: none; }
 	}
 
 	@media print {

@@ -13,31 +13,33 @@ type PaletteStop = {
 // Named anchor modes and their approximate hour
 export type PaletteModeName = 'early-light' | 'full-day' | 'late-afternoon' | 'evening' | 'dusk' | 'night';
 
-// ── Daydream hours palette ────────────────────────────────────────
-// Bright pastel anchors inspired by soft rainbow skies: cotton-candy
-// dawn, mint-blue morning, pearl-sky noon, prismatic afternoon, and
-// lavender evening. Night does not go dark; it quiets into a neutral
-// moonlit pearl so the planner feels calmer rather than heavier.
+// ── Parchment & stained glass ─────────────────────────────────────
+// Every stop is vellum: warm, light, inked in oak-gall aubergine. What
+// moves through the day is the glass — each hour's accent is a jewel,
+// as if the sun had moved on to the next window: rose garnet at dawn,
+// emerald in the morning, sapphire at noon, peacock teal in the
+// afternoon, amethyst at evening, lapis at dusk. Night does not go
+// dark here; it quiets into a moonlit, greyer vellum.
 
 const STOPS: PaletteStop[] = [
-	// 00:00 — neutral night: moonlit pearl + quiet blue-grey + soft lavender
-	{ hour: 0,    bg: '#eef0f5', surface: '#f8f8fb', text: '#2d2d42', muted: '#676b7c', accent: '#8f9ab4', accentSoft: 'rgba(143,154,180,0.18)', border: 'rgba(45,45,66,0.11)', highlight: '#b8a8d8' },
-	// 06:30 — cotton-candy dawn: pink cloud + sky-blue accent
-	{ hour: 6.5,  bg: '#ffeaf4', surface: '#fff6fb', text: '#30243e', muted: '#725c82', accent: '#56bfe4', accentSoft: 'rgba(86,191,228,0.20)',  border: 'rgba(48,36,62,0.12)', highlight: '#ff8fc7' },
-	// 09:00 — bright morning: mint milk + bluebell + bubblegum highlight
-	{ hour: 9,    bg: '#e9fbe9', surface: '#f6fff7', text: '#20343a', muted: '#536f73', accent: '#5bbfe8', accentSoft: 'rgba(91,191,232,0.20)',  border: 'rgba(32,52,58,0.12)', highlight: '#f29bd2' },
-	// 12:00 — rainbow noon: pearl sky + saturated cornflower
-	{ hour: 12,   bg: '#e9f6ff', surface: '#f7fcff', text: '#223047', muted: '#557086', accent: '#6b8cff', accentSoft: 'rgba(107,140,255,0.20)', border: 'rgba(34,48,71,0.12)', highlight: '#ff9fc9' },
-	// 15:00 — prismatic afternoon: aqua sky + cloud-white + sunny yellow
-	{ hour: 15,   bg: '#e8fbff', surface: '#fbffff', text: '#25354a', muted: '#5f7387', accent: '#31c7e8', accentSoft: 'rgba(49,199,232,0.20)',  border: 'rgba(37,53,74,0.12)', highlight: '#ffd84f' },
-	// 18:00 — pastel evening: blue-lavender, not mauve
-	{ hour: 18,   bg: '#f0eaff', surface: '#fbf8ff', text: '#332946', muted: '#6a6380', accent: '#bd8cff', accentSoft: 'rgba(189,140,255,0.20)', border: 'rgba(51,41,70,0.12)', highlight: '#7edfff' },
-	// 20:30 — quiet twilight: cooler lilac, still light
-	{ hour: 20.5, bg: '#edf0ff', surface: '#f7f8ff', text: '#2d3149', muted: '#666d86', accent: '#9b8df2', accentSoft: 'rgba(155,141,242,0.18)', border: 'rgba(45,49,73,0.11)', highlight: '#90cce8' },
-	// 22:00 — neutral night returns: less engaging, not darker
-	{ hour: 22,   bg: '#eef0f5', surface: '#f8f8fb', text: '#2d2d42', muted: '#676b7c', accent: '#8f9ab4', accentSoft: 'rgba(143,154,180,0.18)', border: 'rgba(45,45,66,0.11)', highlight: '#b8a8d8' },
+	// 00:00 — moonlit vellum + dusky lapis + amethyst
+	{ hour: 0,    bg: '#ece4d6', surface: '#f7f1e6', text: '#2a2033', muted: '#665a6c', accent: '#4b4f8f', accentSoft: 'rgba(75,79,143,0.16)',  border: 'rgba(42,32,51,0.14)', highlight: '#a98bc9' },
+	// 06:30 — dawn: rose-washed parchment + garnet + amber
+	{ hour: 6.5,  bg: '#f6e3d6', surface: '#fdf3ea', text: '#33202f', muted: '#74586a', accent: '#b2365f', accentSoft: 'rgba(178,54,95,0.16)',  border: 'rgba(51,32,47,0.14)', highlight: '#e7a33a' },
+	// 09:00 — morning: green-gold parchment + emerald + gilt
+	{ hour: 9,    bg: '#efe7cf', surface: '#fbf6e6', text: '#23302a', muted: '#5a6a5e', accent: '#1f7a5a', accentSoft: 'rgba(31,122,90,0.16)',  border: 'rgba(35,48,42,0.14)', highlight: '#d9a521' },
+	// 12:00 — noon: bright vellum + sapphire + ruby
+	{ hour: 12,   bg: '#ede6d3', surface: '#fbf7ec', text: '#212a44', muted: '#56607a', accent: '#2c56a8', accentSoft: 'rgba(44,86,168,0.16)',  border: 'rgba(33,42,68,0.14)', highlight: '#c9405f' },
+	// 15:00 — afternoon: amber parchment + peacock teal + marigold
+	{ hour: 15,   bg: '#f2e5c9', surface: '#fcf5e3', text: '#2e2630', muted: '#6c5e60', accent: '#16798a', accentSoft: 'rgba(22,121,138,0.16)', border: 'rgba(46,38,48,0.14)', highlight: '#e58b2e' },
+	// 18:00 — evening: mauve vellum + amethyst + ruby
+	{ hour: 18,   bg: '#ece0d6', surface: '#faf3ec', text: '#2f2238', muted: '#6a5a72', accent: '#6c3fa3', accentSoft: 'rgba(108,63,163,0.16)', border: 'rgba(47,34,56,0.14)', highlight: '#c9405f' },
+	// 20:30 — dusk: lilac-grey vellum + lapis + old gold
+	{ hour: 20.5, bg: '#e6dfdc', surface: '#f6f1ee', text: '#2b2440', muted: '#655d79', accent: '#56489e', accentSoft: 'rgba(86,72,158,0.16)',  border: 'rgba(43,36,64,0.14)', highlight: '#c48a3a' },
+	// 22:00 — moonlit vellum returns: less engaging, not darker
+	{ hour: 22,   bg: '#ece4d6', surface: '#f7f1e6', text: '#2a2033', muted: '#665a6c', accent: '#4b4f8f', accentSoft: 'rgba(75,79,143,0.16)',  border: 'rgba(42,32,51,0.14)', highlight: '#a98bc9' },
 	// 24:00 — same as night
-	{ hour: 24,   bg: '#eef0f5', surface: '#f8f8fb', text: '#2d2d42', muted: '#676b7c', accent: '#8f9ab4', accentSoft: 'rgba(143,154,180,0.18)', border: 'rgba(45,45,66,0.11)', highlight: '#b8a8d8' }
+	{ hour: 24,   bg: '#ece4d6', surface: '#f7f1e6', text: '#2a2033', muted: '#665a6c', accent: '#4b4f8f', accentSoft: 'rgba(75,79,143,0.16)',  border: 'rgba(42,32,51,0.14)', highlight: '#a98bc9' }
 ];
 
 function parseHexToRgb(hex: string): [number, number, number] | null {
@@ -197,8 +199,8 @@ export function getNamedPalette(mode: PaletteModeName): Record<string, string> {
 // ── Carillon chrome cycle ─────────────────────────────────────────
 // The --p-* palette above dresses the planner's inner surfaces. The
 // --car-* tokens dress the instrument itself: the ground the app sits
-// on, the text and hairlines drawn straight onto it, the graph-paper
-// rule, the corner washes. Those used to be a fixed night skin, so
+// on, the text and hairlines drawn straight onto it, the star scatter,
+// the window light. Those used to be a fixed night skin, so
 // Carillon opened at 9am looking like 11pm. They now ride the same
 // clock the palette does.
 //
@@ -206,7 +208,7 @@ export function getNamedPalette(mode: PaletteModeName): Record<string, string> {
 // the *night instrument*. Hues move freely *within* a family, but the
 // crossing between them is a switch, not a dissolve. Blending paper
 // toward night necessarily passes through a mid-tone that reads as mud
-// under either text color — the daydream palette above never has to
+// under either text color — the parchment palette above never has to
 // solve this because none of its stops are dark. So a flip segment
 // snaps at its midpoint (about 06:00 and 21:15) and the CSS transition
 // on .planner-root softens the change. An instrument's lamp coming on
@@ -232,67 +234,77 @@ type ChromeStop = {
 	line: string; // --car-line    · hairline on the ground
 	wash: string; // --car-wash    · hover/active fill on the ground
 	inset: string; // --car-inset  · recessed field (inputs) on the ground
-	grid: string; // --car-grid    · graph-paper rule
+	grid: string; // --car-grid    · the star-and-moon scatter on the ground
 	shadow: string; // --car-shadow  · what a paper card casts
-	glowWarm: string; // --car-glow-warm · pink corner wash
-	glowCool: string; // --car-glow-cool · sage corner wash
+	glowWarm: string; // --car-glow-warm · the hour's warm window light
+	glowCool: string; // --car-glow-cool · the hour's cool window light
 };
 
+// The night instrument: midnight velvet lit by candle, gilt where the
+// day uses garnet, and the windows still faintly coloured from inside.
 const NIGHT_CHROME = {
-	ground: '#17101f',
-	groundTop: '#1d1428',
-	groundBottom: '#140d1d',
-	panel: '#24182f',
-	fg: '#fff6da',
-	muted: '#b9adc0',
-	accent: '#f09ab8',
-	surge: '#ff895a',
-	surgeInk: '#20111c',
-	line: 'rgba(255,246,218,0.14)',
-	wash: 'rgba(255,246,218,0.065)',
-	inset: 'rgba(8,4,14,0.22)',
-	grid: 'rgba(255,246,218,0.025)',
-	shadow: 'rgba(17,7,27,0.24)',
-	glowWarm: 'rgba(240,154,184,0.13)',
-	glowCool: 'rgba(113,207,184,0.08)'
+	ground: '#1a1229',
+	groundTop: '#22173a',
+	groundBottom: '#130d1f',
+	panel: '#261b3a',
+	fg: '#f8ecd0',
+	muted: '#bfb0c6',
+	accent: '#e8bf6a',
+	surge: '#ff8f5e',
+	surgeInk: '#1d1020',
+	line: 'rgba(248,236,208,0.15)',
+	wash: 'rgba(248,236,208,0.07)',
+	inset: 'rgba(6,3,14,0.25)',
+	grid: 'rgba(232,191,106,0.12)',
+	shadow: 'rgba(8,4,16,0.35)',
+	glowWarm: 'rgba(150,60,170,0.20)',
+	glowCool: 'rgba(50,80,180,0.18)'
 } as const;
 
-// Shared by every daylight stop: plum ink on paper, deepened Carillon
-// pink. Only the ground's hue moves across the day, echoing the --p-*
-// anchors (blush dawn, mint morning, sky noon, aqua afternoon,
-// lavender evening) so both systems agree about what hour it is.
+// Shared by every daylight stop: oak-gall ink on parchment, garnet for
+// the accent, lead for the hairlines. What changes across the day is
+// the parchment's tint and the two pools of coloured light thrown onto
+// it — the glows are the sun through stained glass, so they carry the
+// hour (rose and amber at dawn, gilt and emerald in the morning, ruby
+// and sapphire at noon, marigold and teal in the afternoon, rose and
+// amethyst at evening, violet and lapis at dusk), echoing the jewel
+// each --p-* anchor uses.
 const DAY_INK = {
-	panel: '#fffaf4',
-	fg: '#33253c',
-	muted: '#6b6274',
-	accent: '#b8446e',
-	surge: '#b4471c',
-	surgeInk: '#fff6ea',
-	line: 'rgba(51,37,60,0.14)',
-	wash: 'rgba(51,37,60,0.055)',
-	inset: 'rgba(255,255,255,0.55)',
-	grid: 'rgba(51,37,60,0.045)',
-	shadow: 'rgba(70,48,74,0.16)',
-	glowWarm: 'rgba(240,154,184,0.18)',
-	glowCool: 'rgba(113,207,184,0.10)'
+	panel: '#fbf4e2',
+	fg: '#2c1b2e',
+	muted: '#6a5363',
+	accent: '#a3214a',
+	surge: '#b04a12',
+	surgeInk: '#fff6e4',
+	line: 'rgba(44,27,46,0.18)',
+	wash: 'rgba(44,27,46,0.05)',
+	inset: 'rgba(255,251,240,0.6)',
+	grid: 'rgba(168,118,30,0.24)',
+	shadow: 'rgba(74,40,40,0.18)'
 } as const;
 
 const CHROME_STOPS: ChromeStop[] = [
 	{ hour: 0, ...NIGHT_CHROME },
 	// 05:30 — still the night instrument
 	{ hour: 5.5, ...NIGHT_CHROME },
-	// 06:30 — sunrise: blush paper
-	{ hour: 6.5, ground: '#efdfe6', groundTop: '#f8e9ec', groundBottom: '#e7d8e2', ...DAY_INK },
-	// 09:00 — bright morning: mint-tinted paper
-	{ hour: 9, ground: '#e3e9e3', groundTop: '#eef3ec', groundBottom: '#dce4de', ...DAY_INK },
-	// 12:00 — noon: pale sky
-	{ hour: 12, ground: '#e1e8ee', groundTop: '#eef4f8', groundBottom: '#dae3ea', ...DAY_INK },
-	// 15:00 — afternoon: pale aqua
-	{ hour: 15, ground: '#e0eaec', groundTop: '#edf6f7', groundBottom: '#d9e5e8', ...DAY_INK },
-	// 18:00 — evening: pale lavender
-	{ hour: 18, ground: '#e6e1ef', groundTop: '#f2eef9', groundBottom: '#ded8ea', ...DAY_INK },
-	// 20:30 — dusk: deeper lilac, still light
-	{ hour: 20.5, ground: '#d6cfe1', groundTop: '#e2dbeb', groundBottom: '#cec6dc', ...DAY_INK },
+	// 06:30 — sunrise: rose-washed parchment, rose and amber light
+	{ hour: 6.5, ground: '#f3e2d2', groundTop: '#f9ece0', groundBottom: '#ead5c6', ...DAY_INK,
+		glowWarm: 'rgba(214,72,120,0.24)', glowCool: 'rgba(232,160,58,0.22)' },
+	// 09:00 — bright morning: green-gold parchment, gilt and emerald light
+	{ hour: 9, ground: '#efe5c9', groundTop: '#f7efd8', groundBottom: '#e6dabb', ...DAY_INK,
+		glowWarm: 'rgba(226,170,40,0.24)', glowCool: 'rgba(31,140,100,0.20)' },
+	// 12:00 — noon: bright vellum, ruby and sapphire light
+	{ hour: 12, ground: '#f0e6cf', groundTop: '#f8f1df', groundBottom: '#e7dcc2', ...DAY_INK,
+		glowWarm: 'rgba(200,50,80,0.18)', glowCool: 'rgba(44,96,200,0.22)' },
+	// 15:00 — afternoon: amber parchment, marigold and teal light
+	{ hour: 15, ground: '#f1e1bf', groundTop: '#f8ecd2', groundBottom: '#e8d4ae', ...DAY_INK,
+		glowWarm: 'rgba(232,140,40,0.24)', glowCool: 'rgba(22,140,160,0.20)' },
+	// 18:00 — evening: mauve vellum, rose and amethyst light
+	{ hour: 18, ground: '#ede0d3', groundTop: '#f6ebe1', groundBottom: '#e3d3c8', ...DAY_INK,
+		glowWarm: 'rgba(200,60,100,0.22)', glowCool: 'rgba(120,70,190,0.24)' },
+	// 20:30 — dusk: lilac-grey vellum, still light; violet and lapis light
+	{ hour: 20.5, ground: '#e2d6d6', groundTop: '#ebe1e0', groundBottom: '#d8cacd', ...DAY_INK,
+		glowWarm: 'rgba(150,70,170,0.24)', glowCool: 'rgba(60,80,170,0.24)' },
 	// 22:00 — the instrument returns
 	{ hour: 22, ...NIGHT_CHROME },
 	{ hour: 24, ...NIGHT_CHROME }
@@ -300,6 +312,21 @@ const CHROME_STOPS: ChromeStop[] = [
 
 function isDarkChrome(stop: ChromeStop): boolean {
 	return lumOfHex(stop.ground) < 0.3;
+}
+
+// The window light is alpha-bearing, but unlike the hairlines it should
+// drift between stops rather than jump — the sun doesn't skip a window.
+function parseRgba(css: string): [number, number, number, number] | null {
+	const m = css.match(/^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/);
+	return m ? [+m[1], +m[2], +m[3], +m[4]] : null;
+}
+
+function lerpRgba(a: string, b: string, t: number): string {
+	const ra = parseRgba(a);
+	const rb = parseRgba(b);
+	if (!ra || !rb) return t < 0.5 ? a : b;
+	const c = ra.map((v, i) => v + (rb[i] - v) * t);
+	return `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${c[3].toFixed(3)})`;
 }
 
 export function getChromeForTime(date: Date): Record<string, string> {
@@ -343,9 +370,19 @@ export function getChromeForTime(date: Date): Record<string, string> {
 		'--car-inset': owner.inset,
 		'--car-grid': owner.grid,
 		'--car-shadow': owner.shadow,
-		'--car-glow-warm': owner.glowWarm,
-		'--car-glow-cool': owner.glowCool
+		'--car-glow-warm': flip ? owner.glowWarm : lerpRgba(a.glowWarm, b.glowWarm, t),
+		'--car-glow-cool': flip ? owner.glowCool : lerpRgba(a.glowCool, b.glowCool, t)
 	};
+}
+
+// Which family a resolved chrome belongs to — the few things that can't
+// be a colour token (the wordmark's font palette, how much parchment
+// grain to lay over the ground) switch on this instead.
+export function chromeFamily(chrome: Record<string, string>): 'paper' | 'night' {
+	const ground = chrome['--car-night'] ?? '';
+	const rgb = ground.match(/^rgb\((\d+),(\d+),(\d+)\)$/);
+	const lum = rgb ? relativeLuminance(+rgb[1], +rgb[2], +rgb[3]) : lumOfHex(ground);
+	return lum < 0.3 ? 'night' : 'paper';
 }
 
 export function getNamedChrome(mode: PaletteModeName): Record<string, string> {
