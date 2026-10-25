@@ -18,6 +18,12 @@ so it's not easy to forget.
 
 ---
 
+## 2026-10-25
+
+- **the moth is the mark** — Carillon's lunar moth, pared down to its
+  peacock and amethyst wings and the crescent behind them, replaces the
+  lapis w in browser tabs and saved home-screen shortcuts across every room.
+
 ## 2026-10-20
 
 - **Write has a format menu** — right-click in the writing, on its own or in

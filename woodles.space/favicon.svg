@@ -1,6 +1,43 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Woodles</title>
-  <rect x="2" y="2" width="60" height="60" rx="18" fill="#c9bfee"/>
-  <path d="M14 21c1 16 4 23 10 23 5 0 7-8 8-16 1 8 3 16 8 16 6 0 10-10 11-23"
-    fill="none" stroke="#3a2d72" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Carillon's lunar moth (apps/planner/src/lib/ornaments/lunar-moth.svg),
+       pared down to its wings, lead, spots and crescent. -->
+  <defs>
+    <linearGradient id="gilt" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f2d68c"/><stop offset="1" stop-color="#c08f35"/></linearGradient>
+    <linearGradient id="teal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#57aaa3"/><stop offset="1" stop-color="#136474"/></linearGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a785bb"/><stop offset="1" stop-color="#5e3592"/></linearGradient>
+    <path id="upper" d="M30 30.6C24 19.4 14.4 12.6 4 14.6C4.4 19.8 6 22.2 4.4 25.4C7.2 26.2 9.2 26.6 9.6 29.8C13.2 29 16 30.2 17.6 33.4C22.4 31.4 25.2 33 30 35Z"/>
+    <path id="lower" d="M29.6 34.2C23.6 32.2 18.4 34.2 15.6 38.2C18 39.4 18.8 41.4 18.8 43.8C21.6 42.6 24 43.4 24.8 46.2C25.2 50.2 22.4 55 23.6 57.8C30 54.6 32 45 31.6 37Z"/>
+    <path id="veins" d="M5.6 15.8C13.6 21.4 18.8 23.8 30 30.6M4.4 25.4L14 22.2L17.6 33.4M19.6 37.8L30 35.4M23.6 56.6L28 45.4L31.6 37.4"/>
+    <path id="spot" d="M15.6 21.8C14.4 18.2 11.6 17 9.6 17.8C9.2 20.6 12 22.6 15.6 21.8Z"/>
+    <path id="antenna" d="M30.8 27.4C29.6 23 27.6 20.4 25.4 20.8C23.8 21.2 24.4 23.2 25.8 22.8"/>
+    <path id="edge" d="M30 30.6C24 19.4 14.4 12.6 4 14.6"/>
+  </defs>
+  <path d="M38.4 6.2A10.4 10.4 0 1 0 41.2 24.2A9.2 9.2 0 0 1 38.4 6.2Z" fill="url(#gilt)"/>
+  <g stroke="#2a1d2e" stroke-linecap="round" stroke-linejoin="round">
+    <g fill="none" stroke-width="1.2">
+      <use href="#antenna"/>
+      <use href="#antenna" transform="matrix(-1 0 0 1 64 0)"/>
+    </g>
+    <g stroke-width="1.8">
+      <use href="#upper" fill="url(#teal)"/>
+      <use href="#upper" transform="matrix(-1 0 0 1 64 0)" fill="url(#violet)"/>
+      <use href="#lower" fill="url(#violet)"/>
+      <use href="#lower" transform="matrix(-1 0 0 1 64 0)" fill="url(#teal)"/>
+    </g>
+    <g fill="none" stroke-width="1">
+      <use href="#veins"/>
+      <use href="#veins" transform="matrix(-1 0 0 1 64 0)"/>
+    </g>
+    <g fill="#d6a24f" stroke-width=".8">
+      <use href="#spot"/>
+      <use href="#spot" transform="matrix(-1 0 0 1 64 0)"/>
+    </g>
+    <path d="M30.4 30.2C29.6 35 30 41 32 45.8C34 41 34.4 35 33.6 30.2Z" fill="#2f1d33" stroke-width="1.2"/>
+    <circle cx="32" cy="28.6" r="2.2" fill="#d4a64a" stroke-width="1"/>
+  </g>
+  <g fill="none" stroke="#e7c473" stroke-width=".8" stroke-linecap="round">
+    <use href="#edge"/>
+    <use href="#edge" transform="matrix(-1 0 0 1 64 0)"/>
+  </g>
 </svg>
