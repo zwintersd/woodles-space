@@ -14,7 +14,11 @@ export const SAFE_HREF_PROTOCOL: RegExp;
 
 export function sanitizeHtml(html: string, options?: SanitizeOptions): string;
 export function stripPresentation(html: string): string;
-export function ensureAnchorsOn(blocks: ArrayLike<Element>, prefix?: string): void;
+export function ensureAnchorsOn(
+	blocks: ArrayLike<Element>,
+	prefix?: string,
+	taken?: Iterable<string>
+): void;
 export function stampAnchorsHtml(html: string, selector?: string, prefix?: string): string;
 export function isEmptyHtml(html: string): boolean;
 

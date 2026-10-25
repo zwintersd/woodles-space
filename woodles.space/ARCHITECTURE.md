@@ -1880,8 +1880,8 @@ in motion. the full log is in [REFACTORING.md](./REFACTORING.md); the shape of i
   `@woodles/app-manifest` shape) so `letter`, a static page with no build step,
   can import it directly. Two policies stayed *parameters* rather than being
   reconciled, because both sides already have stored data: whether a sanitize
-  keeps `data-anchor` (`write` strips and re-stamps; `marginalia` and `letter`
-  keep), and the anchor prefix (`write` stamps `a-`, the reading room `p-`).
+  keeps `data-anchor` (`write` strips it from paste and keeps it on its own
+  stored layers; `marginalia` and `letter` keep), and the anchor prefix (`write` stamps `a-`, the reading room `p-`).
   see [REFACTORING.md](./REFACTORING.md).
 - **`EditorToolbar.svelte`** — `write` (89 lines) and `marginalia` (113).
   diverged, still moving.

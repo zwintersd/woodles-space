@@ -39,6 +39,7 @@
 	import {
 		ANCHOR_BLOCK_SELECTOR,
 		sanitizeHtml,
+		sanitizeStoredHtml,
 		ensureAnchorsOn,
 		stampAnchorsHtml,
 		isEmptyHtml,
@@ -317,9 +318,28 @@
 		return true;
 	}
 
-	function stampLiveAnchors() {
+	// Which element held each anchor at the last stamp. Chromium splits a block
+	// by cloning it, `data-anchor` and all, and Enter at the start of one puts
+	// the clone in front — so left to "first in document order keeps it", the
+	// new empty line would take the note. The element that had the id keeps it.
+	let anchorOwners = new Map<string, Element>();
+
+	// A note whose block was deleted keeps its id, so new blocks number past
+	// it rather than inheriting the note. Load passes none: a draft stored
+	// without ids gets them by order, and its notes with them.
+	function stampLiveAnchors(taken: Iterable<string> = marginNotes.map((m) => m.anchorId)) {
 		if (!fgEl) return;
-		ensureAnchorsOn(fgEl.querySelectorAll(ANCHOR_BLOCK_SELECTOR));
+		const blocks = Array.from(fgEl.querySelectorAll(ANCHOR_BLOCK_SELECTOR));
+		const present = new Set(blocks);
+		for (const block of blocks) {
+			const id = block.getAttribute('data-anchor');
+			const owner = id ? anchorOwners.get(id) : undefined;
+			if (owner && owner !== block && present.has(owner) && owner.getAttribute('data-anchor') === id) {
+				block.removeAttribute('data-anchor');
+			}
+		}
+		ensureAnchorsOn(blocks, 'a-', taken);
+		anchorOwners = new Map(blocks.map((block) => [block.getAttribute('data-anchor') ?? '', block]));
 		markTrashedReferences();
 	}
 
@@ -370,13 +390,14 @@
 		goal = coerceGoal(d.goal);
 		liquidBoard = d.liquid ?? emptyBoard();
 		const layers = d.layers ?? {};
-		const fgHtml = sanitizeHtml(layers.foreground?.html ?? d.content ?? '');
+		// The foreground keeps its own anchors — margin notes are matched by them.
+		const fgHtml = sanitizeStoredHtml(layers.foreground?.html ?? d.content ?? '');
 		const mgHtml = sanitizeHtml(layers.midground?.html ?? '');
 		const bgHtml = sanitizeHtml(layers.background?.html ?? '');
 		if (fgEl) fgEl.innerHTML = fgHtml;
 		if (mgEl) mgEl.innerHTML = mgHtml;
 		if (bgEl) bgEl.innerHTML = bgHtml;
-		stampLiveAnchors();
+		stampLiveAnchors([]);
 		const notes = d.annotations?.pocketNotes;
 		pockets = Array.isArray(notes)
 			? notes.map((n) => ({
@@ -1565,7 +1586,8 @@
 		const issue = incrementIssue();
 		try {
 			const now = new Date().toISOString();
-			const fgHtml = stampAnchorsHtml(sanitizeHtml(fgEl?.innerHTML ?? ''));
+			// Echoes shows anchors as given, so the live ids go out with the notes.
+			const fgHtml = stampAnchorsHtml(sanitizeStoredHtml(fgEl?.innerHTML ?? ''));
 			const mgHtml = sanitizeHtml(mgEl?.innerHTML ?? '');
 			const bgHtml = sanitizeHtml(bgEl?.innerHTML ?? '');
 			const cleanedPockets = pockets.map((p) => ({ ...p, html: sanitizeHtml(p.html) }));

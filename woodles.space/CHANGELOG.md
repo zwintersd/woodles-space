@@ -20,6 +20,16 @@ so it's not easy to forget.
 
 ## 2026-10-25
 
+- **margin notes stay beside the paragraph they were written against** — in
+  Write, adding a paragraph above an annotated one could hand its note to the
+  newcomer (at once if you pressed Enter at the start of the paragraph,
+  otherwise on the next reload), and deleting one above it could lose the
+  note: every load renumbered paragraphs top to bottom, while notes kept the
+  numbers they were written with. a draft now keeps its own paragraph ids, a
+  published letter goes out with the same ones its notes point at, and a new
+  paragraph never picks up the note of one you deleted. pasted text still
+  comes in without ids of its own. a note that had already moved in an
+  existing draft may stay where it landed.
 - **the moth is the mark** — Carillon's lunar moth, pared down to its
   peacock and amethyst wings and the crescent behind them, replaces the
   lapis w in browser tabs and saved home-screen shortcuts across every room.
