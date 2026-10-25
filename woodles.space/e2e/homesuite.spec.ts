@@ -591,6 +591,35 @@ test('artifact context exposes Write’s existing prose snapshot handoff', async
 	expect(JSON.stringify(queue)).toContain('A thought for the canvas.');
 });
 
+test('Write’s prose gets Write’s format menu, and the page around it keeps the shell’s', async ({ page }) => {
+	await page.goto('/homesuite');
+	await create(page, 'Document');
+	const draft = page.frameLocator('iframe.native-surface');
+	const body = draft.getByRole('textbox', { name: 'foreground content' });
+	await body.fill('A thought worth keeping.');
+	const frame = (await page.locator('iframe.native-surface').boundingBox())!;
+	const word = await body.evaluate((el) => {
+		const text = el.firstChild as Text;
+		const range = document.createRange();
+		range.setStart(text, 10);
+		range.setEnd(text, 15);
+		const rect = range.getBoundingClientRect();
+		return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+	});
+	await page.mouse.click(frame.x + word.x, frame.y + word.y, { button: 'right' });
+	const menu = draft.getByRole('menu', { name: 'format text' });
+	await expect(menu).toBeVisible();
+	await expect(page.locator('.context-menu')).toHaveCount(0);
+	await menu.getByRole('menuitemcheckbox', { name: 'italic' }).click();
+	await expect.poll(() => body.innerHTML()).toContain('<i>worth</i>');
+	await page.getByRole('button', { name: 'Undo' }).click();
+	await expect.poll(() => body.innerHTML()).toBe('A thought worth keeping.');
+
+	await page.mouse.click(frame.x + 60, frame.y + 320, { button: 'right' });
+	await expect(page.getByRole('menuitem', { name: 'Continue writing' })).toBeVisible();
+	await expect(menu).toHaveCount(0);
+});
+
 test('a relation menu adds to the open Collection through its owner and keeps local edits undoable', async ({ page }) => {
 	await page.goto('/homesuite');
 	await create(page, 'Document');

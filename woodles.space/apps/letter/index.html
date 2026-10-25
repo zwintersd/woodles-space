@@ -792,8 +792,16 @@
     .letter-body li { margin-bottom: 0.25em; }
     .letter-body a { color: var(--accent-strong); text-decoration: none; border-bottom: 1px solid var(--rule); }
     .letter-body a:hover { border-bottom-color: var(--accent-strong); }
-    .letter-body strong { font-weight: 600; }
+    .letter-body strong, .letter-body b { font-weight: 600; }
     .letter-body em { font-style: italic; }
+    /* Write's highlight, in the letter's own accent rather than the browser's yellow */
+    .letter-body mark {
+      background: color-mix(in srgb, var(--accent) 38%, transparent);
+      color: inherit;
+      border-radius: 0.15em;
+      -webkit-box-decoration-break: clone;
+      box-decoration-break: clone;
+    }
 
     /* ── reply breadcrumb (top of response letters) ── */
     .reply-breadcrumb {
