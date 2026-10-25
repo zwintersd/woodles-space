@@ -75,6 +75,9 @@ now parameters rather than a winner:
   would orphan every margin note. `keepAttributes` covers both. write's own
   test suite caught this — the first version of the shared sanitizer changed
   write's semantics and a test that had been asserting the strip failed.
+  write later stopped stripping its own stored layers: re-stamping on load
+  numbers blocks in document order, so a note moved whenever a paragraph had
+  gone in above its own. only paste and imports strip now.
 - **the anchor prefix.** `write` stamps `a-001`, marginalia's reading room
   stamps `p-001`, and both are already in stored documents. picking one would
   silently orphan the other app's notes, so `ensureAnchorsOn` takes a prefix.
