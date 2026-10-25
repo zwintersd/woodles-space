@@ -30,8 +30,28 @@ so it's not easy to forget.
   paragraph never picks up the note of one you deleted. pasted text still
   comes in without ids of its own. a note that had already moved in an
   existing draft may stay where it landed.
+- **the moth is the mark** — Carillon's lunar moth, pared down to its
+  peacock and amethyst wings and the crescent behind them, replaces the
+  lapis w in browser tabs and saved home-screen shortcuts across every room.
 
 ## 2026-10-20
+
+- **Write has a format menu** — right-click in the writing, on its own or in
+  HomeSuite, for bold, italic, underline, strikethrough and a new highlight,
+  then text, heading, subheading, quote, bullets and numbers, with whichever
+  ones the words already have lit. links are edited in place — a bare
+  `example.com` gets its `https://` — and cut, copy, paste, paste as plain
+  text and a margin note sit underneath. right-clicking inside a word takes
+  the whole word. every change is one ⌘Z. ⇧ right-click still opens the
+  browser's own menu for spelling, and the Menu key or ⇧F10 opens Write's at
+  the caret.
+- **lists stop leaving empty paragraphs behind** — the toolbar's list
+  buttons nested the list inside its paragraph, so it came back after a
+  reload with an empty line above and below; lists now sit beside their
+  paragraphs, and turning a line out of a list splits the list around it.
+- **bold looks bold in Write** — it was drawn at 400 over the prose's 300,
+  barely heavier, and the toolbar's **B** never lit up for it. it's 600 now,
+  matching `<strong>`, in Write and in published letters.
 
 - **Carillon syncs the way HomeSuite does** — something removed on one device
   now stays removed on the others: a signal, a sitting, an obligation, a daily

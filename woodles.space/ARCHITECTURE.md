@@ -362,7 +362,9 @@ Context menus use the same owner boundary: the surface snapshots its target and
 keeps action callbacks locally; the shell renders serializable action descriptors
 above the iframe and adds reference navigation, copying, and Collection membership.
 Request IDs keep dismissed or superseded actions from touching a new selection.
-Native text keeps its browser menu. The data relationships, action matrix, and
+Native text keeps its browser menu — except Write's prose, which opens Write's
+own format menu inside its frame (see [the writing surface](#the-writing-surface)),
+since formatting is the owner's to apply. The data relationships, action matrix, and
 extension contract are in [HomeSuite's context menu design](./apps/homesuite/CONTEXT_MENU.md).
 
 A title is edited in the shell's own title area — click it, or Rename in the
@@ -1215,6 +1217,31 @@ View preferences — mode, ruling, and which layer is on which page — are a
 1100px the notebook lies flat: pages stack, the spine goes away, and the
 verso/recto mirroring stops.
 
+**The format menu.** A right-click in any layer's prose opens Write's own
+menu (`src/lib/FormatMenu.svelte`) instead of the browser's, standalone and
+in HomeSuite alike: character styles (bold, italic, underline, strikethrough,
+highlight), paragraph styles (text, heading, subheading, quote, bullets,
+numbers), links, clear formatting, the clipboard, and a margin note. A caret
+inside a word takes the word, the way a Mac right-click does. ⇧ right-click
+still reaches the browser's menu, which is the only way to spelling
+suggestions; touch keeps its own long-press. The Menu key and ⇧F10 open it
+at the caret. Pockets, margin notes and the title keep the browser's menu.
+
+The edits split along what the browser gets right. Bold, italic, underline
+and strikethrough are `execCommand`. Everything else is a transform in
+`src/lib/formatting.ts` on a detached copy of the layer, swapped back with a
+single `insertHTML` over the whole layer — exact, and one step of the same
+undo history ⌘Z and HomeSuite's undo button walk. Lists are rebuilt there
+rather than asked of the browser, because Chrome's list commands nest the
+list inside the paragraph it started as, which reloads as stray empty
+paragraphs; the toolbar's paragraph and list buttons go through the same
+path. A selection is carried as `{ line, offset }` per end rather than a DOM
+Range, so one position means the same place in the live layer, in its copy,
+and after the swap — a line being a block, a top-level list item, or the
+bare text Chrome leaves for the first line typed. Highlight is `<mark>`,
+already on the sanitize allowlist, drawn in the palette's accent here and in
+`letter`.
+
 **The drafts list earns its size.** Index entries carry `kind` and `tags`;
 the drafts modal searches title + tags and filters by the kinds actually
 present. This answers CONVERGENCE.md §6.1 (write's flat drafts list),
@@ -1970,6 +1997,8 @@ are written up in [apps/planner/KNOWN_ISSUES.md](./apps/planner/KNOWN_ISSUES.md)
 local server reads `vercel.json` and applies the production rewrites, so route
 coverage tests the paths people actually visit instead of seven unrelated Vite
 ports. The suite covers every published entry route, Write → Echoes archiving,
+Write's format menu (each edit surviving the reload, one undo step, lists
+beside paragraphs rather than in them, the keyboard way in),
 Bestiary gallery/adopt/share and Marginalia consumption, an Arcade state change,
 the Thinking About → Carillon round trip, back, and the sitting that returns
 from it, the companion's handoffs arriving on Thinking About (the held

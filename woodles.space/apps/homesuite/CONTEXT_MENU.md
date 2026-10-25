@@ -44,11 +44,15 @@ clear snapshot semantics; further live representations need an address contract.
 | Empty canvas | Add card, draw frame, add stack, fit board, connect the board |
 | Write reference | Open/copy/collect source, unlink while keeping words, inspect |
 | Write surface | Continue writing, layers and notes, existing prose-to-Inbox handoff, connect document |
+| Write prose | Write's own format menu, rendered in its frame: character and paragraph styles, links, clipboard, margin note |
 
 Actions group into Edit, Connect, View, and destructive scope, without nested
 hover submenus. This uses HomeSuite's existing color tokens in both schemes.
 Editable text retains the browser context menu, except explicit reference
-anchors. Right-click and keyboard Context Menu / Shift+F10 open native targets;
+anchors and Write's prose. Formatting is Write's to apply, so its menu is
+Write's own and stays inside the frame rather than crossing the bridge; ⇧
+right-click there still reaches the browser's menu for spelling. Write's
+margins and references keep this shell menu. Right-click and keyboard Context Menu / Shift+F10 open native targets;
 visible `⋯` buttons on artifacts, records, and the selection strip support touch.
 Arrow keys, Home/End, Enter, Escape, and Tab work; menus fit inside the viewport,
 scroll on short screens, and dismiss on outside interaction, resize, and scroll.
