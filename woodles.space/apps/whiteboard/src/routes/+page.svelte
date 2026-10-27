@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy, onMount, tick } from 'svelte';
+	import { fade } from 'svelte/transition';
 	import { getImageAsset, imageDimensions, imageStorageAvailable, removeImageAsset, saveImageAsset } from '$lib/assets';
 	import {
 	boundsForItem,
@@ -244,6 +245,13 @@
 	let saveState = $state<SaveState>('idle');
 	let saveMessage = $state('stored on this device');
 	let notice = $state('');
+	let noticeRevision = $state(0);
+	$effect(() => {
+		noticeRevision;
+		if (!notice) return;
+		const timeout = window.setTimeout(() => { notice = ''; }, notice === inboxNotice ? 5000 : 1800);
+		return () => window.clearTimeout(timeout);
+	});
 	let spaceHeld = $state(false);
 	let fileDragging = $state(false);
 	let activeSession: PointerSession | null = null;
@@ -1386,6 +1394,8 @@
 		}
 		scheduleSave();
 		notice = removingPortals === selectedIds.length ? 'Portal removed from board. Undo to restore it.' : removingPortals ? 'Selected items removed from board. Undo to restore them.' : 'Board item deleted. Undo to restore it.';
+		// Repeated removals can produce identical text; each still gets a full timeout.
+		noticeRevision += 1;
 	}
 
 	function duplicateSelection() {
@@ -2511,6 +2521,9 @@
 	style={paperStyle}
 	aria-label="Whiteboard canvas"
 	onpointerdown={handleCanvasPointerDown}
+	onpointerdowncapture={(event) => {
+		if (searchOpen && event.button === 0 && !targetIsChrome(event.target)) closeSearch(false);
+	}}
 	onpointermove={handlePointerMove}
 	onpointerup={handlePointerUp}
 	onwheel={handleWheel}
@@ -2944,7 +2957,7 @@
 	</div>
 
 	{#if searchOpen}
-		<div class="finder" data-whiteboard-ui>
+		<div class="finder" data-whiteboard-ui transition:fade={{ duration: 180 }}>
 			<div class="finder-field">
 				<span class="finder-mark" aria-hidden="true">⌕</span>
 				<input
@@ -3559,7 +3572,7 @@
 	</div>
 
 	{#if notice && !playing}
-		<p class="notice" data-whiteboard-ui>
+		<p class="notice" data-whiteboard-ui out:fade={{ duration: 180 }}>
 			{notice}
 			{#if notice === inboxNotice && findInbox(board)}
 				<button class="notice-go" onclick={showInbox}>show me</button>
@@ -4091,6 +4104,8 @@
 		font-family: var(--font-body, ui-sans-serif, sans-serif);
 	}
 	.card-body::placeholder { color: #b4aaa5; }
+	.card-body { scrollbar-width: none; }
+	.card-body::-webkit-scrollbar { display: none; }
 
 	/*
 	 * A doorway. The pane shows the board beyond as shapes — the same projection
@@ -4746,9 +4761,7 @@
 		box-shadow: 0 18px 46px rgba(70, 52, 44, 0.2), inset 0 1px rgba(255,255,255,.9);
 		backdrop-filter: blur(18px);
 		transform: translateX(-50%);
-		animation: finder-in 200ms ease both;
 	}
-	@keyframes finder-in { from { opacity: 0; transform: translate(-50%, -10px); } }
 
 	.finder-field { display: flex; align-items: center; gap: 7px; padding: 9px 9px 9px 13px; }
 	.finder-mark { color: #a4938b; font-size: 16px; line-height: 1; }
