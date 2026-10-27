@@ -62,6 +62,11 @@ jobs:
       - name: Run landing browser tests
         run: pnpm exec playwright test e2e/landing.spec.ts e2e/accessibility.spec.ts --grep 'landing|\s/ has'
 
+      # Carillon's sync across real devices and tabs — a removal staying
+      # removed, tabs keeping each other's saves — only exists in a browser too.
+      - name: Run Carillon sync browser tests
+        run: pnpm exec playwright test e2e/carillon-sync.spec.ts
+
       - name: Keep the Playwright report
         if: failure()
         uses: actions/upload-artifact@v4

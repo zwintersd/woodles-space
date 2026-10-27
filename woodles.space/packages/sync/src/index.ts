@@ -15,6 +15,7 @@
 export * from './publicBlobs';
 export * from './crossAppBlobs';
 export * from './ledger';
+export * from './threeWay';
 
 const ENDPOINT = '/api/sync';
 const PUBLIC_ENDPOINT = '/api/public';
@@ -48,6 +49,20 @@ export class SyncError extends Error {
   }
 }
 
+// The endpoints answer a 500 with `{ message }` — the database's own words —
+// so carry it into the error rather than leaving just a status code.
+async function failure(res: Response, what: string): Promise<SyncError> {
+  let detail = '';
+  try {
+    const body = (await res.json()) as { message?: unknown; error?: unknown };
+    const said = body.message ?? body.error;
+    if (typeof said === 'string' && said) detail = `: ${said}`;
+  } catch {
+    /* not JSON — a platform error page */
+  }
+  return new SyncError('server', `${what} failed (${res.status})${detail}`);
+}
+
 export interface Snapshot<T = unknown> {
   blob: T | null;
   version: number;
@@ -69,7 +84,7 @@ export async function pull<T = unknown>(app: string): Promise<Snapshot<T>> {
     throw new SyncError('network', 'could not reach the sync server');
   }
   if (res.status === 401) throw new SyncError('unauthorized', 'wrong passphrase');
-  if (!res.ok) throw new SyncError('server', `pull failed (${res.status})`);
+  if (!res.ok) throw await failure(res, 'pull');
   const data = (await res.json()) as Snapshot<T>;
   return { blob: data.blob, version: data.version };
 }
@@ -97,7 +112,7 @@ export async function push<T = unknown>(
     const data = (await res.json()) as { server: Snapshot<T> };
     return { conflict: true, server: data.server };
   }
-  if (!res.ok) throw new SyncError('server', `push failed (${res.status})`);
+  if (!res.ok) throw await failure(res, 'push');
   const data = (await res.json()) as { ok: true; version: number };
   return data;
 }
@@ -133,7 +148,7 @@ export async function publish<T = unknown>(
     throw new SyncError('network', 'could not reach the sync server');
   }
   if (res.status === 401) throw new SyncError('unauthorized', 'wrong passphrase');
-  if (!res.ok) throw new SyncError('server', `publish failed (${res.status})`);
+  if (!res.ok) throw await failure(res, 'publish');
   return (await res.json()) as { ok: true; version: number; publishedAt: string };
 }
 
@@ -146,7 +161,7 @@ export async function pullPublic<T = unknown>(app: string, slug: string): Promis
   } catch {
     throw new SyncError('network', 'could not reach the sync server');
   }
-  if (!res.ok) throw new SyncError('server', `pullPublic failed (${res.status})`);
+  if (!res.ok) throw await failure(res, 'pullPublic');
   const data = (await res.json()) as PublicSnapshot<T>;
   return { blob: data.blob, version: data.version, publishedAt: data.publishedAt };
 }
@@ -380,7 +395,9 @@ export function createSyncedStore<T>(adapter: StoreAdapter<T>) {
       latestConflict = result;
       if (!adapter.merge || result.server.blob === null) return result;
 
-      candidate = adapter.merge(candidate, result.server.blob);
+      // Merge into what is local *now*, not the copy read before the push:
+      // an edit made while the request was in flight must survive the retry.
+      candidate = adapter.merge(adapter.read() ?? candidate, result.server.blob);
       adapter.write(candidate);
       base = result.server.version;
       writeVersion(app, base);

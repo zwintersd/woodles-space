@@ -166,7 +166,7 @@ woodles.space/
     ├── marginalia/          SvelteKit · a witch writes worlds + a reading room
     ├── planner/             SvelteKit · carillon — self-observation, day piles, and reinforcement
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
-    ├── mycelium/            SvelteKit · people and contact details, on 3:4 cards styled like Bestiary
+    ├── mycelium/            SvelteKit · people and contact details, on 3:4 cards styled like Bestiary, in Carillon's shell
     ├── thinking-about/      SvelteKit · a board for what's being read, played, and watched — and, per entry, a structured record cast for it
     ├── whiteboard/          SvelteKit · a wide, tactile place for spatial thinking — a camera that knows where it is, cards that say more than they show, stacks that do more than hold them, and doorways into other boards
     ├── bloomforge/          SvelteKit · a studio for making incremental games
@@ -334,6 +334,18 @@ style, and creation/update timestamps. `loadPeople()` reports read failures;
 data. Writes validate and reread the store, touch only the requested person,
 and notify same-origin consumers through `subscribePeople()`.
 
+The app's room is Carillon's layout; only the cards are Bestiary's. A mulberry
+cabinet header carries a leaded transom, a rose-window mark and a Kalnia Glaze
+wordmark (its own `--mycelium-glass` palette), and the shelves are lancet tabs
+in jewel glass. Below it the parchment desk, window light, engraved chart and
+study window, vellum sheets with gilt rules and filigree corners, IM Fell
+headings over the crescent divider, and the tools in a ribbon down the right
+edge (a strip above the footer on phones). The ground is held at Carillon's
+evening stop rather than cycled, and `calm` takes the light and ornaments
+away. `tokens.css` keeps the cards' `--b-*` tokens and adds Carillon's stable
+`--car-*` names (furniture, paper, glass, ornaments) plus `--my-*` for the
+fixed ground; the ornament SVGs are copies of Carillon's (see REFACTORING.md).
+
 The shared identity is `{ app: 'mycelium', kind: 'person', id }`, made by
 `personRef(id)`, and the manifest resolves it to `/mycelium?person=<id>`.
 Write's `#` picker reads people through the package. Data's **Mycelium people**
@@ -350,7 +362,9 @@ Context menus use the same owner boundary: the surface snapshots its target and
 keeps action callbacks locally; the shell renders serializable action descriptors
 above the iframe and adds reference navigation, copying, and Collection membership.
 Request IDs keep dismissed or superseded actions from touching a new selection.
-Native text keeps its browser menu. The data relationships, action matrix, and
+Native text keeps its browser menu — except Write's prose, which opens Write's
+own format menu inside its frame (see [the writing surface](#the-writing-surface)),
+since formatting is the owner's to apply. The data relationships, action matrix, and
 extension contract are in [HomeSuite's context menu design](./apps/homesuite/CONTEXT_MENU.md).
 
 A title is edited in the shell's own title area — click it, or Rename in the
@@ -382,7 +396,8 @@ them — one blob under sync key `homesuite`, behind the shared passphrase
 (`apps/homesuite/src/lib/suiteSync.ts`, glue in `sync.svelte.ts`). It reads
 each owning app's storage into the blob and writes a merged one back through
 the same functions the shell uses, saving only what changed. The merge is
-three-way and per item: `woodles.homesuite.sync.base.v1` holds each item's
+three-way and per item (`mergeRecords` in `@woodles/sync`, which Carillon
+shares): `woodles.homesuite.sync.base.v1` holds each item's
 fingerprint as of the last time this device and the server agreed, so a
 thing missing on one side reads as never seen (kept) or deleted since
 (dropped). Both sides changed → the later `updatedAt` wins; an edit beats a
@@ -594,19 +609,47 @@ any earlier sheet, and those marks keep `source: "paper"` so a later clipboard
 transcription never poses as a live sample. Correcting an existing live sample
 preserves its original provenance. A blank interval is unobserved, not failed.
 
-Carillon's surface runs on two clocks' worth of color. `dayCycle.ts` has
-always interpolated the `--p-*` daydream palette across the day; it now also
-produces the `--car-*` **chrome** — the ground the instrument sits on, the text
-and hairlines drawn straight onto it, the graph rule, the corner washes — via
-`getChromeForTime()`, applied alongside the palette in `+layout.svelte`. The
-chrome has two families, paper by day and the night instrument after ~21:15,
-and the crossing between them is a switch rather than a blend: interpolating a
-light ground toward a dark one passes through a mid-tone that reads as mud
-under either text color. Hues still move freely *within* a family. The paper
-tokens (`--car-paper`, `--car-ink`, `--car-ink-soft`, `--car-pink-dark`) stay
-outside the cycle — a field sheet is paper at every hour, only the desk beneath
-it changes. `dayCycle.test.ts` samples every 15 minutes and holds the chrome to
-AA body text, AA-Large accents, and never landing on a mid-tone ground.
+The bell follows the same rows: a sampling bell rings where a row turns over,
+and the clock face names it (hour, half, quarter, or another sample), each with
+its own synthesized voice. A planned block's bell follows the chime it shares a
+minute with. Voices and the mix sync in `settings.bellSounds`; master volume
+and pause stay on the device. Planner settings merge per key by edit stamp
+(`settings.settingsStamps`, stamped only on a real change, newer wins — a newer
+clear included — remote wins ties, far-future stamps ignored), so a stale
+device can't undo a deliberate change. See `apps/planner/BELLS.md`.
+
+Carillon's surface runs on two clocks' worth of color, dressed as parchment
+and stained glass. `dayCycle.ts` interpolates the `--p-*` palette across the
+day — vellum at every stop, with the accent moving from jewel to jewel (garnet
+dawn, emerald morning, sapphire noon, teal afternoon, amethyst evening, lapis
+dusk) — and also produces the `--car-*` **chrome**: the ground the instrument
+sits on, the text and hairlines drawn straight onto it, the star scatter, and
+two glows that are the hour's light thrown through the windows. Both come
+from `getChromeForTime()`, applied alongside the palette in `+layout.svelte`,
+which also sets `data-chrome` (`paper` or `night`, via `chromeFamily()`) for
+the few things that can't be a color token — the wordmark's font palette and
+how much parchment grain lies on the ground. The chrome has two families,
+parchment by day and midnight velvet after ~21:15, and the crossing between
+them is a switch rather than a blend: interpolating a light ground toward a
+dark one passes through a mid-tone that reads as mud under either text color.
+Hues and the window light still drift freely *within* a family. The paper
+tokens (`--car-paper`, `--car-ink`, `--car-ink-soft`, `--car-pink-dark`) and
+the glass tokens (`--car-glass-*`, `--car-lead`, `--car-gilt`) stay outside the
+cycle — a field sheet is paper and glass is glass at every hour; only the desk
+and the light change. Each jewel is deep enough to carry `--car-glass-cream`
+text, so a pane can be a label's ground (the open section tab is one). The
+wordmark is Kalnia Glaze, a color font, recolored into ruby, sapphire and
+amethyst glass with `@font-palette-values` in `tokens.css`. The card
+ornaments are SVG files in `apps/planner/src/lib/ornaments/` (corner filigree,
+a crescent-and-star divider, a stained-glass bell hung from a moon, a moon
+sprig, a quatrefoil), exposed as `--car-orn-*` tokens and laid in as
+backgrounds or pseudo-elements, so they sit under text and stay invisible to
+assistive tech. They're drawn only in gilt, lead and the glass jewels — none
+of which change with the hour — so they're plain images rather than inline SVG;
+the corner filigree is drawn 1 unit = 1px to land on the vellum's -6px gilt
+rule. `dayCycle.test.ts`
+samples every 15 minutes and holds the chrome to AA body text, AA-Large
+accents, and never landing on a mid-tone ground.
 
 Each observation has the deterministic identity
 `observation-<date>@<startTime>`, stores both its observed kind/label and the
@@ -759,18 +802,47 @@ not an audit, and the same view exports the Spores JSON.
 Carillon remains local-first: its domain records live in app-owned localStorage
 keys and `PlannerBlob` treats the instrument fields as optional so older synced
 blobs still hydrate. When passphrase sync is connected, `@woodles/sync` mirrors
-one whole `PlannerBlob` into Neon's `sync.blob` JSONB column. Carillon opts into
-the deterministic merge path: id-keyed collections are unioned; an observation
-collision takes the later `updatedAt`, a routine-practice collision the later
-`recordedAt`, mutable piles/tasks/routines/day choices — and sleep logs and
-signal entries alongside them — take the later `updatedAt`, and a Surge
-collision takes its later update with status precedence as a tie-break. The
+one whole `PlannerBlob` into Neon's `sync.blob` JSONB column, and it merges the
+way HomeSuite's does: three-way and per record, against `planner.sync.base.v1`
+— each record's fingerprint as of the last time this device and the server
+agreed (`mergeKeyed` in `@woodles/sync`). A record only one side changed takes
+that side. One missing on a side is new there (kept) or deleted there since
+(dropped), and an edit beats a delete — so a signal, obligation, ritual,
+domain or sitting removed on one device is removed on the others, where the
+old union brought it back. With no base — a first sync, or after
+disconnecting — the merge is a union. Only a record both devices changed
+reaches the domain rules: an observation takes the later `updatedAt`, a
+routine practice the later `recordedAt`, piles/tasks/routines/day
+choices/sleep logs/signal entries the later `updatedAt` (a pile or routine's
+`deletedAt` is final), a Surge collision its later update with status
+precedence as a tie-break, and loops, loop events, Five Contacts rounds and
+reminders their own resolvers in `openLoops.ts` and `reminders.ts`.
+Obligations, rituals and domains carry no time, so there the server's copy
+wins; settings merge per key by edit stamp (`apps/planner/BELLS.md`). The
 Spore ledger is then reconciled against the merged observations so kind,
-date, and amount stay canonical. Legacy settings and
-overlay collections remain remote-winning. A compare-and-swap conflict merges
-against each returned server version for up to three total pushes; persistent
-contention remains safe locally and surfaces as not-yet-synced instead of a
-false success. See "the sync layer" below for the transport contract.
+date, and amount stay canonical. A merge that adds nothing hands back the
+server's own blob — fingerprints are over canonical JSON, since JSONB reorders
+keys — so a sync with nothing new pushes nothing and leaves the page alone.
+
+The base is only safe while the store holds what this device agreed on, so
+three things guard it. **Tabs follow each other:** the store remembers the raw
+value it last read or wrote per key and takes another tab's save, on `storage`
+and again before every sync read (`catchUp`), so a tab open since morning
+neither saves over a newer tab's records nor reads their absence as
+deletions. **A failed save holds the base back:** a key whose last write threw
+— a full origin quota — means memory and storage disagree, and the base does
+not move until it saves. **An unreadable key starts over:** its section is
+dropped from the base on load, before anything is saved over the fallback, so
+the next sync is a union there. Sync runs one operation at a time per tab — a
+push asked for mid-sync goes out after it — and one tab at a time per device,
+under a Web Lock. It keeps HomeSuite's rhythm: on opening, on coming back to
+the tab after twenty seconds away, every two minutes while in view, a
+coalesced push after each edit, and on `pagehide` or hidden a push only if
+something changed since the base; the binder's *sync now* pulls as well. A
+compare-and-swap conflict merges against each returned server version for up
+to three total pushes; persistent contention remains safe locally and
+surfaces as not-yet-synced instead of a false success. See "the sync layer"
+below for the transport contract.
 
 ## the board
 
@@ -1145,6 +1217,31 @@ View preferences — mode, ruling, and which layer is on which page — are a
 1100px the notebook lies flat: pages stack, the spine goes away, and the
 verso/recto mirroring stops.
 
+**The format menu.** A right-click in any layer's prose opens Write's own
+menu (`src/lib/FormatMenu.svelte`) instead of the browser's, standalone and
+in HomeSuite alike: character styles (bold, italic, underline, strikethrough,
+highlight), paragraph styles (text, heading, subheading, quote, bullets,
+numbers), links, clear formatting, the clipboard, and a margin note. A caret
+inside a word takes the word, the way a Mac right-click does. ⇧ right-click
+still reaches the browser's menu, which is the only way to spelling
+suggestions; touch keeps its own long-press. The Menu key and ⇧F10 open it
+at the caret. Pockets, margin notes and the title keep the browser's menu.
+
+The edits split along what the browser gets right. Bold, italic, underline
+and strikethrough are `execCommand`. Everything else is a transform in
+`src/lib/formatting.ts` on a detached copy of the layer, swapped back with a
+single `insertHTML` over the whole layer — exact, and one step of the same
+undo history ⌘Z and HomeSuite's undo button walk. Lists are rebuilt there
+rather than asked of the browser, because Chrome's list commands nest the
+list inside the paragraph it started as, which reloads as stray empty
+paragraphs; the toolbar's paragraph and list buttons go through the same
+path. A selection is carried as `{ line, offset }` per end rather than a DOM
+Range, so one position means the same place in the live layer, in its copy,
+and after the swap — a line being a block, a top-level list item, or the
+bare text Chrome leaves for the first line typed. Highlight is `<mark>`,
+already on the sanitize allowlist, drawn in the palette's accent here and in
+`letter`.
+
 **The drafts list earns its size.** Index entries carry `kind` and `tags`;
 the drafts modal searches title + tags and filters by the kinds actually
 present. This answers CONVERGENCE.md §6.1 (write's flat drafts list),
@@ -1363,7 +1460,10 @@ if the version still matches what you read, and answers
 `409 { conflict, server }` when the server moved first. auth is one passphrase,
 sent as `Authorization: Bearer …`. the server never stores it — only its
 SHA-256, compared in constant time against the `SYNC_PASS_HASH` env var.
-`DATABASE_URL` comes from the Neon integration.
+`DATABASE_URL` comes from the Neon integration. both write paths go through
+`jsonbText` in `api/_lib.ts`, which drops NULs and replaces lone surrogates —
+the two things `JSON.stringify` emits that the `::jsonb` cast rejects. a 500
+answers `{ message }`, and the client's error carries it.
 
 **`packages/sync` (`@woodles/sync`)** — the client half. `pull(app)` and
 `push(app, blob, baseVersion)` wrap the endpoint; `createSyncedStore(adapter)`
@@ -1371,8 +1471,15 @@ owns the version bookkeeping. Ordinary adapters keep the "ask before clobber"
 decision — `onConflict` returns `mine`, `theirs`, or `cancel`. An append-like
 adapter may instead provide a deterministic `merge(local, remote)`: hydration
 applies and, when needed, flushes the merged blob; a compare-and-swap conflict
-merges against the server snapshot, adopts that returned version, and retries
-the push once. The active passphrase lives in module memory, while
+re-reads local state (so an edit made while the push was in flight isn't
+dropped), merges it against the server snapshot, adopts that returned version,
+and retries the push once. A merge that should let deletes stick builds on
+`packages/sync/src/threeWay.ts`: `canonical` and `fingerprint`, blind to key
+order as JSONB requires, and `mergeKeyed`/`mergeRecords`, which take a *base*
+— each item's fingerprint as of the last agreement — and tell a thing deleted
+on one side from a thing that side never saw. The app keeps the base itself,
+since only it knows whether its storage really holds what the server took.
+The active passphrase lives in module memory, while
 `createAppSync` also caches it under the shared `woodles_sync_passphrase`
 localStorage key so apps can reconnect after a reload; disconnect removes that
 bearer credential. the last-seen version is cached in localStorage too.
@@ -1383,10 +1490,11 @@ a `SyncState` class with `$state` fields, its instantiation, and a call to
 the adapter's `read()` maps the store into the blob type (`PlannerBlob`,
 `BestiaryBlob`, `DevlogBlob`, `ThinkingAboutBlob`); `write()` calls
 the store's `rehydrate()`; `isNewer` is optionally provided (`bestiary` and
-`thinking-about` use it). Carillon's file is deliberately larger because it
-owns the merge described above and coalesces queued instrument writes before
-flushing. HomeSuite's is the other larger one — a three-way, per-item merge
-across Write, Whiteboard, and Data's storage, under "homesuite" above.
+`thinking-about` use it). Carillon's and HomeSuite's are the larger ones:
+each keeps a base for a three-way merge and decides when it may move, and
+each syncs on its own rhythm — Carillon's record rules, tab guards and timing
+under "carillon" above, HomeSuite's merge across Write, Whiteboard, and Data's
+storage under "homesuite".
 `marginalia` still has none of this — it never syncs privately.
 `write`'s adapter used to be a pair of no-ops that existed only to borrow the
 passphrase handling for a public publish. Echoes is private now, so it syncs
@@ -1772,8 +1880,8 @@ in motion. the full log is in [REFACTORING.md](./REFACTORING.md); the shape of i
   `@woodles/app-manifest` shape) so `letter`, a static page with no build step,
   can import it directly. Two policies stayed *parameters* rather than being
   reconciled, because both sides already have stored data: whether a sanitize
-  keeps `data-anchor` (`write` strips and re-stamps; `marginalia` and `letter`
-  keep), and the anchor prefix (`write` stamps `a-`, the reading room `p-`).
+  keeps `data-anchor` (`write` strips it from paste and keeps it on its own
+  stored layers; `marginalia` and `letter` keep), and the anchor prefix (`write` stamps `a-`, the reading room `p-`).
   see [REFACTORING.md](./REFACTORING.md).
 - **`EditorToolbar.svelte`** — `write` (89 lines) and `marginalia` (113).
   diverged, still moving.
@@ -1787,25 +1895,30 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-2529 tests total: 35 in `api/` (its own
+2845 tests total: 39 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts`, `schedules.ts` and
 `sync.ts` — the one part of the workspace that isn't a pnpm package, so it
-needs its own runner instead of the recursive `pnpm -r test`), plus 2494
-across twenty-three pnpm packages — `planner` 558, `marginalia` 396,
+needs its own runner instead of the recursive `pnpm -r test`), plus 2806
+across twenty-four pnpm packages — `planner` 756, `marginalia` 458,
 `whiteboard` 258, `write` 251, `packages/incremental-core` 191,
 `thinking-about` 184, `bestiary` 162, `bloomforge` 83,
-`packages/dynamics` 69, `packages/witch-engine` 58, `companion` 42,
-`packages/sync` 38, `grimoire` 36, `packages/life-points` 30,
-`packages/text` 30, `bloomforge-player` 22, `data` 18,
+`packages/dynamics` 69, `packages/witch-engine` 58, `packages/sync` 48,
+`companion` 42, `grimoire` 36, `homesuite` 36, `packages/life-points` 30,
+`packages/text` 30, `bloomforge-player` 22, `data` 22,
 `packages/app-manifest` 17, `packages/handoff` 15, `packages/spellcraft` 15,
-`homesuite` 11, `packages/persistence` 6, and `packages/emoji` 4.
+`packages/mycelium` 13, `packages/persistence` 6, and `packages/emoji` 4.
 (Counted by running each suite, not by adding to the previous figure — keep
 this inventory current when a suite changes; the root command is the release
-contract, not the prose count. The latest pass, for Thinking About becoming a
-handoff receiver — 36 of its tests, in `handoffs.test.ts` and the store's new
-`thinkingAbout.test.ts` — caught up `companion`, `homesuite` and `data`, which
-had never been listed, and five figures that had drifted: `api/`, `planner`,
-`marginalia`, `write` and `packages/sync`. The pass before it caught up
+contract, not the prose count. The latest pass, for Carillon's sync — 16
+tests in `sync.test.ts` and the new `syncDevices.test.ts`, 7 in
+`packages/sync`'s `threeWay.test.ts` — caught up `packages/mycelium`, which
+had never been listed, and the figures that had drifted since the pass
+before: `api/`, `planner`, `marginalia`, `data` and `homesuite`. That one,
+for Thinking About becoming a handoff receiver — 36 of its tests, in
+`handoffs.test.ts` and the store's new `thinkingAbout.test.ts` — caught up
+`companion`, `homesuite` and `data`, which had never been listed, and five
+figures that had drifted: `api/`, `planner`, `marginalia`, `write` and
+`packages/sync`. The pass before it caught up
 four packages the inventory had never listed and four figures that had
 drifted behind their suites. `life-points` had been missing since the list was written; the
 `witch-engine`, `dynamics` and `grimoire` suites all arrived after it and
@@ -1884,11 +1997,14 @@ are written up in [apps/planner/KNOWN_ISSUES.md](./apps/planner/KNOWN_ISSUES.md)
 local server reads `vercel.json` and applies the production rewrites, so route
 coverage tests the paths people actually visit instead of seven unrelated Vite
 ports. The suite covers every published entry route, Write → Echoes archiving,
+Write's format menu (each edit surviving the reload, one undo step, lists
+beside paragraphs rather than in them, the keyboard way in),
 Bestiary gallery/adopt/share and Marginalia consumption, an Arcade state change,
 the Thinking About → Carillon round trip, back, and the sitting that returns
 from it, the companion's handoffs arriving on Thinking About (the held
 *open it* link, the same link waiting out a failed sync, a live take from
 another tab, a deleted arrival staying deleted), Carillon's binder strip and the way in and out of its task composer,
+Carillon's sync (a removal on one device staying removed on another, two tabs keeping each other's changes),
 legacy localStorage migration across reload,
 keyboard operation, and serious/critical WCAG A axe findings. `homesuite.spec.ts`
 covers the shell's seams: the veil, edits made just before a frame is removed,
@@ -1936,13 +2052,15 @@ lockfile, then runs `pnpm check`, `pnpm test`, and `pnpm build` from this
 workspace. Keep the local root commands and that workflow identical so a green
 checkout means the same thing locally and on GitHub.
 
-After the build it installs Chromium and runs two slices of `e2e/`: HomeSuite's
-spec and the `/homesuite` axe audit, then the landing spec with the `/` axe
-audit and keyboard check. HomeSuite's failures live between frames, and the
-landing page is a static file with no unit suite at all, so neither is reached
-any other way. The rest of `e2e/` is not in CI yet; when last
-run it had failures of its own (a `/letter` axe finding, some Carillon specs),
-so widen the slice once those are green rather than all at once.
+After the build it installs Chromium and runs three slices of `e2e/`:
+HomeSuite's spec and the `/homesuite` axe audit, then the landing spec with
+the `/` axe audit and keyboard check, then Carillon's sync spec. HomeSuite's
+failures live between frames, the landing page is a static file with no unit
+suite at all, and Carillon's sync across tabs leans on `storage` events and
+Web Locks that only a browser has, so none is reached any other way. The rest
+of `e2e/` is not in CI yet; when last run it had failures of its own (a
+`/letter` axe finding; Carillon's specs, which failed then, all passed on
+2026-10-20), so widen the slice once those are green rather than all at once.
 
 ## running things locally
 
@@ -1950,7 +2068,7 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (1832 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (2845 tests)
 pnpm check              svelte-check in every app
 pnpm build              build the eight SvelteKit apps
 ```

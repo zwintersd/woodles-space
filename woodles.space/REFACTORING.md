@@ -31,6 +31,30 @@ defaults to `'woodles_sync_passphrase'`. the `SyncState` class itself stays in e
 app's `.svelte.ts` so `$state` compiles under the app's Svelte plugin rather than
 in the package.
 
+## three-way sync merge
+**Status:** done
+**Copies:** `packages/sync/src/threeWay.ts` (`@woodles/sync`)
+**State:** consolidated
+**Notes:** HomeSuite built `canonical`, `fingerprint` and the per-item
+three-way merge for its suite sync; Carillon needed the same to make deletes
+stick, so the pure half moved into `@woodles/sync` as `mergeKeyed` /
+`mergeRecords` and HomeSuite imports it unchanged. each app passes its own
+resolver for an item both sides changed — HomeSuite the later `updatedAt`,
+Carillon its per-record rules.
+
+## sync base keeping
+**Status:** candidate
+**Copies:** `apps/{homesuite,planner}/src/lib/sync.svelte.ts`
+**State:** minor variation
+**Notes:** the glue around a three-way merge: remember the last blob read or
+written in an operation, save its fingerprints as the base only when the
+server took it, clear the base on disconnect, `pushIfChanged` on the way out.
+Carillon's adds what an in-memory store needs and HomeSuite's doesn't — it
+reads its owning apps' storage fresh on every sync: a follow-up push queued
+behind a running operation, a Web Lock across tabs, catching up with other
+tabs before a read, and holding the base back over a failed save. extract when
+a third app keeps a base, or when HomeSuite's grows the same guards.
+
 ## text / HTML utilities
 **Status:** done
 **Copies:** `packages/text` (`@woodles/text`)
@@ -51,6 +75,9 @@ now parameters rather than a winner:
   would orphan every margin note. `keepAttributes` covers both. write's own
   test suite caught this — the first version of the shared sanitizer changed
   write's semantics and a test that had been asserting the strip failed.
+  write later stopped stripping its own stored layers: re-stamping on load
+  numbers blocks in document order, so a note moved whenever a paragraph had
+  gone in above its own. only paste and imports strip now.
 - **the anchor prefix.** `write` stamps `a-001`, marginalia's reading room
   stamps `p-001`, and both are already in stored documents. picking one would
   silently orphan the other app's notes, so `ensureAnchorsOn` takes a prefix.
@@ -116,3 +143,17 @@ dark mode, and failing contrast. both now read `--hs-*` tokens from the one
 file, with a dark scheme. Write and Whiteboard keep their own palettes on
 purpose.
 
+## Carillon ornaments and shell tokens
+**Status:** candidate
+**Copies:** `apps/planner/src/lib/ornaments/` and `apps/mycelium/src/lib/ornaments/`
+(corner filigree, divider, quatrefoil, lunar moth, celestial chart and
+window); the stable `--car-*` furniture, paper, glass and vellum tokens in
+both apps' `src/lib/style/tokens.css`; the cabinet header, lancet tabs and
+ribbon CSS in planner's `+page.svelte` / `Binder.svelte` and mycelium's
+`mycelium.css`
+**State:** identical SVGs; tokens identical except mycelium's glass strip and
+wordmark palette
+**Notes:** a second app is wearing Carillon's room. if a third does, move the
+SVGs and the stable tokens into `shared/` (a `carillon-shell.css` beside
+`fonts.css`), leaving each app its own ground — planner's cycles, mycelium's
+holds still.

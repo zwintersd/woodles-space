@@ -12,10 +12,22 @@ try {
     const image = new Image();
     image.src = `data:image/svg+xml;base64,${btoa(source)}`;
     await image.decode();
+    // iOS fills a transparent home-screen icon with black and rounds its
+    // corners, so the 180 gets Carillon paper and room inside the mask.
+    const tiles = { 180: { ground: '#fcf5e3', inset: 0.07 } };
     return [16, 32, 48, 180, 256].map(size => {
       const large = document.createElement('canvas');
       large.width = large.height = size * 4;
-      large.getContext('2d').drawImage(image, 0, 0, large.width, large.height);
+      const ctx = large.getContext('2d');
+      const tile = tiles[size];
+      if (tile) {
+        ctx.fillStyle = tile.ground;
+        ctx.fillRect(0, 0, large.width, large.height);
+        const pad = large.width * tile.inset;
+        ctx.drawImage(image, pad, pad, large.width - pad * 2, large.height - pad * 2);
+      } else {
+        ctx.drawImage(image, 0, 0, large.width, large.height);
+      }
       const canvas = document.createElement('canvas');
       canvas.width = canvas.height = size;
       const context = canvas.getContext('2d');

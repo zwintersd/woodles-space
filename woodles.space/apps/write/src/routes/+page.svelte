@@ -13,6 +13,24 @@
 	import PocketsPanel from '$lib/PocketsPanel.svelte';
 	import MarginNotesColumn from '$lib/MarginNotes.svelte';
 	import SelectionPopover from '$lib/SelectionPopover.svelte';
+	import FormatMenu, { type FormatAction, type FormatState } from '$lib/FormatMenu.svelte';
+	import {
+		blockKindAt,
+		clearFormatting,
+		convertLines,
+		escapeHtml,
+		isHighlighted,
+		nodeAt,
+		normalizeLinkUrl,
+		pathTo,
+		pointAt,
+		positionOf,
+		readLines,
+		toggleHighlight,
+		wordBounds,
+		type BlockKind,
+		type Position
+	} from '$lib/formatting';
 	import Binder from '$lib/Binder.svelte';
 	import PublishOverlay, { type PublishStatus } from '$lib/PublishOverlay.svelte';
 	import EchoesSyncPanel from '$lib/EchoesSyncPanel.svelte';
@@ -21,6 +39,7 @@
 	import {
 		ANCHOR_BLOCK_SELECTOR,
 		sanitizeHtml,
+		sanitizeStoredHtml,
 		ensureAnchorsOn,
 		stampAnchorsHtml,
 		isEmptyHtml,
@@ -287,20 +306,40 @@
 	function handlePaste(e: ClipboardEvent) {
 		const data = e.clipboardData;
 		if (!data) return;
-		const html = data.getData('text/html');
-		const text = data.getData('text/plain');
 		e.preventDefault();
-		if (html) {
-			const cleaned = sanitizeHtml(html);
-			document.execCommand('insertHTML', false, cleaned);
-		} else if (text) {
-			document.execCommand('insertText', false, text);
-		}
+		insertClipboard(data.getData('text/html'), data.getData('text/plain'));
 	}
 
-	function stampLiveAnchors() {
+	/** Pasted markup is untrusted, so it goes through the same sanitize as everything else. */
+	function insertClipboard(html: string, text: string): boolean {
+		if (html) document.execCommand('insertHTML', false, sanitizeHtml(html));
+		else if (text) document.execCommand('insertText', false, text);
+		else return false;
+		return true;
+	}
+
+	// Which element held each anchor at the last stamp. Chromium splits a block
+	// by cloning it, `data-anchor` and all, and Enter at the start of one puts
+	// the clone in front — so left to "first in document order keeps it", the
+	// new empty line would take the note. The element that had the id keeps it.
+	let anchorOwners = new Map<string, Element>();
+
+	// A note whose block was deleted keeps its id, so new blocks number past
+	// it rather than inheriting the note. Load passes none: a draft stored
+	// without ids gets them by order, and its notes with them.
+	function stampLiveAnchors(taken: Iterable<string> = marginNotes.map((m) => m.anchorId)) {
 		if (!fgEl) return;
-		ensureAnchorsOn(fgEl.querySelectorAll(ANCHOR_BLOCK_SELECTOR));
+		const blocks = Array.from(fgEl.querySelectorAll(ANCHOR_BLOCK_SELECTOR));
+		const present = new Set(blocks);
+		for (const block of blocks) {
+			const id = block.getAttribute('data-anchor');
+			const owner = id ? anchorOwners.get(id) : undefined;
+			if (owner && owner !== block && present.has(owner) && owner.getAttribute('data-anchor') === id) {
+				block.removeAttribute('data-anchor');
+			}
+		}
+		ensureAnchorsOn(blocks, 'a-', taken);
+		anchorOwners = new Map(blocks.map((block) => [block.getAttribute('data-anchor') ?? '', block]));
 		markTrashedReferences();
 	}
 
@@ -351,13 +390,14 @@
 		goal = coerceGoal(d.goal);
 		liquidBoard = d.liquid ?? emptyBoard();
 		const layers = d.layers ?? {};
-		const fgHtml = sanitizeHtml(layers.foreground?.html ?? d.content ?? '');
+		// The foreground keeps its own anchors — margin notes are matched by them.
+		const fgHtml = sanitizeStoredHtml(layers.foreground?.html ?? d.content ?? '');
 		const mgHtml = sanitizeHtml(layers.midground?.html ?? '');
 		const bgHtml = sanitizeHtml(layers.background?.html ?? '');
 		if (fgEl) fgEl.innerHTML = fgHtml;
 		if (mgEl) mgEl.innerHTML = mgHtml;
 		if (bgEl) bgEl.innerHTML = bgHtml;
-		stampLiveAnchors();
+		stampLiveAnchors([]);
 		const notes = d.annotations?.pocketNotes;
 		pockets = Array.isArray(notes)
 			? notes.map((n) => ({
@@ -438,6 +478,8 @@
 
 	function onHomeSuiteKeydown(event: KeyboardEvent) {
 		if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+			// Write's own format menu already has the keyboard.
+			if (formatMenu) return;
 			if (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
 			event.preventDefault(); openWriteContext({ x: 16, y: 16 }); return;
 		}
@@ -522,6 +564,360 @@
 		openWriteContext({ x: event.clientX, y: event.clientY }, anchor ?? undefined);
 	}
 
+	// ── the format menu: what a right-click in the writing opens ──
+	//
+	// Write's own menu replaces the browser's on the three layers' prose, in
+	// HomeSuite and on its own. The selection it acts on is remembered as line
+	// positions when it opens (see formatting.ts), because focus moves into the
+	// menu and has to come back to exactly the same words before any edit.
+	type FormatTarget = {
+		draftId: string | null;
+		layer: LayerId;
+		el: HTMLDivElement;
+		start: Position;
+		end: Position;
+		collapsed: boolean;
+		link: HTMLAnchorElement | null;
+		reference: HTMLAnchorElement | null;
+		/** The foreground block a margin note would attach to. */
+		anchorId: string | null;
+	};
+	let formatMenu = $state<{
+		x: number;
+		y: number;
+		avoid: { top: number; bottom: number } | null;
+		keyboard: boolean;
+		format: FormatState;
+	} | null>(null);
+	let formatTarget: FormatTarget | null = null;
+	let lastPointerType = 'mouse';
+
+	function layerOf(node: Node | null): LayerId | null {
+		if (!node) return null;
+		return LAYER_IDS.find((id) => elFor(id)?.contains(node)) ?? null;
+	}
+
+	function onPointerKind(event: PointerEvent) {
+		lastPointerType = event.pointerType;
+	}
+
+	/** The link or reference the selection is on, if any. */
+	function anchorAt(el: HTMLElement, range: Range): HTMLAnchorElement | null {
+		const selector = 'a[href], a[data-ref-id]';
+		for (const node of [range.startContainer, range.commonAncestorContainer]) {
+			const found = (node instanceof Element ? node : node.parentElement)?.closest<HTMLAnchorElement>(selector);
+			if (found && el.contains(found)) return found;
+		}
+		// A double-click can start the selection at the very end of the text
+		// before a link; it still means the link if it holds nothing else.
+		const words = range.toString().trim();
+		if (!words) return null;
+		const touched = [...el.querySelectorAll<HTMLAnchorElement>(selector)].filter((a) => range.intersectsNode(a));
+		return touched.length === 1 && touched[0].textContent?.includes(words) ? touched[0] : null;
+	}
+
+	/** The current selection as a format target, if it is in `layer`. */
+	function targetFromSelection(layer: LayerId): FormatTarget | null {
+		const el = elFor(layer);
+		const selection = window.getSelection();
+		if (!el || !selection || selection.rangeCount === 0) return null;
+		const range = selection.getRangeAt(0);
+		if (!el.contains(range.commonAncestorContainer)) return null;
+		const lines = readLines(el);
+		const startEl = range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement;
+		const anchor = anchorAt(el, range);
+		const block = startEl?.closest<HTMLElement>('[data-anchor]');
+		return {
+			draftId: currentDraftId,
+			layer,
+			el,
+			start: positionOf(el, lines, range.startContainer, range.startOffset),
+			end: positionOf(el, lines, range.endContainer, range.endOffset),
+			collapsed: range.collapsed,
+			link: anchor && !anchor.dataset.refId ? anchor : null,
+			reference: anchor?.dataset.refId ? anchor : null,
+			anchorId: layer === 'foreground' && !range.collapsed && block && el.contains(block) ? block.dataset.anchor ?? null : null
+		};
+	}
+
+	function openFormatMenu(layer: LayerId, at: { x: number; y: number } | null): boolean {
+		const selection = window.getSelection();
+		const caret = selection && selection.rangeCount ? selection.getRangeAt(0) : null;
+		// A caret inside a word takes the word, the way a right-click does on a
+		// Mac — otherwise "bold" from the menu would only arm the next keystroke.
+		// From the pointer, only when it is on the word: a right-click in the
+		// blank page after the last line lands the caret beside it too.
+		if (caret?.collapsed && caret.startContainer instanceof Text && elFor(layer)?.contains(caret.startContainer)) {
+			const bounds = wordBounds(caret.startContainer.data, caret.startOffset);
+			if (bounds) {
+				const word = document.createRange();
+				word.setStart(caret.startContainer, bounds[0]);
+				word.setEnd(caret.startContainer, bounds[1]);
+				const onWord = !at || [...word.getClientRects()].some((r) => at.x >= r.left - 2 && at.x <= r.right + 2 && at.y >= r.top - 2 && at.y <= r.bottom + 2);
+				if (onWord) {
+					selection!.removeAllRanges();
+					selection!.addRange(word);
+				}
+			}
+		}
+		const target = targetFromSelection(layer);
+		if (!target) return false;
+		const range = window.getSelection()!.getRangeAt(0);
+		const words = range.toString().replace(/\s+/g, ' ').trim();
+		const ref = target.reference?.dataset;
+		const format: FormatState = {
+			bold: document.queryCommandState('bold'),
+			italic: document.queryCommandState('italic'),
+			underline: document.queryCommandState('underline'),
+			strike: document.queryCommandState('strikeThrough'),
+			highlight: isHighlighted(target.el, target.start, target.end),
+			block: blockKindAt(target.el, target.start, target.end),
+			collapsed: target.collapsed,
+			excerpt: words.length > 38 ? `${words.slice(0, 36).trimEnd()}…` : words,
+			link: target.link ? { href: target.link.getAttribute('href') ?? '' } : null,
+			reference: ref
+				? {
+						label: target.reference!.textContent?.trim() || 'reference',
+						canOpen: homeSuiteMode || !!referenceHref(ref.refApp ?? '', ref.refKind ?? '', ref.refId ?? '')
+					}
+				: null,
+			// A link laid over a reference would overwrite where it points.
+			canLink: !target.reference && ![...target.el.querySelectorAll('a[data-ref-id]')].some((a) => range.intersectsNode(a)),
+			canMarginNote: !!target.anchorId
+		};
+		let point = at;
+		let avoid: { top: number; bottom: number } | null = null;
+		if (point) {
+			// Keep the selected words in sight: open below the line under the pointer.
+			const y = point.y;
+			const row = range.collapsed ? null : [...range.getClientRects()].find((r) => y >= r.top - 1 && y <= r.bottom + 1);
+			if (row) avoid = { top: row.top, bottom: row.bottom };
+		} else {
+			const rect = range.getBoundingClientRect();
+			const box = rect.width || rect.height ? rect : (range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement ?? target.el).getBoundingClientRect();
+			point = { x: box.left, y: box.bottom };
+			avoid = { top: box.top, bottom: box.bottom };
+		}
+		closeReferencePicker();
+		formatTarget = target;
+		formatMenu = { ...point, avoid, keyboard: !at, format };
+		return true;
+	}
+
+	function closeFormatMenu(restore: boolean) {
+		formatMenu = null;
+		if (restore && formatTarget) restoreTarget(formatTarget);
+	}
+
+	/** Focus the layer and select the remembered words again. */
+	function restoreTarget(target: FormatTarget): boolean {
+		if (target.draftId !== currentDraftId || !target.el.isConnected) return false;
+		target.el.focus({ preventScroll: true });
+		const lines = readLines(target.el);
+		const end = pointAt(target.el, lines, target.end, 'back');
+		const start = target.collapsed ? end : pointAt(target.el, lines, target.start, 'forward');
+		const range = document.createRange();
+		range.setStart(start.node, start.offset);
+		range.setEnd(end.node, end.offset);
+		const selection = window.getSelection();
+		selection?.removeAllRanges();
+		selection?.addRange(range);
+		return true;
+	}
+
+	/**
+	 * Swap the layer's content for `transform`'s version of a copy of it. One
+	 * `insertHTML` over the whole layer keeps it a single step of the browser's
+	 * undo — the same history ⌘Z and HomeSuite's undo button walk.
+	 */
+	function rewriteLayer(target: FormatTarget, transform: (copy: HTMLElement) => boolean): boolean {
+		const copy = target.el.cloneNode(true) as HTMLElement;
+		if (!transform(copy) || copy.innerHTML === target.el.innerHTML) return false;
+		const { scrollX, scrollY } = window;
+		const all = document.createRange();
+		all.selectNodeContents(target.el);
+		const selection = window.getSelection();
+		selection?.removeAllRanges();
+		selection?.addRange(all);
+		document.execCommand('insertHTML', false, copy.innerHTML);
+		restoreTarget(target);
+		window.scrollTo(scrollX, scrollY);
+		return true;
+	}
+
+	async function runFormatAction(action: FormatAction, value?: string) {
+		const target = formatTarget;
+		formatMenu = null;
+		if (!target || !restoreTarget(target)) return;
+		let edited = true;
+		switch (action) {
+			case 'bold':
+			case 'italic':
+			case 'underline':
+				document.execCommand(action);
+				break;
+			case 'strike':
+				document.execCommand('strikeThrough');
+				break;
+			case 'highlight':
+				edited = rewriteLayer(target, (copy) => toggleHighlight(copy, target.start, target.end));
+				break;
+			case 'clear':
+				edited = rewriteLayer(target, (copy) => clearFormatting(copy, target.start, target.end));
+				break;
+			case 'block':
+				edited = rewriteLayer(target, (copy) => convertLines(copy, target.start, target.end, value as BlockKind));
+				break;
+			case 'link':
+				edited = applyLink(target, value ?? '');
+				break;
+			case 'link:remove':
+			case 'ref:remove':
+				edited = unlinkAnchor(target.link ?? target.reference);
+				break;
+			case 'link:open':
+				if (target.link) window.open(target.link.href, '_blank', 'noopener');
+				return;
+			case 'ref:open':
+				openReference(target.reference);
+				return;
+			case 'cut':
+				document.execCommand('cut');
+				break;
+			case 'copy':
+				document.execCommand('copy');
+				return;
+			case 'paste':
+			case 'paste-plain':
+				edited = await pasteFromClipboard(target, action === 'paste-plain');
+				break;
+			case 'margin-note':
+				if (target.anchorId) void addMarginNote(target.anchorId);
+				return;
+		}
+		if (edited) afterFormatEdit(target.layer);
+	}
+
+	function applyLink(target: FormatTarget, input: string): boolean {
+		const href = normalizeLinkUrl(input);
+		if (!href) return false;
+		if (target.link) {
+			const path = pathTo(target.el, target.link);
+			return !!path && rewriteLayer(target, (copy) => {
+				const anchor = nodeAt(copy, path);
+				if (!(anchor instanceof HTMLAnchorElement)) return false;
+				anchor.setAttribute('href', href);
+				return true;
+			});
+		}
+		// Nothing selected: the address itself becomes the linked words.
+		if (target.collapsed) document.execCommand('insertHTML', false, `<a href="${escapeHtml(href)}">${escapeHtml(input.trim())}</a>`);
+		else document.execCommand('createLink', false, href);
+		return true;
+	}
+
+	function unlinkAnchor(anchor: HTMLAnchorElement | null): boolean {
+		if (!anchor?.isConnected) return false;
+		const range = document.createRange();
+		range.selectNodeContents(anchor);
+		const selection = window.getSelection();
+		selection?.removeAllRanges();
+		selection?.addRange(range);
+		document.execCommand('unlink');
+		return true;
+	}
+
+	function openReference(anchor: HTMLAnchorElement | null) {
+		const { refApp: app, refKind: kind, refId: id } = anchor?.dataset ?? {};
+		if (!app || !kind || !id) return;
+		if (homeSuiteMode) {
+			postHomeSuiteNavigate({ app, kind, id });
+			return;
+		}
+		const href = referenceHref(app, kind, id);
+		if (!href) return;
+		// Leaving the page — so the last few keystrokes can't wait for the debounce.
+		clearTimeout(saveTimer);
+		persistCurrentDraft();
+		window.location.href = href;
+	}
+
+	async function pasteFromClipboard(target: FormatTarget, plain: boolean): Promise<boolean> {
+		let html = '';
+		let text = '';
+		try {
+			if (plain || !navigator.clipboard.read) {
+				text = await navigator.clipboard.readText();
+			} else {
+				for (const item of await navigator.clipboard.read()) {
+					if (!html && item.types.includes('text/html')) html = await (await item.getType('text/html')).text();
+					if (!text && item.types.includes('text/plain')) text = await (await item.getType('text/plain')).text();
+				}
+			}
+		} catch {
+			// Refused, or a browser that keeps reading the clipboard to its own shortcut.
+			const mac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+			const keys = mac ? (plain ? '⇧⌘V' : '⌘V') : plain ? 'Ctrl+Shift+V' : 'Ctrl+V';
+			flashNotice(`the browser kept the clipboard to itself — paste with ${keys}`);
+			return false;
+		}
+		if (!restoreTarget(target)) return false;
+		return insertClipboard(html, text);
+	}
+
+	function afterFormatEdit(layer: LayerId) {
+		// The swap's input event can read a `#` before the caret as a new trigger.
+		closeReferencePicker();
+		updateMeta();
+		if (layer === 'foreground') {
+			stampLiveAnchors();
+			scheduleMeasure();
+		}
+		fgVersion += 1;
+		scheduleSave();
+		updateToolbarState();
+		scheduleHomeSuiteHistoryState();
+	}
+
+	function flashNotice(text: string) {
+		notice = text;
+		clearTimeout(noticeTimer);
+		noticeTimer = setTimeout(() => {
+			notice = '';
+		}, 3200);
+	}
+
+	/** The keyboard's way in: the Menu key, or ⇧F10. */
+	function openFormatMenuFromKey(event: KeyboardEvent, layer: LayerId): boolean {
+		if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return false;
+		if (isListKind) return false;
+		event.preventDefault();
+		openFormatMenu(layer, null);
+		return true;
+	}
+
+	function onDocumentContextMenu(event: MouseEvent) {
+		if (!(event.target instanceof Element)) return;
+		const reference = event.target.closest('a[data-ref-app][data-ref-kind][data-ref-id]');
+		// In HomeSuite a reference keeps the shell's menu: open, copy, collect.
+		if (homeSuiteMode && reference && editorPageEl?.contains(reference)) {
+			writeContextEvent(event);
+			return;
+		}
+		const layer = isListKind ? null : layerOf(event.target);
+		if (layer) {
+			// ⇧ keeps the browser's own menu — the way to spelling suggestions —
+			// and a long press keeps its selection handles.
+			if (event.shiftKey || lastPointerType === 'touch') return;
+			// A contextmenu from the Menu key has no pointer, and no place to open but the caret.
+			const pointerType = (event as Partial<PointerEvent>).pointerType;
+			const fromKeyboard = pointerType === '' || (pointerType === undefined && event.button !== 2 && !event.clientX && !event.clientY);
+			if (openFormatMenu(layer, fromKeyboard ? null : { x: event.clientX, y: event.clientY })) event.preventDefault();
+			return;
+		}
+		if (homeSuiteMode) writeContextEvent(event);
+	}
+
 	function onHomeSuiteReferenceClick(event: MouseEvent) {
 		if (!(event.metaKey || event.ctrlKey) || !(event.target instanceof Element)) return;
 		const anchor = event.target.closest<HTMLAnchorElement>('a[data-ref-app][data-ref-kind][data-ref-id]');
@@ -570,6 +966,8 @@
 
 		const params = new URLSearchParams(window.location.search);
 		homeSuiteMode = params.get('homesuite') === '1' && window.parent !== window;
+		document.addEventListener('contextmenu', onDocumentContextMenu);
+		document.addEventListener('pointerdown', onPointerKind, true);
 		if (homeSuiteMode) {
 			window.addEventListener('message', onHomeSuiteMessage);
 			window.addEventListener('keydown', onHomeSuiteKeydown, true);
@@ -577,7 +975,6 @@
 			document.addEventListener('focusin', onHomeSuiteFocusIn);
 			document.addEventListener('input', scheduleHomeSuiteHistoryState, true);
 			document.addEventListener('click', onHomeSuiteReferenceClick, true);
-			document.addEventListener('contextmenu', writeContextEvent);
 		}
 		const tid = params.get('template');
 		const replyId = params.get('reply');
@@ -755,7 +1152,8 @@
 			document.removeEventListener('focusin', onHomeSuiteFocusIn);
 			document.removeEventListener('input', scheduleHomeSuiteHistoryState, true);
 			document.removeEventListener('click', onHomeSuiteReferenceClick, true);
-			document.removeEventListener('contextmenu', writeContextEvent);
+			document.removeEventListener('contextmenu', onDocumentContextMenu);
+			document.removeEventListener('pointerdown', onPointerKind, true);
 		}
 		wrapObserver?.disconnect();
 		clearTimeout(noticeTimer);
@@ -1009,14 +1407,37 @@
 
 	function exec(cmd: string, val: string | null = null) {
 		if (activeLayer !== 'foreground') return;
-		document.execCommand(cmd, false, val ?? undefined);
+		const block: BlockKind | null =
+			cmd === 'formatBlock' ? (val as BlockKind) : cmd === 'insertUnorderedList' ? 'ul' : cmd === 'insertOrderedList' ? 'ol' : null;
+		if (block || cmd === 'removeFormat') {
+			// The format menu's edits, not the browser's: its list commands nest
+			// the list inside the paragraph it started as, which reloads as two
+			// stray empty paragraphs around it.
+			const target = targetFromSelection('foreground');
+			if (target) {
+				const isList = block === 'ul' || block === 'ol';
+				// The list buttons toggle, as they always have.
+				const kind = isList && blockKindAt(target.el, target.start, target.end) === block ? 'p' : block;
+				const edited = rewriteLayer(target, (copy) =>
+					kind ? convertLines(copy, target.start, target.end, kind) : clearFormatting(copy, target.start, target.end)
+				);
+				if (edited) afterFormatEdit('foreground');
+			}
+		} else {
+			document.execCommand(cmd, false, val ?? undefined);
+		}
 		fgEl?.focus();
 		updateToolbarState();
 	}
 
 	function insertLink() {
-		const url = prompt('URL:');
-		if (url) exec('createLink', url);
+		const input = prompt('URL:');
+		if (!input) return;
+		// A bare "example.com" would otherwise be a relative link, which the
+		// sanitizer strips the next time the draft loads.
+		const href = normalizeLinkUrl(input);
+		if (href) exec('createLink', href);
+		else flashNotice('that doesn’t look like a web or email address');
 	}
 
 	function updateToolbarState() {
@@ -1165,7 +1586,8 @@
 		const issue = incrementIssue();
 		try {
 			const now = new Date().toISOString();
-			const fgHtml = stampAnchorsHtml(sanitizeHtml(fgEl?.innerHTML ?? ''));
+			// Echoes shows anchors as given, so the live ids go out with the notes.
+			const fgHtml = stampAnchorsHtml(sanitizeStoredHtml(fgEl?.innerHTML ?? ''));
 			const mgHtml = sanitizeHtml(mgEl?.innerHTML ?? '');
 			const bgHtml = sanitizeHtml(bgEl?.innerHTML ?? '');
 			const cleanedPockets = pockets.map((p) => ({ ...p, html: sanitizeHtml(p.html) }));
@@ -1363,6 +1785,7 @@
 	}
 
 	function onEditorKeydown(event: KeyboardEvent) {
+		if (openFormatMenuFromKey(event, 'foreground')) return;
 		if (picker?.handleKey(event)) {
 			event.preventDefault();
 			if (event.key === 'Escape') closeReferencePicker(true);
@@ -1836,6 +2259,7 @@
 					oninput={() => { updateMeta(); scheduleSave(); fgVersion += 1; }}
 					onpaste={handlePaste}
 					onfocus={() => onLayerFocus('midground')}
+					onkeydown={(e) => openFormatMenuFromKey(e, 'midground')}
 					role="textbox"
 					tabindex="0"
 				></div>
@@ -1864,6 +2288,7 @@
 					oninput={() => { updateMeta(); scheduleSave(); fgVersion += 1; }}
 					onpaste={handlePaste}
 					onfocus={() => onLayerFocus('background')}
+					onkeydown={(e) => openFormatMenuFromKey(e, 'background')}
 					role="textbox"
 					tabindex="0"
 				></div>
@@ -1909,9 +2334,23 @@
 </div>
 
 <SelectionPopover
-	rect={selectionRect && selectionAnchorId && activeLayer === 'foreground' ? selectionRect : null}
+	rect={!formatMenu && selectionRect && selectionAnchorId && activeLayer === 'foreground' ? selectionRect : null}
 	onAdd={() => { if (selectionAnchorId) addMarginNote(selectionAnchorId); }}
 />
+
+{#if formatMenu}
+	{#key formatMenu}
+		<FormatMenu
+			x={formatMenu.x}
+			y={formatMenu.y}
+			avoid={formatMenu.avoid}
+			keyboard={formatMenu.keyboard}
+			format={formatMenu.format}
+			onAction={runFormatAction}
+			onClose={closeFormatMenu}
+		/>
+	{/key}
+{/if}
 
 <Binder
 	bind:open={binderOpen}
@@ -2408,8 +2847,19 @@
 		border-bottom: 1px solid color-mix(in srgb, var(--accent-strong) 22%, transparent);
 	}
 	.doc-body :global(a:hover) { border-bottom-color: var(--accent-strong); }
-	.doc-body :global(strong) { font-weight: 600; }
+	/* <b> too: it is what the bold command writes, and left to "bolder" over
+	   the body's 300 it lands at 400 — barely heavier, and below the weight
+	   the browser counts as bold, so bold never read as on. */
+	.doc-body :global(strong), .doc-body :global(b) { font-weight: 600; }
 	.doc-body :global(em) { font-style: italic; }
+	/* the format menu's highlight — the palette's accent, not the browser's yellow */
+	.doc-body :global(mark) {
+		background: color-mix(in srgb, var(--accent) 38%, transparent);
+		color: inherit;
+		border-radius: 0.15em;
+		-webkit-box-decoration-break: clone;
+		box-decoration-break: clone;
+	}
 
 	.layer-midground {
 		font-size: 0.98rem; line-height: 1.78; color: var(--muted);

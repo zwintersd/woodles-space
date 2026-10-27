@@ -1,0 +1,110 @@
+<!-- Carillon: the bellflower observatory. A hand-leaded lancet with a lunar
+     rose, twin botanical lights, and a bell suspended from the waxing moon. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420" width="300" height="420" fill="none">
+  <defs>
+    <linearGradient id="cw-brass" x1="34" y1="26" x2="254" y2="405" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e5c77b"/><stop offset=".34" stop-color="#a6752e"/><stop offset=".66" stop-color="#edce85"/><stop offset="1" stop-color="#8d612d"/>
+    </linearGradient>
+    <linearGradient id="cw-glass" x1="73" y1="49" x2="227" y2="366" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#40234f"/><stop offset=".5" stop-color="#254e64"/><stop offset="1" stop-color="#371e49"/>
+    </linearGradient>
+    <linearGradient id="cw-violet" x1="80" y1="182" x2="140" y2="365" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9d70bd"/><stop offset=".56" stop-color="#67389d"/><stop offset="1" stop-color="#472457"/>
+    </linearGradient>
+    <linearGradient id="cw-peacock" x1="173" y1="191" x2="237" y2="364" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4b9d9b"/><stop offset=".54" stop-color="#136f7c"/><stop offset="1" stop-color="#244b61"/>
+    </linearGradient>
+    <linearGradient id="cw-amber" x1="121" y1="61" x2="169" y2="158" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f0d28d"/><stop offset="1" stop-color="#b77738"/>
+    </linearGradient>
+    <clipPath id="cw-opening"><path d="M47 375V158C47 103 92 65 150 31C208 65 253 103 253 158V375Z"/></clipPath>
+    <path id="cw-petal" d="M150 128C138 115 136 99 150 81C164 99 162 115 150 128Z"/>
+    <path id="cw-leaf" d="M0 0C-13-4-17-16-14-23C-3-20 2-10 0 0Z"/>
+  </defs>
+
+  <!-- The cut brass frame is deliberately a little heavier at the sill. -->
+  <path d="M33 386V157C33 94 86 48 150 12C214 48 267 94 267 157V386Z" fill="#2a1d2e" stroke="#1e1624" stroke-width="2"/>
+  <path d="M39 382V157C39 98 89 55 150 21C211 55 261 98 261 157V382Z" stroke="url(#cw-brass)" stroke-width="3"/>
+  <path d="M47 375V158C47 103 92 65 150 31C208 65 253 103 253 158V375Z" fill="url(#cw-glass)" stroke="#e0bd70" stroke-opacity=".7" stroke-width="1"/>
+
+  <g clip-path="url(#cw-opening)" stroke="#2a1d2e" stroke-width="2.2" stroke-linejoin="round">
+    <!-- Irregular border panes retain the little imperfections of old glass. -->
+    <path d="M47 159L79 146L69 111L43 126Z" fill="#327e84"/>
+    <path d="M69 111L103 91L93 64L55 93Z" fill="#62416f"/>
+    <path d="M103 91L125 76L117 48L93 64Z" fill="#216d76"/>
+    <path d="M125 76L150 69L150 31L117 48Z" fill="#8a517e"/>
+    <path d="M150 69L175 76L183 48L150 31Z" fill="#286a7d"/>
+    <path d="M175 76L197 91L207 64L183 48Z" fill="#7b4e9b"/>
+    <path d="M197 91L231 111L245 93L207 64Z" fill="#9b643e"/>
+    <path d="M231 111L221 146L253 159L257 126Z" fill="#286a7d"/>
+    <path d="M47 159L79 146L91 181L47 201Z" fill="#74437d"/>
+    <path d="M253 159L221 146L209 181L253 201Z" fill="#724265"/>
+    <path d="M47 201L60 198V247L47 264Z" fill="#225e70"/>
+    <path d="M47 264L60 247V308L47 330Z" fill="#764575"/>
+    <path d="M47 330L60 308V375H47Z" fill="#9a653e"/>
+    <path d="M240 198L253 201V264L240 247Z" fill="#5b3b79"/>
+    <path d="M240 247L253 264V330L240 308Z" fill="#286477"/>
+    <path d="M240 308L253 330V375H240Z" fill="#7d3c58"/>
+    <path d="M62 375V245C62 215 78 194 102 179C126 194 142 215 142 245V375Z" fill="url(#cw-violet)"/>
+    <path d="M158 375V245C158 215 174 194 198 179C222 194 238 215 238 245V375Z" fill="url(#cw-peacock)"/>
+    <path d="M62 273L102 254L142 273M62 329L103 309L142 329M158 273L198 254L238 273M158 329L198 309L238 329"/>
+    <path d="M102 179V254M102 309V375M198 179V254M198 309V375"/>
+    <path d="M62 247L83 231L102 254L122 231L142 247M158 247L178 231L198 254L218 231L238 247" stroke-opacity=".65" stroke-width="1.5"/>
+
+    <!-- Eight tear-shaped panes orbit the small lunar heart of the rose. -->
+    <circle cx="150" cy="130" r="58" fill="#30253e" stroke="url(#cw-brass)" stroke-width="2"/>
+    <circle cx="150" cy="130" r="51" stroke="#b99058" stroke-width="1"/>
+    <use href="#cw-petal" fill="#8254a2"/>
+    <use href="#cw-petal" transform="rotate(45 150 130)" fill="#216f7d"/>
+    <use href="#cw-petal" transform="rotate(90 150 130)" fill="#b17d3d"/>
+    <use href="#cw-petal" transform="rotate(135 150 130)" fill="#6b468c"/>
+    <use href="#cw-petal" transform="rotate(180 150 130)" fill="#297b81"/>
+    <use href="#cw-petal" transform="rotate(225 150 130)" fill="#81314f"/>
+    <use href="#cw-petal" transform="rotate(270 150 130)" fill="#7160a3"/>
+    <use href="#cw-petal" transform="rotate(315 150 130)" fill="#428b88"/>
+    <circle cx="150" cy="130" r="17" fill="#3d2b53" stroke="url(#cw-brass)" stroke-width="1.5"/>
+  </g>
+
+  <g stroke="url(#cw-brass)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M155 118A13 13 0 1 0 156 143A11 11 0 0 1 155 118Z" fill="url(#cw-amber)" stroke-width=".8"/>
+    <!-- A bellflower grows through the left lancet, its stem also a lead line. -->
+    <path d="M101 373C97 347 115 331 106 306C97 283 79 267 96 241C105 226 113 221 109 205" stroke-width="2"/>
+    <path d="M103 351C116 342 126 342 127 326C114 325 106 333 103 351Z" fill="#2e6873" stroke-width="1.2"/>
+    <path d="M104 321C89 317 78 306 79 293C91 294 102 306 104 321Z" fill="#537c75" stroke-width="1.2"/>
+    <path d="M98 286C108 276 121 277 126 262C113 258 102 267 98 286Z" fill="#286c74" stroke-width="1.2"/>
+    <path d="M96 244C84 237 80 225 84 215C95 220 99 231 96 244Z" fill="#355e65" stroke-width="1.2"/>
+    <path d="M109 219C119 214 126 219 124 229" stroke-width="1.4"/>
+    <path d="M117 229C117 224 128 224 130 229L133 242C127 237 126 246 123 242C119 238 117 242 114 241Z" fill="#b090bb" stroke-width="1.3"/>
+    <path d="M104 302C91 297 87 302 88 312" stroke-width="1.4"/>
+    <path d="M82 312C83 307 92 307 94 312L98 325C93 322 92 329 88 326C85 322 81 327 78 324Z" fill="#9a6ba5" stroke-width="1.3"/>
+    <path d="M105 341C116 335 122 339 123 348" stroke-width="1.4"/>
+    <path d="M117 348C118 343 127 343 129 348L133 361C128 357 127 365 123 361C120 358 116 362 113 360Z" fill="#bd91b7" stroke-width="1.3"/>
+
+    <!-- The right light is the bell's little night garden. -->
+    <path d="M211 218A25 25 0 1 0 215 263A21 21 0 0 1 211 218Z" fill="url(#cw-brass)" stroke-width=".9"/>
+    <path d="M201 264C202 277 190 279 191 291" stroke-width="1.2"/>
+    <circle cx="191" cy="293" r="2.6" stroke-width="1.1"/>
+    <path d="M191 296C181 296 178 304 178 312C178 320 175 323 172 327H210C206 323 204 320 204 312C204 304 201 296 191 296Z" fill="#81314f" stroke-width="1.5"/>
+    <path d="M191 297V318M178 313Q191 319 204 313" stroke-width="1.2"/>
+    <path d="M172 327H210L212 331H170Z" fill="url(#cw-brass)" stroke-width="1"/>
+    <circle cx="191" cy="336" r="3" fill="url(#cw-brass)" stroke-width=".8"/>
+    <path d="M196 374C195 357 207 346 222 345M201 359C212 359 219 354 222 345M200 361C192 360 188 353 190 348C197 350 199 355 200 361Z" stroke-width="1.2"/>
+    <path d="M216 348C216 338 220 333 227 331C230 339 225 346 216 348Z" fill="#3c6f74" stroke-width="1.1"/>
+  </g>
+
+  <!-- Tiny glints sit on the glass, rather than an all-over grain texture. -->
+  <g stroke="#f7e1ac" stroke-linecap="round" opacity=".55">
+    <path d="M73 217Q79 205 91 196M169 226Q176 209 190 197M57 152Q59 136 64 128" stroke-width="2"/>
+    <path d="M113 97L119 92M180 164L187 157M223 289V300M130 345V354" stroke-width="1.2"/>
+  </g>
+  <g fill="#edce85">
+    <path d="M215 280L216.5 285.5L222 287L216.5 288.5L215 294L213.5 288.5L208 287L213.5 285.5Z"/>
+    <path d="M174 348L175 351L178 352L175 353L174 356L173 353L170 352L173 351Z"/>
+    <circle cx="225" cy="218" r="1.3"/><circle cx="174" cy="243" r="1.1"/><circle cx="116" cy="274" r="1.2"/>
+  </g>
+
+  <path d="M28 386H272V395H28Z" fill="#2a1d2e" stroke="url(#cw-brass)" stroke-width="1.5"/>
+  <path d="M24 398H276V403H24Z" fill="url(#cw-brass)" stroke="#2a1d2e" stroke-width="1"/>
+  <path d="M47 390H253" stroke="url(#cw-brass)" stroke-opacity=".5"/>
+  <g fill="url(#cw-brass)"><circle cx="39" cy="390.5" r="1.8"/><circle cx="150" cy="390.5" r="1.8"/><circle cx="261" cy="390.5" r="1.8"/></g>
+</svg>

@@ -1,0 +1,49 @@
+<!-- Carillon: the moon's apprentice, with peacock and amethyst glass wings. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 150" width="180" height="150" fill="none">
+  <defs>
+    <linearGradient id="lm-gilt" x1="49" y1="13" x2="122" y2="139" gradientUnits="userSpaceOnUse"><stop stop-color="#f2d68c"/><stop offset=".48" stop-color="#b8862b"/><stop offset="1" stop-color="#98633b"/></linearGradient>
+    <linearGradient id="lm-teal" x1="22" y1="40" x2="88" y2="95" gradientUnits="userSpaceOnUse"><stop stop-color="#57aaa3"/><stop offset=".55" stop-color="#136f7c"/><stop offset="1" stop-color="#344362"/></linearGradient>
+    <linearGradient id="lm-violet" x1="103" y1="36" x2="149" y2="101" gradientUnits="userSpaceOnUse"><stop stop-color="#a785bb"/><stop offset=".5" stop-color="#67389d"/><stop offset="1" stop-color="#472957"/></linearGradient>
+    <path id="lm-upper" d="M85 70C70 42 46 25 20 30C21 43 25 49 21 57C28 59 33 60 34 68C43 66 50 69 54 77C66 72 73 76 85 81Z"/>
+    <path id="lm-lower" d="M84 79C69 74 56 79 49 89C55 92 57 97 57 103C64 100 70 102 72 109C73 119 66 131 69 138C85 130 90 106 89 86Z"/>
+  </defs>
+
+  <!-- The crescent is part of the specimen's engraved halo. -->
+  <path d="M106 9A26 26 0 1 0 113 54A23 23 0 0 1 106 9Z" fill="url(#lm-gilt)" opacity=".85"/>
+  <path d="M60 27C70 14 88 10 102 13M55 35L56 32M116 51L120 47" stroke="url(#lm-gilt)" stroke-width=".8" stroke-linecap="round"/>
+
+  <g stroke="#2a1d2e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <use href="#lm-upper" fill="url(#lm-teal)"/>
+    <use href="#lm-upper" transform="translate(180 0) scale(-1 1)" fill="url(#lm-violet)"/>
+    <use href="#lm-lower" fill="#715491"/>
+    <use href="#lm-lower" transform="translate(180 0) scale(-1 1)" fill="#24747b"/>
+    <path d="M24 33C44 47 57 53 85 70M21 57L45 49L54 77M45 49L58 37M45 49L65 61L72 52M65 61L67 74M35 68L47 61M59 88L85 82M59 103L77 92M69 135L80 107L89 87"/>
+    <path d="M156 33C136 47 123 53 95 70M159 57L135 49L126 77M135 49L122 37M135 49L115 61L108 52M115 61L113 74M145 68L133 61M121 88L95 82M121 103L103 92M111 135L100 107L91 87"/>
+    <path d="M49 48C46 39 39 36 34 38C33 45 40 50 49 48Z" fill="#cd9a4e" stroke-width="1"/>
+    <path d="M131 48C134 39 141 36 146 38C147 45 140 50 131 48Z" fill="#c69b59" stroke-width="1"/>
+    <path d="M64 90C69 84 75 84 77 87C75 94 69 97 64 90Z" fill="#c99b6d" stroke-width="1"/>
+    <path d="M116 90C111 84 105 84 103 87C105 94 111 97 116 90Z" fill="#8f4768" stroke-width="1"/>
+  </g>
+
+  <g stroke="url(#lm-gilt)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M85 70C70 42 46 25 20 30M95 70C110 42 134 25 160 30" stroke-width="1"/>
+    <path d="M35 35L38 36M43 38L47 40M51 42L55 44M125 44L129 42M133 40L137 38M142 36L145 35" stroke-width=".75"/>
+    <path d="M87 61C83 49 78 43 73 45C69 47 72 51 75 50M93 61C97 49 102 43 107 45C111 47 108 51 105 50" stroke-width="1.2"/>
+    <path d="M86 69C84 81 85 96 90 108C95 96 96 81 94 69Z" fill="#2f1d33" stroke-width="1.2"/>
+    <path d="M87 79H93M87 85H93M88 91H92M89 97H91" stroke-width=".8"/>
+    <circle cx="90" cy="65" r="4.5" fill="url(#lm-gilt)" stroke="#2a1d2e" stroke-width="1"/>
+    <path d="M86 73L78 69M94 73L102 69M86 82L78 84M94 82L102 84" stroke-width=".9"/>
+  </g>
+
+  <!-- Bellflower cuttings give the moth an asymmetric herbarium setting. -->
+  <g stroke="url(#lm-gilt)" stroke-width=".85" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M34 128C44 124 43 110 35 100M37 115C28 115 22 109 24 103C31 104 35 109 37 115M38 119C45 117 49 113 48 107C41 108 39 113 38 119"/>
+    <path d="M35 100C29 96 26 99 26 104M21 104C21 100 29 100 30 104L33 113C30 110 28 116 25 112C23 110 21 113 18 111Z" fill="#b8862b" fill-opacity=".16"/>
+    <path d="M142 119C132 113 135 100 143 91M138 108C146 107 151 102 149 96C143 98 140 102 138 108M138 111C130 108 126 103 129 98C135 101 137 105 138 111"/>
+  </g>
+  <g fill="url(#lm-gilt)">
+    <path d="M17 77L18 81L22 82L18 83L17 87L16 83L12 82L16 81Z"/>
+    <path d="M153 116L154 119L157 120L154 121L153 124L152 121L149 120L152 119Z"/>
+    <circle cx="147" cy="19" r="1"/><circle cx="27" cy="19" r=".9"/><circle cx="45" cy="138" r=".8"/><circle cx="127" cy="133" r=".9"/>
+  </g>
+</svg>

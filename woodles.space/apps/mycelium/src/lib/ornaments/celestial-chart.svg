@@ -1,0 +1,85 @@
+<!-- Carillon: an unlettered astronomical folio. Intended as a quiet gilt
+     engraving on velvet or parchment; opacity belongs to the host surface. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600" fill="none" stroke="#b8862b" stroke-linecap="round" stroke-linejoin="round">
+  <defs>
+    <path id="cc-tick" d="M300 34V44M300 48V51"/>
+    <path id="cc-notch" d="M300 56V61"/>
+    <path id="cc-fleur" d="M300 100C289 89 290 78 300 69C310 78 311 89 300 100ZM300 99C288 99 281 93 283 86C293 86 298 91 300 99ZM300 99C312 99 319 93 317 86C307 86 302 91 300 99Z"/>
+    <path id="cc-point" d="M0-7L1.5-1.5L7 0L1.5 1.5L0 7L-1.5 1.5L-7 0L-1.5-1.5Z"/>
+  </defs>
+
+  <g stroke-width=".75">
+    <circle cx="300" cy="300" r="267"/>
+    <circle cx="300" cy="300" r="258"/>
+    <circle cx="300" cy="300" r="243"/>
+    <circle cx="300" cy="300" r="238"/>
+    <circle cx="300" cy="300" r="207"/>
+    <circle cx="300" cy="300" r="202" stroke-dasharray="1 8"/>
+    <circle cx="300" cy="300" r="153"/>
+    <circle cx="300" cy="300" r="147"/>
+    <circle cx="300" cy="300" r="82"/>
+    <circle cx="300" cy="300" r="76" stroke-dasharray="1 6"/>
+  </g>
+  <g stroke-width="1.1">
+    <use href="#cc-tick"/><use href="#cc-tick" transform="rotate(15 300 300)"/><use href="#cc-tick" transform="rotate(30 300 300)"/><use href="#cc-tick" transform="rotate(45 300 300)"/>
+    <use href="#cc-tick" transform="rotate(60 300 300)"/><use href="#cc-tick" transform="rotate(75 300 300)"/><use href="#cc-tick" transform="rotate(90 300 300)"/><use href="#cc-tick" transform="rotate(105 300 300)"/>
+    <use href="#cc-tick" transform="rotate(120 300 300)"/><use href="#cc-tick" transform="rotate(135 300 300)"/><use href="#cc-tick" transform="rotate(150 300 300)"/><use href="#cc-tick" transform="rotate(165 300 300)"/>
+    <use href="#cc-tick" transform="rotate(180 300 300)"/><use href="#cc-tick" transform="rotate(195 300 300)"/><use href="#cc-tick" transform="rotate(210 300 300)"/><use href="#cc-tick" transform="rotate(225 300 300)"/>
+    <use href="#cc-tick" transform="rotate(240 300 300)"/><use href="#cc-tick" transform="rotate(255 300 300)"/><use href="#cc-tick" transform="rotate(270 300 300)"/><use href="#cc-tick" transform="rotate(285 300 300)"/>
+    <use href="#cc-tick" transform="rotate(300 300 300)"/><use href="#cc-tick" transform="rotate(315 300 300)"/><use href="#cc-tick" transform="rotate(330 300 300)"/><use href="#cc-tick" transform="rotate(345 300 300)"/>
+  </g>
+  <g stroke-width=".7" opacity=".75">
+    <use href="#cc-notch" transform="rotate(7.5 300 300)"/><use href="#cc-notch" transform="rotate(22.5 300 300)"/><use href="#cc-notch" transform="rotate(37.5 300 300)"/><use href="#cc-notch" transform="rotate(52.5 300 300)"/>
+    <use href="#cc-notch" transform="rotate(67.5 300 300)"/><use href="#cc-notch" transform="rotate(82.5 300 300)"/><use href="#cc-notch" transform="rotate(97.5 300 300)"/><use href="#cc-notch" transform="rotate(112.5 300 300)"/>
+    <use href="#cc-notch" transform="rotate(127.5 300 300)"/><use href="#cc-notch" transform="rotate(142.5 300 300)"/><use href="#cc-notch" transform="rotate(157.5 300 300)"/><use href="#cc-notch" transform="rotate(172.5 300 300)"/>
+    <use href="#cc-notch" transform="rotate(187.5 300 300)"/><use href="#cc-notch" transform="rotate(202.5 300 300)"/><use href="#cc-notch" transform="rotate(217.5 300 300)"/><use href="#cc-notch" transform="rotate(232.5 300 300)"/>
+    <use href="#cc-notch" transform="rotate(247.5 300 300)"/><use href="#cc-notch" transform="rotate(262.5 300 300)"/><use href="#cc-notch" transform="rotate(277.5 300 300)"/><use href="#cc-notch" transform="rotate(292.5 300 300)"/>
+    <use href="#cc-notch" transform="rotate(307.5 300 300)"/><use href="#cc-notch" transform="rotate(322.5 300 300)"/><use href="#cc-notch" transform="rotate(337.5 300 300)"/><use href="#cc-notch" transform="rotate(352.5 300 300)"/>
+  </g>
+
+  <!-- Slanted armillary circles cross an off-centre orbit like engraved brass. -->
+  <g stroke-width=".85">
+    <ellipse cx="300" cy="300" rx="232" ry="96" transform="rotate(-34 300 300)"/>
+    <ellipse cx="300" cy="300" rx="232" ry="92" transform="rotate(54 300 300)"/>
+    <ellipse cx="300" cy="300" rx="180" ry="58" transform="rotate(-12 300 300)"/>
+    <path d="M105 380C111 196 264 109 420 146C536 173 547 324 445 423" stroke-dasharray="3 6"/>
+    <path d="M300 93V507M93 300H507" stroke-opacity=".4"/>
+    <path d="M155 155L445 445M155 445L445 155" stroke-opacity=".3"/>
+    <path d="M194 90L198 103M102 198L90 194M406 90L402 103M510 194L498 198M510 406L498 402M406 510L402 498M194 510L198 498M90 406L102 402"/>
+  </g>
+  <g stroke-width=".85">
+    <use href="#cc-fleur"/><use href="#cc-fleur" transform="rotate(90 300 300)"/>
+    <use href="#cc-fleur" transform="rotate(180 300 300)"/><use href="#cc-fleur" transform="rotate(270 300 300)"/>
+    <path d="M300 218C319 253 336 275 382 300C336 325 319 347 300 382C281 347 264 325 218 300C264 275 281 253 300 218Z"/>
+    <path d="M300 238C310 274 326 290 362 300C326 310 310 326 300 362C290 326 274 310 238 300C274 290 290 274 300 238Z" stroke-opacity=".65"/>
+    <circle cx="300" cy="300" r="22"/><circle cx="300" cy="300" r="17"/>
+    <path d="M306 286A15 15 0 1 0 307 313A13 13 0 0 1 306 286Z" fill="#b8862b" fill-opacity=".35" stroke-width=".65"/>
+  </g>
+
+  <!-- Planet bearings and a sparse, deliberately uneven constellation. -->
+  <g stroke-width="1">
+    <circle cx="167" cy="197" r="10"/><circle cx="167" cy="197" r="13.5" stroke-width=".55"/>
+    <ellipse cx="167" cy="197" rx="20" ry="4" transform="rotate(-28 167 197)" stroke-width=".7"/>
+    <circle cx="465" cy="334" r="7"/><circle cx="465" cy="334" r="3" stroke-width=".6"/>
+    <circle cx="241" cy="463" r="5"/><circle cx="343" cy="164" r="4"/>
+    <path d="M370 396L402 371L427 390L446 366L468 381" stroke-width=".65"/>
+    <path d="M132 324L157 347L139 375L172 400" stroke-width=".65"/>
+    <path d="M389 185L412 201L435 182" stroke-width=".65"/>
+  </g>
+  <g fill="#b8862b" stroke-width=".5">
+    <use href="#cc-point" transform="translate(402 371) scale(.6)"/><use href="#cc-point" transform="translate(446 366) scale(.4)"/>
+    <use href="#cc-point" transform="translate(157 347) scale(.5)"/><use href="#cc-point" transform="translate(412 201) scale(.45)"/>
+    <circle cx="370" cy="396" r="1.7"/><circle cx="427" cy="390" r="1.3"/><circle cx="468" cy="381" r="1.8"/>
+    <circle cx="132" cy="324" r="1.4"/><circle cx="139" cy="375" r="1.6"/><circle cx="172" cy="400" r="1.2"/>
+    <circle cx="389" cy="185" r="1.5"/><circle cx="435" cy="182" r="1.4"/>
+    <circle cx="217" cy="125" r="1.2"/><circle cx="211" cy="411" r="1"/><circle cx="383" cy="458" r="1.4"/>
+    <circle cx="487" cy="265" r="1.2"/><circle cx="126" cy="247" r="1.1"/><circle cx="275" cy="125" r=".9"/>
+  </g>
+
+  <!-- Suspended keys and tiny crescent bearings finish the folio's edge. -->
+  <g stroke-width=".75">
+    <path d="M300 21V7M294 11L300 5L306 11M300 579V593M294 589L300 595L306 589M21 300H7M11 294L5 300L11 306M579 300H593M589 294L595 300L589 306"/>
+    <circle cx="300" cy="23" r="3"/><circle cx="300" cy="577" r="3"/><circle cx="23" cy="300" r="3"/><circle cx="577" cy="300" r="3"/>
+    <path d="M495 104A10 10 0 1 0 497 121A8.5 8.5 0 0 1 495 104ZM108 479A10 10 0 1 0 110 496A8.5 8.5 0 0 1 108 479Z" fill="#b8862b" fill-opacity=".3"/>
+  </g>
+</svg>

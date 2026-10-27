@@ -214,13 +214,30 @@ export function stripPresentation(html) {
  * stamps `p-001`. Picking a winner would silently orphan one app's margin
  * notes, so neither wins.
  *
+ * `taken` is ids spoken for outside the blocks — a margin note whose block was
+ * deleted still points at its id, and a new block must not inherit it. They
+ * only raise the starting number; nothing is stamped with them.
+ *
  * @param {ArrayLike<Element>} blocks
  * @param {string} [prefix]
+ * @param {Iterable<string>} [taken]
  */
-export function ensureAnchorsOn(blocks, prefix = 'a-') {
+export function ensureAnchorsOn(blocks, prefix = 'a-', taken = []) {
 	const list = Array.from(blocks);
+	const pattern = new RegExp('^' + prefix + '(\\d+)$');
 	let max = 0;
 	const seen = new Set();
+
+	/** @param {string} id */
+	function count(id) {
+		const match = pattern.exec(id);
+		if (match) {
+			const n = parseInt(match[1], 10);
+			if (!Number.isNaN(n) && n > max) max = n;
+		}
+	}
+
+	for (const id of taken) count(id);
 
 	for (const block of list) {
 		const id = block.getAttribute('data-anchor');
@@ -230,11 +247,7 @@ export function ensureAnchorsOn(blocks, prefix = 'a-') {
 			continue;
 		}
 		seen.add(id);
-		const match = new RegExp('^' + prefix + '(\\d+)$').exec(id);
-		if (match) {
-			const n = parseInt(match[1], 10);
-			if (!Number.isNaN(n) && n > max) max = n;
-		}
+		count(id);
 	}
 
 	let next = max + 1;

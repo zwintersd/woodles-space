@@ -1,3 +1,5 @@
+import type { BellVoiceId } from './bellVoices';
+
 export type Block = {
 	id: string;
 	flexible?: boolean;
@@ -135,12 +137,37 @@ export type PlannerSettings = {
 	tone: ToneName;
 	/** Notebook's tasks have been taken over — see notebookTasks.ts. */
 	notebookTasksImported?: boolean;
+	/** Opt-in: reminders the person set may also use browser notifications. */
+	reminderNotifications?: boolean;
+	/** Offers and ideas the person waved away. Never re-offered on any device. */
+	dismissedOffers?: string[];
+	/** Which sound rings at each kind of mark. Absent means the defaults in chimes.ts. */
+	bellSounds?: BellSoundSettings;
+	/**
+	 * When each setting was last changed on purpose, so a sync merge keeps the
+	 * newer edit per key instead of whichever device synced last.
+	 */
+	settingsStamps?: Partial<Record<string, string>>;
+};
+
+export type BellMark = 'hour' | 'half' | 'quarter' | 'sample' | 'blockStart' | 'leadTime' | 'reminder';
+
+/**
+ * Which voice rings at each mark, and how loud relative to the others —
+ * the person's mix, synced. Stored leniently: it arrives from other devices
+ * and other versions, so chimes.ts validates every field when reading.
+ */
+export type BellSoundSettings = {
+	marks?: Partial<Record<BellMark, { voice?: string; volume?: number }>>;
+	/** After the hour's sound, strike the hour on a low bell. */
+	countHours?: boolean;
+	/** Ring :00, :15, :30 and :45 even when the sampling grid doesn't land there. */
+	chimeBetweenSamples?: boolean;
 };
 
 export type Bell = {
 	id: string;
 	name: string;
-	filePath: string;
 	defaultVolume: number;
 };
 
@@ -155,6 +182,7 @@ export type BinderTab =
 	| 'week-pattern'
 	| 'schedule'
 	| 'sync'
+	| 'bells'
 	| null;
 
 // ── Carillon instrument data ─────────────────────────────────────
@@ -238,6 +266,8 @@ export type TrackerAnswer = { tracker: MomentTracker; value: string | number | b
 export type MomentNoticing = {
 	channel: 'body' | 'attention' | 'behavior';
 	note: string;
+	/** Loops the person connected to this one noticing. Never inferred. */
+	linkedLoopIds?: string[];
 };
 
 export type OpenLoop = {
@@ -248,6 +278,14 @@ export type OpenLoop = {
 	updatedAt: string;
 	resolvedAt?: string;
 	resolution?: 'completed' | 'released';
+	/** A recurring need: closing ends one cycle, and "need is back" starts the next. */
+	recurring?: boolean;
+	/** The rhythm the person chose, in days. Descriptive only — never "overdue". */
+	rhythmDays?: number;
+	/** Opt-in: after each closed cycle, add a reminder `rhythmDays` later. */
+	remindAfterClosure?: boolean;
+	/** Clock for title and recurrence edits, independent of lifecycle. */
+	editedAt?: string;
 };
 
 export type LoopEventType =
@@ -264,6 +302,29 @@ export type LoopEvent = {
 	sequence?: number;
 	sourceMomentId?: string;
 	note?: string;
+	/** Set when a saved event is corrected; `recordedAt` still says when it was entered. */
+	updatedAt?: string;
+	/** The occurrence time first entered, kept once the time has been corrected. */
+	originalOccurredAt?: string;
+};
+
+/**
+ * A reminder the person asked for. It never repeats on its own: it is either
+ * live, acknowledged, or cancelled. Reminders that follow a recurring loop's
+ * closure carry that closure's id, so they lapse once the need is back.
+ */
+export type LoopReminder = {
+	id: string;
+	loopId: string;
+	dueAt: string;
+	note?: string;
+	afterEventId?: string;
+	createdAt: string;
+	updatedAt: string;
+	/** The `dueAt` a browser notification was shown for, so a snooze can notify again. */
+	notifiedFor?: string;
+	endedAt?: string;
+	ending?: 'acknowledged' | 'cancelled';
 };
 
 export type ClosureReflection = {
@@ -444,4 +505,5 @@ export type PlannerBlob = {
 	loopEvents?: LoopEvent[];
 	closureReflections?: ClosureReflection[];
 	fiveContactsRounds?: FiveContactsRound[];
+	loopReminders?: LoopReminder[];
 };

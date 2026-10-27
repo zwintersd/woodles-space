@@ -4,7 +4,8 @@ import {
 	currentModeLabel,
 	getNamedPalette,
 	getChromeForTime,
-	getNamedChrome
+	getNamedChrome,
+	chromeFamily
 } from './dayCycle';
 
 describe('getPaletteForTime', () => {
@@ -31,8 +32,8 @@ describe('getPaletteForTime', () => {
 
 	it('produces midnight values at hour 0', () => {
 		const p = getPaletteForTime(new Date(2024, 5, 12, 0, 0));
-		// Hour 0 sits on the neutral night stop (#eef0f5 → rgb form via lerp).
-		expect(p['--p-bg']).toBe('rgb(238,240,245)');
+		// Hour 0 sits on the moonlit vellum stop (#ece4d6 → rgb form via lerp).
+		expect(p['--p-bg']).toBe('rgb(236,228,214)');
 	});
 });
 
@@ -104,6 +105,15 @@ describe('palette contrast across the day', () => {
 		it(`text ≥ 3:1 against bg at ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`, () => {
 			const p = getPaletteForTime(new Date(2024, 5, 12, h, m));
 			expect(contrast(p['--p-text'], p['--p-bg'])).toBeGreaterThanOrEqual(3);
+		});
+	}
+
+	// Each hour's jewel accent is also used as text (links, active
+	// labels), so it has to read against the vellum it sits on.
+	for (const [h, m] of samples) {
+		it(`accent ≥ 3:1 against bg at ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`, () => {
+			const p = getPaletteForTime(new Date(2024, 5, 12, h, m));
+			expect(contrast(p['--p-accent'], p['--p-bg'])).toBeGreaterThanOrEqual(3);
 		});
 	}
 
@@ -216,5 +226,34 @@ describe('chrome contrast across the day', () => {
 			const l = lum(parseColor(getChromeForTime(new Date(2024, 5, 12, h, m))['--car-night']));
 			expect(l < 0.16 || l > 0.42).toBe(true);
 		}
+	});
+});
+
+describe('window light', () => {
+	// The two glows are the sun through stained glass. Within the paper
+	// family they drift from one hour's jewels to the next instead of
+	// snapping at the midpoint between stops.
+	it('drifts between stops rather than jumping', () => {
+		const at = (h: number, m = 0) => getChromeForTime(new Date(2024, 5, 12, h, m))['--car-glow-cool'];
+		const morning = at(9);
+		const noon = at(12);
+		const between = at(10, 30);
+		expect(between).not.toBe(morning);
+		expect(between).not.toBe(noon);
+		expect(between).toMatch(/^rgba\(\d+,\d+,\d+,[\d.]+\)$/);
+	});
+
+	it('keeps the night glows whole across the flip', () => {
+		const c = getChromeForTime(new Date(2024, 5, 12, 23, 0));
+		expect(c['--car-glow-warm']).toBe(getNamedChrome('night')['--car-glow-warm']);
+	});
+});
+
+describe('chromeFamily', () => {
+	it('names paper by day and night after dark', () => {
+		expect(chromeFamily(getChromeForTime(new Date(2024, 5, 12, 15, 0)))).toBe('paper');
+		expect(chromeFamily(getChromeForTime(new Date(2024, 5, 12, 10, 30)))).toBe('paper');
+		expect(chromeFamily(getChromeForTime(new Date(2024, 5, 12, 23, 0)))).toBe('night');
+		expect(chromeFamily(getNamedChrome('night'))).toBe('night');
 	});
 });

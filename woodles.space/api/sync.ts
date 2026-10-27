@@ -12,7 +12,7 @@
 //
 // DATABASE_URL is injected automatically by the Neon Vercel integration.
 
-import { authed, db, json, APP_PATTERN } from './_lib';
+import { authed, db, json, jsonbText, APP_PATTERN } from './_lib';
 
 export const config = { runtime: 'edge' };
 
@@ -54,7 +54,7 @@ async function route(req: Request): Promise<Response> {
     if (blob === undefined) return json({ ok: false, error: 'missing blob' }, 400);
     if (typeof baseVersion !== 'number') return json({ ok: false, error: 'missing baseVersion' }, 400);
 
-    const payload = JSON.stringify(blob);
+    const payload = jsonbText(blob);
 
     // First write for this app: insert only if the row doesn't exist yet.
     if (baseVersion === 0) {

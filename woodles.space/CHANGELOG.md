@@ -18,6 +18,67 @@ so it's not easy to forget.
 
 ---
 
+## 2026-10-25
+
+- **margin notes stay beside the paragraph they were written against** — in
+  Write, adding a paragraph above an annotated one could hand its note to the
+  newcomer (at once if you pressed Enter at the start of the paragraph,
+  otherwise on the next reload), and deleting one above it could lose the
+  note: every load renumbered paragraphs top to bottom, while notes kept the
+  numbers they were written with. a draft now keeps its own paragraph ids, a
+  published letter goes out with the same ones its notes point at, and a new
+  paragraph never picks up the note of one you deleted. pasted text still
+  comes in without ids of its own. a note that had already moved in an
+  existing draft may stay where it landed.
+- **the moth is the mark** — Carillon's lunar moth, pared down to its
+  peacock and amethyst wings and the crescent behind them, replaces the
+  lapis w in browser tabs and saved home-screen shortcuts across every room.
+
+## 2026-10-20
+
+- **Write has a format menu** — right-click in the writing, on its own or in
+  HomeSuite, for bold, italic, underline, strikethrough and a new highlight,
+  then text, heading, subheading, quote, bullets and numbers, with whichever
+  ones the words already have lit. links are edited in place — a bare
+  `example.com` gets its `https://` — and cut, copy, paste, paste as plain
+  text and a margin note sit underneath. right-clicking inside a word takes
+  the whole word. every change is one ⌘Z. ⇧ right-click still opens the
+  browser's own menu for spelling, and the Menu key or ⇧F10 opens Write's at
+  the caret.
+- **lists stop leaving empty paragraphs behind** — the toolbar's list
+  buttons nested the list inside its paragraph, so it came back after a
+  reload with an empty line above and below; lists now sit beside their
+  paragraphs, and turning a line out of a list splits the list around it.
+- **bold looks bold in Write** — it was drawn at 400 over the prose's 300,
+  barely heavier, and the toolbar's **B** never lit up for it. it's 600 now,
+  matching `<strong>`, in Write and in published letters.
+
+- **Carillon syncs the way HomeSuite does** — something removed on one device
+  now stays removed on the others: a signal, a sitting, an obligation, a daily
+  activity or a domain used to come back from whichever device still had it.
+  each record merges on its own against what this device and the server last
+  agreed on, so a change made on one side wins even when the other device's
+  clock runs ahead, and the very first sync still only adds. Carillon also
+  syncs when you come back to it, every couple of minutes while it's open, and
+  as you leave — it used to pull only on opening — and *sync now* pulls as
+  well as pushes. two Carillon tabs on one device keep each other's changes
+  instead of saving over them, and a sync with nothing new sends nothing.
+- **sync stops stalling on a stray character** — Postgres refuses a NUL or
+  half an emoji inside JSONB, and the sync endpoint answered every retry with
+  the same 500, so one bad character in any document could block HomeSuite's
+  sync for good. `/api/sync` and `/api/public` now drop NULs and turn a lone
+  surrogate into `�` before saving. a sync that still fails now says why in
+  its status, carrying the server's message instead of just `push failed (500)`.
+- **Mycelium moves into Carillon's room** — the sidebar is gone; people now
+  live under Carillon's mulberry cabinet, with a leaded transom, a rose
+  window holding Mycelium's crescent, and a glazed wordmark in rose and
+  sage. all people, favorites and new person are lancet tabs of glass. the
+  shelf sits on parchment in stained-glass light, with IM Fell headings and
+  gilt rules; contacts and the workshop are vellum sheets with filigree
+  corners, the card waits in an arched stage, and the backup and comfort
+  tools hang in a ribbon down the right edge. circles became a filter strip
+  on the shelf. the cards themselves are unchanged.
+
 ## 2026-10-19
 
 - **Mycelium keeps people on cards** — a contact book with Bestiary's visual
@@ -25,6 +86,61 @@ so it's not easy to forget.
   them from Write or bring current contact details into a Data Collection,
   keeping your own notes alongside. Removing a link or Collection membership
   leaves the person's card in Mycelium.
+- **Carillon is parchment and stained glass now** — the instrument sits on
+  warm, grained parchment scattered with gilt stars and crescent moons, and
+  the hour's light falls across it through stained glass: rose and amber at
+  dawn, gilt and emerald in the morning, ruby and sapphire at noon, marigold
+  and teal in the afternoon, rose and amethyst at evening, violet and lapis at
+  dusk, drifting between them rather than jumping. a leaded transom of jewel
+  panes runs across the top; the bell sits in a little rose window; each
+  section is its own pane of glass (Today ruby, Day piles amber, Routines
+  emerald, Surge sapphire, Editions amethyst) and the open one is set in it
+  like a lancet. cards are vellum with a gilt rule inside the edge, the
+  sampler gets a jewelled top and a crescent moon, headings that are only
+  words are set in IM Fell, and the wordmark is glazed glass. still light all
+  day; after dark it turns to midnight velvet with the glass lit from behind.
+  the binder's panel has a leaded spine, and no longer peeks out when closed.
+- **Carillon's cards have their own drawn ornaments** — hand-drawn SVG art in
+  gilt, lead and the same jewels: filigree corners with a ruby quarry on every
+  vellum card, a crescent cradling a ruby star as the divider under card and
+  page headings (and in the footer and binder), a little stained-glass bell
+  hanging from a moon when the sampler is at rest, a moon and its stars in
+  the sampler's wide corner and wherever there's nothing yet, and a
+  four-jewel quatrefoil before the small labels.
+
+## 2026-10-18
+
+- **Carillon's bell can sound different for the hour, half hour and quarters**
+  — a new ♪ bells panel in the binder (or tap the bell line on Today, which is
+  how phones get there) gives each mark its own voice: bell, lower bell, low
+  bell, glass chime, singing bowl, wood block, soft pip, the Westminster
+  quarters, or silent. one tap picks a set — classic (as before), clock face,
+  or westminster — and the hour can be counted on a low bell. bells between
+  samples, block starts, lead time and reminder sounds have their own rows; a
+  block's bell now follows the chime it shares a minute with instead of being
+  drowned out. volume and pause live on each device, a preview button turns
+  into stop while it plays, and Today names the next bell, says when the
+  browser is holding sound, and shows "rang 12:30 · half hour" afterwards.
+  under the hood the bell no longer rings late or twice: it ticks on the
+  minute, catches up after a throttled background tab, never queues sound on a
+  locked page, and settings changed on one device are no longer undone by
+  another that synced later. Escape stops a ringing bell without closing
+  whatever you were typing in, every binder panel has a close button, and the
+  bell line stays on Today after a moment is saved.
+- **sync keeps an edit made mid-push** — when two devices push at once, the
+  one that loses now merges what's on it *now*, not what it had when the push
+  started, across every app on the shared sync client.
+- **Carillon's open loops can recur, remind, and look back** — a loop can be a
+  recurring need: closing ends one cycle and *need is back* starts the next,
+  with an optional rhythm. reminders are only the ones you set — a time on a
+  loop, or a while after each closed cycle — and appear below the sampler,
+  with browser notifications as a separate opt-in that stays quiet overnight.
+  a *Patterns in your loops* disclosure counts what sat near your closures
+  (reflections, labels, noticings, Five Contacts rounds) without calling any
+  of it a cause, offers loop names and rhythms it spots in your notes, and
+  shows ideas only when you ask. a single body, attention, or actions note can
+  now link to its own loop, and saved loop events can be corrected — the time
+  you first entered stays on the record.
 
 ## 2026-10-16
 

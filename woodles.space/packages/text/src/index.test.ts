@@ -125,6 +125,16 @@ describe('anchors', () => {
 		expect([...host.querySelectorAll('p')].map((p) => p.getAttribute('data-anchor'))).toEqual(first);
 	});
 
+	it('numbers new blocks past ids that are taken elsewhere, without stamping them', () => {
+		// A note's block was deleted; the next new block must not inherit its id.
+		const host = blocks('<p data-anchor="a-001">a</p><p>b</p>');
+		ensureAnchorsOn(host.querySelectorAll('p'), 'a-', ['a-004', 'p-009', 'x']);
+		expect([...host.querySelectorAll('p')].map((p) => p.getAttribute('data-anchor'))).toEqual([
+			'a-001',
+			'a-005'
+		]);
+	});
+
 	it('stamps straight from a string', () => {
 		expect(stampAnchorsHtml('<p>a</p>')).toBe('<p data-anchor="a-001">a</p>');
 	});

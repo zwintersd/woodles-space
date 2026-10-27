@@ -1,14 +1,17 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
-import { mergePlannerBlobs } from './sync.svelte';
+import { differsFromBase, mergePlannerBlobs, mergeSettings, plannerFingerprints } from './sync.svelte';
 import type {
 	IntervalKind,
 	IntervalObservation,
 	PlannerBlob,
+	Ritual,
+	SignalEntry,
 	SporeEvent,
 	OpenLoop,
 	LoopEvent,
-	FiveContactsRound
+	FiveContactsRound,
+	LoopReminder
 } from './types';
 import { activeContacts } from './openLoops';
 
@@ -391,5 +394,157 @@ describe('mergePlannerBlobs', () => {
 
 		expect(merged.signals?.map((entry) => entry.id).sort()).toEqual(['signal-1', 'signal-2']);
 		expect(merged.signals?.find((entry) => entry.id === 'signal-1')?.endDate).toBe('2026-07-30');
+	});
+
+	it('keeps a rename made on one device when another device closes the loop from a stale copy', () => {
+		const loop: OpenLoop = { id: 'loop-1', title: 'Shower', status: 'open', createdAt: '2026-10-18T09:00:00.000Z', updatedAt: '2026-10-18T09:00:00.000Z' };
+		const renamed = { ...loop, title: 'Showering', recurring: true, rhythmDays: 2, editedAt: '2026-10-18T10:00:00.000Z', updatedAt: '2026-10-18T10:00:00.000Z' };
+		const closed: LoopEvent = { id: 'closed', loopId: loop.id, type: 'closed', occurredAt: '2026-10-18T11:00:00.000Z', recordedAt: '2026-10-18T11:00:00.000Z' };
+		const staleCloser = blob({ openLoops: [{ ...loop, status: 'resolved', updatedAt: '2026-10-18T11:00:00.000Z' }], loopEvents: [closed] });
+		for (const merged of [mergePlannerBlobs(blob({ openLoops: [renamed] }), staleCloser), mergePlannerBlobs(staleCloser, blob({ openLoops: [renamed] }))]) {
+			expect(merged.openLoops?.[0]).toMatchObject({ title: 'Showering', recurring: true, rhythmDays: 2, status: 'resolved' });
+		}
+	});
+
+	it('takes a corrected event over its stale original in either direction', () => {
+		const original: LoopEvent = { id: 'event-1', type: 'noticed', occurredAt: '2026-10-18T13:00:00.000Z', recordedAt: '2026-10-18T13:00:00.000Z' };
+		const corrected: LoopEvent = { ...original, loopId: 'loop-1', occurredAt: '2026-10-18T11:30:00.000Z', originalOccurredAt: original.occurredAt, updatedAt: '2026-10-18T14:00:00.000Z' };
+		expect(mergePlannerBlobs(blob({ loopEvents: [corrected] }), blob({ loopEvents: [original] })).loopEvents?.[0]).toEqual(corrected);
+		expect(mergePlannerBlobs(blob({ loopEvents: [original] }), blob({ loopEvents: [corrected] })).loopEvents?.[0]).toEqual(corrected);
+	});
+
+	it('merges reminders by id, keeps finished ones finished, and unions dismissed offers', () => {
+		const base: LoopReminder = { id: 'reminder-1', loopId: 'loop-1', dueAt: '2026-10-18T18:00:00.000Z', createdAt: '2026-10-18T10:00:00.000Z', updatedAt: '2026-10-18T10:00:00.000Z' };
+		const finished = { ...base, endedAt: '2026-10-18T18:01:00.000Z', ending: 'acknowledged' as const, updatedAt: '2026-10-18T18:01:00.000Z' };
+		const staleMove = { ...base, dueAt: '2026-10-19T08:00:00.000Z', updatedAt: '2026-10-18T18:05:00.000Z' };
+		const other: LoopReminder = { ...base, id: 'reminder-2' };
+		const local = blob({ loopReminders: [finished], settings: { ...blob().settings, dismissedOffers: ['theme:laundry'] } });
+		const remote = blob({ loopReminders: [staleMove, other], settings: { ...blob().settings, dismissedOffers: ['idea:many:9'] } });
+		const merged = mergePlannerBlobs(local, remote);
+		expect(merged.loopReminders?.map(reminder => reminder.id).sort()).toEqual(['reminder-1', 'reminder-2']);
+		expect(merged.loopReminders?.find(reminder => reminder.id === 'reminder-1')?.ending).toBe('acknowledged');
+		expect(merged.settings.dismissedOffers?.sort()).toEqual(['idea:many:9', 'theme:laundry']);
+		expect(mergePlannerBlobs(blob(), blob()).settings.dismissedOffers).toBeUndefined();
+		expect(mergePlannerBlobs(blob(), blob()).loopReminders).toEqual([]);
+	});
+
+	it('merges settings per key by edit stamp, so a newer change on a stale device survives', () => {
+		const settings = blob().settings;
+		const laptop = { ...settings, bellsEnabled: true, quietHoursEnd: '06:30', settingsStamps: { quietHoursEnd: '2026-10-18T09:00:00.000Z', bellsEnabled: '2026-10-18T08:00:00.000Z' } };
+		const phone = { ...settings, bellsEnabled: false, quietHoursEnd: '07:00', settingsStamps: { bellsEnabled: '2026-10-18T10:00:00.000Z' } };
+		for (const merged of [mergeSettings(phone, laptop), mergeSettings(laptop, phone)]) {
+			expect(merged.bellsEnabled).toBe(false);
+			expect(merged.quietHoursEnd).toBe('06:30');
+			expect(merged.settingsStamps).toEqual({ bellsEnabled: '2026-10-18T10:00:00.000Z', quietHoursEnd: '2026-10-18T09:00:00.000Z' });
+		}
+	});
+
+	it('keeps remote-wins for ties and unstamped keys, and distrusts odd stamps', () => {
+		const settings = blob().settings;
+		const now = Date.parse('2026-10-18T12:00:00.000Z');
+		expect(mergeSettings({ ...settings, tone: 'wry' }, { ...settings, tone: 'earnest' }, now).tone).toBe('earnest');
+		const same = '2026-10-18T10:00:00.000Z';
+		expect(mergeSettings({ ...settings, tone: 'wry', settingsStamps: { tone: same } }, { ...settings, tone: 'earnest', settingsStamps: { tone: same } }, now).tone).toBe('earnest');
+		expect(mergeSettings({ ...settings, tone: 'wry', settingsStamps: { tone: 'garbage' } }, { ...settings, tone: 'earnest' }, now).tone).toBe('earnest');
+		// A stamp from a clock years ahead never wins, even against an older real edit.
+		const future = mergeSettings({ ...settings, tone: 'wry', settingsStamps: { tone: '2099-01-01T00:00:00.000Z' } }, { ...settings, tone: 'earnest', settingsStamps: { tone: '2026-10-18T10:00:00.000Z' } }, now);
+		expect(future.tone).toBe('earnest');
+		expect(future.settingsStamps?.tone).toBe('2026-10-18T10:00:00.000Z');
+		const futureRemote = mergeSettings({ ...settings, tone: 'wry', settingsStamps: { tone: '2026-10-18T09:00:00.000Z' } }, { ...settings, tone: 'earnest', settingsStamps: { tone: '2099-01-01T00:00:00.000Z' } }, now);
+		expect(futureRemote.tone).toBe('wry');
+		// A deliberate clear on the newer side sticks, whichever side it is on.
+		const cleared = mergeSettings({ ...settings, onboardingStep: undefined, settingsStamps: { onboardingStep: '2026-10-18T11:00:00.000Z' } }, { ...settings, onboardingStep: 3 }, now);
+		expect(cleared.onboardingStep).toBeUndefined();
+		const phone = { ...settings, onboardingStep: 3 as const, settingsStamps: { onboardingStep: '2026-10-18T09:00:00.000Z' } };
+		const laptop = JSON.parse(JSON.stringify({ ...settings, onboardingStep: undefined, settingsStamps: { onboardingStep: '2026-10-18T10:00:00.000Z' } }));
+		const onPhone = mergeSettings(phone, laptop, now);
+		expect('onboardingStep' in onPhone).toBe(false);
+		expect(mergeSettings(laptop, JSON.parse(JSON.stringify(onPhone)), now).onboardingStep).toBeUndefined();
+	});
+
+	it('carries the bell mix as one stamped setting', () => {
+		const settings = blob().settings;
+		const local = { ...settings, bellSounds: { marks: { hour: { voice: 'bowl' } } }, settingsStamps: { bellSounds: '2026-10-18T11:00:00.000Z' } };
+		const remote = { ...settings, bellSounds: { marks: { hour: { voice: 'westminster' } } }, settingsStamps: { bellSounds: '2026-10-18T10:00:00.000Z' } };
+		expect(mergePlannerBlobs(blob({ settings: local }), blob({ settings: remote })).settings.bellSounds?.marks?.hour?.voice).toBe('bowl');
+		expect(mergePlannerBlobs(blob({ settings: remote }), blob({ settings: local })).settings.bellSounds?.marks?.hour?.voice).toBe('bowl');
+	});
+});
+
+describe('mergePlannerBlobs with a base', () => {
+	const signal = (id: string, updatedAt = '2026-10-20T08:00:00.000Z'): SignalEntry => ({
+		id, kind: 'custom', label: id, date: '2026-10-20', createdAt: '2026-10-20T08:00:00.000Z', updatedAt
+	});
+	const ritual = (id: string, name = id): Ritual => ({ id, name, startTime: '08:00', endTime: '08:15' });
+	/** JSONB hands keys back in another order. */
+	const reordered = <T>(value: T): T => JSON.parse(JSON.stringify(value, (_key, inner) =>
+		inner && typeof inner === 'object' && !Array.isArray(inner) ? Object.fromEntries(Object.entries(inner).reverse()) : inner));
+
+	it('keeps a record deleted on either device deleted, instead of bringing it back', () => {
+		const agreed = blob({ signals: [signal('kept'), signal('gone')], rituals: [ritual('walk'), ritual('stretch')] });
+		const base = plannerFingerprints(agreed);
+		const removedHere = blob({ signals: [signal('kept')], rituals: [ritual('walk')] });
+
+		const pushed = mergePlannerBlobs(removedHere, agreed, base);
+		expect(pushed.signals?.map((entry) => entry.id)).toEqual(['kept']);
+		expect(pushed.rituals.map((entry) => entry.id)).toEqual(['walk']);
+
+		const pulled = mergePlannerBlobs(agreed, removedHere, base);
+		expect(pulled.signals?.map((entry) => entry.id)).toEqual(['kept']);
+		expect(pulled.rituals.map((entry) => entry.id)).toEqual(['walk']);
+	});
+
+	it('is still a union for a first sync, and keeps what is new on either side', () => {
+		const here = blob({ signals: [signal('mine')] });
+		const there = blob({ signals: [signal('theirs')] });
+		expect(mergePlannerBlobs(here, there).signals?.map((entry) => entry.id)).toEqual(['mine', 'theirs']);
+		const base = plannerFingerprints(blob());
+		expect(mergePlannerBlobs(here, there, base).signals?.map((entry) => entry.id)).toEqual(['mine', 'theirs']);
+	});
+
+	it('lets an edit beat a delete', () => {
+		const agreed = blob({ signals: [signal('cold')] });
+		const base = plannerFingerprints(agreed);
+		const ended = blob({ signals: [{ ...signal('cold', '2026-10-21T08:00:00.000Z'), endDate: '2026-10-21' }] });
+		expect(mergePlannerBlobs(ended, blob(), base).signals?.[0]?.endDate).toBe('2026-10-21');
+		expect(mergePlannerBlobs(blob(), ended, base).signals?.[0]?.endDate).toBe('2026-10-21');
+	});
+
+	it('keeps a change made on one device even where nothing carries a time', () => {
+		const agreed = blob({ rituals: [ritual('walk', 'Walk')] });
+		const base = plannerFingerprints(agreed);
+		const renamed = blob({ rituals: [ritual('walk', 'Long walk')] });
+		// Without a base the remote copy wins a tie; with one, only this side moved.
+		expect(mergePlannerBlobs(renamed, agreed).rituals[0].name).toBe('Walk');
+		expect(mergePlannerBlobs(renamed, agreed, base).rituals[0].name).toBe('Long walk');
+		expect(mergePlannerBlobs(agreed, renamed, base).rituals[0].name).toBe('Long walk');
+	});
+
+	it('drops a day plan cleared on one device, and follows the week pattern the other device changed', () => {
+		const day = { date: '2026-10-20', dayShapeId: 'deep', updatedAt: '2026-10-19T08:00:00.000Z' };
+		const agreed = blob({ days: { '2026-10-20': day }, weekPattern: { days: ['a', 'a', 'a', 'a', 'a', 'a', 'a'], updatedAt: '2026-10-19T09:00:00.000Z' } });
+		const base = plannerFingerprints(agreed);
+		// The other device's clock is behind, but only it changed the pattern.
+		const there = blob({ days: {}, weekPattern: { days: ['b', 'a', 'a', 'a', 'a', 'a', 'a'], updatedAt: '2026-10-19T07:00:00.000Z' } });
+		const merged = mergePlannerBlobs(agreed, there, base);
+		expect(merged.days).toEqual({});
+		expect(merged.weekPattern.days[0]).toBe('b');
+	});
+
+	it('hands back the server copy itself when it adds nothing, keys reordered or not', () => {
+		const agreed = blob({ signals: [signal('kept')], loopEvents: [], openLoops: [] });
+		const full = mergePlannerBlobs(agreed, agreed);
+		const server = reordered(full);
+		expect(mergePlannerBlobs(full, server, plannerFingerprints(server))).toBe(server);
+		expect(mergePlannerBlobs(full, server)).toBe(server);
+	});
+
+	it('notices a local change since the base, not a reordering', () => {
+		const agreed = blob({ signals: [signal('kept')] });
+		const base = plannerFingerprints(reordered(agreed));
+		expect(differsFromBase(agreed, base)).toBe(false);
+		expect(differsFromBase(blob({ signals: [] }), base)).toBe(true);
+		expect(differsFromBase(blob({ signals: [signal('kept')], settings: { ...agreed.settings, tone: 'wry' } }), base)).toBe(true);
+		expect(differsFromBase(agreed, {})).toBe(true);
 	});
 });

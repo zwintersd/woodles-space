@@ -1,7 +1,6 @@
 <script lang="ts">
   import '$lib/style/tokens.css';
   import './mycelium.css';
-  import '$lib/style/whimsigoth.css';
   let { children } = $props();
 </script>
 

@@ -28,7 +28,10 @@ import type {
 	LoopEvent,
 	LoopEventType,
 	ClosureReflection,
-	FiveContactsRound
+	FiveContactsRound,
+	LoopReminder,
+	BellMark,
+	BellSoundSettings
 } from './types';
 import {
 	STARTER_SHAPES,
@@ -46,8 +49,14 @@ import { buildCommitments } from './commitments';
 import { buildSessions } from './sessions';
 import { thinkingAboutShelf } from './thinkingAboutShelf.svelte';
 import { dateKey, nowMinutes, uid, timeToMinutes } from './utils';
-import { playBell } from './bells';
-import { activeContacts, projectLoopLifecycle, retainContactBoundary } from './openLoops';
+import { after, getBell, installAudioUnlock, levelFor, playNotes, registryNotes, voiceWithStrikes, watchAudioReadiness, watchSounding, type AudioReadiness, type PlayResult, type SoundKind } from './bells';
+import {
+	BELL_PRESETS, CHIME_GRACE_MINUTES, CLOCK_MARKS, DEFAULT_BELL_VOLUME, audible, bellMinuteClaimed, bellsResting, claimBellMinute,
+	cleanVolume, countsHours, dueChime, markReminderRung, markSound, reminderRung, startOfMinute, type ChimeEvent
+} from './chimes';
+import { notesEnd, type BellNote, type BellVoiceId } from './bellVoices';
+import { activeContacts, isLifecycleEvent, latestLifecycleEvent, projectLoopLifecycle, retainContactBoundary } from './openLoops';
+import { cleanRhythmDays, dueReminders, isQuietMinute, liveReminders, rhythmDueAt } from './reminders';
 import {
 	intervalKey,
 	kindLabel,
@@ -56,12 +65,32 @@ import {
 
 // ── persistence helpers ───────────────────────────────────────────
 
-function load<T>(key: string, fallback: T): T {
-	if (typeof localStorage === 'undefined') return fallback;
+// The raw value this tab last read from or wrote to each key, so a different
+// one there now is another tab's save. Keys whose last save failed, and keys
+// that could not be read when the page loaded, matter to sync: memory and
+// storage disagree there, and recording what was agreed over them would let a
+// later sync read the gap as deletions.
+const seenRaw = new Map<string, string>();
+const unsavedKeys = new Set<string>();
+const unreadableKeys = new Set<string>();
+
+function readRaw(key: string): string | null {
+	if (typeof localStorage === 'undefined') return null;
 	try {
-		const raw = localStorage.getItem(key);
-		return raw !== null ? (JSON.parse(raw) as T) : fallback;
+		return localStorage.getItem(key);
 	} catch {
+		return null;
+	}
+}
+
+function load<T>(key: string, fallback: T): T {
+	const raw = readRaw(key);
+	if (raw === null) return fallback;
+	seenRaw.set(key, raw);
+	try {
+		return JSON.parse(raw) as T;
+	} catch {
+		unreadableKeys.add(key);
 		return fallback;
 	}
 }
@@ -69,10 +98,57 @@ function load<T>(key: string, fallback: T): T {
 function save<T>(key: string, value: T): void {
 	if (typeof localStorage === 'undefined') return;
 	try {
-		localStorage.setItem(key, JSON.stringify(value));
+		const raw = JSON.stringify(value);
+		localStorage.setItem(key, raw);
+		seenRaw.set(key, raw);
+		unsavedKeys.delete(key);
 	} catch {
-		// Ignore quota / disabled storage
+		// Quota or disabled storage: memory keeps the change, sync is told.
+		unsavedKeys.add(key);
 	}
+}
+
+/** Every key the planner blob is made of, the store field holding it, and its section. */
+const SYNCED_KEYS = [
+	['planner.shapes.v1', 'dayShapes', 'shapes'],
+	['planner.weekPattern.v1', 'weekPattern', 'weekPattern'],
+	['planner.days.v2', 'dayOverrides', 'days'],
+	['planner.obligations.v1', 'obligations', 'obligations'],
+	['planner.rituals.v1', 'rituals', 'rituals'],
+	['planner.tasks.v1', 'tasks', 'tasks'],
+	['planner.settings.v1', 'settings', 'settings'],
+	['planner.domains.v1', 'domains', 'domains'],
+	['planner.observations.v1', 'intervalObservations', 'observations'],
+	['planner.routines.v1', 'routines', 'routines'],
+	['planner.routinePractices.v1', 'routinePractices', 'routinePractices'],
+	['planner.surgeDrafts.v1', 'surgeDrafts', 'surgeDrafts'],
+	['planner.carillonSpores.v1', 'sporeEvents', 'spores'],
+	['planner.sleepLogs.v1', 'sleepLogs', 'sleepLogs'],
+	['planner.signals.v1', 'signalEntries', 'signals'],
+	['planner.loggedSessions.v1', 'loggedSessions', 'loggedSessions'],
+	['planner.openLoops.v1', 'openLoops', 'openLoops'],
+	['planner.loopEvents.v1', 'loopEvents', 'loopEvents'],
+	['planner.closureReflections.v1', 'closureReflections', 'closureReflections'],
+	['planner.fiveContactsRounds.v1', 'fiveContactsRounds', 'fiveContactsRounds'],
+	['planner.loopReminders.v1', 'loopReminders', 'loopReminders']
+] as const satisfies readonly (readonly [string, keyof PlannerStore, keyof PlannerBlob])[];
+
+const BELL_VOLUME_KEY = 'planner.bellVolume.v1';
+const BELL_PAUSE_KEY = 'planner.bellPause.v1';
+
+/**
+ * Deciding, playing and claiming a bell is one step across every tab on the
+ * device: two tabs whose clocks tick in the same instant must not both ring.
+ * Where Web Locks are missing the step simply runs (a rare double ring).
+ */
+function withBellLock(run: () => Promise<void>): Promise<void> {
+	const locks = typeof navigator !== 'undefined' ? (navigator as Navigator & { locks?: LockManager }).locks : undefined;
+	return locks?.request ? locks.request('carillon-bell', run).then(() => undefined) : run();
+}
+
+function loadPause(): string | null {
+	const value = load<unknown>(BELL_PAUSE_KEY, null);
+	return typeof value === 'string' && Number.isFinite(new Date(value).getTime()) ? value : null;
 }
 
 function loadRoutines(): Routine[] {
@@ -168,6 +244,7 @@ export class PlannerStore {
 	loopEvents = $state<LoopEvent[]>(load('planner.loopEvents.v1', []));
 	closureReflections = $state<ClosureReflection[]>(load('planner.closureReflections.v1', []));
 	fiveContactsRounds = $state<FiveContactsRound[]>(load('planner.fiveContactsRounds.v1', []));
+	loopReminders = $state<LoopReminder[]>(load('planner.loopReminders.v1', []));
 
 	// Transient
 	readonly sessionId = uid();
@@ -578,7 +655,10 @@ export class PlannerStore {
 
 		const observation: IntervalObservation = {
 			trackerAnswers: input.trackerAnswers === undefined ? existing?.trackerAnswers : input.trackerAnswers.map(a => ({ tracker: { ...a.tracker }, value: a.value })),
-			noticings: input.noticings === undefined ? existing?.noticings : input.noticings.map(noticing => ({ ...noticing, note: noticing.note.trim() })),
+			noticings: input.noticings === undefined ? existing?.noticings : input.noticings.map(noticing => {
+				const links = [...new Set(noticing.linkedLoopIds ?? [])];
+				return { channel: noticing.channel, note: noticing.note.trim(), ...(links.length ? { linkedLoopIds: links } : {}) };
+			}),
 			linkedLoopIds: input.linkedLoopIds === undefined ? existing?.linkedLoopIds : [...new Set(input.linkedLoopIds)],
 			details: input.details === undefined ? existing?.details : { ...input.details },
 			sampleTag: input.sampleTag === undefined ? existing?.sampleTag : input.sampleTag ? { ...input.sampleTag } : null,
@@ -656,7 +736,165 @@ export class PlannerStore {
 		this.openLoops = projectLoopLifecycle(this.openLoops, this.loopEvents);
 		save('planner.loopEvents.v1', this.loopEvents);
 		save('planner.openLoops.v1', this.openLoops);
+		if (event.type === 'closed' && loop) this.#ensureRhythmReminder(loop.id);
 		return event;
+	}
+
+	/**
+	 * Rename a loop or change whether it recurs. Lifecycle is untouched: it
+	 * stays a projection of the event ledger.
+	 */
+	updateOpenLoop(id: string, patch: { title?: string; recurring?: boolean; rhythmDays?: number | string | null; remindAfterClosure?: boolean }): OpenLoop | null {
+		const loop = this.openLoops.find(item => item.id === id);
+		if (!loop) return null;
+		const title = patch.title === undefined ? loop.title : patch.title.trim();
+		if (!title) return null;
+		const recurring = patch.recurring ?? Boolean(loop.recurring);
+		const rhythmDays = !recurring ? undefined : patch.rhythmDays === undefined ? loop.rhythmDays : cleanRhythmDays(patch.rhythmDays ?? undefined);
+		const remindAfterClosure = Boolean(recurring && rhythmDays && (patch.remindAfterClosure ?? loop.remindAfterClosure));
+		const timestamp = new Date().toISOString();
+		const updated: OpenLoop = {
+			...loop, title, recurring: recurring || undefined, rhythmDays,
+			remindAfterClosure: remindAfterClosure || undefined, editedAt: timestamp, updatedAt: timestamp
+		};
+		this.openLoops = projectLoopLifecycle(this.openLoops.map(item => item.id === id ? updated : item), this.loopEvents);
+		save('planner.openLoops.v1', this.openLoops);
+		if (remindAfterClosure) this.#ensureRhythmReminder(id);
+		else this.#cancelRhythmReminders(id);
+		return this.openLoops.find(item => item.id === id) ?? null;
+	}
+
+	/**
+	 * Correct a saved event: when it happened, its note, or — for observations
+	 * that are not lifecycle changes — which loop it belongs to. The entry time
+	 * and the first occurrence time are kept, so a correction stays visible.
+	 */
+	updateLoopEvent(id: string, patch: { occurredAt?: string; note?: string | null; loopId?: string | null }): LoopEvent | null {
+		const event = this.loopEvents.find(item => item.id === id);
+		if (!event) return null;
+		let occurredAt = event.occurredAt;
+		if (patch.occurredAt !== undefined) {
+			const time = new Date(patch.occurredAt);
+			// An occurrence can be corrected into the past, not into the future.
+			if (!Number.isFinite(time.getTime()) || time.getTime() > Date.now() + 60_000) return null;
+			occurredAt = time.toISOString();
+		}
+		let loopId = event.loopId;
+		if (patch.loopId !== undefined && (patch.loopId || undefined) !== event.loopId) {
+			if (isLifecycleEvent(event.type)) return null;
+			if (patch.loopId && !this.openLoops.some(loop => loop.id === patch.loopId)) return null;
+			loopId = patch.loopId || undefined;
+		}
+		const note = patch.note === undefined ? event.note : patch.note?.trim() || undefined;
+		if (occurredAt === event.occurredAt && loopId === event.loopId && note === event.note) return event;
+		const timestamp = new Date().toISOString();
+		const updated: LoopEvent = {
+			...event, occurredAt, loopId, note, updatedAt: timestamp,
+			originalOccurredAt: occurredAt !== event.occurredAt ? event.originalOccurredAt ?? event.occurredAt : event.originalOccurredAt
+		};
+		this.loopEvents = this.loopEvents.map(item => item.id === id ? updated : item);
+		this.openLoops = projectLoopLifecycle(this.openLoops, this.loopEvents);
+		save('planner.loopEvents.v1', this.loopEvents);
+		save('planner.openLoops.v1', this.openLoops);
+		if (occurredAt !== event.occurredAt) {
+			// A between-cycles reminder follows its closure's corrected time.
+			const shift = new Date(occurredAt).getTime() - new Date(event.occurredAt).getTime();
+			this.#writeReminders(this.loopReminders.map(reminder => reminder.afterEventId === id && !reminder.endedAt
+				? { ...reminder, dueAt: new Date(new Date(reminder.dueAt).getTime() + shift).toISOString(), updatedAt: timestamp } : reminder));
+		}
+		return updated;
+	}
+
+	// ── reminders: only ever the ones the person asked for ─────────────
+
+	createLoopReminder(loopId: string, dueAt: string, note?: string): LoopReminder | null {
+		const loop = this.openLoops.find(item => item.id === loopId);
+		const due = new Date(dueAt);
+		if (!loop || loop.status === 'resolved' || !Number.isFinite(due.getTime()) || due.getTime() < Date.now() - 60_000) return null;
+		const timestamp = new Date().toISOString();
+		const reminder: LoopReminder = { id: `reminder-${uid()}`, loopId, dueAt: due.toISOString(), note: note?.trim() || undefined, createdAt: timestamp, updatedAt: timestamp };
+		this.#writeReminders([...this.loopReminders, reminder]);
+		return reminder;
+	}
+
+	/** Thanks or cancel: either way the reminder is finished and never repeats. */
+	endLoopReminder(id: string, ending: 'acknowledged' | 'cancelled'): void {
+		const timestamp = new Date().toISOString();
+		this.#writeReminders(this.loopReminders.map(reminder => reminder.id === id && !reminder.endedAt
+			? { ...reminder, endedAt: timestamp, ending, updatedAt: timestamp } : reminder));
+	}
+
+	/** Move a reminder to a specific later time. */
+	moveLoopReminder(id: string, dueAt: Date): void {
+		if (!Number.isFinite(dueAt.getTime())) return;
+		const timestamp = new Date().toISOString();
+		this.#writeReminders(this.loopReminders.map(reminder => reminder.id === id && !reminder.endedAt
+			? { ...reminder, dueAt: dueAt.toISOString(), updatedAt: timestamp } : reminder));
+	}
+
+	getLiveReminders(loopId?: string): LoopReminder[] {
+		return liveReminders(this.loopReminders, this.openLoops, this.loopEvents).filter(reminder => !loopId || reminder.loopId === loopId);
+	}
+
+	getDueReminders(now: Date = this.now): LoopReminder[] {
+		return dueReminders(this.loopReminders, this.openLoops, this.loopEvents, now);
+	}
+
+	#writeReminders(reminders: LoopReminder[]): void {
+		this.loopReminders = reminders;
+		save('planner.loopReminders.v1', this.loopReminders);
+	}
+
+	/** Deterministic id, so a retry or a second device cannot double it. */
+	#ensureRhythmReminder(loopId: string): void {
+		const loop = this.openLoops.find(item => item.id === loopId);
+		const closure = latestLifecycleEvent(loopId, this.loopEvents);
+		if (!loop?.recurring || !loop.remindAfterClosure || !loop.rhythmDays || loop.status !== 'resolved' || closure?.type !== 'closed') return;
+		const id = `reminder-after-${closure.id}`;
+		const dueAt = rhythmDueAt(closure.occurredAt, loop.rhythmDays);
+		const existing = this.loopReminders.find(reminder => reminder.id === id);
+		const timestamp = new Date().toISOString();
+		if (existing && (existing.endedAt || existing.dueAt === dueAt)) return;
+		const reminder: LoopReminder = existing
+			? { ...existing, dueAt, updatedAt: timestamp }
+			: { id, loopId, dueAt, afterEventId: closure.id, createdAt: timestamp, updatedAt: timestamp };
+		this.#writeReminders(existing ? this.loopReminders.map(item => item.id === id ? reminder : item) : [...this.loopReminders, reminder]);
+	}
+
+	#cancelRhythmReminders(loopId: string): void {
+		if (!this.loopReminders.some(reminder => reminder.loopId === loopId && reminder.afterEventId && !reminder.endedAt)) return;
+		const timestamp = new Date().toISOString();
+		this.#writeReminders(this.loopReminders.map(reminder => reminder.loopId === loopId && reminder.afterEventId && !reminder.endedAt
+			? { ...reminder, endedAt: timestamp, ending: 'cancelled', updatedAt: timestamp } : reminder));
+	}
+
+	/**
+	 * Browser notifications are opt-in, respect quiet hours, and fire once per
+	 * due time. The in-app card shows due reminders either way.
+	 */
+	#deliverReminders(): void {
+		if (!this.settings.reminderNotifications || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+		if (isQuietMinute(nowMinutes(this.now), this.settings.quietHoursStart, this.settings.quietHoursEnd)) return;
+		const pending = this.getDueReminders().filter(reminder => reminder.notifiedFor !== reminder.dueAt);
+		if (!pending.length) return;
+		for (const reminder of pending) {
+			const title = this.openLoops.find(loop => loop.id === reminder.loopId)?.title ?? 'An open loop';
+			try {
+				new Notification('Carillon', { body: `A reminder you asked for: ${title}${reminder.note ? ` — ${reminder.note}` : ''}`, tag: reminder.id });
+			} catch {
+				// Some mobile browsers only notify through a service worker; the in-app card still shows it.
+			}
+		}
+		const ids = new Set(pending.map(reminder => reminder.id));
+		// Not an edit: updatedAt stays put so this never outranks a snooze from another device.
+		this.#writeReminders(this.loopReminders.map(reminder => ids.has(reminder.id) ? { ...reminder, notifiedFor: reminder.dueAt } : reminder));
+	}
+
+	/** An offer or idea waved away stays away. */
+	dismissOffer(key: string): void {
+		const dismissed = this.settings.dismissedOffers ?? [];
+		if (dismissed.includes(key)) return;
+		this.updateSettings({ dismissedOffers: [...dismissed, key].slice(-300) });
 	}
 
 	saveClosureReflection(eventId: string, input: { descriptors: string[]; note?: string; nextFeelsPossible?: 'something' | 'rest' | 'nothing' }): ClosureReflection | null {
@@ -1112,8 +1350,19 @@ export class PlannerStore {
 
 	// ── settings + persistence ─────────────────────────────────────
 
+	/**
+	 * Every change stamps the keys whose value actually changed, so sync keeps
+	 * the newer edit per setting. A form that re-saves values it read earlier
+	 * (onboarding's steps) must not stamp them as new.
+	 */
 	updateSettings(patch: Partial<PlannerSettings>): void {
-		this.settings = { ...this.settings, ...patch };
+		const stampedAt = new Date().toISOString();
+		const stamps = { ...(this.settings.settingsStamps ?? {}) };
+		const current = this.settings as Record<string, unknown>;
+		for (const [key, value] of Object.entries(patch)) {
+			if (key !== 'settingsStamps' && JSON.stringify(current[key]) !== JSON.stringify(value)) stamps[key] = stampedAt;
+		}
+		this.settings = { ...this.settings, ...patch, settingsStamps: stamps };
 		save('planner.settings.v1', this.settings);
 	}
 
@@ -1159,6 +1408,7 @@ export class PlannerStore {
 		this.openLoops = projectLoopLifecycle(blob.openLoops ?? this.openLoops, this.loopEvents);
 		this.closureReflections = blob.closureReflections ?? this.closureReflections;
 		this.fiveContactsRounds = blob.fiveContactsRounds ?? this.fiveContactsRounds;
+		this.loopReminders = blob.loopReminders ?? this.loopReminders;
 		save('planner.shapes.v1', this.dayShapes);
 		save('planner.weekPattern.v1', this.weekPattern);
 		save('planner.days.v2', this.dayOverrides);
@@ -1179,7 +1429,58 @@ export class PlannerStore {
 		save('planner.loopEvents.v1', this.loopEvents);
 		save('planner.closureReflections.v1', this.closureReflections);
 		save('planner.fiveContactsRounds.v1', this.fiveContactsRounds);
+		save('planner.loopReminders.v1', this.loopReminders);
 		this.publishSessionsLocally();
+	}
+
+	// ── other tabs + sync bookkeeping ──────────────────────────────
+
+	/**
+	 * Take whatever another tab on this device saved since this one last read
+	 * or wrote it. Every change saves at once, so without this a second tab's
+	 * next save would put back its older copy — and sync, which remembers what
+	 * this device last agreed on, would read the difference as deletions.
+	 * Returns whether anything came in.
+	 */
+	catchUp(): boolean {
+		let changed = false;
+		for (const [key, field] of SYNCED_KEYS) {
+			const raw = readRaw(key);
+			if (raw === null || raw === seenRaw.get(key)) continue;
+			let value: unknown;
+			try {
+				value = JSON.parse(raw);
+			} catch {
+				continue;
+			}
+			seenRaw.set(key, raw);
+			// Memory and storage agree again, whatever this tab failed to save there.
+			unsavedKeys.delete(key);
+			(this as unknown as Record<string, unknown>)[field] =
+				field === 'settings' ? { ...DEFAULT_SETTINGS, ...(value as Partial<PlannerSettings>) } : value;
+			changed = true;
+		}
+		return changed;
+	}
+
+	/** Catch up whenever another tab saves. Returns the cleanup. */
+	followOtherTabs(): () => void {
+		if (typeof window === 'undefined') return () => {};
+		const onStorage = (event: StorageEvent) => {
+			if (event.key === null || SYNCED_KEYS.some(([key]) => key === event.key)) this.catchUp();
+		};
+		window.addEventListener('storage', onStorage);
+		return () => window.removeEventListener('storage', onStorage);
+	}
+
+	/** Whether every synced key's last save went through. */
+	allSaved(): boolean {
+		return SYNCED_KEYS.every(([key]) => !unsavedKeys.has(key));
+	}
+
+	/** Sections whose stored value could not be read when the page loaded. */
+	unreadableSections(): (keyof PlannerBlob)[] {
+		return SYNCED_KEYS.filter(([key]) => unreadableKeys.has(key)).map(([, , section]) => section);
 	}
 
 	// ── view + binder ───────────────────────────────────────────────
@@ -1210,47 +1511,183 @@ export class PlannerStore {
 
 	// ── clock + bell ────────────────────────────────────────────────
 
-	#lastBellMinuteKey = '';
+	#lastChimeCheck: Date | null = null;
+	/** The last bell this tab actually sounded, for the Today status line. */
+	lastChime = $state<{ mark: BellMark; at: string } | null>(null);
+	/** Master bell volume on this device — speakers differ, so it never syncs. */
+	bellVolume = $state<number>(cleanVolume(load<unknown>(BELL_VOLUME_KEY, DEFAULT_BELL_VOLUME), DEFAULT_BELL_VOLUME));
+	/** A pause on this device; every tab here follows it. */
+	bellPausedUntil = $state<string | null>(loadPause());
+	/** Whether the browser is letting this page make sound yet. */
+	audioReadiness = $state<AudioReadiness>('suspended');
+	/** What is sounding now — a preview, an automatic bell — or null. */
+	bellSounding = $state<SoundKind | null>(null);
+	/** Bell runs in this tab happen one after another, never interleaved. */
+	#ringing: Promise<void> = Promise.resolve();
 
-	tick(): void {
-		this.now = new Date();
+	tick(now: Date = new Date()): void {
+		this.now = now;
+		this.#deliverReminders();
+		// A focus and a visibility tick can land together; the second waits for the first.
+		this.#ringing = this.#ringing.then(() => withBellLock(() => this.#ringDueBells(now))).catch(() => {});
+	}
 
-		if (!this.settings.bellsEnabled) return;
+	/** Resolves once every bell this tab has started deciding on is decided. */
+	bellsSettled(): Promise<void> {
+		return this.#ringing;
+	}
 
-		const mins = nowMinutes(this.now);
-		const minuteKey = `${dateKey(this.now)}-${mins}`;
-		if (minuteKey === this.#lastBellMinuteKey) return;
+	pausedUntil(): Date | null {
+		const until = this.bellPausedUntil ? new Date(this.bellPausedUntil) : null;
+		return until && Number.isFinite(until.getTime()) ? until : null;
+	}
 
-		const quietStart = timeToMinutes(this.settings.quietHoursStart);
-		const quietEnd = timeToMinutes(this.settings.quietHoursEnd);
-		const inQuietHours =
-			quietStart <= quietEnd
-				? mins >= quietStart && mins < quietEnd
-				: mins >= quietStart || mins < quietEnd;
-		if (inQuietHours) return;
-
-		const samplingInterval = Math.max(1, this.settings.samplingIntervalMinutes || 15);
-		if (mins % samplingInterval === 0) {
-			playBell('block-start');
-			this.#lastBellMinuteKey = minuteKey;
-			return;
+	/**
+	 * One sequence per tick: this minute's chime (unless another tab or a
+	 * reload already rang it), then a reminder sound if one came due. Claims
+	 * are written only once the sound was actually scheduled, so a tab the
+	 * browser is still holding never takes a bell from one that can play.
+	 */
+	async #ringDueBells(now: Date): Promise<void> {
+		const event = dueChime({ lastChecked: this.#lastChimeCheck, now, settings: this.settings, blocksFor: date => this.getBlocksForDate(date), pausedUntil: this.pausedUntil() });
+		this.#lastChimeCheck = now;
+		const chime = event && !bellMinuteClaimed(event.at) ? this.chimeNotes(event) : [];
+		const reminders = this.#freshReminderSound(now);
+		const notes = [...chime, ...after(reminders.notes, chime.length ? notesEnd(chime) + 0.3 : 0)];
+		if (!notes.length) return;
+		const result = await playNotes(notes, this.bellVolume);
+		if (result !== 'scheduled') return;
+		if (event && chime.length) {
+			claimBellMinute(event.at);
+			this.#announce(event.mark, event.at, event.parts[0].sound.voice);
 		}
-
-		const blocks = this.getBlocksForDate(this.now);
-		for (const block of blocks) {
-			const startMins = timeToMinutes(block.startTime);
-			const diff = startMins - mins;
-			if (diff === this.settings.leadTimeMinutes) {
-				playBell('lead-time');
-				this.#lastBellMinuteKey = minuteKey;
-				break;
-			}
-			if (diff === 0) {
-				playBell(block.bellId ?? 'block-start');
-				this.#lastBellMinuteKey = minuteKey;
-				break;
-			}
+		if (reminders.keys.length) {
+			markReminderRung(reminders.keys);
+			if (!chime.length) this.#announce('reminder', now, markSound(this.settings.bellSounds, 'reminder').voice);
 		}
+	}
+
+	/** Note a bell that sounded — for Today's "rang" line and anything listening on the page. */
+	#announce(mark: BellMark, at: Date, voice: BellVoiceId): void {
+		this.lastChime = { mark, at: at.toISOString() };
+		if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('carillon:bell', { detail: { mark, voice, at: at.toISOString() } }));
+	}
+
+	/**
+	 * The notes for one resolved minute at the person's mix: the clock chime,
+	 * then a block's bell once it has faded. Each part's level is baked into
+	 * its notes so the whole minute plays as one sequence.
+	 */
+	chimeNotes(event: ChimeEvent): BellNote[] {
+		const notes: BellNote[] = [];
+		let offset = 0;
+		for (const part of event.parts) {
+			const own = part.blockBellId && getBell(part.blockBellId)
+				? registryNotes(part.blockBellId)
+				: voiceWithStrikes(part.sound.voice, { minute: event.at.getMinutes(), strikeHour: part.strikeHour });
+			if (!own.length) continue;
+			const scale = levelFor(part.sound.volume);
+			notes.push(...after(own, offset).map(note => ({ ...note, gain: note.gain * scale })));
+			offset += notesEnd(own) + 0.3;
+		}
+		return notes;
+	}
+
+	/**
+	 * A due loop reminder may also make a sound, if one was chosen for it —
+	 * only while Carillon is open when it comes due, once per device.
+	 */
+	#freshReminderSound(now: Date): { notes: BellNote[]; keys: string[] } {
+		const sound = markSound(this.settings.bellSounds, 'reminder');
+		if (!audible(sound) || bellsResting(this.settings, now, this.pausedUntil())) return { notes: [], keys: [] };
+		const keys = this.getDueReminders(now)
+			.filter(reminder => now.getTime() - new Date(reminder.dueAt).getTime() <= CHIME_GRACE_MINUTES * 60_000)
+			.map(reminder => `${reminder.id}@${reminder.dueAt}`)
+			.filter(key => !reminderRung(key));
+		if (!keys.length) return { notes: [], keys: [] };
+		const notes = voiceWithStrikes(sound.voice, { minute: now.getMinutes() }).map(note => ({ ...note, gain: note.gain * levelFor(sound.volume) }));
+		return { notes, keys };
+	}
+
+	/** Hear one mark as it would ring now, ignoring quiet hours and pauses — an explicit request. */
+	previewMark(mark: BellMark): Promise<PlayResult> {
+		const sound = markSound(this.settings.bellSounds, mark);
+		const minute = mark === 'hour' ? 0 : mark === 'half' ? 30 : mark === 'quarter' ? 15 : this.now.getMinutes();
+		const strikeHour = mark === 'hour' && countsHours(this.settings.bellSounds) ? 3 : undefined;
+		const notes = voiceWithStrikes(sound.voice, { minute, strikeHour }).map(note => ({ ...note, gain: note.gain * levelFor(sound.volume) }));
+		return playNotes(notes, this.bellVolume, 'preview');
+	}
+
+	/** Change the synced bell mix. Unknown values from newer versions are kept as they are. */
+	updateBellSounds(patch: Partial<BellSoundSettings>): void {
+		this.updateSettings({ bellSounds: { ...(this.settings.bellSounds ?? {}), ...patch } });
+	}
+
+	setMarkSound(mark: BellMark, sound: { voice?: BellVoiceId; volume?: number }): void {
+		const marks = this.settings.bellSounds?.marks;
+		const current = marks && typeof marks === 'object' && !Array.isArray(marks) ? marks : {};
+		const entry = current[mark] && typeof current[mark] === 'object' ? current[mark] : {};
+		this.updateBellSounds({ marks: { ...current, [mark]: { ...entry, ...sound } } });
+	}
+
+	/** Set hour, half, quarter and sample voices together. Levels stay as they are. */
+	applyBellPreset(id: string): void {
+		const preset = BELL_PRESETS.find(item => item.id === id);
+		if (!preset) return;
+		const marks = this.settings.bellSounds?.marks;
+		const current = marks && typeof marks === 'object' && !Array.isArray(marks) ? { ...marks } : {};
+		for (const mark of CLOCK_MARKS) current[mark] = { ...(current[mark] ?? {}), voice: preset.voices[mark] };
+		this.updateBellSounds({ marks: current });
+	}
+
+	setBellVolume(volume: number): void {
+		this.bellVolume = cleanVolume(volume, this.bellVolume);
+		save(BELL_VOLUME_KEY, this.bellVolume);
+	}
+
+	/** Rest the bells on this device until a minute (rounded down, so that minute's bell rings), or resume with null. */
+	pauseBells(until: Date | null): void {
+		this.bellPausedUntil = until ? startOfMinute(until).toISOString() : null;
+		save(BELL_PAUSE_KEY, this.bellPausedUntil);
+	}
+
+	#clockStarted = false;
+
+	/**
+	 * Start the clock once, from the app root. Ticks land just after each
+	 * wall-clock minute (the delay is recomputed every time, so clock jumps
+	 * correct themselves), a tab coming back into view checks at once, and
+	 * other tabs' volume and pause changes are followed.
+	 */
+	startClock(): () => void {
+		if (this.#clockStarted || typeof window === 'undefined') return () => {};
+		this.#clockStarted = true;
+		let timer: ReturnType<typeof setTimeout>;
+		const schedule = () => {
+			timer = setTimeout(() => { this.tick(); schedule(); }, 60_000 - (Date.now() % 60_000) + 150);
+		};
+		schedule();
+		const wake = () => { if (document.visibilityState !== 'hidden') this.tick(); };
+		const storage = (event: StorageEvent) => {
+			if (event.key === BELL_PAUSE_KEY) this.bellPausedUntil = loadPause();
+			if (event.key === BELL_VOLUME_KEY) this.bellVolume = cleanVolume(load<unknown>(BELL_VOLUME_KEY, DEFAULT_BELL_VOLUME), DEFAULT_BELL_VOLUME);
+		};
+		document.addEventListener('visibilitychange', wake);
+		window.addEventListener('pageshow', wake);
+		window.addEventListener('focus', wake);
+		window.addEventListener('storage', storage);
+		const stopReadiness = watchAudioReadiness(state => { this.audioReadiness = state; });
+		const stopSounding = watchSounding(kind => { this.bellSounding = kind; });
+		const stopUnlock = installAudioUnlock(() => this.settings.bellsEnabled === true);
+		return () => {
+			clearTimeout(timer);
+			document.removeEventListener('visibilitychange', wake);
+			window.removeEventListener('pageshow', wake);
+			window.removeEventListener('focus', wake);
+			window.removeEventListener('storage', storage);
+			stopReadiness(); stopSounding(); stopUnlock();
+			this.#clockStarted = false;
+		};
 	}
 
 	// ── shape-relative wrappers (convenience for views) ─────────────
@@ -1263,11 +1700,6 @@ export class PlannerStore {
 		return getNextBlock(this.getBlocksForDate(date), date);
 	}
 
-	constructor() {
-		if (typeof window !== 'undefined') {
-			setInterval(() => this.tick(), 30_000);
-		}
-	}
 }
 
 export const store = new PlannerStore();
