@@ -122,6 +122,8 @@ export function fitBoardCamera(document: WhiteboardDocument, viewport: Viewport)
 
 export function itemLabel(item: WhiteboardItem): string {
 	switch (item.type) {
+		case 'slip':
+			return item.text.trim().slice(0, 80) || 'Untitled slip';
 		case 'frame':
 			return frameTitle(item);
 		case 'stack':

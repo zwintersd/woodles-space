@@ -1,10 +1,10 @@
 import { DEFAULT_SURFACE, isSurface, normalizeSurface, type Surface } from './surface';
 
-export const BOARD_SCHEMA_VERSION = 6;
+export const BOARD_SCHEMA_VERSION = 7;
 const MIN_CAMERA_ZOOM = 0.1;
 const MAX_CAMERA_ZOOM = 4;
 
-export type WhiteboardItemType = 'card' | 'image' | 'frame' | 'stack' | 'connector' | 'portal';
+export type WhiteboardItemType = 'card' | 'slip' | 'image' | 'frame' | 'stack' | 'connector' | 'portal';
 
 /**
  * One palette for everything that carries colour — labels, the Color property,
@@ -81,6 +81,21 @@ export interface CardItem extends BaseWhiteboardItem {
 	freePosition?: { x: number; y: number };
 }
 
+export interface SlipItem extends BaseWhiteboardItem {
+	type: 'slip';
+	text: string;
+}
+
+export function createSlip(x: number, y: number, zIndex: number): SlipItem {
+	return { ...base('slip', x, y, 170, 48, zIndex), text: '' };
+}
+
+/** Keep identity and references when a small thought needs a full card. */
+export function slipToCard(slip: SlipItem): CardItem {
+	return { ...createCard(slip.x, slip.y, slip.zIndex), id: slip.id, createdAt: slip.createdAt,
+		body: slip.text, ...(slip.properties ? { properties: slip.properties } : {}) };
+}
+
 export interface ImageItem extends BaseWhiteboardItem {
 	type: 'image';
 	assetId: string;
@@ -125,7 +140,7 @@ export interface ConnectorItem extends BaseWhiteboardItem {
 	arrow: boolean;
 }
 
-export type WhiteboardItem = CardItem | ImageItem | FrameItem | StackItem | ConnectorItem | PortalItem;
+export type WhiteboardItem = CardItem | SlipItem | ImageItem | FrameItem | StackItem | ConnectorItem | PortalItem;
 
 /**
  * A reusable label, owned by the board rather than by any one object, so the
@@ -370,6 +385,8 @@ function isJourneyStop(value: unknown): value is JourneyStop {
 export function isWhiteboardItem(value: unknown): value is WhiteboardItem {
 	if (!isRecord(value) || !isBaseItem(value) || typeof value.type !== 'string') return false;
 	switch (value.type) {
+		case 'slip':
+			return typeof value.text === 'string';
 		case 'card':
 			return typeof value.title === 'string' && typeof value.body === 'string' &&
 				(value.stackId === undefined || typeof value.stackId === 'string') &&
