@@ -18,6 +18,7 @@ export type ViewPreferences = {
 	restChrome: boolean;
 	/** The overview map. Off by default — it is a thing you ask for, not furniture. */
 	minimapOn: boolean;
+	snap?: boolean;
 };
 
 export const DEFAULT_VIEW: ViewPreferences = { restChrome: true, minimapOn: false };
@@ -25,7 +26,7 @@ export const DEFAULT_VIEW: ViewPreferences = { restChrome: true, minimapOn: fals
 export function isViewPreferences(value: unknown): value is ViewPreferences {
 	if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
 	const record = value as Record<string, unknown>;
-	return typeof record.restChrome === 'boolean' && typeof record.minimapOn === 'boolean';
+	return typeof record.restChrome === 'boolean' && typeof record.minimapOn === 'boolean' && (record.snap === undefined || typeof record.snap === 'boolean');
 }
 
 /** Anything unreadable falls back to the default rather than costing the rest. */
@@ -33,7 +34,8 @@ export function normalizeView(value: unknown): ViewPreferences {
 	const record = (typeof value === 'object' && value !== null ? value : {}) as Record<string, unknown>;
 	return {
 		restChrome: typeof record.restChrome === 'boolean' ? record.restChrome : DEFAULT_VIEW.restChrome,
-		minimapOn: typeof record.minimapOn === 'boolean' ? record.minimapOn : DEFAULT_VIEW.minimapOn
+		minimapOn: typeof record.minimapOn === 'boolean' ? record.minimapOn : DEFAULT_VIEW.minimapOn,
+		...(typeof record.snap === 'boolean' ? { snap: record.snap } : {})
 	};
 }
 

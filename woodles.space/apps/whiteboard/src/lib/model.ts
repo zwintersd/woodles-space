@@ -1,10 +1,12 @@
 import { DEFAULT_SURFACE, isSurface, normalizeSurface, type Surface } from './surface';
+import { validImageEdits, type ImageEdits } from './imageEditing';
+import { validAppearance, validSwatches, type ItemAppearance } from './appearance';
 
-export const BOARD_SCHEMA_VERSION = 7;
+export const BOARD_SCHEMA_VERSION = 9;
 const MIN_CAMERA_ZOOM = 0.1;
 const MAX_CAMERA_ZOOM = 4;
 
-export type WhiteboardItemType = 'card' | 'slip' | 'image' | 'frame' | 'stack' | 'connector' | 'portal';
+export type WhiteboardItemType = 'card' | 'slip' | 'lettering' | 'image' | 'frame' | 'stack' | 'connector' | 'portal';
 
 /**
  * One palette for everything that carries colour — labels, the Color property,
@@ -71,6 +73,14 @@ export interface BaseWhiteboardItem extends Bounds {
 	createdAt: string;
 	updatedAt: string;
 	properties?: ItemProperties;
+	appearance?: ItemAppearance;
+	/** Flat composition membership, separate from stack membership and source ownership. */
+	groupId?: string;
+	locked?: boolean;
+	/** Board rotation, separate from edits inside an image's original asset. */
+	rotation?: number;
+	/** Explicit paint order; absent keeps the original container/content ordering. */
+	layer?: number;
 }
 
 export interface CardItem extends BaseWhiteboardItem {
@@ -86,6 +96,15 @@ export interface SlipItem extends BaseWhiteboardItem {
 	text: string;
 }
 
+export interface LetteringItem extends BaseWhiteboardItem {
+	type: 'lettering';
+	text: string;
+}
+
+export function createLettering(x: number, y: number, zIndex: number): LetteringItem {
+	return { ...base('lettering', x, y, 320, 74, zIndex), text: '' };
+}
+
 export function createSlip(x: number, y: number, zIndex: number): SlipItem {
 	return { ...base('slip', x, y, 170, 48, zIndex), text: '' };
 }
@@ -93,7 +112,10 @@ export function createSlip(x: number, y: number, zIndex: number): SlipItem {
 /** Keep identity and references when a small thought needs a full card. */
 export function slipToCard(slip: SlipItem): CardItem {
 	return { ...createCard(slip.x, slip.y, slip.zIndex), id: slip.id, createdAt: slip.createdAt,
-		body: slip.text, ...(slip.properties ? { properties: slip.properties } : {}) };
+		body: slip.text, ...(slip.properties ? { properties: { ...slip.properties, ...(slip.properties.labelIds ? { labelIds: [...slip.properties.labelIds] } : {}) } } : {}),
+		...(slip.appearance ? { appearance: { ...slip.appearance } } : {}),
+		...(slip.groupId ? { groupId: slip.groupId } : {}), ...(slip.locked !== undefined ? { locked: slip.locked } : {}),
+		...(slip.rotation !== undefined ? { rotation: slip.rotation } : {}), ...(slip.layer !== undefined ? { layer: slip.layer } : {}) };
 }
 
 export interface ImageItem extends BaseWhiteboardItem {
@@ -101,6 +123,8 @@ export interface ImageItem extends BaseWhiteboardItem {
 	assetId: string;
 	name: string;
 	aspectRatio: number;
+	edits?: ImageEdits;
+	caption?: string;
 }
 
 export interface FrameItem extends BaseWhiteboardItem {
@@ -140,7 +164,7 @@ export interface ConnectorItem extends BaseWhiteboardItem {
 	arrow: boolean;
 }
 
-export type WhiteboardItem = CardItem | SlipItem | ImageItem | FrameItem | StackItem | ConnectorItem | PortalItem;
+export type WhiteboardItem = CardItem | SlipItem | LetteringItem | ImageItem | FrameItem | StackItem | ConnectorItem | PortalItem;
 
 /**
  * A reusable label, owned by the board rather than by any one object, so the
@@ -196,6 +220,8 @@ export type WhiteboardDocument = {
 	labels: Label[];
 	/** The paper and the pattern on it. Decoration the board carries with it. */
 	surface: Surface;
+	/** Personal colours saved with this board. */
+	swatches?: string[];
 	updatedAt: string;
 };
 
@@ -322,7 +348,7 @@ export function createConnector(fromId: string, toId: string, zIndex = 2): Conne
 }
 
 export function nextZ(items: WhiteboardItem[]): number {
-	return Math.max(10, ...items.filter((item) => item.type !== 'frame').map((item) => item.zIndex + 1));
+	return Math.max(10, ...items.filter((item) => item.type !== 'frame').map((item) => Math.max(item.zIndex, item.layer ?? 0) + 1));
 }
 
 export function isWhiteboardDocument(value: unknown): value is WhiteboardDocument {
@@ -335,6 +361,7 @@ export function isWhiteboardDocument(value: unknown): value is WhiteboardDocumen
 	if (!Array.isArray(value.labels) || !value.labels.every(isLabel)) return false;
 	if (new Set(value.labels.map((label) => label.id)).size !== value.labels.length) return false;
 	if (!isSurface(value.surface)) return false;
+	if (value.swatches !== undefined && !validSwatches(value.swatches)) return false;
 	return value.items.every(isWhiteboardItem) && new Set(value.items.map((item) => item.id)).size === value.items.length;
 }
 
@@ -385,14 +412,14 @@ function isJourneyStop(value: unknown): value is JourneyStop {
 export function isWhiteboardItem(value: unknown): value is WhiteboardItem {
 	if (!isRecord(value) || !isBaseItem(value) || typeof value.type !== 'string') return false;
 	switch (value.type) {
-		case 'slip':
+		case 'slip': case 'lettering':
 			return typeof value.text === 'string';
 		case 'card':
 			return typeof value.title === 'string' && typeof value.body === 'string' &&
 				(value.stackId === undefined || typeof value.stackId === 'string') &&
 				(value.freePosition === undefined || isPoint(value.freePosition));
 		case 'image':
-			return typeof value.assetId === 'string' && typeof value.name === 'string' && finite(value.aspectRatio);
+			return typeof value.assetId === 'string' && typeof value.name === 'string' && finite(value.aspectRatio) && (value.edits === undefined || validImageEdits(value.edits)) && (value.caption === undefined || typeof value.caption === 'string');
 		case 'frame':
 			return typeof value.title === 'string' && typeof value.tint === 'string';
 		case 'stack':
@@ -412,7 +439,12 @@ function isBaseItem(value: Record<string, unknown>): boolean {
 	return typeof value.id === 'string' &&
 		finite(value.x) && finite(value.y) && finite(value.width) && finite(value.height) && finite(value.zIndex) &&
 		typeof value.createdAt === 'string' && typeof value.updatedAt === 'string' &&
-		(value.properties === undefined || isItemProperties(value.properties));
+		(value.properties === undefined || isItemProperties(value.properties)) &&
+		(value.appearance === undefined || validAppearance(value.appearance)) &&
+		(value.groupId === undefined || (typeof value.groupId === 'string' && value.groupId.length > 0 && value.groupId.length <= 120)) &&
+		(value.locked === undefined || typeof value.locked === 'boolean') &&
+		(value.rotation === undefined || (finite(value.rotation) && value.rotation >= -180 && value.rotation <= 180)) &&
+		(value.layer === undefined || (finite(value.layer) && Number.isInteger(value.layer) && Math.abs(value.layer) <= 1_000_000));
 }
 
 function isCamera(value: unknown): value is Camera {
@@ -432,7 +464,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Fills in everything schemas 2 through 6 added. Anything unreadable is
+	 * Fills in the optional fields older schemas omitted. Anything unreadable is
  * dropped rather than guessed at: a board's material matters more than what
  * has been said about it, so a corrupt journey costs you the journey, never
  * the board, an unreadable property sheet costs that object its properties
@@ -445,12 +477,19 @@ export function upgradeDocument(value: unknown): unknown {
 	const labels = Array.isArray(value.labels) ? value.labels.filter(isLabel) : [];
 	const items = Array.isArray(value.items)
 		? value.items.map((item) => {
-			if (!isRecord(item) || item.properties === undefined || isItemProperties(item.properties)) return item;
-			const { properties: _unreadable, ...rest } = item;
+			if (!isRecord(item)) return item;
+			const rest = { ...item };
+			if (rest.properties !== undefined && !isItemProperties(rest.properties)) delete rest.properties;
+			if (rest.appearance !== undefined && !validAppearance(rest.appearance)) delete rest.appearance;
+			if (rest.locked !== undefined && typeof rest.locked !== 'boolean') delete rest.locked;
+			if (rest.groupId !== undefined && (typeof rest.groupId !== 'string' || rest.groupId.length === 0 || rest.groupId.length > 120)) delete rest.groupId;
+			if (rest.rotation !== undefined && (!finite(rest.rotation) || Math.abs(rest.rotation) > 180)) delete rest.rotation;
+			if (rest.layer !== undefined && (!finite(rest.layer) || !Number.isInteger(rest.layer) || Math.abs(rest.layer) > 1_000_000)) delete rest.layer;
 			return rest;
 		})
 		: value.items;
-	return { ...value, items, home: isCamera(value.home) ? value.home : null, viewpoints, journey, labels, surface: normalizeSurface(value.surface) };
+	const { swatches, ...rest } = value;
+	return { ...rest, ...(validSwatches(swatches) ? { swatches: [...swatches] } : {}), items, home: isCamera(value.home) ? value.home : null, viewpoints, journey, labels, surface: normalizeSurface(value.surface) };
 }
 
 export function snapshotDocument(document: WhiteboardDocument): WhiteboardDocument {
@@ -462,11 +501,14 @@ export function snapshotDocument(document: WhiteboardDocument): WhiteboardDocume
 		journey: { loop: document.journey.loop, stops: document.journey.stops.map((stop) => ({ ...stop, target: { ...stop.target } })) },
 		labels: document.labels.map((label) => ({ ...label })),
 		surface: { ...document.surface },
+		...(document.swatches ? { swatches: [...document.swatches] } : {}),
 		updatedAt: document.updatedAt,
 		items: document.items.map((item) => ({
 			...item,
+			...(item.appearance ? { appearance: { ...item.appearance } } : {}),
 			...(item.properties ? { properties: { ...item.properties, ...(item.properties.labelIds ? { labelIds: [...item.properties.labelIds] } : {}) } } : {}),
 			...(item.type === 'stack' ? { cardIds: [...item.cardIds] } : {}),
+			...(item.type === 'image' && item.edits ? { edits: { ...item.edits, crop: { ...item.edits.crop } } } : {}),
 			...(item.type === 'card' && item.freePosition ? { freePosition: { ...item.freePosition } } : {})
 		})) as WhiteboardItem[]
 	};

@@ -1,5 +1,5 @@
 import type { Bounds, Label, WhiteboardDocument, WhiteboardItem } from './model';
-import { boundsForItem } from './geometry';
+import { visualBoundsForItem } from './geometry';
 import { itemLabel } from './navigation';
 import { labelsOn } from './labels';
 import { normalizeLabelName } from './model';
@@ -75,7 +75,7 @@ function bestMatch(item: WhiteboardItem, labels: Label[], query: SearchQuery): M
 	if (item.type === 'card') {
 		if (item.title.trim()) candidates.push({ field: 'title', text: item.title });
 		if (item.body.trim()) candidates.push({ field: 'body', text: item.body });
-	} else if (item.type === 'slip') {
+	} else if (item.type === 'slip' || item.type === 'lettering') {
 		candidates.push({ field: 'body', text: item.text });
 	} else if (item.type === 'frame' || item.type === 'stack') {
 		candidates.push({ field: 'title', text: item.title });
@@ -138,7 +138,7 @@ export function excerpt(text: string, at: number, length: number, width = 64): s
 
 /** The one rectangle that holds every result, for pulling back to show them all. */
 export function hitsBounds(items: WhiteboardItem[], hits: SearchHit[]): Bounds | null {
-	const boxes = hits.map((hit) => boundsForItem(items, hit.item));
+	const boxes = hits.map((hit) => visualBoundsForItem(items, hit.item));
 	if (!boxes.length) return null;
 	const left = Math.min(...boxes.map((box) => box.x));
 	const top = Math.min(...boxes.map((box) => box.y));

@@ -1,9 +1,26 @@
 <script lang="ts">
 	import { onDestroy, onMount, tick } from 'svelte';
+	import ImageEditor from '$lib/ImageEditor.svelte';
+	import ImageSurface from '$lib/ImageSurface.svelte';
+	import AppearanceTray from '$lib/AppearanceTray.svelte';
+	import LetteringSurface from '$lib/LetteringSurface.svelte';
+	import CompositionPanel from '$lib/CompositionPanel.svelte';
+	import LayersPanel from '$lib/LayersPanel.svelte';
+	import { alignItems, compositionUnits, duplicateItems, expandGroups, groupItems, isLocked, orderedItems, reorderLayers, snapTranslation, unionBounds, type Alignment, type AlignmentGuide, type LayerMove } from '$lib/composition';
+	import { appearanceCss, patchAppearance, isAppearanceColor, MAX_SWATCHES, type AppearancePatch, type ItemAppearance } from '$lib/appearance';
+	import { imageViewport, validImageEdits, type ImageEdits } from '$lib/imageEditing';
+	import type { ImageItem } from '$lib/model';
 	import { fade } from 'svelte/transition';
 	import { getImageAsset, imageDimensions, imageStorageAvailable, removeImageAsset, saveImageAsset } from '$lib/assets';
 	import {
 	boundsForItem,
+	visualBoundsForItem,
+	canRotate,
+	rotationOf,
+	rotatePoint,
+	resizedBounds,
+	snappedAngle,
+	normalizeAngle,
 	connectorEndpoints,
 	documentBounds,
 	extractCardFromStack,
@@ -21,6 +38,7 @@
 	import {
 	createCard,
 	createSlip,
+	createLettering,
 	slipToCard,
 	type SlipItem,
 	createConnector,
@@ -185,7 +203,7 @@
 	const CHROME_REST_MS = 3200;
 	type SaveState = 'idle' | 'saving' | 'saved' | 'recovered' | 'error';
 	type Point = { x: number; y: number };
-	type PointerMove = { pointerId: number; screen: Point };
+	type PointerMove = { pointerId: number; screen: Point; shift?: boolean };
 	type DragSession = {
 		kind: 'drag';
 		pointerId: number;
@@ -195,6 +213,8 @@
 		startBounds: Record<string, Bounds>;
 		sourceStackId?: string;
 		extracted: boolean;
+		recorded: boolean;
+		visualBounds: Bounds;
 	};
 	type PanSession = {
 		kind: 'pan';
@@ -220,7 +240,8 @@
 		startWorld: Point;
 		bounds: Bounds;
 	};
-	type PointerSession = DragSession | PanSession | MarqueeSession | FrameSession | ResizeSession;
+	type RotateSession = { kind: 'rotate'; pointerId: number; itemId: string; center: Point; startAngle: number; original: number };
+	type PointerSession = DragSession | PanSession | MarqueeSession | FrameSession | ResizeSession | RotateSession;
 
 	let canvasEl = $state<HTMLElement>();
 	let imageInput = $state<HTMLInputElement>();
@@ -242,8 +263,18 @@
 	let dropStackId = $state<string | null>(null);
 	let marquee = $state<Bounds | null>(null);
 	let frameDraft = $state<Bounds | null>(null);
+	let alignmentGuides = $state<AlignmentGuide[]>([]);
 	let renamingFrameId = $state<string | null>(null);
 	let imageUrls = $state<Record<string, string>>({});
+	let editingImageId = $state<string | null>(null);
+	const editingImage = $derived(board.items.find((item): item is ImageItem => item.id === editingImageId && item.type === 'image'));
+	function applyImageEdits(edits: ImageEdits) {
+		if (!editingImage || !validImageEdits(edits)) return;
+		beginEdit();
+		const ratio = imageViewport(editingImage.aspectRatio, edits).aspectRatio;
+		updateItem(editingImage.id, { edits, height: Math.max(80, (editingImage.width - 10) / ratio + (editingImage.caption?.trim() ? 38 : 10)) }, true);
+		editingImageId = null;
+	}
 	let missingAssets = $state<Set<string>>(new Set());
 	let saveState = $state<SaveState>('idle');
 	let saveMessage = $state('stored on this device');
@@ -326,16 +357,7 @@
 	let searchReturn: Camera | null = null;
 	let searchPreviewTimer: ReturnType<typeof setTimeout> | null = null;
 
-	const objects = $derived(
-		board.items
-			.filter((item) => item.type !== 'connector')
-			.slice()
-			.sort((a, b) => {
-				const kindOrder = a.type === 'frame' ? 0 : a.type === 'stack' ? 1 : 2;
-				const otherKindOrder = b.type === 'frame' ? 0 : b.type === 'stack' ? 1 : 2;
-				return kindOrder - otherKindOrder || a.zIndex - b.zIndex;
-			})
-	);
+	const objects = $derived(orderedItems(board.items));
 	const connectors = $derived(board.items.filter((item) => item.type === 'connector'));
 	const hasContent = $derived(board.items.some((item) => item.type !== 'connector'));
 
@@ -360,6 +382,96 @@
 	 */
 	const chosen = $derived(board.items.filter((item) => selectedIds.includes(item.id)));
 	const only = $derived(chosen.length === 1 ? chosen[0] : null);
+	const selectionObjects = $derived(chosen.filter((item) => item.type !== 'connector'));
+	const styleable = $derived(selectionObjects.filter((item) => !isLocked(board.items, item)));
+	let arrangingKey = $state<string | null>(null);
+	let layersOpen = $state(false);
+	let arrangeButton = $state<HTMLButtonElement>();
+	let layersButton = $state<HTMLButtonElement>();
+	const selectionKey = $derived(`${board.board.id}:${selectedIds.join(',')}`);
+	let stylingKey = $state<string | null>(null);
+	let appearancePatch = $state<AppearancePatch>({});
+	let appearanceClipboard = $state<ItemAppearance | null>(null);
+	let appearanceButton = $state<HTMLButtonElement>();
+	const styling = $derived(stylingKey !== null && stylingKey === selectionKey && styleable.length > 0);
+	const arranging = $derived(arrangingKey !== null && arrangingKey === selectionKey && selectionObjects.length > 0);
+	const selectionLocked = $derived(selectionObjects.some((item) => isLocked(board.items, item)));
+	const units = $derived(compositionUnits(board.items, selectedIds));
+	const appearancePosition = $derived.by(() => {
+		const bounds = selectionObjects.map((item) => visualBoundsForItem(board.items, item));
+		const x = Math.min(...bounds.map((b) => b.x)) * board.camera.zoom + board.camera.x;
+		const y = Math.min(...bounds.map((b) => b.y)) * board.camera.zoom + board.camera.y;
+		const right = Math.max(...bounds.map((b) => b.x + b.width)) * board.camera.zoom + board.camera.x;
+		const beside = right + 16 + 312 <= viewportSize.width ? right + 16 : x - 316 >= 12 ? x - 316 : x;
+		return { left: Math.max(12, Math.min(viewportSize.width - (styling || arranging ? 312 : 224), styling || arranging ? beside : x)), top: Math.max(110, Math.min(viewportSize.height - (styling || arranging ? 600 : 140), styling || arranging ? y : y - 48)) };
+	});
+	$effect(() => {
+		if (stylingKey !== null && stylingKey !== selectionKey) { stylingKey = null; appearancePatch = {}; }
+		if (arrangingKey !== null && arrangingKey !== selectionKey) arrangingKey = null;
+	});
+	function openAppearance() {
+		if (!styleable.length) return;
+		appearancePatch = {};
+		arrangingKey = null;
+		stylingKey = selectionKey;
+		wakeChrome();
+	}
+	function closeAppearance(restoreFocus = true) {
+		stylingKey = null;
+		appearancePatch = {};
+		if (restoreFocus) void tick().then(() => (appearanceButton ?? canvasEl)?.focus({ preventScroll: true }));
+	}
+	function applyAppearance(patch: AppearancePatch) {
+		if (!styling) return;
+		const ids = new Set(styleable.map((item) => item.id));
+		const items = board.items.map((item) => ids.has(item.id) ? { ...item, appearance: patchAppearance(item, patch), updatedAt: now() } : item);
+		beginEdit();
+		setItems(items);
+		scheduleSave();
+		closeAppearance();
+	}
+	function saveSwatch(color: string) {
+		if (!isAppearanceColor(color) || (board.swatches?.length ?? 0) >= MAX_SWATCHES || board.swatches?.includes(color)) return;
+		beginEdit();
+		board = { ...board, swatches: [...board.swatches ?? [], color] };
+		scheduleSave();
+	}
+	function removeSwatch(color: string) {
+		beginEdit();
+		board = { ...board, swatches: board.swatches?.filter((swatch) => swatch !== color) };
+		scheduleSave();
+	}
+	function openArrange() { if (!selectionObjects.length) return; closeAppearance(false); arrangingKey = selectionKey; wakeChrome(); }
+	function closeArrange(focus = true) { arrangingKey = null; if (focus) void tick().then(() => (arrangeButton ?? canvasEl)?.focus({ preventScroll: true })); }
+	function changeComposition(items: WhiteboardItem[]) {
+		if (items === board.items) return;
+		beginEdit(); setItems(items); scheduleSave();
+	}
+	function lockItems(ids: string[], locked: boolean) {
+		let expanded = expandGroups(board.items, ids);
+		if (!locked) for (const item of board.items) if (expanded.includes(item.id) && item.type === 'card' && item.stackId && isLocked(board.items, item)) expanded.push(item.stackId);
+		const targets = new Set(expandGroups(board.items, expanded));
+		changeComposition(board.items.map((item) => targets.has(item.id) ? { ...item, locked, updatedAt: now() } : item));
+	}
+	function arrangeSelection(command: string) {
+		if (command === 'unlock' || command === 'lock') { lockItems(selectedIds, command === 'lock'); return; }
+		if (selectionLocked) return;
+		if (['front', 'back', 'forward', 'backward'].includes(command)) changeComposition(reorderLayers(board.items, selectedIds, command as LayerMove));
+		else if (command === 'group' || command === 'ungroup') changeComposition(groupItems(board.items, selectedIds, command === 'ungroup'));
+		else if (command.startsWith('align-')) changeComposition(alignItems(board.items, selectedIds, command.slice(6) as Alignment));
+	}
+	function rotateSelection(degrees: number) {
+		if (selectionLocked || !selectionObjects.every(canRotate)) return;
+		changeComposition(board.items.map((item) => selectedIds.includes(item.id) ? { ...item, rotation: normalizeAngle(degrees), updatedAt: now() } : item));
+	}
+	function setPhotoCaption(text: string) {
+		if (only?.type !== 'image' || isLocked(board.items, only)) return;
+		beginEdit(`caption:${only.id}`);
+		const height = only.height + (text.trim() ? 28 : 0) - (only.caption?.trim() ? 28 : 0);
+		updateItem(only.id, { caption: text, height }, true);
+	}
+	function chooseLayer(id: string) { selectOnly(id); focusItem(id); }
+	function closeLayers() { layersOpen = false; void tick().then(() => layersButton?.focus({ preventScroll: true })); }
 	const crumbs = $derived(breadcrumbs(trail, board, board.camera, viewportSize));
 	const results = $derived(searchOpen && searchText.trim() ? searchBoard(board, searchText) : []);
 	const matchIds = $derived(new Set(results.map((hit) => hit.item.id)));
@@ -397,6 +509,8 @@
 				title: itemLabel(item),
 				rows,
 				actions: [
+					...(item.type !== 'connector' ? [{ commandId: 'arrange', label: 'Arrange' }, { commandId: 'appearance', label: 'Appearance', enabled: !isLocked(board.items, item) }] : []),
+						...(item.type === 'image' ? [{ commandId: 'edit-image', label: 'Edit image' }] : []),
 					...(item.type === 'slip' ? [{ commandId: 'slip-to-card', label: 'Turn into Card' }] : []),
 					{ commandId: 'inspect', label: 'Edit details' },
 					{ commandId: 'duplicate-selection', label: 'Duplicate', enabled: item.type !== 'connector' },
@@ -408,6 +522,7 @@
 			title: `${chosen.length} things selected`,
 			rows: [{ label: 'Kinds', value: [...new Set(chosen.map((item) => item.type))].join(', ') }],
 			actions: [
+				{ commandId: 'appearance', label: 'Appearance', enabled: styleable.length > 0 },
 				{ commandId: 'inspect', label: 'Edit details' },
 				{ commandId: 'duplicate-selection', label: 'Duplicate', enabled: chosen.some((item) => item.type !== 'connector') },
 				{ commandId: 'delete-selection', label: chosen.length === 1 && only?.type === 'portal' ? 'Remove from board' : chosen.length === 1 ? 'Delete board item' : 'Remove selected items from board' }
@@ -442,12 +557,17 @@
 				{ id: 'find', label: 'Find on board', shortcut: '/', context: 'artifact', group: 'view' },
 				{ id: 'add-card', label: 'Add card' },
 				{ id: 'add-slip', label: 'Add slip' },
+				{ id: 'add-lettering', label: 'Add lettering', shortcut: 'T' },
 				{ id: 'slip-to-card', label: 'Turn into Card', enabled: only?.type === 'slip' },
 				{ id: 'add-frame', label: 'Draw frame' },
 				{ id: 'add-stack', label: 'Add stack' },
 				{ id: 'add-image', label: 'Add image' },
+				{ id: 'edit-image', label: 'Edit image', enabled: only?.type === 'image' },
 				{ id: 'fit-board', label: 'Fit board', shortcut: '0', context: 'artifact', group: 'view' },
 				{ id: 'inspect', label: 'Inspect selection', shortcut: 'I', enabled: chosen.length > 0 },
+				{ id: 'appearance', label: 'Style selection', enabled: styleable.length > 0 },
+				{ id: 'arrange', label: 'Arrange selection', enabled: selectionObjects.length > 0 },
+				{ id: 'layers', label: 'Show layers', context: 'artifact', group: 'view' },
 				{ id: 'duplicate-selection', label: 'Duplicate selection', shortcut: '⌘D', enabled: chosen.length > 0 },
 				{ id: 'delete-selection', label: chosen.length === 1 && only?.type === 'portal' ? 'Remove portal from board' : chosen.length === 1 ? 'Delete board item' : 'Remove selected items from board', enabled: chosen.length > 0 },
 				{ id: 'play-journey', label: 'Play journey', enabled: stops.length > 0, context: 'artifact', group: 'view' }
@@ -466,7 +586,7 @@
 	 */
 	const chromeResting = $derived(
 		view.restChrome && !chromeAwake && !drawer && !searchOpen && !shelfOpen &&
-		!shortcutsOpen && !viewOpen && !fileDragging
+		!shortcutsOpen && !viewOpen && !fileDragging && !styling && !arranging && !layersOpen
 	);
 	/**
 	 * The paper, which is fixed to the window, and the pattern, which is not.
@@ -501,12 +621,10 @@
 
 	function itemStyle(item: WhiteboardItem): string {
 		const bounds = itemBounds(item);
-		// Containers always sit beneath their material. Keep the bands integral:
-		// CSS z-index accepts integers, not the fractional stack offsets this replaces.
-		const layerBase = item.type === 'frame' ? 0 : item.type === 'stack' ? 10_000 : 20_000;
-		const selected = isSelected(item.id) && item.type !== 'frame' && item.type !== 'stack' ? 10_000 : 0;
-		return `transform: translate3d(${bounds.x}px, ${bounds.y}px, 0); width: ${bounds.width}px; height: ${bounds.height}px; z-index: ${layerBase + item.zIndex + selected};`;
+		const appearance = styling && styleable.some((entry) => entry.id === item.id) ? patchAppearance(item, appearancePatch) : item.appearance;
+		return `transform: translate3d(${bounds.x}px, ${bounds.y}px, 0) rotate(${rotationOf(item)}deg); width: ${bounds.width}px; height: ${item.type === 'lettering' || item.type === 'slip' ? 'auto' : `${bounds.height}px`}; z-index: ${objects.findIndex((object) => object.id === item.id) + 1};${appearanceCss(appearance, item.type)}`;
 	}
+	function shownAppearance(item: WhiteboardItem) { return styling && styleable.some((entry) => entry.id === item.id) ? patchAppearance(item, appearancePatch) : item.appearance; }
 
 	function worldStyle(): string {
 		return `transform: translate3d(${board.camera.x}px, ${board.camera.y}px, 0) scale(${board.camera.zoom});`;
@@ -575,18 +693,17 @@
 	}
 
 	function selectOnly(id: string) {
-		selectedIds = [id];
+		selectedIds = expandGroups(board.items, [id]);
 		connectorSourceId = null;
 	}
 
 	function selectObject(item: WhiteboardItem, event: PointerEvent | MouseEvent) {
 		const additive = event.shiftKey || event.metaKey || event.ctrlKey;
 		if (additive) {
-			selectedIds = selectedIds.includes(item.id)
-				? selectedIds.filter((id) => id !== item.id)
-				: [...selectedIds, item.id];
+			const ids = expandGroups(board.items, [item.id]);
+			selectedIds = selectedIds.includes(item.id) ? selectedIds.filter((id) => !ids.includes(id)) : [...new Set([...selectedIds, ...ids])];
 		} else if (!selectedIds.includes(item.id)) {
-			selectedIds = [item.id];
+			selectedIds = expandGroups(board.items, [item.id]);
 		}
 	}
 
@@ -601,6 +718,8 @@
 	}
 
 	function updateItem(id: string, patch: Partial<WhiteboardItem>, persist = false) {
+		const target = board.items.find((item) => item.id === id);
+		if (target && isLocked(board.items, target)) return;
 		setItems(
 			board.items.map((item) =>
 				item.id === id ? ({ ...item, ...patch, updatedAt: now() } as WhiteboardItem) : item
@@ -652,6 +771,8 @@
 	}
 
 	function performUndo() {
+		closeAppearance(false);
+		closeArrange(false);
 		if (!canUndo(editHistory)) {
 			notice = 'Nothing to undo yet.';
 			return;
@@ -667,6 +788,8 @@
 	}
 
 	function performRedo() {
+		closeAppearance(false);
+		closeArrange(false);
 		if (!canRedo(editHistory)) {
 			notice = 'Nothing to redo.';
 			return;
@@ -733,10 +856,15 @@
 			case 'find': void openSearch(); break;
 			case 'add-card': addCardFromDock(); break;
 			case 'add-slip': void addSlipFromDock(); break;
+			case 'add-lettering': void addLettering(); break;
 			case 'slip-to-card': if (only?.type === 'slip') turnSlipIntoCard(only); break;
 			case 'add-frame': tool = 'frame'; connectorSourceId = null; notice = 'Drag a region for a frame.'; break;
 			case 'add-stack': addStackFromDock(); break;
 			case 'add-image': imageInput?.click(); break;
+			case 'edit-image': if (only?.type === 'image' && !isLocked(board.items, only)) editingImageId = only.id; break;
+			case 'appearance': openAppearance(); break;
+			case 'arrange': openArrange(); break;
+			case 'layers': layersOpen = !layersOpen; break;
 			case 'fit-board': fitBoard(); break;
 			case 'inspect': if (chosen.length) openDetails(); break;
 			case 'duplicate-selection': if (chosen.length) duplicateSelection(); break;
@@ -758,6 +886,9 @@
 			runHomeSuiteCommand(id);
 		};
 		const actions: ContextAction[] = items.length ? [
+			...(items.some((entry) => entry.type !== 'connector') ? [{ id: 'arrange', label: 'Arrange', group: 'edit' as const, run: () => run('arrange') }] : []),
+			...(items.some((entry) => entry.type !== 'connector') ? [{ id: 'appearance', label: 'Appearance', group: 'edit' as const, run: () => run('appearance') }] : []),
+			...(item?.type === 'image' ? [{ id: 'edit-image', label: 'Edit image', group: 'edit' as const, run: () => run('edit-image') }] : []),
 			...(item?.type === 'slip' ? [{ id: 'slip-to-card', label: 'Turn into Card', group: 'edit' as const, run: () => run('slip-to-card') }] : []),
 			{ id: 'inspect', label: 'Edit details', group: 'edit', run: () => run('inspect') },
 			{ id: 'duplicate-selection', label: items.length === 1 ? 'Duplicate item' : 'Duplicate selected items', group: 'edit', enabled: items.some((entry) => entry.type !== 'connector'), run: () => run('duplicate-selection') },
@@ -765,6 +896,7 @@
 		] : [
 			{ id: 'add-card', label: 'Add card', group: 'edit', run: () => run('add-card') },
 			{ id: 'add-slip', label: 'Add slip', group: 'edit', run: () => run('add-slip') },
+			{ id: 'add-lettering', label: 'Add lettering', group: 'edit', run: () => run('add-lettering') },
 			{ id: 'add-frame', label: 'Draw frame', group: 'edit', run: () => run('add-frame') },
 			{ id: 'add-stack', label: 'Add stack', group: 'edit', run: () => run('add-stack') },
 			{ id: 'fit-board', label: 'Fit board', group: 'view', run: () => run('fit-board') }
@@ -777,10 +909,15 @@
 	}
 
 	function boardContextEvent(event: MouseEvent) {
-		if (!homeSuiteEmbedded || !(event.target instanceof Element) || !canvasEl?.contains(event.target)) return;
+		if (!(event.target instanceof Element) || !canvasEl?.contains(event.target)) return;
 		if (event.target.closest('input, textarea, select, [contenteditable="true"], [data-whiteboard-ui]')) return;
-		event.preventDefault();
 		const object = event.target.closest<HTMLElement>('[data-context-item]');
+		if (!homeSuiteEmbedded) {
+			const item = board.items.find((item) => item.id === object?.dataset.contextItem);
+			if (item?.type === 'image') { event.preventDefault(); selectOnly(item.id); editingImageId = item.id; }
+			return;
+		}
+		event.preventDefault();
 		if (!object) selectedIds = [];
 		openBoardContext({ x: event.clientX, y: event.clientY }, object?.dataset.contextItem);
 	}
@@ -894,6 +1031,20 @@
 		Object.values(imageUrls).forEach((url) => URL.revokeObjectURL(url));
 	});
 
+	async function addLettering() {
+		beginEdit();
+		const point = screenToWorld(board.camera, { x: viewportSize.width / 2 - 160 * board.camera.zoom, y: viewportSize.height / 2 - 40 * board.camera.zoom });
+		const item = createLettering(point.x, point.y, nextZ(board.items));
+		setItems([...board.items, item]);
+		selectOnly(item.id);
+		scheduleSave();
+		await tick();
+		document.getElementById(`lettering-text-${item.id}`)?.focus();
+	}
+	function fitLettering(id: string, height: number) {
+		const item = board.items.find((item) => item.id === id);
+		if (!styling && item?.type === 'lettering' && Math.abs(item.height - height) > 1) updateItem(id, { height }, true);
+	}
 	async function addSlipFromDock() {
 		beginEdit();
 		const size = viewport();
@@ -906,14 +1057,16 @@
 		document.getElementById(`slip-text-${slip.id}`)?.focus();
 	}
 
-	function fitSlip(node: HTMLTextAreaElement, value: { id: string; text: string }) {
-		function fit(current: typeof value) {
+	function fitSlip(node: HTMLTextAreaElement, value: { id: string; text: string; appearance?: ItemAppearance; preview: boolean }) {
+		function measure(current: typeof value) {
+			if (!node.isConnected) return;
 			node.style.height = 'auto';
 			const height = Math.max(28, node.scrollHeight);
 			node.style.height = `${height}px`;
 			const item = board.items.find((item) => item.id === current.id);
-			if (item?.type === 'slip' && item.height !== height + 20) updateItem(item.id, { height: height + 20 }, true);
+			if (!current.preview && item?.type === 'slip' && item.height !== height + 20) updateItem(item.id, { height: height + 20 }, true);
 		}
+		function fit(current: typeof value) { void tick().then(() => measure(current)); }
 		fit(value);
 		return { update: fit };
 	}
@@ -924,6 +1077,7 @@
 	}
 
 	function turnSlipIntoCard(item: SlipItem) {
+		if (isLocked(board.items, item)) return;
 		beginEdit();
 		setItems(board.items.map((entry) => entry.id === item.id ? slipToCard(item) : entry));
 		scheduleSave();
@@ -1083,17 +1237,17 @@
 			return;
 		}
 		selectObject(item, event);
+		if (isLocked(board.items, item)) return;
 		const selection = (event.shiftKey || event.metaKey || event.ctrlKey)
 			? selectedIds
 			: selectedIds.includes(item.id) ? selectedIds : [item.id];
-		const dragIds = selection.filter((id) => board.items.some((candidate) => candidate.id === id && candidate.type !== 'connector'));
+		const dragIds = expandGroups(board.items, selection).filter((id) => board.items.some((candidate) => candidate.id === id && candidate.type !== 'connector' && !isLocked(board.items, candidate)));
 		const startBounds = Object.fromEntries(
 			dragIds
 				.map((id) => board.items.find((candidate) => candidate.id === id))
 				.filter((candidate): candidate is WhiteboardItem => Boolean(candidate))
 				.map((candidate) => [candidate.id, itemBounds(candidate)])
 		);
-		beginEdit();
 		activeSession = {
 			kind: 'drag',
 			pointerId: event.pointerId,
@@ -1102,7 +1256,9 @@
 			startWorld: pointForEvent(event),
 			startBounds,
 			sourceStackId: item.type === 'card' ? item.stackId : undefined,
-			extracted: false
+			extracted: false,
+			recorded: false,
+			visualBounds: unionBounds(board.items.filter((item) => dragIds.includes(item.id)).map((item) => visualBoundsForItem(board.items, item)))!
 		};
 		draggingIds = dragIds;
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
@@ -1134,7 +1290,7 @@
 		wakeChrome(targetIsChrome(event.target));
 		const session = activeSession;
 		if (!session || session.pointerId !== event.pointerId) return;
-		queuedPointerMove = { pointerId: event.pointerId, screen: localPoint(event) };
+		queuedPointerMove = { pointerId: event.pointerId, screen: localPoint(event), shift: event.shiftKey };
 		if (pointerMoveFrame) return;
 		pointerMoveFrame = requestAnimationFrame(() => {
 			pointerMoveFrame = 0;
@@ -1167,6 +1323,11 @@
 		}
 
 		const point = screenToWorld(board.camera, move.screen);
+		if (session.kind === 'rotate') {
+			const angle = Math.atan2(point.y - session.center.y, point.x - session.center.x) * 180 / Math.PI;
+			updateItem(session.itemId, { rotation: snappedAngle(session.original + angle - session.startAngle, move.shift) });
+			return;
+		}
 		if (session.kind === 'marquee') {
 			marquee = normalizeBounds(session.startWorld.x, session.startWorld.y, point.x - session.startWorld.x, point.y - session.startWorld.y);
 			return;
@@ -1178,18 +1339,23 @@
 		if (session.kind === 'resize') {
 			const item = board.items.find((candidate) => candidate.id === session.itemId);
 			if (!item || item.type === 'connector') return;
-			const dx = point.x - session.startWorld.x;
-			const dy = point.y - session.startWorld.y;
-			const width = Math.max(item.type === 'card' ? 150 : 120, session.bounds.width + dx);
-			const height = item.type === 'image'
-				? Math.max(80, width / item.aspectRatio)
-				: Math.max(item.type === 'card' ? 90 : 100, session.bounds.height + dy);
-			updateItem(item.id, { width, height });
+			const next = resizedBounds(session.bounds, rotationOf(item), { x: point.x - session.startWorld.x, y: point.y - session.startWorld.y },
+				{ width: item.type === 'card' ? 150 : 120, height: item.type === 'lettering' || item.type === 'slip' ? 32 : item.type === 'card' ? 90 : 80 },
+				item.type === 'image' ? { ratio: item.edits ? imageViewport(item.aspectRatio, item.edits).aspectRatio : item.aspectRatio, extra: item.caption?.trim() ? 38 : 10 } : undefined);
+			updateItem(item.id, next);
 			return;
 		}
 
-		const dx = point.x - session.startWorld.x;
-		const dy = point.y - session.startWorld.y;
+		let dx = point.x - session.startWorld.x;
+		let dy = point.y - session.startWorld.y;
+		if (!session.recorded) {
+			if (Math.hypot(dx, dy) * board.camera.zoom < 3) return;
+			beginEdit(); session.recorded = true;
+		}
+		if (view.snap && !session.sourceStackId) {
+			const snapped = snapTranslation(board.items, session.dragIds, session.visualBounds, dx, dy, 6 / board.camera.zoom);
+			dx = snapped.dx; dy = snapped.dy; alignmentGuides = snapped.guides;
+		}
 		const source = board.items.find((candidate): candidate is CardItem => candidate.id === session.itemId && candidate.type === 'card');
 		if (source?.stackId && !session.extracted) {
 			const stack = board.items.find((candidate): candidate is StackItem => candidate.id === source.stackId && candidate.type === 'stack');
@@ -1218,7 +1384,7 @@
 			})
 		);
 		const draggedCard = board.items.find((candidate): candidate is CardItem => candidate.id === session.itemId && candidate.type === 'card');
-		dropStackId = draggedCard && !draggedCard.stackId ? stackAt(point, draggedCard.id)?.id ?? null : null;
+		dropStackId = draggedCard && !draggedCard.stackId && !draggedCard.groupId ? stackAt(point, draggedCard.id)?.id ?? null : null;
 	}
 
 	function handlePointerUp(event: PointerEvent) {
@@ -1228,11 +1394,11 @@
 		if (session.kind === 'marquee') {
 			const selected = marquee
 				? board.items
-					.filter((item) => item.type !== 'connector')
-					.filter((item) => intersects(marquee!, itemBounds(item)))
+					.filter((item) => item.type !== 'connector' && !isLocked(board.items, item))
+					.filter((item) => intersects(marquee!, visualBoundsForItem(board.items, item)))
 					.map((item) => item.id)
 				: [];
-			selectedIds = session.additive ? [...new Set([...selectedIds, ...selected])] : selected;
+			selectedIds = expandGroups(board.items, session.additive ? [...new Set([...selectedIds, ...selected])] : selected);
 			marquee = null;
 		} else if (session.kind === 'frame') {
 			const draft = frameDraft;
@@ -1242,7 +1408,7 @@
 			const point = pointForEvent(event);
 			const cards = session.dragIds
 				.map((id) => board.items.find((item): item is CardItem => item.id === id && item.type === 'card'))
-				.filter((item): item is CardItem => Boolean(item && !item.stackId));
+				.filter((item): item is CardItem => Boolean(item && !item.stackId && !item.groupId));
 			const target = stackAt(point, session.itemId);
 			if (target && cards.length) {
 				for (const card of cards) {
@@ -1252,7 +1418,8 @@
 			draggingIds = [];
 			dropStackId = null;
 		}
-		if (session.kind === 'pan' || session.kind === 'resize' || session.kind === 'drag' || session.kind === 'frame') scheduleSave();
+		alignmentGuides = [];
+		if (session.kind === 'pan' || session.kind === 'resize' || session.kind === 'rotate' || (session.kind === 'drag' && session.recorded) || session.kind === 'frame') scheduleSave();
 		activeSession = null;
 		try {
 			(event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId);
@@ -1262,6 +1429,7 @@
 	}
 
 	function cancelPointerSession() {
+		if (activeSession && ['drag', 'resize', 'rotate'].includes(activeSession.kind)) scheduleSave();
 		if (pointerMoveFrame) cancelAnimationFrame(pointerMoveFrame);
 		pointerMoveFrame = 0;
 		queuedPointerMove = null;
@@ -1270,11 +1438,12 @@
 		dropStackId = null;
 		marquee = null;
 		frameDraft = null;
+		alignmentGuides = [];
 	}
 
 	function stackAt(point: Point, excludedId?: string): StackItem | null {
 		return board.items
-			.filter((item): item is StackItem => item.type === 'stack' && item.id !== excludedId)
+			.filter((item): item is StackItem => item.type === 'stack' && item.id !== excludedId && !isLocked(board.items, item))
 			.sort((a, b) => b.zIndex - a.zIndex)
 			.find((stack) => {
 				const bounds = itemBounds(stack);
@@ -1292,16 +1461,35 @@
 	}
 
 	function startResize(event: PointerEvent, item: WhiteboardItem) {
-		if (item.type === 'connector') return;
+		if (item.type === 'connector' || isLocked(board.items, item)) return;
 		event.stopPropagation();
 		selectOnly(item.id);
 		beginEdit();
 		activeSession = { kind: 'resize', pointerId: event.pointerId, itemId: item.id, startWorld: pointForEvent(event), bounds: itemBounds(item) };
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
 	}
+	function rotationHandleStyle(item: WhiteboardItem) {
+		const bounds = itemBounds(item);
+		const offset = rotatePoint({ x: 0, y: -bounds.height / 2 - 24 }, rotationOf(item));
+		return `left:${bounds.x + bounds.width / 2 + offset.x}px;top:${bounds.y + bounds.height / 2 + offset.y}px;`;
+	}
+	function startRotate(event: PointerEvent, item: WhiteboardItem) {
+		if (event.button !== 0 || !canRotate(item) || isLocked(board.items, item)) return;
+		event.stopPropagation(); event.preventDefault();
+		const b = itemBounds(item); const center = { x: b.x + b.width / 2, y: b.y + b.height / 2 }; const point = pointForEvent(event);
+		beginEdit(); activeSession = { kind: 'rotate', itemId: item.id, pointerId: event.pointerId, center, original: rotationOf(item), startAngle: Math.atan2(point.y - center.y, point.x - center.x) * 180 / Math.PI };
+		event.currentTarget instanceof HTMLElement && event.currentTarget.setPointerCapture(event.pointerId);
+	}
+	function rotationHandleKey(event: KeyboardEvent, item: WhiteboardItem) {
+		if (!['ArrowLeft', 'ArrowRight', 'Home'].includes(event.key)) return;
+		event.preventDefault(); event.stopPropagation();
+		beginEdit(`rotation:${item.id}`);
+		updateItem(item.id, { rotation: event.key === 'Home' ? 0 : normalizeAngle(rotationOf(item) + (event.key === 'ArrowLeft' ? -1 : 1) * (event.shiftKey ? 15 : 1)) }, true);
+	}
 
 	function handleEditablePointerDown(event: PointerEvent, item: WhiteboardItem) {
 		event.stopPropagation();
+		if (isLocked(board.items, item)) { event.preventDefault(); return; }
 		if (tool === 'line') {
 			event.preventDefault();
 			connectTo(item);
@@ -1420,6 +1608,7 @@
 
 	function deleteSelection() {
 		if (!selectedIds.length) return;
+		if (chosen.some((item) => isLocked(board.items, item))) { notice = 'Unlock the selection in Arrange or Layers first.'; return; }
 		const removingPortals = board.items.filter((item) => selectedIds.includes(item.id) && item.type === 'portal').length;
 		beginEdit();
 		const selected = new Set(selectedIds);
@@ -1444,27 +1633,17 @@
 	}
 
 	function duplicateSelection() {
-		const originals = board.items.filter((item) => selectedIds.includes(item.id) && item.type !== 'connector');
-		if (!originals.length) return;
+		if (!chosen.some((item) => item.type !== 'connector') || selectionLocked) return;
 		beginEdit();
-		const clones = originals.map((item, index) => {
-			const bounds = itemBounds(item);
-			const stamp = now();
-			if (item.type === 'card') {
-				return { ...item, id: makeId('card'), x: bounds.x + 28, y: bounds.y + 28, stackId: undefined, freePosition: undefined, zIndex: nextZ(board.items) + index, createdAt: stamp, updatedAt: stamp } as WhiteboardItem;
-			}
-			if (item.type === 'stack') {
-				return { ...item, id: makeId('stack'), x: bounds.x + 28, y: bounds.y + 28, cardIds: [], zIndex: nextZ(board.items) + index, createdAt: stamp, updatedAt: stamp } as WhiteboardItem;
-			}
-			return { ...item, id: makeId(item.type), x: bounds.x + 28, y: bounds.y + 28, zIndex: nextZ(board.items) + index, createdAt: stamp, updatedAt: stamp } as WhiteboardItem;
-		});
-		setItems([...board.items, ...clones]);
-		selectedIds = clones.map((item) => item.id);
+		const duplicated = duplicateItems(board, selectedIds);
+		setItems(duplicated.items);
+		selectedIds = duplicated.ids;
 		scheduleSave();
 	}
 
 	function handleConnectorPointerDown(event: PointerEvent, connector: Extract<WhiteboardItem, { type: 'connector' }>) {
 		event.stopPropagation();
+		if (isLocked(board.items, connector)) return;
 		selectOnly(connector.id);
 	}
 
@@ -1526,7 +1705,9 @@
 	}
 
 	function focusItem(id: string, label?: string) {
-		const camera = focusCamera(board.items, id, viewport());
+		const group = expandGroups(board.items, [id]);
+		const bounds = group.length > 1 ? unionBounds(board.items.filter((item) => group.includes(item.id)).map((item) => visualBoundsForItem(board.items, item))) : null;
+		const camera = bounds ? cameraForBounds(bounds, viewport(), 96, 1.7) : focusCamera(board.items, id, viewport());
 		if (!camera) return;
 		const item = board.items.find((candidate) => candidate.id === id);
 		flyTo(camera, label ?? (item ? itemLabel(item) : 'Board'));
@@ -2255,6 +2436,15 @@
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
+		if (editingImage) return;
+		if (arranging) {
+			if (event.key === 'Escape') { event.preventDefault(); closeArrange(); }
+			return;
+		}
+		if (styling) {
+			if (event.key === 'Escape') { event.preventDefault(); closeAppearance(); }
+			return;
+		}
 		// Typing into a card is not a reason for the edges to come back.
 		if (!isTextTarget(event.target)) wakeChrome();
 		// Find is reachable from anywhere, including from inside a card.
@@ -2277,6 +2467,7 @@
 		}
 
 		if (event.key === 'Escape') {
+			if (layersOpen) { closeLayers(); return; }
 			if (searchOpen) {
 				closeSearch();
 				return;
@@ -2325,9 +2516,12 @@
 		}
 		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') {
 			event.preventDefault();
-			selectedIds = board.items.filter((item) => item.type !== 'connector').map((item) => item.id);
+			selectedIds = board.items.filter((item) => item.type !== 'connector' && !isLocked(board.items, item)).map((item) => item.id);
 			connectorSourceId = null;
 			return;
+		}
+		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'g' && chosen.length) {
+			event.preventDefault(); arrangeSelection(event.shiftKey ? 'ungroup' : 'group'); return;
 		}
 		if (event.metaKey || event.ctrlKey) return;
 
@@ -2358,6 +2552,7 @@
 			jumpToFrame(Number(event.key) - 1);
 			return;
 		}
+		if (event.key.toLowerCase() === 't') { event.preventDefault(); void addLettering(); return; }
 		if (event.key.toLowerCase() === 'h') {
 			event.preventDefault();
 			goHome();
@@ -2379,11 +2574,22 @@
 			return;
 		}
 		// The keyboard says what the drag says: move the card one column along.
-		if (event.shiftKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+		if (event.shiftKey && only?.type === 'card' && only.stackId && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
 			event.preventDefault();
 			moveCardColumn(event.key === 'ArrowLeft' ? -1 : 1);
 			return;
 		}
+		if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key) && selectedIds.length && !selectionLocked) {
+			event.preventDefault();
+			const step = event.shiftKey ? 10 : 1;
+			const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
+			const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
+			beginEdit(`nudge:${selectionKey}`);
+			setItems(board.items.map((item) => selectedIds.includes(item.id) && item.type !== 'connector' && !(item.type === 'card' && item.stackId) ? { ...item, x: item.x + dx, y: item.y + dy, updatedAt: now() } : item));
+			scheduleSave(); return;
+		}
+		if (event.key.toLowerCase() === 'l') { event.preventDefault(); layersOpen = !layersOpen; return; }
+		if (event.key.toLowerCase() === 'r' && selectionObjects.length) { event.preventDefault(); openArrange(); return; }
 		if (event.key === '?') {
 			event.preventDefault();
 			toggleShortcuts();
@@ -2570,6 +2776,8 @@
 	onpointerdown={handleCanvasPointerDown}
 	onpointerdowncapture={(event) => {
 		if (searchOpen && event.button === 0 && !targetIsChrome(event.target)) closeSearch(false);
+		if (styling && event.button === 0 && !targetIsChrome(event.target)) closeAppearance(false);
+		if (arranging && event.button === 0 && !targetIsChrome(event.target)) closeArrange(false);
 	}}
 	onpointermove={handlePointerMove}
 	onpointerup={handlePointerUp}
@@ -2630,7 +2838,7 @@
 			{#if item.type === 'frame'}
 				<section
 					data-whiteboard-object
-					class:selected={isSelected(item.id)}
+					class:selected={isSelected(item.id)} class:locked={isLocked(board.items, item)} inert={isLocked(board.items, item)}
 					class:dragging={draggingIds.includes(item.id)}
 					class:found={matchIds.has(item.id)}
 					class="board-item frame tint-{item.tint}"
@@ -2676,7 +2884,7 @@
 			{:else if item.type === 'stack'}
 				<section
 					data-whiteboard-object
-					class:selected={isSelected(item.id)}
+					class:selected={isSelected(item.id)} class:locked={isLocked(board.items, item)} inert={isLocked(board.items, item)}
 					class:dragging={draggingIds.includes(item.id)}
 					class:drop-target={dropStackId === item.id}
 					class:found={matchIds.has(item.id)}
@@ -2726,27 +2934,38 @@
 						<button data-whiteboard-ui class="resize-handle" aria-label="Resize stack" onpointerdown={(event) => startResize(event, item)}></button>
 					{/if}
 				</section>
+			{:else if item.type === 'lettering'}
+				<section data-whiteboard-object class="board-item lettering" class:selected={isSelected(item.id)} class:locked={isLocked(board.items, item)} inert={isLocked(board.items, item)}
+					data-backing={shownAppearance(item)?.backing ?? 'none'} data-context-item={item.id} style={itemStyle(item)} role="group" aria-label={`Lettering: ${item.text || 'Untitled lettering'}`}
+					onpointerdown={(event) => handleItemPointerDown(event, item)}>
+					<LetteringSurface id={item.id} text={item.text} width={item.width} appearance={shownAppearance(item)} locked={isLocked(board.items, item)}
+						input={(text) => { beginEdit(`lettering:${item.id}`); updateItem(item.id, { text }, true); }}
+						pointerdown={(event) => handleEditablePointerDown(event, item)} resize={(height) => fitLettering(item.id, height)} />
+					{#if isSelected(item.id)}<button data-whiteboard-ui class="resize-handle" aria-label="Resize lettering" onpointerdown={(event) => startResize(event, item)}></button>{/if}
+				</section>
 			{:else if item.type === 'slip'}
-				<section data-whiteboard-object class="board-item slip" class:selected={isSelected(item.id)}
+				<section data-whiteboard-object class="board-item slip" class:selected={isSelected(item.id)} class:locked={isLocked(board.items, item)} inert={isLocked(board.items, item)}
 					class:dragging={draggingIds.includes(item.id)} class:found={matchIds.has(item.id)}
-					data-context-item={item.id} style={itemStyle(item)} role="group" aria-label={`Slip: ${item.text || 'Untitled slip'}`}
+					data-material={shownAppearance(item)?.material} data-context-item={item.id} style={itemStyle(item)} role="group" aria-label={`Slip: ${item.text || 'Untitled slip'}`}
 					onpointerdown={(event) => handleItemPointerDown(event, item)}>
 					<textarea id={`slip-text-${item.id}`} rows="1" class="slip-text" aria-label="Slip text" placeholder="A small thought…"
-						value={item.text} use:fitSlip={{ id: item.id, text: item.text }}
+						value={item.text} use:fitSlip={{ id: item.id, text: item.text, appearance: shownAppearance(item), preview: styling }}
 						onpointerdown={(event) => handleEditablePointerDown(event, item)}
 						oninput={(event) => updateSlip(item, event.currentTarget.value)} onkeydown={handleEditableKeydown}></textarea>
+					<span class="material-edge" aria-hidden="true"></span>
 				</section>
 			{:else if item.type === 'card'}
 				{@const chips = chipsFor(item)}
 				<section
 					data-whiteboard-object
-					class:selected={isSelected(item.id)}
+					class:selected={isSelected(item.id)} class:locked={isLocked(board.items, item)} inert={isLocked(board.items, item)}
 					class:dragging={draggingIds.includes(item.id)}
 					class:in-stack={Boolean(item.stackId)}
 					class:found={matchIds.has(item.id)}
 					class:tile={cardMode(item) === 'gallery'}
 					class:ticked={cardMode(item) === 'checklist' && isDone(item)}
 					class="board-item card tint-{colorOf(item) ?? 'none'} laid-{cardMode(item) ?? 'free'}"
+					data-material={shownAppearance(item)?.material}
 					data-context-item={item.id}
 					style={itemStyle(item)}
 					role="group"
@@ -2754,6 +2973,7 @@
 					onpointerdown={(event) => handleItemPointerDown(event, item)}
 					ondblclick={(event) => handleItemDoubleClick(event, item)}
 				>
+					<span class="material-edge" aria-hidden="true"></span>
 					{#if cardMode(item) === 'checklist'}
 						<button
 							data-whiteboard-ui
@@ -2830,7 +3050,7 @@
 				{@const projection = previewProjection(item)}
 				<section
 					data-whiteboard-object
-					class:selected={isSelected(item.id)}
+					class:selected={isSelected(item.id)} class:locked={isLocked(board.items, item)} inert={isLocked(board.items, item)}
 					class:dragging={draggingIds.includes(item.id)}
 					class:found={matchIds.has(item.id)}
 					class:missing={preview?.missing}
@@ -2886,10 +3106,12 @@
 			{:else if item.type === 'image'}
 				<section
 					data-whiteboard-object
-					class:selected={isSelected(item.id)}
+					class:selected={isSelected(item.id)} class:locked={isLocked(board.items, item)} inert={isLocked(board.items, item)}
 					class:dragging={draggingIds.includes(item.id)}
 					class:found={matchIds.has(item.id)}
 					class="board-item image-card"
+					class:captioned={Boolean(item.caption?.trim())}
+					class:shaped={item.edits && item.edits.shape !== 'rounded' && item.edits.shape !== 'rectangle'}
 					data-context-item={item.id}
 					style={itemStyle(item)}
 					role="group"
@@ -2897,14 +3119,17 @@
 					onpointerdown={(event) => handleItemPointerDown(event, item)}
 					ondblclick={(event) => handleItemDoubleClick(event, item)}
 				>
+					<div class="photo-viewport">
 					{#if imageUrls[item.assetId]}
-						<img src={imageUrls[item.assetId]} alt={item.name || 'Board image'} draggable="false" />
+						<ImageSurface source={imageUrls[item.assetId]} name={item.name} aspectRatio={item.aspectRatio} edits={item.edits} />
 					{:else}
 						<div class="missing-image">
 							<span aria-hidden="true">◇</span>
 							<p>{missingAssets.has(item.assetId) ? 'image kept its place' : 'placing image…'}</p>
 						</div>
 					{/if}
+					</div>
+					{#if item.caption?.trim()}<p class="photo-caption">{item.caption}</p>{/if}
 					{#if chipsFor(item).length}
 						<div class="chip-row image-chips" data-whiteboard-ui>
 							{#each chipsFor(item) as label (label.id)}
@@ -2918,6 +3143,11 @@
 				</section>
 			{/if}
 		{/each}
+		{#if only && canRotate(only) && !isLocked(board.items, only) && !playing && !styling && !arranging}
+			<button class="rotation-handle" data-whiteboard-ui aria-label="Rotate object" title={`${rotationOf(only)}° · drag to turn, arrows to adjust`} style={rotationHandleStyle(only)}
+				onpointerdown={(event) => startRotate(event, only)} onkeydown={(event) => rotationHandleKey(event, only)}>↻</button>
+		{/if}
+		{#each alignmentGuides as guide}<div class="alignment-guide" aria-hidden="true" style={guide.axis === 'x' ? `left:${guide.at}px;top:${guide.start}px;width:1px;height:${guide.end - guide.start}px;` : `left:${guide.start}px;top:${guide.at}px;width:${guide.end - guide.start}px;height:1px;`}></div>{/each}
 
 		{#if marquee}
 			<div class="marquee" style={`transform: translate3d(${marquee.x}px, ${marquee.y}px, 0); width: ${marquee.width}px; height: ${marquee.height}px;`}></div>
@@ -2926,6 +3156,25 @@
 			<div class="frame-draft" style={`transform: translate3d(${frameDraft.x}px, ${frameDraft.y}px, 0); width: ${frameDraft.width}px; height: ${frameDraft.height}px;`}></div>
 		{/if}
 	</div>
+
+	{#if selectionObjects.length && !playing && !searchOpen && !editingImage && !shelfOpen}
+		{#if styling}
+			{#key stylingKey}
+				<AppearanceTray items={styleable} swatches={board.swatches ?? []} clipboard={appearanceClipboard}
+					preview={(patch) => appearancePatch = patch} apply={applyAppearance} cancel={() => closeAppearance()}
+					copy={(appearance) => appearanceClipboard = { ...appearance }} {saveSwatch} {removeSwatch} position={appearancePosition} />
+			{/key}
+		{:else if arranging}
+			<CompositionPanel items={selectionObjects} locked={selectionLocked} units={units.length} rotatable={selectionObjects.every(canRotate)} snap={view.snap ?? false}
+				position={appearancePosition} command={arrangeSelection} rotate={rotateSelection} snapping={(snap) => setView({ snap })} caption={setPhotoCaption} close={() => closeArrange()} />
+		{:else}
+			<div class="selection-tools" data-whiteboard-ui style={`left:${appearancePosition.left}px;top:${appearancePosition.top}px;`}>
+				<button bind:this={appearanceButton} class="appearance-button" disabled={!styleable.length} onclick={openAppearance} aria-haspopup="dialog" aria-expanded="false">✦ Appearance</button>
+				<button bind:this={arrangeButton} class="appearance-button" onclick={openArrange} aria-haspopup="dialog" aria-expanded="false">Arrange</button>
+			</div>
+		{/if}
+	{/if}
+	{#if layersOpen && !playing}<LayersPanel items={[...connectors, ...objects]} selected={selectedIds} choose={chooseLayer} toggleLock={(id) => { const item = board.items.find((item) => item.id === id); if (item) lockItems([id], !isLocked(board.items, item)); }} close={closeLayers} />{/if}
 
 	{#if !hasContent && !shelfOpen}
 		<div class="empty-whisper" aria-hidden="true">
@@ -3006,6 +3255,7 @@
 	<div class:hidden={playing || searchOpen} class="rail" data-whiteboard-ui aria-label="Places and journeys">
 		<button class="rail-button" title="Home — the view this board opens to (H)" onclick={goHome}><span aria-hidden="true">⌂</span>Home</button>
 		<button class="rail-button" title="Find anything on this board (/)" onclick={() => void openSearch()}><span aria-hidden="true">⌕</span>Find</button>
+		<button bind:this={layersButton} class:active={layersOpen} class="rail-button" aria-pressed={layersOpen} title="Find and unlock buried objects" onclick={() => layersOpen = !layersOpen}><span aria-hidden="true">▱</span>Layers</button>
 		<button class:active={drawer === 'places'} class="rail-button" aria-pressed={drawer === 'places'} title="Saved views and frames" onclick={() => (drawer = drawer === 'places' ? null : 'places')}><span aria-hidden="true">◈</span>Places</button>
 		<button class:active={drawer === 'journey'} class="rail-button" aria-pressed={drawer === 'journey'} title="Arrange a journey through the board" onclick={() => (drawer = drawer === 'journey' ? null : 'journey')}><span aria-hidden="true">⇉</span>Journey</button>
 		<button class="rail-button play" title="Play the journey (P)" onclick={() => beginJourney()}><span aria-hidden="true">▶</span>Play</button>
@@ -3231,6 +3481,7 @@
 							{#if only?.type === 'slip'}
 								<button class="chip strong" onclick={() => turnSlipIntoCard(only)}>Turn into Card</button>
 							{/if}
+							{#if only?.type === 'image'}<button class="chip strong" onclick={() => editingImageId = only.id}>Edit image</button>{/if}
 							<h3>Labels</h3>
 							{#if only && chipsFor(only).length}
 								<div class="chip-row inline">
@@ -3610,6 +3861,7 @@
 	<div class:hidden={playing} class="tool-dock" data-whiteboard-ui aria-label="Whiteboard tools">
 		<button class="tool-button" aria-label="Add slip" title="Slip" onclick={addSlipFromDock}><span aria-hidden="true">▱</span>Slip</button>
 		<button class="tool-button" aria-label="Add card" title="Card" onclick={addCardFromDock}><span aria-hidden="true">□</span>Card</button>
+		<button class="tool-button" aria-label="Add lettering" title="Lettering (T)" onclick={addLettering}><span aria-hidden="true">T</span>Text</button>
 		<button class="tool-button" aria-label="Add image" title="Image" onclick={() => imageInput?.click()}><span aria-hidden="true">▧</span>Image</button>
 		<button class:active={tool === 'frame'} class="tool-button" aria-pressed={tool === 'frame'} title="Draw a frame" onclick={() => { tool = tool === 'frame' ? 'select' : 'frame'; connectorSourceId = null; notice = tool === 'frame' ? 'Drag a region for a frame.' : ''; }}><span aria-hidden="true">▢</span>Frame</button>
 		<button class="tool-button" aria-label="Add stack" title="Stack" onclick={addStackFromDock}><span aria-hidden="true">▤</span>Stack</button>
@@ -3652,6 +3904,12 @@
 
 	<input bind:this={imageInput} class="image-input" type="file" accept="image/*" multiple onchange={handleImageInput} />
 </main>
+
+{#if editingImage && imageUrls[editingImage.assetId]}
+	{#key editingImage.id}
+		<ImageEditor item={editingImage} source={imageUrls[editingImage.assetId]} apply={applyImageEdits} cancel={() => editingImageId = null} />
+	{/key}
+{/if}
 
 <style>
 	:global(:root) {
@@ -3801,6 +4059,39 @@
 		pointer-events: auto;
 		outline: none;
 	}
+	.board-item[style*="--object-ink:"] :is(.card-title, .card-body, .slip-text, .frame-title, .frame-label input, .stack-header input, .portal-title, .card-kind, .source-chip) { color: var(--object-ink); }
+	.board-item[style*="--object-ink:"] :is(.card-title, .card-body, .slip-text)::placeholder { color: var(--object-ink); opacity: .55; }
+	.appearance-button { position: absolute; z-index: 90; min-height: 34px; padding: 7px 12px; border: 1px solid #d9ccc0; border-radius: 11px; background: #fffdf7; color: #85515d; font: 12px var(--font-body, system-ui, sans-serif); box-shadow: 0 3px 12px #49362e18; cursor: pointer; }
+	.appearance-button:hover { background: #f3e7df; }
+	.appearance-button:focus-visible { outline: 2px solid #a66670; outline-offset: 3px; }
+	.selection-tools { position: absolute; z-index: 90; display: flex; gap: 6px; }
+	.selection-tools .appearance-button { position: static; }
+	.appearance-button:disabled { opacity: .5; cursor: default; }
+	.board-item.locked { pointer-events: none; }
+	.rotation-handle { position: absolute; z-index: 20000; width: 26px; height: 26px; margin: -13px 0 0 -13px; border: 1px solid #ba8790; border-radius: 50%; color: #85515d; background: #fffdf7; box-shadow: 0 2px 5px #49362e20; cursor: grab; pointer-events: auto; }
+	.rotation-handle:focus-visible { outline: 2px solid #a66670; outline-offset: 3px; }
+	.alignment-guide { position: absolute; z-index: 21000; background: #a66670; pointer-events: none; }
+	.lettering { padding: 12px; background: transparent; border: 0; border-radius: 0; cursor: move; }
+	.lettering[data-backing=label] { background: #fff5dc; border: 1px solid #cabb9f; border-radius: 9px; box-shadow: 0 2px 4px #49362e12; }
+	.lettering[data-backing=banner] { background: #e9ced1; border-block: 1px solid #c69ba2; box-shadow: 0 4px 0 #a8757d26; }
+	.lettering[data-backing=strip] { background: #fffdf8; border-bottom: 2px solid #d7c6ae; box-shadow: 1px 4px 8px #49362e15; }
+	.board-item[data-material=paper] { background-color: #fffdf8; border-radius: 6px; box-shadow: 0 3px 9px #49362e14; }
+	.board-item[data-material=index] { background-color: #fffaf0; background-image: repeating-linear-gradient(transparent 0 23px, #a2bacb45 23px 24px); background-position: 0 12px; border-radius: 4px; border-top: 3px solid #cfa3a3; }
+	.board-item[data-material=sticky] { background-color: #fff0b5; border-color: #bfa94c33; border-radius: 1px 1px 7px 1px; box-shadow: 2px 6px 6px #49362e1c; }
+	.board-item[data-material=torn] { background-color: #fffaf0; border-radius: 2px; border-bottom: 0; box-shadow: 0 4px 6px #49362e16; }
+	.material-edge { display: none; }
+	.board-item[data-material=torn] .material-edge { display: block; position: absolute; left: 0; right: 0; bottom: -5px; height: 7px; background: var(--object-fill, #fffaf0); clip-path: polygon(0 0, 100% 0, 100% 70%, 96% 42%, 91% 88%, 86% 54%, 80% 95%, 74% 44%, 68% 80%, 61% 48%, 54% 100%, 47% 52%, 40% 85%, 34% 40%, 27% 90%, 21% 50%, 15% 82%, 9% 46%, 4% 90%, 0 55%); pointer-events: none; }
+	.board-item[data-material=vellum] { background-color: #fffdf89c; backdrop-filter: blur(2px); border-color: #ffffffaa; box-shadow: 0 2px 6px #49362e0a; }
+	.photo-viewport { width: 100%; height: 100%; min-height: 0; }
+	.image-card.captioned .photo-viewport { height: calc(100% - 28px); }
+	.photo-caption { height: 28px; box-sizing: border-box; margin: 0; padding: 8px 4px 0; text-align: center; color: #604c46; font: 11px/16px var(--font-body, system-ui, sans-serif); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.board-item[style*="--type-family:"] :is(.card-title, .card-body, .slip-text) { font-family: var(--type-family); }
+	.board-item[style*="--type-size:"] :is(.card-title, .card-body, .slip-text) { font-size: var(--type-size); }
+	.board-item[style*="--type-align:"] :is(.card-title, .card-body, .slip-text) { text-align: var(--type-align); }
+	.board-item[style*="--type-weight:"] :is(.card-title, .card-body, .slip-text) { font-weight: var(--type-weight); }
+	.board-item[style*="--type-style:"] :is(.card-title, .card-body, .slip-text) { font-style: var(--type-style); }
+	.board-item[style*="--type-leading:"] :is(.card-title, .card-body, .slip-text) { line-height: var(--type-leading); }
+	.board-item[style*="--type-highlight:"] :is(.card-title, .card-body, .slip-text) { background-image: linear-gradient(transparent 50%, var(--type-highlight) 50% 90%, transparent 90%); background-size: 100% calc(var(--type-size, 14px) * var(--type-leading, 1.4)); }
 
 	.board-item.selected::after {
 		content: '';
@@ -4295,7 +4586,7 @@
 		overflow: visible;
 	}
 
-	.image-card img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 7px; pointer-events: none; }
+	.image-card.shaped { background: transparent; border-color: transparent; box-shadow: none; }
 	.missing-image { width: 100%; height: 100%; display: grid; place-content: center; gap: 7px; text-align: center; color: #8d817c; background: repeating-linear-gradient(45deg, rgba(255,255,255,.28), rgba(255,255,255,.28) 10px, rgba(209,195,186,.2) 10px, rgba(209,195,186,.2) 20px); border-radius: 7px; }
 	.missing-image span { font-size: 28px; color: #b08b83; }
 	.missing-image p { margin: 0; font-size: 12px; }

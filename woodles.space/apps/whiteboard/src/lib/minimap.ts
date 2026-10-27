@@ -1,5 +1,5 @@
 import { visibleBounds, type Viewport } from './camera';
-import { boundsForItem, documentBounds } from './geometry';
+import { visualBoundsForItem, documentBounds } from './geometry';
 import type { Bounds, Camera, WhiteboardDocument, WhiteboardItem } from './model';
 
 export type MinimapProjection = {
@@ -59,7 +59,7 @@ export function minimapProjection(extent: Bounds, size: Viewport, padding = 8): 
 export function minimapMarks(items: WhiteboardItem[]): MinimapMark[] {
 	return items
 		.filter((item) => item.type !== 'connector' && !(item.type === 'card' && item.stackId))
-		.map((item) => ({ id: item.id, kind: item.type, bounds: boundsForItem(items, item) }));
+		.map((item) => ({ id: item.id, kind: item.type, bounds: visualBoundsForItem(items, item) }));
 }
 
 /** A camera centred on a world point, keeping the current scale. */

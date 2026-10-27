@@ -124,6 +124,36 @@ export function centerOf(bounds: Bounds): { x: number; y: number } {
 	return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
 }
 
+export function canRotate(item: WhiteboardItem): boolean {
+	return !['connector', 'stack', 'frame'].includes(item.type) && !(item.type === 'card' && item.stackId);
+}
+export function rotationOf(item: WhiteboardItem): number { return canRotate(item) ? item.rotation ?? 0 : 0; }
+export function rotatePoint(point: { x: number; y: number }, degrees: number) {
+	const angle = degrees * Math.PI / 180;
+	return { x: point.x * Math.cos(angle) - point.y * Math.sin(angle), y: point.x * Math.sin(angle) + point.y * Math.cos(angle) };
+}
+export function normalizeAngle(degrees: number): number { return Math.round((((degrees + 180) % 360 + 360) % 360 - 180) * 10) / 10; }
+export function snappedAngle(degrees: number, force = false): number {
+	const snapped = Math.round(degrees / 15) * 15;
+	return normalizeAngle(force || Math.abs(snapped - degrees) <= 3 ? snapped : degrees);
+}
+export function visualBoundsForItem(items: WhiteboardItem[], item: WhiteboardItem): Bounds {
+	const bounds = boundsForItem(items, item);
+	const angle = rotationOf(item) * Math.PI / 180;
+	const width = Math.abs(bounds.width * Math.cos(angle)) + Math.abs(bounds.height * Math.sin(angle));
+	const height = Math.abs(bounds.width * Math.sin(angle)) + Math.abs(bounds.height * Math.cos(angle));
+	return { x: bounds.x + (bounds.width - width) / 2, y: bounds.y + (bounds.height - height) / 2, width, height };
+}
+
+/** Resize in the object's axes, holding its opposite rotated corner in place. */
+export function resizedBounds(bounds: Bounds, rotation: number, delta: { x: number; y: number }, minimum: { width: number; height: number }, photo?: { ratio: number; extra: number }): Bounds {
+	const local = rotatePoint(delta, -rotation);
+	const width = Math.max(minimum.width, bounds.width + local.x);
+	const height = photo ? Math.max(minimum.height, (width - 10) / photo.ratio + photo.extra) : Math.max(minimum.height, bounds.height + local.y);
+	const shift = rotatePoint({ x: (width - bounds.width) / 2, y: (height - bounds.height) / 2 }, rotation);
+	return { x: bounds.x + (bounds.width - width) / 2 + shift.x, y: bounds.y + (bounds.height - height) / 2 + shift.y, width, height };
+}
+
 export function intersects(a: Bounds, b: Bounds): boolean {
 	return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
@@ -147,7 +177,7 @@ export function connectorEndpoints(items: WhiteboardItem[], connector: Extract<W
 export function documentBounds(document: WhiteboardDocument): Bounds | null {
 	const bounds = document.items
 		.filter((item) => item.type !== 'connector' && !(item.type === 'card' && item.stackId))
-		.map((item) => boundsForItem(document.items, item));
+		.map((item) => visualBoundsForItem(document.items, item));
 	if (!bounds.length) return null;
 	const left = Math.min(...bounds.map((bound) => bound.x));
 	const top = Math.min(...bounds.map((bound) => bound.y));
@@ -213,7 +243,10 @@ export function repairDocument(document: WhiteboardDocument): WhiteboardDocument
 		}
 		return item;
 	}) as WhiteboardItem[];
-	const labelled = conferStackStatuses(repairLabelling(document, items));
+	const groupSizes = new Map<string, number>();
+	for (const item of items) if (item.groupId && item.type !== 'connector' && !(item.type === 'card' && item.stackId)) groupSizes.set(item.groupId, (groupSizes.get(item.groupId) ?? 0) + 1);
+	const grouped = items.map((item) => item.groupId && ((groupSizes.get(item.groupId) ?? 0) < 2 || item.type === 'connector' || (item.type === 'card' && item.stackId)) ? { ...item, groupId: undefined } : item);
+	const labelled = conferStackStatuses(repairLabelling(document, grouped));
 	return { ...document, items: labelled, journey: repairJourney(document, labelled) };
 }
 
