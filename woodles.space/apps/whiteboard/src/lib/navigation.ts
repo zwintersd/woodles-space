@@ -1,5 +1,5 @@
 import { cameraForBounds, visibleBounds, type Viewport } from './camera';
-import { boundsForItem, documentBounds } from './geometry';
+import { visualBoundsForItem, documentBounds } from './geometry';
 import type { Bounds, Camera, FrameItem, WhiteboardDocument, WhiteboardItem } from './model';
 
 /** A frame counts as "where you are" only once it fills this much of the view. */
@@ -99,7 +99,7 @@ export function stepFrame(sequence: FrameItem[], currentId: string | null, direc
 export function targetBounds(items: WhiteboardItem[], id: string): Bounds | null {
 	const item = items.find((candidate) => candidate.id === id);
 	if (!item || item.type === 'connector') return null;
-	return boundsForItem(items, item);
+	return visualBoundsForItem(items, item);
 }
 
 /** Padding scaled to the thing being framed, so a card is not lost in margin. */
@@ -122,6 +122,8 @@ export function fitBoardCamera(document: WhiteboardDocument, viewport: Viewport)
 
 export function itemLabel(item: WhiteboardItem): string {
 	switch (item.type) {
+		case 'lettering':
+			return item.text.trim().slice(0, 80) || 'Untitled lettering';
 		case 'slip':
 			return item.text.trim().slice(0, 80) || 'Untitled slip';
 		case 'frame':
