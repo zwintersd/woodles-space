@@ -20,6 +20,9 @@
 	} from '$lib/geometry';
 	import {
 	createCard,
+	createSlip,
+	slipToCard,
+	type SlipItem,
 	createConnector,
 	createFrame,
 	createImage,
@@ -394,6 +397,7 @@
 				title: itemLabel(item),
 				rows,
 				actions: [
+					...(item.type === 'slip' ? [{ commandId: 'slip-to-card', label: 'Turn into Card' }] : []),
 					{ commandId: 'inspect', label: 'Edit details' },
 					{ commandId: 'duplicate-selection', label: 'Duplicate', enabled: item.type !== 'connector' },
 					{ commandId: 'delete-selection', label: item.type === 'portal' ? 'Remove from board' : 'Delete board item' }
@@ -437,6 +441,8 @@
 				{ id: 'save', label: 'Save board', shortcut: '⌘S' },
 				{ id: 'find', label: 'Find on board', shortcut: '/', context: 'artifact', group: 'view' },
 				{ id: 'add-card', label: 'Add card' },
+				{ id: 'add-slip', label: 'Add slip' },
+				{ id: 'slip-to-card', label: 'Turn into Card', enabled: only?.type === 'slip' },
 				{ id: 'add-frame', label: 'Draw frame' },
 				{ id: 'add-stack', label: 'Add stack' },
 				{ id: 'add-image', label: 'Add image' },
@@ -726,6 +732,8 @@
 			case 'save': markDirty(); saveNow(); break;
 			case 'find': void openSearch(); break;
 			case 'add-card': addCardFromDock(); break;
+			case 'add-slip': void addSlipFromDock(); break;
+			case 'slip-to-card': if (only?.type === 'slip') turnSlipIntoCard(only); break;
 			case 'add-frame': tool = 'frame'; connectorSourceId = null; notice = 'Drag a region for a frame.'; break;
 			case 'add-stack': addStackFromDock(); break;
 			case 'add-image': imageInput?.click(); break;
@@ -750,11 +758,13 @@
 			runHomeSuiteCommand(id);
 		};
 		const actions: ContextAction[] = items.length ? [
+			...(item?.type === 'slip' ? [{ id: 'slip-to-card', label: 'Turn into Card', group: 'edit' as const, run: () => run('slip-to-card') }] : []),
 			{ id: 'inspect', label: 'Edit details', group: 'edit', run: () => run('inspect') },
 			{ id: 'duplicate-selection', label: items.length === 1 ? 'Duplicate item' : 'Duplicate selected items', group: 'edit', enabled: items.some((entry) => entry.type !== 'connector'), run: () => run('duplicate-selection') },
 			{ id: 'delete-selection', label: item?.type === 'portal' ? 'Remove portal from board' : items.length === 1 ? 'Delete board item' : 'Remove selected items from board', group: 'danger', detail: item?.type === 'portal' ? 'Keeps the destination board' : 'Undo to restore', run: () => run('delete-selection') }
 		] : [
 			{ id: 'add-card', label: 'Add card', group: 'edit', run: () => run('add-card') },
+			{ id: 'add-slip', label: 'Add slip', group: 'edit', run: () => run('add-slip') },
 			{ id: 'add-frame', label: 'Draw frame', group: 'edit', run: () => run('add-frame') },
 			{ id: 'add-stack', label: 'Add stack', group: 'edit', run: () => run('add-stack') },
 			{ id: 'fit-board', label: 'Fit board', group: 'view', run: () => run('fit-board') }
@@ -883,6 +893,41 @@
 		if (searchPreviewTimer) clearTimeout(searchPreviewTimer);
 		Object.values(imageUrls).forEach((url) => URL.revokeObjectURL(url));
 	});
+
+	async function addSlipFromDock() {
+		beginEdit();
+		const size = viewport();
+		const point = screenToWorld(board.camera, { x: size.width / 2 - 85, y: size.height / 2 - 24 });
+		const slip = createSlip(point.x, point.y, nextZ(board.items));
+		setItems([...board.items, slip]);
+		selectOnly(slip.id);
+		scheduleSave();
+		await tick();
+		document.getElementById(`slip-text-${slip.id}`)?.focus();
+	}
+
+	function fitSlip(node: HTMLTextAreaElement, value: { id: string; text: string }) {
+		function fit(current: typeof value) {
+			node.style.height = 'auto';
+			const height = Math.max(28, node.scrollHeight);
+			node.style.height = `${height}px`;
+			const item = board.items.find((item) => item.id === current.id);
+			if (item?.type === 'slip' && item.height !== height + 20) updateItem(item.id, { height: height + 20 }, true);
+		}
+		fit(value);
+		return { update: fit };
+	}
+
+	function updateSlip(item: SlipItem, text: string) {
+		beginEdit(`slip-text:${item.id}`);
+		updateItem(item.id, { text }, true);
+	}
+
+	function turnSlipIntoCard(item: SlipItem) {
+		beginEdit();
+		setItems(board.items.map((entry) => entry.id === item.id ? slipToCard(item) : entry));
+		scheduleSave();
+	}
 
 	async function createCardAt(point: Point) {
 		beginEdit();
@@ -1424,6 +1469,8 @@
 	}
 
 	function handleWheel(event: WheelEvent) {
+		// Text and board controls own their wheel gestures, including at scroll edges.
+		if (targetIsChrome(event.target) || (event.target instanceof Element && event.target.closest('textarea, input, select, [contenteditable="true"]'))) return;
 		event.preventDefault();
 		wakeChrome();
 		handHoldsTheCamera();
@@ -2679,6 +2726,16 @@
 						<button data-whiteboard-ui class="resize-handle" aria-label="Resize stack" onpointerdown={(event) => startResize(event, item)}></button>
 					{/if}
 				</section>
+			{:else if item.type === 'slip'}
+				<section data-whiteboard-object class="board-item slip" class:selected={isSelected(item.id)}
+					class:dragging={draggingIds.includes(item.id)} class:found={matchIds.has(item.id)}
+					data-context-item={item.id} style={itemStyle(item)} role="group" aria-label={`Slip: ${item.text || 'Untitled slip'}`}
+					onpointerdown={(event) => handleItemPointerDown(event, item)}>
+					<textarea id={`slip-text-${item.id}`} rows="1" class="slip-text" aria-label="Slip text" placeholder="A small thought…"
+						value={item.text} use:fitSlip={{ id: item.id, text: item.text }}
+						onpointerdown={(event) => handleEditablePointerDown(event, item)}
+						oninput={(event) => updateSlip(item, event.currentTarget.value)} onkeydown={handleEditableKeydown}></textarea>
+				</section>
 			{:else if item.type === 'card'}
 				{@const chips = chipsFor(item)}
 				<section
@@ -3171,6 +3228,9 @@
 						{/if}
 
 						<section>
+							{#if only?.type === 'slip'}
+								<button class="chip strong" onclick={() => turnSlipIntoCard(only)}>Turn into Card</button>
+							{/if}
 							<h3>Labels</h3>
 							{#if only && chipsFor(only).length}
 								<div class="chip-row inline">
@@ -3548,6 +3608,7 @@
 	{/if}
 
 	<div class:hidden={playing} class="tool-dock" data-whiteboard-ui aria-label="Whiteboard tools">
+		<button class="tool-button" aria-label="Add slip" title="Slip" onclick={addSlipFromDock}><span aria-hidden="true">▱</span>Slip</button>
 		<button class="tool-button" aria-label="Add card" title="Card" onclick={addCardFromDock}><span aria-hidden="true">□</span>Card</button>
 		<button class="tool-button" aria-label="Add image" title="Image" onclick={() => imageInput?.click()}><span aria-hidden="true">▧</span>Image</button>
 		<button class:active={tool === 'frame'} class="tool-button" aria-pressed={tool === 'frame'} title="Draw a frame" onclick={() => { tool = tool === 'frame' ? 'select' : 'frame'; connectorSourceId = null; notice = tool === 'frame' ? 'Drag a region for a frame.' : ''; }}><span aria-hidden="true">▢</span>Frame</button>
@@ -3931,6 +3992,23 @@
 	.card.tile .chip-row { display: none; }
 	.card.tile .card-title { margin-top: 0; font-size: 12.5px; line-height: 1.3; }
 
+	.slip {
+		padding: 10px 12px;
+		border: 1px solid rgba(130, 112, 73, .12);
+		border-radius: 4px 7px 6px 3px;
+		background: #fff7d9;
+		box-shadow: 0 2px 3px rgba(73, 54, 46, .07);
+		cursor: move;
+	}
+	.slip-text {
+		display: block; width: 100%; min-height: 28px; padding: 3px 0; border: 0;
+		resize: none; overflow: hidden; background: transparent; color: var(--ink);
+		font: 14px/22px var(--font-body, ui-sans-serif, sans-serif);
+		outline: none; overscroll-behavior: contain;
+	}
+	.slip-text::placeholder { color: #a59873; }
+	.slip:focus-within { border-color: #b8a16c; }
+
 	.card {
 		min-width: 150px;
 		min-height: 90px;
@@ -4104,7 +4182,7 @@
 		font-family: var(--font-body, ui-sans-serif, sans-serif);
 	}
 	.card-body::placeholder { color: #b4aaa5; }
-	.card-body { scrollbar-width: none; }
+	.card-body { scrollbar-width: none; overscroll-behavior: contain; }
 	.card-body::-webkit-scrollbar { display: none; }
 
 	/*

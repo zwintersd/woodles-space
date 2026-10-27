@@ -75,6 +75,8 @@ function bestMatch(item: WhiteboardItem, labels: Label[], query: SearchQuery): M
 	if (item.type === 'card') {
 		if (item.title.trim()) candidates.push({ field: 'title', text: item.title });
 		if (item.body.trim()) candidates.push({ field: 'body', text: item.body });
+	} else if (item.type === 'slip') {
+		candidates.push({ field: 'body', text: item.text });
 	} else if (item.type === 'frame' || item.type === 'stack') {
 		candidates.push({ field: 'title', text: item.title });
 	} else if (item.type === 'image') {
