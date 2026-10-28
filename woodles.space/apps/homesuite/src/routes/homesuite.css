@@ -216,8 +216,8 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .inspector-actions button:disabled { opacity: .45; cursor: default; }
 .inspector-controls { display: grid; gap: 12px; margin-top: 18px; }
 .inspector-controls label { display: grid; gap: 6px; color: var(--hs-muted); font: 10px var(--font-mono); text-transform: uppercase; letter-spacing: .07em; }
-.inspector-controls input { width: 100%; height: 34px; border: 1px solid var(--hs-line); border-radius: 7px; padding: 0 8px; outline-color: var(--hs-focus); color: var(--hs-ink); background: var(--hs-field); font: 12px var(--font-sans); text-transform: none; letter-spacing: normal; }
-.inspector-controls input:disabled { color: var(--hs-muted); background: var(--hs-sunk); }
+.inspector-controls input, .inspector-controls select { width: 100%; height: 34px; border: 1px solid var(--hs-line); border-radius: 7px; padding: 0 8px; outline-color: var(--hs-focus); color: var(--hs-ink); background: var(--hs-field); font: 12px var(--font-sans); text-transform: none; letter-spacing: normal; }
+.inspector-controls input:disabled, .inspector-controls select:disabled { color: var(--hs-muted); background: var(--hs-sunk); }
 .inspector-detail { width: 100%; margin-top: 23px; border: 1px solid var(--hs-line-strong); border-radius: 8px; padding: 9px; background: var(--hs-accent-soft); color: var(--hs-accent-text); font-size: 11px; font-weight: 650; text-align: left; }
 .inspector-detail:hover { background: var(--hs-hover); }
 .missing-artifact { margin: auto; text-align: center; padding: 80px 20px; }

@@ -33,7 +33,7 @@ export type HomeSuiteSurfaceState = {
 	inspector: {
 		title: string;
 		rows: { label: string; value: string }[];
-		controls?: { id: string; label: string; value: string; kind?: 'text' | 'number'; placeholder?: string; readonly?: boolean }[];
+		controls?: { id: string; label: string; value: string; kind?: 'text' | 'number' | 'select'; options?: { value: string; label: string }[]; placeholder?: string; readonly?: boolean }[];
 		/** Domain commands shown in the shell's inspector slot. */
 		actions?: { commandId: string; label: string; enabled?: boolean }[];
 	} | null;
