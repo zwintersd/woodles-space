@@ -2,10 +2,12 @@ import { test, expect, type Page } from '@playwright/test';
 
 const boardId = 'board-compose-test';
 const key = `woodles.whiteboard.boards.${boardId}`;
+const browserErrors = new WeakMap<Page, string[]>();
 async function stored(page: Page) {
 	return page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).data, key);
 }
 test.beforeEach(async ({ page }) => {
+	const errors: string[] = []; browserErrors.set(page, errors); page.on('pageerror', (error) => errors.push(error.message));
 	await page.addInitScript(({ key, boardId }) => {
 		if (localStorage.getItem(key)) return;
 		const stamp = new Date().toISOString();
@@ -27,13 +29,14 @@ test.beforeEach(async ({ page }) => {
 	await page.goto(`/whiteboard?board=${boardId}`);
 	await expect(page.getByRole('textbox', { name: 'Card title' }).first()).toHaveValue('A pocket of possibilities');
 });
+test.afterEach(async ({ page }) => { expect(browserErrors.get(page) ?? []).toEqual([]); });
 
 async function select(page: Page, id: string, additive = false) {
 	if (!additive) await page.getByRole('main', { name: 'Whiteboard canvas' }).click({ position: { x: 10, y: 200 } });
 	await page.locator(`[data-context-item="${id}"]`).click({ position: { x: 5, y: 60 }, modifiers: additive ? ['Shift'] : [] });
 }
 async function open(page: Page) {
-	await page.getByRole('button', { name: '✦ Appearance', exact: true }).click();
+	await page.getByRole('button', { name: 'Appearance', exact: true }).click();
 	await expect(page.getByRole('dialog', { name: 'Selection appearance' })).toBeVisible();
 }
 
@@ -45,7 +48,7 @@ test('preview cancels without saving, Apply makes one undo step and persists', a
 	await expect(page.locator('[data-context-item="card-a"]')).toHaveCSS('background-color', 'rgb(237, 201, 207)');
 	expect((await stored(page)).items[0].appearance).toBeUndefined();
 	await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-	await expect(page.getByRole('button', { name: '✦ Appearance' })).toBeFocused();
+	await expect(page.getByRole('button', { name: 'Appearance' })).toBeFocused();
 	await expect(page.locator('[data-context-item="card-a"]')).not.toHaveCSS('background-color', 'rgb(237, 201, 207)');
 	await open(page);
 	await page.getByRole('button', { name: 'Use #edc9cf for fill', exact: true }).click();
@@ -104,7 +107,7 @@ test('narrow tray stays within the screen, owns scrolling and restores keyboard 
 	await expect(page.locator('.world')).toHaveAttribute('style', transform!);
 	await page.screenshot({ path: 'test-results/boards-compose-narrow.png' });
 	await page.keyboard.press('Escape');
-	await expect(page.getByRole('button', { name: '✦ Appearance' })).toBeFocused();
+	await expect(page.getByRole('button', { name: 'Appearance' })).toBeFocused();
 });
 
 test('photo mats and outlines preserve the original asset and image edits', async ({ page }) => {
@@ -112,6 +115,7 @@ test('photo mats and outlines preserve the original asset and image edits', asyn
 	const photo = page.getByRole('group', { name: 'Image: test-photo.svg', exact: true });
 	await expect(photo).toBeVisible();
 	await photo.click({ button: 'right', position: { x: 5, y: 20 } });
+	await page.getByRole('menuitem', { name: 'Edit image', exact: true }).click();
 	const editor = page.getByRole('dialog', { name: 'Edit image' });
 	await editor.getByRole('button', { name: 'ellipse', exact: true }).click();
 	await editor.getByRole('spinbutton', { name: 'Rotation degrees' }).fill('90');
@@ -189,6 +193,7 @@ test('standalone lettering previews typography, grows to its words, searches and
 	await page.getByRole('textbox', { name: 'Find on this board' }).fill('Small wonders');
 	await expect(page.locator('.finder-result')).toHaveCount(1);
 	await page.keyboard.press('Escape');
+	await expect(page.locator('.finder')).toHaveCount(0);
 	await page.screenshot({ path: 'test-results/boards-compose-lettering.png' });
 });
 
@@ -318,4 +323,213 @@ test('photo captions leave original image edits intact and arrangement works on 
 	expect((await stored(page)).items.find((item: any) => item.type === 'image').assetId).toBe(assetId);
 	await page.screenshot({ path: 'test-results/boards-compose-arrange-narrow.png' });
 	await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: 'Arrange', exact: true })).toBeFocused();
+});
+
+test('rotated lettering keeps its corner and measured geometry when its words grow', async ({ page }) => {
+	await page.getByRole('button', { name: 'Add lettering', exact: true }).click();
+	const text = page.getByRole('textbox', { name: 'Lettering text', exact: true });
+	await text.fill('A little room'); await text.press('Escape'); await arrange(page);
+	await page.getByRole('spinbutton', { name: 'Object rotation', exact: true }).fill('30'); await page.keyboard.press('Tab'); await page.keyboard.press('Escape');
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.type === 'lettering')?.rotation).toBe(30);
+	const before = (await stored(page)).items.find((item: any) => item.type === 'lettering');
+	await text.fill('A little room\nfor a larger thought\nand a few more words'); await text.press('Escape');
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.type === 'lettering')?.height).toBeGreaterThan(before.height);
+	const after = (await stored(page)).items.find((item: any) => item.type === 'lettering');
+	const angle = Math.PI / 6;
+	const anchor = (b: any) => ({ x: b.x + b.width / 2 - b.width / 2 * Math.cos(angle) + b.height / 2 * Math.sin(angle), y: b.y + b.height / 2 - b.width / 2 * Math.sin(angle) - b.height / 2 * Math.cos(angle) });
+	expect(anchor(after).x).toBeCloseTo(anchor(before).x, 0); expect(anchor(after).y).toBeCloseTo(anchor(before).y, 0);
+	const actualHeight = await text.locator('..').evaluate((element) => (element as HTMLElement).offsetHeight);
+	expect(after.height).toBe(actualHeight);
+	await page.reload(); await expect(text).toHaveValue('A little room\nfor a larger thought\nand a few more words');
+});
+
+test('deleting a grouped photo and undoing restores the original image through reload', async ({ page }) => {
+	await page.locator('input[type=file]').setInputFiles({ name: 'undo-photo.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="240"><rect width="400" height="240" fill="#d6e2c9"/></svg>') });
+	const photo = page.getByRole('group', { name: 'Image: undo-photo.svg', exact: true });
+	await expect(photo).toBeVisible();
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.type === 'image')?.assetId).toBeTruthy();
+	await page.getByRole('button', { name: 'Add lettering', exact: true }).click();
+	await page.getByRole('textbox', { name: 'Lettering text', exact: true }).fill('A keeper'); await page.keyboard.press('Escape');
+	const original = (await stored(page)).items.find((item: any) => item.type === 'image');
+	await page.keyboard.press('Control+a'); await page.keyboard.press('Control+g');
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.type === 'image')?.groupId).toBeTruthy();
+	await page.keyboard.press('Delete');
+	await expect.poll(async () => (await stored(page)).items.length).toBe(0);
+	await page.keyboard.press('Control+z');
+	await expect(photo.locator('image')).toHaveAttribute('href', /^blob:/);
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.type === 'image')?.assetId).toBe(original.assetId);
+	await page.reload();
+	await expect(photo.locator('image')).toHaveAttribute('href', /^blob:/);
+	await expect(photo.locator('.missing-image')).toHaveCount(0);
+	await expect(page.getByRole('textbox', { name: 'Lettering text', exact: true })).toHaveValue('A keeper');
+});
+
+test('right-click selected card, Slip and lettering text opens the Woodles menu and preserves the range', async ({ page }) => {
+	await page.getByRole('button', { name: 'Add lettering', exact: true }).click();
+	await page.getByRole('textbox', { name: 'Lettering text', exact: true }).fill('Selected lettering');
+	await page.evaluate(() => window.addEventListener('contextmenu', (event) => { (window as any).__contextPrevented = event.defaultPrevented; }));
+	for (const label of ['Card text', 'Slip text', 'Lettering text']) {
+		const field = page.getByRole('textbox', { name: label, exact: true }).first();
+		await field.evaluate((node) => { const field = node as HTMLTextAreaElement; field.focus(); field.setSelectionRange(0, 4); });
+		await field.click({ button: 'right', position: { x: 12, y: 14 } });
+		await expect(page.getByRole('menu')).toBeVisible();
+		expect(await page.evaluate(() => (window as any).__contextPrevented)).toBe(true);
+		await expect(page.getByRole('menuitem', { name: 'Appearance', exact: true })).toBeVisible();
+		await page.keyboard.press('Escape');
+		await expect(field).toBeFocused();
+		expect(await field.evaluate((node) => { const field = node as HTMLTextAreaElement; return [field.selectionStart, field.selectionEnd]; })).toEqual([0, 4]);
+	}
+	await page.getByRole('textbox', { name: 'Lettering text', exact: true }).press('Shift+F10');
+	await expect(page.getByRole('menuitem', { name: 'Arrange', exact: true })).toBeFocused();
+	await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
+	await expect(page.getByRole('dialog', { name: 'Selection appearance' })).toBeVisible();
+	await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+	await page.getByRole('textbox', { name: 'Lettering text', exact: true }).click({ button: 'right', position: { x: 12, y: 14 } });
+	await page.screenshot({ path: 'test-results/boards-text-context-menu.png' });
+});
+
+test('HomeSuite routes selected text right-clicks to its menu instead of the browser', async ({ page }) => {
+	await page.route('**/text-context-shell', (route) => route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body></body></html>' }));
+	await page.goto('/text-context-shell');
+	await page.evaluate((boardId) => {
+		const iframe = document.createElement('iframe'); iframe.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0'; iframe.src = `/whiteboard?board=${boardId}&homesuite=1`;
+		(window as any).__boardMessages = [];
+		window.addEventListener('message', (event) => { if (event.data?.channel === 'woodles.homesuite.v1') (window as any).__boardMessages.push(event.data); });
+		document.body.append(iframe);
+	}, boardId);
+	const frame = page.frameLocator('iframe'); const field = frame.getByRole('textbox', { name: 'Card text', exact: true }).first();
+	await expect(field).toBeVisible();
+	await field.evaluate((node) => { const field = node as HTMLTextAreaElement; field.focus(); field.setSelectionRange(0, 4); window.addEventListener('contextmenu', (event) => { (window as any).__contextPrevented = event.defaultPrevented; }); });
+	await field.click({ button: 'right', position: { x: 12, y: 14 } });
+	await expect.poll(async () => page.evaluate(() => (window as any).__boardMessages.some((message: any) => message.type === 'context-menu' && message.target.actions.some((action: any) => action.id === 'appearance')))).toBe(true);
+	expect(await field.evaluate(() => (window as any).__contextPrevented)).toBe(true);
+	await page.evaluate(() => { const message = (window as any).__boardMessages.findLast((message: any) => message.type === 'context-menu'); document.querySelector('iframe')!.contentWindow!.postMessage({ channel: 'woodles.homesuite.v1', source: 'shell', type: 'action', action: 'context-dismiss', requestId: message.requestId }, window.location.origin); });
+	await expect(field).toBeFocused();
+	expect(await field.evaluate((node) => { const field = node as HTMLTextAreaElement; return [field.selectionStart, field.selectionEnd]; })).toEqual([0, 4]);
+});
+
+test('SVG selection controls stay outside a clipped stack and dock when it fills the view', async ({ page }) => {
+	await page.getByRole('button', { name: 'Add stack', exact: true }).click();
+	await page.getByRole('textbox', { name: 'Stack title', exact: true }).press('Escape');
+	const stack = page.locator('.board-item.stack'); const toolbar = page.getByRole('toolbar', { name: 'Selection tools', exact: true });
+	await expect(toolbar.getByRole('button', { name: 'Appearance', exact: true }).locator('svg')).toBeVisible();
+	await expect(toolbar.getByRole('button', { name: 'Arrange', exact: true }).locator('svg')).toBeVisible();
+	expect(await toolbar.innerText()).toBe('');
+	const initial = (await stack.boundingBox())!;
+	await page.mouse.move(initial.x + 5, initial.y + 65); await page.mouse.down(); await page.mouse.move(25, 85, { steps: 5 }); await page.mouse.up();
+	await expect(toolbar).not.toHaveClass(/interacting/);
+	await expect(toolbar).toHaveCSS('opacity', '1');
+	const selected = (await stack.boundingBox())!; const controls = (await toolbar.boundingBox())!;
+	const overlap = controls.x < selected.x + selected.width && controls.x + controls.width > selected.x && controls.y < selected.y + selected.height && controls.y + controls.height > selected.y;
+	expect(overlap).toBe(false);
+	expect(controls.width).toBeLessThanOrEqual(100);
+	await page.screenshot({ path: 'test-results/boards-selection-controls-clipped-stack.png' });
+	await arrange(page); await page.getByRole('button', { name: 'To front', exact: true }).click(); await page.keyboard.press('Escape');
+	const resize = (await stack.getByRole('button', { name: 'Resize stack', exact: true }).boundingBox())!;
+	await page.mouse.move(resize.x + resize.width / 2, resize.y + resize.height / 2); await page.mouse.down(); await page.mouse.move(1500, 1100, { steps: 5 }); await page.mouse.up();
+	await expect(toolbar).toHaveAttribute('data-placement', 'dock');
+	const docked = (await toolbar.boundingBox())!; const chrome = (await page.locator('.top-deck').boundingBox())!;
+	expect(docked.y).toBeGreaterThan(chrome.y + chrome.height);
+	expect(docked.y + docked.height).toBeLessThanOrEqual(800);
+	await page.screenshot({ path: 'test-results/boards-selection-controls-docked.png' });
+});
+
+test('icon controls fit narrow screens and support keyboard navigation and activation', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.getByRole('button', { name: 'Fit board in view', exact: true }).click();
+	await select(page, 'card-a');
+	const toolbar = page.getByRole('toolbar', { name: 'Selection tools', exact: true });
+	const box = (await toolbar.boundingBox())!; const chrome = (await page.locator('.top-deck').boundingBox())!;
+	expect(box.x).toBeGreaterThanOrEqual(12); expect(box.x + box.width).toBeLessThanOrEqual(378);
+	expect(box.y).toBeGreaterThanOrEqual(chrome.y + chrome.height + 8); expect(box.y + box.height).toBeLessThanOrEqual(744);
+	await toolbar.getByRole('button', { name: 'Appearance', exact: true }).focus();
+	await page.keyboard.press('ArrowRight'); await expect(toolbar.getByRole('button', { name: 'Arrange', exact: true })).toBeFocused();
+	await page.keyboard.press('Space'); await expect(page.getByRole('dialog', { name: 'Arrange selection' })).toBeVisible();
+	await page.keyboard.press('Escape'); await expect(toolbar.getByRole('button', { name: 'Arrange', exact: true })).toBeFocused();
+	await page.screenshot({ path: 'test-results/boards-selection-controls-narrow.png' });
+});
+
+async function addSlipStack(page: Page) {
+	await page.getByRole('button', { name: 'Add stack', exact: true }).click();
+	await page.getByRole('textbox', { name: 'Stack title', exact: true }).fill('Slip pocket');
+	await page.keyboard.press('Escape');
+	return page.getByRole('group', { name: 'Stack: Slip pocket', exact: true });
+}
+async function recordSlipLandings(page: Page) {
+	await page.evaluate(() => {
+		(window as any).__slipLandings = 0;
+		const animate = Element.prototype.animate;
+		Element.prototype.animate = function (keyframes, options) {
+			if (this.matches('.slip')) (window as any).__slipLandings++;
+			return animate.call(this, keyframes, options);
+		};
+	});
+}
+
+test('Slips pop neatly into Stacks, follow them, undo placement and drag back out', async ({ page }) => {
+	const stack = await addSlipStack(page); await recordSlipLandings(page);
+	const stackId = (await stack.getAttribute('data-context-item'))!;
+	const slip = page.locator('[data-context-item="slip-a"]');
+	const from = (await slip.boundingBox())!; const target = (await stack.boundingBox())!;
+	await page.mouse.move(from.x + 3, from.y + 10); await page.mouse.down(); await page.mouse.move(target.x + target.width / 2, target.y + 100, { steps: 6 });
+	await expect(stack).toHaveClass(/drop-target/); await expect(page.locator('.stack-insert-marker')).toHaveCount(1);
+	await page.mouse.up();
+	await expect.poll(async () => page.evaluate(() => (window as any).__slipLandings)).toBeGreaterThan(0);
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === 'slip-a')?.stackId).toBe(stackId);
+	const placed = (await slip.boundingBox())!; const container = (await stack.boundingBox())!;
+	expect(placed.x).toBeCloseTo(container.x + 14, 0); expect(placed.width).toBeCloseTo(container.width - 28, 0);
+	await page.keyboard.press('Control+z');
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === 'slip-a')?.stackId).toBeUndefined();
+	await page.keyboard.press('Control+Shift+z');
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === 'slip-a')?.stackId).toBe(stackId);
+	const beforeMove = (await stack.boundingBox())!;
+	await page.mouse.move(beforeMove.x + 4, beforeMove.y + 65); await page.mouse.down(); await page.mouse.move(beforeMove.x + 104, beforeMove.y + 115, { steps: 5 }); await page.mouse.up();
+	await expect.poll(async () => { const note = (await slip.boundingBox())!; const owner = (await stack.boundingBox())!; return Math.round(note.x - owner.x); }).toBe(14);
+	const note = (await slip.boundingBox())!;
+	await page.mouse.move(note.x + 3, note.y + 10); await page.mouse.down(); await page.mouse.move(200, 650, { steps: 6 }); await page.mouse.up();
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === 'slip-a')?.stackId).toBeUndefined();
+	expect((await slip.boundingBox())!.width).toBeCloseTo(170, 0);
+	await page.keyboard.press('Control+z');
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === 'slip-a')?.stackId).toBe(stackId);
+	await page.reload(); await expect(slip).toHaveClass(/in-stack/);
+	await expect(slip.getByRole('textbox', { name: 'Slip text', exact: true })).toHaveValue('Save this thought for later');
+	await page.screenshot({ path: 'test-results/boards-slip-in-stack.png' });
+});
+
+test('Cards and Slips share an order, and converting a stacked Slip keeps its slot', async ({ page }) => {
+	const stack = await addSlipStack(page); const stackId = (await stack.getAttribute('data-context-item'))!;
+	for (const [id, offset] of [['card-a', 80], ['slip-a', 260]] as const) {
+		const note = (await page.locator(`[data-context-item="${id}"]`).boundingBox())!; const target = (await stack.boundingBox())!;
+		await page.mouse.move(note.x + 3, note.y + 10); await page.mouse.down(); await page.mouse.move(target.x + 80, target.y + offset, { steps: 6 }); await page.mouse.up();
+		await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === id)?.stackId).toBe(stackId);
+	}
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === stackId)?.cardIds).toEqual(['card-a', 'slip-a']);
+	const slip = page.locator('[data-context-item="slip-a"]'); const from = (await slip.boundingBox())!; const target = (await stack.boundingBox())!;
+	await page.mouse.move(from.x + 3, from.y + 10); await page.mouse.down(); await page.mouse.move(target.x + 80, target.y + 70, { steps: 6 }); await page.mouse.up();
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === stackId)?.cardIds).toEqual(['slip-a', 'card-a']);
+	await slip.getByRole('textbox', { name: 'Slip text', exact: true }).click({ button: 'right', position: { x: 12, y: 14 } });
+	await page.getByRole('menuitem', { name: 'Turn into Card', exact: true }).click();
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === 'slip-a')?.type).toBe('card');
+	expect((await stored(page)).items.find((item: any) => item.id === 'slip-a').stackId).toBe(stackId);
+	expect((await stored(page)).items.find((item: any) => item.id === stackId).cardIds).toEqual(['slip-a', 'card-a']);
+	await page.keyboard.press('Control+z');
+	await expect(page.locator('[data-context-item="slip-a"]')).toHaveClass(/slip/);
+});
+
+test('Slip placement stays neat on narrow screens and reduced motion skips the pop', async ({ page }) => {
+	await page.emulateMedia({ reducedMotion: 'reduce' }); const stack = await addSlipStack(page); await recordSlipLandings(page);
+	const stackId = (await stack.getAttribute('data-context-item'))!;
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.getByRole('button', { name: 'Fit board in view', exact: true }).click();
+	const slip = page.locator('[data-context-item="slip-a"]');
+	await expect(slip).toBeInViewport();
+	// Hover waits for the fitted layout and a real, unobstructed drag surface.
+	await slip.hover({ position: { x: 1.5, y: 5 } });
+	const target = (await stack.boundingBox())!;
+	await page.mouse.down(); await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 6 }); await page.mouse.up();
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === 'slip-a')?.stackId).toBe(stackId);
+	expect(await page.evaluate(() => (window as any).__slipLandings)).toBe(0);
+	const noteWidth = await slip.evaluate((node) => (node as HTMLElement).offsetWidth); const stackWidth = await stack.evaluate((node) => (node as HTMLElement).offsetWidth);
+	expect(noteWidth).toBe(stackWidth - 28);
+	await page.screenshot({ path: 'test-results/boards-slip-stack-narrow.png' });
 });

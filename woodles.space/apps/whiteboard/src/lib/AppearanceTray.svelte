@@ -95,5 +95,5 @@
 	.remove-colours { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 8px; } .remove-colours span { width: 100%; font-size: 11px; color: #806e65; } .remove-colours button { padding: 2px 5px; display: flex; align-items: center; gap: 3px; } i { width: 12px; height: 12px; border-radius: 50%; border: 1px solid #59443838; }
 	input[type=number] { width: 100%; box-sizing: border-box; min-height: 30px; border: 1px solid #dfd2c5; background: #fffdf7; border-radius: 7px; color: #584b44; font: inherit; padding: 6px 8px; } .backing { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; margin-top: 12px; } button[aria-pressed=true] { background: #eadbd7; border-color: #ba8790; }
 	footer { border-top: 1px solid #ede4d8; } footer span { flex: 1; font-size: 10px; color: #806e65; } .apply { background: #a66670; border-color: #a66670; color: white; }
-	@media (max-width: 600px) { .appearance-tray { left: 12px !important; top: auto !important; bottom: 100px; max-height: calc(100dvh - 190px); } }
+	@media (max-width: 600px) { .appearance-tray { left: 12px !important; top: auto !important; bottom: 100px; max-height: calc(100dvh - var(--tray-top) - 100px); } }
 </style>

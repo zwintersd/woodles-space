@@ -1,4 +1,4 @@
-import type { Bounds, Camera, CardItem, StackItem, WhiteboardDocument, WhiteboardItem } from './model';
+import { isStackMember, type Bounds, type Camera, type CardItem, type StackMember, type StackItem, type WhiteboardDocument, type WhiteboardItem } from './model';
 import { setProperty, statusOf } from './properties';
 
 export const MIN_ZOOM = 0.1;
@@ -56,7 +56,7 @@ export function fitCamera(bounds: Bounds, viewport: { width: number; height: num
 }
 
 export function boundsForItem(items: WhiteboardItem[], item: WhiteboardItem): Bounds {
-	if (item.type === 'card' && item.stackId) {
+	if (isStackMember(item) && item.stackId) {
 		const stack = items.find((candidate): candidate is StackItem => candidate.id === item.stackId && candidate.type === 'stack');
 		if (stack) return stackCardBounds(items, stack, item);
 	}
@@ -78,17 +78,30 @@ function galleryTileWidth(stack: StackItem): number {
 	return Math.max(80, (usable - STACK_GAP * (columns - 1)) / columns);
 }
 
+export function stackMemberHeight(item: StackMember): number { return Math.max(item.type === 'slip' ? 44 : 72, item.height); }
+
+function galleryRowHeights(items: WhiteboardItem[], stack: StackItem): number[] {
+	const heights: number[] = [];
+	const columns = galleryColumns(stack);
+	stackMembers(items, stack).forEach((item, index) => {
+		const row = Math.floor(index / columns);
+		heights[row] = Math.max(heights[row] ?? 0, item.type === 'slip' ? stackMemberHeight(item) : GALLERY_TILE_HEIGHT);
+	});
+	return heights;
+}
+
 export function stackContentHeight(items: WhiteboardItem[], stack: StackItem): number {
-	const cards = stackCards(items, stack);
+	const cards = stackMembers(items, stack);
 	if (!cards.length) return stack.height;
+	const rows = galleryRowHeights(items, stack);
 	const inner = stack.behavior === 'gallery'
-		? Math.ceil(cards.length / galleryColumns(stack)) * (GALLERY_TILE_HEIGHT + STACK_GAP) - STACK_GAP
-		: cards.reduce((total, card) => total + Math.max(72, card.height), 0) + STACK_GAP * (cards.length - 1);
+		? rows.reduce((sum, height) => sum + height, 0) + STACK_GAP * (rows.length - 1)
+		: cards.reduce((total, card) => total + stackMemberHeight(card), 0) + STACK_GAP * (cards.length - 1);
 	return Math.max(stack.height, stackTopInset(stack) + inner + STACK_INSET);
 }
 
-export function stackCardBounds(items: WhiteboardItem[], stack: StackItem, card: CardItem): Bounds {
-	const cards = stackCards(items, stack);
+export function stackCardBounds(items: WhiteboardItem[], stack: StackItem, card: StackMember): Bounds {
+	const cards = stackMembers(items, stack);
 	const index = Math.max(0, cards.findIndex((candidate) => candidate.id === card.id));
 	const top = stack.y + stackTopInset(stack);
 
@@ -97,27 +110,29 @@ export function stackCardBounds(items: WhiteboardItem[], stack: StackItem, card:
 	if (stack.behavior === 'gallery') {
 		const columns = galleryColumns(stack);
 		const width = galleryTileWidth(stack);
+		const row = Math.floor(index / columns);
+		const rows = galleryRowHeights(items, stack);
 		return {
 			x: stack.x + STACK_INSET + (index % columns) * (width + STACK_GAP),
-			y: top + Math.floor(index / columns) * (GALLERY_TILE_HEIGHT + STACK_GAP),
+			y: top + rows.slice(0, row).reduce((sum, height) => sum + height + STACK_GAP, 0),
 			width,
-			height: GALLERY_TILE_HEIGHT
+			height: card.type === 'slip' ? stackMemberHeight(card) : GALLERY_TILE_HEIGHT
 		};
 	}
 
-	const previousHeight = cards.slice(0, index).reduce((total, candidate) => total + Math.max(72, candidate.height) + STACK_GAP, 0);
+	const previousHeight = cards.slice(0, index).reduce((total, candidate) => total + stackMemberHeight(candidate) + STACK_GAP, 0);
 	return {
 		x: stack.x + STACK_INSET,
 		y: top + previousHeight,
 		width: Math.max(120, stack.width - STACK_INSET * 2),
-		height: Math.max(72, card.height)
+		height: stackMemberHeight(card)
 	};
 }
 
-export function stackCards(items: WhiteboardItem[], stack: StackItem): CardItem[] {
+export function stackMembers(items: WhiteboardItem[], stack: StackItem): StackMember[] {
 	return stack.cardIds
-		.map((id) => items.find((candidate): candidate is CardItem => candidate.id === id && candidate.type === 'card'))
-		.filter((card): card is CardItem => Boolean(card));
+		.map((id) => items.find((candidate): candidate is StackMember => candidate.id === id && isStackMember(candidate)))
+		.filter((card): card is StackMember => Boolean(card));
 }
 
 export function centerOf(bounds: Bounds): { x: number; y: number } {
@@ -125,7 +140,7 @@ export function centerOf(bounds: Bounds): { x: number; y: number } {
 }
 
 export function canRotate(item: WhiteboardItem): boolean {
-	return !['connector', 'stack', 'frame'].includes(item.type) && !(item.type === 'card' && item.stackId);
+	return !['connector', 'stack', 'frame'].includes(item.type) && !(isStackMember(item) && item.stackId);
 }
 export function rotationOf(item: WhiteboardItem): number { return canRotate(item) ? item.rotation ?? 0 : 0; }
 export function rotatePoint(point: { x: number; y: number }, degrees: number) {
@@ -176,7 +191,7 @@ export function connectorEndpoints(items: WhiteboardItem[], connector: Extract<W
 
 export function documentBounds(document: WhiteboardDocument): Bounds | null {
 	const bounds = document.items
-		.filter((item) => item.type !== 'connector' && !(item.type === 'card' && item.stackId))
+		.filter((item) => item.type !== 'connector' && !(isStackMember(item) && item.stackId))
 		.map((item) => visualBoundsForItem(document.items, item));
 	if (!bounds.length) return null;
 	const left = Math.min(...bounds.map((bound) => bound.x));
@@ -192,7 +207,7 @@ export function repairDocument(document: WhiteboardDocument): WhiteboardDocument
 		(item) => item.type !== 'connector' || (availableObjects.has(item.fromId) && availableObjects.has(item.toId) && item.fromId !== item.toId)
 	) as WhiteboardItem[];
 	const stacks = baseItems.filter((item): item is StackItem => item.type === 'stack');
-	const cards = baseItems.filter((item): item is CardItem => item.type === 'card');
+	const cards = baseItems.filter((item): item is StackMember => isStackMember(item));
 	const stackIds = new Set(stacks.map((stack) => stack.id));
 	const cardsById = new Map(cards.map((card) => [card.id, card]));
 	const listedOwners = new Map<string, string[]>();
@@ -232,7 +247,7 @@ export function repairDocument(document: WhiteboardDocument): WhiteboardDocument
 
 	const items = baseItems.map((item) => {
 		if (item.type === 'stack') return { ...item, cardIds: cardIdsByStack.get(item.id) ?? [] };
-		if (item.type !== 'card') return item;
+		if (!isStackMember(item)) return item;
 		const owner = ownerByCard.get(item.id);
 		if (owner) {
 			return { ...item, stackId: owner, freePosition: item.freePosition ?? { x: item.x, y: item.y } };
@@ -244,8 +259,8 @@ export function repairDocument(document: WhiteboardDocument): WhiteboardDocument
 		return item;
 	}) as WhiteboardItem[];
 	const groupSizes = new Map<string, number>();
-	for (const item of items) if (item.groupId && item.type !== 'connector' && !(item.type === 'card' && item.stackId)) groupSizes.set(item.groupId, (groupSizes.get(item.groupId) ?? 0) + 1);
-	const grouped = items.map((item) => item.groupId && ((groupSizes.get(item.groupId) ?? 0) < 2 || item.type === 'connector' || (item.type === 'card' && item.stackId)) ? { ...item, groupId: undefined } : item);
+	for (const item of items) if (item.groupId && item.type !== 'connector' && !(isStackMember(item) && item.stackId)) groupSizes.set(item.groupId, (groupSizes.get(item.groupId) ?? 0) + 1);
+	const grouped = items.map((item) => item.groupId && ((groupSizes.get(item.groupId) ?? 0) < 2 || item.type === 'connector' || (isStackMember(item) && item.stackId)) ? { ...item, groupId: undefined } : item);
 	const labelled = conferStackStatuses(repairLabelling(document, grouped));
 	return { ...document, items: labelled, journey: repairJourney(document, labelled) };
 }
@@ -271,7 +286,7 @@ export function conferStackStatuses(items: WhiteboardItem[]): WhiteboardItem[] {
 	if (!conferred.size) return items;
 	return items.map((item) => {
 		const status = conferred.get(item.id);
-		if (!status || item.type !== 'card') return item;
+		if (!status || !isStackMember(item)) return item;
 		return statusOf(item) === status ? item : setProperty(item, 'status', status);
 	});
 }
@@ -326,7 +341,7 @@ export function removeItems(document: WhiteboardDocument, ids: Set<string>): Whi
 		.filter((item) => !ids.has(item.id))
 		.filter((item) => item.type !== 'connector' || (!ids.has(item.fromId) && !ids.has(item.toId)))
 		.map((item) => {
-			if (item.type !== 'card') return item;
+			if (!isStackMember(item)) return item;
 			if (item.stackId && removedStacks.some((stack) => stack.id === item.stackId)) {
 				const free = item.freePosition ?? { x: item.x, y: item.y };
 				return { ...item, stackId: undefined, freePosition: undefined, x: free.x, y: free.y };
@@ -337,7 +352,7 @@ export function removeItems(document: WhiteboardDocument, ids: Set<string>): Whi
 }
 
 export function insertCardIntoStack(document: WhiteboardDocument, cardId: string, stackId: string, index?: number): WhiteboardDocument {
-	const card = document.items.find((item): item is CardItem => item.id === cardId && item.type === 'card');
+	const card = document.items.find((item): item is StackMember => item.id === cardId && isStackMember(item));
 	const stack = document.items.find((item): item is StackItem => item.id === stackId && item.type === 'stack');
 	if (!card || !stack) return document;
 
@@ -349,19 +364,19 @@ export function insertCardIntoStack(document: WhiteboardDocument, cardId: string
 			const insertion = Math.max(0, Math.min(index ?? without.length, without.length));
 			return { ...item, cardIds: [...without.slice(0, insertion), cardId, ...without.slice(insertion)] };
 		}
-		if (item.id === cardId && item.type === 'card') return { ...item, stackId, freePosition };
+		if (item.id === cardId && isStackMember(item)) return { ...item, stackId, freePosition };
 		return item;
 	}) as WhiteboardItem[];
 	return { ...document, items: conferStackStatuses(nextItems) };
 }
 
 export function extractCardFromStack(document: WhiteboardDocument, cardId: string, point?: { x: number; y: number }): WhiteboardDocument {
-	const card = document.items.find((item): item is CardItem => item.id === cardId && item.type === 'card');
+	const card = document.items.find((item): item is StackMember => item.id === cardId && isStackMember(item));
 	if (!card || !card.stackId) return document;
 	const position = point ?? card.freePosition ?? { x: card.x, y: card.y };
 	const items = document.items.map((item) => {
 		if (item.type === 'stack') return { ...item, cardIds: item.cardIds.filter((id) => id !== cardId) };
-		if (item.id === cardId && item.type === 'card') {
+		if (item.id === cardId && isStackMember(item)) {
 			return { ...item, stackId: undefined, freePosition: undefined, x: position.x, y: position.y };
 		}
 		return item;
@@ -369,17 +384,37 @@ export function extractCardFromStack(document: WhiteboardDocument, cardId: strin
 	return { ...document, items };
 }
 
-export function reorderStackCard(document: WhiteboardDocument, stackId: string, cardId: string, pointY: number): WhiteboardDocument {
+export function stackInsertionIndex(items: WhiteboardItem[], stack: StackItem, point: { x: number; y: number }, excluding: string[] = []): number {
+	const cards = stackMembers(items, stack).filter((card) => !excluding.includes(card.id));
+	const layout = { ...stack, cardIds: cards.map((card) => card.id) };
+	if (stack.behavior === 'gallery') {
+		const columns = galleryColumns(layout);
+		for (let row = 0; row < cards.length; row += columns) {
+			const boxes = cards.slice(row, row + columns).map((card) => stackCardBounds(items, layout, card));
+			const bottom = Math.max(...boxes.map((box) => box.y + box.height));
+			if (point.y <= bottom + STACK_GAP / 2) {
+				for (let col = 0; col < boxes.length; col++) if (point.x < boxes[col].x + boxes[col].width / 2) return row + col;
+				return Math.min(row + columns, cards.length);
+			}
+		}
+		return cards.length;
+	}
+	for (let i = 0; i < cards.length; i++) {
+		const bounds = stackCardBounds(items, layout, cards[i]);
+		if (point.y < bounds.y + bounds.height / 2) return i;
+	}
+	return cards.length;
+}
+
+export function reorderStackCard(document: WhiteboardDocument, stackId: string, cardId: string, pointY: number, pointX?: number): WhiteboardDocument {
 	const stack = document.items.find((item): item is StackItem => item.id === stackId && item.type === 'stack');
 	if (!stack || !stack.cardIds.includes(cardId)) return document;
-	const cards = stackCards(document.items, stack).filter((card) => card.id !== cardId);
-	let index = cards.length;
-	for (let i = 0; i < cards.length; i += 1) {
-		const bounds = stackCardBounds(document.items, { ...stack, cardIds: cards.map((card) => card.id) }, cards[i]);
-		if (pointY < bounds.y + bounds.height / 2) {
-			index = i;
-			break;
-		}
-	}
+	const index = stackInsertionIndex(document.items, stack, { x: pointX ?? stack.x, y: pointY }, [cardId]);
 	return insertCardIntoStack(document, cardId, stackId, index);
 }
+
+// Generic names for new callers; the Card names remain compatible with older callers.
+export { stackCardBounds as stackMemberBounds, insertCardIntoStack as insertIntoStack, extractCardFromStack as extractFromStack, reorderStackCard as reorderStackItem };
+
+/** Card-only compatibility view; stackMembers includes Slips in the shared order. */
+export function stackCards(items: WhiteboardItem[], stack: StackItem): CardItem[] { return stackMembers(items, stack).filter((item): item is CardItem => item.type === 'card'); }

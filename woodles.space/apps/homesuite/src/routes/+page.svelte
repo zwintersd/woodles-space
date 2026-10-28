@@ -24,7 +24,7 @@
 	} from '$lib/surfaces';
 	import { HOMESUITE_TRASH_KEY, moveHomeSuiteArtifactToTrash, restoreHomeSuiteArtifact, forgetHomeSuiteArtifact, type HomeSuiteTrashEntry } from '@shared/homesuiteTrash';
 	import { modal } from '@shared/modal';
-	import ContextMenu from '$lib/ContextMenu.svelte';
+	import ContextMenu from '@shared/ContextMenu.svelte';
 	import FolderNavigation from '$lib/FolderNavigation.svelte';
 	import FolderIcon from '$lib/FolderIcon.svelte';
 	import {

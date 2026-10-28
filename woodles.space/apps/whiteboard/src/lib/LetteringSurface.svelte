@@ -14,7 +14,7 @@
 			field.style.height = '1px';
 			const height = Math.max(32, field.scrollHeight);
 			field.style.height = `${height}px`;
-			resize(height + 24);
+			resize(field.parentElement?.offsetHeight ?? height + 24);
 		});
 		return () => { current = false; };
 	});
