@@ -1,3 +1,4 @@
+import { isStackMember } from './model';
 import { visibleBounds, type Viewport } from './camera';
 import { visualBoundsForItem, documentBounds } from './geometry';
 import type { Bounds, Camera, WhiteboardDocument, WhiteboardItem } from './model';
@@ -58,7 +59,7 @@ export function minimapProjection(extent: Bounds, size: Viewport, padding = 8): 
 /** The board reduced to shapes: enough to recognise, not enough to read. */
 export function minimapMarks(items: WhiteboardItem[]): MinimapMark[] {
 	return items
-		.filter((item) => item.type !== 'connector' && !(item.type === 'card' && item.stackId))
+		.filter((item) => item.type !== 'connector' && !(isStackMember(item) && item.stackId))
 		.map((item) => ({ id: item.id, kind: item.type, bounds: visualBoundsForItem(items, item) }));
 }
 

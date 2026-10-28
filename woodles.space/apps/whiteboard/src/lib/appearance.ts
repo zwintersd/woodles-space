@@ -73,7 +73,7 @@ export function patchAppearance(item: WhiteboardItem, patch: AppearancePatch): I
 	return Object.keys(result).length && validAppearance(result) ? result : undefined;
 }
 
-/** No geometry here: rotation will join bounds, hit-testing and connector geometry together. */
+/** Visual overrides only; rotation and composition live in item geometry. */
 export function appearanceCss(appearance?: ItemAppearance, kind?: WhiteboardItem['type']): string {
 	if (!appearance || !validAppearance(appearance)) return '';
 	const a = appearance;

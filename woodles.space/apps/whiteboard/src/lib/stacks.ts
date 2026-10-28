@@ -1,10 +1,10 @@
-import { conferStackStatuses, extractCardFromStack, stackCards, STACK_GAP } from './geometry';
+import { isStackMember, type StackMember } from './model';
+import { conferStackStatuses, extractCardFromStack, stackMembers, STACK_GAP } from './geometry';
 import { isDone, setProperty } from './properties';
 import {
 	DONE,
 	makeId,
 	now,
-	type CardItem,
 	type StackBehavior,
 	type StackItem,
 	type WhiteboardDocument,
@@ -12,11 +12,11 @@ import {
 } from './model';
 
 export const BEHAVIOR_NOTES: Record<StackBehavior, string> = {
-	plain: 'Cards in the order you put them.',
-	status: 'Cards inside wear this stack’s name. Drag one in and its status changes with it.',
-	checklist: 'Cards can be ticked off. The header keeps the count.',
-	queue: 'The top card is what you are on; the one under it is next.',
-	gallery: 'Cards lie out as tiles rather than a column.'
+	plain: 'Cards and Slips in the order you put them.',
+	status: 'Notes inside wear this stack’s name. Drag one in and its status changes with it.',
+	checklist: 'Notes can be ticked off. The header keeps the count.',
+	queue: 'The top note is what you are on; the one under it is next.',
+	gallery: 'Notes lie out as tiles rather than a column.'
 };
 
 export function behaviorOf(stack: StackItem): StackBehavior {
@@ -57,7 +57,7 @@ export function renameStack(document: WhiteboardDocument, stackId: string, title
 
 export function toggleChecked(document: WhiteboardDocument, cardId: string): WhiteboardDocument {
 	const items = document.items.map((item) => {
-		if (item.id !== cardId || item.type !== 'card') return item;
+		if (item.id !== cardId || !isStackMember(item)) return item;
 		return setProperty(item, 'status', isDone(item) ? null : DONE);
 	}) as WhiteboardItem[];
 	return { ...document, items };
@@ -66,13 +66,13 @@ export function toggleChecked(document: WhiteboardDocument, cardId: string): Whi
 export type ChecklistProgress = { done: number; total: number };
 
 export function checklistProgress(items: WhiteboardItem[], stack: StackItem): ChecklistProgress {
-	const cards = stackCards(items, stack);
+	const cards = stackMembers(items, stack);
 	return { done: cards.filter(isDone).length, total: cards.length };
 }
 
 /** What a queue is on, and what it is on next. Either may be absent. */
-export function queueHeads(items: WhiteboardItem[], stack: StackItem): { now: CardItem | null; next: CardItem | null } {
-	const cards = stackCards(items, stack);
+export function queueHeads(items: WhiteboardItem[], stack: StackItem): { now: StackMember | null; next: StackMember | null } {
+	const cards = stackMembers(items, stack);
 	return { now: cards[0] ?? null, next: cards[1] ?? null };
 }
 
@@ -84,7 +84,7 @@ export function queueHeads(items: WhiteboardItem[], stack: StackItem): { now: Ca
 export function takeFromQueue(document: WhiteboardDocument, stackId: string): WhiteboardDocument {
 	const stack = document.items.find((item): item is StackItem => item.id === stackId && item.type === 'stack');
 	if (!stack) return document;
-	const top = stackCards(document.items, stack)[0];
+	const top = stackMembers(document.items, stack)[0];
 	if (!top) return document;
 	return extractCardFromStack(document, top.id, { x: stack.x + stack.width + STACK_GAP * 2, y: stack.y });
 }
@@ -124,7 +124,7 @@ export function statusColumns(items: WhiteboardItem[]): StackItem[] {
  * keyboard saying the same thing as the drag.
  */
 export function shiftCardColumn(document: WhiteboardDocument, cardId: string, direction: -1 | 1): WhiteboardDocument {
-	const card = document.items.find((item): item is CardItem => item.id === cardId && item.type === 'card');
+	const card = document.items.find((item): item is StackMember => item.id === cardId && isStackMember(item));
 	if (!card?.stackId) return document;
 	const columns = statusColumns(document.items);
 	const at = columns.findIndex((column) => column.id === card.stackId);
@@ -136,7 +136,7 @@ export function shiftCardColumn(document: WhiteboardDocument, cardId: string, di
 			const without = item.cardIds.filter((id) => id !== cardId);
 			return item.id === target.id ? { ...item, cardIds: [...without, cardId] } : { ...item, cardIds: without };
 		}
-		if (item.id === cardId && item.type === 'card') return { ...item, stackId: target.id };
+		if (item.id === cardId && isStackMember(item)) return { ...item, stackId: target.id };
 		return item;
 	}) as WhiteboardItem[];
 	return { ...document, items: conferStackStatuses(items) };

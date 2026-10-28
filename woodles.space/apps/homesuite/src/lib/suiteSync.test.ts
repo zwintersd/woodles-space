@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { listHomeSuiteTrash, moveHomeSuiteArtifactToTrash, restoreHomeSuiteArtifact } from '@shared/homesuiteTrash';
 import { loadDraft, saveDraft } from '../../../write/src/lib/drafts';
 import { boardLibrary } from '../../../whiteboard/src/lib/library';
+import { createLettering, createImage, createConnector, createSlip, createStack } from '../../../whiteboard/src/lib/model';
 import { loadCollections } from '../../../data/src/lib/collections';
 import { createFolder, folderForRef, loadFolders, moveFilesToFolder } from './folders';
 import { listEverything, surfaceFor } from './surfaces';
@@ -53,6 +54,23 @@ function doc(id: string, updatedAt: string, words = id) {
 beforeEach(() => localStorage.clear());
 
 describe('HomeSuite sync merge', () => {
+	it('keeps Compose appearance, lettering, groups, layers, rotation and captions through a device round trip', () => {
+		const board = boardLibrary.create('A personal spread');
+		const heading = { ...createLettering(10, 20, 1), text: 'Little wonders', groupId: 'spread-group', rotation: -15, layer: 5,
+			appearance: { font: 'hand' as const, fontSize: 48, backing: 'strip' as const, highlight: '#f7dfbb' } };
+		const photo = { ...createImage(400, 50, 'original-image-asset', 'Photo', 2, 2), groupId: 'spread-group', locked: true, layer: 4, caption: 'Keep this moment', appearance: { fill: '#edc9cf', outlineWidth: 2 } };
+		board.items = [heading, photo, createConnector(heading.id, photo.id, 3)];
+		const stack = createStack(200, 400, 4);
+		const slip = { ...createSlip(30, 50, 5), text: 'A tucked-away thought', stackId: stack.id, freePosition: { x: 30, y: 50 } };
+		stack.cardIds = [slip.id]; board.items.push(stack, slip);
+		board.swatches = ['#edc9cf'];
+		expect(boardLibrary.save(board).ok).toBe(true);
+		const remote = JSON.parse(JSON.stringify(readSuite()));
+		localStorage.clear();
+		writeSuite(remote);
+		expect(boardLibrary.open(board.board.id)!.document).toEqual(board);
+		expect(readSuite().boards[board.board.id]).toEqual(board);
+	});
 	it('fingerprints ignore key order, the way JSONB hands a blob back', () => {
 		expect(fingerprint({ a: 1, b: { c: [1, 2], d: 'x' } })).toBe(fingerprint({ b: { d: 'x', c: [1, 2] }, a: 1 }));
 		expect(fingerprint({ a: 1 })).not.toBe(fingerprint({ a: 2 }));

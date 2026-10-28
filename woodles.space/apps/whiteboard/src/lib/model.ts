@@ -2,7 +2,7 @@ import { DEFAULT_SURFACE, isSurface, normalizeSurface, type Surface } from './su
 import { validImageEdits, type ImageEdits } from './imageEditing';
 import { validAppearance, validSwatches, type ItemAppearance } from './appearance';
 
-export const BOARD_SCHEMA_VERSION = 9;
+export const BOARD_SCHEMA_VERSION = 10;
 const MIN_CAMERA_ZOOM = 0.1;
 const MAX_CAMERA_ZOOM = 4;
 
@@ -94,7 +94,11 @@ export interface CardItem extends BaseWhiteboardItem {
 export interface SlipItem extends BaseWhiteboardItem {
 	type: 'slip';
 	text: string;
+	stackId?: string;
+	freePosition?: { x: number; y: number };
 }
+
+export type StackMember = CardItem | SlipItem;
 
 export interface LetteringItem extends BaseWhiteboardItem {
 	type: 'lettering';
@@ -114,6 +118,7 @@ export function slipToCard(slip: SlipItem): CardItem {
 	return { ...createCard(slip.x, slip.y, slip.zIndex), id: slip.id, createdAt: slip.createdAt,
 		body: slip.text, ...(slip.properties ? { properties: { ...slip.properties, ...(slip.properties.labelIds ? { labelIds: [...slip.properties.labelIds] } : {}) } } : {}),
 		...(slip.appearance ? { appearance: { ...slip.appearance } } : {}),
+		...(slip.stackId ? { stackId: slip.stackId } : {}), ...(slip.freePosition ? { freePosition: { ...slip.freePosition } } : {}),
 		...(slip.groupId ? { groupId: slip.groupId } : {}), ...(slip.locked !== undefined ? { locked: slip.locked } : {}),
 		...(slip.rotation !== undefined ? { rotation: slip.rotation } : {}), ...(slip.layer !== undefined ? { layer: slip.layer } : {}) };
 }
@@ -137,6 +142,7 @@ export interface StackItem extends BaseWhiteboardItem {
 	type: 'stack';
 	title: string;
 	cardIds: string[];
+	// Legacy storage name: the ordered IDs may belong to Cards or Slips.
 	/** Absent means `plain`. See STACK_BEHAVIORS. */
 	behavior?: StackBehavior;
 }
@@ -165,6 +171,8 @@ export interface ConnectorItem extends BaseWhiteboardItem {
 }
 
 export type WhiteboardItem = CardItem | SlipItem | LetteringItem | ImageItem | FrameItem | StackItem | ConnectorItem | PortalItem;
+
+export function isStackMember(item: WhiteboardItem): item is StackMember { return item.type === 'card' || item.type === 'slip'; }
 
 /**
  * A reusable label, owned by the board rather than by any one object, so the
@@ -412,8 +420,10 @@ function isJourneyStop(value: unknown): value is JourneyStop {
 export function isWhiteboardItem(value: unknown): value is WhiteboardItem {
 	if (!isRecord(value) || !isBaseItem(value) || typeof value.type !== 'string') return false;
 	switch (value.type) {
-		case 'slip': case 'lettering':
+		case 'lettering':
 			return typeof value.text === 'string';
+		case 'slip':
+			return typeof value.text === 'string' && (value.stackId === undefined || typeof value.stackId === 'string') && (value.freePosition === undefined || isPoint(value.freePosition));
 		case 'card':
 			return typeof value.title === 'string' && typeof value.body === 'string' &&
 				(value.stackId === undefined || typeof value.stackId === 'string') &&
@@ -509,7 +519,7 @@ export function snapshotDocument(document: WhiteboardDocument): WhiteboardDocume
 			...(item.properties ? { properties: { ...item.properties, ...(item.properties.labelIds ? { labelIds: [...item.properties.labelIds] } : {}) } } : {}),
 			...(item.type === 'stack' ? { cardIds: [...item.cardIds] } : {}),
 			...(item.type === 'image' && item.edits ? { edits: { ...item.edits, crop: { ...item.edits.crop } } } : {}),
-			...(item.type === 'card' && item.freePosition ? { freePosition: { ...item.freePosition } } : {})
+			...(isStackMember(item) && item.freePosition ? { freePosition: { ...item.freePosition } } : {})
 		})) as WhiteboardItem[]
 	};
 }

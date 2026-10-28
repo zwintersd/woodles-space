@@ -46,7 +46,7 @@
 	});
 </script>
 
-<div class="context-menu" bind:this={menu} role="menu" aria-label={`Actions for ${label}`} tabindex="-1" style:left={`${left}px`} style:top={`${top}px`} onkeydown={keydown} oncontextmenu={(event) => event.preventDefault()}>
+<div class="context-menu" data-whiteboard-ui bind:this={menu} role="menu" aria-label={`Actions for ${label}`} tabindex="-1" style:left={`${left}px`} style:top={`${top}px`} onkeydown={keydown} oncontextmenu={(event) => event.preventDefault()}>
 	<div class="context-heading" role="presentation"><strong>{label}</strong><small>{detail}</small></div>
 	{#each items as item, index (item.id)}
 		{#if index > 0 && item.group !== items[index - 1].group}<div class="context-divider" role="separator"></div>{/if}
@@ -57,15 +57,15 @@
 </div>
 
 <style>
-	.context-menu { position: fixed; z-index: 120; width: min(290px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); overflow-y: auto; padding: 6px; border: 1px solid var(--hs-line-strong); border-radius: 12px; background: var(--hs-raised); color: var(--hs-ink); box-shadow: 0 14px 45px var(--hs-shadow); font: 13px var(--font-sans, system-ui, sans-serif); }
+	.context-menu { position: fixed; z-index: 120; width: min(290px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); overflow-y: auto; padding: 6px; border: 1px solid var(--hs-line-strong, #d9ccc0); border-radius: 12px; background: var(--hs-raised, #fffdf7); color: var(--hs-ink, #584b44); box-shadow: 0 14px 45px var(--hs-shadow, #49362e26); font: 13px var(--font-sans, system-ui, sans-serif); }
 	.context-heading { padding: 9px 10px 11px; display: grid; gap: 4px; }
 	.context-heading strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
-	small { color: var(--hs-muted); font-size: 11px; line-height: 1.4; display: block; }
-	.context-divider { height: 1px; margin: 5px 4px; background: var(--hs-line); }
+	small { color: var(--hs-muted, #806e65); font-size: 11px; line-height: 1.4; display: block; }
+	.context-divider { height: 1px; margin: 5px 4px; background: var(--hs-line, #ede4d8); }
 	button { width: 100%; min-height: 35px; padding: 8px 10px; text-align: left; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
-	button:hover:not(:disabled), button:focus-visible { background: var(--hs-hover); outline: 2px solid var(--hs-focus); outline-offset: -2px; }
-	button:disabled { color: var(--hs-muted); cursor: default; }
-	button.danger { color: var(--hs-danger-ink); }
-	button.danger:hover:not(:disabled) { background: var(--hs-danger-bg); }
+	button:hover:not(:disabled), button:focus-visible { background: var(--hs-hover, #f3e7df); outline: 2px solid var(--hs-focus, #a66670); outline-offset: -2px; }
+	button:disabled { color: var(--hs-muted, #806e65); cursor: default; }
+	button.danger { color: var(--hs-danger-ink, #9b3d44); }
+	button.danger:hover:not(:disabled) { background: var(--hs-danger-bg, #f6e1df); }
 	@media (pointer: coarse) { button { min-height: 44px; } }
 </style>

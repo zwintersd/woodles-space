@@ -12,7 +12,7 @@
 	<header><div><h2>Layers</h2><p>Front to back · {items.length} objects</p></div><button bind:this={closeButton} aria-label="Close layers" onclick={close}>×</button></header>
 	<ul>{#each items.slice().reverse() as item (item.id)}<li class:chosen={selected.includes(item.id)}>
 		<button class="choose" aria-pressed={selected.includes(item.id)} aria-label={`Find ${itemLabel(item)}`} onclick={() => choose(item.id)}><span aria-hidden="true">{item.type === 'lettering' ? 'T' : item.type === 'image' ? '▧' : item.type === 'frame' ? '▢' : item.type === 'stack' ? '▤' : '▱'}</span><span class="name">{itemLabel(item)}<small>{item.type}{item.groupId ? ' · grouped' : ''}</small></span></button>
-		<button class="lock" aria-label={`${isLocked(items, item) ? 'Unlock' : 'Lock'} ${itemLabel(item)}`} title={isLocked(items, item) ? 'Unlock' : 'Lock'} onclick={() => toggleLock(item.id)}>{isLocked(items, item) ? '◆' : '◇'}</button>
+		<button class="lock" aria-label={`${isLocked(items, item) ? 'Unlock' : 'Lock'} ${itemLabel(item)}`} title={isLocked(items, item) ? 'Unlock' : 'Lock'} onclick={() => toggleLock(item.id)}><svg aria-hidden="true" width="16" height="18" viewBox="0 0 16 18" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="8" width="10" height="8" rx="2" fill="currentColor" fill-opacity={isLocked(items, item) ? 0.18 : 0} /><path d={isLocked(items, item) ? 'M5 8V5a3 3 0 0 1 6 0v3' : 'M5 8V5a3 3 0 0 1 5.8-1'} /><path d="M8 11v2" /></svg></button>
 	</li>{/each}</ul>
 	{#if !items.length}<p class="empty">Your objects will be listed here.</p>{/if}
 </aside>

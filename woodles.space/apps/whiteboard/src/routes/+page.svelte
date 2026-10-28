@@ -3,6 +3,8 @@
 	import ImageEditor from '$lib/ImageEditor.svelte';
 	import ImageSurface from '$lib/ImageSurface.svelte';
 	import AppearanceTray from '$lib/AppearanceTray.svelte';
+	import ContextMenu from '@shared/ContextMenu.svelte';
+	import { selectionPanelPosition, selectionToolsPosition } from '$lib/selectionPosition';
 	import LetteringSurface from '$lib/LetteringSurface.svelte';
 	import CompositionPanel from '$lib/CompositionPanel.svelte';
 	import LayersPanel from '$lib/LayersPanel.svelte';
@@ -23,21 +25,25 @@
 	normalizeAngle,
 	connectorEndpoints,
 	documentBounds,
-	extractCardFromStack,
-	insertCardIntoStack,
+	extractFromStack,
+	insertIntoStack,
 	intersects,
 	normalizeBounds,
-	reorderStackCard,
+	reorderStackItem,
 	removeItems,
 	repairDocument,
 	screenToWorld,
-	stackCardBounds,
-	stackCards,
+	stackMemberBounds,
+	stackMembers,
+	stackInsertionIndex,
+	stackTopInset,
 	zoomAroundPoint,
 	} from '$lib/geometry';
 	import {
 	createCard,
 	createSlip,
+	isStackMember,
+	type StackMember,
 	createLettering,
 	slipToCard,
 	type SlipItem,
@@ -261,9 +267,14 @@
 	let connectorSourceId = $state<string | null>(null);
 	let draggingIds = $state<string[]>([]);
 	let dropStackId = $state<string | null>(null);
+	let dropIndex = $state<number | null>(null);
+	const landingAnimations = new Map<string, Animation>();
 	let marquee = $state<Bounds | null>(null);
 	let frameDraft = $state<Bounds | null>(null);
 	let alignmentGuides = $state<AlignmentGuide[]>([]);
+	let transforming = $state(false);
+	let topDeck = $state<HTMLElement>();
+	let chromeBottom = $state(110);
 	let renamingFrameId = $state<string | null>(null);
 	let imageUrls = $state<Record<string, string>>({});
 	let editingImageId = $state<string | null>(null);
@@ -358,6 +369,16 @@
 	let searchPreviewTimer: ReturnType<typeof setTimeout> | null = null;
 
 	const objects = $derived(orderedItems(board.items));
+	const dropIndicator = $derived.by(() => {
+		const stack = board.items.find((item): item is StackItem => item.id === dropStackId && item.type === 'stack');
+		if (!stack || dropIndex === null) return null;
+		const members = stackMembers(board.items, stack).filter((item) => !draggingIds.includes(item.id));
+		const layout = { ...stack, cardIds: members.map((item) => item.id) };
+		const next = members[dropIndex]; const previous = members[dropIndex - 1];
+		const box = next ? stackMemberBounds(board.items, layout, next) : previous ? stackMemberBounds(board.items, layout, previous) : null;
+		if (behaviorOf(stack) === 'gallery' && box) return { x: next ? box.x - 6 : box.x + box.width + 4, y: box.y, width: 2, height: box.height };
+		return { x: stack.x + 14, y: box ? (next ? box.y - 6 : box.y + box.height + 4) : stack.y + stackTopInset(stack) - 6, width: Math.max(80, stack.width - 28), height: 2 };
+	});
 	const connectors = $derived(board.items.filter((item) => item.type === 'connector'));
 	const hasContent = $derived(board.items.some((item) => item.type !== 'connector'));
 
@@ -388,6 +409,11 @@
 	let layersOpen = $state(false);
 	let arrangeButton = $state<HTMLButtonElement>();
 	let layersButton = $state<HTMLButtonElement>();
+	let localContext = $state<{
+		label: string; detail: string; items: ContextAction[]; x: number; y: number;
+		focus: HTMLElement | null;
+		text: { field: HTMLInputElement | HTMLTextAreaElement; start: number; end: number; direction: 'forward' | 'backward' | 'none' } | null;
+	} | null>(null);
 	const selectionKey = $derived(`${board.board.id}:${selectedIds.join(',')}`);
 	let stylingKey = $state<string | null>(null);
 	let appearancePatch = $state<AppearancePatch>({});
@@ -397,13 +423,29 @@
 	const arranging = $derived(arrangingKey !== null && arrangingKey === selectionKey && selectionObjects.length > 0);
 	const selectionLocked = $derived(selectionObjects.some((item) => isLocked(board.items, item)));
 	const units = $derived(compositionUnits(board.items, selectedIds));
-	const appearancePosition = $derived.by(() => {
-		const bounds = selectionObjects.map((item) => visualBoundsForItem(board.items, item));
-		const x = Math.min(...bounds.map((b) => b.x)) * board.camera.zoom + board.camera.x;
-		const y = Math.min(...bounds.map((b) => b.y)) * board.camera.zoom + board.camera.y;
-		const right = Math.max(...bounds.map((b) => b.x + b.width)) * board.camera.zoom + board.camera.x;
-		const beside = right + 16 + 312 <= viewportSize.width ? right + 16 : x - 316 >= 12 ? x - 316 : x;
-		return { left: Math.max(12, Math.min(viewportSize.width - (styling || arranging ? 312 : 224), styling || arranging ? beside : x)), top: Math.max(110, Math.min(viewportSize.height - (styling || arranging ? 600 : 140), styling || arranging ? y : y - 48)) };
+	const selectionScreenBounds = $derived.by(() => {
+		const bounds = unionBounds(selectionObjects.map((item) => visualBoundsForItem(board.items, item)));
+		return bounds ? { x: bounds.x * board.camera.zoom + board.camera.x, y: bounds.y * board.camera.zoom + board.camera.y, width: bounds.width * board.camera.zoom, height: bounds.height * board.camera.zoom } : null;
+	});
+	const selectionViewport = $derived({ ...viewportSize, top: chromeBottom + 12, bottom: 100 });
+	const toolbarPosition = $derived.by(() => {
+		const obstacles: Bounds[] = [];
+		if (only && canRotate(only) && !isLocked(board.items, only)) {
+			const bounds = itemBounds(only);
+			const offset = rotatePoint({ x: 0, y: -bounds.height / 2 - 24 }, rotationOf(only));
+			const radius = 18 * board.camera.zoom;
+			obstacles.push({ x: (bounds.x + bounds.width / 2 + offset.x) * board.camera.zoom + board.camera.x - radius,
+				y: (bounds.y + bounds.height / 2 + offset.y) * board.camera.zoom + board.camera.y - radius, width: radius * 2, height: radius * 2 });
+		}
+		return selectionToolsPosition(selectionScreenBounds, selectionViewport, obstacles);
+	});
+	const appearancePosition = $derived(selectionPanelPosition(selectionScreenBounds, selectionViewport));
+	$effect(() => {
+		if (!topDeck) return;
+		const element = topDeck;
+		const measure = () => { chromeBottom = Math.max(12, element.getBoundingClientRect().bottom); };
+		const observer = new ResizeObserver(measure); observer.observe(element); measure();
+		return () => observer.disconnect();
 	});
 	$effect(() => {
 		if (stylingKey !== null && stylingKey !== selectionKey) { stylingKey = null; appearancePatch = {}; }
@@ -419,7 +461,7 @@
 	function closeAppearance(restoreFocus = true) {
 		stylingKey = null;
 		appearancePatch = {};
-		if (restoreFocus) void tick().then(() => (appearanceButton ?? canvasEl)?.focus({ preventScroll: true }));
+		if (restoreFocus) void tick().then(() => (appearanceButton?.isConnected ? appearanceButton : canvasEl)?.focus({ preventScroll: true }));
 	}
 	function applyAppearance(patch: AppearancePatch) {
 		if (!styling) return;
@@ -442,14 +484,21 @@
 		scheduleSave();
 	}
 	function openArrange() { if (!selectionObjects.length) return; closeAppearance(false); arrangingKey = selectionKey; wakeChrome(); }
-	function closeArrange(focus = true) { arrangingKey = null; if (focus) void tick().then(() => (arrangeButton ?? canvasEl)?.focus({ preventScroll: true })); }
+	function closeArrange(focus = true) { arrangingKey = null; if (focus) void tick().then(() => (arrangeButton?.isConnected ? arrangeButton : canvasEl)?.focus({ preventScroll: true })); }
+	function selectionToolsKey(event: KeyboardEvent) {
+		if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+		event.preventDefault(); event.stopPropagation();
+		const buttons = [...(event.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
+		const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+		buttons[event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length]?.focus();
+	}
 	function changeComposition(items: WhiteboardItem[]) {
 		if (items === board.items) return;
 		beginEdit(); setItems(items); scheduleSave();
 	}
 	function lockItems(ids: string[], locked: boolean) {
 		let expanded = expandGroups(board.items, ids);
-		if (!locked) for (const item of board.items) if (expanded.includes(item.id) && item.type === 'card' && item.stackId && isLocked(board.items, item)) expanded.push(item.stackId);
+		if (!locked) for (const item of board.items) if (expanded.includes(item.id) && isStackMember(item) && item.stackId && isLocked(board.items, item)) expanded.push(item.stackId);
 		const targets = new Set(expandGroups(board.items, expanded));
 		changeComposition(board.items.map((item) => targets.has(item.id) ? { ...item, locked, updatedAt: now() } : item));
 	}
@@ -523,6 +572,7 @@
 			rows: [{ label: 'Kinds', value: [...new Set(chosen.map((item) => item.type))].join(', ') }],
 			actions: [
 				{ commandId: 'appearance', label: 'Appearance', enabled: styleable.length > 0 },
+				{ commandId: 'arrange', label: 'Arrange', enabled: selectionObjects.length > 0 },
 				{ commandId: 'inspect', label: 'Edit details' },
 				{ commandId: 'duplicate-selection', label: 'Duplicate', enabled: chosen.some((item) => item.type !== 'connector') },
 				{ commandId: 'delete-selection', label: chosen.length === 1 && only?.type === 'portal' ? 'Remove from board' : chosen.length === 1 ? 'Delete board item' : 'Remove selected items from board' }
@@ -586,7 +636,7 @@
 	 */
 	const chromeResting = $derived(
 		view.restChrome && !chromeAwake && !drawer && !searchOpen && !shelfOpen &&
-		!shortcutsOpen && !viewOpen && !fileDragging && !styling && !arranging && !layersOpen
+		!shortcutsOpen && !viewOpen && !fileDragging && !styling && !arranging && !layersOpen && !localContext
 	);
 	/**
 	 * The paper, which is fixed to the window, and the pattern, which is not.
@@ -622,7 +672,7 @@
 	function itemStyle(item: WhiteboardItem): string {
 		const bounds = itemBounds(item);
 		const appearance = styling && styleable.some((entry) => entry.id === item.id) ? patchAppearance(item, appearancePatch) : item.appearance;
-		return `transform: translate3d(${bounds.x}px, ${bounds.y}px, 0) rotate(${rotationOf(item)}deg); width: ${bounds.width}px; height: ${item.type === 'lettering' || item.type === 'slip' ? 'auto' : `${bounds.height}px`}; z-index: ${objects.findIndex((object) => object.id === item.id) + 1};${appearanceCss(appearance, item.type)}`;
+		return `transform: translate3d(${bounds.x}px, ${bounds.y}px, 0) rotate(${rotationOf(item)}deg); width: ${bounds.width}px; height: ${item.type === 'lettering' || item.type === 'slip' ? 'auto' : `${bounds.height}px`}; z-index: ${draggingIds.includes(item.id) ? objects.length + 1 : objects.findIndex((object) => object.id === item.id) + 1};${appearanceCss(appearance, item.type)}`;
 	}
 	function shownAppearance(item: WhiteboardItem) { return styling && styleable.some((entry) => entry.id === item.id) ? patchAppearance(item, appearancePatch) : item.appearance; }
 
@@ -781,6 +831,7 @@
 		cancelPointerSession();
 		editHistory = step.history;
 		board = applyRestoredDocument(board, step.document);
+		void hydrateImages();
 		selectedIds = [];
 		connectorSourceId = null;
 		notice = '';
@@ -798,6 +849,7 @@
 		cancelPointerSession();
 		editHistory = step.history;
 		board = applyRestoredDocument(board, step.document);
+		void hydrateImages();
 		selectedIds = [];
 		connectorSourceId = null;
 		notice = '';
@@ -810,6 +862,13 @@
 				pendingAssetDeletes.delete(assetId);
 				continue;
 			}
+			const inHistory = [...editHistory.past, ...editHistory.future].some((entry) => entry.snapshot.items.some((item) => item.type === 'image' && item.assetId === assetId));
+			if (inHistory) continue;
+			const onAnotherBoard = boardLibrary.list().some((entry) => entry.id !== board.board.id && boardLibrary.open(entry.id)?.document.items.some((item) => item.type === 'image' && item.assetId === assetId));
+			if (onAnotherBoard) { pendingAssetDeletes.delete(assetId); continue; }
+			if (imageUrls[assetId]) URL.revokeObjectURL(imageUrls[assetId]);
+			const { [assetId]: _retired, ...remaining } = imageUrls;
+			imageUrls = remaining;
 			void removeImageAsset(assetId)
 				.then(() => pendingAssetDeletes.delete(assetId))
 				.catch(() => undefined);
@@ -817,9 +876,12 @@
 	}
 
 	async function hydrateImages() {
+		const boardId = board.board.id;
 		for (const item of board.items.filter((candidate): candidate is Extract<WhiteboardItem, { type: 'image' }> => candidate.type === 'image')) {
+			if (imageUrls[item.assetId]) continue;
 			try {
 				const asset = await getImageAsset(item.assetId);
+				if (board.board.id !== boardId || !board.items.some((current) => current.type === 'image' && current.assetId === item.assetId) || imageUrls[item.assetId]) continue;
 				if (!asset) {
 					missingAssets = new Set([...missingAssets, item.assetId]);
 					continue;
@@ -874,7 +936,7 @@
 	}
 
 	function openBoardContext(point: { x: number; y: number }, itemId?: string) {
-		if (!homeSuiteEmbedded || !loaded) return;
+		if (!loaded) return;
 		if (itemId && !selectedIds.includes(itemId)) selectOnly(itemId);
 		const boardId = board.board.id;
 		const ids = [...selectedIds];
@@ -901,32 +963,47 @@
 			{ id: 'add-stack', label: 'Add stack', group: 'edit', run: () => run('add-stack') },
 			{ id: 'fit-board', label: 'Fit board', group: 'view', run: () => run('fit-board') }
 		];
-		context.open(point, {
+		const target = {
 			label: item ? itemLabel(item) : items.length ? `${items.length} selected items` : boardTitleFallback(board.board.title),
 			detail: item ? `${item.type} on this board` : items.length ? 'Selection on this board' : 'Board canvas',
 			ref: item?.type === 'portal' ? { app: 'whiteboard', kind: 'board', id: item.boardId } : !items.length ? { app: 'whiteboard', kind: 'board', id: boardId } : undefined
-		}, actions);
+		};
+		if (homeSuiteEmbedded) { context.open(point, target, actions); return; }
+		const focus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+		const field = focus instanceof HTMLTextAreaElement || focus instanceof HTMLInputElement ? focus : null;
+		localContext = { ...target, items: actions, ...point, focus,
+			text: field && field.selectionStart !== null && field.selectionEnd !== null ? { field, start: field.selectionStart, end: field.selectionEnd, direction: field.selectionDirection ?? 'none' } : null };
+	}
+	function closeLocalContext(restoreFocus: boolean) {
+		const previous = localContext;
+		localContext = null;
+		if (!restoreFocus || !previous?.focus?.isConnected) return;
+		previous.focus.focus({ preventScroll: true });
+		if (previous.text?.field.isConnected) previous.text.field.setSelectionRange(previous.text.start, previous.text.end, previous.text.direction);
+	}
+	function runLocalContext(id: string) {
+		const action = localContext?.items.find((item) => item.id === id);
+		if (!action || action.enabled === false) return;
+		closeLocalContext(true);
+		action.run();
 	}
 
 	function boardContextEvent(event: MouseEvent) {
 		if (!(event.target instanceof Element) || !canvasEl?.contains(event.target)) return;
-		if (event.target.closest('input, textarea, select, [contenteditable="true"], [data-whiteboard-ui]')) return;
+		if (event.target.closest('select, [data-whiteboard-ui]')) return;
 		const object = event.target.closest<HTMLElement>('[data-context-item]');
-		if (!homeSuiteEmbedded) {
-			const item = board.items.find((item) => item.id === object?.dataset.contextItem);
-			if (item?.type === 'image') { event.preventDefault(); selectOnly(item.id); editingImageId = item.id; }
-			return;
-		}
+		if (!object && event.target.closest('input, textarea, [contenteditable="true"]')) return;
 		event.preventDefault();
 		if (!object) selectedIds = [];
 		openBoardContext({ x: event.clientX, y: event.clientY }, object?.dataset.contextItem);
 	}
 
 	function boardContextKey(event: KeyboardEvent) {
-		if (homeSuiteEmbedded && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) {
-			if (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
-			event.preventDefault(); openBoardContext({ x: 16, y: 16 });
-		}
+		if (!(event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) || !(event.target instanceof Element) || !canvasEl?.contains(event.target) || event.target.closest('[data-whiteboard-ui]')) return;
+		const object = event.target.closest<HTMLElement>('[data-context-item]');
+		if (!object && event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+		const rect = event.target.getBoundingClientRect();
+		event.preventDefault(); openBoardContext({ x: rect.left + 16, y: rect.top + 16 }, object?.dataset.contextItem);
 	}
 
 	function handleHomeSuiteMessage(event: MessageEvent) {
@@ -1043,7 +1120,13 @@
 	}
 	function fitLettering(id: string, height: number) {
 		const item = board.items.find((item) => item.id === id);
-		if (!styling && item?.type === 'lettering' && Math.abs(item.height - height) > 1) updateItem(id, { height }, true);
+		if (!styling && item?.type === 'lettering') fitTextGeometry(item, height);
+	}
+	function fitTextGeometry(item: WhiteboardItem, height: number) {
+		if (Math.abs(item.height - height) < 1) return;
+		const growth = (height - item.height) / 2;
+		const shift = rotatePoint({ x: 0, y: growth }, rotationOf(item));
+		updateItem(item.id, { x: item.x + shift.x, y: item.y - growth + shift.y, height }, true);
 	}
 	async function addSlipFromDock() {
 		beginEdit();
@@ -1057,14 +1140,14 @@
 		document.getElementById(`slip-text-${slip.id}`)?.focus();
 	}
 
-	function fitSlip(node: HTMLTextAreaElement, value: { id: string; text: string; appearance?: ItemAppearance; preview: boolean }) {
+	function fitSlip(node: HTMLTextAreaElement, value: { id: string; text: string; width: number; appearance?: ItemAppearance; preview: boolean }) {
 		function measure(current: typeof value) {
 			if (!node.isConnected) return;
 			node.style.height = 'auto';
 			const height = Math.max(28, node.scrollHeight);
 			node.style.height = `${height}px`;
 			const item = board.items.find((item) => item.id === current.id);
-			if (!current.preview && item?.type === 'slip' && item.height !== height + 20) updateItem(item.id, { height: height + 20 }, true);
+			if (!current.preview && item?.type === 'slip') fitTextGeometry(item, node.parentElement?.offsetHeight ?? height + 22);
 		}
 		function fit(current: typeof value) { void tick().then(() => measure(current)); }
 		fit(value);
@@ -1223,6 +1306,7 @@
 	}
 
 	function handleItemPointerDown(event: PointerEvent, item: WhiteboardItem) {
+		landingAnimations.get(item.id)?.cancel();
 		if (event.button === 1 || (event.button === 0 && spaceHeld)) {
 			event.stopPropagation();
 			beginPan(event);
@@ -1255,7 +1339,7 @@
 			dragIds,
 			startWorld: pointForEvent(event),
 			startBounds,
-			sourceStackId: item.type === 'card' ? item.stackId : undefined,
+			sourceStackId: isStackMember(item) ? item.stackId : undefined,
 			extracted: false,
 			recorded: false,
 			visualBounds: unionBounds(board.items.filter((item) => dragIds.includes(item.id)).map((item) => visualBoundsForItem(board.items, item)))!
@@ -1356,21 +1440,21 @@
 			const snapped = snapTranslation(board.items, session.dragIds, session.visualBounds, dx, dy, 6 / board.camera.zoom);
 			dx = snapped.dx; dy = snapped.dy; alignmentGuides = snapped.guides;
 		}
-		const source = board.items.find((candidate): candidate is CardItem => candidate.id === session.itemId && candidate.type === 'card');
+		const source = board.items.find((candidate): candidate is StackMember => candidate.id === session.itemId && isStackMember(candidate));
 		if (source?.stackId && !session.extracted) {
 			const stack = board.items.find((candidate): candidate is StackItem => candidate.id === source.stackId && candidate.type === 'stack');
 			if (stack) {
 				const bounds = itemBounds(stack);
 				const staysInStack = point.x >= bounds.x - 24 && point.x <= bounds.x + bounds.width + 24 && point.y >= bounds.y - 24 && point.y <= bounds.y + bounds.height + 24;
 				if (staysInStack) {
-					board = reorderStackCard(board, stack.id, source.id, point.y);
+					board = reorderStackItem(board, stack.id, source.id, point.y, point.x);
 					markDirty();
 					return;
 				}
 			}
 			const start = session.startBounds[source.id];
 			if (start) {
-				board = extractCardFromStack(board, source.id, { x: start.x + dx, y: start.y + dy });
+				board = extractFromStack(board, source.id, { x: start.x + dx, y: start.y + dy });
 				markDirty();
 				session.extracted = true;
 			}
@@ -1379,12 +1463,14 @@
 		setItems(
 			board.items.map((item) => {
 				const start = session.startBounds[item.id];
-				if (!start || item.type === 'connector' || (item.type === 'card' && item.stackId)) return item;
+				if (!start || item.type === 'connector' || (isStackMember(item) && item.stackId)) return item;
 				return { ...item, x: start.x + dx, y: start.y + dy, updatedAt: now() };
 			})
 		);
-		const draggedCard = board.items.find((candidate): candidate is CardItem => candidate.id === session.itemId && candidate.type === 'card');
-		dropStackId = draggedCard && !draggedCard.stackId && !draggedCard.groupId ? stackAt(point, draggedCard.id)?.id ?? null : null;
+		const draggedCard = board.items.find((candidate): candidate is StackMember => candidate.id === session.itemId && isStackMember(candidate));
+		const target = draggedCard && !draggedCard.stackId && !draggedCard.groupId ? stackAt(point, draggedCard.id) : null;
+		dropStackId = target?.id ?? null;
+		dropIndex = target ? stackInsertionIndex(board.items, target, point, session.dragIds) : null;
 	}
 
 	function handlePointerUp(event: PointerEvent) {
@@ -1407,18 +1493,24 @@
 		} else if (session.kind === 'drag') {
 			const point = pointForEvent(event);
 			const cards = session.dragIds
-				.map((id) => board.items.find((item): item is CardItem => item.id === id && item.type === 'card'))
-				.filter((item): item is CardItem => Boolean(item && !item.stackId && !item.groupId));
+				.map((id) => board.items.find((item): item is StackMember => item.id === id && isStackMember(item)))
+				.filter((item): item is StackMember => Boolean(item && !item.stackId && !item.groupId));
 			const target = stackAt(point, session.itemId);
-			if (target && cards.length) {
-				for (const card of cards) {
-					board = insertCardIntoStack(board, card.id, target.id, insertionIndex(target, point.y));
-				}
+			if (target && cards.length && session.recorded) {
+				const index = stackInsertionIndex(board.items, target, point, session.dragIds);
+				cards.sort((a, b) => session.startBounds[a.id].y - session.startBounds[b.id].y || session.startBounds[a.id].x - session.startBounds[b.id].x);
+				cards.forEach((card, offset) => { board = insertIntoStack(board, card.id, target.id, index + offset); });
+				void popIntoStack(cards.map((card) => card.id), target.id);
+			} else if (session.recorded) {
+				const member = board.items.find((item) => item.id === session.itemId);
+				if (member && isStackMember(member) && member.stackId) void popIntoStack([member.id], member.stackId);
 			}
 			draggingIds = [];
 			dropStackId = null;
+			dropIndex = null;
 		}
 		alignmentGuides = [];
+		transforming = false;
 		if (session.kind === 'pan' || session.kind === 'resize' || session.kind === 'rotate' || (session.kind === 'drag' && session.recorded) || session.kind === 'frame') scheduleSave();
 		activeSession = null;
 		try {
@@ -1426,6 +1518,26 @@
 		} catch {
 			// Capture can already be released by the browser, which is fine.
 		}
+	}
+	async function popIntoStack(ids: string[], stackId: string) {
+		if (prefersReducedMotion()) return;
+		await tick();
+		requestAnimationFrame(() => {
+			ids.forEach((id, index) => {
+				const item = board.items.find((item) => item.id === id);
+				if (!item || !isStackMember(item) || item.stackId !== stackId) return;
+				const node = canvasEl?.querySelector<HTMLElement>(`[data-context-item="${CSS.escape(id)}"]`);
+				if (!node) return;
+				landingAnimations.get(id)?.cancel();
+				const animation = node.animate([
+					{ scale: '0.92', translate: '0 -8px' },
+					{ scale: '1.025', translate: '0 1px', offset: 0.7 },
+					{ scale: '1', translate: '0 0' }
+				], { duration: 300, delay: Math.min(index * 35, 105), easing: 'cubic-bezier(.2,.75,.25,1)' });
+				animation.id = 'stack-landing'; landingAnimations.set(id, animation);
+				animation.onfinish = animation.oncancel = () => { if (landingAnimations.get(id) === animation) landingAnimations.delete(id); };
+			});
+		});
 	}
 
 	function cancelPointerSession() {
@@ -1436,28 +1548,21 @@
 		activeSession = null;
 		draggingIds = [];
 		dropStackId = null;
+		dropIndex = null;
 		marquee = null;
 		frameDraft = null;
 		alignmentGuides = [];
+		transforming = false;
 	}
 
 	function stackAt(point: Point, excludedId?: string): StackItem | null {
 		return board.items
 			.filter((item): item is StackItem => item.type === 'stack' && item.id !== excludedId && !isLocked(board.items, item))
-			.sort((a, b) => b.zIndex - a.zIndex)
+			.sort((a, b) => objects.findIndex((item) => item.id === b.id) - objects.findIndex((item) => item.id === a.id))
 			.find((stack) => {
 				const bounds = itemBounds(stack);
 				return point.x >= bounds.x && point.x <= bounds.x + bounds.width && point.y >= bounds.y && point.y <= bounds.y + bounds.height;
 			}) ?? null;
-	}
-
-	function insertionIndex(stack: StackItem, pointY: number): number {
-		const cards = stackCards(board.items, stack);
-		for (let index = 0; index < cards.length; index += 1) {
-			const bounds = stackCardBounds(board.items, stack, cards[index]);
-			if (pointY < bounds.y + bounds.height / 2) return index;
-		}
-		return cards.length;
 	}
 
 	function startResize(event: PointerEvent, item: WhiteboardItem) {
@@ -1465,6 +1570,7 @@
 		event.stopPropagation();
 		selectOnly(item.id);
 		beginEdit();
+		transforming = true;
 		activeSession = { kind: 'resize', pointerId: event.pointerId, itemId: item.id, startWorld: pointForEvent(event), bounds: itemBounds(item) };
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
 	}
@@ -1476,6 +1582,7 @@
 	function startRotate(event: PointerEvent, item: WhiteboardItem) {
 		if (event.button !== 0 || !canRotate(item) || isLocked(board.items, item)) return;
 		event.stopPropagation(); event.preventDefault();
+		transforming = true;
 		const b = itemBounds(item); const center = { x: b.x + b.width / 2, y: b.y + b.height / 2 }; const point = pointForEvent(event);
 		beginEdit(); activeSession = { kind: 'rotate', itemId: item.id, pointerId: event.pointerId, center, original: rotationOf(item), startAngle: Math.atan2(point.y - center.y, point.x - center.x) * 180 / Math.PI };
 		event.currentTarget instanceof HTMLElement && event.currentTarget.setPointerCapture(event.pointerId);
@@ -1534,6 +1641,7 @@
 	 * title is the status it confers, so renaming it renames every card inside.
 	 */
 	function updateStack(item: StackItem, value: string) {
+		if (isLocked(board.items, item)) return;
 		beginEdit(`stack-title:${item.id}`);
 		board = renameStack(board, item.id, value);
 		board.updatedAt = now();
@@ -1541,18 +1649,23 @@
 	}
 
 	function changeBehavior(stackId: string, behavior: StackBehavior) {
+		const item = board.items.find((item) => item.id === stackId);
+		if (item && isLocked(board.items, item)) return;
 		beginEdit();
 		board = setStackBehavior(board, stackId, behavior);
 		scheduleSave();
 	}
 
 	function tickCard(card: WhiteboardItem) {
+		if (isLocked(board.items, card)) return;
 		beginEdit();
 		board = toggleChecked(board, card.id);
 		scheduleSave();
 	}
 
 	function takeTop(stackId: string) {
+		const stack = board.items.find((item) => item.id === stackId);
+		if (stack && isLocked(board.items, stack)) return;
 		beginEdit();
 		board = takeFromQueue(board, stackId);
 		scheduleSave();
@@ -1565,8 +1678,8 @@
 	}
 
 	function moveCardColumn(direction: -1 | 1) {
-		const card = chosen.find((item) => item.type === 'card' && item.stackId);
-		if (!card) return;
+		const card = chosen.find((item) => isStackMember(item) && item.stackId);
+		if (!card || isLocked(board.items, card)) return;
 		const before = board;
 		const next = shiftCardColumn(board, card.id, direction);
 		if (next === before) {
@@ -1582,7 +1695,7 @@
 
 	/** The stack a card is laid in, and therefore how it should be shown. */
 	function homeStack(item: WhiteboardItem): StackItem | null {
-		return item.type === 'card' && item.stackId ? stacksById.get(item.stackId) ?? null : null;
+		return isStackMember(item) && item.stackId ? stacksById.get(item.stackId) ?? null : null;
 	}
 
 	function cardMode(item: WhiteboardItem): StackBehavior | null {
@@ -1609,9 +1722,9 @@
 	function deleteSelection() {
 		if (!selectedIds.length) return;
 		if (chosen.some((item) => isLocked(board.items, item))) { notice = 'Unlock the selection in Arrange or Layers first.'; return; }
-		const removingPortals = board.items.filter((item) => selectedIds.includes(item.id) && item.type === 'portal').length;
+		const selected = new Set(expandGroups(board.items, selectedIds));
+		const removingPortals = board.items.filter((item) => selected.has(item.id) && item.type === 'portal').length;
 		beginEdit();
-		const selected = new Set(selectedIds);
 		const imageAssets = board.items
 			.filter((item): item is Extract<WhiteboardItem, { type: 'image' }> => selected.has(item.id) && item.type === 'image')
 			.map((item) => item.assetId);
@@ -1621,13 +1734,10 @@
 		connectorSourceId = null;
 		for (const assetId of imageAssets) {
 			if (next.items.some((item) => item.type === 'image' && item.assetId === assetId)) continue;
-			if (imageUrls[assetId]) URL.revokeObjectURL(imageUrls[assetId]);
-			const { [assetId]: _removed, ...remaining } = imageUrls;
-			imageUrls = remaining;
 			pendingAssetDeletes.add(assetId);
 		}
 		scheduleSave();
-		notice = removingPortals === selectedIds.length ? 'Portal removed from board. Undo to restore it.' : removingPortals ? 'Selected items removed from board. Undo to restore them.' : 'Board item deleted. Undo to restore it.';
+		notice = removingPortals === selected.size ? 'Portal removed from board. Undo to restore it.' : removingPortals ? 'Selected items removed from board. Undo to restore them.' : 'Board item deleted. Undo to restore it.';
 		// Repeated removals can produce identical text; each still gets a full timeout.
 		noticeRevision += 1;
 	}
@@ -1966,6 +2076,7 @@
 
 	/** Names a label onto everything selected. New labels are made by typing. */
 	function applyLabelDraft() {
+		if (chosen.some((item) => isLocked(board.items, item))) { notice = 'Unlock the selection in Arrange or Layers first.'; return; }
 		const name = labelDraft.trim();
 		if (!name || !chosen.length) return;
 		beginEdit();
@@ -1978,6 +2089,7 @@
 	}
 
 	function toggleLabelOnSelection(labelId: string) {
+		if (chosen.some((item) => isLocked(board.items, item))) { notice = 'Unlock the selection in Arrange or Layers first.'; return; }
 		if (!chosen.length) return;
 		beginEdit();
 		// With several chosen, one click means "give this to all of them" unless
@@ -1993,6 +2105,8 @@
 	}
 
 	function removeLabelFrom(itemId: string, labelId: string) {
+		const item = board.items.find((item) => item.id === itemId);
+		if (item && isLocked(board.items, item)) { notice = 'Unlock the selection in Arrange or Layers first.'; return; }
 		beginEdit();
 		const before = chipRoomBefore([itemId]);
 		board = toggleLabel(board, itemId, labelId);
@@ -2001,6 +2115,7 @@
 	}
 
 	function writeProperty(key: 'status' | 'kind' | 'source' | 'tint', value: string | null) {
+		if (chosen.some((item) => isLocked(board.items, item))) { notice = 'Unlock the selection in Arrange or Layers first.'; return; }
 		beginEdit(`property:${key}:${chosen.map((item) => item.id).join(',')}`);
 		const before = chipRoomBefore(chosen.map((item) => item.id));
 		for (const item of chosen) board = setItemProperty(board, item.id, key, value);
@@ -2269,7 +2384,7 @@
 		if (!bounds) return;
 		if (searchReturn) board.camera = { ...searchReturn };
 		flyTo(cameraForBounds(bounds, viewport(), 140, 1.2), `${results.length} results`);
-		selectedIds = results.map((hit) => hit.item.id);
+		selectedIds = expandGroups(board.items, results.map((hit) => hit.item.id));
 		closeSearch(false);
 	}
 
@@ -2436,6 +2551,7 @@
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
+		if (localContext) return;
 		if (editingImage) return;
 		if (arranging) {
 			if (event.key === 'Escape') { event.preventDefault(); closeArrange(); }
@@ -2454,7 +2570,7 @@
 			else void openSearch(searchOpen ? searchText : '');
 			return;
 		}
-		if (event.code === 'Space' && !isTextTarget(event.target)) {
+		if (event.code === 'Space' && !isTextTarget(event.target) && !targetIsChrome(event.target)) {
 			spaceHeld = true;
 			event.preventDefault();
 		}
@@ -2574,7 +2690,7 @@
 			return;
 		}
 		// The keyboard says what the drag says: move the card one column along.
-		if (event.shiftKey && only?.type === 'card' && only.stackId && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+		if (event.shiftKey && only && isStackMember(only) && only.stackId && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
 			event.preventDefault();
 			moveCardColumn(event.key === 'ArrowLeft' ? -1 : 1);
 			return;
@@ -2585,7 +2701,7 @@
 			const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
 			const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
 			beginEdit(`nudge:${selectionKey}`);
-			setItems(board.items.map((item) => selectedIds.includes(item.id) && item.type !== 'connector' && !(item.type === 'card' && item.stackId) ? { ...item, x: item.x + dx, y: item.y + dy, updatedAt: now() } : item));
+			setItems(board.items.map((item) => selectedIds.includes(item.id) && item.type !== 'connector' && !(isStackMember(item) && item.stackId) ? { ...item, x: item.x + dx, y: item.y + dy, updatedAt: now() } : item));
 			scheduleSave(); return;
 		}
 		if (event.key.toLowerCase() === 'l') { event.preventDefault(); layersOpen = !layersOpen; return; }
@@ -2651,6 +2767,7 @@
 	}
 
 	function handlePaste(event: ClipboardEvent) {
+		if (localContext) return;
 		if (isTextTarget(event.target)) return;
 		const images = [...(event.clipboardData?.files ?? [])].filter((file) => file.type.startsWith('image/'));
 		if (images.length) {
@@ -2804,11 +2921,11 @@
 				{@const label = kindOf(connector)}
 				{#if endpoints}
 					<path
-						class="connector-hit-area"
+						class="connector-hit-area" class:locked={isLocked(board.items, connector)}
 						data-context-item={connector.id}
 						d={`M ${endpoints.from.x} ${endpoints.from.y} L ${endpoints.to.x} ${endpoints.to.y}`}
 						role="button"
-						tabindex="0"
+						tabindex={isLocked(board.items, connector) ? -1 : 0}
 						aria-label="Select connector"
 						onpointerdown={(event) => handleConnectorPointerDown(event, connector)}
 						onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectOnly(connector.id); } }}
@@ -2915,7 +3032,7 @@
 						<button
 							data-whiteboard-ui
 							class="queue-take"
-							title="Take the top card out and set it down beside the stack"
+							title="Take the top note out and set it down beside the stack"
 							onpointerdown={stopChipPointer}
 							onclick={() => takeTop(item.id)}
 						>take “{itemLabel(queueHeads(board.items, item).now ?? item)}”</button>
@@ -2928,7 +3045,7 @@
 						</div>
 					{/if}
 					{#if item.cardIds.length === 0}
-						<p class="stack-empty">drag a card in</p>
+						<p class="stack-empty">drag a Card or Slip in</p>
 					{/if}
 					{#if isSelected(item.id)}
 						<button data-whiteboard-ui class="resize-handle" aria-label="Resize stack" onpointerdown={(event) => startResize(event, item)}></button>
@@ -2945,11 +3062,13 @@
 				</section>
 			{:else if item.type === 'slip'}
 				<section data-whiteboard-object class="board-item slip" class:selected={isSelected(item.id)} class:locked={isLocked(board.items, item)} inert={isLocked(board.items, item)}
+					class:in-stack={Boolean(item.stackId)} class:laid-checklist={cardMode(item) === 'checklist'} class:ticked={cardMode(item) === 'checklist' && isDone(item)}
 					class:dragging={draggingIds.includes(item.id)} class:found={matchIds.has(item.id)}
 					data-material={shownAppearance(item)?.material} data-context-item={item.id} style={itemStyle(item)} role="group" aria-label={`Slip: ${item.text || 'Untitled slip'}`}
 					onpointerdown={(event) => handleItemPointerDown(event, item)}>
+					{#if cardMode(item) === 'checklist'}<button data-whiteboard-ui class="tick" class:on={isDone(item)} aria-label={isDone(item) ? `Untick ${itemLabel(item)}` : `Tick off ${itemLabel(item)}`} aria-pressed={isDone(item)} onpointerdown={stopChipPointer} onclick={() => tickCard(item)}><span aria-hidden="true">✓</span></button>{/if}
 					<textarea id={`slip-text-${item.id}`} rows="1" class="slip-text" aria-label="Slip text" placeholder="A small thought…"
-						value={item.text} use:fitSlip={{ id: item.id, text: item.text, appearance: shownAppearance(item), preview: styling }}
+						value={item.text} use:fitSlip={{ id: item.id, text: item.text, width: itemBounds(item).width, appearance: shownAppearance(item), preview: styling }}
 						onpointerdown={(event) => handleEditablePointerDown(event, item)}
 						oninput={(event) => updateSlip(item, event.currentTarget.value)} onkeydown={handleEditableKeydown}></textarea>
 					<span class="material-edge" aria-hidden="true"></span>
@@ -3143,6 +3262,7 @@
 				</section>
 			{/if}
 		{/each}
+		{#if dropIndicator}<div class="stack-insert-marker" aria-hidden="true" style={`left:${dropIndicator.x}px;top:${dropIndicator.y}px;width:${dropIndicator.width}px;height:${dropIndicator.height}px;`}></div>{/if}
 		{#if only && canRotate(only) && !isLocked(board.items, only) && !playing && !styling && !arranging}
 			<button class="rotation-handle" data-whiteboard-ui aria-label="Rotate object" title={`${rotationOf(only)}° · drag to turn, arrows to adjust`} style={rotationHandleStyle(only)}
 				onpointerdown={(event) => startRotate(event, only)} onkeydown={(event) => rotationHandleKey(event, only)}>↻</button>
@@ -3167,10 +3287,14 @@
 		{:else if arranging}
 			<CompositionPanel items={selectionObjects} locked={selectionLocked} units={units.length} rotatable={selectionObjects.every(canRotate)} snap={view.snap ?? false}
 				position={appearancePosition} command={arrangeSelection} rotate={rotateSelection} snapping={(snap) => setView({ snap })} caption={setPhotoCaption} close={() => closeArrange()} />
-		{:else}
-			<div class="selection-tools" data-whiteboard-ui style={`left:${appearancePosition.left}px;top:${appearancePosition.top}px;`}>
-				<button bind:this={appearanceButton} class="appearance-button" disabled={!styleable.length} onclick={openAppearance} aria-haspopup="dialog" aria-expanded="false">✦ Appearance</button>
-				<button bind:this={arrangeButton} class="appearance-button" onclick={openArrange} aria-haspopup="dialog" aria-expanded="false">Arrange</button>
+		{:else if toolbarPosition}
+			<div class="selection-tools" class:interacting={draggingIds.length > 0 || transforming} data-whiteboard-ui data-placement={toolbarPosition.side} role="toolbar" aria-label="Selection tools" tabindex="-1" onkeydown={selectionToolsKey} style={`left:${toolbarPosition.left}px;top:${toolbarPosition.top}px;`}>
+				<button bind:this={appearanceButton} class="appearance-button" disabled={!styleable.length} onclick={openAppearance} aria-label="Appearance" title="Appearance" aria-haspopup="dialog" aria-expanded="false">
+					<svg aria-hidden="true" width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18h1.2a2.3 2.3 0 0 0 1.6-3.9 1.5 1.5 0 0 1 1-2.6H18a3 3 0 0 0 3-3C21 6.8 17 3 12 3Z" fill="currentColor" fill-opacity=".06" /><circle cx="7.2" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="10.2" cy="6.9" r="1" fill="currentColor" stroke="none"/><circle cx="14.5" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="17.3" cy="10.3" r="1" fill="currentColor" stroke="none"/></svg>
+				</button>
+				<button bind:this={arrangeButton} class="appearance-button" onclick={openArrange} aria-label="Arrange" title="Arrange" aria-haspopup="dialog" aria-expanded="false">
+					<svg aria-hidden="true" width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4v16M3 20h18" opacity=".55"/><rect x="7" y="5" width="6" height="6" rx="1.4" fill="currentColor" fill-opacity=".08"/><rect x="7" y="14" width="13" height="3" rx="1.2" fill="currentColor" fill-opacity=".08"/><path d="M17 5h3m-3 3h3m-3 3h3"/></svg>
+				</button>
 			</div>
 		{/if}
 	{/if}
@@ -3184,7 +3308,7 @@
 		</div>
 	{/if}
 
-	<div class="top-deck">
+	<div class="top-deck" bind:this={topDeck}>
 	{#if !homeSuiteEmbedded}
 	<header class:hidden={playing} class="topbar" data-whiteboard-ui>
 		<a class="back-link" href="/" aria-label="Back to Woodles">←</a>
@@ -3469,7 +3593,7 @@
 									<p class="drawer-note">Four of these side by side is a board. Nothing new is created — they are still stacks on the same canvas.</p>
 								{:else if behaviorOf(only) === 'queue'}
 									<div class="row-buttons">
-										<button class="chip strong" disabled={!only.cardIds.length} onclick={() => takeTop(only.id)}>Take the top card</button>
+										<button class="chip strong" disabled={!only.cardIds.length} onclick={() => takeTop(only.id)}>Take the top note</button>
 									</div>
 								{:else if behaviorOf(only) === 'checklist'}
 									<p class="drawer-note">{checklistProgress(board.items, only).done} of {checklistProgress(board.items, only).total} ticked.</p>
@@ -3528,7 +3652,7 @@
 								value={sharedProperty(statusOf) ?? ''}
 								oninput={(event) => writeProperty('status', (event.currentTarget as HTMLInputElement).value)}
 							/>
-							{#if only?.type === 'card' && homeStack(only) && behaviorOf(homeStack(only)!) === 'status'}
+							{#if only && isStackMember(only) && homeStack(only) && behaviorOf(homeStack(only)!) === 'status'}
 								<p class="drawer-note">Held by “{homeStack(only)!.title.trim() || 'an unnamed stack'}”, which sets this. Drag the card to another column to change it.</p>
 							{/if}
 						</section>
@@ -3749,6 +3873,7 @@
 			<dl>
 				<dt>/ ⌘K</dt><dd>find anything</dd>
 				<dt>I</dt><dd>details of what's chosen</dd>
+				<dt>R / L</dt><dd>arrange / layers</dd>
 				<dt>⇧← →</dt><dd>move a card a column along</dd>
 				<dt>[ ]</dt><dd>previous / next frame</dd>
 				<dt>1–9</dt><dd>jump to a frame</dd>
@@ -3764,6 +3889,9 @@
 			<h3>Editing</h3>
 			<dl>
 				<dt>⌘Z</dt><dd>undo</dd>
+				<dt>T</dt><dd>add lettering</dd>
+				<dt>⌘G / ⇧⌘G</dt><dd>group / ungroup</dd>
+				<dt>← ↑ → ↓</dt><dd>nudge; Shift for larger steps</dd>
 				<dt>⇧⌘Z</dt><dd>redo</dd>
 				<dt>⌘D</dt><dd>duplicate what's chosen</dd>
 				<dt>⌘A</dt><dd>select everything</dd>
@@ -3905,6 +4033,10 @@
 	<input bind:this={imageInput} class="image-input" type="file" accept="image/*" multiple onchange={handleImageInput} />
 </main>
 
+{#if localContext}
+	<ContextMenu label={localContext.label} detail={localContext.detail} items={localContext.items} x={localContext.x} y={localContext.y} onRun={runLocalContext} onClose={closeLocalContext} />
+{/if}
+
 {#if editingImage && imageUrls[editingImage.assetId]}
 	{#key editingImage.id}
 		<ImageEditor item={editingImage} source={imageUrls[editingImage.assetId]} apply={applyImageEdits} cancel={() => editingImageId = null} />
@@ -4039,6 +4171,7 @@
 		cursor: pointer;
 	}
 
+	.connector-hit-area.locked { pointer-events: none; }
 	.connector-path:hover,
 	.connector-path.selected-line { stroke: var(--accent); stroke-width: 3.4; }
 
@@ -4061,11 +4194,12 @@
 	}
 	.board-item[style*="--object-ink:"] :is(.card-title, .card-body, .slip-text, .frame-title, .frame-label input, .stack-header input, .portal-title, .card-kind, .source-chip) { color: var(--object-ink); }
 	.board-item[style*="--object-ink:"] :is(.card-title, .card-body, .slip-text)::placeholder { color: var(--object-ink); opacity: .55; }
-	.appearance-button { position: absolute; z-index: 90; min-height: 34px; padding: 7px 12px; border: 1px solid #d9ccc0; border-radius: 11px; background: #fffdf7; color: #85515d; font: 12px var(--font-body, system-ui, sans-serif); box-shadow: 0 3px 12px #49362e18; cursor: pointer; }
+	.appearance-button { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: #85515d; cursor: pointer; }
 	.appearance-button:hover { background: #f3e7df; }
 	.appearance-button:focus-visible { outline: 2px solid #a66670; outline-offset: 3px; }
-	.selection-tools { position: absolute; z-index: 90; display: flex; gap: 6px; }
-	.selection-tools .appearance-button { position: static; }
+	.selection-tools { position: absolute; z-index: 90; display: flex; gap: 4px; width: 100px; height: 52px; box-sizing: border-box; padding: 3px; border: 1px solid #d9ccc0; border-radius: 14px; background: #fffdf7; box-shadow: 0 4px 16px #49362e1c; transition: opacity 100ms ease; }
+	.selection-tools.interacting { opacity: 0; pointer-events: none; }
+	@media(prefers-reduced-motion: reduce) { .selection-tools { transition: none; } }
 	.appearance-button:disabled { opacity: .5; cursor: default; }
 	.board-item.locked { pointer-events: none; }
 	.rotation-handle { position: absolute; z-index: 20000; width: 26px; height: 26px; margin: -13px 0 0 -13px; border: 1px solid #ba8790; border-radius: 50%; color: #85515d; background: #fffdf7; box-shadow: 0 2px 5px #49362e20; cursor: grab; pointer-events: auto; }
@@ -4299,6 +4433,10 @@
 	}
 	.slip-text::placeholder { color: #a59873; }
 	.slip:focus-within { border-color: #b8a16c; }
+	.slip.in-stack { box-shadow: 0 2px 5px #49362e12; }
+	.slip.laid-checklist .slip-text { padding-left: 24px; }
+	.slip.ticked .slip-text { text-decoration: line-through; text-decoration-color: #89786c80; }
+	.stack-insert-marker { position: absolute; z-index: 21000; pointer-events: none; border-radius: 3px; background: #a66670; box-shadow: 0 0 0 3px #fffdf7b3; }
 
 	.card {
 		min-width: 150px;
