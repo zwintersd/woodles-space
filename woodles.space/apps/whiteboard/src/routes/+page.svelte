@@ -602,6 +602,7 @@
 			],
 			actions: [
 				{ commandId: 'rename-board', label: 'Rename board' },
+				{ commandId: 'board-appearance', label: 'Board appearance' },
 				{ commandId: 'fit-board', label: 'Fit board' }
 			]
 		};
@@ -619,6 +620,7 @@
 			activeMode: 'edit',
 			commands: [
 				{ id: 'rename-board', label: 'Rename board' },
+				{ id: 'board-appearance', label: 'Board appearance', context: 'artifact', group: 'view' },
 				{ id: 'save', label: 'Save board', shortcut: '⌘S' },
 				{ id: 'find', label: 'Find on board', shortcut: '/', context: 'artifact', group: 'view' },
 				{ id: 'add-card', label: 'Add card' },
@@ -930,6 +932,7 @@
 	function runHomeSuiteCommand(commandId: string) {
 		switch (commandId) {
 			case 'rename-board': postHomeSuiteRenameRequest(); break;
+			case 'board-appearance': if (!viewOpen) toggleViewPanel(); break;
 			case 'save': markDirty(); saveNow(); break;
 			case 'find': void openSearch(); break;
 			case 'add-card': addCardFromDock(); break;
@@ -1011,8 +1014,8 @@
 			...(item?.type === 'image' ? [{ id: 'edit-image', label: 'Edit image', group: 'edit' as const, run: () => run('edit-image') }] : []),
 			...(item?.type === 'slip' ? [{ id: 'slip-to-card', label: 'Card', submenu: 'Turn into…', group: 'edit' as const, enabled: !isLocked(board.items, item), run: () => run('slip-to-card') }] : []),
 			...(item && spawnContent(item, board.items) ? [
-				{ id: 'spawn-document', label: 'Document', submenu: 'Turn into…', group: 'edit' as const, enabled: !isLocked(board.items, item), run: () => run('spawn-document') },
-				{ id: 'spawn-collection', label: 'Collection', submenu: 'Turn into…', group: 'edit' as const, enabled: !isLocked(board.items, item), run: () => run('spawn-collection') }
+				{ id: 'spawn-document', label: 'Document', submenu: 'Spawn…', group: 'edit' as const, enabled: !isLocked(board.items, item), run: () => run('spawn-document') },
+				{ id: 'spawn-collection', label: 'Collection', submenu: 'Spawn…', group: 'edit' as const, enabled: !isLocked(board.items, item), run: () => run('spawn-collection') }
 			] : []),
 			{ id: 'inspect', label: 'Edit details', group: 'edit', run: () => run('inspect') },
 			{ id: 'duplicate-selection', label: items.length === 1 ? 'Duplicate item' : 'Duplicate selected items', group: 'edit', enabled: items.some((entry) => entry.type !== 'connector'), run: () => run('duplicate-selection') },
@@ -1023,6 +1026,7 @@
 			{ id: 'add-lettering', label: 'Add lettering', group: 'edit', run: () => run('add-lettering') },
 			{ id: 'add-frame', label: 'Draw frame', group: 'edit', run: () => run('add-frame') },
 			{ id: 'add-stack', label: 'Add stack', group: 'edit', run: () => run('add-stack') },
+			{ id: 'board-appearance', label: 'Board appearance', group: 'view', run: () => run('board-appearance') },
 			{ id: 'fit-board', label: 'Fit board', group: 'view', run: () => run('fit-board') }
 		];
 		const target = {
@@ -4023,7 +4027,7 @@
 	{#if viewOpen && !playing}
 		<div class="view-card" data-whiteboard-ui aria-label="How this board looks">
 			<header class="view-head">
-				<h3>View</h3>
+				<h3>Board appearance</h3>
 				<button class="drawer-close" aria-label="Close view options" onclick={() => (viewOpen = false)}>×</button>
 			</header>
 
@@ -4082,7 +4086,7 @@
 			</section>
 
 			<section>
-				<h4>Shown</h4>
+				<h4>View options</h4>
 				<label class="view-toggle">
 					<input
 						type="checkbox"
@@ -4125,10 +4129,10 @@
 			class:active={viewOpen}
 			class="view-button"
 			aria-expanded={viewOpen}
-			aria-label="How this board looks"
-			title="The surface under the board, and what stays on screen"
+			aria-label="Board appearance"
+			title="Board appearance and view options"
 			onclick={toggleViewPanel}
-		>◍</button>
+		>◍ Board style</button>
 		<span>{zoomLabel()}</span>
 	</div>
 
@@ -4982,7 +4986,7 @@
 		right: 22px;
 		bottom: 25px;
 		display: grid;
-		grid-template-columns: repeat(4, 35px) auto;
+		grid-template-columns: repeat(3, 35px) auto auto;
 		align-items: center;
 		gap: 3px;
 		padding: 5px;
@@ -4997,7 +5001,7 @@
 	.camera-controls button:hover { background: rgba(218,188,181,.37); }
 	.camera-controls button:active { transform: scale(.94); }
 	.camera-controls .home-button { font-size: 20px; }
-	.camera-controls .view-button { font-size: 16px; }
+	.camera-controls .view-button { width: auto; padding: 0 9px; font-size: 12px; white-space: nowrap; }
 	.camera-controls button.active { background: rgba(218, 188, 181, 0.52); color: #69434a; }
 	.camera-controls span { min-width: 40px; padding-left: 5px; color: #978981; font-size: 11px; font-variant-numeric: tabular-nums; }
 
@@ -5593,7 +5597,7 @@
 		.tool-dock { left: 12px; right: 158px; bottom: 12px; max-width: none; overflow-x: auto; transform: none; }
 		.tool-button { padding: 0 8px; }
 		.tool-button span { display: none; }
-		.camera-controls { right: 12px; bottom: 12px; grid-template-columns: repeat(4, 31px); }
+		.camera-controls { right: 12px; bottom: 12px; grid-template-columns: repeat(3, 31px) auto; }
 		.camera-controls button { width: 31px; height: 31px; }
 		.camera-controls span { display: none; }
 		.location-bar { max-width: 100%; }
