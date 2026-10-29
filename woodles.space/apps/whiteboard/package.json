@@ -12,6 +12,8 @@
 	},
 	"dependencies": {
 		"@woodles/app-manifest": "workspace:*",
+		"@woodles/collections": "workspace:*",
+		"@woodles/write-drafts": "workspace:*",
 		"@woodles/handoff": "workspace:*",
 		"@woodles/persistence": "workspace:*"
 	},
