@@ -1,4 +1,4 @@
-import { isStackMember, type Bounds, type Camera, type CardItem, type StackMember, type StackItem, type WhiteboardDocument, type WhiteboardItem } from './model';
+import { isStackColumns, isStackMember, type Bounds, type Camera, type CardItem, type StackMember, type StackItem, type WhiteboardDocument, type WhiteboardItem } from './model';
 import { setProperty, statusOf } from './properties';
 
 export const MIN_ZOOM = 0.1;
@@ -61,31 +61,48 @@ export function boundsForItem(items: WhiteboardItem[], item: WhiteboardItem): Bo
 		if (stack) return stackCardBounds(items, stack, item);
 	}
 	if (item.type === 'stack') {
-		return { ...item, height: Math.max(item.height, stackContentHeight(items, item)) };
+		return { ...item, width: Math.max(item.width, stackMinimumWidth(item)), height: Math.max(item.height, stackContentHeight(items, item)) };
 	}
 	return { x: item.x, y: item.y, width: item.width, height: item.height };
 }
 
 /** How many tiles fit across a gallery stack of this width. */
 export function galleryColumns(stack: StackItem): number {
+	if (isStackColumns(stack.columns)) return stack.columns;
 	const usable = Math.max(1, stack.width - STACK_INSET * 2);
 	return Math.max(1, Math.floor((usable + STACK_GAP) / (GALLERY_MIN_TILE + STACK_GAP)));
 }
 
-function galleryTileWidth(stack: StackItem): number {
-	const usable = Math.max(1, stack.width - STACK_INSET * 2);
-	const columns = galleryColumns(stack);
-	return Math.max(80, (usable - STACK_GAP * (columns - 1)) / columns);
+/** Explicit columns wrap every stack; old galleries still choose by width. */
+export function stackColumns(stack: StackItem): number {
+	return isStackColumns(stack.columns) ? stack.columns : stack.behavior === 'gallery' ? galleryColumns(stack) : 1;
+}
+
+/** Only explicit layouts impose a new minimum; automatic layouts stay intact. */
+export function stackMinimumWidth(stack: StackItem): number {
+	if (!isStackColumns(stack.columns)) return 0;
+	const minimum = stack.behavior === 'gallery' ? GALLERY_MIN_TILE : 120;
+	return Math.max(180, STACK_INSET * 2 + minimum * stack.columns + STACK_GAP * (stack.columns - 1));
+}
+
+function stackTileWidth(stack: StackItem): number {
+	const usable = Math.max(1, Math.max(stack.width, stackMinimumWidth(stack)) - STACK_INSET * 2);
+	const columns = stackColumns(stack);
+	return Math.max(stack.behavior === 'gallery' ? 80 : 120, (usable - STACK_GAP * (columns - 1)) / columns);
 }
 
 export function stackMemberHeight(item: StackMember): number { return Math.max(item.type === 'slip' ? 44 : 72, item.height); }
 
-function galleryRowHeights(items: WhiteboardItem[], stack: StackItem): number[] {
+function laidMemberHeight(stack: StackItem, item: StackMember): number {
+	return stack.behavior === 'gallery' && item.type === 'card' ? GALLERY_TILE_HEIGHT : stackMemberHeight(item);
+}
+
+function stackRowHeights(items: WhiteboardItem[], stack: StackItem): number[] {
 	const heights: number[] = [];
-	const columns = galleryColumns(stack);
+	const columns = stackColumns(stack);
 	stackMembers(items, stack).forEach((item, index) => {
 		const row = Math.floor(index / columns);
-		heights[row] = Math.max(heights[row] ?? 0, item.type === 'slip' ? stackMemberHeight(item) : GALLERY_TILE_HEIGHT);
+		heights[row] = Math.max(heights[row] ?? 0, laidMemberHeight(stack, item));
 	});
 	return heights;
 }
@@ -93,10 +110,8 @@ function galleryRowHeights(items: WhiteboardItem[], stack: StackItem): number[] 
 export function stackContentHeight(items: WhiteboardItem[], stack: StackItem): number {
 	const cards = stackMembers(items, stack);
 	if (!cards.length) return stack.height;
-	const rows = galleryRowHeights(items, stack);
-	const inner = stack.behavior === 'gallery'
-		? rows.reduce((sum, height) => sum + height, 0) + STACK_GAP * (rows.length - 1)
-		: cards.reduce((total, card) => total + stackMemberHeight(card), 0) + STACK_GAP * (cards.length - 1);
+	const rows = stackRowHeights(items, stack);
+	const inner = rows.reduce((sum, height) => sum + height, 0) + STACK_GAP * (rows.length - 1);
 	return Math.max(stack.height, stackTopInset(stack) + inner + STACK_INSET);
 }
 
@@ -105,27 +120,15 @@ export function stackCardBounds(items: WhiteboardItem[], stack: StackItem, card:
 	const index = Math.max(0, cards.findIndex((candidate) => candidate.id === card.id));
 	const top = stack.y + stackTopInset(stack);
 
-	// A gallery lays its cards out as tiles across and then down. It is still
-	// the same stack in the same place — only the reading order is wrapped.
-	if (stack.behavior === 'gallery') {
-		const columns = galleryColumns(stack);
-		const width = galleryTileWidth(stack);
-		const row = Math.floor(index / columns);
-		const rows = galleryRowHeights(items, stack);
-		return {
-			x: stack.x + STACK_INSET + (index % columns) * (width + STACK_GAP),
-			y: top + rows.slice(0, row).reduce((sum, height) => sum + height + STACK_GAP, 0),
-			width,
-			height: card.type === 'slip' ? stackMemberHeight(card) : GALLERY_TILE_HEIGHT
-		};
-	}
-
-	const previousHeight = cards.slice(0, index).reduce((total, candidate) => total + stackMemberHeight(candidate) + STACK_GAP, 0);
+	const columns = stackColumns(stack);
+	const width = stackTileWidth(stack);
+	const row = Math.floor(index / columns);
+	const rows = stackRowHeights(items, stack);
 	return {
-		x: stack.x + STACK_INSET,
-		y: top + previousHeight,
-		width: Math.max(120, stack.width - STACK_INSET * 2),
-		height: stackMemberHeight(card)
+		x: stack.x + STACK_INSET + (index % columns) * (width + STACK_GAP),
+		y: top + rows.slice(0, row).reduce((sum, height) => sum + height + STACK_GAP, 0),
+		width,
+		height: laidMemberHeight(stack, card)
 	};
 }
 
@@ -387,8 +390,8 @@ export function extractCardFromStack(document: WhiteboardDocument, cardId: strin
 export function stackInsertionIndex(items: WhiteboardItem[], stack: StackItem, point: { x: number; y: number }, excluding: string[] = []): number {
 	const cards = stackMembers(items, stack).filter((card) => !excluding.includes(card.id));
 	const layout = { ...stack, cardIds: cards.map((card) => card.id) };
-	if (stack.behavior === 'gallery') {
-		const columns = galleryColumns(layout);
+	if (stack.behavior === 'gallery' || stackColumns(layout) > 1) {
+		const columns = stackColumns(layout);
 		for (let row = 0; row < cards.length; row += columns) {
 			const boxes = cards.slice(row, row + columns).map((card) => stackCardBounds(items, layout, card));
 			const bottom = Math.max(...boxes.map((box) => box.y + box.height));

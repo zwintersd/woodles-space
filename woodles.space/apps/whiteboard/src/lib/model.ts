@@ -33,6 +33,11 @@ export const DONE = 'done';
  */
 export const STACK_BEHAVIORS = ['plain', 'status', 'checklist', 'queue', 'gallery'] as const;
 export type StackBehavior = (typeof STACK_BEHAVIORS)[number];
+export const MAX_STACK_COLUMNS = 6;
+
+export function isStackColumns(value: unknown): value is number {
+	return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= MAX_STACK_COLUMNS;
+}
 
 export type Camera = {
 	x: number;
@@ -145,6 +150,8 @@ export interface StackItem extends BaseWhiteboardItem {
 	// Legacy storage name: the ordered IDs may belong to Cards or Slips.
 	/** Absent means `plain`. See STACK_BEHAVIORS. */
 	behavior?: StackBehavior;
+	/** Absent keeps the default layout: one column, or automatic gallery tiles. */
+	columns?: number;
 }
 
 /**
@@ -435,7 +442,8 @@ export function isWhiteboardItem(value: unknown): value is WhiteboardItem {
 		case 'stack':
 			return typeof value.title === 'string' && Array.isArray(value.cardIds) &&
 				value.cardIds.every((id) => typeof id === 'string') &&
-				(value.behavior === undefined || isStackBehavior(value.behavior));
+				(value.behavior === undefined || isStackBehavior(value.behavior)) &&
+				(value.columns === undefined || isStackColumns(value.columns));
 		case 'portal':
 			return typeof value.boardId === 'string' && typeof value.title === 'string';
 		case 'connector':
@@ -495,6 +503,7 @@ export function upgradeDocument(value: unknown): unknown {
 			if (rest.groupId !== undefined && (typeof rest.groupId !== 'string' || rest.groupId.length === 0 || rest.groupId.length > 120)) delete rest.groupId;
 			if (rest.rotation !== undefined && (!finite(rest.rotation) || Math.abs(rest.rotation) > 180)) delete rest.rotation;
 			if (rest.layer !== undefined && (!finite(rest.layer) || !Number.isInteger(rest.layer) || Math.abs(rest.layer) > 1_000_000)) delete rest.layer;
+			if (rest.type === 'stack' && rest.columns !== undefined && !isStackColumns(rest.columns)) delete rest.columns;
 			return rest;
 		})
 		: value.items;

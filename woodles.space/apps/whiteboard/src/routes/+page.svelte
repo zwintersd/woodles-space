@@ -8,6 +8,7 @@
 	import LetteringSurface from '$lib/LetteringSurface.svelte';
 	import CompositionPanel from '$lib/CompositionPanel.svelte';
 	import LayersPanel from '$lib/LayersPanel.svelte';
+	import StackColumnsControl from '$lib/StackColumnsControl.svelte';
 	import { alignItems, compositionUnits, duplicateItems, expandGroups, groupItems, isLocked, orderedItems, reorderLayers, snapTranslation, unionBounds, type Alignment, type AlignmentGuide, type LayerMove } from '$lib/composition';
 	import { appearanceCss, patchAppearance, isAppearanceColor, MAX_SWATCHES, type AppearancePatch, type ItemAppearance } from '$lib/appearance';
 	import { imageViewport, validImageEdits, type ImageEdits } from '$lib/imageEditing';
@@ -37,6 +38,8 @@
 	stackMembers,
 	stackInsertionIndex,
 	stackTopInset,
+	stackColumns,
+	stackMinimumWidth,
 	zoomAroundPoint,
 	} from '$lib/geometry';
 	import {
@@ -51,6 +54,8 @@
 	createFrame,
 	createImage,
 	createStack,
+	MAX_STACK_COLUMNS,
+	isStackColumns,
 	createViewpoint,
 	makeId,
 	nextZ,
@@ -143,6 +148,7 @@
 	queueHeads,
 	renameStack,
 	setStackBehavior,
+	setStackColumns,
 	shiftCardColumn,
 	stackBeside,
 	takeFromQueue,
@@ -376,7 +382,7 @@
 		const layout = { ...stack, cardIds: members.map((item) => item.id) };
 		const next = members[dropIndex]; const previous = members[dropIndex - 1];
 		const box = next ? stackMemberBounds(board.items, layout, next) : previous ? stackMemberBounds(board.items, layout, previous) : null;
-		if (behaviorOf(stack) === 'gallery' && box) return { x: next ? box.x - 6 : box.x + box.width + 4, y: box.y, width: 2, height: box.height };
+		if ((stackColumns(stack) > 1 || behaviorOf(stack) === 'gallery') && box) return { x: next ? box.x - 6 : box.x + box.width + 4, y: box.y, width: 2, height: box.height };
 		return { x: stack.x + 14, y: box ? (next ? box.y - 6 : box.y + box.height + 4) : stack.y + stackTopInset(stack) - 6, width: Math.max(80, stack.width - 28), height: 2 };
 	});
 	const connectors = $derived(board.items.filter((item) => item.type === 'connector'));
@@ -557,6 +563,10 @@
 			return {
 				title: itemLabel(item),
 				rows,
+				...(item.type === 'stack' ? { controls: [{
+					id: 'stack-columns', label: 'Columns', kind: 'select' as const, value: String(item.columns ?? ''), readonly: isLocked(board.items, item),
+					options: [{ value: '', label: `Auto (${stackColumns({ ...item, columns: undefined })})` }, ...Array.from({ length: MAX_STACK_COLUMNS }, (_, index) => ({ value: String(index + 1), label: String(index + 1) }))]
+				}] } : {}),
 				actions: [
 					...(item.type !== 'connector' ? [{ commandId: 'arrange', label: 'Arrange' }, { commandId: 'appearance', label: 'Appearance', enabled: !isLocked(board.items, item) }] : []),
 						...(item.type === 'image' ? [{ commandId: 'edit-image', label: 'Edit image' }] : []),
@@ -1019,6 +1029,7 @@
 		else if (message.action === 'inspect') openDetails();
 		else if (message.action === 'focus') canvasEl?.focus();
 		else if (message.action === 'command') runHomeSuiteCommand(message.commandId);
+		else if (message.action === 'inspector' && message.controlId === 'stack-columns' && only?.type === 'stack') changeStackColumns(only, message.value);
 		else if (message.action === 'mode' && message.modeId === 'edit' && playing) exitJourney();
 	}
 
@@ -1424,7 +1435,7 @@
 			const item = board.items.find((candidate) => candidate.id === session.itemId);
 			if (!item || item.type === 'connector') return;
 			const next = resizedBounds(session.bounds, rotationOf(item), { x: point.x - session.startWorld.x, y: point.y - session.startWorld.y },
-				{ width: item.type === 'card' ? 150 : 120, height: item.type === 'lettering' || item.type === 'slip' ? 32 : item.type === 'card' ? 90 : 80 },
+				{ width: item.type === 'stack' ? Math.max(180, stackMinimumWidth(item)) : item.type === 'card' ? 150 : 120, height: item.type === 'lettering' || item.type === 'slip' ? 32 : item.type === 'card' ? 90 : 80 },
 				item.type === 'image' ? { ratio: item.edits ? imageViewport(item.aspectRatio, item.edits).aspectRatio : item.aspectRatio, extra: item.caption?.trim() ? 38 : 10 } : undefined);
 			updateItem(item.id, next);
 			return;
@@ -1610,20 +1621,49 @@
 	}
 
 	function handleCanvasDoubleClick(event: MouseEvent) {
-		if (targetHasUI(event.target)) return;
+		if (event.button !== 0 || spaceHeld || targetHasUI(event.target)) return;
 		if (tool === 'select') void createCardAt(pointForEvent(event));
+	}
+
+	/** Locked objects ignore editing gestures, but still offer camera navigation. */
+	function handleLockedItemDoubleClick(event: MouseEvent) {
+		if (event.button !== 0 || tool !== 'select' || spaceHeld || targetIsChrome(event.target)) return;
+		const point = pointForEvent(event);
+		const object = [...objects].reverse().find((item) => {
+			const bounds = itemBounds(item);
+			const local = rotatePoint({ x: point.x - bounds.x - bounds.width / 2, y: point.y - bounds.y - bounds.height / 2 }, -rotationOf(item));
+			return Math.abs(local.x) <= bounds.width / 2 && Math.abs(local.y) <= bounds.height / 2;
+		});
+		const hit = object ?? [...connectors].reverse().find((connector) => {
+			const endpoints = connectorEndpoints(board.items, connector);
+			if (!endpoints) return false;
+			const dx = endpoints.to.x - endpoints.from.x;
+			const dy = endpoints.to.y - endpoints.from.y;
+			const lengthSquared = dx * dx + dy * dy;
+			const along = lengthSquared ? Math.max(0, Math.min(1, ((point.x - endpoints.from.x) * dx + (point.y - endpoints.from.y) * dy) / lengthSquared)) : 0;
+			return Math.hypot(point.x - endpoints.from.x - along * dx, point.y - endpoints.from.y - along * dy) <= 7.5 / board.camera.zoom;
+		});
+		if (!hit || !isLocked(board.items, hit)) return;
+		event.preventDefault();
+		event.stopImmediatePropagation();
+		handleItemDoubleClick(event, hit);
 	}
 
 	function handleItemDoubleClick(event: MouseEvent, item: WhiteboardItem) {
 		event.stopPropagation();
-		if (tool !== 'select') return;
-		if (item.type === 'card') {
-			void tick().then(() => document.getElementById(`card-body-${item.id}`)?.focus());
+		if (event.button !== 0 || tool !== 'select' || spaceHeld || targetIsChrome(event.target)) return;
+		if (event.target instanceof Element && event.target.closest('button, a, select')) return;
+		let center: Point;
+		if (item.type === 'connector') {
+			const endpoints = connectorEndpoints(board.items, item);
+			if (!endpoints) return;
+			center = { x: (endpoints.from.x + endpoints.to.x) / 2, y: (endpoints.from.y + endpoints.to.y) / 2 };
+		} else {
+			const bounds = visualBoundsForItem(board.items, item);
+			center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
 		}
-		if (item.type === 'frame') {
-			renamingFrameId = item.id;
-			void tick().then(() => document.getElementById(`frame-title-${item.id}`)?.focus());
-		}
+		handHoldsTheCamera();
+		flyTo(cameraCentredOn(center, board.camera, viewport()), itemLabel(item));
 	}
 
 	function updateCard(item: CardItem, field: 'title' | 'body', value: string) {
@@ -1653,6 +1693,15 @@
 		if (item && isLocked(board.items, item)) return;
 		beginEdit();
 		board = setStackBehavior(board, stackId, behavior);
+		scheduleSave();
+	}
+
+	function changeStackColumns(stack: StackItem, value: string) {
+		if (isLocked(board.items, stack)) return;
+		const columns = value === '' ? undefined : Number(value);
+		if ((columns !== undefined && !isStackColumns(columns)) || stack.columns === columns) return;
+		beginEdit();
+		board = setStackColumns(board, stack.id, columns);
 		scheduleSave();
 	}
 
@@ -2899,6 +2948,7 @@
 	onpointermove={handlePointerMove}
 	onpointerup={handlePointerUp}
 	onwheel={handleWheel}
+	ondblclickcapture={handleLockedItemDoubleClick}
 	ondblclick={handleCanvasDoubleClick}
 	ondragover={(event) => { event.preventDefault(); fileDragging = true; }}
 	ondragleave={() => (fileDragging = false)}
@@ -2928,6 +2978,7 @@
 						tabindex={isLocked(board.items, connector) ? -1 : 0}
 						aria-label="Select connector"
 						onpointerdown={(event) => handleConnectorPointerDown(event, connector)}
+						ondblclick={(event) => handleItemDoubleClick(event, connector)}
 						onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectOnly(connector.id); } }}
 					/>
 					<path
@@ -3027,6 +3078,7 @@
 							<span class="stack-mode" title={BEHAVIOR_NOTES[behaviorOf(item)]}>{behaviorOf(item)}</span>
 						{/if}
 						<span class="stack-count">{stackCountLabel(item)}</span>
+						{#if isSelected(item.id)}<StackColumnsControl stack={item} compact disabled={isLocked(board.items, item)} change={(value) => changeStackColumns(item, value)} />{/if}
 					</div>
 					{#if behaviorOf(item) === 'queue' && item.cardIds.length}
 						<button
@@ -3054,7 +3106,7 @@
 			{:else if item.type === 'lettering'}
 				<section data-whiteboard-object class="board-item lettering" class:selected={isSelected(item.id)} class:locked={isLocked(board.items, item)} inert={isLocked(board.items, item)}
 					data-backing={shownAppearance(item)?.backing ?? 'none'} data-context-item={item.id} style={itemStyle(item)} role="group" aria-label={`Lettering: ${item.text || 'Untitled lettering'}`}
-					onpointerdown={(event) => handleItemPointerDown(event, item)}>
+					onpointerdown={(event) => handleItemPointerDown(event, item)} ondblclick={(event) => handleItemDoubleClick(event, item)}>
 					<LetteringSurface id={item.id} text={item.text} width={item.width} appearance={shownAppearance(item)} locked={isLocked(board.items, item)}
 						input={(text) => { beginEdit(`lettering:${item.id}`); updateItem(item.id, { text }, true); }}
 						pointerdown={(event) => handleEditablePointerDown(event, item)} resize={(height) => fitLettering(item.id, height)} />
@@ -3065,7 +3117,7 @@
 					class:in-stack={Boolean(item.stackId)} class:laid-checklist={cardMode(item) === 'checklist'} class:ticked={cardMode(item) === 'checklist' && isDone(item)}
 					class:dragging={draggingIds.includes(item.id)} class:found={matchIds.has(item.id)}
 					data-material={shownAppearance(item)?.material} data-context-item={item.id} style={itemStyle(item)} role="group" aria-label={`Slip: ${item.text || 'Untitled slip'}`}
-					onpointerdown={(event) => handleItemPointerDown(event, item)}>
+					onpointerdown={(event) => handleItemPointerDown(event, item)} ondblclick={(event) => handleItemDoubleClick(event, item)}>
 					{#if cardMode(item) === 'checklist'}<button data-whiteboard-ui class="tick" class:on={isDone(item)} aria-label={isDone(item) ? `Untick ${itemLabel(item)}` : `Tick off ${itemLabel(item)}`} aria-pressed={isDone(item)} onpointerdown={stopChipPointer} onclick={() => tickCard(item)}><span aria-hidden="true">✓</span></button>{/if}
 					<textarea id={`slip-text-${item.id}`} rows="1" class="slip-text" aria-label="Slip text" placeholder="A small thought…"
 						value={item.text} use:fitSlip={{ id: item.id, text: item.text, width: itemBounds(item).width, appearance: shownAppearance(item), preview: styling }}
@@ -3180,7 +3232,7 @@
 					role="group"
 					aria-label={`Way through to ${doorLabel(item)}`}
 					onpointerdown={(event) => handleItemPointerDown(event, item)}
-					ondblclick={(event) => { event.stopPropagation(); if (tool === 'select' && !preview?.missing) void enterPortal(item); }}
+					ondblclick={(event) => handleItemDoubleClick(event, item)}
 				>
 					<div class="portal-pane" aria-hidden="true">
 						{#if preview?.missing}
@@ -3586,6 +3638,7 @@
 									{/each}
 								</div>
 								<p class="drawer-note behavior-note">{BEHAVIOR_NOTES[behaviorOf(only)]}</p>
+								<StackColumnsControl stack={only} disabled={isLocked(board.items, only)} change={(value) => only?.type === 'stack' && changeStackColumns(only, value)} />
 								{#if behaviorOf(only) === 'status'}
 									<div class="row-buttons">
 										<button class="chip strong" onclick={() => addColumnBeside(only)}>Add a column beside this</button>
@@ -4295,6 +4348,7 @@
 	.frame-corner.bottom-right { right: 8px; bottom: 8px; border-width: 0 1px 1px 0; border-radius: 0 0 4px 0; }
 
 	.stack {
+		container-type: inline-size;
 		min-width: 180px;
 		min-height: 130px;
 		border: 1px solid rgba(89, 73, 67, 0.17);
@@ -4330,6 +4384,10 @@
 	}
 
 	.stack-count { color: #9a8d86; font-size: 12px; min-width: 10px; text-align: right; font-variant-numeric: tabular-nums; }
+	@container (max-width: 280px) {
+		.stack-header { gap: 5px; }
+		.stack-header .stack-mode { display: none; }
+	}
 	.stack-empty { margin: 22px 14px; color: #a69a93; font-size: 12px; font-style: italic; }
 
 	/*

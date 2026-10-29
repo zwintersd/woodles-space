@@ -1,8 +1,9 @@
 import { isStackMember, type StackMember } from './model';
-import { conferStackStatuses, extractCardFromStack, stackMembers, STACK_GAP } from './geometry';
+import { conferStackStatuses, extractCardFromStack, stackMembers, stackMinimumWidth, STACK_GAP } from './geometry';
 import { isDone, setProperty } from './properties';
 import {
 	DONE,
+	isStackColumns,
 	makeId,
 	now,
 	type StackBehavior,
@@ -15,7 +16,7 @@ export const BEHAVIOR_NOTES: Record<StackBehavior, string> = {
 	plain: 'Cards and Slips in the order you put them.',
 	status: 'Notes inside wear this stack’s name. Drag one in and its status changes with it.',
 	checklist: 'Notes can be ticked off. The header keeps the count.',
-	queue: 'The top note is what you are on; the one under it is next.',
+	queue: 'The first note is what you are on; the one after it is next.',
 	gallery: 'Notes lie out as tiles rather than a column.'
 };
 
@@ -27,6 +28,23 @@ export function isStack(item: WhiteboardItem | undefined | null): item is StackI
 	return Boolean(item && item.type === 'stack');
 }
 
+/** Set a wrapping layout without changing its notes or what the stack does. */
+export function setStackColumns(document: WhiteboardDocument, stackId: string, columns?: number): WhiteboardDocument {
+	if (columns !== undefined && !isStackColumns(columns)) return document;
+	const stack = document.items.find((item): item is StackItem => item.id === stackId && item.type === 'stack');
+	if (!stack) return document;
+	const { columns: _previous, ...automatic } = stack;
+	const next = columns === undefined ? automatic : { ...stack, columns };
+	const width = Math.max(stack.width, stackMinimumWidth(next));
+	if (stack.columns === columns && stack.width === width) return document;
+	const stamp = now();
+	return {
+		...document,
+		updatedAt: stamp,
+		items: document.items.map((item) => item.id === stackId ? { ...next, width, updatedAt: stamp } : item)
+	};
+}
+
 /**
  * Gives a stack a behaviour, or takes it back to plain. Changing to Status
  * confers this stack's title on everything already inside it, so a stack that
@@ -35,11 +53,9 @@ export function isStack(item: WhiteboardItem | undefined | null): item is StackI
 export function setStackBehavior(document: WhiteboardDocument, stackId: string, behavior: StackBehavior): WhiteboardDocument {
 	const items = document.items.map((item) => {
 		if (item.id !== stackId || item.type !== 'stack') return item;
-		if (behavior === 'plain') {
-			const { behavior: _plain, ...rest } = item;
-			return { ...rest, updatedAt: now() } as WhiteboardItem;
-		}
-		return { ...item, behavior, updatedAt: now() } as WhiteboardItem;
+		const { behavior: _previous, ...plain } = item;
+		const next: StackItem = behavior === 'plain' ? { ...plain, updatedAt: now() } : { ...item, behavior, updatedAt: now() };
+		return isStackColumns(next.columns) ? { ...next, width: Math.max(next.width, stackMinimumWidth(next)) } : next;
 	}) as WhiteboardItem[];
 	return { ...document, items: conferStackStatuses(items) };
 }

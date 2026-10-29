@@ -764,7 +764,7 @@
 	 * under the caret: an echo of an earlier keystroke would otherwise land
 	 * after a later one and undo it. It catches up once focus leaves.
 	 */
-	function controlValue(node: HTMLInputElement, value: string) {
+	function controlValue(node: HTMLInputElement | HTMLSelectElement, value: string) {
 		let latest = value;
 		node.value = value;
 		const catchUp = () => { node.value = latest; };
@@ -772,7 +772,7 @@
 		return {
 			update(next: string) {
 				latest = next;
-				if (document.activeElement !== node) node.value = next;
+				if (node instanceof HTMLSelectElement || document.activeElement !== node) node.value = next;
 			},
 			destroy() { node.removeEventListener('blur', catchUp); }
 		};
@@ -924,7 +924,15 @@
 					{#if activeState?.inspector?.controls?.length}
 						<div class="inspector-controls">
 							{#each activeState.inspector.controls as control (control.id)}
-								<label>{control.label}<input use:controlValue={control.value} readonly={control.readonly} oninput={(event) => sendAction({ action: 'inspector', controlId: control.id, value: event.currentTarget.value })} /></label>
+								<label>{control.label}
+									{#if control.kind === 'select'}
+										<select use:controlValue={control.value} disabled={control.readonly} onchange={(event) => sendAction({ action: 'inspector', controlId: control.id, value: event.currentTarget.value })}>
+											{#each control.options ?? [] as option (option.value)}<option value={option.value}>{option.label}</option>{/each}
+										</select>
+									{:else}
+										<input type={control.kind ?? 'text'} use:controlValue={control.value} placeholder={control.placeholder} readonly={control.readonly} oninput={(event) => sendAction({ action: 'inspector', controlId: control.id, value: event.currentTarget.value })} />
+									{/if}
+								</label>
 							{/each}
 						</div>
 					{/if}

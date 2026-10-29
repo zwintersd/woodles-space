@@ -147,13 +147,42 @@ test('edits made just before leaving a board or a Collection are kept', async ({
 	await expect(table.locator('td.primary-cell input').first()).toHaveValue('Fern');
 });
 
+test('double-click centres an object inside the HomeSuite board surface', async ({ page }) => {
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.goto('/homesuite');
+	await create(page, 'Board');
+	const id = openId(page);
+	const board = page.frameLocator('iframe.native-surface');
+	await page.getByRole('button', { name: /Commands/ }).click();
+	await page.getByRole('dialog', { name: 'HomeSuite commands' }).getByRole('option', { name: /Add card/ }).click();
+	const card = board.locator('[data-whiteboard-object].card');
+	await expect(card).toHaveCount(1);
+	const zoom = await board.locator('.world').evaluate((element) => new DOMMatrix(getComputedStyle(element).transform).a);
+	const box = (await card.boundingBox())!;
+	await page.mouse.move(box.x + 6, box.y + 60);
+	await page.mouse.down();
+	await page.mouse.move(box.x + 86, box.y + 130, { steps: 8 });
+	await page.mouse.up();
+	await card.dblclick({ position: { x: 6, y: 60 } });
+	await expect.poll(() => card.evaluate((element) => {
+		const object = element.getBoundingClientRect();
+		const canvas = element.closest('.whiteboard')!.getBoundingClientRect();
+		return Math.hypot(object.x + object.width / 2 - canvas.x - canvas.width / 2, object.y + object.height / 2 - canvas.y - canvas.height / 2);
+	})).toBeLessThan(1);
+	await expect.poll(() => board.locator('.world').evaluate((element) => new DOMMatrix(getComputedStyle(element).transform).a)).toBe(zoom);
+	expect(openId(page)).toBe(id);
+	await expect(board.locator('[data-whiteboard-object].card')).toHaveCount(1);
+	expect(errors).toEqual([]);
+});
+
 test('walking through a portal takes the shell along, so Trash takes the board on screen', async ({ page }) => {
 	await page.goto('/homesuite');
 	await create(page, 'Board');
 	const startingId = openId(page);
 	const board = page.frameLocator('iframe.native-surface');
 	await board.getByRole('button', { name: 'Add a way through to another board' }).click();
-	await board.getByRole('group', { name: /^Way through to/ }).dblclick();
+	await board.getByRole('button', { name: /^Go into / }).click();
 
 	await expect.poll(() => openId(page)).not.toBe(startingId);
 	await expect(page.locator('.artifact-title')).toHaveText('New board');
