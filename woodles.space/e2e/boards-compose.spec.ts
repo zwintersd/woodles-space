@@ -538,7 +538,7 @@ test('Slip placement stays neat on narrow screens and reduced motion skips the p
 test('a card creates a document with its words and retains the document after undo', async ({ page }) => {
 	const card = page.locator('[data-context-item="card-b"]');
 	await card.click({ button: 'right', position: { x: 5, y: 60 } });
-	await page.getByRole('menuitem', { name: 'Turn into…', exact: true }).click();
+	await page.getByRole('menuitem', { name: 'Spawn…', exact: true }).click();
 	await page.getByRole('menuitem', { name: 'Document', exact: true }).click();
 	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === 'card-b')?.artifacts?.[0]?.kind).toBe('draft');
 	const after = (await stored(page)).items.find((item: any) => item.id === 'card-b');
@@ -574,7 +574,7 @@ test('a card creates a document with its words and retains the document after un
 test('a slip creates a collection containing its words and retains the collection after undo', async ({ page }) => {
 	const slip = page.locator('[data-context-item="slip-a"]');
 	await slip.getByRole('textbox', { name: 'Slip text', exact: true }).click({ button: 'right', position: { x: 12, y: 14 } });
-	await page.getByRole('menuitem', { name: 'Turn into…', exact: true }).click();
+	await page.getByRole('menuitem', { name: 'Spawn…', exact: true }).click();
 	await page.getByRole('menuitem', { name: 'Collection', exact: true }).click();
 	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === 'slip-a')?.artifacts?.[0]?.kind).toBe('collection');
 	const after = (await stored(page)).items.find((item: any) => item.id === 'slip-a');
@@ -609,7 +609,7 @@ test('HomeSuite receives Turn into actions and creates through the selected boar
 	}, boardId);
 	const frame = page.frameLocator('iframe');
 	await frame.locator('[data-context-item="card-b"]').click({ button: 'right', position: { x: 5, y: 60 } });
-	await expect.poll(async () => page.evaluate(() => (window as any).__boardMessages.some((message: any) => message.type === 'context-menu' && message.target.actions.some((action: any) => action.id === 'spawn-document' && action.submenu === 'Turn into…') && message.target.actions.some((action: any) => action.id === 'spawn-collection' && action.submenu === 'Turn into…')))).toBe(true);
+	await expect.poll(async () => page.evaluate(() => (window as any).__boardMessages.some((message: any) => message.type === 'context-menu' && message.target.actions.some((action: any) => action.id === 'spawn-document' && action.submenu === 'Spawn…') && message.target.actions.some((action: any) => action.id === 'spawn-collection' && action.submenu === 'Spawn…')))).toBe(true);
 	await page.evaluate(() => {
 		const message = (window as any).__boardMessages.findLast((entry: any) => entry.type === 'context-menu');
 		document.querySelector('iframe')!.contentWindow!.postMessage({ channel: 'woodles.homesuite.v1', source: 'shell', type: 'action', action: 'context-command', requestId: message.requestId, commandId: 'spawn-document' }, window.location.origin);
@@ -624,7 +624,7 @@ test('Turn into submenu fits the screen at a narrow width', async ({ page }) => 
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.getByRole('button', { name: 'Fit board in view', exact: true }).click();
 	await page.locator('[data-context-item="card-b"]').click({ button: 'right', position: { x: 5, y: 60 } });
-	await page.getByRole('menuitem', { name: 'Turn into…', exact: true }).click();
+	await page.getByRole('menuitem', { name: 'Spawn…', exact: true }).click();
 	const documentAction = page.getByRole('menuitem', { name: 'Document', exact: true });
 	const collectionAction = page.getByRole('menuitem', { name: 'Collection', exact: true });
 	await expect(documentAction).toBeInViewport();

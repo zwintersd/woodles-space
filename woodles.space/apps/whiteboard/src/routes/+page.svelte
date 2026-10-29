@@ -1011,8 +1011,8 @@
 			...(item?.type === 'image' ? [{ id: 'edit-image', label: 'Edit image', group: 'edit' as const, run: () => run('edit-image') }] : []),
 			...(item?.type === 'slip' ? [{ id: 'slip-to-card', label: 'Card', submenu: 'Turn into…', group: 'edit' as const, enabled: !isLocked(board.items, item), run: () => run('slip-to-card') }] : []),
 			...(item && spawnContent(item, board.items) ? [
-				{ id: 'spawn-document', label: 'Document', submenu: 'Turn into…', group: 'edit' as const, enabled: !isLocked(board.items, item), run: () => run('spawn-document') },
-				{ id: 'spawn-collection', label: 'Collection', submenu: 'Turn into…', group: 'edit' as const, enabled: !isLocked(board.items, item), run: () => run('spawn-collection') }
+				{ id: 'spawn-document', label: 'Document', submenu: 'Spawn…', group: 'edit' as const, enabled: !isLocked(board.items, item), run: () => run('spawn-document') },
+				{ id: 'spawn-collection', label: 'Collection', submenu: 'Spawn…', group: 'edit' as const, enabled: !isLocked(board.items, item), run: () => run('spawn-collection') }
 			] : []),
 			{ id: 'inspect', label: 'Edit details', group: 'edit', run: () => run('inspect') },
 			{ id: 'duplicate-selection', label: items.length === 1 ? 'Duplicate item' : 'Duplicate selected items', group: 'edit', enabled: items.some((entry) => entry.type !== 'connector'), run: () => run('duplicate-selection') },
