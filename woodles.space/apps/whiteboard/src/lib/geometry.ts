@@ -81,7 +81,8 @@ export function stackColumns(stack: StackItem): number {
 /** Only explicit layouts impose a new minimum; automatic layouts stay intact. */
 export function stackMinimumWidth(stack: StackItem): number {
 	if (!isStackColumns(stack.columns)) return 0;
-	const minimum = stack.behavior === 'gallery' ? GALLERY_MIN_TILE : 120;
+	// Full Cards retain their CSS minimum; gallery tiles can be compact.
+	const minimum = stack.behavior === 'gallery' ? GALLERY_MIN_TILE : 150;
 	return Math.max(180, STACK_INSET * 2 + minimum * stack.columns + STACK_GAP * (stack.columns - 1));
 }
 
@@ -94,7 +95,11 @@ function stackTileWidth(stack: StackItem): number {
 export function stackMemberHeight(item: StackMember): number { return Math.max(item.type === 'slip' ? 44 : 72, item.height); }
 
 function laidMemberHeight(stack: StackItem, item: StackMember): number {
-	return stack.behavior === 'gallery' && item.type === 'card' ? GALLERY_TILE_HEIGHT : stackMemberHeight(item);
+	if (item.type === 'card') {
+		if (stack.behavior === 'gallery') return GALLERY_TILE_HEIGHT;
+		if (isStackColumns(stack.columns)) return Math.max(90, item.height);
+	}
+	return stackMemberHeight(item);
 }
 
 function stackRowHeights(items: WhiteboardItem[], stack: StackItem): number[] {

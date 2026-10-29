@@ -38,6 +38,9 @@ describe('Stack column layouts', () => {
 		expect(plain.columns).toBeUndefined();
 		expect(stackColumns(plain)).toBe(1);
 		expect(stackMinimumWidth(plain)).toBe(0);
+		const legacy = fixture();
+		const narrowed = { ...stackIn(legacy), width: 100 };
+		expect(stackMemberBounds(legacy.items, narrowed, legacy.items[1] as ReturnType<typeof createCard>).width).toBe(120);
 		expect(stackColumns({ ...plain, behavior: 'gallery' })).toBe(2);
 		expect(galleryColumns({ ...plain, behavior: 'gallery', width: 900 })).toBe(7);
 	});
@@ -48,9 +51,11 @@ describe('Stack column layouts', () => {
 		const [a, b, c, d, e] = boxesIn(document);
 		expect(a).toMatchObject({ x: stack.x + 14, y: stack.y + stackTopInset(stack), height: 210 });
 		expect(b).toMatchObject({ y: a.y, height: 180 });
+		expect(b.width).toBeGreaterThanOrEqual(150);
 		expect(b.x).toBe(a.x + a.width + 10);
 		expect(c).toMatchObject({ x: a.x, y: a.y + 220, height: 48 });
 		expect(d).toMatchObject({ y: c.y, height: 260 });
+		expect(d.width).toBeGreaterThanOrEqual(150);
 		expect(e).toMatchObject({ x: a.x, y: d.y + 270, height: 80 });
 		expect(stackContentHeight(document.items, stack)).toBe(e.y + e.height + 14 - stack.y);
 	});
@@ -62,10 +67,24 @@ describe('Stack column layouts', () => {
 		expect(stackColumns(stack)).toBe(3);
 		expect(galleryColumns(stack)).toBe(3);
 		expect(stack.width).toBe(360);
+		expect(b.width).toBe(104);
 		expect([a.height, b.height, c.height, d.height, e.height]).toEqual([210, 96, 48, 96, 80]);
 		expect([a.y, b.y, c.y]).toEqual([a.y, a.y, a.y]);
 		expect(d.y).toBe(a.y + 220);
 		expect(e.y).toBe(d.y);
+	});
+
+	it('gives short saved Cards their rendered 90px minimum before laying out the next explicit row', () => {
+		const before = fixture();
+		const stack = stackIn(before);
+		stack.cardIds = ['b', 'd'];
+		before.items = before.items.map((item) => item.type === 'card' ? { ...item, height: 72 } : item);
+		expect(boxesIn(before).map((box) => box.height)).toEqual([72, 72]);
+		const explicit = setStackColumns(before, 'stack', 1);
+		const [first, second] = boxesIn(explicit);
+		expect([first.height, second.height]).toEqual([90, 90]);
+		expect(second.y).toBe(first.y + 100);
+		expect(stackContentHeight(explicit.items, stackIn(explicit))).toBe(second.y + second.height + 14 - stack.y);
 	});
 
 	it('keeps explicit single columns above the CSS minimum and grows stored width when gallery tiles become full Cards', () => {
@@ -77,7 +96,7 @@ describe('Stack column layouts', () => {
 		const gallery = setStackColumns(fixture('gallery'), 'stack', 3);
 		expect(stackIn(gallery).width).toBe(360);
 		const plain = setStackBehavior(gallery, 'stack', 'plain');
-		expect(stackIn(plain)).toMatchObject({ columns: 3, width: 408 });
+		expect(stackIn(plain)).toMatchObject({ columns: 3, width: 498 });
 		expect(stackIn(plain)).not.toHaveProperty('behavior');
 		expect(stackIn(gallery).width).toBe(360);
 		expect(boxesIn(plain)[1].height).toBe(180);
@@ -88,8 +107,9 @@ describe('Stack column layouts', () => {
 		const stack = stackIn(document);
 		stack.width = 100;
 		const outer = boundsForItem(document.items, stack);
-		expect(outer.width).toBe(behavior === 'gallery' ? 360 : 408);
+		expect(outer.width).toBe(behavior === 'gallery' ? 360 : 498);
 		for (const box of boxesIn(document)) {
+			expect(box.width).toBeGreaterThanOrEqual(behavior === 'gallery' ? 104 : 150);
 			expect(box.x).toBeGreaterThanOrEqual(outer.x + 14);
 			expect(box.x + box.width).toBeLessThanOrEqual(outer.x + outer.width - 14);
 		}
@@ -131,7 +151,7 @@ describe('saved Stack column choices', () => {
 		const before = fixture();
 		const after = setStackColumns(before, 'stack', 3);
 		expect(stackIn(before)).not.toHaveProperty('columns');
-		expect(stackIn(after)).toMatchObject({ columns: 3, width: 408 });
+		expect(stackIn(after)).toMatchObject({ columns: 3, width: 498 });
 		const values = new Map<string, string>();
 		const store = createWhiteboardStorage({ getItem: (key) => values.get(key) ?? null, setItem: (key, value) => { values.set(key, value); }, removeItem: (key) => { values.delete(key); } });
 		expect(store.save(after).ok).toBe(true);

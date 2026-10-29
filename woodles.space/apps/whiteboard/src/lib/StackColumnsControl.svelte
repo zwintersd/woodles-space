@@ -12,7 +12,7 @@
 	<select aria-label="Stack columns" title="Columns" {disabled} value={String(stack.columns ?? '')} onchange={(event) => change(event.currentTarget.value)}>
 		<option value="">Auto ({stackColumns({ ...stack, columns: undefined })})</option>
 		{#each Array.from({ length: MAX_STACK_COLUMNS }, (_, index) => index + 1) as columns}
-			<option value={columns}>{columns}</option>
+			<option value={String(columns)}>{columns}</option>
 		{/each}
 	</select>
 </label>
