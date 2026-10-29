@@ -86,6 +86,7 @@ test('Stack columns wrap full Cards and growing Slips without overlapping rows',
 	await expect(columns).toHaveValue('');
 	await columns.selectOption('2');
 	await expect.poll(async () => (await savedStack(page)).columns).toBe(2);
+	await expect(columns).toHaveValue('2');
 	await rowLayout(notes, 2);
 	await expect(notes[0].getByRole('textbox', { name: 'Card text', exact: true })).toBeVisible();
 	await expect(notes[0].getByRole('textbox', { name: 'Card text', exact: true })).toHaveValue('The card body stays available.');
@@ -96,6 +97,7 @@ test('Stack columns wrap full Cards and growing Slips without overlapping rows',
 	}).toBe(true);
 	await columns.selectOption('3');
 	await expect.poll(async () => (await savedStack(page)).columns).toBe(3);
+	await expect(columns).toHaveValue('3');
 	await rowLayout(notes, 3);
 	expect((await savedStack(page)).cardIds).toEqual(order);
 	expect((await stored(page)).items.find((item) => item.id === 'card-a')?.properties?.source).toContain('document=source-note');
@@ -112,8 +114,9 @@ test('column changes undo, redo and survive reload, while Auto restores gallery 
 	await expect.poll(async () => (await savedStack(page)).columns).toBe(2);
 	await rowLayout(notes, 2);
 	await page.keyboard.press('Control+z');
-	await expect(columns).toHaveValue('');
 	await expect.poll(async () => (await savedStack(page)).columns).toBeUndefined();
+	await selectStack(stack);
+	await expect(columns).toHaveValue('');
 	await page.keyboard.press('Control+Shift+z');
 	await expect.poll(async () => (await savedStack(page)).columns).toBe(2);
 	await page.reload();
@@ -134,9 +137,9 @@ test('column layout respects drag insertion and stays inside a resized Stack on 
 	await selectStack(stack);
 	const columns = stack.getByRole('combobox', { name: 'Stack columns', exact: true });
 	await columns.selectOption('2');
+	await rowLayout(order.map((id) => page.locator(`[data-context-item="${id}"]`)), 2);
+	await page.locator('[data-context-item="slip-short"]').hover({ position: { x: 3, y: 10 } });
 	const first = (await page.locator('[data-context-item="card-a"]').boundingBox())!;
-	const last = (await page.locator('[data-context-item="slip-short"]').boundingBox())!;
-	await page.mouse.move(last.x + 3, last.y + 10);
 	await page.mouse.down();
 	await page.mouse.move(first.x + first.width / 4, first.y + 12, { steps: 8 });
 	await page.mouse.up();

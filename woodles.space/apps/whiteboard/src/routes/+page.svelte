@@ -4467,7 +4467,7 @@
 
 	/* A gallery tile is the same card, read at a glance. Its box is a fixed size,
 	   so unlike a free card it clips rather than spilling over its neighbour. */
-	.card.tile { padding: 11px 12px 10px; overflow: hidden; }
+	.card.tile { min-width: 0; padding: 11px 12px 10px; overflow: hidden; }
 	.card.tile .card-topline,
 	.card.tile .card-grip,
 	.card.tile .card-kind,
