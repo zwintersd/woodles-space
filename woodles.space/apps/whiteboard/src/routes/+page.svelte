@@ -1,5 +1,9 @@
 <script lang="ts">
 	import { onDestroy, onMount, tick } from 'svelte';
+	import { entityHref } from '@woodles/app-manifest';
+	import { createCollection, addRecord, addField, setCellValue, saveCollection } from '@woodles/collections';
+	import { createDraftFromText } from '@woodles/write-drafts';
+	import { spawnContent } from '$lib/spawn';
 	import ImageEditor from '$lib/ImageEditor.svelte';
 	import ImageSurface from '$lib/ImageSurface.svelte';
 	import AppearanceTray from '$lib/AppearanceTray.svelte';
@@ -193,6 +197,8 @@
 	import {
 		isHomeSuiteShellMessage,
 		postHomeSuiteFlushed,
+		postHomeSuiteNavigate,
+		type WoodlesRef,
 		postHomeSuitePaletteRequest,
 		postHomeSuiteRenameRequest,
 		postHomeSuiteState,
@@ -930,6 +936,8 @@
 			case 'add-slip': void addSlipFromDock(); break;
 			case 'add-lettering': void addLettering(); break;
 			case 'slip-to-card': if (only?.type === 'slip') turnSlipIntoCard(only); break;
+			case 'spawn-document': if (only) spawnArtifact(only, 'document'); break;
+			case 'spawn-collection': if (only) spawnArtifact(only, 'collection'); break;
 			case 'add-frame': tool = 'frame'; connectorSourceId = null; notice = 'Drag a region for a frame.'; break;
 			case 'add-stack': addStackFromDock(); break;
 			case 'add-image': imageInput?.click(); break;
@@ -942,6 +950,46 @@
 			case 'duplicate-selection': if (chosen.length) duplicateSelection(); break;
 			case 'delete-selection': if (chosen.length) deleteSelection(); break;
 			case 'play-journey': if (stops.length) beginJourney(); break;
+		}
+	}
+
+	function artifactHref(ref: WoodlesRef): string | null {
+		if (!((ref.app === 'write' && ref.kind === 'draft') || (ref.app === 'data' && ref.kind === 'collection'))) return null;
+		return entityHref(ref.app, ref.kind, ref.id);
+	}
+	function openArtifact(event: MouseEvent, ref: WoodlesRef) {
+		if (homeSuiteEmbedded && postHomeSuiteNavigate(ref)) event.preventDefault();
+	}
+	function removeArtifactLink(item: WhiteboardItem, ref: WoodlesRef) {
+		if (isLocked(board.items, item)) return;
+		beginEdit();
+		updateItem(item.id, { artifacts: (item.artifacts ?? []).filter((entry) => !(entry.app === ref.app && entry.kind === ref.kind && entry.id === ref.id)) }, true);
+	}
+	function spawnArtifact(item: WhiteboardItem, kind: 'document' | 'collection') {
+		const content = spawnContent(item, board.items);
+		if (!content || isLocked(board.items, item)) return;
+		try {
+			let ref: WoodlesRef;
+			if (kind === 'document') ref = createDraftFromText({ title: content.title, text: content.text });
+			else {
+				let collection = createCollection(content.title === 'Untitled document' ? 'Untitled collection' : content.title);
+				if (content.rows.some((row) => row.notes)) collection = addField(collection, 'Notes', 'text');
+				for (const row of content.rows) {
+					collection = addRecord(collection);
+					const record = collection.records[collection.records.length - 1];
+					collection = setCellValue(collection, record.id, collection.fields[0].id, row.name);
+					if (row.notes) collection = setCellValue(collection, record.id, collection.fields[1].id, row.notes);
+				}
+				const result = saveCollection(collection);
+				if (!result.ok) throw new Error(result.issue?.message ?? 'Could not create Collection.');
+				ref = { app: 'data', kind: 'collection', id: collection.id };
+			}
+			beginEdit();
+			updateItem(item.id, { artifacts: [...(item.artifacts ?? []), ref] }, true);
+			notice = `${kind === 'document' ? 'Document' : 'Collection'} created. Open it in details.`;
+			openDetails();
+		} catch (error) {
+			notice = error instanceof Error ? error.message : `Could not create ${kind}.`;
 		}
 	}
 
@@ -961,7 +1009,11 @@
 			...(items.some((entry) => entry.type !== 'connector') ? [{ id: 'arrange', label: 'Arrange', group: 'edit' as const, run: () => run('arrange') }] : []),
 			...(items.some((entry) => entry.type !== 'connector') ? [{ id: 'appearance', label: 'Appearance', group: 'edit' as const, run: () => run('appearance') }] : []),
 			...(item?.type === 'image' ? [{ id: 'edit-image', label: 'Edit image', group: 'edit' as const, run: () => run('edit-image') }] : []),
-			...(item?.type === 'slip' ? [{ id: 'slip-to-card', label: 'Turn into Card', group: 'edit' as const, run: () => run('slip-to-card') }] : []),
+			...(item?.type === 'slip' ? [{ id: 'slip-to-card', label: 'Card', submenu: 'Turn into…', group: 'edit' as const, enabled: !isLocked(board.items, item), run: () => run('slip-to-card') }] : []),
+			...(item && spawnContent(item, board.items) ? [
+				{ id: 'spawn-document', label: 'Document', submenu: 'Turn into…', group: 'edit' as const, enabled: !isLocked(board.items, item), run: () => run('spawn-document') },
+				{ id: 'spawn-collection', label: 'Collection', submenu: 'Turn into…', group: 'edit' as const, enabled: !isLocked(board.items, item), run: () => run('spawn-collection') }
+			] : []),
 			{ id: 'inspect', label: 'Edit details', group: 'edit', run: () => run('inspect') },
 			{ id: 'duplicate-selection', label: items.length === 1 ? 'Duplicate item' : 'Duplicate selected items', group: 'edit', enabled: items.some((entry) => entry.type !== 'connector'), run: () => run('duplicate-selection') },
 			{ id: 'delete-selection', label: item?.type === 'portal' ? 'Remove portal from board' : items.length === 1 ? 'Delete board item' : 'Remove selected items from board', group: 'danger', detail: item?.type === 'portal' ? 'Keeps the destination board' : 'Undo to restore', run: () => run('delete-selection') }
@@ -3720,6 +3772,21 @@
 								oninput={(event) => writeProperty('kind', (event.currentTarget as HTMLInputElement).value)}
 							/>
 						</section>
+
+						{#if only?.artifacts?.length}
+							<section>
+								<h3>Created from this</h3>
+								{#each only.artifacts as ref (`${ref.app}:${ref.kind}:${ref.id}`)}
+									{#if artifactHref(ref)}
+										<div class="row-buttons">
+											<a class="source-link" href={artifactHref(ref) ?? undefined} target="_blank" rel="noreferrer noopener" onclick={(event) => openArtifact(event, ref)}>Open {ref.kind === 'draft' ? 'document' : 'collection'} ↗</a>
+											<button class="chip" disabled={isLocked(board.items, only)} onclick={() => only && removeArtifactLink(only, ref)}>Remove link</button>
+										</div>
+									{/if}
+								{/each}
+								<p class="drawer-note">These have their own contents. Removing a link keeps the document or collection.</p>
+							</section>
+						{/if}
 
 						<section>
 							<h3>Source</h3>

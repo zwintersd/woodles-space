@@ -1,3 +1,4 @@
+import type { WoodlesRef } from '../../../../shared/homesuiteBridge';
 import { DEFAULT_SURFACE, isSurface, normalizeSurface, type Surface } from './surface';
 import { validImageEdits, type ImageEdits } from './imageEditing';
 import { validAppearance, validSwatches, type ItemAppearance } from './appearance';
@@ -78,6 +79,8 @@ export interface BaseWhiteboardItem extends Bounds {
 	createdAt: string;
 	updatedAt: string;
 	properties?: ItemProperties;
+	/** Owner-managed things created from this object. */
+	artifacts?: WoodlesRef[];
 	appearance?: ItemAppearance;
 	/** Flat composition membership, separate from stack membership and source ownership. */
 	groupId?: string;
@@ -121,7 +124,7 @@ export function createSlip(x: number, y: number, zIndex: number): SlipItem {
 /** Keep identity and references when a small thought needs a full card. */
 export function slipToCard(slip: SlipItem): CardItem {
 	return { ...createCard(slip.x, slip.y, slip.zIndex), id: slip.id, createdAt: slip.createdAt,
-		body: slip.text, ...(slip.properties ? { properties: { ...slip.properties, ...(slip.properties.labelIds ? { labelIds: [...slip.properties.labelIds] } : {}) } } : {}),
+		body: slip.text, ...(slip.artifacts ? { artifacts: slip.artifacts.map((ref) => ({ ...ref })) } : {}), ...(slip.properties ? { properties: { ...slip.properties, ...(slip.properties.labelIds ? { labelIds: [...slip.properties.labelIds] } : {}) } } : {}),
 		...(slip.appearance ? { appearance: { ...slip.appearance } } : {}),
 		...(slip.stackId ? { stackId: slip.stackId } : {}), ...(slip.freePosition ? { freePosition: { ...slip.freePosition } } : {}),
 		...(slip.groupId ? { groupId: slip.groupId } : {}), ...(slip.locked !== undefined ? { locked: slip.locked } : {}),
@@ -453,11 +456,16 @@ export function isWhiteboardItem(value: unknown): value is WhiteboardItem {
 	}
 }
 
+function isArtifactRefs(value: unknown): value is WoodlesRef[] {
+	return Array.isArray(value) && value.every((ref) => isRecord(ref) && typeof ref.app === 'string' && !!ref.app && typeof ref.kind === 'string' && !!ref.kind && typeof ref.id === 'string' && !!ref.id);
+}
+
 function isBaseItem(value: Record<string, unknown>): boolean {
 	return typeof value.id === 'string' &&
 		finite(value.x) && finite(value.y) && finite(value.width) && finite(value.height) && finite(value.zIndex) &&
 		typeof value.createdAt === 'string' && typeof value.updatedAt === 'string' &&
 		(value.properties === undefined || isItemProperties(value.properties)) &&
+		(value.artifacts === undefined || isArtifactRefs(value.artifacts)) &&
 		(value.appearance === undefined || validAppearance(value.appearance)) &&
 		(value.groupId === undefined || (typeof value.groupId === 'string' && value.groupId.length > 0 && value.groupId.length <= 120)) &&
 		(value.locked === undefined || typeof value.locked === 'boolean') &&
@@ -497,6 +505,7 @@ export function upgradeDocument(value: unknown): unknown {
 		? value.items.map((item) => {
 			if (!isRecord(item)) return item;
 			const rest = { ...item };
+			if (rest.artifacts !== undefined && !isArtifactRefs(rest.artifacts)) delete rest.artifacts;
 			if (rest.properties !== undefined && !isItemProperties(rest.properties)) delete rest.properties;
 			if (rest.appearance !== undefined && !validAppearance(rest.appearance)) delete rest.appearance;
 			if (rest.locked !== undefined && typeof rest.locked !== 'boolean') delete rest.locked;
@@ -524,6 +533,7 @@ export function snapshotDocument(document: WhiteboardDocument): WhiteboardDocume
 		updatedAt: document.updatedAt,
 		items: document.items.map((item) => ({
 			...item,
+			...(item.artifacts ? { artifacts: item.artifacts.map((ref) => ({ ...ref })) } : {}),
 			...(item.appearance ? { appearance: { ...item.appearance } } : {}),
 			...(item.properties ? { properties: { ...item.properties, ...(item.properties.labelIds ? { labelIds: [...item.properties.labelIds] } : {}) } } : {}),
 			...(item.type === 'stack' ? { cardIds: [...item.cardIds] } : {}),

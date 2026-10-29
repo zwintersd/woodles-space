@@ -19,6 +19,8 @@ export type HomeSuiteContextAction = {
 	group?: 'edit' | 'connect' | 'view' | 'danger';
 	enabled?: boolean;
 	detail?: string;
+	/** Actions with the same submenu are presented together. */
+	submenu?: string;
 };
 export type HomeSuiteContextTarget = {
 	label: string;

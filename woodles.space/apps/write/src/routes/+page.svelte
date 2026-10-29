@@ -47,7 +47,7 @@
 		countWords,
 		previewText
 	} from '$lib/htmlTools';
-	import { POCKETS_ORDER_KEY } from '$lib/storage';
+	import { DRAFTS_INDEX_KEY, POCKETS_ORDER_KEY } from '$lib/storage';
 	import {
 		findLetter,
 		incrementIssue,
@@ -1137,6 +1137,7 @@
 
 		window.addEventListener('resize', onResize);
 		window.addEventListener('storage', onTrashChanged);
+		window.addEventListener('storage', onDraftIndexChanged);
 		document.addEventListener('selectionchange', onSelectionChange);
 		watchWrapWidth();
 	});
@@ -1145,6 +1146,7 @@
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('resize', onResize);
 			window.removeEventListener('storage', onTrashChanged);
+			window.removeEventListener('storage', onDraftIndexChanged);
 			window.removeEventListener('message', onHomeSuiteMessage);
 			window.removeEventListener('keydown', onHomeSuiteKeydown, true);
 			window.removeEventListener('pagehide', flushHomeSuiteSave);
@@ -1333,12 +1335,16 @@
 		saveTimer = setTimeout(persistCurrentDraft, homeSuiteMode ? 250 : 700);
 	}
 
+	function onDraftIndexChanged(event: StorageEvent) {
+		if (event.key === DRAFTS_INDEX_KEY) draftsList = listDrafts();
+	}
+
 	function persistCurrentDraft() {
 		try {
 			const now = new Date().toISOString();
 			if (currentDraftId) {
 				saveDraft(currentDraftId, currentDraftBody(now));
-				draftsList = upsertIndex(draftsList, currentDraftId, title, now, { kind, tags });
+				draftsList = upsertIndex(listDrafts(), currentDraftId, title, now, { kind, tags });
 				writeIndex(draftsList);
 			}
 		} catch (e) {

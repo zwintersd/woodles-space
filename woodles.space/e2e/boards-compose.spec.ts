@@ -508,7 +508,8 @@ test('Cards and Slips share an order, and converting a stacked Slip keeps its sl
 	await page.mouse.move(from.x + 3, from.y + 10); await page.mouse.down(); await page.mouse.move(target.x + 80, target.y + 70, { steps: 6 }); await page.mouse.up();
 	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === stackId)?.cardIds).toEqual(['slip-a', 'card-a']);
 	await slip.getByRole('textbox', { name: 'Slip text', exact: true }).click({ button: 'right', position: { x: 12, y: 14 } });
-	await page.getByRole('menuitem', { name: 'Turn into Card', exact: true }).click();
+	await page.getByRole('menuitem', { name: 'Turn into…', exact: true }).click();
+	await page.getByRole('menuitem', { name: 'Card', exact: true }).click();
 	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === 'slip-a')?.type).toBe('card');
 	expect((await stored(page)).items.find((item: any) => item.id === 'slip-a').stackId).toBe(stackId);
 	expect((await stored(page)).items.find((item: any) => item.id === stackId).cardIds).toEqual(['slip-a', 'card-a']);
@@ -532,4 +533,103 @@ test('Slip placement stays neat on narrow screens and reduced motion skips the p
 	const noteWidth = await slip.evaluate((node) => (node as HTMLElement).offsetWidth); const stackWidth = await stack.evaluate((node) => (node as HTMLElement).offsetWidth);
 	expect(noteWidth).toBe(stackWidth - 28);
 	await page.screenshot({ path: 'test-results/boards-slip-stack-narrow.png' });
+});
+
+test('a card creates a document with its words and retains the document after undo', async ({ page }) => {
+	const card = page.locator('[data-context-item="card-b"]');
+	await card.click({ button: 'right', position: { x: 5, y: 60 } });
+	await page.getByRole('menuitem', { name: 'Turn into…', exact: true }).click();
+	await page.getByRole('menuitem', { name: 'Document', exact: true }).click();
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === 'card-b')?.artifacts?.[0]?.kind).toBe('draft');
+	const after = (await stored(page)).items.find((item: any) => item.id === 'card-b');
+	const ref = after.artifacts[0];
+	expect(ref).toMatchObject({ app: 'write', kind: 'draft' });
+	const id = ref.id;
+	expect(id).toBeTruthy();
+	const draft = await page.evaluate((id) => JSON.parse(localStorage.getItem(`woodles_draft_${id}`)!), id);
+	expect(draft.title).toBe('Something to try');
+	expect(draft.layers.foreground.html).toContain('A little room to play.');
+	const index = await page.evaluate(() => JSON.parse(localStorage.getItem('woodles_drafts_index')!));
+	expect(index.some((entry: any) => entry.id === id)).toBe(true);
+	await page.keyboard.press('Control+z');
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === 'card-b')?.artifacts?.length ?? 0).toBe(0);
+	expect(await page.evaluate((id) => localStorage.getItem(`woodles_draft_${id}`), id)).not.toBeNull();
+	await page.keyboard.press('Control+Shift+z');
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === 'card-b')?.artifacts?.[0]).toEqual(ref);
+	await page.reload();
+	expect((await stored(page)).items.find((item: any) => item.id === 'card-b')).toMatchObject({ type: 'card', title: 'Something to try', body: 'A little room to play.', artifacts: [ref] });
+	expect(await page.evaluate((id) => JSON.parse(localStorage.getItem('woodles_drafts_index')!).filter((entry: any) => entry.id === id).length, id)).toBe(1);
+	await card.click({ button: 'right', position: { x: 5, y: 60 } });
+	await page.getByRole('menuitem', { name: 'Edit details', exact: true }).click();
+	const link = page.getByRole('link', { name: 'Open document ↗' });
+	await expect(link).toHaveAttribute('href', `/write?draft=${id}`);
+	await page.context().route('**/write?draft=*', (route) => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Write destination</title>' }));
+	const popupPromise = page.waitForEvent('popup');
+	await link.click();
+	const popup = await popupPromise;
+	await expect(popup).toHaveURL(new RegExp(`/write\\?draft=${id}$`));
+	await popup.close();
+});
+
+test('a slip creates a collection containing its words and retains the collection after undo', async ({ page }) => {
+	const slip = page.locator('[data-context-item="slip-a"]');
+	await slip.getByRole('textbox', { name: 'Slip text', exact: true }).click({ button: 'right', position: { x: 12, y: 14 } });
+	await page.getByRole('menuitem', { name: 'Turn into…', exact: true }).click();
+	await page.getByRole('menuitem', { name: 'Collection', exact: true }).click();
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === 'slip-a')?.artifacts?.[0]?.kind).toBe('collection');
+	const after = (await stored(page)).items.find((item: any) => item.id === 'slip-a');
+	const ref = after.artifacts[0];
+	expect(ref).toMatchObject({ app: 'data', kind: 'collection' });
+	const id = ref.id;
+	expect(id).toBeTruthy();
+	const collection = await page.evaluate((id) => JSON.parse(localStorage.getItem('woodles.data.collections.v1')!).data.collections.find((entry: any) => entry.id === id), id);
+	expect(collection).toBeTruthy();
+	expect(collection.records.some((record: any) => Object.values(record.values).some((value) => String(value).includes('Save this thought for later')))).toBe(true);
+	await page.getByRole('main', { name: 'Whiteboard canvas' }).click({ position: { x: 10, y: 200 } });
+	await page.keyboard.press('Control+z');
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === 'slip-a')?.artifacts?.length ?? 0).toBe(0);
+	expect(await page.evaluate((id) => JSON.parse(localStorage.getItem('woodles.data.collections.v1')!).data.collections.some((entry: any) => entry.id === id), id)).toBe(true);
+	await page.keyboard.press('Control+Shift+z');
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === 'slip-a')?.artifacts?.[0]).toEqual(ref);
+	await page.reload();
+	expect((await stored(page)).items.find((item: any) => item.id === 'slip-a')).toMatchObject({ type: 'slip', text: 'Save this thought for later', artifacts: [ref] });
+	expect(await page.evaluate((id) => JSON.parse(localStorage.getItem('woodles.data.collections.v1')!).data.collections.filter((entry: any) => entry.id === id).length, id)).toBe(1);
+});
+
+test('HomeSuite receives Turn into actions and creates through the selected board item', async ({ page }) => {
+	await page.route('**/spawn-shell', (route) => route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body></body></html>' }));
+	await page.goto('/spawn-shell');
+	await page.evaluate((boardId) => {
+		const iframe = document.createElement('iframe');
+		iframe.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0';
+		iframe.src = `/whiteboard?board=${boardId}&homesuite=1`;
+		(window as any).__boardMessages = [];
+		window.addEventListener('message', (event) => { if (event.data?.channel === 'woodles.homesuite.v1') (window as any).__boardMessages.push(event.data); });
+		document.body.append(iframe);
+	}, boardId);
+	const frame = page.frameLocator('iframe');
+	await frame.locator('[data-context-item="card-b"]').click({ button: 'right', position: { x: 5, y: 60 } });
+	await expect.poll(async () => page.evaluate(() => (window as any).__boardMessages.some((message: any) => message.type === 'context-menu' && message.target.actions.some((action: any) => action.id === 'spawn-document' && action.submenu === 'Turn into…') && message.target.actions.some((action: any) => action.id === 'spawn-collection' && action.submenu === 'Turn into…')))).toBe(true);
+	await page.evaluate(() => {
+		const message = (window as any).__boardMessages.findLast((entry: any) => entry.type === 'context-menu');
+		document.querySelector('iframe')!.contentWindow!.postMessage({ channel: 'woodles.homesuite.v1', source: 'shell', type: 'action', action: 'context-command', requestId: message.requestId, commandId: 'spawn-document' }, window.location.origin);
+	});
+	await expect.poll(async () => (await stored(page)).items.find((item: any) => item.id === 'card-b')?.artifacts?.[0]).toMatchObject({ app: 'write', kind: 'draft' });
+	const ref = (await stored(page)).items.find((item: any) => item.id === 'card-b').artifacts[0];
+	expect(await page.evaluate((id) => JSON.parse(localStorage.getItem(`woodles_draft_${id}`)!).title, ref.id)).toBe('Something to try');
+});
+
+
+test('Turn into submenu fits the screen at a narrow width', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.getByRole('button', { name: 'Fit board in view', exact: true }).click();
+	await page.locator('[data-context-item="card-b"]').click({ button: 'right', position: { x: 5, y: 60 } });
+	await page.getByRole('menuitem', { name: 'Turn into…', exact: true }).click();
+	const documentAction = page.getByRole('menuitem', { name: 'Document', exact: true });
+	const collectionAction = page.getByRole('menuitem', { name: 'Collection', exact: true });
+	await expect(documentAction).toBeInViewport();
+	await expect(collectionAction).toBeInViewport();
+	const box = (await collectionAction.boundingBox())!;
+	expect(box.x).toBeGreaterThanOrEqual(0);
+	expect(box.x + box.width).toBeLessThanOrEqual(390);
 });

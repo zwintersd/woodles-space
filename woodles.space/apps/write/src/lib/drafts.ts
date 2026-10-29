@@ -1,3 +1,4 @@
+import { textToHtml } from '@woodles/write-drafts';
 import {
 	ACTIVE_DRAFT_ID_KEY,
 	DRAFTS_INDEX_KEY,
@@ -244,25 +245,7 @@ export function migrateLegacyDraft(): { id: string; entry: DraftIndexItem } | nu
 
 const handoffQueue = createHandoffQueue('write');
 
-export function escapeHtml(text: string): string {
-	return text
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;');
-}
-
-// Plain text arrives from apps whose bodies are bare textareas. Blank lines
-// separate paragraphs; single newlines stay soft breaks within one.
-export function textToHtml(text: string): string {
-	const blocks = text
-		.split(/\n{2,}/)
-		.map((block) => block.trim())
-		.filter(Boolean);
-	if (blocks.length === 0) return '';
-	return blocks
-		.map((block) => '<p>' + escapeHtml(block).replace(/\n/g, '<br>') + '</p>')
-		.join('');
-}
+export { escapeHtml, textToHtml } from '@woodles/write-drafts';
 
 export function handoffToDraftBody(item: Handoff): DraftBody {
 	const stamp = new Date().toISOString();

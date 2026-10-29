@@ -8,9 +8,7 @@ export const POCKETS_ORDER_KEY = 'woodles_pockets_order';
 // layer is on which page. A device preference, never part of a draft.
 export const VIEW_PREFS_KEY = 'woodles_write_view';
 
-export const ACTIVE_DRAFT_ID_KEY = 'woodles_active_draft_id';
-export const DRAFTS_INDEX_KEY = 'woodles_drafts_index';
-export const DRAFT_PREFIX = 'woodles_draft_';
+export { ACTIVE_DRAFT_ID_KEY, DRAFTS_INDEX_KEY, DRAFT_PREFIX } from '@woodles/write-drafts';
 
 // Legacy keys — read on first migration of pre-indexed-drafts state,
 // and written-through on publish so older viewer code paths still see

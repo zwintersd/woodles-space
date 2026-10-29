@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import type { HomeSuiteContextAction } from '@shared/homesuiteBridge';
 	let { label, detail, items, x, y, onRun, onClose }: {
 		label: string; detail: string; items: HomeSuiteContextAction[]; x: number; y: number;
@@ -8,8 +8,12 @@
 	let menu: HTMLDivElement;
 	let left = $state(8);
 	let top = $state(8);
+	let submenu = $state<string | null>(null);
+	const visibleItems = $derived(submenu ? items.filter((item) => item.submenu === submenu) : items.filter((item, index) => !item.submenu || items.findIndex((candidate) => candidate.submenu === item.submenu) === index));
+	async function showSubmenu(name: string | null) { submenu = name; await tick(); buttons()[0]?.focus({ preventScroll: true }); }
 	function buttons() { return [...menu.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')]; }
 	function keydown(event: KeyboardEvent) {
+		if (submenu && (event.key === 'Escape' || event.key === 'ArrowLeft')) { event.preventDefault(); event.stopPropagation(); void showSubmenu(null); return; }
 		if (event.key === 'Escape' || event.key === 'Tab') {
 			if (event.key === 'Escape') event.preventDefault();
 			event.stopPropagation(); onClose(true); return;
@@ -48,11 +52,16 @@
 
 <div class="context-menu" data-whiteboard-ui bind:this={menu} role="menu" aria-label={`Actions for ${label}`} tabindex="-1" style:left={`${left}px`} style:top={`${top}px`} onkeydown={keydown} oncontextmenu={(event) => event.preventDefault()}>
 	<div class="context-heading" role="presentation"><strong>{label}</strong><small>{detail}</small></div>
-	{#each items as item, index (item.id)}
-		{#if index > 0 && item.group !== items[index - 1].group}<div class="context-divider" role="separator"></div>{/if}
-		<button role="menuitem" class:danger={item.group === 'danger'} disabled={item.enabled === false} onclick={() => onRun(item.id)}>
-			<span>{item.label}{#if item.detail}<small>{item.detail}</small>{/if}</span>
-		</button>
+	{#if submenu}<button role="menuitem" onclick={() => showSubmenu(null)}>← Back</button>{/if}
+	{#each visibleItems as item, index (item.id)}
+		{#if index > 0 && item.group !== visibleItems[index - 1].group}<div class="context-divider" role="separator"></div>{/if}
+		{#if !submenu && item.submenu}
+			<button role="menuitem" aria-haspopup="menu" onclick={() => showSubmenu(item.submenu ?? null)}>{item.submenu} <span aria-hidden="true">›</span></button>
+		{:else}
+			<button role="menuitem" class:danger={item.group === 'danger'} disabled={item.enabled === false} onclick={() => onRun(item.id)}>
+				<span>{item.label}{#if item.detail}<small>{item.detail}</small>{/if}</span>
+			</button>
+		{/if}
 	{/each}
 </div>
 
