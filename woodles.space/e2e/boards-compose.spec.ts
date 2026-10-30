@@ -633,3 +633,54 @@ test('Turn into submenu fits the screen at a narrow width', async ({ page }) => 
 	expect(box.x).toBeGreaterThanOrEqual(0);
 	expect(box.x + box.width).toBeLessThanOrEqual(390);
 });
+
+test('board looks render, persist and leave objects interactive on desktop and narrow screens', async ({ page }) => {
+	await page.getByRole('button', { name: 'Board appearance', exact: true }).click();
+	const panel = page.locator('.view-card');
+	await panel.getByRole('button', { name: 'Garden journal' }).click();
+	await expect(page.locator('.surface-material')).toHaveClass(/material-linen/);
+	await expect(page.locator('.surface-atmosphere')).toHaveClass(/atmosphere-sunlight/);
+	await expect(page.locator('.surface-edge')).toHaveClass(/edge-frame/);
+	await expect(page.locator('.surface-weave')).toHaveCSS('mask-image', /radial-gradient/);
+	await expect.poll(async () => (await stored(page)).surface.material).toBe('linen');
+	await page.screenshot({ path: 'test-results/board-garden-desktop.png' });
+	await page.reload();
+	await expect(page.locator('.surface-material')).toHaveClass(/material-linen/);
+	await expect(page.locator('.surface-edge')).toHaveClass(/edge-frame/);
+	await page.getByRole('textbox', { name: 'Card title' }).first().fill('Still editable');
+	await expect.poll(async () => (await stored(page)).items[0].title).toBe('Still editable');
+	await page.setViewportSize({ width: 390, height: 844 });
+	const dock = (await page.locator('.tool-dock').boundingBox())!;
+	const controls = (await page.locator('.camera-controls').boundingBox())!;
+	expect(dock.x + dock.width).toBeLessThanOrEqual(controls.x);
+	await page.getByRole('button', { name: 'Board appearance', exact: true }).click();
+	await panel.getByRole('button', { name: 'Stargazer' }).click();
+	await expect(page.locator('.surface-edge')).toHaveClass(/edge-corners/);
+	await expect(page.locator('.surface-atmosphere')).toHaveClass(/atmosphere-twilight/);
+	await expect.poll(async () => (await stored(page)).surface.pattern).toBe('stars');
+	await panel.getByRole('button', { name: 'plain', exact: true }).click();
+	await expect(panel.getByRole('button', { name: 'strong', exact: true })).toBeDisabled();
+	await panel.getByRole('button', { name: 'rainbow', exact: true }).click();
+	await expect(panel.getByRole('button', { name: 'strong', exact: true })).toBeEnabled();
+	await page.screenshot({ path: 'test-results/board-appearance-narrow.png' });
+});
+
+
+test('pattern colors and decorations are saved and can be undone', async ({ page }) => {
+	await page.getByRole('button', { name: 'Board appearance', exact: true }).click();
+	const panel = page.locator('.view-card');
+	await panel.getByLabel('Pattern color').fill('#123456');
+	await expect.poll(async () => (await stored(page)).surface.patternColor).toBe('#123456');
+	await expect(page.locator('.surface-weave')).toHaveCSS('background-image', /18, 52, 86/);
+	if (!(await panel.isVisible())) await page.getByRole('button', { name: 'Board appearance', exact: true }).click();
+	await panel.getByText('Add a decoration', { exact: true }).click();
+	await panel.getByRole('button', { name: '✦ Star' }).click();
+	await expect.poll(async () => (await stored(page)).items.some((item: any) => item.type === 'lettering' && item.text === '✦')).toBe(true);
+	await page.keyboard.press('Control+z');
+	await expect.poll(async () => (await stored(page)).items.some((item: any) => item.type === 'lettering' && item.text === '✦')).toBe(false);
+	await page.keyboard.press('Control+Shift+z');
+	await expect.poll(async () => (await stored(page)).items.some((item: any) => item.type === 'lettering' && item.text === '✦')).toBe(true);
+	await page.reload();
+	await expect(page.locator('[aria-label="Lettering: ✦"]')).toBeVisible();
+	await expect(page.locator('.surface-weave')).toHaveCSS('background-image', /18, 52, 86/);
+});

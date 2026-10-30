@@ -10,7 +10,7 @@
  * (surface, camera) so the whole thing is testable without a DOM.
  */
 
-export const SURFACE_PATTERNS = ['dots', 'grid', 'lines', 'plain'] as const;
+export const SURFACE_PATTERNS = ['dots', 'grid', 'lines', 'stars', 'stitches', 'plain'] as const;
 export type SurfacePattern = (typeof SURFACE_PATTERNS)[number];
 
 export const SURFACE_SIZES = ['fine', 'regular', 'wide'] as const;
@@ -23,11 +23,21 @@ export type SurfaceDepth = (typeof SURFACE_DEPTHS)[number];
 export const SURFACE_PAPERS = ['paper', 'rainbow'] as const;
 export type SurfacePaper = (typeof SURFACE_PAPERS)[number];
 
+export const SURFACE_MATERIALS = ['smooth', 'linen', 'parchment'] as const;
+export const SURFACE_ATMOSPHERES = ['none', 'sunlight', 'twilight'] as const;
+export const SURFACE_EDGES = ['none', 'frame', 'corners'] as const;
+
 export type Surface = {
 	pattern: SurfacePattern;
 	size: SurfaceSize;
 	depth: SurfaceDepth;
 	paper: SurfacePaper;
+	/** Optional paper tint, independent of the pattern. */
+	color?: string;
+	patternColor?: string;
+	material?: (typeof SURFACE_MATERIALS)[number];
+	edge?: (typeof SURFACE_EDGES)[number];
+	atmosphere?: (typeof SURFACE_ATMOSPHERES)[number];
 };
 
 /** Dots, regular, normal: the exact surface every board had before it was a choice. */
@@ -40,7 +50,7 @@ const CELL: Record<SurfaceSize, number> = { fine: 12, regular: 22, wide: 44 };
 const INK_ALPHA: Record<SurfaceDepth, number> = { faint: 0.07, normal: 0.14, strong: 0.24 };
 
 /** Ruled lines carry more ink per cell than dots do, so they are asked for less of it. */
-const PATTERN_WEIGHT: Record<SurfacePattern, number> = { dots: 1, grid: 0.62, lines: 0.72, plain: 0 };
+const PATTERN_WEIGHT: Record<SurfacePattern, number> = { dots: 1, grid: 0.62, lines: 0.72, stars: 1, stitches: 1, plain: 0 };
 
 const WASH_ALPHA: Record<SurfaceDepth, number> = { faint: 0.3, normal: 0.52, strong: 0.78 };
 
@@ -115,7 +125,9 @@ function round(value: number): number {
 
 function ink(surface: Surface): string {
 	const alpha = INK_ALPHA[surface.depth] * PATTERN_WEIGHT[surface.pattern];
-	return `rgba(${INK_RGB}, ${round(alpha * 1000) / 1000})`;
+	const hex = surface.patternColor;
+	const rgb = hex ? [1, 3, 5].map((offset) => parseInt(hex.slice(offset, offset + 2), 16)).join(', ') : INK_RGB;
+	return `rgba(${rgb}, ${round(alpha * 1000) / 1000})`;
 }
 
 /** The pattern layer: what it draws, how big, and where it sits under the camera. */
@@ -132,6 +144,12 @@ export function weaveCss(surface: Surface, camera: { x: number; y: number; zoom:
 		const dot = round(Math.max(1, Math.min(2.2, step / 20)));
 		return `background-image: radial-gradient(circle at ${dot}px ${dot}px, ${color} ${dot}px, transparent ${round(dot + 0.4)}px); background-size: ${step}px ${step}px; ${shift}`;
 	}
+	if (surface.pattern === 'stars') {
+		return `background-image: radial-gradient(circle at 50% 50%, ${color} 1.5px, transparent 2px), linear-gradient(90deg, transparent 47%, ${color} 50%, transparent 53%), linear-gradient(transparent 47%, ${color} 50%, transparent 53%); background-size: ${step}px ${step}px; mask-image: radial-gradient(circle 5px at center, black 45%, transparent 100%); mask-size: ${step}px ${step}px; ${shift}`;
+	}
+	if (surface.pattern === 'stitches') {
+		return `background-image: linear-gradient(45deg, transparent 46%, ${color} 49%, ${color} 51%, transparent 54%), linear-gradient(-45deg, transparent 46%, ${color} 49%, ${color} 51%, transparent 54%); background-size: ${step}px ${step}px; mask-image: radial-gradient(circle 5px at center, black 45%, transparent 100%); mask-size: ${step}px ${step}px; ${shift}`;
+	}
 	if (surface.pattern === 'grid') {
 		return `background-image: linear-gradient(to right, ${color} 1px, transparent 1px), linear-gradient(to bottom, ${color} 1px, transparent 1px); background-size: ${step}px ${step}px; ${shift}`;
 	}
@@ -144,7 +162,7 @@ export function paperCss(surface: Surface): string {
 		? 'radial-gradient(ellipse at 50% -20%, rgba(255, 255, 255, 0.6), transparent 54%)'
 		: 'radial-gradient(ellipse at 50% -20%, rgba(255, 255, 255, 0.82), transparent 59%)';
 	if (surface.paper !== 'rainbow') {
-		return `background-color: ${PAPER_COLOR}; background-image: ${glow};`;
+		return `background-color: ${surface.color ?? PAPER_COLOR}; background-image: ${glow};`;
 	}
 	const wash = WASH_ALPHA[surface.depth];
 	const bands = SPECTRUM
@@ -187,7 +205,12 @@ export function isSurface(value: unknown): value is Surface {
 	return (SURFACE_PATTERNS as readonly unknown[]).includes(record.pattern) &&
 		(SURFACE_SIZES as readonly unknown[]).includes(record.size) &&
 		(SURFACE_DEPTHS as readonly unknown[]).includes(record.depth) &&
-		(SURFACE_PAPERS as readonly unknown[]).includes(record.paper);
+		(SURFACE_PAPERS as readonly unknown[]).includes(record.paper) &&
+		(record.color === undefined || (typeof record.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(record.color))) &&
+		(record.patternColor === undefined || (typeof record.patternColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(record.patternColor))) &&
+		(record.material === undefined || (SURFACE_MATERIALS as readonly unknown[]).includes(record.material)) &&
+		(record.edge === undefined || (SURFACE_EDGES as readonly unknown[]).includes(record.edge)) &&
+		(record.atmosphere === undefined || (SURFACE_ATMOSPHERES as readonly unknown[]).includes(record.atmosphere));
 }
 
 /**
@@ -204,6 +227,11 @@ export function normalizeSurface(value: unknown): Surface {
 		pattern: pick(SURFACE_PATTERNS, record.pattern, DEFAULT_SURFACE.pattern),
 		size: pick(SURFACE_SIZES, record.size, DEFAULT_SURFACE.size),
 		depth: pick(SURFACE_DEPTHS, record.depth, DEFAULT_SURFACE.depth),
-		paper: pick(SURFACE_PAPERS, record.paper, DEFAULT_SURFACE.paper)
+		paper: pick(SURFACE_PAPERS, record.paper, DEFAULT_SURFACE.paper),
+		...(typeof record.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(record.color) ? { color: record.color } : {}),
+		...(typeof record.patternColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(record.patternColor) ? { patternColor: record.patternColor } : {}),
+		...(SURFACE_MATERIALS.includes(record.material as Surface['material'] & string) ? { material: record.material as Surface['material'] } : {}),
+		...(SURFACE_EDGES.includes(record.edge as Surface['edge'] & string) ? { edge: record.edge as Surface['edge'] } : {}),
+		...(SURFACE_ATMOSPHERES.includes(record.atmosphere as Surface['atmosphere'] & string) ? { atmosphere: record.atmosphere as Surface['atmosphere'] } : {})
 	};
 }
