@@ -697,3 +697,52 @@ for (const colorScheme of ['light', 'dark'] as const) {
 		expect(index.violations, JSON.stringify(index.violations, null, 2)).toEqual([]);
 	});
 }
+
+test('each board remembers whether its HomeSuite inspector was open', async ({ page }) => {
+	await page.goto('/homesuite');
+	await create(page, 'Board');
+	const first = page.url();
+	await expect(page.getByRole('complementary', { name: 'Inspector' })).toBeVisible();
+	await page.getByRole('button', { name: 'Hide inspector' }).click();
+	await page.reload(); await surfaceReady(page);
+	await expect(page.getByRole('complementary', { name: 'Inspector' })).toHaveCount(0);
+	await backToIndex(page);
+	await create(page, 'Board');
+	const second = page.url();
+	await expect(page.getByRole('complementary', { name: 'Inspector' })).toBeVisible();
+	await page.goto(first); await surfaceReady(page);
+	await expect(page.getByRole('complementary', { name: 'Inspector' })).toHaveCount(0);
+	await page.getByRole('button', { name: 'Show inspector' }).click();
+	await page.reload(); await surfaceReady(page);
+	await expect(page.getByRole('complementary', { name: 'Inspector' })).toBeVisible();
+	await page.goto(second); await surfaceReady(page);
+	await expect(page.getByRole('complementary', { name: 'Inspector' })).toBeVisible();
+});
+
+test('a new board starts with its inspector closed on a narrow screen and remembers an explicit choice', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/homesuite'); await create(page, 'Board');
+	await expect(page.getByRole('complementary', { name: 'Inspector' })).toHaveCount(0);
+	await page.getByRole('button', { name: 'Show inspector' }).click();
+	await page.reload(); await surfaceReady(page);
+	await expect(page.getByRole('complementary', { name: 'Inspector' })).toBeVisible();
+});
+
+test('HomeSuite keeps a board open if its pending changes cannot be saved', async ({ page }) => {
+	await page.goto('/homesuite'); await create(page, 'Board');
+	const frame = page.frameLocator('iframe.native-surface');
+	await frame.getByRole('button', { name: 'Add card', exact: true }).click();
+	await frame.getByRole('textbox', { name: 'Card title' }).fill('Keep this unsaved work');
+	await page.locator('iframe.native-surface').evaluate((element: HTMLIFrameElement) => {
+		const child = element.contentWindow! as Window & typeof globalThis;
+		const original = child.Storage.prototype.setItem;
+		child.Storage.prototype.setItem = function(key: string, value: string) {
+			if (key.startsWith('woodles.whiteboard.boards.')) throw new DOMException('Storage full', 'QuotaExceededError');
+			return original.call(this, key, value);
+		};
+	});
+	await page.getByRole('button', { name: 'HomeSuite index' }).click();
+	await expect(page.locator('iframe.native-surface')).toBeVisible();
+	await expect(frame.getByRole('textbox', { name: 'Card title' })).toHaveValue('Keep this unsaved work');
+	await expect(page.getByText(/board could not be saved/i)).toBeVisible();
+});

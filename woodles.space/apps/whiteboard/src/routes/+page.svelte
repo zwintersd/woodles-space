@@ -48,6 +48,7 @@
 	} from '$lib/geometry';
 	import {
 	createCard,
+	snapshotDocument,
 	createSlip,
 	isStackMember,
 	type StackMember,
@@ -322,6 +323,8 @@
 	let loaded = $state(false);
 	let trashRevision = $state(0);
 	let dirty = false;
+	let savedRevision: string | null = null;
+	let revisionKnown = false;
 	const pendingAssetDeletes = new Set<string>();
 	const homeSuiteEmbedded = typeof window !== 'undefined' &&
 		window.parent !== window && new URLSearchParams(window.location.search).get('homesuite') === '1';
@@ -811,23 +814,48 @@
 		}, delay);
 	}
 
-	function saveNow() {
-		if (!loaded || !dirty) return;
-		if (saveTimer) {
-			clearTimeout(saveTimer);
-			saveTimer = null;
+	function captureRevision() {
+		try { savedRevision = boardLibrary.revision(board.board.id); revisionKnown = true; }
+		catch { savedRevision = null; revisionKnown = false; }
+	}
+	function saveNow(): boolean {
+		if (!loaded || !dirty) return true;
+		if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+		let currentRevision: string | null;
+		try {
+			if (!revisionKnown) throw new Error('The saved board could not be checked.');
+			currentRevision = boardLibrary.revision(board.board.id);
+		} catch {
+			saveState = 'error'; saveMessage = 'Could not check the saved board. Your changes are still here.';
+			return false;
 		}
-		board.updatedAt = now();
-		const result = boardLibrary.save(board);
-		if (result.ok) {
-			dirty = false;
-			saveState = 'saved';
-			saveMessage = 'saved here';
-			removeSettledImageAssets();
+		const conflict = currentRevision !== savedRevision;
+		const next = snapshotDocument(board);
+		next.updatedAt = now();
+		if (conflict) next.board = { id: makeId('board'), title: `${boardTitleFallback(board.board.title)} (recovery copy)` };
+		const result = boardLibrary.save(next);
+		if (!result.ok) {
+			saveState = 'error'; saveMessage = result.issue?.message ?? 'this board could not be saved';
+			return false;
+		}
+		board.board = next.board;
+		board.updatedAt = next.updatedAt;
+		captureRevision();
+		dirty = false;
+		if (conflict) {
+			const rehome = (entry: EditHistory['past'][number]) => ({ ...entry, snapshot: { ...entry.snapshot, board: { ...entry.snapshot.board, id: next.board.id } } });
+			editHistory = { past: editHistory.past.map(rehome), future: editHistory.future.map(rehome) };
+			rememberActiveBoard(board.board.id);
+			syncBoardAddress();
+			refreshBoards();
+			saveState = 'recovered';
+			saveMessage = 'Another tab changed the original. Your work was saved as a recovery copy.';
+			notice = saveMessage;
 		} else {
-			saveState = 'error';
-			saveMessage = result.issue?.message ?? 'this board could not be saved';
+			saveState = 'saved'; saveMessage = 'saved here';
 		}
+		removeSettledImageAssets();
+		return true;
 	}
 
 	/**
@@ -1081,7 +1109,7 @@
 		const message = event.data;
 		if (context.handle(message)) return;
 		if (message.action === 'context-open') { openBoardContext({ x: 16, y: 16 }); return; }
-		if (message.action === 'flush') { saveNow(); postHomeSuiteFlushed(); }
+		if (message.action === 'flush') { postHomeSuiteFlushed(saveNow()); }
 		else if (message.action === 'rename') renameBoard(message.title);
 		else if (message.action === 'undo') performUndo();
 		else if (message.action === 'redo') performRedo();
@@ -1124,6 +1152,7 @@
 			saveMessage = 'saved here';
 		}
 
+		captureRevision();
 		history = createCameraHistory({ camera: { ...board.camera }, label: 'Where you were' });
 		editHistory = createEditHistory();
 		loaded = true;
@@ -2364,9 +2393,9 @@
 			return;
 		}
 
+		if (!saveNow()) return;
 		travelling = true;
 		handHoldsTheCamera();
-		saveNow();
 		const resting = { ...board.camera };
 		const flight = animateCamera(enterCamera(itemBounds(portal), viewport()));
 		veil = 1;
@@ -2408,9 +2437,9 @@
 			return;
 		}
 
+		if (!saveNow()) return;
 		travelling = true;
 		handHoldsTheCamera();
-		saveNow();
 		const away = { ...board.camera, zoom: Math.max(0.1, board.camera.zoom * 0.4) };
 		const flight = animateCamera(away);
 		veil = 1;
@@ -2557,6 +2586,7 @@
 		renamingLabelId = null;
 		releaseImageUrls();
 		board = restoreWhiteboard(document);
+		captureRevision();
 		syncBoardAddress();
 		selectedIds = [];
 		connectorSourceId = null;
@@ -2590,7 +2620,7 @@
 			shelfOpen = false;
 			return;
 		}
-		saveNow();
+		if (!saveNow()) return;
 		const opened = boardLibrary.open(id);
 		if (!opened) {
 			notice = 'That board is no longer on the shelf.';
@@ -2613,7 +2643,7 @@
 	}
 
 	async function startNewBoard() {
-		saveNow();
+		if (!saveNow()) return;
 		trail = [];
 		boardLibrary.writeTrail(trail);
 		adoptDocument(boardLibrary.create(), 'saved', 'saved here');
