@@ -57,7 +57,7 @@ export type HomeSuiteSurfaceMessage =
 	/** Coordinates are in the surface viewport; actions belong to this request. */
 	| { channel: typeof HOMESUITE_CHANNEL; source: 'surface'; type: 'context-menu'; requestId: string; x: number; y: number; target: HomeSuiteContextTarget }
 	/** The answer to a `flush` action: pending saves have landed. */
-	| { channel: typeof HOMESUITE_CHANNEL; source: 'surface'; type: 'flushed' };
+	| { channel: typeof HOMESUITE_CHANNEL; source: 'surface'; type: 'flushed'; ok?: boolean };
 
 export type HomeSuiteShellMessage =
 	| { channel: typeof HOMESUITE_CHANNEL; source: 'shell'; type: 'action'; action: 'undo' | 'redo' | 'inspect' | 'focus' | 'flush' | 'context-open' }
@@ -81,9 +81,9 @@ export function postHomeSuitePaletteRequest(): void {
 }
 
 /** Answer the shell's `flush` once pending saves are written. */
-export function postHomeSuiteFlushed(): void {
+export function postHomeSuiteFlushed(ok = true): void {
 	if (typeof window === 'undefined' || window.parent === window) return;
-	window.parent.postMessage({ channel: HOMESUITE_CHANNEL, source: 'surface', type: 'flushed' } satisfies HomeSuiteSurfaceMessage, window.location.origin);
+	window.parent.postMessage({ channel: HOMESUITE_CHANNEL, source: 'surface', type: 'flushed', ok } satisfies HomeSuiteSurfaceMessage, window.location.origin);
 }
 
 /** Ask the shell to start renaming. Returns false outside HomeSuite. */

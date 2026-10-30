@@ -108,20 +108,28 @@ export function createBoardLibrary(storage?: StorageLike | null) {
 		return [...index.load().value].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 	}
 
-	function writeIndex(entries: BoardSummary[]): void {
-		index.save(entries);
+	function writeIndex(entries: BoardSummary[]): SaveResult {
+		return index.save(entries);
 	}
 
-	function record(document: WhiteboardDocument): void {
+	function record(document: WhiteboardDocument): SaveResult {
 		const summary = summarize(document);
 		const entries = index.load().value.filter((entry) => entry.id !== summary.id);
-		writeIndex([...entries, summary]);
+		return writeIndex([...entries, summary]);
+	}
+
+	/** Exact stored snapshot, used to detect a different editor's save. */
+	function revision(id: string): string | null {
+		const store = resolveStorage();
+		if (!store) throw new Error('Browser storage is unavailable.');
+		return store.getItem(BOARD_KEY_PREFIX + id);
 	}
 
 	function save(document: WhiteboardDocument): SaveResult {
 		const result = boardStore(document.board.id).save(snapshotDocument(document));
-		if (result.ok) record(document);
-		return result;
+		if (!result.ok) return result;
+		const indexed = record(document);
+		return indexed.ok ? result : indexed;
 	}
 
 	function open(id: string): OpenedBoard | null {
@@ -292,6 +300,7 @@ export function createBoardLibrary(storage?: StorageLike | null) {
 	return {
 		list,
 		open,
+		revision,
 		save,
 		create,
 		duplicate,

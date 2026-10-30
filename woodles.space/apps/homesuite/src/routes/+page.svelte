@@ -80,7 +80,7 @@
 	let frameShowing = '';
 	let navigating = false;
 	let readyFallback: ReturnType<typeof setTimeout> | undefined;
-	let flushWaiter: (() => void) | null = null;
+	let flushWaiter: ((ok: boolean) => void) | null = null;
 	type MenuAction = HomeSuiteContextAction & { run: () => void };
 	let contextMenu = $state<{ label: string; detail: string; x: number; y: number; items: MenuAction[]; requestId?: string; returnTo?: HTMLElement } | null>(null);
 	let referencePicker = $state<{ ref: WoodlesRef; title: string } | null>(null);
@@ -137,7 +137,7 @@
 		selectedFiles = []; search = ''; filter = 'all'; showingTrash = false;
 		closeContext(false); newOpen = false; paletteOpen = false;
 		navigating = true;
-		try { await releaseFrame(); refresh(); await goto(indexPath(id), { noScroll: true }); await tick(); }
+		try { if (!await releaseFrame()) return; refresh(); await goto(indexPath(id), { noScroll: true }); await tick(); }
 		finally { navigating = false; }
 	}
 
@@ -156,7 +156,7 @@
 	async function connectSuite(): Promise<void> {
 		const pass = syncPass.trim();
 		if (!pass) return;
-		await releaseFrame();
+		if (!await releaseFrame()) return;
 		await connectSync(pass);
 		syncPass = '';
 		refresh();
@@ -281,7 +281,7 @@
 	}
 
 	async function pickReferenceDestination(ref: WoodlesRef, title: string): Promise<void> {
-		await releaseFrame();
+		if (!await releaseFrame()) return;
 		referenceTargets = collectionReferenceTargets(ref);
 		referenceQuery = ''; referenceIssue = '';
 		referencePicker = { ref, title };
@@ -294,7 +294,7 @@
 			if (mounted) {
 				// The mounted owner applies this as an undoable edit to its current model.
 				sendAction({ action: 'add-reference', ref: referencePicker.ref });
-				await releaseFrame();
+				if (!await releaseFrame()) return;
 			} else addCollectionReference(referencePicker.ref, id);
 			referencePicker = null;
 			actionNotice = mounted ? 'Reference sent to the open collection.' : 'Reference added to collection.';
@@ -322,7 +322,7 @@
 				run: () => sendAction({ action: 'command', commandId: command.id })
 			})) : []),
 			{ id: 'artifact:owner', label: `Open in ${surfaceFor(artifact.kind)?.appName}`, group: 'view', run: () => {
-				void releaseFrame().then(() => window.open(entityHref(artifact.ref.app, artifact.ref.kind, artifact.ref.id), '_blank', 'noopener'));
+				void releaseFrame().then((ok) => { if (ok) window.open(entityHref(artifact.ref.app, artifact.ref.kind, artifact.ref.id), '_blank', 'noopener'); });
 			} },
 			{ id: 'artifact:trash', label: artifact.inTrash ? 'Restore from Trash' : 'Move to Trash', group: 'danger', run: () => {
 				if (artifact.inTrash) { restoreHomeSuiteArtifact(artifact.ref); refresh(); }
@@ -368,6 +368,22 @@
 		const binned = trashed.find((entry) => entry.kind === adapter.kind && entry.ref.id === requestedId);
 		return binned && { ref: binned.ref, kind: binned.kind, title: binned.title, updatedAt: binned.updatedAt, inTrash: true };
 	});
+	// Inspector visibility is local to this device and remembered per board.
+	function boardInspectorKey(id: string): string { return `woodles.homesuite.board-inspector.${encodeURIComponent(id)}`; }
+	function setInspectorOpen(open: boolean): void {
+		inspectorOpen = open;
+		if (requestedKind !== 'board' || !requestedId) return;
+		try { localStorage.setItem(boardInspectorKey(requestedId), open ? 'open' : 'closed'); } catch { /* The inspector still works if storage is unavailable. */ }
+	}
+	$effect(() => {
+		if (!ready || requestedKind !== 'board' || !requestedId) return;
+		const id = requestedId;
+		untrack(() => {
+			let saved: string | null = null;
+			try { saved = localStorage.getItem(boardInspectorKey(id)); } catch { /* Use the responsive default. */ }
+			inspectorOpen = saved === 'open' ? true : saved === 'closed' ? false : !window.matchMedia('(max-width: 600px)').matches;
+		});
+	});
 	const activeState = $derived(surfaceState);
 	const filtered = $derived(scopedArtifacts.filter((artifact) =>
 		(filter === 'all' || artifact.kind === filter) &&
@@ -404,7 +420,7 @@
 				: { id: 'shell:move-trash', label: 'Move to Trash', detail: 'HomeSuite artifact', enabled: true, run: moveActiveToTrash },
 			{ id: 'shell:rename', label: `Rename ${activeArtifact.kind}`, detail: 'HomeSuite artifact', enabled: !!activeState, run: startRename },
 			{ id: 'shell:folder', label: 'Move to folder…', detail: 'Organize', enabled: !activeArtifact.inTrash, run: () => pickMove({ refs: [activeArtifact.ref], title: activeState?.artifact.title || activeArtifact.title }) },
-			{ id: 'shell:inspect', label: inspectorOpen ? 'Hide inspector' : 'Show inspector', detail: 'View', enabled: true, run: () => { inspectorOpen = !inspectorOpen; } },
+			{ id: 'shell:inspect', label: inspectorOpen ? 'Hide inspector' : 'Show inspector', detail: 'View', enabled: true, run: () => setInspectorOpen(!inspectorOpen) },
 		...(activeState?.commands ?? []).map((command) => ({
 				id: `surface:${command.id}`,
 				label: command.label,
@@ -571,11 +587,16 @@
 	 * its frame away. `pagehide` covers the same ground; this answers first, so
 	 * the next thing opened reads what was just typed.
 	 */
-	function releaseFrame(): Promise<void> {
-		if (!surfaceFrame?.contentWindow || !frameReady) return Promise.resolve();
+	function releaseFrame(): Promise<boolean> {
+		if (!surfaceFrame?.contentWindow || !frameReady) return Promise.resolve(true);
 		return new Promise((resolve) => {
-			const done = () => { clearTimeout(timer); flushWaiter = null; resolve(); };
-			const timer = setTimeout(done, 250);
+			const done = (ok: boolean) => {
+				clearTimeout(timer); flushWaiter = null;
+				if (!ok) actionIssue = 'The board could not be saved. Your changes are still open; try saving again before leaving.';
+				else if (actionIssue.startsWith('The board could not be saved.')) actionIssue = '';
+				resolve(ok);
+			};
+			const timer = setTimeout(() => done(requestedKind !== 'board'), 1000);
 			flushWaiter = done;
 			sendAction({ action: 'flush' });
 		});
@@ -586,7 +607,7 @@
 		newOpen = false;
 		paletteOpen = false;
 		navigating = true;
-		try { await releaseFrame(); await goto(artifactPath(kind, id), { noScroll: true }); await tick(); }
+		try { if (!await releaseFrame()) return; await goto(artifactPath(kind, id), { noScroll: true }); await tick(); }
 		finally { navigating = false; }
 	}
 
@@ -607,7 +628,7 @@
 		paletteOpen = false;
 		navigating = true;
 		try {
-			await releaseFrame();
+			if (!await releaseFrame()) return;
 			showingTrash = trash;
 			selectedFiles = [];
 			refresh();
@@ -669,7 +690,7 @@
 			const rect = surfaceFrame!.getBoundingClientRect();
 			const { target, requestId } = message;
 			const items: MenuAction[] = target.actions.map((action) => ({ ...action, run: () => sendAction({ action: 'context-command', requestId, commandId: action.id }) }));
-			items.push({ id: 'context:inspector', label: 'Show inspector', group: 'view', run: () => { sendAction({ action: 'context-dismiss', requestId }); inspectorOpen = true; } });
+			items.push({ id: 'context:inspector', label: 'Show inspector', group: 'view', run: () => { sendAction({ action: 'context-dismiss', requestId }); setInspectorOpen(true); } });
 			if (target.ref) {
 				const ref = target.ref;
 				let addressable = true;
@@ -688,7 +709,7 @@
 		} else if (message.type === 'request-rename') {
 			startRename();
 		} else if (message.type === 'flushed') {
-			flushWaiter?.();
+			flushWaiter?.(message.ok !== false);
 		} else if (message.type === 'navigate' && message.target === 'index') {
 			void showIndex();
 		} else if (message.type === 'navigate' && message.target === 'artifact') {
@@ -854,7 +875,7 @@
 			<button class="toolbar-button sync-trigger" aria-label={`${syncLabel}. Sync settings`} aria-haspopup="dialog" onclick={openSync}><span class="sync-dot {syncState.syncing ? 'busy' : !syncState.connected ? 'off' : syncState.status}" aria-hidden="true"></span><span class="sync-label">{syncLabel}</span></button>
 			<button class="toolbar-button palette-trigger" onclick={openPalette} title="Commands (Ctrl/⌘ K)">⌕ <span>Commands</span><kbd>⌘ K</kbd></button>
 			{#if activeArtifact}
-				<button class="toolbar-button inspector-trigger" class:pressed={inspectorOpen} aria-label={inspectorOpen ? 'Hide inspector' : 'Show inspector'} aria-pressed={inspectorOpen} onclick={() => { inspectorOpen = !inspectorOpen; }}>☷ <span>Inspector</span></button>
+				<button class="toolbar-button inspector-trigger" class:pressed={inspectorOpen} aria-label={inspectorOpen ? 'Hide inspector' : 'Show inspector'} aria-pressed={inspectorOpen} onclick={() => setInspectorOpen(!inspectorOpen)}>☷ <span>Inspector</span></button>
 				{#if activeArtifact.inTrash}
 					<button class="toolbar-button trash-trigger" onclick={restoreActive}>Restore</button>
 				{:else}
@@ -881,6 +902,7 @@
 	{:else if activeArtifact && adapter}
 		<main class="surface-layout" aria-label={`${adapter.label}: ${activeState?.artifact.title || activeArtifact.title}`}>
 			<div class="surface-main">
+				{#if actionIssue}<div class="trash-issue" role="alert">{actionIssue}</div>{/if}
 				<div class="surface-strip">
 					<button class="back-link" onclick={() => showIndex()}>← {currentFolder?.name ?? (location === 'root' ? 'Unfiled' : 'All things')}</button>
 					{#if activeState?.selection}

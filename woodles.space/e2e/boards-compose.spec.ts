@@ -684,3 +684,26 @@ test('pattern colors and decorations are saved and can be undone', async ({ page
 	await expect(page.locator('[aria-label="Lettering: ✦"]')).toBeVisible();
 	await expect(page.locator('.surface-weave')).toHaveCSS('background-image', /18, 52, 86/);
 });
+
+test('a stale tab saves its work as a recovery board without overwriting the newer board', async ({ page, context }) => {
+	const other = await context.newPage(); await other.goto(page.url());
+	await expect(other.getByRole('textbox', { name: 'Card title' }).first()).toHaveValue('A pocket of possibilities');
+	await page.getByRole('textbox', { name: 'Card title' }).first().fill('First tab work');
+	await expect.poll(async () => (await stored(page)).items[0].title).toBe('First tab work');
+	await other.getByRole('textbox', { name: 'Card title' }).nth(1).fill('Second tab work');
+	await expect(other.getByText(/Another tab changed the original/).first()).toBeVisible();
+	await expect.poll(() => new URL(other.url()).searchParams.get('board')).not.toBe(boardId);
+	const recoveryId = new URL(other.url()).searchParams.get('board')!;
+	const recovery = await other.evaluate((id) => JSON.parse(localStorage.getItem(`woodles.whiteboard.boards.${id}`)!).data, recoveryId);
+	expect(recovery.board.title).toContain('recovery copy');
+	expect(recovery.items[1].title).toBe('Second tab work');
+	expect((await stored(page)).items[0].title).toBe('First tab work');
+	await other.locator('main').click({ position: { x: 10, y: 200 } });
+	await other.keyboard.press('Control+z');
+	await expect.poll(() => new URL(other.url()).searchParams.get('board')).toBe(recoveryId);
+	await other.keyboard.press('Control+Shift+z');
+	await expect.poll(async () => other.evaluate((id) => JSON.parse(localStorage.getItem(`woodles.whiteboard.boards.${id}`)!).data.items[1].title, recoveryId)).toBe('Second tab work');
+	await other.reload();
+	await expect(other.getByRole('textbox', { name: 'Card title' }).nth(1)).toHaveValue('Second tab work');
+	await other.close();
+});
