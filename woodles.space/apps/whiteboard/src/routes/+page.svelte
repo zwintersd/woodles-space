@@ -185,6 +185,9 @@
 	DEFAULT_SURFACE,
 	surfaceStyle,
 	SURFACE_DEPTHS,
+	SURFACE_MATERIALS,
+	SURFACE_ATMOSPHERES,
+	SURFACE_EDGES,
 	SURFACE_PAPERS,
 	SURFACE_PATTERNS,
 	SURFACE_SIZES,
@@ -1184,6 +1187,16 @@
 		scheduleSave();
 		await tick();
 		document.getElementById(`lettering-text-${item.id}`)?.focus();
+	}
+	function addDecoration(symbol: string) {
+		beginEdit();
+		const point = screenToWorld(board.camera, { x: viewportSize.width / 2 - 45 * board.camera.zoom, y: viewportSize.height / 2 - 40 * board.camera.zoom });
+		const item = { ...createLettering(point.x, point.y, nextZ(board.items)), width: 90, text: symbol, appearance: { fontSize: 56, align: 'center' as const, ink: '#a66670' } };
+		setItems([...board.items, item]);
+		selectOnly(item.id);
+		scheduleSave();
+		viewOpen = false;
+		notice = 'Decoration added. Move it or use Appearance to make it yours.';
 	}
 	function fitLettering(id: string, height: number) {
 		const item = board.items.find((item) => item.id === id);
@@ -3010,6 +3023,9 @@
 	ondragleave={() => (fileDragging = false)}
 	ondrop={handleDrop}
 >
+	<div class="surface-atmosphere atmosphere-{board.surface.atmosphere ?? 'none'}" aria-hidden="true"></div>
+	<div class="surface-material material-{board.surface.material ?? 'smooth'}" aria-hidden="true"></div>
+	<div class="surface-edge edge-{board.surface.edge ?? 'none'}" aria-hidden="true"></div>
 	{#if board.surface.pattern !== 'plain'}
 		<div class="surface-weave" style={weaveStyle} aria-hidden="true"></div>
 	{/if}
@@ -4031,8 +4047,22 @@
 				<button class="drawer-close" aria-label="Close view options" onclick={() => (viewOpen = false)}>×</button>
 			</header>
 
+			<details open class="appearance-group">
+				<summary>Starting looks</summary>
 			<section>
-				<h4>Pattern</h4>
+				<div class="row-buttons">
+					<button class="chip look-desk" onclick={() => changeSurface({ patternColor: undefined, atmosphere: 'none', paper: 'paper', color: '#f7f3ec', material: 'smooth', edge: 'none', pattern: 'dots', size: 'regular', depth: 'normal' })}>Desk</button>
+					<button class="chip look-stargazer" onclick={() => changeSurface({ patternColor: undefined, atmosphere: 'twilight', paper: 'paper', color: '#e2e7f2', material: 'smooth', edge: 'corners', pattern: 'stars', size: 'wide', depth: 'faint' })}>Stargazer</button>
+					<button class="chip look-garden" onclick={() => changeSurface({ patternColor: undefined, atmosphere: 'sunlight', paper: 'paper', color: '#e5eddf', material: 'linen', edge: 'frame', pattern: 'stitches', size: 'wide', depth: 'faint' })}>Garden journal</button>
+					<button class="chip look-rainbow" onclick={() => changeSurface({ patternColor: undefined, atmosphere: 'none', size: 'regular', paper: 'rainbow', material: 'smooth', edge: 'none', pattern: 'plain', depth: 'normal' })}>Rainbow</button>
+				</div>
+				<p class="drawer-note">Choose a starting look, then make it your own below.</p>
+			</section>
+
+			</details>
+			<details open class="appearance-group">
+				<summary>Pattern</summary>
+			<section>
 				<div class="row-buttons">
 					{#each SURFACE_PATTERNS as pattern (pattern)}
 						<button
@@ -4042,6 +4072,11 @@
 						>{pattern}</button>
 					{/each}
 				</div>
+			</section>
+
+			<section>
+				<label class="view-toggle">Pattern color <input type="color" aria-label="Pattern color" disabled={board.surface.pattern === 'plain'} value={board.surface.patternColor ?? '#67564b'} onchange={(event) => changeSurface({ patternColor: event.currentTarget.value })} /></label>
+				<button class="chip quiet" disabled={!board.surface.patternColor} onclick={() => changeSurface({ patternColor: undefined })}>Reset pattern color</button>
 			</section>
 
 			<section>
@@ -4065,12 +4100,16 @@
 						<button
 							class:active={board.surface.depth === depth}
 							class="chip"
+							disabled={board.surface.pattern === 'plain' && board.surface.paper !== 'rainbow'}
 							onclick={() => changeSurface({ depth })}
 						>{depth}</button>
 					{/each}
 				</div>
 			</section>
 
+			</details>
+			<details open class="appearance-group">
+				<summary>Paper and edges</summary>
 			<section>
 				<h4>Paper</h4>
 				<div class="row-buttons">
@@ -4082,11 +4121,59 @@
 						>{paper}</button>
 					{/each}
 				</div>
+				{#if board.surface.paper === 'paper'}
+					<label class="view-toggle">Paper color <input type="color" aria-label="Paper color" value={board.surface.color ?? '#f7f3ec'} onchange={(event) => changeSurface({ color: event.currentTarget.value })} /></label>
+				{/if}
 				<p class="drawer-note">The pattern is part of the board — it moves and scales with it. All of this is saved with this whiteboard, not with this device.</p>
 			</section>
 
 			<section>
-				<h4>View options</h4>
+				<h4>Material</h4>
+				<div class="row-buttons">
+					{#each SURFACE_MATERIALS as material (material)}
+						<button class="chip" class:active={(board.surface.material ?? 'smooth') === material} onclick={() => changeSurface({ material })}>{material}</button>
+					{/each}
+				</div>
+			</section>
+			<section>
+				<h4>Edges</h4>
+				<div class="row-buttons">
+					{#each SURFACE_EDGES as edge (edge)}
+						<button class="chip" class:active={(board.surface.edge ?? 'none') === edge} onclick={() => changeSurface({ edge })}>{edge}</button>
+					{/each}
+				</div>
+				<p class="drawer-note">These decorations stay behind your work.</p>
+			</section>
+
+			</details>
+			<details class="appearance-group">
+				<summary>Atmosphere</summary>
+			<section>
+				<div class="row-buttons">
+					{#each SURFACE_ATMOSPHERES as atmosphere (atmosphere)}
+						<button class="chip" class:active={(board.surface.atmosphere ?? 'none') === atmosphere} onclick={() => changeSurface({ atmosphere })}>{atmosphere}</button>
+					{/each}
+				</div>
+				<p class="drawer-note">A quiet wash of light over the paper.</p>
+			</section>
+
+			</details>
+			<details class="appearance-group">
+				<summary>Add a decoration</summary>
+			<section>
+				<div class="row-buttons">
+					<button class="chip" onclick={() => addDecoration('✦')}>✦ Star</button>
+					<button class="chip" onclick={() => addDecoration('❀')}>❀ Flower</button>
+					<button class="chip" onclick={() => addDecoration('☾')}>☾ Moon</button>
+					<button class="chip" onclick={() => addDecoration('❧')}>❧ Flourish</button>
+				</div>
+				<p class="drawer-note">Place, style, and arrange these like other things on the board.</p>
+			</section>
+
+			</details>
+			<details class="appearance-group">
+				<summary>View options</summary>
+			<section>
 				<label class="view-toggle">
 					<input
 						type="checkbox"
@@ -4107,6 +4194,7 @@
 					<button class="chip quiet" onclick={toggleShortcuts}>Keyboard shortcuts<small>?</small></button>
 				</div>
 			</section>
+			</details>
 		</div>
 	{/if}
 
@@ -4207,6 +4295,14 @@
 	 * repainting a full-screen background every frame; only a change of zoom
 	 * redraws the tile itself.
 	 */
+	.surface-atmosphere, .surface-material, .surface-edge { position: absolute; inset: 0; pointer-events: none; }
+	.surface-atmosphere.atmosphere-sunlight { background: radial-gradient(ellipse at 12% 4%, rgba(255, 224, 157, .35), transparent 55%); }
+	.surface-atmosphere.atmosphere-twilight { background: radial-gradient(ellipse at 85% 8%, rgba(160, 164, 218, .28), transparent 60%); }
+	.surface-material.material-linen { background-image: repeating-linear-gradient(0deg, transparent 0 3px, rgba(100, 79, 67, .035) 4px), repeating-linear-gradient(90deg, transparent 0 3px, rgba(100, 79, 67, .035) 4px); }
+	.surface-material.material-parchment { background-image: radial-gradient(ellipse at 15% 20%, rgba(168, 127, 82, .10), transparent 38%), radial-gradient(ellipse at 80% 75%, rgba(168, 127, 82, .09), transparent 42%); }
+	.surface-edge { z-index: 0; }
+	.surface-edge.edge-frame { inset: 14px; border: 1px solid rgba(122, 91, 83, .25); border-radius: 16px; box-shadow: inset 0 0 0 4px rgba(255, 253, 248, .22); }
+	.surface-edge.edge-corners { inset: 18px; background: linear-gradient(90deg, #9b7770 1px, transparent 1px) 0 0 / 28px 28px no-repeat, linear-gradient(#9b7770 1px, transparent 1px) 0 0 / 28px 28px no-repeat, linear-gradient(270deg, #9b7770 1px, transparent 1px) 100% 100% / 28px 28px no-repeat, linear-gradient(0deg, #9b7770 1px, transparent 1px) 100% 100% / 28px 28px no-repeat; opacity: .45; }
 	.surface-weave {
 		position: absolute;
 		inset: -96px;
@@ -5460,10 +5556,19 @@
 	@keyframes card-in { from { opacity: 0; transform: translateY(6px); } }
 	.view-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
 	.view-head h3 { margin: 0; color: #5d4c46; font-family: var(--font-display, Georgia, serif); font-size: 14px; font-weight: 600; }
+	.view-card .appearance-group { border-top: 1px solid rgba(98,80,70,.1); padding: 8px 0; }
+	.view-card .appearance-group summary { cursor: pointer; color: #76635b; font-size: 11px; font-weight: 650; }
+	.view-card .appearance-group summary:focus-visible { outline: 2px solid #a66670; outline-offset: 3px; border-radius: 3px; }
+	.view-card .appearance-group section:first-of-type { border-top: 0; }
 	.view-card section { padding: 9px 0 0; border-top: 1px solid rgba(98,80,70,.08); }
 	.view-card section:first-of-type { border-top: 0; }
 	.view-card h4 { margin: 0 0 6px; color: #9c8e86; font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 	.view-card .row-buttons { gap: 4px; }
+	.view-card .look-desk::before, .view-card .look-stargazer::before, .view-card .look-garden::before, .view-card .look-rainbow::before { content: ''; display: inline-block; width: 12px; height: 12px; margin-right: 5px; vertical-align: -2px; border: 1px solid rgba(98,80,70,.2); border-radius: 3px; }
+	.view-card .look-desk::before { background: #f7f3ec; }
+	.view-card .look-stargazer::before { background: radial-gradient(circle, #968ab6 1px, transparent 2px) 0 0 / 5px 5px, #e2e7f2; }
+	.view-card .look-garden::before { background: repeating-linear-gradient(45deg, #cad7c2 0 1px, #e5eddf 1px 4px); }
+	.view-card .look-rainbow::before { background: linear-gradient(110deg, #f6b8c0, #f4ecae, #bfe3bd, #b6dcef, #e7bfe4); }
 	.view-card .chip { min-height: 25px; padding: 0 9px; font-size: 11px; }
 	.view-card .drawer-note { margin-top: 8px; }
 	/* The paper choices show what they mean rather than only naming it. */
@@ -5594,7 +5699,7 @@
 		.board-name input { min-width: 0; width: 100%; }
 		/* Pinned between the left edge and the camera controls rather than
 		   centred, so the two can never land on top of each other. */
-		.tool-dock { left: 12px; right: 158px; bottom: 12px; max-width: none; overflow-x: auto; transform: none; }
+		.tool-dock { left: 12px; right: 220px; bottom: 12px; max-width: none; overflow-x: auto; transform: none; }
 		.tool-button { padding: 0 8px; }
 		.tool-button span { display: none; }
 		.camera-controls { right: 12px; bottom: 12px; grid-template-columns: repeat(3, 31px) auto; }
@@ -5617,3 +5722,4 @@
 		*, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
 	}
 </style>
+

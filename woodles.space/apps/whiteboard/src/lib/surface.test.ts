@@ -225,3 +225,45 @@ describe('reading a surface back off a saved board', () => {
 		expect(DEFAULT_SURFACE.pattern).toBe('dots');
 	});
 });
+
+
+describe('whimsical surfaces', () => {
+	it('keeps a chosen paper color and rejects invalid colors', () => {
+		const tinted = surfaceWith({ color: '#e2e7f2', pattern: 'stars' });
+		expect(isSurface(tinted)).toBe(true);
+		expect(paperCss(tinted)).toContain('#e2e7f2');
+		expect(normalizeSurface({ ...tinted, color: 'invalid' }).color).toBeUndefined();
+	});
+	it('draws new patterns with the board camera', () => {
+		for (const pattern of ['stars', 'stitches'] as const) {
+			expect(weaveCss(surfaceWith({ pattern }), at(1, 5, 7))).toContain('translate3d(5px, 7px, 0)');
+		}
+	});
+});
+
+
+describe('material and edges', () => {
+	it('preserves optional choices and discards invalid ones on recovery', () => {
+		const surface = surfaceWith({ material: 'linen', edge: 'corners' });
+		expect(isSurface(surface)).toBe(true);
+		expect(normalizeSurface(surface)).toEqual(surface);
+		expect(normalizeSurface({ ...surface, material: 'unknown', edge: 'unknown' })).toEqual(DEFAULT_SURFACE);
+	});
+});
+
+
+it('pattern ink can be colored without changing paper and survives normalization', () => {
+	const surface = surfaceWith({ patternColor: '#123456' });
+	expect(isSurface(surface)).toBe(true);
+	expect(weaveCss(surface, at(1))).toContain('rgba(18, 52, 86, 0.14)');
+	expect(normalizeSurface(surface).patternColor).toBe('#123456');
+	expect(normalizeSurface({ ...surface, patternColor: 'invalid' }).patternColor).toBeUndefined();
+});
+
+
+it('preserves valid atmosphere and discards an unknown one', () => {
+	const surface = surfaceWith({ atmosphere: 'twilight' });
+	expect(isSurface(surface)).toBe(true);
+	expect(normalizeSurface(surface).atmosphere).toBe('twilight');
+	expect(normalizeSurface({ ...surface, atmosphere: 'unknown' }).atmosphere).toBeUndefined();
+});
