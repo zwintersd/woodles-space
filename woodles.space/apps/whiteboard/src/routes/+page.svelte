@@ -2757,7 +2757,7 @@
 		}
 
 		// Camera history rides the platform's own back and forward gesture.
-		if ((event.altKey || event.metaKey) && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+		if ((event.metaKey || (event.altKey && !selectedIds.length)) && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
 			event.preventDefault();
 			travelHistory(event.key === 'ArrowLeft' ? -1 : 1);
 			return;
@@ -2838,7 +2838,7 @@
 			return;
 		}
 		// The keyboard says what the drag says: move the card one column along.
-		if (event.shiftKey && only && isStackMember(only) && only.stackId && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+		if (!event.altKey && event.shiftKey && only && isStackMember(only) && only.stackId && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
 			event.preventDefault();
 			moveCardColumn(event.key === 'ArrowLeft' ? -1 : 1);
 			return;
@@ -2848,6 +2848,17 @@
 			const step = event.shiftKey ? 10 : 1;
 			const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
 			const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
+			if (event.altKey) {
+				beginEdit(`resize:${selectionKey}`);
+				setItems(board.items.map((item) => {
+					if (!selectedIds.includes(item.id) || item.type === 'connector' || (isStackMember(item) && item.stackId)) return item;
+					const bounds = itemBounds(item);
+					const minimumWidth = item.type === 'stack' ? Math.max(180, stackMinimumWidth(item)) : item.type === 'card' ? 150 : 120;
+					const minimumHeight = item.type === 'lettering' || item.type === 'slip' ? 32 : item.type === 'card' ? 90 : 80;
+					return { ...item, width: Math.max(minimumWidth, bounds.width + dx), height: Math.max(minimumHeight, bounds.height - dy), updatedAt: now() };
+				}));
+				scheduleSave(); return;
+			}
 			beginEdit(`nudge:${selectionKey}`);
 			setItems(board.items.map((item) => selectedIds.includes(item.id) && item.type !== 'connector' && !(isStackMember(item) && item.stackId) ? { ...item, x: item.x + dx, y: item.y + dy, updatedAt: now() } : item));
 			scheduleSave(); return;
@@ -4049,7 +4060,7 @@
 				<dt>1–9</dt><dd>jump to a frame</dd>
 				<dt>0</dt><dd>fit the whole board</dd>
 				<dt>H</dt><dd>home</dd>
-				<dt>⌥ ← →</dt><dd>back / forward</dd>
+				<dt>⌥ ← →</dt><dd>back / forward when nothing is chosen</dd>
 				<dt>P</dt><dd>play the journey</dd>
 				<dt>M</dt><dd>overview map</dd>
 				<dt>?</dt><dd>this list</dd>
@@ -4062,6 +4073,7 @@
 				<dt>T</dt><dd>add lettering</dd>
 				<dt>⌘G / ⇧⌘G</dt><dd>group / ungroup</dd>
 				<dt>← ↑ → ↓</dt><dd>nudge; Shift for larger steps</dd>
+				<dt>⌥ arrows</dt><dd>resize; Shift for larger steps</dd>
 				<dt>⇧⌘Z</dt><dd>redo</dd>
 				<dt>⌘D</dt><dd>duplicate what's chosen</dd>
 				<dt>⌘A</dt><dd>select everything</dd>

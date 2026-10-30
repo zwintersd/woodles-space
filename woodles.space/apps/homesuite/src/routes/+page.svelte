@@ -903,15 +903,10 @@
 		<main class="surface-layout" aria-label={`${adapter.label}: ${activeState?.artifact.title || activeArtifact.title}`}>
 			<div class="surface-main">
 				{#if actionIssue}<div class="trash-issue" role="alert">{actionIssue}</div>{/if}
-				<div class="surface-strip">
-					<button class="back-link" onclick={() => showIndex()}>← {currentFolder?.name ?? (location === 'root' ? 'Unfiled' : 'All things')}</button>
+				<div class="surface-frame">
 					{#if activeState?.selection}
 						<button class="selection-pill" aria-label="Actions for selection" aria-haspopup="menu" onclick={() => sendAction({ action: 'context-open' })}><span class="selection-dot"></span>{activeState.selection.count && activeState.selection.count > 1 ? `${activeState.selection.count} selected` : activeState.selection.label}<span aria-hidden="true">⋯</span></button>
-					{:else}
-						<span class="surface-hint">{adapter.surfaceLabel}</span>
 					{/if}
-				</div>
-				<div class="surface-frame">
 					{#if frame}
 						{#key frame.key}
 							<iframe
@@ -975,6 +970,18 @@
 		<main class="missing-artifact"><span>Nothing at that address</span><h1>This {requestedKind || 'thing'} is not in your HomeSuite yet.</h1><button onclick={() => showIndex()}>Back to HomeSuite</button></main>
 	{:else}
 		<main class="suite-index">
+			{#if !showingTrash && !location}
+				<section class="home-welcome" aria-label="HomeSuite overview">
+					<div><span class="home-sparkle" aria-hidden="true">✧</span><h1>Your space, within reach.</h1><p>Everything you’re making, together in one place.</p></div>
+					<label class="home-search"><span aria-hidden="true">⌕</span><input bind:value={search} aria-label="Find a thing" placeholder="Find a thing…" /></label>
+				</section>
+				<nav class="home-categories" aria-label="Browse by type">
+					<button class:chosen={filter === 'document'} onclick={() => { filter = 'document'; }}><span class="category-count">{counts.document}</span><span class="category-icon">▤</span><strong>Documents</strong><span class="category-arrow">→</span></button>
+					<button class:chosen={filter === 'board'} onclick={() => { filter = 'board'; }}><span class="category-count">{counts.board}</span><span class="category-icon">▦</span><strong>Boards</strong><span class="category-arrow">→</span></button>
+					<button class:chosen={filter === 'collection'} onclick={() => { filter = 'collection'; }}><span class="category-count">{counts.collection}</span><span class="category-icon">◇</span><strong>Collections</strong><span class="category-arrow">→</span></button>
+					<button class:chosen={filter === 'all'} onclick={() => { filter = 'all'; }}><span class="category-count">{scopedArtifacts.length}</span><span class="category-icon">▱</span><strong>All files</strong><span class="category-arrow">→</span></button>
+				</nav>
+			{/if}
 				<div class="index-heading">
 					<div><div class="eyebrow">{showingTrash ? 'HOME SUITE TRASH' : currentFolder ? 'YOUR FOLDER' : 'YOUR WORKSPACE'}</div><h1>{#if showingTrash}A little room to reconsider.{:else if currentFolder}{currentFolder.name}{:else if location === 'root'}Unfiled things.{:else}All your things, <em>within reach.</em>{/if}</h1><p>{showingTrash ? 'Trashed items keep their identity and contents until you restore or permanently delete them.' : currentFolder ? 'A place for related documents, boards, and Collections. Use New to add something here.' : location === 'root' ? 'Things you haven’t placed in a folder yet.' : 'Documents, boards, and Collections share one place to begin. Group related things into folders.'}</p></div>
 					<div class="index-count"><strong>{showingTrash ? trashed.length : scopedArtifacts.length}</strong><span>{showingTrash ? 'things in Trash' : currentFolder ? 'things in this folder' : 'things in HomeSuite'}</span></div>
