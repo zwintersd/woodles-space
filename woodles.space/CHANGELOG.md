@@ -33,6 +33,8 @@ so it's not easy to forget.
 - **homesuite home is much more compact** — the hero is one line (title and
   search, no tagline) and the category cards are a slim strip, so files start
   higher on the page.
+- **less copy in homesuite's empty states** — the folder panel no longer
+  explains itself when empty, and empty lists show just a heading.
 
 ## 2026-10-25
 

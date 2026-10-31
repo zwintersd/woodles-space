@@ -429,3 +429,5 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .suite-index:has(.home-welcome) { padding-top: 24px; }
 @media (max-width: 700px) { .home-welcome > div { align-items: flex-start; } .home-categories button { min-height: 0; padding: 12px 14px; gap: 10px; } .category-count { font-size: 26px; } .home-welcome { padding: 16px; } }
 @media (max-width: 700px) { .home-categories button { grid-template-columns: 1fr auto; grid-template-areas: 'name count'; } .home-categories .category-icon { display: none; } }
+.suite-index:has(.home-welcome) .empty-list { padding: 56px 20px; }
+.suite-index:has(.home-welcome) .empty-list h2 { margin: 12px 0 0; }

@@ -1094,7 +1094,7 @@
 						{/each}
 				</div>
 			{:else}
-				<div class="empty-list"><span>{currentFolder ? '▱' : '✳'}</span><h2>{search ? 'Nothing by that name yet.' : currentFolder ? 'Room for your next thing.' : 'A place for your next thing.'}</h2><p>{search ? 'Try another word or clear the search.' : currentFolder ? 'Use New to create something here, or move files into this folder from All files.' : 'Use New to start a document, board, or Collection.'}</p></div>
+				<div class="empty-list"><span>{currentFolder ? '▱' : '✳'}</span><h2>{search ? 'Nothing by that name yet.' : currentFolder ? 'Room for your next thing.' : 'A place for your next thing.'}</h2></div>
 						{/if}
 						{/if}
 					</section>
