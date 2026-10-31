@@ -461,7 +461,11 @@
 	$effect(() => {
 		if (!topDeck) return;
 		const element = topDeck;
-		const measure = () => { chromeBottom = Math.max(12, element.getBoundingClientRect().bottom); };
+		const measure = () => {
+			chromeBottom = Math.max(12, element.getBoundingClientRect().bottom);
+			// Panels that hang off the right edge start below the top row, however many rows it wraps to.
+			document.documentElement.style.setProperty('--chrome-bottom', `${chromeBottom}px`);
+		};
 		const observer = new ResizeObserver(measure); observer.observe(element); measure();
 		return () => observer.disconnect();
 	});
@@ -5323,7 +5327,7 @@
 	.drawer {
 		position: absolute;
 		z-index: 72;
-		top: 66px;
+		top: max(66px, calc(var(--chrome-bottom, 0px) + 10px));
 		right: 22px;
 		bottom: 96px;
 		display: flex;
@@ -5585,7 +5589,7 @@
 		right: 22px;
 		bottom: 76px;
 		width: 248px;
-		max-height: calc(100vh - 150px);
+		max-height: calc(100dvh - var(--chrome-bottom, 66px) - 96px);
 		overflow-y: auto;
 		padding: 11px 14px 14px;
 		border: 1px solid rgba(98, 80, 70, 0.14);
@@ -5707,6 +5711,8 @@
 		right: 22px;
 		bottom: 76px;
 		width: 232px;
+		max-height: calc(100dvh - var(--chrome-bottom, 66px) - 96px);
+		overflow-y: auto;
 		padding: 13px 15px 15px;
 		border: 1px solid rgba(98, 80, 70, 0.14);
 		border-radius: 14px;

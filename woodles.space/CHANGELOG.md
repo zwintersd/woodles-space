@@ -66,6 +66,10 @@ so it's not easy to forget.
   strip (slip, card, text…) used to slide under the zoom and board-style
   buttons. below 1240px it now sits between the left edge and the controls and
   scrolls sideways if it has to.
+- **whiteboard's side panels stay clear of the top bar** — Layers, Places,
+  Journey, Board style and Keyboard shortcuts used to open on top of the
+  breadcrumb and the Home/Find/Layers row when the top bar wrapped onto two
+  lines in a narrower window. they now start below it, and shrink to fit.
 
 ## 2026-10-25
 
