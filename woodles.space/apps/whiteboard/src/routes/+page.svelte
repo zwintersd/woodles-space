@@ -5726,6 +5726,16 @@
 		.board-name span { display: none; }
 	}
 
+	@media (max-width: 1240px) {
+		/* Centred, the dock runs into the camera controls once the canvas narrows
+		   (a window, or HomeSuite's inspector taking a column). From here it is
+		   pinned between the left edge and the controls, and scrolls if it must. */
+		.tool-dock { left: 22px; right: 307px; width: fit-content; max-width: calc(100% - 329px); overflow-x: auto; scrollbar-width: none; transform: none; }
+		.tool-dock::-webkit-scrollbar { display: none; }
+		.tool-button { flex: 0 0 auto; }
+		.chrome-resting .tool-dock { transform: translateY(8px); }
+	}
+
 	@media (max-width: 1120px) {
 		/* The breadcrumb drops to its own line before anything has to shrink. */
 		.location-bar { order: 3; }
@@ -5741,7 +5751,7 @@
 		.board-name input { min-width: 0; width: 100%; }
 		/* Pinned between the left edge and the camera controls rather than
 		   centred, so the two can never land on top of each other. */
-		.tool-dock { left: 12px; right: 220px; bottom: 12px; max-width: none; overflow-x: auto; transform: none; }
+		.tool-dock { left: 12px; right: 232px; bottom: 12px; width: auto; max-width: none; overflow-x: auto; transform: none; }
 		.tool-button { padding: 0 8px; }
 		.tool-button span { display: none; }
 		.camera-controls { right: 12px; bottom: 12px; grid-template-columns: repeat(3, 31px) auto; }

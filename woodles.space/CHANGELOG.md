@@ -61,6 +61,11 @@ so it's not easy to forget.
 - **the homesuite home hero is wordless** — the "Your space, within reach."
   headline is replaced by a dotted constellation of sparkles beside the
   search box (a hidden "HomeSuite" heading stays for screen readers).
+- **whiteboard's tool strip no longer collides with the zoom controls** — on a
+  narrower canvas (a small window, or homesuite's inspector open) the add
+  strip (slip, card, text…) used to slide under the zoom and board-style
+  buttons. below 1240px it now sits between the left edge and the controls and
+  scrolls sideways if it has to.
 
 ## 2026-10-25
 
