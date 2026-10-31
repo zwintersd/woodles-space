@@ -33,6 +33,31 @@ so it's not easy to forget.
 - **homesuite home is much more compact** — the hero is one line (title and
   search, no tagline) and the category cards are a slim strip, so files start
   higher on the page.
+- **less copy in homesuite's empty states** — the folder panel no longer
+  explains itself when empty, and empty lists show just a heading.
+- **homesuite's top-level file list no longer repeats the folders** — the
+  "All files" breadcrumb and folder cards are hidden at the root, since the
+  folder panel already lists them; they still show inside a folder.
+- **homesuite got another polish pass** — a soft color wash behind the page, a
+  frosted sticky top bar, and file rows with gradient kind icons, a colored
+  edge on hover, an arrow and checkbox that appear on hover, and a glossier
+  New button.
+- **more ornament on the homesuite home** — an orbit arc in the hero, a tiny
+  sparkle in each category card, a mid-page orbit on the right edge, a
+  sparkle cluster for empty lists, and a soft glow in the folder panel.
+  sparkles twinkle gently unless motion is reduced.
+- **homesuite's Trash view matches the home** — a rose-tinted header card, the
+  same orbit and sparkle ornaments, tabs and rows styled like the main list,
+  and a one-line empty state. the folder cards above the file list are gone
+  everywhere; folders open from the sidebar.
+- **sort and see more about your files in homesuite** — a Sort menu above the
+  file list orders by last edited, date created, last opened, name, word
+  count, or type, with a button to reverse it, and remembers your choice. each
+  row leads with the date you're sorting by, shows a document's word count, and
+  hovering the date lists edited, created and opened together. documents
+  know when they were made from their own id; boards and collections count from
+  the first time homesuite saw them, and "opened" is tracked per device (it
+  doesn't sync).
 
 ## 2026-10-25
 

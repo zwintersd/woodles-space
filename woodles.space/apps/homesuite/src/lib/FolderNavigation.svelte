@@ -31,8 +31,6 @@
 					<button class="folder-nav-link" class:active={location === row.folder.id} aria-current={location === row.folder.id ? 'page' : undefined} title={row.path} onclick={() => onOpen(row.folder.id)}><FolderIcon /><span class="folder-nav-name">{row.folder.name}</span></button>
 					<button class="folder-nav-actions" aria-label={`Folder actions for ${row.folder.name}`} aria-haspopup="menu" onclick={(event) => onActions(row.folder.id, event)}>⋯</button>
 				</div>
-			{:else}
-				<p class="folder-nav-empty">Give related things a place.</p>
 			{/each}
 		</div>
 		<button class="folder-new-link" onclick={onCreate}>＋ New folder</button>

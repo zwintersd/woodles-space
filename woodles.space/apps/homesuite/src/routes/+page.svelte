@@ -22,6 +22,10 @@
 		type HomeSuiteArtifact,
 		type HomeSuiteSurfaceAdapter
 	} from '$lib/surfaces';
+	import {
+		SORT_OPTIONS, defaultDirection, describeFiles, leadingStamp, loadFileMeta, loadSortPref, saveFileMeta, saveSortPref,
+		sortFiles, syncFileMeta, withOpened, type FileMetaMap, type SortDirection, type SortKey, type SortPref
+	} from '$lib/fileMeta';
 	import { HOMESUITE_TRASH_KEY, moveHomeSuiteArtifactToTrash, restoreHomeSuiteArtifact, forgetHomeSuiteArtifact, type HomeSuiteTrashEntry } from '@shared/homesuiteTrash';
 	import { modal } from '@shared/modal';
 	import ContextMenu from '@shared/ContextMenu.svelte';
@@ -60,6 +64,8 @@
 	let renameDraft = $state('');
 	let permanentConfirmation = $state('');
 	let search = $state('');
+	let fileMeta = $state<FileMetaMap>({});
+	let sortPref = $state<SortPref>({ key: 'edited', direction: 'desc' });
 	let newOpen = $state(false);
 	// The surface whose templates are on offer; New asks which shape first.
 	let templatePicker = $state<HomeSuiteSurfaceAdapter | null>(null);
@@ -107,10 +113,9 @@
 	const location = $derived(page.url.searchParams.get('folder'));
 	const currentFolder = $derived(folderLibrary.folders.find((folder) => folder.id === location));
 	const breadcrumbs = $derived(folderPath(folderLibrary, currentFolder?.id ?? null));
-	const scopedArtifacts = $derived(artifacts.filter((artifact) => location === null ||
+	const described = $derived(describeFiles(artifacts, fileMeta));
+	const scopedArtifacts = $derived(described.filter((artifact) => location === null ||
 		folderForRef(folderLibrary, artifact.ref) === (location === 'root' ? null : location)));
-	const childFolders = $derived(folderLibrary.folders.filter((folder) => folder.parentId === (currentFolder?.id ?? null) &&
-		location !== 'root' && folder.name.toLowerCase().includes(search.trim().toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)));
 	const unfiledCount = $derived(artifacts.filter((artifact) => folderForRef(folderLibrary, artifact.ref) === null).length);
 	const moveTargets = $derived(folderTree(folderLibrary).filter((row) =>
 		(!movePicker?.folderId || !folderPath(folderLibrary, row.folder.id).some((folder) => folder.id === movePicker?.folderId)) &&
@@ -385,10 +390,34 @@
 		});
 	});
 	const activeState = $derived(surfaceState);
-	const filtered = $derived(scopedArtifacts.filter((artifact) =>
+	const filtered = $derived(sortFiles(scopedArtifacts.filter((artifact) =>
 		(filter === 'all' || artifact.kind === filter) &&
 		artifact.title.toLowerCase().includes(search.trim().toLowerCase())
-	));
+	), sortPref));
+	const sortLabel = $derived(SORT_OPTIONS.find((option) => option.key === sortPref.key)?.label ?? 'Last edited');
+	function setSort(key: SortKey): void {
+		sortPref = { key, direction: defaultDirection(key) };
+		saveSortPref(sortPref);
+	}
+	function flipSort(): void {
+		const direction: SortDirection = sortPref.direction === 'asc' ? 'desc' : 'asc';
+		sortPref = { ...sortPref, direction };
+		saveSortPref(sortPref);
+	}
+	/** The open file's key, so opening stamps once rather than on every refresh. */
+	const openKey = $derived(activeArtifact ? refKey(activeArtifact.ref) : '');
+	$effect(() => {
+		if (!openKey) return;
+		untrack(() => {
+			if (!activeArtifact) return;
+			fileMeta = withOpened(fileMeta, activeArtifact.ref, new Date().toISOString());
+			saveFileMeta(fileMeta);
+		});
+	});
+	function stampTitle(file: { updatedAt: string; createdAt?: string; openedAt?: string }): string {
+		const show = (stamp?: string) => stamp && !Number.isNaN(Date.parse(stamp)) ? new Date(stamp).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'never';
+		return `Edited ${show(file.updatedAt)}\nCreated ${show(file.createdAt)}\nOpened here ${show(file.openedAt)}`;
+	}
 	const allVisibleSelected = $derived(filtered.length > 0 && filtered.every((artifact) => selectedFiles.includes(refKey(artifact.ref))));
 	const counts = $derived({
 		document: scopedArtifacts.filter((item) => item.kind === 'document').length,
@@ -437,6 +466,9 @@
 
 	function refresh(): void {
 		({ artifacts, trashed } = listEverything());
+		const ledger = syncFileMeta(loadFileMeta(), artifacts, trashed.map((entry) => refKey(entry.ref)), new Date().toISOString());
+		if (ledger.changed) saveFileMeta(ledger.map);
+		fileMeta = ledger.map;
 		refreshFolders();
 		selectedFiles = selectedFiles.filter((key) => artifacts.some((artifact) => refKey(artifact.ref) === key));
 		storageNotices = surfaces.flatMap((surface) => surface.notice?.() ?? []);
@@ -806,6 +838,7 @@
 
 	onMount(() => {
 		arrivals = prepareSurfaceStorage() ?? '';
+		sortPref = loadSortPref();
 		refresh();
 		if (requested?.legacy) void goto(artifactPath(requested.kind, requested.id), { replaceState: true, noScroll: true });
 		// On a phone the inspector would cover the thing being inspected.
@@ -969,8 +1002,8 @@
 		{:else if requestedId && ready}
 		<main class="missing-artifact"><span>Nothing at that address</span><h1>This {requestedKind || 'thing'} is not in your HomeSuite yet.</h1><button onclick={() => showIndex()}>Back to HomeSuite</button></main>
 	{:else}
-		<main class="suite-index">
-			{#if !showingTrash && !location}
+		<main class="suite-index" class:trash-view={showingTrash}>
+			{#if showingTrash || !location}
 				<div class="home-decor" aria-hidden="true">
 					<svg class="decor-tr" viewBox="0 0 440 320" fill="none">
 						<circle class="decor-ring decor-lilac" cx="470" cy="-40" r="330"/>
@@ -978,6 +1011,13 @@
 						<circle class="decor-dot decor-blue" cx="214" cy="68" r="7"/>
 						<circle class="decor-dot decor-peach" cx="370" cy="88" r="5"/>
 						<g class="decor-star decor-peach" transform="translate(322 24) scale(.8)"><path d="M12 0C12 7 17 12 24 12C17 12 12 17 12 24C12 17 7 12 0 12C7 12 12 7 12 0Z"/></g>
+					</svg>
+					<svg class="decor-mr" viewBox="0 0 200 360" fill="none">
+						<circle class="decor-ring decor-lilac" cx="230" cy="180" r="170" stroke-dasharray="2 7"/>
+						<circle class="decor-ring decor-peach" cx="230" cy="180" r="120"/>
+						<circle class="decor-dot decor-blue" cx="68" cy="108" r="5"/>
+						<g class="decor-star decor-lilac" transform="translate(44 240) scale(.7)"><path d="M12 0C12 7 17 12 24 12C17 12 12 17 12 24C12 17 7 12 0 12C7 12 12 7 12 0Z"/></g>
+						<g class="decor-star decor-peach" transform="translate(90 44) scale(.5)"><path d="M12 0C12 7 17 12 24 12C17 12 12 17 12 24C12 17 7 12 0 12C7 12 12 7 12 0Z"/></g>
 					</svg>
 					<svg class="decor-bl" viewBox="0 0 320 440" fill="none">
 						<circle class="decor-fill decor-lilac" cx="40" cy="330" r="190"/>
@@ -995,18 +1035,19 @@
 			{/if}
 			{#if !showingTrash && !location}
 				<section class="home-welcome" aria-label="HomeSuite overview">
+					<svg class="hero-orbit" viewBox="0 0 360 100" preserveAspectRatio="xMaxYMid slice" fill="none" aria-hidden="true"><circle class="decor-ring decor-lilac" cx="300" cy="-70" r="140"/><circle class="decor-ring decor-peach" cx="340" cy="-60" r="110"/><circle class="decor-dot decor-blue" cx="200" cy="58" r="3.5"/><g class="decor-star decor-peach" transform="translate(262 62) scale(.45)"><path d="M12 0C12 7 17 12 24 12C17 12 12 17 12 24C12 17 7 12 0 12C7 12 12 7 12 0Z"/></g></svg>
 					<div><span class="home-sparkle" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 0C12 7 17 12 24 12C17 12 12 17 12 24C12 17 7 12 0 12C7 12 12 7 12 0Z"/></svg></span><h1>Your space, within reach.</h1></div>
 					<label class="home-search"><span aria-hidden="true">⌕</span><input bind:value={search} aria-label="Find a thing" placeholder="Find a thing…" /></label>
 				</section>
 				<nav class="home-categories" aria-label="Browse by type">
-					<button class:chosen={filter === 'document'} onclick={() => { filter = 'document'; }}><span class="category-count">{counts.document}</span><span class="category-icon">▤</span><strong>Documents</strong><span class="category-arrow">→</span></button>
-					<button class:chosen={filter === 'board'} onclick={() => { filter = 'board'; }}><span class="category-count">{counts.board}</span><span class="category-icon">▦</span><strong>Boards</strong><span class="category-arrow">→</span></button>
-					<button class:chosen={filter === 'collection'} onclick={() => { filter = 'collection'; }}><span class="category-count">{counts.collection}</span><span class="category-icon">◇</span><strong>Collections</strong><span class="category-arrow">→</span></button>
-					<button class:chosen={filter === 'all'} onclick={() => { filter = 'all'; }}><span class="category-count">{scopedArtifacts.length}</span><span class="category-icon">▱</span><strong>All files</strong><span class="category-arrow">→</span></button>
+					<button class:chosen={filter === 'document'} onclick={() => { filter = 'document'; }}><span class="category-count">{counts.document}</span><span class="category-orn" aria-hidden="true"></span><span class="category-icon">▤</span><strong>Documents</strong><span class="category-arrow">→</span></button>
+					<button class:chosen={filter === 'board'} onclick={() => { filter = 'board'; }}><span class="category-count">{counts.board}</span><span class="category-orn" aria-hidden="true"></span><span class="category-icon">▦</span><strong>Boards</strong><span class="category-arrow">→</span></button>
+					<button class:chosen={filter === 'collection'} onclick={() => { filter = 'collection'; }}><span class="category-count">{counts.collection}</span><span class="category-orn" aria-hidden="true"></span><span class="category-icon">◇</span><strong>Collections</strong><span class="category-arrow">→</span></button>
+					<button class:chosen={filter === 'all'} onclick={() => { filter = 'all'; }}><span class="category-count">{scopedArtifacts.length}</span><span class="category-orn" aria-hidden="true"></span><span class="category-icon">▱</span><strong>All files</strong><span class="category-arrow">→</span></button>
 				</nav>
 			{/if}
 				<div class="index-heading">
-					<div><div class="eyebrow">{showingTrash ? 'HOME SUITE TRASH' : currentFolder ? 'YOUR FOLDER' : 'YOUR WORKSPACE'}</div><h1>{#if showingTrash}A little room to reconsider.{:else if currentFolder}{currentFolder.name}{:else if location === 'root'}Unfiled things.{:else}All your things, <em>within reach.</em>{/if}</h1><p>{showingTrash ? 'Trashed items keep their identity and contents until you restore or permanently delete them.' : currentFolder ? 'A place for related documents, boards, and Collections. Use New to add something here.' : location === 'root' ? 'Things you haven’t placed in a folder yet.' : 'Documents, boards, and Collections share one place to begin. Group related things into folders.'}</p></div>
+					<div><div class="eyebrow">{showingTrash ? 'HOME SUITE TRASH' : currentFolder ? 'YOUR FOLDER' : 'YOUR WORKSPACE'}</div><h1>{#if showingTrash}A little room to reconsider.{:else if currentFolder}{currentFolder.name}{:else if location === 'root'}Unfiled things.{:else}All your things, <em>within reach.</em>{/if}</h1>{#if !showingTrash}<p>{currentFolder ? 'A place for related documents, boards, and Collections. Use New to add something here.' : location === 'root' ? 'Things you haven’t placed in a folder yet.' : 'Documents, boards, and Collections share one place to begin. Group related things into folders.'}</p>{/if}</div>
 					<div class="index-count"><strong>{showingTrash ? trashed.length : scopedArtifacts.length}</strong><span>{showingTrash ? 'things in Trash' : currentFolder ? 'things in this folder' : 'things in HomeSuite'}</span></div>
 			</div>
 				<div class="index-toolbar">
@@ -1043,11 +1084,12 @@
 						{/each}
 					</div>
 				{:else if showingTrash}
-					<div class="empty-list"><span>✳</span><h2>Trash is empty.</h2><p>Top-level documents, boards, and Collections you move to Trash will appear here.</p></div>
+					<div class="empty-list"><span class="empty-orn" aria-hidden="true"></span><h2>Trash is empty.</h2></div>
 				{:else}
 				<div class="organized-workspace">
 					<FolderNavigation library={folderLibrary} {location} {unfiledCount} onOpen={(id) => void openFolder(id)} onCreate={() => editFolder()} onActions={folderContext} />
 					<section class="folder-contents" aria-label="Folder contents">
+						{#if location !== null}
 						<div class="folder-location-bar">
 							<nav class="folder-breadcrumbs" aria-label="Folder breadcrumbs">
 								<button onclick={() => openFolder(null)}>All files</button>
@@ -1058,35 +1100,33 @@
 							</nav>
 							{#if currentFolder}<button class="row-context-trigger" aria-label={`Folder actions for current folder ${currentFolder.name}`} aria-haspopup="menu" onclick={(event) => folderContext(currentFolder.id, event)}>⋯</button>{/if}
 						</div>
+						{/if}
 						{#if location && location !== 'root' && !currentFolder}
 							<div class="empty-list"><span>▱</span><h2>This folder is no longer here.</h2><p>Your files are still available in All files.</p><button class="destination-cancel" onclick={() => openFolder(null)}>Show all files</button></div>
 						{:else}
-						{#if childFolders.length}
-							<div class="child-folders" aria-label="Subfolders">
-								{#each childFolders as folder (folder.id)}
-									<div class="folder-card">
-										<button class="folder-card-open" onclick={() => openFolder(folder.id)} oncontextmenu={(event) => folderContext(folder.id, event)}><FolderIcon /><span><strong>{folder.name}</strong><small>{artifacts.filter((artifact) => folderForRef(folderLibrary, artifact.ref) === folder.id).length} files · {folderLibrary.folders.filter((entry) => entry.parentId === folder.id).length} folders</small></span></button>
-										<button class="row-context-trigger" aria-label={`Actions for folder ${folder.name}`} aria-haspopup="menu" onclick={(event) => folderContext(folder.id, event)}>⋯</button>
-									</div>
-								{/each}
-								</div>
-						{/if}
 						{#if filtered.length || pickedFiles.length}
 						<div class="file-selection-bar">
 							<label><input type="checkbox" aria-label="Select all visible files" checked={allVisibleSelected} onchange={toggleVisibleFiles} />{pickedFiles.length ? `${pickedFiles.length} selected` : `${filtered.length} ${filtered.length === 1 ? 'file' : 'files'}`}</label>
-							{#if pickedFiles.length}<div><button class="destination-cancel" onclick={() => pickMove({ refs: pickedFiles.map((artifact) => artifact.ref), title: `${pickedFiles.length} ${pickedFiles.length === 1 ? 'file' : 'files'}` })}>Move to folder…</button><button class="toolbar-button" onclick={() => selectedFiles = []}>Clear selection</button></div>{/if}
+							<div class="file-bar-tools">
+								{#if pickedFiles.length}<button class="destination-cancel" onclick={() => pickMove({ refs: pickedFiles.map((artifact) => artifact.ref), title: `${pickedFiles.length} ${pickedFiles.length === 1 ? 'file' : 'files'}` })}>Move to folder…</button><button class="toolbar-button" onclick={() => selectedFiles = []}>Clear selection</button>{/if}
+								<div class="sort-control" role="group" aria-label="Sort files">
+									<label><span>Sort</span><select value={sortPref.key} onchange={(event) => setSort(event.currentTarget.value as SortKey)}>{#each SORT_OPTIONS as option (option.key)}<option value={option.key}>{option.label}</option>{/each}</select></label>
+									<button class="sort-direction" aria-label={`${sortLabel}, ${sortPref.direction === 'asc' ? 'ascending' : 'descending'}. Reverse order`} title="Reverse order" onclick={flipSort}>{sortPref.direction === 'asc' ? '↑' : '↓'}</button>
+								</div>
+							</div>
 						</div>
 						{/if}
 						{#if filtered.length}
 				<div class="artifact-list" aria-label="Recent artifacts">
 					{#each filtered as artifact (artifact.ref.app + artifact.ref.id)}
+						{@const lead = leadingStamp(artifact, sortPref.key)}
 						<div class="artifact-row" class:selected={selectedFiles.includes(refKey(artifact.ref))}>
 						<input class="file-checkbox" type="checkbox" aria-label={`Select ${artifact.title}`} checked={selectedFiles.includes(refKey(artifact.ref))} onchange={() => toggleFile(artifact.ref)} />
 						<button class="artifact-row-open" onclick={() => openArtifact(artifact)} oncontextmenu={(event) => artifactContext(artifact, event)}>
 							<span class="artifact-icon {artifact.kind}" aria-hidden="true">{surfaceFor(artifact.kind)?.glyph}</span>
-							<span class="artifact-copy"><strong>{artifact.title}</strong><small>{artifact.recordCount === undefined ? surfaceFor(artifact.kind)?.appName : `${artifact.recordCount} ${artifact.recordCount === 1 ? 'record' : 'records'}`}{#if location === null}<span class="file-folder-path"> · {folderPath(folderLibrary, folderForRef(folderLibrary, artifact.ref)).map((folder) => folder.name).join(' / ') || 'Unfiled'}</span>{/if}</small></span>
+							<span class="artifact-copy"><strong>{artifact.title}</strong><small>{artifact.recordCount === undefined ? surfaceFor(artifact.kind)?.appName : `${artifact.recordCount} ${artifact.recordCount === 1 ? 'record' : 'records'}`}{#if location === null}<span class="file-folder-path"> · {folderPath(folderLibrary, folderForRef(folderLibrary, artifact.ref)).map((folder) => folder.name).join(' / ') || 'Unfiled'}</span>{/if}{#if artifact.wordCount !== undefined}<span class="file-words"> · {artifact.wordCount.toLocaleString()} {artifact.wordCount === 1 ? 'word' : 'words'}</span>{/if}</small></span>
 							<span class="kind-badge {artifact.kind}">{artifact.kind}</span>
-							<time datetime={artifact.updatedAt}>{formatDate(artifact.updatedAt)}</time>
+							<time datetime={lead.stamp} title={stampTitle(artifact)}><small>{lead.verb}</small>{lead.stamp ? formatDate(lead.stamp) : 'Never'}</time>
 							<span class="row-arrow" aria-hidden="true">↗</span>
 						</button>
 						<button class="row-context-trigger" aria-label={`Actions for ${artifact.title}`} aria-haspopup="menu" onclick={(event) => artifactContext(artifact, event)}>⋯</button>
@@ -1094,7 +1134,7 @@
 						{/each}
 				</div>
 			{:else}
-				<div class="empty-list"><span>{currentFolder ? '▱' : '✳'}</span><h2>{search ? 'Nothing by that name yet.' : currentFolder ? 'Room for your next thing.' : 'A place for your next thing.'}</h2><p>{search ? 'Try another word or clear the search.' : currentFolder ? 'Use New to create something here, or move files into this folder from All files.' : 'Use New to start a document, board, or Collection.'}</p></div>
+				<div class="empty-list">{#if currentFolder}<span>▱</span>{:else}<span class="empty-orn" aria-hidden="true"></span>{/if}<h2>{search ? 'Nothing by that name yet.' : currentFolder ? 'Room for your next thing.' : 'A place for your next thing.'}</h2></div>
 						{/if}
 						{/if}
 					</section>
