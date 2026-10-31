@@ -35,6 +35,17 @@ so it's not easy to forget.
   higher on the page.
 - **less copy in homesuite's empty states** — the folder panel no longer
   explains itself when empty, and empty lists show just a heading.
+- **homesuite's top-level file list no longer repeats the folders** — the
+  "All files" breadcrumb and folder cards are hidden at the root, since the
+  folder panel already lists them; they still show inside a folder.
+- **homesuite got another polish pass** — a soft color wash behind the page, a
+  frosted sticky top bar, and file rows with gradient kind icons, a colored
+  edge on hover, an arrow and checkbox that appear on hover, and a glossier
+  New button.
+- **more ornament on the homesuite home** — an orbit arc in the hero, a tiny
+  sparkle in each category card, a mid-page orbit on the right edge, a
+  sparkle cluster for empty lists, and a soft glow in the folder panel.
+  sparkles twinkle gently unless motion is reduced.
 
 ## 2026-10-25
 
