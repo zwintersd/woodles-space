@@ -519,3 +519,11 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .artifact-row time small { color: var(--hs-faint); font: 600 9px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; }
 .file-words { white-space: nowrap; margin-left: .3em; }
 @media (max-width: 700px) { .file-selection-bar { align-items: flex-start; } .sort-control label span { display: none; } }
+
+/* hero without words: the constellation fills the space the headline used to */
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.home-welcome > div { flex: 1; min-width: 0; }
+.hero-constellation { flex: 1; min-width: 0; max-width: 620px; height: 40px; }
+.home-welcome .home-sparkle { width: 40px; height: 40px; border-radius: 12px; }
+.home-welcome .home-sparkle svg { width: 20px; height: 20px; }
+@media (max-width: 700px) { .hero-constellation { height: 36px; } .home-welcome > div { align-items: center; } }

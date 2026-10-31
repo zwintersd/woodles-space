@@ -58,6 +58,9 @@ so it's not easy to forget.
   know when they were made from their own id; boards and collections count from
   the first time homesuite saw them, and "opened" is tracked per device (it
   doesn't sync).
+- **the homesuite home hero is wordless** — the "Your space, within reach."
+  headline is replaced by a dotted constellation of sparkles beside the
+  search box (a hidden "HomeSuite" heading stays for screen readers).
 
 ## 2026-10-25
 
