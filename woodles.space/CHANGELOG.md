@@ -18,6 +18,14 @@ so it's not easy to forget.
 
 ---
 
+## 2026-10-31
+
+- **the homesuite main page got a much prettier pass** — a soft gradient hero
+  with a pill search, shorter category cards with big counts that lift on
+  hover, pill-style view/filter tabs, and file and folder rows as rounded
+  cards. the category cards now follow the theme, so dark mode finally gets
+  them too.
+
 ## 2026-10-25
 
 - **margin notes stay beside the paragraph they were written against** — in
