@@ -46,6 +46,10 @@ so it's not easy to forget.
   sparkle in each category card, a mid-page orbit on the right edge, a
   sparkle cluster for empty lists, and a soft glow in the folder panel.
   sparkles twinkle gently unless motion is reduced.
+- **homesuite's Trash view matches the home** — a rose-tinted header card, the
+  same orbit and sparkle ornaments, tabs and rows styled like the main list,
+  and a one-line empty state. the folder cards above the file list are gone
+  everywhere; folders open from the sidebar.
 
 ## 2026-10-25
 

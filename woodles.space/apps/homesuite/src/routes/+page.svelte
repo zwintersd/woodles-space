@@ -109,8 +109,6 @@
 	const breadcrumbs = $derived(folderPath(folderLibrary, currentFolder?.id ?? null));
 	const scopedArtifacts = $derived(artifacts.filter((artifact) => location === null ||
 		folderForRef(folderLibrary, artifact.ref) === (location === 'root' ? null : location)));
-	const childFolders = $derived(folderLibrary.folders.filter((folder) => folder.parentId === (currentFolder?.id ?? null) &&
-		location !== 'root' && folder.name.toLowerCase().includes(search.trim().toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)));
 	const unfiledCount = $derived(artifacts.filter((artifact) => folderForRef(folderLibrary, artifact.ref) === null).length);
 	const moveTargets = $derived(folderTree(folderLibrary).filter((row) =>
 		(!movePicker?.folderId || !folderPath(folderLibrary, row.folder.id).some((folder) => folder.id === movePicker?.folderId)) &&
@@ -969,8 +967,8 @@
 		{:else if requestedId && ready}
 		<main class="missing-artifact"><span>Nothing at that address</span><h1>This {requestedKind || 'thing'} is not in your HomeSuite yet.</h1><button onclick={() => showIndex()}>Back to HomeSuite</button></main>
 	{:else}
-		<main class="suite-index">
-			{#if !showingTrash && !location}
+		<main class="suite-index" class:trash-view={showingTrash}>
+			{#if showingTrash || !location}
 				<div class="home-decor" aria-hidden="true">
 					<svg class="decor-tr" viewBox="0 0 440 320" fill="none">
 						<circle class="decor-ring decor-lilac" cx="470" cy="-40" r="330"/>
@@ -1014,7 +1012,7 @@
 				</nav>
 			{/if}
 				<div class="index-heading">
-					<div><div class="eyebrow">{showingTrash ? 'HOME SUITE TRASH' : currentFolder ? 'YOUR FOLDER' : 'YOUR WORKSPACE'}</div><h1>{#if showingTrash}A little room to reconsider.{:else if currentFolder}{currentFolder.name}{:else if location === 'root'}Unfiled things.{:else}All your things, <em>within reach.</em>{/if}</h1><p>{showingTrash ? 'Trashed items keep their identity and contents until you restore or permanently delete them.' : currentFolder ? 'A place for related documents, boards, and Collections. Use New to add something here.' : location === 'root' ? 'Things you haven’t placed in a folder yet.' : 'Documents, boards, and Collections share one place to begin. Group related things into folders.'}</p></div>
+					<div><div class="eyebrow">{showingTrash ? 'HOME SUITE TRASH' : currentFolder ? 'YOUR FOLDER' : 'YOUR WORKSPACE'}</div><h1>{#if showingTrash}A little room to reconsider.{:else if currentFolder}{currentFolder.name}{:else if location === 'root'}Unfiled things.{:else}All your things, <em>within reach.</em>{/if}</h1>{#if !showingTrash}<p>{currentFolder ? 'A place for related documents, boards, and Collections. Use New to add something here.' : location === 'root' ? 'Things you haven’t placed in a folder yet.' : 'Documents, boards, and Collections share one place to begin. Group related things into folders.'}</p>{/if}</div>
 					<div class="index-count"><strong>{showingTrash ? trashed.length : scopedArtifacts.length}</strong><span>{showingTrash ? 'things in Trash' : currentFolder ? 'things in this folder' : 'things in HomeSuite'}</span></div>
 			</div>
 				<div class="index-toolbar">
@@ -1051,7 +1049,7 @@
 						{/each}
 					</div>
 				{:else if showingTrash}
-					<div class="empty-list"><span>✳</span><h2>Trash is empty.</h2><p>Top-level documents, boards, and Collections you move to Trash will appear here.</p></div>
+					<div class="empty-list"><span class="empty-orn" aria-hidden="true"></span><h2>Trash is empty.</h2></div>
 				{:else}
 				<div class="organized-workspace">
 					<FolderNavigation library={folderLibrary} {location} {unfiledCount} onOpen={(id) => void openFolder(id)} onCreate={() => editFolder()} onActions={folderContext} />
@@ -1071,16 +1069,6 @@
 						{#if location && location !== 'root' && !currentFolder}
 							<div class="empty-list"><span>▱</span><h2>This folder is no longer here.</h2><p>Your files are still available in All files.</p><button class="destination-cancel" onclick={() => openFolder(null)}>Show all files</button></div>
 						{:else}
-						{#if location !== null && childFolders.length}
-							<div class="child-folders" aria-label="Subfolders">
-								{#each childFolders as folder (folder.id)}
-									<div class="folder-card">
-										<button class="folder-card-open" onclick={() => openFolder(folder.id)} oncontextmenu={(event) => folderContext(folder.id, event)}><FolderIcon /><span><strong>{folder.name}</strong><small>{artifacts.filter((artifact) => folderForRef(folderLibrary, artifact.ref) === folder.id).length} files · {folderLibrary.folders.filter((entry) => entry.parentId === folder.id).length} folders</small></span></button>
-										<button class="row-context-trigger" aria-label={`Actions for folder ${folder.name}`} aria-haspopup="menu" onclick={(event) => folderContext(folder.id, event)}>⋯</button>
-									</div>
-								{/each}
-								</div>
-						{/if}
 						{#if filtered.length || pickedFiles.length}
 						<div class="file-selection-bar">
 							<label><input type="checkbox" aria-label="Select all visible files" checked={allVisibleSelected} onchange={toggleVisibleFiles} />{pickedFiles.length ? `${pickedFiles.length} selected` : `${filtered.length} ${filtered.length === 1 ? 'file' : 'files'}`}</label>
