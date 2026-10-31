@@ -979,6 +979,13 @@
 						<circle class="decor-dot decor-peach" cx="370" cy="88" r="5"/>
 						<g class="decor-star decor-peach" transform="translate(322 24) scale(.8)"><path d="M12 0C12 7 17 12 24 12C17 12 12 17 12 24C12 17 7 12 0 12C7 12 12 7 12 0Z"/></g>
 					</svg>
+					<svg class="decor-mr" viewBox="0 0 200 360" fill="none">
+						<circle class="decor-ring decor-lilac" cx="230" cy="180" r="170" stroke-dasharray="2 7"/>
+						<circle class="decor-ring decor-peach" cx="230" cy="180" r="120"/>
+						<circle class="decor-dot decor-blue" cx="68" cy="108" r="5"/>
+						<g class="decor-star decor-lilac" transform="translate(44 240) scale(.7)"><path d="M12 0C12 7 17 12 24 12C17 12 12 17 12 24C12 17 7 12 0 12C7 12 12 7 12 0Z"/></g>
+						<g class="decor-star decor-peach" transform="translate(90 44) scale(.5)"><path d="M12 0C12 7 17 12 24 12C17 12 12 17 12 24C12 17 7 12 0 12C7 12 12 7 12 0Z"/></g>
+					</svg>
 					<svg class="decor-bl" viewBox="0 0 320 440" fill="none">
 						<circle class="decor-fill decor-lilac" cx="40" cy="330" r="190"/>
 						<circle class="decor-ring decor-lilac" cx="20" cy="360" r="280"/>
@@ -995,14 +1002,15 @@
 			{/if}
 			{#if !showingTrash && !location}
 				<section class="home-welcome" aria-label="HomeSuite overview">
+					<svg class="hero-orbit" viewBox="0 0 360 100" preserveAspectRatio="xMaxYMid slice" fill="none" aria-hidden="true"><circle class="decor-ring decor-lilac" cx="300" cy="-70" r="140"/><circle class="decor-ring decor-peach" cx="340" cy="-60" r="110"/><circle class="decor-dot decor-blue" cx="200" cy="58" r="3.5"/><g class="decor-star decor-peach" transform="translate(262 62) scale(.45)"><path d="M12 0C12 7 17 12 24 12C17 12 12 17 12 24C12 17 7 12 0 12C7 12 12 7 12 0Z"/></g></svg>
 					<div><span class="home-sparkle" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 0C12 7 17 12 24 12C17 12 12 17 12 24C12 17 7 12 0 12C7 12 12 7 12 0Z"/></svg></span><h1>Your space, within reach.</h1></div>
 					<label class="home-search"><span aria-hidden="true">⌕</span><input bind:value={search} aria-label="Find a thing" placeholder="Find a thing…" /></label>
 				</section>
 				<nav class="home-categories" aria-label="Browse by type">
-					<button class:chosen={filter === 'document'} onclick={() => { filter = 'document'; }}><span class="category-count">{counts.document}</span><span class="category-icon">▤</span><strong>Documents</strong><span class="category-arrow">→</span></button>
-					<button class:chosen={filter === 'board'} onclick={() => { filter = 'board'; }}><span class="category-count">{counts.board}</span><span class="category-icon">▦</span><strong>Boards</strong><span class="category-arrow">→</span></button>
-					<button class:chosen={filter === 'collection'} onclick={() => { filter = 'collection'; }}><span class="category-count">{counts.collection}</span><span class="category-icon">◇</span><strong>Collections</strong><span class="category-arrow">→</span></button>
-					<button class:chosen={filter === 'all'} onclick={() => { filter = 'all'; }}><span class="category-count">{scopedArtifacts.length}</span><span class="category-icon">▱</span><strong>All files</strong><span class="category-arrow">→</span></button>
+					<button class:chosen={filter === 'document'} onclick={() => { filter = 'document'; }}><span class="category-count">{counts.document}</span><span class="category-orn" aria-hidden="true"></span><span class="category-icon">▤</span><strong>Documents</strong><span class="category-arrow">→</span></button>
+					<button class:chosen={filter === 'board'} onclick={() => { filter = 'board'; }}><span class="category-count">{counts.board}</span><span class="category-orn" aria-hidden="true"></span><span class="category-icon">▦</span><strong>Boards</strong><span class="category-arrow">→</span></button>
+					<button class:chosen={filter === 'collection'} onclick={() => { filter = 'collection'; }}><span class="category-count">{counts.collection}</span><span class="category-orn" aria-hidden="true"></span><span class="category-icon">◇</span><strong>Collections</strong><span class="category-arrow">→</span></button>
+					<button class:chosen={filter === 'all'} onclick={() => { filter = 'all'; }}><span class="category-count">{scopedArtifacts.length}</span><span class="category-orn" aria-hidden="true"></span><span class="category-icon">▱</span><strong>All files</strong><span class="category-arrow">→</span></button>
 				</nav>
 			{/if}
 				<div class="index-heading">
@@ -1096,7 +1104,7 @@
 						{/each}
 				</div>
 			{:else}
-				<div class="empty-list"><span>{currentFolder ? '▱' : '✳'}</span><h2>{search ? 'Nothing by that name yet.' : currentFolder ? 'Room for your next thing.' : 'A place for your next thing.'}</h2></div>
+				<div class="empty-list">{#if currentFolder}<span>▱</span>{:else}<span class="empty-orn" aria-hidden="true"></span>{/if}<h2>{search ? 'Nothing by that name yet.' : currentFolder ? 'Room for your next thing.' : 'A place for your next thing.'}</h2></div>
 						{/if}
 						{/if}
 					</section>
