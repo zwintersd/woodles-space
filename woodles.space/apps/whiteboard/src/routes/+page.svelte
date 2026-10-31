@@ -1241,11 +1241,28 @@
 		const shift = rotatePoint({ x: 0, y: growth }, rotationOf(item));
 		updateItem(item.id, { x: item.x + shift.x, y: item.y - growth + shift.y, height }, true);
 	}
+	/** The slip the dock last added, where it put it, and when. */
+	let lastDockSlip: { id: string; x: number; y: number; at: number } | null = null;
+	const STACK_WINDOW_MS = 5000;
+	const STACK_GAP = 10;
+
+	/** Slips added in quick succession stack neatly, as long as the last one has not been moved. */
+	function stackedSlipPoint(): { x: number; y: number } | null {
+		const last = lastDockSlip;
+		if (!last || Date.now() - last.at > STACK_WINDOW_MS) return null;
+		const previous = board.items.find((item) => item.id === last.id);
+		if (!previous || previous.type !== 'slip' || previous.x !== last.x || previous.y !== last.y) return null;
+		const bounds = itemBounds(previous);
+		return { x: previous.x, y: previous.y + bounds.height + STACK_GAP };
+	}
+
 	async function addSlipFromDock() {
 		beginEdit();
 		const size = viewport();
-		const point = screenToWorld(board.camera, { x: size.width / 2 - 85, y: size.height / 2 - 24 });
+		const centre = screenToWorld(board.camera, { x: size.width / 2 - 85, y: size.height / 2 - 24 });
+		const point = stackedSlipPoint() ?? centre;
 		const slip = createSlip(point.x, point.y, nextZ(board.items));
+		lastDockSlip = { id: slip.id, x: slip.x, y: slip.y, at: Date.now() };
 		setItems([...board.items, slip]);
 		selectOnly(slip.id);
 		scheduleSave();

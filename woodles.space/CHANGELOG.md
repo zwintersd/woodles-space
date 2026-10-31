@@ -70,6 +70,10 @@ so it's not easy to forget.
   Journey, Board style and Keyboard shortcuts used to open on top of the
   breadcrumb and the Home/Find/Layers row when the top bar wrapped onto two
   lines in a narrower window. they now start below it, and shrink to fit.
+- **slips added in a row stack neatly in whiteboard** — add a slip from the
+  dock and add another within five seconds, and the new one lands just below
+  the first with a small gap, as long as the first hasn't been moved. each new
+  one stacks under the last.
 
 ## 2026-10-25
 
