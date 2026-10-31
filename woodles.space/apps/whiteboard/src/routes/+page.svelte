@@ -461,7 +461,11 @@
 	$effect(() => {
 		if (!topDeck) return;
 		const element = topDeck;
-		const measure = () => { chromeBottom = Math.max(12, element.getBoundingClientRect().bottom); };
+		const measure = () => {
+			chromeBottom = Math.max(12, element.getBoundingClientRect().bottom);
+			// Panels that hang off the right edge start below the top row, however many rows it wraps to.
+			document.documentElement.style.setProperty('--chrome-bottom', `${chromeBottom}px`);
+		};
 		const observer = new ResizeObserver(measure); observer.observe(element); measure();
 		return () => observer.disconnect();
 	});
@@ -1237,11 +1241,28 @@
 		const shift = rotatePoint({ x: 0, y: growth }, rotationOf(item));
 		updateItem(item.id, { x: item.x + shift.x, y: item.y - growth + shift.y, height }, true);
 	}
+	/** The slip the dock last added, where it put it, and when. */
+	let lastDockSlip: { id: string; x: number; y: number; at: number } | null = null;
+	const STACK_WINDOW_MS = 5000;
+	const STACK_GAP = 10;
+
+	/** Slips added in quick succession stack neatly, as long as the last one has not been moved. */
+	function stackedSlipPoint(): { x: number; y: number } | null {
+		const last = lastDockSlip;
+		if (!last || Date.now() - last.at > STACK_WINDOW_MS) return null;
+		const previous = board.items.find((item) => item.id === last.id);
+		if (!previous || previous.type !== 'slip' || previous.x !== last.x || previous.y !== last.y) return null;
+		const bounds = itemBounds(previous);
+		return { x: previous.x, y: previous.y + bounds.height + STACK_GAP };
+	}
+
 	async function addSlipFromDock() {
 		beginEdit();
 		const size = viewport();
-		const point = screenToWorld(board.camera, { x: size.width / 2 - 85, y: size.height / 2 - 24 });
+		const centre = screenToWorld(board.camera, { x: size.width / 2 - 85, y: size.height / 2 - 24 });
+		const point = stackedSlipPoint() ?? centre;
 		const slip = createSlip(point.x, point.y, nextZ(board.items));
+		lastDockSlip = { id: slip.id, x: slip.x, y: slip.y, at: Date.now() };
 		setItems([...board.items, slip]);
 		selectOnly(slip.id);
 		scheduleSave();
@@ -5323,7 +5344,7 @@
 	.drawer {
 		position: absolute;
 		z-index: 72;
-		top: 66px;
+		top: max(66px, calc(var(--chrome-bottom, 0px) + 10px));
 		right: 22px;
 		bottom: 96px;
 		display: flex;
@@ -5585,7 +5606,7 @@
 		right: 22px;
 		bottom: 76px;
 		width: 248px;
-		max-height: calc(100vh - 150px);
+		max-height: calc(100dvh - var(--chrome-bottom, 66px) - 96px);
 		overflow-y: auto;
 		padding: 11px 14px 14px;
 		border: 1px solid rgba(98, 80, 70, 0.14);
@@ -5707,6 +5728,8 @@
 		right: 22px;
 		bottom: 76px;
 		width: 232px;
+		max-height: calc(100dvh - var(--chrome-bottom, 66px) - 96px);
+		overflow-y: auto;
 		padding: 13px 15px 15px;
 		border: 1px solid rgba(98, 80, 70, 0.14);
 		border-radius: 14px;
@@ -5726,6 +5749,16 @@
 		.board-name span { display: none; }
 	}
 
+	@media (max-width: 1240px) {
+		/* Centred, the dock runs into the camera controls once the canvas narrows
+		   (a window, or HomeSuite's inspector taking a column). From here it is
+		   pinned between the left edge and the controls, and scrolls if it must. */
+		.tool-dock { left: 22px; right: 307px; width: fit-content; max-width: calc(100% - 329px); overflow-x: auto; scrollbar-width: none; transform: none; }
+		.tool-dock::-webkit-scrollbar { display: none; }
+		.tool-button { flex: 0 0 auto; }
+		.chrome-resting .tool-dock { transform: translateY(8px); }
+	}
+
 	@media (max-width: 1120px) {
 		/* The breadcrumb drops to its own line before anything has to shrink. */
 		.location-bar { order: 3; }
@@ -5741,7 +5774,7 @@
 		.board-name input { min-width: 0; width: 100%; }
 		/* Pinned between the left edge and the camera controls rather than
 		   centred, so the two can never land on top of each other. */
-		.tool-dock { left: 12px; right: 220px; bottom: 12px; max-width: none; overflow-x: auto; transform: none; }
+		.tool-dock { left: 12px; right: 232px; bottom: 12px; width: auto; max-width: none; overflow-x: auto; transform: none; }
 		.tool-button { padding: 0 8px; }
 		.tool-button span { display: none; }
 		.camera-controls { right: 12px; bottom: 12px; grid-template-columns: repeat(3, 31px) auto; }
