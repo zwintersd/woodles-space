@@ -971,8 +971,31 @@
 	{:else}
 		<main class="suite-index">
 			{#if !showingTrash && !location}
+				<div class="home-decor" aria-hidden="true">
+					<svg class="decor-tr" viewBox="0 0 440 320" fill="none">
+						<circle class="decor-ring decor-lilac" cx="470" cy="-40" r="330"/>
+						<circle class="decor-ring decor-peach" cx="540" cy="-10" r="250"/>
+						<circle class="decor-dot decor-blue" cx="214" cy="68" r="7"/>
+						<circle class="decor-dot decor-peach" cx="370" cy="88" r="5"/>
+						<g class="decor-star decor-peach" transform="translate(322 24) scale(.8)"><path d="M12 0C12 7 17 12 24 12C17 12 12 17 12 24C12 17 7 12 0 12C7 12 12 7 12 0Z"/></g>
+					</svg>
+					<svg class="decor-bl" viewBox="0 0 320 440" fill="none">
+						<circle class="decor-fill decor-lilac" cx="40" cy="330" r="190"/>
+						<circle class="decor-ring decor-lilac" cx="20" cy="360" r="280"/>
+						<path class="decor-ring decor-lilac" d="M150 190V440"/>
+						<g class="decor-star decor-lilac" transform="translate(134 160)"><path d="M12 0C12 7 17 12 24 12C17 12 12 17 12 24C12 17 7 12 0 12C7 12 12 7 12 0Z"/></g>
+						<circle class="decor-dot decor-peach" cx="250" cy="372" r="4"/>
+					</svg>
+					<svg class="decor-br" viewBox="0 0 300 220" fill="none">
+						<circle class="decor-fill decor-peach" cx="250" cy="270" r="140"/>
+						<path class="decor-ring decor-lilac" d="M40 178H250"/>
+						<g class="decor-star decor-lilac" transform="translate(236 166) scale(.6)"><path d="M12 0C12 7 17 12 24 12C17 12 12 17 12 24C12 17 7 12 0 12C7 12 12 7 12 0Z"/></g>
+					</svg>
+				</div>
+			{/if}
+			{#if !showingTrash && !location}
 				<section class="home-welcome" aria-label="HomeSuite overview">
-					<div><span class="home-sparkle" aria-hidden="true">✧</span><h1>Your space, within reach.</h1><p>Everything you’re making, together in one place.</p></div>
+					<div><span class="home-sparkle" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 0C12 7 17 12 24 12C17 12 12 17 12 24C12 17 7 12 0 12C7 12 12 7 12 0Z"/></svg></span><h1>Your space, within reach.</h1><p>Everything you’re making, together in one place.</p></div>
 					<label class="home-search"><span aria-hidden="true">⌕</span><input bind:value={search} aria-label="Find a thing" placeholder="Find a thing…" /></label>
 				</section>
 				<nav class="home-categories" aria-label="Browse by type">
