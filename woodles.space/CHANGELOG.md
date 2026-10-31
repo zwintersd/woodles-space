@@ -30,6 +30,9 @@ so it's not easy to forget.
   left, a peach arc at the bottom right, and gentle wave shapes in the
   category cards. all theme-aware and hidden on small screens where they'd
   crowd the content.
+- **homesuite home is much more compact** — the hero is one line (title and
+  search, no tagline) and the category cards are a slim strip, so files start
+  higher on the page.
 
 ## 2026-10-25
 
