@@ -22,6 +22,10 @@
 		type HomeSuiteArtifact,
 		type HomeSuiteSurfaceAdapter
 	} from '$lib/surfaces';
+	import {
+		SORT_OPTIONS, defaultDirection, describeFiles, leadingStamp, loadFileMeta, loadSortPref, saveFileMeta, saveSortPref,
+		sortFiles, syncFileMeta, withOpened, type FileMetaMap, type SortDirection, type SortKey, type SortPref
+	} from '$lib/fileMeta';
 	import { HOMESUITE_TRASH_KEY, moveHomeSuiteArtifactToTrash, restoreHomeSuiteArtifact, forgetHomeSuiteArtifact, type HomeSuiteTrashEntry } from '@shared/homesuiteTrash';
 	import { modal } from '@shared/modal';
 	import ContextMenu from '@shared/ContextMenu.svelte';
@@ -60,6 +64,8 @@
 	let renameDraft = $state('');
 	let permanentConfirmation = $state('');
 	let search = $state('');
+	let fileMeta = $state<FileMetaMap>({});
+	let sortPref = $state<SortPref>({ key: 'edited', direction: 'desc' });
 	let newOpen = $state(false);
 	// The surface whose templates are on offer; New asks which shape first.
 	let templatePicker = $state<HomeSuiteSurfaceAdapter | null>(null);
@@ -107,7 +113,8 @@
 	const location = $derived(page.url.searchParams.get('folder'));
 	const currentFolder = $derived(folderLibrary.folders.find((folder) => folder.id === location));
 	const breadcrumbs = $derived(folderPath(folderLibrary, currentFolder?.id ?? null));
-	const scopedArtifacts = $derived(artifacts.filter((artifact) => location === null ||
+	const described = $derived(describeFiles(artifacts, fileMeta));
+	const scopedArtifacts = $derived(described.filter((artifact) => location === null ||
 		folderForRef(folderLibrary, artifact.ref) === (location === 'root' ? null : location)));
 	const unfiledCount = $derived(artifacts.filter((artifact) => folderForRef(folderLibrary, artifact.ref) === null).length);
 	const moveTargets = $derived(folderTree(folderLibrary).filter((row) =>
@@ -383,10 +390,34 @@
 		});
 	});
 	const activeState = $derived(surfaceState);
-	const filtered = $derived(scopedArtifacts.filter((artifact) =>
+	const filtered = $derived(sortFiles(scopedArtifacts.filter((artifact) =>
 		(filter === 'all' || artifact.kind === filter) &&
 		artifact.title.toLowerCase().includes(search.trim().toLowerCase())
-	));
+	), sortPref));
+	const sortLabel = $derived(SORT_OPTIONS.find((option) => option.key === sortPref.key)?.label ?? 'Last edited');
+	function setSort(key: SortKey): void {
+		sortPref = { key, direction: defaultDirection(key) };
+		saveSortPref(sortPref);
+	}
+	function flipSort(): void {
+		const direction: SortDirection = sortPref.direction === 'asc' ? 'desc' : 'asc';
+		sortPref = { ...sortPref, direction };
+		saveSortPref(sortPref);
+	}
+	/** The open file's key, so opening stamps once rather than on every refresh. */
+	const openKey = $derived(activeArtifact ? refKey(activeArtifact.ref) : '');
+	$effect(() => {
+		if (!openKey) return;
+		untrack(() => {
+			if (!activeArtifact) return;
+			fileMeta = withOpened(fileMeta, activeArtifact.ref, new Date().toISOString());
+			saveFileMeta(fileMeta);
+		});
+	});
+	function stampTitle(file: { updatedAt: string; createdAt?: string; openedAt?: string }): string {
+		const show = (stamp?: string) => stamp && !Number.isNaN(Date.parse(stamp)) ? new Date(stamp).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'never';
+		return `Edited ${show(file.updatedAt)}\nCreated ${show(file.createdAt)}\nOpened here ${show(file.openedAt)}`;
+	}
 	const allVisibleSelected = $derived(filtered.length > 0 && filtered.every((artifact) => selectedFiles.includes(refKey(artifact.ref))));
 	const counts = $derived({
 		document: scopedArtifacts.filter((item) => item.kind === 'document').length,
@@ -435,6 +466,9 @@
 
 	function refresh(): void {
 		({ artifacts, trashed } = listEverything());
+		const ledger = syncFileMeta(loadFileMeta(), artifacts, trashed.map((entry) => refKey(entry.ref)), new Date().toISOString());
+		if (ledger.changed) saveFileMeta(ledger.map);
+		fileMeta = ledger.map;
 		refreshFolders();
 		selectedFiles = selectedFiles.filter((key) => artifacts.some((artifact) => refKey(artifact.ref) === key));
 		storageNotices = surfaces.flatMap((surface) => surface.notice?.() ?? []);
@@ -804,6 +838,7 @@
 
 	onMount(() => {
 		arrivals = prepareSurfaceStorage() ?? '';
+		sortPref = loadSortPref();
 		refresh();
 		if (requested?.legacy) void goto(artifactPath(requested.kind, requested.id), { replaceState: true, noScroll: true });
 		// On a phone the inspector would cover the thing being inspected.
@@ -1072,19 +1107,26 @@
 						{#if filtered.length || pickedFiles.length}
 						<div class="file-selection-bar">
 							<label><input type="checkbox" aria-label="Select all visible files" checked={allVisibleSelected} onchange={toggleVisibleFiles} />{pickedFiles.length ? `${pickedFiles.length} selected` : `${filtered.length} ${filtered.length === 1 ? 'file' : 'files'}`}</label>
-							{#if pickedFiles.length}<div><button class="destination-cancel" onclick={() => pickMove({ refs: pickedFiles.map((artifact) => artifact.ref), title: `${pickedFiles.length} ${pickedFiles.length === 1 ? 'file' : 'files'}` })}>Move to folder…</button><button class="toolbar-button" onclick={() => selectedFiles = []}>Clear selection</button></div>{/if}
+							<div class="file-bar-tools">
+								{#if pickedFiles.length}<button class="destination-cancel" onclick={() => pickMove({ refs: pickedFiles.map((artifact) => artifact.ref), title: `${pickedFiles.length} ${pickedFiles.length === 1 ? 'file' : 'files'}` })}>Move to folder…</button><button class="toolbar-button" onclick={() => selectedFiles = []}>Clear selection</button>{/if}
+								<div class="sort-control" role="group" aria-label="Sort files">
+									<label><span>Sort</span><select value={sortPref.key} onchange={(event) => setSort(event.currentTarget.value as SortKey)}>{#each SORT_OPTIONS as option (option.key)}<option value={option.key}>{option.label}</option>{/each}</select></label>
+									<button class="sort-direction" aria-label={`${sortLabel}, ${sortPref.direction === 'asc' ? 'ascending' : 'descending'}. Reverse order`} title="Reverse order" onclick={flipSort}>{sortPref.direction === 'asc' ? '↑' : '↓'}</button>
+								</div>
+							</div>
 						</div>
 						{/if}
 						{#if filtered.length}
 				<div class="artifact-list" aria-label="Recent artifacts">
 					{#each filtered as artifact (artifact.ref.app + artifact.ref.id)}
+						{@const lead = leadingStamp(artifact, sortPref.key)}
 						<div class="artifact-row" class:selected={selectedFiles.includes(refKey(artifact.ref))}>
 						<input class="file-checkbox" type="checkbox" aria-label={`Select ${artifact.title}`} checked={selectedFiles.includes(refKey(artifact.ref))} onchange={() => toggleFile(artifact.ref)} />
 						<button class="artifact-row-open" onclick={() => openArtifact(artifact)} oncontextmenu={(event) => artifactContext(artifact, event)}>
 							<span class="artifact-icon {artifact.kind}" aria-hidden="true">{surfaceFor(artifact.kind)?.glyph}</span>
-							<span class="artifact-copy"><strong>{artifact.title}</strong><small>{artifact.recordCount === undefined ? surfaceFor(artifact.kind)?.appName : `${artifact.recordCount} ${artifact.recordCount === 1 ? 'record' : 'records'}`}{#if location === null}<span class="file-folder-path"> · {folderPath(folderLibrary, folderForRef(folderLibrary, artifact.ref)).map((folder) => folder.name).join(' / ') || 'Unfiled'}</span>{/if}</small></span>
+							<span class="artifact-copy"><strong>{artifact.title}</strong><small>{artifact.recordCount === undefined ? surfaceFor(artifact.kind)?.appName : `${artifact.recordCount} ${artifact.recordCount === 1 ? 'record' : 'records'}`}{#if location === null}<span class="file-folder-path"> · {folderPath(folderLibrary, folderForRef(folderLibrary, artifact.ref)).map((folder) => folder.name).join(' / ') || 'Unfiled'}</span>{/if}{#if artifact.wordCount !== undefined}<span class="file-words"> · {artifact.wordCount.toLocaleString()} {artifact.wordCount === 1 ? 'word' : 'words'}</span>{/if}</small></span>
 							<span class="kind-badge {artifact.kind}">{artifact.kind}</span>
-							<time datetime={artifact.updatedAt}>{formatDate(artifact.updatedAt)}</time>
+							<time datetime={lead.stamp} title={stampTitle(artifact)}><small>{lead.verb}</small>{lead.stamp ? formatDate(lead.stamp) : 'Never'}</time>
 							<span class="row-arrow" aria-hidden="true">↗</span>
 						</button>
 						<button class="row-context-trigger" aria-label={`Actions for ${artifact.title}`} aria-haspopup="menu" onclick={(event) => artifactContext(artifact, event)}>⋯</button>

@@ -50,6 +50,14 @@ so it's not easy to forget.
   same orbit and sparkle ornaments, tabs and rows styled like the main list,
   and a one-line empty state. the folder cards above the file list are gone
   everywhere; folders open from the sidebar.
+- **sort and see more about your files in homesuite** — a Sort menu above the
+  file list orders by last edited, date created, last opened, name, word
+  count, or type, with a button to reverse it, and remembers your choice. each
+  row leads with the date you're sorting by, shows a document's word count, and
+  hovering the date lists edited, created and opened together. documents
+  know when they were made from their own id; boards and collections count from
+  the first time homesuite saw them, and "opened" is tracked per device (it
+  doesn't sync).
 
 ## 2026-10-25
 
