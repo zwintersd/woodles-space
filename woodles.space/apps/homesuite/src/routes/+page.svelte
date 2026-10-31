@@ -1048,6 +1048,7 @@
 				<div class="organized-workspace">
 					<FolderNavigation library={folderLibrary} {location} {unfiledCount} onOpen={(id) => void openFolder(id)} onCreate={() => editFolder()} onActions={folderContext} />
 					<section class="folder-contents" aria-label="Folder contents">
+						{#if location !== null}
 						<div class="folder-location-bar">
 							<nav class="folder-breadcrumbs" aria-label="Folder breadcrumbs">
 								<button onclick={() => openFolder(null)}>All files</button>
@@ -1058,10 +1059,11 @@
 							</nav>
 							{#if currentFolder}<button class="row-context-trigger" aria-label={`Folder actions for current folder ${currentFolder.name}`} aria-haspopup="menu" onclick={(event) => folderContext(currentFolder.id, event)}>⋯</button>{/if}
 						</div>
+						{/if}
 						{#if location && location !== 'root' && !currentFolder}
 							<div class="empty-list"><span>▱</span><h2>This folder is no longer here.</h2><p>Your files are still available in All files.</p><button class="destination-cancel" onclick={() => openFolder(null)}>Show all files</button></div>
 						{:else}
-						{#if childFolders.length}
+						{#if location !== null && childFolders.length}
 							<div class="child-folders" aria-label="Subfolders">
 								{#each childFolders as folder (folder.id)}
 									<div class="folder-card">
