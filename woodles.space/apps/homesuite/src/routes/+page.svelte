@@ -995,7 +995,7 @@
 			{/if}
 			{#if !showingTrash && !location}
 				<section class="home-welcome" aria-label="HomeSuite overview">
-					<div><span class="home-sparkle" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 0C12 7 17 12 24 12C17 12 12 17 12 24C12 17 7 12 0 12C7 12 12 7 12 0Z"/></svg></span><h1>Your space, within reach.</h1><p>Everything you’re making, together in one place.</p></div>
+					<div><span class="home-sparkle" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 0C12 7 17 12 24 12C17 12 12 17 12 24C12 17 7 12 0 12C7 12 12 7 12 0Z"/></svg></span><h1>Your space, within reach.</h1></div>
 					<label class="home-search"><span aria-hidden="true">⌕</span><input bind:value={search} aria-label="Find a thing" placeholder="Find a thing…" /></label>
 				</section>
 				<nav class="home-categories" aria-label="Browse by type">
