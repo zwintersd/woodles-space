@@ -12,10 +12,10 @@
 	import ScrollFrame from '$lib/ScrollFrame.svelte';
 	import { HOMESUITE_TRASH_KEY, isHomeSuiteTrashed } from '@shared/homesuiteTrash';
 	import { candidatesFor, refreshReferenceSources, shelfSource, type ReferenceCandidate } from '../../../write/src/lib/references.svelte';
-	import { mergePulledRows, pullCollectionSources } from '$lib/sourceSync';
+	import { mergePulledRows, pullCollectionSources, readStackRows } from '$lib/sourceSync';
 	import {
 		addField, addRecord, cloneJson, deleteField, duplicateRecord, exportCollections, importCollections,
-		isCollection, loadCollections, removeRecord, renameField, resizeColumn, saveCollection, setCellValue, setFrozen, setHidden, showAllHidden,
+		isCollection, loadCollections, mirrorStack, removeRecord, renameField, resizeColumn, saveCollection, setCellValue, setFrozen, setHidden, showAllHidden,
 		type Collection, type CollectionField, type FieldType, type FieldValue
 	} from '$lib/collections';
 	import '@shared/homesuiteTheme.css';
@@ -450,9 +450,17 @@
 		if (!collection?.sources?.length || syncBusy) return;
 		syncBusy = true;
 		try {
-			const rows = await pullCollectionSources(collection.sources);
+			const link = collection.stackLink;
+			const stackRowsNow = link ? readStackRows(link) : null;
+			if (link && !stackRowsNow) {
+				// The board or Stack cannot be read. Keep the rows as they are
+				// rather than reading a missing Stack as an empty one.
+				sourceStatus = 'Stack not found on this device';
+				return;
+			}
+			const rows = link ? [] : await pullCollectionSources(collection.sources);
 			if (!collection) return;
-			const next = mergePulledRows(collection, rows);
+			const next = stackRowsNow ? mirrorStack(collection, stackRowsNow) : mergePulledRows(collection, rows);
 			// An unchanged pull saves nothing, so a Collection that is only being
 			// looked at keeps its place in HomeSuite's recent order.
 			if (next !== collection) {
@@ -466,8 +474,8 @@
 				saveIssue = '';
 			}
 			const pulledRefs = rows.map((row) => ({ app: row.ref.app, kind: row.ref.kind, id: row.ref.id, text: row.label, hint: row.hint }));
-			refreshCandidates(pulledRefs);
-			sourceStatus = rows.length ? `Refreshed ${rows.length} source records` : 'No source records found on this device';
+			if (!link) refreshCandidates(pulledRefs);
+			sourceStatus = stackRowsNow ? `Following a Stack · ${stackRowsNow.length} ${stackRowsNow.length === 1 ? 'note' : 'notes'}` : rows.length ? `Refreshed ${rows.length} source records` : 'No source records found on this device';
 			publishState();
 		} catch {
 			sourceStatus = 'Refresh failed';

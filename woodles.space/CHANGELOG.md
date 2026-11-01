@@ -18,6 +18,16 @@ so it's not easy to forget.
 
 ---
 
+## 2026-11-01
+
+- **a collection spawned from a stack now follows it** — spawn → collection on
+  a whiteboard stack makes a Collection whose name and notes columns belong
+  to the stack. reorder, edit, add, or take out a note on the board and the
+  Collection catches up whenever it's open (on open, on focus, every minute).
+  columns and rows you add in the Collection stay yours. if the stack's board
+  can't be found, the rows are left as they were rather than emptied.
+  spawning from a single card or slip is still a plain one-row copy.
+
 ## 2026-10-31
 
 - **the homesuite main page got a much prettier pass** — a soft gradient hero

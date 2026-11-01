@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onDestroy, onMount, tick } from 'svelte';
 	import { entityHref } from '@woodles/app-manifest';
-	import { createCollection, addRecord, addField, setCellValue, saveCollection } from '@woodles/collections';
+	import { saveCollection } from '@woodles/collections';
 	import { createDraftFromText } from '@woodles/write-drafts';
-	import { spawnContent } from '$lib/spawn';
+	import { spawnCollection, spawnContent } from '$lib/spawn';
 	import ImageEditor from '$lib/ImageEditor.svelte';
 	import ImageSurface from '$lib/ImageSurface.svelte';
 	import AppearanceTray from '$lib/AppearanceTray.svelte';
@@ -1013,14 +1013,8 @@
 			let ref: WoodlesRef;
 			if (kind === 'document') ref = createDraftFromText({ title: content.title, text: content.text });
 			else {
-				let collection = createCollection(content.title === 'Untitled document' ? 'Untitled collection' : content.title);
-				if (content.rows.some((row) => row.notes)) collection = addField(collection, 'Notes', 'text');
-				for (const row of content.rows) {
-					collection = addRecord(collection);
-					const record = collection.records[collection.records.length - 1];
-					collection = setCellValue(collection, record.id, collection.fields[0].id, row.name);
-					if (row.notes) collection = setCellValue(collection, record.id, collection.fields[1].id, row.notes);
-				}
+				const collection = spawnCollection(item, board.items, board.board.id);
+				if (!collection) return;
 				const result = saveCollection(collection);
 				if (!result.ok) throw new Error(result.issue?.message ?? 'Could not create Collection.');
 				ref = { app: 'data', kind: 'collection', id: collection.id };

@@ -13,7 +13,10 @@ export type CollectionSource =
 	| 'marginalia-field-notes'
 	| 'marginalia-arcade-games'
 	| 'marginalia-arcade-primitives'
-	| 'marginalia-arcade-copy';
+	| 'marginalia-arcade-copy'
+	| 'whiteboard-stack';
+/** The Whiteboard Stack a Collection mirrors; the board owns the notes. */
+export type StackLink = { boardId: string; stackId: string };
 export type CollectionField = {
 	id: string;
 	name: string;
@@ -55,6 +58,8 @@ export type Collection = {
 	sourceSyncedAt?: string;
 	/** Source-backed rows the user removed here; sync must not re-add them. */
 	excludedRefs?: WoodlesRef[];
+	/** Set on a Collection spawned from a Stack: its rows follow that Stack. */
+	stackLink?: StackLink;
 };
 export type CollectionLibrary = { collections: Collection[] };
 
@@ -65,7 +70,8 @@ const COLLECTION_SOURCES: readonly CollectionSource[] = [
 	'woodles-apps',
 	'bestiary-creatures', 'marginalia-life', 'marginalia-field-notes',
 	'mycelium-people',
-	'marginalia-arcade-games', 'marginalia-arcade-primitives', 'marginalia-arcade-copy'
+	'marginalia-arcade-games', 'marginalia-arcade-primitives', 'marginalia-arcade-copy',
+	'whiteboard-stack'
 ];
 const TINTS = ['#e8dff0', '#f5e5d9', '#e0ece5', '#e5eafa', '#f4ebc9'];
 
@@ -80,6 +86,7 @@ export function isCollection(value: unknown): value is Collection {
 	if (value.sources !== undefined && (!Array.isArray(value.sources) || !value.sources.every((source) => COLLECTION_SOURCES.includes(source)))) return false;
 	if (value.sourceSyncedAt !== undefined && !isStamp(value.sourceSyncedAt)) return false;
 	if (value.excludedRefs !== undefined && (!Array.isArray(value.excludedRefs) || !value.excludedRefs.every(isWoodlesRef))) return false;
+	if (value.stackLink !== undefined && !(isRecord(value.stackLink) && typeof value.stackLink.boardId === 'string' && !!value.stackLink.boardId && typeof value.stackLink.stackId === 'string' && !!value.stackLink.stackId)) return false;
 	const fields = value.fields as unknown[];
 	if (fields.filter((field) => isRecord(field) && field.primary === true).length !== 1 || !fields.every(isCollectionField)) return false;
 	if (new Set((fields as CollectionField[]).map((field) => field.id)).size !== fields.length) return false;
@@ -369,6 +376,76 @@ function isStoredLibrary(value: unknown): value is StoredLibrary {
 
 function storedId(value: unknown): string | null {
 	return isRecord(value) && typeof value.id === 'string' ? value.id : null;
+}
+
+/** What a Stack member looks like to a Collection; Whiteboard's items satisfy it structurally. */
+export type StackSourceItem = { id: string; type: string; title?: string; body?: string; text?: string; cardIds?: string[] };
+export type StackRow = { ref: WoodlesRef; name: string; notes: string };
+
+/** A Stack's Cards and Slips in the Stack's order, as the rows a Collection shows. */
+export function stackRows(items: readonly StackSourceItem[], stackId: string): { title: string; rows: StackRow[] } | null {
+	const stack = items.find((item) => item.id === stackId && item.type === 'stack');
+	if (!stack) return null;
+	const rows = (stack.cardIds ?? []).flatMap((id): StackRow[] => {
+		const member = items.find((item) => item.id === id);
+		if (member?.type === 'card') return [{ ref: { app: 'whiteboard', kind: 'card', id }, name: member.title || member.body || '', notes: member.title ? member.body ?? '' : '' }];
+		if (member?.type === 'slip') return [{ ref: { app: 'whiteboard', kind: 'slip', id }, name: member.text ?? '', notes: '' }];
+		return [];
+	});
+	return { title: stack.title?.trim() ?? '', rows };
+}
+
+/** A Collection whose Name and Notes columns belong to a Stack. Rows arrive with `mirrorStack`. */
+export function createStackCollection(title: string, link: StackLink): Collection {
+	const base = createCollection(title);
+	const primary = { ...base.fields[0], sourceKey: 'name' };
+	const notes: CollectionField = { ...field(makeId('field'), 'Notes', 'text'), sourceKey: 'notes' };
+	const fields = [primary, notes];
+	return {
+		...base, fields,
+		views: { table: { columnOrder: fields.map((entry) => entry.id), columnWidths: Object.fromEntries(fields.map((entry) => [entry.id, entry.primary ? 240 : 320])) } },
+		sources: ['whiteboard-stack'], stackLink: { ...link }
+	};
+}
+
+function sameRef(a: WoodlesRef, b: WoodlesRef): boolean { return a.app === b.app && a.kind === b.kind && a.id === b.id; }
+
+/**
+ * Makes a Collection's Stack-owned rows match the Stack: new notes appear,
+ * edited ones update, ones taken out of the Stack go, and the order is the
+ * Stack's. Columns you added and rows you made here are left alone (local
+ * rows sit after the Stack's). A row removed here stays removed, as with any
+ * connected source. Nothing changing returns the same Collection.
+ */
+export function mirrorStack(collection: Collection, rows: readonly StackRow[], syncedAt = now()): Collection {
+	const sourceFields = collection.fields.filter((entry) => entry.sourceKey);
+	const mine = (record: CollectionRecord) => record.sourceRef?.app === 'whiteboard';
+	const existing = new Map(collection.records.filter(mine).map((record) => [record.sourceRef!.id, record]));
+	const excluded = collection.excludedRefs ?? [];
+	let changed = false;
+	const mirrored = rows.filter((row) => !excluded.some((ref) => sameRef(ref, row.ref))).map((row) => {
+		const found = existing.get(row.ref.id);
+		const incoming: Record<string, string> = { name: row.name, notes: row.notes };
+		if (!found) {
+			changed = true;
+			const record = createRecord(collection, row.ref);
+			for (const entry of sourceFields) record.values[entry.id] = incoming[entry.sourceKey!] ?? '';
+			return record;
+		}
+		const values = { ...found.values };
+		let touched = false;
+		for (const entry of sourceFields) {
+			const value = incoming[entry.sourceKey!] ?? '';
+			if (values[entry.id] !== value) { values[entry.id] = value; touched = true; }
+		}
+		if (!touched) return found;
+		changed = true;
+		return { ...found, values, updatedAt: syncedAt };
+	});
+	const local = collection.records.filter((record) => !mine(record));
+	const records = [...mirrored, ...local];
+	if (!changed && records.length === collection.records.length && records.every((record, index) => record === collection.records[index])) return collection;
+	return { ...collection, records, sourceSyncedAt: syncedAt, updatedAt: syncedAt };
 }
 
 export type CollectionLoad = {
