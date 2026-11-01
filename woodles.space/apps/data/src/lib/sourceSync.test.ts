@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPerson, getPerson, MYCELIUM_STORAGE_KEY, updatePerson } from '@woodles/mycelium';
-import { addRecord, createCollection, isCollection, removeRecord, setCellValue } from './collections';
-import { marginaliaRows, mergePulledRows, pullCollectionSources, readMyceliumRows, type PulledSourceRow } from './sourceSync';
+import { addRecord, createCollection, createStackCollection, isCollection, removeRecord, setCellValue } from './collections';
+import { marginaliaRows, mergePulledRows, pullCollectionSources, readMyceliumRows, readStackRows, type PulledSourceRow } from './sourceSync';
 
 beforeEach(() => {
 	const items = new Map<string, string>();
@@ -126,5 +126,28 @@ describe('connected Collection sources', () => {
 		expect(() => readMyceliumRows()).toThrow();
 		expect(collection.records).toHaveLength(1);
 		expect(localStorage.getItem(MYCELIUM_STORAGE_KEY)).toBe('{broken');
+	});
+});
+
+describe('Collections spawned from a Whiteboard Stack', () => {
+	const board = (items: unknown[]) => ({ getItem: (key: string) => key === 'woodles.whiteboard.boards.b1' ? JSON.stringify({ woodles: 'x', schemaVersion: 1, data: { items } }) : null });
+	const items = [
+		{ id: 'c1', type: 'card', title: 'Plan', body: 'Details' },
+		{ id: 's1', type: 'slip', text: 'Loose thought' },
+		{ id: 'k1', type: 'stack', title: 'Ideas', cardIds: ['s1', 'c1'] }
+	];
+	it('reads the Stack in its order from the board save', () => {
+		expect(readStackRows({ boardId: 'b1', stackId: 'k1' }, board(items))?.map((row) => [row.ref.kind, row.name, row.notes])).toEqual([['slip', 'Loose thought', ''], ['card', 'Plan', 'Details']]);
+	});
+	it('says nothing rather than empty when the board, Stack, or save is missing or unreadable', () => {
+		expect(readStackRows({ boardId: 'gone', stackId: 'k1' }, board(items))).toBeNull();
+		expect(readStackRows({ boardId: 'b1', stackId: 'missing' }, board(items))).toBeNull();
+		expect(readStackRows({ boardId: 'b1', stackId: 'k1' }, { getItem: () => '{not json' })).toBeNull();
+		expect(readStackRows({ boardId: 'b1', stackId: 'k1' }, null)).toBeNull();
+	});
+	it('persists a Stack link as part of a valid Collection', () => {
+		const collection = createStackCollection('Ideas', { boardId: 'b1', stackId: 'k1' });
+		expect(isCollection(collection)).toBe(true);
+		expect(isCollection({ ...collection, stackLink: { boardId: '' } })).toBe(false);
 	});
 });

@@ -3,7 +3,7 @@ import { appManifest } from '@woodles/app-manifest';
 import { loadPeople, personRef, type Person } from '@woodles/mycelium';
 import type { WoodlesRef } from '@shared/homesuiteBridge';
 import { ARCADE_COPY_CATALOG, ARCADE_GAME_CATALOG, ARCADE_PRIMITIVE_CATALOG } from '@woodles/marginalia-arcade-catalog';
-import { createRecord, type Collection, type CollectionSource } from './collections';
+import { createRecord, stackRows, type Collection, type CollectionSource, type StackLink, type StackRow } from './collections';
 
 export type PulledSourceRow = {
 	ref: WoodlesRef;
@@ -268,4 +268,24 @@ export function mergePulledRows(collection: Collection, rows: PulledSourceRow[],
 	}
 	if (records === collection.records) return collection;
 	return { ...collection, records, sourceSyncedAt: syncedAt, updatedAt: syncedAt };
+}
+
+const WHITEBOARD_BOARD_PREFIX = 'woodles.whiteboard.boards.';
+
+/**
+ * Reads a linked Stack's notes straight from its board's saved copy, without
+ * writing to it. Null means the board or Stack cannot be found or read; the
+ * caller keeps the rows it has rather than treating that as an empty Stack.
+ */
+export function readStackRows(link: StackLink, storage: Pick<Storage, 'getItem'> | null = typeof localStorage === 'undefined' ? null : localStorage): StackRow[] | null {
+	try {
+		const text = storage?.getItem(WHITEBOARD_BOARD_PREFIX + link.boardId);
+		if (!text) return null;
+		const parsed = JSON.parse(text) as { data?: { items?: unknown } };
+		const items = parsed?.data?.items;
+		if (!Array.isArray(items)) return null;
+		return stackRows(items, link.stackId)?.rows ?? null;
+	} catch {
+		return null;
+	}
 }
