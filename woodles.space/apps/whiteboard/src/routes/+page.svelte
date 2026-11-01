@@ -13,7 +13,7 @@
 	import CompositionPanel from '$lib/CompositionPanel.svelte';
 	import LayersPanel from '$lib/LayersPanel.svelte';
 	import StackColumnsControl from '$lib/StackColumnsControl.svelte';
-	import { alignItems, compositionUnits, duplicateItems, expandGroups, groupItems, isLocked, orderedItems, reorderLayers, snapTranslation, unionBounds, type Alignment, type AlignmentGuide, type LayerMove } from '$lib/composition';
+	import { alignItems, compositionUnits, duplicateItems, expandGroups, groupItems, isLocked, orderedItems, reorderLayers, snapTranslation, tidyItems, unionBounds, type Alignment, type AlignmentGuide, type LayerMove } from '$lib/composition';
 	import { appearanceCss, patchAppearance, isAppearanceColor, MAX_SWATCHES, type AppearancePatch, type ItemAppearance } from '$lib/appearance';
 	import { imageViewport, validImageEdits, type ImageEdits } from '$lib/imageEditing';
 	import type { ImageItem } from '$lib/model';
@@ -195,7 +195,8 @@
 	weaveCss,
 	type Surface
 	} from '$lib/surface';
-	import { DEFAULT_VIEW, normalizeView, viewPreferences, type ViewPreferences } from '$lib/view';
+	import { DEFAULT_VIEW, normalizeView, placementSettings, viewPreferences, type ViewPreferences } from '$lib/view';
+	import { GAP_UNITS, GRID_SIZES, PLACE_KEEPS, extendChain, nextPlacement, snapToGrid, type PlaceGap, type PlaceKeep, type PlaceMode, type Placed, type Placement, type Rect } from '$lib/placement';
 	import { createHandoffQueue } from '@woodles/handoff';
 	import { createHomeSuiteContext, type ContextAction } from '@shared/homesuiteContext';
 	import {
@@ -530,6 +531,7 @@
 		if (['front', 'back', 'forward', 'backward'].includes(command)) changeComposition(reorderLayers(board.items, selectedIds, command as LayerMove));
 		else if (command === 'group' || command === 'ungroup') changeComposition(groupItems(board.items, selectedIds, command === 'ungroup'));
 		else if (command.startsWith('align-')) changeComposition(alignItems(board.items, selectedIds, command.slice(6) as Alignment));
+		else if (command === 'tidy') changeComposition(tidyItems(board.items, selectedIds, GAP_UNITS[placementSettings(view).gap]));
 	}
 	function rotateSelection(degrees: number) {
 		if (selectionLocked || !selectionObjects.every(canRotate)) return;
@@ -743,6 +745,7 @@
 		}, CHROME_REST_MS);
 	}
 
+	const gridSize = $derived(placementSettings(view).grid);
 	function setView(patch: Partial<ViewPreferences>) {
 		view = { ...view, ...patch };
 		viewPreferences.save(view);
@@ -1214,7 +1217,7 @@
 	async function addLettering() {
 		beginEdit();
 		const point = screenToWorld(board.camera, { x: viewportSize.width / 2 - 160 * board.camera.zoom, y: viewportSize.height / 2 - 40 * board.camera.zoom });
-		const item = createLettering(point.x, point.y, nextZ(board.items));
+		const item = arrangeNew(createLettering(point.x, point.y, nextZ(board.items)), point);
 		setItems([...board.items, item]);
 		selectOnly(item.id);
 		scheduleSave();
@@ -1241,28 +1244,42 @@
 		const shift = rotatePoint({ x: 0, y: growth }, rotationOf(item));
 		updateItem(item.id, { x: item.x + shift.x, y: item.y - growth + shift.y, height }, true);
 	}
-	/** The slip the dock last added, where it put it, and when. */
-	let lastDockSlip: { id: string; x: number; y: number; at: number } | null = null;
-	const STACK_WINDOW_MS = 5000;
-	const STACK_GAP = 10;
+	/** What the dock (and paste, and the image picker) added in the current run, for stacking the next one. */
+	let placementChain: Placed[] = [];
 
-	/** Slips added in quick succession stack neatly, as long as the last one has not been moved. */
-	function stackedSlipPoint(): { x: number; y: number } | null {
-		const last = lastDockSlip;
-		if (!last || Date.now() - last.at > STACK_WINDOW_MS) return null;
-		const previous = board.items.find((item) => item.id === last.id);
-		if (!previous || previous.type !== 'slip' || previous.x !== last.x || previous.y !== last.y) return null;
-		const bounds = itemBounds(previous);
-		return { x: previous.x, y: previous.y + bounds.height + STACK_GAP };
+	/** The part of the board in view and clear of the top bar and tool strip, in board units. */
+	function visibleWorldRect(): Rect {
+		const size = viewport();
+		const from = screenToWorld(board.camera, { x: 24, y: chromeBottom + 12 });
+		const to = screenToWorld(board.camera, { x: size.width - 24, y: size.height - 100 });
+		return { x: from.x, y: from.y, width: to.x - from.x, height: to.y - from.y };
+	}
+
+	function lookupPlaced(id: string): Rect | null {
+		const item = board.items.find((candidate) => candidate.id === id);
+		if (!item || item.type === 'connector') return null;
+		const bounds = itemBounds(item);
+		return { x: item.x, y: item.y, width: bounds.width, height: bounds.height };
+	}
+
+	/** Where a new thing of this size goes: under or beside the last one added, else where it would have landed. */
+	function placeNew(size: { width: number; height: number }, fallback: Point): Placement {
+		return nextPlacement({ chain: placementChain, settings: placementSettings(view), now: Date.now(), size, fallback, visible: visibleWorldRect(), lookup: lookupPlaced });
+	}
+
+	/** Put a freshly made item where the placement says, and remember it for the next one. */
+	function arrangeNew<T extends WhiteboardItem>(item: T, fallback: Point): T {
+		const placement = placeNew({ width: item.width, height: item.height }, fallback);
+		const placed = { ...item, x: placement.x, y: placement.y };
+		placementChain = extendChain(placementChain, placement, { id: placed.id, x: placed.x, y: placed.y, width: placed.width, height: placed.height, at: Date.now() });
+		return placed;
 	}
 
 	async function addSlipFromDock() {
 		beginEdit();
 		const size = viewport();
 		const centre = screenToWorld(board.camera, { x: size.width / 2 - 85, y: size.height / 2 - 24 });
-		const point = stackedSlipPoint() ?? centre;
-		const slip = createSlip(point.x, point.y, nextZ(board.items));
-		lastDockSlip = { id: slip.id, x: slip.x, y: slip.y, at: Date.now() };
+		const slip = arrangeNew(createSlip(centre.x, centre.y, nextZ(board.items)), centre);
 		setItems([...board.items, slip]);
 		selectOnly(slip.id);
 		scheduleSave();
@@ -1296,9 +1313,10 @@
 		scheduleSave();
 	}
 
-	async function createCardAt(point: Point) {
+	async function createCardAt(point: Point, arrange = false) {
 		beginEdit();
-		const card = createCard(point.x - 18, point.y - 18, nextZ(board.items));
+		const made = createCard(point.x - 18, point.y - 18, nextZ(board.items));
+		const card = arrange ? arrangeNew(made, { x: made.x, y: made.y }) : made;
 		setItems([...board.items, card]);
 		selectOnly(card.id);
 		scheduleSave();
@@ -1306,9 +1324,10 @@
 		document.getElementById(`card-body-${card.id}`)?.focus();
 	}
 
-	async function createStackAt(point: Point) {
+	async function createStackAt(point: Point, arrange = false) {
 		beginEdit();
-		const stack = createStack(point.x - 32, point.y - 24, nextZ(board.items));
+		const made = createStack(point.x - 32, point.y - 24, nextZ(board.items));
+		const stack = arrange ? arrangeNew(made, { x: made.x, y: made.y }) : made;
 		setItems([...board.items, stack]);
 		selectOnly(stack.id);
 		scheduleSave();
@@ -1329,13 +1348,13 @@
 
 	function addCardFromDock() {
 		const size = viewport();
-		void createCardAt(screenToWorld(board.camera, { x: size.width / 2 - 120, y: size.height / 2 - 70 }));
+		void createCardAt(screenToWorld(board.camera, { x: size.width / 2 - 120, y: size.height / 2 - 70 }), true);
 	}
 
 	function addStackFromDock() {
 		tool = 'select';
 		const size = viewport();
-		void createStackAt(screenToWorld(board.camera, { x: size.width / 2 - 100, y: size.height / 2 - 80 }));
+		void createStackAt(screenToWorld(board.camera, { x: size.width / 2 - 100, y: size.height / 2 - 80 }), true);
 	}
 
 	async function addImageFile(file: File, point: Point) {
@@ -1354,7 +1373,7 @@
 			const dimensions = await imageDimensions(source);
 			if (!dimensions.width || !dimensions.height) throw new Error('That image has no dimensions.');
 			await saveImageAsset({ id: assetId, name: file.name || 'image', blob: file, createdAt: now() });
-			const image = createImage(
+			const made = createImage(
 				point.x - 150,
 				point.y - (300 / (dimensions.width / dimensions.height)) / 2,
 				assetId,
@@ -1362,6 +1381,9 @@
 				dimensions.width / dimensions.height,
 				nextZ(board.items)
 			);
+			// A batch of images lines up like everything else the dock adds; in
+			// centre mode the caller's gentle diagonal is kept.
+			const image = arrangeNew(made, { x: made.x, y: made.y });
 			imageUrls = { ...imageUrls, [assetId]: source };
 			beginEdit();
 			setItems([...board.items, image]);
@@ -1569,6 +1591,13 @@
 		if (view.snap && !session.sourceStackId) {
 			const snapped = snapTranslation(board.items, session.dragIds, session.visualBounds, dx, dy, 6 / board.camera.zoom);
 			dx = snapped.dx; dy = snapped.dy; alignmentGuides = snapped.guides;
+		}
+		const grid = placementSettings(view).grid;
+		if (grid > 0 && !session.sourceStackId) {
+			// A grid wins over alignment guides: things land on its lines.
+			dx = snapToGrid(session.visualBounds.x + dx, grid) - session.visualBounds.x;
+			dy = snapToGrid(session.visualBounds.y + dy, grid) - session.visualBounds.y;
+			alignmentGuides = [];
 		}
 		const source = board.items.find((candidate): candidate is StackMember => candidate.id === session.itemId && isStackMember(candidate));
 		if (source?.stackId && !session.extracted) {
@@ -2381,7 +2410,7 @@
 		if (!homeSuiteEmbedded) boardLibrary.setActiveId(board.board.id);
 		else if (reopening) boardLibrary.setActiveId(reopening);
 		else boardLibrary.clearActiveId();
-		const portal = createPortal(at.x, at.y, child.board.id, '', nextZ(board.items));
+		const portal = arrangeNew(createPortal(at.x, at.y, child.board.id, '', nextZ(board.items)), at);
 		beginEdit();
 		setItems([...board.items, portal]);
 		selectOnly(portal.id);
@@ -2972,6 +3001,7 @@
 		const files = [...(event.dataTransfer?.files ?? [])];
 		const images = files.filter((file) => file.type.startsWith('image/'));
 		if (images.length) {
+			placementChain = [];
 			void Promise.all(images.map((file, index) => addImageFile(file, { x: point.x + index * 26, y: point.y + index * 26 })));
 			return;
 		}
@@ -3087,6 +3117,9 @@
 >
 	<div class="surface-atmosphere atmosphere-{board.surface.atmosphere ?? 'none'}" aria-hidden="true"></div>
 	<div class="surface-material material-{board.surface.material ?? 'smooth'}" aria-hidden="true"></div>
+	{#if gridSize > 0 && gridSize * board.camera.zoom >= 6}
+		<div class="surface-grid" aria-hidden="true" style={`background-size:${gridSize * board.camera.zoom}px ${gridSize * board.camera.zoom}px;background-position:${board.camera.x}px ${board.camera.y}px;`}></div>
+	{/if}
 	<div class="surface-edge edge-{board.surface.edge ?? 'none'}" aria-hidden="true"></div>
 	{#if board.surface.pattern !== 'plain'}
 		<div class="surface-weave" style={weaveStyle} aria-hidden="true"></div>
@@ -4235,6 +4268,35 @@
 
 			</details>
 			<details class="appearance-group">
+				<summary>Placing new things</summary>
+			<section class="placement-options">
+				<label class="view-select">Where new things go
+					<select value={placementSettings(view).mode} onchange={(event) => setView({ place: (event.currentTarget as HTMLSelectElement).value as PlaceMode })}>
+						<option value="below">In a column under the last one</option>
+						<option value="flow">Flowing across, then down</option>
+						<option value="center">Middle of the screen</option>
+					</select>
+				</label>
+				<label class="view-select">Space between
+					<select value={placementSettings(view).gap} onchange={(event) => setView({ gap: (event.currentTarget as HTMLSelectElement).value as PlaceGap })}>
+						<option value="tight">Tight</option>
+						<option value="normal">Normal</option>
+						<option value="roomy">Roomy</option>
+					</select>
+				</label>
+				<label class="view-select">Keep arranging
+					<select value={String(placementSettings(view).keep)} onchange={(event) => { const value = (event.currentTarget as HTMLSelectElement).value; setView({ keep: (value === 'moved' ? 'moved' : Number(value)) as PlaceKeep }); }}>
+						{#each PLACE_KEEPS as keep (keep)}<option value={String(keep)}>{keep === 'moved' ? 'Until the last one is moved' : `For ${keep} seconds`}</option>{/each}
+					</select>
+				</label>
+				<label class="view-select">Grid
+					<select value={String(placementSettings(view).grid)} onchange={(event) => setView({ grid: Number((event.currentTarget as HTMLSelectElement).value) })}>
+						{#each GRID_SIZES as size (size)}<option value={String(size)}>{size === 0 ? 'Off' : `${size} — snap and show`}</option>{/each}
+					</select>
+				</label>
+			</section>
+			</details>
+			<details class="appearance-group">
 				<summary>View options</summary>
 			<section>
 				<label class="view-toggle">
@@ -4358,7 +4420,8 @@
 	 * repainting a full-screen background every frame; only a change of zoom
 	 * redraws the tile itself.
 	 */
-	.surface-atmosphere, .surface-material, .surface-edge { position: absolute; inset: 0; pointer-events: none; }
+	.surface-atmosphere, .surface-material, .surface-edge, .surface-grid { position: absolute; inset: 0; pointer-events: none; }
+	.surface-grid { background-image: linear-gradient(to right, rgba(98, 80, 70, .09) 1px, transparent 1px), linear-gradient(to bottom, rgba(98, 80, 70, .09) 1px, transparent 1px); }
 	.surface-atmosphere.atmosphere-sunlight { background: radial-gradient(ellipse at 12% 4%, rgba(255, 224, 157, .35), transparent 55%); }
 	.surface-atmosphere.atmosphere-twilight { background: radial-gradient(ellipse at 85% 8%, rgba(160, 164, 218, .28), transparent 60%); }
 	.surface-material.material-linen { background-image: repeating-linear-gradient(0deg, transparent 0 3px, rgba(100, 79, 67, .035) 4px), repeating-linear-gradient(90deg, transparent 0 3px, rgba(100, 79, 67, .035) 4px); }
@@ -5371,6 +5434,9 @@
 	.drawer-body h3 { margin: 0 0 7px; color: #6d5c56; font-family: var(--font-display, Georgia, serif); font-size: 13px; font-weight: 600; }
 	.drawer-note { margin: 0 0 9px; color: #94867f; font-size: 11.5px; line-height: 1.5; }
 	.drawer-empty { margin: 0 0 10px; padding: 14px; border: 1px dashed rgba(120,96,88,.22); border-radius: 11px; color: #9c8e87; font-size: 11.5px; font-style: italic; text-align: center; }
+	.view-select { display: grid; gap: 4px; margin-top: 9px; color: #806e65; font-size: 11px; }
+	.view-select select { width: 100%; min-height: 32px; padding: 0 8px; border: 1px solid rgba(98, 80, 70, .2); border-radius: 9px; background: rgba(255, 253, 248, .9); color: #584b44; font: inherit; font-size: 12px; }
+	.placement-options { padding-top: 2px; }
 	.row-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 8px; }
 
 	.place-list,

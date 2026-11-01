@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alignItems, compositionUnits, duplicateItems, expandGroups, groupItems, isLocked, orderedItems, reorderLayers, snapTranslation } from './composition';
+import { alignItems, compositionUnits, duplicateItems, duplicateOffset, expandGroups, groupItems, isLocked, orderedItems, reorderLayers, snapTranslation, tidyItems } from './composition';
 import { canRotate, connectorEndpoints, documentBounds, insertCardIntoStack, removeItems, repairDocument, resizedBounds, rotatePoint, rotationOf, snappedAngle, visualBoundsForItem } from './geometry';
 import { createCard, createConnector, createEmptyBoard, createFrame, createImage, createLettering, createSlip, createStack, isWhiteboardDocument, slipToCard, snapshotDocument, upgradeDocument } from './model';
 import { createEditHistory, recordEdit, undoEdit, redoEdit } from './history';
@@ -173,5 +173,39 @@ describe('rotation geometry', () => {
 		const styled = { ...card, appearance: { fill: '#d6e2c9', material: 'index' as const } };
 		expect(patchAppearance(styled, { material: null })).toEqual({ fill: '#d6e2c9' });
 		expect(repairDocument({ ...createEmptyBoard(), items: [styled] }).items[0]).toEqual(styled);
+	});
+});
+
+describe('tidying and fanning out', () => {
+	const slipAt = (x: number, y: number, z: number) => createSlip(x, y, z);
+
+	it('tidies scattered things into even rows, keeping the top-left corner', () => {
+		const a = slipAt(300, 100, 1); const b = slipAt(80, 108, 2); const c = slipAt(200, 400, 3); const d = slipAt(40, 380, 4);
+		const board = { ...createEmptyBoard(), items: [a, b, c, d] };
+		const after = tidyItems(board.items, board.items.map((item) => item.id), 10);
+		const at = (id: string) => after.find((item) => item.id === id)!;
+		// First row: b (leftmost) then a; second row: d then c.
+		expect([at(b.id).x, at(b.id).y]).toEqual([40, 100]);
+		expect(at(a.id).y).toBe(100);
+		expect(at(a.id).x).toBe(40 + 170 + 10);
+		expect(at(d.id).x).toBe(40);
+		expect(at(c.id).x).toBe(40 + 170 + 10);
+		expect(at(d.id).y).toBe(at(c.id).y);
+		expect(at(d.id).y).toBe(100 + 48 + 10);
+	});
+
+	it('does nothing for one thing, or when something is locked', () => {
+		const a = slipAt(0, 0, 1); const b = { ...slipAt(500, 9, 2), locked: true };
+		expect(tidyItems([a, b], [a.id], 10)).toEqual([a, b]);
+		expect(tidyItems([a, b], [a.id, b.id], 10)).toEqual([a, b]);
+	});
+
+	it('moves a repeat copy further along rather than onto the last one', () => {
+		const original = slipAt(100, 100, 1);
+		const first = duplicateItems({ ...createEmptyBoard(), items: [original] }, [original.id]);
+		const second = duplicateItems({ ...createEmptyBoard(), items: first.items }, [original.id]);
+		const copies = second.items.filter((item) => item.id !== original.id);
+		expect(copies.map((item) => [item.x, item.y])).toEqual([[128, 128], [156, 156]]);
+		expect(duplicateOffset([original], [original], new Set([original.id]))).toBe(28);
 	});
 });

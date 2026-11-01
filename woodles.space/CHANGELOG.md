@@ -74,6 +74,19 @@ so it's not easy to forget.
   dock and add another within five seconds, and the new one lands just below
   the first with a small gap, as long as the first hasn't been moved. each new
   one stacks under the last.
+- **whiteboard places new things with some manners** — the slip behaviour is
+  now general: card, text, stack, portal and images (picker, paste, a
+  multi-file drop) all continue under, or beside, the last thing the dock
+  added, for as long as it hasn't been moved. a run that fills the screen
+  starts a new column (or, flowing, a new row) instead of running off the
+  edge. duplicate fans out copies rather than stacking them on one spot.
+- **placing options in whiteboard's Board style** — a new "Placing new
+  things" section: where new things go (column under the last, flowing across
+  then down, or the middle of the screen), the space between, how long to keep
+  arranging (5, 15, 60 seconds, or until the last one is moved), and a grid
+  (16–48) that is shown on the board and snaps both dragging and placement.
+  the Arrange panel gains **Tidy up**: a scattered selection becomes even rows
+  with the chosen gap.
 
 ## 2026-10-25
 

@@ -101,6 +101,63 @@ export function alignItems(items: WhiteboardItem[], ids: string[], alignment: Al
 	return items.map((item) => { const offset = offsets.get(item.id); return offset ? { ...item, x: item.x + offset.x, y: item.y + offset.y, updatedAt: now() } : item; });
 }
 
+/**
+ * Tidy a selection into neat rows: things that share a line stay on it, each
+ * row is top-aligned and evenly spaced, and rows stack under one another with
+ * the same gap. The selection keeps its top-left corner.
+ */
+export function tidyItems(items: WhiteboardItem[], ids: string[], gap: number): WhiteboardItem[] {
+	const units = compositionUnits(items, ids);
+	if (units.length < 2 || units.some((unit) => unit.members.some((item) => isLocked(items, item)))) return items;
+	const total = unionBounds(units.map((unit) => unit.bounds))!;
+	const sorted = units.slice().sort((a, b) => a.bounds.y - b.bounds.y || a.bounds.x - b.bounds.x);
+	const rows: (typeof units)[] = [];
+	let rowBottom = 0;
+	for (const unit of sorted) {
+		const centre = unit.bounds.y + unit.bounds.height / 2;
+		const row = rows[rows.length - 1];
+		if (row && centre < rowBottom) {
+			row.push(unit);
+			rowBottom = Math.max(rowBottom, unit.bounds.y + unit.bounds.height);
+		} else {
+			rows.push([unit]);
+			rowBottom = unit.bounds.y + unit.bounds.height;
+		}
+	}
+	const offsets = new Map<string, { x: number; y: number }>();
+	let cursorY = total.y;
+	for (const row of rows) {
+		row.sort((a, b) => a.bounds.x - b.bounds.x);
+		let cursorX = total.x;
+		for (const unit of row) {
+			for (const member of unit.members) offsets.set(member.id, { x: cursorX - unit.bounds.x, y: cursorY - unit.bounds.y });
+			cursorX += unit.bounds.width + gap;
+		}
+		cursorY += Math.max(...row.map((unit) => unit.bounds.height)) + gap;
+	}
+	return items.map((item) => { const offset = offsets.get(item.id); return offset ? { ...item, x: item.x + offset.x, y: item.y + offset.y, updatedAt: now() } : item; });
+}
+
+/**
+ * How far to nudge a copy down and right. One step at first, and another for
+ * each copy already sitting where this one would land, so copying the same
+ * thing repeatedly fans out instead of stacking on one spot.
+ */
+export function duplicateOffset(items: WhiteboardItem[], originals: WhiteboardItem[], selected: Set<string>, step = 28): number {
+	const movable = originals.filter((item) => item.type !== 'connector');
+	const others = items.filter((item) => !selected.has(item.id) && item.type !== 'connector');
+	let offset = step;
+	for (let tries = 0; tries < 24; tries++) {
+		const taken = movable.some((item) => {
+			const bounds = boundsForItem(items, item);
+			return others.some((other) => other.type === item.type && Math.abs(other.x - (bounds.x + offset)) < 1 && Math.abs(other.y - (bounds.y + offset)) < 1);
+		});
+		if (!taken) return offset;
+		offset += step;
+	}
+	return offset;
+}
+
 /** Copies a composition's board-local objects; canonical sources remain references. */
 export function duplicateItems(document: WhiteboardDocument, ids: string[]): { items: WhiteboardItem[]; ids: string[] } {
 	const selected = new Set(expandGroups(document.items, ids));
@@ -110,9 +167,10 @@ export function duplicateItems(document: WhiteboardDocument, ids: string[]): { i
 	const groups = new Map(originals.filter((item) => item.groupId).map((item) => [item.groupId!, makeId('group')]));
 	const top = Math.max(0, ...document.items.map(layerOf));
 	const ranks = new Map(orderedItems(originals).map((item, i) => [item.id, top + i + 1]));
+	const step = duplicateOffset(document.items, originals, selected);
 	const clones = originals.map((item) => {
 		const bounds = boundsForItem(document.items, item);
-		const cloned = { ...item, id: idMap.get(item.id)!, x: bounds.x + 28, y: bounds.y + 28, layer: ranks.get(item.id), groupId: item.groupId ? groups.get(item.groupId) : undefined, createdAt: now(), updatedAt: now() };
+		const cloned = { ...item, id: idMap.get(item.id)!, x: bounds.x + step, y: bounds.y + step, layer: ranks.get(item.id), groupId: item.groupId ? groups.get(item.groupId) : undefined, createdAt: now(), updatedAt: now() };
 		if (cloned.type === 'stack') cloned.cardIds = cloned.cardIds.map((id) => idMap.get(id)).filter((id): id is string => Boolean(id));
 		if (isStackMember(cloned)) { cloned.stackId = cloned.stackId ? idMap.get(cloned.stackId) : undefined; cloned.freePosition = undefined; }
 		if (cloned.type === 'connector') { cloned.fromId = idMap.get(cloned.fromId)!; cloned.toId = idMap.get(cloned.toId)!; }
