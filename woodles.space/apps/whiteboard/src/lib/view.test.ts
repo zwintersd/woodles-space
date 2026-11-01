@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createViewStorage, DEFAULT_VIEW, isViewPreferences, normalizeView, VIEW_STORAGE_KEY } from './view';
+import { createViewStorage, DEFAULT_VIEW, isViewPreferences, normalizeView, placementSettings, VIEW_STORAGE_KEY } from './view';
 
 function memoryStorage() {
 	const values = new Map<string, string>();
@@ -44,5 +44,15 @@ describe('what this device wants to see', () => {
 	it('keeps the half it can read', () => {
 		expect(normalizeView({ minimapOn: true })).toEqual({ restChrome: true, minimapOn: true });
 		expect(normalizeView({ restChrome: 'yes' })).toEqual(DEFAULT_VIEW);
+	});
+
+	it('keeps placement choices, drops ones it does not know, and fills in defaults', () => {
+		const chosen = { restChrome: true, minimapOn: false, place: 'flow', gap: 'roomy', keep: 'moved', grid: 24 } as const;
+		expect(normalizeView(chosen)).toEqual(chosen);
+		expect(isViewPreferences(chosen)).toBe(true);
+		expect(isViewPreferences({ ...chosen, place: 'diagonal' })).toBe(false);
+		expect(normalizeView({ place: 'diagonal', grid: 7, keep: 99 })).toEqual(DEFAULT_VIEW);
+		expect(placementSettings(DEFAULT_VIEW)).toEqual({ mode: 'below', gap: 'normal', keep: 5, grid: 0 });
+		expect(placementSettings({ ...DEFAULT_VIEW, place: 'center', grid: 16 })).toEqual({ mode: 'center', gap: 'normal', keep: 5, grid: 16 });
 	});
 });
