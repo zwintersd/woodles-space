@@ -510,10 +510,14 @@
 		border-top-right-radius: 50%;
 		border-bottom: 0;
 		background: var(--car-glass-ruby);
+		/* pivot on the wheel's centre (1.35rem, 1.35rem) so the counter-rotation
+		   cancels the wheel's spin and the bell stays put instead of orbiting */
+		transform-origin: 0.28rem 0.54rem;
 		transition: transform 600ms cubic-bezier(0.34, 1.56, 0.64, 1);
 	}
 
-	.brand:hover .brand-bell i {
+	.brand:hover .brand-bell i,
+	.brand:hover .brand-bell b {
 		transform: rotate(-45deg);
 	}
 
@@ -534,6 +538,8 @@
 		height: 0.18rem;
 		border-radius: 50%;
 		background: var(--car-gilt);
+		transform-origin: 0.09rem -0.1rem;
+		transition: transform 600ms cubic-bezier(0.34, 1.56, 0.64, 1);
 	}
 
 	.brand > span:last-child {
