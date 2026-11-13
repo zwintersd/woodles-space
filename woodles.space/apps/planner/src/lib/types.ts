@@ -15,7 +15,7 @@ export type Block = {
 	// `standing` is derived from Thinking About's shelf rather than stored here
 	// — a standing watch date is a commitment somebody already recorded in the
 	// app that owns it, and copying it in would create a second truth to drift.
-	overlay?: 'obligation' | 'ritual' | 'standing';
+	overlay?: 'obligation' | 'ritual' | 'standing' | 'appointment';
 	// A suggested sampling category. The observation is still allowed to differ.
 	sampleKind?: IntervalKind;
 };
@@ -45,6 +45,18 @@ export type Obligation = {
 	startTime: string; // "HH:MM"
 	endTime: string;
 	domainId?: string;
+};
+
+// A one-off timed thing on one date — the dentist on Tuesday at three.
+// Resolved into a Block for that date by store.getBlocksForDate(), so it
+// reaches Today, the plan line, the bells and the print sheet like any block.
+export type Appointment = {
+	id: string;
+	date: string; // YYYY-MM-DD
+	startTime: string; // "HH:MM"
+	endTime: string;
+	title: string;
+	updatedAt: string;
 };
 
 // A small repeated thing that's yours — applies to every day.
@@ -169,8 +181,6 @@ export type BinderTab =
 	| 'domains'
 	| 'waiting'
 	| 'upcoming'
-	| 'year-scroll'
-	| 'holidays'
 	| 'week-pattern'
 	| 'schedule'
 	| 'sync'
@@ -478,6 +488,7 @@ export type PlannerBlob = {
 	surgeDrafts?: SurgeDraft[];
 	sleepLogs?: SleepLog[];
 	signals?: SignalEntry[];
+	appointments?: Appointment[];
 	loggedSessions?: LoggedSession[];
 	openLoops?: OpenLoop[];
 	loopEvents?: LoopEvent[];

@@ -20,6 +20,15 @@ so it's not easy to forget.
 
 ## 2026-11-13
 
+- **carillon has a calendar** — a new Calendar section, between Today and
+  Routines, for looking ahead. the week shows each day's shape, a strip of
+  its blocks, and what's pinned to it; pick a different shape for any coming
+  day ("next thursday is an out day") without touching the weekday default.
+  a month view shows the same at a glance. past days open their Edition.
+- **carillon: appointments** — a one-off thing at a time on a date (the
+  dentist, tuesday at three). add one from a day in the calendar and it
+  shows up on that day in Today, the plan line, the bells and the print
+  sheet. the binder's year and holidays tabs retire into the calendar.
 - **carillon: day piles are day shapes, and surge is ideas** — the header is
   down to Today, Routines, Ideas, Editions (keys 1–4). day shapes are still
   all there; the editor opens from the "today's shape" pill on Today, and

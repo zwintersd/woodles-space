@@ -7,9 +7,12 @@
 	let {
 		onopenshapes,
 		onopenroutines,
-		onopenideas
-	}: { onopenshapes: () => void; onopenroutines: () => void; onopenideas: () => void } = $props();
-	let selectedDate = $state(dateKey(store.now));
+		onopenideas,
+		initialDate
+	}: { onopenshapes: () => void; onopenroutines: () => void; onopenideas: () => void; initialDate?: string } = $props();
+	// The page re-creates this component when the calendar hands over a date.
+	// svelte-ignore state_referenced_locally
+	let selectedDate = $state(initialDate ?? dateKey(store.now));
 	let note = $state(''),
 		notice = $state(''),
 		compareDate = $state('');

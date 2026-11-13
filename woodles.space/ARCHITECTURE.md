@@ -770,6 +770,26 @@ authored time slots; nothing reorders them. Obligations and
 rituals are overlays, never part of a shape's own blocks. The store methods
 still say pile (`savePile`, `archivePile`, `deletePile`).
 
+**Calendar** is the forward counterpart to Editions: a header section
+(`CalendarView.svelte`) with a week of day cards and a month grid over the same
+resolution Today uses — `getDayShape()` and `getBlocksForDate()` for any date.
+Each coming day carries a shape picker that writes a one-day `DayInstance`
+("usual" clears it back to the weekday default), a strip of its timed blocks,
+and its appointments, recurring commitments and dated tasks. The day detail
+edits that date's activities through the same `saveDayPlan()` Today uses.
+Past days are read-only there and hand over to Editions on their date; their
+shape is not changeable because an observed day's plan is already frozen.
+There is no hour grid, by choice: the day shape is the unit.
+
+**Appointments** are the one-off timed thing the model lacked — obligations
+only repeat by weekday and tasks have no clock. An `Appointment` is a date, a
+start, an end and a title (`planner.appointments.v1`, synced as
+`appointments`, later `updatedAt` wins). `getBlocksForDate()` resolves it to
+an `apt-<id>` block with `overlay: 'appointment'` on that date only, placed
+last so it is what an interval reads as planned on a shared start — which is
+how it reaches Today, the plan line, the bells and the print sheet with no
+code of its own in any of them.
+
 **Ideas** separate capture from commitment. An idea stays off the schedule
 until tasks are made from it — immediately if wanted; there is no cooling-off
 delay. `extractSurgeTasks()` turns chosen lines into tasks, dated or not, and
