@@ -256,7 +256,7 @@ export const CARILLON_COMMITMENTS_VERSION = 1;
 
 /**
  * One scheduled intention about a Thinking About entry. Carillon's plan is
- * much richer than this — domains, day piles, blocks, observations — and none
+ * much richer than this — domains, day shapes, blocks, observations — and none
  * of that belongs on a board about what you're reading. What survives is the
  * question the board actually asks: when, and is it done.
  */

@@ -5,10 +5,10 @@
 	import { mentions, letterHref } from '$lib/mentions.svelte';
 	import { INTERVAL_KIND_OPTIONS } from '$lib/instrument';
 	let {
-		onopenpiles,
+		onopenshapes,
 		onopenroutines,
-		onopensurge
-	}: { onopenpiles: () => void; onopenroutines: () => void; onopensurge: () => void } = $props();
+		onopenideas
+	}: { onopenshapes: () => void; onopenroutines: () => void; onopenideas: () => void } = $props();
 	let selectedDate = $state(dateKey(store.now));
 	let note = $state(''),
 		notice = $state(''),
@@ -88,13 +88,13 @@
 			<section class="wb-card">
 				<h2>Make a change</h2>
 				<div class="wb-list">
-					<button onclick={onopenpiles}>Edit day piles</button><button onclick={onopenroutines}
+					<button onclick={onopenshapes}>Edit day shapes</button><button onclick={onopenroutines}
 						>Revise routines</button
-					><button onclick={onopensurge}>Review ideas</button>
+					><button onclick={onopenideas}>Review ideas</button>
 				</div>
 			</section>
 			{#if comparable.length}<section class="wb-card">
-					<h2>Same day pile</h2>
+					<h2>Same day shape</h2>
 					<label
 						>Compare recorded days<select bind:value={compareDate}
 							><option value="">Choose a date</option>{#each comparable as date}<option value={date}
@@ -110,7 +110,7 @@
 								).length}
 							</p>{/each}
 						<p class="wb-note">
-							These days have a saved reference to the same pile. Activities and recording coverage
+							These days have a saved reference to the same day shape. Activities and recording coverage
 							may differ.
 						</p>{/if}
 				</section>{/if}
@@ -178,7 +178,7 @@
 					<h2>Ideas saved</h2>
 					{#each ideas as idea}<p>
 							{idea.title} · {(idea.promotedTaskIds ?? []).length} linked tasks
-						</p>{/each}<button onclick={onopensurge}>Open ideas</button>
+						</p>{/each}<button onclick={onopenideas}>Open ideas</button>
 				</section>{/if}
 			{#if store.getSleepLog(selectedDate) || store.signalEntries.some((s) => s.date <= selectedDate && (s.endDate ?? s.date) >= selectedDate)}<section
 					class="wb-card"

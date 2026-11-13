@@ -4,6 +4,7 @@
 	import { uid } from '$lib/utils';
 	import type { DayShape, WeekPattern } from '$lib/types';
 	import BlockEditor from './BlockEditor.svelte';
+	let { onclose }: { onclose?: () => void } = $props();
 	let selected = $state('');
 	let draft = $state<DayShape | null>(null);
 	let notice = $state('');
@@ -19,7 +20,7 @@
 		confirmDelete = false;
 	}
 	function create() {
-		edit({ id: uid(), name: 'New day pile', blocks: [] });
+		edit({ id: uid(), name: 'New day shape', blocks: [] });
 	}
 	function save() {
 		if (!draft) return;
@@ -27,7 +28,7 @@
 			notice = 'Give each activity a name and an end time after its start.';
 			return;
 		}
-		notice = 'Day pile saved.';
+		notice = 'Day shape saved.';
 		queueSync();
 	}
 	function remove() {
@@ -36,7 +37,7 @@
 		draft = null;
 		selected = '';
 		confirmDelete = false;
-		notice = 'Day pile deleted. Dated plans are preserved.';
+		notice = 'Day shape deleted. Dated plans are preserved.';
 		queueSync();
 	}
 	function setWeek(day: number, id: string) {
@@ -50,11 +51,14 @@
 <section class="workbench">
 	<header class="wb-heading">
 		<div>
-			<p class="wb-kicker">Day piles</p>
+			<p class="wb-kicker">Day shapes</p>
 			<h1>Arrange a day you can reuse.</h1>
 			<p>Build a template, then adjust individual days as needed.</p>
 		</div>
-		<button onclick={create}>+ New day pile</button>
+		<div class="wb-actions">
+			{#if onclose}<button onclick={onclose}>← Back to Today</button>{/if}
+			<button onclick={create}>+ New day shape</button>
+		</div>
 	</header>
 	<div class="wb-grid">
 		<aside>
@@ -67,7 +71,7 @@
 			<div class="wb-list">
 				{#each piles as pile}<button aria-pressed={selected === pile.id} onclick={() => edit(pile)}
 						><strong>{pile.name}</strong><small>{pile.blocks.length} activities</small></button
-					>{:else}<p>No {archived ? 'archived' : 'active'} piles.</p>{/each}
+					>{:else}<p>No {archived ? 'archived' : 'active'} day shapes.</p>{/each}
 			</div>
 		</aside>
 		<div>
@@ -79,10 +83,10 @@
 					}}
 				>
 					<p class="wb-kicker">Template editor</p>
-					<label>Pile name<input required bind:value={draft.name} /></label>
+					<label>Day shape name<input required bind:value={draft.name} /></label>
 					<BlockEditor bind:blocks={draft.blocks} />
 					<div class="wb-actions">
-						<button class="primary" type="submit">Save pile</button><button
+						<button class="primary" type="submit">Save day shape</button><button
 							type="button"
 							onclick={() => {
 								draft = null;
@@ -110,8 +114,8 @@
 									if (!draft) return;
 									store.setDayShape(store.now, draft.id);
 									queueSync();
-									notice = 'Saved pile selected for today. Unsaved edits are not applied.';
-								}}>Use saved pile today</button
+									notice = 'Saved day shape selected for today. Unsaved edits are not applied.';
+								}}>Use saved day shape today</button
 							>
 							<button
 								type="button"
@@ -126,22 +130,22 @@
 								{draft.archived ? 'Restore' : 'Archive'}</button
 							>
 							<button type="button" class="wb-danger" onclick={() => (confirmDelete = true)}
-								>Delete pile…</button
+								>Delete day shape…</button
 							>
 						</div>{/if}
-					{#if confirmDelete}<div role="group" aria-label="Confirm pile deletion">
+					{#if confirmDelete}<div role="group" aria-label="Confirm day shape deletion">
 							<p>
 								Delete this template? Weekday assignments will be cleared. Saved day plans remain.
 							</p>
-							<button type="button" onclick={remove}>Delete pile</button><button
+							<button type="button" onclick={remove}>Delete day shape</button><button
 								type="button"
-								onclick={() => (confirmDelete = false)}>Keep pile</button
+								onclick={() => (confirmDelete = false)}>Keep day shape</button
 							>
 						</div>{/if}
 				</form>{:else}<div class="wb-card wb-paper">
 					<h2>Your day templates</h2>
 					<p>
-						Select a pile to edit it, or create one. Changes to a template apply to days that have
+						Select a day shape to edit it, or create one. Changes to a template apply to days that have
 						not been customized.
 					</p>
 				</div>{/if}
@@ -154,7 +158,7 @@
 					>{days[day]}<select
 						value={store.weekPattern.days[day]}
 						onchange={(e) => setWeek(day, e.currentTarget.value)}
-						><option value="">No pile</option
+						><option value="">No day shape</option
 						>{#each store.dayShapes.filter((p) => !p.deletedAt) as pile}<option value={pile.id}
 								>{pile.name}{pile.archived ? ' (archived)' : ''}</option
 							>{/each}</select

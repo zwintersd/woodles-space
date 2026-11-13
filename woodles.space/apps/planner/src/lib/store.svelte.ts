@@ -1094,7 +1094,7 @@ export class PlannerStore {
 		this.publishSessionsLocally();
 	}
 
-	// ── surge quarantine ────────────────────────────────────────────
+	// ── ideas ──────────────────────────────────────────────────────
 
 	addSurgeDraft(title: string, body: string): SurgeDraft | null {
 		const cleanTitle = title.trim();
@@ -1103,7 +1103,7 @@ export class PlannerStore {
 		const timestamp = new Date().toISOString();
 		const draft: SurgeDraft = {
 			id: uid(),
-			title: cleanTitle || cleanBody.split(/\r?\n/)[0].slice(0, 80) || 'untitled surge',
+			title: cleanTitle || cleanBody.split(/\r?\n/)[0].slice(0, 80) || 'untitled idea',
 			body: cleanBody,
 			status: 'captured',
 			createdAt: timestamp,
@@ -1133,7 +1133,7 @@ export class PlannerStore {
 			title: draft.title,
 			status: 'open',
 			notes:
-				`Promoted from Surge · drafted ${draft.createdAt}\n\n${draft.body}`.trim(),
+				`From idea · drafted ${draft.createdAt}\n\n${draft.body}`.trim(),
 			createdAt: timestamp,
 			updatedAt: timestamp
 		};

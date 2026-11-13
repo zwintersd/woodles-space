@@ -11,15 +11,20 @@ async function section(page:Page,name:string) {
 	await page.getByRole('navigation',{name:'Carillon sections'}).getByRole('button',{name:new RegExp(name)}).click();
 }
 
-test('edits a pile, isolates today, and reloads the saved day',async({page})=>{
+async function openShapes(page:Page) {
+	await page.getByRole('button',{name:/today’s shape/}).click();
+	await expect(page.getByRole('navigation',{name:'Carillon sections'}).getByRole('button',{name:/Day shapes|Day piles/})).toHaveCount(0);
+}
+
+test('edits a day shape, isolates today, and reloads the saved day',async({page})=>{
 	const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
-	await open(page);await section(page,'Day piles');
-	await page.getByRole('button',{name:'+ New day pile',exact:true}).click();
-	await page.getByLabel('Pile name').fill('Home test day');
+	await open(page);await openShapes(page);
+	await page.getByRole('button',{name:'+ New day shape',exact:true}).click();
+	await page.getByLabel('Day shape name').fill('Home test day');
 	await page.getByRole('button',{name:'+ Add activity',exact:true}).click();
 	await page.getByLabel('Activity 1',{exact:true}).fill('Read at home');
-	await page.getByRole('button',{name:'Save pile',exact:true}).click();
-	await page.getByRole('button',{name:'Use saved pile today',exact:true}).click();
+	await page.getByRole('button',{name:'Save day shape',exact:true}).click();
+	await page.getByRole('button',{name:'Use saved day shape today',exact:true}).click();
 	await section(page,'Today');
 	await page.getByRole('button', { name: 'schedule', exact: true }).click();
 	await expect(page.getByText('Read at home',{exact:true})).toBeVisible();
@@ -30,7 +35,8 @@ test('edits a pile, isolates today, and reloads the saved day',async({page})=>{
 	await page.getByRole('button', { name: 'schedule', exact: true }).click();
 	await expect(page.getByText('Read outside today',{exact:true})).toBeVisible();
 	await page.keyboard.press('Escape');
-	await section(page,'Day piles');
+	await openShapes(page);
+	await expect(page.getByRole('button',{name:'← Back to Today',exact:true})).toBeVisible();
 	await page.getByRole('button',{name:/Home test day.*1 activities/}).click();
 	await expect(page.getByLabel('Activity 1',{exact:true})).toHaveValue('Read at home');
 	expect(errors).toEqual([]);
@@ -232,7 +238,7 @@ test('customizes trackers, offers relevant questions, and reopens them from the 
 });
 
 test('extracts several idea tasks immediately and persists an edition note',async({page})=>{
-	await open(page);await section(page,'Surge');
+	await open(page);await section(page,'Ideas');
 	await page.getByLabel('Title',{exact:true}).fill('Write a book');
 	await page.getByLabel('Notes',{exact:true}).fill('Notes to retain.');
 	await page.getByRole('button',{name:'Save idea',exact:true}).click();
@@ -253,7 +259,7 @@ test('renders all workspaces at desktop and phone widths without overflow',async
 	await open(page);
 	for (const width of [1440,390]) {
 		await page.setViewportSize({width,height:1000});
-		for(const name of ['Today','Day piles','Routines','Surge','Editions']) {
+		for(const name of ['Today','Routines','Ideas','Editions']) {
 			await section(page,name);
 			await expect(page.locator('#carillon-main')).toBeVisible();
 			expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);

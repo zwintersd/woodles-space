@@ -2,9 +2,9 @@
 	import { store } from '$lib/store.svelte';
 	import { syncState } from '$lib/sync.svelte';
 	import TodayInstrument from '$lib/components/TodayInstrument.svelte';
-	import DayPiles from '$lib/components/DayPiles.svelte';
+	import DayShapes from '$lib/components/DayShapes.svelte';
 	import RoutinesLab from '$lib/components/RoutinesLab.svelte';
-	import SurgeWorkbench from '$lib/components/SurgeWorkbench.svelte';
+	import IdeasWorkbench from '$lib/components/IdeasWorkbench.svelte';
 	import EditionReview from '$lib/components/EditionReview.svelte';
 	import Binder from '$lib/components/Binder.svelte';
 	import TaskEditDrawer from '$lib/components/TaskEditDrawer.svelte';
@@ -16,7 +16,7 @@
 	import { onMount } from 'svelte';
 	import { stopBells } from '$lib/bells';
 
-	type CarillonSection = 'today' | 'piles' | 'routines' | 'surge' | 'review';
+	type CarillonSection = 'today' | 'shapes' | 'routines' | 'ideas' | 'review';
 
 	const SECTIONS: Array<{
 		id: CarillonSection;
@@ -27,10 +27,9 @@
 		jewel: string;
 	}> = [
 		{ id: 'today', label: 'Today', note: 'observe', key: '1', jewel: 'amethyst' },
-		{ id: 'piles', label: 'Day piles', note: 'prepare', key: '2', jewel: 'teal' },
-		{ id: 'routines', label: 'Routines', note: 'use & edit', key: '3', jewel: 'teal' },
-		{ id: 'surge', label: 'Surge', note: 'capture', key: '4', jewel: 'ruby' },
-		{ id: 'review', label: 'Editions', note: 'review', key: '5', jewel: 'amethyst' }
+		{ id: 'routines', label: 'Routines', note: 'use & edit', key: '2', jewel: 'teal' },
+		{ id: 'ideas', label: 'Ideas', note: 'capture', key: '3', jewel: 'ruby' },
+		{ id: 'review', label: 'Editions', note: 'review', key: '4', jewel: 'amethyst' }
 	];
 
 	let section = $state<CarillonSection>('today');
@@ -233,18 +232,18 @@
 		<main id="carillon-main" class="carillon-main" tabindex="-1" bind:this={mainElement}>
 			{#if section === 'today'}
 				<TodayInstrument
-					onopenpiles={() => setSection('piles')}
+					onopenshapes={() => setSection('shapes')}
 					onopenroutines={() => setSection('routines')}
-					onopensurge={() => setSection('surge')}
+					onopenideas={() => setSection('ideas')}
 				/>
-			{:else if section === 'piles'}
-				<DayPiles />
+			{:else if section === 'shapes'}
+				<DayShapes onclose={() => setSection('today')} />
 			{:else if section === 'routines'}
 				<RoutinesLab />
-			{:else if section === 'surge'}
-				<SurgeWorkbench />
+			{:else if section === 'ideas'}
+				<IdeasWorkbench />
 			{:else}
-				<EditionReview onopenpiles={() => setSection('piles')} onopenroutines={() => setSection('routines')} onopensurge={() => setSection('surge')} />
+				<EditionReview onopenshapes={() => setSection('shapes')} onopenroutines={() => setSection('routines')} onopenideas={() => setSection('ideas')} />
 			{/if}
 		</main>
 
@@ -260,7 +259,7 @@
 			<p>saved locally · optional passphrase sync</p>
 		</footer>
 
-		<Binder onopenpiles={() => setSection('piles')} />
+		<Binder onopenshapes={() => setSection('shapes')} />
 		<TaskEditDrawer />
 		<ShelfArrival />
 

@@ -53,7 +53,7 @@
 <section class="workbench">
 	<header class="wb-heading">
 		<div>
-			<p class="wb-kicker">Surge · ideas</p>
+			<p class="wb-kicker">Ideas</p>
 			<h1>Save an idea to review later.</h1>
 			<p>Ideas stay off your schedule until you create a task or assign a date.</p>
 		</div>

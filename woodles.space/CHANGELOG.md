@@ -18,6 +18,15 @@ so it's not easy to forget.
 
 ---
 
+## 2026-11-13
+
+- **carillon: day piles are day shapes, and surge is ideas** — the header is
+  down to Today, Routines, Ideas, Editions (keys 1–4). day shapes are still
+  all there; the editor opens from the "today's shape" pill on Today, and
+  from the binder, the day plan, and Editions, with a way back. Surge is
+  just Ideas now: save one, make tasks from it whenever you like — there is
+  no cooling-off wait. nothing saved changes or moves.
+
 ## 2026-11-01
 
 - **a collection spawned from a stack now follows it** — spawn → collection on

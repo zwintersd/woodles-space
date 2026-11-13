@@ -71,7 +71,7 @@
 >
 	<section class="wb-card routines-card" aria-label="Reusable routines">
 		<h2>Reusable routines</h2>
-		<p>Run these checklists from Routines or link them to a day pile activity.</p>
+		<p>Run these checklists from Routines or link them to a day shape activity.</p>
 		<div class="routine-list">
 			{#each routines as routine (routine.id)}
 				<details class="routine-item"><summary>{routine.name} · {routine.steps.length} {routine.steps.length === 1 ? 'step' : 'steps'}</summary>
@@ -96,7 +96,7 @@
 		<p class="wb-note">Edit, reorder, archive, or delete routines later in Routines. Saved practice records keep their original steps.</p>
 	</section>
 	<details class="wb-card daily-activities" bind:this={dailyActivities}><summary>Daily activities at a fixed time (optional)</summary>
-	<p>These appear every day, separately from routine checklists and day piles.</p>
+	<p>These appear every day, separately from routine checklists and day shapes.</p>
 	{#if store.rituals.length > 0}
 		<ul class="rit-list">
 			{#each store.rituals as r (r.id)}

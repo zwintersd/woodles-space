@@ -208,7 +208,7 @@ describe('Carillon instrument persistence', () => {
 	});
 });
 
-describe('Surge explicit review', () => {
+describe('Ideas explicit review', () => {
 	beforeEach(() => {
 		localStorage.clear();
 	});
@@ -240,7 +240,7 @@ describe('Surge explicit review', () => {
 			title: 'restructure every project',
 			status: 'open'
 		});
-		expect(reviewSession.tasks[0]?.notes).toContain('Promoted from Surge');
+		expect(reviewSession.tasks[0]?.notes).toContain('From idea');
 		expect(reviewSession.tasks[0]?.notes).toContain(draft!.createdAt);
 	});
 

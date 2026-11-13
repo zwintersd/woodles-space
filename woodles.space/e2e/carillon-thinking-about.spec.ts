@@ -151,7 +151,7 @@ test.describe('Carillon ↔ Thinking About', () => {
 			await page.getByRole('button', { name: 'add', exact: true }).click();
 
 			// And the board knows about it, without Thinking About being told
-			// anything about blocks, domains, or day piles.
+			// anything about blocks, domains, or day shapes.
 			await page.goto('/thinking-about');
 			await page.getByRole('button', { name: /Piranesi/ }).first().click();
 

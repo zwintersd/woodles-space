@@ -255,9 +255,8 @@ once entries are referenceable, thinking about's `schedule` (freeform, only
 meaningful on playing/watching) can gain optional weekday+time structure, and
 carillon can *derive* obligation-shaped overlay blocks from it — a standing
 thursday watch date appearing on the calendar with nothing stored twice and
-no obligation created by hand. the existing invariant that
-`sequenceDayPile()` never reorders obligations and rituals already covers the
-derived blocks.
+no obligation created by hand. overlays are synthesized on read and never join a
+day shape's own blocks, which already covers the derived blocks.
 
 this is the piece that most directly answers "from thinking about, find the
 time to prioritize the things i care about."

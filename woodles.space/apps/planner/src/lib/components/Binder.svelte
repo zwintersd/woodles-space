@@ -17,7 +17,7 @@
 		| 'schedule'
 		| 'bells'
 		| 'sync';
-	let { onopenpiles }: { onopenpiles?: () => void } = $props();
+	let { onopenshapes }: { onopenshapes?: () => void } = $props();
 
 	const TABS: { id: BinderTabId; icon: string; label: string }[] = [
 		{ id: 'shapes',       icon: '◐', label: BINDER_LABELS.shapes },
@@ -161,7 +161,7 @@
 			<span class="binder-title">schedule</span>
 		</header>
 		<div class="binder-body binder-schedule">
-			<DayPlan onopenpiles={() => { store.closeBinder(); onopenpiles?.(); }} />
+			<DayPlan onopenshapes={() => { store.closeBinder(); onopenshapes?.(); }} />
 		</div>
 
 	{:else if store.binderTab === 'holidays'}
