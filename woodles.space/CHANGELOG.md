@@ -18,6 +18,13 @@ so it's not easy to forget.
 
 ---
 
+## 2026-11-12
+
+- **carillon's header rose window now spins true** — hovering the logo turns
+  the glass wheel while the bell stays upright in the centre. before, the bell
+  counter-rotated around itself rather than the wheel, so it swung off-centre
+  and the clapper dot orbited. both now pivot on the wheel's centre.
+
 ## 2026-11-01
 
 - **a collection spawned from a stack now follows it** — spawn → collection on
