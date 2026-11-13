@@ -111,7 +111,6 @@ describe('PlannerStore', () => {
 		});
 
 		it('initializes transient state', () => {
-			expect(store.currentView).toBe('now-next');
 			expect(store.binderTab).toBeNull();
 			expect(store.editingTaskId).toBeNull();
 			expect(store.activeDayKey).toBeNull();
@@ -582,30 +581,25 @@ describe('PlannerStore', () => {
 	// ── view & binder ───────────────────────────────────────────────
 
 	describe('view management', () => {
-		it('setView updates currentView', () => {
-			store.setView('month');
-			expect(store.currentView).toBe('month');
-		});
-
 		it('toggleBinder opens tab if closed', () => {
-			store.toggleBinder('shapes');
-			expect(store.binderTab).toBe('shapes');
+			store.toggleBinder('schedule');
+			expect(store.binderTab).toBe('schedule');
 		});
 
 		it('toggleBinder closes tab if open', () => {
-			store.toggleBinder('shapes');
-			store.toggleBinder('shapes');
+			store.toggleBinder('schedule');
+			store.toggleBinder('schedule');
 			expect(store.binderTab).toBeNull();
 		});
 
 		it('toggleBinder switches between tabs', () => {
-			store.toggleBinder('shapes');
+			store.toggleBinder('schedule');
 			store.toggleBinder('waiting');
 			expect(store.binderTab).toBe('waiting');
 		});
 
 		it('closeBinder clears binderTab', () => {
-			store.toggleBinder('shapes');
+			store.toggleBinder('schedule');
 			store.closeBinder();
 			expect(store.binderTab).toBeNull();
 		});

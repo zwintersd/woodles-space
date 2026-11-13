@@ -5,6 +5,7 @@
 	import {
 		INTERVAL_KIND_OPTIONS,
 		buildDayIntervals,
+		planLine,
 		timeForMinutes,
 		type DayInterval
 	} from '$lib/instrument';
@@ -201,7 +202,7 @@
 				<!-- Outside the status region, so the minute-by-minute bell line isn't announced. -->
 				{@render bellLine()}
 			{:else if selectedInterval}
-				<MomentarySample interval={selectedInterval} timeLabel="{displayTime(selectedInterval.startTime)}–{displayTime(selectedInterval.endTime)}" bellNote={selectedStart ? 'editing a recorded moment' : bellStatus} onbellclick={selectedStart ? undefined : openBells} editingPast={Boolean(selectedStart)} onreturnnow={() => selectedStart = ''} onsaved={() => selectedStart = ''} />
+				<MomentarySample interval={selectedInterval} planNote={planLine(selectedInterval, blocks, displayTime)} timeLabel="{displayTime(selectedInterval.startTime)}–{displayTime(selectedInterval.endTime)}" bellNote={selectedStart ? 'editing a recorded moment' : bellStatus} onbellclick={selectedStart ? undefined : openBells} editingPast={Boolean(selectedStart)} onreturnnow={() => selectedStart = ''} onsaved={() => selectedStart = ''} />
 			{:else}
 				<div class="sample-rest"><div><p>Outside sampling hours. Your saved moments are below.</p>{@render bellLine()}</div></div>
 			{/if}
@@ -307,7 +308,6 @@
 			<strong>{tomorrowShape?.name ?? 'open day'}</strong>
 		</div>
 	</header>
-	<p class="print-thesis">The plan is a hypothesis. The day is data.</p>
 	<div class="print-ledger" style={`--print-rows: ${printRowsPerColumn}`}>
 		{#each tomorrowIntervals as row (row.key)}
 			<div class="print-row">
@@ -856,13 +856,6 @@
 			font-family: var(--car-body);
 			font-size: 10pt;
 			font-weight: 500;
-		}
-
-		.print-thesis {
-			margin: 0.08in 0;
-			color: #6e5e6f;
-			font-size: 7.5pt;
-			font-style: italic;
 		}
 
 		.print-ledger {

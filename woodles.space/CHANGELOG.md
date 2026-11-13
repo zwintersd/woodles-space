@@ -26,6 +26,15 @@ so it's not easy to forget.
   from the binder, the day plan, and Editions, with a way back. Surge is
   just Ideas now: save one, make tasks from it whenever you like — there is
   no cooling-off wait. nothing saved changes or moves.
+- **carillon: the sampler shows the plan** — under the clock, one line:
+  what this interval was planned for, when that ends, and what comes next.
+  on an open stretch it names the next thing instead; on an unplanned day it
+  stays quiet.
+- **carillon: spores are gone** — the hidden one-per-moment ledger and its
+  Echo traits never had a screen, so they stop being recorded and synced.
+  moments, labels and editions are untouched.
+- **carillon: smaller cleanups** — the binder's day shapes button opens the
+  editor instead of a read-only list, and the print sheet loses its slogan.
 
 ## 2026-11-01
 

@@ -602,7 +602,9 @@ a central Woodles state service.
 `apps/planner` is Carillon. Its schedule is a hypothesis shown beside
 momentary time-sampling data, not a compliance ledger. `buildDayIntervals()`
 expands the configured wake/sleep anchors into intervals (15 minutes by
-default); the bell asks what is actually happening in the current interval.
+default); the bell asks what is actually happening in the current interval. The sampler
+carries one line about the plan (`planLine()`): the planned block, when it
+ends, and what follows — or the next block, from an open stretch.
 Past intervals only become editable when paper-entry mode is on or through
 the catch-up card's recalled stretches. Paper-entry's date picker can reopen
 any earlier sheet, and those marks keep `source: "paper"` so a later clipboard
@@ -664,8 +666,7 @@ a day instead of living with the bell. `findCatchUpGaps()` scans today's rows
 for contiguous past, unobserved runs of at least an hour, and the Today screen
 offers to sketch each hollow stretch in broad strokes. A sketch is one
 observation with `source: "recall"` whose `intervalMinutes` spans the stretch —
-one memory is one sample and earns one Spore however many bells it covers, so
-backfilling can never out-earn live sampling. `buildDayIntervals()` spreads a
+one memory is one sample however many bells it covers. `buildDayIntervals()` spreads a
 recall mark across every row it covers while an exact sample inside the
 stretch keeps its own row; the ledger renders covered rows as labeled
 continuations, and Edition Review shows the stretch as a single time range
@@ -739,7 +740,7 @@ yet reads as `steady` with no reasons, not an error.
 single day — where in a cycle, how far to payday, whether an illness is
 still running — logged as one flat `SignalEntry[]` rather than three
 separate mechanisms, the same "derive, don't store current state" stance
-Carillon already takes toward observations and Echo's traits. `cycleRead()`
+Carillon already takes toward observations. `cycleRead()`
 derives cycle length from the gap between logged period-start dates (an
 average once there are two or more; a 28-day guess, marked `estimated`, from
 just one) rather than asking for a length up front. `paydayRead()` only
@@ -762,10 +763,10 @@ assigned in advance to dates. The starter set has five: office, maker, out,
 recovery, and writing. `weekPattern` supplies one suggested shape per weekday
 while a `DayInstance` is an explicit one-day override, so choosing today's
 shape does not silently rewrite every future Thursday. The editor is not a
-header section: it opens from the "today's shape" pill on Today, the Binder,
+header section: it opens from the "today's shape" pill on Today, the binder's
+day shapes button,
 the day plan, and Editions, and carries its own way back. Blocks keep their
-authored time slots; a block's optional `momentum` rating (`easy`, `steady`,
-`stretch`) is stored but nothing reads it or reorders by it. Obligations and
+authored time slots; nothing reorders them. Obligations and
 rituals are overlays, never part of a shape's own blocks. The store methods
 still say pile (`savePile`, `archivePile`, `deletePile`).
 
@@ -779,15 +780,6 @@ idea never touches the plan and is reversible. The records are still
 keep hydrating; `createdSessionId` is a leftover from the old same-session
 lock and gates nothing.
 
-**Spores and Echo** are the reinforcement layer. One honest observation creates
-one deterministic, amount-1 `SporeEvent`; correcting the observation updates
-the same Spore's kind instead of double-paying it. Echo's seven visible traits
-grow from lifetime totals by observation kind, while the last seven days only
-decide whether the creature is awake or taking an ordinary nap — there is no
-streak penalty. `buildEchoesExport()` emits the stable
-`carillon-spores` version-1 JSON ledger, which is the narrow surface Echoes can
-consume without importing Carillon's private planner blob.
-
 **Print-first evenings and edition review** close the paper loop. The Today
 screen always carries a print-only sheet for tomorrow's chosen day shape: a
 letter-portrait, two-column interval ledger with the plan beside an empty mark,
@@ -798,7 +790,7 @@ each historical row from the observation's stored interval duration and
 `plannedLabel`; changing today's day shape or sampling interval cannot rewrite the
 old edition. It can overlay pop-up commentary for repeated weekday/interval
 changes and idea provenance. The commentary is a pattern-finding bonus track,
-not an audit, and the same view exports the Spores JSON.
+not an audit.
 
 Carillon remains local-first: its domain records live in app-owned localStorage
 keys and `PlannerBlob` treats the instrument fields as optional so older synced
@@ -819,9 +811,7 @@ choices/sleep logs/signal entries the later `updatedAt` (a day shape or routine'
 precedence as a tie-break, and loops, loop events, Five Contacts rounds and
 reminders their own resolvers in `openLoops.ts` and `reminders.ts`.
 Obligations, rituals and domains carry no time, so there the server's copy
-wins; settings merge per key by edit stamp (`apps/planner/BELLS.md`). The
-Spore ledger is then reconciled against the merged observations so kind,
-date, and amount stay canonical. A merge that adds nothing hands back the
+wins; settings merge per key by edit stamp (`apps/planner/BELLS.md`). A merge that adds nothing hands back the
 server's own blob — fingerprints are over canonical JSON, since JSONB reorders
 keys — so a sync with nothing new pushes nothing and leaves the page alone.
 

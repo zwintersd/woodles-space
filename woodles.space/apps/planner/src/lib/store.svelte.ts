@@ -4,7 +4,6 @@ import type {
 	DayShape,
 	WeekPattern,
 	PlannerSettings,
-	View,
 	BinderTab,
 	Domain,
 	Block,
@@ -18,7 +17,6 @@ import type {
 	RoutinePractice,
 	RoutineStepResult,
 	SurgeDraft,
-	SporeEvent,
 	SleepLog,
 	SleepQuality,
 	SignalEntry,
@@ -95,6 +93,13 @@ function load<T>(key: string, fallback: T): T {
 	}
 }
 
+// The Spore ledger is retired; drop what an older version left on this device.
+try {
+	globalThis.localStorage?.removeItem('planner.carillonSpores.v1');
+} catch {
+	// storage unavailable — nothing to clean up
+}
+
 function save<T>(key: string, value: T): void {
 	if (typeof localStorage === 'undefined') return;
 	try {
@@ -122,7 +127,6 @@ const SYNCED_KEYS = [
 	['planner.routines.v1', 'routines', 'routines'],
 	['planner.routinePractices.v1', 'routinePractices', 'routinePractices'],
 	['planner.surgeDrafts.v1', 'surgeDrafts', 'surgeDrafts'],
-	['planner.carillonSpores.v1', 'sporeEvents', 'spores'],
 	['planner.sleepLogs.v1', 'sleepLogs', 'sleepLogs'],
 	['planner.signals.v1', 'signalEntries', 'signals'],
 	['planner.loggedSessions.v1', 'loggedSessions', 'loggedSessions'],
@@ -236,7 +240,6 @@ export class PlannerStore {
 		load('planner.routinePractices.v1', [])
 	);
 	surgeDrafts = $state<SurgeDraft[]>(load('planner.surgeDrafts.v1', []));
-	sporeEvents = $state<SporeEvent[]>(load('planner.carillonSpores.v1', []));
 	sleepLogs = $state<SleepLog[]>(load('planner.sleepLogs.v1', []));
 	signalEntries = $state<SignalEntry[]>(load('planner.signals.v1', []));
 	loggedSessions = $state<LoggedSession[]>(load('planner.loggedSessions.v1', []));
@@ -248,7 +251,6 @@ export class PlannerStore {
 
 	// Transient
 	readonly sessionId = uid();
-	currentView = $state<View>('now-next');
 	binderTab = $state<BinderTab>(null);
 	now = $state<Date>(new Date());
 	editingTaskId = $state<string | null>(null);
@@ -681,22 +683,8 @@ export class PlannerStore {
 			? this.intervalObservations.map((item) => (item.id === id ? observation : item))
 			: [...this.intervalObservations, observation];
 
-		const sporeId = `carillon-spore-${id}`;
-		const existingSpore = this.sporeEvents.find((event) => event.id === sporeId);
-		const spore: SporeEvent = {
-			id: sporeId,
-			observationId: id,
-			date,
-			kind: input.kind,
-			amount: 1,
-			createdAt: existingSpore?.createdAt ?? timestamp
-		};
-		this.sporeEvents = existingSpore
-			? this.sporeEvents.map((event) => (event.id === sporeId ? spore : event))
-			: [...this.sporeEvents, spore];
 
 		save('planner.observations.v1', this.intervalObservations);
-		save('planner.carillonSpores.v1', this.sporeEvents);
 		return observation;
 	}
 
@@ -1115,44 +1103,6 @@ export class PlannerStore {
 		return draft;
 	}
 
-	canPromoteSurgeDraft(id: string): boolean {
-		const draft = this.surgeDrafts.find((item) => item.id === id);
-		return Boolean(
-			draft &&
-				draft.status === 'captured'
-		);
-	}
-
-	promoteSurgeDraft(id: string): SurgeDraft | null {
-		const draft = this.surgeDrafts.find((item) => item.id === id);
-		if (!draft || !this.canPromoteSurgeDraft(id)) return null;
-		const timestamp = new Date().toISOString();
-		const taskId = `surge-task-${draft.id}`;
-		const task: Task = {
-			id: taskId,
-			title: draft.title,
-			status: 'open',
-			notes:
-				`From idea · drafted ${draft.createdAt}\n\n${draft.body}`.trim(),
-			createdAt: timestamp,
-			updatedAt: timestamp
-		};
-		if (!this.tasks.some((item) => item.id === taskId)) {
-			this.tasks = [...this.tasks, task];
-		}
-		const promoted: SurgeDraft = {
-			...draft,
-			status: 'promoted',
-			promotedAt: timestamp,
-			updatedAt: timestamp,
-			promotedTaskIds: [taskId]
-		};
-		this.surgeDrafts = this.surgeDrafts.map((item) => (item.id === id ? promoted : item));
-		this.#saveTasks();
-		save('planner.surgeDrafts.v1', this.surgeDrafts);
-		return promoted;
-	}
-
 	discardSurgeDraft(id: string): void {
 		const discardedAt = new Date().toISOString();
 		this.surgeDrafts = this.surgeDrafts.map((draft) =>
@@ -1400,7 +1350,6 @@ export class PlannerStore {
 		this.routines = blob.routines ?? this.routines;
 		this.routinePractices = blob.routinePractices ?? this.routinePractices;
 		this.surgeDrafts = blob.surgeDrafts ?? this.surgeDrafts;
-		this.sporeEvents = blob.spores ?? this.sporeEvents;
 		this.sleepLogs = blob.sleepLogs ?? this.sleepLogs;
 		this.signalEntries = blob.signals ?? this.signalEntries;
 		this.loggedSessions = blob.loggedSessions ?? this.loggedSessions;
@@ -1421,7 +1370,6 @@ export class PlannerStore {
 		save('planner.routines.v1', this.routines);
 		save('planner.routinePractices.v1', this.routinePractices);
 		save('planner.surgeDrafts.v1', this.surgeDrafts);
-		save('planner.carillonSpores.v1', this.sporeEvents);
 		save('planner.sleepLogs.v1', this.sleepLogs);
 		save('planner.signals.v1', this.signalEntries);
 		save('planner.loggedSessions.v1', this.loggedSessions);
@@ -1484,10 +1432,6 @@ export class PlannerStore {
 	}
 
 	// ── view + binder ───────────────────────────────────────────────
-
-	setView(v: View): void {
-		this.currentView = v;
-	}
 
 	toggleBinder(tab: BinderTab): void {
 		this.binderTab = this.binderTab === tab ? null : tab;

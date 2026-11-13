@@ -5,8 +5,7 @@ import type {
 	Routine,
 	RoutinePractice,
 	RoutineScaffoldLevel,
-	RoutineStepResult,
-	SporeEvent
+	RoutineStepResult
 } from './types';
 import { dateKey, timeToMinutes } from './utils';
 
@@ -15,18 +14,15 @@ export const INTERVAL_KIND_OPTIONS: ReadonlyArray<{
 	label: string;
 	shortLabel: string;
 	glyph: string;
-	stat: string;
-	/** The part of Echo's portrait this kind grows. */
-	echoPart: string;
 }> = [
 	// prettier-ignore-start
-	{ kind: 'clinic',    label: 'clinic / sessions', shortLabel: 'clinic',    glyph: '◫', stat: 'attunement', echoPart: 'its ears' },
-	{ kind: 'writing',   label: 'writing',           shortLabel: 'writing',   glyph: '✎', stat: 'voice',      echoPart: 'the bell it holds' },
-	{ kind: 'build',     label: 'building',          shortLabel: 'build',     glyph: '⌁', stat: 'craft',      echoPart: 'the patch on its coat' },
-	{ kind: 'movement',  label: 'moving',            shortLabel: 'movement',  glyph: '↗', stat: 'range',      echoPart: 'its tail' },
-	{ kind: 'care',      label: 'care / life',       shortLabel: 'care',      glyph: '♡', stat: 'warmth',     echoPart: 'its belly and cheeks' },
-	{ kind: 'rest',      label: 'resting',           shortLabel: 'rest',      glyph: '☾', stat: 'hush',       echoPart: 'the quiet rings around it' },
-	{ kind: 'elsewhere', label: 'something else',    shortLabel: 'elsewhere', glyph: '…', stat: 'curiosity',  echoPart: 'its spore feelers' }
+	{ kind: 'clinic',    label: 'clinic / sessions', shortLabel: 'clinic',    glyph: '◫' },
+	{ kind: 'writing',   label: 'writing',           shortLabel: 'writing',   glyph: '✎' },
+	{ kind: 'build',     label: 'building',          shortLabel: 'build',     glyph: '⌁' },
+	{ kind: 'movement',  label: 'moving',            shortLabel: 'movement',  glyph: '↗' },
+	{ kind: 'care',      label: 'care / life',       shortLabel: 'care',      glyph: '♡' },
+	{ kind: 'rest',      label: 'resting',           shortLabel: 'rest',      glyph: '☾' },
+	{ kind: 'elsewhere', label: 'something else',    shortLabel: 'elsewhere', glyph: '…' }
 	// prettier-ignore-end
 ];
 
@@ -147,6 +143,39 @@ export function buildDayIntervals(
 	return rows;
 }
 
+/**
+ * The one line the sampler shows about the plan: what this interval was meant
+ * to hold and, for the live interval, what comes after. Empty when the day has
+ * nothing planned at all — an unplanned day should not be told so every bell.
+ */
+export function planLine(
+	interval: DayInterval,
+	blocks: Block[],
+	formatTime: (time: string) => string = (time) => time
+): string {
+	const planned = interval.plannedBlock;
+	if (interval.state !== 'current') {
+		const label = planned?.title ?? interval.observation?.plannedLabel;
+		return label ? `planned: ${label}` : '';
+	}
+	const timed = /^\d{2}:\d{2}$/;
+	const after = planned ? timeToMinutes(planned.endTime) : timeToMinutes(interval.startTime) + 1;
+	const next = blocks
+		.filter(
+			(block) =>
+				block.id !== planned?.id &&
+				!block.flexible &&
+				timed.test(block.startTime) &&
+				timeToMinutes(block.startTime) >= after
+		)
+		.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))[0];
+	if (planned) {
+		const until = `planned: ${planned.title}, until ${formatTime(planned.endTime)}`;
+		return next ? `${until} · then ${next.title}` : until;
+	}
+	return next ? `nothing planned · next: ${next.title} at ${formatTime(next.startTime)}` : '';
+}
+
 // ── catch-up: hollow stretches worth sketching after time away ────
 
 export type CatchUpGap = {
@@ -235,38 +264,4 @@ export function routineScaffoldLevel(
 	}
 
 	return 'full';
-}
-
-export function sporeStats(events: SporeEvent[]): Record<IntervalKind, number> {
-	const totals: Record<IntervalKind, number> = {
-		clinic: 0,
-		writing: 0,
-		build: 0,
-		movement: 0,
-		care: 0,
-		rest: 0,
-		elsewhere: 0
-	};
-	for (const event of events) totals[event.kind] += event.amount;
-	return totals;
-}
-
-export function sporesSince(events: SporeEvent[], sinceDate: string): SporeEvent[] {
-	return events.filter((event) => event.date >= sinceDate);
-}
-
-export function buildEchoesExport(events: SporeEvent[], generatedAt = new Date().toISOString()) {
-	return {
-		format: 'carillon-spores',
-		version: 1,
-		generatedAt,
-		events: events.map(({ id, observationId, date, kind, amount, createdAt }) => ({
-			id,
-			observationId,
-			date,
-			kind,
-			amount,
-			createdAt
-		}))
-	};
 }

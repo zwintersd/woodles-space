@@ -22,7 +22,6 @@ import type {
 	PlannerBlob,
 	PlannerSettings,
 	RoutinePractice,
-	SporeEvent,
 	SurgeDraft
 } from './types';
 
@@ -43,7 +42,7 @@ export const syncState = new SyncState();
  */
 const LISTS = [
 	'shapes', 'obligations', 'rituals', 'tasks', 'domains', 'observations', 'routines',
-	'routinePractices', 'surgeDrafts', 'spores', 'sleepLogs', 'signals', 'loggedSessions',
+	'routinePractices', 'surgeDrafts', 'sleepLogs', 'signals', 'loggedSessions',
 	'openLoops', 'loopEvents', 'closureReflections', 'fiveContactsRounds', 'loopReminders'
 ] as const satisfies readonly (keyof PlannerBlob)[];
 
@@ -165,15 +164,6 @@ export function mergePlannerBlobs(local: PlannerBlob, remote: PlannerBlob, base:
 		mergeById(local.openLoops, remote.openLoops, base.openLoops, mergeOpenLoop), loopEvents
 	);
 	const observations = mergeById(local.observations, remote.observations, base.observations, latestObservation);
-	const observationById = new Map(observations.map((observation) => [observation.id, observation]));
-	const spores = mergeById<SporeEvent>(local.spores, remote.spores, base.spores).map(
-		(event) => {
-			const observation = observationById.get(event.observationId);
-			return observation
-				? { ...event, date: observation.date, kind: observation.kind, amount: 1 }
-				: event;
-		}
-	);
 
 	const merged: PlannerBlob = {
 		shapes: mergeById(local.shapes, remote.shapes, base.shapes, latestLifecycle),
@@ -188,7 +178,6 @@ export function mergePlannerBlobs(local: PlannerBlob, remote: PlannerBlob, base:
 		routines: mergeById(local.routines, remote.routines, base.routines, latestLifecycle),
 		routinePractices: mergeById(local.routinePractices, remote.routinePractices, base.routinePractices, latestPractice),
 		surgeDrafts: mergeById(local.surgeDrafts, remote.surgeDrafts, base.surgeDrafts, latestSurge),
-		spores,
 		sleepLogs: mergeById(local.sleepLogs, remote.sleepLogs, base.sleepLogs, latestMutable),
 		signals: mergeById(local.signals, remote.signals, base.signals, latestMutable),
 		// No resolver: a sitting is identified by entry-and-date, so two devices
@@ -317,7 +306,6 @@ function readPlanner(): PlannerBlob {
 		routines: store.routines,
 		routinePractices: store.routinePractices,
 		surgeDrafts: store.surgeDrafts,
-		spores: store.sporeEvents,
 		sleepLogs: store.sleepLogs,
 		signals: store.signalEntries,
 		loggedSessions: store.loggedSessions,

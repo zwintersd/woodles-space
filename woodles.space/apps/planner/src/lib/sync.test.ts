@@ -7,7 +7,6 @@ import type {
 	PlannerBlob,
 	Ritual,
 	SignalEntry,
-	SporeEvent,
 	OpenLoop,
 	LoopEvent,
 	FiveContactsRound,
@@ -30,17 +29,6 @@ function observation(
 		label: kind,
 		capturedAt: '2026-07-30T12:00:00.000Z',
 		updatedAt
-	};
-}
-
-function spore(item: IntervalObservation): SporeEvent {
-	return {
-		id: `carillon-spore-${item.id}`,
-		observationId: item.id,
-		date: item.date,
-		kind: item.kind,
-		amount: 1,
-		createdAt: item.capturedAt
 	};
 }
 
@@ -159,19 +147,16 @@ describe('mergePlannerBlobs', () => {
 		const desktopMark = observation('09:15', 'writing', '2026-07-30T13:15:00.000Z');
 
 		const merged = mergePlannerBlobs(
-			blob({ observations: [phoneMark], spores: [spore(phoneMark)] }),
-			blob({ observations: [desktopMark], spores: [spore(desktopMark)] })
+			blob({ observations: [phoneMark] }),
+			blob({ observations: [desktopMark] })
 		);
 
 		expect(merged.observations?.map((item) => item.id).sort()).toEqual(
 			[phoneMark.id, desktopMark.id].sort()
 		);
-		expect(merged.spores?.map((item) => item.observationId).sort()).toEqual(
-			[phoneMark.id, desktopMark.id].sort()
-		);
 	});
 
-	it('takes the latest correction and reconciles its single Spore category', () => {
+	it('takes the latest correction', () => {
 		const original = observation('09:30', 'writing', '2026-07-30T13:30:00.000Z');
 		const correction: IntervalObservation = {
 			...original,
@@ -182,17 +167,11 @@ describe('mergePlannerBlobs', () => {
 		};
 
 		const merged = mergePlannerBlobs(
-			blob({ observations: [original], spores: [spore(original)] }),
-			blob({ observations: [correction], spores: [spore(correction)] })
+			blob({ observations: [original] }),
+			blob({ observations: [correction] })
 		);
 
 		expect(merged.observations).toEqual([correction]);
-		expect(merged.spores).toHaveLength(1);
-		expect(merged.spores?.[0]).toMatchObject({
-			observationId: correction.id,
-			kind: 'movement',
-			amount: 1
-		});
 	});
 
 	it('keeps newer task, pile choice, and discarded Surge tombstones', () => {
