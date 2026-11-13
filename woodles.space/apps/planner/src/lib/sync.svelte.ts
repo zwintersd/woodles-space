@@ -42,7 +42,7 @@ export const syncState = new SyncState();
  */
 const LISTS = [
 	'shapes', 'obligations', 'rituals', 'tasks', 'domains', 'observations', 'routines',
-	'routinePractices', 'surgeDrafts', 'sleepLogs', 'signals', 'loggedSessions',
+	'routinePractices', 'surgeDrafts', 'sleepLogs', 'signals', 'appointments', 'loggedSessions',
 	'openLoops', 'loopEvents', 'closureReflections', 'fiveContactsRounds', 'loopReminders'
 ] as const satisfies readonly (keyof PlannerBlob)[];
 
@@ -180,6 +180,7 @@ export function mergePlannerBlobs(local: PlannerBlob, remote: PlannerBlob, base:
 		surgeDrafts: mergeById(local.surgeDrafts, remote.surgeDrafts, base.surgeDrafts, latestSurge),
 		sleepLogs: mergeById(local.sleepLogs, remote.sleepLogs, base.sleepLogs, latestMutable),
 		signals: mergeById(local.signals, remote.signals, base.signals, latestMutable),
+		appointments: mergeById(local.appointments, remote.appointments, base.appointments, latestMutable),
 		// No resolver: a sitting is identified by entry-and-date, so two devices
 		// logging the same one produce the same record, and there is nothing to
 		// pick between.
@@ -298,6 +299,7 @@ function readPlanner(): PlannerBlob {
 		weekPattern: store.weekPattern,
 		days: store.dayOverrides,
 		obligations: store.obligations,
+		appointments: store.appointments,
 		rituals: store.rituals,
 		tasks: store.tasks,
 		settings: store.settings,

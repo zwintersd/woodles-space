@@ -8,6 +8,7 @@ import type {
 	Domain,
 	Block,
 	Obligation,
+	Appointment,
 	Ritual,
 	ToneName,
 	PlannerBlob,
@@ -119,6 +120,7 @@ const SYNCED_KEYS = [
 	['planner.weekPattern.v1', 'weekPattern', 'weekPattern'],
 	['planner.days.v2', 'dayOverrides', 'days'],
 	['planner.obligations.v1', 'obligations', 'obligations'],
+	['planner.appointments.v1', 'appointments', 'appointments'],
 	['planner.rituals.v1', 'rituals', 'rituals'],
 	['planner.tasks.v1', 'tasks', 'tasks'],
 	['planner.settings.v1', 'settings', 'settings'],
@@ -218,6 +220,7 @@ export class PlannerStore {
 	weekPattern = $state<WeekPattern>(load('planner.weekPattern.v1', STARTER_WEEK_PATTERN));
 	dayOverrides = $state<Record<string, DayInstance>>(load('planner.days.v2', {}));
 	obligations = $state<Obligation[]>(load('planner.obligations.v1', []));
+	appointments = $state<Appointment[]>(load('planner.appointments.v1', []));
 	rituals = $state<Ritual[]>(load('planner.rituals.v1', []));
 
 	// Persisted — user data
@@ -298,10 +301,24 @@ export class PlannerStore {
 			overlay: 'ritual' as const
 		}));
 
+		const key = dateKey(date);
+		const appointmentBlocks: Block[] = this.appointments
+			.filter((item) => item.date === key)
+			.map((item) => ({
+				id: `apt-${item.id}`,
+				startTime: item.startTime,
+				endTime: item.endTime,
+				title: item.title,
+				overlay: 'appointment' as const
+			}));
+
+		// Appointments go last so that, on a shared start time, the one-off
+		// thing on this date is what the interval reads as planned.
 		return mergeBlocks(base, [
 			...obligationBlocks.filter((block) => !skipped.has(block.id)),
 			...ritualBlocks.filter((block) => !skipped.has(block.id)),
-			...this.standingBlocksForWeekday(weekday)
+			...this.standingBlocksForWeekday(weekday),
+			...appointmentBlocks
 		]);
 	}
 
@@ -1286,6 +1303,47 @@ export class PlannerStore {
 		save('planner.obligations.v1', this.obligations);
 	}
 
+	// ── appointments: one-off timed things on a date ────────────────
+
+	/** Null when the title is blank, the date isn't a date, or the end isn't after the start. */
+	saveAppointment(input: Omit<Appointment, 'id' | 'updatedAt'> & { id?: string }): Appointment | null {
+		const title = input.title.trim();
+		const timed = /^\d{2}:\d{2}$/;
+		if (
+			!title ||
+			!/^\d{4}-\d{2}-\d{2}$/.test(input.date) ||
+			!timed.test(input.startTime) ||
+			!timed.test(input.endTime) ||
+			input.endTime <= input.startTime
+		) {
+			return null;
+		}
+		const saved: Appointment = {
+			id: input.id ?? uid(),
+			date: input.date,
+			startTime: input.startTime,
+			endTime: input.endTime,
+			title,
+			updatedAt: new Date().toISOString()
+		};
+		this.appointments = this.appointments.some((item) => item.id === saved.id)
+			? this.appointments.map((item) => (item.id === saved.id ? saved : item))
+			: [...this.appointments, saved];
+		save('planner.appointments.v1', this.appointments);
+		return saved;
+	}
+
+	removeAppointment(id: string): void {
+		this.appointments = this.appointments.filter((item) => item.id !== id);
+		save('planner.appointments.v1', this.appointments);
+	}
+
+	getAppointmentsForDay(dateStr: string): Appointment[] {
+		return this.appointments
+			.filter((item) => item.date === dateStr)
+			.sort((a, b) => a.startTime.localeCompare(b.startTime));
+	}
+
 	addRitual(r: Omit<Ritual, 'id'>): Ritual {
 		const created: Ritual = { ...r, id: uid() };
 		this.rituals = [...this.rituals, created];
@@ -1342,6 +1400,7 @@ export class PlannerStore {
 		this.weekPattern = blob.weekPattern;
 		this.dayOverrides = blob.days;
 		this.obligations = blob.obligations;
+		this.appointments = blob.appointments ?? this.appointments;
 		this.rituals = blob.rituals;
 		this.tasks = blob.tasks;
 		this.settings = { ...DEFAULT_SETTINGS, ...blob.settings };
@@ -1362,6 +1421,7 @@ export class PlannerStore {
 		save('planner.weekPattern.v1', this.weekPattern);
 		save('planner.days.v2', this.dayOverrides);
 		save('planner.obligations.v1', this.obligations);
+		save('planner.appointments.v1', this.appointments);
 		save('planner.rituals.v1', this.rituals);
 		this.#saveTasks();
 		save('planner.settings.v1', this.settings);

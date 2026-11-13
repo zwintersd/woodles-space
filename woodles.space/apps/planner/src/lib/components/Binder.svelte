@@ -3,15 +3,12 @@
 	import { store } from '$lib/store.svelte';
 	import { EMPTY_STATES, BINDER_LABELS, REFRESH_SECTIONS } from '$lib/onboarding.copy';
 	import { onboarding } from '$lib/onboarding.store.svelte';
-	import YearScroll from './YearScroll.svelte';
 	import DayPlan from './DayPlan.svelte';
 	import BellSettings from './BellSettings.svelte';
 	import { syncState, connectAndHydrate, syncNow, disconnect } from '$lib/sync.svelte';
 	import type { OnboardingStep } from '$lib/types';
 
 	type BinderTabId =
-		| 'year-scroll'
-		| 'holidays'
 		| 'week-pattern'
 		| 'schedule'
 		| 'bells'
@@ -21,8 +18,6 @@
 	const TABS: { id: BinderTabId; icon: string; label: string }[] = [
 		{ id: 'schedule',     icon: '▤', label: 'schedule' },
 		{ id: 'week-pattern', icon: '◇', label: BINDER_LABELS.weekPattern },
-		{ id: 'year-scroll',  icon: '∞', label: 'year' },
-		{ id: 'holidays',     icon: '✦', label: 'holidays' },
 		{ id: 'bells',        icon: '♪', label: 'bells' },
 		{ id: 'sync',         icon: '◎', label: 'sync' }
 	];
@@ -160,26 +155,13 @@
 		<!-- Phones have no Escape key and no tab strip; this is their way out. -->
 		<button type="button" class="binder-close" aria-label={`close ${TABS.find(tab => tab.id === store.binderTab)?.label ?? 'binder'}`} onclick={() => store.closeBinder()}>×</button>
 	{/if}
-	{#if store.binderTab === 'year-scroll'}
-		<div class="binder-year-scroll">
-			<YearScroll compact />
-		</div>
-	{:else if store.binderTab === 'schedule'}
+	{#if store.binderTab === 'schedule'}
 		<header class="binder-header">
 			<span class="binder-eyebrow">today</span>
 			<span class="binder-title">schedule</span>
 		</header>
 		<div class="binder-body binder-schedule">
 			<DayPlan onopenshapes={() => { store.closeBinder(); onopenshapes?.(); }} />
-		</div>
-
-	{:else if store.binderTab === 'holidays'}
-		<header class="binder-header">
-			<span class="binder-eyebrow">binder</span>
-			<span class="binder-title">holidays</span>
-		</header>
-		<div class="binder-body">
-			<p class="binder-empty">holiday layer — coming soon.</p>
 		</div>
 
 	{:else if store.binderTab === 'week-pattern'}
@@ -543,21 +525,7 @@
 		scrollbar-color: #968371 #ebdfc8;
 	}
 
-	.binder-empty {
-		font-family: var(--pl-font-mono);
-		font-size: 0.72rem;
-		letter-spacing: 0.06em;
-		color: var(--p-muted);
-		padding: 1rem 0;
-	}
 
-	.binder-year-scroll {
-		flex: 1;
-		min-height: 0;
-		overflow-y: auto;
-		overscroll-behavior: contain;
-		padding: 0 0.75rem;
-	}
 
 	/* ── empty states ─────────────────────────────────────────────── */
 	.binder-empty-block {
@@ -906,8 +874,7 @@
 			width: min(38rem, calc(100vw - 1rem));
 		}
 
-		.binder-body,
-		.binder-year-scroll {
+		.binder-body {
 			padding-bottom: 9rem;
 		}
 	}

@@ -259,12 +259,41 @@ test('renders all workspaces at desktop and phone widths without overflow',async
 	await open(page);
 	for (const width of [1440,390]) {
 		await page.setViewportSize({width,height:1000});
-		for(const name of ['Today','Routines','Ideas','Editions']) {
+		for(const name of ['Today','Calendar','Routines','Ideas','Editions']) {
 			await section(page,name);
 			await expect(page.locator('#carillon-main')).toBeVisible();
 			expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
 			await page.screenshot({path:testInfo.outputPath(name.replaceAll(' ','-')+'-'+width+'.png'),fullPage:true});
 		}
 	}
+	expect(errors).toEqual([]);
+});
+
+test('plans ahead: a day shape and an appointment on a future date',async({page})=>{
+	const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+	await open(page);await section(page,'Calendar');
+	const calendar=page.getByTestId('calendar');
+	// The last day on show is never in the past, whatever today is.
+	const day=calendar.locator('.cal-day').last();
+	const date=await day.getAttribute('data-date');
+	await day.getByRole('combobox').selectOption({label:'recovery day'});
+	const detail=page.getByTestId('calendar-day');
+	await expect(detail.getByText('recovery day',{exact:true})).toBeVisible();
+	await expect(detail.getByText('Slow morning',{exact:true})).toBeVisible();
+	await detail.getByLabel('What').fill('Dentist');
+	await detail.getByLabel('From').fill('15:00');
+	await detail.getByLabel('To').fill('16:00');
+	await detail.getByRole('button',{name:'Add appointment',exact:true}).click();
+	await expect(detail.getByText('Dentist',{exact:true})).toBeVisible();
+	await expect(day.locator('.apt')).toContainText('Dentist');
+	await page.reload();await section(page,'Calendar');
+	const again=page.getByTestId('calendar').locator(`.cal-day[data-date="${date}"]`);
+	await expect(again.getByRole('combobox')).toHaveValue('starter-recovery');
+	await expect(again.locator('.apt')).toContainText('Dentist');
+	await page.getByRole('button',{name:'Month',exact:true}).click();
+	await expect(page.getByTestId('calendar').locator('.cal-cell.today')).toHaveCount(1);
+	await again.page().getByTestId('calendar').locator(`.cal-cell[data-date="${date}"]`).click();
+	await page.getByTestId('calendar-day').getByRole('button',{name:'Remove appointment: Dentist'}).click();
+	await expect(page.getByTestId('calendar-day').getByText('Dentist',{exact:true})).toHaveCount(0);
 	expect(errors).toEqual([]);
 });

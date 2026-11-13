@@ -101,7 +101,7 @@
 						<button class="activity-title grow" aria-label={`Edit activity: ${block.title}`} onclick={() => editActivity(block.id)}><span class="title-text">{block.title}</span><span aria-hidden="true"> ↗</span></button>
 					{:else}<strong class="grow">{block.title}</strong>{/if}
 					{#if block.overlay}<small
-							>{block.overlay === 'standing' ? 'Thinking About' : 'Recurring'}</small
+							>{block.overlay === 'standing' ? 'Thinking About' : block.overlay === 'appointment' ? 'Appointment' : 'Recurring'}</small
 						>{/if}{#if block.routineId && store.routines.some((r) => r.id === block.routineId && !r.deletedAt)}<button
 							onclick={() => (activeRoutine = block.routineId!)}>Use routine</button
 						>{/if}

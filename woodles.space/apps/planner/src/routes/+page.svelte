@@ -3,6 +3,7 @@
 	import { syncState } from '$lib/sync.svelte';
 	import TodayInstrument from '$lib/components/TodayInstrument.svelte';
 	import DayShapes from '$lib/components/DayShapes.svelte';
+	import CalendarView from '$lib/components/CalendarView.svelte';
 	import RoutinesLab from '$lib/components/RoutinesLab.svelte';
 	import IdeasWorkbench from '$lib/components/IdeasWorkbench.svelte';
 	import EditionReview from '$lib/components/EditionReview.svelte';
@@ -16,7 +17,7 @@
 	import { onMount } from 'svelte';
 	import { stopBells } from '$lib/bells';
 
-	type CarillonSection = 'today' | 'shapes' | 'routines' | 'ideas' | 'review';
+	type CarillonSection = 'today' | 'calendar' | 'shapes' | 'routines' | 'ideas' | 'review';
 
 	const SECTIONS: Array<{
 		id: CarillonSection;
@@ -27,12 +28,15 @@
 		jewel: string;
 	}> = [
 		{ id: 'today', label: 'Today', note: 'observe', key: '1', jewel: 'amethyst' },
-		{ id: 'routines', label: 'Routines', note: 'use & edit', key: '2', jewel: 'teal' },
-		{ id: 'ideas', label: 'Ideas', note: 'capture', key: '3', jewel: 'ruby' },
-		{ id: 'review', label: 'Editions', note: 'review', key: '4', jewel: 'amethyst' }
+		{ id: 'calendar', label: 'Calendar', note: 'look ahead', key: '2', jewel: 'sapphire' },
+		{ id: 'routines', label: 'Routines', note: 'use & edit', key: '3', jewel: 'teal' },
+		{ id: 'ideas', label: 'Ideas', note: 'capture', key: '4', jewel: 'ruby' },
+		{ id: 'review', label: 'Editions', note: 'review', key: '5', jewel: 'amethyst' }
 	];
 
 	let section = $state<CarillonSection>('today');
+	// The date Editions opens on when the calendar hands a past day over.
+	let editionDate = $state<string | undefined>();
 	let mainElement = $state<HTMLElement>();
 	let refreshReturnFocus: HTMLElement | null = null;
 
@@ -110,6 +114,7 @@
 	});
 
 	function setSection(next: CarillonSection): void {
+		if (next !== 'review') editionDate = undefined;
 		section = next;
 		window.scrollTo({ top: 0, behavior: 'smooth' });
 		requestAnimationFrame(() => mainElement?.focus({ preventScroll: true }));
@@ -236,6 +241,11 @@
 					onopenroutines={() => setSection('routines')}
 					onopenideas={() => setSection('ideas')}
 				/>
+			{:else if section === 'calendar'}
+				<CalendarView
+					onopenshapes={() => setSection('shapes')}
+					onopenedition={(date) => { editionDate = date; setSection('review'); }}
+				/>
 			{:else if section === 'shapes'}
 				<DayShapes onclose={() => setSection('today')} />
 			{:else if section === 'routines'}
@@ -243,7 +253,7 @@
 			{:else if section === 'ideas'}
 				<IdeasWorkbench />
 			{:else}
-				<EditionReview onopenshapes={() => setSection('shapes')} onopenroutines={() => setSection('routines')} onopenideas={() => setSection('ideas')} />
+				{#key editionDate}<EditionReview initialDate={editionDate} onopenshapes={() => setSection('shapes')} onopenroutines={() => setSection('routines')} onopenideas={() => setSection('ideas')} />{/key}
 			{/if}
 		</main>
 
