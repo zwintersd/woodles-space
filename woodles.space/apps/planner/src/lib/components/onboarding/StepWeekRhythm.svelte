@@ -26,10 +26,10 @@
 		notice = '';
 	}
 	function savePile() {
-		if (!draft || !store.savePile(draft)) { notice = 'Give the pile and each activity a name, and fixed activities a valid time range.'; return; }
+		if (!draft || !store.savePile(draft)) { notice = 'Give the day shape and each activity a name, and fixed activities a valid time range.'; return; }
 		activeShapeId = draft.id;
 		draft = null;
-		notice = 'Pile saved. Assign it to weekdays below.';
+		notice = 'Day shape saved. Assign it to weekdays below.';
 	}
 	function assign(dayOfWeek: number, shapeId: string) {
 		const next = [...working];
@@ -76,7 +76,7 @@
 	onAdvance={advance}
 >
 	<!-- Shape palette: cards with day-arc visualisation -->
-	<div class="shape-palette" role="radiogroup" aria-label="day pile palette">
+	<div class="shape-palette" role="radiogroup" aria-label="day shape palette">
 		{#each store.dayShapes.filter(s => !s.deletedAt && !s.archived) as shape (shape.id)}
 			{@const segs = arcSegments(shape)}
 			<button
@@ -85,7 +85,7 @@
 				onclick={() => (activeShapeId = shape.id)}
 				role="radio"
 				aria-checked={activeShapeId === shape.id}
-				title="pick this pile, then tap weekdays below"
+				title="pick this day shape, then tap weekdays below"
 			>
 				<div class="shape-card-head">
 					<span class="shape-card-name">{shape.name}</span>
@@ -123,24 +123,24 @@
 
 	<p class="rhythm-hint">
 		<span class="rhythm-hint-mark">✦</span>
-		Pick a pile, then choose its weekdays.
+		Pick a day shape, then choose its weekdays.
 		<span class="rhythm-hint-mark">✦</span>
 	</p>
 
 	<div class="wb-actions">
-		<button onclick={() => { const pile = store.dayShapes.find(p => p.id === activeShapeId); if (pile) editPile(pile); }} disabled={!activeShapeId}>Edit selected pile</button>
-		<button onclick={() => editPile({ id: uid(), name: '', blocks: [] })}>+ New day pile</button>
-		<button aria-pressed={activeShapeId === ''} onclick={() => activeShapeId = ''}>No pile</button>
+		<button onclick={() => { const pile = store.dayShapes.find(p => p.id === activeShapeId); if (pile) editPile(pile); }} disabled={!activeShapeId}>Edit selected day shape</button>
+		<button onclick={() => editPile({ id: uid(), name: '', blocks: [] })}>+ New day shape</button>
+		<button aria-pressed={activeShapeId === ''} onclick={() => activeShapeId = ''}>No day shape</button>
 	</div>
 	{#if draft}
 		<form class="wb-card wb-list" onsubmit={(e) => { e.preventDefault(); savePile(); }}>
-			<label>Pile name<input required bind:value={draft.name} /></label>
+			<label>Day shape name<input required bind:value={draft.name} /></label>
 			<BlockEditor bind:blocks={draft.blocks} />
-			<div class="wb-actions"><button type="submit">Save pile</button><button type="button" onclick={() => draft = null}>Cancel edit</button></div>
+			<div class="wb-actions"><button type="submit">Save day shape</button><button type="button" onclick={() => draft = null}>Cancel edit</button></div>
 		</form>
 	{/if}
 	<p role="status">{notice}</p>
-	<p class="wb-note">Commitments and daily activities are added separately, so avoid copying them into a pile. Weekday defaults apply to days you have not customized. Today lets you change a single date without changing the template.</p>
+	<p class="wb-note">Commitments and daily activities are added separately, so avoid copying them into a day shape. Weekday defaults apply to days you have not customized. Today lets you change a single date without changing the template.</p>
 	<!-- Weekday tiles -->
 	<div class="weekday-row">
 		{#each WEEKDAY_ORDER as dow, i}
@@ -154,7 +154,7 @@
 				title={shape ? `${WEEKDAY_LABELS[i]} → ${shape.name}` : WEEKDAY_LABELS[i]}
 			>
 				<span class="weekday-dow">{WEEKDAY_LABELS[i]}</span>
-				<span class="weekday-shape">{shape?.name ?? 'No pile'}</span>
+				<span class="weekday-shape">{shape?.name ?? 'No day shape'}</span>
 				{#if shape?.restful}
 					<span class="weekday-mark" aria-hidden="true">✦</span>
 				{/if}

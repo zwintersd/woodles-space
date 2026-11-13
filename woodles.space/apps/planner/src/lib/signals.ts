@@ -3,7 +3,7 @@
 // anything else worth remembering that doesn't deserve its own schema.
 // Everything here is derived from a flat log of dated entries, never stored
 // as "current state" — the same stance the rest of Carillon takes toward
-// observations and Echo's traits.
+// observations.
 
 import type { SignalEntry, SignalKind } from './types';
 

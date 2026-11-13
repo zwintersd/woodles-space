@@ -24,13 +24,13 @@ export const STEP_COPY: OnboardingStepCopy[] = [
 	{
 		eyebrow: 'TWO OF SIX',
 		heading: 'What commitments repeat each week?',
-		subprompt: 'Add fixed times on selected weekdays. These appear alongside your day pile; you can skip a commitment on an individual date.',
+		subprompt: 'Add fixed times on selected weekdays. These appear alongside your day shape; you can skip a commitment on an individual date.',
 		cta: 'Save commitments →'
 	},
 	{
 		eyebrow: 'THREE OF SIX',
 		heading: 'What routines help you get started?',
-		subprompt: 'Save reusable checklists with a cue and small steps. Link them to activities when you arrange your day piles.',
+		subprompt: 'Save reusable checklists with a cue and small steps. Link them to activities when you arrange your day shapes.',
 		cta: 'Save routines →'
 	},
 	{
@@ -41,8 +41,8 @@ export const STEP_COPY: OnboardingStepCopy[] = [
 	},
 	{
 		eyebrow: 'FIVE OF SIX',
-		heading: 'Choose a default pile for each weekday.',
-		subprompt: 'Edit a starter pile or create your own, then assign weekday defaults. Activities can have fixed times or stay flexible.',
+		heading: 'Choose a default day shape for each weekday.',
+		subprompt: 'Edit a starter day shape or create your own, then assign weekday defaults. Activities can have fixed times or stay flexible.',
 		cta: 'Save week →'
 	},
 	{
@@ -66,7 +66,7 @@ export const PLACEHOLDERS = {
 
 export const WELCOME = {
 	heading: 'Set up your week.',
-	subheading: 'Set your hours, commitments, routines, categories, day piles, and check-in preferences.',
+	subheading: 'Set your hours, commitments, routines, categories, day shapes, and check-in preferences.',
 	cta: 'Start setup →'
 };
 
@@ -74,7 +74,7 @@ export const WELCOME = {
 
 export const COMPLETION = {
 	heading: 'Your week is ready.',
-	body: 'Add a task now, or open Today to adjust your plan and record what happens. Save ideas in Surge and turn them into tasks when ready.',
+	body: 'Add a task now, or open Today to adjust your plan and record what happens. Keep ideas under Ideas and turn them into tasks when ready.',
 	cta: 'Add a task →',
 	skipCta: 'open carillon'
 };
@@ -83,18 +83,18 @@ export const COMPLETION = {
 
 export const EMPTY_STATES = {
 	shapes: {
-		heading: 'No day piles yet.',
+		heading: 'No day shapes yet.',
 		body: 'Create a template with activities you want to reuse.',
 		cta: 'add a shape →'
 	},
 	weekPattern: {
 		heading: 'The week is unassigned.',
-		body: 'Choose a default pile for each weekday.',
+		body: 'Choose a default day shape for each weekday.',
 		cta: 'assign days →'
 	},
 	today: {
 		heading: 'No activities planned.',
-		body: 'Add an activity or choose a day pile.',
+		body: 'Add an activity or choose a day shape.',
 		cta: 'add a block →'
 	}
 };
@@ -119,7 +119,7 @@ export const REFRESH_SECTIONS: RefreshSection[] = [
 	{ step: 2, label: 'commitments', hint: 'fixed commitments already on the calendar' },
 	{ step: 3, label: 'routines and daily activities', hint: 'reusable checklists and daily fixed times' },
 	{ step: 4, label: 'categories', hint: 'categories for your tasks' },
-	{ step: 5, label: 'day piles and week', hint: 'which day pile fits which weekday' },
+	{ step: 5, label: 'day shapes and week', hint: 'which day shape fits which weekday' },
 	{ step: 6, label: 'check-ins and reminders', hint: 'observation interval, bells, and reminder detail' }
 ];
 
@@ -136,11 +136,11 @@ export type TonePreset = {
 
 export const TONES: TonePreset[] = [
  { id:'minimal', name:'Brief', description:'Activity and time.', samples:['{block_title}. {start_time}–{end_time}.','Next: {block_title}.','{weekday}. {block_count} activities.'] },
- { id:'gentle', name:'Standard', description:'A short reminder.', samples:['Coming up: {block_title}, at {start_time}.','Today’s pile: {day_shape_name}.'] },
+ { id:'gentle', name:'Standard', description:'A short reminder.', samples:['Coming up: {block_title}, at {start_time}.','Today: {day_shape_name}.'] },
  { id:'earnest', name:'Detailed', description:'Activity, timing, and day context.', samples:['{weekday}: {block_title}, {start_time}–{end_time}.','{day_shape_name}: {block_count} activities planned.'] },
  { id:'wry', name:'Compact', description:'Short schedule labels.', samples:['{start_time} · {block_title}','{day_shape_name} · {weekday}'] }
 ];
-export const FLOURISH_FRAGMENTS: string[] = ['Next: {block_title}.','Today’s pile: {day_shape_name}.'];
+export const FLOURISH_FRAGMENTS: string[] = ['Next: {block_title}.','Today: {day_shape_name}.'];
 
 // ── Starter domains (12 chips for step 4) ──────────────────────────
 
@@ -159,8 +159,8 @@ export const STARTER_DOMAINS: Domain[] = [
 	{ id: 'projects',  name: 'projects',  color: '#78c8b0', icon: '◧' }
 ];
 
-// ── Starter day piles (5 for step 5) ───────────────────────────────
-// Momentum is authored once here (and can be retuned in the pile rack). The
+// ── Starter day shapes (5 for step 5) ───────────────────────────────
+// Momentum is authored once here (and can be retuned in the day shapes editor). The
 // day then begins with high-probability on-ramps before asking for stretch work.
 
 const OFFICE_DAY_BLOCKS: Block[] = [

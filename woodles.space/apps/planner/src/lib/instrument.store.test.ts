@@ -38,14 +38,13 @@ describe('Carillon instrument persistence', () => {
 		vi.useRealTimers();
 	});
 
-	it('corrects a sampled interval and its Spore idempotently', () => {
+	it('corrects a sampled interval in place', () => {
 		const first = store.observeInterval({
 			date: '2026-07-30',
 			intervalStart: '09:15',
 			kind: 'writing',
 			label: 'drafting'
 		});
-		const firstSpore = store.sporeEvents[0];
 
 		vi.setSystemTime(new Date('2026-07-30T13:20:00.000Z'));
 		const corrected = store.observeInterval({
@@ -63,17 +62,9 @@ describe('Carillon instrument persistence', () => {
 			kind: 'movement',
 			label: 'walked outside'
 		});
-		expect(store.sporeEvents).toHaveLength(1);
-		expect(store.sporeEvents[0]).toMatchObject({
-			id: firstSpore?.id,
-			observationId: first.id,
-			kind: 'movement',
-			amount: 1,
-			createdAt: firstSpore?.createdAt
-		});
 	});
 
-	it('records a recalled stretch as one sample with one spore', () => {
+	it('records a recalled stretch as one sample', () => {
 		const stretch = store.observeInterval({
 			date: '2026-07-30',
 			intervalStart: '09:00',
@@ -89,8 +80,6 @@ describe('Carillon instrument persistence', () => {
 			label: 'a slow morning'
 		});
 		expect(store.intervalObservations).toHaveLength(1);
-		expect(store.sporeEvents).toHaveLength(1);
-		expect(store.sporeEvents[0]).toMatchObject({ kind: 'care', amount: 1 });
 
 		const corrected = store.observeInterval({
 			date: '2026-07-30',
@@ -101,8 +90,6 @@ describe('Carillon instrument persistence', () => {
 
 		expect(corrected).toMatchObject({ source: 'recall', intervalMinutes: 150 });
 		expect(store.intervalObservations).toHaveLength(1);
-		expect(store.sporeEvents).toHaveLength(1);
-		expect(store.sporeEvents[0]).toMatchObject({ kind: 'rest', amount: 1 });
 	});
 
 	it('round-trips paper provenance without changing the plan it annotates', () => {
@@ -208,40 +195,9 @@ describe('Carillon instrument persistence', () => {
 	});
 });
 
-describe('Surge explicit review', () => {
+describe('Ideas explicit review', () => {
 	beforeEach(() => {
 		localStorage.clear();
-	});
-
-	it('keeps capture unscheduled and permits explicit review immediately', () => {
-		const captureSession = new PlannerStore();
-		const draft = captureSession.addSurgeDraft(
-			'restructure every project',
-			'Fourteen projects, a new taxonomy, and a moonshot.'
-		);
-
-		expect(draft).not.toBeNull();
-		expect(captureSession.canPromoteSurgeDraft(draft!.id)).toBe(true);
-		expect(captureSession.tasks).toHaveLength(0);
-
-		const reviewSession = new PlannerStore();
-		expect(reviewSession.sessionId).not.toBe(captureSession.sessionId);
-		expect(reviewSession.canPromoteSurgeDraft(draft!.id)).toBe(true);
-
-		const promoted = reviewSession.promoteSurgeDraft(draft!.id);
-		expect(promoted).toMatchObject({
-			id: draft!.id,
-			status: 'promoted'
-		});
-		expect(promoted?.promotedTaskIds).toHaveLength(1);
-		expect(reviewSession.tasks).toHaveLength(1);
-		expect(reviewSession.tasks[0]).toMatchObject({
-			id: `surge-task-${draft!.id}`,
-			title: 'restructure every project',
-			status: 'open'
-		});
-		expect(reviewSession.tasks[0]?.notes).toContain('Promoted from Surge');
-		expect(reviewSession.tasks[0]?.notes).toContain(draft!.createdAt);
 	});
 
 	it('keeps archived drafts recoverable without touching the plan', () => {
@@ -266,7 +222,6 @@ describe('Surge explicit review', () => {
 			status: 'captured',
 			discardedAt: undefined
 		});
-		expect(reloaded.canPromoteSurgeDraft(draft!.id)).toBe(true);
 		expect(reloaded.tasks).toHaveLength(0);
 	});
 });

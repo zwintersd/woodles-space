@@ -71,8 +71,9 @@ marginalia's diorama. the slugs those snapshots live under are shared
 constants (`BESTIARY_PUBLIC_SLUG`, `ECHOES_PUBLIC_SLUG`) precisely so no
 consumer hardcodes the string separately.
 
-carillon already has a private version of this: `buildEchoesExport()`
-(`apps/planner/src/lib/instrument.ts:286`) emits the `carillon-spores` v1
+carillon had a private version of this until the spore ledger was removed
+(2026-11-13): `buildEchoesExport()`
+(`apps/planner/src/lib/instrument.ts`) emitted the `carillon-spores` v1
 ledger, which ARCHITECTURE describes as "the narrow surface Echoes can
 consume without importing Carillon's private planner blob." **that sentence
 is the design principle this whole file is an application of.**
@@ -91,7 +92,7 @@ not every reference should survive its target changing.
 
 ### the cross-cutting habit: deterministic ids
 
-`observation-<date>@<startTime>`, `carillon-spore-<id>`, `sleep-<date>`,
+`observation-<date>@<startTime>`, `sleep-<date>`,
 practice ids of routine-plus-date, write's `d-nb-<capture id>` for an
 imported notebook capture. identity computed from content rather than
 minted, so two devices — or two runs of the same migration — cannot
@@ -255,9 +256,8 @@ once entries are referenceable, thinking about's `schedule` (freeform, only
 meaningful on playing/watching) can gain optional weekday+time structure, and
 carillon can *derive* obligation-shaped overlay blocks from it — a standing
 thursday watch date appearing on the calendar with nothing stored twice and
-no obligation created by hand. the existing invariant that
-`sequenceDayPile()` never reorders obligations and rituals already covers the
-derived blocks.
+no obligation created by hand. overlays are synthesized on read and never join a
+day shape's own blocks, which already covers the derived blocks.
 
 this is the piece that most directly answers "from thinking about, find the
 time to prioritize the things i care about."
@@ -285,15 +285,9 @@ smallest version of the thing that started this.
 
 ## 6. what this deliberately does not do
 
-- **no eighth `IntervalKind`.** `sporeStats` has a fixed seven-key record,
-  echo's seven visible traits each bind to a body part via `echoPart`, and
-  the print sheet and edition review both key off the list — against a
-  486-test suite. `elsewhere` plus a label already carries a title, and
+- **no eighth `IntervalKind`.** the print sheet and edition review both key
+  off the list. `elsewhere` plus a label already carries a title, and
   `CatchUp`'s custom-label path already does exactly this.
-- **no spores from a thinking-about session.** one honest observation makes
-  one spore; a linked observation is still one observation. the recall design
-  already guards against backfilling out-earning live sampling and this must
-  not reopen it.
 - **no merged blob.** the two apps sync under separate app keys with
   genuinely different merge strategies — thinking about uses whole-blob
   `isNewer`, carillon a per-collection deterministic merge — and merging

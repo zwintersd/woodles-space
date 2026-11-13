@@ -12,15 +12,13 @@
 	type BinderTabId =
 		| 'year-scroll'
 		| 'holidays'
-		| 'shapes'
 		| 'week-pattern'
 		| 'schedule'
 		| 'bells'
 		| 'sync';
-	let { onopenpiles }: { onopenpiles?: () => void } = $props();
+	let { onopenshapes }: { onopenshapes?: () => void } = $props();
 
 	const TABS: { id: BinderTabId; icon: string; label: string }[] = [
-		{ id: 'shapes',       icon: '◐', label: BINDER_LABELS.shapes },
 		{ id: 'schedule',     icon: '▤', label: 'schedule' },
 		{ id: 'week-pattern', icon: '◇', label: BINDER_LABELS.weekPattern },
 		{ id: 'year-scroll',  icon: '∞', label: 'year' },
@@ -122,6 +120,17 @@
 			<span class="binder-tab-label" aria-hidden="true">new task</span>
 		</button>
 
+		<!-- Not a panel: day shapes have a full editor, and this is the way to it. -->
+		<button
+			class="binder-tab"
+			onclick={() => { store.closeBinder(); onopenshapes?.(); }}
+			title={BINDER_LABELS.shapes}
+			aria-label={BINDER_LABELS.shapes}
+		>
+			<span class="binder-tab-icon" aria-hidden="true">◐</span>
+			<span class="binder-tab-label" aria-hidden="true">{BINDER_LABELS.shapes}</span>
+		</button>
+
 		{#each TABS as tab}
 			<button
 				class="binder-tab"
@@ -161,7 +170,7 @@
 			<span class="binder-title">schedule</span>
 		</header>
 		<div class="binder-body binder-schedule">
-			<DayPlan onopenpiles={() => { store.closeBinder(); onopenpiles?.(); }} />
+			<DayPlan onopenshapes={() => { store.closeBinder(); onopenshapes?.(); }} />
 		</div>
 
 	{:else if store.binderTab === 'holidays'}
@@ -171,30 +180,6 @@
 		</header>
 		<div class="binder-body">
 			<p class="binder-empty">holiday layer — coming soon.</p>
-		</div>
-
-	{:else if store.binderTab === 'shapes'}
-		<header class="binder-header">
-			<span class="binder-eyebrow">binder</span>
-			<span class="binder-title">{BINDER_LABELS.shapes}</span>
-		</header>
-		<div class="binder-body">
-			{#if store.dayShapes.filter(s => !s.deletedAt && !s.archived).length === 0}
-				<div class="binder-empty-block">
-					<p class="binder-empty-heading">{EMPTY_STATES.shapes.heading}</p>
-					<p class="binder-empty-body">{EMPTY_STATES.shapes.body}</p>
-				</div>
-			{:else}
-				{#each store.dayShapes.filter(s => !s.deletedAt && !s.archived) as shape (shape.id)}
-					<div class="shape-row">
-						<span class="shape-row-name">{shape.name}</span>
-						<span class="shape-row-meta">
-							{shape.blocks.length} block{shape.blocks.length === 1 ? '' : 's'}
-							{#if shape.restful}<span class="shape-restful">· restful</span>{/if}
-						</span>
-					</div>
-				{/each}
-			{/if}
 		</div>
 
 	{:else if store.binderTab === 'week-pattern'}
@@ -606,36 +591,6 @@
 		color: var(--p-muted);
 		font-style: italic;
 		opacity: 0.85;
-	}
-
-	/* ── shape rows ───────────────────────────────────────────────── */
-	.shape-row {
-		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: 0.5rem;
-		padding: 0.55rem 0;
-		border-bottom: 1px solid var(--p-border);
-	}
-
-	.shape-row-name {
-		font-family: var(--pl-font-optical);
-		font-style: italic;
-		font-size: 0.95rem;
-		color: var(--p-text);
-		font-variation-settings: 'opsz' 36;
-	}
-
-	.shape-row-meta {
-		font-family: var(--pl-font-mono);
-		font-size: 0.66rem;
-		letter-spacing: 0.08em;
-		color: var(--p-muted);
-		opacity: 0.9;
-	}
-
-	.shape-restful {
-		opacity: 0.6;
 	}
 
 	/* ── week-pattern rows ────────────────────────────────────────── */

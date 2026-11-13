@@ -92,12 +92,15 @@ describe('accepting an offer', () => {
 	});
 
 	it('mirrors the ledger for a same-origin reader on every change', () => {
-		store.logThinkingAboutSession('piranesi', '2026-08-09');
+		// The mirror only carries the last SESSION_LEDGER_DAYS, measured from the
+		// real clock — so a fixed date here would age out of it and fail.
+		const date = new Date().toISOString().slice(0, 10);
+		store.logThinkingAboutSession('piranesi', date);
 
 		const raw = localStorage.getItem(CARILLON_SESSIONS_STORAGE_KEY);
 		expect(readSessionsBlob(JSON.parse(raw as string))?.sittings[0]).toMatchObject({
 			entryId: 'piranesi',
-			date: '2026-08-09'
+			date
 		});
 	});
 

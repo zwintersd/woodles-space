@@ -16,15 +16,9 @@ export type Block = {
 	// — a standing watch date is a commitment somebody already recorded in the
 	// app that owns it, and copying it in would create a second truth to drift.
 	overlay?: 'obligation' | 'ritual' | 'standing';
-	// The behavioral-momentum position of this block inside a day pile.
-	// `easy` blocks are high-probability on-ramps; `stretch` blocks are the
-	// lower-probability work the on-ramp is meant to carry.
-	momentum?: MomentumLevel;
 	// A suggested sampling category. The observation is still allowed to differ.
 	sampleKind?: IntervalKind;
 };
-
-export type MomentumLevel = 'easy' | 'steady' | 'stretch';
 
 export type DayShape = {
 	id: string;
@@ -171,14 +165,12 @@ export type Bell = {
 	defaultVolume: number;
 };
 
-export type View = 'now-next' | 'today' | 'week' | 'month' | 'year';
 export type BinderTab =
 	| 'domains'
 	| 'waiting'
 	| 'upcoming'
 	| 'year-scroll'
 	| 'holidays'
-	| 'shapes'
 	| 'week-pattern'
 	| 'schedule'
 	| 'sync'
@@ -409,19 +401,6 @@ export type SurgeDraft = {
 	promotedTaskIds?: string[];
 };
 
-/**
- * The stable reinforcement/export event produced by an honest interval mark.
- * Echoes can consume this ledger later without learning the whole planner blob.
- */
-export type SporeEvent = {
-	id: string;
-	observationId: string;
-	date: string;
-	kind: IntervalKind;
-	amount: number;
-	createdAt: string;
-};
-
 // ── capacity: a morning read, and the slower signals beside it ────
 
 export type SleepQuality = 'rough' | 'okay' | 'good';
@@ -497,7 +476,6 @@ export type PlannerBlob = {
 	routines?: Routine[];
 	routinePractices?: RoutinePractice[];
 	surgeDrafts?: SurgeDraft[];
-	spores?: SporeEvent[];
 	sleepLogs?: SleepLog[];
 	signals?: SignalEntry[];
 	loggedSessions?: LoggedSession[];

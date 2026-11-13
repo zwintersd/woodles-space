@@ -164,7 +164,7 @@ woodles.space/
     ├── data/                 SvelteKit · structured Collections, Table view, and Woodles references
     ├── write/               SvelteKit · the writing surface — letters, essays, stories, poems, notes, and lists that nest and move (Liquid); also the knowledge base now, in a small way (cross-draft references, backlinks, "draft it with a prompt")
     ├── marginalia/          SvelteKit · a witch writes worlds + a reading room
-    ├── planner/             SvelteKit · carillon — self-observation, day piles, and reinforcement
+    ├── planner/             SvelteKit · carillon — self-observation, day shapes, and reinforcement
     ├── bestiary/            SvelteKit · the witch's field guide, as playing cards
     ├── mycelium/            SvelteKit · people and contact details, on 3:4 cards styled like Bestiary, in Carillon's shell
     ├── thinking-about/      SvelteKit · a board for what's being read, played, and watched — and, per entry, a structured record cast for it
@@ -602,7 +602,9 @@ a central Woodles state service.
 `apps/planner` is Carillon. Its schedule is a hypothesis shown beside
 momentary time-sampling data, not a compliance ledger. `buildDayIntervals()`
 expands the configured wake/sleep anchors into intervals (15 minutes by
-default); the bell asks what is actually happening in the current interval.
+default); the bell asks what is actually happening in the current interval. The sampler
+carries one line about the plan (`planLine()`): the planned block, when it
+ends, and what follows — or the next block, from an open stretch.
 Past intervals only become editable when paper-entry mode is on or through
 the catch-up card's recalled stretches. Paper-entry's date picker can reopen
 any earlier sheet, and those marks keep `source: "paper"` so a later clipboard
@@ -653,7 +655,7 @@ accents, and never landing on a mid-tone ground.
 
 Each observation has the deterministic identity
 `observation-<date>@<startTime>`, stores both its observed kind/label and the
-pile's `plannedLabel`, and carries `capturedAt`/`updatedAt`. Correcting a mark
+day shape's `plannedLabel`, and carries `capturedAt`/`updatedAt`. Correcting a mark
 updates that record without editing the plan or manufacturing another sample;
 its capture-time plan label, interval duration, and source provenance remain
 fixed. The seven observation kinds are clinic, writing, build, movement, care,
@@ -664,8 +666,7 @@ a day instead of living with the bell. `findCatchUpGaps()` scans today's rows
 for contiguous past, unobserved runs of at least an hour, and the Today screen
 offers to sketch each hollow stretch in broad strokes. A sketch is one
 observation with `source: "recall"` whose `intervalMinutes` spans the stretch —
-one memory is one sample and earns one Spore however many bells it covers, so
-backfilling can never out-earn live sampling. `buildDayIntervals()` spreads a
+one memory is one sample however many bells it covers. `buildDayIntervals()` spreads a
 recall mark across every row it covers while an exact sample inside the
 stretch keeps its own row; the ledger renders covered rows as labeled
 continuations, and Edition Review shows the stretch as a single time range
@@ -673,8 +674,7 @@ with its own provenance commentary and a "recalled stretches" count in the
 extras. Declining is first-class — "leave this stretch hollow" dismisses the
 card because unobserved is an honest answer. The same card carries quiet
 nudge chips for other logging worth catching up on: routines practiced within
-the last two weeks but unmarked today, and captured Surge drafts from an
-earlier session that are ready to review.
+the last two weeks but unmarked today, and saved ideas whose review date has come.
 
 **Prompt-fading routines** begin as full task analyses. A dated practice records
 each step as `independent`, `prompted`, or `missed` and derives an independence
@@ -686,7 +686,7 @@ request. Practice ids are routine-plus-date, so correcting today's data replaces
 today's record rather than pretending it was another day.
 
 **Onboarding and refresh.** First setup is a six-step wizard (`OnboardingStore`,
-`onboarding.store.svelte.ts`) — hours, commitments, routines, categories, day piles and weekday
+`onboarding.store.svelte.ts`) — hours, commitments, routines, categories, day shapes and weekday
 defaults, check-ins and reminders — that mutates the planner directly as each step is answered
 rather than staging changes to commit at the end, so "finish later" is always
 safe: `settings.onboardingStep` checkpoints exactly which question was live,
@@ -696,10 +696,10 @@ questions — changing one setting meant "restart the wizard," which looks and
 feels like wiping progress even though the underlying data was untouched.
 Step three creates reusable routine checklists with cues and keeps daily fixed-time
 activities in an optional section. Step five reuses the activity editor for fixed
-or flexible activities and routine links, supports new piles and unassigned weekdays,
-and saves pile edits explicitly. Step six sets observation intervals, bells, quiet
+or flexible activities and routine links, supports new day shapes and unassigned weekdays,
+and saves shape edits explicitly. Step six sets observation intervals, bells, quiet
 hours, and reminder detail. Revisiting categories retains custom category definitions.
-The completion recap introduces Today, Surge, and Editions.
+The completion recap introduces Today, Ideas, and Editions.
 **Refresh** is a second, independent entry point into the identical step
 components: `startRefresh([steps])` opens directly on whichever section(s)
 were picked from the Binder's sync tab, in that order, over the running app
@@ -740,7 +740,7 @@ yet reads as `steady` with no reasons, not an error.
 single day — where in a cycle, how far to payday, whether an illness is
 still running — logged as one flat `SignalEntry[]` rather than three
 separate mechanisms, the same "derive, don't store current state" stance
-Carillon already takes toward observations and Echo's traits. `cycleRead()`
+Carillon already takes toward observations. `cycleRead()`
 derives cycle length from the gap between logged period-start dates (an
 average once there are two or more; a 28-day guess, marked `estimated`, from
 just one) rather than asking for a length up front. `paydayRead()` only
@@ -758,46 +758,39 @@ Custom entries always appear in Capacity's reasons list, but never move its
 score — Carillon has no way to know a custom entry's valence, and guessing
 would be exactly the black-box behavior the reasons list exists to avoid.
 
-**Day piles** are complete reusable day shapes rather than schedules assigned
-in advance to dates. The starter rack has five: office, maker, out, recovery,
-and writing. `weekPattern` supplies one suggested pile per weekday while a
-`DayInstance` is an explicit one-day override, so choosing today's pile does
-not silently rewrite every future Thursday. Blocks are rated `easy`, `steady`,
-or `stretch`; `sequenceDayPile()` puts high-probability on-ramps before the
-lower-probability work while preserving the authored time slots. Obligations
-and rituals are overlays and are never reordered by that operation.
+**Day shapes** are complete reusable day templates rather than schedules
+assigned in advance to dates. The starter set has five: office, maker, out,
+recovery, and writing. `weekPattern` supplies one suggested shape per weekday
+while a `DayInstance` is an explicit one-day override, so choosing today's
+shape does not silently rewrite every future Thursday. The editor is not a
+header section: it opens from the "today's shape" pill on Today, the binder's
+day shapes button,
+the day plan, and Editions, and carries its own way back. Blocks keep their
+authored time slots; nothing reorders them. Obligations and
+rituals are overlays, never part of a shape's own blocks. The store methods
+still say pile (`savePile`, `archivePile`, `deletePile`).
 
-**Surge drafts** separate capture from commitment. Every draft stores its
-creation timestamp and the `PlannerStore` session id that created it.
-`canPromoteSurgeDraft()` refuses promotion while that same app session is
-alive; a later session may promote it, but promotion only creates an
-unscheduled task in loose pieces, never a block or a calendar commitment.
-The original body, drafted-at time, promoted-at time, and resulting task id
-stay attached as provenance. The resulting task id is deterministic per draft,
-so two devices cannot manufacture duplicate loose pieces; the loose piece opens
-the ordinary task editor for scheduling. Archiving a draft never touches the
-plan and remains reversible from the closed-draft shelf.
-
-**Spores and Echo** are the reinforcement layer. One honest observation creates
-one deterministic, amount-1 `SporeEvent`; correcting the observation updates
-the same Spore's kind instead of double-paying it. Echo's seven visible traits
-grow from lifetime totals by observation kind, while the last seven days only
-decide whether the creature is awake or taking an ordinary nap — there is no
-streak penalty. `buildEchoesExport()` emits the stable
-`carillon-spores` version-1 JSON ledger, which is the narrow surface Echoes can
-consume without importing Carillon's private planner blob.
+**Ideas** separate capture from commitment. An idea stays off the schedule
+until tasks are made from it — immediately if wanted; there is no cooling-off
+delay. `extractSurgeTasks()` turns chosen lines into tasks, dated or not, and
+the original body, created-at time, and resulting task ids stay attached as
+provenance. An optional review date is a reminder, not a lock. Archiving an
+idea never touches the plan and is reversible. The records are still
+`SurgeDraft` in `surgeDrafts` (and `planner.surgeDrafts.v1`) so synced blobs
+keep hydrating; `createdSessionId` is a leftover from the old same-session
+lock and gates nothing.
 
 **Print-first evenings and edition review** close the paper loop. The Today
-screen always carries a print-only sheet for tomorrow's chosen pile: a
+screen always carries a print-only sheet for tomorrow's chosen day shape: a
 letter-portrait, two-column interval ledger with the plan beside an empty mark,
 the cream/print-pink inversion, and VT323 timestamps under `@media print`.
 Paper marks come back through the explicitly labeled, date-addressable
 paper-entry mode. `EditionReview` only offers days with observations and builds
 each historical row from the observation's stored interval duration and
-`plannedLabel`; changing today's pile or sampling interval cannot rewrite the
+`plannedLabel`; changing today's day shape or sampling interval cannot rewrite the
 old edition. It can overlay pop-up commentary for repeated weekday/interval
-changes and Surge provenance. The commentary is a pattern-finding bonus track,
-not an audit, and the same view exports the Spores JSON.
+changes and idea provenance. The commentary is a pattern-finding bonus track,
+not an audit.
 
 Carillon remains local-first: its domain records live in app-owned localStorage
 keys and `PlannerBlob` treats the instrument fields as optional so older synced
@@ -812,15 +805,13 @@ domain or sitting removed on one device is removed on the others, where the
 old union brought it back. With no base — a first sync, or after
 disconnecting — the merge is a union. Only a record both devices changed
 reaches the domain rules: an observation takes the later `updatedAt`, a
-routine practice the later `recordedAt`, piles/tasks/routines/day
-choices/sleep logs/signal entries the later `updatedAt` (a pile or routine's
-`deletedAt` is final), a Surge collision its later update with status
+routine practice the later `recordedAt`, day shapes/tasks/routines/day
+choices/sleep logs/signal entries the later `updatedAt` (a day shape or routine's
+`deletedAt` is final), an idea collision its later update with status
 precedence as a tie-break, and loops, loop events, Five Contacts rounds and
 reminders their own resolvers in `openLoops.ts` and `reminders.ts`.
 Obligations, rituals and domains carry no time, so there the server's copy
-wins; settings merge per key by edit stamp (`apps/planner/BELLS.md`). The
-Spore ledger is then reconciled against the merged observations so kind,
-date, and amount stay canonical. A merge that adds nothing hands back the
+wins; settings merge per key by edit stamp (`apps/planner/BELLS.md`). A merge that adds nothing hands back the
 server's own blob — fingerprints are over canonical JSON, since JSONB reorders
 keys — so a sync with nothing new pushes nothing and leaves the page alone.
 
@@ -1581,7 +1572,7 @@ the one-writer rule earns its keep: rather than Carillon writing into Thinking
 About's store, it publishes `{ entryId, taskId, title, date, time, blockTitle,
 status }` under sync key `planner-commitments` and localStorage key
 `planner.commitments.v1`, and Thinking About reads it. Each app still owns
-everything it writes. Domains, notes, durations and day piles stay in Carillon
+everything it writes. Domains, notes, durations and day shapes stay in Carillon
 — a board about what you're reading has no use for them — and a `dropped` task
 is filtered out rather than published, because "a thing you decided not to do"
 is not an answer to "when am I doing this". An entry's detail then shows what's
@@ -1615,9 +1606,8 @@ time — beside its freeform `schedule` text. It rides the shelf, and Carillon
 id `ta-<entryId>`), so a Thursday watch date appears on the calendar with
 nothing stored twice and no obligation created by hand. The freeform text is
 never parsed into the slot: guessing "Tuesdays after work" wrong is worse than
-leaving it as the note somebody wrote. `sequenceDayPile()` cannot reorder these
-by construction — it only ever touches a pile's own blocks, and these are
-synthesized on read.
+leaving it as the note somebody wrote. They are never part of a day
+shape's own blocks — they are synthesized on read.
 
 All three ledgers rebuild on every write to their source (`#saveTasks`,
 `#saveLoggedSessions`, `#persist`) and on load, for the reason under the shelf

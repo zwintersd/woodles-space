@@ -6,7 +6,7 @@
 	import type { Block } from '$lib/types';
 	import BlockEditor from './BlockEditor.svelte';
 	import RoutineRunner from './RoutineRunner.svelte';
-	let { onopenpiles }: { onopenpiles?: () => void } = $props();
+	let { onopenshapes }: { onopenshapes?: () => void } = $props();
 	let editing = $state(false),
 		notice = $state(''),
 		activeRoutine = $state('');
@@ -60,13 +60,13 @@
 		<div class="wb-heading">
 			<div>
 				<p class="wb-kicker">Today’s plan</p>
-				<h2>{pile?.name ?? 'No day pile selected'}</h2>
+				<h2>{pile?.name ?? 'No day shape selected'}</h2>
 			</div>
 			<div class="wb-actions">
 				<button
 					disabled={editing}
 					onclick={() => editActivity()}>Change today</button
-				><button onclick={onopenpiles}>Edit templates</button><button
+				><button onclick={onopenshapes}>Edit day shapes</button><button
 					onclick={() => store.startCompose({ targetDate: today })}>+ Add task</button
 				>
 			</div>
@@ -144,7 +144,7 @@
 							>{/if}
 					</div>{/each}{/if}
 			{#if !fixed.length && !flexible.length}<p>
-					Add activities for today or choose a day pile.
+					Add activities for today or choose a day shape.
 				</p>{/if}
 			{#if tasks.length}<h3>Tasks</h3>
 				{#each tasks as task}<div class="wb-row">

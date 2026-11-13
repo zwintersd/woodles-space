@@ -211,7 +211,7 @@ export const appManifest = Object.freeze([
 		// with a Thinking About entry means "what does the day say about this
 		// thing", and Carillon answers with what it already has scheduled.
 		addressableBy: ['thinking-about-entry'],
-		landing: tile('planner', 6, 'tend', 'your day in piles, and a bell that asks what is happening now', 'var(--peach)', 'var(--lavender)', '170deg', { defaultPin: 4 })
+		landing: tile('planner', 6, 'tend', 'your day in shapes, and a bell that asks what is happening now', 'var(--peach)', 'var(--lavender)', '170deg', { defaultPin: 4 })
 	},
 	{
 		id: 'animations',

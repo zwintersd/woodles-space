@@ -4,6 +4,7 @@ import {
 	buildDayIntervals,
 	findCatchUpGaps,
 	intervalKey,
+	planLine,
 	routineScaffoldLevel,
 	spanMinutes
 } from './instrument';
@@ -279,25 +280,41 @@ describe('prompt-fading thresholds', () => {
 	});
 });
 
-// Echo draws one feature per interval kind. The mapping lives on the
-// options list so the compiler catches a kind with no feature, and this
-// holds the rest: every kind reaches a distinct, non-empty part.
-describe('interval kinds and Echo', () => {
-	it('gives every kind a part of Echo to grow', () => {
-		for (const option of INTERVAL_KIND_OPTIONS) {
-			expect(option.echoPart.trim().length).toBeGreaterThan(0);
-		}
+describe('the sampler plan line', () => {
+	const blocks: Block[] = [
+		{ id: 'clinic', startTime: '09:00', endTime: '12:00', title: 'Clinic' },
+		{ id: 'midday', startTime: '12:00', endTime: '13:00', title: 'Midday' },
+		{ id: 'later', startTime: '15:00', endTime: '16:00', title: 'Close notes' }
+	];
+	const rowAt = (clock: [number, number], dayBlocks = blocks) => {
+		const now = new Date(2026, 6, 30, clock[0], clock[1]);
+		const rows = buildDayIntervals(now, dayBlocks, [], '08:00', '18:00', 15, now);
+		return { now, rows, current: rows.find((row) => row.state === 'current')! };
+	};
+
+	it('names the planned block, when it ends, and what follows', () => {
+		expect(planLine(rowAt([10, 20]).current, blocks)).toBe(
+			'planned: Clinic, until 12:00 · then Midday'
+		);
 	});
 
-	it('never sends two kinds to the same part', () => {
-		const parts = INTERVAL_KIND_OPTIONS.map((option) => option.echoPart);
-		expect(new Set(parts).size).toBe(parts.length);
+	it('stops at the block when nothing follows it', () => {
+		expect(planLine(rowAt([15, 5]).current, blocks)).toBe('planned: Close notes, until 16:00');
 	});
 
-	it('keeps a stat name and a glyph for every kind', () => {
-		for (const option of INTERVAL_KIND_OPTIONS) {
-			expect(option.stat.trim().length).toBeGreaterThan(0);
-			expect(option.glyph.trim().length).toBeGreaterThan(0);
-		}
+	it('points at the next block from an open stretch', () => {
+		expect(planLine(rowAt([13, 30]).current, blocks)).toBe(
+			'nothing planned · next: Close notes at 15:00'
+		);
+	});
+
+	it('says nothing on an unplanned day or after the last block', () => {
+		expect(planLine(rowAt([10, 20], []).current, [])).toBe('');
+		expect(planLine(rowAt([17, 0]).current, blocks)).toBe('');
+	});
+
+	it('only recalls the plan for a past interval', () => {
+		const past = rowAt([10, 20]).rows.find((row) => row.startTime === '09:15')!;
+		expect(planLine(past, blocks)).toBe('planned: Clinic');
 	});
 });

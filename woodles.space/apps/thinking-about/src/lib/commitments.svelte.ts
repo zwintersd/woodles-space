@@ -1,6 +1,6 @@
 // Reading Carillon's commitments — when a thing on the board is actually
 // scheduled — so an entry can say "Thursday, 20:00" without this app knowing
-// anything about day piles, domains, or blocks.
+// anything about day shapes, domains, or blocks.
 //
 // Same two sources and the same degradation as Carillon's reader of this app's
 // shelf: localStorage first (synchronous, same origin, instant), then the sync

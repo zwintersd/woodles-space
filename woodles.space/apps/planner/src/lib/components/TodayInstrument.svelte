@@ -5,6 +5,7 @@
 	import {
 		INTERVAL_KIND_OPTIONS,
 		buildDayIntervals,
+		planLine,
 		timeForMinutes,
 		type DayInterval
 	} from '$lib/instrument';
@@ -23,13 +24,13 @@
 	import LoopPatterns from './LoopPatterns.svelte';
 
 	let {
-		onopenpiles,
+		onopenshapes,
 		onopenroutines,
-		onopensurge
+		onopenideas
 	}: {
-		onopenpiles?: () => void;
+		onopenshapes?: () => void;
 		onopenroutines?: () => void;
-		onopensurge?: () => void;
+		onopenideas?: () => void;
 	} = $props();
 
 	let selectedStart = $state('');
@@ -174,8 +175,8 @@
 			<h1 id="today-heading">{dayOfWeekLabel(store.now)}, {shortDateLabel(store.now)}</h1>
 		</div>
 		<div class="day-actions">
-			<button type="button" class="pile-pill" onclick={onopenpiles}>
-				<span>today’s pile</span>
+			<button type="button" class="shape-pill" onclick={onopenshapes}>
+				<span>today’s shape</span>
 				<strong>{dayShape?.name ?? 'none chosen'}</strong>
 			</button>
 			<button type="button" class="print-action" onclick={printTomorrow}>
@@ -201,7 +202,7 @@
 				<!-- Outside the status region, so the minute-by-minute bell line isn't announced. -->
 				{@render bellLine()}
 			{:else if selectedInterval}
-				<MomentarySample interval={selectedInterval} timeLabel="{displayTime(selectedInterval.startTime)}–{displayTime(selectedInterval.endTime)}" bellNote={selectedStart ? 'editing a recorded moment' : bellStatus} onbellclick={selectedStart ? undefined : openBells} editingPast={Boolean(selectedStart)} onreturnnow={() => selectedStart = ''} onsaved={() => selectedStart = ''} />
+				<MomentarySample interval={selectedInterval} planNote={planLine(selectedInterval, blocks, displayTime)} timeLabel="{displayTime(selectedInterval.startTime)}–{displayTime(selectedInterval.endTime)}" bellNote={selectedStart ? 'editing a recorded moment' : bellStatus} onbellclick={selectedStart ? undefined : openBells} editingPast={Boolean(selectedStart)} onreturnnow={() => selectedStart = ''} onsaved={() => selectedStart = ''} />
 			{:else}
 				<div class="sample-rest"><div><p>Outside sampling hours. Your saved moments are below.</p>{@render bellLine()}</div></div>
 			{/if}
@@ -241,7 +242,7 @@
 
 	<details class="context-details" bind:open={patternsOpen}><summary>Patterns in your loops</summary>{#if patternsOpen}<LoopPatterns />{/if}</details>
 	<details class="context-details"><summary>Sleep and context</summary><Capacity /></details>
-	<details class="context-details"><summary>Add an earlier activity</summary><CatchUp intervals={todayIntervals} {onopenroutines} {onopensurge} /></details>
+	<details class="context-details"><summary>Add an earlier activity</summary><CatchUp intervals={todayIntervals} {onopenroutines} {onopenideas} /></details>
 
 	<details class="context-details"><summary>Earlier today · {ledgerObservations.length} records</summary>
 	<section class="ledger-card" aria-labelledby="ledger-heading">
@@ -303,11 +304,10 @@
 			<h1>{dayOfWeekLabel(tomorrow)}, {shortDateLabel(tomorrow)}</h1>
 		</div>
 		<div class="print-meta">
-			<span>PILE</span>
+			<span>DAY SHAPE</span>
 			<strong>{tomorrowShape?.name ?? 'open day'}</strong>
 		</div>
 	</header>
-	<p class="print-thesis">The plan is a hypothesis. The day is data.</p>
 	<div class="print-ledger" style={`--print-rows: ${printRowsPerColumn}`}>
 		{#each tomorrowIntervals as row (row.key)}
 			<div class="print-row">
@@ -382,7 +382,7 @@
 		gap: 0.55rem;
 	}
 
-	.pile-pill,
+	.shape-pill,
 	.print-action {
 		border: 1px solid var(--car-line);
 		border-radius: 0.8rem;
@@ -394,7 +394,7 @@
 			transform 160ms ease;
 	}
 
-	.pile-pill {
+	.shape-pill {
 		display: grid;
 		gap: 0.1rem;
 		min-width: 9.5rem;
@@ -402,7 +402,7 @@
 		text-align: left;
 	}
 
-	.pile-pill span {
+	.shape-pill span {
 		color: var(--car-mist);
 		font-family: var(--car-mono);
 		font-size: 0.54rem;
@@ -410,7 +410,7 @@
 		text-transform: uppercase;
 	}
 
-	.pile-pill strong {
+	.shape-pill strong {
 		font-family: var(--car-body);
 		font-size: 0.78rem;
 		font-weight: 500;
@@ -425,7 +425,7 @@
 		font-size: 0.68rem;
 	}
 
-	.pile-pill:hover,
+	.shape-pill:hover,
 	.print-action:hover {
 		border-color: var(--car-pink);
 		background: color-mix(in srgb, var(--car-panel) 85%, transparent);
@@ -702,7 +702,7 @@
 			width: 100%;
 		}
 
-		.pile-pill {
+		.shape-pill {
 			flex: 1;
 		}
 	}
@@ -738,7 +738,7 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.pile-pill,
+		.shape-pill,
 		.print-action { transition: none; }
 	}
 
@@ -856,13 +856,6 @@
 			font-family: var(--car-body);
 			font-size: 10pt;
 			font-weight: 500;
-		}
-
-		.print-thesis {
-			margin: 0.08in 0;
-			color: #6e5e6f;
-			font-size: 7.5pt;
-			font-style: italic;
 		}
 
 		.print-ledger {

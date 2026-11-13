@@ -61,7 +61,7 @@
 		<button class="completion-skip" onclick={() => onboarding.finish()}>{COMPLETION.skipCta}</button>
 
 		<p class="completion-foot">
-			Edit templates in Day piles
+			Change day shapes from Today
 			<span class="foot-sep">·</span>
 			Record in Today
 			<span class="foot-sep">·</span>

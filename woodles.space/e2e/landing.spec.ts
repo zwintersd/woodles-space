@@ -99,7 +99,7 @@ test('desktop icons describe themselves on hover', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.locator('.icon[data-id="planner"]')).toHaveAttribute(
 		'title',
-		'your day in piles, and a bell that asks what is happening now'
+		'your day in shapes, and a bell that asks what is happening now'
 	);
 });
 

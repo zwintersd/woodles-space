@@ -14,11 +14,11 @@
 	let {
 		intervals,
 		onopenroutines,
-		onopensurge
+		onopenideas
 	}: {
 		intervals: DayInterval[];
 		onopenroutines?: () => void;
-		onopensurge?: () => void;
+		onopenideas?: () => void;
 	} = $props();
 
 	let dismissed = $state<string[]>([]);
@@ -58,7 +58,7 @@
 	);
 	let sketchMinutes = $derived(fromTime && toTime ? spanMinutes(fromTime, toTime) : 0);
 
-	let waitingSurge = $derived(
+	let waitingIdeas = $derived(
 		store.surgeDrafts.filter(
 			(draft) => draft.status !== 'discarded' && Boolean(draft.reviewDate && draft.reviewDate <= todayKey)
 		).length
@@ -117,7 +117,7 @@
 	}
 </script>
 
-{#if activeGap || feedback || waitingSurge > 0}
+{#if activeGap || feedback || waitingIdeas > 0}
 	<section class="catch-up" aria-label="catch up on the day">
 		{#if !activeGap && feedback}
 			<p class="caught-up" aria-live="polite">{feedback} · the sheet is caught up</p>
@@ -215,14 +215,14 @@
 			</article>
 		{/if}
 
-		{#if waitingSurge > 0}
+		{#if waitingIdeas > 0}
 			<div class="nudge-strip" aria-label="Ideas to review">
 				<span class="nudge-kicker">Review dates</span>
 
-				{#if waitingSurge > 0}
-					<button type="button" class="nudge-chip" onclick={onopensurge}>
+				{#if waitingIdeas > 0}
+					<button type="button" class="nudge-chip" onclick={onopenideas}>
 						<span aria-hidden="true">✴</span>
-						{waitingSurge} idea{waitingSurge === 1 ? '' : 's'} ready to review
+						{waitingIdeas} idea{waitingIdeas === 1 ? '' : 's'} ready to review
 					</button>
 				{/if}
 			</div>
