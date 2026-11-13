@@ -35,6 +35,12 @@ so it's not easy to forget.
   moments, labels and editions are untouched.
 - **carillon: smaller cleanups** — the binder's day shapes button opens the
   editor instead of a read-only list, and the print sheet loses its slogan.
+## 2026-11-12
+
+- **carillon's header rose window now spins true** — hovering the logo turns
+  the glass wheel while the bell stays upright in the centre. before, the bell
+  counter-rotated around itself rather than the wheel, so it swung off-centre
+  and the clapper dot orbited. both now pivot on the wheel's centre.
 
 ## 2026-11-01
 
