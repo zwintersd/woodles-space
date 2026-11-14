@@ -3,7 +3,10 @@
 	import { queueSync } from '$lib/sync.svelte';
 	import { INTERVAL_KIND_OPTIONS, type DayInterval } from '$lib/instrument';
 	import { uid } from '$lib/utils';
-	import type { SampleTag, MomentDetails as Details, MomentNoticing, TrackerAnswer } from '$lib/types';
+	import type { SampleTag, MomentDetails as Details, MomentEndorsement, MomentNoticing, TrackerAnswer } from '$lib/types';
+	import type { Collection } from '@woodles/collections';
+	import RapidFire from './RapidFire.svelte';
+	import { endorsementLabel, endorsementSummary, rapidSources, readCollections } from '$lib/rapidFire';
 	import { cleanTrackerAnswers } from '$lib/momentTrackers';
 	import MomentDetails from './MomentDetails.svelte';
 	import { cleanDetails, cleanNoticings } from '$lib/momentDetails';
@@ -13,7 +16,7 @@
 	const colors = ['#aa526b', '#8061a8', '#467f92', '#98702f', '#548068', '#6676a0'];
 	const defaults: SampleTag[] = INTERVAL_KIND_OPTIONS.filter(o => o.kind !== 'elsewhere').map((o, i) => ({ id: o.kind, name: o.label, color: colors[i], kind: o.kind }));
 	let tags = $derived(store.settings.sampleTags ?? defaults);
-	let drafts = $state<Record<string, { text: string; tagId: string; fallback?: SampleTag; details: Details; answers: TrackerAnswer[]; noticings: MomentNoticing[]; linkedLoopIds: string[]; thinkingAboutEntryId: string }>>({});
+	let drafts = $state<Record<string, { text: string; tagId: string; fallback?: SampleTag; details: Details; answers: TrackerAnswer[]; noticings: MomentNoticing[]; linkedLoopIds: string[]; thinkingAboutEntryId: string; endorsement: MomentEndorsement | null }>>({});
 	let draft = $derived(interval ? drafts[interval.key] : undefined);
 	let editing = $state(false);
 	let tagDraft = $state<SampleTag[]>([]);
@@ -24,7 +27,7 @@
 		const observation = interval.observation;
 		const own = observation?.intervalStart === interval.startTime ? observation : undefined;
 		const tag = own?.sampleTag === undefined ? defaults.find(t => t.kind === own?.kind) : own.sampleTag;
-		drafts[interval.key] = { text: own?.label ?? '', tagId: tag?.id ?? '', fallback: tag ?? undefined, details: { ...own?.details }, answers: (own?.trackerAnswers ?? []).map(a => ({ tracker: { ...a.tracker }, value: a.value })), noticings: (own?.noticings ?? []).map(n => ({ ...n })), linkedLoopIds: [...(own?.linkedLoopIds ?? [])], thinkingAboutEntryId: own?.thinkingAboutEntryId ?? '' };
+		drafts[interval.key] = { text: own?.label ?? '', tagId: tag?.id ?? '', fallback: tag ?? undefined, details: { ...own?.details }, answers: (own?.trackerAnswers ?? []).map(a => ({ tracker: { ...a.tracker }, value: a.value })), noticings: (own?.noticings ?? []).map(n => ({ ...n })), linkedLoopIds: [...(own?.linkedLoopIds ?? [])], thinkingAboutEntryId: own?.thinkingAboutEntryId ?? '', endorsement: own?.endorsement ?? null };
 		feedback = '';
 	});
 	let chosen = $derived(tags.find(t => t.id === draft?.tagId) ?? (draft?.fallback?.id === draft?.tagId ? draft?.fallback : undefined));
@@ -38,10 +41,36 @@
 	function clearShelfEntry(): void {
 		if (draft) draft.thinkingAboutEntryId = '';
 	}
+	// Rapid fire: the same moment, answered by recognition instead of recall.
+	// Collections are Data's; they're read when the round is offered and again
+	// when it opens, never watched.
+	let collections = $state<Collection[]>([]);
+	$effect(() => { collections = readCollections(); });
+	let sources = $derived(rapidSources(thinkingAboutShelf.entries, collections));
+	let rapidFor = $state('');
+	let rapid = $derived(Boolean(interval && draft && rapidFor === interval.key && sources.length > 0));
+	function openRapid(): void {
+		if (!interval) return;
+		collections = readCollections();
+		rapidFor = interval.key;
+		feedback = '';
+	}
+	function rememberSource(key: string): void {
+		store.updateSettings({ rapidFireSource: key });
+		queueSync();
+	}
+	/** Satiation ends the round and saves the moment; the picks stand in for words that weren't written. */
+	function finishRapid(endorsement: MomentEndorsement): void {
+		if (!draft) return;
+		draft.endorsement = endorsement;
+		if (!draft.text.trim()) draft.text = endorsementLabel(endorsement);
+		rapidFor = '';
+		saveSample();
+	}
 	function saveSample() {
 		if (!interval || !draft?.text.trim()) return;
 		const existing = interval.observation?.intervalStart === interval.startTime ? interval.observation : undefined;
-		store.observeInterval({ date: interval.date, intervalStart: interval.startTime, label: draft.text, kind: chosen?.kind ?? 'elsewhere', sampleTag: chosen ? { ...chosen } : null, details: cleanDetails(draft.details), trackerAnswers: cleanTrackerAnswers(draft.answers), noticings: cleanNoticings(draft.noticings), linkedLoopIds: [...draft.linkedLoopIds], source: existing?.source ?? 'live', note: existing?.note, thinkingAboutEntryId: draft.thinkingAboutEntryId || undefined });
+		store.observeInterval({ date: interval.date, intervalStart: interval.startTime, label: draft.text, kind: chosen?.kind ?? 'elsewhere', sampleTag: chosen ? { ...chosen } : null, details: cleanDetails(draft.details), trackerAnswers: cleanTrackerAnswers(draft.answers), noticings: cleanNoticings(draft.noticings), linkedLoopIds: [...draft.linkedLoopIds], source: existing?.source ?? 'live', note: existing?.note, thinkingAboutEntryId: draft.thinkingAboutEntryId || undefined, endorsement: draft.endorsement });
 		queueSync();
 		feedback = existing ? 'Changes saved.' : 'Moment saved.';
 		onsaved?.();
@@ -64,6 +93,9 @@
 				<span class="sample-source">momentary sample</span>
 			</div>
 			{#if editingPast}<button type="button" class="return-now" onclick={onreturnnow}>Return to now</button>{/if}
+			{#if rapid}
+				<RapidFire {sources} initialKey={store.settings.rapidFireSource ?? ''} onfinish={finishRapid} oncancel={() => rapidFor = ''} onsource={rememberSource} />
+			{:else}
 			<form onsubmit={(event) => { event.preventDefault(); saveSample(); }}>
 				<label class="entry-label" for="moment-entry">{interval?.state === 'past' ? 'What was happening?' : 'What’s happening now?'}</label>
 				<textarea id="moment-entry" placeholder="A few words about this moment…" rows="3" value={draft?.text ?? ''} disabled={!draft} oninput={(event) => { if (draft) draft.text = event.currentTarget.value; feedback = ''; }}></textarea>
@@ -85,6 +117,15 @@
 						</div>
 					</div>
 				{/if}
+				{#if draft?.endorsement}
+					<div class="rapid-saved" data-testid="moment-endorsement">
+						<span class="rapid-kicker">picked · {endorsementSummary(draft.endorsement)}</span>
+						{#each draft.endorsement.picks as picked (picked.id)}<span class="rapid-pick">{picked.label}</span>{/each}
+						<button type="button" class="shelf-clear" onclick={() => { if (draft) draft.endorsement = null; feedback = ''; }}>remove</button>
+					</div>
+				{:else if draft && sources.length > 0}
+					<button type="button" class="rapid-open" data-testid="rapid-fire-open" onclick={openRapid}><strong>Rapid fire</strong><span>or pick what fits from a list, no writing needed</span></button>
+				{/if}
 				<div class="labels-heading"><span>Color label <small>optional</small></span><button type="button" onclick={() => { tagDraft = tags.map(t => ({ ...t })); labelError = ''; editing = !editing; }}>Edit labels</button></div>
 				<div class="labels" role="group" aria-label="Sample color label">
 					<button type="button" class="tag" aria-pressed={!draft?.tagId} disabled={!draft} onclick={() => { if (draft) draft.tagId = ''; feedback = ''; }}>No label</button>
@@ -95,7 +136,8 @@
 				</div>
 				<div class="save-row"><span role="status">{feedback || (interval ? 'Your words first. Add a label if it helps.' : 'Outside sampling hours. Add an earlier activity below.')}</span><button class="save" disabled={!draft?.text.trim()}>{interval?.observation?.intervalStart === interval?.startTime && interval?.observation ? 'Save changes' : 'Save moment'}</button></div>
 			</form>
-			{#if editing}
+			{/if}
+			{#if editing && !rapid}
 		<form class="label-editor" aria-label="Edit sample labels" onsubmit={(event) => { event.preventDefault(); saveLabels(); }}>
 			<p>Name your labels and choose their colors.</p>
 			{#each tagDraft as tag, index (tag.id)}
@@ -152,6 +194,12 @@
 	.shelf-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; flex: none; }
 	.shelf-clear { border: 0; background: transparent; padding: 0; margin-left: auto; color: var(--car-ink-soft); font-size: 0.72rem; text-decoration: underline; }
 	.shelf-clear:hover { color: var(--car-ink); }
+	.rapid-open { display: flex; align-items: baseline; gap: 0.5rem; width: 100%; margin-top: 0.6rem; border-style: dashed; padding: 0.55rem 0.7rem; text-align: left; }
+	.rapid-open strong { font: 400 1rem var(--car-fell); }
+	.rapid-open span { color: var(--car-ink-soft); }
+	.rapid-saved { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-top: 0.6rem; }
+	.rapid-kicker { width: 100%; color: var(--car-ink-soft); font: 0.58rem var(--car-mono); letter-spacing: 0.08em; text-transform: uppercase; }
+	.rapid-pick { border: 1px solid #b8862b70; border-radius: 1rem; background: #f0d48a55; padding: 0.15rem 0.55rem; font-size: 0.72rem; }
 	.labels-heading, .save-row { display: flex; align-items: center; justify-content: space-between; gap: 0.65rem; margin: 0.8rem 0 0.5rem; }
 	.labels-heading { font: 0.75rem var(--car-body); }
 	small, .save-row span { color: var(--car-ink-soft); font-size: 0.7rem; }

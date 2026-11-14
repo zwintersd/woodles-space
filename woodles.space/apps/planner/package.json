@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@woodles/app-manifest": "workspace:*",
+    "@woodles/collections": "workspace:*",
     "@woodles/sync": "workspace:*"
   },
   "devDependencies": {

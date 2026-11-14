@@ -1,6 +1,7 @@
 import { world1Life } from '@woodles/witch-engine';
 import { appManifest } from '@woodles/app-manifest';
 import { loadPeople, personRef, type Person } from '@woodles/mycelium';
+import { readShelfBlob, THINKING_ABOUT_SHELF_STORAGE_KEY, type ShelfEntry } from '@woodles/sync';
 import type { WoodlesRef } from '@shared/homesuiteBridge';
 import { ARCADE_COPY_CATALOG, ARCADE_GAME_CATALOG, ARCADE_PRIMITIVE_CATALOG } from '@woodles/marginalia-arcade-catalog';
 import { createRecord, stackRows, type Collection, type CollectionSource, type StackLink, type StackRow } from './collections';
@@ -61,6 +62,31 @@ export function readMyceliumRows(): PulledSourceRow[] {
 	const loaded = loadPeople();
 	if (loaded.issue) throw new Error(loaded.issue.message);
 	return personRows(loaded.people);
+}
+
+/** `pc_social` → `PC · social`; the board's own labels stay the board's. */
+function shelfLabel(key: string): string {
+	return key.split('_').map((part, index) => part.length <= 2 ? part.toUpperCase() : index === 0 ? part[0].toUpperCase() + part.slice(1) : part).join(' · ');
+}
+
+/** The shelf Thinking About publishes: active entries only, never notes or sessions. */
+export function shelfRows(entries: ShelfEntry[]): PulledSourceRow[] {
+	return entries.filter((entry) => entry.title.trim()).map((entry) => ({
+		ref: { app: 'thinking-about', kind: 'entry', id: entry.id },
+		label: entry.title,
+		hint: `Thinking About · ${shelfLabel(entry.columnKey)}`,
+		values: { name: entry.title, column: shelfLabel(entry.columnKey), section: shelfLabel(entry.sectionKey), lastSession: entry.lastSessionDate ?? '' }
+	}));
+}
+
+export function readShelfRows(): PulledSourceRow[] {
+	if (typeof localStorage === 'undefined') return [];
+	try {
+		const raw = localStorage.getItem(THINKING_ABOUT_SHELF_STORAGE_KEY);
+		return raw ? shelfRows(readShelfBlob(JSON.parse(raw))?.entries ?? []) : [];
+	} catch {
+		return [];
+	}
 }
 
 export async function readBestiaryRows(): Promise<PulledSourceRow[]> {
@@ -224,6 +250,7 @@ export async function pullCollectionSources(sources: CollectionSource[]): Promis
 	if (sources.includes('woodles-apps')) rows.push(...woodlesAppRows());
 	if (sources.includes('bestiary-creatures')) rows.push(...await readBestiaryRows());
 	if (sources.includes('mycelium-people')) rows.push(...readMyceliumRows());
+	if (sources.includes('thinking-about-shelf')) rows.push(...readShelfRows());
 	if (sources.includes('marginalia-life') || sources.includes('marginalia-field-notes')) {
 		const marginalia = readMarginaliaRows();
 		rows.push(...marginalia.filter((row) => row.ref.kind === 'life' ? sources.includes('marginalia-life') : sources.includes('marginalia-field-notes')));

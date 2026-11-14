@@ -86,6 +86,29 @@ describe('connected Collection sources', () => {
 		expect(collection.fields.filter((field) => field.sourceKey)).toHaveLength(8);
 	});
 
+	it('pulls the Thinking About shelf, renames in place, and keeps Collection notes local', async () => {
+		const publish = (title: string) => localStorage.setItem('thinking-about.shelf.v1', JSON.stringify({
+			version: 1, publishedAt: '2026-11-14T09:00:00.000Z',
+			entries: [{ id: 'entry-1', title, columnKey: 'playing', sectionKey: 'pc_social', color: '#33b679', lastSessionDate: '2026-11-12' }]
+		}));
+		publish('Outer Wilds');
+		let collection = mergePulledRows(createCollection('Thinking About', 'thinking-about'), await pullCollectionSources(['thinking-about-shelf']));
+		const record = collection.records[0];
+		const field = (key: string) => collection.fields.find((entry) => entry.sourceKey === key)!;
+		const notes = collection.fields.find((entry) => entry.name === 'My notes')!;
+		expect(collection.sources).toEqual(['thinking-about-shelf']);
+		expect(record.sourceRef).toEqual({ app: 'thinking-about', kind: 'entry', id: 'entry-1' });
+		expect([record.values[field('name').id], record.values[field('column').id], record.values[field('section').id], record.values[field('lastSession').id]])
+			.toEqual(['Outer Wilds', 'Playing', 'PC · social', '2026-11-12']);
+		collection = setCellValue(collection, record.id, notes.id, 'Bring marshmallows.');
+		publish('Outer Wilds: Echoes');
+		collection = mergePulledRows(collection, await pullCollectionSources(['thinking-about-shelf']));
+		expect(collection.records).toHaveLength(1);
+		expect(collection.records[0].values[field('name').id]).toBe('Outer Wilds: Echoes');
+		expect(collection.records[0].values[notes.id]).toBe('Bring marshmallows.');
+		expect(isCollection(collection)).toBe(true);
+	});
+
 	it('reads canonical people, refreshes owner fields, and keeps Collection notes local', async () => {
 		const person = createPerson({ name: 'Juniper Lane', role: 'Illustrator', emails: [{ id: 'email-1', label: 'Work', value: 'juniper@example.com' }], notes: 'Prefers email.' });
 		let collection = mergePulledRows(createCollection('People', 'mycelium-people'), await pullCollectionSources(['mycelium-people']));

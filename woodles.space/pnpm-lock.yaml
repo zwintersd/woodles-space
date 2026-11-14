@@ -465,6 +465,9 @@ importers:
       '@woodles/app-manifest':
         specifier: workspace:*
         version: link:../../packages/app-manifest
+      '@woodles/collections':
+        specifier: workspace:*
+        version: link:../../packages/collections
       '@woodles/sync':
         specifier: workspace:*
         version: link:../../packages/sync

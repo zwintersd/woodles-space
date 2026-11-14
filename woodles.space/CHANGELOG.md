@@ -18,6 +18,19 @@ so it's not easy to forget.
 
 ---
 
+## 2026-11-14
+
+- **carillon: rapid fire** — a moment can be answered by picking instead of
+  writing. under the sampler's text box, *Rapid fire* deals twenty chips
+  (twelve on a phone) from Thinking About or any Collection; tap what fits
+  and each pick flashes, leaves, and its slot refills from the rest. stop
+  when nothing left fits. the moment saves with what was picked, how many
+  were shown, and which list they came from — picking nothing is an answer
+  too. a mis-tap goes back with a tap on its chip.
+- **homesuite: a Collection from Thinking About** — a new connected
+  template pulls what's on the shelf (title, column, section, last sitting)
+  into a table with room for your own notes, and keeps the titles current.
+
 ## 2026-11-13
 
 - **carillon has a calendar** — a new Calendar section, between Today and

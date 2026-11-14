@@ -652,6 +652,8 @@ export class PlannerStore {
 		/** Span of the mark. A recall stretch may cover several bells as one sample. */
 		intervalMinutes?: number;
 		thinkingAboutEntryId?: string;
+		/** Omitted keeps the saved round; null removes it. */
+		endorsement?: IntervalObservation['endorsement'] | null;
 	}): IntervalObservation {
 		const date = input.date ?? dateKey(this.now);
 		if (!this.dayOverrides[date]?.blocks) {
@@ -690,6 +692,7 @@ export class PlannerStore {
 			plannedLabel,
 			note: input.note?.trim() || undefined,
 			thinkingAboutEntryId: input.thinkingAboutEntryId,
+			endorsement: input.endorsement === undefined ? existing?.endorsement : input.endorsement ? { source: { ...input.endorsement.source }, picks: input.endorsement.picks.map(pick => ({ ...pick })), shown: input.endorsement.shown, pool: input.endorsement.pool } : undefined,
 			intervalMinutes:
 				existing?.intervalMinutes ?? input.intervalMinutes ?? this.settings.samplingIntervalMinutes,
 			capturedAt: existing?.capturedAt ?? timestamp,
