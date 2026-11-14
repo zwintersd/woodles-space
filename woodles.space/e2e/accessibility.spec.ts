@@ -63,3 +63,28 @@ test('the scene chooser stays readable over a dark Field Notes palette', async (
 	);
 	expect(violations, JSON.stringify(violations, null, 2)).toEqual([]);
 });
+
+const landingThemes = [
+	'cream', 'dawn', 'dusk', 'terracotta', 'midnight', 'forest', 'paper', 'inkwell',
+	'typewriter', 'blossom', 'sugar', 'fog', 'glacier', 'signal', 'amber'
+];
+
+for (const theme of landingThemes) {
+	test(`the ${theme} Desktop look is readable, with Personalize open`, async ({ page }) => {
+		await page.addInitScript((id) => localStorage.setItem('woodles-theme', id), theme);
+		await page.goto('/');
+		await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+		await page.getByRole('button', { name: 'Start', exact: true }).click();
+		await page.locator('#pers-btn').click();
+		await expect(page.getByRole('dialog', { name: 'Personalize' })).toHaveCSS('opacity', '1');
+		// the icons arrive one after another; audit the desk once the last has landed
+		await expect(page.locator('.icons .icon').last()).toHaveCSS('opacity', '1');
+		// axe can't see through backdrop-filter, so glass and glow are measured
+		// against the pane's own surface; paper and flat are exact
+		const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+		const violations = results.violations.filter(
+			(violation) => violation.impact === 'serious' || violation.impact === 'critical'
+		);
+		expect(violations, JSON.stringify(violations, null, 2)).toEqual([]);
+	});
+}

@@ -271,7 +271,7 @@ test('a theme brings its whole look; cream keeps the one the desk always had', a
 	await page.getByRole('dialog', { name: 'Personalize' }).getByRole('button', { name: 'signal theme' }).click();
 	await expect(html).toHaveAttribute('data-theme', 'signal');
 	await expect(html).toHaveAttribute('data-material', 'flat');
-	await expect(html).toHaveAttribute('data-shape', 'crisp');
+	await expect(html).toHaveAttribute('data-shape', 'square');
 	await expect(html).toHaveAttribute('data-type', 'modern');
 	await expect(html).toHaveAttribute('data-ground', 'plain');
 	await expect(page.locator('.widget')).toHaveCSS('backdrop-filter', 'none');
@@ -335,6 +335,49 @@ test('snappy shortens entrances and leaves the wallpaper drifting at its own pac
 	await expect(page.locator('html')).toHaveAttribute('data-motion', 'snappy');
 	await expect(page.locator('.wash')).toHaveCSS('animation-duration', '34s');
 	await expect(page.locator('.icon').first()).toHaveCSS('animation-duration', '0.3s');
+	// nothing that loops forever may be caught by the 0.3s entrance rule
+	const hurried = await page.evaluate(() =>
+		[...document.querySelectorAll<HTMLElement>('*')]
+			.filter((el) => {
+				const style = getComputedStyle(el);
+				return style.animationName !== 'none' && style.animationIterationCount === 'infinite' && parseFloat(style.animationDuration) < 1;
+			})
+			.map((el) => el.className)
+	);
+	expect(hurried).toEqual([]);
+});
+
+test('each part of a look can be set by hand, and stays when the theme changes', async ({ page }) => {
+	const html = page.locator('html');
+	await page.goto('/');
+	await page.getByRole('button', { name: 'Start', exact: true }).click();
+	await page.locator('#pers-btn').click();
+	const personalize = page.getByRole('dialog', { name: 'Personalize' });
+
+	await personalize.locator('#p-type').getByRole('button', { name: 'fell', exact: true }).click();
+	await personalize.locator('#p-shape').getByRole('button', { name: 'square', exact: true }).click();
+	await personalize.locator('#p-material').getByRole('button', { name: 'paper', exact: true }).click();
+	await personalize.locator('#p-motion').getByRole('button', { name: 'still', exact: true }).click();
+	await personalize.locator('#p-wallpaper').getByRole('button', { name: 'scanlines', exact: true }).click();
+	await personalize.locator('#p-weather').getByRole('button', { name: 'snow', exact: true }).click();
+	for (const [axis, value] of Object.entries({ type: 'fell', shape: 'square', material: 'paper', motion: 'still', ground: 'scanlines', weather: 'snow' }))
+		await expect(html).toHaveAttribute(`data-${axis}`, value);
+
+	// a swatch brings the theme's look for everything not set by hand
+	await personalize.getByRole('button', { name: 'sugar theme' }).click();
+	await expect(html).toHaveAttribute('data-theme', 'sugar');
+	await expect(html).toHaveAttribute('data-type', 'fell');
+	await expect(html).toHaveAttribute('data-material', 'paper');
+	await personalize.locator('#p-shape').getByRole('button', { name: /^theme’s/ }).click();
+	await expect(html).toHaveAttribute('data-shape', 'round');
+
+	// and so does the snowflake
+	await personalize.locator('.win-close').click();
+	await page.getByRole('button', { name: 'Next theme' }).click();
+	await expect(html).toHaveAttribute('data-theme', 'fog');
+	await expect(html).toHaveAttribute('data-type', 'fell');
+	await page.reload();
+	await expect(html).toHaveAttribute('data-material', 'paper');
 });
 
 test('every theme’s tile glyphs read against their own tile', async ({ page }) => {
@@ -422,7 +465,7 @@ test('a scene preview can be cancelled without disturbing saved Desktop icon pos
 	await expect(html).toHaveAttribute('data-scene', 'field-notes');
 	await expect(page.locator('#field-notes-home')).toBeVisible();
 	await expect(personalize.locator('#p-wallpaper')).toBeHidden();
-	await expect(personalize.locator('#p-sparkles')).toBeHidden();
+	await expect(personalize.locator('#p-weather')).toBeHidden();
 	expect(await page.evaluate(() => localStorage.getItem('woodles-landing-scene-v1'))).toBeNull();
 
 	await personalize.getByRole('button', { name: 'Cancel preview' }).click();
