@@ -110,12 +110,22 @@ test('with motion on, a pick flashes out and its replacement arrives in the same
 	await rapid.getByTestId('rapid-fire-source').selectOption({ label: 'Reinforcers · 25' });
 	const chip = rapid.locator('.grid .chip').nth(5);
 	const label = await chip.innerText();
+	// The states last a third of a second each, so they are recorded as they
+	// happen rather than polled for.
+	await chip.evaluate((element) => {
+		const seen: string[] = ((window as unknown as { rapidStates: string[] }).rapidStates = []);
+		const note = () => seen.push(`${element.className.match(/leaving|arriving|idle/)?.[0]}:${element.textContent?.trim()}`);
+		new MutationObserver(note).observe(element, { attributes: true, attributeFilter: ['class'], characterData: true, childList: true, subtree: true });
+	});
 	await chip.click();
-	await expect(chip).toHaveClass(/leaving/);
-	await expect(chip).toHaveText(label);
-	await expect(chip).toHaveClass(/arriving/);
 	await expect(chip).not.toHaveText(label);
 	await expect(chip).toHaveClass(/idle/);
+	const states = await page.evaluate(() => (window as unknown as { rapidStates: string[] }).rapidStates);
+	const next = await chip.innerText();
+	const order = [`leaving:${label}`, `arriving:${next}`, `idle:${next}`].map((state) => states.indexOf(state));
+	expect(order.every((at) => at !== -1), states.join(' → ')).toBe(true);
+	expect(order).toEqual([...order].sort((a, b) => a - b));
+	expect(states).not.toContain(`leaving:${next}`);
 });
 
 test('on a phone the grid fits the page', async ({ page }) => {
