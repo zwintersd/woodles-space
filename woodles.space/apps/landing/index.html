@@ -384,11 +384,13 @@
     }
     @supports (color: oklch(from red l c h)) {
       .tile {
+        /* the dark ink is the tile's own hue, deepened: only as dark as the
+           tile needs, and saturated, so it reads as colour and not as black */
         color: oklch(from var(--tile-mid)
-          calc(0.24 + 0.76 * clamp(0, (0.6 - l) * 100000, 1))
-          calc(min(c, 0.09) * clamp(0, (l - 0.6) * 100000, 1)) h);
+          calc(clamp(0.28, l - 0.48, 0.4) + 1 * clamp(0, (0.64 - l) * 100000, 1))
+          calc(min(c * 3, 0.12) * clamp(0, (l - 0.64) * 100000, 1)) h);
         /* and a halo of the opposite weight, for tiles in the middle */
-        --tile-halo: oklch(from var(--tile-mid) clamp(0, (l - 0.6) * 100000, 1) 0 0 / 0.4);
+        --tile-halo: oklch(from var(--tile-mid) clamp(0, (l - 0.64) * 100000, 1) 0 0 / 0.4);
       }
     }
     .tile::after {
