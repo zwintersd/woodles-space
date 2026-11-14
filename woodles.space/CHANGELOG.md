@@ -27,6 +27,10 @@ so it's not easy to forget.
   when nothing left fits. the moment saves with what was picked, how many
   were shown, and which list they came from — picking nothing is an answer
   too. a mis-tap goes back with a tap on its chip.
+- **carillon: rapid fire has settings** — the cog on the round sets how many
+  chips show at once, shuffle or list order, whether picks refill, a pick
+  limit (1 makes it a single choice), whether ending the round saves the
+  moment, and whether the items shown but passed over are kept too.
 - **homesuite: a Collection from Thinking About** — a new connected
   template pulls what's on the shelf (title, column, section, last sitting)
   into a table with room for your own notes, and keeps the titles current.

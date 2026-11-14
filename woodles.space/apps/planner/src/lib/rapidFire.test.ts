@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addRecord, createCollection, setCellValue, setHidden } from '@woodles/collections';
-import { cleanItems, collectionItems, endorsementLabel, pick, rapidSources, remaining, startRound, toEndorsement, unpick, type RapidItem } from './rapidFire';
+import { atLimit, cleanItems, collectionItems, DEFAULT_RAPID_OPTIONS, endorsementLabel, pick, rapidOptions, rapidSources, remaining, startRound, toEndorsement, unpick, type RapidItem } from './rapidFire';
 
 const items = (count: number): RapidItem[] => Array.from({ length: count }, (_, index) => ({ id: `i${index}`, label: `Item ${index}` }));
 /** No shuffle: Fisher–Yates swaps each index with itself. */
@@ -59,6 +59,41 @@ describe('rapid fire', () => {
 		});
 		expect(endorsementLabel(endorsement)).toBe('Item 2, Item 5');
 		expect(endorsementLabel({ ...endorsement, picks: [] })).toBe('Nothing fit · Reinforcers');
+	});
+
+	it('keeps what was shown and passed over, when asked', () => {
+		let round = pick(pick(startRound(items(8), 4, inOrder), 0), 1);
+		round = unpick(round, 'i1');
+		const endorsement = toEndorsement(round, { kind: 'thinking-about', title: 'Thinking About' }, true);
+		expect(endorsement.picks.map((item) => item.id)).toEqual(['i0']);
+		expect(endorsement.passed?.map((item) => item.id).sort()).toEqual(['i1', 'i2', 'i3', 'i4', 'i5']);
+		expect(endorsement.shown).toBe(6);
+		expect(toEndorsement(round, { kind: 'thinking-about', title: 'Thinking About' }).passed).toBeUndefined();
+	});
+
+	it('deals in list order, and leaves slots empty, when set to', () => {
+		const shuffled = startRound(items(10), 4, () => 0);
+		expect(shuffled.slots.map((item) => item!.id)).not.toEqual(['i0', 'i1', 'i2', 'i3']);
+		let round = startRound(items(10), 4, () => 0, { shuffle: false, refill: false });
+		expect(round.slots.map((item) => item!.id)).toEqual(['i0', 'i1', 'i2', 'i3']);
+		round = pick(round, 2);
+		expect(round.slots[2]).toBeNull();
+		expect(round.pool).toHaveLength(6);
+		expect(remaining(round)).toBe(3);
+		expect(toEndorsement(round, { kind: 'thinking-about', title: 'Thinking About' })).toMatchObject({ shown: 4, pool: 10 });
+	});
+
+	it('knows when a pick limit is met', () => {
+		const round = pick(startRound(items(10), 4, inOrder), 0);
+		expect(atLimit(round, 0)).toBe(false);
+		expect(atLimit(round, 2)).toBe(false);
+		expect(atLimit(round, 1)).toBe(true);
+	});
+
+	it('falls back on unusable saved settings', () => {
+		expect(rapidOptions(undefined)).toEqual(DEFAULT_RAPID_OPTIONS);
+		expect(rapidOptions({ size: 9, refill: false, maxPicks: 1 })).toEqual({ ...DEFAULT_RAPID_OPTIONS, size: 9, refill: false, maxPicks: 1 });
+		expect(rapidOptions({ size: -3, maxPicks: 2.5, shuffle: 'no' as unknown as boolean })).toEqual(DEFAULT_RAPID_OPTIONS);
 	});
 
 	it('drops blank and repeated labels', () => {

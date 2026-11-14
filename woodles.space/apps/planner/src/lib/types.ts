@@ -129,6 +129,7 @@ export type PlannerSettings = {
 	sampleTags?: SampleTag[];
 	/** The last rapid-fire source: `thinking-about` or `collection:<id>`. */
 	rapidFireSource?: string;
+	rapidFire?: RapidFireSettings;
 	flourishEnabled: boolean;
 	quietHoursStart: string; // "HH:MM"
 	quietHoursEnd: string;
@@ -253,6 +254,21 @@ export type MomentEndorsement = {
 	picks: { id: string; label: string }[];
 	shown: number;
 	pool: number;
+	/** Shown and not picked, when the round was set to keep them: what a per-item rate needs. */
+	passed?: { id: string; label: string }[];
+};
+
+/** How a rapid-fire round is dealt and ended. Missing fields take `rapidFire.ts`'s defaults. */
+export type RapidFireSettings = {
+	/** Chips at once; 0 fits the screen. */
+	size?: number;
+	/** Off, a pick leaves its slot empty: one fixed page instead of a trickle. */
+	refill?: boolean;
+	shuffle?: boolean;
+	/** 0 is no limit; 1 makes the round a single forced choice. */
+	maxPicks?: number;
+	saveOnFinish?: boolean;
+	keepPassed?: boolean;
 };
 
 export type SampleTag = {

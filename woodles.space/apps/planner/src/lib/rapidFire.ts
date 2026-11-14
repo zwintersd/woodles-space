@@ -9,7 +9,7 @@
 
 import { createCollectionStore, type Collection } from '@woodles/collections';
 import type { ShelfEntry } from '@woodles/sync';
-import type { MomentEndorsement } from './types';
+import type { MomentEndorsement, RapidFireSettings } from './types';
 
 export type RapidItem = { id: string; label: string; color?: string };
 export type RapidSource = MomentEndorsement['source'] & { key: string; items: RapidItem[] };
@@ -21,7 +21,28 @@ export type RapidRound = {
 	/** Ids that have reached the grid, so an undone pick is not counted twice. */
 	seen: string[];
 	total: number;
+	/** False for a fixed page: picks leave their slots empty. */
+	refill: boolean;
 };
+
+export type RapidOptions = Required<RapidFireSettings>;
+export const RAPID_SIZES = [0, 6, 9, 12, 16, 20, 24, 30] as const;
+export const RAPID_PICK_LIMITS = [0, 1, 2, 3, 5] as const;
+export const DEFAULT_RAPID_OPTIONS: RapidOptions = { size: 0, refill: true, shuffle: true, maxPicks: 0, saveOnFinish: true, keepPassed: true };
+
+/** Saved settings may be partial, older, or hand-edited; anything unusable falls back. */
+export function rapidOptions(saved: RapidFireSettings | undefined): RapidOptions {
+	const flag = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback);
+	const whole = (value: unknown, max: number) => (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= max ? value : 0);
+	return {
+		size: whole(saved?.size, 60),
+		maxPicks: whole(saved?.maxPicks, 60),
+		refill: flag(saved?.refill, DEFAULT_RAPID_OPTIONS.refill),
+		shuffle: flag(saved?.shuffle, DEFAULT_RAPID_OPTIONS.shuffle),
+		saveOnFinish: flag(saved?.saveOnFinish, DEFAULT_RAPID_OPTIONS.saveOnFinish),
+		keepPassed: flag(saved?.keepPassed, DEFAULT_RAPID_OPTIONS.keepPassed)
+	};
+}
 
 export const RAPID_SLOTS = 20;
 export const RAPID_SLOTS_NARROW = 12;
@@ -77,20 +98,21 @@ export function rapidSources(shelf: readonly ShelfEntry[], collections: readonly
 	return sources.filter((source) => source.items.length > 0);
 }
 
-export function startRound(items: readonly RapidItem[], size = RAPID_SLOTS, random: () => number = Math.random): RapidRound {
+export function startRound(items: readonly RapidItem[], size = RAPID_SLOTS, random: () => number = Math.random, deal: { shuffle?: boolean; refill?: boolean } = {}): RapidRound {
 	const deck = cleanItems(items);
-	for (let i = deck.length - 1; i > 0; i--) {
+	for (let i = deck.length - 1; i > 0 && deal.shuffle !== false; i--) {
 		const j = Math.floor(random() * (i + 1));
 		[deck[i], deck[j]] = [deck[j], deck[i]];
 	}
 	const slots = deck.slice(0, Math.max(1, size));
-	return { slots, pool: deck.slice(slots.length), picks: [], seen: slots.map((item) => item.id), total: deck.length };
+	return { slots, pool: deck.slice(slots.length), picks: [], seen: slots.map((item) => item.id), total: deck.length, refill: deal.refill !== false };
 }
 
 /** Endorse the item in a slot; the next from the pool takes that same slot. */
 export function pick(round: RapidRound, slot: number): RapidRound {
 	const item = round.slots[slot];
 	if (!item) return round;
+	if (!round.refill) return { ...round, slots: round.slots.map((current, index) => (index === slot ? null : current)), picks: [...round.picks, item] };
 	const [next = null, ...pool] = round.pool;
 	return {
 		...round,
@@ -112,15 +134,24 @@ export function unpick(round: RapidRound, id: string): RapidRound {
 }
 
 export function remaining(round: RapidRound): number {
-	return round.slots.filter(Boolean).length + round.pool.length;
+	return round.slots.filter(Boolean).length + (round.refill ? round.pool.length : 0);
 }
 
-export function toEndorsement(round: RapidRound, source: MomentEndorsement['source']): MomentEndorsement {
+/** True once a pick limit is met; 0 never is. */
+export function atLimit(round: RapidRound, maxPicks: number): boolean {
+	return maxPicks > 0 && round.picks.length >= maxPicks;
+}
+
+export function toEndorsement(round: RapidRound, source: MomentEndorsement['source'], keepPassed = false): MomentEndorsement {
+	// Seen and unpicked is whatever still sits in a slot, plus an undone pick waiting in the pool.
+	const seen = new Set(round.seen);
+	const passed = [...round.slots, ...round.pool].flatMap((item) => (item && seen.has(item.id) ? [{ id: item.id, label: item.label }] : []));
 	return {
 		source: { kind: source.kind, title: source.title, ...(source.id ? { id: source.id } : {}) },
 		picks: round.picks.map(({ id, label }) => ({ id, label })),
 		shown: round.seen.length,
-		pool: round.total
+		pool: round.total,
+		...(keepPassed ? { passed } : {})
 	};
 }
 

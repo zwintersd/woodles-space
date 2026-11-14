@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onDestroy, untrack } from 'svelte';
-	import { RAPID_SLOTS, RAPID_SLOTS_NARROW, pick, startRound, toEndorsement, unpick, type RapidItem, type RapidRound, type RapidSource } from '$lib/rapidFire';
+	import { RAPID_PICK_LIMITS, RAPID_SIZES, RAPID_SLOTS, RAPID_SLOTS_NARROW, atLimit, pick, startRound, toEndorsement, unpick, type RapidItem, type RapidOptions, type RapidRound, type RapidSource } from '$lib/rapidFire';
 	import type { MomentEndorsement } from '$lib/types';
 
-	let { sources, initialKey = '', onfinish, oncancel, onsource }: { sources: RapidSource[]; initialKey?: string; onfinish: (endorsement: MomentEndorsement) => void; oncancel: () => void; onsource?: (key: string) => void } = $props();
+	let { sources, options, initialKey = '', onfinish, oncancel, onsource, onoptions }: { sources: RapidSource[]; options: RapidOptions; initialKey?: string; onfinish: (endorsement: MomentEndorsement) => void; oncancel: () => void; onsource?: (key: string) => void; onoptions?: (patch: Partial<RapidOptions>) => void } = $props();
 
 	// The motion's three jobs, in order: the flash confirms the pick, the fade
 	// shows it left, and the arrival in the same slot is the one new thing to
@@ -19,7 +19,10 @@
 	let shown = $state<(RapidItem | null)[]>([]);
 	let phase = $state<Phase[]>([]);
 	let announcement = $state('');
-	let dealtKey = '';
+	let dealt = '';
+	let settingsOpen = $state(false);
+	/** Settings that shape the deal changed under a round with picks in it. */
+	let pendingDeal = $state(false);
 	const timers = new Set<ReturnType<typeof setTimeout>>();
 	const still = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 	const narrow = () => typeof matchMedia === 'function' && matchMedia('(max-width: 600px)').matches;
@@ -33,19 +36,32 @@
 	function deal(items: readonly RapidItem[]): void {
 		timers.forEach(clearTimeout);
 		timers.clear();
-		round = startRound(items, narrow() ? RAPID_SLOTS_NARROW : RAPID_SLOTS);
+		round = startRound(items, options.size || (narrow() ? RAPID_SLOTS_NARROW : RAPID_SLOTS), Math.random, { shuffle: options.shuffle, refill: options.refill });
+		pendingDeal = false;
 		shown = [...round.slots];
 		phase = round.slots.map(() => 'idle');
 		announcement = '';
 	}
-	// Deal once per source. The shelf can refresh under an open round; reshuffling
-	// then would move every chip the person is in the middle of reading.
+	// Deal once per source and per shape of deal. The shelf can refresh under an
+	// open round; reshuffling then would move every chip the person is in the
+	// middle of reading. A settings change redeals only a round nothing has been
+	// picked from — otherwise it waits for the next one rather than drop picks.
 	$effect(() => {
 		const key = source?.key ?? '';
-		if (key === dealtKey) return;
-		dealtKey = key;
-		untrack(() => { if (source) deal(source.items); else round = null; });
+		const shape = `${key}|${options.size}|${options.shuffle}|${options.refill}`;
+		if (shape === dealt) return;
+		untrack(() => {
+			if (key === dealt.split('|')[0] && round?.picks.length) { pendingDeal = true; return; }
+			dealt = shape;
+			if (source) deal(source.items); else round = null;
+		});
 	});
+	function redeal(): void {
+		if (!source) return;
+		dealt = `${source.key}|${options.size}|${options.shuffle}|${options.refill}`;
+		deal(source.items);
+	}
+	let locked = $derived(Boolean(round && atLimit(round, options.maxPicks)));
 
 	/** Bring a slot's display up to the round, fading the newcomer in. */
 	function arrive(slot: number): void {
@@ -58,7 +74,7 @@
 
 	function choose(slot: number): void {
 		const item = shown[slot];
-		if (!round || !item || phase[slot] === 'leaving' || round.slots[slot]?.id !== item.id) return;
+		if (!round || !item || locked || phase[slot] === 'leaving' || round.slots[slot]?.id !== item.id) return;
 		round = pick(round, slot);
 		const next = round.slots[slot];
 		announcement = next ? `Picked ${item.label}. New: ${next.label}.` : `Picked ${item.label}.`;
@@ -96,13 +112,45 @@
 				</select>
 			</label>
 		{:else if source}<span class="source">from {source.title}</span>{/if}
+		<button type="button" class="cog" aria-label="Rapid fire settings" aria-expanded={settingsOpen} aria-controls="rapid-settings" title="Settings" data-testid="rapid-fire-settings-open" onclick={() => settingsOpen = !settingsOpen}>
+			<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+		</button>
 	</header>
+
+	{#if settingsOpen}
+		<form class="settings" id="rapid-settings" aria-label="Rapid fire settings" data-testid="rapid-fire-settings" onsubmit={(event) => event.preventDefault()}>
+			<fieldset>
+				<legend>Grid</legend>
+				<label>Chips at once
+					<select value={String(options.size)} onchange={(event) => onoptions?.({ size: Number(event.currentTarget.value) })} data-testid="rapid-fire-size">
+						{#each RAPID_SIZES as size (size)}<option value={String(size)}>{size ? size : 'Fit the screen'}</option>{/each}
+					</select>
+				</label>
+				<label class="check"><input type="checkbox" checked={options.shuffle} onchange={(event) => onoptions?.({ shuffle: event.currentTarget.checked })} /><span>Shuffle <small>off keeps the list’s own order</small></span></label>
+			</fieldset>
+			<fieldset>
+				<legend>Round</legend>
+				<label class="check"><input type="checkbox" checked={options.refill} data-testid="rapid-fire-refill" onchange={(event) => onoptions?.({ refill: event.currentTarget.checked })} /><span>Refill each pick <small>off shows one fixed page</small></span></label>
+				<label>Pick limit
+					<select value={String(options.maxPicks)} onchange={(event) => onoptions?.({ maxPicks: Number(event.currentTarget.value) })} data-testid="rapid-fire-limit">
+						{#each RAPID_PICK_LIMITS as limit (limit)}<option value={String(limit)}>{limit ? limit === 1 ? '1 · a single choice' : limit : 'No limit'}</option>{/each}
+					</select>
+				</label>
+			</fieldset>
+			<fieldset>
+				<legend>Record</legend>
+				<label class="check"><input type="checkbox" checked={options.saveOnFinish} onchange={(event) => onoptions?.({ saveOnFinish: event.currentTarget.checked })} /><span>Save the moment when the round ends <small>off returns to the entry first</small></span></label>
+				<label class="check"><input type="checkbox" checked={options.keepPassed} onchange={(event) => onoptions?.({ keepPassed: event.currentTarget.checked })} /><span>Keep what was shown but not picked <small>for comparing over time</small></span></label>
+			</fieldset>
+			{#if pendingDeal}<p class="pending" role="status">Grid changes start with the next round. <button type="button" class="back" onclick={redeal}>Deal again now</button></p>{/if}
+		</form>
+	{/if}
 
 	{#if round && source}
 		<div class="grid" role="group" aria-label={`Candidates from ${source.title}`}>
 			{#each shown as item, slot (slot)}
 				{#if item}
-					<button type="button" class="chip {phase[slot]}" style:--chip={item.color ?? 'var(--car-gilt-rule)'} aria-disabled={phase[slot] === 'leaving'} onclick={() => choose(slot)}>
+					<button type="button" class="chip {phase[slot]}" class:locked style:--chip={item.color ?? 'var(--car-gilt-rule)'} aria-disabled={locked || phase[slot] === 'leaving'} onclick={() => choose(slot)}>
 						<span>{item.label}</span>
 					</button>
 				{:else}
@@ -123,10 +171,10 @@
 		{/if}
 
 		<footer>
-			<span class="tally">{#if left === 0}That’s all of them.{:else if round.pool.length}{round.pool.length} more behind these{:else}Nothing more behind these{/if}</span>
+			<span class="tally">{#if locked}That’s your {options.maxPicks === 1 ? 'pick' : options.maxPicks}. Put one back to change it.{:else if left === 0}That’s all of them.{:else if !round.refill}One page · {round.total} in the list{:else if round.pool.length}{round.pool.length} more behind these{:else}Nothing more behind these{/if}</span>
 			<button type="button" class="back" onclick={oncancel}>Back to writing</button>
-			<button type="button" class="done" data-testid="rapid-fire-done" onclick={() => { if (round && source) onfinish(toEndorsement(round, source)); }}>
-				{left === 0 ? 'Save moment' : round.picks.length ? 'Nothing left fits · save' : 'Nothing fits · save'}
+			<button type="button" class="done" data-testid="rapid-fire-done" onclick={() => { if (round && source) onfinish(toEndorsement(round, source, options.keepPassed)); }}>
+				{locked || left === 0 ? (options.saveOnFinish ? 'Save moment' : 'Done') : `${round.picks.length ? 'Nothing left fits' : 'Nothing fits'} · ${options.saveOnFinish ? 'save' : 'done'}`}
 			</button>
 		</footer>
 	{:else}
@@ -142,6 +190,19 @@
 	header p { margin: 0.25rem 0 0; color: var(--car-ink-soft); font: 0.75rem var(--car-body); }
 	.source { display: inline-flex; align-items: center; gap: 0.4rem; flex: none; max-width: 50%; color: var(--car-ink-soft); font: 0.7rem var(--car-body); }
 	select { min-width: 0; max-width: 12rem; min-height: 2rem; border: 1px solid #44365b33; border-radius: 0.4rem; background: #ffffff90; padding: 0.25rem 0.4rem; color: var(--car-ink); font: 0.75rem var(--car-body); }
+
+	.cog { display: inline-grid; place-items: center; flex: none; width: 2rem; height: 2rem; border: 1px solid #44365b2b; border-radius: 50%; background: #ffffff60; padding: 0; color: var(--car-ink-soft); cursor: pointer; }
+	.cog:hover, .cog[aria-expanded='true'] { color: var(--car-ink); background: #ffffffb0; }
+	.settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.6rem 1rem; margin-bottom: 0.8rem; border: 1px dashed #44365b40; border-radius: 0.5rem; background: #ffffff70; padding: 0.7rem 0.8rem; color: var(--car-ink); font: 0.75rem var(--car-body); }
+	fieldset { display: grid; align-content: start; gap: 0.45rem; min-width: 0; margin: 0; border: 0; padding: 0; }
+	legend { margin-bottom: 0.35rem; padding: 0; color: var(--car-ink-soft); font: 0.58rem var(--car-mono); letter-spacing: 0.1em; text-transform: uppercase; }
+	.settings label { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; min-height: 2rem; }
+	.settings .check { justify-content: flex-start; align-items: flex-start; cursor: pointer; }
+	.settings input { width: 1rem; height: 1rem; margin: 0.1rem 0 0; flex: none; accent-color: #8e2849; }
+	.settings small { display: block; color: var(--car-ink-soft); font-size: 0.68rem; }
+	.pending { grid-column: 1 / -1; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin: 0; color: var(--car-ink-soft); }
+	.chip.locked { opacity: 0.5; cursor: default; }
+	.chip.locked.idle:hover { transform: none; border-color: #44365b2b; border-left-color: var(--chip); }
 
 	.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.25rem, 1fr)); gap: 0.45rem; }
 	.chip { display: flex; align-items: center; min-width: 0; min-height: 2.9rem; border: 1px solid #44365b2b; border-left: 3px solid var(--chip); border-radius: 0.35rem 0.75rem 0.35rem 0.75rem; background: #ffffffa8; box-shadow: 0 2px 0 #44365b18; padding: 0.35rem 0.6rem; color: var(--car-ink); font: 0.82rem/1.2 var(--car-body); text-align: left; cursor: pointer; transition: transform 140ms ease, border-color 140ms ease; }
@@ -175,6 +236,6 @@
 	.none { color: var(--car-ink-soft); font: 0.8rem var(--car-body); }
 	.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 	:focus-visible { outline: 2px solid var(--car-pink-dark); outline-offset: 3px; }
-	@media (max-width: 600px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } header { flex-direction: column; } .source { max-width: 100%; } }
+	@media (max-width: 600px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } header { flex-wrap: wrap; } header > div { flex-basis: 100%; } .source { max-width: calc(100% - 3rem); margin-right: auto; } }
 	@media (prefers-reduced-motion: reduce) { .chip { transition: none; } .chip.leaving, .chip.arriving { animation: none; } .chip.idle:hover { transform: none; } }
 </style>

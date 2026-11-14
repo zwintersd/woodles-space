@@ -692,7 +692,7 @@ export class PlannerStore {
 			plannedLabel,
 			note: input.note?.trim() || undefined,
 			thinkingAboutEntryId: input.thinkingAboutEntryId,
-			endorsement: input.endorsement === undefined ? existing?.endorsement : input.endorsement ? { source: { ...input.endorsement.source }, picks: input.endorsement.picks.map(pick => ({ ...pick })), shown: input.endorsement.shown, pool: input.endorsement.pool } : undefined,
+			endorsement: input.endorsement === undefined ? existing?.endorsement : input.endorsement ? { source: { ...input.endorsement.source }, picks: input.endorsement.picks.map(pick => ({ ...pick })), shown: input.endorsement.shown, pool: input.endorsement.pool, ...(input.endorsement.passed ? { passed: input.endorsement.passed.map(item => ({ ...item })) } : {}) } : undefined,
 			intervalMinutes:
 				existing?.intervalMinutes ?? input.intervalMinutes ?? this.settings.samplingIntervalMinutes,
 			capturedAt: existing?.capturedAt ?? timestamp,
