@@ -20,6 +20,21 @@ so it's not easy to forget.
 
 ## 2026-11-14
 
+- **the desktop's themes read better** — tile glyphs now pick their own ink,
+  white on a deep tile and dark on a pale one, so the icons on midnight,
+  inkwell, glacier, and amber are no longer white on cream. amber's greeting
+  is set in a plain pixel face you can read. typewriter and amber's
+  wallpaper no longer flickers. and when the ❄ changes the colors but keeps
+  the earlier form, it says so, with a button to take the theme's own look.
+- **every part of a desktop look can be set by hand** — Personalize has a
+  row each for typeface, corners, material, motion, wallpaper, and weather,
+  with every value on offer (wallpaper had four of eight; the rest had
+  none). a choice stays when the theme changes, until its row goes back to
+  "theme's".
+- **four themes look different** — dawn has a heavier wash, inkwell glows
+  gilt with soft corners instead of sharing typewriter's paper, and signal
+  and amber have square corners. small labels are darker in every theme, and
+  the red on close buttons adapts to light and dark desks.
 - **carillon: rapid fire** — a moment can be answered by picking instead of
   writing. under the sampler's text box, *Rapid fire* deals twenty chips
   (twelve on a phone) from Thinking About or any Collection; tap what fits

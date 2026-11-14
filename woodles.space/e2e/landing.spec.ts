@@ -271,7 +271,7 @@ test('a theme brings its whole look; cream keeps the one the desk always had', a
 	await page.getByRole('dialog', { name: 'Personalize' }).getByRole('button', { name: 'signal theme' }).click();
 	await expect(html).toHaveAttribute('data-theme', 'signal');
 	await expect(html).toHaveAttribute('data-material', 'flat');
-	await expect(html).toHaveAttribute('data-shape', 'crisp');
+	await expect(html).toHaveAttribute('data-shape', 'square');
 	await expect(html).toHaveAttribute('data-type', 'modern');
 	await expect(html).toHaveAttribute('data-ground', 'plain');
 	await expect(page.locator('.widget')).toHaveCSS('backdrop-filter', 'none');
@@ -301,6 +301,117 @@ test('the snowflake changes the colors and holds the form; a swatch takes a whol
 	await page.locator('#themes').getByRole('button', { name: 'blossom theme' }).click();
 	await expect(html).toHaveAttribute('data-material', 'glass');
 	await expect(html).toHaveAttribute('data-ground', 'bloom');
+});
+
+test('the held form is named, and one press gives the theme its own look back', async ({ page }) => {
+	await page.addInitScript(() => {
+		if (!sessionStorage.getItem('seeded')) {
+			localStorage.setItem('woodles-theme', 'glacier');
+			sessionStorage.setItem('seeded', '1');
+		}
+	});
+	const html = page.locator('html');
+	await page.goto('/');
+	const snowflake = page.getByRole('button', { name: 'Next theme' });
+	await page.locator('.tray-clock').click();
+	const note = page.locator('#flyout .held-note');
+	await expect(note).toBeHidden();
+
+	await snowflake.click();
+	await expect(html).toHaveAttribute('data-theme', 'signal');
+	await expect(html).toHaveAttribute('data-material', 'glass');
+	await expect(snowflake).toHaveClass(/held/);
+	await expect(note).toBeVisible();
+
+	await note.getByRole('button', { name: 'use signal’s own look' }).click();
+	await expect(html).toHaveAttribute('data-material', 'flat');
+	await expect(note).toBeHidden();
+	await expect(snowflake).not.toHaveClass(/held/);
+});
+
+test('snappy shortens entrances and leaves the wallpaper drifting at its own pace', async ({ page }) => {
+	await page.addInitScript(() => localStorage.setItem('woodles-theme', 'typewriter'));
+	await page.goto('/');
+	await expect(page.locator('html')).toHaveAttribute('data-motion', 'snappy');
+	await expect(page.locator('.wash')).toHaveCSS('animation-duration', '34s');
+	await expect(page.locator('.icon').first()).toHaveCSS('animation-duration', '0.3s');
+	// nothing that loops forever may be caught by the 0.3s entrance rule
+	const hurried = await page.evaluate(() =>
+		[...document.querySelectorAll<HTMLElement>('*')]
+			.filter((el) => {
+				const style = getComputedStyle(el);
+				return style.animationName !== 'none' && style.animationIterationCount === 'infinite' && parseFloat(style.animationDuration) < 1;
+			})
+			.map((el) => el.className)
+	);
+	expect(hurried).toEqual([]);
+});
+
+test('each part of a look can be set by hand, and stays when the theme changes', async ({ page }) => {
+	const html = page.locator('html');
+	await page.goto('/');
+	await page.getByRole('button', { name: 'Start', exact: true }).click();
+	await page.locator('#pers-btn').click();
+	const personalize = page.getByRole('dialog', { name: 'Personalize' });
+
+	await personalize.locator('#p-type').getByRole('button', { name: 'fell', exact: true }).click();
+	await personalize.locator('#p-shape').getByRole('button', { name: 'square', exact: true }).click();
+	await personalize.locator('#p-material').getByRole('button', { name: 'paper', exact: true }).click();
+	await personalize.locator('#p-motion').getByRole('button', { name: 'still', exact: true }).click();
+	await personalize.locator('#p-wallpaper').getByRole('button', { name: 'scanlines', exact: true }).click();
+	await personalize.locator('#p-weather').getByRole('button', { name: 'snow', exact: true }).click();
+	for (const [axis, value] of Object.entries({ type: 'fell', shape: 'square', material: 'paper', motion: 'still', ground: 'scanlines', weather: 'snow' }))
+		await expect(html).toHaveAttribute(`data-${axis}`, value);
+
+	// a swatch brings the theme's look for everything not set by hand
+	await personalize.getByRole('button', { name: 'sugar theme' }).click();
+	await expect(html).toHaveAttribute('data-theme', 'sugar');
+	await expect(html).toHaveAttribute('data-type', 'fell');
+	await expect(html).toHaveAttribute('data-material', 'paper');
+	await personalize.locator('#p-shape').getByRole('button', { name: /^theme’s/ }).click();
+	await expect(html).toHaveAttribute('data-shape', 'round');
+
+	// and so does the snowflake
+	await personalize.locator('.win-close').click();
+	await page.getByRole('button', { name: 'Next theme' }).click();
+	await expect(html).toHaveAttribute('data-theme', 'fog');
+	await expect(html).toHaveAttribute('data-type', 'fell');
+	await page.reload();
+	await expect(html).toHaveAttribute('data-material', 'paper');
+});
+
+test('every theme’s tile glyphs read against their own tile', async ({ page }) => {
+	await page.goto('/');
+	const worst = await page.evaluate(() => {
+		const looks = (window as unknown as { woodlesLooks: { THEMES: string[]; apply(t: string): void } }).woodlesLooks;
+		const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+		const rgb = (color: string) => {
+			ctx.clearRect(0, 0, 1, 1);
+			ctx.fillStyle = color;
+			ctx.fillRect(0, 0, 1, 1);
+			return [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3);
+		};
+		const lum = (c: number[]) => {
+			const [r, g, b] = c.map((v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4));
+			return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+		};
+		const out: Record<string, number> = {};
+		for (const theme of looks.THEMES) {
+			looks.apply(theme);
+			let min = Infinity;
+			for (const tile of document.querySelectorAll<HTMLElement>('.icons .tile')) {
+				const probe = document.createElement('i');
+				probe.style.color = 'var(--tile-mid)';
+				tile.appendChild(probe);
+				const [a, b] = [lum(rgb(getComputedStyle(tile).color)), lum(rgb(getComputedStyle(probe).color))].sort((x, y) => y - x);
+				probe.remove();
+				min = Math.min(min, (a + 0.05) / (b + 0.05));
+			}
+			out[theme] = Math.round(min * 100) / 100;
+		}
+		return out;
+	});
+	for (const [theme, ratio] of Object.entries(worst)) expect(ratio, theme).toBeGreaterThanOrEqual(3);
 });
 
 test('an old wallpaper and sparkles-off carry over as the look’s ground and weather', async ({ page }) => {
@@ -354,7 +465,7 @@ test('a scene preview can be cancelled without disturbing saved Desktop icon pos
 	await expect(html).toHaveAttribute('data-scene', 'field-notes');
 	await expect(page.locator('#field-notes-home')).toBeVisible();
 	await expect(personalize.locator('#p-wallpaper')).toBeHidden();
-	await expect(personalize.locator('#p-sparkles')).toBeHidden();
+	await expect(personalize.locator('#p-weather')).toBeHidden();
 	expect(await page.evaluate(() => localStorage.getItem('woodles-landing-scene-v1'))).toBeNull();
 
 	await personalize.getByRole('button', { name: 'Cancel preview' }).click();

@@ -8,8 +8,9 @@
    the page's module.
 
    storage: woodles-theme holds the palette id (apps/animations shares it).
-   woodles-look holds { over, held }: `over` is what someone set by hand,
-   `held` is the form the ❄ button kept when it stepped the colors on.
+   woodles-look holds { over, held }: `over` is what someone set by hand
+   and stays across theme changes; `held` is the form the ❄ button kept
+   when it stepped the colors on.
    resolving goes base → the theme's look → held → over. */
 (function () {
   var THEMES = ['cream','dawn','dusk','terracotta','midnight','forest','paper','inkwell','typewriter','blossom','sugar','fog','glacier','signal','amber'];
@@ -27,20 +28,20 @@
      homepage; woodles-theme remains the shared palette id. */
   var LOOKS = {
     cream:      { type: 'classic', shape: 'soft', material: 'glass', motion: 'float',  ground: 'aura',      weather: 'sparkles' },
-    dawn:       { type: 'optical', shape: 'soft', material: 'glass', motion: 'float',  ground: 'aura',      weather: 'sparkles' },
+    dawn:       { type: 'optical', shape: 'soft', material: 'glass', motion: 'float',  ground: 'bloom',     weather: 'sparkles' },
     dusk:       { type: 'classic', shape: 'soft', material: 'glass', motion: 'float',  ground: 'aura',      weather: 'stars' },
     terracotta: { type: 'gothic',  shape: 'round', material: 'paper', motion: 'float',  ground: 'aura',      weather: 'none' },
     midnight:   { type: 'modern',  shape: 'soft', material: 'glow',  motion: 'float',  ground: 'aura',      weather: 'stars' },
     forest:     { type: 'optical', shape: 'soft', material: 'paper', motion: 'float',  ground: 'aura',      weather: 'none' },
     paper:      { type: 'classic', shape: 'crisp', material: 'flat',  motion: 'snappy', ground: 'plain',     weather: 'none' },
-    inkwell:    { type: 'fell',    shape: 'crisp', material: 'paper', motion: 'float',  ground: 'ruled',     weather: 'stars' },
+    inkwell:    { type: 'fell',    shape: 'soft', material: 'glow',  motion: 'float',  ground: 'ruled',     weather: 'stars' },
     typewriter: { type: 'fell',    shape: 'crisp', material: 'paper', motion: 'snappy', ground: 'ruled',     weather: 'none' },
     blossom:    { type: 'glaze',   shape: 'round',material: 'glass', motion: 'float',  ground: 'bloom',     weather: 'petals' },
     sugar:      { type: 'modern',  shape: 'round',material: 'glass', motion: 'bouncy', ground: 'sprinkles', weather: 'sparkles' },
     fog:        { type: 'modern',  shape: 'soft', material: 'glass', motion: 'still',  ground: 'still',     weather: 'none' },
     glacier:    { type: 'modern',  shape: 'crisp',material: 'glass', motion: 'float',  ground: 'aura',      weather: 'snow' },
-    signal:     { type: 'modern',  shape: 'crisp',material: 'flat',  motion: 'snappy', ground: 'plain',     weather: 'none' },
-    amber:      { type: 'pixel',   shape: 'crisp',material: 'glow',  motion: 'snappy', ground: 'scanlines', weather: 'embers' }
+    signal:     { type: 'modern',  shape: 'square',material: 'flat', motion: 'snappy', ground: 'plain',     weather: 'none' },
+    amber:      { type: 'pixel',   shape: 'square',material: 'glow', motion: 'snappy', ground: 'scanlines', weather: 'embers' }
   };
   /* classic and Field Notes' faces come with the page; other look families
      load when first used. */
@@ -49,7 +50,7 @@
     modern: 'family=Plus+Jakarta+Sans:wght@300;400;500&family=Space+Grotesk:wght@300;400;500',
     gothic: 'family=Special+Gothic+Condensed+One',
     glaze: 'family=Kalnia+Glaze:wght@100;200;300;400;500;600;700',
-    pixel: 'family=Coral+Pixels'
+    pixel: 'family=VT323'
   };
   var KEY = 'woodles-look';
 
@@ -111,6 +112,9 @@
     loaded[type] = true;
     var link = document.createElement('link');
     link.rel = 'stylesheet';
+    /* while the head is still parsing, hold first paint for the face's
+       stylesheet as the page's own font link does; later it is ignored */
+    link.setAttribute('blocking', 'render');
     link.href = 'https://fonts.googleapis.com/css2?' + FONTS[type] + '&display=swap';
     document.head.appendChild(link);
   }

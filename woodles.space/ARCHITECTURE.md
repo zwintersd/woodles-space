@@ -98,9 +98,9 @@ other docs have narrower jobs:
     `ARCADE_ROADMAP.md`'s own note about it).
   - `apps/planner/`: `KNOWN_ISSUES.md` (the vitest/rune-store sharp edges
     under "the test suite" below).
-  - `apps/landing/`: `THEMES.md` (the earlier six-axis look proposal and a
-    superseding note on the built Soft Desktop and Field Notes scenes; see
-    "shared design tokens").
+  - `apps/landing/`: `THEMES.md` (how the six-axis looks work as built:
+    the look table, resolving, storage, and known limits; see "shared design
+    tokens").
   - `apps/homesuite/`: `ASSESSMENT.md` (a dated 2026-09-27 review of the
     shell, the bridge, and Data — verified findings and a staged fix plan;
     a snapshot, like `../AUDIT.md`, not live truth).
@@ -1830,8 +1830,9 @@ blocking classic script in its `<head>`, resolves a theme into five more
 attributes — `data-type`, `-shape`, `-material`, `-motion`, `-ground`,
 `-weather` — each selecting a block of the page's own `--desk-*` tokens.
 `woodles-theme` stays a palette id (the animations gallery shares it);
-`woodles-look` holds what was set by hand (`over`) and the form ❄ holds
-while it steps the colors (`held`). see
+`woodles-look` holds what was set by hand in Personalize (`over`, one row
+per axis, kept across theme changes) and the form ❄ holds while it steps the
+colors (`held`). see
 [`apps/landing/THEMES.md`](./apps/landing/THEMES.md).
 
 The landing also has a separate scene choice. A small head script reads
