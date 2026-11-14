@@ -265,6 +265,22 @@ getting their own settings:
   and weather `sparkles` `stars` `petals` `snow` `embers` `none`.
 - `prefers-contrast: more` resolves every palette to flat. Reduced transparency
   resolves glass and glow to flat; opaque paper stays paper.
+- **the desk's `pixel` is VT323**, not the Coral Pixels that `fontPairs`
+  gives Write. Coral Pixels is a colour font: it ignores the palette's ink
+  and was unreadable on amber. pixel type also sets the name, note, and moon
+  line upright, since a slanted bitmap face smears.
+- **snappy leaves the endless loops alone.** it shortens every transition and
+  every entrance, but the wash drift and the launch pulse keep their own
+  durations; shortening them to 0.3s made the wallpaper flicker.
+- **a tile's glyph reads its own tile.** `--tile-mid` is the middle of the
+  tile's gradient; a relative `oklch()` colour turns the glyph white on a
+  deep tile and a dark ink in the tile's hue on a pale one, with a halo of
+  the opposite weight. `--desk-tile-ink` (white) is the fallback. the tint
+  for paper, flat, and glow mixes toward `--accent`, not `--accent-strong`,
+  which is near-white in dark palettes and near-black in paper and signal.
+- **the ❄ hold is visible.** while the held form differs from the theme's
+  own, the ❄ carries a dot, and the flyout and Personalize say so beside a
+  "use <theme>'s own look" button, which does what choosing the swatch does.
 
 ## order
 

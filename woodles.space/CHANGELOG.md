@@ -20,6 +20,12 @@ so it's not easy to forget.
 
 ## 2026-11-14
 
+- **the desktop's themes read better** — tile glyphs now pick their own ink,
+  white on a deep tile and dark on a pale one, so the icons on midnight,
+  inkwell, glacier, and amber are no longer white on cream. amber's greeting
+  is set in a plain pixel face you can read. typewriter and amber's
+  wallpaper no longer flickers. and when the ❄ changes the colors but keeps
+  the earlier form, it says so, with a button to take the theme's own look.
 - **carillon: rapid fire** — a moment can be answered by picking instead of
   writing. under the sampler's text box, *Rapid fire* deals twenty chips
   (twelve on a phone) from Thinking About or any Collection; tap what fits

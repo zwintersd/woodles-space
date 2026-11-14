@@ -49,7 +49,7 @@
     modern: 'family=Plus+Jakarta+Sans:wght@300;400;500&family=Space+Grotesk:wght@300;400;500',
     gothic: 'family=Special+Gothic+Condensed+One',
     glaze: 'family=Kalnia+Glaze:wght@100;200;300;400;500;600;700',
-    pixel: 'family=Coral+Pixels'
+    pixel: 'family=VT323'
   };
   var KEY = 'woodles-look';
 

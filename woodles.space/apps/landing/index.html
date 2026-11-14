@@ -159,10 +159,13 @@
       --desk-display: 'Kalnia Glaze', Georgia, serif;
       --desk-ui: 'DM Mono', monospace;
     }
+    /* VT323, not Write's Coral Pixels: that one is a colour font and paints
+       its own blues and oranges over whatever ink the palette asks for */
     html[data-type='pixel'] {
-      --desk-display: 'Coral Pixels', monospace;
+      --desk-display: 'VT323', monospace;
       --desk-ui: 'DM Mono', monospace;
     }
+    html[data-type='pixel'] :is(.widget-greet em, .widget-note, .fly-moon) { font-style: normal; }
     html[data-shape='crisp'] { --desk-round: 0.25; }
     html[data-shape='round'] { --desk-round: 1.45; }
     html[data-shape='square'] { --desk-round: 0; }
@@ -219,6 +222,9 @@
     }
     html[data-motion='snappy']:not([data-scene='field-notes']) *:not(.sparkle) {
       transition-duration: 0.12s !important;
+    }
+    /* entrances shorten; the loops that never end keep their own pace */
+    html[data-motion='snappy']:not([data-scene='field-notes']) *:not(.sparkle, .wash, .launch-card .tile) {
       animation-duration: 0.3s !important;
     }
     html[data-motion='bouncy'] {
@@ -340,8 +346,13 @@
       border-radius: calc(16px * var(--desk-round));
       display: grid; place-items: center;
       font-size: 1.9rem;
+      /* the glyph reads its own tile: white on a deep one, a dark ink in the
+         tile's hue on a pale one. white is the fallback where relative
+         colours aren't understood. */
+      --tile-mid: color-mix(in oklab, var(--t1, var(--g1)), var(--t2, var(--g2)));
+      --tile-halo: color-mix(in srgb, var(--accent-deep) 45%, transparent);
       color: var(--desk-tile-ink);
-      text-shadow: 0 1px 3px color-mix(in srgb, var(--accent-deep) 45%, transparent);
+      text-shadow: 0 1px 3px var(--tile-halo);
       background:
         radial-gradient(130% 95% at 22% 12%, rgba(255,255,255,0.38), transparent 58%),
         linear-gradient(var(--ga, 140deg),
@@ -356,8 +367,17 @@
       transition: transform 0.25s var(--desk-spring), box-shadow 0.25s ease;
     }
     html:is([data-material='paper'], [data-material='flat'], [data-material='glow']) .tile {
-      --t1: color-mix(in oklab, var(--accent-strong) var(--desk-tile-mix), var(--g1));
-      --t2: color-mix(in oklab, var(--accent-strong) var(--desk-tile-mix), var(--g2));
+      --t1: color-mix(in oklab, var(--accent) var(--desk-tile-mix), var(--g1));
+      --t2: color-mix(in oklab, var(--accent) var(--desk-tile-mix), var(--g2));
+    }
+    @supports (color: oklch(from red l c h)) {
+      .tile {
+        color: oklch(from var(--tile-mid)
+          calc(0.24 + 0.76 * clamp(0, (0.6 - l) * 100000, 1))
+          calc(min(c, 0.09) * clamp(0, (l - 0.6) * 100000, 1)) h);
+        /* and a halo of the opposite weight, for tiles in the middle */
+        --tile-halo: oklch(from var(--tile-mid) clamp(0, (l - 0.6) * 100000, 1) 0 0 / 0.4);
+      }
     }
     .tile::after {
       content: '';
@@ -367,7 +387,7 @@
     }
     .tile svg {
       width: 55%; height: 55%;
-      filter: drop-shadow(0 1px 1.5px color-mix(in srgb, var(--accent-deep) 40%, transparent));
+      filter: drop-shadow(0 1px 1.5px var(--tile-halo));
     }
     .icon:hover .tile,
     .start-app:hover .tile {
@@ -1816,6 +1836,17 @@
       font-size: 0.54rem; letter-spacing: 0.04em;
       color: var(--muted);
     }
+    .held-note { margin-top: 0.5rem; line-height: 1.6; }
+    .held-release {
+      border: none; background: none; padding: 0; cursor: pointer;
+      font: inherit; letter-spacing: inherit;
+      color: var(--text); text-decoration: underline;
+    }
+    .tray-btn.held::before {
+      content: ''; position: absolute; top: 3px; right: 3px;
+      width: 4px; height: 4px; border-radius: 50%;
+      background: var(--accent-strong);
+    }
     .theme-grid { display: flex; flex-wrap: wrap; gap: 0.45rem; }
     .theme-grid .swatch { width: 34px; height: 34px; border-radius: calc(10px * var(--desk-round)); }
     .seg {
@@ -2171,6 +2202,8 @@
     <div class="mo-grid" id="fly-cal"></div>
     <p class="fly-moon" id="fly-moon"></p>
     <div class="fly-themes" id="themes"></div>
+    <p class="pers-hint held-note" hidden>&#10052; kept the earlier form.
+      <button type="button" class="held-release"></button></p>
     <button class="fly-pers" id="fly-pers">personalize this desktop &#10024;</button>
   </section>
 
@@ -2256,6 +2289,8 @@
         <span class="pers-label">theme</span>
         <p class="pers-hint">Sets this theme’s colors and default Desktop look. Field Notes keeps its paper style.</p>
         <div class="theme-grid" id="p-themes"></div>
+        <p class="pers-hint held-note" hidden>&#10052; changed the colors and kept the earlier form.
+          <button type="button" class="held-release"></button></p>
       </div>
       <div class="pers-row desktop-only">
         <span class="pers-label">wallpaper</span>
@@ -5000,8 +5035,23 @@
         s.classList.toggle('on', s.dataset.theme === t);
         s.setAttribute('aria-pressed', String(s.dataset.theme === t));
       });
+      renderHold();
       renderPrefs();
     }
+    /* the snowflake's hold, said out loud: shown only while the held form
+       differs from the theme's own, with the way back beside it */
+    function renderHold() {
+      const t = THEMES[themeIdx];
+      const own = looks.lookOf(t);
+      const held = Object.keys(lookState.held).some(a => lookState.held[a] !== own[a]);
+      document.querySelectorAll('.held-note').forEach(n => { n.hidden = !held; });
+      document.querySelectorAll('.held-release').forEach(b => { b.textContent = 'use ' + t + '’s own look'; });
+      const tray = document.getElementById('tray-theme');
+      tray.classList.toggle('held', held);
+      tray.dataset.label = held ? 'next theme · form held' : 'next theme';
+    }
+    document.querySelectorAll('.held-release').forEach(b =>
+      b.addEventListener('click', e => { e.stopPropagation(); takeTheme(themeIdx); }));
     /* ❄ steps the colors and the typeface together, while holding the rest
        of the current look. a swatch takes the selected theme's whole look. */
     function nextTheme() {
