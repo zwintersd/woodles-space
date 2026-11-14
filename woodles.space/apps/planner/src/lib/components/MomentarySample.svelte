@@ -6,7 +6,7 @@
 	import type { SampleTag, MomentDetails as Details, MomentEndorsement, MomentNoticing, TrackerAnswer } from '$lib/types';
 	import type { Collection } from '@woodles/collections';
 	import RapidFire from './RapidFire.svelte';
-	import { endorsementLabel, endorsementSummary, rapidSources, readCollections } from '$lib/rapidFire';
+	import { endorsementLabel, endorsementSummary, rapidOptions, rapidSources, readCollections, type RapidOptions } from '$lib/rapidFire';
 	import { cleanTrackerAnswers } from '$lib/momentTrackers';
 	import MomentDetails from './MomentDetails.svelte';
 	import { cleanDetails, cleanNoticings } from '$lib/momentDetails';
@@ -55,17 +55,23 @@
 		rapidFor = interval.key;
 		feedback = '';
 	}
+	let rapidSettings = $derived(rapidOptions(store.settings.rapidFire));
+	function changeRapidSettings(patch: Partial<RapidOptions>): void {
+		store.updateSettings({ rapidFire: { ...rapidSettings, ...patch } });
+		queueSync();
+	}
 	function rememberSource(key: string): void {
 		store.updateSettings({ rapidFireSource: key });
 		queueSync();
 	}
-	/** Satiation ends the round and saves the moment; the picks stand in for words that weren't written. */
+	/** Satiation ends the round; the picks stand in for words that weren't written. Saving at once is a setting. */
 	function finishRapid(endorsement: MomentEndorsement): void {
 		if (!draft) return;
 		draft.endorsement = endorsement;
 		if (!draft.text.trim()) draft.text = endorsementLabel(endorsement);
 		rapidFor = '';
-		saveSample();
+		if (rapidSettings.saveOnFinish) saveSample();
+		else feedback = 'Picks added. Save the moment when you’re ready.';
 	}
 	function saveSample() {
 		if (!interval || !draft?.text.trim()) return;
@@ -94,7 +100,7 @@
 			</div>
 			{#if editingPast}<button type="button" class="return-now" onclick={onreturnnow}>Return to now</button>{/if}
 			{#if rapid}
-				<RapidFire {sources} initialKey={store.settings.rapidFireSource ?? ''} onfinish={finishRapid} oncancel={() => rapidFor = ''} onsource={rememberSource} />
+				<RapidFire {sources} options={rapidSettings} onoptions={changeRapidSettings} initialKey={store.settings.rapidFireSource ?? ''} onfinish={finishRapid} oncancel={() => rapidFor = ''} onsource={rememberSource} />
 			{:else}
 			<form onsubmit={(event) => { event.preventDefault(); saveSample(); }}>
 				<label class="entry-label" for="moment-entry">{interval?.state === 'past' ? 'What was happening?' : 'What’s happening now?'}</label>

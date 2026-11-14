@@ -26,6 +26,17 @@ No is an explicit answer; unanswered is different. Answer chips reopen saved val
 
 The round ends when nothing left fits: that button saves the moment. With no words written, the picks become the entry; with no picks, the entry reads "Nothing fit". **Back to writing** leaves without recording anything. The saved moment keeps the picked names, the number of items shown, the size of the list, and the list's name. Names are snapshots; later edits to the list do not change them. Reduced-motion settings swap items without animation.
 
+The cog opens the round's settings, kept with Carillon's other settings and synced with them:
+
+- **Chips at once** — fit the screen (twenty, or twelve when narrow), or a fixed 6 to 30.
+- **Shuffle** — off deals in the list's own order.
+- **Refill each pick** — off shows one fixed page; a picked slot stays empty.
+- **Pick limit** — none, or 1, 2, 3, 5. At the limit the grid stops answering until a pick is put back. A limit of 1 is a single forced choice.
+- **Save the moment when the round ends** — off attaches the picks and returns to the entry.
+- **Keep what was shown but not picked** — on by default; stores the passed-over names beside the picks, which is what a per-item rate (picked ÷ times shown) needs.
+
+A change to size, order or refill redeals a round nothing has been picked from. Otherwise it waits for the next round, with a **Deal again now** button.
+
 Carillon only reads these lists. Collections appear on a device once HomeSuite has them there.
 
 Implementation: `rapidFire.ts` deals, refills and records; `RapidFire.svelte` owns the motion.

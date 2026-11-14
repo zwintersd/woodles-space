@@ -98,7 +98,8 @@ test('Thinking About empties out, and picking nothing is still an answer', async
 	await rapid.getByTestId('rapid-fire-done').click();
 	const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('planner.observations.v1') || '[]'));
 	expect(saved[0].label).toBe('Nothing fit · Thinking About');
-	expect(saved[0].endorsement).toEqual({ source: { kind: 'thinking-about', title: 'Thinking About' }, picks: [], shown: 2, pool: 2 });
+	expect(saved[0].endorsement).toMatchObject({ source: { kind: 'thinking-about', title: 'Thinking About' }, picks: [], shown: 2, pool: 2 });
+	expect(saved[0].endorsement.passed.map((item: { label: string }) => item.label).sort()).toEqual(['Outer Wilds', 'Piranesi']);
 });
 
 test('with motion on, a pick flashes out and its replacement arrives in the same slot', async ({ page }) => {
@@ -158,4 +159,49 @@ test('a Collection made from Thinking About in HomeSuite is a source in Carillon
 	await sampler.getByTestId('rapid-fire-done').click();
 	const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('planner.observations.v1') || '[]'));
 	expect(saved[0].endorsement).toMatchObject({ source: { kind: 'collection', title: 'Thinking About' }, picks: [{ label: 'Piranesi' }], shown: 2, pool: 2 });
+});
+
+test('the cog opens settings for the grid’s size and how a round runs', async ({ page }) => {
+	await open(page);
+	const sampler = page.getByTestId('interval-sampler');
+	await sampler.getByTestId('rapid-fire-open').click();
+	const rapid = sampler.getByTestId('rapid-fire');
+	await rapid.getByTestId('rapid-fire-source').selectOption({ label: 'Reinforcers · 25' });
+	const chips = rapid.locator('.grid .chip');
+	await expect(chips).toHaveCount(20);
+
+	await rapid.getByRole('button', { name: 'Rapid fire settings' }).click();
+	const settings = rapid.getByTestId('rapid-fire-settings');
+	await settings.getByTestId('rapid-fire-size').selectOption('9');
+	await expect(chips).toHaveCount(9);
+	await settings.getByLabel(/Shuffle/).uncheck();
+	await expect(chips.first()).toHaveText('Reinforcer 1');
+	await settings.getByTestId('rapid-fire-limit').selectOption('1');
+	await settings.getByLabel(/Save the moment when the round ends/).uncheck();
+
+	// One fixed page: the picked slot stays empty.
+	await settings.getByTestId('rapid-fire-refill').uncheck();
+	await expect(rapid.getByText('One page · 25 in the list')).toBeVisible();
+	await chips.nth(1).click();
+	await expect(rapid.locator('.grid .chip.spent')).toHaveCount(1);
+	// A single choice: the rest of the grid stops answering.
+	await expect(rapid.getByText('That’s your pick.')).toBeVisible();
+	await chips.nth(0).click({ force: true });
+	await expect(rapid.getByTestId('rapid-fire-picked').locator('.picked-chip')).toHaveCount(1);
+
+	// A grid change under a round with picks waits rather than dropping them.
+	await settings.getByTestId('rapid-fire-size').selectOption('6');
+	await expect(settings.getByText('Grid changes start with the next round.')).toBeVisible();
+	await expect(chips).toHaveCount(9);
+
+	await rapid.getByTestId('rapid-fire-done').click();
+	await expect(sampler.getByTestId('moment-endorsement')).toContainText('Reinforcer 2');
+	expect(await page.evaluate(() => localStorage.getItem('planner.observations.v1'))).toBeNull();
+	await sampler.getByRole('button', { name: 'Save moment', exact: true }).click();
+	const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('planner.observations.v1') || '[]'));
+	expect(saved[0].endorsement).toMatchObject({ picks: [{ label: 'Reinforcer 2' }], shown: 9, pool: 25 });
+	expect(saved[0].endorsement.passed).toHaveLength(8);
+
+	// Settings outlast the round.
+	expect(await page.evaluate(() => JSON.parse(localStorage.getItem('planner.settings.v1')!).rapidFire)).toEqual({ size: 6, refill: false, shuffle: false, maxPicks: 1, saveOnFinish: false, keepPassed: true });
 });
