@@ -1564,6 +1564,17 @@ stores `Task.thinkingAboutEntryId` — a *reference*, so a rename over there
 can't leave the planner lying, and so a later observation on that block knows
 exactly which entry it was.
 
+The shelf has two more readers. Data's `thinking-about-shelf` source
+(`shelfRows` in `apps/data/src/lib/sourceSync.ts`) makes it a connected
+Collection, source-owned columns beside local ones like every other pull.
+Carillon's rapid fire (`apps/planner/src/lib/rapidFire.ts`) draws a round of
+candidates from it, or from any Collection's Primary field. Carillon reads
+Data's library through a storage wrapper that cannot write: a migrating load
+saves, and one writer per key is the rule. A round is stored on the
+observation as `endorsement` — picks as label snapshots, plus how many items
+were shown and how many the source held — so it stays true after the list
+changes. Collections reach a device through HomeSuite's sync, not Carillon's.
+
 It republishes **on load as well as on save**, which is not redundant: a
 derived ledger means a board nobody has edited since this shipped holds entries
 and no shelf at all, and the reader would then honestly report an empty picker

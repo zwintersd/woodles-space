@@ -19,3 +19,13 @@ Open **Your trackers → Customize trackers** to add a named 1–5 rating, yes/n
 No is an explicit answer; unanswered is different. Answer chips reopen saved values. Tracker answers snapshot their name, type, and scale, so customizing or removing a tracker does not rewrite old moments. Save trackers updates the available questions; Save moment commits answers.
 
 **Day so far** is a collapsible, searchable record of the day's actual samples. Mood, energy, and coping comparisons use the first and last recorded values and show times and sample counts. They do not fill gaps or infer causes. Search includes entry words, labels, details, and personal tracker names/values. Select a moment to reopen it in the sampler.
+
+## Rapid fire
+
+**Rapid fire**, under the entry box, answers a moment by recognition instead of recall. It deals twenty candidates (twelve on a narrow screen) from Thinking About's shelf or a HomeSuite Collection's Primary field; hidden rows, blank names and repeated names are left out. Each pick flashes, fades, and the next item from the hidden remainder arrives in the same slot. A picked chip in the tray goes back when tapped. The source is remembered.
+
+The round ends when nothing left fits: that button saves the moment. With no words written, the picks become the entry; with no picks, the entry reads "Nothing fit". **Back to writing** leaves without recording anything. The saved moment keeps the picked names, the number of items shown, the size of the list, and the list's name. Names are snapshots; later edits to the list do not change them. Reduced-motion settings swap items without animation.
+
+Carillon only reads these lists. Collections appear on a device once HomeSuite has them there.
+
+Implementation: `rapidFire.ts` deals, refills and records; `RapidFire.svelte` owns the motion.

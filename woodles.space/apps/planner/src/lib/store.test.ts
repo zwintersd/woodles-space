@@ -60,6 +60,16 @@ describe('PlannerStore', () => {
 		expect(new PlannerStore().getObservation(input.date, input.intervalStart)?.details).toEqual({});
 		expect(store.getObservationsForDate(input.date)).toHaveLength(1);
 	});
+	it('keeps a rapid-fire round through edits that omit it, and removes it on null', () => {
+		const endorsement = { source: { kind: 'collection' as const, id: 'collection-1', title: 'Reinforcers' }, picks: [{ id: 'r1', label: 'Tea' }], shown: 20, pool: 60 };
+		const input = { date: '2026-09-19', intervalStart: '12:30', kind: 'elsewhere' as const, label: 'Tea' };
+		store.observeInterval({ ...input, endorsement });
+		endorsement.picks[0].label = 'Draft change';
+		store.observeInterval({ ...input, label: 'Tea, later' });
+		expect(new PlannerStore().getObservation(input.date, input.intervalStart)?.endorsement).toEqual({ source: { kind: 'collection', id: 'collection-1', title: 'Reinforcers' }, picks: [{ id: 'r1', label: 'Tea' }], shown: 20, pool: 60 });
+		store.observeInterval({ ...input, endorsement: null });
+		expect(new PlannerStore().getObservation(input.date, input.intervalStart)?.endorsement).toBeUndefined();
+	});
 	it('persists open sample text and label snapshots independently of editable options', () => {
 		const tag = { id: 'outdoors', name: 'Outside', color: '#338866', kind: 'elsewhere' as const };
 		store.updateSettings({ sampleTags: [tag] });

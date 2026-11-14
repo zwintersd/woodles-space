@@ -127,6 +127,8 @@ export type OnboardingStep = 1 | 2 | 3 | 4 | 5 | 6;
 export type PlannerSettings = {
 	momentTrackers?: MomentTracker[];
 	sampleTags?: SampleTag[];
+	/** The last rapid-fire source: `thinking-about` or `collection:<id>`. */
+	rapidFireSource?: string;
 	flourishEnabled: boolean;
 	quietHoursStart: string; // "HH:MM"
 	quietHoursEnd: string;
@@ -233,8 +235,24 @@ export type IntervalObservation = {
 	 * a task ever having been scheduled for the block.
 	 */
 	thinkingAboutEntryId?: string;
+	/** A rapid-fire round answered at this moment: what was endorsed, out of how much. */
+	endorsement?: MomentEndorsement;
 	capturedAt: string;
 	updatedAt: string;
+};
+
+/**
+ * A checklist-style self-report whose item set was sampled and paged rather
+ * than fixed. Labels are snapshots, like `sampleTag`: renaming or removing the
+ * source item later does not rewrite what was endorsed. `shown` is how many
+ * distinct items reached the grid, `pool` how many the source held — picking
+ * nothing out of twenty shown is an answer, and differs from never being asked.
+ */
+export type MomentEndorsement = {
+	source: { kind: 'thinking-about' | 'collection'; id?: string; title: string };
+	picks: { id: string; label: string }[];
+	shown: number;
+	pool: number;
 };
 
 export type SampleTag = {
