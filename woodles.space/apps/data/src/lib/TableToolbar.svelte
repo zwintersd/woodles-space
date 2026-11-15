@@ -44,6 +44,7 @@
 				{syncBusy ? '↻ Refreshing' : '↻ Refresh sources'}
 			</button>
 		{/if}
+		<button onclick={() => onCommand('find:open')} title="Find and replace (Ctrl/⌘ H)">⌕ Find</button>
 		<button onclick={() => onCommand('reference:add')} title="Add an existing Woodles thing">↗ Add existing</button>
 		<label class="import-button" title="Import a Collection JSON backup">
 			⇧ Import<input type="file" accept="application/json,.json" onchange={(event) => onImport(event.currentTarget.files?.[0])} />

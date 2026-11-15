@@ -20,6 +20,13 @@ so it's not easy to forget.
 
 ## 2026-11-15
 
+- **find and replace in a collection** — ctrl/⌘ h (or "⌕ find" in the toolbar)
+  opens a find bar over the table. matching cells light up, enter and
+  shift-enter step through them, and "replace" / "replace all" rewrite them as
+  one undo step. options: match case, whole cell, and limit to one field
+  (a column you've selected is the default). it only touches text and url
+  cells you can edit and that are showing — synced columns, referenced
+  records' names, and hidden rows and fields are left alone.
 - **a selected row shows it too** — clicking a row's number outlines and tints
   the whole row, the way a selected column does. clicking into a cell goes
   back to just that cell.
