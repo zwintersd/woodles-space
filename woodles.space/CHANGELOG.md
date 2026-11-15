@@ -20,6 +20,11 @@ so it's not easy to forget.
 
 ## 2026-11-15
 
+- **copy, cut, and paste a whole column** — with a column (or a row) selected,
+  ctrl/⌘ c copies it as spreadsheet text, so it pastes into google sheets or
+  another column as it was. ctrl/⌘ x also clears the values, and ctrl/⌘ v
+  pastes down from the top of the selected column. ctrl/⌘ z now undoes from
+  a header too, not only from inside a cell.
 - **duplicate a field** — right-click a column's header for "duplicate
   field": the copy lands beside the original with every value copied, and a
   synced column's copy is a local one you can edit. duplicating a row now puts
