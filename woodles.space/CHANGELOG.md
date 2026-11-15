@@ -20,6 +20,10 @@ so it's not easy to forget.
 
 ## 2026-11-15
 
+- **no more hover text on app tiles** — the launcher's icons, start menu,
+  phone dock, and pinned taskbar apps no longer pop a tooltip or label bubble
+  on hover. names still show under each icon and stay available to screen
+  readers.
 - **widgets land where there's room** — a new widget takes the first free
   spot instead of dropping onto the icons or another widget. dragging one
   catches on its neighbours' edges (hold alt to place it freely), and a

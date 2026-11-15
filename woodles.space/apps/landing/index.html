@@ -2934,7 +2934,6 @@
       el.className = 'icon';
       el.href = a.href;
       el.dataset.id = a.id;
-      el.title = a.desc;
       el.style.animationDelay = (0.15 + i * 0.06) + 's';
       el.innerHTML = tileHTML(a) +
         '<span class="icon-label">' + a.name + '</span>';
@@ -2964,7 +2963,6 @@
         const b = document.createElement('button');
         b.className = 'tb-btn tb-app';
         b.dataset.id = a.id;
-        b.dataset.label = a.name.toLowerCase();
         b.setAttribute('aria-label', a.name);
         b.innerHTML = tileHTML(a);
         b.addEventListener('click', () => launch(a));
@@ -3003,7 +3001,6 @@
       el.className = 'start-app';
       el.href = a.href;
       el.dataset.id = a.id;
-      el.title = a.desc;
       el.innerHTML = tileHTML(a) + '<span class="start-app-name">' + a.name + '</span>';
       wireLaunch(el, a);
       return el;
@@ -3117,7 +3114,6 @@
       if (!a) return;
       const b = document.createElement('button');
       b.className = 'dock-btn';
-      b.title = a.name;
       b.setAttribute('aria-label', a.name);
       b.innerHTML = tileHTML(a);
       b.addEventListener('click', () => launch(a));
