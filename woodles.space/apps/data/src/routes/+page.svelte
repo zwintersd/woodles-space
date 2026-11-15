@@ -818,7 +818,7 @@
 </script>
 
 {#snippet recordRow(record: Collection['records'][number], rowIndex: number, number: number)}
-	<tr class:selected-row={selectedRecord === record.id} class:frozen-edge={frozenRecords.at(-1)?.record.id === record.id} data-record={record.id}>
+	<tr class:selected-row={selectedRecord === record.id} class:whole-row={selectedRecord === record.id && !selectedCell} class:frozen-edge={frozenRecords.at(-1)?.record.id === record.id} data-record={record.id}>
 		<td class="row-number">
 			<button aria-label={`Select ${primaryLabel(record)}`} onclick={() => selectRecord(record.id)}>{number}</button>
 		</td>

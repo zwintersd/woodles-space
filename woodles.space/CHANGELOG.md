@@ -20,6 +20,9 @@ so it's not easy to forget.
 
 ## 2026-11-15
 
+- **a selected row shows it too** — clicking a row's number outlines and tints
+  the whole row, the way a selected column does. clicking into a cell goes
+  back to just that cell.
 - **copy, cut, and paste a whole column** — with a column (or a row) selected,
   ctrl/⌘ c copies it as spreadsheet text, so it pastes into google sheets or
   another column as it was. ctrl/⌘ x also clears the values, and ctrl/⌘ v
