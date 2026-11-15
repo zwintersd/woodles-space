@@ -88,3 +88,25 @@ for (const theme of landingThemes) {
 		expect(violations, JSON.stringify(violations, null, 2)).toEqual([]);
 	});
 }
+
+test('a desk with one of every widget is readable and labelled', async ({ page }) => {
+	await page.setViewportSize({ width: 1440, height: 1000 });
+	await page.goto('/');
+	await page.getByRole('button', { name: 'Start', exact: true }).click();
+	await page.locator('#pers-btn').click();
+	await page.locator('#p-widgets').click();
+	const picker = page.getByRole('dialog', { name: 'Widgets' });
+	const items = picker.locator('#wtype-list button:not([disabled])');
+	const count = await items.count();
+	for (let i = 0; i < count; i++) await items.nth(i).click();
+	await picker.getByRole('button', { name: 'Close' }).click();
+	await expect(page.locator('body > .dwidget')).toHaveCount(count);
+	await expect(page.locator('body > .dwidget').last()).toHaveCSS('opacity', '1');
+	await expect(page.locator('#wwin')).toHaveCSS('opacity', '0');
+	await expect(page.locator('.icons .icon').last()).toHaveCSS('opacity', '1');
+	const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+	const violations = results.violations.filter(
+		(violation) => violation.impact === 'serious' || violation.impact === 'critical'
+	);
+	expect(violations, JSON.stringify(violations, null, 2)).toEqual([]);
+});

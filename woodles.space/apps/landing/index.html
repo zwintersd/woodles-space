@@ -177,7 +177,8 @@
       --desk-display: 'VT323', monospace;
       --desk-ui: 'DM Mono', monospace;
     }
-    html[data-type='pixel'] :is(.widget-greet em, .widget-note, .fly-moon) { font-style: normal; }
+    /* a slanted bitmap face smears, so nothing on a pixel desk is italic */
+    html[data-type='pixel']:not([data-scene='field-notes']) body * { font-style: normal; }
     html[data-shape='crisp'] { --desk-round: 0.25; }
     html[data-shape='round'] { --desk-round: 1.45; }
     html[data-shape='square'] { --desk-round: 0; }
@@ -506,17 +507,67 @@
     }
     .dwidget:active { cursor: grabbing; }
     .dw-x {
-      position: absolute; top: 5px; right: 5px;
-      width: 22px; height: 22px;
+      position: absolute; top: 4px; right: 4px;
+      width: 24px; height: 24px;
       border: none; border-radius: calc(7px * var(--desk-round));
       background: transparent;
       color: var(--desk-muted);
       font-size: 0.7rem;
       cursor: pointer;
-      opacity: 0;
+      opacity: 0.4;
       transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
     }
-    .dwidget:hover .dw-x, .dw-x:focus-visible { opacity: 1; }
+    :is(.dwidget, .widget):hover .dw-x, .dw-x:focus-visible { opacity: 1; }
+    .widget[hidden], .widget-note[hidden] { display: none; }
+    /* anything pressable in a widget is at least a fingertip */
+    .dwidget :is(button, input, select) { min-height: 24px; min-width: 24px; }
+    .desk-toast {
+      position: fixed; left: 50%; bottom: 78px; z-index: 60;
+      transform: translateX(-50%);
+      display: flex; align-items: center; gap: 0.8rem;
+      padding: 0.5rem 0.9rem;
+      border-radius: calc(10px * var(--desk-round));
+      background: color-mix(in srgb, var(--surface) 94%, var(--bg));
+      border: 1px solid var(--rule);
+      box-shadow: 0 12px 28px -16px var(--desk-shadow-ink);
+      font-family: var(--desk-ui);
+      font-size: 0.66rem; letter-spacing: 0.04em;
+      color: var(--text);
+    }
+    .desk-toast[hidden] { display: none; }
+    .desk-toast button {
+      border: none; background: none; padding: 0.2rem 0; cursor: pointer;
+      font: inherit; color: var(--text); text-decoration: underline;
+      min-height: 24px;
+    }
+    /* the picker: the list, and beside it the pointed-at widget itself */
+    #wwin { width: min(700px, calc(100vw - 32px)); }
+    .wt-cols { display: grid; grid-template-columns: minmax(0, 1fr) 272px; gap: 1rem; align-items: start; }
+    .wt-preview { position: sticky; top: 0; display: grid; justify-items: center; padding-top: 1.2rem; }
+    .wt-demo {
+      position: relative !important; left: auto !important; top: auto !important;
+      max-width: 100%; opacity: 1; animation: none; pointer-events: none;
+    }
+    .wt-demo .dw-x { display: none; }
+    #wtype-list .rec-item {
+      width: 100%; border: none; background: transparent;
+      text-align: left; font: inherit; color: inherit;
+    }
+    #wtype-list .rec-item:disabled { cursor: default; opacity: 0.6; }
+    #wtype-list .rec-text { flex: 1; min-width: 0; }
+    .wt-count {
+      flex: none;
+      font-family: var(--desk-ui);
+      font-size: 0.54rem; letter-spacing: 0.06em;
+      color: var(--desk-muted);
+    }
+    @media (max-width: 720px) {
+      .wt-cols { grid-template-columns: minmax(0, 1fr); }
+      .wt-preview { display: none; }
+    }
+    /* on a phone the widgets stack under the apps */
+    .phone-widgets { display: none; }
+    .phone-add { display: none; }
     .dw-x:hover { background: var(--desk-alert); color: var(--desk-on-alert); }
     .dw-title {
       font-family: var(--desk-ui);
@@ -527,9 +578,9 @@
     }
     /* sticky note */
     .dw-sticky {
-      width: 190px;
+      width: var(--sticky-w, 190px);
       transform: rotate(-1.3deg);
-      background: color-mix(in srgb, var(--peach) 42%, var(--surface));
+      background: color-mix(in srgb, var(--sticky-tint, var(--peach)) 42%, var(--surface));
       animation: none; opacity: 1;
     }
     /* js grows the note to fit what's written, so it doesn't scroll */
@@ -544,6 +595,25 @@
       color: var(--text);
       cursor: text;
     }
+    /* the note's own tools stay out of the way until it is pointed at or focused */
+    .st-tools {
+      display: flex; align-items: center; justify-content: space-between;
+      margin: 0.2rem -0.5rem -0.6rem;
+      opacity: 0; transition: opacity 0.15s ease;
+    }
+    .dw-sticky:hover .st-tools, .dw-sticky:focus-within .st-tools { opacity: 1; }
+    .st-tints { display: flex; }
+    .st-tint, .st-grip {
+      border: none; background: none; padding: 0; cursor: pointer;
+      display: grid; place-items: center;
+    }
+    .st-tint::before {
+      content: ''; width: 12px; height: 12px; border-radius: 50%;
+      background: color-mix(in srgb, var(--tint) 70%, var(--surface));
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 30%, transparent);
+    }
+    .st-tint[aria-pressed='true']::before { box-shadow: 0 0 0 2px var(--accent-strong); }
+    .st-grip { cursor: ew-resize; color: var(--desk-muted); font-size: 0.75rem; touch-action: none; }
     .dw-sticky textarea::placeholder { color: color-mix(in srgb, var(--text) 45%, transparent); }
     /* moon */
     .dw-moon { width: 168px; text-align: center; }
@@ -636,7 +706,7 @@
       grid-template-columns: repeat(7, 1fr);
       gap: 2px;
       font-family: var(--desk-ui);
-      font-size: 0.56rem;
+      font-size: 0.68rem;
       text-align: center;
     }
     .mo-h { color: var(--desk-muted); padding: 2px 0; }
@@ -645,6 +715,20 @@
       background: var(--accent-strong);
       color: var(--bg);
     }
+    .mo-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.3rem; }
+    .mo-head .mo-title { margin: 0; border: none; background: none; cursor: pointer; padding: 0 0.3rem; }
+    .mo-nav {
+      border: none; background: none; cursor: pointer;
+      color: var(--desk-muted); font-size: 0.9rem; line-height: 1;
+      border-radius: calc(6px * var(--desk-round));
+    }
+    .mo-nav:hover { color: var(--text); background: color-mix(in srgb, var(--accent) 20%, transparent); }
+    a.mo-has { position: relative; text-decoration: none; }
+    a.mo-has::after {
+      content: ''; position: absolute; left: 50%; bottom: 0;
+      width: 3px; height: 3px; margin-left: -1.5px; border-radius: 50%;
+      background: currentColor;
+    }
     /* countdown */
     .dw-count { width: 176px; text-align: center; }
     .cd-num {
@@ -652,6 +736,18 @@
       font-size: 2.6rem; font-weight: 300;
       color: var(--text); line-height: 1;
     }
+    .cd-num.cd-word { font-family: var(--desk-display); font-style: italic; font-size: 2rem; }
+    .cd-when {
+      display: block; width: 100%;
+      border: none; background: transparent; cursor: pointer;
+      border-top: 1px solid var(--rule);
+      margin-top: 0.5rem; padding-top: 0.45rem;
+      font-family: var(--desk-ui);
+      font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--desk-muted);
+    }
+    .cd-when:hover { color: var(--text); }
+    .cd-when[hidden], .cd-date[hidden] { display: none; }
     .cd-until {
       font-family: var(--desk-ui);
       font-size: 0.54rem; letter-spacing: 0.16em;
@@ -978,8 +1074,17 @@
     }
     .hb-week {
       display: flex; justify-content: center;
-      gap: 0.32rem;
-      margin-bottom: 0.7rem;
+      margin-bottom: 0.6rem;
+    }
+    .hb-day {
+      display: grid; justify-items: center; gap: 3px;
+      border: none; background: none; padding: 3px 0; cursor: pointer;
+      border-radius: calc(6px * var(--desk-round));
+    }
+    .hb-day:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+    .hb-wd {
+      font-family: var(--desk-ui); font-size: 0.56rem;
+      color: var(--desk-muted);
     }
     .hb-dot {
       width: 10px; height: 10px;
@@ -1055,6 +1160,15 @@
     }
     .tb-sw:hover { transform: scale(1.12); }
     .tb-sw.on { border-color: var(--accent-strong); }
+    .tb-more {
+      display: block; width: 100%; margin-top: 0.35rem;
+      border: none; background: none; cursor: pointer;
+      font-family: var(--desk-ui); font-size: 0.56rem; letter-spacing: 0.1em;
+      color: var(--desk-muted); text-decoration: underline;
+    }
+    .tb-more:hover { color: var(--text); }
+    .tb-custom { margin-top: 0.5rem; }
+    .tb-custom[hidden] { display: none; }
     .tb-go {
       width: 100%;
       border: none; border-radius: calc(9px * var(--desk-round));
@@ -2030,6 +2144,15 @@
       padding: 0.5rem 0.1rem 1rem;
     }
     .app-grid::-webkit-scrollbar { display: none; }
+    /* the apps and the widgets under them scroll as one column */
+    .phone-scroll {
+      flex: 1 1 auto; min-height: 0;
+      overflow-y: auto; overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none; -ms-overflow-style: none;
+    }
+    .phone-scroll::-webkit-scrollbar { display: none; }
+    .phone-scroll .app-grid { overflow: visible; }
     .app-cell {
       display: flex; flex-direction: column; align-items: center;
       gap: 0.5rem;
@@ -2103,8 +2226,23 @@
 
     /* ─────────────────────────── responsive ────────────────────────── */
     @media (max-width: 720px) {
-      .desktop, .widget, .taskbar, .dwidget { display: none !important; }
+      .desktop, .widget, .taskbar, body > .dwidget { display: none !important; }
       .phone { display: flex; }
+      .phone-widgets { display: grid; gap: 0.7rem; margin-top: 0.4rem; }
+      .phone-widgets:empty { display: none; }
+      .phone-widgets .dwidget {
+        position: relative !important; left: auto !important; top: auto !important;
+        width: auto !important; transform: none !important;
+        opacity: 1; animation: none; cursor: default; touch-action: auto;
+      }
+      .phone-add {
+        display: block;
+        margin: 0.9rem auto 0.6rem; padding: 0.5rem 0.9rem; min-height: 32px;
+        border: 1px dashed var(--rule); border-radius: calc(9px * var(--desk-round));
+        background: transparent; cursor: pointer;
+        font-family: var(--desk-ui); font-size: 0.62rem; letter-spacing: 0.08em;
+        color: var(--desk-muted);
+      }
       .start-grid { grid-template-columns: repeat(3, 1fr); }
     }
     @media (max-width: 360px) {
@@ -2136,7 +2274,11 @@
       <p class="phone-date" id="m-date"></p>
     </header>
     <input class="phone-search" id="m-search" type="text" placeholder="search woodles.space…" autocomplete="off" />
-    <div class="app-grid" id="app-grid"></div>
+    <div class="phone-scroll">
+      <div class="app-grid" id="app-grid"></div>
+      <div class="phone-widgets" id="phone-widget-host"></div>
+      <button type="button" class="phone-add" id="m-add-widget">+ add a widget</button>
+    </div>
     <nav class="phone-dock" id="phone-dock"></nav>
   </main>
 
@@ -2185,12 +2327,15 @@
     </div>
   </main>
 
+  <p class="desk-toast" id="desk-toast" role="status" aria-live="polite" hidden></p>
+
   <!-- greeting widget -->
   <aside class="widget" id="widget">
     <p class="widget-greet"><span id="greet-word">hello,</span> <em class="greet-name" id="greet-name" title="click to change your name">user</em></p>
     <p class="widget-clock" id="w-clock">--:--</p>
     <p class="widget-date" id="w-date"></p>
     <p class="widget-note" id="w-note"></p>
+    <button class="dw-x" id="w-hide" title="remove" aria-label="Remove clock and greeting">&#10005;</button>
   </aside>
 
   <!-- start menu -->
@@ -2223,7 +2368,7 @@
 
   <!-- tray flyout -->
   <section class="flyout" id="flyout">
-    <p class="dw-title" id="fly-month">month</p>
+    <p class="dw-title mo-title" id="fly-month">month</p>
     <div class="mo-grid" id="fly-cal"></div>
     <p class="fly-moon" id="fly-moon"></p>
     <div class="fly-themes" id="themes"></div>
@@ -2348,9 +2493,12 @@
       <button class="win-close" id="w-close" aria-label="Close">&#10005;</button>
     </div>
     <div class="win-body pers-body">
-      <p class="pers-hint">little things that live on the desktop.
-        drag them anywhere; hover one for its &#10005;.</p>
-      <div class="recommended" id="wtype-list"></div>
+      <p class="pers-hint">little things that live on the desktop. choose as many as you like;
+        drag them anywhere, or focus one and use the arrow keys.</p>
+      <div class="wt-cols">
+        <div class="recommended" id="wtype-list"></div>
+        <div class="wt-preview" id="wt-preview" aria-hidden="true" inert></div>
+      </div>
     </div>
   </div>
 
@@ -2675,6 +2823,9 @@
       e.stopPropagation(); openPers();
     });
     document.getElementById('fn-add-widget').addEventListener('click', e => {
+      e.stopPropagation(); openWin('widgets');
+    });
+    document.getElementById('m-add-widget').addEventListener('click', e => {
       e.stopPropagation(); openWin('widgets');
     });
     document.getElementById('fn-profile').addEventListener('click', e => {
@@ -3050,6 +3201,9 @@
       document.getElementById('user-pic').textContent = name[0].toLowerCase();
       const note = (prefs.note || '').trim() ||
         NOTES[new Date().getDate() % NOTES.length];
+      /* a passing-thought widget is the day's line; the greeting needn't say a second one */
+      document.getElementById('w-note').hidden =
+        !(prefs.note || '').trim() && widgets.some(w => w.type === 'quote');
       document.getElementById('w-note').textContent = note;
       document.getElementById('fn-note').textContent = note;
       const pName = document.getElementById('p-name');
@@ -3149,7 +3303,39 @@
     const WIDGETS_KEY = 'woodles-widgets';
     let widgets = [];
     try { widgets = JSON.parse(localStorage.getItem(WIDGETS_KEY)) || []; } catch {}
-    function saveWidgets() { localStorage.setItem(WIDGETS_KEY, JSON.stringify(widgets)); }
+    if (!Array.isArray(widgets)) widgets = [];
+    /* removed widgets leave a time behind, so another device knows a missing
+       widget was taken away and not simply never seen */
+    const WIDGETS_GONE_KEY = 'woodles-widgets-gone';
+    let widgetsGone = {};
+    try { widgetsGone = JSON.parse(localStorage.getItem(WIDGETS_GONE_KEY)) || {}; } catch {}
+    /* what of a widget follows a person between devices: its type and what
+       they put in it. where it sits is each screen's own business, and the
+       prime counter's running count is not worth a request a second. */
+    const PRIME_LOCAL = ['n', 'found', 'lastPrime', 'recent', 'running'];
+    function syncedData(w) {
+      if (w.type !== 'primes') return w.data;
+      const d = { ...w.data };
+      PRIME_LOCAL.forEach(k => delete d[k]);
+      return d;
+    }
+    const widgetStamp = w => JSON.stringify([w.type, syncedData(w)]);
+    const widgetSeen = {};
+    widgets.forEach(w => { widgetSeen[w.id] = widgetStamp(w); });
+    /* every save notices which widgets' contents changed and dates them;
+       the newest date wins when two devices meet */
+    function saveWidgets() {
+      let changed = false;
+      widgets.forEach(w => {
+        const stamp = widgetStamp(w);
+        if (widgetSeen[w.id] === stamp) return;
+        widgetSeen[w.id] = stamp;
+        w.at = Date.now();
+        changed = true;
+      });
+      try { localStorage.setItem(WIDGETS_KEY, JSON.stringify(widgets)); } catch {}
+      if (changed) queueWidgetPush();
+    }
     const widgetEls = {};
     /* stacking order: whichever widget was touched last floats to the top */
     let topZ = 3;
@@ -4140,6 +4326,7 @@
       return li;
     }
 
+    const STICKY_TINTS = ['peach', 'lavender', 'aqua', 'lilac'];
     const WTYPES = {
       today: {
         title: 'today', glyph: '&#9788;', desc: "what carillon has planned, and what's on your shelf", group: 'today',
@@ -4257,7 +4444,9 @@
         title: 'sticky note', glyph: '&#10002;', desc: 'a little note to self', group: 'keeping',
         data: () => ({ text: '' }),
         build(el, w) {
-          el.innerHTML = '<textarea placeholder="jot something&hellip;" maxlength="400"></textarea>';
+          el.innerHTML = '<textarea placeholder="jot something&hellip;" maxlength="400" aria-label="Sticky note"></textarea>' +
+            '<div class="st-tools"><span class="st-tints" role="group" aria-label="Paper colour"></span>' +
+            '<button type="button" class="st-grip" aria-label="Note width: drag, or use the left and right arrows" title="resize">&#8690;</button></div>';
           const ta = el.querySelector('textarea');
           ta.value = w.data.text || '';
           /* grow to the words rather than scroll. measured once the note is
@@ -4266,6 +4455,41 @@
           requestAnimationFrame(fit);
           document.fonts.ready.then(fit);
           ta.addEventListener('input', () => { w.data.text = ta.value; saveWidgets(); fit(); });
+
+          /* paper in four of the palette's tints, and as wide as you drag it */
+          const paint = () => {
+            el.style.setProperty('--sticky-tint', 'var(--' + (STICKY_TINTS.includes(w.data.tint) ? w.data.tint : 'peach') + ')');
+            if (w.data.w) el.style.setProperty('--sticky-w', w.data.w + 'px');
+            el.querySelectorAll('.st-tint').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tint === (w.data.tint || 'peach'))));
+            fit();
+          };
+          STICKY_TINTS.forEach(tint => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'st-tint';
+            b.dataset.tint = tint;
+            b.style.setProperty('--tint', 'var(--' + tint + ')');
+            b.setAttribute('aria-label', tint + ' paper');
+            b.addEventListener('click', () => { w.data.tint = tint; saveWidgets(); paint(); });
+            el.querySelector('.st-tints').appendChild(b);
+          });
+          const grip = el.querySelector('.st-grip');
+          const setWidth = px => { w.data.w = Math.round(Math.min(Math.max(px, 150), 380)); paint(); };
+          let from = null;
+          grip.addEventListener('pointerdown', e => {
+            from = { x: e.clientX, w: el.offsetWidth };
+            grip.setPointerCapture(e.pointerId);
+            e.preventDefault();
+          });
+          grip.addEventListener('pointermove', e => { if (from) setWidth(from.w + e.clientX - from.x); });
+          grip.addEventListener('pointerup', () => { if (from) { from = null; saveWidgets(); } });
+          grip.addEventListener('keydown', e => {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+            e.preventDefault();
+            setWidth(el.offsetWidth + (e.key === 'ArrowRight' ? 16 : -16));
+            saveWidgets();
+          });
+          paint();
         },
       },
       moon: {
@@ -4292,24 +4516,49 @@
         title: 'this month', glyph: '&#9638;', desc: 'the month at a glance', group: 'today',
         data: () => ({}),
         build(el) {
-          el.innerHTML = '<p class="dw-title"></p><div class="mo-grid"></div>';
+          el.innerHTML =
+            '<div class="mo-head">' +
+              '<button type="button" class="mo-nav" data-step="-1" aria-label="Previous month">&#8249;</button>' +
+              '<button type="button" class="dw-title mo-title" title="back to this month"></button>' +
+              '<button type="button" class="mo-nav" data-step="1" aria-label="Next month">&#8250;</button>' +
+            '</div><div class="mo-grid"></div>';
+          el._month = 0;
+          el.querySelector('.mo-head').addEventListener('click', e => {
+            const b = e.target.closest('button');
+            if (!b) return;
+            el._month = b.dataset.step ? el._month + Number(b.dataset.step) : 0;
+            this.refresh(el);
+          });
           this.refresh(el);
         },
+        /* days carillon has something planned carry a dot and open carillon */
         refresh(el) {
           const now = new Date();
-          const y = now.getFullYear(), mo = now.getMonth();
-          const first = new Date(y, mo, 1).getDay();
+          const view = new Date(now.getFullYear(), now.getMonth() + (el._month || 0), 1);
+          const y = view.getFullYear(), mo = view.getMonth();
+          const first = view.getDay();
           const len = new Date(y, mo + 1, 0).getDate();
+          const planned = {};
+          (readLedger(CARILLON_COMMITMENTS_KEY, 'commitments') || []).forEach(c => {
+            if (c && isText(c.date)) planned[c.date] = (planned[c.date] || 0) + 1;
+          });
+          const carillon = (byId('planner') || {}).href || '/';
           let cells = 'smtwtfs'.split('').map(h => '<span class="mo-h">' + h + '</span>').join('');
           for (let i = 0; i < first; i++) cells += '<span></span>';
-          for (let d = 1; d <= len; d++)
-            cells += '<span class="mo-d' + (d === now.getDate() ? ' mo-today' : '') + '">' + d + '</span>';
-          el.querySelector('.dw-title').textContent = MONTHS[mo] + ' ' + y;
+          for (let d = 1; d <= len; d++) {
+            const key = y + '-' + pad(mo + 1) + '-' + pad(d);
+            const cls = 'mo-d' + (!el._month && d === now.getDate() ? ' mo-today' : '');
+            cells += planned[key]
+              ? '<a class="' + cls + ' mo-has" href="' + carillon + '" aria-label="' + d + ' ' + MONTHS[mo] + ', ' +
+                  planned[key] + ' planned in carillon">' + d + '</a>'
+              : '<span class="' + cls + '">' + d + '</span>';
+          }
+          el.querySelector('.mo-title').textContent = MONTHS[mo] + ' ' + y;
           el.querySelector('.mo-grid').innerHTML = cells;
         },
       },
       count: {
-        title: 'counting down', glyph: '&#8987;', desc: 'days until something lovely', group: 'today',
+        title: 'counting down', glyph: '&#9719;', desc: 'days until something lovely', group: 'today',
         data: () => {
           const d = new Date(Date.now() + 30 * 86400000);
           return { label: 'something lovely', date: ymd(d) };
@@ -4320,30 +4569,47 @@
             '<p class="cd-until">days until</p>' +
             '<input class="cd-label" maxlength="40" placeholder="something lovely" ' +
               'aria-label="What you are counting down to" />' +
-            '<input class="cd-date" type="date" aria-label="Countdown date" />';
+            '<button type="button" class="cd-when" aria-label="Change the date"></button>' +
+            '<input class="cd-date" type="date" aria-label="Countdown date" hidden />';
           const label = el.querySelector('.cd-label');
           const date = el.querySelector('.cd-date');
+          const when = el.querySelector('.cd-when');
           label.value = w.data.label || '';
           date.value = w.data.date || '';
           label.addEventListener('input', () => { w.data.label = label.value; saveWidgets(); });
+          /* the date reads as words; pressing it brings the field out */
+          const edit = on => { date.hidden = !on; when.hidden = on; };
+          when.addEventListener('click', () => {
+            edit(true);
+            date.focus();
+            try { date.showPicker(); } catch {}
+          });
           date.addEventListener('change', () => {
             w.data.date = date.value; saveWidgets(); this.refresh(el, w);
           });
+          date.addEventListener('blur', () => edit(false));
+          date.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === 'Escape') when.focus(); });
           this.refresh(el, w);
         },
         refresh(el, w) {
           const today = new Date(); today.setHours(0, 0, 0, 0);
           const target = new Date((w.data.date || '') + 'T00:00:00');
           const diff = isNaN(target) ? null : Math.round((target - today) / 86400000);
-          el.querySelector('.cd-num').textContent = diff === null ? '--' : Math.abs(diff);
+          const num = el.querySelector('.cd-num');
+          num.textContent = diff === null ? '--' : diff === 0 ? 'today' : Math.abs(diff);
+          num.classList.toggle('cd-word', diff === 0);
+          const days = Math.abs(diff) === 1 ? 'day' : 'days';
           el.querySelector('.cd-until').textContent =
-            diff !== null && diff < 0 ? 'days since' : 'days until';
+            diff === 0 ? 'is the day for' : diff !== null && diff < 0 ? days + ' since' : days + ' until';
+          el.querySelector('.cd-when').textContent = isNaN(target)
+            ? 'choose a day'
+            : target.getDate() + ' ' + MONTHS[target.getMonth()] + ' ' + target.getFullYear();
         },
       },
       primes: {
         title: 'prime counter', glyph: '&#8473;', desc: 'a slow count through the primes, or a recitation game', group: 'tools',
         data: () => ({
-          n: 1, found: 0, lastPrime: null, recent: [], running: true,
+          n: 1, found: 0, lastPrime: null, recent: [], running: false,
           mode: 'ambient',
           game: { current: 0, recited: [], streak: 0, best: 0, bestMs: null, startedAt: null },
         }),
@@ -4471,7 +4737,8 @@
           renderMode(); renderGameTrail(); renderPrompt(); renderGameStats();
 
           primeTimers[w.id] = setInterval(() => {
-            if (!w.data.running) return;
+            /* counts only when asked to, and never to an empty room */
+            if (!w.data.running || document.hidden || !el.isConnected) return;
             w.data.n += 1;
             const prime = isPrime(w.data.n);
             if (prime) {
@@ -4542,7 +4809,7 @@
         },
       },
       bookmarks: {
-        title: 'bookmarks', glyph: '&#128278;', desc: 'a search bar and your saved links', group: 'tools',
+        title: 'bookmarks', glyph: '&#9873;', desc: 'a search bar and your saved links', group: 'tools',
         data: () => ({ links: [] }),
         build(el, w) {
           el.innerHTML =
@@ -4699,17 +4966,27 @@
               'aria-label="What you are tending" />' +
             '<p class="hb-streak-num"></p>' +
             '<p class="hb-streak-label">day streak</p>' +
-            '<div class="hb-week"></div>' +
+            '<div class="hb-week" role="group" aria-label="The last seven days"></div>' +
             '<button type="button" class="hb-toggle"></button>';
           const label = el.querySelector('.hb-label');
           label.value = w.data.label || '';
           label.addEventListener('input', () => { w.data.label = label.value; saveWidgets(); });
-          el.querySelector('.hb-toggle').addEventListener('click', () => {
-            const key = ymd(new Date());
+          const flip = key => {
             const i = w.data.dates.indexOf(key);
             if (i === -1) w.data.dates.push(key); else w.data.dates.splice(i, 1);
             saveWidgets();
             this.refresh(el, w);
+          };
+          el.querySelector('.hb-toggle').addEventListener('click', () => flip(ymd(new Date())));
+          /* any of the last seven days can be marked, so a missed tap
+             yesterday doesn't cost the streak */
+          el.querySelector('.hb-week').addEventListener('click', e => {
+            const day = e.target.closest('.hb-day');
+            if (!day) return;
+            const at = [...day.parentNode.children].indexOf(day);
+            flip(day.dataset.date);
+            const again = el.querySelectorAll('.hb-day')[at];
+            if (again) again.focus();
           });
           this.refresh(el, w);
         },
@@ -4721,6 +4998,7 @@
           if (!set.has(ymd(cursor))) cursor.setDate(cursor.getDate() - 1);
           while (set.has(ymd(cursor))) { streak++; cursor.setDate(cursor.getDate() - 1); }
           el.querySelector('.hb-streak-num').textContent = streak;
+          el.querySelector('.hb-streak-label').textContent = streak === 1 ? 'day streak' : 'day streak';
           const doneToday = set.has(ymd(today));
           const btn = el.querySelector('.hb-toggle');
           btn.textContent = doneToday ? 'done today' : 'mark today';
@@ -4729,14 +5007,22 @@
           week.innerHTML = '';
           for (let i = 6; i >= 0; i--) {
             const d = new Date(today); d.setDate(d.getDate() - i);
-            const dot = document.createElement('span');
-            dot.className = 'hb-dot' + (set.has(ymd(d)) ? ' on' : '') + (i === 0 ? ' today' : '');
-            week.appendChild(dot);
+            const on = set.has(ymd(d));
+            const day = document.createElement('button');
+            day.type = 'button';
+            day.className = 'hb-day';
+            day.dataset.date = ymd(d);
+            day.setAttribute('aria-pressed', String(on));
+            day.setAttribute('aria-label',
+              (i === 0 ? 'today' : i === 1 ? 'yesterday' : d.getDate() + ' ' + MONTHS[d.getMonth()]) + (on ? ', done' : ', not done'));
+            day.innerHTML = '<span class="hb-dot' + (on ? ' on' : '') + (i === 0 ? ' today' : '') + '"></span>' +
+              '<span class="hb-wd">' + 'smtwtfs'[d.getDay()] + '</span>';
+            week.appendChild(day);
           }
         },
       },
       break: {
-        title: 'take a break', glyph: '&#9749;', desc: 'design a screensaver, then hide behind it',
+        title: 'take a break', glyph: '&#9832;&#65038;', desc: 'design a screensaver, then hide behind it',
         group: 'tools',
         data: () => ({ style: 'stars', palette: 'dusk', motion: 'easy', minutes: 5 }),
         build(el, w) {
@@ -4744,11 +5030,24 @@
             '<p class="dw-title">take a break</p>' +
             '<p class="tb-wallet"></p>' +
             '<canvas class="tb-preview" aria-hidden="true"></canvas>' +
-            '<p class="tb-cap">visual</p><div class="tb-row" data-key="style"></div>' +
-            '<p class="tb-cap">colours</p><div class="tb-row" data-key="palette"></div>' +
-            '<p class="tb-cap">motion</p><div class="tb-row" data-key="motion"></div>' +
             '<p class="tb-cap">for</p><div class="tb-row" data-key="minutes"></div>' +
-            '<button type="button" class="tb-go">start</button>';
+            '<button type="button" class="tb-go">start</button>' +
+            '<button type="button" class="tb-more" aria-expanded="false">customize</button>' +
+            '<div class="tb-custom" hidden>' +
+              '<p class="tb-cap">visual</p><div class="tb-row" data-key="style"></div>' +
+              '<p class="tb-cap">colours</p><div class="tb-row" data-key="palette"></div>' +
+              '<p class="tb-cap">motion</p><div class="tb-row" data-key="motion"></div>' +
+            '</div>';
+          /* the widget is a way to start a break; designing the screensaver
+             is behind one button, and stays as it was left */
+          const more = el.querySelector('.tb-more'), custom = el.querySelector('.tb-custom');
+          const showCustom = open => {
+            custom.hidden = !open;
+            more.setAttribute('aria-expanded', String(open));
+            more.textContent = open ? 'done customizing' : 'customize';
+          };
+          more.addEventListener('click', () => { w.data.open = custom.hidden; saveWidgets(); showCustom(w.data.open); });
+          showCustom(!!w.data.open);
 
           const preview = () => {
             if (el._preview) el._preview.stop();
@@ -4800,11 +5099,68 @@
       },
     };
 
+    /* while dragging, a widget's edges catch on its neighbours': flush with
+       them, or a gap away. alt lets it go wherever it is put. */
+    function snapWidget(el, x, y) {
+      const w = el.offsetWidth, h = el.offsetHeight, GAP = 12, REACH = 7;
+      let bx = x, by = y, dx = REACH + 1, dy = REACH + 1;
+      document.querySelectorAll('body > .dwidget, body > .widget').forEach(o => {
+        if (o === el || !o.offsetWidth) return;
+        const r = o.getBoundingClientRect();
+        if (y < r.bottom + 40 && y + h > r.top - 40)
+          [r.left, r.right - w, r.right + GAP, r.left - w - GAP].forEach(c => {
+            if (Math.abs(c - x) < dx) { dx = Math.abs(c - x); bx = c; }
+          });
+        if (x < r.right + 40 && x + w > r.left - 40)
+          [r.top, r.bottom - h, r.bottom + GAP, r.top - h - GAP].forEach(c => {
+            if (Math.abs(c - y) < dy) { dy = Math.abs(c - y); by = c; }
+          });
+      });
+      return [bx, by];
+    }
+    /* the first place a new widget fits without covering an icon, the
+       taskbar, or another widget; a loose cascade when the desk is full */
+    function freeSpot(el) {
+      const w = el.offsetWidth, h = el.offsetHeight, GAP = 14;
+      const taken = [];
+      document.querySelectorAll('body > .dwidget, body > .widget, .icons .icon, .taskbar').forEach(o => {
+        if (o === el) return;
+        const r = o.getBoundingClientRect();
+        if (r.width && r.height) taken.push(r);
+      });
+      const maxX = innerWidth - w - 16, maxY = innerHeight - h - 16;
+      /* the places worth trying are the desk's corner and the spots just
+         past each thing already there, so a tight gap is found exactly */
+      const edges = (pick, max) => [...new Set([16, ...taken.map(pick)])]
+        .map(Math.ceil).filter(v => v >= 16 && v <= max).sort((a, b) => a - b);
+      const xs = edges(r => r.right + GAP, maxX), ys = edges(r => r.bottom + GAP, maxY);
+      for (const y of ys)
+        for (const x of xs)
+          if (!taken.some(r => x < r.right + GAP && x + w + GAP > r.left && y < r.bottom + GAP && y + h + GAP > r.top))
+            return { x, y };
+      const n = widgets.length % 6;
+      return { x: Math.round(innerWidth * 0.3) + n * 26, y: Math.round(innerHeight * 0.12) + n * 26 };
+    }
     function makeWidgetElDraggable(el, w) {
       let sx, sy, ox, oy, active = false, moved = false;
       el.addEventListener('pointerdown', () => raiseWidget(el));
+      /* focused, a widget moves with the arrows (shift for a pixel at a
+         time) and leaves with delete */
+      el.addEventListener('keydown', e => {
+        if (e.target !== el) return;
+        if (e.key === 'Delete') { e.preventDefault(); removeWidget(w.id); return; }
+        const step = e.shiftKey ? 1 : 16;
+        const move = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+        if (!move || el.parentNode !== document.body) return;
+        e.preventDefault();
+        w.x = el.offsetLeft + move[0]; w.y = el.offsetTop + move[1];
+        placeWidget(el, w);
+        w.x = el.offsetLeft; w.y = el.offsetTop;
+        raiseWidget(el);
+        saveWidgets();
+      });
       el.addEventListener('pointerdown', e => {
-        if (root.getAttribute('data-scene') === 'field-notes') return;
+        if (el.parentNode !== document.body) return;
         if (e.button !== 0) return;
         if (e.target.closest('textarea, input, a, button')) return;
         active = true; moved = false;
@@ -4817,8 +5173,9 @@
         const dx = e.clientX - sx, dy = e.clientY - sy;
         if (!moved && Math.hypot(dx, dy) < 6) return;
         moved = true;
-        el.style.left = Math.min(Math.max(ox + dx, 8), innerWidth - el.offsetWidth - 8) + 'px';
-        el.style.top  = Math.min(Math.max(oy + dy, 8), innerHeight - el.offsetHeight - 8) + 'px';
+        const [nx, ny] = e.altKey ? [ox + dx, oy + dy] : snapWidget(el, ox + dx, oy + dy);
+        el.style.left = Math.min(Math.max(nx, 8), innerWidth - el.offsetWidth - 8) + 'px';
+        el.style.top  = Math.min(Math.max(ny, 8), innerHeight - el.offsetHeight - 8) + 'px';
       });
       el.addEventListener('pointerup', () => {
         if (active && moved) {
@@ -4829,10 +5186,36 @@
       });
     }
 
-    function removeWidget(id) {
+    /* a small line above the taskbar for something just done, with a way
+       back. one at a time; the newest replaces the last. */
+    let toastTimer = null;
+    function deskToast(text, actionLabel, action) {
+      const toast = document.getElementById('desk-toast');
+      toast.textContent = '';
+      const say = document.createElement('span');
+      say.textContent = text;
+      toast.appendChild(say);
+      if (action) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = actionLabel;
+        b.addEventListener('click', () => { hideToast(); action(); });
+        toast.appendChild(b);
+      }
+      toast.hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(hideToast, 8000);
+    }
+    function hideToast() {
+      clearTimeout(toastTimer);
+      document.getElementById('desk-toast').hidden = true;
+    }
+
+    /* takes a widget off the page and out of the list, nothing more */
+    function dropWidget(id) {
       const w = widgets.find(w => w.id === id);
       widgets = widgets.filter(w => w.id !== id);
-      saveWidgets();
+      delete widgetSeen[id];
       const el = widgetEls[id];
       if (el) {
         const t = w && WTYPES[w.type];
@@ -4840,21 +5223,60 @@
         el.remove();
         delete widgetEls[id];
       }
+      return w;
+    }
+    function saveGone() {
+      /* a season is long enough for every device to have heard */
+      const old = Date.now() - 90 * 86400000;
+      Object.keys(widgetsGone).forEach(id => { if (widgetsGone[id] < old) delete widgetsGone[id]; });
+      try { localStorage.setItem(WIDGETS_GONE_KEY, JSON.stringify(widgetsGone)); } catch {}
+    }
+    function afterWidgetsChanged() {
+      saveWidgets();
       syncSceneWidgets();
+      paintPicker();
+      renderPrefs();
+    }
+    /* removing is undoable: a note or a streak is a thing someone made */
+    function removeWidget(id) {
+      const w = dropWidget(id);
+      if (!w) return;
+      widgetsGone[id] = Date.now();
+      saveGone();
+      afterWidgetsChanged();
+      queueWidgetPush();
+      deskToast(WTYPES[w.type].title + ' removed', 'undo', () => {
+        delete widgetsGone[id];
+        saveGone();
+        w.at = Date.now();
+        widgets.push(w);
+        widgetSeen[w.id] = widgetStamp(w);
+        renderWidget(w);
+        afterWidgetsChanged();
+        queueWidgetPush();
+      });
     }
 
     function placeWidget(el, w) {
       el.style.left = Math.min(Math.max(w.x, 8), Math.max(innerWidth - el.offsetWidth - 8, 8)) + 'px';
       el.style.top  = Math.min(Math.max(w.y, 8), Math.max(innerHeight - el.offsetHeight - 8, 8)) + 'px';
     }
+    /* widgets float on the desk; in Field Notes they stack in the margin,
+       and on a phone in a column under the apps */
+    const phoneWidth = matchMedia('(max-width: 720px)');
+    function widgetHost() {
+      if (root.getAttribute('data-scene') === 'field-notes') return document.getElementById('fn-widget-host');
+      return phoneWidth.matches ? document.getElementById('phone-widget-host') : document.body;
+    }
+    phoneWidth.addEventListener('change', () => syncSceneWidgets());
     function syncSceneWidgets() {
-      const inNotes = root.getAttribute('data-scene') === 'field-notes';
-      const host = document.getElementById('fn-widget-host');
+      const host = widgetHost();
+      const floating = host === document.body;
       widgets.forEach(w => {
         const el = widgetEls[w.id];
         if (!el) return;
-        (inNotes ? host : document.body).appendChild(el);
-        if (!inNotes) placeWidget(el, w);
+        if (el.parentNode !== host) host.appendChild(el);
+        if (floating) placeWidget(el, w);
         const note = el.querySelector('textarea');
         if (note) requestAnimationFrame(() => {
           note.style.height = 'auto';
@@ -4870,6 +5292,9 @@
       el.className = 'dwidget dw-' + w.type;
       el.dataset.wid = w.id;
       el.style.zIndex = String(++topZ);
+      el.tabIndex = 0;
+      el.setAttribute('role', 'group');
+      el.setAttribute('aria-label', t.title + ' widget');
       t.build(el, w);
       const x = document.createElement('button');
       x.className = 'dw-x';
@@ -4879,12 +5304,9 @@
       x.addEventListener('click', () => removeWidget(w.id));
       el.appendChild(x);
       makeWidgetElDraggable(el, w);
-      if (root.getAttribute('data-scene') === 'field-notes')
-        document.getElementById('fn-widget-host').appendChild(el);
-      else {
-        document.body.appendChild(el);
-        placeWidget(el, w);
-      }
+      const host = widgetHost();
+      host.appendChild(el);
+      if (host === document.body) placeWidget(el, w);
       widgetEls[w.id] = el;
     }
     widgets.forEach(renderWidget);
@@ -4900,21 +5322,138 @@
     }
 
     function addWidget(type) {
-      /* place new widgets in a loose grid so they don't stack */
-      const n = widgets.length;
       const w = {
         id: 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-        type,
-        x: Math.round(innerWidth * 0.3) + (n % 3) * 220,
-        y: Math.round(innerHeight * 0.12) + (Math.floor(n / 3) % 3) * 200,
+        type, x: 16, y: 16,
         data: WTYPES[type].data(),
       };
       widgets.push(w);
-      saveWidgets();
       renderWidget(w);
-      syncSceneWidgets();
-      closeWins();
+      settleNewWidget(w);
+      afterWidgetsChanged();
     }
+    /* a new widget takes the first free spot, measured once it has a size */
+    function settleNewWidget(w) {
+      const el = widgetEls[w.id];
+      if (!el || el.parentNode !== document.body) return;
+      const spot = freeSpot(el);
+      w.x = spot.x; w.y = spot.y;
+      placeWidget(el, w);
+    }
+
+    /* ── widgets between devices ───────────────────────────────────── */
+    /* the same passphrase and /api/sync the life-points ledger uses, but
+       this blob is the widgets themselves, so two devices merge: per widget
+       the newest edit wins, and a removal beats an older edit. positions
+       stay local. never throws; offline, the desk is simply this device's. */
+    const WIDGETS_APP = 'landing-widgets';
+    const WIDGETS_VERSION_KEY = 'woodles_sync_version_' + WIDGETS_APP;
+    const widgetsBlob = () => ({
+      version: 1,
+      widgets: widgets.map(w => ({ id: w.id, type: w.type, data: syncedData(w), at: w.at || 0 })),
+      gone: widgetsGone,
+    });
+    const syncPass = () => { try { return localStorage.getItem(PASSPHRASE_KEY); } catch { return null; } };
+    function mergeWidgets(blob) {
+      if (!blob || blob.version !== 1 || !Array.isArray(blob.widgets)) return;
+      const gone = blob.gone && typeof blob.gone === 'object' ? blob.gone : {};
+      Object.keys(gone).forEach(id => {
+        if (typeof gone[id] === 'number' && !(widgetsGone[id] >= gone[id])) widgetsGone[id] = gone[id];
+      });
+      widgets.filter(w => (widgetsGone[w.id] || 0) > (w.at || 0)).forEach(w => dropWidget(w.id));
+      blob.widgets.forEach(r => {
+        if (!r || typeof r.id !== 'string' || !WTYPES[r.type] || !r.data || typeof r.data !== 'object') return;
+        const at = typeof r.at === 'number' ? r.at : 0;
+        if ((widgetsGone[r.id] || 0) > at) return;
+        const mine = widgets.find(w => w.id === r.id);
+        if (mine && at <= (mine.at || 0)) return;
+        const local = mine ? dropWidget(r.id) : null;
+        const w = {
+          id: r.id, type: r.type, at,
+          x: local ? local.x : 16, y: local ? local.y : 16,
+          data: { ...(local && local.type === r.type ? local.data : WTYPES[r.type].data()), ...r.data },
+        };
+        widgets.push(w);
+        widgetSeen[w.id] = widgetStamp(w);
+        renderWidget(w);
+        if (!local) settleNewWidget(w);
+      });
+      saveGone();
+      try { localStorage.setItem(WIDGETS_KEY, JSON.stringify(widgets)); } catch {}
+      syncSceneWidgets();
+      paintPicker();
+      renderPrefs();
+    }
+    let widgetsPushed = '', widgetsBusy = false, widgetPushTimer = null;
+    function queueWidgetPush() {
+      clearTimeout(widgetPushTimer);
+      widgetPushTimer = setTimeout(pushWidgets, 2000);
+    }
+    async function pushWidgets() {
+      const pass = syncPass();
+      if (!pass || widgetsBusy) return;
+      if (JSON.stringify(widgetsBlob()) === widgetsPushed) return;
+      widgetsBusy = true;
+      try {
+        const send = version => fetch('/api/sync', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: 'Bearer ' + pass },
+          body: JSON.stringify({ app: WIDGETS_APP, blob: widgetsBlob(), baseVersion: version }),
+        });
+        let base = 0;
+        try { base = Number(localStorage.getItem(WIDGETS_VERSION_KEY) || '0') || 0; } catch {}
+        let res = await send(base);
+        if (res.status === 409) {
+          /* another device wrote first: take in what it has, then send the two together */
+          const conflict = await res.json().catch(() => null);
+          const server = conflict && conflict.server;
+          if (server) mergeWidgets(server.blob);
+          res = await send(Number(server && server.version) || 0);
+        }
+        if (res.ok) {
+          const data = await res.json().catch(() => null);
+          if (data && typeof data.version === 'number') {
+            try { localStorage.setItem(WIDGETS_VERSION_KEY, String(data.version)); } catch {}
+          }
+          widgetsPushed = JSON.stringify(widgetsBlob());
+        }
+      } catch {
+        /* offline, unauthorised, or no sync configured */
+      } finally {
+        widgetsBusy = false;
+      }
+    }
+    async function pullWidgets() {
+      const pass = syncPass();
+      if (!pass || widgetsBusy) return;
+      widgetsBusy = true;
+      let merged = false;
+      try {
+        const res = await fetch('/api/sync?app=' + WIDGETS_APP, { headers: { authorization: 'Bearer ' + pass } });
+        if (res.ok) {
+          const data = await res.json().catch(() => null);
+          if (data && typeof data.version === 'number') {
+            try { localStorage.setItem(WIDGETS_VERSION_KEY, String(data.version)); } catch {}
+            if (data.blob) {
+              mergeWidgets(data.blob);
+              if (JSON.stringify(widgetsBlob()) === JSON.stringify({ version: 1, widgets: data.blob.widgets, gone: data.blob.gone }))
+                widgetsPushed = JSON.stringify(widgetsBlob());
+            }
+            merged = true;
+          }
+        }
+      } catch {
+        /* offline, unauthorised, or no sync configured */
+      } finally {
+        widgetsBusy = false;
+      }
+      if (merged) pushWidgets();
+    }
+    pullWidgets();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') pullWidgets();
+      else { clearTimeout(widgetPushTimer); pushWidgets(); }
+    });
 
     /* HomeSuite republishes as its index changes, often from another tab;
        coming back to this one is the other moment the relative times drift */
@@ -4931,17 +5470,17 @@
       });
     }
     addEventListener('storage', e => {
-      if (e.key === null) refreshLedgerWidgets(['homesuite', 'today']);
-      else if (LEDGER_WIDGETS[e.key]) refreshLedgerWidgets([LEDGER_WIDGETS[e.key]]);
+      if (e.key === null) refreshLedgerWidgets(['homesuite', 'today', 'month']);
+      else if (LEDGER_WIDGETS[e.key]) refreshLedgerWidgets([LEDGER_WIDGETS[e.key], 'month']);
     });
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') refreshLedgerWidgets(['homesuite', 'today']);
+      if (document.visibilityState === 'visible') refreshLedgerWidgets(['homesuite', 'today', 'month']);
     });
 
     /* widgets keep their saved spot, pulled back on screen when the window
        is smaller than it was — and returned to it when it grows again */
     addEventListener('resize', () => widgets.forEach(w => {
-      if (root.getAttribute('data-scene') === 'desktop' && widgetEls[w.id])
+      if (widgetEls[w.id] && widgetEls[w.id].parentNode === document.body)
         placeWidget(widgetEls[w.id], w);
     }));
 
@@ -4993,6 +5532,44 @@
       { key: 'tools', label: 'tools & links' },
     ];
     const wtypeList = document.getElementById('wtype-list');
+    const wtPreview = document.getElementById('wt-preview');
+    /* the clock and greeting is the desk's oldest widget and keeps its own
+       markup; here it is one more thing that can be put back */
+    const CLOCK_ENTRY = { title: 'clock & greeting', glyph: '&#9716;', desc: 'the time, a hello, and the day’s note' };
+    let demo = null;
+    function clearDemo() {
+      if (demo && demo.t.destroy) demo.t.destroy(demo.el, demo.w);
+      demo = null;
+      wtPreview.textContent = '';
+    }
+    /* the pointed-at type, built for real but out of reach: what you see is
+       what lands on the desk */
+    function showDemo(type) {
+      if (demo && demo.type === type) return;
+      clearDemo();
+      const t = WTYPES[type];
+      if (!t) return;
+      const el = document.createElement('div');
+      el.className = 'dwidget dw-' + type + ' wt-demo';
+      const w = { id: 'demo-' + type, type, data: t.data() };
+      wtPreview.appendChild(el);
+      t.build(el, w);
+      demo = { type, t, el, w };
+    }
+    function pickerItem(type, t, onPick) {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'rec-item';
+      el.dataset.wtype = type;
+      el.innerHTML = '<span class="wt-glyph" aria-hidden="true">' + t.glyph + '</span>' +
+        '<span class="rec-text"><span class="rec-name">' + t.title +
+        '</span><span class="rec-desc">' + t.desc + '</span></span>' +
+        '<span class="wt-count"></span>';
+      el.addEventListener('click', onPick);
+      el.addEventListener('pointerenter', () => showDemo(type));
+      el.addEventListener('focus', () => showDemo(type));
+      return el;
+    }
     WIDGET_GROUPS.forEach(g => {
       const types = Object.keys(WTYPES).filter(type => (WTYPES[type].group || 'keeping') === g.key);
       if (!types.length) return;
@@ -5000,20 +5577,28 @@
       head.className = 'wt-group';
       head.textContent = g.label;
       wtypeList.appendChild(head);
-      types.forEach(type => {
-        const t = WTYPES[type];
-        const el = document.createElement('button');
-        el.className = 'rec-item';
-        el.style.border = 'none';
-        el.style.background = 'transparent';
-        el.style.width = '100%';
-        el.innerHTML = '<span class="wt-glyph">' + t.glyph + '</span>' +
-          '<span class="rec-text"><span class="rec-name">' + t.title +
-          '</span><span class="rec-desc">' + t.desc + '</span></span>';
-        el.addEventListener('click', () => addWidget(type));
-        wtypeList.appendChild(el);
-      });
+      if (g.key === 'today') wtypeList.appendChild(pickerItem('clock', CLOCK_ENTRY, () => setGreetingShown(true)));
+      types.forEach(type => wtypeList.appendChild(pickerItem(type, WTYPES[type], () => addWidget(type))));
     });
+    /* the picker stays open while you choose, and says what is already out */
+    function paintPicker() {
+      wtypeList.querySelectorAll('.rec-item').forEach(b => {
+        const type = b.dataset.wtype;
+        const n = type === 'clock' ? (prefs.greeting === false ? 0 : 1) : widgets.filter(w => w.type === type).length;
+        b.querySelector('.wt-count').textContent = n > 1 ? n + ' on the desk' : n ? 'on the desk' : '';
+        if (type === 'clock') b.disabled = n === 1;
+      });
+    }
+    function setGreetingShown(shown) {
+      prefs.greeting = shown;
+      savePrefs();
+      document.getElementById('widget').hidden = !shown;
+      paintPicker();
+      if (!shown) deskToast('clock & greeting removed', 'undo', () => setGreetingShown(true));
+    }
+    document.getElementById('widget').hidden = prefs.greeting === false;
+    document.getElementById('w-hide').addEventListener('click', () => setGreetingShown(false));
+    paintPicker();
 
     /* ── start menu toggle ─────────────────────────────────────────── */
     const body = document.body;
@@ -5266,6 +5851,7 @@
     function closeWins() {
       if (!body.classList.contains('win-open')) return;
       const held = Object.values(WINDOWS).some(w => w.contains(document.activeElement));
+      clearDemo();
       hideWins();
       if (held || document.activeElement === body) returnFocus(winReturn);
       winReturn = null;

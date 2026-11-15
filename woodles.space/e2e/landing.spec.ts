@@ -585,3 +585,129 @@ test('Field Notes keeps an editable widget and its Desktop position', async ({ p
 	const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('woodles-widgets') ?? '[]'));
 	expect(stored[0]).toMatchObject({ id: 'kept-note', x: 440, y: 120, data: { text: 'a thought revised' } });
 });
+
+test('new widgets take free spots, and a removed one can be brought back', async ({ page }) => {
+	await page.goto('/');
+	await page.getByRole('button', { name: 'Start', exact: true }).click();
+	await page.locator('#pers-btn').click();
+	await page.locator('#p-widgets').click();
+	const picker = page.getByRole('dialog', { name: 'Widgets' });
+	for (const name of ['sticky note', 'the moon', 'a little streak', 'take a break', 'this month', 'sticky note'])
+		await picker.getByRole('button', { name: new RegExp('^' + name) }).click();
+	// the picker stays open and says what is out
+	await expect(picker.getByRole('button', { name: /^sticky note/ })).toContainText('2 on the desk');
+	await picker.getByRole('button', { name: 'Close' }).click();
+
+	const overlaps = await page.evaluate(() => {
+		const rects = [...document.querySelectorAll('body > .dwidget, body > .widget, .icons .icon')].map((el) => el.getBoundingClientRect());
+		let count = 0;
+		for (let a = 0; a < rects.length; a++)
+			for (let b = a + 1; b < rects.length; b++)
+				if (rects[a].left < rects[b].right && rects[b].left < rects[a].right && rects[a].top < rects[b].bottom && rects[b].top < rects[a].bottom) count++;
+		return count;
+	});
+	expect(overlaps).toBe(0);
+
+	// the screensaver's design is behind one button
+	const rest = page.locator('.dw-break');
+	await expect(rest.getByRole('button', { name: 'starfield' })).toBeHidden();
+	await rest.getByRole('button', { name: 'customize' }).click();
+	await expect(rest.getByRole('button', { name: 'starfield' })).toBeVisible();
+
+	const note = page.locator('.dw-sticky').first();
+	await note.locator('textarea').fill('keep me');
+	await note.getByRole('button', { name: 'Remove widget' }).click();
+	await expect(page.locator('.dw-sticky')).toHaveCount(1);
+	await page.locator('#desk-toast').getByRole('button', { name: 'undo' }).click();
+	await expect(page.locator('.dw-sticky')).toHaveCount(2);
+	await expect(page.locator('.dw-sticky textarea').last()).toHaveValue('keep me');
+});
+
+test('a focused widget moves with the arrow keys, and a streak can mark yesterday', async ({ page }) => {
+	await page.addInitScript(() => {
+		if (!sessionStorage.getItem('seeded')) {
+			localStorage.setItem('woodles-widgets', JSON.stringify([{ id: 'h', type: 'habit', x: 600, y: 200, data: { label: 'stretch', dates: [] } }]));
+			sessionStorage.setItem('seeded', '1');
+		}
+	});
+	await page.goto('/');
+	const streak = page.getByRole('group', { name: 'a little streak widget' });
+	await streak.focus();
+	await page.keyboard.press('ArrowRight');
+	await page.keyboard.press('ArrowDown');
+	await expect(streak).toHaveCSS('left', '616px');
+	await expect(streak).toHaveCSS('top', '216px');
+
+	await streak.getByRole('button', { name: /^yesterday/ }).click();
+	await streak.getByRole('button', { name: /^today/ }).click();
+	await expect(streak.locator('.hb-streak-num')).toHaveText('2');
+	await page.reload();
+	await expect(page.locator('.dw-habit')).toHaveCSS('left', '616px');
+	await expect(page.locator('.hb-streak-num')).toHaveText('2');
+});
+
+test('on a phone the widgets stack under the apps', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.addInitScript(() =>
+		localStorage.setItem('woodles-widgets', JSON.stringify([{ id: 'h', type: 'habit', x: 600, y: 200, data: { label: 'stretch', dates: [] } }]))
+	);
+	await page.goto('/');
+	const streak = page.locator('#phone-widget-host .dw-habit');
+	await streak.scrollIntoViewIfNeeded();
+	await expect(streak).toBeVisible();
+	await streak.getByRole('button', { name: 'mark today' }).click();
+	await expect(streak.locator('.hb-streak-num')).toHaveText('1');
+});
+
+test('widgets follow a connected device: the newest edit wins and a removal holds', async ({ page }) => {
+	const now = Date.now();
+	let server = {
+		version: 3,
+		blob: {
+			version: 1,
+			widgets: [
+				{ id: 'shared', type: 'sticky', at: now + 60_000, data: { text: 'written on the other device' } },
+				{ id: 'theirs', type: 'count', at: now, data: { label: 'the trip', date: '2030-01-01' } },
+				{ id: 'removed-here', type: 'sticky', at: now - 60_000, data: { text: 'old' } }
+			],
+			gone: { 'removed-there': now + 60_000 }
+		}
+	};
+	const pushes: Array<{ blob: typeof server.blob; baseVersion: number }> = [];
+	await page.route('**/api/sync**', async (route) => {
+		const request = route.request();
+		if (request.method() === 'GET') {
+			const app = new URL(request.url()).searchParams.get('app');
+			return route.fulfill({ json: app === 'landing-widgets' ? server : { blob: null, version: 0 } });
+		}
+		const body = request.postDataJSON();
+		if (body.app !== 'landing-widgets') return route.fulfill({ json: { ok: true, version: 1 } });
+		pushes.push(body);
+		server = { version: server.version + 1, blob: body.blob };
+		return route.fulfill({ json: { ok: true, version: server.version } });
+	});
+	await page.addInitScript((at) => {
+		localStorage.setItem('woodles_sync_passphrase', 'a passphrase');
+		localStorage.setItem('woodles-widgets', JSON.stringify([
+			{ id: 'shared', type: 'sticky', x: 500, y: 100, at, data: { text: 'written here, earlier' } },
+			{ id: 'removed-there', type: 'sticky', x: 760, y: 100, at, data: { text: 'gone elsewhere' } },
+			{ id: 'mine', type: 'moon', x: 500, y: 320, at, data: {} }
+		]));
+		localStorage.setItem('woodles-widgets-gone', JSON.stringify({ 'removed-here': at }));
+	}, now);
+	await page.goto('/');
+
+	await expect(page.locator('.dw-sticky')).toHaveCount(1);
+	await expect(page.locator('.dw-sticky textarea')).toHaveValue('written on the other device');
+	await expect(page.locator('.dw-sticky')).toHaveCSS('left', '500px');
+	await expect(page.locator('.dw-count .cd-label')).toHaveValue('the trip');
+	await expect(page.locator('.dw-moon')).toHaveCount(1);
+
+	// what only this device had goes up, merged
+	await expect.poll(() => pushes.length).toBeGreaterThan(0);
+	const sent = pushes[pushes.length - 1];
+	expect(sent.baseVersion).toBe(3);
+	expect(sent.blob.widgets.map((w) => w.id).sort()).toEqual(['mine', 'shared', 'theirs']);
+	expect(Object.keys(sent.blob.gone).sort()).toEqual(['removed-here', 'removed-there']);
+	expect(JSON.stringify(sent.blob)).not.toContain('"x"');
+});
