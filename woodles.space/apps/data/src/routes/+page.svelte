@@ -15,7 +15,7 @@
 	import { mergePulledRows, pullCollectionSources, readStackRows } from '$lib/sourceSync';
 	import { parseClipboard, pasteGrid } from '$lib/paste';
 	import {
-		addField, addRecord, cloneJson, deleteField, duplicateRecord, exportCollections, importCollections,
+		addField, addRecord, cloneJson, deleteField, duplicateField, duplicateRecord, exportCollections, importCollections,
 		isCollection, loadCollections, mirrorStack, removeRecord, renameField, resizeColumn, saveCollection, setCellValue, setFrozen, setHidden, showAllHidden,
 		type Collection, type CollectionField, type FieldType, type FieldValue
 	} from '$lib/collections';
@@ -97,6 +97,7 @@
 		} else if (field) {
 			actions.push({ id: 'field:new', label: 'Add field…', group: 'edit', run: () => run('field:new') });
 			actions.push(...viewActions(undefined, field));
+			actions.push({ id: 'field:duplicate', label: 'Duplicate field', detail: field.sourceKey ? 'Copies the values as a local field' : 'Copies every value · undoable', group: 'edit', run: () => run('field:duplicate') });
 			actions.push({ id: 'field:delete', label: 'Delete field', enabled: !field.primary, detail: field.primary ? 'The Primary field is required' : 'Removes this column and its values · undoable', group: 'danger', run: () => run('field:delete') });
 		} else {
 			for (const [id, label] of [['record:new', 'New record'], ['field:new', 'New field…'], ['reference:add', 'Add Woodles reference…'], ['collection:export', 'Export collection']]) actions.push({ id, label, group: 'edit', run: () => run(id) });
@@ -400,7 +401,17 @@
 		else if (id === 'field:new') { addFieldOpen = true; }
 		else if (id === 'record:delete' && collection && selectedRecord) { updateLibrary(removeRecord(collection, selectedRecord)); selectedRecord = ''; }
 		else if (id === 'relation:remove' && collection && selectedCell) { const field = collection.fields.find((entry) => entry.id === selectedCell?.fieldId); if (field?.type === 'relation') removeRelation(selectedCell.recordId, field); }
-		else if (id === 'record:duplicate' && collection && selectedRecord) { updateLibrary(duplicateRecord(collection, selectedRecord)); }
+		else if (id === 'record:duplicate' && collection && selectedRecord) {
+			const at = collection.records.findIndex((entry) => entry.id === selectedRecord);
+			const next = duplicateRecord(collection, selectedRecord);
+			updateLibrary(next);
+			if (at !== -1 && next.records.length > collection.records.length) selectRecord(next.records[at + 1].id);
+		}
+		else if (id === 'field:duplicate' && collection && activeField) {
+			const next = duplicateField(collection, activeField.id);
+			updateLibrary(next);
+			selectField(next.fields.at(-1)?.id ?? activeField.id);
+		}
 		else if (id === 'field:delete') deleteSelectedField();
 		else if (id === 'collection:rename' && collection) {
 			// In HomeSuite the name is edited where it is shown, in the shell's title.
@@ -622,6 +633,7 @@
 			{ id: 'record:duplicate', label: 'Duplicate record', enabled: !!selectedRecord },
 			{ id: 'record:delete', label: activeRecord?.sourceRef ? 'Remove from collection' : 'Delete record', enabled: !!selectedRecord },
 			{ id: 'relation:remove', label: 'Remove reference', enabled: relationSelected() },
+			{ id: 'field:duplicate', label: 'Duplicate field', enabled: !!activeField },
 			{ id: 'field:delete', label: 'Delete field', enabled: !!activeField && !activeField.primary },
 			{ id: 'source:open', label: 'Open source', enabled: !!activeRecord?.sourceRef },
 			{ id: 'reference:add', label: 'Add Woodles reference' },
