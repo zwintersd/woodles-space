@@ -13,7 +13,7 @@
 	import { HOMESUITE_TRASH_KEY, isHomeSuiteTrashed } from '@shared/homesuiteTrash';
 	import { candidatesFor, refreshReferenceSources, shelfSource, type ReferenceCandidate } from '../../../write/src/lib/references.svelte';
 	import { mergePulledRows, pullCollectionSources, readStackRows } from '$lib/sourceSync';
-	import { parseClipboard, pasteGrid } from '$lib/paste';
+	import { clearCells, parseClipboard, pasteGrid, serializeGrid } from '$lib/paste';
 	import {
 		addField, addRecord, cloneJson, deleteField, duplicateField, duplicateRecord, exportCollections, importCollections,
 		isCollection, loadCollections, mirrorStack, removeRecord, renameField, resizeColumn, saveCollection, setCellValue, setFrozen, setHidden, showAllHidden,
@@ -570,6 +570,36 @@
 		say(`Pasted ${size}${added ? ` · ${added}` : ''}. Undo restores it.${kept}`);
 	}
 
+	/**
+	 * Ctrl/⌘ C and X on a selected column or row. Cells and text boxes keep the
+	 * browser's own copy. Cut clears the values rather than removing anything.
+	 */
+	function onCopyEvent(event: ClipboardEvent): void { onCopy(event); }
+
+	function onCopy(event: ClipboardEvent, cut = false): void {
+		if (!collection || !event.clipboardData || event.defaultPrevented) return;
+		const target = event.target instanceof Element ? event.target : null;
+		if (target?.closest('[role="dialog"], input, textarea, select, [contenteditable="true"]')) return;
+		if (window.getSelection()?.toString()) return;
+		const rows = selectedField ? visibleRecords.map(({ record }) => record) : selectedRecord && !selectedCell ? visibleRecords.map(({ record }) => record).filter((record) => record.id === selectedRecord) : [];
+		const fields = selectedField ? visibleFields.filter((entry) => entry.id === selectedField) : selectedRecord && !selectedCell ? visibleFields : [];
+		if (!rows.length || !fields.length) return;
+		const { text, html } = serializeGrid(rows, fields, (record, field) => {
+			const value = record.values[field.id];
+			if (field.type === 'relation' && isRef(value ?? null)) return referenceLabel(value as WoodlesRef);
+			return record.sourceRef && field.primary ? primaryLabel(record) : undefined;
+		});
+		event.clipboardData.setData('text/plain', text);
+		event.clipboardData.setData('text/html', html);
+		event.preventDefault();
+		const what = selectedField ? `“${fields[0].name}”` : 'the row';
+		if (!cut) { say(`Copied ${what}.`); return; }
+		const result = clearCells(collection, rows.map((record) => record.id), fields.map((entry) => entry.id));
+		if (!result.cleared) { say(`Copied ${what}. Synced values cannot be cleared, so nothing was cut.`); return; }
+		updateLibrary(result.collection);
+		say(`Cut ${what}: its values are cleared. Undo restores them.`);
+	}
+
 	/** A short note that the save status, which the next autosave clears, cannot carry. */
 	function say(message: string): void {
 		notice = message;
@@ -726,6 +756,9 @@
 		window.addEventListener('contextmenu', dataContextEvent);
 		window.addEventListener('keydown', globalKeydown);
 		window.addEventListener('paste', onPaste);
+		const onCut = (event: ClipboardEvent) => onCopy(event, true);
+		window.addEventListener('copy', onCopyEvent);
+		window.addEventListener('cut', onCut);
 		const onTrashChange = (event: StorageEvent) => { if (event.key === HOMESUITE_TRASH_KEY || event.key === null) trashRevision += 1; };
 		window.addEventListener('storage', onTrashChange);
 		const stopPeople = subscribePeople(() => {
@@ -743,6 +776,8 @@
 			window.removeEventListener('contextmenu', dataContextEvent);
 			window.removeEventListener('keydown', globalKeydown);
 			window.removeEventListener('paste', onPaste);
+			window.removeEventListener('copy', onCopyEvent);
+			window.removeEventListener('cut', onCut);
 			window.removeEventListener('storage', onTrashChange);
 			window.removeEventListener('pagehide', flushPendingSave);
 			document.removeEventListener('visibilitychange', flushWhenHidden);
@@ -766,6 +801,10 @@
 		}
 		if (homeSuite && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); postHomeSuitePaletteRequest(); return; }
 		if (event.key === 'Escape') { pickerFor = null; addFieldOpen = false; }
+		// In a cell, undo is handled with the cell's own keys; this is for a header, row number, or the page.
+		if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z' && collection && !(event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]'))) {
+			event.preventDefault(); event.shiftKey ? redo() : undo(); return;
+		}
 		if (event.key === 'F2' && collection) { event.preventDefault(); addFieldOpen = true; }
 		if ((event.key === 'Delete' || event.key === 'Backspace') && collection && selectedRecord) {
 			const target = event.target as HTMLElement | null;

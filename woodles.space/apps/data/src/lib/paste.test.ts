@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addField, addRecord, createCollection, isCollection, type Collection } from './collections';
-import { classifyText, parseClipboard, parseTsv, pasteGrid } from './paste';
+import { classifyText, clearCells, parseClipboard, parseTsv, pasteGrid, serializeGrid } from './paste';
+import { setCellValue } from './collections';
 
 const sheetsCell = (value: object, display: string, format?: object, attrs = '') =>
 	`<td data-sheets-value='${JSON.stringify(value)}'${format ? ` data-sheets-numberformat='${JSON.stringify(format)}'` : ''}${attrs}>${display}</td>`;
@@ -172,5 +173,69 @@ describe('pasting into a Collection', () => {
 	it('does nothing for an empty grid', () => {
 		const collection = tracker();
 		expect(pasteGrid(collection, [], target(collection)).collection).toBe(collection);
+	});
+});
+
+describe('copying out', () => {
+	const sample = () => {
+		let collection = createCollection('Media', 'media');
+		collection = addRecord(addRecord(collection));
+		const [title, medium, , rating] = collection.fields;
+		const game = medium.config!.options!.find((option) => option.label === 'Game')!;
+		collection = setCellValue(collection, collection.records[0].id, title.id, 'Say "hi"\tthere');
+		collection = setCellValue(collection, collection.records[0].id, medium.id, game.id);
+		collection = setCellValue(collection, collection.records[0].id, rating.id, 4.5);
+		collection = setCellValue(collection, collection.records[1].id, title.id, 'Plain');
+		return collection;
+	};
+
+	it('writes a column as tab-separated text with option names, TRUE/FALSE, and quoting', () => {
+		const collection = sample();
+		const [title, medium, , rating] = collection.fields;
+		const favorite = collection.fields.find((field) => field.name === 'Favorite')!;
+		expect(serializeGrid(collection.records, [title]).text).toBe('"Say ""hi""\tthere"\nPlain\n');
+		expect(serializeGrid(collection.records, [medium, rating, favorite]).text).toBe('Game\t4.5\tFALSE\n\t\tFALSE\n');
+		expect(serializeGrid(collection.records, [title]).html).toContain('<td>Plain</td>');
+	});
+
+	it('reads back through the paste path unchanged', () => {
+		const collection = sample();
+		const [title, medium] = collection.fields;
+		const { text, html } = serializeGrid(collection.records, [title, medium]);
+		for (const grid of [parseClipboard('', text)!, parseClipboard(html, text)!]) {
+			const blank = createCollection('Copy', 'media');
+			const pasted = pasteGrid(blank, grid, target(blank));
+			expect(pasted.collection.records[0].values[pasted.collection.fields[0].id]).toBe('Say "hi"\tthere');
+		}
+	});
+
+	it('lets the caller name a cell, as for references', () => {
+		const collection = sample();
+		expect(serializeGrid(collection.records, [collection.fields[0]], () => 'Ref').text).toBe('Ref\nRef\n');
+	});
+
+	it('clears a cut column to what a new record holds, leaving synced columns and other columns alone', () => {
+		const collection = sample();
+		const [title, medium] = collection.fields;
+		const cut = clearCells(collection, collection.records.map((r) => r.id), [medium.id]);
+		expect(cut.cleared).toBe(2);
+		expect(cut.collection.records[0].values[medium.id]).toBeNull();
+		expect(cut.collection.records[0].values[title.id]).toBe('Say "hi"\tthere');
+		expect(isCollection(cut.collection)).toBe(true);
+		const texts = clearCells(collection, collection.records.map((r) => r.id), [title.id]);
+		expect(texts.collection.records[1].values[title.id]).toBe('');
+		const synced = createCollection('Apps', 'woodles-apps');
+		const apps = addRecord(synced);
+		expect(clearCells(apps, [apps.records[0].id], [synced.fields[0].id]).cleared).toBe(0);
+	});
+});
+
+describe('a copied column keeps its blank cells', () => {
+	it('ends every row with a line break, as Sheets does, so a blank last cell survives a round trip', () => {
+		const collection = addRecord(addRecord(createCollection('T', 'tracker')));
+		const named = setCellValue(collection, collection.records[0].id, collection.fields[0].id, 'A');
+		const { text } = serializeGrid(named.records, [named.fields[0]]);
+		expect(text).toBe('A\n\n');
+		expect(parseClipboard('', text)!).toHaveLength(2);
 	});
 });

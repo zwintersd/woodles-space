@@ -299,3 +299,57 @@ export function pasteGrid(collection: Collection, grid: PastedGrid, target: Past
 	};
 	return { collection: next, rows: grid.length, columns: width, newRecords: created.length, newFields, skipped };
 }
+
+// ── copying out ──
+
+export type CopyLabel = (record: Collection['records'][number], field: CollectionField) => string | undefined;
+
+function cellText(record: Collection['records'][number], field: CollectionField, label?: CopyLabel): string {
+	const custom = label?.(record, field);
+	if (custom !== undefined) return custom;
+	const value = record.values[field.id] ?? null;
+	if (value === null) return field.type === 'checkbox' ? 'FALSE' : '';
+	const options = field.config?.options ?? [];
+	const named = (id: string) => options.find((option) => option.id === id)?.label ?? id;
+	switch (field.type) {
+		case 'checkbox': return value === true ? 'TRUE' : 'FALSE';
+		case 'select': return typeof value === 'string' ? named(value) : '';
+		case 'multi-select': return Array.isArray(value) ? value.map(named).join(', ') : '';
+		case 'relation': return '';
+		default: return String(value);
+	}
+}
+
+const escapeHtml = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+
+/**
+ * The records × fields as a spreadsheet would put them on the clipboard: tab-
+ * separated text (quoted where a cell holds a tab, quote, or line break), and
+ * an HTML table. What it writes reads back through `parseClipboard`, so a
+ * copied column pastes into another column as it was.
+ */
+export function serializeGrid(records: Collection['records'], fields: CollectionField[], label?: CopyLabel): { text: string; html: string } {
+	const rows = records.map((record) => fields.map((field) => cellText(record, field, label)));
+	const quote = (cell: string) => (/[\t\n\r"]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell);
+	return {
+		text: rows.map((row) => `${row.map(quote).join('\t')}\n`).join(''),
+		html: `<table>${rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}</table>`
+	};
+}
+
+/** What cutting leaves behind: each cell as a new record has it. Synced columns are not yours to clear. */
+export function clearCells(collection: Collection, recordIds: string[], fieldIds: string[]): { collection: Collection; cleared: number } {
+	const fields = collection.fields.filter((field) => fieldIds.includes(field.id) && !field.sourceKey);
+	if (!fields.length) return { collection, cleared: 0 };
+	const rows = new Set(recordIds);
+	const stamp = new Date().toISOString();
+	let cleared = 0;
+	const records = collection.records.map((record) => {
+		if (!rows.has(record.id)) return record;
+		const values = { ...record.values };
+		for (const field of fields) values[field.id] = field.type === 'checkbox' ? false : field.type === 'multi-select' ? [] : field.type === 'text' || field.type === 'url' ? '' : null;
+		cleared++;
+		return { ...record, values, updatedAt: stamp };
+	});
+	return { collection: { ...collection, records, updatedAt: stamp }, cleared };
+}
