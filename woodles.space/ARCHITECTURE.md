@@ -1718,6 +1718,21 @@ the shape is settled because the one-writer rule decides it, and it is easier
 to decide once. The landing page reads the balance back through the same helper
 with an empty spender list, so the call site is already right.
 
+### the desk's widgets
+
+the landing page's widgets (`woodles-widgets`) are the one thing it keeps
+that a person typed: sticky notes, streaks, countdowns, bookmarks. they ride
+`/api/sync` under `landing-widgets` as landing's own private blob, not a
+ledger: two-way, and merged rather than overwritten. each widget carries the
+time its contents last changed (`at`), and removals leave a dated entry in
+`woodles-widgets-gone`. on a pull or a 409, the page merges per widget — the
+newest edit wins, a removal beats an older edit — then pushes the union.
+positions are left out: where a widget sits is each screen's own business, so
+one arriving from another device takes the first free spot. the prime
+counter's running count is left out too. hand-rolled for the same reason the
+life-points push is: a static page cannot import `@woodles/sync`. a device
+with no passphrase never calls the server.
+
 ### the public read path
 
 a second, unrelated spine, added across ROADMAP.md's weeks 1–9: publishing a

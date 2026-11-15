@@ -18,6 +18,29 @@ so it's not easy to forget.
 
 ---
 
+## 2026-11-15
+
+- **widgets land where there's room** — a new widget takes the first free
+  spot instead of dropping onto the icons or another widget. dragging one
+  catches on its neighbours' edges (hold alt to place it freely), and a
+  focused widget moves with the arrow keys.
+- **removing a widget can be undone** — a line above the taskbar offers
+  undo for a few seconds, so a note or a streak isn't lost to a stray click.
+  the clock and greeting can be removed and put back the same way.
+- **the widget picker stays open** — pick several in one visit; each row
+  says what's already on the desk, and pointing at one shows the widget
+  itself beside the list.
+- **widgets on a phone, and between devices** — on a phone they stack under
+  the apps. on a connected device they follow you: notes, streaks, and
+  countdowns sync; where each sits stays per screen.
+- **smaller things** — take a break keeps the screensaver's design behind
+  "customize"; this month steps between months and dots the days carillon
+  has plans; a streak shows weekdays and lets you mark any of the last
+  seven; a countdown shows its date as words and says so on the day; sticky
+  notes come in four tints and can be widened; the prime counter starts
+  paused; a passing thought replaces the greeting's daily line rather than
+  doubling it. every control in a widget is at least 24px.
+
 ## 2026-11-14
 
 - **the desktop's themes read better** — tile glyphs now pick their own ink,
