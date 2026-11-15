@@ -20,6 +20,10 @@ so it's not easy to forget.
 
 ## 2026-11-15
 
+- **clicking a column selects it** — the whole column, header to last row,
+  takes a tint and an outline in a collection's table, so it's clear what a
+  paste, hide, or freeze will act on. the paste note is no longer styled like
+  an error.
 - **paste a spreadsheet into a collection** — copy cells from google sheets
   (or excel), select a cell in a collection, and paste: rows and columns fill
   across from there, adding records and fields as needed. numbers, dates,

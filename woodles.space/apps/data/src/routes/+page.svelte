@@ -777,6 +777,7 @@
 			<td
 				class:primary-cell={field.primary}
 				class:active-cell={selectedCell?.recordId === record.id && selectedCell.fieldId === field.id}
+				class:selected-col={selectedField === field.id}
 				class:frozen-col={frozenOffsets.has(field.id)}
 				class:frozen-col-edge={lastFrozenField === field.id}
 				style={frozenOffsets.has(field.id) ? `left:${frozenOffsets.get(field.id)}px` : undefined}
@@ -877,7 +878,7 @@
 	<main class="data-surface">
 		<TableToolbar {collection} {sourceStatus} {syncBusy} hiddenFields={hiddenFieldCount} hiddenRecords={hiddenRecordCount} onCommand={command} onImport={importFile} />
 		{#if saveIssue}<div class="save-issue" role="status">{saveIssue}</div>{/if}
-		{#if notice}<div class="save-issue" role="status">{notice}</div>{/if}
+		{#if notice}<div class="save-issue notice" role="status">{notice}</div>{/if}
 		<ScrollFrame label={`${collection.title} scrollable table`}>
 			<table class="data-table" aria-label={`${collection.title} table`}>
 				<thead>
@@ -886,9 +887,10 @@
 						{#each visibleFields as field (field.id)}
 							{@const width = collection.views.table.columnWidths[field.id] ?? 160}
 							{@const left = frozenOffsets.get(field.id)}
-							<th data-field={field.id} class:primary={field.primary} class:frozen-col={left !== undefined} class:frozen-col-edge={lastFrozenField === field.id} style={`width:${width}px;min-width:${width}px${left !== undefined ? `;left:${left}px` : ''}`}>
+							<th data-field={field.id} class:primary={field.primary} class:selected-col={selectedField === field.id} class:frozen-col={left !== undefined} class:frozen-col-edge={lastFrozenField === field.id} style={`width:${width}px;min-width:${width}px${left !== undefined ? `;left:${left}px` : ''}`}>
 								<button
 									class="field-head"
+									aria-pressed={selectedField === field.id}
 									draggable="true"
 									onclick={() => selectField(field.id)}
 									ondragstart={() => { dragField = field.id; }}
