@@ -53,6 +53,9 @@ button { cursor: pointer; }
 .data-table select { color: var(--hs-muted); }
 .data-table select[multiple] { height: 37px; }
 .row-number button { width: 100%; height: 100%; border: 0; background: transparent; color: inherit; font: 11px var(--font-mono, monospace); }
+.data-table tr.whole-row td { background-image: linear-gradient(color-mix(in srgb, var(--hs-focus) 12%, transparent), color-mix(in srgb, var(--hs-focus) 12%, transparent)); box-shadow: inset 0 2px 0 var(--hs-focus), inset 0 -2px 0 var(--hs-focus); }
+.data-table tr.whole-row td.row-number { box-shadow: inset 2px 0 0 var(--hs-focus), inset 0 2px 0 var(--hs-focus), inset 0 -2px 0 var(--hs-focus); }
+.data-table tr.whole-row td.row-actions { box-shadow: inset -2px 0 0 var(--hs-focus), inset 0 2px 0 var(--hs-focus), inset 0 -2px 0 var(--hs-focus); }
 .selected-row .row-number { background: var(--hs-hover) !important; color: var(--hs-accent-text) !important; }
 .checkbox-cell { width: 16px; height: 16px; margin: 0 11px; padding: 0; border: 1px solid var(--hs-line-strong); border-radius: 4px; background: var(--hs-field); color: var(--hs-on-accent); line-height: 14px; }
 .checkbox-cell.checked { background: var(--hs-accent); border-color: var(--hs-accent); }
