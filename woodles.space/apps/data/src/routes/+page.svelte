@@ -13,6 +13,7 @@
 	import { HOMESUITE_TRASH_KEY, isHomeSuiteTrashed } from '@shared/homesuiteTrash';
 	import { candidatesFor, refreshReferenceSources, shelfSource, type ReferenceCandidate } from '../../../write/src/lib/references.svelte';
 	import { mergePulledRows, pullCollectionSources, readStackRows } from '$lib/sourceSync';
+	import { parseClipboard, pasteGrid } from '$lib/paste';
 	import {
 		addField, addRecord, cloneJson, deleteField, duplicateRecord, exportCollections, importCollections,
 		isCollection, loadCollections, mirrorStack, removeRecord, renameField, resizeColumn, saveCollection, setCellValue, setFrozen, setHidden, showAllHidden,
@@ -24,6 +25,8 @@
 	let collection = $state<Collection | null>(null);
 	let ready = $state(false);
 	let saveIssue = $state('');
+	let notice = $state('');
+	let noticeTimer: ReturnType<typeof setTimeout> | null = null;
 	let selectedField = $state('');
 	let selectedRecord = $state('');
 	let selectedCell = $state<{ recordId: string; fieldId: string } | null>(null);
@@ -519,6 +522,50 @@
 		publishState();
 	}
 
+	/**
+	 * Spreadsheet cells pasted onto the table fill across rows and columns from
+	 * the selected cell. One cell pasted into a text box is left to the browser.
+	 */
+	function onPaste(event: ClipboardEvent): void {
+		const data = event.clipboardData;
+		if (!collection || !data || event.defaultPrevented) return;
+		const target = event.target instanceof Element ? event.target : null;
+		if (target?.closest('[role="dialog"]')) return;
+		const editing = target?.closest('input, textarea, select, [contenteditable="true"]') ?? null;
+		if (editing && !editing.closest('.data-table')) return;
+		const grid = parseClipboard(data.getData('text/html'), data.getData('text/plain'));
+		if (!grid) return;
+		const single = grid.length === 1 && grid[0].length === 1;
+		const cellField = collection.fields.find((entry) => entry.id === selectedCell?.fieldId);
+		if (editing && single && (cellField?.type === 'text' || cellField?.type === 'url') && !grid[0][0].href) return;
+
+		const recordIds = visibleRecords.map(({ record }) => record.id);
+		const fieldIds = visibleFields.map((entry) => entry.id);
+		let row = 0, col = 0;
+		if (selectedCell) { row = recordIds.indexOf(selectedCell.recordId); col = fieldIds.indexOf(selectedCell.fieldId); }
+		else if (selectedRecord) { row = recordIds.indexOf(selectedRecord); }
+		else if (selectedField) { col = fieldIds.indexOf(selectedField); }
+		// With nothing selected, a paste only lands in a Collection that is still empty.
+		else if (collection.records.length) return;
+		if (row === -1 || col === -1) return;
+
+		event.preventDefault();
+		const result = pasteGrid(collection, grid, { recordIds, fieldIds, row, col });
+		if (result.collection === collection) return;
+		updateLibrary(result.collection);
+		const size = `${result.rows} ${result.rows === 1 ? 'row' : 'rows'} × ${result.columns} ${result.columns === 1 ? 'column' : 'columns'}`;
+		const added = [result.newRecords && `${result.newRecords} new ${result.newRecords === 1 ? 'record' : 'records'}`, result.newFields && `${result.newFields} new ${result.newFields === 1 ? 'field' : 'fields'}`].filter(Boolean).join(', ');
+		const kept = result.skipped ? ` ${result.skipped} ${result.skipped === 1 ? 'cell' : 'cells'} did not fit their field and kept what they had.` : '';
+		say(`Pasted ${size}${added ? ` · ${added}` : ''}. Undo restores it.${kept}`);
+	}
+
+	/** A short note that the save status, which the next autosave clears, cannot carry. */
+	function say(message: string): void {
+		notice = message;
+		if (noticeTimer) clearTimeout(noticeTimer);
+		noticeTimer = setTimeout(() => { notice = ''; noticeTimer = null; }, 8000);
+	}
+
 	function inspectorChange(controlId: string, value: string): void {
 		if (!collection || !activeField) return;
 		recordBurst(`inspector:${activeField.id}:${controlId}`);
@@ -666,6 +713,7 @@
 		window.addEventListener('message', onShellMessage);
 		window.addEventListener('contextmenu', dataContextEvent);
 		window.addEventListener('keydown', globalKeydown);
+		window.addEventListener('paste', onPaste);
 		const onTrashChange = (event: StorageEvent) => { if (event.key === HOMESUITE_TRASH_KEY || event.key === null) trashRevision += 1; };
 		window.addEventListener('storage', onTrashChange);
 		const stopPeople = subscribePeople(() => {
@@ -682,6 +730,7 @@
 			window.removeEventListener('message', onShellMessage);
 			window.removeEventListener('contextmenu', dataContextEvent);
 			window.removeEventListener('keydown', globalKeydown);
+			window.removeEventListener('paste', onPaste);
 			window.removeEventListener('storage', onTrashChange);
 			window.removeEventListener('pagehide', flushPendingSave);
 			document.removeEventListener('visibilitychange', flushWhenHidden);
@@ -828,6 +877,7 @@
 	<main class="data-surface">
 		<TableToolbar {collection} {sourceStatus} {syncBusy} hiddenFields={hiddenFieldCount} hiddenRecords={hiddenRecordCount} onCommand={command} onImport={importFile} />
 		{#if saveIssue}<div class="save-issue" role="status">{saveIssue}</div>{/if}
+		{#if notice}<div class="save-issue" role="status">{notice}</div>{/if}
 		<ScrollFrame label={`${collection.title} scrollable table`}>
 			<table class="data-table" aria-label={`${collection.title} table`}>
 				<thead>

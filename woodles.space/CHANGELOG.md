@@ -20,6 +20,13 @@ so it's not easy to forget.
 
 ## 2026-11-15
 
+- **paste a spreadsheet into a collection** — copy cells from google sheets
+  (or excel), select a cell in a collection, and paste: rows and columns fill
+  across from there, adding records and fields as needed. numbers, dates,
+  checkboxes, and links land as the right kind of value, select options match
+  by name, and a new column takes the type its cells share. percents and
+  currency stay as shown. one undo takes it all back. a single cell pasted
+  into a text box still pastes as plain text.
 - **bookmarks is just your links** — the web search bar is gone from the
   bookmarks widget, and the add-a-link row stays folded away until you hover
   (or tab into) the bottom edge, then unfolds downward.
