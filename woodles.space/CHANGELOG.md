@@ -26,7 +26,10 @@ so it's not easy to forget.
   one undo step. options: match case, whole cell, and limit to one field
   (a column you've selected is the default). it only touches text and url
   cells you can edit and that are showing — synced columns, referenced
-  records' names, and hidden rows and fields are left alone.
+  records' names, and hidden rows and fields are left alone. "replace all"
+  with nothing in the replace box asks first, listing how many matches and
+  cells it would delete in each field; after any replace-all, a note says what
+  changed and where.
 - **a selected row shows it too** — clicking a row's number outlines and tints
   the whole row, the way a selected column does. clicking into a cell goes
   back to just that cell.

@@ -55,7 +55,27 @@ export function findMatches(collection: Collection, query: string, options: Find
 	return matches;
 }
 
-export type ReplaceResult = { collection: Collection; cells: number; occurrences: number };
+/** What a set of matches comes to in one field. */
+export type FieldTally = { fieldId: string; name: string; cells: number; occurrences: number };
+
+function tally(collection: Collection, entries: Iterable<{ fieldId: string; occurrences: number }>): FieldTally[] {
+	const byField = new Map<string, FieldTally>();
+	for (const { fieldId, occurrences } of entries) {
+		const found = byField.get(fieldId) ?? { fieldId, name: collection.fields.find((field) => field.id === fieldId)?.name ?? '', cells: 0, occurrences: 0 };
+		found.cells++;
+		found.occurrences += occurrences;
+		byField.set(fieldId, found);
+	}
+	const order = collection.views.table.columnOrder;
+	return [...byField.values()].sort((a, b) => order.indexOf(a.fieldId) - order.indexOf(b.fieldId));
+}
+
+/** Per-field counts for matches, in column order — what a replace would touch. */
+export function matchStats(collection: Collection, matches: readonly FindMatch[]): FieldTally[] {
+	return tally(collection, matches);
+}
+
+export type ReplaceResult = { collection: Collection; cells: number; occurrences: number; /** What actually changed, per field. */ byField: FieldTally[] };
 
 /**
  * Replaces every match, or just the one cell in `only`. The replacement is
@@ -74,6 +94,7 @@ export function replaceMatches(
 	}
 	const stamp = new Date().toISOString();
 	let cells = 0, occurrences = 0;
+	const changed: { fieldId: string; occurrences: number }[] = [];
 	const records = collection.records.map((record) => {
 		const fieldIds = targets.get(record.id);
 		if (!fieldIds) return record;
@@ -84,12 +105,14 @@ export function replaceMatches(
 			const after = before.replace(re, () => replacement);
 			if (after === before) continue;
 			values[fieldId] = after;
-			occurrences += before.match(re)?.length ?? 0;
+			const count = before.match(re)?.length ?? 0;
+			occurrences += count;
+			changed.push({ fieldId, occurrences: count });
 			cells++;
 			touched = true;
 		}
 		return touched ? { ...record, values, updatedAt: stamp } : record;
 	});
-	if (!cells) return { collection, cells: 0, occurrences: 0 };
-	return { collection: { ...collection, records, updatedAt: stamp }, cells, occurrences };
+	if (!cells) return { collection, cells: 0, occurrences: 0, byField: [] };
+	return { collection: { ...collection, records, updatedAt: stamp }, cells, occurrences, byField: tally(collection, changed) };
 }

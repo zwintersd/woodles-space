@@ -14,7 +14,7 @@
 	import { HOMESUITE_TRASH_KEY, isHomeSuiteTrashed } from '@shared/homesuiteTrash';
 	import { candidatesFor, refreshReferenceSources, shelfSource, type ReferenceCandidate } from '../../../write/src/lib/references.svelte';
 	import { mergePulledRows, pullCollectionSources, readStackRows } from '$lib/sourceSync';
-	import { findMatches, isSearchableField, replaceMatches, type FindMatch } from '$lib/findReplace';
+	import { findMatches, isSearchableField, matchStats, replaceMatches, type FieldTally, type FindMatch } from '$lib/findReplace';
 	import { clearCells, parseClipboard, pasteGrid, serializeGrid } from '$lib/paste';
 	import {
 		addField, addRecord, cloneJson, deleteField, duplicateField, duplicateRecord, exportCollections, importCollections,
@@ -53,6 +53,8 @@
 	let findWholeCell = $state(false);
 	let findScopeField = $state('');
 	let findIndex = $state(0);
+	/** The state an empty-replacement Replace all was asked about; any change to it withdraws the question. */
+	let findConfirmKey = $state('');
 	const context = createHomeSuiteContext();
 	const ROW_HEAD_WIDTH = 42;
 
@@ -189,6 +191,10 @@
 	const findOptions = $derived({ matchCase: findMatchCase, wholeCell: findWholeCell });
 	const findList = $derived(collection && findOpen ? findMatches(collection, findQuery, findOptions, findScope) : []);
 	const findCurrent = $derived(findList.length ? findList[Math.min(findIndex, findList.length - 1)] : null);
+	const findOccurrences = $derived(findList.reduce((sum, match) => sum + match.occurrences, 0));
+	const findSignature = $derived(JSON.stringify([findQuery, findReplacement, findMatchCase, findWholeCell, findScopeField, findList.length, findOccurrences]));
+	const findConfirming = $derived(findOpen && findConfirmKey === findSignature && !!findList.length);
+	const findTally = $derived(collection && findConfirming ? matchStats(collection, findList) : []);
 	const findHits = $derived(new Set(findList.map((match) => `${match.recordId}:${match.fieldId}`)));
 	const activeField = $derived(collection?.fields.find((entry) => entry.id === selectedField) ?? null);
 	const activeRecord = $derived(collection?.records.find((entry) => entry.id === selectedRecord) ?? null);
@@ -385,6 +391,7 @@
 
 	function closeFind(): void {
 		findOpen = false;
+		findConfirmKey = '';
 	}
 
 	/** Moves to a match: selects its cell and brings it into view, leaving focus in the find bar. */
@@ -418,13 +425,18 @@
 		revealMatch(rest[findIndex]);
 	}
 
-	function findReplaceAll(): void {
+	/** Replacing with nothing deletes, so that asks first unless `confirmed`. */
+	function findReplaceAll(confirmed = false): void {
 		if (!collection || !findList.length) return;
-		const result = replaceMatches(collection, findQuery, findReplacement, findOptions, findScope);
+		if (!findReplacement && !confirmed) { findConfirmKey = findSignature; return; }
+		const query = findQuery;
+		const result = replaceMatches(collection, query, findReplacement, findOptions, findScope);
+		findConfirmKey = '';
 		if (result.collection === collection) { say('Nothing to replace — the replacement is already what is there.'); return; }
 		updateLibrary(result.collection);
 		findIndex = 0;
-		say(`Replaced ${result.occurrences} ${result.occurrences === 1 ? 'match' : 'matches'} in ${result.cells} ${result.cells === 1 ? 'cell' : 'cells'}. Undo restores it.`);
+		const by = (tally: FieldTally[]) => tally.map((entry) => `${entry.name} ${entry.occurrences}`).join(', ');
+		say(`${findReplacement ? 'Replaced' : 'Deleted'} ${result.occurrences} ${result.occurrences === 1 ? 'match' : 'matches'} of “${query}” in ${result.cells} ${result.cells === 1 ? 'cell' : 'cells'}${result.byField.length > 1 ? ` (${by(result.byField)})` : result.byField.length === 1 ? ` in ${result.byField[0].name}` : ''}. Undo restores it.`);
 	}
 
 	function openRelationPicker(recordId: string, fieldId: string): void {
@@ -872,7 +884,7 @@
 		}
 		if (homeSuite && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); postHomeSuitePaletteRequest(); return; }
 		if ((event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'h' && collection && !(event.target instanceof Element && event.target.closest('[role="dialog"]'))) { event.preventDefault(); openFind(); return; }
-		if (event.key === 'Escape') { pickerFor = null; addFieldOpen = false; findOpen = false; }
+		if (event.key === 'Escape') { pickerFor = null; addFieldOpen = false; closeFind(); }
 		// In a cell, undo is handled with the cell's own keys; this is for a header, row number, or the page.
 		if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z' && collection && !(event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]'))) {
 			event.preventDefault(); event.shiftKey ? redo() : undo(); return;
@@ -1007,9 +1019,10 @@
 		{#if findOpen}
 			<FindBar
 				bind:query={findQuery} bind:replacement={findReplacement} bind:matchCase={findMatchCase} bind:wholeCell={findWholeCell} bind:scopeField={findScopeField}
-				fields={findFields} cells={findList.length} occurrences={findList.reduce((sum, match) => sum + match.occurrences, 0)}
+				fields={findFields} cells={findList.length} occurrences={findOccurrences}
+				confirming={findConfirming} tally={findTally}
 				position={findCurrent ? findList.indexOf(findCurrent) + 1 : 0}
-				onChange={findChanged} onStep={findStep} onReplace={findReplaceCurrent} onReplaceAll={findReplaceAll} onClose={closeFind}
+				onChange={findChanged} onStep={findStep} onReplace={findReplaceCurrent} onReplaceAll={() => findReplaceAll()} onConfirm={() => findReplaceAll(true)} onCancel={() => { findConfirmKey = ''; }} onClose={closeFind}
 			/>
 		{/if}
 		<ScrollFrame label={`${collection.title} scrollable table`}>

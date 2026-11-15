@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addField, addRecord, createCollection, isCollection, setCellValue, type Collection } from './collections';
-import { findMatches, isSearchableField, replaceMatches, type FindOptions } from './findReplace';
+import { findMatches, isSearchableField, matchStats, replaceMatches, type FindOptions } from './findReplace';
 
 const loose: FindOptions = { matchCase: false, wholeCell: false };
 
@@ -129,5 +129,26 @@ describe('replacing', () => {
 		const collection = fruit();
 		const result = replaceMatches(collection, 'apple', 'apple pie', { matchCase: true, wholeCell: false }, scopeOf(collection));
 		expect(result.collection.records[0].values[collection.fields[0].id]).toBe('Red apple pie');
+	});
+});
+
+describe('stats', () => {
+	it('tallies matches per field in column order, before anything changes', () => {
+		const collection = fruit();
+		const stats = matchStats(collection, findMatches(collection, 'apple', loose, scopeOf(collection)));
+		expect(stats.map(({ name, cells, occurrences }) => [name, cells, occurrences])).toEqual([['Name', 2, 2], ['Notes', 1, 2]]);
+	});
+
+	it('reports what a replace changed, per field', () => {
+		const collection = fruit();
+		const result = replaceMatches(collection, 'apple', 'pear', loose, scopeOf(collection));
+		expect(result.byField.map(({ name, cells, occurrences }) => [name, cells, occurrences])).toEqual([['Name', 2, 2], ['Notes', 1, 2]]);
+		expect(replaceMatches(collection, 'zzz', 'x', loose, scopeOf(collection)).byField).toEqual([]);
+	});
+
+	it('counts only cells that changed', () => {
+		const collection = fruit();
+		const result = replaceMatches(collection, 'Banana', 'Banana', loose, scopeOf(collection));
+		expect(result.byField).toEqual([]);
 	});
 });

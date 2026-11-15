@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { CollectionField } from './collections';
+	import type { FieldTally } from './findReplace';
 
 	let {
 		query = $bindable(),
@@ -11,10 +12,14 @@
 		cells,
 		occurrences,
 		position,
+		confirming,
+		tally,
 		onChange,
 		onStep,
 		onReplace,
 		onReplaceAll,
+		onConfirm,
+		onCancel,
 		onClose
 	}: {
 		query: string;
@@ -27,16 +32,23 @@
 		occurrences: number;
 		/** 1-based place of the current match among `cells`, or 0 when there is none. */
 		position: number;
+		/** Replace all with nothing deletes text, so it asks first, with what it would remove. */
+		confirming: boolean;
+		tally: FieldTally[];
 		onChange: () => void;
 		onStep: (direction: 1 | -1) => void;
 		onReplace: () => void;
 		onReplaceAll: () => void;
+		onConfirm: () => void;
+		onCancel: () => void;
 		onClose: () => void;
 	} = $props();
 
 	const summary = $derived(
 		!query ? 'Type to find' : !cells ? 'No matches' : `${position} of ${cells} ${cells === 1 ? 'cell' : 'cells'}${occurrences > cells ? ` · ${occurrences} matches` : ''}`
 	);
+
+	const plural = (count: number, word: 'cell' | 'match') => `${count} ${count === 1 ? word : word === 'match' ? 'matches' : `${word}s`}`;
 
 	function keydown(event: KeyboardEvent): void {
 		if (event.key === 'Escape') { event.preventDefault(); onClose(); }
@@ -70,4 +82,16 @@
 			</select>
 		</label>
 	</div>
+	{#if confirming}
+		<div class="find-confirm" role="alertdialog" aria-label="Confirm delete">
+			<p>Delete “{query}” — {plural(occurrences, 'match')} in {plural(cells, 'cell')}. Undo restores it.</p>
+			<ul>
+				{#each tally as entry (entry.fieldId)}<li><strong>{entry.name}</strong> {plural(entry.cells, 'cell')} · {plural(entry.occurrences, 'match')}</li>{/each}
+			</ul>
+			<div class="find-row">
+				<button class="find-danger" onclick={onConfirm} data-find-confirm>Delete {plural(occurrences, 'match')}</button>
+				<button onclick={onCancel}>Cancel</button>
+			</div>
+		</div>
+	{/if}
 </div>
