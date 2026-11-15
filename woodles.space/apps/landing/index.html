@@ -977,11 +977,44 @@
       color: var(--desk-muted);
       padding: 0.3rem 0.35rem 0.15rem;
     }
+    /* the add row stays folded away; hovering (or focusing into) the foot
+       unfolds it downward */
+    /* the foot reaches out over the widget's own padding, so hovering
+       anywhere along the bottom edge counts */
+    .bm-foot {
+      position: relative;
+      margin: 0.2rem -1.1rem -1rem;
+      padding: 0 1.1rem 1rem;
+    }
+    .bm-foot-hint {
+      text-align: center;
+      font-family: var(--desk-ui);
+      font-size: 0.7rem;
+      line-height: 14px;
+      color: var(--desk-muted);
+      opacity: 0.45;
+      transition: opacity 0.16s ease;
+    }
+    .bm-foot:hover .bm-foot-hint,
+    .bm-foot:focus-within .bm-foot-hint { opacity: 0; }
+    .bm-foot-hint { position: absolute; inset: 0 0 auto 0; pointer-events: none; }
+    .bm-foot::before { content: ''; display: block; height: 14px; }
+    .bm-reveal {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows 0.22s var(--desk-spring, ease);
+    }
+    .bm-foot:hover .bm-reveal,
+    .bm-foot:focus-within .bm-reveal { grid-template-rows: 1fr; }
+    .bm-reveal-inner { min-height: 0; overflow: hidden; }
     .bm-add {
       display: flex; gap: 0.3rem;
-      margin-top: 0.55rem;
+      margin-top: 0.1rem;
       padding-top: 0.55rem;
       border-top: 1px solid var(--rule);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bm-reveal, .bm-foot-hint { transition: none; }
     }
     .bm-add-label, .bm-add-url {
       min-width: 0;
@@ -4793,11 +4826,16 @@
           el.innerHTML =
             '<p class="dw-title">bookmarks</p>' +
             '<div class="bm-list"></div>' +
-            '<form class="bm-add" autocomplete="off">' +
-              '<input class="bm-add-label" type="text" placeholder="label" maxlength="24" />' +
-              '<input class="bm-add-url" type="text" placeholder="url" maxlength="300" />' +
-              '<button class="bm-add-btn" type="submit" aria-label="Add bookmark">&#43;</button>' +
-            '</form>';
+            '<div class="bm-foot">' +
+              '<span class="bm-foot-hint" aria-hidden="true">&#43;</span>' +
+              '<div class="bm-reveal"><div class="bm-reveal-inner">' +
+                '<form class="bm-add" autocomplete="off">' +
+                  '<input class="bm-add-label" type="text" placeholder="label" maxlength="24" aria-label="Bookmark label" />' +
+                  '<input class="bm-add-url" type="text" placeholder="url" maxlength="300" aria-label="Bookmark url" />' +
+                  '<button class="bm-add-btn" type="submit" aria-label="Add bookmark">&#43;</button>' +
+                '</form>' +
+              '</div></div>' +
+            '</div>';
 
           const list = el.querySelector('.bm-list');
           /* grow the list to fit its links; only cap (and scroll) once it
@@ -4805,9 +4843,9 @@
              widget currently sits */
           function sizeList() {
             if (!el.isConnected) return;
-            const GAP = 16, MIN_LIST = 90;
+            const GAP = 16, MIN_LIST = 90, ADD_ROW = 44; /* unfolded add row */
             list.style.maxHeight = 'none';
-            const otherHeight = el.offsetHeight - list.scrollHeight;
+            const otherHeight = el.offsetHeight - list.scrollHeight + ADD_ROW;
             const taskbar = document.getElementById('taskbar');
             const floor = (taskbar ? taskbar.getBoundingClientRect().top : innerHeight) - GAP;
             const budget = floor - el.getBoundingClientRect().top - otherHeight;

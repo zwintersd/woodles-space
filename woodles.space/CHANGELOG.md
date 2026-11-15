@@ -21,7 +21,8 @@ so it's not easy to forget.
 ## 2026-11-15
 
 - **bookmarks is just your links** — the web search bar is gone from the
-  bookmarks widget.
+  bookmarks widget, and the add-a-link row stays folded away until you hover
+  (or tab into) the bottom edge, then unfolds downward.
 - **no more hover text on app tiles** — the launcher's icons, start menu,
   phone dock, and pinned taskbar apps no longer pop a tooltip or label bubble
   on hover. names still show under each icon and stay available to screen
