@@ -350,7 +350,33 @@ export function duplicateRecord(collection: Collection, recordId: string): Colle
 	if (!source) return collection;
 	const stamp = now();
 	const copy: CollectionRecord = { ...source, id: makeId('record'), values: cloneJson(source.values), createdAt: stamp, updatedAt: stamp };
-	return { ...collection, records: [...collection.records, copy], updatedAt: stamp };
+	// The copy sits right under the original, and joins the frozen rows if it lands inside them.
+	const at = collection.records.indexOf(source) + 1;
+	const table = collection.views.table;
+	const views = table.frozenRows && at < table.frozenRows ? { table: { ...table, frozenRows: table.frozenRows + 1 } } : collection.views;
+	return { ...collection, records: [...collection.records.slice(0, at), copy, ...collection.records.slice(at)], views, updatedAt: stamp };
+}
+
+/**
+ * A copy of a field, right after the original, with every record's value
+ * copied. The Primary field and synced columns copy as ordinary local fields,
+ * so the copy is yours to edit. Returns the same Collection for an unknown id.
+ */
+export function duplicateField(collection: Collection, fieldId: string): Collection {
+	const source = collection.fields.find((entry) => entry.id === fieldId);
+	if (!source) return collection;
+	const { sourceKey: _synced, ...rest } = source;
+	const copy: CollectionField = { ...rest, id: makeId('field'), name: `${source.name} copy`, primary: false, createdAt: now(), ...(source.config ? { config: cloneJson(source.config) } : {}) };
+	const table = collection.views.table;
+	const at = table.columnOrder.indexOf(fieldId) + 1;
+	const columnOrder = [...table.columnOrder.slice(0, at), copy.id, ...table.columnOrder.slice(at)];
+	return {
+		...collection, fields: [...collection.fields, copy],
+		records: collection.records.map((record) => ({ ...record, values: { ...record.values, [copy.id]: cloneJson(record.values[fieldId] ?? null) } })),
+		// A copy inserted inside the frozen block joins it, so the edge stays where it was.
+		views: { table: { ...table, columnOrder, columnWidths: { ...table.columnWidths, [copy.id]: table.columnWidths[fieldId] ?? 160 }, ...(table.frozenColumns && at < table.frozenColumns ? { frozenColumns: table.frozenColumns + 1 } : {}) } },
+		updatedAt: now()
+	};
 }
 
 export function resizeColumn(collection: Collection, fieldId: string, width: number): Collection {

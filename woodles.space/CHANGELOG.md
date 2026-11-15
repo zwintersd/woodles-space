@@ -20,6 +20,10 @@ so it's not easy to forget.
 
 ## 2026-11-15
 
+- **duplicate a field** — right-click a column's header for "duplicate
+  field": the copy lands beside the original with every value copied, and a
+  synced column's copy is a local one you can edit. duplicating a row now puts
+  the copy directly under the original instead of at the bottom, and selects it.
 - **clicking a column selects it** — the whole column, header to last row,
   takes a tint and an outline in a collection's table, so it's clear what a
   paste, hide, or freeze will act on. the paste note is no longer styled like

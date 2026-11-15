@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createVersionedStorage, type StorageLike } from '@woodles/persistence';
 import {
-	addField, addRecord, createCollection, createCollectionStore, deleteField, duplicateRecord, importCollections, isCollection,
+	addField, addRecord, createCollection, createCollectionStore, deleteField, duplicateField, duplicateRecord, importCollections, isCollection,
 	isCollectionLibrary, removeRecord, renameField, resizeColumn, setCellValue, setFrozen, setHidden, showAllHidden, type CollectionLibrary
 } from './collections';
 
@@ -205,5 +205,61 @@ describe('Collection store', () => {
 		const text = JSON.stringify({ woodles: 'woodles-persistence', schemaVersion: 1, savedAt: new Date().toISOString(), data: { collections: [{ id: 'bad' }, good] } });
 		expect(importCollections(text).collections.map((collection) => collection.title)).toEqual(['Keep me']);
 		expect(importCollections(JSON.stringify({ collections: [{ id: 'bad' }] })).collections).toEqual([]);
+	});
+});
+
+describe('duplicating fields and records', () => {
+	it('copies a field right after the original with every value, as a local field', () => {
+		let collection = addField(addField(createCollection('T', 'tracker'), 'Amount', 'number'), 'Due', 'date');
+		collection = addRecord(addRecord(collection));
+		const amount = collection.fields.find((entry) => entry.name === 'Amount')!;
+		collection = setCellValue(collection, collection.records[0].id, amount.id, 12);
+		const next = duplicateField(collection, amount.id);
+		const copy = next.fields.at(-1)!;
+		expect(copy).toMatchObject({ name: 'Amount copy', type: 'number', primary: false });
+		expect(copy.id).not.toBe(amount.id);
+		const order = next.views.table.columnOrder;
+		expect(order[order.indexOf(amount.id) + 1]).toBe(copy.id);
+		expect(next.records[0].values[copy.id]).toBe(12);
+		expect(next.records[1].values[copy.id]).toBeNull();
+		expect(next.views.table.columnWidths[copy.id]).toBe(160);
+		expect(isCollection(next)).toBe(true);
+		expect(duplicateField(collection, 'missing')).toBe(collection);
+	});
+
+	it('copies a select field with its options, a Primary field as an ordinary one, and a synced column as local', () => {
+		const tracker = addRecord(createCollection('T', 'tracker'));
+		const status = tracker.fields[1];
+		const withStatus = setCellValue(tracker, tracker.records[0].id, status.id, status.config!.options![1].id);
+		const copied = duplicateField(withStatus, status.id);
+		expect(copied.fields.at(-1)!.config!.options).toEqual(status.config!.options);
+		expect(copied.fields.at(-1)!.config).not.toBe(status.config);
+		expect(copied.records[0].values[copied.fields.at(-1)!.id]).toBe(status.config!.options![1].id);
+		const primary = duplicateField(tracker, tracker.fields[0].id);
+		expect(primary.fields.filter((entry) => entry.primary)).toHaveLength(1);
+		expect(isCollection(primary)).toBe(true);
+		const synced = createCollection('Apps', 'woodles-apps');
+		const local = duplicateField(synced, synced.fields[1].id);
+		expect(local.fields.at(-1)!.sourceKey).toBeUndefined();
+		expect(isCollection(local)).toBe(true);
+	});
+
+	it('keeps the frozen edge where it was when a copy lands inside the frozen block', () => {
+		let collection = setFrozen(createCollection('T', 'tracker'), 'columns', 3);
+		collection = duplicateField(collection, collection.fields[0].id);
+		expect(collection.views.table.frozenColumns).toBe(4);
+		collection = setFrozen(addRecord(addRecord(addRecord(collection))), 'rows', 2);
+		collection = duplicateRecord(collection, collection.records[0].id);
+		expect(collection.views.table.frozenRows).toBe(3);
+		expect(isCollection(collection)).toBe(true);
+	});
+
+	it('puts a duplicated record directly under the original', () => {
+		let collection = addRecord(addRecord(createCollection()));
+		const [first, second] = collection.records;
+		collection = duplicateRecord(collection, first.id);
+		expect(collection.records.map((record) => record.id)[0]).toBe(first.id);
+		expect(collection.records[2].id).toBe(second.id);
+		expect(collection.records[1].id).not.toBe(first.id);
 	});
 });
