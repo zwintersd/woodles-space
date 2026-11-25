@@ -115,7 +115,7 @@
 	}
 </script>
 
-<aside class="inspector">
+<aside class="inspector" data-tour="inspector">
 	{#if !selected}
 		<div class="empty">
 			<span><EmojiIcon char="🌸" size={26} /></span>

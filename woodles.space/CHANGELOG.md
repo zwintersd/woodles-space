@@ -18,6 +18,14 @@ so it's not easy to forget.
 
 ---
 
+## 2026-11-25
+
+- **faerie guides the bloomforge tour** — a small glowing companion now flies
+  to whatever each tour step is about and outlines it, then celebrates when
+  you finish a track. the inspector steps used to point at nothing; now the
+  inspector is outlined. it only points — the banner still has the words, and
+  the tour still finishes by watching what you did, never by faerie.
+
 ## 2026-11-15
 
 - **find and replace in a collection** — ctrl/⌘ h (or "⌕ find" in the toolbar)

@@ -9,7 +9,8 @@ state. The calling app decides what deserves attention and when.
 The standalone playground lives in `playground/`. From the workspace root,
 run `node e2e/support/site-server.mjs`, then open
 `http://127.0.0.1:4173/packages/faerie/playground/` to try the different
-behaviors. Nothing in the playground connects Faerie to an existing Woodle.
+behaviors. The playground connects Faerie to no Woodle; the one real host
+is the [bloomforge](../../apps/bloomforge/README.md) tour.
 
 ## Create a companion
 
@@ -64,10 +65,13 @@ targets are resolved as the view changes. Missing, disconnected, or offscreen
 targets safely return Faerie to rest. `attend()` returns `true` when the cue
 is displayed and `false` when its target is unavailable.
 
-`attend` accepts `{ message, placement, scroll, action, duration }`. `placement`
+`attend` accepts `{ message, placement, scroll, action, duration, focusButton }`. `placement`
 is `auto`, `top`, `right`, `bottom`, or `left`; Faerie falls back when the
 requested side cannot fit. `scroll` defaults to `false`; opt in to bring an
-element into view. `duration` is milliseconds. `say` accepts `{ duration,
+element into view. `focusButton` defaults to `true`; pass `false` when the host
+already tells the person what to do, and the cue is then only the orb and the
+outline — a target with no message and no action shows no hint at all.
+`duration` is milliseconds. `say` accepts `{ duration,
 action }`. An `action` has `{ label, onSelect }`; selecting it calls `onSelect()`.
 
 Hints render as plain text. Faerie leaves the page's keyboard focus alone.

@@ -529,7 +529,11 @@ It also caught two bugs that only a first-timer would have hit — a new
 generator that started unowned (so a from-scratch game could never produce
 anything and pressing play showed zeroes forever) and a playtest that kept
 running the def it was built from, so edits were invisible until you found the
-reset button.
+reset button. Faerie is the tour's pointer: a mounted-once `TourFaerie.svelte`
+reads `tour.step` and flies to the matching `data-tour` element, outlining it
+— no hint bubble, because the banner owns the words — and celebrates when
+a track finishes. It only reads the tour, so it can't complete or skip a step.
+The inspector steps used to point at nothing; it's now outlined.
 
 **`bloomforge-player` is the third consumer of the schema**, and the one that
 proves the split was worth making. It takes a `GameDef` and renders a game: buy
@@ -1803,7 +1807,8 @@ IndexedDB-backed fallback chain land in the same place by different means.
 ## shared design tokens
 
 **`packages/faerie` (`@woodles/faerie`)** is a framework-independent browser
-companion, currently used only in its standalone
+companion, used by one app so far — the bloomforge tour (below) — and
+otherwise in its standalone
 [`playground`](./packages/faerie/playground/index.html). `createFaerie()` mounts
 an orb with translucent wings, gentle motion, plain-text hints, and an
 optional target outline. A host can point it at an element, selector,
@@ -1815,6 +1820,13 @@ removed, clipped, and offscreen targets release the cue, with scrolling
 available only when requested. Imports work during SSR; create the instance
 after mounting and call `destroy()` when the view is removed. See its
 [`README`](./packages/faerie/README.md) for the API and local preview command.
+
+The bloomforge tour is the pilot, and it taught the package two things: a
+focusable target always raised a hint bubble (a "Focus target" button),
+which is what `attend`'s `focusButton: false` now turns off; and a bubble
+sized for a free-floating hint lands on whatever the host has next to its
+target. A host that already says its words elsewhere should let Faerie only
+go and outline.
 
 the design system is shared at the lowest level only, and not by every app.
 
@@ -1932,13 +1944,13 @@ different palettes, so they aren't a consolidation target.
 
 ## the test suite
 
-2845 tests total: 39 in `api/` (its own
+2850 tests total: 39 in `api/` (its own
 root-level `vitest.config.ts`, covering `public.ts`, `schedules.ts` and
 `sync.ts` — the one part of the workspace that isn't a pnpm package, so it
-needs its own runner instead of the recursive `pnpm -r test`), plus 2806
+needs its own runner instead of the recursive `pnpm -r test`), plus 2811
 across twenty-four pnpm packages — `planner` 756, `marginalia` 458,
 `whiteboard` 258, `write` 251, `packages/incremental-core` 191,
-`thinking-about` 184, `bestiary` 162, `bloomforge` 83,
+`thinking-about` 184, `bestiary` 162, `bloomforge` 88,
 `packages/dynamics` 69, `packages/witch-engine` 58, `packages/sync` 48,
 `companion` 42, `grimoire` 36, `homesuite` 36, `packages/life-points` 30,
 `packages/text` 30, `bloomforge-player` 22, `data` 22,
@@ -2105,7 +2117,7 @@ from `woodles.space/`:
 
 ```
 pnpm install            one install for the whole workspace
-pnpm test               api/'s own vitest, then every pnpm package with a test script (2845 tests)
+pnpm test               api/'s own vitest, then every pnpm package with a test script (2850 tests)
 pnpm check              svelte-check in every app
 pnpm build              build the eight SvelteKit apps
 ```

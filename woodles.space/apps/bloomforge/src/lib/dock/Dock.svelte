@@ -33,6 +33,7 @@
 				type="button"
 				id="bf-tab-{tab.id}"
 				class:bf-spotlight={tour.spotlight === tab.id && active !== tab.id}
+				data-tour={tab.id}
 				aria-selected={active === tab.id}
 				aria-controls="bf-panel-{tab.id}"
 				tabindex={active === tab.id ? 0 : -1}

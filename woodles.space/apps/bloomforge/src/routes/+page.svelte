@@ -9,6 +9,7 @@
 	import Sidebar from '$lib/sidebar/Sidebar.svelte';
 	import Toolbar from '$lib/Toolbar.svelte';
 	import TourCard from '$lib/TourCard.svelte';
+	import TourFaerie from '$lib/TourFaerie.svelte';
 	import Welcome from '$lib/Welcome.svelte';
 	import { balance } from '$lib/balance.svelte.js';
 	import { playtest } from '$lib/playtest.svelte.js';
@@ -218,6 +219,8 @@
 			<Dock collapsed={dockCollapsed} ontoggle={() => (dockCollapsed = !dockCollapsed)} />
 		</div>
 	</main>
+
+	<TourFaerie />
 
 	{#if tour.showWelcome}
 		<Welcome onstart={startTour} onexplore={() => tour.dismissWelcome()} />

@@ -58,6 +58,7 @@
 			<button
 				class="bf-button bf-button--primary"
 				class:bf-spotlight={tour.spotlight === 'playtest' && !playtest.running}
+				data-tour="playtest"
 				type="button"
 				onclick={() => playtest.toggle(studio.def)}
 			>

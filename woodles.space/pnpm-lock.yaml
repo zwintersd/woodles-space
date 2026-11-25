@@ -85,6 +85,9 @@ importers:
       '@woodles/emoji':
         specifier: workspace:*
         version: link:../../packages/emoji
+      '@woodles/faerie':
+        specifier: workspace:*
+        version: link:../../packages/faerie
       '@woodles/incremental-core':
         specifier: workspace:*
         version: link:../../packages/incremental-core

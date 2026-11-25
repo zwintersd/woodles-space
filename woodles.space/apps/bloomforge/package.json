@@ -13,6 +13,7 @@
   "dependencies": {
     "@woodles/app-manifest": "workspace:*",
     "@woodles/emoji": "workspace:*",
+    "@woodles/faerie": "workspace:*",
     "@woodles/incremental-core": "workspace:*",
     "@woodles/persistence": "workspace:*",
     "@woodles/sync": "workspace:*",

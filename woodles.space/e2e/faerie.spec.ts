@@ -126,6 +126,26 @@ test('hints preserve focus, announce their text, run actions, and dismiss by Esc
   expect(await page.evaluate(() => (window as any).faerieEvents.some((event: any) => event.name === 'faerie-dismiss'))).toBe(true);
 });
 
+test('a cue can be only the orb and the outline, with no hint or focus button', async ({ page }) => {
+  const attended = await page.evaluate(() => (window as any).testFaerie.attend('#target', { focusButton: false }));
+  expect(attended).toBe(true);
+  await expect(page.getByTestId('faerie')).toHaveAttribute('data-state', 'attending');
+  await expect(page.getByTestId('faerie').locator('.ring')).toBeVisible();
+  await expect(page.getByTestId('faerie').locator('.hint')).toBeHidden();
+  await ringFollows(page, '#target');
+
+  // The default is unchanged: a focusable target still offers its focus button.
+  await page.evaluate(() => (window as any).testFaerie.attend('#target'));
+  await expect(page.getByTestId('faerie').getByRole('button', { name: 'Focus target', exact: true })).toBeVisible();
+
+  // A message still shows its hint, just without the focus button.
+  await page.evaluate(() => (window as any).testFaerie.attend('#target', { message: 'Over here.', focusButton: false }));
+  await expect(page.getByTestId('faerie').locator('.message')).toHaveText('Over here.');
+  await expect(page.getByTestId('faerie').getByRole('button', { name: 'Focus target', exact: true })).toHaveCount(0);
+
+  await expect(page.evaluate(() => (window as any).testFaerie.attend('#target', { focusButton: 'no' }))).rejects.toThrow(/focusButton/);
+});
+
 test('reduced motion removes animation and mobile cues stay within the viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('#target').evaluate((target) => {

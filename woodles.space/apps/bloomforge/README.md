@@ -36,7 +36,10 @@ constraint does a lot of work: the tour cannot claim you did something you
 didn't, it cannot drift out of step with the app, and it gives you credit for
 doing the thing by a route the hint never mentioned. It is a banner above the
 canvas rather than a floating card, because a card that covers the button it is
-pointing at is worse than no card.
+pointing at is worse than no card. [Faerie](../../packages/faerie/README.md)
+does the pointing: it flies to each step's target and outlines it, and
+carries no words of its own. Targets are marked `data-tour="…"`
+([`tourFaerie.ts`](./src/lib/tourFaerie.ts)).
 
 The `?` in the toolbar starts it again. Skipping means "not now", never "never
 again".

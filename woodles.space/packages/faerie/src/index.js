@@ -27,6 +27,9 @@ function hintOptions(options) {
   if (options.action && (typeof options.action.label !== 'string' || !options.action.label.trim() || typeof options.action.onSelect !== 'function')) {
     throw new TypeError('A Faerie action needs a label and an onSelect callback.');
   }
+  if (options.focusButton !== undefined && typeof options.focusButton !== 'boolean') {
+    throw new TypeError('Faerie focusButton must be a boolean.');
+  }
 }
 
 /** A browser-only factory; the module itself is safe to import during SSR. */
@@ -332,7 +335,7 @@ export function createFaerie(options = {}) {
     }
     target = source;
     cue = { ...settings, placement };
-    const canFocus = Boolean(resolved.element && (resolved.element.matches('button,a[href],input,select,textarea,[tabindex]') || resolved.element.querySelector('button,a[href],input,select,textarea,[tabindex]')));
+    const canFocus = settings.focusButton !== false && Boolean(resolved.element && (resolved.element.matches('button,a[href],input,select,textarea,[tabindex]') || resolved.element.querySelector('button,a[href],input,select,textarea,[tabindex]')));
     renderHint(message, settings, canFocus);
     setState('attending');
     position();

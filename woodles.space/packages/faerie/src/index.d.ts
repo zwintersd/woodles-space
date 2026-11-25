@@ -11,6 +11,11 @@ export interface FaerieAttendOptions extends FaerieHintOptions {
   placement?: FaeriePlacement;
   /** Explicitly allow bringing an offscreen target into view. Defaults to false. */
   scroll?: boolean;
+  /**
+   * Offer a "Focus target" button when the target holds a focusable control. Defaults to true.
+   * Pass false for a cue that is only the orb and the outline — with no message or action, no hint is shown.
+   */
+  focusButton?: boolean;
 }
 export interface FaerieAppearance { tone?: FaerieTone; motion?: FaerieMotion; size?: number; }
 export interface FaerieOptions extends FaerieAppearance { container?: HTMLElement; zIndex?: number; }

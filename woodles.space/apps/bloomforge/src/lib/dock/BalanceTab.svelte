@@ -123,6 +123,7 @@
 			<button
 				class="bf-button bf-button--primary"
 				class:bf-spotlight={tour.spotlight === 'balance' && !balance.running}
+				data-tour="balance"
 				type="button"
 				disabled={balance.running}
 				onclick={() => balance.run(studio.def)}

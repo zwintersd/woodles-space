@@ -130,6 +130,7 @@
 					<button
 						class="add"
 						class:bf-spotlight={tour.spotlight === `sidebar-${group.kind}`}
+						data-tour="sidebar-{group.kind}"
 						type="button"
 						onclick={() => onadd(group.kind)}
 						title="Add {ENTITY_KIND_SINGULAR[group.kind]}"
