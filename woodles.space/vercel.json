@@ -38,6 +38,7 @@
     { "source": "/schedules/p/:path*", "destination": "/apps/schedules/view/index.html" },
     { "source": "/schedules/view/:path*", "destination": "/apps/schedules/view/:path*" },
     { "source": "/piano",           "destination": "/apps/piano/index.html" },
+    { "source": "/piano/groove",    "destination": "/apps/piano/groove.html" },
     { "source": "/piano/:path*",    "destination": "/apps/piano/:path*" },
     { "source": "/digits",          "destination": "/apps/digits/index.html" },
     { "source": "/digits/:path*",   "destination": "/apps/digits/:path*" },

@@ -18,6 +18,20 @@ so it's not easy to forget.
 
 ---
 
+## 2026-11-26
+
+- **groove mode in the piano** — "groove mode →" at the top of the piano (or
+  `/piano/groove`) opens a patatap-style room. a quiet 115 bpm loop (warm pad
+  chords, soft kick, hats, bass) runs underneath, and all 26 letter keys — or
+  touch and drag across the screen, split into three rows like a keyboard —
+  play C major pentatonic across two octaves plus a few tuned drum and vocal
+  hits. the loop's chords use only those same five notes, so nothing clashes.
+  every letter has its own shape, with no text on the stage; the background
+  pulses on each beat, a lone hit stays sharp and a pile of them softens.
+  space cycles five palettes and changes the pad's sound with them. a small
+  toggle at the top right switches between instant and 16th-note quantize
+  (hits snap to the loop's grid). tone.js is vendored in `apps/piano/vendor/`.
+
 ## 2026-11-15
 
 - **find and replace in a collection** — ctrl/⌘ h (or "⌕ find" in the toolbar)
