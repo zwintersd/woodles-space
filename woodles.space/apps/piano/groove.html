@@ -143,7 +143,7 @@
   </style>
 </head>
 <body>
-  <canvas id="stage" aria-label="Touch or type letters to play. Space changes colors and sound."></canvas>
+  <canvas id="stage" aria-label="Touch or type letters to play. Space changes colors and the backing groove."></canvas>
 
   <nav class="chrome left" aria-label="Groove navigation">
     <a href="/piano">&larr; piano</a>
@@ -154,7 +154,7 @@
       <button type="button" id="mode-instant" aria-pressed="true" title="play the instant you press">instant</button>
       <button type="button" id="mode-quantize" aria-pressed="false" title="snap each press to the next 16th note">16th</button>
     </div>
-    <button type="button" id="palette-btn" aria-label="Next color palette and sound (space)" title="next palette + sound (space)"><i></i></button>
+    <button type="button" id="palette-btn" aria-label="Next palette and backing groove (space)" title="next palette + groove (space)"><i></i></button>
   </div>
 
   <div id="wake"><span>tap or press any key</span></div>
@@ -172,31 +172,34 @@
     }
 
     // ── key map ───────────────────────────────────────────────────────
-    // C major pentatonic across two octaves. every melodic key and every
-    // tuned hit below lands on C D E G A, and the backing chords are built
-    // only from those same five pitch classes, so nothing can clash.
-    const BPM = 115;
-    const SIXTEENTH = 60 / BPM / 4;
-    const SCALE = ['C4', 'D4', 'E4', 'G4', 'A4', 'C5', 'D5', 'E5', 'G5', 'A5', 'C6'];
+    // C major pentatonic (C D E G A) over octaves 4, 5 and 6. the backing
+    // chords (Fmaj7 · G6 · Am7 · Cmaj9) carry every one of those five notes
+    // as a chord tone or an extension, so presses stay consonant. the one
+    // soft spot is C over G6's B, a half-step apart for a single bar.
     const ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
-
-    // q–p lead plucks (C4–A5), a–l bells (E4–C6), z–m percussive + vocal hits
-    const HITS = ['tom', 'clap', 'hat', 'rim', 'ooh', 'ahh', 'zap'];
+    // q–p marimba plucks C5–A6 · a–j lead plucks C4–D5
+    const MARIMBA = ['C5', 'D5', 'E5', 'G5', 'A5', 'C6', 'D6', 'E6', 'G6', 'A6'];
+    const LEAD = ['C4', 'D4', 'E4', 'G4', 'A4', 'C5', 'D5'];
+    // k l v b n m vocal-style chops: [vowel, pitch]
+    const VOCALS = {
+      k: ['ah', 'G4'], l: ['oh', 'A4'], v: ['ee', 'C5'],
+      b: ['oo', 'D5'], n: ['eh', 'E5'], m: ['ah', 'G5'],
+    };
+    // z x c percussive hits
+    const PERC = { z: 'tom', x: 'clap', c: 'shaker' };
     const KEYS = {};
     ROWS.forEach((row, r) => {
       [...row].forEach((letter, c) => {
-        let voice, note;
-        if (r === 0) { voice = 'lead'; note = SCALE[c]; }
-        else if (r === 1) { voice = 'bell'; note = SCALE[c + 2]; }
-        else { voice = HITS[c]; }
-        KEYS[letter] = {
-          letter, voice, note, row: r, col: c, cols: row.length,
-          shape: letter.charCodeAt(0) - 97,
-        };
+        const key = { letter, row: r, col: c, cols: row.length, shape: letter.charCodeAt(0) - 97 };
+        if (r === 0) { key.voice = 'marimba'; key.note = MARIMBA[c]; }
+        else if (VOCALS[letter]) { key.voice = 'vocal'; key.vowel = VOCALS[letter][0]; key.note = VOCALS[letter][1]; }
+        else if (PERC[letter]) { key.voice = PERC[letter]; }
+        else { key.voice = 'lead'; key.note = LEAD[c]; }
+        KEYS[letter] = key;
       });
     });
 
-    // ── palettes: five high-contrast looks, each paired with a pad timbre ─
+    // ── palettes: five high-contrast looks, each paired with a groove ────
     const PALETTES = [
       { bg: '#0b0b1a', pulse: '#2a2058', ink: '#ffffff', colors: ['#ff2e93', '#00e5ff', '#ffe600', '#7cff4d', '#b266ff'] },
       { bg: '#1c0a08', pulse: '#4a1a10', ink: '#fff4e0', colors: ['#ff6b35', '#ffd23f', '#ff3c78', '#fff1d0', '#00d4b4'] },
@@ -241,112 +244,187 @@
       return t;
     }
 
-    function makeFormantVoice(formants, out) {
-      const osc = new Tone.Synth({
-        oscillator: { type: 'sawtooth' },
-        envelope: { attack: 0.012, decay: 0.12, sustain: 0.45, release: 0.14 },
+    // vowel formants (hz): two resonant bandpasses make a synth pop sing
+    const FORMANTS = {
+      ah: [800, 1200], oh: [450, 850], ee: [300, 2300], oo: [350, 800], eh: [530, 1840],
+    };
+
+    function makeVocal(vowel, out) {
+      const osc = new Tone.FMSynth({
+        harmonicity: 1, modulationIndex: 3,
+        oscillator: { type: 'sawtooth' }, modulation: { type: 'square' },
+        envelope: { attack: 0.006, decay: 0.1, sustain: 0.5, release: 0.12 },
+        modulationEnvelope: { attack: 0.001, decay: 0.09, sustain: 0.3, release: 0.1 },
       });
-      const mix = new Tone.Gain(2.6).connect(out);
-      formants.forEach((freq, i) => {
-        const band = new Tone.Filter({ type: 'bandpass', frequency: freq, Q: 7 + i * 2 });
-        const gain = new Tone.Gain([1, 0.55, 0.3][i]);
+      const mix = new Tone.Gain(3.2).connect(out);
+      FORMANTS[vowel].forEach((freq, i) => {
+        const band = new Tone.Filter({ type: 'bandpass', frequency: freq, Q: 9 });
+        const gain = new Tone.Gain(i ? 0.7 : 1);
         osc.chain(band, gain, mix);
       });
       return osc;
     }
 
+    // pad voices, one per groove (the active one plays; the rest are released)
     const TIMBRES = [
-      // warm: detuned saw, soft cutoff
-      { cutoff: 1100, make: () => new Tone.PolySynth(Tone.Synth, {
+      // warm detuned saw
+      () => new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'fatsawtooth', count: 3, spread: 24 },
-        envelope: { attack: 0.22, decay: 0.4, sustain: 0.75, release: 1.2 } }) },
-      // glass: soft fm bells
-      { cutoff: 3200, make: () => new Tone.PolySynth(Tone.FMSynth, {
-        harmonicity: 2, modulationIndex: 1.4,
+        envelope: { attack: 0.22, decay: 0.4, sustain: 0.75, release: 1.2 } }),
+      // supersaw stab
+      () => new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'fatsawtooth', count: 5, spread: 38 },
+        envelope: { attack: 0.01, decay: 0.25, sustain: 0.3, release: 0.25 } }),
+      // fm electric piano
+      () => new Tone.PolySynth(Tone.FMSynth, {
+        harmonicity: 3, modulationIndex: 1.1,
         oscillator: { type: 'sine' }, modulation: { type: 'sine' },
-        envelope: { attack: 0.1, decay: 0.5, sustain: 0.65, release: 1.4 } }) },
-      // organ: am, round and breathy
-      { cutoff: 2000, make: () => new Tone.PolySynth(Tone.AMSynth, {
+        envelope: { attack: 0.005, decay: 1.3, sustain: 0.25, release: 1 },
+        modulationEnvelope: { attack: 0.005, decay: 0.4, sustain: 0.1, release: 0.5 } }),
+      // am organ
+      () => new Tone.PolySynth(Tone.AMSynth, {
         harmonicity: 1.5, oscillator: { type: 'triangle' }, modulation: { type: 'square' },
-        envelope: { attack: 0.06, decay: 0.3, sustain: 0.8, release: 0.9 } }) },
-      // pluck: short triangle stabs
-      { cutoff: 2800, make: () => new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: 'triangle' },
-        envelope: { attack: 0.004, decay: 0.55, sustain: 0.06, release: 0.5 } }) },
-      // hollow: narrow pulse
-      { cutoff: 1500, make: () => new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: 'pulse', width: 0.22 },
-        envelope: { attack: 0.03, decay: 0.3, sustain: 0.55, release: 0.8 } }) },
+        envelope: { attack: 0.05, decay: 0.3, sustain: 0.8, release: 0.7 } }),
+      // narrow pulse
+      () => new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'pulse', width: 0.25 },
+        envelope: { attack: 0.01, decay: 0.2, sustain: 0.35, release: 0.3 } }),
     ];
 
-    // every chord tone and bass root is one of C D E G A
+    // Fmaj7 → G6 → Am7 → Cmaj9, voiced low-mid so the plucks sit above
     const CHORDS = [
-      { bass: 'C2', notes: ['C3', 'E3', 'G3', 'D4'] },
-      { bass: 'A1', notes: ['A2', 'C3', 'E3', 'G3'] },
-      { bass: 'G1', notes: ['G2', 'D3', 'A3', 'E4'] },
-      { bass: 'E2', notes: ['E3', 'G3', 'D4', 'A4'] },
+      { bass: 'F2', notes: ['F3', 'A3', 'C4', 'E4'] },
+      { bass: 'G2', notes: ['G3', 'B3', 'D4', 'E4'] },
+      { bass: 'A2', notes: ['A3', 'C4', 'E4', 'G4'] },
+      { bass: 'C2', notes: ['C3', 'E3', 'G3', 'B3', 'D4'] },
+    ];
+
+    // 16-step patterns: a digit is a velocity (4 → 0.4), '.' is a rest
+    const pat = (s) => [...s].map((c) => (c === '.' ? 0 : parseInt(c, 10) / 10));
+
+    // one preset per palette; space swaps the whole backing groove
+    const PRESETS = [
+      { name: 'dreamy synthwave', bpm: 115, pad: 0, cutoff: 900, duck: 0.45, swing: 0, chordLen: '1m',
+        chord: pat('9...............'), kick: pat('9...9...9...9...'), clap: pat('....3.......3...'),
+        hat: pat('..4...2...4...2.'), bass: pat('9.....7.........') },
+      { name: 'kawaii future bass', bpm: 128, pad: 1, cutoff: 2600, duck: 0.25, swing: 0, chordLen: '8n',
+        chord: pat('9..6..7...6.5...'), kick: pat('9.....7...7.....'), clap: pat('....9.......9...'),
+        hat: pat('4.3.4.3.4.3.4.3.'), bass: pat('9..9..7...9..5..') },
+      { name: 'lo-fi kalimba', bpm: 95, pad: 2, cutoff: 1400, duck: 0.6, swing: 0.22, chordLen: '2n',
+        chord: pat('7.......5.......'), kick: pat('9.....6...7.....'), clap: pat('....4.......4...'),
+        hat: pat('..3...2...3...2.'), bass: pat('9.......7.......'),
+        arp: { voice: 'kalimba', steps: pat('6.5.6.4.6.5.6.4.') } },
+      { name: 'sunday organ', bpm: 110, pad: 3, cutoff: 1800, duck: 0.5, swing: 0, chordLen: '2n',
+        chord: pat('8.......6.......'), kick: pat('9..7..9...7.....'), clap: pat('....7.......7...'),
+        hat: pat('5.5.5.5.5.5.5.5.'), bass: pat('9.....7...9.....') },
+      { name: 'pixel pulse', bpm: 124, pad: 4, cutoff: 1600, duck: 0.35, swing: 0, chordLen: '8n',
+        chord: pat('8.....6...7.....'), kick: pat('9...9...9...9...'), clap: pat('................'),
+        hat: pat('..4...4...4...4.'), bass: pat('9.7.9.7.9.7.9.7.'),
+        arp: { voice: 'pixel', steps: pat('3.5.3.5.3.5.3.5.') } },
     ];
 
     const v = {};
+    let cur = PRESETS[0];      // the groove that is playing
+    let presetIndex = 0;       // the groove the palette is asking for
+    let pending = null;        // groove waiting for the next bar line
+    let dropout = false;       // drums + bass muted while a swap waits
+
     function buildAudio() {
-      const master = new Tone.Limiter(-1).toDestination();
+      // master: compressor, then a hard ceiling so a 10-key mash can't clip
+      const master = new Tone.Limiter(-3).toDestination();
       const comp = new Tone.Compressor(-20, 3).connect(master);
       const reverb = new Tone.Reverb({ decay: 2.4, preDelay: 0.012 }).connect(comp);
       reverb.wet.value = 1;
       const send = new Tone.Gain(0.3).connect(reverb);
-      const bus = new Tone.Gain(1);
+
+      // play bus: your notes
+      const bus = new Tone.Gain(1.4);
       bus.connect(comp);
       bus.connect(send);
-      v.bus = bus;
-
-      // backing bus is kept below the play bus so your notes sit on top
-      const back = new Tone.Gain(0.8);
+      // backing bus: sits under the play bus
+      const back = new Tone.Gain(0.55);
       back.connect(comp);
       back.connect(send);
-      v.padFilter = new Tone.Filter(TIMBRES[0].cutoff, 'lowpass').connect(back);
-      v.pads = TIMBRES.map((t) => {
-        const synth = t.make();
+
+      // layer 2, low-mids: warm pad → low-pass → chorus → ping-pong → sidechain duck
+      v.duck = new Tone.Gain(1).connect(back);
+      const pingpong = new Tone.PingPongDelay({ delayTime: '8n.', feedback: 0.3, wet: 0.16 }).connect(v.duck);
+      const chorus = new Tone.Chorus(4, 2.5, 0.35).connect(pingpong);
+      chorus.start();
+      chorus.wet.value = 0.5;
+      v.padFilter = new Tone.Filter(cur.cutoff, 'lowpass').connect(chorus);
+      v.pads = TIMBRES.map((make) => {
+        const synth = make();
         synth.volume.value = -17;
         synth.connect(v.padFilter);
         return synth;
       });
-      v.bass = new Tone.Synth({
+      v.kalimba = new Tone.PolySynth(Tone.FMSynth, {
+        harmonicity: 6, modulationIndex: 2.5,
+        oscillator: { type: 'sine' }, modulation: { type: 'sine' },
+        envelope: { attack: 0.002, decay: 0.9, sustain: 0, release: 0.4 },
+        modulationEnvelope: { attack: 0.002, decay: 0.15, sustain: 0, release: 0.1 },
+      });
+      v.kalimba.volume.value = -14;
+      v.kalimba.connect(v.duck);
+      v.pixel = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'square' },
+        envelope: { attack: 0.002, decay: 0.12, sustain: 0, release: 0.08 },
+      });
+      v.pixel.volume.value = -22;
+      v.pixel.chain(new Tone.Filter(2600, 'lowpass'), v.duck);
+
+      // layer 1, sub: filtered triangle, fast decay, ~280 hz ceiling
+      v.bass = new Tone.MonoSynth({
         oscillator: { type: 'triangle' },
-        envelope: { attack: 0.01, decay: 0.3, sustain: 0.5, release: 0.25 },
-      }).chain(new Tone.Filter(520, 'lowpass'), back);
-      v.bass.volume.value = -10;
+        envelope: { attack: 0.005, decay: 0.25, sustain: 0.2, release: 0.2 },
+        filter: { type: 'lowpass', Q: 1, rolloff: -24 },
+        filterEnvelope: { attack: 0.001, decay: 0.18, sustain: 0.4, release: 0.2, baseFrequency: 90, octaves: 1.6 },
+      }).connect(back);
+      v.bass.volume.value = -6;
+
+      // layer 3, micro-percussion: round kick (110 → 45 hz in 0.08s), noise hats
       v.kick = new Tone.MembraneSynth({
-        pitchDecay: 0.04, octaves: 5,
+        pitchDecay: 0.08, octaves: 110 / 45,
         envelope: { attack: 0.001, decay: 0.28, sustain: 0, release: 0.1 },
       }).connect(back);
-      v.kick.volume.value = -12;
-      v.bhat = new Tone.MetalSynth({
-        envelope: { attack: 0.001, decay: 0.045, release: 0.01 },
-        harmonicity: 5.1, modulationIndex: 32, resonance: 5000, octaves: 1.5,
-      }).connect(back);
-      v.bhat.volume.value = -32;
+      v.kick.volume.value = -8;
+      v.bhat = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.03, sustain: 0 },
+      }).chain(new Tone.Filter(6000, 'highpass'), back);
+      v.bhat.volume.value = -10;
       v.bclap = new Tone.NoiseSynth({
         noise: { type: 'pink' },
         envelope: { attack: 0.002, decay: 0.12, sustain: 0 },
       }).chain(new Tone.Filter(1600, 'bandpass'), back);
-      v.bclap.volume.value = -26;
+      v.bclap.volume.value = -14;
+      v.crash = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.002, decay: 0.7, sustain: 0 },
+      }).chain(new Tone.Filter(3000, 'highpass'), back);
+      v.crash.volume.value = -18;
 
-      // play voices
+      // your voices
+      v.marimba = new Tone.PolySynth(Tone.FMSynth, {
+        harmonicity: 4, modulationIndex: 1.2,
+        oscillator: { type: 'sine' }, modulation: { type: 'sine' },
+        envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.25 },
+        modulationEnvelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.1 },
+      });
+      v.marimba.volume.value = -5;
+      v.marimba.connect(bus);
       v.lead = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'sawtooth' },
         envelope: { attack: 0.003, decay: 0.22, sustain: 0.06, release: 0.3 },
       });
-      v.lead.volume.value = -12;
-      v.lead.chain(new Tone.Filter(4200, 'lowpass'), bus);
-      v.bell = new Tone.PolySynth(Tone.FMSynth, {
-        harmonicity: 3.01, modulationIndex: 7,
-        oscillator: { type: 'sine' }, modulation: { type: 'square' },
-        envelope: { attack: 0.002, decay: 0.9, sustain: 0, release: 0.9 },
-        modulationEnvelope: { attack: 0.002, decay: 0.3, sustain: 0, release: 0.2 },
+      v.lead.volume.value = -11;
+      v.lead.chain(new Tone.Filter(3600, 'lowpass'), bus);
+      v.vocal = {};
+      Object.keys(FORMANTS).forEach((vowel) => {
+        v.vocal[vowel] = makeVocal(vowel, bus);
+        v.vocal[vowel].volume.value = -10;
       });
-      v.bell.volume.value = -14;
-      v.bell.connect(bus);
-
       v.tom = new Tone.MembraneSynth({
         pitchDecay: 0.06, octaves: 3,
         envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.2 },
@@ -357,59 +435,85 @@
         envelope: { attack: 0.001, decay: 0.15, sustain: 0 },
       }).chain(new Tone.Filter(1900, 'bandpass'), bus);
       v.clap.volume.value = -8;
-      v.hat = new Tone.MetalSynth({
-        envelope: { attack: 0.001, decay: 0.07, release: 0.02 },
-        harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5,
-      }).connect(bus);
-      v.hat.volume.value = -22;
-      v.rim = new Tone.MembraneSynth({
-        pitchDecay: 0.008, octaves: 2,
-        envelope: { attack: 0.001, decay: 0.07, sustain: 0, release: 0.05 },
-      }).connect(bus);
-      v.rim.volume.value = -8;
-      v.ooh = makeFormantVoice([300, 870, 2240], bus);
-      v.ahh = makeFormantVoice([800, 1150, 2900], bus);
-      v.ooh.volume.value = -10;
-      v.ahh.volume.value = -10;
-      v.zap = new Tone.MembraneSynth({
-        pitchDecay: 0.09, octaves: 6,
-        envelope: { attack: 0.001, decay: 0.22, sustain: 0, release: 0.1 },
-      }).connect(bus);
-      v.zap.volume.value = -9;
+      v.shaker = new Tone.NoiseSynth({
+        noise: { type: 'pink' },
+        envelope: { attack: 0.002, decay: 0.07, sustain: 0 },
+      }).chain(new Tone.Filter(5000, 'highpass'), bus);
+      v.shaker.volume.value = -6;
 
-      // 4 bars of 16ths: kick on the beat, hats on the off-beat, chord + stab
+      // four bars of 16ths, the groove read from whichever preset is live
+      let arpN = 0;
       const steps = Array.from({ length: 64 }, (_, i) => i);
       v.seq = new Tone.Sequence((time, step) => {
-        const bar = Math.floor(step / 16);
-        const s = step % 16;
+        const bar = step >> 4;
+        const s = step & 15;
         const chord = CHORDS[bar];
-        const pad = v.pads[paletteIndex];
-        if (s === 0) pad.triggerAttackRelease(chord.notes, '1m', time, 0.7);
-        if (s === 10) pad.triggerAttackRelease(chord.notes, '8n', time, 0.45);
-        if (s % 4 === 0) v.kick.triggerAttackRelease('C1', '8n', time, 0.9);
-        if (s % 4 === 2) v.bhat.triggerAttackRelease(250, 0.04, time, 0.8);
-        if (s === 4 || s === 12) v.bclap.triggerAttackRelease(0.1, time, 0.7);
-        if (s === 0 || s === 6 || s === 10) v.bass.triggerAttackRelease(chord.bass, '8n', time, 0.9);
-        if (s === 14) v.bass.triggerAttackRelease(Tone.Frequency(chord.bass).transpose(12), '16n', time, 0.6);
+        let dropIn = false;
+        if (s === 0) {
+          arpN = 0;
+          if (pending !== null) {
+            applyPreset(pending, time);
+            pending = null;
+            dropout = false;
+            dropIn = true;
+          }
+        }
+        const P = cur;
+        // swing delays only the off-beat 8ths; the quantize grid stays straight
+        const late = s % 4 === 2 ? P.swing * 60 / P.bpm / 4 : 0;
+
+        if (P.chord[s]) v.pads[P.pad].triggerAttackRelease(chord.notes, P.chordLen, time, P.chord[s]);
+
+        if (!dropout) {
+          const kv = dropIn ? Math.max(P.kick[s], 0.9) : P.kick[s];
+          if (kv) {
+            v.kick.triggerAttackRelease(45, '8n', time, kv);
+            // sidechain-style breath: pad dips on the kick, swells back in 0.15s
+            v.duck.gain.setValueAtTime(P.duck, time);
+            v.duck.gain.linearRampToValueAtTime(1, time + 0.15);
+          }
+          if (P.clap[s]) v.bclap.triggerAttackRelease(0.1, time, P.clap[s]);
+          if (P.hat[s]) v.bhat.triggerAttackRelease(0.03, time + late, P.hat[s]);
+          if (P.bass[s]) v.bass.triggerAttackRelease(chord.bass, '8n', time, P.bass[s] + 0.1);
+          if (P.arp && P.arp.steps[s]) {
+            const note = Tone.Frequency(chord.notes[arpN++ % chord.notes.length]).transpose(12);
+            v[P.arp.voice].triggerAttackRelease(note, '16n', time + late, P.arp.steps[s]);
+          }
+        }
+        if (dropIn) v.crash.triggerAttackRelease(0.7, time, 0.7);
+
         if (s % 4 === 0) {
-          Tone.Draw.schedule(() => { pulse = s === 0 ? 1 : 0.7; }, time);
+          Tone.Draw.schedule(() => { pulse = s === 0 ? (dropIn ? 1.3 : 1) : 0.7; }, time);
         }
       }, steps, '16n');
       v.seq.start(0);
     }
 
+    // swap the groove on a bar line: tempo, pad voice and filter, patterns
+    function applyPreset(index, time) {
+      cur = PRESETS[index];
+      Tone.getTransport().bpm.setValueAtTime(cur.bpm, time);
+      v.pads.forEach((pad, i) => { if (i !== cur.pad) pad.releaseAll(time); });
+      v.padFilter.frequency.rampTo(cur.cutoff, 0.3, time);
+    }
+
+    // spacebar: mute drums + bass now, drop the new groove at the next bar
+    function requestPreset(index) {
+      presetIndex = index;
+      if (!audio.ready || Tone.getTransport().state !== 'started') return;
+      pending = index;
+      dropout = true;
+    }
+
     function playVoice(key, time) {
       const n = key.note;
       switch (key.voice) {
+        case 'marimba': v.marimba.triggerAttackRelease(n, '8n', time, 0.85); break;
         case 'lead': v.lead.triggerAttackRelease(n, '8n', time, 0.85); break;
-        case 'bell': v.bell.triggerAttackRelease(n, '4n', time, 0.8); break;
+        case 'vocal': v.vocal[key.vowel].triggerAttackRelease(n, '8n', monoTime('vocal-' + key.vowel, time), 0.9); break;
         case 'tom': v.tom.triggerAttackRelease('G2', '8n', monoTime('tom', time), 1); break;
         case 'clap': v.clap.triggerAttackRelease(0.12, monoTime('clap', time), 1); break;
-        case 'hat': v.hat.triggerAttackRelease(300, 0.06, monoTime('hat', time), 0.9); break;
-        case 'rim': v.rim.triggerAttackRelease('G5', 0.05, monoTime('rim', time), 1); break;
-        case 'ooh': v.ooh.triggerAttackRelease('G4', '8n', monoTime('ooh', time), 0.9); break;
-        case 'ahh': v.ahh.triggerAttackRelease('E4', '8n', monoTime('ahh', time), 0.9); break;
-        case 'zap': v.zap.triggerAttackRelease('C5', '8n', monoTime('zap', time), 0.9); break;
+        case 'shaker': v.shaker.triggerAttackRelease(0.07, monoTime('shaker', time), 0.9); break;
       }
     }
 
@@ -417,7 +521,8 @@
       if (audio.ready) return Promise.resolve();
       if (!audio.starting) {
         audio.starting = Tone.start().then(() => {
-          Tone.getTransport().bpm.value = BPM;
+          cur = PRESETS[presetIndex];
+          Tone.getTransport().bpm.value = cur.bpm;
           buildAudio();
           Tone.getTransport().start('+0.06');
           audio.ready = true;
@@ -427,14 +532,15 @@
       return audio.starting;
     }
 
-    // next 16th-note gridline, measured against the live transport so a
-    // quantized hit lands exactly on the same clock as the kick and hats
+    // next 16th-note gridline, measured in transport ticks so a quantized
+    // hit lands on the same clock as the kick and hats at any tempo
     function nextGrid() {
       const t = Tone.getTransport();
       const from = Tone.immediate() + 0.012;
-      const pos = t.getSecondsAtTime(from);
-      const idx = Math.ceil(pos / SIXTEENTH - 1e-6);
-      return from + (idx * SIXTEENTH - pos);
+      const step = t.PPQ / 4;
+      const ticks = t.getTicksAtTime(from);
+      const next = Math.ceil(ticks / step - 1e-6) * step;
+      return from + (next - ticks) / t.PPQ * 60 / t.bpm.getValueAtTime(from);
     }
 
     // ── triggering ───────────────────────────────────────────────────
@@ -478,7 +584,7 @@
       return letters[col];
     }
 
-    // ── palette + timbre ─────────────────────────────────────────────
+    // ── palette + groove ─────────────────────────────────────────────
     function applyPalette(index, announce) {
       paletteIndex = index;
       const p = PALETTES[index];
@@ -488,16 +594,14 @@
       root.setProperty('--bg', p.bg);
       root.setProperty('--ink', p.ink);
       p.colors.forEach((c, i) => root.setProperty('--c' + i, c));
-      if (audio.ready) {
-        v.pads.forEach((s, i) => { if (i !== index) s.releaseAll(Tone.now()); });
-        v.padFilter.frequency.rampTo(TIMBRES[index].cutoff, 0.4);
-      }
       pulse = 1.4;
-      if (announce) live.textContent = 'palette ' + (index + 1) + ' of ' + PALETTES.length;
+      if (announce) live.textContent = PRESETS[index].name + ', ' + PRESETS[index].bpm + ' bpm';
     }
 
     function nextPalette() {
-      applyPalette((paletteIndex + 1) % PALETTES.length, true);
+      const next = (paletteIndex + 1) % PALETTES.length;
+      applyPalette(next, true);
+      requestPreset(next);
     }
 
     // ── visuals ──────────────────────────────────────────────────────

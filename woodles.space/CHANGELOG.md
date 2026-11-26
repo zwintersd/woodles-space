@@ -21,16 +21,20 @@ so it's not easy to forget.
 ## 2026-11-26
 
 - **groove mode in the piano** — "groove mode →" at the top of the piano (or
-  `/piano/groove`) opens a patatap-style room. a quiet 115 bpm loop (warm pad
-  chords, soft kick, hats, bass) runs underneath, and all 26 letter keys — or
-  touch and drag across the screen, split into three rows like a keyboard —
-  play C major pentatonic across two octaves plus a few tuned drum and vocal
-  hits. the loop's chords use only those same five notes, so nothing clashes.
-  every letter has its own shape, with no text on the stage; the background
-  pulses on each beat, a lone hit stays sharp and a pile of them softens.
-  space cycles five palettes and changes the pad's sound with them. a small
-  toggle at the top right switches between instant and 16th-note quantize
-  (hits snap to the loop's grid). tone.js is vendored in `apps/piano/vendor/`.
+  `/piano/groove`) opens a patatap-style room. a quiet loop runs underneath
+  (Fmaj7 · G6 · Am7 · Cmaj9: a sub bass pulse, a warm ducking pad, soft kick
+  and hats), and all 26 letter keys — or touch and drag across the screen,
+  split into three rows like a keyboard — play C major pentatonic over
+  octaves 4–6: marimba and lead plucks, six vocal-style chops, a tom, clap and
+  shaker. every letter has its own shape, with no text on the stage; the
+  background pulses on each beat, a lone hit stays sharp and a pile of them
+  softens, and a limiter keeps a full-keyboard mash from clipping.
+  space cycles five palettes and swaps the whole groove with them — 115 bpm
+  dreamy synthwave, 128 bpm kawaii future bass, 95 bpm lo-fi kalimba, plus an
+  organ and a pixel-pulse one. drums and bass drop out when you press it and
+  the new groove lands on the next bar. a toggle at the top right switches
+  between instant and 16th-note quantize (hits snap to the loop's grid, at
+  any tempo). tone.js is vendored in `apps/piano/vendor/`.
 
 ## 2026-11-15
 
