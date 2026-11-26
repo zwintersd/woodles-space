@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>groove · piano · woodles.space</title>
+  <link rel="stylesheet" href="/shared/fonts.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink: #ffffff;
+      --bg: #0b0b1a;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-mono, ui-monospace, monospace);
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior: none;
+    }
+
+    canvas#stage {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      cursor: pointer;
+    }
+
+    /* quiet chrome: nearly invisible until you reach for it */
+    .chrome {
+      position: fixed;
+      z-index: 2;
+      top: max(0.9rem, env(safe-area-inset-top));
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.68rem;
+      letter-spacing: 0.04em;
+      opacity: 0.32;
+      transition: opacity 0.25s ease;
+    }
+    .chrome:hover, .chrome:focus-within { opacity: 1; }
+    .chrome.left { left: max(1rem, env(safe-area-inset-left)); }
+    .chrome.right { right: max(1rem, env(safe-area-inset-right)); }
+
+    .chrome a, .chrome button {
+      color: var(--ink);
+      font: inherit;
+      text-decoration: none;
+      background: color-mix(in srgb, var(--bg) 55%, transparent);
+      border: 1px solid color-mix(in srgb, var(--ink) 38%, transparent);
+      border-radius: 999px;
+      min-height: 2rem;
+      padding: 0 0.8rem;
+      display: inline-flex;
+      align-items: center;
+      cursor: pointer;
+    }
+    .chrome a:focus-visible, .chrome button:focus-visible {
+      outline: 2px solid var(--ink);
+      outline-offset: 2px;
+    }
+
+    .seg {
+      display: inline-flex;
+      border: 1px solid color-mix(in srgb, var(--ink) 38%, transparent);
+      border-radius: 999px;
+      overflow: hidden;
+      background: color-mix(in srgb, var(--bg) 55%, transparent);
+    }
+    .seg button { border: 0; border-radius: 0; background: transparent; }
+    .seg button[aria-pressed="true"] {
+      background: var(--ink);
+      color: var(--bg);
+    }
+
+    #palette-btn {
+      width: 2rem;
+      padding: 0;
+      justify-content: center;
+    }
+    #palette-btn i {
+      width: 0.8rem;
+      height: 0.8rem;
+      border-radius: 50%;
+      background: conic-gradient(var(--c0), var(--c1), var(--c2), var(--c3), var(--c4), var(--c0));
+    }
+
+    /* the only text the stage ever shows: a wake-up nudge before audio starts */
+    #wake {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+      font-size: 0.8rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      transition: opacity 0.5s ease;
+    }
+    #wake span { animation: breathe 1.8s ease-in-out infinite; }
+    #wake.gone { opacity: 0; }
+    @keyframes breathe { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.9; } }
+
+    #fail {
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      display: none;
+      place-items: center;
+      padding: 2rem;
+      text-align: center;
+      font-size: 0.8rem;
+      line-height: 1.7;
+    }
+    #fail.on { display: grid; }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #wake span { animation: none; opacity: 0.7; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="stage" aria-label="Touch or type letters to play. Space changes colors and sound."></canvas>
+
+  <nav class="chrome left" aria-label="Groove navigation">
+    <a href="/piano">&larr; piano</a>
+  </nav>
+
+  <div class="chrome right" role="group" aria-label="Groove controls">
+    <div class="seg" role="group" aria-label="Trigger timing">
+      <button type="button" id="mode-instant" aria-pressed="true" title="play the instant you press">instant</button>
+      <button type="button" id="mode-quantize" aria-pressed="false" title="snap each press to the next 16th note">16th</button>
+    </div>
+    <button type="button" id="palette-btn" aria-label="Next color palette and sound (space)" title="next palette + sound (space)"><i></i></button>
+  </div>
+
+  <div id="wake"><span>tap or press any key</span></div>
+  <div id="fail" role="alert">tone.js did not load, so there is nothing to play. reload to try again.</div>
+  <p class="sr-only" id="live" aria-live="polite"></p>
+
+  <script src="/piano/vendor/tone-15.1.22.js"></script>
+  <script>
+  (() => {
+    'use strict';
+
+    if (typeof Tone === 'undefined') {
+      document.getElementById('fail').classList.add('on');
+      return;
+    }
+
+    // ── key map ───────────────────────────────────────────────────────
+    // C major pentatonic across two octaves. every melodic key and every
+    // tuned hit below lands on C D E G A, and the backing chords are built
+    // only from those same five pitch classes, so nothing can clash.
+    const BPM = 115;
+    const SIXTEENTH = 60 / BPM / 4;
+    const SCALE = ['C4', 'D4', 'E4', 'G4', 'A4', 'C5', 'D5', 'E5', 'G5', 'A5', 'C6'];
+    const ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+
+    // q–p lead plucks (C4–A5), a–l bells (E4–C6), z–m percussive + vocal hits
+    const HITS = ['tom', 'clap', 'hat', 'rim', 'ooh', 'ahh', 'zap'];
+    const KEYS = {};
+    ROWS.forEach((row, r) => {
+      [...row].forEach((letter, c) => {
+        let voice, note;
+        if (r === 0) { voice = 'lead'; note = SCALE[c]; }
+        else if (r === 1) { voice = 'bell'; note = SCALE[c + 2]; }
+        else { voice = HITS[c]; }
+        KEYS[letter] = {
+          letter, voice, note, row: r, col: c, cols: row.length,
+          shape: letter.charCodeAt(0) - 97,
+        };
+      });
+    });
+
+    // ── palettes: five high-contrast looks, each paired with a pad timbre ─
+    const PALETTES = [
+      { bg: '#0b0b1a', pulse: '#2a2058', ink: '#ffffff', colors: ['#ff2e93', '#00e5ff', '#ffe600', '#7cff4d', '#b266ff'] },
+      { bg: '#1c0a08', pulse: '#4a1a10', ink: '#fff4e0', colors: ['#ff6b35', '#ffd23f', '#ff3c78', '#fff1d0', '#00d4b4'] },
+      { bg: '#f3eee4', pulse: '#ffffff', ink: '#14122b', colors: ['#e5243b', '#1b2a6b', '#0e9f8e', '#f08a24', '#7a1fa2'] },
+      { bg: '#04130d', pulse: '#0f3a28', ink: '#f2ffe0', colors: ['#c6ff00', '#00ffa3', '#ff5e5b', '#f9f871', '#00b3ff'] },
+      { bg: '#000000', pulse: '#22222c', ink: '#ffffff', colors: ['#ffffff', '#9be7ff', '#4da3ff', '#c7b8ff', '#ffd1f0'] },
+    ];
+
+    // ── state ─────────────────────────────────────────────────────────
+    const canvas = document.getElementById('stage');
+    const ctx = canvas.getContext('2d');
+    const wake = document.getElementById('wake');
+    const live = document.getElementById('live');
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let W = 0, H = 0, dpr = 1;
+    let paletteIndex = 0;
+    let mode = 'instant';
+    let pulse = 0;
+    let soft = 0;
+    const fxList = [];
+    const bgNow = hexToRgb(PALETTES[0].bg);
+    const pulseNow = hexToRgb(PALETTES[0].pulse);
+    const bgTarget = bgNow.slice();
+    const pulseTarget = pulseNow.slice();
+
+    function hexToRgb(hex) {
+      const n = parseInt(hex.slice(1), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+    function rgbStr(rgb) {
+      return 'rgb(' + rgb.map(Math.round).join(',') + ')';
+    }
+
+    // ── audio ─────────────────────────────────────────────────────────
+    const audio = { ready: false, starting: null };
+    const lastTime = new Map();
+
+    // Tone throws if a mono synth is asked to start at or before its last start
+    function monoTime(key, time) {
+      const t = Math.max(time, (lastTime.get(key) || 0) + 0.003);
+      lastTime.set(key, t);
+      return t;
+    }
+
+    function makeFormantVoice(formants, out) {
+      const osc = new Tone.Synth({
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.012, decay: 0.12, sustain: 0.45, release: 0.14 },
+      });
+      const mix = new Tone.Gain(2.6).connect(out);
+      formants.forEach((freq, i) => {
+        const band = new Tone.Filter({ type: 'bandpass', frequency: freq, Q: 7 + i * 2 });
+        const gain = new Tone.Gain([1, 0.55, 0.3][i]);
+        osc.chain(band, gain, mix);
+      });
+      return osc;
+    }
+
+    const TIMBRES = [
+      // warm: detuned saw, soft cutoff
+      { cutoff: 1100, make: () => new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'fatsawtooth', count: 3, spread: 24 },
+        envelope: { attack: 0.22, decay: 0.4, sustain: 0.75, release: 1.2 } }) },
+      // glass: soft fm bells
+      { cutoff: 3200, make: () => new Tone.PolySynth(Tone.FMSynth, {
+        harmonicity: 2, modulationIndex: 1.4,
+        oscillator: { type: 'sine' }, modulation: { type: 'sine' },
+        envelope: { attack: 0.1, decay: 0.5, sustain: 0.65, release: 1.4 } }) },
+      // organ: am, round and breathy
+      { cutoff: 2000, make: () => new Tone.PolySynth(Tone.AMSynth, {
+        harmonicity: 1.5, oscillator: { type: 'triangle' }, modulation: { type: 'square' },
+        envelope: { attack: 0.06, decay: 0.3, sustain: 0.8, release: 0.9 } }) },
+      // pluck: short triangle stabs
+      { cutoff: 2800, make: () => new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.004, decay: 0.55, sustain: 0.06, release: 0.5 } }) },
+      // hollow: narrow pulse
+      { cutoff: 1500, make: () => new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'pulse', width: 0.22 },
+        envelope: { attack: 0.03, decay: 0.3, sustain: 0.55, release: 0.8 } }) },
+    ];
+
+    // every chord tone and bass root is one of C D E G A
+    const CHORDS = [
+      { bass: 'C2', notes: ['C3', 'E3', 'G3', 'D4'] },
+      { bass: 'A1', notes: ['A2', 'C3', 'E3', 'G3'] },
+      { bass: 'G1', notes: ['G2', 'D3', 'A3', 'E4'] },
+      { bass: 'E2', notes: ['E3', 'G3', 'D4', 'A4'] },
+    ];
+
+    const v = {};
+    function buildAudio() {
+      const master = new Tone.Limiter(-1).toDestination();
+      const comp = new Tone.Compressor(-20, 3).connect(master);
+      const reverb = new Tone.Reverb({ decay: 2.4, preDelay: 0.012 }).connect(comp);
+      reverb.wet.value = 1;
+      const send = new Tone.Gain(0.3).connect(reverb);
+      const bus = new Tone.Gain(1);
+      bus.connect(comp);
+      bus.connect(send);
+      v.bus = bus;
+
+      // backing bus is kept below the play bus so your notes sit on top
+      const back = new Tone.Gain(0.8);
+      back.connect(comp);
+      back.connect(send);
+      v.padFilter = new Tone.Filter(TIMBRES[0].cutoff, 'lowpass').connect(back);
+      v.pads = TIMBRES.map((t) => {
+        const synth = t.make();
+        synth.volume.value = -17;
+        synth.connect(v.padFilter);
+        return synth;
+      });
+      v.bass = new Tone.Synth({
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.01, decay: 0.3, sustain: 0.5, release: 0.25 },
+      }).chain(new Tone.Filter(520, 'lowpass'), back);
+      v.bass.volume.value = -10;
+      v.kick = new Tone.MembraneSynth({
+        pitchDecay: 0.04, octaves: 5,
+        envelope: { attack: 0.001, decay: 0.28, sustain: 0, release: 0.1 },
+      }).connect(back);
+      v.kick.volume.value = -12;
+      v.bhat = new Tone.MetalSynth({
+        envelope: { attack: 0.001, decay: 0.045, release: 0.01 },
+        harmonicity: 5.1, modulationIndex: 32, resonance: 5000, octaves: 1.5,
+      }).connect(back);
+      v.bhat.volume.value = -32;
+      v.bclap = new Tone.NoiseSynth({
+        noise: { type: 'pink' },
+        envelope: { attack: 0.002, decay: 0.12, sustain: 0 },
+      }).chain(new Tone.Filter(1600, 'bandpass'), back);
+      v.bclap.volume.value = -26;
+
+      // play voices
+      v.lead = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.003, decay: 0.22, sustain: 0.06, release: 0.3 },
+      });
+      v.lead.volume.value = -12;
+      v.lead.chain(new Tone.Filter(4200, 'lowpass'), bus);
+      v.bell = new Tone.PolySynth(Tone.FMSynth, {
+        harmonicity: 3.01, modulationIndex: 7,
+        oscillator: { type: 'sine' }, modulation: { type: 'square' },
+        envelope: { attack: 0.002, decay: 0.9, sustain: 0, release: 0.9 },
+        modulationEnvelope: { attack: 0.002, decay: 0.3, sustain: 0, release: 0.2 },
+      });
+      v.bell.volume.value = -14;
+      v.bell.connect(bus);
+
+      v.tom = new Tone.MembraneSynth({
+        pitchDecay: 0.06, octaves: 3,
+        envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.2 },
+      }).connect(bus);
+      v.tom.volume.value = -6;
+      v.clap = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.15, sustain: 0 },
+      }).chain(new Tone.Filter(1900, 'bandpass'), bus);
+      v.clap.volume.value = -8;
+      v.hat = new Tone.MetalSynth({
+        envelope: { attack: 0.001, decay: 0.07, release: 0.02 },
+        harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5,
+      }).connect(bus);
+      v.hat.volume.value = -22;
+      v.rim = new Tone.MembraneSynth({
+        pitchDecay: 0.008, octaves: 2,
+        envelope: { attack: 0.001, decay: 0.07, sustain: 0, release: 0.05 },
+      }).connect(bus);
+      v.rim.volume.value = -8;
+      v.ooh = makeFormantVoice([300, 870, 2240], bus);
+      v.ahh = makeFormantVoice([800, 1150, 2900], bus);
+      v.ooh.volume.value = -10;
+      v.ahh.volume.value = -10;
+      v.zap = new Tone.MembraneSynth({
+        pitchDecay: 0.09, octaves: 6,
+        envelope: { attack: 0.001, decay: 0.22, sustain: 0, release: 0.1 },
+      }).connect(bus);
+      v.zap.volume.value = -9;
+
+      // 4 bars of 16ths: kick on the beat, hats on the off-beat, chord + stab
+      const steps = Array.from({ length: 64 }, (_, i) => i);
+      v.seq = new Tone.Sequence((time, step) => {
+        const bar = Math.floor(step / 16);
+        const s = step % 16;
+        const chord = CHORDS[bar];
+        const pad = v.pads[paletteIndex];
+        if (s === 0) pad.triggerAttackRelease(chord.notes, '1m', time, 0.7);
+        if (s === 10) pad.triggerAttackRelease(chord.notes, '8n', time, 0.45);
+        if (s % 4 === 0) v.kick.triggerAttackRelease('C1', '8n', time, 0.9);
+        if (s % 4 === 2) v.bhat.triggerAttackRelease(250, 0.04, time, 0.8);
+        if (s === 4 || s === 12) v.bclap.triggerAttackRelease(0.1, time, 0.7);
+        if (s === 0 || s === 6 || s === 10) v.bass.triggerAttackRelease(chord.bass, '8n', time, 0.9);
+        if (s === 14) v.bass.triggerAttackRelease(Tone.Frequency(chord.bass).transpose(12), '16n', time, 0.6);
+        if (s % 4 === 0) {
+          Tone.Draw.schedule(() => { pulse = s === 0 ? 1 : 0.7; }, time);
+        }
+      }, steps, '16n');
+      v.seq.start(0);
+    }
+
+    function playVoice(key, time) {
+      const n = key.note;
+      switch (key.voice) {
+        case 'lead': v.lead.triggerAttackRelease(n, '8n', time, 0.85); break;
+        case 'bell': v.bell.triggerAttackRelease(n, '4n', time, 0.8); break;
+        case 'tom': v.tom.triggerAttackRelease('G2', '8n', monoTime('tom', time), 1); break;
+        case 'clap': v.clap.triggerAttackRelease(0.12, monoTime('clap', time), 1); break;
+        case 'hat': v.hat.triggerAttackRelease(300, 0.06, monoTime('hat', time), 0.9); break;
+        case 'rim': v.rim.triggerAttackRelease('G5', 0.05, monoTime('rim', time), 1); break;
+        case 'ooh': v.ooh.triggerAttackRelease('G4', '8n', monoTime('ooh', time), 0.9); break;
+        case 'ahh': v.ahh.triggerAttackRelease('E4', '8n', monoTime('ahh', time), 0.9); break;
+        case 'zap': v.zap.triggerAttackRelease('C5', '8n', monoTime('zap', time), 0.9); break;
+      }
+    }
+
+    function startAudio() {
+      if (audio.ready) return Promise.resolve();
+      if (!audio.starting) {
+        audio.starting = Tone.start().then(() => {
+          Tone.getTransport().bpm.value = BPM;
+          buildAudio();
+          Tone.getTransport().start('+0.06');
+          audio.ready = true;
+          wake.classList.add('gone');
+        });
+      }
+      return audio.starting;
+    }
+
+    // next 16th-note gridline, measured against the live transport so a
+    // quantized hit lands exactly on the same clock as the kick and hats
+    function nextGrid() {
+      const t = Tone.getTransport();
+      const from = Tone.immediate() + 0.012;
+      const pos = t.getSecondsAtTime(from);
+      const idx = Math.ceil(pos / SIXTEENTH - 1e-6);
+      return from + (idx * SIXTEENTH - pos);
+    }
+
+    // ── triggering ───────────────────────────────────────────────────
+    function layoutPoint(key) {
+      return {
+        x: W * (key.col + 0.5) / key.cols,
+        y: H * (key.row + 0.5) / 3,
+      };
+    }
+
+    function fire(key, x, y) {
+      const spawnAt = (when) => {
+        if (when === null) { spawn(key, x, y); return; }
+        Tone.Draw.schedule(() => spawn(key, x, y), when);
+      };
+      const go = () => {
+        if (mode === 'quantize' && Tone.getTransport().state === 'started') {
+          const when = nextGrid();
+          playVoice(key, when);
+          spawnAt(when);
+        } else {
+          playVoice(key, Tone.immediate() + 0.005);
+          spawnAt(null);
+        }
+      };
+      if (audio.ready) go();
+      else startAudio().then(go).catch(() => {});
+    }
+
+    function pressLetter(letter) {
+      const key = KEYS[letter];
+      if (!key) return;
+      const p = layoutPoint(key);
+      fire(key, p.x, p.y);
+    }
+
+    function cellAt(clientX, clientY) {
+      const row = Math.min(2, Math.max(0, Math.floor(clientY / H * 3)));
+      const letters = ROWS[row];
+      const col = Math.min(letters.length - 1, Math.max(0, Math.floor(clientX / W * letters.length)));
+      return letters[col];
+    }
+
+    // ── palette + timbre ─────────────────────────────────────────────
+    function applyPalette(index, announce) {
+      paletteIndex = index;
+      const p = PALETTES[index];
+      hexToRgb(p.bg).forEach((c, i) => { bgTarget[i] = c; });
+      hexToRgb(p.pulse).forEach((c, i) => { pulseTarget[i] = c; });
+      const root = document.documentElement.style;
+      root.setProperty('--bg', p.bg);
+      root.setProperty('--ink', p.ink);
+      p.colors.forEach((c, i) => root.setProperty('--c' + i, c));
+      if (audio.ready) {
+        v.pads.forEach((s, i) => { if (i !== index) s.releaseAll(Tone.now()); });
+        v.padFilter.frequency.rampTo(TIMBRES[index].cutoff, 0.4);
+      }
+      pulse = 1.4;
+      if (announce) live.textContent = 'palette ' + (index + 1) + ' of ' + PALETTES.length;
+    }
+
+    function nextPalette() {
+      applyPalette((paletteIndex + 1) % PALETTES.length, true);
+    }
+
+    // ── visuals ──────────────────────────────────────────────────────
+    const TAU = Math.PI * 2;
+    const ease = (p) => 1 - Math.pow(1 - p, 3);
+    const clamp01 = (n) => Math.min(1, Math.max(0, n));
+
+    function poly(c, n, r, rot) {
+      c.beginPath();
+      for (let i = 0; i < n; i++) {
+        const a = rot + i * TAU / n;
+        const px = Math.cos(a) * r, py = Math.sin(a) * r;
+        if (i) c.lineTo(px, py); else c.moveTo(px, py);
+      }
+      c.closePath();
+    }
+
+    function starPath(c, n, r1, r2, rot) {
+      c.beginPath();
+      for (let i = 0; i < n * 2; i++) {
+        const a = rot + i * Math.PI / n;
+        const r = i % 2 ? r1 : r2;
+        const px = Math.cos(a) * r, py = Math.sin(a) * r;
+        if (i) c.lineTo(px, py); else c.moveTo(px, py);
+      }
+      c.closePath();
+    }
+
+    function ring(c, r) { c.beginPath(); c.arc(0, 0, Math.max(0, r), 0, TAU); }
+
+    // one drawer per letter, a–z. c is translated to the hit point;
+    // p runs 0→1; R is the radius budget; a/b are the primary + accent colors
+    const SHAPES = [
+      /* a */ (c, f, p, R, a) => { ring(c, R * ease(p)); c.strokeStyle = a; c.lineWidth = f.lw * 1.5; c.stroke(); },
+      /* b */ (c, f, p, R, a, b) => {
+        ring(c, R * ease(p)); c.strokeStyle = a; c.lineWidth = f.lw * 1.4; c.stroke();
+        ring(c, R * 0.62 * ease(clamp01((p - 0.14) / 0.86))); c.strokeStyle = b; c.stroke();
+      },
+      /* c */ (c, f, p, R, a) => { poly(c, 3, R * (0.3 + 0.7 * ease(p)), p * Math.PI - Math.PI / 2); c.strokeStyle = a; c.lineWidth = f.lw * 1.6; c.stroke(); },
+      /* d */ (c, f, p, R, a) => { poly(c, 4, R * 0.8 * (1 - ease(p) * 0.7), p * Math.PI); c.fillStyle = a; c.fill(); },
+      /* e */ (c, f, p, R, a, b) => {
+        poly(c, 6, R * ease(p), p * 2.4); c.strokeStyle = a; c.lineWidth = f.lw * 1.6; c.stroke();
+        poly(c, 6, R * 0.5 * ease(p), -p * 2.4); c.strokeStyle = b; c.stroke();
+      },
+      /* f */ (c, f, p, R, a) => {
+        const e = ease(p);
+        c.strokeStyle = a; c.lineWidth = f.lw * 1.2;
+        for (let i = 0; i < 12; i++) {
+          const ang = i * TAU / 12;
+          const r0 = R * Math.max(0.1, e - 0.45), r1 = R * e;
+          c.beginPath(); c.moveTo(Math.cos(ang) * r0, Math.sin(ang) * r0); c.lineTo(Math.cos(ang) * r1, Math.sin(ang) * r1); c.stroke();
+        }
+      },
+      /* g */ (c, f, p, R, a, b) => {
+        const e = ease(p);
+        for (let i = 0; i < 16; i++) {
+          const ang = i * TAU / 16 + 0.2;
+          c.fillStyle = i % 2 ? b : a;
+          c.beginPath(); c.arc(Math.cos(ang) * R * 1.05 * e, Math.sin(ang) * R * 1.05 * e, f.lw * 1.7 * (1 - p * 0.7), 0, TAU); c.fill();
+        }
+      },
+      /* h */ (c, f, p, R, a) => {
+        const y = -Math.abs(Math.sin(p * Math.PI * 3)) * R * 0.9 * (1 - p * 0.6);
+        c.beginPath(); c.arc(0, y, R * 0.45, Math.PI, TAU); c.strokeStyle = a; c.lineWidth = f.lw * 2; c.stroke();
+      },
+      /* i */ (c, f, p, R, a) => { starPath(c, 5, R * 0.42 * ease(p), R * ease(p), p * Math.PI - Math.PI / 2); c.fillStyle = a; c.fill(); },
+      /* j */ (c, f, p, R, a, b) => {
+        for (let i = 0; i < 30; i++) {
+          const t = i / 30, ang = t * 9 + p * 3, r = t * R * 1.15 * ease(p);
+          c.fillStyle = i % 3 ? a : b;
+          c.beginPath(); c.arc(Math.cos(ang) * r, Math.sin(ang) * r, f.lw * (0.7 + t * 1.2), 0, TAU); c.fill();
+        }
+      },
+      /* k */ (c, f, p, R, a) => {
+        c.rotate(ease(p) * Math.PI / 2); c.fillStyle = a;
+        const len = R * 1.1 * ease(clamp01(p * 2)), th = R * 0.14 * (1 - p * 0.5);
+        c.fillRect(-len, -th / 2, len * 2, th); c.fillRect(-th / 2, -len, th, len * 2);
+      },
+      /* l */ (c, f, p, R, a, b) => {
+        ring(c, R * 0.5 * ease(p)); c.fillStyle = a; c.fill();
+        ring(c, R * ease(p)); c.strokeStyle = b; c.lineWidth = f.lw; c.stroke();
+      },
+      /* m */ (c, f, p, R, a) => {
+        c.setLineDash([R * 0.18, R * 0.12]); poly(c, 5, R * (0.35 + 0.65 * ease(p)), -p * Math.PI);
+        c.strokeStyle = a; c.lineWidth = f.lw * 1.7; c.stroke(); c.setLineDash([]);
+      },
+      /* n */ (c, f, p, R, a, b) => {
+        const e = ease(p);
+        [1, 0.66, 0.33].forEach((k, i) => {
+          const s = R * k * e;
+          c.strokeStyle = i % 2 ? b : a; c.lineWidth = f.lw * 1.4;
+          c.strokeRect(-s, -s, s * 2, s * 2);
+        });
+      },
+      /* o */ (c, f, p, R, a) => {
+        const e = ease(p), th = R * 0.14 * (1 - p * 0.5);
+        const head = -f.x + W * 1.1 * e, tail = -f.x + W * 1.1 * Math.max(0, e - 0.3);
+        c.fillStyle = a; c.fillRect(tail, -th / 2, head - tail, th);
+      },
+      /* p */ (c, f, p, R, a) => {
+        c.fillStyle = a;
+        for (let i = -2; i <= 2; i++) {
+          const h = R * (0.25 + 0.95 * Math.abs(Math.sin(p * Math.PI * 2 + i * 0.9))) * (1 - p * 0.45);
+          c.fillRect(i * R * 0.26 - R * 0.07, -h / 2, R * 0.14, h);
+        }
+      },
+      /* q */ (c, f, p, R, a, b) => {
+        const r = R * (0.25 + 0.7 * ease(p));
+        ring(c, r); c.strokeStyle = b; c.globalAlpha *= 0.35; c.lineWidth = f.lw * 0.6; c.stroke(); c.globalAlpha /= 0.35;
+        c.fillStyle = a;
+        for (let i = 0; i < 3; i++) {
+          const ang = p * Math.PI * 3 + i * TAU / 3;
+          c.beginPath(); c.arc(Math.cos(ang) * r, Math.sin(ang) * r, f.lw * 2.4, 0, TAU); c.fill();
+        }
+      },
+      /* r */ (c, f, p, R, a) => {
+        c.strokeStyle = a; c.lineWidth = f.lw * 1.8;
+        [0.4, 0.7, 1].forEach((k, i) => {
+          const rot = p * Math.PI * (1 + i * 0.6) * (i % 2 ? -1 : 1);
+          c.beginPath(); c.arc(0, 0, R * k * ease(p), rot, rot + Math.PI); c.stroke();
+        });
+      },
+      /* s */ (c, f, p, R, a) => {
+        const amp = R * 0.45 * (1 - p), x0 = -f.x, x1 = W - f.x;
+        c.beginPath();
+        for (let x = x0; x <= x1; x += 10) {
+          const yy = Math.sin(x / (R * 0.32) - p * 14) * amp;
+          if (x === x0) c.moveTo(x, yy); else c.lineTo(x, yy);
+        }
+        c.strokeStyle = a; c.lineWidth = f.lw * 1.6; c.stroke();
+      },
+      /* t */ (c, f, p, R, a) => {
+        c.fillStyle = a;
+        for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+          const delay = (i + j + 2) * 0.1;
+          const k = Math.sin(clamp01((p - delay) / 0.6) * Math.PI);
+          c.beginPath(); c.arc(i * R * 0.42, j * R * 0.42, f.lw * 0.8 + R * 0.12 * k, 0, TAU); c.fill();
+        }
+      },
+      /* u */ (c, f, p, R, a, b) => {
+        const e = ease(p), start = -Math.PI / 2;
+        c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, R * 0.9, start, start + TAU * e); c.closePath();
+        c.fillStyle = a; c.fill(); c.strokeStyle = b; c.lineWidth = f.lw; c.stroke();
+      },
+      /* v */ (c, f, p, R, a) => {
+        const e = ease(p), s = R * 0.42;
+        c.strokeStyle = a; c.lineWidth = f.lw * 1.8; c.lineCap = 'butt';
+        for (let i = 0; i < 3; i++) {
+          const y = -R * e * (0.15 + 0.38 * i) + R * 0.3;
+          c.beginPath(); c.moveTo(-s, y + s * 0.6); c.lineTo(0, y); c.lineTo(s, y + s * 0.6); c.stroke();
+        }
+        c.lineCap = 'round';
+      },
+      /* w */ (c, f, p, R, a, b) => {
+        const e = ease(p);
+        c.rotate(p * 2.2);
+        for (let i = 0; i < 6; i++) {
+          c.rotate(TAU / 6);
+          c.beginPath(); c.ellipse(R * 0.5 * e, 0, R * 0.45 * e, R * 0.16 * e, 0, 0, TAU);
+          c.fillStyle = a; c.fill(); c.strokeStyle = b; c.lineWidth = f.lw * 0.8; c.stroke();
+        }
+      },
+      /* x */ (c, f, p, R, a) => {
+        const e = ease(p);
+        c.strokeStyle = a; c.lineWidth = f.lw * 2.4;
+        for (let i = 0; i < 4; i++) {
+          const ang = Math.PI / 4 + i * Math.PI / 2;
+          c.beginPath();
+          c.moveTo(Math.cos(ang) * R * 0.15 * e, Math.sin(ang) * R * 0.15 * e);
+          c.lineTo(Math.cos(ang) * R * 1.3 * e, Math.sin(ang) * R * 1.3 * e);
+          c.stroke();
+        }
+      },
+      /* y */ (c, f, p, R, a, b) => {
+        const e = ease(p);
+        poly(c, 8, R * 1.3 * (1 - e), p * Math.PI / 2); c.strokeStyle = a; c.lineWidth = f.lw * 1.8; c.stroke();
+        poly(c, 8, R * 0.65 * (1 - e), -p * Math.PI / 2); c.strokeStyle = b; c.stroke();
+      },
+      /* z */ (c, f, p, R, a) => {
+        const n = Math.max(2, Math.ceil(f.bolt.length * clamp01(p * 3)));
+        c.beginPath();
+        for (let i = 0; i < n; i++) {
+          const pt = f.bolt[i];
+          if (i) c.lineTo(pt[0] * R, pt[1] * R); else c.moveTo(pt[0] * R, pt[1] * R);
+        }
+        c.strokeStyle = a; c.lineWidth = f.lw * 2.2; c.lineJoin = 'miter'; c.stroke(); c.lineJoin = 'round';
+      },
+    ];
+
+    function spawn(key, x, y) {
+      const pal = PALETTES[paletteIndex];
+      const f = {
+        shape: key.shape, x, y, t0: performance.now(), dur: 950,
+        a: pal.colors[key.shape % 5], b: pal.colors[(key.shape + 2) % 5], lw: 3,
+      };
+      if (key.shape === 25) {
+        // seeded zigzag from above the point down to it (unit = R)
+        const segs = 9, pts = [];
+        for (let i = 0; i < segs; i++) {
+          const t = i / (segs - 1);
+          pts.push([i === segs - 1 ? 0 : (((i * 37) % 11) / 11 - 0.5) * 0.5, -1.6 * (1 - t)]);
+        }
+        f.bolt = pts;
+      }
+      if (fxList.length >= 40) fxList.shift();
+      fxList.push(f);
+    }
+
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = window.innerWidth; H = window.innerHeight;
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    let lastFrame = performance.now();
+    function frame(now) {
+      const dt = Math.min(0.05, (now - lastFrame) / 1000);
+      lastFrame = now;
+
+      // background eases toward the palette and swells on each quarter note
+      for (let i = 0; i < 3; i++) {
+        bgNow[i] += (bgTarget[i] - bgNow[i]) * 0.12;
+        pulseNow[i] += (pulseTarget[i] - pulseNow[i]) * 0.12;
+      }
+      pulse *= Math.exp(-dt * 5.5);
+      const amp = Math.min(1, pulse) * (reduceMotion ? 0.25 : 0.2) + Math.max(0, pulse - 1) * 0.3;
+      const mix = bgNow.map((c, i) => c + (pulseNow[i] - c) * amp);
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = rgbStr(mix);
+      ctx.fillRect(0, 0, W, H);
+
+      // faint touch-zone seams so the invisible grid is discoverable
+      ctx.strokeStyle = PALETTES[paletteIndex].ink;
+      ctx.globalAlpha = 0.05;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, H / 3); ctx.lineTo(W, H / 3);
+      ctx.moveTo(0, H * 2 / 3); ctx.lineTo(W, H * 2 / 3);
+      ctx.stroke();
+
+      // drop finished animations
+      for (let i = fxList.length - 1; i >= 0; i--) {
+        if (now - fxList[i].t0 >= fxList[i].dur) fxList.splice(i, 1);
+      }
+
+      // a lone hit stays sharp and opaque; a crowd softens and glows
+      const target = clamp01((fxList.length - 1) / 6);
+      soft += (target - soft) * 0.2;
+      const R = Math.min(W, H) * 0.27;
+      const lwBase = Math.max(2.5, Math.min(W, H) * 0.0065) * (1 - soft * 0.3);
+
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      for (const f of fxList) {
+        const p = clamp01((now - f.t0) / f.dur);
+        const fade = p < 0.55 ? 1 : 1 - (p - 0.55) / 0.45;
+        ctx.save();
+        ctx.translate(f.x, f.y);
+        ctx.globalAlpha = fade * (1 - soft * 0.4);
+        ctx.shadowColor = f.a;
+        ctx.shadowBlur = soft * 16;
+        f.lw = lwBase;
+        SHAPES[f.shape](ctx, f, p, R, f.a, f.b);
+        ctx.restore();
+      }
+      requestAnimationFrame(frame);
+    }
+
+    // ── input ────────────────────────────────────────────────────────
+    window.addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        if (!e.repeat) nextPalette();
+        return;
+      }
+      if (e.repeat) return;
+      const letter = e.key.length === 1 ? e.key.toLowerCase() : '';
+      if (!KEYS[letter]) return;
+      e.preventDefault();
+      pressLetter(letter);
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.key === ' ') e.preventDefault();
+    });
+
+    const lastCell = new Map();
+    canvas.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetic or already-ended pointer */ }
+      const letter = cellAt(e.clientX, e.clientY);
+      lastCell.set(e.pointerId, letter);
+      fire(KEYS[letter], e.clientX, e.clientY);
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!lastCell.has(e.pointerId)) return;
+      const letter = cellAt(e.clientX, e.clientY);
+      if (letter === lastCell.get(e.pointerId)) return;
+      lastCell.set(e.pointerId, letter);
+      fire(KEYS[letter], e.clientX, e.clientY);
+    });
+    const release = (e) => lastCell.delete(e.pointerId);
+    canvas.addEventListener('pointerup', release);
+    canvas.addEventListener('pointercancel', release);
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    const instantBtn = document.getElementById('mode-instant');
+    const quantBtn = document.getElementById('mode-quantize');
+    function setMode(next) {
+      mode = next;
+      instantBtn.setAttribute('aria-pressed', String(next === 'instant'));
+      quantBtn.setAttribute('aria-pressed', String(next === 'quantize'));
+      live.textContent = next === 'quantize' ? 'sixteenth-note quantize on' : 'instant trigger on';
+    }
+    instantBtn.addEventListener('click', () => { setMode('instant'); instantBtn.blur(); });
+    quantBtn.addEventListener('click', () => { setMode('quantize'); quantBtn.blur(); });
+    const paletteBtn = document.getElementById('palette-btn');
+    paletteBtn.addEventListener('click', () => { nextPalette(); paletteBtn.blur(); });
+
+    window.addEventListener('resize', resize);
+    resize();
+    applyPalette(0, false);
+    pulse = 0;
+    requestAnimationFrame(frame);
+  })();
+  </script>
+</body>
+</html>
