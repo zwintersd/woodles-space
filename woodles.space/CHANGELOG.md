@@ -18,6 +18,21 @@ so it's not easy to forget.
 
 ---
 
+## 2026-11-27
+
+- **groove mode plays more like an instrument** — the loop now exists
+  because you're playing: it starts with a kick and pad on your first hit,
+  brings in bass, then drums, then an arpeggio and downbeat flashes as you
+  play more, and fades out a few seconds after you stop. keys no longer
+  have fixed pitches — each one is a rung on the current chord (C · Am · F ·
+  G), so the same key follows the progression and always lands, and the
+  a–l row plays short three-note phrases that lock to the beat. your notes
+  are now well above the backing (the bells were about 16 dB under it),
+  and the backing dips on every hit. typed letters land anywhere on screen
+  at random angles, shapes are nearly twice as big, and tom, clap and zap
+  flash the whole screen (at most three times a second; off with reduced
+  motion).
+
 ## 2026-11-26
 
 - **groove mode in the piano** — "groove mode →" at the top of the piano (or

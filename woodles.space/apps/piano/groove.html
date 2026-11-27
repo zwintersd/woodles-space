@@ -171,30 +171,60 @@
       return;
     }
 
-    // ── key map ───────────────────────────────────────────────────────
-    // C major pentatonic across two octaves. every melodic key and every
-    // tuned hit below lands on C D E G A, and the backing chords are built
-    // only from those same five pitch classes, so nothing can clash.
+    // ── harmony ───────────────────────────────────────────────────────
+    // a key names a rung on the current chord's ladder, not a fixed pitch,
+    // so every press lands on a chord tone and the same key moves with the
+    // progression. tones are [root, third, fifth, colour] as pitch classes.
     const BPM = 115;
     const SIXTEENTH = 60 / BPM / 4;
-    const SCALE = ['C4', 'D4', 'E4', 'G4', 'A4', 'C5', 'D5', 'E5', 'G5', 'A5', 'C6'];
-    const ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+    const BAR = SIXTEENTH * 16;
+    const CHORDS = [
+      { tones: [0, 4, 7, 2],  bass: 'C2', notes: ['C3', 'E3', 'G3', 'D4'] },  // Cadd9
+      { tones: [9, 0, 4, 7],  bass: 'A1', notes: ['A2', 'C3', 'E3', 'G3'] },  // Am7
+      { tones: [5, 9, 0, 4],  bass: 'F1', notes: ['F2', 'A2', 'C3', 'E3'] },  // Fmaj7
+      { tones: [7, 11, 2, 9], bass: 'G1', notes: ['G2', 'B2', 'D3', 'A3'] },  // Gadd9
+    ];
+    function ladder(chord, fromMidi, count) {
+      const out = [];
+      for (let m = fromMidi; out.length < count; m++) if (chord.tones.includes(m % 12)) out.push(m);
+      return out;
+    }
+    CHORDS.forEach((c) => {
+      c.lead = ladder(c, 55, 10);  // G3 up, one rung per q–p key
+      c.bell = ladder(c, 60, 13);  // C4 up, with headroom for phrases
+    });
+    const hz = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
+    const pitch = (pc, octave) => 12 * (octave + 1) + pc;
 
-    // q–p lead plucks (C4–A5), a–l bells (E4–C6), z–m percussive + vocal hits
+    // each bell key plays a three-note phrase of ladder offsets
+    const PHRASES = [[0, 1, 2], [0, 2, 1], [2, 1, 0], [0, 1, 3], [1, 0, 2]];
+
+    const ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+    // q–p lead plucks, a–l bell phrases, z–m percussive + vocal hits
     const HITS = ['tom', 'clap', 'hat', 'rim', 'ooh', 'ahh', 'zap'];
+    const FLASH_VOICES = new Set(['tom', 'clap', 'zap']);
     const KEYS = {};
     ROWS.forEach((row, r) => {
       [...row].forEach((letter, c) => {
-        let voice, note;
-        if (r === 0) { voice = 'lead'; note = SCALE[c]; }
-        else if (r === 1) { voice = 'bell'; note = SCALE[c + 2]; }
-        else { voice = HITS[c]; }
+        const voice = r === 0 ? 'lead' : r === 1 ? 'bell' : HITS[c];
         KEYS[letter] = {
-          letter, voice, note, row: r, col: c, cols: row.length,
+          letter, voice, row: r, col: c, cols: row.length,
           shape: letter.charCodeAt(0) - 97,
         };
       });
     });
+
+    // ── activity ──────────────────────────────────────────────────────
+    // the loop only exists while you play: hits over the last two bars pick
+    // how many layers run, and it fades then stops once you go quiet
+    const LAYER_AT = [4, 8, 14];   // hits for bass, then drums, then arp + stabs
+    const IDLE_FADE = 5;           // seconds without a hit before the fade
+    const IDLE_STOP = 8;
+    const hitTimes = [];
+    let lastHit = -Infinity;
+    let layer = 0;
+    let fading = false;
+    let running = false;  // transport.state lags a start scheduled a few ms ahead
 
     // ── palettes: five high-contrast looks, each paired with a pad timbre ─
     const PALETTES = [
@@ -216,6 +246,8 @@
     let mode = 'instant';
     let pulse = 0;
     let soft = 0;
+    let flash = null;
+    let lastFlash = -Infinity;
     const fxList = [];
     const bgNow = hexToRgb(PALETTES[0].bg);
     const pulseNow = hexToRgb(PALETTES[0].pulse);
@@ -279,14 +311,6 @@
         envelope: { attack: 0.03, decay: 0.3, sustain: 0.55, release: 0.8 } }) },
     ];
 
-    // every chord tone and bass root is one of C D E G A
-    const CHORDS = [
-      { bass: 'C2', notes: ['C3', 'E3', 'G3', 'D4'] },
-      { bass: 'A1', notes: ['A2', 'C3', 'E3', 'G3'] },
-      { bass: 'G1', notes: ['G2', 'D3', 'A3', 'E4'] },
-      { bass: 'E2', notes: ['E3', 'G3', 'D4', 'A4'] },
-    ];
-
     const v = {};
     function buildAudio() {
       const master = new Tone.Limiter(-1).toDestination();
@@ -299,10 +323,14 @@
       bus.connect(send);
       v.bus = bus;
 
-      // backing bus is kept below the play bus so your notes sit on top
-      const back = new Tone.Gain(0.8);
-      back.connect(comp);
-      back.connect(send);
+      // backing sits well under the play bus, dips on every hit (duck), and
+      // fades out when you stop playing (fade)
+      const back = new Tone.Gain(0.42);
+      v.duck = new Tone.Gain(1);
+      v.fade = new Tone.Gain(1);
+      back.chain(v.duck, v.fade);
+      v.fade.connect(comp);
+      v.fade.connect(send);
       v.padFilter = new Tone.Filter(TIMBRES[0].cutoff, 'lowpass').connect(back);
       v.pads = TIMBRES.map((t) => {
         const synth = t.make();
@@ -330,13 +358,18 @@
         envelope: { attack: 0.002, decay: 0.12, sustain: 0 },
       }).chain(new Tone.Filter(1600, 'bandpass'), back);
       v.bclap.volume.value = -26;
+      v.arp = new Tone.Synth({
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.003, decay: 0.14, sustain: 0, release: 0.12 },
+      }).connect(back);
+      v.arp.volume.value = -18;
 
       // play voices
       v.lead = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'sawtooth' },
         envelope: { attack: 0.003, decay: 0.22, sustain: 0.06, release: 0.3 },
       });
-      v.lead.volume.value = -12;
+      v.lead.volume.value = -3;
       v.lead.chain(new Tone.Filter(4200, 'lowpass'), bus);
       v.bell = new Tone.PolySynth(Tone.FMSynth, {
         harmonicity: 3.01, modulationIndex: 7,
@@ -344,53 +377,69 @@
         envelope: { attack: 0.002, decay: 0.9, sustain: 0, release: 0.9 },
         modulationEnvelope: { attack: 0.002, decay: 0.3, sustain: 0, release: 0.2 },
       });
-      v.bell.volume.value = -14;
+      v.bell.volume.value = 0;
       v.bell.connect(bus);
 
       v.tom = new Tone.MembraneSynth({
         pitchDecay: 0.06, octaves: 3,
         envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.2 },
       }).connect(bus);
-      v.tom.volume.value = -6;
+      v.tom.volume.value = -4;
       v.clap = new Tone.NoiseSynth({
         noise: { type: 'white' },
         envelope: { attack: 0.001, decay: 0.15, sustain: 0 },
       }).chain(new Tone.Filter(1900, 'bandpass'), bus);
-      v.clap.volume.value = -8;
+      v.clap.volume.value = -2;
       v.hat = new Tone.MetalSynth({
         envelope: { attack: 0.001, decay: 0.07, release: 0.02 },
         harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5,
       }).connect(bus);
-      v.hat.volume.value = -22;
+      v.hat.volume.value = -9;
       v.rim = new Tone.MembraneSynth({
         pitchDecay: 0.008, octaves: 2,
         envelope: { attack: 0.001, decay: 0.07, sustain: 0, release: 0.05 },
       }).connect(bus);
-      v.rim.volume.value = -8;
+      v.rim.volume.value = -2;
       v.ooh = makeFormantVoice([300, 870, 2240], bus);
       v.ahh = makeFormantVoice([800, 1150, 2900], bus);
-      v.ooh.volume.value = -10;
-      v.ahh.volume.value = -10;
+      v.ooh.volume.value = -1;
+      v.ahh.volume.value = -1;
       v.zap = new Tone.MembraneSynth({
         pitchDecay: 0.09, octaves: 6,
         envelope: { attack: 0.001, decay: 0.22, sustain: 0, release: 0.1 },
       }).connect(bus);
-      v.zap.volume.value = -9;
+      v.zap.volume.value = -5;
 
-      // 4 bars of 16ths: kick on the beat, hats on the off-beat, chord + stab
+      // 4 bars of 16ths. layer 1: kick + pad. 2: + bass. 3: + hats, clap.
+      // 4: + arp, pad stab, bass pop and a colour flash on each downbeat
       const steps = Array.from({ length: 64 }, (_, i) => i);
       v.seq = new Tone.Sequence((time, step) => {
         const bar = Math.floor(step / 16);
         const s = step % 16;
         const chord = CHORDS[bar];
         const pad = v.pads[paletteIndex];
+        if (s % 4 === 0) layer = layerAt(time);
+        if (layer === 0) return;
         if (s === 0) pad.triggerAttackRelease(chord.notes, '1m', time, 0.7);
-        if (s === 10) pad.triggerAttackRelease(chord.notes, '8n', time, 0.45);
         if (s % 4 === 0) v.kick.triggerAttackRelease('C1', '8n', time, 0.9);
-        if (s % 4 === 2) v.bhat.triggerAttackRelease(250, 0.04, time, 0.8);
-        if (s === 4 || s === 12) v.bclap.triggerAttackRelease(0.1, time, 0.7);
-        if (s === 0 || s === 6 || s === 10) v.bass.triggerAttackRelease(chord.bass, '8n', time, 0.9);
-        if (s === 14) v.bass.triggerAttackRelease(Tone.Frequency(chord.bass).transpose(12), '16n', time, 0.6);
+        if (layer >= 2) {
+          if (s === 0 || s === 6 || s === 10) v.bass.triggerAttackRelease(chord.bass, '8n', time, 0.9);
+        }
+        if (layer >= 3) {
+          if (s % 4 === 2) v.bhat.triggerAttackRelease(250, 0.04, time, 0.8);
+          if (s === 4 || s === 12) v.bclap.triggerAttackRelease(0.1, time, 0.7);
+        }
+        if (layer >= 4) {
+          if (s === 10) pad.triggerAttackRelease(chord.notes, '8n', time, 0.45);
+          if (s === 14) v.bass.triggerAttackRelease(Tone.Frequency(chord.bass).transpose(12), '16n', time, 0.6);
+          if (s % 2 === 0) {
+            const n = Tone.Frequency(chord.notes[(s / 2) % 4]).transpose(24);
+            v.arp.triggerAttackRelease(n, '16n', time, 0.5);
+          }
+          if (s === 0) {
+            Tone.Draw.schedule(() => flashScreen(PALETTES[paletteIndex].colors[bar % 5], 0.3), time);
+          }
+        }
         if (s % 4 === 0) {
           Tone.Draw.schedule(() => { pulse = s === 0 ? 1 : 0.7; }, time);
         }
@@ -398,18 +447,98 @@
       v.seq.start(0);
     }
 
+    function layerAt(time) {
+      if (time - lastHit > IDLE_FADE + 1) return 0;
+      let n = 0;
+      for (const t of hitTimes) if (t > time - BAR * 2 && t <= time + 0.2) n++;
+      return 1 + LAYER_AT.filter((need) => n >= need).length;
+    }
+
+    function noteHit() {
+      const now = Tone.now();
+      lastHit = now;
+      hitTimes.push(now);
+      while (hitTimes.length && now - hitTimes[0] > BAR * 2) hitTimes.shift();
+    }
+
+    // bring the loop back (or keep it) when a hit arrives after a quiet spell
+    function wakeLoop() {
+      if (!audio.ready) return;
+      const t = Tone.getTransport();
+      if (fading) {
+        fading = false;
+        v.fade.gain.cancelScheduledValues(Tone.now());
+        v.fade.gain.rampTo(1, 0.06);
+      }
+      if (!running) {
+        running = true;
+        t.position = 0;
+        t.start('+0.02');
+      }
+      // a fresh first hit gets its beat right away instead of at the next quarter
+      if (layer === 0) layer = 1;
+    }
+
+    setInterval(() => {
+      if (!audio.ready) return;
+      const t = Tone.getTransport();
+      if (!running) return;
+      const idle = Tone.now() - lastHit;
+      if (idle > IDLE_STOP) {
+        t.stop();
+        running = false;
+        layer = 0;
+      } else if (idle > IDLE_FADE && !fading) {
+        fading = true;
+        v.fade.gain.rampTo(0, IDLE_STOP - IDLE_FADE - 0.5);
+      }
+    }, 200);
+
+    function chordAt(time) {
+      const t = Tone.getTransport();
+      if (t.state !== 'started') return CHORDS[0];
+      // a hit just ahead of a bar line belongs to the chord that's arriving
+      const pos = Math.max(0, t.getSecondsAtTime(time) + SIXTEENTH * 0.5);
+      return CHORDS[Math.floor(pos / BAR) % CHORDS.length];
+    }
+
+    // the dip that lets each hit punch through the backing
+    function duck(time) {
+      const g = v.duck.gain;
+      g.cancelAndHoldAtTime(time);
+      g.linearRampToValueAtTime(0.55, time + 0.012);
+      g.linearRampToValueAtTime(1, time + 0.22);
+    }
+
+    // first note right away, the rest of a phrase locked to the 16th grid
+    function phraseTimes(time, n) {
+      const out = [time];
+      const synced = Tone.getTransport().state === 'started';
+      let next = synced ? gridAfter(time + SIXTEENTH * 0.5) : time + SIXTEENTH;
+      for (let i = 1; i < n; i++) { out.push(next); next += SIXTEENTH; }
+      return out;
+    }
+
     function playVoice(key, time) {
-      const n = key.note;
+      const chord = chordAt(time);
+      const [root, third] = chord.tones;
+      duck(time);
       switch (key.voice) {
-        case 'lead': v.lead.triggerAttackRelease(n, '8n', time, 0.85); break;
-        case 'bell': v.bell.triggerAttackRelease(n, '4n', time, 0.8); break;
-        case 'tom': v.tom.triggerAttackRelease('G2', '8n', monoTime('tom', time), 1); break;
+        case 'lead': v.lead.triggerAttackRelease(hz(chord.lead[key.col]), '8n', time, 0.85); break;
+        case 'bell': {
+          const phrase = PHRASES[key.col % PHRASES.length];
+          phraseTimes(time, phrase.length).forEach((at, i) => {
+            v.bell.triggerAttackRelease(hz(chord.bell[key.col + phrase[i]]), '8n', at, i ? 0.6 : 0.85);
+          });
+          break;
+        }
+        case 'tom': v.tom.triggerAttackRelease(hz(pitch(root, 2)), '8n', monoTime('tom', time), 1); break;
         case 'clap': v.clap.triggerAttackRelease(0.12, monoTime('clap', time), 1); break;
         case 'hat': v.hat.triggerAttackRelease(300, 0.06, monoTime('hat', time), 0.9); break;
         case 'rim': v.rim.triggerAttackRelease('G5', 0.05, monoTime('rim', time), 1); break;
-        case 'ooh': v.ooh.triggerAttackRelease('G4', '8n', monoTime('ooh', time), 0.9); break;
-        case 'ahh': v.ahh.triggerAttackRelease('E4', '8n', monoTime('ahh', time), 0.9); break;
-        case 'zap': v.zap.triggerAttackRelease('C5', '8n', monoTime('zap', time), 0.9); break;
+        case 'ooh': v.ooh.triggerAttackRelease(hz(pitch(root, 4)), '8n', monoTime('ooh', time), 0.9); break;
+        case 'ahh': v.ahh.triggerAttackRelease(hz(pitch(third, 4)), '8n', monoTime('ahh', time), 0.9); break;
+        case 'zap': v.zap.triggerAttackRelease(hz(pitch(root, 5)), '8n', monoTime('zap', time), 0.9); break;
       }
     }
 
@@ -419,7 +548,6 @@
         audio.starting = Tone.start().then(() => {
           Tone.getTransport().bpm.value = BPM;
           buildAudio();
-          Tone.getTransport().start('+0.06');
           audio.ready = true;
           wake.classList.add('gone');
         });
@@ -429,19 +557,21 @@
 
     // next 16th-note gridline, measured against the live transport so a
     // quantized hit lands exactly on the same clock as the kick and hats
-    function nextGrid() {
-      const t = Tone.getTransport();
-      const from = Tone.immediate() + 0.012;
-      const pos = t.getSecondsAtTime(from);
+    function gridAfter(from) {
+      const pos = Tone.getTransport().getSecondsAtTime(from);
       const idx = Math.ceil(pos / SIXTEENTH - 1e-6);
       return from + (idx * SIXTEENTH - pos);
     }
+    function nextGrid() {
+      return gridAfter(Tone.immediate() + 0.012);
+    }
 
     // ── triggering ───────────────────────────────────────────────────
-    function layoutPoint(key) {
+    // typed letters land anywhere on screen, so the stage fills up
+    function randomPoint() {
       return {
-        x: W * (key.col + 0.5) / key.cols,
-        y: H * (key.row + 0.5) / 3,
+        x: W * (0.14 + 0.72 * Math.random()),
+        y: H * (0.16 + 0.68 * Math.random()),
       };
     }
 
@@ -451,6 +581,8 @@
         Tone.Draw.schedule(() => spawn(key, x, y), when);
       };
       const go = () => {
+        noteHit();
+        wakeLoop();
         if (mode === 'quantize' && Tone.getTransport().state === 'started') {
           const when = nextGrid();
           playVoice(key, when);
@@ -467,7 +599,7 @@
     function pressLetter(letter) {
       const key = KEYS[letter];
       if (!key) return;
-      const p = layoutPoint(key);
+      const p = randomPoint();
       fire(key, p.x, p.y);
     }
 
@@ -687,12 +819,26 @@
       },
     ];
 
+    // full-screen colour hits, held to at most ~3 a second (wcag 2.3.1)
+    function flashScreen(color, strength) {
+      if (reduceMotion) return;
+      const now = performance.now();
+      if (now - lastFlash < 340) return;
+      lastFlash = now;
+      flash = { color, strength, t0: now };
+    }
+
+    // o and s sweep the full width, so they keep their axis
+    const NO_SPIN = new Set([14, 18]);
+
     function spawn(key, x, y) {
       const pal = PALETTES[paletteIndex];
       const f = {
         shape: key.shape, x, y, t0: performance.now(), dur: 950,
         a: pal.colors[key.shape % 5], b: pal.colors[(key.shape + 2) % 5], lw: 3,
+        rot: NO_SPIN.has(key.shape) ? 0 : Math.random() * TAU,
       };
+      if (FLASH_VOICES.has(key.voice)) flashScreen(f.b, 0.7);
       if (key.shape === 25) {
         // seeded zigzag from above the point down to it (unit = R)
         const segs = 9, pts = [];
@@ -730,6 +876,16 @@
       ctx.shadowBlur = 0;
       ctx.fillStyle = rgbStr(mix);
       ctx.fillRect(0, 0, W, H);
+      if (flash) {
+        const k = (now - flash.t0) / 260;
+        if (k >= 1) flash = null;
+        else {
+          ctx.globalAlpha = flash.strength * (1 - k) * (1 - k);
+          ctx.fillStyle = flash.color;
+          ctx.fillRect(0, 0, W, H);
+          ctx.globalAlpha = 1;
+        }
+      }
 
       // faint touch-zone seams so the invisible grid is discoverable
       ctx.strokeStyle = PALETTES[paletteIndex].ink;
@@ -748,8 +904,8 @@
       // a lone hit stays sharp and opaque; a crowd softens and glows
       const target = clamp01((fxList.length - 1) / 6);
       soft += (target - soft) * 0.2;
-      const R = Math.min(W, H) * 0.27;
-      const lwBase = Math.max(2.5, Math.min(W, H) * 0.0065) * (1 - soft * 0.3);
+      const R = Math.min(W, H) * 0.48;
+      const lwBase = Math.max(3, Math.min(W, H) * 0.009) * (1 - soft * 0.3);
 
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -758,6 +914,7 @@
         const fade = p < 0.55 ? 1 : 1 - (p - 0.55) / 0.45;
         ctx.save();
         ctx.translate(f.x, f.y);
+        ctx.rotate(f.rot);
         ctx.globalAlpha = fade * (1 - soft * 0.4);
         ctx.shadowColor = f.a;
         ctx.shadowBlur = soft * 16;
@@ -818,6 +975,9 @@
     quantBtn.addEventListener('click', () => { setMode('quantize'); quantBtn.blur(); });
     const paletteBtn = document.getElementById('palette-btn');
     paletteBtn.addEventListener('click', () => { nextPalette(); paletteBtn.blur(); });
+
+    // read-only handle for e2e: the voices and the current backing layer
+    window.__groove = { voices: v, get layer() { return layer; }, get running() { return running; } };
 
     window.addEventListener('resize', resize);
     resize();
