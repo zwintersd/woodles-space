@@ -73,6 +73,50 @@ test.describe('piano groove mode', () => {
 		await expect.poll(groove).toEqual({ layer: 1, running: true });
 	});
 
+	test('cat mode meows over the backing and plays every letter without errors', async ({ page }) => {
+		await expectNoPageErrors(page, async () => {
+			await page.goto('/piano/groove');
+			const cat = page.locator('#cat-btn');
+			await expect(cat).toHaveAttribute('aria-pressed', 'false');
+			await cat.click();
+			await expect(cat).toHaveAttribute('aria-pressed', 'true');
+
+			await page.keyboard.press('q');
+			await page.evaluate(() => {
+				const Tone = (window as any).Tone;
+				const meter = new Tone.Meter({ smoothing: 0 });
+				Tone.getDestination().connect(meter);
+				(window as any).peakOver = (ms: number) =>
+					new Promise<number>((resolve) => {
+						let peak = -Infinity;
+						const iv = setInterval(() => { peak = Math.max(peak, meter.getValue()); }, 5);
+						setTimeout(() => { clearInterval(iv); resolve(peak); }, ms);
+					});
+			});
+			for (let i = 0; i < 20; i++) {
+				await page.keyboard.press('qwertasdfg'[i % 10]);
+				await page.waitForTimeout(140);
+			}
+			await page.waitForTimeout(500);
+			const backing = await page.evaluate(() => (window as any).peakOver(1200));
+			await page.evaluate(() => { (window as any).__groove.voices.fade.gain.value = 0; });
+			await page.waitForTimeout(400);
+			const meow = page.evaluate(() => (window as any).peakOver(600));
+			await page.keyboard.press('q');
+			expect(await meow, `meow vs backing ${backing}`).toBeGreaterThan(backing + 3);
+
+			for (const letter of 'abcdefghijklmnopqrstuvwxyz') await page.keyboard.press(letter);
+			for (let i = 0; i < 5; i++) await page.keyboard.press('Space');
+			await cat.click();
+			await expect(cat).toHaveAttribute('aria-pressed', 'false');
+		});
+	});
+
+	test('?cat opens straight into cat mode', async ({ page }) => {
+		await page.goto('/piano/groove?cat');
+		await expect(page.locator('#cat-btn')).toHaveAttribute('aria-pressed', 'true');
+	});
+
 	test('toggles between instant and 16th-note quantize', async ({ page }) => {
 		await page.goto('/piano/groove');
 		const instant = page.locator('#mode-instant');
