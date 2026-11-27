@@ -16,44 +16,61 @@ test.describe('piano groove mode', () => {
 		});
 	});
 
-	test('space swaps the backing groove on the next bar line', async ({ page }) => {
+	test('your notes sit clearly above the full backing loop', async ({ page }) => {
 		await page.goto('/piano/groove');
 		await page.keyboard.press('q');
-		const bpm = () => page.evaluate(() => (window as any).Tone.getTransport().bpm.value);
-		expect(await bpm()).toBe(115);
+		await page.evaluate(() => {
+			const Tone = (window as any).Tone;
+			const meter = new Tone.Meter({ smoothing: 0 });
+			Tone.getDestination().connect(meter);
+			(window as any).peakOver = (ms: number) =>
+				new Promise<number>((resolve) => {
+					let peak = -Infinity;
+					const iv = setInterval(() => { peak = Math.max(peak, meter.getValue()); }, 5);
+					setTimeout(() => { clearInterval(iv); resolve(peak); }, ms);
+				});
+		});
 
-		await page.keyboard.press('Space');
-		await expect(page.locator('#live')).toHaveText(/kawaii future bass, 128 bpm/);
-		// drums mute now; the tempo only changes once the bar rolls over (<= ~2.1s)
-		await expect.poll(bpm, { timeout: 5000 }).toBe(128);
+		// play enough to bring every backing layer in, then listen to it alone
+		for (let i = 0; i < 20; i++) {
+			await page.keyboard.press('qwertasdfg'[i % 10]);
+			await page.waitForTimeout(140);
+		}
+		await page.waitForTimeout(500);
+		expect(await page.evaluate(() => (window as any).__groove.layer)).toBeGreaterThanOrEqual(3);
+		const backing = await page.evaluate(() => (window as any).peakOver(1200));
+
+		const solo = async (letter: string) => {
+			await page.evaluate(() => { (window as any).__groove.voices.fade.gain.value = 0; });
+			await page.waitForTimeout(400);
+			const peak = page.evaluate(() => (window as any).peakOver(500));
+			await page.keyboard.press(letter);
+			return peak;
+		};
+		for (const letter of ['q', 'a', 'z']) {
+			expect(await solo(letter), `${letter} vs backing ${backing}`).toBeGreaterThan(backing + 3);
+		}
 	});
 
-	test('quantize keeps hits on the 16th grid', async ({ page }) => {
+	test('the loop builds with your playing and stops when you go quiet', async ({ page }) => {
+		test.setTimeout(30_000);
 		await page.goto('/piano/groove');
 		await page.keyboard.press('q');
-		await page.locator('#mode-quantize').click();
-		await page.evaluate(() => {
-			const w = window as any;
-			w.__scheduled = [] as number[];
-			const draw = w.Tone.Draw;
-			const orig = draw.schedule.bind(draw);
-			draw.schedule = (cb: () => void, time: number) => { w.__scheduled.push(time); return orig(cb, time); };
+		const groove = () => page.evaluate(() => {
+			const g = (window as any).__groove;
+			return { layer: g.layer as number, running: g.running as boolean };
 		});
-		for (const letter of 'asdfghj') {
-			await page.keyboard.press(letter);
-			await page.waitForTimeout(37);
+		await expect.poll(groove).toEqual({ layer: 1, running: true });
+
+		for (let i = 0; i < 16; i++) {
+			await page.keyboard.press('asdfg'[i % 5]);
+			await page.waitForTimeout(120);
 		}
-		await page.waitForTimeout(300);
-		const offsets = await page.evaluate(() => {
-			const w = window as any;
-			const t = w.Tone.getTransport();
-			return (w.__scheduled as number[]).map((time) => {
-				const x = t.getTicksAtTime(time) / (t.PPQ / 4);
-				return Math.abs(x - Math.round(x));
-			});
-		});
-		expect(offsets.length).toBeGreaterThanOrEqual(7);
-		for (const off of offsets) expect(off).toBeLessThan(0.01);
+		await expect.poll(async () => (await groove()).layer).toBeGreaterThanOrEqual(3);
+
+		await expect.poll(async () => (await groove()).running, { timeout: 12_000 }).toBe(false);
+		await page.keyboard.press('k');
+		await expect.poll(groove).toEqual({ layer: 1, running: true });
 	});
 
 	test('toggles between instant and 16th-note quantize', async ({ page }) => {
