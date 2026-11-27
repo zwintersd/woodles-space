@@ -143,7 +143,7 @@
   </style>
 </head>
 <body>
-  <canvas id="stage" aria-label="Touch or type letters to play. Space changes colors and sound."></canvas>
+  <canvas id="stage" aria-label="Touch or type letters to play. Space changes colors and the backing groove."></canvas>
 
   <nav class="chrome left" aria-label="Groove navigation">
     <a href="/piano">&larr; piano</a>
@@ -154,7 +154,7 @@
       <button type="button" id="mode-instant" aria-pressed="true" title="play the instant you press">instant</button>
       <button type="button" id="mode-quantize" aria-pressed="false" title="snap each press to the next 16th note">16th</button>
     </div>
-    <button type="button" id="palette-btn" aria-label="Next color palette and sound (space)" title="next palette + sound (space)"><i></i></button>
+    <button type="button" id="palette-btn" aria-label="Next palette and backing groove (space)" title="next palette + groove (space)"><i></i></button>
   </div>
 
   <div id="wake"><span>tap or press any key</span></div>
@@ -273,52 +273,69 @@
       return t;
     }
 
-    function makeFormantVoice(formants, out) {
-      const osc = new Tone.Synth({
-        oscillator: { type: 'sawtooth' },
-        envelope: { attack: 0.012, decay: 0.12, sustain: 0.45, release: 0.14 },
+    // vowel formants (hz): two resonant bandpasses make a synth pop sing
+    const FORMANTS = {
+      ah: [800, 1200], oh: [450, 850], ee: [300, 2300], oo: [350, 800], eh: [530, 1840],
+    };
+
+    function makeVocal(vowel, out) {
+      const osc = new Tone.FMSynth({
+        harmonicity: 1, modulationIndex: 3,
+        oscillator: { type: 'sawtooth' }, modulation: { type: 'square' },
+        envelope: { attack: 0.006, decay: 0.1, sustain: 0.5, release: 0.12 },
+        modulationEnvelope: { attack: 0.001, decay: 0.09, sustain: 0.3, release: 0.1 },
       });
-      const mix = new Tone.Gain(2.6).connect(out);
-      formants.forEach((freq, i) => {
-        const band = new Tone.Filter({ type: 'bandpass', frequency: freq, Q: 7 + i * 2 });
-        const gain = new Tone.Gain([1, 0.55, 0.3][i]);
+      const mix = new Tone.Gain(3.2).connect(out);
+      FORMANTS[vowel].forEach((freq, i) => {
+        const band = new Tone.Filter({ type: 'bandpass', frequency: freq, Q: 9 });
+        const gain = new Tone.Gain(i ? 0.7 : 1);
         osc.chain(band, gain, mix);
       });
       return osc;
     }
 
+    // pad voices, one per groove (the active one plays; the rest are released)
     const TIMBRES = [
-      // warm: detuned saw, soft cutoff
-      { cutoff: 1100, make: () => new Tone.PolySynth(Tone.Synth, {
+      // warm detuned saw
+      () => new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'fatsawtooth', count: 3, spread: 24 },
-        envelope: { attack: 0.22, decay: 0.4, sustain: 0.75, release: 1.2 } }) },
-      // glass: soft fm bells
-      { cutoff: 3200, make: () => new Tone.PolySynth(Tone.FMSynth, {
-        harmonicity: 2, modulationIndex: 1.4,
+        envelope: { attack: 0.22, decay: 0.4, sustain: 0.75, release: 1.2 } }),
+      // supersaw stab
+      () => new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'fatsawtooth', count: 5, spread: 38 },
+        envelope: { attack: 0.01, decay: 0.25, sustain: 0.3, release: 0.25 } }),
+      // fm electric piano
+      () => new Tone.PolySynth(Tone.FMSynth, {
+        harmonicity: 3, modulationIndex: 1.1,
         oscillator: { type: 'sine' }, modulation: { type: 'sine' },
-        envelope: { attack: 0.1, decay: 0.5, sustain: 0.65, release: 1.4 } }) },
-      // organ: am, round and breathy
-      { cutoff: 2000, make: () => new Tone.PolySynth(Tone.AMSynth, {
+        envelope: { attack: 0.005, decay: 1.3, sustain: 0.25, release: 1 },
+        modulationEnvelope: { attack: 0.005, decay: 0.4, sustain: 0.1, release: 0.5 } }),
+      // am organ
+      () => new Tone.PolySynth(Tone.AMSynth, {
         harmonicity: 1.5, oscillator: { type: 'triangle' }, modulation: { type: 'square' },
-        envelope: { attack: 0.06, decay: 0.3, sustain: 0.8, release: 0.9 } }) },
-      // pluck: short triangle stabs
-      { cutoff: 2800, make: () => new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: 'triangle' },
-        envelope: { attack: 0.004, decay: 0.55, sustain: 0.06, release: 0.5 } }) },
-      // hollow: narrow pulse
-      { cutoff: 1500, make: () => new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: 'pulse', width: 0.22 },
-        envelope: { attack: 0.03, decay: 0.3, sustain: 0.55, release: 0.8 } }) },
+        envelope: { attack: 0.05, decay: 0.3, sustain: 0.8, release: 0.7 } }),
+      // narrow pulse
+      () => new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'pulse', width: 0.25 },
+        envelope: { attack: 0.01, decay: 0.2, sustain: 0.35, release: 0.3 } }),
     ];
 
     const v = {};
+    let cur = PRESETS[0];      // the groove that is playing
+    let presetIndex = 0;       // the groove the palette is asking for
+    let pending = null;        // groove waiting for the next bar line
+    let dropout = false;       // drums + bass muted while a swap waits
+
     function buildAudio() {
-      const master = new Tone.Limiter(-1).toDestination();
+      // master: compressor, then a hard ceiling so a 10-key mash can't clip
+      const master = new Tone.Limiter(-3).toDestination();
       const comp = new Tone.Compressor(-20, 3).connect(master);
       const reverb = new Tone.Reverb({ decay: 2.4, preDelay: 0.012 }).connect(comp);
       reverb.wet.value = 1;
       const send = new Tone.Gain(0.3).connect(reverb);
-      const bus = new Tone.Gain(1);
+
+      // play bus: your notes
+      const bus = new Tone.Gain(1.4);
       bus.connect(comp);
       bus.connect(send);
       v.bus = bus;
@@ -338,21 +355,41 @@
         synth.connect(v.padFilter);
         return synth;
       });
-      v.bass = new Tone.Synth({
+      v.kalimba = new Tone.PolySynth(Tone.FMSynth, {
+        harmonicity: 6, modulationIndex: 2.5,
+        oscillator: { type: 'sine' }, modulation: { type: 'sine' },
+        envelope: { attack: 0.002, decay: 0.9, sustain: 0, release: 0.4 },
+        modulationEnvelope: { attack: 0.002, decay: 0.15, sustain: 0, release: 0.1 },
+      });
+      v.kalimba.volume.value = -14;
+      v.kalimba.connect(v.duck);
+      v.pixel = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'square' },
+        envelope: { attack: 0.002, decay: 0.12, sustain: 0, release: 0.08 },
+      });
+      v.pixel.volume.value = -22;
+      v.pixel.chain(new Tone.Filter(2600, 'lowpass'), v.duck);
+
+      // layer 1, sub: filtered triangle, fast decay, ~280 hz ceiling
+      v.bass = new Tone.MonoSynth({
         oscillator: { type: 'triangle' },
-        envelope: { attack: 0.01, decay: 0.3, sustain: 0.5, release: 0.25 },
-      }).chain(new Tone.Filter(520, 'lowpass'), back);
-      v.bass.volume.value = -10;
+        envelope: { attack: 0.005, decay: 0.25, sustain: 0.2, release: 0.2 },
+        filter: { type: 'lowpass', Q: 1, rolloff: -24 },
+        filterEnvelope: { attack: 0.001, decay: 0.18, sustain: 0.4, release: 0.2, baseFrequency: 90, octaves: 1.6 },
+      }).connect(back);
+      v.bass.volume.value = -6;
+
+      // layer 3, micro-percussion: round kick (110 → 45 hz in 0.08s), noise hats
       v.kick = new Tone.MembraneSynth({
-        pitchDecay: 0.04, octaves: 5,
+        pitchDecay: 0.08, octaves: 110 / 45,
         envelope: { attack: 0.001, decay: 0.28, sustain: 0, release: 0.1 },
       }).connect(back);
-      v.kick.volume.value = -12;
-      v.bhat = new Tone.MetalSynth({
-        envelope: { attack: 0.001, decay: 0.045, release: 0.01 },
-        harmonicity: 5.1, modulationIndex: 32, resonance: 5000, octaves: 1.5,
-      }).connect(back);
-      v.bhat.volume.value = -32;
+      v.kick.volume.value = -8;
+      v.bhat = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.03, sustain: 0 },
+      }).chain(new Tone.Filter(6000, 'highpass'), back);
+      v.bhat.volume.value = -10;
       v.bclap = new Tone.NoiseSynth({
         noise: { type: 'pink' },
         envelope: { attack: 0.002, decay: 0.12, sustain: 0 },
@@ -364,7 +401,15 @@
       }).connect(back);
       v.arp.volume.value = -18;
 
-      // play voices
+      // your voices
+      v.marimba = new Tone.PolySynth(Tone.FMSynth, {
+        harmonicity: 4, modulationIndex: 1.2,
+        oscillator: { type: 'sine' }, modulation: { type: 'sine' },
+        envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.25 },
+        modulationEnvelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.1 },
+      });
+      v.marimba.volume.value = -5;
+      v.marimba.connect(bus);
       v.lead = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'sawtooth' },
         envelope: { attack: 0.003, decay: 0.22, sustain: 0.06, release: 0.3 },
@@ -414,8 +459,8 @@
       // 4: + arp, pad stab, bass pop and a colour flash on each downbeat
       const steps = Array.from({ length: 64 }, (_, i) => i);
       v.seq = new Tone.Sequence((time, step) => {
-        const bar = Math.floor(step / 16);
-        const s = step % 16;
+        const bar = step >> 4;
+        const s = step & 15;
         const chord = CHORDS[bar];
         const pad = v.pads[paletteIndex];
         if (s % 4 === 0) layer = layerAt(time);
@@ -441,7 +486,7 @@
           }
         }
         if (s % 4 === 0) {
-          Tone.Draw.schedule(() => { pulse = s === 0 ? 1 : 0.7; }, time);
+          Tone.Draw.schedule(() => { pulse = s === 0 ? (dropIn ? 1.3 : 1) : 0.7; }, time);
         }
       }, steps, '16n');
       v.seq.start(0);
@@ -546,7 +591,8 @@
       if (audio.ready) return Promise.resolve();
       if (!audio.starting) {
         audio.starting = Tone.start().then(() => {
-          Tone.getTransport().bpm.value = BPM;
+          cur = PRESETS[presetIndex];
+          Tone.getTransport().bpm.value = cur.bpm;
           buildAudio();
           audio.ready = true;
           wake.classList.add('gone');
@@ -610,7 +656,7 @@
       return letters[col];
     }
 
-    // ── palette + timbre ─────────────────────────────────────────────
+    // ── palette + groove ─────────────────────────────────────────────
     function applyPalette(index, announce) {
       paletteIndex = index;
       const p = PALETTES[index];
@@ -620,16 +666,14 @@
       root.setProperty('--bg', p.bg);
       root.setProperty('--ink', p.ink);
       p.colors.forEach((c, i) => root.setProperty('--c' + i, c));
-      if (audio.ready) {
-        v.pads.forEach((s, i) => { if (i !== index) s.releaseAll(Tone.now()); });
-        v.padFilter.frequency.rampTo(TIMBRES[index].cutoff, 0.4);
-      }
       pulse = 1.4;
-      if (announce) live.textContent = 'palette ' + (index + 1) + ' of ' + PALETTES.length;
+      if (announce) live.textContent = PRESETS[index].name + ', ' + PRESETS[index].bpm + ' bpm';
     }
 
     function nextPalette() {
-      applyPalette((paletteIndex + 1) % PALETTES.length, true);
+      const next = (paletteIndex + 1) % PALETTES.length;
+      applyPalette(next, true);
+      requestPreset(next);
     }
 
     // ── visuals ──────────────────────────────────────────────────────
