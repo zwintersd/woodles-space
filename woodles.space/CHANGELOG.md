@@ -20,6 +20,11 @@ so it's not easy to forget.
 
 ## 2026-11-27
 
+- **groove mode loads again** — merging the two groove rewrites left the
+  page throwing on load, so nothing played. it's one design now: the loop
+  still builds up as you play, and space still swaps between the five
+  named grooves, changing tempo and pad on the next bar while bass and
+  drums drop out.
 - **groove mode plays more like an instrument** — the loop now exists
   because you're playing: it starts with a kick and pad on your first hit,
   brings in bass, then drums, then an arpeggio and downbeat flashes as you
