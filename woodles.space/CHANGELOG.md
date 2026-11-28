@@ -20,11 +20,21 @@ so it's not easy to forget.
 
 ## 2026-11-27
 
-- **groove mode loads again** — merging the two groove rewrites left the
-  page throwing on load, so nothing played. it's one design now: the loop
-  still builds up as you play, and space still swaps between the five
-  named grooves, changing tempo and pad on the next bar while bass and
-  drums drop out.
+- **cat mode in groove** — a "cat" toggle at the top right (or
+  `/piano/groove?cat`) turns every key into cat things: q–p meow up the
+  current chord, a–l chirp little three-note trills, and the bottom row
+  purrs, hisses, jingles a collar bell, taps, mrrows, mews and trills. the
+  shapes become cat faces (mouth open mid-meow), happy ^ ^ faces, walking
+  pawprint trails, rings of paws, a big stomp, floating hearts, whiskers,
+  a rolling ball of yarn, a fish and a swishing tail. the backing groove
+  keeps playing underneath.
+- **groove mode loads again, and each groove sounds like itself** —
+  merging the two groove rewrites left the page throwing on load, so
+  nothing played. it's one design now: the loop still builds up as you
+  play, and space swaps between the five named grooves on the next bar,
+  each with its own kick, clap, hat and bass patterns, pad voice, swing
+  (lo-fi kalimba) and arp (kalimba plucks, pixel squares), plus a crash
+  when the new one drops in.
 - **groove mode plays more like an instrument** — the loop now exists
   because you're playing: it starts with a kick and pad on your first hit,
   brings in bass, then drums, then an arpeggio and downbeat flashes as you
